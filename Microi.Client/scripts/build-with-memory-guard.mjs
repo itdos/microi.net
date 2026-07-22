@@ -30,7 +30,8 @@ const esbuildParallelism = Math.max(
     1,
     Math.min(Number.parseInt(process.env.MICROI_ESBUILD_PROCS || '2', 10) || 2, os.cpus().length, 2)
 );
-const buildMemoryBudget = totalMemory * 0.25;
+const buildMemoryNoticeThreshold = totalMemory * 0.25;
+const criticalMemoryUsageRatio = 0.95;
 const rawArgs = process.argv.slice(2);
 const dryRun = rawArgs.includes('--dry-run');
 const legacyOnly = rawArgs.includes('--legacy-only');
@@ -38,6 +39,10 @@ const viteArgs = ['build', ...rawArgs.filter((arg) => arg !== '--dry-run' && arg
 
 function formatGb(bytes) {
     return (bytes / GB).toFixed(1);
+}
+
+function formatPercent(ratio) {
+    return (ratio * 100).toFixed(1);
 }
 
 function nodeOptionsWithHeapLimit(value, limitMb = heapMb) {
@@ -86,6 +91,10 @@ console.log(
     `[Microi build guard] 物理内存 ${formatGb(totalMemory)} GB，可用 ${formatGb(freeMemory)} GB，` +
     `现代构建 Node 堆上限 ${heapMb} MB，esbuild 并行 ${esbuildParallelism}，legacy 子进程堆上限 2048 MB。`
 );
+console.log(
+    `[Microi build guard] 启动前保留内存目标 ${formatGb(reserveMemory)} GB；` +
+    '构建启动后仅在全机内存占用达到 95% 时强制终止。'
+);
 
 if (!existsSync(viteBin)) {
     console.error('[Microi build guard] 未找到本地 Vite，请先执行 npm install。');
@@ -110,23 +119,34 @@ let activeChild = null;
 let activePhaseName = '';
 let phaseStartFreeMemory = freeMemory;
 let lastProgressAt = 0;
+let warnedForPhaseMemory = false;
 const monitor = setInterval(() => {
     if (!activeChild) return;
     const available = os.freemem();
-    const estimatedBuildMemory = Math.max(0, phaseStartFreeMemory - available);
+    const phaseMemoryDrop = Math.max(0, phaseStartFreeMemory - available);
+    const systemMemoryUsageRatio = 1 - available / totalMemory;
     if (Date.now() - lastProgressAt >= 30000) {
         lastProgressAt = Date.now();
         console.log(
             `[Microi build guard] ${activePhaseName}进行中：可用 ${formatGb(available)} GB，` +
-            `本阶段估算占用 ${formatGb(estimatedBuildMemory)} GB。`
+            `全机占用 ${formatPercent(systemMemoryUsageRatio)}%，本阶段可用内存下降 ${formatGb(phaseMemoryDrop)} GB。`
         );
     }
-    if ((available >= reserveMemory && estimatedBuildMemory <= buildMemoryBudget) || stoppedForMemory) return;
+
+    // 可用内存变化还包含 IDE、浏览器和系统缓存，不能据此把阶段下降量当作构建进程树的精确占用。
+    // 超过 25% 时只提示；已启动任务仅在全机内存占用达到 95% 时强制终止。
+    if (phaseMemoryDrop > buildMemoryNoticeThreshold && !warnedForPhaseMemory) {
+        warnedForPhaseMemory = true;
+        console.warn(
+            `[Microi build guard] 本阶段可用内存已下降 ${formatGb(phaseMemoryDrop)} GB，` +
+            `该数值包含其它进程和系统缓存变化；构建继续运行，仅在全机内存占用达到 95% 时终止。`
+        );
+    }
+
+    if (systemMemoryUsageRatio < criticalMemoryUsageRatio || stoppedForMemory) return;
 
     stoppedForMemory = true;
-    const reason = available < reserveMemory
-        ? `可用内存已降至 ${formatGb(available)} GB，低于保护线 ${formatGb(reserveMemory)} GB`
-        : `本次构建估算已消耗 ${formatGb(estimatedBuildMemory)} GB，超过物理内存 25%`;
+    const reason = `全机内存占用已达 ${formatPercent(systemMemoryUsageRatio)}%（可用 ${formatGb(available)} GB）`;
     console.error(`\n[Microi build guard] ${reason}，正在终止构建以保护 VS Code 和系统。`);
     stopProcessTree(activeChild.pid);
 }, 1000);
@@ -145,6 +165,7 @@ function runVitePhase(name, variant, outDir) {
         phaseStartFreeMemory = os.freemem();
         activePhaseName = name;
         lastProgressAt = 0;
+        warnedForPhaseMemory = false;
         if (phaseStartFreeMemory < requiredStartMemory) {
             reject(new Error(
                 `${name} 构建前可用内存不足：至少需要约 ${formatGb(requiredStartMemory)} GB，` +
@@ -212,6 +233,7 @@ function runLegacyConversionPhase() {
         phaseStartFreeMemory = os.freemem();
         activePhaseName = name;
         lastProgressAt = 0;
+        warnedForPhaseMemory = false;
         if (phaseStartFreeMemory < requiredStartMemory) {
             reject(new Error(
                 `${name}前可用内存不足：至少需要约 ${formatGb(requiredStartMemory)} GB，` +

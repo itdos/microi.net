@@ -879,8 +879,10 @@ Microi 项目必须支持用户或项目级形态偏好：`data-mci-shape="round
 - uni-app 页面需要结合 `uni.getSystemInfoSync().statusBarHeight` 或平台导航栏高度，状态栏高度用于占位，内容安全边距仍使用 `env(safe-area-inset-*)` 兜底。
 - 微信小程序中 `env()` 可能返回 `0`，不得把它作为唯一安全区来源；优先读取 `uni.getWindowInfo()` 并把真实值注入页面壳变量。
 - 自定义导航必须读取微信胶囊矩形并预留右侧空间，任何标题、登录、分享或状态按钮都不能与胶囊区域重叠。
+- 全屏弹层、沉浸式工作台和独立工具页同样属于自定义导航场景。右侧存在两个以上操作按钮且无法在胶囊左侧完整容纳时，必须把整组标题与操作区放到 `capsule.top + capsule.height` 下方，禁止把关闭、新建、历史等按钮塞到胶囊背后。
 - 顶部 fixed/sticky 导航使用 `padding-top: max(var(--mci-safe-top), statusBarHeight)` 的等价实现；返回按钮触摸区域要随顶部安全区整体下移。
 - 底部 fixed 操作栏和 tabBar 使用 `padding-bottom: calc(var(--mci-safe-bottom) + 8px)` 或项目等价间距，页面主体同步预留底部高度，避免按钮遮挡列表最后一项。
+- 多层页面必须定义返回优先级：先关闭键盘/确认框，再关闭抽屉/筛选层，再退出全屏工具页，最后才返回底层业务路由。需要支持手机侧滑返回的全屏功能优先实现为独立路由，不能只做覆盖当前页的普通 `fixed` 蒙层。
 - 安卓三键导航、手势导航和 iOS Safari/PWA/WebView 都要截图验收；不能只在 PC 模拟器或单一 iPhone 尺寸上看起来正常。
 
 ### 3. 底部 TabBar

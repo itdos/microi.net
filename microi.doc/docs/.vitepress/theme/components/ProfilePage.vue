@@ -73,7 +73,7 @@
           <article class="stat-card">
             <span>{{ t('tenantCreated') }}</span>
             <strong>{{ tenants.length }}</strong>
-            <small>{{ t('freeQuota', { count: tenantCenter.FreeQuota || 1 }) }}</small>
+            <small>{{ t('freeQuota', { count: tenantDatabaseQuota }) }}</small>
           </article>
           <article class="stat-card">
             <span>{{ t('freeCreate') }}</span>
@@ -131,13 +131,20 @@
         </section>
 
         <section v-if="activeMenu === 'create'" class="content-grid">
-          <form class="content-panel create-panel" @submit.prevent="createTenant">
+          <form class="content-panel create-panel" @submit.prevent="requestTenantCreation">
             <div class="panel-head">
               <div>
                 <h2>{{ canCreateFreeTenant ? t('createFreeTenant') : t('createMoreTenants') }}</h2>
                 <p>{{ canCreateFreeTenant ? t('firstTenantFree') : t('moreTenantPaid') }}</p>
               </div>
             </div>
+            <aside class="star-policy-notice" role="note">
+              <span class="star-policy-notice__icon" aria-hidden="true">★</span>
+              <div>
+                <strong>{{ t('starPolicyTitle') }}</strong>
+                <p>{{ t('starPolicyDescription') }}</p>
+              </div>
+            </aside>
             <div class="form-row">
               <label>{{ t('tenantKey') }}</label>
               <input v-model.trim="tenantKey" :placeholder="t('tenantKeyPlaceholder')" autocomplete="off" />
@@ -149,8 +156,8 @@
               <small>{{ t('systemNameTip') }}</small>
             </div>
             <p v-if="createError" class="error-box">{{ createError }}</p>
-            <button class="primary-action submit" type="submit" :disabled="isCreating || !canCreateFreeTenant">
-              {{ isCreating ? t('creating') : canCreateFreeTenant ? t('createFreeTenant') : t('paymentComing') }}
+            <button ref="createSubmitButton" class="primary-action submit" type="submit" :disabled="isCreating || isCheckingGiteeStar || !canCreateFreeTenant">
+              {{ isCreating ? t('creating') : isCheckingGiteeStar ? t('giteeStarChecking') : canCreateFreeTenant ? t('createFreeTenant') : t('paymentComing') }}
             </button>
           </form>
 
@@ -260,11 +267,46 @@
         <p v-if="profileError" class="page-error">{{ profileError }}</p>
       </template>
     </main>
+
+    <div
+      v-if="showStarReminder"
+      class="star-reminder-backdrop"
+      @click.self="closeStarReminder"
+      @keydown.esc="closeStarReminder"
+    >
+      <section
+        class="star-reminder-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="star-reminder-title"
+        aria-describedby="star-reminder-description"
+      >
+        <button class="star-reminder-close" type="button" :aria-label="t('starReminderClose')" :disabled="isStartingGiteeOAuth" @click="closeStarReminder">×</button>
+        <span class="star-reminder-icon" aria-hidden="true">★</span>
+        <p class="eyebrow">Microi Open Source</p>
+        <h2 id="star-reminder-title">{{ t('starReminderTitle') }}</h2>
+        <p id="star-reminder-description" class="star-reminder-description">{{ t('starReminderDescription') }}</p>
+        <a class="star-project-link" href="https://gitee.com/ITdos/microi.net" target="_blank" rel="noopener noreferrer">
+          gitee.com/ITdos/microi.net
+        </a>
+        <p class="star-reminder-thanks">{{ t('starReminderThanks') }}</p>
+        <p v-if="giteeStarError" class="star-reminder-status" role="alert">{{ giteeStarError }}</p>
+        <div class="star-reminder-actions">
+          <a class="primary-action" href="https://gitee.com/ITdos/microi.net" target="_blank" rel="noopener noreferrer">
+            {{ t('starReminderOpenGitee') }}
+          </a>
+          <button ref="starContinueButton" class="ghost-action star-continue-action" type="button" :disabled="isStartingGiteeOAuth" @click="beginGiteeStarOAuth">
+            {{ isStartingGiteeOAuth ? t('giteeOAuthStarting') : t('starReminderContinue') }}
+          </button>
+        </div>
+        <button class="star-reminder-cancel" type="button" :disabled="isStartingGiteeOAuth" @click="closeStarReminder">{{ t('starReminderCancel') }}</button>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
@@ -287,6 +329,12 @@ const tenantProgress = ref('')
 const createError = ref('')
 const profileError = ref('')
 const profileNotice = ref(null)
+const showStarReminder = ref(false)
+const isStartingGiteeOAuth = ref(false)
+const isCheckingGiteeStar = ref(false)
+const giteeStarError = ref('')
+const createSubmitButton = ref(null)
+const starContinueButton = ref(null)
 const tenantSteps = ref([])
 const tenantProgressTick = ref(Date.now())
 const relayToken = ref({
@@ -315,6 +363,9 @@ let tenantProgressTraceId = ''
 let tenantProgressRestorePending = false
 let openClawAuthBridge = null
 
+const GITEE_STAR_DRAFT_KEY = 'microi_gitee_star_tenant_draft'
+const GITEE_STAR_DRAFT_TTL_MS = 10 * 60 * 1000
+
 const menus = computed(() => [
   { key: 'overview', name: t('overview'), icon: '⌂' },
   { key: 'create', name: t('createTenant'), icon: '+' },
@@ -327,7 +378,7 @@ const routeAliases = { tenants: 'overview', billing: 'overview' }
 
 const tenantStepMessages = {
   'zh-CN': [
-    ['validate', '校验账号与租户Key', '检查登录态、租户Key格式和系统名称。'], ['quota', '检查免费开通额度', '每个账号可免费创建一个租户，第二个起按 9.9 元/年。'],
+    ['validate', '校验账号与租户Key', '检查登录态、租户Key格式和系统名称。'], ['quota', '检查租户数据库额度', '检查当前账号的已用额度与可创建总额度。'],
     ['columns', '检查主库字段', '补齐官网开通所需的租户归属字段。'], ['database-info', '生成数据库信息', '生成数据库名、专属账号名和访问域名，不返回主库连接串。'],
     ['create-database', '创建租户数据库', '创建独立租户库、随机密码账号，并仅授权当前租户库。'], ['import-template', '下载并导入空库模板', '每次都获取最新 microi_empty_mysql57.sql.zip。'],
     ['create-osclient', '写入SaaS引擎配置', '复制主租户公共配置并写入租户域名、连接串和JWT密钥。'], ['owner', '绑定账号与租户', '记录租户归属，后续个人中心按账号展示。'],
@@ -335,7 +386,7 @@ const tenantStepMessages = {
     ['reload', '刷新SaaS引擎缓存', '让新租户无需重启即可访问。']
   ],
   'en-US': [
-    ['validate', 'Validate account and tenant key', 'Check the session, tenant key format, and system name.'], ['quota', 'Check free quota', 'Each account has one free tenant; additional tenants cost ¥9.9/year.'],
+    ['validate', 'Validate account and tenant key', 'Check the session, tenant key format, and system name.'], ['quota', 'Check tenant database quota', 'Check this account\'s used and total tenant database quota.'],
     ['columns', 'Check main database fields', 'Add the ownership fields required by website provisioning.'], ['database-info', 'Generate database information', 'Generate the database name, dedicated account, and domain without exposing the main connection.'],
     ['create-database', 'Create tenant database', 'Create an independent database and a random-password account limited to this tenant database.'], ['import-template', 'Import the empty template', 'Fetch the latest microi_empty_mysql57.sql.zip.'],
     ['create-osclient', 'Write SaaS configuration', 'Copy shared settings and write the domain, connection string, and JWT secret.'], ['owner', 'Bind account and tenant', 'Save tenant ownership for the personal center.'],
@@ -350,7 +401,9 @@ const tokenUsagePercent = computed(() => {
   const used = Math.max(0, Number(relayToken.value.UsedTokens || 0))
   return total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
 })
-const canCreateFreeTenant = computed(() => tenants.value.length < (tenantCenter.value.FreeQuota || 1))
+const tenantDatabaseQuota = computed(() => Math.max(1, Number(tenantCenter.value.TenantDatabaseQuota ?? tenantCenter.value.FreeQuota ?? 1)))
+const tenantUsedQuota = computed(() => Math.max(0, Number(tenantCenter.value.UsedQuota ?? tenants.value.length)))
+const canCreateFreeTenant = computed(() => tenantUsedQuota.value < tenantDatabaseQuota.value)
 const primaryTenantUrl = computed(() => tenants.value[0]?.Url || '')
 const profileName = computed(() => currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || 'Microi吾码')
 const profileInitial = computed(() => String(profileName.value || 'M').trim().slice(0, 1).toUpperCase())
@@ -848,18 +901,220 @@ function localizeServerMessage(message) {
   return text
 }
 
-async function createTenant() {
+function validateTenantCreation() {
   createError.value = ''
   tenantProgress.value = ''
-  if (isCreating.value || !canCreateFreeTenant.value) return
+  if (isCreating.value || isCheckingGiteeStar.value || isStartingGiteeOAuth.value || !canCreateFreeTenant.value) return false
   if (!/^[A-Za-z][A-Za-z0-9_-]*$/.test(tenantKey.value)) {
     createError.value = t('invalidTenantKey')
-    return
+    return false
   }
   if (!systemName.value) {
     createError.value = t('enterSystemName')
+    return false
+  }
+  return true
+}
+
+async function requestTenantCreation() {
+  if (!validateTenantCreation()) return
+  giteeStarError.value = ''
+  isCheckingGiteeStar.value = true
+  let createImmediately = false
+  try {
+    const resp = await authenticatedFetch(apiEngineUrl('official_gitee_star_status'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ TenantKey: tenantKey.value, _Lang: locale.value })
+    })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    if (result.Code !== 1) {
+      createError.value = localizeServerMessage(result.Msg) || t('giteeStarStatusFailed')
+      return
+    }
+
+    const data = result.Data || {}
+    const starRequired = data.Required === true || data.Required === 1 || String(data.Required || '') === '1'
+    if (!starRequired || isVerifiedGiteeStar(data)) {
+      createImmediately = true
+    } else {
+      showStarReminder.value = true
+      await nextTick()
+      starContinueButton.value?.focus()
+    }
+  } catch {
+    createError.value = t('giteeStarStatusFailed')
+  } finally {
+    isCheckingGiteeStar.value = false
+  }
+
+  if (createImmediately) await createTenant()
+}
+
+async function closeStarReminder() {
+  if (isStartingGiteeOAuth.value) return
+  showStarReminder.value = false
+  giteeStarError.value = ''
+  await nextTick()
+  createSubmitButton.value?.focus()
+}
+
+function currentProfileUserId() {
+  return String(currentUser.value?.Id || currentUser.value?.UserId || currentUser.value?.id || '').trim()
+}
+
+function saveGiteeStarTenantDraft() {
+  const userId = currentProfileUserId()
+  if (!userId || typeof window === 'undefined') return false
+  window.sessionStorage.setItem(GITEE_STAR_DRAFT_KEY, JSON.stringify({
+    UserId: userId,
+    TenantKey: tenantKey.value,
+    SystemName: systemName.value,
+    ExpiresAt: Date.now() + GITEE_STAR_DRAFT_TTL_MS
+  }))
+  return true
+}
+
+function consumeGiteeStarTenantDraft() {
+  if (typeof window === 'undefined') return null
+  const raw = window.sessionStorage.getItem(GITEE_STAR_DRAFT_KEY)
+  if (!raw) return null
+  try {
+    const draft = JSON.parse(raw)
+    const valid = String(draft?.UserId || '') === currentProfileUserId()
+      && Number(draft?.ExpiresAt || 0) > Date.now()
+      && /^[A-Za-z][A-Za-z0-9_-]*$/.test(String(draft?.TenantKey || ''))
+      && !!String(draft?.SystemName || '').trim()
+    if (!valid) {
+      window.sessionStorage.removeItem(GITEE_STAR_DRAFT_KEY)
+      return null
+    }
+    window.sessionStorage.removeItem(GITEE_STAR_DRAFT_KEY)
+    return draft
+  } catch {
+    window.sessionStorage.removeItem(GITEE_STAR_DRAFT_KEY)
+    return null
+  }
+}
+
+function isTrustedGiteeAuthorizeUrl(value) {
+  try {
+    const url = new URL(String(value || ''))
+    return url.protocol === 'https:' && url.hostname === 'gitee.com' && url.pathname === '/oauth/authorize'
+  } catch {
+    return false
+  }
+}
+
+async function beginGiteeStarOAuth() {
+  if (isStartingGiteeOAuth.value || isCheckingGiteeStar.value || isCreating.value) return
+  if (!validateTenantCreation()) {
+    showStarReminder.value = false
     return
   }
+  if (!saveGiteeStarTenantDraft()) {
+    giteeStarError.value = t('giteeUserMissing')
+    return
+  }
+
+  isStartingGiteeOAuth.value = true
+  giteeStarError.value = ''
+  try {
+    const resp = await authenticatedFetch(apiEngineUrl('official_gitee_star_oauth_start'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ReturnUrl: `${window.location.origin}/profile.html#/create`,
+        TenantKey: tenantKey.value,
+        _Lang: locale.value
+      })
+    })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    const authorizeUrl = result.Data?.AuthorizeUrl || result.Data?.AuthorizationUrl || ''
+    if (result.Code !== 1 || !isTrustedGiteeAuthorizeUrl(authorizeUrl)) {
+      giteeStarError.value = localizeServerMessage(result.Msg) || t('giteeOAuthStartFailed')
+      return
+    }
+    window.location.assign(authorizeUrl)
+  } catch {
+    giteeStarError.value = t('giteeOAuthNetworkFailed')
+  } finally {
+    isStartingGiteeOAuth.value = false
+  }
+}
+
+function isGiteeStarReturn() {
+  if (typeof window === 'undefined') return false
+  return new URLSearchParams(window.location.search).get('giteeStar') === 'returned'
+}
+
+function cleanGiteeStarReturnQuery() {
+  if (typeof window === 'undefined') return
+  const url = new URL(window.location.href)
+  url.searchParams.delete('giteeStar')
+  url.searchParams.delete('giteeStarStatus')
+  url.searchParams.delete('reason')
+  const search = url.searchParams.toString()
+  window.history.replaceState(null, '', `${url.pathname}${search ? `?${search}` : ''}${url.hash || '#/create'}`)
+}
+
+function isVerifiedGiteeStar(data) {
+  const value = data?.Verified ?? data?.StarVerified ?? data?.GiteeStarVerified ?? data?.IsVerified
+  return value === true || value === 1 || String(value || '') === '1'
+}
+
+async function handleGiteeStarReturn() {
+  if (isCheckingGiteeStar.value || isCreating.value) return
+  cleanGiteeStarReturnQuery()
+  navigateProfile('create')
+  const draft = consumeGiteeStarTenantDraft()
+  if (!draft) {
+    createError.value = t('giteeDraftExpired')
+    tenantProgress.value = createError.value
+    return
+  }
+  tenantKey.value = draft.TenantKey
+  systemName.value = draft.SystemName
+  isCheckingGiteeStar.value = true
+  createError.value = ''
+  tenantProgress.value = t('giteeStarChecking')
+  try {
+    const resp = await authenticatedFetch(apiEngineUrl('official_gitee_star_status'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ TenantKey: draft.TenantKey, _Lang: locale.value })
+    })
+    const result = await resp.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return
+    }
+    if (result.Code !== 1 || !isVerifiedGiteeStar(result.Data || {})) {
+      createError.value = localizeServerMessage(result.Msg) || t('giteeStarNotVerified')
+      tenantProgress.value = createError.value
+      return
+    }
+    tenantProgress.value = t('giteeStarVerified')
+  } catch {
+    createError.value = t('giteeStarStatusFailed')
+    tenantProgress.value = createError.value
+    return
+  } finally {
+    isCheckingGiteeStar.value = false
+  }
+  await createTenant()
+}
+
+async function createTenant() {
+  if (!validateTenantCreation()) return
   isCreating.value = true
   const traceId = createTraceId()
   let keepPollingAfterRequestError = false
@@ -875,6 +1130,12 @@ async function createTenant() {
     if (result.Code !== 1) {
       createError.value = result.Msg || t('tenantCreateFailed')
       tenantProgress.value = createError.value
+      const reason = result.Data?.Reason || result.DataAppend?.Reason || ''
+      if (reason === 'GITEE_STAR_REQUIRED') {
+        showStarReminder.value = true
+        await nextTick()
+        starContinueButton.value?.focus()
+      }
       return
     }
     const data = result.Data || {}
@@ -1058,7 +1319,8 @@ function redirectToLoginIfNeeded() {
     return true
   }
   if (typeof window !== 'undefined') {
-    window.location.href = '/login.html?redirect=/profile.html%23/overview'
+    const profileRedirect = `${window.location.pathname}${window.location.search}${window.location.hash || '#/overview'}`
+    window.location.href = `/login.html?redirect=${encodeURIComponent(profileRedirect)}`
   }
   return true
 }
@@ -1093,8 +1355,13 @@ onMounted(async () => {
   window.addEventListener('microi-profile-locale-change', onProfileLocaleChange)
   window.addEventListener('hashchange', syncMenuFromHash)
   window.addEventListener('popstate', syncMenuFromHash)
+  const returnedFromGitee = isGiteeStarReturn()
   const valid = await refreshCenter()
-  if (valid && activeMenu.value === 'create') restoreActiveTenantProgress()
+  if (valid && returnedFromGitee) {
+    await handleGiteeStarReturn()
+  } else if (valid && activeMenu.value === 'create') {
+    restoreActiveTenantProgress()
+  }
 })
 
 onUnmounted(() => {
@@ -1295,6 +1562,184 @@ onUnmounted(() => {
 }
 
 .profile-notice.error { background: #fef2f2; color: #b91c1c; }
+
+.star-policy-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: -2px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 90, 46, 0.18);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 247, 237, 0.96), rgba(255, 255, 255, 0.92));
+}
+
+.star-policy-notice__icon {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff4d2d, #ff9f43);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(255, 90, 46, 0.2);
+  font-size: 17px;
+}
+
+.star-policy-notice strong {
+  display: block;
+  margin: 1px 0 4px;
+  color: #9a3412;
+  font-size: 14px;
+}
+
+.star-policy-notice p {
+  margin: 0;
+  color: #7c4a32;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.star-reminder-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.star-reminder-dialog {
+  position: relative;
+  width: min(100%, 520px);
+  padding: 32px;
+  border: 1px solid rgba(255, 90, 46, 0.18);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 86% 8%, rgba(255, 138, 61, 0.15), transparent 34%),
+    #fff;
+  color: #1f2937;
+  text-align: center;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.28);
+  outline: none;
+}
+
+.star-reminder-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #64748b;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.star-reminder-icon {
+  width: 54px;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ff4d2d, #ff9f43);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(255, 90, 46, 0.26);
+  font-size: 28px;
+}
+
+.star-reminder-dialog h2 {
+  margin: 0;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.3;
+}
+
+.star-reminder-description,
+.star-reminder-thanks {
+  color: #64748b;
+  line-height: 1.75;
+}
+
+.star-reminder-description {
+  margin: 14px 0 12px;
+}
+
+.star-project-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 90, 46, 0.2);
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #e64a19;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.star-reminder-thanks {
+  margin: 12px 0 20px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.star-reminder-status {
+  margin: -8px 0 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.star-reminder-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.star-continue-action {
+  min-height: 38px;
+}
+
+.star-continue-action:disabled,
+.star-reminder-close:disabled,
+.star-reminder-cancel:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.star-reminder-cancel {
+  min-height: 36px;
+  margin-top: 10px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.star-reminder-close:hover,
+.star-reminder-cancel:hover {
+  color: #ff5a2e;
+}
 
 .primary-action,
 .ghost-action,
@@ -2133,6 +2578,56 @@ onUnmounted(() => {
   color: #e2e8f0;
 }
 
+:global(.dark) .star-reminder-dialog {
+  border-color: rgba(251, 146, 60, 0.24);
+  background:
+    radial-gradient(circle at 86% 8%, rgba(251, 146, 60, 0.14), transparent 34%),
+    #111827;
+  color: #e5e7eb;
+}
+
+:global(.dark) .star-policy-notice {
+  border-color: rgba(251, 146, 60, 0.24);
+  background: linear-gradient(135deg, rgba(124, 45, 18, 0.24), rgba(17, 24, 39, 0.72));
+}
+
+:global(.dark) .star-policy-notice strong {
+  color: #fdba74;
+}
+
+:global(.dark) .star-policy-notice p {
+  color: #cbd5e1;
+}
+
+:global(.dark) .star-reminder-dialog h2 {
+  color: #f8fafc;
+}
+
+:global(.dark) .star-reminder-description,
+:global(.dark) .star-reminder-thanks {
+  color: #cbd5e1;
+}
+
+:global(.dark) .star-reminder-status {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+}
+
+:global(.dark) .star-project-link {
+  border-color: rgba(251, 146, 60, 0.25);
+  background: rgba(251, 146, 60, 0.1);
+  color: #fb923c;
+}
+
+:global(.dark) .star-reminder-close {
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+}
+
+:global(.dark) .star-reminder-cancel {
+  color: #94a3b8;
+}
+
 .dark .link-action {
   background: rgba(255, 90, 46, 0.12);
   color: #fb923c;
@@ -2252,6 +2747,18 @@ onUnmounted(() => {
   .profile-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .star-reminder-backdrop {
+    padding: 16px;
+  }
+
+  .star-reminder-dialog {
+    padding: 28px 20px 22px;
+  }
+
+  .star-reminder-actions {
+    grid-template-columns: 1fr;
   }
 }
 </style>

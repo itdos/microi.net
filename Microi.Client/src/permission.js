@@ -2,7 +2,7 @@ import router from "./router";
 // 使用 Pinia stores
 import { useUserStore, usePermissionStore, useDiyStore } from "./pinia";
 import pinia from "./pinia";
-import { normalizeMenuRoutePath } from "./pinia/modules/permission";
+import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath } from "./pinia/modules/permission";
 // Element Plus 消息组件
 import { ElMessage } from "element-plus";
 import { getToken } from "@/utils/auth.js"; // get token from cookie
@@ -35,6 +35,13 @@ function normalizeIframeRouteUrl(url) {
         rawUrl = decodeURIComponent(rawUrl);
     } catch (error) { }
     return "/iframe/" + encodeURIComponent(rawUrl);
+}
+
+function getPermissionFallbackPath(routes, targetPath) {
+    const normalizedTarget = normalizeMenuRoutePath(targetPath || "/");
+    if (hasAccessibleRoutePath(routes, normalizedTarget)) return "";
+    if (normalizedTarget !== "/") return "";
+    return getFirstValidRoutePath(routes);
 }
 
 router.beforeEach(async (to, from, next) => {
@@ -201,15 +208,21 @@ router.beforeEach(async (to, from, next) => {
         } else {
             const userStore = useUserStore(pinia);
             const hasRoles = userStore.roles && userStore.roles.length > 0;
-            if (hasRoles) {
-                next();
+            const permissionStore = usePermissionStore(pinia);
+            if (hasRoles && permissionStore.addRoutes && permissionStore.addRoutes.length > 0) {
+                const fallbackPath = getPermissionFallbackPath(permissionStore.addRoutes, to.path);
+                if (fallbackPath) {
+                    next({ path: fallbackPath, replace: true });
+                } else {
+                    next();
+                }
             } else {
                 try {
                     // 设置角色，避免无限循环
-                    userStore.setRoles(["admin"]);
+                    const currentRoles = hasRoles ? userStore.roles : ["admin"];
+                    if (!hasRoles) userStore.setRoles(currentRoles);
                     
-                    const permissionStore = usePermissionStore(pinia);
-                    const accessRoutes = await permissionStore.generateRoutes(["admin"]);
+                    const accessRoutes = await permissionStore.generateRoutes(currentRoles);
                     // Vue Router 4: addRoutes 已移除，改用 addRoute 逐个添加
                     accessRoutes.forEach((route) => {
                         try {
@@ -218,7 +231,12 @@ router.beforeEach(async (to, from, next) => {
                             console.warn("[permission] addRoute failed:", route && route.path, routeError);
                         }
                     });
-                    next({ ...to, replace: true });
+                    const fallbackPath = getPermissionFallbackPath(accessRoutes, to.path);
+                    if (fallbackPath) {
+                        next({ path: fallbackPath, replace: true });
+                    } else {
+                        next({ ...to, replace: true });
+                    }
                 } catch (error) {
                     console.error("[permission] 动态路由初始化失败：", error);
                     // 同域切换 OsClient 时，浏览器里可能仍残留其它租户的 Token。

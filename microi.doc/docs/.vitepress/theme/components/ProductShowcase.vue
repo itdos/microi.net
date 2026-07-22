@@ -105,7 +105,10 @@
             @click="openDetail(app)"
             @keydown.enter="openDetail(app)"
           >
-            <div class="app-preview" :class="`preview-${app.tone}`">
+            <div
+              class="app-preview"
+              :class="[`preview-${app.tone}`, previewFitClass(app.ApplicationType)]"
+            >
               <img
                 v-if="app.AppPreviewUrl && !brokenPreviewKeys.has(app.AppKey)"
                 :src="app.AppPreviewUrl"
@@ -297,6 +300,13 @@ function typeLabel(value) {
   return { Platform: '平台应用', UniApp: 'UniApp', Web: 'Web', MicroService: '微服务' }[value] || value
 }
 
+function previewFitClass(applicationType) {
+  const normalizedType = String(applicationType || '').toLowerCase()
+  return normalizedType === 'uniapp' || normalizedType === 'web'
+    ? 'preview-fit-contain'
+    : 'preview-fit-cover'
+}
+
 function isAllowed(value, options) {
   return options.some(item => item.value === value) ? value : 'all'
 }
@@ -485,7 +495,7 @@ onBeforeUnmount(() => {
 }
 
 .app-market-home .app-preview {
-  height: 190px;
+  height: 204px;
 }
 
 .app-market-page {
@@ -673,7 +683,7 @@ onBeforeUnmount(() => {
 .app-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 22px;
 }
 
@@ -721,7 +731,7 @@ onBeforeUnmount(() => {
 
 .app-preview {
   position: relative;
-  height: 210px;
+  height: 224px;
   overflow: hidden;
   background: linear-gradient(145deg, #eaf1fb, #dfe8f5);
 }
@@ -730,13 +740,25 @@ onBeforeUnmount(() => {
   display: block;
   width: 100%;
   height: 100%;
+  transition: transform .35s ease;
+}
+
+.preview-fit-contain > img {
+  object-fit: contain;
+  object-position: center;
+}
+
+.preview-fit-cover > img {
   object-fit: cover;
   object-position: top center;
-  transition: transform .35s ease;
 }
 
 .app-card:hover .app-preview > img {
   transform: scale(1.025);
+}
+
+.app-card:hover .preview-fit-contain > img {
+  transform: none;
 }
 
 .preview-empty {
@@ -990,12 +1012,12 @@ onBeforeUnmount(() => {
 }
 
 .skeleton-preview {
-  height: 210px;
+  height: 224px;
   border-radius: 0;
 }
 
 .app-market-home .skeleton-preview {
-  height: 190px;
+  height: 204px;
 }
 
 .skeleton-title {
@@ -1049,7 +1071,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 1060px) {
+@media (max-width: 960px) {
   .app-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1104,7 +1126,7 @@ onBeforeUnmount(() => {
 
   .app-preview,
   .skeleton-preview {
-    height: 190px;
+    height: 204px;
   }
 
   .market-pagination {

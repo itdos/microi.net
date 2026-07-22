@@ -494,6 +494,9 @@ export default {
             TableEnableBatch: false,
             //卡片模式批量选择
             cardSelection: [],
+            // 私有卡片图片必须先换取短期访问地址，不能直接拼接 FileServer。
+            _privateCardImageUrls: {},
+            _privateCardImagePending: {},
             // 性能优化V3：全局共享菜单状态
             _moreMenuVisible: false,
             _moreMenuRow: null,

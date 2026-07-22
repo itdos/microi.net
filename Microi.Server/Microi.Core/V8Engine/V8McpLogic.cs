@@ -3461,11 +3461,13 @@ namespace Microi.net
             try
             {
                 var allowed = new[] {
-                    "Name", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
+                    "Name", "Description", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
                     "OpenType", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere", "DiyConfig",
                     "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
-                    "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText"
+                    "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText",
+                    "DefaultPageSize", "TableCardCol", "TableCardImgField", "TableCardImgStyle", "TableCardImgPosition", "GeneralSeaarch", "HiddenIndex",
+                    "AddCodeShowV8", "EditCodeShowV8", "DelCodeShowV8", "DetailPageV8"
                 };
                 var data = BuildDataFromParam(osClient, param, allowed, moduleId);
                 var warnings = new List<string>();
@@ -3913,7 +3915,7 @@ namespace Microi.net
         /// <summary>
         /// MCP 上传 base64 文件到平台文件存储，并可同步写入指定表字段。
         /// </summary>
-        public static async Task<DosResult<object>> UploadFileBase64(string osClient, string fileName, string fileByteBase64, string path, bool? limit, bool? preview, string targetTable, string targetId, string targetField, dynamic currentToken)
+        public static async Task<DosResult<object>> UploadFileBase64(string osClient, string fileName, string fileByteBase64, string path, string filePathName, bool? limit, bool? preview, string targetTable, string targetId, string targetField, dynamic currentToken)
         {
             try
             {
@@ -3932,46 +3934,100 @@ namespace Microi.net
                 }
 
                 if (bytes.Length == 0) return new DosResult<object>(0, null, "文件内容为空");
-                if (IsBlank(fileName)) fileName = $"mcp-{DateTime.Now:yyyyMMddHHmmssfff}.png";
-                if (IsBlank(path)) path = "mcp/assets";
 
-                using var fileStream = new MemoryStream(bytes);
-                var currentUser = currentToken?.CurrentUser;
-                var uploadParam = new DiyUploadParam
+                object uploadData;
+                string savedFilePathName;
+                if (!IsBlank(filePathName))
                 {
-                    OsClient = osClient,
-                    Path = path.Trim().Trim('/'),
-                    Limit = limit ?? false,
-                    Preview = preview ?? true,
-                    Multiple = false,
-                    _InvokeType = InvokeType.Client.ToString(),
-                    _CurrentUser = currentUser,
-                    Files = new Dictionary<string, Stream> { [fileName] = fileStream }
-                };
+                    if (limit != true)
+                    {
+                        return new DosResult<object>(0, null, "FilePathName 精确路径模式仅允许写入私有桶（Limit=true）");
+                    }
 
-                var uploadResult = await MicroiEngine.HDFS.Upload(uploadParam);
-                if (uploadResult.Code != 1)
+                    string normalizedPath;
+                    try
+                    {
+                        normalizedPath = TenantConfigurationSecurity.NormalizeStoragePath(osClient, filePathName);
+                    }
+                    catch (Exception ex)
+                    {
+                        return new DosResult<object>(0, null, "FilePathName 不合法：" + ex.Message);
+                    }
+
+                    var exactFileName = Path.GetFileName(normalizedPath);
+                    if (IsBlank(exactFileName)) return new DosResult<object>(0, null, "FilePathName 必须包含文件名");
+                    if (IsBlank(fileName)) fileName = exactFileName;
+                    if (!string.Equals(Path.GetFileName(fileName), exactFileName, StringComparison.Ordinal))
+                    {
+                        return new DosResult<object>(0, null, "FileName 必须与 FilePathName 中的文件名一致");
+                    }
+
+                    var clientModel = OsClientExtend.GetClient(osClient);
+                    var hdfs = clientModel.OsClientModel["HDFS"].Val<string>() ?? "Aliyun";
+                    var hdfsClient = hdfs switch
+                    {
+                        "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
+                        "S3" => MicroiEngine.HDFSFactory(HDFSType.AmazonS3),
+                        _ => MicroiEngine.HDFSFactory(HDFSType.Aliyun)
+                    };
+                    using var exactStream = new MemoryStream(bytes);
+                    var putResult = await hdfsClient.PutObject(new HDFSParam
+                    {
+                        ClientModel = clientModel,
+                        Limit = true,
+                        FileFullPath = normalizedPath.TrimStart('/'),
+                        FileStream = exactStream
+                    });
+                    if (putResult.Code != 1)
+                    {
+                        return new DosResult<object>(putResult.Code, putResult.Data, "MCP 精确路径上传失败：" + putResult.Msg);
+                    }
+                    savedFilePathName = normalizedPath;
+                    uploadData = new { ExactPath = true, Put = putResult.Data };
+                }
+                else
                 {
-                    return new DosResult<object>(uploadResult.Code, uploadResult.Data, "MCP 上传文件失败：" + uploadResult.Msg);
+                    if (IsBlank(fileName)) fileName = $"mcp-{DateTime.Now:yyyyMMddHHmmssfff}.png";
+                    if (IsBlank(path)) path = "mcp/assets";
+                    using var fileStream = new MemoryStream(bytes);
+                    var currentUser = currentToken?.CurrentUser;
+                    var uploadParam = new DiyUploadParam
+                    {
+                        OsClient = osClient,
+                        Path = path.Trim().Trim('/'),
+                        Limit = limit ?? false,
+                        Preview = preview ?? true,
+                        Multiple = false,
+                        _InvokeType = InvokeType.Client.ToString(),
+                        _CurrentUser = currentUser,
+                        Files = new Dictionary<string, Stream> { [fileName] = fileStream }
+                    };
+
+                    var uploadResult = await MicroiEngine.HDFS.Upload(uploadParam);
+                    if (uploadResult.Code != 1)
+                    {
+                        return new DosResult<object>(uploadResult.Code, uploadResult.Data, "MCP 上传文件失败：" + uploadResult.Msg);
+                    }
+                    savedFilePathName = ExtractUploadPath(uploadResult.Data);
+                    uploadData = uploadResult.Data;
                 }
 
-                var filePathName = ExtractUploadPath(uploadResult.Data);
                 object updateInfo = null;
                 if (!IsBlank(targetTable) && !IsBlank(targetId) && !IsBlank(targetField))
                 {
-                    if (IsBlank(filePathName)) return new DosResult<object>(0, uploadResult.Data, "文件已上传，但未能从上传结果解析文件路径，无法写入表字段");
+                    if (IsBlank(savedFilePathName)) return new DosResult<object>(0, uploadData, "文件已上传，但未能从上传结果解析文件路径，无法写入表字段");
 
                     var updateParam = new JObject
                     {
                         ["OsClient"] = osClient,
                         ["Id"] = targetId,
-                        [targetField] = filePathName,
+                        [targetField] = savedFilePathName,
                         ["_InvokeType"] = InvokeType.Client.ToString()
                     };
                     var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(targetTable, updateParam);
                     if (updateResult.Code != 1)
                     {
-                        return new DosResult<object>(updateResult.Code, new { Upload = uploadResult.Data, FilePathName = filePathName }, "文件已上传，但写入数据库字段失败：" + updateResult.Msg);
+                        return new DosResult<object>(updateResult.Code, new { Upload = uploadData, FilePathName = savedFilePathName }, "文件已上传，但写入数据库字段失败：" + updateResult.Msg);
                     }
                     updateInfo = updateResult.Data;
                 }
@@ -3979,8 +4035,8 @@ namespace Microi.net
                 return new DosResult<object>(1, new
                 {
                     FileName = fileName,
-                    FilePathName = filePathName,
-                    Upload = uploadResult.Data,
+                    FilePathName = savedFilePathName,
+                    Upload = uploadData,
                     Updated = updateInfo
                 }, "MCP 文件上传完成");
             }
@@ -4472,7 +4528,7 @@ namespace Microi.net
                     var fileName = Path.GetFileName(relativePath);
                     var relativeDir = Path.GetDirectoryName(relativePath)?.Replace("\\", "/");
                     var uploadDir = $"ai-app-source/{appId}/{relativeDir}".TrimEnd('/');
-                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, true, false, "", "", "", currentToken);
+                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, "", true, false, "", "", "", currentToken);
                     if (uploadResult.Code != 1) return new DosResult<object>(uploadResult.Code, uploadResult.Data, $"同步源码失败：{relativePath}，{uploadResult.Msg}");
 
                     var uploadObj = JObject.FromObject(uploadResult.Data);
@@ -4592,7 +4648,7 @@ namespace Microi.net
                     if (base64.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"Assets[{i}].FileByteBase64 不能为空");
 
                     var uploadDir = $"micro-app/{msKey}/{buildVersion}/{Path.GetDirectoryName(relativePath)?.Replace("\\", "/")}".TrimEnd('/');
-                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, false, true, "", "", "", currentToken);
+                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, "", false, true, "", "", "", currentToken);
                     if (uploadResult.Code != 1) return new DosResult<object>(uploadResult.Code, uploadResult.Data, $"发布微服务文件失败：{relativePath}，{uploadResult.Msg}");
 
                     var uploadObj = JObject.FromObject(uploadResult.Data);

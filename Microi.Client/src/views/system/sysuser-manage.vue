@@ -253,7 +253,7 @@
                         <el-form-item :label="$t('Msg.Avatar')">
                             <el-upload
                                 :action="DiyApi.Upload()"
-                                :data="{ Path: '/avatar', Limit: false }"
+                                :data="{ Path: 'avatar', Limit: true, Preview: true }"
                                 :headers="{
                                     authorization: 'Bearer ' + DiyCommon.Authorization()
                                 }"
@@ -262,7 +262,7 @@
                                 :on-success="ImgUploadSuccess"
                                 :before-upload="UploadImgBefore"
                             >
-                                <img v-if="!DiyCommon.IsNull(CurrentSysUserModel.Avatar)" :src="DiyCommon.GetServerPath(CurrentSysUserModel.Avatar)" class="avatar" style="object-fit: cover" />
+                                <img v-if="!DiyCommon.IsNull(CurrentSysUserModel.Avatar)" :src="CurrentSysUserAvatarUrl || './static/img/loading.gif'" class="avatar" style="object-fit: cover" />
                                 <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
                             </el-upload>
                         </el-form-item>
@@ -466,7 +466,9 @@ export default {
             },
             SysRoleList: [],
             SysDeptList: [],
-            SysDeptListJainZhi: []
+            SysDeptListJainZhi: [],
+            SysUserAvatarUrls: {},
+            CurrentSysUserAvatarUrl: ""
         };
     },
     mounted() {
@@ -490,7 +492,24 @@ export default {
                 return "./static/img/nohead-boy.png";
                 // return require('../../microi/img/nohead-boy.png');
             }
-            return self.DiyCommon.GetFileServer() + m.Avatar;
+            return self.SysUserAvatarUrls[m.Id] || "./static/img/loading.gif";
+        },
+        async ResolveSysUserAvatar(m) {
+            var self = this;
+            if (!m || self.DiyCommon.IsNull(m.Avatar)) return;
+            var url = await self.DiyCommon.GetUserAvatarUrl(m.Avatar, m.Id);
+            if (url) {
+                self.SysUserAvatarUrls = Object.assign({}, self.SysUserAvatarUrls, { [m.Id]: url });
+                if (self.CurrentSysUserModel && self.CurrentSysUserModel.Id === m.Id) {
+                    self.CurrentSysUserAvatarUrl = url;
+                }
+            }
+        },
+        ResolveSysUserAvatars(list) {
+            var self = this;
+            (list || []).forEach(function (item) {
+                self.ResolveSysUserAvatar(item);
+            });
         },
         ChangeDataViewType(command) {
             var self = this;
@@ -557,6 +576,8 @@ export default {
             var self = this;
             if (self.DiyCommon.Result(result)) {
                 self.CurrentSysUserModel["Avatar"] = result.Data.Path;
+                self.CurrentSysUserAvatarUrl = "./static/img/loading.gif";
+                self.ResolveSysUserAvatar(self.CurrentSysUserModel);
                 self.DiyCommon.Tips(self.$t("Msg.UploadSuccess"));
             }
         },
@@ -677,6 +698,7 @@ export default {
                     if (self.DiyCommon.Result(result)) {
                         self.SysUserList = result.Data;
                         self.SysUserCount = result.DataCount;
+                        self.ResolveSysUserAvatars(self.SysUserList);
                     }
                 }
             );
@@ -707,6 +729,7 @@ export default {
                     DeptIds: [],
                     RoleIds: []
                 };
+                self.CurrentSysUserAvatarUrl = "";
                 // self.CurrentSysUserRoleIds = [];
             } else {
                 title = m.Name;
@@ -741,6 +764,8 @@ export default {
                 //---END
 
                 self.CurrentSysUserModel = m;
+                self.CurrentSysUserAvatarUrl = self.SysUserAvatarUrls[m.Id] || "./static/img/loading.gif";
+                self.ResolveSysUserAvatar(m);
 
                 // var maxLavel = 0;
                 // self.DiyCommon.Post(self.DiyApi.GetSysUserFk(), {

@@ -289,7 +289,7 @@ import { User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from 
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
-import { getFirstValidRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
+import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import config from "@/config.json";
 
@@ -926,11 +926,9 @@ export default {
             } else {
                 var url = "/";
                 var fallbackUrl = getFirstValidRoutePath(accessRoutes.length > 0 ? accessRoutes : self.permissionStore.addRoutes);
-                var configuredDefaultIndexUrl = "";
                 //这里需要跳转到sys_menu的第一个路由
                 //2022-07-05新增：以系统设置的默认首页路由为优先
                 if (self.SysConfig && self.SysConfig.DefaultIndexUrl) {
-                    configuredDefaultIndexUrl = String(self.SysConfig.DefaultIndexUrl || "").trim();
                     url = String(self.SysConfig.DefaultIndexUrl || "");
                     url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {
@@ -947,8 +945,14 @@ export default {
                     return;
                 }
                 url = normalizeMenuRoutePath(url || fallbackUrl || "/");
-                var keepConfiguredRoot = configuredDefaultIndexUrl && normalizeMenuRoutePath(configuredDefaultIndexUrl) === "/";
-                if (!keepConfiguredRoot && (url === "/" || self.$router.resolve(url).matched.length === 0) && fallbackUrl) {
+                var isRegisteredRoute = function (targetPath) {
+                    if (hasAccessibleRoutePath(accessRoutes, targetPath)) return true;
+                    var resolved = self.$router.resolve(targetPath);
+                    return resolved.matched.some(function (record) {
+                        return record.name !== "page_404" && String(record.path || "").indexOf(":pathMatch") === -1;
+                    });
+                };
+                if (!isRegisteredRoute(url) && fallbackUrl) {
                     url = fallbackUrl;
                 }
                 
@@ -961,7 +965,7 @@ export default {
                 
                 var useDefaultTarget = self.DiyCommon.IsNull(self.redirect) || self.redirect == "/";
                 var targetPath = useDefaultTarget ? url : normalizeMenuRoutePath(self.redirect);
-                if (!(useDefaultTarget && keepConfiguredRoot) && (targetPath === "/" || self.$router.resolve(targetPath).matched.length === 0) && fallbackUrl) {
+                if (!isRegisteredRoute(targetPath) && fallbackUrl) {
                     targetPath = fallbackUrl;
                 }
                 self.$router.push({

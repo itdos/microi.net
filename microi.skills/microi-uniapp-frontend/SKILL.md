@@ -69,6 +69,17 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 - 私有文件使用后端签名 URL，例如 `V8.Method.GetPrivateFileUrl({ FilePathName })`，失败时再回退到公开文件服务器路径。
 - 第三方占位图、已失效临时地址、空字符串统一清理为空，交给 UI 占位态。
 
+## 移动端大资源优先使用租户 HDFS/CDN
+
+定制 UniApp/H5/小程序中的大图、视频、音频、字体和大型第三方静态文件，默认不要塞进主包。应先确认目标 `OsClient`，通过该租户 MCP/HDFS 上传，再以 `sys_config.FileServer + Path` 的 CDN/公有桶地址引用；合同、证件等敏感资源仍必须使用私有桶和临时签名 URL。
+
+- 首页 Hero、商品占位图、活动 Banner、引导音频、演示视频等公开资源使用 `Limit:false`，上传后必须以匿名请求验证最终 URL 返回 `200`、正确 `Content-Type` 和非空内容。
+- tabBar 图标、返回/关闭等小型交互图标、启动阶段必须离线可用的关键素材可以留在主包；不能为了远程化导致断网时连导航和基本操作都不可识别。
+- 上传前按场景做适度压缩和尺寸裁剪，同时保存原始素材或可重复生成源；禁止为了通过包体扫描而盲目把图片、音频压到明显失真、文字模糊或播放体验受损。
+- 压缩后必须在至少 375px、430px 和目标小程序设备截图中核对清晰度、裁切、首屏加载与失败占位；音视频还要抽听/抽播。质量不合格时优先调整编码、分辨率和缓存策略，而不是继续极端压缩。
+- 项目只能通过统一配置或资源解析器保存 CDN 地址，页面不得散落硬编码 FileServer；切换环境或租户时必须能整体替换。
+- CDN 资源必须设置加载失败占位或降级路径。构建验收同时检查小程序主包资源总量、单资源大小、远程域名白名单和真实 CDN 可达性，不能只看源码文件大小。
+
 ## 头像必须异步统一解析
 
 头像字段比普通图片更容易混合出现上传 JSON、私有路径、相对路径、历史字段名和脏数据。列表页、详情页、业务记录、审批记录、团队/会员卡片、聊天/消息等头像场景都必须走同一个头像解析入口。
@@ -188,12 +199,21 @@ async function load() {
 - 顶部自定义导航栏应结合 `uni.getSystemInfoSync().statusBarHeight` 和 CSS `env(safe-area-inset-top)`：状态栏占位负责不同系统高度，导航按钮和标题整体下移，返回按钮触摸区不能压到刘海/状态栏。
 - 不能只依赖 `env(safe-area-inset-*)`。微信小程序、部分 Android WebView 或开发者工具中该值可能为 `0`；项目必须通过 `uni.getWindowInfo()`（旧端回退 `uni.getSystemInfoSync()`）读取 `statusBarHeight`、`safeArea` / `safeAreaInsets`，注入统一的 `--mci-safe-top`、`--mci-safe-bottom` 等页面壳变量。
 - 微信小程序使用 `navigationStyle: custom` 时，必须读取 `uni.getMenuButtonBoundingClientRect()`（必要时回退 `wx.getMenuButtonBoundingClientRect()`），给顶部栏右侧预留 `windowWidth - capsule.left + gap`。登录、分享、状态角标、更多操作等任何按钮都不能进入右上角胶囊区域。
+- 全屏弹层/工作台如果包含历史、新建、关闭等多个头部操作，必须先计算整组宽度；胶囊左侧不足时将整组放到胶囊底边以下，不得通过缩小触摸区、覆盖胶囊或截断标题硬塞。自动化测试应读取元素与胶囊 `boundingClientRect` 并断言不相交。
 - 安全区实现必须集中在 `MciPage`、页面壳 composable/runtime 或全局布局中；禁止每页各自猜测 `20px/44px`。`pages.json` 中每个 `navigationStyle: custom` 页面都必须接入同一个页面壳，新增路由时同步纳入检查。
 - 底部 `tabBar`、购买栏、提交栏、批量操作栏等 fixed 元素必须使用 `padding-bottom: env(safe-area-inset-bottom)`，主体内容必须额外预留底部高度，避免最后一条数据被按钮或 tabBar 遮挡。
 - 底部 fixed 元素应优先使用运行时 `--mci-safe-bottom`，以 CSS `env(safe-area-inset-bottom)` 作为 H5 兜底；底部导航、提交栏、弹出层和滚动容器必须引用同一变量，不能各算一套。
 - 双栏分类页、聊天页、详情页带底部按钮时，内部 `scroll-view` 要用 `flex:1; min-height:0` 承载滚动，并在滚动容器底部预留 `calc(fixedBarHeight + env(safe-area-inset-bottom))`。
 - H5 在 PC 手机壳模式下，fixed 顶栏/底栏仍要限制在手机壳宽度内；不能铺满整个桌面浏览器。
 - 验收必须至少覆盖一个 iPhone 刘海/灵动岛尺寸、一个 Android 高状态栏或虚拟导航栏尺寸、一个微信开发者工具真机模拟尺寸、一个 PC H5 手机壳尺寸；逐项截图检查顶部不被状态栏/胶囊遮挡、底部按钮不贴边、列表最后一项可见。不能只截图首页，必须按 `pages.json` 路由清单覆盖登录、Tab 页、详情、表单、弹层和管理页。
+- 独占屏幕且需要支持手机侧滑返回的功能应使用独立页面路由。`onBackPress`/页面返回先消费当前页内部的键盘、对话框和抽屉状态；内部状态清空后才弹出当前页，不能让一次返回直接退出小程序或越过底层业务页。
+
+## 微信自定义组件的点击与拖动事件必须真机链路验收
+
+- UniApp 可拖动浮动入口等自定义组件，不要给 `touchstart/touchmove/touchend/tap` 整组无差别添加 `.stop/.prevent`。这些修饰符会生成微信 `catchtouch* / catchtap`，部分 UniApp 自定义组件中可能吞掉事件桥，出现节点可见但点击和触摸方法完全不执行。
+- 优先使用可正常分发的 `bindtouch* / bindtap`，在方法内部通过 10-12px 位移阈值区分短触与拖动；短触应在 `touchend` 直接执行主动作，`tap` 仅作鼠标/H5 兜底，拖动结束不得误触主动作。
+- 导航失败必须提供可见提示并记录错误，禁止让点击失败表现为毫无反应。
+- H5 的 DOM `.click()`、CDP 触摸和微信预览编译都不能证明小程序组件事件桥正常。交付前必须使用微信开发者工具或 `miniprogram-automator` 对真实节点派发触摸，并断言目标页面进入页面栈；同时抽查一个普通按钮，排除自动化工具自身失效。
 
 参考样式：
 

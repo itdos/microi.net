@@ -52,6 +52,98 @@ return { Code : 0, Data : resultObj, Msg : result };
 ### **Report**
 >* 虚拟报表
 
+## 树形+表格（左右结构）
+
+适用于“左侧按项目、分类或组织导航，右侧显示关联数据列表/表单”的业务页面。目标菜单使用组件模式：
+
+```json
+{
+  "ComponentName": "树形+表格",
+  "ComponentPath": "/diy/left-right/LeftTreeJoinRightForm"
+}
+```
+
+页面配置保存在 `diy_LeftJoinRightView`。同一菜单应只有一条有效配置，保存前按【关联菜单】回读并复用，避免重复配置造成命中不确定。
+
+### 核心配置
+
+| 配置项 | 说明 |
+| --- | --- |
+| `GuanlianCD`（关联菜单） | 当前右侧业务菜单链，末级为当前菜单 `sys_menu.Id`。 |
+| `ShuxingGLCD`（树形关联菜单） | 左侧主数据菜单链。 |
+| `GuanlianBD`（关联表单） | 左侧主表，例如 `xiangmuguanli`。 |
+| `FubiaoGLZD`（父表关联字段） | 左表关联键，通常为 `Id`。 |
+| `ZibiaoGLZD`（子表关联字段） | 右表外键，例如 `XiangmuID`、`ProjectId`；必须以实时表结构为准。 |
+| `GuanlianPPLJ`（关联匹配逻辑） | 普通主外键使用 `=`。 |
+| `ZuobianZSZJ` / `YoubianZSZJ` | 左侧通常为 `树形控件`；右侧可选 `表格`、`表单`、`表单/表格`。 |
+| `ShuxianSZDM`（树显示字段名） | 必须和初始化 V8 返回对象的属性名一致。 |
+| `ChushiHDM`（初始化代码） | 读取 `V8.Form._PageIndex/_PageSize/inputText` 获取左树当前页，最终返回 `Data` 和 `DataCount`。 |
+| `ZuoyouXSZB`（左右显示占比） | 24 栅格比例，例如 `6/18`，`/` 是必要分隔符。 |
+| `ShubiaoT` | 左侧标题。 |
+| `ShumoHSS`、`ShuxiaLSS`、`ShusouSAN`、`ShushuaX` | 模糊搜索、搜索字段下拉、搜索按钮、刷新按钮。 |
+| `ShudingJXZ`、`ShuxinZ`、`ShubianJ`、`ShushanC` | 顶级新增、节点新增、编辑、删除；仅在业务允许时开启。 |
+| `ShujieDDJSJ`、`JiedianANXSSJ` | 节点点击事件、节点按钮显示事件 V8。 |
+| `YincangBSF` | 节点值命中时隐藏右侧区域。 |
+| `TanchuangLX`、`TanchuangDX` | 树节点维护弹窗类型与大小。 |
+| `LanjiaZ`、`LanjiaZDM` | 大数据树懒加载开关与代码。 |
+
+左树也必须分页。组件默认每页 20 条，允许切换 10/20/50/100 条；搜索会回到第一页。初始化代码示例：
+
+```js
+var form = V8.Form || {};
+var pageIndex = Math.max(1, parseInt(form._PageIndex || 1, 10));
+var pageSize = Math.min(100, Math.max(1, parseInt(form._PageSize || 20, 10)));
+var keyword = String(form.inputText || '').trim();
+var query = {
+    _SelectFields: ['Id', 'Code', 'Name'],
+    _OrderBy: 'CreateTime',
+    _OrderByType: 'DESC',
+    _PageIndex: pageIndex,
+    _PageSize: pageSize
+};
+
+if (keyword) {
+    query._Where = [
+        ['Code', 'Like', keyword],
+        ['OR', 'Name', 'Like', keyword]
+    ];
+}
+
+var result = await V8.FormEngine.GetTableData('xiangmuguanli', query);
+
+if (result.Code !== 1) {
+    V8.Result = result;
+    return;
+}
+
+V8.Result = {
+    Code: 1,
+    Data: (result.Data || []).map(function (item) {
+        return {
+            Id: item.Id,
+            TreeTitle: [item.Code, item.Name].filter(Boolean).join(' '),
+            Code: item.Code,
+            Name: item.Name
+        };
+    }),
+    DataCount: Number(result.DataCount || 0),
+    PageIndex: pageIndex,
+    PageSize: pageSize
+};
+```
+
+此时配置 `ShuxianSZDM=TreeTitle`、`FubiaoGLZD=Id`。右侧表格根据 `ZibiaoGLZD = 当前节点.Id` 查询；点击【全部】时清除关联条件。
+
+加载期间组件显示“正在加载项目...”，不会先显示“暂无数据”；并发搜索/翻页只接受最后一次请求结果，避免旧页覆盖新页。禁止用大 `_PageSize` 一次拉取完整项目表。
+
+### 移动端与验收
+
+- 手机端不把左树堆在数据列表顶部。右侧列表占满页面，顶部“项目目录”按钮从左侧打开宽度 `88%`、高度 100% 的树形抽屉。
+- 抽屉带遮罩、关闭按钮并支持点击遮罩或 Esc 关闭；选择节点后自动关闭，同时保留筛选结果。
+- 左树在抽屉内独立滚动，搜索、分页、每页条数切换均可操作。
+- 禁止用固定高度或祖先 `overflow:hidden` 截断卡片、分页、底部按钮。
+- 至少验证桌面 1440x900 与手机 390x844：20 条分页、切换每页条数、搜索、节点筛选、全部、刷新、抽屉打开/关闭、右侧新增自动写入外键，以及树和列表都能滚动到底。
+
 ## 数据源配置
 >* **关联表**：join哪些表，设置表的别名
 

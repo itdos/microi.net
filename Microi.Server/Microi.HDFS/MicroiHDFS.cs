@@ -115,9 +115,10 @@ namespace Microi.net
             var clientModel = OsClient.GetClient(param.OsClient);
             //默认阿里云，兼容低代码平台老版本数据库
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -535,9 +536,10 @@ namespace Microi.net
             var clientModel = OsClient.GetClient(param.OsClient);
             //默认阿里云，兼容低代码平台老版本数据库
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -810,9 +812,10 @@ namespace Microi.net
 
             var clientModel = OsClient.GetClient(param.OsClient);
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -856,9 +859,10 @@ namespace Microi.net
 
             var clientModel = OsClient.GetClient(param.OsClient);
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -898,9 +902,10 @@ namespace Microi.net
 
             var clientModel = OsClient.GetClient(param.OsClient);
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -940,9 +945,10 @@ namespace Microi.net
 
             var clientModel = OsClient.GetClient(param.OsClient);
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)
@@ -983,9 +989,10 @@ namespace Microi.net
 
             var clientModel = OsClient.GetClient(param.OsClient);
             var hdfs = "Aliyun";
-            if (!clientModel.OsClientModel["HDFS"].Val<string>().DosIsNullOrWhiteSpace())
+            string configuredHdfs = Convert.ToString(clientModel.OsClientModel["HDFS"]);
+            if (!string.IsNullOrWhiteSpace(configuredHdfs))
             {
-                hdfs = clientModel.OsClientModel["HDFS"].Val<string>();
+                hdfs = configuredHdfs;
             }
             var _iMicroiHDFS = default(IMicroiHDFS);
             switch (hdfs)

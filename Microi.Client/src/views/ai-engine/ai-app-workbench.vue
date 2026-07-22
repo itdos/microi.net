@@ -175,12 +175,12 @@
                             v-model="currentAiModel"
                             value-key="Id"
                             filterable
-                            :loading="modelLoading"
+                            :loading="effectiveModelLoading"
                             placeholder="选择模型"
                             class="app-model-select"
                         >
                             <el-option
-                                v-for="model in aiModels"
+                                v-for="model in effectiveAiModels"
                                 :key="model.Id"
                                 :label="formatModelName(model)"
                                 :value="model"
@@ -467,6 +467,15 @@ const props = defineProps({
     modelLoading: {
         type: Boolean,
         default: false
+    },
+    mode: {
+        type: String,
+        default: "auto",
+        validator: (value) => ["auto", "gallery", "detail"].includes(value)
+    },
+    standalone: {
+        type: Boolean,
+        default: false
     }
 });
 const emit = defineEmits(["update:selectedAiModel"]);
@@ -481,7 +490,7 @@ const route = useRoute();
 const router = useRouter();
 
 const keyword = ref("");
-const appViewMode = ref("gallery");
+const appViewMode = ref(props.mode === "detail" || route.params.appId || route.query.appId ? "develop" : "gallery");
 const appLoading = ref(false);
 const previewingAppId = ref("");
 const apps = ref([]);
@@ -519,6 +528,11 @@ const appChatWrapRef = ref(null);
 const appFileInputRef = ref(null);
 const appSelectedFiles = ref([]);
 const fileTreeRef = ref(null);
+const localAiModels = ref([]);
+const localSelectedAiModel = ref(null);
+const localRelayModel = ref("");
+const localModelLoading = ref(false);
+const runtimePages = ref([]);
 let appAbortController = null;
 
 const createForm = reactive({
@@ -544,12 +558,15 @@ const appCategoryOptions = [
 
 const currentAiModel = computed({
     get() {
-        return props.selectedAiModel || null;
+        return props.selectedAiModel || localSelectedAiModel.value || null;
     },
     set(value) {
+        localSelectedAiModel.value = value || null;
         emit("update:selectedAiModel", value);
     }
 });
+const effectiveAiModels = computed(() => props.aiModels.length ? props.aiModels : localAiModels.value);
+const effectiveModelLoading = computed(() => props.modelLoading || localModelLoading.value);
 const currentUser = computed(() => diyStore.GetCurrentUser || {});
 const currentUserId = computed(() => String(currentUser.value?.Id || "").trim());
 const editorHeight = computed(() => "calc(100vh - 250px)");
@@ -571,21 +588,33 @@ const sourceFilesUnavailableReason = computed(() => files.value.length
     ? ""
     : "当前安装包只有已发布运行产物，没有携带私有源码。请从原开发服务器重新制作包含源码的离线包，或在保存了源码的服务器上用 VS Code 拉取。"
 );
-const isMicroServicePreview = computed(() => currentApp.value?.AppType === "MicroService");
+const isMicroServicePreview = computed(() => (currentApp.value?.ApplicationType || currentApp.value?.AppType) === "MicroService");
 const microServiceRoutes = computed(() => {
     const routeFile = files.value.find((item) => /(^|\/)microi\.routes\.json$/i.test(String(item?.FilePath || item?.FileName || "")));
+    let sourceRoutes = [];
     try {
         const routes = JSON.parse(String(routeFile?.Content || routeFile?.FileContent || "[]"));
-        return (Array.isArray(routes) ? routes : routes?.routes || []).map((item) => ({
+        sourceRoutes = Array.isArray(routes) ? routes : routes?.routes || [];
+    } catch {
+        sourceRoutes = [];
+    }
+    const merged = new Map();
+    [...sourceRoutes, ...runtimePages.value].forEach((item) => {
+        const path = normalizeMicroRoute(item?.path || item?.Path || item?.RoutePath || "/");
+        const old = merged.get(path) || {};
+        merged.set(path, {
             ...item,
-            path: normalizeMicroRoute(item?.path || item?.Path || item?.RoutePath || "/"),
-            name: String(item?.name || item?.Name || item?.PageKey || ""),
-            title: String(item?.title || item?.Title || item?.PageTitle || ""),
+            ...old,
+            path,
+            name: String(item?.name || item?.Name || item?.PageKey || old?.name || ""),
+            title: String(item?.title || item?.Title || item?.PageTitle || old?.title || ""),
+            sourceFile: ""
+        });
+    });
+    return Array.from(merged.values()).map((item) => ({
+            ...item,
             sourceFile: resolveRouteSourceFile(item)
         }));
-    } catch {
-        return [];
-    }
 });
 const previewMicroRoute = computed(() => {
     if (selectedPreviewRoute.value) return normalizeMicroRoute(selectedPreviewRoute.value);
@@ -598,9 +627,15 @@ const previewMicroAppName = computed(() => {
         .replace(/[^a-z0-9_-]+/g, "-")
         .replace(/^-+|-+$/g, "");
     if (!name || !/^[a-z]/.test(name)) name = `app-${name || "preview"}`;
-    return `${name.substring(0, 48)}-workbench`;
+    const routeName = previewMicroRoute.value
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "home";
+    return `${name.substring(0, 34)}-workbench-${routeName.substring(0, 24)}`;
 });
 const previewMicroAppVersion = computed(() => {
+    const runtimeVersion = String(currentApp.value?.RuntimeBuildVersion || "").trim();
+    if (runtimeVersion) return runtimeVersion;
     const match = String(previewUrl.value || "").match(/\/(v\d+\.\d+\.\d+)(?:\/|$)/i);
     return match?.[1] || formatVersionNo(getAppCurrentVersion(currentApp.value));
 });
@@ -609,7 +644,8 @@ const previewMicroAppEntryUrl = computed(() => {
     const osClient = encodeURIComponent(String(DiyCommon.GetOsClient ? DiyCommon.GetOsClient() : ""));
     const appKey = encodeURIComponent(String(currentApp.value?.AppKey || ""));
     const version = encodeURIComponent(previewMicroAppVersion.value);
-    return `${apiBase}/micro-app/${osClient}/${appKey}/${version}/index.html`;
+    const entryPath = String(currentApp.value?.RuntimeEntryPath || "index.html").replace(/^\/+/, "");
+    return `${apiBase}/micro-app/${osClient}/${appKey}/${version}/${entryPath}`;
 });
 const previewMicroAppKey = computed(() => `${previewMicroAppName.value}@${previewMicroAppEntryUrl.value}@${previewMicroRoute.value}`);
 const previewMicroAppData = computed(() => ({
@@ -632,7 +668,7 @@ const currentTreeFile = computed(() => fileTreeMode.value === "build" ? activeBu
 const sortedVersions = computed(() => [...(versions.value || [])].sort((a, b) => versionScore(b) - versionScore(a)));
 const currentChatModelId = computed(() => (
     /Microi(?:吾码)?\.?(?:AI)?中转站/i.test(`${currentAiModel.value?.Name || ""} ${currentAiModel.value?.AiModel || ""}`)
-        ? String(props.selectedRelayModel || "").trim()
+        ? String(props.selectedRelayModel || localRelayModel.value || "").trim()
         : String(currentAiModel.value?.AiModel || "").trim()
 ));
 const canSendAppChat = computed(() => (
@@ -644,21 +680,31 @@ const canSendAppChat = computed(() => (
 ));
 
 onMounted(async () => {
+    if (props.standalone) await loadStandaloneAiModels();
+    if (props.mode === "detail") {
+        await openAppFromRoute();
+        return;
+    }
     var routeToken = claimRouteOpen();
     await loadApps();
     await completeRouteOpen(routeToken);
 });
 
-watch(() => route.query.appId, async () => {
+watch(() => [route.params.appId, route.query.appId], async () => {
+    if (props.mode === "gallery") return;
     var routeToken = claimRouteOpen();
     // 给按 fullPath 创建的新实例一次挂载机会；新实例会立即覆盖旧令牌。
     await new Promise((resolve) => setTimeout(resolve, 50));
     await completeRouteOpen(routeToken);
 });
 
+watch(currentAiModel, () => {
+    if (props.standalone && isRelayModel(currentAiModel.value)) loadStandaloneRelayModels();
+});
+
 watch(currentUserId, (value, oldValue) => {
     if (!value || value === oldValue) return;
-    loadApps();
+    if (props.mode !== "detail") loadApps();
     if (currentApp.value?.Id) {
         loadAppChatHistory(currentApp.value.Id);
     }
@@ -683,6 +729,45 @@ function isOk(result) {
 function dataOf(result) {
     const current = unwrapResult(result);
     return current?.Data ?? current?.data ?? null;
+}
+
+function isRelayModel(model) {
+    return /Microi(?:吾码)?\.?(?:AI)?中转站/i.test(`${model?.Name || ""} ${model?.AiModel || ""}`);
+}
+
+async function loadStandaloneAiModels() {
+    localModelLoading.value = true;
+    try {
+        const result = await DiyCommon.FormEngine.GetTableData("mic_ai", {
+            _Where: [["IsEnable", "=", "1"]],
+            _SelectFields: ["Id", "Name", "AiModel", "ModelType", "Provider", "SupportReasoning", "IsRelayModel", "CreateTime"],
+            _OrderBy: "CreateTime",
+            _OrderByType: "DESC",
+            _PageSize: 100
+        });
+        if (!isOk(result)) throw new Error(unwrapResult(result)?.Msg || "加载 AI 模型失败");
+        localAiModels.value = Array.isArray(dataOf(result)) ? dataOf(result) : [];
+        if (!localSelectedAiModel.value && localAiModels.value.length) {
+            localSelectedAiModel.value = localAiModels.value[0];
+        }
+        if (isRelayModel(localSelectedAiModel.value)) await loadStandaloneRelayModels();
+    } catch (error) {
+        ElMessage.error(error?.message || "加载 AI 模型失败");
+    } finally {
+        localModelLoading.value = false;
+    }
+}
+
+async function loadStandaloneRelayModels() {
+    try {
+        const response = await fetch("https://api.itdos.com/apiengine/official_ai_relay_models?OsClient=iTdos");
+        const json = await response.json();
+        if (!response.ok || Number(json?.Code) !== 1) return;
+        const rows = Array.isArray(json?.Data) ? json.Data : Array.isArray(json?.Data?.Data) ? json.Data.Data : [];
+        localRelayModel.value = String(rows[0]?.id || rows[0]?.ModelId || "").trim();
+    } catch (error) {
+        console.warn("[AiApp] load relay models failed", error);
+    }
 }
 
 function buildFileTree(fileRows = []) {
@@ -925,6 +1010,11 @@ async function loadApps() {
                 _Where: [
                     ["ApplicationType", "In", ["Web", "UniApp", "MicroService"]]
                 ],
+                _SelectFields: [
+                    "Id", "Name", "AppName", "AppKey", "AppType", "ApplicationType", "Description",
+                    "Status", "OwnerUserId", "OwnerName", "CurrentVersion", "PreviewUrl", "BuildStatus",
+                    "LastBuildTaskId", "LastBuildMsg", "LastConversationId", "CreateTime", "UpdateTime"
+                ],
                 _OrderBy: "UpdateTime",
                 _OrderByType: "DESC",
                 _PageIndex: 1,
@@ -1109,7 +1199,7 @@ function selectVersionByKey(key) {
 
 async function selectApp(app) {
     currentApp.value = app;
-    previewDeviceMode.value = app?.AppType === "UniApp" ? "mobile" : "desktop";
+    previewDeviceMode.value = (app?.ApplicationType || app?.AppType) === "UniApp" ? "mobile" : "desktop";
     previewUrl.value = normalizePreviewUrl(app.PreviewUrl || "");
     activeFile.value = null;
     activeContent.value = "";
@@ -1118,16 +1208,19 @@ async function selectApp(app) {
     activeBuildFile.value = null;
     activeBuildContent.value = "";
     selectedPreviewRoute.value = "";
+    runtimePages.value = [];
     appChatMessages.value = [];
     try {
         const detail = await runAiAppEngine("ai_app_detail", { AppId: app.Id });
         const selected = detail?.App || app;
         currentApp.value = selected;
-        previewDeviceMode.value = selected?.AppType === "UniApp" ? "mobile" : "desktop";
+        const selectedType = selected?.ApplicationType || selected?.AppType;
+        previewDeviceMode.value = selectedType === "UniApp" ? "mobile" : "desktop";
         files.value = detail?.Files || [];
         versions.value = detail?.Versions || [];
-        if (selected?.AppType === "MicroService") {
+        if (selectedType === "MicroService") {
             await hydrateMicroServicePreviewMetadata(selected.Id);
+            await loadMicroServiceRuntimeMetadata(selected);
             const homeRoute = microServiceRoutes.value.find((item) => item?.isHome || item?.IsHome) || microServiceRoutes.value[0];
             selectedPreviewRoute.value = normalizeMicroRoute(homeRoute?.path || "/");
         }
@@ -1140,12 +1233,14 @@ async function selectApp(app) {
         const latestVersion = sortedVersions.value[0];
         if (latestVersion) {
             selectedVersionKey.value = versionKey(latestVersion);
-            previewUrl.value = selected.AppType === "MicroService"
-                ? normalizePreviewUrl(selected.PreviewUrl || "") || getVersionPreviewUrl(latestVersion)
+            previewUrl.value = selectedType === "MicroService" && currentApp.value?.RuntimeBuildVersion
+                ? previewMicroAppEntryUrl.value
                 : getVersionPreviewUrl(latestVersion) || normalizePreviewUrl(selected.PreviewUrl || "");
         } else {
             selectedVersionKey.value = "";
-            previewUrl.value = normalizePreviewUrl(selected.PreviewUrl || "");
+            previewUrl.value = selectedType === "MicroService" && currentApp.value?.RuntimeBuildVersion
+                ? previewMicroAppEntryUrl.value
+                : normalizePreviewUrl(selected.PreviewUrl || "");
         }
         await refreshPreviewHtml();
         const firstFile = files.value.find((item) => Number(item.IsDirectory || 0) !== 1);
@@ -1162,14 +1257,13 @@ async function selectApp(app) {
 async function enterDevelop(app) {
     var appId = String(app?.Id || "").trim();
     if (!appId) return;
-    var nextQuery = { ...route.query, workspace: "apps", appId };
     appViewMode.value = "develop";
     currentApp.value = app;
     var detailPromise = selectApp(app);
-    if (String(route.query.appId || "") !== appId || route.query.workspace !== "apps") {
+    if (String(route.params.appId || route.query.appId || "") !== appId || route.path.indexOf("/mic-ai-app/") !== 0) {
         await Promise.all([
             detailPromise,
-            router.push({ path: route.path, query: nextQuery })
+            router.push({ name: "mic_ai_app_detail", params: { appId } })
         ]);
     } else {
         await detailPromise;
@@ -1193,15 +1287,13 @@ async function completeRouteOpen(token) {
 }
 
 async function openAppFromRoute() {
-    var appId = String(route.query.appId || "").trim();
+    var appId = String(route.params.appId || route.query.appId || "").trim();
     if (!appId) {
         appViewMode.value = "gallery";
         return;
     }
-    if (!apps.value.length) return;
     if (appViewMode.value === "develop" && String(currentApp.value?.Id || "") === appId) return;
-    var app = apps.value.find((item) => String(item?.Id || "") === appId);
-    if (!app) return;
+    var app = apps.value.find((item) => String(item?.Id || "") === appId) || { Id: appId };
     appViewMode.value = "develop";
     await selectApp(app);
     if (previewUrl.value) activeView.value = "preview";
@@ -1234,9 +1326,7 @@ async function getPublishedPreviewUrl(app) {
 
 async function backToGallery() {
     appViewMode.value = "gallery";
-    var nextQuery = { ...route.query, workspace: "apps" };
-    delete nextQuery.appId;
-    await router.push({ path: route.path, query: nextQuery });
+    await router.push({ path: "/mci-ai-app" });
 }
 
 async function loadAppChatHistory(appId) {
@@ -1298,6 +1388,37 @@ async function openFile(file, options = {}) {
         if (focusSource) activeView.value = "source";
     } catch (error) {
         ElMessage.error(error.message || "读取文件失败");
+    }
+}
+
+async function loadMicroServiceRuntimeMetadata(app) {
+    const appKey = String(app?.AppKey || "").trim();
+    if (!appKey) return;
+    try {
+        const serviceResult = await DiyCommon.FormEngine.GetFormData("sys_microiservice", {
+            _Where: [["MsKey", "=", appKey]],
+            _SelectFields: ["Id", "MsKey", "MsName", "BuildVersion", "EntryPath", "IsEnable", "PublishTime"]
+        });
+        if (!serviceResult || Number(serviceResult.Code) !== 1 || !serviceResult.Data) return;
+        const service = serviceResult.Data;
+        currentApp.value = {
+            ...currentApp.value,
+            RuntimeServiceId: service.Id,
+            RuntimeBuildVersion: service.BuildVersion || "",
+            RuntimeEntryPath: service.EntryPath || "index.html"
+        };
+        const pageResult = await DiyCommon.FormEngine.GetTableData("sys_microiservice_page", {
+            _Where: [["MicroServiceId", "=", service.Id], ["AND", "IsEnable", "=", 1]],
+            _SelectFields: ["Id", "PageKey", "PageName", "PageTitle", "RoutePath", "EntryPath", "Sort", "IsHome", "IsEnable", "BuildVersion", "RouteMetaJson"],
+            _OrderBy: "Sort",
+            _OrderByType: "ASC",
+            _PageSize: 200
+        });
+        runtimePages.value = pageResult && Number(pageResult.Code) === 1 && Array.isArray(pageResult.Data)
+            ? pageResult.Data
+            : [];
+    } catch (error) {
+        console.warn("[AiApp] load micro service runtime metadata failed", error);
     }
 }
 

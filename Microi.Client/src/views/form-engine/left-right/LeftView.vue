@@ -139,7 +139,11 @@
             </div>
 
             <!-- 树形控件 -->
-            <div class="custom-tree-wrapper">
+            <div
+                class="custom-tree-wrapper"
+                v-loading="TreeLoading"
+                element-loading-text="正在加载项目..."
+            >
                 <div class="custom-tree-scroll">
                     <div
                         class="tree-all-node"
@@ -160,6 +164,7 @@
                         :load="lazy ? loadNode : null"
                         @node-click="handleCategoryClick"
                         :lazy="lazy"
+                        :empty-text="TreeLoading ? '正在加载...' : '暂无数据'"
                         :key="'tree-' + lazy + '-' + TreeData.treeRenderKey"
                         ref="categoryTree"
                     >
@@ -194,6 +199,20 @@
                         </template>
                     </el-tree>
                 </div>
+            </div>
+            <div class="tree-pagination" v-if="TreePage.DataCount > 0">
+                <el-pagination
+                    background
+                    small
+                    layout="total, sizes, prev, pager, next"
+                    :current-page="TreePage.PageIndex"
+                    :page-size="TreePage.PageSize"
+                    :page-sizes="TreePage.PageSizes"
+                    :pager-count="5"
+                    :total="TreePage.DataCount"
+                    @size-change="handleTreePageSizeChange"
+                    @current-change="handleTreePageChange"
+                />
             </div>
         </div>
     </div>
@@ -231,6 +250,14 @@ export default {
     data() {
         return {
             lazy: false,
+            TreeLoading: false,
+            TreeRequestId: 0,
+            TreePage: {
+                PageIndex: 1,
+                PageSize: 20,
+                PageSizes: [10, 20, 50, 100],
+                DataCount: 0
+            },
             TreeData: {
                 SearchFormData: {
                     inputText: "",
@@ -330,37 +357,57 @@ export default {
         // 获取树形数据
         async treeData() {
             var self = this;
-            if (self.LeftTreeData.ChushiHDM) {
-                var V8 = {
-                    Form: this.TreeData.SearchFormData
-                };
-                self.SetV8DefaultValue(V8);
-                await self.DiyCommon.InitV8Code(V8, self.$router);
-                try {
+            var requestId = ++self.TreeRequestId;
+            self.TreeLoading = true;
+            try {
+                if (self.LeftTreeData.ChushiHDM) {
+                    var V8 = {
+                        Form: {
+                            ...this.TreeData.SearchFormData,
+                            _PageIndex: self.TreePage.PageIndex,
+                            _PageSize: self.TreePage.PageSize
+                        }
+                    };
+                    self.SetV8DefaultValue(V8);
+                    await self.DiyCommon.InitV8Code(V8, self.$router);
                     await eval("(async () => {\n " + self.LeftTreeData.ChushiHDM + " \n})()");
                     var result = V8.Result;
-                    self.ApplyTreeData(result && result.Data ? result.Data : []);
-                } catch (error) {
-                    self.DiyCommon.Tips("执行初始化V8引擎代码出现错误：" + error.message, false);
-                } finally {
-                    
-                    
+                    if (requestId !== self.TreeRequestId) return;
+                    self.ApplyPagedTreeResult(result);
+                } else {
+                    var ShuxingGLCD = JSON.parse(self.LeftTreeData.ShuxingGLCD);
+                    const res = await new Promise((resolve) => {
+                        self.DiyCommon.Post(
+                            self.DiyCommon.GetApiBase() + "/api/FormEngine/GetDiyTableRowTree",
+                            {
+                                ModuleEngineKey: ShuxingGLCD[ShuxingGLCD.length - 1],
+                                _PageIndex: self.TreePage.PageIndex,
+                                _PageSize: self.TreePage.PageSize,
+                                Keyword: self.TreeData.SearchFormData.inputText || ""
+                            },
+                            function (response) {
+                                resolve(response);
+                            }
+                        );
+                    });
+                    if (requestId !== self.TreeRequestId) return;
+                    self.ApplyPagedTreeResult(res);
                 }
-            } else {
-                var ShuxingGLCD = JSON.parse(self.LeftTreeData.ShuxingGLCD);
-                const res = await new Promise((resolve, reject) => {
-                    self.DiyCommon.Post(
-                        self.DiyCommon.GetApiBase() + "/api/FormEngine/GetDiyTableRowTree",
-                        {
-                            ModuleEngineKey: ShuxingGLCD[ShuxingGLCD.length - 1]
-                        },
-                        function (res) {
-                            resolve(res);
-                        }
-                    );
-                });
-                self.ApplyTreeData(res.Data);
+            } catch (error) {
+                if (requestId === self.TreeRequestId) {
+                    self.DiyCommon.Tips("执行初始化V8引擎代码出现错误：" + error.message, false);
+                }
+            } finally {
+                if (requestId === self.TreeRequestId) {
+                    self.TreeLoading = false;
+                }
             }
+        },
+        ApplyPagedTreeResult(result) {
+            var data = result && Array.isArray(result.Data) ? result.Data : [];
+            var total = Number(result && result.DataCount);
+            this.TreePage.DataCount = Number.isFinite(total) && total >= 0 ? total : data.length;
+            this.ApplyTreeData(data);
         },
 
         // 获取下拉选项
@@ -393,10 +440,15 @@ export default {
                 await self.ClearTreeSearch();
                 return;
             }
+            self.TreePage.PageIndex = 1;
             if (self.LeftTreeData.ChufaSJ) {
                 var V8 = {
                     Origin: origin,
-                    Form: this.TreeData.SearchFormData
+                    Form: {
+                        ...this.TreeData.SearchFormData,
+                        _PageIndex: self.TreePage.PageIndex,
+                        _PageSize: self.TreePage.PageSize
+                    }
                 };
                 self.SetV8DefaultValue(V8);
                 await self.DiyCommon.InitV8Code(V8, self.$router);
@@ -404,7 +456,7 @@ export default {
                     await eval("(async () => {\n " + self.LeftTreeData.ChufaSJ + " \n})()");
                     var result = await V8.Result;
                     if (result && Array.isArray(result.Data)) {
-                        self.ApplyTreeData(result.Data);
+                        self.ApplyPagedTreeResult(result);
                     }
                 } catch (error) {
                     self.DiyCommon.Tips("执行搜索触发V8引擎代码出现错误：" + error.message, false);
@@ -412,6 +464,8 @@ export default {
                     
                     
                 }
+            } else if (self.LeftTreeData.ChushiHDM) {
+                await self.treeData();
             } else if (self.$refs.categoryTree && self.$refs.categoryTree.filter) {
                 self.$refs.categoryTree.filter(self.TreeData.SearchFormData.inputText || "");
             }
@@ -420,6 +474,7 @@ export default {
             var self = this;
             self.TreeData.SearchFormData.inputText = "";
             self.TreeData.SearchFormData.selectText = "";
+            self.TreePage.PageIndex = 1;
             await self.treeData();
             self.$nextTick(function () {
                 if (self.$refs.categoryTree) {
@@ -522,6 +577,15 @@ export default {
         // 刷新树
         refreshTree() {
             this.treeData();
+        },
+        async handleTreePageChange(pageIndex) {
+            this.TreePage.PageIndex = pageIndex;
+            await this.treeData();
+        },
+        async handleTreePageSizeChange(pageSize) {
+            this.TreePage.PageSize = pageSize;
+            this.TreePage.PageIndex = 1;
+            await this.treeData();
         },
 
         // 删除节点
@@ -698,6 +762,22 @@ export default {
     border-radius: 4px;
     margin-top: 10px;
     margin-bottom: 0;
+}
+
+.tree-pagination {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 0;
+    overflow: visible;
+}
+
+.tree-pagination :deep(.el-pagination) {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 6px;
+    white-space: normal;
 }
 
 /* 树形控件滚动区域 */

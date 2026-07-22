@@ -873,7 +873,7 @@
                                         v-if="SysMenuModel.TableCardImgField"
                                         :src="
                                             item[SysMenuModel.TableCardImgField]
-                                                ? GetFileServerUrl(item[SysMenuModel.TableCardImgField])
+                                                ? GetCardImageUrl(item, SysMenuModel.TableCardImgField)
                                                 : bodyBgSvg
                                         "
                                         class="preview"

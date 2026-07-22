@@ -54,10 +54,10 @@
                     </div>
                     <div class="form-actions">
                         <!-- 工作流：醒目的【发起流程/处理工作】按钮（PageMode 顶部） -->
-                        <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                        <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                             {{ WfTopSubmitBtnText }}
                         </el-button>
-                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
+                        <el-button v-if="FormMode != 'View' && !ShowWfTopSubmitBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" @click="SaveDiyTableCommonPage(true)">
                             {{ $t("Msg.Save") }}
                         </el-button>
                         <el-dropdown trigger="click">
@@ -190,11 +190,11 @@
                 <!--移动端底部固定操作条（Page模式）：保存/编辑/发起流程常驻在底部 -->
                 <div class="mobile-form-bottom-bar" v-if="diyStore.IsPhoneView && (ShowWfTopSubmitBtn || FormMode != 'View' || (FormMode == 'View' && ShowUpdateBtn))">
                     <el-button v-if="ShowWfTopSubmitBtn"
-                        :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                        :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                         @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
-                    <el-button v-else-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
+                    <el-button v-else-if="FormMode != 'View'" :loading="SaveDiyTableCommonLoding" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn" @click="SaveDiyTableCommonPage(true)">
                         {{ $t('Msg.Save') }}
                     </el-button>
                     <el-button v-else-if="FormMode == 'View' && ShowUpdateBtn" :loading="SaveDiyTableCommonLoding" type="primary" :icon="Edit" class="mobile-form-bottom-btn" @click="GotoEdit()">
@@ -271,7 +271,7 @@
                 </div>
                 <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Dialog模式顶部） -->
-                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
                     <el-dropdown
@@ -469,12 +469,12 @@
                 || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
             )">
                 <el-button v-if="ShowWfTopSubmitBtn"
-                    :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="TriggerWfSubmit()">
                     {{ WfTopSubmitBtnText }}
                 </el-button>
                 <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
-                    :loading="BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    :loading="BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="SaveDiyTableCommon(true, 'Close')">
                     {{ $t('Msg.Save') }}
                 </el-button>
@@ -558,7 +558,7 @@
                 </div>
                 <div v-if="!diyStore.IsPhoneView" style="display: flex;gap: 10px;align-items: center;justify-content: center;">
                     <!-- 工作流：醒目的【发起流程/处理工作】按钮（Drawer模式顶部） -->
-                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" @click="TriggerWfSubmit()">
+                    <el-button v-if="ShowWfTopSubmitBtn" :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" @click="TriggerWfSubmit()">
                         {{ WfTopSubmitBtnText }}
                     </el-button>
                     <el-dropdown
@@ -768,12 +768,12 @@
                 || (FormMode == 'View' && LimitEdit() && ShowUpdateBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork')
             )">
                 <el-button v-if="ShowWfTopSubmitBtn"
-                    :loading="WfSubmitting || BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    :loading="WfSubmitting || BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="TriggerWfSubmit()">
                     {{ WfTopSubmitBtnText }}
                 </el-button>
                 <el-button v-else-if="FormMode != 'View' && ShowSaveBtn && OpenDiyFormWorkFlowType.WorkType != 'StartWork'"
-                    :loading="BtnLoading" type="danger" :icon="SuccessFilled" class="mobile-form-bottom-btn"
+                    :loading="BtnLoading" type="primary" :icon="SuccessFilled" class="mobile-form-bottom-btn"
                     @click="SaveDiyTableCommon(true, 'Close')">
                     {{ $t('Msg.Save') }}
                 </el-button>

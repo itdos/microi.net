@@ -53,6 +53,90 @@ export default {
             }
             return self.SysConfig.FileServer.TrimEnd('/') + urlPah;
         },
+
+        /**
+         * 卡片图片字段是否属于私有文件。
+         * sys_user.Avatar 是系统安全约定，即使旧缓存暂未带回字段 Config 也必须按私有文件处理。
+         */
+        IsPrivateCardImageField(fieldName) {
+            var self = this;
+            var tableName = String(
+                (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
+                || (self.SysMenuModel && self.SysMenuModel.DiyTableName)
+                || self.TableName
+                || ""
+            ).toLowerCase();
+            if (tableName === "sys_user" && String(fieldName || "").toLowerCase() === "avatar") {
+                return true;
+            }
+
+            var field = Array.isArray(self.DiyFieldList)
+                ? self.DiyFieldList.find(function (item) {
+                    return item && (item.Name === fieldName || item.AsName === fieldName);
+                })
+                : null;
+            if (!field || !field.Config) return false;
+
+            var config = field.Config;
+            if (typeof config === "string") {
+                try {
+                    config = JSON.parse(config);
+                } catch (error) {
+                    return false;
+                }
+            }
+            var uploadConfig = config && (config.ImgUpload || config.FileUpload || config.Upload);
+            var limit = uploadConfig && uploadConfig.Limit;
+            return limit === true || limit === 1 || String(limit).toLowerCase() === "true";
+        },
+
+        /**
+         * 获取卡片图片地址。私有图片首次渲染先显示占位图，签名完成后由响应式缓存自动替换。
+         */
+        GetCardImageUrl(row, fieldName) {
+            var self = this;
+            var rawValue = row && row[fieldName];
+            if (!rawValue) return self.bodyBgSvg;
+            if (!self.IsPrivateCardImageField(fieldName)) return self.GetFileServerUrl(rawValue);
+
+            var rawKey;
+            try {
+                rawKey = typeof rawValue === "string" ? rawValue : JSON.stringify(rawValue);
+            } catch (error) {
+                rawKey = String(rawValue);
+            }
+            var cacheKey = String(fieldName || "") + "|" + rawKey;
+            if (self._privateCardImageUrls[cacheKey]) return self._privateCardImageUrls[cacheKey];
+            if (!self._privateCardImagePending[cacheKey]) {
+                self._privateCardImagePending[cacheKey] = true;
+                var tableName = String(
+                    (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
+                    || (self.SysMenuModel && self.SysMenuModel.DiyTableName)
+                    || self.TableName
+                    || ""
+                ).toLowerCase();
+                var field = Array.isArray(self.DiyFieldList)
+                    ? self.DiyFieldList.find(function (item) {
+                        return item && (item.Name === fieldName || item.AsName === fieldName);
+                    })
+                    : null;
+                var resolver = tableName === "sys_user" && String(fieldName || "").toLowerCase() === "avatar"
+                    ? self.DiyCommon.GetUserAvatarUrl(rawValue, row && row.Id)
+                    : self.DiyCommon.GetPrivateFileUrl(rawValue, {
+                        FormEngineKey: tableName,
+                        FormDataId: row && row.Id,
+                        FieldId: (field && field.Id) || fieldName
+                    });
+                Promise.resolve(resolver).then(function (url) {
+                    self._privateCardImageUrls[cacheKey] = url || self.bodyBgSvg;
+                }).catch(function () {
+                    self._privateCardImageUrls[cacheKey] = self.bodyBgSvg;
+                }).finally(function () {
+                    delete self._privateCardImagePending[cacheKey];
+                });
+            }
+            return self.bodyBgSvg;
+        },
         
         /**
          * 获取第一张图片URL
