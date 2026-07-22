@@ -53,7 +53,7 @@ $topHeight: 40px;
 
 @include go(content-charts) {
   width: $width;
-  @extend .go-transition;
+  @extend %go-transition;
   &.scoped,
   .menu-width {
     width: $widthScoped;

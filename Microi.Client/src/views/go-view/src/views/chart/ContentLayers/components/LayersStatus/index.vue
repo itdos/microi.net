@@ -73,7 +73,7 @@ $activeColor: v-bind('themeColor');
   .icon-item {
     opacity: 0;
     padding-top: 5px;
-    @extend.go-transition;
+    @extend %go-transition;
     &.active,
     &:hover {
       color: $activeColor;

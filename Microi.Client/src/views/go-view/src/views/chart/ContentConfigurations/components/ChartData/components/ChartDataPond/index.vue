@@ -156,7 +156,7 @@ onBeforeUnmount(() => {
   align-items: center;
   .n-card-shallow {
     &.n-card {
-      @extend .go-background-filter;
+      @extend %go-background-filter;
       @include deep() {
         .n-card__content {
           padding: 10px;
@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
       cursor: pointer;
       opacity: 0;
       transition: all 0.3s;
-      @extend .go-background-filter;
+      @extend %go-background-filter;
       backdrop-filter: blur(2px) !important;
     }
     &:hover {

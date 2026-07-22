@@ -1,15 +1,14 @@
-@import "./var.scss";
+@import "./resources.scss";
 @import "./format.scss";
 @import "./animation.scss";
-@import "./mixins/mixins.scss";
 
 // 过度
 .go-transition {
-  transition: all 0.4s;
+  @extend %go-transition;
 }
 
 .go-transition-quick {
-  transition: all 0.2s;
+  @extend %go-transition-quick;
 }
 
 .go-flex-center {
@@ -48,16 +47,12 @@
 
 // 毛玻璃
 .go-background-filter {
-  backdrop-filter: $--filter-blur-base;
-  @include fetch-bg-color("filter-color");
-  box-shadow: $--border-shadow;
+  @extend %go-background-filter;
 }
 
 // 毛玻璃
 .go-background-filter-shallow {
-  backdrop-filter: $--filter-blur-base;
-  @include fetch-bg-color("filter-color-shallow");
-  box-shadow: $--border-shadow;
+  @extend %go-background-filter-shallow;
 }
 
 // 边框圆角
@@ -68,8 +63,7 @@
 
 // 背景斑点需配合 @mixin background-image 使用
 .go-point-bg {
-  @include fetch-theme-custom("background-color", "background-color1");
-  background-size: 15px 15px, 15px 15px;
+  @extend %go-point-bg;
 }
 
 // 省略号

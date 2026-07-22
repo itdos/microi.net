@@ -222,7 +222,7 @@ $asideMiniHeight: 22px;
 $asideBottom: 70px;
 
 @include go('chart-edit-tools') {
-  @extend .go-background-filter;
+  @extend %go-background-filter;
   position: absolute;
   display: flex;
   justify-content: space-around;
