@@ -1,77 +1,27 @@
-﻿using Dos.Common;
-using Microi.net;
 using RabbitMQ.Client;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Microi.net
 {
-    public class MicroiRabbitMQSingleConnection : IMicroiMQConnection
+    internal sealed class MicroiRabbitMQSingleConnection : TenantRabbitMQConnectionBase
     {
-        private static IConnection publishConnection;
-        private static IConnection receiveConnection;
-        private static object publishConnectionLock = new object();
-        private static object receiveConnectionLock = new object();
-
-        /// <summary>
-        /// 获取生产者连接，使用单例
-        /// </summary>
-        /// <returns></returns>
-        public IConnection GetPublishConnection()
+        protected override Task<IConnection> CreateConnectionAsync(
+            TenantRabbitMQConnectionSettings settings,
+            string role,
+            CancellationToken cancellationToken)
         {
-            if (publishConnection == null)
+            var factory = CreateFactory(settings, role);
+            if (settings.Hosts.Count == 1)
             {
-                lock (publishConnectionLock)
-                {
-                    if (publishConnection == null)
-                    {
-                        //publishConnection = GetConnectionFactory().CreateConnection();
-                        publishConnection = GetConnectionFactory().CreateConnectionAsync().GetAwaiter().GetResult();
-                    }
-                }
+                return factory.CreateConnectionAsync(cancellationToken);
             }
 
-            return publishConnection;
-        }
-
-        /// <summary>
-        /// 获取消费者连接，使用单例
-        /// </summary>
-        /// <returns></returns>
-        public IConnection GetReceiveConnection()
-        {
-            if (receiveConnection == null)
-            {
-                lock (receiveConnectionLock)
-                {
-                    if (receiveConnection == null)
-                    {
-                        //receiveConnection = GetConnectionFactory().CreateConnection();
-                        receiveConnection = GetConnectionFactory().CreateConnectionAsync().GetAwaiter().GetResult();
-                    }
-                }
-            }
-
-            return receiveConnection;
-        }
-
-        private ConnectionFactory GetConnectionFactory()
-        {
-            var osClientName = DiyToken.GetCurrentOsClient();
-            var clientModel = OsClient.GetClient(osClientName);
-            // 此处账号密码以及ip和端口都要走配置
-            var connectionFactory = new ConnectionFactory()
-            {
-                HostName = clientModel.OsClientModel["MQHost"].Val<string>(),
-                Port = Convert.ToInt32(clientModel.OsClientModel["MQPort"].Val<string>()),
-                UserName = clientModel.OsClientModel["MQUserName"].Val<string>(),
-                Password = clientModel.OsClientModel["MQPassword"].Val<string>(),
-                VirtualHost = clientModel.OsClientModel["MQVitrualHost"].Val<string>()
-            };
-            return connectionFactory;
+            var endpoints = settings.Hosts
+                .Select(host => new AmqpTcpEndpoint { HostName = host, Port = settings.Port })
+                .ToList();
+            return factory.CreateConnectionAsync(endpoints, cancellationToken);
         }
     }
 }

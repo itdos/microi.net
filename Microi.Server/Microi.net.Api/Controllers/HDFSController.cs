@@ -19,32 +19,156 @@ namespace Microi.net.Api
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public partial class HDFSController : Controller
     {
-        private async Task DefaultParam(DiyUploadParam param)
+        private async Task<DosResult> DefaultParam(DiyUploadParam param)
         {
-            var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            if (currentTokenDynamic != null)
-            {
-                param._CurrentUser = currentTokenDynamic.CurrentUser;
-                param.OsClient = currentTokenDynamic.OsClient;
-            }
-            param._InvokeType = InvokeType.Client.ToString();
-        }
-
-        private string ResolveOsClient(DiyUploadParam param)
-        {
-            var osClient = param.OsClient;
-            if (osClient.DosIsNullOrWhiteSpace()) osClient = Request.Query["OsClient"].ToString();
-            if (osClient.DosIsNullOrWhiteSpace()) osClient = Request.Headers["OsClient"].ToString();
-            if (osClient.DosIsNullOrWhiteSpace()) osClient = Request.Headers["osclient"].ToString();
+            dynamic currentTokenDynamic;
             try
             {
-                if (osClient.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                currentTokenDynamic = await DiyToken.GetCurrentToken();
+            }
+            catch
+            {
+                return new DosResult(1001, null, "登录身份无效，请重新登录！");
+            }
+            string tokenOsClient = currentTokenDynamic == null
+                ? ""
+                : Convert.ToString(currentTokenDynamic.OsClient);
+            if (currentTokenDynamic == null
+                || currentTokenDynamic.CurrentUser == null
+                || tokenOsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(1001, null, "登录身份已过期，请重新登录！");
+            }
+
+            if (!TryResolveRequestedOsClient(param, out var requestedOsClient, out var resolveError))
+            {
+                return resolveError;
+            }
+
+            var authenticatedOsClient = tokenOsClient.Trim();
+            if (!requestedOsClient.DosIsNullOrWhiteSpace()
+                && !string.Equals(requestedOsClient, authenticatedOsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(0, null, "请求租户与当前登录租户不一致！");
+            }
+
+            param._CurrentUser = currentTokenDynamic.CurrentUser;
+            param.OsClient = authenticatedOsClient;
+            param._InvokeType = InvokeType.Client.ToString();
+            return null;
+        }
+
+        private bool TryResolveRequestedOsClient(DiyUploadParam param, out string osClient, out DosResult error)
+        {
+            osClient = "";
+            error = null;
+            var values = new List<string>();
+            AddRequestedOsClient(values, param?.OsClient);
+            AddRequestedOsClient(values, Request.Query["OsClient"].ToString());
+            AddRequestedOsClient(values, Request.Headers["OsClient"].ToString());
+            AddRequestedOsClient(values, Request.Headers["osclient"].ToString());
+            try
+            {
+                if (Request.HasFormContentType)
                 {
-                    osClient = Request.Form["OsClient"].ToString();
+                    AddRequestedOsClient(values, Request.Form["OsClient"].ToString());
                 }
             }
             catch (InvalidOperationException) { }
-            return osClient;
+
+            var distinctValues = values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (distinctValues.Count > 1)
+            {
+                error = new DosResult(0, null, "请求中存在互相冲突的OsClient参数！");
+                return false;
+            }
+            if (distinctValues.Count == 0) return true;
+
+            try
+            {
+                osClient = TenantConfigurationSecurity.NormalizeTenantId(distinctValues[0]);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = new DosResult(0, null, "OsClient不合法：" + ex.Message);
+                return false;
+            }
+        }
+
+        private static void AddRequestedOsClient(ICollection<string> values, string value)
+        {
+            if (!value.DosIsNullOrWhiteSpace()) values.Add(value.Trim());
+        }
+
+        private bool TryValidateAuthenticatedOsClient(JObject body, string authenticatedOsClient, out DosResult error)
+        {
+            error = null;
+            var requestParam = new DiyUploadParam { OsClient = TokenString(body?["OsClient"]) };
+            if (!TryResolveRequestedOsClient(requestParam, out var requestedOsClient, out error)) return false;
+            if (!requestedOsClient.DosIsNullOrWhiteSpace()
+                && !string.Equals(requestedOsClient, authenticatedOsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                error = new DosResult(0, null, "请求租户与当前登录租户不一致！");
+                return false;
+            }
+            return true;
+        }
+
+        private static DosResult NormalizeFilePaths(DiyUploadParam param, bool allowEmpty = false)
+        {
+            try
+            {
+                var hasSinglePath = !param.FilePathName.DosIsNullOrWhiteSpace();
+                var hasMultiplePaths = param.FilePathNames != null && param.FilePathNames.Count > 0;
+                if (hasSinglePath)
+                {
+                    param.FilePathName = TenantConfigurationSecurity.NormalizeStoragePath(
+                        param.OsClient, param.FilePathName);
+                }
+                if (hasMultiplePaths)
+                {
+                    param.FilePathNames = param.FilePathNames
+                        .Select(path => TenantConfigurationSecurity.NormalizeStoragePath(param.OsClient, path))
+                        .ToList();
+                }
+                if (!hasSinglePath && !hasMultiplePaths && !allowEmpty)
+                {
+                    return new DosResult(0, null, "文件路径不能为空！");
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "文件路径不合法：" + ex.Message);
+            }
+        }
+
+        private static DosResult NormalizeObjectPath(DiyUploadParam param, bool allowEmpty = false)
+        {
+            try
+            {
+                param.Path = TenantConfigurationSecurity.NormalizeStoragePath(
+                    param.OsClient, param.Path, allowEmpty);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "文件路径不合法：" + ex.Message);
+            }
+        }
+
+        private static DosResult NormalizeUploadPath(DiyUploadParam param)
+        {
+            try
+            {
+                param.Path = TenantConfigurationSecurity.NormalizeUploadSubPath(param.OsClient, param.Path);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "上传目录不合法：" + ex.Message);
+            }
         }
 
         private string ResolveRequestToken()
@@ -134,48 +258,6 @@ namespace Microi.net.Api
             return null;
         }
 
-        private static bool HasUnsafePathSegment(string value)
-        {
-            if (value.DosIsNullOrWhiteSpace()) return true;
-            var normalized = value.Trim().Replace("\\", "/");
-            var isAbsoluteWebUrl = false;
-            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-            {
-                normalized = uri.AbsolutePath.TrimStart('/');
-                isAbsoluteWebUrl = true;
-            }
-            if (normalized.Contains("..") || normalized.Contains(":") || normalized.Contains("//")) return true;
-            if ((!isAbsoluteWebUrl && normalized.StartsWith("/")) || normalized.StartsWith("~")) return true;
-            return false;
-        }
-
-        private static string NormalizeTenantFilePath(string filePathName)
-        {
-            var normalized = filePathName.Trim().Replace("\\", "/");
-            if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-            {
-                normalized = uri.AbsolutePath;
-            }
-            return normalized.Trim().Trim('/').ToLower();
-        }
-
-        private static bool IsSafeClientUploadPath(string path)
-        {
-            if (HasUnsafePathSegment(path)) return false;
-            var normalized = path.Trim().Trim('/').Replace("\\", "/");
-            if (normalized.DosIsNullOrWhiteSpace()) return false;
-            return normalized.Split('/').All(item => !item.DosIsNullOrWhiteSpace());
-        }
-
-        private static bool IsTenantFilePath(string osClient, string filePathName)
-        {
-            if (osClient.DosIsNullOrWhiteSpace() || filePathName.DosIsNullOrWhiteSpace()) return false;
-            var normalized = NormalizeTenantFilePath(filePathName);
-            if (normalized.DosIsNullOrWhiteSpace() || normalized.Contains("..") || normalized.Contains(":") || normalized.Contains("//") || normalized.StartsWith("~")) return false;
-            var client = osClient.Trim('/').ToLower();
-            return normalized == client || normalized.StartsWith(client + "/");
-        }
-
         private void LoadFormFiles(DiyUploadParam param)
         {
             param.Files = new Dictionary<string, Stream>();
@@ -214,6 +296,10 @@ namespace Microi.net.Api
             }
             if (param.OsClient.DosIsNullOrWhiteSpace()) param.OsClient = json["OsClient"]?.Val<string>();
             if (param.FilePathName.DosIsNullOrWhiteSpace()) param.FilePathName = json["FilePathName"]?.Val<string>();
+            if ((param.FilePathNames == null || param.FilePathNames.Count == 0) && json["FilePathNames"] is JArray filePaths)
+            {
+                param.FilePathNames = filePaths.Select(item => item.Val<string>()).ToList();
+            }
             if (param.Path.DosIsNullOrWhiteSpace()) param.Path = json["Path"]?.Val<string>();
             if (param.Limit == null && json["Limit"] != null) param.Limit = json["Limit"]?.Val<bool>();
             if (param.Preview == null && json["Preview"] != null) param.Preview = json["Preview"]?.Val<bool>();
@@ -230,7 +316,10 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> Upload(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
+            var pathError = NormalizeUploadPath(param);
+            if (pathError != null) return Json(pathError);
 
             #region 测试手动传入文件流，也可以不用这样
             param.Files = new Dictionary<string, Stream>();
@@ -264,7 +353,10 @@ namespace Microi.net.Api
                 return await Upload(param);
             }
 
-            var osClient = ResolveOsClient(param);
+            if (!TryResolveRequestedOsClient(param, out var osClient, out var osClientError))
+            {
+                return Json(osClientError);
+            }
             var clientUser = await GetClientUserFromToken(osClient);
             if (clientUser == null)
             {
@@ -272,12 +364,13 @@ namespace Microi.net.Api
             }
 
             param.Path = ResolveUploadPath(param);
-            if (!IsSafeClientUploadPath(param.Path))
+            param.OsClient = osClient;
+            var pathError = NormalizeUploadPath(param);
+            if (pathError != null)
             {
-                return Json(new DosResult(0, null, "移动端文件上传路径不合法！"));
+                return Json(pathError);
             }
 
-            param.OsClient = osClient;
             param._CurrentUser = clientUser;
             param._InvokeType = InvokeType.Client.ToString();
             param.Limit ??= true;
@@ -301,28 +394,29 @@ namespace Microi.net.Api
             var currentToken = await DiyToken.GetCurrentToken();
             if (currentToken?.CurrentUser != null)
             {
-                param._CurrentUser = currentToken.CurrentUser;
-                param.OsClient = currentToken.OsClient;
-                param._InvokeType = InvokeType.Client.ToString();
+                var accessError = await DefaultParam(param);
+                if (accessError != null) return Json(accessError);
+                var pathError = NormalizeFilePaths(param);
+                if (pathError != null) return Json(pathError);
                 var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
                 return Json(platformResult);
             }
 
-            var osClient = ResolveOsClient(param);
+            if (!TryResolveRequestedOsClient(param, out var osClient, out var osClientError))
+            {
+                return Json(osClientError);
+            }
             var clientUser = await GetClientUserFromToken(osClient);
             if (clientUser == null)
             {
                 return Json(new DosResult(1001, null, "登录身份已过期！"));
             }
-            if (!IsTenantFilePath(osClient, param.FilePathName))
-            {
-                return Json(new DosResult(0, null, "移动端仅允许访问当前租户文件！"));
-            }
-
             param.OsClient = osClient;
             param._CurrentUser = clientUser;
             param._InvokeType = InvokeType.Client.ToString();
             param.Limit = true;
+            var clientPathError = NormalizeFilePaths(param);
+            if (clientPathError != null) return Json(clientPathError);
             var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
             return Json(result);
         }
@@ -371,28 +465,29 @@ namespace Microi.net.Api
             var currentToken = await DiyToken.GetCurrentToken();
             if (currentToken?.CurrentUser != null)
             {
-                param._CurrentUser = currentToken.CurrentUser;
-                param.OsClient = currentToken.OsClient;
-                param._InvokeType = InvokeType.Client.ToString();
+                var accessError = await DefaultParam(param);
+                if (accessError != null) return Json(accessError);
+                var pathError = NormalizeFilePaths(param);
+                if (pathError != null) return Json(pathError);
                 var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
                 return Json(platformResult);
             }
 
-            var osClient = ResolveOsClient(param);
+            if (!TryResolveRequestedOsClient(param, out var osClient, out var osClientError))
+            {
+                return Json(osClientError);
+            }
             var clientUser = await GetClientUserFromToken(osClient);
             if (clientUser == null)
             {
                 return Json(new DosResult(1001, null, "登录身份已过期！"));
             }
-            if (!IsTenantFilePath(osClient, param.FilePathName))
-            {
-                return Json(new DosResult(0, null, "移动端仅允许访问当前租户文件！"));
-            }
-
             param.OsClient = osClient;
             param._CurrentUser = clientUser;
             param._InvokeType = InvokeType.Client.ToString();
             param.Limit = true;
+            var clientPathError = NormalizeFilePaths(param);
+            if (clientPathError != null) return Json(clientPathError);
             var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
             return Json(result);
         }
@@ -407,10 +502,25 @@ namespace Microi.net.Api
             }
 
             var osClient = currentToken.OsClient?.ToString();
+            if (!TryValidateAuthenticatedOsClient(param, osClient, out var osClientError))
+            {
+                return Json(osClientError);
+            }
             var context = await ResolveOfficeFileContext(param, osClient);
             if (context.Error != null) return Json(context.Error);
 
             var filePathName = TokenString(param["FilePathName"]);
+            if (!filePathName.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    filePathName = TenantConfigurationSecurity.NormalizeStoragePath(osClient, filePathName);
+                }
+                catch (Exception ex)
+                {
+                    return Json(new DosResult(0, null, "文件路径不合法：" + ex.Message));
+                }
+            }
             var fileMeta = FindOfficeFileMeta(context.FieldValue, filePathName);
             return Json(new DosResult(1, new
             {
@@ -431,6 +541,10 @@ namespace Microi.net.Api
             }
 
             var osClient = currentToken.OsClient?.ToString();
+            if (!TryValidateAuthenticatedOsClient(param, osClient, out var osClientError))
+            {
+                return Json(osClientError);
+            }
             var downloadUrl = TokenString(param["DownloadUrl"]);
             var sourceFilePath = TokenString(param["FilePathName"]);
             var hdfs = TokenString(param["HDFS"]);
@@ -444,9 +558,13 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "FilePathName不能为空！"));
             }
-            if (!IsTenantFilePath(osClient, sourceFilePath))
+            try
             {
-                return Json(new DosResult(0, null, "仅允许保存当前租户文件！"));
+                sourceFilePath = TenantConfigurationSecurity.NormalizeStoragePath(osClient, sourceFilePath);
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "文件路径不合法：" + ex.Message));
             }
 
             var onlyOfficeApiBase = await GetOnlyOfficeApiBase(osClient);
@@ -977,7 +1095,10 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> ListObjects(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
+            var pathError = NormalizeObjectPath(param, allowEmpty: true);
+            if (pathError != null) return Json(pathError);
             var result = await new MicroiHDFS().ListObjects(param);
             return Json(result);
         }
@@ -989,12 +1110,15 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> DeleteObject(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
                 return Json(new DosResult(0, null, "FilePathName不能为空！"));
             }
+            var pathError = NormalizeFilePaths(param);
+            if (pathError != null) return Json(pathError);
 
             var result = await new MicroiHDFS().DeleteObject(param);
             return Json(result);
@@ -1007,12 +1131,15 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> CreateFolder(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
                 return Json(new DosResult(0, null, "FilePathName不能为空！"));
             }
+            var pathError = NormalizeFilePaths(param);
+            if (pathError != null) return Json(pathError);
 
             var result = await new MicroiHDFS().CreateFolder(param);
             return Json(result);
@@ -1025,7 +1152,8 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> RenameObject(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
@@ -1035,6 +1163,10 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "新路径Path不能为空！"));
             }
+            var sourcePathError = NormalizeFilePaths(param);
+            if (sourcePathError != null) return Json(sourcePathError);
+            var destinationPathError = NormalizeObjectPath(param);
+            if (destinationPathError != null) return Json(destinationPathError);
 
             var result = await new MicroiHDFS().RenameObject(param);
             return Json(result);
@@ -1047,7 +1179,8 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> MoveObject(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
@@ -1057,6 +1190,10 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "目标路径Path不能为空！"));
             }
+            var sourcePathError = NormalizeFilePaths(param);
+            if (sourcePathError != null) return Json(sourcePathError);
+            var destinationPathError = NormalizeObjectPath(param);
+            if (destinationPathError != null) return Json(destinationPathError);
 
             var result = await new MicroiHDFS().MoveObject(param);
             return Json(result);
@@ -1070,7 +1207,10 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> FileManageUpload(DiyUploadParam param)
         {
-            await DefaultParam(param);
+            var accessError = await DefaultParam(param);
+            if (accessError != null) return Json(accessError);
+            var pathError = NormalizeUploadPath(param);
+            if (pathError != null) return Json(pathError);
 
             param.Files = new Dictionary<string, Stream>();
             if (HttpContext.Request.HasFormContentType)

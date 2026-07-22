@@ -1427,7 +1427,11 @@ namespace Microi.net
 
         public DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true, string source = "startup")
         {
-            var osClients = OsClientExtend.ClientList.Keys.ToList();
+            var osClients = OsClientExtend.ClientList.Keys
+                .Select(ResolveLangSyncOsClient)
+                .Where(item => !IsBlank(item))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
             if (osClients.Count == 0)
             {
                 var defaultOsClient = ResolveLangSyncOsClient("");
@@ -1436,10 +1440,7 @@ namespace Microi.net
                     osClients.Add(defaultOsClient);
                 }
             }
-            var distinctClients = osClients
-                .Where(item => !IsBlank(item))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var distinctClients = osClients;
             if (Interlocked.Exchange(ref DiyLangAllClientSyncRunning, 1) == 1)
             {
                 return new DosResult(1, distinctClients, "DiyLang all-client sync is already running.");
@@ -3169,7 +3170,7 @@ namespace Microi.net
                 || message.IndexOf("bad request", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        private static string ResolveLangSyncOsClient(string osClient)
+        private string ResolveLangSyncOsClient(string osClient)
         {
             if (IsBlank(osClient))
             {
@@ -3183,7 +3184,7 @@ namespace Microi.net
             {
                 osClient = OsClientDefault.OsClient;
             }
-            return osClient?.DosTrim();
+            return EnforceConfigurationOsClient(osClient?.DosTrim());
         }
 
         private static string GetTranslateProviderKey(string osClient)

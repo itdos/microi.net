@@ -5,7 +5,7 @@ description: Microi V8 SaaS 多租户指南。用于处理 OsClient、OsClientTy
 
 # Microi V8 SaaS 多租户引擎
 
-你正在为 Microi 吾码平台编写多租户（SaaS）相关代码。SaaS 引擎为每个租户配置独立的数据库、Redis、MQ、存储、第三方密钥等，**所有 V8 代码都在租户上下文中运行**。
+你正在为 Microi 吾码平台编写多租户（SaaS）相关代码。每个租户使用独立数据库账号；Redis、对象存储、RabbitMQ、MQTT 和搜索集群可以共享基础设施，但必须使用租户命名空间与独立服务凭据，**所有 V8 代码都在租户上下文中运行**。
 
 ## 核心概念
 
@@ -25,22 +25,26 @@ Microi 多租户 = **`OsClient` + `OsClientType` + `OsClientNetwork`** 三参数
 V8.OsClient            // 当前租户标识，如 'veken'
 V8.OsClientType        // 'Normal' / 'App' / 'Wechat'
 V8.OsClientNetwork     // 'Intranet' / 'Outernet'
-V8.OsClientModel       // 当前租户敏感配置对象（数据库、密钥等，仅服务端可访问）
+V8.OsClientModel       // 当前租户 SaaS 配置的脱敏副本
+V8.ClientModel         // OsClientModel 的兼容别名，同样是脱敏副本
+V8.SysConfig           // 当前租户 sys_config 的独立脱敏副本
 ```
+
+`V8.SysConfig` 与 `V8.FormEngine.GetSysConfig(...)` 不暴露 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 或疑似凭据字段；子租户显式传其它 `OsClient` 也会被强制改回当前租户。
 
 ### V8.OsClientModel 常用字段
 
 ```javascript
 V8.OsClientModel.SysTitle              // 租户系统标题
-V8.OsClientModel.DbType                // 'MySql' / 'Oracle' / 'SqlServer'
-V8.OsClientModel.DbConnString          // 主库连接串
-V8.OsClientModel.DbReadConnString      // 从库连接串
-V8.OsClientModel.RedisHost / RedisPort
-V8.OsClientModel.MQHost / MQUserName / MQPassword
-V8.OsClientModel.HDFSStorageType       // 'Aliyun' / 'MinIO' / 'AmazonS3'
-V8.OsClientModel.AliyunOSSAccessKeyId
-V8.OsClientModel.AliyunOSSAccessKeySecret
-// ... 任何用户在 sys_osclient 表中扩展的字段
+V8.OsClientModel.DbType                // 非敏感数据库类型
+V8.OsClientModel.HDFS                  // 'Aliyun' / 'MinIO' / 'S3'
+V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
+// 当前租户自行扩展的业务集成字段仍可读取
+
+// 以下基础设施字段不会注入 V8：
+// DbConn / DbReadConn / AuthSecret
+// RedisHost / RedisPwd / MinIOSecretKey / AliOss*AccessKey*
+// MQHost / MQUserName / MQPassword / MqttPwd / SearchEngineApiKey
 ```
 
 ## 平台级配置与主租户规则
@@ -53,6 +57,9 @@ V8.OsClientModel.AliyunOSSAccessKeySecret
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
 - 修改 `sys_osclients` 的表、字段、数据源或配置值后，必须刷新 SaaS 引擎运行缓存，并回读验证字段 `Component`、`Data`、`Config`、实际数据值和前端真实消费结果。不要只看 MCP 写入成功。
 - 新增平台级字段时，字段名建议保持英文稳定，例如 `PressureGlobalMaxConcurrentRequests`、`PressureV8MaxConcurrentExecutions`、`PressureOrmMaxConcurrentConnectionOpens`；字段标签和说明必须中文，说明中写清楚“主租户有效/子租户仅可降低”。
+- 新租户记录不得复制主租户的数据库、鉴权、Redis/对象存储密钥或 MQ/MQTT/Search 凭据。共享基础设施地址与管理密钥只在服务端运行时解析，不持久化到子租户记录，也不进入 V8 投影。
+- RabbitMQ 子租户必须使用独立 user/vhost/ACL，MQTT 必须使用独立账号密码，Search 必须使用限制到 `{osClient}_*` 的 API Key/用户。外部资源尚未真实创建时保持空凭据并失败关闭，禁止把主租户管理员凭据复制过去冒充完成。
+- `V8.Cache`、`V8.HDFS`、RabbitMQ、MQTT、Search 分别强制 `Microi:{OsClient}:*`、`/{osClient}/...`、`microi.{osClient}.*`、`tenant/{osClient}/...`、`{osClient}_*` 命名空间。body/query 中的 `OsClient` 不能覆盖登录 Token 或 V8 上下文。
 
 ## 接口调用区分租户的三种方式
 
@@ -98,12 +105,14 @@ var list = V8.Dbs[sub.Data.DbAlias].FromSql('SELECT * FROM diy_xxx').ToArray();
 ## 缓存按租户隔离
 
 ```javascript
-// ✅ 必须在 Key 中包含 OsClient
-var key = 'Microi:' + V8.OsClient + ':Product:' + V8.Param.id;
+// 推荐传逻辑 Key；服务端自动添加当前租户前缀
+var key = 'Product:' + V8.Param.id;
 V8.Cache.Set(key, value, 600);
 
-// ❌ 错误：跨租户数据混淆，严重安全问题
-var key = 'Product:' + V8.Param.id;
+// 完整当前租户 Key 继续兼容
+var fullKey = 'Microi:' + V8.OsClient + ':Product:' + V8.Param.id;
+
+// 其它租户的 Microi: 前缀会被服务端拒绝
 ```
 
 ## 接口引擎中针对不同租户走不同逻辑
@@ -139,7 +148,7 @@ var ak = V8.OsClientModel.WxPayMchKey;
 var secret = V8.OsClientModel.WxPaySecret;
 ```
 
-> 在表单引擎中给 `sys_osclient` 添加任意自定义字段（如 `WxPayMchKey`），即可通过 `V8.OsClientModel.字段名` 访问。
+> 在表单引擎中给 `sys_osclients` 添加租户自有业务字段（如 `WxPayMchKey`），可通过 `V8.OsClientModel.字段名` 访问。共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
 
 ## 用户扩展字段访问（同理）
 
@@ -155,19 +164,22 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 
 ## 常见错误
 
-❌ 缓存 Key 不带 OsClient → 租户数据串号  
+❌ 绕开 `V8.Cache` 使用底层 Redis → 租户数据串号（V8 已不再暴露底层句柄）
 ❌ MongoDB DbName 不带 OsClient → 数据混淆  
 ❌ 把 OsClientModel 字段直接返回给前端 → 密钥泄漏  
 ❌ 在前端硬编码 OsClient → 一改全改，应通过 token/URL 自动识别  
 ❌ 跨租户操作不验证当前用户权限 → 越权风险  
+❌ 子租户缺少 MQ/MQTT/Search 独立凭据时回退主账号 → 全平台越权
 
 ## 检查清单
 
-- [ ] 所有缓存 Key 都包含 `V8.OsClient`
+- [ ] 缓存只通过 `V8.Cache` 使用逻辑 Key 或当前租户完整 Key
 - [ ] 所有 MongoDB DbName 都包含 `V8.OsClient`
-- [ ] 第三方密钥放 `V8.OsClientModel`，不硬编码
+- [ ] 当前租户自有的业务集成密钥可放 `V8.OsClientModel`，共享 Redis/存储/MQ/MQTT/Search 凭据只能由服务端托管
 - [ ] 跨租户操作前校验权限
 - [ ] 不向前端返回 `V8.OsClientModel`
+- [ ] 子租户数据库账号只授权本租户库，MQ/MQTT/Search 独立凭据已真实创建
+- [ ] 文件、队列、Topic、索引均由服务端规范为当前租户命名空间
 
 ## Microi.AI 中转站租户凭据
 
