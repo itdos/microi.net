@@ -364,6 +364,189 @@ namespace Microi.net.Api
             }
         }
 
+        private sealed class AiDataPolicyDecision
+        {
+            public bool Allowed { get; set; }
+            public string Message { get; set; }
+        }
+
+        private static readonly IReadOnlyDictionary<string, string[]> AiDomainTables =
+            new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["customers"] = new[] { "Diy_Kehu" },
+                ["orders"] = new[] { "Diy_Dingdan" },
+                ["followups"] = new[] { "Diy_GenjinJL" },
+                ["tasks"] = new[] { "Diy_ShouhouDD" },
+                ["devices"] = new[] { "Diy_KehuSB" },
+                ["opportunities"] = new[] { "Diy_Shangji" }
+            };
+
+        private static List<string> ParsePolicyList(object value)
+        {
+            if (value == null) return new List<string>();
+            JToken token;
+            try
+            {
+                token = value as JToken ?? JToken.FromObject(value);
+                if (token.Type == JTokenType.String)
+                {
+                    var text = token.ToString().Trim();
+                    if (string.IsNullOrWhiteSpace(text)) return new List<string>();
+                    if (text.StartsWith("[") || text.StartsWith("{"))
+                    {
+                        try { token = JToken.Parse(text); }
+                        catch { return text.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(item => item.Trim()).ToList(); }
+                    }
+                    else
+                    {
+                        return text.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(item => item.Trim()).ToList();
+                    }
+                }
+            }
+            catch
+            {
+                return new List<string>();
+            }
+
+            if (token is JArray array)
+            {
+                return array
+                    .SelectMany(item => item.Type == JTokenType.Object
+                        ? new[] { item["Id"]?.ToString(), item["RoleId"]?.ToString(), item["Value"]?.ToString(), item["Key"]?.ToString() }
+                        : new[] { item.ToString() })
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Select(item => item.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+
+            if (token is JObject obj)
+            {
+                return new[] { obj["Id"]?.ToString(), obj["RoleId"]?.ToString(), obj["Value"]?.ToString(), obj["Key"]?.ToString() }
+                    .Where(item => !string.IsNullOrWhiteSpace(item))
+                    .Select(item => item.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+            }
+            return new List<string>();
+        }
+
+        private static bool PolicyFlag(JToken value)
+        {
+            var text = value?.ToString()?.Trim();
+            return text == "1" || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase) || text == "是";
+        }
+
+        /// <summary>
+        /// NL2SQL 的权限必须由服务端角色策略决定，不能信任客户端传入的 AllowedTables。
+        /// 非全部数据范围使用业务接口做条件化查询，避免生成 SQL 绕过行级权限。
+        /// </summary>
+        private async Task<AiDataPolicyDecision> ApplyNl2SqlPolicyAsync(NL2SQLParam param)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = SafeJObject(token?.CurrentUser);
+            if (currentUser == null || string.IsNullOrWhiteSpace(param?.CurrentUserId))
+            {
+                return new AiDataPolicyDecision { Allowed = false, Message = "登录身份已过期，请重新登录。" };
+            }
+
+            var level = int.TryParse(currentUser["Level"]?.ToString(), out var parsedLevel) ? parsedLevel : 0;
+            var roleIds = ParsePolicyList(currentUser["RoleIds"] ?? currentUser["Roles"] ?? currentUser["RoleId"])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (roleIds.Count == 0 && level < 999)
+            {
+                return new AiDataPolicyDecision { Allowed = false, Message = "当前帐号没有可用的 AI 数据权限。" };
+            }
+
+            DosResultList<dynamic> policyResult;
+            try
+            {
+                policyResult = await _formEngine.GetTableDataAsync("mci_ai_role_policy", new
+                {
+                    _Where = new List<DiyWhere> { new DiyWhere { Name = "Enabled", Value = 1, Type = "=" } },
+                    _PageSize = 500,
+                    _SelectFields = new[] { "RoleId", "DataScope", "AllowedDomains", "AllowedModels", "AllowRawSql" }
+                });
+            }
+            catch
+            {
+                policyResult = null;
+            }
+
+            // 兼容尚未建立策略表的历史租户，但只给平台管理员保留原能力。
+            if (policyResult == null || policyResult.Code != 1 || policyResult.Data == null)
+            {
+                return level >= 999
+                    ? new AiDataPolicyDecision { Allowed = true }
+                    : new AiDataPolicyDecision { Allowed = false, Message = "当前租户尚未配置 AI 数据权限，请联系管理员。" };
+            }
+
+            var matchedPolicies = policyResult.Data
+                .Select(SafeJObject)
+                .Where(item => item != null && roleIds.Contains(item["RoleId"]?.ToString() ?? ""))
+                .ToList();
+            if (matchedPolicies.Count == 0)
+            {
+                return new AiDataPolicyDecision { Allowed = false, Message = "当前角色尚未配置 AI 数据权限。" };
+            }
+
+            var rawSqlPolicies = matchedPolicies.Where(item =>
+            {
+                var scope = item["DataScope"]?.ToString()?.Trim();
+                var isAllScope = string.Equals(scope, "All", StringComparison.OrdinalIgnoreCase)
+                    || scope == "全部" || scope == "全部数据";
+                return isAllScope && PolicyFlag(item["AllowRawSql"]);
+            }).ToList();
+            if (rawSqlPolicies.Count == 0)
+            {
+                return new AiDataPolicyDecision
+                {
+                    Allowed = false,
+                    Message = "当前角色仅可使用受范围约束的 AI 经营分析，不能执行通用数据查询。"
+                };
+            }
+
+            var allowedModels = rawSqlPolicies
+                .SelectMany(item => ParsePolicyList(item["AllowedModels"]))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var requestedModel = param.AiModelId ?? param.AiId ?? param.AiModel ?? "";
+            if (allowedModels.Count > 0 && (string.IsNullOrWhiteSpace(requestedModel) || !allowedModels.Contains(requestedModel)))
+            {
+                return new AiDataPolicyDecision { Allowed = false, Message = "当前角色不能使用所选 AI 模型。" };
+            }
+
+            var domains = rawSqlPolicies
+                .SelectMany(item => ParsePolicyList(item["AllowedDomains"]))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var serverTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var domain in domains)
+            {
+                if (string.Equals(domain, "all", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var tables in AiDomainTables.Values)
+                    foreach (var table in tables) serverTables.Add(table);
+                }
+                else if (AiDomainTables.TryGetValue(domain, out var tables))
+                {
+                    foreach (var table in tables) serverTables.Add(table);
+                }
+            }
+            if (serverTables.Count == 0)
+            {
+                return new AiDataPolicyDecision { Allowed = false, Message = "当前角色没有已授权的数据域。" };
+            }
+
+            var requestedTables = param.AllowedTables?.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            param.AllowedTables = requestedTables == null || requestedTables.Count == 0
+                ? serverTables.ToList()
+                : serverTables.Where(requestedTables.Contains).ToList();
+            if (param.AllowedTables.Count == 0)
+            {
+                return new AiDataPolicyDecision { Allowed = false, Message = "请求的数据表不在当前角色授权范围内。" };
+            }
+            return new AiDataPolicyDecision { Allowed = true };
+        }
+
         // ============================================================
         // region: AI 对话 / NL2SQL / NL2V8Engine（原有功能）
         // ============================================================
@@ -525,6 +708,8 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
+            var policy = await ApplyNl2SqlPolicyAsync(param);
+            if (!policy.Allowed) return Json(new DosResult(0, null, policy.Message));
             var result = await _microiAi.NL2SQL(param);
             return Json(result);
         }

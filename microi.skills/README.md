@@ -232,3 +232,7 @@ MIT
 ## 新增表单布局分组 Skill
 
 - `microi.skills/microi-form-layout/SKILL.md`：低代码表单布局分组规范，**强制 AI 在通过 MCP、Manifest、VS Code 插件或 V8 引擎创建设计表单时优先使用 `CollapseGroup` 折叠分组，只有 ≥8 字段的大业务域才用 `Tabs` 分页**。覆盖三种分组方式（`diy_table.Tabs` 表级 Tab / `Component='Tabs'` 字段级 Tab / `Component='CollapseGroup'` 折叠分组）的存储位置、Config JSON 示例、决策算法、禁止事项和回读验收清单。所有表单设计任务必须先读本 skill 再下结论。
+
+## 新增左右树表 Skill
+
+- `microi.skills/microi-left-right-layout/SKILL.md`：模块引擎“树形+表格/表单”配置规范，覆盖 `diy_LeftJoinRightView` 全部业务配置项、主外键过滤、初始化 V8、MCP 幂等写入、移动端自适应和桌面/手机回读验收。

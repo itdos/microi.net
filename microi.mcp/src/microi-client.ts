@@ -88,6 +88,15 @@ const MENU_JSON_ARRAY_FIELDS = new Set([
   'PageTabs',
   'ExportMoreBtns',
   'PageBtns',
+  'SearchFieldIds',
+  'TableDiyFieldIds',
+  'SelectFields',
+  'SortFieldIds',
+  'NotShowFields',
+  'StatisticsFields',
+  'MobileListFields',
+  'CardTitleTagFields',
+  'CardBottomTagFields',
 ]);
 
 function resolveTimeoutMs(value: unknown, fallback: number): number {
@@ -128,7 +137,7 @@ function modulePatchMatches(
   for (const [field, expectedValue] of Object.entries(expected)) {
     if (ignoredFields.has(field) || expectedValue === undefined) continue;
     const actualValue = actual[field];
-    if (MENU_JSON_ARRAY_FIELDS.has(field)) {
+    if (MENU_JSON_ARRAY_FIELDS.has(field) || field === 'DiyConfig') {
       const expectedJson = canonicalMenuJson(expectedValue);
       const actualJson = canonicalMenuJson(actualValue);
       if (!expectedJson || !actualJson || expectedJson !== actualJson) {
@@ -874,6 +883,7 @@ export class MicroiClient {
     FileName?: string;
     FileByteBase64: string;
     Path?: string;
+    FilePathName?: string;
     Limit?: boolean;
     Preview?: boolean;
     TargetTable?: string;

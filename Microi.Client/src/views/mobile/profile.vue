@@ -266,7 +266,7 @@
 
 <script setup>
 import { DiyCommon } from "@/utils/diy.common.js";
-import { ref, computed, reactive, onMounted } from 'vue';
+import { ref, computed, reactive, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore, useUserStore, useTagsViewStore, useAppStore } from '@/pinia';
 import {
@@ -296,11 +296,22 @@ onMounted(() => {
 });
 
 const currentUser = computed(() => diyStore.GetCurrentUser);
-const userAvatar = computed(() => {
-    const avatar = currentUser.value?.Avatar;
-    if (avatar) return avatar.startsWith('http') ? avatar : DiyCommon.GetServerPath(avatar);
-    return './static/img/nohead-girl.png';
-});
+const userAvatar = ref('./static/img/nohead-girl.png');
+const loadUserAvatar = async () => {
+    const user = currentUser.value || {};
+    if (!user.Avatar) {
+        userAvatar.value = './static/img/nohead-girl.png';
+        return;
+    }
+    userAvatar.value = './static/img/loading.gif';
+    userAvatar.value = await DiyCommon.GetUserAvatarUrl(user.Avatar, user.Id) || './static/img/nohead-girl.png';
+};
+
+watch(
+    () => [currentUser.value?.Avatar, currentUser.value?.Id],
+    () => loadUserAvatar(),
+    { immediate: true }
+);
 
 const orgInfo = computed(() => {
     const user = currentUser.value;

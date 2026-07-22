@@ -526,6 +526,38 @@ function isGeneratedMicroiRoute(route) {
     return id.startsWith("grid_");
 }
 
+function resolveRoutePath(parentPath, routePath) {
+    const rawPath = String(routePath == null ? "" : routePath).trim();
+    if (!rawPath) return normalizeMenuRoutePath(parentPath || "/");
+    if (isExternalRoutePath(rawPath) || rawPath.startsWith("/")) {
+        return normalizeMenuRoutePath(rawPath);
+    }
+    const basePath = normalizeMenuRoutePath(parentPath || "/").replace(/\/$/, "");
+    return normalizeMenuRoutePath(basePath + "/" + rawPath);
+}
+
+export function hasAccessibleRoutePath(routes, targetPath, parentPath = "") {
+    if (!Array.isArray(routes)) return false;
+    const normalizedTarget = normalizeMenuRoutePath(targetPath || "/");
+    for (const route of routes) {
+        if (!route) continue;
+        const currentPath = resolveRoutePath(parentPath, route.path);
+        if (
+            isGeneratedMicroiRoute(route)
+            && !route.hidden
+            && route.Display !== 0
+            && route.Display !== "0"
+            && currentPath === normalizedTarget
+        ) {
+            return true;
+        }
+        if (hasAccessibleRoutePath(route.children, normalizedTarget, currentPath)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 export function getFirstValidRoutePath(routes) {
     if (!Array.isArray(routes)) return "";
     for (const route of routes) {

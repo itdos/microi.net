@@ -1,5 +1,36 @@
 @import "@/styles/diy-form.scss";
 
+/* 校验失败时在当前控件内展示错误，不占行高，也不遮挡下一行字段。 */
+.itdos-diy-form {
+    :deep(.el-form-item__content) {
+        position: relative;
+        overflow: visible;
+    }
+
+    :deep(.el-form-item.is-error) {
+        position: relative;
+        z-index: 2;
+    }
+
+    :deep(.el-form-item__error) {
+        left: auto;
+        right: 30px;
+        top: 50%;
+        z-index: 3;
+        max-width: calc(100% - 42px);
+        padding: 3px 8px;
+        border: 1px solid var(--el-color-danger-light-5, #f89898);
+        border-radius: 4px;
+        background: var(--el-color-danger-light-9, #fef0f0);
+        box-shadow: 0 2px 8px rgba(245, 108, 108, 0.16);
+        color: var(--el-color-danger, #f56c6c);
+        line-height: 18px;
+        white-space: normal;
+        transform: translateY(-50%);
+        pointer-events: none;
+    }
+}
+
 /* ==================== 骨架屏样式 ==================== */
 .form-skeleton-container {
     padding: 20px;

@@ -199,6 +199,7 @@ export default {
             ShowChat: false,
             ChatType: "",
             ShowUnreadCount: true,
+            CurrentUserAvatarUrl: "./static/img/icon/personal.png",
             isBrowserFullScreen: !!document.fullscreenElement,
             dialogUptPwd: false,
             FormUptPwd: {
@@ -237,6 +238,14 @@ export default {
         },
         currentLang: function () {
             return this.SysConfig?.SysLang;
+        }
+    },
+    watch: {
+        "GetCurrentUser.Avatar": {
+            immediate: true,
+            handler() {
+                this.LoadCurrentUserAvatar();
+            }
         }
     },
     async mounted() {
@@ -444,11 +453,18 @@ export default {
             });
         },
         GetCurrentUserAvatar() {
+            return this.CurrentUserAvatarUrl || "./static/img/icon/personal.png";
+        },
+        async LoadCurrentUserAvatar() {
             var self = this;
-            if (!self.DiyCommon.IsNull(self.GetCurrentUser.Avatar)) {
-                return self.DiyCommon.GetServerPath(self.GetCurrentUser.Avatar);
+            var user = self.GetCurrentUser || {};
+            if (self.DiyCommon.IsNull(user.Avatar)) {
+                self.CurrentUserAvatarUrl = "./static/img/icon/personal.png";
+                return;
             }
-            return self.DiyCommon.GetServerPath("./static/img/icon/personal.png");
+            self.CurrentUserAvatarUrl = "./static/img/loading.gif";
+            var url = await self.DiyCommon.GetUserAvatarUrl(user.Avatar, user.Id);
+            self.CurrentUserAvatarUrl = url || "./static/img/icon/personal.png";
         },
         GotoDesktop() {
             this.diyStore.setState("ShowGotoWebOS", true);

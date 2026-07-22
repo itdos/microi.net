@@ -348,13 +348,13 @@ echo ""
 # --- 发布模式（6选1）---
 echo -e "  ${BOLD}【发布模式】${NC}"
 echo "    1) 只编译前端和后端（含DLL加密+NuGet替换，不推送、版本号不变）"
-echo "    2) 只发布后端（推送Docker、推送NuGet、更新版本号）"
+echo "    2) 只发布后端（推送Docker、推送NuGet可选跳过、更新版本号）"
 if [ "$HAS_CLIENT" = true ]; then
     echo "    3) 只发布前端（推送Docker、不推送NuGet、版本号不变）"
-    echo "    4) 发布前端和后端（推送Docker、推送NuGet、更新版本号）"
+    echo "    4) 发布前端和后端（推送Docker、推送NuGet可选跳过、更新版本号）"
 else
     echo -e "    ${DIM}3) 只发布前端（未检测到前端源码，不可用）${NC}"
-    echo "    4) 只发布后端（推送Docker、推送NuGet、更新版本号）"
+    echo "    4) 只发布后端（推送Docker、推送NuGet可选跳过、更新版本号）"
 fi
     echo "    5) 仅推送Docker镜像（跳过编译，直接使用已有产物推送）"
     echo "    6) 只编译和推送【官方网站文档】"
@@ -407,6 +407,29 @@ if [ "$BUMP_VERSION" = true ]; then
     VERSION="$NEXT_VERSION"
 else
     VERSION="$CURRENT_VERSION"
+fi
+
+# --- NuGet 发布选项（模式2/4）---
+SKIP_NUGET_REQUESTED=false
+if [ "$PUSH_NUGET" = true ]; then
+    if [ "$HAS_NUGET" != true ]; then
+        PUSH_NUGET=false
+    else
+        echo ""
+        echo -e "  ${BOLD}【NuGet发布】${NC}"
+        echo "    是否跳过 NuGet 发布？"
+        echo "    已发布过同版本、仅需继续前端/Docker 发布时请选择 1。"
+        read -r -p "  请输入选项 [0=否，正常推送/1=是，跳过NuGet，直接回车=否]: " _skip_nuget_choice
+        case "$_skip_nuget_choice" in
+            0|"") ;;
+            1)
+                PUSH_NUGET=false
+                SKIP_NUGET_REQUESTED=true
+                print_info "已选择跳过 NuGet 发布"
+                ;;
+            *) print_fail "无效选项: $_skip_nuget_choice（仅支持 0/1）" ;;
+        esac
+    fi
 fi
 
 # --- Docker 方案选择（仅发布模式需要）---
@@ -469,11 +492,6 @@ elif [ "$PUSH_DOCKER" = true ] && [ "$HAS_DOCKER" != true ]; then
     print_warning "Docker 未配置，将跳过 Docker 推送"
 fi
 
-# NuGet 可用性
-if [ "$PUSH_NUGET" = true ] && [ "$HAS_NUGET" != true ]; then
-    PUSH_NUGET=false
-fi
-
 # --- 官方网站文档发布选项 ---
 PUBLISH_DOC=false
 if [ "$DEPLOY_MODE" = "6" ]; then
@@ -521,6 +539,8 @@ for _p in "${SELECTED_CLIENT_PLANS[@]}"; do
 done
 if [ "$PUSH_NUGET" = true ]; then
     echo -e "  NuGet:    ${GREEN}✔${NC} 自动推送"
+elif [ "$SKIP_NUGET_REQUESTED" = true ]; then
+    echo -e "  NuGet:    ${YELLOW}⏭${NC} 已手动跳过"
 fi
 if [ "$HAS_ENCRYPT" = true ] && [ "$PUBLISH_BACKEND" = true ]; then
     echo -e "  DLL加密:  ${GREEN}✔${NC} 自动加密"
@@ -1191,6 +1211,8 @@ if [ "$DLL_ENCRYPTED" = true ]; then
 fi
 if [ "$PUSH_NUGET" = true ]; then
     echo -e "  NuGet:    ${GREEN}✅${NC}"
+elif [ "$SKIP_NUGET_REQUESTED" = true ]; then
+    echo -e "  NuGet:    ${YELLOW}⏭ 已手动跳过${NC}"
 fi
 for _p in "${SELECTED_API_PLANS[@]}"; do
     echo -e "  后端Docker: ${GREEN}✅${NC} $(echo "$_p" | cut -d'|' -f1)"

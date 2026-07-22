@@ -242,3 +242,44 @@ test('updateModule verifies menu JSON after an uncertain write', async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('updateModule rejects a false success when EditCodeShowV8 is not persisted', async () => {
+  const originalFetch = globalThis.fetch;
+  let receivedEditCodeShowV8 = '';
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/api/V8Engine/UpdateModule')) {
+        const payload = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+        receivedEditCodeShowV8 = String(payload.EditCodeShowV8 || '');
+        return jsonResponse({ Code: 1, Data: { Id: 'menu-visibility' }, Msg: '' });
+      }
+      if (url.endsWith('/api/V8Engine/GetModule')) {
+        return jsonResponse({
+          Code: 1,
+          Data: {
+            Id: 'menu-visibility',
+            EditCodeShowV8: '',
+          },
+          Msg: '',
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const result = await createClient().updateModule({
+      ModuleId: 'menu-visibility',
+      EditCodeShowV8: 'return V8.Form.Status === "Draft";',
+    });
+
+    assert.equal(receivedEditCodeShowV8, 'return V8.Form.Status === "Draft";');
+    assert.equal(result.Code, 0);
+    assert.match(result.Msg || '', /EditCodeShowV8/);
+    assert.deepEqual(
+      (result.Data as { Mismatches?: string[] }).Mismatches,
+      ['EditCodeShowV8'],
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

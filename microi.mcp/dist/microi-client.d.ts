@@ -253,6 +253,7 @@ export declare class MicroiClient {
         FileName?: string;
         FileByteBase64: string;
         Path?: string;
+        FilePathName?: string;
         Limit?: boolean;
         Preview?: boolean;
         TargetTable?: string;
