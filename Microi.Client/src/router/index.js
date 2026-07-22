@@ -270,6 +270,19 @@ export const asyncRoutes = [
             }
         ]
     },
+    {
+        path: "/mic-ai-app/:appId",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "/mic-ai-app/:appId",
+                name: "mic_ai_app_detail",
+                component: () => import("@/views/ai-engine/ai-app-detail.vue"),
+                meta: { title: "AI应用开发", keepAlive: false }
+            }
+        ]
+    },
     // 业务架构蓝图（Business Blueprint）
     {
         path: "/blueprint/list",

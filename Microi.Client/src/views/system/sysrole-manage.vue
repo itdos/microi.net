@@ -44,9 +44,10 @@
                         <el-table-column v-if="GetCurrentUser._IsAdmin" prop="TenantName" label="所属租户" />
                         <el-table-column prop="Remark" :label="$t('Msg.Remark')" />
                         <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
-                        <el-table-column fixed="right" :label="$t('Msg.Operation')" width="250">
+                        <el-table-column fixed="right" :label="$t('Msg.Operation')" width="360">
                             <template #default="scope">
                                 <el-button type="default" class="marginRight5" :icon="QuestionFilled" @click="OpenSysRole(scope.row)">{{ $t("Msg.Edit") }}</el-button>
+                                <el-button type="primary" plain class="marginRight5" :icon="Setting" @click="OpenAiPolicy(scope.row)">AI数据权限</el-button>
                                 <el-button type="danger" class="marginRight5" :icon="Delete" @click="DelSysRole(scope.row)">{{ $t("Msg.Del") }}</el-button>
                             </template>
                         </el-table-column>
@@ -149,6 +150,99 @@
                 <el-button :icon="Close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
             </template>
         </el-dialog>
+        <el-dialog
+            draggable
+            width="720px"
+            v-model="AiPolicyVisible"
+            :title="`AI数据权限 - ${AiPolicyRole.Name || ''}`"
+            :close-on-click-modal="false"
+        >
+            <div v-loading="AiPolicyLoading" class="ai-policy-editor">
+                <el-alert
+                    v-if="!AiPolicyAvailable"
+                    title="当前租户尚未启用 AI 角色策略表，请先完成平台升级或创建 mci_ai_role_policy。"
+                    type="warning"
+                    :closable="false"
+                    show-icon
+                />
+                <el-form v-else :model="AiPolicyModel" label-width="120px">
+                    <el-row :gutter="18">
+                        <el-col :span="12" :xs="24">
+                            <el-form-item label="启用分析">
+                                <el-switch v-model="AiPolicyModel.Enabled" :active-value="1" :inactive-value="0" />
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="12" :xs="24">
+                            <el-form-item label="数据范围">
+                                <el-select v-model="AiPolicyModel.DataScope" style="width: 100%">
+                                    <el-option label="仅本人数据" value="Self" />
+                                    <el-option label="本部门数据" value="Department" />
+                                    <el-option label="本租户数据" value="Tenant" />
+                                    <el-option label="全部数据" value="All" />
+                                </el-select>
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="24">
+                            <el-form-item label="授权业务域">
+                                <el-checkbox-group v-model="AiPolicyModel.AllowedDomains" class="ai-policy-domains">
+                                    <el-checkbox v-for="item in AiDomainOptions" :key="item.value" :value="item.value" border>{{ item.label }}</el-checkbox>
+                                </el-checkbox-group>
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="24">
+                            <el-form-item label="可用模型">
+                                <el-select v-model="AiPolicyModel.AllowedModels" multiple collapse-tags collapse-tags-tooltip style="width: 100%" placeholder="请选择角色可用的 AI 模型">
+                                    <el-option v-for="item in AiModelList" :key="item.Id" :label="item.Name || item.AiModel" :value="item.Id" />
+                                </el-select>
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="8" :xs="24">
+                            <el-form-item label="单次上限">
+                                <el-input-number v-model="AiPolicyModel.MaxRows" :min="1" :max="100" controls-position="right" />
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="8" :xs="24">
+                            <el-form-item label="敏感字段">
+                                <el-switch v-model="AiPolicyModel.CanViewSensitive" :active-value="1" :inactive-value="0" />
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="8" :xs="24">
+                            <el-form-item label="通用查询">
+                                <el-switch
+                                    v-model="AiPolicyModel.AllowRawSql"
+                                    :active-value="1"
+                                    :inactive-value="0"
+                                    :disabled="AiPolicyModel.DataScope !== 'All'"
+                                />
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="24">
+                            <el-alert
+                                title="通用查询只允许“全部数据”范围的高权限角色开启；其他角色由业务接口强制附加本人、部门或租户范围。"
+                                type="info"
+                                :closable="false"
+                                show-icon
+                                class="ai-policy-alert"
+                            />
+                        </el-col>
+                        <el-col :span="24">
+                            <el-form-item label="附加规则">
+                                <el-input v-model="AiPolicyModel.PromptRules" type="textarea" :rows="3" placeholder="例如：不得返回手机号完整号码；重点关注逾期售后任务。" />
+                            </el-form-item>
+                        </el-col>
+                        <el-col :span="24">
+                            <el-form-item label="备注">
+                                <el-input v-model="AiPolicyModel.Remark" type="textarea" :rows="2" />
+                            </el-form-item>
+                        </el-col>
+                    </el-row>
+                </el-form>
+            </div>
+            <template #footer>
+                <el-button @click="AiPolicyVisible = false">取消</el-button>
+                <el-button v-if="AiPolicyAvailable" type="primary" :loading="AiPolicySaving" :icon="QuestionFilled" @click="SaveAiPolicy">保存策略</el-button>
+            </template>
+        </el-dialog>
     </div>
 </template>
 
@@ -179,6 +273,21 @@ export default {
             tableLoading: true,
             ShowEditModelTitle: "",
             ShowEditModel: false,
+            AiPolicyVisible: false,
+            AiPolicyLoading: false,
+            AiPolicySaving: false,
+            AiPolicyAvailable: true,
+            AiPolicyRole: {},
+            AiModelList: [],
+            AiDomainOptions: [
+                { value: "customers", label: "客户" },
+                { value: "orders", label: "合同订单" },
+                { value: "followups", label: "跟进记录" },
+                { value: "tasks", label: "售后任务" },
+                { value: "devices", label: "客户设备" },
+                { value: "opportunities", label: "商机" }
+            ],
+            AiPolicyModel: {},
             SearchModel: {
                 Keyword: "",
                 RoleIds: [],
@@ -235,6 +344,97 @@ export default {
         self.Init();
     },
     methods: {
+        ParseAiPolicyList(value) {
+            if (Array.isArray(value)) return value;
+            if (!value) return [];
+            try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                return String(value).split(",").map((item) => item.trim()).filter(Boolean);
+            }
+        },
+        CreateAiPolicyModel(role, source) {
+            const highPrivilege = Number(role.Level || 0) >= 999;
+            return {
+                Id: source?.Id || "",
+                RoleId: role.Id,
+                RoleName: role.Name,
+                Enabled: source?.Enabled === undefined ? 1 : Number(source.Enabled),
+                DataScope: source?.DataScope || (highPrivilege ? "All" : "Self"),
+                AllowedDomains: this.ParseAiPolicyList(source?.AllowedDomains),
+                AllowedModels: this.ParseAiPolicyList(source?.AllowedModels),
+                MaxRows: Number(source?.MaxRows || (highPrivilege ? 100 : 30)),
+                CanViewSensitive: Number(source?.CanViewSensitive || 0),
+                AllowRawSql: Number(source?.AllowRawSql || 0),
+                PromptRules: source?.PromptRules || "",
+                Remark: source?.Remark || ""
+            };
+        },
+        async OpenAiPolicy(role) {
+            this.AiPolicyRole = role || {};
+            this.AiPolicyVisible = true;
+            this.AiPolicyLoading = true;
+            this.AiPolicyAvailable = true;
+            this.AiPolicyModel = this.CreateAiPolicyModel(this.AiPolicyRole);
+            try {
+                const [policyResult, modelResult] = await Promise.all([
+                    this.DiyCommon.FormEngine.GetTableData("mci_ai_role_policy", {
+                        _Where: [["RoleId", "=", this.AiPolicyRole.Id]],
+                        _PageIndex: 1,
+                        _PageSize: 1
+                    }),
+                    this.DiyCommon.FormEngine.GetTableData("mic_ai", {
+                        _Where: [["IsEnable", "=", "1"]],
+                        _OrderBy: "CreateTime",
+                        _OrderByType: "DESC",
+                        _PageSize: 100
+                    })
+                ]);
+                if (!policyResult || Number(policyResult.Code) !== 1) {
+                    this.AiPolicyAvailable = false;
+                    return;
+                }
+                this.AiModelList = modelResult && Number(modelResult.Code) === 1 ? (modelResult.Data || []) : [];
+                this.AiPolicyModel = this.CreateAiPolicyModel(this.AiPolicyRole, (policyResult.Data || [])[0]);
+            } catch (error) {
+                this.AiPolicyAvailable = false;
+            } finally {
+                this.AiPolicyLoading = false;
+            }
+        },
+        async SaveAiPolicy() {
+            if (!this.AiPolicyModel.AllowedDomains.length) {
+                this.DiyCommon.Tips("请至少选择一个授权业务域", false);
+                return;
+            }
+            if (!this.AiPolicyModel.AllowedModels.length) {
+                this.DiyCommon.Tips("请至少选择一个可用模型", false);
+                return;
+            }
+            if (this.AiPolicyModel.DataScope !== "All") this.AiPolicyModel.AllowRawSql = 0;
+            this.AiPolicySaving = true;
+            try {
+                const payload = {
+                    ...this.AiPolicyModel,
+                    AllowedDomains: JSON.stringify(this.AiPolicyModel.AllowedDomains),
+                    AllowedModels: JSON.stringify(this.AiPolicyModel.AllowedModels)
+                };
+                const result = payload.Id
+                    ? await this.DiyCommon.FormEngine.UptFormData("mci_ai_role_policy", payload)
+                    : await this.DiyCommon.FormEngine.AddFormData("mci_ai_role_policy", payload);
+                if (result && Number(result.Code) === 1) {
+                    this.DiyCommon.Tips("AI数据权限已保存");
+                    this.AiPolicyVisible = false;
+                } else {
+                    this.DiyCommon.Tips(result?.Msg || "AI数据权限保存失败", false);
+                }
+            } catch (error) {
+                this.DiyCommon.Tips(error?.message || "AI数据权限保存失败", false);
+            } finally {
+                this.AiPolicySaving = false;
+            }
+        },
         Init() {
             var self = this;
             // self.DiyCommon.SetWin10Loading(false)
@@ -879,5 +1079,31 @@ export default {
 
 .avatar-uploader .el-upload:hover {
     border-color: #409eff;
+}
+
+.ai-policy-editor {
+    min-height: 250px;
+}
+
+.ai-policy-domains {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .el-checkbox {
+        margin-right: 0;
+    }
+}
+
+.ai-policy-alert {
+    margin: 0 0 18px 120px;
+    width: calc(100% - 120px);
+}
+
+@media (max-width: 768px) {
+    .ai-policy-alert {
+        margin-left: 0;
+        width: 100%;
+    }
 }
 </style>

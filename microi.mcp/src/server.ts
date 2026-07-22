@@ -1527,18 +1527,20 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       fileByteBase64: z.string().describe('File content as base64. Data URLs such as data:image/png;base64,... are accepted.'),
       fileName: z.string().optional().describe('File name, e.g. mall-banner.png'),
       path: z.string().optional().describe('Platform storage path, e.g. mall/banner or mcp/assets'),
+      filePathName: z.string().optional().describe('Exact tenant-scoped private object path. Requires limit=true and preserves the existing database path during public-to-private migration.'),
       limit: z.boolean().optional().describe('Whether to upload to a private path. Default false.'),
       preview: z.boolean().optional().describe('Whether to let the platform generate preview/compressed output. Default true.'),
       targetTable: z.string().optional().describe('Optional table name to update after upload.'),
       targetId: z.string().optional().describe('Optional row Id to update after upload.'),
       targetField: z.string().optional().describe('Optional field name that stores the uploaded file path.'),
     },
-    async ({ fileByteBase64, fileName, path, limit, preview, targetTable, targetId, targetField }) => {
+    async ({ fileByteBase64, fileName, path, filePathName, limit, preview, targetTable, targetId, targetField }) => {
       try {
         const result = await client.uploadFileBase64({
           FileName: fileName,
           FileByteBase64: fileByteBase64,
           Path: path,
+          FilePathName: filePathName,
           Limit: limit,
           Preview: preview,
           TargetTable: targetTable,

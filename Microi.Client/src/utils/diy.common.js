@@ -101,6 +101,9 @@ var DiyCommon = {
     _LangBundleStatus: {},
     _LangBundlePromises: {},
     _LangBundleCacheMinutes: 30,
+    _PrivateFileUrlCache: {},
+    _PrivateFileUrlRequests: {},
+    _PrivateFileUrlCacheMilliseconds: 4 * 60 * 1000,
     /**
      * 安全解析 JSON，避免裸 JSON.parse 抛错导致页面崩溃
      * @param {*} str 待解析内容
@@ -279,6 +282,70 @@ var DiyCommon = {
             }
         }
         return DiyCommon.GetFileServer().TrimEnd('/') + urlPah;
+    },
+    /**
+     * 获取私有文件的短期访问地址。私有文件不能通过 FileServer 拼接访问。
+     * 同一路径在短时间内复用结果，并合并并发请求，避免列表头像触发重复签名。
+     */
+    GetPrivateFileUrl: async function (filePathName, options) {
+        options = options || {};
+        var path = filePathName;
+        if (path && typeof path === "object") {
+            path = path.Path || path.FilePathName || path.Url || "";
+        }
+        path = String(path || "").trim();
+        if (path.startsWith("{") || path.startsWith("[")) {
+            var parsed = DiyCommon.SafeJsonParse(path, null);
+            if (Array.isArray(parsed)) parsed = parsed.length > 0 ? parsed[0] : null;
+            if (parsed && typeof parsed === "object") {
+                path = String(parsed.Path || parsed.FilePathName || parsed.Url || "").trim();
+            }
+        }
+        if (!path) return "";
+        if (path.startsWith(".") || /^(https?:|data:|blob:)/i.test(path)) return path;
+
+        var cacheKey = DiyCommon.GetOsClient() + "|" + path;
+        var cached = DiyCommon._PrivateFileUrlCache[cacheKey];
+        if (cached && cached.Url && cached.ExpiresAt > Date.now()) return cached.Url;
+        if (DiyCommon._PrivateFileUrlRequests[cacheKey]) return DiyCommon._PrivateFileUrlRequests[cacheKey];
+
+        var request = (async function () {
+            try {
+                var sysConfig = store.state.DiyStore.SysConfig || {};
+                var result = await DiyCommon.PostAsync("/api/HDFS/GetPrivateFileUrl", {
+                    FilePathName: path,
+                    HDFS: options.HDFS || sysConfig.HDFS || "Aliyun",
+                    FormEngineKey: options.FormEngineKey || undefined,
+                    FormDataId: options.FormDataId || undefined,
+                    FieldId: options.FieldId || undefined
+                });
+                if (result && result.Code === 1 && result.Data) {
+                    var url = String(result.Data);
+                    DiyCommon._PrivateFileUrlCache[cacheKey] = {
+                        Url: url,
+                        ExpiresAt: Date.now() + DiyCommon._PrivateFileUrlCacheMilliseconds
+                    };
+                    return url;
+                }
+            } catch (error) {
+                console.error("[PrivateFile] 获取临时访问地址失败：", path, error);
+            } finally {
+                delete DiyCommon._PrivateFileUrlRequests[cacheKey];
+            }
+            return "";
+        })();
+        DiyCommon._PrivateFileUrlRequests[cacheKey] = request;
+        return request;
+    },
+    /**
+     * sys_user.Avatar 固定按私有文件处理；返回值为 Promise<string>。
+     */
+    GetUserAvatarUrl: function (avatar, userId) {
+        return DiyCommon.GetPrivateFileUrl(avatar, {
+            FormEngineKey: "sys_user",
+            FormDataId: userId || "",
+            FieldId: "Avatar"
+        });
     },
     pathBase: "./",
     RepalceUrlKey(url) {

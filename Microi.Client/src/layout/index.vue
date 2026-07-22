@@ -3,8 +3,6 @@
     <component :is="WebOSAppContainer" v-if="isWebOS && WebOSAppContainer && !hideShellForAnonymous" />
     <!-- 经典传统模式（仅当非 WebOS 时渲染，避免 WebOS 异步加载期间闪烁经典传统布局） -->
     <div v-else-if="!isWebOS || hideShellForAnonymous" :class="classObj" class="app-wrapper-microi">
-        <!-- 遮罩层：仅在移动端且菜单展开时显示 -->
-        <div v-if="diyStore.IsPhoneView && sidebar.opened" class="drawer-bg-microi" @click="handleClickOutside" />
         <!-- 左边菜单区域（移动端不显示） -->
         <sidebar v-if="!hideShellForAnonymous && ShowClassicLeft != 0 && !diyStore.IsPhoneView" class="sidebar-container-microi" :style="GetMenuBg()" />
         <div :class="{ hasTagsView: !hideShellForAnonymous && needTagsView && !diyStore.IsPhoneView, 'mobile-view': diyStore.IsPhoneView, 'anonymous-shell-hidden': hideShellForAnonymous }" class="main-container-microi" :style="GetMainContainerMicroiStyle()">
@@ -196,17 +194,6 @@ export default {
         position: fixed;
         top: 0;
     }
-}
-
-.drawer-bg-microi {
-    background: #000;
-    opacity: 0.3;
-    width: 100%;
-    top: 0;
-    height: 100%;
-    position: absolute;
-    // 这里一定要大一点，否则移动端的左侧菜单弹出后无法显示在最顶层，下次要修改需慎重！ --2025-08-24 by anderson
-    z-index: 999;
 }
 
 .fixed-header-microi {

@@ -1,13 +1,18 @@
 <template>
     <div class="forklift-management left-right-page">
         <el-row :gutter="10" class="main-container left-right-layout" v-if="ShowRowView">
-            <el-col :span="colData.Left" class="left-right-col">
+            <el-col v-if="!diyStore.IsPhoneView" :span="colData.Left" class="left-right-col left-tree-col">
                 <el-card class="box-card left-tree-card">
                     <LeftView :LeftTreeData="LeftTreeData" @LeftViewClick="LeftViewClick" @ShowRightClick="ShowRightClick"></LeftView>
                 </el-card>
             </el-col>
-            <el-col :span="colData.Right" class="left-right-col">
+            <el-col :span="diyStore.IsPhoneView ? 24 : colData.Right" class="left-right-col right-table-col">
                 <el-card class="products-card right-content-card">
+                    <div class="mobile-tree-toolbar" v-if="diyStore.IsPhoneView">
+                        <el-button circle type="primary" @click="MobileTreeDrawer = true" title="打开项目目录" aria-label="打开项目目录">
+                            <el-icon><Operation /></el-icon>
+                        </el-button>
+                    </div>
                     <div class="right-content-body">
                         <RightView ref="ref_RightView" class="right-form-panel" :RightViewData="RightViewData" v-if="(RightViewType === '表单' || RightViewType === '表单/表格') && ShowRightView"></RightView>
                         <div class="left-right-table-host" v-if="(RightViewType === '表格' || RightViewType === '表单/表格') && ShowRightView">
@@ -23,6 +28,31 @@
                 </el-card>
             </el-col>
         </el-row>
+        <el-drawer
+            v-if="diyStore.IsPhoneView"
+            v-model="MobileTreeDrawer"
+            direction="ltr"
+            size="88%"
+            :append-to-body="true"
+            :modal="true"
+            :close-on-click-modal="true"
+            :close-on-press-escape="true"
+            :show-close="true"
+            class="left-tree-mobile-drawer"
+        >
+            <template #header>
+                <div class="mobile-tree-drawer-title">
+                    <el-icon><Operation /></el-icon>
+                    <span>{{ LeftTreeData.ShubiaoT || "项目目录" }}</span>
+                </div>
+            </template>
+            <LeftView
+                class="mobile-tree-drawer-content"
+                :LeftTreeData="LeftTreeData"
+                @LeftViewClick="MobileLeftViewClick"
+                @ShowRightClick="ShowRightClick"
+            ></LeftView>
+        </el-drawer>
     </div>
 </template>
 
@@ -65,7 +95,9 @@ export default {
             WhereType: "",
             ShowRightView: true,
             rightTableDataAppend: {},
-            LastClickNode : {},
+            LastClickNode: {},
+            MobileTreeDrawer: false,
+            MobileTreeTitle: "全部项目"
         };
     },
     computed: {},
@@ -155,6 +187,7 @@ export default {
                     IsAllCategory: true
                 };
                 self.rightTableDataAppend = {};
+                self.MobileTreeTitle = "全部项目";
                 if (self.RightViewType === "表格" || self.RightViewType === "表单/表格") {
                     self.whereList = [];
                 }
@@ -164,6 +197,7 @@ export default {
                 return;
             }
             self.LastClickNode = data;
+            self.MobileTreeTitle = data.TreeTitle || data.Name || data.Code || "已选项目";
             if (this.LeftTreeData.YincangBSF) {
                 if (data[this.LeftTreeData.YincangBSF]) {
                     this.ShowRightClick(false);
@@ -174,7 +208,7 @@ export default {
             var self = this;
             if (self.LeftTreeData.ShujieDDJSJ) {
                 var V8 = {
-                    Origin: origin,
+                    Origin: self.clickData && self.clickData.Origin ? self.clickData.Origin : "LeftTreeJoinRightForm",
                     Form: data,
                     CurrentUser: self.GetCurrentUser
                 };
@@ -232,6 +266,10 @@ export default {
                 ];
             }
         },
+        async MobileLeftViewClick(data) {
+            await this.LeftViewClick(data);
+            this.MobileTreeDrawer = false;
+        },
         ShowRightClick(item) {
             this.ShowRightView = item;
         },
@@ -241,9 +279,9 @@ export default {
 
 <style scoped>
 .forklift-management {
-    height: calc(100vh - 128px);
+    height: calc(100vh - 70px);
     min-height: 520px;
-    padding: 10px 10px 0;
+    padding: 0;
     margin-top: 0;
     box-sizing: border-box;
     overflow: hidden;
@@ -352,12 +390,18 @@ export default {
 
 :deep(.left-right-diy-table .table-rowlist-tabs),
 :deep(.left-right-diy-table .el-tabs__content),
-:deep(.left-right-diy-table .el-tab-pane),
 :deep(.left-right-diy-table .box-card-table-row-list) {
     flex: 1;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+}
+
+:deep(.left-right-diy-table .el-tabs__content > .el-tab-pane) {
+    flex: 0 0 0;
+    height: 0;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -435,5 +479,108 @@ export default {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 5px;
+}
+
+.mobile-tree-toolbar {
+    display: none;
+}
+
+.mobile-tree-drawer-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+}
+
+:global(.left-tree-mobile-drawer .el-drawer__header) {
+    margin-bottom: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+:global(.left-tree-mobile-drawer .el-drawer__body) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px;
+    overflow: hidden;
+}
+
+:global(.left-tree-mobile-drawer .mobile-tree-drawer-content) {
+    flex: 1;
+    min-height: 0;
+}
+
+@media (max-width: 767px) {
+    .forklift-management {
+        height: auto;
+        min-height: 0;
+        padding: 6px;
+        overflow: visible;
+    }
+
+    .main-container,
+    .left-right-layout,
+    .left-right-col {
+        height: auto;
+        min-height: 0;
+    }
+
+    .left-right-layout {
+        display: block;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .left-right-col {
+        width: 100%;
+        max-width: 100%;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    .products-card,
+    .right-content-card,
+    .right-content-body,
+    .left-right-table-host,
+    :deep(.left-right-diy-table),
+    :deep(.left-right-diy-table .table-rowlist-tabs),
+    :deep(.left-right-diy-table .el-tabs__content),
+    :deep(.left-right-diy-table .box-card-table-row-list),
+    :deep(.left-right-diy-table .box-card-table-row-list > .el-card__body) {
+        height: auto;
+        min-height: 0;
+        overflow: visible !important;
+    }
+
+    .left-tree-card :deep(.el-card__body) {
+        overflow: hidden;
+    }
+
+    .right-content-card :deep(.el-card__body) {
+        padding: 6px;
+        overflow: visible;
+    }
+
+    .mobile-tree-toolbar {
+        display: flex;
+        align-items: center;
+        position: fixed;
+        top: max(7px, env(safe-area-inset-top));
+        right: 12px;
+        z-index: 1200;
+        margin: 0;
+        pointer-events: none;
+    }
+
+    .mobile-tree-toolbar .el-button {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        margin: 0;
+        pointer-events: auto;
+    }
 }
 </style>

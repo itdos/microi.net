@@ -15,8 +15,7 @@
                     v-if="isAiAdmin"
                     type="button"
                     class="workspace-tab"
-                    :class="{ active: activeWorkspace === 'apps' }"
-                    @click="activeWorkspace = 'apps'"
+                    @click="goAiApps"
                 >
                     <el-icon><FolderOpened /></el-icon>
                     <span>AI应用</span>
@@ -122,17 +121,7 @@
                 </div>
             </header>
 
-            <AiAppWorkbench
-                v-if="activeWorkspace === 'apps' && isAiAdmin"
-                class="inline-project-workbench"
-                :selected-ai-model="selectedAiModel"
-                :selected-relay-model="selectedRelayModel"
-                :ai-models="aiModelList"
-                :model-loading="modelLoading"
-                @update:selected-ai-model="selectedAiModel = $event"
-            />
-
-            <template v-else>
+            <template v-if="activeWorkspace === 'chat'">
             <section ref="messageWrapRef" class="message-wrap">
                 <div v-if="messages.length === 0" class="empty-state">
                     <div class="empty-hero">
@@ -453,7 +442,6 @@ import {
 import { ElMessage, ElMessageBox } from "element-plus";
 
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
-const AiAppWorkbench = defineAsyncComponent(() => import("./ai-app-workbench.vue"));
 const props = defineProps({
     embedded: {
         type: Boolean,
@@ -513,7 +501,7 @@ const aiSysMenuId = ref("");
 const aiModelTableId = ref("");
 const aiModelSysMenuId = ref("");
 const modelDrawerVisible = ref(false);
-const activeWorkspace = ref(route.query.workspace === "apps" || route.query.appId ? "apps" : "chat");
+const activeWorkspace = ref("chat");
 const statsLoading = ref(false);
 const platformStats = reactive({
     DiyTableCount: 0,
@@ -609,12 +597,17 @@ const currentUserName = computed(() => {
     const user = currentUser.value || {};
     return user.Name || user.Account || "你";
 });
-const currentUserAvatar = computed(() => {
+const currentUserAvatar = ref("");
+const loadCurrentUserAvatar = async () => {
     const user = currentUser.value || {};
     const avatar = user.Avatar || user.HeadIcon || user.HeadImg || "";
-    if (!avatar) return "";
-    return typeof DiyCommon.GetServerPath === "function" ? DiyCommon.GetServerPath(avatar) : avatar;
-});
+    if (!avatar) {
+        currentUserAvatar.value = "";
+        return;
+    }
+    currentUserAvatar.value = "./static/img/loading.gif";
+    currentUserAvatar.value = await DiyCommon.GetUserAvatarUrl(avatar, user.Id) || "";
+};
 const statCards = computed(() => [
     { key: "table", label: "表单数量", value: platformStats.DiyTableCount || 0, desc: "Form Engine" },
     { key: "module", label: "模块数量", value: platformStats.SysMenuCount || 0, desc: "Module Engine" },
@@ -623,6 +616,7 @@ const statCards = computed(() => [
 ]);
 
 onMounted(async () => {
+    if (await redirectLegacyAiAppWorkspace()) return;
     await Promise.all([loadAiModels(), loadHistory(), loadAiEngineMeta(), loadPlatformStats()]);
 });
 
@@ -632,8 +626,14 @@ watch(reasoningEffort, (value) => {
     } catch {}
 });
 
-watch(() => [route.query.workspace, route.query.appId], ([workspace, appId]) => {
-    if (workspace === "apps" || appId) activeWorkspace.value = "apps";
+watch(
+    () => [currentUser.value?.Avatar, currentUser.value?.Id],
+    () => loadCurrentUserAvatar(),
+    { immediate: true }
+);
+
+watch(() => [route.query.workspace, route.query.appId], () => {
+    redirectLegacyAiAppWorkspace();
 });
 
 watch(selectedAiModel, () => {
@@ -1053,6 +1053,23 @@ async function openModelDrawer() {
 
 function goMicroiStore() {
     proxy.$router.push({ path: "/microi-store" });
+}
+
+function goAiApps() {
+    proxy.$router.push({ path: "/mci-ai-app" });
+}
+
+async function redirectLegacyAiAppWorkspace() {
+    const appId = String(route.query.appId || "").trim();
+    if (appId) {
+        await proxy.$router.replace({ name: "mic_ai_app_detail", params: { appId } });
+        return true;
+    }
+    if (route.query.workspace === "apps") {
+        await proxy.$router.replace({ path: "/mci-ai-app" });
+        return true;
+    }
+    return false;
 }
 
 async function sendMessage() {

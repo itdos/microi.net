@@ -85,7 +85,7 @@ var extractResult = V8.Method.ExtractZip({
 
 | 类型 | `Limit` | 访问 URL | 用途 |
 |------|---------|---------|------|
-| 公有桶 | `false` | 直接拼接 `V8.SysConfig.FileServer + Path` | 头像、产品图、公开文档 |
+| 公有桶 | `false` | 直接拼接 `V8.SysConfig.FileServer + Path` | 产品图、Banner、公开文档 |
 | 私有桶 | `true` | 必须用 `V8.Method.GetPrivateFileUrl` 获取临时 URL | 合同、身份证、敏感数据 |
 
 ### 默认 MinIO 桶名与安装验收
@@ -102,7 +102,23 @@ var extractResult = V8.Method.ExtractZip({
 - 通用规则：数据库还原并创建默认桶后，必须按安装模式选择的访问 IP 和动态端口同时回写有效 `sys_config.ApiBase/FileServer`；其中 `ApiBase` 指向 API 服务，`FileServer` 指向公有桶根地址。
 - 自动化检查：安装完成后通过 `GetSysConfig` 回读两个字段，断言均使用本次访问 IP 和实际端口；再执行公有上传并使用 `FileServer + Path` 匿名下载，内容必须一致。
 
-公开页面图片（首页 banner、商品主图、头像等）应返回公有 URL，例如 `V8.SysConfig.FileServer + Path`。不要把公有图片统一转成 `GetPrivateFileUrl` 的 `static-private` 签名地址；部分 H5/浏览器会因响应头或跨域策略触发 ORB/CORS 拦截，表现为 uni-app `<image>` 内层 `background-image: none`。
+公开页面图片（首页 banner、商品主图、公开活动头像等）应返回公有 URL，例如 `V8.SysConfig.FileServer + Path`。不要把公有图片统一转成 `GetPrivateFileUrl` 的 `static-private` 签名地址；部分 H5/浏览器会因响应头或跨域策略触发 ORB/CORS 拦截，表现为 uni-app `<image>` 内层 `background-image: none`。
+
+### `sys_user.Avatar` 固定使用私有桶
+
+- `sys_user` 是内部系统用户表，`Avatar` 可能暴露员工身份信息，因此字段配置必须保持 `ImgUpload.Limit=true`，上传端也必须显式传 `Limit:true`；自定义用户管理页不能因为绕过表单引擎而回退到公有上传。
+- 数据库继续只保存租户内相对路径，例如 `/itdos/avatar/20240218/user.png`。历史公有头像迁移时，应把同一文件复制到私有桶的同一路径，确认私有对象可访问后再停用公有访问；不得为了迁移批量改写路径或制造重复日期目录。
+- PC、移动端、聊天、工作流等任何页面渲染 `sys_user.Avatar` 时，禁止 `FileServer + Avatar`、`GetServerPath(Avatar)` 或把相对路径直接交给 `<img>`。前端应调用 `DiyCommon.GetUserAvatarUrl(avatar, userId)`，接口/V8 应调用 `V8.Method.GetPrivateFileUrl({ FilePathName: avatar })`，并为临时 URL 设置短期缓存与失败占位图。
+- `ContactUserAvatar`、`FromUserAvatar`、`SenderAvatar` 等从 `sys_user.Avatar` 派生的快照字段同样按私有路径处理；消息数据只保存原始相对路径，不能把会过期的临时 URL 持久化到数据库。
+
+#### 复盘：字段改私有后卡片仍访问公有桶
+
+- 触发条件：把 `sys_user.Avatar` 改为 `Limit=true`，但模块卡片仍配置 `TableCardImgField=Avatar`。
+- 根因：通用卡片渲染器只读取了字段值，没有读取图片字段的 `Config.ImgUpload.Limit`，仍统一调用 `GetServerPath/FileServer`。
+- 修复规则：通用图片渲染器必须同时检查字段配置；私有字段先异步换取临时地址，`sys_user.Avatar` 还要有表名+字段名语义兜底，避免元数据缓存短暂陈旧时泄露到公有路径。
+- 验收断言：筛选一条有头像的系统用户，页面中 `/itdos/avatar/` 的直接公有请求数必须为 0，私有代理图片 `naturalWidth > 0`，并同时验证无头像占位图不报错。
+
+定制移动端项目的 Hero、Banner、音频、视频、字体等大资源也应优先上传到目标租户公有 HDFS，再通过 FileServer/CDN 引用；小型导航图标和离线关键素材才保留在主包。上传前可适度压缩，但必须在多尺寸截图或试听/试播中确认质量，禁止以明显失真换取包体扫描通过。完整移动端规则见 `microi-uniapp-frontend/SKILL.md`。
 
 后台 `ImgUpload` 字段通常保存相对路径或 JSON：接口返回给移动端前先解析出 `Path`，再按公私有场景转换 URL：
 
