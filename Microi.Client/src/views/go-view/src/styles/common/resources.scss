@@ -1,0 +1,5 @@
+// 仅包含 Sass 编译资源，不输出实体 CSS。
+// 由 Vite 注入每个 go-view 组件，避免重复编译 style.scss 中的全局样式。
+@import "./var.scss";
+@import "./mixins/mixins.scss";
+@import "./extendables.scss";

@@ -49,7 +49,7 @@ src/views/go-view/
 `vite.config.js` 中的关键配置：
 
 - **路径别名**：`@goview` → `src/views/go-view/src`
-- **SCSS 注入**：`src/views/go-view/src/` 下的文件自动注入 `@goview/styles/common/style.scss`
+- **SCSS 注入**：`src/views/go-view/src/` 下的组件只自动注入 `@goview/styles/common/resources.scss`（变量、函数和 mixin）；实体全局样式 `style.scss` 由 `setup.js` 单次加载，避免数百个组件重复生成同一份 CSS
 
 ## 后端对接
 

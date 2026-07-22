@@ -96,7 +96,7 @@ $textSize: 10px;
   border-radius: 5px;
   cursor: pointer;
   border: 1px solid rgba(0, 0, 0, 0);
-  @extend .go-transition-quick;
+  @extend %go-transition-quick;
   &.hover,
   &:hover {
     @include fetch-bg-color('background-color4');

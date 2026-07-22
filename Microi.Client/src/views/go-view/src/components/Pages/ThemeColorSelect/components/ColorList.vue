@@ -98,7 +98,7 @@ const colorSelectHandle = (color: AppThemeColorType) => {
       opacity: 0.7;
       overflow: hidden;
       border-radius: 5px;
-      @extend .go-background-filter-shallow;
+      @extend %go-background-filter-shallow;
       backdrop-filter: none;
     }
     &-color {

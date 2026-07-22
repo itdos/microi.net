@@ -930,7 +930,7 @@ fi
 if [ "$BUILD_CLIENT" = true ]; then
     print_phase "编译前端 Microi.Client"
 
-    print_step "npm run build..."
+    print_step "npm run build（现代构建最高 6GB、legacy 逐文件 2GB、全程内存保护）..."
     echo ""
     cd Microi.Client
     if ! npm run build; then

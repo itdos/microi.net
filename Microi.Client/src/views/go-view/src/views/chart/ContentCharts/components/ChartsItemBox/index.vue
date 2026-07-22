@@ -223,7 +223,7 @@ $halfCenterHeight: 50px;
         max-width: 140px;
         border-radius: 6px;
         object-fit: contain;
-        @extend .go-transition;
+        @extend %go-transition;
       }
     }
     .list-bottom {
@@ -263,7 +263,7 @@ $halfCenterHeight: 50px;
   }
   &.single {
     .item-box {
-      @extend .go-transition;
+      @extend %go-transition;
     }
   }
   &.double {

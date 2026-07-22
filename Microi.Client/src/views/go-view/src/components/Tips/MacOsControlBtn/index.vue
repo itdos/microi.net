@@ -125,7 +125,7 @@ const handleClick = (key: 'close' | 'remove' | 'resize' | 'fullResize') => {
       opacity: 0;
     }
     .hover {
-      @extend .go-transition;
+      @extend %go-transition;
     }
   }
   .close {

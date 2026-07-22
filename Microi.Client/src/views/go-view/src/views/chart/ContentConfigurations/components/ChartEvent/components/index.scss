@@ -16,7 +16,7 @@
   }
   &.n-card.n-modal,
   .n-card {
-    @extend .go-background-filter;
+    @extend %go-background-filter;
   }
 }
 @include deep() {

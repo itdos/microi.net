@@ -89,7 +89,7 @@ const onEsc = () => {
 @include go('chart-data-request') {
   &.n-card.n-modal,
   .n-card {
-    @extend .go-background-filter;
+    @extend %go-background-filter;
   }
   .n-card-shallow {
     background-color: rgba(0, 0, 0, 0) !important;

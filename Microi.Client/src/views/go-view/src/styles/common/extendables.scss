@@ -1,0 +1,25 @@
+// 供组件 @extend 的占位样式。placeholder 本身不输出 CSS，只有使用它的组件会生成规则。
+%go-transition {
+  transition: all 0.4s;
+}
+
+%go-transition-quick {
+  transition: all 0.2s;
+}
+
+%go-background-filter {
+  backdrop-filter: $--filter-blur-base;
+  @include fetch-bg-color("filter-color");
+  box-shadow: $--border-shadow;
+}
+
+%go-background-filter-shallow {
+  backdrop-filter: $--filter-blur-base;
+  @include fetch-bg-color("filter-color-shallow");
+  box-shadow: $--border-shadow;
+}
+
+%go-point-bg {
+  @include fetch-theme-custom("background-color", "background-color1");
+  background-size: 15px 15px, 15px 15px;
+}

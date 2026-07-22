@@ -9,6 +9,8 @@ import { setupCustomComponents } from './src/plugins/customComponents'
 import { setupDirectives } from './src/plugins/directives'
 import 'iconify-icon'
 import { addCollection } from 'iconify-icon'
+// go-view 的实体全局样式只加载一次；组件 SCSS 仅注入 variables/functions/mixins。
+import './src/styles/common/style.scss'
 // 标尺样式
 import 'vue3-sketch-ruler/lib/style.css'
 // 动画库

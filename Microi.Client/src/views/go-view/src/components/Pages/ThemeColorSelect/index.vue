@@ -103,7 +103,7 @@ $height: 85vh;
   height: $height;
   border-radius: 15px;
   overflow: hidden;
-  @extend .go-background-filter;
+  @extend %go-background-filter;
   @include hover-border-color("background-color5");
   .title {
     margin: 0;
