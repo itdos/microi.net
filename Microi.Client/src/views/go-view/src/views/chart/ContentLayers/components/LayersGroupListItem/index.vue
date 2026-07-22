@@ -200,7 +200,7 @@ $textSize: 10px;
   width: 90%;
   margin: 10px 5%;
   margin-bottom: 5px;
-  @extend .go-transition-quick;
+  @extend %go-transition-quick;
   @include deep() {
     .go-content-layers-list-item {
       margin-right: 0 !important;

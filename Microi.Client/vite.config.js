@@ -5,7 +5,9 @@ import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
 import { visualizer } from 'rollup-plugin-visualizer';
 import compression from 'vite-plugin-compression';
 import basicSsl from '@vitejs/plugin-basic-ssl';
-import legacy from '@vitejs/plugin-legacy';
+
+const isAnalyzeBuild = process.env.MICROI_BUILD_ANALYZE === 'true';
+const buildOutDir = process.env.MICROI_BUILD_OUT_DIR || 'bin/Release/dist';
 
 function monacoLegacySpreadCompat() {
     const monacoGpuActionsPath = '/monaco-editor/esm/vs/editor/contrib/gpu/browser/gpuActions.js';
@@ -63,20 +65,12 @@ export default defineConfig({
                 }
             }
         }),
-        // Windows 7 客户环境仍可能使用 Chrome 49 / 旧版 360 极速内核。
-        // 现代浏览器继续加载 ESM 包，旧内核通过 nomodule 自动加载 SystemJS legacy 包。
-        legacy({
-            targets: ['Chrome >= 49'],
-            additionalLegacyPolyfills: [
-                'abortcontroller-polyfill/dist/abortcontroller-polyfill-only'
-            ]
-        }),
         createSvgIconsPlugin({
             iconDirs: [path.resolve(process.cwd(), 'src/icons/svg')],
             symbolId: 'icon-[name]'
         }),
-        // 构建分析插件 - 生成可视化报告
-        visualizer({
+        // 构建分析只在 npm run build:analyze 时启用，避免日常发布额外保留整份 bundle 元数据。
+        isAnalyzeBuild && visualizer({
             open: false, // 构建后不自动打开
             gzipSize: false, // 关闭 gzip 计算以加速构建（需要时可手动开启）
             brotliSize: false, // 关闭 brotli 计算以加速构建
@@ -87,7 +81,7 @@ export default defineConfig({
         // compression({ algorithm: 'gzip', ext: '.gz', ... }),
         // HTTPS 自签名证书（仅开发环境）
         // basicSsl()
-    ],
+    ].filter(Boolean),
     resolve: {
         alias: {
             '@goview': path.resolve(__dirname, 'src/views/go-view/src'),
@@ -115,16 +109,21 @@ export default defineConfig({
                     if (source.includes('@use "sass:')) {
                         return source;
                     }
-                    // go-view 文件注入 go-view 自己的全局样式
-                    if (filename.includes('views/go-view/src/')) {
-                        return `@import "@goview/styles/common/style.scss";\n${source}`;
+                    const normalizedFilename = filename.replace(/\\/g, '/');
+                    // go-view 组件只注入变量/函数/mixin。全局 CSS 由 setup.js 单次加载，
+                    // 避免把 style.scss 的实体规则重复编译进数百个 Vue 组件。
+                    if (normalizedFilename.includes('/views/go-view/src/')) {
+                        if (normalizedFilename.includes('/views/go-view/src/styles/common/')) {
+                            return source;
+                        }
+                        return `@import "@goview/styles/common/resources.scss";\n${source}`;
                     }
                     return `@import "@/styles/variables.scss";\n${source}`;
                 },
                 // 添加 includePaths 以支持 ~ 开头的导入
                 includePaths: [path.resolve(__dirname, 'node_modules')],
                 // 静默弃用警告（可选）
-                silenceDeprecations: ['legacy-js-api', 'import']
+                silenceDeprecations: ['legacy-js-api', 'import', 'slash-div', 'global-builtin', 'color-functions']
             }
         },
         // 开发和生产保持一致的 devSourcemap
@@ -144,9 +143,11 @@ export default defineConfig({
         }
     },
     build: {
-        outDir: 'bin/Release/dist',
+        outDir: buildOutDir,
         assetsDir: 'static',
         sourcemap: false,
+        // 发布时不再额外计算 gzip 体积；压缩由 nginx 完成，可显著降低大包构建末段的内存峰值。
+        reportCompressedSize: false,
         // 设置 chunk 大小警告阈值
         chunkSizeWarningLimit: 800, // 降低到 800KB，促使更好的代码分割
         // CSS 代码分割
@@ -156,6 +157,8 @@ export default defineConfig({
         // 确保 CSS 导入顺序一致
         assetsInlineLimit: 4096,
         // 🔥 压缩优化 - esbuild 比 terser 快 20-40 倍，体积差异仅 1-2%
+        // Chrome 49 产物由构建保护脚本基于现代 chunk 逐文件串行转换，
+        // 避免完整 Rollup 图与全部 Babel AST 同时驻留。
         minify: 'esbuild',
         rollupOptions: {
             // 🔥 确保依赖加载顺序：Vue -> Element Plus -> 其他
@@ -166,21 +169,22 @@ export default defineConfig({
                 // 优化：手动划分重量级依赖到独立 chunk，以提高浏览器缓存命中率、
                 // 避免所有重包集中进入主包。
                 manualChunks(id) {
-                    if (!id.includes('node_modules')) return
-                    if (id.includes('monaco-editor')) return 'monaco'
-                    if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
-                    if (id.includes('@visactor')) return 'vchart'
-                    if (id.includes('three')) return 'three'
-                    if (id.includes('fullcalendar') || id.includes('@fullcalendar')) return 'fullcalendar'
-                    if (id.includes('@wangeditor') || id.includes('@codemirror') || id.includes('codemirror')) return 'editors'
+                    const normalizedId = id.replace(/\\/g, '/')
+                    if (!normalizedId.includes('node_modules')) return
+                    if (normalizedId.includes('monaco-editor')) return 'monaco'
+                    if (normalizedId.includes('echarts') || normalizedId.includes('zrender')) return 'echarts'
+                    if (normalizedId.includes('@visactor')) return 'vchart'
+                    if (normalizedId.includes('three')) return 'three'
+                    if (normalizedId.includes('fullcalendar') || normalizedId.includes('@fullcalendar')) return 'fullcalendar'
+                    if (normalizedId.includes('@wangeditor') || normalizedId.includes('@codemirror') || normalizedId.includes('codemirror')) return 'editors'
                     // Element Plus 依赖 lodash-unified；lodash 不再强制拆成 utils，
                     // 交由 Rollup 自动放置，避免 legacy SystemJS 循环分片。
-                    if (id.includes('element-plus')) return 'element-plus'
-                    if (id.includes('@element-plus/icons-vue')) return 'element-icons'
-                    if (id.includes('@fortawesome')) return 'fontawesome'
-                    if (id.includes('dhtmlx-gantt')) return 'gantt'
-                    if (id.includes('@vue-office') || id.includes('xlsx')) return 'office'
-                    if (id.includes('html2canvas') || id.includes('jspdf')) return 'export'
+                    if (normalizedId.includes('element-plus')) return 'element-plus'
+                    if (normalizedId.includes('@element-plus/icons-vue')) return 'element-icons'
+                    if (normalizedId.includes('@fortawesome')) return 'fontawesome'
+                    if (normalizedId.includes('dhtmlx-gantt')) return 'gantt'
+                    if (normalizedId.includes('@vue-office') || normalizedId.includes('xlsx')) return 'office'
+                    if (normalizedId.includes('html2canvas') || normalizedId.includes('jspdf')) return 'export'
                 }
             }
         }

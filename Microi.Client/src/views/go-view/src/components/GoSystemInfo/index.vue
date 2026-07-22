@@ -46,7 +46,7 @@ const closeHandle = () => {
 
 <style lang="scss" scoped>
 @include go('system-info') {
-  @extend .go-background-filter;
+  @extend %go-background-filter;
   min-width: 100px;
   max-width: 60vw;
   padding-bottom: 20px;

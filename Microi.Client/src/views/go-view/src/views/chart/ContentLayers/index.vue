@@ -203,7 +203,7 @@ $wight: 200px;
 @include go('content-layers') {
   width: $wight;
   overflow: hidden;
-  @extend .go-transition;
+  @extend %go-transition;
   .not-layer-text {
     position: relative;
     top: 10px;

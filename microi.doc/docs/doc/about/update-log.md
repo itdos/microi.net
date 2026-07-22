@@ -1,5 +1,15 @@
 # 更新日志
 
+## v6.5.0
+
+更新日期：2026-07-22
+
+- **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.5.0；Microi VS Code 插件与内置 Skills 升级至 v4.0.3。
+- **前端构建内存保护**：`npm run build`／`build:clean` 统一接入资源守卫，启动前检查物理内存和可用内存，现代构建默认限制 6GB Node 堆、esbuild 最多 2 个并行进程，构建期间持续监测可用内存和本次任务估算占用，触发保护线时回收完整子进程树；详细日志写入项目临时目录，分析报告只在 `build:analyze` 显式开启，并关闭日常发布中的压缩体积统计以降低末段内存峰值。
+- **Chrome 49 低内存兼容构建**：旧浏览器产物由“完整现代／legacy 双图构建”改为先生成现代 ESM 包，再按真实依赖关系发现 chunk，使用独立 2GB 子进程逐文件串行转换为 Chrome 49 可用的 SystemJS／ES5 代码；自动生成 polyfill、注入 `nomodule` 回退入口，并校验 legacy chunk、依赖、HTML 入口和 polyfill 完整性，在保留旧版 Windows 7／360 极速内核兼容的同时降低 Babel AST 同时驻留造成的 OOM 风险。
+- **go-view 样式构建去重**：go-view 的全局实体样式改由 `setup.js` 单次加载，Vite 向组件注入的 SCSS 只保留变量、函数、mixin 和 placeholder；过渡、毛玻璃、点阵背景等复用样式统一改用 Sass 占位选择器，避免数百个 Vue 组件重复编译整份 `style.scss`，并同步更新组件引用和开发说明。
+- **构建配置稳定性**：Vite 输出目录支持通过环境变量覆盖，依赖分包路径统一按跨平台格式归一；日常构建不再默认启用可视化分析插件或 gzip 体积计算，一键编译发布脚本同步标注现代构建、legacy 串行转换及内存保护策略。
+
 ## v6.4.9
 
 更新日期：2026-07-22

@@ -205,12 +205,12 @@ onActivated(() => {
   position: relative;
   width: 100%;
   overflow: hidden;
-  @extend .go-point-bg;
+  @extend %go-point-bg;
   @include background-image('background-point');
 
   @include goId('chart-edit-content') {
     overflow: hidden;
-    @extend .go-transition;
+    @extend %go-transition;
     @include fetch-theme('box-shadow');
 
     .edit-content-chart {

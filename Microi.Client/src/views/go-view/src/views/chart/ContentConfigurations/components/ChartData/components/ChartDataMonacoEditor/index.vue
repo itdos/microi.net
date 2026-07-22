@@ -203,7 +203,7 @@ watch(
 @include go('chart-data-monaco-editor') {
   &.n-card.n-modal,
   .n-card {
-    @extend .go-background-filter;
+    @extend %go-background-filter;
   }
   .editor-data-show {
     @include fetch-bg-color('filter-color');
