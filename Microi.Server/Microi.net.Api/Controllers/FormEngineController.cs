@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
@@ -189,7 +190,8 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost, HttpGet]
         [AllowAnonymous]
-        public async Task<JsonResult> GetSysConfig([FromBody]DiyTableRowParam param)
+        public async Task<JsonResult> GetSysConfig(
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] DiyTableRowParam param = null)
         {
             if (param == null)
             {
