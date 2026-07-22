@@ -5,7 +5,7 @@ description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租
 
 # Microi V8 Redis 缓存模式
 
-你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 Redis 缓存提升性能。
+你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 Redis 缓存提升性能。V8 只获得当前租户的安全缓存代理，不会获得 Redis `IDatabase`、连接管理或服务器扫描能力。
 
 ## V8.Cache API
 
@@ -17,6 +17,8 @@ description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租
 | `V8.Cache.KeyExist(key)` | 是否存在（兼容旧版运行时的真实方法名） | `boolean` |
 
 > 需要把接口引擎复制到不同版本的 Microi 环境时，统一使用 `V8.Cache.KeyExist(key)`。部分新版本可能提供 `Exists` 别名，但旧版运行时没有该方法。
+
+> 新运行时把逻辑 Key 自动规范为 `Microi:${V8.OsClient}:{逻辑Key}`；已带当前租户完整前缀的历史 Key 不会重复添加。任何其它租户的 `Microi:` 前缀都会被拒绝，而不是改写后继续执行。
 
 ## Redis 管理器与 MCP
 
@@ -52,16 +54,19 @@ MCP 默认操作当前 MCP `OsClient` 的租户 Redis；额外连接只传管理
 
 ## 🔑 Key 命名规范（必须遵守）
 
-平台统一使用 4 段式 Key：`Microi:${OsClient}:{Category}:{Key}`
+Redis 中统一保存 4 段式 Key：`Microi:${OsClient}:{Category}:{Key}`。V8 代码推荐只传 `{Category}:{Key}`，服务端自动添加当前 `OsClient`；传完整当前租户 Key 用于兼容旧脚本。
 
 ```javascript
-// ✅ 正确
-var k1 = 'Microi:' + V8.OsClient + ':User:' + userId;
-var k2 = 'Microi:' + V8.OsClient + ':SmsCode:' + phone;
-var k3 = 'Microi:' + V8.OsClient + ':Lock:OrderPay:' + orderId;
+// ✅ 推荐：逻辑 Key，运行时自动绑定当前租户
+var k1 = 'User:' + userId;
+var k2 = 'SmsCode:' + phone;
+var k3 = 'Lock:OrderPay:' + orderId;
 
-// ❌ 错误：缺少 OsClient → 多租户串号
-var k = 'User:' + userId;
+// ✅ 兼容：完整当前租户 Key
+var fullKey = 'Microi:' + V8.OsClient + ':User:' + userId;
+
+// ❌ 拒绝：不能访问其它租户
+var foreignKey = 'Microi:other-tenant:User:' + userId;
 ```
 
 | 段 | 说明 |

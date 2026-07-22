@@ -22,6 +22,13 @@
   <ItemGroup>
     <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
     <ProjectReference Include="..\Microi.V8Engine\Microi.V8Engine.csproj" />
+    <!-- 私有 Microi.net 子仓存在时启用端到端租户边界回归；开源仓单独检出仍可构建。 -->
+    <ProjectReference Include="..\Microi.net\Microi.net.csproj"
+                      Condition="Exists('..\Microi.net\Microi.net.csproj')" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('..\Microi.net\Microi.net.csproj')">
+    <Compile Remove="FormEngineTenantBoundaryTests.cs" />
   </ItemGroup>
 
 </Project>

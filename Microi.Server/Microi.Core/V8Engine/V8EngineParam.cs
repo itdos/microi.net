@@ -55,6 +55,10 @@ namespace Microi.net
         public string InvokeType { get; set; }
         public string OsClient { get; set; }
         public dynamic OsClientModel { get; set; }
+        /// <summary>
+        /// OsClientModel 的兼容别名。两者均为服务端生成的脱敏副本，不是运行时配置原引用。
+        /// </summary>
+        public dynamic ClientModel { get; set; }
         public dynamic SysConfig { get; set; }
         public dynamic TableModel { get; set; }
         public dynamic Result { get; set; }
@@ -119,7 +123,7 @@ namespace Microi.net
         public IMicroiSpider Spider { get; set; }
         public IV8Method Method { get; set; }
 
-        public IMicroiCache Cache { get; set; }
+        public IV8Cache Cache { get; set; }
 
         //public HttpHelper HttpHelper { get; set; }
         public WFParam WF { get; set; }
@@ -133,6 +137,6 @@ namespace Microi.net
         public IMicroiOffice Office { get; set; }
         public IMicroiMQ MQ { get; set; }
 
-        public IMicroiHDFS HDFS;//  = new MicroiHDFS();
+        public IV8HDFS HDFS;
     }
 }

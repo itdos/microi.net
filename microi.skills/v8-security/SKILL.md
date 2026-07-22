@@ -7,7 +7,7 @@ description: Microi V8 安全指南。用于审查接口引擎安全、密钥管
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。
 
-## 0. 敏感配置统一放 OsClientModel（不硬编码）
+## 0. 租户业务密钥放 OsClientModel（基础设施密钥由服务端托管）
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。`sys_osclient` 表由表单引擎驱动，可自由扩展配置项，按租户独立配置：
 
@@ -21,7 +21,13 @@ var smtpPwd   = V8.OsClientModel.SmtpPassword;
 var openaiKey = 'sk-xxxxxxxxxx';
 ```
 
-> ⚠️ 不要把 `V8.OsClientModel` 整体序列化返回给前端。详见 `v8-saas-multi-tenant/SKILL.md`
+> `V8.OsClientModel` 与兼容别名 `V8.ClientModel` 均为独立脱敏副本：数据库连接、AuthSecret、Redis、对象存储、MQ、MQTT、Search 的地址与凭据不会注入脚本。当前租户自有的微信、支付、ERP 等业务密钥仍可能存在，因此仍严禁把整个对象或单个密钥返回前端。
+
+`V8.SysConfig` 也是独立脱敏副本，`ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段不会注入脚本。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时服务端会强制使用当前 `OsClient`，不能借缓存命中读取主租户配置。
+
+共享基础设施只能通过受控能力访问：`V8.Cache` 自动绑定 `Microi:{OsClient}:*`，文件路径绑定 `/{OsClient}/...`，RabbitMQ 队列绑定 `microi.{OsClient}.*`，MQTT Topic 绑定 `tenant/{OsClient}/...`，Search 索引绑定 `{OsClient}_*`。V8 不得获得 Redis `IDatabase`、HDFS `ClientModel` 或原始基础设施配置。
+
+子租户缺少 RabbitMQ/MQTT/Search 独立凭据时必须失败关闭，禁止回退主租户账号。新租户开通只有在外部 broker/search 中真实创建 user、vhost、ACL 或 API Key 后，才能标记对应服务可用。
 
 ## 0.5 接口引擎配置安全
 

@@ -27,6 +27,17 @@ namespace Microi.net
         {
             return string.Concat("Microi:", osClient ?? "", prefix ?? "", (key ?? "").ToLowerInvariant());
         }
+
+        /// <summary>
+        /// Allows the concrete FormEngine implementation to constrain an explicitly requested
+        /// tenant before any tenant-specific cache or database access. The open-source core has
+        /// no dependency on the private V8 runtime, so its default behavior remains unchanged.
+        /// </summary>
+        protected virtual string EnforceConfigurationOsClient(string osClient)
+        {
+            return osClient;
+        }
+
         private static int IntOrDefaultWhenMissing(JObject param, string name, int defaultValue)
         {
             var token = param?[name];
@@ -2019,6 +2030,7 @@ namespace Microi.net
         {
             try
             {
+                osClient = EnforceConfigurationOsClient(osClient);
                 if (osClient.DosIsNullOrWhiteSpace())
                 {
                     return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang) + "[GetSysMenu]");
@@ -2082,6 +2094,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult<dynamic>> GetDiyTable(string idOrName, string osClient, string _Lang = "cn")
         {
+            osClient = EnforceConfigurationOsClient(osClient);
             if (osClient.DosIsNullOrWhiteSpace())
             {
                 return new DosResult<dynamic>(0, null, DiyMessage.GetLang(osClient, "ParamError", _Lang) + "[GetDiyTable]");

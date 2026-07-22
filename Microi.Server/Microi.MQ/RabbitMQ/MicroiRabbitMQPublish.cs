@@ -1,262 +1,257 @@
-﻿using Dos.Common;
-using Microi.net;
+using Dos.Common;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 using System.Text;
-using System.Threading.Channels;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace Microi.net
 {
     public class MicroiRabbitMQPublish : IMicroiMQ
     {
-        private IMicroiMQConnection mqConnection;
+        private readonly IMicroiMQConnection _mqConnection;
+
         public MicroiRabbitMQPublish(IMicroiMQConnection mqConnection)
         {
-            this.mqConnection = mqConnection;
+            _mqConnection = mqConnection;
         }
-        public void CloseChannel(string queueName)
+
+        public async Task CloseChannelAsync(string osClient, string queueName)
         {
-            var obj = MicroiRabbitMQConsumer.list.Where(x => x.Value.QueueName == queueName).ToList();
-            if (obj.Any())
+            var tenant = ResolveOperationTenant(osClient);
+            var physicalQueue = TenantConfigurationSecurity.NormalizeQueueName(tenant, queueName);
+            var mapKey = MicroiRabbitMQConsumer.BuildMapKey(tenant, physicalQueue);
+            if (!MicroiRabbitMQConsumer.list.TryRemove(mapKey, out var receiveInfo)) return;
+
+            if (receiveInfo.Channel != null)
             {
-                var objFirst = obj.First().Value;
-                if (objFirst.Channel != null && objFirst.Channel.IsOpen)
-                {
-                    //obj.Channel.Close();
-                    objFirst.Channel.CloseAsync();
-                }
-                MicroiRabbitMQConsumer.list.Remove(objFirst.QueueName, out _);
+                await receiveInfo.Channel.DisposeAsync().ConfigureAwait(false);
             }
         }
 
-        public void ReceiveMsg(string queueName)
+        public async Task ReceiveMsgAsync(string osClient, string queueName)
         {
-            IConnection conn = null;
+            var tenant = ResolveOperationTenant(osClient);
+            var physicalQueue = TenantConfigurationSecurity.NormalizeQueueName(tenant, queueName);
+            var connection = await _mqConnection.GetReceiveConnectionAsync(tenant).ConfigureAwait(false);
+            var channel = await connection.CreateChannelAsync().ConfigureAwait(false);
+
             try
             {
-                conn = mqConnection.GetPublishConnection();
+                await channel.QueueDeclareAsync(
+                    queue: physicalQueue,
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: null).ConfigureAwait(false);
+                await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false).ConfigureAwait(false);
+
+                var consumer = new AsyncEventingBasicConsumer(channel);
+                consumer.ReceivedAsync += async (_, eventArgs) =>
                 {
-                    //var channel = conn.CreateModel();
-                    var channel = conn.CreateChannelAsync().GetAwaiter().GetResult();
-                    {
-                        //channel.QueueDeclare(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-                        channel.QueueDeclareAsync(queue: queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-                        // BasicQos 方法设置prefetchCount = 1。这样RabbitMQ就会使得每个Consumer在同一个时间点最多处理一个Message。
-                        // 换句话说，在接收到该Consumer的ack前，他它不会将新的Message分发给它
-                        //channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
-                        channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
-                        //EventingBasicConsumer consumer = new EventingBasicConsumer(channel);
-                        var consumer = new AsyncEventingBasicConsumer(channel);
-                        //channel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);                     
-                        channel.BasicConsumeAsync(queue: queueName, autoAck: false, consumer: consumer);
-                        //consumer.Received += (model, ea) =>
-                        //{
-                        //    var body = ea.Body.ToArray();
-                        //    var message = Encoding.UTF8.GetString(body);
-                        //    Console.WriteLine(message);
-                        //    Console.WriteLine(consumer.ConsumerTags.Length);
-                        //    Console.WriteLine(consumer.ConsumerTags[0]);
-                        //    channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-                        //    //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                        //};
-                        consumer.ReceivedAsync += async (model, ea) =>
-                        {
-                            var body = ea.Body.ToArray();
-                            var message = Encoding.UTF8.GetString(body);
-                            channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
-                        };
-                        // 涉及到集群有问题
-                        MicroiRabbitMQConsumer.list.TryAdd(queueName, new MicroiMQReceiveInfo
-                        {
-                            QueueName = queueName,
-                            Channel = channel
-                        });
-                    }
+                    await channel.BasicAckAsync(
+                        deliveryTag: eventArgs.DeliveryTag,
+                        multiple: false).ConfigureAwait(false);
+                };
+                await channel.BasicConsumeAsync(
+                    queue: physicalQueue,
+                    autoAck: false,
+                    consumer: consumer).ConfigureAwait(false);
+
+                var mapKey = MicroiRabbitMQConsumer.BuildMapKey(tenant, physicalQueue);
+                var info = new MicroiMQReceiveInfo
+                {
+                    OsClient = tenant,
+                    LogicalQueueName = queueName,
+                    QueueName = physicalQueue,
+                    Channel = channel
+                };
+                if (!MicroiRabbitMQConsumer.list.TryAdd(mapKey, info))
+                {
+                    await channel.DisposeAsync().ConfigureAwait(false);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine("zhuangtai:" + conn.IsOpen + ",连接状态" + ex.Message);
+                await channel.DisposeAsync().ConfigureAwait(false);
+                throw;
             }
-
         }
 
-
         /// <summary>
-        /// 发送消息到队列
+        /// 将消息发送到当前租户的物理队列。事务提交由 RabbitMQ broker 确认；
+        /// EventId 是跨节点重投时的稳定幂等键，但业务消费者仍必须按 EventId 幂等处理。
         /// </summary>
-        /// <param name="queueName">队列名称</param>
-        /// <param name="msg">消息需要序列化</param>
-        /// <returns></returns>
-        //public MqResult SendMsg(SendInfo sendInfo)
-        //{
-        //    MqResult mqResult = new MqResult();
-        //    string statusInfo = "正常";
-        //    string status = "成功";
-        //    try
-        //    {
-        //        var conn = mqConnection.GetPublishConnection();
-        //        {
-        //            using (var channel = conn.CreateModel())
-        //            {
-        //                // 队列需要持久化
-        //                channel.QueueDeclare(sendInfo.QueueName, true, false, false, null);
-        //                MessageModel messageModel = new MessageModel()
-        //                {
-        //                    Id = Guid.NewGuid().ToString(),
-        //                    Msg = sendInfo.Msg,
-        //                };
-        //                var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(messageModel));
-        //                IBasicProperties properties = channel.CreateBasicProperties();
-        //                // 消息需要持久化
-        //                properties.DeliveryMode = 2;
-        //                //开启消息确认模式
-        //                channel.ConfirmSelect();
-        //                /*-------------Return机制：不可达的消息消息监听--------------*/
-        //                //这个事件就是用来监听我们一些不可达的消息的内容的：比如某些情况下交换机没有绑定到队列的情况下
-        //                EventHandler<BasicReturnEventArgs> evreturn = new EventHandler<BasicReturnEventArgs>((o, basic) =>
-        //                {
-        //                    mqResult.Code = 0;
-        //                    mqResult.Msg = basic.ReplyText;
-        //                    //mqResult.Data = Encoding.UTF8.GetString(basic.Body.span);
-        //                    statusInfo = "发送失败";
-        //                    status = "失败";
-        //                });
-        //                channel.BasicReturn += evreturn;
-        //                //消息发送成功的时候进入到这个事件：即RabbitMq服务器告诉生产者，我已经成功收到了消息
-        //                EventHandler<BasicAckEventArgs> BasicAcks = new EventHandler<BasicAckEventArgs> ((o, basic) =>
-        //                {
-        //                    mqResult.Code = 1;
-        //                    mqResult.Msg = "发送成功";
-        //                });
-        //                //消息发送失败的时候进入到这个事件：即RabbitMq服务器告诉生产者，你发送的这条消息我没有成功的投递到Queue中，或者说我没有收到这条消息。
-        //                EventHandler<BasicNackEventArgs> BasicNacks = new EventHandler<BasicNackEventArgs>((o, basic) =>
-        //                {
-        //                    mqResult.Code = 0;
-        //                    mqResult.Msg = "发送失败";
-        //                    statusInfo = "发送失败";
-        //                    status = "失败";
-        //                });
-        //                channel.BasicAcks += BasicAcks;
-        //                channel.BasicNacks += BasicNacks;
-        //                // 绑定到默认交换机
-        //                channel.BasicPublish("", sendInfo.QueueName, properties, body);
-        //            }
-        //        }
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        mqResult.Code = 0;
-        //        mqResult.Msg = ex.Message;
-        //    }
-        //    finally
-        //    {
-        //        _formEngine.AddFormData(new
-        //        {
-        //            FormEngineKey = MQConst.queueLogTable,
-        //            _RowModel = new Dictionary<string, string>()
-        //            {
-        //                { "Type", "发送"},
-        //                { "QueueName", sendInfo.QueueName},
-        //                { "Message", sendInfo.Msg},
-        //                { "SendTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")},
-        //                { "Status", status},
-        //                { "StatusInfo", statusInfo},
-        //            },
-        //            OsClient = OsClientDefault.OsClient
-        //        });
-
-        //    }
-        //    return mqResult;
-        //}
-
-        /// <summary>
-        /// 发送消息到队列
-        /// </summary>
-        /// <param name="queueName">队列名称</param>
-        /// <param name="msg">消息需要序列化</param>
-        /// <returns></returns>
         public async Task<DosResult> SendMsg(MicroiMQSendInfo sendInfo)
         {
-            DosResult mqResult = new DosResult()
-            {
-                Code = 1,
-                Msg = "发送成功"
-            };
-            string statusInfo = "正常";
-            string status = "成功";
-            string messageId = Ulid.NewUlid().ToString();
+            var result = new DosResult { Code = 1, Msg = "发送成功" };
+            var status = "成功";
+            var statusInfo = "正常";
+            string tenant = null;
+            string physicalQueue = null;
+            string eventId = null;
+
             try
             {
-                var conn = mqConnection.GetPublishConnection();
+                if (sendInfo == null)
                 {
-                    //using (var channel = conn.CreateModel())
-                    using (var channel = await conn.CreateChannelAsync())
-                    {
-                        // 队列需要持久化
-                        //channel.QueueDeclare(sendInfo.QueueName, true, false, false, null);
-                        channel.QueueDeclareAsync(sendInfo.QueueName, true, false, false, null);
-                        MicroiMQMessageModel messageModel = new MicroiMQMessageModel()
-                        {
-                            Id = messageId,
-                            Message = sendInfo.Message,
-                            //这里没必要发送整个用户的token，发送Id即可 ，消费消息时根据Id再次从redis取token
-                            CurrentUserId = sendInfo.CurrentToken?.CurrentUser?.GetValue("Id")?.ToString()
-                        };
-                        var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(messageModel));
-                        //IBasicProperties properties = channel.CreateBasicProperties();
-                        // 消息需要持久化
-                        //properties.DeliveryMode = 2;
-                        var properties = new BasicProperties { Persistent = true };
-
-                        //开启消息确认模式
-                        //channel.ConfirmSelect();
-                        channel.TxSelectAsync();
-
-                        // 绑定到默认交换机
-                        //channel.BasicPublish("", sendInfo.QueueName, properties, body);
-                        await channel.BasicPublishAsync("", sendInfo.QueueName, false, properties, body);
-                        //if (!channel.WaitForConfirms())
-                        //{
-                        //    statusInfo = "发送失败";
-                        //    status = "失败";
-                        //    mqResult.Code = 0;
-                        //    mqResult.Msg = "发送失败";
-                        //}
-                    }
+                    throw new ArgumentNullException(nameof(sendInfo));
                 }
+
+                eventId = NormalizeEventId(sendInfo.EventId);
+                tenant = ResolveTenant(sendInfo);
+                physicalQueue = TenantConfigurationSecurity.NormalizeQueueName(tenant, sendInfo.QueueName);
+                sendInfo.OsClient = tenant;
+                sendInfo.QueueName = physicalQueue;
+                sendInfo.EventId = eventId;
+
+                var connection = await _mqConnection
+                    .GetPublishConnectionAsync(tenant)
+                    .ConfigureAwait(false);
+                await using var channel = await connection.CreateChannelAsync().ConfigureAwait(false);
+
+                await channel.QueueDeclareAsync(
+                    queue: physicalQueue,
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: null).ConfigureAwait(false);
+
+                var message = new MicroiMQMessageModel
+                {
+                    EventId = eventId,
+                    Id = eventId,
+                    OsClient = tenant,
+                    Message = sendInfo.Message,
+                    CurrentUserId = sendInfo.CurrentToken?.CurrentUser?.GetValue("Id")?.ToString()
+                };
+                var body = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message));
+                var properties = new BasicProperties
+                {
+                    Persistent = true,
+                    ContentType = "application/json",
+                    Type = "microi.tenant-message.v1",
+                    MessageId = eventId
+                };
+
+                // RabbitMQ transaction makes broker acceptance explicit. Every async operation is awaited;
+                // omitting TxCommitAsync would silently lose messages when the channel is disposed.
+                await channel.TxSelectAsync().ConfigureAwait(false);
+                await channel.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: physicalQueue,
+                    mandatory: true,
+                    basicProperties: properties,
+                    body: body).ConfigureAwait(false);
+                await channel.TxCommitAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                mqResult.Code = 0;
-                mqResult.Msg = ex.Message;
+                result.Code = 0;
+                result.Msg = ex.Message;
                 status = "失败";
                 statusInfo = ex.ToString();
             }
             finally
             {
+                TryWriteSendLog(sendInfo, tenant, physicalQueue, eventId, status, statusInfo);
+            }
+
+            return result;
+        }
+
+        private static string ResolveTenant(MicroiMQSendInfo sendInfo)
+        {
+            var requestedTenant = sendInfo.OsClient?.Trim();
+            if (V8TenantContext.IsActive)
+            {
+                var v8Tenant = V8TenantContext.Current.OsClient;
+                if (!string.IsNullOrWhiteSpace(requestedTenant)
+                    && !string.Equals(requestedTenant, v8Tenant, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("V8 只能向当前租户的 RabbitMQ 命名空间发送消息。");
+                }
+                return TenantRabbitMQConnectionSettings.NormalizeTenant(v8Tenant);
+            }
+
+            var tokenTenant = sendInfo.CurrentToken?.OsClient?.Trim();
+            if (!string.IsNullOrWhiteSpace(tokenTenant))
+            {
+                if (!string.IsNullOrWhiteSpace(requestedTenant)
+                    && !string.Equals(requestedTenant, tokenTenant, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"当前 Token 属于租户[{tokenTenant}]，禁止向租户[{requestedTenant}]发送 RabbitMQ 消息。");
+                }
+                return tokenTenant;
+            }
+
+            return TenantRabbitMQConnectionSettings.NormalizeTenant(requestedTenant);
+        }
+
+        private static string ResolveOperationTenant(string requestedTenant)
+        {
+            if (!V8TenantContext.IsActive)
+            {
+                return TenantRabbitMQConnectionSettings.NormalizeTenant(requestedTenant);
+            }
+
+            var v8Tenant = V8TenantContext.Current.OsClient;
+            if (!string.IsNullOrWhiteSpace(requestedTenant)
+                && !string.Equals(requestedTenant, v8Tenant, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("V8 只能管理当前租户的 RabbitMQ 队列。");
+            }
+            return TenantRabbitMQConnectionSettings.NormalizeTenant(v8Tenant);
+        }
+
+        private static string NormalizeEventId(string eventId)
+        {
+            var normalized = eventId?.Trim();
+            if (string.IsNullOrWhiteSpace(normalized)) return Ulid.NewUlid().ToString();
+            if (normalized.Length > 128)
+            {
+                throw new ArgumentException("RabbitMQ EventId 长度不能超过 128 个字符。", nameof(eventId));
+            }
+            foreach (var character in normalized)
+            {
+                if (char.IsControl(character))
+                {
+                    throw new ArgumentException("RabbitMQ EventId 不能包含控制字符。", nameof(eventId));
+                }
+            }
+            return normalized;
+        }
+
+        private static void TryWriteSendLog(
+            MicroiMQSendInfo sendInfo,
+            string tenant,
+            string queueName,
+            string eventId,
+            string status,
+            string statusInfo)
+        {
+            if (string.IsNullOrWhiteSpace(tenant)) return;
+            try
+            {
                 MicroiEngine.FormEngine.AddFormData(MicroiMQConst.queueLogTable, new
                 {
                     Type = "发送",
-                    QueueName = sendInfo.QueueName,
-                    Message = sendInfo.Message,
+                    QueueName = queueName ?? sendInfo?.QueueName,
+                    Message = sendInfo?.Message,
                     SendTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
                     Status = status,
                     StatusInfo = statusInfo,
-                    MessageId = messageId,
-                    OsClient = OsClientDefault.OsClient
+                    MessageId = eventId,
+                    OsClient = tenant
                 });
             }
-            return mqResult;
+            catch (Exception logException)
+            {
+                Console.WriteLine(
+                    $"Microi：【Error异常】租户[{tenant}]的 MQ 发送日志写入失败：{logException.Message}");
+            }
         }
-
     }
 }

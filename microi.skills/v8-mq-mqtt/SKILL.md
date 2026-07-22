@@ -12,20 +12,29 @@ description: Microi V8 消息队列与 MQTT 指南。用于使用 V8.MQ.SendMsg�
 ### 生产消息（后端）
 
 ```javascript
-// 在接口引擎或 V8 事件中发送消息
-V8.MQ.SendMsg('queue_name', {
-  ProductId: '123',
-  Count: 2,
-  OrderId: V8.Param.orderId
+// 在 async 接口引擎或 V8 事件中发送消息。
+// 业务重试必须复用同一个 EventId，供消费者幂等去重。
+var result = await V8.MQ.SendMsg({
+  QueueName: 'order_process',
+  EventId: V8.Param.eventId || V8.Method.NewUlid(),
+  Message: {
+    ProductId: '123',
+    Count: 2,
+    OrderId: V8.Param.orderId
+  }
 });
+if (result.Code !== 1) return result;
 ```
+
+逻辑队列名由服务端规范为 `microi.{lowerOsClient}.{queueName}`。V8 上下文、登录 Token 与后台显式 `OsClient` 是权威租户，body 不能切换到其它租户队列。
 
 ### 生产消息（前端）
 
 ```javascript
 V8.Post('/api/mq/sendmsg', {
   QueueName: 'queue_name',
-  Message: JSON.stringify({ ProductId: '123', Count: 2 })
+  EventId: stableEventId,
+  Message: { ProductId: '123', Count: 2 }
 }, function(result) {
   if (result.Code === 1) V8.Tips('消息已发送', true);
 }, null, {}, 'json');
@@ -38,7 +47,9 @@ V8.Post('/api/mq/sendmsg', {
 ```javascript
 // 消费者接口引擎
 var message = V8.Param.Message;   // object 类型
-// message.Id          — 消息 Id
+// message.EventId     — 稳定业务幂等 Id
+// message.Id          — EventId 的兼容别名
+// message.OsClient    — 消息所属租户
 // message.Message     — 消息内容
 // message.CurrentUserId — 生产消息的用户 Id
 
@@ -54,10 +65,14 @@ V8.FormEngine.UptFormData('Product', {
 
 ```javascript
 // 接口引擎：接收请求后发送到队列，快速返回
-V8.MQ.SendMsg('order_process', {
-  orderId: V8.Param.orderId,
-  action: 'create',
-  userId: V8.CurrentUser.Id
+await V8.MQ.SendMsg({
+  QueueName: 'order_process',
+  EventId: V8.Param.eventId,
+  Message: {
+    orderId: V8.Param.orderId,
+    action: 'create',
+    userId: V8.CurrentUser.Id
+  }
 });
 
 return { Code: 1, Msg: '订单处理中，请稍候查看结果' };
@@ -94,19 +109,21 @@ try {
 
 ### MQ 配置
 
-在 SaaS 引擎配置 MQ 连接参数：`MQHost`, `MQPort`, `MQUserName`, `MQPassword`, `MQVitrualHost`
+主租户提供共享 Broker 地址 `MQHost/MQPort`。每个子租户必须在 RabbitMQ 中真实创建独立的 `MQUserName/MQPassword/MQVitrualHost`，并把权限限制在自己的 vhost 与 `microi.{osClient}.*` 队列；缺少凭据或与其它租户共用 user/password/vhost 时失败关闭，不回退主租户管理员账号。
 
 在 `diy_queue_receive` 表新增记录后，平台启动时自动订阅：
 
 | 字段 | 含义 |
 |------|------|
 | `Type` | `接口引擎`（固定） |
-| `QueueName` | 队列名（生产端 `V8.MQ.SendMsg(queueName, ...)` 与此一致） |
+| `QueueName` | 逻辑队列名（与生产端 `SendMsg({ QueueName, ... })` 一致） |
 | `ApiEngineKey` | 消费者接口引擎 Key |
 | `IsEnable` | 是否启用 |
 | `OsClient` | 所属租户（多租户隔离） |
 
 > ⚠️ 修改 `diy_queue_receive` 后需重启平台才会生效订阅。
+
+多节点会对同一租户队列使用 RabbitMQ competing consumer，但“只有一个节点收到”不等于业务只执行一次。消息 envelope 的 `EventId` 是稳定幂等键，消费者必须配合数据库唯一约束、inbox/条件更新保证副作用仅一次；连接凭据轮换后当前版本需要重启节点重建连接。
 
 ---
 
@@ -131,6 +148,8 @@ MQTT 通过一个接口引擎处理所有事件，通过 `V8.EventName` 判断�
 | `V8.MQTT.ClientId` | 客户端 Id |
 | `V8.MQTT.Topic` | 消息主题 |
 | `V8.MQTT.Payload` | 消息内容（在 MessageReceived 事件中） |
+
+子租户必须 `MqttEnable=1` 并配置独立 `MqttAccount/MqttPwd`。子租户不能通过 `MqttAllowAnonymous=1` 或 `MqttTopicIsolation=0` 关闭边界；缺少完整凭据时拒绝连接。Topic 统一为 `tenant/{lowerOsClient}/{businessTopic}`，服务端 publish、subscribe、retained、ResponseTopic 都会校验并拒绝其它租户、系统 Topic 和共享订阅绕过。
 
 ### 完整示例
 
@@ -178,7 +197,8 @@ if (eventName === 'StartServer') {
   });
 
   // 解析特定主题的数据
-  if (topic === 'sensor/temperature') {
+  var temperatureTopic = 'tenant/' + V8.OsClient.toLowerCase() + '/sensor/temperature';
+  if (topic === temperatureTopic) {
     var temp = parseFloat(payload);
     if (temp > 80) {
       // 温度报警
@@ -197,9 +217,11 @@ if (eventName === 'StartServer') {
 
 ## 注意事项
 
-- MQ 消费者接口引擎通过 `V8.Param.Message` 获取消息，包含 `Id`、`Message`、`CurrentUserId`
+- MQ 消费者接口引擎通过 `V8.Param.Message` 获取消息，包含 `EventId`、兼容 `Id`、`OsClient`、`Message`、`CurrentUserId`
 - MQ 适合异步解耦、削峰填谷、耗时操作异步化
 - MQTT 所有事件在同一个接口引擎中处理，通过 `V8.EventName` 区分
 - MQTT 适合 IoT 设备管理、实时数据采集
 - 海量 MQTT 数据建议存入 MongoDB 而非 MySQL
-- MQ 和 MQTT 的配置在 SaaS 引擎中管理
+- MQ 和 MQTT 的租户凭据在 SaaS 引擎中管理，但必须先在真实 Broker 创建对应资源，不能只写数据库字段
+- `ConnectedClients` 只代表当前 MQTT 节点的诊断快照，不是集群全局在线事实
+- 内嵌 MQTT Broker 不具备跨节点共享会话/订阅/retained 的集群一致性；多 API 节点生产部署应使用支持集群的外部 Broker，或把内嵌 Broker 固定到独立节点并由负载入口路由，不能让每个 API 节点各自充当一套独立 Broker

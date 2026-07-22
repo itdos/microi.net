@@ -11,9 +11,14 @@ namespace Microi.net
     {
         Task<DosResult> SendMsg(MicroiMQSendInfo sendInfo);
 
-        void ReceiveMsg(string queueName);
+        /// <summary>
+        /// 为指定租户注册临时消费者。队列名会在服务端强制转换为租户物理队列名。
+        /// </summary>
+        Task ReceiveMsgAsync(string osClient, string queueName);
 
-
-        void CloseChannel(string queueName);
+        /// <summary>
+        /// 关闭指定租户的队列通道；不能只按队列名关闭，避免跨租户误操作。
+        /// </summary>
+        Task CloseChannelAsync(string osClient, string queueName);
     }
 }

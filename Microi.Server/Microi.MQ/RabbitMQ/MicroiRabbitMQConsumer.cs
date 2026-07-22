@@ -1,6 +1,4 @@
-﻿using Dos.Common;
-using Microi.net;
-using Microsoft.AspNetCore.Http;
+using Dos.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
@@ -13,497 +11,530 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace Microi.net
 {
     public class MicroiRabbitMQConsumer : IMicroiMQConsumer
     {
-        public static ConcurrentDictionary<string, MicroiMQReceiveInfo> list = new ConcurrentDictionary<string, MicroiMQReceiveInfo>();
-        private IMicroiMQConnection mqConnection;
-        
-        // 用于优雅关闭后台任务
-        private CancellationTokenSource _cts = new CancellationTokenSource();
-        
-        // 跟踪每个队列的连接失败次数
-        private static ConcurrentDictionary<string, int> _failedAttempts = new ConcurrentDictionary<string, int>();
-        private const int MaxFailedAttempts = 3;
-        
+        public static readonly ConcurrentDictionary<string, MicroiMQReceiveInfo> list =
+            new ConcurrentDictionary<string, MicroiMQReceiveInfo>(StringComparer.Ordinal);
+
+        private static readonly ConcurrentDictionary<string, int> _failedAttempts =
+            new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+
+        private readonly IMicroiMQConnection _mqConnection;
+        private readonly CancellationTokenSource _cts = new CancellationTokenSource();
+        private Task _backgroundTask;
+        private int _started;
+
         public MicroiRabbitMQConsumer(IMicroiMQConnection mqConnection)
         {
-            this.mqConnection = mqConnection;
+            _mqConnection = mqConnection;
+        }
+
+        internal static string BuildMapKey(string osClient, string physicalQueueName)
+        {
+            var tenant = TenantRabbitMQConnectionSettings.NormalizeTenant(osClient).ToLowerInvariant();
+            return tenant + "|" + (physicalQueueName ?? string.Empty);
         }
 
         /// <summary>
-        /// 启动消费端
+        /// 启动所有已启用租户的 RabbitMQ 消费者。每个节点都会注册消费者；RabbitMQ 的
+        /// competing-consumer 语义负责节点间分发。锁只能避免并发执行，业务处理仍必须使用
+        /// envelope.EventId 做 inbox/唯一约束/条件更新等幂等保护。
         /// </summary>
         public void ConsumerInit()
         {
-            Task.Run(async () =>
-            {
-                var param = new
-                {
-                    FormEngineKey = MicroiMQConst.queueTable,
-                    OsClient = OsClientDefault.OsClient
-                };
-                DosResultList<dynamic> resultList = MicroiEngine.FormEngine.GetTableData(param);
-                if (resultList.Code == 1 && resultList.Data != null)
-                {
-                    foreach (var item in resultList.Data)
-                    {
-                        var model = new MicroiMQReceiveInfo()
-                        {
-                            QueueName = item.QueueName,
-                            Type = Convert.ToInt32(item.Type),
-                            FailToReject = item.FailToReject == "是" ? true : false,
-                            DllName = item.DllName,
-                            ClassName = item.ClassName,
-                            MethodName = item.MethodName,
-                            ApiEngineKey = item.ApiEngineKey,
-                            Count = item.Count,
-                            Id = item.Id
-                        };
-                        bool addResult = list.TryAdd(item.QueueName, model);
-                        if (!addResult)
-                        {
-                            Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(model));
-                        }
-                    }
-                }
-                foreach (var item in list)
-                {
-                    await RegisterMQAsync(item.Value);
-                }
-                await AddOrRemoveReceiveAsync();
-            });
+            if (Interlocked.Exchange(ref _started, 1) == 1) return;
+            _backgroundTask = Task.Run(() => RunAsync(_cts.Token));
         }
 
-        /// <summary>
-        /// 注册MQ
-        /// </summary>
-        /// <param name="item"></param>
-        /// <returns></returns>
-        private async Task<bool> RegisterMQAsync(MicroiMQReceiveInfo item)
+        private async Task RunAsync(CancellationToken cancellationToken)
         {
-            // 检查失败次数，超过3次不再尝试
-            if (_failedAttempts.TryGetValue(item.QueueName, out int attempts) && attempts >= MaxFailedAttempts)
-            {
-                return false;
-            }
-
-            //IModel channel = null;
-            IChannel channel = null;
-            IConnection conn = null;
-            try
-            {
-                // 获取消费端连接，该连接获取可能会因为RabbitMQ无法连接而失败
-                try
-                {
-                    conn = mqConnection.GetReceiveConnection();
-                }
-                catch (Exception connEx)
-                {
-                    int currentAttempts = _failedAttempts.AddOrUpdate(item.QueueName, 1, (key, oldValue) => oldValue + 1);
-                    
-                    // 只在前3次输出错误日志
-                    if (currentAttempts <= MaxFailedAttempts)
-                    {
-                        Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：RabbitMQ 服务器连接失败！" + connEx.Message + $"（第{currentAttempts}次失败）");
-                        if (currentAttempts == MaxFailedAttempts)
-                        {
-                            Console.WriteLine($"Microi：【警告】队列 {item.QueueName} 连接失败已达到{MaxFailedAttempts}次，停止重连尝试");
-                        }
-                    }
-                    return false;
-                }
-
-                if (conn == null)
-                {
-                    int currentAttempts = _failedAttempts.AddOrUpdate(item.QueueName, 1, (key, oldValue) => oldValue + 1);
-                    
-                    if (currentAttempts <= MaxFailedAttempts)
-                    {
-                        Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：获取连接失败，连接对象为 null（第{currentAttempts}次失败）");
-                        if (currentAttempts == MaxFailedAttempts)
-                        {
-                            Console.WriteLine($"Microi：【警告】队列 {item.QueueName} 连接失败已达到{MaxFailedAttempts}次，停止重连尝试");
-                        }
-                    }
-                    return false;
-                }
-
-                {
-                    //channel = conn.CreateModel();
-                    channel = await conn.CreateChannelAsync();
-                    {
-                        //channel.QueueDeclare(queue: item.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-                        await channel.QueueDeclareAsync(queue: item.QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-                        // BasicQos 方法设置prefetchCount = 1。这样RabbitMQ就会使得每个Consumer在同一个时间点最多处理一个Message。
-                        // 换句话说，在接收到该Consumer的ack前，他它不会将新的Message分发给它
-                        //channel.BasicQos(prefetchSize: 0, prefetchCount: 1, global: false);
-                        await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
-                        //EventingBasicConsumer consumer = new EventingBasicConsumer(channel);
-                        var consumer = new AsyncEventingBasicConsumer(channel);
-                        //channel.BasicConsume(queue: item.QueueName, autoAck: false, consumer: consumer);
-                        await channel.BasicConsumeAsync(queue: item.QueueName, autoAck: false, consumer: consumer);
-                        item.Channel = channel;
-                        //consumer.Received += (model, ea) => HandleMessage(item, ea, channel);
-                        consumer.ReceivedAsync += (model, ea) => HandleMessage(item, ea, channel);
-                        
-                        // 注册成功，重置失败计数
-                        _failedAttempts.TryRemove(item.QueueName, out _);
-                    }
-                }
-                return true;
-            }
-            catch (Exception ex)
-            {
-                int currentAttempts = _failedAttempts.AddOrUpdate(item.QueueName, 1, (key, oldValue) => oldValue + 1);
-                
-                if (currentAttempts <= MaxFailedAttempts)
-                {
-                    Console.WriteLine($"Microi：【Error异常】注册MQ失败：{item.QueueName}，错误：{ex.Message}（第{currentAttempts}次失败）");
-                    if (currentAttempts == MaxFailedAttempts)
-                    {
-                        Console.WriteLine($"Microi：【警告】队列 {item.QueueName} 连接失败已达到{MaxFailedAttempts}次，停止重连尝试");
-                    }
-                }
-                
-                if (channel != null && channel.IsOpen)
-                {
-                    //channel.Close();
-                    await channel.DisposeAsync();
-                }
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// 定时从数据库获取所有监听队列数据，发现有新增的需要启动监听,发现删除的的需要删除
-        /// </summary>
-        private async Task AddOrRemoveReceiveAsync()
-        {
-            while (!_cts.Token.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    var osClientName = DiyToken.GetCurrentOsClient();
-                    var clientModel = OsClient.GetClient(osClientName);
-                    //string mqListenerTime = string.IsNullOrEmpty(clientModel.MQListenerTime) ? "180" : clientModel.MQListenerTime;
-                    int listenerTime = 180;
-                    try
-                    {
-                        listenerTime = clientModel.OsClientModel["MQListenerTime"].Val<string>().DosIsNullOrWhiteSpace()
-                             ? 180 : clientModel.OsClientModel["MQListenerTime"].Val<int>();
-                    }
-                    catch (Exception e)
-                    {
-                        listenerTime = 180;
-                    }
-                    try
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(listenerTime), _cts.Token);
-                    }
-                    catch (TaskCanceledException)
-                    {
-                        // 正常取消，退出循环
-                        break;
-                    }
-                    List<MicroiMQReceiveInfo> databaseList = new List<MicroiMQReceiveInfo>();
-                    // 此处需要从数据库获取数据
-                    var param = new
-                    {
-                        FormEngineKey = MicroiMQConst.queueTable,
-                        OsClient = OsClientDefault.OsClient
-                    };
-                    DosResultList<dynamic> resultList = MicroiEngine.FormEngine.GetTableData(param);
-                    if (resultList.Code == 1 && resultList.Data != null)
-                    {
-                        foreach (var item in resultList.Data)
-                        {
-                            databaseList.Add(new MicroiMQReceiveInfo()
-                            {
-                                QueueName = item.QueueName,
-                                Type = Convert.ToInt32(item.Type),
-                                FailToReject = item.FailToReject == "是" ? true : false,
-                                DllName = item.DllName,
-                                ClassName = item.ClassName,
-                                MethodName = item.MethodName,
-                                ApiEngineKey = item.ApiEngineKey,
-                                Count = item.Count,
-                                Id = item.Id
-                            });
-                        }
-                    }
-                    // 获取数据库有但是list集合没有，需要添加
-                    var addList = databaseList.Where(x => !list.Any(a => x.QueueName == a.Value.QueueName)).ToList();
-                    if (addList != null && addList.Count > 0)
-                    {
-                        foreach (var item in addList)
-                        {
-                            if (await RegisterMQAsync(item))
-                            {
-                                var addResult = list.TryAdd(item.QueueName, item);
-                                if (!addResult)
-                                {
-                                    Console.WriteLine($"Microi：【Error异常】添加MQ失败：" + JsonConvert.SerializeObject(item));
-                                }
-                            }
-                        }
-                    }
-                    // 获取list集合有数据库没有，需要删除
-                    var removeList = list.Where(x => !databaseList.Any(a => x.Value.QueueName == a.QueueName)).ToList();
-                    if (removeList != null && removeList.Count > 0)
-                    {
-                        foreach (var item in removeList)
-                        {
-                            if (item.Value.Channel != null && item.Value.Channel.IsOpen)
-                            {
-                                //item.Channel.Close();
-                                await item.Value.Channel.DisposeAsync();
-                            }
-                            var delResult = list.Remove(item.Value.QueueName, out _);
-                            if (!delResult)
-                            {
-                                Console.WriteLine($"Microi：【Error异常】删除MQ失败：" + JsonConvert.SerializeObject(item));
-                            }
-                        }
-                    }
-                    databaseList = null;
+                    await ReconcileAllTenantsAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【Error异常】MQ Consumer 循环异常：{ex.Message}");
+                    Console.WriteLine($"Microi：【Error异常】MQ 多租户消费者同步失败：{ex.Message}");
                 }
 
-            }
-            Console.WriteLine("Microi：【信息】MQ Consumer 后台同步任务已停止");
-        }
-
-
-        //private void HandleMessage(MicroiMQReceiveInfo item,BasicDeliverEventArgs ea, IModel channel)
-        private async Task HandleMessage(MicroiMQReceiveInfo item, BasicDeliverEventArgs ea, IChannel channel)
-        {
-            // 2026-05-01 健壮性加固：HandleMessage 是 AsyncEventingBasicConsumer 的入口回调，
-            // 任何未捕获异常都会让 RabbitMQ 客户端关闭 channel 并停止派发，导致整个队列"假死"。
-            // 因此最外层必须吞掉所有异常，并尝试 Nack（若失败再忽略），保证消费者循环不退出。
-            bool success = false;
-            string receiveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            string statusInfo = "正常";
-            string status = "成功";
-            byte[] body = null;
-            string rawJson = null;
-            MicroiMQMessageModel messageModel = null;
-            object msg = null;
-            try
-            {
-                body = ea.Body.ToArray();
-                rawJson = Encoding.UTF8.GetString(body);
                 try
                 {
-                    messageModel = JsonConvert.DeserializeObject<MicroiMQMessageModel>(rawJson);
+                    await Task.Delay(GetListenerInterval(), cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception deserEx)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    // 消息体格式错误：不能 requeue（永远反序列化失败）→ 直接 Reject 进入 DLX
-                    Console.WriteLine($"Microi：【Error异常】MQ消息反序列化失败，丢弃消息。Queue={item.QueueName}, Body={rawJson}, Error={deserEx.Message}");
-                    try { await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false); } catch { }
-                    return;
+                    break;
                 }
-                if (messageModel == null)
+            }
+
+            Console.WriteLine("Microi：【信息】MQ 多租户消费者后台同步任务已停止");
+        }
+
+        private async Task ReconcileAllTenantsAsync(CancellationToken cancellationToken)
+        {
+            var desired = new Dictionary<string, MicroiMQReceiveInfo>(StringComparer.Ordinal);
+            var tenants = OsClientExtend.ClientList.Keys
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            foreach (var tenant in tenants)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                foreach (var receiver in LoadTenantReceivers(tenant))
                 {
-                    Console.WriteLine($"Microi：【Error异常】MQ消息为空，丢弃。Queue={item.QueueName}");
-                    try { await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false); } catch { }
-                    return;
+                    desired[BuildMapKey(receiver.OsClient, receiver.QueueName)] = receiver;
                 }
-                msg = messageModel.Message;
+            }
+
+            foreach (var pair in desired)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (list.TryGetValue(pair.Key, out var existing))
+                {
+                    CopyMutableConfiguration(pair.Value, existing);
+                    continue;
+                }
+
+                if (await RegisterMQAsync(pair.Value, cancellationToken).ConfigureAwait(false))
+                {
+                    if (!list.TryAdd(pair.Key, pair.Value))
+                    {
+                        await DisposeChannelAsync(pair.Value).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            var stale = list
+                .Where(pair => pair.Value.ManagedByDatabase && !desired.ContainsKey(pair.Key))
+                .ToArray();
+            foreach (var pair in stale)
+            {
+                if (list.TryRemove(pair.Key, out var removed))
+                {
+                    await DisposeChannelAsync(removed).ConfigureAwait(false);
+                    _failedAttempts.TryRemove(pair.Key, out _);
+                }
+            }
+        }
+
+        private static IReadOnlyList<MicroiMQReceiveInfo> LoadTenantReceivers(string osClient)
+        {
+            var result = new List<MicroiMQReceiveInfo>();
             try
             {
-                if (item.Type.Equals(Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey))) // 接口引擎处理业务逻辑
+                var tableResult = MicroiEngine.FormEngine.GetTableData(new
                 {
-                    JObject obj = new JObject();
-                    obj["Message"] = JTokenEx.FromObject(messageModel);
-                    //调用接口引擎
-                    // success = (bool)_apiEngineLogic.Run(obj);
-                    var apiEngineResult = await MicroiEngine.ApiEngine.RunAsync(item.ApiEngineKey, obj);
-                    if (apiEngineResult == null)
+                    FormEngineKey = MicroiMQConst.queueTable,
+                    OsClient = osClient
+                });
+                if (tableResult.Code != 1 || tableResult.Data == null) return result;
+
+                foreach (var row in tableResult.Data)
+                {
+                    try
                     {
-                        success = true;
+                        var logicalQueue = Convert.ToString(row.QueueName)?.Trim();
+                        var physicalQueue = TenantConfigurationSecurity.NormalizeQueueName(osClient, logicalQueue);
+                        var handlerType = Convert.ToInt32(row.Type);
+                        if (handlerType == Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey)
+                            && string.IsNullOrWhiteSpace(Convert.ToString(row.ApiEngineKey)))
+                        {
+                            throw new InvalidOperationException("接口引擎消费者缺少 ApiEngineKey。");
+                        }
+                        if (handlerType != Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey)
+                            && !string.Equals(osClient, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase))
+                        {
+                            throw new InvalidOperationException("子租户只允许使用接口引擎 MQ 消费者，禁止动态 DLL 处理器。");
+                        }
+
+                        result.Add(new MicroiMQReceiveInfo
+                        {
+                            OsClient = osClient,
+                            LogicalQueueName = logicalQueue,
+                            QueueName = physicalQueue,
+                            ManagedByDatabase = true,
+                            Type = handlerType,
+                            FailToReject = Convert.ToString(row.FailToReject) == "是",
+                            DllName = row.DllName,
+                            ClassName = row.ClassName,
+                            MethodName = row.MethodName,
+                            ApiEngineKey = row.ApiEngineKey,
+                            Count = Math.Max(0, Convert.ToInt32(row.Count)),
+                            Id = row.Id
+                        });
                     }
-                    else
+                    catch (Exception rowException)
                     {
-                        try
-                        {
-                            var tmpResult = ((JObject)JObject.FromObject(apiEngineResult)).ToObject<DosResult>();
-                            if (tmpResult == null || tmpResult.Code != 1)
-                            {
-                                success = false;
-                            }
-                            else
-                            {
-                                success = true;
-                            }
-                        }
-                        catch (System.Exception)
-                        {
-                            success = true;
-                        }
+                        Console.WriteLine(
+                            $"Microi：【Error异常】租户[{osClient}]存在无效 MQ 消费配置，已 fail-closed：{rowException.Message}");
                     }
-                }
-                else // 定制接口处理业务逻辑
-                {
-                    string saveFilePath = $"{Directory.GetCurrentDirectory()}\\{item.DllName}";
-                    Assembly assembly = Assembly.LoadFrom(saveFilePath);
-                    //类名称
-                    Type tp = assembly.GetType(item.ClassName);
-                    //方法
-                    MethodInfo method = tp.GetMethod(item.MethodName);
-                    object obj = Activator.CreateInstance(tp);
-                    object[] parameters = new object[1] { messageModel.Message };
-                    success = (bool)method.Invoke(obj, parameters);
-                }
-                if (success)
-                {
-                    // 回ack,服务器删除消息
-                    //channel.BasicAck(deliveryTag: ea.DeliveryTag, multiple: false);
-                    await channel.BasicAckAsync(deliveryTag: ea.DeliveryTag, multiple: false);
-                }
-                else if (item.FailToReject)
-                {
-                    status = "失败";
-                    string str = "消息消费失败, 重新返回消息队列";
-                    statusInfo = await FailToRejectHandlerAsync(item, messageModel, ea, channel, str);
-                }
-                else
-                {
-                    status = "失败";
-                    statusInfo = "消息消费失败,删除消息";
-                    // 删除消息
-                    //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
                 }
             }
             catch (Exception ex)
             {
+                // 某个租户没有 MQ 表或数据库暂时不可用，不得阻断其它租户的消费者。
+                Console.WriteLine($"Microi：【Error异常】读取租户[{osClient}]的 MQ 消费配置失败：{ex.Message}");
+            }
+            return result;
+        }
 
+        private async Task<bool> RegisterMQAsync(
+            MicroiMQReceiveInfo item,
+            CancellationToken cancellationToken)
+        {
+            var mapKey = BuildMapKey(item.OsClient, item.QueueName);
+            IChannel channel = null;
+            try
+            {
+                var connection = await _mqConnection
+                    .GetReceiveConnectionAsync(item.OsClient, cancellationToken)
+                    .ConfigureAwait(false);
+                channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+                await channel.QueueDeclareAsync(
+                    queue: item.QueueName,
+                    durable: true,
+                    exclusive: false,
+                    autoDelete: false,
+                    arguments: null,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+                await channel.BasicQosAsync(
+                    prefetchSize: 0,
+                    prefetchCount: 1,
+                    global: false,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
 
-                Console.WriteLine("消息处理异常" + ex);
-                status = "失败";
-                if (item.FailToReject)
+                var consumer = new AsyncEventingBasicConsumer(channel);
+                consumer.ReceivedAsync += (_, eventArgs) => HandleMessageAsync(item, eventArgs, channel);
+                await channel.BasicConsumeAsync(
+                    queue: item.QueueName,
+                    autoAck: false,
+                    consumer: consumer,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+
+                item.Channel = channel;
+                _failedAttempts.TryRemove(mapKey, out _);
+                return true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                if (channel != null) await channel.DisposeAsync().ConfigureAwait(false);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (channel != null) await channel.DisposeAsync().ConfigureAwait(false);
+                var attempt = _failedAttempts.AddOrUpdate(mapKey, 1, (_, oldValue) => oldValue + 1);
+                if (attempt <= 3 || attempt % 10 == 0)
                 {
-                    string str = "消息处理异常,重新返回消息队列";
-                    statusInfo = await FailToRejectHandlerAsync(item, messageModel, ea, channel, str);
+                    Console.WriteLine(
+                        $"Microi：【Error异常】注册租户[{item.OsClient}]的 MQ 队列[{item.QueueName}]失败" +
+                        $"（第{attempt}次，未回退主租户凭据）：{ex.Message}");
+                }
+                return false;
+            }
+        }
+
+        private async Task HandleMessageAsync(
+            MicroiMQReceiveInfo item,
+            BasicDeliverEventArgs eventArgs,
+            IChannel channel)
+        {
+            var receiveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var status = "失败";
+            var statusInfo = "未处理";
+            MicroiMQMessageModel envelope = null;
+
+            try
+            {
+                var rawJson = Encoding.UTF8.GetString(eventArgs.Body.ToArray());
+                try
+                {
+                    envelope = JsonConvert.DeserializeObject<MicroiMQMessageModel>(rawJson);
+                }
+                catch (Exception ex)
+                {
+                    statusInfo = "消息反序列化失败：" + ex.Message;
+                    await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
+                    return;
+                }
+
+                var validationError = ValidateEnvelope(item, envelope, eventArgs.BasicProperties?.MessageId);
+                if (validationError != null)
+                {
+                    statusInfo = validationError;
+                    Console.WriteLine(
+                        $"Microi：【安全】租户[{item.OsClient}]的 MQ 消息 envelope 校验失败，Queue={item.QueueName}：{validationError}");
+                    await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
+                    return;
+                }
+
+                var success = await ExecuteHandlerAsync(item, envelope).ConfigureAwait(false);
+                if (success)
+                {
+                    status = "成功";
+                    statusInfo = "正常";
+                    await channel.BasicAckAsync(eventArgs.DeliveryTag, multiple: false).ConfigureAwait(false);
+                    await ClearRetryStateAsync(item, envelope.StableEventId).ConfigureAwait(false);
+                }
+                else if (item.FailToReject)
+                {
+                    statusInfo = await RequeueOrRejectAsync(
+                        item,
+                        envelope,
+                        eventArgs,
+                        channel,
+                        "消息消费失败").ConfigureAwait(false);
                 }
                 else
                 {
-                    statusInfo = "消息处理异常,删除消息";
-                    //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
+                    statusInfo = "消息消费失败，已删除消息";
+                    await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
                 }
             }
-            // 写入消息日志
+            catch (Exception ex)
+            {
+                statusInfo = "消息处理异常：" + ex.Message;
+                Console.WriteLine(
+                    $"Microi：【Error异常】租户[{item.OsClient}]处理 MQ 消息失败，Queue={item.QueueName}：{ex}");
+                try
+                {
+                    if (envelope != null && item.FailToReject)
+                    {
+                        statusInfo = await RequeueOrRejectAsync(
+                            item,
+                            envelope,
+                            eventArgs,
+                            channel,
+                            statusInfo).ConfigureAwait(false);
+                    }
+                    else if (channel.IsOpen)
+                    {
+                        await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
+                    }
+                }
+                catch
+                {
+                    // 连接中断时 RabbitMQ 会把未 Ack 消息重新派发；业务端仍须按 EventId 幂等。
+                }
+            }
+            finally
+            {
+                TryWriteReceiveLog(item, envelope, receiveTime, status, statusInfo);
+            }
+        }
+
+        private static string ValidateEnvelope(
+            MicroiMQReceiveInfo item,
+            MicroiMQMessageModel envelope,
+            string brokerMessageId)
+        {
+            if (envelope == null) return "消息 envelope 为空";
+            if (string.IsNullOrWhiteSpace(envelope.OsClient)) return "消息 envelope 未携带 OsClient";
+            if (!string.Equals(envelope.OsClient, item.OsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"消息租户[{envelope.OsClient}]与队列租户[{item.OsClient}]不一致";
+            }
+            if (string.IsNullOrWhiteSpace(envelope.StableEventId)) return "消息 envelope 未携带 EventId/Id";
+            if (!string.IsNullOrWhiteSpace(envelope.EventId)
+                && !string.IsNullOrWhiteSpace(envelope.Id)
+                && !string.Equals(envelope.EventId, envelope.Id, StringComparison.Ordinal))
+            {
+                return "消息 envelope 的 EventId 与兼容字段 Id 不一致";
+            }
+            if (!string.IsNullOrWhiteSpace(brokerMessageId)
+                && !string.Equals(brokerMessageId, envelope.StableEventId, StringComparison.Ordinal))
+            {
+                return "RabbitMQ MessageId 与 envelope EventId 不一致";
+            }
+            return null;
+        }
+
+        private static async Task<bool> ExecuteHandlerAsync(
+            MicroiMQReceiveInfo item,
+            MicroiMQMessageModel envelope)
+        {
+            if (item.Type == Convert.ToInt32(MicroiMQConst.MQTypeApiEngineKey))
+            {
+                var param = new JObject
+                {
+                    ["OsClient"] = item.OsClient,
+                    ["Message"] = JTokenEx.FromObject(envelope),
+                    ["EventId"] = envelope.StableEventId
+                };
+                var apiResult = await MicroiEngine.ApiEngine
+                    .RunAsync(item.ApiEngineKey, param)
+                    .ConfigureAwait(false);
+                if (apiResult == null) return true;
+                try
+                {
+                    return JObject.FromObject(apiResult).ToObject<DosResult>()?.Code == 1;
+                }
+                catch
+                {
+                    // 保留历史约定：非 DosResult 返回值视为接口引擎已成功执行。
+                    return true;
+                }
+            }
+
+            var applicationRoot = Path.GetFullPath(Directory.GetCurrentDirectory());
+            var saveFilePath = Path.GetFullPath(Path.Combine(applicationRoot, item.DllName ?? string.Empty));
+            var rootPrefix = applicationRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                             + Path.DirectorySeparatorChar;
+            if (!saveFilePath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(Path.GetExtension(saveFilePath), ".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("MQ DLL 处理器路径不在应用目录或扩展名无效。");
+            }
+            var assembly = Assembly.LoadFrom(saveFilePath);
+            var type = assembly.GetType(item.ClassName, throwOnError: true);
+            var method = type.GetMethod(item.MethodName)
+                         ?? throw new MissingMethodException(item.ClassName, item.MethodName);
+            var instance = Activator.CreateInstance(type);
+            return Convert.ToBoolean(method.Invoke(instance, new[] { envelope.Message }));
+        }
+
+        private static async Task<string> RequeueOrRejectAsync(
+            MicroiMQReceiveInfo item,
+            MicroiMQMessageModel envelope,
+            BasicDeliverEventArgs eventArgs,
+            IChannel channel,
+            string reason)
+        {
+            var cache = MicroiEngine.CacheTenant.Cache(item.OsClient);
+            var key = RetryKey(item.OsClient, envelope.StableEventId);
+            var rawCount = await cache.GetAsync<object>(key).ConfigureAwait(false);
+            var currentCount = rawCount == null ? 0 : Convert.ToInt32(rawCount);
+            if (currentCount >= item.Count)
+            {
+                await cache.RemoveAsync(key).ConfigureAwait(false);
+                await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
+                return reason + "，已达到最大重试次数并删除消息";
+            }
+
+            await cache.SetAsync(key, currentCount + 1, TimeSpan.FromDays(7)).ConfigureAwait(false);
+            await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: true).ConfigureAwait(false);
+            return reason + $"，已重新入队（{currentCount + 1}/{item.Count}）";
+        }
+
+        private static async Task ClearRetryStateAsync(MicroiMQReceiveInfo item, string eventId)
+        {
+            try
+            {
+                await MicroiEngine.CacheTenant
+                    .Cache(item.OsClient)
+                    .RemoveAsync(RetryKey(item.OsClient, eventId))
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // 重试计数清理失败不应把已经成功处理的业务消息重新投递。
+            }
+        }
+
+        private static string RetryKey(string osClient, string eventId)
+        {
+            return $"Microi:{osClient}:MQ:Retry:{eventId}";
+        }
+
+        private static void TryWriteReceiveLog(
+            MicroiMQReceiveInfo item,
+            MicroiMQMessageModel envelope,
+            string receiveTime,
+            string status,
+            string statusInfo)
+        {
             try
             {
                 MicroiEngine.FormEngine.AddFormData(new
                 {
                     FormEngineKey = MicroiMQConst.queueLogTable,
-                    _RowModel = new Dictionary<string, object>()
-                        {
-                            { "Type", "接收"},
-                            { "QueueName", item.QueueName},
-                            { "Message", msg},
-                            { "ReceiveTime", receiveTime},
-                            { "CompleteTime", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")},
-                            { "Status", status},
-                            { "StatusInfo", statusInfo},
-                            { "MessageId", messageModel.Id}
-                        },
-                    OsClient = OsClientDefault.OsClient
+                    _RowModel = new Dictionary<string, object>
+                    {
+                        ["Type"] = "接收",
+                        ["QueueName"] = item.QueueName,
+                        ["Message"] = envelope?.Message,
+                        ["ReceiveTime"] = receiveTime,
+                        ["CompleteTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                        ["Status"] = status,
+                        ["StatusInfo"] = statusInfo,
+                        ["MessageId"] = envelope?.StableEventId
+                    },
+                    OsClient = item.OsClient
                 });
             }
-            catch (Exception logEx)
+            catch (Exception ex)
             {
-                // 日志写入失败不应影响 MQ 消费者主流程
-                Console.WriteLine($"Microi：【Error异常】MQ日志写入失败：{logEx.Message}");
-            }
-            }
-            catch (Exception outerEx)
-            {
-                // 兜底：保证 HandleMessage 不向上抛出，否则 channel 会被关闭
-                Console.WriteLine($"Microi：【Error异常】MQ HandleMessage 顶层异常：{outerEx}");
-                try
-                {
-                    if (channel != null && channel.IsOpen)
-                    {
-                        await channel.BasicNackAsync(deliveryTag: ea.DeliveryTag, multiple: false, requeue: false);
-                    }
-                }
-                catch { /* ignore */ }
+                Console.WriteLine(
+                    $"Microi：【Error异常】租户[{item.OsClient}]的 MQ 接收日志写入失败：{ex.Message}");
             }
         }
 
-        //private string FailToRejectHandler(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IModel channel,string msg)
-        private async Task<string> FailToRejectHandlerAsync(MicroiMQReceiveInfo item, MicroiMQMessageModel messageModel, BasicDeliverEventArgs ea, IChannel channel, string msg)
+        private static TimeSpan GetListenerInterval()
         {
-            string statusInfo = msg;
-            string key = "Microi:MQ:" + messageModel.Id;
-            // todo ： 这里是否应该考虑到osClient的cache？
-            if (MicroiEngine.CacheTenant.Default().KeyExist(key))
+            var seconds = 180;
+            foreach (var client in OsClientExtend.ClientList.Values)
             {
-                // todo ： 这里是否应该考虑到osClient的cache？
-                int count = Convert.ToInt32(MicroiEngine.CacheTenant.Default().Get(key));
-                if (count >= item.Count)
-                {
-                    statusInfo = "消息达到重回队列次数，删除消息";
-                    //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: false);
-                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: false);
-                }
-                else
-                {
-                    MicroiEngine.CacheTenant.Default().Set(key, count + 1);
-                    // 消息重回队列
-                    //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
-                    await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
-                }
+                var configured = client?.OsClientModel?["MQListenerTime"]?.Val<int>() ?? 0;
+                if (configured > 0) seconds = Math.Min(seconds, configured);
             }
-            else
-            {
-                MicroiEngine.CacheTenant.Default().Set(key, 1);
-                // 消息重回队列
-                //channel.BasicReject(deliveryTag: ea.DeliveryTag, requeue: true);
-                await channel.BasicRejectAsync(deliveryTag: ea.DeliveryTag, requeue: true);
-            }
-            return statusInfo;
+            return TimeSpan.FromSeconds(Math.Max(15, Math.Min(3600, seconds)));
         }
 
-        /// <summary>
-        /// 停止消费者（优雅关闭）
-        /// </summary>
+        private static void CopyMutableConfiguration(
+            MicroiMQReceiveInfo source,
+            MicroiMQReceiveInfo target)
+        {
+            target.Type = source.Type;
+            target.FailToReject = source.FailToReject;
+            target.DllName = source.DllName;
+            target.ClassName = source.ClassName;
+            target.MethodName = source.MethodName;
+            target.ApiEngineKey = source.ApiEngineKey;
+            target.Count = source.Count;
+            target.Id = source.Id;
+            target.LogicalQueueName = source.LogicalQueueName;
+        }
+
+        private static async Task DisposeChannelAsync(MicroiMQReceiveInfo item)
+        {
+            if (item?.Channel != null)
+            {
+                await item.Channel.DisposeAsync().ConfigureAwait(false);
+                item.Channel = null;
+            }
+        }
+
         public void Stop()
         {
             try
             {
                 _cts.Cancel();
-                Console.WriteLine("Microi：【信息】MQ Consumer 正在停止...");
-                
-                // 关闭所有 Channel
-                foreach (var item in list)
+                _backgroundTask?.ConfigureAwait(false).GetAwaiter().GetResult();
+                foreach (var pair in list.ToArray())
                 {
-                    if (item.Value.Channel != null && item.Value.Channel.IsOpen)
+                    if (list.TryRemove(pair.Key, out var item))
                     {
-                        item.Value.Channel.CloseAsync().GetAwaiter().GetResult();
+                        DisposeChannelAsync(item).ConfigureAwait(false).GetAwaiter().GetResult();
                     }
                 }
-                list.Clear();
                 _failedAttempts.Clear();
-                Console.WriteLine("Microi：【信息】MQ Consumer 已停止");
+                Console.WriteLine("Microi：【信息】MQ 多租户消费者已停止");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】MQ Consumer 停止失败：{ex.Message}");
+                Console.WriteLine($"Microi：【Error异常】MQ 多租户消费者停止失败：{ex.Message}");
             }
         }
-
     }
 }
