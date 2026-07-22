@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using MQTTnet;
+using System.Threading.Tasks;
 
 namespace Microi.net.Api
 {
@@ -21,12 +21,18 @@ namespace Microi.net.Api
         }
 
         [HttpGet("status")]
-        public IActionResult GetStatus()
+        public async Task<IActionResult> GetStatus()
         {
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var osClient = currentToken?.OsClient;
+            if (string.IsNullOrWhiteSpace(osClient)) return Unauthorized();
+
             return Ok(new
             {
                 IsRunning = _mqttService.IsRunning,
-                ConnectedClients = _mqttService.ConnectedClients
+                OsClient = osClient,
+                StatusScope = "CurrentNode",
+                ConnectedClients = _mqttService.GetConnectedClients(osClient)
             });
         }
 
@@ -41,13 +47,11 @@ namespace Microi.net.Api
         [HttpPost("send-command")]
         public async Task<IActionResult> SendCommand([FromBody] string command)
         {
-            // 注意：此为旧版示例接口，未做租户隔离。生产请使用 PublishAsync(osClient, topic, payload)
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic("M100/command")
-                .WithPayload(command)
-                .Build();
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var osClient = currentToken?.OsClient;
+            if (string.IsNullOrWhiteSpace(osClient)) return Unauthorized();
 
-            await _mqttService.PublishAsync(message);
+            await _mqttService.PublishAsync(osClient, "M100/command", command);
             return Ok("Command sent");
         }
     }

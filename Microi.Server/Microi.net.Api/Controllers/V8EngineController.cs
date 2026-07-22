@@ -197,6 +197,7 @@ namespace Microi.net.Api
                 param["FileName"]?.Val<string>(),
                 param["FileByteBase64"]?.Val<string>(),
                 param["Path"]?.Val<string>(),
+                param["FilePathName"]?.Val<string>(),
                 param["Limit"]?.Val<bool>(),
                 param["Preview"]?.Val<bool>(),
                 param["TargetTable"]?.Val<string>(),

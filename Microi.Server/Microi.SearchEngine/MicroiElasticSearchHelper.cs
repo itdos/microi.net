@@ -7,7 +7,7 @@ using NPOI.SS.Formula.Functions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Security;
 using System.Threading.Tasks;
 
 namespace Microi.net
@@ -15,14 +15,66 @@ namespace Microi.net
     public class MicroiElasticSearchHelper : IMicroiSearchEngineHelper
     {
         /// <summary>
-        /// 获取当前租户的OsClient标识
-        /// 优先使用显式传入的osClient，其次从HTTP上下文获取
+        /// 获取当前租户的 OsClient 标识。
+        /// HTTP/JWT 与 V8 执行上下文中的租户永远是权威值；只有确实不存在请求/V8
+        /// 上下文的后台任务，才允许通过参数显式指定租户。
         /// </summary>
         private string GetOsClient(string explicitOsClient = null)
         {
-            if (!string.IsNullOrWhiteSpace(explicitOsClient))
-                return explicitOsClient;
-            return DiyToken.GetCurrentOsClient();
+            var requested = explicitOsClient?.Trim();
+
+            var v8OsClient = V8TenantContext.Current?.OsClient?.Trim();
+            if (!string.IsNullOrWhiteSpace(v8OsClient))
+            {
+                EnsureSameTenant(v8OsClient, requested);
+                return v8OsClient;
+            }
+
+            Microsoft.AspNetCore.Http.HttpContext httpContext = null;
+            try
+            {
+                httpContext = DiyHttpContext.Current;
+            }
+            catch
+            {
+                // 非 Web 宿主没有 IHttpContextAccessor，按后台任务规则继续处理。
+            }
+
+            if (httpContext != null)
+            {
+                // 已通过 ASP.NET Core 身份验证的 JWT Claim 优先级最高。匿名入口则使用
+                // DiyToken 已解析的 query/form/header 租户；JSON body 不能成为租户选择器。
+                var authenticatedOsClient = httpContext.User?.Claims?
+                    .FirstOrDefault(c => string.Equals(c.Type, "OsClient", StringComparison.OrdinalIgnoreCase))
+                    ?.Value?.Trim();
+                var requestOsClient = !string.IsNullOrWhiteSpace(authenticatedOsClient)
+                    ? authenticatedOsClient
+                    : DiyToken.GetCurrentOsClient(false)?.Trim();
+
+                if (string.IsNullOrWhiteSpace(requestOsClient))
+                {
+                    throw new SecurityException("当前请求无法确定租户，已拒绝搜索引擎访问。");
+                }
+
+                EnsureSameTenant(requestOsClient, requested);
+                return requestOsClient;
+            }
+
+            if (string.IsNullOrWhiteSpace(requested))
+            {
+                throw new InvalidOperationException("后台搜索任务必须显式指定 OsClient。");
+            }
+
+            return requested;
+        }
+
+        private static void EnsureSameTenant(string authoritativeOsClient, string requestedOsClient)
+        {
+            if (!string.IsNullOrWhiteSpace(requestedOsClient)
+                && !string.Equals(authoritativeOsClient, requestedOsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new SecurityException("禁止跨租户访问搜索引擎资源。");
+            }
         }
 
         /// <summary>
@@ -32,25 +84,114 @@ namespace Microi.net
         private string GetIndexName(string tableName, string osClient = null)
         {
             var client = GetOsClient(osClient);
-            return $"{client}_{tableName}".ToLower();
+            return TenantConfigurationSecurity.NormalizeSearchIndex(tableName, client);
         }
 
         private ElasticClient GetEsClient(string osClient = null)
         {
             var osClientName = GetOsClient(osClient);
             var clientModel = OsClient.GetClient(osClientName);
-            string host = clientModel.OsClientModel["SearchEngineHost"].Val<string>();
-            var hostArr = host.DosSplit(',');
-            var uris = new Uri[hostArr.Length];
-            for (int i = 0; i < hostArr.Length; i++)
+            if (clientModel?.OsClientModel == null)
             {
-                string ipStr = $"http://{hostArr[i]}:{clientModel.OsClientModel["SearchEnginePort"].Val<int>()}";
-                uris[i] = new Uri(ipStr);
+                throw new InvalidOperationException("当前租户的搜索引擎配置不可用。");
             }
+
+            // Host/Port 由 SaaS 运行时安全配置模型解析（可继承共享服务地址），凭据必须来自
+            // 当前租户自身配置。这里不读取主租户，也不做管理员凭据回退。
+            string host = ReadConfig(clientModel.OsClientModel, "SearchEngineHost");
+            int port = ReadIntConfig(clientModel.OsClientModel, "SearchEnginePort");
+            string scheme = ReadConfig(clientModel.OsClientModel, "SearchEngineScheme");
+            if (string.IsNullOrWhiteSpace(scheme)) scheme = "http";
+            if (string.IsNullOrWhiteSpace(host) || port <= 0 || port > 65535)
+            {
+                throw new InvalidOperationException("当前租户的搜索引擎连接地址未配置或无效。");
+            }
+
+            var hostArr = host.DosSplit(',');
+            var uris = hostArr
+                .Where(item => !string.IsNullOrWhiteSpace(item))
+                .Select(item => BuildEndpoint(item, port, scheme))
+                .ToArray();
+            if (uris.Length == 0)
+            {
+                throw new InvalidOperationException("当前租户的搜索引擎连接地址未配置或无效。");
+            }
+
             //var pool = new SniffingConnectionPool(uris);
             var pool = new StaticConnectionPool(uris);
-            var client = new ElasticClient(new ConnectionSettings(pool));
+            var settings = new ConnectionSettings(pool);
+
+            var apiKey = ReadConfig(clientModel.OsClientModel, "SearchEngineApiKey");
+            var userName = ReadConfig(clientModel.OsClientModel, "SearchEngineUserName", "SearchEngineUsername");
+            var password = ReadConfig(clientModel.OsClientModel, "SearchEnginePassword");
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                var separator = apiKey.IndexOf(':');
+                settings = separator > 0 && separator < apiKey.Length - 1
+                    ? settings.ApiKeyAuthentication(apiKey.Substring(0, separator), apiKey.Substring(separator + 1))
+                    : settings.ApiKeyAuthentication(new ApiKeyAuthenticationCredentials(apiKey));
+            }
+            else if (!string.IsNullOrWhiteSpace(userName) && !string.IsNullOrWhiteSpace(password))
+            {
+                settings = settings.BasicAuthentication(userName, password);
+            }
+            else if (!string.IsNullOrWhiteSpace(userName) || !string.IsNullOrWhiteSpace(password))
+            {
+                throw new InvalidOperationException("当前租户的搜索引擎凭据配置不完整。");
+            }
+            else if (!string.Equals(osClientName, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("当前租户尚未配置独立的搜索引擎凭据。");
+            }
+
+            var client = new ElasticClient(settings);
             return client;
+        }
+
+        private static string ReadConfig(Newtonsoft.Json.Linq.JObject model, params string[] names)
+        {
+            foreach (var name in names)
+            {
+                var value = model[name]?.Val<string>()?.Trim();
+                if (!string.IsNullOrWhiteSpace(value)) return value;
+            }
+            return string.Empty;
+        }
+
+        private static int ReadIntConfig(Newtonsoft.Json.Linq.JObject model, string name)
+        {
+            var value = ReadConfig(model, name);
+            return int.TryParse(value, out var result) ? result : 0;
+        }
+
+        private static Uri BuildEndpoint(string host, int port, string scheme)
+        {
+            host = host?.Trim();
+            scheme = scheme?.Trim().ToLowerInvariant();
+            if (scheme != "http" && scheme != "https")
+            {
+                throw new InvalidOperationException("搜索引擎连接协议无效。");
+            }
+
+            if (string.IsNullOrWhiteSpace(host)
+                || host.IndexOfAny(new[] { '/', '\\', '?', '#', '@' }) >= 0)
+            {
+                throw new InvalidOperationException("搜索引擎连接地址无效。");
+            }
+
+            try
+            {
+                return new UriBuilder(scheme, host, port).Uri;
+            }
+            catch
+            {
+                throw new InvalidOperationException("搜索引擎连接地址无效。");
+            }
+        }
+
+        private static MicroiSearchEngineResult Failed(string message)
+        {
+            return new MicroiSearchEngineResult(0, message);
         }
 
         /// <summary>
@@ -113,9 +254,9 @@ namespace Microi.net
                 }
                 return await CreateIndex(indexName, fielsResult.Data, currentOsClient);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return new MicroiSearchEngineResult(0, "同步索引失败:" + ex.Message);
+                return Failed("同步索引失败，请检查当前租户的搜索配置与索引名称。");
             }
 
         }
@@ -132,6 +273,7 @@ namespace Microi.net
             try
             {
                 var currentOsClient = GetOsClient(osClient);
+                string indexName = GetIndexName(tableName, currentOsClient);
                 // 依据表名称以及id获取数据
                 var dataResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                 {
@@ -143,7 +285,6 @@ namespace Microi.net
                 {
                     string jsonStr = JsonConvert.SerializeObject(dataResult.Data);
                     Dictionary<string, object> dic = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonStr);
-                    string indexName = GetIndexName(tableName, currentOsClient);
                     var result = await GetEsClient(currentOsClient).IndexAsync<Dictionary<string, object>>(dic, i => i.Index(indexName).Id(id));
                     if (result == null || !result.IsValid)
                     {
@@ -152,11 +293,9 @@ namespace Microi.net
                 }
 
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
-
-                return new MicroiSearchEngineResult(0, ex.Message);
+                return Failed("新增失败，搜索请求已拒绝。");
             }
             return new MicroiSearchEngineResult(1, "新增成功");
         }
@@ -173,6 +312,7 @@ namespace Microi.net
             try
             {
                 var currentOsClient = GetOsClient(osClient);
+                string indexName = GetIndexName(tableName, currentOsClient);
                 // 依据表名称以及id获取数据
                 var dataResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
                 {
@@ -184,7 +324,6 @@ namespace Microi.net
                 {
                     string jsonStr = JsonConvert.SerializeObject(dataResult.Data);
                     Dictionary<string, object> dic = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonStr);
-                    string indexName = GetIndexName(tableName, currentOsClient);
                     IUpdateRequest<Dictionary<string, object>, Dictionary<string, object>> request = new UpdateRequest<Dictionary<string, object>, Dictionary<string, object>>(indexName, id)
                     {
                         Doc = dic,
@@ -196,11 +335,9 @@ namespace Microi.net
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
-
-                return new MicroiSearchEngineResult(0, ex.Message);
+                return Failed("更新失败，搜索请求已拒绝。");
             }
             return new MicroiSearchEngineResult(1, "更新成功");
         }
@@ -225,11 +362,9 @@ namespace Microi.net
                     return new MicroiSearchEngineResult(0, "删除失败");
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
-
-                return new MicroiSearchEngineResult(0, ex.Message);
+                return Failed("删除失败，搜索请求已拒绝。");
             }
             return new MicroiSearchEngineResult(1, "删除成功");
         }
@@ -290,9 +425,9 @@ namespace Microi.net
                 }
                 return new MicroiSearchEngineResult(1, "新增字段成功");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return new MicroiSearchEngineResult(0, "新增字段失败:" + ex.Message);
+                return Failed("新增字段失败，搜索请求已拒绝。");
             }
         }
 
@@ -303,7 +438,25 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<MicroiSearchEngineResult> GetSearchResponse(MicroiSearchEngineParam searchParam)
         {
+            try
+            {
+                return await GetSearchResponseCore(searchParam);
+            }
+            catch (Exception)
+            {
+                return Failed("查询失败，搜索请求已拒绝。");
+            }
+        }
+
+        private async Task<MicroiSearchEngineResult> GetSearchResponseCore(MicroiSearchEngineParam searchParam)
+        {
+            if (searchParam == null)
+            {
+                return Failed("查询参数不能为空。");
+            }
             var currentOsClient = GetOsClient(searchParam.OsClient);
+            // 在访问表元数据前先验证名称，阻止通配符、多索引、路径和外租户前缀。
+            GetIndexName(searchParam.TableName, currentOsClient);
             List<QueryContainer> must = new List<QueryContainer>();
             BoolQuery boolQuery = new BoolQuery();
             boolQuery.Must = must;
@@ -443,7 +596,7 @@ namespace Microi.net
                 var response = await GetEsClient(currentOsClient).DeleteByQueryAsync(deleteByQueryRequest);
                 if (!response.IsValid)
                 {
-                    return new MicroiSearchEngineResult(0, "同步失败：" + response.ServerError.ToString());
+                    return Failed("同步失败，请检查当前租户的搜索配置。");
                 }
                 // 获取表数据
                 var param = new
@@ -467,9 +620,9 @@ namespace Microi.net
                 }
                 return new MicroiSearchEngineResult(1, "同步成功");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return new MicroiSearchEngineResult(0, "同步失败:" + ex.Message);
+                return Failed("同步失败，搜索请求已拒绝。");
             }
 
         }
@@ -484,8 +637,10 @@ namespace Microi.net
         private async Task<MicroiSearchEngineResult> ReIndex(string indexName, List<dynamic> data, string osClient = null)
         {
             var currentOsClient = GetOsClient(osClient);
+            indexName = TenantConfigurationSecurity.NormalizeSearchIndex(indexName, currentOsClient);
             // 创建新索引
-            string destIndexName = $"{indexName}-{Ulid.NewUlid().ToString()}";
+            string destIndexName = TenantConfigurationSecurity.NormalizeSearchIndex(
+                $"{indexName}-{Ulid.NewUlid().ToString()}", currentOsClient);
             var createIndexResponse = await CreateIndex(destIndexName, data, currentOsClient);
             if (createIndexResponse.Code != 1)
             {
@@ -511,7 +666,8 @@ namespace Microi.net
             {
                 existIndexAlias = true;
                 id = result.Data.Id;
-                sourceIndexName = result.Data.IndexName;
+                sourceIndexName = TenantConfigurationSecurity.NormalizeSearchIndex(
+                    Convert.ToString(result.Data.IndexName), currentOsClient);
             }
             var esClient = GetEsClient(currentOsClient);
             // reindex 复制源index数据到新index
@@ -538,8 +694,7 @@ namespace Microi.net
             var putAliasResponse = await esClient.Indices.PutAliasAsync(destIndexName, indexName);
             if (!putAliasResponse.IsValid)
             {
-                string message = $"更改别名失败，需要手动修改别名,源index名称为：{destIndexName},别名为：{indexName}";
-                return new MicroiSearchEngineResult(0, message);
+                return Failed("更改索引别名失败，请联系管理员处理。");
             }
 
             // 保存indexName和别名对应关系
@@ -558,8 +713,7 @@ namespace Microi.net
                 });
                 if (updateResult == null || updateResult.Code != 1)
                 {
-                    string message = $"修改对应关系失败，需要手动修改,源index名称为：{destIndexName},别名为：{indexName}，Id为：{id}";
-                    return new MicroiSearchEngineResult(0, message);
+                    return Failed("修改索引别名关系失败，请联系管理员处理。");
                 }
             }
             else
@@ -576,8 +730,7 @@ namespace Microi.net
                 });
                 if (addResult == null || addResult.Code != 1)
                 {
-                    string message = $"新增对应关系失败，需要手动新增,源index名称为：{destIndexName},别名为：{indexName}";
-                    return new MicroiSearchEngineResult(0, message);
+                    return Failed("新增索引别名关系失败，请联系管理员处理。");
                 }
             }
             return new MicroiSearchEngineResult(1, "重建索引成功");
@@ -592,6 +745,8 @@ namespace Microi.net
         /// <returns></returns>
         private async Task<MicroiSearchEngineResult> CreateIndex(string indexName, List<dynamic> data, string osClient = null)
         {
+            var currentOsClient = GetOsClient(osClient);
+            indexName = TenantConfigurationSecurity.NormalizeSearchIndex(indexName, currentOsClient);
 
             PropertiesDescriptor<object> propertiesDescriptor = new PropertiesDescriptor<object>();
             propertiesDescriptor.Keyword(k => k.Name("Id"));
@@ -617,7 +772,7 @@ namespace Microi.net
             var dateArr = new List<string>() { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyy/MM/dd" };
             AliasesDescriptor aliasesDescriptor = new AliasesDescriptor();
             aliasesDescriptor.Alias(indexName);
-            var response = await GetEsClient(osClient).Indices.CreateAsync(indexName, i => i.Settings(s => s.NumberOfShards(3).NumberOfReplicas(1))
+            var response = await GetEsClient(currentOsClient).Indices.CreateAsync(indexName, i => i.Settings(s => s.NumberOfShards(3).NumberOfReplicas(1))
                                                                                     .Map(m => m.AutoMap()
                                                                                                .Dynamic(true)
                                                                                                .NumericDetection()
@@ -625,7 +780,7 @@ namespace Microi.net
                                                                                                .Properties(p => propertiesDescriptor)));
             if (!response.IsValid)
             {
-                return new MicroiSearchEngineResult(0, "创建索引失败:" + response.ServerError);
+                return Failed("创建索引失败，请检查当前租户的搜索配置。");
             }
             return new MicroiSearchEngineResult(1, "创建索引成功");
         }
@@ -638,10 +793,12 @@ namespace Microi.net
         /// <returns></returns>
         private async Task<MicroiSearchEngineResult> DeleteIndex(string indexName, string osClient = null)
         {
-            var result = await GetEsClient(osClient).Indices.DeleteAsync(indexName);
+            var currentOsClient = GetOsClient(osClient);
+            indexName = TenantConfigurationSecurity.NormalizeSearchIndex(indexName, currentOsClient);
+            var result = await GetEsClient(currentOsClient).Indices.DeleteAsync(indexName);
             if (!result.IsValid)
             {
-                return new MicroiSearchEngineResult(1, "删除失败");
+                return Failed("删除失败");
             }
             return new MicroiSearchEngineResult(1, "删除成功");
         }
@@ -654,7 +811,9 @@ namespace Microi.net
         /// <returns></returns>
         private async Task<bool> IndexExist(string indexName, string osClient = null)
         {
-            var response = await GetEsClient(osClient).Indices.ExistsAsync(indexName);
+            var currentOsClient = GetOsClient(osClient);
+            indexName = TenantConfigurationSecurity.NormalizeSearchIndex(indexName, currentOsClient);
+            var response = await GetEsClient(currentOsClient).Indices.ExistsAsync(indexName);
             return response.Exists;
             // 首先从关系表查找有无对应关系
             //var result = await MicroiEngine.FormEngine.GetFormDataAsync(new
@@ -694,7 +853,9 @@ namespace Microi.net
         {
             try
             {
-                var result = await GetEsClient(osClient).SearchAsync<T>(s => s.Index(index).Query(q => queryContainer));
+                var currentOsClient = GetOsClient(osClient);
+                index = TenantConfigurationSecurity.NormalizeSearchIndex(index, currentOsClient);
+                var result = await GetEsClient(currentOsClient).SearchAsync<T>(s => s.Index(index).Query(q => queryContainer));
                 if (result != null && result.IsValid)
                 {
                     return new MicroiSearchEngineResult()
@@ -706,11 +867,9 @@ namespace Microi.net
                     };
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
-
-                return new MicroiSearchEngineResult(0, ex.Message);
+                return Failed("查询失败，搜索请求已拒绝。");
             }
             return new MicroiSearchEngineResult(0, "查询失败");
         }
@@ -757,11 +916,9 @@ namespace Microi.net
                     };
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
-
-                return new MicroiSearchEngineResult(0, ex.Message);
+                return Failed("查询失败，搜索请求已拒绝。");
             }
             return new MicroiSearchEngineResult(0, "查询失败");
         }
@@ -818,11 +975,9 @@ namespace Microi.net
                     };
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-
-
-                return new MicroiSearchEngineResult(0, ex.Message);
+                return Failed("查询失败，搜索请求已拒绝。");
             }
             return new MicroiSearchEngineResult(0, "查询失败");
         }

@@ -58,6 +58,24 @@ namespace Microi.net.Api
             }
         }
 
+        private static DosResult<dynamic> CreatePublicSysConfigResult(DosResult<dynamic> source)
+        {
+            if (source == null) return null;
+
+            var result = new DosResult<dynamic>(
+                source.Code,
+                source.Data == null
+                    ? null
+                    : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data),
+                source.Msg,
+                source.DataAppend);
+            foreach (var property in source.DynamicProperties)
+            {
+                result.DynamicProperties[property.Key] = property.Value;
+            }
+            return result;
+        }
+
         private async Task<JObject> BuildRequestParam()
         {
             var result = new JObject();
@@ -195,7 +213,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
-            return Json(result);
+            return Json(CreatePublicSysConfigResult(result));
         }
 
         [HttpPost, HttpGet]
@@ -827,7 +845,7 @@ namespace Microi.net.Api
             if (param.OsClient.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
-            return Json(result);
+            return Json(CreatePublicSysConfigResult(result));
         }
 
         /// <summary>

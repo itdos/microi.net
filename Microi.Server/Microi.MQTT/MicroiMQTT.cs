@@ -19,8 +19,8 @@ namespace Microi.net
 {
     /// <summary>
     /// Microi.MQTT，支持 SaaS 多租户。
-    /// 当前为单机版（ConnectedClients 基于内存 ConcurrentDictionary），
-    /// 集群部署时需将 ConnectedClients 改造为 Redis 等分布式存储。
+    /// 连接字典只是当前 Broker 节点的短期路由与诊断快照，
+    /// 租户身份、权限和 Topic ACL 始终以共享租户配置及每次 Broker 拦截校验为准。
     /// </summary>
     public class MicroiMQTT : IMicroiMQTT
     {
@@ -28,20 +28,22 @@ namespace Microi.net
         public bool IsRunning { get; private set; }
 
         /// <summary>
-        /// 客户端连接映射：ClientId → OsClient（租户标识），线程安全。
-        /// 由于 MQTT Broker 内 ClientId 全局唯一，因此 ClientId 单一 Key 已足够；
-        /// 跨租户冲突由 OnValidateConnection 拒绝同 ClientId 跨租户接入来保证。
+        /// 当前节点客户端连接映射：Key=normalizedTenant+separator+ClientId，Value=normalizedTenant。
+        /// 复合键避免设备缓存在 SaaS 租户间串用。
         /// </summary>
         private static readonly ConcurrentDictionary<string, string> _connectedClients
             = new ConcurrentDictionary<string, string>();
 
         /// <summary>
-        /// 设备级 ApiEngineId 缓存：ClientId → 设备专属接口引擎Id（来自 mci_mqtt_client.ApiEngineId）。
+        /// 设备级 ApiEngineId 缓存：normalizedTenant+separator+ClientId → 设备专属接口引擎Id。
         /// 若该字段为空则不入缓存，运行时回退到租户默认 OsClientModel.MqttApiEngine。
         /// 连接成功时刷新，断开时清理。
         /// </summary>
         private static readonly ConcurrentDictionary<string, string> _clientApiEngineCache
             = new ConcurrentDictionary<string, string>();
+        private static readonly object _clientRegistrationSync = new object();
+        private const char ClientKeySeparator = '\u001f';
+        private const string InternalSenderPrefix = "__microi_internal__:";
 
         // mci_mqtt_log / mci_mqtt_client 表名与日志类型常量
         private const string LogTable = "mci_mqtt_log";
@@ -53,7 +55,26 @@ namespace Microi.net
         private const string LogTypeReceive = "Receive";
         private const string LogTypeSubscribe = "Subscribe";
 
-        public IReadOnlyDictionary<string, string> ConnectedClients => _connectedClients;
+        public IReadOnlyDictionary<string, string> ConnectedClients
+            => new Dictionary<string, string>(_connectedClients);
+
+        public IReadOnlyDictionary<string, string> GetConnectedClients(string osClient)
+        {
+            if (!TryResolveTenant(osClient, out var normalizedTenant, out _))
+                throw new ArgumentException("未找到 MQTT 租户配置。", nameof(osClient));
+
+            var prefix = TenantConfigurationSecurity.NormalizeTenantId(normalizedTenant).ToLowerInvariant()
+                + ClientKeySeparator;
+            var result = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var item in _connectedClients)
+            {
+                if (item.Key.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    result[item.Key.Substring(prefix.Length)] = normalizedTenant;
+                }
+            }
+            return result;
+        }
 
         public async Task StartServerAsync(OsClientSecret clientModel)
         {
@@ -128,92 +149,218 @@ namespace Microi.net
 
         public async Task PublishAsync(MqttApplicationMessage message)
         {
-            if (_mqttServer == null || !IsRunning)
-                throw new System.InvalidOperationException("MQTT server not running");
+            await Task.Yield();
+            throw new InvalidOperationException("原生 MQTT 发布缺少租户上下文，已拒绝。请使用 PublishAsync(osClient, ...)。");
+        }
 
-            await _mqttServer.InjectApplicationMessage(
-                new InjectedMqttApplicationMessage(message)
-            );
+        public async Task PublishAsync(string osClient, MqttApplicationMessage message)
+        {
+            if (_mqttServer == null || !IsRunning)
+                throw new InvalidOperationException("MQTT server not running");
+            if (message == null) throw new ArgumentNullException(nameof(message));
+
+            var normalizedTenant = EnsureMqttTenantEnabled(osClient);
+            message.Topic = NormalizeTopic(normalizedTenant, message.Topic, false);
+            if (!string.IsNullOrWhiteSpace(message.ResponseTopic))
+            {
+                message.ResponseTopic = NormalizeTopic(normalizedTenant, message.ResponseTopic, false);
+            }
+
+            if (message.UserProperties == null) message.UserProperties = new List<MqttUserProperty>();
+            message.UserProperties.RemoveAll(item => string.Equals(item.Name, "OsClient", StringComparison.OrdinalIgnoreCase));
+            message.UserProperties.Add(new MqttUserProperty("OsClient", normalizedTenant));
+
+            await _mqttServer.InjectApplicationMessage(new InjectedMqttApplicationMessage(message)
+            {
+                SenderClientId = InternalSenderPrefix + normalizedTenant
+            });
         }
 
         public async Task PublishAsync(string osClient, string topic, string payload, int qos = 0, bool retain = false)
         {
-            if (_mqttServer == null || !IsRunning)
-                throw new InvalidOperationException("MQTT server not running");
-            if (string.IsNullOrWhiteSpace(osClient))
-                throw new ArgumentNullException(nameof(osClient));
             if (string.IsNullOrWhiteSpace(topic))
                 throw new ArgumentNullException(nameof(topic));
 
-            // 强制 Topic 租户前缀（若该租户启用 Topic 隔离）
-            var finalTopic = ApplyTopicIsolation(osClient, topic, isPublish: true);
-
             var message = new MqttApplicationMessageBuilder()
-                .WithTopic(finalTopic)
+                .WithTopic(topic)
                 .WithPayload(payload ?? string.Empty)
                 .WithQualityOfServiceLevel((MqttQualityOfServiceLevel)qos)
                 .WithRetainFlag(retain)
                 .Build();
 
-            await _mqttServer.InjectApplicationMessage(new InjectedMqttApplicationMessage(message));
+            await PublishAsync(osClient, message);
         }
 
         #region SaaS多租户：租户解析与V8引擎调用
 
         /// <summary>
-        /// 解析客户端的OsClient租户标识
-        /// 优先级：ConnectedClients缓存（最权威） > UserProperties(MQTT v5) > 主租户回退
+        /// 解析客户端的 OsClient。已验证的当前节点连接映射优先，
+        /// 其次仅接受合法且存在的 MQTT v5 OsClient；未知租户绝不回退主租户。
         /// </summary>
         private string ResolveOsClient(string clientId, List<MqttUserProperty> userProperties = null)
         {
-            // 1. 已连接客户端映射（验证阶段已注册，是最权威来源）
-            if (!clientId.DosIsNullOrWhiteSpace() && _connectedClients.TryGetValue(clientId, out var cached))
+            if (TryGetConnectedTenant(clientId, out var connectedTenant))
             {
-                return cached;
+                return connectedTenant;
             }
 
-            // 2. 尝试从UserProperties获取（MQTT v5）
-            var osClient = userProperties?.Find(d => d.Name == "OsClient")?.Value;
-            if (!osClient.DosIsNullOrWhiteSpace())
+            if (!clientId.DosIsNullOrWhiteSpace()
+                && clientId.StartsWith(InternalSenderPrefix, StringComparison.Ordinal)
+                && TryResolveTenant(clientId.Substring(InternalSenderPrefix.Length), out var internalTenant, out _))
             {
-                return osClient;
+                return internalTenant;
             }
 
-            // 3. 回退到主租户
-            return OsClient.GetConfigOsClient();
+            var candidate = userProperties?.Find(d => string.Equals(d.Name, "OsClient", StringComparison.OrdinalIgnoreCase))?.Value;
+            return TryResolveTenant(candidate, out var propertyTenant, out _) ? propertyTenant : null;
         }
 
-        /// <summary>
-        /// 当前租户是否启用 Topic 隔离（默认开启，需显式 MqttTopicIsolation=0 才关闭）
-        /// </summary>
-        private static bool IsTopicIsolationEnabled(OsClientSecret clientModel)
+        private static string NormalizeClientCacheKey(string osClient, string clientId)
         {
-            var v = clientModel?.OsClientModel?["MqttTopicIsolation"];
-            if (v == null) return true;
-            return v.Val<int>() != 0;
+            return TenantConfigurationSecurity.NormalizeTenantId(osClient).ToLowerInvariant()
+                + ClientKeySeparator
+                + (clientId ?? string.Empty);
         }
 
-        /// <summary>
-        /// 当前租户是否允许匿名连接（默认禁止）
-        /// </summary>
-        private static bool IsAnonymousAllowed(OsClientSecret clientModel)
+        private static bool TryGetConnectedTenant(string clientId, out string osClient)
         {
-            return clientModel?.OsClientModel?["MqttAllowAnonymous"]?.Val<int>() == 1;
+            osClient = null;
+            if (clientId.DosIsNullOrWhiteSpace()) return false;
+            var suffix = ClientKeySeparator + clientId;
+            foreach (var item in _connectedClients)
+            {
+                if (item.Key.EndsWith(suffix, StringComparison.Ordinal))
+                {
+                    osClient = item.Value;
+                    return true;
+                }
+            }
+            return false;
         }
 
-        /// <summary>
-        /// 强制 Topic 加上租户前缀（仅 publish 自动补；subscribe 不擅自改写）
-        /// </summary>
-        private string ApplyTopicIsolation(string osClient, string topic, bool isPublish)
+        private static bool TryRegisterConnectedClient(string osClient, string clientId, out string existedTenant)
         {
-            var clientModel = OsClient.GetClient(osClient);
-            if (!IsTopicIsolationEnabled(clientModel)) return topic;
+            existedTenant = null;
+            lock (_clientRegistrationSync)
+            {
+                if (TryGetConnectedTenant(clientId, out existedTenant)
+                    && !string.Equals(existedTenant, osClient, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+                _connectedClients[NormalizeClientCacheKey(osClient, clientId)] = osClient;
+                return true;
+            }
+        }
 
-            var prefix = osClient + "/";
-            if (topic.StartsWith(prefix, StringComparison.Ordinal)) return topic;
+        private static void RemoveConnectedClient(string osClient, string clientId)
+        {
+            if (osClient.DosIsNullOrWhiteSpace() || clientId.DosIsNullOrWhiteSpace()) return;
+            _connectedClients.TryRemove(NormalizeClientCacheKey(osClient, clientId), out _);
+            _clientApiEngineCache.TryRemove(NormalizeClientCacheKey(osClient, clientId), out _);
+        }
 
-            if (isPublish) return prefix + topic;
-            return topic;
+        private static bool TryResolveTenant(string candidate, out string normalizedTenant, out OsClientSecret clientModel)
+        {
+            normalizedTenant = null;
+            clientModel = null;
+            if (candidate.DosIsNullOrWhiteSpace()) return false;
+            try
+            {
+                normalizedTenant = TenantConfigurationSecurity.NormalizeTenantId(candidate);
+            }
+            catch
+            {
+                return false;
+            }
+
+            if (OsClient.ClientList.TryGetValue(normalizedTenant, out clientModel))
+            {
+                normalizedTenant = TenantConfigurationSecurity.NormalizeTenantId(clientModel?.OsClient ?? normalizedTenant);
+                return true;
+            }
+            foreach (var item in OsClient.ClientList)
+            {
+                string normalizedKey;
+                try { normalizedKey = TenantConfigurationSecurity.NormalizeTenantId(item.Key); }
+                catch { continue; }
+                if (!string.Equals(normalizedKey, normalizedTenant, StringComparison.OrdinalIgnoreCase)) continue;
+                clientModel = item.Value;
+                normalizedTenant = TenantConfigurationSecurity.NormalizeTenantId(clientModel?.OsClient ?? item.Key);
+                return true;
+            }
+            normalizedTenant = null;
+            return false;
+        }
+
+        private static bool IsMainTenant(string osClient)
+        {
+            try
+            {
+                return string.Equals(
+                    TenantConfigurationSecurity.NormalizeTenantId(osClient).ToLowerInvariant(),
+                    TenantConfigurationSecurity.NormalizeTenantId(OsClient.GetConfigOsClient()).ToLowerInvariant(),
+                    StringComparison.Ordinal);
+            }
+            catch { return false; }
+        }
+
+        private static bool IsMqttEnabled(OsClientSecret clientModel)
+            => clientModel?.OsClientModel?["MqttEnable"]?.Val<int>() == 1;
+
+        private static string EnsureMqttTenantEnabled(string osClient)
+        {
+            if (!TryResolveTenant(osClient, out var normalizedTenant, out var clientModel))
+                throw new InvalidOperationException("未找到 MQTT 租户配置。");
+            if (!IsMqttEnabled(clientModel))
+                throw new InvalidOperationException($"租户[{normalizedTenant}]未启用 MQTT。");
+            return normalizedTenant;
+        }
+
+        private static bool IsAnonymousAllowed(string osClient, OsClientSecret clientModel)
+        {
+            return IsMainTenant(osClient)
+                && clientModel?.OsClientModel?["MqttAllowAnonymous"]?.Val<int>() == 1;
+        }
+
+        private static string NormalizeTopic(string osClient, string topic, bool isSubscription)
+        {
+            if (topic.DosIsNullOrWhiteSpace()) throw new InvalidOperationException("MQTT Topic 不能为空。");
+            if (topic.IndexOf('\0') >= 0) throw new InvalidOperationException("MQTT Topic 包含非法字符。");
+            var trimmedTopic = topic.Trim().TrimStart('/');
+            if (trimmedTopic.StartsWith("$share/", StringComparison.OrdinalIgnoreCase)
+                || trimmedTopic.StartsWith("$SYS/", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("MQTT 共享订阅与 Broker 系统 Topic 不允许绕过租户命名空间。");
+            }
+
+            var segments = trimmedTopic.Split('/');
+            if (isSubscription)
+            {
+                for (var i = 0; i < segments.Length; i++)
+                {
+                    var segment = segments[i];
+                    if (segment.IndexOf('#') >= 0 && (segment != "#" || i != segments.Length - 1))
+                        throw new InvalidOperationException("MQTT 订阅通配符 # 只能作为最后一个完整段。");
+                    if (segment.IndexOf('+') >= 0 && segment != "+")
+                        throw new InvalidOperationException("MQTT 订阅通配符 + 必须作为完整段。");
+                }
+            }
+            else if (topic.IndexOf('#') >= 0 || topic.IndexOf('+') >= 0)
+            {
+                throw new InvalidOperationException("MQTT 发布 Topic 不允许通配符。");
+            }
+
+            var normalizedTenant = TenantConfigurationSecurity.NormalizeTenantId(osClient).ToLowerInvariant();
+            if (segments.Length > 1
+                && !string.Equals(segments[0], "tenant", StringComparison.OrdinalIgnoreCase)
+                && TryResolveTenant(segments[0], out var legacyTenant, out _)
+                && !string.Equals(legacyTenant, normalizedTenant, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("MQTT Topic 不允许访问其它租户命名空间。");
+            }
+
+            return TenantConfigurationSecurity.NormalizeMqttTopic(normalizedTenant, topic, true);
         }
 
         /// <summary>
@@ -223,12 +370,13 @@ namespace Microi.net
         {
             try
             {
-                var clientModel = OsClient.GetClient(osClient);
-                if (clientModel == null)
+                if (!TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
+                    || !IsMqttEnabled(clientModel))
                 {
                     Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT V8事件：未找到OsClient配置 osClient={osClient}, Event={eventName}");
                     return null;
                 }
+                osClient = normalizedTenant;
 
                 // 优先取设备级 ApiEngineId（mci_mqtt_client.ApiEngineId），缺失时回退到租户默认 OsClientModel.MqttApiEngine
                 var mqttApiEngine = ResolveClientApiEngineId(mqttParam?.ClientId, clientModel);
@@ -247,7 +395,7 @@ namespace Microi.net
                     EventName = eventName,
                     MQTT = mqttParam ?? new MqttParam { OsClient = osClient }
                 }, null);
-                return new DosResult { Code = 1 };
+                return NormalizeMqttV8Result(runResult);
 
                 // var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam()
                 // {
@@ -286,7 +434,41 @@ namespace Microi.net
             catch (Exception ex)
             {
                 Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT V8事件执行异常：osClient={osClient}, Event={eventName}, Error={ex.Message}");
-                return null;
+                // 已配置 V8 策略时执行异常必须 fail-closed，避免脚本故障反而放行消息。
+                return new DosResult(0, null, $"MQTT V8事件执行失败：{ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// MQTT 事件引擎兼容普通返回值；只有显式返回 DosResult/Code 时才作为策略结果。
+        /// 这样既保留旧脚本无返回值即放行的行为，也确保 Code != 1 能真正阻断发布。
+        /// </summary>
+        private static DosResult NormalizeMqttV8Result(object runResult)
+        {
+            if (runResult == null)
+            {
+                return new DosResult { Code = 1 };
+            }
+            if (runResult is DosResult dosResult)
+            {
+                return dosResult;
+            }
+
+            try
+            {
+                var json = JObject.FromObject(runResult);
+                var code = json.GetValue("Code", StringComparison.OrdinalIgnoreCase);
+                if (code == null)
+                {
+                    return new DosResult { Code = 1 };
+                }
+                return json.ToObject<DosResult>()
+                    ?? new DosResult(0, null, "MQTT V8事件返回了无效的策略结果。");
+            }
+            catch
+            {
+                // 字符串、数字等历史普通返回值不承担 ACL 语义，保持兼容放行。
+                return new DosResult { Code = 1 };
             }
         }
 
@@ -303,7 +485,7 @@ namespace Microi.net
                 try
                 {
                     var mqttApiEngine = item.Value.OsClientModel?["MqttApiEngine"]?.Val<string>();
-                    if (!mqttApiEngine.DosIsNullOrWhiteSpace())
+                    if (IsMqttEnabled(item.Value) && !mqttApiEngine.DosIsNullOrWhiteSpace())
                     {
                         var key = item.Key;
                         // 每个租户独立 mqttParam，避免共享引用
@@ -443,11 +625,11 @@ namespace Microi.net
                     string apiEngineId = existing.Data.ApiEngineId?.ToString();
                     if (isOnline && !string.IsNullOrWhiteSpace(apiEngineId))
                     {
-                        _clientApiEngineCache[clientId] = apiEngineId;
+                        _clientApiEngineCache[NormalizeClientCacheKey(osClient, clientId)] = apiEngineId;
                     }
                     else
                     {
-                        _clientApiEngineCache.TryRemove(clientId, out _);
+                        _clientApiEngineCache.TryRemove(NormalizeClientCacheKey(osClient, clientId), out _);
                     }
                 }
                 else
@@ -460,7 +642,7 @@ namespace Microi.net
                         LastConnectTime = nowStr,
                         IsOnline = isOnline ? 1 : 0
                     });
-                    _clientApiEngineCache.TryRemove(clientId, out _);
+                    _clientApiEngineCache.TryRemove(NormalizeClientCacheKey(osClient, clientId), out _);
                 }
             }
             catch (Exception ex)
@@ -477,8 +659,11 @@ namespace Microi.net
         /// </summary>
         private static string ResolveClientApiEngineId(string clientId, OsClientSecret clientModel)
         {
-            if (!string.IsNullOrEmpty(clientId)
-                && _clientApiEngineCache.TryGetValue(clientId, out var deviceEngine)
+            var clientCacheKey = !string.IsNullOrEmpty(clientId) && clientModel != null
+                ? NormalizeClientCacheKey(clientModel.OsClient, clientId)
+                : null;
+            if (!string.IsNullOrEmpty(clientCacheKey)
+                && _clientApiEngineCache.TryGetValue(clientCacheKey, out var deviceEngine)
                 && !string.IsNullOrWhiteSpace(deviceEngine))
             {
                 return deviceEngine;
@@ -495,9 +680,9 @@ namespace Microi.net
             var tasks = new List<Task>(snapshot.Length);
             foreach (var item in snapshot)
             {
-                // 仅对配置了 MqttApiEngine 的租户写日志（即真正启用 MQTT 的租户）
+                // 仅对显式启用 MQTT 且配置了事件引擎的租户写日志。
                 var mqttApiEngine = item.Value.OsClientModel?["MqttApiEngine"]?.Val<string>();
-                if (mqttApiEngine.DosIsNullOrWhiteSpace()) continue;
+                if (!IsMqttEnabled(item.Value) || mqttApiEngine.DosIsNullOrWhiteSpace()) continue;
                 tasks.Add(WriteMqttLogAsync(item.Key, type, null, null, message));
             }
             if (tasks.Count > 0) await Task.WhenAll(tasks);
@@ -513,82 +698,138 @@ namespace Microi.net
             try
             {
                 Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接开始验证！ ClientId：{args.ClientId}");
-                if (string.IsNullOrEmpty(args.ClientId))
+                if (string.IsNullOrEmpty(args.ClientId) || args.ClientId.IndexOf(ClientKeySeparator) >= 0)
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId为空");
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId为空或包含非法字符");
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
                     return Task.CompletedTask;
                 }
 
-                // 优先级：MQTT v5 UserProperties > Username 前缀 > ClientId 前缀 > 主租户回退
-                var osClient = args.UserProperties?.Find(d => d.Name == "OsClient")?.Value;
+                // 优先级：MQTT v5 OsClient > Username 租户前缀 > ClientId 租户前缀 > 精确主租户账号兼容。
+                // 显式未知租户直接拒绝，不再无条件回退主租户。
+                var explicitTenant = args.UserProperties?
+                    .Find(d => string.Equals(d.Name, "OsClient", StringComparison.OrdinalIgnoreCase))?.Value;
+                string osClient = null;
                 OsClientSecret clientModel = null;
-                // 1. MQTT v5 UserProperties
-                if (!osClient.DosIsNullOrWhiteSpace())
-                {
-                    OsClient.ClientList.TryGetValue(osClient, out clientModel);
-                }
-                // 2. MQTT 3.1/3.1.1：Username 前缀格式 "{osClient}:{actualUsername}"（如 "congshi:admin"）
-                // effectiveUserName 存放剥离前缀后的实际用户名，用于凭据校验
                 var effectiveUserName = args.UserName;
-                if (clientModel == null && !string.IsNullOrEmpty(args.UserName))
+
+                if (!explicitTenant.DosIsNullOrWhiteSpace())
+                {
+                    if (!TryResolveTenant(explicitTenant, out osClient, out clientModel))
+                    {
+                        Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：未知租户 OsClient={explicitTenant}, ClientId={args.ClientId}");
+                        args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
+                        return Task.CompletedTask;
+                    }
+                }
+
+                string userPrefixTenant = null;
+                OsClientSecret userPrefixModel = null;
+                var userPrefixLength = -1;
+                if (!string.IsNullOrEmpty(args.UserName))
                 {
                     var idx = args.UserName.IndexOf(':');
-                    if (idx > 0)
+                    if (idx > 0 && TryResolveTenant(args.UserName.Substring(0, idx), out userPrefixTenant, out userPrefixModel))
                     {
-                        var candidate = args.UserName.Substring(0, idx);
-                        if (OsClient.ClientList.TryGetValue(candidate, out var m))
-                        {
-                            osClient = candidate;
-                            clientModel = m;
-                            effectiveUserName = args.UserName.Substring(idx + 1);
-                        }
+                        userPrefixLength = idx;
                     }
                 }
-                // 3. MQTT 3.1/3.1.1：ClientId 前缀格式 "{osClient}:{actualClientId}"（如 "congshi:device001"）
-                //    Bridge 等格式（如 "bridge:mqtt:huayou:egress:emqx@127..."）首段不是有效 OsClient 时
-                //    会自动 fallback 到下一步主租户回退，不会抛异常
-                if (clientModel == null && !string.IsNullOrEmpty(args.ClientId))
+
+                if (clientModel == null && userPrefixModel != null)
                 {
-                    var idx = args.ClientId.IndexOf(':');
-                    if (idx > 0)
+                    osClient = userPrefixTenant;
+                    clientModel = userPrefixModel;
+                    effectiveUserName = args.UserName.Substring(userPrefixLength + 1);
+                }
+                else if (clientModel != null && userPrefixModel != null)
+                {
+                    if (!string.Equals(osClient, userPrefixTenant, StringComparison.OrdinalIgnoreCase))
                     {
-                        var candidate = args.ClientId.Substring(0, idx);
-                        if (OsClient.ClientList.TryGetValue(candidate, out var m))
-                        {
-                            osClient = candidate;
-                            clientModel = m;
-                        }
+                        args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
+                        return Task.CompletedTask;
                     }
+                    effectiveUserName = args.UserName.Substring(userPrefixLength + 1);
                 }
-                // 4. 最终回退到主租户
-                if (clientModel == null)
+
+                string clientPrefixTenant = null;
+                OsClientSecret clientPrefixModel = null;
+                var clientSeparatorIndex = args.ClientId.IndexOf(':');
+                if (clientSeparatorIndex > 0)
                 {
-                    osClient = OsClient.GetConfigOsClient();
-                    OsClient.ClientList.TryGetValue(osClient, out clientModel);
+                    TryResolveTenant(args.ClientId.Substring(0, clientSeparatorIndex), out clientPrefixTenant, out clientPrefixModel);
                 }
-                if (clientModel == null)
+                if (clientModel == null && clientPrefixModel != null)
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：未找到OsClient配置");
-                    args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
+                    osClient = clientPrefixTenant;
+                    clientModel = clientPrefixModel;
+                }
+                else if (clientModel != null && clientPrefixModel != null
+                    && !string.Equals(osClient, clientPrefixTenant, StringComparison.OrdinalIgnoreCase))
+                {
+                    args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
 
-                // P0：跨租户 ClientId 冲突检测
-                if (_connectedClients.TryGetValue(args.ClientId, out var existedOsClient)
-                    && !string.Equals(existedOsClient, osClient, StringComparison.Ordinal))
+                // 兼容没有传 OsClient/前缀的旧主租户客户端：只有用户名精确等于主租户 MqttAccount 才能选中主租户。
+                if (clientModel == null
+                    && TryResolveTenant(OsClient.GetConfigOsClient(), out var mainTenant, out var mainModel))
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId 跨租户冲突 ClientId={args.ClientId}, 已存在 OsClient={existedOsClient}, 新连接 OsClient={osClient}");
-                    args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
+                    var mainAccount = mainModel.OsClientModel?["MqttAccount"]?.Val<string>();
+                    if (!mainAccount.DosIsNullOrWhiteSpace() && FixedTimeStringEquals(args.UserName, mainAccount))
+                    {
+                        osClient = mainTenant;
+                        clientModel = mainModel;
+                        effectiveUserName = args.UserName;
+                    }
+                }
+
+                if (clientModel == null)
+                {
+                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：未明确解析到租户 ClientId={args.ClientId}");
+                    args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
 
-                // P0：账号密码校验（修正未配密码默认放行的安全漏洞）
+                if (!IsMqttEnabled(clientModel))
+                {
+                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：租户未启用 MQTT OsClient={osClient}");
+                    args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
+                    return Task.CompletedTask;
+                }
+
                 var mqttPwd = clientModel.OsClientModel?["MqttPwd"]?.Val<string>();
                 var mqttAccount = clientModel.OsClientModel?["MqttAccount"]?.Val<string>();
-                var hasCredential = !mqttAccount.DosIsNullOrWhiteSpace() || !mqttPwd.DosIsNullOrWhiteSpace();
+                var hasCompleteCredential = !mqttAccount.DosIsNullOrWhiteSpace() && !mqttPwd.DosIsNullOrWhiteSpace();
+                var isChildTenant = !IsMainTenant(osClient);
 
-                if (hasCredential)
+                // 子租户必须使用自身完整账号密码；MqttAllowAnonymous 和 MqttTopicIsolation=0 对子租户不生效。
+                if (isChildTenant && !hasCompleteCredential)
+                {
+                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：子租户未配置独立完整凭据 OsClient={osClient}");
+                    args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
+                    return Task.CompletedTask;
+                }
+
+                if (isChildTenant)
+                {
+                    var otherCredentials = OsClient.ClientList
+                        .Where(pair => !string.Equals(pair.Key, osClient, StringComparison.OrdinalIgnoreCase))
+                        .Select(pair => new KeyValuePair<string, string>(
+                            pair.Value?.OsClientModel?["MqttAccount"]?.Val<string>(),
+                            pair.Value?.OsClientModel?["MqttPwd"]?.Val<string>()))
+                        .ToArray();
+                    if (TenantConfigurationSecurity.HasTenantServiceCredentialCollision(
+                            mqttAccount,
+                            mqttPwd,
+                            otherCredentials))
+                    {
+                        Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：子租户账号或密码与其它租户重复，已 fail-closed OsClient={osClient}");
+                        args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
+                        return Task.CompletedTask;
+                    }
+                }
+
+                if (hasCompleteCredential)
                 {
                     if (!FixedTimeStringEquals(effectiveUserName, mqttAccount)
                         || !FixedTimeStringEquals(args.Password, mqttPwd))
@@ -598,16 +839,20 @@ namespace Microi.net
                         return Task.CompletedTask;
                     }
                 }
-                else if (!IsAnonymousAllowed(clientModel))
+                else if (!IsAnonymousAllowed(osClient, clientModel))
                 {
-                    // 未配置账密且未显式允许匿名 → 拒绝
                     Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：租户未配置账号密码且未启用匿名（MqttAllowAnonymous） ClientId：{args.ClientId}, OsClient：{osClient}");
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
 
-                // 验证通过：立即注册ClientId→OsClient映射，后续事件直接查询
-                _connectedClients[args.ClientId] = osClient;
+                if (!TryRegisterConnectedClient(osClient, args.ClientId, out var existedOsClient))
+                {
+                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId 跨租户冲突 ClientId={args.ClientId}, ExistingOsClient={existedOsClient}, OsClient={osClient}");
+                    args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
+                    return Task.CompletedTask;
+                }
+
                 args.ReasonCode = MqttConnectReasonCode.Success;
                 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接验证成功！ ClientId：{args.ClientId}, OsClient：{osClient}");
             }
@@ -622,12 +867,13 @@ namespace Microi.net
         // 客户端连接事件：触发对应租户的Connected V8事件
         private async Task OnClientConnected(ClientConnectedEventArgs args)
         {
-            // 从ConnectedClients获取OsClient（验证阶段已注册）
             var osClient = ResolveOsClient(args.ClientId, args.UserProperties);
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接事件未解析到租户，已跳过 ClientId={args.ClientId}");
+                return;
+            }
             Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接成功！ ClientId：{args.ClientId}, OsClient：{osClient}");
-
-            // 防御性：确保映射已注册
-            _connectedClients[args.ClientId] = osClient;
 
             // 内部写入 mci_mqtt_log + 设备表 mci_mqtt_client（同时刷新设备级 ApiEngineId 缓存）
             await UpsertMqttClientAsync(osClient, args.ClientId, true);
@@ -650,21 +896,17 @@ namespace Microi.net
         // 客户端断开事件：先获取租户映射再清理，触发对应租户的Disconnected V8事件
         private async Task OnClientDisconnected(ClientDisconnectedEventArgs args)
         {
-            // 先获取OsClient再清理（断开时UserProperties可能不可用）
-            _connectedClients.TryGetValue(args.ClientId, out var osClient);
+            TryGetConnectedTenant(args.ClientId, out var osClient);
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = ResolveOsClient(args.ClientId, args.UserProperties);
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                osClient = args.UserProperties?.Find(d => d.Name == "OsClient")?.Value;
-            }
-            if (osClient.DosIsNullOrWhiteSpace())
-            {
-                osClient = OsClient.GetConfigOsClient();
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT断开事件未解析到租户，不回退主租户 ClientId={args.ClientId}");
+                return;
             }
 
             Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT断开连接！ ClientId：{args.ClientId}, OsClient：{osClient}");
 
-            // 清理连接记录
-            _connectedClients.TryRemove(args.ClientId, out _);
+            RemoveConnectedClient(osClient, args.ClientId);
 
             // 内部写入 mci_mqtt_log + 更新设备表 IsOnline=0 + 清理设备级 ApiEngineId 缓存
             await UpsertMqttClientAsync(osClient, args.ClientId, false);
@@ -684,34 +926,36 @@ namespace Microi.net
         {
             var osClient = ResolveOsClient(args.ClientId, args.UserProperties);
             var topic = args.TopicFilter?.Topic;
-
-            var clientModel = OsClient.GetClient(osClient);
-            if (IsTopicIsolationEnabled(clientModel))
+            if (osClient.DosIsNullOrWhiteSpace()
+                || !TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
+                || !IsMqttEnabled(clientModel))
             {
-                if (string.IsNullOrEmpty(topic))
+                args.ProcessSubscription = false;
+                if (args.Response != null) args.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT订阅被拒：未知或未启用租户 ClientId={args.ClientId}");
+                return;
+            }
+            osClient = normalizedTenant;
+
+            try
+            {
+                var corrected = NormalizeTopic(osClient, topic, true);
+                args.TopicFilter = new MqttTopicFilter
                 {
-                    args.ProcessSubscription = false;
-                    if (args.Response != null) args.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT订阅被拒（Topic 为空）：ClientId={args.ClientId}, OsClient={osClient}");
-                    return;
-                }
-                // 自动补全租户前缀，与发布行为保持一致：
-                //   "#"         → "huayou/#"
-                //   "device/+"  → "huayou/device/+"
-                //   "huayou/#"  → 不变
-                var corrected = ApplyTopicIsolation(osClient, topic, isPublish: true);
-                if (corrected != topic)
-                {
-                    args.TopicFilter = new MqttTopicFilter
-                    {
-                        Topic = corrected,
-                        QualityOfServiceLevel = args.TopicFilter.QualityOfServiceLevel,
-                        NoLocal = args.TopicFilter.NoLocal,
-                        RetainAsPublished = args.TopicFilter.RetainAsPublished,
-                        RetainHandling = args.TopicFilter.RetainHandling
-                    };
-                    topic = corrected;
-                }
+                    Topic = corrected,
+                    QualityOfServiceLevel = args.TopicFilter.QualityOfServiceLevel,
+                    NoLocal = args.TopicFilter.NoLocal,
+                    RetainAsPublished = args.TopicFilter.RetainAsPublished,
+                    RetainHandling = args.TopicFilter.RetainHandling
+                };
+                topic = corrected;
+            }
+            catch (Exception ex)
+            {
+                args.ProcessSubscription = false;
+                if (args.Response != null) args.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT订阅被 Topic ACL 拒绝：ClientId={args.ClientId}, OsClient={osClient}, Topic={topic}, Error={ex.Message}");
+                return;
             }
 
             // 内部写入 mci_mqtt_log（订阅日志）
@@ -732,8 +976,26 @@ namespace Microi.net
             if (args.ChangedRetainedMessage == null) return;
 
             var osClient = ResolveOsClient(args.ClientId);
+            if (osClient.DosIsNullOrWhiteSpace()
+                || !TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
+                || !IsMqttEnabled(clientModel))
+            {
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT保留消息未解析到已启用租户，已跳过 ClientId={args.ClientId}");
+                return;
+            }
+            osClient = normalizedTenant;
             var (raw, parsed) = ParsePayload(args.ChangedRetainedMessage.PayloadSegment);
-            var topic = args.ChangedRetainedMessage.Topic;
+            string topic;
+            try
+            {
+                topic = NormalizeTopic(osClient, args.ChangedRetainedMessage.Topic, false);
+                args.ChangedRetainedMessage.Topic = topic;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT保留消息 Topic ACL 拒绝：OsClient={osClient}, Error={ex.Message}");
+                return;
+            }
 
             Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT消息变更！ topic：{topic}, OsClient：{osClient}");
 
@@ -753,25 +1015,31 @@ namespace Microi.net
         private async Task OnMessageReceived(InterceptingPublishEventArgs args)
         {
             var osClient = ResolveOsClient(args.ClientId, args.ApplicationMessage?.UserProperties);
-            var clientModel = OsClient.GetClient(osClient);
             var topic = args.ApplicationMessage?.Topic;
-
-            // P0：发布 Topic 为空直接拒绝；否则自动补全租户前缀（保证消息落在正确的租户命名空间）
-            if (IsTopicIsolationEnabled(clientModel))
+            if (osClient.DosIsNullOrWhiteSpace()
+                || !TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
+                || !IsMqttEnabled(clientModel))
             {
-                if (string.IsNullOrEmpty(topic))
+                args.ProcessPublish = false;
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT发布被拒：未知或未启用租户 ClientId={args.ClientId}");
+                return;
+            }
+            osClient = normalizedTenant;
+
+            try
+            {
+                topic = NormalizeTopic(osClient, topic, false);
+                args.ApplicationMessage.Topic = topic;
+                if (!string.IsNullOrWhiteSpace(args.ApplicationMessage.ResponseTopic))
                 {
-                    args.ProcessPublish = false;
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT发布被拒（Topic 为空）：ClientId={args.ClientId}, OsClient={osClient}");
-                    return;
+                    args.ApplicationMessage.ResponseTopic = NormalizeTopic(osClient, args.ApplicationMessage.ResponseTopic, false);
                 }
-                // 自动补全前缀：若客户端已写 "congshi/xxx" 则不变；若只写 "xxx" 则改为 "congshi/xxx"
-                var corrected = ApplyTopicIsolation(osClient, topic, true);
-                if (corrected != topic)
-                {
-                    args.ApplicationMessage.Topic = corrected;
-                    topic = corrected;
-                }
+            }
+            catch (Exception ex)
+            {
+                args.ProcessPublish = false;
+                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT发布被 Topic ACL 拒绝：ClientId={args.ClientId}, OsClient={osClient}, Topic={topic}, Error={ex.Message}");
+                return;
             }
 
             var (raw, parsed) = ParsePayload(args.ApplicationMessage.PayloadSegment);

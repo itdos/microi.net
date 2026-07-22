@@ -49,6 +49,9 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> AddDocument([FromBody] MicroiSearchEngineParam param)
         {
+            if (param == null) return new MicroiSearchEngineResult(0, "请求参数不能为空");
+            // param.OsClient 仅用于一致性校验；helper 会以 JWT/HTTP/V8 租户为权威，
+            // JSON body 不能选择另一个租户。
             return await searchEngineHelper.AddDocument(param.TableName, param.Id, param.OsClient);
         }
 
@@ -59,6 +62,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> UpdateDocument([FromBody] MicroiSearchEngineParam param)
         {
+            if (param == null) return new MicroiSearchEngineResult(0, "请求参数不能为空");
             return await searchEngineHelper.UpdateDocument(param.TableName, param.Id, param.OsClient);
         }
 
@@ -69,6 +73,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> DeleteDocument([FromBody] MicroiSearchEngineParam param)
         {
+            if (param == null) return new MicroiSearchEngineResult(0, "请求参数不能为空");
             return await searchEngineHelper.DeleteDocument(param.TableName, param.Id, param.OsClient);
         }
 
@@ -80,6 +85,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> AddField([FromBody] MicroiSearchEngineFieldModel fieldModel)
         {
+            if (fieldModel == null) return new MicroiSearchEngineResult(0, "请求参数不能为空");
             return await searchEngineHelper.AddField(fieldModel);
         }
 
@@ -91,6 +97,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> SearchByPage([FromBody] MicroiSearchEngineParam searchParam)
         {
+            if (searchParam == null) return new MicroiSearchEngineResult(0, "请求参数不能为空");
             searchParam.PageType = MicroiSearchEngineConst.page_from_size;
             return await searchEngineHelper.GetSearchResponse(searchParam);
         }
@@ -103,6 +110,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<MicroiSearchEngineResult> SearchBySearchAfter([FromBody] MicroiSearchEngineParam searchParam)
         {
+            if (searchParam == null) return new MicroiSearchEngineResult(0, "请求参数不能为空");
             searchParam.PageType = MicroiSearchEngineConst.page_searchafter;
             return await searchEngineHelper.GetSearchResponse(searchParam);
         }

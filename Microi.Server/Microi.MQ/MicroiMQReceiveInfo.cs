@@ -9,6 +9,8 @@ namespace Microi.net
 {
     public class MicroiMQReceiveInfo
     {
+        public string OsClient { get; set; }
+
         public string DllName { get; set; }
 
         public string ClassName { get; set; }
@@ -21,6 +23,13 @@ namespace Microi.net
         public string ApiEngineKey { get; set; }
 
         public string QueueName { get; set; }
+
+        /// <summary>
+        /// 数据库中配置的逻辑队列名；QueueName 是经过租户隔离后的物理队列名。
+        /// </summary>
+        public string LogicalQueueName { get; set; }
+
+        public bool ManagedByDatabase { get; set; }
 
         public bool FailToReject { get; set; }
 

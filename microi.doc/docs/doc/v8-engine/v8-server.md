@@ -34,7 +34,8 @@ var resul2 = V8.ApiEngine.Run('ApiEngineKey', {
 >* 平台分布式缓存是L1、L2级联动的分布式缓存，L1为本地内存缓存，L2为redis缓存，V8.Cache操作的就是L2级redis缓存，平台会自动管理L1和L2的联动关系。当覆盖数据库、或直接修改数据库表结构数据后，可能需要手动重启api的docker容器以实现自动清除L1级缓存，然后可通过redis desktop manage软件清除L2级缓存。
 >* 分布式缓存操作类，用法V8.Cache('Key', 'Value', '0.00:10:00');
 >* 注意：过期时间的格式必须是`d.HH:mm:ss`，如`0.12:00:00`0天12小时，`1.10:10:00`一天10小时10分钟，也可以不传过期时间参数，则为永久。
->* 建议使用的缓存Key命名规则为：`Microi:${V8.OsClient}:{分类key值}:{Key}`，这样与平台的缓存Key命名规则一致，方便查看，并且区分SaaS租户，防止缓存混乱
+>* V8 缓存会由服务端强制限定在当前租户命名空间。传逻辑 Key 时自动生成 `Microi:${V8.OsClient}:{逻辑Key}`；传完整的当前租户 Key 继续兼容。传入其它租户的 `Microi:` 前缀会被拒绝。
+>* `V8.Cache` 不再暴露 Redis `IDatabase`、连接管理或服务器扫描能力，接口引擎不能读取共享 Redis 中其它租户的数据。
 ```javascript
 var cacheKey = `Microi:${V8.OsClient}:FormData:baoming`;
 var cacheValue = JSON.stringify(formData);
@@ -1193,18 +1194,27 @@ return V8.Office.SendEmail({
 ```
 
 ## 系统设置 V8.SysConfig
->* 访问系统设置信息，可以访问到系统设置`sys_config`表的任意字段
+>* 访问当前租户系统设置中的非敏感业务与展示字段；返回值是独立脱敏副本，脚本修改不会写回缓存或数据库。
+>* `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 以及 Password/Secret/Token/Key/Connection 等疑似凭据字段不会注入 V8。`V8.FormEngine.GetSysConfig(...)` 同样强制绑定当前租户并应用此安全边界。
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
+// V8.SysConfig.ClientSecrets / GlobalServerV8Code 为 undefined
 ```
 
-## SaaS引擎信息 V8.OsClientModel
->* 访问当前SaaS引擎敏感配置数据
->* 第三方系统敏感配置也均应该放到SaaS引擎的配置中，如第三方系统key、secret等
+## SaaS引擎信息 V8.OsClientModel / V8.ClientModel
+>* 两者是当前租户 SaaS 配置的独立脱敏副本，脚本修改不会写回服务端运行配置。
+>* 数据库连接、鉴权密钥以及共享 Redis、对象存储、RabbitMQ、MQTT、Search 的地址、账号和密码不会注入 V8；即使接口错误地 `return V8.ClientModel`，也不会泄露主库基础设施凭据。
+>* 当前租户自行扩展的业务集成字段（例如微信支付 Key）仍可供后端 V8 使用，但不得把整个配置对象或单个密钥返回前端。
+>* 存储类型 `HDFS` 与公开文件域名可以读取；访问缓存、文件、MQ、MQTT 和 Search 必须使用对应的 `V8.*` 受控能力，服务端自动添加当前租户命名空间。
 ```js
-//获取redis host
-var redisHost = V8.OsClientModel.RedisHost;
+var title = V8.OsClientModel.SysTitle;
+var storageType = V8.ClientModel.HDFS; // ClientModel 是兼容别名
+
+// 以下字段为 undefined，不再暴露：
+// V8.ClientModel.DbConn / RedisPwd / MinIOSecretKey / MQPassword / MqttPwd / SearchEngineApiKey
 ```
+
+共享基础设施可以复用同一 Redis、对象存储、RabbitMQ Broker、MQTT Broker 和搜索集群，但隔离边界由服务端强制执行：缓存 Key、对象路径、队列、Topic、索引分别绑定当前 `OsClient`。RabbitMQ、MQTT 和 Search 还必须为子租户配置独立凭据；缺少独立凭据时对应能力失败关闭，不会回退使用主租户账号。
 
 ## 表单数据 V8.Form
 >* 表单提交事件中可访问表单数据，接口引擎中此对象为空。
