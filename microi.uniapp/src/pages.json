@@ -1,153 +1,126 @@
 {
   "pages": [
     {
+      "path": "pages/workspace/index",
+      "style": { "navigationBarTitleText": "首页", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f4f8fa" }
+    },
+    {
       "path": "pages/mall/index",
-      "style": {
-        "navigationBarTitleText": "商城",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#f5f7fa"
-      }
+      "style": { "navigationBarTitleText": "商城", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/news/index",
-      "style": {
-        "navigationBarTitleText": "资讯",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#f5f7fa"
-      }
-    },
-    {
-      "path": "pages/workspace/index",
-      "style": {
-        "navigationBarTitleText": "工作台",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#f5f7fa"
-      }
+      "style": { "navigationBarTitleText": "资讯", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/message/index",
-      "style": {
-        "navigationBarTitleText": "消息",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#f5f7fa"
-      }
+      "style": { "navigationBarTitleText": "消息", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/profile/index",
-      "style": {
-        "navigationBarTitleText": "我的",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#f5f7fa"
-      }
+      "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/message/chat",
-      "style": {
-        "navigationBarTitleText": "会话",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#f5f7fa"
-      }
+      "style": { "navigationBarTitleText": "会话", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/mall/detail",
-      "style": {
-        "navigationBarTitleText": "商品详情",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#f5f7fa"
-      }
+      "style": { "navigationBarTitleText": "商品详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/news/detail",
-      "style": {
-        "navigationBarTitleText": "资讯详情",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "black",
-        "backgroundColor": "#ffffff"
-      }
+      "style": { "navigationBarTitleText": "资讯详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#ffffff" }
     },
     {
       "path": "pages/login/index",
-      "style": {
-        "navigationBarTitleText": "登录",
-        "navigationStyle": "custom",
-        "navigationBarTextStyle": "white",
-        "backgroundColor": "#f5f7fa"
-      }
-    },
-    {
-      "path": "pages/webview/index",
-      "style": {
-        "navigationBarTitleText": "工作台",
-        "navigationStyle": "custom",
-        "backgroundColor": "#ffffff"
-      }
+      "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
     },
     {
       "path": "pages/privacy/index",
-      "style": {
-        "navigationBarTitleText": "隐私政策",
-        "navigationBarBackgroundColor": "#ffffff",
-        "navigationBarTextStyle": "black"
-      }
+      "style": { "navigationBarTitleText": "隐私政策", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
     },
     {
       "path": "pages/about/index",
-      "style": {
-        "navigationBarTitleText": "关于我们",
-        "navigationBarBackgroundColor": "#ffffff",
-        "navigationBarTextStyle": "black"
-      }
+      "style": { "navigationBarTitleText": "关于我们", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
+    }
+  ],
+  "subPackages": [
+    {
+      "name": "business",
+      "root": "pages/business",
+      "pages": [
+        { "path": "list", "style": { "navigationBarTitleText": "业务列表", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa", "enablePullDownRefresh": false } },
+        { "path": "catalog", "style": { "navigationBarTitleText": "全部功能", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "detail", "style": { "navigationBarTitleText": "业务详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "stats", "style": { "navigationBarTitleText": "经营统计", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    },
+    {
+      "name": "nativeForm",
+      "root": "pages/native-form",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "业务表单", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    },
+    {
+      "name": "ai",
+      "root": "pages/ai",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "消息中心", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f3f7f9", "disableScroll": true } }
+      ]
+    },
+    {
+      "name": "task",
+      "root": "pages/task",
+      "pages": [
+        { "path": "list", "style": { "navigationBarTitleText": "售后任务", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "detail", "style": { "navigationBarTitleText": "任务详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "device", "style": { "navigationBarTitleText": "设备处理", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "consumable", "style": { "navigationBarTitleText": "设备耗材", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "add-devices", "style": { "navigationBarTitleText": "选择售后设备", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "scan", "style": { "navigationBarTitleText": "扫码做任务", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "map", "style": { "navigationBarTitleText": "设备地图", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    },
+    {
+      "name": "native",
+      "root": "pages/native",
+      "pages": [
+        { "path": "checkin", "style": { "navigationBarTitleText": "拜访打卡", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "repair", "style": { "navigationBarTitleText": "设备报修", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "customer-share", "style": { "navigationBarTitleText": "分享客户", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "password", "style": { "navigationBarTitleText": "修改密码", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "member-edit", "style": { "navigationBarTitleText": "新增成员", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "reminders", "style": { "navigationBarTitleText": "提醒管理", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "merchant-apply", "style": { "navigationBarTitleText": "商家入驻", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "service-record", "style": { "navigationBarTitleText": "生成服务记录表", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "casebook", "style": { "navigationBarTitleText": "案例册", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "watermark-camera", "style": { "navigationBarTitleText": "现场水印相机", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#07161d" } },
+        { "path": "task-feedback", "style": { "navigationBarTitleText": "服务反馈", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "task-follow-up", "style": { "navigationBarTitleText": "追加评价", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
     }
   ],
   "tabBar": {
     "color": "#999999",
-    "selectedColor": "#6C2BD9",
+    "selectedColor": "#E54625",
     "borderStyle": "black",
     "backgroundColor": "#ffffff",
     "list": [
-      {
-        "pagePath": "pages/mall/index",
-        "text": "商城",
-        "iconPath": "static/tab-mall.png",
-        "selectedIconPath": "static/tab-mall-active.png"
-      },
-      {
-        "pagePath": "pages/news/index",
-        "text": "资讯",
-        "iconPath": "static/tab-news.png",
-        "selectedIconPath": "static/tab-news-active.png"
-      },
-      {
-        "pagePath": "pages/workspace/index",
-        "text": "工作台",
-        "iconPath": "static/tab-workspace.png",
-        "selectedIconPath": "static/tab-workspace-active.png"
-      },
-      {
-        "pagePath": "pages/message/index",
-        "text": "消息",
-        "iconPath": "static/tab-message.png",
-        "selectedIconPath": "static/tab-message-active.png"
-      },
-      {
-        "pagePath": "pages/profile/index",
-        "text": "我的",
-        "iconPath": "static/tab-profile.png",
-        "selectedIconPath": "static/tab-profile-active.png"
-      }
+      { "pagePath": "pages/workspace/index", "text": "首页", "iconPath": "static/tab-workspace.png", "selectedIconPath": "static/tab-workspace-active.png" },
+      { "pagePath": "pages/mall/index", "text": "商城", "iconPath": "static/tab-mall.png", "selectedIconPath": "static/tab-mall-active.png" },
+      { "pagePath": "pages/news/index", "text": "资讯", "iconPath": "static/tab-news.png", "selectedIconPath": "static/tab-news-active.png" },
+      { "pagePath": "pages/message/index", "text": "消息", "iconPath": "static/tab-message.png", "selectedIconPath": "static/tab-message-active.png" },
+      { "pagePath": "pages/profile/index", "text": "我的", "iconPath": "static/tab-profile.png", "selectedIconPath": "static/tab-profile-active.png" }
     ]
   },
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "Microi.net",
+    "navigationBarTitleText": "集福鲤",
     "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#f5f7fa"
+    "backgroundColor": "#f4f8fa",
+    "backgroundColorTop": "#f4f8fa",
+    "backgroundColorBottom": "#ffffff"
   }
 }

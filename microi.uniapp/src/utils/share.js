@@ -1,21 +1,64 @@
-const HOME_PATH = '/pages/mall/index'
-const DEFAULT_TITLE = 'Microi.net'
-const DEFAULT_IMAGE = '/static/microi-blue-256.png'
+import appConfig from '@/config.js'
 
-const PAGE_TITLES = {
-  'pages/mall/index': '商城',
-  'pages/news/index': '资讯',
-  'pages/workspace/index': '工作台',
-  'pages/message/index': '消息',
-  'pages/profile/index': '我的',
-  'pages/message/chat': '会话',
-  'pages/mall/detail': '商品详情',
-  'pages/news/detail': '资讯详情',
-  'pages/login/index': '登录',
-  'pages/webview/index': '工作台',
-  'pages/privacy/index': '隐私政策',
-  'pages/about/index': '关于我们'
+const HOME_PATH = '/pages/workspace/index'
+
+const FALLBACK_SHARE_TITLES = {
+  platform: `${appConfig.platformName}｜${appConfig.workspaceSubTitle}`,
+  business: `${appConfig.platformName}｜业务协同中心`,
+  service: `${appConfig.platformName}｜专业售后服务保障`,
+  mall: `${appConfig.appName}商城｜品质服务解决方案`,
+  news: `${appConfig.appName}资讯｜洞察行业新动态`,
+  invite: `加入${appConfig.platformName}｜连接业务与专业服务`,
+  merchantInvite: `加入${appConfig.appName}｜共创服务新价值`,
+  insiderInvite: `加入${appConfig.platformName}｜开启高效协作`
 }
+const SHARE_TITLES = { ...FALLBACK_SHARE_TITLES, ...(appConfig.shareTitles || {}) }
+
+const PUBLIC_POLICIES = {
+  'pages/workspace/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH, timeline: true },
+  'pages/mall/index': { title: SHARE_TITLES.mall, image: 'mall', sharePath: '/pages/mall/index', timeline: true },
+  'pages/mall/detail': { title: SHARE_TITLES.mall, image: 'mall', sharePath: '/pages/mall/detail', allowedQuery: ['id'], timeline: true },
+  'pages/news/index': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/index', timeline: true },
+  'pages/news/detail': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/detail', allowedQuery: ['id'], timeline: true },
+  'pages/privacy/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: '/pages/privacy/index', timeline: true },
+  'pages/about/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: '/pages/about/index', timeline: true }
+}
+
+// Internal pages never expose record ids, search terms or login-state content.
+// Their friend share opens a safe landing page; timeline sharing stays hidden.
+const INTERNAL_POLICIES = {
+  'pages/message/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
+  'pages/profile/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
+  'pages/message/chat': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
+  'pages/login/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
+  'pages/ai/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
+  'pages/business/list': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
+  'pages/business/catalog': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/catalog' },
+  'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
+  'pages/business/stats': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/native-form/index': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/task/list': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/device': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/consumable': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/add-devices': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/scan': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/map': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/native/checkin': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/native/repair': { title: SHARE_TITLES.service, image: 'service', sharePath: HOME_PATH },
+  'pages/native/customer-share': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/native/password': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
+  'pages/native/member-edit': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/native/reminders': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/native/merchant-apply': { title: SHARE_TITLES.invite, image: 'invite', sharePath: HOME_PATH },
+  'pages/native/service-record': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/native/casebook': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
+  'pages/native/watermark-camera': { title: SHARE_TITLES.service, image: 'service', sharePath: HOME_PATH },
+  'pages/native/task-feedback': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/native/task-follow-up': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' }
+}
+
+export const PAGE_POLICIES = Object.freeze({ ...PUBLIC_POLICIES, ...INTERNAL_POLICIES })
 
 function normalizePath(path) {
   if (!path) return HOME_PATH
@@ -26,10 +69,23 @@ function routeKey(path) {
   return normalizePath(path).replace(/^\//, '').split('?')[0]
 }
 
+function cleanQueryValue(value) {
+  if (value === undefined || value === null) return ''
+  const text = String(value).trim()
+  return text.length > 160 ? text.slice(0, 160) : text
+}
+
+function pickQuery(query, allowedKeys = []) {
+  if (!query || typeof query !== 'object' || !allowedKeys.length) return {}
+  return allowedKeys.reduce((result, key) => {
+    const value = cleanQueryValue(query[key])
+    if (value) result[key] = value
+    return result
+  }, {})
+}
+
 function encodeQuery(query) {
-  if (!query || typeof query !== 'object') return ''
-  return Object.keys(query)
-    .filter((key) => query[key] !== undefined && query[key] !== null && query[key] !== '')
+  return Object.keys(query || {})
     .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(String(query[key]))}`)
     .join('&')
 }
@@ -51,73 +107,85 @@ function getRouteInfo(vm) {
   return { path, query }
 }
 
-function getShareTitle(vm, path) {
-  if (vm) {
-    const directTitle = vm.shareTitle || vm.pageTitle || vm.title
-    if (directTitle) return String(directTitle)
-    if (typeof vm.t === 'function') {
-      const key = routeKey(path)
-      const i18nKeys = {
-        'pages/mall/index': 'mall.title',
-        'pages/news/index': 'news.title',
-        'pages/workspace/index': 'workspace.title',
-        'pages/message/index': 'message.title'
-      }
-      const i18nKey = i18nKeys[key]
-      if (i18nKey) {
-        const translated = vm.t(i18nKey)
-        if (translated && translated !== i18nKey) return translated
-      }
-    }
+function getPolicy(path) {
+  return PAGE_POLICIES[routeKey(path)] || {
+    title: SHARE_TITLES.platform,
+    image: 'platform',
+    sharePath: HOME_PATH,
+    timeline: false
   }
-
-  return PAGE_TITLES[routeKey(path)] || DEFAULT_TITLE
 }
 
-function buildSharePayload(vm) {
+function getShareImage(imageKey) {
+  const images = appConfig.cdnAssets && appConfig.cdnAssets.share
+  return (images && images[imageKey]) || (images && images.platform) || (appConfig.cdnAssets && appConfig.cdnAssets.logo) || appConfig.logoUrl
+}
+
+export function buildSharePayload(vm) {
   const route = getRouteInfo(vm)
-  const query = encodeQuery(route.query)
-  const path = query ? `${route.path}?${query}` : route.path
+  const policy = getPolicy(route.path)
+  const safeQuery = pickQuery(route.query, policy.allowedQuery)
+  const query = encodeQuery(safeQuery)
+  const path = query ? `${policy.sharePath}?${query}` : policy.sharePath
+
   return {
-    title: getShareTitle(vm, route.path),
+    title: policy.title,
     path,
-    query,
-    imageUrl: DEFAULT_IMAGE
+    query: policy.timeline && policy.sharePath === normalizePath(route.path) ? query : '',
+    imageUrl: getShareImage(policy.image),
+    timeline: Boolean(policy.timeline)
   }
 }
 
-function enableShareMenu() {
+export function buildInviteSharePayload(inviteType, currentUser = {}) {
+  const type = inviteType === 'business' || inviteType === 'Insider' ? inviteType : 'normal'
+  const query = {
+    InviterId: cleanQueryValue(currentUser.Id),
+    InviterName: cleanQueryValue(currentUser.Name || currentUser.Account),
+    InviterType: type === 'normal' ? '' : type
+  }
+  const queryString = encodeQuery(Object.keys(query).reduce((result, key) => {
+    if (query[key]) result[key] = query[key]
+    return result
+  }, {}))
+  const basePath = type === 'business' ? '/pages/native/merchant-apply' : HOME_PATH
+  const title = type === 'business'
+    ? SHARE_TITLES.merchantInvite
+    : (type === 'Insider' ? SHARE_TITLES.insiderInvite : SHARE_TITLES.invite)
+
+  return {
+    title,
+    path: queryString ? `${basePath}?${queryString}` : basePath,
+    imageUrl: getShareImage('invite')
+  }
+}
+
+function enableShareMenu(vm) {
   // #ifdef MP-WEIXIN
   try {
-    uni.showShareMenu({
-      withShareTicket: true,
-      menus: ['shareAppMessage', 'shareTimeline']
-    })
-  } catch (e) {}
+    const policy = getPolicy(getRouteInfo(vm).path)
+    const menus = policy.timeline ? ['shareAppMessage', 'shareTimeline'] : ['shareAppMessage']
+    if (!policy.timeline && typeof uni.hideShareMenu === 'function') {
+      uni.hideShareMenu({ menus: ['shareTimeline'] })
+    }
+    uni.showShareMenu({ withShareTicket: true, menus })
+  } catch (error) {}
   // #endif
 }
 
 export default {
   onLoad() {
-    enableShareMenu()
+    enableShareMenu(this)
   },
   onShow() {
-    enableShareMenu()
+    enableShareMenu(this)
   },
   onShareAppMessage() {
     const payload = buildSharePayload(this)
-    return {
-      title: payload.title,
-      path: payload.path,
-      imageUrl: payload.imageUrl
-    }
+    return { title: payload.title, path: payload.path, imageUrl: payload.imageUrl }
   },
   onShareTimeline() {
     const payload = buildSharePayload(this)
-    return {
-      title: payload.title,
-      query: payload.query,
-      imageUrl: payload.imageUrl
-    }
+    return { title: payload.title, query: payload.query, imageUrl: payload.imageUrl }
   }
 }

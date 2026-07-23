@@ -3,6 +3,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const WebSocketClient = globalThis.WebSocket || require('ws');
 
 const root = path.resolve(__dirname, '..');
 const h5Root = path.join(root, 'dist', 'build', 'h5');
@@ -20,9 +21,10 @@ const visualTargets = [
     label: 'workspace',
     route: '/#/pages/workspace/index',
     screenshot: 'workspace-login.png',
-    headerSelector: '.ws-header',
-    promptSelector: '.mci-auth-prompt__card',
-    buttonSelector: '.mci-auth-prompt__button'
+    headerSelector: '.home-header',
+    promptSelector: '.welcome-row',
+    buttonSelector: '.login-button',
+    checkPromptCenter: false
   }
 ];
 
@@ -152,7 +154,7 @@ function findBrowser() {
 
 function connectCdp(wsUrl) {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(wsUrl);
+    const ws = new WebSocketClient(wsUrl);
     let id = 0;
     const pending = new Map();
 
@@ -306,6 +308,7 @@ async function main() {
           const centerDeltaY = Math.abs(btnCenterY - textCenterY);
           const centerDeltaX = Math.abs(btnCenterX - textCenterX);
           const promptCenterDeltaY = Math.abs(promptCenterY - availableCenterY);
+          const checkPromptCenter = ${JSON.stringify(target.checkPromptCenter !== false)};
           const maxDeltaY = Math.max(2, btnRect.height * 0.06);
           const maxDeltaX = Math.max(2, btnRect.width * 0.06);
           const maxPromptDeltaY = Math.max(16, (availableBottom - availableTop) * 0.08);
@@ -314,8 +317,9 @@ async function main() {
             btnStyle.justifyContent === 'center' &&
             textStyle.lineHeight !== 'normal';
           return {
-            ok: cssOk && centerDeltaY <= maxDeltaY && centerDeltaX <= maxDeltaX && promptCenterDeltaY <= maxPromptDeltaY,
+            ok: cssOk && centerDeltaY <= maxDeltaY && centerDeltaX <= maxDeltaX && (!checkPromptCenter || promptCenterDeltaY <= maxPromptDeltaY),
             cssOk,
+            checkPromptCenter,
             centerDeltaY,
             centerDeltaX,
             promptCenterDeltaY,

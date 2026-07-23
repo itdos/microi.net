@@ -185,19 +185,16 @@ const messages = {
       me: '我',
       reconnecting: '连接已断开，正在重连...',
       sendFailed: '发送失败',
-      featureDev: '功能开发中',
       clearHistoryConfirm: '确定要清空聊天记录吗？',
     },
 
     // ── 我的 ──
     profile: {
-      themeSwitch: '主题切换',
       langSwitch: '语言切换',
       aboutSystem: '关于系统',
       privacyPolicy: '隐私政策',
       changePassword: '修改密码',
       logout: '退出登录',
-      selectTheme: '选择主题',
       selectLang: '选择语言',
       oldPassword: '原密码',
       newPassword: '新密码',
@@ -205,7 +202,6 @@ const messages = {
       enterOldPwd: '请输入原密码',
       enterNewPwd: '请输入新密码（至少6位）',
       enterConfirmPwd: '请再次输入新密码',
-      themeSwitched: '主题已切换',
       langSwitched: '已切换为中文',
       pwdMinLength: '新密码至少6位',
       pwdNotMatch: '两次密码不一致',
@@ -213,21 +209,6 @@ const messages = {
       changeFailed: '修改失败',
       logoutConfirm: '确定要退出登录吗？',
       loggedOut: '已退出登录',
-      // theme colors
-      blue: '蓝色', skyBlue: '天蓝', orange: '橙色', red: '红色',
-      green: '绿色', purple: '紫色', pink: '粉色', cyan: '青色',
-      indigo: '靛蓝', deepOrange: '深橙', blueGrey: '灰蓝', black: '黑色',
-    },
-
-    // ── WebView ──
-    webview: {
-      loading: '正在加载...',
-      notExist: '不存在',
-      noToken: '无 Token，返回工作台页面',
-      loadError: '加载提示',
-      loadErrorMsg: 'WebView 页面加载异常，请重试或返回首页',
-      backHome: '返回首页',
-      logoutConfirm: '确定要退出登录吗？',
     },
 
     // ── 关于 ──
@@ -434,18 +415,15 @@ const messages = {
       me: 'Me',
       reconnecting: 'Disconnected, reconnecting...',
       sendFailed: 'Send failed',
-      featureDev: 'Feature in development',
       clearHistoryConfirm: 'Clear all chat history?',
     },
 
     profile: {
-      themeSwitch: 'Theme',
       langSwitch: 'Language',
       aboutSystem: 'About',
       privacyPolicy: 'Privacy Policy',
       changePassword: 'Change Password',
       logout: 'Logout',
-      selectTheme: 'Select Theme',
       selectLang: 'Select Language',
       oldPassword: 'Current Password',
       newPassword: 'New Password',
@@ -453,7 +431,6 @@ const messages = {
       enterOldPwd: 'Enter current password',
       enterNewPwd: 'Enter new password (min 6 chars)',
       enterConfirmPwd: 'Re-enter new password',
-      themeSwitched: 'Theme changed',
       langSwitched: 'Switched to English',
       pwdMinLength: 'Password must be at least 6 characters',
       pwdNotMatch: 'Passwords do not match',
@@ -461,19 +438,6 @@ const messages = {
       changeFailed: 'Change failed',
       logoutConfirm: 'Confirm logout?',
       loggedOut: 'Logged out',
-      blue: 'Blue', skyBlue: 'Sky Blue', orange: 'Orange', red: 'Red',
-      green: 'Green', purple: 'Purple', pink: 'Pink', cyan: 'Cyan',
-      indigo: 'Indigo', deepOrange: 'Deep Orange', blueGrey: 'Blue Grey', black: 'Black',
-    },
-
-    webview: {
-      loading: 'Loading...',
-      notExist: 'Not found',
-      noToken: 'No token, returning to workspace',
-      loadError: 'Load Error',
-      loadErrorMsg: 'Page failed to load. Please retry or go back.',
-      backHome: 'Go Home',
-      logoutConfirm: 'Confirm logout?',
     },
 
     about: {

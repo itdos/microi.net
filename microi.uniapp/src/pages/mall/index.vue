@@ -1,10 +1,11 @@
 <template>
   <view class="mall-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部搜索栏 -->
-    <view class="search-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
+    <view class="search-header mci-safe-top" :style="{ background: themeGradient }">
+      <view class="xjy-live-drop"></view>
       <view class="search-bar" :style="{ paddingRight: capsuleWidth + 'px' }">
         <view class="search-input-wrap">
-          <text class="search-icon">🔍</text>
+          <view class="search-icon"></view>
           <input
             class="search-input"
             type="text"
@@ -16,7 +17,9 @@
           />
           <view v-if="keyword" class="search-clear" @tap="clearSearch">✕</view>
           <view class="filter-btn-inline" :style="{ background: themeColor }" @tap="showFilter = true">
-            <text class="filter-icon-inline">☰</text>
+            <view class="filter-icon-inline">
+              <view></view><view></view><view></view>
+            </view>
             <view class="filter-dot-inline" v-if="hasActiveFilter"></view>
           </view>
         </view>
@@ -64,8 +67,10 @@
       <scroll-view
         class="product-area"
         scroll-y
+        :scroll-top="xjyScrollCommand"
         :refresher-enabled="true"
         :refresher-triggered="refreshing"
+        @scroll="handleXjyListScroll"
         @refresherrefresh="onRefresh"
         @scrolltolower="loadMore"
       >
@@ -110,7 +115,7 @@
 
         <!-- 空状态 -->
         <view class="empty-state" v-if="!loading && products.length === 0">
-          <text class="empty-icon">📦</text>
+          <image class="empty-icon" src="/static/xjy/business/goods.png" mode="aspectFit" />
           <text class="empty-text">{{ t('mall.noProducts') }}</text>
           <text class="empty-sub">{{ t('mall.tryOther') }}</text>
         </view>
@@ -182,6 +187,7 @@
         </view>
       </view>
     </view>
+    <mci-ai-launcher />
   </view>
 </template>
 
@@ -190,12 +196,14 @@ import { getProductList, getProductCategories, getProductTypes, parseImages, get
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getMenuButtonRect } from '@/utils/platform.js'
+import { listReturnMixin } from '@/platform/list-return.js'
+import { loadMallSnapshot, readMallSnapshot } from '@/platform/preload.js'
 
 export default {
-  mixins: [themeMixin],
+  mixins: [themeMixin, listReturnMixin],
   data() {
     return {
-      statusBarHeight: 44,
+      statusBarHeight: 0,
       capsuleWidth: 0,
       keyword: '',
       // 分类树
@@ -233,10 +241,10 @@ export default {
   onLoad() {
     try {
       const info = uni.getWindowInfo()
-      this.statusBarHeight = info.statusBarHeight || 44
+      this.statusBarHeight = info.statusBarHeight || 0
     } catch (e) {
       try {
-        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
+        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0
       } catch (e2) {}
     }
     // 计算小程序胶囊按钮占用的右侧宽度（跨平台）
@@ -247,12 +255,31 @@ export default {
         this.capsuleWidth = sysInfo.windowWidth - menuBtn.left + 8
       }
     } catch (e) {}
-    this.loadCategoryTree()
-    this.loadTypes()
-    this.loadProducts()
+    const snapshot = readMallSnapshot()
+    if (snapshot) this.applyInitialSnapshot(snapshot)
+    this.loadInitialSnapshot()
   },
 
   methods: {
+    applyInitialSnapshot(snapshot) {
+      this.categoryTree = (snapshot.categories || []).map((item) => ({ ...item, _expanded: false }))
+      this.typeOptions = snapshot.types || []
+      this.products = snapshot.products || []
+      this.totalCount = Number(snapshot.totalCount || 0)
+      this.noMore = this.products.length < this.pageSize
+      this.loading = false
+    },
+
+    async loadInitialSnapshot() {
+      try {
+        this.applyInitialSnapshot(await loadMallSnapshot())
+      } catch (error) {
+        if (!this.products.length) console.error('[Mall] initial snapshot error:', error)
+      } finally {
+        this.loading = false
+      }
+    },
+
     // 加载分类树（带子分类）
     async loadCategoryTree() {
       try {
@@ -387,9 +414,13 @@ export default {
     },
 
     // 下拉刷新
-    onRefresh() {
+    async onRefresh() {
       this.refreshing = true
-      this.loadProducts()
+      try {
+        await Promise.all([this.loadCategoryTree(), this.loadTypes(), this.loadProducts()])
+      } finally {
+        this.refreshing = false
+      }
     },
 
     // 加载更多
@@ -430,7 +461,7 @@ export default {
     getProductImage(item) {
       const imgs = parseImages(item.Tupian)
       if (imgs.length > 0) return imgs[0]
-      return '/static/microi-blue-256.png'
+      return this.xjyAssets.productPlaceholder
     },
 
     // 格式化数字
@@ -441,9 +472,7 @@ export default {
 
     // 跳转详情
     goDetail(id) {
-      uni.navigateTo({
-        url: '/pages/mall/detail?id=' + id
-      })
+      this.xjyNavigateToDetail('/pages/mall/detail?id=' + id)
     }
   }
 }
@@ -461,12 +490,16 @@ export default {
 /* ========== 搜索栏 ========== */
 .search-header {
   /* bg: themeGradient inline */
+  position: relative;
+  overflow: hidden;
   padding-bottom: 16rpx;
   flex-shrink: 0;
   z-index: 100;
 }
 
 .search-bar {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   padding: 12rpx 24rpx;
@@ -483,9 +516,25 @@ export default {
 }
 
 .search-icon {
-  font-size: 26rpx;
+  position: relative;
+  width: 22rpx;
+  height: 22rpx;
+  border: 3rpx solid #8a96a3;
+  border-radius: 50%;
   margin-right: 10rpx;
   flex-shrink: 0;
+}
+
+.search-icon::after {
+  content: '';
+  position: absolute;
+  width: 10rpx;
+  height: 3rpx;
+  right: -8rpx;
+  bottom: -4rpx;
+  border-radius: 3rpx;
+  background: #8a96a3;
+  transform: rotate(45deg);
 }
 
 .search-input {
@@ -517,8 +566,24 @@ export default {
 }
 
 .filter-icon-inline {
-  font-size: 26rpx;
-  color: #fff;
+  width: 26rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 5rpx;
+}
+
+.filter-icon-inline view {
+  height: 3rpx;
+  border-radius: 3rpx;
+  background: #fff;
+}
+
+.filter-icon-inline view:nth-child(2) {
+  width: 18rpx;
+}
+
+.filter-icon-inline view:nth-child(3) {
+  width: 10rpx;
 }
 
 .filter-dot-inline {
@@ -751,8 +816,10 @@ export default {
 }
 
 .empty-icon {
-  font-size: 80rpx;
+  width: 104rpx;
+  height: 104rpx;
   margin-bottom: 24rpx;
+  opacity: 0.72;
 }
 
 .empty-text {

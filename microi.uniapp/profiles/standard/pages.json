@@ -1,0 +1,75 @@
+{
+  "pages": [
+    {
+      "path": "pages/workspace/index",
+      "style": { "navigationBarTitleText": "首页", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f4f8fa" }
+    },
+    {
+      "path": "pages/message/index",
+      "style": { "navigationBarTitleText": "消息", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
+    },
+    {
+      "path": "pages/profile/index",
+      "style": { "navigationBarTitleText": "我的", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
+    },
+    {
+      "path": "pages/message/chat",
+      "style": { "navigationBarTitleText": "会话", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f5f7fa" }
+    },
+    {
+      "path": "pages/login/index",
+      "style": { "navigationBarTitleText": "登录", "navigationStyle": "custom", "navigationBarTextStyle": "white", "backgroundColor": "#f5f7fa" }
+    },
+    {
+      "path": "pages/privacy/index",
+      "style": { "navigationBarTitleText": "隐私政策", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
+    },
+    {
+      "path": "pages/about/index",
+      "style": { "navigationBarTitleText": "关于我们", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
+    }
+  ],
+  "subPackages": [
+    {
+      "name": "nativeForm",
+      "root": "pages/native-form",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "业务表单", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    },
+    {
+      "name": "ai",
+      "root": "pages/ai",
+      "pages": [
+        { "path": "index", "style": { "navigationBarTitleText": "消息中心", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f3f7f9", "disableScroll": true } }
+      ]
+    },
+    {
+      "name": "native",
+      "root": "pages/native",
+      "pages": [
+        { "path": "password", "style": { "navigationBarTitleText": "修改密码", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "reminders", "style": { "navigationBarTitleText": "提醒管理", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    }
+  ],
+  "tabBar": {
+    "color": "#80909A",
+    "selectedColor": "#E54625",
+    "borderStyle": "black",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/workspace/index", "text": "首页", "iconPath": "static/tab-workspace.png", "selectedIconPath": "static/tab-workspace-active.png" },
+      { "pagePath": "pages/message/index", "text": "消息", "iconPath": "static/tab-message.png", "selectedIconPath": "static/tab-message-active.png" },
+      { "pagePath": "pages/profile/index", "text": "我的", "iconPath": "static/tab-profile.png", "selectedIconPath": "static/tab-profile-active.png" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "Microi",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f4f8fa",
+    "backgroundColorTop": "#f4f8fa",
+    "backgroundColorBottom": "#ffffff"
+  }
+}

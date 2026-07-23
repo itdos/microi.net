@@ -9,15 +9,17 @@
 page,
 page[data-theme="light"] {
   /* 主色调 */
-  --mci-color-primary: #6C2BD9;
-  --mci-color-primary-light: #8B5CF6;
-  --mci-color-primary-glow: rgba(108, 43, 217, 0.20);
+  --mci-color-primary: #087DA8;
+  --mci-color-primary-light: #18A6B8;
+  --mci-color-primary-dark: #063B5C;
+  --mci-color-primary-glow: rgba(8, 125, 168, 0.18);
+  --mci-color-brand: #E54625;
 
   /* 强调色 */
-  --mci-color-accent-blue: #2196F3;
-  --mci-color-accent-cyan: #06B6D4;
-  --mci-color-accent-pink: #EC4899;
-  --mci-color-accent-yellow: #F59E0B;
+  --mci-color-accent-blue: #167FB2;
+  --mci-color-accent-cyan: #18A6B8;
+  --mci-color-accent-pink: #E54625;
+  --mci-color-accent-yellow: #D99A20;
 
   /* 状态色 */
   --mci-color-success: #07C160;
@@ -26,7 +28,7 @@ page[data-theme="light"] {
   --mci-color-info: #2196F3;
 
   /* 背景 */
-  --mci-bg-base: #F5F5FA;
+  --mci-bg-base: #F3F7F9;
   --mci-bg-elevated: #FFFFFF;
   --mci-bg-surface: #F0F0F8;
   --mci-bg-card: rgba(255, 255, 255, 0.92);
@@ -34,11 +36,11 @@ page[data-theme="light"] {
   --mci-bg-mask: rgba(0, 0, 0, 0.42);
 
   /* 文本 */
-  --mci-text-primary: #1A1A2E;
-  --mci-text-secondary: rgba(26, 26, 46, 0.65);
-  --mci-text-tertiary: rgba(26, 26, 46, 0.45);
-  --mci-text-muted: rgba(26, 26, 46, 0.22);
-  --mci-text-placeholder: rgba(26, 26, 46, 0.30);
+  --mci-text-primary: #18313D;
+  --mci-text-secondary: rgba(24, 49, 61, 0.68);
+  --mci-text-tertiary: rgba(24, 49, 61, 0.48);
+  --mci-text-muted: rgba(24, 49, 61, 0.24);
+  --mci-text-placeholder: rgba(24, 49, 61, 0.34);
   --mci-text-on-primary: #FFFFFF;
 
   /* 边框 */
@@ -46,9 +48,9 @@ page[data-theme="light"] {
   --mci-border-color-hover: rgba(15, 18, 30, 0.16);
 
   /* 渐变 */
-  --mci-gradient-primary: linear-gradient(135deg, #6C2BD9 0%, #2196F3 100%);
-  --mci-gradient-warm: linear-gradient(135deg, #EC4899 0%, #F59E0B 100%);
-  --mci-gradient-cool: linear-gradient(135deg, #06B6D4 0%, #2196F3 100%);
+  --mci-gradient-primary: linear-gradient(135deg, #063B5C 0%, #087DA8 58%, #18A6B8 100%);
+  --mci-gradient-warm: linear-gradient(135deg, #E54625 0%, #D99A20 100%);
+  --mci-gradient-cool: linear-gradient(135deg, #087DA8 0%, #18A6B8 100%);
 
   /* 阴影 / 光晕 */
   --mci-shadow-sm: 0 2rpx 8rpx rgba(15, 18, 30, 0.06);
@@ -104,41 +106,31 @@ page[data-theme="light"] {
   --mci-safe-bottom: env(safe-area-inset-bottom, 0);
   --mci-safe-left: env(safe-area-inset-left, 0);
   --mci-safe-right: env(safe-area-inset-right, 0);
+  --mci-status-bar-height: 0px;
+  --mci-nav-height: 44px;
+  --mci-header-height: 44px;
+  --mci-nav-side-width: 52px;
+  --mci-capsule-right: 0px;
 }
 
-/* === 暗黑主题（可选切换） === */
-page[data-theme="dark"] {
-  --mci-color-primary: #722BFF;
-  --mci-color-primary-light: #9B5FFF;
-  --mci-color-primary-glow: rgba(114, 43, 255, 0.35);
-  --mci-color-accent-blue: #29B8FF;
-  --mci-color-accent-cyan: #00F5D4;
-  --mci-color-accent-pink: #FF6EC7;
-  --mci-color-danger: #FF2E63;
+/* Runtime-safe custom navigation. The page root supplies the measured tokens. */
+.mci-safe-top {
+  box-sizing: border-box;
+  padding-top: var(--mci-status-bar-height, env(safe-area-inset-top, 0px)) !important;
+}
 
-  --mci-bg-base: #0A0A0F;
-  --mci-bg-elevated: #121218;
-  --mci-bg-surface: #181824;
-  --mci-bg-card: rgba(255, 255, 255, 0.04);
-  --mci-bg-card-hover: rgba(255, 255, 255, 0.08);
-  --mci-bg-mask: rgba(0, 0, 0, 0.68);
+.mci-safe-nav-row {
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: var(--mci-nav-left-width, 52px) minmax(0, 1fr) var(--mci-nav-side-width, 52px) !important;
+  min-height: var(--mci-nav-height, 44px) !important;
+  padding-right: max(16rpx, var(--mci-safe-right, 0px)) !important;
+  padding-left: max(16rpx, var(--mci-safe-left, 0px)) !important;
+}
 
-  --mci-text-primary: #FFFFFF;
-  --mci-text-secondary: rgba(255, 255, 255, 0.55);
-  --mci-text-tertiary: rgba(255, 255, 255, 0.35);
-  --mci-text-muted: rgba(255, 255, 255, 0.18);
-  --mci-text-placeholder: rgba(255, 255, 255, 0.30);
-  --mci-text-on-primary: #FFFFFF;
-
-  --mci-border-color: rgba(255, 255, 255, 0.08);
-  --mci-border-color-hover: rgba(255, 255, 255, 0.16);
-
-  --mci-gradient-primary: linear-gradient(135deg, #722BFF 0%, #29B8FF 100%);
-
-  --mci-shadow-md: 0 8rpx 24rpx rgba(0, 0, 0, 0.40);
-  --mci-shadow-button: 0 8rpx 32rpx var(--mci-color-primary-glow);
-  --mci-glow-primary: 0 0 48rpx rgba(114, 43, 255, 0.5),
-                      0 0 120rpx rgba(41, 184, 255, 0.18);
+.mci-safe-bottom {
+  box-sizing: border-box;
+  padding-bottom: max(16rpx, var(--mci-safe-bottom, env(safe-area-inset-bottom, 0px))) !important;
 }
 
 /* === Structured page texture === */
@@ -154,7 +146,7 @@ page[data-theme="dark"] {
   background:
     linear-gradient(90deg, var(--mci-border-color) 1rpx, transparent 1rpx),
     linear-gradient(0deg, var(--mci-border-color) 1rpx, transparent 1rpx),
-    linear-gradient(135deg, rgba(108, 43, 217, 0.08), rgba(33, 150, 243, 0.03) 48%, transparent 72%);
+    linear-gradient(135deg, rgba(233, 75, 44, 0.06), rgba(6, 182, 212, 0.04) 48%, transparent 72%);
   background-size: 72rpx 72rpx, 72rpx 72rpx, 100% 100%;
   opacity: 0.42;
 }
@@ -168,14 +160,6 @@ page[data-theme="dark"] {
   background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.28), transparent);
   transform: rotate(-12deg);
   animation: mciTextureScan 8s ease-in-out infinite;
-}
-page[data-theme="dark"] .mci-page-texture {
-  opacity: 0.26;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1rpx, transparent 1rpx),
-    linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1rpx, transparent 1rpx),
-    linear-gradient(135deg, rgba(114, 43, 255, 0.18), rgba(41, 184, 255, 0.06) 48%, transparent 72%);
-  background-size: 72rpx 72rpx, 72rpx 72rpx, 100% 100%;
 }
 @keyframes mciTextureScan {
   0%, 35% { transform: translate3d(0, -220rpx, 0) rotate(-12deg); opacity: 0; }
@@ -254,8 +238,7 @@ page[data-theme="dark"] .mci-page-texture {
 .privacy-container,
 .privacy-page,
 .about-container,
-.about-page,
-.webview-container {
+.about-page {
   background: var(--mci-bg-base) !important;
   color: var(--mci-text-primary);
 }
@@ -268,7 +251,6 @@ page[data-theme="dark"] .mci-page-texture {
 .msg-item,
 .contact-item,
 .func-group,
-.current-url-card,
 .submenu-panel,
 .filter-panel,
 .new-chat-panel,
@@ -358,8 +340,7 @@ page[data-theme="dark"] .mci-page-texture {
 .chat-container,
 .detail-container,
 .privacy-page,
-.about-page,
-.webview-container {
+.about-page {
   animation: mciPageEnter 360ms ease both;
   padding-left: var(--mci-safe-left);
   padding-right: var(--mci-safe-right);
@@ -385,7 +366,6 @@ page[data-theme="dark"] .mci-page-texture {
 .about-desc,
 .info-group,
 .privacy-content .section,
-.current-url-card,
 .loading-content,
 .error-state {
   background: var(--mci-bg-elevated) !important;
@@ -540,6 +520,12 @@ page[data-theme="dark"] .mci-page-texture {
 .booking-mask,
 .loading-overlay {
   background: var(--mci-bg-mask) !important;
+}
+
+.settings-panel {
+  box-sizing: border-box;
+  padding-top: var(--mci-safe-top);
+  padding-bottom: var(--mci-safe-bottom);
 }
 
 .loading-overlay .loading-content,

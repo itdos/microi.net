@@ -1,8 +1,8 @@
 <template>
   <view class="detail-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-content">
+    <view class="nav-bar mci-safe-top">
+      <view class="nav-content mci-safe-nav-row">
         <view class="nav-back" @tap="goBack">
           <text class="back-icon">‹</text>
         </view>
@@ -28,7 +28,7 @@
           </swiper-item>
           <swiper-item v-if="images.length === 0">
             <view class="swiper-empty">
-              <text class="empty-icon">📷</text>
+              <image class="empty-icon" src="/static/xjy/watermarkCamera/photo.png" mode="aspectFit" />
               <text class="empty-text">{{ t('mall.noImage') }}</text>
             </view>
           </swiper-item>
@@ -99,7 +99,7 @@
       <!-- 供应商信息 -->
       <view class="vendor-section" v-if="product.TenantName || product.ShangpinGYS">
         <view class="section-header">
-          <text class="section-icon">🏪</text>
+          <image class="section-icon" src="/static/xjy/business/store.png" mode="aspectFit" />
           <text class="section-title">{{ t('mall.supplyInfo') }}</text>
         </view>
         <view class="vendor-info">
@@ -117,7 +117,7 @@
       <!-- 动态属性 -->
       <view class="specs-section" v-if="dynamicFields.length > 0">
         <view class="section-header">
-          <text class="section-icon">📋</text>
+          <image class="section-icon" src="/static/xjy/business/goods.png" mode="aspectFit" />
           <text class="section-title">{{ t('mall.productParams') }}</text>
         </view>
         <view class="specs-grid">
@@ -244,20 +244,20 @@
         </view>
       </view>
     </view>
+    <mci-ai-launcher />
   </view>
 </template>
 
 <script>
 import { getProductDetail, getProductDynamicInfo, parseImages, getImageUrl, checkFavorite, toggleFavorite, reserveProduct } from '@/utils/api.js'
 import { getToken } from '@/utils/request.js'
-import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 
 export default {
   mixins: [themeMixin],
   data() {
     return {
-      statusBarHeight: 44,
+      statusBarHeight: 0,
       productId: '',
       product: null,
       images: [],
@@ -280,10 +280,10 @@ export default {
   onLoad(options) {
     try {
       const info = uni.getWindowInfo()
-      this.statusBarHeight = info.statusBarHeight || 44
+      this.statusBarHeight = info.statusBarHeight || 0
     } catch (e) {
       try {
-        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
+        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0
       } catch (e2) {}
     }
 
@@ -292,15 +292,6 @@ export default {
       this.loadDetail()
       this.loadDynamicInfo()
       this.loadFavoriteStatus()
-    }
-  },
-
-  // 微信分享
-  onShareAppMessage() {
-    return {
-      title: this.product ? this.product.ShangpinMC : '商品详情',
-      path: '/pages/mall/detail?id=' + this.productId,
-      imageUrl: this.images.length > 0 ? this.images[0] : ''
     }
   },
 
@@ -377,10 +368,9 @@ export default {
       // App 端可以调用系统分享
       uni.share && uni.share({
         provider: 'system',
-        type: 0,
-        title: this.product ? this.product.ShangpinMC : '商品详情',
-        summary: '查看商品详情',
-        href: appConfig.webviewUrl.replace(/\/$/, '') + (appConfig.webviewUrl.includes('?') ? '#' : '/#') + '/pages/mall/detail?id=' + this.productId
+        type: 1,
+        title: '集福鲤商城｜品质净水解决方案',
+        summary: '专业产品与全周期服务，来自集福鲤平台。'
       })
       // #endif
     },
@@ -561,8 +551,10 @@ export default {
 }
 
 .swiper-empty .empty-icon {
-  font-size: 80rpx;
+  width: 96rpx;
+  height: 96rpx;
   margin-bottom: 12rpx;
+  opacity: 0.65;
 }
 
 .swiper-empty .empty-text {
@@ -799,7 +791,8 @@ export default {
 }
 
 .section-icon {
-  font-size: 32rpx;
+  width: 36rpx;
+  height: 36rpx;
   margin-right: 10rpx;
 }
 
@@ -945,7 +938,7 @@ export default {
   align-items: center;
   background: #fff;
   padding: 16rpx 24rpx;
-  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(16rpx + var(--mci-safe-bottom));
   box-shadow: 0 -4rpx 16rpx rgba(0,0,0,0.06);
   position: relative;
   z-index: 50;
@@ -1093,7 +1086,7 @@ export default {
 
 .popup-footer {
   padding: 16rpx 32rpx 32rpx;
-  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(32rpx + var(--mci-safe-bottom));
 }
 
 .popup-submit-btn {
@@ -1117,7 +1110,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 24rpx;
-  padding: 24rpx 32rpx calc(140rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 32rpx calc(140rpx + var(--mci-safe-bottom));
   overflow: hidden;
 }
 
