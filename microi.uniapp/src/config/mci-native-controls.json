@@ -1,0 +1,56 @@
+{
+  "editable": [
+    "Text",
+    "Textarea",
+    "NumberText",
+    "DateTime",
+    "Select",
+    "MultipleSelect",
+    "Radio",
+    "Checkbox",
+    "Switch",
+    "Rate",
+    "Progress",
+    "Slider",
+    "ColorPicker",
+    "RichText",
+    "CodeEditor",
+    "JsonTable",
+    "ImgUpload",
+    "FileUpload",
+    "Autocomplete",
+    "TagInput",
+    "Transfer",
+    "Cascader",
+    "Address",
+    "Department",
+    "SelectTree",
+    "TreeCheckbox",
+    "Map",
+    "MapArea"
+  ],
+  "readonly": [
+    "Guid",
+    "AutoNumber",
+    "StaticText",
+    "Html",
+    "Alert",
+    "Qrcode",
+    "FontAwesome"
+  ],
+  "layout": [
+    "Divider",
+    "CollapseGroup",
+    "Tabs"
+  ],
+  "related": [
+    "OpenTable",
+    "JoinTable",
+    "JoinForm",
+    "TableChild"
+  ],
+  "guarded": [
+    "Button",
+    "DevComponent"
+  ]
+}

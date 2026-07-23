@@ -7,6 +7,18 @@ import appConfig from '../config.js'
 
 const CACHE_KEY = 'sys_config_cache'
 const CACHE_EXPIRE = 30 * 60 * 1000 // 缓存30分钟
+const AI_FLAG_EXPIRE = 60 * 1000
+
+let sysConfigRequest = null
+let aiFlagRequest = null
+let aiFlagState = {
+  checkedAt: 0,
+  enabled: false
+}
+
+export function isEnabledFlag(value) {
+  return value === 1 || value === '1'
+}
 
 /**
  * 从缓存读取 SysConfig
@@ -39,25 +51,64 @@ function setCachedSysConfig(data) {
  * 获取 SysConfig（优先缓存，否则请求接口）
  * @returns {Promise<Object|null>}
  */
-export async function getSysConfig() {
+export async function getSysConfig(options = {}) {
+  const refresh = options === true || (options && options.refresh === true)
   // 先尝试读缓存
-  const cached = getCachedSysConfig()
-  if (cached) return cached
+  if (!refresh) {
+    const cached = getCachedSysConfig()
+    if (cached) return cached
+  }
+
+  if (sysConfigRequest) return sysConfigRequest
 
   // 请求接口
-  try {
-    const result = await post('/api/DiyTable/GetSysConfig', {
-      _SearchEqual: { IsEnable: 1 },
-      OsClient: appConfig.osClient
-    }, false)
-    if (result.Code === 1 && result.Data) {
-      setCachedSysConfig(result.Data)
-      return result.Data
+  sysConfigRequest = (async () => {
+    try {
+      const result = await post('/api/DiyTable/GetSysConfig', {
+        _SearchEqual: { IsEnable: 1 },
+        OsClient: appConfig.osClient
+      }, false)
+      if (result.Code === 1 && result.Data) {
+        setCachedSysConfig(result.Data)
+        return result.Data
+      }
+    } catch (e) {
+      console.log('[SysConfig] fetch error:', e.message)
     }
-  } catch (e) {
-    console.log('[SysConfig] fetch error:', e.message)
+    return null
+  })()
+
+  try {
+    return await sysConfigRequest
+  } finally {
+    sysConfigRequest = null
   }
-  return null
+}
+
+/**
+ * AI 助手采用失败关闭策略：只有服务端最新配置明确开启时才显示。
+ */
+export async function getAiAssistantEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = aiFlagState.checkedAt && Date.now() - aiFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return aiFlagState.enabled
+  if (aiFlagRequest) return aiFlagRequest
+
+  aiFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isEnabledFlag(config && config.IsShowAiAssistant)
+    aiFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await aiFlagRequest
+  } catch (error) {
+    aiFlagState = { checkedAt: Date.now(), enabled: false }
+    return false
+  } finally {
+    aiFlagRequest = null
+  }
 }
 
 /**

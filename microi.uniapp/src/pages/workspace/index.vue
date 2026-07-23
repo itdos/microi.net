@@ -1,838 +1,716 @@
 <template>
-  <view class="workspace-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
-    <!-- 顶部区域 -->
-    <view class="ws-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
-      <view class="header-bg">
-        <view class="bg-circle c1"></view>
-        <view class="bg-circle c2"></view>
-      </view>
-      <view class="header-content">
-        <view class="header-top">
-          <view class="header-left">
-            <image class="ws-logo" :src="logoUrl" mode="aspectFit" />
-            <view class="header-text">
-              <text class="ws-title">{{ t('workspace.title') }}</text>
-              <text class="ws-subtitle">{{ appName }}</text>
-            </view>
+  <view class="home-page" :style="mciTokenStyle">
+    <view class="home-header mci-safe-top">
+      <image v-if="xjyAssets.waterHero" class="header-water" :src="xjyAssets.waterHero" mode="aspectFill" />
+      <mci-water-motion tone="dark" mode="hero" />
+      <view class="header-shade"></view>
+      <view class="topbar">
+        <view class="brand">
+          <image class="brand-logo" :src="logoUrl" mode="aspectFill" />
+          <view class="brand-copy">
+            <text class="brand-name">{{ appConfig.platformName }}</text>
+            <text class="brand-subtitle">{{ appConfig.workspaceSubTitle }}</text>
           </view>
+        </view>
+        <view class="topbar-actions">
+          <view v-if="featureEnabled('scan')" class="icon-button" hover-class="icon-button--pressed" @tap="handleScan">
+            <image :src="xjyAssets.scan" mode="aspectFill" />
+          </view>
+          <view v-if="featureEnabled('messages')" class="icon-button" hover-class="icon-button--pressed" @tap="goMessages">
+            <image src="/static/tab-message.png" mode="aspectFit" />
+          </view>
+        </view>
+      </view>
+
+      <view class="welcome-row">
+        <view>
+          <text class="welcome-title">{{ welcomeText }}</text>
+          <text class="welcome-note">{{ welcomeIdentity }}</text>
+          <text class="welcome-date">{{ todayText }}</text>
+        </view>
+        <view v-if="!isLoggedIn" class="login-button" @tap="goLogin">登录</view>
+      </view>
+
+      <view v-if="featureEnabled('business')" class="metrics" :class="{ 'is-loading': summaryLoading }">
+        <view v-for="metric in metrics" :key="metric.key" class="metric" @tap="openModule(metric.key)">
+          <view v-if="summaryLoading" class="metric-value metric-skeleton"></view>
+          <text v-else class="metric-value">{{ compactNumber(metric.value) }}</text>
+          <text class="metric-label">{{ metric.label }}</text>
         </view>
       </view>
     </view>
 
-    <!-- 未登录提示 -->
-    <view v-if="!isLoggedIn" class="workspace-auth-wrap">
-      <mci-auth-prompt
-        :title="t('common.loginFirst')"
-        :desc="t('workspace.loginHint')"
-        :action-text="t('common.loginNow')"
-        :gradient="themeGradient"
-        @action="goLogin"
-      />
-    </view>
-
-    <!-- 内容区域 -->
     <scroll-view
-      v-else
-      class="ws-content"
+      class="home-scroll"
       scroll-y
-      :refresher-enabled="true"
+      refresher-enabled
       :refresher-triggered="refreshing"
-      @refresherrefresh="onRefresh"
+      @refresherrefresh="refreshAll"
     >
-      <!-- 骨架屏 -->
-      <view v-if="loading && menuList.length === 0" class="skeleton-wrap">
-        <view class="sk-card" v-for="i in 3" :key="i">
-          <view class="sk-card-header"></view>
-          <view class="sk-card-body">
-            <view class="sk-grid-item" v-for="j in 4" :key="j">
-              <view class="sk-icon-circle"></view>
-              <view class="sk-text-line"></view>
-            </view>
+      <view class="home-content">
+        <view v-if="quickEntries.length" class="section-heading">
+          <view>
+            <text class="section-title">快捷处理</text>
+            <text class="section-subtitle">按当前角色优先展示常用工作</text>
           </view>
+          <view v-if="featureEnabled('businessCatalog')" class="text-action" @tap="goCatalog">全部</view>
         </view>
-      </view>
 
-      <!-- 菜单卡片 -->
-      <view v-else class="menu-cards">
-        <!-- 空状态 -->
-        <view class="empty-ws" v-if="menuList.length === 0 && !loading">
-          <text class="empty-icon">📋</text>
-          <text class="empty-text">{{ t('workspace.noMenu') }}</text>
-          <text class="empty-sub">{{ t('workspace.contactAdmin') }}</text>
+        <view v-if="quickEntries.length" class="quick-grid">
+          <view
+            v-for="item in quickEntries"
+            :key="item.key"
+            class="quick-item"
+            hover-class="quick-item--pressed"
+            @tap="openModule(item.key)"
+          >
+            <view class="quick-icon" :style="{ backgroundColor: `${item.accent}14` }">
+              <image :src="item.icon" mode="aspectFit" />
+              <text v-if="item.badgeKey && summary.tasks" class="quick-badge">{{ compactNumber(summary.tasks) }}</text>
+            </view>
+            <text class="quick-title">{{ item.title }}</text>
+          </view>
         </view>
 
         <view
-          v-for="menu in menuList"
-          :key="menu.Id"
-          class="menu-card"
+          v-for="(group, groupIndex) in visibleBusinessGroups"
+          :key="group.key"
+          class="business-section"
+          :style="{ animationDelay: `${groupIndex * 55}ms` }"
         >
-          <!-- 卡片头部 -->
-          <view class="card-header" :style="{ background: themeGradient }">
-            <view class="card-header-icon">
-              <text>{{ getMenuEmoji(menu) }}</text>
+          <view class="group-heading">
+            <view class="group-mark" :style="{ backgroundColor: group.accent }"></view>
+            <view class="group-copy">
+              <text class="group-title">{{ group.title }}</text>
+              <text class="group-subtitle">{{ group.subtitle }}</text>
             </view>
-            <text class="card-header-title">{{ menu.meta && menu.meta.title || menu.name || t('workspace.menu') }}</text>
           </view>
-
-          <!-- 子菜单网格 -->
-          <view class="card-grid">
+          <view class="module-grid">
             <view
-              v-for="child in getVisibleChildren(menu.children)"
-              :key="child.Id"
-              class="grid-item"
-              @tap="handleMenuClick(child)"
+              v-for="item in group.items"
+              :key="item.key"
+              class="module-item"
+              hover-class="module-item--pressed"
+              @tap="openModule(item.key)"
             >
-              <view class="grid-icon-wrap">
-                <text class="grid-icon">{{ getMenuEmoji(child) }}</text>
+              <view class="module-icon">
+                <image :src="item.icon" mode="aspectFit" />
+                <text v-if="item.badgeKey && summary.tasks" class="module-badge">{{ compactNumber(summary.tasks) }}</text>
               </view>
-              <text class="grid-name">{{ child.meta && child.meta.title || child.name || '' }}</text>
-              <view class="has-sub-badge" v-if="child.children && getVisibleChildren(child.children).length > 0">
-			    <!-- 隐藏掉箭头 -->
-                <!-- <text>⟩</text> -->
-              </view>
+              <text class="module-name">{{ item.title }}</text>
             </view>
           </view>
         </view>
-      </view>
 
-      <!-- 底部 powered by -->
-      <view class="ws-footer">
-        <text>Powered by {{ companyName || 'Microi.net' }}</text>
+        <view class="service-promise">
+          <view class="promise-line"></view>
+          <text class="promise-title">{{ appConfig.promiseTitle }}</text>
+          <text class="promise-text">{{ appConfig.promiseText }}</text>
+        </view>
       </view>
     </scroll-view>
-
-    <!-- 子菜单弹窗 -->
-    <view class="submenu-mask" v-if="showSubMenu" @tap="closeSubMenu">
-      <view class="submenu-panel" @tap.stop>
-        <view class="submenu-header">
-          <view class="submenu-back" v-if="subMenuStack.length > 1" @tap="goBackSubMenu">
-            <text>‹ {{ t('common.back') }}</text>
-          </view>
-          <text class="submenu-title">{{ currentSubMenu && currentSubMenu.meta && currentSubMenu.meta.title || t('workspace.subMenu') }}</text>
-          <text class="submenu-close" @tap="closeSubMenu">✕</text>
-        </view>
-        <scroll-view class="submenu-list" scroll-y>
-          <view
-            v-for="item in currentSubMenuItems"
-            :key="item.Id"
-            class="submenu-item"
-            @tap="handleSubMenuClick(item)"
-          >
-            <view class="submenu-item-icon">
-              <text>{{ getMenuEmoji(item) }}</text>
-            </view>
-            <text class="submenu-item-name">{{ item.meta && item.meta.title || item.name || '' }}</text>
-            <text class="submenu-item-arrow" v-if="item.children && getVisibleChildren(item.children).length > 0">›</text>
-          </view>
-        </scroll-view>
-      </view>
-    </view>
+    <mci-ai-launcher v-if="featureEnabled('ai')" />
   </view>
 </template>
 
 <script>
-import { getToken, getUser } from '@/utils/request.js'
-import { post } from '@/utils/request.js'
 import appConfig from '@/config.js'
-import { themeMixin } from '@/utils/theme.js'
+import { getToken, getUser } from '@/utils/request.js'
 import { getSysConfig, getServerPath } from '@/utils/sysconfig.js'
-import { getSourceTag } from '@/utils/platform.js'
-import MciAuthPrompt from '@/components/mci-auth-prompt/mci-auth-prompt.vue'
+import { themeMixin } from '@/utils/theme.js'
+import {
+  businessGroups,
+  quickActions,
+  getBusinessEntry,
+  getRoleProfile
+} from '@/platform/business.js'
+import { openBusiness, scanDevice } from '@/platform/business-runtime.js'
+import { loadSummarySnapshot, readSummarySnapshot, warmPrimaryTabs } from '@/platform/preload.js'
+import { hasFeature, getProfileRoute } from '@/platform/profile/index.js'
+import { captureInvitation } from '@/platform/invitation.js'
 
 export default {
-  components: {
-    MciAuthPrompt
-  },
   mixins: [themeMixin],
   data() {
     return {
-      statusBarHeight: 44,
+      appConfig,
+      statusBarHeight: 0,
+      logoUrl: appConfig.logoUrl,
       isLoggedIn: false,
-      loading: true,
+      currentUser: {},
+      businessGroups,
+      summary: { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 },
+      summaryLoading: false,
       refreshing: false,
-      menuList: [],
-      appName: appConfig.appName || '',
-      logoUrl: appConfig.logoUrl || '/static/microi-blue-256.png',
-      companyName: '',
-      // 子菜单
-      showSubMenu: false,
-      currentSubMenu: null,
-      currentSubMenuItems: [],
-      subMenuStack: []
+      summaryRequestId: 0
     }
   },
-
-  onLoad() {
+  computed: {
+    roleProfile() {
+      return getRoleProfile(this.currentUser)
+    },
+    welcomeText() {
+      if (!this.isLoggedIn) return appConfig.guestWelcomeText
+      const name = this.currentUser.Name || this.currentUser.Account || '您好'
+      const hour = new Date().getHours()
+      const greeting = hour < 6 ? '夜深了' : hour < 11 ? '早上好' : hour < 14 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
+      return `${name}，${greeting}`
+    },
+    welcomeIdentity() {
+      if (!this.isLoggedIn) return appConfig.workspaceSubTitle
+      return this.roleProfile.identityText || this.roleProfile.roleText
+    },
+    todayText() {
+      const now = new Date()
+      const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+      return `${now.getMonth() + 1}月${now.getDate()}日 ${weekdays[now.getDay()]}`
+    },
+    metrics() {
+      if (this.roleProfile.isCustomer) {
+        return [
+          { key: 'orders', label: '我的合同', value: this.summary.orders },
+          { key: 'devices', label: '我的设备', value: this.summary.devices },
+          { key: 'tasks', label: '售后进度', value: this.summary.tasks },
+          { key: 'serviceRecords', label: '服务记录', value: this.summary.services }
+        ]
+      }
+      if (this.roleProfile.isService) {
+        return [
+          { key: 'tasks', label: '待处理任务', value: this.summary.tasks },
+          { key: 'customers', label: '服务客户', value: this.summary.customers },
+          { key: 'serviceRecords', label: '服务记录', value: this.summary.services },
+          { key: 'devices', label: '客户设备', value: this.summary.devices }
+        ]
+      }
+      if (this.roleProfile.isSales) {
+        return [
+          { key: 'customers', label: '我的客户', value: this.summary.customers },
+          { key: 'orders', label: '我的订单', value: this.summary.orders },
+          { key: 'serviceRecords', label: '服务记录', value: this.summary.services },
+          { key: 'tasks', label: '协同任务', value: this.summary.tasks }
+        ]
+      }
+      return [
+        { key: 'tasks', label: '待处理任务', value: this.summary.tasks },
+        { key: 'customers', label: '全部客户', value: this.summary.customers },
+        { key: 'orders', label: '合同订单', value: this.summary.orders },
+        { key: 'devices', label: '客户设备', value: this.summary.devices }
+      ]
+    },
+    visibleBusinessGroups() {
+      const allowed = new Set(this.roleProfile.allowedGroupKeys || [])
+      return this.businessGroups.filter((group) => allowed.has(group.key))
+    },
+    quickEntries() {
+      const keys = [...this.roleProfile.primaryActions, ...quickActions]
+      const unique = [...new Set(keys)].slice(0, 8)
+      return unique.map((key) => ({ key, ...getBusinessEntry(key) })).filter((item) => item.title)
+    }
+  },
+  onLoad(options) {
+    captureInvitation(options || {})
     try {
       const info = uni.getWindowInfo()
-      this.statusBarHeight = info.statusBarHeight || 44
+      this.statusBarHeight = info.statusBarHeight || 0
     } catch (e) {
-      try {
-        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
-      } catch (e2) {}
+      try { this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0 } catch (error) {}
     }
-    this.loadSysConfig()
+    this.loadBrand()
+    const summary = readSummarySnapshot()
+    if (summary) this.summary = summary
+    warmPrimaryTabs(80)
   },
-
   onShow() {
-    const token = getToken()
-    this.isLoggedIn = !!token
-    if (this.isLoggedIn) {
-      this.loadMenus()
-    } else {
-      this.loading = false
-    }
+    this.currentUser = getUser() || {}
+    this.isLoggedIn = !!getToken()
+    if (this.isLoggedIn) this.loadSummary()
   },
-
   methods: {
-    async loadSysConfig() {
+    featureEnabled(name) {
+      return hasFeature(name)
+    },
+    async loadBrand() {
       try {
-        const cfg = await getSysConfig()
-        if (cfg) {
-          if (cfg.SysTitle) this.appName = cfg.SysTitle
-          if (cfg.CompanyName) this.companyName = cfg.CompanyName
-          if (cfg.SysLogo) this.logoUrl = getServerPath(cfg.SysLogo)
-        }
+        const config = await getSysConfig()
+        if (config && config.SysLogo) this.logoUrl = getServerPath(config.SysLogo)
       } catch (e) {}
     },
-
-    // 加载菜单数据（参考 microi.web/src/pinia/modules/permission.js）
-    // 使用与 web 端相同的 SysMenu/GetSysMenuStep 接口
-    async loadMenus() {
-      this.loading = true
+    async loadSummary(refresh = false) {
+      if (this.summaryLoading && !refresh) return
+      const requestId = ++this.summaryRequestId
+      this.summaryLoading = true
       try {
-        const res = await post('/api/SysMenu/GetSysMenuStep', {
-          OsClient: appConfig.osClient,
-          TableName: 'Sys_Menu',
-          _OrderBy: 'Sort',
-          _OrderByType: 'ASC'
-        }, true)
-        if (res.Code === 1 && res.Data) {
-          // 将 SysMenu 结构转为显示用的菜单树
-          this.menuList = this.buildMenuTree(res.Data || [])
-        }
+        const summary = await loadSummarySnapshot({ refresh })
+        if (requestId === this.summaryRequestId) this.summary = summary
       } catch (e) {
-        console.error('[Workspace] loadMenus error:', e)
+        console.warn('[XJY Home] summary load failed:', e && e.message)
       } finally {
-        this.loading = false
+        if (requestId === this.summaryRequestId) this.summaryLoading = false
+      }
+    },
+    compactNumber(value) {
+      const number = Number(value || 0)
+      if (number >= 10000) return `${(number / 10000).toFixed(number >= 100000 ? 0 : 1)}万`
+      return String(number)
+    },
+    openModule(key) {
+      openBusiness(key)
+    },
+    handleScan() {
+      scanDevice()
+    },
+    goCatalog() {
+      const url = getProfileRoute('catalog')
+      if (url) uni.navigateTo({ url })
+    },
+    goMessages() {
+      uni.switchTab({ url: getProfileRoute('messages', '/pages/message/index') })
+    },
+    goLogin() {
+      uni.navigateTo({ url: getProfileRoute('login', '/pages/login/index') })
+    },
+    async refreshAll() {
+      this.refreshing = true
+      if (!this.isLoggedIn) {
+        this.refreshing = false
+        return
+      }
+      try {
+        await Promise.all([this.loadSummary(true), this.loadBrand()])
+      } finally {
         this.refreshing = false
       }
-    },
-
-    /**
-     * 将后端 SysMenu 结构转为小程序显示用的菜单树
-     * SysMenu 字段映射：
-     *   Name → meta.title
-     *   IconClass → meta.icon
-     *   Display → Display (PC端显示标志)
-     *   AppDisplay → AppDisplay (移动端显示标志，优先检查)
-     *   Url → path
-     *   Link → Link (外部链接)
-     *   _Child → children (递归)
-     *   DiyTableId → 关联表引擎ID
-     */
-    buildMenuTree(sysMenus) {
-      if (!Array.isArray(sysMenus)) return []
-
-      const result = []
-      for (const item of sysMenus) {
-        const menu = this.convertSysMenu(item)
-        if (!menu) continue
-
-        // 顶级菜单（有子菜单的显示为卡片，无子菜单的也显示为独立卡片）
-        if (menu.children && menu.children.length > 0) {
-          result.push(menu)
-        } else if (menu.meta && menu.meta.title) {
-          // 无子菜单的顶级项，包装成一个卡片（自身作为唯一子项）
-          result.push({
-            Id: menu.Id,
-            meta: menu.meta,
-            Display: menu.Display,
-            AppDisplay: menu.AppDisplay,
-            children: [menu]
-          })
-        }
-      }
-      return result
-    },
-
-    convertSysMenu(item) {
-      if (!item) return null
-      // 过滤掉无名称的项
-      if (!item.Name) return null
-      // 过滤移动端不显示的项（AppDisplay 为 0 或 false 表示不在移动端显示）
-      if (item.AppDisplay === 0 || item.AppDisplay === false || item.AppDisplay === '0') return null
-      // 过滤外部 http 链接作为顶级项（但保留 Link 字段用于跳转）
-      const url = (item.Url || '').trim()
-      if (url.startsWith('http://') || url.startsWith('https://')) return null
-
-      const menu = {
-        Id: item.Id,
-        path: url || ('/folder-' + (item.Id || '')),
-        Display: item.Display,
-        AppDisplay: item.AppDisplay,
-        Link: item.Link || '',
-        DiyTableId: item.DiyTableId || '',
-        meta: {
-          title: item.Name,
-          icon: item.IconClass || '',
-          Id: item.Id,
-          Display: item.Display,
-          DiyTableId: item.DiyTableId
-        },
-        children: []
-      }
-
-      // 递归处理子菜单
-      if (item._Child && Array.isArray(item._Child) && item._Child.length > 0) {
-        for (const child of item._Child) {
-          const childMenu = this.convertSysMenu(child)
-          if (childMenu) {
-            menu.children.push(childMenu)
-          }
-        }
-      }
-
-      return menu
-    },
-
-    // 获取可见子菜单（移动端使用 AppDisplay 字段）
-    getVisibleChildren(children) {
-      if (!children || !Array.isArray(children)) return []
-      return children.filter(child => {
-        // AppDisplay 控制移动端是否显示（0 或 false 为隐藏）
-        if (child.AppDisplay === 0 || child.AppDisplay === false || child.AppDisplay === '0') return false
-        if (child.hidden) return false
-        // 有标题的才显示
-        if (!child.meta || !child.meta.title) return false
-        return true
-      })
-    },
-
-    // 处理菜单点击
-    handleMenuClick(menu) {
-      const visibleChildren = this.getVisibleChildren(menu.children)
-      if (visibleChildren.length > 0) {
-        this.currentSubMenu = menu
-        this.currentSubMenuItems = visibleChildren
-        this.subMenuStack = [menu]
-        this.showSubMenu = true
-      } else {
-        this.navigateToMenu(menu)
-      }
-    },
-
-    // 处理子菜单点击
-    handleSubMenuClick(item) {
-      const visibleChildren = this.getVisibleChildren(item.children)
-      if (visibleChildren.length > 0) {
-        this.subMenuStack.push(item)
-        this.currentSubMenu = item
-        this.currentSubMenuItems = visibleChildren
-      } else {
-        this.closeSubMenu()
-        this.navigateToMenu(item)
-      }
-    },
-
-    // 子菜单返回上级
-    goBackSubMenu() {
-      if (this.subMenuStack.length > 1) {
-        this.subMenuStack.pop()
-        const parent = this.subMenuStack[this.subMenuStack.length - 1]
-        this.currentSubMenu = parent
-        this.currentSubMenuItems = this.getVisibleChildren(parent.children)
-      }
-    },
-
-    closeSubMenu() {
-      this.showSubMenu = false
-      this.subMenuStack = []
-    },
-
-    // 导航到菜单对应页面（通过 webview 加载）
-    navigateToMenu(menu) {
-      let targetPath = menu.path || ''
-
-      // 外部链接
-      if (menu.Link && (menu.Link.startsWith('http://') || menu.Link.startsWith('https://'))) {
-        targetPath = menu.Link
-      } else {
-        const base = appConfig.webviewUrl.replace(/\/$/, '')
-        if (targetPath && !targetPath.startsWith('/')) {
-          targetPath = '/' + targetPath
-        }
-        // Web端使用 hash 路由模式，URL格式为 base/#/path
-        // 当 base 含查询参数（如 ?OsClient=xjy）时，用 # 而非 /# 避免 / 被浏览器当作查询参数值的一部分
-        const hashPrefix = base.includes('?') ? '#' : '/#'
-        targetPath = base + hashPrefix + targetPath
-      }
-
-      // 附加 token 等参数到 hash 部分（hash 路由下参数需用 ? 跟在 hash 路径后）
-      const token = getToken()
-      const hashHasQuery = targetPath.indexOf('?', targetPath.indexOf('#')) > -1
-      const sep = hashHasQuery ? '&' : '?'
-      targetPath += sep + 'token=' + encodeURIComponent(token)
-      targetPath += '&source=' + getSourceTag()
-      targetPath += '&OsClient=' + appConfig.osClient
-      targetPath += '&hideTabBar=1'
-
-      uni.navigateTo({
-        url: '/pages/webview/index?url=' + encodeURIComponent(targetPath),
-        fail: (err) => {
-          console.error('[Workspace] navigate to webview failed:', err)
-        }
-      })
-    },
-
-    onRefresh() {
-      this.refreshing = true
-      this.loadMenus()
-    },
-
-    goLogin() {
-      uni.navigateTo({
-        url: '/pages/login/index'
-      })
-    },
-
-    // 根据菜单名称获取 emoji 图标
-    getMenuEmoji(menu) {
-      const title = (menu.meta && menu.meta.title) || menu.name || ''
-      const icon = (menu.meta && menu.meta.icon) || ''
-
-      const map = {
-        'dashboard': '📊', 'home': '🏠', 'system': '⚙️', 'user': '👤',
-        'setting': '⚙️', 'tool': '🔧', 'monitor': '📡', 'log': '📝',
-        'chart': '📈', 'table': '📋', 'form': '📝', 'tree': '🌲',
-        'edit': '✏️', 'list': '📃', 'search': '🔍', 'message': '💬',
-        'peoples': '👥', 'money': '💰', 'shopping': '🛒', 'star': '⭐',
-        'lock': '🔒', 'eye': '👁️', 'guide': '🧭', 'international': '🌐',
-        'documentation': '📖', 'bug': '🐛', 'excel': '📊', 'zip': '📦',
-        'pdf': '📄', 'clipboard': '📋', 'education': '🎓', 'nested': '📂',
-        'component': '🧩', 'tab': '📑', 'link': '🔗', 'example': '💡',
-        'email': '📧', 'wechat': '💚', 'skill': '⚡', 'drag': '🖱️',
-        'dict': '📚', 'build': '🏗️', 'code': '💻', 'swagger': '🔌',
-        'job': '⏰', 'online': '🖥️', 'server': '🖧', 'redis': '🗄️',
-        'row': '📊', 'date': '📅', 'number': '🔢'
-      }
-
-      const iconLower = icon.toLowerCase()
-      for (const [key, emoji] of Object.entries(map)) {
-        if (iconLower.includes(key)) return emoji
-      }
-
-      const titleMap = {
-        '系统': '⚙️', '用户': '👤', '角色': '👥', '菜单': '📋',
-        '部门': '🏢', '岗位': '💼', '字典': '📚', '参数': '🔧',
-        '通知': '🔔', '日志': '📝', '登录': '🔑', '操作': '⚡',
-        '在线': '🟢', '定时': '⏰', '任务': '📌', '代码': '💻',
-        '表单': '📝', '流程': '🔄', '设备': '🖥️', '商品': '🛒',
-        '订单': '📦', '客户': '🤝', '合同': '📃', '财务': '💰',
-        '报表': '📊', '审批': '✅', '考勤': '⏰', '工资': '💵',
-        '公告': '📢', '文件': '📁', '资产': '🏠', '库存': '📦',
-        '采购': '🛍️', '销售': '💹', '项目': '📋', '会议': '🤝',
-        '数据': '📊', '分析': '📈', '配置': '⚙️', '管理': '📋',
-        '监控': '📡', '服务': '🔌', '接口': '🔗', '工具': '🔧',
-        '企业': '🏢', '租赁': '🔑', '维护': '🛠️', '安装': '📦',
-        '净水': '💧', '水源': '💧', '滤芯': '🔄'
-      }
-
-      for (const [key, emoji] of Object.entries(titleMap)) {
-        if (title.includes(key)) return emoji
-      }
-
-      return '📋'
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.workspace-container {
+.home-page {
   height: 100vh;
-  background: #f5f7fa;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
+  background: #f4f8fa;
+  color: #18313d;
 }
 
-/* 顶部区域 */
-.ws-header {
+.home-header {
   position: relative;
-  /* bg: themeGradient set inline */
-  padding-bottom: 28rpx;
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.header-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  z-index: 2;
+  min-height: 390rpx;
   overflow: hidden;
+  color: #fff;
+  background: #063b5c;
 }
 
-.bg-circle {
+.header-water {
   position: absolute;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.06);
-
-  &.c1 {
-    width: 400rpx;
-    height: 400rpx;
-    top: -100rpx;
-    right: -80rpx;
-  }
-  &.c2 {
-    width: 250rpx;
-    height: 250rpx;
-    bottom: -60rpx;
-    left: -60rpx;
-  }
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
-.header-content {
+.header-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(105deg, rgba(3, 37, 58, 0.96) 0%, rgba(4, 57, 78, 0.82) 50%, rgba(6, 80, 101, 0.38) 100%),
+    linear-gradient(180deg, rgba(1, 28, 44, 0.08), rgba(1, 28, 44, 0.40));
+  pointer-events: none;
+}
+
+.topbar,
+.welcome-row,
+.metrics {
   position: relative;
   z-index: 1;
-  padding: 16rpx 32rpx 0;
 }
 
-.header-top {
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 104rpx;
+  padding: 10rpx calc(28rpx + var(--mci-capsule-right)) 0 28rpx;
 }
 
-.header-left {
+.brand {
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
-.ws-logo {
-  width: 72rpx;
-  height: 72rpx;
+.brand-logo {
+  width: 74rpx;
+  height: 74rpx;
+  border: 3rpx solid rgba(255, 255, 255, 0.72);
   border-radius: 16rpx;
-  background: rgba(255,255,255,0.2);
-  margin-right: 16rpx;
+  box-shadow: 0 6rpx 18rpx rgba(2, 46, 78, 0.2);
 }
 
-.header-text {
+.brand-copy {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  margin-left: 16rpx;
 }
 
-.ws-title {
+.brand-name {
+  color: #fff;
   font-size: 34rpx;
+  line-height: 42rpx;
   font-weight: 700;
-  color: #fff;
 }
 
-.ws-subtitle {
-  font-size: 22rpx;
-  color: rgba(255,255,255,0.7);
+.brand-subtitle {
   margin-top: 2rpx;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 22rpx;
 }
 
-/* 内容滚动区 */
-.ws-content {
-  flex: 1;
-  height: 0;
+.topbar-actions {
+  display: flex;
+  gap: 14rpx;
 }
 
-.workspace-auth-wrap {
-  flex: 1;
-  min-height: 0;
+.icon-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-bottom: env(safe-area-inset-bottom);
+  width: 64rpx;
+  height: 64rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.26);
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, 0.16);
+  transition: transform 150ms ease;
 }
 
-/* 骨架屏 */
-.skeleton-wrap {
-  padding: 20rpx 24rpx;
+.icon-button image {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 6rpx;
 }
 
-.sk-card {
-  background: #fff;
-  border-radius: 20rpx;
-  margin-bottom: 20rpx;
-  overflow: hidden;
+.icon-button--pressed {
+  transform: scale(0.92);
 }
 
-.sk-card-header {
-  height: 88rpx;
-  background: linear-gradient(90deg, #e8e8e8 25%, #f0f0f0 50%, #e8e8e8 75%);
-  background-size: 400% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.sk-card-body {
+.welcome-row {
   display: flex;
-  flex-wrap: wrap;
-  padding: 20rpx 16rpx;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 32rpx 16rpx;
 }
 
-.sk-grid-item {
-  width: 25%;
+.welcome-row > view:first-child {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 16rpx 0;
+  min-width: 0;
 }
 
-.sk-icon-circle {
-  width: 80rpx;
-  height: 80rpx;
-  border-radius: 20rpx;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
-  background-size: 400% 100%;
-  animation: shimmer 1.5s infinite;
-  margin-bottom: 10rpx;
-}
-
-.sk-text-line {
-  width: 60%;
-  height: 20rpx;
-  border-radius: 10rpx;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
-  background-size: 400% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-/* 菜单卡片 */
-.menu-cards {
-  padding: 20rpx 24rpx;
-}
-
-.menu-card {
-  background: #fff;
-  border-radius: 20rpx;
-  margin-bottom: 20rpx;
+.welcome-title {
   overflow: hidden;
-  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.06);
-  transition: transform 0.2s ease;
-
-  &:active {
-    transform: scale(0.98);
-  }
+  font-size: 32rpx;
+  line-height: 44rpx;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.card-header {
-  display: flex;
-  align-items: center;
-  padding: 24rpx 28rpx;
-  /* bg: themeGradient inline */
-}
-
-.card-header-icon {
-  width: 48rpx;
-  height: 48rpx;
-  background: rgba(255,255,255,0.25);
-  border-radius: 12rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16rpx;
-
-  text {
-    font-size: 28rpx;
-  }
-}
-
-.card-header-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #fff;
-}
-
-.card-grid {
-  display: flex;
-  flex-wrap: wrap;
-  padding: 20rpx 12rpx;
-}
-
-.grid-item {
-  width: 25%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16rpx 8rpx;
-  position: relative;
-}
-
-.grid-icon-wrap {
-  width: 80rpx;
-  height: 80rpx;
-  background: linear-gradient(135deg, #f0f5ff, #e6f0ff);
-  border-radius: 20rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 10rpx;
-}
-
-.grid-icon {
-  font-size: 36rpx;
-}
-
-.grid-name {
-  font-size: 24rpx;
-  color: #606266;
-  text-align: center;
-  line-height: 1.3;
-  max-width: 100%;
+.welcome-note {
+  margin-top: 6rpx;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 23rpx;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
 }
 
-.has-sub-badge {
-  position: absolute;
-  top: 12rpx;
-  right: 16rpx;
-
-  text {
-    font-size: 20rpx;
-    color: #ccc;
-  }
+.welcome-date {
+  margin-top: 3rpx;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 21rpx;
 }
 
-/* 空状态 */
-.empty-ws {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 120rpx 0;
-}
-
-.empty-icon {
-  font-size: 80rpx;
-  margin-bottom: 24rpx;
-}
-
-.empty-text {
-  font-size: 30rpx;
-  color: #666;
-  font-weight: 500;
-}
-
-.empty-sub {
-  font-size: 24rpx;
-  color: #999;
-  margin-top: 8rpx;
-}
-
-/* Footer */
-.ws-footer {
-  text-align: center;
-  padding: 40rpx 0 60rpx;
-
-  text {
-    font-size: 22rpx;
-    color: #ccc;
-  }
-}
-
-/* 子菜单弹窗 */
-.submenu-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 1000;
+.login-button {
+  flex: 0 0 auto;
+  min-width: 104rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.submenu-panel {
-  width: 85%;
-  max-height: 70vh;
-  background: #fff;
-  border-radius: 24rpx;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.submenu-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 28rpx 32rpx;
-  border-bottom: 1rpx solid #f0f0f0;
-  min-height: 88rpx;
-}
-
-.submenu-back {
-  text {
-    font-size: 28rpx;
-    color: var(--theme, #6C2BD9);
-  }
-}
-
-.submenu-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #333;
-  flex: 1;
+  padding: 14rpx 24rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.48);
+  border-radius: 14rpx;
   text-align: center;
+  font-size: 25rpx;
+  line-height: 1;
 }
 
-.submenu-close {
-  font-size: 32rpx;
-  color: #999;
-}
-
-.submenu-list {
-  flex: 1;
-  max-height: 55vh;
-}
-
-.submenu-item {
-  display: flex;
-  align-items: center;
-  padding: 28rpx 32rpx;
-  border-bottom: 1rpx solid #f8f8f8;
-}
-
-.submenu-item-icon {
-  width: 72rpx;
-  height: 72rpx;
-  background: linear-gradient(135deg, #f0f5ff, #e6f0ff);
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 12rpx 24rpx 26rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.2);
   border-radius: 16rpx;
+  background: rgba(3, 63, 96, 0.18);
+  backdrop-filter: blur(12rpx);
+}
+
+.metric {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  padding: 18rpx 6rpx;
+}
+
+.metric + .metric::before {
+  position: absolute;
+  top: 20rpx;
+  bottom: 20rpx;
+  left: 0;
+  width: 1rpx;
+  background: rgba(255, 255, 255, 0.18);
+  content: '';
+}
+
+.metric-value {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 34rpx;
+  line-height: 42rpx;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-label {
+  max-width: 100%;
+  margin-top: 4rpx;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 20rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metrics.is-loading .metric-value {
+  opacity: 0.62;
+}
+.metric-skeleton { width: 58rpx; height: 34rpx; margin: 0 auto; border-radius: 6rpx; background: linear-gradient(90deg, rgba(255,255,255,.14) 25%, rgba(255,255,255,.38) 45%, rgba(255,255,255,.14) 65%); background-size: 300% 100%; animation: homeMetricShimmer 1.2s ease-in-out infinite; }
+@keyframes homeMetricShimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+.home-scroll {
+  height: calc(100vh - 390rpx - var(--mci-safe-top));
+}
+
+.home-content {
+  padding: 28rpx 24rpx calc(44rpx + var(--mci-safe-bottom));
+}
+
+.section-heading,
+.group-heading {
+  display: flex;
+  align-items: center;
+}
+
+.section-heading {
+  justify-content: space-between;
+  margin: 2rpx 4rpx 18rpx;
+}
+
+.section-heading > view:first-child,
+.group-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.section-title,
+.group-title {
+  font-size: 30rpx;
+  line-height: 40rpx;
+  font-weight: 650;
+}
+
+.section-subtitle,
+.group-subtitle {
+  margin-top: 3rpx;
+  color: #75909c;
+  font-size: 21rpx;
+}
+
+.text-action {
+  padding: 12rpx 8rpx 12rpx 20rpx;
+  color: #0b86d4;
+  font-size: 24rpx;
+}
+
+.quick-grid,
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.quick-grid {
+  padding: 16rpx 8rpx 12rpx;
+  border: 1rpx solid #e5eef2;
+  border-radius: 16rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(17, 74, 101, 0.06);
+}
+
+.quick-item,
+.module-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.quick-item {
+  min-height: 142rpx;
+  padding: 12rpx 4rpx;
+}
+
+.quick-item--pressed,
+.module-item--pressed {
+  opacity: 0.7;
+  transform: scale(0.94);
+}
+
+.quick-icon,
+.module-icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 20rpx;
-
-  text {
-    font-size: 32rpx;
-  }
 }
 
-.submenu-item-name {
-  flex: 1;
-  font-size: 30rpx;
-  color: #333;
+.quick-icon {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 16rpx;
 }
 
-.submenu-item-arrow {
-  font-size: 36rpx;
-  color: #ccc;
+.quick-icon image {
+  width: 48rpx;
+  height: 48rpx;
 }
 
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+.quick-title,
+.module-name {
+  width: 100%;
+  overflow: hidden;
+  color: #284652;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-title {
+  margin-top: 10rpx;
+  font-size: 23rpx;
+}
+
+.quick-badge,
+.module-badge {
+  position: absolute;
+  top: -10rpx;
+  right: -16rpx;
+  min-width: 28rpx;
+  height: 28rpx;
+  padding: 0 7rpx;
+  border: 3rpx solid #fff;
+  border-radius: 16rpx;
+  background: #e94b2c;
+  color: #fff;
+  font-size: 17rpx;
+  line-height: 28rpx;
+  text-align: center;
+}
+
+.business-section {
+  margin-top: 30rpx;
+  padding: 24rpx 18rpx 14rpx;
+  border: 1rpx solid #e5eef2;
+  border-radius: 16rpx;
+  background: #fff;
+  box-shadow: 0 8rpx 24rpx rgba(17, 74, 101, 0.05);
+  animation: sectionIn 420ms ease both;
+}
+
+.group-heading {
+  padding: 0 8rpx 18rpx;
+}
+
+.group-mark {
+  flex: 0 0 auto;
+  width: 8rpx;
+  height: 50rpx;
+  margin-right: 16rpx;
+  border-radius: 4rpx;
+}
+
+.module-grid {
+  border-top: 1rpx solid #edf3f5;
+}
+
+.module-item {
+  min-height: 136rpx;
+  padding: 22rpx 4rpx 14rpx;
+}
+
+.module-icon {
+  width: 66rpx;
+  height: 66rpx;
+}
+
+.module-icon image {
+  width: 58rpx;
+  height: 58rpx;
+}
+
+.module-name {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+
+.service-promise {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 38rpx 8rpx 0;
+  padding: 28rpx 24rpx;
+  border-top: 1rpx solid #dce8ed;
+}
+
+.promise-line {
+  width: 100rpx;
+  height: 5rpx;
+  border-radius: 3rpx;
+  background: linear-gradient(90deg, #e94b2c, #0b86d4, #1f9d72);
+}
+
+.promise-title {
+  margin-top: 16rpx;
+  color: #365866;
+  font-size: 25rpx;
+  font-weight: 600;
+}
+
+.promise-text {
+  margin-top: 8rpx;
+  color: #8aa0aa;
+  font-size: 20rpx;
+  line-height: 32rpx;
+  text-align: center;
+}
+
+@keyframes sectionIn {
+  from { opacity: 0; transform: translateY(18rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>

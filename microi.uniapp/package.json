@@ -4,23 +4,37 @@
   "description": "Microi.net 低代码平台小程序端",
   "main": "main.js",
   "scripts": {
-    "dev:mp-weixin": "uni -p mp-weixin",
+    "dev:mp-weixin": "node scripts/run-profile.cjs xjy dev mp-weixin",
+    "dev:mp-weixin:standard": "node scripts/run-profile.cjs standard dev mp-weixin",
     "dev:mp-alipay": "uni -p mp-alipay",
     "dev:mp-toutiao": "uni -p mp-toutiao",
     "dev:mp-lark": "uni -p mp-lark",
     "dev:mp-xhs": "uni -p mp-xhs",
     "dev:app": "uni -p app",
-    "build:mp-weixin": "uni build -p mp-weixin",
+    "build:mp-weixin": "node scripts/run-profile.cjs xjy build mp-weixin",
+    "build:mp-weixin:standard": "node scripts/run-profile.cjs standard build mp-weixin",
     "build:mp-alipay": "uni build -p mp-alipay",
     "build:mp-toutiao": "uni build -p mp-toutiao",
     "build:mp-lark": "uni build -p mp-lark",
     "build:mp-xhs": "uni build -p mp-xhs",
     "build:app": "uni build -p app",
-    "build:h5": "uni build -p h5",
-    "check:ui": "node scripts/check-mci-compliance.js",
+    "build:h5": "node scripts/run-profile.cjs xjy build h5",
+    "build:h5:standard": "node scripts/run-profile.cjs standard build h5",
+    "build:xjy-icons": "node scripts/build-xjy-tabbar-icons.js",
+    "optimize:mp-assets": "node scripts/optimize-wechat-assets.js",
+    "check:controls": "node scripts/check-native-controls.js",
+    "check:share": "node scripts/check-share-policy.js",
+    "check:profiles": "node scripts/check-profiles.cjs",
+    "check:ui": "npm run check:profiles && node scripts/check-mci-compliance.js && npm run check:controls && npm run check:share",
+    "check:mp-quality": "node scripts/check-wechat-quality.js",
+    "check:mp-quality:standard": "node scripts/check-wechat-quality.js standard",
+    "audit:legacy": "node scripts/audit-xjy-legacy-coverage.js",
     "visual:auth-prompts": "node scripts/visual-message-button.js",
     "visual:message": "npm run visual:auth-prompts",
-    "test": "npm run check:ui && npm run build:mp-weixin && npm run build:h5 && npm run visual:auth-prompts"
+    "visual:xjy": "node scripts/visual-xjy-delivery.js",
+    "smoke:live:xjy": "node scripts/live-xjy-smoke.js",
+    "preview:h5": "node scripts/serve-h5.js",
+    "test": "npm run check:ui && npm run build:mp-weixin && npm run check:mp-quality && npm run build:h5 && npm run visual:auth-prompts && npm run visual:xjy"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080720251210001",
@@ -39,6 +53,7 @@
     "@dcloudio/uni-mp-weixin": "3.0.0-4080720251210001",
     "@dcloudio/uni-mp-xhs": "3.0.0-4080720251210001",
     "@dcloudio/uni-quickapp-webview": "3.0.0-4080720251210001",
+    "@dcloudio/uni-ui": "^1.5.12",
     "encryptlong": "^3.1.4",
     "vue": "3.4.21",
     "vue-i18n": "9.14.4"
@@ -51,6 +66,8 @@
     "@dcloudio/vite-plugin-uni": "3.0.0-4080720251210001",
     "@vue/runtime-core": "3.5.28",
     "sass": "^1.77.0",
-    "vite": "5.2.8"
+    "sharp": "^0.34.4",
+    "vite": "5.2.8",
+    "ws": "^8.18.3"
   }
 }

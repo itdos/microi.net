@@ -1,7 +1,8 @@
 <template>
   <view class="news-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部区域 -->
-    <view class="news-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
+    <view class="news-header mci-safe-top" :style="{ background: themeGradient }">
+      <view class="xjy-live-drop"></view>
       <view class="header-content">
         <text class="header-title">{{ t('news.title') }}</text>
         <text class="header-sub">{{ t('news.subtitle') }}</text>
@@ -34,8 +35,10 @@
     <scroll-view
       class="news-list-wrap"
       scroll-y
+      :scroll-top="xjyScrollCommand"
       :refresher-enabled="true"
       :refresher-triggered="refreshing"
+      @scroll="handleXjyListScroll"
       @refresherrefresh="onRefresh"
       @scrolltolower="loadMore"
     >
@@ -48,7 +51,7 @@
             <text class="featured-title">{{ newsList[0].Biaoti }}</text>
             <view class="featured-meta">
               <text class="meta-time">{{ formatTime(newsList[0].UpdateTime) }}</text>
-              <text class="meta-views" v-if="newsList[0].BrowseNum">👁 {{ newsList[0].BrowseNum }}</text>
+              <text class="meta-views" v-if="newsList[0].BrowseNum">阅读 {{ newsList[0].BrowseNum }}</text>
             </view>
           </view>
         </view>
@@ -65,7 +68,7 @@
               <text class="news-item-title">{{ item.Biaoti }}</text>
               <view class="news-item-meta">
                 <text class="meta-time">{{ formatTime(item.UpdateTime) }}</text>
-                <text class="meta-views" v-if="item.BrowseNum">👁 {{ item.BrowseNum }}</text>
+                <text class="meta-views" v-if="item.BrowseNum">阅读 {{ item.BrowseNum }}</text>
               </view>
             </view>
             <image
@@ -80,7 +83,7 @@
 
       <!-- 空状态 -->
       <view class="empty-state" v-if="!loading && newsList.length === 0">
-        <text class="empty-icon">📰</text>
+        <image class="empty-icon" src="/static/xjy/repair/notice.png" mode="aspectFit" />
         <text class="empty-text">{{ t('news.noNews') }}</text>
         <text class="empty-sub">{{ t('news.checkLater') }}</text>
       </view>
@@ -105,6 +108,7 @@
         <view class="skeleton-thumb"></view>
       </view>
     </view>
+    <mci-ai-launcher />
   </view>
 </template>
 
@@ -112,12 +116,14 @@
 import { getNewsList, getBannerList, parseImages, getImageUrl } from '@/utils/api.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
+import { listReturnMixin } from '@/platform/list-return.js'
+import { loadNewsSnapshot, readNewsSnapshot } from '@/platform/preload.js'
 
 export default {
-  mixins: [themeMixin],
+  mixins: [themeMixin, listReturnMixin],
   data() {
     return {
-      statusBarHeight: 44,
+      statusBarHeight: 0,
       banners: [],
       newsList: [],
       loading: true,
@@ -132,17 +138,35 @@ export default {
   onLoad() {
     try {
       const info = uni.getWindowInfo()
-      this.statusBarHeight = info.statusBarHeight || 44
+      this.statusBarHeight = info.statusBarHeight || 0
     } catch (e) {
       try {
-        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
+        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0
       } catch (e2) {}
     }
-    this.loadBanners()
-    this.loadNews()
+    const snapshot = readNewsSnapshot()
+    if (snapshot) this.applyInitialSnapshot(snapshot)
+    this.loadInitialSnapshot()
   },
 
   methods: {
+    applyInitialSnapshot(snapshot) {
+      this.banners = snapshot.banners || []
+      this.newsList = snapshot.news || []
+      this.noMore = this.newsList.length < this.pageSize
+      this.loading = false
+    },
+
+    async loadInitialSnapshot() {
+      try {
+        this.applyInitialSnapshot(await loadNewsSnapshot())
+      } catch (error) {
+        if (!this.newsList.length) console.error('[News] initial snapshot error:', error)
+      } finally {
+        this.loading = false
+      }
+    },
+
     // 加载轮播图
     async loadBanners() {
       try {
@@ -162,11 +186,15 @@ export default {
         this.pageIndex = 1
         this.noMore = false
       }
+      this._loadNewsSeq = (this._loadNewsSeq || 0) + 1
+      const seq = this._loadNewsSeq
+      const requestPage = this.pageIndex
       try {
         const res = await getNewsList({
-          pageIndex: this.pageIndex,
+          pageIndex: requestPage,
           pageSize: this.pageSize
         })
+        if (seq !== this._loadNewsSeq) return
         if (res.Code === 1) {
           const list = res.Data || []
           if (append) {
@@ -181,18 +209,20 @@ export default {
       } catch (e) {
         console.error('[News] loadNews error:', e)
       } finally {
-        this.loading = false
-        this.loadingMore = false
-        this.refreshing = false
+        if (seq === this._loadNewsSeq) {
+          this.loading = false
+          this.loadingMore = false
+          this.refreshing = false
+        }
       }
     },
 
     // 获取资讯封面图
     getNewsImage(item) {
-      if (!item.Tupian) return ''
+      if (!item.Tupian) return this.xjyAssets.productPlaceholder
       const imgs = parseImages(item.Tupian)
       if (imgs.length > 0) return imgs[0]
-      return getImageUrl(item.Tupian)
+      return getImageUrl(item.Tupian) || this.xjyAssets.productPlaceholder
     },
 
     // 获取轮播图图片
@@ -204,7 +234,7 @@ export default {
     // 轮播图点击
     onBannerTap(item) {
       if (item.Leixing === '商品' && item.Lianjie) {
-        uni.navigateTo({ url: '/pages/mall/detail?id=' + item.Lianjie })
+        this.xjyNavigateToDetail('/pages/mall/detail?id=' + item.Lianjie)
       } else if (item.Leixing === '链接' && item.Lianjie) {
         // 外部链接暂不处理
       }
@@ -231,10 +261,13 @@ export default {
     },
 
     // 下拉刷新
-    onRefresh() {
+    async onRefresh() {
       this.refreshing = true
-      this.loadBanners()
-      this.loadNews()
+      try {
+        await Promise.all([this.loadBanners(), this.loadNews()])
+      } finally {
+        this.refreshing = false
+      }
     },
 
     // 加载更多
@@ -247,9 +280,7 @@ export default {
 
     // 跳转详情
     goDetail(id) {
-      uni.navigateTo({
-        url: '/pages/news/detail?id=' + id
-      })
+      this.xjyNavigateToDetail('/pages/news/detail?id=' + id)
     }
   }
 }
@@ -266,17 +297,21 @@ export default {
 
 /* 顶部 */
 .news-header {
+  position: relative;
+  overflow: hidden;
   background: var(--theme-gradient, linear-gradient(135deg, #6C2BD9, #8B5CF6));
   padding-bottom: 24rpx;
 }
 
 .header-content {
-  padding: 16rpx 32rpx 0;
+  position: relative;
+  z-index: 1;
+  padding: 16rpx calc(32rpx + var(--mci-capsule-right)) 0 32rpx;
 }
 
 .header-title {
   font-size: 44rpx;
-  color: #fff;
+  color: #fff !important;
   font-weight: 700;
   display: block;
 }
@@ -439,8 +474,10 @@ export default {
 }
 
 .empty-icon {
-  font-size: 80rpx;
+  width: 104rpx;
+  height: 104rpx;
   margin-bottom: 24rpx;
+  opacity: 0.72;
 }
 
 .empty-text {
