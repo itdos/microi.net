@@ -1,7 +1,13 @@
 <template>
   <view class="mci-auth-prompt">
     <view class="mci-auth-prompt__card">
-      <text class="mci-auth-prompt__icon">{{ icon }}</text>
+      <text v-if="icon" class="mci-auth-prompt__icon">{{ icon }}</text>
+      <view v-else class="mci-auth-prompt__lock" aria-hidden="true">
+        <view class="mci-auth-prompt__lock-shackle" />
+        <view class="mci-auth-prompt__lock-body">
+          <view class="mci-auth-prompt__lock-keyhole" />
+        </view>
+      </view>
       <text class="mci-auth-prompt__title">{{ title }}</text>
       <text class="mci-auth-prompt__desc">{{ desc }}</text>
       <view class="mci-auth-prompt__button" :style="{ background: gradient }" @tap="$emit('action')">
@@ -17,7 +23,7 @@ export default {
   props: {
     icon: {
       type: String,
-      default: '🔒'
+      default: ''
     },
     title: {
       type: String,
@@ -69,6 +75,45 @@ export default {
   font-size: 80rpx;
   line-height: 1;
   margin-bottom: 20rpx;
+}
+
+.mci-auth-prompt__lock {
+  position: relative;
+  width: 80rpx;
+  height: 82rpx;
+  margin-bottom: 20rpx;
+}
+
+.mci-auth-prompt__lock-shackle {
+  position: absolute;
+  top: 0;
+  left: 17rpx;
+  width: 46rpx;
+  height: 42rpx;
+  box-sizing: border-box;
+  border: 7rpx solid var(--mci-brand-primary, #ff5a3c);
+  border-bottom: 0;
+  border-radius: 24rpx 24rpx 0 0;
+}
+
+.mci-auth-prompt__lock-body {
+  position: absolute;
+  left: 8rpx;
+  bottom: 0;
+  width: 64rpx;
+  height: 52rpx;
+  border-radius: 12rpx;
+  background: var(--mci-brand-primary, #ff5a3c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mci-auth-prompt__lock-keyhole {
+  width: 9rpx;
+  height: 18rpx;
+  border-radius: 6rpx;
+  background: #fff;
 }
 
 .mci-auth-prompt__title {

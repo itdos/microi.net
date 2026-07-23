@@ -217,6 +217,21 @@ function normalizeFileUrlData(data, assetUrl, fallback = '') {
   return assetUrl(url || path || fallback);
 }
 
+function isLocalPackagedAsset(path) {
+  return /^(?:\.\/)?\/?static\//i.test(String(path || ''));
+}
+
+function hasPublicUploadFlag(value) {
+  if (!value || typeof value !== 'object') return false;
+  const raw = Array.isArray(value) ? (value[0] || {}) : value;
+  return raw.Limit === false || raw.Limit === 0 || String(raw.Limit).toLowerCase() === 'false' ||
+    raw.IsPrivate === false || raw.Private === false || raw.Public === true;
+}
+
+function isKnownPublicUploadPath(path) {
+  return /^\/?(?:xjy\/img|xjyimg|upload|public|mci-public|xjy\/xjy\/miniapp-assets)\//i.test(String(path || ''));
+}
+
 function getHeaderValue(headers, key) {
   if (!headers) return '';
   const lower = key.toLowerCase();
@@ -871,6 +886,7 @@ export function createMicroiV8(options = {}) {
     const picked = extractUploadPath(value);
     if (!picked || isBlockedAsset(picked)) return '';
     if (/^(https?:|data:|blob:|file:)/i.test(picked)) return picked;
+    if (isLocalPackagedAsset(picked)) return picked;
     if (/^\/?file\//i.test(picked)) return joinUrl(config.apiBase, picked);
     if (/^\//.test(picked) || /^[a-z0-9_-]+\//i.test(picked)) return joinUrl(config.fileServer || config.apiBase, picked);
     return picked;
@@ -880,10 +896,13 @@ export function createMicroiV8(options = {}) {
     return config.blockedAssetPattern ? config.blockedAssetPattern.test(String(value || '')) : false;
   }
 
-  async function resolveFileUrl(filePathName) {
+  async function resolveFileUrl(filePathName, options = {}) {
     const path = extractUploadPath(filePathName);
     if (!path || isBlockedAsset(path)) return '';
     if (/^(https?:|blob:|data:|file:)/i.test(path)) return assetUrl(path);
+    if (isLocalPackagedAsset(path) || options.private === false || hasPublicUploadFlag(filePathName) || isKnownPublicUploadPath(path)) {
+      return assetUrl(path);
+    }
 
     async function requestPrivate(action) {
       try {

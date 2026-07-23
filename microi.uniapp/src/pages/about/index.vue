@@ -1,9 +1,11 @@
 <template>
   <view class="about-page" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
+    <mci-skeleton v-if="loading" class="about-skeleton" type="detail" :rows="5" />
+    <template v-else>
     <view class="about-header">
       <image class="about-logo" :src="logoUrl" mode="aspectFit" />
       <text class="about-name">{{ appName }}</text>
-      <text class="about-version">{{ t('about.version') }} 1.0.0</text>
+      <text class="about-version">{{ t('about.version') }} {{ appConfig.versionName }}</text>
     </view>
 
     <view class="about-content">
@@ -23,8 +25,9 @@
 
     <view class="about-footer">
       <text class="footer-text">© {{ currentYear }} {{ companyName || appName }}</text>
-      <text class="footer-text">Powered by {{ companyName || 'Microi.net' }}</text>
+      <text class="footer-text">Power by {{ appConfig.poweredBy }}</text>
     </view>
+    </template>
   </view>
 </template>
 
@@ -37,9 +40,11 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
+      appConfig,
       appName: appConfig.appName,
       logoUrl: appConfig.logoUrl || '/static/microi-blue-256.png',
       companyName: '',
+      loading: true,
       currentYear: new Date().getFullYear()
     }
   },
@@ -61,6 +66,8 @@ export default {
         }
       } catch (e) {
         console.log('[About] loadSysConfig:', e.message)
+      } finally {
+        this.loading = false
       }
     },
 
@@ -80,6 +87,8 @@ export default {
   display: flex;
   flex-direction: column;
 }
+
+.about-skeleton { flex: 1; padding-top: 80rpx; }
 
 .about-header {
   display: flex;
@@ -157,7 +166,7 @@ export default {
 
 .about-footer {
   padding: 40rpx 0;
-  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(40rpx + var(--mci-safe-bottom));
   display: flex;
   flex-direction: column;
   align-items: center;

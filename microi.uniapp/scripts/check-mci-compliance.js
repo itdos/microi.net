@@ -31,6 +31,16 @@ function listVuePages(dir) {
   return result;
 }
 
+function listSourceFiles(dir) {
+  const result = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) result.push(...listSourceFiles(full));
+    else if (entry.isFile() && /\.(?:vue|js|ts)$/.test(entry.name)) result.push(full);
+  }
+  return result;
+}
+
 const request = read('src/utils/request.js');
 const sdk = read('src/utils/microi.v8.js');
 const theme = read('src/utils/theme.js');
@@ -42,6 +52,15 @@ const messagePage = read('src/pages/message/index.vue');
 const workspacePage = read('src/pages/workspace/index.vue');
 const authPrompt = read('src/components/mci-auth-prompt/mci-auth-prompt.vue');
 const visualAuthPrompt = read('scripts/visual-message-button.js');
+const pagesConfig = JSON.parse(read('src/pages.json'));
+const manifest = JSON.parse(read('src/manifest.json'));
+const aiPage = read('src/pages/ai/index.vue');
+const aiLauncher = read('src/components/mci-ai-launcher/mci-ai-launcher.vue');
+const aiAssistant = read('src/pages/ai/components/mci-ai-assistant/mci-ai-assistant.vue');
+const aiClient = read('src/pages/ai/utils/mci-ai.js');
+const messageChat = read('src/pages/message/chat.vue');
+const loginPage = read('src/pages/login/index.vue');
+const sysConfig = read('src/utils/sysconfig.js');
 
 assert(request.includes('function uniRequestAdapter'), 'request.js must define an explicit uni.request adapter.');
 assert(request.includes('requestAdapter: uniRequestAdapter'), 'Configured Microi V8 instance must use the uni.request adapter.');
@@ -57,6 +76,33 @@ assert(pkg.scripts && pkg.scripts['visual:auth-prompts'], 'package.json must exp
 assert(pkg.scripts && pkg.scripts.test && pkg.scripts.test.includes('npm run visual:auth-prompts'), 'npm test must run the auth prompt screenshot checks.');
 assert(visualAuthPrompt.includes('workspace-login.png'), 'Visual screenshot check must include the workspace auth prompt.');
 assert(visualAuthPrompt.includes('message-login.png'), 'Visual screenshot check must include the message auth prompt.');
+assert(aiClient.includes("MCI_AI_ENGINE_KEY = 'mci_ai_data_assistant'"), 'AI client must use the canonical mci_ai_data_assistant engine key.');
+assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/index'"), 'The enabled AI launcher must open the dedicated route without an auth request.');
+assert(aiLauncher.includes('v-if="aiAssistantEnabled"') && aiLauncher.includes('getAiAssistantEnabled'), 'AI launcher visibility must be controlled by the server-side system setting.');
+assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
+assert(aiLauncher.includes('const DRAG_THRESHOLD = 12') && /endDrag\(\)[\s\S]*?this\.openAssistant\(\)/.test(aiLauncher), 'AI launcher must open from touchend after a short touch and reserve movement for a deliberate drag.');
+assert(!/@(?:touchstart|touchmove|touchend|touchcancel|tap)[^=]*\.(?:stop|prevent)/.test(aiLauncher), 'AI launcher events must use bindtouch/bindtap in a UniApp custom component; catchtouch/catchtap can swallow the event bridge in WeChat.');
+assert(aiLauncher.includes("服务助手打开失败，请重试"), 'Assistant launcher navigation failures must give the user visible feedback.');
+assert(aiPage.includes('onBackPress') && aiPage.includes('assistant.handleBack'), 'AI page must consume internal back states before leaving the dedicated route.');
+assert(aiPage.includes('getAiAssistantEnabled({ refresh: true })') && aiPage.includes('message-fallback-page') && aiPage.includes('暂无新消息'), 'Direct assistant routes must enforce the server-side switch and render a complete normal message state while disabled.');
+assert(!aiPage.includes('功能暂未开放') && !aiPage.includes('敬请期待') && !aiPage.includes('根据平台配置'), 'Closed assistant state must not expose rollout, review, or incomplete-feature copy.');
+assert(messagePage.includes('getAiAssistantEnabled') && messagePage.includes('stripAiEntries') && messagePage.includes('syncAiEntries'), 'Message lists, contacts, dialogs, and cached conversations must share the assistant feature switch.');
+assert(messageChat.includes('getAiAssistantEnabled({ refresh: true })') && messageChat.includes('leaveBlockedAiChat') && messageChat.includes('内容由人工智能生成，请注意甄别'), 'Legacy assistant chat deep links must fail closed and enabled generated content must be disclosed.');
+assert(/loadAiModelList\(\)\s*\{[\s\S]*?if \(!this\.isAIChat\) return/.test(messageChat), 'Legacy chat must not request model data unless the assistant is enabled.');
+assert(aiAssistant.includes('if (!this.isAuthenticated)') && aiAssistant.includes('登录前不会读取、分析或展示任何业务数据'), 'AI assistant must render an anonymous login prompt without loading protected data.');
+assert(aiAssistant.includes('内容由人工智能生成，请注意甄别'), 'AI-generated content must carry a prominent artificial-intelligence disclosure.');
+assert(aiAssistant.includes('capsuleBottom') && aiAssistant.includes('aiHeaderStyle'), 'AI header actions must be laid out below the WeChat capsule when required.');
+assert(loginPage.includes("LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v1'"), 'Account login must expose persistent remember-account preferences.');
+assert(loginPage.includes('rememberedPasswordCipher') && loginPage.includes('永不保存明文密码'), 'Remember-password must persist only the successful RSA ciphertext.');
+assert(!loginPage.includes('<mci-water-motion'), 'Login must not use a native video layer that can cover the form in WeChat.');
+assert(!loginPage.includes('v-if="configLoading"') && loginPage.includes('<view class="login-content">'), 'Login controls must render immediately without waiting for remote Sys_Config.');
+
+for (const sourceFile of listSourceFiles(src)) {
+  const relative = path.relative(root, sourceFile).replace(/\\/g, '/');
+  if (relative.startsWith('src/platform/ui/adapters/')) continue;
+  const content = fs.readFileSync(sourceFile, 'utf8');
+  assert(!/from\s+['"]@dcloudio\/uni-ui/.test(content), `${relative} must wrap uni-ui behind src/platform/ui/adapters.`);
+}
 
 assert(app.includes("@import './styles/mci-design.scss'"), 'App.vue must import the MCI design stylesheet.');
 for (const token of [
@@ -74,7 +120,10 @@ assert(!/\n\s*button\s*\{/.test(design), 'MCI stylesheet must not use broad glob
 assert(!/\n\s*img\s*\{/.test(design), 'MCI stylesheet must not use broad global img selectors.');
 assert(!/\n\s*\.card\s*\{/.test(design), 'MCI stylesheet must not use broad global .card selectors.');
 assert(messagePage.includes('<mci-auth-prompt'), 'message page must use the shared mci-auth-prompt component.');
-assert(workspacePage.includes('<mci-auth-prompt'), 'workspace page must use the shared mci-auth-prompt component.');
+assert(
+  workspacePage.includes('<mci-auth-prompt') || workspacePage.includes('class="login-button"'),
+  'workspace page must expose a clear login action for anonymous users.'
+);
 assert(!messagePage.includes('class="login-prompt"') && !messagePage.includes('class="prompt-btn"'), 'message page must not keep duplicated auth prompt markup/styles.');
 assert(!workspacePage.includes('class="login-prompt"') && !workspacePage.includes('class="prompt-btn"'), 'workspace page must not keep duplicated auth prompt markup/styles.');
 assert(/\.mci-auth-prompt__button\s*\{[\s\S]*display:\s*flex/.test(authPrompt), 'auth prompt button must use flex layout for centering.');
@@ -91,7 +140,6 @@ for (const page of listVuePages(path.join(src, 'pages'))) {
 const dynamicPages = [
   { file: 'src/pages/mall/index.vue', loading: 'loading && products.length === 0', empty: '!loading && products.length === 0' },
   { file: 'src/pages/news/index.vue', loading: 'loading && newsList.length === 0', empty: '!loading && newsList.length === 0' },
-  { file: 'src/pages/workspace/index.vue', loading: 'loading && menuList.length === 0', empty: 'menuList.length === 0 && !loading' },
   { file: 'src/pages/message/index.vue', loading: 'loading && messageList.length === 0', empty: '!loading && filteredMessageList.length === 0' },
   { file: 'src/pages/mall/detail.vue', loading: 'detail-skeleton', empty: 'swiper-empty' },
   { file: 'src/pages/news/detail.vue', loading: 'article-skeleton', empty: 'error-state' }
@@ -102,6 +150,48 @@ for (const check of dynamicPages) {
   assert(content.includes(check.loading), `${check.file} must render a skeleton-like first loading state.`);
   assert(content.includes(check.empty), `${check.file} must render empty/error state only after loading completes.`);
 }
+
+assert(workspacePage.includes('summaryLoading'), 'workspace page must expose a stable summary loading state.');
+assert(workspacePage.includes('metric-skeleton'), 'workspace summary must use a visible skeleton state.');
+assert(workspacePage.includes('v-for="(group, groupIndex) in visibleBusinessGroups"'), 'workspace page must render the role-filtered business catalog.');
+assert(workspacePage.includes('allowedGroupKeys'), 'workspace business catalog must be filtered by the current role profile.');
+
+const remotePages = [
+  'src/pages/about/index.vue',
+  'src/pages/business/detail.vue',
+  'src/pages/business/list.vue',
+  'src/pages/business/stats.vue',
+  'src/pages/mall/detail.vue',
+  'src/pages/mall/index.vue',
+  'src/pages/message/chat.vue',
+  'src/pages/message/index.vue',
+  'src/pages/native/checkin.vue',
+  'src/pages/native/watermark-camera.vue',
+  'src/pages/native-form/index.vue',
+  'src/pages/news/detail.vue',
+  'src/pages/news/index.vue',
+  'src/pages/profile/index.vue',
+  'src/pages/task/list.vue',
+  'src/pages/workspace/index.vue'
+];
+for (const page of remotePages) {
+  const content = read(page);
+  assert(/mci-skeleton|skeleton/.test(content), `${page} must expose a first-load skeleton state.`);
+}
+
+const declaredPages = [
+  ...(pagesConfig.pages || []).map((page) => ({ ...page, source: `src/${page.path}.vue` })),
+  ...(pagesConfig.subPackages || []).flatMap((pkgEntry) => (pkgEntry.pages || []).map((page) => ({
+    ...page,
+    source: `src/${pkgEntry.root}/${page.path}.vue`
+  })))
+];
+for (const page of declaredPages.filter((item) => item.style && item.style.navigationStyle === 'custom')) {
+  const content = read(page.source);
+  assert(content.includes('<mci-page-shell') || content.includes('mci-safe-top') || content.includes('<mci-ai-assistant'), `${page.source} must reserve the runtime top safe area.`);
+}
+assert((pagesConfig.subPackages || []).length >= 4, 'pages.json must split non-critical pages into at least 4 subpackages.');
+assert(manifest['mp-weixin'] && manifest['mp-weixin'].lazyCodeLoading === 'requiredComponents', 'WeChat required component injection must be enabled.');
 
 const missingImageRefs = [];
 for (const page of listVuePages(path.join(src, 'pages'))) {

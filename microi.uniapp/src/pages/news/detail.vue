@@ -1,8 +1,8 @@
 <template>
   <view class="detail-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 自定义导航栏 -->
-    <view class="nav-bar" :style="{ paddingTop: statusBarHeight + 'px' }">
-      <view class="nav-content">
+    <view class="nav-bar mci-safe-top">
+      <view class="nav-content mci-safe-nav-row">
         <view class="nav-back" @tap="goBack">
           <text class="back-icon">‹</text>
         </view>
@@ -55,12 +55,13 @@
 
     <!-- 错误状态 -->
     <view class="error-state" v-if="!loading && !article">
-      <text class="error-icon">😕</text>
+      <image class="error-icon" src="/static/xjy/repair/notice.png" mode="aspectFit" />
       <text class="error-text">{{ t('news.articleNotFound') }}</text>
       <view class="error-btn" :style="{ background: themeColor }" @tap="goBack">
         <text>{{ t('news.backToList') }}</text>
       </view>
     </view>
+    <mci-ai-launcher />
   </view>
 </template>
 
@@ -73,7 +74,7 @@ export default {
   mixins: [themeMixin],
   data() {
     return {
-      statusBarHeight: 44,
+      statusBarHeight: 0,
       articleId: '',
       article: null,
       coverImage: '',
@@ -106,12 +107,12 @@ export default {
     let windowHeight = 667
     try {
       const info = uni.getWindowInfo()
-      this.statusBarHeight = info.statusBarHeight || 44
+      this.statusBarHeight = info.statusBarHeight || 0
       windowHeight = info.windowHeight || info.screenHeight || 667
     } catch (e) {
       try {
         const sys = uni.getSystemInfoSync()
-        this.statusBarHeight = sys.statusBarHeight || 44
+        this.statusBarHeight = sys.statusBarHeight || 0
         windowHeight = sys.windowHeight || 667
       } catch (e2) {}
     }
@@ -373,8 +374,10 @@ export default {
 }
 
 .error-icon {
-  font-size: 80rpx;
+  width: 112rpx;
+  height: 112rpx;
   margin-bottom: 24rpx;
+  opacity: 0.7;
 }
 
 .error-text {

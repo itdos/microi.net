@@ -2,5 +2,6 @@ node_modules/
 dist/
 unpackage/
 .hbuilderx/
+.tmp/
 .DS_Store
 *.log

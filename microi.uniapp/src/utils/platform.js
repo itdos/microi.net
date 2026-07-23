@@ -116,7 +116,7 @@ export function getAuthLoginApi(config) {
 }
 
 /**
- * 获取 source 参数值（用于 webview URL 区分来源平台）
+ * 获取 source 参数值（用于后端区分来源平台）
  * @returns {string} 如 'wx-miniprogram', 'alipay-miniprogram', 'app'
  */
 export function getSourceTag() {

@@ -1,0 +1,63 @@
+{
+  "name": "Microi移动工作台",
+  "appid": "__UNI__MICROI_MOBILE",
+  "description": "Microi AI低代码平台原生移动工作台",
+  "versionName": "2.0.0",
+  "versionCode": "200",
+  "transformPx": false,
+  "app-plus": {
+    "distribute": {
+      "android": {
+        "permissions": [ "<uses-permission android:name=\"android.permission.INTERNET\"/>" ]
+      },
+      "ios": {}
+    },
+    "modules": {}
+  },
+  "h5": {},
+  "mp-weixin": {
+    "appid": "",
+    "lazyCodeLoading": "requiredComponents",
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "enhance": true,
+      "postcss": true,
+      "minified": true,
+      "ignoreDevUnusedFiles": false,
+      "compileHotReLoad": false
+    },
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-alipay": {
+    "appid": "",
+    "setting": {},
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-toutiao": {
+    "appid": "",
+    "setting": {
+      "es6": true,
+      "minified": true,
+      "postcss": true
+    },
+    "usingComponents": true
+  },
+  "mp-lark": {
+    "appid": "",
+    "setting": {},
+    "usingComponents": true
+  },
+  "mp-xhs": {
+    "appid": "",
+    "setting": {},
+    "usingComponents": true
+  },
+  "vueVersion": "3"
+}

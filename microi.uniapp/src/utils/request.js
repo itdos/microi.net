@@ -19,22 +19,67 @@ function getRuntimeUni() {
 
 function uniRequestAdapter(options = {}) {
   const runtimeUni = getRuntimeUni();
-  if (!runtimeUni || typeof runtimeUni.request !== 'function') {
-    return Promise.reject(new Error('uni.request is not available in current runtime.'));
+  if (runtimeUni && typeof runtimeUni.request === 'function') {
+    return new Promise((resolve, reject) => {
+      runtimeUni.request({
+        url: options.url,
+        method: options.method || 'POST',
+        data: options.data,
+        header: options.header || options.headers || {},
+        timeout: options.timeout,
+        responseType: options.responseType,
+        success: resolve,
+        fail: reject
+      });
+    });
   }
 
-  return new Promise((resolve, reject) => {
-    runtimeUni.request({
-      url: options.url,
-      method: options.method || 'POST',
-      data: options.data,
-      header: options.header || options.headers || {},
-      timeout: options.timeout,
-      responseType: options.responseType,
-      success: resolve,
-      fail: reject
+  if (typeof fetch !== 'function') {
+    return Promise.reject(new Error('No HTTP request adapter is available in current runtime.'));
+  }
+
+  const method = String(options.method || 'POST').toUpperCase();
+  const headers = { ...(options.header || options.headers || {}) };
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeout = Number(options.timeout || 30000);
+  let url = options.url;
+  let body;
+
+  if ((method === 'GET' || method === 'HEAD') && options.data && typeof options.data === 'object') {
+    const query = new URLSearchParams();
+    Object.keys(options.data).forEach((key) => {
+      const value = options.data[key];
+      if (value !== undefined && value !== null) query.append(key, typeof value === 'object' ? JSON.stringify(value) : String(value));
     });
-  });
+    const queryText = query.toString();
+    if (queryText) url += `${url.includes('?') ? '&' : '?'}${queryText}`;
+  } else if (options.data !== undefined && options.data !== null) {
+    const isRawBody = typeof options.data === 'string' || options.data instanceof ArrayBuffer ||
+      (typeof FormData !== 'undefined' && options.data instanceof FormData) ||
+      (typeof Blob !== 'undefined' && options.data instanceof Blob);
+    body = isRawBody ? options.data : JSON.stringify(options.data);
+    if (!isRawBody && !Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
+      headers['Content-Type'] = 'application/json';
+    }
+  }
+
+  const timer = controller && timeout > 0 ? setTimeout(() => controller.abort(), timeout) : null;
+  return fetch(url, { method, headers, body, signal: controller ? controller.signal : undefined })
+    .then(async (response) => {
+      const responseHeaders = {};
+      response.headers.forEach((value, key) => { responseHeaders[key] = value; });
+      let data;
+      if (options.responseType === 'arraybuffer') {
+        data = await response.arrayBuffer();
+      } else {
+        const text = await response.text();
+        try { data = text ? JSON.parse(text) : {}; } catch (error) { data = text; }
+      }
+      return { data, statusCode: response.status, header: responseHeaders, headers: responseHeaders };
+    })
+    .finally(() => {
+      if (timer) clearTimeout(timer);
+    });
 }
 
 function redirectToLogin() {
@@ -62,7 +107,7 @@ function redirectToLogin() {
       url,
       fail: () => {
         uni.switchTab({
-          url: '/pages/mall/index',
+          url: '/pages/workspace/index',
           complete: () => {
             redirectingToLogin = false;
           }
@@ -82,7 +127,7 @@ function redirectToLogin() {
 export const V8 = createMicroiV8({
   apiBase: appConfig.apiBase,
   fileServer: appConfig.fileServer,
-  webBase: appConfig.webviewUrl,
+  webBase: '',
   osClient: appConfig.osClient,
   clientType: 'Mobile',
   tokenKey: TOKEN_KEY,
@@ -121,10 +166,20 @@ export function setToken(token) {
 
 export function removeToken() {
   V8.clearToken();
+  const runtimeUni = getRuntimeUni();
+  if (runtimeUni && typeof runtimeUni.$emit === 'function') {
+    runtimeUni.$emit('mci:auth-changed');
+    runtimeUni.$emit('xjy-auth-changed');
+  }
 }
 
 export function setUser(user) {
   V8.setUser(user);
+  const runtimeUni = getRuntimeUni();
+  if (runtimeUni && typeof runtimeUni.$emit === 'function') {
+    runtimeUni.$emit('mci:auth-changed');
+    runtimeUni.$emit('xjy-auth-changed');
+  }
 }
 
 export function getUser() {

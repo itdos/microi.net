@@ -1,18 +1,13 @@
 <template>
-  <view class="login-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient, background: themeGradient }]">
+  <view class="login-container" :style="mciTokenStyle">
+    <image class="login-water" :src="xjyAssets.waterHero" mode="aspectFill" />
+    <view class="login-shade"></view>
     <!-- 顶部导航：返回按钮 -->
-    <view class="login-nav" :style="{ paddingTop: statusBarHeight + 'px' }">
+    <view class="login-nav mci-safe-top">
       <view class="login-nav-back" @tap="goBack">
         <text class="login-nav-back-icon">‹</text>
         <text class="login-nav-back-text">{{ t('common.back') }}</text>
       </view>
-    </view>
-
-    <!-- 背景装饰 -->
-    <view class="bg-decoration">
-      <view class="bg-circle circle-1"></view>
-      <view class="bg-circle circle-2"></view>
-      <view class="bg-circle circle-3"></view>
     </view>
 
     <!-- 主体内容 -->
@@ -35,7 +30,6 @@
             :loading="phoneAuthLoading"
             @getphonenumber="handleGetPhoneNumber"
           >
-            <text class="mp-login-icon">📱</text>
             <text>授权手机号登录</text>
           </button>
           <view class="switch-login" @tap="showPhoneAuth = false">
@@ -51,7 +45,6 @@
             :loading="wxLoginLoading"
             @tap="handleAuthLogin"
           >
-            <text class="mp-login-icon">🔐</text>
             <text>{{ t('login.authLogin') }}</text>
           </button>
         </template>
@@ -67,16 +60,15 @@
         <!-- 账号输入 -->
         <view class="input-group">
           <view class="input-wrapper">
-            <view class="input-icon">
-              <text class="icon-text">👤</text>
-            </view>
+            <text class="input-label">账号</text>
             <input
               class="login-input"
               type="text"
-              v-model="account"
+              :value="account"
               :placeholder="t('login.enterAccount')"
               placeholder-style="color:#ffffff;font-size:28rpx;"
               maxlength="50"
+              @input="handleAccountInput"
             />
           </view>
         </view>
@@ -84,21 +76,20 @@
         <!-- 密码输入 -->
         <view class="input-group">
           <view class="input-wrapper">
-            <view class="input-icon">
-              <text class="icon-text">🔑</text>
-            </view>
+            <text class="input-label">密码</text>
             <input
               class="login-input"
               type="text"
               :password="!showPassword"
-              v-model="password"
+              :value="password"
               :placeholder="t('login.enterPassword')"
               placeholder-style="color:#ffffff;font-size:28rpx;"
               maxlength="50"
+              @input="handlePasswordInput"
               @confirm="handleAccountLogin"
             />
             <view class="pwd-toggle" @tap="showPassword = !showPassword">
-              <text class="pwd-toggle-icon">{{ showPassword ? '🙈' : '👁️' }}</text>
+              <text class="pwd-toggle-icon">{{ showPassword ? '◎' : '◉' }}</text>
             </view>
           </view>
         </view>
@@ -106,9 +97,7 @@
         <!-- 验证码输入（如果开启） -->
         <view class="input-group" v-if="enableCaptcha">
           <view class="input-wrapper captcha-wrapper">
-            <view class="input-icon">
-              <text class="icon-text">🛡️</text>
-            </view>
+            <text class="input-label">验证</text>
             <input
               class="login-input captcha-input"
               type="text"
@@ -130,6 +119,21 @@
           </view>
         </view>
 
+        <view class="remember-options">
+          <view class="remember-option" role="checkbox" :aria-checked="rememberAccount" @tap="toggleRememberAccount">
+            <view class="remember-check" :class="{ 'remember-check--checked': rememberAccount }">
+              <text v-if="rememberAccount">✓</text>
+            </view>
+            <text>记住账号</text>
+          </view>
+          <view class="remember-option" role="checkbox" :aria-checked="rememberPassword" @tap="toggleRememberPassword">
+            <view class="remember-check" :class="{ 'remember-check--checked': rememberPassword }">
+              <text v-if="rememberPassword">✓</text>
+            </view>
+            <text>记住密码</text>
+          </view>
+        </view>
+
         <!-- 登录按钮 -->
         <button
           class="account-login-btn"
@@ -137,7 +141,6 @@
           :disabled="accountLoginLoading"
           @tap="handleAccountLogin"
         >
-          <text class="login-btn-icon">➡️</text>
           <text>{{ t('login.loginBtn') }}</text>
         </button>
 
@@ -168,7 +171,7 @@
 
     <!-- 底部信息 -->
     <view class="footer">
-      <text class="footer-text">© {{ currentYear }} {{ appName }}</text>
+      <text class="login-footer-text">© {{ currentYear }} {{ appName }}</text>
     </view>
   </view>
 </template>
@@ -178,6 +181,7 @@ import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { post, setToken, setUser, getToken, removeToken } from '@/utils/request.js'
 import { encryptPassword } from '@/utils/crypto.js'
+import { captureInvitation, invitationPayload } from '@/platform/invitation.js'
 import { getLoginProvider, getAuthLoginApi, getClientType, supportsAuthLogin, getPlatformName, getPlatformNameEn } from '@/utils/platform.js'
 
 function isEnabledFlag(value) {
@@ -189,6 +193,9 @@ function isEnabledFlag(value) {
   return false
 }
 
+const LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v1'
+const REMEMBERED_PASSWORD_MASK = '••••••••'
+
 export default {
   mixins: [themeMixin],
   data() {
@@ -199,12 +206,16 @@ export default {
       logoUrl: appConfig.logoUrl,
       enablePrivacyPolicy: appConfig.enablePrivacyPolicy,
       privacyPolicyName: appConfig.privacyPolicyName,
-      statusBarHeight: 44,
+      statusBarHeight: 0,
       showAccountLogin: false,
       // 账号密码
       account: '',
       password: '',
       showPassword: false,
+      rememberAccount: false,
+      rememberPassword: false,
+      rememberedAccount: '',
+      rememberedPasswordCipher: '',
       // 验证码
       enableCaptcha: false,
       captchaId: '',
@@ -228,16 +239,18 @@ export default {
   },
 
   onLoad(options) {
+    captureInvitation(options || {})
+    this.restoreLoginPreferences()
     // 获取状态栏高度（优先使用新 API，兼容旧版本）
     try {
       const windowInfo = uni.getWindowInfo()
-      this.statusBarHeight = windowInfo.statusBarHeight || 44
+      this.statusBarHeight = windowInfo.statusBarHeight || 0
     } catch (e) {
       try {
         const sysInfo = uni.getSystemInfoSync()
-        this.statusBarHeight = sysInfo.statusBarHeight || 44
+        this.statusBarHeight = sysInfo.statusBarHeight || 0
       } catch (e2) {
-        this.statusBarHeight = 44
+        this.statusBarHeight = 0
       }
     }
 
@@ -246,9 +259,9 @@ export default {
       this.redirectUrl = decodeURIComponent(options.redirect)
     }
 
-    // 如果是从 webview H5 退出登录跳回来的，先清除 token
+    // 兼容带 logout 参数进入登录页的旧链接。
     if (options && options.logout === '1') {
-      console.log('[Login] 从 H5 退出登录，清除本地 Token')
+      console.log('[Login] logout 参数已生效，清除本地 Token')
       removeToken()
     }
 
@@ -260,7 +273,7 @@ export default {
     // 如果已登录，直接跳转
     const token = getToken()
     if (token) {
-      this.navigateToWebview()
+      this.navigateAfterLogin()
       return
     }
 
@@ -269,6 +282,82 @@ export default {
   },
 
   methods: {
+    restoreLoginPreferences() {
+      let saved = {}
+      try {
+        saved = uni.getStorageSync(LOGIN_PREFERENCES_KEY) || {}
+      } catch (error) {}
+      const account = String(saved.account || '').trim()
+      const passwordCipher = String(saved.passwordCipher || '')
+      this.rememberAccount = saved.rememberAccount === true && !!account
+      this.rememberPassword = this.rememberAccount && saved.rememberPassword === true && !!passwordCipher
+      this.rememberedAccount = this.rememberAccount ? account : ''
+      this.rememberedPasswordCipher = this.rememberPassword ? passwordCipher : ''
+      this.account = this.rememberedAccount
+      this.password = this.rememberPassword ? REMEMBERED_PASSWORD_MASK : ''
+    },
+    persistLoginPreferences(passwordCipher = '') {
+      if (!this.rememberAccount) {
+        try { uni.removeStorageSync(LOGIN_PREFERENCES_KEY) } catch (error) {}
+        return
+      }
+      const account = String(this.account || '').trim()
+      const cipher = this.rememberPassword ? String(passwordCipher || this.rememberedPasswordCipher || '') : ''
+      try {
+        uni.setStorageSync(LOGIN_PREFERENCES_KEY, {
+          version: 1,
+          rememberAccount: true,
+          rememberPassword: this.rememberPassword && !!cipher,
+          account,
+          passwordCipher: cipher
+        })
+      } catch (error) {}
+      this.rememberedAccount = account
+      this.rememberedPasswordCipher = cipher
+      if (cipher) this.password = REMEMBERED_PASSWORD_MASK
+    },
+    clearRememberedPassword() {
+      this.rememberPassword = false
+      this.rememberedPasswordCipher = ''
+      if (this.password === REMEMBERED_PASSWORD_MASK) this.password = ''
+      this.persistLoginPreferences()
+    },
+    handleAccountInput(event) {
+      const value = String((event.detail && event.detail.value) || '')
+      if (this.rememberedAccount && value.trim() !== this.rememberedAccount) {
+        this.rememberedPasswordCipher = ''
+        this.rememberPassword = false
+        if (this.password === REMEMBERED_PASSWORD_MASK) this.password = ''
+      }
+      this.account = value
+    },
+    handlePasswordInput(event) {
+      const value = String((event.detail && event.detail.value) || '')
+      if (this.rememberedPasswordCipher && value !== REMEMBERED_PASSWORD_MASK) {
+        this.rememberedPasswordCipher = ''
+      }
+      this.password = value
+    },
+    toggleRememberAccount() {
+      this.rememberAccount = !this.rememberAccount
+      if (!this.rememberAccount) {
+        this.rememberPassword = false
+        this.rememberedAccount = ''
+        this.rememberedPasswordCipher = ''
+        if (this.password === REMEMBERED_PASSWORD_MASK) this.password = ''
+        try { uni.removeStorageSync(LOGIN_PREFERENCES_KEY) } catch (error) {}
+      }
+    },
+    toggleRememberPassword() {
+      this.rememberPassword = !this.rememberPassword
+      if (this.rememberPassword) {
+        this.rememberAccount = true
+      } else {
+        this.rememberedPasswordCipher = ''
+        if (this.password === REMEMBERED_PASSWORD_MASK) this.password = ''
+        this.persistLoginPreferences()
+      }
+    },
     /**
      * 获取系统配置
      */
@@ -419,7 +508,8 @@ export default {
         const authApi = getAuthLoginApi(appConfig)
         const result = await post(authApi, {
           LoginCode: loginCode,
-          OsClient: appConfig.osClient
+          OsClient: appConfig.osClient,
+          ...invitationPayload()
         }, false)
 
         if (result.Code === 1 && result.Data) {
@@ -428,14 +518,14 @@ export default {
           if (token) {
             setUser(result.Data)
             this.showLoginSuccess(result.Data)
-            this.navigateToWebview()
+            this.navigateAfterLogin()
           } else {
             const bodyToken = result.Data.Token || result.Data.token
             if (bodyToken) {
               setToken(bodyToken)
               setUser(result.Data)
               this.showLoginSuccess(result.Data)
-              this.navigateToWebview()
+              this.navigateAfterLogin()
             } else {
               uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
               this.showAccountLogin = true
@@ -498,7 +588,8 @@ export default {
         const result = await post(authApi, {
           LoginCode: loginCode,
           Code: phoneCode,
-          OsClient: appConfig.osClient
+          OsClient: appConfig.osClient,
+          ...invitationPayload()
         }, false)
 
         if (result.Code === 1 && result.Data) {
@@ -506,14 +597,14 @@ export default {
           if (token) {
             setUser(result.Data)
             this.showLoginSuccess(result.Data)
-            this.navigateToWebview()
+            this.navigateAfterLogin()
           } else {
             const bodyToken = result.Data.Token || result.Data.token
             if (bodyToken) {
               setToken(bodyToken)
               setUser(result.Data)
               this.showLoginSuccess(result.Data)
-              this.navigateToWebview()
+              this.navigateAfterLogin()
             } else {
               uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
               this.showAccountLogin = true
@@ -553,8 +644,14 @@ export default {
 
       this.accountLoginLoading = true
       try {
-        // RSA 加密密码
-        const encryptedPwd = encryptPassword(this.password)
+        const canReuseRememberedCipher = this.rememberPassword &&
+          this.password === REMEMBERED_PASSWORD_MASK &&
+          !!this.rememberedPasswordCipher &&
+          this.account.trim() === this.rememberedAccount
+        // 本地只复用曾成功登录的 RSA 密文，永不保存明文密码。
+        const encryptedPwd = canReuseRememberedCipher
+          ? this.rememberedPasswordCipher
+          : encryptPassword(this.password)
         if (!encryptedPwd) {
           uni.showToast({ title: this.t('login.encryptionFailed'), icon: 'none' })
           this.accountLoginLoading = false
@@ -589,9 +686,11 @@ export default {
             }
           }
           setUser(result.Data)
+          this.persistLoginPreferences(encryptedPwd)
           this.showLoginSuccess(result.Data)
-          this.navigateToWebview()
+          this.navigateAfterLogin()
         } else {
+          if (canReuseRememberedCipher) this.clearRememberedPassword()
           const msg = result.Msg || this.t('login.loginFailedMsg')
           uni.showToast({ title: msg, icon: 'none', duration: 2500 })
           // 刷新验证码
@@ -636,9 +735,9 @@ export default {
     },
 
     /**
-     * 跳转到 WebView 页面（或重定向到指定页面）
+     * 登录完成后返回原生业务页或首页。
      */
-    navigateToWebview() {
+    navigateAfterLogin() {
       setTimeout(() => {
         // 如果有重定向地址（从其他页面跳转来的），回到该页面
         if (this.redirectUrl) {
@@ -660,16 +759,16 @@ export default {
           uni.navigateBack({
             fail: () => {
               // 如果返回失败，跳首页
-              uni.switchTab({ url: '/pages/mall/index' })
+              uni.switchTab({ url: '/pages/workspace/index' })
             }
           })
         } else {
           // 没有上一页（直接打开的登录页），跳到首页 Tab
           uni.switchTab({
-            url: '/pages/mall/index',
+            url: '/pages/workspace/index',
             fail: (err) => {
               console.error('[Login] switchTab 失败:', err)
-              uni.reLaunch({ url: '/pages/mall/index' })
+              uni.reLaunch({ url: '/pages/workspace/index' })
             }
           })
         }
@@ -693,7 +792,7 @@ export default {
       if (pages.length > 1) {
         uni.navigateBack({ delta: 1 })
       } else {
-        uni.switchTab({ url: '/pages/mall/index' })
+        uni.switchTab({ url: '/pages/workspace/index' })
       }
     }
   }
@@ -703,11 +802,36 @@ export default {
 <style lang="scss" scoped>
 .login-container {
   min-height: 100vh;
-  /* bg: themeGradient inline */
+  background: #063b5c;
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.login-water,
+.login-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.login-water {
+  opacity: 0.86;
+  transform: scale(1.02);
+  animation: loginWaterDrift 14s ease-in-out infinite;
+}
+
+@keyframes loginWaterDrift {
+  0%, 100% { transform: scale(1.02) translate3d(0, 0, 0); }
+  50% { transform: scale(1.055) translate3d(-0.8%, -0.4%, 0); }
+}
+
+.login-shade {
+  background:
+    linear-gradient(155deg, rgba(2, 30, 48, 0.92) 0%, rgba(4, 64, 87, 0.78) 54%, rgba(4, 82, 102, 0.58) 100%),
+    linear-gradient(180deg, rgba(2, 24, 38, 0.08), rgba(2, 24, 38, 0.70));
 }
 
 /* 顶部返回导航 */
@@ -738,45 +862,6 @@ export default {
   color: rgba(255,255,255,0.9);
 }
 
-/* 背景装饰圆 */
-.bg-decoration {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.bg-circle {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.08;
-  background: #ffffff;
-}
-
-.circle-1 {
-  width: 500rpx;
-  height: 500rpx;
-  top: -120rpx;
-  right: -100rpx;
-}
-
-.circle-2 {
-  width: 360rpx;
-  height: 360rpx;
-  top: 300rpx;
-  left: -120rpx;
-}
-
-.circle-3 {
-  width: 280rpx;
-  height: 280rpx;
-  bottom: 100rpx;
-  right: -60rpx;
-}
-
 /* 主体内容 */
 .login-content {
   flex: 1;
@@ -786,7 +871,7 @@ export default {
   justify-content: center;
   padding: 0 60rpx;
   position: relative;
-  z-index: 1;
+  z-index: 3;
 }
 
 /* Logo 区域 */
@@ -794,7 +879,7 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 80rpx;
+  margin-bottom: 58rpx;
 }
 
 .logo-image {
@@ -810,14 +895,14 @@ export default {
   font-size: 44rpx;
   font-weight: 700;
   color: #ffffff;
-  letter-spacing: 4rpx;
+  letter-spacing: 0;
   margin-bottom: 12rpx;
 }
 
 .app-subtitle {
   font-size: 26rpx;
   color: rgba(255, 255, 255, 0.75);
-  letter-spacing: 2rpx;
+  letter-spacing: 0;
 }
 
 /* 授权登录区域 */
@@ -838,27 +923,23 @@ export default {
 
   width: 100%;
   height: 96rpx;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: #e94b2c;
   color: #ffffff;
   font-size: 34rpx;
   font-weight: 600;
-  border-radius: 48rpx;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  letter-spacing: 4rpx;
-  box-shadow: 0 8rpx 24rpx rgba(102, 126, 234, 0.4);
+  letter-spacing: 0;
+  box-shadow: 0 8rpx 24rpx rgba(159, 51, 30, 0.32);
   transition: all 0.3s;
 
   &::after {
     border: none;
   }
 
-  .mp-login-icon {
-    font-size: 36rpx;
-    margin-right: 12rpx;
-  }
 }
 
 .phone-auth-tip {
@@ -909,11 +990,10 @@ export default {
   align-items: center;
   background: rgba(255, 255, 255, 0.15);
   border: 2rpx solid rgba(255, 255, 255, 0.25);
-  border-radius: 48rpx;
+  border-radius: 16rpx;
   height: 96rpx;
   padding: 0 32rpx;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 
   &:focus-within {
     background: rgba(255, 255, 255, 0.25);
@@ -921,17 +1001,12 @@ export default {
   }
 }
 
-.input-icon {
-  width: 48rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 16rpx;
-  flex-shrink: 0;
-}
-
-.icon-text {
-  font-size: 36rpx;
+.input-label {
+  flex: 0 0 auto;
+  width: 76rpx;
+  margin-right: 14rpx;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 25rpx;
 }
 
 .login-input {
@@ -1007,15 +1082,15 @@ export default {
   width: 100%;
   height: 96rpx;
   background: rgba(255, 255, 255, 0.95);
-  color: #667eea;
+  color: #0b7dbb;
   font-size: 34rpx;
   font-weight: 600;
-  border-radius: 48rpx;
+  border-radius: 16rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  letter-spacing: 4rpx;
+  letter-spacing: 0;
   box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.12);
   margin-top: 10rpx;
 
@@ -1027,10 +1102,43 @@ export default {
     opacity: 0.7;
   }
 
-  .login-btn-icon {
-    font-size: 32rpx;
-    margin-right: 8rpx;
-  }
+}
+
+.remember-options {
+  width: 100%;
+  margin: -4rpx 0 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.remember-option {
+  min-height: 56rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  color: rgba(255, 255, 255, .88);
+  font-size: 25rpx;
+}
+
+.remember-check {
+  width: 34rpx;
+  height: 34rpx;
+  box-sizing: border-box;
+  border: 2rpx solid rgba(255, 255, 255, .62);
+  border-radius: 7rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 23rpx;
+  line-height: 1;
+}
+
+.remember-check--checked {
+  border-color: #19a6b7;
+  background: #19a6b7;
+  box-shadow: 0 4rpx 12rpx rgba(25, 166, 183, .25);
 }
 
 /* 隐私协议 */
@@ -1083,15 +1191,15 @@ export default {
 /* 底部 */
 .footer {
   padding: 30rpx 0;
-  padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(30rpx + var(--mci-safe-bottom));
   display: flex;
   justify-content: center;
   position: relative;
   z-index: 1;
 }
 
-.footer-text {
+.login-footer-text {
   font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.72);
 }
 </style>

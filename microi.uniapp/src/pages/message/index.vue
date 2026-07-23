@@ -2,7 +2,8 @@
 	<view class="message-container"
 		:style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
 		<!-- 顶部导航栏 -->
-		<view class="msg-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
+		<view class="msg-header mci-safe-top" :style="{ background: themeGradient }">
+			<view class="xjy-live-drop"></view>
 			<view class="header-inner">
 				<text class="header-title">{{ t('message.title') }}</text>
 				<view class="header-action" v-if="isLoggedIn" @tap="showNewChat = true">
@@ -36,7 +37,7 @@
 		<!-- 搜索栏 -->
 		<view class="search-section" v-if="isLoggedIn">
 			<view class="search-wrap">
-				<text class="search-icon">🔍</text>
+				<view class="search-icon"></view>
 				<input class="search-input"
 					:placeholder="activeTab === 'messages' ? t('message.searchMsg') : t('message.searchContact')"
 					placeholder-style="color:#bbb;font-size:13px;" v-model="searchKeyword" @confirm="doSearch"
@@ -113,7 +114,7 @@
 
 			<!-- 空状态 -->
 			<view class="empty-state" v-if="!loading && filteredMessageList.length === 0">
-				<text class="empty-icon">💬</text>
+				<image class="empty-icon" src="/static/tab-message.png" mode="aspectFit" />
 				<text class="empty-text">{{ t('message.noMessages') }}</text>
 				<view class="empty-btn" @tap="showNewChat = true">
 					<text>{{ t('message.startChat') }}</text>
@@ -155,7 +156,7 @@
 
 			<!-- 空状态 -->
 			<view class="empty-state" v-if="!contactLoading && contactList.length === 0">
-				<text class="empty-icon">📇</text>
+				<image class="empty-icon" src="/static/xjy/repair/tongxunlu.png" mode="aspectFit" />
 				<text class="empty-text">{{ t('message.noContacts') }}</text>
 			</view>
 		</scroll-view>
@@ -186,6 +187,7 @@
 				</scroll-view>
 			</view>
 		</view>
+    <mci-ai-launcher />
 	</view>
 </template>
 
@@ -206,6 +208,8 @@
 		getSignalR,
 		connectSignalR
 	} from '@/utils/signalr.js'
+	import { readCache, writeCache } from '@/platform/cache.js'
+	import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
 
 	export default {
 		components: {
@@ -214,7 +218,8 @@
 		mixins: [themeMixin],
 		data() {
 			return {
-				statusBarHeight: 44,
+				statusBarHeight: 0,
+				aiAssistantEnabled: false,
 				isLoggedIn: false,
 				activeTab: 'messages',
 				searchKeyword: '',
@@ -258,9 +263,12 @@
 				return getUser() || {}
 			},
 			filteredMessageList() {
-				if (!this.searchKeyword) return this.messageList
+				const visibleList = this.aiAssistantEnabled
+					? this.messageList
+					: this.messageList.filter(item => !this.isAiIdentity(item))
+				if (!this.searchKeyword) return visibleList
 				const kw = this.searchKeyword.toLowerCase()
-				return this.messageList.filter(m =>
+				return visibleList.filter(m =>
 					(m.ContactUserName || '').toLowerCase().includes(kw) ||
 					(m.LastMessage || '').toLowerCase().includes(kw)
 				)
@@ -270,19 +278,45 @@
 		onLoad() {
 			try {
 				const info = uni.getWindowInfo()
-				this.statusBarHeight = info.statusBarHeight || 44
+				this.statusBarHeight = info.statusBarHeight || 0
 			} catch (e) {
 				try {
-					this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
+					this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0
 				} catch (e2) {}
 			}
+			this.restoreMessageCache()
 		},
 
 		onShow() {
 			this.checkLoginAndLoad()
+			this.refreshAiAssistantVisibility()
 		},
 
 		methods: {
+			messageCacheKey() {
+				const user = getUser() || {}
+				return `message:${user.Id || 'anonymous'}`
+			},
+			restoreMessageCache() {
+				const cached = readCache(this.messageCacheKey(), 24 * 60 * 60 * 1000)
+				if (!cached || !cached.data) return
+				this.messageList = Array.isArray(cached.data.messageList) ? cached.data.messageList : []
+				this.contactList = Array.isArray(cached.data.contactList) ? cached.data.contactList : []
+				this.contactPageIndex = Number(cached.data.contactPageIndex || 1)
+				this.contactHasMore = cached.data.contactHasMore !== false
+				this.syncAiEntries()
+				if (this.messageList.length) {
+					this.loading = false
+				}
+			},
+			persistMessageCache() {
+				writeCache(this.messageCacheKey(), {
+					messageList: this.messageList,
+					contactList: this.contactList,
+					contactPageIndex: this.contactPageIndex,
+					contactHasMore: this.contactHasMore
+				})
+			},
 			// zhy多选人员角色筛选方法
 			    toggleTypeSelection(typeId,typeLabel) {
 			      const idx = this.selectedTypes.indexOf(typeId);
@@ -320,19 +354,34 @@
 					this.messageList = []
 					return
 				}
+				if (!this.messageList.length) this.restoreMessageCache()
 				this.initSignalR()
 			},
 
 			// 初始化 SignalR 连接并注册事件
 			async initSignalR() {
-				this.loading = true
+				if (this._messageInitializing) return
+				const existing = getSignalR()
+				if (this._messageInitialized && existing && existing.isConnected) {
+					this.wsConnected = true
+					this.loading = false
+					this.requestLastContacts()
+					return
+				}
+				this._messageInitializing = true
+				this.loading = this.messageList.length === 0
 				// 先停止可能存在的旧轮询，避免重复启动
 				this.stopPolling()
 				try {
 					const client = await connectSignalR()
 					this.wsConnected = client.isConnected
 
-					// 注册事件（先移除旧的避免重复）
+					// 页面在 tab 切换时不会销毁，事件只注册一次。
+					if (this._messageInitialized) {
+						this.loading = false
+						this.requestLastContacts()
+						return
+					}
 					this.cleanupSignalREvents()
 
 					// 接收最近联系人列表
@@ -340,10 +389,11 @@
 						console.log('[Message] ReceiveSendLastContacts:', data?.length || 0)
 						if (Array.isArray(data)) {
 							this.messageList = data
-							this.ensureAIFirst()
+							this.syncAiEntries()
+							this.persistMessageCache()
 						}
 						this.loading = false
-						this.refreshing = false
+						this.finishMessageRefresh()
 					}
 					client.on('ReceiveSendLastContacts', this._onReceiveLastContacts)
 
@@ -369,6 +419,7 @@
 						this.requestLastContacts()
 					}
 					client.on('_connected', this._onReconnected)
+					this._messageInitialized = true
 
 					// 请求最近联系人
 					this.requestLastContacts()
@@ -379,15 +430,15 @@
 							console.warn('[Message] 加载超时，关闭loading')
 							this.loading = false
 							this.refreshing = false
-							this.ensureAIFirst()
+							this.syncAiEntries()
 						}
-					}, 8000)
+					}, this.messageList.length ? 1200 : 3500)
 
 					// 如果 SignalR 连接失败，使用轮询兜底
 					if (!client.isConnected) {
 						console.warn('[Message] SignalR未连接，启动轮询兜底')
 						this.loading = false
-						this.ensureAIFirst()
+						this.syncAiEntries()
 						this.startPollingFallback()
 					}
 				} catch (e) {
@@ -395,7 +446,9 @@
 					this.loading = false
 					this.refreshing = false
 					// 连接失败兜底
-					this.ensureAIFirst()
+					this.syncAiEntries()
+				} finally {
+					this._messageInitializing = false
 				}
 			},
 
@@ -409,12 +462,22 @@
 						ContactUserId: '',
 						OsClient: appConfig.osClient
 					})
+					return true
 				} else {
 					console.warn('[Message] requestLastContacts: SignalR未连接')
 					this.loading = false
-					this.refreshing = false
-					this.ensureAIFirst()
+					this.finishMessageRefresh()
+					this.syncAiEntries()
+					return false
 				}
+			},
+
+			finishMessageRefresh() {
+				if (this._refreshTimeout) {
+					clearTimeout(this._refreshTimeout)
+					this._refreshTimeout = null
+				}
+				this.refreshing = false
 			},
 
 			// 处理新消息推送
@@ -446,10 +509,23 @@
 				}, 30000)
 			},
 
-			ensureAIFirst() {
-				const idx = this.messageList.findIndex(m => m.ContactUserId === 'AI')
-				if (idx === -1) {
-					this.messageList.unshift({
+			isAiIdentity(item) {
+				if (!item) return false
+				const id = item.ContactUserId || item.Id || ''
+				return String(id).trim().toUpperCase() === 'AI'
+			},
+
+			stripAiEntries() {
+				this.messageList = this.messageList.filter(item => !this.isAiIdentity(item))
+				this.contactList = this.contactList.filter(item => !this.isAiIdentity(item))
+				this.dialogContactList = this.dialogContactList.filter(item => !this.isAiIdentity(item))
+			},
+
+			syncAiEntries() {
+				const existingAi = this.messageList.find(item => this.isAiIdentity(item))
+				this.stripAiEntries()
+				if (!this.aiAssistantEnabled) return
+				this.messageList.unshift(existingAi || {
 						ContactUserId: 'AI',
 						ContactUserName: 'AI助手',
 						ContactUserAvatar: '',
@@ -457,9 +533,18 @@
 						UpdateTime: new Date().toISOString(),
 						UnRead: 0
 					})
-				} else if (idx > 0) {
-					const ai = this.messageList.splice(idx, 1)[0]
-					this.messageList.unshift(ai)
+			},
+
+			async refreshAiAssistantVisibility() {
+				const enabled = await getAiAssistantEnabled({ refresh: true })
+				if (enabled === this.aiAssistantEnabled) return
+				this.aiAssistantEnabled = enabled
+				this.syncAiEntries()
+				this.persistMessageCache()
+				if (this.activeTab === 'contacts' && this.isLoggedIn) {
+					this.contactPageIndex = 1
+					this.contactHasMore = true
+					this.loadContacts(false)
 				}
 			},
 
@@ -478,11 +563,11 @@
 						_Keyword: this.searchKeyword || ''
 					}, true)
 					if (res.Code === 1 && res.Data) {
-						const data = res.Data || []
+						const data = (res.Data || []).filter(item => this.aiAssistantEnabled || !this.isAiIdentity(item))
 						if (isLoadMore) {
 							this.contactList = this.contactList.concat(data)
 						} else {
-							if (!this.searchKeyword) {
+							if (!this.searchKeyword && this.aiAssistantEnabled) {
 								this.contactList = [{
 										Id: 'AI',
 										Name: 'AI助手',
@@ -495,9 +580,10 @@
 							}
 						}
 						// 判断是否还有更多
-						const aiOffset = (!this.searchKeyword && this.contactPageIndex === 1) ? 1 : 0
+						const aiOffset = (this.aiAssistantEnabled && !this.searchKeyword && this.contactPageIndex === 1) ? 1 : 0
 						const loadedCount = this.contactList.length - aiOffset
-						this.contactHasMore = loadedCount < (res.Total || 0)
+						this.contactHasMore = loadedCount < Number(res.Total || res.DataCount || 0)
+						this.persistMessageCache()
 					}
 				} catch (e) {
 					console.error('[Message] loadContacts error:', e)
@@ -547,7 +633,7 @@
 						_Keyword: this.dialogKeyword
 					}, true)
 					if (res.Code === 1 && res.Data) {
-						this.dialogContactList = res.Data || []
+						this.dialogContactList = (res.Data || []).filter(item => this.aiAssistantEnabled || !this.isAiIdentity(item))
 					}
 				} catch (e) {
 					console.error('[Message] searchDialogContacts error:', e)
@@ -606,18 +692,21 @@
 			},
 
 			openChat(msg) {
+				if (this.isAiIdentity(msg) && !this.aiAssistantEnabled) return
 				uni.navigateTo({
 					url: `/pages/message/chat?id=${msg.ContactUserId}&name=${encodeURIComponent(msg.ContactUserName)}`
 				})
 			},
 
 			startChat(contact) {
+				if (this.isAiIdentity(contact) && !this.aiAssistantEnabled) return
 				uni.navigateTo({
 					url: `/pages/message/chat?id=${contact.Id}&name=${encodeURIComponent(contact.Name)}`
 				})
 			},
 
 			startDialogChat(contact) {
+				if (this.isAiIdentity(contact) && !this.aiAssistantEnabled) return
 				this.showNewChat = false
 				uni.navigateTo({
 					url: `/pages/message/chat?id=${contact.Id}&name=${encodeURIComponent(contact.Name)}`
@@ -626,11 +715,8 @@
 
 			onRefresh() {
 				this.refreshing = true
-				this.requestLastContacts()
-				// 超时保护
-				setTimeout(() => {
-					this.refreshing = false
-				}, 5000)
+				if (!this.requestLastContacts()) return
+				this._refreshTimeout = setTimeout(() => this.finishMessageRefresh(), 1800)
 			},
 
 			doSearch() {
@@ -670,12 +756,13 @@
 
 		onHide() {
 			this.stopPolling()
-			this.cleanupSignalREvents()
 		},
 
 		onUnload() {
 			this.stopPolling()
+			this.finishMessageRefresh()
 			this.cleanupSignalREvents()
+			this._messageInitialized = false
 		}
 	}
 </script>
@@ -691,6 +778,8 @@
 
 	/* 顶部导航 */
 	.msg-header {
+		position: relative;
+		overflow: hidden;
 		background: #fff;
 		flex-shrink: 0;
 		border-bottom: 1rpx solid #f0f0f0;
@@ -702,28 +791,32 @@
 		justify-content: center;
 		height: 88rpx;
 		position: relative;
+		z-index: 1;
+		padding-right: var(--mci-capsule-right);
 	}
 
 	.header-title {
 		font-size: 34rpx;
 		font-weight: 600;
-		color: #fff;
+		color: #fff !important;
 	}
 
 	.header-action {
 		position: absolute;
-		right: 32rpx;
+		right: calc(32rpx + var(--mci-capsule-right));
 		top: 50%;
 		transform: translateY(-50%);
 	}
 
 	.action-icon {
 		font-size: 36rpx;
-		color: var(--theme, #6C2BD9);
+		color: #fff !important;
 	}
 
 	/* Tab */
 	.msg-tabs {
+		position: relative;
+		z-index: 1;
 		display: flex;
 		padding: 0 48rpx;
 	}
@@ -750,7 +843,7 @@
 		width: 48rpx;
 		height: 6rpx;
 		border-radius: 3rpx;
-		background: var(--theme, #6C2BD9);
+		background: #fff;
 	}
 
 	/* 搜索 */
@@ -766,7 +859,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding-bottom: env(safe-area-inset-bottom);
+		padding-bottom: var(--mci-safe-bottom);
 	}
 
 	/* zhy筛选下拉样式 */
@@ -875,8 +968,24 @@
 	}
 
 	.search-icon {
-		font-size: 24rpx;
+		position: relative;
+		width: 22rpx;
+		height: 22rpx;
+		border: 3rpx solid #8a96a3;
+		border-radius: 50%;
 		margin-right: 12rpx;
+	}
+
+	.search-icon::after {
+		content: '';
+		position: absolute;
+		width: 10rpx;
+		height: 3rpx;
+		right: -8rpx;
+		bottom: -4rpx;
+		border-radius: 3rpx;
+		background: #8a96a3;
+		transform: rotate(45deg);
 	}
 
 	.search-input {
@@ -895,7 +1004,9 @@
 	/* 滚动区域 */
 	.msg-scroll {
 		flex: 1;
+		min-height: 0;
 		height: 0;
+		background: #f5f7fa;
 	}
 
 	/* 消息条目 */
@@ -1044,8 +1155,10 @@
 	}
 
 	.empty-icon {
-		font-size: 80rpx;
+		width: 104rpx;
+		height: 104rpx;
 		margin-bottom: 24rpx;
+		opacity: 0.72;
 	}
 
 	.empty-text {

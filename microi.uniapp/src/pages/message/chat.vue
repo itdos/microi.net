@@ -1,8 +1,8 @@
 <template>
   <view class="chat-container" :style="[mciTokenStyle, { '--theme': themeColor, '--theme-light': themeColorLight, '--theme-gradient': themeGradient }]">
     <!-- 顶部导航 -->
-    <view class="chat-header" :style="{ paddingTop: statusBarHeight + 'px', background: themeGradient }">
-      <view class="header-inner">
+    <view class="chat-header mci-safe-top" :style="{ background: themeGradient }">
+      <view class="header-inner mci-safe-nav-row">
         <view class="header-back" @tap="goBack">
           <text class="back-arrow">‹</text>
           <text class="back-text">{{ t('common.back') }}</text>
@@ -23,7 +23,7 @@
     >
       <!-- 连接状态提示 -->
       <view class="connection-hint" v-if="wsEverAttempted && !wsConnected">
-        <text class="hint-text">⏳ {{ t('message.reconnecting') }}</text>
+        <view class="hint-pill"><view class="hint-spinner"></view><text class="hint-text">{{ t('message.reconnecting') }}</text></view>
       </view>
 
       <!-- 加载更多 -->
@@ -31,7 +31,10 @@
         <text>{{ t('common.loading') }}</text>
       </view>
 
+      <mci-skeleton v-if="initialLoading && messages.length === 0" type="list" :rows="6" />
+
       <!-- 消息列表 -->
+      <template v-else>
       <view
         v-for="(msg, index) in messages"
         :key="msg.id"
@@ -55,8 +58,9 @@
             <view class="bubble" :class="msg.isSelf ? 'bubble-self' : 'bubble-other'">
               <!-- 数据表格消息 -->
               <view v-if="msg.Type === 'data'" class="bubble-data">
-                <text class="bubble-text">📊 {{ t('message.dataResult') || '查询结果' }}</text>
+                <text class="bubble-text">{{ t('message.dataResult') || '查询结果' }}</text>
               </view>
+              <image v-else-if="msg.Type === 'image'" class="bubble-image" :src="msg.Content" mode="widthFix" @tap="previewChatImage(msg.Content)" />
               <!-- 普通文本消息 -->
               <view v-else>
                 <view v-if="msg.isThinking" class="thinking-indicator">
@@ -69,7 +73,7 @@
             <view class="bubble-meta">
               <text class="bubble-time">{{ formatBubbleTime(msg.SendTime) }}</text>
               <!-- 发送失败指示器 -->
-              <text class="send-failed" v-if="msg.sendStatus === 'failed'" @tap="resendMessage(msg)">⚠ {{ t('message.sendFailed') }}</text>
+              <text class="send-failed" v-if="msg.sendStatus === 'failed'" @tap="resendMessage(msg)">{{ t('message.sendFailed') }}</text>
             </view>
           </view>
 
@@ -81,6 +85,7 @@
       </view>
 
       <view id="msg-bottom"></view>
+      </template>
     </scroll-view>
 
     <!-- 底部输入区域 -->
@@ -100,6 +105,7 @@
           </view>
         </picker>
       </view>
+      <view v-if="isAIChat" class="ai-disclosure">内容由人工智能生成，请注意甄别</view>
       <view class="input-row">
         <view class="input-wrap">
           <textarea
@@ -118,7 +124,7 @@
           <view v-if="inputMessage.trim()" class="send-btn" :style="{ background: themeColor }" @tap="sendMessage">
             <text>{{ t('common.send') }}</text>
           </view>
-          <view v-else class="more-btn" @tap="showMorePanel = !showMorePanel">
+          <view v-else-if="!isAIChat" class="more-btn" @tap="showMorePanel = !showMorePanel">
             <text class="plus-icon">＋</text>
           </view>
         </view>
@@ -130,27 +136,15 @@
       <view class="panel-grid">
         <view class="panel-item" @tap="handleAction('image')">
           <view class="panel-icon-wrap">
-            <text class="panel-icon">🖼️</text>
+            <image class="panel-icon" src="/static/xjy/watermarkCamera/photo.png" mode="aspectFit" />
           </view>
           <text class="panel-label">{{ t('message.image') }}</text>
         </view>
         <view class="panel-item" @tap="handleAction('camera')">
           <view class="panel-icon-wrap">
-            <text class="panel-icon">📷</text>
+            <image class="panel-icon" src="/static/xjy/watermarkCamera/camera.png" mode="aspectFit" />
           </view>
           <text class="panel-label">{{ t('message.camera') }}</text>
-        </view>
-        <view class="panel-item" @tap="handleAction('file')">
-          <view class="panel-icon-wrap">
-            <text class="panel-icon">📁</text>
-          </view>
-          <text class="panel-label">{{ t('message.file') }}</text>
-        </view>
-        <view class="panel-item" @tap="handleAction('location')">
-          <view class="panel-icon-wrap">
-            <text class="panel-icon">📍</text>
-          </view>
-          <text class="panel-label">{{ t('message.location') }}</text>
         </view>
       </view>
     </view>
@@ -164,11 +158,11 @@
         <view class="settings-list">
           <view class="settings-item">
             <text>{{ t('message.muteNotification') }}</text>
-            <switch :checked="chatMuted" @change="chatMuted = $event.detail.value" color="#6C2BD9" />
+            <switch :checked="chatMuted" @change="chatMuted = $event.detail.value" :color="themeColor" />
           </view>
           <view class="settings-item">
             <text>{{ t('message.pinChat') }}</text>
-            <switch :checked="chatPinned" @change="chatPinned = $event.detail.value" color="#6C2BD9" />
+            <switch :checked="chatPinned" @change="chatPinned = $event.detail.value" :color="themeColor" />
           </view>
           <view class="settings-item danger" @tap="clearHistory">
             <text>{{ t('message.clearHistory') }}</text>
@@ -177,21 +171,24 @@
         </view>
       </view>
     </view>
+    <mci-ai-launcher />
   </view>
 </template>
 
 <script>
-import { getToken, getUser } from '@/utils/request.js'
+import { getToken, getUser, V8 } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
 import appConfig from '@/config.js'
 import { themeMixin } from '@/utils/theme.js'
 import { getSignalR, connectSignalR } from '@/utils/signalr.js'
+import { getAiAssistantEnabled } from '@/utils/sysconfig.js'
 
 export default {
   mixins: [themeMixin],
   data() {
     return {
-      statusBarHeight: 44,
+      statusBarHeight: 0,
+      aiAssistantEnabled: false,
       chatId: '',
       chatName: '聊天',
       chatType: 'private',
@@ -202,6 +199,7 @@ export default {
       chatMuted: false,
       chatPinned: false,
       loadingMore: false,
+      initialLoading: true,
       scrollToId: '',
       currentStreamMessage: null,
       wsConnected: false,
@@ -212,6 +210,7 @@ export default {
       aiModelList: [],
       selectedAiModelIndex: -1,
       aiModelLoading: false,
+      uploadingAttachment: false,
       // SignalR 事件回调引用
       _onReceiveChatRecord: null,
       _onReceiveMessage: null,
@@ -226,7 +225,7 @@ export default {
       return getUser() || {}
     },
     isAIChat() {
-      return this.chatId === 'AI'
+      return this.aiAssistantEnabled && this.chatId === 'AI'
     },
     selectedAiModel() {
       if (this.selectedAiModelIndex >= 0 && this.selectedAiModelIndex < this.aiModelList.length) {
@@ -236,17 +235,30 @@ export default {
     }
   },
 
-  onLoad(options) {
-    this.chatId = options.id || ''
-    this.chatName = decodeURIComponent(options.name || '聊天')
-    this.chatType = options.type || 'private'
+  async onLoad(options) {
+    const requestedChatId = options.id || ''
+    const requestedChatName = decodeURIComponent(options.name || '聊天')
+    const requestedChatType = options.type || 'private'
+
+    if (String(requestedChatId).trim().toUpperCase() === 'AI') {
+      this.aiAssistantEnabled = await getAiAssistantEnabled({ refresh: true })
+      if (!this.aiAssistantEnabled) {
+        this.initialLoading = false
+        this.leaveBlockedAiChat()
+        return
+      }
+    }
+
+    this.chatId = requestedChatId
+    this.chatName = requestedChatName
+    this.chatType = requestedChatType
 
     try {
       const info = uni.getWindowInfo()
-      this.statusBarHeight = info.statusBarHeight || 44
+      this.statusBarHeight = info.statusBarHeight || 0
     } catch (e) {
       try {
-        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 44
+        this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0
       } catch (e2) {}
     }
 
@@ -310,6 +322,10 @@ export default {
     }, 15000)
   },
 
+  onShow() {
+    this.verifyCurrentAiAccess()
+  },
+
   onUnload() {
     this.stopPolling()
     this.cleanupSignalREvents()
@@ -333,9 +349,24 @@ export default {
       clearInterval(this._wsCheckTimer)
       this._wsCheckTimer = null
     }
+    if (this._initialLoadingTimer) clearTimeout(this._initialLoadingTimer)
   },
 
   methods: {
+    async verifyCurrentAiAccess() {
+      if (String(this.chatId).trim().toUpperCase() !== 'AI') return
+      const enabled = await getAiAssistantEnabled({ refresh: true })
+      this.aiAssistantEnabled = enabled
+      if (!enabled) this.leaveBlockedAiChat()
+    },
+
+    leaveBlockedAiChat() {
+      uni.switchTab({
+        url: '/pages/message/index',
+        fail: () => uni.reLaunch({ url: '/pages/message/index' })
+      })
+    },
+
     goBack() {
       uni.navigateBack({
         fail: () => {
@@ -346,6 +377,7 @@ export default {
 
     // 加载AI模型列表
     loadAiModelList() {
+      if (!this.isAIChat) return
       this.aiModelLoading = true
       post('/api/FormEngine/GetTableData/mic_ai', {
         _Where: [['IsEnable', '=', '1']],
@@ -379,11 +411,12 @@ export default {
         try {
           client = await Promise.race([
             connectSignalR(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时')), 8000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('连接超时')), 3500))
           ])
         } catch (e) {
           console.warn('[Chat] 连接超时或失败:', e.message)
           this.wsConnected = false
+          this.initialLoading = false
           if (this._loadRetryCount < 3) {
             this._loadRetryCount++
             setTimeout(() => this.loadChatRecord(), 3000)
@@ -394,6 +427,7 @@ export default {
         // 检查连接是否真正成功（不 show toast，避免反复弹窗；由模板统一展示提示）
         if (!client || !client.isConnected) {
           this.wsConnected = false
+          this.initialLoading = false
           if (this._loadRetryCount < 3) {
             this._loadRetryCount++
             setTimeout(() => this.loadChatRecord(), 3000)
@@ -426,6 +460,8 @@ export default {
             }))
             this.$nextTick(() => this.scrollToBottom())
           }
+          this.initialLoading = false
+          if (this._initialLoadingTimer) clearTimeout(this._initialLoadingTimer)
         }
         client.on('ReceiveSendChatRecordToUser', this._onReceiveChatRecord)
 
@@ -469,8 +505,9 @@ export default {
         }
         client.on('ReceiveSendToUser', this._onReceiveMessage)
 
-        // 注册 AI 流式响应
-        this._onReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
+        // 仅在功能已开启且进入对应会话时注册流式响应。
+        if (this.isAIChat) {
+          this._onReceiveAIChunk = (chunk, fromUserId, toUserId, isComplete) => {
           const userId = this.currentUser.Id
           if (toUserId !== userId) return
           // isComplete类型容错
@@ -536,8 +573,9 @@ export default {
             this.currentStreamMessage = null
           }
           this.$nextTick(() => this.scrollToBottom())
+          }
+          client.on('ReceiveAIChunk', this._onReceiveAIChunk)
         }
-        client.on('ReceiveAIChunk', this._onReceiveAIChunk)
 
         // 发送请求获取聊天记录
         if (client.isConnected) {
@@ -547,9 +585,12 @@ export default {
             ToUserId: this.chatId,
             OsClient: appConfig.osClient
           })
+          if (this._initialLoadingTimer) clearTimeout(this._initialLoadingTimer)
+          this._initialLoadingTimer = setTimeout(() => { this.initialLoading = false }, 2500)
         }
       } catch (e) {
         console.error('[Chat] loadChatRecord error:', e)
+        this.initialLoading = false
       } finally {
         this._loadingChatRecord = false
       }
@@ -559,6 +600,15 @@ export default {
     async sendMessage() {
       const content = this.inputMessage.trim()
       if (!content) return
+      await this.sendContent(content, 'text')
+    },
+
+    async sendContent(content, type = 'text') {
+      if (!content) return
+      if (String(this.chatId).trim().toUpperCase() === 'AI' && !this.aiAssistantEnabled) {
+        this.leaveBlockedAiChat()
+        return
+      }
 
       const user = this.currentUser
       if (!user || !user.Id) {
@@ -568,7 +618,7 @@ export default {
 
       const newMsg = {
         id: Date.now().toString(),
-        Type: 'text',
+        Type: type,
         Content: content,
         SendTime: new Date().toISOString(),
         FromUserId: user.Id,
@@ -580,12 +630,13 @@ export default {
       }
 
       this.messages.push(newMsg)
-      this.inputMessage = ''
+      if (type === 'text') this.inputMessage = ''
       this.showMorePanel = false
       this.$nextTick(() => this.scrollToBottom())
 
       // 通过 SignalR 发送
       const msgPayload = {
+        Type: type,
         Content: content,
         OsClient: appConfig.osClient,
         ToUserId: this.chatId,
@@ -723,6 +774,7 @@ export default {
 
       const user = this.currentUser
       const msgPayload = {
+        Type: msg.Type || 'text',
         Content: msg.Content,
         OsClient: appConfig.osClient,
         ToUserId: this.chatId,
@@ -770,9 +822,33 @@ export default {
       return new Date(time).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     },
 
-    handleAction(type) {
+    async handleAction(type) {
       this.showMorePanel = false
-      uni.showToast({ title: type + ' ' + this.t('message.featureDev'), icon: 'none' })
+      if (this.uploadingAttachment) return
+      const sourceType = type === 'camera' ? ['camera'] : ['album']
+      try {
+        const picked = await new Promise((resolve, reject) => {
+          uni.chooseImage({ count: 1, sourceType, sizeType: ['compressed'], success: resolve, fail: reject })
+        })
+        const filePath = picked && picked.tempFilePaths ? picked.tempFilePaths[0] : ''
+        if (!filePath) return
+        this.uploadingAttachment = true
+        uni.showLoading({ title: '正在发送', mask: true })
+        const uploaded = await V8.uploadFile(filePath, { path: 'xjy/chat', preview: true })
+        const imageUrl = uploaded.Url || uploaded.Path
+        await this.sendContent(imageUrl, 'image')
+      } catch (error) {
+        const message = error && error.errMsg && error.errMsg.includes('cancel') ? '' : ((error && error.Msg) || '图片发送失败')
+        if (message) uni.showToast({ title: message, icon: 'none' })
+      } finally {
+        this.uploadingAttachment = false
+        uni.hideLoading()
+      }
+    },
+
+    previewChatImage(url) {
+      if (!url) return
+      uni.previewImage({ current: url, urls: [url] })
     },
 
     clearHistory() {
@@ -813,7 +889,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   height: 88rpx;
-  padding: 0 24rpx;
+  padding: 0 calc(24rpx + var(--mci-capsule-right)) 0 24rpx;
 }
 
 .header-back {
@@ -862,16 +938,35 @@ export default {
 
 /* 连接状态提示 */
 .connection-hint {
-  text-align: center;
+  display: flex;
+  justify-content: center;
   padding: 12rpx 0 20rpx;
 }
-.hint-text {
-  font-size: 24rpx;
-  color: #e6a23c;
+
+.hint-pill {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
   background: #fff3e0;
   padding: 8rpx 24rpx;
   border-radius: 20rpx;
 }
+
+.hint-spinner {
+  width: 18rpx;
+  height: 18rpx;
+  border: 3rpx solid rgba(230, 162, 60, 0.28);
+  border-top-color: #e6a23c;
+  border-radius: 50%;
+  animation: chatSpin 0.8s linear infinite;
+}
+
+.hint-text {
+  font-size: 24rpx;
+  color: #e6a23c;
+}
+
+@keyframes chatSpin { to { transform: rotate(360deg); } }
 
 /* rich-text 文本样式 */
 .bubble-richtext {
@@ -883,6 +978,13 @@ export default {
 /* 数据表格气泡 */
 .bubble-data {
   padding: 4rpx 0;
+}
+
+.bubble-image {
+  display: block;
+  width: 320rpx;
+  max-height: 440rpx;
+  border-radius: 12rpx;
 }
 
 .load-more-hint {
@@ -1015,7 +1117,7 @@ export default {
   background: #f5f5f5;
   border-top: 1rpx solid #e5e5e5;
   padding: 16rpx 24rpx;
-  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(16rpx + var(--mci-safe-bottom));
   flex-shrink: 0;
 }
 
@@ -1081,7 +1183,7 @@ export default {
 .more-panel {
   background: #f5f5f5;
   padding: 32rpx 24rpx;
-  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(32rpx + var(--mci-safe-bottom));
   flex-shrink: 0;
 }
 
@@ -1108,7 +1210,8 @@ export default {
 }
 
 .panel-icon {
-  font-size: 44rpx;
+  width: 52rpx;
+  height: 52rpx;
 }
 
 .panel-label {
@@ -1181,6 +1284,15 @@ export default {
   padding: 12rpx 24rpx;
   background: #f8f8f8;
   border-bottom: 1rpx solid #e8e8e8;
+}
+.ai-disclosure {
+  padding: 9rpx 24rpx;
+  border-top: 1rpx solid #e6edef;
+  background: #f5fafb;
+  color: #6f838b;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  text-align: center;
 }
 .ai-model-label {
   font-size: 24rpx;
