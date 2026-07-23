@@ -1,4 +1,4 @@
-const PREFIX = 'xjy_native_cache_v2:'
+const PREFIX = 'microi_uniapp_cache_v3:'
 const memory = new Map()
 const inflight = new Map()
 

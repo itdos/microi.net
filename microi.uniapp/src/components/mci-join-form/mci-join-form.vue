@@ -31,8 +31,8 @@
 </template>
 
 <script>
-import { V8 } from '@/utils/request.js'
 import { openForm } from '@/platform/business-runtime.js'
+import { loadNativeTableModel } from '@/platform/native-form.js'
 
 function unwrapValue(value) {
   if (value && typeof value === 'object') return value.Id ?? value.Value ?? value.value ?? ''
@@ -68,9 +68,7 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const result = await V8.FormEngine.GetFormData('diy_table', { Id: this.config.TableId })
-        if (!result || Number(result.Code) !== 1 || !result.Data) throw new Error((result && result.Msg) || '关联表配置不存在')
-        this.table = result.Data
+        this.table = await loadNativeTableModel(this.config.TableId)
       } catch (error) {
         this.error = error.message || error.Msg || '关联表配置读取失败'
       } finally {

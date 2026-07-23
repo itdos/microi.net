@@ -42,7 +42,8 @@ module.exports = {
     features: {
       ai: true,
       business: false,
-      businessCatalog: false,
+      businessCatalog: true,
+      dynamicModules: true,
       dynamicForm: true,
       invitations: false,
       mall: false,
@@ -52,7 +53,7 @@ module.exports = {
       serviceTasks: false
     },
     routes: {
-      catalog: '',
+      catalog: '/pages/module/catalog',
       login: '/pages/login/index',
       messages: '/pages/message/index',
       password: '/pages/native/password',

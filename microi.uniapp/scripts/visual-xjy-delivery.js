@@ -571,6 +571,12 @@ function buildMockResponse(request) {
   if (lowerUrl.includes('getsysconfig') || lowerUrl.includes('microi-init')) {
     return { Code: 1, Data: { SysTitle: '集福鲤', SysShortTitle: '集福鲤', CompanyName: '新纪源水科技', IsShowAiAssistant: 1 } };
   }
+  if (lowerUrl.includes('formengine/getdiytablemodel')) {
+    return { Code: 1, Data: sysUserTable };
+  }
+  if (lowerUrl.includes('formengine/getdiyfieldlist')) {
+    return { Code: 1, Data: sysUserFields, DataCount: sysUserFields.length };
+  }
   if (lowerUrl.includes('moduleengine/gettabledata')) {
     const result = moduleRows[table] || { rows: [], count: 0, statistics: {} };
     const effectiveCount = periodCount(body, result.count);

@@ -25,10 +25,10 @@
 
 			<template v-else>
 				<view class="hero-band">
-					<image class="hero-water" :src="xjyAssets.waterHero" mode="aspectFill" />
+					<image class="hero-water" :src="preset.background || xjyAssets.waterHero" mode="aspectFill" />
 					<view class="hero-shade"></view>
 					<view class="hero-topline">
-						<image class="hero-icon" :src="preset.icon" mode="aspectFit" />
+						<image class="hero-icon" :src="heroIcon" mode="aspectFit" />
 						<view class="hero-copy">
 							<text class="hero-title">{{ primaryTitle }}</text>
 							<text class="hero-meta">{{ heroMeta }}</text>
@@ -62,6 +62,19 @@
 						@tap="openRelated('tasks', 'KehuID', detail.Id)">
 						<image src="/static/xjy/repair/renwu.png" mode="aspectFit" />
 						<text>售后任务</text>
+					</view>
+				</view>
+				<view v-if="dynamicActions.length" class="quick-band quick-band--dynamic">
+					<view
+						v-for="action in dynamicActions"
+						:key="action.Key"
+						class="quick-action"
+						hover-class="quick-action--pressed"
+						@tap="runDynamicAction(action)"
+					>
+						<image v-if="isActionImage(action.Icon)" :src="action.Icon" mode="aspectFit" />
+						<view v-else class="quick-action__symbol">+</view>
+						<text>{{ action.Label }}</text>
 					</view>
 				</view>
 
@@ -227,20 +240,35 @@
 	} from '@/utils/request.js'
 	import {
 		getBusinessModule,
+		getBusinessEntry,
 		getRoleProfile
 	} from '@/platform/business.js'
 	import {
 		callApiEngine,
+		findMenu,
 		formatFieldValue,
 		openForm
 	} from '@/platform/business-runtime.js'
 	import {
 		isHtmlValue,
-		normalizeRichTextHtml
+		normalizeRichTextHtml,
+		normalizeUploadItems,
+		publicAssetUrl
 	} from '@/platform/display.js'
 	import {
 		loadNativeFormDefinition
 	} from '@/platform/native-form.js'
+	import {
+		compileDetailPreset,
+		loadModuleViewManifest
+	} from '@/platform/view-manifest.js'
+	import {
+		executeViewAction,
+		isActionVisible
+	} from '@/platform/view-actions.js'
+	import {
+		loadViewMetricValues
+	} from '@/platform/view-metrics.js'
 	import {
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
@@ -1072,6 +1100,7 @@
 				statusBarHeight: 0,
 				key: 'customers',
 				id: '',
+				menuId: '',
 				detail: {},
 				loading: true,
 				refreshing: false,
@@ -1087,13 +1116,47 @@
 				roleProfile: {},
 				deviceActiveTask: {},
 				definition: null,
+				viewManifest: null,
+				metricValues: {},
 				expandedSections: {},
 				relationExpanded: false
 			}
 		},
 		computed: {
 			preset() {
-				return presets[this.key] || presets.customers
+				const module = this.moduleConfig || {}
+				const entry = getBusinessEntry(this.key) || {}
+				const base = presets[this.key] || {
+					title: module.title || '业务详情',
+					icon: entry.icon || icon('business/kehu.png'),
+					titleField: module.titleField || 'Name',
+					fallbackTitleField: 'Name',
+					statusField: module.statusField || 'Status',
+					metaField: 'CreateTime',
+					phoneFields: [module.phoneField, 'Phone', 'ShoujiH'].filter(Boolean),
+					metrics: [],
+					sections: [],
+					summaries: module.summaryField ? [{
+						label: '详细说明',
+						field: module.summaryField
+					}] : []
+				}
+				const dynamic = compileDetailPreset(this.viewManifest)
+				if (!dynamic) return base
+				return {
+					...base,
+					...dynamic,
+					icon: dynamic.icon || base.icon,
+					background: dynamic.background || base.background,
+					titleField: dynamic.titleField || base.titleField,
+					fallbackTitleField: dynamic.fallbackTitleField || base.fallbackTitleField,
+					statusField: dynamic.statusField || base.statusField,
+					metaField: dynamic.metaField || base.metaField,
+					phoneFields: dynamic.phoneFields?.length ? dynamic.phoneFields : base.phoneFields,
+					metrics: dynamic.metrics?.length ? dynamic.metrics : base.metrics,
+					sections: dynamic.sections?.length ? dynamic.sections : base.sections,
+					summaries: dynamic.summaries?.length ? dynamic.summaries : base.summaries
+				}
 			},
 			moduleConfig() {
 				return getBusinessModule(this.key) || getBusinessModule('customers')
@@ -1103,6 +1166,11 @@
 			},
 			primaryTitle() {
 				return this.detail[this.preset.titleField] || this.detail[this.preset.fallbackTitleField] || this.pageTitle
+			},
+			heroIcon() {
+				const imageField = this.preset.imageField
+				const upload = imageField ? normalizeUploadItems(this.detail[imageField])[0] : null
+				return upload && upload.Path ? publicAssetUrl(upload.Path) : this.preset.icon
 			},
 			statusText() {
 				return this.detail[this.preset.statusField] || ''
@@ -1125,8 +1193,10 @@
 			},
 			heroMetrics() {
 				return (this.preset.metrics || []).map((metric) => {
-					const raw = this.detail[metric.field]
-					const value = raw === null || raw === undefined || raw === '' ?
+					const key = metric.key || metric.field || metric.apiEngineKey
+					const remote = String(metric.source || '').toLowerCase() === 'apiengine'
+					const raw = remote ? this.metricValues[key] : this.detail[metric.field]
+					const value = raw === null || raw === undefined || raw === '' || raw === '-' ?
 						'-' :
 						`${formatFieldValue(raw, metric.format)}${metric.suffix || ''}`
 					return {
@@ -1134,6 +1204,9 @@
 						value
 					}
 				})
+			},
+			dynamicActions() {
+				return (this.preset.actions || []).filter((action) => isActionVisible(action, this.detail))
 			},
 			fieldDefinitionMap() {
 				const map = new Map();
@@ -1545,8 +1618,9 @@
 					this.statusBarHeight = uni.getSystemInfoSync().statusBarHeight || 0
 				} catch (error) {}
 			}
-			this.key = options.key && presets[options.key] ? options.key : 'customers'
+			this.key = options.key && getBusinessModule(options.key) ? options.key : 'customers'
 			this.id = decodeURIComponent(options.id || '')
+			this.menuId = decodeURIComponent(options.menuId || '')
 			this.currentUser = getUser() || {}
 			this.roleProfile = getRoleProfile(this.currentUser)
 			this.loadDetail()
@@ -1555,7 +1629,7 @@
 			if (!this.loading && this.id) this.loadDetail(false)
 		},
 		methods: {
-			async loadDetail(showLoading = true) {
+			async loadDetail(showLoading = true, refreshManifest = false) {
 				if (!this.id) {
 					this.error = '缺少业务数据编号'
 					this.loading = false
@@ -1564,9 +1638,11 @@
 				if (showLoading) this.loading = true
 				this.error = ''
 				try {
+					await this.loadViewManifest(refreshManifest)
 					const [result, definitionResult] = await Promise.all([
 						V8.FormEngine.GetFormData(this.moduleConfig.table, {
-							Id: this.id
+							Id: this.id,
+							...(this.menuId ? { _SysMenuId: this.menuId } : {})
 						}),
 						loadNativeFormDefinition(this.moduleConfig.table).catch(() => null)
 					])
@@ -1574,6 +1650,14 @@
 						'未找到该条业务数据')
 					this.detail = result.Data
 					if (definitionResult) this.definition = definitionResult
+					this.metricValues = await loadViewMetricValues(this.preset.metrics || [], {
+						form: this.detail,
+						user: this.currentUser,
+						menu: {
+							Id: this.menuId,
+							ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
+						}
+					})
 					if (!Object.keys(this.expandedSections).length) {
 						this.$nextTick(() => {
 							const first = this.visibleSections[0]
@@ -1593,10 +1677,55 @@
 			async refresh() {
 				this.refreshing = true
 				try {
-					await this.loadDetail(false)
+					await this.loadDetail(false, true)
 				} finally {
 					this.refreshing = false
 				}
+			},
+			async loadViewManifest(refresh = false) {
+				try {
+					let menuId = this.menuId
+					if (!menuId) {
+						const menu = await findMenu(
+							this.moduleConfig.menuAliases || [],
+							this.moduleConfig.table,
+							refresh
+						)
+						menuId = menu && menu.Id || ''
+					}
+					const manifest = await loadModuleViewManifest({
+						...this.moduleConfig,
+						menuId
+					}, {
+						scene: 'Detail',
+						device: 'Mobile',
+						user: this.currentUser,
+						refresh
+					})
+					if (manifest) {
+						this.viewManifest = manifest
+						this.menuId = manifest.Module?.Id || menuId
+					} else {
+						this.menuId = menuId
+					}
+				} catch (error) {}
+			},
+			isActionImage(value) {
+				return /^(https?:|\/|static\/)/i.test(String(value || ''))
+			},
+			async runDynamicAction(action) {
+				await executeViewAction(action, {
+					form: this.detail,
+					user: this.currentUser,
+					menu: {
+						Id: this.menuId || this.viewManifest?.Module?.Id || '',
+						ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
+					},
+					tableName: this.moduleConfig?.table,
+					refresh: async () => {
+						await this.loadDetail(true, true)
+					}
+				})
 			},
 			async loadDeviceActiveTask() {
 				this.deviceActiveTask = {}
@@ -1668,6 +1797,7 @@
 					rowId: this.detail.Id || this.id,
 					mode: 'Edit',
 					title: this.pageTitle,
+					menuId: this.menuId,
 					menuAliases: this.moduleConfig.menuAliases || []
 				})
 			},
@@ -2257,6 +2387,12 @@
 		background: #fff;
 	}
 
+	.quick-band--dynamic {
+		margin-top: 12rpx;
+		border-top: 1rpx solid #edf2f4;
+		animation: sectionBodyEnter .2s ease both;
+	}
+
 	.quick-action {
 		display: flex;
 		flex-direction: column;
@@ -2270,6 +2406,20 @@
 	.quick-action image {
 		width: 48rpx;
 		height: 48rpx;
+	}
+
+	.quick-action__symbol {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 48rpx;
+		height: 48rpx;
+		border-radius: 8rpx;
+		background: #e8f6f8;
+		color: #1098ad;
+		font-size: 34rpx;
+		font-weight: 600;
+		line-height: 1;
 	}
 
 	.quick-action text {
