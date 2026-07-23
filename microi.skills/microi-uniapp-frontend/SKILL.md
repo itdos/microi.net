@@ -11,6 +11,26 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 
 创建、重构或修复任何 Microi 移动端项目前，必须同时应用 `microi.skills/microi-mobile-app-quality/SKILL.md`。该 Skill 中的底部导航真实图标、重要按钮图标化、登录 API 校验、微信手机号快捷登录、后台二级菜单和页面动效要求，属于交付验收条件，不是可选优化。
 
+## 标准产品、视图协议与租户扩展
+
+Microi 标准小程序必须采用“平台内核 + 版本化元数据 + Profile + 租户插件”架构，不能把某个交付项目直接写死成平台产品：
+
+- `src/platform/`、通用 `mci-*` 组件、动态模块页和动态表单页只实现平台能力，不得出现租户表名、字段名、品牌文案、素材或客户路由。
+- `src/tenants/<tenant>/` 存放客户专属业务组合、首页统计、表单联动、子表规则、扫码/定位/相机和复杂原生流程；`profiles/<id>/` 管理 OsClient、API、品牌、功能开关、路由和真实编译范围。
+- `src/generated/`、`pages.json`、`manifest.json` 等 Profile 产物由脚本生成，不能作为人工定制入口。多人合并冲突时以 Profile 与租户源码为准重新生成。
+- 普通 CRUD 必须优先使用授权后的 `sys_menu + diy_table + diy_field` 动态渲染；只有原生能力或客户独有的复杂组合才增加租户扩展。
+
+统一视图协议归属 `sys_menu`。使用 `EnableViewSchema`、`ViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion` 等明确物理字段保存 `List/Card/Detail/Edit`、`PC/Mobile/All`、角色视图、Hero、MetricStrip、ActionGrid 和 ResponsiveSection。`diy_table/diy_field/sys_menu.DiyConfig` 已废弃，禁止继续读取或写入。
+
+- 后台新增字段或修改名称、顺序、显隐、组件、校验、数据源和分组后，客户端必须通过版本指纹刷新定义，无需重新发版。
+- 表单元数据必须通过 `V8.FormEngine.GetDiyTableModel/GetDiyFieldList` 访问当前 FormEngine 缓存入口，并携带真实菜单授权上下文；页面和控件不得用普通 `GetFormData/GetTableData` 直查受保护的 `diy_table/diy_field`，也不得散落裸元数据接口 URL。
+- ViewSchema 未配置、配置不完整或网络暂时失败时，必须回退到菜单移动字段和完整 `diy_field` 定义；定制详情还必须把未显式编排的新字段追加到折叠分组，不能静默丢字段。
+- 列表、详情、编辑和保存请求应携带真实授权 `_SysMenuId`；客户端不能自行声明角色、数据范围或表权限，服务端仍是最终权限边界。
+- 小程序不得下载或执行任意前端 V8，不得使用 `eval/new Function`。字段显隐和联动使用白名单声明式规则，按钮使用 ActionSchema，复杂事务和校验进入 ApiEngine 或后端表单事件。
+- ActionSchema 只能描述文字、图标、颜色、确认提示、参数映射、ApiEngineKey、原生 ActionType 和成功后的刷新/跳转；扫码、定位、拍照、拨号、导航等由受控原生适配器执行。
+
+仓库必须提供 AI 与人工协作约束文件、租户脚手架、Profile 构建/同步命令和架构检查。平台层改动至少同时构建标准 Profile 与默认交付 Profile；租户视觉改动还要执行多视口截图回归。这样其他同事使用 Codex、Claude、Copilot、Cursor 等工具继续开发时，会先读取相同规则，而不是依赖某次对话记忆。
+
 ## H5 预览壳与底部导航强制规则
 
 - 桌面浏览器允许使用 `Microi UniApp H5 Preview` 手机壳帮助用户理解移动端比例。
@@ -22,7 +42,7 @@ description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复�
 
 - 登录页必须是直接登录面，不要默认做“员工登录 / 客户登录”身份 Tab 切换，除非用户明确要求。默认展示系统账号密码登录，同时提供客户手机号快捷登录入口。
 - 账号密码登录必须先检查项目本地 SDK 实际导出，常见是 `V8.Login(param)` 或 `/api/SysUser/Login`。禁止凭空写 `V8.Login.Login(...)` 这类未验证子对象。
-- 登录、接口引擎、FormEngine、上传等所有请求头必须做大小写不敏感去重；`osclient` 只能发送一个规范值，例如 `lxwb`，禁止同时传 `OsClient` 与 `osclient` 导致网络面板出现 `lxwb, lxwb`。
+- 登录、接口引擎、FormEngine、上传等所有请求头必须做大小写不敏感去重；`osclient` 只能发送一个运行期值，例如 `demo`，禁止同时传 `OsClient` 与 `osclient` 导致网络面板出现 `demo, demo`。
 - 账号密码登录只有在同时拿到成功码、有效 token 和有效用户 `Id` 时才算成功。Microi 登录 token 可能在响应头 `authorization`，用户信息可能在响应体 `Data`；两者任一缺失都要清理 SDK token、本地用户缓存和 session。
 - 恢复本地会话时必须重新校验 token 和用户 `Id`，禁止出现页面显示 `admin` 但状态仍是“未登录”的半登录状态。
 - 账号密码登录调用 `/api/SysUser/login`、`/api/SysUser/Login` 或 `V8.Login(param)` 前，必须读取 `/api/DiyTable/GetSysConfig` 或 `V8.GetSysConfig(true)`，并根据 `Sys_Config.EnableCaptcha` 决定是否显示图形验证码。判断函数必须兼容 `1`、`true`、`'1'`、`'true'`，不要直接 `!!cfg.EnableCaptcha`。
@@ -345,7 +365,7 @@ async function load() {
 ## 账号角色与会话状态
 
 - Microi 企业移动端默认要从 `sys_user.RoleIds`、`_Roles`、`Roles`、`RoleName`、`Level` 解析内部账号角色，不要只用“是否登录”控制界面。
-- 角色能力必须集中在 Pinia/session store 中计算，例如 `isTechnician`、`isServiceAgent`、`isCustomerAccount`、`canAcceptOrders`、`canManageCustomers`、`canViewReports`。多角色账号取能力并集，`Level>=999` 或“超级管理员”给全权限。
+- 角色能力必须集中在 Pinia/session store 中计算，例如 `isTechnician`、`isServiceAgent`、`isCustomerAccount`、`canAcceptOrders`、`canManageCustomers`、`canViewReports`。多角色账号取能力并集；只有服务端已确认的 `Level>=9999` 才属于平台超级管理员。前端“超级管理员”角色名只用于展示，不能授予接口权限。
 - 客户账号判断要精确，只把“客户”“客户账号”“客户用户”或明确包含“客户账号”的角色当作客户侧账号；不要把“客户管理”等后台角色误判为客户。
 - 所有页面、底部导航、按钮、未登录提示、头像姓名和角色文本都必须读同一个 session store。页面不能直接读取旧 storage 展示用户名。
 - 客户小程序手机号登录得到的是业务 `CustomerToken`，与员工 `sys_user` token 是两条会话；客户数据必须通过绑定关系过滤，不要把客户账号塞进员工接口绕过权限。

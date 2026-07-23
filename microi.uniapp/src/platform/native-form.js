@@ -1,5 +1,10 @@
-import { V8, post } from '@/utils/request.js'
-import { cachedRequest, removeCachePrefix } from '@/platform/cache.js'
+import { V8, getUser, post } from '@/utils/request.js'
+import {
+  dedupeRequest,
+  readCache,
+  removeCachePrefix,
+  writeCache
+} from '@/platform/cache.js'
 import nativeControls from '@/config/mci-native-controls.json'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
 
@@ -237,28 +242,140 @@ function buildDefinition(table, fields, layoutFields = fields) {
   }
 }
 
-export async function loadNativeFormDefinition(tableName, refresh = false) {
-  const key = `form-definition:v2:${String(tableName).toLowerCase()}`
-  const result = await cachedRequest(key, async () => {
-    const [tableResult, fieldResult] = await Promise.all([
-      V8.FormEngine.GetFormData('diy_table', {
-        _Where: [{ Name: 'Name', Type: '=', Value: tableName }]
-      }),
-      V8.FormEngine.GetTableData('diy_field', {
-        _Where: [{ Name: 'TableName', Type: '=', Value: tableName }],
-        _OrderBy: 'Sort',
-        _OrderByType: 'ASC',
-        _PageIndex: 1,
-        _PageSize: 500
-      })
+export function createNativeFormDefinition(table = {}, rawFields = []) {
+  const layoutFields = (Array.isArray(rawFields) ? rawFields : []).map(normalizeField)
+  const fields = layoutFields.filter((field) => field.visible)
+  return buildDefinition(table, fields, layoutFields)
+}
+
+export const NATIVE_FORM_SCHEMA_VERSION = 3
+const FORM_VERSION_MAX_AGE = 30 * 1000
+const FORM_DEFINITION_MAX_AGE = 30 * 24 * 60 * 60 * 1000
+
+function hashText(value) {
+  let hash = 2166136261
+  const text = String(value || '')
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0')
+}
+
+function definitionFingerprint(table, fields) {
+  const source = {
+    schema: NATIVE_FORM_SCHEMA_VERSION,
+    table: [
+      table && table.Id,
+      table && table.UpdateTime,
+      table && table.Tabs,
+      table && table.Name
+    ],
+    fields: (fields || []).map((field) => [
+      field.Id,
+      field.UpdateTime,
+      field.Name,
+      field.Sort,
+      field.Visible,
+      field.AppVisible,
+      field.Component
     ])
-    if (!tableResult || tableResult.Code !== 1) throw new Error((tableResult && tableResult.Msg) || `未找到表单 ${tableName}`)
-    if (!fieldResult || fieldResult.Code !== 1) throw new Error((fieldResult && fieldResult.Msg) || '字段配置加载失败')
-    const layoutFields = (fieldResult.Data || []).map(normalizeField)
-    const fields = layoutFields.filter((field) => field.visible)
-    return buildDefinition(tableResult.Data, fields, layoutFields)
-  }, { refresh, maxAge: 10 * 60 * 1000, allowStale: true })
-  return JSON.parse(JSON.stringify(result.data))
+  }
+  return hashText(JSON.stringify(source))
+}
+
+function definitionAuthorizationScope(options = {}) {
+  const tableChildAuth = options.tableChildAuth || {}
+  const childScope = [
+    tableChildAuth.ParentSysMenuId,
+    tableChildAuth.ParentTableId,
+    tableChildAuth.ParentFieldId
+  ].filter(Boolean).join(':')
+  return String(options.menuId || options.moduleEngineKey || childScope || 'granted-menu')
+}
+
+function definitionKeys(tableName, options = {}) {
+  const normalized = String(tableName || '').trim().toLowerCase()
+  const user = getUser() || {}
+  const identity = String(user.Id || user.Account || 'guest').toLowerCase()
+  const scope = hashText(definitionAuthorizationScope(options))
+  return {
+    version: `form-definition-version:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${scope}:${normalized}`,
+    definition: (fingerprint) =>
+      `form-definition:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${scope}:${normalized}:${fingerprint}`,
+    request: `form-definition-request:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${scope}:${normalized}`
+  }
+}
+
+function metadataAuthorizationParams(options = {}) {
+  const result = {}
+  if (options.menuId) result._SysMenuId = options.menuId
+  if (options.moduleEngineKey) result.ModuleEngineKey = options.moduleEngineKey
+  if (options.tableChildAuth) result._TableChildAuth = options.tableChildAuth
+  return result
+}
+
+export async function loadNativeTableModel(tableKey, options = {}) {
+  const tableResult = await V8.FormEngine.GetDiyTableModel(
+    String(tableKey || ''),
+    metadataAuthorizationParams(options)
+  )
+  if (!tableResult || Number(tableResult.Code) !== 1 || !tableResult.Data) {
+    throw new Error((tableResult && tableResult.Msg) || `未找到表单 ${tableKey}`)
+  }
+  return tableResult.Data
+}
+
+async function requestFullDefinition(tableName, options = {}) {
+  const authorization = metadataAuthorizationParams(options)
+  const table = await loadNativeTableModel(tableName, options)
+  const fieldResult = await V8.FormEngine.GetDiyFieldList({
+    TableId: table.Id,
+    TableName: table.Name || tableName,
+    ...authorization,
+    _OrderBy: 'Sort',
+    _OrderByType: 'ASC',
+    _PageIndex: 1,
+    _PageSize: 1000
+  })
+  if (!fieldResult || Number(fieldResult.Code) !== 1) {
+    throw new Error((fieldResult && fieldResult.Msg) || '字段配置加载失败')
+  }
+  const rawFields = fieldResult.Data || []
+  const definition = createNativeFormDefinition(table, rawFields)
+  return {
+    fingerprint: definitionFingerprint(table, rawFields),
+    definition
+  }
+}
+
+export async function loadNativeFormDefinition(tableName, refresh = false, options = {}) {
+  const keys = definitionKeys(tableName, options)
+  const cachedVersion = refresh ? null : readCache(keys.version, FORM_VERSION_MAX_AGE)
+  if (cachedVersion && !cachedVersion.stale) {
+    const cachedDefinition = readCache(keys.definition(cachedVersion.data), FORM_DEFINITION_MAX_AGE)
+    if (cachedDefinition) return JSON.parse(JSON.stringify(cachedDefinition.data))
+  }
+
+  const staleVersion = readCache(keys.version, FORM_DEFINITION_MAX_AGE)
+  try {
+    const full = await dedupeRequest(
+      keys.request,
+      () => requestFullDefinition(tableName, options)
+    )
+    full.definition.schemaFingerprint = full.fingerprint
+    full.definition.schemaVersion = NATIVE_FORM_SCHEMA_VERSION
+    writeCache(keys.version, full.fingerprint)
+    writeCache(keys.definition(full.fingerprint), full.definition)
+    return JSON.parse(JSON.stringify(full.definition))
+  } catch (error) {
+    const fingerprint = staleVersion && staleVersion.data
+    const staleDefinition = fingerprint
+      ? readCache(keys.definition(fingerprint), FORM_DEFINITION_MAX_AGE)
+      : null
+    if (staleDefinition) return JSON.parse(JSON.stringify(staleDefinition.data))
+    throw error
+  }
 }
 
 export function scopeNativeFormDefinition(definition, options = {}) {
@@ -275,6 +392,63 @@ export function scopeNativeFormDefinition(definition, options = {}) {
     editable: readonly.has(String(field.Name || '').toLowerCase()) ? false : field.editable
   }))
   return buildDefinition(definition.table || {}, fields, definition.layoutFields || definition.fields || [])
+}
+
+export function applyNativeFormViewDefinition(definition, formConfig) {
+  if (!definition || !formConfig || !Array.isArray(formConfig.sections) || !formConfig.sections.length) {
+    return definition
+  }
+  const byName = new Map((definition.fields || []).map((field) => [
+    String(field.Name || '').toLowerCase(),
+    field
+  ]))
+  const used = new Set()
+  const hidden = new Set()
+  const groups = formConfig.sections.map((section) => {
+    const fields = (section.fields || []).map((item) => {
+      const name = String(item.name || item.Name || '').toLowerCase()
+      if (!name) return null
+      used.add(name)
+      if (item.hidden === true || item.Hidden === true) {
+        hidden.add(name)
+        return null
+      }
+      const field = byName.get(name)
+      if (!field) return null
+      return {
+        ...field,
+        Label: item.label || item.Label || field.Label,
+        viewWidth: item.mobileWidth || item.MobileWidth || item.width || item.Width || null,
+        viewFormat: item.format || item.Format || ''
+      }
+    }).filter(Boolean)
+    return {
+      name: section.title || section.Title || '基本信息',
+      fields,
+      defaultExpanded: section.defaultExpanded !== false && section.DefaultExpanded !== false,
+      columns: Number(section.columns || section.Columns || 1)
+    }
+  }).filter((group) => group.fields.length)
+
+  ;(definition.groups || []).forEach((group) => {
+    const fields = (group.fields || []).filter((field) => {
+      const name = String(field.Name || '').toLowerCase()
+      return !used.has(name) && !hidden.has(name)
+    })
+    if (fields.length) {
+      groups.push({
+        ...group,
+        fields,
+        defaultExpanded: false
+      })
+    }
+  })
+
+  return {
+    ...definition,
+    groups: groups.length ? groups : definition.groups,
+    viewConfig: formConfig
+  }
 }
 
 function currentOptionRows(field, form) {
@@ -295,6 +469,9 @@ async function requestFieldOptions(field, form, options = {}) {
     _PageIndex: pageIndex,
     _PageSize: pageSize
   }
+  if (options.menuId) common._SysMenuId = options.menuId
+  if (options.moduleEngineKey) common.ModuleEngineKey = options.moduleEngineKey
+  if (options.tableChildAuth) common._TableChildAuth = options.tableChildAuth
   if (dataSource === 'Sql' && config.Sql) {
     return post('/api/FormEngine/GetDiyFieldSqlData', common, true)
   }
@@ -358,7 +535,10 @@ export async function loadNativeFieldOptionPage(field, form = {}, options = {}) 
   const result = await requestFieldOptions(field, form, {
     pageIndex,
     pageSize,
-    keyword: remoteSearch ? keyword : ''
+    keyword: remoteSearch ? keyword : '',
+    menuId: options.menuId,
+    moduleEngineKey: options.moduleEngineKey,
+    tableChildAuth: options.tableChildAuth
   })
   if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '选项加载失败')
 
@@ -384,7 +564,7 @@ export async function loadNativeFieldOptionPage(field, form = {}, options = {}) 
   }
 }
 
-export async function hydrateNativeFormOptions(definition, form) {
+export async function hydrateNativeFormOptions(definition, form, options = {}) {
   if (!definition || !Array.isArray(definition.fields)) return definition
   const fields = definition.fields.filter((field) => OPTION_COMPONENTS.has(field.component))
   let cursor = 0
@@ -399,7 +579,10 @@ export async function hydrateNativeFormOptions(definition, form) {
       try {
         const page = await loadNativeFieldOptionPage(field, form, {
           pageIndex: 1,
-          pageSize: 20
+          pageSize: 20,
+          menuId: options.menuId,
+          moduleEngineKey: options.moduleEngineKey,
+          tableChildAuth: options.tableChildAuth
         })
         const rows = [...page.options.slice(0, 20).map((item) => item.raw)]
         currentOptionRows(field, form).forEach((current) => {
@@ -463,10 +646,12 @@ export function nativeFormDefaultSubmitValues(definition = {}, defaults = {}) {
   return values
 }
 
-export async function saveNativeForm(tableName, rowId, form, fields, extraValues = {}) {
+export async function saveNativeForm(tableName, rowId, form, fields, extraValues = {}, options = {}) {
   const error = validateNativeForm(form, fields)
   if (error) throw new Error(error)
   const payload = { _InvokeType: 'Client' }
+  if (options.menuId) payload._SysMenuId = options.menuId
+  if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   fields.forEach((field) => {
     if (!field.editable || form[field.Name] === undefined) return
     let value = form[field.Name]
@@ -511,6 +696,7 @@ export default {
   normalizeOptions,
   inferNativeComponent,
   normalizeField,
+  createNativeFormDefinition,
   isNativeFieldMultiple,
   nativeFieldOptionSource,
   isRemoteNativeFieldOptions,
@@ -518,8 +704,10 @@ export default {
   filterNativeFieldOptions,
   loadNativeFieldOptionPage,
   groupFields,
+  loadNativeTableModel,
   loadNativeFormDefinition,
   scopeNativeFormDefinition,
+  applyNativeFormViewDefinition,
   hydrateNativeFormOptions,
   defaultFormData,
   validateNativeForm,

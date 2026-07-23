@@ -67,10 +67,10 @@
       <scroll-view
         class="product-area"
         scroll-y
-        :scroll-top="xjyScrollCommand"
+        :scroll-top="mciScrollCommand"
         :refresher-enabled="true"
         :refresher-triggered="refreshing"
-        @scroll="handleXjyListScroll"
+        @scroll="handleMciListScroll"
         @refresherrefresh="onRefresh"
         @scrolltolower="loadMore"
       >
@@ -472,7 +472,7 @@ export default {
 
     // 跳转详情
     goDetail(id) {
-      this.xjyNavigateToDetail('/pages/mall/detail?id=' + id)
+      this.mciNavigateToDetail('/pages/mall/detail?id=' + id)
     }
   }
 }

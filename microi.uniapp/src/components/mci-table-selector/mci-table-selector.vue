@@ -66,8 +66,12 @@
 
 <script>
 import { V8 } from '@/utils/request.js'
-import { fieldDisplayValue, loadNativeFormDefinition } from '@/platform/native-form.js'
-import { getOpenTableWhere, submitOpenTableSelection } from '@/platform/native-table.js'
+import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
+import {
+  getOpenTableWhere,
+  submitOpenTableSelection,
+  validateOpenTableContext
+} from '@/platform/native-table.js'
 
 const HEAVY_COMPONENTS = new Set(['TableChild', 'JoinForm', 'JoinTable', 'OpenTable', 'RichText', 'CodeEditor', 'ImgUpload', 'FileUpload', 'Map'])
 
@@ -78,6 +82,7 @@ export default {
     parentTable: { type: String, default: '' },
     parentId: { type: [String, Number], default: '' },
     parentForm: { type: Object, default: () => ({}) },
+    parentMenuId: { type: String, default: '' },
     readonly: { type: Boolean, default: false }
   },
   emits: ['change'],
@@ -100,6 +105,7 @@ export default {
   },
   computed: {
     config() { return (this.field.config && this.field.config.OpenTable) || {} },
+    targetMenuId() { return this.config.SysMenuId || this.config.ModuleId || '' },
     multiple() { return this.config.MultipleSelect !== false },
     buttonTitle() { return this.config.BtnName || this.config.BtnText || this.field.Label || '选择数据' },
     tableLabel() { return (this.table && (this.table.Description || this.table.Name)) || this.config.SysMenuName || '' },
@@ -119,17 +125,18 @@ export default {
       if (this.table && this.definition) return
       const tableId = this.config.TableId
       if (!tableId && !this.config.TableName) throw new Error('选择组件未配置数据表')
-      const result = tableId
-        ? await V8.FormEngine.GetFormData('diy_table', { Id: tableId })
-        : await V8.FormEngine.GetFormData('diy_table', { _Where: [{ Name: 'Name', Type: '=', Value: this.config.TableName }] })
-      if (!result || Number(result.Code) !== 1 || !result.Data) throw new Error((result && result.Msg) || '选择数据表不存在')
-      this.table = result.Data
-      this.definition = await loadNativeFormDefinition(this.table.Name)
+      this.table = await loadNativeTableModel(tableId || this.config.TableName, {
+        menuId: this.targetMenuId
+      })
+      this.definition = await loadNativeFormDefinition(this.table.Name, false, {
+        menuId: this.targetMenuId
+      })
     },
     async openSelector() {
       if (this.readonly) return
-      if (['XuanzeSHSB', 'XuanzeGLSP', 'XuanzeFA', 'XuanzeFAXX'].includes(this.field.Name) && !this.parentForm.KehuID) {
-        uni.showToast({ title: '请先选择客户', icon: 'none' })
+      const validationMessage = validateOpenTableContext(this.field, this.parentForm)
+      if (validationMessage) {
+        uni.showToast({ title: validationMessage, icon: 'none' })
         return
       }
       this.visible = true
@@ -151,6 +158,7 @@ export default {
         const result = await V8.FormEngine.GetTableData(this.table.Name, {
           _Keyword: this.keyword.trim(),
           _Where: getOpenTableWhere(this.field, this.parentForm),
+          ...(this.targetMenuId ? { _SysMenuId: this.targetMenuId } : {}),
           _OrderBy: 'CreateTime',
           _OrderByType: 'DESC',
           _PageIndex: this.pageIndex,

@@ -35,10 +35,10 @@
     <scroll-view
       class="news-list-wrap"
       scroll-y
-      :scroll-top="xjyScrollCommand"
+      :scroll-top="mciScrollCommand"
       :refresher-enabled="true"
       :refresher-triggered="refreshing"
-      @scroll="handleXjyListScroll"
+      @scroll="handleMciListScroll"
       @refresherrefresh="onRefresh"
       @scrolltolower="loadMore"
     >
@@ -234,7 +234,7 @@ export default {
     // 轮播图点击
     onBannerTap(item) {
       if (item.Leixing === '商品' && item.Lianjie) {
-        this.xjyNavigateToDetail('/pages/mall/detail?id=' + item.Lianjie)
+        this.mciNavigateToDetail('/pages/mall/detail?id=' + item.Lianjie)
       } else if (item.Leixing === '链接' && item.Lianjie) {
         // 外部链接暂不处理
       }
@@ -280,7 +280,7 @@ export default {
 
     // 跳转详情
     goDetail(id) {
-      this.xjyNavigateToDetail('/pages/news/detail?id=' + id)
+      this.mciNavigateToDetail('/pages/news/detail?id=' + id)
     }
   }
 }

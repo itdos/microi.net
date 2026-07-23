@@ -8,9 +8,11 @@ const WebSocketClient = globalThis.WebSocket || require('ws')
 
 const account = process.env.XJY_SMOKE_ACCOUNT || ''
 const password = process.env.XJY_SMOKE_PASSWORD || ''
-const baseUrl = process.env.XJY_SMOKE_URL || 'http://127.0.0.1:5198'
+const configuredBaseUrl = process.env.XJY_SMOKE_URL || ''
+const requireOrderCount = process.env.XJY_SMOKE_REQUIRE_ORDER_COUNT === '1'
 const workspaceRoot = findWorkspaceRoot(path.resolve(__dirname, '..'))
 const outputRoot = path.join(workspaceRoot, '.tmp', 'xjy-live-smoke')
+const h5Root = path.resolve(__dirname, '../dist/build/h5')
 
 const pages = [
   { name: 'workspace', route: '/#/pages/workspace/index', root: '.home-page', ready: '.quick-grid', settled: '.metric-value:not(.metric-skeleton)', expectedText: ['合同订单'] },
@@ -29,7 +31,7 @@ const pages = [
   },
   {
     name: 'native-current-user', dynamicRoute: 'currentUserForm', root: '.native-form-page',
-    ready: '.form-section, .error-state', checkImages: true, forbiddenText: ['密码', 'Token', 'OpenId']
+    ready: '.form-section, .form-state', checkImages: true, forbiddenText: ['密码', 'Token', 'OpenId']
   },
   {
     name: 'profile', route: '/#/pages/profile/index', root: '.profile-page', ready: '.menu-group',
@@ -67,6 +69,39 @@ function getFreePort() {
       const port = server.address().port
       server.close(() => resolve(port))
     })
+  })
+}
+
+function createStaticServer() {
+  const contentTypes = {
+    '.css': 'text/css; charset=utf-8',
+    '.html': 'text/html; charset=utf-8',
+    '.ico': 'image/x-icon',
+    '.jpeg': 'image/jpeg',
+    '.jpg': 'image/jpeg',
+    '.js': 'application/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml; charset=utf-8',
+    '.webp': 'image/webp'
+  }
+  return http.createServer((request, response) => {
+    const requestPath = decodeURIComponent(String(request.url || '/').split('?')[0])
+    const relativePath = requestPath === '/' ? 'index.html' : requestPath.replace(/^\/+/, '')
+    const candidate = path.resolve(h5Root, relativePath)
+    if (!candidate.startsWith(h5Root)) {
+      response.writeHead(403)
+      response.end('Forbidden')
+      return
+    }
+    const filePath = fs.existsSync(candidate) && fs.statSync(candidate).isFile()
+      ? candidate
+      : path.join(h5Root, 'index.html')
+    response.writeHead(200, {
+      'Cache-Control': 'no-store',
+      'Content-Type': contentTypes[path.extname(filePath).toLowerCase()] || 'application/octet-stream'
+    })
+    fs.createReadStream(filePath).pipe(response)
   })
 }
 
@@ -154,6 +189,19 @@ async function main() {
   if (!browserPath) fail('Chrome or Edge was not found')
   fs.mkdirSync(outputRoot, { recursive: true })
 
+  let appServer = null
+  let baseUrl = configuredBaseUrl
+  if (!baseUrl) {
+    if (!fs.existsSync(path.join(h5Root, 'index.html'))) fail('H5 build not found. Run npm run build:h5 first')
+    const appPort = await getFreePort()
+    appServer = createStaticServer()
+    await new Promise((resolve, reject) => {
+      appServer.once('error', reject)
+      appServer.listen(appPort, '127.0.0.1', resolve)
+    })
+    baseUrl = `http://127.0.0.1:${appPort}`
+  }
+
   const debugPort = await getFreePort()
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xjy-live-smoke-'))
   const browser = spawn(browserPath, [
@@ -228,8 +276,6 @@ async function main() {
         return { present: Boolean(value), length: value.length, literalNull: /^(null|undefined|\[\]|\{\})$/i.test(value), absolute: /^(https?:|data:|blob:)/i.test(value) };
       } catch (error) { return { parseError: true }; }
     })()`)
-    const currentUser = await evaluate(cdp, `(() => { try { return JSON.parse(localStorage.getItem('microi_user') || '{}'); } catch (error) { return {}; } })()`)
-
     for (const page of pages) {
       context = page.name
       const consoleStart = consoleErrors.length
@@ -238,7 +284,7 @@ async function main() {
       if (page.dynamicRoute === 'currentUserForm') {
         const userId = await evaluate(cdp, `(() => { try { return JSON.parse(localStorage.getItem('microi_user') || '{}').Id || ''; } catch (error) { return ''; } })()`)
         if (!userId) fail('Current user Id is missing for native form smoke')
-        pageRoute = `/#/pages/native-form/index?table=Sys_User&id=${encodeURIComponent(userId)}&mode=View&title=${encodeURIComponent('个人资料')}`
+        pageRoute = `/#/pages/native-form/index?table=Sys_User&id=${encodeURIComponent(userId)}&mode=View&title=${encodeURIComponent('个人资料')}&recordAdapter=current-user&related=0`
       }
       const route = pageRoute.startsWith('/#') ? pageRoute.slice(1) : pageRoute
       await cdp.send('Page.navigate', { url: `${baseUrl}/?liveSmoke=${Date.now()}${route}` })
@@ -332,7 +378,7 @@ async function main() {
           textLength: bodyText.length, taskStats,
           forbidden, expectedTextMissing, titleState, metrics,
           failedImages,
-          errorState: Boolean(document.querySelector('.error-state')),
+          errorState: Boolean(document.querySelector('.error-state, .form-state')),
           loginVisible: Boolean(document.querySelector('.login-container')),
           avatarFallback: Boolean(document.querySelector('.avatar')) && !document.querySelector('.avatar image')
         };
@@ -359,7 +405,7 @@ async function main() {
       if (page.captureTaskStats && (!state.taskStats || state.taskStats.typeKeys < 1 || state.taskStats.stateKeys < 7 || state.taskStats.periodKeys < 7 || state.taskStats.typeTotal !== state.taskStats.count || state.taskStats.stateTotal !== state.taskStats.count)) {
         fail(`Live task statistics are inconsistent: ${JSON.stringify(state.taskStats)}`)
       }
-      if (page.name === 'workspace' && String(currentUser.Account || '') === '13575718658') {
+      if (page.name === 'workspace' && requireOrderCount) {
         const orderCount = Number(String(state.metrics['合同订单'] || '').replace(/[^\d.]/g, ''))
         if (!(orderCount > 0)) fail(`Manager contract statistics should be greater than zero: ${JSON.stringify(state.metrics)}`)
       }
@@ -374,6 +420,7 @@ async function main() {
   } finally {
     if (cdp) cdp.close()
     if (!browser.killed) browser.kill()
+    if (appServer) await new Promise((resolve) => appServer.close(resolve))
     try { fs.rmSync(profileDir, { recursive: true, force: true }) } catch (error) {}
   }
 }

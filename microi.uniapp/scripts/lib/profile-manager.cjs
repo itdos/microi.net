@@ -50,13 +50,37 @@ function generatedTenantNativeTableSource(profile) {
   ].join('\n')
 }
 
+function generatedTenantFormSource(profile) {
+  const modulePath = `@/tenants/${profile.tenantModule}/form.js`
+  return [
+    '// Generated from the active profile. Keep tenant form behavior out of platform pages.',
+    `import tenantForm from '${modulePath}'`,
+    'const activeTenantForm = tenantForm',
+    'export default activeTenantForm',
+    ''
+  ].join('\n')
+}
+
+function generatedTenantRuntimeSource(profile) {
+  const modulePath = `@/tenants/${profile.tenantModule}/runtime.js`
+  return [
+    '// Generated from the active profile. Keep tenant runtime behavior out of platform modules.',
+    `import tenantRuntime from '${modulePath}'`,
+    'const activeTenantRuntime = tenantRuntime',
+    'export default activeTenantRuntime',
+    ''
+  ].join('\n')
+}
+
 function getProfileArtifacts(profileId) {
   const profile = loadProfile(profileId)
   const pagesSource = profilePath(profileId, 'pages.json')
   const manifestSource = profilePath(profileId, 'manifest.json')
   const tenantSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'business.js')
   const tenantNativeTableSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'native-table.js')
-  for (const required of [pagesSource, manifestSource, tenantSource, tenantNativeTableSource]) {
+  const tenantFormSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'form.js')
+  const tenantRuntimeSource = path.join(projectRoot, 'src', 'tenants', profile.tenantModule, 'runtime.js')
+  for (const required of [pagesSource, manifestSource, tenantSource, tenantNativeTableSource, tenantFormSource, tenantRuntimeSource]) {
     if (!fs.existsSync(required)) throw new Error(`Profile 缺少文件: ${required}`)
   }
   return [
@@ -79,6 +103,14 @@ function getProfileArtifacts(profileId) {
     {
       target: path.join(projectRoot, 'src', 'generated', 'tenant-native-table.js'),
       content: Buffer.from(generatedTenantNativeTableSource(profile), 'utf8')
+    },
+    {
+      target: path.join(projectRoot, 'src', 'generated', 'tenant-form.js'),
+      content: Buffer.from(generatedTenantFormSource(profile), 'utf8')
+    },
+    {
+      target: path.join(projectRoot, 'src', 'generated', 'tenant-runtime.js'),
+      content: Buffer.from(generatedTenantRuntimeSource(profile), 'utf8')
     }
   ]
 }
@@ -109,5 +141,7 @@ module.exports = {
   activateProfile,
   generatedProfileSource,
   generatedTenantSource,
-  generatedTenantNativeTableSource
+  generatedTenantNativeTableSource,
+  generatedTenantFormSource,
+  generatedTenantRuntimeSource
 }

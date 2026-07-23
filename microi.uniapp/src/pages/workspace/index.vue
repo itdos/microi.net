@@ -125,6 +125,7 @@ import {
   getRoleProfile
 } from '@/platform/business.js'
 import { openBusiness, scanDevice } from '@/platform/business-runtime.js'
+import { loadAccessibleModuleGroups } from '@/platform/module-registry.js'
 import { loadSummarySnapshot, readSummarySnapshot, warmPrimaryTabs } from '@/platform/preload.js'
 import { hasFeature, getProfileRoute } from '@/platform/profile/index.js'
 import { captureInvitation } from '@/platform/invitation.js'
@@ -139,6 +140,7 @@ export default {
       isLoggedIn: false,
       currentUser: {},
       businessGroups,
+      runtimeBusinessGroups: [],
       summary: { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 },
       summaryLoading: false,
       refreshing: false,
@@ -199,12 +201,17 @@ export default {
     },
     visibleBusinessGroups() {
       const allowed = new Set(this.roleProfile.allowedGroupKeys || [])
-      return this.businessGroups.filter((group) => allowed.has(group.key))
+      const configured = allowed.size
+        ? this.businessGroups.filter((group) => allowed.has(group.key))
+        : this.businessGroups
+      return configured.concat(this.runtimeBusinessGroups)
     },
     quickEntries() {
       const keys = [...this.roleProfile.primaryActions, ...quickActions]
       const unique = [...new Set(keys)].slice(0, 8)
-      return unique.map((key) => ({ key, ...getBusinessEntry(key) })).filter((item) => item.title)
+      const configured = unique.map((key) => ({ key, ...getBusinessEntry(key) })).filter((item) => item.title)
+      if (configured.length || !this.runtimeBusinessGroups.length) return configured
+      return this.runtimeBusinessGroups.flatMap((group) => group.items || []).slice(0, 8)
     }
   },
   onLoad(options) {
@@ -223,7 +230,8 @@ export default {
   onShow() {
     this.currentUser = getUser() || {}
     this.isLoggedIn = !!getToken()
-    if (this.isLoggedIn) this.loadSummary()
+    if (this.isLoggedIn && this.featureEnabled('business')) this.loadSummary()
+    if (this.isLoggedIn && this.featureEnabled('dynamicModules')) this.loadRuntimeModules()
   },
   methods: {
     featureEnabled(name) {
@@ -254,7 +262,22 @@ export default {
       return String(number)
     },
     openModule(key) {
+      const runtime = this.runtimeBusinessGroups.flatMap((group) => group.items || [])
+        .find((item) => item.key === key)
+      if (runtime) {
+        uni.navigateTo({
+          url: `/pages/module/list?menuId=${encodeURIComponent(runtime.menuId || runtime.key)}`
+        })
+        return
+      }
       openBusiness(key)
+    },
+    async loadRuntimeModules(refresh = false) {
+      try {
+        this.runtimeBusinessGroups = await loadAccessibleModuleGroups(refresh)
+      } catch (error) {
+        this.runtimeBusinessGroups = []
+      }
     },
     handleScan() {
       scanDevice()
@@ -276,7 +299,11 @@ export default {
         return
       }
       try {
-        await Promise.all([this.loadSummary(true), this.loadBrand()])
+        await Promise.all([
+          this.featureEnabled('business') ? this.loadSummary(true) : Promise.resolve(),
+          this.loadBrand(),
+          this.featureEnabled('dynamicModules') ? this.loadRuntimeModules(true) : Promise.resolve()
+        ])
       } finally {
         this.refreshing = false
       }

@@ -1,0 +1,14 @@
+---
+description: Microi native mobile architecture and tenant isolation
+alwaysApply: true
+---
+
+Read `AGENTS.md` and `docs/architecture.md` before editing.
+Keep `src/platform`, `src/pages/module`, and shared `mci-*` components tenant
+neutral. Put customer code in `src/tenants/<tenant>` and branding/routes in
+`profiles/<profile>`. Use sys_menu/diy_table/diy_field metadata and physical
+ViewSchema fields. Read metadata only through
+`V8.FormEngine.GetDiyTableModel/GetDiyFieldList`; do not query protected
+`diy_table/diy_field` with ordinary CRUD or add raw metadata endpoint URLs to
+pages and controls. Never use retired DiyConfig, arbitrary frontend V8, eval,
+or new Function. Preserve the default xjy delivery and validate both profiles.

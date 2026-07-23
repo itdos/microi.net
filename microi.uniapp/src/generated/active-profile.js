@@ -48,6 +48,7 @@ export default {
     "business": true,
     "businessCatalog": true,
     "dynamicForm": true,
+    "dynamicModules": false,
     "invitations": true,
     "mall": true,
     "messages": true,

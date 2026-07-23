@@ -1,5 +1,5 @@
 import { V8, getUser, post } from '@/utils/request.js'
-import { PERIOD_OPTIONS, buildPeriodRange, callApiEngine, formatFieldValue, formatRegion } from '@/platform/business-runtime.js'
+import { PERIOD_OPTIONS, buildPeriodRange, callApiEngine, findMenu, formatFieldValue, formatRegion } from '@/platform/business-runtime.js'
 import { cachedRequest, readPageState, removeCachePrefix, writePageState } from '@/platform/cache.js'
 
 export const TASK_STATES = [
@@ -37,6 +37,22 @@ export const TASK_PHOTO_FIELDS = [
 ]
 
 const TASK_PERMISSION_ID = 'aab7df97-4009-4d9f-89f7-ed30e5eba3fb'
+let taskMenuPromise = null
+
+function taskIdentity() {
+  const user = getUser() || {}
+  return String(user.Id || user.Account || 'guest')
+}
+
+async function taskMenuId(refresh = false) {
+  if (refresh) taskMenuPromise = null
+  if (!taskMenuPromise) {
+    taskMenuPromise = findMenu(['售后订单', '售后任务'], 'Diy_ShouhouDD', refresh)
+      .then((menu) => menu && menu.Id || '')
+      .catch(() => '')
+  }
+  return taskMenuPromise
+}
 
 export function hasTaskPermission(name, user = getUser() || {}) {
   if (Number(user.Level || 0) >= 999) return true
@@ -109,7 +125,9 @@ export async function loadTasks(options = {}) {
     _OrderByType: options.orderType || 'ASC',
     _Where: where
   }
-  const key = `task:list:${JSON.stringify(payload)}`
+  const menuId = await taskMenuId(options.refresh === true)
+  if (menuId) payload._SysMenuId = menuId
+  const key = `task:list:${taskIdentity()}:${JSON.stringify(payload)}`
   const cached = await cachedRequest(key, () => post('/api/ModuleEngine/GetTableData', payload, true), {
     maxAge: pageIndex === 1 ? 30 * 1000 : 10 * 1000,
     refresh: options.refresh === true,
@@ -206,7 +224,10 @@ export async function loadTaskPeriodCounts(filters = {}) {
 }
 
 export async function loadTask(id, refresh = false) {
-  const cached = await cachedRequest(`task:detail:${id}`, () => V8.FormEngine.GetFormData('Diy_ShouhouDD', { Id: id }), {
+  const menuId = await taskMenuId(refresh)
+  const payload = { Id: id }
+  if (menuId) payload._SysMenuId = menuId
+  const cached = await cachedRequest(`task:detail:${taskIdentity()}:${id}`, () => V8.FormEngine.GetFormData('Diy_ShouhouDD', payload), {
     maxAge: 20 * 1000,
     refresh,
     allowStale: true
@@ -216,7 +237,7 @@ export async function loadTask(id, refresh = false) {
 }
 
 export async function loadTaskDevices(taskId, refresh = false) {
-  const cached = await cachedRequest(`task:devices:${taskId}`, () => V8.FormEngine.GetTableData('diy_shouhousp', {
+  const cached = await cachedRequest(`task:devices:${taskIdentity()}:${taskId}`, () => V8.FormEngine.GetTableData('diy_shouhousp', {
     _Where: [{ Name: 'ShouhouDDID', Type: '=', Value: taskId }],
     _OrderBy: 'CreateTime',
     _OrderByType: 'ASC',
@@ -265,7 +286,10 @@ export async function loadServiceUsers(keyword = '') {
 }
 
 export async function updateTask(id, values) {
-  ensureSuccess(await V8.FormEngine.UptFormData('Diy_ShouhouDD', { Id: id, ...values, _InvokeType: 'Client' }), '任务更新失败')
+  const payload = { Id: id, ...values, _InvokeType: 'Client' }
+  const menuId = await taskMenuId()
+  if (menuId) payload._SysMenuId = menuId
+  ensureSuccess(await V8.FormEngine.UptFormData('Diy_ShouhouDD', payload), '任务更新失败')
   invalidateTask(id)
 }
 

@@ -68,7 +68,7 @@
 
 <script>
 import { V8 } from '@/utils/request.js'
-import { fieldDisplayValue, loadNativeFormDefinition } from '@/platform/native-form.js'
+import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
 import { openForm } from '@/platform/business-runtime.js'
 
 const EXCLUDED_COLUMNS = new Set([
@@ -87,6 +87,9 @@ export default {
     field: { type: Object, required: true },
     parentId: { type: [String, Number], default: '' },
     parentForm: { type: Object, default: () => ({}) },
+    parentMenuId: { type: String, default: '' },
+    parentTableId: { type: String, default: '' },
+    parentMode: { type: String, default: 'View' },
     readonly: { type: Boolean, default: false }
   },
   data() {
@@ -106,10 +109,22 @@ export default {
       return this.field.Label || this.config.TableChildSysMenuName || this.childConfig.Title || this.table?.Description || this.table?.Name || this.field.Name || '关联数据'
     },
     childTableId() { return this.config.TableChildTableId || '' },
+    childMenuId() { return this.config.TableChildSysMenuId || '' },
     childFkField() { return this.config.TableChildFkFieldName || '' },
     relationValue() {
       const parentField = this.childConfig.PrimaryTableFieldName
       return unwrapValue(parentField ? this.parentForm[parentField] : this.parentId)
+    },
+    tableChildAuth() {
+      if (!this.field.Id || !this.parentTableId || !this.parentMenuId || !this.parentId || !this.relationValue) return null
+      return {
+        ParentFieldId: this.field.Id,
+        ParentTableId: this.parentTableId,
+        ParentSysMenuId: this.parentMenuId,
+        ParentRowId: String(this.parentId),
+        ParentValue: String(this.relationValue),
+        ParentFormMode: this.parentMode || (this.readonly ? 'View' : 'Edit')
+      }
     },
     canMaintain() { return !this.readonly && Boolean(this.relationValue && this.childFkField && (this.childTableName || this.childTableId)) },
     childTableName() { return this.table ? this.table.Name : '' },
@@ -135,8 +150,8 @@ export default {
       }
     }
   },
-  created() { uni.$on('xjy:data-changed', this.handleDataChanged) },
-  beforeUnmount() { uni.$off('xjy:data-changed', this.handleDataChanged) },
+  created() { uni.$on('microi:data-changed', this.handleDataChanged) },
+  beforeUnmount() { uni.$off('microi:data-changed', this.handleDataChanged) },
   methods: {
     async toggleExpanded() {
       this.expanded = !this.expanded
@@ -144,12 +159,14 @@ export default {
     },
     async resolveDefinition(refresh = false) {
       if (!this.childTableId) throw new Error('子表未配置数据表')
-      const tableResult = await V8.FormEngine.GetFormData('diy_table', { Id: this.childTableId })
-      if (!tableResult || Number(tableResult.Code) !== 1 || !tableResult.Data) {
-        throw new Error((tableResult && tableResult.Msg) || '子表配置不存在')
-      }
-      this.table = tableResult.Data
-      this.definition = await loadNativeFormDefinition(this.table.Name, refresh)
+      this.table = await loadNativeTableModel(this.childTableId, {
+        menuId: this.childMenuId,
+        tableChildAuth: this.tableChildAuth
+      })
+      this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
+        menuId: this.childMenuId,
+        tableChildAuth: this.tableChildAuth
+      })
     },
     async loadRows(refresh = false) {
       if (!this.relationValue) return
@@ -160,6 +177,8 @@ export default {
         if (!this.childFkField) throw new Error('子表未配置关联字段')
         const result = await V8.FormEngine.GetTableData(this.childTableName, {
           _Where: [{ Name: this.childFkField, Type: '=', Value: this.relationValue }],
+          ...(this.childMenuId ? { _SysMenuId: this.childMenuId } : {}),
+          ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {}),
           _OrderBy: 'CreateTime',
           _OrderByType: 'DESC',
           _PageIndex: 1,
@@ -185,6 +204,8 @@ export default {
         rowId: row.Id,
         mode: this.readonly ? 'View' : 'Edit',
         title: `${this.sectionTitle}详情`,
+        menuId: this.childMenuId,
+        tableChildAuth: this.tableChildAuth,
         includeRelated: false
       })
     },
@@ -200,6 +221,8 @@ export default {
         table: this.childTableName,
         mode: 'Add',
         title: `新增${this.sectionTitle}`,
+        menuId: this.childMenuId,
+        tableChildAuth: this.tableChildAuth,
         defaultValues: { [this.childFkField]: this.relationValue },
         includeRelated: false
       })
@@ -213,7 +236,13 @@ export default {
         success: async ({ confirm }) => {
           if (!confirm) return
           try {
-            const result = await V8.FormEngine.DelFormData({ FormEngineKey: this.childTableName, Id: row.Id, _InvokeType: 'Client' })
+            const result = await V8.FormEngine.DelFormData({
+              FormEngineKey: this.childTableName,
+              Id: row.Id,
+              _InvokeType: 'Client',
+              ...(this.childMenuId ? { _SysMenuId: this.childMenuId } : {}),
+              ...(this.tableChildAuth ? { _TableChildAuth: this.tableChildAuth } : {})
+            })
             if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '删除失败')
             uni.showToast({ title: '已删除', icon: 'success' })
             await this.loadRows(true)

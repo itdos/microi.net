@@ -40,7 +40,12 @@
 
 <script>
 import { V8 } from '@/utils/request.js'
-import { fieldDisplayValue, loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
+import {
+  fieldDisplayValue,
+  loadNativeFormDefinition,
+  loadNativeTableModel,
+  parseJson
+} from '@/platform/native-form.js'
 import { parseTableWhere } from '@/platform/native-table.js'
 import { openForm } from '@/platform/business-runtime.js'
 
@@ -50,11 +55,13 @@ export default {
   name: 'MciRelatedTable',
   props: {
     field: { type: Object, required: true },
-    parentForm: { type: Object, default: () => ({}) }
+    parentForm: { type: Object, default: () => ({}) },
+    parentMenuId: { type: String, default: '' }
   },
   data() { return { table: null, definition: null, rows: [], expanded: false, loading: false, error: '' } },
   computed: {
     config() { return (this.field.config && this.field.config.JoinTable) || {} },
+    targetMenuId() { return this.config.ModuleId || this.config.SysMenuId || '' },
     sectionTitle() { return this.field.Label || this.config.ModuleName || (this.table && this.table.Description) || '关联数据' },
     columns() {
       if (!this.definition) return []
@@ -67,9 +74,9 @@ export default {
     secondaryColumns() { return this.columns.filter((item) => item !== this.titleColumn).slice(0, 3) }
   },
   created() {
-    uni.$on('xjy:data-changed', this.handleDataChanged)
+    uni.$on('microi:data-changed', this.handleDataChanged)
   },
-  beforeUnmount() { uni.$off('xjy:data-changed', this.handleDataChanged) },
+  beforeUnmount() { uni.$off('microi:data-changed', this.handleDataChanged) },
   methods: {
     async toggleExpanded() {
       this.expanded = !this.expanded
@@ -78,10 +85,12 @@ export default {
     async resolveTable(refresh = false) {
       if (this.table && !refresh) return
       if (!this.config.TableId) throw new Error('关联表格未配置数据表')
-      const result = await V8.FormEngine.GetFormData('diy_table', { Id: this.config.TableId })
-      if (!result || Number(result.Code) !== 1 || !result.Data) throw new Error((result && result.Msg) || '关联表格配置不存在')
-      this.table = result.Data
-      this.definition = await loadNativeFormDefinition(this.table.Name, refresh)
+      this.table = await loadNativeTableModel(this.config.TableId, {
+        menuId: this.targetMenuId
+      })
+      this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
+        menuId: this.targetMenuId
+      })
     },
     buildWhere() {
       const where = parseTableWhere(this.config.Where || this.config.Search, this.parentForm)
@@ -100,6 +109,7 @@ export default {
         await this.resolveTable(refresh)
         const result = await V8.FormEngine.GetTableData(this.table.Name, {
           _Where: this.buildWhere(),
+          ...(this.targetMenuId ? { _SysMenuId: this.targetMenuId } : {}),
           _OrderBy: 'CreateTime',
           _OrderByType: 'DESC',
           _PageIndex: 1,
@@ -117,7 +127,14 @@ export default {
     rowTitle(row) { return this.titleColumn ? this.display(this.titleColumn, row[this.titleColumn.Name]) : `记录 ${String(row.Id || '').slice(-6)}` },
     openRow(row) {
       if (this.table && row.Id) {
-        openForm({ table: this.table.Name, rowId: row.Id, mode: 'View', title: `${this.sectionTitle}详情`, includeRelated: false })
+        openForm({
+          table: this.table.Name,
+          rowId: row.Id,
+          mode: 'View',
+          title: `${this.sectionTitle}详情`,
+          menuId: this.targetMenuId,
+          includeRelated: false
+        })
       }
     },
     handleDataChanged(payload = {}) {

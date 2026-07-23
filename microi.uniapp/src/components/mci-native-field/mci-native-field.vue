@@ -196,6 +196,7 @@ import {
   loadNativeFieldOptionPage,
   parseJson
 } from '@/platform/native-form.js'
+import appConfig from '@/config.js'
 import { V8 } from '@/utils/request.js'
 import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
 
@@ -207,7 +208,10 @@ export default {
     modelValue: { type: [String, Number, Boolean, Array, Object], default: '' },
     readonly: { type: Boolean, default: false },
     tableName: { type: String, default: '' },
-    formData: { type: Object, default: () => ({}) }
+    formData: { type: Object, default: () => ({}) },
+    menuId: { type: String, default: '' },
+    moduleEngineKey: { type: String, default: '' },
+    tableChildAuth: { type: Object, default: null }
   },
   emits: ['update:modelValue', 'change', 'select'],
   data() {
@@ -254,7 +258,10 @@ export default {
     booleanValue() { return this.modelValue === true || this.modelValue === 1 || this.modelValue === '1' || String(this.modelValue).toLowerCase() === 'true' },
     numberValue() { const value = Number(this.modelValue || 0); return Number.isFinite(value) ? value : 0 },
     inputType() { return ['tel', 'number', 'digit', 'idcard'].includes(this.field.inputMode) ? this.field.inputMode : 'text' },
-    uploadPath() { return `xjy/native/${String(this.tableName || 'form').toLowerCase()}/${this.field.Name}` },
+    uploadPath() {
+      const tenant = String(appConfig.osClient || appConfig.tenantKey || 'microi').toLowerCase()
+      return `${tenant}/native/${String(this.tableName || 'form').toLowerCase()}/${this.field.Name}`
+    },
     mediaMaxCount() {
       if (this.isAvatar) return 1
       const config = this.field.config || {}
@@ -491,7 +498,10 @@ export default {
         const page = await loadNativeFieldOptionPage(this.field, this.formData, {
           keyword: this.searchKeyword,
           pageIndex: this.optionPageIndex,
-          pageSize: this.optionPageSize
+          pageSize: this.optionPageSize,
+          menuId: this.menuId,
+          moduleEngineKey: this.moduleEngineKey,
+          tableChildAuth: this.tableChildAuth
         })
         if (!this.selectorOpen || requestId !== this.optionRequestId) return
         if (page.clientPaging) {
@@ -525,7 +535,10 @@ export default {
         const page = await loadNativeFieldOptionPage(this.field, this.formData, {
           keyword: this.searchKeyword,
           pageIndex: this.optionPageIndex,
-          pageSize: this.optionPageSize
+          pageSize: this.optionPageSize,
+          menuId: this.menuId,
+          moduleEngineKey: this.moduleEngineKey,
+          tableChildAuth: this.tableChildAuth
         })
         if (!this.selectorOpen || requestId !== this.optionRequestId) return
         if (page.clientPaging) {

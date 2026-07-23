@@ -64,6 +64,15 @@
       ]
     },
     {
+      "name": "module",
+      "root": "pages/module",
+      "pages": [
+        { "path": "catalog", "style": { "navigationBarTitleText": "全部应用", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
+        { "path": "list", "style": { "navigationBarTitleText": "业务列表", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa", "enablePullDownRefresh": false } },
+        { "path": "detail", "style": { "navigationBarTitleText": "业务详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } }
+      ]
+    },
+    {
       "name": "ai",
       "root": "pages/ai",
       "pages": [

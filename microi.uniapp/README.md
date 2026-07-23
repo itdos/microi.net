@@ -60,6 +60,24 @@ AI 总开关位于“系统设置”的 `是否显示AI助手（IsShowAiAssistan
 
 `src/components/mci-native-field/` 是表单的统一原生字段入口，`src/config/mci-native-controls.json` 对应 Microi 表单引擎的官方控件清单。当前自动检查覆盖 **44/44** 个官方控件。
 
+### 统一视图协议与自动更新
+
+小程序以 `sys_menu` 作为业务入口与授权上下文，以 `diy_table/diy_field` 作为字段事实源。`sys_menu` 的 `EnableViewSchema`、`ViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion` 物理字段可配置 `List/Card/Detail/Edit` 场景，以及 `PC/Mobile/All` 和角色差异视图。`diy_table/diy_field/sys_menu.DiyConfig` 已废弃，不能用于新配置。
+
+- 后台新增字段，或修改字段名称、顺序、显隐、控件、校验、数据源和 Tabs 分组后，客户端会按版本指纹检查并拉取新定义，无需重新发布小程序。
+- 未配置 ViewSchema 时，通用模块自动使用 `sys_menu` 移动列、卡片列和完整表单定义；配置不完整或网络失败时回退最近可用版本，不能白屏。
+- ViewSchema 只负责视觉组合。普通字段、关联字段和上传控件仍来自 `diy_field`；MetricStrip 可读取字段或调用 ApiEngine；ActionSchema 仅允许白名单动作。
+- 集福鲤客户、合同订单、设备和售后详情保留已交付的 Hero、指标、快捷入口与原生流程，同时把后台新增但未显式编排的字段自动追加到折叠分组，避免定制视觉导致字段丢失。
+- 列表、详情、编辑和保存请求尽量携带当前真实 `_SysMenuId`，服务端继续执行最终的菜单、表和数据权限校验。
+- 特殊安全域通过 `src/platform/form-record-adapter.js` 解耦动态 UI 与数据授权。普通表单使用 `form-engine`；“个人资料”使用服务端按当前 Token 限定的 `current-user` 接口，不伪造 `_SysMenuId`，也不能修改角色、部门、状态等管理字段。
+
+表单元数据统一通过 `V8.FormEngine.GetDiyTableModel/GetDiyFieldList` 调用当前
+FormEngine 缓存入口，并携带真实菜单上下文；页面和控件不得使用普通 CRUD
+直接读取受保护的 `diy_table/diy_field`。客户端按 30 秒窗口复核服务端缓存
+元数据并计算指纹：指纹未变复用本地定义，变化时写入新版本缓存。新增一种
+客户端原生能力、客户专属页面或新 ActionType 才需要发版；普通后台字段和
+视图调整不需要。
+
 已实现的原生类型包括：
 
 - 文本、多行文本、代码/JSON、富文本、数字、开关、滑块、评分和进度。
@@ -129,6 +147,31 @@ microi.uniapp/
 |- dist/build/mp-weixin/     # 微信小程序生产构建产物
 `- package.json
 ```
+
+## 多租户定制与多人协作
+
+标准产品代码、租户定制和构建配置必须分层维护：
+
+- `src/platform/`、`src/components/mci-*`、`src/pages/module/` 不得出现租户表名、字段名、品牌素材或客户文案。
+- `src/tenants/<tenant>/` 存放客户专属业务组合、运行时行为、表单钩子和复杂子表规则；扫码、定位、相机、售后流程等可以增加专属原生页面。
+- `profiles/<id>/` 是 OsClient、API、品牌、功能开关、路由和真实编译范围的事实源。
+- `src/generated/`、`src/pages.json`、`src/manifest.json` 是 Profile 生成物，不手工修改。仓库默认生成物必须始终指向 `xjy`，保证普通构建与当前集福鲤交付版一致。
+
+创建新客户 Profile：
+
+```bash
+npm run tenant:create -- demo 示例项目 demo https://api.example.com
+npm run profile:run -- demo dev mp-weixin
+npm run profile:run -- demo build mp-weixin
+```
+
+多人合并时若生成文件冲突，以 `profiles/` 和 `src/tenants/` 为准，然后执行：
+
+```bash
+npm run profile:sync -- xjy
+```
+
+仓库提供 `AGENTS.md`、`CLAUDE.md`、`.github/copilot-instructions.md` 和 `.cursor/rules/`，让常见 AI 编程工具自动加载同一套边界；根仓库还提供 `.github/instructions/microi-uniapp.instructions.md`。提交前的 `check:architecture` 会阻止平台层混入租户标识、任意前端 V8、`eval/new Function`、废弃 DiyConfig、缺失租户合同、错误 Profile 路由和默认生成物漂移。完整协作流程见 `CONTRIBUTING.md` 与 `docs/architecture.md`。
 
 ## 本地开发
 

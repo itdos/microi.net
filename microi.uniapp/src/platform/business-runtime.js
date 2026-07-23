@@ -2,11 +2,12 @@ import appConfig from '@/config.js'
 import { V8, getToken, getUser } from '@/utils/request.js'
 import { post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule, getRoleProfile } from '@/platform/business.js'
-import { cachedRequest, removeCachePrefix } from '@/platform/cache.js'
+import { cachedRequest } from '@/platform/cache.js'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
+import tenantRuntime from '@/generated/tenant-runtime.js'
 
-const TABLE_CACHE_KEY = 'xjy_diy_table_ids_v1'
-const MENU_CACHE_KEY = 'xjy_mobile_menu_tree_v1'
+const TABLE_CACHE_KEY = 'microi_diy_table_ids_v2'
+const MENU_CACHE_KEY = 'microi_mobile_menu_tree_v2'
 let tableIdCache = null
 let menuTreeCache = null
 
@@ -72,6 +73,35 @@ export function formatFieldValue(value, format, options = {}) {
   return formatStructuredValue(value, { ...options, empty })
 }
 
+export function statisticsFieldValue(dataAppend, fieldName, fallback = 0) {
+  if (!fieldName) return fallback
+  let source = dataAppend && dataAppend.StatisticsFields !== undefined
+    ? dataAppend.StatisticsFields
+    : dataAppend
+  for (let index = 0; index < 2 && typeof source === 'string'; index += 1) {
+    try {
+      source = JSON.parse(source)
+    } catch (error) {
+      return fallback
+    }
+  }
+  if (Array.isArray(source)) {
+    const row = source.find((item) => {
+      const name = item && (item.Name || item.name || item.Field || item.field || item.Key || item.key)
+      return String(name || '').toLowerCase() === String(fieldName).toLowerCase()
+    })
+    if (!row) return fallback
+    const value = row.Value ?? row.value ?? row.Sum ?? row.sum ?? row.Total ?? row.total
+    return value === undefined || value === null || value === '' ? fallback : value
+  }
+  if (!source || typeof source !== 'object') return fallback
+  const key = Object.keys(source).find((name) =>
+    String(name).toLowerCase() === String(fieldName).toLowerCase()
+  )
+  const value = key ? source[key] : undefined
+  return value === undefined || value === null || value === '' ? fallback : value
+}
+
 export function buildPeriodRange(period, customRange = null) {
   if (!period || period === 'all') return null
   if (period === 'custom') return Array.isArray(customRange) && customRange.length === 2 ? customRange : null
@@ -130,6 +160,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     _OrderByType: options.orderType || moduleConfig.defaultOrderType || 'DESC',
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
+  if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
   if (options.status && moduleConfig.statusField) {
     payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
   }
@@ -160,18 +191,23 @@ export async function loadModuleRows(moduleConfig, options = {}) {
 export async function loadModulePeriodCounts(moduleConfig, options = {}) {
   const periods = PERIOD_OPTIONS.filter((item) => item.value !== 'custom' || options.customRange)
   const counts = {}
-  for (const item of periods) {
-    try {
-      const result = await loadModuleRows(moduleConfig, {
-        ...options,
-        pageIndex: 1,
-        pageSize: 1,
-        period: item.value,
-        customRange: item.value === 'custom' ? options.customRange : null
-      })
-      counts[item.value] = Number(result.count || 0)
-    } catch (error) {}
+  let cursor = 0
+  const worker = async () => {
+    while (cursor < periods.length) {
+      const item = periods[cursor++]
+      try {
+        const result = await loadModuleRows(moduleConfig, {
+          ...options,
+          pageIndex: 1,
+          pageSize: 1,
+          period: item.value,
+          customRange: item.value === 'custom' ? options.customRange : null
+        })
+        counts[item.value] = Number(result.count || 0)
+      } catch (error) {}
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(3, periods.length) }, worker))
   return counts
 }
 
@@ -185,39 +221,16 @@ export async function callApiEngine(key, data = {}) {
 
 export async function loadHomeSummary(options = {}) {
   const user = getUser() || {}
-  const role = getRoleProfile(user)
-  const summary = { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 }
-
-  if (!role.isInternal) {
-    try {
-      const result = await callApiEngine('my_some_count', {})
-      const data = result && result.Data ? result.Data : result || {}
-      summary.orders = Number(data.orderCount ?? 0)
-      summary.devices = Number(data.ShebeiCount ?? 0)
-      summary.services = Number(data.FuwuCount ?? 0)
-    } catch (e) {}
-    return summary
+  if (!tenantRuntime || typeof tenantRuntime.loadHomeSummary !== 'function') {
+    return { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 }
   }
-
-  const pendingStates = ['待接单', '待服务', '待商家验收', '待客户验收', '待评价', '暂停']
-  const taskWhere = [{ Name: 'Zhuangtai', Type: 'In', Value: pendingStates }]
-  if (role.isService && !role.isAdmin && user.Id) {
-    taskWhere.push({ Name: 'ShouhouRYID', Type: '=', Value: user.Id })
-  }
-  const common = { pageIndex: 1, pageSize: 1, refresh: options.refresh === true }
-  const requests = [
-    loadModuleRows(getBusinessModule('orders'), common),
-    loadModuleRows(getBusinessModule('devices'), common),
-    loadModuleRows(getBusinessModule('serviceRecords'), common),
-    loadModuleRows(getBusinessModule('tasks'), { ...common, extraWhere: taskWhere }),
-    loadModuleRows(getBusinessModule('customers'), common)
-  ]
-  const results = await Promise.allSettled(requests)
-  const keys = ['orders', 'devices', 'services', 'tasks', 'customers']
-  results.forEach((result, index) => {
-    if (result.status === 'fulfilled') summary[keys[index]] = Number(result.value.count || 0)
-  })
-  return summary
+  return tenantRuntime.loadHomeSummary({
+    user,
+    getRoleProfile,
+    getBusinessModule,
+    loadModuleRows,
+    callApiEngine
+  }, options)
 }
 
 export async function resolveDiyTableId(tableName, refresh = false) {
@@ -226,11 +239,34 @@ export async function resolveDiyTableId(tableName, refresh = false) {
   const cacheKey = String(tableName).toLowerCase()
   if (!refresh && tableIdCache[cacheKey]) return tableIdCache[cacheKey]
 
-  const result = await V8.FormEngine.GetFormData('diy_table', {
-    _Where: [{ Name: 'Name', Type: '=', Value: tableName }],
-    _SelectFields: ['Id', 'Name']
-  })
-  const id = result && result.Code === 1 && result.Data ? result.Data.Id : ''
+  const menus = flattenMenus(await loadMenuTree(refresh))
+  const normalizedName = String(tableName).toLowerCase()
+  const direct = menus.find((menu) =>
+    String(menu.DiyTableName || menu.TableName || menu.DiyTable?.Name || menu._DiyTable?.Name || '').toLowerCase() === normalizedName
+  )
+  let id = direct ? String(direct.DiyTableId || '') : ''
+  if (!id) {
+    let cursor = 0
+    const candidates = menus.filter((menu) => menu && menu.DiyTableId && menu.Id)
+    let matched = ''
+    const worker = async () => {
+      while (!matched && cursor < candidates.length) {
+        const menu = candidates[cursor++]
+        try {
+          const result = await V8.FormEngine.GetDiyTableModel({
+            Name: menu.DiyTableId,
+            _SysMenuId: menu.Id
+          })
+          const model = result && Number(result.Code) === 1 ? result.Data : null
+          if (model && String(model.Name || '').toLowerCase() === normalizedName) {
+            matched = String(model.Id || menu.DiyTableId || '')
+          }
+        } catch (error) {}
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(3, Math.max(1, candidates.length)) }, worker))
+    id = matched
+  }
   if (id) {
     tableIdCache[cacheKey] = id
     writeStorage(TABLE_CACHE_KEY, tableIdCache)
@@ -271,10 +307,19 @@ export async function loadMenuTree(refresh = false) {
   return data
 }
 
-export async function findMenu(aliases = [], tableName = '') {
-  const menus = flattenMenus(await loadMenuTree())
+export async function findMenu(aliases = [], tableName = '', refresh = false, menuId = '') {
+  const menus = flattenMenus(await loadMenuTree(refresh))
   const names = aliases.map((item) => String(item).trim()).filter(Boolean)
-  let result = menus.find((menu) => names.includes(String(menu.Name || '').trim()))
+  let result = menuId
+    ? menus.find((menu) => String(menu.Id || '') === String(menuId))
+    : null
+  if (!result) result = menus.find((menu) => names.includes(String(menu.Name || '').trim()))
+  if (!result && tableName) {
+    const normalizedTableName = String(tableName).toLowerCase()
+    result = menus.find((menu) =>
+      String(menu.DiyTableName || menu.TableName || menu.DiyTable?.Name || menu._DiyTable?.Name || '').toLowerCase() === normalizedTableName
+    )
+  }
   if (!result && tableName) {
     const tableId = await resolveDiyTableId(tableName)
     result = menus.find((menu) => tableId && String(menu.DiyTableId || '') === tableId)
@@ -285,20 +330,31 @@ export async function findMenu(aliases = [], tableName = '') {
   return result || null
 }
 
-export async function openForm({ table, rowId = '', mode = 'View', title = '', menuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false }) {
+export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null }) {
   if (!requireLogin()) return
   if (!table) {
     uni.showToast({ title: '未配置业务表单', icon: 'none' })
     return
+  }
+  const normalizedRecordAdapter = String(recordAdapter || 'form-engine').trim().toLowerCase()
+  let menu = menuId ? { Id: menuId } : null
+  if (!menu && normalizedRecordAdapter === 'form-engine') {
+    try {
+      menu = await findMenu(menuAliases, table)
+    } catch (error) {}
   }
   const params = [
     `table=${encodeURIComponent(table)}`,
     `id=${encodeURIComponent(rowId || '')}`,
     `mode=${encodeURIComponent(mode || (rowId ? 'View' : 'Add'))}`,
     `title=${encodeURIComponent(title || (mode === 'Add' ? '新增' : '详情'))}`,
+    `recordAdapter=${encodeURIComponent(normalizedRecordAdapter)}`,
     `related=${includeRelated === false ? '0' : '1'}`,
     `stayAfterAdd=${stayAfterAdd === true ? '1' : '0'}`
   ]
+  if (menu && menu.Id) params.push(`menuId=${encodeURIComponent(menu.Id)}`)
+  if (moduleEngineKey) params.push(`moduleEngineKey=${encodeURIComponent(moduleEngineKey)}`)
+  if (tableChildAuth) params.push(`tableChildAuth=${encodeURIComponent(JSON.stringify(tableChildAuth))}`)
   if (defaultValues && Object.keys(defaultValues).length) params.push(`defaults=${encodeURIComponent(JSON.stringify(defaultValues))}`)
   if (fieldNames && fieldNames.length) params.push(`fields=${encodeURIComponent(JSON.stringify(fieldNames))}`)
   if (excludeFieldNames && excludeFieldNames.length) params.push(`excludeFields=${encodeURIComponent(JSON.stringify(excludeFieldNames))}`)
@@ -316,31 +372,15 @@ export async function openLowCodeMenu(moduleConfig) {
 }
 
 export async function openBusiness(key) {
-  const moduleConfig = getBusinessModule(key)
-  const entry = getBusinessEntry(key)
-  if (!moduleConfig) {
-    uni.showToast({ title: '功能配置不存在', icon: 'none' })
-    return
+  if (!tenantRuntime || typeof tenantRuntime.openBusiness !== 'function') {
+    uni.showToast({ title: '当前应用未配置此业务入口', icon: 'none' })
+    return null
   }
-  if (key === 'tasks' || moduleConfig.target === 'task-list') {
-    uni.navigateTo({ url: '/pages/task/list' })
-  } else if (moduleConfig.target === 'native-list') {
-    uni.navigateTo({ url: `/pages/business/list?key=${encodeURIComponent(key)}` })
-  } else if (moduleConfig.target === 'native-page') {
-    uni.navigateTo({ url: moduleConfig.path })
-  } else if (moduleConfig.target === 'form-add') {
-    await openForm({
-      table: moduleConfig.table,
-      mode: 'Add',
-      title: moduleConfig.title,
-      menuAliases: moduleConfig.menuAliases
-    })
-  } else if (moduleConfig.table) {
-    uni.navigateTo({ url: `/pages/business/list?key=${encodeURIComponent(key)}` })
-  } else {
-    uni.showToast({ title: '功能配置不完整', icon: 'none' })
-  }
-  return entry
+  return tenantRuntime.openBusiness({
+    getBusinessEntry,
+    getBusinessModule,
+    openForm
+  }, key)
 }
 
 export function parseDeviceId(scanResult) {
@@ -352,22 +392,11 @@ export function parseDeviceId(scanResult) {
 }
 
 export function scanDevice() {
-  if (!requireLogin()) return
-  uni.scanCode({
-    onlyFromCamera: false,
-    success: async (result) => {
-      const deviceId = parseDeviceId(result.result)
-      if (!deviceId) {
-        uni.showModal({ title: '未识别设备', content: `二维码中没有有效的设备编号，请确认扫描的是${appConfig.appName || '平台'}设备码。`, showCancel: false })
-        return
-      }
-      uni.navigateTo({ url: `/pages/task/scan?deviceId=${encodeURIComponent(deviceId)}` })
-    },
-    fail: (error) => {
-      const message = error && error.errMsg && error.errMsg.includes('cancel') ? '' : '扫码失败，请重试'
-      if (message) uni.showToast({ title: message, icon: 'none' })
-    }
-  })
+  if (!tenantRuntime || typeof tenantRuntime.scanDevice !== 'function') {
+    uni.showToast({ title: '当前应用未配置设备扫码场景', icon: 'none' })
+    return
+  }
+  tenantRuntime.scanDevice({ appConfig, parseDeviceId, requireLogin })
 }
 
 export default {
@@ -376,6 +405,7 @@ export default {
   formatMoney,
   formatRegion,
   formatFieldValue,
+  statisticsFieldValue,
   buildPeriodRange,
   loadModuleRows,
   callApiEngine,

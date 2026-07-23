@@ -4,73 +4,73 @@ let pendingListSnapshot = null
 export const listReturnMixin = {
   data() {
     return {
-      xjyCurrentScrollTop: 0,
-      xjySavedScrollTop: 0,
-      xjyScrollCommand: 0,
-      xjyDetailReturnPending: false
+      mciCurrentScrollTop: 0,
+      mciSavedScrollTop: 0,
+      mciScrollCommand: 0,
+      mciDetailReturnPending: false
     }
   },
   onShow() {
-    if (!this.xjyDetailReturnPending) return
-    this.xjyDetailReturnPending = false
+    if (!this.mciDetailReturnPending) return
+    this.mciDetailReturnPending = false
     pendingListSnapshot = null
     this.$nextTick(() => {
-      const target = Math.max(0, Number(this.xjySavedScrollTop || 0))
-      this.xjyScrollCommand = Math.max(0, target - 1)
+      const target = Math.max(0, Number(this.mciSavedScrollTop || 0))
+      this.mciScrollCommand = Math.max(0, target - 1)
       setTimeout(() => {
-        this.xjyScrollCommand = target
-        if (typeof this.onXjyListDetailReturned === 'function') this.onXjyListDetailReturned(target)
+        this.mciScrollCommand = target
+        if (typeof this.onMciListDetailReturned === 'function') this.onMciListDetailReturned(target)
       }, 24)
     })
   },
   methods: {
-    handleXjyListScroll(event) {
+    handleMciListScroll(event) {
       const top = Number(event && event.detail && event.detail.scrollTop)
-      if (Number.isFinite(top)) this.xjyCurrentScrollTop = top
+      if (Number.isFinite(top)) this.mciCurrentScrollTop = top
     },
-    xjyMarkDetailReturn() {
-      this.xjySavedScrollTop = this.xjyCurrentScrollTop
-      this.xjyDetailReturnPending = true
-      if (typeof this.getXjyListSnapshotKey === 'function' && typeof this.getXjyListSnapshot === 'function') {
+    mciMarkDetailReturn() {
+      this.mciSavedScrollTop = this.mciCurrentScrollTop
+      this.mciDetailReturnPending = true
+      if (typeof this.getMciListSnapshotKey === 'function' && typeof this.getMciListSnapshot === 'function') {
         pendingListSnapshot = {
-          key: this.getXjyListSnapshotKey(),
+          key: this.getMciListSnapshotKey(),
           createdAt: Date.now(),
-          scrollTop: this.xjySavedScrollTop,
-          payload: this.getXjyListSnapshot()
+          scrollTop: this.mciSavedScrollTop,
+          payload: this.getMciListSnapshot()
         }
       }
     },
-    xjyCancelDetailReturn() {
-      this.xjyDetailReturnPending = false
+    mciCancelDetailReturn() {
+      this.mciDetailReturnPending = false
       pendingListSnapshot = null
     },
-    xjyNavigateToDetail(url) {
-      this.xjyMarkDetailReturn()
+    mciNavigateToDetail(url) {
+      this.mciMarkDetailReturn()
       uni.navigateTo({
         url,
-        fail: () => this.xjyCancelDetailReturn()
+        fail: () => this.mciCancelDetailReturn()
       })
     },
-    xjyResetListPosition() {
-      this.xjyCurrentScrollTop = 0
-      this.xjySavedScrollTop = 0
-      this.xjyScrollCommand = 0
-      this.xjyDetailReturnPending = false
+    mciResetListPosition() {
+      this.mciCurrentScrollTop = 0
+      this.mciSavedScrollTop = 0
+      this.mciScrollCommand = 0
+      this.mciDetailReturnPending = false
       pendingListSnapshot = null
     },
-    xjyConsumeListSnapshot(key) {
+    mciConsumeListSnapshot(key) {
       const snapshot = pendingListSnapshot
       pendingListSnapshot = null
       if (!snapshot || snapshot.key !== key || Date.now() - snapshot.createdAt > SNAPSHOT_TTL) return null
       return snapshot
     },
-    xjyRestoreListPosition(scrollTop) {
+    mciRestoreListPosition(scrollTop) {
       const target = Math.max(0, Number(scrollTop || 0))
-      this.xjyCurrentScrollTop = target
-      this.xjySavedScrollTop = target
-      this.xjyScrollCommand = Math.max(0, target - 1)
+      this.mciCurrentScrollTop = target
+      this.mciSavedScrollTop = target
+      this.mciScrollCommand = Math.max(0, target - 1)
       this.$nextTick(() => {
-        setTimeout(() => { this.xjyScrollCommand = target }, 24)
+        setTimeout(() => { this.mciScrollCommand = target }, 24)
       })
     }
   }

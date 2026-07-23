@@ -222,9 +222,10 @@ export default {
         rowId: this.currentUser.Id,
         mode: 'Edit',
         title: '个人资料',
-        menuAliases: ['系统用户', '用户管理'],
-        fieldNames: ['Avatar', 'No', 'Account', 'Name', 'Email', 'Phone', 'Sex'],
-        readonlyFieldNames: ['No', 'Account']
+        recordAdapter: 'current-user',
+        fieldNames: ['Avatar', 'No', 'Account', 'Name', 'Email', 'Phone', 'Sex', 'Remark'],
+        readonlyFieldNames: ['No', 'Account', 'Phone'],
+        includeRelated: false
       })
     },
     prepareInvite(type) {

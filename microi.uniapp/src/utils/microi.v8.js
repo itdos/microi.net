@@ -1030,6 +1030,14 @@ export function createMicroiV8(options = {}) {
     return post(`/api/FormEngine/${name}`, body, { auth: false, checkCode: false, ...options });
   }
 
+  function formEngineMetadata(action, first, second = {}, options = {}) {
+    const body = typeof first === 'string'
+      ? { Name: first, ...(second || {}) }
+      : { ...(first || {}) };
+    if (config.osClient && body.OsClient === undefined) body.OsClient = config.osClient;
+    return post(`/api/FormEngine/${action}`, body, { checkCode: false, ...options });
+  }
+
   function withCallback(promise, callback) {
     if (typeof callback === 'function') {
       promise.then((result) => callback(result)).catch((error) => callback(error));
@@ -1369,6 +1377,8 @@ export function createMicroiV8(options = {}) {
     },
     FormEngine: {
       Request: formEngineRequest,
+      GetDiyTableModel: (table, data, options) => formEngineMetadata('GetDiyTableModel', table, data, options),
+      GetDiyFieldList: (data, options) => formEngineMetadata('GetDiyFieldList', data, {}, options),
       GetTableData: (table, data, options) => formEngineRequest('gettabledata', table, data, options),
       GetFormData: (table, data, options) => formEngineRequest('getformdata', table, data, options),
       GetTableDataTree: (table, data, options) => formEngineRequest('gettabledatatree', table, data, options),
