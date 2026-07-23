@@ -54,10 +54,10 @@
     <scroll-view
       class="task-scroll"
       scroll-y
-      :scroll-top="xjyScrollCommand"
+      :scroll-top="mciScrollCommand"
       :refresher-enabled="true"
       :refresher-triggered="refreshing"
-      @scroll="handleXjyListScroll"
+      @scroll="handleMciListScroll"
       @refresherrefresh="refresh"
       @scrolltolower="loadMore"
     >
@@ -299,7 +299,7 @@ export default {
     },
     async refresh() { this.refreshing = true; try { await this.loadData(true, true) } finally { this.refreshing = false } },
     loadMore() { this.loadData(false, false) },
-    async onXjyListDetailReturned(scrollTop) {
+    async onMciListDetailReturned(scrollTop) {
       if (!this.taskDataChanged || !this.rows.length) return
       this.taskDataChanged = false
       const loadedCount = Math.max(this.pageSize, this.rows.length)
@@ -319,12 +319,12 @@ export default {
       } catch (error) {
         console.warn('[TaskList] detail return refresh failed:', error && (error.message || error))
       } finally {
-        this.xjyScrollCommand = Math.max(0, scrollTop - 1)
-        this.$nextTick(() => { this.xjyScrollCommand = scrollTop })
+        this.mciScrollCommand = Math.max(0, scrollTop - 1)
+        this.$nextTick(() => { this.mciScrollCommand = scrollTop })
       }
     },
-    openTask(item) { this.xjyNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(item.Id)}`) },
-    addTask() { this.xjyMarkDetailReturn(); openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuAliases: ['售后订单', '售后任务'] }) },
+    openTask(item) { this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(item.Id)}`) },
+    addTask() { this.mciMarkDetailReturn(); openForm({ table: 'Diy_ShouhouDD', mode: 'Add', title: '新增售后任务', menuAliases: ['售后订单', '售后任务'] }) },
     scan() { scanDevice() },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },
     goBack() { uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/workspace/index' }) }) }

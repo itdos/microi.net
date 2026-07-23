@@ -68,6 +68,23 @@
         <view v-if="task.KehuYSYJ" class="text-block text-block--warning"><text class="text-block__label">客户验收意见</text><text class="text-block__value">{{ task.KehuYSYJ }}</text></view>
       </view>
 
+      <view v-for="(group, index) in metadataGroups" :key="`${group.name}:${index}`" class="section-band metadata-section">
+        <view class="section-heading metadata-section__heading" @tap="toggleMetadataGroup(index)">
+          <view class="section-heading__mark"></view>
+          <text>{{ group.name }}</text>
+          <text class="section-heading__hint">{{ group.fields.length }} 项</text>
+          <text class="metadata-section__arrow">{{ expandedMetadata[index] ? '⌃' : '⌄' }}</text>
+        </view>
+        <view v-if="expandedMetadata[index]" class="metadata-section__body">
+          <view v-for="field in group.fields" :key="field.Id || field.Name" class="metadata-field">
+            <text class="metadata-field__label">{{ field.Label || field.Name }}</text>
+            <view class="metadata-field__value">
+              <mci-native-field :model-value="task[field.Name]" :field="field" readonly table-name="Diy_ShouhouDD" />
+            </view>
+          </view>
+        </view>
+      </view>
+
       <view class="detail-spacer"></view>
     </scroll-view>
 
@@ -89,6 +106,7 @@
 import { themeMixin } from '@/utils/theme.js'
 import { getUser } from '@/utils/request.js'
 import { callApiEngine, formatDateTime, openForm } from '@/platform/business-runtime.js'
+import { loadNativeFormDefinition } from '@/platform/native-form.js'
 import {
   hasTaskPermission,
   loadServiceUsers,
@@ -100,6 +118,13 @@ import {
 } from '@/utils/xjy-task.js'
 
 const TIMELINE_STATES = ['待接单', '待服务', '待商家验收', '待客户验收', '待评价', '已结束']
+const CUSTOM_DETAIL_FIELDS = new Set([
+  'ShouhouFWBH', 'DingdanBH', 'KehuMC', 'KehuID', 'KehuLXRR', 'LianxiR', 'KehuDH', 'LianxiDH',
+  'Chengshi', 'Dizhi', 'TenantName', 'Leixing', 'ShouhouLX', 'Zhuangtai', 'ShouhouRY', 'ShouhouRYID',
+  'YujiSHSJ', 'YuyueSJ', 'JiedanSJ', 'ShangmenSJ', 'FinishTime', 'Neirong', 'Jieguo',
+  'ShangjiaYSSJ', 'KehuYSSJ', 'ShangjiaYSYJ', 'KehuYSYJ', 'Pingjia', 'ZhuipingNR',
+  'CreateTime', 'UpdateTime', 'CreateUser', 'OsClient'
+])
 
 export default {
   mixins: [themeMixin],
@@ -107,6 +132,7 @@ export default {
     return {
       id: '', task: {}, devices: [], currentUser: {}, loading: true, devicesLoading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
+      metadataDefinition: null, expandedMetadata: {},
       selectedUser: null, userKeyword: '', timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
       evaluation: { rate: 5, deviceRate: 5, staffRate: 5, tags: [], content: '' },
@@ -120,6 +146,13 @@ export default {
     isAdmin() { return Number(this.currentUser.Level || 0) >= 999 || /管理员/.test(this.currentUser.RoleName || '') },
     completedDeviceCount() { return this.devices.filter((item) => item.status === '已完成').length },
     canManageDevices() { return this.task.state === '待服务' && (this.isOwner || this.isAdmin) },
+    metadataGroups() {
+      const groups = this.metadataDefinition && this.metadataDefinition.groups || []
+      return groups.map((group) => ({
+        name: group.name || '更多业务信息',
+        fields: (group.fields || []).filter((field) => !CUSTOM_DETAIL_FIELDS.has(field.Name))
+      })).filter((group) => group.fields.length)
+    },
     timeline() {
       const currentIndex = Math.max(0, TIMELINE_STATES.indexOf(this.task.state))
       const times = [this.task.CreateTime, this.task.acceptedTime, this.task.finishTime, this.task.ShangjiaYSSJ, this.task.KehuYSSJ, this.task.UpdateTime]
@@ -174,9 +207,16 @@ export default {
       this.devicesLoading = true
       this.error = ''
       try {
-        const [taskResult, devices] = await Promise.all([loadTask(this.id, refresh), loadTaskDevices(this.id, refresh)])
+        const definitionRequest = loadNativeFormDefinition('Diy_ShouhouDD', refresh).catch(() => this.metadataDefinition)
+        const [taskResult, devices, definition] = await Promise.all([
+          loadTask(this.id, refresh),
+          loadTaskDevices(this.id, refresh),
+          definitionRequest
+        ])
         this.task = taskResult.task
         this.devices = devices
+        this.metadataDefinition = definition || null
+        this.expandedMetadata = {}
         this.stale = taskResult.stale
       } catch (error) {
         this.error = error.message || '任务加载失败'
@@ -186,6 +226,9 @@ export default {
     },
     async refresh() { this.refreshing = true; try { await this.loadAll(true, false) } finally { this.refreshing = false } },
     formatTime: formatDateTime,
+    toggleMetadataGroup(index) {
+      this.expandedMetadata[index] = !this.expandedMetadata[index]
+    },
     canEditWorkTime(field) { return ['planTime', 'appointmentTime', 'visitTime'].includes(field) && this.task.state === '待服务' && (this.isOwner || this.isAdmin) },
     editTime(item) {
       if (!this.canEditWorkTime(item.field)) return
@@ -321,6 +364,14 @@ export default {
 .quick-action > text { max-width: 100%; margin-top: 9rpx; overflow: hidden; color: #45636e; text-overflow: ellipsis; white-space: nowrap; font-size: 21rpx; }
 .section-band { margin-top: 14rpx; padding: 0 26rpx; background: #fff; }
 .section-heading { min-height: 82rpx; display: flex; align-items: center; border-bottom: 1px solid #edf2f4; color: #244954; font-size: 27rpx; font-weight: 700; }.section-heading__mark { width: 7rpx; height: 28rpx; margin-right: 13rpx; border-radius: 3rpx; background: #e54625; }.section-heading__hint { flex: 1; color: #8a9ca3; font-size: 20rpx; font-weight: 400; text-align: right; }
+.metadata-section__heading { cursor: pointer; }
+.metadata-section__arrow { width: 38rpx; margin-left: 10rpx; color: #82969d; font-size: 24rpx; text-align: right; }
+.metadata-section__body { padding-bottom: 4rpx; }
+.metadata-field { min-height: 84rpx; display: grid; grid-template-columns: 190rpx minmax(0, 1fr); gap: 18rpx; align-items: start; padding: 19rpx 0; border-bottom: 1px solid #edf2f4; box-sizing: border-box; }
+.metadata-field:last-child { border-bottom: 0; }
+.metadata-field__label { color: #82949b; font-size: 23rpx; line-height: 1.55; }
+.metadata-field__value { min-width: 0; color: #294750; font-size: 24rpx; line-height: 1.55; overflow-wrap: anywhere; }
+.metadata-field__value :deep(.native-control--readonly) { min-height: auto; padding: 0; border: 0; background: transparent; }
 .info-row { min-height: 75rpx; display: grid; grid-template-columns: 160rpx minmax(0,1fr); gap: 16rpx; align-items: center; border-bottom: 1px solid #f0f4f5; box-sizing: border-box; }.info-row:last-child { border-bottom: none; }.info-row--multiline { padding: 17rpx 0; align-items: start; }
 .info-row__label { color: #71868f; font-size: 23rpx; }.info-row__value-wrap { display: flex; align-items: center; justify-content: flex-end; min-width: 0; gap: 10rpx; }.info-row__value { color: #294b57; font-size: 24rpx; line-height: 1.55; text-align: right; word-break: break-all; }.inline-icon { flex: none; width: 49rpx; height: 49rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #087da8; background: #eaf6f9; font-size: 20rpx; }
 .time-row { min-height: 82rpx; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f0f4f5; }.time-row:last-child { border-bottom: none; }.time-row__label, .time-row__value { display: block; }.time-row__label { color: #71868f; font-size: 21rpx; }.time-row__value { margin-top: 5rpx; color: #294b57; font-size: 24rpx; }.time-row__action { color: #087da8; font-size: 21rpx; }.time-row.editable { cursor: pointer; }

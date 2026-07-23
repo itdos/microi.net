@@ -53,6 +53,7 @@ const profileSource = fs.readFileSync(path.join(root, 'src', 'pages', 'profile',
 assert(profileSource.includes('buildInviteSharePayload'), 'Profile invitation must use the centralized safe share builder')
 assert(shareSource.includes("'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' }"), 'Task details must share the safe task-list landing page')
 assert(shareSource.includes("'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list'"), 'Business details must share the safe business-list landing page')
+assert(shareSource.includes("'pages/module/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/list'"), 'Generic module details must share the safe authorized module-list landing page')
 assert(shareSource.includes("allowedQuery: ['id']"), 'Public detail pages must explicitly allow only their public id')
 assert(shareSource.includes("uni.hideShareMenu({ menus: ['shareTimeline'] })"), 'Sensitive pages must hide timeline sharing')
 

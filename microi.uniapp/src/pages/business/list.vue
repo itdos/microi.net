@@ -70,10 +70,10 @@
     <scroll-view
       class="data-scroll"
       scroll-y
-      :scroll-top="xjyScrollCommand"
+      :scroll-top="mciScrollCommand"
       :refresher-enabled="true"
       :refresher-triggered="refreshing"
-      @scroll="handleXjyListScroll"
+      @scroll="handleMciListScroll"
       @refresherrefresh="refresh"
       @scrolltolower="loadMore"
     >
@@ -239,13 +239,20 @@ import { getBusinessEntry, getBusinessModule } from '@/platform/business.js'
 import { executeBusinessRowAction, getBusinessRowActions, loadApprovalOpinions } from './utils/xjy-row-actions.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 import {
+  compileListConfig,
+  loadModuleViewManifest
+} from '@/platform/view-manifest.js'
+import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import {
   formatDateTime,
   formatFieldValue,
   formatMoney,
   PERIOD_OPTIONS,
   loadModulePeriodCounts,
   loadModuleRows,
-  openForm
+  openForm,
+  findMenu,
+  statisticsFieldValue
 } from '@/platform/business-runtime.js'
 
 export default {
@@ -254,7 +261,9 @@ export default {
     return {
       statusBarHeight: 0,
       key: '',
+      menuId: '',
       config: {},
+      baseConfig: {},
       entry: {},
       keyword: '',
       period: 'all',
@@ -282,6 +291,7 @@ export default {
       filterLoading: false,
       filterValues: {},
       filterOptions: {},
+      viewManifest: null,
       loadRequestId: 0
     }
   },
@@ -305,8 +315,7 @@ export default {
       }, 0)
     },
     statisticsValue() {
-      const fields = this.dataAppend && this.dataAppend.StatisticsFields
-      const value = fields ? fields[this.config.statisticsField] : 0
+      const value = statisticsFieldValue(this.dataAppend, this.config.statisticsField, 0)
       return formatMoney(value || 0)
     }
   },
@@ -320,16 +329,32 @@ export default {
     this.key = options.key || 'customers'
     this.whereField = options.whereField ? decodeURIComponent(options.whereField) : ''
     this.whereValue = options.whereValue ? decodeURIComponent(options.whereValue) : ''
-    this.config = getBusinessModule(this.key) || getBusinessModule('customers')
+    this.baseConfig = getBusinessModule(this.key) || getBusinessModule('customers')
+    this.config = { ...this.baseConfig }
     this.entry = getBusinessEntry(this.key) || { icon: '/static/xjy/business/kehu.png', accent: '#0B86D4' }
     this.currentUser = getUser() || {}
-    if (!this.restoreXjyListSnapshot()) this.loadData(true)
+    const restored = this.restoreMciListSnapshot()
+    this.initializeList(restored)
   },
   methods: {
-    getXjyListSnapshotKey() {
+    async initializeList(restored = false, refresh = false) {
+      try {
+        const menu = await findMenu(
+          this.baseConfig.menuAliases || [],
+          this.baseConfig.table,
+          refresh
+        )
+        if (menu && menu.Id) this.menuId = menu.Id
+      } catch (error) {}
+      this.baseConfig = { ...this.baseConfig, menuId: this.menuId }
+      this.config = { ...this.config, menuId: this.menuId }
+      await this.loadViewConfig(refresh)
+      if (!restored) await this.loadData(true, refresh)
+    },
+    getMciListSnapshotKey() {
       return [this.key, this.whereField, this.whereValue].join('|')
     },
-    getXjyListSnapshot() {
+    getMciListSnapshot() {
       return {
         keyword: this.keyword,
         period: this.period,
@@ -346,12 +371,57 @@ export default {
         filterOptions: { ...this.filterOptions }
       }
     },
-    restoreXjyListSnapshot() {
-      const snapshot = this.xjyConsumeListSnapshot(this.getXjyListSnapshotKey())
+    restoreMciListSnapshot() {
+      const snapshot = this.mciConsumeListSnapshot(this.getMciListSnapshotKey())
       if (!snapshot) return false
       Object.assign(this, snapshot.payload || {})
-      this.xjyRestoreListPosition(snapshot.scrollTop)
+      this.mciRestoreListPosition(snapshot.scrollTop)
       return true
+    },
+    async loadViewConfig(refresh = false) {
+      try {
+        let manifest = await loadModuleViewManifest(this.baseConfig, {
+          scene: 'Card',
+          device: 'Mobile',
+          user: this.currentUser,
+          refresh
+        })
+        if (!manifest) {
+          manifest = await loadModuleViewManifest(this.baseConfig, {
+            scene: 'List',
+            device: 'Mobile',
+            user: this.currentUser,
+            refresh
+          })
+        }
+        const dynamic = compileListConfig(manifest)
+        if (!dynamic) return
+        this.viewManifest = manifest
+        if (manifest.Module && manifest.Module.Id) this.menuId = manifest.Module.Id
+        const merged = { ...this.baseConfig }
+        merged.menuId = this.menuId
+        const arrayFields = ['tagFields', 'lines', 'statusOptions']
+        arrayFields.forEach((name) => {
+          if (dynamic[name]?.length) merged[name] = dynamic[name]
+        })
+        const scalarFields = [
+          'titleField',
+          'statusField',
+          'summaryField',
+          'imageField',
+          'periodField',
+          'statisticsField',
+          'statisticsLabel',
+          'statisticsFormat'
+        ]
+        scalarFields.forEach((name) => {
+          if (dynamic[name] !== undefined && dynamic[name] !== null && dynamic[name] !== '') {
+            merged[name] = dynamic[name]
+          }
+        })
+        if (dynamic.actionSchema?.length) merged.actionSchema = dynamic.actionSchema
+        this.config = merged
+      } catch (error) {}
     },
     async loadData(reset = false, refresh = false) {
       if (this.loading && !reset) return
@@ -430,7 +500,12 @@ export default {
     },
     async refresh() {
       this.refreshing = true
-      try { await this.loadData(true, true) } finally { this.refreshing = false }
+      try {
+        await this.loadViewConfig(true)
+        await this.loadData(true, true)
+      } finally {
+        this.refreshing = false
+      }
     },
     loadMore() {
       this.loadData(false)
@@ -569,20 +644,57 @@ export default {
       return formatDateTime(value)
     },
     rowActions(row) {
-      return getBusinessRowActions(this.key, row, this.currentUser)
+      const nativeActions = getBusinessRowActions(this.key, row, this.currentUser)
+      const nativeKeys = new Set(nativeActions.map((action) => String(action.key || '').toLowerCase()))
+      const viewActions = (this.config.actionSchema || [])
+        .filter((action) => isActionVisible(action, row))
+        .filter((action) => !nativeKeys.has(String(action.Key || '').toLowerCase()))
+        .map((action) => ({
+          key: `view:${action.Key}`,
+          label: action.Label,
+          tone: ['primary', 'success', 'warning', 'danger'].includes(String(action.Tone || '').toLowerCase())
+            ? String(action.Tone).toLowerCase()
+            : 'default',
+          __viewAction: action
+        }))
+      return nativeActions.concat(viewActions)
     },
     async triggerRowAction(action, row) {
       if (!action || !row || this.actionSubmitting) return
+      if (action.__viewAction) {
+        if (['OpenDetail', 'OpenForm', 'OpenList', 'Navigate'].includes(action.__viewAction.ActionType)) {
+          this.mciMarkDetailReturn()
+        }
+        this.actionSubmitting = true
+        try {
+          await executeViewAction(action.__viewAction, {
+            form: row,
+            user: this.currentUser,
+            menu: {
+              Id: this.viewManifest?.Module?.Id || '',
+              ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
+            },
+            tableName: this.config.table,
+            refresh: async () => {
+              await this.loadViewConfig(true)
+              await this.loadData(true, true)
+            }
+          })
+        } finally {
+          this.actionSubmitting = false
+        }
+        return
+      }
       if (action.key === 'device-repair') {
-        this.xjyNavigateToDetail(`/pages/native/repair?deviceId=${encodeURIComponent(row.Id)}`)
+        this.mciNavigateToDetail(`/pages/native/repair?deviceId=${encodeURIComponent(row.Id)}`)
         return
       }
       if (action.key === 'device-consumables') {
-        this.xjyNavigateToDetail(`/pages/task/consumable?deviceId=${encodeURIComponent(row.Id)}&source=device`)
+        this.mciNavigateToDetail(`/pages/task/consumable?deviceId=${encodeURIComponent(row.Id)}&source=device`)
         return
       }
       if (action.key === 'visit-care') {
-        this.xjyMarkDetailReturn()
+        this.mciMarkDetailReturn()
         openForm({
           table: 'Diy_kehuguanhuai',
           mode: 'Add',
@@ -598,7 +710,7 @@ export default {
         return
       }
       if (action.key === 'position-product' && row.ShangpinID) {
-        this.xjyNavigateToDetail(`/pages/mall/detail?id=${encodeURIComponent(row.ShangpinID)}`)
+        this.mciNavigateToDetail(`/pages/mall/detail?id=${encodeURIComponent(row.ShangpinID)}`)
         return
       }
       if (action.input) {
@@ -667,42 +779,43 @@ export default {
     openDetail(row) {
       if (!row.Id) return
       if (this.key === 'serviceForms') {
-        this.xjyNavigateToDetail(`/pages/native/service-record?id=${encodeURIComponent(row.Id)}`)
+        this.mciNavigateToDetail(`/pages/native/service-record?id=${encodeURIComponent(row.Id)}`)
         return
       }
       if (this.key === 'casebooks') {
-        this.xjyNavigateToDetail(`/pages/native/casebook?id=${encodeURIComponent(row.Id)}`)
+        this.mciNavigateToDetail(`/pages/native/casebook?id=${encodeURIComponent(row.Id)}`)
         return
       }
       if (this.key === 'taskDevices' && row.ShouhouDDID) {
-        this.xjyNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(row.ShouhouDDID)}`)
+        this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(row.ShouhouDDID)}`)
         return
       }
       if (this.key === 'merchantProducts') {
-        this.xjyNavigateToDetail(`/pages/mall/detail?id=${encodeURIComponent(row.Id)}`)
+        this.mciNavigateToDetail(`/pages/mall/detail?id=${encodeURIComponent(row.Id)}`)
         return
       }
       if (this.key === 'tasks') {
-        this.xjyNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(row.Id)}`)
+        this.mciNavigateToDetail(`/pages/task/detail?id=${encodeURIComponent(row.Id)}`)
         return
       }
       if (['customers', 'orders', 'devices', 'leads', 'recruitment', 'demands', 'stores', 'providers'].includes(this.key)) {
-        this.xjyNavigateToDetail(`/pages/business/detail?key=${encodeURIComponent(this.key)}&id=${encodeURIComponent(row.Id)}`)
+        this.mciNavigateToDetail(`/pages/business/detail?key=${encodeURIComponent(this.key)}&id=${encodeURIComponent(row.Id)}&menuId=${encodeURIComponent(this.menuId || '')}`)
         return
       }
-      this.xjyMarkDetailReturn()
+      this.mciMarkDetailReturn()
       openForm({
         table: this.config.table,
         rowId: row.Id,
         mode: 'View',
         title: `${this.config.title}详情`,
+        menuId: this.menuId,
         menuAliases: this.config.menuAliases || []
       })
     },
-    onXjyListDetailReturned(scrollTop) {
+    onMciListDetailReturned(scrollTop) {
       const target = Math.max(0, Number(scrollTop || 0))
-      this.xjyScrollCommand = Math.max(0, target - 1)
-      this.$nextTick(() => { this.xjyScrollCommand = target })
+      this.mciScrollCommand = Math.max(0, target - 1)
+      this.$nextTick(() => { this.mciScrollCommand = target })
     },
     openAdd() {
       if (this.key === 'members') {
@@ -717,11 +830,12 @@ export default {
         uni.navigateTo({ url: '/pages/native/casebook' })
         return
       }
-      this.xjyMarkDetailReturn()
+      this.mciMarkDetailReturn()
       openForm({
         table: this.config.table,
         mode: 'Add',
         title: `新增${this.config.title}`,
+        menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         defaultValues: this.whereField && this.whereValue ? { [this.whereField]: this.whereValue } : null
       })

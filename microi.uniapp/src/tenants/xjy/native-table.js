@@ -9,6 +9,13 @@ function requireParentId(parentId) {
   return false
 }
 
+export function validateOpenTableContext({ field, form }) {
+  if (['XuanzeSHSB', 'XuanzeGLSP', 'XuanzeFA', 'XuanzeFAXX'].includes(field.Name) && !form.KehuID) {
+    return '请先选择客户'
+  }
+  return ''
+}
+
 export function appendOpenTableWhere({ field, form, where }) {
   const fieldName = field.Name
   if (fieldName === 'XuanzeSHSB') where.push({ Name: 'KehuID', Type: '=', Value: form.KehuID || '' })
@@ -38,7 +45,7 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
       DingdanID: parentId
     })
     if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '商品添加失败')
-    uni.$emit('xjy:data-changed', { table: 'Diy_DingdanSP', parentId })
+    uni.$emit('microi:data-changed', { table: 'Diy_DingdanSP', parentId })
     return { matched: true, handled: true }
   }
 
@@ -51,7 +58,7 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
       FangAnList: selected
     })
     if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '方案商品添加失败')
-    uni.$emit('xjy:data-changed', { table: 'Diy_DingdanSP', parentId })
+    uni.$emit('microi:data-changed', { table: 'Diy_DingdanSP', parentId })
     return { matched: true, handled: true }
   }
 
@@ -59,7 +66,7 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
     if (!requireParentId(parentId)) return { matched: true, handled: false }
     if (!form.KehuID) throw new Error('请先选择客户')
     await addTaskDevices(parentId, selected)
-    uni.$emit('xjy:data-changed', { table: 'diy_shouhousp', parentId })
+    uni.$emit('microi:data-changed', { table: 'diy_shouhousp', parentId })
     return { matched: true, handled: true }
   }
 
@@ -71,7 +78,7 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
       DingdanID: form.DingdanID
     })
     if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '滤芯添加失败')
-    uni.$emit('xjy:data-changed', { table: 'diy_dingdansphc', parentId })
+    uni.$emit('microi:data-changed', { table: 'diy_dingdansphc', parentId })
     return { matched: true, handled: true }
   }
 
@@ -100,7 +107,7 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
     }))
     const result = await V8.FormEngine.AddFormDataBatch(payload)
     if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '关联耗材失败')
-    uni.$emit('xjy:data-changed', { table: 'Diy_ShangpinLx', parentId })
+    uni.$emit('microi:data-changed', { table: 'Diy_ShangpinLx', parentId })
     return { matched: true, handled: true }
   }
 
@@ -109,5 +116,6 @@ export async function submitTenantOpenTableSelection({ tableName, parentId, fiel
 
 export default {
   appendOpenTableWhere,
+  validateOpenTableContext,
   submitTenantOpenTableSelection
 }

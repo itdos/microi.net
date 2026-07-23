@@ -30,6 +30,11 @@ export function getOpenTableWhere(field, form = {}) {
   return result.filter((item) => item.Value !== undefined && item.Value !== null)
 }
 
+export function validateOpenTableContext(field, form = {}) {
+  if (!tenantNativeTable || typeof tenantNativeTable.validateOpenTableContext !== 'function') return ''
+  return String(tenantNativeTable.validateOpenTableContext({ field, form }) || '')
+}
+
 function cleanSelected(rows) {
   return rows.map((row) => {
     const item = { ...row }
@@ -55,4 +60,9 @@ export async function submitOpenTableSelection({ tableName, parentId, field, for
   return { handled: true, changedField: field.Name }
 }
 
-export default { parseTableWhere, getOpenTableWhere, submitOpenTableSelection }
+export default {
+  parseTableWhere,
+  getOpenTableWhere,
+  validateOpenTableContext,
+  submitOpenTableSelection
+}

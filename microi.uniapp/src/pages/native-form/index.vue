@@ -2,7 +2,7 @@
 	<mci-page-shell class="native-form-page" :style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
 		@back="goBack">
 		<template #right><button v-if="!loading && !error && mode === 'View' && rowId" class="edit-command"
-				@tap="mode = 'Edit'">编辑</button></template>
+				@tap="switchToEdit">编辑</button></template>
 		<mci-skeleton v-if="loading" type="form" :rows="7" />
 
 		<view v-else-if="error" class="form-state">
@@ -31,14 +31,17 @@
 					</view>
 
 					<mci-native-field v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
-						:table-name="tableName" @select="handleNativeFieldSelect" />
+						:table-name="tableName" :form-data="form" :menu-id="menuId"
+						:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
+						@select="handleNativeFieldSelect" />
 
-					<view v-if="isCustomerAddressField(field)" class="customer-location">
-						<view class="customer-location__button"
-							:class="{ 'customer-location__button--disabled': customerLocating }"
-							hover-class="customer-location__button--pressed" @tap="chooseCustomerLocation">
-							<text class="customer-location__icon">⌖</text>
-							<text>{{ customerLocating ? '定位中…' : '重新定位' }}</text>
+					<view v-if="tenantFieldActions(field).length" class="tenant-field-actions">
+						<view v-for="action in tenantFieldActions(field)" :key="action.key"
+							class="tenant-field-action"
+							:class="{ 'tenant-field-action--disabled': action.disabled }"
+							hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
+							<text v-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
+							<text>{{ action.label }}</text>
 						</view>
 					</view>
 
@@ -48,17 +51,20 @@
 			</view>
 
 			<mci-child-table v-for="field in childFields" :key="field.Id || field.Name" :field="field"
-				:parent-id="rowId" :parent-form="form" :readonly="mode === 'View'" />
+				:parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+				:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+				:parent-mode="mode" :readonly="mode === 'View'" />
 
 			<mci-join-form v-for="field in joinFields" :key="field.Id || field.Name" :field="field" :parent-form="form"
 				:parent-mode="mode" :readonly="mode === 'View'" />
 
 			<mci-table-selector v-for="field in openTableFields" :key="field.Id || field.Name" :field="field"
 				:parent-table="tableName" :parent-id="rowId" :parent-form="form"
+				:parent-menu-id="menuId"
 				:readonly="mode === 'View' || Number(field.Readonly || 0) === 1" @change="handleRelatedChange" />
 
 			<mci-related-table v-for="field in joinTableFields" :key="field.Id || field.Name" :field="field"
-				:parent-form="form" />
+				:parent-form="form" :parent-menu-id="menuId" />
 
 			<view class="form-bottom-space"></view>
 		</view>
@@ -79,63 +85,45 @@
 		themeMixin
 	} from '@/utils/theme.js'
 	import {
-		V8,
 		getUser,
 		setUser
 	} from '@/utils/request.js'
 	import {
 		defaultFormData,
+		applyNativeFormViewDefinition,
 		hydrateNativeFormOptions,
-		loadNativeFormDefinition,
 		nativeFormDefaultSubmitValues,
 		parseJson,
-		scopeNativeFormDefinition,
-		saveNativeForm
+		scopeNativeFormDefinition
 	} from '@/platform/native-form.js'
 	import {
-		normalizeChosenLocation,
-		reverseGeocode
-	} from '@/platform/location.js'
-
-	const CUSTOMER_TABLE = 'diy_kehu'
-	const CUSTOMER_LOCATION_FIELDS = {
-		region: 'Chengshi',
-		address: 'XiangxiDZ',
-		latitude: 'KehuDT_Lat',
-		longitude: 'KehuDT_Lng'
-	}
-	const CUSTOMER_PERSONNEL_LINKS = [{
-			sourceNames: ['FuzeR'],
-			sourceLabels: ['负责人'],
-			phoneName: 'FuzeRDH',
-			phoneLabel: '负责人电话',
-			idName: 'FuzeRID'
-		},
-		{
-			sourceNames: ['ZhuanshuKF', 'ZhaunshuKF'],
-			sourceLabels: ['专属客服'],
-			phoneName: 'ZhuanshuKFDH',
-			phoneLabel: '专属客服电话'
-		},
-		{
-			sourceNames: ['ShouhouRY'],
-			sourceLabels: ['售后人员'],
-			phoneName: 'ShouhouRYDH',
-			phoneLabel: '售后人员电话',
-			idName: 'ShouhouRYID'
-		}
-	]
-	const PERSON_ID_KEYS = ['Id', 'ID', 'id', 'UserId', 'UserID', 'userId', 'Value', 'value']
-	const PERSON_PHONE_KEYS = [
-		'Phone', 'phone', 'Mobile', 'mobile', 'MobilePhone', 'mobilePhone',
-		'ShoujiH', 'Shouji', 'Tel', 'Telephone', 'LianxiDH', 'PhoneNumber'
-	]
+		isFormEngineRecordAdapter,
+		loadNativeFormRecordDefinition,
+		loadNativeFormRecord,
+		normalizeFormRecordAdapter,
+		saveNativeFormRecord
+	} from '@/platform/form-record-adapter.js'
+	import {
+		compileFormConfig,
+		loadModuleViewManifest
+	} from '@/platform/view-manifest.js'
+	import {
+		createTenantFormState,
+		getTenantFormFieldActions,
+		handleTenantFormFieldSelect,
+		initializeTenantForm,
+		notifyTenantFormSaved,
+		prepareTenantFormSubmit,
+		runTenantFormFieldAction,
+		tenantFormBusyMessage
+	} from '@/platform/form-extension.js'
 
 	export default {
 		mixins: [themeMixin],
 		data() {
 			return {
 				tableName: '',
+				menuId: '',
 				rowId: '',
 				mode: 'View',
 				title: '',
@@ -151,10 +139,11 @@
 				includeNames: [],
 				excludeNames: [],
 				readonlyNames: [],
-				customerLocating: false,
-				customerLocationInitialized: false,
-				customerLocationValues: {},
-				customerPersonnelValues: {}
+				recordAdapter: 'form-engine',
+				moduleEngineKey: '',
+				tableChildAuth: null,
+				tenantFormState: {},
+				viewManifest: null
 			}
 		},
 		computed: {
@@ -182,14 +171,11 @@
 			hasRelatedFields() {
 				return this.childFields.length + this.joinFields.length + this.openTableFields.length + this
 					.joinTableFields.length > 0
-			},
-			isCustomerAdd() {
-				return String(this.tableName || '').toLowerCase() === CUSTOMER_TABLE &&
-					this.mode === 'Add' && !this.rowId
 			}
 		},
 		onLoad(options) {
 			this.tableName = decodeURIComponent(options.table || '')
+			this.menuId = decodeURIComponent(options.menuId || '')
 			this.rowId = decodeURIComponent(options.id || '')
 			this.mode = options.mode || (this.rowId ? 'View' : 'Add')
 			this.title = decodeURIComponent(options.title || '')
@@ -199,6 +185,10 @@
 			this.includeNames = parseJson(decodeURIComponent(options.fields || ''), []) || []
 			this.excludeNames = parseJson(decodeURIComponent(options.excludeFields || ''), []) || []
 			this.readonlyNames = parseJson(decodeURIComponent(options.readonlyFields || ''), []) || []
+			this.recordAdapter = normalizeFormRecordAdapter(decodeURIComponent(options.recordAdapter || 'form-engine'))
+			this.moduleEngineKey = decodeURIComponent(options.moduleEngineKey || '')
+			this.tableChildAuth = parseJson(decodeURIComponent(options.tableChildAuth || ''), null)
+			this.tenantFormState = createTenantFormState(this.tenantFormContext())
 			this.loadForm()
 		},
 		methods: {
@@ -211,28 +201,73 @@
 				this.loading = true
 				this.error = ''
 				try {
-					const tasks = [loadNativeFormDefinition(this.tableName, refresh)]
-					if (this.rowId) tasks.push(V8.FormEngine.GetFormData(this.tableName, {
-						Id: this.rowId
-					}))
-					const [rawDefinition, rowResult] = await Promise.all(tasks)
-					if (this.rowId && (!rowResult || rowResult.Code !== 1)) throw new Error((rowResult && rowResult
+					const manifestPromise = loadModuleViewManifest({
+						table: this.tableName,
+						menuId: this.menuId,
+						menuAliases: this.title ? [this.title.replace(/^(新增|编辑|查看)/, '')] : []
+					}, {
+						scene: this.mode === 'View' ? 'Detail' : 'Edit',
+						device: 'Mobile',
+						refresh
+					}).catch(() => null)
+					let manifest = null
+					if (!this.menuId && isFormEngineRecordAdapter(this.recordAdapter)) {
+						manifest = await manifestPromise
+						if (manifest && manifest.Module && manifest.Module.Id) {
+							this.menuId = manifest.Module.Id
+						}
+					}
+					const context = {
+						adapter: this.recordAdapter,
+						tableName: this.tableName,
+						rowId: this.rowId,
+						menuId: this.menuId,
+						moduleEngineKey: this.moduleEngineKey,
+						tableChildAuth: this.tableChildAuth,
+						refresh
+					}
+					const definitionPromise = loadNativeFormRecordDefinition(context)
+					const rowPromise = (this.rowId || !isFormEngineRecordAdapter(this.recordAdapter))
+						? loadNativeFormRecord({
+							...context,
+							adapter: this.recordAdapter,
+							tableName: this.tableName,
+							rowId: this.rowId,
+							menuId: this.menuId
+						})
+						: null
+					const [rawDefinition, resolvedManifest, rowResult] = await Promise.all([
+						definitionPromise,
+						manifest ? Promise.resolve(manifest) : manifestPromise,
+						rowPromise || Promise.resolve(null)
+					])
+					manifest = resolvedManifest
+					this.viewManifest = manifest
+					if ((this.rowId || !isFormEngineRecordAdapter(this.recordAdapter)) &&
+						(!rowResult || Number(rowResult.Code) !== 1)) throw new Error((rowResult && rowResult
 						.Msg) || '数据不存在')
-					const definition = scopeNativeFormDefinition(rawDefinition, {
+					if (rowResult && rowResult.Data && rowResult.Data.Id) this.rowId = rowResult.Data.Id
+					const scopedDefinition = scopeNativeFormDefinition(rawDefinition, {
 						includeNames: this.includeNames,
 						excludeNames: this.excludeNames,
 						readonlyNames: this.readonlyNames
 					})
+					const definition = applyNativeFormViewDefinition(
+						scopedDefinition,
+						compileFormConfig(manifest)
+					)
 					this.form = defaultFormData(definition, {
 						...this.defaultValues,
 						...(rowResult ? rowResult.Data : {})
 					})
-					await hydrateNativeFormOptions(definition, this.form)
+					await hydrateNativeFormOptions(definition, this.form, {
+						menuId: this.menuId,
+						moduleEngineKey: this.moduleEngineKey,
+						tableChildAuth: this.tableChildAuth
+					})
 					this.definition = definition
-					if (this.isCustomerAdd && !this.customerLocationInitialized) {
-						this.customerLocationInitialized = true
-						this.$nextTick(() => this.locateCustomer(false))
-					}
+					await this.$nextTick()
+					await initializeTenantForm(this.tenantFormContext())
 				} catch (error) {
 					this.error = error.message || error.Msg || '表单加载失败'
 				} finally {
@@ -247,182 +282,46 @@
 					...this.form
 				}
 			},
-			personnelLinkForField(field) {
-				const name = String(field && field.Name || '').toLowerCase()
-				const label = String(field && field.Label || '').trim()
-				return CUSTOMER_PERSONNEL_LINKS.find((link) =>
-					link.sourceNames.some((item) => String(item).toLowerCase() === name) ||
-					link.sourceLabels.includes(label)
-				)
+			async switchToEdit() {
+				this.mode = 'Edit'
+				await this.loadForm()
 			},
-			personValue(row, keys) {
-				if (!row || typeof row !== 'object') return ''
-				for (const key of keys) {
-					const value = row[key]
-					if (value !== undefined && value !== null && String(value).trim()) return value
-				}
-				return ''
-			},
-			selectedPersonId(payload, row) {
-				const direct = this.personValue(row, PERSON_ID_KEYS)
-				if (direct !== '') return direct
-				const field = payload && payload.field || {}
-				const config = field.config || {}
-				const saveField = String(config.SelectSaveField || '')
-				if (/id$/i.test(saveField) && payload.value !== undefined && payload.value !== null) {
-					return payload.value
-				}
-				return ''
-			},
-			handleNativeFieldSelect(payload) {
-				if (!this.isCustomerAdd || !payload || payload.multiple) return
-				const link = this.personnelLinkForField(payload.field)
-				if (!link) return
-				const row = payload.raw && typeof payload.raw === 'object' ?
-					payload.raw :
-					(payload.option && payload.option.raw && typeof payload.option.raw === 'object' ?
-						payload.option.raw : {})
-				const phone = this.personValue(row, PERSON_PHONE_KEYS)
-				const personId = this.selectedPersonId(payload, row)
-				const phoneName = this.customerFieldName(link.phoneName, link.phoneLabel)
-				const updates = {
-					[phoneName]: phone
-				}
-				const submitValues = {
-					[phoneName]: phone
-				}
-
-				if (link.idName && personId !== '') {
-					const idName = this.customerFieldName(link.idName)
-					updates[idName] = personId
-					submitValues[idName] = personId
-				}
-
-				this.form = {
-					...this.form,
-					...updates
-				}
-				this.customerPersonnelValues = {
-					...this.customerPersonnelValues,
-					...submitValues
+			tenantFormContext(extra = {}) {
+				return {
+					tableName: this.tableName,
+					menuId: this.menuId,
+					rowId: this.rowId,
+					mode: this.mode,
+					recordAdapter: this.recordAdapter,
+					definition: this.definition,
+					form: this.form,
+					defaultValues: this.defaultValues,
+					state: this.tenantFormState,
+					patchForm: (updates = {}) => {
+						this.form = {
+							...this.form,
+							...updates
+						}
+					},
+					...extra
 				}
 			},
-			isCustomerAddressField(field) {
-				if (!this.isCustomerAdd || !field) return false
-				const name = String(field.Name || '').toLowerCase()
-				const label = String(field.Label || '').trim()
-				return name === CUSTOMER_LOCATION_FIELDS.address.toLowerCase() || label === '详细地址'
+			tenantFieldActions(field) {
+				return getTenantFormFieldActions(this.tenantFormContext(), field)
 			},
-			requestCurrentLocation() {
-				return new Promise((resolve, reject) => {
-					uni.getLocation({
-						type: 'gcj02',
-						isHighAccuracy: true,
-						highAccuracyExpireTime: 5000,
-						success: resolve,
-						fail: reject
-					})
-				})
+			async runTenantFieldAction(field, action) {
+				if (!action || action.disabled) return
+				await runTenantFormFieldAction(this.tenantFormContext(), field, action)
 			},
-			requestChosenLocation() {
-				return new Promise((resolve, reject) => {
-					uni.chooseLocation({
-						success: resolve,
-						fail: reject
-					})
-				})
-			},
-			customerFieldName(expectedName, expectedLabel = '') {
-				const fields = this.definition ?
-					(this.definition.layoutFields || this.definition.fields || []) : []
-				const expected = String(expectedName || '').toLowerCase()
-				const field = fields.find((item) => String(item.Name || '').toLowerCase() === expected) ||
-					(expectedLabel ? fields.find((item) => String(item.Label || '').trim() === expectedLabel) : null)
-				return field && field.Name ? field.Name : expectedName
-			},
-			applyCustomerLocation(location) {
-				const latitude = Number(location && location.latitude)
-				const longitude = Number(location && location.longitude)
-				const updates = {}
-				const submitValues = {}
-				const regionName = this.customerFieldName(CUSTOMER_LOCATION_FIELDS.region, '城市')
-				const addressName = this.customerFieldName(CUSTOMER_LOCATION_FIELDS.address, '详细地址')
-				const latitudeName = this.customerFieldName(CUSTOMER_LOCATION_FIELDS.latitude)
-				const longitudeName = this.customerFieldName(CUSTOMER_LOCATION_FIELDS.longitude)
-
-				if (Array.isArray(location.region) && location.region.length) {
-					const regionValue = JSON.stringify(location.region)
-					updates[regionName] = regionValue
-					submitValues[regionName] = regionValue
-				}
-				if (location.address) {
-					updates[addressName] = location.address
-					submitValues[addressName] = location.address
-				}
-				if (Number.isFinite(latitude)) {
-					updates[latitudeName] = latitude
-					submitValues[latitudeName] = latitude
-				}
-				if (Number.isFinite(longitude)) {
-					updates[longitudeName] = longitude
-					submitValues[longitudeName] = longitude
-				}
-
-				this.form = {
-					...this.form,
-					...updates
-				}
-				this.customerLocationValues = {
-					...this.customerLocationValues,
-					...submitValues
-				}
-			},
-			async locateCustomer(chooseFromMap = false) {
-				if (!this.isCustomerAdd || this.customerLocating) return
-				this.customerLocating = true
-				try {
-					const source = chooseFromMap ?
-						await this.requestChosenLocation() :
-						await this.requestCurrentLocation()
-					let geocode = null
-					try {
-						geocode = await reverseGeocode(source.longitude, source.latitude)
-					} catch (error) {
-						// 地图选点本身会返回地址；逆地理编码失败时仍可用选点结果完成赋值。
-					}
-					const location = normalizeChosenLocation(source, geocode)
-					this.applyCustomerLocation(location)
-					if (chooseFromMap) {
-						uni.showToast({
-							title: '位置已更新',
-							icon: 'success'
-						})
-					} else if (!location.address || !location.region.length) {
-						uni.showToast({
-							title: '已获取坐标，地址解析失败',
-							icon: 'none'
-						})
-					}
-				} catch (error) {
-					const message = String(error && error.errMsg || error && error.message || '')
-					if (!/cancel/i.test(message)) {
-						uni.showToast({
-							title: chooseFromMap ? '位置选择失败' : '自动定位失败，请点击重新定位',
-							icon: 'none'
-						})
-					}
-				} finally {
-					this.customerLocating = false
-				}
-			},
-			chooseCustomerLocation() {
-				this.locateCustomer(true)
+			async handleNativeFieldSelect(payload) {
+				await handleTenantFormFieldSelect(this.tenantFormContext(), payload)
 			},
 			async submit() {
 				if (this.saving) return
-				if (this.customerLocating) {
+				const busyMessage = tenantFormBusyMessage(this.tenantFormContext())
+				if (busyMessage) {
 					uni.showToast({
-						title: '正在获取位置，请稍候',
+						title: busyMessage,
 						icon: 'none'
 					})
 					return
@@ -430,20 +329,20 @@
 				this.saving = true
 				try {
 					const wasAdd = !this.rowId
-					const result = await saveNativeForm(
-						this.tableName,
-						this.rowId,
-						this.form,
-						this.definition.fields,
-						{
+					const tenantSubmitValues = await prepareTenantFormSubmit(this.tenantFormContext())
+					const result = await saveNativeFormRecord({
+						adapter: this.recordAdapter,
+						tableName: this.tableName,
+						rowId: this.rowId,
+						form: this.form,
+						fields: this.definition.fields,
+						extraValues: {
 							...nativeFormDefaultSubmitValues(this.definition, this.defaultValues),
-							...(String(this.tableName || '').toLowerCase() === CUSTOMER_TABLE ?
-								{
-									...this.customerLocationValues,
-									...this.customerPersonnelValues
-								} : {})
-						}
-					)
+							...tenantSubmitValues
+						},
+						menuId: this.menuId,
+						tableChildAuth: this.tableChildAuth
+					})
 					if (!this.rowId && result.Data) this.rowId = result.Data.Id || result.Data
 					const currentUser = getUser() || {}
 					if (String(this.tableName).toLowerCase() === 'sys_user' && currentUser.Id && String(currentUser
@@ -462,10 +361,15 @@
 						title: '保存成功',
 						icon: 'success'
 					})
-					uni.$emit('xjy:data-changed', {
+					const changedEvent = {
 						table: this.tableName,
 						id: this.rowId
-					})
+					}
+					uni.$emit('microi:data-changed', changedEvent)
+					await notifyTenantFormSaved(this.tenantFormContext({
+						wasAdd,
+						changedEvent
+					}), result)
 					if (wasAdd && this.rowId && this.hasRelatedFields && this.stayAfterAdd) {
 						this.mode = 'Edit'
 						await this.loadForm(true)
@@ -578,13 +482,15 @@
 		color: #e54625;
 	}
 
-	.customer-location {
+	.tenant-field-actions {
 		display: flex;
+		flex-wrap: wrap;
+		gap: 12rpx;
 		justify-content: flex-end;
 		margin-top: 16rpx;
 	}
 
-	.customer-location__button {
+	.tenant-field-action {
 		min-width: 190rpx;
 		height: 66rpx;
 		display: flex;
@@ -601,16 +507,16 @@
 		transition: transform .18s ease, opacity .18s ease;
 	}
 
-	.customer-location__icon {
+	.tenant-field-action__icon {
 		font-size: 30rpx;
 		line-height: 1;
 	}
 
-	.customer-location__button--disabled {
+	.tenant-field-action--disabled {
 		opacity: .62;
 	}
 
-	.customer-location__button--pressed {
+	.tenant-field-action--pressed {
 		transform: scale(.97);
 	}
 
