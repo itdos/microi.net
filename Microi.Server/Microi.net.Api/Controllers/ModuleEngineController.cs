@@ -19,6 +19,10 @@ namespace Microi.net.Api
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
             param["OsClient"] = currentTokenDynamic.OsClient;
+            // ModuleEngine is another public entry point into FormEngine. Always
+            // mark it as a client call so table/menu authorization cannot be bypassed.
+            param["_InvokeType"] = InvokeType.Client.ToString();
+            param["_IsAnonymous"] = false;
         }
         /// <summary>
         /// 

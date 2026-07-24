@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.5.1
+ * Version: v1.5.3
  * Function:
  * - 统一使用 sys_microistore 发布应用商城包；按 source/build 角色生成根目录正确的可编译源码 ZIP 与完整真实 dist ZIP，并保留可移植安装所需表、接口和版本元数据。
  */
@@ -632,4 +632,3 @@ if (action === 'Publish') {
 }
 
 return ok({ Package: packageModel, SourceZipIncluded: !!packageAssets.SourceZip, BuildZipIncluded: true }, '统一应用包已生成');
-

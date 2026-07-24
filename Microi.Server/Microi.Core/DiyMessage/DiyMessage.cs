@@ -21,7 +21,8 @@ namespace Microi.net
         /// <summary>
         /// 多语言集合
         /// </summary>
-        public static Dictionary<string, Dictionary<string, JObject>> Msg = new Dictionary<string, Dictionary<string, JObject>>();
+        public static ConcurrentDictionary<string, Dictionary<string, JObject>> Msg =
+            new ConcurrentDictionary<string, Dictionary<string, JObject>>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, string> SourceTextLangCache = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         private static readonly Dictionary<string, JObject> BuiltInMsg = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase)
@@ -34,7 +35,11 @@ namespace Microi.net
             { "Parameter", JObject.FromObject(new { ZhCN = "参数", En = "Parameters", ZhTW = "參數" }) },
             { "Id", JObject.FromObject(new { ZhCN = "主键", En = "ID", ZhTW = "主鍵" }) },
             { "FieldId", JObject.FromObject(new { ZhCN = "字段ID", En = "Field ID", ZhTW = "欄位ID" }) },
-            { "FieldName", JObject.FromObject(new { ZhCN = "字段名", En = "Field", ZhTW = "欄位名" }) }
+            { "FieldName", JObject.FromObject(new { ZhCN = "字段名", En = "Field", ZhTW = "欄位名" }) },
+            // Security and parameter failures must remain understandable on legacy
+            // tenant databases whose diy_lang rows predate these message keys.
+            { "NoAuth", JObject.FromObject(new { ZhCN = "您没有权限做此操作！", En = "You do not have permission to perform this operation.", ZhTW = "您沒有權限執行此操作！" }) },
+            { "ParamError", JObject.FromObject(new { ZhCN = "参数错误！", En = "Invalid parameters.", ZhTW = "參數錯誤！" }) }
         };
 
         public static string GetLang(string osClient, string key, string lang = "cn")

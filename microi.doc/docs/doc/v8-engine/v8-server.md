@@ -13,130 +13,125 @@
 - 主要用于表单属性的服务器端 V8 事件、接口引擎、数据源引擎等
 
 ## 接口引擎 V8.ApiEngine
->* [接口引擎详细介绍](https://microi.net/doc/v8-engine/api-engine)
->* 服务器端V8事件可以直接调用接口引擎（非http），接口引擎也可以调用接口引擎
->* V8事件或接口引擎在调用另外一个接口引擎时，可传入事件对象，即可保证在同一事务
+
+> [接口引擎详细介绍](https://microi.net/doc/v8-engine/api-engine)
+
+服务器端 V8 事件可以直接调用接口引擎（非 HTTP），接口引擎也可以调用其它接口引擎。传入 `V8.DbTrans` 时，共享外层事务；不传时由被调用接口引擎管理自己的事务。
+
+`StopHttp`、允许匿名调用和接口角色限制约束的是外部 HTTP 入口。`V8.ApiEngine.Run` 属于可信服务端调用，不经过 HTTP 门禁。因此，被其它接口引擎复用的敏感业务仍必须在被调用引擎内部校验当前用户、业务状态和数据范围；能够编辑接口引擎、数据源、Job 或后端事件的账号属于“服务端代码执行”信任边界，只应授予高权限管理员。
+
 ```javascript
-//调用方式：
+// 同步调用
 var result = V8.ApiEngine.Run('ApiEngineKey', { 
-    Param1 : '1',
+    Param1: '1'
 });
-//同一事务
-var resul2 = V8.ApiEngine.Run('ApiEngineKey', { 
-    Param2 : '1',
-}， V8.DbTrans);
+
+// 共享当前事务
+var result2 = V8.ApiEngine.Run('ApiEngineKey', {
+    Param2: '1'
+}, V8.DbTrans);
 ```
+
+接口引擎返回值与事务语义：
+
+- 返回 `DosResult` 或带 `Code` 的对象：`Code === 1` 提交，其它值回滚。
+- 返回对象但没有 `Code`：回滚，避免“忘记返回状态”时误提交。
+- 返回字符串、数字、数组、布尔值或 `null`，且脚本未抛异常：默认提交。
+- 嵌套调用传入外层事务时，最终提交或回滚由外层调用者决定。
+- `V8.DbTrans.Commit()`、`Rollback()`、`Close()` 会被安全代理忽略，不要在脚本中手动管理平台事务。
 
 ## 表单引擎 V8.FormEngine
->* 见平台文档：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)
+
+见平台文档：[FormEngine 用法](https://microi.net/doc/v8-engine/form-engine.html)。
+
+后端接口引擎和后端表单 V8 事件在活跃 V8 上下文中调用 FormEngine 时，由服务端写入不可被外部 JSON 构造的可信标记，因此不要求 `_SysMenuId`。租户边界、平台保护表和脚本自身的业务校验仍然生效。浏览器或其它外部 HTTP 请求不能通过伪造 `_InvokeType: 'Server'` 获得该信任；`_InvokeType` 只控制是否触发表单事件，不是身份或授权标记。
+
+这里要区分“进入事件前”和“事件内部”：浏览器调用 `AddFormData` 仍要先通过目标菜单的 `Add` 权限，菜单 `SqlWhere` / `SqlJoin` 只约束已有记录的查询、修改和删除，不用于拒绝一条尚不存在的新增记录；进入 `SubmitBeforeServerV8` / `SubmitAfterServerV8` 后，事件代码与接口引擎具有相同的服务器 FormEngine/数据库执行能力，可在当前租户内完成跨表事务、复杂 SQL 及归属字段写入。
+
+前端/外部 HTTP 的菜单授权、历史无 `_SysMenuId` 推断、TableChild 委托和行级权限规则详见 [FormEngine 安全授权](./form-engine.md#安全授权模型)。
+
+平台内部的多层封装也必须保留来源：如果一个已校验管理员的设计器或升级任务在内部再次调用 FormEngine，应传递原管理员上下文，或由服务器构造带 `_TrustedServerInvocation` 的强类型参数；不要把数据转成裸 `JObject` 后依赖类型推断。可信标记是服务端实现细节，V8 代码和 HTTP 客户端都不需要、也不能自行设置。
+
+这一规则也适用于 `AddDiyField/AddField`：它会先读取表定义，再在事务中调用通用 FormEngine 写入 `diy_field`，最后创建物理列。内部 `diy_field` 写入必须继承外层已验证的管理员或可信升级上下文；普通客户端不能借动态建字段入口绕过保护表授权。
 
 ## 缓存操作 V8.Cache
->* 平台分布式缓存是L1、L2级联动的分布式缓存，L1为本地内存缓存，L2为redis缓存，V8.Cache操作的就是L2级redis缓存，平台会自动管理L1和L2的联动关系。当覆盖数据库、或直接修改数据库表结构数据后，可能需要手动重启api的docker容器以实现自动清除L1级缓存，然后可通过redis desktop manage软件清除L2级缓存。
->* 分布式缓存操作类，用法V8.Cache('Key', 'Value', '0.00:10:00');
->* 注意：过期时间的格式必须是`d.HH:mm:ss`，如`0.12:00:00`0天12小时，`1.10:10:00`一天10小时10分钟，也可以不传过期时间参数，则为永久。
->* V8 缓存会由服务端强制限定在当前租户命名空间。传逻辑 Key 时自动生成 `Microi:${V8.OsClient}:{逻辑Key}`；传完整的当前租户 Key 继续兼容。传入其它租户的 `Microi:` 前缀会被拒绝。
->* `V8.Cache` 不再暴露 Redis `IDatabase`、连接管理或服务器扫描能力，接口引擎不能读取共享 Redis 中其它租户的数据。
+
+`V8.Cache` 是当前租户命名空间内的 Redis 能力。传逻辑 Key 时服务端自动生成 `Microi:${V8.OsClient}:{逻辑Key}`；传完整的当前租户 Key 继续兼容，传入其它租户的 `Microi:` 前缀会被拒绝。它不暴露 Redis `IDatabase`、连接管理、服务器扫描或任意连接能力。
+
+过期时间可传秒数，也可传 `d.HH:mm:ss` 字符串，例如 `59` 或 `0.00:00:59`；省略时为永久。常用方法包括 `Set/Get/Delete/Del/Remove`，以及 `HashSet/HashGet/HashGetAll/HashGetAllKeys/HashDelete/HashExists/HashLength/HashIncrement`。
+
 ```javascript
-var cacheKey = `Microi:${V8.OsClient}:FormData:baoming`;
+// 推荐只传逻辑 Key，租户前缀由服务端添加
+var cacheKey = 'FormData:baoming';
 var cacheValue = JSON.stringify(formData);
-//写缓存
-var result1 = V8.Cache.Set(cacheKey, cacheValue, '0.00:00:59');//返回bool类型
-//获取缓存
-var result2 = V8.Cache.Get(cacheKey);//返回string类型，无缓存返回null
-//删除缓存。注：若在Set时设置了有效期，到期会自动删除。
-var result3 = V8.Cache.Remove(cacheKey);//返回bool类型
+var result1 = V8.Cache.Set(cacheKey, cacheValue, 59);
+var result2 = V8.Cache.Get(cacheKey);
+var result3 = V8.Cache.Remove(cacheKey);
+
+V8.Cache.HashSet('Customer:Stats', 'Count', '1');
+var count = V8.Cache.HashGet('Customer:Stats', 'Count');
 ```
-* 验证码缓存Key命名规则：
+
+不要用“先 `KeyExist`、再 `Set`、最后 `Remove`”实现分布式锁：这不是原子加锁，没有持有者令牌，且可能删除其它节点的锁。接口引擎应使用平台的分布式锁配置，Job/Worker 使用带租约和持有者令牌的锁；锁之外还必须使用稳定幂等键、唯一约束或状态机保证副作用只执行一次。
+
+菜单、角色和表权限保存会递增 Redis 授权版本并使各节点的短期快照失效。不要把“重启容器”或“清空整个 Redis”当作权限刷新方案。
+
+## .NET 互操作与异步边界
+
+后端 V8 对部分 .NET 类型开放互操作，但平台能力应优先使用 `V8.*`：例如用 `V8.Method.NewUlid()` 生成标识、用 `V8.Base64` 编解码、用 `DateNow()` 处理时间。不要依赖全局 `System` 名称访问任意 CLR 类型；平台还提供了 `V8.System` 主机监控扩展，两者可能发生名称冲突，且部分危险 CLR 类型会被禁用。
+
+`setTimeout` 和 `System.Threading.Tasks.Task.Run` 不能作为“请求返回后可靠执行”的方案。`V8Engine.Run` 返回后会释放当前 Jint Engine、租户上下文、事务和并发租约，延迟回调可能面对已失效的上下文。请求内异步 API 使用 `await`；需要脱离请求执行时，使用接口引擎后台任务、Job、MQ 或 outbox，并设计幂等、重试和多节点故障恢复。
+
+```javascript
+var now = DateNow('yyyy-MM-dd HH:mm:ss');
+var id = V8.Method.NewUlid();
+
+// 请求内异步方法（仅在方法本身提供 Async 版本时）
+var result = await V8.ApiEngine.RunAsync('ApiEngineKey', { Id: id });
 ```
-`Microi:${OsClient值}:{分类key值}:{Key}`
-示例：
-`Microi:iTdos:Captcha:aaaa-bbbb-cccc`
-```
-* 平台的redis key前缀只总有4级：
->* 第一级用于区分其它第三方系统共用同一个redis实例时，区分哪个redis文件夹是吾码平台在用的
->* 第二级用于区分saas租户
->* 第三级用于区分redis分类，比如说验证码一类
->* 第四级就是最终要用的key
-
-## C#系统类 System
->* 服务器端V8代码能直接使用.net下的System命名空间
-::: details 展开查看 C# 代码（39 行）
-```csharp
-//生成一个服务器端GUID值
-//强烈建议使用 V8.Method.NewUlid() 方法替代 System.Guid.NewGuid()，Ulid 具有更好的排序性和更短的字符串长度
-System.Guid.NewGuid()
-
-
-//将字符串转为base64字符串，建议使用后封装的V8.Base64
-var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
-var base64String = System.Convert.ToBase64String(bytes);
-
-//解密base64，，建议使用后封装的V8.Base64
-var bytes = System.Text.Encoding.UTF8.GetBytes(originalString);  
-var base64String = System.Convert.ToBase64String(bytes);
-
-//等待1000毫秒
-System.Threading.Thread.Sleep(1000);
-
-//调用服务器端全局V8函数，获取yyyy-MM-dd HH:mm:ss格式的当前时间字符串。若获取日期格式，可使用new Date();
-V8.Action.GetDateTimeNow()
-
-//如果在服务器端全局V8函数是通过function DateNow(){}这样定义的，则可以直接使用DateNow()
-var nowDate = DateNow('yyyy_mm-dd HH:mm:ss');
-
-//异步执行V8代码，方法1（推荐）
-var timer1 = setTimeout(function() {
-    V8.FormEngine.UptFormData('diy_test1', {
-      Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
-      Text45 : '2222',
-    });
-}, 1000);
-//可在timer1开始执行前随时手动提前终止定时执行
-clearTimeout(timer1);
-
-//异步执行V8代码，方法2
-System.Threading.Tasks.Task.Run(function(){
-  //实现setTimeout(function, 1000)的效果，不加则是setTimeout(function, 0)的异步效果
-  System.Threading.Thread.Sleep(1000);
-  V8.FormEngine.UptFormData('diy_test1', {
-    Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
-    Text45 : '2222',
-  });
-});
-```
-:::
 
 ## 常用函数 V8.Method
->* 集成了一些常用函数，可自定义扩展
-::: details 展开查看 JavaScript 代码（26 行）
+
+`V8.Method` 同时包含业务工具、管理员运维能力和平台内部能力。普通业务脚本优先使用下列稳定接口；数据库备份、清空数据库、认证缓存维护等管理方法不能作为普通业务 API 暴露。
+
+::: details 展开查看 JavaScript 代码
 ```javascript
-//从redis中获取当前登陆用户的token和身份信息
-//token：可选，是否包含Bearer均支持
-//osClient：可选
+// 当前 Token 与身份。不要把返回对象直接透传给前端。
 var currentTokenObj = V8.Method.GetCurrentToken(token, osClient)
-//返回：{ OsClient : '', CurrentUser : {}, Token : '不包含 Bearer ' } 或 null
+// { OsClient:'', CurrentUser:{}, Token:'不包含 Bearer ' } 或 null
 
-//刷新用户的登陆身份redis缓存信息，必传userId、osClient
-V8.Method.RefreshLoginUser(userId, osClient)
+var id = V8.Method.NewUlid();
+var timestamp = V8.Method.GetTimestamp();
 
-//获取私有文件的临时访问地址，可传入FilePathName、或FilePathNames
-V8.Method.GetPrivateFileUrl()
+// 后端可信 V8 按租户内对象路径签发短期代理地址
 var result = V8.Method.GetPrivateFileUrl({
-    FilePathName : '/microi/file/2023-08-06/xxx.doc',
-    //FilePathNameS : ['/microi/file/2023-08-06/xxx.doc']
+    FilePathName: '/microi/file/2023-08-06/xxx.doc'
 });
-//返回{ Code : 1/0, Data : '临时访问地址'/['临时访问地址'], Msg : '错误信息' }
 
-//添加系统日志
+// 结构化系统日志；不要记录密码、Token、密钥或完整请求体
 V8.Method.AddSysLog({
-	Type : '', //日志类型，自定义文字，如：接口日志、性能日志、登录日志等
-	Title : '', //日志标题，如：张三登录了系统
-	Content: '', //日志内容，如：张三在2024-12-12 20:13通过扫码登录了系统 
-	OtherInfo : '', //其它信息，如：{ Append : 'test' }
-	Remark : '', //日志备注
-	Level : 1,//日志等级
+    Type: '接口日志',
+    Title: '同步完成',
+    Content: '记录数：20',
+    Level: 1
 });
 ```
+
+### V8.Method.Upload
+
+`V8.Method.Upload` 使用当前租户文件配置，并执行平台上传上限与租户动态配额。默认上限为：单文件 100 MB、单请求 200 MB、最多 10 个文件、每用户每天 2 GB、每租户每天 20 GB；`sys_osclients` 的 `FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB` 可按租户进一步收紧。HTTP 上传会在 Base64 解码前预检体积，日配额用 Redis Lua 原子计数；配额服务不可用时失败关闭。
+
+```javascript
+var uploadResult = V8.Method.Upload({
+  FilesByteBase64: V8.FilesByteBase64,
+  Limit: true,
+  Preview: false,
+  Path: '/file',
+  OsClient: V8.OsClient
+});
+```
+
+普通 HTTP 上传只允许平台规定的目录并默认按私有文件处理；可信后端 V8 可进行租户内受控文件操作，但不能把 `GetPrivateFileByte`、对象列举或删除等管理能力直接暴露给普通用户。浏览器访问私有文件时还必须证明菜单、记录、字段与附件绑定关系，详见 [文件上传与私有文件](../more/hdfs.md)。
 
 `GetPrivateFileUrl` 返回的是后端短期票据代理地址，而不是可泄露的对象存储真实签名地址。后端会分别记录链接签发和实际 `GET/HEAD` 打开/下载行为；登录用户记录为 `Name(Account)`，转发链接被无身份访问时记录为匿名访问。代理支持 `Range` 流式响应并对分片请求短时去重，失败时不会退回未经审计的真实签名地址。`Limit:false` 的公有文件仍可直接走 CDN/公有桶，不记录此类行为日志。
 
@@ -528,21 +523,27 @@ var userName = V8.CurrentUser.Name;
 ## 数据库对象 V8.Db
 >* 数据库访问对象，支持Dos.ORM、SqlSugar切换
 >* `FromSql` 只传 SQL 字符串；动态值请使用 `.AddInParameter("@p0", value)` 链式绑定，不要写 `FromSql(sql, value)`。
-```csharp
-//用例：
-var list = V8.Db.FromSql("select * from table")//也可以使用V8.DbTrans.FromSql()
-                .ToArray(); //返回数组数据，一般用于select查询多条数据语句
-                //返回受影响行数，一般用于update、delete、insert语句
-                .ExecuteNonQuery(); 
-                //返回单条数据，一般用于select查询单条数据语句
-                .First(); 
-                //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table、select Name from table
-                .ToScalar(); 
+```js
+// 查询多条
+var list = V8.Db.FromSql("select Id, Account, Name from sys_user where Status = @p0")
+    .AddInParameter("@p0", 1)
+    .ToArray();
 
-// 参数化查询
-var user = V8.Db.FromSql("select * from sys_user where Id = @p0")
-                .AddInParameter("@p0", userId)
-                .First();
+// 执行 insert/update/delete，返回受影响行数
+var affected = V8.Db.FromSql("update sys_user set Status = @p0 where Id = @p1")
+    .AddInParameter("@p0", 0)
+    .AddInParameter("@p1", userId)
+    .ExecuteNonQuery();
+
+// 查询单条
+var user = V8.Db.FromSql("select Id, Account, Name from sys_user where Id = @p0")
+    .AddInParameter("@p0", userId)
+    .First();
+
+// 查询单个标量
+var count = V8.Db.FromSql("select count(1) from sys_user where Status = @p0")
+    .AddInParameter("@p0", 1)
+    .ToScalar();
 ```
 
 ## 数据库只读对象 V8.DbRead
@@ -557,12 +558,21 @@ var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 
 //扩展数据库的事务用法
 //【注意】emptyExTrans 是扮展库自己创建的事务，与 V8.DbTrans 完全独立，需要手动管理生命周期
+var recordId = V8.Param.Id;
 var emptyExTrans = V8.Dbs.EmptyEx.BeginTransaction();
-var count = emptyExTrans.FromSql("delete from diy_extend_test where Id='49ec484d-a2cf-47fe-b498-6efb2bf9f99d'").ExecuteNonQuery();
-emptyExTrans.Commit();//提交事务
-//emptyExTrans.Rollback();//回滚事务
-emptyExTrans.Close();//释放事务对象
-return { Code : 1, Data : count };
+try {
+    var count = emptyExTrans
+        .FromSql("delete from diy_extend_test where Id = @p0")
+        .AddInParameter("@p0", recordId)
+        .ExecuteNonQuery();
+    emptyExTrans.Commit();
+    return { Code : 1, Data : count };
+} catch (error) {
+    emptyExTrans.Rollback();
+    throw error;
+} finally {
+    emptyExTrans.Close();
+}
 ```
 >* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效
 
@@ -571,7 +581,14 @@ return { Code : 1, Data : count };
 ```js
 var array = V8.DbTrans.FromSql('...').ToArray();
 ```
-* 无需在接口引擎中手动调用【V8.DbTrans.Rollback()】，平台会自动管理事务的提交与回滚（返回Code=1时自动提交，否则自动回滚）。**事务生命周期由平台统一管理，调用V8.DbTrans.Commit()或Rollback()均无效。**
+无需在接口引擎中手动调用 `V8.DbTrans.Commit()` 或 `Rollback()`。事务生命周期由平台安全代理统一管理：
+
+- 返回 `DosResult` 或带 `Code` 的对象时，只有 `Code === 1` 提交。
+- 返回对象但没有 `Code` 时回滚。
+- 返回字符串、数字、数组、布尔值或 `null`，且脚本未异常时提交。
+- 复用外层传入的事务时，最终结果由外层调用决定。
+- 脚本显式调用平台事务的 `Commit/ Rollback/Close` 会被忽略。
+
 * 接口引擎示例
 ```javascript
 //操作第一张表，带事务
@@ -579,18 +596,18 @@ var result1 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
     Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
     Sex : '女'
-}， V8.DbTrans);
+}, V8.DbTrans);
 //操作第二张表，带事务
 var result2 = V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {
     Id : '',//必传
     Age : 20, //要修改的字段，注意字段值不能是{}或[]，需要序列化
     Sex : '女'
-}， V8.DbTrans);
+}, V8.DbTrans);
 //如果第二张表操作成功
 if(result2.Code == 1){
   return { Code : 1 };//平台会自动提交事务，因为返回的Code=1
 }else{//如果第二张表操作失败
-  return { Code : 0, Msg : result.Msg };//平台会自动回滚事务，因为返回的Code=0
+  return { Code : 0, Msg : result2.Msg };//平台会自动回滚事务，因为返回的Code=0
 }
 ```
 
@@ -659,7 +676,7 @@ V8.MongoDb.GetFormData({
 ```
 
 ## V8.Http
->* 对 RestSharp 的受控封装，支持 GET、POST、PATCH。前后端 V8 使用相同的 PascalCase 对象参数；后端接口引擎同步返回，前端浏览器端需使用 `await`。
+>* 对 RestSharp 的受控封装，支持 GET、POST、PATCH。前后端 V8 使用相同的 PascalCase 对象参数；后端同步方法直接返回，显式 `*Async` 方法在 Jint 中使用 `await`，前端浏览器端也需使用 `await`。
 
 | 方法 | 主要参数 | 返回值 |
 |---|---|---|
@@ -667,8 +684,10 @@ V8.MongoDb.GetFormData({
 | `V8.Http.Post` | `PostParam` / `PostParamString` | 响应字符串 |
 | `V8.Http.Patch` | `PatchParam` / `PatchParamString` | 响应字符串 |
 | `GetResponse/PostResponse/PatchResponse` | 同上 | 完整响应对象 |
+| `GetAsync/PostAsync/PatchAsync` | 同步版对应参数 | `await` 后得到响应字符串 |
+| `GetResponseAsync/PostResponseAsync/PatchResponseAsync` | 同步版对应参数 | `await` 后得到完整响应对象 |
 
-完整响应对象包含 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。`Timeout` 与兼容参数名 `TimeOut` 的单位均为秒，默认 `600` 秒（10 分钟）；`Headers` 与 `Header` 等效；`ParamType` 支持 `form`（默认）、`json`、`xml`、`binary`。`GetParam` 是 URL 查询参数，GET、POST、PATCH 均可使用。
+完整响应对象包含 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。`Timeout` 与兼容参数名 `TimeOut` 的单位均为秒，默认 `600` 秒（10 分钟）；`Headers` 与 `Header` 等效；`ParamType` 支持 `form`（默认）、`json`、`xml`、`binary`。`GetParam` 是 URL 查询参数，GET、POST、PATCH 均可使用。字符串版遇到部分网络错误时可能直接返回错误文本，因此支付、同步、回调等关键集成应使用 `*Response` 并检查 `StatusCode` 与 `ErrorMessage`，不要假定字符串一定是 JSON。
 
 ```javascript
 // POST JSON。嵌套对象使用 PostParamString，避免对象转换丢失层级。
@@ -709,6 +728,12 @@ if (patchResp.StatusCode < 200 || patchResp.StatusCode >= 300) {
   return { Code: 0, Msg: patchResp.ErrorMessage || patchResp.Content };
 }
 
+// 请求内异步。不要用 setTimeout/Task.Run 把它变成请求外后台任务。
+var asyncResp = await V8.Http.GetResponseAsync({
+  Url: 'https://api.example.com/health',
+  Timeout: 5
+});
+
 // XML 请求
 var xmlText = V8.Http.Post({
   Url: 'https://api.example.com/xml',
@@ -726,6 +751,8 @@ var uploadText = V8.Http.Post({
 
 接口引擎中必须使用对象参数格式，例如 `V8.Http.Get({ Url: url })`。不要使用 `V8.Http.Get(url)`；旧的 .NET 同名异步重载可能被 Jint 解析为 Promise。
 
+后端 `V8.Http` 的严格 SSRF 防护默认关闭，未配置时完全保留历史行为：不限制协议、URL 内嵌凭据、`localhost`、私网、链路本地或云元数据地址，并继续自动处理重定向。只有显式设置 `SsrfProtection:Enabled=true` 或环境变量 `MICROI_SSRF_PROTECTION_ENABLED=true` 后，才只允许 HTTP(S)，拒绝 URL 内嵌凭据、回环、私网、链路本地、云元数据和其它特殊地址，同时禁止自动跟随 3xx；受控目标可通过 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 精确放行。白名单匹配主机，不匹配 URL 子串；严格模式下需要跳转时，先用 `GetResponse/PostResponse/PatchResponse` 检查状态码和 `Location`，再显式发起下一次请求。兼容旧配置的优先级和租户配置方法见 [平台安全总览](../more/security.md)。
+
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
@@ -737,9 +764,11 @@ var pwd = V8.EncryptHelper.DESDecode('JdZe5gWKjZo=');//DES解密
 var pwd = V8.EncryptHelper.SHA1('123456');
 var pwd = V8.EncryptHelper.SHA256('123456');
 var pwd = V8.EncryptHelper.SHA512('123456');
-var pwd = V8.EncryptHelper.MD5Encrypt('123456');//MD5加密
+var digest = V8.EncryptHelper.MD5Encrypt('123456');//兼容用不可逆摘要，不是加密
 var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
+
+MD5、SHA1、SHA256 等摘要不能用于新密码存储；密码必须使用平台认证流程和带盐的专用密码哈希。DES/AES 的安全性取决于密钥管理，不要把密钥写进 V8 代码、日志或接口响应。
 
 ## V8.Office
 
@@ -1254,6 +1283,41 @@ WFNodeStart：流程节点开始V8事件
 
 ## V8.OsClient
 >* 访问当前的OsClient值
+
+## 其它后端能力与支持边界
+
+后端会把多个扩展同时注册为 `V8.*` 和兼容全局对象。新代码统一使用 `V8.*`，不要依赖全局别名，避免与 JavaScript、CLR 或其它扩展同名。
+
+| 能力 | 推荐入口 | 适用范围与安全边界 |
+|---|---|---|
+| 数据源引擎 | `V8.DataSourceEngine.Run/RunAsync` | 只运行当前租户数据源；动态 SQL、远程连接和返回字段仍需按业务授权 |
+| 模块引擎 | `V8.ModuleEngine` | 读取当前用户可见模块模型；不能代替 FormEngine 的数据权限 |
+| 工作流引擎 | `V8.WFEngine`、事件中的 `V8.WF` | 启动、发送、撤回、取消等动作必须校验当前用户、当前租户、流程状态与表单范围 |
+| 翻译引擎 | `V8.TranslateEngine.Translate/GetLang...` | 使用当前租户的语言与供应商配置，不能传其它租户消耗其凭据或额度 |
+| 文件能力 | `V8.HDFS`、`V8.Method.Upload/GetPrivateFileUrl` | 普通业务优先使用受控上传和短期代理；列举、删除、读取私有字节属于可信管理能力 |
+| 消息能力 | `V8.MQ.SendMsg` | 队列名绑定当前租户；消费、关闭通道等属于 Worker 内部能力，消息必须有全局 `EventId` 和幂等消费 |
+| 短信 | `V8.Sms.Send` | 供应商配置必须脱敏，发送接口要有频率、金额/条数、模板和收件人限制 |
+| 爬虫 | `V8.Spider` | 属于高风险 Worker 能力；必须使用租户目标地址策略、租户/用户会话隔离、并发和运行时限，禁止脚本指定浏览器可执行文件 |
+| 主机监控 | `V8.System` | CPU、内存、磁盘、网络等运维数据仅供管理员/运维，不应从普通或匿名接口返回 |
+| 支付、微信、DNS | 对应 `V8.*` 扩展 | 单独校验签名、幂等键、回调重放、金额与租户凭据，不要返回密钥 |
+
+动态建表、动态字段、数据库备份/清空、缓存连接管理、接口引擎代码写入等属于控制面能力。即使某个低层方法在 V8 对象上可见，也不等于普通业务脚本可以安全暴露；控制面 HTTP API 还会独立执行 `Level >= 9999` 管理员门禁。
+
+## 执行上下文与资源限制
+
+常见上下文包括 `V8.Param`、`V8.Header`、`V8.CurrentUser`、`V8.OsClient`、`V8.Form`、`V8.OldForm`、`V8.TableModel`、`V8.TableData`、`V8.FormSubmitAction`、`V8.EventName`、`V8.InvokeType`、`V8.RowIndex`、`V8.CacheData`、`V8.NotSaveField`、`V8.LineValue`、`V8.NextNodeId`、`V8.FilesByteBase64` 和 `V8.WF`。`Engine`、`HttpContext`、执行租约等宿主对象属于内部实现，不要保存到静态变量、缓存或延迟回调。
+
+平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同限制单次脚本和单节点资源。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
+
+脚本应主动控制：
+
+- SQL 页大小、字段数、循环次数和返回体大小；
+- HTTP 超时、响应大小与目标地址；
+- 图片、Office、ZIP 的文件数、解压体积和托管内存；
+- MQ/短信/支付等外部副作用的幂等与重试；
+- 日志内容的脱敏、限长与关联 ID。
+
+完整的部署与安全基线见 [平台安全总览](../more/security.md)。
 
 ## console
 >* Microi.net.dll从v3.5.1开始支持console往服务器端输出日志

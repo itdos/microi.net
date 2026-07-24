@@ -275,8 +275,9 @@ V8.FormEngine.DelFormDataByWhere('SysUser', {
 
 ```javascript
 // 接口引擎中 V8.Db 自动开启事务：
-// 返回 Code=1 → 自动提交事务
-// 返回 Code≠1 → 自动回滚事务
+// 返回DosResult/带Code对象：仅Code=1提交，其他值回滚
+// 返回对象但没有Code：回滚
+// 返回字符串/数字/数组/布尔/null且未异常：提交
 // 手动调用 V8.DbTrans.Commit() 或 Rollback() 无效，由平台统一管理
 
 // FormEngine 可传入事务对象（第三个参数）
@@ -287,19 +288,21 @@ V8.FormEngine.UptFormData('Table2', { Id: 'xxx', Status: 1 }, V8.DbTrans);
 V8.ApiEngine.Run('other-engine-key', { Id: 'xxx' }, V8.DbTrans);
 ```
 
-## 异步执行（不阻塞响应）
+## 请求内异步与后台处理
 
 ```javascript
-// setTimeout：接口立即返回，后台继续执行
-setTimeout(function() {
-  V8.FormEngine.UptFormData('Order', { Id: V8.Param.id, SyncStatus: 'done' });
-  V8.Http.Post({ Url: 'https://other.com/notify', PostParam: {} });
-}, 100);
-
-return { Code: 1, Msg: '已接收，后台处理中' };
+// 本次请求必须拿到结果时，使用真实Async API并await
+var resp = await V8.Http.PostResponseAsync({
+  Url: 'https://other.com/notify',
+  PostParam: { Id: V8.Param.id },
+  Timeout: 10
+});
+return resp.StatusCode >= 200 && resp.StatusCode < 300
+  ? { Code: 1 }
+  : { Code: 0, Msg: '通知失败' };
 ```
 
-> 长任务（>30s）应改用 MQ 消费者模式，见 `v8-mq-mqtt/SKILL.md`
+禁止用 `setTimeout` / `Task.Run` 实现“立即返回、后台继续”：接口返回后 Jint Engine、租户上下文、事务和执行租约会释放。脱离请求的任务使用后台任务、Job、MQ 或 outbox，并按 `EventId` 幂等处理与恢复。
 
 ## 动态加字段（运行时改表结构）
 
@@ -307,7 +310,7 @@ return { Code: 1, Msg: '已接收，后台处理中' };
 V8.FormEngine.AddField({
   TableName: 'diy_test',
   Name: 'Age',
-  Type: 'int',          // varchar / nvarchar / int / decimal / datetime / text
+  Type: 'int',          // 仅使用平台允许的varchar(N)/mediumtext/longtext/int/bigint/decimal(18,N)
   Label: '年龄',
   Component: 'NumberText',
   TableWidth: '100',
@@ -316,6 +319,8 @@ V8.FormEngine.AddField({
 ```
 
 > 风险：会执行 DDL（ALTER TABLE）。仅在低代码自定义配置场景使用，业务运行时**不要**频繁调用。
+
+日期时间字段统一使用 `varchar(25)` 保存 `yyyy-MM-dd HH:mm:ss`，组件使用 `DateTime`。禁止 `datetime/date/timestamp/float/double/boolean/string/text/nvarchar` 等平台不允许的物理类型。动态表/字段属于控制面能力，只允许 `Level >= 9999` 的可信管理脚本使用。
 
 ## 旧版 _Where 兼容
 

@@ -22,9 +22,9 @@ namespace Microi.net.Api
     {
         private static async Task<JObject> DefaultParam(JObject param)
         {
+            param = param ?? new JObject();
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-            param["_CurrentUser"] = JTokenEx.FromObject(currentTokenDynamic.CurrentUser);
-            param["OsClient"] = currentTokenDynamic.OsClient;
+            var currentUser = currentTokenDynamic?.CurrentUser;
             //2024-04-18 往V8.Param中添加Url参数
             try
             {
@@ -68,9 +68,35 @@ namespace Microi.net.Api
                 }
             }
             catch (Exception ex) { }
+            // Request body/query/form/xml are untrusted business parameters. Restore
+            // the server-derived security context after merging them so callers cannot
+            // impersonate another user or turn a client request into an internal
+            // invocation. OsClient remains a supported public-engine routing parameter;
+            // the core engine strips identity when it differs from the token tenant.
+            if (currentUser != null)
+            {
+                param["_CurrentUser"] = JTokenEx.FromObject(currentUser);
+                if (param["OsClient"].Val<string>().DosIsNullOrWhiteSpace())
+                {
+                    param["OsClient"] = currentTokenDynamic.OsClient;
+                }
+            }
+            else
+            {
+                param.Remove("_CurrentUser");
+            }
             //调用方式 Server、Client
             param["_InvokeType"] = InvokeType.Client.ToString();
             return param;
+        }
+
+        private static void ApplyRouteOsClient(JObject param, string routeOsClient)
+        {
+            if (routeOsClient.DosIsNullOrWhiteSpace()) return;
+            // ApiEngine's core boundary clears the authenticated identity when this
+            // target differs from the token tenant, so only AllowAnonymous engines
+            // can be called across tenants.
+            param["OsClient"] = routeOsClient;
         }
 
         private static void XmlToJObject(XElement element, JObject param)
@@ -342,7 +368,7 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<IActionResult> Run([FromBody] JObject param)
         {
-            await DefaultParam(param);
+            param = await DefaultParam(param);
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
             string osClientPattern = @"--OsClient--(.*?)--$";
@@ -352,6 +378,7 @@ namespace Microi.net.Api
             {
                 osClient = osClientMatch.Groups[1].Value;
             }
+            ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
             param["ApiAddress"] = apiPath;
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
@@ -394,7 +421,7 @@ namespace Microi.net.Api
         public async Task<IActionResult> Run_FormData(ApiEngineParam apiEngineParam)
         {
             var param = JObject.FromObject(apiEngineParam);
-            await DefaultParam(param);
+            param = await DefaultParam(param);
 
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
@@ -405,6 +432,7 @@ namespace Microi.net.Api
             {
                 osClient = osClientMatch.Groups[1].Value;
             }
+            ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
 
             param["ApiAddress"] = apiPath;
@@ -447,7 +475,7 @@ namespace Microi.net.Api
         public async Task<IActionResult> Run_Request_Get()
         {
             JObject param = new JObject();
-            await DefaultParam(param);
+            param = await DefaultParam(param);
 
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
@@ -458,6 +486,7 @@ namespace Microi.net.Api
             {
                 osClient = osClientMatch.Groups[1].Value;
             }
+            ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
 
             param["ApiAddress"] = apiPath;
@@ -517,7 +546,7 @@ namespace Microi.net.Api
         public async Task<ActionResult> Run_Response_File()
         {
             JObject param = new JObject();
-            await DefaultParam(param);
+            param = await DefaultParam(param);
 
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
@@ -528,6 +557,7 @@ namespace Microi.net.Api
             {
                 osClient = osClientMatch.Groups[1].Value;
             }
+            ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
 
             param["ApiAddress"] = apiPath;
@@ -629,7 +659,7 @@ namespace Microi.net.Api
         public async Task<ActionResult> Run_Response_Html()
         {
             JObject param = new JObject();
-            await DefaultParam(param);
+            param = await DefaultParam(param);
 
             var apiPath = HttpContext.Request.Path.Value;
             // 正则表达式模
@@ -640,6 +670,7 @@ namespace Microi.net.Api
             {
                 osClient = osClientMatch.Groups[1].Value;
             }
+            ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
 
             param["ApiAddress"] = apiPath;

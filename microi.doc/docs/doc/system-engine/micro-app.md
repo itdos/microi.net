@@ -130,8 +130,8 @@ npm run dev
 
 ```text
 Microi-MicroApp/
-  Microi吾码 (api.itdos.com)/
-    iTdos.Product.Internal/
+  示例服务器 (api.example.com)/
+    Demo.Product.Internal/
       microi-official/
         .microi-micro-app.json
         microi.routes.json
@@ -152,8 +152,8 @@ Microi-MicroApp/
 同一个租户可以创建多个微服务，例如：
 
 ```text
-Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/microi-official
-Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/platform-service
+Microi-MicroApp/示例服务器 (api.example.com)/Demo.Product.Internal/demo-official
+Microi-MicroApp/示例服务器 (api.example.com)/Demo.Product.Internal/platform-service
 ```
 
 旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入隔离目录。拉取先从 `sys_microistore` 读取应用主数据，再从 `mci_ai_app_file` 读取私有 HDFS 源码，不是读取 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
@@ -274,7 +274,7 @@ Microi-MicroApp/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/platform-ser
 #### 示例一：先盘点再扩展现有微服务
 
 ```text
-请使用 microi_itdos，先调用 microi_list_applications 获取当前全部 Web、UniApp、
+请使用 microi_demo，先调用 microi_list_applications 获取当前全部 Web、UniApp、
 MicroService 应用和文件清单，再读取最适合承载“官方系统工具”的应用完整源码。
 优先在已有“吾码官网微服务”中新增页面，不要创建只包含一个弹窗的新微服务。
 
@@ -289,8 +289,8 @@ OsClientNetwork 默认读取当前环境值但允许手工修改。页面使用 
 #### 示例二：创建新的微服务
 
 ```text
-请使用 microi_lxwb。先检查当前在线应用，确认没有适合的设备运维微服务后，
-创建 AppKey 为 lxwb-device-ops、名称为“设备运维微服务”的 MicroService。
+请使用 microi_demo。先检查当前在线应用，确认没有适合的设备运维微服务后，
+创建 AppKey 为 `demo-device-ops`、名称为“设备运维微服务”的 MicroService。
 包含 /、/device/detail、/work-order/create 三个路由，使用 Vue3 + Element Plus，
 通过宿主 token 和 osClient 调用吾码接口，不允许把 token 写进 URL。
 先 dry-run，确认后同步源码、发布构建产物和路由，并返回菜单绑定方式。
@@ -484,7 +484,7 @@ window.microApp.dispatch({
 
 | 字段 | 说明 |
 |---|---|
-| `ApplicationType` | 运行时应用类型：`Platform`、`Web`、`UniApp`、`MicroService`。 |
+| `ApplicationType` | 运行时应用类型：普通平台包兼容 `Regular / Platform`，独立应用使用 `Web / UniApp / MicroService`。新建普通离线包默认 `Regular`，既有商城平台应用和通知仍可能为 `Platform`。 |
 | `Category` | 游戏、企业应用、办公、教育、行业应用、平台能力等业务分类。 |
 | `PublisherType` | 官方应用或社区应用来源；仅作为搜索字段，不再拆分一级页签。 |
 

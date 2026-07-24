@@ -27,6 +27,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddSysDept(SysDeptParam param)
         {
             await DefaultParam(param);
@@ -40,6 +41,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DelSysDept(SysDeptParam param)
         {
             await DefaultParam(param);
@@ -53,6 +55,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptSysDept(SysDeptParam param)
         {
             await DefaultParam(param);

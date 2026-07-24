@@ -17,10 +17,14 @@ description: Microi V8 调试与日志指南。用于排查接口引擎、V8 事
 
 ## 调试模式 isDebugLog
 
-接口引擎建议通过参数开关控制日志详细度：
+调试开关必须同时满足“服务端允许调试 + 当前用户 `Level >= 9999`”。不能只相信 URL/query 的 `isDebugLog=1`，匿名或普通用户否则可获得内部数据与堆栈。
 
 ```javascript
-var isDebugLog = V8.Param.isDebugLog === '1' || V8.Param.isDebugLog === true;
+var isAdmin = V8.CurrentUser && Number(V8.CurrentUser.Level || 0) >= 9999;
+var isDebugLog = isAdmin &&
+  V8.SysConfig &&
+  V8.SysConfig.EnableV8Debug === 1 &&
+  (V8.Param.isDebugLog === '1' || V8.Param.isDebugLog === true);
 var debugLog = [];
 function dbg(msg, data) {
   if (!isDebugLog) return;
@@ -31,7 +35,10 @@ function dbg(msg, data) {
   });
 }
 
-dbg('开始查询参数', V8.Param);
+dbg('开始查询参数', {
+  Keyword: String(V8.Param.Keyword || '').substring(0, 100),
+  PageIndex: V8.Param.PageIndex
+});
 
 var products = V8.FormEngine.GetTableData('Product', {
   _Where: [['Status', '=', 1]]
@@ -47,7 +54,7 @@ return {
 };
 ```
 
-调用时在 URL 加 `?isDebugLog=1` 即可在响应中看到所有节点的日志，**不影响生产**。
+管理员在服务端显式开启调试后，才可用 `?isDebugLog=1` 查看当次请求的脱敏节点日志。生产环境默认关闭，调试完成后立即关闭。
 
 ## try/catch 异常捕获 + 详情上报
 
@@ -55,7 +62,10 @@ return {
 try {
   var r = V8.Http.Post({
     Url: 'https://api.partner.com/sync',
-    PostParam: V8.Param,
+    PostParam: {
+      Id: V8.Param.Id,
+      Action: V8.Param.Action
+    },
     ParamType: 'json',
     Timeout: 30
   });
@@ -65,7 +75,9 @@ try {
   return { Code: 1, Data: JSON.parse(r) };
 } catch (ex) {
   // 完整异常信息
+  var traceId = V8.Method.NewUlid();
   var errorDetails = {
+    traceId: traceId,
     message: ex.message,
     stack:   ex.stack,
     line:    ex.lineNumber,
@@ -84,8 +96,8 @@ try {
 
   return {
     Code: 0,
-    Msg: '同步失败：' + ex.message,
-    DataAppend: V8.Param.isDebugLog ? { Stack: ex.stack } : null
+    Msg: '同步失败，请按追踪号查询日志',
+    DataAppend: isDebugLog ? { TraceId: traceId } : null
   };
 }
 ```
@@ -157,13 +169,13 @@ docker compose logs -f api
 ## 性能跟踪（毫秒级耗时）
 
 ```javascript
-var t0 = System.Environment.TickCount;
+var t0 = Date.now();
 
 var step1 = V8.FormEngine.GetTableData('Big', { _PageSize: 5000 });
-var t1 = System.Environment.TickCount;
+var t1 = Date.now();
 
 var step2 = V8.Db.FromSql('SELECT COUNT(*) FROM Order').ToScalar();
-var t2 = System.Environment.TickCount;
+var t2 = Date.now();
 
 dbg('耗时', { step1Ms: t1 - t0, step2Ms: t2 - t1, totalMs: t2 - t0 });
 ```
@@ -195,11 +207,13 @@ Microi VS Code 插件的右下角信息、警告和错误通知必须同步写�
 // ❌ 危险：返回给前端
 return { Code: 0, Msg: ex.message, DataAppend: { Stack: ex.stack } };
 
-// ✅ 仅 isDebugLog=1 时才返回
+// ✅ 只返回关联ID；完整堆栈仅写内部日志
+var traceId = V8.Method.NewUlid();
+console.error('traceId=' + traceId + ' error=' + ex.message);
 return {
   Code: 0,
   Msg: '系统繁忙',
-  DataAppend: V8.Param.isDebugLog === '1' ? { Stack: ex.stack } : null
+  DataAppend: { TraceId: traceId }
 };
 ```
 

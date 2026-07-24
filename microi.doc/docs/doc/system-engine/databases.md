@@ -19,11 +19,20 @@ var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
 
 //扩展数据库的事务用法
 //【注意】emptyExTrans 是扮展库自己创建的事务，与 V8.DbTrans 完全独立，需要手动管理生命周期
+var recordId = V8.Param.Id;
 var emptyExTrans = V8.Dbs.EmptyEx.BeginTransaction();
-var count = emptyExTrans.FromSql("delete from diy_extend_test where Id='49ec484d-a2cf-47fe-b498-6efb2bf9f99d'").ExecuteNonQuery();
-emptyExTrans.Commit();//提交事务
-//emptyExTrans.Rollback();//回滚事务
-emptyExTrans.Close();//释放事务对象
-return { Code : 1, Data : count };
+try {
+    var count = emptyExTrans
+        .FromSql("delete from diy_extend_test where Id = @p0")
+        .AddInParameter("@p0", recordId)
+        .ExecuteNonQuery();
+    emptyExTrans.Commit();
+    return { Code : 1, Data : count };
+} catch (error) {
+    emptyExTrans.Rollback();
+    throw error;
+} finally {
+    emptyExTrans.Close();
+}
 ```
 >* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效

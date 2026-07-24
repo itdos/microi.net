@@ -245,6 +245,7 @@ export default {
                         apiGetDiyFieldSqlData,
                         {
                             _FieldId: field.Id,
+                            _TableChildAuth: field._TableChildAuth || null,
                             _FormData: {},
                             _Keyword: queryString
                         },
@@ -267,6 +268,7 @@ export default {
                         apiDataSourceUrl,
                         {
                             _FieldId: field.Id,
+                            _TableChildAuth: field._TableChildAuth || null,
                             _FormData: {},
                             _Keyword: queryString,
                             DataSourceKey: field.Config.DataSourceId

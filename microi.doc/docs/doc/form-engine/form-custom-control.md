@@ -28,11 +28,11 @@
 
 ## 实现步骤
 ## 1、到Microi吾码框架源码中创建一个定制vue组件
->如：/src/views/custom/xjy/components/kehu-childtable-class.vue
+>如：`/src/views/custom/demo/components/customer-childtable.vue`
 ::: details 展开查看 JavaScript 代码（160 行）
 ```javascript
 <template>
-    <div class="xjy-kehu-childtable-class">
+    <div class="microi-customer-childtable">
         <div class="item" style="
                 color: rgb(255, 163, 96);
                 background: rgba(255, 163, 96, 0.2);

@@ -42,7 +42,11 @@ DIY tables created by the platform include fixed fields even when they are not p
 | `sys_menu` | `EditCodeShowV8` | 前端 | [编辑]按钮显示条件。 |
 | `sys_menu` | `DelCodeShowV8` | 前端 | [删除]按钮显示条件。 |
 | `sys_menu` | `DetailPageV8` | 前端 | 详情按钮行为。 |
-| `sys_menu` | `DiyConfig` | 前端/模块 | 模块级自定义配置。 |
+| `sys_menu` | `DiyConfig` | 兼容字段 | 已废弃，只用于读取历史数据；禁止写入新配置。 |
+| `sys_menu` | `EnableViewSchema` | 前端/模块 | 是否启用跨端统一视图协议。 |
+| `sys_menu` | `ViewSchemaVersion` | 前端/模块 | 跨端统一视图协议版本。 |
+| `sys_menu` | `ViewConfigVersion` | 前端/模块 | 视图配置递增版本，用于缓存失效。 |
+| `sys_menu` | `ViewSchema` | 前端/模块 | Detail/Edit/List/Card 的版本化跨端视图 JSON。 |
 | `sys_menu` | `SqlJoin` | 后端查询 | 列表查询 JOIN 片段。默认主表别名为 A。 |
 | `sys_menu` | `SqlWhere` | 后端查询 | 模块级 Where 片段，可使用 CurrentUser 变量。 |
 | `sys_menu` | `ImportV8` | 导入 | 导入处理扩展。 |
@@ -82,7 +86,7 @@ DIY tables created by the platform include fixed fields even when they are not p
 | 表名 | 字段数 | 说明 |
 |---|---:|---|
 | `Sys_Config` | 70 | 系统设置 |
-| `sys_osclients` | 92 | OsClients |
+| `sys_osclients` | 98 | OsClients（含六个租户上传开关/限额字段） |
 | `sys_user` | 37 | 员工信息 |
 | `sys_role` | 9 | Sys_Role |
 | `sys_rolelimit` | 5 | sys_rolelimit |

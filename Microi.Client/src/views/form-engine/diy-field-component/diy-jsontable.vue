@@ -853,6 +853,7 @@ export default {
                 const formData = props.FormDiyTableModel || {};
                 let postData = {
                     _FieldId: props.field?.Id || '',
+                    _TableChildAuth: props.field?._TableChildAuth || null,
                     _FormData: formData,
                     _Keyword: keyword || ''
                 };

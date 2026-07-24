@@ -85,10 +85,23 @@ var foreignKey = 'Microi:other-tenant:User:' + userId;
 - L1：.NET 进程内 `IMemoryCache`（每个容器独立）
 - L2：Redis（全集群共享）
 
-读取顺序：L1 命中 → L2 命中 → 数据库  
+读取顺序：L1 命中 → L2 命中 → 数据库
 写入顺序：DB → L2 → L1
 
-> ⚠️ 直接修改数据库未走 V8 引擎时，L1 不会自动失效，需要**重启 docker 容器**（或调 `刷新缓存` 接口）让 L1 重建
+> ⚠️ 直接修改数据库未走平台保存流程时，可能绕过缓存失效。优先调用受支持的保存/刷新接口并回读验证；不要把重启容器或清空整个 Redis 当作日常缓存刷新方案。
+
+### FormEngine 授权缓存（Redis epoch + 用户级快照）
+
+FormEngine 授权是平台内部安全缓存，不能由业务 V8 直接读写。它既要兼容历史前端 V8 的无 `_SysMenuId` 调用，也要避免每个请求重复查询 `sys_user`、`sys_role`、`sys_rolelimit` 和 `sys_menu`：
+
+1. 每个 `OsClient` 在共享 Redis 中维护单调递增的授权版本 `epoch`。
+2. 用户授权快照 Key 至少包含 `OsClient + epoch + UserId`，内容包含当前有效用户状态/级别、有效角色、可访问菜单、菜单绑定表、操作权限和数据范围元数据。
+3. 每个 API 节点可用短 TTL 的进程内 L1 加速；Redis L2 在所有节点间共享。读取顺序为“当前 epoch → L1 用户快照 → L2 用户快照 → 主库冷加载”。
+4. 冷加载必须查询主库而不是只读副本，防止复制延迟把刚禁用的用户、撤销的角色或旧菜单范围重新写回缓存。并发冷加载可在单节点合并，但正确性仍以 Redis `epoch` 和主库事实为准。
+5. 用户状态/级别/角色、角色状态、角色菜单/高级表权限、菜单绑定表、菜单权限 JSON、`SqlWhere`、`SqlJoin` / `JoinTables` 等授权事实变更后，必须在写入成功后递增 Redis `epoch`。新旧节点滚动发布期间都通过版本切换自然淘汰旧快照。
+6. L1 丢失、节点重启或发布不影响正确性；禁止把永久 `static` 字典、单机文件或粘性会话当作授权事实源。短 TTL 只是兜底，不能代替变更时递增 `epoch`。
+
+无菜单客户端请求只使用该快照推断当前用户对目标表的权限；显式 `_SysMenuId` 仍按对应菜单严格精确校验。两种路径都必须在实际 SQL 中应用菜单 `SqlWhere` / `SqlJoin` 数据范围，不能只缓存一个“允许/拒绝”结果后绕过行级范围。
 
 ## 基本读写
 
@@ -199,40 +212,22 @@ if (result.Code === 1 && result.Data) {
 }
 ```
 
-## 分布式锁（简易版）
+## 分布式锁：不要用普通 Cache 拼装
 
-```javascript
-var lockKey = 'Microi:' + V8.OsClient + ':lock:order:' + V8.Param.orderId;
+`KeyExist → Set → Remove` 不是分布式锁：检查与写入不原子、没有唯一持有者令牌、锁过期后旧持有者会删除新持有者的锁，也无法处理节点暂停、网络分区和滚动发布。
 
-// 尝试获取锁（10 秒过期）
-if (V8.Cache.KeyExist(lockKey)) {
-  return { Code: 0, Msg: '操作正在进行中，请勿重复提交' };
-}
-V8.Cache.Set(lockKey, '1', '0.00:00:10');
+V8 业务脚本需要互斥时：
 
-try {
-  // 执行业务逻辑
-  var result = processOrder(V8.Param.orderId);
-  return result;
-} finally {
-  // 释放锁
-  V8.Cache.Remove(lockKey);
-}
-```
+1. 接口引擎使用平台 `LockKey/LockTimeout` 配置；
+2. Job/Worker 使用带租约、唯一持有者令牌、续租、超时自动释放和“仅持有者可释放”语义的共享锁；
+3. Key 至少包含 `OsClient + 任务/业务唯一标识`；
+4. 分布式锁只能减少并发，业务副作用仍必须用幂等键、唯一约束/条件更新、状态机或 outbox/inbox 保证只执行一次。
 
-## 计数器
+`V8.Cache` 没有公开安全的 compare-and-set/带令牌释放原语时，禁止自行实现锁。
 
-```javascript
-// 简单计数器（如接口调用次数限制）
-var countKey = 'Microi:' + V8.OsClient + ':api:count:' + V8.CurrentUser.Id + ':' + DateNow('yyyy-MM-dd');
-var count = V8.Cache.Get(countKey);
+## 原子计数与限流
 
-if (count && parseInt(count) >= 100) {
-  return { Code: 0, Msg: '今日调用次数已达上限' };
-}
-
-V8.Cache.Set(countKey, (parseInt(count || '0') + 1).toString(), '1.00:00:00');
-```
+`Get → parseInt → Set` 在并发下会丢计数。普通 Hash 计数可使用 `V8.Cache.HashIncrement`；需要“计数 + 首次设置 TTL + 超限拒绝”的安全限流、日上传配额或金额额度时，应使用平台 `RateLimit` / SecurityGuard 或后端 Redis Lua 原子脚本，并在 Redis 不可用时按风险选择失败关闭。不要在 V8 中用多个普通 Cache 调用模拟原子配额。
 
 ## 缓存 Key 命名规范
 

@@ -9,13 +9,14 @@
 - 前端 V8 引擎代码与服务器端 V8 的编程语言均为 JavaScript 语法
 - 前端 V8 引擎支持完整 ES6 语法
 - 前端新 HTTP 代码优先使用与后端参数基本一致的 `V8.Http`；旧 `V8.Post/Get` 继续兼容已有代码
-- 若前端直接调用服务器端的通用增删改查接口，前端 V8 事件**不会执行**（服务器端 V8 事件会执行）
+- 若前端直接调用服务器端的通用增删改查接口，浏览器内的 `SubmitFormV8` 等前端事件**不会执行**；服务器端提交前/后事件仍按客户端调用语义执行
+- 后端接口引擎、后端表单 V8 调用 `V8.FormEngine` 默认不触发表单事件；只有明确传入 `_InvokeType:'Client'` 才触发客户端式表单事件。`_InvokeType` 不是授权开关
 - 主要用于表单属性的前端 V8 事件、模块引擎 V8 按钮代码等
 
 ## V8.Form
 >* 访问当前表单字段值
 ```js
-var id = V8.Form.Id;//在新增数据时也能访问到，因为id是提前后成，以备可能有子表要使用
+var id = V8.Form.Id;//在新增数据时也能访问到，因为 Id 是提前生成的，以备子表使用
 var name = V8.Form.UserName;
 //如果是下拉框组件，则获取到的是object，可访问到数据源中的所有字段
 var selectId = V8.Form.SelectUser.Id;
@@ -28,10 +29,11 @@ var oldName = V8.OldForm.UserName;
 ```
 
 ## V8.FormSet
->* 给当前表单字段赋值，并且会触发被赋值字段的值变更事件
+>* 在普通表单 `diy-form` 中给字段赋值，并触发目标字段的值变更事件
 >* 下拉框可以赋值对象；对象至少应包含该下拉框配置的存储字段（`SelectSaveField`）和显示字段（`SelectLabel`），字段 V8 还会读取其它业务属性时也要一并传入
 >* 直接使用 `V8.Form.UserName = value`（包括对象）同样会响应式更新表单，但不会触发该字段的值变更事件，也不会执行 `FormSet` 的下拉选项注入、修改字段记录和模板通知，适合需要“静默赋值”的场景
 >* 前端已阻止字段值变更 V8 同步执行期间再次 `FormSet` 当前字段所造成的直接重入；但异步回写和多字段互相赋值仍可能形成循环，字段自身事件中仍建议直接写 `V8.Form.字段名`
+>* 在列表按钮、行内编辑等 `diy-table` 上下文中，`FormSet` 只更新当前行并刷新模板结果，不会递归触发目标字段 V8。不要依赖不同上下文的副作用做业务校验
 ```js
 //给文本框赋值
 V8.FormSet('UserName', '张三');
@@ -51,6 +53,7 @@ var isReadonly = V8.Field.UserName.Readonly;//UserName字段当前是否是只�
 
 ## V8.FieldSet
 >* 给当前表单字段属性赋值
+>* 普通表单支持 `Config.Button.Loading` 这类 `Config` 点路径；列表和部分全屏按钮上下文目前只保证顶层属性（如 `Visible`、`Readonly`、`Data`）可用。跨上下文代码优先使用顶层属性
 ```js
 //设置UserName字段为只读
 V8.FieldSet('UserName', 'Readonly', true);
@@ -117,7 +120,9 @@ FormTemplateEngine：表单模板引擎
 TableTemplateEngine：表格模板引擎
 OpenTableBefore：弹出表格前事件
 OpenTableSubmit：弹出表格提交事件
-FieldOnKeyup：文本框键盘事件
+FieldOnKeyup：表单文本框键盘事件
+TableFieldOnKeyup：表格行内文本框键盘事件
+FieldSlotButtonClick：单行文本插槽按钮点击事件
 FormOut：离开表单事件（指表单提交后）
 FormSubmitBefore：表单提交前事件
 FormIn：进入表单事件
@@ -133,12 +138,37 @@ WFNodeStart：流程节点开始V8事件
 
 ## V8.CurrentToken
 >* 当前登陆身份token
+>* Token 可能在每次受保护请求后续签轮换。Microi.Client 以公共 Token 存储为请求发送时的单一事实源，平台请求层收到响应头中的新 `authorization/token` 后会更新公共存储并同步登录状态；不要再用组件或状态库中的副本决定是否携带 Token，也不要把 Token 写入 URL、日志、`V8.Result` 或业务数据，或自行长期缓存旧值
 
 ## V8.TableModel
 >* 获取当前表的对象，里面包含了Id、Name等表信息。
 
 ## V8.ThisValue
->* 访问下拉框选择后的值对象，如V8.ThisValue.Id
+>* 当前字段事件的新值。下拉框通常是选中对象，文本/数字等控件可能是原始值；表格行内部分数值控件可能传入 `{ New, Old }`
+
+## V8.OldValue
+>* 当前字段旧值，仅在表格行内字段值变更上下文中可靠提供。普通表单字段事件应从 `V8.OldForm` 或业务快照读取，不要假设始终存在
+
+## 常用上下文变量
+
+不同事件只会提供与当前宿主有关的变量，使用前应判空：
+
+| 变量 | 主要上下文 | 说明 |
+|------|------------|------|
+| `V8.DataAppend` | 表单、列表、弹窗 | 打开宿主时传入的附加业务数据 |
+| `V8.SysMenuId` | 标准菜单表单/列表 | 当前真实菜单 Id；只读使用，不要伪造 |
+| `V8.SysMenuModel` | 列表、菜单按钮 | 当前菜单模型 |
+| `V8.TableRowId` | 表单、子表 | 当前记录 Id 或父子表关联值 |
+| `V8.CurrentTableData` | 表单/列表 | 当前页或当前宿主已加载的数据 |
+| `V8.TableRowSelected` / `V8.SelectedData` | 列表批量按钮 | 当前勾选行数组，两个名称互为兼容别名 |
+| `V8.ClearTableSelection()` | 列表 | 清空勾选 |
+| `V8.SearchParam` | 列表 | `{ Keyword, Where }` 当前搜索快照 |
+| `V8.Row` / `V8.Rows` / `V8.RowIndex` | 表格行事件 | 当前行、当前页行数组、行索引 |
+| `V8.Event` | 插槽按钮等显式传事件的场景 | 原生浏览器事件；键盘 V8 目前请使用 `V8.KeyCode` |
+| `V8.Result` | 模板、显隐、字段回调 | 事件/模板的显式输出 |
+| `V8.ParentForm` / `V8.ParentV8` | 子表/嵌套表单 | 父级数据与父级 V8 |
+| `V8.FormWF` | 带流程表单 | 当前工作流打开状态 |
+| `V8.ApiReplace` | 表单 | 当前表单的接口替换配置 |
 
 ## V8.Tips
 >* 右下角弹出消息提示
@@ -223,7 +253,7 @@ var pinyin = V8.ChineseToPinyin('你好吾码', 2, 1);//结果：NihaoWM
 ## V8.RefreshTable({ _PageIndex : 1 })
 >* 刷新表格数据列表，_PageIndex传入-1表示跳转到最后一页。
 >* 一般用于页面更多按钮、行更多按钮等刷新当前表格。
->* 注意与【V8.TableRefresh】不同的是它是刷新当前主表单里面的子表格（将来会优化函数命名）。
+>* `V8.RefreshTable` 刷新当前 V8 所属的列表；`V8.TableRefresh(子表字段, 参数)` 用于刷新当前主表单里的指定子表格。
 
 ## V8.Router.Push
 >* 页面跳转，可以在V8按钮上执行
@@ -247,7 +277,7 @@ V8.OpenForm(V8.Form, 'Edit')
 >* 打开带流程信息的表单。（目前是获取此数据对应的最后一个流程）
 
 ## V8.SelectedData
->* 获取已选择的行数组，每行包含了所有数据
+>* 列表批量按钮中获取已选择的行数组，每行包含当前列表已查询的数据。兼容别名为 `V8.TableRowSelected`；非列表上下文不保证存在
 ```js
 //批量删除数据
 var selectData = V8.SelectedData;
@@ -270,21 +300,25 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
 ```
 
 ## V8.SearchSet
->* 表格Tabs**设置**搜索条件
+>* 列表/PageTabs **替换**搜索条件。数组按 `_Where` 处理；对象会转换为各字段的 `Like` 条件
 ```js
 V8.SearchSet([
   ['Age', '>=', 18],
   ['Age', '<', 50]
 ]);
+// 或：
+V8.SearchSet({ Status: '待办' });
 ```
 
 ## V8.SearchAppend
->* 表格Tabs**追加**搜索条件
+>* 列表/PageTabs **追加**搜索条件。数组追加 `_Where`；对象合并到当前搜索模型
 ```js
 V8.SearchAppend([
   ['Age', '>=', 18],
   ['Age', '<', 50]
 ]);
+// 或：
+V8.SearchAppend({ OwnerId: V8.CurrentUser.Id });
 ```
 
 ## V8.AppendSearchChildTable【建议使用V8.OpenTableSetWhere】
@@ -321,7 +355,11 @@ _PageIndex传入-1表示跳转到最后一页。（注意与【V8.RefreshTable�
 V8.FormSubmit({
   CloseForm: true,  //是否关闭Form表单
   SavedType:'Insert', //保存表单后的操作Insert/Update/View
-  Callback : function //回调函数
+  Callback: function (result) {
+    if (result && result.Code == 1) {
+      V8.Tips('保存成功', true);
+    }
+  }
 });
 ```
 
@@ -370,7 +408,7 @@ V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 ## V8.ShowFormTab(tabName)
 >* 显示某个表单Tab标签页
 ```js
-V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
+V8.ShowFormTab('tabName（在表单属性中配置的Tab名称）')
 ```
 
 ## V8.ClickFormTab(tabName)
@@ -387,7 +425,9 @@ V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 `option` 除了 `Title`、`OkText`、`CancelText`、`Icon` 外，还支持 `CustomClass` 自定义弹窗样式，以及 Element Plus 兼容的 `BeforeClose(action, instance, done)` 关闭前校验。文件上传、表格、Tab、步骤条等复杂交互仍应优先使用 `V8.OpenAppDialog`；`BeforeClose` 主要用于极少量输入或老环境兼容兜底。
 //option为可选参数，可配置：{Title:'',OkText:'',CancelText:'',Icon:''}
 ```
->* 自定义html玩法，可以传入动态html字符串，来实现更丰富的提示框内容，如下图所示：
+> `ConfirmTips` 内部会按 HTML 渲染 `content`。只有完全可信或经过 HTML 转义的数据才能拼接进去，严禁直接插入用户输入、接口返回文本、数据库富文本或 URL。复杂交互不要拼 HTML，使用 `V8.OpenAppDialog`。
+>
+>* 自定义 HTML 仅用于简单、一次性的可信展示，如下图所示：
 <table>
   <tr>
     <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips.png"/></td>
@@ -401,6 +441,16 @@ V8.HideFormTab('tabName（在表单属性中配置的Tab名称）')
 if (V8.FormOutAction == 'Insert'
   && V8.Form._GongDanLX == '生产工单'
   && V8.Form._LinshiGX != 1) {
+
+  // ConfirmTips 按 HTML 渲染，所有业务值必须先转义
+  var escapeHtml = function (value) {
+      return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+  };
 
   // 查询工位任务，判断是否为完成品（末道工序 ShifouMDGX == 1）
   var gwrwRes = await V8.FormEngine.GetFormData('diy_gwrw', {
@@ -430,16 +480,16 @@ if (V8.FormOutAction == 'Insert'
       var rows = xmList.map(function(item, idx) {
           return '<tr>'
               + '<td ' + tdStyle + '>' + (idx + 1) + '</td>'
-              + '<td ' + tdStyle + '>' + (item.Xiangma || '') + '</td>'
-              + '<td ' + tdStyle + '>' + (item.CunhuoMC || '') + '</td>'
-              + '<td ' + tdStyle + '>' + (item.Tuhao || '') + '</td>'
-              + '<td ' + tdStyle + ' style="text-align:center">' + (item.ZhuangxiangSL || 0) + '</td>'
-              + '<td ' + tdStyle + '>' + (item.RukuZT || '-') + '</td>'
+              + '<td ' + tdStyle + '>' + escapeHtml(item.Xiangma || '') + '</td>'
+              + '<td ' + tdStyle + '>' + escapeHtml(item.CunhuoMC || '') + '</td>'
+              + '<td ' + tdStyle + '>' + escapeHtml(item.Tuhao || '') + '</td>'
+              + '<td ' + tdStyle + ' style="text-align:center">' + escapeHtml(item.ZhuangxiangSL || 0) + '</td>'
+              + '<td ' + tdStyle + '>' + escapeHtml(item.RukuZT || '-') + '</td>'
               + '</tr>';
       }).join('');
 
       var html = '<div>'
-          + '<div style="margin-bottom:8px">报工单号：<b>' + baoGongDan + '</b>，共生成 <b>' + xmList.length + '</b> 个箱码，是否跳转到快捷报工单进行入库？</div>'
+          + '<div style="margin-bottom:8px">报工单号：<b>' + escapeHtml(baoGongDan) + '</b>，共生成 <b>' + xmList.length + '</b> 个箱码，是否跳转到快捷报工单进行入库？</div>'
           + '<div style="max-height:260px;overflow-y:auto">'
           + '<table style="width:100%;border-collapse:collapse;font-size:13px">'
           + '<thead><tr>'
@@ -457,7 +507,7 @@ if (V8.FormOutAction == 'Insert'
       V8.ConfirmTips(
           html,
           function () {
-              V8.Router.Push('/baogongdan?Keyword=' + baoGongDan);
+              V8.Router.Push('/baogongdan?Keyword=' + encodeURIComponent(baoGongDan));
           },
           function () { /* 用户取消 */ },
           {
@@ -488,6 +538,29 @@ var data = V8.GetChildTableData('子表字段名称');
 
 ## V8.CurrentTableData
 >* 获取当前表当页的数据
+
+## 表格/表单 V8 模板引擎
+
+- 表格模板逐行同步执行，`V8.EventName='TableTemplateEngine'`，`V8.Form`/`V8.Row` 是当前行。输出优先级为 `V8.Result` → JavaScript `return` → 原字段值。
+- 表单模板异步执行，`V8.EventName='FormTemplateEngine'`，使用 `V8.Result` 输出；空值会回退到原字段值。
+- 模板能访问的字段取决于当前菜单查询列。缺字段应补模块查询列或在后端 `DataFilterV8` 预处理，不要在逐行模板中调用 FormEngine 造成 N+1。
+- 模板结果最终通过 `v-safe-html`/DOMPurify 净化后渲染。`script`、`iframe`、`on*` 事件属性、`javascript:` 等危险内容会被移除，因此不要依赖 `onclick` 等内联事件。
+- 输出建议显式转换为字符串，并对业务文本做 HTML 转义。模板只负责展示；权限、校验、金额/状态写入等业务逻辑必须放后端。
+
+```js
+var escapeHtml = function (value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+V8.Result = '<span class="badge badge-success">'
+  + escapeHtml(V8.Form.Status)
+  + '</span>';
+```
 
 ## V8.WF.StartWork
 >* 发起流程
@@ -548,11 +621,11 @@ return V8.Http.Post({
 ```
 
 ## V8.Base64
->* Base64加解密
+>* Base64 编码/解码（不是加密，不能用于保护密码或密钥）
 ```js
-V8.Base64.endcode('待加密字符串');//加密
-V8.Base64.dedcode('待解密字符串');//解密
-V8.Base64.isValid('已加密字符串');//判断是否是已加密的base64格式
+V8.Base64.encode('待编码字符串');//编码
+V8.Base64.decode('待解码Base64');//解码
+V8.Base64.isValid('待判断字符串');//判断是否是有效 Base64
 ```
 
 ## V8.OpenDialog
@@ -737,26 +810,58 @@ V8._.where(...)
 ```
 
 ## V8.ModuleEngine
->* 模块引擎相关
+>* 当前标准前端 V8 运行时没有公开挂载 `V8.ModuleEngine`。模块关联查询应配置为接口引擎/数据源引擎，或使用后端受控查询；不要仅因后端存在同名能力就在前端调用
 
 ## V8.ApiEngine
 >* 接口引擎
 ```javascript
-//调用方式：
-var result = await V8.ApiEngine.Run('ApiEngineKey', { 
+// 推荐：ApiEngineKey + 参数，返回 Promise
+var result = await V8.ApiEngine.Run('ApiEngineKey', {
     Param1 : '1',
 });
+
+// 对象参数形式
+var result2 = await V8.ApiEngine.Run({
+  ApiEngineKey: 'ApiEngineKey',
+  Param1: '1'
+});
+
+// 历史回调形式继续兼容
+V8.ApiEngine.Run('ApiEngineKey', { Param1: '1' }, function (r) {
+  V8.Tips(r.Code == 1 ? '执行成功' : r.Msg, r.Code == 1);
+});
+
+// 长任务：返回 Promise，也可传第 4 个 callback
+await V8.ApiEngine.RunBackground(
+  'ApiEngineKey',
+  { Param1: '1' },
+  '后台任务标题'
+);
 ```
 
 ## V8.DataSourceEngine
->* 数据源引擎
+>* 数据源引擎。`Run` 返回 Promise，并兼容回调；旧 `GetData` 已弃用
+```js
+var result = await V8.DataSourceEngine.Run('DataSourceKey', {
+  Keyword: '测试'
+});
+
+var result2 = await V8.DataSourceEngine.Run({
+  DataSourceKey: 'DataSourceKey',
+  Keyword: '测试'
+});
+
+V8.DataSourceEngine.Run('DataSourceKey', {}, function (r) {
+  console.log(r);
+});
+```
 
 ## V8.OpenAnyForm
 >* 打开一个任意表单
 ::: details 展开查看 JavaScript 代码（26 行）
 ```javascript
 V8.OpenAnyForm({
-  TableName: "Diy_ShouhouDD", //必传。打开哪张表。
+  TableName: "Diy_BizOrder", //必传。打开哪张表。
   FormMode: "Edit", //必传。打开的模式：Add、Edit、View
   Id: V8.Form.Id, //当FormMode为Edit、View时，必传Id。
   DialogType: "Dialog", //可选。打开的方式，不传则默认为表单属性设置的打开方式。
@@ -774,15 +879,17 @@ V8.OpenAnyForm({
       //调用指派接口
       var result = await V8.ApiEngine.Run('shouhoudd_zhipai',{
         Id: v8.Form.Id,
-        ShouhouRY: V8.Form.ShouhouRY,
+        ShouhouRY: v8.Form.ShouhouRY,
       });
       callback(result);
-	  V8.RefreshTable({ PageIndex: 1 });
+      V8.RefreshTable({ _PageIndex: 1 });
     },
   },
 });
 ```
 :::
+
+`OpenAnyForm` 负责发起打开动作，不是“等待用户关闭后返回结果”的 Promise。需要替换保存行为时使用 `EventReplace.Submit(v8, param, callback)`，其中小写 `v8` 是被打开的子表单上下文；外层 `V8` 仍是发起打开动作的父上下文。替换提交后必须调用 `callback(DosResult)`。
 
 ## V8.OpenAnyTable
 >* 打开一个任意列表
@@ -804,7 +911,7 @@ V8.OpenAnyTable({
   ShowSubTitleList: ['PeijianMC'], //副标题
   ShowPageSize: 10, //显示条数
   NoPullDown: false, //是否禁用下拉
-  SubmitEvent : async function (selectData,callback){//提交事件    
+  SubmitEvent : async function (selectData,callback){//当前选择器提交按钮必传
     var addList = [];
     if (selectData.length == 0) {
       V8.Tips('请选择数据');
@@ -815,7 +922,7 @@ V8.OpenAnyTable({
         Name: V8.Form.Name,
       })
 	  callback(result);
-      V8.RefreshTable({ PageIndex: 1 });
+      V8.RefreshTable({ _PageIndex: 1 });
     }
   }
 })
@@ -823,6 +930,11 @@ V8.OpenAnyTable({
 :::
 
 `DialogType` 不传时继续使用弹窗模式；传 `"Drawer"` 时使用抽屉模式。`Width` 同时作用于弹窗宽度和抽屉尺寸，支持百分比、`vw` 和固定 `px`，纯数字会按 `px` 处理。列表型子表建议使用 `"80vw"` 或 `"80%"`，窄表单类选择可使用 `"960px"`。
+
+- `SysMenuId` 与 `ModuleEngineKey` 必须传一个，用于加载真实菜单/模块上下文；不要传与目标表无关的菜单 Id。
+- `SubmitEvent(selectData, callback)` 在当前选择器提交模式中必须提供，调用 `callback(...)` 后宿主关闭。
+- `ContinuousSelection` 控制跨页连续选择，`TableMultipleSelection` 可传入初始选中行，`ShowDiyFieldList` 可限制选择列表显示列。
+- `TableChildImportContext`、父子表外键、`_TableChildAuth` 等属于平台内部关系上下文，不要在业务 V8 中手工构造。
 
 ## 表单按钮防重复点击
 ```js
@@ -838,14 +950,77 @@ var clientType = V8.ClientType;
 ```
 
 ## V8.SysConfig
->* 访问系统设置信息
+>* 访问当前租户允许公开给浏览器的系统设置脱敏投影
 ```js
-//可以访问到系统设置sys_config表的任意字段
 var sysTitle = V8.SysConfig.SysTitle;
+var apiBase = V8.SysConfig.ApiBase;
 ```
 
+`V8.SysConfig` 不是 `sys_config`/SaaS 配置整行。数据库、Redis、对象存储、MQ、搜索、密码、Secret、Token、Key、Connection、`ClientSecrets`、`GlobalServerV8Code` 等敏感字段不会注入浏览器。需要业务密钥的逻辑必须放到后端接口引擎或受控服务中，禁止尝试从前端读取。
+
 ## V8.FormEngine
->* 见平台文档：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)
+>* 前端表单引擎 facade，用于受权限约束的单表 CRUD。完整查询参数见：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)
+
+### 前端真实方法
+
+前端 `V8.FormEngine` 不是后端方法的一比一映射。当前标准运行时公开：
+
+| 方法 | 常用签名 | 返回 |
+|------|----------|------|
+| `GetFormData` | `(table, params, callback?)` / `(params, callback?)` | `Promise<DosResult>` |
+| `GetFormDataAnonymous` | 同上 | `Promise<DosResult>` |
+| `GetTableData` | 同上 | `Promise<DosResult>` |
+| `GetTableTree` | 同上 | `Promise<DosResult>` |
+| `AddFormData` | 同上 | `Promise<DosResult>` |
+| `AddFormDataBatch` | `(rows, callback?)` | `Promise<DosResult>` |
+| `UptFormData` | `(table, params, callback?)` / `(params, callback?)` | `Promise<DosResult>` |
+| `UptFormDataBatch` | `(rows, callback?)` | `Promise<DosResult>` |
+| `UptFormDataByWhere` | `(table, params, callback?)` / `(params, callback?)` | `Promise<DosResult>` |
+| `DelFormData` | `(table, params, callback?)` / `(params, callback?)` | `Promise<DosResult>` |
+| `DelFormDataBatch` | `(rows, callback?)` | `Promise<DosResult>` |
+| `DelFormDataByWhere` | `(table, params, callback?)` / `(params, callback?)` | `Promise<DosResult>` |
+
+前端没有公开 `GetTableDataCount`、`GetTableDataTree`（前端名称为 `GetTableTree`）、`AddTableData`、`UptTableData`、`DelTableData`、`AddField`。这些名字可能存在于后端 V8，但不能直接复制到前端代码。
+
+```js
+// 推荐 Promise/await
+var listResult = await V8.FormEngine.GetTableData('Diy_Product', {
+  _Where: [['Status', '=', 1]],
+  _SelectFields: ['Id', 'Name', 'Status'],
+  _PageIndex: 1,
+  _PageSize: 20
+});
+
+// 历史回调形式继续兼容
+V8.FormEngine.GetFormData('Diy_Product', { Id: V8.Form.ProductId }, function (r) {
+  if (r.Code == 1) {
+    V8.FormSet('ProductName', r.Data.Name);
+  }
+});
+
+// 对象参数形式
+var rowResult = await V8.FormEngine.GetFormData({
+  FormEngineKey: 'Diy_Product',
+  Id: V8.Form.ProductId
+});
+```
+
+### 菜单上下文、跨表兼容与性能
+
+- 当前 V8 目标表就是当前菜单绑定表时，前端 scoped facade 自动注入真实 `_SysMenuId`，历史项目不需要逐个补参数。
+- 跨表调用不会错误继承当前主表菜单。未显式传菜单时，后端根据当前用户有效角色可访问的目标表菜单授权快照推断权限，兼容大量历史前端 V8。
+- 显式传 `_SysMenuId`（或兼容的 `ModuleEngineKey`）会进入严格菜单校验；传错、伪造或借用其它表菜单必须失败，不能退回兼容推断。
+- 授权快照按 `OsClient` 隔离，使用共享 Redis 版本号和带 TTL 的授权快照，并允许平台普通两级缓存加速；每次外部授权检查先读取共享版本，角色、菜单、表权限变更会递增版本使旧快照不可达。Redis 不可用时回源数据库，不能继续使用陈旧快照。
+- 菜单 `SqlWhere`、关联限制和数据范围由后端强制追加。前端 `_Where` 只能缩小结果，不能覆盖服务端范围。
+- 平台敏感表对普通客户端硬拒绝；不要用通用 FormEngine 读写 SaaS、接口引擎、表/字段元数据、菜单角色、用户、任务、数据源、工作流等控制面表。
+- 后端接口引擎、后端表单 V8 属于服务端受信任调用，不要求 `_SysMenuId`；浏览器不能通过提交 `_TrustedServerInvocation` 或 `_InvokeType:'Server'` 把自己变成受信任调用。
+- Import/Export 使用独立端点和专项权限，必须携带目标模块的真实菜单上下文；它们不是 `V8.FormEngine` facade 方法。
+
+### TableChild 委托授权
+
+标准 `TableChild` 会自动携带内部 `_TableChildAuth` 关系提示。该对象不是授权令牌，浏览器中的值不能被信任；服务端仍会重新加载父/子表、父/子菜单和 `TableChild` 字段配置，校验父记录数据范围、父键唯一性和子表外键，并强制写入真实外键条件。
+
+业务 V8 不得手工构造、缓存、跨父记录复用或向其它表传播 `_TableChildAuth`。存量项目也不需要给每个隐藏子表菜单逐角色补权限，合法子表访问由上述父记录范围内的委托授权完成。
 
 ## 移动端函数
 ### 蓝牙打印
@@ -864,7 +1039,7 @@ if(V8.ClientType == 'PC'){
         DataAppend:{//传入自定义附加数据，DataAppend为固定参数名称
             Url:'/autoprint/#/doprint',        
             PrintId:Dydz,
-            DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?0sClient=${V8.SysConfig.OsClient}&Id=${ids}`
+            DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?OsClient=${V8.SysConfig.OsClient}&Id=${ids}`
         }
     });
 }else{
@@ -907,8 +1082,8 @@ if (V8.ClientType == 'PC') {
         DataAppend: { //传入自定义附加数据，DataAppend为固定参数名称
             Url: '/autoprint/#/doprint',
             PrintId: Dydz,
-            // DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?0sClient=${V8.SysConfig.OsClient}&Id=${ids}`
-            DataApi: 'https://api.chongstech.com/apiengine/print_bgxm?OsClient=qiqiang&Id=' + ids
+            // DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?OsClient=${V8.SysConfig.OsClient}&Id=${ids}`
+            DataApi: `${V8.SysConfig.ApiBase}/apiengine/print-demo?OsClient=${encodeURIComponent(V8.OsClient)}&Id=${ids}`
         }
     });
 } else {

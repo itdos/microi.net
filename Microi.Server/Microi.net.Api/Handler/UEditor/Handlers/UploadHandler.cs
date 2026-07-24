@@ -59,7 +59,14 @@ namespace Microi.net.Api
             if (UploadConfig.Base64)
             {
                 uploadFileName = UploadConfig.Base64Filename;
-                uploadFileBytes = Convert.FromBase64String(Request.Form[UploadConfig.UploadFieldName]);
+                var encoded = Request.Form[UploadConfig.UploadFieldName].ToString();
+                if (!FileUploadSecurity.TryGetBase64DecodedLength(encoded, out var decodedLength)
+                    || !CheckFileSize(decodedLength))
+                {
+                    Result.State = UploadState.SizeLimitExceed;
+                    return WriteResult();
+                }
+                uploadFileBytes = Convert.FromBase64String(encoded);
             }
             else
             {
@@ -161,15 +168,19 @@ namespace Microi.net.Api
                 //2023-08-18
                 var param = new DiyUploadParam()
                 {
-                    Limit = false,
+                    // Rich-text uploads are private by default. Public delivery must
+                    // be an explicit, separately reviewed publishing operation.
+                    Limit = true,
                     Preview = false,
                     Multiple = false,
-                    Path = savePathOrigin.TrimStart('/')
+                    Path = "editor",
+                    _InvokeType = InvokeType.Client.ToString()
                 };
                 var currentTokenDynamic = await DiyToken.GetCurrentToken();
                 if (currentTokenDynamic != null)
                 {
                     param.OsClient = currentTokenDynamic.OsClient;
+                    param._CurrentUser = currentTokenDynamic.CurrentUser;
                 }
 
                 param.Files = new Dictionary<string, Stream>();

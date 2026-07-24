@@ -111,7 +111,8 @@ export default {
                 }
                 var param = {
                     TableId: self.TableId,
-                    _TableRowId: rowModel.Id
+                    _TableRowId: rowModel.Id,
+                    _TableChildAuth: self.TableChildAuth
                 };
 
                 var url = self.DiyApi.DelDiyTableRow;
@@ -456,13 +457,8 @@ export default {
             }
             var token = ++self._DataCommentLoadToken;
             self.DataCommentListLoading = true;
-            self.DiyCommon.FormEngine.GetTableData(
-                {
-                    FormEngineKey: "diy_comment",
-                    _Where: [["TableRowId", "=", self.TableRowId]],
-                    _OrderBy: "CreateTime",
-                    _OrderByType: "DESC"
-                },
+            self.GetFormRelatedData(
+                "DataComment",
                 function (result) {
                     if (token !== self._DataCommentLoadToken) return;
                     try {

@@ -791,6 +791,24 @@ namespace Microi.net
                 return new DosResult(0, null, "租户和用户Id不能为空");
             }
 
+            return await RevokeUserSessionsAsync(osClient, targetUserId, reason)
+                .ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// 服务端用户生命周期逻辑专用：吊销指定用户的全部终端会话。
+        /// 仅在当前程序集内开放，外部管理接口仍必须经过 ClearUserLoginInfoAsync 的管理员校验。
+        /// </summary>
+        internal static async Task<DosResult> RevokeUserSessionsAsync(
+            string osClient,
+            string targetUserId,
+            string reason = null)
+        {
+            if (osClient.DosIsNullOrWhiteSpace() || targetUserId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, "租户和用户Id不能为空");
+            }
+
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             var loginTokenKey = GetLoginTokenKey(osClient, targetUserId);
             var tokenModel = await cache.GetAsync<CurrentToken>(loginTokenKey).ConfigureAwait(false);

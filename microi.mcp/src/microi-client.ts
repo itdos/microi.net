@@ -5,6 +5,7 @@ import path from 'node:path';
 import { API } from './api-paths.js';
 import { resolveMcpDid } from './mcp-did.js';
 import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
+import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-integrity.js';
 import { prepareV8VersionedCode } from './v8-version.js';
 
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
@@ -137,7 +138,7 @@ function modulePatchMatches(
   for (const [field, expectedValue] of Object.entries(expected)) {
     if (ignoredFields.has(field) || expectedValue === undefined) continue;
     const actualValue = actual[field];
-    if (MENU_JSON_ARRAY_FIELDS.has(field) || field === 'DiyConfig') {
+    if (MENU_JSON_ARRAY_FIELDS.has(field) || field === 'ViewSchema') {
       const expectedJson = canonicalMenuJson(expectedValue);
       const actualJson = canonicalMenuJson(actualValue);
       if (!expectedJson || !actualJson || expectedJson !== actualJson) {
@@ -749,13 +750,24 @@ export class MicroiClient {
     });
   }
 
-  async saveEngineCode(apiEngineKey: string, code: string, options?: { functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+  async saveEngineCode(apiEngineKey: string, code: string, options?: { functionDescription?: string; changeSummary?: string; confirmLargeReduction?: boolean }): Promise<ApiResponse> {
+    assertSourceIntegrity(code, `保存接口引擎 ${apiEngineKey}`);
     let remote: ApiEngine | undefined;
     try {
       const remoteResult = await this.getEngineCode(apiEngineKey);
       remote = remoteResult.Code === 1 ? remoteResult.Data : undefined;
     } catch {
       remote = undefined;
+    }
+    const remoteSource = normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code);
+    const nextSource = normalizeCodeForComparison(code);
+    if (remoteSource.length >= 8000
+      && nextSource.length < remoteSource.length * 0.85
+      && !options?.confirmLargeReduction) {
+      throw new Error(
+        `保存接口引擎 ${apiEngineKey} 已拦截：新源码 ${nextSource.length} 字符，远端源码 ${remoteSource.length} 字符，`
+        + `减少超过 15%。这可能是长工具结果被截断；确认确需大幅删减时请传 confirmLargeReduction="${apiEngineKey}"。`,
+      );
     }
     const prepared = prepareV8VersionedCode({
       kind: 'ApiEngine',
@@ -805,6 +817,7 @@ export class MicroiClient {
       ...data,
     };
     const code = typeof payload.Code === 'string' ? payload.Code : (typeof payload.ApiV8Code === 'string' ? payload.ApiV8Code : '');
+    assertSourceIntegrity(code, `创建接口引擎 ${data.ApiEngineKey}`);
     const prepared = prepareV8VersionedCode({
       kind: 'ApiEngine',
       key: data.ApiEngineKey,
@@ -982,6 +995,7 @@ export class MicroiClient {
   }
 
   async saveEventCode(formEngineKey: string, eventType: string, code: string, options?: { functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+    assertSourceIntegrity(code, `保存 V8 事件 ${formEngineKey}/${eventType}`);
     let remote: V8Event | undefined;
     try {
       const remoteResult = await this.getEventCode(formEngineKey, eventType);
@@ -1058,6 +1072,7 @@ export class MicroiClient {
   }
 
   async saveWorkflowV8EventCode(nodeId: string, eventType: string, code: string, options?: { flowDesignId?: string; functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+    assertSourceIntegrity(code, `保存流程节点 V8 ${nodeId}/${eventType}`);
     let remote: WorkflowNodeV8Event | undefined;
     try {
       const remoteResult = await this.getWorkflowV8EventCode(nodeId, eventType, options?.flowDesignId);
@@ -1176,7 +1191,9 @@ export class MicroiClient {
     Display?: number; AppDisplay?: number;
     OpenType?: string; Url?: string; Sort?: number;
     Icon?: string; SearchFieldIds?: string; TableDiyFieldIds?: string;
-    DefaultOrderBy?: string; SqlWhere?: string; DiyConfig?: string;
+    DefaultOrderBy?: string; SqlWhere?: string;
+    EnableViewSchema?: number; ViewSchemaVersion?: string;
+    ViewConfigVersion?: number; ViewSchema?: string;
     // 业务按钮 / 高级配置（JSON 字符串）
     MoreBtns?: string; FormBtns?: string; BatchSelectMoreBtns?: string;
     PageTabs?: string; ExportMoreBtns?: string; PageBtns?: string;
@@ -1238,6 +1255,7 @@ export class MicroiClient {
     };
     const moduleId = String(payload.ModuleId || payload.Id || '');
     const operation = `更新菜单模块 ${moduleId || payload.Name || ''}`.trim();
+    assertPayloadSourceIntegrity(payload, operation);
     const verify = async (): Promise<{ matched: boolean; mismatches: string[]; response?: ApiResponse }> => {
       if (!moduleId) return { matched: false, mismatches: ['ModuleId'] };
       try {

@@ -39,6 +39,27 @@ namespace Microi.net
     public class MicroiHDFS
     {
         /// <summary>
+        /// 每次上传都从 SaaS 引擎共享配置读取当前租户限额，不建立单节点静态缓存。
+        /// 因此 sys_osclients 经现有 ReloadOsClient 流程发布到 Redis 后，各节点立即按新值执行。
+        /// </summary>
+        public static FileUploadSecurityOptions GetFileUploadSecurityOptions(string osClient)
+        {
+            Newtonsoft.Json.Linq.JObject tenantConfig = null;
+            if (!osClient.DosIsNullOrWhiteSpace())
+            {
+                try
+                {
+                    tenantConfig = OsClient.GetClient(osClient)?.OsClientModel;
+                }
+                catch
+                {
+                    // 租户配置暂不可用时仍保留平台硬上限，不能降级成无限上传。
+                }
+            }
+            return FileUploadSecurityOptions.Load(tenantConfig);
+        }
+
+        /// <summary>
         /// 上传文件或不压缩的图片。返回/路径。
         /// 必传：OsClient、
         /// Path：根目录，如：upload、download、ueditor等
@@ -50,6 +71,10 @@ namespace Microi.net
         public async Task<DosResult> Upload(DiyUploadParam param, Microsoft.AspNetCore.Http.HttpContext _httpContext = null)
         {
             #region check
+            if (param == null)
+            {
+                return new DosResult(0, null, "DiyCommon.Upload()的上传参数不能为空！");
+            }
             if (param.OsClient.DosIsNullOrWhiteSpace())
             {
                 param.OsClient = DiyToken.GetCurrentOsClient();
@@ -59,9 +84,87 @@ namespace Microi.net
                 return new DosResult(0, null, "DiyCommon.Upload()的OsClient不能为空！");
             }
 
-            var files = new Dictionary<string, Stream>();
+            var httpContext = DiyHttpContext.Current ?? _httpContext;
+            param.Files ??= new Dictionary<string, Stream>();
+            if (httpContext?.Request?.HasFormContentType == true)
+            {
+                foreach (var file in httpContext.Request.Form.Files)
+                {
+                    if (file != null && !param.Files.ContainsKey(file.FileName))
+                    {
+                        param.Files.Add(file.FileName, file.OpenReadStream());
+                    }
+                }
+            }
 
+            // 即使旧 Controller 或 V8 调用漏传 _CurrentUser，也要在 HTTP 请求中恢复真实身份，
+            // 防止通过兼容入口选择公有桶或任意目录。
+            var currentUser = param._CurrentUser;
+            if (currentUser == null && httpContext != null)
+            {
+                try
+                {
+                    var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
+                    if (currentToken?.CurrentUser != null
+                        && string.Equals(currentToken.OsClient, param.OsClient, StringComparison.OrdinalIgnoreCase))
+                    {
+                        currentUser = currentToken.CurrentUser;
+                        param._CurrentUser = currentUser;
+                    }
+                }
+                catch { }
+            }
 
+            try
+            {
+                param.Path = TenantConfigurationSecurity.NormalizeUploadSubPath(param.OsClient, param.Path);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "上传目录不合法：" + ex.Message);
+            }
+
+            var isInteractiveRequest = httpContext != null
+                || currentUser != null
+                || string.Equals(param._InvokeType, InvokeType.Client.ToString(), StringComparison.OrdinalIgnoreCase);
+            param.Limit ??= true;
+            if (isInteractiveRequest)
+            {
+                var isPlatformAdmin = currentUser?["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+                var interactivePolicyError = FileUploadSecurity.ApplyInteractivePolicy(param, isPlatformAdmin);
+                if (interactivePolicyError != null) return interactivePolicyError;
+            }
+
+            var fileUploadOptions = GetFileUploadSecurityOptions(param.OsClient);
+            if (isInteractiveRequest && !fileUploadOptions.UploadEnabled)
+            {
+                return new DosResult(0, null, "当前租户已停用文件上传！");
+            }
+
+            var payloadError = FileUploadSecurity.ValidatePayload(
+                param,
+                out var totalUploadBytes,
+                fileUploadOptions);
+            if (payloadError != null) return payloadError;
+            if (isInteractiveRequest)
+            {
+                var userId = currentUser?["Id"].Val<string>();
+                if (userId.DosIsNullOrWhiteSpace()) userId = currentUser?["UserId"].Val<string>();
+                var quotaError = await FileUploadSecurity
+                    .ReserveDailyQuotaAsync(
+                        param.OsClient,
+                        userId,
+                        totalUploadBytes,
+                        fileUploadOptions)
+                    .ConfigureAwait(false);
+                if (quotaError != null) return quotaError;
+            }
+
+            var files = new Dictionary<string, Stream>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in param.Files)
+            {
+                files.Add(file.Key, file.Value);
+            }
             if (param.FilesByte != null && param.FilesByte.Any())
             {
                 foreach (var file in param.FilesByte)
@@ -69,7 +172,6 @@ namespace Microi.net
                     files.Add(file.Key, StreamHelper.BytesToStream(file.Value));
                 }
             }
-
             if (param.FilesByteBase64 != null && param.FilesByteBase64.Any())
             {
                 foreach (var file in param.FilesByteBase64)
@@ -77,38 +179,6 @@ namespace Microi.net
                     files.Add(file.Key, StreamHelper.BytesToStream(Convert.FromBase64String(file.Value)));
                 }
             }
-
-            if (param.Files != null && param.Files.Any())
-            {
-                files = param.Files;
-                foreach (var item in files)
-                {
-                    if (item.Value.Length == 0)
-                    {
-                        return new DosResult(0, null, "文件体积为0：" + item.Key);
-                    }
-                }
-            }
-
-            if (files.Count == 0)
-            {
-                var httpContext = DiyHttpContext.Current ?? _httpContext;//param.HttpContext;
-                if (httpContext == null)
-                {
-                    return new DosResult(0, null, "未找到文件流或HttpContext！");
-                }
-                foreach (var file in httpContext.Request.Form.Files)
-                {
-                    if (file != null)
-                        files.Add(file.FileName, file.OpenReadStream());
-                }
-            }
-
-            if (files.Count == 0)
-            {
-                return new DosResult(1, null, "The file was not found!");
-            }
-
             #endregion
 
             #region init

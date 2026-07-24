@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-07-20
+# 版本：v2026-07-24
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
 #   microi-install-database   - 主数据库（安装前按编号选择）
@@ -13,20 +13,22 @@
 #   microi-install-minio      - MinIO 对象存储
 #   microi-install-app        - 平台应用（API + Web）
 #   microi-install-watchtower - 自动更新服务
-#   microi-install-ollama     - Ollama AI 服务（可选：在线 AI 引擎）
-#   microi-install-qdrant     - Qdrant 向量数据库（可选：在线 AI 引擎）
+#   microi-install-ollama     - Ollama Embedding 服务（可选：向量检索增强）
+#   microi-install-qdrant     - Qdrant 向量数据库（可选：向量检索增强）
+#   microi-install-libretranslate - LibreTranslate 翻译服务（可选）
 # ============================================================
 # 端口分配规则：
-#   默认从 7000 开始顺序 +1 分配 7 个端口；如安装在线 AI 引擎则分配 10 个端口
+#   默认从 7000 开始顺序 +1 分配 7 个端口；向量检索增加 3 个，翻译服务增加 1 个
 #   若存在端口被占用，则自动从 7100 开始重新检测，以此类推
 #   基础端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, API, Web
-#   在线 AI 端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console,
+#   向量增强端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console,
 #                  Ollama, Qdrant-HTTP, Qdrant-gRPC, API, Web
+#   同时安装翻译服务时，LibreTranslate 位于可选向量服务之后、API 之前
 # ============================================================
 
 set -e
 
-SCRIPT_VERSION="v2026-07-20"
+SCRIPT_VERSION="v2026-07-24"
 
 # ============================================================
 # 数据库安装配置
@@ -764,17 +766,106 @@ fi
 
 # === 在线 AI 引擎依赖安装选择 ===
 echo ''
-echo 'Microi：是否安装 Ollama、向量数据库以支持在线 AI 引擎？'
-echo 'Microi：该能力用于在线 AI 数据分析、在线 AI 编程等功能，不影响本地 AI 编程。'
-echo 'Microi：输入 1 安装，输入 0 不安装：'
+echo '=================================================================='
+echo 'Microi：AI Schema 检索说明（请先阅读）'
+echo '=================================================================='
+echo 'Microi：平台已内置“大模型关键词扩展 + 权限感知 Schema 搜索 + 精确字段回读”。'
+echo 'Microi：不安装 Ollama、nomic-embed-text、Qdrant，也可使用在线 AI 数据分析和 AI 编程。'
+echo 'Microi：默认轻量模式启动更快、资源占用更低，且不需要连接或同步向量数据库。'
+echo 'Microi：向量模式仅作为高度模糊语义召回的可选增强，不建议默认安装。'
+echo 'Microi：是否安装 Ollama + nomic-embed-text + Qdrant 向量检索组件？'
+echo 'Microi：输入 1 安装；直接按 Enter 或输入 0 跳过（推荐）：'
 read -r install_online_ai
+install_online_ai="${install_online_ai:-0}"
 
 if [ "${install_online_ai}" == "1" ]; then
   INSTALL_ONLINE_AI=1
-  echo 'Microi：将安装 Ollama 与 Qdrant 向量数据库 ✓'
+  echo 'Microi：将安装 Ollama、nomic-embed-text 与 Qdrant 向量检索组件 ✓'
 elif [ "${install_online_ai}" == "0" ]; then
   INSTALL_ONLINE_AI=0
-  echo 'Microi：将跳过 Ollama 与 Qdrant 向量数据库安装 ✓'
+  echo 'Microi：将使用平台内置轻量 Schema 搜索，跳过向量检索组件 ✓'
+else
+  echo 'Microi：错误：无效的输入，脚本退出。'
+  exit 1
+fi
+
+# === LibreTranslate 翻译服务安装选择 ===
+echo ''
+echo 'Microi：是否安装开源 LibreTranslate 翻译服务？'
+echo 'Microi：直接按 Enter 或输入 0 跳过（默认）；输入 1 安装：'
+read -r install_libretranslate
+install_libretranslate="${install_libretranslate:-0}"
+
+LIBRETRANSLATE_SUPPORTED_LANGS="zh zt en ja ko vi th id ms tl hi ur ar ru de fr es pt it nl tr pl uk"
+LIBRETRANSLATE_LANGS=""
+LIBRETRANSLATE_LANGS_CSV=""
+
+append_libretranslate_language() {
+  local language_key="$1"
+  case " ${LIBRETRANSLATE_LANGS} " in
+    *" ${language_key} "*) ;;
+    *) LIBRETRANSLATE_LANGS="${LIBRETRANSLATE_LANGS} ${language_key}" ;;
+  esac
+}
+
+if [ "${install_libretranslate}" == "1" ]; then
+  INSTALL_LIBRETRANSLATE=1
+  echo ''
+  echo 'Microi：LibreTranslate 支持的语言（中文名 / key）：'
+  echo '  简体中文 zh    繁体中文 zt    英语 en        日语 ja'
+  echo '  韩语 ko        越南语 vi      泰语 th        印度尼西亚语 id'
+  echo '  马来语 ms      菲律宾语 tl    印地语 hi      乌尔都语 ur'
+  echo '  阿拉伯语 ar    俄语 ru        德语 de        法语 fr'
+  echo '  西班牙语 es    葡萄牙语 pt    意大利语 it    荷兰语 nl'
+  echo '  土耳其语 tr    波兰语 pl      乌克兰语 uk'
+  echo ''
+  echo 'Microi：请选择预装语言套餐：'
+  echo '  1 = 基础套餐：简体中文、繁体中文、英语（推荐，下载最快）'
+  echo '  2 = 亚洲常用：套餐1 + 日语、韩语、越南语、泰语、印度尼西亚语、马来语、菲律宾语'
+  echo '  3 = 全部语言：以上列出的全部 23 种语言（下载时间最长）'
+  echo 'Microi：直接按 Enter 默认选择 1：'
+  read -r libretranslate_language_package
+  libretranslate_language_package="${libretranslate_language_package:-1}"
+
+  case "${libretranslate_language_package}" in
+    1)
+      LIBRETRANSLATE_LANGS="zh zt en"
+      ;;
+    2)
+      LIBRETRANSLATE_LANGS="zh zt en ja ko vi th id ms tl"
+      ;;
+    3)
+      LIBRETRANSLATE_LANGS="${LIBRETRANSLATE_SUPPORTED_LANGS}"
+      ;;
+    *)
+      echo 'Microi：错误：语言套餐只能输入 1、2 或 3，脚本退出。'
+      exit 1
+      ;;
+  esac
+
+  echo 'Microi：如需在套餐上额外添加语言，请输入上方语言 key（逗号或空格分隔）；直接 Enter 不添加：'
+  read -r libretranslate_extra_languages
+  libretranslate_extra_languages="${libretranslate_extra_languages//，/ }"
+  libretranslate_extra_languages="${libretranslate_extra_languages//；/ }"
+  libretranslate_extra_languages=$(printf '%s' "${libretranslate_extra_languages}" | tr ',;' '  ')
+  for language_key in ${libretranslate_extra_languages}; do
+    language_key="${language_key,,}"
+    case " ${LIBRETRANSLATE_SUPPORTED_LANGS} " in
+      *" ${language_key} "*)
+        append_libretranslate_language "${language_key}"
+        ;;
+      *)
+        echo "Microi：警告：忽略不支持的语言 key：${language_key}"
+        ;;
+    esac
+  done
+
+  LIBRETRANSLATE_LANGS="${LIBRETRANSLATE_LANGS# }"
+  LIBRETRANSLATE_LANGS_CSV=$(printf '%s' "${LIBRETRANSLATE_LANGS}" | tr ' ' ',')
+  echo "Microi：将安装 LibreTranslate，加载语言：${LIBRETRANSLATE_LANGS_CSV} ✓"
+elif [ "${install_libretranslate}" == "0" ]; then
+  INSTALL_LIBRETRANSLATE=0
+  echo 'Microi：将跳过 LibreTranslate 翻译服务安装 ✓'
 else
   echo 'Microi：错误：无效的输入，脚本退出。'
   exit 1
@@ -1077,13 +1168,15 @@ generate_random_data_dir() {
 }
 
 # === 端口检测 ===
+PORT_LABELS=("${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console")
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  PORT_COUNT=10
-  PORT_LABELS=("${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "Ollama" "Qdrant-HTTP" "Qdrant-gRPC" "API" "Web")
-else
-  PORT_COUNT=7
-  PORT_LABELS=("${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "API" "Web")
+  PORT_LABELS+=("Ollama" "Qdrant-HTTP" "Qdrant-gRPC")
 fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  PORT_LABELS+=("LibreTranslate")
+fi
+PORT_LABELS+=("API" "Web")
+PORT_COUNT=${#PORT_LABELS[@]}
 
 check_port_in_use() {
   local port="$1"
@@ -1147,19 +1240,25 @@ REDIS_PORT=$((PORT_BASE + 1))
 MONGO_PORT=$((PORT_BASE + 2))
 MINIO_PORT=$((PORT_BASE + 3))
 MINIO_CONSOLE_PORT=$((PORT_BASE + 4))
+NEXT_PORT_OFFSET=5
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  OLLAMA_PORT=$((PORT_BASE + 5))
-  QDRANT_HTTP_PORT=$((PORT_BASE + 6))
-  QDRANT_GRPC_PORT=$((PORT_BASE + 7))
-  API_PORT=$((PORT_BASE + 8))
-  VUE_PORT=$((PORT_BASE + 9))
+  OLLAMA_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+  QDRANT_HTTP_PORT=$((PORT_BASE + NEXT_PORT_OFFSET + 1))
+  QDRANT_GRPC_PORT=$((PORT_BASE + NEXT_PORT_OFFSET + 2))
+  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 3))
 else
   OLLAMA_PORT=""
   QDRANT_HTTP_PORT=""
   QDRANT_GRPC_PORT=""
-  API_PORT=$((PORT_BASE + 5))
-  VUE_PORT=$((PORT_BASE + 6))
 fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  LIBRETRANSLATE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+else
+  LIBRETRANSLATE_PORT=""
+fi
+API_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+VUE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET + 1))
 
 echo ''
 echo 'Microi：端口分配方案：'
@@ -1174,15 +1273,24 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
   printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
 fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}"
+fi
 printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 echo '------------------------------------------------------------------'
 
+ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+FIREWALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT} ${API_PORT} ${VUE_PORT}"
-else
-  ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${API_PORT} ${VUE_PORT}"
+  ALL_PORTS="${ALL_PORTS} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT}"
+  FIREWALL_PORTS="${FIREWALL_PORTS} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT}"
 fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  ALL_PORTS="${ALL_PORTS} ${LIBRETRANSLATE_PORT}"
+fi
+ALL_PORTS="${ALL_PORTS} ${API_PORT} ${VUE_PORT}"
+FIREWALL_PORTS="${FIREWALL_PORTS} ${API_PORT} ${VUE_PORT}"
 
 echo ''
 echo '[步骤3/11] 端口分配完成 ✓'
@@ -1206,11 +1314,19 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
 else
   QDRANT_API_KEY=""
 fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  LIBRETRANSLATE_API_KEY=$(generate_random_password)
+else
+  LIBRETRANSLATE_API_KEY=""
+fi
 
 # 验证密码是否生成成功（bash <4.4 下 set -e 不会传播到 $() 中）
 _REQUIRED_PW_VARS="DATABASE_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   _REQUIRED_PW_VARS="${_REQUIRED_PW_VARS} QDRANT_API_KEY"
+fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  _REQUIRED_PW_VARS="${_REQUIRED_PW_VARS} LIBRETRANSLATE_API_KEY"
 fi
 for _pw_var in ${_REQUIRED_PW_VARS}; do
   eval _pw_val="\${${_pw_var}}"
@@ -1311,11 +1427,14 @@ echo ''
 echo '[步骤5/11] 开放防火墙端口'
 echo '------------------------------------------------------------------'
 
-echo 'Microi：在部署服务前，先开放所有端口...'
-for port in ${ALL_PORTS}; do
+echo 'Microi：在部署服务前，先开放需要对外访问的端口...'
+for port in ${FIREWALL_PORTS}; do
   firewall_open_port "${port}"
   echo "Microi：  端口 ${port}/tcp 已开放 ✓"
 done
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  echo "Microi：  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 仅供平台内部调用，未自动开放到宿主机防火墙 ✓"
+fi
 firewall_reload
 echo ''
 echo 'Microi：提示：以上为服务器内部防火墙规则，若使用云服务器（阿里云/腾讯云等），'
@@ -2028,14 +2147,14 @@ echo '[步骤9/11] MinIO 部署完成 ✓'
 
 
 # ============================================================
-# 步骤10：部署在线 AI 依赖与平台应用
+# 步骤10：部署可选服务与平台应用
 # ============================================================
 echo ''
-echo '[步骤10/11] 部署在线 AI 依赖与平台应用'
+echo '[步骤10/11] 部署可选服务与平台应用'
 echo '------------------------------------------------------------------'
 
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  echo 'Microi：已选择安装在线 AI 引擎依赖，将部署 Ollama 与 Qdrant。'
+  echo 'Microi：已选择安装向量检索增强，将部署 Ollama、nomic-embed-text 与 Qdrant。'
   echo ''
   echo 'Microi：部署 Ollama AI 服务'
   echo '------------------------------------------------------------------'
@@ -2076,8 +2195,29 @@ EOF
 
   compose_up "${OLLAMA_DIR}"
 
+  echo 'Microi：等待 Ollama 就绪并下载 nomic-embed-text 模型...'
+  OLLAMA_READY=0
+  for _ollama_wait in $(seq 1 30); do
+    if docker exec microi-install-ollama ollama list > /dev/null 2>&1; then
+      OLLAMA_READY=1
+      break
+    fi
+    sleep 2
+  done
+  if [ "${OLLAMA_READY}" != "1" ]; then
+    echo 'Microi：错误：Ollama 在 60 秒内未就绪，无法下载 nomic-embed-text。'
+    docker logs microi-install-ollama 2>&1 | tail -50 || true
+    exit 1
+  fi
+  if docker exec microi-install-ollama ollama pull nomic-embed-text; then
+    echo 'Microi：nomic-embed-text 模型下载完成 ✓'
+  else
+    echo 'Microi：错误：nomic-embed-text 模型下载失败。'
+    exit 1
+  fi
+
   echo ''
-  echo 'Microi：Ollama 部署完成 ✓'
+  echo 'Microi：Ollama 与 nomic-embed-text 部署完成 ✓'
 
   # --- Qdrant ---
   echo ''
@@ -2146,7 +2286,101 @@ EOF
   echo ''
   echo 'Microi：Qdrant 部署完成 ✓'
 else
-  echo 'Microi：已选择不安装在线 AI 引擎依赖，跳过 Ollama 与 Qdrant。'
+  echo 'Microi：使用平台内置轻量 Schema 搜索，跳过 Ollama、nomic-embed-text 与 Qdrant。'
+fi
+
+# --- LibreTranslate ---
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  echo ''
+  echo 'Microi：部署 LibreTranslate 开源翻译服务'
+  echo '------------------------------------------------------------------'
+
+  LIBRETRANSLATE_DIR="${COMPOSE_BASE_DIR}/microi-install-libretranslate"
+  echo "Microi：LibreTranslate 端口: ${LIBRETRANSLATE_PORT}"
+  echo "Microi：LibreTranslate 加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
+
+  mkdir -p "${LIBRETRANSLATE_DIR}" /microi/libretranslate/models /microi/libretranslate/api-keys
+  cat > "${LIBRETRANSLATE_DIR}/docker-compose.yml" <<EOF
+version: '3.8'
+services:
+  microi-translate:
+    image: libretranslate/libretranslate:latest
+    container_name: microi-install-libretranslate
+${COMPOSE_SERVICE_NETWORK}
+    user: "0:0"
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - /microi/libretranslate/models:/home/libretranslate/.local
+      - /microi/libretranslate/api-keys:/app/db
+    environment:
+      - LT_UPDATE_MODELS=true
+      - LT_LOAD_ONLY=${LIBRETRANSLATE_LANGS_CSV}
+      - LT_API_KEYS=true
+      - LT_API_KEYS_DB_PATH=/app/db/api_keys.db
+      - LT_WORKERS=1
+      - LT_TIMEOUT=120
+    ports:
+      - "${LIBRETRANSLATE_PORT}:5000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+${COMPOSE_EXTERNAL_NETWORKS}
+EOF
+  echo 'Microi：LibreTranslate 编排文件已生成 ✓'
+
+  compose_up "${LIBRETRANSLATE_DIR}"
+
+  echo 'Microi：等待 LibreTranslate 下载语言模型并通过健康检查（首次安装可能需要较长时间）...'
+  LIBRETRANSLATE_READY=0
+  for _libretranslate_wait in $(seq 1 1800); do
+    if ! docker inspect microi-install-libretranslate > /dev/null 2>&1 \
+      || [ "$(docker inspect microi-install-libretranslate --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
+      echo 'Microi：错误：LibreTranslate 容器已停止。'
+      docker logs microi-install-libretranslate 2>&1 | tail -100 || true
+      exit 1
+    fi
+    if docker exec microi-install-libretranslate ./venv/bin/python scripts/healthcheck.py > /dev/null 2>&1; then
+      LIBRETRANSLATE_READY=1
+      break
+    fi
+    if [ $((_libretranslate_wait % 15)) -eq 0 ]; then
+      echo "Microi：LibreTranslate 仍在准备语言模型，已等待 $((_libretranslate_wait * 2)) 秒..."
+    fi
+    sleep 2
+  done
+  if [ "${LIBRETRANSLATE_READY}" != "1" ]; then
+    echo 'Microi：错误：LibreTranslate 在 60 分钟内未通过健康检查。'
+    docker logs microi-install-libretranslate 2>&1 | tail -100 || true
+    exit 1
+  fi
+
+  echo 'Microi：LibreTranslate 已就绪，正在注册随机 API Key...'
+  LIBRETRANSLATE_KEY_READY=0
+  for _libretranslate_key_wait in $(seq 1 30); do
+    if docker exec microi-install-libretranslate \
+      ltmanage keys --api-keys-db-path /app/db/api_keys.db \
+      add 1000000 --key "${LIBRETRANSLATE_API_KEY}" > /dev/null 2>&1; then
+      LIBRETRANSLATE_KEY_READY=1
+      break
+    fi
+    sleep 2
+  done
+  if [ "${LIBRETRANSLATE_KEY_READY}" != "1" ]; then
+    echo 'Microi：错误：LibreTranslate 已启动，但随机 API Key 注册失败。'
+    docker logs microi-install-libretranslate 2>&1 | tail -100 || true
+    exit 1
+  fi
+
+  echo ''
+  echo 'Microi：LibreTranslate 健康检查与 API Key 注册完成 ✓'
+else
+  echo 'Microi：已选择不安装 LibreTranslate，跳过翻译服务。'
 fi
 
 # --- 平台应用（API + Web）---
@@ -2173,6 +2407,14 @@ esac
 
 echo "Microi：API端口: ${API_PORT}, Web端口: ${VUE_PORT}"
 
+APP_TRANSLATE_ENV=""
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  APP_TRANSLATE_ENV="      - MICROI_TRANSLATE_PROVIDER=libretranslate
+      - MICROI_TRANSLATE_URL=http://${LAN_IP}:${LIBRETRANSLATE_PORT}
+      - MICROI_TRANSLATE_API_KEY=${LIBRETRANSLATE_API_KEY}
+      - MICROI_TRANSLATE_TIMEOUT=120"
+fi
+
 mkdir -p "${APP_DIR}"
 cat > "${APP_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
@@ -2197,6 +2439,7 @@ ${COMPOSE_SERVICE_NETWORK}
       - OsClientRedisPort=${REDIS_PORT}
       - OsClientRedisPwd=${REDIS_PASSWORD}
       - AuthServer=http://${LAN_IP}:${API_PORT}
+${APP_TRANSLATE_ENV}
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -2236,11 +2479,7 @@ echo ''
 echo 'Microi：平台应用（API + Web）部署完成 ✓'
 
 echo ''
-if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  echo '[步骤10/11] Ollama + Qdrant + 平台应用 部署完成 ✓'
-else
-  echo '[步骤10/11] 平台应用部署完成，已跳过在线 AI 依赖 ✓'
-fi
+echo '[步骤10/11] 可选服务与平台应用部署完成 ✓'
 
 
 # ============================================================
@@ -2317,6 +2556,9 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
   printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
 fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}"
+fi
 printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 echo ''
@@ -2346,6 +2588,7 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo "Ollama:      容器 microi-install-ollama,    端口 ${OLLAMA_PORT}"
   echo "             数据目录: /microi/ollama/data"
   echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-ollama/"
+  echo "             Embedding模型: nomic-embed-text（安装时已下载）"
   echo "             下载模型: docker exec microi-install-ollama ollama pull deepseek-r1:1.5b"
   echo ""
   echo "Qdrant:      容器 microi-install-qdrant,    端口 ${QDRANT_HTTP_PORT}(HTTP) / ${QDRANT_GRPC_PORT}(gRPC)"
@@ -2353,9 +2596,29 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo "             管理界面: http://${ACCESS_IP}:${QDRANT_HTTP_PORT}/dashboard"
   echo "             数据目录: /microi/qdrant/storage"
   echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-qdrant/"
+  echo "向量开关:    安装程序不会自动修改任何租户的 mic_ai，当前仍保持默认关键词检索。"
+  echo "             如需启用，请在 AI 引擎“向量数据库（可选）”Tab 设置："
+  echo "             EnableVectorDatabase=1"
+  echo "             EmbeddingApiUrl=http://${LAN_IP}:${OLLAMA_PORT}/v1/embeddings"
+  echo "             QdrantHost=${LAN_IP}"
+  echo "             QdrantPort=${QDRANT_HTTP_PORT}"
+  echo "             QdrantApiKey=${QDRANT_API_KEY}"
+  echo "             nomic-embed-text 当前 Microi Ollama HTTP 链路维度：768"
   echo ""
 else
-  echo "在线AI依赖: 已跳过 Ollama 与 Qdrant。后续如需在线AI数据分析/在线AI编程，请重新执行脚本并选择安装。"
+  echo 'AI Schema检索: 使用平台内置“大模型关键词扩展 + 权限感知 Schema 搜索”；已跳过 Ollama、nomic-embed-text 与 Qdrant。'
+  echo '             只有需要高度模糊语义召回时，才建议重新执行脚本并启用向量检索增强。'
+  echo ""
+fi
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  echo "LibreTranslate: 容器 microi-install-libretranslate, 端口 ${LIBRETRANSLATE_PORT}"
+  echo "             加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
+  echo "             API Key: ${LIBRETRANSLATE_API_KEY}"
+  echo "             数据目录: /microi/libretranslate/"
+  echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-libretranslate/"
+  echo ""
+else
+  echo 'LibreTranslate: 已跳过；如需动态内容翻译，可重新执行脚本并选择安装。'
   echo ""
 fi
 echo "API:         容器 microi-install-api,        端口 ${API_PORT}"
@@ -2376,9 +2639,12 @@ echo ''
 echo '------------------------------------------------------------------'
 echo '已开放的防火墙端口（服务器内部防火墙）：'
 echo '------------------------------------------------------------------'
-for port in ${ALL_PORTS}; do
+for port in ${FIREWALL_PORTS}; do
   echo "  ${port}/tcp"
 done
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  echo "  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 未自动开放（仅供平台内部调用）"
+fi
 echo ''
 echo '------------------------------------------------------------------'
 echo '编排项目列表：'

@@ -16,6 +16,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dos.ORM;
 using System.Text;
 
 namespace Microi.net
@@ -111,6 +112,11 @@ namespace Microi.net
         public List<SysRole> _Child { get; set; }
         public List<string> SysMenuIds { get; set; }
         public List<SysRoleLimits> SysRoleLimits { get; set; }
+        /// <summary>
+        /// Explicit direct FormEngine table permissions (sys_rolelimit.Type=Table).
+        /// Ordinary menu-driven access should continue to use SysRoleLimits.
+        /// </summary>
+        public List<SysRoleLimits> TableRoleLimits { get; set; }
         public string _Test { get; set; }
         public string DeptNames { get; set; }
     }
@@ -140,6 +146,14 @@ namespace Microi.net
     public partial class SysMenu
     {
         public List<SysMenu> _Child { get; set; }
+
+        /// <summary>
+        /// Stable module key used by routes and FormEngine authorization. The
+        /// generated entity predates this sys_menu column, so keep the mapping in
+        /// the partial extension instead of querying the full dynamic row.
+        /// </summary>
+        [Field("ModuleEngineKey")]
+        public string ModuleEngineKey { get; set; }
     }
 
     public partial class SysMessage

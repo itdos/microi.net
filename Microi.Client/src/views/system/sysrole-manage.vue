@@ -143,6 +143,11 @@
                             </div>
                         </el-form-item>
                     </el-col>
+                    <el-col v-if="GetCurrentUser._IsAdmin" :span="24" :xs="24">
+                        <el-form-item label="表直连权限">
+                            <SysroleTablePermission v-model="CurrentSysRoleModel.TableRoleLimits" />
+                        </el-form-item>
+                    </el-col>
                 </el-row>
             </el-form>
             <template #footer>
@@ -183,10 +188,24 @@
                             </el-form-item>
                         </el-col>
                         <el-col :span="24">
-                            <el-form-item label="授权业务域">
-                                <el-checkbox-group v-model="AiPolicyModel.AllowedDomains" class="ai-policy-domains">
-                                    <el-checkbox v-for="item in AiDomainOptions" :key="item.value" :value="item.value" border>{{ item.label }}</el-checkbox>
-                                </el-checkbox-group>
+                            <el-form-item label="授权业务表">
+                                <el-select
+                                    v-model="AiPolicyModel.AllowedDomains"
+                                    multiple
+                                    filterable
+                                    collapse-tags
+                                    collapse-tags-tooltip
+                                    :loading="AiTableLoading"
+                                    style="width: 100%"
+                                    placeholder="选择允许 AI 查询的业务表"
+                                >
+                                    <el-option
+                                        v-for="item in AiTableOptions"
+                                        :key="item.Name"
+                                        :label="`${item.Description || item.Name} (${item.Name})`"
+                                        :value="item.Name"
+                                    />
+                                </el-select>
                             </el-form-item>
                         </el-col>
                         <el-col :span="24">
@@ -202,11 +221,6 @@
                             </el-form-item>
                         </el-col>
                         <el-col :span="8" :xs="24">
-                            <el-form-item label="敏感字段">
-                                <el-switch v-model="AiPolicyModel.CanViewSensitive" :active-value="1" :inactive-value="0" />
-                            </el-form-item>
-                        </el-col>
-                        <el-col :span="8" :xs="24">
                             <el-form-item label="通用查询">
                                 <el-switch
                                     v-model="AiPolicyModel.AllowRawSql"
@@ -218,17 +232,12 @@
                         </el-col>
                         <el-col :span="24">
                             <el-alert
-                                title="通用查询只允许“全部数据”范围的高权限角色开启；其他角色由业务接口强制附加本人、部门或租户范围。"
+                                title="NL2SQL 仅允许“全部数据 + 通用查询”。最终白名单还会与该用户真实菜单/高级表只读权限取交集；带菜单行级范围的表不会交给通用 SQL，请改用经过审核的接口引擎。"
                                 type="info"
                                 :closable="false"
                                 show-icon
                                 class="ai-policy-alert"
                             />
-                        </el-col>
-                        <el-col :span="24">
-                            <el-form-item label="附加规则">
-                                <el-input v-model="AiPolicyModel.PromptRules" type="textarea" :rows="3" placeholder="例如：不得返回手机号完整号码；重点关注逾期售后任务。" />
-                            </el-form-item>
                         </el-col>
                         <el-col :span="24">
                             <el-form-item label="备注">
@@ -252,11 +261,13 @@ import _ from "underscore";
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
 import SysroleMenuPermissionRow from "./components/sysrole-menu-permission-row.vue";
+import SysroleTablePermission from "./components/sysrole-table-permission.vue";
 import { setRoleMenuChecked } from "./utils/sysrole-menu-permission";
 export default {
     name: "sys_role",
     components: {
-        SysroleMenuPermissionRow
+        SysroleMenuPermissionRow,
+        SysroleTablePermission
     },
     directives: {},
     setup() {
@@ -279,14 +290,8 @@ export default {
             AiPolicyAvailable: true,
             AiPolicyRole: {},
             AiModelList: [],
-            AiDomainOptions: [
-                { value: "customers", label: "客户" },
-                { value: "orders", label: "合同订单" },
-                { value: "followups", label: "跟进记录" },
-                { value: "tasks", label: "售后任务" },
-                { value: "devices", label: "客户设备" },
-                { value: "opportunities", label: "商机" }
-            ],
+            AiTableOptions: [],
+            AiTableLoading: false,
             AiPolicyModel: {},
             SearchModel: {
                 Keyword: "",
@@ -309,7 +314,8 @@ export default {
             zTree: {},
             CurrentSysRoleModel: {
                 DeptIds: [],
-                BaseLimit: []
+                BaseLimit: [],
+                TableRoleLimits: []
             },
             SysRoleList: [],
             SysDeptList: [],
@@ -355,7 +361,7 @@ export default {
             }
         },
         CreateAiPolicyModel(role, source) {
-            const highPrivilege = Number(role.Level || 0) >= 999;
+            const highPrivilege = Number(role.Level || 0) >= 9999;
             return {
                 Id: source?.Id || "",
                 RoleId: role.Id,
@@ -365,9 +371,7 @@ export default {
                 AllowedDomains: this.ParseAiPolicyList(source?.AllowedDomains),
                 AllowedModels: this.ParseAiPolicyList(source?.AllowedModels),
                 MaxRows: Number(source?.MaxRows || (highPrivilege ? 100 : 30)),
-                CanViewSensitive: Number(source?.CanViewSensitive || 0),
                 AllowRawSql: Number(source?.AllowRawSql || 0),
-                PromptRules: source?.PromptRules || "",
                 Remark: source?.Remark || ""
             };
         },
@@ -375,10 +379,11 @@ export default {
             this.AiPolicyRole = role || {};
             this.AiPolicyVisible = true;
             this.AiPolicyLoading = true;
+            this.AiTableLoading = true;
             this.AiPolicyAvailable = true;
             this.AiPolicyModel = this.CreateAiPolicyModel(this.AiPolicyRole);
             try {
-                const [policyResult, modelResult] = await Promise.all([
+                const [policyResult, modelResult, tableResult] = await Promise.all([
                     this.DiyCommon.FormEngine.GetTableData("mci_ai_role_policy", {
                         _Where: [["RoleId", "=", this.AiPolicyRole.Id]],
                         _PageIndex: 1,
@@ -389,23 +394,26 @@ export default {
                         _OrderBy: "CreateTime",
                         _OrderByType: "DESC",
                         _PageSize: 100
-                    })
+                    }),
+                    this.DiyCommon.PostAsync("/api/Ai/GetNl2SqlPolicyTableOptions", {}, null, null, "json")
                 ]);
                 if (!policyResult || Number(policyResult.Code) !== 1) {
                     this.AiPolicyAvailable = false;
                     return;
                 }
                 this.AiModelList = modelResult && Number(modelResult.Code) === 1 ? (modelResult.Data || []) : [];
+                this.AiTableOptions = tableResult && Number(tableResult.Code) === 1 ? (tableResult.Data || []) : [];
                 this.AiPolicyModel = this.CreateAiPolicyModel(this.AiPolicyRole, (policyResult.Data || [])[0]);
             } catch (error) {
                 this.AiPolicyAvailable = false;
             } finally {
                 this.AiPolicyLoading = false;
+                this.AiTableLoading = false;
             }
         },
         async SaveAiPolicy() {
             if (!this.AiPolicyModel.AllowedDomains.length) {
-                this.DiyCommon.Tips("请至少选择一个授权业务域", false);
+                this.DiyCommon.Tips("请至少选择一个授权业务表", false);
                 return;
             }
             if (!this.AiPolicyModel.AllowedModels.length) {
@@ -801,7 +809,8 @@ export default {
                 url = self.DiyApi.AddSysRole();
                 self.CurrentSysRoleModel = {
                     DeptIds: [],
-                    BaseLimit: []
+                    BaseLimit: [],
+                    TableRoleLimits: []
                 };
                 // 新增时清除所有选中（传null作为sysRoleLimits）
                 self.ForSetSysMenuListCheck(self.SysMenuList, null, true);
@@ -825,6 +834,9 @@ export default {
                                 result1.Data.DeptIds = [];
                             } else {
                                 result1.Data.DeptIds = JSON.parse(result1.Data.DeptIds);
+                            }
+                            if (!Array.isArray(result1.Data.TableRoleLimits)) {
+                                result1.Data.TableRoleLimits = [];
                             }
                             // 优化：合并清除和设置操作，使用Map提升性能
                             self.ForSetSysMenuListCheck(self.SysMenuList, result1.Data.SysRoleLimits || null, true);
@@ -1083,16 +1095,6 @@ export default {
 
 .ai-policy-editor {
     min-height: 250px;
-}
-
-.ai-policy-domains {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-
-    .el-checkbox {
-        margin-right: 0;
-    }
 }
 
 .ai-policy-alert {

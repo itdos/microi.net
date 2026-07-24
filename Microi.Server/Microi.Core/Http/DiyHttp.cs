@@ -27,26 +27,58 @@ namespace Microi.net
             MaxTimeout = int.MaxValue
         });
 
-        #region 2026-05-01 SSRF 防护
+        // 严格 SSRF 模式使用独立连接池并禁止自动重定向，避免已通过校验的公网地址
+        // 再跳转到私网。默认兼容模式继续使用历史 _sharedClient 行为。
+        private static readonly RestClient _strictSsrfClient = new RestClient(new RestClientOptions
+        {
+            ThrowOnAnyError = false,
+            FollowRedirects = false,
+            MaxTimeout = int.MaxValue
+        });
+
+        #region SSRF 防护
         /// <summary>
-        /// 是否启用 SSRF（Server-Side Request Forgery）防护，默认开启。
-        /// 开启后会阻止 V8 脚本和接口引擎发起到 localhost / 私网 / 云元数据服务的 HTTP 请求。
-        /// 如需在内部场景显式访问内网，请通过 appsettings.json 设置 "DisableSsrfProtection":"true" 关闭，
-        /// 或将目标主机加入 SsrfAllowedHosts 白名单。
+        /// 是否启用严格 SSRF（Server-Side Request Forgery）防护，默认关闭。
+        /// 未显式开启时完全保留历史 HTTP 行为，不做协议、URL 凭据、私网或云元数据拦截。
+        /// 显式开启后才执行 ValidateSsrfUrl 的完整校验。
+        ///
+        /// 配置优先级：环境变量 MICROI_SSRF_PROTECTION_ENABLED >
+        /// 主租户 sys_osclients 运行配置 > appsettings.json SsrfProtection:Enabled。
+        /// 历史 AppSettings:DisableSsrfProtection=true 继续兼容，并始终优先关闭严格模式。
         /// </summary>
-        private static readonly bool _ssrfProtectionEnabled =
-            !string.Equals(ConfigHelper.GetAppSettings("DisableSsrfProtection"), "true",
-                StringComparison.OrdinalIgnoreCase);
+        private static bool IsStrictSsrfProtectionEnabled()
+        {
+            if (IsTruthy(ConfigHelper.GetAppSettings("DisableSsrfProtection")))
+            {
+                return false;
+            }
+
+            return ConfigHelper.GetEnvOrConfigurationBool(
+                "MICROI_SSRF_PROTECTION_ENABLED",
+                "SsrfProtection:Enabled",
+                false);
+        }
 
         /// <summary>
-        /// SSRF 主机白名单（通过 appsettings.json "SsrfAllowedHosts" 逗号分隔配置）
+        /// 严格模式下的 SSRF 主机白名单。新配置为
+        /// SsrfProtection:AllowedHosts / MICROI_SSRF_ALLOWED_HOSTS，
+        /// 同时兼容历史 AppSettings:SsrfAllowedHosts。
         /// </summary>
-        private static readonly HashSet<string> _ssrfAllowedHosts = new HashSet<string>(
-            (ConfigHelper.GetAppSettings("SsrfAllowedHosts") ?? "")
+        private static HashSet<string> GetSsrfAllowedHosts()
+        {
+            var configuredHosts = ConfigHelper.GetEnvOrConfiguration(
+                                      "MICROI_SSRF_ALLOWED_HOSTS",
+                                      "SsrfProtection:AllowedHosts")
+                                  ?? ConfigHelper.GetAppSettings("SsrfAllowedHosts")
+                                  ?? "";
+
+            return new HashSet<string>(
+                configuredHosts
                 .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(s => s.Trim().ToLowerInvariant())
                 .Where(s => !string.IsNullOrEmpty(s)),
-            StringComparer.OrdinalIgnoreCase);
+                StringComparer.OrdinalIgnoreCase);
+        }
 
         /// <summary>
         /// 校验 URL 是否被 SSRF 策略允许。返回 (allowed, reason)。
@@ -59,7 +91,7 @@ namespace Microi.net
         /// </summary>
         private static (bool allowed, string reason) ValidateSsrfUrl(string url)
         {
-            if (!_ssrfProtectionEnabled) return (true, null);
+            if (!IsStrictSsrfProtectionEnabled()) return (true, null);
             if (string.IsNullOrWhiteSpace(url)) return (false, "URL 为空");
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
@@ -70,9 +102,13 @@ namespace Microi.net
             {
                 return (false, $"不允许的协议: {uri.Scheme}");
             }
+            if (!string.IsNullOrEmpty(uri.UserInfo))
+            {
+                return (false, "URL 不允许包含用户凭据");
+            }
             var host = uri.Host?.ToLowerInvariant() ?? "";
             // 显式白名单
-            if (_ssrfAllowedHosts.Contains(host)) return (true, null);
+            if (GetSsrfAllowedHosts().Contains(host)) return (true, null);
 
             // 解析 IP（如果 host 已经是 IP 直接用；否则 DNS 查）
             IPAddress[] addresses;
@@ -146,6 +182,15 @@ namespace Microi.net
                 }
             }
             return false;
+        }
+
+        private static bool IsTruthy(string value)
+        {
+            return !string.IsNullOrWhiteSpace(value)
+                   && (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase));
         }
         #endregion
 
@@ -309,17 +354,20 @@ namespace Microi.net
         {
             //ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12 | SecurityProtocolType.Ssl3;
 
-            // 2026-05-01 SSRF 防护：在所有 HTTP 调用入口校验目标 URL，
-            // 拒绝访问 localhost / 私网 / 链路本地 / 云元数据服务等危险地址。
+            // 默认关闭并完全保留历史 HTTP 行为；只有显式开启严格 SSRF 模式后
+            // ValidateSsrfUrl 才会拦截协议、URL 凭据、私网和云元数据地址。
             var (allowed, reason) = ValidateSsrfUrl(param.Url);
             if (!allowed)
             {
                 Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】SSRF 防护拦截：{reason} (URL={param.Url})");
-                throw new InvalidOperationException($"SSRF 防护已拦截此请求：{reason}。如需放行请配置 SsrfAllowedHosts。");
+                throw new InvalidOperationException(
+                    $"SSRF 防护已拦截此请求：{reason}。如需放行请配置 SsrfProtection:AllowedHosts。");
             }
 
-            // 使用共享的 RestClient 实例，避免每次请求创建新实例导致 Socket 耗尽
-            RestClient client = _sharedClient;
+            // 两种模式分别复用连接池：默认模式保留历史自动重定向；严格模式禁止自动重定向。
+            RestClient client = IsStrictSsrfProtectionEnabled()
+                ? _strictSsrfClient
+                : _sharedClient;
 
             // client.RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true; // 禁用证书验证
 

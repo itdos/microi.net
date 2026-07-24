@@ -59,7 +59,7 @@ if (V8.LoadMode === 'Design') return;
 
 - ❌ **禁止** 在 `SubmitFormV8.js` 中调 `V8.FormSubmit()` —— 无限递归
 - ❌ **禁止** 在 `FieldValueChange` 中 `V8.FormSet(同字段, ...)` —— 循环触发
-- ❌ **禁止** 在后端 `SubmitBeforeServerV8.js` 中再 `UptFormData(本表, V8.Form.Id)` 不加 `_InvokeType:'Server'` —— 表单事件递归
+- ❌ **禁止** 在后端提交前/后事件中再次写当前表；即使默认 Server 调用不递归，也可能覆盖本次增量数据、引发死锁或重复副作用。确需跨表联动时使用同一 `V8.DbTrans`，且不要传 `_InvokeType:'Client'`
 
 ### 3. 阻止提交（后端）
 
@@ -90,7 +90,8 @@ V8.ApiEngine.Run('other-engine', { Form: V8.Form }, V8.DbTrans);
 ## 前端事件特有 API
 
 ```javascript
-// 设置字段值（触发值变更事件）
+// 普通 diy-form 中设置字段值（触发目标字段值变更事件）
+// diy-table 列表上下文只更新当前行和模板，不递归触发目标字段 V8
 V8.FormSet('FieldName', 'value');
 V8.FormSet('DropdownField', { Id: 1, Name: '选项' }); // 下拉框
 
@@ -110,6 +111,7 @@ V8.Tips('操作失败', false);   // 错误提示（5秒消失）
 
 // 确认框
 V8.ConfirmTips('确定删除？', function() { /* 确定 */ }, function() { /* 取消 */ });
+// content 使用 HTML 模式渲染；只能传固定文案或已转义内容，复杂交互用 OpenAppDialog
 
 // 前端 HTTP 请求
 V8.Post('/api/xxx', { key: 'value' }, function(res) { });
@@ -232,13 +234,12 @@ if (V8.FormSubmitAction === 'Insert' || V8.FormSubmitAction === 'Update') {
 // 此时数据已成功写入数据库（仍在事务中）
 // 返回 { Code: 0 } 仍可回滚事务
 
-// 新增后：自动创建关联数据（使用 _InvokeType: 'Client' 避免递归）
+// 新增后：自动创建关联数据。保持默认 Server 调用，不触发目标表事件
 if (V8.FormSubmitAction === 'Insert') {
   V8.FormEngine.AddFormData('UserProfile', {
     UserId: V8.Form.Id,
-    NickName: V8.Form.Name,
-    _InvokeType: 'Client'
-  });
+    NickName: V8.Form.Name
+  }, V8.DbTrans);
 }
 
 // 更新后：同步更新其它表的冗余字段
@@ -305,18 +306,20 @@ if (V8.Form.Phone) {
 | 变量 | 说明 | 可用事件 |
 |------|------|---------|
 | `V8.Form` | 当前表单数据（新增时也有 Id） | 全部 |
-| `V8.OldForm` | 修改前旧数据 | 提交前/后 |
+| `V8.OldForm` | 已加载的修改前旧数据 | 普通表单；提交前/后 |
 | `V8.FormMode` | `'Add'` / `'Edit'` / `'View'` | 全部 |
 | `V8.FormOutAction` | `'Insert'`/`'Update'`/`'Close'`/`'Delete'` | FormOut |
 | `V8.FormSubmitAction` | `'Insert'` / `'Update'` / `'Delete'` | SubmitBefore |
 | `V8.EventName` | 当前事件名 | 全部 |
 | `V8.CurrentUser` | 当前用户 | 全部 |
 | `V8.TableId` / `V8.TableName` | 当前表 Id / Name | 全部 |
-| `V8.SelectedData` | 选中的行数组 | 全部 |
+| `V8.SelectedData` / `V8.TableRowSelected` | 选中的行数组 | 列表/批量按钮 |
 | `V8.CurrentTableData` | 当前表当页数据 | 全部 |
 | `V8.ClientType` | `'PC'`/`'IOS'`/`'Android'`/`'H5'`/`'WeChat'` | 全部 |
-| `V8.ThisValue` | 下拉框选择后的值对象 | FieldValueChange |
+| `V8.ThisValue` | 当前字段新值：可能是对象、原始值或行内 `{New,Old}` | FieldValueChange |
+| `V8.OldValue` | 当前字段旧值，仅行内编辑可靠 | 表格行内 FieldValueChange |
 | `V8.KeyCode` | 键盘事件的键码 | FieldOnKeyup |
+| `V8.Event` | 原生事件；键盘事件目前不提供 | FieldSlotButtonClick 等显式事件 |
 | `V8.ParentV8` | 子表中访问父表 V8 对象 | 子表事件 |
 
 ### 后端事件
@@ -343,6 +346,8 @@ if (V8.Form.Phone) {
 | `FormOut` | 离开表单事件 |
 | `FieldValueChange` | 字段值变更事件 |
 | `FieldOnKeyup` | 文本框键盘事件 |
+| `TableFieldOnKeyup` | 表格行内文本框键盘事件 |
+| `FieldSlotButtonClick` | 单行文本插槽按钮点击事件 |
 | `V8BtnRun` | V8 按钮执行事件 |
 | `V8BtnLimit` | V8 按钮是否显示事件 |
 | `BtnFormDetailRun` | 详情按钮 V8 按钮 |
@@ -358,7 +363,8 @@ if (V8.Form.Phone) {
 - 前端事件可使用 `window` 对象和 `async/await`，后端事件不可以
 - 后端提交前/后事件返回 `{ Code: 0, Msg: '...' }` 可阻止数据写入并回滚事务
 - 直接修改 `V8.Form` 的字段值即可改变最终写入的数据
-- 后端事件中使用 `V8.FormEngine` 操作数据时，加 `_InvokeType: 'Client'` 避免递归触发事件
+- 后端事件中使用 `V8.FormEngine` 默认是 Server 调用，不触发目标表事件；`_InvokeType:'Client'` 恰好会触发目标表事件，不能用于“避免递归”
+- `_InvokeType:'Server'` 只表达事件调用语义，不是客户端授权开关；浏览器伪造它不会获得受信任权限
 - `V8.FormSubmitAction` 的值是 `'Insert'`/`'Update'`/`'Delete'`（非 Add/Upt/Del）
 - 在 DataFilterV8 中使用 `V8.CacheData` 缓存查询结果，避免每行执行 N+1 查询
 

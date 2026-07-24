@@ -58,10 +58,16 @@ const getUploadHeaders = () => ({
   authorization: 'Bearer ' + DiyCommon.Authorization()
 })
 
-const encryptPassword = (password) => {
-  const publicKey = config && config.LoginRsaPublicKey === false
-    ? ''
-    : (config && config.LoginRsaPublicKey) || window.MicroiLoginPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY
+const resolveLoginRsaPublicKey = (serverPublicKey = '') => {
+  if (config && config.LoginRsaPublicKey === false) return ''
+  return (config && config.LoginRsaPublicKey)
+    || window.MicroiLoginPublicKey
+    || serverPublicKey
+    || DEFAULT_LOGIN_RSA_PUBLIC_KEY
+}
+
+const encryptPassword = (password, serverPublicKey = '') => {
+  const publicKey = resolveLoginRsaPublicKey(serverPublicKey)
   if (!publicKey || !String(publicKey).trim()) return password
   const encrypt = new JSEncrypt()
   encrypt.setPublicKey(publicKey)
@@ -147,7 +153,7 @@ export const fileSyncApi = {
 
   async loginRemote(platform) {
     const apiBase = normalizeApiBase(platform.apiBase)
-    const encryptedPwd = encryptPassword(platform.password)
+    const encryptedPwd = encryptPassword(platform.password, platform.loginRsaPublicKey)
     if (!encryptedPwd) {
       return { result: { Code: 0, Msg: '密码加密失败' }, authorization: '' }
     }
@@ -194,7 +200,8 @@ export const fileSyncApi = {
     }
     return {
       sysConfig: result.Data,
-      captchaRequired: isEnabledFlag(result.Data.EnableCaptcha)
+      captchaRequired: isEnabledFlag(result.Data.EnableCaptcha),
+      loginRsaPublicKey: result.Data.LoginRsaPublicKey || ''
     }
   },
 

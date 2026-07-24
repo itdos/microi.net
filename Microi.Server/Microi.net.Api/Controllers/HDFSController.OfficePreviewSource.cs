@@ -128,7 +128,7 @@ public partial class HDFSController
         var objectPath = $"{osClient}/office-preview/{cacheHash}/{fileName}";
         using (var stream = new MemoryStream(fileBytes, writable: false))
         {
-            var putResult = await PutOfficeObject(osClient, null, false, objectPath, stream).ConfigureAwait(false);
+            var putResult = await PutOfficeObject(osClient, false, objectPath, stream).ConfigureAwait(false);
             if (putResult.Code != 1)
                 return Json(new DosResult(putResult.Code, putResult.Data, "缓存预览文件失败：" + putResult.Msg));
         }
@@ -253,14 +253,7 @@ public partial class HDFSController
 
     private static bool HasExpectedOfficeFileSignature(string extension, byte[] bytes)
     {
-        if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase)) return bytes.Length > 0;
-        if (extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
-            return bytes.Length >= 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46;
-        if (extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".docx", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".pptx", StringComparison.OrdinalIgnoreCase))
-            return bytes.Length >= 2 && bytes[0] == 0x50 && bytes[1] == 0x4B;
-        return bytes.Length >= 4 && bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0;
+        return OfficeDocumentSecurity.HasExpectedFileSignature(extension, bytes);
     }
 
     private static string Sha256Hex(string value) =>

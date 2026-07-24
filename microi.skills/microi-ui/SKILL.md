@@ -1,7 +1,6 @@
 ---
 name: microi-ui
 description: 用于构建或编写 Microi.UI / MCI-UI 文档，覆盖 Vue 3 网站、响应式站点、uni-app 移动端、主题色板、形态模式、高品质移动端界面、骨架屏、安全区、动效和 Microi 品牌前端组件。
-applyTo: "**/*.{vue,js,ts,css,scss,md,json}"
 ---
 
 # Microi.UI / MCI-UI
@@ -42,7 +41,7 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - 动态页面首次加载必须显示骨架屏，不能只有 spinner，也不能过早显示空状态。
 - 醒目按钮必须使用图标加文字，flex 居中，固定高度，具备加载态和按下反馈。
 - `open-type="getPhoneNumber"` 这类小程序原生按钮必须样式化为 Microi 主按钮，并移除默认边框。
-- API 请求头必须把 `OsClient` 作为单一准确值传递，例如 `lxwb`，不得出现 `lxwb, lxwb` 这类重复值。
+- API 请求头必须把 `OsClient` 作为单一运行期值传递，例如 `demo`，不得出现 `demo, demo` 这类重复值。
 - `MciPage` 必须统一注入运行时安全区变量。微信小程序不能只使用 CSS `env()`；自定义导航页还必须读取胶囊矩形并为 `.mci-topbar` 预留右侧空间。
 - 页面安全区验收以 `pages.json` 全路由为清单，至少覆盖 iPhone、Android 和微信开发者工具；首页、详情、表单、底部弹层及 fixed 操作栏必须全部通过。
 

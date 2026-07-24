@@ -1,12 +1,13 @@
 ---
 name: microi-form-layout
 description: Microi 吾码低代码表单布局分组规范。用于通过 MCP、Manifest、VS Code 插件或 V8 引擎创建/优化 `diy_table` 和 `diy_field` 时，决定使用 `diy_table.Tabs` 表单全局 Tab、字段级 `Tabs` 控件、字段级 `CollapseGroup` 折叠分组，还是直接平铺字段。覆盖"何时分 Tab、何时分折叠分组、字段数判断阈值、JSON 配置示例、回读验收与回滚"。
-applyTo: "**"
 ---
 
 # Microi 表单布局分组规范（Tabs vs CollapseGroup）
 
 Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明确的使用场景。**AI 必须先按本规范评估，再决定如何分组**，禁止盲目创建 Tab。
+
+本 Skill 中的 Tabs、CollapseGroup、Divider 是编辑表单布局。模块级 Detail/Edit/List/Card 跨端视图必须配置在 `sys_menu.ViewSchema` 物理字段中；EntityHero、MetricStrip、ActionGrid、ResponsiveSection 属于独立视图区块，不得伪装成 `diy_field`。三个核心表的 `DiyConfig` 均已废弃，禁止作为新布局或新功能配置入口。
 
 控件事实源：`Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json` 中 `Sort=1000` 附近的 `Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText` 等都属于 Advanced 布局控件。
 

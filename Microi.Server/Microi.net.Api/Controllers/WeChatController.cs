@@ -17,6 +17,7 @@ using Senparc.CO2NET.Extensions;
 using Microsoft.AspNetCore.Cors;
 using Senparc.Weixin.MP.AdvancedAPIs.TemplateMessage;
 using Senparc.Weixin.MP.Containers;
+using StackExchange.Redis;
 
 // For more information on enabling MVC for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -29,6 +30,134 @@ namespace Microi.net.Api.Controllers
     [Route("api/[controller]/[action]")]
     public class WeChatController : Controller
     {
+        private const int OAuthStateLifetimeMinutes = 10;
+        private const int MaxOAuthReturnUrlLength = 2048;
+
+        private static bool IsAllowedOAuthReturnUrl(string returnUrl)
+        {
+            if (returnUrl.DosIsNullOrWhiteSpace()) return true;
+            returnUrl = returnUrl.Trim();
+            if (returnUrl.Length > MaxOAuthReturnUrlLength
+                || returnUrl.IndexOfAny(new[] { '\r', '\n', '\\' }) >= 0)
+            {
+                return false;
+            }
+
+            // Same-site SPA routes remain compatible without creating an open redirect.
+            if (returnUrl.StartsWith("/", StringComparison.Ordinal)
+                && !returnUrl.StartsWith("//", StringComparison.Ordinal))
+            {
+                return Uri.TryCreate(returnUrl, UriKind.Relative, out _);
+            }
+
+            if (!Uri.TryCreate(returnUrl, UriKind.Absolute, out var returnUri)
+                || !string.Equals(returnUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                || !returnUri.UserInfo.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            var configuredOrigins = ConfigHelper.GetEnvOrConfiguration(
+                "MICROI_OAUTH_RETURN_URL_ORIGINS",
+                "Security:OAuthReturnUrlOrigins");
+            if (configuredOrigins.DosIsNullOrWhiteSpace()) return false;
+
+            var returnOrigin = returnUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+            return configuredOrigins
+                .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(item => item.Trim().TrimEnd('/'))
+                .Any(item =>
+                    Uri.TryCreate(item, UriKind.Absolute, out var allowedUri)
+                    && string.Equals(allowedUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                    && allowedUri.UserInfo.DosIsNullOrWhiteSpace()
+                    && string.Equals(
+                        allowedUri.GetLeftPart(UriPartial.Authority).TrimEnd('/'),
+                        returnOrigin,
+                        StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string OAuthStateCacheKey(string osClient, string state)
+        {
+            return $"Microi:{osClient}:OAuth:WeChat:{state}";
+        }
+
+        private static async Task<string> CreateOAuthStateAsync(
+            string osClient,
+            string userId,
+            string wxMpId,
+            string returnUrl)
+        {
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            var database = cache.GetIDatabase();
+            if (database == null) return null;
+
+            var ticket = new JObject
+            {
+                ["OsClient"] = osClient,
+                ["UserId"] = userId,
+                ["WxMpId"] = wxMpId,
+                ["ReturnUrl"] = returnUrl ?? "",
+                ["ExpiresAt"] = DateTimeOffset.UtcNow.AddMinutes(OAuthStateLifetimeMinutes).ToUnixTimeSeconds()
+            }.ToString(Newtonsoft.Json.Formatting.None);
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var state = Guid.NewGuid().ToString("N");
+                if (await database.StringSetAsync(
+                        OAuthStateCacheKey(osClient, state),
+                        ticket,
+                        TimeSpan.FromMinutes(OAuthStateLifetimeMinutes),
+                        When.NotExists).ConfigureAwait(false))
+                {
+                    return state;
+                }
+            }
+            return null;
+        }
+
+        private static async Task<JObject> ConsumeOAuthStateAsync(string osClient, string state)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()
+                || state.DosIsNullOrWhiteSpace()
+                || state.Length != 32
+                || state.Any(character => !Uri.IsHexDigit(character)))
+            {
+                return null;
+            }
+
+            try
+            {
+                osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+                var database = MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase();
+                if (database == null) return null;
+                const string consumeScript = @"
+local value = redis.call('get', KEYS[1])
+if value then
+  redis.call('del', KEYS[1])
+  return value
+end
+return ''";
+                var result = await database.ScriptEvaluateAsync(
+                    consumeScript,
+                    new RedisKey[] { OAuthStateCacheKey(osClient, state) },
+                    Array.Empty<RedisValue>()).ConfigureAwait(false);
+                var raw = result.ToString();
+                if (raw.DosIsNullOrWhiteSpace()) return null;
+                var ticket = JObject.Parse(raw);
+                if (!string.Equals(ticket["OsClient"].Val<string>(), osClient, StringComparison.OrdinalIgnoreCase)
+                    || ticket["ExpiresAt"].Val<long>() < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+                {
+                    return null;
+                }
+                return ticket;
+            }
+            catch
+            {
+                // OAuth身份绑定依赖共享Redis。无法原子消费票据时必须失败关闭。
+                return null;
+            }
+        }
+
         /// <summary>
         /// 根据公众号用户openid推送模板消息给特定用户
         /// </summary>
@@ -36,14 +165,33 @@ namespace Microi.net.Api.Controllers
         {
             try
             {
-                string templateId = "fxrtUb0v1sVmo_y-M9Wyz489PSAJlkSw5YabKfjMLFU";   //模版id  
+                var appId = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_WECHAT_TEMPLATE_APP_ID",
+                    "Integrations:WeChat:TemplateAppId");
+                var appSecret = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_WECHAT_TEMPLATE_APP_SECRET",
+                    "Integrations:WeChat:TemplateAppSecret");
+                var templateId = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_WECHAT_TEMPLATE_ID",
+                    "Integrations:WeChat:TemplateId");
+                var miniProgramAppId = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_WECHAT_MINI_PROGRAM_APP_ID",
+                    "Integrations:WeChat:MiniProgramAppId");
+                if (openId.DosIsNullOrWhiteSpace()
+                    || appId.DosIsNullOrWhiteSpace()
+                    || appSecret.DosIsNullOrWhiteSpace()
+                    || templateId.DosIsNullOrWhiteSpace())
+                {
+                    return false;
+                }
+
                 string linkUrl = "";    //点击详情后跳转后的链接地址，为空则不跳转  
                                         //根据appId判断获取    
-                if (!AccessTokenContainer.CheckRegistered("wxb3fb0a1b44902df3\n"))    //检查是否已经注册    
+                if (!AccessTokenContainer.CheckRegistered(appId))    //检查是否已经注册
                 {
-                    AccessTokenContainer.RegisterAsync("wxb3fb0a1b44902df3", "a4e9c22e3474a9ff73c07d6e7003531e");    //如果没有注册则进行注册    
+                    AccessTokenContainer.RegisterAsync(appId, appSecret).GetAwaiter().GetResult();
                 }
-                string accessToken = Senparc.Weixin.MP.CommonAPIs.CommonApi.GetToken("wxb3fb0a1b44902df3", "a4e9c22e3474a9ff73c07d6e7003531e").access_token;  //获取AccessToken值
+                string accessToken = Senparc.Weixin.MP.CommonAPIs.CommonApi.GetToken(appId, appSecret).access_token;
 
                 //传入UserId、模板Key、Dictionary<string,string>
                 var data = new Dictionary<string, string>() {
@@ -66,7 +214,7 @@ namespace Microi.net.Api.Controllers
                 SendTemplateMessageResult sendResult = null;
                 sendResult = TemplateApi.SendTemplateMessage(accessToken, openId, templateId, linkUrl, templateData, new TemplateModel_MiniProgram()
                 {
-                    appid = "wxe82f5569f39caea0",
+                    appid = miniProgramAppId ?? "",
                     pagepath = ""
                 });
 
@@ -80,12 +228,9 @@ namespace Microi.net.Api.Controllers
                     return false;
                 }
             }
-            catch (Exception ex)
+            catch
             {
-
-
                 return false;
-
             }
 
         }
@@ -129,17 +274,33 @@ namespace Microi.net.Api.Controllers
         }
 
         /// <summary>
-        /// 必传authorization、OsClient，可选 ReturnUrl
+        /// 必传 Authorization 请求头（兼容 POST 表单 authorization）、OsClient，可选 ReturnUrl。
+        /// 禁止通过 GET/query 传 Token，避免访问日志、浏览器历史和 Referer 泄露。
         /// </summary>
         /// <param name="authorization"></param>
         /// <param name="OsClient"></param>
         /// <returns></returns>
-        [HttpPost, HttpGet]
+        [HttpPost]
         public async Task<IActionResult> BindSysUser(string authorization, string OsClient, string ReturnUrl)
         {
+            authorization = Request.Headers["Authorization"].ToString();
+            if (authorization.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+            {
+                authorization = (await Request.ReadFormAsync()).TryGetValue("authorization", out var formToken)
+                    ? formToken.ToString()
+                    : "";
+            }
+            if (authorization.DosIsNullOrWhiteSpace())
+            {
+                return Unauthorized();
+            }
             if (ReturnUrl == null)
             {
                 ReturnUrl = "";
+            }
+            if (!IsAllowedOAuthReturnUrl(ReturnUrl))
+            {
+                return Content("返回URL验证失败：仅允许站内路径或已配置的可信HTTPS Origin");
             }
             //解析authorization
             var tokenModelJobj = await DiyToken.GetCurrentToken(authorization, OsClient);
@@ -195,10 +356,20 @@ namespace Microi.net.Api.Controllers
                 return Content("系统设置ApiBase不能为空！");
             }
 
+            var oauthState = await CreateOAuthStateAsync(
+                OsClient,
+                sysUserDynamic["Id"].Val<string>(),
+                sysUserDynamic["WxMpId"].Val<string>(),
+                ReturnUrl);
+            if (oauthState.DosIsNullOrWhiteSpace())
+            {
+                return StatusCode(StatusCodes.Status503ServiceUnavailable);
+            }
+
             var urlBase = OAuthApi.GetAuthorizeUrl(
                                 appId,
-                                $"{apiBase}/WeChat/UserInfoCallback?OsClient={OsClient}&ReturnUrl={ReturnUrl.UrlEncode()}&authorization={authorization}",
-                                null, OAuthScope.snsapi_userinfo);
+                                $"{apiBase}/WeChat/UserInfoCallback?o={Uri.EscapeDataString(OsClient)}",
+                                oauthState, OAuthScope.snsapi_userinfo);
             return Redirect(urlBase);
         }
         /// <summary>
@@ -208,29 +379,46 @@ namespace Microi.net.Api.Controllers
         /// <param name="returnUrl">用户最初尝试进入的页面</param>
         /// <returns></returns>
         [HttpPost, HttpGet]
-        public async Task<ActionResult> UserInfoCallback(string code, string ReturnUrl, string authorization, string OsClient)
+        public async Task<ActionResult> UserInfoCallback(string code, string state, string o)
         {
             if (string.IsNullOrEmpty(code))
             {
                 return Content("您拒绝了授权！");
             }
 
-            //解析authorization
-            var tokenModelJobj = await DiyToken.GetCurrentToken(authorization, OsClient);
-            if (tokenModelJobj == null)
+            var oauthTicket = await ConsumeOAuthStateAsync(o, state);
+            if (oauthTicket == null)
             {
-                return Content("无效的token！");
+                return Content("授权票据无效或已过期！");
             }
-            var sysUserDynamic = tokenModelJobj.CurrentUser;
-            if (sysUserDynamic["WxMpId"] == null || sysUserDynamic["WxMpId"].Val<string>().DosIsNullOrWhiteSpace())
+            var osClient = oauthTicket["OsClient"].Val<string>();
+            var userId = oauthTicket["UserId"].Val<string>();
+            var wxMpId = oauthTicket["WxMpId"].Val<string>();
+            var returnUrl = oauthTicket["ReturnUrl"].Val<string>() ?? "";
+            if (osClient.DosIsNullOrWhiteSpace()
+                || userId.DosIsNullOrWhiteSpace()
+                || wxMpId.DosIsNullOrWhiteSpace())
             {
-                return Content("用户信息未绑定所属公众号，无法获取OpenId！");
+                return Content("授权票据内容无效！");
             }
+
+            var sysUserResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+            {
+                FormEngineKey = "sys_user",
+                Id = userId,
+                OsClient = osClient
+            });
+            if (sysUserResult.Code != 1)
+            {
+                return Content("用户不存在或已被停用！");
+            }
+            var sysUserDynamic = JObject.FromObject(sysUserResult.Data);
+
             var wxmpModelResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
             {
                 FormEngineKey = "wx_mp",
-                Id = sysUserDynamic["WxMpId"].Val<string>(),
-                OsClient = OsClient
+                Id = wxMpId,
+                OsClient = osClient
             });
             if (wxmpModelResult.Code != 1)
             {
@@ -252,8 +440,7 @@ namespace Microi.net.Api.Controllers
             }
             catch (Exception ex)
             {
-
-                return Content(ex.Message);
+                return Content("微信授权服务暂时不可用，请稍后重试！");
             }
             if (result.errcode != ReturnCode.请求成功)
             {
@@ -288,19 +475,19 @@ namespace Microi.net.Api.Controllers
                 var uptSysUserResult = await MicroiEngine.FormEngine.UptFormDataAsync(new
                 {
                     FormEngineKey = "sys_user",
-                    Id = sysUserDynamic["Id"].Val<string>(),
+                    Id = userId,
                     _RowModel = _formData,
                     CurrentUser = sysUserDynamic,
-                    OsClient = OsClient
+                    OsClient = osClient
                 });
 
-                if (!string.IsNullOrEmpty(ReturnUrl))
+                if (!string.IsNullOrEmpty(returnUrl))
                 {
-                    if (!CommonHelper.IsUrlSafe(ReturnUrl))
+                    if (!IsAllowedOAuthReturnUrl(returnUrl))
                     {
-                        return Content("返回URL验证失败：不允许的URL格式");
+                        return Content("返回URL验证失败：仅允许站内路径或已配置的可信HTTPS Origin");
                     }
-                    return Redirect(ReturnUrl);
+                    return Redirect(returnUrl);
                 }
                 if (uptSysUserResult.Code == 1)
                 {

@@ -4,6 +4,97 @@
 
 ![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
+
+## 跨端统一视图
+
+跨端视图属于模块引擎，因为同一张表可能被多个 `sys_menu` 以不同角色、业务场景和卡片样式复用。配置保存在 `sys_menu` 的专用物理字段中，不放在 SaaS 引擎、`diy_table` 或 `DiyConfig`：
+
+| 物理字段 | 说明 |
+| --- | --- |
+| `EnableViewSchema` | `1` 启用跨端视图；未启用时继续使用现有表单和模块配置。 |
+| `ViewSchemaVersion` | 协议语义版本，例如 `1.0`。 |
+| `ViewConfigVersion` | 配置递增版本；每次发布视图时递增，用于客户端缓存失效。 |
+| `ViewSchema` | Detail、Edit、List、Card 的版本化 JSON。 |
+
+`diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均已废弃。旧字段只保留历史读取兼容，新功能必须增加专用物理列，并通过 `diy_field` 元数据提供设计控件。
+
+### 视图结构
+
+```json
+{
+  "Views": [
+    {
+      "Key": "customer-detail",
+      "Scene": "Detail",
+      "Device": "All",
+      "RoleIds": [],
+      "Priority": 10,
+      "Layout": {
+        "Hero": {
+          "TitleField": "KehuMC",
+          "ImageField": "Logo",
+          "StatusField": "KehuHZ",
+          "MetaField": "KehuLX",
+          "Metrics": [
+            { "Label": "设备", "Field": "ShebeiSL", "Suffix": "台" }
+          ]
+        },
+        "Actions": [
+          {
+            "Key": "orders",
+            "Label": "合同订单",
+            "ActionType": "OpenList",
+            "ModuleEngineKey": "orders",
+            "ParamMap": { "KehuID": "$form.Id" }
+          }
+        ],
+        "Blocks": [
+          {
+            "Key": "basic",
+            "Type": "ResponsiveSection",
+            "Title": "客户信息",
+            "Columns": 3,
+            "DefaultExpanded": true,
+            "Fields": ["KehuMC", "KehuLX", "LianxiDH"]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+- `Scene`：`Detail`、`Edit`、`List`、`Card`。
+- `Device`：`PC`、`Mobile`、`All`。
+- `RoleIds`：空数组表示所有已获模块权限的角色；配置角色后优先选择角色专属视图。
+- `Priority`：同场景、同终端命中多个视图时选择优先级更高者。
+- 没有新视图、配置损坏或客户端暂不支持某个区块时，必须回退到现有 `sys_menu + diy_table + diy_field` 渲染，不能白屏。
+
+### 标准视图区块
+
+数据控件继续由 `diy-field-component` 负责，例如 Text、Select、ImgUpload、Map、RichText。以下区块不代表数据库字段，独立存放在 `form-view-blocks`：
+
+| 区块 | 用途 |
+| --- | --- |
+| `EntityHero` | 背景、图片、标题、副标题、状态徽标与关键指标。 |
+| `MetricStrip` | 字段值、关联数量、聚合结果或接口引擎指标。 |
+| `ActionGrid` | 图标化快捷入口和业务动作。 |
+| `ResponsiveSection` | PC 1 至 4 列、移动端单列的详情分组与折叠。 |
+
+详情模式使用只读详情渲染器，不把所有字段伪装成禁用输入框；编辑模式继续复用完整表单控件、校验、数据源和后端表单事件。未被视图区块显式引用的 PC 字段必须进入兜底分组，保证字段完整度不低于原表单。
+
+### 跨端动作
+
+小程序不会下载或执行 `V8Code`。跨端按钮使用声明式动作：
+
+- `ActionType`：`ApiEngine`、`OpenDetail`、`OpenList`、`OpenForm`、`Navigate`、`Dial`、`Scan`、`Map`、`Refresh`、`Back`、`Copy`。
+- `ParamMap`：支持 `$form.Field`、`$user.Field`、`$menu.Field` 白名单绑定。
+- `VisibleWhen`：字段、操作符和值组成的声明式显隐条件，不使用 `eval`。
+- `Confirm`、`SuccessMessage`、`SuccessActions`：确认、成功提示和后续刷新/跳转。
+- 涉及校验、事务、跨表写入和数据权限的逻辑必须放到接口引擎或 `SubmitBeforeServerV8` / `SubmitAfterServerV8`。
+
+PC 可继续兼容历史按钮 V8，但跨端视图只向小程序输出规范化后的安全动作。客户端调用时携带当前授权模块的真实 `_SysMenuId`；接口引擎仍在服务端可信执行链中运行。
+
 ## 打开方式
 ### **Diy**
 >* 以表单引擎渲染，打开是一个表格

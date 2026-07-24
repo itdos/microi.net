@@ -138,6 +138,8 @@
                                                 :TableId="TableId"
                                                 :TableName="TableName"
                                                 :TableRowId="TableRowId"
+                                                :SysMenuId="SysMenuId"
+                                                :DiyTableModel="DiyTableModel"
                                                 :ReadonlyFields="ReadonlyFields"
                                                 :FieldReadonly="GetFieldReadOnly(field)"
                                                 :ApiReplace="ApiReplace"
@@ -145,8 +147,9 @@
                                                 :pageLifetimes="pageLifetimes"
                                                 :ParentV8="GetV8(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
-                                                :DiyFieldList="DiyFieldList"
-                                                :ParentFieldList="DiyFieldListGrouped[tab.Id || tab.Name] || []"
+                                                 :DiyFieldList="DiyFieldList"
+                                                 :TableChildAuth="TableChildAuth"
+                                                 :ParentFieldList="DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                                 :CodeEditorMini="CodeEditorMini"
                                                 @CallbackRunV8Code="RunV8Code"
                                                 @CallbackGoUrl="GoUrl"
@@ -215,6 +218,8 @@
                                                 :TableId="TableId"
                                                 :TableName="TableName"
                                                 :TableRowId="TableRowId"
+                                                :SysMenuId="SysMenuId"
+                                                :DiyTableModel="DiyTableModel"
                                                 :ReadonlyFields="ReadonlyFields"
                                                 :FieldReadonly="GetFieldReadOnly(field)"
                                                 :ApiReplace="ApiReplace"
@@ -222,8 +227,9 @@
                                                 :pageLifetimes="pageLifetimes"
                                                 :ParentV8="GetV8(field)"
                                                 :ParentFormLoadFinish="GetDiyTableRowModelFinish"
-                                                :DiyFieldList="DiyFieldList"
-                                                :ParentFieldList="DiyFieldListGrouped[tab.Id || tab.Name] || []"
+                                                 :DiyFieldList="DiyFieldList"
+                                                 :TableChildAuth="TableChildAuth"
+                                                 :ParentFieldList="DiyFieldListGrouped[tab.Id || tab.Name] || []"
                                                 :CodeEditorMini="CodeEditorMini"
                                                 @CallbackRunV8Code="RunV8Code"
                                                 @CallbackGoUrl="GoUrl"
@@ -341,6 +347,17 @@ export default {
         TableRowId: {
             type: String,
             default: ""
+        },
+        // The menu is an authorization context, not only a navigation hint.
+        // Every client-side read/write must carry it so the server can enforce
+        // role operation permissions and the menu row-scope policy.
+        SysMenuId: {
+            type: String,
+            default: ""
+        },
+        TableChildAuth: {
+            type: Object,
+            default: null
         },
         //表单模式Add、Edit、View
         FormMode: {
@@ -874,6 +891,14 @@ export default {
             V8.TableName = self.TableName;
             V8.TableModel = self.DiyTableModel;
             V8.CurrentTableData = self.CurrentTableData;
+            V8.SysMenuId = self.SysMenuId;
+            self.DiyCommon.BindV8FormEngine(
+                V8,
+                self.SysMenuId,
+                self.TableId,
+                self.TableName || (self.DiyTableModel && self.DiyTableModel.Name),
+                self.TableChildAuth
+            );
 
             return V8;
         },
@@ -942,7 +967,9 @@ export default {
                     Param: {
                         Id: self.TableId,
                         FormEngineKey: "Diy_Table",
-                        _RawMetadata: rawMetadata
+                         _SysMenuId: self.SysMenuId,
+                         _TableChildAuth: self.TableChildAuth,
+                         _RawMetadata: rawMetadata
                     }
                 });
             } else if (self.TableName) {
@@ -951,7 +978,9 @@ export default {
                     Param: {
                         Name: self.TableName,
                         FormEngineKey: "Diy_Table",
-                        _RawMetadata: rawMetadata
+                         _SysMenuId: self.SysMenuId,
+                         _TableChildAuth: self.TableChildAuth,
+                         _RawMetadata: rawMetadata
                     }
                 });
             }
@@ -960,7 +989,9 @@ export default {
             if (self.PageType == "Report") {
                 var getFieldListParam = {
                     FormEngineKey: "diy_field",
-                    _RawMetadata: rawMetadata
+                     _SysMenuId: self.SysMenuId,
+                     _TableChildAuth: self.TableChildAuth,
+                     _RawMetadata: rawMetadata
                 };
                 if (self.TableId) {
                     // getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
@@ -970,7 +1001,7 @@ export default {
                 //     getFieldListParam._Where = [{ Name : 'TableId', Value : self.TableName, Type : '=' }]
                 // }
                 param.push({
-                    Url: "/api/FormEngine/GetTableData-diyfield", //apiGetDiyField,
+                    Url: apiGetDiyField,
                     Param: getFieldListParam
                 });
             } else {
@@ -979,6 +1010,8 @@ export default {
                     Param: {
                         TableId: self.TableId,
                         TableName: self.TableName,
+                         _SysMenuId: self.SysMenuId,
+                         _TableChildAuth: self.TableChildAuth,
                         // OsClient: self.OsClient,
                         _SelectFields: self.SelectFields,
                         _RawMetadata: rawMetadata
@@ -1077,6 +1110,8 @@ export default {
                             // TableName: self.TableName,
                             // TableName: self.DiyTableModel.Name,
                             FormEngineKey: self.DiyTableModel.Name,
+                             _SysMenuId: self.SysMenuId,
+                             _TableChildAuth: self.TableChildAuth,
                             // _TableRowId: self.TableRowId,
                             Id: self.TableRowId
                         };
@@ -1161,7 +1196,7 @@ export default {
                         self.DiyFieldList = resultGetDiyField.Data;
 
                         // 字段数据源新位置
-                        self.DiyCommon.SetFieldsData(self.DiyFieldList, formData);
+                        self.DiyCommon.SetFieldsData(self.DiyFieldList, formData, self.TableChildAuth);
 
                         // 初始化每个字段的属性（从计算属性移到这里，避免副作用）
                         self.DiyFieldList.forEach((field) => {
@@ -1462,18 +1497,16 @@ export default {
                 if (element.Name == fieldName) {
                     if (attrName.indexOf("Config.") > -1) {
                         needRefreshRuntime = true;
-                        var oldConfig = element.Config;
                         var attrArray = attrName.split(".");
-                        if (attrArray.length == 2) {
-                            oldConfig[attrArray[1]] = value;
-                        } else if (attrArray.length == 3) {
-                            oldConfig[attrArray[1]][attrArray[2]] = value;
-                        } else if (attrArray.length == 4) {
-                            oldConfig[attrArray[1]][attrArray[2]][attrArray[3]] = value;
-                        } else if (tempArr.length == 5) {
-                            oldConfig[attrArray[1]][attrArray[2]][attrArray[3]][attrArray[4]] = value;
+                        var target = element;
+                        for (var i = 0; i < attrArray.length - 1; i++) {
+                            var key = attrArray[i];
+                            if (!target[key] || typeof target[key] !== "object") {
+                                target[key] = {};
+                            }
+                            target = target[key];
                         }
-                        element["Config"] = oldConfig;
+                        target[attrArray[attrArray.length - 1]] = value;
                     } else {
                         element[attrName] = value;
                         if(attrName == 'Visible'
@@ -1823,6 +1856,8 @@ export default {
                 // param.TableName = self.TableName
                 // param.TableName = self.DiyTableModel.Name;
                 param.FormEngineKey = self.DiyTableModel.Name;
+                 param._SysMenuId = self.SysMenuId;
+                 param._TableChildAuth = self.TableChildAuth;
 
                 // param.OsClient = self.OsClient
                 // param._FormData = JSON.stringify(self.$refs.fieldForm.FormDiyTableModel);

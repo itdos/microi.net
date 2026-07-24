@@ -103,14 +103,31 @@ namespace Microi.net
                                 JObject formData = null
                             )
         {
-            if(tableName.DosToLower() == "sys_config")
+            var normalizedTableName = tableName.DosToLower();
+            if (normalizedTableName == "sys_menu")
+            {
+                await FormEngineAuthorizationCache.InvalidateMenuAsync(
+                    osClient,
+                    formData?["Id"].Val<string>(),
+                    formData?["ModuleEngineKey"].Val<string>());
+            }
+            else if (normalizedTableName == "sys_rolelimit"
+                     || normalizedTableName == "sys_role"
+                     || normalizedTableName == "sys_user"
+                     || normalizedTableName == "diy_table"
+                     || normalizedTableName == "diy_field")
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(osClient);
+            }
+
+            if(normalizedTableName == "sys_config")
             {
                 var sysConfigCacheKey = $"Microi:{osClient}:SysConfig";
                 await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(sysConfigCacheKey);
                 await MicroiEngine.CacheTenant.Default().RemoveAsync(sysConfigCacheKey);
             }
             //如果【增删改】diy_field表
-            if(tableName.DosToLower() == "diy_field")
+            if(normalizedTableName == "diy_field")
             {
                 //注意方法传入过来的tableId、tableName并不是[diy_field]表的主表diy_table的Id和Name
                 if(formData != null && !formData["TableId"].Val<string>().DosIsNullOrWhiteSpace())
@@ -132,19 +149,32 @@ namespace Microi.net
                 }
             }
             //如果【增删改】diy_table表
-            if(tableName.DosToLower() == "diy_table")
+            if(normalizedTableName == "diy_table")
             {
-                if (!tableId.DosIsNullOrWhiteSpace())
+                var changedTableId = formData?["Id"].Val<string>();
+                var changedTableName = formData?["Name"].Val<string>();
+                if (changedTableId.DosIsNullOrWhiteSpace()
+                    && changedTableName.DosIsNullOrWhiteSpace())
                 {
-                    //清除该表的缓存
-                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", tableId.DosToLower());
-                    MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
+                    // ByWhere/批量配置写入无法枚举旧、新 Id/Name，必须清理该租户
+                    // 的表元数据及字段列表缓存，避免其它节点继续使用旧表配置。
+                    var cache = MicroiEngine.CacheTenant.Cache(osClient);
+                    await cache.RemoveParentAsync(
+                        $"Microi:{osClient}:FormData:diy_table:*");
+                    await cache.RemoveParentAsync(
+                        $"Microi:{osClient}:FormData:diy_table_field_list:*");
                 }
-                if (!tableName.DosIsNullOrWhiteSpace())
+                else if (!changedTableId.DosIsNullOrWhiteSpace())
                 {
                     //清除该表的缓存
-                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", tableName.DosToLower());
-                    MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
+                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", changedTableId.DosToLower());
+                    await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
+                }
+                if (!changedTableName.DosIsNullOrWhiteSpace())
+                {
+                    //清除该表的缓存
+                    var cacheKey = BuildCacheKey(osClient, ":FormData:diy_table:", changedTableName.DosToLower());
+                    await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync(cacheKey);
                 }
             }
             //如果是给某张表【增、删】数据
@@ -748,6 +778,12 @@ namespace Microi.net
             try
             {
                 JObject param = await DefaultParam2(JsonHelper.ToJObject(dynamicParam));
+                var sourceBaseParam = dynamicParam as BaseParam;
+                var sourceWasExternalJson = dynamicParam is JToken;
+                var sourceInvokeType = sourceBaseParam?._InvokeType
+                                       ?? param["_InvokeType"].Val<string>();
+                var sourceCurrentUser = sourceBaseParam?._CurrentUser
+                                        ?? param["_CurrentUser"] as JObject;
                 EnsureDiyFieldVisibilityDefaults(param);
                 var lang = DiyMessage.Lang;
                 if (param["_Lang"] == null || param["_Lang"].Val<string>().DosIsNullOrWhiteSpace())
@@ -880,7 +916,39 @@ namespace Microi.net
                         //这里会触发后端V8事件中的创建实体表，因为自动传入了_InvokeType=Client
                         //修改为不触发后端V8事件
                         param["_InvokeType"] = InvokeType.Server.ToString();
-                        addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, trans);
+                        // AddDiyField is reached both from the PlatformAdminOnly
+                        // designer endpoint and from trusted server upgrade/MCP code.
+                        // Passing the flattened JObject to generic FormEngine CRUD
+                        // discards the verified user/server provenance, so the nested
+                        // diy_field insert is correctly rejected as NoAuth.
+                        //
+                        // Rebuild a typed argument and preserve the context supplied
+                        // by the outer caller. Browser requests were already forced to
+                        // Client by the controller and still require the database-
+                        // verified platform administrator; trusted server calls keep
+                        // their JsonIgnore marker. The marker cannot be forged by JSON.
+                        var nestedFieldAdd = new DiyTableRowParam
+                        {
+                            FormEngineKey = "diy_field",
+                            Id = param["Id"].Val<string>(),
+                            OsClient = osClient,
+                            _CurrentUser = sourceCurrentUser,
+                            // Raw JSON is always an external caller. Controllers
+                            // already force Client, but keep this fail-closed even
+                            // if a future wrapper forgets to do so. CLR arguments
+                            // created by server code preserve their original mode.
+                            _InvokeType = sourceWasExternalJson
+                                ? InvokeType.Client.ToString()
+                                : (sourceInvokeType.DosIsNullOrWhiteSpace()
+                                    ? InvokeType.Server.ToString()
+                                    : sourceInvokeType),
+                            _TrustedServerInvocation =
+                                sourceBaseParam?._TrustedServerInvocation == true,
+                            _RowModel = (JObject)param.DeepClone()
+                        };
+                        addResult = await MicroiEngine.FormEngine.AddFormDataAsync(
+                            nestedFieldAdd,
+                            trans);
                         if (addResult.Code != 1)
                         {
                             if (_trans == null)
@@ -1282,7 +1350,10 @@ namespace Microi.net
             var dosOrmDbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
             // var oldFieldList = dosOrmDbRead.From<DiyField>().Where(d => d.Id.In(newFieldList.Select(o => o.Id).ToList()))
             //                             .ToList();
-            var oldFieldListResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
+            // 必须使用强类型。GetTableDataAsync<dynamic> 返回的属性是运行时 JValue，
+            // 后续 LINQ/扩展方法会进入 dynamic binder，出现
+            // “JValue does not contain a definition for Val”的运行时异常。
+            var oldFieldListResult = await MicroiEngine.FormEngine.GetTableDataAsync<DiyField>("diy_field", new
             {
                 Ids = newFieldList.Select(o => o["Id"].Val<string>()).ToList(),
                 // _Where = new List<DiyWhere>() {
@@ -1331,6 +1402,7 @@ namespace Microi.net
                         //}
                         #endregion
                         //第一次循环修改diy_field 表
+                        var fieldModelsToUpdate = new List<DiyField>();
                         foreach (var newField in newFieldList)
                         {
                             newField["Name"] = DiyCommon.FilterTableFieldName(newField["Name"].Val<string>().DosTrim());
@@ -1341,12 +1413,46 @@ namespace Microi.net
                             }
                             newField["NameConfirm"] = 1;
                             newField["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-                            var uptResult = await MicroiEngine.FormEngine.UptFormDataAsync("diy_field", newField, trans);
-                            if(uptResult.Code != 1)
+
+                            if (!string.Equals(
+                                    oldModel.TableId,
+                                    param.TableId,
+                                    StringComparison.OrdinalIgnoreCase))
                             {
                                 trans.Rollback();
-                                return uptResult;
+                                return new DosResult(0, null, "字段不属于当前表，已拒绝批量保存！");
                             }
+
+                            // UptDiyFieldList 的外层 HTTP 入口已由 PlatformAdminOnly
+                            // 一次性完成授权。这里是设计器元数据批处理，不应让 105 个
+                            // 字段逐条进入通用 FormEngine 管线，否则会重复执行权限快照、
+                            // V8、数据日志、版本记录和缓存失效。
+                            //
+                            // 先用旧行补齐客户端未传字段，再合并显式 null，保持历史的
+                            // “只改传入字段”语义，最后在同一事务中批量更新。
+                            var oldFieldObject = JObject.FromObject(oldModel);
+                            oldFieldObject.Merge(
+                                newField,
+                                new JsonMergeSettings
+                                {
+                                    MergeArrayHandling = MergeArrayHandling.Replace,
+                                    MergeNullValueHandling = MergeNullValueHandling.Merge
+                                });
+                            var fieldModel = oldFieldObject.ToObject<DiyField>();
+                            if (fieldModel == null)
+                            {
+                                trans.Rollback();
+                                return new DosResult(0, null, "字段数据解析失败！");
+                            }
+                            fieldModel.Id = newField["Id"].Val<string>();
+                            fieldModel.TableId = param.TableId;
+                            fieldModel.NameConfirm = 1;
+                            fieldModel.UpdateTime = DateTime.Now;
+                            fieldModelsToUpdate.Add(fieldModel);
+                        }
+                        if (fieldModelsToUpdate.Any())
+                        {
+                            trans.Update(fieldModelsToUpdate);
                         }
                         // 第二次循环修改物理表
                         foreach (var newField in newFieldList)

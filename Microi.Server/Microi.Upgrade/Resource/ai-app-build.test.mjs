@@ -87,7 +87,7 @@ test("application-store package and server upgrade both carry the fixed builder"
   assert.ok(packaged);
   assert.equal(packaged.Version, "v1.2.9");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
-  assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.[4-9]$|^v6\.[6-9]\./);
+  assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.(?:[4-9]|\d{2,})$|^v6\.[6-9]\./);
   assert.match(upgradeSource, /BuildAiAppResourceName\s*=\s*"ai-app-build\.js"/);
   assert.match(upgradeSource, /EnsureAiAppBuilderAsync\(osClient, msgs, resources\)/);
   assert.match(upgradeSource, /TENANT_RUNTIME_CONTEXT_V1/);

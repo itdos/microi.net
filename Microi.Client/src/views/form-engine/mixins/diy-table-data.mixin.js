@@ -117,6 +117,7 @@ export default {
                 _PageIndex: pageIndex || 1,
                 _PageSize: pageSize || self.GetTreeLazyChildPageSize()
             };
+            self.ApplyTableChildAuthContext(param);
             if (!param.ModuleEngineKey) {
                 param.ModuleEngineKey = self.SysMenuId;
             }
@@ -396,15 +397,16 @@ export default {
             var params = [
                 {
                     Url: self.DiyApi.GetSysMenuModel,
-                    Param: {
+                    Param: self.ApplyTableChildAuthContext({
                         Id: self.SysMenuId
-                    }
+                    })
                 },
                 {
                     Url: self.DiyApi.GetDiyTableModel,
-                    Param: {
-                        Id: self.TableId
-                    }
+                    Param: self.ApplyTableChildAuthContext({
+                        Id: self.TableId,
+                        _SysMenuId: self.SysMenuId
+                    })
                 },
                 //这里注释是因为需要先获取到SysMenu中的JoinTables，再去获取 DiyFields
                 // ,{
@@ -416,10 +418,10 @@ export default {
                 //后来还是在后端处理了
                 {
                     Url: self.DiyApi.GetDiyFieldByDiyTables,
-                    Param: {
+                    Param: self.ApplyTableChildAuthContext({
                         TableIds: [self.TableId],
                         SysMenuId: self.SysMenuId
-                    }
+                    })
                 }
             ];
             //同时获SysMenuModel、DiyTableModel、DiyFieldList（包含了SysMenu中配置的JoinTables）
@@ -697,6 +699,7 @@ export default {
                 // _SysMenuId: self.SysMenuId,
                 ModuleEngineKey: self.SysMenuModel.ModuleEngineKey
             };
+            self.ApplyTableChildAuthContext(param);
             self.applyTableOrderParams(param);
             //2023-06-39：子表可关闭分页
             if (!self.TableChildConfig || (self.TableChildConfig && !self.TableChildConfig.DisablePagination)) {

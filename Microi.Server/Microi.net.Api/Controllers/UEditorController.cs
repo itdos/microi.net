@@ -35,11 +35,10 @@ namespace Microi.net.Api.Controllers
         public async Task<ContentResult> UploadAsync(string Path)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-
-            if (Path.DosIsNullOrWhiteSpace())
-            {
-                Path = currentTokenDynamic.OsClient;
-            }
+            // Path is a storage namespace, not a client-selectable display value.
+            // Always bind it to the authenticated tenant to prevent cross-tenant
+            // local/object-storage path selection through this legacy endpoint.
+            Path = currentTokenDynamic.OsClient;
 
             #region 这是以前默认的百度编辑器上传
             var response = _ueditorService.UploadAndGetResponse(HttpContext, Path);

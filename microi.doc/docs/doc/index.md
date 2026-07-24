@@ -95,7 +95,7 @@
 <tr><td>🔗 <strong><a href="/doc/v8-engine/api-engine">接口引擎</a></strong></td><td>在线使用 JavaScript 编写后端接口，支持 AI 在线编程 + VS Code 本地 AI 编程，保存即生效无需编译发布，支持 Get/Post，支持返回 JSON、文件、HTML 等</td></tr>
 <tr><td>🤖 <strong><a href="/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件">AI 本地编程</a></strong></td><td><strong>业界首创。</strong> VS Code 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，GitHub Copilot / Claude Code / Cursor 零配置开箱即用，写代码 → 远程执行 → 逐行断点调试全在 VS Code 内闭环</td></tr>
 <tr><td>🤖 <strong><a href="/doc/v8-engine/ai-apiengine">AI 在线编程</a></strong></td><td>平台内置 DeepSeek 等 AI 模型，上传 V8 文档 + 数据库结构即可生成高质量接口代码，支持自然语言转 SQL、代码智能检查与优化</td></tr>
-<tr><td>📊 <strong>AI 数据分析</strong></td><td>自然语言提问，AI 自动分析业务数据并生成可视化图表，支持接入 DeepSeek、OpenAI 等大模型，自动差量同步向量数据库，AI 训练、微调、提示词管理一站式管理</td></tr>
+<tr><td>📊 <strong>AI 数据分析</strong></td><td>自然语言提问，AI 自动分析业务数据并生成可视化图表；默认使用大模型关键词扩展、权限感知 Schema 搜索与准确字段回读，不依赖 Ollama/Qdrant，向量数据库仅作为可选语义召回增强；AI 训练、微调、提示词管理一站式管理</td></tr>
 <tr><td>📝 <strong><a href="/doc/form-engine/form-engine-info">表单引擎</a></strong></td><td>支持扩展组件、自定义 Vue 组件嵌入表单、V8 引擎事件，灵活实现复杂业务逻辑</td></tr>
 <tr><td>📦 <strong><a href="/doc/system-engine/module-engine">模块引擎</a></strong></td><td>多表关联、查询列、统计列、动态 V8 按钮、复杂 Where 条件、多种嵌入模式</td></tr>
 <tr><td>🔄 <strong><a href="/doc/system-engine/wf-engine">工作流引擎 v4</a></strong></td><td>完全自主研发，由表单引擎 + 接口引擎驱动</td></tr>
@@ -113,7 +113,7 @@
 <tbody>
 <tr><td><strong>本地 AI 编程</strong> ⭐</td><td>VS Code + Copilot / Claude Code / Cursor</td><td><strong>推荐模式，业界首创。</strong> 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，AI 精准了解你的 V8 API 和 数据库表，写代码 → 保存自动部署 → 远程执行 → 逐行断点调试，全在 VS Code 内闭环完成</td></tr>
 <tr><td><strong>在线 AI 编程</strong></td><td>平台内置 DeepSeek / ChatGPT / Kimi 等</td><td>上传 V8 文档 + 数据库结构（db.json），AI 直接生成接口引擎代码，支持代码补全、智能检查与优化</td></tr>
-<tr><td><strong>AI 数据分析</strong></td><td>DeepSeek / OpenAI + 向量数据库</td><td>自然语言提问即可分析业务数据，自动生成可视化图表；自动差量同步向量数据库，支持 AI 训练、微调、提示词管理</td></tr>
+<tr><td><strong>AI 数据分析</strong></td><td>DeepSeek / OpenAI + 内置 Schema 搜索</td><td>自然语言提问即可分析业务数据，自动生成可视化图表；默认使用大模型关键词扩展、权限感知 Schema 搜索与准确字段回读，按需启用向量融合，支持 AI 训练、微调、提示词管理</td></tr>
 <tr><td><strong>V8 代码调用 AI</strong></td><td>接口引擎 + DeepSeek 接口</td><td>在接口引擎中直接调 AI，实现智能问答、自然语言转 SQL、内容审核等</td></tr>
 </tbody>
 </table>
@@ -131,6 +131,7 @@
 <tr><td>☁️ <strong>分布式部署</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
 <tr><td>💾 <strong>分布式缓存</strong></td><td>Redis 哨兵模式</td></tr>
 <tr><td>📂 <strong><a href="/doc/more/hdfs">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
+<tr><td>🔐 <strong><a href="/doc/more/security">平台安全与兼容基线</a></strong></td><td>FormEngine 混合授权、保护表、TableChild、上传与私有文件、CORS/SSRF、RSA、Token 和多节点缓存</td></tr>
 <tr><td>📨 <strong><a href="/doc/system-engine/mq">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
 <tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
 <tr><td>🔍 <strong><a href="/doc/system-engine/search-engine">搜索引擎</a></strong></td><td>ElasticSearch 分词搜索</td></tr>
@@ -201,6 +202,7 @@ Microi.net/
 ├── Microi.Server/          # 🔧 后端 99% 源码（.NET10）
 │   ├── Microi.net.Api/     #     Web API 层（ASP.NET Core 控制器）
 │   ├── Microi.Core/        #     核心基础设施库（接口定义/模型/抽象）
+│   ├── Microi.AI/          #     AI 领域实现（模型路由、Schema/NL2SQL、代理、计量、工作流）
 │   ├── Microi.V8Engine/    #     V8 引擎独立模块
 │   ├── Microi.Cache/       #     缓存模块（Redis + 内存）
 │   ├── Microi.ORM/         #     ORM 模块（多数据库适配）

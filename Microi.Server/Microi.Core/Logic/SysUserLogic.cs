@@ -1167,6 +1167,9 @@ namespace Microi.net
         /// </summary>
         /// <param name="param"></param>
         /// <returns></returns>
+        // 兼容历史部署：该密钥仅用于登录请求中的密码传输混淆，不替代 HTTPS。
+        // 新部署可以通过环境变量或配置文件覆盖，但未配置时必须继续兼容所有
+        // 已发布的旧前端，否则后端升级后旧前端/浏览器缓存会全部无法登录。
         private const string DefaultLoginRsaPrivateKey = @"-----BEGIN RSA PRIVATE KEY-----
 MIICXAIBAAKBgQC7q21EG3HiSFNO9XFUJoMeyz2RXaFX8UgCFE4d4pvK6IvQsWun
 m+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ1rS/MVn4i6CsPgP9Q7nFV6dZ
@@ -1890,6 +1893,10 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
+            var oldRoleIds = model.RoleIds;
+            var oldLevel = model.Level;
+            var oldState = model.State;
+            var oldIsDeleted = model.IsDeleted;
             //如果修改了帐号
             param.Account = param.Account.DosTrim();
             if (model.Account != param.Account.DosTrim() && !param.Account.DosIsNullOrWhiteSpace())
@@ -2232,6 +2239,34 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                 trans.Commit();
                 //SysUserCache.DelSysUserModel(model, param.OsClient);
 
+                if (count > 0)
+                {
+                    var roleOrLevelChanged =
+                        !string.Equals(oldRoleIds, model.RoleIds, StringComparison.Ordinal)
+                        || oldLevel != model.Level;
+                    var accountStateChanged = oldState != model.State
+                                              || oldIsDeleted != model.IsDeleted;
+
+                    if (roleOrLevelChanged || accountStateChanged)
+                    {
+                        await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
+                    }
+
+                    if (model.State != 1 || model.IsDeleted == 1)
+                    {
+                        await OnlineTerminalService.RevokeUserSessionsAsync(
+                            param.OsClient,
+                            model.Id,
+                            model.IsDeleted == 1
+                                ? "账号已被删除，请重新联系管理员。"
+                                : "账号已被停用，请重新联系管理员。");
+                    }
+                    else if (roleOrLevelChanged || accountStateChanged)
+                    {
+                        await RefreshLoginUser(model.Id, param.OsClient);
+                    }
+                }
+
                 return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
         }
@@ -2289,6 +2324,14 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //var count = SysUserRepository.Update(model);
             var count = dbSession.Update(model);
             //SysUserCache.DelSysUserModel(model, param.OsClient);
+            if (count > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
+                await OnlineTerminalService.RevokeUserSessionsAsync(
+                    param.OsClient,
+                    model.Id,
+                    "账号已被删除，请重新联系管理员。");
+            }
             return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
         //public async Task<DosResult> RDelSysUser(SysUserParam param)

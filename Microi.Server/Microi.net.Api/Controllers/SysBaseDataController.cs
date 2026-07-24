@@ -28,6 +28,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost, HttpGet]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddSysBaseData(SysBaseDataParam param)
         {
             await DefaultParam(param);
@@ -40,6 +41,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost, HttpGet]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DelSysBaseData(SysBaseDataParam param)
         {
             await DefaultParam(param);
@@ -52,6 +54,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost, HttpGet]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptSysBaseData(SysBaseDataParam param)
         {
             await DefaultParam(param);

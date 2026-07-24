@@ -268,7 +268,10 @@ namespace Microi.net
                 OsClient = param.OsClient,
                 _Lang = param._Lang,
                 _CurrentUser = param._CurrentUser,
-                _InvokeType = "Client",
+                // Menu discovery already applies sys_rolelimit filtering above. Mark this
+                // internal materialization as Server so the generic FormEngine client
+                // boundary can keep raw sys_menu access admin-only.
+                _InvokeType = "Server",
             });
             var allData = allResult.Data as List<dynamic> ?? new List<dynamic>();
 
@@ -567,6 +570,13 @@ namespace Microi.net
                 return new DosResult(modelResult.Code, null, modelResult.Msg);
             }
             var model = modelResult.Data;
+            var oldMenuCache = await MicroiEngine.FormEngine.GetSysMenu(
+                param.Id,
+                param.OsClient,
+                param._Lang);
+            var oldModuleEngineKey = oldMenuCache?.Code == 1 && oldMenuCache.Data != null
+                ? JObject.FromObject(oldMenuCache.Data)["ModuleEngineKey"].Val<string>()
+                : null;
 
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
@@ -583,6 +593,14 @@ namespace Microi.net
                 //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
             }
             //SysMenuCache.DelSysMenuModel(model, param.OsClient);
+            if (count > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateMenuAsync(
+                    param.OsClient,
+                    model.Id,
+                    oldModuleEngineKey,
+                    param.ModuleEngineKey);
+            }
             return new DosResult(1, model);
         }
         /// <summary>
@@ -635,6 +653,13 @@ namespace Microi.net
                     {
                         //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
                     }
+                    if (count > 0)
+                    {
+                        await FormEngineAuthorizationCache.InvalidateMenuAsync(
+                            param.OsClient,
+                            model.Id,
+                            param.ModuleEngineKey);
+                    }
                     return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
                 }
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
@@ -676,9 +701,20 @@ namespace Microi.net
             if (param.Ids != null)
             {
                 var list = dbSession.From<SysMenu>().Where(d => d.Id.In(param.Ids)).ToList();
+                var menuCacheKeys = new List<string>();
                 foreach (var baseData in list)
                 {
                     //SysMenuCache.DelSysMenuModel(baseData, param.OsClient);
+                    menuCacheKeys.Add(baseData.Id);
+                    var cachedMenu = await MicroiEngine.FormEngine.GetSysMenu(
+                        baseData.Id,
+                        param.OsClient,
+                        param._Lang);
+                    if (cachedMenu?.Code == 1 && cachedMenu.Data != null)
+                    {
+                        menuCacheKeys.Add(
+                            JObject.FromObject(cachedMenu.Data)["ModuleEngineKey"].Val<string>());
+                    }
                 }
                 if (list.Any())
                 {
@@ -690,6 +726,12 @@ namespace Microi.net
                 }
                 //var count = SysMenuRepository.Update(list);
                 var count = dbSession.Update(list);
+                if (count > 0)
+                {
+                    await FormEngineAuthorizationCache.InvalidateMenuAsync(
+                        param.OsClient,
+                        menuCacheKeys.ToArray());
+                }
                 return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
             else
@@ -700,6 +742,13 @@ namespace Microi.net
                     return new DosResult(0, null, modelResult.Msg);
                 }
                 var model = modelResult.Data;
+                var cachedMenu = await MicroiEngine.FormEngine.GetSysMenu(
+                    model.Id,
+                    param.OsClient,
+                    param._Lang);
+                var moduleEngineKey = cachedMenu?.Code == 1 && cachedMenu.Data != null
+                    ? JObject.FromObject(cachedMenu.Data)["ModuleEngineKey"].Val<string>()
+                    : null;
                 if (dbSession.From<SysMenu>().Where(d => d.ParentId == model.Id && d.IsDeleted != 1).First() != null)
                 {
                     return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ExistChildData", param._Lang));
@@ -715,6 +764,13 @@ namespace Microi.net
                     //SysMenuCache.DelSysMenuList(model.ParentId, param.OsClient);
                 }
                 //SysMenuCache.DelSysMenuModel(model, param.OsClient);
+                if (count > 0)
+                {
+                    await FormEngineAuthorizationCache.InvalidateMenuAsync(
+                        param.OsClient,
+                        model.Id,
+                        moduleEngineKey);
+                }
                 return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
             }
         }

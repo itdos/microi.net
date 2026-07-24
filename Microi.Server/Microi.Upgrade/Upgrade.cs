@@ -18,6 +18,7 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResultList<MicroiUpgradeResult>> Upgrade(string CurrentVersion, OsClientSecret osClientSecret)
         {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
             if (!CurrentVersion.DosIsNullOrWhiteSpace()
                 && (!System.Version.TryParse(CurrentVersion, out var parsedCurrentVersion)
                     || parsedCurrentVersion.Revision < 0))
@@ -39,6 +40,9 @@ namespace Microi.net
                 EnsureMicroServiceColumns(osClientSecret);
                 EnsureSecurityLevels(osClientSecret);
                 EnsureMobileVisibilityColumns(osClientSecret);
+                EnsureModuleViewSchemaColumns(osClientSecret);
+                EnsureApiEngineRuntimeColumns(osClientSecret);
+                EnsureLegacyFieldMetadataColumns(osClientSecret);
                 menuAppDisplaySnapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
             }
             catch (Exception ex)
@@ -58,7 +62,7 @@ namespace Microi.net
                     EnsureMobileVisibilityColumns(osClientSecret);
                     Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级AppDisplay、AppVisible】成功！");
                     needUptServerVersion = true;
-                    uptVersion = UpgradeAppDisplay.Version;
+                    AdvanceSuccessfulVersion(ref uptVersion, UpgradeAppDisplay.Version);
                 }
                 catch (Exception ex)
                 {
@@ -94,7 +98,7 @@ namespace Microi.net
                         var count = osClientSecret.Db.FromSql(UpgradeSysConfig.Sql).ExecuteNonQuery();
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级sys_config】成功！");
                         needUptServerVersion = true;
-                        uptVersion = UpgradeSysConfig.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, UpgradeSysConfig.Version);
                     }
                 }
                 catch (Exception ex)
@@ -114,7 +118,7 @@ namespace Microi.net
                     var count = osClientSecret.Db.FromSql(UpgradeLang.Sql).ExecuteNonQuery();
                     Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级多语言】成功！");
                     needUptServerVersion = true;
-                    uptVersion = UpgradeLang.Version;
+                    AdvanceSuccessfulVersion(ref uptVersion, UpgradeLang.Version);
                 }
                 catch (Exception ex)
                 {
@@ -145,7 +149,7 @@ namespace Microi.net
                         var count = osClientSecret.Db.FromSql(UpgradeApiEngine.Sql).ExecuteNonQuery();
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级ApiEngine】成功！");
                         needUptServerVersion = true;
-                        uptVersion = UpgradeApiEngine.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, UpgradeApiEngine.Version);
                     }
                 }
                 catch (Exception ex)
@@ -176,7 +180,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级7 - 2025-08-16】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade7.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade7.Version);
                     }
 
                 }
@@ -208,7 +212,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级8 - 2025-12-19】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade8.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade8.Version);
                     }
                 }
                 catch (Exception ex)
@@ -239,7 +243,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级9 - 2026-01-09】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade9.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade9.Version);
                     }
                 }
                 catch (Exception ex)
@@ -270,7 +274,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级10 - 2026-01-10】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade10.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade10.Version);
                     }
                 }
                 catch (Exception ex)
@@ -301,7 +305,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级11 - 2026-01-13】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade11.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade11.Version);
                     }
                 }
                 catch (Exception ex)
@@ -332,7 +336,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级12 - 2026-01-25】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade12.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade12.Version);
                     }
                 }
                 catch (Exception ex)
@@ -366,7 +370,7 @@ namespace Microi.net
                         if (needAppStoreVersionUpgrade)
                         {
                             needUptServerVersion = true;
-                            uptVersion = UpgradeAppStore.Version;
+                            AdvanceSuccessfulVersion(ref uptVersion, UpgradeAppStore.Version);
                         }
                     }
                 }
@@ -398,7 +402,7 @@ namespace Microi.net
                     {
                         Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级14 - 2026-07-12】成功！");
                         needUptServerVersion = true;
-                        uptVersion = Upgrade14.Version;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade14.Version);
                     }
                 }
                 catch (Exception ex)
@@ -410,9 +414,134 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级15 --2026-07-23【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade15.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade15().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级15 - 2026-07-23】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级15 - 2026-07-23】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade15.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级15失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级15 - 2026-07-23】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级16 --2026-07-23【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade16.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade16().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级16 - 2026-07-23】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级16 - 2026-07-23】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade16.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级16失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级16 - 2026-07-23】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级17 --2026-07-24【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade17.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade17().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级17 - 2026-07-24】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级17 - 2026-07-24】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade17.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级17失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级17 - 2026-07-24】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级18 --2026-07-24【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade18.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade18().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级18 - 2026-07-24】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级18 - 2026-07-24】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade18.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级18失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级18 - 2026-07-24】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保护客户已有菜单的移动端显隐配置【必须】
             try
             {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
                 await RestoreMenuAppDisplaySnapshotAsync(osClientSecret, menuAppDisplaySnapshot);
             }
             catch (Exception ex)
@@ -428,11 +557,7 @@ namespace Microi.net
             {
                 if (needUptServerVersion && !migrationFailed)
                 {
-                    var count = osClientSecret.Db.FromSql("update sys_config set ServerVersion=@p0")
-                        .AddInParameter("p0", uptVersion)
-                        .ExecuteNonQuery();
-                    await MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient).RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_config");
-                    await MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient).RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_config:sys_config");
+                    var count = await PersistServerVersionForwardOnlyAsync(osClientSecret, uptVersion);
                     Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【更新系统版本号ServerVersion】成功，共更新 {count} 行！");
                     Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】完成！");
                 }
@@ -487,6 +612,103 @@ namespace Microi.net
                     SET {quoteOpen}AppDisplay{quoteClose}={sourceExpression}
                     WHERE {quoteOpen}AppDisplay{quoteClose} IS NULL").ExecuteNonQuery();
             }
+        }
+
+        private void EnsureModuleViewSchemaColumns(OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
+            if (!TableExists(osClientSecret, "sys_menu"))
+            {
+                return;
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+            var jsonType = dbType == "SqlServer" ? "nvarchar(max)" : "mediumtext";
+
+            EnsureColumn(osClientSecret, "sys_menu", "EnableViewSchema", "int");
+            EnsureColumn(osClientSecret, "sys_menu", "ViewSchemaVersion", "varchar(25)");
+            EnsureColumn(osClientSecret, "sys_menu", "ViewConfigVersion", "int");
+            EnsureColumn(osClientSecret, "sys_menu", "ViewSchema", jsonType);
+
+            osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
+                    SET {quoteOpen}EnableViewSchema{quoteClose}=0
+                    WHERE {quoteOpen}EnableViewSchema{quoteClose} IS NULL")
+                .ExecuteNonQuery();
+            osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
+                    SET {quoteOpen}ViewSchemaVersion{quoteClose}='1.0'
+                    WHERE {quoteOpen}ViewSchemaVersion{quoteClose} IS NULL
+                       OR {quoteOpen}ViewSchemaVersion{quoteClose}=''")
+                .ExecuteNonQuery();
+            osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
+                    SET {quoteOpen}ViewConfigVersion{quoteClose}=1
+                    WHERE {quoteOpen}ViewConfigVersion{quoteClose} IS NULL
+                       OR {quoteOpen}ViewConfigVersion{quoteClose}<1")
+                .ExecuteNonQuery();
+        }
+
+        private void EnsureApiEngineRuntimeColumns(OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
+            if (!TableExists(osClientSecret, "sys_apiengine"))
+            {
+                return;
+            }
+
+            // 升级13会先读取并调整这些运行限额，再安装应用商城包。很老的数据库
+            // 可能已有对应 diy_field 元数据但物理列尚未创建，FormEngine 会因此在
+            // 应用商城菜单落库前直接报 Unknown column。
+            var columns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["StopHttp"] = "int",
+                ["Timeout"] = "int",
+                ["MaxStatements"] = "int",
+                ["LimitMemory"] = "int",
+                ["LimitRecursion"] = "int",
+                ["Lock"] = "int"
+            };
+
+            foreach (var column in columns)
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                EnsureColumn(osClientSecret, "sys_apiengine", column.Key, column.Value);
+            }
+        }
+
+        private void EnsureLegacyFieldMetadataColumns(OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
+            if (!TableExists(osClientSecret, "diy_field"))
+            {
+                return;
+            }
+
+            EnsureColumn(osClientSecret, "diy_field", "TableName", "varchar(50)");
+            if (!TableExists(osClientSecret, "diy_table")
+                || !ColumnExists(osClientSecret, "diy_field", "TableId")
+                || !ColumnExists(osClientSecret, "diy_table", "Id")
+                || !ColumnExists(osClientSecret, "diy_table", "Name"))
+            {
+                return;
+            }
+
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var sql = dbType == "SqlServer"
+                ? @"UPDATE df
+                    SET df.[TableName]=dt.[Name]
+                    FROM [diy_field] df
+                    INNER JOIN [diy_table] dt ON dt.[Id]=df.[TableId]
+                    WHERE df.[TableName] IS NULL OR df.[TableName]=''"
+                : @"UPDATE `diy_field` df
+                    INNER JOIN `diy_table` dt ON dt.`Id`=df.`TableId`
+                    SET df.`TableName`=dt.`Name`
+                    WHERE df.`TableName` IS NULL OR df.`TableName`=''";
+            osClientSecret.Db.FromSql(sql).ExecuteNonQuery();
         }
 
         private Dictionary<string, int> CaptureMenuAppDisplaySnapshot(OsClientSecret osClientSecret)
@@ -770,6 +992,109 @@ namespace Microi.net
             return true;
         }
 
+        private static void AdvanceSuccessfulVersion(ref string currentVersion, string candidateVersion)
+        {
+            var candidate = ParseFourPartVersion(candidateVersion, "升级版本号");
+            if (currentVersion.DosIsNullOrWhiteSpace()
+                || candidate.CompareTo(ParseFourPartVersion(currentVersion, "已完成升级版本号")) > 0)
+            {
+                currentVersion = candidateVersion;
+            }
+        }
+
+        private async Task<int> PersistServerVersionForwardOnlyAsync(
+            OsClientSecret osClientSecret,
+            string targetVersionText)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null)
+            {
+                throw new InvalidOperationException("租户数据库连接不存在。");
+            }
+
+            var targetVersion = ParseFourPartVersion(targetVersionText, "目标ServerVersion");
+            var rows = osClientSecret.Db
+                .FromSql("SELECT Id, ServerVersion FROM sys_config WHERE IsEnable = @p0")
+                .AddInParameter("p0", 1)
+                .ToList<ServerVersionRow>();
+            if (rows.Count == 0)
+            {
+                throw new InvalidOperationException("未找到启用的 sys_config 配置。");
+            }
+
+            var updatedCount = 0;
+            foreach (var row in rows)
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                if (row == null || row.Id.DosIsNullOrWhiteSpace())
+                {
+                    throw new InvalidOperationException("启用的 sys_config 配置缺少 Id。");
+                }
+
+                var actualText = row.ServerVersion ?? "";
+                if (!actualText.DosIsNullOrWhiteSpace()
+                    && ParseFourPartVersion(actualText, "数据库当前ServerVersion")
+                        .CompareTo(targetVersion) >= 0)
+                {
+                    continue;
+                }
+
+                var affected = osClientSecret.Db
+                    .FromSql(@"UPDATE sys_config
+                        SET ServerVersion = @p0
+                        WHERE Id = @p1
+                          AND (ServerVersion = @p2
+                               OR (ServerVersion IS NULL AND @p2 = ''))")
+                    .AddInParameter("p0", targetVersionText)
+                    .AddInParameter("p1", row.Id)
+                    .AddInParameter("p2", actualText)
+                    .ExecuteNonQuery();
+                if (affected > 0)
+                {
+                    updatedCount += affected;
+                    continue;
+                }
+
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                var reread = osClientSecret.Db
+                    .FromSql("SELECT Id, ServerVersion FROM sys_config WHERE Id = @p0")
+                    .AddInParameter("p0", row.Id)
+                    .First<ServerVersionRow>();
+                if (reread != null
+                    && !reread.ServerVersion.DosIsNullOrWhiteSpace()
+                    && ParseFourPartVersion(reread.ServerVersion, "并发写入后的ServerVersion")
+                        .CompareTo(targetVersion) >= 0)
+                {
+                    continue;
+                }
+
+                throw new InvalidOperationException(
+                    $"sys_config[{row.Id}] ServerVersion发生并发变化，且未达到目标版本 {targetVersionText}。");
+            }
+
+            await MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient)
+                .RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_config");
+            await MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient)
+                .RemoveAsync($"Microi:{osClientSecret.OsClient}:FormData:sys_config:sys_config");
+            return updatedCount;
+        }
+
+        private static System.Version ParseFourPartVersion(string versionText, string fieldName)
+        {
+            if (!System.Version.TryParse(versionText, out var version)
+                || version.Revision < 0)
+            {
+                throw new FormatException($"{fieldName}格式错误，应为四段数字版本号：{versionText}");
+            }
+            return version;
+        }
+
+        public sealed class ServerVersionRow
+        {
+            public string Id { get; set; }
+            public string ServerVersion { get; set; }
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -778,6 +1103,7 @@ namespace Microi.net
         /// <returns></returns>
         public bool NeedUpgrade(string CurrentVersion, string UpgrageVersion)
         {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
             if (CurrentVersion.DosIsNullOrWhiteSpace())
             {
                 return true;

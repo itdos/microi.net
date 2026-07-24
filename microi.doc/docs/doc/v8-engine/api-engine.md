@@ -60,29 +60,29 @@ return result;
 var id = V8.Param.Id;
 ```
 
-## 异步执行代码
->* 新开一个线程异步执行V8代码。System更多用法见：[V8函数列表-后端-System](https://microi.net/doc/v8-engine/v8-server.html#system)
-```js
-//方法1（推荐）
-var timer1 = setTimeout(function() {
-    V8.FormEngine.UptFormData('diy_test1', {
-      Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
-      Text45 : '2222',
-    });
-}, 1000);
-//可在timer1开始执行前随时手动提前终止定时执行
-clearTimeout(timer1);
+## 异步与后台任务
 
-//方法2
-System.Threading.Tasks.Task.Run(function(){
-  //实现setTimeout(function, 1000)的效果，不加则是setTimeout(function, 0)的异步效果
-  System.Threading.Thread.Sleep(1000);
-  V8.FormEngine.UptFormData('diy_test1', {
-    Id : '8007f94b-4883-4a0c-8c23-f25aca910722'
-    Text45 : '2222',
-  });
+接口引擎支持真正的请求内异步调用；需要等待结果时使用 `await`，并在本次请求结束前完成：
+
+```js
+var result = await V8.Http.PostAsync({
+  Url: 'https://api.example.com/orders',
+  ParamType: 'json',
+  PostParam: { OrderId: V8.Param.OrderId }
 });
+return result;
 ```
+
+不要使用后端 `setTimeout`、`System.Threading.Tasks.Task.Run` 或自行创建线程，把数据库写入、通知、同步等业务延伸到接口已经返回之后。这些进程内任务在多节点调度、滚动发布、进程崩溃或服务器重启时可能丢失，也无法提供可靠的幂等、重试与可观测性。
+
+需要“稍后执行”或长耗时处理时，应根据业务选择：
+
+- 菜单后台任务：按钮配置 `RunBackground/BackgroundTask/IsBackgroundTask=true`，并绑定 `ApiEngineKey`。
+- `Microi.Job`：适合定时扫描、补偿和周期任务；多节点下必须使用带租约的分布式锁，并同时保证业务幂等。
+- MQ/outbox：适合可靠异步消息、重试和跨服务处理；事件使用稳定的全局 `EventId`，消费端幂等。
+- 前端 `setTimeout`：仅用于当前页面生命周期内的短时 UI 延迟或防抖，不承担可靠业务；页面关闭、卸载或租户切换时必须清理。
+
+详见：[V8 函数列表（后端）](https://microi.net/doc/v8-engine/v8-server.html) 与 [接口引擎配置 Skill](https://gitee.com/ITdos/microi.net/tree/master/microi.skills/v8-api-config)。
 
 ## 扩展接口引擎
 >* 详见[`Microi.V8Engine`](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.V8Engine)类库，在[`V8EngineExtend`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8EngineExtend.cs)类中扩展

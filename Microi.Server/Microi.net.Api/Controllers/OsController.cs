@@ -52,6 +52,10 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public ActionResult CreateQRCode(string qrCodeContent)
         {
+            if ((qrCodeContent ?? "").Length > 2048)
+            {
+                return BadRequest("二维码内容不能超过 2048 个字符。");
+            }
             if (qrCodeContent.DosIsNullOrWhiteSpace())
             {
                 qrCodeContent = "测试内容";
@@ -77,6 +81,10 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public ActionResult CreateQRCodeImage(string qrCodeContent)
         {
+            if ((qrCodeContent ?? "").Length > 2048)
+            {
+                return BadRequest("二维码内容不能超过 2048 个字符。");
+            }
             if (qrCodeContent.DosIsNullOrWhiteSpace())
             {
                 qrCodeContent = "测试内容";
@@ -356,7 +364,7 @@ namespace Microi.net.Api
         /// <param name="OsClient"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
+        [PlatformAdminOnly]
         public string GetHID()
         {
             var hid = DiyLicense.GetHardwareID();
@@ -435,7 +443,7 @@ namespace Microi.net.Api
         /// <param name="OsClient"></param>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
+        [PlatformAdminOnly]
         public JsonResult MicroiNetInitCheck(string OsClient)
         {
             return Json(new DosResult(1, DiyStartup.MicroiNetInitCheck()));

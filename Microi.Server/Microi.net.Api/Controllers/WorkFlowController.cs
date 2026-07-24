@@ -1,6 +1,7 @@
 ﻿using Dos.Common;
 using Dos.ORM;
 using Microi.net;
+using Microi.net.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
@@ -29,9 +30,11 @@ namespace Microi.net.Api.Controllers
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             param._CurrentUser = currentTokenDynamic?.CurrentUser;
             param.OsClient = currentTokenDynamic?.OsClient;
+            param._InvokeType = InvokeType.Client.ToString();
         }
 
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> SaveWFFlowDesign(WFParam param)
         {
             await DefaultParam(param);
@@ -238,6 +241,7 @@ namespace Microi.net.Api.Controllers
             formPayload["_CurrentUser"] = JTokenEx.FromObject(currentUser);
             formPayload["OsClient"] = osClient;
             formPayload["_InvokeType"] = "Client";
+            formPayload["_IsAnonymous"] = false;
             var mergedSubmitAction = isStart ? "StartWorkWithForm" : "SendWorkWithForm";
             formPayload["_MergedSubmitAction"] = mergedSubmitAction;
             if (formPayload["_FormData"] is JObject formDataPayload)
@@ -259,6 +263,7 @@ namespace Microi.net.Api.Controllers
             }
             wfParam._CurrentUser = currentUser;
             wfParam.OsClient = osClient;
+            wfParam._InvokeType = InvokeType.Client.ToString();
             wfParam.LineValue = ""; // 与 StartWork/SendWork 保持一致
             MarkStage("deserialize-wf");
 

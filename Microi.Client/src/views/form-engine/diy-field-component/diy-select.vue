@@ -1062,6 +1062,7 @@ export default {
                 var apiGetDiyFieldSqlData = self.DiyApi.GetDiyFieldSqlData;
                 var postData = {
                     _FieldId: field.Id,
+                    _TableChildAuth: field._TableChildAuth || null,
                     _FormData: this.FormDiyTableModel,
                     _Keyword: query
                 };

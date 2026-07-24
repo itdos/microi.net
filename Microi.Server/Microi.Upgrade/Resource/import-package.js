@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.6.3
+ * Version: v1.6.8
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -599,6 +599,12 @@ try {
         if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) {
             throw new Error('不支持的应用类型：' + appType);
         }
+        var microServiceConfig = bundle.MicroService || {};
+        var runtimeStorageMode = String(appType == 'MicroService'
+            ? firstTextParam([microServiceConfig.StorageMode, 'file'])
+            : 'file').replace(/^\s+|\s+$/g, '');
+        var inlineRuntimeBuild = /^(db|database)$/i.test(runtimeStorageMode);
+        if (inlineRuntimeBuild) runtimeStorageMode = 'db';
         var appKey = firstTextParam([app.AppKey, app.MsKey, V8.Param.AppId, Package.PackageInfo.AppId]);
         if (!appKey) throw new Error('ApplicationBundle.Application.AppKey 不能为空');
         var appId = firstTextParam([app.Id, bundle.AppId, V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid()]);
@@ -670,6 +676,33 @@ try {
             ? embeddedBuildAssets
             : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []);
         var uploadedBuild = [];
+        var runtimeDbAssets = [];
+        var moveBuildToStablePath = function (buildUpload, stableBuildPath) {
+            if (!V8.Method.MoveObject || !buildUpload.HdfsPath || !stableBuildPath) return false;
+            if (normalizeApplicationPath(buildUpload.HdfsPath).toLowerCase() == stableBuildPath.toLowerCase()) {
+                buildUpload.HdfsPath = stableBuildPath;
+                buildUpload.FilePathName = stableBuildPath;
+                buildUpload.PublishHdfsPath = stableBuildPath;
+                return true;
+            }
+            try {
+                var moveBuildResult = V8.Method.MoveObject({
+                    OsClient: V8.OsClient,
+                    FilePathName: buildUpload.HdfsPath,
+                    Path: stableBuildPath,
+                    Limit: false
+                });
+                if (moveBuildResult && moveBuildResult.Code == 1) {
+                    buildUpload.HdfsPath = stableBuildPath;
+                    buildUpload.FilePathName = stableBuildPath;
+                    buildUpload.PublishHdfsPath = stableBuildPath;
+                    return true;
+                }
+            } catch (moveBuildError) {
+                // 老版本存储实现可能不支持 MoveObject；调用方保留或重传可用对象。
+            }
+            return false;
+        };
         reportProgress(65, '正在写入' + appType + '应用公有编译文件');
         for (var b = 0; b < buildAssets.length; b++) {
             var buildFile = buildAssets[b] || {};
@@ -677,33 +710,55 @@ try {
             var buildMetadataPath = 'dist/' + buildRelativePath;
             expectedApplicationPaths[buildMetadataPath.toLowerCase()] = true;
             var buildUpload = reuseApplicationAsset(existingApplicationAssets, buildMetadataPath, buildFile);
-            if (buildUpload) {
+            var buildWasReused = !!buildUpload;
+            var reusedBuildHdfsPath = buildWasReused ? normalizeApplicationPath(buildUpload.HdfsPath).toLowerCase() : '';
+            if (buildWasReused) {
                 buildUpload.Path = buildRelativePath;
                 stats.ApplicationBuildAssetsReused++;
             } else {
                 buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
             }
             var normalizedBuildPath = normalizeApplicationPath(buildUpload.Path);
+            // MICRO_APP_PUBLIC_HDFS_PATH_V1：公有桶对象 Key 必须带租户前缀。
+            // MoveObject 的 Path 是目标对象完整 Key，不是目录；移动成功后运行清单
+            // 也必须切换到同一个真实 Key，不能继续保留已被删除的临时上传路径。
             var stableBuildPath = appType == 'MicroService'
-                ? normalizeApplicationPath(buildRoot + '/' + normalizedBuildPath)
-                : String(V8.OsClient || '').toLowerCase() + '/ai-app-publish/' + appKey + '/' + normalizedBuildPath;
-            // SKIP_MOVE_FOR_REUSED_BUILD_V1：断点续装命中已有 build 元数据时，
-            // 对象已位于上一次成功写入的稳定路径，不能再次逐文件 MoveObject。
-            if (!buildUpload.Reused && V8.Method.MoveObject && buildUpload.HdfsPath && stableBuildPath) {
-                try {
-                    var moveBuildResult = V8.Method.MoveObject({
-                        OsClient: V8.OsClient,
-                        FilePathName: buildUpload.HdfsPath,
-                        Path: stableBuildPath,
-                        Limit: false
-                    });
-                    if (moveBuildResult && moveBuildResult.Code == 1) buildUpload.HdfsPath = stableBuildPath;
-                } catch (moveBuildError) {
-                    // 老版本存储实现可能不支持 MoveObject；保留上传返回路径继续安装。
-                }
+                ? normalizeApplicationPath(String(V8.OsClient || '').toLowerCase() + '/' + buildRoot + '/' + normalizedBuildPath)
+                : normalizeApplicationPath(String(V8.OsClient || '').toLowerCase() + '/ai-app-publish/' + appKey + '/' + normalizedBuildPath);
+            var buildPathRepaired = moveBuildToStablePath(buildUpload, stableBuildPath);
+            // SKIP_MOVE_FOR_REUSED_BUILD_V1：已处于当前租户稳定 Key 的断点资产不重复移动。
+            // 旧版错误 Key 若已被移动或删除，则从本次自包含包重传，再尝试写入正确 Key。
+            if (buildWasReused && !buildPathRepaired) {
+                buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
+                buildUpload.Path = buildRelativePath;
+                stats.ApplicationBuildAssetsReused--;
+                buildWasReused = false;
+                moveBuildToStablePath(buildUpload, stableBuildPath);
             }
             uploadedBuild.push(buildUpload);
-            if (buildUpload.Reused) continue;
+            // DB_RUNTIME_BUILD_ASSETS_V1：目标环境的 FileServer/CDN 可能与开发环境不同。
+            // 离线包显式选择 db/database 时，把公有编译产物同步写入运行清单；
+            // 私有源码与编译资产仍照常上传 HDFS，保持开发、重建与切回 file 模式能力。
+            if (inlineRuntimeBuild) {
+                var runtimeBuildBase64 = firstTextParam([buildFile.FileByteBase64, buildFile.ContentBase64, buildFile.Base64]);
+                if (!runtimeBuildBase64 && buildFile.Content !== undefined && buildFile.Content !== null) {
+                    runtimeBuildBase64 = V8.Base64.StringToBase64(String(buildFile.Content));
+                }
+                if (!runtimeBuildBase64) {
+                    throw new Error('DB运行模式缺少内嵌编译内容：' + normalizedBuildPath);
+                }
+                runtimeDbAssets.push({
+                    Path: normalizedBuildPath,
+                    FileName: buildFile.FileName || applicationFileName(normalizedBuildPath),
+                    ContentType: buildFile.ContentType || '',
+                    ContentBase64: runtimeBuildBase64,
+                    Size: buildUpload.Size,
+                    Hash: buildUpload.Hash,
+                    IsEntry: buildFile.IsEntry === true || buildFile.IsEntry === 1
+                });
+            }
+            if (buildWasReused && buildPathRepaired
+                && reusedBuildHdfsPath == stableBuildPath.toLowerCase()) continue;
             // 安装后的 Web/UniApp 仍须保留真实 dist 元数据，才能继续编辑源码、
             // 重新构建并打包，而不是退回只生成一张兼容预览页。
             var buildAssetRow = {
@@ -727,7 +782,7 @@ try {
             if (!buildAssetResult || buildAssetResult.Code != 1) {
                 throw new Error('写入应用编译资产元数据失败：' + normalizedBuildPath + '，' + ((buildAssetResult && buildAssetResult.Msg) || ''));
             }
-            stats.ApplicationBuildAssets++;
+            if (!buildWasReused) stats.ApplicationBuildAssets++;
         }
 
         // 只有源码和编译产物都完整走完后才移除旧路径。请求中途超时时，已上传
@@ -809,7 +864,7 @@ try {
         }
 
         if (appType == 'MicroService') {
-            var ms = bundle.MicroService || {};
+            var ms = microServiceConfig;
             var existingService = getApplicationRow('sys_microiservice', firstTextParam([ms.Id]), [['MsKey', '=', appKey]]);
             if (!existingService && previousAppKey && previousAppKey != appKey) {
                 existingService = getApplicationRow('sys_microiservice', '', [['MsKey', '=', previousAppKey]]);
@@ -819,13 +874,13 @@ try {
                 MsName: appName,
                 MsType: firstTextParam([ms.MsType, '前端']),
                 Runtime: firstTextParam([ms.Runtime, 'micro-app']),
-                StorageMode: firstTextParam([ms.StorageMode, 'file']),
+                StorageMode: runtimeStorageMode,
                 IsEnable: ms.IsEnable === 0 ? 0 : 1,
                 SourceDirName: firstTextParam([ms.SourceDirName, appKey]),
                 EntryPath: entryPath,
                 BuildVersion: versionNo,
                 AssetCount: uploadedBuild.length,
-                AssetsJson: JSON.stringify(uploadedBuild),
+                AssetsJson: JSON.stringify(inlineRuntimeBuild ? runtimeDbAssets : uploadedBuild),
                 AssetManifestJson: JSON.stringify({ MsKey: appKey, BuildVersion: versionNo, EntryPath: entryPath, Assets: uploadedBuild }),
                 PublishTime: nowText('yyyy-MM-dd HH:mm:ss')
             };
@@ -891,7 +946,7 @@ try {
         'SelectFields', 'MobileListFields', 'SearchFieldIds', 'SortFieldIds',
         'TableDiyFieldIds', 'NotShowFields', 'StatisticsFields', 'FixedFields',
         'TableHeaders', 'InTableEditFields', 'MoreBtns', 'FormBtns', 'PageBtns',
-        'PageTabs', 'BatchSelectMoreBtns', 'ExportMoreBtns', 'DiyConfig', 'JoinTables'
+        'PageTabs', 'BatchSelectMoreBtns', 'ExportMoreBtns', 'JoinTables'
     ];
     var fieldJsonFields = ['Config', 'Data', 'BindRole'];
 
@@ -1722,6 +1777,9 @@ try {
         for (var key in table) {
             modelCopy[key] = table[key];
         }
+        // DiyConfig is a retired compatibility column. New package installs
+        // must use dedicated physical columns exposed through DIY metadata.
+        delete modelCopy.DiyConfig;
         modelCopy.OsClient = V8.OsClient;
         modelCopy.Id = table.Id;
         if (exists) {
@@ -1924,6 +1982,7 @@ try {
             for (var key in field) {
                 fieldCopy[key] = field[key];
             }
+            delete fieldCopy.DiyConfig;
             fieldCopy.OsClient = V8.OsClient;
             fieldCopy.Id = field.Id;
             fieldCopy.NameConfirm = 1;
@@ -2043,6 +2102,7 @@ try {
             for (var key in field) {
                 fieldCopy[key] = field[key];
             }
+            delete fieldCopy.DiyConfig;
             fieldCopy.OsClient = V8.OsClient;
             fieldCopy.Id = field.Id;
             // 不存在则新增
@@ -2568,6 +2628,7 @@ try {
         for (var key in menu) {
             modelCopy[key] = menu[key];
         }
+        delete modelCopy.DiyConfig;
         modelCopy.OsClient = V8.OsClient;
         modelCopy.Id = menu.Id;
 
@@ -3291,5 +3352,3 @@ try {
         }
     };
 }
-
-

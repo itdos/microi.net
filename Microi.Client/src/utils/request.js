@@ -7,6 +7,7 @@ import pinia from "@/pinia";
 import { useUserStore } from "@/pinia";
 // import { getToken } from '@/utils/auth.js'
 import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
+import { reportApiServiceFailure, reportApiServiceRecovered } from "@/utils/api-service-status.js";
 
 // 辅助函数：获取 UserStore
 const getUserStore = () => useUserStore(pinia);
@@ -22,13 +23,13 @@ const service = axios.create({
 service.interceptors.request.use(
     (config) => {
         // do something before request is sent
-        const userStore = getUserStore();
-        config.__microiRequestToken = DiyCommon.getToken();
-        if (userStore.token) {
+        const requestToken = DiyCommon.getToken();
+        config.__microiRequestToken = requestToken;
+        if (requestToken) {
             // let each request carry token
             // ['X-Token'] is a custom headers key
             // please modify it according to the actual situation
-            config.headers["X-Token"] = DiyCommon.getToken();
+            config.headers["X-Token"] = requestToken;
         }
         return config;
     },
@@ -50,8 +51,27 @@ service.interceptors.response.use(
      * Determine the request status by custom code
      * Here is just an example
      * You can also judge the status by HTTP Status Code
-     */
+    */
     (response) => {
+        reportApiServiceRecovered({
+            apiBase: DiyCommon.GetApiBase(),
+            url: response.config?.url
+        });
+        const requestToken = response.config && response.config.__microiRequestToken;
+        if (DiyCommon && typeof DiyCommon.ApplyAuthorizationToken === "function") {
+            DiyCommon.ApplyAuthorizationToken(
+                response.headers?.authorization || response.headers?.token,
+                requestToken
+            );
+            // DiyCommon is the cross-tab source of truth. Keep the router-facing
+            // Pinia store synchronized so a token issued/rotated by this axios
+            // instance cannot leave the two request paths in different states.
+            const currentToken = DiyCommon.getToken();
+            const userStore = getUserStore();
+            if (userStore.token !== currentToken) {
+                userStore.setToken(currentToken);
+            }
+        }
         const res = response.data;
 
         // 修复：适配 Microi 后端返回格式 { Code: 1, Data, Msg }
@@ -64,7 +84,6 @@ service.interceptors.response.use(
                 || authMessage.includes("token签名")
                 || authMessage.includes("token失效")
                 || authMessage.includes("请重新登录");
-            const requestToken = response.config && response.config.__microiRequestToken;
             const tokenChanged = isAuthFailure
                 && DiyCommon
                 && typeof DiyCommon.HasTokenChangedSinceRequest === "function"
@@ -90,6 +109,12 @@ service.interceptors.response.use(
         }
     },
     (error) => {
+        reportApiServiceFailure(error, {
+            apiBase: DiyCommon.GetApiBase(),
+            osClient: DiyCommon.GetOsClient(),
+            url: error.config?.url,
+            method: error.config?.method
+        });
         console.log("err" + error); // for debug
         Message({
             message: error.message,

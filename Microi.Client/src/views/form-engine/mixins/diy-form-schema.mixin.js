@@ -281,8 +281,9 @@ export default {
                                 FilePathName: filePath,
                                 HDFS: self.SysConfig.HDFS || "Aliyun",
                                 FormEngineKey: self.DiyTableModel.Name || self.TableId,
-                                FormDataId: self.TableRowId,
-                                FieldId: field.Id
+                                FormDataId: self.TableRowId || self.FormDiyTableModel.Id || "",
+                                FieldId: field.Id,
+                                SysMenuId: self.SysMenuId
                             },
                             function(privateResult) {
                                 try {

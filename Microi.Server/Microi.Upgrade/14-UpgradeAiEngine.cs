@@ -85,7 +85,7 @@ namespace Microi.net
             });
             if (relayResult.Code == 1 && relayResult.Data != null)
             {
-                var relayUpdate = await MicroiEngine.FormEngine.UptFormDataAsync("mic_ai", new
+                var relayUpdate = await UpgradeTrustedFormEngine.UpdateAsync("mic_ai", osClient, new
                 {
                     Id = (string)relayResult.Data.Id,
                     OsClient = osClient,
@@ -102,7 +102,7 @@ namespace Microi.net
             var currentTableId = (string)menuResult.Data.DiyTableId;
             if (currentTableId != tableId)
             {
-                var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", new
+                var updateResult = await UpgradeTrustedFormEngine.UpdateAsync("sys_menu", osClient, new
                 {
                     Id = menuId,
                     OsClient = osClient,

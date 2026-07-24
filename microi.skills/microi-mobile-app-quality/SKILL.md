@@ -1,7 +1,6 @@
 ---
 name: microi-mobile-app-quality
 description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序。用于创建、重设计、修复、测试或交付任何 Microi 移动端项目，覆盖登录、底部导航、快捷入口、按钮、动效、菜单层级与移动端视觉验收。
-applyTo: "**/*.{vue,js,ts,css,scss,json,md}"
 ---
 
 # Microi 移动端质量门禁
@@ -94,23 +93,23 @@ PC 端、H5、App、微信小程序或任何自定义前端只要调用 `/api/Sy
 
 ## 3. OsClient 请求头不得重复
 
-Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览器、代理或服务端运行时可能把 `OsClient` 和 `osclient` 这类大小写重复键合并成 `lxwb, lxwb`，导致租户识别失败。
+Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览器、代理或服务端运行时可能把 `OsClient` 和 `osclient` 这类大小写重复键合并成 `demo, demo`，导致租户识别失败。
 
 要求：
 - 通过统一工具构建请求头，设置 `osclient` 前先删除已有的不区分大小写匹配项。标准 SDK 的 `buildHeaders` 必须使用单值写入函数，不得直接写 `headers.OsClient = ...`。
-- 优先使用一个标准键，通常是小写 `osclient`，并且只传一个值，例如 `lxwb`。
+- 优先使用一个标准键，通常是小写 `osclient`，并且只传一个运行期值，例如 `demo`。
 - `Authorization` / `authorization` 以及其它单值鉴权头也要做同样的大小写去重。
 - 当 Microi 端点契约需要时，请求体或查询参数可以包含 `OsClient`，但请求头仍只能包含一个 `osclient` 值。
 
 禁止：
 - 同时设置 `headers.OsClient` 和 `headers.osclient`。
 - 同时设置 `headers.Authorization` 和 `headers.authorization`。
-- 网络面板里已经看到 `lxwb, lxwb` 仍然交付。
+- 网络面板里已经看到 `demo, demo` 仍然交付。
 
 验收：
 - 在网络面板或请求适配器日志里检查登录请求。
-- 确认目标租户请求头正好是 `osclient: lxwb`，没有被逗号合并。
-- 微信/支付宝/飞书/抖音等小程序授权登录接口也必须检查，例如 `/apiengine/wx-miniprogram-login-reg-bind`，不得出现 `osclient: xjy, xjy` 这类合并值。
+- 确认目标租户请求头正好是一个运行期值（例如 `osclient: demo`），没有被逗号合并。
+- 微信/支付宝/飞书/抖音等小程序授权登录接口也必须检查，例如 `/apiengine/miniprogram-login`，不得出现 `osclient: demo, demo` 这类合并值。
 
 ## 3.1 小程序授权登录必须可追踪、可读错误
 
@@ -361,7 +360,7 @@ Microi 请求只能发送一个不区分大小写的 OsClient 请求头。浏览
 移动端和后台不能只区分“已登录/未登录”。企业应用通常至少有内部员工、售后师傅、客服、客户账号等角色，必须在建模阶段明确角色、菜单权限和数据权限。
 
 要求：
-- 内部账号统一使用 `sys_user` 登录，身份优先从 `RoleIds`、`_Roles`、`Roles`、`RoleName` 和 `Level` 推导。`Level>=999` 或“超级管理员”视为全权限。
+- 内部账号统一使用 `sys_user` 登录，身份可从 `RoleIds`、`_Roles`、`Roles`、`RoleName` 和 `Level` 推导展示能力；只有服务端已确认的 `Level>=9999` 才视为平台超级管理员。角色名和前端 `_IsAdmin` 不能代替接口授权。
 - 角色能力要在统一 session/capability store 中计算，例如 `isTechnician`、`isServiceAgent`、`isCustomerAccount`、`canAcceptOrders`、`canManageCustomers`、`canViewReports`。一个人有多个角色时取能力并集。
 - 客户账号角色要精确判断，不能把“客户管理”这类内部后台角色误判为客户账号。建议只把“客户”“客户账号”“客户用户”或明确包含“客户账号”的角色当作客户侧账号。
 - 后台通过 `sys_role` + `sys_rolelimit` 建角色和菜单权限。售后师傅通常能看维保计划、工单、维保记录、报修和检测报告；客服通常能看客户中心、工单、报修、报告和资讯；客户账号默认不直接授予后台菜单，客户侧数据通过绑定关系和接口数据过滤提供。

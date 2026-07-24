@@ -78,6 +78,29 @@ namespace Microi.net
             }
         }
 
+        /// <summary>
+        /// Preserve trusted provenance when an authenticated MCP administration
+        /// operation forwards a JObject row into the generic FormEngine boundary.
+        /// The marker is JsonIgnore and is assigned only on this server-created CLR
+        /// instance; request JSON cannot bind or forge it.
+        /// </summary>
+        private static DiyTableRowParam BuildTrustedMcpFormWriteParam(
+            string osClient,
+            JObject rowModel)
+        {
+            var safeRowModel = rowModel == null
+                ? new JObject()
+                : (JObject)rowModel.DeepClone();
+            return new DiyTableRowParam
+            {
+                OsClient = osClient,
+                Id = safeRowModel["Id"].Val<string>(),
+                _InvokeType = InvokeType.Server.ToString(),
+                _TrustedServerInvocation = true,
+                _RowModel = safeRowModel
+            };
+        }
+
         private static string NormalizeV8SemanticVersion(string value)
         {
             var text = SafeString(value).Trim();
@@ -736,7 +759,7 @@ namespace Microi.net
                     ["OsClient"] = osClient,
                     ["ApiV8Code"] = plainCode,
                     ["UpdateTime"] = now,
-                    ["_InvokeType"] = "Client"
+                    ["_InvokeType"] = "Server"
                 };
                 if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace())
                 {
@@ -835,7 +858,7 @@ namespace Microi.net
                     ["Files"] = "[]",
                     ["IsDeleted"] = 0,
                     ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                    ["_InvokeType"] = "Client"
+                    ["_InvokeType"] = "Server"
                 };
                 if (hasVersionColumn) addParam["Version"] = resolvedVersion;
                 if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) addParam["ChangeHistory"] = changeHistoryEntry;
@@ -1241,7 +1264,7 @@ namespace Microi.net
                     ["Id"] = id,
                     ["Name"] = existingName,
                     [eventType] = v8Code ?? "",
-                    ["_InvokeType"] = "Client"
+                    ["_InvokeType"] = "Server"
                 };
 
                 var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("Diy_Table", updateParam);
@@ -2016,7 +2039,7 @@ namespace Microi.net
                     ["Name"] = name,
                     ["Description"] = description ?? "",
                     ["IsDeleted"] = 0,
-                    ["_InvokeType"] = "Client"
+                    ["_InvokeType"] = "Server"
                 };
                 if (!string.IsNullOrWhiteSpace(tabs)) tableData["Tabs"] = tabs;
                 if (isTree > 0) tableData["IsTree"] = isTree;
@@ -2302,7 +2325,7 @@ namespace Microi.net
                     Encrypt = encrypt,
                     InTableEdit = inTableEdit,
                     IsDeleted = 0,
-                    _InvokeType = InvokeType.Client.ToString()
+                    _InvokeType = InvokeType.Server.ToString()
                 };
 
                 var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);
@@ -2642,7 +2665,7 @@ namespace Microi.net
             string parentId = null, int sort = 100,
             string icon = null, string searchFieldIds = null,
             string tableDiyFieldIds = null, string defaultOrderBy = null,
-            string sqlWhere = null, string diyConfig = null,
+            string sqlWhere = null,
             string moreBtns = null, string formBtns = null,
             string batchSelectMoreBtns = null, string pageTabs = null,
             string exportMoreBtns = null, string pageBtns = null,
@@ -2651,7 +2674,9 @@ namespace Microi.net
             string selectFields = null, string statisticsFields = null,
             int inTableEdit = 0, string inTableEditFields = null,
             string mobileListFields = null,
-            string cardTitleTagFields = null, string cardBottomTagFields = null)
+            string cardTitleTagFields = null, string cardBottomTagFields = null,
+            int enableViewSchema = 0, string viewSchemaVersion = "1.0",
+            int viewConfigVersion = 1, string viewSchema = null)
         {
             try
             {
@@ -2759,6 +2784,8 @@ namespace Microi.net
                 if (!exportBtnsNormalized.Ok) return new DosResult<object>(0, null, exportBtnsNormalized.Msg);
                 var pageBtnsNormalized = NormalizeMenuJsonArray("PageBtns", pageBtns, buttonWarnings);
                 if (!pageBtnsNormalized.Ok) return new DosResult<object>(0, null, pageBtnsNormalized.Msg);
+                var viewSchemaNormalized = NormalizeViewSchemaJson(viewSchema);
+                if (!viewSchemaNormalized.Ok) return new DosResult<object>(0, null, viewSchemaNormalized.Msg);
 
                 if (!diyTableId.DosIsNullOrWhiteSpace())
                 {
@@ -2791,15 +2818,18 @@ namespace Microi.net
                     ["AppDisplay"] = appDisplay,
                     ["OpenType"] = openType ?? "Diy",
                     ["Url"] = effectiveUrl ?? "",
+                    ["EnableViewSchema"] = enableViewSchema == 1 ? 1 : 0,
+                    ["ViewSchemaVersion"] = viewSchemaVersion.DosIsNullOrWhiteSpace() ? "1.0" : viewSchemaVersion,
+                    ["ViewConfigVersion"] = viewConfigVersion < 1 ? 1 : viewConfigVersion,
                     ["IsDeleted"] = 0,
-                    ["_InvokeType"] = "Client"
+                    ["_InvokeType"] = "Server"
                 };
                 if (!string.IsNullOrWhiteSpace(icon)) menuData["Icon"] = icon;
                 if (!string.IsNullOrWhiteSpace(searchFieldIds)) menuData["SearchFieldIds"] = searchFieldIds;
                 if (!string.IsNullOrWhiteSpace(tableDiyFieldIds)) menuData["TableDiyFieldIds"] = tableDiyFieldIds;
                 if (!string.IsNullOrWhiteSpace(defaultOrderBy)) menuData["DefaultOrderBy"] = defaultOrderBy;
                 if (!string.IsNullOrWhiteSpace(sqlWhere)) menuData["SqlWhere"] = sqlWhere;
-                if (!string.IsNullOrWhiteSpace(diyConfig)) menuData["DiyConfig"] = diyConfig;
+                if (!string.IsNullOrWhiteSpace(viewSchemaNormalized.Value)) menuData["ViewSchema"] = viewSchemaNormalized.Value;
                 // 业务按钮 / 高级配置（统一存为 sys_menu 的 JSON 字符串列）
                 if (!string.IsNullOrWhiteSpace(moreBtnsNormalized.Value)) menuData["MoreBtns"] = moreBtnsNormalized.Value;
                 if (!string.IsNullOrWhiteSpace(formBtnsNormalized.Value)) menuData["FormBtns"] = formBtnsNormalized.Value;
@@ -3025,7 +3055,7 @@ namespace Microi.net
                         ["Id"] = pageId,
                         ["Title"] = title,
                         ["JsonObj"] = jsonStr,
-                        ["_InvokeType"] = "Client"
+                        ["_InvokeType"] = "Server"
                     };
                     if (!string.IsNullOrWhiteSpace(number)) uptData["Number"] = number;
                     if (!string.IsNullOrWhiteSpace(desc)) uptData["Desc"] = desc;
@@ -3055,7 +3085,7 @@ namespace Microi.net
                         ["Title"] = title,
                         ["JsonObj"] = jsonStr,
                         ["IsDeleted"] = 0,
-                        ["_InvokeType"] = "Client"
+                        ["_InvokeType"] = "Server"
                     };
                     if (!string.IsNullOrWhiteSpace(number)) addData["Number"] = number;
                     if (!string.IsNullOrWhiteSpace(desc)) addData["Desc"] = desc;
@@ -3280,6 +3310,194 @@ namespace Microi.net
             return (true, array.ToString(Newtonsoft.Json.Formatting.None), "");
         }
 
+        private static readonly HashSet<string> ViewSchemaActionTypes = new HashSet<string>(
+            new[] {
+                "ApiEngine", "OpenDetail", "OpenList", "OpenForm", "Navigate",
+                "Dial", "Scan", "Map", "Refresh", "Back", "Copy"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> ViewSchemaExecutableProperties = new HashSet<string>(
+            new[] { "V8Code", "V8CodeShow", "Script", "JavaScript", "Eval", "OnClick", "Function" },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static JProperty FindJsonProperty(JObject source, params string[] names)
+        {
+            if (source == null || names == null) return null;
+            return source.Properties().FirstOrDefault(property =>
+                names.Any(name => string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        private static string ValidateViewActionArray(JToken token, string path, int depth = 0)
+        {
+            if (token == null || token.Type == JTokenType.Null) return "";
+            if (depth > 4) return $"{path} 的 SuccessActions 嵌套不能超过 4 层";
+            if (token.Type != JTokenType.Array) return $"{path} 必须是 JSON 数组";
+
+            var actions = (JArray)token;
+            if (actions.Count > 50) return $"{path} 最多允许 50 个动作";
+            for (var index = 0; index < actions.Count; index++)
+            {
+                if (actions[index].Type != JTokenType.Object)
+                {
+                    return $"{path}[{index}] 必须是 JSON 对象";
+                }
+
+                var action = (JObject)actions[index];
+                var typeProperty = FindJsonProperty(action, "ActionType", "Type");
+                var actionType = typeProperty?.Value.Val<string>();
+                if (actionType.DosIsNullOrWhiteSpace() || !ViewSchemaActionTypes.Contains(actionType))
+                {
+                    return $"{path}[{index}].ActionType 不受支持：{actionType}";
+                }
+
+                if (string.Equals(actionType, "ApiEngine", StringComparison.OrdinalIgnoreCase))
+                {
+                    var apiEngineKey = FindJsonProperty(action, "ApiEngineKey")?.Value.Val<string>();
+                    if (apiEngineKey.DosIsNullOrWhiteSpace())
+                    {
+                        return $"{path}[{index}] 使用 ApiEngine 时必须配置 ApiEngineKey";
+                    }
+                }
+
+                var successActions = FindJsonProperty(action, "SuccessActions");
+                if (successActions != null)
+                {
+                    var error = ValidateViewActionArray(
+                        successActions.Value,
+                        $"{path}[{index}].SuccessActions",
+                        depth + 1);
+                    if (!error.DosIsNullOrWhiteSpace()) return error;
+                }
+            }
+            return "";
+        }
+
+        private static (bool Ok, string Value, string Msg) NormalizeViewSchemaJson(string rawValue)
+        {
+            if (string.IsNullOrWhiteSpace(rawValue)) return (true, null, "");
+            if (Encoding.UTF8.GetByteCount(rawValue) > 512 * 1024)
+            {
+                return (false, rawValue, "ViewSchema 不能超过 512KB");
+            }
+            try
+            {
+                var token = JToken.Parse(rawValue);
+                if (token.Type == JTokenType.String)
+                {
+                    token = JToken.Parse(token.Val<string>() ?? "");
+                }
+                if (token.Type != JTokenType.Object)
+                {
+                    return (false, rawValue, "ViewSchema 必须是 JSON 对象");
+                }
+
+                var schema = (JObject)token;
+                var executableProperty = schema
+                    .DescendantsAndSelf()
+                    .OfType<JProperty>()
+                    .FirstOrDefault(property => ViewSchemaExecutableProperties.Contains(property.Name));
+                if (executableProperty != null)
+                {
+                    return (false, rawValue,
+                        $"ViewSchema 不允许包含可执行前端脚本字段：{executableProperty.Path}");
+                }
+
+                var viewsProperty = FindJsonProperty(schema, "Views");
+                if (viewsProperty != null && viewsProperty.Value.Type != JTokenType.Array)
+                {
+                    return (false, rawValue, "ViewSchema.Views 必须是 JSON 数组");
+                }
+
+                var views = viewsProperty?.Value as JArray;
+                if (views != null && views.Count > 100)
+                {
+                    return (false, rawValue, "ViewSchema.Views 最多允许 100 个视图");
+                }
+
+                for (var viewIndex = 0; views != null && viewIndex < views.Count; viewIndex++)
+                {
+                    if (views[viewIndex].Type != JTokenType.Object)
+                    {
+                        return (false, rawValue, $"ViewSchema.Views[{viewIndex}] 必须是 JSON 对象");
+                    }
+
+                    var view = (JObject)views[viewIndex];
+                    var scene = FindJsonProperty(view, "Scene")?.Value.Val<string>();
+                    if (!new[] { "Detail", "Edit", "List", "Card" }
+                        .Any(value => string.Equals(value, scene, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return (false, rawValue, $"ViewSchema.Views[{viewIndex}].Scene 不受支持：{scene}");
+                    }
+
+                    var device = FindJsonProperty(view, "Device")?.Value.Val<string>() ?? "All";
+                    if (!new[] { "PC", "Mobile", "All" }
+                        .Any(value => string.Equals(value, device, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return (false, rawValue, $"ViewSchema.Views[{viewIndex}].Device 不受支持：{device}");
+                    }
+
+                    var layoutProperty = FindJsonProperty(view, "Layout", "LayoutJson");
+                    if (layoutProperty == null || layoutProperty.Value.Type == JTokenType.Null) continue;
+                    if (layoutProperty.Value.Type == JTokenType.String)
+                    {
+                        var layoutText = layoutProperty.Value.Val<string>();
+                        var layoutToken = JToken.Parse(layoutText ?? "");
+                        if (layoutToken.Type != JTokenType.Object)
+                        {
+                            return (false, rawValue,
+                                $"ViewSchema.Views[{viewIndex}].Layout 必须是 JSON 对象");
+                        }
+                        layoutProperty.Value = layoutToken;
+                    }
+                    if (layoutProperty.Value.Type != JTokenType.Object)
+                    {
+                        return (false, rawValue,
+                            $"ViewSchema.Views[{viewIndex}].Layout 必须是 JSON 对象");
+                    }
+
+                    var layout = (JObject)layoutProperty.Value;
+                    var actionsProperty = FindJsonProperty(layout, "Actions", "ActionSchema");
+                    if (actionsProperty != null)
+                    {
+                        var error = ValidateViewActionArray(
+                            actionsProperty.Value,
+                            $"ViewSchema.Views[{viewIndex}].Layout.Actions");
+                        if (!error.DosIsNullOrWhiteSpace()) return (false, rawValue, error);
+                    }
+
+                    var blocksProperty = FindJsonProperty(layout, "Blocks", "Sections");
+                    if (blocksProperty == null) continue;
+                    if (blocksProperty.Value.Type != JTokenType.Array)
+                    {
+                        return (false, rawValue,
+                            $"ViewSchema.Views[{viewIndex}].Layout.Blocks 必须是 JSON 数组");
+                    }
+                    var blocks = (JArray)blocksProperty.Value;
+                    if (blocks.Count > 100)
+                    {
+                        return (false, rawValue,
+                            $"ViewSchema.Views[{viewIndex}].Layout.Blocks 最多允许 100 个区块");
+                    }
+                    for (var blockIndex = 0; blockIndex < blocks.Count; blockIndex++)
+                    {
+                        if (blocks[blockIndex].Type != JTokenType.Object) continue;
+                        var blockActions = FindJsonProperty((JObject)blocks[blockIndex], "Actions");
+                        if (blockActions == null) continue;
+                        var error = ValidateViewActionArray(
+                            blockActions.Value,
+                            $"ViewSchema.Views[{viewIndex}].Layout.Blocks[{blockIndex}].Actions");
+                        if (!error.DosIsNullOrWhiteSpace()) return (false, rawValue, error);
+                    }
+                }
+                return (true, schema.ToString(Newtonsoft.Json.Formatting.None), "");
+            }
+            catch (Exception ex)
+            {
+                return (false, rawValue, "ViewSchema 不是合法 JSON：" + ex.Message);
+            }
+        }
+
         private static (bool Ok, string Msg) ValidateJsonIfPresent(string fieldName, string rawValue, bool arrayOnly = false)
         {
             if (string.IsNullOrWhiteSpace(rawValue)) return (true, "");
@@ -3303,7 +3521,7 @@ namespace Microi.net
             var data = new JObject
             {
                 ["OsClient"] = osClient,
-                ["_InvokeType"] = "Client"
+                ["_InvokeType"] = "Server"
             };
             if (!id.DosIsNullOrWhiteSpace()) data["Id"] = id;
             else if (param["Id"] != null) data["Id"] = CloneToken(param["Id"]);
@@ -3422,7 +3640,8 @@ namespace Microi.net
                     _SelectFields = new[] {
                         "Id", "Name", "ParentId", "DiyTableId", "DiyTableName", "Url", "ComponentName", "ComponentPath",
                         "OpenType", "Display", "AppDisplay", "Sort", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds",
-                        "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "UpdateTime"
+                        "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns",
+                        "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "UpdateTime"
                     },
                     _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName"),
                     _OrderBy = "Sort",
@@ -3460,9 +3679,15 @@ namespace Microi.net
         {
             try
             {
+                if (param["DiyConfig"] != null)
+                {
+                    return new DosResult<object>(0, null,
+                        "DiyConfig 已废弃；请新增专用物理字段，并通过 diy_field 元数据暴露配置控件。跨端视图请使用 sys_menu.ViewSchema。");
+                }
                 var allowed = new[] {
                     "Name", "Description", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
-                    "OpenType", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere", "DiyConfig",
+                    "OpenType", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere",
+                    "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
                     "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
                     "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText",
@@ -3477,6 +3702,12 @@ namespace Microi.net
                     var normalized = NormalizeMenuJsonArray(field, ToJsonString(data[field]), warnings);
                     if (!normalized.Ok) return new DosResult<object>(0, null, normalized.Msg);
                     data[field] = normalized.Value;
+                }
+                if (data["ViewSchema"] != null)
+                {
+                    var normalized = NormalizeViewSchemaJson(ToJsonString(data["ViewSchema"]));
+                    if (!normalized.Ok) return new DosResult<object>(0, null, normalized.Msg);
+                    data["ViewSchema"] = normalized.Value;
                 }
                 var result = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", data);
                 if (result.Code != 1) return new DosResult<object>(result.Code, result.Data, result.Msg);
@@ -3998,7 +4229,7 @@ namespace Microi.net
                         Limit = limit ?? false,
                         Preview = preview ?? true,
                         Multiple = false,
-                        _InvokeType = InvokeType.Client.ToString(),
+                        _InvokeType = InvokeType.Server.ToString(),
                         _CurrentUser = currentUser,
                         Files = new Dictionary<string, Stream> { [fileName] = fileStream }
                     };
@@ -4022,7 +4253,7 @@ namespace Microi.net
                         ["OsClient"] = osClient,
                         ["Id"] = targetId,
                         [targetField] = savedFilePathName,
-                        ["_InvokeType"] = InvokeType.Client.ToString()
+                        ["_InvokeType"] = InvokeType.Server.ToString()
                     };
                     var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(targetTable, updateParam);
                     if (updateResult.Code != 1)
@@ -4870,7 +5101,7 @@ namespace Microi.net
                         ["Type"] = "Menu",
                         ["Permission"] = "[\"Add\",\"Edit\",\"Del\",\"Export\",\"Import\"]",
                         ["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        ["_InvokeType"] = "Client"
+                        ["_InvokeType"] = "Server"
                     });
 
                     if (addResult.Code == 1) addedCount++;
@@ -4931,7 +5162,7 @@ namespace Microi.net
                     Config = patch["Config"].Val<string>(),
                     Description = patch["Description"].Val<string>(),
                     InTableEdit = patch["InTableEdit"]?.Val<int>(),
-                    _InvokeType = InvokeType.Client.ToString()
+                    _InvokeType = InvokeType.Server.ToString()
                 };
 
                 if (p.Id.DosIsNullOrWhiteSpace() && (p.Name.DosIsNullOrWhiteSpace() || (p.TableId.DosIsNullOrWhiteSpace() && p.TableName.DosIsNullOrWhiteSpace())))
@@ -5294,7 +5525,9 @@ namespace Microi.net
                     if (prop.Name == "Id" || prop.Name == "Name" || prop.Name == "OsClient") continue;
                     upt[prop.Name] = prop.Value;
                 }
-                var r = await MicroiEngine.FormEngine.UptFormDataAsync("diy_table", upt);
+                var r = await MicroiEngine.FormEngine.UptFormDataAsync(
+                    "diy_table",
+                    BuildTrustedMcpFormWriteParam(osClient, upt));
 
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
                 var tid = ((string)tableRow.Id ?? "").ToLower();

@@ -26,6 +26,7 @@ namespace Microi.net.Api
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
+    [PlatformAdminOnly]
     public class DiyChatController : Controller
     {
         private IHubContext<DiyWebSocket> _context;

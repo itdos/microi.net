@@ -79,6 +79,8 @@
 4. **每个扩展** 同时注册为全局变量和 `V8` 对象属性
 5. **用户脚本** 通过 `V8.ExtensionName.Method()` 调用
 
+新扩展应只推荐 `V8.ExtensionName` 入口。全局别名可能与 JavaScript 或 CLR 名称冲突；例如监控扩展注册名 `System` 会与 CLR `System` 命名空间冲突，新增扩展不得继续占用通用全局名称。
+
 ---
 
 ## 快速开始：5 分钟添加一个扩展
@@ -567,11 +569,13 @@ var disk = V8.System.GetDiskInfo();
 // → { Disks: [{ Filesystem, MountPoint, TotalGB, UsedGB, FreeGB, UsagePercent }] }
 
 // 获取网络流量（需调用两次，间隔一段时间，才有速率数据）
-var net = V8.System.GetNetworkTrafficInfo();
+var net = V8.System.GetNetworkTraffic();
 
 // 获取磁盘 IO
-var io = V8.System.GetDiskIOInfo();
+var io = V8.System.GetDiskIO();
 ```
+
+主机监控属于运维能力，只能由 `Level >= 9999` 的管理链路使用，不得从普通或匿名接口返回机器名、磁盘、网络、进程或基础设施信息。
 
 ---
 
@@ -792,16 +796,15 @@ public class SmsParam {
 
 ### Q: 扩展中可以使用异步方法吗？
 
-Jint 引擎为同步执行环境，建议扩展方法使用同步调用。如果必须调用异步 API，使用 `.GetAwaiter().GetResult()` 转为同步：
+可以。当前宿主启用了 Jint Task 互操作，扩展方法可返回 `Task<T>`，V8 脚本在本次请求内使用 `await`。不要用 `.GetAwaiter().GetResult()` 长时间阻塞线程池，也不要在扩展中用 `Task.Run` / 定时器把工作遗留到 `V8Engine.Run` 返回之后；届时 Engine、租户上下文、事务和执行租约会被释放。
 
 ```csharp
-public DosResult CallExternalApi(string url)
+public async Task<DosResult> CallExternalApiAsync(string url)
 {
     try
     {
-        // 将异步调用转为同步
-        var response = httpClient.GetAsync(url).GetAwaiter().GetResult();
-        var content = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        using var response = await httpClient.GetAsync(url);
+        var content = await response.Content.ReadAsStringAsync();
         return new DosResult(1, content);
     }
     catch (Exception ex)
@@ -811,11 +814,28 @@ public DosResult CallExternalApi(string url)
 }
 ```
 
+```javascript
+var result = await V8.YourExtension.CallExternalApiAsync(url);
+```
+
+需要脱离请求的可靠工作应进入 Job、MQ 或 outbox，使用共享租约、幂等键和重启恢复。
+
 ### Q: 是否每次脚本执行都会创建新的扩展实例？
 
 是的。`V8ExtensionRegistry.InjectAll()` 方法在每次 V8 引擎执行时调用，会执行注册的工厂方法 `() => new YourExtension()` 创建新实例。这意味着：
 - 扩展类应当是**无状态**的，或每次创建的状态是独立的
-- 如果需要共享状态（如缓存），使用 `static` 字段
+- 跨请求/跨节点状态必须写入按 `OsClient` 隔离的 Redis、数据库或可靠消息系统
+- `static` 字段只能做允许丢失的单节点优化或诊断，不能作为全局锁、任务是否执行过、用户会话或业务完成事实
+
+### Q: 扩展发布前有哪些强制安全检查？
+
+- 从活跃 V8 上下文读取并强制当前 `OsClient`，不能相信脚本参数切换租户；
+- 明确普通业务、管理员和平台内部能力边界，危险方法不应仅靠文档约束；
+- 对 URL 做与平台一致的 SSRF/允许主机策略，对文件、图片、Office、ZIP 和响应体设置上限；
+- 不向 V8 投影数据库、认证、Redis、存储、MQ、支付等基础设施密钥；
+- 日志和 `DosResult` 对密码、Token、密钥、连接字符串、堆栈及内部路径做脱敏；
+- 多节点共享状态使用 Redis/数据库，分布式锁之外仍实现业务幂等；
+- 为跨租户、匿名、普通用户、超限、依赖故障和滚动重启增加负向测试。
 
 ### Q: Microi.net.Api 主项目如何引用此类库？
 

@@ -28,7 +28,7 @@
 4. **必须**配置 `/Microi.net.Api/appsettings.json` 文件
 ```json
   "AppSettings": {
-    "OsClient": "iTdos",//【必须】自定义SaaS引擎Key，与数据库【sys_osclient】表的【OsClient】字段值对应
+    "OsClient": "iTdos",//【必须】自定义SaaS引擎Key，与数据库【sys_osclients】表的【OsClient】字段值对应
     "OsClientType": "Product",//【必须】自定义程序运行环境，如：Product（正式环境）、Dev（测试环境）等
     "OsClientNetwork": "Internet",//【必须】自定义网络类型，如：Internet（公网）、Internal（内网）等
     "OsClientDbType": "MySql",//默认MySql，可选SqlServer、Oracle
@@ -36,7 +36,7 @@
     "OsClientDbConn": "Data Source=192.168.31.1;Database=microi_empty;User Id=roo;Password=password123456;Port=3306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;Min Pool Size=5;Connection Lifetime=300;Connection Timeout=30;Pooling=true;sslmode=None;",
     //SqlServer连接字符串示例：Server=192.168.31.1,1434;Database=microi_empty;User Id=sa;Password=password123456;
     //Oracle连接字符串示例：User Id=MICROI;Password=password123456;Data Source=192.168.31.1:1521/xe;
-    //Tips：若【OsClient + OsClientType + OsClientNetwork】在【sys_osclient】表中能匹配到数据，且数据中有Redis相关配置，则可以省略以下Redis配置
+    //Tips：若【OsClient + OsClientType + OsClientNetwork】在【sys_osclients】表中能匹配到数据，且数据中有Redis相关配置，则可以省略以下Redis配置
     "OsClientRedisHost" : "",//Redis Host，如：119.31.116.88
     "OsClientRedisPort" : "",//Redis端口，如：6379
     "OsClientRedisPwd" : "",//Redis密码，如：123456
@@ -44,6 +44,9 @@
     //其余配置分布式存储（如阿里云OSS、MinIO）、MQ消息队列、ES搜索引擎等，均在平台【SaaS引擎】中动态配置
   },
 ```
+
+本地与存量部署的 CORS 在未配置来源时默认允许任意来源；只有在主 SaaS 配置或 `Cors:AllowOrigins` 中填写来源后才收紧。严格 SSRF 模式同样默认关闭。不要为了本地调试删除登录 RSA 历史兼容密钥或私有授权密钥；完整规则见 [平台安全与兼容基线](../more/security)。
+
 ::: warning 注意事项
 - 拉取源码后，请**优先将 `Microi.net.dll` 更新至最新版本**
 - 若 NuGet 自动还原失败 / 加载项目失败导致编译失败，可尝试重启 VS Code 重新加载项目等待 NuGet 还原

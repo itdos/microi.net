@@ -14,7 +14,7 @@
 | 前端 | 直接调用 FormEngine 对应的接口地址也会触发服务器端 V8 事件 |
 
 ::: tip 提示
-`V8.FormEngine` 下所有函数均为单表操作（除 Batch 批量操作外），多表关联查询请查看 `V8.ModuleEngine` 用法。
+`V8.FormEngine` 下所有函数均为单表操作（除 Batch 批量操作外）。后端 V8 可用 `V8.ModuleEngine` 让模块关联配置生效，或使用参数化 SQL 完成受控 JOIN；当前标准前端 V8 没有公开挂载 `V8.ModuleEngine`。
 :::
 >* __<font color="red">注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）</font>__
 
@@ -68,6 +68,47 @@ URL 中的表名建议小写。Body 仍可传 `FormEngineKey` 用于校验，多
 | `OsClient` | 当前租户标识；也可作为 querystring `?OsClient=xxx` 或 body 字段传入 |
 | `Token` | 登录后获得的 Token；匿名接口可省略 |
 
+### HTTP 授权边界
+
+::: warning Token 不是数据授权
+Token 只证明“当前请求是谁、属于哪个 `OsClient`”，不能据此读取或修改任意表。浏览器、移动端和其它外部客户端发起的 FormEngine 请求，服务端会继续校验表、菜单、角色、操作类型和数据范围；隐藏前端按钮不能代替服务端授权。
+:::
+
+平台按以下顺序执行客户端 FormEngine 授权：
+
+1. **显式菜单严格校验**：请求传 `_SysMenuId`（推荐）或兼容的 `ModuleEngineKey` 时，服务端校验菜单确实绑定目标 `diy_table`，且当前用户的有效角色在 `sys_rolelimit` 中拥有该菜单及当前操作权限。列表、写入、导入、导出显式传错、伪造或借用其它表的菜单 Id 会直接失败。
+2. **详情按表菜单授权**：单行详情只校验当前用户是否拥有至少一个直接绑定目标表的菜单（或精确表级 `Read` 权限），不应用菜单 `SqlWhere`、`SqlJoin`。旧版 PC/UniApp 未传菜单或保留已删除菜单 Id 时，只要当前授权快照中仍有同表菜单即可恢复。该规则不适用于列表枚举、导入和导出。
+3. **历史无菜单调用安全推断**：为兼容存量项目中大量未传 `_SysMenuId` 的前端 V8，登录用户的无菜单请求由后端从“当前用户有效角色真正拥有的 `sys_menu`”中推断目标表和操作权限。候选菜单及权限来自后端授权快照，不相信客户端提交的角色、菜单列表或权限 JSON。集合查询的多个范围只有 Join 上下文一致时才可合并；无法合并时失败关闭。
+4. **高级表权限兜底**：确实没有菜单入口的 SDK / 定制页面，可在角色管理的【高级表权限】中为普通业务表按最小权限授予 `Read`、`Add`、`Edit`、`Del`。对应数据使用 `sys_rolelimit.Type = 'Table'` 保存；`diy_table.BindRole` 只做候选角色过滤，不能单独代替具体操作权限。
+5. **平台保护表**：SaaS 配置、接口引擎、表/字段元数据、菜单角色权限、系统用户、任务、数据源、消息队列、页面/打印/工作流、扩展数据库等平台控制面表，客户端通用 FormEngine 对 `Level < 9999` 的帐号硬拒绝；菜单和高级表权限都不能覆盖。管理 Controller 同样执行服务端超级管理员校验。
+6. **导入/导出**：必须携带真实菜单上下文，并分别拥有 `Import`、`Export` 权限；高级表权限不能绕过。导出属于查询并继续应用菜单数据范围；导入属于写入，由 `Import` 权限和表单后端 V8 业务校验控制，不使用菜单查询 Join/Where 拒绝。
+
+标准 PC 表单引擎的前端 FormEngine facade 会给“当前菜单绑定的当前表”自动注入真实 `_SysMenuId`；跨表 V8 调用故意保持无菜单，由后端按目标表授权推断，不能把当前主表菜单错误传播给其它表。菜单表单的详情、新增、修改、删除以及导入上传、进度查询、清理临时数据，应持续传递同一个菜单上下文。导入、导出等操作类型由服务端固定，不能相信客户端提交的操作名称。
+
+旧版 PC/UniApp 的单表字段请求可在菜单缺失或过期时回退到当前用户另一个已授权且引用同表的菜单。调用 `GetDiyFieldByDiyTables` 时还可能一次提交“主表 + 多张关联表”：服务端按原顺序把第一张表视为主表授权锚点，主表无权时返回 `NoAuth`；主表有权时，后续关联表逐张校验并只返回有权的普通表字段，未授权表和平台保护表会被剔除而不会使整张业务表单失败。元数据兼容不会授予关联表的数据行访问权。
+
+#### 数据范围和子表委托
+
+- 菜单 `SqlWhere`、`SqlJoin` / `JoinTables` 只进入真实列表、计数和导出 SQL，不能只在界面或查询后过滤；单行详情不应用这些模块列表过滤配置，它们也不是行级写权限。
+- 主表新增、修改、删除分别校验菜单或高级表权限中的 `Add`、`Edit`、`Del`，不把菜单查询条件追加到写入 SQL，也不因查询包含跨表 Join 而拒绝。需要“仅可修改本人数据”等业务规则时，在 `SubmitBeforeServerV8` 或专用接口引擎中以服务端可信代码校验。
+- 导入校验菜单 `Import` 权限；导出校验 `Export` 并继续应用查询范围。
+- `TableChild` 隐藏子菜单不要求存量角色逐个补权限。后端会验证父菜单、父表的 TableChild 字段配置、子菜单绑定、父记录数据范围、父键唯一性及子表外键，再把外键条件强制写入查询/写入。伪造 `_TableChildAuth`、跨父记录或脱离父表直接访问都会失败。
+
+#### 服务端可信调用与缓存
+
+后端接口引擎、后端表单 V8 和平台内部调用由服务端创建不可由 HTTP JSON 伪造的可信上下文，调用 `V8.FormEngine` 时不要求 `_SysMenuId`。`_InvokeType:'Server'` 只是事件语义，不是客户端授权开关。接口引擎、任务、数据源和 V8 管理入口本身必须限制为 `Level >= 9999`。
+
+浏览器发起 `AddFormData` 时，服务端会先验证用户拥有目标菜单和 `Add` 权限，再进入 `SubmitBeforeServerV8` / `SubmitAfterServerV8`。事件内部的 `V8.FormEngine`、`V8.Db` 与接口引擎一样属于服务器可信执行，可在当前租户内实现复杂 SQL 和跨表事务，不会被外层浏览器菜单权限二次拦截。
+
+授权校验使用按 `OsClient` 隔离的 Redis `epoch`、用户授权快照、短 TTL L1 与共享 L2 缓存，不会每次请求都重新查询所有权限表。用户、角色、菜单、数据范围和角色授权变化后提升共享 `epoch`，所有 API/Worker 节点自然丢弃旧快照，无需逐节点重启或清空 Redis；共享缓存不可用时按平台策略回源主库。
+
+#### 兼容迁移
+
+- 标准后台菜单继续继承菜单权限，不需要维护“角色 × 所有业务表”的巨大矩阵；【高级表权限】只用于没有菜单入口的 SDK、定制页面。
+- 新页面应携带真实菜单上下文；历史前端 V8 无菜单请求继续由后端安全推断，不应为兼容而加全局表白名单。
+- 匿名读取/新增仍须由 `diy_table` 明确开启，平台保护表不会因匿名开关而放行。
+- 完整安全模型、CORS/SSRF、登录会话和文件权限见 [平台安全与兼容基线](../more/security)。
+
 ### 常见错误对照
 
 | 错误现象 | 原因 |
@@ -75,13 +116,14 @@ URL 中的表名建议小写。Body 仍可传 `FormEngineKey` 用于校验，多
 | 404 Not Found | URL 写成 `/formengine/{表名}/gettabledata`、缺少 `/api/` 前缀、或表名与动作之间写成 `/` 而非 `-` |
 | `Code:1001 登录身份已过期` | 未带 Token、Token 过期、或 Redis 缓存被清空 |
 | `Code:1002 身份验证失败` | OsClient 与 Token 不匹配 |
+| `Code:0 无权限` | 当前角色没有目标表菜单/操作权限、列表范围无法安全合并、写入使用错误菜单，或普通帐号访问平台保护表 |
 | `Code:0 表不存在` | `FormEngineKey` 大小写或拼写错误（实际不区分大小写，但表必须存在于 `diy_table`） |
 
 ### 移动端 uni-app 调用示例
 
 ```javascript
 const BASE = 'https://api.itdos.com';
-const OS_CLIENT = 'lsg';
+const OS_CLIENT = runtimeConfig.osClient;
 function formEngineGet(table, where = {}) {
   return new Promise((resolve, reject) => {
     uni.request({
@@ -332,17 +374,23 @@ var result = V8.FormEngine.DelFormDataByWhere('表名或表Id，不区分大小�
 ```
 
 ## 多表联合查询
->* 多表关联查询可以使用[V8.ModuleEngine]，用法与[V8.FormEngine]一致，不同的是会让模块引擎的配置（如关联表查询配置）生效
+>* 后端 V8 的 `V8.ModuleEngine.GetTableData` 接收包含 `ModuleEngineKey` 的查询对象，并让对应模块的关联表配置生效。当前标准前端 V8 没有公开挂载 `V8.ModuleEngine`；前端需要多表数据时应调用受控接口引擎/数据源引擎。
 ```js
-var sql = `SELECT A.*, B.Id as BID, B.Name AS BName 
-            FROM tableA A 
-            LEFT JOIN tableB B on A.BID = B.ID
-            WHERE A.ClassType = 'TEST'`;
-var result = V8.Db.FromSql(sql).ToArray();
-// .ToArray(); //返回数组数据，一般用于select查询多条数据语句
-// .ExecuteNonQuery(); //返回受影响行数，一般用于update、delete、insert语句
-// .First(); //返回单条数据，一般用于select查询单条数据语句
-// .ToScalar(); //返回单条数据的单个字段值，一般用于select单条数据查询、聚合函数、单个字段，如：select sum(Money) from table、select Name from table
+// 方式一：后端 V8 使用已经配置好关联字段的模块
+var moduleResult = V8.ModuleEngine.GetTableData({
+    ModuleEngineKey: 'customer-order-module',
+    _PageIndex: 1,
+    _PageSize: 20
+});
+
+// 方式二：后端 V8 使用参数化 JOIN；所有动态值都必须绑定参数
+var sql = `SELECT A.*, B.Id AS BID, B.Name AS BName
+           FROM tableA A
+           LEFT JOIN tableB B ON A.BID = B.ID
+           WHERE A.ClassType = @p0`;
+var rows = V8.Db.FromSql(sql)
+    .AddInParameter('@p0', V8.Param.ClassType)
+    .ToArray();
 ```
 
 ## 新增一个字段 AddField
@@ -360,6 +408,16 @@ var addField = V8.FormEngine.AddField({
 ```
 ## 新增一张表 AddTable
 >* 暂时仅支持服务器端V8。新增一张表
+
+## 表单设计器批量保存字段
+
+`/api/DiyField/UptDiyFieldList` 是 PC 表单设计器使用的平台控制面接口，不是普通业务角色或前端 V8 的通用批量写接口。
+
+- 入口要求 `Level >= 9999`，并在批次开始时完成一次管理员身份与目标表校验。
+- 每个字段必须属于请求中的同一 `TableId`；混入其它表字段会整体回滚。
+- 字段元数据在同一数据库事务中批量更新，物理列只有在名称或类型确实变化时才执行变更。
+- 批次完成后只执行一次字段缓存、授权快照和 V8 代码版本刷新，不会按字段数量重复刷新 SaaS 配置。
+- 该内部元数据批处理不逐条触发 `diy_field` 的通用 FormEngine V8/数据日志管线。业务数据需要逐行事件时应继续使用 `V8.FormEngine.UptTableData` 或受控接口引擎。
 
 
 ## 获取某个字段配置的数据源 GetFieldData

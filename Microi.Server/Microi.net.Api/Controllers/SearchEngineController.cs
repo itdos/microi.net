@@ -15,6 +15,7 @@ namespace Microi.net.Api
     /// 搜索引擎（支持SaaS多租户）
     /// </summary>
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     [Route("api/[controller]/[action]")]
     [ApiController]
     public class SearchEngineController : Controller

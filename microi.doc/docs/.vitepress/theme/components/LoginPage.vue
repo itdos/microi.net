@@ -304,8 +304,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createOpenClawAuthBridge } from '../openclaw-auth-bridge'
 import { siteStyle } from '../site-style'
+import { resolveSiteApiBase } from '../utils/site-api-base.js'
 
-const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
+const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const OS_CLIENT = 'iTdos'
 
 const authTab = ref('login')
@@ -352,13 +353,6 @@ let visibilityHandler = null
 let tenantProgressTimer = null
 let tenantProgressTraceId = ''
 let openClawAuthBridge = null
-
-function getDefaultApiBase() {
-  if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
-    return 'https://localhost:7266'
-  }
-  return 'https://api.itdos.com'
-}
 
 const brandFeatures = [
   'AI 引擎 · 智能数据分析与编程',

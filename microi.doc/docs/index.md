@@ -23,7 +23,7 @@ hero:
 features:
   - icon: 🤖
     title: AI 编程、数据分析
-    details: VS Code 插件一键拉取业务代码 + 数据库结构，自动为 VS Code/Codex/Copilot/Claude/Cursor 生成知识库——AI 精准了解你的 V8 API 和每一张数据库表，AI零代码编程保存即部署，无需编译发布。AI数据分析，自动差量同步向量数据库。支持 AI 训练、AI 微调、AI 提示词管理。接入 OpenClaw 小龙虾，支持远程集群管理
+    details: VS Code 插件一键拉取业务代码 + 数据库结构，自动为 VS Code/Codex/Copilot/Claude/Cursor 生成知识库——AI 精准了解你的 V8 API 和每一张数据库表，AI零代码编程保存即部署，无需编译发布。AI数据分析默认使用大模型关键词扩展、权限感知 Schema 搜索与精确字段回读；向量数据库仅作为可选增强。支持 AI 训练、AI 微调、AI 提示词管理。接入 OpenClaw 小龙虾，支持远程集群管理
     link: https://microi.net/doc/v8-engine/ai-apiengine.html
     linkText: AI本地编程文档
   - icon: 🔗

@@ -54,9 +54,9 @@ namespace Microi.net.Api
                     return Json(new DosResult(0, null, "获取验证码失败"));
                 return Json(new DosResult(1, new { CaptchaId = info.Id, Image = Convert.ToBase64String(info.Bytes) }));
             }
-            catch (Exception ex)
+            catch
             {
-                return Json(new DosResult(0, null, "获取验证码失败: " + ex.Message));
+                return Json(new DosResult(0, null, "获取验证码失败"));
             }
         }
 
@@ -71,6 +71,19 @@ namespace Microi.net.Api
         {
             try
             {
+                if (request == null
+                    || string.IsNullOrWhiteSpace(request.HID)
+                    || request.HID.Length > 512
+                    || (request.Company?.Length ?? 0) > 200
+                    || (request.Name?.Length ?? 0) > 100
+                    || (request.Phone?.Length ?? 0) > 50
+                    || (request.Remark?.Length ?? 0) > 2000
+                    || (request.Account?.Length ?? 0) > 200
+                    || (request.Password?.Length ?? 0) > 512)
+                {
+                    return Json(new DosResult(0, null, "License申请参数无效或长度超出限制"));
+                }
+
                 // 验证码校验
                 if (string.IsNullOrWhiteSpace(request?.CaptchaId))
                     return Json(new DosResult(0, null, "请先获取验证码"));
@@ -79,15 +92,10 @@ namespace Microi.net.Api
                 if (!_captcha.Validate(request.CaptchaId, request.CaptchaValue, true, true))
                     return Json(new DosResult(0, null, "验证码错误，请重新输入"));
 
-                // 自动获取客户端IP（优先X-Forwarded-For，适配反向代理/Docker环境）
-                var clientIP = request?.IP;
-                if (string.IsNullOrWhiteSpace(clientIP))
-                {
-                    clientIP = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',').FirstOrDefault()?.Trim()
-                        ?? HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault()
-                        ?? HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString()
-                        ?? "";
-                }
+                // Never trust a caller-supplied IP or raw forwarding header.
+                // When a reverse proxy is used, ASP.NET ForwardedHeaders must
+                // first validate the known proxy and then updates RemoteIpAddress.
+                var clientIP = HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString() ?? "";
 
                 var result = await LicenseService.ApplyAsync(
                     request?.HID, request?.Company, request?.Name, request?.Phone,
@@ -96,9 +104,9 @@ namespace Microi.net.Api
                     request?.Account, request?.Password);
                 return Json(result);
             }
-            catch (Exception ex)
+            catch
             {
-                return Json(new DosResult(0, null, "License申请失败: " + ex.Message));
+                return Json(new DosResult(0, null, "License申请失败，请稍后重试"));
             }
         }
 
@@ -107,6 +115,7 @@ namespace Microi.net.Api
         /// 仅在License服务器（有私钥）上可用
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> Issue([FromBody] LicenseIssueRequest request)
         {
             // 验证管理员权限（权限检查保留在Controller层）
@@ -133,10 +142,10 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 获取当前服务器的硬件指纹ID（匿名可访问，本地操作）
+        /// 获取当前服务器的硬件指纹ID（仅平台管理员）
         /// </summary>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
+        [PlatformAdminOnly]
         public JsonResult GetHardwareId()
         {
             try
@@ -144,17 +153,17 @@ namespace Microi.net.Api
                 var hid = LicenseService.GetHardwareId();
                 return Json(new DosResult(1, new { HID = hid }));
             }
-            catch (Exception ex)
+            catch
             {
-                return Json(new DosResult(0, null, "获取HID失败: " + ex.Message));
+                return Json(new DosResult(0, null, "获取HID失败"));
             }
         }
 
         /// <summary>
-        /// 验证当前服务器的License状态（匿名可访问，本地操作）
+        /// 验证当前服务器的License状态（仅平台管理员）
         /// </summary>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
+        [PlatformAdminOnly]
         public JsonResult Verify()
         {
             try
@@ -174,9 +183,10 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 获取授权管理页完整状态。主、子租户均可查看；是否允许操作由 IsMainTenant 标识。
+        /// 获取授权管理页完整状态。仅平台管理员可查看，主租户标识决定可执行操作。
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetManagementState()
         {
             var scope = await GetTenantScopeAsync();
@@ -192,6 +202,7 @@ namespace Microi.net.Api
         /// 重新加载并验证当前服务器 License，仅主租户可执行。
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> RefreshCurrentServer()
         {
             var scope = await GetTenantScopeAsync(true);
@@ -216,6 +227,7 @@ namespace Microi.net.Api
         /// 通过当前服务器向官方 License 服务提交申请，仅主租户可执行。
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> ApplyCurrentServer([FromBody] LicenseApplyRequest request)
         {
             var scope = await GetTenantScopeAsync(true);
@@ -254,9 +266,10 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 获取主租户保存的已部署服务器节点。主、子租户均为只读访问。
+        /// 获取主租户保存的已部署服务器节点。仅平台管理员只读访问。
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetServerNodes()
         {
             var scope = await GetTenantScopeAsync();
@@ -272,6 +285,7 @@ namespace Microi.net.Api
         /// 获取硬件指纹诊断信息（需要登录）
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public JsonResult Diagnostics()
         {
             try
@@ -295,12 +309,16 @@ namespace Microi.net.Api
         {
             try
             {
+                if (request == null || string.IsNullOrWhiteSpace(request.HID) || request.HID.Length > 512)
+                {
+                    return Json(new DosResult(0, null, "HID参数无效"));
+                }
                 var result = await LicenseService.CheckAsync(request?.HID);
                 return Json(result);
             }
-            catch (Exception ex)
+            catch
             {
-                return Json(new DosResult(0, null, "查询License状态失败: " + ex.Message));
+                return Json(new DosResult(0, null, "查询License状态失败"));
             }
         }
 
@@ -314,12 +332,16 @@ namespace Microi.net.Api
         {
             try
             {
+                if (request == null || string.IsNullOrWhiteSpace(request.HID) || request.HID.Length > 512)
+                {
+                    return Json(new DosResult(0, null, "HID参数无效"));
+                }
                 var result = await LicenseService.QueryApplicationAsync(request?.HID);
                 return Json(result);
             }
-            catch (Exception ex)
+            catch
             {
-                return Json(new DosResult(0, null, "查询申请状态失败: " + ex.Message));
+                return Json(new DosResult(0, null, "查询申请状态失败"));
             }
         }
 
@@ -328,12 +350,18 @@ namespace Microi.net.Api
         /// 写入前会验证License内容的合法性（JSON格式 + RSA签名验签）
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> WriteLicenseFile([FromBody] WriteLicenseFileRequest request)
         {
             var scope = await GetTenantScopeAsync(true);
             if (scope.Error != null)
             {
                 return Json(scope.Error);
+            }
+            if ((request?.LicenseContent?.Length ?? 0) == 0
+                || request.LicenseContent.Length > 1024 * 1024)
+            {
+                return Json(new DosResult(0, null, "License内容为空或超过1MB限制"));
             }
 
             try
@@ -432,6 +460,7 @@ namespace Microi.net.Api
         /// 仅在License服务器（有私钥）上可用
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> Revoke([FromBody] LicenseRevokeRequest request)
         {
             // 验证管理员权限（权限检查保留在Controller层）
@@ -459,6 +488,7 @@ namespace Microi.net.Api
         /// 仅超级管理员可操作，仅在License服务器（有私钥）上可用
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> Approve([FromBody] LicenseCheckRequest request)
         {
             var currentUser = await DiyToken.GetCurrentUser();
@@ -485,6 +515,7 @@ namespace Microi.net.Api
         /// 仅超级管理员可操作，仅在License服务器（有私钥）上可用
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> Reject([FromBody] LicenseRejectRequest request)
         {
             var currentUser = await DiyToken.GetCurrentUser();

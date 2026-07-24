@@ -50,8 +50,9 @@ var submitType = V8.FormSubmitAction;
 >* 可以实现某些字段脱敏，如：V8.Form.价格 = "***";此时一定要设置：V8.NotSaveField = ["价格"];否则在修改数据时会将***写到数据库。
 >* 示例：
 ```javascript
-//如果不是超级管理员，数据脱敏
-if(V8.CurrentUser.Level < 999){
+// 这里只决定返回值是否脱敏；真正的数据访问权限必须由后端授权策略强制。
+// 平台超级管理员阈值为 Level >= 9999。
+if(Number(V8.CurrentUser.Level || 0) < 9999){
     V8.Form.Price = "***";//脱敏
     V8.Form.CompanyName = "***";//脱敏
     V8.NotSaveField = ["Price", "CompanyName"];//告诉前端，此字段在编辑时不保存

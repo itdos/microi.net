@@ -151,6 +151,10 @@ export const asyncRoutes = [
             {
                 path: "/diy/diy-design/:Id",
                 name: "diy_field",
+                // 表单设计器持有大量字段/拖拽/ref 状态，不能与普通数据页一样
+                // 由 keep-alive 缓存半初始化实例。每次进入都按路由 Id 干净挂载，
+                // 避免首次从列表动态跳转时只显示空壳、必须 F5 才恢复。
+                meta: { keepAlive: false },
                 component: () => import("@/views/form-engine/diy-design-page.vue")
             }
         ]

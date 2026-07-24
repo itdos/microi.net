@@ -6,7 +6,15 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-自动安装 **MySQL + Redis + MinIO + MongoDB + Watchtower + 低代码平台程序（API + Web）**，可选安装 **Ollama + Qdrant** 在线 AI 依赖。全套服务基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
+自动安装 **MySQL + Redis + MinIO + MongoDB + Watchtower + 低代码平台程序（API + Web）**，可选安装 **LibreTranslate** 开源翻译服务，以及 **Ollama + nomic-embed-text + Qdrant** 向量检索增强。全套服务基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
+
+:::: warning 默认无需安装 Ollama、nomic-embed-text 和 Qdrant
+Microi吾码平台 AI 引擎已内置“**大模型关键词扩展 + 权限感知 Schema 搜索 + 精确字段回读**”。不部署 Ollama、nomic-embed-text 和 Qdrant，也可使用在线 AI 数据分析和 AI 编程；轻量模式启动更快、资源占用更低，不会连接或同步向量数据库。
+
+向量模式只用于高度模糊语义召回的可选增强，不建议默认安装。一键安装脚本在此处**直接按 Enter 即跳过**。
+
+选择安装只会部署 Ollama、`nomic-embed-text` 与 Qdrant，并在安装结果中打印连接参数，**不会自动修改任何租户的 `mic_ai` 数据，也不会自动打开向量开关**。部署完成后，由租户管理员在 AI 引擎的“向量数据库（可选）”Tab 中设置 `EnableVectorDatabase=1`，并配置 `EmbeddingApiUrl`、`QdrantHost`、`QdrantPort`、`QdrantApiKey`；在此之前平台继续使用默认关键词检索，也不会连接或同步向量服务。
+::::
 
 ### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
 ```bash
@@ -23,8 +31,8 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 | 4 | 数据库还原后会自动同步 `sys_osclients.OsClient/ClientName` 和 API、Web 编排中的 `OsClient` |
 | 5 | MinIO 会自动创建私有桶 `mci-private`、公有桶 `mci-public`，为公有桶开放匿名下载权限，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
 | 6 | 根据安装模式选择的访问 IP 和实际分配端口，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为 `http://<访问IP>:<MinIO API端口>/mci-public` |
-| 7 | 端口从 **7000 开始顺序 +1 分配**；基础服务占用 7 个端口，选择在线 AI 后占用 10 个端口。安装前会自动检测占用，若有冲突则从 7100 开始重试 |
-| 8 | 安装前脚本会**先在防火墙中开放**所有端口，再部署服务（若使用云服务器，还需在云控制台安全组中开放） |
+| 7 | 端口从 **7000 开始顺序 +1 分配**；基础服务占用 7 个端口，向量检索增加 3 个端口，LibreTranslate 增加 1 个端口。安装前会自动检测占用，若有冲突则从 7100 开始重试 |
+| 8 | 安装前脚本会先开放数据库、缓存、对象存储、可选向量服务、API 和 Web 端口；LibreTranslate 只供平台内部调用，**不会默认开放其宿主机防火墙端口**（若使用云服务器，对外端口还需在云控制台安全组中开放） |
 | 9 | 重复执行脚本前会提示先删除已安装容器/编排，**这将导致所有数据丢失** |
 | 10 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
 
@@ -40,12 +48,13 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 | 7005 | Ollama AI | 11434 |
 | 7006 | Qdrant HTTP | 6333 |
 | 7007 | Qdrant gRPC | 6334 |
-| 7008 | API | 80 |
-| 7009 | Web 前端 | 80 |
+| 7008 | LibreTranslate（可选） | 5000 |
+| 7009 | API | 80 |
+| 7010 | Web 前端 | 80 |
 
-> 若 7000-7009 中有端口被占用，脚本会自动从 7100-7109 开始重新检测，以此类推（每次 +100）。
+> 上表是“向量检索 + LibreTranslate 全部安装”时的 11 端口示例。若端口段中有端口被占用，脚本会从下一组整百端口重新检测（例如从 7000 段切换到 7100 段）。
 
-> 上表是“安装在线 AI 依赖”时的 10 端口示例。若跳过 Ollama、Qdrant，则 API、Web 分别使用 7005、7006，共占用 7000-7006 七个端口。
+> 仅安装基础服务时，API、Web 分别使用 7005、7006；仅增加 LibreTranslate 时，LibreTranslate、API、Web 分别使用 7005、7006、7007；仅增加向量检索时，端口仍为原来的 7000-7009。
 
 ### 🔄 一键更新 API 与 Web 前端
 
@@ -1159,7 +1168,110 @@ services:
 
 ---
 
-### 7️⃣ Ollama 编排
+### 7️⃣ LibreTranslate 开源翻译服务编排（可选）
+
+LibreTranslate 用于动态内容翻译，不影响 `diy_lang` 固定界面词条。加载的语言越多，首次下载模型的时间和磁盘占用越大，因此建议从基础套餐开始：
+
+| 套餐 | 语言 |
+| ---- | ---- |
+| 1（推荐） | 简体中文 `zh`、繁体中文 `zt`、英语 `en` |
+| 2 | 套餐 1 + 日语 `ja`、韩语 `ko`、越南语 `vi`、泰语 `th`、印度尼西亚语 `id`、马来语 `ms`、菲律宾语 `tl` |
+| 3 | 全部支持语言 |
+
+全部可选语言如下：
+
+| 中文名 | Key | 中文名 | Key | 中文名 | Key |
+| ---- | ---- | ---- | ---- | ---- | ---- |
+| 简体中文 | `zh` | 繁体中文 | `zt` | 英语 | `en` |
+| 日语 | `ja` | 韩语 | `ko` | 越南语 | `vi` |
+| 泰语 | `th` | 印度尼西亚语 | `id` | 马来语 | `ms` |
+| 菲律宾语 | `tl` | 印地语 | `hi` | 乌尔都语 | `ur` |
+| 阿拉伯语 | `ar` | 俄语 | `ru` | 德语 | `de` |
+| 法语 | `fr` | 西班牙语 | `es` | 葡萄牙语 | `pt` |
+| 意大利语 | `it` | 荷兰语 | `nl` | 土耳其语 | `tr` |
+| 波兰语 | `pl` | 乌克兰语 | `uk` |  |  |
+
+一键安装脚本默认不安装 LibreTranslate。选择安装后可选套餐 1/2/3，还可输入额外语言 Key；脚本会自动分配端口、生成随机 API Key，并把翻译服务地址与密钥注入 Microi API 容器。
+
+手动部署时可使用项目中的 `数据库、案例、文档、资料/docker-compose.libretranslate.yml`，并根据服务器修改宿主机目录、端口、`LT_LOAD_ONLY` 和 API Key。由于 Docker Compose 可能把全中文目录名归一化为空项目名，建议复制到 ASCII 目录，并始终显式指定项目名：
+
+```bash
+mkdir -p /microi/compose/libretranslate
+cp "数据库、案例、文档、资料/docker-compose.libretranslate.yml" /microi/compose/libretranslate/docker-compose.yml
+cd /microi/compose/libretranslate
+docker compose -p microi-libretranslate up -d
+```
+
+如果直接在源码目录运行，也必须使用 `docker compose -p microi-libretranslate -f "数据库、案例、文档、资料/docker-compose.libretranslate.yml" up -d`。正式使用前请替换示例 API Key；不要把 LibreTranslate 端口直接暴露到公网。一键安装脚本会生成随机 Key、等待服务真正就绪并确认 Key 注册成功，且默认不会为 LibreTranslate 打开宿主机防火墙端口。
+
+下面是适用于 `/microi` 目录的等价编排：
+
+:::: details 展开查看 LibreTranslate 编排
+```yaml
+services:
+  microi-translate:
+    image: libretranslate/libretranslate:latest
+    container_name: microi-translate
+    user: "0:0"
+    security_opt:
+      - apparmor=unconfined
+    volumes:
+      - /microi/libretranslate/models:/home/libretranslate/.local
+      - /microi/libretranslate/api-keys:/app/db
+    environment:
+      - LT_UPDATE_MODELS=true
+      # 基础套餐；按上表追加语言 Key。加载全部语言会显著增加首次下载时间。
+      - LT_LOAD_ONLY=zh,zt,en
+      - LT_API_KEYS=true
+      - LT_API_KEYS_DB_PATH=/app/db/api_keys.db
+      # 请替换为随机强密钥，并与 Microi API 的 MICROI_TRANSLATE_API_KEY 保持一致。
+      - MICROI_TRANSLATE_API_KEY=replace-with-a-random-strong-key
+      - LT_WORKERS=1
+      - LT_TIMEOUT=120
+    entrypoint: /bin/sh
+    command: >
+      -lc "set -e;
+      ./scripts/entrypoint.sh &
+      (
+        for i in $$(seq 1 90); do
+          if [ -f \"$${LT_API_KEYS_DB_PATH:-/app/db/api_keys.db}\" ]; then
+            ltmanage keys --api-keys-db-path \"$${LT_API_KEYS_DB_PATH:-/app/db/api_keys.db}\" add 1000000 --key \"$${MICROI_TRANSLATE_API_KEY}\" || true;
+            break;
+          fi;
+          sleep 2;
+        done
+      ) &
+      wait"
+    ports:
+      - "1469:5000"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "10"
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+```
+::::
+
+Microi API 连接该服务时，设置以下服务端环境变量；密钥不得写入前端：
+
+```yaml
+environment:
+  - MICROI_TRANSLATE_PROVIDER=libretranslate
+  - MICROI_TRANSLATE_URL=http://宿主机IP:1469
+  - MICROI_TRANSLATE_API_KEY=与LibreTranslate编排一致的随机强密钥
+  - MICROI_TRANSLATE_TIMEOUT=120
+```
+
+---
+
+### 8️⃣ Ollama 编排（可选向量增强）
+
+:::: warning 仅在确有向量语义召回需求时安装
+在线 AI 的默认 Schema 搜索不依赖 Ollama。只有启用向量数据库后，才需要本节的 Ollama、下一节的 `nomic-embed-text` 和 Qdrant；三者配置必须配套。
+::::
 
 >* Docker会自动创建所需的数据目录，无需手动创建
 >* 通过docker编排部署
@@ -1218,7 +1330,7 @@ networks:
 ```
 :::
 
->* 拉取nomic-embed-text模型（384维，用于中英文文本）
+>* 拉取 nomic-embed-text 模型（当前 Microi Ollama HTTP 向量链路使用 768 维，用于中英文文本）
 ```shell
 docker exec microi-ollama ollama pull nomic-embed-text
 ```
@@ -1230,7 +1342,7 @@ curl http://localhost:1434/v1/embeddings \
   -d '{"model": "nomic-embed-text", "input": "测试"}'
 ```
 
-### 7️⃣ Qdrant 向量数据库编排
+### 9️⃣ Qdrant 向量数据库编排（可选向量增强）
 ::: details 展开查看 Shell 命令（93 行）
 ```shell
 version: '3.8'

@@ -39,6 +39,16 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ## 2. 表单引擎三层结构
 
+### 模块级跨端视图
+
+- Detail/Edit/List/Card 视图属于 `sys_menu`，使用物理字段 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion`、`ViewSchema`。
+- `diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均为废弃兼容字段；禁止向其中写入任何新功能配置。
+- Text、Select、ImgUpload、Map 等数据控件继续放在 `diy-field-component`。
+- EntityHero、MetricStrip、ActionGrid、ResponsiveSection 是独立展示区块，放在 `form-view-blocks`，禁止用虚拟字段或 DevComponent 模拟。
+- PC 详情使用只读视图渲染器，编辑继续复用完整 `DiyForm`。未被视图区块引用的字段必须有兜底分组，不能因移动端视图精简而丢失 PC 字段。
+- 小程序只执行白名单 ActionSchema，不执行任意前端 V8。复杂业务统一调用接口引擎，重要提交校验放在后端表单事件。
+- 新视图缺失、禁用或解析失败时必须回退到现有模块/表单，禁止白屏。
+
 ### `diy-table.vue`
 
 列表页/模块页容器，负责：
@@ -88,6 +98,28 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 - 执行字段前端 V8、表单前端 V8、模板 V8。
 - 维护 `FormDiyTableModel`、`OldForm`、`DiyFieldList`。
 - 对外 emit `CallbackSetFormData` 和 `CallbackSetDiyTableModel` 给 `diy-form-full.vue`。
+
+### 前端 V8 上下文不是固定 DTO
+
+`DiyCommon.SetV8DefaultValue()` 只创建基础能力，`diy-table.vue`、`diy-form.vue`、`diy-form-full.vue` 和各 mixin 会按事件再挂载动态属性。新增 API 或修正文档时必须同时核对这些入口，不能只看一个 `V8` 对象字面量。
+
+常见上下文差异：
+
+| 场景 | 可靠上下文 |
+|------|------------|
+| 表单字段值变化 | `V8.Form`、`V8.ThisValue`、`V8.EventName='FieldValueChange'` |
+| 普通 `diy-form` 字段变化 | 不保证存在 `V8.OldValue`；需要旧值时应由业务代码自己保存 |
+| 列表行内编辑 | `V8.Row`、`V8.RowIndex`、`V8.ThisValue`、`V8.OldValue` |
+| 表单字段键盘事件 | `V8.EventName='FieldOnKeyup'`、`V8.KeyCode` |
+| 列表字段键盘事件 | `V8.EventName='TableFieldOnKeyup'`、`V8.KeyCode` |
+| 字段插槽按钮 | `V8.EventName='FieldSlotButtonClick'`、`V8.Event` |
+| 列表按钮/批量按钮 | `V8.Row` 或 `V8.Rows`、`V8.TableRowSelected`、`V8.SysMenuId` |
+
+`V8.FormSet()` 在普通 `diy-form` 中可能继续触发目标字段 V8；在 `diy-table` 行/模板上下文中通常只更新当前行或模板数据。需要静默赋值时直接修改当前上下文模型，并防止字段事件递归。
+
+标准前端 V8 会挂载 `FormEngine`、`ApiEngine`、`DataSourceEngine`、`Http`、`Base64` 等能力；虽然 `DiyCommon.ModuleEngine` 有底层实现，标准全局 V8 当前并未挂载 `V8.ModuleEngine`，文档和编辑器提示不得把它当作可用 API。
+
+`V8.SysConfig` 是面向浏览器的脱敏公开配置投影，不得依赖其中出现数据库连接串、对象存储密钥、短信/邮件密码或其它 SaaS 私密字段。
 
 ---
 
@@ -167,6 +199,7 @@ Page 模式要特别注意：
 - `SysMenuId` 可能来自 query `SysMenuId`、query `Id`、或 route meta。
 - `CallbackSetFormData` 到达后才能可靠评估 `FormBtns`，因为此时才有当前表单数据。
 - keep-alive 会触发 `activated/deactivated`，不要只在 `mounted` 里写一次性逻辑。
+- `diy-design.vue` 会复用同一个命名路由与 keep-alive 实例。必须以 `TableId + PageType` 作为表单实例 Key，并监听 `$route.fullPath`、在 `activated` 中同步路由上下文、清理旧表字段状态并重新加载；只依赖首次 `mounted` 会造成从列表跳转后白屏或显示上一张表。
 
 ### `/online-office` 匿名只读路由
 
@@ -263,7 +296,19 @@ Page 模式要特别注意：
 
 ### FormEngine 前端封装以 `diy.common.js` 为准
 
-前端 `DiyCommon.FormEngine` 不是后端 `FormEngine` 方法的一比一暴露，动表单引擎数据前必须先查 `Microi.Client/src/utils/diy.common.js` 的真实封装。单条新增评论、日志、草稿、配置等业务数据时使用：
+前端 `DiyCommon.FormEngine` 不是后端 `FormEngine` 方法的一比一暴露，动表单引擎数据前必须先查 `Microi.Client/src/utils/diy.common.js` 的真实封装。当前前端方法为：
+
+| 类型 | 方法 |
+|------|------|
+| 通用底层 | `CommonFormEngineFunc` |
+| 单条/列表读取 | `GetFormData`、`GetFormDataAnonymous`、`GetTableData`、`GetTableTree` |
+| 新增 | `AddFormData`、`AddFormDataBatch` |
+| 修改 | `UptFormData`、`UptFormDataBatch`、`UptFormDataByWhere` |
+| 删除 | `DelFormData`、`DelFormDataBatch`、`DelFormDataByWhere` |
+
+这些方法支持 Promise，历史回调参数继续兼容。前端当前没有 `GetTableDataCount`、`GetTableDataTree`、`AddTableData`、`UptTableData`、`DelTableData`、`AddField`；不能因为后端 V8 存在同名或相近能力，就在浏览器端直接调用。
+
+单条新增评论、日志、草稿等业务数据时使用：
 
 ```js
 await DiyCommon.FormEngine.AddFormData("table_name", {
@@ -277,7 +322,34 @@ await DiyCommon.FormEngine.AddFormData("table_name", {
 DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (result) {});
 ```
 
-不要凭后端存在 `AddTableData` 就在前端写 `DiyCommon.FormEngine.AddTableData(...)`；该封装在 Microi.Client 中可能不存在，单条数据也不应该走批量新增。批量新增前先确认当前前端封装是否是 `AddFormDataBatch`，并按项目已有调用方式传参。
+前端 FormEngine 还必须使用统一的菜单上下文封装：
+
+- 当前菜单绑定表会自动补真实 `_SysMenuId`。
+- 跨表调用不能继承当前菜单 Id，否则会把无关菜单的数据范围错误套到目标表；未显式指定目标菜单时，由后端从当前用户的版本化授权缓存中推断其对目标表的菜单/表级权限。
+- 传入 `_SysMenuId`、历史 `SysMenuId` 或 `ModuleEngineKey` 表示调用方选择了明确菜单，后端必须按该菜单严格校验，失败时不能回退。
+- 受保护的平台表始终受敏感资源策略限制。`_InvokeType:'Client'` 只控制表单事件触发方式，不是授权绕过参数。
+- `TableChild` 使用运行时生成的不透明 `_TableChildAuth`；后端会重新验证父菜单、父记录、字段关系、外键和数据范围。业务代码不得手工伪造。
+- 导入、导出必须锚定真实菜单；通用 CRUD 的历史无菜单兼容不能扩展到批量数据传输。
+
+前端作用域封装在注入菜单/子表上下文时必须克隆待修改对象，不得把内部 `_SysMenuId` / `_TableChildAuth` 写回调用者；字符串、对象、批量参数、回调和 Promise 语义都要保持兼容。授权快照由后端按租户/用户隔离，使用共享 Redis 版本号和带 TTL 的快照；外部授权检查读取共享版本，权限变更后旧快照不可达，Redis 故障则回源数据库。不能在每次 CRUD 里重新查询整套角色/菜单，也不能用进程内缓存作为多节点事实源。
+
+### OpenAnyTable / 模板 HTML / ConfirmTips 安全边界
+
+- `OpenAnyTable` 应传已授权的 `SysMenuId` / `ModuleEngineKey` 和 `SubmitEvent`，由目标模块按自身表、字段和权限初始化。不要先通过通用 FormEngine 读取 `sys_menu` 来发现任意模块，也不要只传物理 `TableName` 试图绕过菜单。
+- 表格/表单 V8 模板结果通过 `v-safe-html` / DOMPurify 渲染；`onclick`、`onerror`、`javascript:` 等危险内容会被移除。交互请使用平台按钮、插槽或安全链接，不要把内联事件写进模板字符串。
+- `V8.ConfirmTips` 内部使用 Element Plus 的 HTML 模式。只允许固定可信 HTML；数据库、URL、用户输入等动态值必须先进行 HTML/属性转义，路由参数还要 `encodeURIComponent`。它是回调式确认框，不能假定 `await V8.ConfirmTips()` 会直接返回用户选择。
+- 前端 `V8.Base64` 来自 `js-base64`，真实方法是 `encode`、`decode`、`isValid`，不要写成后端的 `StringToBase64/Base64ToString`。
+
+### V8 文档与编辑器提示同步
+
+修改前端 V8 能力、属性、事件名或参数契约时，至少同步核对：
+
+- 运行时：`src/utils/diy.common.js`、`diy-table.vue`、`diy-form.vue`、`diy-form-full.vue` 及其 mixins。
+- Monaco 提示：`src/views/form-engine/diy-components/v8-api-definitions.js`。
+- 官方文档：`microi.doc/docs/doc/v8-engine/v8-client.md`。
+- Skills：`v8-frontend-events`、`v8-table-event`、`v8-menu-buttons`、`v8-template-engine`、`v8-formengine-http` 和本 Skill。
+
+自动化静态检查至少覆盖方法名、事件名、示例参数和危险 HTML；真实页面还要验证表单/列表两种上下文、普通角色菜单范围、跨表历史 V8、TableChild、并发 Token 续签及移动端。
 
 ### Pinia persisted-state 覆盖 state 默认值
 
@@ -341,6 +413,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 ### PC/移动自适应 Token 续签
 
 - PC 登录传 `_ClientType:'PC'`；`diyStore.IsPhoneView` 的移动自适应登录传 `_ClientType:'Mobile'`。完整协议以 `microi-frontend-sdk/SKILL.md` 为准。
+- `DiyCommon.getToken()` 是 Microi.Client 请求发送时的 Token 单一事实源；不得先用 Pinia、组件 data 或其它副本判断“是否需要携带 X-Token”，否则持久化恢复或并发续签后会把有效 Token 漏掉。受保护请求收到新 `authorization/token` 后，必须先更新公共存储，再同步 Pinia；登录成功也要在生成动态路由前完成同样的同步。
 - `TokenExpires` 表示“下次应检查续签的时间”，不能固定成所有终端 15 分钟；应从 JWT `exp` 和 `MicroiTokenIssuedAt` 按 10% 提前量计算，最少 5 分钟、最多 1 天。
 - `App.vue` 除一分钟维护定时器外，还必须监听 `visibilitychange`、`focus`、`pageshow`。标签页从浏览器休眠恢复时先走 single-flight RefreshToken，再发业务请求。
 - `Code=1001/1002` 或明确的 `NoLogin / Token签名验证失败` 时展示后端原始 `Msg`。确认失败响应对应的仍是当前 Token 后，必须清理 Token，并携带当前 Hash 用 `location.replace` 完整进入登录页，重建旧页签的动态路由与组件状态，禁止停留在空白页。
@@ -400,13 +473,13 @@ VS Code 插件执行前端微服务构建前必须先安全清理当前项目自
 
 ## 在线 AI 应用与微服务页面协作
 
-Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`。`ApplicationType` 统一使用 `Platform / Web / UniApp / MicroService`，`Category` 保存游戏、企业、行业、教育等业务分类，`PublisherType` 保存官方/社区来源；`mci_ai_app_file / mci_ai_app_version` 仅作为私有源码清单和构建版本从表，其 `AppId` 必须指向 `sys_microistore.Id`。禁止再向 `mci_ai_app` 创建新的主记录。MicroService 另外使用 `sys_microiservice / sys_microiservice_page` 保存运行元数据和页面路由。
+Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`。运行类型写入 `ApplicationType`：普通平台离线包的新建默认值为 `Regular`，既有商城平台应用/通知仍使用 `Platform`，另外还有 `Web / UniApp / MicroService`；读取端必须兼容 `Regular/Platform`。`Category` 保存游戏、企业、行业、教育等业务分类，`PublisherType` 保存官方/社区来源；`mci_ai_app_file / mci_ai_app_version` 仅作为私有源码清单和构建版本从表，其 `AppId` 必须指向 `sys_microistore.Id`。禁止再向 `mci_ai_app` 创建新的主记录。MicroService 另外使用 `sys_microiservice / sys_microiservice_page` 保存运行元数据和页面路由。
 
 - 开始改页面前先通过 MCP 的 `microi_list_applications` 和 `microi_get_application_context` 读取应用、文件树与源码，不得只看本地目录。
 - 在线 AI 工作台应允许三种应用在线编辑、保存、运行/预览、下载源码/编译包、制作离线包、发布应用商城；不能在前端单独拦截 `MicroService` 构建。
 - 源码一律上传当前租户私有 HDFS；最终编译文件一律上传公有 HDFS。应用商城包使用 `ApplicationBundle.SchemaVersion=2 + PackageAssets`：编译 ZIP 必须上传公有桶并允许匿名下载，源码 ZIP 按应用选配且默认不发布；数据库只保存公开 ZIP 路径、大小、校验值，禁止再把每个源码/构建文件以 `FileByteBase64` 写入 `AppPakcet`。安装端下载 ZIP 后必须通过目标租户 HDFS 适配器重新上传。旧版 `SourceFiles/BuildAssets` 逐文件 Base64 仅作为向后兼容读取格式。
 - V8/Jint 沙箱禁止接口脚本直接访问 `System.IO`。创建和解压应用 ZIP 必须使用受控的 `V8.Method.CreateZip / ExtractZip`，由服务端统一执行 Zip Slip、文件数、单文件大小、解压总大小和异常压缩比检查，禁止放开 `System.IO` 黑名单。
-- 商城字段 `AppType` 是历史“应用类别（官方/社区）”；运行类型使用独立 `ApplicationType`，枚举为 `Regular / MicroService / UniApp / Web`，禁止复用 `AppType` 破坏旧筛选。
+- `AppType` 是历史复用字段，旧包/接口曾把它用于官方/社区来源，也曾把它作为运行类型回退。新代码只在读取旧数据时回退，写入使用 `ApplicationType + PublisherType`，禁止继续扩大混用。
 - 三类前端应用可复用 `ApplicationBundle` 文件传输协议，但运行安装不同：MicroService 还要写 `sys_microiservice_page`，Web/UniApp 只维护 AI 应用与版本，因此商城必须保存明确类型，不能合并成一个含糊枚举。
 - 在线商城记录可以保存可下载 ZIP 引用；用户下载的离线 JSON 则必须自包含最新运行产物，勾选“同时发布源码”时再额外内嵌私有源码。无源码只限制二次开发，不能阻断已经发布页面的运行。
 - 平台自有打包/导入接口不得假设客户全局 V8 已定义 `DateNow` 等辅助函数；应在接口内实现 `DateNow -> System.DateTime.Now -> ISO` 的局部回退，升级时只差量更新平台接口，禁止覆盖客户系统设置中的全局 V8。
