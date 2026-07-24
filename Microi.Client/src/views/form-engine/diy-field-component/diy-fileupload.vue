@@ -319,6 +319,14 @@ const props = defineProps({
     TableRowId: {
         type: String,
         default: ''
+    },
+    SysMenuId: {
+        type: String,
+        default: ''
+    },
+    TableChildAuth: {
+        type: Object,
+        default: null
     }
 });
 
@@ -640,8 +648,10 @@ const openCadPreview = (url, fileName, fileObj) => {
                 FilePathName: previewStoragePath,
                 HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
-                FormDataId: props.TableRowId,
-                FieldId: props.field.Id
+                FormDataId: props.TableRowId || props.FormDiyTableModel.Id || '',
+                FieldId: props.field.Id,
+                SysMenuId: props.SysMenuId,
+                _TableChildAuth: props.TableChildAuth || undefined
             },
             (result) => {
                 if (DiyCommon.Result(result) && result.Data) {
@@ -882,8 +892,10 @@ const setRealPath = (fileId, filePath, isLimit) => {
                 FilePathName: filePath,
                 HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
-                FormDataId: props.TableRowId,
-                FieldId: props.field.Id
+                FormDataId: props.TableRowId || props.FormDiyTableModel.Id || '',
+                FieldId: props.field.Id,
+                SysMenuId: props.SysMenuId,
+                _TableChildAuth: props.TableChildAuth || undefined
             },
             (privateResult) => {
                 if (DiyCommon.Result(privateResult)) {
@@ -1081,8 +1093,10 @@ const buildOnlineOfficePayload = (url, fileMeta = null) => {
         isPrivate: isPrivateFile,
         hdfs: SysConfig.value.HDFS || 'Aliyun',
         formEngineKey: props.DiyTableModel.Name || props.field.TableId || '',
-        formDataId: props.TableRowId || '',
+        formDataId: props.TableRowId || props.FormDiyTableModel.Id || '',
         fieldId: props.field.Id || '',
+        sysMenuId: props.SysMenuId || '',
+        tableChildAuth: props.TableChildAuth || null,
         fileName: meta.Name || meta.name || GetFileName(props.modelValue) || GetFileName(url),
         fileSize: meta.Size || meta.size || getSingleFileRawSize(),
         canEdit: isOfficeEditAllowed(),
@@ -1192,8 +1206,10 @@ const GetUploadPath = (field, file) => {
                         FilePathName: filePathName,
                         HDFS: SysConfig.value.HDFS || 'Aliyun',
                         FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
-                        FormDataId: props.TableRowId,
-                        FieldId: field.Id
+                        FormDataId: props.TableRowId || props.FormDiyTableModel.Id || '',
+                        FieldId: field.Id,
+                        SysMenuId: props.SysMenuId,
+                        _TableChildAuth: props.TableChildAuth || undefined
                     },
                     (result) => {
                         if (DiyCommon.Result(result)) {

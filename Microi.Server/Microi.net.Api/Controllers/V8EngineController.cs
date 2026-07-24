@@ -547,6 +547,11 @@ namespace Microi.net.Api
             var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
             var name = param["Name"].Val<string>();
             if (string.IsNullOrWhiteSpace(name)) return Ok(new DosResult(0, null, "Name 不能为空"));
+            if (param["DiyConfig"] != null)
+            {
+                return Ok(new DosResult(0, null,
+                    "DiyConfig 已废弃；请新增专用物理字段，并通过 diy_field 元数据暴露配置控件。跨端视图请使用 sys_menu.ViewSchema。"));
+            }
             var result = await V8McpLogic.CreateModule(
                 osClient, name,
                 param["DiyTableId"].Val<string>(),
@@ -556,7 +561,7 @@ namespace Microi.net.Api
                 param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100,
                 param["Icon"].Val<string>(), param["SearchFieldIds"].Val<string>(),
                 param["TableDiyFieldIds"].Val<string>(), param["DefaultOrderBy"].Val<string>(),
-                param["SqlWhere"].Val<string>(), param["DiyConfig"].Val<string>(),
+                param["SqlWhere"].Val<string>(),
                 param["MoreBtns"].Val<string>(), param["FormBtns"].Val<string>(),
                 param["BatchSelectMoreBtns"].Val<string>(), param["PageTabs"].Val<string>(),
                 param["ExportMoreBtns"].Val<string>(), param["PageBtns"].Val<string>(),
@@ -565,7 +570,11 @@ namespace Microi.net.Api
                 param["SelectFields"].Val<string>(), param["StatisticsFields"].Val<string>(),
                 param["InTableEdit"]?.Val<int>() ?? 0, param["InTableEditFields"].Val<string>(),
                 param["MobileListFields"].Val<string>(),
-                param["CardTitleTagFields"].Val<string>(), param["CardBottomTagFields"].Val<string>());
+                param["CardTitleTagFields"].Val<string>(), param["CardBottomTagFields"].Val<string>(),
+                param["EnableViewSchema"]?.Val<int>() ?? 0,
+                param["ViewSchemaVersion"].Val<string>() ?? "1.0",
+                param["ViewConfigVersion"]?.Val<int>() ?? 1,
+                param["ViewSchema"].Val<string>());
             return Ok(result);
         }
 

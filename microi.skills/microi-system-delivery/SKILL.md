@@ -51,6 +51,16 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 - 写入后台菜单时必须至少规划两级菜单树：先创建业务域父菜单，再把 CRUD、报表、日志、设置模块挂到对应父菜单。不要把客户、设备、工单、报告、日志、配置等所有模块直接创建为一级菜单。Manifest dry-run 和最终交付说明都必须列出菜单树。
 - 用户明确要求通过 MCP 修正当前后台菜单时，不能只更新 Skill 或文档后停下。必须回读 `sys_menu`，创建缺失的父级 `SecondMenu`，更新现有子菜单 `ParentId` / `Sort`，给管理员角色补父菜单权限，最后再次回读验证树结构。
 - 表单布局默认遵守平台约定，例如 PC 双列；字段显示顺序要跟业务表单顺序一致。
+- 平台通用功能除了改源码，还必须同步到官方主租户 `iTdos` 的应用商城母版并回读验证；项目专属视图、字段和业务动作只写目标租户，不能混入官方母版。
+
+### 2.1 物理字段与跨端视图
+
+- `diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均为废弃兼容字段。MCP、Manifest、应用包和手工更新都不得向其中写入新配置。
+- 新配置必须先增加业务语义清晰的物理字段，再通过 `diy_field` 元数据暴露控件；不得把多个无关能力重新塞进一个通用 JSON 口袋字段。
+- Detail/Edit/List/Card 统一视图属于模块场景，使用 `sys_menu.EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion`、`ViewSchema`。
+- `ViewSchema` 可按 PC/Mobile/All 和 RoleIds 选择视图；禁用、缺失、损坏或客户端不支持时必须回退到现有模块/表单。
+- EntityHero、MetricStrip、ActionGrid、ResponsiveSection 是独立视图区块，不是 `diy_field` 数据字段，也不能用 DevComponent 或虚拟字段模拟。
+- 小程序仅执行白名单 ActionSchema 和声明式显隐/参数映射，不执行任意前端 V8。复杂业务动作调用接口引擎，重要校验进入后端表单事件。
 
 绑定 `diyTableId` 创建 CRUD 菜单时，必须配置或允许 MCP/后端自动推断 `TableDiyFieldIds`、`SelectFields`、`SearchFieldIds`、`SortFieldIds`、`NotShowFields`、`StatisticsFields`、`MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`、`DefaultOrderBy`。列表列、搜索列、移动端卡片列不能为空白；`Id/XxxId/XxxIds`、系统字段、布局控件和富文本/上传/地图/子表等重字段默认不展示在列表。
 
@@ -148,6 +158,57 @@ VS Code 插件必须让用户清楚知道本地和远端是否一致。
 4. 只有租户私有业务逻辑才新建接口引擎。
 
 不要用租户接口引擎修平台设计器、全局上传限制、VS Code 插件同步、MCP 元数据写入等平台级问题。
+
+## 平台安全与存量兼容验收（强制）
+
+AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：
+
+### FormEngine 混合授权
+
+- Token 只完成身份认证，不是任意表的访问凭证。浏览器、UniApp、SDK 等外部请求必须继续校验表、菜单、角色、操作权限和数据范围。
+- 显式 `_SysMenuId` / `ModuleEngineKey` 进入精确菜单校验；伪造、传错或借用其它表菜单时失败关闭，不能退回兼容推断。
+- 为兼容存量前端 V8，无菜单请求由后端从当前用户真正拥有的菜单授权快照中推断目标表权限。没有候选菜单、范围无法安全合并或解析失败时失败关闭；不要要求所有历史项目一次性补 `_SysMenuId`。
+- 标准 PC facade 只给当前菜单绑定的当前表注入菜单 Id，跨表调用不借用主表菜单。没有菜单入口的 SDK/定制页才使用最小【高级表权限】。
+- 后端接口引擎、后端表单 V8 和平台内部调用由服务端建立可信上下文，不要求 `_SysMenuId`；客户端伪造 `_TrustedServerInvocation` 或 `_InvokeType:'Server'` 不能获得信任。
+- `TableChild` 使用父记录范围内委托：验证父菜单、父表字段配置、子菜单、父记录数据范围和外键，并由服务端强制注入外键。隐藏子菜单不要求存量角色逐个补权限。
+- 菜单 `SqlWhere` / `SqlJoin` 只约束列表、计数、导出等集合查询；单行详情只校验同表菜单访问权。主表写入由 `Add` / `Edit` / `Del` / `Import` 专项权限控制，不把查询范围追加到写入 SQL，也不因查询 Join 拒绝。行级写业务限制放在后端表单 V8 或专用接口引擎。
+
+### 保护表、控制面与缓存
+
+- SaaS、接口引擎、表/字段、菜单角色、用户、任务、数据源、MQ/MQTT、页面、打印、工作流、数据库、应用商城、AI 与安全审计等保护表，普通客户端 `Level < 9999` 硬拒绝；菜单或表权限不能覆盖。
+- 创建 V8、接口引擎、任务、数据源和 Redis 管理等控制面 API 继续要求 `Level >= 9999`。不能只靠前端隐藏菜单。
+- 权限缓存使用按 `OsClient` 隔离的共享 Redis `epoch`、用户快照、短 TTL L1/L2。用户/角色/菜单/权限变化后提升 `epoch`；验收至少使用两个节点确认无需清 Redis或重启即可生效。
+- Upgrade15 只清理普通角色的保护表直接授权，不能删除正常业务菜单权限。
+
+### 上传、私有文件与 SaaS
+
+- 上传业务默认值为 100 MB/文件、200 MB/次、10 文件、2 GB/帐号/日、20 GB/租户/日。有效值按当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值解析，租户可以提高或降低业务默认值；最终仍受独立 `Absolute*`、HTTP/Multipart/Form 和反向代理上限约束。共享 Redis 原子预留，Redis 故障失败关闭。
+- 普通交互式上传强制私有桶，一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后端 V8 仍受全局文件大小硬上限。
+- 普通客户端私有文件签名必须提交 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId` 并验证记录字段真实引用；不能把后端 `V8.Method.GetPrivateFileUrl({FilePathName})` 的可信调用方式照搬到浏览器。
+- Upgrade16 六个上传字段全部可空，空值保持老租户兼容；升级后回读字段元数据、租户值并刷新 SaaS 缓存。
+- `V8.OsClientModel` / `V8.SysConfig` 只使用脱敏副本，不返回整个对象。新租户不能复制主租户整条 `sys_osclients`；数据库、认证、Redis、存储、MQ/MQTT、搜索凭据必须独立创建或由服务端托管。
+- Redis 管理器只允许超级管理员使用当前租户或已保存连接；匿名/temporary 任意 Host 连接必须拒绝，MCP 写操作必须 `confirmExecution`，禁止传递 Redis 密码。
+
+### 网络、登录和发布兼容
+
+- `CorsAllowOrigins` 和全局 CORS 来源都为空时默认允许任意来源；配置后才按精确来源/通配符收紧。CORS 不是鉴权边界。
+- 严格 SSRF 默认关闭，未配置时不得拒绝存量非 HTTP(S)、URL 凭据、私网、云元数据和重定向调用；显式启用后才执行严格拦截与精确主机白名单。
+- 登录 RSA 仅避免密码在请求体直接显示，HTTPS 才是安全边界。必须保留历史 RSA fallback，专属公私钥成对切换，不能因删除旧常量造成所有客户无法登录。
+- 登录传 `_ClientType`，请求携带稳定 `did`，每次响应接收 `authorization`。多标签续签 single-flight；`TokenReplaced` 先检查新 Token，旧响应不能清掉新登录态。
+- 安全升级不得删除私有子 Git 的 `Microi.Server/Microi.net/License/keys/`。授权签名资产与登录 RSA 用途不同，禁止以安全清理为由混删。
+- 不得修改默认 CORS/SSRF/RSA 行为后只用新装环境验收；必须覆盖旧前端、历史 V8、滚动升级和至少两个节点。
+
+### 安全自动化最低断言
+
+1. 普通角色保护表读写、伪造菜单、伪造可信标记均失败。
+2. 真实菜单、历史无菜单推断和父记录范围内 TableChild 均成功，跨父记录失败。
+3. 查询范围在列表、计数、导出中生效；详情按同表菜单访问权成功；有写权限的单表/Join 模块写入成功，无写权限失败，后端 V8 行级业务校验可回滚。
+4. 节点 A 改权限后节点 B 无需重启生效。
+5. 上传大小/数量/双日额度、多节点并发和 Redis 故障行为正确。
+6. 私有文件跨菜单/记录/字段失败，授权访问成功，匿名失败。
+7. CORS 空配置兼容、配置后收紧；SSRF 默认兼容、严格模式拦截。
+8. 历史 RSA fallback 和专属匹配密钥均可登录；并发续签不反复退出。
+9. SaaS 脱敏投影不包含基础设施密钥，Redis anonymous/temporary/非管理员管理失败。
 
 ## 自动化测试必须覆盖的坑
 
@@ -299,3 +360,22 @@ VS Code 插件必须让用户清楚知道本地和远端是否一致。
 - 根因：旧 `UptSysMenu` 部分更新接口读取旧菜单后又丢弃旧实体，重新创建非空 `int` 字段默认为 `0` 的 `SysMenu` 再全字段更新；仅修改排序或父级也会把未传的 `Display/AppDisplay` 清零。历史加列迁移的不可重入多语句 SQL、应用包全量覆盖目标菜单，以及移动端把 `NULL/未配置` 当作隐藏，都会进一步放大影响。
 - 通用规则：实体型部分更新必须把非空参数合并到已读取的旧实体，禁止新建实体后全字段更新；新增菜单的 `Display/AppDisplay` 默认均为 `1`。移动端只有明确的 `0/false` 才表示隐藏，`NULL/未配置` 按兼容可见处理；升级开始前先把 `NULL` 按同一行 `Display` 归一，再快照所有既有菜单的 `AppDisplay`，升级结束无论成功失败都要恢复发生变化的旧菜单。应用包只能给新增菜单写包内显隐值，更新既有菜单时必须保留目标库 `Display/AppDisplay`。加列迁移必须按“查列、单条加列、单条回填”幂等执行。
 - 自动化检查：先用只含 `Id/Sort/ParentId` 的旧菜单更新请求验证 `Display/AppDisplay` 不变，并验证新增菜单默认双端可见。再构造含 `AppDisplay=NULL/0/1`、顶级和子级菜单的旧库，运行升级并验证空值按 `Display` 归一、既有 `0/1` 原样保留、新增包菜单采用包内值；升级中途失败时快照仍恢复。应用包导入测试必须断言存在 `preserve_existing_menu_visibility_` 保护标记，移动端测试必须覆盖 `undefined/null/0/"0"/false/1` 六种输入。
+
+### 复盘：Compose 升级脚本按目录推导 project 后误判旧容器不存在
+
+- 触发场景：客户历史服务由另一个工作目录或显式 project name 启动；升级脚本虽然拿到现存 `docker-compose.yml`，但执行 `docker compose -p <目录名> ps -q <服务>` 返回空，随后误报旧容器不存在。继续用错误 project 启动还会与旧容器的宿主机端口冲突。
+- 根因：把 Compose 文件路径或当前目录推导出的 project name 当成运行态事实源，没有从现有容器的 `com.docker.compose.project` 标签回读真实 project，也没有用宿主机 published port 和 service 标签交叉定位旧容器。
+- 通用规则：生产 Compose 升级先按目标 published port、当前 project、`com.docker.compose.service` 三层发现唯一运行容器，并校验服务标签或镜像身份；再读取并复用其 `com.docker.compose.project`。完成原 yml 和旧镜像不可变备份、拉取并校验新镜像后，先检查所有新增服务的宿主机发布端口；端口可顺延时必须设置明确起点、步长和有限重试上限，把最终端口写入实际 Compose 与审计记录，确认可用后才停止旧容器。启动瞬间再次发生端口竞争时，只重试冲突服务；非端口错误立即回滚。再由同一 project 执行 `up --force-recreate`，且不在新镜像就绪和端口预检通过前删除旧容器。后续手工拉取 `latest` 做日常更新时，必须把当前编排、实际 project、发布端口以及 API/前端两个运行镜像 ID 同时备份并打不可变回滚标签；失败时回到本次更新前的两个镜像，禁止误用首次跨版本升级的旧基线。Compose v2 的 `version is obsolete` 只可在命令成功时作为已知非致命告警过滤，其它 stderr 和非零退出码必须保留。
+- 自动化检查：模拟当前 project 查询为空、目标宿主机端口仍有旧 API、容器标签带另一个 project 的场景；断言脚本识别旧容器、保存并复用真实 project、在覆盖 yml 前完成备份、拉取校验后执行 stop，并覆盖新增端口连续占用时按上限顺延、重试耗尽时旧服务不停止，以及新服务启动失败后的自动还原。日常更新另测 API/前端双镜像拉取、当前动态端口保持、强制重建成功，以及任一重建/健康检查失败后两个镜像都恢复到本次更新前的 ID。
+
+### 复盘：新旧 Compose 双版本并行部署误伤旧服务或产生重叠网络
+
+- 通用规则：需要保留旧版本并并行安装新版本时，新版必须使用独立 Compose 文件、独立 project 和独立 service 名；旧编排与旧容器在安装路径中只读。新版若必须保持原内网通信，应从旧容器回读并校验实际 Docker 网络，再通过 `external` 网络引用其真实名称，禁止由第二个 project 重复声明同一 IPAM 子网。动态端口必须写回 API 自身公开地址及前端 `ApiBase`；先启动并确认 API，再启动前端。失败清理只能 `down` 新 project，完成后还要回读旧端口对应的容器 ID 和运行状态，确认未被替换。并行项目后续更新必须使用另一份专用命令，固定读取新版 Compose/project/service，保留现场动态端口，备份新版 API/前端两个运行镜像 ID 并打不可变标签；先更新 API、再更新前端，任一步失败时只恢复新版双镜像，禁止复用会读取旧编排的历史日常更新脚本。进程、端口和 project 隔离不代表数据隔离；若新旧后端共用数据库、Redis 或租户，新版迁移、缓存与基础数据变化仍可能影响旧版，交付时必须明确警告并准备数据库级恢复方案。
+- 自动化检查：模拟新版起始端口连续占用、新版 API 启动失败和前端健康检查失败；断言旧 yml 字节不变、旧容器未执行 stop/rm/recreate、新版使用独立 project、实际 API 端口同时写入 `AuthServer` 与 `ApiBase`、新版 API 先于前端启动，失败时只清理新 project，并保存端口、网络、镜像 ID 和失败日志。并行日常更新另测动态端口不变、API/前端按序重建、任一服务失败后两个镜像都恢复到本次更新前的 ID，且旧端口容器 ID 始终不变。
+
+### 复盘：程序能启动但 Obfuscar 找不到共享框架程序集
+
+- 触发场景：框架依赖型 `dotnet publish` 的程序冒烟启动正常，但 Obfuscar 处理某个插件 DLL 时报告 `Unable to resolve dependency: Microsoft.Extensions.*`；此前同一脚本可用，插件新增 `BackgroundService`、Hosted Service 或其它共享框架类型后开始失败。
+- 根因：ASP.NET Core 运行时从 `Microsoft.AspNetCore.App` / `Microsoft.NETCore.App` 共享框架加载程序集，这些 DLL 默认不复制到 framework-dependent 的发布目录；Obfuscar 是离线元数据处理器，只搜索 `InPath` 时无法解析新增基类。同时，插件直接使用的 NuGet API 若只由其它项目传递带入，项目依赖契约也不完整。
+- 通用规则：项目直接使用的包必须在自身 `.csproj` 声明直接 `PackageReference`，但不能把“补 NuGet 引用”误当作 Obfuscar 搜索路径修复。混淆脚本应从发布目录的 `runtimeconfig.json` 读取目标 .NET 主版本，再从 `dotnet --list-runtimes` 动态选择同主版本的最新 `Microsoft.AspNetCore.App` 和 `Microsoft.NETCore.App` 目录，生成绝对路径 `AssemblySearchPath`；禁止硬编码补丁版本，也不要为了混淆把共享框架 DLL 强行复制进最终发布目录。错误提示应保留 Obfuscar 的真实依赖解析错误，不能统一误报“工具未安装”。
+- 自动化检查：使用实际 Git Bash 执行脚本语法检查；定向构建插件并检查 nupkg 明确包含直接依赖；对全部受保护 DLL 执行混淆并验证哈希变化；最后必须启动混淆后的发布目录，断言插件注入、平台初始化和 Kestrel 监听成功，且日志不存在 `FileNotFoundException`、`TypeLoadException`、`Unable to resolve dependency` 或 `Could not load file or assembly`。

@@ -100,6 +100,7 @@ export default {
             var formEngineKey = typeof file === "object" && file !== null ? file.formEngineKey || file.FormEngineKey : "";
             var formDataId = typeof file === "object" && file !== null ? file.formDataId || file.FormDataId : "";
             var fieldId = typeof file === "object" && file !== null ? file.fieldId || file.FieldId : "";
+            var sysMenuId = (typeof file === "object" && file !== null ? file.sysMenuId || file.SysMenuId || file.menuId || file.MenuId : "") || self.SysMenuId || "";
             var canEdit = typeof file === "object" && file !== null ? file.canEdit || file.CanEdit || file.allowEdit || file.AllowEdit : "";
             var enableOfficeVersion = typeof file === "object" && file !== null ? file.enableOfficeVersion || file.EnableOfficeVersion : "";
             var isPrivateFile = isPrivate === true || isPrivate === "true" || isPrivate === 1 || isPrivate === "1";
@@ -141,6 +142,9 @@ export default {
                 }
                 if (fieldId) {
                     params.set("fieldId", fieldId);
+                }
+                if (sysMenuId) {
+                    params.set("sysMenuId", sysMenuId);
                 }
                 params.set("canEdit", canEditFile ? "1" : "0");
                 params.set("enableOfficeVersion", enableVersion ? "1" : "0");

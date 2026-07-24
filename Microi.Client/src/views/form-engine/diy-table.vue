@@ -1693,6 +1693,8 @@ export default {
         TableChildFormMode: { type: String, default: "" },
         // 子表数据，由DiyForm传进来，会直接赋值到Table表格
         TableChildData: { type: Array, default: () => [] },
+        // Server-validated aggregate authorization chain for hidden/nested TableChild.
+        TableChildAuth: { type: Object, default: null },
         // 追加搜索条件.{'FieldName' : value, 'FieldName': value}
         SearchAppend: { type: Object, default: () => ({}) },
         // //设置搜索条件.{'FieldName' : value, 'FieldName': value}
@@ -1744,6 +1746,12 @@ export default {
         }
     },
     methods: {
+        ApplyTableChildAuthContext(param) {
+            if (param && this.TableChildAuth) {
+                param._TableChildAuth = this.TableChildAuth;
+            }
+            return param;
+        },
       // ========== 移动端FAB拖拽 ==========
               //可传入外键Id值 、父表model
         GetMenuDefaultPageSize(options = {}) {
@@ -1907,9 +1915,9 @@ export default {
             //根据PropsModuleEngineKey查询出SysMenuId+TableId
             // 2025-10-29 liucheng 修复：在OpenTable模式下，如果已经通过PropsSysMenuId设置了SysMenuId，则不使用PropsModuleEngineKey覆盖
             if (self.PropsModuleEngineKey && (!self.PropsSysMenuId || self.PropsTableType !== "OpenTable")) {
-                var sysMenuResult = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", {
+                var sysMenuResult = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", self.ApplyTableChildAuthContext({
                     ModuleEngineKey: self.PropsModuleEngineKey
-                });
+                }));
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
@@ -1923,9 +1931,9 @@ export default {
             }
 
             if (!self.TableId) {
-                var sysMenuResult = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", {
+                var sysMenuResult = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", self.ApplyTableChildAuthContext({
                     ModuleEngineKey: self.SysMenuId
-                });
+                }));
                 if (sysMenuResult.Code != 1) {
                     self.DiyCommon.Tips(sysMenuResult.Msg);
                     return;
@@ -2296,6 +2304,13 @@ export default {
             V8.CurrentTableData = self.DiyTableRowList;
             // V8.GetChildTableData = '';
             V8.FormClose = self.CallbackFormClose;
+            self.DiyCommon.BindV8FormEngine(
+                V8,
+                self.SysMenuId,
+                self.TableId,
+                self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name,
+                self.TableChildAuth
+            );
             // 注册 V8.Method.ScanCode 扫码功能
             initV8ScanCode(V8);
             // 注册 V8.Print 蓝牙打印功能
@@ -2389,9 +2404,7 @@ export default {
         async RunPageTabV8Code(v8code) {
             var self = this;
             var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
-            var V8 = {
-                EventName: "PageTab"
-            };
+            V8.EventName = "PageTab";
             self.SetV8DefaultValue(V8);
 
             try {
@@ -2605,7 +2618,8 @@ export default {
                             Width: self.CurrentDiyTableModel.FormOpenWidth || undefined,
                             IsDefaultOpen: isDefaultOpen,
                             IsOpenWorkFlowForm: isOpenWorkFlowForm,
-                            WFParam: wfParam
+                            WFParam: wfParam,
+                            TableChildAuth: self.TableChildAuth
                         });
                         self.BtnLoading = false;
                         self._openFormDialogTimer = null;

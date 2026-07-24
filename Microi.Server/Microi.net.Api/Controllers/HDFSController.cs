@@ -58,6 +58,18 @@ namespace Microi.net.Api
             return null;
         }
 
+        private static bool IsPlatformAdmin(DiyUploadParam param)
+        {
+            return param?._CurrentUser?["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+        }
+
+        private static DosResult RequirePlatformAdmin(DiyUploadParam param)
+        {
+            return IsPlatformAdmin(param)
+                ? null
+                : new DosResult(0, null, "仅平台超级管理员可以使用文件管理接口！");
+        }
+
         private bool TryResolveRequestedOsClient(DiyUploadParam param, out string osClient, out DosResult error)
         {
             osClient = "";
@@ -104,6 +116,20 @@ namespace Microi.net.Api
         private bool TryValidateAuthenticatedOsClient(JObject body, string authenticatedOsClient, out DosResult error)
         {
             error = null;
+            if (authenticatedOsClient.DosIsNullOrWhiteSpace())
+            {
+                error = new DosResult(1001, null, "登录身份已过期，请重新登录！");
+                return false;
+            }
+            try
+            {
+                authenticatedOsClient = TenantConfigurationSecurity.NormalizeTenantId(authenticatedOsClient);
+            }
+            catch
+            {
+                error = new DosResult(1001, null, "登录身份中的租户信息无效，请重新登录！");
+                return false;
+            }
             var requestParam = new DiyUploadParam { OsClient = TokenString(body?["OsClient"]) };
             if (!TryResolveRequestedOsClient(requestParam, out var requestedOsClient, out error)) return false;
             if (!requestedOsClient.DosIsNullOrWhiteSpace()
@@ -258,17 +284,22 @@ namespace Microi.net.Api
             return null;
         }
 
-        private void LoadFormFiles(DiyUploadParam param)
+        private DosResult LoadFormFiles(DiyUploadParam param)
         {
             param.Files = new Dictionary<string, Stream>();
             if (HttpContext.Request.HasFormContentType)
             {
                 foreach (var file in HttpContext.Request.Form.Files)
                 {
-                    if (file != null)
-                        param.Files.Add(file.FileName, file.OpenReadStream());
+                    if (file == null) continue;
+                    if (param.Files.ContainsKey(file.FileName))
+                    {
+                        return new DosResult(0, null, "同一次上传中存在重复文件名：" + file.FileName);
+                    }
+                    param.Files.Add(file.FileName, file.OpenReadStream());
                 }
             }
+            return null;
         }
 
         private async Task LoadJsonBody(DiyUploadParam param)
@@ -304,6 +335,242 @@ namespace Microi.net.Api
             if (param.Limit == null && json["Limit"] != null) param.Limit = json["Limit"]?.Val<bool>();
             if (param.Preview == null && json["Preview"] != null) param.Preview = json["Preview"]?.Val<bool>();
             if (param.ForOfficePreview == null && json["ForOfficePreview"] != null) param.ForOfficePreview = json["ForOfficePreview"]?.Val<bool>();
+            if (param.ReturnFileType.DosIsNullOrWhiteSpace()) param.ReturnFileType = json["ReturnFileType"]?.Val<string>();
+            if (param.FormEngineKey.DosIsNullOrWhiteSpace()) param.FormEngineKey = json["FormEngineKey"]?.Val<string>();
+            if (param.FormDataId.DosIsNullOrWhiteSpace()) param.FormDataId = json["FormDataId"]?.Val<string>();
+            if (param.FieldId.DosIsNullOrWhiteSpace()) param.FieldId = json["FieldId"]?.Val<string>();
+            if (param.SysMenuId.DosIsNullOrWhiteSpace()) param.SysMenuId = json["SysMenuId"]?.Val<string>();
+            if (param.MenuId.DosIsNullOrWhiteSpace()) param.MenuId = json["MenuId"]?.Val<string>();
+            if (param._TableChildAuth == null)
+            {
+                param._TableChildAuth = ParseTableChildAuthorizationContext(
+                    json["_TableChildAuth"] ?? json["TableChildAuth"]);
+            }
+        }
+
+        private string ResolveRequestValue(string currentValue, string name)
+        {
+            if (!currentValue.DosIsNullOrWhiteSpace()) return currentValue;
+            var value = Request.Query[name].ToString();
+            try
+            {
+                if (value.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    value = Request.Form[name].ToString();
+                }
+            }
+            catch (InvalidOperationException) { }
+            return value;
+        }
+
+        private static TableChildAuthorizationContext ParseTableChildAuthorizationContext(JToken value)
+        {
+            if (value == null || value.Type == JTokenType.Null) return null;
+            try
+            {
+                if (value.Type == JTokenType.String)
+                {
+                    var json = value.Val<string>();
+                    if (json.DosIsNullOrWhiteSpace()) return null;
+                    value = JToken.Parse(json);
+                }
+                return value.Type == JTokenType.Object
+                    ? value.ToObject<TableChildAuthorizationContext>()
+                    : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private TableChildAuthorizationContext ResolveRequestTableChildAuthorizationContext(
+            TableChildAuthorizationContext currentValue)
+        {
+            if (currentValue != null) return currentValue;
+            var value = Request.Query["_TableChildAuth"].ToString();
+            if (value.DosIsNullOrWhiteSpace())
+            {
+                value = Request.Query["TableChildAuth"].ToString();
+            }
+            try
+            {
+                if (value.DosIsNullOrWhiteSpace() && Request.HasFormContentType)
+                {
+                    value = Request.Form["_TableChildAuth"].ToString();
+                    if (value.DosIsNullOrWhiteSpace())
+                    {
+                        value = Request.Form["TableChildAuth"].ToString();
+                    }
+                }
+            }
+            catch (InvalidOperationException) { }
+            return value.DosIsNullOrWhiteSpace()
+                ? null
+                : ParseTableChildAuthorizationContext(new JValue(value));
+        }
+
+        /// <summary>
+        /// 普通用户读取私有文件必须同时证明：
+        /// 1. 当前角色拥有传入菜单；2. 菜单绑定目标表；
+        /// 3. 当前菜单上下文能够读取目标记录；4. 文件字段确实引用目标对象路径。
+        /// 裸路径、Byte/Stream 和缺少上下文的旧调用一律失败关闭。
+        /// </summary>
+        private async Task<DosResult> AuthorizePrivateFileRead(DiyUploadParam param)
+        {
+            if (IsPlatformAdmin(param)) return null;
+
+            param.ReturnFileType = ResolveRequestValue(param.ReturnFileType, "ReturnFileType");
+            if (string.Equals(param.ReturnFileType, "Byte", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(param.ReturnFileType, "Stream", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(0, null, "普通用户禁止直接读取私有文件字节或流！");
+            }
+
+            param.FormEngineKey = ResolveRequestValue(param.FormEngineKey, "FormEngineKey");
+            param.FormDataId = ResolveRequestValue(param.FormDataId, "FormDataId");
+            param.FieldId = ResolveRequestValue(param.FieldId, "FieldId");
+            param.SysMenuId = ResolveRequestValue(param.SysMenuId, "SysMenuId");
+            param.MenuId = ResolveRequestValue(param.MenuId, "MenuId");
+            param._TableChildAuth = ResolveRequestTableChildAuthorizationContext(
+                param._TableChildAuth);
+            var sysMenuId = param.SysMenuId.DosIsNullOrWhiteSpace() ? param.MenuId : param.SysMenuId;
+
+            if (param.FormEngineKey.DosIsNullOrWhiteSpace()
+                || param.FormDataId.DosIsNullOrWhiteSpace()
+                || param.FieldId.DosIsNullOrWhiteSpace()
+                || sysMenuId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null,
+                    "普通用户读取私有文件必须提交FormEngineKey、FormDataId、FieldId和SysMenuId！");
+            }
+
+            // 非管理员不能通过 Limit=false 把该入口降级成无需授权的公有地址查询。
+            param.Limit = true;
+
+            try
+            {
+                // 由 FormEngine 的版本化授权快照校验真实角色、菜单与目标表绑定。
+                // 不直接读取 sys_menu，也不依赖 Token 中可选的 _RoleLimits；这样既兼容
+                // 老数据库/精简 Token，也避免在 MVC 层复制一套会漂移的菜单授权规则。
+                var menuAuthorizationParam = new DiyTableRowParam
+                {
+                    FormEngineKey = param.FormEngineKey,
+                    Id = param.FormDataId,
+                    _SysMenuId = sysMenuId,
+                    OsClient = param.OsClient,
+                    _CurrentUser = param._CurrentUser?.DeepClone() as JObject,
+                    _InvokeType = InvokeType.Client.ToString(),
+                    _TableChildAuth = param._TableChildAuth
+                };
+                var menuAuthorization = await MicroiEngine.FormEngine
+                    .AuthorizeClientTableOperationAsync(menuAuthorizationParam, "Read");
+                if (menuAuthorization?.Code != 1)
+                {
+                    return new DosResult(0, null, "当前用户无权通过该菜单访问私有文件！");
+                }
+                sysMenuId = menuAuthorizationParam._SysMenuId;
+
+                var tableModel = await ResolveDiyTableModelForFileAccess(param.OsClient, param.FormEngineKey);
+                var tableId = TokenString(tableModel?["Id"]);
+                var tableName = TokenString(tableModel?["Name"]);
+                if (tableId.DosIsNullOrWhiteSpace() || tableName.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, "未找到私有文件所属表单！");
+                }
+
+                var fieldModel = await ResolveDiyFieldModel(param.OsClient, param.FieldId, tableName, tableId);
+                var fieldName = TokenString(fieldModel?["Name"]);
+                var fieldTableId = TokenString(fieldModel?["TableId"]);
+                var component = TokenString(fieldModel?["Component"]);
+                if (fieldName.DosIsNullOrWhiteSpace()
+                    || !string.Equals(fieldTableId, tableId, StringComparison.OrdinalIgnoreCase)
+                    || (!string.Equals(component, "FileUpload", StringComparison.OrdinalIgnoreCase)
+                        && !string.Equals(component, "ImgUpload", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return new DosResult(0, null, "文件字段与当前表单不匹配！");
+                }
+
+                // 复用表单引擎的 Client + SysMenuId 查询上下文，使版本化授权缓存中的
+                // 角色菜单权限、SqlWhere/DataLimitV8 和后端数据过滤共同参与记录读取。
+                // 不能依赖 Token 中可选的 _RoleLimits：老 Token/精简 Token 通常不携带该
+                // 字段，但 FormEngine 的共享授权快照仍可准确判断真实菜单权限。
+                // 未能读到记录时不再退回无权限的内部查询。
+                var rowQuery = new JObject
+                {
+                    ["FormEngineKey"] = tableName,
+                    ["OsClient"] = param.OsClient,
+                    ["Id"] = param.FormDataId,
+                    ["_SysMenuId"] = sysMenuId,
+                    ["SysMenuId"] = sysMenuId,
+                    ["_CurrentUser"] = param._CurrentUser?.DeepClone(),
+                    ["_InvokeType"] = InvokeType.Client.ToString(),
+                    ["_SelectFields"] = new JArray("Id", fieldName)
+                };
+                if (param._TableChildAuth != null)
+                {
+                    rowQuery["_TableChildAuth"] = JToken.FromObject(param._TableChildAuth);
+                }
+                var rowResult = await MicroiEngine.FormEngine
+                    .GetFormDataAsync<dynamic>(tableName, rowQuery);
+                if (rowResult.Code != 1)
+                {
+                    return new DosResult(0, null, "当前菜单上下文无权读取该业务记录！");
+                }
+
+                var row = ToJObject((object)rowResult.Data);
+                var fieldValue = row?[fieldName];
+                var requestedPaths = new List<string>();
+                if (!param.FilePathName.DosIsNullOrWhiteSpace()) requestedPaths.Add(param.FilePathName);
+                if (param.FilePathNames != null) requestedPaths.AddRange(param.FilePathNames);
+                if (requestedPaths.Count == 0
+                    || requestedPaths.Any(path => !FieldValueReferencesPath(fieldValue, path)))
+                {
+                    return new DosResult(0, null, "业务记录的文件字段未引用所请求的私有文件！");
+                }
+
+                return null;
+            }
+            catch
+            {
+                // 授权依赖异常时必须失败关闭，不能退回裸路径临时签名地址。
+                return new DosResult(0, null, "私有文件授权校验暂时不可用，请稍后重试！");
+            }
+        }
+
+        private async Task<JObject> ResolveDiyTableModelForFileAccess(string osClient, string formEngineKey)
+        {
+            var result = await MicroiEngine.FormEngine.GetDiyTable(formEngineKey, osClient);
+            return result.Code == 1 ? ToJObject((object)result.Data) : null;
+        }
+
+        private static bool FieldValueReferencesPath(JToken fieldValue, string requestedPath)
+        {
+            var target = NormalizeComparePath(requestedPath);
+            if (fieldValue == null || target.DosIsNullOrWhiteSpace()) return false;
+
+            if (fieldValue.Type == JTokenType.String)
+            {
+                var text = TokenString(fieldValue);
+                if (text.DosIsNullOrWhiteSpace()) return false;
+                var trimmed = text.TrimStart();
+                if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
+                {
+                    try { return FieldValueReferencesPath(JToken.Parse(text), requestedPath); }
+                    catch { return false; }
+                }
+                return string.Equals(NormalizeComparePath(text), target, StringComparison.Ordinal);
+            }
+
+            if (fieldValue is JValue value)
+            {
+                return string.Equals(
+                    NormalizeComparePath(Convert.ToString(value.Value)),
+                    target,
+                    StringComparison.Ordinal);
+            }
+
+            return fieldValue.Children().Any(child => FieldValueReferencesPath(child, requestedPath));
         }
         /// <summary>
         /// 上传文件、图片。返回/路径。支持单文件、多文件。
@@ -321,17 +588,8 @@ namespace Microi.net.Api
             var pathError = NormalizeUploadPath(param);
             if (pathError != null) return Json(pathError);
 
-            #region 测试手动传入文件流，也可以不用这样
-            param.Files = new Dictionary<string, Stream>();
-            if (HttpContext.Request.HasFormContentType)
-            {
-                foreach (var file in HttpContext.Request.Form.Files)
-                {
-                    if (file != null)
-                        param.Files.Add(file.FileName, file.OpenReadStream());
-                }
-            }
-            #endregion
+            var fileError = LoadFormFiles(param);
+            if (fileError != null) return Json(fileError);
 
             //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
             //var result = await DiyCommon.Upload(param);//, HttpContext
@@ -375,7 +633,8 @@ namespace Microi.net.Api
             param._InvokeType = InvokeType.Client.ToString();
             param.Limit ??= true;
             param.Preview ??= true;
-            LoadFormFiles(param);
+            var fileError = LoadFormFiles(param);
+            if (fileError != null) return Json(fileError);
 
             var result = await MicroiEngine.HDFS.Upload(param);
             return Json(result);
@@ -398,6 +657,8 @@ namespace Microi.net.Api
                 if (accessError != null) return Json(accessError);
                 var pathError = NormalizeFilePaths(param);
                 if (pathError != null) return Json(pathError);
+                var authorizationError = await AuthorizePrivateFileRead(param);
+                if (authorizationError != null) return Json(authorizationError);
                 var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
                 return Json(platformResult);
             }
@@ -417,6 +678,8 @@ namespace Microi.net.Api
             param.Limit = true;
             var clientPathError = NormalizeFilePaths(param);
             if (clientPathError != null) return Json(clientPathError);
+            var clientAuthorizationError = await AuthorizePrivateFileRead(param);
+            if (clientAuthorizationError != null) return Json(clientAuthorizationError);
             var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
             return Json(result);
         }
@@ -469,6 +732,8 @@ namespace Microi.net.Api
                 if (accessError != null) return Json(accessError);
                 var pathError = NormalizeFilePaths(param);
                 if (pathError != null) return Json(pathError);
+                var authorizationError = await AuthorizePrivateFileRead(param);
+                if (authorizationError != null) return Json(authorizationError);
                 var platformResult = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
                 return Json(platformResult);
             }
@@ -488,6 +753,8 @@ namespace Microi.net.Api
             param.Limit = true;
             var clientPathError = NormalizeFilePaths(param);
             if (clientPathError != null) return Json(clientPathError);
+            var clientAuthorizationError = await AuthorizePrivateFileRead(param);
+            if (clientAuthorizationError != null) return Json(clientAuthorizationError);
             var result = await MicroiEngine.HDFS.GetPrivateFileUrl(param);
             return Json(result);
         }
@@ -495,6 +762,10 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> GetOfficeFileMeta([FromBody] JObject param)
         {
+            if (param == null)
+            {
+                return Json(new DosResult(0, null, "请求参数不能为空！"));
+            }
             var currentToken = await DiyToken.GetCurrentToken();
             if (currentToken?.CurrentUser == null)
             {
@@ -506,22 +777,40 @@ namespace Microi.net.Api
             {
                 return Json(osClientError);
             }
-            var context = await ResolveOfficeFileContext(param, osClient);
-            if (context.Error != null) return Json(context.Error);
-
             var filePathName = TokenString(param["FilePathName"]);
-            if (!filePathName.DosIsNullOrWhiteSpace())
+            if (filePathName.DosIsNullOrWhiteSpace())
             {
-                try
-                {
-                    filePathName = TenantConfigurationSecurity.NormalizeStoragePath(osClient, filePathName);
-                }
-                catch (Exception ex)
-                {
-                    return Json(new DosResult(0, null, "文件路径不合法：" + ex.Message));
-                }
+                return Json(new DosResult(0, null, "FilePathName不能为空！"));
             }
+            try
+            {
+                filePathName = TenantConfigurationSecurity.NormalizeStoragePath(osClient, filePathName);
+            }
+            catch (Exception ex)
+            {
+                return Json(new DosResult(0, null, "文件路径不合法：" + ex.Message));
+            }
+            param["FilePathName"] = filePathName;
+            var currentUser = ToJObject(currentToken.CurrentUser);
+            var authorizationError = await AuthorizeOfficeFileAccess(
+                param,
+                osClient,
+                currentUser,
+                "Read");
+            if (authorizationError != null) return Json(authorizationError);
+
+            var context = await ResolveOfficeFileContext(param, osClient, currentUser);
+            if (context.Error != null) return Json(context.Error);
+            if (!IsOfficePreviewEnabled(context.FieldModel))
+            {
+                return Json(new DosResult(0, null, "该文件字段未开启Office在线预览！"));
+            }
+
             var fileMeta = FindOfficeFileMeta(context.FieldValue, filePathName);
+            if (fileMeta == null)
+            {
+                return Json(new DosResult(0, null, "业务记录的文件字段未引用所请求的Office文件！"));
+            }
             return Json(new DosResult(1, new
             {
                 context.TableName,
@@ -534,6 +823,10 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> SaveOfficeDocument([FromBody] JObject param)
         {
+            if (param == null)
+            {
+                return Json(new DosResult(0, null, "请求参数不能为空！"));
+            }
             var currentToken = await DiyToken.GetCurrentToken();
             if (currentToken?.CurrentUser == null)
             {
@@ -547,8 +840,7 @@ namespace Microi.net.Api
             }
             var downloadUrl = TokenString(param["DownloadUrl"]);
             var sourceFilePath = TokenString(param["FilePathName"]);
-            var hdfs = TokenString(param["HDFS"]);
-            var limit = TokenBool(param["Limit"]) ?? true;
+            var currentUser = ToJObject(currentToken.CurrentUser);
 
             if (downloadUrl.DosIsNullOrWhiteSpace())
             {
@@ -573,34 +865,145 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "OnlyOffice导出地址不在平台配置的文档服务域名内！"));
             }
 
-            var context = await ResolveOfficeFileContext(param, osClient);
+            param["FilePathName"] = sourceFilePath;
+            var authorizationError = await AuthorizeOfficeFileAccess(
+                param,
+                osClient,
+                currentUser,
+                "Edit");
+            if (authorizationError != null) return Json(authorizationError);
+
+            var context = await ResolveOfficeFileContext(param, osClient, currentUser);
             if (context.Error != null) return Json(context.Error);
+            if (!FieldValueReferencesPath(context.FieldValue, sourceFilePath))
+            {
+                return Json(new DosResult(0, null, "业务记录的文件字段未引用所请求的Office文件！"));
+            }
+            if (!IsOfficePreviewEnabled(context.FieldModel)
+                || !IsOfficeEditEnabled(context.FieldModel))
+            {
+                return Json(new DosResult(0, null, "该文件字段未开启Office在线编辑！"));
+            }
+            if (!IsPrivateOfficeField(context.FieldModel))
+            {
+                return Json(new DosResult(0, null, "Office在线编辑仅允许私有文件字段，请先开启文件字段的私有存储！"));
+            }
+
+            var sourceExtension = Path.GetExtension(sourceFilePath);
+            if (!OfficePreviewSourceExtensions.Contains(sourceExtension))
+            {
+                return Json(new DosResult(0, null, "仅支持Excel、Word、PowerPoint、PDF和CSV文件在线保存！"));
+            }
+
+            var leaseResult = await TryAcquireOfficeSaveLeaseAsync(
+                osClient,
+                context.TableName,
+                TokenString(param["FormDataId"]),
+                context.FieldName,
+                HttpContext.RequestAborted);
+            if (leaseResult.Error != null) return Json(leaseResult.Error);
+            await using var saveLease = leaseResult.Lease;
+
+            // 获取分布式租约后再次执行授权和行级读取，避免等待锁期间记录、
+            // 字段引用或用户权限已经发生变化。
+            authorizationError = await AuthorizeOfficeFileAccess(
+                param,
+                osClient,
+                currentUser,
+                "Edit");
+            if (authorizationError != null) return Json(authorizationError);
+            context = await ResolveOfficeFileContext(param, osClient, currentUser);
+            if (context.Error != null) return Json(context.Error);
+            if (!FieldValueReferencesPath(context.FieldValue, sourceFilePath))
+            {
+                return Json(new DosResult(0, null, "业务记录的文件字段未引用所请求的Office文件！"));
+            }
+            if (!IsOfficePreviewEnabled(context.FieldModel)
+                || !IsOfficeEditEnabled(context.FieldModel)
+                || !IsPrivateOfficeField(context.FieldModel))
+            {
+                return Json(new DosResult(0, null, "该文件字段当前不允许私有Office在线编辑！"));
+            }
 
             byte[] fileBytes;
+            FileUploadSecurityOptions fileLimits;
             try
             {
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
-                using var response = await httpClient.GetAsync(downloadUrl);
+                fileLimits = MicroiHDFS.GetFileUploadSecurityOptions(osClient);
+                if (!fileLimits.UploadEnabled)
+                {
+                    return Json(new DosResult(0, null, "当前租户已停用文件上传！"));
+                }
+                using var handler = new HttpClientHandler
+                {
+                    AllowAutoRedirect = false,
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip
+                        | System.Net.DecompressionMethods.Deflate
+                };
+                using var httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(90) };
+                using var response = await httpClient.GetAsync(
+                    downloadUrl,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    HttpContext.RequestAborted);
                 if (!response.IsSuccessStatusCode)
                 {
                     return Json(new DosResult(0, null, "OnlyOffice导出文件下载失败：" + (int)response.StatusCode));
                 }
-                fileBytes = await response.Content.ReadAsByteArrayAsync();
+                if (response.Content.Headers.ContentLength > fileLimits.MaxFileBytes)
+                {
+                    return Json(new DosResult(0, null, "OnlyOffice导出文件超过平台单文件上限！"));
+                }
+
+                await using var input = await response.Content.ReadAsStreamAsync(HttpContext.RequestAborted);
+                using var output = new MemoryStream();
+                var buffer = new byte[81920];
+                while (true)
+                {
+                    var read = await input.ReadAsync(
+                        buffer.AsMemory(0, buffer.Length),
+                        HttpContext.RequestAborted);
+                    if (read <= 0) break;
+                    if (output.Length > fileLimits.MaxFileBytes - read)
+                    {
+                        return Json(new DosResult(0, null, "OnlyOffice导出文件超过平台单文件上限！"));
+                    }
+                    await output.WriteAsync(
+                        buffer.AsMemory(0, read),
+                        HttpContext.RequestAborted);
+                }
+                fileBytes = output.ToArray();
+            }
+            catch (OperationCanceledException) when (!HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                return Json(new DosResult(0, null, "OnlyOffice导出文件下载超时！"));
             }
             catch (Exception ex)
             {
-                return Json(new DosResult(0, null, "OnlyOffice导出文件下载异常：" + ex.Message));
+                var traceId = HttpContext.TraceIdentifier;
+                Console.WriteLine($"Microi：[OnlyOfficeSave] 下载文件失败，TraceId={traceId}：{ex.Message}");
+                return Json(new DosResult(0, null, "OnlyOffice导出文件下载异常，请稍后重试！TraceId：" + traceId));
             }
 
             if (fileBytes.Length == 0)
             {
                 return Json(new DosResult(0, null, "OnlyOffice导出文件内容为空！"));
             }
+            if (!OfficePreviewSourceExtensions.Contains(sourceExtension)
+                || !HasExpectedOfficeFileSignature(sourceExtension, fileBytes))
+            {
+                return Json(new DosResult(0, null, "OnlyOffice导出内容与原文件类型不匹配！"));
+            }
+
+            var quotaError = await FileUploadSecurity.ReserveDailyQuotaAsync(
+                osClient,
+                TokenString(currentUser?["Id"]),
+                fileBytes.LongLength,
+                fileLimits);
+            if (quotaError != null) return Json(quotaError);
 
             var enableVersion = IsOfficeVersionEnabled(context.FieldModel);
             var currentFileMeta = FindOfficeFileMeta(context.FieldValue, sourceFilePath)
-                ?? ParseOfficeFileMeta(param["CurrentFileMeta"])
-                ?? BuildOfficeFileMetaFromPath(sourceFilePath, TokenString(param["FileName"]));
+                ?? BuildOfficeFileMetaFromPath(sourceFilePath, GetFileNameFromPath(sourceFilePath));
             var mergeSourcePath = TokenString(currentFileMeta?["Path"]) ?? sourceFilePath;
 
             var versions = GetOfficeVersions(currentFileMeta);
@@ -615,8 +1018,13 @@ namespace Microi.net.Api
                 targetPath = BuildVersionFilePath(sourceFilePath, version);
             }
 
-            using var stream = new MemoryStream(fileBytes);
-            var putResult = await PutOfficeObject(osClient, hdfs, limit, targetPath, stream);
+            if (!await saveLease.IsOwnerAsync())
+            {
+                return Json(new DosResult(0, null, "Office保存租约已失效，请重新打开文档后再试！"));
+            }
+
+            using var stream = new MemoryStream(fileBytes, writable: false);
+            var putResult = await PutOfficeObject(osClient, true, targetPath, stream);
             if (putResult.Code != 1)
             {
                 return Json(new DosResult(putResult.Code, putResult.Data, "保存文件到分布式存储失败：" + putResult.Msg));
@@ -638,7 +1046,6 @@ namespace Microi.net.Api
                 {
                     item["IsLatest"] = false;
                 }
-                var currentUser = ToJObject(currentToken.CurrentUser);
                 var versionMeta = new JObject
                 {
                     ["Version"] = version,
@@ -655,14 +1062,27 @@ namespace Microi.net.Api
                 updatedFileMeta["Versions"] = versions;
             }
 
+            if (!await saveLease.IsOwnerAsync())
+            {
+                return Json(new DosResult(0, null, "Office保存租约已失效，表单字段未更新，请重新保存！"));
+            }
+
             var mergedFieldValue = MergeOfficeFileValue(context.FieldValue, updatedFileMeta, mergeSourcePath);
             var updateParam = new JObject
             {
                 ["OsClient"] = osClient,
                 ["Id"] = TokenString(param["FormDataId"]),
                 [context.FieldName] = SerializeOfficeFieldValue(context.FieldValue, mergedFieldValue),
-                ["_InvokeType"] = InvokeType.Server.ToString()
+                ["_InvokeType"] = InvokeType.Client.ToString(),
+                ["_CurrentUser"] = currentUser?.DeepClone(),
+                ["_SysMenuId"] = TokenString(param["SysMenuId"]) ?? TokenString(param["MenuId"])
             };
+            var tableChildAuth = ParseTableChildAuthorizationContext(
+                param["_TableChildAuth"] ?? param["TableChildAuth"]);
+            if (tableChildAuth != null)
+            {
+                updateParam["_TableChildAuth"] = JToken.FromObject(tableChildAuth);
+            }
             var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync(context.TableName, updateParam);
             if (updateResult.Code != 1)
             {
@@ -680,7 +1100,62 @@ namespace Microi.net.Api
             }, "保存成功"));
         }
 
-        private async Task<(string TableName, string FieldName, JObject FieldModel, JToken FieldValue, DosResult Error)> ResolveOfficeFileContext(JObject param, string osClient)
+        private async Task<DosResult> AuthorizeOfficeFileAccess(
+            JObject param,
+            string osClient,
+            JObject currentUser,
+            string operation)
+        {
+            var sysMenuId = TokenString(param?["SysMenuId"]);
+            if (sysMenuId.DosIsNullOrWhiteSpace())
+            {
+                sysMenuId = TokenString(param?["MenuId"]);
+            }
+            var tableChildAuth = ParseTableChildAuthorizationContext(
+                param?["_TableChildAuth"] ?? param?["TableChildAuth"]);
+
+            var fileParam = new DiyUploadParam
+            {
+                OsClient = osClient,
+                FormEngineKey = TokenString(param?["FormEngineKey"]),
+                FormDataId = TokenString(param?["FormDataId"]),
+                FieldId = TokenString(param?["FieldId"]),
+                SysMenuId = sysMenuId,
+                FilePathName = TokenString(param?["FilePathName"]),
+                Limit = true,
+                _CurrentUser = currentUser,
+                _InvokeType = InvokeType.Client.ToString(),
+                _TableChildAuth = tableChildAuth
+            };
+
+            // First prove that this exact path is referenced by a record readable in
+            // the submitted menu context. This closes the old Office metadata/save
+            // bypass around the private-file authorization boundary.
+            var readError = await AuthorizePrivateFileRead(fileParam);
+            if (readError != null) return readError;
+
+            var operationParam = new DiyTableRowParam
+            {
+                FormEngineKey = fileParam.FormEngineKey,
+                Id = fileParam.FormDataId,
+                _SysMenuId = sysMenuId,
+                OsClient = osClient,
+                _CurrentUser = currentUser,
+                _InvokeType = InvokeType.Client.ToString(),
+                _TableChildAuth = tableChildAuth
+            };
+            var authorization = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(
+                operationParam,
+                operation);
+            return authorization?.Code == 1
+                ? null
+                : authorization ?? new DosResult(0, null, "当前用户无权访问该Office文件！");
+        }
+
+        private async Task<(string TableName, string FieldName, JObject FieldModel, JToken FieldValue, DosResult Error)> ResolveOfficeFileContext(
+            JObject param,
+            string osClient,
+            JObject currentUser = null)
         {
             var formEngineKey = TokenString(param["FormEngineKey"]);
             var formDataId = TokenString(param["FormDataId"]);
@@ -690,19 +1165,46 @@ namespace Microi.net.Api
             if (formDataId.DosIsNullOrWhiteSpace()) return ("", "", null, null, new DosResult(0, null, "FormDataId不能为空！"));
             if (fieldId.DosIsNullOrWhiteSpace()) return ("", "", null, null, new DosResult(0, null, "FieldId不能为空！"));
 
-            var tableName = await ResolveDiyTableName(osClient, formEngineKey);
-            if (tableName.DosIsNullOrWhiteSpace()) return ("", "", null, null, new DosResult(0, null, "未找到表单引擎：" + formEngineKey));
-
-            var fieldModel = await ResolveDiyFieldModel(osClient, fieldId, tableName);
-            var fieldName = TokenString(fieldModel?["Name"]);
-            if (fieldName.DosIsNullOrWhiteSpace()) fieldName = fieldId;
-            if (fieldName.DosIsNullOrWhiteSpace()) return ("", "", null, null, new DosResult(0, null, "未找到文件字段：" + fieldId));
-
-            var rowResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(tableName, new JObject
+            var tableModel = await ResolveDiyTableModelForFileAccess(osClient, formEngineKey);
+            var tableId = TokenString(tableModel?["Id"]);
+            var tableName = TokenString(tableModel?["Name"]);
+            if (tableId.DosIsNullOrWhiteSpace() || tableName.DosIsNullOrWhiteSpace())
             {
+                return ("", "", null, null, new DosResult(0, null, "未找到表单引擎：" + formEngineKey));
+            }
+
+            var fieldModel = await ResolveDiyFieldModel(osClient, fieldId, tableName, tableId);
+            var fieldName = TokenString(fieldModel?["Name"]);
+            var fieldTableId = TokenString(fieldModel?["TableId"]);
+            var fieldComponent = TokenString(fieldModel?["Component"]);
+            if (fieldName.DosIsNullOrWhiteSpace()
+                || !string.Equals(fieldTableId, tableId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(fieldComponent, "FileUpload", StringComparison.OrdinalIgnoreCase))
+            {
+                return ("", "", null, null, new DosResult(0, null, "Office文件字段与当前表单不匹配：" + fieldId));
+            }
+
+            var rowQuery = new JObject
+            {
+                ["FormEngineKey"] = tableName,
                 ["OsClient"] = osClient,
-                ["Id"] = formDataId
-            });
+                ["Id"] = formDataId,
+                ["_SysMenuId"] = TokenString(param["SysMenuId"]) ?? TokenString(param["MenuId"]),
+                ["SysMenuId"] = TokenString(param["SysMenuId"]) ?? TokenString(param["MenuId"]),
+                ["_CurrentUser"] = currentUser?.DeepClone(),
+                ["_InvokeType"] = currentUser == null
+                    ? InvokeType.Server.ToString()
+                    : InvokeType.Client.ToString(),
+                ["_SelectFields"] = new JArray("Id", fieldName)
+            };
+            var tableChildAuth = ParseTableChildAuthorizationContext(
+                param["_TableChildAuth"] ?? param["TableChildAuth"]);
+            if (tableChildAuth != null)
+            {
+                rowQuery["_TableChildAuth"] = JToken.FromObject(tableChildAuth);
+            }
+            var rowResult = await MicroiEngine.FormEngine
+                .GetFormDataAsync<dynamic>(tableName, rowQuery);
             if (rowResult.Code != 1)
             {
                 return ("", "", null, null, new DosResult(rowResult.Code, rowResult.Data, "未找到业务数据：" + rowResult.Msg));
@@ -714,44 +1216,32 @@ namespace Microi.net.Api
 
         private async Task<string> ResolveDiyTableName(string osClient, string formEngineKey)
         {
-            var byId = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new JObject
-            {
-                ["OsClient"] = osClient,
-                ["Id"] = formEngineKey,
-                ["IsDeleted"] = 0
-            });
-            if (byId.Code == 1)
-            {
-                return TokenString(ToJObject((object)byId.Data)?["Name"]);
-            }
-
-            var byName = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new JObject
-            {
-                ["OsClient"] = osClient,
-                ["Name"] = formEngineKey,
-                ["IsDeleted"] = 0
-            });
-            return byName.Code == 1 ? TokenString(ToJObject((object)byName.Data)?["Name"]) : formEngineKey;
+            var tableModel = await ResolveDiyTableModelForFileAccess(osClient, formEngineKey);
+            return TokenString(tableModel?["Name"]) ?? formEngineKey;
         }
 
-        private async Task<JObject> ResolveDiyFieldModel(string osClient, string fieldId, string tableName)
+        private async Task<JObject> ResolveDiyFieldModel(string osClient, string fieldId, string tableName, string tableId = null)
         {
-            var byId = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new JObject
+            // 使用 FormEngine 的字段元数据内部入口，不通过通用 CRUD 读取受保护的
+            // diy_field。通用 CRUD 的 Server 标记不等于可信内部调用，安全加固后会
+            // 正确拒绝该路径，进而让拥有业务菜单的老 Token 被误判为字段不匹配。
+            var byId = await MicroiEngine.FormEngine.GetDiyFieldModel(new DiyFieldParam
             {
-                ["OsClient"] = osClient,
-                ["Id"] = fieldId,
-                ["IsDeleted"] = 0
+                OsClient = osClient,
+                Id = fieldId,
+                IsDeleted = 0
             });
-            if (byId.Code == 1) return ToJObject((object)byId.Data);
+            if (byId?.Code == 1 && byId.Data != null) return byId.Data;
 
-            var byName = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new JObject
+            var byName = await MicroiEngine.FormEngine.GetDiyFieldModel(new DiyFieldParam
             {
-                ["OsClient"] = osClient,
-                ["TableName"] = tableName,
-                ["Name"] = fieldId,
-                ["IsDeleted"] = 0
+                OsClient = osClient,
+                TableId = tableId,
+                TableName = tableName,
+                Name = fieldId,
+                IsDeleted = 0
             });
-            return byName.Code == 1 ? ToJObject((object)byName.Data) : null;
+            return byName?.Code == 1 ? byName.Data : null;
         }
 
         private async Task<string> GetOnlyOfficeApiBase(string osClient)
@@ -763,29 +1253,34 @@ namespace Microi.net.Api
 
         private static bool IsAllowedOfficeDownloadUrl(string downloadUrl, string onlyOfficeApiBase)
         {
-            if (!Uri.TryCreate(downloadUrl, UriKind.Absolute, out var downloadUri)) return false;
-            if (downloadUri.Scheme != Uri.UriSchemeHttp && downloadUri.Scheme != Uri.UriSchemeHttps) return false;
-            if (onlyOfficeApiBase.DosIsNullOrWhiteSpace()) return false;
-            if (!Uri.TryCreate(onlyOfficeApiBase, UriKind.Absolute, out var officeUri)) return false;
-            return string.Equals(downloadUri.Host, officeUri.Host, StringComparison.OrdinalIgnoreCase)
-                && downloadUri.Port == officeUri.Port;
+            return OfficeDocumentSecurity.IsAllowedDownloadUrl(downloadUrl, onlyOfficeApiBase);
         }
 
-        private async Task<DosResult> PutOfficeObject(string osClient, string hdfs, bool? limit, string fileFullPath, Stream fileStream)
+        private async Task<DosResult> PutOfficeObject(
+            string osClient,
+            bool limit,
+            string fileFullPath,
+            Stream fileStream)
         {
             var clientModel = OsClient.GetClient(osClient);
-            var defaultHdfs = TokenString(ToJObject((object)clientModel.OsClientModel)?["HDFS"]);
-            if (hdfs.DosIsNullOrWhiteSpace() && !defaultHdfs.DosIsNullOrWhiteSpace())
+            if (clientModel?.OsClientModel == null)
             {
-                hdfs = defaultHdfs;
+                return new DosResult(0, null, "当前租户的分布式存储配置不可用！");
             }
+            var defaultHdfs = TokenString(ToJObject((object)clientModel.OsClientModel)?["HDFS"]);
 
-            IMicroiHDFS hdfsClient = hdfs switch
-            {
-                "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
-                "S3" => MicroiEngine.HDFSFactory(HDFSType.AmazonS3),
-                _ => MicroiEngine.HDFSFactory(HDFSType.Aliyun)
-            };
+            IMicroiHDFS hdfsClient;
+            if (string.Equals(defaultHdfs, "MinIO", StringComparison.OrdinalIgnoreCase))
+                hdfsClient = MicroiEngine.HDFSFactory(HDFSType.MinIO);
+            else if (string.Equals(defaultHdfs, "S3", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(defaultHdfs, "AmazonS3", StringComparison.OrdinalIgnoreCase))
+                hdfsClient = MicroiEngine.HDFSFactory(HDFSType.AmazonS3);
+            else if (defaultHdfs.DosIsNullOrWhiteSpace()
+                     || string.Equals(defaultHdfs, "Aliyun", StringComparison.OrdinalIgnoreCase)
+                     || string.Equals(defaultHdfs, "AliOss", StringComparison.OrdinalIgnoreCase))
+                hdfsClient = MicroiEngine.HDFSFactory(HDFSType.Aliyun);
+            else
+                return new DosResult(0, null, "当前租户配置了不受支持的分布式存储类型！");
 
             return await hdfsClient.PutObject(new HDFSParam
             {
@@ -796,29 +1291,52 @@ namespace Microi.net.Api
             });
         }
 
+        private static JObject ParseOfficeFieldConfig(JObject fieldModel)
+        {
+            var config = fieldModel?["Config"];
+            if (config is JObject objectConfig) return objectConfig;
+            var configText = TokenString(config);
+            if (configText.DosIsNullOrWhiteSpace()) return null;
+            try { return JObject.Parse(configText); }
+            catch { return null; }
+        }
+
+        private static bool IsOfficePreviewEnabled(JObject fieldModel)
+        {
+            return TokenBool(ParseOfficeFieldConfig(fieldModel)?
+                .SelectToken("FileUpload.EnableOfficePreview")) != false;
+        }
+
+        private static bool IsOfficeEditEnabled(JObject fieldModel)
+        {
+            return TokenBool(ParseOfficeFieldConfig(fieldModel)?
+                .SelectToken("FileUpload.AllowOfficeEdit")) == true;
+        }
+
+        private static bool IsPrivateOfficeField(JObject fieldModel)
+        {
+            return TokenBool(ParseOfficeFieldConfig(fieldModel)?
+                .SelectToken("FileUpload.Limit")) == true;
+        }
+
         private static bool IsOfficeVersionEnabled(JObject fieldModel)
         {
-            var configText = TokenString(fieldModel?["Config"]);
-            if (configText.DosIsNullOrWhiteSpace()) return false;
-            try
-            {
-                var config = JObject.Parse(configText);
-                return TokenBool(config.SelectToken("FileUpload.EnableOfficeVersion")) == true;
-            }
-            catch
-            {
-                return false;
-            }
+            return TokenBool(ParseOfficeFieldConfig(fieldModel)?
+                .SelectToken("FileUpload.EnableOfficeVersion")) == true;
         }
 
         private static JObject FindOfficeFileMeta(JToken fieldValue, string sourceFilePath)
         {
             var parsed = ParseOfficeFieldValue(fieldValue);
             if (parsed == null) return null;
-            if (parsed is JObject obj) return obj;
+            var normalizedSource = NormalizeComparePath(sourceFilePath);
+            if (normalizedSource.DosIsNullOrWhiteSpace()) return null;
+            if (parsed is JObject obj)
+            {
+                return OfficeFileMetaMatches(obj, normalizedSource) ? obj : null;
+            }
             if (parsed is not JArray arr) return null;
 
-            var normalizedSource = NormalizeComparePath(sourceFilePath);
             foreach (var item in arr.OfType<JObject>())
             {
                 if (OfficeFileMetaMatches(item, normalizedSource))
@@ -1097,6 +1615,8 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var adminError = RequirePlatformAdmin(param);
+            if (adminError != null) return Json(adminError);
             var pathError = NormalizeObjectPath(param, allowEmpty: true);
             if (pathError != null) return Json(pathError);
             var result = await new MicroiHDFS().ListObjects(param);
@@ -1112,6 +1632,8 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var adminError = RequirePlatformAdmin(param);
+            if (adminError != null) return Json(adminError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
@@ -1133,6 +1655,8 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var adminError = RequirePlatformAdmin(param);
+            if (adminError != null) return Json(adminError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
@@ -1154,6 +1678,8 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var adminError = RequirePlatformAdmin(param);
+            if (adminError != null) return Json(adminError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
@@ -1181,6 +1707,8 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var adminError = RequirePlatformAdmin(param);
+            if (adminError != null) return Json(adminError);
 
             if (param.FilePathName.DosIsNullOrWhiteSpace())
             {
@@ -1209,18 +1737,13 @@ namespace Microi.net.Api
         {
             var accessError = await DefaultParam(param);
             if (accessError != null) return Json(accessError);
+            var adminError = RequirePlatformAdmin(param);
+            if (adminError != null) return Json(adminError);
             var pathError = NormalizeUploadPath(param);
             if (pathError != null) return Json(pathError);
 
-            param.Files = new Dictionary<string, Stream>();
-            if (HttpContext.Request.HasFormContentType)
-            {
-                foreach (var file in HttpContext.Request.Form.Files)
-                {
-                    if (file != null)
-                        param.Files.Add(file.FileName, file.OpenReadStream());
-                }
-            }
+            var fileError = LoadFormFiles(param);
+            if (fileError != null) return Json(fileError);
 
             // 文件管理上传不压缩
             param.Preview = false;

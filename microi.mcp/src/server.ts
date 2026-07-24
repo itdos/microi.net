@@ -1,8 +1,9 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import crypto from 'node:crypto';
 import { z } from 'zod';
 import type { MicroiClient, DbTable, DbField, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo } from './microi-client.js';
-import { registerAdvancedTools } from './advanced-tools.js';
+import { normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
@@ -1222,11 +1223,13 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_get_engine_code',
-    `Get JavaScript source code of a specific API engine (OsClient: ${osClient}).`,
+    `Get JavaScript source code of a specific API engine (OsClient: ${osClient}). Large source is returned in explicit character chunks so the MCP host cannot silently replace missing code with a "tokens truncated" marker. Read every chunk before editing; never save a single partial chunk as complete source.`,
     {
       apiEngineKey: z.string().describe('The unique key of the API engine'),
+      charOffset: z.number().int().nonnegative().optional().describe('Zero-based character offset. Start with 0, then use nextCharOffset until hasMore=false.'),
+      maxChars: z.number().int().min(1000).max(16000).optional().describe('Characters per chunk (default 6000, max 16000).'),
     },
-    async ({ apiEngineKey }) => {
+    async ({ apiEngineKey, charOffset, maxChars }) => {
       try {
         const result = await client.getEngineCode(apiEngineKey);
         if (result.Code !== 1) {
@@ -1235,15 +1238,25 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
 
         const engine = result.Data;
         const code = getStringField(engine, 'ApiV8Code', 'Code', 'V8Code');
+        const start = Math.min(charOffset || 0, code.length);
+        const chunkSize = maxChars || 6000;
+        const end = Math.min(start + chunkSize, code.length);
+        const chunk = code.slice(start, end);
+        const hasMore = end < code.length;
+        const sha256 = crypto.createHash('sha256').update(code, 'utf8').digest('hex');
         const lines = [
           `## API Engine: ${engine?.ApiEngineKey || apiEngineKey}`,
           engine?.ApiName ? `- **Name**: ${engine.ApiName}` : '',
           engine?.Category ? `- **Category**: ${engine.Category}` : '',
           engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
           engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
+          `- **Source completeness**: ${hasMore || start > 0 ? 'PARTIAL CHUNK — do not save this chunk alone' : 'COMPLETE'}`,
+          `- **Character range**: [${start}, ${end}) of ${code.length}`,
+          `- **Full source SHA-256**: ${sha256}`,
+          hasMore ? `- **Next call**: charOffset=${end}, maxChars=${chunkSize}` : '- **Has more**: false',
           '',
           '```javascript',
-          code || '// No code available',
+          chunk || '// No code available',
           '```',
         ].filter(Boolean);
 
@@ -1453,10 +1466,15 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       code: z.string().describe('The complete JavaScript source code to save'),
       functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
+      confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
     },
-    async ({ apiEngineKey, code, functionDescription, changeSummary }) => {
+    async ({ apiEngineKey, code, functionDescription, changeSummary, confirmLargeReduction }) => {
       try {
-        const result = await client.saveEngineCode(apiEngineKey, code, { functionDescription, changeSummary });
+        const result = await client.saveEngineCode(apiEngineKey, code, {
+          functionDescription,
+          changeSummary,
+          confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
+        });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
@@ -2214,7 +2232,10 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       tableDiyFieldIds: z.string().optional().describe('Comma-separated field Ids to show as table columns (e.g. "fieldId1,fieldId2,fieldId3"). Controls which fields appear in the list view.'),
       defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
       sqlWhere: z.string().optional().describe('Fixed SQL WHERE clause for data filtering (e.g. "Status=1", "IsDeleted=0")'),
-      diyConfig: z.string().optional().describe('Advanced module config JSON string'),
+      enableViewSchema: z.number().optional().describe('Enable the versioned cross-client ViewSchema (1=yes, 0=no). Default: 0.'),
+      viewSchemaVersion: z.string().optional().describe('ViewSchema protocol version stored in sys_menu.ViewSchemaVersion. Default: "1.0".'),
+      viewConfigVersion: z.number().optional().describe('Monotonic configuration version stored in sys_menu.ViewConfigVersion. Default: 1.'),
+      viewSchema: z.string().optional().describe('Versioned cross-client view JSON stored in the physical sys_menu.ViewSchema column. Supports Detail/Edit/List/Card views and PC/Mobile/All device scopes.'),
       moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
       formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required.'),
       batchSelectMoreBtns: z.string().optional().describe('Batch action buttons (after selecting multiple rows) JSON ARRAY (string). Same item shape as moreBtns. Use V8.TableRowSelected to access selected rows.'),
@@ -2234,18 +2255,30 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
     },
     async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort,
-      icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, diyConfig,
+      icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere,
+      enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema,
       moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns,
       sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields,
       inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields }) => {
       try {
+        const normalizedViewSchema = normalizeViewSchemaJson(viewSchema);
+        if (!normalizedViewSchema.ok) {
+          return {
+            content: [{ type: 'text', text: `Error: ${normalizedViewSchema.errors.join('\n')}` }],
+            isError: true,
+          };
+        }
         const result = await client.createModule({
           Name: name, DiyTableId: diyTableId, ParentId: parentId,
           ComponentName: componentName, ComponentPath: componentPath,
           Display: display ?? 1, AppDisplay: appDisplay ?? 1,
           OpenType: openType, Url: url, Sort: sort,
           Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
-          DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere, DiyConfig: diyConfig,
+          DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere,
+          EnableViewSchema: enableViewSchema ?? 0,
+          ViewSchemaVersion: viewSchemaVersion ?? '1.0',
+          ViewConfigVersion: viewConfigVersion ?? 1,
+          ViewSchema: normalizedViewSchema.value,
           MoreBtns: moreBtns, FormBtns: formBtns, BatchSelectMoreBtns: batchSelectMoreBtns,
           PageTabs: pageTabs, ExportMoreBtns: exportMoreBtns, PageBtns: pageBtns,
           SortFieldIds: sortFieldIds, NotShowFields: notShowFields,

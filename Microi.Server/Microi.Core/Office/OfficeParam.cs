@@ -122,6 +122,12 @@ namespace Microi.net
     {
         public string FormEngineKey { get; set; }
         public string FormDataId { get; set; }
+        /// <summary>
+        /// Exact menu context used to authorize the source record. Client exports
+        /// must provide either this value or ModuleEngineKey.
+        /// </summary>
+        public string _SysMenuId { get; set; }
+        public string ModuleEngineKey { get; set; }
         public JObject FormData { get; set; }
         public byte[] TplFileByte { get; set; }
         public string TplKey { get; set; }

@@ -362,6 +362,7 @@ export default {
                 // _SysMenuId: self.SysMenuId,
                 ModuleEngineKey: self.SysMenuModel.ModuleEngineKey
             };
+            self.ApplyTableChildAuthContext(param);
             self.applyTableOrderParams(param);
             if (!param.ModuleEngineKey) {
                 param.ModuleEngineKey = self.SysMenuId;
@@ -512,8 +513,11 @@ export default {
                 }
                 var param = {
                     TableId: self.TableId,
-                    Id: rowModel.Id
+                    Id: rowModel.Id,
+                    _SysMenuId: self.SysMenuId || (self.SysMenuModel && self.SysMenuModel.Id) || "",
+                    ModuleEngineKey: self.SysMenuModel && self.SysMenuModel.ModuleEngineKey
                 };
+                self.ApplyTableChildAuthContext(param);
 
                 var url = self.DiyApi.DelDiyTableRow;
                 if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.ApiReplace.Delete)) {
@@ -572,7 +576,7 @@ export default {
                 self.BtnLoading = true;
                 self.DiyCommon.Post(
                     self.DiyApi.UptDiyTableRow,
-                    {
+                    self.ApplyTableChildAuthContext({
                         FormEngineKey: self.CurrentDiyTableModel.Name,
                         Id: rowModel.Id,
                         _TableRowId: rowModel.Id,
@@ -581,7 +585,7 @@ export default {
                         _FormData: {
                             IsDeleted: 0
                         }
-                    },
+                    }),
                     function (result) {
                         self.BtnLoading = false;
                         if (self.DiyCommon.Result(result)) {

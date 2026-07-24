@@ -1,96 +1,105 @@
 ---
 name: uniapp-mall-assets
-description: 数字经济商城 uni-app H5（mci.lsg.uniapp）资源/图片路径与 FileServer 前缀强制规范。用于在 uni-app `<image :src>` 或 PC 商城页面渲染 MainImg、Avatar、BannerImg、CardImage、MainImage、Cover 或任何用户上传资源路径。
+description: Microi UniApp、H5、商城与 PC 页面中的上传图片、附件、FileServer、私有文件临时 URL 和富文本资源安全规范。
 ---
 
-# 商城前端：图片 / 资源路径规范
+# Microi UniApp / 商城资源路径规范
 
-数据库里的图片/附件字段（`MainImg`, `Avatar`, `BannerImg`, `CardImage`, `Image`, `Cover` 等）几乎都保存的是**相对路径**，例如 `/lsg/mall/product/20260521/p1-01.jpg` 或 `mall/.../xxx.jpg`。
+本 Skill 只描述平台通用资源规则。不得写入客户名称、真实 `OsClient`、客户应用路径、客户接口 Key 或特定商城结算规则。
 
-直接把这种路径写进 `<image :src="row.MainImg">` 等价于让浏览器访问 `https://host/lsg/mall/...`，**404**、图片不显示。
+## 先识别资源类型
 
-## 关键事实：FileServer 不是 API 服务
+Microi 上传字段通常保存对象存储 Key 或相对路径，例如 `/demo/product/20260101/p1.jpg`。页面不能把相对路径直接交给 `<image>` / `<img>`，也不能一律拼接 API Base。
 
-后端 `V8.SysConfig.FileServer` 对应**对象存储/CDN 公网域名**（如 `https://static.itdos.com`），与 API 网关 `https://api.xxx` 是**两个不同的域名**。
+| 类型 | 处理方式 |
+|---|---|
+| 已允许的 `https://` 绝对地址 | 校验协议和允许域名后使用 |
+| 公有对象存储相对路径 | 拼接当前租户 `FileServer` |
+| `/file/...` 平台本地文件路由 | 拼接当前 API Base |
+| 私有对象 | 后端鉴权后签发短期 URL，前端只使用临时 URL |
+| `blob:` | 仅用于本页创建且能及时 `revokeObjectURL` 的预览 |
+| `data:` | 仅允许经过大小和 MIME 校验的图片预览；禁止用于富文本任意 HTML |
 
-❌ 把 `/lsg/mall/...` 拼到 `${API_BASE}/file/microi/` 下是**错的**——本地接口服务下并没有这个文件，会 404。
-✅ 必须拼到 `${FILE_SERVER}/`（OSS/CDN）。
-✅ 私有文件需要签名 URL，由后端 `V8.Method.GetPrivateFileUrl({FilePathName})` 返回带 `Signature/Expires` 的临时 URL。
+`FileServer` 是对象存储/CDN 地址，不等同于 API 服务。租户切换时必须使用当前 `OsClient` 的运行期配置，禁止在源码中写死域名或租户目录。
 
-## 必须经过 sanitizeAssetUrl
+## 统一资源解析函数
 
-`mci.lsg.uniapp/src/utils/api.js` 已经导出 `sanitizeAssetUrl(url)`，规则：
+项目应在共享请求/资源模块中实现一个 `resolveAssetUrl`，所有页面复用同一逻辑：
 
-- `http(s)://`、`data:`、`blob:` → 原样返回。
-- `/file/...` → `${API_BASE}/file/...`（API 服务的本地文件接口、二维码生成等）。
-- `/{anything}/...` 或 `xxx/yyy.ext` 这类相对路径 → `${FILE_SERVER}/...`（OSS/CDN）。
-- 第三方占位图（picsum/placehold/qrserver 等）→ 屏蔽返回空串。
+```js
+export function resolveAssetUrl(raw, {
+  apiBase,
+  fileServer,
+  allowedHosts = []
+}) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
 
-`FILE_SERVER` 来源：`mall-api.config.js` 顶层 `fileServer` 字段（默认 `https://static.itdos.com`），可被 `VITE_MALL_FILE_SERVER` 覆盖。**新部署到其它租户/CDN 时必须更新此处**。
+  if (/^https:\/\//i.test(value)) {
+    const host = new URL(value).hostname.toLowerCase();
+    return allowedHosts.includes(host) ? value : '';
+  }
+  if (/^blob:/i.test(value)) return value;
+  if (/^data:image\/(png|jpeg|gif|webp);base64,/i.test(value)) return value;
+  if (value.startsWith('/file/')) return `${apiBase.replace(/\/$/, '')}${value}`;
 
-### ✅ 正确
+  const relative = value.replace(/^\/+/, '');
+  return `${fileServer.replace(/\/$/, '')}/${relative}`;
+}
+```
+
+示例：
 
 ```vue
 <script setup>
-import { sanitizeAssetUrl } from '@/utils/api.js';
-function resolveImg(u) { return sanitizeAssetUrl(u); }
+import { resolveAssetUrl } from '@/utils/assets.js';
+
+function imageUrl(path) {
+  return resolveAssetUrl(path, {
+    apiBase: runtimeConfig.apiBase,
+    fileServer: runtimeConfig.fileServer,
+    allowedHosts: runtimeConfig.assetAllowedHosts
+  });
+}
 </script>
+
 <template>
-  <image v-if="p.MainImg" :src="resolveImg(p.MainImg)" mode="aspectFill" />
+  <image v-if="row.MainImg" :src="imageUrl(row.MainImg)" mode="aspectFill" />
 </template>
 ```
 
-或在数据 fetch 后一次性归一化（首页 [index.vue](ai-helper/数字经济商城/mci.lsg.uniapp/src/pages/index/index.vue) 用的就是这种）：
+不要让业务页面各自拼 `${API_BASE}/${path}` 或 `${FILE_SERVER}/${path}`；这会造成租户切换、私有桶、绝对 URL 和本地文件路由行为不一致。
 
-```js
-products.value = r.Data.map(p => ({ ...p, MainImg: sanitizeAssetUrl(p.MainImg) }));
-```
+## 私有文件
 
-### ❌ 错误（曾在 category/checkout/order-detail/order-list/product-detail/redeem-pickup/register/transfer 同时犯过）
+- 私有对象 Key 不能直接转换成可长期访问的公网地址。
+- 前端通过受保护接口请求临时 URL；后端使用 `V8.Method.GetPrivateFileUrl({ FilePathName })` 或等价受控能力。
+- 后端必须验证当前用户、`OsClient`、记录范围和字段绑定关系，不能只凭文件路径签名。
+- 临时 URL 设置较短有效期，不写入数据库、不进入长期缓存、不记录完整签名参数。
+- 下载响应使用安全的 `Content-Disposition`、MIME 白名单与文件名清洗。
 
-```vue
-<image :src="p.MainImg" />                    <!-- 404 -->
-<image :src="uni.$mciFileBase + p.CardImage" /> <!-- $mciFileBase 不存在 -->
-```
+## 富文本与 CSS 资源
 
-## 检查清单（添加新页面时必过）
+- 富文本 HTML 先做标签、属性和协议白名单清洗，再改写允许的 `src` / `href`。
+- 禁止 `javascript:`、任意 `data:text/html`、事件属性和未知 iframe。
+- `background-image`、Markdown 图片、视频封面和头像与普通 `<image>` 使用同一资源解析策略。
+- 商品详情等富文本可让图片自适应宽度，但文本容器仍需留出安全边距；不得在文件名或页面文案暴露成本、导入批次、内部目录或生成规则。
 
-1. 模板里每一处 `<image :src="...">` 引用的字段是否经过 `sanitizeAssetUrl` 处理？
-2. `<img>`、`background-image: url(...)`、富文本 HTML 中的 src 同样要处理。
-3. Avatar / Logo / 卡面图等用户上传字段统一走相同函数。
-4. 不要直接拼 `API_BASE + path`，让 `sanitizeAssetUrl` 处理；它能识别已带 `http://` 的绝对地址。
-5. Vue/uni-app SFC 写法用辅助函数 `resolveImg`，便于未来全局替换。
+## 上传与预览边界
 
-## 商品详情富文本排版
+- 前端扩展名、大小提示只是体验校验；服务端仍须验证单文件大小、请求总量、租户配额、真实 MIME、魔数和文件名。
+- 对象 Key 必须由服务端生成并包含租户隔离前缀，不能信任客户端提交的完整路径。
+- SVG、HTML、脚本、压缩包和办公文档按风险策略处理；可执行内容不在同源页面直接渲染。
+- 预览失败时显示受控占位，不回退到未经校验的原始 URL。
 
-商品详情富文本里，图片满宽通常是合理的，但文字不能贴边。生成或清洗 `DetailHtml` 时必须把图片和文字分块：
+## 验收清单
 
-- 图片块：`img` 用 `display:block;width:100%;max-width:100%;height:auto;`，外层 `p` 的 `margin` 设为 `0`。
-- 文字块：标题、专区、分类、售价、规格说明、温馨提示等统一包进文本容器，使用 `padding:16px 18px 18px;box-sizing:border-box;line-height:1.7;`。
-- 不得在详情文案或图片文件名里暴露供价、成本价、倍率、导入批次、生成规则等后台信息。
-- 截图验收时同时看图片是否真实加载、文字是否贴边、长标题是否换行后仍在容器内。
+- [ ] 公有对象、本地文件、私有对象、绝对 URL 的路径分支均有测试
+- [ ] 切换两个 `OsClient` 后使用各自 `FileServer`，无跨租户路径或缓存复用
+- [ ] 私有 URL 越权、过期、篡改签名和复制到其它账号均失败
+- [ ] 网络面板中没有硬编码客户域名、真实租户或永久签名 URL
+- [ ] 关键列表、详情、上传、预览页面有截图和真实资源加载断言
+- [ ] `blob:` URL 及时释放，大文件预览不会持续占用内存
+- [ ] 富文本协议/标签白名单可阻止 XSS
 
-## 与 sys_menu 表单 V8 事件配合
-
-在表单 V8 `InFormV8` 等事件里给字段补图片预览时，也要用同样规则。`<el-image>` / `<img>` / `mci-image` 都受影响。
-
-## 全自动化测试强制截图（防回归）
-
-E2E 测试必须在以下页面做全屏截图并复核：
-
-- 首页、商品分类、商品详情、抢购详情、约单详情、订单详情、个人中心、库存转让区。
-- 每个截图都要用 `view_image` 工具人眼检查"图片是否真实显示"。
-- 若关键图片块出现纯背景渐变/首字母占位/空白，立即回到本 Skill 检查 `sanitizeAssetUrl` 是否覆盖。
-
-参见 [microi.skills/playwright-e2e/SKILL.md](microi.skills/playwright-e2e/SKILL.md)。
-
-## 商品购买入口规范
-
-商城项目里“加入购物车”和“立即购买”必须是两条不同入口：
-
-- “加入购物车”只调用购物车新增接口，并停留当前页或提示成功。
-- “立即购买”不得自动加入购物车，必须携带当前 `ProductId/SkuId/Quantity` 进入结算页，例如 `/pages/order/checkout?mode=buyNow&productId=...&qty=1`。
-- 结算页必须识别 `mode=buyNow`，只加载当前商品；从购物车进入时才读取购物车列表/勾选项。
-- 后端结算接口需要同时支持购物车 `CartIds` 和直购 `ProductId/Quantity`，直购成功后不得删除或影响购物车其它商品。
-- 专区支付必须按商品属性隔离：提货卡专区只能扣提货卡余额并生成提货扣除记录；兑换金专区只能扣兑换金并生成兑换金流水。不同支付专区商品不得混合结算。
-- 自动化测试至少覆盖：未登录点击加入购物车跳登录、登录后加入购物车可见、立即购买不会调用 `mall_cart_add`、立即购买结算页只出现当前商品、结算接口按专区扣减对应资产。
+参见 `microi.skills/v8-file-upload/SKILL.md`、`microi.skills/microi-uniapp-frontend/SKILL.md` 和 `microi.skills/playwright-e2e/SKILL.md`。

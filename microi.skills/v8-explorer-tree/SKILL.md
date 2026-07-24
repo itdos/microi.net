@@ -98,6 +98,8 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 └── 模块引擎/
     └── <父菜单Name>（<ParentMenuId>）/                     // 非叶子模块只显示子模块，不生成按钮目录
         └── <叶子菜单Name>（<LeafMenuId>）/
+            ├── Join关联（SqlJoin）.js                       // 始终生成，直接映射 sys_menu.SqlJoin
+            ├── Where条件（SqlWhere）.js                    // 始终生成，直接映射 sys_menu.SqlWhere
             ├── 页面多Tab（PageTabs）/                     // 叶子模块固定生成全部 6 个按钮目录，即使为空
             │   ├── <按钮Name>（<按钮Id>）.js              // V8Code，仅远端非空代码生成文件
             │   └── <按钮Name>_显隐判断（<按钮Id>）.js     // V8CodeShow，仅在非空时生成
@@ -115,6 +117,8 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 > 因此：拉取远端资源时，空 V8 代码**不要生成本地 `.js` 文件**。若历史同步留下空 `.js` 文件，且远端代码同样为空，应删除本地空文件，避免被“查看同步状态”误判为本地未推送。
 >
 > 用户需要清空远端代码时，可以把已有非空文件清空并推送；推送成功后插件应删除该本地空文件或对齐为“无本地文件”状态。
+>
+> 例外：`SqlJoin`、`SqlWhere` 是模块查询配置，不是按钮 V8 事件。叶子模块必须始终生成两个平级文件，空文件表示远端字段为空，并允许通过推送空文件清空对应字段。
 
 ---
 
@@ -142,13 +146,13 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 ### 3.3 sys_menu 按钮 JSON 拆分（✅ 已实现 2026-05）
 
 **接口**：
-- `GET /api/V8Debug/GetModule?osClient&moduleId` — 返回菜单详情含 6 类按钮 JSON
-- `POST /api/V8Debug/UpdateModule` — Body 含 `OsClient/ModuleId` 及 6 类按钮 JSON
+- `GET /api/V8Debug/GetModule?osClient&moduleId` — 返回菜单详情，包含 6 类按钮 JSON 以及 `SqlJoin/SqlWhere`
+- `POST /api/V8Debug/UpdateModule` — Body 含 `OsClient/ModuleId` 以及目标按钮字段或 `SqlJoin/SqlWhere`
 
 **拉取**：
 1. 解析 `PageTabs/PageBtns/MoreBtns/FormBtns/BatchSelectMoreBtns/ExportMoreBtns` 6 个 JSON 数组（非法 JSON 记录错误并跳过该字段）
 2. 按 `ParentId` 生成与 `sys_menu/GetSysMenuStep` 一致的模块树；非叶子模块只生成子模块目录，不生成按钮目录
-3. 叶子模块固定生成全部 6 个按钮分类目录，即使远端数组为空
+3. 叶子模块固定生成全部 6 个按钮分类目录，并直接生成 `Join关联（SqlJoin）.js`、`Where条件（SqlWhere）.js`；两个配置文件即使远端为空也必须生成
 4. 对每个按钮：
   - 仅在 `V8Code` 非空时生成 `<按钮Name>（<按钮Id>）.js`
   - 若 `V8CodeShow` 非空 → 生成 `<按钮Name>_显隐判断（<按钮Id>）.js`
@@ -163,7 +167,9 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 5. 写一份 `.backups/<moduleId>/<ButtonField>-<timestamp>.json`（变更前的远端 JSON）
 6. 调 `UpdateModule` 整段写回；任何一步失败不写库
 
-**修改状态**：接口引擎、表单V8事件、字段V8事件、模块按钮文件都必须写入 `.microi-meta.json` 的 `updateTime/filePath`；本地 `mtime > updateTime + 1s` 时树节点显示 `已修改`，推送成功后同步更新 meta 并将文件 mtime 设置为远端更新时间以清除标记。
+**SqlJoin/SqlWhere 保存**：从文件路径解析 `ModuleId / SqlJoin|SqlWhere`，推送前重新 `GetModule`，备份远端原字段，`UpdateModule` 只提交目标字段；成功后必须再次 `GetModule` 回读正文完全一致，才更新 meta/mtime。空正文正常保留为空文件。
+
+**修改状态**：接口引擎、表单V8事件、字段V8事件、模块按钮、模块 SqlJoin/SqlWhere 文件都必须写入 `.microi-meta.json` 的 `updateTime/filePath`；本地 `mtime > updateTime + 1s` 时树节点显示 `已修改`，推送成功后同步更新 meta 并将文件 mtime 设置为远端更新时间以清除标记。
 
 **Controller OsClient 规则**：`CheckPermission()` 返回的 `token` 是 `dynamic`。调用 `V8McpLogic.ResolveOsClient` 时必须传 `(object)token`，并让 `ResolveOsClient(string osClient, object currentToken)` 返回真正的 `string`；Controller 中 OsClient 空判断用 `string.IsNullOrWhiteSpace(osClient)`，不要对 `osClient` 调 `DosIsNullOrWhiteSpace()`。
 
@@ -189,13 +195,14 @@ description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 
 - ✅ **Stage 2 字段V8事件** —— 已实现：右键单表拉取字段 V8 事件；空代码不生成文件；推送仅更新目标字段的目标 V8 字段
 - ✅ **Stage 3 sys_menu 按钮拆分** —— 已实现：主拉取同步模块引擎；按钮 V8Code 仅在非空时生成 `.js`；推送前重拉远端 JSON、按 ButtonId 只改目标按钮并保留其它按钮，写入前自动备份
 - ✅ **Stage 4 树形模块引擎 + 全类型修改状态** —— 已实现：模块按 ParentId 树形拉取；非叶子只显示子模块；叶子固定生成 6 个按钮目录；字段/按钮文件也显示并清除 `已修改`
+- ✅ **Stage 5 sys_menu 查询脚本本地化** —— 已实现：叶子模块固定生成 `SqlJoin/SqlWhere` 两个平级 `.js` 文件，支持备份、预检、推送、远端回读和修改状态
 
 ---
 
 ## 6. 实施约束总结
 
 - **不要**在没看过 §4 全部 7 条不变量就动手实现 Stage 3
-- **不要**为远端空代码生成 `.js` 文件；历史空 `.js` 文件在同步收尾时应删除
+- **不要**为远端空 V8 事件/按钮代码生成 `.js` 文件；`SqlJoin/SqlWhere` 属于查询配置，必须保留空文件
 - **不要**用半角括号；统一用全角 `（）`
 - **不要**清空 V8事件/ 旧目录；保留兼容直到用户主动删除
 - 文件名中 `<英文Key>` 段必须 ASCII，避免 Windows 不可见字符
@@ -212,6 +219,6 @@ AI 使用 MCP、接口引擎、数据库脚本或平台 API 修改远端 V8 代�
 - 收尾复核应确认 touched 范围没有 `changed/created/local-only` 差异；若存在差异，必须在最终回复中说明原因。
 - 空 V8 代码不生成本地 `.js` 文件；同步收尾时应清理历史空文件。
 - 插件“查看同步状态”不能只显示数量。若本地未推送数量大于 0，必须能列出具体资源类型、Key、名称、同步基准时间、本地修改时间和文件路径，并支持直接打开该文件。
-- 接口引擎、表单引擎、模块引擎、流程引擎四个顶层分类必须分别提供行内“查看同步状态”，分类检测只请求该类型的远端数据，禁止每次强制扫描全部引擎。表单引擎范围必须同时覆盖表单 V8 事件与字段 V8 事件，模块引擎范围必须覆盖按钮 V8。
+- 接口引擎、表单引擎、模块引擎、流程引擎四个顶层分类必须分别提供行内“查看同步状态”，分类检测只请求该类型的远端数据，禁止每次强制扫描全部引擎。表单引擎范围必须同时覆盖表单 V8 事件与字段 V8 事件，模块引擎范围必须覆盖按钮 V8 与 `SqlJoin/SqlWhere`。
 - 一次同步检测的结果必须持久保留在侧边“同步结果”树中，按双方冲突、服务器较新、本地未推送分组；用户应能连续点击不同文件查看远端/本地差异，只有主动刷新时才重新请求服务器，禁止每查看一个文件都重新执行整次检测。
 - 表单事件、字段事件、按钮事件等远端 Key 比对要做大小写兼容；当本地代码与远端代码相同但 mtime 晚于 meta 时，应自动刷新 meta/mtime，避免误报“本地未推送”。

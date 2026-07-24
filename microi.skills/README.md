@@ -8,6 +8,8 @@
 
 ## 包含的 Skills
 
+当前仓库包含 48 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+
 ### V8 引擎核心（后端）
 
 | Skill | 场景 | 文件 |
@@ -27,6 +29,7 @@
 | **v8-export-import** | Excel 自定义导入导出（含进度跟踪） | `v8-export-import/SKILL.md` |
 | **v8-debugging** | 调试模式、异常捕获、系统日志 | `v8-debugging/SKILL.md` |
 | **v8-security** | 安全最佳实践（权限/输入验证/防注入） | `v8-security/SKILL.md` |
+| **spider-engine** | 爬虫/浏览器采集 Worker、会话、目标地址、配额与交付边界 | `spider-engine/SKILL.md` |
 
 ### V8 引擎核心（前端）
 
@@ -47,6 +50,14 @@
 | **microi-ui** | 吾码UI（Microi.UI / MCI-UI）组件库、主题 palette、圆角/扁平、Web/UniApp 用法 | `microi-ui/SKILL.md` |
 | **microi-form-layout** | 表单布局分组规范：Tabs vs CollapseGroup 决策、字段数阈值、回读验收 | `microi-form-layout/SKILL.md` |
 | **microi-db-schema** | 数据库字典、核心表关系、字段归属与 V8 配置存储位置 | `microi-db-schema/SKILL.md` |
+| **microi-left-right-layout** | 模块引擎“树形+表格/表单”左右布局与主外键过滤 | `microi-left-right-layout/SKILL.md` |
+| **datasource-engine** | SQL/V8/JSON 数据源设计、租户与权限、字段供数和验收 | `datasource-engine/SKILL.md` |
+| **job-engine** | 定时/后台任务、多节点租约、幂等、恢复和进度 | `job-engine/SKILL.md` |
+| **search-engine** | Elasticsearch 索引、同步、查询、租户/数据范围和重建 | `search-engine/SKILL.md` |
+| **report-engine** | Rpt_Report 虚拟报表、数据源、聚合、写接口和导出 | `report-engine/SKILL.md` |
+| **translate-engine** | 多语言词条、翻译供应商、租户隔离、缓存和批量翻译 | `translate-engine/SKILL.md` |
+| **ai-engine** | 模型代理、NL2SQL/NL2V8、Schema/Skill 关键词检索与可选向量融合 | `ai-engine/SKILL.md` |
+| **app-store** | 应用包、Manifest、后台安装、差异升级、回滚和验收 | `app-store/SKILL.md` |
 
 ### 项目交付、前端与移动端
 
@@ -63,7 +74,7 @@
 | **v8-explorer-tree** | VS Code 插件 V8 资源管理器目录规范和本地文件归档 | `v8-explorer-tree/SKILL.md` |
 | **workspace-conventions** | 工作区文件放置、临时产物、项目专属目录和根目录污染防护 | `workspace-conventions/SKILL.md` |
 | **production-readonly-audit** | 正式环境只读巡检，不改动线上数据的业务核对流程 | `production-readonly-audit/SKILL.md` |
-| **uniapp-mall-assets** | 数字经济商城 UniApp 资源/图片路径与 FileServer 前缀规范 | `uniapp-mall-assets/SKILL.md` |
+| **uniapp-mall-assets** | UniApp/H5/商城上传资源、FileServer、私有临时 URL 与富文本安全 | `uniapp-mall-assets/SKILL.md` |
 
 ### 自动化测试
 
@@ -76,17 +87,27 @@
 
 ## 快速开始：如何使用 Skills
 
-### 第 1 步：获取 Skills
+### 推荐：VS Code 插件零配置安装
+
+安装 Microi 吾码 VS Code 插件后，在工作区执行初始化/拉取。插件会安装当前版本的完整 `microi.skills`，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成 `AGENTS.md`、`.github/copilot-instructions.md`、`CLAUDE.md` 和 Cursor rules；不需要手工维护 48 条 Skill 引用。
+
+插件升级采用清单和内容哈希做差异更新：未被用户修改的官方 Skill 自动升级，用户已经修改的文件不被整文件覆盖，新增 Skill 自动补齐。发布插件时必须比对源 Skills、插件 `dist`、VSIX 和空工作区初始化产物的相对路径与 SHA-256，不能只检查文件数量。
+
+随后按需连接 Microi MCP：MCP 提供实时表结构、接口引擎、菜单和应用源码上下文；Skills 提供设计、安全、编码与验收规则；VS Code 插件提供类型、资源树和上下文生成。三者组合才是推荐的 AI 零代码开发路径。
+
+### 备用：手工获取 Skills
 
 ```bash
-git clone https://gitee.com/microi-net/microi.skills.git
+git clone https://gitee.com/ITdos/microi.net.git
 ```
 
-将 `microi.skills` 文件夹放到你的 V8 引擎工作区目录下（如 `microi-v8-engine/` 同级）。
+将源码中的 `microi.skills` 文件夹放到工作区根目录。也可使用 Git sparse-checkout 只获取该目录。
 
-### 第 2 步：配置 AI 工具加载 Skills
+### 手工配置 AI 工具加载 Skills
 
 根据你使用的 AI 工具，选择对应的配置方式：
+
+> 手工配置仅是插件不可用时的备用方案。不要把全部 Skill 内容拼接到单个规则文件；保留独立文件并按任务路由读取，可避免超长上下文、重复规则和版本漂移。
 
 ---
 
@@ -189,6 +210,19 @@ done
 
 ---
 
+## 安全与兼容底线
+
+- 浏览器 FormEngine 请求优先携带真实 `_SysMenuId`；历史无菜单调用由后端从用户真实菜单缓存安全推断，后端可信 V8 不要求 `_SysMenuId`。
+- `_InvokeType: 'Client'` 会触发表单 V8 事件，不是授权标记，也不能用来“避免递归”。
+- 平台保护表和控制面 API 只允许 `Level >= 9999`；普通角色的表权限不能绕过该基线。
+- 多租户、文件、Redis、MQ、对象存储和搜索能力必须由服务端绑定当前 `OsClient`。
+- `setTimeout`、`Task.Run` 和进程内静态状态不能承担可靠后台任务或集群锁。
+- 上传上限由平台默认值和 `sys_osclients` 租户配置共同约束；私有文件的浏览器访问必须绑定菜单、记录、字段和附件。
+- CORS 未配置时为兼容历史默认允许 `*`，配置后才按租户域名收紧；SSRF 严格模式默认关闭，启用后按精确主机白名单放行。
+- MCP 写入前先读取实时 schema/manifest，写后回读；超时先回读确认，不得立即重复创建。
+
+---
+
 ## 使用效果示例
 
 配置 Skills 后，AI 对话中的代码生成质量会显著提升：
@@ -225,14 +259,9 @@ AI：参考 v8-crud-api Skill，生成完整代码：
 
 MIT
 
-## 新增通用前端 SDK Skill
+## 关键路由提示
 
-- `microi.skills/microi-frontend-sdk/SKILL.md`：Microi Vue3 前端 SDK 规范，覆盖请求、Token终端类型、`did`、休眠恢复续签、过期/租户诊断、上传、资源 URL、ApiEngine/FormEngine、Vue3 app 挂载。所有移动端 H5、UniApp、PC 官网、响应式站点和独立前端项目都应优先参考。
-
-## 新增表单布局分组 Skill
-
-- `microi.skills/microi-form-layout/SKILL.md`：低代码表单布局分组规范，**强制 AI 在通过 MCP、Manifest、VS Code 插件或 V8 引擎创建设计表单时优先使用 `CollapseGroup` 折叠分组，只有 ≥8 字段的大业务域才用 `Tabs` 分页**。覆盖三种分组方式（`diy_table.Tabs` 表级 Tab / `Component='Tabs'` 字段级 Tab / `Component='CollapseGroup'` 折叠分组）的存储位置、Config JSON 示例、决策算法、禁止事项和回读验收清单。所有表单设计任务必须先读本 skill 再下结论。
-
-## 新增左右树表 Skill
-
-- `microi.skills/microi-left-right-layout/SKILL.md`：模块引擎“树形+表格/表单”配置规范，覆盖 `diy_LeftJoinRightView` 全部业务配置项、主外键过滤、初始化 V8、MCP 幂等写入、移动端自适应和桌面/手机回读验收。
+- 独立 PC/H5/UniApp 前端：先读 `microi-frontend-sdk`，再读对应端的 UI/质量 Skill。
+- 表单字段较多时：先读 `microi-form-layout`。默认优先使用 `diy_table.Tabs + diy_field.Tab` 做业务域分组，局部复杂区域再用 `CollapseGroup` 或字段级 `Tabs`。
+- 树形+表格/表单：使用 `microi-left-right-layout`。
+- 跨模块完整交付：从 `business-blueprint` 进入，由 `microi-system-delivery` 总控，并把 `v8-security`、`microi-db-schema` 和自动化验收作为强制门禁。

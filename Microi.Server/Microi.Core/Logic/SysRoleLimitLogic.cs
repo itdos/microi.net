@@ -180,6 +180,10 @@ namespace Microi.net
             model.CreateTime = DateTime.Now;
             //var count = SysRoleLimitRepository.Insert(model);
             var count = dbSession.Insert(model);
+            if (count > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
+            }
             return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
 
@@ -231,6 +235,10 @@ namespace Microi.net
 
             //var count = SysRoleLimitRepository.Update(model);
             var count = dbSession.Update(model);
+            if (count > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
+            }
             return new DosResult(1);
         }
 
@@ -253,7 +261,11 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoExistData", param._Lang) + " Id:" + param.Id);
             }
             //var count = SysRoleLimitRepository.Delete(param.Id);
-            var count = dbSession.Delete<SysRole>(param.Id);
+            var count = dbSession.Delete<SysRoleLimit>(param.Id);
+            if (count > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
+            }
             return new DosResult(count > 0 ? 1 : 0, count, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
 
@@ -296,6 +308,7 @@ namespace Microi.net
                 trans.Insert(addList);
                 trans.Commit();
             }
+            await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
             return new DosResult(1);
         }
 
@@ -317,7 +330,7 @@ namespace Microi.net
                           FROM sys_role as r
                      LEFT JOIN sys_rolelimit rl
                             ON r.Id = rl.RoleId AND rl.FkId = @pFkId
-                         WHERE r.IsDeleted <> 1 AND rl.IsDeleted <> 1
+                         WHERE r.IsDeleted <> 1
                       ORDER BY r.Sort ASC";
             var list = dbSession.FromSql(sql)
                                 .AddInParameter("pFkId", System.Data.DbType.String, param.FkId)
@@ -333,11 +346,12 @@ namespace Microi.net
         public async Task UpdateSysRoleLimitByMenuId(string osClient, string id, string roleId, string fkId, string permission)
         {
             DbSession dbSession = OsClientExtend.GetClient(osClient).Db;
+            var changed = 0;
             if (string.IsNullOrEmpty(id))
             {
                 var insertSql = @"INSERT INTO sys_rolelimit (Id, RoleId, FkId, Type, Permission, CreateTime)
                                   VALUES (@pId, @pRoleId, @pFkId, @pType, @pPermission, @pCreateTime)";
-                dbSession.FromSql(insertSql)
+                changed = dbSession.FromSql(insertSql)
                          .AddInParameter("pId", System.Data.DbType.String, Guid.NewGuid().ToString())
                          .AddInParameter("pRoleId", System.Data.DbType.String, roleId)
                          .AddInParameter("pFkId", System.Data.DbType.String, fkId)
@@ -349,10 +363,14 @@ namespace Microi.net
             else
             {
                 var updateSql = "UPDATE sys_rolelimit SET Permission = @pPermission WHERE Id = @pId";
-                dbSession.FromSql(updateSql)
+                changed = dbSession.FromSql(updateSql)
                          .AddInParameter("pPermission", System.Data.DbType.String, permission)
                          .AddInParameter("pId", System.Data.DbType.String, id)
                          .ExecuteNonQuery();
+            }
+            if (changed > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(osClient);
             }
         }
 

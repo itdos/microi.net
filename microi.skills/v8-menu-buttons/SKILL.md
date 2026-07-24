@@ -87,7 +87,7 @@ if (V8.Form.Status == '待指派' && !V8.Form.AssigneeId) {
 | `V8.TableId` | 当前 diy_table 的 Id |
 | `V8.TableRowSelected` | 批量按钮里勾选的行数组 |
 | `V8.CurrentUser` | 登录用户 |
-| `V8.ClientType` | `PC` / `App` / `Wechat` |
+| `V8.ClientType` | `PC` / `IOS` / `Android` / `H5` / `WeChat` |
 | `V8.Tips(msg, ok?)` | 浮层提示 |
 | `V8.ConfirmTips(msg, cb)` | 确认弹窗 |
 | `V8.RefreshTable({_PageIndex:1})` | 刷新列表 |
@@ -95,7 +95,7 @@ if (V8.Form.Status == '待指派' && !V8.Form.AssigneeId) {
 | `V8.OpenAnyForm({...})` | 弹出任意表单（核心：可替换提交事件）|
 | `V8.OpenAppDialog({...})` | 按 AppKey 打开已发布在线微服务定制页 |
 | `V8.FormSubmit({...})` | 提交当前表单 |
-| `V8.FormSet(field, val)` | 修改表单字段 |
+| `V8.FormSet(field, val)` | 普通表单触发目标字段 V8；列表上下文只更新当前行/模板 |
 | `V8.ApiEngine.Run({...})` | 调用接口引擎（业务逻辑必走）|
 | `V8.ApiEngine.RunBackground(...)` | 启动后台任务（用于安装、导入、初始化等长任务）|
 
@@ -159,6 +159,8 @@ V8.OpenAnyForm({
 ```
 
 ## 4. 模式 B：直接确认 + 接口调用
+
+`ConfirmTips` 使用 HTML 模式渲染内容，只传固定文案或经过 HTML 转义的简单文本；不要拼接用户输入、接口消息或数据库富文本。
 
 ```js
 V8.ConfirmTips('确认领取该任务？', function () {
@@ -238,12 +240,17 @@ switch (V8.Form.Status) {
   case '待验收': next = '待评价'; break;
 }
 if (next) {
-  V8.UptDiyTableRow({
-    TableId: V8.TableId, Id: V8.Form.Id,
-    _RowModel: { Status: next }
-  }, function () { V8.RefreshTable({ _PageIndex: -1 }); });
+  var result = await V8.ApiEngine.Run('order_advance_status', {
+    Id: V8.Form.Id,
+    ExpectedStatus: V8.Form.Status,
+    NextStatus: next
+  });
+  V8.Tips(result.Code == 1 ? '状态已更新' : result.Msg, result.Code == 1);
+  if (result.Code == 1) V8.RefreshTable({ _PageIndex: -1 });
 }
 ```
+
+状态机必须由接口引擎校验当前状态、目标状态、权限和并发版本；不要在前端直接更新状态字段。
 
 ## 6. 模式 D：批量操作（BatchSelectMoreBtns）
 
@@ -252,9 +259,8 @@ var rows = V8.TableRowSelected;
 if (!rows || rows.length == 0) { V8.Tips('请先勾选数据'); return; }
 var ids = rows.map(function (r) { return r.Id; });
 V8.ConfirmTips('确认删除选中的 ' + ids.length + ' 条？', function () {
-  V8.FormEngine.DelFormDataByWhere({
-    FormEngineKey: 'Diy_Order',
-    _Where: [{ Name: 'Id', Value: JSON.stringify(ids), Type: 'In' }]
+  V8.ApiEngine.Run('order_batch_delete', {
+    Ids: ids
   }, function (r) {
     if (r.Code == 1) { V8.Tips('删除成功'); V8.RefreshTable({ _PageIndex: 1 }); }
     else V8.Tips(r.Msg, false);
@@ -381,6 +387,18 @@ var modulePayload = {
 
 ---
 
+## 前端 FormEngine 权限与兼容
+
+- 当前按钮所在菜单绑定表会由 scoped facade 自动补真实 `_SysMenuId`，历史按钮不需要逐个修改。
+- 按钮跨表调用时不要把当前菜单 Id 传播给目标表；后端按当前用户对目标表的有效菜单权限缓存推断。
+- 显式 `_SysMenuId`/`ModuleEngineKey` 会严格校验，伪造或借用其它表菜单不会回退兼容推断。
+- 平台敏感表仍对普通客户端硬拒绝；Import/Export 必须走独立端点和专项菜单权限。
+- TableChild 的 `_TableChildAuth` 由标准子表自动维护，业务按钮不得构造或跨父记录复用。
+- 前端真实批量方法名是 `AddFormDataBatch/UptFormDataBatch/DelFormDataBatch`，没有 `AddTableData/UptTableData/DelTableData`。
+- 状态推进、资产、库存、审批、批量副作用等业务动作必须调用 ApiEngine；FormEngine 只适合权限范围内的简单单表 CRUD。
+
+---
+
 ## 10. 与接口引擎配套的工作流
 
 业务按钮通常与接口引擎配套：
@@ -407,26 +425,27 @@ var modulePayload = {
 - 验证时至少做一次小额测试，读回主表余额、订单表和流水表；测试备注要明确标识，方便审计。
 - 还必须做一次回滚验收：故意让流水写入失败，回读资产主表确认余额完全未变，再修正输入完成成功验收。
 
-按钮 V8Code 骨架：
+按钮 V8Code 骨架。充值包含金额、备注、联动校验，属于可维护业务表单，应使用在线微服务页面，不要在 `ConfirmTips` 中拼接 `<input>/<textarea>`：
 
 ```js
 var row = V8.Form || {};
-var uid = 'admin_recharge_' + String(row.Id || '').replace(/[^a-zA-Z0-9_]/g, '');
-var html = '<div style="text-align:left;min-width:360px;line-height:1.6">'
-  + '<div style="margin-bottom:10px">会员：<b>' + (row.NickName || row.Phone || row.Id || '') + '</b></div>'
-  + '<input id="' + uid + '_amount" type="number" min="0" step="0.01" placeholder="请输入充值积分" />'
-  + '<textarea id="' + uid + '_remark">平台直充积分</textarea>'
-  + '</div>';
-
-V8.ConfirmTips(html, function () {
-  var amount = Number((document.getElementById(uid + '_amount') || {}).value || 0);
-  var remark = ((document.getElementById(uid + '_remark') || {}).value || '平台直充积分');
-  if (!amount || amount <= 0) { V8.Tips('请输入大于0的充值积分', false); return; }
-  V8.ApiEngine.Run({ ApiEngineKey: 'xxx_admin_recharge', MemberId: row.Id, Amount: amount, Remark: remark }, function (r) {
-    V8.Tips(r && r.Code == 1 ? '充值成功' : ((r && r.Msg) || '充值失败'), r && r.Code == 1);
-    if (r && r.Code == 1) V8.RefreshTable({ _PageIndex: -1 });
-  });
-}, null, { Title: '后台充值积分', OkText: '确认充值', CancelText: '取消' });
+V8.OpenAppDialog({
+  AppKey: 'member_asset_admin',
+  RoutePath: '/recharge',
+  Title: '后台充值积分',
+  Width: 'min(720px, calc(100vw - 32px))',
+  Data: {
+    MemberId: row.Id,
+    MemberName: row.NickName || row.Phone || row.Id || ''
+  },
+  OnSuccess: function (result) {
+    V8.Tips((result && result.message) || '充值成功', true);
+    V8.RefreshTable({ _PageIndex: -1 });
+  },
+  OnError: function (error) {
+    V8.Tips((error && error.message) || '充值失败', false);
+  }
+});
 ```
 
 ---
@@ -519,5 +538,6 @@ DiyCommon._V8BaseInstance = {
 ### AI 编写按钮时的检查清单
 - [ ] `V8CodeShow` 中读 `V8.CurrentUser.RoleName` / `V8.CurrentUser._IsAdmin` 之前，**不**做 `if (!V8.CurrentUser)` 容错回写——容错会反过来掩盖框架问题。
 - [ ] 不要在 `V8Code` 里 `Object.assign(V8, {...})`，避免再次覆盖动态字段。
-- [ ] 涉及租户切换（SaaS）的按钮，禁止把 `V8.OsClient` 缓存在 `setTimeout` 闭包里，应每次重新读 `V8.OsClient` 或 `DiyCommon.GetOsClient()`。
+- [ ] 后端接口引擎/表单事件禁止用 `setTimeout` 把业务工作延伸到请求结束之后；可靠异步任务必须使用后台任务、MQ、定时任务或持久化 outbox，并具备幂等与失败恢复。
+- [ ] 前端按钮若确需 `setTimeout`，仅限当前页面生命周期内的短时 UI 延迟/防抖。必须保存定时器句柄，在弹窗关闭、组件卸载或租户切换时清理；回调执行前还要确认页面仍有效且 `OsClient` 未变化。前端定时器不能承担写库、同步、通知或其它可靠业务任务。
 

@@ -19,6 +19,7 @@ import LocalStorageManager from "./localStorage-manager.js";
 import { initV8ScanCode } from "./v8-scan-code.js";
 import { initV8Print } from "./v8-print.js";
 import { createV8Http } from "./v8-http.js";
+import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -304,7 +305,18 @@ var DiyCommon = {
         if (!path) return "";
         if (path.startsWith(".") || /^(https?:|data:|blob:)/i.test(path)) return path;
 
-        var cacheKey = DiyCommon.GetOsClient() + "|" + path;
+        var currentUser = store.getters["DiyStore/GetCurrentUser"] || {};
+        var cacheContext = [
+            DiyCommon.GetOsClient(),
+            currentUser.Id || "",
+            options.FormEngineKey || "",
+            options.FormDataId || "",
+            options.FieldId || "",
+            options.SysMenuId || options.MenuId || "",
+            options.ForOfficePreview === true ? "office" : "browser",
+            path
+        ];
+        var cacheKey = cacheContext.join("|");
         var cached = DiyCommon._PrivateFileUrlCache[cacheKey];
         if (cached && cached.Url && cached.ExpiresAt > Date.now()) return cached.Url;
         if (DiyCommon._PrivateFileUrlRequests[cacheKey]) return DiyCommon._PrivateFileUrlRequests[cacheKey];
@@ -317,7 +329,9 @@ var DiyCommon = {
                     HDFS: options.HDFS || sysConfig.HDFS || "Aliyun",
                     FormEngineKey: options.FormEngineKey || undefined,
                     FormDataId: options.FormDataId || undefined,
-                    FieldId: options.FieldId || undefined
+                    FieldId: options.FieldId || undefined,
+                    SysMenuId: options.SysMenuId || options.MenuId || undefined,
+                    ForOfficePreview: options.ForOfficePreview === true
                 });
                 if (result && result.Code === 1 && result.Data) {
                     var url = String(result.Data);
@@ -340,11 +354,13 @@ var DiyCommon = {
     /**
      * sys_user.Avatar 固定按私有文件处理；返回值为 Promise<string>。
      */
-    GetUserAvatarUrl: function (avatar, userId) {
+    GetUserAvatarUrl: function (avatar, userId, options) {
+        options = options || {};
         return DiyCommon.GetPrivateFileUrl(avatar, {
             FormEngineKey: "sys_user",
             FormDataId: userId || "",
-            FieldId: "Avatar"
+            FieldId: options.FieldId || "Avatar",
+            SysMenuId: options.SysMenuId || options.MenuId || ""
         });
     },
     pathBase: "./",
@@ -1840,6 +1856,65 @@ var DiyCommon = {
         var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
         return !DiyCommon.IsNull(requested) && !DiyCommon.IsNull(current) && requested !== current;
     },
+    GetAuthFailureReason: function (result) {
+        if (!result || typeof result !== "object") return "";
+        var append = result.DataAppend || result.dataAppend || {};
+        return String(append.ReasonCode || append.reasonCode || "").trim();
+    },
+    IsTokenReplacedResult: function (result) {
+        var reason = DiyCommon.GetAuthFailureReason(result);
+        if (reason.toLowerCase() === "tokenreplaced") return true;
+        var message = String((result && (result.Msg || result.Message)) || "");
+        return message.indexOf("Token已被同一终端的新Token替换") > -1;
+    },
+    WaitForTokenChange: function (requestToken, timeoutMs) {
+        var requested = DiyCommon.NormalizeAuthorizationToken(requestToken);
+        if (DiyCommon.IsNull(requested)) return Promise.resolve(false);
+        if (DiyCommon.HasTokenChangedSinceRequest(requested)) return Promise.resolve(true);
+
+        var timeout = Math.max(0, Number(timeoutMs) || 0);
+        if (timeout === 0) return Promise.resolve(false);
+        return new Promise(function (resolve) {
+            var startedAt = Date.now();
+            var timer = window.setInterval(function () {
+                if (DiyCommon.HasTokenChangedSinceRequest(requested)) {
+                    window.clearInterval(timer);
+                    resolve(true);
+                    return;
+                }
+                if (Date.now() - startedAt >= timeout) {
+                    window.clearInterval(timer);
+                    resolve(false);
+                }
+            }, 50);
+        });
+    },
+    QueueTokenReplacementRecovery: function (result) {
+        var requested = DiyCommon.NormalizeAuthorizationToken(result && result.__MicroiRequestToken);
+        if (DiyCommon.IsNull(requested)) {
+            // 未绑定请求 Token 的失败结果可能来自登录前已经发出的旧请求。
+            // 它没有资格清理当前共享登录态；后续带请求上下文的请求会做最终判定。
+            console.warn("[Auth] 忽略缺少请求上下文的 TokenReplaced 结果，保留当前 Token。");
+            return;
+        }
+        if (DiyCommon.HasTokenChangedSinceRequest(requested)) return;
+
+        if (DiyCommon._TokenReplacementRecoveryTimer) {
+            window.clearTimeout(DiyCommon._TokenReplacementRecoveryTimer);
+        }
+        DiyCommon._TokenReplacementRecoveryTimer = window.setTimeout(function () {
+            DiyCommon._TokenReplacementRecoveryTimer = null;
+            var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
+            if (DiyCommon.IsNull(current) || current !== requested) return;
+
+            // 等待并发续签响应后 Token 仍未变化，才判定当前登录态确实已被替换。
+            DiyCommon.setToken("");
+            removeToken();
+            if (!DiyCommon.IsRedisManagerRoute()) {
+                DiyCommon.OpenLogin();
+            }
+        }, 1500);
+    },
     DecodeJwtPayload: function (token) {
         try {
             var normalized = DiyCommon.NormalizeAuthorizationToken(token);
@@ -1929,6 +2004,17 @@ var DiyCommon = {
                 || authMessage.indexOf("token失效") > -1
                 || authMessage.indexOf("请重新登录") > -1;
             if (isAuthenticationFailure) {
+                // TokenReplaced 通常表示另一个并发请求刚完成续签。新 Token 的响应可能
+                // 还在网络中，不能先清空共享 Token，否则详情初始化的后续请求都会变成
+                // MissingToken。等待短暂窗口后仍未收到新 Token，才要求重新登录。
+                if (DiyCommon.IsTokenReplacedResult(result)) {
+                    if (DiyCommon.HasTokenChangedSinceRequest(result.__MicroiRequestToken)) {
+                        console.warn("[Auth] 忽略旧 Token 请求返回的 TokenReplaced 结果。");
+                    } else {
+                        DiyCommon.QueueTokenReplacementRecovery(result);
+                    }
+                    return false;
+                }
                 // 多 Tab/并发请求场景：旧请求失败返回时，另一个请求可能已经完成续签并写入新 Token。
                 // 此时不能让旧响应清空共享的新登录态。
                 if (DiyCommon.HasTokenChangedSinceRequest(result.__MicroiRequestToken)) {
@@ -2094,6 +2180,7 @@ var DiyCommon = {
                 sync: true,
                 other: null,
                 resolve: resolve,
+                reject: reject,
                 paramType: paramType,
                 header: header
             });
@@ -2126,7 +2213,8 @@ var DiyCommon = {
                 method: "get",
                 sync: true,
                 other: null,
-                resolve: resolve
+                resolve: resolve,
+                reject: reject
             });
         });
     },
@@ -2144,7 +2232,8 @@ var DiyCommon = {
                 method: "get",
                 sync: true,
                 other: null,
-                resolve: resolve
+                resolve: resolve,
+                reject: reject
             });
         });
     },
@@ -2177,7 +2266,8 @@ var DiyCommon = {
                 callback: callback,
                 errorCallback: errorCallback,
                 method: "post",
-                resolve: resolve
+                resolve: resolve,
+                reject: reject
             });
         });
     },
@@ -2197,7 +2287,7 @@ var DiyCommon = {
     },
     UseAxios: function (params) {
         var self = this;
-        var { url, param, callback, errorCallback, method, sync, other, resolve, paramType, header } = params;
+        var { url, param, callback, errorCallback, method, sync, other, resolve, reject, paramType, header } = params;
         var requestToken = DiyCommon.getToken();
         if (!header) {
             header = {};
@@ -2240,10 +2330,21 @@ var DiyCommon = {
             return;
         }
         axios(axiosOption)
-            .then(function (req, b, c) {
+            .then(async function (req, b, c) {
+                reportApiServiceRecovered({
+                    apiBase: DiyCommon.GetApiBase(),
+                    url: url
+                });
                 // 拿到token，存起来
                 DiyCommon.ApplyAuthorizationToken(req.headers.authorization, requestToken);
                 DiyCommon.MarkAuthRequestToken(req.data, requestToken);
+                if (DiyCommon.IsTokenReplacedResult(req.data) && !params._authRetry) {
+                    var tokenChanged = await DiyCommon.WaitForTokenChange(requestToken, 1000);
+                    if (tokenChanged) {
+                        DiyCommon.UseAxios(Object.assign({}, params, { _authRetry: true }));
+                        return;
+                    }
+                }
                 if (!DiyCommon.IsNull(callback)) {
                     callback(req.data, req.headers);
                 }
@@ -2252,6 +2353,12 @@ var DiyCommon = {
                 }
             })
             .catch(function (error) {
+                reportApiServiceFailure(error, {
+                    apiBase: DiyCommon.GetApiBase(),
+                    osClient: DiyCommon.GetOsClient(),
+                    url: url,
+                    method: method
+                });
                 if (!DiyCommon.IsNull(errorCallback)) {
                     errorCallback(error);
                 }
@@ -2260,7 +2367,10 @@ var DiyCommon = {
                         console.log(error);
                         if (DiyCommon.HasTokenChangedSinceRequest(requestToken)) {
                             console.warn("[Auth] 忽略旧 Token 请求返回的 401。");
-                            throw error;
+                            if (!DiyCommon.IsNull(reject)) {
+                                reject(error);
+                            }
+                            return;
                         }
                         DiyCommon.setToken("");
                         removeToken();
@@ -2289,12 +2399,14 @@ var DiyCommon = {
                 } else {
                     console.log(error);
                 }
-                throw error;
+                if (!DiyCommon.IsNull(reject)) {
+                    reject(error);
+                }
             });
     },
     UseAxiosAll: function (params) {
         var self = this;
-        const { allParams, callback, errorCallback, method, resolve, paramType } = params;
+        const { allParams, callback, errorCallback, method, resolve, reject, paramType } = params;
         var requestToken = DiyCommon.getToken();
         var headers = {};
         headers.did = DiyCommon.GetDid();
@@ -2341,27 +2453,46 @@ var DiyCommon = {
 
         axios
             .all(requests)
-            .then((results) => {
+            .then(async (results) => {
+                var firstRequestUrl = allParams.length > 0 ? allParams[0].Url : DiyCommon.GetApiBase();
+                reportApiServiceRecovered({
+                    apiBase: DiyCommon.GetApiBase(),
+                    url: firstRequestUrl
+                });
                 var returnData = [];
-                if (results.length > 0) {
-                    // 拿到token，存起来
-                    var result = results[0];
+                results.forEach((result) => {
+                    // 批量请求中的任意一个响应都可能完成 Token 续签。必须逐个处理；
+                    // 只读取第一个响应会丢失其它响应携带的新 Token。
                     var authorization = result.headers.authorization;
                     var token = result.headers.token;
                     DiyCommon.ApplyAuthorizationToken(authorization || token, requestToken);
-                }
-                results.forEach((result) => {
                     DiyCommon.MarkAuthRequestToken(result.data, requestToken);
                     returnData.push(result.data);
                 });
-                callback(returnData);
+                if (returnData.some(DiyCommon.IsTokenReplacedResult) && !params._authRetry) {
+                    var tokenChanged = await DiyCommon.WaitForTokenChange(requestToken, 1000);
+                    if (tokenChanged) {
+                        DiyCommon.UseAxiosAll(Object.assign({}, params, { _authRetry: true }));
+                        return;
+                    }
+                }
+                if (!DiyCommon.IsNull(callback)) {
+                    callback(returnData);
+                }
                 if (!DiyCommon.IsNull(resolve)) {
                     resolve(returnData);
                 }
             })
             .catch(function (error) {
+                var failedRequestUrl = error?.config?.url || (allParams.length > 0 ? allParams[0].Url : DiyCommon.GetApiBase());
+                reportApiServiceFailure(error, {
+                    apiBase: DiyCommon.GetApiBase(),
+                    osClient: DiyCommon.GetOsClient(),
+                    url: failedRequestUrl,
+                    method: method
+                });
                 if (!DiyCommon.IsNull(errorCallback)) {
-                    errorCallback();
+                    errorCallback(error);
                 }
                 if (error.response) {
                     if (error.response.status == 401) {
@@ -2370,7 +2501,10 @@ var DiyCommon = {
 
                         if (DiyCommon.HasTokenChangedSinceRequest(requestToken)) {
                             console.warn("[Auth] 忽略旧 Token 批量请求返回的 401。");
-                            throw error;
+                            if (!DiyCommon.IsNull(reject)) {
+                                reject(error);
+                            }
+                            return;
                         }
 
                         //2020-12-05注释，使用DiyCommon
@@ -2407,7 +2541,9 @@ var DiyCommon = {
                 } else {
                     DiyCommon.Tips(error.message, false);
                 }
-                throw error;
+                if (!DiyCommon.IsNull(reject)) {
+                    reject(error);
+                }
             });
     },
     GetSysBaseData: function (parantId, callback) {
@@ -3510,7 +3646,8 @@ var DiyCommon = {
                     var param = {
                         _FieldId: field.Id,
                         //OsClient: DiyCommon.GetOsClient(),
-                        _FormData: formData
+                        _FormData: formData,
+                        _TableChildAuth: field._TableChildAuth || null
                     };
                     if (field.Config.DataSource == "Api") {
                         apiGetDiyFieldSqlData = field.Config.Api;
@@ -3728,8 +3865,11 @@ var DiyCommon = {
 
         return null;
     },
-    SetFieldsData(fields, formData) {
+    SetFieldsData(fields, formData, tableChildAuth) {
         var self = this;
+        fields.forEach((field) => {
+            field._TableChildAuth = tableChildAuth || field._TableChildAuth || null;
+        });
 
         //提前定义查询数据库的方法
         function GetFieldsData() {
@@ -3814,7 +3954,8 @@ var DiyCommon = {
                         // 标记为加载中，防止子组件 SetFieldData 再次发起重复请求
                         field._DataLoading = true;
                         var param = {
-                            _FormData: formData
+                            _FormData: formData,
+                            _TableChildAuth: field._TableChildAuth || null
                         };
                         var apiGetFieldsData = field.Config.Api;
                         if (field.Config.DataSource == "DataSource") {
@@ -3891,7 +4032,8 @@ var DiyCommon = {
             var param = {
                 FieldIds: _.pluck(fieldList, "Id"),
                 FieldNames: _.pluck(fieldList, "Name"),
-                _FormData: formData
+                _FormData: formData,
+                _TableChildAuth: tableChildAuth || null
             };
             GetFieldsData();
         }
@@ -4560,9 +4702,9 @@ var DiyCommon = {
          * @param {*} param
          * @returns
          */
-        async GetData(param) {
+        async GetData(param, callback) {
             var result = await DiyCommon.PostAsync("/api/DataSourceEngine/Run", param, null, null, "json");
-            if (callback) {
+            if (typeof callback === "function") {
                 callback(result);
             }
             return result;
@@ -4719,6 +4861,163 @@ var DiyCommon = {
             return await DiyCommon.FormEngine.CommonFormEngineFunc(DiyApi.FormEngine.DelFormData, paramOrKey, callbackOrParam, callback);
         }
     },
+    _ScopedFormEngineCache: new WeakMap(),
+    /**
+     * 为前端 V8 创建带当前菜单上下文的 FormEngine 门面。
+     *
+     * 只给“当前菜单绑定的当前表”透明补充 _SysMenuId。跨表 V8 调用不应错误
+     * 继承当前菜单，否则会把合法的目标表菜单权限误判为当前菜单越权；这类历史
+     * 调用由后端根据当前用户真实拥有的目标表菜单权限做缓存推断。
+     */
+    CreateScopedFormEngine(sysMenuId, tableId, tableName, V8) {
+        if (DiyCommon.IsNull(sysMenuId)
+            || (DiyCommon.IsNull(tableId) && DiyCommon.IsNull(tableName))) {
+            return DiyCommon.FormEngine;
+        }
+
+        var normalizeKey = function (value) {
+            return DiyCommon.IsNull(value)
+                ? ""
+                : value.toString().trim().toLowerCase();
+        };
+        var normalizedMenuId = normalizeKey(sysMenuId);
+        var normalizedTableId = normalizeKey(tableId);
+        var normalizedTableName = normalizeKey(tableName);
+        var cacheKey = [
+            normalizedMenuId,
+            normalizedTableId,
+            normalizedTableName
+        ].join("|");
+        if (V8 && typeof V8 === "object") {
+            var cached = DiyCommon._ScopedFormEngineCache.get(V8);
+            if (cached && cached.Key === cacheKey) {
+                return cached.FormEngine;
+            }
+        }
+
+        var isCurrentTable = function (targetTable) {
+            var normalizedTarget = normalizeKey(targetTable);
+            return normalizedTarget !== ""
+                && (normalizedTarget === normalizedTableId
+                    || normalizedTarget === normalizedTableName);
+        };
+        var injectMenuContext = function (param, targetTable) {
+            if (!param || typeof param !== "object" || Array.isArray(param)) {
+                return param;
+            }
+            var actualTarget = targetTable
+                || param.FormEngineKey
+                || param.TableId
+                || param.TableName;
+            var legacyExplicitMenuId = param.SysMenuId;
+            var shouldNormalizeExplicitMenu = DiyCommon.IsNull(param._SysMenuId)
+                && !DiyCommon.IsNull(legacyExplicitMenuId);
+            if (!isCurrentTable(actualTarget) && !shouldNormalizeExplicitMenu) {
+                return param;
+            }
+            var tableChildAuth = V8 && V8.TableChildAuth;
+            var shouldInjectMenu = isCurrentTable(actualTarget)
+                && !shouldNormalizeExplicitMenu
+                && DiyCommon.IsNull(param._SysMenuId)
+                && DiyCommon.IsNull(param.ModuleEngineKey);
+            var shouldInjectTableChildAuth = isCurrentTable(actualTarget)
+                && tableChildAuth
+                && DiyCommon.IsNull(param._TableChildAuth);
+            if (!shouldNormalizeExplicitMenu
+                && !shouldInjectMenu
+                && !shouldInjectTableChildAuth) {
+                return param;
+            }
+            var scopedParam = Object.assign({}, param);
+            if (shouldNormalizeExplicitMenu || shouldInjectMenu) {
+                scopedParam._SysMenuId = shouldNormalizeExplicitMenu
+                    ? legacyExplicitMenuId
+                    : sysMenuId;
+            }
+            if (shouldInjectTableChildAuth) {
+                scopedParam._TableChildAuth = tableChildAuth;
+            }
+            return scopedParam;
+        };
+        var scopedFormEngine = {};
+
+        Object.keys(DiyCommon.FormEngine).forEach(function (methodName) {
+            var sourceMethod = DiyCommon.FormEngine[methodName];
+            if (typeof sourceMethod !== "function") {
+                scopedFormEngine[methodName] = sourceMethod;
+                return;
+            }
+            if (methodName.indexOf("Anonymous") > -1) {
+                scopedFormEngine[methodName] = sourceMethod;
+                return;
+            }
+
+            scopedFormEngine[methodName] = function () {
+                var args = Array.prototype.slice.call(arguments);
+                var argOffset = methodName === "CommonFormEngineFunc" ? 1 : 0;
+                if (methodName === "CommonFormEngineFunc"
+                    && /anonymous/i.test(String(args[0] || ""))) {
+                    return sourceMethod.apply(DiyCommon.FormEngine, args);
+                }
+                if (Array.isArray(args[argOffset])) {
+                    args[argOffset] = args[argOffset].map(function (row) {
+                        return injectMenuContext(
+                            row,
+                            row && (row.FormEngineKey || row.TableId || row.TableName)
+                        );
+                    });
+                } else if (typeof args[argOffset] === "string") {
+                    var targetTable = args[argOffset];
+                    if (isCurrentTable(targetTable)) {
+                        var paramIndex = argOffset + 1;
+                        var callbackIndex = argOffset + 2;
+                        if (typeof args[paramIndex] === "function" || args[paramIndex] == null) {
+                            if (typeof args[paramIndex] === "function") {
+                                args[callbackIndex] = args[paramIndex];
+                            }
+                            args[paramIndex] = injectMenuContext({}, targetTable);
+                        } else {
+                            args[paramIndex] = injectMenuContext(args[paramIndex], targetTable);
+                        }
+                    }
+                } else {
+                    args[argOffset] = injectMenuContext(args[argOffset]);
+                }
+                return sourceMethod.apply(DiyCommon.FormEngine, args);
+            };
+        });
+
+        if (V8 && typeof V8 === "object") {
+            DiyCommon._ScopedFormEngineCache.set(V8, {
+                Key: cacheKey,
+                FormEngine: scopedFormEngine
+            });
+        }
+        return scopedFormEngine;
+    },
+    BindV8FormEngine(V8, sysMenuId, tableId, tableName, tableChildAuth) {
+        if (!V8) {
+            return DiyCommon.FormEngine;
+        }
+        var resolvedMenuId = sysMenuId || V8.SysMenuId;
+        var resolvedTableId = tableId || V8.TableId;
+        var resolvedTableName = tableName
+            || V8.TableName
+            || (V8.TableModel && V8.TableModel.Name);
+        if (!DiyCommon.IsNull(resolvedMenuId)) {
+            V8.SysMenuId = resolvedMenuId;
+        }
+        if (tableChildAuth !== undefined) {
+            V8.TableChildAuth = tableChildAuth || null;
+        }
+        V8.FormEngine = DiyCommon.CreateScopedFormEngine(
+            resolvedMenuId,
+            resolvedTableId,
+            resolvedTableName,
+            V8
+        );
+        return V8.FormEngine;
+    },
     async CreatQRCode(content, refElement) {
         // 使用主流的 qrcode 库（纯 JS 实现，无兼容性问题）
         const QRCodeModule = await import('qrcode');
@@ -4783,6 +5082,15 @@ var DiyCommon = {
             V8.AppStores = DiyCommon._AppStoresCache || [];
             V8.AppStoreMap = DiyCommon._AppStoreMapCache || {};
             V8.CompareVersion = DiyCommon.CompareVersion;
+            // 某些按钮流程会先 SetV8DefaultValue、再 InitV8Code；Object.assign 会
+            // 覆盖 FormEngine，因此在动态上下文刷新末尾重新绑定一次。
+            DiyCommon.BindV8FormEngine(
+                V8,
+                V8.SysMenuId,
+                V8.TableId,
+                V8.TableName || (V8.TableModel && V8.TableModel.Name),
+                V8.TableChildAuth
+            );
         } catch (e) {
             // 极早期调用（store 未就绪）时容错
             V8.CurrentUser = V8.CurrentUser || {};

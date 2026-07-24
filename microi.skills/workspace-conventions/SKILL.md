@@ -1,7 +1,6 @@
 ---
 name: workspace-conventions
 description: Microi 工作区全局约定。用于在本工作区工作时，确保临时文件、生成产物和项目专属内容放在正确位置，不污染仓库根目录。
-applyTo: "**"
 ---
 
 # Microi 工作区全局约定
@@ -104,8 +103,8 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 
 编写或更新 `microi.skills/` 下的技能文档时，**不能加入特定项目名称、特定本地路径或特定业务规则**，必须保持通用性：
 
-- ❌ 不允许：`d:\Work\microi.net.all\AI-Project\数字经济商城\mci.lsg.uniapp`
-- ❌ 不允许：`乐闪购`、`任亿` 等客户/项目名称
+- ❌ 不允许：`d:\Work\microi.net.all\AI-Project\客户项目\mci.demo.uniapp`
+- ❌ 不允许：任何客户、租户或交付项目名称
 - ❌ 不允许：某项目特定的费率、字段名、接口 Key 作为"规范"
 - ✅ 允许：使用 `<项目路径>`、`<OsClient>` 等占位符
 - ✅ 允许：通用的最佳实践、模式和约定
@@ -378,6 +377,8 @@ VS Code、Cursor 或 Codex 设置界面显示某个 MCP 服务器“已启用”
 - 请求超时是“结果不确定”，不是“写入失败”。标准工具返回 `RecoveredAfterTransportError:true` 时，表示已经通过远端回读确认成功，不得再次写入。
 - 标准工具明确返回“回读未确认”时，只调用对应 get 工具继续核对一次。没有用户明确授权，不得改走原生 FormEngine HTTP、直接 SQL、表定义增量更新，也不得创建一次性维护接口引擎绕过原端点。
 - `MoreBtns`、`FormBtns`、`BatchSelectMoreBtns`、`PageTabs`、`ExportMoreBtns`、`PageBtns` 一律向 MCP 传明文 JSON 数组。租户 `sys_menu` 表单事件中的 Base64 解码属于平台内部兼容逻辑，AI 不得据此手工 Base64 编码。
+- AI/终端工具显示的 `…N tokens truncated…`、`Exit code: N`、`Chunk ID:`、`Wall time:` 等是宿主输出标记，不是 V8 源码。禁止复制到本地文件或 MCP 写入参数；读取长源码必须按工具返回的字符范围分段取完，并核对完整源码 SHA-256。标准 MCP 写工具和插件推送检测到这些标记时必须拒绝写入。
+- 远端源码不少于 8000 字符，而新源码减少超过 15% 时，应先视为可能只拿到了截断片段并停止写入。只有核对完整源码且确需大幅删减时，才使用写工具提供的显式大幅删减确认参数。
 - 发生连续写入超时时，要先停止并发写入，记录具体工具、资源 Key、耗时和回读结果；禁止用“服务器整体不可用”“缓存锁死”等没有日志证据的结论代替诊断。
 
 ## Codex MCP 单入口约定

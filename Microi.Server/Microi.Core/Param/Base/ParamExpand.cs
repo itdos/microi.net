@@ -22,6 +22,7 @@ using System.Runtime.Serialization;
 using System.Text;
 
 //using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.net
@@ -280,6 +281,32 @@ namespace Microi.net
     /// </summary>
     public partial class DiyTableRowParam : BaseParam
     {
+        /// <summary>
+        /// Internal legacy-client authorization scope inferred from the user's
+        /// granted menus. It is intentionally separate from _SysMenuId so a fallback
+        /// does not apply presentation settings such as SelectFields or sorting.
+        /// </summary>
+        [JsonIgnore]
+        public FormEngineAuthorizationPolicy _AuthorizationPolicy { get; set; }
+
+        /// <summary>
+        /// Server-only marker used by an internal row-scope probe. Trusted calls
+        /// normally discard any policy left on a reused request object; this marker
+        /// allows the probe to carry a freshly constructed policy into its final
+        /// SELECT. JsonIgnore prevents an HTTP caller from preserving or supplying
+        /// an authorization policy.
+        /// </summary>
+        [JsonIgnore]
+        public bool _PreserveAuthorizationPolicyForRead { get; set; }
+
+        /// <summary>
+        /// Per-request memoization for the shared authorization snapshot. This avoids
+        /// a second Redis/version lookup when metadata authorization falls back from
+        /// direct table access to a menu/JoinTables metadata check.
+        /// </summary>
+        [JsonIgnore]
+        public FormEngineAuthorizationSnapshot _AuthorizationSnapshot { get; set; }
+
         public List<dynamic> ExcelData { get; set; }
         public List<JObject> ExcelHeader { get; set; }
         public List<ExcelSheetParam> ExcelSheets { get; set; }
@@ -544,10 +571,33 @@ namespace Microi.net
         public string _FieldId { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string _FieldName { get; set; }
+        /// <summary>
+        /// TableChild 聚合授权上下文。客户端只能提供关系线索；后端必须逐层
+        /// 回查 diy_field/sys_menu 并验证父记录范围，不能直接信任此对象。
+        /// Parent 用于嵌套子表，服务端会限制最大深度并检测关系环。
+        /// </summary>
+        public TableChildAuthorizationContext _TableChildAuth { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string FormEngineFieldKey { get; set; }
         public List<string> FormEngineFieldKeys { get; set; }
         public List<string> FieldIds { get; set; }
+    }
+
+    public sealed class TableChildAuthorizationContext
+    {
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ParentSysMenuId { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ParentTableId { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ParentFieldId { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ParentRowId { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ParentValue { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ParentFormMode { get; set; }
+        public TableChildAuthorizationContext Parent { get; set; }
     }
 
     public class ExcelSheetParam : DiyTableRowParam
@@ -557,7 +607,13 @@ namespace Microi.net
     }
     public partial class DiyFieldParam : BaseParam
     {
+        [JsonIgnore]
         public dynamic _DiyTableModel { get; set; }
+        /// <summary>
+        /// TableChild 聚合授权上下文。字段元数据接口与数据接口必须使用
+        /// 同一份委托授权链，避免子表字段列表因模型绑定丢参而被误拒绝。
+        /// </summary>
+        public TableChildAuthorizationContext _TableChildAuth { get; set; }
         public bool? _NotAddDbField { get; set; }
         public int? Encrypt { get; set; }
         public string SysMenuId { get; set; }
@@ -700,7 +756,14 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string SearchFieldIds { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
+        // Legacy compatibility only. New module configuration uses physical columns.
         public string DiyConfig { get; set; }
+        public int? EnableViewSchema { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ViewSchemaVersion { get; set; }
+        public int? ViewConfigVersion { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string ViewSchema { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string SortFieldIds { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -830,6 +893,11 @@ namespace Microi.net
         public string Class { get; set; }
         //public List<string> SysMenuIds { get; set; }
         public List<SysRoleLimits> SysRoleLimits { get; set; }
+        /// <summary>
+        /// Advanced direct table permissions. These do not override the
+        /// platform protected-table baseline.
+        /// </summary>
+        public List<SysRoleLimits> TableRoleLimits { get; set; }
         public int? IsDeleted { get; set; }
         public string Remark { get; set; }
         public string _DeptId { get; set; }

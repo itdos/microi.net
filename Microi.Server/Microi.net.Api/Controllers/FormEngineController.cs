@@ -63,11 +63,24 @@ namespace Microi.net.Api
         {
             if (source == null) return null;
 
+            var publicProjection = source.Data == null
+                ? null
+                : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data);
+            var configuredLoginPublicKey = ConfigHelper.GetEnvOrConfiguration(
+                "MICROI_LOGIN_RSA_PUBLIC_KEY",
+                "Security:LoginRsaPublicKey");
+            if (publicProjection != null && !configuredLoginPublicKey.DosIsNullOrWhiteSpace())
+            {
+                // 公钥不是凭据，可以由匿名登录配置接口返回，以确保客户端公钥
+                // 与当前部署的私钥成对。未配置时客户端继续使用历史兼容公钥。
+                publicProjection["LoginRsaPublicKey"] = configuredLoginPublicKey
+                    .Replace("\\n", "\n")
+                    .Trim();
+            }
+
             var result = new DosResult<dynamic>(
                 source.Code,
-                source.Data == null
-                    ? null
-                    : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data),
+                publicProjection,
                 source.Msg,
                 source.DataAppend);
             foreach (var property in source.DynamicProperties)
@@ -163,6 +176,7 @@ namespace Microi.net.Api
                 param["OsClient"] = currentOsClient.DosIsNullOrWhiteSpace() ? OsClient.GetConfigOsClient() : currentOsClient;
             }
             param["_InvokeType"] = "Client";
+            param["_IsAnonymous"] = false;
             EnsureLang(param);
             return param;
         }
@@ -173,16 +187,16 @@ namespace Microi.net.Api
         private async Task DefaultParamList(List<JObject> paramList)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
-
-            if(currentTokenDynamic != null)
+            foreach (var param in paramList)
             {
-                foreach (var param in paramList)
+                if (currentTokenDynamic != null)
                 {
                     SetCurrentUserParam(param, currentTokenDynamic.CurrentUser);
                     param["OsClient"] = currentTokenDynamic?.OsClient;
-                    param["_InvokeType"] = "Client";
-                    EnsureLang(param);
                 }
+                param["_InvokeType"] = "Client";
+                param["_IsAnonymous"] = false;
+                EnsureLang(param);
             }
         }
         /// <summary>
@@ -219,6 +233,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost, HttpGet]
+        [PlatformAdminOnly]
         public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
         {
             var requestedOsClient = param?["OsClient"].Val<string>();
@@ -490,6 +505,7 @@ namespace Microi.net.Api
                 SetCurrentUserParam(row, currentUser);
                 row["OsClient"] = osClient;
                 row["_InvokeType"] = "Client";
+                row["_IsAnonymous"] = false;
                 EnsureLang(row);
             }
 
@@ -615,6 +631,94 @@ namespace Microi.net.Api
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
+
+        /// <summary>
+        /// 获取表单详情的关联系统数据（数据日志、数据评论、数据版本）。
+        ///
+        /// 这些数据不能按 microi_datalog / diy_comment / mic_data_version
+        /// 的独立表权限直接开放，否则普通用户可能枚举其它业务表的日志或版本。
+        /// 本接口先校验调用者对父菜单、父表和父记录的读取权限，再由服务端
+        /// 固定辅助表及筛选条件执行查询。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetFormRelatedData([FromBody] JObject param)
+        {
+            param = await DefaultParam(param ?? new JObject());
+
+            var osClient = param["OsClient"].Val<string>();
+            var lang = param["_Lang"].Val<string>();
+            var relatedType = param["RelatedType"].Val<string>()?.Trim();
+            var parentFormEngineKey = param["ParentFormEngineKey"].Val<string>()?.Trim();
+            var parentTableRowId = param["ParentTableRowId"].Val<string>()?.Trim();
+            var sysMenuId = param["_SysMenuId"].Val<string>()?.Trim();
+            if (parentFormEngineKey.DosIsNullOrWhiteSpace()
+                || parentTableRowId.DosIsNullOrWhiteSpace()
+                || sysMenuId.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
+            }
+
+            var parentParam = new DiyTableRowParam
+            {
+                FormEngineKey = parentFormEngineKey,
+                Id = parentTableRowId,
+                _SysMenuId = sysMenuId,
+                _InvokeType = InvokeType.Client.ToString(),
+                _IsAnonymous = false,
+                _CurrentUser = param["_CurrentUser"] as JObject,
+                OsClient = osClient,
+                _Lang = lang
+            };
+            var authResult = await MicroiEngine.FormEngine
+                .AuthorizeClientTableOperationAsync(parentParam, "Read");
+            if (authResult == null || authResult.Code != 1)
+            {
+                return Json(authResult
+                    ?? new DosResult(0, null, DiyMessage.GetLang(osClient, "NoAuth", lang)));
+            }
+
+            var relatedParam = new JObject
+            {
+                ["OsClient"] = osClient,
+                ["_Lang"] = lang,
+                ["_InvokeType"] = InvokeType.Server.ToString(),
+                ["_IsAnonymous"] = false,
+                ["IsDeleted"] = 0,
+                ["_PageIndex"] = 1,
+                ["_PageSize"] = 200,
+                ["_OrderBy"] = "CreateTime",
+                ["_OrderByType"] = "DESC"
+            };
+            if (param["_CurrentUser"] != null)
+            {
+                relatedParam["_CurrentUser"] = param["_CurrentUser"].DeepClone();
+            }
+
+            var where = new JArray();
+            switch (relatedType?.ToLowerInvariant())
+            {
+                case "datalog":
+                    relatedParam["FormEngineKey"] = "microi_datalog";
+                    where.Add(new JArray("DataId", "=", parentTableRowId));
+                    where.Add(new JArray("TableId", "=", parentParam.TableId));
+                    break;
+                case "datacomment":
+                    relatedParam["FormEngineKey"] = "diy_comment";
+                    where.Add(new JArray("TableRowId", "=", parentTableRowId));
+                    break;
+                case "dataversion":
+                    relatedParam["FormEngineKey"] = "mic_data_version";
+                    where.Add(new JArray("TableRowId", "=", parentTableRowId));
+                    where.Add(new JArray("TableId", "=", parentParam.TableId));
+                    break;
+                default:
+                    return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
+            }
+
+            relatedParam["_Where"] = where;
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync(relatedParam);
+            return Json(result);
+        }
         /// <summary>
         /// 匿名获取数据，必传：OsClient、TableId或Name
         /// </summary>
@@ -709,6 +813,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> LoadNotDiyTable([FromBody] JObject param)
         {
             param = await DefaultParam(param);
@@ -740,6 +845,28 @@ namespace Microi.net.Api
             if(idOrKey.DosIsNullOrWhiteSpace())
             {
                 idOrKey = param["Id"].Val<string>();
+            }
+            var currentLevel = (param["_CurrentUser"] as JObject)?["Level"].Val<int>() ?? 0;
+            if (currentLevel < DiyCommon.MaxRoleLevel)
+            {
+                param["_RawMetadata"] = false;
+            }
+            var menuAuthorization = await MicroiEngine.FormEngine
+                .AuthorizeClientMenuMetadataOperationAsync(new DiyTableRowParam
+                {
+                    _SysMenuId = param["ModuleEngineKey"].Val<string>().DosIsNullOrWhiteSpace()
+                        ? param["Id"].Val<string>()
+                        : null,
+                    ModuleEngineKey = param["ModuleEngineKey"].Val<string>(),
+                    _InvokeType = InvokeType.Client.ToString(),
+                    _CurrentUser = param["_CurrentUser"] as JObject,
+                    OsClient = param["OsClient"].Val<string>(),
+                    _Lang = param["_Lang"].Val<string>(),
+                    _TableChildAuth = param["_TableChildAuth"]?.ToObject<TableChildAuthorizationContext>()
+                });
+            if (menuAuthorization.Code != 1)
+            {
+                return Json(menuAuthorization);
             }
             var lang = param["_RawMetadata"].Val<bool>() ? DiyMessage.Lang : param["_Lang"].Val<string>();
             var result = await MicroiEngine.FormEngine.GetSysMenuModel(idOrKey, param["OsClient"].Val<string>(), lang);
@@ -795,8 +922,35 @@ namespace Microi.net.Api
             {
                 idOrKey = param["Id"].Val<string>();
             }
+            var currentLevel = (param["_CurrentUser"] as JObject)?["Level"].Val<int>() ?? 0;
+            if (currentLevel < DiyCommon.MaxRoleLevel)
+            {
+                // Raw metadata is a design-time capability. A normal renderer must
+                // never use a client flag to opt into unfiltered platform metadata.
+                param["_RawMetadata"] = false;
+            }
+
+            var metadataParam = param.ToObject<DiyTableRowParam>();
+            metadataParam.FormEngineKey = idOrKey;
+            var metadataAuth = await MicroiEngine.FormEngine
+                .AuthorizeClientTableMetadataOperationAsync(metadataParam);
+            if (metadataAuth.Code != 1)
+            {
+                return Json(metadataAuth);
+            }
+
             var lang = param["_RawMetadata"].Val<bool>() ? DiyMessage.Lang : param["_Lang"].Val<string>();
             var result = await MicroiEngine.FormEngine.GetDiyTableModel(idOrKey, param["OsClient"].Val<string>(), lang);
+            if (result?.Code == 1
+                && currentLevel < DiyCommon.MaxRoleLevel
+                && result.Data != null)
+            {
+                var clientMetadata = JObject.FromObject((object)result.Data);
+                clientMetadata.Remove("ServerDataV8");
+                clientMetadata.Remove("SubmitBeforeServerV8");
+                clientMetadata.Remove("SubmitAfterServerV8");
+                result.Data = clientMetadata;
+            }
             return Json(result);
         }
 
@@ -808,6 +962,9 @@ namespace Microi.net.Api
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = currentTokenDynamic.OsClient;
             param._InvokeType = InvokeType.Client.ToString();
+            // Authenticated endpoints must not trust a payload-supplied anonymous flag.
+            // Dedicated anonymous endpoints set it explicitly after model binding.
+            param._IsAnonymous = false;
         }
 
         private static async Task DefaultDiyTableParam(DiyTableParam param)
@@ -833,6 +990,269 @@ namespace Microi.net.Api
             param._InvokeType = InvokeType.Client.ToString();
         }
 
+        private static DiyTableRowParam CreateDiyFieldMetadataAuthorizationParam(
+            DiyFieldParam param,
+            string tableIdOrName)
+        {
+            return new DiyTableRowParam
+            {
+                FormEngineKey = tableIdOrName,
+                _SysMenuId = !param._SysMenuId.DosIsNullOrWhiteSpace()
+                    ? param._SysMenuId
+                    : param.SysMenuId,
+                ModuleEngineKey = param._ModuleEngineKey,
+                _InvokeType = InvokeType.Client.ToString(),
+                _CurrentUser = param._CurrentUser,
+                OsClient = param.OsClient,
+                _Lang = param._Lang,
+                _TableChildAuth = param._TableChildAuth
+            };
+        }
+
+        private static async Task<DosResult> AuthorizeDiyFieldMetadataTableAsync(
+            DiyFieldParam param,
+            string tableIdOrName,
+            DiyTableRowParam authorizationParam = null)
+        {
+            if (tableIdOrName.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
+            }
+            authorizationParam = authorizationParam
+                ?? CreateDiyFieldMetadataAuthorizationParam(param, tableIdOrName);
+            authorizationParam.FormEngineKey = tableIdOrName;
+            authorizationParam.TableId = null;
+            authorizationParam.TableName = null;
+            authorizationParam._AuthorizationPolicy = null;
+            return await MicroiEngine.FormEngine.AuthorizeClientTableMetadataOperationAsync(
+                authorizationParam);
+        }
+
+        /// <summary>
+        /// Authorize a single-table field metadata request. Field definitions can
+        /// contain executable V8 and SQL data-source configuration, so knowing a
+        /// field/table id is never sufficient authorization.
+        /// </summary>
+        private static async Task<DosResult> AuthorizeDiyFieldMetadataAsync(DiyFieldParam param)
+        {
+            var tableIdOrName = !param.TableId.DosIsNullOrWhiteSpace()
+                ? param.TableId
+                : param.TableName;
+            return await AuthorizeDiyFieldMetadataTableAsync(param, tableIdOrName);
+        }
+
+        /// <summary>
+        /// Authorize a multi-table field metadata request. When a real menu context
+        /// is supplied, discard all caller-selected table ids and replace them with
+        /// the exact subset of sys_menu tables whose metadata this user may read.
+        /// A JoinTable can be required by trusted server-side SqlJoin/SqlWhere while
+        /// its complete field definition remains protected from the browser.
+        /// </summary>
+        private static async Task<DosResult> AuthorizeDiyFieldTablesMetadataAsync(DiyFieldParam param)
+        {
+            // Reuse one authorization parameter for the entire batch. The first
+            // table authorization loads the versioned tenant/user snapshot; later
+            // tables reuse it instead of repeating permission-table/cache work.
+            var sharedAuthorizationParam =
+                CreateDiyFieldMetadataAuthorizationParam(param, string.Empty);
+            var menuIdOrKey = !param._SysMenuId.DosIsNullOrWhiteSpace()
+                ? param._SysMenuId
+                : (!param.SysMenuId.DosIsNullOrWhiteSpace()
+                    ? param.SysMenuId
+                    : param._ModuleEngineKey);
+            if (!menuIdOrKey.DosIsNullOrWhiteSpace())
+            {
+                var menuResult = await MicroiEngine.FormEngine.GetSysMenu(
+                    menuIdOrKey,
+                    param.OsClient,
+                    param._Lang);
+                if (menuResult == null || menuResult.Code != 1 || menuResult.Data == null)
+                {
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+                }
+
+                var menuModel = JObject.FromObject((object)menuResult.Data);
+                var menuId = menuModel["Id"].Val<string>();
+                var primaryTableId = menuModel["DiyTableId"].Val<string>();
+                if (menuId.DosIsNullOrWhiteSpace() || primaryTableId.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+                }
+
+                param._SysMenuId = menuId;
+                param.SysMenuId = menuId;
+                var trustedTableIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    primaryTableId
+                };
+                var joinTablesToken = menuModel["JoinTables"];
+                if (joinTablesToken != null && joinTablesToken.Type != JTokenType.Null)
+                {
+                    try
+                    {
+                        if (joinTablesToken.Type == JTokenType.String)
+                        {
+                            var rawJoinTables = joinTablesToken.Val<string>();
+                            joinTablesToken = rawJoinTables.DosIsNullOrWhiteSpace()
+                                ? new JArray()
+                                : JToken.Parse(rawJoinTables);
+                        }
+                        if (!(joinTablesToken is JArray joinTables))
+                        {
+                            return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+                        }
+                        foreach (var joinTable in joinTables)
+                        {
+                            var joinTableId = joinTable["Id"].Val<string>();
+                            if (joinTableId.DosIsNullOrWhiteSpace())
+                            {
+                                return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+                            }
+                            trustedTableIds.Add(joinTableId);
+                        }
+                    }
+                    catch
+                    {
+                        return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang));
+                    }
+                }
+
+                // The primary table is mandatory: owning the menu must authorize
+                // the table rendered by that menu.
+                var primaryAuthorization = await AuthorizeDiyFieldMetadataTableAsync(
+                    param,
+                    primaryTableId,
+                    sharedAuthorizationParam);
+                if (primaryAuthorization.Code != 1)
+                {
+                    return primaryAuthorization;
+                }
+
+                // Join-table metadata is optional. In particular, menus commonly
+                // join Sys_User only to apply trusted row-level SqlWhere rules. A
+                // protected or role-restricted join must not expose all of its
+                // fields, but it must not make the authorized primary table
+                // unusable either.
+                var authorizedTableIds = new HashSet<string>(
+                    StringComparer.OrdinalIgnoreCase)
+                {
+                    primaryTableId
+                };
+                foreach (var trustedTableId in trustedTableIds)
+                {
+                    if (trustedTableId.Equals(
+                        primaryTableId,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    var joinAuthorization = await AuthorizeDiyFieldMetadataTableAsync(
+                        param,
+                        trustedTableId,
+                        sharedAuthorizationParam);
+                    if (joinAuthorization.Code == 1)
+                    {
+                        authorizedTableIds.Add(trustedTableId);
+                    }
+                }
+
+                // Prevent an authorized menu id from being combined with arbitrary
+                // caller-selected table ids. Clear the menu expansion context after
+                // authorization so GetDiyFieldByDiyTables cannot add a denied join
+                // table back into this already-sanitized list.
+                param.TableIds = authorizedTableIds.ToList();
+                param.TableNames = new List<string>();
+                param.SysMenuId = string.Empty;
+                param._SysMenuId = string.Empty;
+                param._ModuleEngineKey = string.Empty;
+                return new DosResult(1);
+            }
+
+            var requestedTables = new List<(string Key, bool IsTableId)>();
+            var requestedTableKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (param.TableIds != null)
+            {
+                foreach (var tableId in param.TableIds)
+                {
+                    if (!tableId.DosIsNullOrWhiteSpace()
+                        && requestedTableKeys.Add(tableId))
+                    {
+                        requestedTables.Add((tableId, true));
+                    }
+                }
+            }
+            if (param.TableNames != null)
+            {
+                foreach (var tableName in param.TableNames)
+                {
+                    if (!tableName.DosIsNullOrWhiteSpace()
+                        && requestedTableKeys.Add(tableName))
+                    {
+                        requestedTables.Add((tableName, false));
+                    }
+                }
+            }
+
+            // Preserve the legacy empty-result behavior; no metadata is returned.
+            if (requestedTables.Count == 0)
+            {
+                return new DosResult(1);
+            }
+
+            // Legacy PC/UniApp renderers sent [primary table, ...JoinTables]
+            // without a menu id. The primary table is the authorization anchor and
+            // remains mandatory. Secondary tables are best-effort: an unauthorized
+            // or protected JoinTable is omitted instead of making the already
+            // authorized business form unusable. This keeps old deployments
+            // compatible without allowing arbitrary or protected-table metadata.
+            var anchorAuthorization = await AuthorizeDiyFieldMetadataTableAsync(
+                param,
+                requestedTables[0].Key,
+                sharedAuthorizationParam);
+            if (anchorAuthorization.Code != 1)
+            {
+                return anchorAuthorization;
+            }
+
+            var legacyAuthorizedTableIds = new List<string>();
+            var legacyAuthorizedTableNames = new List<string>();
+            if (requestedTables[0].IsTableId)
+            {
+                legacyAuthorizedTableIds.Add(requestedTables[0].Key);
+            }
+            else
+            {
+                legacyAuthorizedTableNames.Add(requestedTables[0].Key);
+            }
+
+            foreach (var requestedTable in requestedTables.Skip(1))
+            {
+                var authorization = await AuthorizeDiyFieldMetadataTableAsync(
+                    param,
+                    requestedTable.Key,
+                    sharedAuthorizationParam);
+                if (authorization.Code == 1)
+                {
+                    if (requestedTable.IsTableId)
+                    {
+                        legacyAuthorizedTableIds.Add(requestedTable.Key);
+                    }
+                    else
+                    {
+                        legacyAuthorizedTableNames.Add(requestedTable.Key);
+                    }
+                }
+            }
+
+            // The core method must only receive the authorized subset. In
+            // particular, a caller cannot append sys_apiengine/Sys_User/etc. to an
+            // allowed primary table and obtain their field definitions.
+            param.TableIds = legacyAuthorizedTableIds;
+            param.TableNames = legacyAuthorizedTableNames;
+            return new DosResult(1);
+        }
+
         #endregion
 
         #region DiyTable methods (merged from DiyTableController, backward compat: /api/DiyTable/*)
@@ -854,6 +1274,7 @@ namespace Microi.net.Api
         /// [Compat] 将非diy表加载为diy表 - backward compat for /api/DiyTable/LoadNotDiyTable
         /// </summary>
         [HttpPost("~/api/DiyTable/LoadNotDiyTable")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> LoadNotDiyTable_Compat(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -868,7 +1289,32 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyTableModel_Compat(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
+            var metadataParam = JObject.FromObject(param).ToObject<DiyTableRowParam>();
+            metadataParam.FormEngineKey = !param.Id.DosIsNullOrWhiteSpace()
+                ? param.Id
+                : (!param.Name.DosIsNullOrWhiteSpace() ? param.Name : param.TableName);
+            var metadataAuth = await MicroiEngine.FormEngine
+                .AuthorizeClientTableMetadataOperationAsync(metadataParam);
+            if (metadataAuth.Code != 1)
+            {
+                return Json(metadataAuth);
+            }
+
+            if ((param._CurrentUser?["Level"].Val<int>() ?? 0) < DiyCommon.MaxRoleLevel)
+            {
+                param._RawMetadata = false;
+            }
             var result = await MicroiEngine.FormEngine.GetDiyTableModel(param);
+            if (result?.Code == 1
+                && (param._CurrentUser?["Level"].Val<int>() ?? 0) < DiyCommon.MaxRoleLevel
+                && result.Data != null)
+            {
+                var clientMetadata = JObject.FromObject((object)result.Data);
+                clientMetadata.Remove("ServerDataV8");
+                clientMetadata.Remove("SubmitBeforeServerV8");
+                clientMetadata.Remove("SubmitAfterServerV8");
+                result.Data = clientMetadata;
+            }
             return Json(result);
         }
 
@@ -877,6 +1323,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyTable/GetDiyTable"), HttpGet("~/api/DiyTable/GetDiyTable")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetDiyTableList(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -905,6 +1352,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyTable/GetNotDiyTable"), HttpGet("~/api/DiyTable/GetNotDiyTable")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetNotDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -917,6 +1365,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyTable/AddDiyTable")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -929,6 +1378,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyTable/DelDiyTable")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DelDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -941,6 +1391,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyTable/UptDiyTable")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptDiyTable(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -1095,6 +1546,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             param.IsDeleted = 0;
             param._IsAnonymous = true;
+            param._InvokeType = InvokeType.Client.ToString();
             var result = await MicroiEngine.FormEngine.GetTableDataAsync(param);
             return Json(result);
         }
@@ -1111,6 +1563,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             param.IsDeleted = 0;
             param._IsAnonymous = true;
+            param._InvokeType = InvokeType.Client.ToString();
             var result = await MicroiEngine.FormEngine.AddFormDataAsync(param);
             return Json(result);
         }
@@ -1151,6 +1604,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             param.IsDeleted = 0;
             param._IsAnonymous = true;
+            param._InvokeType = InvokeType.Client.ToString();
             var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(param);
             return Json(result);
         }
@@ -1246,7 +1700,10 @@ namespace Microi.net.Api
             await DefaultDiyTableRowParam(param);
             if (param.OsClient.DosIsNullOrWhiteSpace() || param.TableId.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
-            var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
+            var authResult = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Import");
+            if (authResult.Code != 1)
+                return Json(authResult);
+            var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}:{param._SysMenuId}";
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
             var importStep = await DiyCacheBase.GetAsync<List<string>>(stepSign);
             if (importStep == null) importStep = new List<string>();
@@ -1263,8 +1720,13 @@ namespace Microi.net.Api
             await DefaultDiyTableRowParam(param);
             if (param.OsClient.DosIsNullOrWhiteSpace() || param.TableId.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
+            var authResult = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Import");
+            if (authResult.Code != 1)
+                return Json(authResult);
+            if ((param._CurrentUser?["Level"].Val<int>() ?? 0) < DiyCommon.MaxRoleLevel)
+                return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang)));
             var startSign = $"Microi:{param.OsClient}:ImportTableDataStart:{param.TableId}";
-            var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}";
+            var stepSign = $"Microi:{param.OsClient}:ImportTableDataStep:{param.TableId}:{param._SysMenuId}";
             var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
             await DiyCacheBase.SetAsync(startSign, "0");
             await DiyCacheBase.DeleteAsync(stepSign);
@@ -1279,6 +1741,15 @@ namespace Microi.net.Api
         public async Task<JsonResult> ImportDiyTableRow(DiyTableRowParam param)
         {
             await DefaultDiyTableRowParam(param);
+            var importAuth = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Import");
+            if (importAuth.Code != 1)
+                return Json(importAuth);
+            var addAuth = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Add");
+            if (addAuth.Code != 1)
+                return Json(addAuth);
+            var editAuth = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Edit");
+            if (editAuth.Code != 1)
+                return Json(editAuth);
             var result = await MicroiEngine.Office.ImportExcel(param, HttpContext);
             return Json(result);
         }
@@ -1309,12 +1780,31 @@ namespace Microi.net.Api
             {
                 param.OsClient = tokenModelJobj.OsClient;
                 param._CurrentUser = tokenModelJobj.CurrentUser;
+                param._InvokeType = InvokeType.Client.ToString();
+                param._IsAnonymous = false;
             }
             else
             {
                 return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang) };
             }
             param.IsDeleted = 0;
+            var exportAuth = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Export");
+            if (exportAuth.Code != 1)
+                return new ContentResult() { Content = exportAuth.Msg };
+            var readAuth = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "List");
+            if (readAuth.Code != 1)
+                return new ContentResult() { Content = readAuth.Msg };
+            if ((param.ExcelSheets != null && param.ExcelSheets.Any())
+                || (param.Sheets != null && param.Sheets.Any())
+                || param.ExcelData != null
+                || param.ExcelHeader != null
+                || param.ExcelLayout != null)
+            {
+                return new ContentResult()
+                {
+                    Content = "客户端表格导出接口不接受自定义ExcelData、ExcelSheets或ExcelLayout；请使用当前菜单的标准数据导出。"
+                };
+            }
             DbSession dbSessionStart = OsClient.GetClient(param.OsClient).Db;
             var diyTableModelStart = dbSessionStart.From<DiyTable>()
                                         .Select(new DiyTable().GetFields())
@@ -1361,6 +1851,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyTable/AddTableIndex")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddTableIndex(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -1388,6 +1879,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyTable/DropTableIndex")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DropTableIndex(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -1412,6 +1904,7 @@ namespace Microi.net.Api
         /// 根据模块配置自动生成索引（可搜索字段、可排序字段、默认排序字段、统计列等）
         /// </summary>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AutoGenerateIndexes(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -1685,6 +2178,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyField/AddDiyField")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddDiyField(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1694,6 +2188,7 @@ namespace Microi.net.Api
 
         [HttpPost]
         [HttpPost("~/api/DiyField/AddDiyFieldFromBody")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddDiyFieldFromBody([FromBody] JObject body)
         {
             body = await DefaultParam(body ?? new JObject());
@@ -1703,6 +2198,7 @@ namespace Microi.net.Api
 
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyField/GetExceptionFieldList"), HttpGet("~/api/DiyField/GetExceptionFieldList")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetExceptionFieldList(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1712,6 +2208,7 @@ namespace Microi.net.Api
 
         [HttpPost]
         [HttpPost("~/api/DiyField/AddDbField")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddDbField(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1724,6 +2221,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyField/DelDiyField")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DelDiyField(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1736,6 +2234,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyField/UptDiyField")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptDiyField(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1748,6 +2247,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [HttpPost("~/api/DiyField/UptDiyFieldList")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptDiyFieldList(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1757,6 +2257,7 @@ namespace Microi.net.Api
 
         [HttpPost]
         [HttpPost("~/api/DiyField/UptDiyFieldListFromBody")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptDiyFieldListFromBody([FromBody] DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1769,6 +2270,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyField/GetDiyFieldModel"), HttpGet("~/api/DiyField/GetDiyFieldModel")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetDiyFieldModel(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1791,6 +2293,11 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyFieldList(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
+            var authorization = await AuthorizeDiyFieldMetadataAsync(param);
+            if (authorization.Code != 1)
+            {
+                return Json(authorization);
+            }
             param.IsDeleted = 0;
             var result = await MicroiEngine.FormEngine.GetDiyFieldList(param);
             return Json(result);
@@ -1798,6 +2305,7 @@ namespace Microi.net.Api
 
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyField/GetDeletedDiyField"), HttpGet("~/api/DiyField/GetDeletedDiyField")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetDeletedDiyField(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1808,6 +2316,7 @@ namespace Microi.net.Api
 
         [HttpPost]
         [HttpPost("~/api/DiyField/RecoverDiyField")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> RecoverDiyField(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
@@ -1823,6 +2332,11 @@ namespace Microi.net.Api
         public async Task<JsonResult> GetDiyFieldByDiyTables(DiyFieldParam param)
         {
             await DefaultDiyFieldParam(param);
+            var authorization = await AuthorizeDiyFieldTablesMetadataAsync(param);
+            if (authorization.Code != 1)
+            {
+                return Json(authorization);
+            }
             param.IsDeleted = 0;
             var result = await MicroiEngine.FormEngine.GetDiyFieldByDiyTables(param);
             return Json(result);

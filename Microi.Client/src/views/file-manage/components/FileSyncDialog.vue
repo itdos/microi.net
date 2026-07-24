@@ -572,6 +572,7 @@ const form = reactive({
     suspendEndpointReset: false,
     loginConfigLoaded: false,
     checkingLoginConfig: false,
+    loginRsaPublicKey: '',
     captchaRequired: false,
     captchaId: '',
     captchaValue: '',
@@ -605,6 +606,7 @@ const form = reactive({
     suspendEndpointReset: false,
     loginConfigLoaded: false,
     checkingLoginConfig: false,
+    loginRsaPublicKey: '',
     captchaRequired: false,
     captchaId: '',
     captchaValue: '',
@@ -676,6 +678,7 @@ const resetRemoteLoginState = (platformConfig) => {
   platformConfig.capability = {}
   platformConfig.capabilityError = ''
   platformConfig.loginConfigLoaded = false
+  platformConfig.loginRsaPublicKey = ''
   platformConfig.captchaRequired = false
   platformConfig.captchaId = ''
   platformConfig.captchaValue = ''
@@ -1048,6 +1051,7 @@ const handleSavedConnectionChange = async (platformConfig, connectionId, role) =
       capability: {},
       capabilityError: '',
       loginConfigLoaded: false,
+      loginRsaPublicKey: '',
       captchaRequired: false,
       captchaId: '',
       captchaValue: '',
@@ -1139,6 +1143,7 @@ const detectRemoteLoginConfig = async (platformConfig) => {
       const loginConfig = await fileSyncApi.getRemoteLoginConfig(platformConfig)
       platformConfig.loginConfigLoaded = true
       platformConfig.captchaRequired = loginConfig.captchaRequired
+      platformConfig.loginRsaPublicKey = loginConfig.loginRsaPublicKey || ''
       if (loginConfig.captchaRequired) {
         await refreshRemoteCaptcha(platformConfig)
       } else {

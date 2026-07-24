@@ -60,6 +60,48 @@ test('saveEngineCode confirms an uncertain write by readback', async () => {
   }
 });
 
+test('saveEngineCode blocks suspicious large source reduction unless explicitly confirmed', async () => {
+  const originalFetch = globalThis.fetch;
+  let updateCalls = 0;
+  try {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith('/api/V8Engine/GetApiEngineCode')) {
+        return jsonResponse({
+          Code: 1,
+          Data: {
+            ApiEngineKey: 'large-engine',
+            ApiV8Code: `// full source\n${'var value = 1;\n'.repeat(700)}`,
+            Version: 'v1.0.0',
+          },
+          Msg: '',
+        });
+      }
+      if (url.endsWith('/api/V8Engine/UpdateApiEngineCode')) {
+        updateCalls += 1;
+        return jsonResponse({ Code: 1, Data: {}, Msg: '' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await assert.rejects(
+      createClient().saveEngineCode('large-engine', 'return { Code: 1 };'),
+      /减少超过 15%/,
+    );
+    assert.equal(updateCalls, 0);
+
+    const confirmed = await createClient().saveEngineCode(
+      'large-engine',
+      'return { Code: 1 };',
+      { confirmLargeReduction: true },
+    );
+    assert.equal(confirmed.Code, 1);
+    assert.equal(updateCalls, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('saveEventCode confirms an uncertain write by readback', async () => {
   const originalFetch = globalThis.fetch;
   let storedCode = '';

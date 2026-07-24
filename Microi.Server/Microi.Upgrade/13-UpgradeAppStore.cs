@@ -78,7 +78,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 6, 3) ||
+                    importerVersion < new System.Version(1, 6, 6) ||
                     !code.Contains("field_primary_recovered_") ||
                     !code.Contains("rename_skipped_target_exists_") ||
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
@@ -95,6 +95,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("upsertApplicationRow('sys_microistore'") ||
                     !code.Contains("official_marketplace_install_stat") ||
                     !code.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
+                    !code.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
+                    !code.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
                     !code.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
@@ -449,7 +451,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 6, 3) ||
+                    importerVersion < new System.Version(1, 6, 6) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -464,6 +466,8 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("preservedLegacyUrl") ||
                     !content.Contains("preserve_existing_menu_visibility_") ||
                     !content.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
+                    !content.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
+                    !content.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
                     !content.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
@@ -537,15 +541,17 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var importerEngineCode = importerEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var importerEngineVersionText = importerEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(6, 5, 8) ||
+                    packageVersion < new System.Version(6, 5, 14) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 6, 3) ||
+                    embeddedImporterVersion < new System.Version(1, 6, 4) ||
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
                     !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
                     !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
                     !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||
                     !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
+                    !importerEngineCode.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
+                    !importerEngineCode.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
                     !importerEngineCode.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
@@ -640,7 +646,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             DosResult result;
             if (existing.Code == 1 && existing.Data != null)
             {
-                result = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
+                result = await UpgradeTrustedFormEngine.UpdateAsync("sys_apiengine", osClient, new
                 {
                     Id = (string)existing.Data.Id,
                     model.OsClient,
@@ -661,7 +667,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             }
             else
             {
-                result = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", model);
+                result = await UpgradeTrustedFormEngine.AddAsync("sys_apiengine", osClient, model);
             }
             if (result.Code != 1)
             {
@@ -795,7 +801,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             });
             if (existing.Code == 1 && existing.Data != null) return;
 
-            var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_rolelimit", new
+            var addResult = await UpgradeTrustedFormEngine.AddAsync("sys_rolelimit", osClient, new
             {
                 OsClient = osClient,
                 RoleId = roleId,
@@ -847,9 +853,15 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                 },
             });
             var importV8 = resources[ImportPackageResourceName];
-            if (importMicroiStorePackageResult.Code != 1)
+            if (importMicroiStorePackageResult.Code != 1
+                && importMicroiStorePackageResult.Code != 2)
             {
-                var addImportMicroiStorePackageResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new
+                msgs.Add("读取应用商城导入器失败：" + importMicroiStorePackageResult.Msg);
+            }
+            else if (importMicroiStorePackageResult.Code == 2
+                     || importMicroiStorePackageResult.Data == null)
+            {
+                var addImportMicroiStorePackageResult = await UpgradeTrustedFormEngine.AddAsync("sys_apiengine", osClient, new
                 {
                     ApiName = "[应用商城]导入Microi应用数据包",
                     ApiEngineKey = "import-microi-store-package",
@@ -865,12 +877,12 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                 });
                 if(addImportMicroiStorePackageResult.Code != 1)
                 {
-                    msgs.Add(addImportMicroiStorePackageResult.Msg);
+                    msgs.Add("新增应用商城导入器失败：" + addImportMicroiStorePackageResult.Msg);
                 }
             }
             else
             {
-                var uptImportMicroiStorePackageResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
+                var uptImportMicroiStorePackageResult = await UpgradeTrustedFormEngine.UpdateAsync("sys_apiengine", osClient, new
                 {
                     Id = (string)importMicroiStorePackageResult.Data.Id,
                     ApiName = "[应用商城]导入Microi应用数据包",
@@ -887,7 +899,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                 });
                 if(uptImportMicroiStorePackageResult.Code != 1)
                 {
-                    msgs.Add(uptImportMicroiStorePackageResult.Msg);
+                    msgs.Add("更新应用商城导入器失败：" + uptImportMicroiStorePackageResult.Msg);
                 }
                 else
                 {
@@ -941,7 +953,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             DosResult publishAiAppResult;
             if (publishAiAppEngine.Code == 1)
             {
-                publishAiAppResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", new
+                publishAiAppResult = await UpgradeTrustedFormEngine.UpdateAsync("sys_apiengine", osClient, new
                 {
                     Id = (string)publishAiAppEngine.Data.Id,
                     OsClient = osClient,
@@ -960,7 +972,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             }
             else
             {
-                publishAiAppResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", new
+                publishAiAppResult = await UpgradeTrustedFormEngine.AddAsync("sys_apiengine", osClient, new
                 {
                     OsClient = osClient,
                     ApiName = "[AI应用]制作离线包并发布应用商城",
@@ -1010,7 +1022,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                 if(getMenuResult.Code == 1)
                 {
                     var appStoreMenuId = (string)getMenuResult.Data.Id;
-                    var uptMenuResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", new {
+                    var uptMenuResult = await UpgradeTrustedFormEngine.UpdateAsync("sys_menu", osClient, new {
                         Id = appStoreMenuId,
                         OsClient = osClient,
                         DiyTableId = (string)getStoreTableResult.Data.Id,

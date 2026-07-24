@@ -42,6 +42,15 @@ namespace Microi.net
         /// 这里之所以不使用【InvokeType】是因为【表单引擎】需要区分【表单字段】和【系统字段】
         /// </summary>
         public string _InvokeType { get; set; }
+
+        /// <summary>
+        /// Set only by trusted server code after entering a V8 tenant context.
+        /// A browser cannot bind this flag from JSON. Authorization must use this
+        /// provenance flag rather than overloading _InvokeType, because historical
+        /// server V8 code may set _InvokeType=Client only to run form events.
+        /// </summary>
+        [JsonIgnore]
+        public bool _TrustedServerInvocation { get; set; }
         /// <summary>
         /// 是否执行V8引擎事件。0或空表示不执行，1表示执行。默认1
         /// 主要用于表单引擎提交时，区分是否执行SubmitBeforeServerV8和SubmitAfterServerV8事件

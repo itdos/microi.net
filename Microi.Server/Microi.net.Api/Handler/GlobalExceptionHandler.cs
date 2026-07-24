@@ -70,7 +70,8 @@ namespace Microi.net.Api
                 Msg = userMessage,
                 DataAppend = new
                 {
-                    ExceptionType = ex.GetType().Name,
+                    TraceId = context.TraceIdentifier,
+                    ExceptionType = IsDevelopment() ? ex.GetType().Name : null,
                     Path = context.Request.Path.ToString(),
                     Method = context.Request.Method,
                     Timestamp = DateTime.Now,
@@ -139,8 +140,7 @@ namespace Microi.net.Api
                 // 默认异常
                 _ => (
                     HttpStatusCode.OK,//InternalServerError,
-                    // IsDevelopment() ? ex.Message : "服务器内部错误，请稍后重试"
-                    ex.Message
+                    IsDevelopment() ? ex.Message : "服务器内部错误，请稍后重试。"
                 )
             };
         }

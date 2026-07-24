@@ -175,8 +175,9 @@ export default {
             // 2025-10-29 liucheng 修复：如果OpenAnyTableParam中没有TableId或TableName，则根据SysMenuId获取
             if ((!param.TableId || !param.TableName) && param.SysMenuId) {
                 try {
-                    var sysMenuResult = await self.DiyCommon.FormEngine.GetFormData({
-                        FormEngineKey: "sys_menu",
+                    // 使用菜单元数据专用端点。该端点会验证当前用户确实拥有目标菜单权限，
+                    // 不通过通用 FormEngine 暴露受保护的 sys_menu 表。
+                    var sysMenuResult = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", {
                         Id: param.SysMenuId
                     });
                     if (sysMenuResult.Code == 1) {

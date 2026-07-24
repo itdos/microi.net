@@ -155,7 +155,7 @@ namespace Microi.net.Api
                 }
 
                 SetAssetHeaders(appKey, currentVersion, assetPath, asset);
-                return Redirect(redirectUrl);
+                return StatusCode(502, $"MicroApp file asset could not be read from managed storage: {assetPath}");
             }
 
             var contentBase64 = GetText(asset, "contentBase64", "ContentBase64");
@@ -424,6 +424,10 @@ namespace Microi.net.Api
                 if (item is not JObject asset) continue;
                 if (!GetText(
                         asset,
+                        "hdfsPath",
+                        "HdfsPath",
+                        "publishHdfsPath",
+                        "PublishHdfsPath",
                         "filePathName",
                         "FilePathName",
                         "filePath",
@@ -514,18 +518,27 @@ namespace Microi.net.Api
 
         private async Task<string> ResolveFileAssetUrl(string osClient, JObject asset)
         {
-            var url = GetText(asset, "url", "Url", "fullPath", "FullPath", "fileUrl", "FileUrl", "publicUrl", "PublicUrl");
-            if (!url.DosIsNullOrWhiteSpace())
+            var filePathName = GetText(
+                asset,
+                "hdfsPath",
+                "HdfsPath",
+                "publishHdfsPath",
+                "PublishHdfsPath",
+                "filePathName",
+                "FilePathName",
+                "filePath",
+                "FilePath");
+            if (!filePathName.DosIsNullOrWhiteSpace())
             {
-                return await BuildPublicFileUrl(osClient, url);
+                return await BuildPublicFileUrl(osClient, filePathName);
             }
 
-            var filePathName = GetText(asset, "filePathName", "FilePathName", "filePath", "FilePath");
-            if (filePathName.DosIsNullOrWhiteSpace())
+            var url = GetText(asset, "url", "Url", "fullPath", "FullPath", "fileUrl", "FileUrl", "publicUrl", "PublicUrl");
+            if (url.DosIsNullOrWhiteSpace())
             {
                 return "";
             }
-            return await BuildPublicFileUrl(osClient, filePathName);
+            return await BuildPublicFileUrl(osClient, url);
         }
 
         private async Task<string> BuildPublicFileUrl(string osClient, string filePathOrUrl)
@@ -544,9 +557,15 @@ namespace Microi.net.Api
 
         private static async Task<byte[]> ReadFileAssetBytes(string osClient, JObject asset, string fileUrl)
         {
-            var filePathName = GetText(asset, "filePathName", "FilePathName", "filePath", "FilePath");
-            if (!filePathName.DosIsNullOrWhiteSpace())
+            var filePaths = new[]
             {
+                GetText(asset, "hdfsPath", "HdfsPath"),
+                GetText(asset, "publishHdfsPath", "PublishHdfsPath"),
+                GetText(asset, "filePathName", "FilePathName", "filePath", "FilePath")
+            };
+            foreach (var filePathName in filePaths)
+            {
+                if (filePathName.DosIsNullOrWhiteSpace()) continue;
                 try
                 {
                     var fileResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
@@ -562,7 +581,26 @@ namespace Microi.net.Api
                 }
                 catch
                 {
-                    // Fall back to public URL download below.
+                    // Try the next stored path before falling back to the public URL.
+                }
+            }
+            var directFileUrl = GetText(
+                asset,
+                "url",
+                "Url",
+                "fullPath",
+                "FullPath",
+                "fileUrl",
+                "FileUrl",
+                "publicUrl",
+                "PublicUrl");
+            if (!directFileUrl.DosIsNullOrWhiteSpace()
+                && await IsTrustedPublicFileUrl(osClient, directFileUrl))
+            {
+                var directFileBytes = await DownloadPublicFileAssetBytes(directFileUrl);
+                if (directFileBytes != null)
+                {
+                    return directFileBytes;
                 }
             }
             if (await IsTrustedPublicFileUrl(osClient, fileUrl))

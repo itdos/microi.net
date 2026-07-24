@@ -8,8 +8,8 @@
  * - /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/form-engine.md
  * - /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/where.md
  *
- * @version 2.0.0
- * @date 2026-01-21
+ * @version 2.1.0
+ * @date 2026-07-24
  */
 
 // V8引擎后端完整API定义
@@ -68,14 +68,14 @@ export const V8ServerApiDefinitions = {
             ApiEngine: {
                 label: "ApiEngine",
                 kind: "Module",
-                documentation: "接口引擎 - 服务器端V8可直接调用(非http)\n\n详见: /doc/v8-engine/api-engine",
+                documentation: "接口引擎 - 服务器端V8可直接调用(非HTTP)\n\nStopHttp和接口角色只限制外部HTTP入口。服务端调用敏感业务时仍需在被调用引擎内校验当前用户、状态和数据范围。\n\n详见: /doc/v8-engine/api-engine",
                 insertText: "ApiEngine",
                 methods: {
                     Run: {
                         label: "Run",
                         kind: "Method",
                         documentation:
-                            '执行接口引擎\n\n参数:\n  - ApiEngineKey: 接口引擎Key\n  - params: 参数对象\n  - V8.DbTrans: 事务对象(可选，传入可保证同一事务)\n\n返回: { Code: 1/0, Data: any, Msg: "" }\n\n示例:\nvar result = V8.ApiEngine.Run("ApiEngineKey", {\n  Param1: "1"\n});\n\n同一事务:\nvar result = V8.ApiEngine.Run("ApiEngineKey", {\n  Param2: "1"\n}, V8.DbTrans);',
+                            '执行接口引擎\n\n参数:\n  - ApiEngineKey: 接口引擎Key\n  - params: 参数对象\n  - V8.DbTrans: 事务对象(可选，传入后由外层事务决定提交/回滚)\n\n事务: 返回带Code对象时仅Code=1提交；无Code对象回滚；字符串/数字/数组/布尔/null且无异常时提交。\n\n示例:\nvar result = V8.ApiEngine.Run("ApiEngineKey", {\n  Param1: "1"\n});\n\n同一事务:\nvar result = V8.ApiEngine.Run("ApiEngineKey", {\n  Param2: "1"\n}, V8.DbTrans);',
                         insertText: "Run",
                         snippet: 'Run("${1:ApiEngineKey}", {\n\t${2:Param1}: ${3:value}\n}${4:, V8.DbTrans})'
                     }
@@ -86,7 +86,7 @@ export const V8ServerApiDefinitions = {
             FormEngine: {
                 label: "FormEngine",
                 kind: "Module",
-                documentation: "表单引擎 - 用于操作表单数据的增删改查\n\n详见: /doc/v8-engine/form-engine.html",
+                documentation: "表单引擎 - 用于操作表单数据的增删改查\n\n活跃后端V8上下文属于服务端可信调用，不要求_SysMenuId；租户边界和平台保护表仍生效。_InvokeType只控制是否触发表单事件，不是信任标记。\n\n详见: /doc/v8-engine/form-engine.html",
                 insertText: "FormEngine",
                 methods: {
                     GetFormData: {
@@ -159,7 +159,7 @@ export const V8ServerApiDefinitions = {
                 label: "DbTrans",
                 kind: "Module",
                 documentation:
-                    '数据库事务对象\n\n可以像V8.Db一样使用\n不用手动执行Rollback，接口引擎外部会识别异常并自动回滚\n\n示例:\nvar result1 = V8.FormEngine.UptFormData("table1", {}, V8.DbTrans);\nvar result2 = V8.FormEngine.UptFormData("table2", {}, V8.DbTrans);\nif(result2.Code == 1) {\n  return { Code: 1 }; // 自动提交事务\n} else {\n  return { Code: 0 }; // 自动回滚事务\n}',
+                    '数据库事务对象\n\n可以像V8.Db一样使用。平台安全代理统一管理事务，脚本显式Commit/Rollback/Close无效。返回带Code对象时仅Code=1提交；对象无Code回滚；原始值且无异常时提交。\n\n示例:\nvar result1 = V8.FormEngine.UptFormData("table1", {}, V8.DbTrans);\nvar result2 = V8.FormEngine.UptFormData("table2", {}, V8.DbTrans);\nif(result2.Code == 1) {\n  return { Code: 1 }; // 自动提交事务\n} else {\n  return { Code: 0 }; // 自动回滚事务\n}',
                 insertText: "DbTrans",
                 methods: {
                     FromSql: {
@@ -183,16 +183,16 @@ export const V8ServerApiDefinitions = {
             Cache: {
                 label: "Cache",
                 kind: "Module",
-                documentation: "分布式缓存操作类\n\n过期时间格式: d.HH:mm:ss\n\n建议缓存Key命名: Microi:${V8.OsClient}:{分类}:{Key}",
+                documentation: "当前租户命名空间内的Redis缓存\n\n过期时间可传秒数或d.HH:mm:ss；推荐只传逻辑Key，服务端自动添加租户前缀。不要用KeyExist+Set+Remove模拟分布式锁。\n\n建议逻辑Key: {分类}:{Key}",
                 insertText: "Cache",
                 methods: {
                     Set: {
                         label: "Set",
                         kind: "Method",
                         documentation:
-                            '写缓存\n\n参数:\n  - key: 缓存键\n  - value: 缓存值\n  - expiry: 过期时间(d.HH:mm:ss)\n\n返回: bool\n\n示例:\nvar cacheKey = `Microi:${V8.OsClient}:FormData:baoming`;\nvar result = V8.Cache.Set(cacheKey, value, "0.00:00:59");',
+                            '写缓存\n\n参数:\n  - key: 当前租户逻辑键\n  - value: 缓存值\n  - expiry: 过期秒数或d.HH:mm:ss\n\n返回: bool\n\n示例:\nvar result = V8.Cache.Set("FormData:baoming", value, 59);',
                         insertText: "Set",
-                        snippet: 'Set("${1:key}", ${2:value}, "${3:0.00:10:00}")'
+                        snippet: 'Set("${1:key}", ${2:value}, ${3:600})'
                     },
                     Get: {
                         label: "Get",
@@ -466,7 +466,7 @@ export const V8ServerApiDefinitions = {
     System: {
         label: "System",
         kind: "Module",
-        documentation: "C#系统类 - 服务器端V8代码能直接使用.net下的System命名空间",
+        documentation: "兼容的.NET互操作入口。新代码优先使用V8.*；不要依赖任意CLR类型。平台同时有V8.System主机监控扩展，全局System可能发生名称冲突。",
         insertText: "System",
         properties: {
             Guid: {
@@ -536,7 +536,7 @@ export const V8ServerApiDefinitions = {
                                         label: "Run",
                                         kind: "Method",
                                         documentation:
-                                            '异步执行V8代码\n\n示例:\nSystem.Threading.Tasks.Task.Run(function() {\n  System.Threading.Thread.Sleep(1000);\n  V8.FormEngine.UptFormData("table", {});\n});',
+                                            "不应用于V8后台任务。V8Engine.Run返回后会释放Engine、租户上下文、事务和并发租约，Task.Run回调不可靠。请求内使用await；请求外使用后台任务、Job、MQ或outbox。",
                                         insertText: "Run",
                                         snippet: "Run(function() {\n\t${1:// 异步代码}\n})"
                                     }
@@ -574,11 +574,11 @@ export function createV8ServerCompletionItems(monaco, range) {
         range: range
     });
 
-    // 添加setTimeout和clearTimeout
+    // setTimeout 仅作为兼容提示，不能承担请求返回后的可靠后台任务
     suggestions.push({
         label: "setTimeout",
         kind: monaco.languages.CompletionItemKind.Function,
-        documentation: { value: "异步执行V8代码(推荐)\n\n示例:\nvar timer = setTimeout(function() {\n  // 异步代码\n}, 1000);" },
+        documentation: { value: "兼容定时器，不应用于请求返回后的可靠后台任务。V8Engine.Run返回后Engine、租户上下文和事务会释放。请求内异步使用await；脱离请求使用后台任务、Job、MQ或outbox。" },
         insertText: "setTimeout",
         insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
         range: range
@@ -587,7 +587,7 @@ export function createV8ServerCompletionItems(monaco, range) {
     suggestions.push({
         label: "clearTimeout",
         kind: monaco.languages.CompletionItemKind.Function,
-        documentation: { value: "取消定时器\n\n示例:\nclearTimeout(timer);" },
+        documentation: { value: "取消尚未执行的兼容定时器。定时器不提供持久化、重试、跨节点或重启恢复保证。" },
         insertText: "clearTimeout",
         range: range
     });

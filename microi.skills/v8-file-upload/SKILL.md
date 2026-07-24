@@ -34,7 +34,7 @@ var firstBase64 = V8.FilesByteBase64[firstFile];
 // 上传到 HDFS
 var upResult = V8.Method.Upload({
   FilesByteBase64: V8.FilesByteBase64,
-  Limit: false,        // false=公有桶 / true=私有桶（需临时URL访问）
+  Limit: true,         // 业务上传默认私有桶（需临时 URL 访问）
   Preview: false,      // true=自动生成预览图
   Path: '/business/orders',  // 存储路径前缀
   OsClient: V8.OsClient
@@ -46,6 +46,54 @@ if (upResult.Code !== 1) return upResult;
 var filePath = upResult.Data[0].Path;  // 相对路径，存数据库
 var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 ```
+
+### 平台上传分层限制
+
+Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入口必须在解码 Base64、解析图片或调用对象存储前执行服务端校验。上传限制分为四层，不能把租户业务值误称为平台硬上限：
+
+1. **租户业务配置**：有效正数/布尔值按 `sys_osclients` 当前租户 → 自定义环境变量 → `appsettings` → 代码默认值取第一项。租户可以按业务需要提高或降低默认值。
+2. **平台绝对上限**：最终业务值再与独立 `Absolute*` 取较小值；`ForceDisabled=true` 是最高优先级全局紧急熔断，任何租户都不能重新开启。
+3. **HTTP 解析上限**：Kestrel 请求正文、Multipart 和表单值上限在进程启动时确定，是所有租户共享的请求解析硬顶，不能由 SaaS 动态配置放大。
+4. **字段级限制**：前端 `FileUpload` / `ImgUpload` 的 `MaxSize`、`MaxCount` 等只能与当前租户有效值取更小值，不能提高后端上限，也不能替代服务端校验。
+
+业务默认值及其回退配置：
+
+| 环境变量 | `appsettings` 配置 | 代码默认值 | `sys_osclients` 覆盖字段 |
+|---|---|---:|---|
+| `MICROI_FILE_UPLOAD_ENABLED` | `FileUploadSecurity:UploadEnabled` | `true` | `FileUploadEnabled` |
+| `MICROI_FILE_UPLOAD_MAX_FILE_MB` | `FileUploadSecurity:MaxFileMB` | 100 MB | `FileUploadMaxFileMB` |
+| `MICROI_FILE_UPLOAD_MAX_TOTAL_MB` | `FileUploadSecurity:MaxTotalMB` | 200 MB | `FileUploadMaxRequestMB` |
+| `MICROI_FILE_UPLOAD_MAX_COUNT` | `FileUploadSecurity:MaxFileCount` | 10 | `FileUploadMaxCount` |
+| `MICROI_FILE_UPLOAD_DAILY_USER_QUOTA_MB` | `FileUploadSecurity:DailyUserQuotaMB` | 2048 MB | `FileUploadDailyUserQuotaMB` |
+| `MICROI_FILE_UPLOAD_DAILY_TENANT_QUOTA_MB` | `FileUploadSecurity:DailyTenantQuotaMB` | 20480 MB | `FileUploadDailyTenantQuotaMB` |
+
+平台灾难保护配置不接受租户覆盖：
+
+| 环境变量 | `appsettings` 配置 | 代码默认值 |
+|---|---|---:|
+| `MICROI_FILE_UPLOAD_ABSOLUTE_MAX_FILE_MB` | `FileUploadSecurity:AbsoluteMaxFileMB` | 1024 MB |
+| `MICROI_FILE_UPLOAD_ABSOLUTE_MAX_TOTAL_MB` | `FileUploadSecurity:AbsoluteMaxTotalMB` | 2048 MB |
+| `MICROI_FILE_UPLOAD_ABSOLUTE_MAX_COUNT` | `FileUploadSecurity:AbsoluteMaxFileCount` | 100 |
+| `MICROI_FILE_UPLOAD_ABSOLUTE_DAILY_USER_QUOTA_MB` | `FileUploadSecurity:AbsoluteDailyUserQuotaMB` | 10485760 MB（10 TB） |
+| `MICROI_FILE_UPLOAD_ABSOLUTE_DAILY_TENANT_QUOTA_MB` | `FileUploadSecurity:AbsoluteDailyTenantQuotaMB` | 10485760 MB（10 TB） |
+| `MICROI_FILE_UPLOAD_FORCE_DISABLED` | `FileUploadSecurity:ForceDisabled` | `false` |
+
+HTTP 请求解析硬顶同样不接受租户覆盖：
+
+| 环境变量 | `appsettings` 配置 | 默认值 | 代码边界 |
+|---|---|---:|---|
+| `MICROI_HTTP_MAX_REQUEST_BODY_MB` | `FileUploadSecurity:MaxRequestBodyMB` | 256 MB | 1～2048 MB |
+| `MICROI_FILE_UPLOAD_MAX_MULTIPART_MB` | `FileUploadSecurity:MaxMultipartBodyMB` | 256 MB | 1 MB～HTTP 正文上限 |
+| `MICROI_FILE_UPLOAD_MAX_FORM_VALUE_MB` | `FileUploadSecurity:MaxFormValueMB` | 128 MB | 1 MB～`min(HTTP, 512 MB)` |
+
+- `sys_osclients` 六个字段全部可空；空值、无效值或老数据库缺列时继续向环境变量、`appsettings` 和代码默认值回退，不会因升级自动停用上传。`FileUploadMaxRequestMB` 指一次上传所有文件的业务合计大小，不等于 Kestrel HTTP 请求正文上限。
+- `Absolute*`、`ForceDisabled` 和 HTTP/Multipart/Form 解析上限是平台运维边界；租户值即使更大也会被这些边界截断。最终单次总量还不能超过帐号或租户的有效日额度，单文件不能超过最终单次总量。
+- `FileUploadEnabled=0` 表示禁用当前租户的交互式上传，不表示绕过限制。平台内部受控任务仍受全局大小硬上限；租户配置刷新应走现有 SaaS 引擎重载和共享 Redis 发布订阅，不能依赖单节点内存。
+- 帐号与租户每日额度在共享 Redis 中用单次原子脚本预留，支持多节点；Redis 不可用时失败关闭，不能降级成无限上传。
+- 额度按 UTC 日期统计。为防并发重试绕过限制，后续对象存储失败也不退还已经预留的额度。
+- 每日额度只阻断短期滥用；对象存储必须另外配置租户/桶总容量、账单告警、生命周期与实际用量对账。Redis 计数不能作为长期容量事实源。
+- 普通交互式用户无论客户端是否传 `Limit:false`，服务端都强制使用私有桶，并只允许平台预定义安全一级目录；公有资产必须经过授权的发布流程或超级管理员。
+- 反向代理、Ingress/IIS 的请求体上限应与进程级 HTTP 解析硬顶协调。字段自身的类型、后缀、大小和数量配置只能进一步收紧当前租户有效值，不能替代平台硬顶。
 
 ### UniApp / H5 客户端直传路径规则
 
@@ -107,7 +155,7 @@ var extractResult = V8.Method.ExtractZip({
 ### `sys_user.Avatar` 固定使用私有桶
 
 - `sys_user` 是内部系统用户表，`Avatar` 可能暴露员工身份信息，因此字段配置必须保持 `ImgUpload.Limit=true`，上传端也必须显式传 `Limit:true`；自定义用户管理页不能因为绕过表单引擎而回退到公有上传。
-- 数据库继续只保存租户内相对路径，例如 `/itdos/avatar/20240218/user.png`。历史公有头像迁移时，应把同一文件复制到私有桶的同一路径，确认私有对象可访问后再停用公有访问；不得为了迁移批量改写路径或制造重复日期目录。
+- 数据库继续只保存租户内相对路径，例如 `/tenant_demo/avatar/20240218/user.png`。历史公有头像迁移时，应把同一文件复制到私有桶的同一路径，确认私有对象可访问后再停用公有访问；不得为了迁移批量改写路径或制造重复日期目录。
 - PC、移动端、聊天、工作流等任何页面渲染 `sys_user.Avatar` 时，禁止 `FileServer + Avatar`、`GetServerPath(Avatar)` 或把相对路径直接交给 `<img>`。前端应调用 `DiyCommon.GetUserAvatarUrl(avatar, userId)`，接口/V8 应调用 `V8.Method.GetPrivateFileUrl({ FilePathName: avatar })`，并为临时 URL 设置短期缓存与失败占位图。
 - `ContactUserAvatar`、`FromUserAvatar`、`SenderAvatar` 等从 `sys_user.Avatar` 派生的快照字段同样按私有路径处理；消息数据只保存原始相对路径，不能把会过期的临时 URL 持久化到数据库。
 
@@ -116,7 +164,7 @@ var extractResult = V8.Method.ExtractZip({
 - 触发条件：把 `sys_user.Avatar` 改为 `Limit=true`，但模块卡片仍配置 `TableCardImgField=Avatar`。
 - 根因：通用卡片渲染器只读取了字段值，没有读取图片字段的 `Config.ImgUpload.Limit`，仍统一调用 `GetServerPath/FileServer`。
 - 修复规则：通用图片渲染器必须同时检查字段配置；私有字段先异步换取临时地址，`sys_user.Avatar` 还要有表名+字段名语义兜底，避免元数据缓存短暂陈旧时泄露到公有路径。
-- 验收断言：筛选一条有头像的系统用户，页面中 `/itdos/avatar/` 的直接公有请求数必须为 0，私有代理图片 `naturalWidth > 0`，并同时验证无头像占位图不报错。
+- 验收断言：筛选一条有头像的系统用户，页面中 `/tenant_demo/avatar/` 的直接公有请求数必须为 0，私有代理图片 `naturalWidth > 0`，并同时验证无头像占位图不报错。
 
 定制移动端项目的 Hero、Banner、音频、视频、字体等大资源也应优先上传到目标租户公有 HDFS，再通过 FileServer/CDN 引用；小型导航图标和离线关键素材才保留在主包。上传前可适度压缩，但必须在多尺寸截图或试听/试播中确认质量，禁止以明显失真换取包体扫描通过。完整移动端规则见 `microi-uniapp-frontend/SKILL.md`。
 
@@ -141,6 +189,9 @@ var url = V8.Method.GetPrivateFileUrl({
 // 后端审计代理 URL，过期不可访问；真实对象存储签名 URL 不会返回前端
 ```
 
+- 普通客户端调用 `/api/HDFS/GetPrivateFileUrl` 时，不能只提交 `FilePathName`，必须同时提交 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId`。服务端校验菜单、菜单绑定表、记录数据范围、字段归属以及字段值确实引用该路径后，才签发临时票据。
+- `FieldId` 必须属于目标表，且组件为 `FileUpload` 或 `ImgUpload`；`SysMenuId` 必须是当前用户真实拥有、并绑定目标表的菜单。
+- 普通用户禁止通过该入口直接取得私有文件 `Byte` / `Stream`。签发失败时不能回退裸路径、真实对象存储签名地址或公有 URL。
 - 私有文件访问必须经过后端短期票据代理：签发链接时记录当前登录用户，实际 `GET/HEAD` 打开或下载时再记录一次访问行为；支持 `Range` 流式响应，并对同一次分片请求做短时去重，不能把文件完整读入内存。
 - 用户把私有链接转发给别人后，接收者没有有效登录身份时按“匿名访问”记录，禁止根据签发人猜测实际访问人；票据仍按原有效期失效。
 - 代理创建或包装失败时必须失败关闭，不得退回未经审计的真实签名 URL；行为日志中也禁止保存真实签名 URL、Token、Authorization 或存储密钥。
@@ -284,11 +335,11 @@ return { Code: 1, Data: savedPaths };
 ```json
 {
   "Name": "contract.docx",
-  "Path": "/itdos/file/20260622/contract_v1.0.1.docx",
+  "Path": "/tenant_demo/file/20260622/contract_v1.0.1.docx",
   "Version": "v1.0.1",
   "Versions": [
-    { "Version": "v1.0.0", "Name": "contract.docx", "Path": "/itdos/file/20260622/contract.docx", "IsLatest": false },
-    { "Version": "v1.0.1", "Name": "contract_v1.0.1.docx", "Path": "/itdos/file/20260622/contract_v1.0.1.docx", "IsLatest": true }
+    { "Version": "v1.0.0", "Name": "contract.docx", "Path": "/tenant_demo/file/20260622/contract.docx", "IsLatest": false },
+    { "Version": "v1.0.1", "Name": "contract_v1.0.1.docx", "Path": "/tenant_demo/file/20260622/contract_v1.0.1.docx", "IsLatest": true }
   ]
 }
 ```
@@ -376,10 +427,20 @@ function publicUploadUrl(path) {
 
 - ❌ 不要让前端任意指定 `Path`（路径穿越风险），只允许后端固定路径
 - ❌ 不要不校验文件类型 / 大小：根据 ContentType + 后缀双重校验
+- ❌ 不要把持有 Token 当成私有文件授权；普通用户必须证明菜单、记录和字段引用关系
+- ❌ 不要向普通角色开放文件列表、移动、重命名、删除、覆盖等管理接口；这些接口仅限 `Level >= 9999`
+- ❌ 不要开启 UEditor `catchimage` 远程抓图；默认关闭，确需采集时另建带域名白名单、DNS/IP 校验、禁止跳转、超时和响应上限的受控接口
 - ❌ 敏感文件（合同、身份证）必须用私有桶 `Limit: true`
 - ✅ 公有桶 URL 可缓存到前端，私有桶临时 URL 每次重新生成
 - ✅ 删除数据时同步清理 HDFS 文件（避免存储泄漏）
 - ✅ Excel/PDF 等导出文件通过【响应文件】配置返回，不要拼接到 JSON 数据里
+
+### 安全升级兼容
+
+- 旧页面如果只传 `FilePathName` 获取私有地址，升级后普通帐号会失败；必须补齐 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId`，不能改回匿名或放开管理权限。
+- 旧自定义上传若依赖普通用户设置 `Limit:false` 或任意多级 `Path`，应改成私有上传；公开资源改走受控发布流程。
+- 历史公有文件不会自动变成私有文件。迁移时先复制对象、验证私有读取，再停止旧公有访问；数据库继续保存租户内相对路径，不能持久化临时 URL。
+- 上线验收至少覆盖：普通角色跨菜单/跨记录/跨字段读取被拒绝、单文件/单请求/数量限制、帐号与租户配额、Redis 故障失败关闭、多节点并发、公有匿名 `200`、私有匿名 `403`、授权私有访问 `200`。
 
 ### 复盘：ZIP 发布端与安装端 SHA256 口径不一致
 

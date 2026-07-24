@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v6.2.3",
+    "Version": "v6.2.7",
     "CreateTime": "2026-07-12T13:55:37.022Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -3447,7 +3447,7 @@
       "DATA_TYPE": "mediumtext",
       "IS_NULLABLE": "YES",
       "COLUMN_DEFAULT": null,
-      "COLUMN_COMMENT": "模块配置",
+      "COLUMN_COMMENT": "模块配置（已废弃）",
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 27
@@ -4686,7 +4686,6 @@
       "ExportMoreBtns": "[]",
       "IconClass": "fab fa-wpforms",
       "Url": "/mic-form-engine",
-      "DiyConfig": "{\"HiddenIndex\":0,\"GeneralSeaarch\":0}",
       "SortFieldIds": "[\"CreateTime\",\"UpdateTime\",\"784dcf4c-5486-4bec-8457-8e78f2db5206\",\"ae23394b-ebfa-45ea-879b-1f3391fb3a34\",\"14846112-81c9-4662-aa42-db99478fffc5\",\"d3174c97-91cb-4497-a163-54477d6b49d6\"]",
       "BatchSelectMoreBtns": "[]",
       "Name": "表单管理",
@@ -4735,7 +4734,6 @@
       "ExportMoreBtns": "[]",
       "IconClass": "fas fa-server",
       "Url": "/diy-component",
-      "DiyConfig": "{}",
       "SortFieldIds": "[\"96f0d85f-5aab-498d-908d-5d3191ca0e7e\",\"87ea6355-7f10-4c76-8833-05f2d7b4b717\",\"5277fd9a-d7c2-451f-98bf-290e242cfce7\",\"505b98bf-d4ff-46da-935d-cc6e3040ace1\",\"6ff6a0c0-9abd-4c9b-98fe-a96c9b2b57c9\",\"8af89580-86b4-498e-9555-49d745a6652b\"]",
       "BatchSelectMoreBtns": "[]",
       "Name": "表单引擎组件",

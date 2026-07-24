@@ -15,6 +15,22 @@ description: Microi V8 模板引擎指南。用于编写表格/表单模板渲�
 - 注意：`V8.Form` 此时只能访问到【模块引擎】配置的【查询列】字段；若查询列为空则可访问全部字段
 - 支持 `bootstrap`、`element-ui` 样式类名
 - `V8.EventName` 可能为 `TableTemplateEngine` 或 `FormTemplateEngine`
+- 表格模板同步执行，输出优先级是 `V8.Result` → JavaScript `return` → 原字段值；表单模板异步执行并以 `V8.Result` 为输出
+- 模板结果通过 `v-safe-html`/DOMPurify 净化。`script`、`iframe`、`on*` 事件属性、`javascript:` 等危险内容会被剥离，禁止依赖内联点击事件
+- 业务文本必须 HTML 转义后再拼接；权限、校验、状态写入等业务逻辑必须放后端
+
+模板中需要拼 HTML 时，先定义安全转义函数：
+
+```javascript
+var escapeHtml = function (value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+```
 
 ## 状态徽章（Bootstrap 样式）
 
@@ -28,7 +44,7 @@ if (V8.IsNull(value)) {
   else if (value === '未通过') classStr = 'badge-warning';
   else if (value === '待审核') classStr = 'badge-info';
   else if (value === '通过')   classStr = 'badge-success';
-  V8.Result = '<span class="badge badge-pill ' + classStr + '">' + value + '</span>';
+  V8.Result = '<span class="badge badge-pill ' + classStr + '">' + escapeHtml(value) + '</span>';
 }
 ```
 
@@ -39,11 +55,11 @@ if (V8.IsNull(value)) {
 ```javascript
 // 不同业务状态显示不同字体颜色
 if (V8.Form.XuqiuLX === '合并') {
-  V8.Result = '<span style="color:blue;">' + V8.Form.XuqiuDDH + '</span>';
+  V8.Result = '<span style="color:blue;">' + escapeHtml(V8.Form.XuqiuDDH) + '</span>';
 } else if (V8.Form.HebingID) {
-  V8.Result = '<span style="color:#999;">' + V8.Form.XuqiuDDH + '</span>';
+  V8.Result = '<span style="color:#999;">' + escapeHtml(V8.Form.XuqiuDDH) + '</span>';
 } else {
-  V8.Result = V8.Form.XuqiuDDH;
+  V8.Result = escapeHtml(V8.Form.XuqiuDDH);
 }
 ```
 
@@ -53,8 +69,8 @@ if (V8.Form.XuqiuLX === '合并') {
 var html = '';
 var fileServer = V8.SysConfig.FileServer;
 if (!V8.IsNull(V8.Form.GongsiLOGO)) {
-  html = '<image src="' + fileServer + V8.Form.GongsiLOGO + '" '
-       + 'mode="widthfix" '
+  html = '<img src="' + escapeHtml(fileServer + V8.Form.GongsiLOGO) + '" '
+       + 'alt="公司Logo" '
        + 'style="height:40px;width:40px;object-fit:cover;margin:5px 0;" />';
 }
 V8.Result = html;
@@ -68,9 +84,11 @@ var fileServer = V8.SysConfig.FileServer;
 if (!V8.IsNull(V8.Form.TupianMS) && V8.Form.TupianMS.indexOf('[') !== -1) {
   var imgs = JSON.parse(V8.Form.TupianMS);
   imgs.forEach(function(item) {
-    html += '<img onclick="window.open(\'' + fileServer + item.Path + '\')" '
-         +  'src="' + fileServer + item.Path + '" '
-         +  'style="width:40px;height:40px;object-fit:cover;margin:5px 5px 5px 0;cursor:pointer;" />';
+    var url = escapeHtml(fileServer + item.Path);
+    html += '<a href="' + url + '" target="_blank" rel="noopener noreferrer">'
+         +  '<img src="' + url + '" alt="图片" '
+         +  'style="width:40px;height:40px;object-fit:cover;margin:5px 5px 5px 0;" />'
+         +  '</a>';
   });
 }
 V8.Result = html;
@@ -98,13 +116,14 @@ V8.Result =
 var name = V8.Form.LianxiR || '';
 var phone = V8.Form.LianxiPhone || '';
 if (phone.length === 11) phone = phone.substring(0, 3) + '****' + phone.substring(7);
-V8.Result = '<div><b>' + name + '</b><br/><small style="color:#999;">' + phone + '</small></div>';
+V8.Result = '<div><b>' + escapeHtml(name) + '</b><br/><small style="color:#999;">'
+  + escapeHtml(phone) + '</small></div>';
 ```
 
 ## 条件性图标
 
 ```javascript
-var html = V8.Form.Title || '';
+var html = escapeHtml(V8.Form.Title || '');
 if (V8.Form.IsHot === 1) html += ' <i class="fas fa-fire" style="color:#F56C6C;"></i>';
 if (V8.Form.IsNew === 1) html += ' <span class="badge badge-danger">NEW</span>';
 V8.Result = html;
@@ -123,10 +142,11 @@ V8.Result = '<span style="color:' + color + ';font-weight:bold;">¥' + total + '
 
 ## 常见错误
 
-❌ 不要在模板中调用 `V8.FormEngine`（每行都查 → N+1 性能问题），如必须查请用 `V8.CacheData`（仅 DataFilterV8 支持）  
-❌ 不要返回非字符串到 `V8.Result`（必须是字符串）  
+❌ 不要在模板中调用 `V8.FormEngine`（每行都查 → N+1 性能问题）；需要关联数据时在查询列、接口引擎或后端 `DataFilterV8` 预取，只有 `DataFilterV8` 才提供 `V8.CacheData`
+❌ 不要依赖对象/数组的隐式字符串化；`V8.Result` 建议显式输出字符串
 ❌ 模板中 `V8.Form` 默认只有【查询列】字段；缺字段就要去模块引擎补查询列  
 ❌ 不要在模板里写复杂业务逻辑（应放到接口引擎或 DataFilterV8）  
+❌ 不要输出 `onclick/onerror`、`script/iframe` 或 `javascript:` URL；DOMPurify 会剥离这些内容
 
 ## 与 DataFilterV8 的区别
 

@@ -1,3 +1,8 @@
+---
+name: microi-datasource-mapping
+description: Microi 选项类字段的数据源 Key/Value 映射规范。用于 Select、Radio、Checkbox、UniApp 枚举显示、KeyValue 配置、数据迁移和接口返回标签映射。
+---
+
 # microi-datasource-mapping — 数据源 Key/Value 映射规范
 
 ## 一、后台字段数据源的两种模式
@@ -15,33 +20,29 @@ Microi 低代码平台中，`Select / Radio / Checkbox` 等选项组件支持两
 
 ## 二、移动端前端显示枚举值的规范
 
-移动端（UniApp）不能直接复用后台 diy_field 的 Config 数据源，必须在 JS 中手写映射函数：
+移动端（UniApp）不应假定页面已经加载后台 `diy_field.Config`。优先由接口返回当前租户可用的 `Key/Value` 选项，或复用项目内的共享字典模块；只有不会被租户配置动态修改的协议枚举，才适合在前端维护映射函数：
 
 ```js
 // ✅ 正确做法：手写完整的枚举映射
-function rewardTypeLabel(type) {
+function statusLabel(status) {
   return ({
-    Direct: '直推奖',
-    Team: '团队奖',
-    GrabDirect: '抢购直推奖',
-    GrabTeam: '抢购团队奖',
-    // ... 所有已知类型
-  })[type] || type; // 未知类型显示原始英文 key
+    Draft: '草稿',
+    Enabled: '启用',
+    Disabled: '停用'
+  })[status] || status; // 未知值显示原始 key
 }
 
-// ✅ 会员等级 —— 支持历史遗留英文 key
-export function memberLevelLabel(level) {
-  const v = String(level ?? '').trim();
-  const lv = v.toLowerCase();
-  if (lv === 'vip' || lv === 'vip会员' || lv === 'vipmember') return 'VIP';
-  if (lv === 'normal' || lv === 'member' || lv === 'free' || lv === 'basic' || v === '普通会员' || v === '') return t('普通会员');
-  return v || t('普通会员'); // 其他已知中文直接返回
+// ✅ 动态选项：后端返回 [{ Key, Value }] 后建立映射
+export function createOptionLabel(options = []) {
+  const map = new Map(options.map(x => [String(x.Key), x.Value]));
+  return key => map.get(String(key ?? '')) || String(key ?? '');
 }
 ```
 
 **原则**：
-- 映射函数兜底 `|| type` —— 未知类型显示原始 key，方便发现新枚举值再补充
+- 映射函数兜底返回原始 key，方便发现新枚举值或配置漂移
 - **不要** 用 `|| '未知'` 作为兜底，否则后台新增类型后移动端会显示"未知"而不是英文 key（更难排查）
+- 租户可配置的 Select/Radio/Checkbox 选项不得复制成官方 Skill 中的固定业务字典
 
 ---
 
@@ -52,48 +53,31 @@ export function memberLevelLabel(level) {
 ```js
 // 接口引擎：一次性数据迁移
 var affected = V8.Db.FromSql(
-  "UPDATE mall_member SET Level='普通会员', UpdateTime=NOW() WHERE Level='Normal' AND IFNULL(IsDeleted,0)=0"
-).ExecuteNonQuery();
+  'UPDATE biz_member SET Level = @p0, UpdateTime = @p1 WHERE Level = @p2'
+)
+  .AddInParameter('@p0', 'NormalMember')
+  .AddInParameter('@p1', DateNow('yyyy-MM-dd HH:mm:ss'))
+  .AddInParameter('@p2', 'Normal')
+  .ExecuteNonQuery();
 return { Code: 1, Msg: '迁移完成，共更新 ' + affected + ' 条', Data: { Updated: affected } };
 ```
 
 **最佳实践**：
 1. 执行前先 `SELECT COUNT(*)` 确认受影响行数
-2. 迁移引擎用完后保留（不删除），以备历史回溯
+2. 迁移接口默认 `StopHttp=1`，仅管理员可运行；保留版本和审计记录
 3. 新字段应从一开始就统一使用 Key≠Value 格式（英文 key + 中文 label），避免后续迁移
 
 ---
 
-## 四、乐闪购（lsg）已确认的枚举映射
+## 四、租户与项目映射隔离
 
-### 会员等级 (mall_member.Level)
-| DB 存储值 | 显示文本 | 说明 |
-|----------|---------|------|
-| `VIP` | VIP | 正常值 |
-| `普通会员` | 普通会员 | 正常值（Key=Value 模式） |
-| `Normal` | 普通会员 | 历史遗留值，已通过 SQL 迁移为"普通会员" |
+官方 Skill 只维护平台通用机制，不记录任何客户名称、真实 `OsClient`、客户表名、接口 Key 或业务枚举。项目专有映射应保存在对应应用源码、租户私有配置或项目级 Skill 中，并遵循以下规则：
 
-### 奖励类型 (mall_reward_log.RewardType)
-| DB 存储值 | 显示文本 |
-|----------|---------|
-| `Direct` | 直推奖 |
-| `Team` | 团队奖 |
-| `Static` | 静态奖 |
-| `Recommend` | 推荐奖 |
-| `RecommendListingFee` | 上架服务费推荐奖 |
-| `GrabDirect` | 抢购直推奖 |
-| `GrabTeam` | 抢购团队奖 |
-| `GrabIndirect` | 抢购间推奖 |
-| `GrabBoth` | 抢购联合奖 |
-| `TeamLevel` | 团队层级奖 |
-| `Management` | 管理奖 |
-| `Register` | 注册奖 |
-| `ShareReward` | 分享奖 |
-| `Appointment` | 约单奖 |
-| `AppointmentDiff` | 约单差价奖 |
-| `Platform` | 平台奖 |
-| `Rebate` | 返佣奖 |
-| `Other` | 其它 |
+1. 每个映射注明事实源（字段 KeyValue、数据源引擎或接口引擎）和更新时间。
+2. 动态选项优先实时读取；允许缓存时，缓存 Key 必须包含 `OsClient` 和配置版本。
+3. 后台字段配置修改后刷新字段/数据源缓存，前端不得长期保留另一份无版本的硬编码字典。
+4. 历史值兼容只放在受影响项目中；迁移完成后仍保留审计与回滚说明。
+5. 示例统一使用 `demo`、`biz_*` 等虚构名称，禁止把客户项目复制进官方文档、官方 Skill 或平台 AI 公共知识库。
 
 ---
 
@@ -112,11 +96,11 @@ function withOsClient(url) {
 }
 
 // 请求头中包含：
-// { OsClient: 'lsg', Token: 'xxx', ... }
+// { OsClient: OS_CLIENT, Token: 'xxx', ... }
 
-// ❌ 错误（旧写法）：URL 路径附加 --OsClient--lsg-- 后缀
-// /apiengine/mall_buy_order_mobile_query_v3--OsClient--lsg--
+// ❌ 不要在已经携带租户请求头时，再把租户写死到 URL
+// /apiengine/order-query--OsClient--demo--
 // 这种写法在路由匹配时可能出错，导致 404 或参数丢失
 ```
 
-**结论**：`callEngine()` 系列函数已在请求头中传递 `OsClient`，无需在 URL 中重复传递。对于非 apiengine 端点（如 `/api/formengine/`、`/api/HDFS/`），URL query 中的 `?OsClient=lsg` 仍然需要。
+**结论**：`callEngine()` 系列函数已在请求头中传递 `OsClient` 时，无需在 URL 中重复传递。对于需要 query 参数识别租户的端点，使用运行期变量 `?OsClient=${encodeURIComponent(OS_CLIENT)}`，不得写死真实租户。

@@ -60,12 +60,31 @@ namespace Microi.net
         Task<(string Mode, string Reason, string Source)> ResolveIntentAsync(AiParam param);
 
         /// <summary>
+        /// 返回可直接用于 HTTP/SignalR 传输的意图识别结果。
+        /// 模式名称和路由语义由 AI 领域层统一维护，接口层不重复实现。
+        /// </summary>
+        Task<DosResult> ResolveIntentResultAsync(AiParam param);
+
+        /// <summary>
         /// AI对话（流式输出）
         /// </summary>
         /// <param name="param"></param>
         /// <param name="onChunkReceived">流式数据块回调函数</param>
         /// <returns></returns>
         Task<DosResult> ChatStream(AiParam param, Func<string, Task> onChunkReceived);
+
+        /// <summary>
+        /// 执行完整 AI 对话流程：内置回答、历史上下文恢复和模型调用。
+        /// MVC 层只负责绑定可信用户/租户并传输结果。
+        /// </summary>
+        Task<DosResult> ChatWithContextAsync(AiParam param);
+
+        /// <summary>
+        /// 执行完整流式 AI 对话流程：内置回答、历史上下文恢复和模型调用。
+        /// </summary>
+        Task<DosResult> ChatStreamWithContextAsync(
+            AiParam param,
+            Func<string, Task> onChunkReceived);
         
         /// <summary>
         /// 自然语言转SQL并执行查询
@@ -73,6 +92,45 @@ namespace Microi.net
         /// <param name="param"></param>
         /// <returns></returns>
         Task<DosResult> NL2SQL(NL2SQLParam param);
+
+        /// <summary>
+        /// 根据已认证的服务端用户与租户上下文，为 NL2SQL 构建不可伪造的
+        /// 表白名单、行数上限和旧数据库兼容授权。
+        /// </summary>
+        Task<DosResult> AuthorizeNl2SqlAsync(
+            NL2SQLParam param,
+            object currentUser,
+            string authenticatedOsClient);
+
+        /// <summary>
+        /// 使用已认证用户和租户执行完整 NL2SQL 授权与查询。
+        /// </summary>
+        Task<DosResult> NL2SQLAuthorizedAsync(
+            NL2SQLParam param,
+            object currentUser,
+            string authenticatedOsClient);
+
+        /// <summary>
+        /// 从服务端持久化记录恢复当前用户的 AI 会话上下文，并在需要时完成
+        /// 历史过滤与摘要压缩。HTTP/SignalR 层只负责写入可信身份。
+        /// </summary>
+        Task ApplyConversationContextAsync(AiParam param);
+
+        /// <summary>
+        /// 修改当前用户整组 AI 对话标题。
+        /// </summary>
+        Task<DosResult> UpdateConversationTitleAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            string conversationId,
+            string title,
+            string source);
+
+        /// <summary>
+        /// 获取当前租户可配置到 NL2SQL 角色策略的普通业务表。
+        /// </summary>
+        Task<DosResult> GetNl2SqlPolicyTableOptionsAsync(
+            string authenticatedOsClient);
         
         /// <summary>
         /// 自然语言转SQL并执行查询（流式版本，支持实时输出）
@@ -89,6 +147,17 @@ namespace Microi.net
         /// <param name="onChunkReceived">流式输出回调（可选）</param>
         /// <returns>返回AI回复结果</returns>
         Task<ChatMessageResult> HandleChatMessage(ChatMessageParam param, Func<string, Task> onChunkReceived = null);
+
+        /// <summary>
+        /// SignalR 等可信服务端入口的完整聊天编排。
+        /// AI 领域层负责选择租户模型、构建数据白名单并执行聊天；
+        /// 传输层不得直接查询 mic_ai 或拼装授权结果。
+        /// </summary>
+        Task<ChatMessageResult> HandleTrustedChatMessageAsync(
+            ChatMessageParam param,
+            object currentUser,
+            string authenticatedOsClient,
+            Func<string, Task> onChunkReceived = null);
         
         /// <summary>
         /// 初始化Schema缓存（使用向量数据库）

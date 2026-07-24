@@ -18,7 +18,7 @@ description: Microi 前端 V8 事件指南。用于编写浏览器端字段事�
 ```javascript
 // V8.EventName === 'FieldValueChange'
 // V8.ThisValue   — 当前字段新值
-// V8.OldValue    — 当前字段旧值
+// V8.OldValue    — 仅表格行内字段事件可靠提供；普通表单读取 V8.OldForm
 // V8.Form        — 整个表单数据
 // V8.FormMode    — 'Add' / 'Edit' / 'View'
 // V8.LoadMode    — 'Design' 表示设计器中，'View' 是真实表单
@@ -29,7 +29,7 @@ if (V8.LoadMode === 'Design') return;
 // 选择部门 → 联动加载该部门下的人员到 联系人 控件
 var deptId = V8.ThisValue && V8.ThisValue.Id;
 if (deptId) {
-  var users = await V8.FormEngine.GetTableData('sys_user', {
+  var users = await V8.FormEngine.GetTableData('Diy_Employee', {
     _SelectFields: ['Id', 'Name', 'Account'],
     _Where: [['DeptId', '=', deptId]]
   });
@@ -52,21 +52,23 @@ V8.FieldSet('Reason', 'Required', V8.ThisValue === '退款');
 
 ```javascript
 // V8.EventName === 'FieldOnKeyup'
-// V8.Event       — 原生 KeyboardEvent
-// V8.ThisValue   — 当前输入值
+// 表格行内键盘事件为 V8.EventName === 'TableFieldOnKeyup'
+// V8.KeyCode     — 键码；当前键盘 V8 不提供原生 V8.Event
 
-if (V8.Event.key === 'Enter') {
+if (V8.KeyCode === 13) {
   V8.FormSubmit({ CloseForm: false });
 }
 ```
 
-### FieldOnBlur — 失焦事件
+### V8CodeBlur — 失焦专用代码
 
 ```javascript
+// 当前运行时仍使用 V8.EventName === 'FieldValueChange'
+// V8.ThisValue 是失焦时的当前输入值
 // 失焦校验手机号
 if (V8.ThisValue && !/^1[3-9]\d{9}$/.test(V8.ThisValue)) {
   V8.Tips('手机号格式不正确', false);
-  V8.FieldSet('Phone', 'Value', '');
+  V8.Form.Phone = ''; // 静默清空，避免再次触发当前字段事件
 }
 ```
 
@@ -81,7 +83,13 @@ if (V8.ThisValue && !/^1[3-9]\d{9}$/.test(V8.ThisValue)) {
 
 if (V8.LoadMode === 'Design') return;
 
-V8.OpenAnyTable({ TableName: 'sys_user', Title: '选择用户' });
+V8.OpenAnyTable({
+  SysMenuId: '目标业务菜单Id',
+  MultipleSelect: false,
+  SubmitEvent: function (selectData, callback) {
+    callback({ Code: 1, Data: selectData });
+  }
+});
 // 或 V8.OpenAnyForm / V8.OpenAppDialog / V8.ApiEngine.Run 等任意前端 V8 能力
 ```
 
@@ -96,7 +104,7 @@ V8.OpenAnyTable({ TableName: 'sys_user', Title: '选择用户' });
 // V8.FormMode    — Add / Edit / View
 // V8.TableId     — 当前 diy_table 的 Id
 // V8.TableRowSelected — 批量按钮中选中的行数组
-// V8.ClientType  — 'PC' / 'App' / 'Wechat'
+// V8.ClientType  — 'PC' / 'IOS' / 'Android' / 'H5' / 'WeChat'
 
 V8.ConfirmTips('确认审核通过？', function() {
   V8.ApiEngine.Run({
@@ -166,9 +174,9 @@ V8.RefreshTable({ _PageIndex: 1 });
 | API | 说明 |
 |-----|------|
 | `V8.Tips(msg, ok?)` | 浮层提示。`ok=true` 绿色 |
-| `V8.ConfirmTips(msg, cb)` | 确认弹窗 |
-| `V8.FormSet(field, value)` | 设置表单字段值并触发目标字段的值变更 V8；下拉框可传对象 |
-| `V8.FieldSet(field, prop, value)` | 设置字段属性（Visible/Required/Disabled/Data） |
+| `V8.ConfirmTips(msg, cb)` | 回调式确认弹窗；内容按 HTML 渲染，只能传可信/已转义文本 |
+| `V8.FormSet(field, value)` | 普通表单会触发目标字段 V8；列表上下文只更新当前行/模板 |
+| `V8.FieldSet(field, prop, value)` | 设置字段属性；跨上下文只依赖顶层 Visible/Required/Readonly/Data |
 | `V8.FormSubmit({CloseForm:true})` | 提交当前表单 |
 | `V8.RefreshTable({_PageIndex:1})` | 刷新表格（-1 保持当前页） |
 | `V8.SearchSet({field: value})` | 设置筛选条件 |
@@ -179,6 +187,19 @@ V8.RefreshTable({ _PageIndex: 1 });
 | `V8.ApiEngine.Run({ApiEngineKey, ...})` | 调接口引擎（前端，参数对象格式） |
 | `V8.FormEngine.GetTableData(name, params, cb)` | 前端查列表（参数对象、回调或 await） |
 | `V8.Post(url, data, cb, errCb, headers, contentType)` | 通用 POST |
+
+### 常用上下文差异
+
+| 变量 | 可用范围 |
+|------|----------|
+| `V8.OldForm` | 普通表单已加载旧数据后可用；服务端提交前/后事件也可用 |
+| `V8.OldValue` | 仅表格行内字段值变更可靠提供 |
+| `V8.Event` | 插槽按钮等显式传原生事件的场景；键盘事件使用 `V8.KeyCode` |
+| `V8.Row/Rows/RowIndex` | 表格行事件 |
+| `V8.TableRowSelected/SelectedData` | 列表批量按钮，互为兼容别名 |
+| `V8.SearchParam` | 列表 `{Keyword, Where}` 搜索快照 |
+| `V8.SysMenuModel` | 列表/菜单按钮 |
+| `V8.DataAppend` | 打开表单、列表、弹窗时传入的附加数据 |
 
 ### 在线微服务弹窗 V8.OpenAppDialog
 
@@ -205,6 +226,40 @@ V8.OpenAppDialog({
 ```
 
 子应用用 `window.microApp.getData()` 获取自动下发的 `apiBase`、`osClient`、`token`、`appKey`、`version`、`microRoute`、`dialog` 和 `dialogData`；用 `window.microApp.dispatch({type:'app-dialog:success', data:{...}})` 返回成功结果。完整参数表和结果协议见 `v8-menu-buttons/SKILL.md`。
+
+### ConfirmTips 的 HTML 安全边界
+
+`V8.ConfirmTips` 当前是 callback API，且内容使用 HTML 模式渲染。只传固定文案或经过 HTML 转义的简单展示；严禁直接拼接用户输入、接口消息、数据库富文本和不可信 URL。三个以上字段、上传、表格、Tab、步骤条、代码编辑器或需要复用的页面必须使用 `V8.OpenAppDialog`。
+
+## 前端 FormEngine 菜单上下文与兼容授权
+
+前端 V8 不需要为每个历史项目手工补 `_SysMenuId`。新版 PC 表单引擎通过作用域 FormEngine facade 透明处理菜单上下文：
+
+- V8 调用的目标表就是当前菜单绑定表时，facade 自动注入真实 `_SysMenuId`；如果业务代码已经显式传入 `_SysMenuId` 或兼容的 `ModuleEngineKey`，平台保留显式值，由后端做严格精确校验。
+- V8 查询其它表时，不得把当前主表菜单 Id 带给目标表。facade 保持无菜单，由后端根据当前登录用户有效角色可访问的 `sys_menu` 缓存推断该目标表及当前操作权限。
+- 历史 V8 的对象参数、`表名 + 参数`、Promise、回调、批量参数等调用形式继续兼容。业务代码不得自行伪造角色、菜单或 `_TrustedServerInvocation`。
+- 平台敏感表仍对普通客户端硬拒绝；Import/Export 仍必须携带目标模块的真实菜单上下文及专项权限，不能依赖无菜单推断。
+- 菜单配置的 `SqlWhere`、`SqlJoin` / `JoinTables` 由后端追加到真实查询。前端追加 `_Where` 只能进一步缩小结果，不能扩大或覆盖服务端数据范围。
+- 标准 `TableChild` 自动携带内部 `_TableChildAuth` 关系提示。服务端仍会重载父/子表、菜单和字段配置，校验父记录范围并强制子表外键；业务 V8 禁止构造、缓存、跨父记录复用该对象。
+
+```javascript
+// 假设当前菜单绑定 Customer：平台 facade 自动注入真实菜单，无需历史 V8 手工改造
+var current = await V8.FormEngine.GetFormData('Customer', { Id: V8.Form.Id });
+
+// 跨表：不要传当前表的菜单 Id；后端按用户对 Product 的菜单授权推断
+var products = await V8.FormEngine.GetTableData('Product', {
+  _Where: [['Status', '=', 1]],
+  _PageSize: 20
+});
+```
+
+后端接口引擎和后端表单 V8 不是浏览器调用链：平台只在服务端内部构造参数时写入 `_TrustedServerInvocation`，所以它们调用 `V8.FormEngine` 不要求 `_SysMenuId`。该标记不能从浏览器 JSON、URL 或表单参数获得，前端 V8 也不得尝试设置。
+
+### 前端 FormEngine 方法矩阵
+
+前端 facade 当前公开 `GetFormData`、`GetFormDataAnonymous`、`GetTableData`、`GetTableTree`、`AddFormData`、`AddFormDataBatch`、`UptFormData`、`UptFormDataBatch`、`UptFormDataByWhere`、`DelFormData`、`DelFormDataBatch`、`DelFormDataByWhere`。全部返回 Promise，并兼容可选 callback。
+
+前端没有 `GetTableDataCount`、`GetTableDataTree`（前端名称是 `GetTableTree`）、`AddTableData`、`UptTableData`、`DelTableData`、`AddField`。Import/Export 是独立端点与专项菜单权限，也不是 facade 方法。
 
 ## 异步写法（async/await vs 回调）
 

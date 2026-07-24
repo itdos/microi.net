@@ -13,16 +13,16 @@ Microi 多租户 = **`OsClient` + `OsClientType` + `OsClientNetwork`** 三参数
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
-| `OsClient` | 租户标识（系统Key） | `master`, `veken`, `demo` |
+| `OsClient` | 租户标识（系统Key） | `tenant_a`, `tenant_demo` |
 | `OsClientType` | 租户类型 | `Normal` / `App` / `Wechat` |
 | `OsClientNetwork` | 网络环境 | `Intranet`（内网）/`Outernet`（外网） |
 
-`master` 是平台默认主租户，新增租户在 `sys_osclient` 表中配置（由表单引擎驱动，可自由扩展配置项）。
+主租户不是固定字符串 `master`，而是由当前部署的环境变量 `OsClient` 或 `AppSettings:OsClient` 决定。租户记录存放在受保护的 `sys_osclients` 表中；普通业务角色和普通 V8 不得直接查询、复制或修改该表。
 
 ## 上下文变量
 
 ```javascript
-V8.OsClient            // 当前租户标识，如 'veken'
+V8.OsClient            // 当前租户标识，如 'tenant_demo'
 V8.OsClientType        // 'Normal' / 'App' / 'Wechat'
 V8.OsClientNetwork     // 'Intranet' / 'Outernet'
 V8.OsClientModel       // 当前租户 SaaS 配置的脱敏副本
@@ -54,8 +54,12 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 - 所有可变业务逻辑默认必须由接口引擎编排，包括但不限于租户开通、开库、初始化、归属修复、官网个人中心、付费额度等 SaaS 业务流程。C# 后端只暴露原子 V8 能力，例如建库、导入空库模板、复制 `sys_config`、刷新 SaaS 缓存、补偿回滚、字段兜底等；不要把可变业务分支写死到 Controller 或 `TenantProvisioningService` 这类后端定制代码里。接口引擎缺少能力时，优先扩展 `V8.Method`/V8 引擎原子函数，再由接口引擎调用。
 - 主租户由运行环境决定：优先读取环境变量 `OsClient`，其次读取 `appsettings.json` 的 `AppSettings:OsClient`。只有这条主租户 `sys_osclients` 数据中的平台级字段会作为全局配置生效。
 - 环境变量仍然拥有最高优先级，适合容器编排统一兜底；主租户 `sys_osclients` 次之，体现吾码 SaaS 引擎可配置能力；再其次才是 `appsettings.json`；最后才使用代码默认值。
+- 上一条只适用于进程级平台配置。文件上传的租户业务开关与额度按“当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值”解析，租户可以提高或降低业务默认值；独立 `Absolute*`、`ForceDisabled`、HTTP/Multipart/Form 和反向代理上限仍是不可由租户覆盖的运维边界。
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
 - 修改 `sys_osclients` 的表、字段、数据源或配置值后，必须刷新 SaaS 引擎运行缓存，并回读验证字段 `Component`、`Data`、`Config`、实际数据值和前端真实消费结果。不要只看 MCP 写入成功。
+- SaaS 配置只在启动、管理员保存 `sys_osclients` 或显式租户刷新时发布到共享 Redis。初始化数据库会话、创建 `V8.Dbs` 运行态对象、普通 FormEngine 请求和表单设计器保存不得冒充配置变更反复发布。
+- 扩展库缓存必须区分“尚未加载”和“已加载但为 0 条”；后者是有效结果。没有配置 `microi_database` 的租户不能在每次 V8 执行时重复查询、调用 `AddOrUptClient` 或打印“缓存 OsClient 配置到 Redis”。
+- 多节点的缓存失效订阅只做本节点失效与数据库回源，禁止收到消息后再次发布形成回声。进程内初始化标记仅是可丢失优化，真正租户配置仍以共享数据库/Redis 为准。
 - 新增平台级字段时，字段名建议保持英文稳定，例如 `PressureGlobalMaxConcurrentRequests`、`PressureV8MaxConcurrentExecutions`、`PressureOrmMaxConcurrentConnectionOpens`；字段标签和说明必须中文，说明中写清楚“主租户有效/子租户仅可降低”。
 - 新租户记录不得复制主租户的数据库、鉴权、Redis/对象存储密钥或 MQ/MQTT/Search 凭据。共享基础设施地址与管理密钥只在服务端运行时解析，不持久化到子租户记录，也不进入 V8 投影。
 - RabbitMQ 子租户必须使用独立 user/vhost/ACL，MQTT 必须使用独立账号密码，Search 必须使用限制到 `{osClient}_*` 的 API Key/用户。外部资源尚未真实创建时保持空凭据并失败关闭，禁止把主租户管理员凭据复制过去冒充完成。
@@ -75,32 +79,29 @@ Token: xxx-token-xxx
 ### 方式 2：URL 参数
 
 ```bash
-GET /apiengine/get-products?OsClient=veken
+GET /apiengine/get-products?OsClient=tenant_demo
 ```
 
 ### 方式 3：特殊 URL 格式（无 Token、无参数）
 
 ```bash
-GET /apiengine/get-products--OsClient--veken--
-GET /apiengine/get-products--OsClient--veken--OsClientType--App--
+GET /apiengine/get-products--OsClient--tenant_demo--
+GET /apiengine/get-products--OsClient--tenant_demo--OsClientType--App--
 ```
 
 > 适用于第三方回调（无法添加 Header）、支付/微信回调等场景。
 
-## 跨租户操作（管理员场景）
+## 跨租户操作（仅可信控制面）
 
-```javascript
-// 主租户管理员代为操作子租户
-// 1) 获取子租户的 OsClientModel
-var sub = V8.FormEngine.GetFormData('sys_osclient', {
-  _Where: [['OsClient', '=', V8.Param.targetOsClient]]
-});
-if (sub.Code !== 1) return sub;
+普通 V8 的 `FormEngine`、`DataSourceEngine`、`TranslateEngine`、`WFEngine`、`Cache`、`HDFS`、MQ/MQTT、Search 和 `Dbs` 都必须绑定当前 Token/V8 上下文中的 `OsClient`。请求 body/query 里传入其它租户不能切换连接，也不能读取其它租户凭据。
 
-// 2) 通过 V8.Dbs 访问子租户数据库
-// （扩展数据库需要先在 SaaS 引擎中配置）
-var list = V8.Dbs[sub.Data.DbAlias].FromSql('SELECT * FROM diy_xxx').ToArray();
-```
+租户开通、迁移、备份或平台管理员代维只能走明确的控制面服务/接口引擎：
+
+- 调用者必须是 `Level >= 9999`，并再次校验目标租户白名单和操作类型；
+- 使用专用原子能力，不通过通用 FormEngine 读取完整 `sys_osclients` 记录；
+- 不把数据库、认证、Redis、存储、MQ/MQTT、搜索等连接与密钥投影进 V8；
+- 每次操作写安全审计、幂等键和补偿状态，并对目标租户回读验收；
+- 多节点部署使用共享租约和业务幂等，不能依赖进程静态锁。
 
 ## 缓存按租户隔离
 
@@ -118,11 +119,11 @@ var fullKey = 'Microi:' + V8.OsClient + ':Product:' + V8.Param.id;
 ## 接口引擎中针对不同租户走不同逻辑
 
 ```javascript
-// 主租户跳过审批，子租户走审批
-if (V8.OsClient === 'master') {
+// 租户差异应来自当前租户的非敏感业务配置，不要硬编码某个“主租户”字符串
+if (V8.OsClientModel.OrderApprovalMode === 'Direct') {
   V8.FormEngine.UptFormData('Order', { Id: id, Status: 'Approved' });
 } else {
-  V8.WF.StartWork({ FlowDesignId: 'order-flow', TableRowId: id });
+  await V8.WFEngine.StartWork({ FlowDesignId: 'order-flow', TableRowId: id });
 }
 
 // App 端 vs PC 端不同返回
@@ -143,7 +144,7 @@ var erpUrl = (V8.OsClientNetwork === 'Intranet')
 // ❌ 危险：密钥写在代码里，所有租户共用，无法独立轮换
 var ak = 'AKIDxxxxxxxx';
 
-// ✅ 正确：每个租户在 sys_osclient 表中配置自己的密钥
+// ✅ 正确：每个租户在 sys_osclients 表中配置自己的业务集成密钥
 var ak = V8.OsClientModel.WxPayMchKey;
 var secret = V8.OsClientModel.WxPaySecret;
 ```
@@ -180,6 +181,7 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 - [ ] 不向前端返回 `V8.OsClientModel`
 - [ ] 子租户数据库账号只授权本租户库，MQ/MQTT/Search 独立凭据已真实创建
 - [ ] 文件、队列、Topic、索引均由服务端规范为当前租户命名空间
+- [ ] 无扩展库租户重复执行 V8 时不会重复刷新 SaaS 配置；真实 `sys_osclients` 保存后各节点能按租户失效并回源
 
 ## Microi.AI 中转站租户凭据
 
