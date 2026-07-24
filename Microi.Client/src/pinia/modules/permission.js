@@ -128,6 +128,18 @@ function getVisibleMenuChildren(item) {
     return item._Child.filter((child) => isMenuVisible(child));
 }
 
+function repairOfficialMenuTitle(item) {
+    if (!item || String(item.Name || "").trim()) return;
+    const menuId = String(item.Id || "").toLowerCase();
+    const menuUrl = normalizeMenuRoutePath(item.Url || "", "").toLowerCase();
+    if (menuId === "61b7faee-35b2-4571-add2-5231a355f368" || menuUrl === "/microi-store") {
+        // Compatibility for tenants affected by the historical upgrade sparse-
+        // write bug. The server upgrade repairs the row permanently; this keeps
+        // navigation and tags readable before that repair has run.
+        item.Name = "应用商城";
+    }
+}
+
 function safeDecode(value) {
     if (DiyCommon.IsNull(value)) return "";
     try {
@@ -365,6 +377,7 @@ function buildHiddenMenuGridRoute(item) {
 function MenuBuild(result, data, isFater) {
     data.forEach((item) => {
         try {
+            repairOfficialMenuTitle(item);
             // 如果有子菜单，即使没有 Url 也要处理（作为父级文件夹）
             const hasChildren = item._Child && item._Child.length > 0;
 

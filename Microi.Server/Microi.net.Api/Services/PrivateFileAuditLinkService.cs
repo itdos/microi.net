@@ -43,7 +43,7 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
                 };
                 var key = PrivateFileAuditTicket.CacheKey(param.OsClient, ticketId);
                 await MicroiEngine.CacheTenant.Cache(param.OsClient).SetAsync(key, ticket, TicketLifetime).ConfigureAwait(false);
-                wrapped.Add(await BuildProxyUrlAsync(param.OsClient, ticketId, param.ForOfficePreview == true).ConfigureAwait(false));
+                wrapped.Add(await BuildProxyUrlAsync(param.OsClient, ticketId).ConfigureAwait(false));
                 UserBehaviorAudit.Track(param, "File", "PrivateFileUrlIssued", "私有附件", "PrivateFile", path,
                     $"获取了私有附件[{ticket.FileName}]的临时访问地址", new { FilePath = path, TicketExpiresAt = ticket.ExpiresAt },
                     true, null, "ServerFileGateway", eventId:
@@ -74,31 +74,22 @@ public sealed class PrivateFileAuditLinkService : IPrivateFileAuditLinkService
         }
     }
 
-    private async Task<string> BuildProxyUrlAsync(string osClient, string ticketId, bool preferConfiguredApiBase)
+    private async Task<string> BuildProxyUrlAsync(string osClient, string ticketId)
     {
         var request = _httpContextAccessor.HttpContext?.Request;
         string apiBase = null;
-        if (preferConfiguredApiBase)
+        // Tickets live in shared Redis and can be redeemed by every API node.
+        // Prefer the tenant's canonical API address because Request.Host is often
+        // localhost behind Nginx and must never leak into a browser-facing link.
+        try
         {
-            try
-            {
-                var config = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
-                apiBase = DynamicHelper.GetDynamicStringValue(config?.Data, "ApiBase");
-            }
-            catch { }
+            var config = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
+            apiBase = DynamicHelper.GetDynamicStringValue(config?.Data, "ApiBase");
         }
+        catch { }
         if (!IsHttpBaseUrl(apiBase) && request != null)
         {
             apiBase = $"{request.Scheme}://{request.Host}{request.PathBase}";
-        }
-        if (!IsHttpBaseUrl(apiBase))
-        {
-            try
-            {
-                var config = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
-                apiBase = DynamicHelper.GetDynamicStringValue(config?.Data, "ApiBase");
-            }
-            catch { }
         }
         if (apiBase.DosIsNullOrWhiteSpace()) return $"/api/HDFS/OpenPrivateFile?o={Uri.EscapeDataString(osClient)}&t={ticketId}";
         return apiBase.TrimEnd('/') + $"/api/HDFS/OpenPrivateFile?o={Uri.EscapeDataString(osClient)}&t={ticketId}";

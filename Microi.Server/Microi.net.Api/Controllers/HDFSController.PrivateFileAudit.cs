@@ -53,6 +53,11 @@ public partial class HDFSController
             if (!upstream.IsSuccessStatusCode && upstream.StatusCode != HttpStatusCode.PartialContent)
             {
                 QueuePrivateFileOpen(ticket, o, t, false, $"上游返回{(int)upstream.StatusCode}", currentUser, null);
+                if (upstream.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return NotFound(new DosResult(0, null,
+                        $"对象存储中不存在文件[{ticket.FileName}]，请从原存储或备份恢复后重试。"));
+                }
                 return StatusCode((int)upstream.StatusCode);
             }
 
