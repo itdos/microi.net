@@ -1,0 +1,4 @@
+interface:
+  display_name: "AI 引擎"
+  short_description: "配置模型、知识库、提示词、密钥边界、内容安全、配额与应用验收"
+  default_prompt: "使用 $ai-engine 设计并验收当前 Microi AI 能力。"

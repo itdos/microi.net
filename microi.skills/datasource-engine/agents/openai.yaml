@@ -1,0 +1,4 @@
+interface:
+  display_name: "数据源引擎"
+  short_description: "配置和调用数据源引擎，落实租户、参数、权限、缓存与结果安全"
+  default_prompt: "使用 $datasource-engine 设计并验收当前 Microi 数据源。"

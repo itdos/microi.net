@@ -4,6 +4,10 @@
 
 平台全部源码开源：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 
+::: tip 在线 AI 默认不需要向量数据库
+平台已内置“大模型关键词扩展 + 权限感知 Schema/Skill 搜索 + 准确字段回读”。未开启 `mic_ai.EnableVectorDatabase` 时，不安装 Ollama、`nomic-embed-text` 和 Qdrant 也可使用 NL2SQL、NL2V8 与在线 AI 数据分析；默认模式部署更轻、启动更快、Schema 更新更及时。只有确有高度模糊语义召回需求时，才建议把向量数据库作为增强通道启用。
+:::
+
 ---
 
 ## 🎬 视频演示：AI本地编程环境搭建
@@ -162,27 +166,34 @@ Microi Skills 是一组 **AI 编程最佳实践文件**，内置于平台源码�
 
 **有 Skills 时：** AI 自动参考 Skill 文件，生成符合平台最佳实践的代码（参数化查询、权限校验、规范的返回格式等）。
 
-### 可用的 Skills
+::: warning Skills 不是“可选提示”
+凡是平台新增了授权、租户隔离、上传配额、私有文件、Token 续签、SSRF/CORS 或分布式执行规则，都必须同步写入官方文档、相关 Skill、VS Code 类型/知识库和平台 AI 内嵌资源。否则平台用户和 AI 都无法正确使用这些能力。发布前必须校验源码 Skills、插件 `dist`、VSIX、空工作区初始化产物和 AI 内嵌镜像的一致性。
+:::
 
-| Skill | 场景 | 文件路径 |
-|-------|------|----------|
-| **v8-crud-api** | V8 接口引擎增删改查 | `microi.skills/v8-crud-api/SKILL.md` |
-| **v8-table-event** | 表单 V8 事件开发 | `microi.skills/v8-table-event/SKILL.md` |
-| **v8-sql-query** | 安全 SQL 查询 | `microi.skills/v8-sql-query/SKILL.md` |
-| **v8-http-integration** | 调用外部 HTTP API | `microi.skills/v8-http-integration/SKILL.md` |
-| **v8-cache-pattern** | Redis 缓存模式 | `microi.skills/v8-cache-pattern/SKILL.md` |
-| **v8-security** | 安全最佳实践 | `microi.skills/v8-security/SKILL.md` |
-| **v8-workflow** | 工作流审批事件 | `microi.skills/v8-workflow/SKILL.md` |
-| **v8-mongodb** | MongoDB 操作 | `microi.skills/v8-mongodb/SKILL.md` |
-| **v8-mq-mqtt** | 消息队列与 MQTT | `microi.skills/v8-mq-mqtt/SKILL.md` |
-| **page-engine** | 界面引擎页面 JSON 生成 | `microi.skills/page-engine/SKILL.md` |
-| **print-engine** | 打印引擎模板 JSON 生成 | `microi.skills/print-engine/SKILL.md` |
+### 平台内置 AI 的 Skill 镜像
+
+后端 `Microi.AI` 会把官方仓库全部 48 个 Skill 作为嵌入资源，供当前 `NL2V8EngineService` 建立检索知识库，覆盖 V8、前端事件、FormEngine HTTP、文件/租户安全、系统引擎、页面/打印、UniApp、MCP 交付与测试验收；普通 `Chat/ChatStream` 当前不会自动注入这套完整 corpus。嵌入资源必须从 `microi.skills/*/SKILL.md` 机械同步，禁止长期维护另一份手工简化版；新增、删除或修改 Skill 时，源码目录、嵌入资源、项目资源清单和向量文档清单必须一起校验。公共镜像不得包含客户名称、真实 `OsClient`、客户域名、项目路径或定制业务枚举。
+
+知识库 collection 名包含当前嵌入文档的 SHA-256 版本片段。新旧服务节点滚动发布时分别使用自己的版本化 collection，通过确定性 point id 幂等写入；初始化不会删除其它节点仍在使用的旧 collection。旧版本 collection 应在旧节点全部退出后由运维按保留策略清理，而不是在应用启动时抢占式删除。
+
+### 完整 Skills 目录
+
+当前官方仓库包含 48 个 Skill，覆盖：
+
+- 后端 V8：CRUD、SQL、表单事件、缓存、HTTP、MongoDB、MQ/MQTT、工作流、接口配置、SaaS、图片、文件、导入导出、调试、安全和爬虫；
+- 前端 V8：字段/表单/列表事件、模板、菜单按钮、FormEngine HTTP；
+- 平台引擎：界面、打印、数据源、任务、搜索、报表、翻译、AI、应用商城、数据库结构、表单布局、左右树表和 Microi.UI；
+- AI 零代码交付：业务蓝图、MCP 系统交付、前端 SDK、UniApp、移动质量、数据源映射、Playwright、性能测试、生产只读巡检和工作区规范。
+
+完整且随版本维护的清单以源码中的 [`microi.skills/README.md`](https://gitee.com/ITdos/microi.net/blob/master/microi.skills/README.md) 为准，不要在 AI 提示词里长期复制一份静态子集。
 
 ### 快速集成
 
-#### 第 1 步：获取 Skills
+#### 第 1 步：使用插件安装并生成 AI 指令（推荐）
 
-Skills 已内置在平台源码的 `microi.skills` 目录中，克隆整个平台或单独获取均可：
+安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=microi.v8-engine)，在工作区执行初始化/拉取。插件会安装完整 Skills，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成对应项目指令。升级时按清单与哈希做差异更新，保留用户自行修改的 Skill。
+
+无法使用插件时，再从源码手工获取：
 
 ```bash
 # 方式一：克隆整个平台源码（含 Skills）
@@ -195,7 +206,7 @@ git sparse-checkout set microi.skills
 git checkout master
 ```
 
-将 `microi.skills` 文件夹放到你的工作区根目录下。
+将 `microi.skills` 文件夹放到工作区根目录。不要把 48 个 Skill 全文拼接成一个超长提示词；AI 应按任务类型读取相关 `SKILL.md`。
 
 #### 第 2 步：配置 AI 工具
 
@@ -332,6 +343,16 @@ AI：（参考 v8-crud-api Skill）
 ## 🔌 AI MCP 集成指南
 
 > MCP（Model Context Protocol）是 Anthropic 制定的开放协议，让 AI 工具以标准化方式连接外部系统。Microi MCP Server（[开源仓库](https://gitee.com/ITdos/microi.net)）让 AI 工具直接连接 Microi 吾码平台，实时查询数据库结构、读取引擎代码、远程执行引擎。
+
+::: warning 当前实现边界
+本节的“AI 可以调用 MCP”指 Codex、GitHub Copilot、Cursor、Claude Code 等已经实现 MCP Host/Agent Loop 的外部客户端。平台普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt，不检索完整知识库；`NL2SQL` 默认使用当前租户 Schema 关键词检索与准确字段回读；`NL2V8` 默认使用 Skill 镜像与当前租户 Schema 关键词检索。只有 `mic_ai.EnableVectorDatabase=1` 时，两条检索链路才增加 Ollama/Embedding/Qdrant 向量融合；向量服务异常会回退到关键词结果。当前 `Microi.Server/Microi.AI` 没有向模型注册 MCP Tools，也没有执行 `tool_calls` 循环，因此不会自动调用 MCP。仅在 Prompt 中写“使用 MCP”并不等于已经接入工具。
+
+NL2SQL 当前由服务端生成不可被 JSON 伪造的授权上下文：白名单仅包含当前租户非受保护业务表；普通角色的 AI 角色策略还会与缓存的 FormEngine 列表读取权限取交集，关键词候选和可选向量候选都会在进入 Prompt 前再次过滤。执行层要求精确非空白名单，逐个校验每个 `FROM`/`JOIN` 表，拒绝注释、多语句、CTE、`UNION`、写操作和危险函数，并按数据库施加 `MaxRows + 1` 行限制与 30 秒超时。
+
+这仍是词法安全门禁而不是 SQL AST；模型生成的动态值当前不会自动改写为数据库参数，通用 NL2SQL 也不会执行菜单 `SqlWhere`/`SqlJoin` 行级范围。带行级范围的表对普通角色失败关闭；部门、本人或关联记录范围查询必须通过经过审核、显式参数化并记录审计的业务 ApiEngine，不能把“拥有菜单读取权限”描述成“NL2SQL 已继承行级权限”。
+
+平台在线 AI 若在后续版本增加 Tool/Agent Loop，应复用后端现有授权服务并继承当前用户和租户身份；禁止使用平台超级管理员 Token 自调用 MCP 绕过权限。模型提出工具调用后，服务端仍需校验参数、确认写操作、限制循环次数/时长/结果大小、记录审计并回读验证。
+:::
 
 ### 什么是 Microi MCP
 
@@ -538,7 +559,7 @@ curl https://api.example.com/mcp/health
 
 ### 使用场景示例
 
-配置 MCP 后，你可以直接在 AI 对话中操作平台：
+在支持 MCP Host 的外部 AI 客户端中配置 MCP 后，可以直接在对话中操作平台：
 
 ```
 你：查看当前数据库有哪些表
@@ -554,16 +575,17 @@ AI：（调用 microi_run_engine）返回了 20 条订单数据...
 
 ---
 
-## 📌 三种 AI 能力对比
+## 📌 四种 AI 能力对比
 
 | 方案 | 提供的能力 | 适用场景 |
 |------|-----------|---------|
 | **VS Code 插件** | V8 全部 API 知识 + 数据库表结构 + 代码拉取/推送 + 断点调试 | 日常开发，自动化 |
-| **MCP Server** | 实时查询数据库结构、读取/保存引擎代码、远程执行 | AI 实时操作平台 |
+| **MCP Server** | 为具备 MCP Host 的客户端提供实时查询、保存和执行工具 | AI 受控操作平台 |
 | **Skills** | 具体场景的编码最佳实践和代码模板 | 编码规范，深度指导 |
+| **平台在线 AI** | 普通会话上下文、NL2SQL Schema 双模式检索、NL2V8 Skill + Schema 双模式检索 | 默认关键词检索，可选向量融合；当前不自动调用 MCP |
 
-::: tip 推荐三者搭配使用
-VS Code 插件提供 API 知识和表结构 → MCP 提供实时数据查询和远程执行 → Skills 提供编码最佳实践。
+::: tip 推荐组合
+外部开发场景由 VS Code 插件提供编辑体验，Skills 提供规范，MCP 提供最新事实和受控执行；平台在线 AI 在 NL2SQL/NL2V8 等明确入口默认使用大模型关键词扩展与权限感知 Schema/Skill 检索，只有管理员显式开启向量数据库后才增加向量召回。MCP 是工具协议，关键词/向量索引都是检索手段，三者不能互相替代。
 
 平台源码（含 Skills、MCP）：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 :::

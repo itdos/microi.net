@@ -1,6 +1,5 @@
 using Dos.Common;
 using Microi.net;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
@@ -15,10 +14,10 @@ namespace Microi.net.Api
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
+    [PlatformAdminOnly]
     public class TestController : Controller
     {
         [HttpGet, HttpPost]
-        [AllowAnonymous]
         public async Task Test()
         {
             //测试sql语句

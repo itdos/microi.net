@@ -306,6 +306,7 @@ export default {
                     apiGetDiyFieldSqlData,
                     {
                         _FieldId: field.Id,
+                        _TableChildAuth: field._TableChildAuth || null,
                         // OsClient: self.OsClient,
                         _FormData: {},
                         _Keyword: query

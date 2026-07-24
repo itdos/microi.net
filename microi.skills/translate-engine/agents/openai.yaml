@@ -1,0 +1,4 @@
+interface:
+  display_name: "翻译引擎"
+  short_description: "管理多语言词条、租户翻译配置、缓存、批量翻译与隐私验收"
+  default_prompt: "使用 $translate-engine 设计并验收当前 Microi 翻译能力。"

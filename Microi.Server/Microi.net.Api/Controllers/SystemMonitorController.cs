@@ -14,6 +14,7 @@ namespace Microi.net.Api
     /// </summary>
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     [Route("api/[controller]/[action]")]
     public class SystemMonitorController : Controller
     {

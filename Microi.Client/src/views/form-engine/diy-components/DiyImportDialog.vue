@@ -136,6 +136,7 @@ export default {
                 TableId: this.tableId,
                 UserId: this.$store?.getters?.GetCurrentUser?.Id || ""
             };
+            this.appendMenuContext(result);
             var fixedFormData = this.buildChildImportFixedData();
             if (Object.keys(fixedFormData).length > 0) {
                 result["_FieldId"] = JSON.stringify(fixedFormData);
@@ -156,6 +157,16 @@ export default {
         }
     },
     methods: {
+        appendMenuContext(target) {
+            var menu = this.sysMenuModel || {};
+            if (menu.Id) {
+                target["_SysMenuId"] = menu.Id;
+            }
+            if (menu.ModuleEngineKey) {
+                target.ModuleEngineKey = menu.ModuleEngineKey;
+            }
+            return target;
+        },
         mergeFixedImportValue(target, key, value) {
             if (key && value !== undefined && value !== null && value !== "") {
                 target[key] = value;
@@ -211,9 +222,10 @@ export default {
         },
         getImportProgress() {
             var self = this;
+            var requestParam = self.appendMenuContext({ TableId: self.tableId });
             self.DiyCommon.Post(
                 self.importProgressApi,
-                { TableId: self.tableId },
+                requestParam,
                 function(result) {
                     if (self.DiyCommon.Result(result)) {
                         if (!self.DiyCommon.IsNull(result.Data) && Array.isArray(result.Data)) {
@@ -225,9 +237,10 @@ export default {
         },
         delImportProgress() {
             var self = this;
+            var requestParam = self.appendMenuContext({ TableId: self.tableId });
             self.DiyCommon.Post(
                 "/api/FormEngine/DelImportDiyTableRowStep",
-                { TableId: self.tableId },
+                requestParam,
                 function(result) {
                     if (self.DiyCommon.Result(result)) {
                         self.DiyCommon.Tips("操作成功！");

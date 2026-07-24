@@ -2,9 +2,10 @@
  * V8引擎 JavaScript API 智能提示定义
  * 用于Monaco编辑器提供代码自动完成功能
  *
- * 根据官方文档生成: /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/v8-client.md
- * @version 2.0.0
- * @date 2026-01-21
+ * 事实源: src/utils/diy.common.js、diy-form.vue、diy-form-full.vue、diy-table.vue
+ * 官方文档: microi.doc/docs/doc/v8-engine/v8-client.md
+ * @version 2.1.0
+ * @date 2026-07-24
  */
 
 // V8引擎完整API定义
@@ -55,13 +56,13 @@ export const V8ApiDefinitions = {
             CurrentToken: {
                 label: "CurrentToken",
                 kind: "Property",
-                documentation: "当前登录身份Token",
+                documentation: "当前登录身份 Token。Token 会随受保护请求续签轮换；不要写入 URL、日志或业务数据，也不要长期缓存旧值。",
                 insertText: "CurrentToken"
             },
             SysConfig: {
                 label: "SysConfig",
                 kind: "Property",
-                documentation: "访问系统设置信息\n\n可以访问sys_config表的任意字段\n\n示例:\nvar sysTitle = V8.SysConfig.SysTitle;\nvar apiBase = V8.SysConfig.ApiBase;",
+                documentation: "访问当前租户允许公开给浏览器的系统设置脱敏投影。\n\n数据库、Redis、对象存储、MQ、密码、Secret、Token、Key、Connection、ClientSecrets、GlobalServerV8Code 等敏感字段不会注入前端。\n\n示例:\nvar sysTitle = V8.SysConfig.SysTitle;\nvar apiBase = V8.SysConfig.ApiBase;",
                 insertText: "SysConfig"
             },
             SelectedData: {
@@ -76,13 +77,139 @@ export const V8ApiDefinitions = {
                 documentation: '子表中访问父表的V8对象\n\n可使用父表V8对象的所有功能\n\n示例:\nvar parentForm = V8.ParentV8.Form;\nV8.ParentV8.FormSet("字段名", "值");',
                 insertText: "ParentV8"
             },
+            OldValue: {
+                label: "OldValue",
+                kind: "Property",
+                documentation: "当前字段旧值，仅在表格行内字段值变更上下文中可靠提供。普通表单字段事件应读取 V8.OldForm 或业务快照。",
+                insertText: "OldValue"
+            },
+            ThisValue: {
+                label: "ThisValue",
+                kind: "Property",
+                documentation: "当前字段事件的新值。下拉框通常是对象，文本/数字可能是原始值；表格行内部分数值控件可能传入 { New, Old }。",
+                insertText: "ThisValue"
+            },
+            EventName: {
+                label: "EventName",
+                kind: "Property",
+                documentation: "当前前端 V8 事件名，例如 FormIn、FormSubmitBefore、FormOut、FieldValueChange、FieldOnKeyup、TableFieldOnKeyup、FieldSlotButtonClick、V8BtnRun、V8BtnLimit、TableRowClick、PageTab。",
+                insertText: "EventName"
+            },
+            Event: {
+                label: "Event",
+                kind: "Property",
+                documentation: "显式传入当前 V8 的原生浏览器事件。插槽按钮等场景可用；键盘 V8 当前请使用 V8.KeyCode。",
+                insertText: "Event"
+            },
+            KeyCode: {
+                label: "KeyCode",
+                kind: "Property",
+                documentation: "键盘 V8 事件的 keyCode，例如 Enter 为 13。",
+                insertText: "KeyCode"
+            },
+            TableId: {
+                label: "TableId",
+                kind: "Property",
+                documentation: "当前 diy_table 的 Id。",
+                insertText: "TableId"
+            },
+            TableName: {
+                label: "TableName",
+                kind: "Property",
+                documentation: "当前 diy_table 的物理表名/表 Key。",
+                insertText: "TableName"
+            },
+            TableModel: {
+                label: "TableModel",
+                kind: "Property",
+                documentation: "当前 diy_table 模型。",
+                insertText: "TableModel"
+            },
+            SysMenuId: {
+                label: "SysMenuId",
+                kind: "Property",
+                documentation: "当前标准菜单的真实 sys_menu.Id。只读使用，不要伪造或传播给其它表。",
+                insertText: "SysMenuId"
+            },
+            SysMenuModel: {
+                label: "SysMenuModel",
+                kind: "Property",
+                documentation: "当前列表/菜单按钮上下文的 sys_menu 模型；非列表场景不保证存在。",
+                insertText: "SysMenuModel"
+            },
+            DataAppend: {
+                label: "DataAppend",
+                kind: "Property",
+                documentation: "打开表单、列表或弹窗时传入的附加业务数据。",
+                insertText: "DataAppend"
+            },
+            TableRowId: {
+                label: "TableRowId",
+                kind: "Property",
+                documentation: "当前记录 Id 或父子表关联值。",
+                insertText: "TableRowId"
+            },
+            CurrentTableData: {
+                label: "CurrentTableData",
+                kind: "Property",
+                documentation: "当前宿主已加载的当页数据。",
+                insertText: "CurrentTableData"
+            },
+            TableRowSelected: {
+                label: "TableRowSelected",
+                kind: "Property",
+                documentation: "列表批量按钮中当前勾选的行数组，兼容别名为 V8.SelectedData。",
+                insertText: "TableRowSelected"
+            },
+            SearchParam: {
+                label: "SearchParam",
+                kind: "Property",
+                documentation: "列表当前搜索快照：{ Keyword, Where }。",
+                insertText: "SearchParam"
+            },
+            Row: {
+                label: "Row",
+                kind: "Property",
+                documentation: "表格行事件中的当前行。",
+                insertText: "Row"
+            },
+            Rows: {
+                label: "Rows",
+                kind: "Property",
+                documentation: "表格行事件中的当前页行数组。",
+                insertText: "Rows"
+            },
+            RowIndex: {
+                label: "RowIndex",
+                kind: "Property",
+                documentation: "表格行事件中的当前行索引。",
+                insertText: "RowIndex"
+            },
+            Result: {
+                label: "Result",
+                kind: "Property",
+                documentation: "模板、按钮显隐和字段回调的显式输出值。",
+                insertText: "Result"
+            },
+            ClientType: {
+                label: "ClientType",
+                kind: "Property",
+                documentation: "当前客户端类型：PC、IOS、Android、H5、WeChat。",
+                insertText: "ClientType"
+            },
+            OsClient: {
+                label: "OsClient",
+                kind: "Property",
+                documentation: "当前租户 OsClient。",
+                insertText: "OsClient"
+            },
 
             // ========== 表单操作方法 ==========
             FormSet: {
                 label: "FormSet",
                 kind: "Method",
                 documentation:
-                    '给当前表单字段赋值，会触发被赋值字段的值变更事件\n\n参数:\n  - fieldName: 字段名\n  - value: 字段值\n\n注意: V8.Form.UserName = "张三" 不会触发值变更事件\n强烈不建议在字段的值变更事件中使用FormSet再次对此字段赋值\n\n示例:\nV8.FormSet("UserName", "张三");\nV8.FormSet("SelectUser", { Id: 1, Name: "张三" });',
+                    '给当前字段/行赋值。\n\n普通 diy-form 中会触发目标字段的值变更 V8；diy-table 列表/行内上下文只更新当前行和模板，不递归触发目标字段 V8。\n\n参数:\n  - fieldName: 字段名\n  - value: 字段值\n\nV8.Form.UserName = "张三" 是响应式静默赋值，不触发值变更事件。字段自身事件中避免 FormSet 同一字段形成循环。\n\n示例:\nV8.FormSet("UserName", "张三");\nV8.FormSet("SelectUser", { Id: 1, Name: "张三" });',
                 insertText: "FormSet",
                 snippet: 'FormSet("${1:fieldName}", ${2:value})'
             },
@@ -90,7 +217,7 @@ export const V8ApiDefinitions = {
                 label: "FieldSet",
                 kind: "Method",
                 documentation:
-                    '给当前表单字段属性赋值\n\n参数:\n  - fieldName: 字段名\n  - propertyName: 属性名\n  - value: 属性值\n\n示例:\nV8.FieldSet("UserName", "Readonly", true);\nV8.FieldSet("SelectField", "Data", [{Id:1}, {Id:2}]);',
+                    '给当前表单字段属性赋值。\n\n普通表单支持 Config.Button.Loading 等 Config 点路径；列表和部分全屏按钮上下文只保证顶层属性可用，跨上下文代码优先使用 Visible/Readonly/Data 等顶层属性。\n\n参数:\n  - fieldName: 字段名\n  - propertyName: 属性名\n  - value: 属性值\n\n示例:\nV8.FieldSet("UserName", "Readonly", true);\nV8.FieldSet("SelectField", "Data", [{Id:1}, {Id:2}]);',
                 insertText: "FieldSet",
                 snippet: 'FieldSet("${1:fieldName}", "${2:propertyName}", ${3:value})'
             },
@@ -138,21 +265,21 @@ export const V8ApiDefinitions = {
             RefreshTable: {
                 label: "RefreshTable",
                 kind: "Method",
-                documentation: "刷新表格数据列表\n\n参数:\n  - _PageIndex: 页码，传入-1表示跳转到最后一页\n\n示例:\nV8.RefreshTable({ _PageIndex: 1 });",
+                documentation: "刷新当前 V8 所属的列表。\n\n参数:\n  - _PageIndex: 页码，传入 -1 表示跳转到最后一页\n\n主表单内指定子表请使用 V8.TableRefresh(子表字段, 参数)。\n\n示例:\nV8.RefreshTable({ _PageIndex: 1 });",
                 insertText: "RefreshTable",
                 snippet: "RefreshTable({ _PageIndex: ${1:1} })"
             },
             SearchSet: {
                 label: "SearchSet",
                 kind: "Method",
-                documentation: '表格Tabs设置搜索条件(替换原有条件)\n\n示例:\nV8.SearchSet([\n  ["Age", ">=", 18]\n]);',
+                documentation: '列表/PageTabs 替换搜索条件。数组按 _Where 处理；对象转换为各字段 Like 条件。\n\n示例:\nV8.SearchSet([\n  ["Age", ">=", 18]\n]);\nV8.SearchSet({ Status: "待办" });',
                 insertText: "SearchSet",
                 snippet: 'SearchSet([\n\t["${1:FieldName}", "${2:=}", ${3:value}]\n])'
             },
             SearchAppend: {
                 label: "SearchAppend",
                 kind: "Method",
-                documentation: '表格Tabs追加搜索条件(保留原有条件)\n\n示例:\nV8.SearchAppend([\n  ["Age", ">=", 18]\n]);',
+                documentation: '列表/PageTabs 追加搜索条件。数组追加 _Where；对象合并到当前搜索模型。\n\n示例:\nV8.SearchAppend([\n  ["Age", ">=", 18]\n]);\nV8.SearchAppend({ OwnerId: V8.CurrentUser.Id });',
                 insertText: "SearchAppend",
                 snippet: 'SearchAppend([\n\t["${1:FieldName}", "${2:=}", ${3:value}]\n])'
             },
@@ -161,48 +288,97 @@ export const V8ApiDefinitions = {
             FormEngine: {
                 label: "FormEngine",
                 kind: "Module",
-                documentation: "表单引擎 - 用于操作表单数据的增删改查\n\n详见平台文档: /doc/v8-engine/form-engine.html",
+                documentation: "前端受权限约束的单表 CRUD facade；不是后端 FormEngine 方法的一比一暴露。\n\n当前表自动注入真实 _SysMenuId；跨表不继承当前菜单，由后端按当前用户对目标表的菜单授权缓存推断。显式菜单会严格校验。_TableChildAuth 由标准 TableChild 自动维护，业务 V8 不得构造。敏感平台表对普通客户端硬拒绝。\n\n全部方法返回 Promise，并兼容可选 callback。Import/Export 不是本 facade 方法。\n\n详见: /doc/v8-engine/v8-client.html#v8-formengine",
                 insertText: "FormEngine",
                 methods: {
                     GetFormData: {
                         label: "GetFormData",
                         kind: "Method",
                         documentation:
-                            '获取单条表单数据\n\n参数:\n  - FormEngineKey: 表单引擎Key或表名\n  - Id: 主键ID(可选)\n  - _Where: 查询条件(可选)\n  - _SelectFields: 指定查询字段(可选)\n\n返回: { Code: 1/0, Data: {}, Msg: "" }\n\n示例:\nvar result = await V8.FormEngine.GetFormData("sys_user", {\n  Id: "xxx-xxx"\n});',
+                            '获取单条业务数据。支持 (table, params, callback?) 或 (params, callback?)，返回 Promise<DosResult>。\n\n参数:\n  - FormEngineKey: 表名（对象形式）\n  - Id: 主键ID(可选)\n  - _Where: 查询条件(可选)\n  - _SelectFields: 指定查询字段(可选)\n\n示例:\nvar result = await V8.FormEngine.GetFormData("Diy_Product", {\n  Id: V8.Form.ProductId\n});',
                         insertText: "GetFormData",
                         snippet: 'GetFormData("${1:FormEngineKey}", {\n\tId: "${2:id}"\n})'
+                    },
+                    GetFormDataAnonymous: {
+                        label: "GetFormDataAnonymous",
+                        kind: "Method",
+                        documentation: "匿名获取单条数据。仅当目标 diy_table 明确开启匿名读取时可用；平台敏感表不会因匿名开关放行。返回 Promise<DosResult>。",
+                        insertText: "GetFormDataAnonymous",
+                        snippet: 'GetFormDataAnonymous("${1:FormEngineKey}", {\n\tId: "${2:id}",\n\tOsClient: V8.OsClient\n})'
                     },
                     GetTableData: {
                         label: "GetTableData",
                         kind: "Method",
                         documentation:
-                            '获取表格数据列表\n\n参数:\n  - FormEngineKey: 表单引擎Key或表名\n  - _Where: 查询条件数组\n  - _PageSize: 每页条数\n  - _PageIndex: 页码(从1开始)\n  - _OrderBy: 排序字段\n  - _OrderByType: 排序方式(ASC/DESC)\n\n返回: { Code: 1/0, Data: [], DataCount: 0, Msg: "" }\n\n示例:\nvar result = await V8.FormEngine.GetTableData("sys_user", {\n  _Where: [["Age", ">", "18"]],\n  _PageSize: 20,\n  _PageIndex: 1\n});',
+                            '获取业务数据列表。支持 (table, params, callback?) 或 (params, callback?)，返回 Promise<DosResult>。\n\n参数:\n  - _Where: 查询条件数组\n  - _SelectFields: 查询字段\n  - _PageSize/_PageIndex: 分页\n  - _OrderBy/_OrderByType/_OrderBys: 排序\n\n服务端菜单范围会强制追加，前端 _Where 只能缩小结果。\n\n示例:\nvar result = await V8.FormEngine.GetTableData("Diy_Product", {\n  _Where: [["Status", "=", 1]],\n  _PageSize: 20,\n  _PageIndex: 1\n});',
                         insertText: "GetTableData",
                         snippet: 'GetTableData("${1:FormEngineKey}", {\n\t_Where: [["${2:FieldName}", "${3:=}", ${4:value}]],\n\t_PageSize: ${5:20},\n\t_PageIndex: ${6:1}\n})'
+                    },
+                    GetTableTree: {
+                        label: "GetTableTree",
+                        kind: "Method",
+                        documentation: "获取树形数据列表。前端方法名是 GetTableTree，不是后端文档中可能出现的 GetTableDataTree。返回 Promise<DosResult>。",
+                        insertText: "GetTableTree",
+                        snippet: 'GetTableTree("${1:FormEngineKey}", {\n\t_Where: []\n})'
                     },
                     AddFormData: {
                         label: "AddFormData",
                         kind: "Method",
                         documentation:
-                            '新增单条表单数据\n\n参数:\n  - FormEngineKey: 表单引擎Key或表名\n  - Id: 主键ID(可选)\n  - 其他字段: 要保存的数据\n\n返回: { Code: 1/0, Data: {}, Msg: "" }\n\n示例:\nvar result = await V8.FormEngine.AddFormData("sys_user", {\n  Name: "张三",\n  Age: 25\n});',
+                            '新增单条业务数据。返回 Promise<DosResult>，也可传 callback。重要业务写入优先调用 ApiEngine，由后端完成事务、幂等和权限校验。\n\n示例:\nvar result = await V8.FormEngine.AddFormData("Diy_Comment", {\n  BusinessId: V8.Form.Id,\n  Content: "备注"\n});',
                         insertText: "AddFormData",
                         snippet: 'AddFormData("${1:FormEngineKey}", {\n\t${2:Name}: "${3:value}"\n})'
+                    },
+                    AddFormDataBatch: {
+                        label: "AddFormDataBatch",
+                        kind: "Method",
+                        documentation: "前端批量新增封装，参数为包含 FormEngineKey 的行数组，返回 Promise<DosResult>。前端没有 AddTableData。",
+                        insertText: "AddFormDataBatch",
+                        snippet: 'AddFormDataBatch([\n\t{ FormEngineKey: "${1:TableName}", ${2:Field}: ${3:value} }\n])'
                     },
                     UptFormData: {
                         label: "UptFormData",
                         kind: "Method",
                         documentation:
-                            '修改单条表单数据\n\n参数:\n  - FormEngineKey: 表单引擎Key或表名\n  - Id: 主键ID(必传)\n  - 其他字段: 要修改的数据\n\n返回: { Code: 1/0, Msg: "" }\n\n示例:\nvar result = await V8.FormEngine.UptFormData("sys_user", {\n  Id: "xxx-xxx",\n  Name: "李四"\n});',
+                            '修改单条业务数据，Id 必传。返回 Promise<DosResult>，也可传 callback。\n\n示例:\nvar result = await V8.FormEngine.UptFormData("Diy_Product", {\n  Id: V8.Form.ProductId,\n  Status: 1\n});',
                         insertText: "UptFormData",
                         snippet: 'UptFormData("${1:FormEngineKey}", {\n\tId: "${2:id}",\n\t${3:Name}: "${4:value}"\n})'
+                    },
+                    UptFormDataBatch: {
+                        label: "UptFormDataBatch",
+                        kind: "Method",
+                        documentation: "前端批量修改封装，参数为包含 FormEngineKey、Id 的行数组，返回 Promise<DosResult>。前端没有 UptTableData。",
+                        insertText: "UptFormDataBatch",
+                        snippet: 'UptFormDataBatch([\n\t{ FormEngineKey: "${1:TableName}", Id: "${2:id}", ${3:Field}: ${4:value} }\n])'
+                    },
+                    UptFormDataByWhere: {
+                        label: "UptFormDataByWhere",
+                        kind: "Method",
+                        documentation: "按 _Where 修改数据。必须提供明确条件；高风险或跨表业务写入应使用 ApiEngine。返回 Promise<DosResult>。",
+                        insertText: "UptFormDataByWhere",
+                        snippet: 'UptFormDataByWhere("${1:FormEngineKey}", {\n\t_Where: [["${2:Field}", "=", ${3:value}]],\n\t${4:SaveField}: ${5:newValue}\n})'
                     },
                     DelFormData: {
                         label: "DelFormData",
                         kind: "Method",
                         documentation:
-                            '删除单条表单数据(软删除)\n\n参数:\n  - FormEngineKey: 表单引擎Key或表名\n  - Id或Ids: 主键ID或ID数组\n\n返回: { Code: 1/0, Msg: "" }\n\n示例:\nvar result = await V8.FormEngine.DelFormData("sys_user", {\n  Id: "xxx-xxx"\n});',
+                            '按 Id 或 Ids 删除业务数据。返回 Promise<DosResult>，也可传 callback。高风险删除优先使用 ApiEngine。\n\n示例:\nvar result = await V8.FormEngine.DelFormData("Diy_Comment", {\n  Id: V8.Form.CommentId\n});',
                         insertText: "DelFormData",
                         snippet: 'DelFormData("${1:FormEngineKey}", {\n\tId: "${2:id}"\n})'
+                    },
+                    DelFormDataBatch: {
+                        label: "DelFormDataBatch",
+                        kind: "Method",
+                        documentation: "前端批量删除封装，参数为包含 FormEngineKey、Id 的行数组，返回 Promise<DosResult>。前端没有 DelTableData。",
+                        insertText: "DelFormDataBatch",
+                        snippet: 'DelFormDataBatch([\n\t{ FormEngineKey: "${1:TableName}", Id: "${2:id}" }\n])'
+                    },
+                    DelFormDataByWhere: {
+                        label: "DelFormDataByWhere",
+                        kind: "Method",
+                        documentation: "按明确 _Where 删除数据。高风险批量删除应使用 ApiEngine，并在后端做权限、范围、审计和幂等校验。返回 Promise<DosResult>。",
+                        insertText: "DelFormDataByWhere",
+                        snippet: 'DelFormDataByWhere("${1:FormEngineKey}", {\n\t_Where: [["${2:Field}", "=", ${3:value}]]\n})'
                     }
                 }
             },
@@ -211,16 +387,39 @@ export const V8ApiDefinitions = {
             ApiEngine: {
                 label: "ApiEngine",
                 kind: "Module",
-                documentation: "接口引擎 - 用于调用后端API接口",
+                documentation: "接口引擎。Run 支持 (key, params, callback?) 与 ({ApiEngineKey,...}, callback?)，均返回 Promise；长任务使用 RunBackground。",
                 insertText: "ApiEngine",
                 methods: {
                     Run: {
                         label: "Run",
                         kind: "Method",
                         documentation:
-                            '执行接口引擎\n\n参数:\n  - ApiEngineKey: 接口引擎Key\n  - 其他参数: 传递给接口的参数\n\n返回: { Code: 1/0, Data: any, Msg: "" }\n\n示例:\nvar result = await V8.ApiEngine.Run("sysuser_reg", {\n  Account: "test",\n  Name: "测试"\n});',
+                            '执行接口引擎，返回 Promise 并兼容 callback。\n\n示例:\nvar result = await V8.ApiEngine.Run("order_approve", {\n  Id: V8.Form.Id\n});\nvar result2 = await V8.ApiEngine.Run({ ApiEngineKey: "order_approve", Id: V8.Form.Id });',
                         insertText: "Run",
                         snippet: 'Run("${1:ApiEngineKey}", {\n\t${2:ParamName}: ${3:value}\n})'
+                    },
+                    RunBackground: {
+                        label: "RunBackground",
+                        kind: "Method",
+                        documentation: "启动后台接口引擎任务：RunBackground(apiEngineKey, params, title, callback?)，返回 Promise。",
+                        insertText: "RunBackground",
+                        snippet: 'RunBackground("${1:ApiEngineKey}", {\n\t${2:ParamName}: ${3:value}\n}, "${4:任务标题}")'
+                    }
+                }
+            },
+
+            DataSourceEngine: {
+                label: "DataSourceEngine",
+                kind: "Module",
+                documentation: "数据源引擎。Run 支持 (key, params, callback?) 与 ({DataSourceKey,...}, callback?)，返回 Promise。GetData 已弃用。",
+                insertText: "DataSourceEngine",
+                methods: {
+                    Run: {
+                        label: "Run",
+                        kind: "Method",
+                        documentation: "执行数据源引擎，返回 Promise 并兼容 callback。",
+                        insertText: "Run",
+                        snippet: 'Run("${1:DataSourceKey}", {\n\t${2:Keyword}: ${3:value}\n})'
                     }
                 }
             },
@@ -306,7 +505,7 @@ export const V8ApiDefinitions = {
                 label: "ConfirmTips",
                 kind: "Method",
                 documentation:
-                    '确认提示框\n\n参数:\n  - message: 确认消息\n  - okCallback: 确认回调\n  - cancelCallback: 取消回调(可选)\n  - option: 选项配置(可选)\n\n示例:\nV8.ConfirmTips("确认删除?", function() {\n  // 确认后的操作\n});',
+                    '确认提示框（回调式，不返回等待用户选择的 Promise）。\n\ncontent 会按 HTML 渲染，只能使用可信或已转义内容；严禁直接拼接用户输入、接口文本或数据库富文本。复杂表单/列表/上传/步骤页面使用 V8.OpenAppDialog。\n\n参数:\n  - message: 确认消息\n  - okCallback: 确认回调\n  - cancelCallback: 取消回调(可选)\n  - option: 选项配置(可选)\n\n示例:\nV8.ConfirmTips("确认删除?", function() {\n  // 确认后的操作\n});',
                 insertText: "ConfirmTips",
                 snippet: 'ConfirmTips("${1:message}", function() {\n\t${2:// 确认后的操作}\n})'
             },
@@ -335,11 +534,11 @@ export const V8ApiDefinitions = {
                 snippet: 'ChineseToPinyin("${1:中文}", ${2:2}, ${3:1})'
             },
 
-            // ========== Base64加解密 ==========
+            // ========== Base64 编码/解码 ==========
             Base64: {
                 label: "Base64",
                 kind: "Module",
-                documentation: "Base64编码解码工具",
+                documentation: "Base64 编码/解码工具；不是加密，不能用于保护密码或密钥。",
                 insertText: "Base64",
                 methods: {
                     encode: {
@@ -355,6 +554,13 @@ export const V8ApiDefinitions = {
                         documentation: "Base64解码",
                         insertText: "decode",
                         snippet: 'decode("${1:base64str}")'
+                    },
+                    isValid: {
+                        label: "isValid",
+                        kind: "Method",
+                        documentation: "判断字符串是否为有效 Base64。",
+                        insertText: "isValid",
+                        snippet: 'isValid("${1:value}")'
                     }
                 }
             },

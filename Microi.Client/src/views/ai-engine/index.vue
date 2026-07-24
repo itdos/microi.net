@@ -130,7 +130,7 @@
                         <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
                         <p class="hero-local-tip">AI 深度融合 V8 引擎，强烈建议使用本地 VS Code Codex / Copilot / Claude / Cursor + MCP + Skills，进行真正意义的零代码 AI 编程。</p>
                     </div>
-                    <div class="platform-stats" v-loading="statsLoading">
+                    <div v-if="isAiAdmin" class="platform-stats" v-loading="statsLoading">
                         <div v-for="stat in statCards" :key="stat.key" class="platform-stat" :data-stat="stat.key">
                             <span>{{ stat.label }}</span>
                             <strong>{{ stat.value }}</strong>
@@ -347,6 +347,11 @@
                                     :value="item.value"
                                 />
                             </el-select>
+                            <el-tooltip :content="schemaSearchModeTooltip" placement="top">
+                                <el-tag class="schema-mode-tag" size="small" effect="plain">
+                                    {{ schemaSearchModeLabel }}
+                                </el-tag>
+                            </el-tooltip>
                         </div>
                         <div class="composer-right">
                             <el-select
@@ -589,9 +594,19 @@ const reasoningEffortTooltip = computed(() =>
         ? "推理模型可选择低、中、高；模型默认不会额外传递参数。强度越高通常越慢、消耗的推理 Token 越多。"
         : "当前模型未声明推理强度能力，将使用模型默认设置。"
 );
+const schemaSearchModeLabel = computed(() =>
+    Number(selectedAiModel.value?.EnableVectorDatabase || 0) === 1
+        ? "Schema 关键词 + 向量"
+        : "Schema 关键词"
+);
+const schemaSearchModeTooltip = computed(() =>
+    Number(selectedAiModel.value?.EnableVectorDatabase || 0) === 1
+        ? "先由大模型扩展关键词，再检索当前用户有权访问的表和字段；Qdrant 向量召回只作为可选增强，连接失败会安全回退到关键词检索。"
+        : "由大模型扩展关键词后，在当前用户有权访问的 Schema 中检索；不会连接或同步 Ollama、Embedding、Qdrant。"
+);
 const isAiAdmin = computed(() => {
     const user = currentUser.value || {};
-    return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 999;
+    return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 9999;
 });
 const currentUserName = computed(() => {
     const user = currentUser.value || {};
@@ -617,7 +632,9 @@ const statCards = computed(() => [
 
 onMounted(async () => {
     if (await redirectLegacyAiAppWorkspace()) return;
-    await Promise.all([loadAiModels(), loadHistory(), loadAiEngineMeta(), loadPlatformStats()]);
+    const tasks = [loadAiModels(), loadHistory(), loadAiEngineMeta()];
+    if (isAiAdmin.value) tasks.push(loadPlatformStats());
+    await Promise.all(tasks);
 });
 
 watch(reasoningEffort, (value) => {
@@ -731,7 +748,24 @@ function unwrapDosResult(result) {
 }
 
 async function loadAiEngineMeta() {
-    await Promise.all([loadAiMenuMeta(), loadAiModelTableId()]);
+    // 路由元数据由后端按当前用户菜单权限生成，优先使用真实菜单 Id。
+    // 普通用户不需要读取受保护的 Sys_Menu/diy_table 元数据；这些查询只服务于
+    // 管理员打开“AI 引擎列表”抽屉，避免在线 AI 页面产生无意义的 NoAuth 提示。
+    aiSysMenuId.value = String(
+        route.meta?.Id
+        || route.meta?.id
+        || route.meta?.SysMenuId
+        || route.meta?.sysMenuId
+        || route.query?.SysMenuId
+        || route.query?.Id
+        || ""
+    );
+    if (!isAiAdmin.value) return;
+
+    if (!aiSysMenuId.value) {
+        await loadAiMenuMeta();
+    }
+    await loadAiModelTableId();
     await loadAiModelMenuMeta();
 }
 
@@ -793,12 +827,28 @@ async function loadAiModelMenuMeta() {
 async function loadAiModels() {
     modelLoading.value = true;
     try {
-        const result = await DiyCommon.FormEngine.GetTableData("mic_ai", {
+        const query = {
             _Where: [["IsEnable", "=", "1"]],
+            // mic_ai 属于平台敏感配置表。在线 AI 只读取公开模型投影，
+            // 严禁把 ApiKey、Endpoint、Embedding/Qdrant 凭据下载到浏览器。
+            _SelectFields: [
+                "Id", "Name", "AiModel", "IsEnable", "IsRelayModel",
+                "ModelType", "Provider", "SupportReasoning",
+                "EnableVectorDatabase", "CreateTime"
+            ],
             _OrderBy: "CreateTime",
             _OrderByType: "DESC",
             _PageSize: 100
-        });
+        };
+        let result = await DiyCommon.FormEngine.GetTableData("mic_ai", query);
+        // 极早期数据库可能尚未完成 EnableVectorDatabase 等可选字段升级。
+        // 仅回退到更小的公开投影，不回退到“查询全部字段”。
+        if (!isOk(result)) {
+            result = await DiyCommon.FormEngine.GetTableData("mic_ai", {
+                ...query,
+                _SelectFields: ["Id", "Name", "AiModel", "IsEnable", "CreateTime"]
+            });
+        }
         if (isOk(result)) {
             aiModelList.value = getData(result) || [];
             if (!selectedAiModel.value && aiModelList.value.length) {
@@ -1283,9 +1333,7 @@ function isSuperUser() {
     const level = Number(user.Level || 0);
     return user.IsAdmin === true
         || user._IsAdmin === true
-        || level >= 999
-        || user.Account === "admin"
-        || String(user.RoleName || "").includes("管理员");
+        || level >= 9999;
 }
 
 function normalizePermission(permission) {
@@ -1356,6 +1404,18 @@ function buildDataThinkingSummary(data, question) {
     ];
     if (question) lines.push(`用户问题：${question}`);
     if (data?.Source) lines.push(`数据源策略：${data.Source}`);
+    if (data?.SchemaSearchMode) {
+        lines.push(
+            `Schema 检索：${
+                data.SchemaSearchMode === "hybrid-vector"
+                    ? "大模型关键词扩展 + 关键词/向量融合"
+                    : "大模型关键词扩展 + 权限内关键词检索"
+            }。`
+        );
+    }
+    if (Number.isFinite(Number(data?.SchemaCandidateCount))) {
+        lines.push(`候选范围：权限过滤后命中 ${Number(data.SchemaCandidateCount)} 张候选表。`);
+    }
     if (data?.GeneratedSQL) lines.push(`执行方式：生成只读 SELECT 语句并在服务端受控执行。`);
     const count = Array.isArray(data?.QueryResult) ? data.QueryResult.length : 0;
     lines.push(`结果处理：返回 ${count} 条结果用于前端表格展示，同时生成自然语言回答。`);
@@ -2937,6 +2997,17 @@ async function copyText(text) {
 
 .reasoning-label {
     margin-left: 2px;
+    cursor: help;
+}
+
+.schema-mode-tag {
+    flex: 0 0 auto;
+    max-width: 150px;
+    overflow: hidden;
+    border-color: #c7d2fe;
+    color: #4f46e5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     cursor: help;
 }
 

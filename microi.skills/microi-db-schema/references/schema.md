@@ -55,7 +55,11 @@
 | `sys_menu` | `EditCodeShowV8` | 前端 | [编辑]按钮显示条件 |
 | `sys_menu` | `DelCodeShowV8` | 前端 | [删除]按钮显示条件 |
 | `sys_menu` | `DetailPageV8` | 前端 | 详情按钮行为 |
-| `sys_menu` | `DiyConfig` | 前端/模块 | 模块级自定义配置 |
+| `sys_menu` | `DiyConfig` | 兼容字段 | 已废弃，只用于读取历史数据；禁止写入新配置 |
+| `sys_menu` | `EnableViewSchema` | 前端/模块 | 是否启用跨端统一视图协议 |
+| `sys_menu` | `ViewSchemaVersion` | 前端/模块 | 跨端统一视图协议版本 |
+| `sys_menu` | `ViewConfigVersion` | 前端/模块 | 视图配置递增版本，用于缓存失效 |
+| `sys_menu` | `ViewSchema` | 前端/模块 | Detail/Edit/List/Card 的版本化跨端视图 JSON |
 | `sys_menu` | `SqlJoin` | 后端查询 | 列表查询 JOIN 片段（主表别名 A） |
 | `sys_menu` | `SqlWhere` | 后端查询 | 模块级 Where 片段，可用 CurrentUser 变量 |
 | `sys_menu` | `ImportV8` | 导入 | 导入处理扩展 |
@@ -97,9 +101,9 @@
 | 表名 | 字段数 | 说明 |
 |---|---:|---|
 | `Sys_Config` | 70 | 系统设置（全局 V8、主题、密码策略等） |
-| `sys_osclients` | 92 | SaaS 租户配置（DB、Redis、MQ、MQTT、存储、域名等） |
+| `sys_osclients` | 98 | SaaS 租户配置（DB、Redis、MQ、MQTT、存储、域名、租户上传限额等） |
 | `sys_user` | 37 | 员工信息 |
-| `sys_role` | 9 | 角色（Level=999 为超级管理员） |
+| `sys_role` | 9 | 角色（Level>=9999 为平台超级管理员） |
 | `sys_rolelimit` | 5 | 角色-菜单权限关联 |
 | `sys_dept` | 9 | 组织机构 |
 | `diy_tenant` | 1 | 租户管理 |
@@ -338,7 +342,11 @@
 | `EditCodeShowV8` | `mediumtext` | `CodeEditor` | [编辑]按钮显示条件 |
 | `DelCodeShowV8` | `mediumtext` | `CodeEditor` | [删除]按钮显示条件 |
 | `DetailPageV8` | `mediumtext` | `CodeEditor` | 详情按钮 V8 |
-| `DiyConfig` | `mediumtext` | `CodeEditor` | 模块配置 JSON |
+| `DiyConfig` | `mediumtext` | `CodeEditor` | 已废弃，仅兼容历史数据，禁止写入新配置 |
+| `EnableViewSchema` | `int` | `Switch` | 是否启用跨端统一视图协议 |
+| `ViewSchemaVersion` | `varchar(25)` | `Text` | 跨端统一视图协议版本 |
+| `ViewConfigVersion` | `int` | `NumberText` | 视图配置递增版本 |
+| `ViewSchema` | `mediumtext` | `CodeEditor` | Detail/Edit/List/Card 的版本化跨端视图 JSON |
 | `PageTemplate` | `varchar(255)` | `Text` | 界面模板 |
 | `ReportId` | `varchar(36)` | `Guid` | 报表 Id |
 | `ReportName` | `varchar(100)` | `Select` | 报表 |
@@ -448,7 +456,7 @@
 | 字段 | 类型 | 控件 | 说明 |
 |---|---|---|---|
 | `Name` | `varchar(500)` | `Text` | 角色名称 |
-| `Level` | `int(255)` | `NumberText` | 权限级别（999=超级管理员） |
+| `Level` | `int(255)` | `NumberText` | 权限级别（Level >= 9999 为平台超级管理员） |
 | `Sort` | `int(11)` | `NumberText` | 排序 |
 | `Class` | `varchar(500)` | `Text` | 就是 Customer |
 | `BaseLimit` | `varchar(500)` | `Text` | 基础权限 |

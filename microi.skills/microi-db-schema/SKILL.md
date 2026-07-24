@@ -36,7 +36,7 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 创建或修复 `diy_table` 时必须区分三个字段职责：
 
 - `Name`：英文物理表名或表 Key，例如 `edu_exam_question`、`mci_spider_rule`。不要写中文，不要写长说明。
-- `Description`：简短中文表名，例如 `题库`、`课程`、`采集规则`。不要写一整段用途说明。
+- `Description`：简短中文表名，例如 `商品`、`订单`、`采集规则`。不要写一整段用途说明。
 - `Remark`：备注/表详细说明，用于写业务用途、维护规则、交付说明、注意事项等长文本。
 
 AI 或 MCP 生成低代码系统时，必须默认遵守此规则。发现已有数据把长说明写进 `Description` 时，应将短中文名保留在 `Description`，把详细说明迁移到 `Remark`，并回读 `diy_table` 验证。
@@ -88,6 +88,19 @@ AI 或 MCP 生成低代码系统时，必须默认遵守此规则。发现已有
 `ImportBackfillFields` 用于把已匹配到的主表字段回填到子表字段，例如项目主表的 `Code`、`Name` 回填到成品清单的 `XiangmuBM`、`XiangmuMC`。当 Excel 缺少这些展示冗余列，但导入发生在主表子表弹窗或可通过 `ImportRelations` 找到主表时，导入引擎会批量查询主表并补齐；Excel 已传值时不覆盖。旧版根节点 `Config.TableChildCallbackField` 保存的同类 JSON 数组也会被导入引擎兼容读取。
 
 更多表单组件配置项见 `references/form-component-options.md`。新增或修改 `Microi.Client/src/views/form-engine/diy-field-component/` 组件配置时，同步更新该参考文档和官方表单组件文档。
+
+## 简单枚举统一使用 Key-Value（强制）
+
+- 只要字段会跨 PC、UniApp、小程序、Web、接口或多语言使用，`Select`、`Radio`、`MultipleSelect`、`Checkbox` 的简单枚举默认必须使用 `KeyValue`，不得把中文展示文字同时当作数据库值。
+- `Key` 使用稳定、简短、大小写固定的英文或 ASCII 标识，不随界面语言和文案调整；`Value` 是给用户展示的中文或当前语言文字。
+- 字段配置必须保持 `DataSource:"KeyValue"`、`SelectLabel:"Value"`、`SelectSaveField:"Key"`；数据库、URL 查询参数和接口筛选条件统一保存/传递 `Key`，界面只展示 `Value`。
+- 客户端不得各自硬编码另一套中文到英文映射。由字段元数据或业务接口返回公开的 `{Key,Value}` 投影，客户端按 `Value` 渲染、按 `Key` 提交和筛选。
+- 旧表若已经保存中文 `Value`，上线时必须提供明确的 `Value -> Key` 数据迁移，并在过渡期让读取接口兼容 Key 和 Value；迁移后回读确认数据库只剩合法 Key，并刷新字段缓存。
+- 只有展示值与存储值永远相同、无需搜索筛选、无需多语言且不会跨客户端使用的纯静态字段，才允许使用简单 `Data` 数组。
+
+### 复盘：Key-Value 展示值与筛选值混用
+
+当字段元数据已改为 Key-Value、但历史记录仍保存中文 Value 时，界面按钮传英文 Key 会造成等值筛选全部为 0。修复不能只改按钮文案或只加前端映射，必须同时核对字段 Data/Config、存量物理数据、接口入参归一化和接口返回值；以“数据库存 Key、接口筛 Key、界面显 Value”的端到端回读为验收标准。
 
 ## 安全注意
 

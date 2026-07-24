@@ -105,27 +105,38 @@ export default {
             } catch (error) {
                 rawKey = String(rawValue);
             }
-            var cacheKey = String(fieldName || "") + "|" + rawKey;
+            var tableName = String(
+                (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
+                || (self.SysMenuModel && self.SysMenuModel.DiyTableName)
+                || self.TableName
+                || ""
+            ).toLowerCase();
+            var field = Array.isArray(self.DiyFieldList)
+                ? self.DiyFieldList.find(function (item) {
+                    return item && (item.Name === fieldName || item.AsName === fieldName);
+                })
+                : null;
+            var currentUser = self.GetCurrentUser || (self.diyStore && self.diyStore.GetCurrentUser) || {};
+            var cacheKey = [
+                currentUser.Id || "",
+                self.SysMenuId || "",
+                tableName,
+                row && row.Id,
+                (field && field.Id) || fieldName || "",
+                rawKey
+            ].join("|");
             if (self._privateCardImageUrls[cacheKey]) return self._privateCardImageUrls[cacheKey];
             if (!self._privateCardImagePending[cacheKey]) {
                 self._privateCardImagePending[cacheKey] = true;
-                var tableName = String(
-                    (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
-                    || (self.SysMenuModel && self.SysMenuModel.DiyTableName)
-                    || self.TableName
-                    || ""
-                ).toLowerCase();
-                var field = Array.isArray(self.DiyFieldList)
-                    ? self.DiyFieldList.find(function (item) {
-                        return item && (item.Name === fieldName || item.AsName === fieldName);
-                    })
-                    : null;
                 var resolver = tableName === "sys_user" && String(fieldName || "").toLowerCase() === "avatar"
-                    ? self.DiyCommon.GetUserAvatarUrl(rawValue, row && row.Id)
+                    ? self.DiyCommon.GetUserAvatarUrl(rawValue, row && row.Id, {
+                        SysMenuId: self.SysMenuId
+                    })
                     : self.DiyCommon.GetPrivateFileUrl(rawValue, {
                         FormEngineKey: tableName,
                         FormDataId: row && row.Id,
-                        FieldId: (field && field.Id) || fieldName
+                        FieldId: (field && field.Id) || fieldName,
+                        SysMenuId: self.SysMenuId
                     });
                 Promise.resolve(resolver).then(function (url) {
                     self._privateCardImageUrls[cacheKey] = url || self.bodyBgSvg;

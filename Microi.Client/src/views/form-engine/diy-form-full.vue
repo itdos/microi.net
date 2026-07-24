@@ -85,6 +85,13 @@
                             {{ $t("Msg.Edit") }}
                         </el-button>
                         <el-button
+                            v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
+                            @click="showDesktopRightPanel = !showDesktopRightPanel"
+                        >
+                            <fa-icon icon="far fa-clipboard" class="mr-1" />
+                            {{ showDesktopRightPanel ? '收起记录' : '查看记录' }}
+                        </el-button>
+                        <el-button
                             v-if="FormMode == 'Edit'"
                             type="info"
                             @click="FormMode = 'View'"
@@ -111,13 +118,25 @@
                     </div>
                 </div>
                 <el-row class="page-mode-row" :gutter="20">
-                    <el-col :span="ShowFormRight() && !diyStore.IsPhoneView ? 18 : 24" :xs="24">
+                    <el-col :span="ShowDesktopFormRight ? 19 : 24" :xs="24">
+                        <FormViewRenderer
+                            v-if="UseViewSchemaDetail"
+                            :menu="SysMenuModel"
+                            :form="CurrentRowModel"
+                            :fields="DiyFieldList"
+                            :table="CurrentDiyTableModel"
+                            :user="GetCurrentUser"
+                            :get-server-path="DiyCommon.GetServerPath"
+                            @action="HandleViewAction"
+                        />
                         <DiyForm
                             v-if="TableId && TableRowId"
+                            v-show="!UseViewSchemaDetail"
                             ref="fieldFormPage"
                             :FormMode="FormMode"
                             :LoadMode="'Page'"
                             :TableId="TableId"
+                            :SysMenuId="SysMenuId"
                             :TableRowId="TableRowId"
                             @CallbackFormSubmit="CallbackFormSubmitPage"
                             @CallbackSetFormData="CallbackSetFormData"
@@ -142,13 +161,14 @@
                             :ActiveDiyTableTab="CurrentTableRowListActiveTab"
                             :ShowHideField="ShowHideField"
                             :DataAppend="DataAppend"
+                            :TableChildAuth="TableChildAuth"
                             @ParentFormSet="ParentFormSet"
                             @CallbackRefreshTable="CallbackRefreshTable"
                             @CallbackParentFormSubmit="CallbackParentFormSubmit"
                             @CallbackFormClose="CallbackFormClose"
                         />
                     </el-col>
-                    <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="6" class="page-right-col">
+                    <el-col v-if="ShowDesktopFormRight" :span="5" class="page-right-col">
                         <FormRightPanel
                             ref="formRightPanel"
                             v-model="FormRightType"
@@ -380,6 +400,13 @@
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
+                    <el-button
+                        v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
+                        @click="showDesktopRightPanel = !showDesktopRightPanel"
+                    >
+                        <fa-icon icon="far fa-clipboard" class="mr-1" />
+                        {{ showDesktopRightPanel ? '收起记录' : '查看记录' }}
+                    </el-button>
                     <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
                 </div>
                 <!--移动端仅显示关闭按钮-->
@@ -388,8 +415,19 @@
                 </div>
             </template>
             <el-row class="clear" :gutter="20">
-                <el-col :span="ShowFormRight() ? 18 : 24" :xs="24">
+                <el-col :span="ShowDesktopFormRight ? 19 : 24" :xs="24">
+                    <FormViewRenderer
+                        v-if="UseViewSchemaDetail"
+                        :menu="SysMenuModel"
+                        :form="CurrentRowModel"
+                        :fields="DiyFieldList"
+                        :table="CurrentDiyTableModel"
+                        :user="GetCurrentUser"
+                        :get-server-path="DiyCommon.GetServerPath"
+                        @action="HandleViewAction"
+                    />
                     <DiyForm
+                        v-show="!UseViewSchemaDetail"
                         ref="fieldForm"
                         :AutoInit="false"
                         :FormWF="FormWF"
@@ -397,6 +435,7 @@
                         :FormMode="FormMode"
                         :TableChildFormMode="TableChildFormMode"
                         :TableId="TableId"
+                        :SysMenuId="SysMenuId"
                         :TableName="TableName"
                         :TableRowId="TableRowId"
                         :DefaultValues="FieldFormDefaultValues"
@@ -411,7 +450,9 @@
                         :ActiveDiyTableTab="CurrentTableRowListActiveTab"
                         :ShowHideField="ShowHideField"
                         :DataAppend="DataAppend"
+                        :TableChildAuth="TableChildAuth"
                         @ParentFormSet="ParentFormSet"
+                        @CallbackSetFormData="CallbackSetFormData"
                         @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
                         @CallbackGetDiyField="CallbackGetDiyField"
                         @CallbackFormSubmit="CallbackFormSubmit"
@@ -423,7 +464,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="6" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -678,6 +719,13 @@
                             </el-dropdown-menu>
                         </template>
                     </el-dropdown>
+                    <el-button
+                        v-if="UseViewSchemaDetail && ShowFormRight() && !diyStore.IsPhoneView"
+                        @click="showDesktopRightPanel = !showDesktopRightPanel"
+                    >
+                        <fa-icon icon="far fa-clipboard" class="mr-1" />
+                        {{ showDesktopRightPanel ? '收起记录' : '查看记录' }}
+                    </el-button>
                     <el-button :icon="Close" @click="CloseFieldForm('ShowFieldFormDrawer', 'Close', TableRowId)">{{ $t("Msg.Close") }}</el-button>
                 </div>
                 <!--移动端仅显示关闭按钮-->
@@ -687,8 +735,19 @@
             </template>
 
             <el-row class="clear" :gutter="20">
-                <el-col :span="ShowFormRight() ? 18 : 24" :xs="24">
+                <el-col :span="ShowDesktopFormRight ? 19 : 24" :xs="24">
+                    <FormViewRenderer
+                        v-if="UseViewSchemaDetail"
+                        :menu="SysMenuModel"
+                        :form="CurrentRowModel"
+                        :fields="DiyFieldList"
+                        :table="CurrentDiyTableModel"
+                        :user="GetCurrentUser"
+                        :get-server-path="DiyCommon.GetServerPath"
+                        @action="HandleViewAction"
+                    />
                     <DiyForm
+                        v-show="!UseViewSchemaDetail"
                         ref="fieldForm"
                         :AutoInit="false"
                         :FormWF="FormWF"
@@ -696,6 +755,7 @@
                         :FormMode="FormMode"
                         :TableChildFormMode="TableChildFormMode"
                         :TableId="TableId"
+                        :SysMenuId="SysMenuId"
                         :TableName="TableName"
                         :TableRowId="TableRowId"
                         :DefaultValues="FieldFormDefaultValues"
@@ -710,7 +770,9 @@
                         :ActiveDiyTableTab="CurrentTableRowListActiveTab"
                         :ShowHideField="ShowHideField"
                         :DataAppend="DataAppend"
+                        :TableChildAuth="TableChildAuth"
                         @ParentFormSet="ParentFormSet"
+                        @CallbackSetFormData="CallbackSetFormData"
                         @CallbackSetDiyTableModel="CallbackSetDiyTableModel"
                         @CallbackGetDiyField="CallbackGetDiyField"
                         @CallbackFormSubmit="CallbackFormSubmit"
@@ -722,7 +784,7 @@
                         @CallbackFormClose="CallbackFormClose"
                     />
                 </el-col>
-                <el-col v-if="ShowFormRight() && !diyStore.IsPhoneView" :span="6" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
+                <el-col v-if="ShowDesktopFormRight" :span="5" style="background-color: var(--el-fill-color-light, #f5f7fa); height: 100%; padding-left: 15px; padding-right: 15px">
                     <FormRightPanel
                         ref="formRightPanel"
                         v-model="FormRightType"
@@ -903,6 +965,7 @@
                 :FormMode="'View'"
                 :LoadMode="'DataVersionPreview'"
                 :TableId="TableId"
+                :SysMenuId="SysMenuId"
                 :TableName="TableName"
                 :TableRowId="''"
                 :DefaultValues="PreviewDataVersionData || {}"
@@ -1005,6 +1068,7 @@ import { defineAsyncComponent, computed } from "vue";
 import { useDiyStore, useTagsViewStore } from "@/pinia";
 import _ from "underscore";
 import { resolveV8ButtonVisibility, runV8ButtonVisibilityCode, runV8ButtonVisibilityCodeAsync } from "@/utils/v8-button-visibility";
+import { hasModuleDetailView } from "./form-view-blocks/view-schema-runtime";
 import {
     diyFormFullCleanupMixin,
     diyFormFullMobileMixin,
@@ -1029,7 +1093,20 @@ export default {
     ],
     components: {
         DiyForm: defineAsyncComponent(() => import("@/views/form-engine/diy-form")),
-        FormRightPanel: defineAsyncComponent(() => import("@/views/form-engine/form-right-panel"))
+        FormRightPanel: defineAsyncComponent(() => import("@/views/form-engine/form-right-panel")),
+        FormViewRenderer: defineAsyncComponent(() => import("./form-view-blocks/form-view-renderer.vue"))
+    },
+    computed: {
+        UseViewSchemaDetail() {
+            return this.FormMode === "View" &&
+                !this.diyStore.IsPhoneView &&
+                Boolean(this.CurrentRowModel && Object.keys(this.CurrentRowModel).length) &&
+                hasModuleDetailView(this.SysMenuModel, this.GetCurrentUser);
+        },
+        ShowDesktopFormRight() {
+            if (this.diyStore.IsPhoneView || !this.ShowFormRight()) return false;
+            return !this.UseViewSchemaDetail || this.showDesktopRightPanel;
+        }
     },
     setup() {
         const diyStore = useDiyStore();
@@ -1109,6 +1186,126 @@ export default {
     //  3) ParentV8_Data 闭包持有
     //  4) Element Plus 子组件 ref（fieldForm、refWFHistory 等）
     methods: {
+        ResolveViewActionValue(value) {
+            if (Array.isArray(value)) {
+                return value.map((item) => this.ResolveViewActionValue(item));
+            }
+            if (value && typeof value === "object") {
+                const result = {};
+                Object.keys(value).forEach((key) => {
+                    result[key] = this.ResolveViewActionValue(value[key]);
+                });
+                return result;
+            }
+            if (typeof value !== "string") return value;
+            const match = value.match(/^\$(form|user|menu)\.([A-Za-z_][A-Za-z0-9_]*)$/i);
+            if (!match) return value;
+            const sources = {
+                form: this.CurrentRowModel || {},
+                user: this.GetCurrentUser || {},
+                menu: this.SysMenuModel || {}
+            };
+            return sources[match[1].toLowerCase()][match[2]];
+        },
+        ResolveViewActionParams(action) {
+            const params = this.ResolveViewActionValue(action?.ParamMap || {});
+            if (!Object.prototype.hasOwnProperty.call(params, "Id") && this.CurrentRowModel?.Id) {
+                params.Id = this.CurrentRowModel.Id;
+            }
+            if (!Object.prototype.hasOwnProperty.call(params, "_SysMenuId") && this.SysMenuId) {
+                params._SysMenuId = this.SysMenuId;
+            }
+            return params;
+        },
+        async HandleViewAction(action) {
+            if (!action || !action.ActionType) return;
+            if (action.Confirm) {
+                try {
+                    await this.$confirm(action.Confirm, action.Label || "确认操作", {
+                        confirmButtonText: "确定",
+                        cancelButtonText: "取消",
+                        type: "warning"
+                    });
+                } catch (error) {
+                    return;
+                }
+            }
+            try {
+                const result = await this.RunViewAction(action);
+                if (result?.Code !== undefined && result.Code !== 1) {
+                    this.DiyCommon.Tips(result.Msg || `${action.Label || "操作"}失败`, false);
+                    return;
+                }
+                if (action.SuccessMessage) {
+                    this.DiyCommon.Tips(action.SuccessMessage, true);
+                }
+                for (const successAction of action.SuccessActions || []) {
+                    await this.RunViewAction(successAction);
+                }
+            } catch (error) {
+                this.DiyCommon.Tips(`${action.Label || "操作"}失败：${error.message || error}`, false);
+            }
+        },
+        async RunViewAction(action) {
+            const params = this.ResolveViewActionParams(action);
+            switch (action.ActionType) {
+                case "ApiEngine":
+                    return await this.DiyCommon.ApiEngine.Run(action.ApiEngineKey, params);
+                case "OpenDetail":
+                case "OpenForm": {
+                    const formMode = action.ActionType === "OpenDetail"
+                        ? "View"
+                        : (params.FormMode || "Add");
+                    this.OpenAnyForm({
+                        TableName: action.TableName || params.TableName || this.CurrentDiyTableModel?.Name,
+                        TableId: params.TableId,
+                        SysMenuId: params.SysMenuId || this.SysMenuId,
+                        FormMode: formMode,
+                        Id: params.Id,
+                        DefaultValues: params.DefaultValues || {},
+                        DataAppend: params.DataAppend || {}
+                    });
+                    return { Code: 1 };
+                }
+                case "OpenList":
+                case "Navigate": {
+                    const target = action.Target || params.Target;
+                    if (!target) throw new Error("未配置 Target");
+                    if (/^https?:\/\//i.test(target)) {
+                        window.open(target, "_blank", "noopener,noreferrer");
+                    } else {
+                        await this.$router.push(target);
+                    }
+                    return { Code: 1 };
+                }
+                case "Dial": {
+                    const phone = action.Target || params.Phone || params.Mobile || params.Value;
+                    if (!phone) throw new Error("未配置电话号码");
+                    window.location.href = `tel:${String(phone).replace(/[^\d+*-]/g, "")}`;
+                    return { Code: 1 };
+                }
+                case "Copy": {
+                    const text = String(action.Target || params.Text || params.Value || "");
+                    if (!text) throw new Error("未配置复制内容");
+                    await navigator.clipboard.writeText(text);
+                    return { Code: 1 };
+                }
+                case "Refresh": {
+                    const formRef = this.$refs.fieldFormPage || this.$refs.fieldForm;
+                    if (formRef?.Init) await formRef.Init();
+                    return { Code: 1 };
+                }
+                case "Back":
+                    this.Go_1();
+                    return { Code: 1 };
+                case "Scan":
+                case "Map":
+                    this.DiyCommon.Tips("该操作需要在移动端原生环境中使用。", false);
+                    return { Code: 1 };
+                default:
+                    throw new Error(`不支持的 ActionType：${action.ActionType}`);
+            }
+        },
         /**
          * 初始化方法（外部调用入口）
          * 必传：TableId或TableName、FormMode（Add/Edit/View）、Id（当FormMode为View或Edit时，必传Id）
@@ -1133,6 +1330,7 @@ export default {
             self.FormMode = param.FormMode;
             self.DialogType = param.DialogType;
             self.SysMenuId = param.SysMenuId;
+            self.TableChildAuth = param.TableChildAuth || null;
 
             // 设置表单相关参数，优先使用 param 传入的值，其次使用 props，最后使用默认值
             self.FieldFormSelectFields = param.SelectFields || self.SelectFields || [];
@@ -1481,6 +1679,11 @@ export default {
             var self = this;
             V8.DataAppend = self.DataAppend;
             V8.TableId = self.TableId;
+            V8.TableName = (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
+                || (self.DiyTableModel && self.DiyTableModel.Name)
+                || self.TableName;
+            V8.TableModel = self.CurrentDiyTableModel || self.DiyTableModel;
+            V8.SysMenuId = self.SysMenuId;
             V8.CurrentUser = self.GetCurrentUser;
             V8.TableRowSelected = self.TableMultipleSelection;
             V8.ParentForm = self.FatherFormModel;
@@ -1505,6 +1708,13 @@ export default {
             V8.FieldSet = self.FieldSet;
             V8.CurrentTableData = self.DiyTableRowList;
             V8.FormClose = self.CallbackFormClose;
+            self.DiyCommon.BindV8FormEngine(
+                V8,
+                self.SysMenuId,
+                self.TableId,
+                V8.TableName,
+                self.TableChildAuth
+            );
         },
 
         // ========== 更多按钮运行 ==========
@@ -1536,7 +1746,7 @@ export default {
                     V8.V8Callback = () => {
                         self.BtnV8Loading = false;
                     };
-                    V8.EventName = "​V8BtnRun";
+                    V8.EventName = "V8BtnRun";
                     self.SetV8DefaultValue(V8);
                     await self.DiyCommon.InitV8Code(V8, self.$router);
                     await eval("(async () => {\n " + btn.V8Code + " \n})()");
@@ -1653,8 +1863,7 @@ export default {
             if (!self.DiyCommon.IsNull(self.SysMenuModel) && self.SysMenuModel.Id == self.SysMenuId) {
                 return;
             }
-            var result = await self.DiyCommon.PostAsync("/api/FormEngine/GetFormData-sysmenu", {
-                FormEngineKey: "Sys_Menu",
+            var result = await self.DiyCommon.PostAsync("/api/FormEngine/GetSysMenuModel", {
                 Id: self.SysMenuId
             });
             if (self.DiyCommon.Result(result)) {

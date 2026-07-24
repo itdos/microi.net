@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Microsoft.Extensions.Configuration;
@@ -45,6 +47,13 @@ namespace Microi.net
     /// </summary>
     public class MicroiCaptchaRecognizer : IMicroiCaptchaRecognizer
     {
+        private const int DefaultTimeoutSeconds = 8;
+        private const int MaxTimeoutSeconds = 15;
+        private const int MaxInputImageBytes = 2 * 1024 * 1024;
+        private const int MaxResponseBytes = 256 * 1024;
+        private const int MaxProviderLength = 64;
+        private const int MaxAllowedCharsLength = 256;
+        private const int MaxExpressionTextLength = 512;
         private static readonly HttpClient HttpClient = new HttpClient();
         private readonly IConfiguration _configuration;
 
@@ -64,6 +73,16 @@ namespace Microi.net
 
             try
             {
+                if (provider.Length > MaxProviderLength)
+                {
+                    return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual("Invalid", "验证码识别 Provider 长度超出限制。"));
+                }
+                if ((param.AllowedChars?.Length ?? 0) > MaxAllowedCharsLength
+                    || (param.ExpressionText?.Length ?? 0) > MaxExpressionTextLength)
+                {
+                    return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "验证码识别文本参数长度超出限制。"));
+                }
+
                 if (IsAutoProvider(provider))
                 {
                     var arithmetic = TryRecognizeArithmetic(param.ExpressionText, provider);
@@ -73,7 +92,7 @@ namespace Microi.net
                     }
 
                     var configuredProvider = _configuration?["CaptchaOcr:Provider"];
-                    var configuredEndpoint = GetEndpoint(param, configuredProvider);
+                    var configuredEndpoint = GetConfiguredEndpoint(configuredProvider);
                     if (!configuredProvider.DosIsNullOrWhiteSpace() && !configuredEndpoint.DosIsNullOrWhiteSpace())
                     {
                         return await RecognizeByHttpAsync(param, configuredProvider);
@@ -94,9 +113,9 @@ namespace Microi.net
 
                 return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "未知验证码识别 Provider，已进入人工兜底。"));
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "验证码识别异常，已进入人工兜底：" + ex.Message));
+                return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "验证码识别异常，已进入人工兜底。"));
             }
         }
 
@@ -123,43 +142,48 @@ namespace Microi.net
 
         private async Task<DosResult<MicroiCaptchaRecognizeResult>> RecognizeByHttpAsync(MicroiCaptchaRecognizeParam param, string provider)
         {
-            var endpoint = GetEndpoint(param, provider);
-            if (endpoint.DosIsNullOrWhiteSpace())
-            {
-                return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "未配置 OCR 服务地址，已进入人工兜底。"));
-            }
-
             if (param.ImageBase64.DosIsNullOrWhiteSpace())
             {
                 return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "未提供验证码图片，已进入人工兜底。"));
             }
 
-            var timeoutSeconds = param.TimeoutSeconds.GetValueOrDefault(ReadInt("CaptchaOcr:TimeoutSeconds", 8));
-            if (timeoutSeconds <= 0)
+            if (!TryNormalizeImageBase64(param.ImageBase64, out var normalizedImage, out var validationMessage))
             {
-                timeoutSeconds = 8;
+                return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, validationMessage));
             }
 
+            var endpoint = GetConfiguredEndpoint(provider);
+            if (endpoint.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "未配置 OCR 服务地址，已进入人工兜底。"));
+            }
+            if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri)
+                || (endpointUri.Scheme != Uri.UriSchemeHttp && endpointUri.Scheme != Uri.UriSchemeHttps))
+            {
+                return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "OCR 服务地址配置无效，已进入人工兜底。"));
+            }
+
+            var timeoutSeconds = Math.Max(1, Math.Min(MaxTimeoutSeconds, ReadInt("CaptchaOcr:TimeoutSeconds", DefaultTimeoutSeconds)));
             var payload = new
             {
                 osClient = param.OsClient,
                 provider = provider,
-                imageBase64 = StripBase64Prefix(param.ImageBase64),
-                image = StripBase64Prefix(param.ImageBase64),
+                imageBase64 = normalizedImage,
+                image = normalizedImage,
                 allowedChars = param.AllowedChars,
                 expressionText = param.ExpressionText
             };
 
-            using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint))
+            using (var request = new HttpRequestMessage(HttpMethod.Post, endpointUri))
             {
                 request.Content = new StringContent(JsonConvert.SerializeObject(payload), Encoding.UTF8, "application/json");
-                AddHeaders(request, param.HeadersJson);
+                AddConfiguredHeaders(request, provider);
 
-                using (var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)))
+                using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)))
                 {
-                    using (var response = await HttpClient.SendAsync(request, cts.Token))
+                    using (var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token))
                     {
-                        var raw = await response.Content.ReadAsStringAsync();
+                        var raw = await ReadResponseBodyWithLimitAsync(response, cts.Token);
                         if (!response.IsSuccessStatusCode)
                         {
                             return new DosResult<MicroiCaptchaRecognizeResult>(1, Manual(provider, "OCR 服务返回异常：" + (int)response.StatusCode, raw));
@@ -182,13 +206,8 @@ namespace Microi.net
             return defaultValue;
         }
 
-        private string GetEndpoint(MicroiCaptchaRecognizeParam param, string provider)
+        private string GetConfiguredEndpoint(string provider)
         {
-            if (!param.Endpoint.DosIsNullOrWhiteSpace())
-            {
-                return param.Endpoint;
-            }
-
             if (!provider.DosIsNullOrWhiteSpace())
             {
                 var providerEndpoint = _configuration?[$"CaptchaOcr:{provider}:Endpoint"];
@@ -201,8 +220,15 @@ namespace Microi.net
             return _configuration?["CaptchaOcr:Endpoint"];
         }
 
-        private static void AddHeaders(HttpRequestMessage request, string headersJson)
+        private void AddConfiguredHeaders(HttpRequestMessage request, string provider)
         {
+            var headersJson = !provider.DosIsNullOrWhiteSpace()
+                ? _configuration?[$"CaptchaOcr:{provider}:HeadersJson"]
+                : null;
+            if (headersJson.DosIsNullOrWhiteSpace())
+            {
+                headersJson = _configuration?["CaptchaOcr:HeadersJson"];
+            }
             if (headersJson.DosIsNullOrWhiteSpace())
             {
                 return;
@@ -227,6 +253,70 @@ namespace Microi.net
             catch
             {
                 // 可选请求头无效时不影响人工兜底。
+            }
+        }
+
+        private static bool TryNormalizeImageBase64(string value, out string normalized, out string message)
+        {
+            normalized = StripBase64Prefix(value)?.Trim();
+            message = null;
+            if (normalized.DosIsNullOrWhiteSpace())
+            {
+                message = "未提供验证码图片，已进入人工兜底。";
+                return false;
+            }
+
+            var maxEncodedChars = ((long)MaxInputImageBytes + 2L) / 3L * 4L;
+            if (normalized.Length > maxEncodedChars)
+            {
+                message = $"验证码图片不能超过 {MaxInputImageBytes / 1024 / 1024} MB。";
+                return false;
+            }
+
+            try
+            {
+                var bytes = Convert.FromBase64String(normalized);
+                if (bytes.Length == 0 || bytes.Length > MaxInputImageBytes)
+                {
+                    message = $"验证码图片不能超过 {MaxInputImageBytes / 1024 / 1024} MB。";
+                    return false;
+                }
+            }
+            catch (FormatException)
+            {
+                message = "验证码图片不是有效的 Base64 内容。";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static async Task<string> ReadResponseBodyWithLimitAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+        {
+            if (response.Content.Headers.ContentLength.HasValue
+                && response.Content.Headers.ContentLength.Value > MaxResponseBytes)
+            {
+                throw new InvalidOperationException($"OCR 服务响应不能超过 {MaxResponseBytes / 1024} KB。");
+            }
+
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var buffer = new MemoryStream())
+            {
+                var chunk = new byte[8192];
+                while (true)
+                {
+                    var read = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken);
+                    if (read <= 0)
+                    {
+                        break;
+                    }
+                    if (buffer.Length + read > MaxResponseBytes)
+                    {
+                        throw new InvalidOperationException($"OCR 服务响应不能超过 {MaxResponseBytes / 1024} KB。");
+                    }
+                    buffer.Write(chunk, 0, read);
+                }
+                return Encoding.UTF8.GetString(buffer.ToArray());
             }
         }
 

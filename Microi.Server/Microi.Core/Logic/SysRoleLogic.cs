@@ -34,10 +34,128 @@ namespace Microi.net
 {
     public partial class SysRoleLogic
     {
+        private static readonly HashSet<string> AllowedDirectTablePermissions =
+            new HashSet<string>(new[] { "Read", "Add", "Edit", "Del" }, StringComparer.OrdinalIgnoreCase);
+
         public static List<string> CantUpt = new List<string>()
         {
             "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower()
         };
+
+        /// <summary>
+        /// Direct table grants are an advanced escape hatch, so validate their full
+        /// shape on the server. The UI is not an authority: callers may post arbitrary
+        /// table ids, protected resources or invented permission names.
+        /// </summary>
+        private static DosResult NormalizeDirectTableRoleLimits(
+            DbSession dbSession,
+            IEnumerable<SysRoleLimits> requestedLimits,
+            int targetRoleLevel,
+            string osClient,
+            string lang,
+            out List<SysRoleLimits> normalizedLimits)
+        {
+            normalizedLimits = null;
+            if (requestedLimits == null)
+            {
+                return new DosResult(1);
+            }
+
+            var rawRequested = requestedLimits.ToList();
+            if (rawRequested.Any(d => d == null || d.Id.DosIsNullOrWhiteSpace()))
+            {
+                return new DosResult(0, null, "数据表直连权限缺少有效的数据表标识。");
+            }
+
+            var requested = rawRequested.ToList();
+            if (requested.Count == 0)
+            {
+                normalizedLimits = new List<SysRoleLimits>();
+                return new DosResult(1);
+            }
+
+            var duplicateTableId = requested
+                .GroupBy(d => d.Id.Trim(), StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault(d => d.Count() > 1);
+            if (duplicateTableId != null)
+            {
+                return new DosResult(0, null, "同一数据表不能重复配置直连权限。");
+            }
+
+            var requestedIds = requested
+                .Select(d => d.Id.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var tableModels = dbSession.From<DiyTable>()
+                .Where(d => d.Id.In(requestedIds) && d.IsDeleted != 1)
+                .ToList();
+            if (tableModels.Count != requestedIds.Count)
+            {
+                return new DosResult(
+                    0,
+                    null,
+                    DiyMessage.GetLang(osClient, "NoExistData", lang));
+            }
+
+            var tableById = tableModels.ToDictionary(d => d.Id, StringComparer.OrdinalIgnoreCase);
+            var result = new List<SysRoleLimits>();
+            foreach (var requestedLimit in requested)
+            {
+                var tableId = requestedLimit.Id.Trim();
+                if (!tableById.TryGetValue(tableId, out var tableModel))
+                {
+                    return new DosResult(
+                        0,
+                        null,
+                        DiyMessage.GetLang(osClient, "NoExistData", lang));
+                }
+
+                if (targetRoleLevel < DiyCommon.MaxRoleLevel
+                    && PlatformResourceSecurity.IsProtectedTable(tableModel.Name))
+                {
+                    return new DosResult(0, null, "平台保护表不能授予普通角色直连权限。");
+                }
+
+                JArray permissionArray;
+                try
+                {
+                    permissionArray = requestedLimit.Permission.DosIsNullOrWhiteSpace()
+                        ? new JArray()
+                        : JArray.Parse(requestedLimit.Permission);
+                }
+                catch
+                {
+                    return new DosResult(0, null, "数据表直连权限格式不正确。");
+                }
+
+                var permissions = permissionArray
+                    .Values<string>()
+                    .Where(d => !d.DosIsNullOrWhiteSpace())
+                    .Select(d => d.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                if (permissions.Any(d => !AllowedDirectTablePermissions.Contains(d)))
+                {
+                    return new DosResult(0, null, "数据表直连权限包含不支持的操作。");
+                }
+
+                // An empty permission array grants nothing. Do not persist a misleading
+                // sys_rolelimit row that may acquire broader meaning in future code.
+                if (permissions.Count == 0)
+                {
+                    continue;
+                }
+
+                result.Add(new SysRoleLimits
+                {
+                    Id = tableId,
+                    Permission = JArray.FromObject(permissions).ToString(Formatting.None)
+                });
+            }
+
+            normalizedLimits = result;
+            return new DosResult(1);
+        }
 
         public async Task<DosResultList<SysRole>> GetSysRole(SysRoleParam param)
         {
@@ -185,6 +303,18 @@ namespace Microi.net
                 //model.SysRoleLimits = ids.Select(d => d.FkId).ToList();
                 model.SysRoleLimits = ids.Select(d => new SysRoleLimits { Id = d.FkId, Permission = d.Permission }).ToList();
             }
+            if (model.TableRoleLimits == null || !model.TableRoleLimits.Any())
+            {
+                var tableLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam()
+                {
+                    RoleId = model.Id,
+                    Type = "Table",
+                    OsClient = param.OsClient
+                }, dbSession);
+                model.TableRoleLimits = tableLimits
+                    .Select(d => new SysRoleLimits { Id = d.FkId, Permission = d.Permission })
+                    .ToList();
+            }
 
             return new DosResult<SysRole>(1, model);
         }
@@ -217,6 +347,19 @@ namespace Microi.net
                     model.Level = DiyCommon.MaxRoleLevel - 1;
                 }
             }
+            var directGrantValidation = NormalizeDirectTableRoleLimits(
+                dbSession,
+                param.TableRoleLimits,
+                model.Level,
+                param.OsClient,
+                param._Lang,
+                out var normalizedTableRoleLimits);
+            if (directGrantValidation.Code != 1)
+            {
+                return directGrantValidation;
+            }
+            param.TableRoleLimits = normalizedTableRoleLimits;
+
             var count = dbSession.Insert(model);
             if (count > 0)
             {
@@ -241,6 +384,21 @@ namespace Microi.net
                     //SysRoleLimitRepository.Insert(sysRoleLimitList);
                     var count2 = dbSession.Insert(sysRoleLimitList);
                 }
+                if (param.TableRoleLimits != null && param.TableRoleLimits.Any())
+                {
+                    dbSession.Delete<SysRoleLimit>(d => d.RoleId == model.Id && d.Type == "Table");
+                    var tableRoleLimitList = param.TableRoleLimits.Select(roleLimit => new SysRoleLimit()
+                    {
+                        Id = Ulid.NewUlid().ToString(),
+                        RoleId = model.Id,
+                        FkId = roleLimit.Id,
+                        Type = "Table",
+                        CreateTime = DateTime.Now,
+                        Permission = roleLimit.Permission
+                    }).ToList();
+                    dbSession.Insert(tableRoleLimitList);
+                }
+                await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
             }
             return new DosResult(count > 0 ? 1 : 0, model, count > 0 ? "" : DiyMessage.GetLang(param.OsClient, "Line0", param._Lang));
         }
@@ -259,9 +417,11 @@ namespace Microi.net
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
 
-            if (param._CurrentUser?["Account"].Val<string>().ToLower() != "admin" && CantUpt.Contains(param.Id))
+            if (param._CurrentUser?["Account"].Val<string>().ToLower() != "admin"
+                && param._CurrentUser?["Level"].Val<int>() < 9999
+                && CantUpt.Contains(param.Id))
             {
-                return new DosResult(0, null, "系统内置默认角色禁止修改！");
+                return new DosResult(0, null, "您没有权限修改此固定超级管理员角色的权限配置！");
             }
 
             #endregion
@@ -339,6 +499,19 @@ namespace Microi.net
                     model.Level = DiyCommon.MaxRoleLevel - 1;
                 }
             }
+
+            var directGrantValidation = NormalizeDirectTableRoleLimits(
+                dbSession,
+                param.TableRoleLimits,
+                model.Level,
+                param.OsClient,
+                param._Lang,
+                out var normalizedTableRoleLimits);
+            if (directGrantValidation.Code != 1)
+            {
+                return directGrantValidation;
+            }
+            param.TableRoleLimits = normalizedTableRoleLimits;
 
             var count = dbSession.Update(model);
 
@@ -454,7 +627,25 @@ namespace Microi.net
                 //SysRoleLimitRepository.Insert(sysRoleLimitList);
                 var count2 = dbSession.Insert(sysRoleLimitList);
             }
+            if (param.TableRoleLimits != null)
+            {
+                dbSession.Delete<SysRoleLimit>(d => d.RoleId == model.Id && d.Type == "Table");
+                var tableRoleLimitList = param.TableRoleLimits.Select(roleLimit => new SysRoleLimit()
+                {
+                    Id = Ulid.NewUlid().ToString(),
+                    RoleId = model.Id,
+                    FkId = roleLimit.Id,
+                    Type = "Table",
+                    CreateTime = DateTime.Now,
+                    Permission = roleLimit.Permission
+                }).ToList();
+                if (tableRoleLimitList.Any())
+                {
+                    dbSession.Insert(tableRoleLimitList);
+                }
+            }
 
+            await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
             return new DosResult(1);
         }
 
@@ -486,6 +677,10 @@ namespace Microi.net
             //var count = SysRoleRepository.Delete(param.Id);
             //var count = dbSession.Delete<SysRole>(param.Id);
             var count = dbSession.Update(model);
+            if (count > 0)
+            {
+                await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
+            }
             return new DosResult(1);
         }
 

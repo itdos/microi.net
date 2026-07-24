@@ -10,6 +10,8 @@ const refreshSource = await readFile(new URL("./refresh-resources.mjs", import.m
 const upgradeSource = await readFile(new URL("../Upgrade.cs", import.meta.url), "utf8");
 const appStoreUpgradeSource = await readFile(new URL("../13-UpgradeAppStore.cs", import.meta.url), "utf8");
 const sysMenuLogicSource = await readFile(new URL("../../Microi.Core/Logic/SysMenuLogic.cs", import.meta.url), "utf8");
+const microAppControllerSource = await readFile(new URL("../../Microi.net.Api/Controllers/MicroAppController.cs", import.meta.url), "utf8");
+const apiProgramSource = await readFile(new URL("../../Microi.net.Api/Program.cs", import.meta.url), "utf8");
 const functionSource = source.match(/var countPageTabs = function \(value\) \{[\s\S]*?\n\};/);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
@@ -92,33 +94,61 @@ test("application-store upgrade resources carry the canonical resumable importer
     engine => engine.ApiEngineKey === "import-microi-store-package"
   );
   assert.ok(packageImporter, "application-store package should contain its importer");
-  assert.equal(packageModel.PackageInfo.Version, "v6.5.8");
-  assert.equal(packageImporter.Version, "v1.6.3");
+  assert.equal(packageModel.PackageInfo.Version, "v6.5.14");
+  const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
+  assert.equal(packageImporter.Version, importerSourceVersion);
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical source byte-for-byte");
-  assert.match(source, /Version:\s*v1\.6\.3/);
+  assert.match(source, /Version:\s*v1\.6\.(?:[6-9]|\d{2,})/);
   assert.match(source, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
+  assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
+  assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(source, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 6, 3\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.6.3 floor");
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 6, 6\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.6.6 floor");
   assert.match(appStoreUpgradeSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
+  assert.match(appStoreUpgradeSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
+  assert.match(appStoreUpgradeSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(appStoreUpgradeSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 8\)/);
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 14\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_006_003/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_006_006/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
+  assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
+  assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_004_004/);
-  assert.match(refreshSource, /versionNumber\s*<\s*6_005_008/);
+  assert.match(refreshSource, /versionNumber\s*<\s*6_005_014/);
 });
 
-test("application-store package embeds the canonical v1.4.4 publisher", () => {
+test("legacy databases receive application-store bootstrap columns before upgrade 13", () => {
+  assert.match(upgradeSource, /EnsureApiEngineRuntimeColumns\(osClientSecret\)/);
+  for (const columnName of ["StopHttp", "Timeout", "MaxStatements", "LimitMemory", "LimitRecursion", "Lock"]) {
+    assert.match(upgradeSource, new RegExp(`\\["${columnName}"\\]\\s*=\\s*"int"`));
+  }
+  assert.match(upgradeSource, /EnsureColumn\(osClientSecret,\s*"diy_field",\s*"TableName",\s*"varchar\(50\)"\)/);
+  assert.match(upgradeSource, /INNER JOIN `diy_table` dt ON dt\.`Id`=df\.`TableId`/);
+  assert.match(apiProgramSource, /"MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",[\s\S]*?"License:RestoreMaxAttempts",[\s\S]*?\b3\)\)/);
+  assert.match(apiProgramSource, /"MICROI_LICENSE_RESTORE_RETRY_SECONDS",[\s\S]*?"License:RestoreRetrySeconds",[\s\S]*?\b10\)\)/);
+});
+
+test("database runtime mode embeds compiled files while retaining the HDFS manifest", () => {
+  assert.match(source, /runtimeStorageMode[\s\S]*?\^\(db\|database\)\$/);
+  assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
+  assert.match(source, /runtimeDbAssets\.push\(\{[\s\S]*?ContentBase64:\s*runtimeBuildBase64/);
+  assert.match(source, /AssetsJson:\s*JSON\.stringify\(inlineRuntimeBuild \? runtimeDbAssets : uploadedBuild\)/);
+  assert.match(source, /AssetManifestJson:\s*JSON\.stringify\(\{[\s\S]*?Assets:\s*uploadedBuild/);
+  assert.match(source, /if \(inlineRuntimeBuild\) runtimeStorageMode = 'db'/);
+});
+
+test("application-store package embeds the canonical publisher", () => {
   const packagePublisher = packageModel.SysApiEngines.find(
     engine => engine.ApiEngineKey === "ai_app_publish_store"
   );
   assert.ok(packagePublisher);
-  assert.equal(packagePublisher.Version, "v1.4.4");
+  const publisherSourceVersion = `v${publishSource.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
+  assert.equal(packagePublisher.Version, publisherSourceVersion);
   assert.equal(packagePublisher.ApiV8Code.replace(/\r\n/g, "\n"), publishSource.replace(/\r\n/g, "\n"));
   assert.match(publishSource, /latestVersion \? text\(latestVersion\.BuildLog\)/);
   assert.match(publishSource, /Path: 'index\.html'/);
@@ -171,6 +201,7 @@ test("fully reused build assets skip object moves and reach stale-row pruning", 
     appId: "app-1",
     appKey: "resume-app",
     appType: "UniApp",
+    inlineRuntimeBuild: false,
     buildRoot: "ai-app-publish/resume-app/versions/v1.0.0",
     buildAssets: [
       { Path: "index.html", Size: 128, Sha256: "hash-index" },
@@ -227,6 +258,237 @@ test("fully reused build assets skip object moves and reach stale-row pruning", 
   assert.equal(calls.upsert, 0, "reused build metadata should not upsert again");
   assert.equal(calls.prune, 1, "a fully reused build should proceed to stale-row pruning");
   assert.equal(buildContext.stats.ApplicationBuildAssetsReused, 2);
+});
+
+test("fresh microservice build moves to a tenant-prefixed stable public HDFS key", () => {
+  const buildStageSource = source.match(
+    /var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/
+  );
+  assert.ok(buildStageSource, "build asset stage should be extractable");
+
+  const calls = { move: [], rows: [] };
+  const buildContext = {
+    appId: "app-1",
+    appKey: "demo-service",
+    appName: "Demo Service",
+    appType: "MicroService",
+    inlineRuntimeBuild: false,
+    buildRoot: "micro-app/demo-service/v1.0.0",
+    buildAssets: [{ Path: "index.html", Size: 128, Sha256: "hash-index" }],
+    existingApplicationAssets: {},
+    expectedApplicationPaths: {},
+    stats: { ApplicationBuildAssets: 0, ApplicationBuildAssetsReused: 0 },
+    V8: {
+      OsClient: "Loctek-LowCode",
+      Method: {
+        MoveObject(param) {
+          calls.move.push(param);
+          return { Code: 1 };
+        }
+      }
+    },
+    normalizeApplicationPath(value) {
+      return String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    },
+    firstTextParam(values) {
+      return values.find(value => value !== null && value !== undefined && String(value).trim() !== "") || "";
+    },
+    reuseApplicationAsset() { return null; },
+    uploadApplicationAsset() {
+      return {
+        Path: "index.html",
+        HdfsPath: "/loctek-lowcode/temp/index-123.html",
+        FilePathName: "/loctek-lowcode/temp/index-123.html",
+        Size: 128,
+        Hash: "hash-index"
+      };
+    },
+    upsertApplicationRow(_table, _where, row) {
+      calls.rows.push({ ...row });
+      return { Code: 1 };
+    },
+    applicationFileName(value) { return String(value || "").split("/").pop(); },
+    applicationFileType() { return "html"; },
+    reportProgress() {},
+    pruneApplicationAssets() {}
+  };
+
+  vm.runInNewContext(buildStageSource[0], buildContext);
+
+  const stablePath = "loctek-lowcode/micro-app/demo-service/v1.0.0/index.html";
+  assert.equal(calls.move.length, 1);
+  assert.equal(calls.move[0].Path, stablePath);
+  assert.equal(calls.rows.length, 1);
+  assert.equal(calls.rows[0].HdfsPath, stablePath);
+  assert.equal(buildContext.uploadedBuild[0].FilePathName, stablePath);
+  assert.equal(buildContext.uploadedBuild[0].PublishHdfsPath, stablePath);
+});
+
+test("database runtime build keeps the HDFS copy and embeds the package bytes", () => {
+  const buildStageSource = source.match(
+    /var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/
+  );
+  assert.ok(buildStageSource, "build asset stage should be extractable");
+
+  const calls = { upload: 0, move: 0, rows: [] };
+  const buildContext = {
+    appId: "app-db",
+    appKey: "db-service",
+    appName: "DB Service",
+    appType: "MicroService",
+    inlineRuntimeBuild: true,
+    buildRoot: "micro-app/db-service/v1.0.0",
+    buildAssets: [{
+      Path: "index.html",
+      FileName: "index.html",
+      ContentType: "text/html",
+      FileByteBase64: "PGgxPk9LPC9oMT4=",
+      Size: 11,
+      Sha256: "hash-index",
+      IsEntry: true
+    }],
+    existingApplicationAssets: {},
+    expectedApplicationPaths: {},
+    stats: { ApplicationBuildAssets: 0, ApplicationBuildAssetsReused: 0 },
+    V8: {
+      OsClient: "tenant-a",
+      Base64: { StringToBase64(value) { return Buffer.from(value).toString("base64"); } },
+      Method: {
+        MoveObject() {
+          calls.move++;
+          return { Code: 1 };
+        }
+      }
+    },
+    normalizeApplicationPath(value) {
+      return String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    },
+    firstTextParam(values) {
+      return values.find(value => value !== null && value !== undefined && String(value).trim() !== "") || "";
+    },
+    reuseApplicationAsset() { return null; },
+    uploadApplicationAsset() {
+      calls.upload++;
+      return {
+        Path: "index.html",
+        HdfsPath: "tenant-a/temp/index.html",
+        FilePathName: "tenant-a/temp/index.html",
+        Size: 11,
+        Hash: "hash-index"
+      };
+    },
+    upsertApplicationRow(_table, _where, row) {
+      calls.rows.push({ ...row });
+      return { Code: 1 };
+    },
+    applicationFileName(value) { return String(value || "").split("/").pop(); },
+    applicationFileType() { return "html"; },
+    reportProgress() {},
+    pruneApplicationAssets() {}
+  };
+
+  vm.runInNewContext(buildStageSource[0], buildContext);
+
+  assert.equal(calls.upload, 1, "DB runtime must still upload the HDFS build asset");
+  assert.equal(calls.move, 1, "DB runtime must still move the HDFS build asset to its stable key");
+  assert.equal(calls.rows.length, 1, "DB runtime must still persist HDFS build metadata");
+  assert.deepEqual(JSON.parse(JSON.stringify(buildContext.runtimeDbAssets)), [{
+    Path: "index.html",
+    FileName: "index.html",
+    ContentType: "text/html",
+    ContentBase64: "PGgxPk9LPC9oMT4=",
+    Size: 11,
+    Hash: "hash-index",
+    IsEntry: true
+  }]);
+});
+
+test("legacy reused microservice build with a broken key is reuploaded and repaired", () => {
+  const buildStageSource = source.match(
+    /var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/
+  );
+  assert.ok(buildStageSource, "build asset stage should be extractable");
+
+  const calls = { move: [], upload: 0, rows: [] };
+  const buildContext = {
+    appId: "app-1",
+    appKey: "demo-service",
+    appName: "Demo Service",
+    appType: "MicroService",
+    inlineRuntimeBuild: false,
+    buildRoot: "micro-app/demo-service/v1.0.0",
+    buildAssets: [{ Path: "index.html", Size: 128, Sha256: "hash-index" }],
+    existingApplicationAssets: {
+      "dist/index.html": {
+        Id: "old-build",
+        HdfsPath: "micro-app/demo-service/v1.0.0/index.html",
+        ContentHash: "hash-index",
+        Size: 128
+      }
+    },
+    expectedApplicationPaths: {},
+    stats: { ApplicationBuildAssets: 0, ApplicationBuildAssetsReused: 0 },
+    V8: {
+      OsClient: "Loctek-LowCode",
+      Method: {
+        MoveObject(param) {
+          calls.move.push(param);
+          return { Code: calls.move.length === 1 ? 0 : 1 };
+        }
+      }
+    },
+    normalizeApplicationPath(value) {
+      return String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    },
+    reuseApplicationAsset(_existing, metadataPath, file) {
+      return {
+        Path: metadataPath,
+        HdfsPath: "micro-app/demo-service/v1.0.0/index.html",
+        FilePathName: "micro-app/demo-service/v1.0.0/index.html",
+        Size: file.Size,
+        Hash: file.Sha256,
+        Reused: true
+      };
+    },
+    uploadApplicationAsset() {
+      calls.upload++;
+      return {
+        Path: "index.html",
+        HdfsPath: "/loctek-lowcode/temp/index-456.html",
+        FilePathName: "/loctek-lowcode/temp/index-456.html",
+        Size: 128,
+        Hash: "hash-index"
+      };
+    },
+    upsertApplicationRow(_table, _where, row) {
+      calls.rows.push({ ...row });
+      return { Code: 1 };
+    },
+    applicationFileName(value) { return String(value || "").split("/").pop(); },
+    applicationFileType() { return "html"; },
+    reportProgress() {},
+    pruneApplicationAssets() {}
+  };
+
+  vm.runInNewContext(buildStageSource[0], buildContext);
+
+  const stablePath = "loctek-lowcode/micro-app/demo-service/v1.0.0/index.html";
+  assert.equal(calls.move.length, 2, "broken legacy object should retry after reupload");
+  assert.equal(calls.upload, 1);
+  assert.equal(calls.rows.length, 1);
+  assert.equal(calls.rows[0].HdfsPath, stablePath);
+  assert.equal(buildContext.stats.ApplicationBuildAssetsReused, 0);
+  assert.equal(buildContext.stats.ApplicationBuildAssets, 1);
+});
+
+test("managed micro-app assets proxy stable HDFS paths instead of cross-origin redirects", () => {
+  assert.match(microAppControllerSource, /GetText\(asset, "hdfsPath", "HdfsPath"\)/);
+  assert.match(microAppControllerSource, /GetText\(asset, "publishHdfsPath", "PublishHdfsPath"\)/);
+  assert.match(microAppControllerSource, /HasFileAssetManifest[\s\S]*?"HdfsPath"[\s\S]*?"PublishHdfsPath"/);
+  assert.match(microAppControllerSource, /directFileUrl[\s\S]*?IsTrustedPublicFileUrl\(osClient, directFileUrl\)[\s\S]*?DownloadPublicFileAssetBytes\(directFileUrl\)/);
+  assert.match(microAppControllerSource, /assetUri\.Host\.Equals\(fileServerUri\.Host[\s\S]*?assetUri\.Port == fileServerUri\.Port/);
+  assert.match(microAppControllerSource, /MicroApp file asset could not be read from managed storage/);
+  assert.doesNotMatch(microAppControllerSource, /return Redirect\(redirectUrl\);/);
 });
 
 test("updating an existing menu preserves customer desktop and mobile visibility", () => {

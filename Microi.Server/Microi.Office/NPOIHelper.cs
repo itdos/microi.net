@@ -293,7 +293,10 @@ namespace Microi.net
             return ExportToList<T>(_IWorkbook.GetSheetAt(sheetIndex - 1), fields);
         }
 
-        public List<dynamic> ExcelToListDynamic(int sheetIndex = 0)
+        public List<dynamic> ExcelToListDynamic(
+            int sheetIndex = 0,
+            int? maxDataRows = null,
+            int? maxColumns = null)
         {
             if (_IWorkbook == null)
             {
@@ -312,9 +315,12 @@ namespace Microi.net
             {
                 throw new ArgumentException($"未读取到第{sheetIndex + 1}个Sheet，请检查Excel文件内容。");
             }
-            return ExcelToListDynamic(sheet);
+            return ExcelToListDynamic(sheet, maxDataRows, maxColumns);
         }
-        private List<dynamic> ExcelToListDynamic(ISheet sheet)
+        private List<dynamic> ExcelToListDynamic(
+            ISheet sheet,
+            int? maxDataRows,
+            int? maxColumns)
         {
             var list = new List<dynamic>();
             if (sheet == null)
@@ -331,6 +337,12 @@ namespace Microi.net
             {
                 throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]表头为空，请确认第一行是字段标题。");
             }
+            var dataRowCount = Math.Max(0, sheet.LastRowNum - sheet.FirstRowNum);
+            if (maxDataRows.HasValue && dataRowCount > maxDataRows.Value)
+            {
+                throw new ArgumentException(
+                    $"Excel数据行数{dataRowCount}超过上限{maxDataRows.Value}，请拆分后导入。");
+            }
             var fields = new List<string>();
             foreach (var cell in cells)
             {
@@ -343,6 +355,11 @@ namespace Microi.net
             if (fields.Count == 0)
             {
                 throw new ArgumentException($"Excel Sheet[{sheet.SheetName}]未读取到有效表头，请确认第一行是字段标题。");
+            }
+            if (maxColumns.HasValue && fields.Count > maxColumns.Value)
+            {
+                throw new ArgumentException(
+                    $"Excel有效列数{fields.Count}超过上限{maxColumns.Value}，请精简后导入。");
             }
 
             //遍历每一行数据

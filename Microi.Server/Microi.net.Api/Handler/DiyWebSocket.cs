@@ -60,6 +60,7 @@ namespace Microi.net
     public class DiyWebSocket : Hub<IClient>, IConnectionHub, ISuppertToClientInvoke
     {
         private readonly IMicroiAI _microiAI;
+        private readonly IHubContext<DiyWebSocket, IClient> _backgroundHubContext;
         
         // MongoDB连接配置缓存，避免频繁调用OsClient.GetClient
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _mongoConnectionCache = new();
@@ -84,9 +85,12 @@ namespace Microi.net
             return !IsBlank(value);
         }
 
-        public DiyWebSocket(IMicroiAI microiAI)
+        public DiyWebSocket(
+            IMicroiAI microiAI,
+            IHubContext<DiyWebSocket, IClient> backgroundHubContext = null)
         {
             _microiAI = microiAI;
+            _backgroundHubContext = backgroundHubContext;
         }
 
         //private static IDictionary<string, ClientInfo> _clients;
@@ -493,19 +497,45 @@ namespace Microi.net
                 if (msg.ToUserId == "AI")
                 {
                     Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 检测到发送给AI的消息: {msg.Content}");
-                    _ = Task.Run(async () =>
+                    var trustedAiToken = await DiyToken.GetCurrentToken();
+                    var trustedAiUser = trustedAiToken?.CurrentUser;
+                    var trustedAiOsClient = trustedAiToken?.OsClient?.Trim();
+                    var trustedAiUserId =
+                        trustedAiUser?["Id"].Val<string>()?.Trim();
+                    if (trustedAiUser == null
+                        || string.IsNullOrWhiteSpace(trustedAiOsClient)
+                        || string.IsNullOrWhiteSpace(trustedAiUserId)
+                        || !string.Equals(
+                            trustedAiOsClient,
+                            msg.OsClient?.Trim(),
+                            StringComparison.OrdinalIgnoreCase)
+                        || !string.Equals(
+                            trustedAiUserId,
+                            msg.FromUserId?.Trim(),
+                            StringComparison.OrdinalIgnoreCase))
                     {
-                        try
-                        {
-                            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 开始处理AI回复...");
-                            await HandleAIResponse(msg);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】AI自动回复失败: {ex.Message}");
-                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】堆栈跟踪: {ex.StackTrace}");
-                        }
-                    });
+                        Console.WriteLine(
+                            $"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
+                            + "AI聊天身份或租户与当前登录Token不一致，已拒绝后台AI调用。");
+                        return;
+                    }
+
+                    if (_microiAI == null || _backgroundHubContext == null)
+                    {
+                        Console.WriteLine(
+                            $"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
+                            + "AI自动回复服务或HubContext未注入，已拒绝后台AI调用。");
+                        return;
+                    }
+
+                    // 不把瞬态 Hub 实例传入后台状态机。AI 服务、可信身份和
+                    // 强类型 HubContext 都是独立参数，Hub 方法返回后仍可安全推送。
+                    _ = RunAiResponseInBackgroundAsync(
+                        _microiAI,
+                        _backgroundHubContext,
+                        msg,
+                        trustedAiUser,
+                        trustedAiOsClient);
                 }
                 else
                 {
@@ -520,7 +550,7 @@ namespace Microi.net
         /// <summary>
         /// 获取MongoDB连接配置（带缓存）
         /// </summary>
-        private string GetMongoConnection(string osClient)
+        private static string GetMongoConnection(string osClient)
         {
             return _mongoConnectionCache.GetOrAdd(osClient, key =>
             {
@@ -533,7 +563,7 @@ namespace Microi.net
         /// <summary>
         /// 创建MongoDB聊天记录Host
         /// </summary>
-        private MongodbHost GetChatHost(string osClient)
+        private static MongodbHost GetChatHost(string osClient)
         {
             return new MongodbHost
             {
@@ -559,33 +589,33 @@ namespace Microi.net
         /// <summary>
         /// 获取在线用户信息
         /// </summary>
-        private async Task<ClientInfo> GetOnlineUserInfo(string osClient, string userId)
+        private static async Task<ClientInfo> GetOnlineUserInfo(string osClient, string userId)
         {
             var cache = MicroiEngine.CacheTenant.Cache(osClient);
             return await cache.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userId}");
         }
 
         /// <summary>
-        /// 发送消息到前端（支持Hub和IHubContext两种方式）
+        /// 通过可跨 Hub 生命周期使用的强类型 HubContext 发送消息。
         /// </summary>
-        private async Task SendMessageToClient(ClientInfo clientInfo, MessageBodyDto message, IHubContext<DiyWebSocket> hubContext = null)
+        private static async Task SendMessageToClient(
+            ClientInfo clientInfo,
+            MessageBodyDto message,
+            IHubContext<DiyWebSocket, IClient> hubContext)
         {
-            if (clientInfo == null || clientInfo.ConnectionIds == null || !clientInfo.ConnectionIds.Any())
+            if (clientInfo == null
+                || clientInfo.ConnectionIds == null
+                || !clientInfo.ConnectionIds.Any()
+                || hubContext == null)
             {
                 return;
             }
 
             try
             {
-                if (hubContext != null)
-                {
-                    var typedClients = (IHubClients<IClient>)hubContext.Clients;
-                    await typedClients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(message);
-                }
-                else
-                {
-                    await base.Clients.Clients(clientInfo.ConnectionIds).ReceiveSendToUser(message);
-                }
+                await hubContext.Clients
+                    .Clients(clientInfo.ConnectionIds)
+                    .ReceiveSendToUser(message);
             }
             catch (Exception ex)
             {
@@ -594,9 +624,47 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 记录 fire-and-forget 异常，同时确保状态机不捕获 DiyWebSocket 实例。
+        /// </summary>
+        private static async Task RunAiResponseInBackgroundAsync(
+            IMicroiAI microiAI,
+            IHubContext<DiyWebSocket, IClient> hubContext,
+            MessageBodyParam originalMsg,
+            object trustedCurrentUser,
+            string trustedOsClient)
+        {
+            try
+            {
+                Console.WriteLine(
+                    $"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
+                    + "[WebSocket] 开始处理AI回复...");
+                await HandleAIResponse(
+                    microiAI,
+                    hubContext,
+                    originalMsg,
+                    trustedCurrentUser,
+                    trustedOsClient);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(
+                    $"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
+                    + $"AI自动回复失败: {ex.Message}");
+                Console.WriteLine(
+                    $"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
+                    + $"堆栈跟踪: {ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
         /// 处理AI自动回复
         /// </summary>
-        private async Task HandleAIResponse(MessageBodyParam originalMsg)
+        private static async Task HandleAIResponse(
+            IMicroiAI microiAI,
+            IHubContext<DiyWebSocket, IClient> hubContext,
+            MessageBodyParam originalMsg,
+            object trustedCurrentUser,
+            string trustedOsClient)
         {
             Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复开始 ==========");
             Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 用户: {originalMsg.FromUserName} (ID: {originalMsg.FromUserId})");
@@ -604,7 +672,7 @@ namespace Microi.net
             
             try
             {
-                var chatHost = GetChatHost(originalMsg.OsClient);
+                var chatHost = GetChatHost(trustedOsClient);
                 var aiUser = new
                 {
                     Id = "AI",
@@ -612,11 +680,9 @@ namespace Microi.net
                     Avatar = ""
                 };
 
-                // 获取AI配置
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 正在获取AI模型配置...");
-                
                 // 优先使用客户端传递的AI模型（通过OtherInfo字段）
                 string clientAiModel = null;
+                string clientAiModelId = null;
                 if (!string.IsNullOrEmpty(originalMsg.OtherInfo))
                 {
                     try
@@ -627,34 +693,27 @@ namespace Microi.net
                             clientAiModel = otherInfo["AiModel"];
                             Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 客户端指定模型: {clientAiModel}");
                         }
+                        if (otherInfo != null
+                            && otherInfo.TryGetValue(
+                                "AiModelId",
+                                out var requestedAiModelId))
+                        {
+                            clientAiModelId =
+                                requestedAiModelId?.Trim();
+                        }
                     }
                     catch { }
                 }
-                
-                var aiModelConfig = await MicroiEngine.FormEngine.GetFormDataAsync("mic_ai", new
-                {
-                    _Where = new List<List<object>>()
-                    {
-                        new List<object> { "IsEnable", "=", "1" },
-                    },
-                    _OrderBy = "CreateTime DESC",
-                    OsClient = originalMsg.OsClient
-                });
-
-                string aiModel = clientAiModel ?? "deepseek-r1:1.5b";
-                if (string.IsNullOrEmpty(clientAiModel) && aiModelConfig.Code == 1 && aiModelConfig.Data != null)
-                {
-                    aiModel = aiModelConfig.Data.AiModel ?? aiModel;
-                }
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 使用模型: {aiModel}");
 
                 // 获取用户连接信息
-                var clientInfoTo = await GetOnlineUserInfo(originalMsg.OsClient, originalMsg.FromUserId);
+                var clientInfoTo = await GetOnlineUserInfo(
+                    trustedOsClient,
+                    originalMsg.FromUserId);
                 
                 // 立即发送"思考中"信号，让前端马上显示AI正在响应
                 if (clientInfoTo != null)
                 {
-                    await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
+                    await hubContext.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
                         "[THINKING]", 
                         aiUser.Id, 
                         originalMsg.FromUserId, 
@@ -673,7 +732,7 @@ namespace Microi.net
                         // 每次收到数据块就立即发送给前端
                         if (clientInfoTo != null)
                         {
-                            await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
+                            await hubContext.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
                                 chunk, 
                                 aiUser.Id, 
                                 originalMsg.FromUserId, 
@@ -694,19 +753,26 @@ namespace Microi.net
                     }
                 };
                 
-                // 调用AI统一入口（包含意图识别）
-                var aiResult = await _microiAI.HandleChatMessage(new ChatMessageParam
+                // SignalR 只绑定客户端选择与可信身份。租户模型解析、
+                // 默认模型、Schema 授权和聊天编排全部由 Microi.AI 完成。
+                var chatParam = new ChatMessageParam
                 {
                     Question = originalMsg.Content,
-                    AiModel = aiModel,
-                    AllowedTables = null,
-                    OsClient = originalMsg.OsClient
-                }, streamCallback);
+                    AiModel = clientAiModel,
+                    AiModelId = clientAiModelId,
+                    OsClient = trustedOsClient
+                };
+                var aiResult =
+                    await microiAI.HandleTrustedChatMessageAsync(
+                        chatParam,
+                        trustedCurrentUser,
+                        trustedOsClient,
+                        streamCallback);
 
                 // 发送完成信号
                 if (clientInfoTo != null)
                 {
-                    await base.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
+                    await hubContext.Clients.Clients(clientInfoTo.ConnectionIds).ReceiveAIChunk(
                         "", 
                         aiUser.Id, 
                         originalMsg.FromUserId, 
@@ -745,7 +811,10 @@ namespace Microi.net
                                 IsRead = false
                             };
                             
-                            await SendMessageToClient(clientInfoTo, dataMessageDto, originalMsg._iHubContext);
+                            await SendMessageToClient(
+                                clientInfoTo,
+                                dataMessageDto,
+                                hubContext);
                             await TMongodbHelper<MessageBodyDto>.InsertAsync(chatHost, dataMessageDto);
                             Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 详细数据已发送到前端（{queryResultArray.Length}条记录）");
                         }

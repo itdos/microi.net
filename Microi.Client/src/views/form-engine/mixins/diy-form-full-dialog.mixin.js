@@ -79,13 +79,8 @@ export default {
             // token 机制：防止旧请求覆盖新结果
             var token = ++self._DataLogLoadToken;
             self.DataLogListLoading = true;
-            self.DiyCommon.FormEngine.GetTableData(
-                {
-                    FormEngineKey: "microi_datalog",
-                    _Where: [["DataId", "=", self.TableRowId]],
-                    _OrderBy: "CreateTime",
-                    _OrderByType: "DESC"
-                },
+            self.GetFormRelatedData(
+                "DataLog",
                 function (result) {
                     // 旧请求被新请求覆盖，丢弃
                     if (token !== self._DataLogLoadToken) return;
@@ -113,6 +108,22 @@ export default {
                 }
             );
         },
+        GetFormRelatedData(relatedType, callback) {
+            var self = this;
+            var parentFormEngineKey = (self.CurrentDiyTableModel && (self.CurrentDiyTableModel.Id || self.CurrentDiyTableModel.Name))
+                || self.TableId
+                || self.TableName;
+            self.DiyCommon.Post(
+                "/api/FormEngine/GetFormRelatedData",
+                {
+                    RelatedType: relatedType,
+                    ParentFormEngineKey: parentFormEngineKey,
+                    ParentTableRowId: self.TableRowId,
+                    _SysMenuId: self.SysMenuId || (self.SysMenuModel && self.SysMenuModel.Id) || ""
+                },
+                callback
+            );
+        },
         // ========== 加载数据评论（可重复调用） ==========
         LoadDataComment() {
             var self = this;
@@ -137,18 +148,8 @@ export default {
 
             var token = ++self._DataVersionLoadToken;
             self.DataVersionListLoading = true;
-            var where = [["TableRowId", "=", self.TableRowId]];
-            if (!self.DiyCommon.IsNull(self.CurrentDiyTableModel.Id)) {
-                where.push(["TableId", "=", self.CurrentDiyTableModel.Id]);
-            }
-
-            self.DiyCommon.FormEngine.GetTableData(
-                {
-                    FormEngineKey: "mic_data_version",
-                    _Where: where,
-                    _OrderBy: "CreateTime",
-                    _OrderByType: "DESC"
-                },
+            self.GetFormRelatedData(
+                "DataVersion",
                 function (result) {
                     if (token !== self._DataVersionLoadToken) return;
                     try {
@@ -411,12 +412,17 @@ export default {
         },
         GetOpenTitleIcon() {
             var self = this;
+            if (self.UseViewSchemaDetail) {
+                return "far fa-eye";
+            }
             return self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id) ? "fas fa-plus" : "far fa-edit";
         },
         GetOpenTitle() {
             var self = this;
             var title1 = "";
-            if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
+            if (self.UseViewSchemaDetail) {
+                title1 = self.$t("Msg.View");
+            } else if (self.DiyCommon.IsNull(self.CurrentRowModel) || self.DiyCommon.IsNull(self.CurrentRowModel.Id)) {
                 title1 = self.$t("Msg.Add");
             } else {
                 var fieldModel = self.ShowDiyFieldList && self.ShowDiyFieldList[0];
@@ -645,10 +651,11 @@ export default {
         GetOpenTitlePage() {
             var self = this;
             var result = "";
-            if (self.FormMode) {
-                var formMode = self.$t("Msg." + self.FormMode);
+            var effectiveFormMode = self.UseViewSchemaDetail ? "View" : self.FormMode;
+            if (effectiveFormMode) {
+                var formMode = self.$t("Msg." + effectiveFormMode);
                 var firstValue = "";
-                if (self.FormMode == "Edit" || self.FormMode == "View") {
+                if (!self.UseViewSchemaDetail && (effectiveFormMode == "Edit" || effectiveFormMode == "View")) {
                     var fieldModel = self.DiyFieldList[0];
                     if (fieldModel && self.CurrentRowModel[fieldModel.Name]) {
                         firstValue = "[" + self.CurrentRowModel[fieldModel.Name] + "]";
@@ -656,7 +663,7 @@ export default {
                 }
                 var tableName = self.DiyCommon.IsNull(self.CurrentDiyTableModel) || self.DiyCommon.IsNull(self.CurrentDiyTableModel.Description) ? "" : " - " + self.CurrentDiyTableModel.Description;
                 result = formMode + firstValue + tableName;
-                if ((self.CallbackSetFormDataFinish && self.CallbackSetDiyTableModelFinish) || (self.FormMode == "Add" && self.CallbackSetDiyTableModelFinish)) {
+                if ((self.CallbackSetFormDataFinish && self.CallbackSetDiyTableModelFinish) || (effectiveFormMode == "Add" && self.CallbackSetDiyTableModelFinish)) {
                     var item = self.tagsViewStore.visitedViews.filter((item) => item.fullPath == self.$route.fullPath);
                     if (item.length > 0) {
                         item[0].title = result;

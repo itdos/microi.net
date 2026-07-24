@@ -56,6 +56,8 @@ namespace Microi.net.Api
         /// </summary>
         /// <returns></returns>
         [HttpPost]
+        [ServiceFilter(typeof(DiyFilter<dynamic>))]
+        [RequestSizeLimit(3 * 1024 * 1024)]
         public async Task<DosResult<MicroiCaptchaRecognizeResult>> Recognize([FromBody] MicroiCaptchaRecognizeParam param)
         {
             if (param == null)
@@ -66,6 +68,17 @@ namespace Microi.net.Api
             {
                 return new DosResult<MicroiCaptchaRecognizeResult>(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang));
             }
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            if (currentToken?.CurrentUser == null || currentToken.OsClient.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<MicroiCaptchaRecognizeResult>(1001, null, DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang));
+            }
+
+            // 公网调用只能选择识别内容，OCR 网络目标、请求头和超时必须由服务端配置。
+            param.OsClient = currentToken.OsClient;
+            param.Endpoint = null;
+            param.HeadersJson = null;
+            param.TimeoutSeconds = null;
             return await _captchaRecognizer.RecognizeAsync(param);
         }
 

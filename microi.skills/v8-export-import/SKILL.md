@@ -211,7 +211,7 @@ if (!exportResult || exportResult.Code != 1 || !exportResult.Data || !exportResu
 V8.Result = exportResult;
 ```
 
-预览 URL 形式：`/?OsClient=iTdos#/online-office?fileUrl=<URL编码后的接口地址>&fileName=示例.xlsx&fileType=xlsx&canEdit=0`。`canEdit` 只是编辑申请，不是授权依据；未登录时即使传 `canEdit=1` 也必须强制只读，并隐藏左侧菜单、顶部导航和页签。公网匿名文件接口应配置频率限制或让导出逻辑足够轻量，不能依赖进程内变量控制并发。
+预览 URL 形式：`/?OsClient=tenant_demo#/online-office?fileUrl=<URL编码后的接口地址>&fileName=示例.xlsx&fileType=xlsx&canEdit=0`。`canEdit` 只是编辑申请，不是授权依据；未登录时即使传 `canEdit=1` 也必须强制只读，并隐藏左侧菜单、顶部导航和页签。公网匿名文件接口应配置频率限制或让导出逻辑足够轻量，不能依赖进程内变量控制并发。
 
 ## 多 Sheet Excel 导出
 

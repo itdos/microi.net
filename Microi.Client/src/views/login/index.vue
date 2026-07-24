@@ -293,12 +293,22 @@ import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath 
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import config from "@/config.json";
 
+// 历史兼容公钥：仅用于避免登录密码在请求体中直接显示，不替代 HTTPS。
+// 显式部署配置仍然优先；未配置时保持旧版客户端与旧版服务端完全兼容。
 const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
 XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
 1DsI9VJ7gTHGL3R7sQIDAQAB
 -----END PUBLIC KEY-----`;
+
+const resolveLoginRsaPublicKey = (serverPublicKey = "") => {
+    if (config && config.LoginRsaPublicKey === false) return "";
+    return (config && config.LoginRsaPublicKey)
+        || window.MicroiLoginPublicKey
+        || serverPublicKey
+        || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
+};
 
 export default {
     name: "Login",
@@ -416,10 +426,9 @@ export default {
                 Pwd2: "",
                 SmsCaptchaValue: ""
             },
-            // 登录RSA公钥：优先使用 config.json / window 覆盖；如需本地明文兼容，可将 LoginRsaPublicKey 显式配置为 false。
-            publicKey: config && config.LoginRsaPublicKey === false
-                ? ""
-                : (config && config.LoginRsaPublicKey) || window.MicroiLoginPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY
+            // 优先使用部署配置；未配置时使用历史公钥，保证存量客户平滑升级。
+            // RSA 只避免请求体中出现明文密码，生产环境仍必须强制 HTTPS。
+            publicKey: resolveLoginRsaPublicKey()
             // TokenLoginCount : 0
         };
     },
@@ -492,6 +501,12 @@ export default {
                 function (sysConfigResult) {
                     if (sysConfigResult.Code == 1) {
                         var sysConfig = sysConfigResult.Data;
+                        // 服务端可以公开与部署私钥配对的公钥；本地显式配置仍优先。
+                        self.publicKey = resolveLoginRsaPublicKey(
+                            sysConfig && sysConfig.LoginRsaPublicKey
+                                ? String(sysConfig.LoginRsaPublicKey).replace(/\\n/g, "\n").trim()
+                                : ""
+                        );
                         self.GetCaptcha(sysConfig);
                     }
                 }
@@ -884,6 +899,11 @@ export default {
                 // 设置用户身份之前销毁登录页面视频
                 self.DiyCommon.DisposeVideoLogin();
                 self.diyStore.setCurrentUser(self.LoginResult.Data);
+
+                // Login requests use DiyCommon's axios path, while route guards use
+                // the user Pinia store. Synchronize them before generating routes so
+                // the first detail/metadata requests cannot be sent without a token.
+                self.userStore.setToken(self.DiyCommon.getToken());
 
                 // 设置用户角色到 userStore (用于 permission.js 检查)
                 const roles = self.LoginResult.Data.Roles || ["admin"];

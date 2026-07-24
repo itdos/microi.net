@@ -12,6 +12,26 @@ namespace Microi.net
     /// </summary>
     public interface IFormEngine
     {
+        /// <summary>
+        /// Authorize a trusted server-selected client table operation such as
+        /// Import or Export. The operation must not be taken from request payload.
+        /// </summary>
+        Task<DosResult> AuthorizeClientTableOperationAsync(DiyTableRowParam param, string operation);
+        /// <summary>
+        /// Batch-filter registered ordinary tables through one versioned user
+        /// authorization snapshot. Scoped menus and protected tables are excluded.
+        /// </summary>
+        Task<List<string>> FilterAuthorizedUnscopedClientTableNamesAsync(
+            DiyTableRowParam param,
+            IEnumerable<string> candidateTableNames);
+        /// <summary>
+        /// Authorize schema/field-data reads for one business table.
+        /// </summary>
+        Task<DosResult> AuthorizeClientTableMetadataOperationAsync(DiyTableRowParam param);
+        /// <summary>
+        /// Authorize metadata reads for one exact menu id or ModuleEngineKey.
+        /// </summary>
+        Task<DosResult> AuthorizeClientMenuMetadataOperationAsync(DiyTableRowParam param);
         DosResult UptTableData(dynamic dynamicParam, DbTrans _trans = null);
         DosResult DelTableData(dynamic dynamicParam, DbTrans _trans = null);
         DosResult AddTableData(dynamic dynamicParam, DbTrans _trans = null);

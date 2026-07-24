@@ -1,22 +1,13 @@
 ﻿using Dos.Common;
-using Dos.ORM;
 using Microi.net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Minio.DataModel;
-using MySqlX.XDevAPI.Common;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Quartz.Impl.AdoJobStore.Common;
-using Senparc.CO2NET.Extensions;
 using System;
 using System.Collections.Generic;
-using System.Data.Common;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Microi.net.Api
@@ -31,16 +22,17 @@ namespace Microi.net.Api
     public class AiController : Controller
     {
         private readonly IMicroiAI _microiAi;
-        private readonly IFormEngine _formEngine;
         private readonly SubscriptionService _subService;
         private readonly AiProxyService _proxyService;
 
-        public AiController(IMicroiAI microiAi, IFormEngine formEngine)
+        public AiController(
+            IMicroiAI microiAi,
+            SubscriptionService subService,
+            AiProxyService proxyService)
         {
             _microiAi = microiAi;
-            _formEngine = formEngine;
-            _subService = new SubscriptionService(formEngine);
-            _proxyService = new AiProxyService(_subService);
+            _subService = subService;
+            _proxyService = proxyService;
         }
 
         /// <summary>
@@ -52,28 +44,12 @@ namespace Microi.net.Api
             return (context.UserId, context.UserName);
         }
 
-        private string GetRequestOsClient()
-        {
-            var osClient = Request?.Headers["OsClient"].ToString();
-            if (string.IsNullOrWhiteSpace(osClient))
-            {
-                osClient = Request?.Headers["osclient"].ToString();
-            }
-            if (string.IsNullOrWhiteSpace(osClient))
-            {
-                osClient = Request?.Query["OsClient"].ToString();
-            }
-            return osClient ?? "";
-        }
-
         private async Task<(string UserId, string UserName, string OsClient)> GetCurrentUserContextAsync()
         {
             var token = await DiyToken.GetCurrentToken();
-            var osClient = GetRequestOsClient();
-            if (string.IsNullOrWhiteSpace(osClient))
-            {
-                osClient = token?.OsClient ?? "";
-            }
+            // Tenant identity is an authenticated server-side claim.  Never let
+            // an OsClient header, query string or request body override it.
+            var osClient = token?.OsClient ?? "";
             if (token?.CurrentUser == null) return (null, null, osClient);
             var userId = token.CurrentUser["Id"]?.ToString();
             var userName = token.CurrentUser["Name"]?.ToString() ?? token.CurrentUser["Account"]?.ToString() ?? "";
@@ -89,10 +65,11 @@ namespace Microi.net.Api
             var (userId, userName, osClient) = await GetCurrentUserContextAsync();
             param.CurrentUserId = userId;
             param.CurrentUserName = userName;
-            if (string.IsNullOrWhiteSpace(param.OsClient))
-            {
-                param.OsClient = osClient;
-            }
+            param.OsClient = osClient;
+            // Runtime credentials and endpoints are resolved inside the
+            // AI domain module, never from untrusted client input.
+            param.ApiKey = null;
+            param.Endpoint = null;
         }
 
         private async Task EnrichCurrentUserAsync(NL2SQLParam param)
@@ -104,142 +81,7 @@ namespace Microi.net.Api
             var (userId, userName, osClient) = await GetCurrentUserContextAsync();
             param.CurrentUserId = userId;
             param.CurrentUserName = userName;
-            if (string.IsNullOrWhiteSpace(param.OsClient))
-            {
-                param.OsClient = osClient;
-            }
-        }
-
-        private const int AiContextRecentCount = 20;
-        private const int AiContextSummaryThreshold = 28;
-
-        private class AiConversationRecord
-        {
-            public string Id { get; set; }
-            public string Source { get; set; }
-            public string ConversationId { get; set; }
-            public string Role { get; set; }
-            public string Mode { get; set; }
-            public string Content { get; set; }
-            public string Error { get; set; }
-            public string CreatedAt { get; set; }
-        }
-
-        private static bool IsConversationRuntimeError(AiConversationRecord item)
-        {
-            if (item == null || (item.Role != "assistant" && item.Role != "ai")) return false;
-            if (!string.IsNullOrWhiteSpace(item.Error)) return true;
-
-            var content = item.Content ?? "";
-            return content.Contains(MicroiAI.NoAiAuthMsg, StringComparison.Ordinal)
-                || (content.Contains("产品为[开源版]", StringComparison.Ordinal)
-                    && content.Contains("无法使用在线AI", StringComparison.Ordinal))
-                || (content.Contains("产品为【开源版】", StringComparison.Ordinal)
-                    && content.Contains("无法使用在线 AI", StringComparison.Ordinal));
-        }
-
-        private async Task ApplyServerConversationContextAsync(AiParam param)
-        {
-            if (param == null || string.IsNullOrWhiteSpace(param.ConversationId) || string.IsNullOrWhiteSpace(param.CurrentUserId))
-            {
-                return;
-            }
-
-            var source = string.IsNullOrWhiteSpace(param.Source) ? "ai-engine-workbench" : param.Source;
-            var rowsResult = await _formEngine.GetTableDataAsync("mic_ai_record", new
-            {
-                _Where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "UserId", Value = param.CurrentUserId, Type = "=" },
-                    new DiyWhere { Name = "Content", Value = param.ConversationId, Type = "Like", AndOr = "And" }
-                },
-                _OrderBy = "CreateTime",
-                _OrderByType = "DESC",
-                _PageSize = 300,
-                _SelectFields = new[] { "Id", "Content", "CreateTime" }
-            });
-            if (rowsResult.Code != 1 || rowsResult.Data == null)
-            {
-                return;
-            }
-
-            var records = new List<AiConversationRecord>();
-            foreach (var row in rowsResult.Data)
-            {
-                var rowJson = SafeJObject(row);
-                var raw = rowJson?["Content"]?.ToString();
-                if (string.IsNullOrWhiteSpace(raw)) continue;
-                var payload = SafeJObject(raw);
-                if (payload == null) continue;
-                var rowSource = payload["Source"]?.ToString();
-                var rowConversationId = payload["ConversationId"]?.ToString();
-                if (!string.Equals(rowSource, source, StringComparison.OrdinalIgnoreCase)) continue;
-                if (!string.Equals(rowConversationId, param.ConversationId, StringComparison.OrdinalIgnoreCase)) continue;
-
-                records.Add(new AiConversationRecord
-                {
-                    Id = rowJson?["Id"]?.ToString() ?? payload["Id"]?.ToString() ?? "",
-                    Source = rowSource,
-                    ConversationId = rowConversationId,
-                    Role = (payload["Role"]?.ToString() ?? "assistant").Trim().ToLowerInvariant(),
-                    Mode = payload["Mode"]?.ToString() ?? param.Mode ?? "",
-                    Content = payload["Content"]?.ToString() ?? "",
-                    Error = payload["Error"]?.ToString() ?? "",
-                    CreatedAt = payload["CreatedAt"]?.ToString() ?? rowJson?["CreateTime"]?.ToString() ?? ""
-                });
-            }
-
-            records = records
-                .Where(item => !string.IsNullOrWhiteSpace(item.Content))
-                // 授权失败、网络失败等运行期提示不是用户与模型的有效语义上下文。
-                // 历史错误一旦被继续送入模型，会让已经恢复授权的旧会话反复复述旧错误。
-                .Where(item => !IsConversationRuntimeError(item))
-                .OrderBy(item => item.CreatedAt)
-                .ToList();
-            if (records.Count == 0)
-            {
-                return;
-            }
-
-            // 前端会先把当前用户消息写入 mic_ai_record，再请求 AI。这里排除同一条当前消息，避免模型看到重复问题。
-            var currentUserMessageIndex = records.FindLastIndex(item =>
-                item.Role == "user" && string.Equals(item.Content, param.UserChatMsg ?? "", StringComparison.Ordinal));
-            if (currentUserMessageIndex >= 0)
-            {
-                records.RemoveAt(currentUserMessageIndex);
-            }
-
-            var nonSummary = records
-                .Where(item => item.Role != "summary")
-                .ToList();
-            var history = new List<ChatHistoryItem>();
-            if (nonSummary.Count > AiContextSummaryThreshold)
-            {
-                var olderRecords = nonSummary.Take(Math.Max(0, nonSummary.Count - AiContextRecentCount)).ToList();
-                var summary = BuildConversationSummary(olderRecords);
-                if (!string.IsNullOrWhiteSpace(summary))
-                {
-                    history.Add(new ChatHistoryItem
-                    {
-                        Role = "system",
-                        Content = "以下是本对话较早上下文的自动压缩摘要，请结合最近消息继续回答：\n" + summary
-                    });
-                    if (nonSummary.Count % 16 == 0)
-                    {
-                        _ = SaveConversationSummaryAsync(param, source, summary);
-                    }
-                }
-            }
-
-            history.AddRange(nonSummary
-                .TakeLast(AiContextRecentCount)
-                .Select(item => new ChatHistoryItem
-                {
-                    Role = item.Role == "assistant" || item.Role == "ai" ? "assistant" : "user",
-                    Content = item.Content
-                }));
-
-            param.ChatHistory = history;
+            param.OsClient = osClient;
         }
 
         public class UpdateConversationTitleParam
@@ -255,296 +97,30 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> UpdateConversationTitle([FromBody] UpdateConversationTitleParam param)
         {
-            var (userId, _, _) = await GetCurrentUserContextAsync();
-            if (string.IsNullOrWhiteSpace(userId)) return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
-            var conversationId = (param?.ConversationId ?? "").Trim();
-            var title = (param?.Title ?? "").Trim();
-            var source = string.IsNullOrWhiteSpace(param?.Source) ? "ai-engine-workbench" : param.Source.Trim();
-            if (string.IsNullOrWhiteSpace(conversationId)) return Json(new DosResult(0, null, "ConversationId不能为空。"));
-            if (string.IsNullOrWhiteSpace(title)) return Json(new DosResult(0, null, "标题不能为空。"));
-            if (title.Length > 60) return Json(new DosResult(0, null, "标题不能超过60个字符。"));
-
-            var rowsResult = await _formEngine.GetTableDataAsync("mic_ai_record", new
-            {
-                _Where = new List<DiyWhere>
-                {
-                    new DiyWhere { Name = "UserId", Value = userId, Type = "=" },
-                    new DiyWhere { Name = "Content", Value = conversationId, Type = "Like", AndOr = "And" }
-                },
-                _OrderBy = "CreateTime",
-                _OrderByType = "ASC",
-                _PageSize = 5000,
-                _SelectFields = new[] { "Id", "Content" }
-            });
-            if (rowsResult.Code != 1 || rowsResult.Data == null) return Json(rowsResult);
-
-            var updates = new List<Task<DosResult>>();
-            foreach (var row in rowsResult.Data)
-            {
-                var rowJson = SafeJObject(row);
-                var payload = SafeJObject(rowJson?["Content"]?.ToString());
-                if (payload == null) continue;
-                if (!string.Equals(payload["Source"]?.ToString(), source, StringComparison.OrdinalIgnoreCase)) continue;
-                if (!string.Equals(payload["ConversationId"]?.ToString(), conversationId, StringComparison.OrdinalIgnoreCase)) continue;
-                payload["Title"] = title;
-                updates.Add(_formEngine.UptFormDataAsync("mic_ai_record", new
-                {
-                    Id = rowJson?["Id"]?.ToString(),
-                    Content = payload.ToString(Formatting.None)
-                }));
-            }
-            if (updates.Count == 0) return Json(new DosResult(0, null, "未找到可修改的对话记录。"));
-
-            var results = await Task.WhenAll(updates);
-            var failed = results.FirstOrDefault(item => item.Code != 1);
-            return failed != null
-                ? Json(new DosResult(0, null, failed.Msg ?? "修改标题失败。"))
-                : Json(new DosResult(1, new { ConversationId = conversationId, Title = title, UpdatedCount = results.Length }, "标题已修改。"));
-        }
-
-        private static string BuildConversationSummary(List<AiConversationRecord> records)
-        {
-            if (records == null || records.Count == 0) return "";
-            var sb = new StringBuilder();
-            sb.AppendLine($"自动摘要共压缩 {records.Count} 条较早消息：");
-            foreach (var item in records.TakeLast(60))
-            {
-                var role = item.Role == "user" ? "用户" : "AI";
-                var content = (item.Content ?? "").Replace("\r", " ").Replace("\n", " ").Trim();
-                if (content.Length > 260)
-                {
-                    content = content.Substring(0, 260) + "...";
-                }
-                if (!string.IsNullOrWhiteSpace(content))
-                {
-                    sb.AppendLine($"- {role}: {content}");
-                }
-                if (sb.Length > 6000) break;
-            }
-            return sb.ToString().Trim();
-        }
-
-        private async Task SaveConversationSummaryAsync(AiParam param, string source, string summary)
-        {
-            try
-            {
-                await _formEngine.AddFormDataAsync("mic_ai_record", new
-                {
-                    AiModel = param.AiModel ?? "",
-                    Content = JsonConvert.SerializeObject(new
-                    {
-                        Source = source,
-                        ConversationId = param.ConversationId,
-                        Title = "上下文自动压缩摘要",
-                        Role = "summary",
-                        Mode = param.Mode ?? "chat",
-                        Content = summary,
-                        ModelId = param.AiModel ?? "",
-                        AiModel = param.AiModel ?? "",
-                        Time = DateTime.Now.ToString("HH:mm"),
-                        CreatedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                    })
-                });
-            }
-            catch { }
-        }
-
-        private static JObject SafeJObject(object value)
-        {
-            try
-            {
-                if (value == null) return null;
-                if (value is JObject jObject) return jObject;
-                if (value is string text) return JObject.Parse(text);
-                return JObject.FromObject(value);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private sealed class AiDataPolicyDecision
-        {
-            public bool Allowed { get; set; }
-            public string Message { get; set; }
-        }
-
-        private static readonly IReadOnlyDictionary<string, string[]> AiDomainTables =
-            new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["customers"] = new[] { "Diy_Kehu" },
-                ["orders"] = new[] { "Diy_Dingdan" },
-                ["followups"] = new[] { "Diy_GenjinJL" },
-                ["tasks"] = new[] { "Diy_ShouhouDD" },
-                ["devices"] = new[] { "Diy_KehuSB" },
-                ["opportunities"] = new[] { "Diy_Shangji" }
-            };
-
-        private static List<string> ParsePolicyList(object value)
-        {
-            if (value == null) return new List<string>();
-            JToken token;
-            try
-            {
-                token = value as JToken ?? JToken.FromObject(value);
-                if (token.Type == JTokenType.String)
-                {
-                    var text = token.ToString().Trim();
-                    if (string.IsNullOrWhiteSpace(text)) return new List<string>();
-                    if (text.StartsWith("[") || text.StartsWith("{"))
-                    {
-                        try { token = JToken.Parse(text); }
-                        catch { return text.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(item => item.Trim()).ToList(); }
-                    }
-                    else
-                    {
-                        return text.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(item => item.Trim()).ToList();
-                    }
-                }
-            }
-            catch
-            {
-                return new List<string>();
-            }
-
-            if (token is JArray array)
-            {
-                return array
-                    .SelectMany(item => item.Type == JTokenType.Object
-                        ? new[] { item["Id"]?.ToString(), item["RoleId"]?.ToString(), item["Value"]?.ToString(), item["Key"]?.ToString() }
-                        : new[] { item.ToString() })
-                    .Where(item => !string.IsNullOrWhiteSpace(item))
-                    .Select(item => item.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-
-            if (token is JObject obj)
-            {
-                return new[] { obj["Id"]?.ToString(), obj["RoleId"]?.ToString(), obj["Value"]?.ToString(), obj["Key"]?.ToString() }
-                    .Where(item => !string.IsNullOrWhiteSpace(item))
-                    .Select(item => item.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-            }
-            return new List<string>();
-        }
-
-        private static bool PolicyFlag(JToken value)
-        {
-            var text = value?.ToString()?.Trim();
-            return text == "1" || string.Equals(text, "true", StringComparison.OrdinalIgnoreCase) || text == "是";
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
+            var result = await _microiAi.UpdateConversationTitleAsync(
+                userId,
+                osClient,
+                param?.ConversationId,
+                param?.Title,
+                param?.Source);
+            return Json(result);
         }
 
         /// <summary>
-        /// NL2SQL 的权限必须由服务端角色策略决定，不能信任客户端传入的 AllowedTables。
-        /// 非全部数据范围使用业务接口做条件化查询，避免生成 SQL 绕过行级权限。
+        /// Returns the current tenant's ordinary business tables for the role-policy
+        /// editor. The AI domain service remains the authority for tenant and
+        /// protected-table filtering.
         /// </summary>
-        private async Task<AiDataPolicyDecision> ApplyNl2SqlPolicyAsync(NL2SQLParam param)
+        [HttpGet, HttpPost]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> GetNl2SqlPolicyTableOptions()
         {
-            var token = await DiyToken.GetCurrentToken();
-            var currentUser = SafeJObject(token?.CurrentUser);
-            if (currentUser == null || string.IsNullOrWhiteSpace(param?.CurrentUserId))
-            {
-                return new AiDataPolicyDecision { Allowed = false, Message = "登录身份已过期，请重新登录。" };
-            }
-
-            var level = int.TryParse(currentUser["Level"]?.ToString(), out var parsedLevel) ? parsedLevel : 0;
-            var roleIds = ParsePolicyList(currentUser["RoleIds"] ?? currentUser["Roles"] ?? currentUser["RoleId"])
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (roleIds.Count == 0 && level < 999)
-            {
-                return new AiDataPolicyDecision { Allowed = false, Message = "当前帐号没有可用的 AI 数据权限。" };
-            }
-
-            DosResultList<dynamic> policyResult;
-            try
-            {
-                policyResult = await _formEngine.GetTableDataAsync("mci_ai_role_policy", new
-                {
-                    _Where = new List<DiyWhere> { new DiyWhere { Name = "Enabled", Value = 1, Type = "=" } },
-                    _PageSize = 500,
-                    _SelectFields = new[] { "RoleId", "DataScope", "AllowedDomains", "AllowedModels", "AllowRawSql" }
-                });
-            }
-            catch
-            {
-                policyResult = null;
-            }
-
-            // 兼容尚未建立策略表的历史租户，但只给平台管理员保留原能力。
-            if (policyResult == null || policyResult.Code != 1 || policyResult.Data == null)
-            {
-                return level >= 999
-                    ? new AiDataPolicyDecision { Allowed = true }
-                    : new AiDataPolicyDecision { Allowed = false, Message = "当前租户尚未配置 AI 数据权限，请联系管理员。" };
-            }
-
-            var matchedPolicies = policyResult.Data
-                .Select(SafeJObject)
-                .Where(item => item != null && roleIds.Contains(item["RoleId"]?.ToString() ?? ""))
-                .ToList();
-            if (matchedPolicies.Count == 0)
-            {
-                return new AiDataPolicyDecision { Allowed = false, Message = "当前角色尚未配置 AI 数据权限。" };
-            }
-
-            var rawSqlPolicies = matchedPolicies.Where(item =>
-            {
-                var scope = item["DataScope"]?.ToString()?.Trim();
-                var isAllScope = string.Equals(scope, "All", StringComparison.OrdinalIgnoreCase)
-                    || scope == "全部" || scope == "全部数据";
-                return isAllScope && PolicyFlag(item["AllowRawSql"]);
-            }).ToList();
-            if (rawSqlPolicies.Count == 0)
-            {
-                return new AiDataPolicyDecision
-                {
-                    Allowed = false,
-                    Message = "当前角色仅可使用受范围约束的 AI 经营分析，不能执行通用数据查询。"
-                };
-            }
-
-            var allowedModels = rawSqlPolicies
-                .SelectMany(item => ParsePolicyList(item["AllowedModels"]))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var requestedModel = param.AiModelId ?? param.AiId ?? param.AiModel ?? "";
-            if (allowedModels.Count > 0 && (string.IsNullOrWhiteSpace(requestedModel) || !allowedModels.Contains(requestedModel)))
-            {
-                return new AiDataPolicyDecision { Allowed = false, Message = "当前角色不能使用所选 AI 模型。" };
-            }
-
-            var domains = rawSqlPolicies
-                .SelectMany(item => ParsePolicyList(item["AllowedDomains"]))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var serverTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var domain in domains)
-            {
-                if (string.Equals(domain, "all", StringComparison.OrdinalIgnoreCase))
-                {
-                    foreach (var tables in AiDomainTables.Values)
-                    foreach (var table in tables) serverTables.Add(table);
-                }
-                else if (AiDomainTables.TryGetValue(domain, out var tables))
-                {
-                    foreach (var table in tables) serverTables.Add(table);
-                }
-            }
-            if (serverTables.Count == 0)
-            {
-                return new AiDataPolicyDecision { Allowed = false, Message = "当前角色没有已授权的数据域。" };
-            }
-
-            var requestedTables = param.AllowedTables?.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            param.AllowedTables = requestedTables == null || requestedTables.Count == 0
-                ? serverTables.ToList()
-                : serverTables.Where(requestedTables.Contains).ToList();
-            if (param.AllowedTables.Count == 0)
-            {
-                return new AiDataPolicyDecision { Allowed = false, Message = "请求的数据表不在当前角色授权范围内。" };
-            }
-            return new AiDataPolicyDecision { Allowed = true };
+            var context = await GetCurrentUserContextAsync();
+            var result =
+                await _microiAi.GetNl2SqlPolicyTableOptionsAsync(
+                    context.OsClient);
+            return Json(result);
         }
 
         // ============================================================
@@ -569,21 +145,8 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
 
-            var intent = await _microiAi.ResolveIntentAsync(param);
-            return Json(new DosResult(1, new
-            {
-                intent.Mode,
-                ModeName = intent.Mode switch
-                {
-                    "data" => "数据分析",
-                    "builder" => "低代码建模",
-                    "project" => "AI应用",
-                    "code" => "V8 编程",
-                    _ => "AI对话"
-                },
-                intent.Reason,
-                intent.Source
-            }));
+            return Json(
+                await _microiAi.ResolveIntentResultAsync(param));
         }
 
         /// <summary>
@@ -608,15 +171,8 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
 
-            var builtinReply = _microiAi.TryBuildBuiltinChatReply(param);
-            if (!string.IsNullOrWhiteSpace(builtinReply))
-            {
-                return Json(new DosResult(1, builtinReply));
-            }
-
-            await ApplyServerConversationContextAsync(param);
-            var result = await _microiAi.Chat(param);
-            return Json(result);
+            return Json(
+                await _microiAi.ChatWithContextAsync(param));
         }
 
         /// <summary>
@@ -646,27 +202,14 @@ namespace Microi.net.Api
             Response.Headers["Connection"] = "keep-alive";
             Response.Headers["X-Accel-Buffering"] = "no";
 
-            var builtinReply = _microiAi.TryBuildBuiltinChatReply(param);
-            if (!string.IsNullOrWhiteSpace(builtinReply))
-            {
-                foreach (var ch in builtinReply)
-                {
-                    await WriteSseEventAsync("message", ch.ToString());
-                    await Task.Delay(8);
-                }
-                await WriteSseEventAsync("result", JsonConvert.SerializeObject(builtinReply));
-                await WriteSseEventAsync("done", "[DONE]");
-                return;
-            }
-
-            await ApplyServerConversationContextAsync(param);
-
             try
             {
-                var result = await _microiAi.ChatStream(param, async (chunk) =>
-                {
-                    await WriteSseEventAsync("message", chunk);
-                });
+                var result =
+                    await _microiAi.ChatStreamWithContextAsync(
+                        param,
+                        chunk => WriteSseEventAsync(
+                            "message",
+                            chunk));
 
                 if (result.Code == 1 && result.Data != null)
                 {
@@ -708,10 +251,12 @@ namespace Microi.net.Api
             if (!string.IsNullOrWhiteSpace(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
             if (!string.IsNullOrWhiteSpace(OsClient)) param.OsClient = OsClient;
             await EnrichCurrentUserAsync(param);
-            var policy = await ApplyNl2SqlPolicyAsync(param);
-            if (!policy.Allowed) return Json(new DosResult(0, null, policy.Message));
-            var result = await _microiAi.NL2SQL(param);
-            return Json(result);
+            var currentToken = await DiyToken.GetCurrentToken();
+            return Json(
+                await _microiAi.NL2SQLAuthorizedAsync(
+                    param,
+                    currentToken?.CurrentUser,
+                    currentToken?.OsClient));
         }
 
         /// <summary>
@@ -737,13 +282,15 @@ namespace Microi.net.Api
         /// 自然语言转V8引擎代码（SSE流式输出）
         /// </summary>
         [HttpPost, HttpGet]
+        [PlatformAdminOnly]
         public async Task NL2V8Engine([FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] NL2V8Param bodyParam, [FromQuery] string Question = null, [FromQuery] string AiModel = null, [FromQuery] string ReasoningEffort = null, [FromQuery] string OsClient = null)
         {
             var param = bodyParam ?? new NL2V8Param();
             if (!string.IsNullOrEmpty(Question)) param.Question = Question;
             if (!string.IsNullOrEmpty(AiModel)) param.AiModel = AiModel;
             if (!string.IsNullOrEmpty(ReasoningEffort)) param.ReasoningEffort = ReasoningEffort;
-            if (!string.IsNullOrEmpty(OsClient)) param.OsClient = OsClient;
+            var currentContext = await GetCurrentUserContextAsync();
+            param.OsClient = currentContext.OsClient;
 
             Response.ContentType = "text/event-stream; charset=utf-8";
             Response.Headers["Cache-Control"] = "no-cache";
@@ -800,8 +347,12 @@ namespace Microi.net.Api
         /// 自然语言转V8引擎代码（非流式）
         /// </summary>
         [HttpPost, HttpGet]
+        [PlatformAdminOnly]
         public async Task<JsonResult> NL2V8EngineSync(NL2V8Param param)
         {
+            param ??= new NL2V8Param();
+            var currentContext = await GetCurrentUserContextAsync();
+            param.OsClient = currentContext.OsClient;
             var result = await _microiAi.NL2V8Engine(param);
             return Json(result);
         }
@@ -887,10 +438,12 @@ namespace Microi.net.Api
             var (userId, userName) = await GetCurrentUserAsync();
             if (string.IsNullOrEmpty(userId))
                 return Json(new DosResult(0, null, "请先登录！"));
-            if (string.IsNullOrWhiteSpace(param?.PlanId))
-                return Json(new DosResult(0, null, "请选择套餐！"));
 
-            var result = await _subService.CreateOrder(userId, userName, param.PlanId, param.Months > 0 ? param.Months : 1);
+            var result = await _subService.CreateOrder(
+                userId,
+                userName,
+                param?.PlanId,
+                param?.Months ?? 0);
             return Json(result);
         }
 
@@ -900,13 +453,16 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> SubCreateAlipay([FromBody] PayOrderParam param)
         {
-            var (userId, _) = await GetCurrentUserAsync();
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
             if (string.IsNullOrEmpty(userId))
                 return Json(new DosResult(0, null, "请先登录！"));
             if (string.IsNullOrWhiteSpace(param?.OrderId))
                 return Json(new DosResult(0, null, "订单Id不能为空！"));
 
-            var result = await _subService.CreateAlipay(param.OrderId);
+            var result = await _subService.CreateAlipayForUser(
+                param.OrderId,
+                userId,
+                osClient);
             return Json(result);
         }
 
@@ -926,20 +482,13 @@ namespace Microi.net.Api
                     signParams[key] = form[key];
                 }
 
-                var verifyResult = await _subService.VerifyAlipayNotify(signParams);
-                if (verifyResult.Code != 1)
-                    return Content("fail");
-
-                string tradeStatus = signParams.ContainsKey("trade_status") ? signParams["trade_status"] : "";
-                string outTradeNo = signParams.ContainsKey("out_trade_no") ? signParams["out_trade_no"] : "";
-                string tradeNo = signParams.ContainsKey("trade_no") ? signParams["trade_no"] : "";
-
-                if (tradeStatus == "TRADE_SUCCESS" || tradeStatus == "TRADE_FINISHED")
-                {
-                    await _subService.HandlePaySuccess(outTradeNo, tradeNo);
-                }
-
-                return Content("success");
+                var result =
+                    await _subService.ProcessAlipayNotify(
+                        signParams);
+                return Content(
+                    result.Code == 1
+                        ? "success"
+                        : "fail");
             }
             catch (Exception ex)
             {
@@ -982,36 +531,23 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> SubGetOrderStatus(string orderId)
         {
-            var (userId, _) = await GetCurrentUserAsync();
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
             if (string.IsNullOrEmpty(userId))
                 return Json(new DosResult(0, null, "请先登录！"));
             if (string.IsNullOrWhiteSpace(orderId))
                 return Json(new DosResult(0, null, "订单Id不能为空！"));
 
-            var orderResult = await _formEngine.GetFormDataAsync("mic_sub_order", new
-            {
-                Id = orderId,
-                _Where = new List<DiyWhere>()
-                {
-                    new DiyWhere() { Name = "UserId", Value = userId, Type = "=" }
-                }
-            });
-
-            if (orderResult.Code != 1 || orderResult.Data == null)
-                return Json(new DosResult(0, null, "订单不存在！"));
-
-            return Json(new DosResult(1, new
-            {
-                PayStatus = Convert.ToInt32(orderResult.Data.PayStatus),
-                PayTime = orderResult.Data.PayTime,
-                TradeNo = orderResult.Data.TradeNo
-            }));
+            return Json(await _subService.GetOrderStatusForUser(
+                orderId,
+                userId,
+                osClient));
         }
 
         /// <summary>
         /// 获取所有APIKey列表（管理接口）
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> SubGetApiKeyList()
         {
             var result = await _subService.GetApiKeyList();
@@ -1022,6 +558,7 @@ namespace Microi.net.Api
         /// 获取指定APIKey绑定的用户列表（管理接口）
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> SubGetApiKeyBindUsers(string apiKeyId)
         {
             if (string.IsNullOrWhiteSpace(apiKeyId))
@@ -1035,6 +572,7 @@ namespace Microi.net.Api
         /// 获取APIKey容量预警（管理接口）
         /// </summary>
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> SubGetApiKeyCapacity()
         {
             var result = await _subService.GetApiKeyCapacityReport();
@@ -1054,85 +592,32 @@ namespace Microi.net.Api
         public async Task ProxyChatStream()
         {
             var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-            {
-                Response.ContentType = "text/event-stream; charset=utf-8";
-                await WriteSseDataAsync(JsonConvert.SerializeObject(new { error = new { message = "请先登录！", code = "unauthorized" } }));
-                await WriteSseDoneAsync();
-                return;
-            }
-
-            // 读取请求体
             string rawBody;
             using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
             {
                 rawBody = await reader.ReadToEndAsync();
             }
-
-            // 解析模型路由
-            string modelName = null;
-            try { modelName = JObject.Parse(rawBody)["model"]?.ToString(); } catch { }
-            var route = await _subService.ResolveModel(modelName);
-            if (route == null)
-            {
-                // 未指定或无效模型时使用第一个可用模型
-                var models = await _subService.GetModels();
-                if (models.Code == 1 && models.Data != null && models.Data.Count > 0)
-                {
-                    route = await _subService.ResolveModel((string)models.Data[0].DisplayName);
-                }
-            }
-            if (route == null)
-            {
-                Response.ContentType = "text/event-stream; charset=utf-8";
-                await WriteSseDataAsync(JsonConvert.SerializeObject(new { error = new { message = "没有可用的模型！", code = "model_not_found" } }));
-                await WriteSseDoneAsync();
-                return;
-            }
-
-            // 鉴权 + 扣额度 + 获取 Key
-            var (apiKey, prepError) = await _proxyService.PrepareProxy(userId, route);
-            if (!string.IsNullOrEmpty(prepError))
-            {
-                Response.ContentType = "text/event-stream; charset=utf-8";
-                await WriteSseDataAsync(JsonConvert.SerializeObject(new { error = new { message = prepError, code = "quota_exceeded" } }));
-                await WriteSseDoneAsync();
-                return;
-            }
-
-            // 规范化请求体（替换为上游模型名）
-            var (body, _, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, forceStream: true, includeUsage: route.IsRelayModel);
-            if (!string.IsNullOrEmpty(bodyError))
-            {
-                Response.ContentType = "text/event-stream; charset=utf-8";
-                await WriteSseDataAsync(JsonConvert.SerializeObject(new { error = new { message = bodyError, code = "invalid_request" } }));
-                await WriteSseDoneAsync();
-                return;
-            }
-
-            // SSE 流式转发到供应商
             Response.ContentType = "text/event-stream; charset=utf-8";
             Response.Headers["Cache-Control"] = "no-cache";
             Response.Headers["Connection"] = "keep-alive";
             Response.Headers["X-Accel-Buffering"] = "no";
 
-            try
+            var result =
+                await _proxyService.ExecuteAuthenticatedStreamAsync(
+                    userId,
+                    rawBody,
+                    Response.Body,
+                    HttpContext.RequestAborted);
+            if (!result.ResponseWritten
+                && !string.IsNullOrWhiteSpace(
+                    result.ErrorMessage))
             {
-                string targetUrl = route.ApiBase.TrimEnd('/') + route.ApiPath;
-                var streamResult = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
-                if (streamResult.Success && route.IsRelayModel)
-                    await _subService.RecordRelayTokenUsage(userId, route, body, streamResult.ResponseBody, "proxy-chat-stream");
-                _ = _subService.IncrementApiKeyCallCount(userId);
-            }
-            catch (TaskCanceledException) { }
-            catch (Exception ex)
-            {
-                try
-                {
-                    await WriteSseDataAsync(JsonConvert.SerializeObject(new { error = new { message = $"代理转发异常: {ex.Message}", code = "proxy_error" } }));
-                    await WriteSseDoneAsync();
-                }
-                catch { }
+                await WriteSseDataAsync(
+                    AiProxyService.MakeOpenAIError(
+                        result.ErrorMessage,
+                        result.ErrorType,
+                        result.ErrorCode));
+                await WriteSseDoneAsync();
             }
         }
 
@@ -1145,54 +630,15 @@ namespace Microi.net.Api
         public async Task<JsonResult> ProxyChat()
         {
             var (userId, _) = await GetCurrentUserAsync();
-            if (string.IsNullOrEmpty(userId))
-                return Json(new DosResult(0, null, "请先登录！"));
-
-            // 读取请求体
             string rawBody;
             using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
             {
                 rawBody = await reader.ReadToEndAsync();
             }
-
-            // 解析模型路由
-            string modelName = null;
-            try { modelName = JObject.Parse(rawBody)["model"]?.ToString(); } catch { }
-            var route = await _subService.ResolveModel(modelName);
-            if (route == null)
-            {
-                var models = await _subService.GetModels();
-                if (models.Code == 1 && models.Data != null && models.Data.Count > 0)
-                {
-                    route = await _subService.ResolveModel((string)models.Data[0].DisplayName);
-                }
-            }
-            if (route == null)
-                return Json(new DosResult(0, null, "没有可用的模型！"));
-
-            var (apiKey, prepError) = await _proxyService.PrepareProxy(userId, route);
-            if (!string.IsNullOrEmpty(prepError))
-                return Json(new DosResult(0, null, prepError));
-
-            var (body, _, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, forceStream: false, includeUsage: route.IsRelayModel);
-            if (!string.IsNullOrEmpty(bodyError))
-                return Json(new DosResult(0, null, bodyError));
-
-            try
-            {
-                string targetUrl = route.ApiBase.TrimEnd('/') + route.ApiPath;
-                var (success, responseBody, statusCode) = await _proxyService.ForwardAsync(body, apiKey, targetUrl, route.AuthPrefix);
-                if (!success)
-                    return Json(new DosResult(0, null, $"上游 API 错误: {statusCode} - {responseBody}"));
-
-                if (route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseBody, "proxy-chat");
-                _ = _subService.IncrementApiKeyCallCount(userId);
-                return Json(new DosResult(1, JObject.Parse(responseBody)));
-            }
-            catch (Exception ex)
-            {
-                return Json(new DosResult(0, null, $"代理请求异常: {ex.Message}"));
-            }
+            return Json(
+                await _proxyService.ExecuteAuthenticatedAsync(
+                    userId,
+                    rawBody));
         }
 
         /// <summary>
@@ -1224,82 +670,43 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task OpenAIChatCompletions()
         {
-            // 1. 平台 APIKey 鉴权
-            var (userId, authError) = await _proxyService.AuthByPlatformApiKey(Request.Headers["Authorization"].ToString());
-            if (!string.IsNullOrEmpty(authError))
-            {
-                await WriteOpenAIErrorAsync(401, authError, "invalid_request_error", "invalid_api_key");
-                return;
-            }
-
-            // 2. 读取请求体
             string rawBody;
             using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
             {
                 rawBody = await reader.ReadToEndAsync();
             }
+            Response.ContentType =
+                "text/event-stream; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["Connection"] = "keep-alive";
+            Response.Headers["X-Accel-Buffering"] = "no";
 
-            // 3. 解析模型 → 获取供应商路由信息
-            string modelName = null;
-            try { modelName = JObject.Parse(rawBody)["model"]?.ToString(); } catch { }
-            var route = await _subService.ResolveModel(modelName);
-            if (route == null)
+            var result =
+                await _proxyService.ExecuteOpenAiCompatibleAsync(
+                    Request.Headers["Authorization"].ToString(),
+                    rawBody,
+                    Response.Body,
+                    HttpContext.RequestAborted);
+            if (result.ResponseWritten)
             {
-                await WriteOpenAIErrorAsync(400, $"Model '{modelName}' not found or not available.", "invalid_request_error", "model_not_found");
+                return;
+            }
+            if (!string.IsNullOrWhiteSpace(
+                    result.ErrorMessage))
+            {
+                await WriteOpenAIErrorAsync(
+                    result.StatusCode,
+                    result.ErrorMessage,
+                    result.ErrorType,
+                    result.ErrorCode);
                 return;
             }
 
-            // 4. 扣额度 + 获取供应商 APIKey
-            var (apiKey, prepError) = await _proxyService.PrepareProxy(userId, route);
-            if (!string.IsNullOrEmpty(prepError))
-            {
-                await WriteOpenAIErrorAsync(429, prepError, "rate_limit_error", "quota_exceeded");
-                return;
-            }
-
-            // 5. 规范化请求体（替换为上游模型名）
-            var (body, isStream, bodyError) = _proxyService.PrepareRequestBody(rawBody, route.UpstreamModelId, includeUsage: route.IsRelayModel);
-            if (!string.IsNullOrEmpty(bodyError))
-            {
-                await WriteOpenAIErrorAsync(400, bodyError, "invalid_request_error", "invalid_json");
-                return;
-            }
-
-            // 6. 转发到供应商
-            try
-            {
-                string targetUrl = route.ApiBase.TrimEnd('/') + route.ApiPath;
-
-                if (isStream)
-                {
-                    Response.ContentType = "text/event-stream; charset=utf-8";
-                    Response.Headers["Cache-Control"] = "no-cache";
-                    Response.Headers["Connection"] = "keep-alive";
-                    Response.Headers["X-Accel-Buffering"] = "no";
-
-                    var streamResult = await _proxyService.ForwardStreamingAsync(body, apiKey, targetUrl, route.AuthPrefix, Response.Body, HttpContext.RequestAborted);
-                    if (streamResult.Success && route.IsRelayModel)
-                        await _subService.RecordRelayTokenUsage(userId, route, body, streamResult.ResponseBody, "openai-stream");
-                }
-                else
-                {
-                    var (success, responseBody, statusCode) = await _proxyService.ForwardAsync(body, apiKey, targetUrl, route.AuthPrefix);
-                    Response.StatusCode = statusCode;
-                    Response.ContentType = "application/json; charset=utf-8";
-                    await Response.WriteAsync(responseBody);
-                    if (success && route.IsRelayModel) await _subService.RecordRelayTokenUsage(userId, route, body, responseBody, "openai");
-                }
-
-                _ = _subService.IncrementApiKeyCallCount(userId);
-            }
-            catch (TaskCanceledException) { }
-            catch (Exception ex)
-            {
-                if (!Response.HasStarted)
-                {
-                    await WriteOpenAIErrorAsync(502, $"Proxy error: {ex.Message}", "server_error", "proxy_error");
-                }
-            }
+            Response.StatusCode = result.StatusCode;
+            Response.ContentType =
+                "application/json; charset=utf-8";
+            await Response.WriteAsync(
+                result.ResponseBody ?? "{}");
         }
 
         /// <summary>
@@ -1319,9 +726,13 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public async Task<JsonResult> OpenAIUsage(int pageIndex = 1, int pageSize = 20)
         {
-            var (userId, authError) = await _proxyService.AuthByPlatformApiKey(Request.Headers["Authorization"].ToString());
-            if (!string.IsNullOrEmpty(authError)) return Json(new DosResult(0, null, authError));
-            return Json(await _subService.GetRelayTokenUsage(userId, pageIndex, pageSize));
+            return Json(
+                await _proxyService
+                    .GetUsageByPlatformApiKeyAsync(
+                        Request.Headers["Authorization"]
+                            .ToString(),
+                        pageIndex,
+                        pageSize));
         }
 
         /// <summary>

@@ -1,8 +1,7 @@
-using Ionic.Zlib;
 using Microi.net;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -14,6 +13,7 @@ namespace Microi.net.Api
     /// </summary>
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     [Route("api/[controller]/[action]")]
     public class ImController : Controller
     {
@@ -34,9 +34,12 @@ namespace Microi.net.Api
         /// <param name="secretKey"></param>
         /// <param name="expire"></param>
         /// <returns></returns>
-        [HttpGet, HttpPost]
-        [AllowAnonymous]
-        public string GetUserSig([FromQuery] string userId, uint sdkAppid = 0, string secretKey = "", int expire = 604800)
+        [HttpPost]
+        public string GetUserSig(
+            [FromForm] string userId,
+            [FromForm] uint sdkAppid = 0,
+            [FromForm] string secretKey = "",
+            [FromForm] int expire = 604800)
         {
             string userSig = genUserSig(userId, sdkAppid, secretKey, expire, null, false);
             return userSig;
@@ -85,7 +88,12 @@ namespace Microi.net.Api
 
         private static byte[] CompressBytes(byte[] sourceByte)
         {
-            return ZlibStream.CompressBuffer(sourceByte);
+            using var output = new MemoryStream();
+            using (var zlib = new ZLibStream(output, CompressionLevel.Optimal, leaveOpen: true))
+            {
+                zlib.Write(sourceByte, 0, sourceByte.Length);
+            }
+            return output.ToArray();
         }
 
         private string HMACSHA256(string identifier, uint sdkAppid, string secretKey, long currTime, int expire, string base64UserBuf, bool userBufEnabled)
@@ -120,7 +128,6 @@ namespace Microi.net.Api
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPost]
-        [AllowAnonymous]
         public async Task<IActionResult> MultiAccountImport([FromBody] ImAccountImportRequest request)
         {
             var random = new Random().Next(10000000, 99999999); // 生成随机数
@@ -169,7 +176,6 @@ namespace Microi.net.Api
         /// <param name="request"></param>
         /// <returns></returns>
         [HttpPost]
-        [AllowAnonymous]
         public async Task<IActionResult> MultiAccountDelete([FromBody] ImAccountDeleteRequest request)
         {
             var random = new Random().Next(10000000, 99999999); // 生成随机数

@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
 using Microsoft.AspNetCore.Cors;
@@ -10,6 +9,7 @@ namespace Microi.net.Api
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
     [Route("api/[controller]/[action]")]
+    [PlatformAdminOnly]
     public class SecurityGuardController : Controller
     {
         [HttpGet, HttpPost]
@@ -80,10 +80,9 @@ namespace Microi.net.Api
             }
             if (identity.OsClient.DosIsNullOrWhiteSpace())
             {
-                identity.OsClient = Request.Query["OsClient"].FirstOrDefault()
-                                    ?? Request.Headers["OsClient"].FirstOrDefault()
-                                    ?? Request.Headers["X-OsClient"].FirstOrDefault()
-                                    ?? Microi.net.OsClient.GetConfigOsClient();
+                // An operator's tenant is an authenticated claim; request
+                // headers/query strings must never select the security scope.
+                identity.OsClient = Microi.net.OsClient.GetConfigOsClient();
             }
             if (identity.UserName.DosIsNullOrWhiteSpace())
             {

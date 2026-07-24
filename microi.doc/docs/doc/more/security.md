@@ -1,0 +1,282 @@
+# 🔐 平台安全与兼容基线
+
+> 本文说明 Microi 吾码平台在 FormEngine、接口引擎、SaaS、多租户、文件、登录会话和外部 HTTP 访问中的服务端安全边界。安全能力必须在服务端生效；隐藏按钮、前端路由和“用户已经登录”都不能代替授权。
+
+---
+
+## 一、先区分身份、授权与可信执行
+
+| 层次 | 解决的问题 | 不能代表 |
+|---|---|---|
+| Token / 登录态 | 当前请求是谁、属于哪个 `OsClient`、来自哪个终端 | 可以访问任意表、记录、文件或管理 API |
+| 菜单与表权限 | 当前角色可对目标业务资源执行哪些操作 | 可以越过菜单数据范围或访问平台控制面 |
+| 数据范围 | 当前菜单列表、计数、导出可返回哪些记录 | 可以绕过独立的详情/写入权限，或把客户端请求伪装成服务端 V8 |
+| 服务端可信调用 | 接口引擎、后端表单 V8、平台内部代码发起的调用 | 可以把管理入口开放给普通用户 |
+
+来自浏览器、UniApp、第三方 SDK 或任意 HTTP 客户端的字段均不可信。`_TrustedServerInvocation` 只能由后端创建，客户端在 JSON、QueryString 或 Header 中伪造不会变成可信调用。`_InvokeType:'Server'` / `'Client'` 只控制表单事件调用语义，也不是授权开关。
+
+后端接口引擎、后端表单 V8 和平台内部调用由服务端建立可信上下文，因此调用 `V8.FormEngine` 时不要求传 `_SysMenuId`。但是，能够创建接口引擎、保存 V8、配置任务或数据源的管理入口本身必须限制为平台超级管理员，否则普通用户仍可能借受信任代码获得任意数据执行能力。
+
+---
+
+## 二、FormEngine 混合授权模型
+
+### 1. 有菜单上下文：默认严格精确校验
+
+标准表单引擎页面应携带真实 `_SysMenuId`（兼容 `ModuleEngineKey`）。服务端会校验：
+
+1. 菜单真实存在且绑定目标 `diy_table`。
+2. 当前用户的有效角色拥有该菜单。
+3. 当前操作拥有对应权限，例如 `Read`、`Add`、`Edit`、`Del`。
+4. 列表、计数和导出应用菜单 `SqlWhere`、`SqlJoin` / `JoinTables`；详情和写入不应用模块列表过滤。
+
+列表、写入、导入和导出显式传入错误、伪造或绑定其它表的菜单 Id 时直接失败关闭，不会自动退回其它菜单或表权限。为兼容已经发布的旧版 PC/UniApp，普通业务表的单行详情只要当前用户真实拥有至少一个直接绑定同表的菜单（或精确表级 `Read` 权限）即可读取，不应用该菜单的 `SqlWhere` / `SqlJoin`。该兼容不会放宽列表、导入、导出或写操作的菜单动作权限。
+
+### 2. 历史前端 V8 未传菜单：从后端授权快照推断
+
+吾码已有大量客户在前端 V8 中直接调用 `V8.FormEngine`，历史代码没有 `_SysMenuId`。升级不要求这些项目一次性重写：
+
+- 登录用户未传菜单时，后端从该用户真正拥有的 `sys_menu` 中查找绑定目标表且允许当前操作的候选菜单。
+- 候选菜单及角色信息来自服务端授权快照，不相信客户端提交的角色 Id、菜单列表或权限 JSON。
+- 多个候选菜单的数据范围只有在能够安全合并时才用于列表等集合查询。任一候选菜单没有查询范围时可读取整表；不同 Join 上下文无法安全合并时列表失败关闭，不能通过故意省略 `_SysMenuId` 绕过范围。单行详情只校验同表菜单访问权，不应用候选菜单范围。
+- 确实没有菜单入口的 SDK 或定制页面，可在角色管理的【高级表权限】按最小权限授予目标表的 `Read`、`Add`、`Edit`、`Del`。
+
+标准 PC 表单引擎的前端 FormEngine facade 只给“当前菜单绑定的当前表”自动注入真实 `_SysMenuId`。跨表 V8 调用不借用主表菜单，而是由后端按目标表授权推断，避免把错误菜单传播给其它表。
+
+历史 PC/UniApp 的字段元数据请求还可能不传菜单、携带已删除菜单，或通过 `GetDiyFieldByDiyTables` 按“主表在前、关联表在后”批量请求。单表字段请求只可回退到当前用户真实拥有且引用同一张表的菜单；批量请求把第一张主表作为必须通过授权的锚点，后续普通关联表逐张校验，未授权表或平台保护表只从返回结果中剔除，不会拖垮已经授权的主表，也不会返回被剔除表的字段、SQL 数据源或 V8 配置。元数据兼容不会授予数据行访问；只有第一张主表本身无权访问时才返回 `NoAuth`。
+
+### 3. 查询数据范围与写入操作权限必须分开
+
+- 列表、计数、导出必须在真实查询中应用菜单数据范围，不能先查出越权数据再在前端或内存中过滤。单行详情按同表菜单访问权授权，不应用模块的 `SqlWhere` / `SqlJoin`。
+- `sys_menu.SqlWhere`、`SqlJoin`、`JoinTables` 是模块引擎的**查询过滤配置**，不是行级写权限。主表新增、修改、删除分别由当前角色在该菜单上的 `Add`、`Edit`、`Del` 权限控制；拥有对应权限时，不得再因为查询配置包含单表条件或跨表 Join 拒绝写入，也不得把查询条件追加到最终 `INSERT`、`UPDATE` 或软删除 SQL。
+- 项目若需要“只能修改自己负责的数据”等行级写入规则，应在 `SubmitBeforeServerV8` 或专用接口引擎中用服务端可信代码做业务校验并返回失败，同时可统一写入 `TenantId`、负责人、创建人等归属字段；不能改变通用 FormEngine 菜单权限的既有语义。
+- 导入、导出必须携带真实菜单上下文，并分别拥有 `Import`、`Export`；高级表权限不能绕过。
+
+客户端 `AddFormData` 仍先校验真实菜单和 `Add` 权限，之后才进入后端表单 V8。后端 `SubmitBeforeServerV8`、`SubmitAfterServerV8` 以及接口引擎中的 `V8.FormEngine` 属于服务器可信执行，可在租户边界内执行复杂 SQL、跨表事务和其它表的 CRUD，不会再次套用浏览器菜单权限；外部 HTTP 伪造 `_InvokeType:'Server'` 或 `_TrustedServerInvocation` 不能获得该能力。
+
+### 4. TableChild 父记录范围内委托
+
+隐藏的子表菜单不要求上百个存量项目逐个给角色补菜单权限。`TableChild` 请求由后端同时验证：
+
+- 当前用户拥有父菜单，父菜单绑定父表。
+- 父表字段确实配置为目标子表及隐藏子菜单。
+- 当前用户在父菜单数据范围内能读取该父记录。
+- 子表外键配置、父记录主键和子记录外键一致。
+
+通过后，服务端把父记录外键条件强制写入子表查询或写入。伪造 `_TableChildAuth`、跨父记录借用外键、脱离父表直接访问子表都会失败。
+
+更多 HTTP 路由与调用示例见 [FormEngine 接口](../v8-engine/form-engine)。
+
+---
+
+## 三、平台保护表与超级管理员基线
+
+SaaS 配置、接口引擎、表/字段元数据、菜单、角色、用户、数据源、任务、MQ/MQTT、页面、打印、工作流、扩展数据库、应用商城、AI 配置以及安全审计等平台控制面表属于保护资源。保护表的唯一事实源是后端 `PlatformResourceSecurity`，新增控制面能力时必须同步加入该集中清单。
+
+- 通用客户端 FormEngine 对 `Level < 9999` 的保护表访问硬拒绝。
+- 菜单权限、高级表权限、匿名开关都不能覆盖保护表基线。
+- 控制面 Controller 使用服务端管理员校验，不能因为普通角色看到了菜单就放行。
+- 角色表级权限只支持 `Read`、`Add`、`Edit`、`Del`；普通角色不能保存指向保护表的直接授权。
+- 匿名读取/新增只适用于 `diy_table` 明确开启匿名能力的普通业务表。
+- 表单设计器保存 `diy_table/diy_field` 时，外层接口先校验 `Level >= 9999`；内部批量字段写入继续携带同一服务端确认的管理员上下文，不能因为二次封装为 `JObject` 丢失身份，也不能把整个设计器改成无条件可信调用。
+- `AddDiyField/AddField` 创建物理列前会在事务中写入 `diy_field`。这次嵌套写入同样必须使用强类型参数传递外层管理员或可信升级上下文；浏览器入口仍由 `PlatformAdminOnly + Level >= 9999` 校验，JSON 中伪造 `_InvokeType` 或 `_TrustedServerInvocation` 无效。
+
+升级程序 Upgrade15 会清理普通角色历史遗留的保护表 `Type='Table'` 直连授权，保留正常业务菜单权限，并提升共享授权版本使所有节点放弃旧快照。
+平台升级程序写入接口引擎、菜单、角色权限等保护表时使用服务端专用参数对象和不可由 HTTP JSON 绑定的可信标记；不能依赖匿名对象/JObject 的运行时类型猜测调用来源。
+
+---
+
+## 四、授权缓存与性能
+
+安全校验不应让每个 FormEngine 请求重复全表查询。平台使用：
+
+- 按 `OsClient` 隔离的共享 Redis 授权版本 `epoch`。
+- “租户 + epoch + 用户”的授权快照。
+- 短 TTL 的进程内 L1 与共享 Redis L2。
+- Redis 不可用或快照不可用时从主库回源，不依赖只读库延迟。
+
+用户状态、级别、角色，角色状态，菜单绑定/数据范围，角色菜单或高级表权限变化后，在事务成功后递增共享 `epoch`。各 API/Worker 节点看到新版本后自然丢弃旧快照，无需粘性会话、逐节点清 Redis 或重启容器。L1 只用于性能优化，不能成为权限事实源。
+
+正确菜单上下文、可安全合并的历史无菜单范围以及高级表权限都复用一次授权快照，不会逐菜单查询数据库。详情只读取同一授权快照中的同表菜单绑定关系，不执行逐菜单数据范围探测；标准详情与列表不会因此增加额外数据库往返。
+
+授权快照 Key 同时包含独立的“快照契约版本”。当快照新增 `UserLevel`、`IsActiveUser` 等安全字段或改变解释语义时必须提升该版本，使 Redis 中跨重启、跨滚动升级保留的旧 JSON 立即失效；不能让缺失字段按 `0/false` 反序列化后误判管理员或普通用户。
+
+---
+
+## 五、上传限制与私有文件
+
+### 1. 租户业务配置与独立灾难保护上限
+
+下列值是环境变量、`appsettings` 和代码提供的业务默认值，不是租户不可突破的硬上限：
+
+| 配置 | 默认值 |
+|---|---:|
+| 单文件 | 100 MB |
+| 单次全部文件 | 200 MB |
+| 单次文件数量 | 10 |
+| 单帐号每日额度 | 2048 MB |
+| 单租户每日额度 | 20480 MB |
+
+Upgrade16 会在 `sys_osclients` 增加六个可空租户字段：
+
+`FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。
+
+有效业务值按当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值取第一项，租户可以提高或降低业务默认值。最终结果仍受独立 `Absolute*` 灾难保护、`ForceDisabled` 紧急熔断、HTTP/Multipart/Form 解析和反向代理上限约束；这些运维边界不接受租户覆盖。帐号与租户日额度在共享 Redis 中原子预留，适用于多节点；Redis 不可用时失败关闭。普通交互式上传强制使用私有桶，且一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后台任务仍受平台灾难保护上限。
+
+### 2. 私有文件不是“知道路径即可访问”
+
+普通客户端请求 `/api/HDFS/GetPrivateFileUrl` 时，必须同时提供：
+
+- `FormEngineKey`
+- `FormDataId`
+- `FieldId`
+- `SysMenuId`
+- 私有文件相对路径
+
+服务端验证菜单、菜单绑定表、记录数据范围、字段归属、字段组件及记录字段确实引用该文件后，才签发短期后端票据。不得返回真实对象存储签名地址、存储密钥或裸文件流。
+
+可信后端 V8 使用 `V8.Method.GetPrivateFileUrl({ FilePathName })` 属于服务端能力；不要把这种调用方式复制成普通浏览器 HTTP 调用。文件列表、移动、重命名、覆盖、删除等管理 API 仅限 `Level >= 9999`。
+
+完整配置见 [分布式存储与文件安全](./hdfs)。
+
+---
+
+## 六、SaaS 配置和租户隔离
+
+`sys_osclients` 同时包含租户业务配置和数据库、认证、Redis、对象存储、MQ/MQTT、搜索等基础设施机密。运行时必须使用脱敏投影：
+
+- `V8.OsClientModel` / `V8.ClientModel` 不注入数据库连接、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索等基础设施凭据。
+- `V8.SysConfig` 不注入 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段。
+- 当前租户自行扩展的微信、支付、ERP 等业务密钥仍可能存在，V8 不得把整个对象或密钥返回前端。
+- 子租户调用 `GetSysConfig` 时强制绑定当前 `OsClient`，不能借缓存命中读取主租户配置。
+
+新租户不能复制整条主租户记录。受控开库流程必须排除租户身份、数据库、认证、Redis、存储、MQ/MQTT、搜索凭据，为新租户生成独立配置，并在刷新 SaaS 缓存后回读验证。跨租户路由时，Token 身份不能自动带到另一个 `OsClient`；目标接口只有明确允许匿名时才能按匿名边界执行。
+
+DataSource、Translate、Workflow 等引擎在 V8 调用链中统一服从当前 `V8TenantContext`：普通租户脚本即使在参数中伪造其它 `OsClient`，服务端也会绑定回当前租户或拒绝。只有非 V8 的可信平台 C# 调用，或主租户经过明确控制面授权的调用，才可以显式处理目标租户；业务 HTTP 参数本身不能建立这种信任。
+
+Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存的连接。`temporary` 临时连接和匿名任意 Host/密码管理已禁止；保存密码由后端保护且不返回前端。MCP Redis 写操作必须传 `confirmExecution`，不得把 Redis 密码放入参数、日志或对话。
+
+### AI、MCP 与向量数据
+
+::: tip 向量数据库默认关闭
+在线 AI 默认通过“大模型关键词扩展 + 权限感知 Schema 搜索 + 精确字段回读”工作，不需要安装或连接 Ollama、nomic-embed-text、Qdrant。`mic_ai.EnableVectorDatabase=1` 时才启用向量增强；字段缺失、为空、关闭或服务异常时，必须跳过向量连接/同步或回退到关键词模式。
+:::
+
+- 普通 `Chat/ChatStream` 当前使用服务端会话上下文和固定核心规范 Prompt，不检索完整向量 corpus；`NL2SQL` 默认使用当前租户权限范围内的 Schema 关键词检索，启用向量开关后才叠加 Schema RAG；`NL2V8` 同理叠加可选 Skill / Schema 向量召回。平台在线 AI 不是 MCP Host；只有真正注册 Tools 并处理 `tool_calls` 的宿主才能调用 MCP。模型文字声称“已调用”不能作为执行证据。
+- 关键词、同义词和候选表均不是授权凭据。候选 Schema 必须先与服务端授权快照取交集，再从权威元数据精确回读；缓存按 `OsClient + 授权版本` 隔离，权限变化后失效，不能让模型或客户端提交的表名扩大范围。
+- 启用向量数据库时，Schema 向量的写入、搜索、精确匹配、差量同步、删除和重建必须强制携带规范化 `OsClient`，Qdrant payload/filter 形成同一租户分区；point id 由 `OsClient + TableId` 确定性生成，重试和多节点同步不能生成重复点。
+- HTTP 与 gRPC 使用不同版本/维度的 collection，禁止让 768 维和 384 维向量共用同名 collection。
+- 初始化状态按租户和 Qdrant/Embedding 配置分区，只有初始化返回成功才允许缓存完成状态；进程内状态只是优化，失败后必须可重试。
+- 重建只能删除当前租户的向量，不能删除共享 collection 或其它租户数据。
+- Skill 公共知识库不得包含客户名称、真实租户、客户域名、私有表/接口 Key 或定制业务枚举；项目知识进入对应租户私有域。
+- 向量命中是近似检索结果，不是授权、实时事实或执行凭据。写操作仍需 Token、权限、确认、审计和权威接口回读。
+- NL2SQL 的可信授权标记和最大返回行数只由服务端写入，并由两套 JSON 序列化器忽略客户端输入。表白名单仅取当前租户未删除、非平台受保护的业务表。老数据库中某角色从未保存过 AI 策略时，服务端只按其现有 FormEngine `List` 读取权限兼容放行无行级范围的业务表；一旦存在该角色的策略记录（包括显式禁用），就严格要求启用的全量数据策略与 `AllowRawSql`。两种路径都会与 FormEngine 权限取交集，并按授权版本与用户缓存；Schema 关键词或向量命中后仍按该精确非空白名单再次过滤。
+- 执行层使用严格词法门禁要求单条 `SELECT`，逐个验证每个 `FROM`/`JOIN` 来源表，拒绝注释、多语句、CTE、`UNION`、写操作、危险关键字/函数和变量赋值；按数据库施加 `MaxRows + 1` 行限制、最多返回 100 行并设置 30 秒命令超时。
+- 该门禁不是完整 SQL AST，模型生成的动态值当前也不会被重写为数据库参数。通用 NL2SQL 不执行菜单 `SqlWhere`/`SqlJoin`；普通角色遇到带行级范围的表必须失败关闭，本人、部门或关联记录范围查询改走经过审核、显式参数化并记录审计的业务 ApiEngine。不得把表级读取权限、模型输出或向量命中描述为行级数据授权。
+- OpenAI 代理流式接口会传递请求取消信号；普通 `ChatStream` 与 `NL2V8` 当前主要依赖内部超时，不能承诺客户端断开一定立即取消上游和计费。
+- 当前计量表和诊断日志可能保存完整问题、回答或问题摘要。必须把它们视为敏感业务数据并限制访问、配置留存；全面脱敏和可配置留存实现前，不得宣称 Prompt/Answer 已全部脱敏或不落日志。
+
+---
+
+## 七、兼容优先的网络安全默认值
+
+### CORS
+
+为兼容本地开发、独立前端、H5 和存量租户，主 SaaS 配置 `sys_osclients.CorsAllowOrigins` 与 `Cors:AllowOrigins` 都未配置时，默认允许任意来源跨域（等价于 `*` 的来源匹配，同时支持凭据）。只有配置来源后，才按精确来源或通配符收紧。
+
+可使用：
+
+- `MICROI_CORS_ALLOW_ORIGINS` / `Cors:AllowOrigins`
+- `MICROI_CORS_ALLOW_ANY_WHEN_UNCONFIGURED` / `Cors:AllowAnyWhenUnconfigured`
+- 主租户 `sys_osclients.CorsAllowOrigins`
+
+默认兼容开关为允许。跨域响应暴露 `authorization`、`osclient`、`did` 等会话续签所需 Header。CORS 不是鉴权边界，不能代替 Token、菜单、表权限和数据范围。
+
+### SSRF
+
+吾码存量 V8 大量访问内网设备、InfluxDB、内部 ApiEngine 和本机 sidecar，因此严格 SSRF 模式默认关闭。未显式开启时保持历史行为，不默认拒绝：
+
+- 非 HTTP(S) 协议
+- URL 内嵌凭据
+- 回环、私网、链路本地地址
+- 云元数据地址
+- HTTP 重定向
+
+只有显式设置 `SsrfProtection:Enabled=true` 或 `MICROI_SSRF_PROTECTION_ENABLED=true` 后才进入严格模式。严格模式仅允许 HTTP(S)，拒绝 URL 凭据、私网/特殊地址和重定向；使用 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 精确放行主机。历史 `DisableSsrfProtection=true` 和 `SsrfAllowedHosts` 继续兼容。
+
+---
+
+## 八、登录 RSA、HTTPS 与 Token 续签
+
+### 登录 RSA
+
+登录 RSA 的用途只是避免密码在请求体和普通代理调试界面中直接显示，不能替代 HTTPS，也不是密码存储或身份认证密钥。
+
+- 平台保留历史登录 RSA 密钥对作为默认 fallback，兼容已发布客户、旧前端和浏览器缓存；安全升级不得直接删除 fallback。
+- 部署专属密钥时，私钥通过 `MICROI_LOGIN_RSA_PRIVATE_KEY` 或受限密钥文件注入，公钥通过 `MICROI_LOGIN_RSA_PUBLIC_KEY` / `Security:LoginRsaPublicKey` 提供给登录前端。
+- 公钥和私钥必须成对切换；不匹配会导致所有用户无法登录。
+- 生产登录和管理端必须使用 HTTPS。
+
+### Token 和多标签页
+
+- 登录时传 `_ClientType`，请求携带稳定 `did`，Token 始终绑定当前 `OsClient`。
+- 客户端每次响应都应接收新的 `authorization` Header。
+- 同一终端续签使用 single-flight，避免详情页并发请求同时换新 Token。
+- 收到 `TokenReplaced` 时，先判断同一终端是否已保存新 Token；旧请求的错误响应不能清除新 Token。
+- `TenantMismatch` 必须停止请求，不能把 Token 复制到其它租户。
+- `JwtExpired`、`SessionExpired`、`SessionMissing`、`AuthVersionChanged` 仅清理受影响的租户/连接，不应让其它连接全局退出。
+- 管理员禁用用户时应先通过平台统一能力吊销该用户全部终端 Token，再修改用户状态并记录审计。
+
+---
+
+## 九、运行时资源保护
+
+`SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 用于限制高频异常请求、并发 V8、数据库连接打开、启动并发和资源压力。全局上限由环境变量、主租户运行配置和 `appsettings` 控制；子租户隔离值只能降低自己的额度，不能抬高整个进程上限。
+
+限流、并发控制和熔断需要按多节点语义设计。进程内计数只代表当前节点；平台级配额、授权版本、会话、票据和任务租约应使用共享 Redis、数据库或可靠消息系统。
+
+### Spider / 浏览器采集
+
+`V8.Spider` 与 `V8.Http` 使用同一套 SSRF 兼容开关：默认不拦截存量内网目标；开启严格模式后，初始页面、跳转和浏览器子资源都执行协议、URL 凭据、DNS/IP 与白名单检查。V8 脚本不能传 `ExecutablePath` 或 `UserDataDir`，浏览器配置目录由平台按 `OsClient + ApiEngineKey/EventName + SessionId/ProfileKey` 建立隔离。
+
+默认资源边界为：
+
+| 配置 | 默认值 | 环境变量 / 配置路径 |
+|---|---:|---|
+| 当前节点全部会话 | 32 | `MICROI_SPIDER_MAX_SESSIONS_TOTAL` / `Spider:MaxSessionsTotal` |
+| 每个租户与引擎作用域会话 | 4 | `MICROI_SPIDER_MAX_SESSIONS_PER_SCOPE` / `Spider:MaxSessionsPerScope` |
+| 空闲回收 | 30 分钟 | `MICROI_SPIDER_SESSION_IDLE_MINUTES` / `Spider:SessionIdleMinutes` |
+| 最长生命周期 | 8 小时 | `MICROI_SPIDER_SESSION_MAX_HOURS` / `Spider:SessionMaxHours` |
+| 单条抓包响应体 | 默认 200,000 字符，硬上限 1,000,000 | 调用参数 `CaptureResponseBodyMaxLength` 只能在硬上限内收紧 |
+| 每会话抓包条数 | 100 | 超出后移除最旧记录 |
+
+目前 Spider 的浏览器会话和上述会话数配额是**节点进程内状态**，不是跨节点共享会话。多 API 节点部署若要复用登录态，应对 Spider 流量使用按会话的粘性路由，或部署独立 Spider Worker；不要假设任意节点都能恢复另一个节点的浏览器进程。需要跨重启可靠恢复的采集任务，应把任务状态、幂等键和业务结果写入共享数据库/MQ，浏览器会话本身只作为可丢失执行资源。
+
+---
+
+## 十、安全升级与发布约束
+
+- Upgrade15 只清理普通角色的保护表直接授权，不删除正常业务菜单权限。
+- Upgrade16 只补充六个租户上传配置字段，空值保持升级前兼容行为。
+- 安全升级不得删除或清空私有子 Git 中的 `Microi.Server/Microi.net/License/keys/`。授权签名资产与登录 RSA 是两套不同用途的密钥，不能以“清理硬编码密钥”为由混删。
+- 不得删除登录 RSA 历史 fallback，除非已经完成所有客户前后端成对迁移并有明确发布方案。
+- 不得把未配置 CORS 改成默认拒绝，也不得把严格 SSRF 改成默认开启。
+- 新旧版本滚动共存时，数据库字段、缓存值、Token 和 API 合约遵守“先扩展、后迁移、再收缩”。
+- 文档、Skills、VS Code 插件内置 Skills 与实际运行版本必须同步校验；仅 Skill 数量相同不代表内容一致。
+
+---
+
+## 十一、最低安全验收
+
+1. 普通角色不能读写保护表，伪造菜单或可信标记无效。
+2. 真实菜单访问成功；历史无菜单 V8 能安全推断；无候选或范围歧义失败。
+3. TableChild 只能访问父记录范围内子数据，跨父记录失败。
+4. 单表行级写入受真实 SQL 约束，Join 型写入和导入失败关闭。
+5. 节点 A 修改权限后，节点 B 不重启即可使用新 `epoch`；Redis 故障时按设计回源或失败关闭。
+6. 上传大小、数量、帐号/租户日额度生效，多节点不能绕过；Redis 故障不会变成无限上传。
+7. 私有文件跨菜单、记录、字段访问失败；授权访问成功；匿名访问失败。
+8. CORS 未配置时本地与存量前端可访问，配置后只有指定来源可访问。
+9. SSRF 默认保持历史内网调用，严格模式按白名单拦截。
+10. 历史 RSA fallback 与部署专属匹配密钥对都能登录；不匹配密钥对明确失败。
+11. 多标签页并发续签不会反复退出登录，旧响应不会删除新 Token。
+12. Redis 临时/匿名管理和普通角色管理均被拒绝。

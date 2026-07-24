@@ -36,12 +36,19 @@ namespace Microi.net
 
             try
             {
+                var sourceInvokeType = string.Equals(
+                    param._InvokeType,
+                    InvokeType.Client.ToString(),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? InvokeType.Client.ToString()
+                    : InvokeType.Server.ToString();
                 #region 初始化数据
                 var diyTableResult = await _formEngine.GetFormDataAsync<DiyTable>("diy_table", new
                 {
                     _Where = new List<DiyWhere>() { new DiyWhere() { Name = "Name", Value = param.FormEngineKey, Type = "=" } },
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
+                    _InvokeType = InvokeType.Server.ToString(),
                 });
                 if (diyTableResult.Code != 1) return new DosResult<byte[]>(0, null, diyTableResult.Msg);
 
@@ -50,6 +57,7 @@ namespace Microi.net
                     _Where = new List<DiyWhere>() { new DiyWhere() { Name = "TableId", Value = diyTableResult.Data.Id, Type = "=" } },
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
+                    _InvokeType = InvokeType.Server.ToString(),
                 });
                 if (allFieldListResult.Code != 1) return new DosResult<byte[]>(0, null, allFieldListResult.Msg);
 
@@ -57,8 +65,11 @@ namespace Microi.net
                 var formDataResult = await _formEngine.GetFormDataAsync(param.FormEngineKey, new
                 {
                     Id = param.FormDataId,
+                    _SysMenuId = param._SysMenuId,
+                    ModuleEngineKey = param.ModuleEngineKey,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
+                    _InvokeType = sourceInvokeType,
                 });
                 if (formDataResult.Code != 1) return new DosResult<byte[]>(0, null, formDataResult.Msg);
 
@@ -78,6 +89,7 @@ namespace Microi.net
                         },
                         OsClient = param.OsClient,
                         _CurrentUser = param._CurrentUser,
+                        _InvokeType = InvokeType.Server.ToString(),
                     });
                     if (tplResult.Code != 1) return new DosResult<byte[]>(0, null, "获取模板信息失败：" + tplResult.Msg);
 
@@ -146,6 +158,12 @@ namespace Microi.net
         {
             try
             {
+                var sourceInvokeType = string.Equals(
+                    param._InvokeType,
+                    InvokeType.Client.ToString(),
+                    StringComparison.OrdinalIgnoreCase)
+                    ? InvokeType.Client.ToString()
+                    : InvokeType.Server.ToString();
                 var fieldConfig = JsonHelper.Deserialize<DiyFieldConfig>(tableChildField.Config);
 
                 var tableChildResult = await _formEngine.GetFormDataAsync<DiyTable>("diy_table", new
@@ -153,6 +171,7 @@ namespace Microi.net
                     Id = fieldConfig.TableChildTableId,
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
+                    _InvokeType = InvokeType.Server.ToString(),
                 });
                 if (tableChildResult.Code != 1) return;
 
@@ -168,6 +187,7 @@ namespace Microi.net
                     },
                     OsClient = param.OsClient,
                     _CurrentUser = param._CurrentUser,
+                    _InvokeType = sourceInvokeType,
                 });
                 if (childDataResult.Code != 1) return;
 

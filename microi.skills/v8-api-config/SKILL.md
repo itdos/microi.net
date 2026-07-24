@@ -79,11 +79,11 @@ return { Code: 1 };
 
 ## 3. 分布式锁（LockKey）
 
-集群部署时同一时刻全平台只允许一个实例执行（如：每月对账、自动补单）：
+集群部署时可用接口引擎 `LockKey` 减少同一任务的并发执行（如：每月对账、自动补单）：
 
 ```javascript
 // 配置：LockKey = month_settlement，LockTimeout = 600
-// 该接口同一时刻全集群只会有一个实例运行
+// 平台使用共享锁协调多节点；锁超时、节点暂停和网络分区仍可能触发重试
 var month = DateNow('yyyy-MM');
 V8.Db.FromSql('INSERT INTO MonthSettle SELECT ... WHERE Month = @p0')
   .AddInParameter("@p0", month)
@@ -92,6 +92,8 @@ return { Code: 1 };
 ```
 
 `LockKey` 可包含 `${V8.OsClient}` 实现按租户独立锁。
+
+分布式锁不是“业务只执行一次”的最终保证。扣款、库存、积分、流水、对账等副作用还必须使用稳定幂等键、数据库唯一约束/条件更新、状态机或 outbox/inbox；锁 Key 至少包含 `OsClient + 业务唯一标识`，超时必须大于正常执行时间。
 
 ## 4. 自定义路径（ApiAddress）
 
@@ -163,31 +165,36 @@ Headers: Content-Type=application/json, OsClient={OsClient}, apiengine=1
 - Header `OsClient` 只能作为补充，URL 路径里的 `--OsClient--{OsClient}--` 更稳。避免用 `?OsClient=` 做 ApiEngine 复测；部分动态路由会把 querystring 参与 `ApiAddress` 匹配并误报引擎不存在。
 - 更新接口代码时保留 HTTP 元数据，避免只覆盖 JS 代码却把匿名、启用、自定义地址等配置冲掉。
 
-## 异步执行（接口内）
+## 请求内异步与可靠后台任务
 
-接口默认同步返回。需要异步执行（如：耗时同步、批量操作不阻塞响应）：
+接口默认同步返回。对本次请求必须完成的异步 I/O，调用真实的 `*Async` 方法并 `await`：
 
 ```javascript
-// 立即响应，后台执行
-setTimeout(function() {
-  // 此处可用 V8.FormEngine、V8.Db 等
-  V8.FormEngine.UptFormData('table', { Id: 'xxx', SyncStatus: 'done' });
-}, 100);
-
-return { Code: 1, Msg: '已接收，后台处理中' };
+var resp = await V8.Http.GetResponseAsync({
+  Url: 'https://example.com/health',
+  Timeout: 5
+});
+if (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+  return { Code: 0, Msg: '上游调用失败' };
+}
+return { Code: 1, Data: resp.Content };
 ```
 
-> 长时间任务（>30秒）应改为 MQ 消费者模式，见 `v8-mq-mqtt/SKILL.md`
+禁止用 `setTimeout` 或 `System.Threading.Tasks.Task.Run` 实现“接口先返回、后台继续执行”：`V8Engine.Run` 返回后会释放 Jint Engine、租户上下文、事务和并发租约，回调不可靠，也没有持久化、重试、幂等或重启恢复保证。
+
+需要先响应再处理时，使用接口引擎后台任务按钮（`RunBackground + ApiEngineKey`）、Job、MQ 或 outbox；消费者按全局 `EventId` 幂等处理并持久化进度。见 `v8-menu-buttons`、`v8-mq-mqtt` 和 `microi-system-delivery`。
 
 ## 接口安全检查清单
 
 - [ ] 公开接口是否仅开启 `IsAnonymous`，敏感接口是否关闭？
 - [ ] 内部接口是否开启 `StopHttp`？
 - [ ] 写操作（扣款、对账、补单）是否配置 `LockKey`？
+- [ ] 锁之外是否还有幂等键、唯一约束/条件更新或状态机？
 - [ ] 频率敏感接口是否配置 `RateLimit`？
 - [ ] 审计需求接口是否开启 `LogParam`？
 - [ ] 文件响应接口是否开启 `IsResponseFile`？
 - [ ] 接口代码内是否仍校验 `V8.CurrentUser`（`IsAnonymous=true` 时尤其重要）？
+- [ ] 是否没有使用 `setTimeout` / `Task.Run` 承担请求外后台任务？
 - [ ] 保存后是否通过 `/apiengine/{key}--OsClient--{osClient}--` 做过 HTTP 复测？
 
 ## 常见错误

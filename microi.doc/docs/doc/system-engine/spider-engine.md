@@ -13,6 +13,20 @@
 
 跨平台桌面场景优先使用 OpenClaw，因为它可以封装 Electron / Express / Playwright / Chrome，并支持 Windows 与 macOS 打包。
 
+## 服务端 V8.Spider 安全边界
+
+`V8.Spider` 与 `V8.Http` 使用同一套 SSRF 兼容配置：严格模式默认关闭以兼容存量内网采集；显式开启后，初始 URL、重定向和浏览器子资源都执行协议、URL 凭据、DNS/IP 与允许主机校验。
+
+V8 脚本不能传 `ExecutablePath` 或 `UserDataDir`。平台按 `OsClient + ApiEngineKey/EventName + SessionId/ProfileKey` 隔离浏览器目录与会话。默认资源边界：
+
+- 当前节点最多 32 个会话：`MICROI_SPIDER_MAX_SESSIONS_TOTAL` / `Spider:MaxSessionsTotal`；
+- 每个租户与引擎作用域最多 4 个：`MICROI_SPIDER_MAX_SESSIONS_PER_SCOPE` / `Spider:MaxSessionsPerScope`；
+- 空闲 30 分钟回收：`MICROI_SPIDER_SESSION_IDLE_MINUTES` / `Spider:SessionIdleMinutes`；
+- 最长 8 小时：`MICROI_SPIDER_SESSION_MAX_HOURS` / `Spider:SessionMaxHours`；
+- 抓包响应体默认 200,000 字符、硬上限 1,000,000，每会话最多 100 条。
+
+浏览器会话和会话数配额目前是节点进程内状态。多节点复用登录态需粘性路由或独立 Spider Worker；可靠任务状态、幂等键和结果必须写共享数据库/MQ，不能把浏览器进程当可恢复事实源。
+
 ## 标准表
 
 采集引擎标准表使用 `mci_spider_` 前缀：
@@ -30,7 +44,7 @@
 | `mci_spider_result` | 通用采集结果。具体业务表由规则 V8 保存。 |
 | `mci_spider_export` | 导出产物，保存 TXT、Word、ZIP、Excel 等私有附件路径和导出统计。 |
 
-通用表不要写死“学校、题目、答案、课程”等业务含义。题库只是业务场景之一，应由业务表和规则 V8 表达。
+通用表不要写死任何特定行业的主对象、分类或内容结构；具体业务含义应由业务表和规则 V8 表达。
 
 ## 采集规则
 
@@ -39,7 +53,7 @@
 - `RecipeJson`：采集步骤、页面入口、接口捕获、DOM 选择器、人工步骤。
 - `CredentialSchemaJson`：需要哪些账号字段，例如账号、密码、姓名、机构码。
 - `RetryPolicyJson`：验证码、密码、页面加载、接口捕获的重试策略。
-- `ExpectedPlanJson`：应采集的账号、分类、课程、接口或页数，用于统计进度。
+- `ExpectedPlanJson`：应采集的账号、分类、模块、接口、页面或内容条目，用于统计进度。
 - `SaveApiEngineKey`：保存业务数据的 V8 接口引擎。
 - `ExportApiEngineKey`：导出交付文件的 V8 接口引擎。
 - `ExportConfigJson`：支持的导出格式、命名规则、是否按分类拆分、是否上传私有附件。
@@ -48,19 +62,19 @@
 
 ## 批量站点交付
 
-当一个项目包含多所学校、多个网站或多种内容来源时，采集引擎应按“一个站点/入口一套可复跑规则”的方式交付，而不是由 AI 临时采集一次。
+当一个项目包含多个业务主体、多个网站或多种内容来源时，采集引擎应按“一个站点/入口一套可复跑规则”的方式交付，而不是由 AI 临时采集一次。
 
 批量交付流程：
 
-1. 从 Excel、Markdown、TXT、截图或客户资料中提取全量站点、账号、密码、姓名、入口地址、分类、课程和交付格式。
+1. 从 Excel、Markdown、TXT、截图或客户资料中提取全量站点、账号、密码、身份信息、入口地址、分类、模块和交付格式。
 2. 为每个站点创建或更新 `mci_spider_site`、`mci_spider_rule`、`mci_spider_account`。
-3. 在 `ExpectedPlanJson` 中保存应采集账号、分类、课程、接口或页面范围。
+3. 在 `ExpectedPlanJson` 中保存应采集账号、分类、模块、接口、页面或内容条目范围。
 4. OpenClaw Worker 按规则执行，所有进度写入 `mci_spider_task`，所有步骤写入 `mci_spider_task_step`。
 5. 页面截图、验证码截图、接口响应、HTML、日志、导出文件和 ZIP 包写入 `mci_spider_artifact` 或 `mci_spider_export`。
 6. 规则保存引擎把采集结果写入业务表；规则导出引擎按业务需要生成 TXT、Word、ZIP、Excel 或其他格式，并上传为私有附件。
 7. 交付报告按站点列出应采集、成功、失败、剩余、导出附件和失败原因。
 
-推荐为项目配置一个交付报告接口引擎，例如 `schoolpaper-spider-delivery-report`。报告接口不负责采集内容，而是读取 `mci_spider_site`、`mci_spider_rule`、`mci_spider_account`、`mci_spider_task`、业务结果表和 `mci_spider_export`，按规则输出：
+推荐为项目配置一个交付报告接口引擎，例如 `<project>-spider-delivery-report`。报告接口不负责采集内容，而是读取 `mci_spider_site`、`mci_spider_rule`、`mci_spider_account`、`mci_spider_task`、业务结果表和 `mci_spider_export`，按规则输出：
 
 - 规则是否可复跑。
 - 账号是否完整。
@@ -73,11 +87,11 @@
 
 ## 业务表与导出附件
 
-采集引擎的通用表只记录规则和运行态；客户查看的数据应写入业务表。以题库场景为例：
+采集引擎的通用表只记录规则和运行态；客户查看的数据应写入业务表。例如：
 
-- 课程表应通过 `TableChild` 关联题库表，用户在课程详情里可以直接查看题目和答案。
-- 课程表保存该课程的 TXT、Word 私有附件路径。
-- 学校或项目表保存整校 TXT 包、Word 包或 ZIP 私有附件路径。
+- 业务主表可通过 `TableChild` 关联内容明细表，用户在主记录详情里直接查看采集结果。
+- 分类或模块表可保存对应范围的 TXT、Word、Excel 等私有附件路径。
+- 项目或来源表可保存全量 TXT 包、Word 包、ZIP 或其他交付附件路径。
 - 导出产物表 `mci_spider_export` 使用中性字段保存导出标题、导出格式、私有附件、业务表、业务记录、导出数量、成功数量、失败数量。
 - 后台用户应能在业务表和导出产物中重复下载附件。
 

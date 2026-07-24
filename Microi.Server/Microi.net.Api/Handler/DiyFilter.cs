@@ -284,10 +284,20 @@ namespace Microi.net.Api
                 OsClient = osClient
             });
 
-            var json = new DosResult(0, null, "未处理的异常：" + context.Exception?.Message, null, new
+            var isDevelopment = string.Equals(
+                Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
+                "Development",
+                StringComparison.OrdinalIgnoreCase);
+            var json = new DosResult(0, null,
+                isDevelopment
+                    ? "未处理的异常：" + context.Exception?.Message
+                    : "服务器内部错误，请稍后重试。",
+                null,
+                new
             {
-                StackTrace = context.Exception?.StackTrace,
-                InnerException = context.Exception?.InnerException?.Message,
+                TraceId = context.HttpContext.TraceIdentifier,
+                StackTrace = isDevelopment ? context.Exception?.StackTrace : null,
+                InnerException = isDevelopment ? context.Exception?.InnerException?.Message : null,
                 OsClient = osClient
             });
             context.Result = new JsonResult(json);

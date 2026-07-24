@@ -115,6 +115,8 @@ export default {
             formEngineKey: "",
             formDataId: "",
             fieldId: "",
+            sysMenuId: "",
+            tableChildAuth: null,
             canEdit: false,
             requestedCanEdit: false,
             isAuthenticated: false,
@@ -185,6 +187,18 @@ export default {
         parseBoolean(value) {
             return value === true || value === 1 || value === "1" || value === "true" || value === "True";
         },
+        parseTableChildAuth(value) {
+            if (!value) return null;
+            if (typeof value === "object" && !Array.isArray(value)) return value;
+            try {
+                const parsed = JSON.parse(this.safeDecode(value));
+                return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+                    ? parsed
+                    : null;
+            } catch (error) {
+                return null;
+            }
+        },
         readOfficeSessionPayload() {
             const key = this.safeDecode(this.$route.query.officeSessionKey || "");
             if (!key) return null;
@@ -217,6 +231,11 @@ export default {
             this.formEngineKey = this.safeDecode(query.formEngineKey || query.FormEngineKey || payload.formEngineKey || payload.FormEngineKey || "");
             this.formDataId = this.safeDecode(query.formDataId || query.FormDataId || payload.formDataId || payload.FormDataId || "");
             this.fieldId = this.safeDecode(query.fieldId || query.FieldId || payload.fieldId || payload.FieldId || "");
+            this.sysMenuId = this.safeDecode(query.sysMenuId || query.SysMenuId || query.menuId || query.MenuId || payload.sysMenuId || payload.SysMenuId || payload.menuId || payload.MenuId || "");
+            this.tableChildAuth = this.parseTableChildAuth(
+                payload.tableChildAuth || payload.TableChildAuth || payload._TableChildAuth ||
+                query.TableChildAuth || query._TableChildAuth
+            );
             this.requestedCanEdit = this.parseBoolean(query.canEdit || query.allowEdit || query.edit || query.CanEdit || payload.canEdit || payload.AllowEdit);
             this.canEdit = false;
             this.enableVersion = this.parseBoolean(query.enableOfficeVersion || query.EnableOfficeVersion || payload.enableOfficeVersion || payload.EnableOfficeVersion);
@@ -452,6 +471,8 @@ export default {
                     FormEngineKey: this.formEngineKey,
                     FormDataId: this.formDataId,
                     FieldId: this.fieldId,
+                    SysMenuId: this.sysMenuId,
+                    _TableChildAuth: this.tableChildAuth || undefined,
                     FilePathName: this.sourceFilePath,
                     HDFS: this.hdfs || (this.SysConfig && this.SysConfig.HDFS) || "Aliyun"
                 });
@@ -607,6 +628,8 @@ export default {
                 FormEngineKey: this.formEngineKey,
                 FormDataId: this.formDataId,
                 FieldId: this.fieldId,
+                SysMenuId: this.sysMenuId,
+                _TableChildAuth: this.tableChildAuth || undefined,
                 Limit: true,
                 ForOfficePreview: true,
                 OsClient: this.OsClient || this.DiyCommon?.GetOsClient?.() || ""
@@ -735,6 +758,8 @@ export default {
                     FormEngineKey: this.formEngineKey,
                     FormDataId: this.formDataId,
                     FieldId: this.fieldId,
+                    SysMenuId: this.sysMenuId,
+                    _TableChildAuth: this.tableChildAuth || undefined,
                     EnableVersion: this.enableVersion,
                     CurrentFileMeta: this.officeFileMeta
                 });
@@ -818,6 +843,8 @@ export default {
                 formEngineKey: this.formEngineKey,
                 formDataId: this.formDataId,
                 fieldId: this.fieldId,
+                sysMenuId: this.sysMenuId,
+                tableChildAuth: this.tableChildAuth,
                 canEdit: this.canEdit,
                 enableOfficeVersion: this.enableVersion,
                 fileMeta: this.officeFileMeta
@@ -838,6 +865,10 @@ export default {
                 filePathName: this.sourceFilePath || undefined,
                 fileType: this.fileType || undefined,
                 hdfs: this.hdfs || undefined,
+                formEngineKey: this.formEngineKey || undefined,
+                formDataId: this.formDataId || undefined,
+                fieldId: this.fieldId || undefined,
+                sysMenuId: this.sysMenuId || undefined,
                 isPrivate: this.isPrivate ? "1" : "0",
                 canEdit: this.canEdit ? "1" : "0",
                 enableOfficeVersion: this.enableVersion ? "1" : "0",

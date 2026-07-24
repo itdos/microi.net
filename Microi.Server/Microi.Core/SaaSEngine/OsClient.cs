@@ -320,7 +320,9 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static OsClientSecret AddOrUptClient(OsClientSecret client)
+        public static OsClientSecret AddOrUptClient(
+            OsClientSecret client,
+            bool publishConfiguration = true)
         {
             try
             {
@@ -332,6 +334,11 @@ namespace Microi.net
 
                 // 第一步：更新本地ClientList
                 ClientList.AddOrUpdate(client.OsClient, client, (key, oldValue) => client);
+                if (!publishConfiguration)
+                {
+                    return client;
+                }
+
                 Console.WriteLine("Microi：【成功】更新OsClient：" + client.OsClient);
 
                 // 第二步：提取可序列化配置并缓存到L2（Redis）
@@ -376,7 +383,9 @@ namespace Microi.net
             if (clientModel.DataBases == null || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
             {
                 InitOsClientDataBases(clientModel.Db, clientModel);
-                AddOrUptClient(clientModel);
+                // 这里只初始化当前进程的数据库会话，没有修改 SaaS 配置，
+                // 禁止向 Redis 再发布一次配置变更。
+                AddOrUptClient(clientModel, publishConfiguration: false);
             }
             if (clientModel.DataBases == null || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
             {
@@ -399,7 +408,7 @@ namespace Microi.net
                 }
                 var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbReadType);
                 dataBaseModel.DbRead = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbReadConn, dbReadType);
-                AddOrUptClient(clientModel);
+                AddOrUptClient(clientModel, publishConfiguration: false);
             }
             return dataBaseModel;
         }
@@ -427,11 +436,13 @@ namespace Microi.net
                 {
                     secret.DataBases = new List<OsClientDataBase>();
                 }
+                secret.DataBasesInitialized = true;
                 return secret;
             }
             catch (Exception ex)
             {
                 secret.DataBases = new List<OsClientDataBase>();
+                secret.DataBasesInitialized = false;
                 return null;
             }
         }
@@ -449,7 +460,7 @@ namespace Microi.net
                 if (clientModel.DataBases == null || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
                 {
                     InitOsClientDataBases(clientModel.Db, clientModel);
-                    AddOrUptClient(clientModel);
+                    AddOrUptClient(clientModel, publishConfiguration: false);
                 }
                 if (clientModel.DataBases == null || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
                 {
@@ -467,7 +478,7 @@ namespace Microi.net
                         dataBaseModel.DbReadConn = dataBaseModel.DbConn;
                     }
                     dataBaseModel.DbRead = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbReadConn, dbType);
-                    AddOrUptClient(clientModel);
+                    AddOrUptClient(clientModel, publishConfiguration: false);
                 }
                 return dataBaseModel.Db;
             }

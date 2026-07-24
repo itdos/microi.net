@@ -7,6 +7,7 @@ import axios from 'axios'
 import { usePageEngineStore } from '../stores/pageEngine'
 import { ElMessage } from 'element-plus'
 import { DiyCommon } from "@/utils/diy.common.js";
+import { reportApiServiceFailure, reportApiServiceRecovered } from "@/utils/api-service-status.js";
 // 创建 axios 实例
 const axiosInstance = axios.create({
   baseURL: '',
@@ -36,9 +37,19 @@ axiosInstance.interceptors.request.use(
 // 响应拦截器
 axiosInstance.interceptors.response.use(
   (response) => {
+    reportApiServiceRecovered({
+      apiBase: DiyCommon.GetApiBase(),
+      url: response.config?.url
+    })
     return response
   },
   (error) => {
+    reportApiServiceFailure(error, {
+      apiBase: DiyCommon.GetApiBase(),
+      osClient: DiyCommon.GetOsClient(),
+      url: error.config?.url,
+      method: error.config?.method
+    })
     if (error.response) {
       const { status } = error.response
       if (status === 401) {

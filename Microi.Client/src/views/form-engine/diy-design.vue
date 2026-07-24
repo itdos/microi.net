@@ -115,6 +115,7 @@
                 </el-tabs> -->
                 <DiyForm
                     v-if="TableId"
+                    :key="'diy-design-form-' + TableId + '-' + PageType"
                     ref="fieldForm"
                     :LoadMode="'Design'"
                     :RawMetadata="true"
@@ -278,6 +279,11 @@ export default {
         // }
     },
     watch: {
+        "$route.fullPath"() {
+            if (this.SyncDesignRouteContext()) {
+                this.LoadDesignRouteData();
+            }
+        },
         // 监听共享V8设计器的currentV8Model变化，同步回原始对象
         currentV8Model(newValue) {
             if (this.currentV8ModelPath) {
@@ -294,6 +300,7 @@ export default {
             // 共享V8设计器的当前编辑对象
             currentV8Model: '',
             currentV8ModelPath: '',
+            _designRouteKey: "",
             PageType: "", //可以是Report
             DiyFieldListClone: [],
             DiyFieldList: [],
@@ -427,8 +434,7 @@ export default {
     },
     mounted() {
         var self = this;
-        self.PageType = self.$route.query.PageType;
-        self.TableId = self.$route.params.Id;
+        self.SyncDesignRouteContext();
         // self.GetDiyTableModel();
         // self.GetDiyField();
         
@@ -459,11 +465,7 @@ export default {
         self.GetSysMenu();
         self.GetSysDataSourceList();
         self.GetApiEngineList();
-        // 2026-03-25 修复：报表引擎的表是虚拟的，调用异常字段和回收站接口会报错
-        if (self.PageType != 'Report') {
-            self.GetExceptionFieldList();
-            self.GetDeletedDiyField();
-        }
+        self.LoadDesignRouteData();
         // self.$nextTick(function () {
         //     // self.LoadDragula();
         //     // setTimeout(() => {
@@ -471,7 +473,58 @@ export default {
         //     // }, 500);
         // });
     },
+    activated() {
+        var self = this;
+        var routeChanged = self.SyncDesignRouteContext();
+        if (routeChanged) {
+            self.LoadDesignRouteData();
+            return;
+        }
+        // keep-alive may restore a designer shell whose conditional DiyForm was
+        // never mounted during the first dynamic-route transition. Force only the
+        // missing child to mount; an existing initialized form is left untouched.
+        if (self.TableId && !self.$refs.fieldForm) {
+            var tableId = self.TableId;
+            self.TableId = "";
+            self.$nextTick(function () {
+                self.TableId = tableId;
+            });
+        }
+    },
     methods: {
+        SyncDesignRouteContext() {
+            var self = this;
+            var tableId = String(self.$route?.params?.Id || "");
+            var pageType = String(self.$route?.query?.PageType || "");
+            if (!tableId) {
+                return false;
+            }
+            var routeKey = tableId + "|" + pageType;
+            if (self._designRouteKey === routeKey) {
+                return false;
+            }
+
+            self._designRouteKey = routeKey;
+            self.PageType = pageType;
+            self.TableId = tableId;
+            self.TableRowId = "";
+            self.DiyFieldList = [];
+            self.DiyFieldListClone = [];
+            self.CurrentDiyFieldModel = null;
+            self.CurrentDiyTableModel = {};
+            self.FormDiyTableModel = {};
+            return true;
+        },
+        LoadDesignRouteData() {
+            var self = this;
+            self.ExceptionFieldList = [];
+            self.DeletedDiyField = [];
+            // 报表引擎的表是虚拟的，调用异常字段和回收站接口会报错。
+            if (self.PageType != "Report" && self.TableId) {
+                self.GetExceptionFieldList();
+                self.GetDeletedDiyField();
+            }
+        },
         CallbackForm_Field(){
             this.RefreshDiyFieldTabDataSource();
         },

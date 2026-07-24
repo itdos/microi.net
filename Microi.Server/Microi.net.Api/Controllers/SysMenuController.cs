@@ -53,6 +53,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> AddSysMenu(SysMenuParam param)
         {
             await DefaultParam(param);
@@ -66,6 +67,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> DelSysMenu(SysMenuParam param)
         {
             await DefaultParam(param);
@@ -79,6 +81,7 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UptSysMenu(SysMenuParam param)
         {
             await DefaultParam(param);
@@ -138,6 +141,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [PlatformAdminOnly]
         public async Task<JsonResult> UpdateSysRoleLimitByMenuId(SysRoleLimitParam paramLog)
         {
             var param = paramLog;

@@ -15,7 +15,7 @@
 >* 所有的`Saas引擎配置`以`主库`为准， 租户库的`Saas引擎配置`表清空数据即可
 
 ## `OsClient`
->* OsClient值即为`SaaS引擎Key`，确定哪一个租户，值自定义，建议全小写字母，如填写`microi`、`anderson`、`iTdos`
+>* OsClient 值即为 `SaaS引擎Key`，用于确定租户，值可自定义，建议使用全小写字母，例如 `tenant_a`、`tenant_demo`、`demo01`。
 
 ## `OsClientType`
 >* OsClientType值为`SaaS引擎环境类型`，值自定义，如`正式环境`、`测试环境`、`外帐环境`等
@@ -34,6 +34,39 @@
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internal"，`DbConn=`"Data Source=192.168.1.11;Database=microi_dev"时，代表使用了`内网IP`+`测试环境数据库`
 >* 当`OsClient`="microi"，`OsClientType`="Dev"，`OsClientNetwork`="Internet"，`DbConn`="Data Source=59.110.139.95;Database=microi_dev"时，代表使用了`公网IP`+`测试环境数据库`
 
+## 安全、脱敏与平台级配置
+
+`sys_osclients` 包含数据库、认证、Redis、对象存储、MQ/MQTT、搜索等基础设施机密，不能通过普通 FormEngine、前端 V8 或接口返回整行数据。
+
+- `V8.OsClientModel` / `V8.ClientModel` 是当前租户的独立脱敏副本，不包含数据库连接、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索凭据。
+- `V8.SysConfig` 同样是脱敏副本，不包含 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 和疑似 Password/Secret/Token/Key/Connection 字段。
+- 租户自行扩展的微信、支付、ERP 等业务密钥仍可能存在，V8 只能在服务端使用，禁止把整个配置对象或具体密钥返回前端。
+- 普通帐号即使拥有 Token 或错误配置了菜单/高级表权限，也不能通过通用 FormEngine 访问 SaaS 配置、接口引擎、菜单角色、任务、数据源等平台保护表。相关控制面管理接口要求 `Level >= 9999`。
+- 主租户由运行环境中的 `OsClient` 或 `AppSettings:OsClient` 决定，不应在业务代码中写死为 `master`、`iTdos` 或其它固定值。
+
+影响整个 API 进程的端口、HTTP 解析、并发和数据库连接等配置，以环境变量、主租户运行配置和 `appsettings` 为准，子租户不能抬高这些进程级上限。文件上传的租户业务值是例外：按当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值解析，租户可以提高或降低业务默认值，但最终仍受独立 `Absolute*`、HTTP 解析和反向代理边界保护。配置保存后应走 SaaS 引擎的共享缓存刷新流程并回读验证，不依赖逐节点重启。
+
+### CORS 兼容规则
+
+主租户 `sys_osclients.CorsAllowOrigins` 与 `Cors:AllowOrigins` 都为空时，平台默认允许任意来源跨域，兼容本地开发、独立前端、H5 和存量租户；只有配置来源后才按精确来源或 `https://*.example.com` 这类通配符收紧。可用 `MICROI_CORS_ALLOW_ANY_WHEN_UNCONFIGURED` / `Cors:AllowAnyWhenUnconfigured` 显式调整兼容开关，默认值为允许。
+
+CORS 不是鉴权边界。即使默认允许跨域，服务端仍会校验 Token、`OsClient`、菜单/表权限、数据范围和保护表基线。平台会暴露 `authorization`、`osclient`、`did` 等续签所需响应 Header。
+
+### 租户文件上传配置
+
+Upgrade16 会在 `sys_osclients` 增加以下可空字段：
+
+| 字段 | 说明 |
+|---|---|
+| `FileUploadEnabled` | 是否允许当前租户交互式上传；空值按启用 |
+| `FileUploadMaxFileMB` | 单文件上限 MB |
+| `FileUploadMaxRequestMB` | 单次全部文件上限 MB |
+| `FileUploadMaxCount` | 单次文件数 |
+| `FileUploadDailyUserQuotaMB` | 单帐号 UTC 日额度 MB |
+| `FileUploadDailyTenantQuotaMB` | 单租户 UTC 日额度 MB |
+
+这些字段优先于环境变量和 `appsettings` 的业务默认值，可以按租户提高或降低；独立 `Absolute*` 灾难保护、`ForceDisabled` 以及 HTTP/Multipart/Form 解析上限不接受租户覆盖。帐号与租户日额度由共享 Redis 原子统计，Redis 不可用时上传失败关闭。完整说明见 [分布式存储与文件安全](../more/hdfs)。
+
 ## 基础配置
 >* 支持数据库读写分离，支持指定存储介质
 
@@ -50,23 +83,23 @@
 >* 比如说博主的反向代理配置文件
 ::: details 展开查看 Shell 命令（88 行）
 ```shell
-proxy_cache_path /www/wwwroot/static.chongstech.com/proxy_cache_dir levels=1:2 keys_zone=static_chongstech_com_cache:20m inactive=1d max_size=5g;
+proxy_cache_path /www/wwwroot/static.example.com/proxy_cache_dir levels=1:2 keys_zone=static_example_com_cache:20m inactive=1d max_size=5g;
 server {
     listen 80;
     listen 443 quic;
     listen 443 ssl;
     http2 on;
-    server_name static.chongstech.com;
+    server_name static.example.com;
     index index.php index.html index.htm default.php default.htm default.html;
-    root /www/wwwroot/static.chongstech.com;
+    root /www/wwwroot/static.example.com;
     #CERT-APPLY-CHECK--START
     # 用于SSL证书申请时的文件验证相关配置 -- 请勿删除
-    include /www/server/panel/vhost/nginx/well-known/static.chongstech.com.conf;
+    include /www/server/panel/vhost/nginx/well-known/static.example.com.conf;
     #CERT-APPLY-CHECK--END
     #SSL-START SSL相关配置，请勿删除或修改下一行带注释的404规则
     #error_page 404/404.html;
-    ssl_certificate    /www/server/panel/vhost/cert/static.chongstech.com/fullchain.pem;
-    ssl_certificate_key    /www/server/panel/vhost/cert/static.chongstech.com/privkey.pem;
+    ssl_certificate    /www/server/panel/vhost/cert/static.example.com/fullchain.pem;
+    ssl_certificate_key    /www/server/panel/vhost/cert/static.example.com/privkey.pem;
     ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
     ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+AES128:RSA+AES128:EECDH+AES256:RSA+AES256:EECDH+3DES:RSA+3DES:!MD5;
     ssl_prefer_server_ciphers on;
@@ -134,8 +167,8 @@ server {
         return 403;
     }
     #LOG START
-    access_log  /www/wwwlogs/static.chongstech.com.log;
-    error_log  /www/wwwlogs/static.chongstech.com.error.log;
+    access_log  /www/wwwlogs/static.example.com.log;
+    error_log  /www/wwwlogs/static.example.com.error.log;
     #LOG END
 }
 ```
@@ -149,13 +182,25 @@ server {
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
 
+### SaaS 运行缓存刷新与扩展库加载
+
+`sys_osclients` 配置只应在平台启动、管理员保存 SaaS 配置或显式调用租户刷新能力时同步到进程内存与共享 Redis。普通表单查询、V8 执行、字段设计器保存不代表 SaaS 配置发生变化，不应持续输出“更新 OsClient / 缓存 OsClient 配置到 Redis”。
+
+- `microi_database` 的扩展库列表使用三态处理：尚未加载、已加载且为空、已加载且有数据。空列表是有效结果，不会在每次 V8 执行时重复查询或发布租户配置。
+- 创建数据库会话、初始化 `V8.Dbs` 等运行态动作只更新当前节点的可丢失本地对象，不向 Redis 发布配置变更；真正的配置更新才发布共享缓存通知。
+- 多节点收到共享缓存失效通知后只清理本节点缓存并按需回源，不能把收到的通知再次发布。配置更新仍须在数据库事务完成后发布，并按 `OsClient` 精确失效。
+- 表单设计器批量保存字段会在外层完成一次平台管理员授权，在同一事务内更新字段元数据，结束后只清理一次字段/授权缓存。字段数量较多但没有物理列改名或改类型时，不应出现按字段数重复的 SaaS 刷新日志。
+
+若终端连续出现成百上千条上述日志，先检查是否把“已加载但无扩展库”误判为未加载，或是否在循环内逐条调用完整 FormEngine 更新管线；不要通过关闭 Redis Pub/Sub 掩盖问题。
+
 ### Redis 管理器
 
 平台内置 Redis 管理页面：`#/mci-redis-manager`。页面采用连接/数据库树、Key 空间树、SCAN 列表和内容编辑器三栏布局，可查看服务器与内存统计，并维护 String、Hash、List、Set、Sorted Set；Stream 支持分页只读。Hash、集合等内容统一使用吾码代码编辑器展示和格式化 JSON。
 
-- 已登录平台管理员默认可连接当前租户 Redis，也可新增额外连接。额外连接保存于主租户的 `mci_redis_connection` 表，并通过 `TenantOsClient` 隔离；密码由后端加密保存且不会返回前端。
-- 未登录也可直接打开此路由，但不会看到当前租户或已保存服务器，只能输入 Host、端口、用户名、密码和数据库建立当前页面内存中的临时连接。刷新页面后临时凭据立即清空，适合登录系统不可用时检查或删除缓存。
-- Key 查询使用非阻塞 `SCAN` 游标分页，支持按模式搜索、类型/TTL/内存查看、单个与批量删除、重命名、TTL 设置和 JSON 内容覆盖。匿名模式同样只开放这些白名单操作，不支持任意命令、Lua、`FLUSHALL` 或 `FLUSHDB`。
+- Redis 管理属于平台控制面，只允许 `Level >= 9999` 的平台超级管理员。未登录或普通角色即使知道路由也不能读取统计、扫描 Key 或执行写操作。
+- 支持当前租户连接和后端已经保存的连接。额外连接保存于主租户 `mci_redis_connection`，按 `TenantOsClient` 隔离；密码由后端保护且不会返回前端。
+- `temporary` 临时连接以及匿名输入任意 Host、用户名、密码直接管理 Redis 的旧模式已经禁止。登录系统不可用时应通过服务器受控运维通道排障，不能重新开放匿名 Redis 管理。
+- Key 查询使用非阻塞 `SCAN` 游标分页，支持按模式搜索、类型/TTL/内存查看、单个与批量删除、重命名、TTL 设置和 JSON 内容覆盖；不支持任意命令、Lua、`FLUSHALL` 或 `FLUSHDB`。
 - 修改集合内容时，后端会先完整校验 JSON，再替换原 Key；删除和覆盖操作会显示确认提示。生产环境仍应优先按 `Microi:{OsClient}:...` 前缀缩小检索范围。
 
 Microi MCP 同步提供 `microi_redis_statistics`、`microi_redis_list_keys`、`microi_redis_get_key`、`microi_redis_delete_keys`、`microi_redis_replace_value`、`microi_redis_rename_key`、`microi_redis_set_ttl`。MCP 默认操作当前 `OsClient` 的租户 Redis；额外连接只传管理页保存后的 `connectionId`，不得把 Redis 密码写入 MCP 参数或日志。所有写操作都要求 `confirmExecution` 明确确认。
@@ -174,8 +219,13 @@ Microi MCP 同步提供 `microi_redis_statistics`、`microi_redis_list_keys`、`
 >* 用户访问一个接口引擎的自定义接口地址，如：(https://api.itdos.com/apiengine/test1)[https://api.itdos.com/apiengine/test1]，默认是走主库的接口引擎
 >* 假设租户A和租户B均有一个【/apiengine/test1】接口，则有多种方式来区分访问：
 >* 1、在访问【/apiengine/test1】接口时，传入对应用户的token，平台会根据token识别到OsClient值以访问对应的saas租户数据库
->* 2、在访问【/apiengine/test1】接口时，没有token就是匿名访问，则通过增加Url参数来区别，如：/apiengine/test1?OsClient=veken
->* 3、某些特殊情况可能无法使用Url参数，如微信支付回调，则可以通过特殊格式来实现传入OsClient值以区分saas租户数据库，如：/apiengine/test1--OsClient--veken--
+>* 2、在访问【/apiengine/test1】接口时，没有token就是匿名访问，则通过增加Url参数来区别，如：/apiengine/test1?OsClient=tenant_demo
+>* 3、某些特殊情况可能无法使用Url参数，如微信支付回调，则可以通过特殊格式来实现传入OsClient值以区分saas租户数据库，如：/apiengine/test1--OsClient--tenant_demo--
+
+::: warning Token 不能跨租户继承身份
+当 URL 指定的目标 `OsClient` 与 Token 所属租户不一致时，平台不会把原登录身份带到目标租户。目标接口只有明确开启匿名调用时才能按匿名边界执行；不能通过修改 QueryString 或特殊 URL 格式，把租户 A 的管理员身份带入租户 B。
+:::
+
 ```js
 //示例代码
 var appid = V8.OsClientModel.MiniProgramAppId;//小程序 appid
@@ -186,29 +236,33 @@ var jsapiUrlSimple = '/v3/pay/transactions/jsapi';//腾讯官方下单地址，�
 var currentUser = V8.CurrentUser;
 ```
 
+示例中的租户业务密钥只允许在后端 V8 中使用，禁止返回前端、写入日志或把整个 `V8.OsClientModel` 作为接口结果。
+
 ## 添加SaaS租户、SaaS数据库开库
->* 开启saas模式前，必须要确认主库PC前端程序的环境变量OsClient值为空，也就是对应的主库访问地址如[【https://os.itdos.com】](https://os.itdos.com/)的源码打开后【var OsClient = '';】是一个空值。若不满足，需要手动重新docker run安装PC前端程序，并保证环境变量OsClient的值为空字符串。
 
-### 1、准备SaaS数据库
->* 建议使用[gitee上面的demo或empty数据库](https://gitee.com/ITdos/microi.net/tree/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99)，假设新的数据库连接字符串为：Data Source=59.110.139.96;Database=microi_demo;User Id=microi_demo;Password=password123456;Port=1306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;Min Pool Size=5;Connection Lifetime=300;Connection Timeout=30;Pooling=true;sslmode=None;
->* 提前想好该SaaS数据库的Key值，也就是OsClient值，如：saas1
->* 若源服务器数据库是MySql8，而目标服务器数据库是MySql5.7，会导致无法直接还原，可以在目标服务器创建空数据库，然后使用Navicat的数据传输功能实现还原数据库
->* 还原成功后，建议执行以下sql：
-```sql
--- 1、修改【sys_config】表中的【SysTitle】字段为新系统名称
-update sys_config set SysTitle='新系统名称';
--- 2、修改【sys_osclients】表中的【OsClient】字段为新系统key，修改【RedisHost、RedisPort、RedisPwd】字段为空
-update sys_osclients set OsClient='新系统key',RedisHost='',RedisPort='',RedisPwd='';
--- 3、为了防止部分定时任务影响原有业务，建议执行sql停止所有定时任务
-update diy_schedule_job set Status='暂停';
-update microi_job_triggers set TRIGGER_STATE='PAUSED';
-```
+开库属于高权限、跨数据库操作，建议通过平台受控租户开通流程或接口引擎编排的原子能力完成，并保留操作人、目标 `OsClient`、数据库、执行结果和回读记录。不要在普通业务接口中直接拼接建库 SQL。
 
-### 2、在主库[SaaS引擎](https://web.microi.net/#/osclients)中添加数据
->* 为了能快速添加并引用主库的一些配置，建议直接使用SaaS引擎中的【复制】功能，比如说我们复制【iTdos、Product、Internal】这条数据，然后填写新的【saas1、Product、Internal】并添加
->* 修改上面添加的那条数据中【数据库连接字符串】的值为上面准备的SaaS数据库的连接字符串，并且修改域名为您想访问的域名或IP:端口，比如说【web.microi.net】就是一个saas库，或者您也可以填写如【192.168.1.11:1002】
->* 此时必须要重启一下后端api镜像的docker容器（之后的版本会修复此问题而不用再重启）
+### 1、规划租户身份与数据库
+
+- 提前确定唯一的 `OsClient`、`OsClientType`、`OsClientNetwork`，不要复用已有租户 Key。
+- 使用官方支持的 empty/demo 模板或受控开库能力创建数据库。目标数据库使用独立最小权限帐号，只授权当前租户库。
+- 数据库连接、用户名、密码、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索等凭据不要写入文档、日志、截图或前端。
+- 初始化后暂停模板中的业务 Job，并按新租户实际需要逐个启用；不要让复制来的任务立即影响生产业务。
+
+### 2、在主库 SaaS 引擎创建独立记录
+
+::: danger 不要复制整条主租户配置
+主租户记录包含身份、数据库、认证、Redis、对象存储、MQ/MQTT、搜索等机密。直接使用“复制”并只修改 `OsClient`，容易让新租户继承主租户数据库或管理员凭据，造成跨租户访问。
+:::
+
+- 优先使用【新增】或受控租户开通流程，显式填写新租户的身份、数据库和域名。
+- 即使界面复制仅作为草稿，也必须在保存前清空并重新生成租户身份、数据库、认证、Redis、对象存储、MQ/MQTT、搜索等敏感字段；共享基础设施的管理密钥不能持久化到子租户记录。
+- RabbitMQ 使用独立 user/vhost/ACL，MQTT 使用独立帐号，Search 使用只允许 `{osClient}_*` 的 API Key。外部资源尚未创建时保持不可用并失败关闭，不能回退主租户管理员凭据。
+- 保存后刷新 SaaS 引擎共享缓存，分别回读 `OsClient`、域名、数据库类型、启用状态和脱敏后的运行配置。不要以“保存成功”或“重启容器”代替回读。
+- 通过新租户 `admin` 登录，验证 Token 只属于新租户、基础菜单可见、FormEngine 不会访问主租户数据、文件/缓存/队列/Topic/索引均使用新租户命名空间。
 
 ### 3、做反向代理
 >* 假设主库的访问地址是【192.168.1.11:1001】，此时需要nginx新增一个反向代理【192.168.1.11:1002】到1001端口，此时则可以直接访问【192.168.1.11:1002】saas库
 >* 类似的例子【https://os.itdos.com】就是主库，而【web.microi.net】就是其中saas库之一
+
+完整平台授权、CORS、SSRF、登录 RSA、Token 和升级兼容规则见 [平台安全与兼容基线](../more/security)。

@@ -19,6 +19,7 @@ using static Quartz.Logging.OperationName;
 namespace Microi.net.Api
 {
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     [Route("api/[controller]/[action]")]
     [ApiController]
     public class JobController : Controller

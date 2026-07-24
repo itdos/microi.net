@@ -163,9 +163,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vitepress'
+import { resolveSiteApiBase } from '../utils/site-api-base.js'
 
 const route = useRoute()
-const APP_API_BASE = import.meta.env.VITE_MICROI_PUBLIC_API_BASE || 'https://api.itdos.com'
+const APP_API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_PUBLIC_API_BASE)
 const OS_CLIENT = 'iTdos'
 
 const liveApps = ref([])
@@ -183,7 +184,7 @@ let requestSequence = 0
 let requestController = null
 let keywordTimer = null
 
-const applicationTypes = [
+const defaultApplicationTypes = [
   { label: '全部', value: 'all' },
   { label: '平台应用', value: 'Platform' },
   { label: 'Web', value: 'Web' },
@@ -191,7 +192,7 @@ const applicationTypes = [
   { label: '微服务', value: 'MicroService' }
 ]
 
-const businessCategories = [
+const defaultBusinessCategories = [
   { label: '全部', value: 'all' },
   { label: '游戏', value: 'game' },
   { label: '企业应用', value: 'business' },
@@ -206,12 +207,14 @@ const businessCategories = [
   { label: '平台能力', value: 'platform' },
   { label: '其它', value: 'other' }
 ]
+const applicationTypes = ref(defaultApplicationTypes)
+const businessCategories = ref(defaultBusinessCategories)
 
 const currentPath = computed(() => route.path || (typeof window !== 'undefined' ? window.location.pathname : ''))
 const isHomePage = computed(() => ['/', '/index', '/index.html'].includes(currentPath.value))
 const isAppsPage = computed(() => ['/apps', '/apps.html'].includes(currentPath.value))
 const shouldRender = computed(() => isHomePage.value || isAppsPage.value)
-const pageSize = computed(() => isHomePage.value ? 6 : 12)
+const pageSize = computed(() => isHomePage.value ? 8 : 12)
 const skeletonCount = computed(() => pageSize.value)
 const pageCount = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)))
 const showInitialSkeleton = computed(() => isLoading.value && liveApps.value.length === 0)
@@ -311,12 +314,23 @@ function isAllowed(value, options) {
   return options.some(item => item.value === value) ? value : 'all'
 }
 
+function keyValueOptions(value, fallback) {
+  if (!Array.isArray(value) || value.length === 0) return fallback
+  const normalized = value
+    .map(item => ({
+      label: String(item?.Value ?? item?.Label ?? '').trim(),
+      value: String(item?.Key ?? item?.Value ?? '').trim()
+    }))
+    .filter(item => item.label && item.value)
+  return normalized.length ? [{ label: '全部', value: 'all' }, ...normalized] : fallback
+}
+
 function readUrlState() {
   if (typeof window === 'undefined') return
   const params = new URLSearchParams(window.location.search)
   if (isAppsPage.value) {
-    activeType.value = isAllowed(params.get('type') || 'all', applicationTypes)
-    activeCategory.value = isAllowed(params.get('category') || 'all', businessCategories)
+    activeType.value = isAllowed(params.get('type') || 'all', applicationTypes.value)
+    activeCategory.value = isAllowed(params.get('category') || 'all', businessCategories.value)
     keyword.value = params.get('q') || ''
     pageIndex.value = Math.max(1, Number.parseInt(params.get('page') || '1', 10) || 1)
   } else {
@@ -378,6 +392,8 @@ async function loadApplications() {
     }
     if (sequence !== requestSequence) return
     fileServer.value = String(result.DataAppend?.FileServer || '').trim()
+    applicationTypes.value = keyValueOptions(result.DataAppend?.ApplicationTypes, defaultApplicationTypes)
+    businessCategories.value = keyValueOptions(result.DataAppend?.Categories, defaultBusinessCategories)
     totalCount.value = Number(result.DataCount || 0)
     liveApps.value = result.Data.map(normalizeApp)
     brokenPreviewKeys.value = new Set()

@@ -310,8 +310,9 @@ import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, wa
 import ProfileAiSummary from './ProfileAiSummary.vue'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
+import { resolveSiteApiBase } from '../utils/site-api-base.js'
 
-const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
+const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const OS_CLIENT = 'iTdos'
 
 const activeMenu = ref('overview')
@@ -558,13 +559,6 @@ function navigateProfile(key) {
     stopTenantProgress()
     isCreating.value = false
   }
-}
-
-function getDefaultApiBase() {
-  if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
-    return 'https://localhost:7266'
-  }
-  return 'https://api.itdos.com'
 }
 
 function normalizeToken(raw) {

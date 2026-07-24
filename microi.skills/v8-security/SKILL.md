@@ -9,7 +9,7 @@ description: Microi V8 安全指南。用于审查接口引擎安全、密钥管
 
 ## 0. 租户业务密钥放 OsClientModel（基础设施密钥由服务端托管）
 
-第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。`sys_osclient` 表由表单引擎驱动，可自由扩展配置项，按租户独立配置：
+第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。受保护的 `sys_osclients` 表可扩展租户自有业务集成字段；只有可信控制面能维护，普通角色不能通过 FormEngine 直接读写：
 
 ```javascript
 // ✅ 正确
@@ -28,6 +28,12 @@ var openaiKey = 'sk-xxxxxxxxxx';
 共享基础设施只能通过受控能力访问：`V8.Cache` 自动绑定 `Microi:{OsClient}:*`，文件路径绑定 `/{OsClient}/...`，RabbitMQ 队列绑定 `microi.{OsClient}.*`，MQTT Topic 绑定 `tenant/{OsClient}/...`，Search 索引绑定 `{OsClient}_*`。V8 不得获得 Redis `IDatabase`、HDFS `ClientModel` 或原始基础设施配置。
 
 子租户缺少 RabbitMQ/MQTT/Search 独立凭据时必须失败关闭，禁止回退主租户账号。新租户开通只有在外部 broker/search 中真实创建 user、vhost、ACL 或 API Key 后，才能标记对应服务可用。
+
+登录和管理端必须强制 HTTPS。登录 RSA 只用于避免密码在请求体、代理调试界面中直接显示，不能替代 HTTPS，也不能作为身份认证或密码存储密钥。平台为兼容已发布客户、旧前端和浏览器缓存，保留历史登录 RSA 密钥对作为缺省回退；安全修复不得直接删除该回退并造成全量客户无法登录。需要部署专属密钥时，服务端通过 `MICROI_LOGIN_RSA_PRIVATE_KEY` 或受限密钥文件注入私钥，同时通过 `MICROI_LOGIN_RSA_PUBLIC_KEY` / `Security:LoginRsaPublicKey` 向匿名 `GetSysConfig` 提供匹配公钥；两端必须成对切换。源码、V8、前端业务代码和日志中仍禁止新增或输出其它真正的业务私钥、JWT 密钥、支付密钥及对象存储凭据。
+
+吾码现有多端兼容约定是：主 SaaS 引擎 `sys_osclients.CorsAllowOrigins` 为空时默认允许全部跨域，便于本地开发、独立前端、H5 和不同租户域名访问；配置了来源后才按精确来源或通配符限制。安全修复不得把“未配置”改成默认拒绝，否则会造成所有存量部署和本地调试突然失效。CORS 不是鉴权边界，权限仍必须依赖 Token、租户隔离、菜单/表权限和服务端数据范围。
+
+吾码既有客户大量通过 `V8.Http` 访问内网设备、InfluxDB、内部 ApiEngine 和本机 sidecar。严格 SSRF 防护必须默认关闭：未配置时不得限制协议、URL 内嵌凭据、回环、私网、链路本地、云元数据或重定向。只有客户显式设置 `SsrfProtection:Enabled=true` / `MICROI_SSRF_PROTECTION_ENABLED=true` 后才进入严格模式，并用精确 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 放行。
 
 ## 0.5 接口引擎配置安全
 
@@ -69,6 +75,41 @@ V8.Db.FromSql("SELECT * FROM " + V8.Param.table).ToArray();
 ```
 
 ## 2. 权限校验
+
+### 平台 FormEngine 授权边界
+
+**Token 只完成身份认证，不是任意表的访问凭证。** 来自浏览器、UniApp、SDK 或其它外部客户端的通用 FormEngine 请求，必须由服务端完成以下授权，V8 或前端代码不得自行模拟、放宽：
+
+- HTTP 客户端显式传入 `_SysMenuId`（或兼容的 `ModuleEngineKey`）时，服务端默认进入**严格精确菜单授权**：校验该菜单真实存在、绑定的 `DiyTableId` 与目标表一致、当前用户有效角色拥有该菜单，以及当前操作的 `Read`、`Add`、`Edit`、`Del` 等权限。列表、写入、导入、导出显式传错、伪造或借用其它菜单 Id 必须失败关闭。
+- 为兼容已发布项目中大量未传或保留过期 `_SysMenuId` 的旧版 PC/UniApp，普通业务表的唯一详情只要当前角色真实拥有至少一个直接绑定同表的菜单（或精确表级 `Read` 权限）即可读取，不应用菜单 `SqlWhere` / `SqlJoin`。该规则不能用于放宽列表、导入、导出或写入的菜单动作权限。
+- 历史前端 V8 的无菜单 FormEngine 集合请求由后端根据“当前用户有效角色可访问的 `sys_menu`”推断目标表权限；多个菜单范围只有 Join 上下文一致时才可合并，否则失败关闭。推断必须使用后端授权快照，不能相信前端提交的角色、菜单列表或权限 JSON。确实没有菜单入口的 SDK/定制页面仍可按最小权限使用高级表权限；`diy_table.BindRole` 只做候选角色过滤，不能单独代替操作权限。
+- 标准 PC 表单引擎会通过前端 FormEngine facade 给“当前表”的 V8 调用自动注入真实 `_SysMenuId`；V8 跨表调用故意保持无菜单，让后端按目标表的已授权菜单推断，禁止把当前主表菜单错误传播给其它表。
+- 历史 PC/UniApp 的单表字段元数据可在菜单缺失/过期时回退到当前角色另一个引用同表的已授权菜单；`GetDiyFieldByDiyTables` 还可能批量提交“主表 + 关联表”，后端必须保留调用顺序，以第一张主表作为强制授权锚点。主表通过后，后续表逐张授权并过滤未授权表/保护表，不能让一张被拒绝的关联表拖垮已授权主表，也不能把被过滤表的字段、SQL 数据源或 V8 配置返回客户端。元数据兼容不授予数据行权限。
+- `TableChild` 隐藏子菜单不要求存量角色逐个补授权。子表访问只能由后端在同一次请求中验证“已授权父菜单、父表 TableChild 字段配置、子菜单绑定、父记录可见范围、父键唯一性和子表外键”后委托，并把外键条件强制写入真实查询/写入；伪造 `_TableChildAuth`、跨父记录借用外键或脱离父表直接访问都必须失败。
+- 菜单 `SqlWhere`、`SqlJoin` / `JoinTables` 数据范围必须在服务端形成的**真实列表、计数和导出查询**中执行，不能只用于界面展示或查询后过滤。单行详情只校验同表菜单访问权，不应用这些模块列表过滤；它们也不是行级写权限。
+- 主表新增、修改、删除分别由当前角色的 `Add`、`Edit`、`Del` 权限控制；不得把查询 SqlWhere 追加到写入 SQL，也不得因为查询包含跨表 Join 拒绝已获授权的写入。需要“仅可修改本人数据”等业务限制时，在 `SubmitBeforeServerV8` 或专用接口引擎中以可信服务器代码校验，并统一写入 `TenantId`、负责人、创建人等归属字段。
+- 导入、导出必须携带真实菜单上下文，并分别拥有 `Import`、`Export`；不能用 Table 级直接授权绕过。
+- SaaS 配置、接口引擎、表/字段元数据、菜单角色、系统用户、任务、数据源、MQ/MQTT、页面/打印/工作流、扩展数据库等平台敏感表，对 `Level < 9999` 的通用客户端 FormEngine 硬拒绝。错误的菜单或 Table 授权不能覆盖。
+- 匿名读取/新增仅适用于 `diy_table` 明确开启匿名能力的普通业务表；敏感平台表必须先于匿名开关拒绝。
+- 权限 JSON、角色 Id 或菜单上下文解析失败时必须失败关闭；角色 Id 使用精确集合匹配，禁止 `Contains` 子串判断。
+
+标准菜单模块继承菜单权限，不需要维护“角色 × 全部业务表”的巨大矩阵，也不能要求所有历史前端 V8 立即补传菜单 Id。新前端在当前表上下文应由平台 facade 自动携带真实菜单；历史无菜单请求继续由后端安全推断。【高级表权限】只用于确实没有任何菜单入口的定制页面/SDK，并按最小权限授予。
+
+> 后端接口引擎、后端表单 V8 和平台内部调用由服务端在构造参数时设置不可由 HTTP JSON 注入的 `_TrustedServerInvocation`，因此调用 `V8.FormEngine` 不要求 `_SysMenuId`。`_InvokeType:'Server'` 只是事件调用语义，不是外部客户端可用的授权开关；普通用户即使在请求中伪造这两个字段也不能成为可信调用。任何能让普通用户写 V8、接口引擎、任务或数据源配置的管理入口本身都必须限制为 `Level >= 9999`，否则会重新获得任意数据执行能力。
+
+> 外层 `AddFormData` 的客户端菜单/`Add` 权限校验与事件内部执行权是两件事：前者防止无新增权限的用户进入事件，后者允许已经进入的 `SubmitBeforeServerV8` / `SubmitAfterServerV8` 像接口引擎一样在当前租户内执行复杂 SQL、跨表事务和其它表 CRUD。不要把客户端菜单范围再次套到服务器 V8 的嵌套调用。
+
+### FormEngine 授权缓存与性能
+
+授权不能在每次 FormEngine 请求中重复全表查询，也不能用只在单节点有效的永久静态字典。平台使用按 `OsClient` 隔离的 Redis 授权版本 `epoch`、用户级授权快照、短 TTL 的进程内 L1 与共享 Redis L2：
+
+- 请求先读取当前租户 `epoch`，再按“租户 + epoch + 用户”读取授权快照；同一版本命中时复用有效用户、有效角色、菜单、表与操作权限。
+- 正确菜单、无菜单候选范围和详情同表菜单访问都只读取一次缓存快照；详情不逐菜单执行数据范围探测。不得把详情的同表菜单兼容扩展为无范围列表或批量查询。
+- 冷加载必须从主库读取 `sys_user`、`sys_role`、`sys_rolelimit`、`sys_menu` 等授权事实，避免只读副本延迟把已撤销权限重新缓存。
+- 用户状态/级别/角色、角色状态、菜单绑定/数据范围、角色菜单或高级表权限发生变化时，必须在事务成功后递增共享 Redis `epoch`。所有 API 节点看到新版本后自然放弃旧快照，不依赖粘性会话或逐节点重启。
+- L1 只做短时性能优化，允许丢失；L2 和 `epoch` 才负责多节点共享版本。缓存失效异常时应缩短使用窗口并失败关闭敏感操作，不能无限沿用旧权限。
+- 快照 Key 必须包含独立的“序列化契约版本”。新增 `UserLevel`、`IsActiveUser` 等安全字段或改变字段语义时提升版本，让 Redis 中跨重启、滚动升级遗留的旧 JSON 立即失效，禁止缺失字段按 `0/false` 反序列化后误拒绝有效管理员或误放普通用户。
+- 已通过 `Level >= 9999` 校验的表单设计器批量写 `diy_field` 时，应在外层只授权一次，并校验所有字段都属于同一 `TableId`；随后在同一事务内更新元数据，批次结束后只清一次缓存/版本。不要让每个字段重新进入通用 FormEngine 授权、V8、日志和缓存管线。`AddDiyField/AddField` 等单字段能力仍须传递经服务端确认的管理员上下文；升级程序等无 HTTP 用户的可信任务必须构造强类型参数并设置不可由 JSON 绑定的 `_TrustedServerInvocation`。
 
 ### 接口引擎中校验当前用户
 
@@ -161,58 +202,50 @@ if (isNaN(amount) || amount <= 0 || amount > 999999.99) {
 
 ## 4. 防 XSS
 
-存入数据库前过滤危险字符：
+四个字符替换不是通用 XSS 防护。必须按输出上下文处理：
+
+- 纯文本保存原始业务值，渲染时使用 Vue 文本绑定/`textContent`，不要用 `v-html`；
+- URL 只允许明确协议和域名，并通过 URL 解析器校验；
+- 富文本使用平台统一 allowlist 清洗器，移除 `script`、事件属性、危险协议、`iframe/object` 等；
+- V8 模板经 `v-safe-html` / DOMPurify 清洗，内联 `onclick` 等事件会被移除；交互使用平台按钮/V8 事件，不拼接可执行 HTML；
+- CSV、Excel、邮件和日志还要分别处理公式注入、HTML 邮件和日志换行注入。
 
 ```javascript
-function sanitizeHtml(str) {
-  if (!str) return '';
-  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+var content = String(V8.Param.content || '');
+if (content.length > 5000) {
+  return { Code: 0, Msg: '内容过长' };
 }
-
 V8.FormEngine.AddFormData('Comment', {
-  Content: sanitizeHtml(V8.Param.content),
+  Content: content,
   UserId: V8.CurrentUser.Id
 });
 ```
 
 ## 5. 防重复提交
 
-```javascript
-var lockKey = 'submit:' + V8.CurrentUser.Id + ':' + V8.Param.formKey;
-if (V8.Cache.Exists(lockKey)) {
-  return { Code: 0, Msg: '请勿重复提交' };
-}
-V8.Cache.Set(lockKey, '1', 5);  // 5 秒内不可重复
+前端禁用按钮或普通 Cache 的 `Exists → Set` 只能改善体验，不能保证业务只执行一次。写操作必须接收稳定幂等键，并通过数据库唯一约束、条件更新或状态机原子落库；接口引擎可再配置 `LockKey` 降低并发，但锁不能代替业务幂等。
 
-try {
-  // 执行业务逻辑
-  var result = V8.FormEngine.AddFormData('Order', { ... });
-  return { Code: 1, Data: result.Data };
-} finally {
-  V8.Cache.Remove(lockKey);
+```javascript
+var requestId = String(V8.Param.RequestId || '');
+if (!/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) {
+  return { Code: 0, Msg: '缺少合法幂等键' };
 }
+
+// IdempotencyKey 在数据库中建立唯一索引；重复请求读取并返回已有结果
+var old = V8.FormEngine.GetFormData('Order', {
+  _Where: [['IdempotencyKey', '=', requestId]]
+});
+if (old.Code === 1 && old.Data) {
+  return { Code: 1, Data: old.Data, Msg: '重复请求已复用原结果' };
+}
+// 最终仍以唯一约束处理并发竞态，不以这次预查询作为安全保证
 ```
 
 ## 6. 敏感数据
 
-### 密码加密存储
+### 密码与认证
 
-```javascript
-// 存储时加密
-var encryptedPwd = V8.EncryptHelper.MD5Encrypt(V8.Param.password);
-V8.FormEngine.AddFormData('SysUser', {
-  Account: V8.Param.account,
-  Password: encryptedPwd
-});
-
-// 验证密码
-var user = V8.FormEngine.GetFormData('SysUser', {
-  _Where: [['Account', '=', V8.Param.account]]
-});
-if (!user.Data || user.Data.Password !== V8.EncryptHelper.MD5Encrypt(V8.Param.password)) {
-  return { Code: 0, Msg: '账号或密码错误' };
-}
-```
+业务 V8 禁止自行查询 `sys_user`、保存密码或用 MD5/SHA1/SHA256 直接哈希密码。统一使用平台登录、重置密码和管理员用户管理接口；新密码存储必须由后端使用带盐、可调成本的专用密码哈希，并支持版本与轮换。登录 RSA 只隐藏传输报文中的明文外观，不能替代 HTTPS，也不能用于密码存储。
 
 ### 脱敏返回
 
@@ -257,7 +290,7 @@ V8.Method.AddSysLog({
 需要让某个用户所有终端立即退出时，接口引擎必须调用平台统一能力，不要只删除前端 Token，也不要只修改用户状态：
 
 ```javascript
-if (!V8.CurrentUser || (!V8.CurrentUser._IsAdmin && Number(V8.CurrentUser.Level || 0) < 9999)) {
+if (!V8.CurrentUser || Number(V8.CurrentUser.Level || 0) < 9999) {
   return { Code: 0, Msg: '仅系统管理员可执行此操作' };
 }
 
@@ -283,10 +316,11 @@ try {
     .ToArray();
   return { Code: 1, Data: result };
 } catch (ex) {
-  // 记录完整错误日志
-  console.error('查询失败: ' + ex.message + ' | 参数: ' + JSON.stringify(V8.Param));
+  // 内部日志使用追踪号和必要的非敏感字段；不要记录完整V8.Param
+  var traceId = V8.Method.NewUlid();
+  console.error('查询失败 traceId=' + traceId + ' error=' + ex.message);
   // 返回给前端的信息不含内部细节
-  return { Code: 0, Msg: '查询失败，请稍后重试' };
+  return { Code: 0, Msg: '查询失败，请稍后重试', DataAppend: { TraceId: traceId } };
 }
 ```
 
@@ -303,10 +337,22 @@ try {
 ## 安全检查清单
 
 - [ ] 所有数据库查询使用参数化（`_Where` 或 `@p0`）
+- [ ] 把 Token 认证与表/菜单/操作授权分开；列表/写入显式菜单严格精确校验，历史唯一详情只校验同表已授权菜单访问权
+- [ ] 当前表前端 facade 自动注入真实菜单，跨表不借用主菜单；可信后端 V8 由服务端标记且不要求菜单
+- [ ] 敏感平台表仅限 `Level >= 9999` 的可信管理链路，Import/Export 必须携带真实菜单并有专项权限
+- [ ] 菜单 `SqlWhere` / `SqlJoin` 覆盖真实列表、计数和导出查询；详情只校验同表菜单访问；主表新增/修改/删除/导入只按专项操作权限，不把查询范围带入写 SQL；行级写业务限制由后端 V8/接口引擎校验
+- [ ] 授权缓存按租户使用 Redis `epoch` 和用户级快照；冷加载读主库，权限变更递增 `epoch`
 - [ ] 关键操作校验 `V8.CurrentUser` 权限
 - [ ] 涉及数据修改的接口校验请求参数合法性
 - [ ] 敏感数据（手机号、身份证等）脱敏返回
-- [ ] 密码使用加密存储，不存明文
+- [ ] 密码只走平台认证/重置流程；禁止MD5/SHA直接存储，后端使用带盐自适应密码哈希
 - [ ] 写操作有防重复提交机制
 - [ ] 关键操作写审计日志
 - [ ] catch 块不暴露内部错误给前端
+
+### 复盘：管理员设计器和升级任务的嵌套 FormEngine 写入被误判
+
+- 触发场景：`Level=9999` 管理员在表单设计器保存时，外层 `UptFormData`、内部 `UptDiyFieldList` 或 `AddDiyField` 返回 `NoAuth`；无 HTTP 用户的升级任务写 `sys_apiengine/sys_menu/diy_field` 也被拒绝。
+- 根因：Redis 保留了旧结构的授权快照，新字段反序列化为 `0/false`；同时更新前旧记录读取或动态新增字段把已校验上下文降成裸 `JObject` / 匿名参数，丢失管理员或可信服务端来源。批量字段保存若逐字段调用完整 CRUD，还会把授权、V8 和缓存工作放大 N 倍。
+- 通用规则：授权快照使用独立契约版本；内部嵌套调用必须显式传递原始客户端管理员上下文，或由真正的服务端任务构造不可伪造的强类型可信参数，不能依赖 `_InvokeType` 或 CLR/JObject 猜测。
+- 自动化检查：预置缺少新字段的旧 Redis 快照后验证新版本 Key 不命中；分别覆盖管理员设计器批量字段保存/新增字段、普通用户直接写保护表被拒绝、升级程序可信写入成功，以及 HTTP JSON 伪造可信字段仍失败。

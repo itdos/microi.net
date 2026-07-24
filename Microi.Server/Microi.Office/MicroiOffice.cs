@@ -31,6 +31,10 @@ namespace Microi.net
     /// </summary>
     public partial class MicroiOffice : IMicroiOffice
     {
+        private const long MaxImportExcelFileBytes = 20L * 1024L * 1024L;
+        private const int MaxImportExcelDataRows = 50000;
+        private const int MaxImportExcelColumns = 256;
+
         /// <summary>
         /// 通用的 dynamic 参数转换方法
         /// </summary>
@@ -1929,7 +1933,7 @@ namespace Microi.net
             const string dateTimeFormat = "yyyy/MM/dd HH:mm:ss";
             var osClient = param.OsClient;
             var startSign = $"Microi:{osClient}:ImportTableDataStart:{param.TableId}";
-            var stepSign = $"Microi:{osClient}:ImportTableDataStep:{param.TableId}";
+            var stepSign = $"Microi:{osClient}:ImportTableDataStep:{param.TableId}:{param._SysMenuId}";
 
             var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam()
             {
@@ -1949,21 +1953,38 @@ namespace Microi.net
                 return;
             }
             await diyCacheBase.SetAsync(startSign, "1");
-            if (files.Count == 0)
+            if (files.Count != 1)
             {
                 await diyCacheBase.SetAsync(startSign, "0");
-                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！未找到文件！");
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！必须且只能上传一个Excel文件！");
                 await diyCacheBase.SetAsync(stepSign, importStepList);
-                result = new DosResult(0, null, "The file was not found!");
+                result = new DosResult(0, null, "必须且只能上传一个Excel文件！");
+                return;
+            }
+
+            var file = files[0];
+            var fileSuffix = Path.GetExtension(file.FileName)?.ToLowerInvariant();
+            if (file.Length <= 0 || file.Length > MaxImportExcelFileBytes)
+            {
+                await diyCacheBase.SetAsync(startSign, "0");
+                result = new DosResult(0, null, $"Excel文件必须大于0且不超过{MaxImportExcelFileBytes / 1024 / 1024}MB！");
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{result.Msg}");
+                await diyCacheBase.SetAsync(stepSign, importStepList);
+                return;
+            }
+            if (fileSuffix != ".xls" && fileSuffix != ".xlsx")
+            {
+                await diyCacheBase.SetAsync(startSign, "0");
+                result = new DosResult(0, null, "只允许导入真实的.xls或.xlsx文件！");
+                importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{result.Msg}");
+                await diyCacheBase.SetAsync(stepSign, importStepList);
                 return;
             }
 
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在上传文件...");
             await diyCacheBase.SetAsync(stepSign, importStepList);
 
-            var file = files[0];
             var realFileName = Ulid.NewUlid().ToString();
-            var fileSuffix = Path.GetExtension(file.FileName);
 
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在读取文件数据...");
             await diyCacheBase.SetAsync(stepSign, importStepList);
@@ -2015,7 +2036,10 @@ namespace Microi.net
                 var lastSqlLog = "";
                 try
                 {
-                    var fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic();
+                    var fileDataList = new NPOIHelper(fileByte).ExcelToListDynamic(
+                        0,
+                        MaxImportExcelDataRows,
+                        MaxImportExcelColumns);
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已读取【{fileDataList.Count}】条数据！");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：正在开启新线程进行导入...");
                     await diyCacheBase.SetAsync(stepSign, importStepList);

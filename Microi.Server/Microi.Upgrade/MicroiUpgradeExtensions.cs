@@ -38,7 +38,6 @@ namespace Microi.net
                 }
 
                 var scheduledTask = app.ApplicationServices.GetRequiredService<IMicroiUpgrade>();
-                var _formEngine = app.ApplicationServices.GetRequiredService<IFormEngine>();
                 if (scheduledTask != null)
                 {
                     #region 平台自动升级
@@ -66,52 +65,37 @@ namespace Microi.net
                             }
                             try
                             {
-                                //获取当前数据库版本号
-                                var versionResult = await _formEngine.GetFormDataAsync<SysConfig>(new
+                                var upgradeLease = UpgradeDistributedLease.TryAcquire(
+                                    runtimeClient.OsClient,
+                                    out var leaseReason);
+                                if (upgradeLease == null)
                                 {
-                                    FormEngineKey = "sys_config",
-                                    _Where = new List<DiyWhere>() {
-                                    new DiyWhere() {
-                                        Name = "IsEnable",
-                                        Value = "1",
-                                        Type = "="
+                                    // 其它节点持锁或 Redis 暂不可用时必须 fail-closed，但这不是迁移失败。
+                                    Console.WriteLine(
+                                        $"Microi：【信息】平台自动升级跳过本节点租户【{runtimeClient.OsClient}】：{leaseReason}");
+                                }
+                                else
+                                {
+                                    using (upgradeLease)
+                                    using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
+                                    {
+                                        upgradeLease.ThrowIfLost();
+                                        // 必须在取得跨节点租约后读取版本，避免使用等待期间已过期的快照。
+                                        var currentVersion = runtimeClient.Db
+                                            .FromSql("SELECT ServerVersion FROM sys_config WHERE IsEnable = @p0")
+                                            .AddInParameter("p0", 1)
+                                            .ToScalar<string>() ?? "";
+
+                                        var upgradeResult = await scheduledTask.Upgrade(
+                                            currentVersion,
+                                            runtimeClient);
+                                        upgradeLease.ThrowIfLost();
+                                        if (upgradeResult.Code != 1)
+                                        {
+                                            Console.WriteLine(
+                                                $"Microi：【Error异常】【{runtimeClient.OsClient}】平台自动升级失败：{upgradeResult.Msg}");
+                                        }
                                     }
-                                },
-                                    OsClient = runtimeClient.OsClient
-                                });
-                                var currentVersion = "";
-                                if (versionResult.Code == 1)
-                                {
-                                    currentVersion = versionResult.Data.ServerVersion ?? "";
-                                }
-                                try
-                                {
-                                    // var sqlResult = await new MicroiUpgrade().Upgrade(currentVersion, clientModelItem.Value);
-                                    await scheduledTask.Upgrade(currentVersion, runtimeClient);
-
-                                    // if (sqlResult.Code == 1)
-                                    // {
-                                    //     foreach (var upgdareItem in sqlResult.Data)
-                                    //     {
-                                    //         try
-                                    //         {
-                                    //             var count = clientModelItem.Value.Db.FromSql(upgdareItem.Sql).ExecuteNonQuery();
-                                    //         }
-                                    //         catch (Exception ex)
-                                    //         {
-                                    //             Console.WriteLine($"Microi：平台自动升级升级执行sql失败：Sql：{upgdareItem.Sql}。{OsClientDefault.OsClient}-{OsClient.OsClientType}-{OsClient.OsClientNetwork}-ClientList[{ClientList.Count}]。-->{ex.Message}");
-                                    //         }
-                                    //     }
-                                    // }
-                                    // else
-                                    // {
-                                    //     Console.WriteLine($"Microi：平台自动升级升级获取sql失败：{OsClientDefault.OsClient}-{OsClient.OsClientType}-{OsClient.OsClientNetwork}-ClientList[{ClientList.Count}]。-->{sqlResult.Msg}");
-                                    // }
-
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine($"Microi：【Error异常】【{clientModelItem.Value.OsClient}】平台自动升级出现异常：{ex.Message}");
                                 }
                             }
                             catch (Exception ex)
@@ -128,21 +112,23 @@ namespace Microi.net
                                     // var langs = new List<string>(){
                                     //     "zh-cn", "zh", "cn", "en", "zh-tw"
                                     // };
-                                    var langLevel2 = new Dictionary<string, JObject>();
+                                    var langLevel2 = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
                                     foreach (var item in langList)
                                     {
                                         JObject itemObj = JObject.FromObject(item);
-                                        var key = itemObj["Key"]?.ToString();
-                                        langLevel2.Add(key, itemObj);
+                                        var key = itemObj["Key"]?.ToString()?.Trim();
+                                        if (key.DosIsNullOrWhiteSpace())
+                                        {
+                                            continue;
+                                        }
+                                        // Legacy databases may contain duplicate
+                                        // language keys. Cache construction must be
+                                        // deterministic and must not prevent the
+                                        // tenant from starting.
+                                        langLevel2[key] = itemObj;
                                     }
-                                    if (DiyMessage.Msg.ContainsKey(runtimeClient.OsClient))
-                                    {
-                                        DiyMessage.Msg[runtimeClient.OsClient] = langLevel2;
-                                    }
-                                    else
-                                    {
-                                        DiyMessage.Msg.Add(runtimeClient.OsClient, langLevel2);
-                                    }
+                                    DiyMessage.Msg[runtimeClient.OsClient] = langLevel2;
+                                    DiyMessage.ClearSourceTextCache(runtimeClient.OsClient);
                                 }
                                 catch (Exception ex)
                                 {

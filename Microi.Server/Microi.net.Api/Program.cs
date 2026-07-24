@@ -33,14 +33,6 @@ Console.InputEncoding = Encoding.UTF8;
 // ⚙️ 注册Console输出拦截器，捕获所有Console.WriteLine到内存环形缓冲区（用于系统监控-应用日志）
 Console.SetOut(new Microi.net.ConsoleLogInterceptor(Console.Out));
 
-// ⚙️ 启用gRPC over HTTP/2（非TLS）支持 - 必须在最开始设置！
-// 用于Qdrant向量数据库的gRPC连接（允许HTTP协议使用HTTP/2）
-AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
-// 额外配置：允许不安全的HTTP连接使用HTTP/2
-Environment.SetEnvironmentVariable("DOTNET_SYSTEM_NET_HTTP_SOCKETSHTTPHANDLER_HTTP2SUPPORT", "1");
-
-Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】HTTP/2非加密支持已启用");
-
 // 🔧 本地环境快速切换：读取 .microi-local 文件（已加入 .gitignore，每位开发者本地独立配置）
 // 优先级：IDE 环境变量（launch.json env / launchSettings.json）> .microi-local > 系统环境变量
 // 切换方式：编辑 Microi.Server/Microi.net.Api/.microi-local，写入环境名（如 iTdos / renyiPro）
@@ -74,6 +66,45 @@ Console.WriteLine(
 #region Microi.net 初始化
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 // ------- 文件上传大小限制 -------
+static int ReadBoundedMegabytes(
+    IConfiguration configuration,
+    string environmentName,
+    string configurationKey,
+    int defaultValue,
+    int minimum,
+    int maximum)
+{
+    var rawValue = Environment.GetEnvironmentVariable(environmentName)
+        ?? configuration[configurationKey];
+    var value = int.TryParse(rawValue, out var configured) ? configured : defaultValue;
+    return Math.Clamp(value, minimum, maximum);
+}
+
+var maxRequestBodyMb = ReadBoundedMegabytes(
+    builder.Configuration,
+    "MICROI_HTTP_MAX_REQUEST_BODY_MB",
+    "FileUploadSecurity:MaxRequestBodyMB",
+    256,
+    1,
+    2048);
+var maxMultipartBodyMb = ReadBoundedMegabytes(
+    builder.Configuration,
+    "MICROI_FILE_UPLOAD_MAX_MULTIPART_MB",
+    "FileUploadSecurity:MaxMultipartBodyMB",
+    256,
+    1,
+    maxRequestBodyMb);
+var maxFormValueMb = ReadBoundedMegabytes(
+    builder.Configuration,
+    "MICROI_FILE_UPLOAD_MAX_FORM_VALUE_MB",
+    "FileUploadSecurity:MaxFormValueMB",
+    128,
+    1,
+    Math.Min(maxRequestBodyMb, 512));
+var maxRequestBodyBytes = maxRequestBodyMb * 1024L * 1024L;
+var maxMultipartBodyBytes = maxMultipartBodyMb * 1024L * 1024L;
+var maxFormValueBytes = maxFormValueMb * 1024L * 1024L;
+
 //USE LINUX【发布到Linux使用以下代码】
 builder.WebHost.UseKestrel((host, options) =>
 {
@@ -81,18 +112,21 @@ builder.WebHost.UseKestrel((host, options) =>
     // Kestrel has no request-processing timeout by default; disable data-rate timeouts for slow request/response streams.
     options.Limits.MinRequestBodyDataRate = null;
     options.Limits.MinResponseDataRate = null;
-    options.Limits.MaxRequestLineSize = int.MaxValue;//HTTP 请求行的最大允许大小。 默认为 8kb
-    options.Limits.MaxRequestBufferSize = int.MaxValue;//请求缓冲区的最大大小。 默认为 1M
-    options.Limits.MaxRequestBodySize = long.MaxValue;//任何请求正文的最大允许大小（以字节为单位）,默认 30,000,000 字节，大约为 28.6MB
+    options.Limits.MaxRequestLineSize = 32 * 1024;
+    options.Limits.MaxRequestBufferSize = 1024 * 1024;
+    options.Limits.MaxRequestBodySize = maxRequestBodyBytes;
 });
 //USE IIS【发布到Windows IIS使用以下代码】
 //builder.WebHost.UseIISIntegration();
 var services = builder.Services;
 services.Configure<FormOptions>(options =>
 {
-    options.ValueLengthLimit = int.MaxValue;
-    options.MultipartBodyLengthLimit = long.MaxValue;
+    options.ValueLengthLimit = checked((int)Math.Min(maxFormValueBytes, int.MaxValue));
+    options.MultipartBodyLengthLimit = maxMultipartBodyBytes;
 });
+Console.WriteLine(
+    $"Microi：【文件安全】HTTP正文上限{maxRequestBodyMb}MB，Multipart上限{maxMultipartBodyMb}MB，" +
+    $"单个表单值上限{maxFormValueMb}MB。");
 Console.WriteLine($"------------------------------------------------------------------------------");
 Console.WriteLine($"------------------------------------------------------------------------------");
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始初始化！");
@@ -132,17 +166,6 @@ services.AddMicroiSpider();//【可选】注入【采集引擎】插件
 services.AddMicroiMQ();//【可选】注入【MQ消息队列】插件
 services.AddMicroiSearchEngine();//【可选】注入【搜索引擎】插件
 services.AddMicroiAI();//【可选】注入【AI引擎】插件
-// 发布目录中如果残留旧 Microi.AI.dll，过去会出现 License.Verify=Enterprise，
-// 但 AI 插件仍按旧逻辑返回 OpenSource。启动时强制核对新授权契约，禁止静默混用 DLL。
-var aiLicenseContract = typeof(MicroiAI).GetMethod(nameof(IMicroiAI.GetOnlineAiLicenseState));
-if (aiLicenseContract == null)
-{
-    throw new InvalidOperationException(
-        "Microi.AI.dll 与 Microi.Core.dll 版本不一致：缺少统一授权契约 GetOnlineAiLicenseState。请清空发布目录后完整发布全部 DLL。");
-}
-Console.WriteLine(
-    $"Microi：【✅成功】AI统一授权契约已加载：Microi.AI={typeof(MicroiAI).Assembly.GetName().Version}，"
-    + $"Microi.Core={typeof(IMicroiAI).Assembly.GetName().Version}");
 services.AddMicroiMQTT();//【可选】注入【MQTT引擎】插件
 services.AddMicroiHDFS();//【可选】注入【分布式存储】插件
 services.AddMicroiCaptcha();//【可选】注入验证码插件
@@ -391,7 +414,7 @@ if (scheduleLicenseRestoreRetry)
             var maxAttempts = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
                 "MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",
                 "License:RestoreMaxAttempts",
-                30));
+                3));
             var retrySeconds = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
                 "MICROI_LICENSE_RESTORE_RETRY_SECONDS",
                 "License:RestoreRetrySeconds",
@@ -518,7 +541,7 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 }
 #endregion
 
-#region 应用完全启动后的延迟初始化（接口引擎缓存 / AI Schema 缓存）
+#region 应用完全启动后的延迟初始化（接口引擎缓存 / 多语言元数据）
 {
     var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
     lifetime.ApplicationStarted.Register(() =>
@@ -552,7 +575,7 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
                 Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】接口引擎初始化失败：{ex.Message}");
             }
 
-            // AI 引擎 Schema 缓存初始化
+            // 多语言元数据延迟修复
             try
             {
                 _ = Task.Run(async () =>
@@ -582,21 +605,6 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
                 Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 排队同步 diy_lang 失败：{ex.Message}");
             }
 
-            try
-            {
-                using var scope = app.Services.CreateScope();
-                var microiAI = scope.ServiceProvider.GetService<IMicroiAI>();
-                if (microiAI != null)
-                {
-                    var initResult = await microiAI.InitializeSchemaCache(osClientName);
-                    var tag = initResult.Code == 1 ? "✅成功" : "⚠️警告";
-                    Console.WriteLine($"Microi：【{tag}】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】{initResult.Msg}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【AI插件】AI Schema缓存初始化失败: {ex.Message}");
-            }
         });
     });
 }

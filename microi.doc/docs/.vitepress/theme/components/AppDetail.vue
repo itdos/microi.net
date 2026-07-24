@@ -116,9 +116,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
 import { withPreviewVersion } from '../utils/app-preview-url.js'
+import { resolveSiteApiBase } from '../utils/site-api-base.js'
 
 const route = useRoute()
-const APP_API_BASE = import.meta.env.VITE_MICROI_PUBLIC_API_BASE || 'https://api.itdos.com'
+const APP_API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_PUBLIC_API_BASE)
 const OS_CLIENT = 'iTdos'
 
 const app = ref(null)

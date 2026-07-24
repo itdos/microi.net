@@ -13,9 +13,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，V8引擎注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>6.5.1</Version>
-    <AssemblyVersion>6.5.1</AssemblyVersion>
-    <FileVersion>6.5.1</FileVersion>
+    <Version>6.6.0</Version>
+    <AssemblyVersion>6.6.0</AssemblyVersion>
+    <FileVersion>6.6.0</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -38,6 +38,8 @@
     <PackageReference Include="AlibabaCloud.SDK.ESA20240910" Version="2.33.3" />
     <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.0" />
     <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.448" />
+    <!-- AlipaySDKNet.OpenAPI 2.4.0 depends on vulnerable log4net 2.0.12; force the compatible fixed release. -->
+    <PackageReference Include="log4net" Version="3.3.2" />
     <!-- 使用 Portable.BouncyCastle 1.9.0 解决版本冲突 -->
     <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
     <!-- 排除传递依赖引入的新版 BouncyCastle -->

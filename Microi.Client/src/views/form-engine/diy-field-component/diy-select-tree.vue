@@ -496,6 +496,7 @@ export default {
                 self.DiyApi.GetDiyFieldSqlData,
                 {
                     _FieldId: self.field.Id,
+                    _TableChildAuth: self.field._TableChildAuth || null,
                     _FormData: {},
                     _ParentValue: parentValue
                 },
@@ -643,6 +644,7 @@ export default {
                 self.DiyApi.GetDiyFieldSqlData,
                 {
                     _FieldId: self.field.Id,
+                    _TableChildAuth: self.field._TableChildAuth || null,
                     _FormData: {},
                     _Keyword: keyword
                 },
@@ -729,6 +731,7 @@ export default {
                     apiGetDiyFieldSqlData,
                     {
                         _FieldId: field.Id,
+                        _TableChildAuth: field._TableChildAuth || null,
                         _FormData: {},
                         _Keyword: queryString
                     },

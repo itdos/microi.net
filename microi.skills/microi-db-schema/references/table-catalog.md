@@ -65,7 +65,7 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `sys_microistore` | 21 | 应用商城 |
 | `sys_microistoreversion` | 1 | 应用商城应用版本 |
 | `sys_microiuptlog` | 7 | 框架更新日志 |
-| `sys_osclients` | 92 | OsClients |
+| `sys_osclients` | 98 | OsClients |
 | `sys_role` | 9 | Sys_Role |
 | `sys_rolelimit` | 5 | sys_rolelimit |
 | `sys_servernode` | 6 | 服务器节点管理 |
@@ -583,18 +583,19 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 
 ### `mic_ai` - AI模型管理
 
-字段数：19
+字段数：20
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
-| `EmbeddingApiUrl` | EmbeddingApiUrl | `varchar(50)` | `Text` | 示例：http://net.itdos.net:1434/v1/embeddings |
-| `QdrantHost` | QdrantHost | `varchar(50)` | `Text` | 示例：net.itdos.net |
-| `QdrantPort` | QdrantPort | `varchar(50)` | `Text` | 示例：1333 |
-| `QdrantApiKey` | QdrantApiKey | `varchar(50)` | `Text` | 示例：qdrant#pwd |
-| `TopTables` | TopTables | `int` | `NumberText` | 使用前N张最相关的表生成Schema（本地Ollama建议1，官网API建议2-3） |
-| `VectorTopK` | VectorTopK | `int` | `NumberText` | 向量检索返回多少张候选表（推荐10-20） |
-| `VectorScoreThreshold` | VectorScoreThreshold | `decimal(18, 2)` | `NumberText` | 相似度阈值（0-1，越小越宽松，建议0.3-0.5） |
-| `AiTimeout` | AiTimeout | `int` | `NumberText` | AI响应超时秒数（本地Ollama建议120，官网API建议30-60） |
+| `EnableVectorDatabase` | 是否启用向量数据库 | `int` | `Switch` | 默认0；缺失、空值或0时仅使用Schema关键词索引，且不连接、初始化、同步或搜索Embedding/Ollama/Qdrant。 |
+| `EmbeddingApiUrl` | EmbeddingApiUrl | `varchar(50)` | `Text` | 仅启用向量数据库时使用；示例：http://embedding-host:11434/v1/embeddings |
+| `QdrantHost` | QdrantHost | `varchar(50)` | `Text` | 仅启用向量数据库时使用；示例：qdrant-host |
+| `QdrantPort` | QdrantPort | `varchar(50)` | `Text` | 仅启用向量数据库时使用；示例：6333 |
+| `QdrantApiKey` | QdrantApiKey | `varchar(50)` | `Text` | 仅服务端读取；未启用向量数据库时不得用于网络请求。 |
+| `TopTables` | TopTables | `int` | `NumberText` | 使用前N张授权相关表的准确字段生成Schema Prompt。 |
+| `VectorTopK` | VectorTopK | `int` | `NumberText` | 启用向量数据库时，向量通道返回的候选表数量。 |
+| `VectorScoreThreshold` | VectorScoreThreshold | `decimal(18, 2)` | `NumberText` | 启用向量数据库时的相似度阈值（0-1，越小越宽松，建议0.3-0.5）。 |
+| `AiTimeout` | AiTimeout | `int` | `NumberText` | AI响应超时秒数；按实际模型延迟设置，本地高延迟模型通常需要更长超时。 |
 | `StreamDelay` | StreamDelay | `int` | `NumberText` | 流式输出每个字符延迟毫秒数（5=很快，10=适中，20=慢） |
 | `NL2SQLPrompt` | NL2SQLPrompt | `mediumtext` | `Textarea` | NL2SQLPrompt |
 | `Remark` | 备注 | `mediumtext` | `Textarea` | 备注 |
@@ -1076,7 +1077,11 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `SelectFields` | 查询列 | `mediumtext` | `JsonTable` | 指定select哪些列，不指定则是select * |
 | `SortFieldIds` | 可排序字段 | `mediumtext` | `MultipleSelect` | 可排序字段 |
 | `DelCodeShowV8` | [删除]按钮显示条件 | `mediumtext` | `CodeEditor` | [删除]按钮显示条件 |
-| `DiyConfig` | 模块配置 | `mediumtext` | `CodeEditor` | 模块配置 |
+| `DiyConfig` | 已废弃 | `mediumtext` | `CodeEditor` | 仅兼容历史数据，禁止写入新配置 |
+| `EnableViewSchema` | 启用跨端视图 | `int` | `Switch` | 1 表示启用 `ViewSchema` |
+| `ViewSchemaVersion` | 视图协议版本 | `varchar(25)` | `Text` | 当前协议语义版本 |
+| `ViewConfigVersion` | 视图配置版本 | `int` | `NumberText` | 每次发布配置时递增 |
+| `ViewSchema` | 跨端视图协议 | `mediumtext` | `CodeEditor` | Detail/Edit/List/Card 的版本化 JSON |
 | `Url` | Url地址 | `varchar(500)` | `Text` | Url地址 |
 | `IconClass` | 图标 | `varchar(500)` | `FontAwesome` | 图标 |
 | `EditCodeShowV8` | [编辑]按钮显示条件 | `mediumtext` | `CodeEditor` | [编辑]按钮显示条件 |
@@ -1192,10 +1197,16 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 
 ### `sys_osclients` - OsClients
 
-字段数：92
+字段数：98
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
+| `FileUploadEnabled` | 启用文件上传 | `int` | `Switch` | 关闭后禁止当前租户的交互式上传；空值按启用。可信平台任务仍受全局大小硬上限。 |
+| `FileUploadMaxFileMB` | 单文件上限MB | `int` | `NumberText` | 租户业务值；留空依次使用环境变量、appsettings、代码默认值，最终受独立 Absolute/HTTP 上限保护。 |
+| `FileUploadMaxRequestMB` | 单次总量上限MB | `int` | `NumberText` | 租户一次上传全部文件的业务合计；留空按回退链取值，最终受独立 Absolute/HTTP 上限保护。 |
+| `FileUploadMaxCount` | 单次文件数上限 | `int` | `NumberText` | 租户业务值；必须为正整数，留空按回退链取值，最终受 AbsoluteMaxFileCount 保护。 |
+| `FileUploadDailyUserQuotaMB` | 账号日额度MB | `int` | `NumberText` | 留空使用平台默认额度；按 UTC 日期、当前租户和账号在共享 Redis 原子统计。 |
+| `FileUploadDailyTenantQuotaMB` | 租户日额度MB | `int` | `NumberText` | 留空使用平台默认额度；按 UTC 日期和当前租户在共享 Redis 原子统计。 |
 | `MqttEnable` | 启用MQTT | `int` | `Switch` | 注意只有主库对应的SaaS引擎这一条数据MQTT配置的【MQTT端口】才有效果，其它租户SaaS引擎中的MQTT配置中【启用MQTT、用户名、密码、接口引擎】有效。 |
 | `MqttApiEngine` | 接口引擎 | `varchar(100)` | `Select` | 服务器端启动时、客户端连接时/发送消息时/断开连接时均触发。EventName：StartServer、Connected、Disconnected、MessageReceived、StopServer |
 | `MqttPort` | MQTT端口 | `int` | `NumberText` | 默认1883，注意api的编排ports参数必须添加对应的如- "1883:1883"。<br>注意只有主库对应的SaaS引擎这一条数据MQTT配置的【MQTT端口】才有效果，其它租户SaaS引擎中的MQTT配置中【启用MQTT、用户名、密码、接口引擎】有效。 |
@@ -1236,12 +1247,12 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `OsClientType` | OsClientType | `varchar(50)` | `Text` | SaaS引擎软件环境，自定义值，示例：Product（正式环境））、Dev（测试环境）、WZ（外帐） |
 | `TencentAppId` | TencentAppId | `varchar(50)` | `Text` | TencentAppId |
 | `DbVersion` | 数据库版本 | `varchar(50)` | `Text` | 如：12c、11g |
-| `OsClient` | OsClient | `varchar(50)` | `Text` | SaaS引擎Key，自定义值，建议全小写字母。示例：microi、itdos、xjy123 |
+| `OsClient` | OsClient | `varchar(50)` | `Text` | SaaS引擎Key，自定义值，建议全小写字母。示例：tenant_a、tenant_demo、demo01 |
 | `AliOssPrivateAccessKeyId` | 阿里云私有桶Key | `varchar(50)` | `Text` | 阿里云私有桶Key |
 | `ClientSecrets` | Token密钥 | `varchar(50)` | `Text` | 废弃字段 |
 | `MQVitrualHost` | VitrualHost | `varchar(50)` | `Text` | VitrualHost |
 | `DbReadConn` | 数据库连接字符串（读） | `varchar(500)` | `Text` | 为空则取DbConn |
-| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 需要在主库中配置所有saas库可能用到的前端访问域名，支持通配符，修改此配置后需要重启api的docker容器。示例值：http://localhost:2009;https://os.itdos.com;https://*.microi.net |
+| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 主租户此字段与 `Cors:AllowOrigins` 都为空时默认允许任意来源；填写后按精确来源或通配符收紧。示例：http://localhost:2009;https://os.itdos.com;https://*.microi.net。CORS 不是鉴权边界。 |
 | `SessionAuthTimeout` | Token过期时间（PC） | `varchar(50)` | `Text` | 单位：分钟，默认20分钟 |
 | `MQUserName` | 用户名 | `varchar(50)` | `Text` | 用户名 |
 | `DomainName` | 域名 | `mediumtext` | `Text` | 多个域名使用英文分号分割，移动端建议使用m-开头。 |

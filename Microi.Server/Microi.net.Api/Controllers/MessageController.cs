@@ -11,28 +11,60 @@ namespace Microi.net.Api
     public class MessageController : ControllerBase
     {
         [HttpGet]
-        public string OAuth(string code, string state)
+        public IActionResult OAuth(string code, string state)
         {
-            Console.WriteLine($"Code:{code}");
-            return code;
+            var expectedState = ConfigHelper.GetEnvOrConfiguration(
+                "MICROI_CHANJET_OAUTH_STATE",
+                "Integrations:Chanjet:OAuthState");
+            if (expectedState.DosIsNullOrWhiteSpace()
+                || code.DosIsNullOrWhiteSpace()
+                || !FixedTimeEquals(expectedState, state))
+            {
+                return NotFound();
+            }
+            // The authorization code is a credential. Never echo or log it.
+            return Ok(new DosResult(1));
         }
 
         [HttpPost]
         [Route("Receive")]
-        public dynamic Receive([FromBody] ChanjetEncryptMsg encryptMsg)
+        [RequestSizeLimit(512 * 1024)]
+        public IActionResult Receive([FromBody] ChanjetEncryptMsg encryptMsg)
         {
-            string enMsg = encryptMsg.GetEncryptMsg();
-
-            string Key_encryptKey = "1234567890123456";
-
-            Console.WriteLine($"解密前的消息{enMsg}");
-            String decryptMsg = OpenapiHelper.AesDecrypt(enMsg, Key_encryptKey);
-            Console.WriteLine($"解密后消息{decryptMsg}");
-
-            MessageBase message = JsonHelper.Deserialize<MessageBase>(decryptMsg);
-            object retObj = null;
             try
             {
+                var aesKey = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_CHANJET_AES_KEY",
+                    "Integrations:Chanjet:AesKey");
+                var expectedAppKey = ConfigHelper.GetEnvOrConfiguration(
+                    "MICROI_CHANJET_APP_KEY",
+                    "Integrations:Chanjet:AppKey");
+                var enMsg = encryptMsg?.GetEncryptMsg();
+                var keyLength = Encoding.UTF8.GetByteCount(aesKey ?? "");
+                if (aesKey.DosIsNullOrWhiteSpace()
+                    || expectedAppKey.DosIsNullOrWhiteSpace()
+                    || (keyLength != 16 && keyLength != 24 && keyLength != 32)
+                    || enMsg.DosIsNullOrWhiteSpace()
+                    || enMsg.Length > 384 * 1024)
+                {
+                    return NotFound();
+                }
+
+                var decryptMsg = OpenapiHelper.AesDecrypt(enMsg, aesKey);
+                if (decryptMsg.DosIsNullOrWhiteSpace() || decryptMsg.Length > 256 * 1024)
+                {
+                    return BadRequest(new DosResult(0, null, "消息格式无效。"));
+                }
+                var message = JsonHelper.Deserialize<MessageBase>(decryptMsg);
+                if (message == null
+                    || message.id.DosIsNullOrWhiteSpace()
+                    || message.msgType.DosIsNullOrWhiteSpace()
+                    || !FixedTimeEquals(expectedAppKey, message.appKey))
+                {
+                    return BadRequest(new DosResult(0, null, "消息验证失败。"));
+                }
+
+                object retObj;
                 switch (message.msgType)
                 {
                     case "APP_TEST":
@@ -55,12 +87,12 @@ namespace Microi.net.Api
                         retObj = DealBussnessMsg(message);
                         break;
                 }
+                return Ok(retObj);
             }
-            catch (Exception ex)
+            catch
             {
-                throw;
+                return BadRequest(new DosResult(0, null, "消息格式无效。"));
             }
-            return retObj;
         }
 
         private object DealOrderPayMsg(MessageBase message)
@@ -70,16 +102,28 @@ namespace Microi.net.Api
 
         private object DealOrgTempAuthMsg(MessageBase message)
         {
-            OrgTempAuthContent content = JsonHelper.Deserialize<OrgTempAuthContent>(message.bizContent.ToString());
-            Console.WriteLine($"OrgTempAuthCode:{content.tempAuthCode}");
+            JsonHelper.Deserialize<OrgTempAuthContent>(message.bizContent.ToString());
             return ReceiveMsgOK();
         }
 
         private object DealTicketMsg(MessageBase message)
         {
-            AppTicketContent content = JsonHelper.Deserialize<AppTicketContent>(message.bizContent.ToString());
-            Console.WriteLine($"AppTicket:{content.appTicket}");
+            JsonHelper.Deserialize<AppTicketContent>(message.bizContent.ToString());
             return ReceiveMsgOK();
+        }
+
+        private static bool FixedTimeEquals(string left, string right)
+        {
+            if (left == null || right == null) return false;
+            using var sha = SHA256.Create();
+            var leftHash = sha.ComputeHash(Encoding.UTF8.GetBytes(left));
+            var rightHash = sha.ComputeHash(Encoding.UTF8.GetBytes(right));
+            var different = 0;
+            for (var i = 0; i < leftHash.Length; i++)
+            {
+                different |= leftHash[i] ^ rightHash[i];
+            }
+            return different == 0;
         }
 
         private object DealTestMsg(MessageBase message)

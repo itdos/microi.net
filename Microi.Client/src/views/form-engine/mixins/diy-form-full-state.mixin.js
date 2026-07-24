@@ -25,6 +25,11 @@ export default {
         }
     },
     watch: {
+        TableRowId(newValue, oldValue) {
+            if (newValue !== oldValue) {
+                this.showDesktopRightPanel = false;
+            }
+        },
         // 监听路由变化，在页面模式下重新初始化表单
         $route: {
             handler(newRoute, oldRoute) {
@@ -126,6 +131,7 @@ export default {
             TableId: "",
             TableName: "",
             SysMenuId: "",
+            TableChildAuth: null,
             SysMenuModel: {},
             TableRowId: "",
             CurrentDiyTableModel: {},
@@ -172,6 +178,7 @@ export default {
             // 表单顶部/底部【发起流程/处理工作】CTA 按钮防重入状态
             WfSubmitting: false,
             FormRightType: "WorkFlow",
+            showDesktopRightPanel: false,
 
             // ========== 数据日志相关 ==========
             isCheckDataLog: true,

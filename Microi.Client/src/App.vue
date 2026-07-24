@@ -3,6 +3,7 @@
         <div id="app-microi" :class="GetAppClass()">
             <router-view />
         </div>
+        <ApiServiceUnavailable />
     </el-config-provider>
 </template>
 
@@ -12,11 +13,12 @@ import { ElConfigProvider } from "element-plus";
 import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
+import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
     name: "App",
-    components: { ElConfigProvider },
+    components: { ElConfigProvider, ApiServiceUnavailable },
     setup() {
         const diyStore = useDiyStore();
         const settingsStore = useSettingsStore();

@@ -36,6 +36,7 @@ import "./styles/itdos.diy.scss";
 import "./styles/mci-design.scss";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
+import { reportApiServiceFailure } from "./utils/api-service-status.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor } from "./utils/theme-color";
 import $ from "jquery";
@@ -476,7 +477,14 @@ window.addEventListener("beforeunload", () => {
     }
 });
 // 执行初始化
-initApp();
+initApp().catch(function (error) {
+    reportApiServiceFailure(error, {
+        apiBase: DiyCommon.GetApiBase(),
+        osClient: DiyCommon.GetOsClient(),
+        url: error?.config?.url || DiyCommon.GetApiBase() + "/api/FormEngine/GetSysConfig"
+    });
+    console.error("[Microi] 应用初始化失败：", error);
+});
 onAppMounted();
 // 导出 app 实例供其他模块使用
 export { app, pinia, router };

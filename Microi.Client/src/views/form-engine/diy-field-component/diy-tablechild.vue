@@ -21,6 +21,7 @@
         :TableChildData="field.Config.TableChild.Data"
         :SearchAppend="field.Config.TableChild.SearchAppend"
         :ParentFormLoadFinish="ParentFormLoadFinish"
+        :TableChildAuth="childAuthorizationContext"
         @ParentFormSet="handleParentFormSet"
         @CallbackParentFormSubmit="handleCallbackParentFormSubmit"
         @CallbakRefreshChildTable="handleCallbakRefreshChildTable"
@@ -149,6 +150,18 @@ const props = defineProps({
         type: String,
         default: ""
     },
+    TableId: {
+        type: String,
+        default: ""
+    },
+    SysMenuId: {
+        type: String,
+        default: ""
+    },
+    TableChildAuth: {
+        type: Object,
+        default: null
+    },
     FormDiyTableModel: {
         type: Object,
         default: () => ({})
@@ -182,6 +195,21 @@ const fatherFormModelSnapshot = computed(() => {
     }
     return Object.assign({}, { ...props.FormDiyTableModel });
 });
+
+// The browser supplies only relationship hints. The server reloads the field,
+// both menus and both tables, checks the parent row scope, and then forces the
+// child foreign-key filter. Parent preserves the chain for nested TableChild.
+const childAuthorizationContext = computed(() => ({
+    ParentSysMenuId: props.SysMenuId || "",
+    ParentTableId: props.TableId || "",
+    ParentFieldId: props.field && props.field.Id ? props.field.Id : "",
+    ParentRowId: props.FormDiyTableModel && props.FormDiyTableModel.Id
+        ? props.FormDiyTableModel.Id
+        : props.TableRowId || "",
+    ParentValue: getTableChildTableRowId() || "",
+    ParentFormMode: props.FormMode || "",
+    Parent: props.TableChildAuth || null
+}));
 
 // 子表组件实例引用
 const tableChildInstance = ref(null);

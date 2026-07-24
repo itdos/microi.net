@@ -153,7 +153,11 @@ Use this reference when exact field names are needed for core platform configura
 | `SelectFields` | 查询列 | `mediumtext` | `JsonTable` | 指定select哪些列，不指定则是select * |
 | `SortFieldIds` | 可排序字段 | `mediumtext` | `MultipleSelect` | 可排序字段 |
 | `DelCodeShowV8` | [删除]按钮显示条件 | `mediumtext` | `CodeEditor` | [删除]按钮显示条件 |
-| `DiyConfig` | 模块配置 | `mediumtext` | `CodeEditor` | 模块配置 |
+| `DiyConfig` | 已废弃 | `mediumtext` | `CodeEditor` | 仅兼容历史数据，禁止写入新配置 |
+| `EnableViewSchema` | 启用跨端视图 | `int` | `Switch` | 1 表示启用 `ViewSchema` |
+| `ViewSchemaVersion` | 视图协议版本 | `varchar(25)` | `Text` | 当前协议语义版本 |
+| `ViewConfigVersion` | 视图配置版本 | `int` | `NumberText` | 每次发布配置时递增 |
+| `ViewSchema` | 跨端视图协议 | `mediumtext` | `CodeEditor` | Detail/Edit/List/Card 的版本化 JSON |
 | `Url` | Url地址 | `varchar(500)` | `Text` | Url地址 |
 | `IconClass` | 图标 | `varchar(500)` | `FontAwesome` | 图标 |
 | `EditCodeShowV8` | [编辑]按钮显示条件 | `mediumtext` | `CodeEditor` | [编辑]按钮显示条件 |
@@ -352,10 +356,16 @@ Use this reference when exact field names are needed for core platform configura
 
 ### `sys_osclients` - OsClients
 
-字段数：92
+字段数：98
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
+| `FileUploadEnabled` | 启用文件上传 | `int` | `Switch` | 关闭后禁止当前租户的交互式上传；空值按启用。可信平台任务仍受全局大小硬上限。 |
+| `FileUploadMaxFileMB` | 单文件上限MB | `int` | `NumberText` | 租户业务值；留空依次使用环境变量、appsettings、代码默认值，最终受独立 Absolute/HTTP 上限保护。 |
+| `FileUploadMaxRequestMB` | 单次总量上限MB | `int` | `NumberText` | 租户一次上传全部文件的业务合计；留空按回退链取值，最终受独立 Absolute/HTTP 上限保护。 |
+| `FileUploadMaxCount` | 单次文件数上限 | `int` | `NumberText` | 租户业务值；必须为正整数，留空按回退链取值，最终受 AbsoluteMaxFileCount 保护。 |
+| `FileUploadDailyUserQuotaMB` | 账号日额度MB | `int` | `NumberText` | 留空使用平台默认额度；按 UTC 日期、当前租户和账号在共享 Redis 原子统计。 |
+| `FileUploadDailyTenantQuotaMB` | 租户日额度MB | `int` | `NumberText` | 留空使用平台默认额度；按 UTC 日期和当前租户在共享 Redis 原子统计。 |
 | `MqttEnable` | 启用MQTT | `int` | `Switch` | 注意只有主库对应的SaaS引擎这一条数据MQTT配置的【MQTT端口】才有效果，其它租户SaaS引擎中的MQTT配置中【启用MQTT、用户名、密码、接口引擎】有效。 |
 | `MqttApiEngine` | 接口引擎 | `varchar(100)` | `Select` | 服务器端启动时、客户端连接时/发送消息时/断开连接时均触发。EventName：StartServer、Connected、Disconnected、MessageReceived、StopServer |
 | `MqttPort` | MQTT端口 | `int` | `NumberText` | 默认1883，注意api的编排ports参数必须添加对应的如- "1883:1883"。<br>注意只有主库对应的SaaS引擎这一条数据MQTT配置的【MQTT端口】才有效果，其它租户SaaS引擎中的MQTT配置中【启用MQTT、用户名、密码、接口引擎】有效。 |
@@ -396,12 +406,12 @@ Use this reference when exact field names are needed for core platform configura
 | `OsClientType` | OsClientType | `varchar(50)` | `Text` | SaaS引擎软件环境，自定义值，示例：Product（正式环境））、Dev（测试环境）、WZ（外帐） |
 | `TencentAppId` | TencentAppId | `varchar(50)` | `Text` | TencentAppId |
 | `DbVersion` | 数据库版本 | `varchar(50)` | `Text` | 如：12c、11g |
-| `OsClient` | OsClient | `varchar(50)` | `Text` | SaaS引擎Key，自定义值，建议全小写字母。示例：microi、itdos、xjy123 |
+| `OsClient` | OsClient | `varchar(50)` | `Text` | SaaS引擎Key，自定义值，建议全小写字母。示例：tenant_a、tenant_demo、demo01 |
 | `AliOssPrivateAccessKeyId` | 阿里云私有桶Key | `varchar(50)` | `Text` | 阿里云私有桶Key |
 | `ClientSecrets` | Token密钥 | `varchar(50)` | `Text` | 废弃字段 |
 | `MQVitrualHost` | VitrualHost | `varchar(50)` | `Text` | VitrualHost |
 | `DbReadConn` | 数据库连接字符串（读） | `varchar(500)` | `Text` | 为空则取DbConn |
-| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 需要在主库中配置所有saas库可能用到的前端访问域名，支持通配符，修改此配置后需要重启api的docker容器。示例值：http://localhost:2009;https://os.itdos.com;https://*.microi.net |
+| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 主租户此字段与 `Cors:AllowOrigins` 都为空时默认允许任意来源；填写后按精确来源或通配符收紧。示例：http://localhost:2009;https://os.itdos.com;https://*.microi.net。CORS 不是鉴权边界。 |
 | `SessionAuthTimeout` | Token过期时间（PC） | `varchar(50)` | `Text` | 单位：分钟，默认20分钟 |
 | `MQUserName` | 用户名 | `varchar(50)` | `Text` | 用户名 |
 | `DomainName` | 域名 | `mediumtext` | `Text` | 多个域名使用英文分号分割，移动端建议使用m-开头。 |

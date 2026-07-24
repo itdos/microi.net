@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using Dos.ORM;
@@ -58,5 +59,14 @@ namespace Microi.net
         public DbSession DbRead { get; set; }
 
         public List<OsClientDataBase> DataBases { get; set; } //ConcurrentDictionary
+
+        /// <summary>
+        /// 当前进程是否已经完成扩展数据库列表初始化。
+        /// DataBases 为空列表表示“已加载且没有扩展库”，不能与尚未加载混为一谈，
+        /// 否则每次 V8 执行都会重复查询 microi_database 并回写 SaaS 配置缓存。
+        /// 这是可丢失的进程内运行态，不写入 Redis 或数据库。
+        /// </summary>
+        [JsonIgnore]
+        public bool DataBasesInitialized { get; set; }
     }
 }

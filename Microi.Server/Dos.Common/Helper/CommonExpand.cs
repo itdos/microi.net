@@ -303,6 +303,12 @@ namespace Dos.Common
             {
                 return default(T);
             }
+            if (typeof(T) != typeof(string)
+                && token.Type == JTokenType.String
+                && string.IsNullOrWhiteSpace(token.ToString()))
+            {
+                return default(T);
+            }
             try
             {
                 if (typeof(T) == typeof(string))

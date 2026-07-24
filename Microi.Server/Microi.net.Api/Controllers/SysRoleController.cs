@@ -13,6 +13,7 @@ namespace Microi.net.Api
     [EnableCors("any")]
     //[ApiController]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     //[Error]
     [Route("api/[controller]/[action]")]
     public class SysRoleController : Controller

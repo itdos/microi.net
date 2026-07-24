@@ -6,7 +6,9 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json;
@@ -23,13 +25,29 @@ namespace Microi.net
         private static IBrowser _browser = null;
         private static IPage _page = null;
         private static readonly ConcurrentDictionary<string, SpiderSession> _sessions = new ConcurrentDictionary<string, SpiderSession>(StringComparer.OrdinalIgnoreCase);
+        private static readonly SemaphoreSlim SessionMutationLock = new SemaphoreSlim(1, 1);
+        private static readonly ConditionalWeakTable<IPage, PageSecurityState> PageSecurityStates = new ConditionalWeakTable<IPage, PageSecurityState>();
         private static readonly HttpClient DevToolsHttpClient = new HttpClient { Timeout = TimeSpan.FromMilliseconds(1000) };
         private const int DefaultTimeoutMs = 30000;
         private const int DefaultCaptureBodyMaxLength = 200000;
+        private const int MaxCaptureBodyMaxLength = 1000000;
+        private const int MaxCapturedResponses = 100;
+        private const int DefaultMaxSessionsTotal = 32;
+        private const int DefaultMaxSessionsPerScope = 4;
+        private const int DefaultSessionIdleMinutes = 30;
+        private const int DefaultSessionMaxHours = 8;
+
+        private sealed class PageSecurityState
+        {
+            public SemaphoreSlim Sync { get; } = new SemaphoreSlim(1, 1);
+            public bool Configured { get; set; }
+        }
 
         private sealed class SpiderSession
         {
             public string SessionId { get; set; }
+            public string StorageKey { get; set; }
+            public string ScopeKey { get; set; }
             public string ProfileKey { get; set; }
             public string UserDataDir { get; set; }
             public Process BrowserProcess { get; set; }
@@ -64,13 +82,29 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult> GetRenderHtml(MicroiSpiderParam param)
         {
-            if (param.Url.DosIsNullOrWhiteSpace())
+            if (param == null || param.Url.DosIsNullOrWhiteSpace())
             {
                 return new DosResult(0, null, "param error.");
+            }
+            var callerOptionError = ValidateV8CallerOptions(param.ExecutablePath, null);
+            if (!callerOptionError.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult(0, null, callerOptionError);
+            }
+            var urlValidation = SpiderSecurityPolicy.ValidateUrl(param.Url);
+            if (!urlValidation.Allowed)
+            {
+                return new DosResult(0, null, "SSRF 防护已拦截此请求：" + urlValidation.Reason);
             }
             try
             {
                 JObject dataAppend = new JObject();
+                // The legacy singleton browser/page has no tenant identity.
+                // V8 callers therefore always use an isolated ephemeral
+                // browser; reusable login state belongs to the scoped session
+                // API below.
+                var keepBrowser = !V8TenantContext.IsActive && param.IsCloseBrowser == false;
+                var keepPage = keepBrowser && param.IsClosePage == false;
 
                 //var revisionInfo = new BrowserFetcherOptions
                 //{
@@ -94,7 +128,7 @@ namespace Microi.net
                 }
 
                 IBrowser browser = null;
-                if (param.IsCloseBrowser == false)
+                if (keepBrowser)
                 {
                     if (_browser == null)
                     {
@@ -108,7 +142,7 @@ namespace Microi.net
                 }
 
                 IPage page = null;
-                if (param.IsClosePage == false)
+                if (keepPage)
                 {
                     if (_page == null)
                     {
@@ -212,6 +246,7 @@ namespace Microi.net
                         //在这种情况下，Networkidle2 可能是更好的选择。
 
                         //await page.GoToAsync(url, WaitUntilNavigation.Networkidle0); //会提示验证码
+                        await ConfigureRequestSecurityAsync(page);
                         await page.GoToAsync(url, BuildNavigationOptions(WaitUntilNavigation.Networkidle2)); //会提示验证码
                         //await page.GoToAsync(url); // 会报错：Execution context was destroyed, most likely because of a navigation.
                         //await page.GoToAsync(url, WaitUntilNavigation.DOMContentLoaded);// 会报错：Execution context was destroyed, most likely because of a navigation.
@@ -241,7 +276,7 @@ namespace Microi.net
                             }
                             // 关闭页面和浏览器上下文
                             //await context.CloseAsync();
-                            if (param.IsCloseBrowser != false)
+                            if (!keepBrowser)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -250,7 +285,7 @@ namespace Microi.net
                                 _browser = null;
                                 _page = null;
                             }
-                            else if (param.IsClosePage != false)
+                            else if (!keepPage)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -281,7 +316,7 @@ namespace Microi.net
                             }
                             // 关闭页面和浏览器上下文
                             //await context.CloseAsync();
-                            if (param.IsCloseBrowser != false)
+                            if (!keepBrowser)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -290,7 +325,7 @@ namespace Microi.net
                                 _browser = null;
                                 _page = null;
                             }
-                            else if (param.IsClosePage != false)
+                            else if (!keepPage)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -305,7 +340,7 @@ namespace Microi.net
                         {
                             // 关闭页面和浏览器上下文
                             //await context.CloseAsync();
-                            if (param.IsCloseBrowser != false)
+                            if (!keepBrowser)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -314,7 +349,7 @@ namespace Microi.net
                                 _browser = null;
                                 _page = null;
                             }
-                            else if (param.IsClosePage != false)
+                            else if (!keepPage)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -326,7 +361,7 @@ namespace Microi.net
                         {
                             // 关闭页面和浏览器上下文
                             //await context.CloseAsync();
-                            if (param.IsCloseBrowser != false)
+                            if (!keepBrowser)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -335,7 +370,7 @@ namespace Microi.net
                                 _browser = null;
                                 _page = null;
                             }
-                            else if (param.IsClosePage != false)
+                            else if (!keepPage)
                             {
                                 page.CloseAsync();
                                 page.DisposeAsync();
@@ -343,7 +378,7 @@ namespace Microi.net
                             }
                             return new DosResult(1, responseUrlResult, "", -1, dataAppend);//方式2 + 3
                         }
-                        if (param.IsCloseBrowser != false)
+                        if (!keepBrowser)
                         {
                             page.CloseAsync();
                             page.DisposeAsync();
@@ -352,7 +387,7 @@ namespace Microi.net
                             _browser = null;
                             _page = null;
                         }
-                        else if (param.IsClosePage != false)
+                        else if (!keepPage)
                         {
                             page.CloseAsync();
                             page.DisposeAsync();
@@ -363,7 +398,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    if (param.IsCloseBrowser != false)
+                    if (!keepBrowser)
                     {
                         page.CloseAsync();
                         page.DisposeAsync();
@@ -372,7 +407,7 @@ namespace Microi.net
                         _browser = null;
                         _page = null;
                     }
-                    else if (param.IsClosePage != false)
+                    else if (!keepPage)
                     {
                         page.CloseAsync();
                         page.DisposeAsync();
@@ -393,7 +428,13 @@ namespace Microi.net
             try
             {
                 param = param ?? new MicroiSpiderSessionParam();
-                var session = await OpenOrCreateSessionAsync(param);
+                var callerOptionError = ValidateV8CallerOptions(param.ExecutablePath, param.UserDataDir);
+                if (!callerOptionError.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, callerOptionError);
+                }
+                var scopeKey = ResolveExecutionScope();
+                var session = await OpenOrCreateSessionAsync(param, scopeKey);
                 if (!string.IsNullOrWhiteSpace(param.Url))
                 {
                     await NavigateAsync(session.Page, ReplaceVariables(param.Url, session.Variables), param.WaitUntil, param.TimeoutMs);
@@ -409,22 +450,24 @@ namespace Microi.net
             }
         }
 
-        public Task<DosResult> GetSession(MicroiSpiderSessionParam param)
+        public async Task<DosResult> GetSession(MicroiSpiderSessionParam param)
         {
             try
             {
                 param = param ?? new MicroiSpiderSessionParam();
-                var sessionKey = ResolveSessionId(param);
-                if (string.IsNullOrWhiteSpace(sessionKey) || !_sessions.TryGetValue(sessionKey, out var session))
+                await CleanupExpiredSessionsAsync();
+                var sessionId = ResolveSessionId(param);
+                var sessionKey = BuildSessionStorageKey(ResolveExecutionScope(), sessionId);
+                if (string.IsNullOrWhiteSpace(sessionId) || !_sessions.TryGetValue(sessionKey, out var session))
                 {
-                    return Task.FromResult(new DosResult(2, null, "session not found."));
+                    return new DosResult(2, null, "session not found.");
                 }
                 Touch(session);
-                return Task.FromResult(new DosResult(1, BuildSessionData(session, null, null), "success"));
+                return new DosResult(1, BuildSessionData(session, null, null), "success");
             }
             catch (Exception ex)
             {
-                return Task.FromResult(new DosResult(0, null, ex.Message));
+                return new DosResult(0, null, ex.Message);
             }
         }
 
@@ -433,8 +476,9 @@ namespace Microi.net
             try
             {
                 param = param ?? new MicroiSpiderSessionParam();
-                var sessionKey = ResolveSessionId(param);
-                if (string.IsNullOrWhiteSpace(sessionKey) || !_sessions.TryRemove(sessionKey, out var session))
+                var sessionId = ResolveSessionId(param);
+                var sessionKey = BuildSessionStorageKey(ResolveExecutionScope(), sessionId);
+                if (string.IsNullOrWhiteSpace(sessionId) || !_sessions.TryRemove(sessionKey, out var session))
                 {
                     return new DosResult(2, null, "session not found.");
                 }
@@ -456,8 +500,13 @@ namespace Microi.net
 
             try
             {
+                var callerOptionError = ValidateV8CallerOptions(param.ExecutablePath, param.UserDataDir);
+                if (!callerOptionError.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult(0, null, callerOptionError);
+                }
                 TraceSpider("RunRecipe: opening session.");
-                var session = await OpenOrCreateSessionAsync(param);
+                var session = await OpenOrCreateSessionAsync(param, ResolveExecutionScope());
                 TraceSpider("RunRecipe: session opened. url=" + (session.Page == null ? "" : session.Page.Url));
                 MergeVariables(session.Variables, param.Variables);
                 MergeCaptureStarts(session, param.CaptureResponseUrlStarts, param.CaptureResponseBodyMaxLength);
@@ -539,7 +588,7 @@ namespace Microi.net
                 var resultData = BuildSessionData(session, param.Steps.Count - 1, param.Steps.Count);
                 if (param.CloseWhenDone == true)
                 {
-                    _sessions.TryRemove(session.SessionId, out _);
+                    _sessions.TryRemove(session.StorageKey, out _);
                     await CloseSessionAsync(session);
                 }
                 return new DosResult(1, resultData, "success");
@@ -550,7 +599,7 @@ namespace Microi.net
             }
         }
 
-        private async Task<SpiderSession> OpenOrCreateSessionAsync(MicroiSpiderSessionParam param)
+        private async Task<SpiderSession> OpenOrCreateSessionAsync(MicroiSpiderSessionParam param, string scopeKey)
         {
             param = param ?? new MicroiSpiderSessionParam();
             var sessionId = ResolveSessionId(param);
@@ -559,66 +608,101 @@ namespace Microi.net
                 sessionId = Guid.NewGuid().ToString("N");
             }
 
-            if (_sessions.TryGetValue(sessionId, out var existingSession) && existingSession.Browser != null && existingSession.Page != null)
+            var storageKey = BuildSessionStorageKey(scopeKey, sessionId);
+            await SessionMutationLock.WaitAsync();
+            try
             {
-                MergeCaptureStarts(existingSession, param.CaptureResponseUrlStarts, param.CaptureResponseBodyMaxLength);
-                Touch(existingSession);
-                return existingSession;
-            }
-
-            var userDataDir = GetUserDataDir(param, sessionId);
-            Directory.CreateDirectory(userDataDir);
-
-            IBrowser browser;
-            Process browserProcess = null;
-            if (!string.IsNullOrWhiteSpace(param.ExecutablePath))
-            {
-                var debugPort = GetFreeTcpPort();
-                TraceSpider("OpenSession: starting browser on debug port " + debugPort + ".");
-                browserProcess = StartBrowserProcess(param.ExecutablePath, userDataDir, debugPort, param.Headless ?? false);
-                var browserWSEndpoint = await WaitForDevToolsAsync(debugPort, param.TimeoutMs ?? DefaultTimeoutMs);
-                TraceSpider("OpenSession: DevTools ready.");
-                browser = await Puppeteer.ConnectAsync(new ConnectOptions
+                await CleanupExpiredSessionsAsync();
+                if (_sessions.TryGetValue(storageKey, out var existingSession)
+                    && existingSession.Browser != null
+                    && existingSession.Page != null)
                 {
-                    BrowserWSEndpoint = browserWSEndpoint,
-                    DefaultViewport = null,
-                    ProtocolTimeout = param.TimeoutMs ?? DefaultTimeoutMs
-                });
-                TraceSpider("OpenSession: connected to browser.");
-            }
-            else
-            {
-                await new BrowserFetcher().DownloadAsync();
-                browser = await Puppeteer.LaunchAsync(new LaunchOptions
+                    await ConfigureRequestSecurityAsync(existingSession.Page);
+                    MergeCaptureStarts(existingSession, param.CaptureResponseUrlStarts, param.CaptureResponseBodyMaxLength);
+                    Touch(existingSession);
+                    return existingSession;
+                }
+
+                var maxSessionsTotal = GetPositiveConfiguration(
+                    "MICROI_SPIDER_MAX_SESSIONS_TOTAL",
+                    "Spider:MaxSessionsTotal",
+                    DefaultMaxSessionsTotal);
+                var maxSessionsPerScope = GetPositiveConfiguration(
+                    "MICROI_SPIDER_MAX_SESSIONS_PER_SCOPE",
+                    "Spider:MaxSessionsPerScope",
+                    DefaultMaxSessionsPerScope);
+                if (_sessions.Count >= maxSessionsTotal)
                 {
-                    Headless = param.Headless ?? false,
+                    throw new InvalidOperationException("spider session quota exceeded.");
+                }
+                if (_sessions.Values.Count(item =>
+                        string.Equals(item.ScopeKey, scopeKey, StringComparison.OrdinalIgnoreCase))
+                    >= maxSessionsPerScope)
+                {
+                    throw new InvalidOperationException("spider session scope quota exceeded.");
+                }
+
+                var userDataDir = GetUserDataDir(param, scopeKey, sessionId);
+                Directory.CreateDirectory(userDataDir);
+
+                IBrowser browser;
+                Process browserProcess = null;
+                if (!string.IsNullOrWhiteSpace(param.ExecutablePath))
+                {
+                    var debugPort = GetFreeTcpPort();
+                    TraceSpider("OpenSession: starting browser on debug port " + debugPort + ".");
+                    browserProcess = StartBrowserProcess(param.ExecutablePath, userDataDir, debugPort, param.Headless ?? false);
+                    var browserWSEndpoint = await WaitForDevToolsAsync(debugPort, param.TimeoutMs ?? DefaultTimeoutMs);
+                    TraceSpider("OpenSession: DevTools ready.");
+                    browser = await Puppeteer.ConnectAsync(new ConnectOptions
+                    {
+                        BrowserWSEndpoint = browserWSEndpoint,
+                        DefaultViewport = null,
+                        ProtocolTimeout = param.TimeoutMs ?? DefaultTimeoutMs
+                    });
+                    TraceSpider("OpenSession: connected to browser.");
+                }
+                else
+                {
+                    await new BrowserFetcher().DownloadAsync();
+                    browser = await Puppeteer.LaunchAsync(new LaunchOptions
+                    {
+                        Headless = param.Headless ?? false,
+                        UserDataDir = userDataDir,
+                        Timeout = param.TimeoutMs ?? DefaultTimeoutMs,
+                        Args = new[] { "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage" }
+                    });
+                }
+
+                var pages = await browser.PagesAsync();
+                TraceSpider("OpenSession: pages loaded. count=" + pages.Length);
+                var page = pages.FirstOrDefault() ?? await browser.NewPageAsync();
+                await ConfigureRequestSecurityAsync(page);
+                if (param.VirtualWindows == true)
+                {
+                    await ApplyVirtualWindowsAsync(page);
+                }
+
+                var session = new SpiderSession
+                {
+                    SessionId = sessionId,
+                    StorageKey = storageKey,
+                    ScopeKey = scopeKey,
+                    ProfileKey = string.IsNullOrWhiteSpace(param.ProfileKey) ? sessionId : param.ProfileKey,
                     UserDataDir = userDataDir,
-                    Timeout = param.TimeoutMs ?? DefaultTimeoutMs,
-                    Args = new[] { "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage" }
-                });
+                    BrowserProcess = browserProcess,
+                    Browser = browser,
+                    Page = page
+                };
+                MergeCaptureStarts(session, param.CaptureResponseUrlStarts, param.CaptureResponseBodyMaxLength);
+                AttachResponseCapture(session);
+                _sessions[storageKey] = session;
+                return session;
             }
-
-            var pages = await browser.PagesAsync();
-            TraceSpider("OpenSession: pages loaded. count=" + pages.Length);
-            var page = pages.FirstOrDefault() ?? await browser.NewPageAsync();
-            if (param.VirtualWindows == true)
+            finally
             {
-                await ApplyVirtualWindowsAsync(page);
+                SessionMutationLock.Release();
             }
-
-            var session = new SpiderSession
-            {
-                SessionId = sessionId,
-                ProfileKey = string.IsNullOrWhiteSpace(param.ProfileKey) ? sessionId : param.ProfileKey,
-                UserDataDir = userDataDir,
-                BrowserProcess = browserProcess,
-                Browser = browser,
-                Page = page
-            };
-            MergeCaptureStarts(session, param.CaptureResponseUrlStarts, param.CaptureResponseBodyMaxLength);
-            AttachResponseCapture(session);
-            _sessions[sessionId] = session;
-            return session;
         }
 
         private static int GetFreeTcpPort()
@@ -712,14 +796,65 @@ namespace Microi.net
             return "";
         }
 
-        private static string GetUserDataDir(MicroiSpiderSessionParam param, string sessionId)
+        private static string ResolveExecutionScope()
+        {
+            var context = V8TenantContext.Current;
+            var osClient = context?.OsClient;
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                osClient = DiyToken.GetCurrentOsClient();
+            }
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                osClient = OsClientDefault.OsClient;
+            }
+
+            var executor = string.Join(
+                "__",
+                new[] { context?.ApiEngineKey, context?.EventName }
+                    .Where(item => !item.DosIsNullOrWhiteSpace()));
+            if (executor.DosIsNullOrWhiteSpace())
+            {
+                executor = V8TenantContext.IsActive ? "v8" : "host";
+            }
+            return SafeProfileName(osClient) + "__" + SafeProfileName(executor);
+        }
+
+        private static string BuildSessionStorageKey(string scopeKey, string sessionId)
+        {
+            return SafeProfileName(scopeKey) + ":" + SafeProfileName(sessionId);
+        }
+
+        private static string ValidateV8CallerOptions(string executablePath, string userDataDir)
+        {
+            if (!V8TenantContext.IsActive)
+            {
+                return "";
+            }
+            if (!executablePath.DosIsNullOrWhiteSpace())
+            {
+                return "V8 Spider 不允许指定 ExecutablePath，请使用平台配置的浏览器运行时。";
+            }
+            if (!userDataDir.DosIsNullOrWhiteSpace())
+            {
+                return "V8 Spider 不允许指定 UserDataDir，请使用租户与引擎隔离的会话目录。";
+            }
+            return "";
+        }
+
+        private static string GetUserDataDir(MicroiSpiderSessionParam param, string scopeKey, string sessionId)
         {
             if (param != null && !string.IsNullOrWhiteSpace(param.UserDataDir))
             {
                 return param.UserDataDir;
             }
             var profileKey = param != null && !string.IsNullOrWhiteSpace(param.ProfileKey) ? param.ProfileKey : sessionId;
-            return Path.Combine(Path.GetTempPath(), "Microi.Spider", "profiles", SafeProfileName(profileKey));
+            return Path.Combine(
+                Path.GetTempPath(),
+                "Microi.Spider",
+                "profiles",
+                SafeProfileName(scopeKey),
+                SafeProfileName(profileKey));
         }
 
         private static string SafeProfileName(string key)
@@ -737,11 +872,66 @@ namespace Microi.net
             await page.SetViewportAsync(new ViewPortOptions { Width = 1366, Height = 768 });
         }
 
+        private static async Task ConfigureRequestSecurityAsync(IPage page)
+        {
+            if (page == null || !SpiderSecurityPolicy.IsStrictProtectionEnabled())
+            {
+                return;
+            }
+
+            var state = PageSecurityStates.GetValue(page, _ => new PageSecurityState());
+            await state.Sync.WaitAsync();
+            try
+            {
+                if (state.Configured)
+                {
+                    return;
+                }
+
+                await page.SetRequestInterceptionAsync(true);
+                page.AddRequestInterceptor(async request =>
+                {
+                    try
+                    {
+                        var validation = SpiderSecurityPolicy.ValidateUrl(request?.Url);
+                        if (!validation.Allowed)
+                        {
+                            TraceSpider(
+                                "SSRF blocked: " + validation.Reason + " (URL=" + (request?.Url ?? "") + ")");
+                            await request.AbortAsync(RequestAbortErrorCode.BlockedByClient);
+                            return;
+                        }
+                        await request.ContinueAsync();
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            await request.AbortAsync(RequestAbortErrorCode.BlockedByClient);
+                        }
+                        catch
+                        {
+                        }
+                    }
+                });
+                state.Configured = true;
+            }
+            finally
+            {
+                state.Sync.Release();
+            }
+        }
+
         private static async Task NavigateAsync(IPage page, string url, string waitUntil, int? timeoutMs)
         {
             if (page == null || string.IsNullOrWhiteSpace(url))
             {
                 return;
+            }
+            var validation = SpiderSecurityPolicy.ValidateUrl(url);
+            if (!validation.Allowed)
+            {
+                throw new InvalidOperationException("SSRF 防护已拦截此请求：" + validation.Reason);
             }
             TraceSpider("Navigate: " + url);
             var navigateTask = page.Client.SendAsync("Page.navigate", new
@@ -937,7 +1127,9 @@ namespace Microi.net
             }
             if (bodyMaxLength.HasValue && bodyMaxLength.Value > 0)
             {
-                session.CaptureBodyMaxLength = bodyMaxLength.Value;
+                session.CaptureBodyMaxLength = Math.Min(
+                    bodyMaxLength.Value,
+                    MaxCaptureBodyMaxLength);
             }
             if (starts == null)
             {
@@ -989,6 +1181,10 @@ namespace Microi.net
                     };
                     lock (session.SyncRoot)
                     {
+                        while (session.CapturedResponses.Count >= MaxCapturedResponses)
+                        {
+                            session.CapturedResponses.RemoveAt(0);
+                        }
                         session.CapturedResponses.Add(item);
                     }
                 }
@@ -1072,6 +1268,43 @@ namespace Microi.net
                 data["NextStepIndex"] = nextStepIndex.Value;
             }
             return data;
+        }
+
+        private static int GetPositiveConfiguration(
+            string environmentKey,
+            string configurationPath,
+            int defaultValue)
+        {
+            return ConfigHelper.GetEnvOrConfigurationInt(
+                environmentKey,
+                configurationPath,
+                defaultValue);
+        }
+
+        private static async Task CleanupExpiredSessionsAsync()
+        {
+            var now = DateTime.Now;
+            var idleMinutes = GetPositiveConfiguration(
+                "MICROI_SPIDER_SESSION_IDLE_MINUTES",
+                "Spider:SessionIdleMinutes",
+                DefaultSessionIdleMinutes);
+            var maxHours = GetPositiveConfiguration(
+                "MICROI_SPIDER_SESSION_MAX_HOURS",
+                "Spider:SessionMaxHours",
+                DefaultSessionMaxHours);
+
+            var expired = _sessions
+                .Where(pair =>
+                    now - pair.Value.LastActiveAt >= TimeSpan.FromMinutes(idleMinutes)
+                    || now - pair.Value.CreatedAt >= TimeSpan.FromHours(maxHours))
+                .ToList();
+            foreach (var pair in expired)
+            {
+                if (_sessions.TryRemove(pair.Key, out var session))
+                {
+                    await CloseSessionAsync(session);
+                }
+            }
         }
 
         private static void Touch(SpiderSession session)

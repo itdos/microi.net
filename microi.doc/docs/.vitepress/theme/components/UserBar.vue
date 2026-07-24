@@ -108,8 +108,9 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vitepress'
+import { resolveSiteApiBase } from '../utils/site-api-base.js'
 
-const API_BASE = import.meta.env.VITE_MICROI_API_BASE || getDefaultApiBase()
+const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const route = useRoute()
 
 const user = ref(null)
@@ -125,13 +126,6 @@ const isHomePage = computed(() => route.path === '/' || route.path === '/index.h
 const pwdDialogStyle = computed(() => ({
   transform: `translate(${pwdDialogOffset.value.x}px, ${pwdDialogOffset.value.y}px)`
 }))
-
-function getDefaultApiBase() {
-  if (typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) {
-    return 'https://localhost:7266'
-  }
-  return 'https://api.itdos.com'
-}
 
 function normalizeToken(raw) {
   return (raw || '').replace(/^Bearer\s+/i, '').trim()
@@ -395,13 +389,6 @@ onUnmounted(() => {
 }
 
 /* 首页强制暗色导航，账号区需要独立提升对比度 */
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-bar {
-  --microi-userbar-home-text: rgba(255, 255, 255, 0.94);
-  --microi-userbar-home-muted: rgba(255, 255, 255, 0.72);
-  --microi-userbar-home-border: rgba(148, 163, 255, 0.42);
-  --microi-userbar-home-bg: rgba(18, 31, 67, 0.72);
-}
-
 .home-user-bar {
   --microi-userbar-home-text: rgba(255, 255, 255, 0.96);
   --microi-userbar-home-muted: rgba(255, 255, 255, 0.74);
@@ -409,8 +396,6 @@ onUnmounted(() => {
   --microi-userbar-home-bg: rgba(18, 31, 67, 0.78);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info,
 .home-user-bar .login-link,
 .home-user-bar .user-info {
   color: var(--microi-userbar-home-text) !important;
@@ -420,27 +405,12 @@ onUnmounted(() => {
   backdrop-filter: blur(14px);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info {
-  color: var(--microi-userbar-home-text) !important;
-  background: var(--microi-userbar-home-bg);
-  border-color: var(--microi-userbar-home-border);
-  box-shadow: 0 12px 32px rgba(16, 24, 64, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(14px);
-}
-
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-info:hover,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link:hover,
 .home-user-bar .user-info:hover,
 .home-user-bar .login-link:hover {
   background: rgba(35, 50, 104, 0.86);
   border-color: rgba(255, 90, 46, 0.58);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .user-name,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .arrow-icon,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link span,
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .login-link svg,
 .home-user-bar .user-name,
 .home-user-bar .arrow-icon,
 .home-user-bar .login-link span,
@@ -449,32 +419,27 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .default-avatar,
 .home-user-bar .default-avatar {
   background: rgba(255, 90, 46, 0.16);
   color: #ff7a45;
   border-color: rgba(255, 90, 46, 0.5);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .dropdown-menu,
 .home-user-bar .dropdown-menu {
   background: rgba(8, 16, 40, 0.96);
   border-color: rgba(148, 163, 255, 0.26);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.38);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item,
 .home-user-bar .menu-item {
   color: rgba(255, 255, 255, 0.88);
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-item:hover,
 .home-user-bar .menu-item:hover {
   background: rgba(255, 90, 46, 0.16);
   color: #fff;
 }
 
-:global(body:has(.VPHome):not(:has(.ai-login-page))) .menu-divider,
 .home-user-bar .menu-divider {
   background: rgba(255, 255, 255, 0.12);
 }

@@ -1314,160 +1314,109 @@ function toggle() { cur.value = toggleTheme(); uni.showToast({ title: '已切换
 
 ---
 
-## 🚨 移动端低代码项目落地踩坑（必�?- 2026.5�?
+## 🚨 移动端低代码项目落地踩坑（必读，2026.5）
 
-实战中频繁出现的 7 类问题，团队复盘后总结为强制规范：
+实战中频繁出现的 7 类问题，统一按以下规则处理。
 
 ### 1. 路由前缀不要硬编码租户名
-- �?`manifest.json` �?`"router": { "base": "/lsg/" }`
-- �?`"router": { "base": "/" }`，租户隔离通过 `OS_CLIENT` 常量 + 请求头完�?
-- 任何形如 `https://api.itdos.com/{tenant}/...` �?URL 都是错误的，平台对外只暴�?`/`、`/api/...`、`/apiengine/...`
 
-### 2. tabBar 必须�?PNG 图标
-- uniapp / 微信小程序的 tabBar `iconPath` / `selectedIconPath` **只接受静�?PNG 文件路径**
-- 不允许：emoji 字符、字体图标、SVG（部分平台不支持）、远�?URL
-- 推荐尺寸�?0×60 ~ 81×81 px，未选中�?`#9898B0`，选中�?= 品牌主色
-- 可用 PowerShell + System.Drawing 一次性生�?5×2 = 10 个图标，保证统一风格
+- 错误：在 `manifest.json` 写死 `"router": { "base": "/fixed-tenant/" }`。
+- 正确：默认使用 `"router": { "base": "/" }`；租户由运行配置、`OsClient` 和请求头/参数确定。
+- 不要自行把租户名拼进 API 路径。平台接口使用 `/api/...`、`/apiengine/...` 等标准路由。
 
-### 3. font-size 严禁通配 `.parent text { ... }`
-SCSS scoped �?`.qo text { font-size: 40rpx }` 会同时影�?emoji 图标 *�? 子标�?`<text class="fz-22">`，导致标签字体被强行放大�?
-- �?`.qo text { font-size: 40rpx; }`
-- �?`.qo .qo-emoji { font-size: 40rpx; } .qo .qo-label { font-size: 22rpx; }`
-- 凡同一容器内同时含图标与文字，**必须**给图标和文字各自的具�?class
+### 2. tabBar 使用本地静态 PNG 图标
 
-### 4. 我的�?/ 详情页菜单优先用网格单元格而非纵向列表
-参�?"乐闪�?�?环球捕手"�?云集" 等线上商城：
-- 5 列资产汇总条 �?4-5 列彩色图标网�?�?多行 4 列服务网�?
-- 单元�?cell 结构：`80rpx 圆角图标背景�?+ 22rpx 标签`，间�?16~24rpx
-- 不要�?"图标 �?文字 �?�?箭头" 的横排长列表（除非是设置类深层菜单）
+- uni-app/微信小程序 tabBar 的 `iconPath`、`selectedIconPath` 使用项目内静态 PNG。
+- 不使用 emoji、字体图标、远程 URL；SVG 仅在目标端明确支持并已做真实设备验证时使用。
+- 普通态与选中态保持相同画布和轮廓，推荐 60×60 至 81×81 px，并验证深浅色背景可读性。
 
-### 5. 必备微动效（每个可点击元素都要有反馈�?
+### 3. 字号样式不要通配所有 `text`
+
+Scoped SCSS 中的 `.entry text { font-size: 40rpx; }` 会同时放大图标文字和子标签。图标、标题、说明必须使用独立 class：
+
+```scss
+.entry .entry-icon { font-size: 40rpx; }
+.entry .entry-label { font-size: 22rpx; }
+```
+
+### 4. 个人中心/详情入口按信息层级选布局
+
+- 高频资产、订单状态、服务入口适合 4～5 列网格。
+- 设置、安全、协议等低频入口适合纵向列表。
+- 单元格须有稳定触控区域、清晰标签和一致间距；不要为了追求密度牺牲可读性。
+
+### 5. 每个可点击元素都要有反馈
+
 ```scss
 .cell, .entry-item, .product-card, .zone-card {
   position: relative;
-  transition: transform .2s ease;
+  transition: transform .2s ease, box-shadow .2s ease;
 }
-.cell::after, .entry-item::after, .product-card::after, .zone-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: var(--mci-shadow-card-hover);
-  opacity: 0;
-  transition: opacity .2s ease;
-  pointer-events: none;
+.cell:active, .entry-item:active {
+  transform: scale(.94);
 }
-.cell:active, .entry-item:active { transform: scale(0.94); }
-
 @keyframes fadein-up {
   from { opacity: 0; transform: translateY(16rpx); }
-  to   { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .animate-fadein { animation: fadein-up .45s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadein { animation: none; }
+}
 ```
 
-### 6. 品牌�?/ Logo 在所有标题位置统一替换
-- `manifest.json`: `name`、`h5.title`
-- `pages.json`: 每个页面 `navigationBarTitleText`、`globalStyle.navigationBarTitleText`
-- 各页面顶�?brand 文本（首�?hero、登录页 logo 区、注册页标题�?
-- 控制�?`console.log('[lsg-mall]')` 等技术代号可保留，但用户可见文案必须统一为产品名（如 `乐闪购`�?
+动效只表达状态，不承担业务完成事实；提交、支付、安装等动作仍以服务端返回和可恢复状态为准。
 
-### 7. 接口路径必须自动包含 ApiAddress（MCP 创建接口的硬规则�?
-平台动态路�?`/apiengine/{key}` 通过 `sys_apiengine.ApiAddress` �?Redis 中查找�?*ApiAddress 为空 = 全部 404�?*
-- MCP `microi_create_engine` 已自�?`ApiAddress = '/apiengine/{apiEngineKey}'`
-- 手工 SQL / 直接 INSERT 创建的接口请补全 `ApiAddress` 字段，并写入缓存�?
-  `Microi:{osClient}:FormData:sys_apiengine:{apiAddress.toLowerCase()}` �?整行模型对象
-- 修复脚本可用一次�?V8 接口循环 `V8.FormEngine.UptFormData('sys_apiengine', { Id, ApiAddress })` �?`V8.Cache.Set` 三个键（key、Id、ApiAddress �?lowercase�?
+### 6. 品牌名和 Logo 的用户可见位置保持一致
 
+同步检查 `manifest.json` 的 `name/h5.title`、`pages.json` 的导航标题、登录/注册/首页品牌区、空状态和分享标题。控制台中的技术标识可保留，但用户可见文案必须统一。
 
-## 🔗 外键字段必须使用 Id+Name 双控件设计（强制规范�?
+### 7. 接口地址由标准引擎工具维护
 
-> **错误做法**：只建一�?`XxxId` 字段并设�?Select 下拉，存的是 Id，列表中显示的也�?Id —�?用户根本看不懂�?
->
-> **正确做法**：`XxxId`（隐�?Text�? `XxxName`（显�?Select+SQL 数据源）成对出现。Name 控件的值变�?V8 事件自动�?Id 控件赋值�?
+- `microi_create_engine`/`microi_upsert_engine` 会维护 `ApiEngineKey`、`ApiAddress` 和路由缓存。
+- 写入超时先用标准 get/list 工具回读，不得立即重复创建。
+- 禁止通过手工 SQL、直接修改 `sys_apiengine` 或自行拼 Redis Key 修补路由；这会绕过租户、审计、缓存失效和控制面权限。
+- 长任务使用后台任务并持久化进度；普通接口写入后以远端回读为最终依据。
 
-### 字段对结�?
+## 🔗 关联字段：保存真实 Id，界面展示可读标签
 
-| 字段 | Component | Visible | 用�?|
-|------|-----------|---------|------|
-| `XxxId` | Text | **0**（隐藏） | 实际外键 Id（数据库索引 / 关联查询用） |
-| `XxxName` | Select | 1 | 用户在表�?列表里看到的关联记录名称 |
+关联字段的数据库事实值通常是 `XxxId`。表单使用 `JoinForm`、`OpenTable` 或带数据源的 `Select` 显示名称，`SelectSaveField` 保存 `Id`，`SelectLabel` 展示名称。不要因为列表默认显示 Id，就强制所有业务表冗余一对可编辑的 `XxxId/XxxName` 字段。
 
-### XxxName 字段 Config（Sql 数据源）
+### Select 数据源示例
 
-```jsonc
+```json
 {
   "DataSource": "Sql",
-  "Sql": "select Id, Name from <关联�? where Name like '%$Keyword$%' limit 0,20",
-  "SelectLabel": "Name",          // 下拉显示字段
-  "SelectSaveField": "Name",      // 保存�?XxxName 的字段（注意保存的是 Name 而非 Id�?
+  "Sql": "select Id, Name from mall_category where Name like '%$Keyword$%' limit 0,20",
+  "SelectLabel": "Name",
+  "SelectSaveField": "Id",
   "SelectSaveFormat": "Text",
   "EnableSearch": true,
-  "DataSourceSqlRemote": true,    // 必须 true：每次输入关键字向后端查�?
-  "V8Code": "if (V8.ThisValue && typeof V8.ThisValue === 'object') { V8.Form.XxxId = V8.ThisValue.Id || ''; } else if (!V8.ThisValue) { V8.Form.XxxId = ''; }"
+  "DataSourceSqlRemote": true
 }
 ```
 
-**关键�?*�?
-1. `SelectSaveField` �?**Name 而非 Id** —�?`XxxName` 存的是名称，列表直接显示就有意义
-2. `DataSourceSqlRemote: true` —�?远程搜索，避免一次性把整张表拉到前�?
-3. `V8Code` 中通过 `V8.ThisValue` 拿到完整选项对象（包�?Id �?Name），赋值给 `V8.Form.XxxId` 即可同步外键 Id
-4. SQL �?`$Keyword$` 是占位符，会被替换为用户输入的关键字
-5. 若关联表"name 字段"叫别的（�?`mall_member.NickName`、`mall_shop.ShopName`、`mall_product.Title`、`mall_address.Receiver`、`mall_pickup_apply.ApplyNo`），需�?SQL �?Config 中相应替�?
+- `$Keyword$` 是平台数据源占位符，不要把浏览器输入直接拼进任意 SQL。
+- 关联表、字段和数据源必须来自当前租户，并受当前表单/菜单的授权与数据范围约束。
+- 大表使用远程搜索和分页，不一次性把全表拉到浏览器。
+- 列表展示名称优先配置 Join/模块关联字段或受控数据源，不把隐藏 Id 暴露给用户。
 
-### 命名规范
+### 什么时候增加 `XxxName` 快照字段
 
-| 关联场景 | baseName | 字段�?| joinTable.joinNameField |
-|---------|---------|--------|------------------------|
-| 商品分类 | Category | CategoryId / CategoryName | mall_category.Name |
-| 会员（直推上�?/ 买家 / 卖家 / 持有�?/ 发起�?/ 目标人） | Parent / Buyer / Seller / Owner / Initiator / Target | XxxId / XxxName | mall_member.NickName |
-| 店铺 | Shop / ShopOwner | ShopId / ShopName | mall_shop.ShopName |
-| 商品 | Product / AnchorProduct | ProductId / ProductName | mall_product.Title |
-| 收货地址 | Address | AddressId / AddressName | mall_address.Receiver |
+只有在业务明确要求“保存当时名称”、离线展示、历史审计或高频报表需要时才增加 `XxxName`。它是快照/冗余字段，不是外键事实源，并遵守：
 
-### MCP 工具支持
+1. 后端 SubmitBefore/接口引擎在同一事务内根据 `XxxId` 校验并写入名称。
+2. 前端 V8 可以即时回显，但不能作为唯一一致性保障。
+3. 关联名称后续变化时，先明确历史快照是否应随之更新。
+4. 批量回填必须参数化、可恢复、可幂等，并经过明确写入确认。
 
-#### 新建外键对：`microi_add_join_field`
-```jsonc
-{
-  "tableId": "01XXX...",
-  "baseName": "Category",
-  "label": "分类",
-  "joinTableName": "mall_category",
-  "joinIdField": "Id",      // 默认 "Id"
-  "joinNameField": "Name",  // 默认 "Name"
-  "tab": "",
-  "sort": 100
-}
-```
+### MCP 建模流程
 
-#### 修复存量字段：`microi_fix_join_field`（或直接调用 `_mcp_fix_join_field` 接口引擎�?
-- 自动隐藏 `XxxId`（Visible=0/AppVisible=0�?
-- 自动创建/更新 `XxxName` �?Select+SQL+V8Code 三件�?
-- 自动回填：遍历目标表所有非�?`XxxId` 行，�?Id 查询关联表的 Name，UPDATE �?`XxxName`
-- 幂等：重复调用不会重复创建字段，只会刷新 Config
-
-调用示例（dryRun 先看计划）：
-```jsonc
-microi_run_engine "_mcp_fix_join_field" {
-  "tableName": "mall_buy_order",
-  "baseName": "Buyer",
-  "label": "买家",
-  "joinTableName": "mall_member",
-  "joinNameField": "NickName",
-  "dryRun": true
-}
-```
-
-### 何时跳过 Name 字段
-
-只在以下场景下保留单 `XxxId` 字段（不�?Name 对）�?
-- 关联表完全没有可�?名称字段"（如�?Id 表）
-- 多态关联（同一字段可能指向多张不同表，�?`RelOrderId`�?
-- 高频写入的日志表外键，且管理后台不需要列表展�?
-
-其他所有业务表的外�?**必须** �?Id+Name 对�?
-
+1. 先用 `microi_get_db_schema` 获取真实表和字段。
+2. 使用 `microi_build_field_config` 生成 JoinForm/OpenTable/Select 配置。
+3. 使用 `microi_add_field` 或 `microi_update_field` 写入字段。
+4. 修改 KeyValue/Config 后回读 `microi_get_field_list`，并执行 `microi_refresh_schema_cache`。
+5. 在真实菜单下验证普通角色能看到标签，但不能借数据源越权读取其它表或行。
 ---
 
 ## 表单布局规范（Column）

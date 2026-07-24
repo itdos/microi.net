@@ -104,11 +104,11 @@ export async function login(account, pwd, captcha = {}) {
 
 SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业务 wrapper 或上传逻辑各自拼接租户和鉴权头。
 
-- `osclient` 必须作为唯一租户请求头键，值为当前租户，例如 `xjy`。写入前删除已有 `OsClient` / `osclient` / 任意大小写变体。
+- `osclient` 必须作为唯一租户请求头键，值来自当前运行期租户，例如 `demo`。写入前删除已有 `OsClient` / `osclient` / 任意大小写变体。
 - `Authorization` 写入前也必须删除已有 `Authorization` / `authorization` 变体。需要同时兼容平台 Token 时，可以保留单独的 `Token` 请求头，但它也必须先做大小写去重。
 - 页面传入的 `headers` / `header` 要先合并，再统一去重；禁止 `headers.OsClient = ...` 和 `headers.osclient = ...` 同时存在。
 - 小程序授权登录、账号登录、刷新 Token、FormEngine、ApiEngine、上传都必须走同一套去重逻辑。
-- 验收时检查真实网络请求：不得出现 `osclient: xjy, xjy`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
+- 验收时检查真实网络请求：不得出现 `osclient: demo, demo`、`Authorization: Bearer xxx, Bearer xxx` 这类逗号合并值。
 
 ## Token、当前登录用户与当前终端登录协议
 
@@ -230,6 +230,13 @@ uni.request({ url: apiBase + '/apiengine/' + key, header: { Token: token } });
 
 新的 Microi 前端工作只支持 Vue 3。不要把 Vue2、Vuex、`Vue.prototype` 或 Vue2/uni-app 条件编译加入 `microi.v8.js`。状态管理属于项目本身，通常使用 Pinia 或本地组合函数；SDK 只负责平台访问、请求、鉴权、上传、资源 URL 和小工具。
 
+## Key-Value 枚举的跨端约定（强制）
+
+- PC、UniApp、小程序和 Web 页面遇到简单枚举时，应从字段元数据或业务接口返回的公开 `{Key,Value}` 选项获取数据源；`Value` 只负责展示，`Key` 才能进入表单值、URL、缓存键和接口筛选参数。
+- 不得把中文 `Value` 当作查询条件，也不得在各端复制维护互相漂移的中文/英文映射。若业务接口已返回选项投影，优先直接消费；本地常量只能作为接口暂时不可用时的同 Key 兜底。
+- 页面 URL 需要保存筛选状态时写入稳定英文 Key，返回页面后按 Key 恢复选中项；切换语言只替换 Value，不得改变 URL 和数据库值。
+- 兼容历史数据时，客户端可以短期识别旧 Value，但提交和新 URL 必须立即归一为 Key；长期迁移由服务端完成并回读验证。
+
 ## 界面层独立
 
 SDK 不得导入 Element Plus、uni-ui、uView、TDesign、FirstUI、Pinia、Vue Router 或 axios。界面反馈通过可配置适配器提供：
@@ -250,6 +257,13 @@ SDK 不得导入 Element Plus、uni-ui、uView、TDesign、FirstUI、Pinia、Vue
 - 用 `assetUrl` 测试一个图片或上传 JSON 字段。
 - 如果任务涉及鉴权，测试 Token 过期行为。
 - 对 uni-app H5，同时验证移动视口和 PC 浏览器手机壳下 SDK 正常工作。
+
+### 复盘：生产构建被 `.env.local` 的 localhost 地址污染
+
+- 触发场景：本地开发通过 `.env.local` 指向 `localhost` API，发布后的官网仍请求开发者电脑的 loopback 地址，线上出现 `Failed to fetch`。
+- 根因：Vite 会在所有模式加载 `.env.local`；它不是仅开发模式文件。若生产模式没有更高优先级配置，loopback 地址会被编译进正式产物。
+- 通用规则：本地 API 只写入 `.env.development.local`；生产项目必须提供 `.env.production`。独立官网还要在统一 ApiBase 解析层拒绝“生产构建或非本地域名 + localhost/127.0.0.1/::1”，并安全回退到明确的正式 API。
+- 自动化检查：生产构建后扫描 JS 产物不得包含本地 ApiBase，并在正式域名上下文断言接口请求 origin 等于配置的生产 API；本地 `npm run dev` 仍应命中开发 API。
 
 ## 搭配 MCI-UI
 

@@ -1,7 +1,6 @@
 ---
 name: microi-left-right-layout
 description: Microi 吾码模块引擎“树形+表格/表单”左右结构配置规范。用于通过 MCP、模块引擎或源码配置 `diy_LeftJoinRightView`，把项目、分类、组织等主数据作为左树，并用主外键过滤右侧列表；覆盖字段语义、初始化 V8、移动端自适应、幂等写入和回读验收。
-applyTo: "**"
 ---
 
 # Microi 左右树表配置规范

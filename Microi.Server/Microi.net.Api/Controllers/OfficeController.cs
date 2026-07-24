@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 
 using Microsoft.AspNetCore.Cors;
-using Microsoft.AspNetCore.Authorization;
 using Dos.Common;
 using Newtonsoft.Json.Linq;
 
@@ -32,21 +31,45 @@ public class OfficeController : Controller
     /// </summary>
     /// <param name="param"></param>
     /// <returns></returns>
-    [HttpPost, HttpGet]
-    [AllowAnonymous]
-    public async Task<ActionResult> ExportWordByTpl(OfficeExportParam param)
+    [HttpPost]
+    public async Task<ActionResult> ExportWordByTpl([FromForm] OfficeExportParam param)
     {
+        if (param == null)
+        {
+            return Json(new DosResult(0, null, DiyMessage.GetLang("", "ParamError")));
+        }
         await DefaultParam(param);
 
-        var tokenModelJobj = await DiyToken.GetCurrentToken(param.authorization, param.OsClient);
-        if (tokenModelJobj != null)
+        if (param._CurrentUser == null)
         {
-            param.OsClient = tokenModelJobj.OsClient;
-            param._CurrentUser = tokenModelJobj.CurrentUser;
+            return Json(new DosResult(
+                int.Parse(DiyMessage.GetLangCode(param.OsClient, "NoLogin")),
+                null,
+                DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang)));
         }
-        else
+
+        if (param._SysMenuId.DosIsNullOrWhiteSpace()
+            && param.ModuleEngineKey.DosIsNullOrWhiteSpace())
         {
-            return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang) };
+            return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAuth", param._Lang)));
+        }
+
+        var authorization = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(
+            new DiyTableRowParam
+            {
+                FormEngineKey = param.FormEngineKey,
+                Id = param.FormDataId,
+                _SysMenuId = param._SysMenuId,
+                ModuleEngineKey = param.ModuleEngineKey,
+                _InvokeType = InvokeType.Client.ToString(),
+                _CurrentUser = param._CurrentUser,
+                OsClient = param.OsClient,
+                _Lang = param._Lang
+            },
+            "Read");
+        if (authorization.Code != 1)
+        {
+            return Json(authorization);
         }
 
         var result = await MicroiEngine.Office.ExportWordByTpl(param);

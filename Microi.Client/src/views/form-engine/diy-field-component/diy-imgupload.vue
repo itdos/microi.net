@@ -294,6 +294,14 @@ const props = defineProps({
     TableRowId: {
         type: String,
         default: ''
+    },
+    SysMenuId: {
+        type: String,
+        default: ''
+    },
+    TableChildAuth: {
+        type: Object,
+        default: null
     }
 });
 
@@ -732,8 +740,10 @@ const setRealPath = (imgId, imgPath, isLimit) => {
                 FilePathName: imgPath,
                 HDFS: SysConfig.value.HDFS || 'Aliyun',
                 FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
-                FormDataId: props.TableRowId,
-                FieldId: props.field.Id
+                FormDataId: props.TableRowId || props.FormDiyTableModel.Id || '',
+                FieldId: props.field.Id,
+                SysMenuId: props.SysMenuId,
+                _TableChildAuth: props.TableChildAuth || undefined
             },
             (privateResult) => {
                 if (DiyCommon.Result(privateResult)) {
@@ -939,8 +949,10 @@ const GetUploadPath = (img) => {
                         FilePathName: imgPathName,
                         HDFS: SysConfig.value.HDFS || 'Aliyun',
                         FormEngineKey: props.DiyTableModel.Name || props.field.TableId,
-                        FormDataId: props.TableRowId,
-                        FieldId: props.field.Id
+                        FormDataId: props.TableRowId || props.FormDiyTableModel.Id || '',
+                        FieldId: props.field.Id,
+                        SysMenuId: props.SysMenuId,
+                        _TableChildAuth: props.TableChildAuth || undefined
                     },
                     (result) => {
                         if (DiyCommon.Result(result)) {

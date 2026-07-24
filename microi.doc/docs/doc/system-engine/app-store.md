@@ -18,10 +18,24 @@ AI 应用与应用商城已经统一为一个系统，`sys_microistore` 是唯�
 
 | 字段 | 说明 |
 |---|---|
-| `ApplicationType` | `Platform / Web / UniApp / MicroService`。 |
+| `ApplicationType` | 运行形态：`Regular / Platform / Web / UniApp / MicroService`。`Regular` 是普通平台离线包的新建默认值；商城中的既有平台应用、平台应用通知和旧包仍使用 `Platform`，两者都必须兼容，不能在未迁移数据和调用方前强制改单值。 |
+| `AppType` | 历史兼容字段，旧数据/接口曾同时把它用于“官方/社区来源”和运行形态。新代码不得以它作为唯一判断依据；读取旧包时可回退，写入新数据使用 `ApplicationType + PublisherType`。 |
 | `Category` | 游戏、企业应用、办公、教育、行业应用、平台能力等。 |
-| `PublisherType` | 官方应用、社区应用。 |
+| `PublisherType` | 发布者身份/展示来源：官方应用、社区应用。新代码的官方/社区筛选以此字段为准。 |
 | `ViewCount` | 官网或商城打开应用时累计浏览次数。 |
 | `InstallCount` | 应用安装成功后累计安装次数。 |
 
 因此本地数据始终走当前 `ApiBase + OsClient + Token`，不会发送到官网；以后其它业务遇到“不同 Tab 使用不同表单引擎和模块引擎”时，也直接配置 `TargetSysMenuId`，不需要修改 `diy-table` 的数据加载代码。
+
+## 安装、升级与安全
+
+- 应用商城定义、私有源码、安装、升级和卸载属于控制面，只允许 `Level >= 9999`。
+- 离线包必须校验 Manifest、平台最低版本、依赖、文件哈希和资源清单；包内不能携带源租户 `OsClient`、数据库、Redis、对象存储、MQ/MQTT、AI 或第三方密钥。
+- 安装使用后台任务和稳定 `InstallationId`，阶段进度/checkpoint 写共享存储。两个节点重复领取时，由幂等键与数据库唯一/条件更新保证副作用一次。
+- 已有资源使用存在性检查与差异合并；客户自定义 V8、全局配置和非包拥有字段不得被整表覆盖。
+- 更新遵守“先扩展、后迁移、再收缩”，新旧节点滚动期间 API、数据库和缓存合约兼容。
+- 安装成功后回读表、字段、接口引擎、菜单、权限、页面、工作流和版本，并执行真实 HTTP/UI 冒烟。
+
+复杂安装交互使用 `V8.OpenAppDialog`；后台安装调用 `V8.ApiEngine.RunBackground`。不要在 `ConfirmTips` 中拼接上传控件和大段内联 HTML/事件。
+
+完整规范见源码 `microi.skills/app-store/SKILL.md` 与[平台安全与兼容基线](../more/security)。

@@ -22,6 +22,7 @@ namespace Microi.net.Api
     /// 
     /// </summary>
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     [Route("api/[controller]/[action]")]
     [ApiController]
     public class MqController : Controller

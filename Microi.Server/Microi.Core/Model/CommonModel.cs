@@ -166,6 +166,21 @@ namespace Microi.net
         public string FieldId { get; set; }
         public string FormDataId { get; set; }
         public string FormEngineKey { get; set; }
+        /// <summary>
+        /// 发起文件访问的菜单上下文。非超级管理员读取私有文件时必传，
+        /// 服务端会同时校验菜单授权、绑定表、业务记录和文件字段引用。
+        /// </summary>
+        public string SysMenuId { get; set; }
+        /// <summary>
+        /// SysMenuId 的兼容别名。
+        /// </summary>
+        public string MenuId { get; set; }
+        /// <summary>
+        /// TableChild 聚合授权上下文。客户端只能提交父子关系线索；
+        /// 私有文件接口必须继续交由 FormEngine 逐层回查并校验父菜单、
+        /// 父记录、字段配置和外键范围，不能直接信任此对象。
+        /// </summary>
+        public TableChildAuthorizationContext _TableChildAuth { get; set; }
         public string HDFS { get; set; }
         public string FilePathName { get; set; }
         public List<string> FilePathNames { get; set; }

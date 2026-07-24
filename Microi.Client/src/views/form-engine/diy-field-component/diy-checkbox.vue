@@ -402,6 +402,7 @@ export default {
                     apiGetDiyFieldSqlData,
                     {
                         _FieldId: field.Id,
+                        _TableChildAuth: field._TableChildAuth || null,
                         // OsClient: self.OsClient,
                         _FormData: {},
                         _Keyword: query
@@ -444,6 +445,7 @@ export default {
             var apiUrl = self.DiyApi.GetDiyFieldSqlData;
             var param = {
                 _FieldId: field.Id,
+                _TableChildAuth: field._TableChildAuth || null,
                 _FormData: self.FormDiyTableModel || {}
             };
             

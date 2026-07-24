@@ -1111,6 +1111,7 @@ export default {
                 apiGetDiyFieldSqlData,
                 {
                     _FieldId: field.Id,
+                    _TableChildAuth: field._TableChildAuth || null,
                     _FormData: {},
                     _Keyword: query
                 },

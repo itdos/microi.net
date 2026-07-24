@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Newtonsoft.Json;
 
 #nullable enable
 
@@ -84,6 +85,7 @@ namespace Microi.net
         /// AI模型名称
         /// </summary>
         public string? AiModel { get; set; }
+
         /// <summary>
         /// mic_ai 表主键。前端传入后，后端优先按 Id 精确读取模型配置。
         /// </summary>
@@ -111,9 +113,27 @@ namespace Microi.net
         public string? OsClient { get; set; }
         
         /// <summary>
-        /// 允许查询的表名列表（白名单），为空则允许所有表
+        /// 服务端根据当前用户权限计算出的允许查询表名。
+        /// 客户端提交的同名字段不能作为授权依据；只有
+        /// <see cref="ServerAuthorizationApplied"/> 为 true 时才会使用。
         /// </summary>
         public List<string>? AllowedTables { get; set; }
+
+        /// <summary>
+        /// 仅由服务端在完成当前用户、租户和角色数据范围授权后设置。
+        /// 两种 JSON 序列化器均忽略此字段，防止客户端伪造可信来源。
+        /// </summary>
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ServerAuthorizationApplied { get; set; }
+
+        /// <summary>
+        /// 仅由服务端授权策略设置的最大返回行数，取值范围 1..100。
+        /// 0 或越界值会由执行层归一化为安全范围。
+        /// </summary>
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public int ServerMaxRows { get; set; }
     }
 
     /// <summary>
@@ -146,6 +166,18 @@ namespace Microi.net
         /// 注意：这里只放可审计的执行步骤，不输出模型内部隐式推理。
         /// </summary>
         public string? Thinking { get; set; }
+
+        /// <summary>
+        /// Schema候选检索的实际执行模式：keyword / hybrid-vector。
+        /// 即使配置开启向量，向量通道失败并安全回退时仍返回 keyword。
+        /// </summary>
+        public string? SchemaSearchMode { get; set; }
+
+        /// <summary>
+        /// 经服务端表权限白名单过滤后的Schema候选数量。
+        /// 不包含也不暴露未授权表名或字段名。
+        /// </summary>
+        public int SchemaCandidateCount { get; set; }
         
         /// <summary>
         /// SQL来源：模板匹配 / AI生成
@@ -167,6 +199,11 @@ namespace Microi.net
         /// AI模型名称
         /// </summary>
         public string? AiModel { get; set; }
+
+        /// <summary>
+        /// mic_ai 主键。存在时优先于可能重名的 AiModel。
+        /// </summary>
+        public string? AiModelId { get; set; }
         
         /// <summary>
         /// 租户标识
@@ -174,9 +211,31 @@ namespace Microi.net
         public string? OsClient { get; set; }
         
         /// <summary>
-        /// 允许查询的表名列表（白名单），为空则允许所有表
+        /// 服务端计算出的允许查询表名。客户端同名输入不能作为授权依据。
         /// </summary>
         public List<string>? AllowedTables { get; set; }
+
+        /// <summary>
+        /// 仅由受信任的 HTTP / SignalR 服务端入口在完成角色、菜单和租户
+        /// 授权后设置。两个 JSON 序列化器都忽略该值，客户端无法伪造。
+        /// </summary>
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ServerAuthorizationApplied { get; set; }
+
+        /// <summary>
+        /// 服务端授权策略给出的最大返回行数。
+        /// </summary>
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public int ServerMaxRows { get; set; }
+
+        /// <summary>
+        /// 授权失败原因只在识别为数据分析意图时返回；不能阻断普通聊天。
+        /// </summary>
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string? ServerAuthorizationError { get; set; }
     }
 
     /// <summary>

@@ -16,6 +16,7 @@ namespace Microi.net.Api
     [EnableCors("any")]
     //[ApiController]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [PlatformAdminOnly]
     //[Error]
     [Route("api/[controller]/[action]")]
     public class SysLogController : Controller
@@ -80,7 +81,6 @@ namespace Microi.net.Api
         /// </summary>
         /// <returns></returns>
         [HttpGet, HttpPost]
-        [AllowAnonymous]
         public async Task<JsonResult> AddSysLog(SysLogParam paramLog)
         {
             var param = paramLog;
@@ -91,21 +91,12 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "平台用户行为日志只能由后端可信执行点生成。"));
             }
             var currentToken = await DiyToken.GetCurrentToken();
-            if (currentToken?.CurrentUser != null)
-            {
-                param.OsClient = currentToken.OsClient;
-                param.UserName = UserBehaviorAudit.FormatUser(currentToken.CurrentUser);
-                param.UserId = currentToken.CurrentUser["Id"].Val<string>();
-            }
-            else
-            {
-                param.UserId = null;
-                param.UserName = "匿名";
-                param.Source = "LegacyAnonymousEndpoint";
-            }
+            param.OsClient = currentToken.OsClient;
+            param.UserName = UserBehaviorAudit.FormatUser(currentToken.CurrentUser);
+            param.UserId = currentToken.CurrentUser["Id"].Val<string>();
             param.Category = "Legacy";
             param.Action = "ClientLog";
-            if (currentToken?.CurrentUser != null) param.Source = "LegacyClientEndpoint";
+            param.Source = "LegacyClientEndpoint";
 
             // 记录IP
             if (string.IsNullOrWhiteSpace(param.IP))

@@ -127,9 +127,10 @@ export default {
 
             // 请求缺失表的字段
             try {
-                var result = await self.DiyCommon.PostAsync(self.DiyApi.GetDiyFieldByDiyTables, {
-                    TableIds: missingTableIds
-                });
+                var result = await self.DiyCommon.PostAsync(self.DiyApi.GetDiyFieldByDiyTables, self.ApplyTableChildAuthContext({
+                    TableIds: missingTableIds,
+                    SysMenuId: self.SysMenuId
+                }));
                 if (result && self.DiyCommon.Result(result, false) && Array.isArray(result.Data)) {
                     result.Data.forEach(function (field) {
                         // 避免重复添加
@@ -142,7 +143,7 @@ export default {
                         }
                     });
                     // 触发数据源加载
-                    self.DiyCommon.SetFieldsData(result.Data);
+                    self.DiyCommon.SetFieldsData(result.Data, null, self.TableChildAuth);
                 }
             } catch (e) {
                 console.warn('[DiyTable] 补充加载搜索字段失败:', e);
@@ -158,9 +159,10 @@ export default {
             }
             self.DiyCommon.Post(
                 self.DiyApi.GetDiyFieldByDiyTables,
-                {
-                    TableIds: tableIds
-                },
+                self.ApplyTableChildAuthContext({
+                    TableIds: tableIds,
+                    SysMenuId: self.SysMenuId
+                }),
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.GetDiyFieldAfter(result);
@@ -182,7 +184,7 @@ export default {
                 // 使用公共方法初始化字段属性
                 self.DiyCommon.EnsureFieldProperties(field);
             });
-            self.DiyCommon.SetFieldsData(result.Data);
+            self.DiyCommon.SetFieldsData(result.Data, null, self.TableChildAuth);
 
             result.Data.forEach((field) => {
                 // self.DiyFieldStrToJson(field, formData, isPostSql);
@@ -274,8 +276,10 @@ export default {
         GetDiyTableModel() {
             var self = this;
             var param = {
-                Id: self.TableId
+                Id: self.TableId,
+                _SysMenuId: self.SysMenuId
             };
+            self.ApplyTableChildAuthContext(param);
             self.DiyCommon.Post(self.DiyApi.GetDiyTableModel, param, function (result) {
                 if (self.DiyCommon.Result(result)) {
                     self.GetDiyTableModelAfter(result);
@@ -646,9 +650,9 @@ export default {
             var self = this;
             self.DiyCommon.Post(
                 self.DiyApi.GetSysMenuModel,
-                {
+                self.ApplyTableChildAuthContext({
                     Id: self.SysMenuId
-                },
+                }),
                 function (result) {
                     if (self.DiyCommon.Result(result)) {
                         self.GetSysMenuModelAfter(result);

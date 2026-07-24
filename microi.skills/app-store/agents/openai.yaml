@@ -1,0 +1,4 @@
+interface:
+  display_name: "应用商城"
+  short_description: "开发、打包、安装、差异升级和验收可复用且保护客户配置的吾码应用"
+  default_prompt: "使用 $app-store 设计、打包、安装或升级当前 Microi 应用。"

@@ -139,3 +139,6 @@ Microi.Server/Microi.net.Api/.tmp-api-out-run.log
 .codex/config.toml
 .codex
 tmp/
+.codex-build/
+.codex-logs/
+.codex-tmp/

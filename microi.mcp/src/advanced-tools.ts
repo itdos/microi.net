@@ -296,6 +296,11 @@ function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; errors: str
   const result = { ...data };
   const errors: string[] = [];
   const warnings: string[] = [];
+  if (data.DiyConfig !== undefined || data.diyConfig !== undefined) {
+    errors.push('DiyConfig 已废弃；请新增专用物理字段，并通过 diy_field 元数据暴露配置控件。跨端视图请使用 sys_menu.ViewSchema。');
+    delete result.DiyConfig;
+    delete result.diyConfig;
+  }
   const fieldMap: Record<string, string[]> = {
     MoreBtns: ['MoreBtns', 'moreBtns'],
     FormBtns: ['FormBtns', 'formBtns'],
@@ -312,7 +317,176 @@ function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; errors: str
     warnings.push(...normalized.warnings);
     if (normalized.ok && normalized.value !== undefined) result[canonical] = normalized.value;
   }
+  const viewSchemaKey = ['ViewSchema', 'viewSchema'].find((candidate) => data[candidate] !== undefined);
+  if (viewSchemaKey) {
+    const normalized = normalizeViewSchemaJson(data[viewSchemaKey]);
+    errors.push(...normalized.errors);
+    warnings.push(...normalized.warnings);
+    delete result.viewSchema;
+    if (normalized.value !== undefined) result.ViewSchema = normalized.value;
+  }
   return { data: result, errors, warnings };
+}
+
+const VIEW_SCHEMA_SCENES = ['Detail', 'Edit', 'List', 'Card'];
+const VIEW_SCHEMA_DEVICES = ['PC', 'Mobile', 'All'];
+const VIEW_SCHEMA_ACTION_TYPES = [
+  'ApiEngine', 'OpenDetail', 'OpenList', 'OpenForm', 'Navigate',
+  'Dial', 'Scan', 'Map', 'Refresh', 'Back', 'Copy',
+];
+const VIEW_SCHEMA_EXECUTABLE_KEYS = new Set([
+  'v8code', 'v8codeshow', 'script', 'javascript', 'eval', 'onclick', 'function',
+]);
+
+function canonicalValue(value: unknown, allowed: string[]): string {
+  const source = String(value ?? '').trim().toLowerCase();
+  return allowed.find((item) => item.toLowerCase() === source) || '';
+}
+
+function findRecordValue(record: JsonRecord, ...keys: string[]): unknown {
+  const names = new Set(keys.map((key) => key.toLowerCase()));
+  const entry = Object.entries(record).find(([key]) => names.has(key.toLowerCase()));
+  return entry?.[1];
+}
+
+function findExecutableKey(value: unknown, path = 'ViewSchema'): string {
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const found = findExecutableKey(value[index], `${path}[${index}]`);
+      if (found) return found;
+    }
+    return '';
+  }
+  if (!value || typeof value !== 'object') return '';
+  for (const [key, child] of Object.entries(value as JsonRecord)) {
+    if (VIEW_SCHEMA_EXECUTABLE_KEYS.has(key.toLowerCase())) return `${path}.${key}`;
+    const found = findExecutableKey(child, `${path}.${key}`);
+    if (found) return found;
+  }
+  return '';
+}
+
+function validateViewActions(value: unknown, path: string, depth = 0): string[] {
+  if (value === undefined || value === null) return [];
+  if (depth > 4) return [`${path} 的 SuccessActions 嵌套不能超过 4 层`];
+  if (!Array.isArray(value)) return [`${path} 必须是 JSON 数组`];
+  if (value.length > 50) return [`${path} 最多允许 50 个动作`];
+  const errors: string[] = [];
+  value.forEach((rawAction, index) => {
+    const action = asRecord(rawAction);
+    if (!Object.keys(action).length) {
+      errors.push(`${path}[${index}] 必须是 JSON 对象`);
+      return;
+    }
+    const actionType = canonicalValue(findRecordValue(action, 'ActionType', 'Type'), VIEW_SCHEMA_ACTION_TYPES);
+    if (!actionType) {
+      errors.push(`${path}[${index}].ActionType 不受支持`);
+      return;
+    }
+    if (actionType === 'ApiEngine' && !getString(action, 'ApiEngineKey', 'apiEngineKey')) {
+      errors.push(`${path}[${index}] 使用 ApiEngine 时必须配置 ApiEngineKey`);
+    }
+    const successActions = findRecordValue(action, 'SuccessActions');
+    errors.push(...validateViewActions(successActions, `${path}[${index}].SuccessActions`, depth + 1));
+  });
+  return errors;
+}
+
+export function normalizeViewSchemaJson(raw: unknown): {
+  ok: boolean;
+  value?: string;
+  errors: string[];
+  warnings: string[];
+} {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  if (raw === undefined || raw === null || raw === '') {
+    return { ok: true, value: undefined, errors, warnings };
+  }
+
+  let schema: unknown = raw;
+  try {
+    if (typeof schema === 'string') schema = JSON.parse(schema);
+    if (typeof schema === 'string') schema = JSON.parse(schema);
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [`ViewSchema 不是合法 JSON：${error instanceof Error ? error.message : String(error)}`],
+      warnings,
+    };
+  }
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return { ok: false, errors: ['ViewSchema 必须是 JSON 对象'], warnings };
+  }
+
+  const executableKey = findExecutableKey(schema);
+  if (executableKey) {
+    errors.push(`ViewSchema 不允许包含可执行前端脚本字段：${executableKey}`);
+  }
+
+  const schemaRecord = schema as JsonRecord;
+  const views = findRecordValue(schemaRecord, 'Views');
+  if (views !== undefined && !Array.isArray(views)) {
+    errors.push('ViewSchema.Views 必须是 JSON 数组');
+  } else if (Array.isArray(views)) {
+    if (views.length > 100) errors.push('ViewSchema.Views 最多允许 100 个视图');
+    views.forEach((rawView, viewIndex) => {
+      const view = asRecord(rawView);
+      if (!Object.keys(view).length) {
+        errors.push(`ViewSchema.Views[${viewIndex}] 必须是 JSON 对象`);
+        return;
+      }
+      if (!canonicalValue(findRecordValue(view, 'Scene'), VIEW_SCHEMA_SCENES)) {
+        errors.push(`ViewSchema.Views[${viewIndex}].Scene 不受支持`);
+      }
+      const rawDevice = findRecordValue(view, 'Device');
+      if (rawDevice !== undefined && !canonicalValue(rawDevice, VIEW_SCHEMA_DEVICES)) {
+        errors.push(`ViewSchema.Views[${viewIndex}].Device 不受支持`);
+      }
+      let layout = findRecordValue(view, 'Layout', 'LayoutJson');
+      if (typeof layout === 'string') {
+        try {
+          layout = JSON.parse(layout);
+        } catch (error) {
+          errors.push(`ViewSchema.Views[${viewIndex}].Layout 不是合法 JSON`);
+          return;
+        }
+      }
+      if (layout === undefined || layout === null) return;
+      const layoutRecord = asRecord(layout);
+      if (!Object.keys(layoutRecord).length && (typeof layout !== 'object' || Array.isArray(layout))) {
+        errors.push(`ViewSchema.Views[${viewIndex}].Layout 必须是 JSON 对象`);
+        return;
+      }
+      errors.push(...validateViewActions(
+        findRecordValue(layoutRecord, 'Actions', 'ActionSchema'),
+        `ViewSchema.Views[${viewIndex}].Layout.Actions`,
+      ));
+      const blocks = findRecordValue(layoutRecord, 'Blocks', 'Sections');
+      if (blocks !== undefined && !Array.isArray(blocks)) {
+        errors.push(`ViewSchema.Views[${viewIndex}].Layout.Blocks 必须是 JSON 数组`);
+      } else if (Array.isArray(blocks)) {
+        if (blocks.length > 100) {
+          errors.push(`ViewSchema.Views[${viewIndex}].Layout.Blocks 最多允许 100 个区块`);
+        }
+        blocks.forEach((rawBlock, blockIndex) => {
+          const block = asRecord(rawBlock);
+          errors.push(...validateViewActions(
+            findRecordValue(block, 'Actions'),
+            `ViewSchema.Views[${viewIndex}].Layout.Blocks[${blockIndex}].Actions`,
+          ));
+        });
+      }
+    });
+  } else {
+    warnings.push('ViewSchema.Views 为空，客户端将使用现有模块和表单配置。');
+  }
+
+  const value = JSON.stringify(schema);
+  if (Buffer.byteLength(value, 'utf8') > 512 * 1024) {
+    errors.push('ViewSchema 不能超过 512KB');
+  }
+  return { ok: errors.length === 0, value, errors, warnings };
 }
 
 function buildFieldConfig(sourceType: string, options: JsonRecord): { data?: string; config: JsonRecord; warnings: string[] } {
@@ -1166,7 +1340,10 @@ function modulePayload(module: JsonRecord, tableIdByName: Map<string, string>, m
     MobileListFields: getExplicitJsonString(module, 'mobileListFields', 'MobileListFields') || resolvedFields.MobileListFields,
     CardTitleTagFields: getExplicitJsonString(module, 'cardTitleTagFields', 'CardTitleTagFields') || resolvedFields.CardTitleTagFields,
     CardBottomTagFields: getExplicitJsonString(module, 'cardBottomTagFields', 'CardBottomTagFields') || resolvedFields.CardBottomTagFields,
-    DiyConfig: stringifyConfig(module.diyConfig ?? module.DiyConfig),
+    EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema'),
+    ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion'),
+    ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion'),
+    ViewSchema: normalized.data.ViewSchema,
   });
   return payload;
 }
@@ -1269,6 +1446,34 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
         searchFields: ['OrderNo', 'CustomerName', 'Status'],
         sortFields: ['CreateTime'],
         defaultOrderBy: [{ field: 'CreateTime', type: 'DESC' }],
+        enableViewSchema: 1,
+        viewSchemaVersion: '1.0',
+        viewConfigVersion: 1,
+        viewSchema: {
+          Views: [
+            {
+              Scene: 'Detail',
+              Device: 'All',
+              Priority: 100,
+              Layout: {
+                Hero: { Title: 'Order Detail', TitleField: 'OrderNo', StatusField: 'Status' },
+                Blocks: [{ Type: 'ResponsiveSection', Title: 'Order Info', Fields: ['OrderNo', 'CustomerName', 'Status'] }],
+              },
+            },
+            {
+              Scene: 'Card',
+              Device: 'Mobile',
+              Priority: 100,
+              Layout: {
+                Card: {
+                  TitleField: 'OrderNo',
+                  StatusField: 'Status',
+                  Fields: [{ Name: 'CustomerName', Label: 'Customer' }, { Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
+                },
+              },
+            },
+          ],
+        },
         moreBtns: [{ Name: 'Submit', BtnStyle: 'primary', V8CodeShow: "V8.Result=V8.Form.Status=='Draft';", V8Code: "var r=await V8.ApiEngine.Run({ApiEngineKey:'biz_order_submit',Id:V8.Form.Id});V8.Result=r;" }],
       }],
       permissions: [{ roleId: 'admin', moduleNames: ['Orders'] }],
@@ -1328,6 +1533,8 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
         cardTitleFields: 'Field names/labels/ids for card title tags. Produces CardTitleTagFields. When omitted, generator picks status/type/category fields.',
         cardBottomFields: 'Field names/labels/ids for card bottom tags. Produces CardBottomTagFields. When omitted, generator picks amount/count/date fields.',
         statisticsFields: 'Field names/labels/ids for table footer statistics. When omitted, generator sums amount/price/count/point/balance numeric fields.',
+        enableViewSchema: 'Set to 1 to enable the versioned cross-client view protocol stored in physical sys_menu columns.',
+        viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Use declarative blocks and ActionSchema only; never place arbitrary client V8Code in mobile actions.',
       },
     },
     rules: [
@@ -1338,6 +1545,7 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
       'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
       'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
       'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
+      'Do not use diy_table.DiyConfig, diy_field.DiyConfig or sys_menu.DiyConfig for new configuration. Add dedicated physical columns and expose them through DIY metadata.',
       'For forms with many fields, use diy_table.Tabs first. Use CollapseGroup for optional/secondary sections and field component Tabs for nested in-page grouping.',
       'Use dryRun=true until the user explicitly asks to write.',
       'For Page Engine pages, save only the JsonObj layer to mic_page.JsonObj: {formConfig, wrapperList}. Do not wrap it in formData.',

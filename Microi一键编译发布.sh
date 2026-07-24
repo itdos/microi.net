@@ -591,6 +591,21 @@ if [ "$BUMP_VERSION" = true ]; then
     print_success "共更新 $update_count 个 .csproj + ${#PACKAGE_JSON_FILES[@]} 个 package.json"
 fi
 
+# ─── 阶段（条件）: 双向同步官方升级资源 ──────────────────
+# 后端发布产物会把 Resource 下的基础应用打入程序集，因此必须在编译前完成
+# 本地 / iTdos 官网三方合并。仅官网有更新时无需 Token；需要写回官网时由
+# MICROI_UPGRADE_RESOURCE_TOKEN 提供管理员令牌。冲突或发布后回读不一致会终止发布。
+if [ "$PUBLISH_BACKEND" = true ]; then
+    print_phase "同步 iTdos 官网与后端内置升级资源"
+    if ! command -v node >/dev/null 2>&1; then
+        print_fail "未找到 Node.js，无法执行升级资源三方同步"
+    fi
+    if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish; then
+        print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
+    fi
+    print_success "升级资源已完成三方合并、官网回读和共同基线更新"
+fi
+
 # Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）
 _BUILD_EXTRA_ARGS=""
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
@@ -815,7 +830,7 @@ if [ "$HAS_ENCRYPT" = true ]; then
     print_divider
     print_step "加密 DLL（Microi.net.dll + Microi.AI.dll）..."
     if ! bash "$ENCRYPT_SCRIPT" "$PUBLISH_DIR"; then
-        print_fail "DLL 加密失败！请确认已安装 Obfuscar: dotnet tool install --global Obfuscar.GlobalTool"
+        print_fail "DLL 加密失败！请查看上方 Obfuscar 具体错误（工具缺失或依赖解析失败）"
     fi
     DLL_ENCRYPTED=true
     print_success "DLL 加密完成"

@@ -72,7 +72,10 @@ namespace Microi.net.Api
                 case AppConsts.Action.ListFile:
                     return new ListFileManager(context, UeditorConfig.GetString("fileManagerListPath"), UeditorConfig.GetStringList("fileManagerAllowFiles"));
                 case AppConsts.Action.CatchImage:
-                    return new CrawlerHandler(context);
+                    // Remote image crawling is intentionally disabled. The legacy
+                    // implementation followed redirects and fetched user-controlled
+                    // URLs from the API network, which is an SSRF primitive.
+                    return new NotSupportedHandler(context);
                 default:
                     return new NotSupportedHandler(context);
             }

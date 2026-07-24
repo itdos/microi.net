@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 using Newtonsoft.Json.Linq;
 using Dos.Common;
 using Microi.net;
 using Microi.Cache;
-using System.Collections.Concurrent;
 
 namespace Microi.net.Api.Controllers
 {
@@ -13,10 +11,10 @@ namespace Microi.net.Api.Controllers
     /// </summary>
     [Route("api/[controller]")]
     [ApiController]
+    [ServiceFilter(typeof(DiyFilter<dynamic>))]
     public class CacheController : ControllerBase
     {
         private readonly IMicroiRedisManager _redisManager;
-        private static readonly ConcurrentDictionary<string, int> AnonymousRedisRate = new ConcurrentDictionary<string, int>();
 
         public CacheController(IMicroiRedisManager redisManager)
         {
@@ -27,10 +25,12 @@ namespace Microi.net.Api.Controllers
         /// GET /api/cache/statistics
         /// </summary>
         [HttpGet("statistics")]
-        public IActionResult GetStatistics()
+        public async Task<IActionResult> GetStatistics()
         {
             try
             {
+                var access = await GetRedisAccessAsync("tenant").ConfigureAwait(false);
+                if (!access.Allowed) return Ok(new DosResult(access.Code, null, access.Message));
                 var stats = MicroiTwoLevelCache.GetStatistics();
                 return Ok(new DosResult(1, new
                 {
@@ -59,6 +59,8 @@ namespace Microi.net.Api.Controllers
         {
             try
             {
+                var access = await GetRedisAccessAsync("tenant").ConfigureAwait(false);
+                if (!access.Allowed) return Ok(new DosResult(access.Code, null, access.Message));
                 var key = param["Key"]?.ToString();
                 if (string.IsNullOrEmpty(key))
                 {
@@ -88,6 +90,8 @@ namespace Microi.net.Api.Controllers
         {
             try
             {
+                var access = await GetRedisAccessAsync("tenant").ConfigureAwait(false);
+                if (!access.Allowed) return Ok(new DosResult(access.Code, null, access.Message));
                 var pattern = param["Pattern"]?.ToString();
                 if (string.IsNullOrEmpty(pattern))
                 {
@@ -162,9 +166,8 @@ namespace Microi.net.Api.Controllers
             }
         }
 
-        /// <summary>测试 Redis 连接。temporary 模式支持匿名调用且不会持久化凭据。</summary>
+        /// <summary>测试 Redis 连接。仅超级管理员可使用当前租户或已保存连接。</summary>
         [HttpPost("redis/test")]
-        [AllowAnonymous]
         public async Task<IActionResult> TestRedisConnection([FromBody] RedisManagerContextRequest input)
         {
             try
@@ -182,7 +185,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>获取 Redis 服务器、内存、客户端、命中率及数据类型抽样统计。</summary>
         [HttpPost("redis/statistics")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetRedisStatistics([FromBody] RedisManagerContextRequest input)
         {
             try
@@ -200,7 +202,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>使用 SCAN 游标分页获取 Key，禁止使用阻塞式 KEYS 命令。</summary>
         [HttpPost("redis/keys")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetRedisKeys([FromBody] RedisManagerKeyListRequest input)
         {
             try
@@ -218,7 +219,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>查看 String、Hash、List、Set、Sorted Set、Stream 内容与 TTL/内存信息。</summary>
         [HttpPost("redis/key")]
-        [AllowAnonymous]
         public async Task<IActionResult> GetRedisKey([FromBody] RedisManagerKeyRequest input)
         {
             try
@@ -236,7 +236,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>单个或批量删除 Redis Key，单次最多 500 个。</summary>
         [HttpPost("redis/keys/delete")]
-        [AllowAnonymous]
         public async Task<IActionResult> DeleteRedisKeys([FromBody] RedisManagerDeleteRequest input)
         {
             try
@@ -263,7 +262,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>创建或覆盖 String/Hash/List/Set/Sorted Set 内容。</summary>
         [HttpPost("redis/key/replace")]
-        [AllowAnonymous]
         public async Task<IActionResult> ReplaceRedisValue([FromBody] RedisManagerReplaceRequest input)
         {
             try
@@ -282,7 +280,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>重命名 Key，不覆盖已有目标 Key。</summary>
         [HttpPost("redis/key/rename")]
-        [AllowAnonymous]
         public async Task<IActionResult> RenameRedisKey([FromBody] RedisManagerRenameRequest input)
         {
             try
@@ -301,7 +298,6 @@ namespace Microi.net.Api.Controllers
 
         /// <summary>设置 TTL；-1 永久，0 立即删除，大于 0 为秒。</summary>
         [HttpPost("redis/key/ttl")]
-        [AllowAnonymous]
         public async Task<IActionResult> SetRedisTtl([FromBody] RedisManagerTtlRequest input)
         {
             try
@@ -331,18 +327,12 @@ namespace Microi.net.Api.Controllers
             var normalizedMode = (mode ?? "tenant").Trim().ToLowerInvariant();
             if (normalizedMode == "temporary")
             {
-                var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                var minuteKey = ip + ":" + System.DateTime.UtcNow.ToString("yyyyMMddHHmm");
-                var count = AnonymousRedisRate.AddOrUpdate(minuteKey, 1, (_, oldValue) => oldValue + 1);
-                if (AnonymousRedisRate.Count > 2000)
+                return new RedisAccessResult
                 {
-                    var currentMinute = System.DateTime.UtcNow.ToString("yyyyMMddHHmm");
-                    foreach (var key in AnonymousRedisRate.Keys.Where(key => !key.EndsWith(currentMinute)).Take(1000))
-                        AnonymousRedisRate.TryRemove(key, out _);
-                }
-                if (count > 120)
-                    return new RedisAccessResult { Allowed = false, Code = 0, Message = "匿名 Redis 操作过于频繁，请一分钟后重试。" };
-                return new RedisAccessResult { Allowed = true, Code = 1, OsClient = "" };
+                    Allowed = false,
+                    Code = 0,
+                    Message = "公网 Redis 管理接口不支持 temporary 连接模式，请由超级管理员先保存受控连接。"
+                };
             }
 
             if (normalizedMode != "tenant" && normalizedMode != "saved")
@@ -354,14 +344,14 @@ namespace Microi.net.Api.Controllers
                 JObject currentUser = currentToken?.CurrentUser as JObject;
                 var osClient = currentToken?.OsClient as string;
                 if (currentUser == null || string.IsNullOrWhiteSpace(osClient))
-                    return new RedisAccessResult { Allowed = false, Code = 1001, Message = "登录身份已过期；未登录状态只能使用临时 Redis 连接。" };
+                    return new RedisAccessResult { Allowed = false, Code = 1001, Message = "登录身份已过期，请重新登录。" };
                 if (currentUser["Level"].Val<int>() < DiyCommon.MaxRoleLevel)
                     return new RedisAccessResult { Allowed = false, Code = 0, Message = "只有超级管理员可以访问当前租户或已保存的 Redis 连接。" };
                 return new RedisAccessResult { Allowed = true, Code = 1, OsClient = osClient };
             }
             catch
             {
-                return new RedisAccessResult { Allowed = false, Code = 1001, Message = "登录身份无效；未登录状态只能使用临时 Redis 连接。" };
+                return new RedisAccessResult { Allowed = false, Code = 1001, Message = "登录身份无效，请重新登录。" };
             }
         }
 

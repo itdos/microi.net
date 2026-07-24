@@ -552,22 +552,20 @@ export default {
             }
             if (self.TableId) {
                 params.push({
-                    // Url: self.DiyApi.GetDiyTableModel,
-                    Url: self.DiyApi.FormEngine.GetFormData,
+                    Url: self.DiyApi.GetDiyTableModel,
                     Param: {
                         Id: self.TableId,
-                        FormEngineKey: "Diy_Table"
+                        FormEngineKey: "Diy_Table",
+                        _SysMenuId: self.SysMenuId
                     }
                 });
             } else if (self.TableName) {
                 params.push({
-                    // Url: self.DiyApi.GetDiyTableModel,
-                    Url: self.DiyApi.FormEngine.GetFormData,
+                    Url: self.DiyApi.GetDiyTableModel,
                     Param: {
-                        _SearchEqual: {
-                            Name: self.TableName
-                        },
-                        FormEngineKey: "Diy_Table"
+                        Name: self.TableName,
+                        FormEngineKey: "Diy_Table",
+                        _SysMenuId: self.SysMenuId
                     }
                 });
             }
@@ -856,6 +854,10 @@ export default {
             var self = this;
             V8.DataAppend = self.DataAppend;
             V8.TableId = self.TableId;
+            V8.TableName = (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
+                || self.TableName;
+            V8.TableModel = self.CurrentDiyTableModel;
+            V8.SysMenuId = self.SysMenuId;
             V8.CurrentUser = self.GetCurrentUser;
             V8.TableRowSelected = self.TableMultipleSelection;
             V8.ParentForm = self.FatherFormModel;
@@ -883,6 +885,12 @@ export default {
             V8.FieldSet = self.FieldSet;
             V8.CurrentTableData = self.DiyTableRowList;
             // V8.GetChildTableData = '';
+            self.DiyCommon.BindV8FormEngine(
+                V8,
+                self.SysMenuId,
+                self.TableId,
+                V8.TableName
+            );
         },
         ParentFormSet(fieldName, value) {
             var self = this;
