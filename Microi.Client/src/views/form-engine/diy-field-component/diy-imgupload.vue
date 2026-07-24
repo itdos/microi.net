@@ -1,10 +1,12 @@
 <template>
     <div class="diy-imgupload">
         <!-- 上传组件 - 编辑/新增模式 -->
+        <!-- 增加accept="image/*"属性，允许移动端上传图片和拍照 -->
         <el-upload
             v-if="FormMode != 'View' && field.Visible"
             ref="uploadRef"
             drag
+            accept="image/*"
             :multiple="field.Config.ImgUpload.Multiple === true"
             :limit="field.Config.ImgUpload.MaxCount"
             :action="GetUploadUrl()"
@@ -89,10 +91,11 @@
                 :body-style="{ padding: '0px' }"
             >
                 <el-icon class="drag-handle"><Rank /></el-icon>
-                <!-- zhy取消浏览器图片预览@click="openImagePreview(img)" ，开通遮罩层取消图片预览:hide-on-click-modal='true'-->
+                <!-- zhy取消浏览器图片预览@click="openImagePreview(img)" ，开通遮罩层取消图片预览:hide-on-click-modal='true'  ，:initial-index="index"该属性主要是支持多图预览可以点击预览对应图片而不是默认第一张---->
                 <el-image
                     :src="FormDiyTableModel[field.Name + '_' + img.Id + '_RealPath']"
                     :preview-src-list="GetImgUploadImgs()"
+                    :initial-index="index"
                     fit="cover"
                     :hide-on-click-modal='true'
                     class="card-image"

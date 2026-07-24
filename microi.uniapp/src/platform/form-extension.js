@@ -16,6 +16,20 @@ export async function initializeTenantForm(context = {}) {
   return invoke('initialize', context)
 }
 
+export function getTenantFormPresentation(context = {}) {
+  const presentation = invoke('getPresentation', context)
+  return presentation && typeof presentation === 'object' ? presentation : {}
+}
+
+export async function runTenantFormPresentationAction(context = {}, action = {}) {
+  return invoke('runPresentationAction', context, action)
+}
+
+export function getTenantFormFieldPresentation(context = {}, field = {}) {
+  const presentation = invoke('getFieldPresentation', context, field)
+  return presentation && typeof presentation === 'object' ? presentation : {}
+}
+
 export function getTenantFormFieldActions(context = {}, field = {}) {
   const actions = invoke('getFieldActions', context, field)
   return Array.isArray(actions) ? actions.filter((item) => item && item.key && item.label) : []
@@ -43,13 +57,21 @@ export function tenantFormBusyMessage(context = {}) {
   return result ? String(result) : ''
 }
 
+export function disposeTenantForm(context = {}) {
+  return invoke('dispose', context)
+}
+
 export default {
   createTenantFormState,
   initializeTenantForm,
+  getTenantFormPresentation,
+  runTenantFormPresentationAction,
+  getTenantFormFieldPresentation,
   getTenantFormFieldActions,
   runTenantFormFieldAction,
   handleTenantFormFieldSelect,
   prepareTenantFormSubmit,
   notifyTenantFormSaved,
-  tenantFormBusyMessage
+  tenantFormBusyMessage,
+  disposeTenantForm
 }

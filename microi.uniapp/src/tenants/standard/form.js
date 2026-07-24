@@ -4,6 +4,16 @@ export function createState() {
 
 export async function initialize() {}
 
+export function getPresentation() {
+  return {}
+}
+
+export async function runPresentationAction() {}
+
+export function getFieldPresentation() {
+  return {}
+}
+
 export function getFieldActions() {
   return []
 }
@@ -22,13 +32,19 @@ export function getBusyMessage() {
   return ''
 }
 
+export function dispose() {}
+
 export default {
   createState,
   initialize,
+  getPresentation,
+  runPresentationAction,
+  getFieldPresentation,
   getFieldActions,
   runFieldAction,
   handleFieldSelect,
   beforeSubmit,
   afterSubmit,
-  getBusyMessage
+  getBusyMessage,
+  dispose
 }

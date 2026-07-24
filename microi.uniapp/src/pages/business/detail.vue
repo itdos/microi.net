@@ -110,10 +110,36 @@
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
 					</view>
 					<view v-if="isSectionExpanded(section, sectionIndex)" class="field-list section-body-enter">
-						<view class="field-row" v-for="field in section.fields" :key="`${section.key}:${field.name}`">
+						<view class="field-row"
+							:class="{ 'field-row--map': tenantDetailFieldPresentation(field).type === 'map' }"
+							v-for="field in section.fields" :key="`${section.key}:${field.name}`">
 							<text class="field-label">{{ field.label }}</text>
 							<view class="field-value-wrap">
-								<mci-native-field v-if="usesNativeDisplay(field)"
+								<view v-if="tenantDetailFieldPresentation(field).type === 'map'"
+									class="detail-field-map">
+									<map
+										v-if="tenantDetailFieldPresentation(field).latitude && tenantDetailFieldPresentation(field).longitude"
+										class="detail-field-map__canvas"
+										:latitude="tenantDetailFieldPresentation(field).latitude"
+										:longitude="tenantDetailFieldPresentation(field).longitude"
+										:markers="tenantDetailMapMarkers(field)" :show-location="false"
+										:scale="16" :enable-zoom="true" />
+									<view v-else class="detail-field-map__placeholder">
+										<text class="detail-field-map__pin">⌖</text>
+										<text>{{ tenantDetailFieldPresentation(field).emptyText || '暂无位置信息' }}</text>
+									</view>
+									<text v-if="tenantDetailFieldPresentation(field).address"
+										class="detail-field-map__address">
+										{{ tenantDetailFieldPresentation(field).address }}
+									</text>
+									<text
+										v-if="tenantDetailFieldPresentation(field).latitude && tenantDetailFieldPresentation(field).longitude"
+										class="detail-field-map__coordinate">
+										经度 {{ Number(tenantDetailFieldPresentation(field).longitude).toFixed(6) }}，纬度
+										{{ Number(tenantDetailFieldPresentation(field).latitude).toFixed(6) }}
+									</text>
+								</view>
+								<mci-native-field v-else-if="usesNativeDisplay(field)"
 									class="field-value field-value--native" :field="field.nativeField"
 									:model-value="detail[field.name]" :table-name="moduleConfig.table" readonly />
 								<rich-text v-else-if="isFieldRich(field)" class="field-value field-value--rich"
@@ -258,6 +284,9 @@
 	import {
 		loadNativeFormDefinition
 	} from '@/platform/native-form.js'
+	import {
+		getTenantFormFieldPresentation
+	} from '@/platform/form-extension.js'
 	import {
 		compileDetailPreset,
 		loadModuleViewManifest
@@ -1313,6 +1342,11 @@
 							key: 'contacts',
 							field: 'KehuID',
 							value: this.detail.Id,
+							// zhy: 从客户详情进入联系人列表时，同时携带客户Id和客户名称作为新增默认值。
+							defaultValues: {
+								KehuID: this.detail.Id,
+								SuoshuKH: this.detail.KehuMC
+							},
 							icon: icon('business/lianxiren.png')
 						},
 						{
@@ -1769,6 +1803,29 @@
 				return Boolean(field.nativeField && DETAIL_NATIVE_COMPONENTS.has(String(field.nativeField.component ||
 					field.nativeField.Component || '')))
 			},
+			tenantDetailFieldPresentation(field) {
+				if (!field || !field.nativeField) return {}
+				return getTenantFormFieldPresentation({
+					tableName: this.moduleConfig && this.moduleConfig.table || '',
+					menuId: this.menuId,
+					rowId: this.detail && this.detail.Id || this.id,
+					mode: 'View',
+					definition: this.definition,
+					form: this.detail || {},
+					state: {}
+				}, field.nativeField)
+			},
+			tenantDetailMapMarkers(field) {
+				const presentation = this.tenantDetailFieldPresentation(field)
+				if (!presentation.latitude || !presentation.longitude) return []
+				return [{
+					id: 1,
+					latitude: Number(presentation.latitude),
+					longitude: Number(presentation.longitude),
+					width: 32,
+					height: 40
+				}]
+			},
 			isFieldRich(field) {
 				return field.format === 'richtext' || isHtmlValue(this.detail[field.name])
 			},
@@ -1813,10 +1870,19 @@
 					}
 				})
 			},
-			openRelated(key, field, value) {
+			openRelated(key, field, value, defaultValues = null) {
 				if (!value) return
+				// zhy: 将关联业务提供的新增默认值透传给目标列表，供其继续传入新增表单。
+				const params = [
+					`key=${encodeURIComponent(key)}`,
+					`whereField=${encodeURIComponent(field)}`,
+					`whereValue=${encodeURIComponent(value)}`
+				]
+				if (defaultValues && Object.keys(defaultValues).length) {
+					params.push(`defaults=${encodeURIComponent(JSON.stringify(defaultValues))}`)
+				}
 				uni.navigateTo({
-					url: `/pages/business/list?key=${encodeURIComponent(key)}&whereField=${encodeURIComponent(field)}&whereValue=${encodeURIComponent(value)}`
+					url: `/pages/business/list?${params.join('&')}`
 				})
 			},
 			async runRelation(action) {
@@ -1841,7 +1907,7 @@
 						url: `/pages/task/consumable?deviceId=${encodeURIComponent(this.detail.Id || this.id)}&source=device`
 					})
 				} else {
-					this.openRelated(action.key, action.field, action.value)
+					this.openRelated(action.key, action.field, action.value, action.defaultValues)
 				}
 			},
 			addLeadVisit() {
@@ -2555,6 +2621,62 @@
 
 	.field-row:last-child {
 		border-bottom: none;
+	}
+
+	.field-row--map {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 12rpx;
+	}
+
+	.field-row--map .field-value-wrap {
+		display: block;
+		width: 100%;
+	}
+
+	.detail-field-map {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.detail-field-map__canvas,
+	.detail-field-map__placeholder {
+		width: 100%;
+		height: 330rpx;
+		overflow: hidden;
+		border-radius: var(--mci-radius-md);
+		background: var(--mci-bg-surface);
+	}
+
+	.detail-field-map__placeholder {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 12rpx;
+		color: var(--mci-text-tertiary);
+		font-size: 24rpx;
+	}
+
+	.detail-field-map__pin {
+		color: var(--mci-color-primary);
+		font-size: 44rpx;
+		line-height: 1;
+	}
+
+	.detail-field-map__address,
+	.detail-field-map__coordinate {
+		display: block;
+		margin-top: 12rpx;
+		color: var(--mci-text-secondary);
+		font-size: 23rpx;
+		line-height: 34rpx;
+		word-break: break-all;
+	}
+
+	.detail-field-map__coordinate {
+		margin-top: 4rpx;
+		color: var(--mci-text-tertiary);
+		font-size: 21rpx;
 	}
 
 	.field-value--rich {
