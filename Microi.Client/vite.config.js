@@ -130,7 +130,7 @@ export default defineConfig({
         devSourcemap: true
     },
     server: {
-        port: 1988,
+        port: 19888,
         open: true,
         host: '0.0.0.0',
         https: false,

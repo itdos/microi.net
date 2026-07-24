@@ -147,6 +147,7 @@ export const asyncRoutes = [
     {
         path: "/diy/diy-design/:Id",
         component: Layout,
+        hidden: true,
         children: [
             {
                 path: "/diy/diy-design/:Id",

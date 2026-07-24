@@ -72,9 +72,64 @@ set +o posix 2>/dev/null || true
 set -e
 set -o pipefail
 
-# Windows (Git Bash) 下：无论正常结束还是异常退出，都暂停等待用户确认，避免窗口自动关闭
+# Windows (Git Bash) 下：正常结束时暂停便于查看结果；关闭窗口/Ctrl+C 时立即清理，不再卡在 read。
+MICROI_SKIP_EXIT_PAUSE=false
+MICROI_ACTIVE_BUILD_PID=""
+MICROI_ACTIVE_GUARD_PID_FILE=""
+
+is_windows_shell() {
+    [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]
+}
+
+stop_active_client_build() {
+    local _pid="${MICROI_ACTIVE_BUILD_PID:-}"
+    [ -z "$_pid" ] && return 0
+
+    kill -TERM "$_pid" 2>/dev/null || true
+    local _wait_count=0
+    while kill -0 "$_pid" 2>/dev/null && [ $_wait_count -lt 20 ]; do
+        sleep 0.1
+        ((_wait_count++)) || true
+    done
+
+    # Node guard 会把真实 Windows PID 写入此文件。若优雅退出失败，精确清理它的整个子进程树。
+    if is_windows_shell && [ -n "${MICROI_ACTIVE_GUARD_PID_FILE:-}" ] && [ -f "$MICROI_ACTIVE_GUARD_PID_FILE" ]; then
+        local _guard_pid
+        _guard_pid=$(tr -cd '0-9' < "$MICROI_ACTIVE_GUARD_PID_FILE")
+        if [[ "$_guard_pid" =~ ^[0-9]+$ ]] && [ "$_guard_pid" -gt 0 ]; then
+            taskkill.exe /PID "$_guard_pid" /T /F >/dev/null 2>&1 || true
+        fi
+    fi
+
+    kill -KILL "$_pid" 2>/dev/null || true
+    wait "$_pid" 2>/dev/null || true
+    MICROI_ACTIVE_BUILD_PID=""
+}
+
+handle_session_interrupt() {
+    local _signal="${1:-TERM}"
+    MICROI_SKIP_EXIT_PAUSE=true
+    stop_active_client_build
+    trap - EXIT INT TERM HUP
+    [ "$_signal" = "INT" ] && exit 130
+    exit 143
+}
+
+finish_windows_session() {
+    local _exit_code=$?
+    trap - EXIT
+    if [ "$MICROI_SKIP_EXIT_PAUSE" != true ] && [ -t 0 ]; then
+        echo ""
+        read -r -p "  按回车键关闭窗口..." _w || true
+    fi
+    exit "$_exit_code"
+}
+
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
-    trap 'echo ""; read -r -p "  按回车键关闭窗口..." _w' EXIT
+    trap finish_windows_session EXIT
+    trap 'handle_session_interrupt INT' INT
+    trap 'handle_session_interrupt TERM' TERM
+    trap 'handle_session_interrupt HUP' HUP
     # 将 Windows 常见 Node.js 安装路径加入 PATH，确保 npm/pnpm 可用
     for _np in \
         "/c/Program Files/nodejs" \
@@ -183,6 +238,34 @@ print_info() {
 
 print_divider() {
     echo -e "  ${DIM}────────────────────────────────────────────────────────${NC}"
+}
+
+# 直接启动前端构建守护器，避免 Git Bash + nvm-windows 的 npm POSIX 包装器
+# 在异常关闭时留下多层 bash/npm 残留进程。
+run_client_build() {
+    local _node_cmd="node"
+    if is_windows_shell && command -v node.exe >/dev/null 2>&1; then
+        _node_cmd="node.exe"
+    fi
+    if ! command -v "$_node_cmd" >/dev/null 2>&1; then
+        echo "未找到 Node.js：$_node_cmd" >&2
+        return 127
+    fi
+    if [ ! -f "scripts/build-with-memory-guard.mjs" ]; then
+        echo "未找到前端构建守护器 scripts/build-with-memory-guard.mjs" >&2
+        return 1
+    fi
+
+    MICROI_ACTIVE_GUARD_PID_FILE="$PWD/.tmp/build-logs/guard.pid"
+    rm -f "$MICROI_ACTIVE_GUARD_PID_FILE"
+    "$_node_cmd" scripts/build-with-memory-guard.mjs &
+    MICROI_ACTIVE_BUILD_PID=$!
+
+    local _exit_code=0
+    wait "$MICROI_ACTIVE_BUILD_PID" || _exit_code=$?
+    MICROI_ACTIVE_BUILD_PID=""
+    rm -f "$MICROI_ACTIVE_GUARD_PID_FILE"
+    return "$_exit_code"
 }
 
 # 跨平台 sed -i
@@ -965,10 +1048,10 @@ fi
 if [ "$BUILD_CLIENT" = true ]; then
     print_phase "编译前端 Microi.Client"
 
-    print_step "npm run build（现代构建最高 6GB、legacy 逐文件 2GB、全程内存保护）..."
+    print_step "前端受保护构建（现代 Node 堆最高 6GB、legacy 2GB；全机 95% 自动暂停，恢复后继续）..."
     echo ""
     cd Microi.Client
-    if ! npm run build; then
+    if ! run_client_build; then
         cd ..
         print_fail "前端编译失败"
     fi

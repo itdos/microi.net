@@ -32,6 +32,7 @@ namespace Microi.net
         private const string FormEnginePackageResourceName = "app.microi.form-engine.json";
         private const string ModuleEnginePackageResourceName = "app.microi.module-engine.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
+        private const string AppStoreMenuId = "61b7faee-35b2-4571-add2-5231a355f368";
 
         private static readonly string[] RequiredResourceNames =
         {
@@ -1016,18 +1017,31 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     OsClient = osClient,
                     _Where = new List<object>()
                     {
-                        new List<object>() { "ModuleEngineKey", "=", "sys_microistore" },
+                        // Stable official id also repairs tenants whose engine key was
+                        // cleared by an older sparse-write conversion bug.
+                        new List<object>() { "Id", "=", AppStoreMenuId },
                     }
                 });
                 if(getMenuResult.Code == 1)
                 {
                     var appStoreMenuId = (string)getMenuResult.Data.Id;
-                    var uptMenuResult = await UpgradeTrustedFormEngine.UpdateAsync("sys_menu", osClient, new {
-                        Id = appStoreMenuId,
-                        OsClient = osClient,
-                        DiyTableId = (string)getStoreTableResult.Data.Id,
-                        DiyTableName = (string)getStoreTableResult.Data.Name,
-                    });
+                    var currentMenu = JsonHelper.ToJObject(getMenuResult.Data) ?? new JObject();
+                    var menuPatch = new JObject
+                    {
+                        ["Id"] = appStoreMenuId,
+                        ["OsClient"] = osClient,
+                        ["DiyTableId"] = (string)getStoreTableResult.Data.Id,
+                        ["DiyTableName"] = (string)getStoreTableResult.Data.Name,
+                    };
+                    if (currentMenu["Name"].Val<string>().DosIsNullOrWhiteSpace())
+                    {
+                        menuPatch["Name"] = "应用商城";
+                    }
+                    if (currentMenu["ModuleEngineKey"].Val<string>().DosIsNullOrWhiteSpace())
+                    {
+                        menuPatch["ModuleEngineKey"] = "sys_microistore";
+                    }
+                    var uptMenuResult = await UpgradeTrustedFormEngine.UpdateAsync("sys_menu", osClient, menuPatch);
                     if(uptMenuResult.Code != 1)
                     {
                         msgs.Add(uptMenuResult.Msg);
