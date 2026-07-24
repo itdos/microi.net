@@ -2036,17 +2036,29 @@ export default {
                             callback(false);
                         }
                     }
+                    // 编码仅存在于最后发送的网络副本；前端V8、数据日志、表单状态及
+                    // SubmitCallback仍使用明文，后端会在服务端V8事件和入库前解码。
+                    var transportParam = Object.assign({}, param, {
+                        _FormData: Object.assign({}, param._FormData)
+                    });
+                    var codeEditorTransport = self.DiyCommon.PrepareCodeEditorTransport(
+                        transportParam._FormData,
+                        self.DiyFieldList
+                    );
+                    if (codeEditorTransport) {
+                        transportParam._CodeEditorTransport = codeEditorTransport;
+                    }
                     if (self.EventReplace && self.EventReplace.Submit) {
                         var V8 = await self.DiyCommon.InitV8Code({}, self.$router);
                         V8.EventName = "FormSubmitBefore";
                         self.SetV8DefaultValue(V8);
 
                         //传入V8、Param、callback,  必须执行SubmitCallback(DosResult)
-                        let result = self.EventReplace.Submit(V8, param, SubmitCallback);
+                        let result = self.EventReplace.Submit(V8, transportParam, SubmitCallback);
                     } else if (typeof formParam._AlternateSubmit === "function") {
                         // 事务合并钩子：把已构建好的 url/param 交给外部（如工作流合并端点），由其完成HTTP并回传 DosResult
                         try {
-                            formParam._AlternateSubmit(url, param, async function (result) {
+                            formParam._AlternateSubmit(url, transportParam, async function (result) {
                                 SubmitCallback(result);
                             });
                         } catch (e) {
@@ -2056,7 +2068,7 @@ export default {
                     } else {
                         self.DiyCommon.Post(
                             url,
-                            param,
+                            transportParam,
                             async function (result) {
                                 SubmitCallback(result);
                             },

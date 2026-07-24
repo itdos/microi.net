@@ -40,11 +40,13 @@ namespace Microi.net
         internal static Task<DosResult> AddAsync(
             string tableName,
             string osClient,
-            object payload)
+            object payload,
+            Dos.ORM.DbTrans trans = null)
         {
             return MicroiEngine.FormEngine.AddFormDataAsync(
                 tableName,
-                BuildWriteParam(tableName, osClient, payload));
+                BuildWriteParam(tableName, osClient, payload),
+                trans);
         }
 
         internal static Task<DosResult> UpdateAsync(

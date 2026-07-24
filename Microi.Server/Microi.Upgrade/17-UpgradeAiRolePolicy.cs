@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Dos.Common;
+using Dos.ORM;
 
 namespace Microi.net
 {
@@ -126,18 +127,50 @@ namespace Microi.net
                 var tableResult = await GetTableAsync(osClient);
                 if (tableResult.Code != 1 || tableResult.Data == null)
                 {
-                    var addTableResult = await MicroiEngine.FormEngine.AddTableAsync(new
+                    var client = OsClient.GetClient(osClient);
+                    if (client?.Db == null)
                     {
-                        OsClient = osClient,
-                        Name = TableName,
-                        Description = "AI角色数据访问策略",
-                        DataBaseId = "",
-                        DataBaseName = ""
-                    });
-                    if (addTableResult.Code != 1)
-                    {
-                        messages.Add($"创建 {TableName} 失败：{addTableResult.Msg}");
+                        messages.Add($"创建 {TableName} 失败：租户数据库连接不存在。");
                         return messages;
+                    }
+
+                    var physicalTableExists = client.Db.TableExists(TableName);
+                    if (!physicalTableExists)
+                    {
+                        var addTableResult = await MicroiEngine.FormEngine.AddTableAsync(new
+                        {
+                            OsClient = osClient,
+                            Name = TableName,
+                            Description = "AI角色数据访问策略",
+                            DataBaseId = "",
+                            DataBaseName = ""
+                        });
+                        physicalTableExists = client.Db.TableExists(TableName);
+                        if (addTableResult.Code != 1)
+                        {
+                            // AddDiyTable 的物理 DDL 与元数据事务不是同一个连接。
+                            // 元数据写入失败时物理表可能已经成功创建，不能在下次
+                            // 启动继续 CREATE 并永久卡在 “already exists”。
+                            if (!physicalTableExists)
+                            {
+                                messages.Add($"创建 {TableName} 失败：{addTableResult.Msg}");
+                                return messages;
+                            }
+                        }
+                    }
+
+                    tableResult = await GetTableAsync(osClient);
+                    if ((tableResult.Code != 1 || tableResult.Data == null)
+                        && physicalTableExists)
+                    {
+                        var adoptResult = await AdoptExistingPhysicalTableAsync(osClient, client);
+                        if (adoptResult.Code != 1)
+                        {
+                            messages.Add($"恢复 {TableName} 元数据失败：{adoptResult.Msg}");
+                            return messages;
+                        }
+                        Console.WriteLine(
+                            $"Microi：【兼容修复】【{osClient}】已接管现有物理表 {TableName} 并补齐表单引擎元数据。");
                     }
 
                     tableResult = await GetTableAsync(osClient);
@@ -150,6 +183,7 @@ namespace Microi.net
                 }
 
                 var tableId = Convert.ToString(tableResult.Data.Id);
+                var tenantClient = OsClient.GetClient(osClient);
                 foreach (var field in Fields)
                 {
                     UpgradeExecutionLeaseContext.ThrowIfLost();
@@ -184,7 +218,10 @@ namespace Microi.net
                         field.TableWidth,
                         field.Description,
                         Visible = 1,
-                        AppVisible = 1
+                        AppVisible = 1,
+                        // 迁移中断可能留下“物理列已成功、diy_field事务已回滚”的
+                        // 半完成状态；此时只补元数据，避免重复 ALTER TABLE。
+                        _NotAddDbField = tenantClient?.Db?.ColumnExists(TableName, field.Name) == true
                     });
                     if (addFieldResult.Code != 1)
                     {
@@ -199,6 +236,79 @@ namespace Microi.net
             }
 
             return messages;
+        }
+
+        private static async Task<DosResult> AdoptExistingPhysicalTableAsync(
+            string osClient,
+            OsClientSecret client)
+        {
+            var tableId = Guid.NewGuid().ToString();
+            var trans = client.Db.BeginTransaction();
+            try
+            {
+                var addTableResult = await UpgradeTrustedFormEngine.AddAsync(
+                    "diy_table",
+                    osClient,
+                    new
+                    {
+                        Id = tableId,
+                        Name = TableName,
+                        Description = "AI角色数据访问策略",
+                        DataBaseId = "",
+                        DataBaseName = "",
+                        IsDeleted = 0
+                    },
+                    trans);
+                if (addTableResult.Code != 1)
+                {
+                    trans.Rollback();
+                    return addTableResult;
+                }
+
+                foreach (var field in DiyCommon.FixedDiyField)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    var addFieldResult = await UpgradeTrustedFormEngine.AddAsync(
+                        "diy_field",
+                        osClient,
+                        new
+                        {
+                            TableId = tableId,
+                            TableName,
+                            field.Label,
+                            field.Name,
+                            field.Type,
+                            field.Component,
+                            field.Sort,
+                            IsLockField = 1,
+                            field.Visible,
+                            AppVisible = field.Visible,
+                            Readonly = 1,
+                            NameConfirm = 1,
+                            field.TableWidth,
+                            Unique = 0,
+                            IsDeleted = 0
+                        },
+                        trans);
+                    if (addFieldResult.Code != 1)
+                    {
+                        trans.Rollback();
+                        return addFieldResult;
+                    }
+                }
+
+                trans.Commit();
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                trans.Rollback();
+                return new DosResult(0, null, ex.Message);
+            }
+            finally
+            {
+                trans.Close();
+            }
         }
 
         private static Task<DosResult<dynamic>> GetTableAsync(string osClient)
