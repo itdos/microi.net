@@ -358,8 +358,11 @@
 					this.definition = definition
 					this.loading = false
 					await this.$nextTick()
+					// 必须更新页面持有的响应式定义。直接修改上面的原始 definition 会绕过
+					//zhy Vue 代理，导致接口已有数据但 Radio/Checkbox 等控件仍保留空选项。
+					const liveDefinition = this.definition
 					await Promise.all([
-						hydrateNativeFormOptions(definition, this.form, {
+						hydrateNativeFormOptions(liveDefinition, this.form, {
 							menuId: this.menuId,
 							moduleEngineKey: this.moduleEngineKey,
 							tableChildAuth: this.tableChildAuth,
@@ -368,9 +371,6 @@
 						initializeTenantForm(this.tenantFormContext())
 					])
 					if (loadId !== this.formLoadId) return
-					this.definition = {
-						...definition
-					}
 				} catch (error) {
 					if (loadId !== this.formLoadId) return
 					this.error = error.message || error.Msg || '表单加载失败'
