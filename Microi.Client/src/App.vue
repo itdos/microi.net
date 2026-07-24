@@ -81,11 +81,17 @@ export default {
 
     async mounted() {
         // console.log("-------> App.vue mounted");
-        if(window && window.location && window.location.href) {
-            console.log('当前URL：', window.location.href);
-        } else {
-            console.log('无法获取当前URL');
-        }
+       if(window && window.location && window.location.href) {
+         //zhy存储小程序端传过来的经纬度，用于定位和地图，小程序获取的比浏览器准确
+           let query = getQueryObject(window.location.href);
+           if(query && query.appAddress_lat && query.appAddress_lng) {
+               window.localStorage.setItem('microi_appAddress_lat', query.appAddress_lat || '');
+               window.localStorage.setItem('microi_appAddress_lng', query.appAddress_lng || '');
+           }
+           // console.log('当前URL：', window.location.href,query.appAddress_lat,query.appAddress_lng);
+       } else {
+           console.log('无法获取当前URL');
+       }
         var self = this;
 
         // 初始化窗口大小监听，用于响应式布局

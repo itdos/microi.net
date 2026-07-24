@@ -38,5 +38,8 @@ if (!nativeForm.includes('<mci-native-field')) fail('native form must delegate f
 if (!formRuntime.includes('inferNativeComponent')) fail('semantic control inference is missing')
 if (!formRuntime.includes("return 'ImgUpload'")) fail('avatar/image semantic fallback is missing')
 if (!formRuntime.includes('SENSITIVE_FIELD_PATTERN')) fail('sensitive field visibility guard is missing')
+if (!nativeForm.includes('hydrateNativeFormOptions(liveDefinition')) {
+  fail('async field options must hydrate the live reactive form definition')
+}
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)

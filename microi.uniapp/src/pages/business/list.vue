@@ -243,6 +243,7 @@ import {
   loadModuleViewManifest
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { parseJson } from '@/platform/native-form.js'
 import {
   formatDateTime,
   formatFieldValue,
@@ -254,6 +255,16 @@ import {
   findMenu,
   statisticsFieldValue
 } from '@/platform/business-runtime.js'
+
+// zhy: 为客户主联系人和联系人子表生成同一个稳定关联编号，支持后续双向更新。
+function createRelationshipId() {
+  let seed = Date.now()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (token) => {
+    const value = (seed + Math.random() * 16) % 16 | 0
+    seed = Math.floor(seed / 16)
+    return (token === 'x' ? value : (value & 0x3) | 0x8).toString(16)
+  })
+}
 
 export default {
   mixins: [themeMixin, listReturnMixin],
@@ -281,6 +292,7 @@ export default {
       finished: false,
       whereField: '',
       whereValue: '',
+      defaultValues: {},
       currentUser: {},
       activeAction: null,
       activeRow: {},
@@ -329,6 +341,8 @@ export default {
     this.key = options.key || 'customers'
     this.whereField = options.whereField ? decodeURIComponent(options.whereField) : ''
     this.whereValue = options.whereValue ? decodeURIComponent(options.whereValue) : ''
+    // zhy: 接收客户详情透传的客户Id、客户名称等新增联系人默认值。
+    this.defaultValues = parseJson(decodeURIComponent(options.defaults || ''), {}) || {}
     this.baseConfig = getBusinessModule(this.key) || getBusinessModule('customers')
     this.config = { ...this.baseConfig }
     this.entry = getBusinessEntry(this.key) || { icon: '/static/xjy/business/kehu.png', accent: '#0B86D4' }
@@ -831,13 +845,21 @@ export default {
         return
       }
       this.mciMarkDetailReturn()
+      // zhy: 新增联系人时合并客户关联条件，并补充唯一关联编号后传入动态表单。
+      const defaultValues = {
+        ...this.defaultValues,
+        ...(this.whereField && this.whereValue ? { [this.whereField]: this.whereValue } : {})
+      }
+      if (this.key === 'contacts' && !defaultValues.Guid70) {
+        defaultValues.Guid70 = createRelationshipId()
+      }
       openForm({
         table: this.config.table,
         mode: 'Add',
         title: `新增${this.config.title}`,
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
-        defaultValues: this.whereField && this.whereValue ? { [this.whereField]: this.whereValue } : null
+        defaultValues: Object.keys(defaultValues).length ? defaultValues : null
       })
     },
     callPhone(phone) {

@@ -14,8 +14,8 @@
     <!-- zhy此处只针对地移动端地区选择 -->
     <el-tree-select
         v-if="field.Component == 'Address' && diyStore.IsPhoneView"
-        v-model="ModelValue2"
-        :data="regionData2"
+        v-model="appRegionValue"
+        :data="appRegionData"
         :props="defineProps"
         placeholder="请选择"
         clearable
@@ -42,10 +42,10 @@ export default {
     data() {
         return {
             ModelValue: [],
-            ModelValue2: [],
+            appRegionValue: [],//移动端地区选择绑定值，主要是通过ModelValue值转换来
             LastModelValue: [],
             regionData: regionDataPlus,
-            regionData2: [],
+            appRegionData: [],
             props: {
                 value: "label"
             },
@@ -108,6 +108,12 @@ export default {
             var self = this;
             if (newVal != oldVal) {
                 self.ModelValue = newVal;
+                // zhy同步更新手机端树形选择器的值
+                if (newVal && Array.isArray(newVal)) {
+                    self.appRegionValue = newVal.join('/');
+                } else if (typeof newVal === 'string' && newVal) {
+                    self.appRegionValue = newVal;
+                }
             }
         },
         ModelProps: function (newVal, oldVal) {
@@ -128,7 +134,7 @@ export default {
         var a = self.regionData;
         // console.log('地区数据',self.ModelValue)
         //修改地区数据
-        self.regionData2 = self.addFullPath(regionDataPlus);
+        self.appRegionData = self.addFullPath(regionDataPlus);
     },
 
     methods: {
@@ -162,11 +168,12 @@ export default {
                 modelValue = JSON.parse(modelValue);
             }
             self.ModelValue = modelValue;
+            // console.log(modelValue, self.ModelValue, 8888);
             //zhy新增树形默认值
             if (modelValue) {
-                self.ModelValue2 = modelValue.join('/');
+                self.appRegionValue = modelValue.join('/');
             }
-            // console.log(modelValue,self.ModelValue2,6666)
+            // console.log(modelValue,self.appRegionValue,'手机端城市')
             self.LastModelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
         },
         GetFieldValue(field, form) {
@@ -185,7 +192,7 @@ export default {
         // zhy传送给接口的数据是数组所以选中值后将字符串转换，并直接调用之前的选择方法，不额外修改该组件原有数据
         treeNodeClick() {
          var self = this;
-         var treeVule = self.ModelValue2.split('/');
+         var treeVule = self.appRegionValue.split('/');
          self.CommonV8CodeChange(treeVule);
         },
         CommonV8CodeChange(item) {
@@ -196,7 +203,7 @@ export default {
             self.ModelValue = item;
             //zhy外部调用后也能给树形赋值
             if (Array.isArray(item)) {
-              self.ModelValue2 = item.join('/');
+              self.appRegionValue = item.join('/');
             }
             self.ModelChangeMethods(item);
             if (self.field.V8Code || self.field.Config.V8Code) {
