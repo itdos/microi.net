@@ -20,6 +20,26 @@
 
 `StopHttp`、允许匿名调用和接口角色限制约束的是外部 HTTP 入口。`V8.ApiEngine.Run` 属于可信服务端调用，不经过 HTTP 门禁。因此，被其它接口引擎复用的敏感业务仍必须在被调用引擎内部校验当前用户、业务状态和数据范围；能够编辑接口引擎、数据源、Job 或后端事件的账号属于“服务端代码执行”信任边界，只应授予高权限管理员。
 
+外部客户端推荐直接向动态路由发送 JSON：
+
+```http
+POST /apiengine/{ApiEngineKey}--OsClient--{OsClient}--
+Content-Type: application/json
+
+{"Action":"Bootstrap","Keyword":"客户"}
+```
+
+兼容旧入口时，请把接口 Key 放在 JSON Body 中：
+
+```http
+POST /api/ApiEngine/Run
+Content-Type: application/json
+
+{"ApiEngineKey":"your_key","Action":"Bootstrap"}
+```
+
+两种入口都会把 JSON Body 恢复到 `V8.Param`；同名 Query/Form 参数保持既有优先级。接口层只负责 HTTP 路由、参数绑定和可信上下文恢复，不承载 AI、模型路由等业务逻辑。客户端提交的 `_CurrentUser`、`_InvokeType:'Server'` 或 `_TrustedServerInvocation` 不能建立服务端信任，身份和调用类型始终由认证中间件及接口层决定。
+
 ```javascript
 // 同步调用
 var result = V8.ApiEngine.Run('ApiEngineKey', { 

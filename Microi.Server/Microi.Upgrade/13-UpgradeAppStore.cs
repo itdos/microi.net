@@ -541,7 +541,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var importerEngineCode = importerEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var importerEngineVersionText = importerEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(6, 5, 14) ||
+                    packageVersion < new System.Version(6, 5, 16) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
                     embeddedImporterVersion < new System.Version(1, 6, 4) ||
                     !content.Contains("TargetSysMenuId") ||

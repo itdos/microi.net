@@ -94,7 +94,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     engine => engine.ApiEngineKey === "import-microi-store-package"
   );
   assert.ok(packageImporter, "application-store package should contain its importer");
-  assert.equal(packageModel.PackageInfo.Version, "v6.5.14");
+  assert.equal(packageModel.PackageInfo.Version, "v6.5.16");
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
   assert.equal(packageImporter.Version, importerSourceVersion);
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical source byte-for-byte");
@@ -103,6 +103,29 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(source, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
+  assert.match(source, /var latestCacheJson = JSON\.stringify\(latest\)/);
+  assert.equal(
+    (source.match(/FormData:sys_apiengine:[^`]+`, latestCacheJson\)/g) || []).length,
+    3,
+    "all shared interface-engine cache aliases must store JSON text for v3/v6 compatibility"
+  );
+  assert.doesNotMatch(
+    source,
+    /FormData:sys_apiengine:[^`]+`, latest\)/,
+    "never pass a Jint object to the string-only V8 cache API"
+  );
+  assert.match(source, /var legacyMenuDiyConfigFields = \[/);
+  assert.match(source, /syncLegacyMenuDiyConfig\([\s\S]*?existingMenuVisibility \? existingMenuVisibility\.DiyConfig/);
+  assert.match(source, /_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
+
+  const appStoreMenu = packageModel.SysMenus.find(
+    menu => menu.Id === "61b7faee-35b2-4571-add2-5231a355f368"
+  );
+  assert.ok(appStoreMenu, "application-store menu should exist");
+  const legacyMenuConfig = JSON.parse(appStoreMenu.DiyConfig);
+  assert.equal(legacyMenuConfig.SelectApi, appStoreMenu.SelectApi);
+  assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
+  assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
   const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 6, 6\)/g) || [];
   assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.6.6 floor");
@@ -111,7 +134,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(appStoreUpgradeSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(appStoreUpgradeSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 14\)/);
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 16\)/);
 
   assert.match(refreshSource, /versionNumber\s*<\s*1_006_006/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
@@ -492,7 +515,7 @@ test("managed micro-app assets proxy stable HDFS paths instead of cross-origin r
 });
 
 test("updating an existing menu preserves customer desktop and mobile visibility", () => {
-  assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay'\]/);
+    assert.match(source, /GetFormData\('sys_menu',[\s\S]*?_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
   assert.match(source, /existingMenuVisibility\.Display[\s\S]*?modelCopy\.Display/);
   assert.match(source, /existingMenuVisibility\.AppDisplay[\s\S]*?modelCopy\.AppDisplay/);
   assert.match(source, /preserve_existing_menu_visibility_/);

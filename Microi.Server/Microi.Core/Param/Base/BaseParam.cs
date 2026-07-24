@@ -57,6 +57,12 @@ namespace Microi.net
         /// </summary>
         public string _RunV8Event { get; set; }
 
+        /// <summary>
+        /// Browser-only CodeEditor transport metadata. The new backend removes it
+        /// after decoding and before V8 events or persistence.
+        /// </summary>
+        public JObject _CodeEditorTransport { get; set; }
+
         public string _ClientType { get; set; }
         /// <summary>
         /// .net9需要这样使用

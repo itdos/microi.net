@@ -26,6 +26,41 @@ export function canonicalizeResource(name, content) {
   return `${JSON.stringify(JSON.parse(normalized), null, 2)}\n`;
 }
 
+export function isTemporaryOfficialResourceFailure(error) {
+  const messages = [];
+  const codes = [];
+  let current = error;
+  for (let depth = 0; current && depth < 5; depth += 1) {
+    messages.push(String(current.message || current));
+    if (current.code) codes.push(String(current.code));
+    current = current.cause;
+  }
+  const message = messages.join(' | ');
+  const code = codes.join(' | ');
+  return /服务器内部错误/i.test(message)
+    || /\bHTTP (?:408|425|429|5\d\d)\b/i.test(message)
+    || /\b(?:fetch failed|network|socket|timeout|timed out|aborted)\b/i.test(message)
+    || /\b(?:ECONNRESET|ECONNREFUSED|ECONNABORTED|ENETUNREACH|EHOSTUNREACH|ETIMEDOUT|EAI_AGAIN)\b/i.test(`${message} ${code}`);
+}
+
+export function verifyOfflineReleaseSafety(resourceNames, localResources, baseResources) {
+  const missingBases = [];
+  const localChanges = [];
+  for (const name of resourceNames) {
+    if (!baseResources.has(name)) {
+      missingBases.push(name);
+    } else if (localResources.get(name) !== baseResources.get(name)) {
+      localChanges.push(name);
+    }
+  }
+  if (missingBases.length || localChanges.length) {
+    const reasons = [];
+    if (missingBases.length) reasons.push(`缺少共同基线：${missingBases.join('、')}`);
+    if (localChanges.length) reasons.push(`本地已有未同步修改：${localChanges.join('、')}`);
+    throw new Error(`官网升级资源暂时不可用，且不能安全使用离线基线（${reasons.join('；')}）`);
+  }
+}
+
 function same(left, right) {
   if (left === MISSING || right === MISSING) return left === right;
   return JSON.stringify(left) === JSON.stringify(right);

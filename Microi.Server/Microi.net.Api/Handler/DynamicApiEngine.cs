@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc.Routing;
 using Dos.Common;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 
@@ -116,8 +117,11 @@ namespace Microi.net.Api
                             var apiEngineKey = ((string)item.ApiEngineKey).ToLower();
                             var apiAddress = ((string)item.ApiAddress).ToLower();
 
-                            tasks.Add(DiyCacheBase.SetAsync(BuildCacheKey(clientModel.OsClient, apiEngineKey), item));
-                            tasks.Add(DiyCacheBase.SetAsync(BuildCacheKey(clientModel.OsClient, apiAddress), item));
+                            // v3 与 v6 共用这些键，旧版固定按 JSON 文本反序列化。
+                            // 显式写字符串，避免 dynamic/object 命中非 JSON 的 ToString()。
+                            var cacheJson = JsonConvert.SerializeObject(item);
+                            tasks.Add(DiyCacheBase.SetAsync(BuildCacheKey(clientModel.OsClient, apiEngineKey), cacheJson));
+                            tasks.Add(DiyCacheBase.SetAsync(BuildCacheKey(clientModel.OsClient, apiAddress), cacheJson));
                         }
                         // 等待所有缓存写入完成
                         await Task.WhenAll(tasks);
@@ -271,6 +275,59 @@ namespace Microi.net.Api
                 // 从缓存查询接口配置
                 var cacheKey = BuildCacheKey(osClient, apiPathLower);
                 var apiModel = await cacheClient.GetAsync<dynamic>(cacheKey);
+                if (apiModel is string cachedText)
+                {
+                    try
+                    {
+                        apiModel = JObject.Parse(cachedText);
+                    }
+                    catch
+                    {
+                        // 兼容曾由应用商城导入脚本写入的 "System..." 对象类型名。
+                        // 只删除当前确定损坏的别名，随后从数据库回源并重建全部兼容别名。
+                        await cacheClient.RemoveAsync(cacheKey);
+                        apiModel = null;
+                        Console.WriteLine($"Microi：【Warning】【{osClient}】已移除非JSON接口引擎缓存：{cacheKey}");
+                    }
+                }
+
+                if (apiModel == null && !osClient.DosIsNullOrWhiteSpace())
+                {
+                    var fallbackResult = await MicroiEngine.FormEngine.GetFormDataAsync(new
+                    {
+                        FormEngineKey = "sys_apiengine",
+                        _Where = new List<DiyWhere>
+                        {
+                            new DiyWhere
+                            {
+                                Name = "ApiAddress",
+                                Value = apiPathLower,
+                                Type = "="
+                            }
+                        },
+                        OsClient = osClient
+                    });
+                    if (fallbackResult.Code == 1 && fallbackResult.Data != null)
+                    {
+                        apiModel = JObject.FromObject((object)fallbackResult.Data);
+                        var cacheJson = JsonConvert.SerializeObject((object)fallbackResult.Data);
+                        var apiEngineKey = DynamicHelper.GetDynamicStringValue(apiModel, "ApiEngineKey", "").ToLowerInvariant();
+                        var apiAddress = DynamicHelper.GetDynamicStringValue(apiModel, "ApiAddress", "").ToLowerInvariant();
+                        var cacheTasks = new List<Task>();
+                        if (!apiEngineKey.DosIsNullOrWhiteSpace())
+                        {
+                            cacheTasks.Add(cacheClient.SetAsync(BuildCacheKey(osClient, apiEngineKey), cacheJson));
+                        }
+                        if (!apiAddress.DosIsNullOrWhiteSpace())
+                        {
+                            cacheTasks.Add(cacheClient.SetAsync(BuildCacheKey(osClient, apiAddress), cacheJson));
+                        }
+                        if (cacheTasks.Count > 0)
+                        {
+                            await Task.WhenAll(cacheTasks);
+                        }
+                    }
+                }
 
                 if (apiModel != null)
                 {

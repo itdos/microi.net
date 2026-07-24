@@ -8,6 +8,7 @@ using Dos.Common;
 using Newtonsoft.Json;
 using Dos.ORM;
 using System.Text.RegularExpressions;
+using System.Text;
 using System.Xml.Linq;
 
 namespace Microi.net.Api
@@ -46,24 +47,62 @@ namespace Microi.net.Api
                 }
             }
             catch (Exception ex) { }
-            //2024-12-26 往V8.Param中添加 xml 参数
+            // 动态接口路由下，[FromBody] JObject 在部分客户端/路由组合中可能没有
+            // 获得 JSON Body。统一从已启用缓冲的请求体补偿恢复缺失参数；Query/Form
+            // 仍保持较高优先级，避免改变既有调用语义。同时继续兼容 XML 请求。
             try
             {
-                // 启用 Request.Body 缓冲以支持重复读取
-                DiyHttpContext.Current.Request.EnableBuffering();
-                DiyHttpContext.Current.Request.Body.Position = 0;
-                
-                using (var reader = new StreamReader(DiyHttpContext.Current.Request.Body, leaveOpen: true))
+                var request = DiyHttpContext.Current?.Request;
+                if (request?.Body != null)
                 {
-                    var body = await reader.ReadToEndAsync();
-                    // 重置位置以便后续可能的读取
-                    DiyHttpContext.Current.Request.Body.Position = 0;
-                    
+                    request.EnableBuffering();
+                    if (request.Body.CanSeek)
+                    {
+                        request.Body.Position = 0;
+                    }
+
+                    string body;
+                    using (var reader = new StreamReader(
+                               request.Body,
+                               Encoding.UTF8,
+                               detectEncodingFromByteOrderMarks: true,
+                               bufferSize: 1024,
+                               leaveOpen: true))
+                    {
+                        body = await reader.ReadToEndAsync();
+                    }
+
+                    if (request.Body.CanSeek)
+                    {
+                        request.Body.Position = 0;
+                    }
+
                     if (!body.DosIsNullOrWhiteSpace())
                     {
-                        XDocument xmlDoc = XDocument.Parse(body);
-                        if (xmlDoc.Root != null)
-                            XmlToJObject(xmlDoc.Root, param);
+                        var trimmedBody = body.TrimStart();
+                        var isJson = request.ContentType?.Contains(
+                                         "json",
+                                         StringComparison.OrdinalIgnoreCase) == true
+                                     || trimmedBody.StartsWith("{", StringComparison.Ordinal);
+                        if (isJson)
+                        {
+                            var bodyParam = JObject.Parse(body);
+                            foreach (var property in bodyParam.Properties())
+                            {
+                                if (param.Property(property.Name) == null)
+                                {
+                                    param[property.Name] = property.Value.DeepClone();
+                                }
+                            }
+                        }
+                        else if (trimmedBody.StartsWith("<", StringComparison.Ordinal))
+                        {
+                            var xmlDoc = XDocument.Parse(body);
+                            if (xmlDoc.Root != null)
+                            {
+                                XmlToJObject(xmlDoc.Root, param);
+                            }
+                        }
                     }
                 }
             }
@@ -85,6 +124,8 @@ namespace Microi.net.Api
             {
                 param.Remove("_CurrentUser");
             }
+            // HTTP 调用者不得伪造表单引擎内部可信调用标记。
+            param.Remove("_TrustedServerInvocation");
             //调用方式 Server、Client
             param["_InvokeType"] = InvokeType.Client.ToString();
             return param;

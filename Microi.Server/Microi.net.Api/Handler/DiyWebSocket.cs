@@ -141,7 +141,10 @@ namespace Microi.net
             
             if(currentToken?.CurrentUser == null)
             {
-                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 身份验证失败 - IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}, Claims Count: {Context.User?.Claims?.Count() ?? 0}");
+                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 已拒绝未携带有效Token的连接 - IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}, Claims Count: {Context.User?.Claims?.Count() ?? 0}");
+                // 只 return 会让 SignalR 把未初始化的匿名连接保留到超时；明确中止，
+                // 既不恢复旧版按 UserId/OsClient 直接信任的安全漏洞，也避免空连接占用资源。
+                Context.Abort();
                 return;
                 // throw new HubException("身份验证失败：未提供有效的访问令牌。请在连接时传入 token（查询参数: ?access_token=xxx 或请求头: Authorization: Bearer xxx）");
             }

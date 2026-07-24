@@ -5,8 +5,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   canonicalizeResource,
+  isTemporaryOfficialResourceFailure,
   mergeJavascriptResource,
   mergeJsonResource,
+  verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
@@ -79,11 +81,35 @@ test('资源规范化统一换行和 JSON 缩进', () => {
   assert.equal(canonicalizeResource('package.json', '{"a":1}'), '{\n  "a": 1\n}\n');
 });
 
+test('官网临时故障识别只放行网络、限流和服务端错误', () => {
+  assert.equal(isTemporaryOfficialResourceFailure(new Error('服务器内部错误，请稍后重试。')), true);
+  assert.equal(isTemporaryOfficialResourceFailure(new Error('import-package.js HTTP 503')), true);
+  assert.equal(isTemporaryOfficialResourceFailure(new Error('fetch failed', { cause: { code: 'ECONNRESET' } })), true);
+  assert.equal(isTemporaryOfficialResourceFailure(new Error('import-package.js HTTP 401')), false);
+  assert.equal(isTemporaryOfficialResourceFailure(new Error('资源名不正确')), false);
+});
+
+test('离线发布仅允许六项本地资源与共同基线完全一致', () => {
+  const names = ['a.js', 'b.json'];
+  const local = new Map([['a.js', 'a\n'], ['b.json', '{}\n']]);
+  const base = new Map(local);
+  assert.doesNotThrow(() => verifyOfflineReleaseSafety(names, local, base));
+  assert.throws(
+    () => verifyOfflineReleaseSafety(names, new Map([['a.js', 'changed\n'], ['b.json', '{}\n']]), base),
+    /本地已有未同步修改：a\.js/,
+  );
+  assert.throws(
+    () => verifyOfflineReleaseSafety(names, local, new Map([['a.js', 'a\n']])),
+    /缺少共同基线：b\.json/,
+  );
+});
+
 test('后端发布前强制执行官网三方同步和发布后回读', () => {
-  assert.match(releaseSource, /refresh-resources\.mjs --publish/);
+  assert.match(releaseSource, /refresh-resources\.mjs --publish --allow-verified-offline/);
   assert.match(refreshSource, /发布后回读与合并结果不一致，未推进共同基线/);
   assert.match(refreshSource, /ExpectedRemoteSha256/);
   assert.match(refreshSource, /PackageInfo\.Version，避免商城自动版本与包内版本不一致/);
+  assert.match(refreshSource, /未写入官网、未修改本地资源、未推进共同基线/);
 });
 
 test('官网发布接口以固定白名单、事务行锁和哈希保护多节点写入', () => {
