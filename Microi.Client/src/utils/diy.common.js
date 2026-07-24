@@ -20,6 +20,8 @@ import { initV8ScanCode } from "./v8-scan-code.js";
 import { initV8Print } from "./v8-print.js";
 import { createV8Http } from "./v8-http.js";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
+import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
+import { prepareCodeEditorTransport } from "./code-editor-transport.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -4365,6 +4367,9 @@ var DiyCommon = {
         }
     },
     ForConvertSysMenu(data) {
+        // v3 stores these settings in DiyConfig; v6 uses physical sys_menu columns.
+        // Keep the new renderer usable while a legacy node or an unmigrated row is present.
+        applyLegacySysMenuConfigFallback(data);
         // data.Display = data.Display ? true : false;
         // data.InTableEdit = data.InTableEdit ? true : false;
         // data.IsMicroiService = data.IsMicroiService ? true : false;
@@ -5599,6 +5604,9 @@ var DiyCommon = {
             }
         }
         return newRowModel;
+    },
+    PrepareCodeEditorTransport(formData, diyFieldList) {
+        return prepareCodeEditorTransport(formData, diyFieldList);
     },
     getToken() {
         // 优先从 LocalStorageManager 获取，确保最新值

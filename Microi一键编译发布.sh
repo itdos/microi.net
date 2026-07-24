@@ -600,10 +600,10 @@ if [ "$PUBLISH_BACKEND" = true ]; then
     if ! command -v node >/dev/null 2>&1; then
         print_fail "未找到 Node.js，无法执行升级资源三方同步"
     fi
-    if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish; then
+    if ! node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish --allow-verified-offline; then
         print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
     fi
-    print_success "升级资源已完成三方合并、官网回读和共同基线更新"
+    print_success "升级资源安全检查已完成（实时同步或已验证离线基线，详见上方明细）"
 fi
 
 # Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）

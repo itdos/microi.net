@@ -4,7 +4,13 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { canonicalizeResource, mergeResource, normalizeText } from './resource-sync-core.mjs';
+import {
+  canonicalizeResource,
+  isTemporaryOfficialResourceFailure,
+  mergeResource,
+  normalizeText,
+  verifyOfflineReleaseSafety,
+} from './resource-sync-core.mjs';
 
 const resourceNames = [
   'import-package.js',
@@ -168,6 +174,33 @@ async function download(name) {
   };
 }
 
+const readAttempts = Math.max(
+  1,
+  Number.parseInt(process.env.MICROI_UPGRADE_RESOURCE_READ_ATTEMPTS || '3', 10) || 3,
+);
+const retryDelayMilliseconds = Math.max(
+  0,
+  Number.parseInt(process.env.MICROI_UPGRADE_RESOURCE_RETRY_DELAY_MS || '5000', 10) || 5000,
+);
+
+async function downloadAllWithRetry(stage) {
+  let lastError;
+  for (let attempt = 1; attempt <= readAttempts; attempt += 1) {
+    try {
+      return new Map(await Promise.all(resourceNames.map(async name => [name, await download(name)])));
+    } catch (error) {
+      lastError = error;
+      if (!isTemporaryOfficialResourceFailure(error) || attempt >= readAttempts) throw error;
+      process.stderr.write(
+        `官网升级资源${stage}暂时失败（第 ${attempt}/${readAttempts} 次）：${error.message}\n`
+        + `${retryDelayMilliseconds / 1000} 秒后重试...\n`,
+      );
+      await new Promise(resolvePromise => setTimeout(resolvePromise, retryDelayMilliseconds));
+    }
+  }
+  throw lastError;
+}
+
 function synchronizeApplicationStoreEngines(packageContent, importerSource, publisherSource) {
   const packageModel = JSON.parse(packageContent);
   const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
@@ -306,7 +339,7 @@ if (process.argv.includes('--synchronize-local')) {
 } else {
   const initializeBase = process.argv.includes('--initialize-base');
   const publish = process.argv.includes('--publish');
-  const remoteResources = new Map(await Promise.all(resourceNames.map(async name => [name, await download(name)])));
+  const allowVerifiedOffline = process.argv.includes('--allow-verified-offline');
   const localResources = new Map();
   const rawLocalResources = new Map();
   const baseResources = new Map();
@@ -314,11 +347,40 @@ if (process.argv.includes('--synchronize-local')) {
     const rawLocalContent = await readFile(resolve(outputDirectory, name), 'utf8');
     rawLocalResources.set(name, rawLocalContent);
     const localContent = canonicalizeResource(name, rawLocalContent);
+    validate(name, localContent);
     localResources.set(name, localContent);
     const baseContent = await readOptional(resolve(baseDirectory, name));
     if (baseContent !== null) {
       baseResources.set(name, canonicalizeResource(name, baseContent));
     }
+  }
+
+  let remoteResources;
+  try {
+    remoteResources = await downloadAllWithRetry('读取');
+  } catch (error) {
+    if (!allowVerifiedOffline
+      || initializeBase
+      || !isTemporaryOfficialResourceFailure(error)) {
+      throw error;
+    }
+    verifyOfflineReleaseSafety(resourceNames, localResources, baseResources);
+    const reconciledLocalResources = new Map(localResources);
+    reconcileApplicationStoreEngines(reconciledLocalResources, baseResources);
+    for (const name of resourceNames) {
+      if (reconciledLocalResources.get(name) !== localResources.get(name)) {
+        throw new Error(`${name} 与应用商城内嵌接口引擎副本不一致，不能安全使用离线基线`);
+      }
+    }
+    process.stderr.write(
+      '\n⚠ 官网升级资源接口在重试后仍暂时不可用；6 项本地资源与上次官网成功回读的共同基线完全一致。\n'
+      + '  本次仅允许继续后端编译发布：未写入官网、未修改本地资源、未推进共同基线。\n'
+      + `  故障原因：${error.message}\n\n`,
+    );
+    for (const name of resourceNames) {
+      printResource(name, localResources.get(name), '已验证离线基线（未实时同步官网）');
+    }
+    process.exit(0);
   }
 
   if (initializeBase) {
@@ -397,7 +459,7 @@ if (process.argv.includes('--synchronize-local')) {
   }
   if (remoteChanges.length) await publishResources(remoteChanges);
 
-  const verifiedRemote = new Map(await Promise.all(resourceNames.map(async name => [name, await download(name)])));
+  const verifiedRemote = await downloadAllWithRetry('发布后回读');
   await mkdir(baseDirectory, { recursive: true });
   for (const name of resourceNames) {
     const content = mergedResources.get(name);

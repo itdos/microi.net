@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.6.8
+ * Version: v1.6.10
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -2521,6 +2521,70 @@ try {
     var packageName = firstTextParam([V8.Param.AppName, Package.PackageInfo.Name]);
     var preserveInterfaceEnginePageTabs = packageAppIdLower == 'app.microi.api-engine'
         || packageName == '接口引擎';
+    var legacyMenuDiyConfigFields = [
+        'SelectApi', 'AddBtnText', 'SaveBtnText', 'AddBtnType', 'SaveType',
+        'HiddenIndex', 'GeneralSeaarch', 'ImportApi', 'ImportProgressApi', 'ExportApi'
+    ];
+    var parseLegacyMenuDiyConfig = function (value, label) {
+        if (!value) return {};
+        if (typeof value == 'object') return value;
+        try {
+            var parsed = JSON.parse(String(value));
+            return parsed && typeof parsed == 'object' && !Array.isArray(parsed) ? parsed : {};
+        } catch (error) {
+            debugLog['menu_diyconfig_parse_warning_' + label] =
+                'DiyConfig不是合法JSON，已保留可识别的物理字段：' + error.message;
+            return {};
+        }
+    };
+    var mergeLegacyMenuDiyConfig = function (target, source) {
+        if (!source || typeof source != 'object') return;
+        for (var sourceKey in source) {
+            if (!Object.prototype.hasOwnProperty.call(source, sourceKey)
+                || sourceKey == '__proto__'
+                || sourceKey == 'constructor'
+                || sourceKey == 'prototype') {
+                continue;
+            }
+            target[sourceKey] = source[sourceKey];
+        }
+    };
+    var syncLegacyMenuDiyConfig = function (model, existingDiyConfig, label) {
+        var config = {};
+        // 先保留目标库中仅旧版使用的未知配置，再合并包内显式配置。
+        mergeLegacyMenuDiyConfig(config, parseLegacyMenuDiyConfig(existingDiyConfig, label + '_existing'));
+        mergeLegacyMenuDiyConfig(config, parseLegacyMenuDiyConfig(model.DiyConfig, label + '_package'));
+        for (var fieldIndex = 0; fieldIndex < legacyMenuDiyConfigFields.length; fieldIndex++) {
+            var fieldName = legacyMenuDiyConfigFields[fieldIndex];
+            var physicalValue = model[fieldName];
+            var physicalPresent = physicalValue !== null
+                && physicalValue !== undefined
+                && !(typeof physicalValue == 'string' && physicalValue.trim() == '');
+            var configValue = config[fieldName];
+            var configPresent = configValue !== null
+                && configValue !== undefined
+                && !(typeof configValue == 'string' && configValue.trim() == '');
+            if (physicalPresent) {
+                // 包内新版物理字段是本次安装的显式变更，镜像给旧版。
+                config[fieldName] = physicalValue;
+            } else if (configPresent) {
+                // 旧版配置仍有值时补齐新版物理字段。
+                model[fieldName] = configValue;
+            }
+        }
+        var hasConfig = false;
+        for (var configKey in config) {
+            if (Object.prototype.hasOwnProperty.call(config, configKey)) {
+                hasConfig = true;
+                break;
+            }
+        }
+        if (hasConfig) {
+            model.DiyConfig = JSON.stringify(config);
+        } else {
+            delete model.DiyConfig;
+        }
+    };
 
     // 按ParentId排序，确保父菜单先导入
     var sortedMenus = [];
@@ -2628,18 +2692,18 @@ try {
         for (var key in menu) {
             modelCopy[key] = menu[key];
         }
-        delete modelCopy.DiyConfig;
         modelCopy.OsClient = V8.OsClient;
         modelCopy.Id = menu.Id;
+        var existingMenuVisibility = null;
 
         // 应用包升级只能更新菜单功能配置，不能反向覆盖客户已经维护的桌面端/移动端显隐。
         // 新增菜单继续采用包内默认值；仅对目标库中已存在且值明确的菜单保留原值。
         if (exists) {
             var existingMenuVisibilityResult = V8.FormEngine.GetFormData('sys_menu', {
                 Id: menu.Id,
-                _SelectFields: ['Display', 'AppDisplay']
+                _SelectFields: ['Display', 'AppDisplay', 'DiyConfig']
             });
-            var existingMenuVisibility = existingMenuVisibilityResult
+            existingMenuVisibility = existingMenuVisibilityResult
                 && existingMenuVisibilityResult.Code == 1
                 ? existingMenuVisibilityResult.Data
                 : null;
@@ -2654,6 +2718,11 @@ try {
                     '已保留目标库菜单的Display/AppDisplay配置';
             }
         }
+        syncLegacyMenuDiyConfig(
+            modelCopy,
+            existingMenuVisibility ? existingMenuVisibility.DiyConfig : null,
+            String(menu.Id || i)
+        );
 
         // 接口引擎的 PageTabs 是每个客户按接口分类长期维护的V8按钮集合。
         // 只对 app.microi.api-engine 保留目标库已有的真正多Tab配置（至少2个）；其它字段、
@@ -3024,14 +3093,17 @@ try {
 
         if (!latest) return;
         normalizeApiEngineModel(latest);
+        // IV8Cache.Set 的 value 参数是 string。直接传 Jint/.NET 对象会被转换成
+        // "System..." 类型名，污染 v3 与 v6 共用的 sys_apiengine JSON 缓存。
+        var latestCacheJson = JSON.stringify(latest);
         if (!isMissingValue(latest.ApiEngineKey)) {
-            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiEngineKey).toLowerCase()}`, latest);
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiEngineKey).toLowerCase()}`, latestCacheJson);
         }
         if (!isMissingValue(latest.Id)) {
-            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.Id).toLowerCase()}`, latest);
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.Id).toLowerCase()}`, latestCacheJson);
         }
         if (!isMissingValue(latest.ApiAddress)) {
-            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latest);
+            V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latestCacheJson);
         }
     }
 

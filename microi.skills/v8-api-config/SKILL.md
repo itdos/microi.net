@@ -155,11 +155,19 @@ LogResult = true    # 记录每次返回
 ```text
 POST /apiengine/{ApiEngineKey}--OsClient--{OsClient}--
 Headers: Content-Type=application/json, OsClient={OsClient}, apiengine=1
+Body: {"Action":"Bootstrap"}
+
+# 兼容旧入口
+POST /api/ApiEngine/Run
+Headers: Content-Type=application/json, OsClient={OsClient}
+Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 ```
 
 复测重点：
 
 - `IsEnable=1`、`StopHttp=0`、公开接口 `AllowAnonymous=1`。
+- JSON Body 会恢复到 `V8.Param`；同名参数已由 Query/Form 绑定时保持既有值，避免改变旧调用优先级。直接动态路由与兼容入口都要覆盖 JSON Body 测试，不能只用 Query 参数证明可用。
+- HTTP 请求中的 `_CurrentUser`、`_InvokeType:'Server'`、`_TrustedServerInvocation` 都不能建立可信服务端身份；当前用户和调用类型必须由认证中间件与接口层重新写入。
 - `ApiAddress` 不能为空字符串；空字符串可能导致 404。
 - 响应不能是空 body、字符串 `null`、非 JSON；业务接口必须返回标准 DosResult。
 - Header `OsClient` 只能作为补充，URL 路径里的 `--OsClient--{OsClient}--` 更稳。避免用 `?OsClient=` 做 ApiEngine 复测；部分动态路由会把 querystring 参与 `ApiAddress` 匹配并误报引擎不存在。

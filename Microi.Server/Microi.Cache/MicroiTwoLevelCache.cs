@@ -246,6 +246,30 @@ namespace Microi.net
                             return default(T);
                         }
 
+                        // dynamic 的底层类型是 object。字符串重载写入的标准 JSON 在
+                        // Redis(L2)命中时会被反序列化，但此前 L1 命中会因为 string 也是
+                        // object 而直接返回字符串，导致同一个 Key 在不同节点/命中层级
+                        // 得到不同类型。L1 必须与 L2 保持相同的动态 JSON 语义。
+                        if (typeof(T) == typeof(object) && entry.Value is string localJsonString)
+                        {
+                            try
+                            {
+                                var deserializedValue =
+                                    Newtonsoft.Json.JsonConvert.DeserializeObject(localJsonString);
+                                if (deserializedValue != null)
+                                {
+                                    AddToLocalCache(key, deserializedValue);
+                                    return (T)(object)deserializedValue;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                _localCache.TryRemove(key, out _);
+                                Console.WriteLine(
+                                    $"Microi：【本地缓存】动态JSON反序列化失败，已清除L1: {key}, 异常: {ex.Message}");
+                            }
+                        }
+
                         // 如果存储的就是目标类型，直接转换
                         if (entry.Value is T result)
                         {
