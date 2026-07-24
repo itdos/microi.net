@@ -1,4 +1,5 @@
-import { getSysConfig } from '@/utils/sysconfig.js'
+// import { getSysConfig } from '@/utils/sysconfig.js'
+import { callApiEngine } from '@/platform/business-runtime.js'
 
 function textValue(value) {
   if (Array.isArray(value)) return value.find(Boolean) || ''
@@ -35,56 +36,39 @@ export function inferRegionFromAddress(address = '') {
   return compactRegion([province, city, district])
 }
 
-function amapKey(config = {}) {
-  return config.AMapKey || config.AmapKey || config.GaodeMapKey || config.MapKey || ''
-}
-
-function requestAmapReverseGeocode(key, longitude, latitude) {
-  return new Promise((resolve, reject) => {
-    uni.request({
-      url: 'https://restapi.amap.com/v3/geocode/regeo',
-      method: 'GET',
-      data: {
-        key,
-        location: `${longitude},${latitude}`,
-        extensions: 'base',
-        radius: 1000,
-        batch: false,
-        roadlevel: 0
-      },
-      success: (response) => {
-        const body = response && response.data ? response.data : {}
-        if (String(body.status) !== '1' || !body.regeocode) {
-          reject(new Error(body.info || '地址解析失败'))
-          return
-        }
-        resolve(body.regeocode)
-      },
-      fail: (error) => reject(new Error(error?.errMsg || '地址解析失败'))
-    })
-  })
-}
-
-export async function reverseGeocode(longitude, latitude) {
+export async function reverseGeocode(longitude, latitude, options = {}) {
   const lng = Number(longitude)
   const lat = Number(latitude)
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) throw new Error('定位坐标无效')
-  const config = await getSysConfig()
-  const key = amapKey(config || {})
-  if (!key) throw new Error('未配置高德地图 Key')
-  const result = await requestAmapReverseGeocode(key, lng, lat)
-  const component = result.addressComponent || {}
-  const address = textValue(result.formatted_address)
-  const region = compactRegion([
-    component.province,
-    component.city || component.province,
-    component.district
-  ])
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) throw new Error('定位坐标超出有效范围')
+
+  const apiEngineKey = String(options.apiEngineKey || '').trim()
+  if (!apiEngineKey) throw new Error('未配置地址解析接口引擎')
+  const result = await callApiEngine(apiEngineKey, {
+    Longitude: lng,
+    Latitude: lat
+  })
+  if (!result || Number(result.Code) !== 1) {
+    throw new Error(result?.Data?.ProviderMessage || result?.Msg || '地址解析失败')
+  }
+
+  const data = result.Data || {}
+  const address = textValue(data.address).trim()
+  let region = Array.isArray(data.region) ? compactRegion(data.region) : []
+  if (!region.length) {
+    region = compactRegion([
+      data.province,
+      data.city || data.province,
+      data.district
+    ])
+  }
+  if (!address) throw new Error('地址解析接口未返回有效地址')
+
   return {
     address,
     region: region.length ? region : inferRegionFromAddress(address),
-    longitude: lng,
-    latitude: lat
+    longitude: Number.isFinite(Number(data.longitude)) ? Number(data.longitude) : lng,
+    latitude: Number.isFinite(Number(data.latitude)) ? Number(data.latitude) : lat
   }
 }
 

@@ -16,6 +16,52 @@
 		<view v-else class="native-form">
 			<view v-if="stale" class="stale-tip"><text>当前展示了缓存配置，网络恢复后将自动更新</text></view>
 
+			<view v-if="tenantFormPresentation.clock || tenantFormPresentation.location"
+				class="tenant-form-presentation">
+				<view v-if="tenantFormPresentation.clock" class="tenant-form-clock">
+					<text class="tenant-form-clock__value">{{ tenantFormPresentation.clock.value }}</text>
+					<text v-if="tenantFormPresentation.clock.note" class="tenant-form-clock__note">
+						{{ tenantFormPresentation.clock.note }}
+					</text>
+				</view>
+
+				<view v-if="tenantFormPresentation.location" class="tenant-form-location">
+					<view class="tenant-form-location__heading">
+						<text class="tenant-form-location__title">
+							{{ tenantFormPresentation.location.title || '现场位置' }}
+						</text>
+						<view class="tenant-form-location__action"
+							@tap="runTenantPresentationAction(tenantFormPresentation.location.actionKey)">
+							{{ tenantFormPresentation.location.actionLabel || '重新定位' }}
+						</view>
+					</view>
+					<view class="tenant-form-location__map-wrap"
+						@tap="runTenantPresentationAction(tenantFormPresentation.location.actionKey)">
+						<map v-if="tenantFormPresentation.location.latitude && tenantFormPresentation.location.longitude"
+							class="tenant-form-location__map"
+							:latitude="tenantFormPresentation.location.latitude"
+							:longitude="tenantFormPresentation.location.longitude"
+							:markers="tenantFormPresentationMarkers" :show-location="true" :enable-zoom="true" />
+						<view v-else class="tenant-form-location__placeholder">
+							<text class="tenant-form-location__pin">⌖</text>
+							<text>
+								{{ tenantFormPresentation.location.locating
+									? '正在获取当前位置…'
+									: tenantFormPresentation.location.emptyText || '点击获取当前位置' }}
+							</text>
+						</view>
+					</view>
+					<text class="tenant-form-location__address">
+						{{ tenantFormPresentation.location.address || '正在获取并解析签到地点…' }}
+					</text>
+					<text v-if="tenantFormPresentation.location.latitude && tenantFormPresentation.location.longitude"
+						class="tenant-form-location__coordinate">
+						经度 {{ Number(tenantFormPresentation.location.longitude).toFixed(6) }}，纬度
+						{{ Number(tenantFormPresentation.location.latitude).toFixed(6) }}
+					</text>
+				</view>
+			</view>
+
 			<view v-for="(group, groupIndex) in groups" :key="group.name + groupIndex" class="form-section mci-fade-up"
 				:style="{ animationDelay: `${Math.min(groupIndex, 6) * 45}ms` }">
 				<view class="form-section__header">
@@ -30,7 +76,27 @@
 						<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
 					</view>
 
-					<mci-native-field v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
+					<view v-if="tenantFieldPresentation(field).type === 'map'" class="tenant-field-map">
+						<map v-if="tenantFieldPresentation(field).latitude && tenantFieldPresentation(field).longitude"
+							class="tenant-field-map__canvas"
+							:latitude="tenantFieldPresentation(field).latitude"
+							:longitude="tenantFieldPresentation(field).longitude"
+							:markers="tenantFieldMapMarkers(field)" :show-location="false" :enable-zoom="true" />
+						<view v-else class="tenant-field-map__placeholder">
+							<text class="tenant-field-map__pin">⌖</text>
+							<text>{{ tenantFieldPresentation(field).emptyText || '暂无位置信息' }}</text>
+						</view>
+						<text v-if="tenantFieldPresentation(field).address" class="tenant-field-map__address">
+							{{ tenantFieldPresentation(field).address }}
+						</text>
+						<text v-if="tenantFieldPresentation(field).latitude && tenantFieldPresentation(field).longitude"
+							class="tenant-field-map__coordinate">
+							经度 {{ Number(tenantFieldPresentation(field).longitude).toFixed(6) }}，纬度
+							{{ Number(tenantFieldPresentation(field).latitude).toFixed(6) }}
+						</text>
+					</view>
+
+					<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
 						:table-name="tableName" :form-data="form" :menu-id="menuId"
 						:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
 						@select="handleNativeFieldSelect" />
@@ -109,12 +175,16 @@
 	} from '@/platform/view-manifest.js'
 	import {
 		createTenantFormState,
+		disposeTenantForm,
 		getTenantFormFieldActions,
+		getTenantFormFieldPresentation,
+		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
 		initializeTenantForm,
 		notifyTenantFormSaved,
 		prepareTenantFormSubmit,
 		runTenantFormFieldAction,
+		runTenantFormPresentationAction,
 		tenantFormBusyMessage
 	} from '@/platform/form-extension.js'
 
@@ -143,7 +213,9 @@
 				moduleEngineKey: '',
 				tableChildAuth: null,
 				tenantFormState: {},
-				viewManifest: null
+				viewManifest: null,
+				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
+				formLoadId: 0
 			}
 		},
 		computed: {
@@ -171,6 +243,20 @@
 			hasRelatedFields() {
 				return this.childFields.length + this.joinFields.length + this.openTableFields.length + this
 					.joinTableFields.length > 0
+			},
+			tenantFormPresentation() {
+				return getTenantFormPresentation(this.tenantFormContext())
+			},
+			tenantFormPresentationMarkers() {
+				const location = this.tenantFormPresentation.location || {}
+				if (!location.latitude || !location.longitude) return []
+				return [{
+					id: 1,
+					latitude: Number(location.latitude),
+					longitude: Number(location.longitude),
+					width: 28,
+					height: 36
+				}]
 			}
 		},
 		onLoad(options) {
@@ -191,8 +277,15 @@
 			this.tenantFormState = createTenantFormState(this.tenantFormContext())
 			this.loadForm()
 		},
+		onUnload() {
+			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
+			this.formLoadId += 1
+			disposeTenantForm(this.tenantFormContext())
+		},
 		methods: {
 			async loadForm(refresh = false) {
+				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
+				const loadId = ++this.formLoadId
 				if (!this.tableName) {
 					this.error = '缺少表单名称'
 					this.loading = false
@@ -241,6 +334,7 @@
 						manifest ? Promise.resolve(manifest) : manifestPromise,
 						rowPromise || Promise.resolve(null)
 					])
+					if (loadId !== this.formLoadId) return
 					manifest = resolvedManifest
 					this.viewManifest = manifest
 					if ((this.rowId || !isFormEngineRecordAdapter(this.recordAdapter)) &&
@@ -260,18 +354,28 @@
 						...this.defaultValues,
 						...(rowResult ? rowResult.Data : {})
 					})
-					await hydrateNativeFormOptions(definition, this.form, {
-						menuId: this.menuId,
-						moduleEngineKey: this.moduleEngineKey,
-						tableChildAuth: this.tableChildAuth
-					})
+					// zhy: 核心定义和记录成功后立即结束整页骨架屏，选项数据在页面显示后补齐。
 					this.definition = definition
+					this.loading = false
 					await this.$nextTick()
-					await initializeTenantForm(this.tenantFormContext())
+					await Promise.all([
+						hydrateNativeFormOptions(definition, this.form, {
+							menuId: this.menuId,
+							moduleEngineKey: this.moduleEngineKey,
+							tableChildAuth: this.tableChildAuth,
+							timeoutMs: 8000
+						}),
+						initializeTenantForm(this.tenantFormContext())
+					])
+					if (loadId !== this.formLoadId) return
+					this.definition = {
+						...definition
+					}
 				} catch (error) {
+					if (loadId !== this.formLoadId) return
 					this.error = error.message || error.Msg || '表单加载失败'
 				} finally {
-					this.loading = false
+					if (loadId === this.formLoadId) this.loading = false
 				}
 			},
 			isReadonly(field) {
@@ -309,9 +413,29 @@
 			tenantFieldActions(field) {
 				return getTenantFormFieldActions(this.tenantFormContext(), field)
 			},
+			tenantFieldPresentation(field) {
+				return getTenantFormFieldPresentation(this.tenantFormContext(), field)
+			},
+			tenantFieldMapMarkers(field) {
+				const presentation = this.tenantFieldPresentation(field)
+				if (!presentation.latitude || !presentation.longitude) return []
+				return [{
+					id: 1,
+					latitude: Number(presentation.latitude),
+					longitude: Number(presentation.longitude),
+					width: 32,
+					height: 40
+				}]
+			},
 			async runTenantFieldAction(field, action) {
 				if (!action || action.disabled) return
 				await runTenantFormFieldAction(this.tenantFormContext(), field, action)
+			},
+			async runTenantPresentationAction(actionKey) {
+				if (!actionKey) return
+				await runTenantFormPresentationAction(this.tenantFormContext(), {
+					key: actionKey
+				})
 			},
 			async handleNativeFieldSelect(payload) {
 				await handleTenantFormFieldSelect(this.tenantFormContext(), payload)
@@ -432,6 +556,115 @@
 		font-size: 23rpx;
 	}
 
+	.tenant-form-presentation {
+		margin-bottom: 20rpx;
+	}
+
+	.tenant-form-clock {
+		display: flex;
+		flex-direction: column;
+		padding: 28rpx;
+		border-radius: 8px;
+		color: var(--mci-text-inverse, #fff);
+		background: var(--mci-gradient-primary, linear-gradient(120deg, #0b86d4, #12a6b3 65%, #31af81));
+		box-shadow: var(--mci-shadow-md, 0 10rpx 28rpx rgba(11, 134, 212, .16));
+	}
+
+	.tenant-form-clock__value {
+		font-size: 37rpx;
+		font-weight: 700;
+		line-height: 1.25;
+	}
+
+	.tenant-form-clock__note {
+		margin-top: 8rpx;
+		color: rgba(255, 255, 255, .8);
+		font-size: 22rpx;
+	}
+
+	.tenant-form-location {
+		margin-top: 20rpx;
+		padding: 22rpx;
+		border: 1px solid var(--mci-border, #e1ebef);
+		border-radius: 8px;
+		background: var(--mci-bg-card, #fff);
+		box-shadow: var(--mci-shadow-sm, 0 6rpx 18rpx rgba(24, 76, 98, .05));
+	}
+
+	.tenant-form-location__heading {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 16rpx;
+	}
+
+	.tenant-form-location__title {
+		color: var(--mci-text-primary, #17313b);
+		font-size: 28rpx;
+		font-weight: 700;
+	}
+
+	.tenant-form-location__action {
+		min-height: 64rpx;
+		display: flex;
+		align-items: center;
+		padding: 0 0 0 24rpx;
+		color: var(--mci-color-primary, #0b86d4);
+		font-size: 23rpx;
+		transition: transform .18s ease;
+	}
+
+	.tenant-form-location__action:active {
+		transform: scale(.96);
+	}
+
+	.tenant-form-location__map-wrap {
+		width: 100%;
+		height: 310rpx;
+		overflow: hidden;
+		border-radius: 8px;
+		background: var(--mci-bg-muted, #eaf3f6);
+	}
+
+	.tenant-form-location__map {
+		width: 100%;
+		height: 100%;
+	}
+
+	.tenant-form-location__placeholder {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		color: var(--mci-text-secondary, #718994);
+		font-size: 23rpx;
+	}
+
+	.tenant-form-location__pin {
+		margin-bottom: 10rpx;
+		color: var(--mci-color-danger, #e94b2c);
+		font-size: 68rpx;
+		line-height: 1;
+	}
+
+	.tenant-form-location__address,
+	.tenant-form-location__coordinate {
+		display: block;
+		margin-top: 14rpx;
+		color: var(--mci-text-secondary, #4d6975);
+		font-size: 23rpx;
+		line-height: 34rpx;
+		overflow-wrap: anywhere;
+	}
+
+	.tenant-form-location__coordinate {
+		margin-top: 5rpx;
+		color: var(--mci-text-tertiary, #84969d);
+		font-size: 21rpx;
+	}
+
 	.form-section {
 		margin-bottom: 20rpx;
 		background: var(--mci-bg-card, #fff);
@@ -486,7 +719,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 12rpx;
-		justify-content: flex-end;
+		justify-content: flex-start;
 		margin-top: 16rpx;
 	}
 
@@ -518,6 +751,57 @@
 
 	.tenant-field-action--pressed {
 		transform: scale(.97);
+	}
+
+	.tenant-field-map {
+		width: 100%;
+		overflow: hidden;
+		border: 1px solid var(--mci-border, #dce7eb);
+		border-radius: 8px;
+		background: var(--mci-bg-muted, #f4f8fa);
+	}
+
+	.tenant-field-map__canvas,
+	.tenant-field-map__placeholder {
+		width: 100%;
+		height: 330rpx;
+	}
+
+	.tenant-field-map__placeholder {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		color: var(--mci-text-secondary, #718994);
+		font-size: 23rpx;
+	}
+
+	.tenant-field-map__pin {
+		margin-bottom: 10rpx;
+		color: var(--mci-color-primary, #0b86d4);
+		font-size: 68rpx;
+		line-height: 1;
+	}
+
+	.tenant-field-map__address,
+	.tenant-field-map__coordinate {
+		display: block;
+		padding: 14rpx 18rpx 0;
+		color: var(--mci-text-secondary, #4d6975);
+		font-size: 23rpx;
+		line-height: 34rpx;
+		overflow-wrap: anywhere;
+	}
+
+	.tenant-field-map__coordinate {
+		padding-top: 4rpx;
+		padding-bottom: 14rpx;
+		color: var(--mci-text-tertiary, #84969d);
+		font-size: 21rpx;
+	}
+
+	.tenant-field-map__address:last-child {
+		padding-bottom: 14rpx;
 	}
 
 	.form-field__description {

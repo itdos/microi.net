@@ -26,8 +26,10 @@
     <!-- v-if="field.Component == 'Textarea'" -->
     <!-- :type="TableInEdit == true ? 'text' : 'textarea'" -->
     <!-- type="textarea" -->
+    <!-- 增加该属性实现自定义下拉高度:autosize="TableInEdit == false ?{ minRows: 2, maxRows: 14 } : ''" -->
     <el-input
         v-model="ModelValue"
+        :autosize="TableInEdit == false ?{ minRows: 2, maxRows: 15 } : ''"
         :disabled="GetFieldReadOnly(field)"
         :type="TableInEdit == true ? 'text' : 'textarea'"
         :rows="(field && field.Config && field.Config.Textarea && field.Config.Textarea.DefaultRows) || DefaultRows"
@@ -278,7 +280,7 @@ export default {
             var self = this;
             return new Promise((resolve, reject) => {
                 // 判断需要执行的V8
-                if (field.V8Code || (field.Config && field.Config.V8Code) 
+                if (field.V8Code || (field.Config && field.Config.V8Code)
                     || (v8codeKey && !self.DiyCommon.IsNull(field.Config[v8codeKey]))) {
                     // self.RunV8Code(field, item)
                     self.$emit("CallbackRunV8Code", {
@@ -362,7 +364,7 @@ export default {
                 self.field.Config.Textarea = {};
             }
             self.field.Config.Textarea.DefaultRows = self.configForm.DefaultRows;
-            
+
             self.configDialogVisible = false;
             self.DiyCommon.Tips('配置已保存', true);
         }
