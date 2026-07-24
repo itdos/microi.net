@@ -157,8 +157,10 @@ function extractUploadPath(value) {
   if (typeof value === 'object') {
     const raw = Array.isArray(value) ? (value[0] || {}) : value;
     if (typeof raw === 'string') return extractUploadPath(raw);
-    return raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL ||
-      raw.FullUrl || raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath || '';
+    // Path/FilePathName are the durable value stored by the upload field. Url/PreviewUrl
+    // may be a short-lived private-file signature and must never prevent re-signing.
+    return raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath ||
+      raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL || raw.FullUrl || '';
   }
 
   const text = String(value || '').trim();

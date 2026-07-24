@@ -457,6 +457,18 @@ function currentOptionRows(field, form) {
   return (Array.isArray(values) ? values : [values]).filter((item) => item && typeof item === 'object')
 }
 
+// zhy: 限制单个远程选项请求的等待时间，避免异常数据源永久占用表单加载流程。
+function withTimeout(promise, timeoutMs, message) {
+  const duration = Math.max(1000, Number(timeoutMs || 10000))
+  let timer = null
+  const timeout = new Promise((resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(message || '选项加载超时，请稍后重试')), duration)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
+}
+
 async function requestFieldOptions(field, form, options = {}) {
   const config = field.config || {}
   const dataSource = nativeFieldOptionSource(field)
@@ -532,14 +544,18 @@ export async function loadNativeFieldOptionPage(field, form = {}, options = {}) 
   const pageSize = Math.max(1, Number(options.pageSize || 20))
   const keyword = String(options.keyword || '').trim()
   const remoteSearch = isRemoteNativeFieldSearch(field)
-  const result = await requestFieldOptions(field, form, {
-    pageIndex,
-    pageSize,
-    keyword: remoteSearch ? keyword : '',
-    menuId: options.menuId,
-    moduleEngineKey: options.moduleEngineKey,
-    tableChildAuth: options.tableChildAuth
-  })
+  const result = await withTimeout(
+    requestFieldOptions(field, form, {
+      pageIndex,
+      pageSize,
+      keyword: remoteSearch ? keyword : '',
+      menuId: options.menuId,
+      moduleEngineKey: options.moduleEngineKey,
+      tableChildAuth: options.tableChildAuth
+    }),
+    options.timeoutMs,
+    `${field.Label || field.Name || '选项'}加载超时，请稍后重试`
+  )
   if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '选项加载失败')
 
   let rows = optionResponseRows(field, result)
@@ -564,9 +580,30 @@ export async function loadNativeFieldOptionPage(field, form = {}, options = {}) 
   }
 }
 
+// zhy: 视图配置会复制分组字段；选项接口返回后需把状态同步到同名渲染副本，否则接口有数据但单选项仍显示为空。
+function syncNativeFieldOptionState(definition, sourceField) {
+  const fieldName = String(sourceField && sourceField.Name || '').toLowerCase()
+  if (!fieldName) return
+  const targets = [
+    ...(definition.fields || []),
+    ...(definition.groups || []).reduce((rows, group) => rows.concat(group.fields || []), [])
+  ]
+  targets.forEach((target) => {
+    if (!target || target === sourceField || String(target.Name || '').toLowerCase() !== fieldName) return
+    target.Data = sourceField.Data
+    target.options = sourceField.options
+    target.optionsLoading = sourceField.optionsLoading
+    target.optionError = sourceField.optionError
+  })
+}
+
 export async function hydrateNativeFormOptions(definition, form, options = {}) {
   if (!definition || !Array.isArray(definition.fields)) return definition
-  const fields = definition.fields.filter((field) => OPTION_COMPONENTS.has(field.component))
+  // zhy: 下拉框改为打开时按需加载，避免成功返回的大型客户SQL结果阻塞编辑页主线程。
+  const fields = definition.fields.filter((field) =>
+    OPTION_COMPONENTS.has(field.component) &&
+    (options.eagerDropdowns === true || ['Radio', 'Checkbox'].includes(field.component))
+  )
   let cursor = 0
   const worker = async () => {
     while (cursor < fields.length) {
@@ -576,13 +613,15 @@ export async function hydrateNativeFormOptions(definition, form, options = {}) {
       const requiresRemote = field.component === 'Department' || ['Sql', 'DataSource', 'ApiEngine', 'Api'].includes(inferredSource)
       if (!requiresRemote) continue
       field.optionsLoading = true
+      syncNativeFieldOptionState(definition, field)
       try {
         const page = await loadNativeFieldOptionPage(field, form, {
           pageIndex: 1,
           pageSize: 20,
           menuId: options.menuId,
           moduleEngineKey: options.moduleEngineKey,
-          tableChildAuth: options.tableChildAuth
+          tableChildAuth: options.tableChildAuth,
+          timeoutMs: options.timeoutMs
         })
         const rows = [...page.options.slice(0, 20).map((item) => item.raw)]
         currentOptionRows(field, form).forEach((current) => {
@@ -597,6 +636,8 @@ export async function hydrateNativeFormOptions(definition, form, options = {}) {
         field.optionError = error.message || error.Msg || '选项加载失败'
       } finally {
         field.optionsLoading = false
+        // zhy: 无论加载成功或失败都同步最终状态，让分组中的角色、职位状态、性别等字段立即刷新。
+        syncNativeFieldOptionState(definition, field)
       }
     }
   }
