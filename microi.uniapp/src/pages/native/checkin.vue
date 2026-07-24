@@ -91,7 +91,10 @@
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser } from '@/utils/request.js'
 import { callApiEngine, openLowCodeMenu } from '@/platform/business-runtime.js'
+import { normalizeChosenLocation, reverseGeocode } from '@/platform/location.js'
 import { updateTask } from '@/utils/xjy-task.js'
+
+const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
 
 export default {
   mixins: [themeMixin],
@@ -137,8 +140,7 @@ export default {
   },
   methods: {
     async initializePage() {
-      const locationReady = new Promise((resolve) => this.chooseLocation(false, resolve))
-      await Promise.allSettled([this.loadTodayCount(), locationReady])
+      await Promise.allSettled([this.loadTodayCount(), this.chooseLocation(false)])
       this.initialLoading = false
     },
     updateTime() {
@@ -152,45 +154,64 @@ export default {
         this.todayCount = Number(result && result.Data !== undefined ? result.Data : result) || 0
       } catch (e) {}
     },
-    chooseLocation(showPicker = true, finished) {
+    requestCurrentCheckinLocation() {
+      return new Promise((resolve, reject) => {
+        uni.getLocation({
+          type: 'gcj02',
+          isHighAccuracy: true,
+          highAccuracyExpireTime: 5000,
+          success: resolve,
+          fail: reject
+        })
+      })
+    },
+    requestChosenCheckinLocation() {
+      return new Promise((resolve, reject) => {
+        uni.chooseLocation({
+          success: resolve,
+          fail: reject
+        })
+      })
+    },
+    async resolveCheckinLocation(source) {
+      let geocode = null
+      try {
+        geocode = await reverseGeocode(source.longitude, source.latitude, {
+          apiEngineKey: AMAP_REVERSE_GEOCODE_ENGINE
+        })
+      } catch (error) {
+        // 地图选点自带地址时仍可使用选点结果；自动定位会在下方校验地址。
+      }
+      const location = normalizeChosenLocation(source, geocode)
+      if (!location.address) throw new Error('当前坐标的详细地址解析失败')
+      this.location = location
+    },
+    async chooseLocation(showPicker = true) {
       if (this.locating) return
       this.locating = true
-      const done = () => { this.locating = false; if (finished) finished() }
-      if (showPicker && uni.chooseLocation) {
-        uni.chooseLocation({
-          success: (res) => {
-            this.location = {
-              latitude: Number(res.latitude || 0),
-              longitude: Number(res.longitude || 0),
-              address: `${res.name || ''}${res.address || ''}` || '已选择现场位置'
-            }
-          },
-          fail: (error) => {
-            if (!(error && error.errMsg && error.errMsg.includes('cancel'))) this.getCurrentLocation()
-          },
-          complete: done
-        })
-        return
-      }
-      this.getCurrentLocation(done)
-    },
-    getCurrentLocation(callback) {
-      uni.getLocation({
-        type: 'gcj02',
-        isHighAccuracy: true,
-        success: (res) => {
-          this.location = {
-            latitude: Number(res.latitude || 0),
-            longitude: Number(res.longitude || 0),
-            address: this.location.address || `经度 ${Number(res.longitude).toFixed(6)}，纬度 ${Number(res.latitude).toFixed(6)}`
+      try {
+        let source
+        if (showPicker && uni.chooseLocation) {
+          try {
+            source = await this.requestChosenCheckinLocation()
+          } catch (error) {
+            const message = String(error && error.errMsg || error && error.message || '')
+            if (/cancel/i.test(message)) return
+            source = await this.requestCurrentCheckinLocation()
           }
-        },
-        fail: () => uni.showToast({ title: '无法获取位置，请检查定位权限', icon: 'none' }),
-        complete: () => {
-          this.locating = false
-          if (callback) callback()
+        } else {
+          source = await this.requestCurrentCheckinLocation()
         }
-      })
+        await this.resolveCheckinLocation(source)
+        if (showPicker) uni.showToast({ title: '签到地点已更新', icon: 'success' })
+      } catch (error) {
+        uni.showToast({
+          title: showPicker ? '位置选择失败' : '无法获取位置，请检查定位权限',
+          icon: 'none'
+        })
+      } finally {
+        this.locating = false
+      }
     },
     openWatermarkCamera() {
       if (this.photos.length >= 6) return
