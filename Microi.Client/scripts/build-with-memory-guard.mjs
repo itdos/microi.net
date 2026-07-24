@@ -1,5 +1,13 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync } from 'node:fs';
+import {
+    closeSync,
+    existsSync,
+    mkdirSync,
+    openSync,
+    readFileSync,
+    rmSync,
+    writeFileSync
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,9 +18,11 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(scriptDir, '..');
 const viteBin = path.join(projectDir, 'node_modules', 'vite', 'bin', 'vite.js');
 const legacyBuilder = path.join(scriptDir, 'build-legacy-from-modern.mjs');
+const processTreeMemoryControl = path.join(scriptDir, 'process-tree-memory-control.ps1');
 const modernOutDir = path.join(projectDir, 'bin', 'Release', 'dist');
 const legacyOutDir = path.join(projectDir, 'bin', 'Release', '.legacy-dist');
 const logDir = path.join(projectDir, '.tmp', 'build-logs');
+const guardPidPath = path.join(logDir, 'guard.pid');
 const totalMemory = os.totalmem();
 const freeMemory = os.freemem();
 const reserveMemory = Math.max(6 * GB, totalMemory * 0.2);
@@ -31,7 +41,9 @@ const esbuildParallelism = Math.max(
     Math.min(Number.parseInt(process.env.MICROI_ESBUILD_PROCS || '2', 10) || 2, os.cpus().length, 2)
 );
 const buildMemoryNoticeThreshold = totalMemory * 0.25;
-const criticalMemoryUsageRatio = 0.95;
+const pauseMemoryUsageRatio = 0.95;
+const resumeMemoryUsageRatio = 0.9;
+const resumeStableSampleCount = 5;
 const rawArgs = process.argv.slice(2);
 const dryRun = rawArgs.includes('--dry-run');
 const legacyOnly = rawArgs.includes('--legacy-only');
@@ -75,6 +87,51 @@ function stopProcessTree(pid) {
     }
 }
 
+function setProcessTreeSuspended(pid, suspended) {
+    if (!pid) return { ok: true, detail: '没有活动子进程。' };
+
+    if (process.platform === 'win32') {
+        if (!existsSync(processTreeMemoryControl)) {
+            return {
+                ok: false,
+                detail: `缺少进程树内存控制脚本：${processTreeMemoryControl}`
+            };
+        }
+
+        const result = spawnSync('powershell.exe', [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            processTreeMemoryControl,
+            '-Action',
+            suspended ? 'Suspend' : 'Resume',
+            '-RootPid',
+            String(pid)
+        ], {
+            encoding: 'utf8',
+            timeout: 15000,
+            windowsHide: true
+        });
+        const detail = [result.stdout, result.stderr, result.error?.message]
+            .filter(Boolean)
+            .join('\n')
+            .trim();
+        return {
+            ok: !result.error && result.status === 0,
+            detail: detail || `PowerShell 退出码 ${result.status ?? 'unknown'}`
+        };
+    }
+
+    try {
+        process.kill(-pid, suspended ? 'SIGSTOP' : 'SIGCONT');
+        return { ok: true, detail: `${suspended ? 'SIGSTOP' : 'SIGCONT'} 已发送。` };
+    } catch (error) {
+        return { ok: false, detail: error.message };
+    }
+}
+
 function assertSafeBuildPath(targetPath) {
     const relative = path.relative(projectDir, targetPath);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
@@ -87,13 +144,43 @@ function readLogTail(logPath, lineCount = 60) {
     return readFileSync(logPath, 'utf8').split(/\r?\n/).slice(-lineCount).join('\n');
 }
 
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForStartMemory(context) {
+    let available = os.freemem();
+    if (available >= requiredStartMemory) return;
+
+    console.warn(
+        `[Microi build guard] ${context}前可用内存 ${formatGb(available)} GB，` +
+        `低于启动目标 ${formatGb(requiredStartMemory)} GB；暂不启动新构建，等待内存恢复。`
+    );
+    let lastWaitLogAt = 0;
+    while (available < requiredStartMemory) {
+        await delay(5000);
+        available = os.freemem();
+        if (Date.now() - lastWaitLogAt >= 30000) {
+            lastWaitLogAt = Date.now();
+            const usageRatio = 1 - available / totalMemory;
+            console.log(
+                `[Microi build guard] 等待${context}：可用 ${formatGb(available)} GB，` +
+                `全机占用 ${formatPercent(usageRatio)}%。`
+            );
+        }
+    }
+    console.log(
+        `[Microi build guard] 内存已恢复到 ${formatGb(available)} GB，继续${context}。`
+    );
+}
+
 console.log(
     `[Microi build guard] 物理内存 ${formatGb(totalMemory)} GB，可用 ${formatGb(freeMemory)} GB，` +
     `现代构建 Node 堆上限 ${heapMb} MB，esbuild 并行 ${esbuildParallelism}，legacy 子进程堆上限 2048 MB。`
 );
 console.log(
     `[Microi build guard] 启动前保留内存目标 ${formatGb(reserveMemory)} GB；` +
-    '构建启动后仅在全机内存占用达到 95% 时强制终止。'
+    '全机占用达到 95% 时自动暂停整个构建进程树，降至 90% 并稳定 5 秒后继续。'
 );
 
 if (!existsSync(viteBin)) {
@@ -101,78 +188,132 @@ if (!existsSync(viteBin)) {
     process.exit(1);
 }
 
-if (freeMemory < requiredStartMemory) {
-    console.error(
-        `[Microi build guard] 当前可用内存不足：至少需要约 ${formatGb(requiredStartMemory)} GB，` +
-        `当前仅 ${formatGb(freeMemory)} GB。请关闭其它高内存程序后重试。`
-    );
-    process.exit(1);
-}
-
 if (dryRun) {
-    console.log('[Microi build guard] 资源检查通过（dry-run，未启动 Vite）。');
+    if (freeMemory < requiredStartMemory) {
+        console.log(
+            `[Microi build guard] dry-run：当前可用 ${formatGb(freeMemory)} GB；` +
+            `实际构建会等待到 ${formatGb(requiredStartMemory)} GB 后再启动。`
+        );
+    } else {
+        console.log('[Microi build guard] 资源检查通过（dry-run，未启动 Vite）。');
+    }
     process.exit(0);
 }
 
 let stoppedForMemory = false;
+let pausedForMemory = false;
+let resumeStableSamples = 0;
 let activeChild = null;
 let activePhaseName = '';
 let phaseStartFreeMemory = freeMemory;
 let lastProgressAt = 0;
 let warnedForPhaseMemory = false;
+
+mkdirSync(logDir, { recursive: true });
+writeFileSync(guardPidPath, `${process.pid}\n`, 'utf8');
+
 const monitor = setInterval(() => {
     if (!activeChild) return;
     const available = os.freemem();
     const phaseMemoryDrop = Math.max(0, phaseStartFreeMemory - available);
     const systemMemoryUsageRatio = 1 - available / totalMemory;
-    if (Date.now() - lastProgressAt >= 30000) {
+    const progressInterval = pausedForMemory ? 10000 : 30000;
+    if (Date.now() - lastProgressAt >= progressInterval) {
         lastProgressAt = Date.now();
         console.log(
-            `[Microi build guard] ${activePhaseName}进行中：可用 ${formatGb(available)} GB，` +
+            `[Microi build guard] ${activePhaseName}${pausedForMemory ? '已暂停' : '进行中'}：` +
+            `可用 ${formatGb(available)} GB，` +
             `全机占用 ${formatPercent(systemMemoryUsageRatio)}%，本阶段可用内存下降 ${formatGb(phaseMemoryDrop)} GB。`
         );
     }
 
     // 可用内存变化还包含 IDE、浏览器和系统缓存，不能据此把阶段下降量当作构建进程树的精确占用。
-    // 超过 25% 时只提示；已启动任务仅在全机内存占用达到 95% 时强制终止。
+    // 超过 25% 时只提示；全机达到 95% 时暂停整个进程树，不把阶段估算当作硬阈值。
     if (phaseMemoryDrop > buildMemoryNoticeThreshold && !warnedForPhaseMemory) {
         warnedForPhaseMemory = true;
         console.warn(
             `[Microi build guard] 本阶段可用内存已下降 ${formatGb(phaseMemoryDrop)} GB，` +
-            `该数值包含其它进程和系统缓存变化；构建继续运行，仅在全机内存占用达到 95% 时终止。`
+            '该数值包含其它进程和系统缓存变化；构建继续运行，全机达到 95% 时才暂停。'
         );
     }
 
-    if (systemMemoryUsageRatio < criticalMemoryUsageRatio || stoppedForMemory) return;
+    if (pausedForMemory) {
+        if (systemMemoryUsageRatio <= resumeMemoryUsageRatio) {
+            resumeStableSamples += 1;
+        } else {
+            resumeStableSamples = 0;
+        }
+
+        if (resumeStableSamples < resumeStableSampleCount) return;
+
+        const result = setProcessTreeSuspended(activeChild.pid, false);
+        if (!result.ok) {
+            stoppedForMemory = true;
+            console.error(
+                `\n[Microi build guard] 内存恢复后无法继续构建（${result.detail}），` +
+                '正在终止本次构建树，避免留下挂起进程。'
+            );
+            stopProcessTree(activeChild.pid);
+            return;
+        }
+
+        pausedForMemory = false;
+        resumeStableSamples = 0;
+        lastProgressAt = Date.now();
+        console.log(
+            `\n[Microi build guard] 全机内存已连续 ${resumeStableSampleCount} 秒低于或等于 ` +
+            `${formatPercent(resumeMemoryUsageRatio)}%，继续${activePhaseName}。`
+        );
+        return;
+    }
+
+    if (systemMemoryUsageRatio < pauseMemoryUsageRatio || stoppedForMemory) return;
+
+    const reason = `全机内存占用已达 ${formatPercent(systemMemoryUsageRatio)}%（可用 ${formatGb(available)} GB）`;
+    console.warn(`\n[Microi build guard] ${reason}，正在暂停${activePhaseName}进程树。`);
+    const result = setProcessTreeSuspended(activeChild.pid, true);
+    if (result.ok) {
+        pausedForMemory = true;
+        resumeStableSamples = 0;
+        lastProgressAt = Date.now();
+        console.warn(
+            `[Microi build guard] 构建已暂停；将持续监听，` +
+            `全机占用降至 ${formatPercent(resumeMemoryUsageRatio)}% 并稳定 ` +
+            `${resumeStableSampleCount} 秒后自动继续。`
+        );
+        return;
+    }
 
     stoppedForMemory = true;
-    const reason = `全机内存占用已达 ${formatPercent(systemMemoryUsageRatio)}%（可用 ${formatGb(available)} GB）`;
-    console.error(`\n[Microi build guard] ${reason}，正在终止构建以保护 VS Code 和系统。`);
+    console.error(
+        `[Microi build guard] 无法安全暂停进程树（${result.detail}），` +
+        '正在终止本次构建树作为保护回退。'
+    );
     stopProcessTree(activeChild.pid);
 }, 1000);
 
 const handleSignal = (signal) => {
     clearInterval(monitor);
+    if (pausedForMemory && activeChild?.pid) {
+        setProcessTreeSuspended(activeChild.pid, false);
+    }
     stopProcessTree(activeChild?.pid);
+    rmSync(guardPidPath, { force: true });
     process.exit(signal === 'SIGINT' ? 130 : 143);
 };
 
 process.once('SIGINT', () => handleSignal('SIGINT'));
 process.once('SIGTERM', () => handleSignal('SIGTERM'));
 
-function runVitePhase(name, variant, outDir) {
+async function runVitePhase(name, variant, outDir) {
+    await waitForStartMemory(`${name}构建`);
     return new Promise((resolve, reject) => {
         phaseStartFreeMemory = os.freemem();
         activePhaseName = name;
         lastProgressAt = 0;
         warnedForPhaseMemory = false;
-        if (phaseStartFreeMemory < requiredStartMemory) {
-            reject(new Error(
-                `${name} 构建前可用内存不足：至少需要约 ${formatGb(requiredStartMemory)} GB，` +
-                `当前仅 ${formatGb(phaseStartFreeMemory)} GB。`
-            ));
-            return;
-        }
+        pausedForMemory = false;
+        resumeStableSamples = 0;
 
         mkdirSync(logDir, { recursive: true });
         const logPath = path.join(logDir, variant === 'modern' ? 'modern.log' : 'legacy.log');
@@ -202,11 +343,15 @@ function runVitePhase(name, variant, outDir) {
         activeChild.once('error', (error) => {
             closeLog();
             activeChild = null;
+            pausedForMemory = false;
+            resumeStableSamples = 0;
             reject(new Error(`无法启动 ${name} Vite：${error.message}`));
         });
         activeChild.once('exit', (code, signal) => {
             closeLog();
             activeChild = null;
+            pausedForMemory = false;
+            resumeStableSamples = 0;
             if (stoppedForMemory) {
                 reject(new Error(`${name}构建触发内存保护。`));
                 return;
@@ -227,20 +372,16 @@ function runVitePhase(name, variant, outDir) {
     });
 }
 
-function runLegacyConversionPhase() {
+async function runLegacyConversionPhase() {
+    const name = 'Chrome 49 legacy串行转换';
+    await waitForStartMemory(name);
     return new Promise((resolve, reject) => {
-        const name = 'Chrome 49 legacy串行转换';
         phaseStartFreeMemory = os.freemem();
         activePhaseName = name;
         lastProgressAt = 0;
         warnedForPhaseMemory = false;
-        if (phaseStartFreeMemory < requiredStartMemory) {
-            reject(new Error(
-                `${name}前可用内存不足：至少需要约 ${formatGb(requiredStartMemory)} GB，` +
-                `当前仅 ${formatGb(phaseStartFreeMemory)} GB。`
-            ));
-            return;
-        }
+        pausedForMemory = false;
+        resumeStableSamples = 0;
 
         mkdirSync(logDir, { recursive: true });
         const logPath = path.join(logDir, 'legacy.log');
@@ -272,11 +413,15 @@ function runLegacyConversionPhase() {
         activeChild.once('error', (error) => {
             closeLog();
             activeChild = null;
+            pausedForMemory = false;
+            resumeStableSamples = 0;
             reject(new Error(`无法启动 ${name}：${error.message}`));
         });
         activeChild.once('exit', (code, signal) => {
             closeLog();
             activeChild = null;
+            pausedForMemory = false;
+            resumeStableSamples = 0;
             if (stoppedForMemory) {
                 reject(new Error(`${name}触发内存保护。`));
                 return;
@@ -315,4 +460,5 @@ try {
     process.exitCode = stoppedForMemory ? 137 : 1;
 } finally {
     clearInterval(monitor);
+    rmSync(guardPidPath, { force: true });
 }

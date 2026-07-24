@@ -662,8 +662,9 @@ public class FormEngineTenantBoundaryTests
                     ApiEngineKey = "upgrade-test"
                 }
             }));
-        var normalized = await new FormEngine()
-            .DynamicToDiyTableRowParam(trustedArgument);
+        var formEngine = new FormEngine();
+        var normalized = await formEngine.DynamicToDiyTableRowParam(trustedArgument);
+        var sparseWrite = await formEngine.DynamicParamToDiyParam(trustedArgument);
 
         Assert.True(normalized._TrustedServerInvocation);
         Assert.Equal("tenant-a", normalized.OsClient);
@@ -671,6 +672,11 @@ public class FormEngineTenantBoundaryTests
         Assert.Equal(
             "upgrade-test",
             normalized._RowModel?["ApiEngineKey"]?.ToString());
+        Assert.Equal(
+            "upgrade-test",
+            sparseWrite._RowModel?["ApiEngineKey"]?.ToString());
+        Assert.False(sparseWrite._RowModel?.ContainsKey("Name"));
+        Assert.False(sparseWrite._RowModel?.ContainsKey("ModuleEngineKey"));
         normalized._AuthorizationPolicy = new FormEngineAuthorizationPolicy
         {
             SqlWhere = "A.OwnerId = '$CurrentUser.Id$'",

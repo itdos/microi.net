@@ -142,3 +142,4 @@ tmp/
 .codex-build/
 .codex-logs/
 .codex-tmp/
+.codex-verify-api-20260725/

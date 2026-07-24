@@ -1680,7 +1680,10 @@ const createTaskRecord = async (sourcePlatform, targetPlatform, selectedRows) =>
 
 const syncFile = async (row, sourcePlatform, targetPlatform, targetFolder) => {
   const targetPath = joinPath(targetFolder, row.name)
-  if (sourcePlatform.platformType === 'minio' || targetPlatform.platformType === 'minio') {
+  const useServerMinioSync = sourcePlatform.platformType === 'minio'
+    || targetPlatform.platformType === 'minio'
+    || (sourcePlatform.platformType === 'current' && targetPlatform.platformType === 'current')
+  if (useServerMinioSync) {
     if (sourcePlatform.platformType === 'remote' || targetPlatform.platformType === 'remote') {
       throw new Error('MinIO直连暂不支持与远程吾码平台直接组合，请将吾码平台设为当前平台')
     }
