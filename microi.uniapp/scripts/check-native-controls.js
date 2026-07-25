@@ -41,5 +41,15 @@ if (!formRuntime.includes('SENSITIVE_FIELD_PATTERN')) fail('sensitive field visi
 if (!nativeForm.includes('hydrateNativeFormOptions(liveDefinition')) {
   fail('async field options must hydrate the live reactive form definition')
 }
+// zhy: 防止下拉层级通知和解除卡片裁切的修复被后续改动移除。
+if (!renderer.includes("'selector-toggle'") || !nativeForm.includes('@selector-toggle="handleSelectorToggle(field, $event)"')) {
+  fail('dropdown selector must notify the form before elevating its stacking context')
+}
+if (!nativeForm.includes('.form-section--select-open') || !nativeForm.includes('overflow: visible')) {
+  fail('open dropdown section must escape card clipping')
+}
+if (!nativeForm.includes('.native-form-page--select-open :deep(.mci-page-shell__body)')) {
+  fail('open dropdown must stack above fixed page controls and floating launchers')
+}
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)
