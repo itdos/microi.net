@@ -51,5 +51,13 @@ if (!nativeForm.includes('.form-section--select-open') || !nativeForm.includes('
 if (!nativeForm.includes('.native-form-page--select-open :deep(.mci-page-shell__body)')) {
   fail('open dropdown must stack above fixed page controls and floating launchers')
 }
+// zhy: 确保新增和编辑页的字段分组保持可折叠能力。
+if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
+  !nativeForm.includes('initializeGroupExpansion(definition.groups || [])') ||
+  !nativeForm.includes('this.expandedGroupKeys = [this.groupKey(groups[0], 0)]') ||
+  !nativeForm.includes('.form-section__toggle.expanded') ||
+  !nativeForm.includes('this.expandFirstInvalidGroup()')) {
+  fail('native form field groups must support collapsed and expanded states')
+}
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)
