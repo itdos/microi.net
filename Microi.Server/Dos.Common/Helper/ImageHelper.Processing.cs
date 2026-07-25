@@ -542,13 +542,10 @@ namespace Dos.Common
             if (param.Size <= 0 || param.Size > ImageProcessingMaxDimension)
                 throw new ArgumentOutOfRangeException(nameof(param), "Size 超出允许范围。");
             var format = ResolveFormat(param.OutputFormat, param.Format);
-            using (var generator = new QRCodeGenerator())
-            using (var qrCode = generator.CreateQrCode(content, ECCLevel.H))
-            {
-                return Render(param.Size, param.Size, format, param.Quality, param.FileName,
-                    param.BackgroundColor,
-                    canvas => canvas.Render(qrCode, param.Size, param.Size));
-            }
+            var qrCode = QRCodeGenerator.CreateQrCode(content, ECCLevel.H);
+            return Render(param.Size, param.Size, format, param.Quality, param.FileName,
+                param.BackgroundColor,
+                canvas => canvas.Render(qrCode, param.Size, param.Size));
         }
 
         public static ImageInfoResult GetInfo(ImageInfoParam param)
@@ -834,10 +831,10 @@ namespace Dos.Common
         {
             var centerX = boundsX + layer.BoundsWidth / 2F;
             var centerY = boundsY + layer.BoundsHeight / 2F;
+            var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
             using (var paint = new SKPaint
             {
                 IsAntialias = true,
-                FilterQuality = SKFilterQuality.High,
                 Color = ApplyOpacity(SKColors.White, layer.Param.Opacity),
                 BlendMode = ParseBlendMode(layer.Param.BlendMode)
             })
@@ -855,12 +852,12 @@ namespace Dos.Common
                         Math.Min(layer.TargetWidth, layer.TargetHeight) / 2D);
                     canvas.Save();
                     canvas.ClipRoundRect(new SKRoundRect(destination, radius, radius), SKClipOperation.Intersect, true);
-                    canvas.DrawBitmap(layer.Bitmap, layer.SourceRect, destination, paint);
+                    canvas.DrawBitmap(layer.Bitmap, layer.SourceRect, destination, sampling, paint);
                     canvas.Restore();
                 }
                 else
                 {
-                    canvas.DrawBitmap(layer.Bitmap, layer.SourceRect, destination, paint);
+                    canvas.DrawBitmap(layer.Bitmap, layer.SourceRect, destination, sampling, paint);
                 }
                 if (layer.Param.BorderWidth > 0D && !string.IsNullOrWhiteSpace(layer.Param.BorderColor))
                 {
@@ -962,23 +959,23 @@ namespace Dos.Common
                 var runs = ResolveTextRuns(element.Text, element.FontFamily, weight, slant,
                     primaryTypeface, ownedTypefaces);
 
+                var fontSize = (float)Math.Max(1D, element.FontSize);
                 using (var paint = new SKPaint
                 {
                     IsAntialias = true,
-                    TextSize = (float)Math.Max(1D, element.FontSize),
-                    Color = ApplyOpacity(ParseColor(element.Color), element.Opacity),
-                    TextAlign = SKTextAlign.Left
+                    Color = ApplyOpacity(ParseColor(element.Color), element.Opacity)
                 })
+                using (var font = new SKFont(primaryTypeface, fontSize))
                 {
                     var totalWidth = 0F;
                     var lineAscent = 0F;
                     var lineDescent = 0F;
                     foreach (var run in runs)
                     {
-                        paint.Typeface = run.Typeface;
-                        run.Width = paint.MeasureText(run.Text);
+                        font.Typeface = run.Typeface;
+                        run.Width = font.MeasureText(run.Text, paint);
                         totalWidth += run.Width;
-                        var metrics = paint.FontMetrics;
+                        var metrics = font.Metrics;
                         lineAscent = Math.Min(lineAscent, metrics.Ascent);
                         lineDescent = Math.Max(lineDescent, metrics.Descent);
                     }
@@ -1001,8 +998,8 @@ namespace Dos.Common
 
                     foreach (var run in runs)
                     {
-                        paint.Typeface = run.Typeface;
-                        canvas.DrawText(run.Text, x, y, paint);
+                        font.Typeface = run.Typeface;
+                        canvas.DrawText(run.Text, x, y, SKTextAlign.Left, font, paint);
                         x += run.Width;
                     }
                 }

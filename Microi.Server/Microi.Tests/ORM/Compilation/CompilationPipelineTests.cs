@@ -176,7 +176,8 @@ public sealed class CompilationPipelineTests
     {
         var compilationDirectory = Path.GetDirectoryName(testFile)!;
         var testsDirectory = Directory.GetParent(compilationDirectory)!.FullName;
-        var serverDirectory = Directory.GetParent(testsDirectory)!.FullName;
+        var serverDirectory = Directory.GetParent(
+            Directory.GetParent(testsDirectory)!.FullName)!.FullName;
         var path = Path.Combine(
             serverDirectory, "Dos.ORM", "SqlCompilation", "SqlCompilerBase.cs");
         Assert.True(File.Exists(path), path);

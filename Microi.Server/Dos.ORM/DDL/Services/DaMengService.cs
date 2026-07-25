@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using Dos.Common;
 using Dos.ORM.Dialects.Dm8;
@@ -248,19 +249,30 @@ namespace Dos.ORM
         /// </summary>
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
-            var getAllFieldSql = @"SELECT 
-                                            a.COLUMN_NAME as ""column_name"", 
+            var getAllFieldSql = @"SELECT
+                                            a.COLUMN_NAME as ""column_name"",
                                             a.DATA_TYPE as ""data_type"",
-                                            NVL(b.COMMENTS, a.COLUMN_NAME) as ""column_comment"",
-                                            'YES' as ""is_nullable"",
+                                            NVL(b.COMMENTS, '') as ""column_comment"",
+                                            CASE WHEN pk.COLUMN_NAME IS NULL THEN '' ELSE 'PRI' END as ""column_key"",
+                                            CASE WHEN a.NULLABLE = 'Y' THEN 'YES' ELSE 'NO' END as ""is_nullable"",
                                             a.DATA_TYPE as ""column_type"",
                                             a.CHAR_LENGTH as ""character_maximum_length""
-                                            FROM all_tab_columns a
-                                            LEFT JOIN all_col_comments b 
+                                            FROM USER_TAB_COLUMNS a
+                                            LEFT JOIN USER_COL_COMMENTS b
                                                 ON a.TABLE_NAME = b.TABLE_NAME AND a.COLUMN_NAME = b.COLUMN_NAME
-                                            WHERE a.OWNER = USER
-                                              AND a.table_name = UPPER('{0}')";
-            var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
+                                            LEFT JOIN (
+                                                SELECT cols.TABLE_NAME, cols.COLUMN_NAME
+                                                FROM USER_CONSTRAINTS cons
+                                                INNER JOIN USER_CONS_COLUMNS cols
+                                                  ON cons.CONSTRAINT_NAME = cols.CONSTRAINT_NAME
+                                                WHERE cons.CONSTRAINT_TYPE = 'P'
+                                            ) pk
+                                                ON pk.TABLE_NAME = a.TABLE_NAME AND pk.COLUMN_NAME = a.COLUMN_NAME
+                                            WHERE a.TABLE_NAME = UPPER(:tableName)
+                                            ORDER BY a.COLUMN_ID";
+            var realFieldList = param.DbSession.FromSql(getAllFieldSql)
+                .AddInParameter("tableName", DbType.String, param.TableName)
+                .ToList<information_schema_columns>();
             foreach (var column in realFieldList)
             {
                 if (column?.column_name != null)

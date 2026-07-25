@@ -48,6 +48,8 @@ export function createOptionLabel(options = []) {
 
 ## 三、历史遗留数据迁移
 
+从第三方数据库迁移枚举前，先用 `microi_inspect_external_database` 确认真实字段类型和说明，再用受限 `microi_query_external_database` 抽样唯一值。第三方显示文字不能直接成为吾码协议 Key；建立明确的“源值 -> 稳定 Key -> 展示 Value”映射，未识别值进入失败清单，禁止静默写成“未知”。持续同步应把映射版本写入任务配置，并保证同一源记录重投不会重复新增。
+
 当后台 Select 字段的 Key 发生变更时（如从英文 `Normal` 改为中文 `普通会员`），DB 中已存入的旧 key 不会自动更新。需要手动执行迁移：
 
 ```js

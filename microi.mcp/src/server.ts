@@ -78,6 +78,12 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_redis_rename_key',
   'microi_redis_set_ttl',
   'microi_get_db_schema',
+  'microi_list_database_types',
+  'microi_inspect_external_database',
+  'microi_query_external_database',
+  'microi_execute_external_database',
+  'microi_save_database_connection',
+  'microi_import_external_attachment',
   'microi_get_field_list',
   'microi_add_field',
   'microi_update_field',
@@ -1107,6 +1113,278 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         }
 
         return { content: [{ type: 'text', text: formatDbTables(tables) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_list_database_types',
+    'List all database types certified by the current Microi Dos.ORM runtime, including aliases, default ports, and redacted connection-string examples.',
+    {},
+    async () => {
+      try {
+        const result = await client.getSupportedDatabaseTypes();
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_inspect_external_database',
+    `Connect to an external database through Dos.ORM for OsClient "${osClient}" and return physical tables, columns, native types, nullability, keys, and comments. Prefer dbKey after saving a connection so credentials are not repeatedly passed to AI tools. This tool never returns the connection string.`,
+    {
+      dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred over passing connectionString.'),
+      databaseType: z.string().optional().describe('Required only with a temporary connectionString. Call microi_list_database_types for certified values.'),
+      connectionString: z.string().optional().describe('Temporary database connection string. Sensitive: never place it in generated code, logs, or narrative output.'),
+      tableName: z.string().optional().describe('Optional case-insensitive partial table-name filter.'),
+      maxTables: z.number().int().min(1).max(5000).optional().describe('Maximum returned tables. Default 500.'),
+      includeColumns: z.boolean().optional().describe('Whether to load columns for each table. Default true.'),
+      commandTimeoutSeconds: z.number().int().min(1).max(600).optional().describe('Metadata query timeout. Default 60 seconds.'),
+    },
+    async ({ dbKey, databaseType, connectionString, tableName, maxTables, includeColumns, commandTimeoutSeconds }) => {
+      if (!dbKey && (!databaseType || !connectionString)) {
+        return { content: [{ type: 'text', text: 'Error: pass dbKey, or both databaseType and connectionString.' }], isError: true };
+      }
+      try {
+        const result = await client.inspectExternalDatabase({
+          DbKey: dbKey,
+          DatabaseType: databaseType,
+          ConnectionString: connectionString,
+          TableName: tableName,
+          MaxTables: maxTables,
+          IncludeColumns: includeColumns,
+          CommandTimeoutSeconds: commandTimeoutSeconds,
+        });
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_query_external_database',
+    `Run a bounded, parameterized, read-only SELECT/CTE query against an external Dos.ORM database for OsClient "${osClient}". Use this after schema inspection to read source rows for migration or synchronization. Multi-statement, DML, DDL, procedures, and file-reading SQL are rejected.`,
+    {
+      sql: z.string().min(1).describe('Single read-only SELECT or WITH ... SELECT statement. Use named parameters.'),
+      parameters: z.record(z.unknown()).optional().describe('Named SQL parameter values, e.g. { status: 1 }. Never concatenate dynamic values into SQL.'),
+      dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred.'),
+      databaseType: z.string().optional().describe('Required only with a temporary connectionString.'),
+      connectionString: z.string().optional().describe('Temporary connection string. Sensitive and never returned.'),
+      maxRows: z.number().int().min(1).max(5000).optional().describe('Maximum returned rows. Default 200.'),
+      commandTimeoutSeconds: z.number().int().min(1).max(600).optional().describe('Query timeout. Default 60 seconds.'),
+    },
+    async ({ sql, parameters, dbKey, databaseType, connectionString, maxRows, commandTimeoutSeconds }) => {
+      if (!dbKey && (!databaseType || !connectionString)) {
+        return { content: [{ type: 'text', text: 'Error: pass dbKey, or both databaseType and connectionString.' }], isError: true };
+      }
+      try {
+        const result = await client.queryExternalDatabase({
+          Sql: sql,
+          Parameters: parameters,
+          DbKey: dbKey,
+          DatabaseType: databaseType,
+          ConnectionString: connectionString,
+          MaxRows: maxRows,
+          CommandTimeoutSeconds: commandTimeoutSeconds,
+        });
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_execute_external_database',
+    `Execute explicitly confirmed administrative SQL against an external Dos.ORM database for OsClient "${osClient}". This Level >= 9999 control-plane tool intentionally permits DML, DDL, stored procedures, provider-specific commands, and driver-supported multi-statement scripts. The SQL text and connection string are never written to audit logs.`,
+    {
+      sql: z.string().min(1).describe('Raw administrative SQL. It may change schema/data or invoke provider-specific capabilities.'),
+      mode: z.enum(['Query', 'Scalar', 'NonQuery']).describe('How Dos.ORM should consume the result. Use NonQuery for DML/DDL/scripts.'),
+      parameters: z.record(z.unknown()).optional().describe('Optional named parameters. Use parameters for dynamic values whenever the provider supports them.'),
+      dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred.'),
+      databaseType: z.string().optional().describe('Required only with a temporary connectionString.'),
+      connectionString: z.string().optional().describe('Temporary connection string. Sensitive and never returned or audited.'),
+      maxRows: z.number().int().min(1).max(100000).optional().describe('Query response cap only; it does not limit SQL permissions. Default 1000.'),
+      commandTimeoutSeconds: z.number().int().min(1).max(86400).optional().describe('Default 600 seconds.'),
+      confirmExecution: z.string().optional().describe('Required. Pass EXECUTE or the SHA-256 shown by the dry run.'),
+    },
+    async ({ sql, mode, parameters, dbKey, databaseType, connectionString, maxRows, commandTimeoutSeconds, confirmExecution }) => {
+      if (!dbKey && (!databaseType || !connectionString)) {
+        return { content: [{ type: 'text', text: 'Error: pass dbKey, or both databaseType and connectionString.' }], isError: true };
+      }
+      const sqlSha256 = crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+      if (confirmExecution !== 'EXECUTE' && confirmExecution?.toLowerCase() !== sqlSha256) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              dryRun: true,
+              action: 'execute_external_database_sql',
+              target: dbKey ? `DbKey:${dbKey}` : `temporary:${databaseType}`,
+              mode,
+              sqlSha256,
+              sqlLength: sql.length,
+              parameterNames: Object.keys(parameters || {}),
+              connectionStringProvided: !!connectionString,
+              requiresConfirmation: 'EXECUTE or sqlSha256',
+            }, null, 2),
+          }],
+        };
+      }
+      try {
+        const result = await client.executeExternalDatabaseSql({
+          Sql: sql,
+          Mode: mode,
+          Parameters: parameters,
+          DbKey: dbKey,
+          DatabaseType: databaseType,
+          ConnectionString: connectionString,
+          MaxRows: maxRows,
+          CommandTimeoutSeconds: commandTimeoutSeconds,
+          ConfirmExecution: confirmExecution,
+        });
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_save_database_connection',
+    `Validate and add or update a connection in the protected microi_database table for OsClient "${osClient}". The backend tests the connection before writing, never returns the secret, and invalidates the local V8.Dbs cache. Requires explicit confirmation.`,
+    {
+      dbKey: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,49}$/).describe('Stable V8 key used as V8.Dbs.{DbKey}.'),
+      dbName: z.string().max(100).optional().describe('Display name. Defaults to dbKey.'),
+      databaseType: z.string().describe('Certified type returned by microi_list_database_types.'),
+      connectionString: z.string().min(1).describe('Sensitive database connection string. It is validated and never echoed.'),
+      dbReadConn: z.string().optional().describe('Optional read-replica connection string of the same database type.'),
+      dbVersion: z.string().optional(),
+      remark: z.string().optional(),
+      isEnable: z.number().int().min(0).max(1).optional().describe('Default 1.'),
+      commandTimeoutSeconds: z.number().int().min(5).max(120).optional().describe('Connection validation timeout. Default 30 seconds.'),
+      confirmExecution: z.string().optional().describe('Required. Pass the exact dbKey or EXECUTE.'),
+    },
+    async ({ dbKey, dbName, databaseType, connectionString, dbReadConn, dbVersion, remark, isEnable, commandTimeoutSeconds, confirmExecution }) => {
+      if (confirmExecution !== dbKey && confirmExecution !== 'EXECUTE') {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              dryRun: true,
+              action: 'save_database_connection',
+              dbKey,
+              dbName: dbName || dbKey,
+              databaseType,
+              connectionStringProvided: true,
+              requiresConfirmation: dbKey,
+            }, null, 2),
+          }],
+        };
+      }
+      try {
+        const result = await client.saveDatabaseConnection({
+          DbKey: dbKey,
+          DbName: dbName,
+          DatabaseType: databaseType,
+          ConnectionString: connectionString,
+          DbReadConn: dbReadConn,
+          DbVersion: dbVersion,
+          Remark: remark,
+          IsEnable: isEnable,
+          CommandTimeoutSeconds: commandTimeoutSeconds,
+          ConfirmExecution: confirmExecution,
+        });
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_import_external_attachment',
+    `Stream one attachment from HTTP(S), an absolute server-local path, or a UNC path into Microi storage for OsClient "${osClient}". This Level >= 9999 control-plane tool intentionally permits private-network and server-filesystem access. It bypasses Base64 buffering and has no fixed MCP size ceiling; MaxBytes is an optional caller safety limit. Requires explicit confirmation and writes a redacted audit record.`,
+    {
+      sourceUrl: z.string().url().refine(value => /^https?:\/\//i.test(value), 'sourceUrl must use http or https').optional().describe('HTTP(S) attachment URL. Provide exactly one of sourceUrl/sourcePath.'),
+      sourcePath: z.string().optional().describe('Absolute path visible to the API service account, including Windows UNC paths such as \\\\server\\share\\file.bin. Provide exactly one source.'),
+      headers: z.record(z.string()).optional().describe('Optional authentication headers. Sensitive values are never returned.'),
+      fileName: z.string().optional(),
+      path: z.string().optional().describe('Target Microi storage directory.'),
+      filePathName: z.string().optional().describe('Exact tenant-scoped target path; bucket visibility follows limit.'),
+      limit: z.boolean().optional(),
+      preview: z.boolean().optional(),
+      maxBytes: z.number().int().nonnegative().optional().describe('Optional caller limit in bytes. Omit or pass 0 for no MCP-level size cap.'),
+      timeoutSeconds: z.number().int().min(5).max(86400).optional().describe('HTTP transfer timeout. Default 3600 seconds.'),
+      targetTable: z.string().optional(),
+      targetId: z.string().optional(),
+      targetField: z.string().optional(),
+      confirmExecution: z.string().optional().describe('Required. Pass EXECUTE, the exact source value, or its dry-run SHA-256.'),
+    },
+    async ({ sourceUrl, sourcePath, headers, fileName, path, filePathName, limit, preview, maxBytes, timeoutSeconds, targetTable, targetId, targetField, confirmExecution }) => {
+      if (!!sourceUrl === !!sourcePath) {
+        return { content: [{ type: 'text', text: 'Error: provide exactly one of sourceUrl or sourcePath.' }], isError: true };
+      }
+      const source = sourceUrl || sourcePath || '';
+      const sourceSha256 = crypto.createHash('sha256').update(source, 'utf8').digest('hex');
+      if (confirmExecution !== source && confirmExecution !== 'EXECUTE'
+        && confirmExecution?.toLowerCase() !== sourceSha256) {
+        let redactedSource = sourcePath ? '[LOCAL_OR_UNC_SOURCE]' : '[INVALID_URL]';
+        if (sourceUrl) {
+          try {
+            const parsed = new URL(sourceUrl);
+            redactedSource = `${parsed.protocol}//${parsed.host}/[REDACTED]`;
+          } catch {
+            // Zod already validates URL; retain defensive fallback.
+          }
+        }
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              dryRun: true,
+              action: 'import_external_attachment',
+              source: redactedSource,
+              sourceKind: sourcePath ? 'LocalOrUncPath' : 'Http',
+              sourceSha256,
+              headersProvided: !!headers && Object.keys(headers).length > 0,
+              targetTable,
+              targetId,
+              targetField,
+              requiresConfirmation: 'EXECUTE, exact source, or sourceSha256',
+            }, null, 2),
+          }],
+        };
+      }
+      try {
+        const result = await client.importExternalAttachment({
+          SourceUrl: sourceUrl,
+          SourcePath: sourcePath,
+          Headers: headers,
+          FileName: fileName,
+          Path: path,
+          FilePathName: filePathName,
+          Limit: limit,
+          Preview: preview,
+          MaxBytes: maxBytes,
+          TimeoutSeconds: timeoutSeconds,
+          TargetTable: targetTable,
+          TargetId: targetId,
+          TargetField: targetField,
+          ConfirmExecution: confirmExecution,
+        });
+        if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

@@ -185,7 +185,7 @@ public sealed class DatabaseCapabilitiesTests
     public void Internal_test_access_and_fresh_profiles_are_exact()
     {
         Assert.Equal(
-            new[] { "Dos.ORM.Tests" },
+            new[] { "Microi.Tests" },
             typeof(DatabaseCapabilities).Assembly
                 .GetCustomAttributes<InternalsVisibleToAttribute>()
                 .Select(attribute => attribute.AssemblyName)

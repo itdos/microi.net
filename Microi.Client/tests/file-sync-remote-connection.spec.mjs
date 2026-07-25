@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
-const FRONTEND = process.env.FRONTEND || 'http://localhost:1988'
-const BACKEND = process.env.BACKEND || 'https://localhost:7266'
+const FRONTEND = process.env.FRONTEND || 'http://localhost:61500'
+const BACKEND = process.env.BACKEND || 'https://localhost:61501'
 const OS_CLIENT = process.env.MICROI_OSCLIENT || 'iTdos'
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin'
 const PASSWORD = process.env.PW_TEST_PASSWORD || ''

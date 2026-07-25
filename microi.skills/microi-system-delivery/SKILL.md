@@ -212,6 +212,33 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 
 ## 自动化测试必须覆盖的坑
 
+### 后端统一测试与发布门禁
+
+- 吾码后端统一测试入口是 `Microi.Server/Microi.Tests/Microi.Tests.csproj`，
+  不得重新创建 `Dos.Common.Tests`、`Dos.ORM.Tests` 等分散入口。
+- 日常源码验证运行
+  `Microi.Server/Microi.Tests/run-tests.ps1 -Mode Quick`。Quick 只做
+  单元/组件回归，不连接远端、不写数据库，不能称为“全量生产验收”。
+- 发布 API 前运行 `-Mode Full`。默认提供隔离测试租户、专用测试表、
+  测试 ApiEngine、测试 Token，并显式设置
+  `MICROI_TEST_ALLOW_WRITES=YES`。只有用户明确授权时才可对真实租户执行；
+  真实租户默认只做登录和只读烟测，写入必须限定到名称/说明明确为自动化
+  测试用途的专用表，并使用唯一前缀、`finally` 清理和清理回读。
+- Full 至少覆盖完整 Release 构建、FormEngine 单条/批量/按条件 CRUD、
+  查询和计数、ApiEngine GET/JSON POST、API 实际启动与健康检查、真实登录、
+  匿名系统配置脱敏、清理回读、NuGet 漏洞/弃用审计。NuGet 全面升级后不能
+  只看编译；必须捕获程序集 ABI 不一致、旧连接串枚举值失效等启动/运行时问题。
+  新增后端公共操作时，同步扩展统一测试入口和 FullStack 闭环。
+- 真实账号、密码和 Token 只能来自进程环境变量、CI Secret 或已被 Git 忽略
+  的本机配置；不得写入 `Microi.Tests`、README、命令行参数、TRX、覆盖率报告
+  或失败消息。测试输出还要验证私有 `appsettings.*.json` 未被复制发布。
+- 交付报告必须分别写明：源码检查、项目/解决方案构建、Quick 结果、
+  FullStack 结果、两节点分布式故障结果。未提供测试环境而未运行 Full，
+  必须明确写“未运行”，不能用 Quick 通过代替。
+- 即使 Full 通过，涉及定时任务、消息消费、共享缓存、迁移或滚动发布时，
+  仍需两个节点连接同一 Redis/数据库，覆盖重复投递、锁持有者退出、
+  Redis/MongoDB 短暂故障、响应前重启和新旧版本共存。
+
 ### 登录与账号密码
 
 - E2E 必须支持提前录入测试账号密码：`PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD`、`PW_LOGIN_ENGINE`。

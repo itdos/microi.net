@@ -1460,7 +1460,7 @@ public sealed class DmlStatementTests
         [CallerFilePath] string testFilePath = "") =>
         Path.GetFullPath(Path.Combine(
             Path.GetDirectoryName(testFilePath)!,
-            "..", "..", "Dos.ORM", "SqlAst", "SqlStatements.cs"));
+            "..", "..", "..", "Dos.ORM", "SqlAst", "SqlStatements.cs"));
 
     private static string RemoveCSharpComments(string source)
     {

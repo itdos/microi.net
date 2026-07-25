@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- xUnit.net v3 测试项目同时是可独立执行的测试宿主。 -->
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>Microi.Tests</AssemblyName>
+    <RootNamespace>Microi.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="10.0.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <!-- 保留 dotnet test / VS Test Explorer / 既有 CI 的 VSTest 入口。 -->
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dos.Common\Dos.Common.csproj" />
+    <ProjectReference Include="..\Dos.ORM\Dos.ORM.csproj" />
+    <ProjectReference Include="..\Microi.Core\Microi.Core.csproj" />
+    <ProjectReference Include="..\Microi.V8Engine\Microi.V8Engine.csproj" />
+    <ProjectReference Include="..\Microi.Upgrade\Microi.Upgrade.csproj" />
+    <ProjectReference Include="..\Microi.net.Api\Microi.net.Api.csproj"
+                      Condition="Exists('..\Microi.net.Api\Microi.net.Api.csproj')" />
+    <!-- 私有 Microi.net 子仓存在时启用服务端安全、FormEngine 与 ApiEngine 回归。 -->
+    <ProjectReference Include="..\Microi.net\Microi.net.csproj"
+                      Condition="Exists('..\Microi.net\Microi.net.csproj')" />
+    <ProjectReference Include="..\Microi.Spider\Microi.Spider.csproj"
+                      Condition="Exists('..\Microi.net\Microi.net.csproj')" />
+    <!-- 私有 AI 项目存在时，把其测试并入同一个 Microi.Tests 入口。 -->
+    <ProjectReference Include="..\Microi.AI\Microi.AI.csproj"
+                      Condition="Exists('..\Microi.AI\Microi.AI.csproj')" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('..\Microi.AI\Microi.AI.Tests')">
+    <Compile Include="..\Microi.AI\Microi.AI.Tests\**\*.cs"
+             Exclude="..\Microi.AI\Microi.AI.Tests\bin\**\*;..\Microi.AI\Microi.AI.Tests\obj\**\*"
+             Link="AI\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('..\Microi.net\Microi.net.csproj')">
+    <Compile Remove="Common\FormEngineTenantBoundaryTests.cs" />
+    <Compile Remove="Common\TokenRotationSecurityTests.cs" />
+    <Compile Remove="Common\DataSourceEngineAuthorizationTests.cs" />
+    <Compile Remove="Common\TenantEngineIsolationTests.cs" />
+    <Compile Remove="Common\SpiderSecurityBoundaryTests.cs" />
+    <Compile Remove="Common\LicenseKeyTrustTests.cs" />
+  </ItemGroup>
+
+</Project>

@@ -83,11 +83,21 @@ namespace Dos.ORM
         public static bool IsSensitiveParameter(DbCommand command, string parameterName)
         {
             if (command == null || string.IsNullOrWhiteSpace(parameterName)) return false;
-            if (!SensitiveParameters.TryGetValue(command, out var names)) return false;
-            lock (names.Names)
+            if (SensitiveParameters.TryGetValue(command, out var names))
             {
-                return names.Names.Contains(NormalizeParameterName(parameterName));
+                lock (names.Names)
+                {
+                    if (names.Names.Contains(NormalizeParameterName(parameterName))) return true;
+                }
             }
+
+            // FormEngine 会按字段名生成参数，凭据字段不一定能逐层显式调用
+            // AddSensitiveInParameter。这里提供最后一道日志脱敏保护。
+            var normalized = NormalizeParameterName(parameterName).Replace("_", string.Empty).ToLowerInvariant();
+            return normalized.Contains("password") || normalized.Contains("pwd")
+                   || normalized.Contains("secret") || normalized.Contains("token")
+                   || normalized.Contains("apikey") || normalized.Contains("authorization")
+                   || normalized.Contains("dbconn") || normalized.Contains("connectionstring");
         }
 
         private static string NormalizeParameterName(string parameterName)
