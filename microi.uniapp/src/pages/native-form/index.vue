@@ -1,5 +1,7 @@
 <template>
-	<mci-page-shell class="native-form-page" :style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
+	<!-- zhy: 下拉打开时提升表单正文层级，避免被固定栏和悬浮入口遮挡。 -->
+	<mci-page-shell class="native-form-page" :class="{ 'native-form-page--select-open': !!openSelectorField }"
+		:style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
 		@back="goBack">
 		<template #right><button v-if="!loading && !error && mode === 'View' && rowId" class="edit-command"
 				@tap="switchToEdit">编辑</button></template>
@@ -62,7 +64,9 @@
 				</view>
 			</view>
 
+			<!-- zhy: 当前下拉所在分组临时解除卡片裁切。 -->
 			<view v-for="(group, groupIndex) in groups" :key="group.name + groupIndex" class="form-section mci-fade-up"
+				:class="{ 'form-section--select-open': isSelectorGroupOpen(group) }"
 				:style="{ animationDelay: `${Math.min(groupIndex, 6) * 45}ms` }">
 				<view class="form-section__header">
 					<view class="form-section__bar"></view>
@@ -70,7 +74,7 @@
 				</view>
 
 				<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
-					:class="{ 'form-field--readonly': isReadonly(field) }">
+					:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name }">
 					<view class="form-field__label">
 						<text>{{ field.Label || field.Name }}</text>
 						<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
@@ -96,10 +100,12 @@
 						</text>
 					</view>
 
+					<!-- zhy: 接收下拉开关状态并同步外层层叠样式。 -->
 					<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
 						:table-name="tableName" :form-data="form" :menu-id="menuId"
 						:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
-						@select="handleNativeFieldSelect" />
+						@select="handleNativeFieldSelect"
+						@selector-toggle="handleSelectorToggle(field, $event)" />
 
 					<view v-if="tenantFieldActions(field).length" class="tenant-field-actions">
 						<view v-for="action in tenantFieldActions(field)" :key="action.key"
@@ -214,6 +220,8 @@
 				tableChildAuth: null,
 				tenantFormState: {},
 				viewManifest: null,
+				// zhy: 记录当前打开下拉框的字段名。
+				openSelectorField: '',
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
 				formLoadId: 0
 			}
@@ -280,12 +288,14 @@
 		onUnload() {
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
 			this.formLoadId += 1
+			this.openSelectorField = ''
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
 			async loadForm(refresh = false) {
 				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
 				const loadId = ++this.formLoadId
+				this.openSelectorField = ''
 				if (!this.tableName) {
 					this.error = '缺少表单名称'
 					this.loading = false
@@ -440,6 +450,19 @@
 			async handleNativeFieldSelect(payload) {
 				await handleTenantFormFieldSelect(this.tenantFormContext(), payload)
 			},
+			// zhy: 根据下拉开关状态提升或恢复对应表单分组。
+			handleSelectorToggle(field, open) {
+				const fieldName = String(field && field.Name || '')
+				if (open) {
+					this.openSelectorField = fieldName
+				} else if (this.openSelectorField === fieldName) {
+					this.openSelectorField = ''
+				}
+			},
+			isSelectorGroupOpen(group) {
+				if (!this.openSelectorField || !group || !Array.isArray(group.fields)) return false
+				return group.fields.some((field) => field.Name === this.openSelectorField)
+			},
 			async submit() {
 				if (this.saving) return
 				const busyMessage = tenantFormBusyMessage(this.tenantFormContext())
@@ -523,6 +546,11 @@
 <style scoped>
 	.native-form-page {
 		--form-control-height: 82rpx;
+	}
+
+	/* zhy: 下拉打开时让正文高于固定底栏和 AI 悬浮入口。 */
+	.native-form-page--select-open :deep(.mci-page-shell__body) {
+		z-index: 1000;
 	}
 
 	.edit-command {
@@ -666,12 +694,22 @@
 	}
 
 	.form-section {
+		position: relative;
+		z-index: 0;
 		margin-bottom: 20rpx;
 		background: var(--mci-bg-card, #fff);
 		border: 1px solid var(--mci-border, #e4ecef);
 		border-radius: 8px;
 		overflow: hidden;
 		animation: mciNativeFormEnter .32s ease both;
+	}
+
+	/* zhy: 解除当前卡片裁切及动画层叠上下文。 */
+	.form-section--select-open {
+		z-index: 100;
+		overflow: visible;
+		animation: none;
+		transform: none;
 	}
 
 	.form-section__header {
@@ -693,8 +731,14 @@
 	}
 
 	.form-field {
+		position: relative;
 		padding: 24rpx;
 		border-bottom: 1px solid #edf2f4;
+	}
+
+	/* zhy: 保证当前字段中的下拉浮层高于同组其它字段。 */
+	.form-field--select-open {
+		z-index: 101;
 	}
 
 	.form-field:last-child {
