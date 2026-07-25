@@ -350,6 +350,9 @@ export default {
   },
   beforeUnmount() {
     if (this.searchTimer) clearTimeout(this.searchTimer)
+    // zhy: 分组折叠销毁控件时终止尚未完成的下拉选项请求。
+    this.selectorOpen = false
+    this.optionRequestId += 1
   },
   methods: {
     emitValue(value) { this.$emit('update:modelValue', value); this.$emit('change', value) },
