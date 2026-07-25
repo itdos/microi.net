@@ -1329,7 +1329,7 @@
 							icon: icon('business/xiezuo.png')
 						},
 						{
-							label: '客户地址',
+							label: '客户其它地址',
 							type: 'list',
 							key: 'customerAddresses',
 							field: 'KehuID',
