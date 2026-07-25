@@ -2,9 +2,9 @@
 using System.Threading.Tasks;
 using Lazy.Captcha.Core;
 using Lazy.Captcha.Core.Generator;
+using Lazy.Captcha.Core.RateLimit;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Protocols;
 using Dos.Common;
 using Lazy.Captcha.Core.Generator.Image.Option;
 using Newtonsoft.Json;
@@ -75,12 +75,28 @@ namespace Microi.net
 
         public bool Validate(string captchaId, string code, bool removeIfSuccess = true, bool removeIfFail = true)
         {
-            throw new NotImplementedException();
+            return _captcha.Validate(captchaId, code, removeIfSuccess, removeIfFail);
         }
 
         CaptchaData ICaptcha.Generate(string captchaId, int? expirySeconds)
         {
-            throw new NotImplementedException();
+            return _captcha.Generate(captchaId, expirySeconds);
+        }
+
+        public CaptchaData GenerateWithRateLimit(
+            string captchaId,
+            string rateLimitKey,
+            int? expirySeconds = null)
+        {
+            return _captcha.GenerateWithRateLimit(
+                captchaId,
+                rateLimitKey,
+                expirySeconds);
+        }
+
+        public RateLimitResult CheckRateLimit(string rateLimitKey)
+        {
+            return _captcha.CheckRateLimit(rateLimitKey);
         }
     }
     /// <summary>

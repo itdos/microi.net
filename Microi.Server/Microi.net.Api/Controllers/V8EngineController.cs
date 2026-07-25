@@ -481,6 +481,108 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        public async Task<IActionResult> GetSupportedDatabaseTypes()
+        {
+            var (ok, msg, _) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            return Ok(V8McpLogic.GetSupportedDatabaseTypes());
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> InspectExternalDatabase([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            var result = await V8McpLogic.InspectExternalDatabase(
+                osClient,
+                param?["DatabaseType"].Val<string>() ?? param?["DbType"].Val<string>(),
+                param?["ConnectionString"].Val<string>() ?? param?["DbConn"].Val<string>(),
+                param?["DbKey"].Val<string>(),
+                param?["TableName"].Val<string>(),
+                Math.Max(1, Math.Min(param?["MaxTables"]?.Val<int>() ?? 500, 5000)),
+                param?["IncludeColumns"]?.Val<bool?>() ?? true,
+                Math.Max(1, Math.Min(param?["CommandTimeoutSeconds"]?.Val<int>() ?? 60, 600)));
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> QueryExternalDatabase([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            var result = await V8McpLogic.QueryExternalDatabase(
+                osClient,
+                param?["DatabaseType"].Val<string>() ?? param?["DbType"].Val<string>(),
+                param?["ConnectionString"].Val<string>() ?? param?["DbConn"].Val<string>(),
+                param?["DbKey"].Val<string>(),
+                param?["Sql"].Val<string>(),
+                param?["Parameters"] as JObject,
+                Math.Max(1, Math.Min(param?["MaxRows"]?.Val<int>() ?? 200, 5000)),
+                Math.Max(1, Math.Min(param?["CommandTimeoutSeconds"]?.Val<int>() ?? 60, 600)));
+            return Ok(result);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ExecuteExternalDatabaseSql([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var sql = param["Sql"].Val<string>();
+            if (string.IsNullOrWhiteSpace(sql)) return Ok(new DosResult(0, null, "Sql 不能为空"));
+            var confirmation = param["ConfirmExecution"].Val<string>();
+            var sqlHash = V8McpLogic.GetAdministrativeSqlConfirmation(sql);
+            if (confirmation != "EXECUTE" && !string.Equals(confirmation, sqlHash, StringComparison.OrdinalIgnoreCase))
+                return Ok(new DosResult(0, new { SqlSha256 = sqlHash }, "ConfirmExecution 必须等于 EXECUTE 或当前 SQL 的 SHA-256"));
+
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            return Ok(await V8McpLogic.ExecuteExternalDatabaseSql(
+                osClient,
+                param["DatabaseType"].Val<string>() ?? param["DbType"].Val<string>(),
+                param["ConnectionString"].Val<string>() ?? param["DbConn"].Val<string>(),
+                param["DbKey"].Val<string>(),
+                sql,
+                param["Mode"].Val<string>(),
+                param["Parameters"] as JObject,
+                Math.Max(1, Math.Min(param["MaxRows"]?.Val<int>() ?? 1000, 100000)),
+                Math.Max(1, Math.Min(param["CommandTimeoutSeconds"]?.Val<int>() ?? 600, 86400)),
+                token));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveDatabaseConnection([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var dbKey = param?["DbKey"].Val<string>();
+            var confirmation = param?["ConfirmExecution"].Val<string>();
+            if (confirmation != dbKey && confirmation != "EXECUTE")
+                return Ok(new DosResult(0, null, "ConfirmExecution 必须等于 DbKey 或 EXECUTE"));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            return Ok(await V8McpLogic.SaveDatabaseConnection(osClient, param, token));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ImportExternalAttachment([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var sourceUrl = param?["SourceUrl"].Val<string>();
+            var sourcePath = param?["SourcePath"].Val<string>();
+            var source = string.IsNullOrWhiteSpace(sourceUrl) ? sourcePath : sourceUrl;
+            var confirmation = param?["ConfirmExecution"].Val<string>();
+            var sourceHash = V8McpLogic.GetAdministrativeSqlConfirmation(source ?? string.Empty);
+            if (confirmation != source && confirmation != "EXECUTE"
+                && !string.Equals(confirmation, sourceHash, StringComparison.OrdinalIgnoreCase))
+                return Ok(new DosResult(0, new { SourceSha256 = sourceHash },
+                    "ConfirmExecution 必须等于源地址、EXECUTE 或当前源地址的 SHA-256"));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            return Ok(await V8McpLogic.ImportExternalAttachmentAdministrative(osClient, param, token));
+        }
+
+        [HttpGet, HttpPost]
         public async Task<IActionResult> GetPlaywrightContext(string osClient, string keyword, int? pageSize, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();

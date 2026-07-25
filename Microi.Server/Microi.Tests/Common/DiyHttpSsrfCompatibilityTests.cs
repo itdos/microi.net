@@ -52,7 +52,7 @@ public class DiyHttpSsrfCompatibilityTests
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
 
-        var result = method.Invoke(null, new object[] { url });
+        var result = method.Invoke(null, new object[] { url, false });
         Assert.NotNull(result);
         return ((bool allowed, string reason))result;
     }

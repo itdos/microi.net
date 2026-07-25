@@ -2143,6 +2143,13 @@ namespace Microi.net
             return fullWidthComponents.Any(item => item.Equals(component.Trim(), StringComparison.OrdinalIgnoreCase)) ? (int?)24 : null;
         }
 
+        private static bool IsLayoutComponent(string component)
+        {
+            if (string.IsNullOrWhiteSpace(component)) return false;
+            var layoutComponents = new[] { "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html" };
+            return layoutComponents.Any(item => item.Equals(component.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
         /// <summary>
         /// 将 AI 传入的简洁 data 字符串解析为前端约定的 Data + Config JSON
         /// 支持格式：
@@ -2305,7 +2312,9 @@ namespace Microi.net
                     TableId = tableId,
                     Name = name,
                     Label = label,
-                    Type = NormalizeFieldType(type),
+                    Type = IsLayoutComponent(componentName) && string.IsNullOrWhiteSpace(type)
+                        ? string.Empty
+                        : NormalizeFieldType(type),
                     Component = componentName,
                     Visible = visible,
                     AppVisible = appVisible,
@@ -2325,7 +2334,9 @@ namespace Microi.net
                     Encrypt = encrypt,
                     InTableEdit = inTableEdit,
                     IsDeleted = 0,
-                    _InvokeType = InvokeType.Server.ToString()
+                    _InvokeType = InvokeType.Server.ToString(),
+                    _TrustedServerInvocation = true,
+                    _NotAddDbField = IsLayoutComponent(componentName) && string.IsNullOrWhiteSpace(type)
                 };
 
                 var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);

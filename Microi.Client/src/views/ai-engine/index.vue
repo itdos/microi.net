@@ -695,6 +695,21 @@ function nowText() {
     return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
+function toTimestamp(value) {
+    if (!value) return 0;
+    const text = String(value).trim();
+    const timestamp = Date.parse(text.includes("T") ? text : text.replace(" ", "T"));
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatHistoryTime(value) {
+    const timestamp = toTimestamp(value);
+    if (!timestamp) return String(value || "");
+    const date = new Date(timestamp);
+    const pad = (part) => String(part).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function modeName(mode) {
     if (mode === "project") return "AI应用";
     const map = {
@@ -894,12 +909,15 @@ async function loadHistory() {
             const record = parseRecord(row.Content);
             if (!record || record.Source !== SOURCE || !record.ConversationId) return;
             record.__rowId = row.Id;
+            record.CreatedAt = record.CreatedAt || row.CreateTime || "";
             record.Archived = record.Archived === true || Number(record.Archived || 0) === 1;
+            const recordTimestamp = toTimestamp(record.CreatedAt);
             if (!grouped.has(record.ConversationId)) {
                 grouped.set(record.ConversationId, {
                     id: record.ConversationId,
                     title: record.Title || firstLine(record.Content) || "新对话",
-                    lastTime: record.Time || "",
+                    lastTime: formatHistoryTime(record.CreatedAt) || record.Time || "",
+                    lastTimestamp: recordTimestamp,
                     archived: false,
                     records: []
                 });
@@ -907,6 +925,10 @@ async function loadHistory() {
             const group = grouped.get(record.ConversationId);
             group.records.push(record);
             group.archived = group.archived || record.Archived;
+            if (recordTimestamp > group.lastTimestamp) {
+                group.lastTimestamp = recordTimestamp;
+                group.lastTime = formatHistoryTime(record.CreatedAt) || record.Time || "";
+            }
             if (record.Role === "user" && (!group.title || group.title === "新对话")) {
                 group.title = firstLine(record.Content);
             }
@@ -914,9 +936,9 @@ async function loadHistory() {
         conversations.value = Array.from(grouped.values())
             .map((item) => ({
                 ...item,
-                records: item.records.sort((a, b) => String(a.CreatedAt || "").localeCompare(String(b.CreatedAt || "")))
+                records: item.records.sort((a, b) => toTimestamp(a.CreatedAt) - toTimestamp(b.CreatedAt))
             }))
-            .sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
+            .sort((a, b) => b.lastTimestamp - a.lastTimestamp);
     } finally {
         historyLoading.value = false;
     }
@@ -1913,22 +1935,25 @@ async function saveMessage(message) {
                 CreatedAt: new Date().toISOString()
             })
         });
-        loadHistory();
+        await loadHistory();
     } catch (error) {
         console.warn("[AiEngine] save message failed", error);
     }
 }
 
 function refreshCurrentConversationTitle(userMessage) {
+    const latestAt = new Date().toISOString();
     const existing = conversations.value.find((item) => item.id === currentConversationId.value);
     if (existing) {
         existing.title = firstLine(userMessage.content);
-        existing.lastTime = userMessage.time;
+        existing.lastTimestamp = toTimestamp(latestAt);
+        existing.lastTime = formatHistoryTime(latestAt);
     } else {
         conversations.value.unshift({
             id: currentConversationId.value,
             title: firstLine(userMessage.content),
-            lastTime: userMessage.time,
+            lastTimestamp: toTimestamp(latestAt),
+            lastTime: formatHistoryTime(latestAt),
             archived: false,
             records: []
         });

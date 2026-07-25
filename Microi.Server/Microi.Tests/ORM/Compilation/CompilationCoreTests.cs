@@ -5282,7 +5282,8 @@ public sealed partial class CompilationCoreTests
     {
         var testDirectory = Path.GetDirectoryName(Task8CurrentFilePath())!;
         var serverDirectory = Directory.GetParent(
-            Directory.GetParent(testDirectory)!.FullName)!.FullName;
+            Directory.GetParent(
+                Directory.GetParent(testDirectory)!.FullName)!.FullName)!.FullName;
         return new[]
         {
             Path.Combine(serverDirectory, "Dos.ORM", "SqlCompilation",
@@ -6587,6 +6588,15 @@ public sealed partial class CompilationCoreTests
     {
         foreach (var type in Task8TypeShape(dependency))
         {
+            // Coverlet rewrites the built assembly for coverage collection and injects
+            // a tracker type into method bodies. It is test tooling, not a production
+            // source dependency, so it must not invalidate this architecture contract.
+            if (type.FullName?.StartsWith(
+                    "Coverlet.Core.Instrumentation.Tracker.",
+                    StringComparison.Ordinal) == true)
+            {
+                continue;
+            }
             Assert.False(
                 IsTask8ForbiddenDependency(type, ownedTypes),
                 $"{owner.DeclaringType?.FullName ?? (owner as Type)?.FullName}." +
@@ -7018,8 +7028,12 @@ public sealed partial class CompilationCoreTests
         RuntimeHelpers.GetUninitializedObject(
             typeof(Task8CustomAttributeDependencyPoison));
 
+    // This fixture deliberately exercises RuntimeHelpers.GetHashCode as emitted IL;
+    // it is not comparing Roslyn symbols, so RS1024 is not applicable here.
+#pragma warning disable RS1024
     private static int Task8RuntimeHelpersGetHashCodeAllowed(object value) =>
         RuntimeHelpers.GetHashCode(value);
+#pragma warning restore RS1024
 
     private struct Task8LocalProviderPoison
     {

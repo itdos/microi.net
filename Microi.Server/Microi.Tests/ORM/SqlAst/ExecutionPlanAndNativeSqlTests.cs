@@ -285,7 +285,7 @@ public sealed class ExecutionPlanAndNativeSqlTests
             typeof(CompiledPlanFingerprint), typeof(PlanSafetyBinding),
             typeof(CompiledImpactApproval));
 
-        Assert.Equal(new[] { "Dos.ORM.Tests" },
+        Assert.Equal(new[] { "Microi.Tests" },
             typeof(DatabaseExecutionPlan).Assembly
                 .GetCustomAttributes<InternalsVisibleToAttribute>()
                 .Select(x => x.AssemblyName)
@@ -3937,7 +3937,7 @@ public sealed class ExecutionPlanAndNativeSqlTests
 
         Assert.Contains("<TargetFramework>netstandard2.1</TargetFramework>",
             text, StringComparison.Ordinal);
-        Assert.Equal(new[] { "Dos.ORM.Tests" },
+        Assert.Equal(new[] { "Microi.Tests" },
             typeof(DatabaseExecutionPlan).Assembly
                 .GetCustomAttributes<InternalsVisibleToAttribute>()
                 .Select(x => x.AssemblyName)
@@ -4609,7 +4609,8 @@ public sealed class ExecutionPlanAndNativeSqlTests
     {
         var testDirectory = Path.GetDirectoryName(CurrentFilePath())!;
         var serverDirectory = Directory.GetParent(
-            Directory.GetParent(testDirectory)!.FullName)!.FullName;
+            Directory.GetParent(
+                Directory.GetParent(testDirectory)!.FullName)!.FullName)!.FullName;
         return Path.Combine(
             new[] { serverDirectory, first }.Concat(remaining).ToArray());
     }

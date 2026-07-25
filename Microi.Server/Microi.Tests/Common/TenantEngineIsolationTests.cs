@@ -1,4 +1,5 @@
 using System.Reflection;
+using Jint;
 using Microi.net;
 
 namespace Dos.Common.Tests;
@@ -90,13 +91,33 @@ public class TenantEngineIsolationTests
         {
             OsClient = osClient,
             DataBases = new List<OsClientDataBase>(),
-            DataBasesInitialized = true
+            DataBasesInitialized = true,
+            DataBasesLoadedAtUtc = DateTime.UtcNow
         };
 
         var databases = OsClient.GetAllClientDataBase(client);
 
-        Assert.Null(databases);
+        Assert.NotNull(databases);
+        Assert.Empty(databases);
+        Assert.NotNull(typeof(V8DatabaseCollection).GetMethod("Open", new[] { typeof(string), typeof(string) }));
         Assert.False(OsClientExtend.ClientList.ContainsKey(osClient));
+    }
+
+    [Fact]
+    public void V8DatabaseCollection_ExposesSavedKeysAndTemporaryOpenToJint()
+    {
+        var v8 = new V8EngineParam();
+        v8.Dbs["archive"] = v8.Dbs.Open(
+            "MySql",
+            "Server=127.0.0.1;Port=3306;Database=demo;Uid=user;Pwd=test;");
+        var engine = new Engine();
+        engine.SetValue("V8", v8);
+
+        Assert.Equal("function", engine.Evaluate("typeof V8.Dbs.Open").AsString());
+        Assert.Equal("function", engine.Evaluate("typeof V8.Dbs.archive.FromSql").AsString());
+        Assert.True(engine.Evaluate(
+            "V8.Dbs.Open('PostgreSql', 'Host=127.0.0.1;Port=5432;Database=demo;Username=user;Password=test;') !== null")
+            .AsBoolean());
     }
 
     private static string InvokeTenantResolver(Type engineType, string requestedOsClient)

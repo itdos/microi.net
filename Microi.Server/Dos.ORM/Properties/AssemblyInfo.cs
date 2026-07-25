@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Dos.ORM.Tests")]
+[assembly: InternalsVisibleTo("Microi.Tests")]

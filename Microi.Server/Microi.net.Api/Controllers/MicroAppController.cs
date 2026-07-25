@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -285,13 +286,6 @@ namespace Microi.net.Api
             return JObject.FromObject(data);
         }
 
-        private static JArray Where(params JArray[] items)
-        {
-            var where = new JArray();
-            foreach (var item in items) where.Add(item);
-            return where;
-        }
-
         private static async Task<JObject> GetService(string osClient, string appKey)
         {
             var service = await GetServiceByField(osClient, "MsKey", appKey);
@@ -307,13 +301,30 @@ namespace Microi.net.Api
 
         private static async Task<JObject> GetServiceByField(string osClient, string fieldName, string fieldValue)
         {
-            var param = new JObject
+            // The public asset endpoint is anonymous, but resolving its published
+            // runtime metadata is an internal platform read. sys_microiservice is a
+            // protected control-plane table, so routing this lookup through the
+            // anonymous FormEngine path correctly fails closed after the platform
+            // authorization hardening. Preserve that boundary and mark only this
+            // server-constructed, field-limited lookup as trusted. JsonIgnore on
+            // _TrustedServerInvocation prevents an HTTP client from forging it.
+            var param = new DiyTableRowParam
             {
-                ["FormEngineKey"] = ServiceTable,
-                ["OsClient"] = osClient,
-                ["_IsAnonymous"] = true,
-                ["_Where"] = Where(new JArray(fieldName, "=", fieldValue)),
-                ["_SelectFields"] = new JArray(
+                FormEngineKey = ServiceTable,
+                OsClient = osClient,
+                _InvokeType = InvokeType.Server.ToString(),
+                _TrustedServerInvocation = true,
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere
+                    {
+                        Name = fieldName,
+                        Type = "=",
+                        Value = fieldValue
+                    }
+                },
+                _SelectFields = new List<string>
+                {
                     "Id",
                     "MsKey",
                     "MsName",
@@ -332,7 +343,7 @@ namespace Microi.net.Api
                     "TotalSize",
                     "PublishTime",
                     "SourceDirName"
-                )
+                }
             };
 
             dynamic result = await MicroiEngine.FormEngine.GetFormDataAsync(param);

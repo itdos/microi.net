@@ -266,6 +266,8 @@ V8.Method.AddSysLog({
 });
 ```
 
+`SubmitAfterServerV8` 的“After”仍是“写入后、提交前”。需要在事务真正提交后才发布的缓存版本、跨节点通知等副作用，不能直接在事件中执行。平台为 `microi_database` 提供专用 `V8.Method.RefreshExtensionDatabases()`：事件调用时只登记提交后回调，提交成功才递增当前租户共享 Redis 版本，回滚时自动丢弃。普通业务的外部消息仍优先使用同事务 outbox，不能把任意不可撤销副作用都塞进内存回调。
+
 ## DataFilterV8.js — 服务端数据处理事件
 
 获取列表/表单数据后，每行数据都会执行一次此事件。

@@ -17,6 +17,18 @@ description: Microi V8 文件上传下载指南。用于处理 V8.FilesByteBase6
 | `V8.Http.GetResponse({Url}).RawBytes` | 下载远程文件为字节数组 |
 | 接口返回 `{ FileName, ContentType, FileByteBase64 }` | 接口直接响应文件 |
 
+## 第三方数据库附件迁移
+
+当第三方表只保存附件路径时，先用 `microi_inspect_external_database` / `microi_query_external_database` 或 `V8.Dbs.<DbKey>` 查询记录。`microi_import_external_attachment` 允许后端已确认的 `Level >= 9999` 当前用户直接提供 HTTP/HTTPS URL、API 节点可读的本机绝对路径或 UNC 路径。
+
+- 导入工具必须显式确认；HTTP、私网、重定向、本机和 UNC 均可访问，但最终能力受 API 服务进程账号、网络、磁盘及对象存储权限约束。
+- 下载与上传使用临时文件和文件流，不经过 Base64；不设固定 20/100 MB 上限，`MaxBytes=0` 或省略表示不设置 MCP 上限，可处理 200/500 MB 或更大文件。
+- 带签名参数或用户凭据的源 URL、鉴权 Header 和本机/UNC 路径不得出现在结果、日志或目标表；脱敏审计只记录来源 SHA-256、类型和字节数，目标字段只保存吾码租户内相对路径。
+- 使用第三方附件 Id/版本作为幂等键，回读目标记录后才标记成功；多节点重投不能重复产生业务附件。
+- 批量迁移应落任务状态表并分页处理，失败可重试；不要让 MCP 一次加载整库路径或大文件集合。
+
+可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
+
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：

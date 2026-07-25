@@ -16,8 +16,8 @@ const aspnetcoreEnvironment = process.env.PW_ASPNETCORE_ENVIRONMENT || backendEn
 const dotnetEnvironment = process.env.PW_DOTNET_ENVIRONMENT || backendEnv;
 const appsettingsEnv = process.env.PW_APPSETTINGS_ENV || dotnetEnvironment;
 const appsettingsPath = process.env.PW_APPSETTINGS_PATH || path.join(apiDir, `appsettings.${appsettingsEnv}.json`);
-const backendUrl = process.env.BACKEND || process.env.PW_API_BASE || 'https://localhost:7266';
-const frontendUrl = process.env.FRONTEND || process.env.PW_BASE_URL || 'http://localhost:1988';
+const backendUrl = process.env.BACKEND || process.env.PW_API_BASE || 'https://localhost:61501';
+const frontendUrl = process.env.FRONTEND || process.env.PW_BASE_URL || 'http://localhost:61500';
 const osClient = process.env.MICROI_OSCLIENT || process.env.PW_OS_CLIENT || appsettingsEnv;
 const launchProfile = process.env.PW_BACKEND_PROFILE || 'Microi.net.Api';
 

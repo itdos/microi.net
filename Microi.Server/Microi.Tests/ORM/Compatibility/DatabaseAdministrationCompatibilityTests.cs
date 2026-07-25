@@ -22,13 +22,13 @@ public sealed class DatabaseAdministrationCompatibilityTests
     public void MySqlPrincipalCommands_GrantOnlyTheRequestedDatabase_AndParameterizePassword()
     {
         var commands = DatabaseAdministrationCompatibility.BuildPrincipalCommands(
-            DatabaseType.MySql, "microi_tenant_a", "mci_tenant_a_12345678");
+            DatabaseType.MySql, "microi_tenant_a", "mci_tenant_a_fixture8");
 
         Assert.Contains("mysql.user", commands.ExistsSql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("IDENTIFIED BY @p0", commands.CreateSql, StringComparison.Ordinal);
         Assert.Contains("IDENTIFIED BY @p0", commands.AlterPasswordSql, StringComparison.Ordinal);
         Assert.Equal(
-            "GRANT ALL PRIVILEGES ON `microi_tenant_a`.* TO 'mci_tenant_a_12345678'@'%'",
+            "GRANT ALL PRIVILEGES ON `microi_tenant_a`.* TO 'mci_tenant_a_fixture8'@'%'",
             commands.GrantSql);
         Assert.DoesNotContain("GRANT OPTION", commands.GrantSql, StringComparison.OrdinalIgnoreCase);
     }
@@ -41,12 +41,12 @@ public sealed class DatabaseAdministrationCompatibilityTests
             DatabaseType.MySql,
             "Server=127.0.0.1;Database=itdos;Uid=root;Pwd=root-secret;Allow User Variables=True",
             "microi_tenant_a",
-            "mci_tenant_a_12345678",
+            "mci_tenant_a_fixture8",
             password);
         var builder = new DbConnectionStringBuilder { ConnectionString = connection };
 
         Assert.Equal("microi_tenant_a", builder["database"]?.ToString());
-        Assert.Equal("mci_tenant_a_12345678", builder["user id"]?.ToString());
+        Assert.Equal("mci_tenant_a_fixture8", builder["user id"]?.ToString());
         Assert.Equal(password, builder["password"]?.ToString());
         Assert.DoesNotContain("root", connection, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("root-secret", connection, StringComparison.Ordinal);

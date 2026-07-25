@@ -21,6 +21,12 @@ export const API = {
 
   // 数据库结构
   GET_DB_SCHEMA: '/api/V8Engine/GetDbSchema',
+  GET_SUPPORTED_DATABASE_TYPES: '/api/V8Engine/GetSupportedDatabaseTypes',
+  INSPECT_EXTERNAL_DATABASE: '/api/V8Engine/InspectExternalDatabase',
+  QUERY_EXTERNAL_DATABASE: '/api/V8Engine/QueryExternalDatabase',
+  EXECUTE_EXTERNAL_DATABASE_SQL: '/api/V8Engine/ExecuteExternalDatabaseSql',
+  SAVE_DATABASE_CONNECTION: '/api/V8Engine/SaveDatabaseConnection',
+  IMPORT_EXTERNAL_ATTACHMENT: '/api/V8Engine/ImportExternalAttachment',
   GET_PLAYWRIGHT_CONTEXT: '/api/V8Engine/GetPlaywrightContext',
 
   // 接口引擎

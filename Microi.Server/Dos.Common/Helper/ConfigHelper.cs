@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -55,11 +56,39 @@ namespace Dos.Common
         {
             //ReloadOnChange = true 当appsettings.json被修改时重新加载
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Production";
-            
+            var basePath = ResolveConfigurationBasePath(environment);
+
             Configuration = new ConfigurationBuilder()
-                .Add(new JsonConfigurationSource { Path = "appsettings.json", ReloadOnChange = true, Optional = true })
-                .Add(new JsonConfigurationSource { Path = $"appsettings.{environment}.json", ReloadOnChange = true, Optional = true })
+                .SetBasePath(basePath)
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
                 .Build();
+        }
+
+        private static string ResolveConfigurationBasePath(string environment)
+        {
+            var configured = Environment.GetEnvironmentVariable("MICROI_CONFIG_BASE_PATH");
+            if (!string.IsNullOrWhiteSpace(configured))
+            {
+                var configuredPath = Path.GetFullPath(configured);
+                if (Directory.Exists(configuredPath)) return configuredPath;
+            }
+
+            var candidates = new[]
+            {
+                Directory.GetCurrentDirectory(),
+                AppContext.BaseDirectory,
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", ".."))
+            }
+            .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+            var environmentFile = $"appsettings.{environment}.json";
+            return candidates.FirstOrDefault(path => File.Exists(Path.Combine(path, environmentFile)))
+                   ?? candidates.FirstOrDefault(path => File.Exists(Path.Combine(path, "appsettings.json")))
+                   ?? Directory.GetCurrentDirectory();
         }
         /// <summary>
         /// 直接传入 Name
