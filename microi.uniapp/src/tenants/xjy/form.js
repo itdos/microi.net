@@ -15,6 +15,21 @@ const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
 const FOLLOWUP_TABLE = 'diy_genjinjl'
 const CONTACT_TABLE = 'Diy_LianxiR'
+// zhy：客户方案表及设备联动字段集中配置。
+const PROPOSAL_TABLE = 'diy_kehufaxx'
+const PROPOSAL_FIELDS = {
+  deviceModel: 'ShebeiXH',
+  deviceModelId: 'ShebeiXHID',
+  deviceName: 'ShebeiMC',
+  rentalPrice: 'ShebeiDJZL',
+  buyoutPrice: 'ShebeiDJ',
+  filterPrice: 'GenghuanLXJG',
+  expectedCooperationDate: 'YujiHZSJ',
+  rentalDeviceCount: 'HezuoHYSSBSL',
+  rentalTrialYears: 'ShisuanNS',
+  buyoutDeviceCount: 'HezuoHYSSBSLMD',
+  buyoutTrialYears: 'ShisuanNSMD'
+}
 const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
 const CUSTOMER_LOCATION_FIELDS = {
   region: 'Chengshi',
@@ -81,6 +96,14 @@ function isCheckinAdd(context) {
 function isFollowupAdd(context) {
   return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE &&
     context.mode === 'Add' && !context.rowId
+}
+
+function isProposalForm(context) {
+  return String(context.tableName || '').toLowerCase() === PROPOSAL_TABLE
+}
+
+function isProposalAdd(context) {
+  return isProposalForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function fieldName(context, expectedName, expectedLabel = '') {
@@ -181,6 +204,24 @@ function currentTimestamp() {
 
 function currentDate() {
   return currentTimestamp().slice(0, 10)
+}
+
+function isEmptyFormValue(value) {
+  return value === undefined || value === null || value === ''
+}
+
+function proposalDefaults(context) {
+  // zhy：只填充空值，保留路由参数或业务侧已传入的客户方案默认值。
+  const defaults = {
+    [fieldName(context, PROPOSAL_FIELDS.expectedCooperationDate, '预计合作时间')]: currentDate(),
+    [fieldName(context, PROPOSAL_FIELDS.rentalDeviceCount, '合作后饮水设备数量')]: 1,
+    [fieldName(context, PROPOSAL_FIELDS.rentalTrialYears, '试算年数')]: 5,
+    [fieldName(context, PROPOSAL_FIELDS.buyoutDeviceCount, '合作后饮水设备数量')]: 1,
+    [fieldName(context, PROPOSAL_FIELDS.buyoutTrialYears, '试算年数')]: 5
+  }
+  return Object.fromEntries(
+    Object.entries(defaults).filter(([name]) => isEmptyFormValue(context.form[name]))
+  )
 }
 
 function currentUserOption() {
@@ -434,7 +475,8 @@ export function createState() {
       address: ''
     },
     currentTime: '',
-    followupInitialized: false
+    followupInitialized: false,
+    proposalInitialized: false
   }
 }
 
@@ -467,6 +509,11 @@ export async function initialize(context) {
       context,
       context.form[fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')]
     )
+  }
+  if (isProposalAdd(context) && !context.state.proposalInitialized) {
+    // zhy：新增客户方案时初始化日期、租赁/买断设备数量及试算年数。
+    context.state.proposalInitialized = true
+    context.patchForm(proposalDefaults(context))
   }
 }
 
@@ -543,6 +590,25 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isProposalForm(context) && payload && !payload.multiple) {
+    const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
+      const row = payload.raw && typeof payload.raw === 'object'
+        ? payload.raw
+        : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
+          ? payload.option.raw
+          : {}
+      // zhy：移动端选择设备型号后复用 PC 表单的设备名称、价格及型号 Id 联动映射。
+      context.patchForm({
+        [fieldName(context, PROPOSAL_FIELDS.deviceModelId, '设备型号Id')]: personValue(row, ['Id', 'ID', 'id']),
+        [fieldName(context, PROPOSAL_FIELDS.deviceName, '设备名称')]: personValue(row, ['ShangpinMC']),
+        [fieldName(context, PROPOSAL_FIELDS.rentalPrice, '设备单价（租赁）')]: personValue(row, ['ZulinXJ']),
+        [fieldName(context, PROPOSAL_FIELDS.buyoutPrice, '设备单价（买断）')]: personValue(row, ['Xianjia']),
+        [fieldName(context, PROPOSAL_FIELDS.filterPrice, '更换滤芯价格')]: personValue(row, ['GenghuanLXJG'])
+      })
+      return { handled: true }
+    }
+  }
   if (isFollowupAdd(context) && payload && !payload.multiple) {
     // zhy：用户切换客户后同步客户 Id，清空旧联系人并重新加载该客户的联系人。
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()

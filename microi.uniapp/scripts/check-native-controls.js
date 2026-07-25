@@ -30,6 +30,7 @@ if (unknown.length) fail(`unknown controls: ${unknown.join(', ')}`)
 const renderer = fs.readFileSync(path.join(root, 'src/components/mci-native-field/mci-native-field.vue'), 'utf8')
 const nativeForm = fs.readFileSync(path.join(root, 'src/pages/native-form/index.vue'), 'utf8')
 const formRuntime = fs.readFileSync(path.join(root, 'src/platform/native-form.js'), 'utf8')
+const xjyTenantForm = fs.readFileSync(path.join(root, 'src/tenants/xjy/form.js'), 'utf8')
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -58,6 +59,18 @@ if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
   !nativeForm.includes('.form-section__toggle.expanded') ||
   !nativeForm.includes('this.expandFirstInvalidGroup()')) {
   fail('native form field groups must support collapsed and expanded states')
+}
+// zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
+for (const token of [
+  'PROPOSAL_FIELDS',
+  "['ShangpinMC']",
+  "['ZulinXJ']",
+  "['Xianjia']",
+  "['GenghuanLXJG']",
+  "['Id', 'ID', 'id']",
+  'proposalDefaults(context)'
+]) {
+  if (!xjyTenantForm.includes(token)) fail(`xjy proposal form rule is missing: ${token}`)
 }
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)
