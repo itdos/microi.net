@@ -32,6 +32,8 @@ namespace Dos.ORM
 
         public override SqlSection FromSql(string sql) => _inner.FromSql(sql);
 
+        public override void RegisterAfterCommit(Action callback) => _inner.RegisterAfterCommit(callback);
+
         /// <summary>
         /// 拦截Commit：V8代码不允许直接提交框架管理的事务
         /// </summary>

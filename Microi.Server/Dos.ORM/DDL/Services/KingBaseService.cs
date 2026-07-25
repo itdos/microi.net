@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using Dos.Common;
 
@@ -214,7 +215,7 @@ namespace Dos.ORM
         {
             var sql = @"SELECT tablename AS table_name
                         FROM pg_catalog.pg_tables
-                        WHERE schemaname NOT IN ('pg_catalog', 'information_schema', 'sys_catalog')
+                        WHERE schemaname = current_schema()
                         ORDER BY tablename";
             var result = param.DbSession.FromSql(sql).ToList<string>();
             return new DosResultList<string>(1, result);
@@ -225,11 +226,11 @@ namespace Dos.ORM
         /// </summary>
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
-            var sql = $@"SELECT 
+            var sql = @"SELECT
                             c.column_name,
                             c.data_type,
                             COALESCE(pgd.description, '') AS column_comment,
-                            '' AS column_key,
+                            CASE WHEN pk.column_name IS NULL THEN '' ELSE 'PRI' END AS column_key,
                             '' AS extra,
                             c.is_nullable,
                             c.udt_name AS column_type,
@@ -239,10 +240,23 @@ namespace Dos.ORM
                             ON st.relname = c.table_name AND st.schemaname = c.table_schema
                         LEFT JOIN pg_catalog.pg_description pgd 
                             ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
+                        LEFT JOIN (
+                            SELECT ku.table_schema, ku.table_name, ku.column_name
+                            FROM information_schema.table_constraints tc
+                            INNER JOIN information_schema.key_column_usage ku
+                              ON tc.constraint_name = ku.constraint_name
+                             AND tc.constraint_schema = ku.constraint_schema
+                            WHERE tc.constraint_type = 'PRIMARY KEY'
+                        ) pk
+                          ON pk.table_schema = c.table_schema
+                         AND pk.table_name = c.table_name
+                         AND pk.column_name = c.column_name
                         WHERE c.table_schema = current_schema()
-                          AND c.table_name = '{param.TableName}'
+                          AND c.table_name = :tableName
                         ORDER BY c.ordinal_position";
-            var realFieldList = param.DbSession.FromSql(sql).ToList<information_schema_columns>();
+            var realFieldList = param.DbSession.FromSql(sql)
+                .AddInParameter("tableName", DbType.String, param.TableName)
+                .ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
 

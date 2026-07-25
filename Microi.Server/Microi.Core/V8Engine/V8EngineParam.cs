@@ -79,7 +79,7 @@ namespace Microi.net
         public string NextNodeId { get; set; }
         public string V8Code { get; set; }
         public DbSession Db { get; set; }
-        public Dictionary<string, DbSession> Dbs { get; set; } = new Dictionary<string, DbSession>();
+        public V8DatabaseCollection Dbs { get; set; } = new V8DatabaseCollection();
         public DbSession DbRead { get; set; }
         public DbTrans DbTrans { get; set; }
         public string[] NotSaveField { get; set; }

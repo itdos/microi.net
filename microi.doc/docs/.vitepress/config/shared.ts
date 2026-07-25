@@ -41,7 +41,7 @@ export const shared = defineConfig({
 	vite: {
 		plugins: [],
 		server: {
-			port: 2015,
+			port: 61503,
 			strictPort: false,
 		},
 	},

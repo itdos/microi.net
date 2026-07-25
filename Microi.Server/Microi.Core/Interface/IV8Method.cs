@@ -21,6 +21,12 @@ namespace Microi.net
         DosResult ReloadOsClient(string osClient, DbTrans _trans = null);
 
         /// <summary>
+        /// 在当前事务提交成功后刷新当前租户的 V8.Dbs 扩展数据库缓存；
+        /// 无事务时立即刷新。用于 microi_database 的后端提交后事件。
+        /// </summary>
+        DosResult RefreshExtensionDatabases(string osClient = null);
+
+        /// <summary>
         /// Clear all Redis cache keys for a tenant and remove its SaaS config cache.
         /// </summary>
         DosResult ClearTenantCache(string osClient);

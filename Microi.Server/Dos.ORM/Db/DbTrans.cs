@@ -58,6 +58,9 @@ namespace Dos.ORM
         /// </summary>
         private bool isClose = false;
 
+        private readonly object afterCommitLock = new object();
+        private readonly List<Action> afterCommitCallbacks = new List<Action>();
+
         /// <summary>
         /// 构造函数
         /// </summary>
@@ -116,8 +119,43 @@ namespace Dos.ORM
             trans.Commit();
 
             IsCommitOrRollback = true;
+            try
+            {
+                Action[] callbacks;
+                lock (afterCommitLock)
+                {
+                    callbacks = afterCommitCallbacks.ToArray();
+                    afterCommitCallbacks.Clear();
+                }
+                foreach (var callback in callbacks)
+                {
+                    try { callback(); }
+                    catch (Exception ex)
+                    {
+                        // 数据库事务已经提交，提交后通知失败不能把已提交业务伪装成回滚。
+                        Console.WriteLine("Microi：【Warning】事务提交后回调执行失败：" + ex.Message);
+                    }
+                }
+            }
+            finally
+            {
+                Close();
+            }
+        }
 
-            Close();
+        /// <summary>
+        /// 注册仅在真实事务成功提交后执行的回调。用于缓存版本、事件通知等
+        /// 不能在 SubmitAfterServerV8 的事务内提前发布的副作用。
+        /// </summary>
+        public virtual void RegisterAfterCommit(Action callback)
+        {
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+            lock (afterCommitLock)
+            {
+                if (IsCommitOrRollback || isClose)
+                    throw new InvalidOperationException("事务已经结束，不能再注册提交后回调。");
+                afterCommitCallbacks.Add(callback);
+            }
         }
 
 
@@ -129,6 +167,11 @@ namespace Dos.ORM
             trans.Rollback();
 
             IsCommitOrRollback = true;
+
+            lock (afterCommitLock)
+            {
+                afterCommitCallbacks.Clear();
+            }
 
             Close();
         }
@@ -158,6 +201,10 @@ namespace Dos.ORM
                 if (!IsCommitOrRollback)
                 {
                     IsCommitOrRollback = true;
+                    lock (afterCommitLock)
+                    {
+                        afterCommitCallbacks.Clear();
+                    }
                     try { trans.Rollback(); } catch { }
                 }
             }

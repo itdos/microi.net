@@ -346,7 +346,7 @@ public sealed class MySqlCompilerTests
             () => CompileSingleDefault(
                 new SqlTypeDescriptor(LogicalDbType.DateTime),
                 new DateTimeDefaultDefinition(
-                    baseValue.AddTicks(1234567))));
+                    baseValue.AddTicks(424242))));
 
         var command = CompileSingleDefault(
             new SqlTypeDescriptor(LogicalDbType.DateTime),

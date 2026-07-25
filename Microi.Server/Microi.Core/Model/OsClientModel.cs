@@ -68,5 +68,19 @@ namespace Microi.net
         /// </summary>
         [JsonIgnore]
         public bool DataBasesInitialized { get; set; }
+
+        /// <summary>
+        /// 本节点最近一次从共享业务数据库加载扩展数据库配置的时间。
+        /// 短 TTL 允许多节点最终看到 UI/MCP 的配置修改；该值可随重启丢失。
+        /// </summary>
+        [JsonIgnore]
+        public DateTime DataBasesLoadedAtUtc { get; set; }
+
+        /// <summary>
+        /// 本节点加载扩展数据库列表时观察到的共享 Redis 版本。
+        /// microi_database 提交成功后递增版本，所有节点下次访问 V8.Dbs 时重载。
+        /// </summary>
+        [JsonIgnore]
+        public long DataBasesVersion { get; set; }
     }
 }

@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：微信平台相关功能依赖注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>6.7.0</Version>
-    <AssemblyVersion>6.7.0</AssemblyVersion>
-    <FileVersion>6.7.0</FileVersion>
+    <Version>6.7.1</Version>
+    <AssemblyVersion>6.7.1</AssemblyVersion>
+    <FileVersion>6.7.1</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -27,8 +27,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="PuppeteerSharp" Version="20.0.5" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.0" />
+    <PackageReference Include="PuppeteerSharp" Version="25.3.4" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Microi.Core/Microi.Core.csproj" />
