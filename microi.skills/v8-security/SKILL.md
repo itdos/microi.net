@@ -35,6 +35,15 @@ var openaiKey = 'sk-xxxxxxxxxx';
 
 吾码既有客户大量通过 `V8.Http` 访问内网设备、InfluxDB、内部 ApiEngine 和本机 sidecar。严格 SSRF 防护必须默认关闭：未配置时不得限制协议、URL 内嵌凭据、回环、私网、链路本地、云元数据或重定向。只有客户显式设置 `SsrfProtection:Enabled=true` / `MICROI_SSRF_PROTECTION_ENABLED=true` 后才进入严格模式，并用精确 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 放行。
 
+外部数据库与附件迁移属于更高风险的控制面操作：
+
+- `microi_database` 只允许 `Level >= 9999` 的可信管理链路维护；连接字符串、密码和鉴权 Header 不得出现在日志、接口返回、前端或审计详情。
+- MCP 临时连接和保存连接只接受平台认证数据库类型；保存前测试写连接和独立读连接，写入必须显式确认，返回只包含 DbKey、类型和回读状态。
+- `microi_query_external_database` 是默认只读入口；`microi_execute_external_database` 是独立超级管理员入口，后端必须从当前 Token 硬校验 `Level >= 9999`。显式确认后不限制 SQL 类型，可执行数据库账号有权执行的 DML、DDL、存储过程、文件能力和多语句；审计仅保留 SQL 哈希、长度、模式和结果。
+- `V8.Dbs.Open` 只能在可信后端代码中使用，连接串来自服务端密钥或管理员配置；禁止把 `V8.Param`、Header 或匿名请求里的连接串直接传入。
+- `microi_import_external_attachment` 仅对后端确认的 `Level >= 9999` 当前用户开放，可访问 HTTP/HTTPS、私网、本机绝对路径和 UNC；不设固定 MCP 大小上限并采用流式迁移。源 URL、鉴权 Header、本机/UNC 路径只以哈希进入审计，能力仍受 API 服务账号和目标基础设施授权约束。
+- 多节点保存连接使用按 `OsClient + DbKey` 隔离的分布式锁，并由数据库唯一索引兜底；同步数据和附件仍必须使用业务幂等键，锁不能替代唯一约束、状态机或 inbox/outbox。
+
 ## 0.5 接口引擎配置安全
 
 代码以外，接口本身的配置项也是安全防线（详见 `v8-api-config/SKILL.md`）：
@@ -336,6 +345,16 @@ try {
 - 收到 `TokenReplaced` 时先检查同一终端是否已有新 Token，避免并发旧响应误清新登录态。
 - 用户提示可以显示过期时长、终端类型和租户 Key，但日志、Toast、URL、截图禁止输出完整 Token。
 
+## 10. Jint 运行时升级边界
+
+升级 Jint 时必须逐版阅读官方 release notes，并至少验证以下兼容面，不能只以编译通过作为验收：
+
+- `Engine` 非线程安全；每次执行使用独立 Engine。`setTimeout` 等回调必须在当前请求内由同一 Engine 串行排空后再释放，禁止 `Task.Run` 捕获 Engine 跨线程或在响应后继续执行。需要可靠后台执行时改用 MQ、Job 或 outbox，不把进程内定时器当作持久任务。
+- 重复脚本使用有上限的 `Engine.PrepareScript` 缓存；`Prepared<Script>` 可跨 Engine 复用。Promise 使用 `EvaluateAsync` / `UnwrapIfPromiseAsync` 和请求取消令牌，禁止在 ASP.NET 请求线程上使用阻塞的 `UnwrapIfPromise`。
+- 内存 MB 转字节前先提升为 `long`，例如 `checked((long)mb * 1024L * 1024L)`；2GB 用 `int` 相乘会溢出并让限制失真。
+- Jint 4.14 默认把 CLR 数组改为 `LiveView`，并默认缓存最近对象包装器。Microi 为兼容历史脚本显式使用 `ArrayConversionMode.Copy + CacheRecentObjectWrappers=false`；若以后切到 LiveView，必须覆盖宿主数组被 JS 修改、固定长度 push/pop 报错、`Array.isArray=false` 和重复读取身份缓存测试。
+- 引擎约束必须在平台宿主对象注入完成、用户脚本执行前 `Constraints.Reset()`；同时覆盖超时、语句数、递归、内存、Promise 取消及 CLR 宿主边界返回后的再次检查。
+
 ## 安全检查清单
 
 - [ ] 所有数据库查询使用参数化（`_Where` 或 `@p0`）
@@ -351,6 +370,9 @@ try {
 - [ ] 写操作有防重复提交机制
 - [ ] 关键操作写审计日志
 - [ ] catch 块不暴露内部错误给前端
+- [ ] 外部数据库连接串不来自普通请求、不回显，DbKey 无重复且不占用 V8.Dbs 保留名称
+- [ ] 外部附件管理入口硬校验 `Level >= 9999`、显式确认、来源脱敏，流式迁移并按源附件 Id 幂等回读
+- [ ] Jint 升级覆盖 Prepared 缓存、非阻塞 Promise、long 内存换算、数组互操作兼容和同线程定时器生命周期
 
 ### 复盘：管理员设计器和升级任务的嵌套 FormEngine 写入被误判
 

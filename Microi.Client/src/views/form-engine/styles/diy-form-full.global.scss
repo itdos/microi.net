@@ -179,6 +179,41 @@
     }
 }
 
+// 通过 DiyFormFull.Init({ Height }) 打开的固定高度 Dialog。
+// Header 保持稳定，表单内容在 Body 内滚动，切换表单 Tab 时不再改变弹窗尺寸。
+.diy-form-container.el-dialog.diy-form-fixed-height {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 32px);
+
+    .el-dialog__header {
+        flex: 0 0 auto;
+    }
+
+    > .el-dialog__body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+
+    // 全局旧样式会给所有弹窗内的 el-tabs__content 再创建一层滚动。
+    // 固定高度表单只允许 el-dialog__body 纵向滚动，表单顶层 Tab 随内容自然展开。
+    .diy-form-dialog-scroll-content,
+    .diy-form-dialog-scroll-content > .el-col,
+    .diy-form-dialog-scroll-content > .el-col > .itdos-diy-form,
+    .diy-form-dialog-scroll-content > .el-col > .itdos-diy-form > .field-form-tabs,
+    .diy-form-dialog-scroll-content > .el-col > .itdos-diy-form > .field-form-tabs > .el-tabs__content {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+}
+
+// Element Plus 的 overlay-dialog 默认也可滚动；固定 80vh 时由弹窗 Body 唯一承载滚动。
+.diy-form-fixed-height-overlay > .el-overlay-dialog {
+    overflow: hidden;
+}
+
 .data-version-preview-dialog {
     .el-dialog__body {
         padding-top: 8px;

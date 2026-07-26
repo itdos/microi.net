@@ -9,7 +9,7 @@ namespace Microi.net
         public static int MaxTimeout => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_TIMEOUT_SECONDS", "V8Limits:MaxTimeoutSeconds", 3600);
         public static int DefaultMaxStatements => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_MAX_STATEMENTS", "V8Limits:DefaultMaxStatements", 50_000_000);
         public static int MaxStatementsLimit => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_STATEMENTS", "V8Limits:MaxStatements", 500_000_000);
-        public static int DefaultLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_MEMORY_MB", "V8Limits:DefaultLimitMemoryMB", 1024);
+        public static int DefaultLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_MEMORY_MB", "V8Limits:DefaultLimitMemoryMB", 2048);
         public static int MaxLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_MEMORY_MB", "V8Limits:MaxLimitMemoryMB", 4096);
         public static int DefaultLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_RECURSION", "V8Limits:DefaultLimitRecursion", 2000);
         public static int MaxLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_RECURSION", "V8Limits:MaxLimitRecursion", 5000);

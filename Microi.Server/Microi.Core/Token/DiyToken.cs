@@ -308,7 +308,7 @@ namespace Microi.net
                     catch (System.Exception ex)
                     {
                         // 2026-05-01 安全审计：记录 JWT 解析失败（可能是伪造、篡改或格式错误的 Token）
-                        Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】JWT 解析失败: {ex.Message}");
+                        MicroiEngine.QueueSystemLog(osClient, "Security", "JwtParseFailed", "JWT 解析失败", ex.ToString(), 3);
                     }
                 }
                 var tokenOsClient = claims?.FirstOrDefault(d => d.Type == "OsClient")?.Value;
@@ -320,7 +320,7 @@ namespace Microi.net
                     && !osClient.DosIsNullOrWhiteSpace()
                     && tokenOsClient != osClient)
                 {
-                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】跨租户调用：Token.OsClient={tokenOsClient}，请求 OsClient={osClient}，已清空当前用户身份");
+                    MicroiEngine.QueueSystemLog(osClient, "Security", "CrossTenantIdentityCleared", "检测到跨租户调用，已清空当前用户身份", $"Token.OsClient={tokenOsClient}; Request.OsClient={osClient}", 3);
                     try
                     {
                         if (context.User?.Identity is ClaimsIdentity ci)
@@ -332,7 +332,7 @@ namespace Microi.net
                     }
                     catch (System.Exception ex)
                     {
-                        Console.WriteLine($"Microi：【⚠️安全】清空跨租户身份失败：{ex.Message}");
+                        MicroiEngine.QueueSystemLog(osClient, "Security", "CrossTenantIdentityClearFailed", "清空跨租户身份失败", ex.ToString(), 3);
                     }
                 }
 

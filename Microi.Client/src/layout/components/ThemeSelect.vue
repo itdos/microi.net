@@ -1,5 +1,5 @@
 <template>
-    <el-popover v-model="ShowThemes" placement="bottom" width="320" trigger="hover" popper-class="mci-theme-popover">
+    <el-popover v-model="ShowThemes" placement="bottom" width="320" trigger="click" popper-class="mci-theme-popover">
         <div class="mci-theme-panel">
             <!-- 显示模式 -->
             <div class="mci-theme-section">
@@ -7,15 +7,15 @@
                     <el-icon><Sunny v-if="themeMode === 'light'" /><Moon v-else /></el-icon>
                     <span>显示模式</span>
                 </div>
-                <div class="mci-mode-row">
-                    <a class="mci-mode-btn" :class="{ active: themeMode === 'light' }" @click="changeMode('light')">
+                <div class="mci-mode-row" role="group" aria-label="显示模式">
+                    <button type="button" class="mci-mode-btn" :class="{ active: themeMode === 'light' }" @click="changeMode('light')">
                         <el-icon><Sunny /></el-icon>
-                        <span>亮色</span>
-                    </a>
-                    <a class="mci-mode-btn" :class="{ active: themeMode === 'dark' }" @click="changeMode('dark')">
+                        <span>浅色</span>
+                    </button>
+                    <button type="button" class="mci-mode-btn" :class="{ active: themeMode === 'dark' }" @click="changeMode('dark')">
                         <el-icon><Moon /></el-icon>
-                        <span>深色</span>
-                    </a>
+                        <span>暗色</span>
+                    </button>
                 </div>
             </div>
 
@@ -25,18 +25,24 @@
                     <el-icon><Brush /></el-icon>
                     <span>主题色</span>
                 </div>
-                <div class="mci-color-grid">
-                    <a
+                <div class="mci-color-grid" role="group" aria-label="主题色">
+                    <button
                         v-for="item in mciPresets"
-                        :key="item.value"
+                        :key="item.key"
+                        type="button"
                         class="mci-color-dot"
-                        :class="{ active: isActive(item.value) }"
-                        :style="{ background: item.value, color: item.value }"
+                        :class="{
+                            active: isActive(item.value),
+                            'is-white': item.key === 'white',
+                            'is-black': item.key === 'black'
+                        }"
+                        :style="{ background: item.swatch, color: item.value }"
+                        :aria-label="`切换为${item.name}主题`"
                         :title="item.name"
                         @click="changeTheme(item.value)"
                     >
                         <el-icon v-if="isActive(item.value)" class="check"><Check /></el-icon>
-                    </a>
+                    </button>
                 </div>
             </div>
 
@@ -54,10 +60,10 @@
         </div>
 
         <template #reference>
-            <div class="theme-select-trigger">
+            <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
                 <!-- <el-icon class="theme-icon"><Brush /></el-icon> -->
                 <font-awesome-icon icon="fa-solid fa-shirt" style="font-size: 16px;" />
-            </div>
+            </button>
         </template>
     </el-popover>
 </template>
@@ -66,7 +72,12 @@
 import { Brush, Sunny, Moon, Check, MagicStick } from "@element-plus/icons-vue";
 import { computed, watch } from "vue";
 import { useDiyStore, useAppStore, useSettingsStore } from "@/pinia";
-import { setThemeColor as applyThemeColor, setThemeMode, getThemeMode } from "@/utils/theme-color.js";
+import {
+    getThemePalettes,
+    setThemeColor as applyThemeColor,
+    setThemeMode,
+    getThemeMode
+} from "@/utils/theme-color.js";
 
 const DEFAULT_THEME_COLOR = "#409eff";
 
@@ -97,29 +108,21 @@ export default {
     data() {
         return {
             ShowThemes: false,
-            themeMode: 'light',
-            // MCI 设计系统统一调色板（与 microi.app / microi.uniapp 一致）
-            mciPresets: [
-                { name: '紫色 (默认)', value: '#6C2BD9' },
-                { name: '蓝色',       value: '#2196F3' },
-                { name: '青色',       value: '#06B6D4' },
-                { name: '粉色',       value: '#EC4899' },
-                { name: '橙色',       value: '#F59E0B' },
-                { name: '红色',       value: '#E8294A' },
-                { name: '绿色',       value: '#27AE60' },
-                { name: '靛蓝',       value: '#3F51B5' },
-                { name: '深橙',       value: '#FF5722' },
-                { name: '灰蓝',       value: '#607D8B' },
-                { name: '天蓝',       value: '#409EFF' },
-                { name: '深紫',       value: '#673AB7' }
-            ]
+            themeMode: 'light'
         };
+    },
+    computed: {
+        // 每种显示模式固定 12 色（6 × 2）；暗色模式不出现白色主色。
+        mciPresets() {
+            return getThemePalettes(this.themeMode);
+        }
     },
     mounted() {
         // 初始化模式
         this.themeMode = getThemeMode();
         // 初始化主题色：本地手动选择 > SysConfig.ThemeColor > 默认色
-        applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
+        const appliedColor = applyThemeColor(this.themeColor || DEFAULT_THEME_COLOR);
+        if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
     },
     methods: {
         isActive(color) {
@@ -127,14 +130,14 @@ export default {
         },
         changeTheme(color) {
             if (!color) color = (this.SysConfig && this.SysConfig.ThemeColor) || DEFAULT_THEME_COLOR;
-            applyThemeColor(color);
-            this.diyStore.setThemeColor(color);
+            const appliedColor = applyThemeColor(color);
+            this.diyStore.setThemeColor(appliedColor || color);
         },
         changeMode(mode) {
             this.themeMode = mode;
-            setThemeMode(mode);
-            // 切换模式后重新写入主题色，使 MCI 渐变 / 阴影按当前模式重算
-            if (this.themeColor) applyThemeColor(this.themeColor);
+            const appliedColor = setThemeMode(mode);
+            // 从浅色白色切到暗色时自动回落为蓝色，并同步持久化状态。
+            if (appliedColor && !this.isActive(appliedColor)) this.diyStore.setThemeColor(appliedColor);
         }
     }
 };
@@ -147,6 +150,12 @@ export default {
     justify-content: center;
     cursor: pointer;
     width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
     transition: transform 0.2s ease;
 
     .theme-icon { font-size: 20px; }
@@ -188,12 +197,14 @@ export default {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    height: 36px;
+    height: 40px;
+    border: 1px solid var(--mci-border-color, rgba(0, 0, 0, 0.08));
     border-radius: 8px;
     background: var(--mci-bg-surface, #f0f0f8);
     color: var(--mci-text-secondary, #64648c);
     font-size: 13px;
     cursor: pointer;
+    font-family: inherit;
     transition: all 0.2s ease;
 
     .el-icon { font-size: 15px; }
@@ -204,7 +215,8 @@ export default {
     }
     &.active {
         background: var(--mci-gradient-primary, linear-gradient(135deg, #6C2BD9 0%, #2196F3 100%));
-        color: #fff;
+        color: var(--mci-text-on-primary, #fff);
+        border-color: var(--mci-border-glow, transparent);
         box-shadow: var(--mci-shadow-button, 0 4px 14px rgba(108, 43, 217, 0.2));
     }
 }
@@ -214,6 +226,7 @@ export default {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 10px;
+    justify-items: center;
 }
 .mci-color-dot {
     position: relative;
@@ -223,6 +236,7 @@ export default {
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     border: 2px solid transparent;
+    padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -233,6 +247,15 @@ export default {
         filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
     }
 
+    &.is-white {
+        border-color: var(--mci-border-strong, #cbd5e1);
+
+        .check {
+            color: #111827 !important;
+            filter: none;
+        }
+    }
+
     &:hover {
         transform: translateY(-2px) scale(1.08);
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
@@ -241,6 +264,11 @@ export default {
         border-color: var(--mci-bg-elevated, #fff);
         box-shadow: 0 0 0 2px currentColor, 0 6px 16px rgba(0, 0, 0, 0.15);
         transform: scale(1.05);
+    }
+
+    &.active.is-white {
+        border-color: #fff;
+        box-shadow: 0 0 0 2px var(--mci-text-primary, #111827), 0 6px 16px rgba(15, 23, 42, 0.14);
     }
 }
 

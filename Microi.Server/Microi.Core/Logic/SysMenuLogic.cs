@@ -215,7 +215,7 @@ namespace Microi.net
                     catch (Exception ex)
                     {
                         // 异常时记录日志，返回空列表
-                        Console.WriteLine($"解析用户角色失败: {ex.Message}");
+                        MicroiEngine.QueueSystemLog(param?.OsClient, "Authorization", "RoleIdsParseFailed", "解析用户角色失败", ex.ToString(), 2);
                         roleIds = new List<string>();
                     }
 

@@ -695,6 +695,21 @@ function nowText() {
     return `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
 }
 
+function toTimestamp(value) {
+    if (!value) return 0;
+    const text = String(value).trim();
+    const timestamp = Date.parse(text.includes("T") ? text : text.replace(" ", "T"));
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatHistoryTime(value) {
+    const timestamp = toTimestamp(value);
+    if (!timestamp) return String(value || "");
+    const date = new Date(timestamp);
+    const pad = (part) => String(part).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function modeName(mode) {
     if (mode === "project") return "AI应用";
     const map = {
@@ -894,12 +909,15 @@ async function loadHistory() {
             const record = parseRecord(row.Content);
             if (!record || record.Source !== SOURCE || !record.ConversationId) return;
             record.__rowId = row.Id;
+            record.CreatedAt = record.CreatedAt || row.CreateTime || "";
             record.Archived = record.Archived === true || Number(record.Archived || 0) === 1;
+            const recordTimestamp = toTimestamp(record.CreatedAt);
             if (!grouped.has(record.ConversationId)) {
                 grouped.set(record.ConversationId, {
                     id: record.ConversationId,
                     title: record.Title || firstLine(record.Content) || "新对话",
-                    lastTime: record.Time || "",
+                    lastTime: formatHistoryTime(record.CreatedAt) || record.Time || "",
+                    lastTimestamp: recordTimestamp,
                     archived: false,
                     records: []
                 });
@@ -907,6 +925,10 @@ async function loadHistory() {
             const group = grouped.get(record.ConversationId);
             group.records.push(record);
             group.archived = group.archived || record.Archived;
+            if (recordTimestamp > group.lastTimestamp) {
+                group.lastTimestamp = recordTimestamp;
+                group.lastTime = formatHistoryTime(record.CreatedAt) || record.Time || "";
+            }
             if (record.Role === "user" && (!group.title || group.title === "新对话")) {
                 group.title = firstLine(record.Content);
             }
@@ -914,9 +936,9 @@ async function loadHistory() {
         conversations.value = Array.from(grouped.values())
             .map((item) => ({
                 ...item,
-                records: item.records.sort((a, b) => String(a.CreatedAt || "").localeCompare(String(b.CreatedAt || "")))
+                records: item.records.sort((a, b) => toTimestamp(a.CreatedAt) - toTimestamp(b.CreatedAt))
             }))
-            .sort((a, b) => String(b.lastTime || "").localeCompare(String(a.lastTime || "")));
+            .sort((a, b) => b.lastTimestamp - a.lastTimestamp);
     } finally {
         historyLoading.value = false;
     }
@@ -1913,22 +1935,25 @@ async function saveMessage(message) {
                 CreatedAt: new Date().toISOString()
             })
         });
-        loadHistory();
+        await loadHistory();
     } catch (error) {
         console.warn("[AiEngine] save message failed", error);
     }
 }
 
 function refreshCurrentConversationTitle(userMessage) {
+    const latestAt = new Date().toISOString();
     const existing = conversations.value.find((item) => item.id === currentConversationId.value);
     if (existing) {
         existing.title = firstLine(userMessage.content);
-        existing.lastTime = userMessage.time;
+        existing.lastTimestamp = toTimestamp(latestAt);
+        existing.lastTime = formatHistoryTime(latestAt);
     } else {
         conversations.value.unshift({
             id: currentConversationId.value,
             title: firstLine(userMessage.content),
-            lastTime: userMessage.time,
+            lastTimestamp: toTimestamp(latestAt),
+            lastTime: formatHistoryTime(latestAt),
             archived: false,
             records: []
         });
@@ -2250,9 +2275,9 @@ async function copyText(text) {
     gap: 4px;
     margin: 0 16px 8px;
     padding: 4px;
-    border: 1px solid rgba(145, 158, 171, .18);
+    border: 1px solid var(--ai-border, rgba(145, 158, 171, .18));
     border-radius: 10px;
-    background: rgba(255, 255, 255, .46);
+    background: var(--ai-surface, rgba(255, 255, 255, .46));
 }
 
 .history-tabs button {
@@ -2265,15 +2290,15 @@ async function copyText(text) {
     border: 0;
     border-radius: 7px;
     background: transparent;
-    color: #707a72;
+    color: var(--ai-text-secondary, #707a72);
     cursor: pointer;
     font-size: 13px;
 }
 
 .history-tabs button.active {
-    background: #fff;
-    color: #ff5f2e;
-    box-shadow: 0 6px 16px rgba(43, 55, 78, .08);
+    background: var(--ai-card, #fff);
+    color: var(--ai-primary, #ff5f2e);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, .08);
 }
 
 .history-tabs small {
@@ -2424,9 +2449,9 @@ async function copyText(text) {
     align-items: center;
     gap: 4px;
     padding: 4px;
-    border: 1px solid #e9edf4;
+    border: 1px solid var(--ai-border, #e9edf4);
     border-radius: 8px;
-    background: #f7f8fb;
+    background: var(--ai-surface, #f7f8fb);
 }
 
 .header-workspace-switch button {
@@ -2434,7 +2459,7 @@ async function copyText(text) {
     border: 0;
     border-radius: 6px;
     background: transparent;
-    color: #697386;
+    color: var(--ai-text-secondary, #697386);
     cursor: pointer;
     font-weight: 650;
     padding: 0 12px;
@@ -2442,8 +2467,8 @@ async function copyText(text) {
 
 .header-workspace-switch button.active,
 .header-workspace-switch button:hover {
-    background: #fff;
-    color: #ff5f2e;
+    background: var(--ai-card, #fff);
+    color: var(--ai-primary, #ff5f2e);
     box-shadow: 0 6px 16px rgba(43, 55, 78, .08);
 }
 
@@ -2681,8 +2706,8 @@ async function copyText(text) {
 }
 
 .message-copy-btn:hover {
-    background: #f2f5f9;
-    color: #ff5f2e;
+    background: var(--ai-surface, #f2f5f9);
+    color: var(--ai-primary, #ff5f2e);
 }
 
 .message-text {
@@ -2768,8 +2793,8 @@ async function copyText(text) {
     max-height: 220px;
     overflow: auto;
     margin: 0;
-    border-top: 1px solid #e6eaf1;
-    color: #6c7480;
+    border-top: 1px solid var(--mci-divider-color, var(--ai-border, #e6eaf1));
+    color: var(--ai-text-secondary, #6c7480);
     font-family: inherit;
     font-size: 13px;
     line-height: 1.65;
@@ -2814,16 +2839,16 @@ async function copyText(text) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid #e2e7f0;
+    border: 1px solid var(--ai-border, #e2e7f0);
     border-radius: 999px;
-    background: #f8fafc;
-    color: #445064;
+    background: var(--ai-surface, #f8fafc);
+    color: var(--ai-text-secondary, #445064);
     padding: 4px 8px;
     font-size: 12px;
 }
 
 .attachment-chip.readonly {
-    background: #fff;
+    background: var(--ai-card, #fff);
 }
 
 .attachment-chip button {
@@ -2929,9 +2954,9 @@ async function copyText(text) {
     min-width: 0;
     max-width: 100%;
     box-sizing: border-box;
-    border-top: 1px solid #edf0f5;
+    border-top: 1px solid var(--mci-divider-color, var(--ai-border, #edf0f5));
     padding: 14px 24px 18px;
-    background: #fff;
+    background: var(--ai-bg, #fff);
 }
 
 .composer-box {
@@ -2939,9 +2964,9 @@ async function copyText(text) {
     isolation: isolate;
     max-width: 980px;
     margin: 0 auto;
-    border: 1px solid #dfe3eb;
+    border: 1px solid var(--ai-border, #dfe3eb);
     border-radius: 14px;
-    background: #fff;
+    background: var(--ai-panel, #fff);
     box-shadow: 0 14px 38px rgba(25, 32, 44, .08);
     overflow: visible;
 }
@@ -3004,8 +3029,8 @@ async function copyText(text) {
     flex: 0 0 auto;
     max-width: 150px;
     overflow: hidden;
-    border-color: #c7d2fe;
-    color: #4f46e5;
+    border-color: rgba(var(--el-color-primary-rgb, 79, 70, 229), .34);
+    color: var(--ai-primary, #4f46e5);
     text-overflow: ellipsis;
     white-space: nowrap;
     cursor: help;
@@ -3126,6 +3151,25 @@ body.dark .ai-engine-page,
     background: var(--ai-card);
     color: var(--ai-text);
     box-shadow: var(--ai-shadow);
+}
+
+/* 对话内容靠表面层级分组，避免每一层都叠加描边与阴影。 */
+.message-text,
+.message-thinking,
+.query-result,
+.mcp-actions {
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.message-thinking,
+.query-result,
+.mcp-actions {
+    background: var(--ai-surface);
+}
+
+.conversation-item {
+    box-shadow: none;
 }
 
 .workspace-tab:hover,
@@ -3356,7 +3400,7 @@ body.dark .ai-engine-page,
     border: 1px solid color-mix(in srgb, var(--ai-border) 72%, transparent);
     background:
         linear-gradient(135deg, color-mix(in srgb, var(--ai-card) 88%, var(--ai-primary)), var(--ai-card));
-    box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
+    box-shadow: none;
     transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
@@ -3375,7 +3419,7 @@ body.dark .ai-engine-page,
 .conversation-item.active {
     transform: translateY(-1px);
     border-color: color-mix(in srgb, var(--ai-primary) 34%, var(--ai-border));
-    box-shadow: 0 16px 34px color-mix(in srgb, var(--ai-primary) 13%, rgba(15, 23, 42, .08));
+    box-shadow: 0 10px 26px color-mix(in srgb, var(--ai-primary) 10%, rgba(15, 23, 42, .08));
 }
 
 .conversation-item:hover::before,
@@ -3393,7 +3437,7 @@ body.dark .ai-engine-page,
     min-height: 94px;
     border-color: color-mix(in srgb, var(--ai-primary) 18%, var(--ai-border));
     background:
-        linear-gradient(145deg, color-mix(in srgb, var(--ai-primary) 16%, var(--ai-card)), color-mix(in srgb, var(--ai-card) 92%, #fff)),
+        linear-gradient(145deg, color-mix(in srgb, var(--ai-primary) 16%, var(--ai-card)), color-mix(in srgb, var(--ai-card) 92%, var(--ai-panel))),
         var(--ai-card);
     box-shadow: 0 18px 40px color-mix(in srgb, var(--ai-primary) 12%, rgba(15, 23, 42, .08));
     transform: translateZ(0);
@@ -3661,7 +3705,7 @@ body.dark .ai-engine-page,
     .ai-engine-sidebar {
         height: 230px;
         border-right: 0;
-        border-bottom: 1px solid #e3e6ee;
+        border-bottom: 1px solid var(--mci-divider-color, var(--ai-border, #e3e6ee));
     }
 
     .ai-engine-main {

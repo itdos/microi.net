@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using Dos.Common;
 
@@ -197,28 +198,45 @@ namespace Dos.ORM
             if (param.TableName.DosIsNullOrWhiteSpace() || param.DbSession == null)
                 return new DosResultList<information_schema_columns>(0, null, DDLConfig.GetLang(param.OsClient, "ParamError", param._Lang));
 
-            // SQL注入防护
-            if (!IsValidIdentifier(param.TableName))
-                return new DosResultList<information_schema_columns>(0, null, "表名不合法");
-
-            var sql = $@"SELECT
-                            column_name,
-                            data_type,
-                            column_name AS column_comment,
-                            '' AS column_key,
+            var sql = @"SELECT
+                            c.column_name,
+                            c.data_type,
+                            CAST(ep.value AS nvarchar(4000)) AS column_comment,
+                            CASE WHEN pk.column_name IS NULL THEN '' ELSE 'PRI' END AS column_key,
                             '' AS extra,
-                            is_nullable,
-                            data_type AS column_type,
-                            character_maximum_length
-                        FROM information_schema.columns
-                        WHERE table_schema = SCHEMA_NAME()
-                          AND table_name = '{param.TableName}'
-                        ORDER BY ordinal_position";
+                            c.is_nullable,
+                            c.data_type AS column_type,
+                            c.character_maximum_length
+                        FROM information_schema.columns c
+                        LEFT JOIN sys.columns sc
+                          ON sc.object_id = OBJECT_ID(QUOTENAME(c.table_schema) + '.' + QUOTENAME(c.table_name))
+                         AND sc.name = c.column_name
+                        LEFT JOIN sys.extended_properties ep
+                          ON ep.major_id = sc.object_id
+                         AND ep.minor_id = sc.column_id
+                         AND ep.name = 'MS_Description'
+                        LEFT JOIN (
+                            SELECT ku.table_schema, ku.table_name, ku.column_name
+                            FROM information_schema.table_constraints tc
+                            INNER JOIN information_schema.key_column_usage ku
+                              ON tc.constraint_name = ku.constraint_name
+                             AND tc.table_schema = ku.table_schema
+                             AND tc.table_name = ku.table_name
+                            WHERE tc.constraint_type = 'PRIMARY KEY'
+                        ) pk
+                          ON pk.table_schema = c.table_schema
+                         AND pk.table_name = c.table_name
+                         AND pk.column_name = c.column_name
+                        WHERE c.table_schema = SCHEMA_NAME()
+                          AND c.table_name = @tableName
+                        ORDER BY c.ordinal_position";
 
             try
             {
                 var dosSession = param.DbSession;
-                var result = dosSession.FromSql(sql).ToList<information_schema_columns>();
+                var result = dosSession.FromSql(sql)
+                    .AddInParameter("tableName", DbType.String, param.TableName)
+                    .ToList<information_schema_columns>();
                 return new DosResultList<information_schema_columns>(1, result);
             }
             catch (Exception ex)

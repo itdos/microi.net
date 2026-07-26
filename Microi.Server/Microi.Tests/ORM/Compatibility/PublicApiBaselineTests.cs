@@ -44,6 +44,18 @@ public sealed class PublicApiBaselineTests
     }
 
     [Fact]
+    public void DbTrans_RegisterAfterCommit_signature_is_available_to_safe_proxies()
+    {
+        AssertPublicMethod(
+            typeof(DbTrans),
+            nameof(DbTrans.RegisterAfterCommit),
+            typeof(void),
+            isStatic: false,
+            isVirtual: true,
+            typeof(Action));
+    }
+
+    [Fact]
     public void ProviderFactory_CreateDbProvider_signature_is_stable()
     {
         // The one-string overload is compiled only under NETFRAMEWORK. Dos.ORM

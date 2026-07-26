@@ -469,7 +469,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[OnlineTerminal] scan login token keys failed: {ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "OnlineTerminal", "LoginTokenScanFailed", "扫描登录 Token 缓存失败", ex.ToString(), 2);
             }
             return keys;
         }

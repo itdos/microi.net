@@ -21,6 +21,7 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
+using Dos.Common;
 using Dos;
 using Dos.ORM;
 
@@ -57,6 +58,9 @@ namespace Dos.ORM
         /// 是否关闭
         /// </summary>
         private bool isClose = false;
+
+        private readonly object afterCommitLock = new object();
+        private readonly List<Action> afterCommitCallbacks = new List<Action>();
 
         /// <summary>
         /// 构造函数
@@ -116,8 +120,43 @@ namespace Dos.ORM
             trans.Commit();
 
             IsCommitOrRollback = true;
+            try
+            {
+                Action[] callbacks;
+                lock (afterCommitLock)
+                {
+                    callbacks = afterCommitCallbacks.ToArray();
+                    afterCommitCallbacks.Clear();
+                }
+                foreach (var callback in callbacks)
+                {
+                    try { callback(); }
+                    catch (Exception ex)
+                    {
+                        // 数据库事务已经提交，提交后通知失败不能把已提交业务伪装成回滚。
+                        RuntimeDiagnostics.Write("Dos.ORM", "AfterCommitCallbackFailed", "事务提交后回调执行失败", ex.ToString(), 3);
+                    }
+                }
+            }
+            finally
+            {
+                Close();
+            }
+        }
 
-            Close();
+        /// <summary>
+        /// 注册仅在真实事务成功提交后执行的回调。用于缓存版本、事件通知等
+        /// 不能在 SubmitAfterServerV8 的事务内提前发布的副作用。
+        /// </summary>
+        public virtual void RegisterAfterCommit(Action callback)
+        {
+            if (callback == null) throw new ArgumentNullException(nameof(callback));
+            lock (afterCommitLock)
+            {
+                if (IsCommitOrRollback || isClose)
+                    throw new InvalidOperationException("事务已经结束，不能再注册提交后回调。");
+                afterCommitCallbacks.Add(callback);
+            }
         }
 
 
@@ -129,6 +168,11 @@ namespace Dos.ORM
             trans.Rollback();
 
             IsCommitOrRollback = true;
+
+            lock (afterCommitLock)
+            {
+                afterCommitCallbacks.Clear();
+            }
 
             Close();
         }
@@ -158,6 +202,10 @@ namespace Dos.ORM
                 if (!IsCommitOrRollback)
                 {
                     IsCommitOrRollback = true;
+                    lock (afterCommitLock)
+                    {
+                        afterCommitCallbacks.Clear();
+                    }
                     try { trans.Rollback(); } catch { }
                 }
             }
@@ -201,7 +249,7 @@ namespace Dos.ORM
             {
                 var sqlPreview = sql?.Length > 200 ? sql.Substring(0, 200) : sql;
                 var errMsg = $"数据库事务连接已断开（State={conn.State}），无法执行SQL。可能原因：同一事务中前面的某个SQL执行导致MySQL驱动关闭了连接（Fatal error），或事务持有时间过长。SQL={sqlPreview}";
-                Console.WriteLine($"Microi：【Error异常】{errMsg}");
+                RuntimeDiagnostics.Write("Dos.ORM", "TransactionConnectionClosed", "数据库事务连接已断开", $"State={conn.State}；SQL 长度={sql?.Length ?? 0}", 3);
                 throw new InvalidOperationException(errMsg);
             }
             return dbSession.FromSql(sql).SetDbTransaction(trans);

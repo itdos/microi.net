@@ -130,8 +130,17 @@ namespace Microi.net
         }
     }
 
+    internal sealed class TenantRabbitMQConfigurationException : InvalidOperationException
+    {
+        public TenantRabbitMQConfigurationException(string message) : base(message) { }
+    }
+
     internal sealed class TenantRabbitMQConnectionSettings
     {
+        // 仅用于抑制单节点重复诊断；配置事实仍来自共享SaaS配置，不能以此字典作为业务状态。
+        private static readonly ConcurrentDictionary<string, int> _configurationFailureCounts =
+            new ConcurrentDictionary<string, int>(StringComparer.Ordinal);
+
         public string OsClient { get; private set; }
         public IReadOnlyList<string> Hosts { get; private set; }
         public int Port { get; private set; }
@@ -146,7 +155,7 @@ namespace Microi.net
             var tenant = NormalizeTenant(osClient);
             var client = OsClientExtend.GetClient(tenant);
             var model = client?.OsClientModel
-                        ?? throw new InvalidOperationException($"租户[{tenant}]的 SaaS 配置不存在，RabbitMQ 已拒绝连接。");
+                        ?? throw RejectConfiguration(tenant, $"租户[{tenant}]的 SaaS 配置不存在，RabbitMQ 已拒绝连接。");
 
             var hosts = ReadRequired(model, "MQHost", tenant)
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
@@ -156,14 +165,14 @@ namespace Microi.net
                 .ToArray();
             if (hosts.Length == 0)
             {
-                throw new InvalidOperationException($"租户[{tenant}]未配置 MQHost，RabbitMQ 已拒绝回退主租户配置。");
+                throw RejectConfiguration(tenant, $"租户[{tenant}]未配置 MQHost，RabbitMQ 已拒绝回退主租户配置。");
             }
 
             if (!int.TryParse(ReadRequired(model, "MQPort", tenant), out var port)
                 || port < 1
                 || port > 65535)
             {
-                throw new InvalidOperationException($"租户[{tenant}]的 MQPort 无效，RabbitMQ 已拒绝连接。");
+                throw RejectConfiguration(tenant, $"租户[{tenant}]的 MQPort 无效，RabbitMQ 已拒绝连接。");
             }
 
             var settings = new TenantRabbitMQConnectionSettings
@@ -192,7 +201,8 @@ namespace Microi.net
             var value = model[field]?.Val<string>()?.Trim();
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new InvalidOperationException(
+                throw RejectConfiguration(
+                    tenant,
                     $"租户[{tenant}]未配置 {field}，RabbitMQ 已 fail-closed，禁止回退主租户账号。");
             }
             return value;
@@ -224,22 +234,44 @@ namespace Microi.net
                 if (!string.IsNullOrWhiteSpace(otherUser)
                     && string.Equals(settings.UserName, otherUser, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException(
+                    throw RejectConfiguration(
+                        settings.OsClient,
                         $"租户[{settings.OsClient}]与租户[{pair.Key}]共用了 MQUserName，RabbitMQ 已拒绝连接；请为每个租户创建专用账号。");
                 }
                 if (!string.IsNullOrWhiteSpace(otherPassword)
                     && string.Equals(settings.Password, otherPassword, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException(
+                    throw RejectConfiguration(
+                        settings.OsClient,
                         $"租户[{settings.OsClient}]与租户[{pair.Key}]共用了 MQPassword，RabbitMQ 已拒绝连接；请为每个租户生成独立随机密码。");
                 }
                 if (!string.IsNullOrWhiteSpace(otherVirtualHost)
                     && string.Equals(settings.VirtualHost, otherVirtualHost, StringComparison.Ordinal))
                 {
-                    throw new InvalidOperationException(
+                    throw RejectConfiguration(
+                        settings.OsClient,
                         $"租户[{settings.OsClient}]与租户[{pair.Key}]共用了 MQVitrualHost，RabbitMQ 已拒绝连接；请为每个租户创建专用 vhost 和 ACL。");
                 }
             }
+        }
+
+        private static TenantRabbitMQConfigurationException RejectConfiguration(string tenant, string message)
+        {
+            var key = tenant + "|" + message;
+            var attempt = _configurationFailureCounts.AddOrUpdate(key, 1, (_, previous) => previous + 1);
+            if (attempt <= 3 || attempt % 10 == 0)
+            {
+                MicroiEngine.QueueSystemLog(
+                    tenant,
+                    "RabbitMQ",
+                    "ConfigurationRejected",
+                    "RabbitMQ 租户配置不安全或不完整，已拒绝连接",
+                    $"第{attempt}次检测失败。{message}",
+                    3,
+                    false,
+                    tenant);
+            }
+            return new TenantRabbitMQConfigurationException(message);
         }
     }
 }

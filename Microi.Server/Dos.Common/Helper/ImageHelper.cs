@@ -103,11 +103,7 @@ namespace Dos.Common
         /// </summary>
         public static Stream CreateQRCode(string qrCodeContent)
         {
-            using (var generator = new QRCodeGenerator())
-            {
-                // 创建二维码（并设置纠错能力最高级）
-                var createQrCode = generator.CreateQrCode(qrCodeContent, ECCLevel.H);
-
+            var createQrCode = QRCodeGenerator.CreateQrCode(qrCodeContent, ECCLevel.H);
                 // 计算二维码模块的数量  
                 //int qrCodeWidth = createQrCode.
 
@@ -121,16 +117,17 @@ namespace Dos.Common
 
                     using (var image = surface.Snapshot())
                     // 编码画布快照为PNG格式的数据
-                    using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
                     {
-                        return data.AsStream();
+                        // SkiaSharp 4.x 的 AsStream() 仍依赖 SKData 的生命周期；
+                        // 本方法在离开 using 后必须返回拥有独立缓冲区的流。
+                        return new MemoryStream(data.ToArray(), writable: false);
                     }
                     //using (var stream = File.OpenWrite(@"MyQRCode.png"))
                     //{
                     //    data.SaveTo(stream);// 将数据保存到文件流中，生成二维码图片
                     //}
                 }
-            }
         }
 
 

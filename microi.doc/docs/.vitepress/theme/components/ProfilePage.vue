@@ -184,18 +184,43 @@
 
         <section v-if="activeMenu === 'account'" class="content-panel">
           <h2>{{ t('account') }}</h2>
-          <div class="account-grid">
-            <label>{{ t('accountLabel') }}</label>
-            <span>{{ currentUser.Account || '-' }}</span>
-            <label>{{ t('nameLabel') }}</label>
-            <span>{{ currentUser.Name || currentUser.NickName || '-' }}</span>
-            <label>{{ t('phoneLabel') }}</label>
-            <span>{{ currentUser.Phone || '-' }}</span>
+          <p class="account-intro">{{ t('profileEditDesc') }}</p>
+          <div class="account-editor">
+            <div class="avatar-editor">
+              <img v-if="profileDraftAvatarUrl" :src="profileDraftAvatarUrl" :alt="profileDraftName" />
+              <span v-else>{{ profileInitial }}</span>
+              <div>
+                <strong>{{ t('avatarLabel') }}</strong>
+                <small>{{ t('avatarTip') }}</small>
+                <div class="avatar-actions">
+                  <button class="ghost-action" type="button" @click="showAvatarGenerator = true">{{ t('generateAvatar') }}</button>
+                  <button class="ghost-action" type="button" :disabled="isUploadingAvatar" @click="profileFileInput?.click()">{{ isUploadingAvatar ? t('uploadingAvatar') : t('uploadAvatar') }}</button>
+                  <input ref="profileFileInput" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="handleAvatarFileChange" />
+                </div>
+              </div>
+            </div>
+            <div class="account-form">
+              <label>{{ t('accountLabel') }}<input :value="currentUser.Account || '-'" disabled /></label>
+              <label>{{ t('nicknameLabel') }}<input v-model.trim="profileDraftName" maxlength="50" :placeholder="t('nicknamePlaceholder')" /></label>
+              <label>{{ t('phoneLabel') }}<input :value="currentUser.Phone || '-'" disabled /></label>
+            </div>
           </div>
-          <button class="ghost-action danger" type="button" @click="logout">{{ t('logout') }}</button>
+          <div class="account-actions">
+            <button class="primary-action" type="button" :disabled="isSavingProfile || isUploadingAvatar" @click="saveProfile">{{ isSavingProfile ? t('savingProfile') : t('saveProfile') }}</button>
+            <button class="ghost-action danger" type="button" @click="logout">{{ t('logout') }}</button>
+          </div>
         </section>
 
         <section v-if="activeMenu === 'ai'" class="content-panel">
+          <ProfileAiChat
+            :api-base="API_BASE"
+            :os-client="OS_CLIENT"
+            :auth-token="authToken"
+            :user-id="String(currentUser?.Id || '')"
+            :locale="locale"
+            @token-refreshed="handleAiTokenRefreshed"
+            @refresh-quota="refreshAiAfterChat"
+          />
           <ProfileAiSummary
             :api-key="aiApiKey"
             :endpoint="aiApiEndpoint || 'https://api.itdos.com/v1'"
@@ -268,6 +293,33 @@
       </template>
     </main>
 
+    <div v-if="showAvatarGenerator" class="avatar-generator-backdrop" @click.self="closeAvatarGenerator" @keydown.esc="closeAvatarGenerator">
+      <section class="avatar-generator-dialog" role="dialog" aria-modal="true" aria-labelledby="avatar-generator-title">
+        <button class="avatar-generator-close" type="button" :aria-label="t('closeAvatarGenerator')" @click="closeAvatarGenerator">×</button>
+        <span class="avatar-generator-mark" aria-hidden="true">AI</span>
+        <p class="eyebrow">Microi AI Studio · MiniMax image-01</p>
+        <h2 id="avatar-generator-title">{{ t('generateAvatarTitle') }}</h2>
+        <p>{{ t('generateAvatarDesc') }}</p>
+        <div class="avatar-style-list">
+          <button v-for="style in avatarStyles" :key="style.key" type="button" :class="{ active: avatarStyle === style.key }" @click="avatarStyle = style.key">{{ style.label }}</button>
+        </div>
+        <textarea v-model.trim="avatarPrompt" maxlength="500" rows="3" :placeholder="t('avatarPromptPlaceholder')"></textarea>
+        <button class="primary-action avatar-generate-action" type="button" :disabled="isGeneratingAvatar || avatarPrompt.length < 4" @click="generateAvatarCandidates">
+          {{ isGeneratingAvatar ? t('generatingAvatar') : t('generateCandidates') }}
+        </button>
+        <p v-if="avatarGeneratorError" class="avatar-generator-error" role="alert">{{ avatarGeneratorError }}</p>
+        <div v-if="avatarCandidates.length" class="avatar-candidate-grid">
+          <button v-for="image in avatarCandidates" :key="image" type="button" :class="{ selected: selectedAvatarCandidate === image }" @click="selectedAvatarCandidate = image">
+            <img :src="image" :alt="t('avatarCandidate')" />
+          </button>
+        </div>
+        <div v-if="avatarCandidates.length" class="avatar-generator-footer">
+          <small>{{ t('avatarGeneratedNotice') }}</small>
+          <button class="primary-action" type="button" :disabled="!selectedAvatarCandidate || isUploadingAvatar" @click="useGeneratedAvatar">{{ t('useAvatar') }}</button>
+        </div>
+      </section>
+    </div>
+
     <div
       v-if="showStarReminder"
       class="star-reminder-backdrop"
@@ -307,6 +359,7 @@
 
 <script setup>
 import { computed, defineComponent, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import ProfileAiChat from './ProfileAiChat.vue'
 import ProfileAiSummary from './ProfileAiSummary.vue'
 import { getInitialProfileLocale, normalizeProfileLocale, translateProfile } from '../profile-i18n'
 import { createOpenClawAuthBridge, isOpenClawBridgeMode } from '../openclaw-auth-bridge'
@@ -330,6 +383,19 @@ const tenantProgress = ref('')
 const createError = ref('')
 const profileError = ref('')
 const profileNotice = ref(null)
+const profileDraftName = ref('')
+const profileDraftAvatar = ref('')
+const profileDraftPreview = ref('')
+const profileFileInput = ref(null)
+const isSavingProfile = ref(false)
+const isUploadingAvatar = ref(false)
+const showAvatarGenerator = ref(false)
+const isGeneratingAvatar = ref(false)
+const avatarPrompt = ref('')
+const avatarStyle = ref('professional')
+const avatarCandidates = ref([])
+const selectedAvatarCandidate = ref('')
+const avatarGeneratorError = ref('')
 const showStarReminder = ref(false)
 const isStartingGiteeOAuth = ref(false)
 const isCheckingGiteeStar = ref(false)
@@ -409,6 +475,10 @@ const primaryTenantUrl = computed(() => tenants.value[0]?.Url || '')
 const profileName = computed(() => currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || 'Microi吾码')
 const profileInitial = computed(() => String(profileName.value || 'M').trim().slice(0, 1).toUpperCase())
 const profileAvatarUrl = computed(() => normalizeAvatarUrl(currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl))
+const profileDraftAvatarUrl = computed(() => profileDraftPreview.value || normalizeAvatarUrl(profileDraftAvatar.value) || profileAvatarUrl.value)
+const avatarStyles = computed(() => locale.value === 'en-US'
+  ? [{ key: 'professional', label: 'Professional' }, { key: 'anime', label: 'Anime' }, { key: '3d', label: '3D' }, { key: 'watercolor', label: 'Watercolor' }]
+  : [{ key: 'professional', label: '专业肖像' }, { key: 'anime', label: '动漫插画' }, { key: '3d', label: '3D 角色' }, { key: 'watercolor', label: '水彩艺术' }])
 const licenseInfo = computed(() => {
   const raw = String(currentUser.value?.LicenseType || tenantCenter.value?.LicenseType || tenantCenter.value?.SysConfig?.LicenseType || '').trim().toLowerCase()
   if (raw === 'personal') {
@@ -532,6 +602,127 @@ function normalizeAvatarUrl(value) {
   return `${API_BASE}/${url.replace(/^\.?\//, '')}`
 }
 
+function syncProfileDraft() {
+  profileDraftName.value = String(currentUser.value?.Name || currentUser.value?.NickName || currentUser.value?.Account || '').trim()
+  profileDraftAvatar.value = String(currentUser.value?.Avatar || currentUser.value?.HeadImgUrl || currentUser.value?.HeadImg || currentUser.value?.AvatarUrl || '').trim()
+  profileDraftPreview.value = ''
+}
+
+async function uploadProfileAvatar(file) {
+  if (!file || !/^image\/(png|jpe?g|webp)$/i.test(file.type || '')) throw new Error(t('avatarTypeError'))
+  if (Number(file.size || 0) > 5 * 1024 * 1024) throw new Error(t('avatarSizeError'))
+  isUploadingAvatar.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file, file.name || `avatar-${Date.now()}.jpg`)
+    form.append('Path', 'member/avatar')
+    form.append('Limit', 'false')
+    form.append('Preview', 'true')
+    form.append('OsClient', OS_CLIENT)
+    const response = await authenticatedFetch(`${API_BASE}/api/HDFS/Upload?OsClient=${OS_CLIENT}`, { method: 'POST', body: form })
+    const result = await response.json()
+    if (!response.ok || Number(result?.Code) !== 1) throw new Error(result?.Msg || t('avatarUploadFailed'))
+    const path = String(result?.Data?.Path || result?.Data?.FilePathName || '').trim()
+    if (!path) throw new Error(t('avatarUploadFailed'))
+    profileDraftAvatar.value = path
+    profileDraftPreview.value = normalizeAvatarUrl(path)
+    return path
+  } finally {
+    isUploadingAvatar.value = false
+  }
+}
+
+async function handleAvatarFileChange(event) {
+  const file = event?.target?.files?.[0]
+  if (event?.target) event.target.value = ''
+  if (!file) return
+  try {
+    await uploadProfileAvatar(file)
+    showProfileNotice('success', t('avatarUploaded'))
+  } catch (error) {
+    showProfileNotice('error', error?.message || t('avatarUploadFailed'))
+  }
+}
+
+function avatarStylePrompt() {
+  const map = {
+    professional: locale.value === 'en-US' ? 'professional studio portrait, clean background, friendly, premium profile avatar' : '专业影棚肖像，干净背景，亲和自然，高级感头像',
+    anime: locale.value === 'en-US' ? 'refined anime illustration, expressive eyes, clean line art, profile avatar' : '精致动漫插画，灵动眼神，干净线稿，头像构图',
+    '3d': locale.value === 'en-US' ? 'premium 3D character render, soft lighting, polished profile avatar' : '高级 3D 角色渲染，柔和光照，精致头像',
+    watercolor: locale.value === 'en-US' ? 'artistic watercolor portrait, elegant brushwork, clean profile avatar' : '艺术水彩肖像，优雅笔触，干净头像构图'
+  }
+  return map[avatarStyle.value] || map.professional
+}
+
+async function generateAvatarCandidates() {
+  const prompt = avatarPrompt.value.trim()
+  if (prompt.length < 4 || isGeneratingAvatar.value) return
+  isGeneratingAvatar.value = true
+  avatarGeneratorError.value = ''
+  avatarCandidates.value = []
+  selectedAvatarCandidate.value = ''
+  try {
+    const response = await authenticatedFetch(`${API_BASE}/api/Ai/GenerateProfileAvatar?OsClient=${OS_CLIENT}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Prompt: `${prompt}。${avatarStylePrompt()}。正方形单人头像，不要文字，不要水印。`, Count: 4 })
+    })
+    const result = await response.json()
+    if (!response.ok || Number(result?.Code) !== 1) throw new Error(result?.Msg || t('avatarGenerateFailed'))
+    avatarCandidates.value = (Array.isArray(result?.Data?.Images) ? result.Data.Images : [])
+      .filter(Boolean).map(value => `data:image/jpeg;base64,${value}`)
+    selectedAvatarCandidate.value = avatarCandidates.value[0] || ''
+    if (!avatarCandidates.value.length) throw new Error(t('avatarGenerateFailed'))
+  } catch (error) {
+    avatarGeneratorError.value = error?.message || t('avatarGenerateFailed')
+  } finally {
+    isGeneratingAvatar.value = false
+  }
+}
+
+function closeAvatarGenerator() {
+  if (isGeneratingAvatar.value || isUploadingAvatar.value) return
+  showAvatarGenerator.value = false
+  avatarGeneratorError.value = ''
+}
+
+async function useGeneratedAvatar() {
+  if (!selectedAvatarCandidate.value) return
+  try {
+    const blob = await (await fetch(selectedAvatarCandidate.value)).blob()
+    await uploadProfileAvatar(new File([blob], `microi-ai-avatar-${Date.now()}.jpg`, { type: 'image/jpeg' }))
+    showAvatarGenerator.value = false
+    await saveProfile()
+  } catch (error) {
+    avatarGeneratorError.value = error?.message || t('avatarUploadFailed')
+  }
+}
+
+async function saveProfile() {
+  const name = profileDraftName.value.trim()
+  if (!name || name.length > 50 || isSavingProfile.value) {
+    if (!name || name.length > 50) showProfileNotice('error', t('nicknameInvalid'))
+    return
+  }
+  isSavingProfile.value = true
+  try {
+    const response = await authenticatedFetch(`${API_BASE}/api/SysUser/UpdateCurrentProfile?OsClient=${OS_CLIENT}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ Name: name, Avatar: profileDraftAvatar.value })
+    })
+    const result = await response.json()
+    if (!response.ok || Number(result?.Code) !== 1) throw new Error(result?.Msg || t('profileSaveFailed'))
+    currentUser.value = result.Data || { ...currentUser.value, Name: name, Avatar: profileDraftAvatar.value }
+    localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
+    syncProfileDraft()
+    window.dispatchEvent(new CustomEvent('microi-login-success'))
+    showProfileNotice('success', t('profileSaved'))
+  } catch (error) {
+    showProfileNotice('error', error?.message || t('profileSaveFailed'))
+  } finally {
+    isSavingProfile.value = false
+  }
+}
+
 function syncMenuFromHash() {
   if (typeof window === 'undefined') return
   const nextKey = normalizeProfileRoute(window.location.hash)
@@ -588,6 +779,18 @@ async function authenticatedFetch(url, options = {}) {
   })
   syncAuthTokenFromResponse(response)
   return response
+}
+
+function handleAiTokenRefreshed(token) {
+  const nextToken = normalizeToken(token)
+  if (!nextToken || nextToken === authToken.value) return
+  authToken.value = nextToken
+  localStorage.setItem('microi_doc_token', nextToken)
+  window.dispatchEvent(new CustomEvent('microi-token-refreshed'))
+}
+
+async function refreshAiAfterChat() {
+  await Promise.all([refreshRelayTokenSummary(), refreshAiUsage(aiUsagePageIndex.value)])
 }
 
 function formatTokenNumber(value) {
@@ -647,6 +850,7 @@ function restoreSession() {
   } catch {
     currentUser.value = null
   }
+  syncProfileDraft()
 }
 
 function isSessionExpiredResult(result) {
@@ -2470,6 +2674,38 @@ onUnmounted(() => {
   color: #64748b;
 }
 
+.account-intro { margin: 6px 0 18px; color: #64748b; }
+.account-editor { display: grid; grid-template-columns: minmax(280px,.8fr) minmax(320px,1.2fr); gap: 28px; padding: 24px; border: 1px solid #e8eef6; border-radius: 18px; background: #f8fafc; }
+.avatar-editor { display: flex; align-items: center; gap: 18px; }
+.avatar-editor > img, .avatar-editor > span { width: 104px; height: 104px; flex: 0 0 104px; border: 3px solid #fff; border-radius: 50%; object-fit: cover; box-shadow: 0 10px 30px rgba(15,23,42,.16); }
+.avatar-editor > span { display: grid; place-items: center; background: linear-gradient(135deg,#fb923c,#f97316); color: #fff; font-size: 34px; font-weight: 800; }
+.avatar-editor strong, .avatar-editor small { display: block; }
+.avatar-editor small { margin-top: 5px; color: #64748b; line-height: 1.5; }
+.avatar-actions, .account-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 13px; }
+.account-form { display: grid; gap: 14px; }
+.account-form label { display: grid; gap: 7px; color: #475569; font-size: 12px; font-weight: 700; }
+.account-form input { min-height: 42px; box-sizing: border-box; padding: 0 13px; border: 1px solid #dbe2ea; border-radius: 10px; outline: none; background: #fff; color: #0f172a; font: inherit; }
+.account-form input:focus { border-color: #fb923c; box-shadow: 0 0 0 3px rgba(251,146,60,.13); }
+.account-form input:disabled { background: #eef2f7; color: #64748b; cursor: not-allowed; }
+.avatar-generator-backdrop { position: fixed; z-index: 1002; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(2,6,23,.7); backdrop-filter: blur(12px); }
+.avatar-generator-dialog { position: relative; width: min(720px,100%); max-height: calc(100vh - 48px); overflow-y: auto; box-sizing: border-box; padding: 30px; border: 1px solid rgba(251,146,60,.24); border-radius: 24px; background: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.35); }
+.avatar-generator-dialog h2 { margin: 8px 0; font-size: 26px; }
+.avatar-generator-dialog > p:not(.eyebrow) { margin: 0 0 16px; color: #64748b; }
+.avatar-generator-close { position: absolute; top: 16px; right: 16px; width: 36px; height: 36px; border: 0; border-radius: 10px; background: #f1f5f9; color: #64748b; cursor: pointer; font-size: 22px; }
+.avatar-generator-mark { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; background: linear-gradient(135deg,#fb923c,#f97316); color: #fff; font-weight: 900; box-shadow: 0 12px 28px rgba(249,115,22,.28); }
+.avatar-style-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.avatar-style-list button { min-height: 34px; padding: 0 13px; border: 1px solid #dbe2ea; border-radius: 999px; background: #fff; color: #475569; cursor: pointer; }
+.avatar-style-list button.active { border-color: #fb923c; background: #fff7ed; color: #c2410c; }
+.avatar-generator-dialog textarea { width: 100%; min-height: 84px; box-sizing: border-box; resize: vertical; padding: 12px 14px; border: 1px solid #dbe2ea; border-radius: 12px; outline: none; background: #f8fafc; color: #0f172a; font: inherit; line-height: 1.6; }
+.avatar-generate-action { width: 100%; margin-top: 12px; }
+.avatar-generator-error { padding: 10px 12px; border-radius: 10px; background: #fef2f2; color: #b91c1c !important; }
+.avatar-candidate-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-top: 18px; }
+.avatar-candidate-grid button { aspect-ratio: 1; overflow: hidden; padding: 3px; border: 2px solid transparent; border-radius: 16px; background: #eef2f7; cursor: pointer; }
+.avatar-candidate-grid button.selected { border-color: #f97316; box-shadow: 0 0 0 3px rgba(249,115,22,.16); }
+.avatar-candidate-grid img { width: 100%; height: 100%; border-radius: 12px; object-fit: cover; }
+.avatar-generator-footer { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-top: 18px; }
+.avatar-generator-footer small { color: #64748b; line-height: 1.5; }
+
 .dark .profile-page {
   background: #0b1120;
   color: #e5e7eb;
@@ -2536,6 +2772,14 @@ onUnmounted(() => {
   border-color: rgba(148, 163, 184, 0.18);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
+.dark .account-editor { border-color: rgba(148,163,184,.18); background: #0f172a; }
+.dark .account-form label, .dark .avatar-editor small, .dark .account-intro { color: #94a3b8; }
+.dark .account-form input { border-color: rgba(148,163,184,.24); background: #111827; color: #f8fafc; }
+.dark .account-form input:disabled { background: #0b1220; color: #64748b; }
+.dark .avatar-generator-dialog { border-color: rgba(251,146,60,.24); background: #111827; color: #e5e7eb; }
+.dark .avatar-generator-dialog > p:not(.eyebrow), .dark .avatar-generator-footer small { color: #94a3b8; }
+.dark .avatar-generator-close, .dark .avatar-style-list button, .dark .avatar-generator-dialog textarea { border-color: rgba(148,163,184,.22); background: #0f172a; color: #e5e7eb; }
+.dark .avatar-style-list button.active { border-color: #fb923c; background: rgba(249,115,22,.12); color: #fdba74; }
 
 .dark .tenant-card {
   background:
@@ -2742,6 +2986,11 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .account-editor { grid-template-columns: 1fr; padding: 18px; }
+  .avatar-candidate-grid { grid-template-columns: repeat(2,1fr); }
+  .avatar-generator-dialog { padding: 24px 18px; }
+  .avatar-generator-footer { align-items: stretch; flex-direction: column; }
 
   .star-reminder-backdrop {
     padding: 16px;

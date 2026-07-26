@@ -1,0 +1,358 @@
+html.microi-ai-studio-page {
+  color-scheme: light;
+  --mci-ai-page-bg: #f5f6f8;
+  --vp-c-bg: #f5f6f8;
+  --vp-c-bg-alt: #eef1f5;
+  --vp-c-bg-elv: #fff;
+  --vp-c-bg-soft: #e9edf2;
+  --vp-c-text-1: #111827;
+  --vp-c-text-2: #667085;
+  --vp-c-text-3: #8a94a3;
+  --vp-c-divider: #d8dde6;
+  --vp-c-gutter: #e8ebf0;
+}
+
+html.dark.microi-ai-studio-page {
+  color-scheme: dark;
+  --mci-ai-page-bg: #141414;
+  --vp-c-bg: #141414;
+  --vp-c-bg-alt: #171717;
+  --vp-c-bg-elv: #242424;
+  --vp-c-bg-soft: #202020;
+  --vp-c-text-1: #f7f7f7;
+  --vp-c-text-2: #a0a0a0;
+  --vp-c-text-3: #777;
+  --vp-c-divider: #363636;
+  --vp-c-gutter: #242424;
+}
+
+html.microi-ai-studio-page,
+html.microi-ai-studio-page body,
+html.microi-ai-studio-page #app,
+html.microi-ai-studio-page .Layout,
+html.microi-ai-studio-page .VPContent,
+html.microi-ai-studio-page .VPPage {
+  background: var(--mci-ai-page-bg) !important;
+}
+
+html.microi-ai-studio-page .VPContent,
+html.microi-ai-studio-page .VPPage,
+html.microi-ai-studio-page .VPPage .container,
+html.microi-ai-studio-page .VPPage .content,
+html.microi-ai-studio-page .VPPage .content-container {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+html.microi-ai-studio-page .VPNav {
+  height: 88px;
+  pointer-events: none;
+  background: transparent !important;
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page body:not(:has(.ai-login-page)) .VPNav {
+  background: transparent !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+}
+
+html.microi-ai-studio-page .VPNavBar {
+  position: relative;
+  width: min(1440px, calc(100% - 40px));
+  height: 58px;
+  margin: 16px auto 0;
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px;
+  background: rgba(32, 32, 32, .68) !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .24);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page body:not(:has(.ai-login-page)) .VPNavBar {
+  min-height: 58px !important;
+  border: 1px solid rgba(255, 255, 255, .12) !important;
+  border-radius: 18px !important;
+  background: rgba(32, 32, 32, .68) !important;
+  background-image: none !important;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, .24) !important;
+  opacity: 1 !important;
+  backdrop-filter: blur(18px) saturate(145%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(145%) !important;
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page body:not(:has(.ai-login-page)) .VPNavBar .container,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page body:not(:has(.ai-login-page)) .VPNavBar .title {
+  background: transparent !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.microi-ai-studio-page .VPNavBar.has-sidebar .content-body,
+html.microi-ai-studio-page .VPNavBar:not(.has-sidebar) .content-body,
+html.microi-ai-studio-page .VPNavBar .container {
+  background: transparent !important;
+}
+
+html.microi-ai-studio-page .VPNavBar .container {
+  max-width: none;
+  height: 56px;
+  padding: 0 18px;
+}
+
+html.microi-ai-studio-page .VPNavBar .title,
+html.microi-ai-studio-page .VPNavBarTitle,
+html.microi-ai-studio-page .VPNavBarTitle .title,
+html.microi-ai-studio-page .VPNavBar .content,
+html.microi-ai-studio-page .VPNavBar .content-body,
+html.microi-ai-studio-page .VPNavBarMenu,
+html.microi-ai-studio-page .VPNavBarMenuLink,
+html.microi-ai-studio-page .VPNavBarMenuGroup,
+html.microi-ai-studio-page .VPNavBarMenuGroup .button {
+  height: 56px !important;
+  min-height: 56px !important;
+  align-items: center !important;
+}
+
+html.microi-ai-studio-page .VPNavBarTitle,
+html.microi-ai-studio-page .VPNavBarMenuLink,
+html.microi-ai-studio-page .VPNavBarMenuGroup .text,
+html.microi-ai-studio-page .VPNavBarTranslations .text,
+html.microi-ai-studio-page .VPSocialLink,
+html.microi-ai-studio-page .VPNavBarAppearance .VPSwitchAppearance {
+  color: #ededed !important;
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarTitle .title,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarMenuLink,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarMenuGroup .button,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarTranslations .button,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarTranslations .text,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarTranslations svg,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBar .VPNavBarMenu a {
+  color: #ededed !important;
+  -webkit-text-fill-color: #ededed !important;
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page body:not(:has(.ai-login-page)) .DocSearch-Button {
+  margin: 0 !important;
+  border-color: rgba(255, 255, 255, .12) !important;
+  background: rgba(255, 255, 255, .07) !important;
+  color: #a9a9a9 !important;
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarSearch,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBarExtra,
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .home-user-bar {
+  height: 56px !important;
+  display: flex;
+  align-items: center;
+}
+
+html[data-mci-site-style="mainstream"].microi-ai-studio-page .VPNavBar .divider {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html.microi-ai-studio-page .home-user-bar .login-link,
+html.microi-ai-studio-page .home-user-bar .user-info {
+  border-color: rgba(255, 255, 255, .14) !important;
+  background: rgba(255, 255, 255, .08) !important;
+  color: #f1f1f1 !important;
+  box-shadow: none !important;
+}
+
+html.microi-ai-studio-page .VPNavBarMenuLink:hover,
+html.microi-ai-studio-page .VPNavBarMenuLink.active,
+html.microi-ai-studio-page .VPNavBarMenuGroup:hover .text {
+  color: #fff !important;
+}
+
+html.microi-ai-studio-page .VPNavBarMenuLink::after {
+  background-color: #f7f7f7 !important;
+}
+
+html.microi-ai-studio-page .VPNavBarHamburger .container span {
+  background-color: #f1f1f1;
+}
+
+html.microi-ai-studio-page .VPNavScreen {
+  margin: 10px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px;
+  background: rgba(25, 25, 25, .96) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+html.microi-ai-studio-page .VPFooter {
+  border-top-color: #2f2f2f;
+  background: #141414;
+}
+
+html:not(.dark).microi-ai-studio-page .VPNavBar,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page body:not(:has(.ai-login-page)) .VPNavBar {
+  border-color: rgba(15, 23, 42, .12) !important;
+  background: rgba(255, 255, 255, .72) !important;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, .10) !important;
+}
+
+html:not(.dark).microi-ai-studio-page .VPNavBarTitle,
+html:not(.dark).microi-ai-studio-page .VPNavBarMenuLink,
+html:not(.dark).microi-ai-studio-page .VPNavBarMenuGroup .text,
+html:not(.dark).microi-ai-studio-page .VPNavBarTranslations .text,
+html:not(.dark).microi-ai-studio-page .VPSocialLink,
+html:not(.dark).microi-ai-studio-page .VPNavBarAppearance .VPSwitchAppearance,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBarTitle .title,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBarMenuLink,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBarMenuGroup .button,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBarTranslations .button,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBarTranslations .text,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBarTranslations svg,
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page .VPNavBar .VPNavBarMenu a {
+  color: #1f2937 !important;
+  -webkit-text-fill-color: #1f2937 !important;
+}
+
+html[data-mci-site-style="mainstream"]:not(.dark).microi-ai-studio-page body:not(:has(.ai-login-page)) .DocSearch-Button {
+  border-color: rgba(15, 23, 42, .12) !important;
+  background: rgba(15, 23, 42, .045) !important;
+  color: #667085 !important;
+}
+
+html:not(.dark).microi-ai-studio-page .home-user-bar .login-link,
+html:not(.dark).microi-ai-studio-page .home-user-bar .user-info {
+  border-color: rgba(15, 23, 42, .12) !important;
+  background: rgba(15, 23, 42, .05) !important;
+  color: #1f2937 !important;
+}
+
+html:not(.dark).microi-ai-studio-page .VPNavScreen {
+  border-color: rgba(15, 23, 42, .12);
+  background: rgba(255, 255, 255, .97) !important;
+}
+
+html:not(.dark).microi-ai-studio-page .VPFooter {
+  border-top-color: #d8dde6;
+  background: #f5f6f8;
+}
+
+html:not(.dark).microi-ai-studio-page .microi-ai-studio-home {
+  background: #f5f6f8;
+  color: #111827;
+}
+
+html:not(.dark).microi-ai-studio-page .ai-studio-brand {
+  border-color: rgba(133,103,0,.2);
+  background: linear-gradient(180deg, rgba(244,211,94,.2), rgba(255,255,255,.75));
+  color: #5f4b00;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 10px 30px rgba(15,23,42,.08);
+}
+
+html:not(.dark).microi-ai-studio-page .ai-studio-brand span { border-color: rgba(95,75,0,.5); }
+html:not(.dark).microi-ai-studio-page .ai-studio-hero h1 { color: #111827; }
+html:not(.dark).microi-ai-studio-page .ai-studio-chat { border-color: #d7dce5; background: rgba(255,255,255,.92); box-shadow: 0 18px 50px rgba(15,23,42,.10); }
+html:not(.dark).microi-ai-studio-page .ai-studio-chat textarea { color: #1f2937; }
+html:not(.dark).microi-ai-studio-page .ai-studio-chat textarea::placeholder { color: #8a94a3; }
+html:not(.dark).microi-ai-studio-page .ai-studio-prompts button:hover:not(:disabled) { background: #eef1f5; color: #1f2937; }
+html:not(.dark).microi-ai-studio-page .ai-studio-safety { color: #7b8492; }
+html:not(.dark).microi-ai-studio-page .ai-studio-send { background: #1f2937; color: #fff; }
+html:not(.dark).microi-ai-studio-page .ai-studio-send:hover:not(:disabled) { background: #111827; }
+html:not(.dark).microi-ai-studio-page .ai-studio-login-mask { background: rgba(245,246,248,.44); }
+html:not(.dark).microi-ai-studio-page .ai-studio-lock { border-color: rgba(15,23,42,.12); background: rgba(255,255,255,.7); color: #475467; }
+html:not(.dark).microi-ai-studio-page .ai-studio-login-mask strong { color: #1f2937; }
+html:not(.dark).microi-ai-studio-page .ai-studio-login-mask p { color: #667085; }
+html:not(.dark).microi-ai-studio-page .ai-studio-login-mask a { background: #111827; color: #fff; }
+
+html:not(.dark) .ai-app-market { color: #111827; }
+html:not(.dark) .ai-app-heading h2 { color: #111827; }
+html:not(.dark) .ai-app-categories button { border-color: #d8dde6; background: rgba(255,255,255,.54); color: #667085; }
+html:not(.dark) .ai-app-categories button:hover,
+html:not(.dark) .ai-app-categories button:focus-visible { border-color: #aab2c0; color: #111827; }
+html:not(.dark) .ai-app-categories button.active { border-color: #c8ced8; background: #fff; color: #111827; box-shadow: 0 5px 18px rgba(15,23,42,.07); }
+html:not(.dark) .ai-app-sort,
+html:not(.dark) .ai-app-search { border-color: #d7dce5; background: rgba(255,255,255,.78); color: #667085; }
+html:not(.dark) .ai-app-sort:focus-within { border-color: #aab2c0; background: #fff; box-shadow: 0 0 0 3px rgba(15,23,42,.045); }
+html:not(.dark) .ai-app-sort-trigger,
+html:not(.dark) .ai-app-search input { color: #1f2937; }
+html:not(.dark) .ai-app-sort-menu { border-color: #d9dee7; background: rgba(255,255,255,.98); box-shadow: 0 18px 44px rgba(15,23,42,.16); }
+html:not(.dark) .ai-app-sort-menu button { color: #667085; }
+html:not(.dark) .ai-app-sort-menu button:hover,
+html:not(.dark) .ai-app-sort-menu button:focus-visible { background: #f2f4f7; color: #111827; }
+html:not(.dark) .ai-app-sort-menu button.active { background: #fff8db; color: #705b00; }
+html:not(.dark) .ai-app-preview { border-color: #dfe3ea; background: #eef1f5; }
+html:not(.dark) .ai-app-preview-fallback { background: radial-gradient(circle at 50% 30%, #fff, #eef1f5 68%); color: #344054; }
+html:not(.dark) .ai-app-author-avatar { border-color: #d7dce5; background: #fff; color: #475467; }
+html:not(.dark) .ai-app-name-row h3 { color: #1f2937; }
+html:not(.dark) .ai-app-member svg path:last-child { stroke: #fff; }
+html:not(.dark) .ai-app-copy p,
+html:not(.dark) .ai-app-author,
+html:not(.dark) .ai-app-sentinel { color: #667085; }
+html:not(.dark) .ai-app-state button,
+html:not(.dark) .ai-app-sentinel button { border-color: #d7dce5; background: #fff; color: #344054; }
+html:not(.dark) .skeleton { background: linear-gradient(100deg, #edf0f4 20%, #fff 38%, #edf0f4 56%); background-size: 220% 100%; }
+
+@media (max-width: 767px) {
+  html.microi-ai-studio-page .VPNav { height: 76px; }
+  html.microi-ai-studio-page .VPNavBar {
+    width: calc(100% - 20px);
+    height: 54px;
+    min-height: 54px !important;
+    margin-top: 10px;
+    border-radius: 16px;
+  }
+  html.microi-ai-studio-page .VPNavBar > .container {
+    height: 52px !important;
+    min-height: 52px !important;
+    padding: 0 10px !important;
+  }
+  html.microi-ai-studio-page .VPNavBar .title,
+  html.microi-ai-studio-page .VPNavBarTitle,
+  html.microi-ai-studio-page .VPNavBarTitle .title,
+  html.microi-ai-studio-page .VPNavBar .content,
+  html.microi-ai-studio-page .VPNavBar .content-body,
+  html.microi-ai-studio-page .VPNavBarSearch,
+  html.microi-ai-studio-page .home-user-bar {
+    height: 52px !important;
+    min-height: 52px !important;
+    align-items: center !important;
+  }
+  html.microi-ai-studio-page .VPNavBar .content,
+  html.microi-ai-studio-page .VPNavBar .content-body {
+    gap: 4px;
+    min-width: 0;
+  }
+  html.microi-ai-studio-page .VPNavBarExtra { display: none !important; }
+  html.microi-ai-studio-page .VPNavBarSearch { margin-left: auto; }
+  html.microi-ai-studio-page .DocSearch-Button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0 !important;
+    justify-content: center;
+  }
+  html.microi-ai-studio-page .DocSearch-Button-Placeholder,
+  html.microi-ai-studio-page .DocSearch-Button-Keys { display: none !important; }
+  html.microi-ai-studio-page .VPNavBarHamburger {
+    width: 42px !important;
+    height: 52px !important;
+    padding: 0 9px !important;
+  }
+  html.microi-ai-studio-page .VPNavBarHamburger .container {
+    width: 22px !important;
+    height: 18px !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html.microi-ai-studio-page .VPNavBar,
+  html.microi-ai-studio-page .VPNavScreen { background: #202020 !important; backdrop-filter: none; }
+}

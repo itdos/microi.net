@@ -23,6 +23,15 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 - `microi_database` 将扩展数据库 key 映射到 `V8.Dbs.<DbKey>`。
 - `wf_*` 表存储工作流设计、节点、连线、实例、待办和历史。
 
+### 外部数据库结构发现
+
+- `microi_get_db_schema` 只读取当前吾码租户自身的 DIY/物理表结构，不接受第三方连接串。
+- 用户提供 MySQL、SQL Server、Oracle、PostgreSQL、达梦或人大金仓连接信息时，先用 `microi_list_database_types` 归一化类型，再用 `microi_inspect_external_database` 读取表、字段、类型、空值、默认值、主键和说明。
+- 临时读取不等于保存连接。只有用户明确确认后才能调用 `microi_save_database_connection`；结果与工作记录不得回显连接字符串。
+- 默认抽样使用只读的 `microi_query_external_database`。用户明确要求数据库管理级操作时，可使用独立的 `microi_execute_external_database` 执行 DML、DDL、存储过程和多语句；该接口必须由后端验证当前用户 `Level >= 9999`、显式确认并写脱敏审计。
+- 外部结构映射到吾码时仍需走 Manifest 计划、`dryRun:true`、确认写入和 `microi_validate_system`，不能把第三方物理 DDL 直接复制到吾码主库。
+- 大批量同步使用稳定业务键、唯一约束和 upsert；MCP 适合结构发现和抽样，持续搬运应生成接口引擎、Job 或 MQ 消费者。
+
 ## AI 应用持久化表创建规则（强制）
 
 - AI 创建的应用、业务模块或演示项目，只要需要持久化业务数据，默认必须通过 `microi_create_table`、Manifest + `microi_generate_system` 等 MCP 标准建模入口创建表，确保物理表、`diy_table` 和 `diy_field` 同步落地。不得只执行 `CREATE TABLE`、只导入物理表，或只写 `diy_table` 元数据。
