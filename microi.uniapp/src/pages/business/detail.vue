@@ -1247,7 +1247,20 @@
 				const sectionByTitle = new Map()
 				const used = new Set()
 				const appendSection = (title, fields) => {
-					const rows = fields.filter((field) => hasDisplayValue(this.detail[field.name]))
+					const rows = fields.map((field) => {
+						const name = String(field.name || '')
+						const nativeField = field.nativeField || this.fieldDefinitionMap.get(name
+							.toLowerCase()) || null
+						return {
+							...field,
+							label: field.label || nativeField?.Label || name,
+							format: field.format || (nativeField ? detailFieldFormat(nativeField) : ''),
+							nativeField
+						}
+					}).filter((field) =>
+						!this.isTenantMapCoordinateHelper(field) &&
+						(hasDisplayValue(this.detail[field.name]) || this.hasTenantDetailMap(field))
+					)
 					if (!rows.length) return
 					if (!sectionByTitle.has(title)) {
 						const section = {
@@ -1261,15 +1274,7 @@
 					rows.forEach((field) => {
 						const name = String(field.name || '')
 						if (!name || used.has(name.toLowerCase())) return
-						const nativeField = field.nativeField || this.fieldDefinitionMap.get(name
-							.toLowerCase()) || null
-						target.fields.push({
-							...field,
-							label: field.label || nativeField?.Label || name,
-							format: field.format || (nativeField ? detailFieldFormat(nativeField) :
-								''),
-							nativeField
-						})
+						target.fields.push(field)
 						used.add(name.toLowerCase())
 					})
 				}
@@ -1814,6 +1819,22 @@
 					form: this.detail || {},
 					state: {}
 				}, field.nativeField)
+			},
+			hasTenantDetailMap(field) {
+				const presentation = this.tenantDetailFieldPresentation(field)
+				return presentation.type === 'map' &&
+					Boolean(Number(presentation.latitude) && Number(presentation.longitude))
+			},
+			isTenantMapCoordinateHelper(field) {
+				const name = String(field && field.name || '')
+				const match = name.match(/^(.+)_(Lat|Lng)$/i)
+				if (!match) return false
+				const mapField = this.fieldDefinitionMap.get(match[1].toLowerCase())
+				if (!mapField) return false
+				return this.tenantDetailFieldPresentation({
+					name: mapField.Name,
+					nativeField: mapField
+				}).type === 'map'
 			},
 			tenantDetailMapMarkers(field) {
 				const presentation = this.tenantDetailFieldPresentation(field)
