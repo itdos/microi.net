@@ -75,7 +75,7 @@ namespace Microi.net
                     TryDropTargetDatabase(sourceBuilder);
                 }
                 Report(0, 8, "复制失败，已清理未完成的临时数据库");
-                Console.WriteLine($"Microi：准备主库空数据库失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "PrepareFailed", "准备主库空数据库失败", ex.ToString(), 3);
                 return new DosResult(0, null, "准备主库空数据库失败，已清理临时数据库。错误：" + ex.Message);
             }
         }
@@ -117,7 +117,7 @@ namespace Microi.net
                     TryDropTargetDatabase(sourceBuilder);
                 }
                 Report(0, 8, "脱敏失败，已删除可能含敏感数据的临时数据库");
-                Console.WriteLine($"Microi：执行空数据库脱敏失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "SanitizationFailed", "空数据库脱敏失败", ex.ToString(), 3);
                 return new DosResult(0, null, "执行脱敏 SQL 失败，已删除临时数据库。错误：" + ex.Message);
             }
         }
@@ -193,7 +193,7 @@ namespace Microi.net
             catch (Exception ex)
             {
                 Report(0, 8, "生成或上传数据库发布包失败");
-                Console.WriteLine($"Microi：发布主库空数据库失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "PublishFailed", "发布主库空数据库失败", ex.ToString(), 3);
                 return new DosResult(0, new
                 {
                     UploadedFiles = uploadedFiles
@@ -995,7 +995,7 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
             }
             catch (Exception cleanupEx)
             {
-                Console.WriteLine("Microi：清理未脱敏临时数据库失败：" + cleanupEx.Message);
+                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "DatabaseRelease", "TemporaryDatabaseCleanupFailed", "清理未脱敏临时数据库失败", cleanupEx.ToString(), 3);
             }
         }
 
@@ -1007,7 +1007,7 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
             }
             catch (Exception cleanupEx)
             {
-                Console.WriteLine("Microi：清理空数据库临时文件失败：" + cleanupEx.Message);
+                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "DatabaseRelease", "TemporaryFileCleanupFailed", "清理空数据库临时文件失败", cleanupEx.ToString(), 2);
             }
         }
 

@@ -27,6 +27,7 @@ html[data-mci-site-style="mainstream"] {
   --mci-main-inline-code-text: #174ea6;
   --mci-main-placeholder: #94a3b8;
   --mci-main-hover-border: #b9ccf8;
+  --mci-main-danger: #dc2626;
 
   --vp-layout-max-width: 100%;
   --vp-c-bg: #fff;
@@ -74,6 +75,7 @@ html.dark[data-mci-site-style="mainstream"] {
   --mci-main-inline-code-text: #b7ceff;
   --mci-main-placeholder: #718096;
   --mci-main-hover-border: #46659b;
+  --mci-main-danger: #fb7185;
 
   --vp-c-bg: #0b1120;
   --vp-c-bg-alt: #0f172a;
@@ -140,6 +142,10 @@ html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar 
   box-shadow: none !important;
 }
 
+html.dark[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar {
+  border-bottom-color: rgba(148, 163, 184, .16) !important;
+}
+
 html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar::after {
   display: none !important;
 }
@@ -183,7 +189,10 @@ html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page
 
 html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPNavBar .divider,
 html[data-mci-site-style="mainstream"] body:has(.VPHome):not(:has(.ai-login-page)) .VPNavBar .divider {
-  background-color: var(--mci-main-border) !important;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background-color: transparent !important;
 }
 
 /* 首页 Hero */
@@ -707,6 +716,10 @@ html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc li 
 html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .VPDoc a {
   color: var(--mci-main-primary-strong);
   font-weight: 650;
+}
+
+html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc .mci-doc-danger {
+  color: var(--mci-main-danger);
 }
 
 html[data-mci-site-style="mainstream"] body:not(:has(.ai-login-page)) .vp-doc :not(pre) > code {

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Microi.net;
 using Dos.Common;
 using System;
@@ -18,12 +17,10 @@ namespace Microi.net.Api
     public class GlobalExceptionHandler
     {
         private readonly RequestDelegate _next;
-        private readonly ILogger<GlobalExceptionHandler> _logger;
 
-        public GlobalExceptionHandler(RequestDelegate next, ILogger<GlobalExceptionHandler> logger)
+        public GlobalExceptionHandler(RequestDelegate next)
         {
             _next = next;
-            _logger = logger;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -40,12 +37,8 @@ namespace Microi.net.Api
 
         private async Task HandleExceptionAsync(HttpContext context, Exception ex)
         {
-            // 标准化日志输出 + 异步写MongoDB
+            // 请求级异常进入异步MongoDB日志，不再污染平台启动/致命故障Console。
             var exceptionContext = $"{context.Request.Method} {context.Request.Path}";
-            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】全局异常捕获 [{exceptionContext}]: {ex.Message}");
-            _logger.LogError(ex, $"全局异常捕获: {exceptionContext}");
-
-            // 异步写日志到MongoDB
             _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
             {
                 Type = "全局异常",

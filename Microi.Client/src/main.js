@@ -38,7 +38,7 @@ import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
 import { reportApiServiceFailure } from "./utils/api-service-status.js";
 // 主题色工具 - 360 极速浏览器兼容方案
-import { initThemeColor } from "./utils/theme-color";
+import { initThemeColor, setThemeColor } from "./utils/theme-color";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
@@ -122,6 +122,8 @@ app.component('font-awesome-icon', FontAwesomeIcon);
 // ve-plus（WebOS 桌面弹层/上下文菜单）
 import VePlus from 've-plus';
 import 've-plus/dist/ve-plus.css';
+// 管理后台主题桥接层必须晚于第三方组件样式加载，保证浅色/暗色令牌生效。
+import './styles/mci-admin-theme.scss';
 app.use(VePlus);
 // WebOS 样式（使用 glob 动态加载，webos 目录不存在时静默跳过）
 import.meta.glob('@/views/webos/styles/*.scss', { eager: true });
@@ -152,44 +154,6 @@ window.__VUE_APP__ = app;
 // 存储定时器引用，用于应用销毁时清理
 const appTimers = [];
 
-function applyThemeVariables(color) {
-    if (!color) return;
-    // 主题色变量
-    document.documentElement.style.setProperty("--color-primary", color);
-    document.documentElement.style.setProperty("--theme-color", color);
-    document.documentElement.style.setProperty("--el-color-primary", color);
-
-    // 计算主题色亮度，自动设置文字颜色
-    let r, g, b;
-    if (color.startsWith("#")) {
-        const hex = color.replace("#", "");
-        r = parseInt(hex.substr(0, 2), 16);
-        g = parseInt(hex.substr(2, 2), 16);
-        b = parseInt(hex.substr(4, 2), 16);
-    } else if (color.startsWith("rgb")) {
-        const rgb = color.match(/\d+/g) || [0, 0, 0];
-        r = parseInt(rgb[0]);
-        g = parseInt(rgb[1]);
-        b = parseInt(rgb[2]);
-    } else {
-        r = g = b = 0;
-    }
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    const textColor = brightness > 180 ? "#303133" : "#ffffff";
-    document.documentElement.style.setProperty("--color-primary-text", textColor);
-
-    // 侧边栏主题变量
-    document.documentElement.style.setProperty("--sidebar-bg-color", color);
-    if (brightness > 180) {
-        document.documentElement.style.setProperty("--sidebar-text-color", "rgba(48, 49, 51, 0.9)");
-        document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(0, 0, 0, 0.08)");
-        document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(0, 0, 0, 0.12)");
-    } else {
-        document.documentElement.style.setProperty("--sidebar-text-color", "rgba(255, 255, 255, 0.9)");
-        document.documentElement.style.setProperty("--sidebar-hover-bg", "rgba(255, 255, 255, 0.15)");
-        document.documentElement.style.setProperty("--sidebar-active-bg", "rgba(255, 255, 255, 0.25)");
-    }
-}
 // 初始化逻辑
 async function initApp() {
     // 初始化 LocalStorage 管理器（迁移旧数据）
@@ -214,13 +178,13 @@ async function initApp() {
 
     // 初始化主题色（兼容生产环境 CSS 顺序差异）
     const themeColor = diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff";
-    applyThemeVariables(themeColor);
+    setThemeColor(themeColor);
 
     // 监听主题变化并实时应用
     watch(
         () => [diyStore.themeColor, diyStore.SysConfig?.ThemeColor],
         ([localColor, sysColor]) => {
-            applyThemeVariables(localColor || sysColor || "#409eff");
+            setThemeColor(localColor || sysColor || "#409eff");
         },
         { immediate: false }
     );

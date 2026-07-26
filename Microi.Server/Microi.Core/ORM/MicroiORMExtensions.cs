@@ -133,7 +133,6 @@ namespace Microi.net
                     }
 
                     var msg = $"慢SQL[{method}] 耗时{elapsedMs}ms（阈值{DiyCommon.SlowSqlThresholdMs}ms）: {sqlText}";
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{msg}");
                     _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     {
                         Type = "数据库慢SQL",
@@ -147,7 +146,6 @@ namespace Microi.net
                     });
                 };
 
-                Console.WriteLine($"Microi：【成功】注入【Dos.ORM数据库引擎】成功！");
                 return services;
             }
             catch (Exception ex)

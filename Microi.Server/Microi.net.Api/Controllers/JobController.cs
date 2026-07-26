@@ -87,7 +87,7 @@ namespace Microi.net.Api
             {
 
 
-                Console.WriteLine("JobController获取所有任务异常:" + ex);
+                MicroiEngine.QueueSystemLog(jobModel?.OsClient, "Job", "ControllerQueryFailed", "任务调度接口查询失败", ex.ToString(), 2);
                 var result = new DosResult()
                 {
                     Code = 0,
@@ -137,7 +137,7 @@ namespace Microi.net.Api
             {
 
 
-                Console.WriteLine("JobController获取所有任务异常:" + ex);
+                MicroiEngine.QueueSystemLog(jobModel?.OsClient, "Job", "ControllerQueryByNamesFailed", "任务调度接口按名称查询失败", ex.ToString(), 2);
                 var result = new DosResult()
                 {
                     Code = 0,

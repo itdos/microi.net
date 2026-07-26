@@ -668,7 +668,11 @@ export default {
     padding: 8px 10px;
     border: 1px solid var(--mci-border-color, #ebeef5);
     border-radius: 6px;
-    background: linear-gradient(135deg, rgba(var(--mci-primary-rgb, 255, 90, 40), 0.09), rgba(255, 255, 255, 0.88));
+    background: linear-gradient(
+        135deg,
+        rgba(var(--mci-primary-rgb, 255, 90, 40), 0.09),
+        rgba(var(--mci-surface-rgb, 255, 255, 255), 0.96)
+    );
     color: var(--mci-text-color, #303133);
 
     .el-icon {

@@ -177,6 +177,7 @@ namespace Microi.net.Api.Controllers
             var lastElapsedMs = 0L;
             string formEngineKey = null;
             string tableRowId = null;
+            string osClient = null;
 
             void MarkStage(string stage)
             {
@@ -192,7 +193,7 @@ namespace Microi.net.Api.Controllers
 
             JsonResult TimedJson(DosResult result)
             {
-                AppendMergedSubmitTimings(result, stageTimings, totalSw, isStart, formEngineKey, tableRowId);
+                AppendMergedSubmitTimings(result, stageTimings, totalSw, isStart, formEngineKey, tableRowId, osClient);
                 return Json(result);
             }
 
@@ -204,7 +205,7 @@ namespace Microi.net.Api.Controllers
 
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
             var currentUser = currentTokenDynamic?.CurrentUser;
-            string osClient = currentTokenDynamic?.OsClient;
+            osClient = currentTokenDynamic?.OsClient;
             MarkStage("get-token");
 
             JObject formPayload = param["Form"] as JObject;
@@ -298,7 +299,7 @@ namespace Microi.net.Api.Controllers
 
                 if (formResult == null || formResult.Code != 1)
                 {
-                    try { trans.Rollback(); } catch (Exception rollbackEx) { Console.WriteLine("Microi：【警告】工作流合并提交保存表单失败后回滚异常：" + rollbackEx.Message); }
+                    try { trans.Rollback(); } catch (Exception rollbackEx) { MicroiEngine.QueueSystemLog(osClient, "Workflow", "RollbackAfterFormFailureFailed", "工作流合并提交回滚失败", rollbackEx.ToString(), 2, false, tableRowId); }
                     MarkStage("rollback-form-failed");
                     return TimedJson(formResult ?? new DosResult(0, null, "保存表单失败"));
                 }
@@ -318,7 +319,7 @@ namespace Microi.net.Api.Controllers
                     }
                     catch (Exception savedIdEx)
                     {
-                        Console.WriteLine("Microi：【警告】工作流合并提交解析表单保存主键失败：" + savedIdEx.Message);
+                        MicroiEngine.QueueSystemLog(osClient, "Workflow", "SavedIdParseFailed", "工作流合并提交解析表单主键失败", savedIdEx.ToString(), 2, false, tableRowId);
                     }
                 }
                 if (string.IsNullOrEmpty(savedId))
@@ -352,7 +353,7 @@ namespace Microi.net.Api.Controllers
 
                 if (wfResult == null || wfResult.Code != 1)
                 {
-                    try { trans.Rollback(); } catch (Exception rollbackEx) { Console.WriteLine("Microi：【警告】工作流合并提交流程执行失败后回滚异常：" + rollbackEx.Message); }
+                    try { trans.Rollback(); } catch (Exception rollbackEx) { MicroiEngine.QueueSystemLog(osClient, "Workflow", "RollbackAfterWorkflowFailureFailed", "工作流执行失败后的事务回滚异常", rollbackEx.ToString(), 2, false, tableRowId); }
                     MarkStage("rollback-workflow-failed");
                     return TimedJson(wfResult ?? new DosResult(0, null, isStart ? "启动工作流失败" : "发送工作流失败"));
                 }
@@ -377,7 +378,7 @@ namespace Microi.net.Api.Controllers
             {
                 if (trans != null)
                 {
-                    try { trans.Rollback(); } catch (Exception rollbackEx) { Console.WriteLine("Microi：【警告】工作流合并提交异常后回滚失败：" + rollbackEx.Message); }
+                    try { trans.Rollback(); } catch (Exception rollbackEx) { MicroiEngine.QueueSystemLog(osClient, "Workflow", "RollbackAfterExceptionFailed", "工作流合并提交异常后的事务回滚失败", rollbackEx.ToString(), 2, false, tableRowId); }
                 }
                 MarkStage("rollback-exception");
                 return TimedJson(new DosResult(0, null, "事务执行失败：" + ex.Message));
@@ -386,12 +387,12 @@ namespace Microi.net.Api.Controllers
             {
                 if (trans != null)
                 {
-                    try { trans.Close(); } catch (Exception closeEx) { Console.WriteLine("Microi：【警告】工作流合并提交事务关闭失败：" + closeEx.Message); }
+                    try { trans.Close(); } catch (Exception closeEx) { MicroiEngine.QueueSystemLog(osClient, "Workflow", "TransactionCloseFailed", "工作流合并提交事务关闭失败", closeEx.ToString(), 2, false, tableRowId); }
                 }
             }
         }
 
-        private static void AppendMergedSubmitTimings(DosResult result, List<Dictionary<string, object>> stageTimings, Stopwatch totalSw, bool isStart, string formEngineKey, string tableRowId)
+        private static void AppendMergedSubmitTimings(DosResult result, List<Dictionary<string, object>> stageTimings, Stopwatch totalSw, bool isStart, string formEngineKey, string tableRowId, string osClient)
         {
             if (totalSw.IsRunning)
             {
@@ -432,7 +433,7 @@ namespace Microi.net.Api.Controllers
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Microi：【警告】工作流合并提交慢日志写入失败：" + ex.Message);
+                    MicroiEngine.QueueSystemLog(osClient, "Workflow", "SlowLogWriteFailed", "工作流合并提交慢日志写入失败", ex.ToString(), 2, false, tableRowId);
                 }
             }
         }

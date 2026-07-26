@@ -13,6 +13,7 @@ import { ElConfigProvider } from "element-plus";
 import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
+import { getQueryObject } from "@/utils/index.js";
 import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
@@ -100,9 +101,6 @@ export default {
 
         // 检测是否在小程序 webview 中运行（用于隐藏顶部/底部菜单）
         self.diyStore.detectMiniProgram();
-
-        // 初始化主题色的文字颜色变量
-        this.initThemeColorDefaults();
 
         // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
         this.restoreMciMode();
@@ -230,39 +228,9 @@ export default {
                 if (mode !== 'light' && mode !== 'dark') {
                     mode = 'light';
                 }
-                // 通过 setThemeMode 应用：暗色时会基于当前主题色生成主题色调暗色调色板
+                // 通过统一入口恢复浅色/暗色，并同步当前 palette 的全部令牌。
                 applyThemeMode(mode);
             } catch (e) {}
-        },
-        // 初始化主题色的文字颜色变量
-        initThemeColorDefaults() {
-            // 获取当前计算出的主题色
-            const computedStyle = window.getComputedStyle(document.documentElement);
-            const primaryColor = computedStyle.getPropertyValue('--color-primary').trim() || '#409eff';
-
-            // 计算亮度
-            const brightness = this.getColorBrightness(primaryColor);
-            const textColor = brightness > 180 ? '#303133' : '#ffffff';
-
-            // 设置--color-primary-text变量
-            document.documentElement.style.setProperty('--color-primary-text', textColor);
-        },
-        // 计算颜色亮度 (0-255)
-        getColorBrightness(color) {
-            let r, g, b;
-            if (color.startsWith('#')) {
-                const hex = color.replace('#', '');
-                r = parseInt(hex.substring(0, 2), 16);
-                g = parseInt(hex.substring(2, 4), 16);
-                b = parseInt(hex.substring(4, 6), 16);
-            } else if (color.startsWith('rgb')) {
-                const rgb = color.match(/\d+/g);
-                r = parseInt(rgb[0]);
-                g = parseInt(rgb[1]);
-                b = parseInt(rgb[2]);
-            }
-            // 使用相对亮度公式计算亮度
-            return (r * 299 + g * 587 + b * 114) / 1000;
         },
         GetAppClass: function () {
             var result = "";

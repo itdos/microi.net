@@ -262,7 +262,6 @@ import { buildDefaultRemoteData } from '../utils/util.js'
 import { EventBus } from '../utils/eventBus.js'
 import { usePrintEngineStore } from '../stores/printEngine'
 import { get } from '../utils/axiosInstance'
-import { useDark, useToggle } from '@vueuse/core'
 import { isObjectOrArray } from '../utils/util'
 const printEngineStore = usePrintEngineStore()
 
@@ -317,10 +316,6 @@ import 'jsoneditor/dist/jsoneditor.css'
 const DiyCodeEditor = defineAsyncComponent(() =>
   import('@/views/form-engine/diy-field-component/diy-code-editor.vue')
 )
-
-//是否暗黑模式
-const isDark = useDark()
-isDark.value = false
 
 const jsonEditorOption = {
   mode: 'code',

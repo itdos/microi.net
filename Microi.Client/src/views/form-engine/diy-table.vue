@@ -460,6 +460,7 @@
                     style="width: 100%"
                     :show-summary="StatisticsFields != null"
                     :summary-method="StatisticsFieldsMethod"
+                    :tooltip-options="{ popperClass: 'diy-table-overflow-tooltip' }"
                     @sort-change="DiyTableRowSortChange"
                     :class="[
                         'clear no-border-outside table-table table-data diy-table-' + CurrentDiyTableModel.Name,

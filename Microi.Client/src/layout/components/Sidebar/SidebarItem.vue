@@ -165,9 +165,11 @@ export default {
 
 <style scoped>
 .submenu-title-link {
-    display: inline-flex;
+    display: flex;
+    flex: 1;
+    min-width: 0;
     align-items: center;
-    width: 100%;
+    width: auto;
     height: 100%;
 }
 </style>

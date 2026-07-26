@@ -126,6 +126,7 @@ export default {
             // ========== 打开模式 ==========
             DialogType: "", //Dialog、Drawer、Page
             Width: "",
+            Height: "",
 
             // ========== 表相关 ==========
             TableId: "",

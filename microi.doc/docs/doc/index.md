@@ -28,9 +28,25 @@
 
 强大的 [**API 接口引擎**](https://microi.net/doc/v8-engine/api-engine)，在线使用 JavaScript 编写后端 API 接口，支持[**在线 AI 编程**](https://microi.net/doc/v8-engine/ai-apiengine)与[**本地 AI 编程（VS Code 插件）**](https://microi.net/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件)。
 
+## 原官网首页能力概览
+
+以下内容由旧版官网首页完整迁移而来。新首页专注于 Microi AI Studio 与 AI 应用发现，这些产品信息继续在文档中长期维护。
+
+| 概览 | 说明 |
+|---|---|
+| **持续演进** | 平台始于 2014 年，已有 10+ 年持续产品演进；提供 20+ 核心系统引擎，支持 AI 零代码编程，并采用 MIT 开放源码协议。 |
+| **AI 编程、数据分析** | VS Code 插件一键拉取业务代码 + 数据库结构，自动为 VS Code / Codex / Copilot / Claude / Cursor 生成知识库——AI 精准了解你的 V8 API 和每一张数据库表，AI 零代码编程保存即部署，无需编译发布。AI 数据分析默认使用大模型关键词扩展、权限感知 Schema 搜索与精确字段回读；向量数据库仅作为可选增强。支持 AI 训练、AI 微调、AI 提示词管理。接入 OpenClaw 小龙虾，支持远程集群管理。 |
+| **API 接口引擎** | 在线使用 JavaScript 编写后端 API 接口，支持 AI 在线编程 + VS Code 本地 AI 编程。无需编译发布，保存即生效；支持 Get、Post 请求，支持返回 JSON、字符串、文件、HTML 等，并支持自定义接口地址、分布式锁、权限、自定义扩展函数。 |
+| **系统引擎** | AI 引擎、V8 引擎、表单引擎、接口引擎、界面引擎、打印引擎、工作流引擎、Office 引擎、模块引擎、模板引擎、采集引擎、调度引擎、数据源引擎、SaaS 引擎、搜索引擎、消息队列引擎、IoT 物联网 MQTT 引擎、报表引擎、3D 引擎、goView 数据大屏、定制组件、应用商城、多数据库扩展、微服务、任务调度、自定义导出模板、单点登录、聊天系统、公众号平台管理等。 |
+| **分布式架构** | 支持 Docker、K8S、Jenkins、Rancher、CI/CD、RabbitMQ、Redis 分布式缓存、ElasticSearch、MongoDB、OSS / MinIO / Amazon S3 分布式存储及分布式任务调度；所有系统引擎均按分布式部署设计。 |
+| **跨平台、跨数据库、跨语言** | 支持 Linux、Windows、国产操作系统，支持阿里云、腾讯云与本地化部署；支持 MySQL 5.5+、SQL Server 2000+、Oracle 11g+、达梦 DM8、PostgreSQL 17+、人大金仓 KingbaseES V9+、SQLite、MS Access 等数据库，以及分库分表、读写分离、多主同步；支持 gRPC，并支持 .NET、Java、Python、PHP 等二次开发。 |
+| **无限制与开放能力** | 不限制用户数、表单数、数据量、数据库数量；前端 100% 开源、后端 99% 开源，支持 Vue、React、Angular 与 .NET 二次开发。 |
+
+> 从业务想法到企业级应用，Microi吾码围绕 AI 编程、低代码建模、系统集成与私有化交付，提供清晰、可扩展的数字化能力底座。
+
 | 资源 | 地址 |
 |---|---|
-| 🌐 官网 | [https://microi.net](https://microi.net) 【<font color="red">支持在线注册免费使用</font>】 |
+| 🌐 官网 | [https://microi.net](https://microi.net) 【<span class="mci-doc-danger">支持在线注册免费使用</span>】 |
 | 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
 | 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |

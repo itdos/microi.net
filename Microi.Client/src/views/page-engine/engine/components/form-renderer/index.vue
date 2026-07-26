@@ -76,16 +76,12 @@ import {
 import { widgetList, widgetOption } from '../../utils/builtWidget'
 
 import { PAGE_ENGINE_RENDER_CONTEXT_KEY, usePageEngineStore } from '../../stores/pageEngine'
-import { useDark } from '@vueuse/core'
 import { useDiyStore } from '@/pinia'
 
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
 
 const diyStore = useDiyStore()
-
-//是否暗黑模式
-const isDark = useDark()
 
 // 移动端判断及顶部信息
 const isPhoneView = computed(() => diyStore.IsPhoneView)
@@ -214,9 +210,6 @@ onActivated(() => {
 
 onMounted(() => {
   window.addEventListener('resize', syncRuntimeMobileMode, { passive: true })
-  //加载暗黑模式
-  isDark.value = formData.value.JsonObj?.formConfig?.dark
-
   // 使用提取的函数设置定时刷新
   setupRefreshInterval()
 
@@ -277,9 +270,6 @@ onMounted(() => {
         defaultFormJson.JsonObj.formConfig.mobile = false
       }
       pageEngineStore.updateFormData(defaultFormJson)
-
-      //加载暗黑模式
-      isDark.value = defaultFormJson.JsonObj?.formConfig?.dark
 
       let i = defaultFormJson.JsonObj?.formConfig?.autoRefresh * 1000
       if (

@@ -11,7 +11,7 @@ description: Microi V8 调试与日志指南。用于排查接口引擎、V8 事
 
 | 通道 | 何处看 | 用途 |
 |------|--------|------|
-| `console.log` / `console.error` | docker logs / 服务器控制台 | 长期跟踪、性能日志 |
+| 后端 V8 的 `console.log` / `console.error` | 租户系统日志（MongoDB）；MCP/调试执行同时返回当次 `ConsoleOutput` | 临时诊断、性能日志 |
 | `DataAppend.DebugLog`（返回给前端） | 浏览器开发者工具 / Postman 响应 | 当次请求的关键节点、变量值 |
 | `V8.Method.AddSysLog({...})` | 系统日志页 / `sys_log` 表 | 业务操作审计、第三方回调记录 |
 
@@ -171,18 +171,15 @@ function fail(stage, message, detail) {
 
 - 在身份交换、AccessToken、手机号/用户资料交换、账号匹配、注册/更新、Token 签发前维护明确阶段名，所有显式失败和顶层 `catch` 都走同一个 `fail`。
 - 日志保留第三方 `errcode/errmsg`，但先脱敏；禁止记录 Secret、AccessToken、授权 code、LoginCode、OpenId、完整手机号和用户 Token。
-- `V8.Method.AddSysLog` 写 MongoDB 系统日志，适合 `Code=0` 仍需保留的失败记录；同时可用 `console.error` 作为容器日志兜底。
-- 前端响应显示同一个追踪号，排查时先按追踪号查系统日志，再结合容器日志和第三方错误码定位。
+- `V8.Method.AddSysLog` 写 MongoDB 系统日志，适合 `Code=0` 仍需保留的结构化失败记录；`console.error` 也按当前 `OsClient` 进入 MongoDB，但不替代带追踪号的业务审计日志。
+- 前端响应显示同一个追踪号，排查时先按追踪号查系统日志，再结合第三方错误码定位。
 
-## console 在 Docker 中查看
+## 后端 V8 console 的去向
 
-```bash
-docker logs -f microi-net.api  --tail 100
-# 或者
-docker compose logs -f api
-```
-
-> 在 Linux 部署时 `console.log/error` 直接输出到容器 stdout/stderr，可被日志采集系统（Loki/ELK）收集。
+- 普通接口引擎和表单后端 V8 的 `console.log/info/warn/error` 按租户写入 MongoDB 系统日志，`Source/TargetType` 为 `V8`，可按接口 Key 或事件名定位。
+- MCP 远程执行和 V8 调试会通过请求级上下文捕获当次输出并返回 `ConsoleOutput`；不得用进程级 `Console.SetOut`，否则并发请求会互相截取日志。
+- Docker/服务器控制台只保留影响平台启动、主租户、日志管道或进程存活的关键日志，不再作为普通 V8 调试日志入口。
+- 前端 V8 的 `console.log` 仍在浏览器开发者工具中查看，与后端日志通道无关。
 
 ## 性能跟踪（毫秒级耗时）
 

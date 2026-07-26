@@ -345,6 +345,16 @@ try {
 - 收到 `TokenReplaced` 时先检查同一终端是否已有新 Token，避免并发旧响应误清新登录态。
 - 用户提示可以显示过期时长、终端类型和租户 Key，但日志、Toast、URL、截图禁止输出完整 Token。
 
+## 10. Jint 运行时升级边界
+
+升级 Jint 时必须逐版阅读官方 release notes，并至少验证以下兼容面，不能只以编译通过作为验收：
+
+- `Engine` 非线程安全；每次执行使用独立 Engine。`setTimeout` 等回调必须在当前请求内由同一 Engine 串行排空后再释放，禁止 `Task.Run` 捕获 Engine 跨线程或在响应后继续执行。需要可靠后台执行时改用 MQ、Job 或 outbox，不把进程内定时器当作持久任务。
+- 重复脚本使用有上限的 `Engine.PrepareScript` 缓存；`Prepared<Script>` 可跨 Engine 复用。Promise 使用 `EvaluateAsync` / `UnwrapIfPromiseAsync` 和请求取消令牌，禁止在 ASP.NET 请求线程上使用阻塞的 `UnwrapIfPromise`。
+- 内存 MB 转字节前先提升为 `long`，例如 `checked((long)mb * 1024L * 1024L)`；2GB 用 `int` 相乘会溢出并让限制失真。
+- Jint 4.14 默认把 CLR 数组改为 `LiveView`，并默认缓存最近对象包装器。Microi 为兼容历史脚本显式使用 `ArrayConversionMode.Copy + CacheRecentObjectWrappers=false`；若以后切到 LiveView，必须覆盖宿主数组被 JS 修改、固定长度 push/pop 报错、`Array.isArray=false` 和重复读取身份缓存测试。
+- 引擎约束必须在平台宿主对象注入完成、用户脚本执行前 `Constraints.Reset()`；同时覆盖超时、语句数、递归、内存、Promise 取消及 CLR 宿主边界返回后的再次检查。
+
 ## 安全检查清单
 
 - [ ] 所有数据库查询使用参数化（`_Where` 或 `@p0`）
@@ -362,6 +372,7 @@ try {
 - [ ] catch 块不暴露内部错误给前端
 - [ ] 外部数据库连接串不来自普通请求、不回显，DbKey 无重复且不占用 V8.Dbs 保留名称
 - [ ] 外部附件管理入口硬校验 `Level >= 9999`、显式确认、来源脱敏，流式迁移并按源附件 Id 幂等回读
+- [ ] Jint 升级覆盖 Prepared 缓存、非阻塞 Promise、long 内存换算、数组互操作兼容和同线程定时器生命周期
 
 ### 复盘：管理员设计器和升级任务的嵌套 FormEngine 写入被误判
 

@@ -10,7 +10,6 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMicroiWeChat, MicroiWeChat>();
-                Console.WriteLine("Microi：【成功】注入【微信公众号平台】插件成功！");
                 return services;
             }
             catch (Exception ex)

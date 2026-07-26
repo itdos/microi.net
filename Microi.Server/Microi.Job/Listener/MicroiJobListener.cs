@@ -22,7 +22,10 @@ namespace Microi.net
         /// <exception cref="NotImplementedException"></exception>
         public async Task JobExecutionVetoed(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
-            Console.WriteLine($"Microi：【{Name}】-【JobExecutionVetoed】-【{context.JobDetail.Key.Name}】-【工作执行被否决】");
+            var osClient = context.JobDetail.JobDataMap.ContainsKey(MicroiJobConst.OsClient)
+                ? context.JobDetail.JobDataMap.GetString(MicroiJobConst.OsClient)
+                : OsClientDefault.OsClient;
+            MicroiEngine.QueueSystemLog(osClient, "Job", "ExecutionVetoed", "定时任务执行被否决", "Quartz监听器拒绝了本次执行。", 2, false, context.JobDetail.Key.Name);
             await Task.CompletedTask;
         }
 

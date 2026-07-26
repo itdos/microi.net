@@ -423,7 +423,14 @@ export default {
 <style lang="scss" scoped>
 .microi-calendar {
     padding: 0px;
-    background: #fff;
+    --fc-page-bg-color: var(--el-bg-color, #fff);
+    --fc-neutral-bg-color: var(--el-fill-color-light, #f8fafc);
+    --fc-neutral-text-color: var(--el-text-color-secondary, #64748b);
+    --fc-border-color: var(--el-border-color, #e8ecf1);
+    --fc-list-event-hover-bg-color: var(--el-fill-color-light, #f8fafc);
+    --fc-today-bg-color: var(--mci-bg-primary-soft, rgba(64, 158, 255, 0.08));
+    background: var(--el-bg-color, #fff);
+    color: var(--el-text-color-regular, #334155);
     border-radius: 8px;
     display: flex;
     flex-direction: column;
@@ -446,7 +453,7 @@ export default {
         .fc-toolbar-title {
             font-size: 1.3em;
             font-weight: 700;
-            color: #1d2129;
+            color: var(--el-text-color-primary, #1d2129);
             letter-spacing: 0.5px;
         }
         .fc-button {
@@ -472,23 +479,24 @@ export default {
         .fc-scrollgrid {
             border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #e8ecf1 !important;
+            border: 1px solid var(--el-border-color, #e8ecf1) !important;
+            background: var(--el-bg-color, #fff);
         }
         .fc-scrollgrid td,
         .fc-scrollgrid th {
-            border-color: #e8ecf1 !important;
+            border-color: var(--el-border-color, #e8ecf1) !important;
         }
         .fc-col-header-cell {
             padding: 10px 0;
             font-weight: 600;
             font-size: 13px;
-            color: #475569;
-            background: linear-gradient(180deg, #f8faff 0%, #f1f5fb 100%);
+            color: var(--el-text-color-regular, #475569);
+            background: var(--mci-gradient-surface, linear-gradient(180deg, #f8faff 0%, #f1f5fb 100%));
         }
         .fc-daygrid-day-number {
             font-size: 13px;
             font-weight: 500;
-            color: #475569;
+            color: var(--el-text-color-regular, #475569);
             padding: 6px 10px;
         }
         .fc-day-today {

@@ -1224,16 +1224,16 @@ export default {
 
 // ====== 主Tab样式 ======
 .main-tabs {
-    background: #fff;
+    background: var(--el-bg-color, #fff);
     border-radius: 12px;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
     min-height: 100%;
 
     :deep(.el-tabs__header) {
-        background: linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%);
+        background: var(--mci-gradient-surface, linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%));
         margin: 0;
         padding: 0 20px;
-        border-bottom: 1px solid #ebeef5;
+        border-bottom: 1px solid var(--el-border-color, #ebeef5);
         border-radius: 12px 12px 0 0;
     }
 
@@ -1245,7 +1245,7 @@ export default {
         height: 54px;
         line-height: 54px;
         font-size: 15px;
-        color: #606266;
+        color: var(--el-text-color-regular, #606266);
         transition: all 0.3s;
 
         &.is-active {
@@ -1391,14 +1391,14 @@ export default {
 }
 
 .stat-card {
-    background: #fff;
+    background: var(--el-bg-color-overlay, #fff);
     border-radius: 14px;
     padding: 18px 16px;
     display: flex;
     align-items: center;
     gap: 14px;
     cursor: pointer;
-    border: 2px solid #f0f2f5;
+    border: 2px solid var(--el-border-color, #f0f2f5);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 
@@ -1409,7 +1409,7 @@ export default {
 
     &.active {
         border-color: var(--el-color-primary, #409eff);
-        background: linear-gradient(135deg, rgba(64, 158, 255, 0.04) 0%, rgba(64, 158, 255, 0.01) 100%);
+        background: var(--mci-bg-primary-soft, linear-gradient(135deg, rgba(64, 158, 255, 0.04) 0%, rgba(64, 158, 255, 0.01) 100%));
         box-shadow: 0 4px 16px rgba(64, 158, 255, 0.12);
     }
 }
@@ -1439,14 +1439,14 @@ export default {
 .stat-count {
     font-size: 24px;
     font-weight: 700;
-    color: #1d2129;
+    color: var(--el-text-color-primary, #1d2129);
     line-height: 1.2;
     font-variant-numeric: tabular-nums;
 }
 
 .stat-label {
     font-size: 12px;
-    color: #86909c;
+    color: var(--el-text-color-secondary, #86909c);
     margin-top: 3px;
     white-space: nowrap;
 }
@@ -1470,8 +1470,8 @@ export default {
     overflow: hidden;
 
     :deep(.el-table__header th) {
-        background: #f8fafc !important;
-        color: #475569;
+        background: var(--el-fill-color-light, #f8fafc) !important;
+        color: var(--el-text-color-regular, #475569);
         font-weight: 600;
         font-size: 13px;
     }
@@ -1494,8 +1494,8 @@ export default {
 }
 
 .notice-item {
-    background: #fff;
-    border: 1px solid #ebeef5;
+    background: var(--el-bg-color-overlay, #fff);
+    border: 1px solid var(--el-border-color, #ebeef5);
     border-radius: 10px;
     padding: 14px 18px;
     cursor: pointer;
@@ -1525,7 +1525,7 @@ export default {
 .notice-title {
     font-size: 13px;
     font-weight: 500;
-    color: #303133;
+    color: var(--el-text-color-primary, #303133);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1533,16 +1533,16 @@ export default {
 
 .notice-date {
     font-size: 12px;
-    color: #909399;
+    color: var(--el-text-color-secondary, #909399);
     flex-shrink: 0;
 }
 
 .notice-body {
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px dashed #ebeef5;
+    border-top: 1px dashed var(--el-border-color, #ebeef5);
     font-size: 13px;
-    color: #606266;
+    color: var(--el-text-color-regular, #606266);
     line-height: 1.8;
     word-break: break-all;
 }
@@ -1567,7 +1567,7 @@ export default {
     min-width: 0;
     font-size: 15px;
     font-weight: 600;
-    color: #1d2129;
+    color: var(--el-text-color-primary, #1d2129);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1693,7 +1693,7 @@ export default {
 
     :deep(.el-input__wrapper) {
         border-radius: 20px;
-        background: #f5f7fa;
+        background: var(--el-fill-color-light, #f5f7fa);
         box-shadow: none;
         &:hover, &.is-focus {
             box-shadow: 0 0 0 1px var(--el-color-primary) inset;
@@ -1702,18 +1702,18 @@ export default {
 }
 
 .wf-card {
-    background: #fff;
+    background: var(--el-bg-color-overlay, #fff);
     border-radius: 12px;
     padding: 14px 16px;
     margin-bottom: 5px;
-    border: 1px solid #f0f2f5;
+    border: 1px solid var(--el-border-color, #f0f2f5);
     transition: all 0.2s;
     cursor: pointer;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 
     &:active {
         transform: scale(0.99);
-        background: #fafbfc;
+        background: var(--el-fill-color-light, #fafbfc);
     }
 }
 
@@ -1742,7 +1742,7 @@ export default {
     flex: 1;
     font-size: 15px;
     font-weight: 600;
-    color: #1d2129;
+    color: var(--el-text-color-primary, #1d2129);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1750,7 +1750,7 @@ export default {
 
 .wf-card-body {
     font-size: 13px;
-    color: #606266;
+    color: var(--el-text-color-regular, #606266);
     line-height: 1.6;
     margin-bottom: 8px;
     overflow: hidden;
@@ -1777,7 +1777,7 @@ export default {
     gap: 10px;
     margin-bottom: 5px;
     font-size: 12px;
-    color: #86909c;
+    color: var(--el-text-color-secondary, #86909c);
 }
 
 .wf-card-meta-item {
@@ -1795,13 +1795,13 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid #f5f7fa;
+    border-top: 1px solid var(--el-border-color, #f5f7fa);
     padding-top: 10px;
 }
 
 .wf-card-time {
     font-size: 12px;
-    color: #c0c4cc;
+    color: var(--el-text-color-placeholder, #c0c4cc);
 }
 
 .wf-card-actions {
@@ -1843,8 +1843,8 @@ export default {
             padding: 12px 16px;
             padding-top: calc(12px + var(--status-bar-height, 0px));
             margin-bottom: 0;
-            border-bottom: 1px solid #f0f0f0;
-            background: #fff;
+            border-bottom: 1px solid var(--el-border-color, #f0f0f0);
+            background: var(--el-bg-color-overlay, #fff);
         }
 
         .el-drawer__body {

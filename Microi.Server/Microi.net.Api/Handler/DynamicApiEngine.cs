@@ -127,18 +127,18 @@ namespace Microi.net.Api
                         await Task.WhenAll(tasks);
                     }
                     var count = sysApiEngineList != null ? sysApiEngineList.Count : 0;
-                    Console.WriteLine($"Microi：【成功】【{clientModel.OsClient}】接口引擎缓存初始化成功！共缓存 {count} 个接口。");
+                    MicroiEngine.QueueSystemLog(clientModel.OsClient, "ApiEngine", "RouteCacheInitialized", "接口引擎路由缓存初始化完成", $"共缓存 {count} 个接口。", 1, true);
                     return new DosResult(1);
                 }
                 else
                 {
-                    Console.WriteLine($"Microi：【Error异常】【{clientModel.OsClient}】接口引擎缓存初始化失败，这将可能导致接口引擎自定义地址访问404！错误原因：" + sysApiEngineListResult.Msg);
+                    MicroiEngine.QueueSystemLog(clientModel.OsClient, "ApiEngine", "RouteCacheInitializationFailed", "接口引擎路由缓存初始化失败，可能导致自定义地址 404", sysApiEngineListResult.Msg, 3);
                 }
                 return new DosResult(0, null, sysApiEngineListResult.Msg);
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】【{clientModel.OsClient}】接口引擎缓存初始化异常，这将可能导致接口引擎自定义地址访问404！异常原因：" + ex.Message);
+                MicroiEngine.QueueSystemLog(clientModel.OsClient, "ApiEngine", "RouteCacheInitializationException", "接口引擎路由缓存初始化异常，可能导致自定义地址 404", ex.ToString(), 3);
                 return new DosResult(0, null, $"DynamicApiEngine.Init() {clientModel.OsClient} ERROR：" + ex.Message);
             }
         }
@@ -287,7 +287,7 @@ namespace Microi.net.Api
                         // 只删除当前确定损坏的别名，随后从数据库回源并重建全部兼容别名。
                         await cacheClient.RemoveAsync(cacheKey);
                         apiModel = null;
-                        Console.WriteLine($"Microi：【Warning】【{osClient}】已移除非JSON接口引擎缓存：{cacheKey}");
+                        MicroiEngine.QueueSystemLog(osClient, "ApiEngine", "InvalidRouteCacheRemoved", "已移除非 JSON 接口引擎缓存", "缓存将在数据库回源后重建。", 2, true, cacheKey);
                     }
                 }
 
@@ -338,7 +338,7 @@ namespace Microi.net.Api
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Microi：【Warning】设置 osclient Header 失败：{ex.Message}");
+                        MicroiEngine.QueueSystemLog(osClient, "ApiEngine", "TenantHeaderWriteFailed", "设置 osclient 请求头失败", ex.ToString(), 2);
                     }
 
                     // 检查接口是否启用
@@ -359,7 +359,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】TransformAsync 出现异常：{ex.Message}。PathValue：{httpContext?.Request?.Path.Value}");
+                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "ApiEngine", "RouteTransformFailed", "接口引擎动态路由转换异常", ex.ToString(), 2, false, httpContext?.Request?.Path.Value);
             }
 
             return values;

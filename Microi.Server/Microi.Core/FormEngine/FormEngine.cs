@@ -183,12 +183,17 @@ namespace Microi.net
                 if (!tableId.DosIsNullOrWhiteSpace())
                 {
                     //清除该表的SqlCount缓存
-                    MicroiEngine.CacheTenant.Cache(osClient).RemoveParentAsync(CacheKeySqlCount(osClient, tableId, null));
+                    // 必须等待分布式失效通知完成。批量导入时若 fire-and-forget，
+                    // 数千个 SCAN/DEL/PUBLISH 会同时压入同一个 Redis 连接，
+                    // 最终触发 SocketClosed，并让其它节点继续读取旧的 SqlCount。
+                    await MicroiEngine.CacheTenant.Cache(osClient)
+                        .RemoveParentAsync(CacheKeySqlCount(osClient, tableId, null));
                 }
                 if (!tableName.DosIsNullOrWhiteSpace())
                 {
                     //清除该表的SqlCount缓存
-                    MicroiEngine.CacheTenant.Cache(osClient).RemoveParentAsync(CacheKeySqlCount(osClient, tableName, null));
+                    await MicroiEngine.CacheTenant.Cache(osClient)
+                        .RemoveParentAsync(CacheKeySqlCount(osClient, tableName, null));
                 }
             }
         }
@@ -1254,7 +1259,7 @@ namespace Microi.net
                             "Update");
                         if (codeVersionResult.Code != 1)
                         {
-                            Console.WriteLine($"Microi: 保存字段V8代码版本失败。FieldId={fieldModel.Id}, Msg={codeVersionResult.Msg}");
+                            MicroiEngine.QueueSystemLog(param.OsClient, "FormEngine", "FieldCodeVersionWriteFailed", "保存字段 V8 代码版本失败", codeVersionResult.Msg, 2, false, fieldModel.Id);
                         }
                         QueueDiyFieldLangSync(param.OsClient, diyTableModel.Name, fieldModel.Name, fieldModel.Label);
                         return new DosResult(1, fieldModel, "");
@@ -1514,7 +1519,7 @@ namespace Microi.net
                             "Update");
                         if (codeVersionResult.Code != 1)
                         {
-                            Console.WriteLine($"Microi: 批量保存字段V8代码版本失败。TableId={diyTableModel.Id}, Msg={codeVersionResult.Msg}");
+                            MicroiEngine.QueueSystemLog(param.OsClient, "FormEngine", "FieldCodeVersionBatchWriteFailed", "批量保存字段 V8 代码版本失败", codeVersionResult.Msg, 2, false, diyTableModel.Id);
                         }
                         return new DosResult(1);
                     }
@@ -1827,7 +1832,9 @@ namespace Microi.net
                     }
 
                     //设置缓存
-                    cache.SetAsync(cacheFieldList, result);
+                    // 缓存写入也包含跨节点失效广播，必须纳入当前异步调用链，
+                    // 避免高并发首次加载字段时形成未受控的 Redis 待处理命令。
+                    await cache.SetAsync(cacheFieldList, result);
 
                     if (param.IsDeleted != null)
                     {

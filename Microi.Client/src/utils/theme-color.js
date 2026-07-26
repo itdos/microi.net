@@ -1,373 +1,766 @@
 /**
- * 主题色工具函数
- * 用于动态计算主题色的各种变体，兼容 360 极速浏览器
+ * Microi 后台主题运行时。
+ *
+ * 明暗模式负责页面明度、边框和文字层级；palette 同时驱动品牌主色与低饱和表面染色。
+ * 后台的亮/暗表面令牌与 microi.doc 官网 mainstream 主题保持一致，
+ * 同时桥接 Element Plus、ve-plus、MCI 和历史 --color-* 变量。
  */
 
+const DEFAULT_THEME_COLOR = "#409EFF";
+
+export const MCI_THEME_PALETTES = Object.freeze([
+    {
+        key: "white",
+        name: "白色",
+        value: "#F8FAFC",
+        swatch: "#FFFFFF",
+        strong: "#E5E7EB",
+        onPrimary: "#111827",
+        borderGlow: "rgba(15, 23, 42, 0.18)",
+        gradient: "linear-gradient(135deg, #FFFFFF 0%, #E5E7EB 100%)"
+    },
+    {
+        key: "black",
+        name: "黑色",
+        value: "#111827",
+        swatch: "#111827",
+        strong: "#030712",
+        onPrimary: "#FFFFFF",
+        borderGlow: "rgba(17, 24, 39, 0.22)",
+        gradient: "linear-gradient(135deg, #111827 0%, #374151 100%)"
+    },
+    {
+        key: "graphite",
+        name: "石墨",
+        value: "#334155",
+        swatch: "#334155",
+        strong: "#1E293B",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #334155 0%, #64748B 100%)"
+    },
+    {
+        key: "red",
+        name: "红色",
+        value: "#B51220",
+        swatch: "#B51220",
+        strong: "#8E0613",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #B51220 0%, #F04438 100%)"
+    },
+    {
+        key: "orange",
+        name: "橙色",
+        value: "#EA580C",
+        swatch: "#EA580C",
+        strong: "#C2410C",
+        onPrimary: "#000000",
+        gradient: "linear-gradient(135deg, #EA580C 0%, #FB923C 100%)"
+    },
+    {
+        key: "yellow",
+        name: "黄色",
+        value: "#D9A23A",
+        swatch: "#D9A23A",
+        strong: "#B7791F",
+        onPrimary: "#3A2500",
+        gradient: "linear-gradient(135deg, #D9A23A 0%, #F5C85B 100%)"
+    },
+    {
+        key: "green",
+        name: "绿色",
+        value: "#16A34A",
+        swatch: "#16A34A",
+        strong: "#15803D",
+        onPrimary: "#000000",
+        gradient: "linear-gradient(135deg, #16A34A 0%, #4ADE80 100%)"
+    },
+    {
+        key: "teal",
+        name: "青绿",
+        value: "#0F766E",
+        swatch: "#0F766E",
+        strong: "#115E59",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #0F766E 0%, #2DD4BF 100%)"
+    },
+    {
+        key: "cyan",
+        name: "青色",
+        value: "#0891B2",
+        swatch: "#0891B2",
+        strong: "#0E7490",
+        onPrimary: "#000000",
+        gradient: "linear-gradient(135deg, #0891B2 0%, #22D3EE 100%)"
+    },
+    {
+        key: "blue",
+        name: "蓝色",
+        value: "#2563EB",
+        swatch: "#2563EB",
+        strong: "#1D4ED8",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #2563EB 0%, #60A5FA 100%)"
+    },
+    {
+        key: "indigo",
+        name: "靛蓝",
+        value: "#4F46E5",
+        swatch: "#4F46E5",
+        strong: "#4338CA",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #4F46E5 0%, #818CF8 100%)"
+    },
+    {
+        key: "purple",
+        name: "紫色",
+        value: "#7C3AED",
+        swatch: "#7C3AED",
+        strong: "#6D28D9",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #7C3AED 0%, #A78BFA 100%)"
+    },
+    {
+        key: "pink",
+        name: "粉色",
+        value: "#DB2777",
+        swatch: "#DB2777",
+        strong: "#BE185D",
+        onPrimary: "#FFFFFF",
+        gradient: "linear-gradient(135deg, #DB2777 0%, #F472B6 100%)"
+    }
+]);
+
+const LIGHT_THEME_PALETTE_KEYS = Object.freeze([
+    "white", "black", "red", "orange", "yellow", "green",
+    "teal", "cyan", "blue", "indigo", "purple", "pink"
+]);
+
+const DARK_THEME_PALETTE_KEYS = Object.freeze([
+    "black", "graphite", "red", "orange", "yellow", "green",
+    "teal", "cyan", "blue", "indigo", "purple", "pink"
+]);
+
 /**
- * 将 HEX 颜色转换为 RGB
- * @param {string} hex - HEX 颜色值，如 #409eff
- * @returns {object} {r, g, b}
+ * 明暗模式分别返回 12 个主题色：浅色包含白色，暗色明确排除白色。
+ */
+export function getThemePalettes(mode = "light") {
+    const keys = mode === "dark" ? DARK_THEME_PALETTE_KEYS : LIGHT_THEME_PALETTE_KEYS;
+    return keys.map(key => MCI_THEME_PALETTES.find(item => item.key === key)).filter(Boolean);
+}
+
+function clampChannel(value) {
+    return Math.max(0, Math.min(255, Math.round(Number(value) || 0)));
+}
+
+/**
+ * 规范化 3/6 位 HEX；无法识别时返回空字符串。
+ */
+export function normalizeHexColor(color) {
+    if (typeof color !== "string") return "";
+    let value = color.trim();
+    if (!value) return "";
+    if (value.charAt(0) !== "#") value = `#${value}`;
+    if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+        value = `#${value.charAt(1)}${value.charAt(1)}${value.charAt(2)}${value.charAt(2)}${value.charAt(3)}${value.charAt(3)}`;
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(value)) return "";
+    return value.toUpperCase();
+}
+
+/**
+ * 根据颜色识别标准 palette；自定义颜色返回 null。
+ */
+export function resolveThemePalette(color) {
+    const normalized = normalizeHexColor(color);
+    return MCI_THEME_PALETTES.find(item => item.value === normalized) || null;
+}
+
+/**
+ * 将 HEX 颜色转换为 RGB。
  */
 export function hexToRgb(hex) {
-    // 移除 # 号
-    hex = hex.replace('#', '');
-    
-    // 转换为 RGB
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    
-    return { r, g, b };
+    const normalized = normalizeHexColor(hex) || DEFAULT_THEME_COLOR;
+    return {
+        r: parseInt(normalized.substring(1, 3), 16),
+        g: parseInt(normalized.substring(3, 5), 16),
+        b: parseInt(normalized.substring(5, 7), 16)
+    };
 }
 
 /**
- * 将 RGB 转换为 HEX
- * @param {number} r 
- * @param {number} g 
- * @param {number} b 
- * @returns {string}
+ * 将 RGB 转换为 HEX。
  */
 export function rgbToHex(r, g, b) {
-    return '#' + [r, g, b].map(x => {
-        const hex = Math.round(x).toString(16);
-        return hex.length === 1 ? '0' + hex : hex;
-    }).join('');
+    return `#${[r, g, b].map(channel => clampChannel(channel).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
 }
 
 /**
- * 将 HEX 转为 HSL
- * @param {string} hex
- * @returns {{h: number, s: number, l: number}} h: 0-360, s/l: 0-100
+ * 将 HEX 转为 HSL。
  */
 export function hexToHsl(hex) {
     const { r, g, b } = hexToRgb(hex);
-    const r1 = r / 255, g1 = g / 255, b1 = b / 255;
-    const max = Math.max(r1, g1, b1), min = Math.min(r1, g1, b1);
-    let h = 0, s = 0, l = (max + min) / 2;
+    const r1 = r / 255;
+    const g1 = g / 255;
+    const b1 = b / 255;
+    const max = Math.max(r1, g1, b1);
+    const min = Math.min(r1, g1, b1);
+    let h = 0;
+    let s = 0;
+    const l = (max + min) / 2;
     if (max !== min) {
-        const d = max - min;
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        const delta = max - min;
+        s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
         switch (max) {
-            case r1: h = ((g1 - b1) / d + (g1 < b1 ? 6 : 0)) / 6; break;
-            case g1: h = ((b1 - r1) / d + 2) / 6; break;
-            case b1: h = ((r1 - g1) / d + 4) / 6; break;
+            case r1:
+                h = ((g1 - b1) / delta + (g1 < b1 ? 6 : 0)) / 6;
+                break;
+            case g1:
+                h = ((b1 - r1) / delta + 2) / 6;
+                break;
+            default:
+                h = ((r1 - g1) / delta + 4) / 6;
+                break;
         }
     }
     return { h: h * 360, s: s * 100, l: l * 100 };
 }
 
 /**
- * 将 HSL 转为 HEX
- * @param {number} h 0-360
- * @param {number} s 0-100
- * @param {number} l 0-100
- * @returns {string}
+ * 将 HSL 转为 HEX。
  */
 export function hslToHex(h, s, l) {
-    h /= 360; s /= 100; l /= 100;
-    let r, g, b;
-    if (s === 0) {
-        r = g = b = l;
+    let hue = h / 360;
+    const saturation = s / 100;
+    const lightness = l / 100;
+    let r;
+    let g;
+    let b;
+    if (saturation === 0) {
+        r = g = b = lightness;
     } else {
         const hue2rgb = (p, q, t) => {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1 / 6) return p + (q - p) * 6 * t;
-            if (t < 1 / 2) return q;
-            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            let next = t;
+            if (next < 0) next += 1;
+            if (next > 1) next -= 1;
+            if (next < 1 / 6) return p + (q - p) * 6 * next;
+            if (next < 1 / 2) return q;
+            if (next < 2 / 3) return p + (q - p) * (2 / 3 - next) * 6;
             return p;
         };
-        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-        const p = 2 * l - q;
-        r = hue2rgb(p, q, h + 1 / 3);
-        g = hue2rgb(p, q, h);
-        b = hue2rgb(p, q, h - 1 / 3);
+        const q = lightness < 0.5
+            ? lightness * (1 + saturation)
+            : lightness + saturation - lightness * saturation;
+        const p = 2 * lightness - q;
+        r = hue2rgb(p, q, hue + 1 / 3);
+        g = hue2rgb(p, q, hue);
+        b = hue2rgb(p, q, hue - 1 / 3);
     }
-    return rgbToHex(Math.round(r * 255), Math.round(g * 255), Math.round(b * 255));
+    return rgbToHex(r * 255, g * 255, b * 255);
 }
 
-/**
- * 计算主题色的浅色变体（混合白色）
- * @param {string} color - HEX 颜色值
- * @param {number} percent - 白色混合比例 (0-100)
- * @returns {string} HEX 颜色值
- */
+/** 混合白色生成浅色阶。 */
 export function lighten(color, percent) {
     const { r, g, b } = hexToRgb(color);
-    const amount = percent / 100;
-    
-    const newR = r + (255 - r) * amount;
-    const newG = g + (255 - g) * amount;
-    const newB = b + (255 - b) * amount;
-    
-    return rgbToHex(newR, newG, newB);
+    const amount = Math.max(0, Math.min(100, percent)) / 100;
+    return rgbToHex(
+        r + (255 - r) * amount,
+        g + (255 - g) * amount,
+        b + (255 - b) * amount
+    );
 }
 
-/**
- * 计算主题色的深色变体（混合黑色）
- * @param {string} color - HEX 颜色值
- * @param {number} percent - 黑色混合比例 (0-100)
- * @returns {string} HEX 颜色值
- */
+/** 混合黑色生成深色阶。 */
 export function darken(color, percent) {
     const { r, g, b } = hexToRgb(color);
-    const amount = percent / 100;
-    
-    const newR = r * (1 - amount);
-    const newG = g * (1 - amount);
-    const newB = b * (1 - amount);
-    
-    return rgbToHex(newR, newG, newB);
+    const amount = Math.max(0, Math.min(100, percent)) / 100;
+    return rgbToHex(r * (1 - amount), g * (1 - amount), b * (1 - amount));
 }
 
 /**
- * 设置主题色并更新所有 CSS 变量
- * 同步驱动：旧版 --color-primary、Element Plus --el-color-primary、MCI 设计系统 --mci-color-primary*
- * @param {string} primaryColor - HEX 主题色
+ * 将颜色按权重混合。weight=0 返回 base，weight=1 返回 tint。
+ * 暗色主题用它在稳定明度骨架上叠加低饱和主题倾向，避免整页变成高饱和色块。
+ */
+export function mixColors(baseColor, tintColor, weight) {
+    const base = hexToRgb(baseColor);
+    const tint = hexToRgb(tintColor);
+    const amount = Math.max(0, Math.min(1, Number(weight) || 0));
+    return rgbToHex(
+        base.r + (tint.r - base.r) * amount,
+        base.g + (tint.g - base.g) * amount,
+        base.b + (tint.b - base.b) * amount
+    );
+}
+
+function getRelativeLuminance(color) {
+    const { r, g, b } = hexToRgb(color);
+    const channels = [r, g, b].map(channel => {
+        const value = channel / 255;
+        return value <= 0.03928
+            ? value / 12.92
+            : Math.pow((value + 0.055) / 1.055, 2.4);
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+export function getContrastRatio(foreground, background) {
+    const first = getRelativeLuminance(foreground);
+    const second = getRelativeLuminance(background);
+    const lighter = Math.max(first, second);
+    const darker = Math.min(first, second);
+    return (lighter + 0.05) / (darker + 0.05);
+}
+
+function getReadableText(background) {
+    // 纯黑/纯白二选一可保证任意实色背景至少达到 WCAG AA 的 4.5:1。
+    const light = "#FFFFFF";
+    const dark = "#000000";
+    return getContrastRatio(light, background) >= getContrastRatio(dark, background)
+        ? light
+        : dark;
+}
+
+function getReadableAccent(color, background) {
+    const primary = normalizeHexColor(color) || DEFAULT_THEME_COLOR;
+    if (getContrastRatio(primary, background) >= 4.5) return primary;
+
+    const { h, s, l } = hexToHsl(primary);
+    const saturation = Math.max(18, Math.min(78, s));
+    for (let lightness = Math.max(58, l); lightness <= 92; lightness += 3) {
+        const candidate = hslToHex(h, saturation, lightness);
+        if (getContrastRatio(candidate, background) >= 4.5) return candidate;
+    }
+    return "#F8FAFC";
+}
+
+function createDarkSurfaceTint(profile) {
+    if (profile.key === "black") return "#2B3544";
+    const { h, s } = hexToHsl(profile.value);
+    if (s < 8) return hslToHex(220, 8, 42);
+    const saturation = profile.key === "graphite"
+        ? 18
+        : Math.max(28, Math.min(48, s * 0.52));
+    return hslToHex(h, saturation, 46);
+}
+
+function getBrightness(color) {
+    const { r, g, b } = hexToRgb(color);
+    return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+function createPaletteProfile(color) {
+    const primary = normalizeHexColor(color) || DEFAULT_THEME_COLOR;
+    const preset = resolveThemePalette(primary);
+    if (preset) return preset;
+    const { r, g, b } = hexToRgb(primary);
+    const onPrimary = getReadableText(primary);
+    return {
+        key: "custom",
+        name: "自定义",
+        value: primary,
+        swatch: primary,
+        strong: darken(primary, 20),
+        onPrimary,
+        borderGlow: `rgba(${r}, ${g}, ${b}, 0.24)`,
+        gradient: `linear-gradient(135deg, ${primary} 0%, ${lighten(primary, 24)} 100%)`
+    };
+}
+
+function setProperties(root, properties) {
+    Object.keys(properties).forEach(name => root.style.setProperty(name, properties[name]));
+}
+
+function applyVePlusVars(profile, surface) {
+    setProperties(document.documentElement, {
+        "--color-primary": profile.value,
+        "--primary-hover-color": profile.strong,
+        "--primary-active-color": profile.strong,
+        "--primary-disabled-color": lighten(profile.value, 45),
+        "--primary-outline-color": surface.primarySoft,
+        "--color-text-primary": surface.ink,
+        "--color-text-regular": surface.text,
+        "--color-text-secondary": surface.muted,
+        "--color-text-placeholder": surface.placeholder,
+        "--border-color-base": surface.borderStrong,
+        "--border-color-light": surface.border,
+        "--border-color-lighter": surface.borderLight,
+        "--border-color-extra-light": surface.soft,
+        "--border-color-hover": surface.borderHover,
+        "--background-color-base": surface.soft,
+        "--button-default-font-color": surface.text,
+        "--button-default-border-color": surface.borderStrong,
+        "--button-default-background-color": surface.surface,
+        "--button-default-hover-color": surface.primarySoft,
+        "--button-default-hover-border": surface.borderHover,
+        "--button-primary-font-color": profile.onPrimary,
+        "--button-primary-border-color": profile.value,
+        "--button-primary-background-color": profile.value,
+        "--button-primary-hover-color": profile.strong,
+        "--button-primary-active-color": profile.strong,
+        "--input-font-color": surface.text,
+        "--input-background-color": surface.surface,
+        "--input-fill-color": surface.soft,
+        "--input-icon-color": surface.muted,
+        "--input-border-color": surface.border,
+        "--input-border-color-hover": surface.borderHover,
+        "--input-disabled-fill": surface.pageAlt,
+        "--input-disabled-color": surface.muted,
+        "--checkbox-font-color": surface.text,
+        "--checkbox-background-color": surface.surface,
+        "--radio-font-color": surface.text,
+        "--radio-background-color": surface.surface,
+        "--select-option-color": surface.text,
+        "--select-option-hover-background": surface.soft,
+        "--select-option-selected-background": surface.primarySoft,
+        "--select-option-disabled-background": surface.pageAlt,
+        "--menu-font-color": surface.text,
+        "--menu-border-color": surface.border,
+        "--menu-hover-background": surface.soft,
+        "--menu-active-background": surface.primarySoft,
+        "--tab-font-color": surface.ink,
+        "--tab-bar-color": surface.border,
+        "--tab-close-color": surface.muted,
+        "--card-font-color": surface.ink,
+        "--card-border-color": surface.border,
+        "--pagination-font-color": surface.ink,
+        "--pagination-background-color": surface.soft,
+        "--pagination-background-font-color": surface.text
+    });
+}
+
+function applySurfaceVars(profile, mode) {
+    const root = document.documentElement;
+    const { r, g, b } = hexToRgb(profile.value);
+    const isDark = mode === "dark";
+    let surface;
+    if (isDark) {
+        const tint = createDarkSurfaceTint(profile);
+        const tintRgb = hexToRgb(tint);
+        const sidebar = mixColors("#0B1526", tint, 0.15);
+        surface = {
+            tint,
+            page: mixColors("#080D18", tint, 0.06),
+            pageAlt: mixColors("#0B1220", tint, 0.075),
+            surface: mixColors("#101827", tint, 0.09),
+            header: mixColors("#0F1828", tint, 0.10),
+            soft: mixColors("#152033", tint, 0.11),
+            overlay: mixColors("#1B2638", tint, 0.13),
+            fill: mixColors("#1D293B", tint, 0.14),
+            sidebar,
+            cardHover: mixColors("#172033", tint, 0.13),
+            ink: "#F8FAFC",
+            text: "#CBD5E1",
+            muted: "#94A3B8",
+            placeholder: "#718096",
+            border: `rgba(${tintRgb.r}, ${tintRgb.g}, ${tintRgb.b}, 0.20)`,
+            borderLight: `rgba(${tintRgb.r}, ${tintRgb.g}, ${tintRgb.b}, 0.10)`,
+            borderStrong: `rgba(${tintRgb.r}, ${tintRgb.g}, ${tintRgb.b}, 0.30)`,
+            borderHover: getReadableAccent(profile.value, sidebar),
+            tooltip: mixColors("#202A3C", tint, 0.12),
+            tooltipText: "#F8FAFC",
+            primarySoft: `rgba(${r}, ${g}, ${b}, 0.18)`
+        };
+    } else {
+        surface = {
+            tint: profile.value,
+            page: "#F7F9FC",
+            pageAlt: "#EEF2F7",
+            surface: "#FFFFFF",
+            header: "#FFFFFF",
+            soft: "#F1F5F9",
+            overlay: "#FFFFFF",
+            fill: "#E2E8F0",
+            sidebar: profile.value,
+            cardHover: "#F1F5F9",
+            ink: "#0F172A",
+            text: "#334155",
+            muted: "#64748B",
+            placeholder: "#94A3B8",
+            border: "#E2E8F0",
+            borderLight: "#EEF2F7",
+            borderStrong: "#CBD5E1",
+            borderHover: "#B9CCF8",
+            tooltip: "#1E293B",
+            tooltipText: "#F8FAFC",
+            primarySoft: `rgba(${r}, ${g}, ${b}, 0.10)`
+        };
+    }
+
+    const surfaceRgb = hexToRgb(surface.surface);
+    const footerTint = isDark && profile.key === "black" ? profile.value : surface.tint;
+    const footerWave = isDark
+        ? mixColors(surface.sidebar, footerTint, 0.42)
+        : getBrightness(profile.value) > 180
+            ? mixColors(profile.value, "#0F172A", 0.18)
+            : mixColors(profile.value, "#FFFFFF", 0.22);
+    const footerText = getReadableText(footerWave);
+    const sidebarGradient = isDark
+        ? `linear-gradient(180deg, ${surface.sidebar} 0%, ${mixColors(surface.sidebar, surface.tint, 0.08)} 100%)`
+        : `linear-gradient(180deg, ${profile.value} 0%, ${profile.strong} 100%)`;
+
+    setProperties(root, {
+        "--el-bg-color-page": surface.page,
+        "--el-bg-color": surface.surface,
+        "--el-bg-color-overlay": surface.overlay,
+        "--el-fill-color-blank": surface.surface,
+        "--el-fill-color-extra-light": surface.pageAlt,
+        "--el-fill-color-lighter": surface.pageAlt,
+        "--el-fill-color-light": surface.soft,
+        "--el-fill-color": surface.fill,
+        "--el-fill-color-dark": isDark ? surface.pageAlt : surface.border,
+        "--el-fill-color-darker": isDark ? surface.page : surface.borderStrong,
+        "--el-border-color": surface.border,
+        "--el-border-color-light": surface.border,
+        "--el-border-color-lighter": surface.borderLight,
+        "--el-border-color-extra-light": surface.borderLight,
+        "--el-border-color-dark": surface.borderStrong,
+        "--el-border-color-darker": surface.borderHover,
+        "--el-text-color-primary": surface.ink,
+        "--el-text-color-regular": surface.text,
+        "--el-text-color-secondary": surface.muted,
+        "--el-text-color-placeholder": surface.placeholder,
+        "--el-text-color-disabled": isDark ? "#526079" : "#A8B3C4",
+        "--el-drawer-bg-color": surface.surface,
+        "--el-dialog-bg-color": surface.surface,
+        "--el-card-bg-color": surface.surface,
+        "--el-mask-color": isDark ? "rgba(2, 6, 23, 0.72)" : "rgba(15, 23, 42, 0.42)",
+        "--el-input-bg-color": surface.surface,
+        "--el-input-text-color": surface.text,
+        "--el-input-border-color": surface.border,
+        "--el-disabled-bg-color": surface.pageAlt,
+        "--el-table-bg-color": surface.surface,
+        "--el-table-tr-bg-color": surface.surface,
+        "--el-table-header-bg-color": surface.soft,
+        "--el-table-row-hover-bg-color": surface.primarySoft,
+        "--el-table-current-row-bg-color": surface.primarySoft,
+        "--el-table-border-color": surface.border,
+        "--el-table-text-color": surface.text,
+        "--el-table-header-text-color": surface.ink,
+        "--mci-bg-base": surface.page,
+        "--mci-bg-page": surface.page,
+        "--mci-bg-page-alt": surface.pageAlt,
+        "--mci-bg-elevated": surface.surface,
+        "--mci-bg-header": surface.header,
+        "--mci-bg-content": surface.surface,
+        "--mci-bg-sidebar": surface.sidebar,
+        "--mci-bg-overlay": surface.overlay,
+        "--mci-bg-surface": surface.soft,
+        "--mci-bg-soft": surface.soft,
+        "--mci-bg-card": surface.surface,
+        "--mci-bg-card-hover": surface.cardHover,
+        "--mci-bg-primary-soft": surface.primarySoft,
+        "--mci-bg-color-page": surface.page,
+        "--mci-surface-rgb": `${surfaceRgb.r}, ${surfaceRgb.g}, ${surfaceRgb.b}`,
+        "--mci-bg-glass": `rgba(${surfaceRgb.r}, ${surfaceRgb.g}, ${surfaceRgb.b}, 0.94)`,
+        "--mci-bg-glass-border": surface.border,
+        "--mci-bg-mask": isDark ? "rgba(2, 6, 23, 0.72)" : "rgba(15, 23, 42, 0.42)",
+        "--mci-text-primary": surface.ink,
+        "--mci-text-secondary": surface.text,
+        "--mci-text-tertiary": surface.muted,
+        "--mci-text-color": surface.ink,
+        "--mci-text-color-secondary": surface.text,
+        "--mci-text-disabled": isDark ? "#526079" : "#A8B3C4",
+        "--mci-border-color": surface.border,
+        "--mci-border-subtle": surface.borderLight,
+        "--mci-divider-color": surface.borderLight,
+        "--mci-border-color-hover": surface.borderHover,
+        "--mci-border-strong": surface.borderStrong,
+        "--mci-tooltip-bg": surface.tooltip,
+        "--mci-tooltip-text": surface.tooltipText,
+        "--mci-primary-color": profile.value,
+        "--mci-primary-rgb": `${r}, ${g}, ${b}`,
+        "--mci-gradient-surface": `linear-gradient(180deg, ${surface.surface} 0%, ${surface.pageAlt} 100%)`,
+        "--mci-gradient-bg": `linear-gradient(180deg, ${surface.page} 0%, ${surface.pageAlt} 100%)`,
+        "--sidebar-bg-gradient": sidebarGradient,
+        "--sidebar-footer-wave-bg": footerWave,
+        "--sidebar-footer-text-color": footerText,
+        "--mci-shadow-card": isDark
+            ? "0 12px 34px rgba(0, 0, 0, 0.28)"
+            : "0 10px 30px rgba(15, 23, 42, 0.07)",
+        "--mci-shadow-card-hover": isDark
+            ? "0 20px 48px rgba(0, 0, 0, 0.38)"
+            : "0 18px 44px rgba(15, 23, 42, 0.11)",
+        "--mci-shadow-dialog": isDark
+            ? "0 24px 72px rgba(0, 0, 0, 0.48)"
+            : "0 24px 72px rgba(15, 23, 42, 0.18)",
+        "--mci-shadow-dropdown": isDark
+            ? "0 16px 42px rgba(0, 0, 0, 0.36)"
+            : "0 14px 38px rgba(15, 23, 42, 0.14)"
+    });
+
+    if (isDark) {
+        const sidebarHover = mixColors(surface.sidebar, surface.tint, 0.12);
+        const sidebarParentActive = mixColors(surface.sidebar, surface.tint, 0.18);
+        const sidebarActive = mixColors(surface.sidebar, surface.tint, 0.28);
+        setProperties(root, {
+            "--sidebar-bg-color": surface.sidebar,
+            "--sidebar-text-color": surface.text,
+            "--sidebar-hover-bg": sidebarHover,
+            "--sidebar-active-bg": sidebarActive,
+            "--sidebar-parent-active-bg": sidebarParentActive,
+            "--sidebar-active-text-color": getReadableAccent(profile.value, sidebarActive),
+            "--sidebar-opened-title-bg": "transparent",
+            "--sidebar-submenu-item-bg": "transparent",
+            "--sidebar-submenu-hover-bg": sidebarHover,
+            "--sidebar-submenu-active-bg": sidebarActive
+        });
+    } else {
+        setProperties(root, {
+            "--sidebar-bg-color": profile.value,
+            "--sidebar-text-color": profile.onPrimary,
+            "--sidebar-hover-bg": getBrightness(profile.value) > 180
+                ? "rgba(15, 23, 42, 0.06)"
+                : "rgba(255, 255, 255, 0.15)",
+            "--sidebar-parent-active-bg": getBrightness(profile.value) > 180
+                ? "rgba(15, 23, 42, 0.06)"
+                : "rgba(255, 255, 255, 0.12)",
+            "--sidebar-active-bg": getBrightness(profile.value) > 180
+                ? "rgba(15, 23, 42, 0.10)"
+                : "rgba(255, 255, 255, 0.24)",
+            "--sidebar-active-text-color": profile.onPrimary,
+            "--sidebar-opened-title-bg": "transparent",
+            "--sidebar-submenu-item-bg": "transparent",
+            "--sidebar-submenu-hover-bg": getBrightness(profile.value) > 180
+                ? "rgba(15, 23, 42, 0.06)"
+                : "rgba(255, 255, 255, 0.15)",
+            "--sidebar-submenu-active-bg": getBrightness(profile.value) > 180
+                ? "rgba(15, 23, 42, 0.10)"
+                : "rgba(255, 255, 255, 0.24)"
+        });
+    }
+
+    applyVePlusVars(profile, surface);
+}
+
+/**
+ * 设置主题色并更新所有 CSS 变量。
  */
 export function setThemeColor(primaryColor) {
     const root = document.documentElement;
-    const { r, g, b } = hexToRgb(primaryColor);
+    const requestedProfile = createPaletteProfile(primaryColor);
+    const mode = getThemeMode();
+    // 暗色模式不接受白色或近白自定义主色，避免重新制造白色按钮和高亮块。
+    const isNearWhiteCustom = requestedProfile.key === "custom"
+        && getBrightness(requestedProfile.value) >= 245;
+    const selectedProfile = mode === "dark"
+        && (requestedProfile.key === "white" || isNearWhiteCustom)
+        ? MCI_THEME_PALETTES.find(item => item.key === "blue")
+        : requestedProfile;
+    // 黑色及近黑自定义色在暗底上不可见；保留用户选择值，但将实际交互色提升为中性石板灰。
+    const isNearBlackCustom = selectedProfile.key === "custom"
+        && getBrightness(selectedProfile.value) <= 32;
+    const useNeutralDarkAccent = mode === "dark"
+        && (selectedProfile.key === "black" || isNearBlackCustom);
+    const renderedProfile = useNeutralDarkAccent
+        ? {
+            ...selectedProfile,
+            key: "black",
+            value: "#64748B",
+            strong: "#475569",
+            borderGlow: "rgba(100, 116, 139, 0.34)",
+            gradient: "linear-gradient(135deg, #64748B 0%, #475569 100%)"
+        }
+        : selectedProfile;
+    const profile = {
+        ...renderedProfile,
+        onPrimary: getReadableText(renderedProfile.value)
+    };
+    const primary = profile.value;
+    const { r, g, b } = hexToRgb(primary);
+    const isDark = mode === "dark";
 
-    // === 旧版变量（兼容现有页面） ===
-    root.style.setProperty('--color-primary', primaryColor);
-    root.style.setProperty('--color-primary-rgb', `${r}, ${g}, ${b}`);
-    root.style.setProperty('--theme-color', primaryColor);
-    root.style.setProperty('--sidebar-bg-color', primaryColor);
-
-    // 计算并设置浅色变体（用于渐变）
-    const lightColor = lighten(primaryColor, 15);
-    root.style.setProperty('--color-primary-light', lightColor);
-
-    // 计算并设置深色变体（用于渐变）
-    const darkColor = darken(primaryColor, 30);
-    root.style.setProperty('--color-primary-dark', darkColor);
-
-    // === Element Plus 主题（含 light-3..9 / dark-2 阶梯） ===
-    root.style.setProperty('--el-color-primary', primaryColor);
-
-    // 暗色模式下 light-N 应混合暗色背景（而非白色），否则表格/组件出现浅亮色块
-    const isDark = getThemeMode() === 'dark';
+    // 保证 data-theme、Element Plus 的 html.dark 与令牌永远处于同一状态。
+    // 首屏 Loading、HMR 或租户初始化重复应用主题色时也能自行修复类名漂移。
+    root.setAttribute("data-theme", mode);
     if (isDark) {
-        // 暗色模式：light-N 用主题色与暗色背景混合（降低亮度和饱和度）
-        const { h } = hexToHsl(primaryColor);
-        root.style.setProperty('--el-color-primary-light-3', hslToHex(h, 35, 35));
-        root.style.setProperty('--el-color-primary-light-5', hslToHex(h, 25, 25));
-        root.style.setProperty('--el-color-primary-light-7', hslToHex(h, 18, 18));
-        root.style.setProperty('--el-color-primary-light-8', hslToHex(h, 14, 14));
-        root.style.setProperty('--el-color-primary-light-9', hslToHex(h, 10, 11));
+        root.classList.add("dark");
     } else {
-        root.style.setProperty('--el-color-primary-light-3', lighten(primaryColor, 30));
-        root.style.setProperty('--el-color-primary-light-5', lighten(primaryColor, 50));
-        root.style.setProperty('--el-color-primary-light-7', lighten(primaryColor, 70));
-        root.style.setProperty('--el-color-primary-light-8', lighten(primaryColor, 80));
-        root.style.setProperty('--el-color-primary-light-9', lighten(primaryColor, 90));
+        root.classList.remove("dark");
     }
-    root.style.setProperty('--el-color-primary-dark-2', darken(primaryColor, 20));
+    root.setAttribute("data-mci-palette", selectedProfile.key);
 
-    // === MCI 设计系统令牌 ===
-    const mciLight = lighten(primaryColor, 25);
-    const mciDark = darken(primaryColor, 20);
-    const glow = `rgba(${r}, ${g}, ${b}, 0.20)`;
-    const glowStrong = `rgba(${r}, ${g}, ${b}, 0.35)`;
-    root.style.setProperty('--mci-color-primary', primaryColor);
-    root.style.setProperty('--mci-color-primary-light', mciLight);
-    root.style.setProperty('--mci-color-primary-dark', mciDark);
-    root.style.setProperty('--mci-color-primary-glow', glow);
-    root.style.setProperty('--mci-border-glow', glow);
-    root.style.setProperty('--mci-shadow-button', `0 4px 14px ${glow}`);
-    root.style.setProperty('--mci-shadow-button-hover', `0 8px 22px ${glowStrong}`);
-    root.style.setProperty('--mci-glow-primary', `0 0 16px ${glow}, 0 0 36px ${glow}`);
-    // 主渐变：当前主题色 → MCI 蓝（保持设计系统的科技感双色调）
-    root.style.setProperty('--mci-gradient-primary',
-        `linear-gradient(135deg, ${primaryColor} 0%, #2196F3 100%)`);
+    setProperties(root, {
+        "--color-primary": primary,
+        "--mci-palette-value": selectedProfile.value,
+        "--color-primary-rgb": `${r}, ${g}, ${b}`,
+        "--color-primary-light": lighten(primary, 15),
+        "--color-primary-dark": profile.strong,
+        "--color-primary-text": profile.onPrimary,
+        "--theme-color": primary,
+        "--el-color-primary": primary,
+        "--el-color-primary-rgb": `${r}, ${g}, ${b}`,
+        "--el-color-primary-dark-2": profile.strong,
+        "--mci-color-primary": primary,
+        "--mci-color-primary-rgb": `${r}, ${g}, ${b}`,
+        "--mci-color-primary-light": lighten(primary, 25),
+        "--mci-color-primary-dark": profile.strong,
+        "--mci-color-primary-strong": profile.strong,
+        "--mci-color-primary-glow": `rgba(${r}, ${g}, ${b}, 0.22)`,
+        "--mci-text-on-primary": profile.onPrimary,
+        "--mci-border-glow": profile.borderGlow || `rgba(${r}, ${g}, ${b}, 0.24)`,
+        "--mci-gradient-primary": profile.gradient,
+        "--mci-shadow-button": `0 10px 22px rgba(${r}, ${g}, ${b}, 0.18)`,
+        "--mci-shadow-button-hover": `0 16px 34px rgba(${r}, ${g}, ${b}, 0.26)`,
+        "--mci-glow-primary": `0 0 16px rgba(${r}, ${g}, ${b}, 0.22), 0 0 36px rgba(${r}, ${g}, ${b}, 0.12)`
+    });
 
-    // === 侧边栏文字与悬浮态：根据主题色亮度自动选择 ===
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    if (brightness > 180) {
-        root.style.setProperty('--color-primary-text', '#303133');
-        root.style.setProperty('--sidebar-text-color', 'rgba(48, 49, 51, 0.9)');
-        root.style.setProperty('--sidebar-hover-bg', 'rgba(0, 0, 0, 0.08)');
-        root.style.setProperty('--sidebar-active-bg', 'rgba(0, 0, 0, 0.12)');
+    if (isDark) {
+        const { h } = hexToHsl(primary);
+        setProperties(root, {
+            "--el-color-primary-light-3": hslToHex(h, 42, 44),
+            "--el-color-primary-light-5": hslToHex(h, 34, 32),
+            "--el-color-primary-light-7": hslToHex(h, 26, 24),
+            "--el-color-primary-light-8": hslToHex(h, 22, 20),
+            "--el-color-primary-light-9": `rgba(${r}, ${g}, ${b}, 0.16)`
+        });
     } else {
-        root.style.setProperty('--color-primary-text', '#ffffff');
-        root.style.setProperty('--sidebar-text-color', 'rgba(255, 255, 255, 0.9)');
-        root.style.setProperty('--sidebar-hover-bg', 'rgba(255, 255, 255, 0.15)');
-        root.style.setProperty('--sidebar-active-bg', 'rgba(255, 255, 255, 0.25)');
+        setProperties(root, {
+            "--el-color-primary-light-3": lighten(primary, 30),
+            "--el-color-primary-light-5": lighten(primary, 50),
+            "--el-color-primary-light-7": lighten(primary, 70),
+            "--el-color-primary-light-8": lighten(primary, 80),
+            "--el-color-primary-light-9": lighten(primary, 90)
+        });
     }
 
-    // 当前若为暗色模式，重新计算并应用基于主题色的暗色调色板
-    if (getThemeMode() === 'dark') {
-        applyDarkTintedVars(primaryColor);
-    }
-
-    console.log('[主题色] 已更新 (含 MCI 令牌):', primaryColor);
+    applySurfaceVars(profile, mode);
+    return selectedProfile.value;
 }
 
-/**
- * 计算并应用基于主题色色相的暗色调色板
- *
- * 设计要点：
- *   - 取主题色的 HUE（色相），而非 RGB 直接混合 → 避免暖色系产生脏/泥色
- *   - 饱和度限制 8-15%，只保留微弱色调，不会太彩
- *   - 用三档亮度梯度构建层级：页面(最暗) → 容器(中) → 卡片/弹层(最亮)
- *   - 侧边栏保持主题色深色变体，维持品牌识别感
- *
- * @param {string} primaryColor - HEX 主题色
- */
-function applyDarkTintedVars(primaryColor) {
-    const root = document.documentElement;
-    const { r, g, b } = hexToRgb(primaryColor);
-    const { h } = hexToHsl(primaryColor);
-
-    // 用主题色色相 + 中等饱和度 + 不同亮度生成暗色阶梯
-    // 拉高饱和度让背景明显带主题色（而非看起来像纯黑）
-    const tint = (s, l) => hslToHex(h, s, l);
-
-    // === 三层暗色背景（核心层级）===
-    const bgPage    = tint(35, 11);   // L11 — 最深，页面底层（带明显主题色）
-    const bgColor   = tint(38, 14);   // L14 — 容器（侧边栏/导航/表格主体）
-    const bgOverlay = tint(40, 17);   // L17 — 卡片/弹层/对话框（视觉提升一档）
-
-    // === Fill 层级（EP 组件内部使用）===
-    const fillBlank      = tint(35, 14);
-    const fillExtraLight = tint(32, 18);
-    const fillLight      = tint(30, 21);
-    const fill           = tint(28, 25);
-    const fillDark       = tint(35, 15);
-    const fillDarker     = tint(38, 12);
-
-    // === 写入 Element Plus 背景变量 ===
-    root.style.setProperty('--el-bg-color-page', bgPage);
-    root.style.setProperty('--el-bg-color', bgColor);
-    root.style.setProperty('--el-bg-color-overlay', bgOverlay);
-    root.style.setProperty('--el-fill-color-blank', fillBlank);
-    root.style.setProperty('--el-fill-color-extra-light', fillExtraLight);
-    root.style.setProperty('--el-fill-color-light', fillLight);
-    root.style.setProperty('--el-fill-color', fill);
-    root.style.setProperty('--el-fill-color-dark', fillDark);
-    root.style.setProperty('--el-fill-color-darker', fillDarker);
-
-    // === Element Plus 组件级背景变量 ===
-    root.style.setProperty('--el-drawer-bg-color', bgOverlay);
-    root.style.setProperty('--el-dialog-bg-color', bgOverlay);
-    root.style.setProperty('--el-mask-color', 'rgba(0, 0, 0, 0.6)');
-    root.style.setProperty('--el-input-bg-color', fillBlank);
-    root.style.setProperty('--el-input-text-color', '#E5E5ED');
-    root.style.setProperty('--el-input-border-color', tint(20, 28));
-    root.style.setProperty('--el-disabled-bg-color', fillDarker);
-
-    // === 边框：白色低透明度 + 适度主题色相 ===
-    root.style.setProperty('--el-border-color',             tint(20, 28));
-    root.style.setProperty('--el-border-color-light',       tint(18, 24));
-    root.style.setProperty('--el-border-color-lighter',     tint(15, 21));
-    root.style.setProperty('--el-border-color-extra-light', tint(12, 18));
-    root.style.setProperty('--el-border-color-dark',        tint(22, 32));
-    root.style.setProperty('--el-border-color-darker',      tint(25, 36));
-
-    // === 文字：柔和近白（不刺眼）===
-    root.style.setProperty('--el-text-color-primary',     '#E5E5ED');
-    root.style.setProperty('--el-text-color-regular',     '#B8B8C8');
-    root.style.setProperty('--el-text-color-secondary',   '#8E8EA0');
-    root.style.setProperty('--el-text-color-placeholder', '#5C5C6E');
-    root.style.setProperty('--el-text-color-disabled',    '#484858');
-
-    // === MCI 设计系统令牌 ===
-    root.style.setProperty('--mci-bg-base', bgPage);
-    root.style.setProperty('--mci-bg-elevated', bgColor);
-    root.style.setProperty('--mci-bg-surface', bgOverlay);
-    root.style.setProperty('--mci-bg-card', bgOverlay);
-    root.style.setProperty('--mci-bg-card-hover', fillLight);
-    root.style.setProperty('--mci-bg-glass', `rgba(${r}, ${g}, ${b}, 0.05)`);
-    root.style.setProperty('--mci-bg-glass-border', `rgba(${r}, ${g}, ${b}, 0.10)`);
-    root.style.setProperty('--mci-border-color', tint(5, 19));
-    root.style.setProperty('--mci-border-color-hover', tint(6, 26));
-    root.style.setProperty('--mci-text-primary', '#E5E5ED');
-    root.style.setProperty('--mci-text-secondary', '#8E8EA0');
-    root.style.setProperty('--mci-text-tertiary', '#5C5C6E');
-
-    // === 侧边栏：保持主题色深色变体（维持品牌识别）===
-    const sidebarBg = tint(Math.min(30, 30), 13); // 稍高饱和度 + 略亮于底层
-    root.style.setProperty('--sidebar-bg-color', sidebarBg);
-    root.style.setProperty('--sidebar-text-color', '#C4C4D4');
-    root.style.setProperty('--sidebar-hover-bg', tint(12, 18));
-    root.style.setProperty('--sidebar-active-bg', `rgba(${r}, ${g}, ${b}, 0.20)`);
-}
-
-/**
- * 清除暗色模式自定义变量，回到亮色默认值
- */
-function clearDarkTintedVars() {
-    const root = document.documentElement;
-    const props = [
-        '--el-bg-color-page', '--el-bg-color', '--el-bg-color-overlay',
-        '--el-fill-color-blank', '--el-fill-color-extra-light', '--el-fill-color-light',
-        '--el-fill-color', '--el-fill-color-dark', '--el-fill-color-darker',
-        '--el-border-color', '--el-border-color-light', '--el-border-color-lighter',
-        '--el-border-color-extra-light', '--el-border-color-dark', '--el-border-color-darker',
-        '--el-text-color-primary', '--el-text-color-regular', '--el-text-color-secondary',
-        '--el-text-color-placeholder', '--el-text-color-disabled',
-        '--el-color-primary-light-3', '--el-color-primary-light-5',
-        '--el-color-primary-light-7', '--el-color-primary-light-8', '--el-color-primary-light-9',
-        '--el-drawer-bg-color', '--el-dialog-bg-color', '--el-mask-color',
-        '--el-input-bg-color', '--el-input-text-color', '--el-input-border-color',
-        '--el-disabled-bg-color',
-        '--mci-bg-base', '--mci-bg-elevated', '--mci-bg-surface',
-        '--mci-bg-card', '--mci-bg-card-hover', '--mci-bg-glass', '--mci-bg-glass-border',
-        '--mci-border-color', '--mci-border-color-hover',
-        '--mci-text-primary', '--mci-text-secondary', '--mci-text-tertiary',
-    ];
-    props.forEach(p => root.style.removeProperty(p));
-    // sidebar 由 setThemeColor 重设，无需在此清理
-}
-
-/**
- * 切换 MCI 设计系统的明/暗主题
- * @param {'light' | 'dark'} mode
- */
+/** 切换浅色/暗色显示模式。 */
 export function setThemeMode(mode) {
     const root = document.documentElement;
-    const next = mode === 'dark' ? 'dark' : 'light';
-    // 先写 localStorage，确保后续 getThemeMode() 读到最新值
-    try { localStorage.setItem('mci-theme', next); } catch (e) {}
-    root.setAttribute('data-theme', next);
-    if (next === 'dark') {
-        root.classList.add('dark');
-        applyDarkTintedVars(getThemeColor());
+    const next = mode === "dark" ? "dark" : "light";
+    try {
+        localStorage.setItem("mci-theme", next);
+    } catch (e) {}
+    root.setAttribute("data-theme", next);
+    if (next === "dark") {
+        root.classList.add("dark");
     } else {
-        root.classList.remove('dark');
-        clearDarkTintedVars();
-        // 重新应用主题色，恢复亮色侧边栏（实色主题色）
-        setThemeColor(getThemeColor());
+        root.classList.remove("dark");
     }
+    return setThemeColor(getThemeColor());
 }
 
-/**
- * 获取当前 MCI 主题模式
- */
+/** 获取当前 MCI 主题模式。 */
 export function getThemeMode() {
     try {
-        const saved = localStorage.getItem('mci-theme');
-        if (saved === 'light' || saved === 'dark') return saved;
+        const saved = localStorage.getItem("mci-theme");
+        if (saved === "light" || saved === "dark") return saved;
     } catch (e) {}
-    return document.documentElement.getAttribute('data-theme') || 'light';
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
 }
 
-/**
- * 获取当前主题色
- * @returns {string} HEX 颜色值
- */
+/** 获取当前主题色。 */
 export function getThemeColor() {
-    return getComputedStyle(document.documentElement)
-        .getPropertyValue('--color-primary')
-        .trim() || '#409eff';
+    return normalizeHexColor(
+        getComputedStyle(document.documentElement).getPropertyValue("--mci-palette-value").trim()
+    ) || normalizeHexColor(
+        getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim()
+    ) || DEFAULT_THEME_COLOR;
 }
 
-/**
- * 初始化主题色系统
- * 确保所有 CSS 变量都正确设置
- */
+/** 初始化主题色系统。 */
 export function initThemeColor() {
-    const currentColor = getThemeColor();
-    setThemeColor(currentColor);
+    setThemeColor(getThemeColor());
 }

@@ -10,7 +10,6 @@ namespace Microi.net
             try
             {
                 services.AddSingleton<IMicroiHttp, DiyHttp>();
-                Console.WriteLine("Microi：【成功】注入【Http】插件成功！");
                 return services;
             }
             catch (Exception ex)

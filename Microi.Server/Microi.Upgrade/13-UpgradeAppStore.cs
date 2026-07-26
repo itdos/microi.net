@@ -33,6 +33,10 @@ namespace Microi.net
         private const string ModuleEnginePackageResourceName = "app.microi.module-engine.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
         private const string AppStoreMenuId = "61b7faee-35b2-4571-add2-5231a355f368";
+        // Jint 4.14 的 MemoryLimitConstraint 统计一次执行的累计分配量，而非实时存活堆。
+        // 大型官方应用包在 2GB 限额下会于约 2055MB 被终止；仅提升受信任导入器，
+        // 普通接口引擎仍遵守原有默认值与平台硬上限。
+        private const int ImporterLimitMemoryMb = 3072;
 
         private static readonly string[] RequiredResourceNames =
         {
@@ -75,11 +79,17 @@ namespace Microi.net
 WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     .AddInParameter("p0", "import-microi-store-package")
                     .ToScalar()?.ToString() ?? string.Empty;
+                var importerLimitMemoryText = client.Db.FromSql(@"SELECT LimitMemory FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "import-microi-store-package")
+                    .ToScalar()?.ToString();
                 var versionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
                     importerVersion < new System.Version(1, 6, 6) ||
+                    !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
+                    importerLimitMemory < ImporterLimitMemoryMb ||
                     !code.Contains("field_primary_recovered_") ||
                     !code.Contains("rename_skipped_target_exists_") ||
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
@@ -589,10 +599,18 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             client.Db.FromSql(sql)
                 .AddInParameter("p0", 3600)
                 .AddInParameter("p1", 100000000)
-                .AddInParameter("p2", 2048)
+                .AddInParameter("p2", ImporterLimitMemoryMb)
                 .AddInParameter("p3", 10000)
                 .AddInParameter("p4", "import-microi-store-package")
                 .ExecuteNonQuery();
+        }
+
+        private static async Task EnsureImporterExecutionLimitsAndInvalidateAsync(string osClient)
+        {
+            EnsureImporterExecutionLimits(osClient);
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:import-microi-store-package");
+            await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
         }
 
         private static void EnsurePublisherExecutionSettings(string osClient)
@@ -870,7 +888,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     IsEnable = 1,
                     Timeout = 3600,
                     MaxStatements = 100000000,
-                    LimitMemory = 2048,
+                    LimitMemory = ImporterLimitMemoryMb,
                     LimitRecursion = 10000,
                     Lock = 1,
                     OsClient = osClient,
@@ -892,7 +910,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     IsEnable = 1,
                     Timeout = 3600,
                     MaxStatements = 100000000,
-                    LimitMemory = 2048,
+                    LimitMemory = ImporterLimitMemoryMb,
                     LimitRecursion = 10000,
                     Lock = 1,
                     OsClient = osClient,
@@ -913,9 +931,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             {
                 // 老库虽然已有物理字段，但 diy_field 元数据可能缺失，FormEngine 更新会忽略这些值。
                 // 这里直接修正导入器运行限额，避免大体量元数据包继续使用默认 1GB 限制。
-                EnsureImporterExecutionLimits(osClient);
-                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:import-microi-store-package");
-                await MicroiEngine.CacheTenant.Cache(osClient).RemoveAsync($"Microi:{osClient}:FormData:sys_apiengine:/apiengine/import-microi-store-package");
+                await EnsureImporterExecutionLimitsAndInvalidateAsync(osClient);
             }
             if (msgs.Count > 0) return msgs;
             #endregion
@@ -925,6 +941,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
             #region 应用商城 数据包
             await InstallUpgradePackage(osClient, msgs, AppStorePackageResourceName, "应用商城数据包", resources);
             if (msgs.Count > 0) return msgs;
+            // 尚未同步的官方在线商城包可能仍内嵌 2048MB 配置，并在导入自身时覆盖
+            // 当前导入器。立即恢复受信任导入器限额，保证后续表单/模块大包继续稳定执行。
+            await EnsureImporterExecutionLimitsAndInvalidateAsync(osClient);
             await EnsureAiAppBuilderAsync(osClient, msgs, resources);
             if (msgs.Count > 0) return msgs;
             await EnsureAiPackagingTimeFallback(osClient, msgs);
@@ -1025,7 +1044,10 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                 if(getMenuResult.Code == 1)
                 {
                     var appStoreMenuId = (string)getMenuResult.Data.Id;
-                    var currentMenu = JsonHelper.ToJObject(getMenuResult.Data) ?? new JObject();
+                    // Data 是 dynamic；若直接作为 dynamic 参数调用 ToJObject，整个调用结果也会
+                    // 被编译为 dynamic，随后 JValue.Val<T>() 会被当作实例方法解析并失败。
+                    // 显式落到 object/JObject，确保 Dos.Common 的 JToken 扩展方法静态绑定。
+                    JObject currentMenu = JsonHelper.ToJObject((object)getMenuResult.Data) ?? new JObject();
                     var menuPatch = new JObject
                     {
                         ["Id"] = appStoreMenuId,
