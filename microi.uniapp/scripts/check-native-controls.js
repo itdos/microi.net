@@ -35,6 +35,7 @@ const xjyProposalCalculation = fs.readFileSync(
   path.join(root, 'src/tenants/xjy/proposal-calculation.js'),
   'utf8'
 )
+const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -92,6 +93,15 @@ if (!nativeForm.includes('@change="handleNativeFieldChange(field, $event)"')) {
 }
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')
+}
+// zhy：客户详情应将地图主字段与 _Lat/_Lng 辅助字段合并成内嵌地图。
+for (const token of [
+  'hasTenantDetailMap(field)',
+  'isTenantMapCoordinateHelper(field)',
+  "name.match(/^(.+)_(Lat|Lng)$/i)",
+  "presentation.type === 'map'"
+]) {
+  if (!businessDetail.includes(token)) fail(`business detail map rendering is missing: ${token}`)
 }
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)
