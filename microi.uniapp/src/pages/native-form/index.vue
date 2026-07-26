@@ -84,6 +84,7 @@
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
 				<view v-if="isGroupExpanded(group, groupIndex)" class="form-section__content">
 					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
+						v-show="tenantFieldPresentation(field).visible !== false"
 						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name }">
 						<view class="form-field__label">
 							<text>{{ field.Label || field.Name }}</text>
@@ -114,6 +115,7 @@
 						<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
 							:table-name="tableName" :form-data="form" :menu-id="menuId"
 							:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
+							@change="handleNativeFieldChange(field, $event)"
 							@select="handleNativeFieldSelect"
 							@selector-toggle="handleSelectorToggle(field, $event)" />
 
@@ -198,6 +200,7 @@
 		getTenantFormFieldPresentation,
 		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
+		handleTenantFormFieldChange,
 		initializeTenantForm,
 		notifyTenantFormSaved,
 		prepareTenantFormSubmit,
@@ -505,6 +508,12 @@
 			},
 			async handleNativeFieldSelect(payload) {
 				await handleTenantFormFieldSelect(this.tenantFormContext(), payload)
+			},
+			async handleNativeFieldChange(field, value) {
+				await handleTenantFormFieldChange(this.tenantFormContext(), {
+					field,
+					value
+				})
 			},
 			// zhy: 根据下拉开关状态提升或恢复对应表单分组。
 			handleSelectorToggle(field, open) {
