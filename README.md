@@ -1,26 +1,41 @@
 <div align="center">
 
-<img src="https://static.itdos.com/upload/img/microi-red-256.png" alt="Microi吾码" width="120" />
+<img src="https://static.itdos.com/upload/img/microi-red-256.png" alt="Microi吾码" width="104" />
 
-# Microi 吾码
+# Microi吾码
 
-# AI 深度融合 V8引擎 的开源低代码平台
+## 用 AI 快速开发并交付企业应用
 
-<p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
-  <img src="https://static.itdos.com/upload/img/NET-10.svg" />
-  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" />
-  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" />
+<p>
+  <img src="https://static.itdos.com/upload/img/NET-10.svg" alt=".NET 10" />
+  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" alt="Vue 2 / Vue 3" />
+  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" alt="MIT License" />
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" /></a>
 </p>
 
-🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
-.NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
+开源 AI 低代码平台：`.NET 10 + Vue 3 + Redis`，以 V8 引擎连接 AI 编程、可视化建模与企业级交付。<br>
+支持 VS Code / Codex / Copilot / Cursor / Claude + MCP + Skills，本地或在线开发，保存即生效。
 
-[官网](https://microi.net/) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+[在线体验](https://microi.net/) · [快速开始](https://microi.net/doc/getting-started/start-use.html) · [完整文档](https://microi.net/doc/index.html) · [Docker 部署](https://microi.net/doc/getting-started/docker-run.html) · [Gitee](https://gitee.com/ITdos/microi.net) · [GitHub](https://github.com/itdos/microi.net)
 
 </div>
 
 ---
+
+## 30 秒了解 Microi吾码
+
+| AI 开发 | 低代码建模 | 企业集成 | 私有化交付 |
+|---|---|---|---|
+| AI 理解 V8 API 与真实数据库结构，可在 VS Code 本地编程，也可在平台在线编程 | 表单、模块、工作流、界面、打印、报表等 20+ 引擎覆盖应用全生命周期 | 跨数据库、RabbitMQ、MQTT、Redis、MongoDB、ElasticSearch、Office 与第三方 API | Docker / K8S / CI/CD，多节点分布式部署；PC、UniApp、多端源码开放 |
+
+> Microi吾码不是“只生成页面”的工具。它把业务数据模型、后端接口、权限、流程、前端交互和部署交付放进同一条可持续维护的工程链路。
+
+### 推荐阅读路径
+
+1. [在线注册并体验](https://microi.net/profile.html)
+2. [5 分钟快速开始](https://microi.net/doc/getting-started/start-use.html)
+3. [了解 AI + V8 编程](https://microi.net/doc/v8-engine/ai-apiengine.html)
+4. [使用 Docker 部署](https://microi.net/doc/getting-started/docker-run.html)
 
 ## 📖 平台简介
 
@@ -30,7 +45,7 @@
 
 | 资源 | 地址 |
 |---|---|
-| 🌐 官网 | [https://microi.net](https://microi.net) 【<font color="red">支持在线注册免费使用</font>】 |
+| 🌐 官网 | [https://microi.net](https://microi.net)（支持在线注册免费使用） |
 | 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
 | 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
@@ -92,17 +107,17 @@
 <table>
 <thead><tr><th width="200">引擎</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td>🔗 <strong><a href="/doc/v8-engine/api-engine">接口引擎</a></strong></td><td>在线使用 JavaScript 编写后端接口，支持 AI 在线编程 + VS Code 本地 AI 编程，保存即生效无需编译发布，支持 Get/Post，支持返回 JSON、文件、HTML 等</td></tr>
-<tr><td>🤖 <strong><a href="/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件">AI 本地编程</a></strong></td><td><strong>业界首创。</strong> VS Code 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，GitHub Copilot / Claude Code / Cursor 零配置开箱即用，写代码 → 远程执行 → 逐行断点调试全在 VS Code 内闭环</td></tr>
-<tr><td>🤖 <strong><a href="/doc/v8-engine/ai-apiengine">AI 在线编程</a></strong></td><td>平台内置 DeepSeek 等 AI 模型，上传 V8 文档 + 数据库结构即可生成高质量接口代码，支持自然语言转 SQL、代码智能检查与优化</td></tr>
+<tr><td>🔗 <strong><a href="https://microi.net/doc/v8-engine/api-engine.html">接口引擎</a></strong></td><td>在线使用 JavaScript 编写后端接口，支持 AI 在线编程 + VS Code 本地 AI 编程，保存即生效无需编译发布，支持 Get/Post，支持返回 JSON、文件、HTML 等</td></tr>
+<tr><td>🤖 <strong><a href="https://microi.net/doc/v8-engine/ai-apiengine.html#模式二-本地-ai-编程vs-code-插件">AI 本地编程</a></strong></td><td><strong>业界首创。</strong> VS Code 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，GitHub Copilot / Claude Code / Cursor 零配置开箱即用，写代码 → 远程执行 → 逐行断点调试全在 VS Code 内闭环</td></tr>
+<tr><td>🤖 <strong><a href="https://microi.net/doc/v8-engine/ai-apiengine.html">AI 在线编程</a></strong></td><td>平台内置 DeepSeek 等 AI 模型，上传 V8 文档 + 数据库结构即可生成高质量接口代码，支持自然语言转 SQL、代码智能检查与优化</td></tr>
 <tr><td>📊 <strong>AI 数据分析</strong></td><td>自然语言提问，AI 自动分析业务数据并生成可视化图表，支持接入 DeepSeek、OpenAI 等大模型，自动差量同步向量数据库，AI 训练、微调、提示词管理一站式管理</td></tr>
-<tr><td>📝 <strong><a href="/doc/form-engine/form-engine-info">表单引擎</a></strong></td><td>支持扩展组件、自定义 Vue 组件嵌入表单、V8 引擎事件，灵活实现复杂业务逻辑</td></tr>
-<tr><td>📦 <strong><a href="/doc/system-engine/module-engine">模块引擎</a></strong></td><td>多表关联、查询列、统计列、动态 V8 按钮、复杂 Where 条件、多种嵌入模式</td></tr>
-<tr><td>🔄 <strong><a href="/doc/system-engine/wf-engine">工作流引擎 v4</a></strong></td><td>完全自主研发，由表单引擎 + 接口引擎驱动</td></tr>
-<tr><td>🎨 <strong><a href="/doc/system-engine/page-engine">界面引擎</a></strong></td><td>可视化界面自定义设计，支持 ECharts 图表</td></tr>
-<tr><td>🖨️ <strong><a href="/doc/system-engine/print-engine">打印引擎</a></strong></td><td>在线制作打印模板，无需导出即可打印</td></tr>
-<tr><td>📊 <strong><a href="/doc/system-engine/report-engine">报表引擎</a></strong></td><td>虚拟表格、ECharts 报表，支持自定义增删改</td></tr>
-<tr><td>☁️ <strong><a href="/doc/system-engine/saas-engine">SaaS 引擎</a></strong></td><td>三种模式：数据库隔离多租户、TenantId 租户隔离、独立组织机构隔离</td></tr>
+<tr><td>📝 <strong><a href="https://microi.net/doc/form-engine/form-engine-info.html">表单引擎</a></strong></td><td>支持扩展组件、自定义 Vue 组件嵌入表单、V8 引擎事件，灵活实现复杂业务逻辑</td></tr>
+<tr><td>📦 <strong><a href="https://microi.net/doc/system-engine/module-engine.html">模块引擎</a></strong></td><td>多表关联、查询列、统计列、动态 V8 按钮、复杂 Where 条件、多种嵌入模式</td></tr>
+<tr><td>🔄 <strong><a href="https://microi.net/doc/system-engine/wf-engine.html">工作流引擎 v4</a></strong></td><td>完全自主研发，由表单引擎 + 接口引擎驱动</td></tr>
+<tr><td>🎨 <strong><a href="https://microi.net/doc/system-engine/page-engine.html">界面引擎</a></strong></td><td>可视化界面自定义设计，支持 ECharts 图表</td></tr>
+<tr><td>🖨️ <strong><a href="https://microi.net/doc/system-engine/print-engine.html">打印引擎</a></strong></td><td>在线制作打印模板，无需导出即可打印</td></tr>
+<tr><td>📊 <strong><a href="https://microi.net/doc/system-engine/report-engine.html">报表引擎</a></strong></td><td>虚拟表格、ECharts 报表，支持自定义增删改</td></tr>
+<tr><td>☁️ <strong><a href="https://microi.net/doc/system-engine/saas-engine.html">SaaS 引擎</a></strong></td><td>三种模式：数据库隔离多租户、TenantId 租户隔离、独立组织机构隔离</td></tr>
 </tbody>
 </table>
 
@@ -130,10 +145,10 @@
 <tr><td>🗄️ <strong>跨数据库</strong></td><td>MySql 5.5+ / SqlServer 2016+ / Oracle 11g+，支持读写分离 / 分库分表</td></tr>
 <tr><td>☁️ <strong>分布式部署</strong></td><td>Docker / K8S / Jenkins / Rancher / CI/CD</td></tr>
 <tr><td>💾 <strong>分布式缓存</strong></td><td>Redis 哨兵模式</td></tr>
-<tr><td>📂 <strong><a href="/doc/more/hdfs">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
-<tr><td>📨 <strong><a href="/doc/system-engine/mq">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
-<tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
-<tr><td>🔍 <strong><a href="/doc/system-engine/search-engine">搜索引擎</a></strong></td><td>ElasticSearch 分词搜索</td></tr>
+<tr><td>📂 <strong><a href="https://microi.net/doc/more/hdfs.html">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
+<tr><td>📨 <strong><a href="https://microi.net/doc/system-engine/mq.html">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
+<tr><td>📡 <strong><a href="https://microi.net/doc/system-engine/mqtt-engine.html">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>
+<tr><td>🔍 <strong><a href="https://microi.net/doc/system-engine/search-engine.html">搜索引擎</a></strong></td><td>ElasticSearch 分词搜索</td></tr>
 <tr><td>🍃 <strong>MongoDB</strong></td><td>日志系统，亿级数据量毫秒级分页</td></tr>
 </tbody>
 </table>
@@ -144,17 +159,17 @@
 <thead><tr><th width="200">能力</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td>📄 <strong>模板引擎</strong></td><td>表单/表格支持在线 HTML 模板渲染</td></tr>
-<tr><td>📂 <strong><a href="/doc/system-engine/databases">数据库管理</a></strong></td><td>一键加载第三方数据库，接口引擎中访问任意数据库</td></tr>
-<tr><td>📑 <strong><a href="/doc/more/office">Office 引擎</a></strong></td><td>集成 OnlyOffice，本地设计模板，导出/打印</td></tr>
+<tr><td>📂 <strong><a href="https://microi.net/doc/system-engine/databases.html">数据库管理</a></strong></td><td>一键加载第三方数据库，接口引擎中访问任意数据库</td></tr>
+<tr><td>📑 <strong><a href="https://microi.net/doc/more/office.html">Office 引擎</a></strong></td><td>集成 OnlyOffice，本地设计模板，导出/打印</td></tr>
 <tr><td>🔐 <strong>细粒度权限</strong></td><td>精确到每张表、每个字段、每个菜单、每个按钮、每个接口</td></tr>
 <tr><td>🔑 <strong>单点登录</strong></td><td>支持第三方系统 ↔ 低代码平台双向单点登录</td></tr>
 <tr><td>💬 <strong>微信公众平台</strong></td><td>多公众号 / 多小程序配置、模板消息</td></tr>
 <tr><td>📱 <strong>移动端 (UniApp)</strong></td><td>100% 开源，支持小程序 / H5 / Android / iOS</td></tr>
 <tr><td>🧩 <strong>微服务</strong></td><td>Vue2 基于 Qiankun，Vue3 基于 MicroApp</td></tr>
-<tr><td>⏱️ <strong><a href="/doc/system-engine/job">任务调度</a></strong></td><td>定时执行接口引擎或定制 DLL</td></tr>
+<tr><td>⏱️ <strong><a href="https://microi.net/doc/system-engine/job.html">任务调度</a></strong></td><td>定时执行接口引擎或定制 DLL</td></tr>
 <tr><td>💬 <strong>聊天系统</strong></td><td>自研在线聊天 + 腾讯 IM 集成</td></tr>
-<tr><td>🕷️ <strong><a href="/doc/system-engine/spider-engine">采集引擎</a></strong></td><td>可重复规则采集、真实 Chrome Worker、验证码人工兜底、接口与 DOM 全覆盖</td></tr>
-<tr><td>🌍 <strong><a href="/doc/system-engine/translate-engine">多语言</a></strong></td><td>前后端多语言管理，在线配置</td></tr>
+<tr><td>🕷️ <strong><a href="https://microi.net/doc/system-engine/spider-engine.html">采集引擎</a></strong></td><td>可重复规则采集、真实 Chrome Worker、验证码人工兜底、接口与 DOM 全覆盖</td></tr>
+<tr><td>🌍 <strong><a href="https://microi.net/doc/system-engine/translate-engine.html">多语言</a></strong></td><td>前后端多语言管理，在线配置</td></tr>
 <tr><td>📊 <strong>goView 数据大屏</strong></td><td><a href="https://lisaisai.blog.csdn.net/article/details/149858192?spm=1001.2014.3001.5502">集成 goView</a>，快速实现数据可视化</td></tr>
 <tr><td>🧊 <strong>WebGL 3D 渲染器</strong></td><td>基于 Three.js，支持 .gltf / .obj / .glb / .fbx / .stl 格式</td></tr>
 <tr><td>💬 <strong>腾讯 IM</strong></td><td>快速集成社交聊天、客服会话、直播弹幕</td></tr>

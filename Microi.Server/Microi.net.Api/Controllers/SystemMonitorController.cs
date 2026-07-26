@@ -200,7 +200,7 @@ LIMIT 10;";
         }
 
         /// <summary>
-        /// 获取应用运行日志（Console.WriteLine输出的内容，支持Docker和非Docker环境）
+        /// 获取应用关键运行日志（经 ConsoleLogInterceptor 白名单保留，支持 Docker 和非 Docker 环境）
         /// </summary>
         [HttpGet, HttpPost]
         public JsonResult GetAppLogs(int Lines = 200)
@@ -254,7 +254,7 @@ LIMIT 10;";
                 }
                 catch { }
 
-                return Json(new { Code = 1, Data = new string[0], Source = "Empty", Msg = "暂无日志数据。请在 Program.cs 中注册 Console.SetOut(new ConsoleLogInterceptor(Console.Out)); 以捕获应用日志" });
+                return Json(new { Code = 1, Data = new string[0], Source = "Empty", Msg = "暂无平台级关键日志；普通运行日志请在 MongoDB 系统日志中查询。" });
             }
             catch (Exception ex)
             {

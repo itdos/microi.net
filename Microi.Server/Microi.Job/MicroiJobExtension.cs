@@ -10,6 +10,7 @@ using Microi.net;
 using System.Collections.Specialized;
 using Quartz.Simpl;
 using Microsoft.AspNetCore.Builder;
+using Dos.ORM;
 
 namespace Microi.net
 {
@@ -19,6 +20,14 @@ namespace Microi.net
         {
             try
             {
+                // Quartz 直接把连接串交给 MySql.Data，不会经过 Dos.ORM 的 DbSession。
+                // 因此必须在插件边界统一兼容旧租户的 SslMode=None/false 等历史写法。
+                var quartzDbConn = ConnectionStringCompatibility.Normalize(
+                    DatabaseType.MySql,
+                    dbConn,
+                    100,
+                    120,
+                    600);
                 services.AddQuartz(q =>
                 {
                     //-------使用内存存储作为临时配置 --延迟启动未实验成功
@@ -29,7 +38,7 @@ namespace Microi.net
                     q.UsePersistentStore(x =>
                     {
                         x.UseClustering();
-                        x.UseMySql(dbConn);//OsClient.OsClientDbConn
+                        x.UseMySql(quartzDbConn);//OsClient.OsClientDbConn
                         x.UseNewtonsoftJsonSerializer();
                         // x.SetProperty("quartz.jobStore.misfireThreshold", "60000");//检查失火阈值
                         // x.SetProperty("quartz.scheduler.timeZone", "Asia/Shanghai");//或 "China Standard Time"
@@ -43,7 +52,6 @@ namespace Microi.net
                     {
                         var maxConcurrency = Math.Max(4 * 10, Environment.ProcessorCount * 10);
                         tp.MaxConcurrency = maxConcurrency;
-                        Console.WriteLine($"Microi：【成功】配置【分布式任务调度】插件线程最多[{maxConcurrency}]个！");
                     });
                 });
 
@@ -53,7 +61,6 @@ namespace Microi.net
                     options.StartDelay = TimeSpan.FromSeconds(10); // 延迟启动
                 });
                 services.AddSingleton<IMicroiJob, MicroiQuartzScheduledTask>();
-                Console.WriteLine("Microi：【成功】注入【分布式任务调度】插件成功！");
                 return services;
             }
             catch (Exception ex)
@@ -75,7 +82,6 @@ namespace Microi.net
                 // scheduledTask.InitializeAsync(osClientModel.DbConn).GetAwaiter().GetResult();
 
                 scheduledTask.SyncTaskTime();
-                Console.WriteLine("Microi：【成功】【分布式任务调度】插件启动成功！");
                 return app;
             }
             catch (System.Exception ex)

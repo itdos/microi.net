@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Dos.Common;
 using Dos.ORM;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,6 +13,17 @@ namespace Microi.net
         public static void Init(IServiceProvider serviceProvider)
         {
             _serviceProvider = serviceProvider;
+            RuntimeDiagnostics.Configure(item => QueueSystemLog(
+                item.OsClient,
+                item.Subsystem,
+                item.Action,
+                item.Title,
+                item.Content,
+                item.Level,
+                item.Success,
+                item.TargetId,
+                item.OtherInfo));
+            ConsoleLogInterceptor.FlushPendingToMongo();
         }
         public static T GetService<T>() where T : class
         {
@@ -48,6 +60,46 @@ namespace Microi.net
         public static bool QueueSysLog(SysLogParam param)
         {
             return param != null && SysLogQueue?.Enqueue(param) == true;
+        }
+        /// <summary>
+        /// 将租户级运行诊断写入平台MongoDB日志队列。该旁路永不向调用方抛异常，
+        /// 避免日志系统故障反过来影响Job、MQ等业务线程。
+        /// </summary>
+        public static bool QueueSystemLog(
+            string osClient,
+            string subsystem,
+            string action,
+            string title,
+            string content,
+            int level = 2,
+            bool? success = false,
+            string targetId = null,
+            string otherInfo = null)
+        {
+            try
+            {
+                return QueueSysLog(new SysLogParam
+                {
+                    OsClient = string.IsNullOrWhiteSpace(osClient) ? OsClientDefault.OsClient : osClient,
+                    Category = "System",
+                    Action = action,
+                    Source = subsystem,
+                    TargetType = subsystem,
+                    TargetId = targetId,
+                    Success = success,
+                    OccurredAt = DateTime.Now,
+                    Type = subsystem,
+                    Title = title,
+                    Content = content,
+                    OtherInfo = otherInfo,
+                    Level = level
+                });
+            }
+            catch
+            {
+                // 日志是旁路能力；队列未初始化或正在停止时不能破坏原业务流程。
+                return false;
+            }
         }
         public static IMicroiLock Lock => GetService<IMicroiLock>();
 

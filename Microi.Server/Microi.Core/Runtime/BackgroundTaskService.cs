@@ -257,7 +257,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【后台任务】推送任务列表失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "BackgroundTask", "RealtimePushFailed", "后台任务列表实时推送失败", ex.ToString(), 2, false, userKey);
             }
         }
 
@@ -417,13 +417,13 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Microi：【后台任务】读取Redis任务失败，TaskId={entry.Name}：{ex.Message}");
+                        MicroiEngine.QueueSystemLog(normalizedOsClient, "BackgroundTask", "RedisTaskReadFailed", "读取 Redis 后台任务失败", ex.ToString(), 2, false, entry.Name);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【后台任务】读取Redis任务列表失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(normalizedOsClient, "BackgroundTask", "RedisTaskListReadFailed", "读取 Redis 后台任务列表失败", ex.ToString(), 2, false, normalizedUserKey);
             }
 
             foreach (var item in Tasks.Values
@@ -457,7 +457,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【后台任务】保存Redis任务失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(item.OsClient, "BackgroundTask", "RedisTaskWriteFailed", "保存 Redis 后台任务失败", ex.ToString(), 2, false, item.Id);
             }
         }
 
@@ -476,7 +476,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【后台任务】删除Redis任务失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "BackgroundTask", "RedisTaskDeleteFailed", "删除 Redis 后台任务失败", ex.ToString(), 2, false, taskId);
                 return false;
             }
         }
@@ -511,7 +511,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【后台任务】修剪Redis任务失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "BackgroundTask", "RedisTaskPruneFailed", "修剪 Redis 后台任务失败", ex.ToString(), 2, false, userKey);
             }
         }
 

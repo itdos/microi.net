@@ -11,6 +11,15 @@ namespace Microi.net
     /// </summary>
     public class DwgConverter
     {
+        private const string LoggedFlag = "MicroiDwgConverterLogged";
+
+        private static void LogFailureOnce(Exception ex, string action, string title, string targetId = null)
+        {
+            if (ex == null || ex.Data.Contains(LoggedFlag)) return;
+            ex.Data[LoggedFlag] = true;
+            MicroiEngine.QueueSystemLog(null, "DwgConverter", action, title, ex.ToString(), 3, false, targetId);
+        }
+
         /// <summary>
         /// 将DWG文件转换为DXF格式
         /// </summary>
@@ -61,7 +70,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"DWG转DXF失败: {ex.Message}");
+                LogFailureOnce(ex, "FileConversionFailed", "DWG 文件转换为 DXF 失败", Path.GetFileName(dwgFilePath));
                 throw;
             }
         }
@@ -114,7 +123,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"DWG转DXF失败: {ex.Message}");
+                LogFailureOnce(ex, "StreamConversionFailed", "DWG 流转换为 DXF 失败");
                 throw;
             }
         }
@@ -140,7 +149,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"DWG转DXF字节数组失败: {ex.Message}");
+                LogFailureOnce(ex, "FileToBytesFailed", "DWG 文件转换为 DXF 字节失败", Path.GetFileName(dwgFilePath));
                 throw;
             }
         }
@@ -169,7 +178,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"DWG字节数组转DXF字节数组失败: {ex.Message}");
+                LogFailureOnce(ex, "BytesConversionFailed", "DWG 字节转换为 DXF 字节失败");
                 throw;
             }
         }
@@ -200,7 +209,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"读取DWG文件信息失败: {ex.Message}");
+                LogFailureOnce(ex, "ReadFileInfoFailed", "读取 DWG 文件信息失败", Path.GetFileName(dwgFilePath));
                 throw;
             }
         }
@@ -251,12 +260,11 @@ namespace Microi.net
                         if (ConvertDwgToDxf(dwgFile, dxfFilePath, isBinary))
                         {
                             successCount++;
-                            Console.WriteLine($"成功转换: {Path.GetFileName(dwgFile)} -> {Path.GetFileName(dxfFilePath)}");
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"转换文件失败 {Path.GetFileName(dwgFile)}: {ex.Message}");
+                        LogFailureOnce(ex, "BatchFileConversionFailed", "批量任务中的 DWG 文件转换失败", Path.GetFileName(dwgFile));
                     }
                 }
 
@@ -264,7 +272,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"批量转换失败: {ex.Message}");
+                LogFailureOnce(ex, "BatchConversionFailed", "批量转换 DWG 文件失败", Path.GetFileName(dwgDirectoryPath));
                 throw;
             }
         }

@@ -21,6 +21,7 @@ using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Linq.Expressions;
+using Dos.Common;
 using Dos;
 using Dos.ORM;
 
@@ -133,7 +134,7 @@ namespace Dos.ORM
                     catch (Exception ex)
                     {
                         // 数据库事务已经提交，提交后通知失败不能把已提交业务伪装成回滚。
-                        Console.WriteLine("Microi：【Warning】事务提交后回调执行失败：" + ex.Message);
+                        RuntimeDiagnostics.Write("Dos.ORM", "AfterCommitCallbackFailed", "事务提交后回调执行失败", ex.ToString(), 3);
                     }
                 }
             }
@@ -248,7 +249,7 @@ namespace Dos.ORM
             {
                 var sqlPreview = sql?.Length > 200 ? sql.Substring(0, 200) : sql;
                 var errMsg = $"数据库事务连接已断开（State={conn.State}），无法执行SQL。可能原因：同一事务中前面的某个SQL执行导致MySQL驱动关闭了连接（Fatal error），或事务持有时间过长。SQL={sqlPreview}";
-                Console.WriteLine($"Microi：【Error异常】{errMsg}");
+                RuntimeDiagnostics.Write("Dos.ORM", "TransactionConnectionClosed", "数据库事务连接已断开", $"State={conn.State}；SQL 长度={sql?.Length ?? 0}", 3);
                 throw new InvalidOperationException(errMsg);
             }
             return dbSession.FromSql(sql).SetDbTransaction(trans);

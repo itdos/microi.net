@@ -180,7 +180,6 @@ namespace Microi.net
                     option.ImageOption.Quality = optionDefault.ImageOption.Quality;
                 });
                 services.AddSingleton<IMicroiCaptchaRecognizer, MicroiCaptchaRecognizer>();
-                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入并初始化【验证码】插件成功！");
                 return services;
             }
             catch (Exception ex)

@@ -86,7 +86,7 @@ if(V8.Form.Phone.length != 11){
 
 ## 开关 Switch
 >* 开关组件默认为int类型，打开1，关闭0（很老的版本默认是bit类型，建议更换为int类型）
->* __<font color="red">开关组件不能是varchar类型，否则不管数据库存的是"1"或者"0"，都会显示打开</font>__
+>* __<span class="mci-doc-danger">开关组件不能是varchar类型，否则不管数据库存的是"1"或者"0"，都会显示打开</span>__
 
 ## 日期时间 DateTime
 >* 建议使用varchar类型，主要原因是日期支持各种格式设置

@@ -30,8 +30,9 @@ using Newtonsoft.Json.Linq;
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-// ⚙️ 注册Console输出拦截器，捕获所有Console.WriteLine到内存环形缓冲区（用于系统监控-应用日志）
+// ⚙️ 注册 Console 分流器：平台级关键日志保留 stdout，其它历史 Console 日志写入 MongoDB。
 Console.SetOut(new Microi.net.ConsoleLogInterceptor(Console.Out));
+Console.SetError(new Microi.net.ConsoleLogInterceptor(Console.Error));
 
 // 🔧 本地环境快速切换：读取 .microi-local 文件（已加入 .gitignore，每位开发者本地独立配置）
 // 优先级：IDE 环境变量（launch.json env / launchSettings.json）> .microi-local > 系统环境变量

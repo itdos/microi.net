@@ -409,7 +409,7 @@ namespace Microi.net
             {
                 if (client == null || client.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    Console.WriteLine("Microi：【Error异常】AddOrUptClient中OsClient不能为空！");
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "SaaS", "EmptyTenantRejected", "更新租户运行时配置失败", "OsClient 不能为空。", 2);
                     return client;
                 }
 
@@ -420,7 +420,7 @@ namespace Microi.net
                     return client;
                 }
 
-                Console.WriteLine("Microi：【成功】更新OsClient：" + client.OsClient);
+                MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "RuntimeConfigurationUpdated", "租户运行时配置已更新", "本节点 ClientList 已刷新。", 1, true, client.OsClient);
 
                 // 第二步：提取可序列化配置并缓存到L2（Redis）
                 try
@@ -433,19 +433,19 @@ namespace Microi.net
                     {
                         // 缓存配置到Redis（此操作自动触发Pub/Sub通知所有实例）
                         SetToCache(cache, cacheKey, config);
-                        Console.WriteLine($"Microi：【成功】缓存OsClient配置到Redis：{client.OsClient}");
+                        MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "ConfigurationCached", "租户配置已缓存到 Redis", "已发布跨节点缓存失效通知。", 1, true, client.OsClient);
                     }
                 }
                 catch (Exception cacheEx)
                 {
-                    Console.WriteLine($"Microi：【警告】缓存OsClient配置失败（non-critical）：{cacheEx.Message}");
+                    MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "ConfigurationCacheFailed", "租户配置写入 Redis 失败", cacheEx.ToString(), 2, false, client.OsClient);
                 }
 
                 return client;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】更新OsClient：" + client.OsClient + "失败！" + ex.Message);
+                MicroiEngine.QueueSystemLog(client?.OsClient, "SaaS", "RuntimeConfigurationUpdateFailed", "更新租户运行时配置失败", ex.ToString(), 2, false, client?.OsClient);
                 return client;
             }
         }

@@ -250,3 +250,16 @@ Microi:myapp:api:count:userId:date     API 调用计数
 - Key 命名建议：`Microi:{V8.OsClient}:{分类}:{Key}`，避免跨应用冲突
 - 写操作后即时清除相关缓存，避免脏数据
 - 不要缓存频繁变化的数据（如实时库存），不如每次查库
+
+## 后端批量写入与 Redis Pub/Sub 回压
+
+平台源码中的缓存写入、删除和按模式删除不仅操作 Redis 数据，还会发布跨节点 L1
+失效通知。批量导入、自动升级和迁移代码必须 `await` 这些异步调用，禁止
+fire-and-forget；否则数千个 `SCAN/DEL/PUBLISH` 会同时进入同一个
+`ConnectionMultiplexer`，表现为 `outstanding` 持续升高、`SocketClosed`，并可能让
+其它节点继续使用旧缓存。
+
+- 同一租户的失效广播要有界并发，短暂连接异常可做有限次数重试；
+- 持续故障的日志应按时间窗口汇总，但不得静默吞掉一致性告警；
+- 每个租户可能使用不同 Redis，订阅初始化状态不得用一个全局 `static bool` 共享；
+- 等待发布只解决回压，业务写入和缓存失效仍需保持 `OsClient` 隔离及可重试幂等。

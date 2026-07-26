@@ -91,6 +91,12 @@ namespace Microi.net.Api
             public string Source { get; set; }
         }
 
+        public class GenerateAvatarParam
+        {
+            public string Prompt { get; set; }
+            public int Count { get; set; } = 4;
+        }
+
         /// <summary>
         /// 修改当前用户整组 AI 对话标题。
         /// </summary>
@@ -492,7 +498,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[AiController] SubAlipayNotify 异常: {ex.Message}");
+                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "AI", "SubscriptionPaymentCallbackFailed", "AI 订阅支付回调处理异常", ex.ToString(), 2);
                 return Content("fail");
             }
         }
@@ -639,6 +645,20 @@ namespace Microi.net.Api
                 await _proxyService.ExecuteAuthenticatedAsync(
                     userId,
                     rawBody));
+        }
+
+        /// <summary>
+        /// 为当前登录用户生成候选头像。上游密钥只在服务端使用，返回的候选图
+        /// 仍需由用户选中后上传到本租户 HDFS 并保存为账户头像。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GenerateProfileAvatar([FromBody] GenerateAvatarParam param)
+        {
+            var (userId, _) = await GetCurrentUserAsync();
+            return Json(await _proxyService.GenerateAuthenticatedAvatarAsync(
+                userId,
+                param?.Prompt,
+                param?.Count ?? 4));
         }
 
         /// <summary>

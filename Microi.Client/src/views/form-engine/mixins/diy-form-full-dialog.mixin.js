@@ -403,6 +403,14 @@ export default {
             var result = self.DiyCommon.IsNull(self.CurrentDiyTableModel.FormOpenWidth) ? "50%" : self.CurrentDiyTableModel.FormOpenWidth;
             return result;
         },
+        GetOpenFormStyle() {
+            var self = this;
+            if (!self.Height || self.diyStore.IsPhoneView) {
+                return {};
+            }
+            var height = typeof self.Height === "number" ? self.Height + "px" : String(self.Height);
+            return { height: height };
+        },
         // ========== zhy生成实例ID ==========
         _generateInstanceId(prefix) {
             var self = this;

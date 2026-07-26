@@ -31,9 +31,20 @@
                 立即体验
                 <span aria-hidden="true">↗</span>
               </button>
+              <button
+                type="button"
+                class="favorite"
+                :class="{ active: isFavorite }"
+                :disabled="favoriteBusy"
+                @click="setFavorite"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 4.8a5.5 5.5 0 0 0-7.8 0L12 5.9l-1.1-1.1a5.5 5.5 0 1 0-7.8 7.8L12 21l8.8-8.4a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+                {{ isFavorite ? '已收藏' : '收藏应用' }} · {{ formatNumber(app.FavoriteCount) }}
+              </button>
               <a class="secondary" href="/apps.html">浏览更多应用</a>
             </div>
           </section>
+          <p v-if="favoriteMessage" class="app-detail-action-message" role="status">{{ favoriteMessage }}</p>
 
           <section class="app-detail-facts" aria-label="应用数据">
             <article>
@@ -43,6 +54,10 @@
             <article>
               <strong>{{ formatNumber(app.InstallCount) }}</strong>
               <span>安装次数</span>
+            </article>
+            <article>
+              <strong>{{ formatNumber(app.FavoriteCount) }}</strong>
+              <span>收藏次数</span>
             </article>
             <article>
               <strong>{{ typeLabel(app.ApplicationType) }}</strong>
@@ -113,18 +128,23 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
 import { withPreviewVersion } from '../utils/app-preview-url.js'
-import { resolveSiteApiBase } from '../utils/site-api-base.js'
+import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
 
 const route = useRoute()
-const APP_API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_PUBLIC_API_BASE)
+// 应用详情与列表使用同一官方公开源，防止开发环境误读其它租户。
+const APP_API_BASE = OFFICIAL_MICROI_API_BASE
 const OS_CLIENT = 'iTdos'
 
 const app = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
+const authToken = ref('')
+const isFavorite = ref(false)
+const favoriteBusy = ref(false)
+const favoriteMessage = ref('')
 
 const isDetailPage = computed(() => ['/app-detail', '/app-detail.html'].includes(route.path || ''))
 const updatedDate = computed(() => {
@@ -180,7 +200,94 @@ function normalizeApp(item) {
     icon: iconMap[category] || 'AI',
     tone: toneMap[category] || 'blue',
     ViewCount: Number(item.ViewCount || 0),
-    InstallCount: Number(item.InstallCount || 0)
+    InstallCount: Number(item.InstallCount || 0),
+    FavoriteCount: Number(item.FavoriteCount || 0)
+  }
+}
+
+function normalizeToken(raw) {
+  return String(raw || '').replace(/^Bearer\s+/i, '').trim()
+}
+
+function syncAuth() {
+  if (typeof window === 'undefined') return
+  let hasUser = false
+  try { hasUser = Boolean(JSON.parse(localStorage.getItem('microi_doc_user') || 'null')?.Id) } catch (_) {}
+  const token = normalizeToken(localStorage.getItem('microi_doc_token'))
+  authToken.value = token && hasUser ? token : ''
+  if (!authToken.value) isFavorite.value = false
+}
+
+function authHeaders() {
+  return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
+}
+
+function syncTokenFromResponse(response) {
+  const token = normalizeToken(response?.headers?.get?.('authorization'))
+  if (!token || token === authToken.value) return
+  authToken.value = token
+  localStorage.setItem('microi_doc_token', token)
+  window.dispatchEvent(new CustomEvent('microi-token-refreshed'))
+}
+
+function isSessionExpired(result) {
+  return [1001, 1002].includes(Number(result?.Code)) || /登录|权限|Token/i.test(result?.Msg || '')
+}
+
+async function loadFavoriteStatus() {
+  if (!authToken.value || !app.value?.Id) return
+  try {
+    const response = await fetch(`${APP_API_BASE}/apiengine/official_ai_app_favorite?OsClient=${OS_CLIENT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ Action: 'Status', AppIds: [app.value.Id] })
+    })
+    syncTokenFromResponse(response)
+    const result = await response.json()
+    if (isSessionExpired(result)) {
+      authToken.value = ''
+      return
+    }
+    if (result.Code === 1) {
+      isFavorite.value = (result.Data?.FavoriteIds || []).map(String).includes(String(app.value.Id))
+    }
+  } catch (_) {
+    // 收藏状态不阻断公开详情。
+  }
+}
+
+async function setFavorite() {
+  if (!app.value || favoriteBusy.value) return
+  favoriteMessage.value = ''
+  if (!authToken.value) {
+    const redirect = encodeURIComponent(`${window.location.pathname}${window.location.search}`)
+    window.location.href = `/login.html?redirect=${redirect}`
+    return
+  }
+  favoriteBusy.value = true
+  try {
+    const response = await fetch(`${APP_API_BASE}/apiengine/official_ai_app_favorite?OsClient=${OS_CLIENT}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ Action: 'Set', AppId: app.value.Id, IsFavorite: !isFavorite.value })
+    })
+    syncTokenFromResponse(response)
+    const result = await response.json()
+    if (result.Code !== 1) {
+      if (isSessionExpired(result)) {
+        authToken.value = ''
+        window.location.href = `/login.html?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`
+        return
+      }
+      throw new Error(result.Msg || '收藏失败')
+    }
+    isFavorite.value = Boolean(result.Data?.IsFavorite)
+    app.value.FavoriteCount = Number(result.Data?.FavoriteCount || 0)
+    favoriteMessage.value = isFavorite.value ? '已加入收藏' : '已取消收藏'
+  } catch (error) {
+    favoriteMessage.value = error?.message || '收藏失败，请稍后重试'
+  } finally {
+    favoriteBusy.value = false
   }
 }
 
@@ -204,7 +311,7 @@ async function loadApp() {
     const matched = result.Data.find(item => String(item.AppKey || item.AppId) === appKey)
     if (!matched) throw new Error('应用不存在或尚未发布')
     app.value = normalizeApp(matched)
-    await recordView()
+    await Promise.all([recordView(), loadFavoriteStatus()])
   } catch (error) {
     errorMessage.value = error?.message || '网络异常'
   } finally {
@@ -252,7 +359,26 @@ function formatNumber(value) {
   return new Intl.NumberFormat('zh-CN').format(Number(value || 0))
 }
 
-onMounted(loadApp)
+function handleAuthChange() {
+  syncAuth()
+  loadFavoriteStatus()
+}
+
+onMounted(() => {
+  syncAuth()
+  loadApp()
+  window.addEventListener('storage', handleAuthChange)
+  window.addEventListener('microi-login-success', handleAuthChange)
+  window.addEventListener('microi-logout', handleAuthChange)
+  window.addEventListener('microi-token-refreshed', handleAuthChange)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('storage', handleAuthChange)
+  window.removeEventListener('microi-login-success', handleAuthChange)
+  window.removeEventListener('microi-logout', handleAuthChange)
+  window.removeEventListener('microi-token-refreshed', handleAuthChange)
+})
 </script>
 
 <style scoped>
@@ -441,6 +567,16 @@ onMounted(loadApp)
   text-decoration: none;
 }
 
+.app-detail-actions svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .app-detail-actions .primary {
   border: 1px solid #1769e0;
   background: #1769e0;
@@ -454,15 +590,49 @@ onMounted(loadApp)
   color: #253148;
 }
 
+.app-detail-actions .favorite {
+  border: 1px solid #dfe5ed;
+  background: #fff;
+  color: #536078;
+}
+
+.app-detail-actions .favorite.active {
+  border-color: rgba(244, 63, 94, .3);
+  background: rgba(244, 63, 94, .08);
+  color: #e11d48;
+}
+
+.app-detail-actions .favorite.active svg { fill: currentColor; }
+.app-detail-actions .favorite:disabled { opacity: .58; cursor: wait; }
+
+.app-detail-action-message {
+  margin: 10px 8px -8px;
+  color: #1769e0;
+  font-size: 12px;
+  text-align: right;
+}
+
 :global(html.dark .app-detail-actions .secondary) {
   border-color: rgba(148, 163, 184, .2);
   background: #162134;
   color: #f4f7fb;
 }
 
+:global(html.dark .app-detail-actions .favorite) {
+  border-color: rgba(148, 163, 184, .2);
+  background: #162134;
+  color: #cbd5e1;
+}
+
+:global(html.dark .app-detail-actions .favorite.active) {
+  border-color: rgba(251, 113, 133, .38);
+  background: rgba(244, 63, 94, .12);
+  color: #fb7185;
+}
+
 .app-detail-facts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 20px 0;
   border: 1px solid #e2e7ef;
   border-radius: 22px;
@@ -602,6 +772,32 @@ onMounted(loadApp)
   line-height: 1.7;
 }
 
+:global(html.dark .app-detail-browser) {
+  border-color: rgba(148, 163, 184, .2);
+  background: #07101e;
+}
+
+:global(html.dark .browser-bar) {
+  border-bottom-color: rgba(148, 163, 184, .18);
+  background: #0d1726;
+}
+
+:global(html.dark .browser-bar span) { color: #94a3b8; }
+
+:global(html.dark .app-detail-browser iframe) {
+  background: #07101e;
+  color-scheme: dark;
+}
+
+:global(html.dark .app-detail-platform) {
+  background:
+    radial-gradient(circle at 50% 25%, rgba(99, 102, 241, .18), transparent 19rem),
+    linear-gradient(145deg, #0b1423, #0d1727);
+  color: #f8fafc;
+}
+
+:global(html.dark .app-detail-platform p) { color: #94a3b8; }
+
 .app-detail-about {
   padding: 26px;
 }
@@ -624,6 +820,14 @@ onMounted(loadApp)
   gap: 5px;
   padding: 14px 0;
   border-top: 1px solid #e7ebf1;
+}
+
+:global(html.dark .app-detail-about dl div) {
+  border-top-color: rgba(148, 163, 184, .18);
+}
+
+:global(html.dark .app-detail-facts article + article::before) {
+  background: rgba(148, 163, 184, .18);
 }
 
 .app-detail-about dt {
@@ -696,7 +900,7 @@ onMounted(loadApp)
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .app-detail-facts article:nth-child(3)::before {
+  .app-detail-facts article:nth-child(odd)::before {
     display: none;
   }
 

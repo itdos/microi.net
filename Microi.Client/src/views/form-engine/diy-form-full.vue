@@ -270,10 +270,13 @@
         <el-dialog
             v-if="ShowFieldForm"
             class="diy-form-container"
+            :class="{ 'diy-form-fixed-height': !!Height }"
             draggable
             align-center
             :width="GetOpenFormWidth()"
+            :style="GetOpenFormStyle()"
             :modal="true"
+            :modal-class="Height ? 'diy-form-fixed-height-overlay' : ''"
             :modal-append-to-body="true"
             :model-value="ShowFieldForm"
             @update:model-value="ShowFieldForm = $event"
@@ -414,7 +417,7 @@
                     <el-button :icon="Close" @click="CloseFieldForm('ShowFieldForm', 'Close', TableRowId)" />
                 </div>
             </template>
-            <el-row class="clear" :gutter="20">
+            <el-row class="clear diy-form-dialog-scroll-content" :gutter="20">
                 <el-col :span="ShowDesktopFormRight ? 19 : 24" :xs="24">
                     <FormViewRenderer
                         v-if="UseViewSchemaDetail"
@@ -1310,7 +1313,7 @@ export default {
          * 初始化方法（外部调用入口）
          * 必传：TableId或TableName、FormMode（Add/Edit/View）、Id（当FormMode为View或Edit时，必传Id）
          * 可传：DialogType（Dialog/Drawer/Page），若不传，则读取表单设计中配置的宽度。
-         * 可传：Width宽度
+         * 可传：Width宽度、Height高度（如 80vh）
          * 可传：SelectFields：['fieldName']
          * 可传：DefaultValues：{ fieldName: value } 表单默认值
          * 可传：FixedTabs：[] 固定标签页
@@ -1341,6 +1344,7 @@ export default {
             self.ApiReplace = param.ApiReplace || {};
             self.EventReplace = param.EventReplace || {};
             self.Width = param.Width;
+            self.Height = param.Height || "";
             self.DataAppend = param.DataAppend || {};
 
             // 支持通过 Init 传入 ParentV8（如 V8.OpenAnyForm 调用时的上下文传递）

@@ -14,7 +14,7 @@
             <div v-if="ShowChat" class="right-menu-item hover-effect" @click="SwitchDiyChatShow()">
                 <el-badge :value="$root.UnreadCount" :max="99" :hidden="$root.UnreadCount == 0 || !ShowUnreadCount"
                     style="display: flex;">
-                    <el-icon class="menu-icon" :style="{ color: WebSocketOnline ? themeColor : '#606266' }"><ChatDotRound /></el-icon>
+                    <el-icon class="menu-icon" :style="{ color: WebSocketOnline ? 'var(--mci-color-primary, #409eff)' : 'var(--el-text-color-regular)' }"><ChatDotRound /></el-icon>
                 </el-badge>
             </div>
 
@@ -30,7 +30,7 @@
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
-                    <font-awesome-icon icon="fa-solid fa-display" style="color: #333;font-size:18px;" />
+                    <font-awesome-icon icon="fa-solid fa-display" style="color: var(--el-text-color-regular);font-size:18px;" />
                 </a>
                 <template #dropdown>
                     <el-dropdown-menu>
@@ -169,7 +169,6 @@ export default {
         const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
         const SysConfig = computed(() => diyStore.SysConfig);
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
-        const themeColor = computed(() => diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff");
 
         return {
             diyStore,
@@ -189,7 +188,6 @@ export default {
             ShowClassicTop,
             SysConfig,
             GetCurrentUser,
-            themeColor
         };
     },
     data() {
@@ -271,9 +269,6 @@ export default {
                 self.$root.ChatType = self.ChatType;
             }
         }
-
-        // 动态修改 CSS 变量
-        document.documentElement.style.setProperty("--color-primary", self.themeColor || "#409eff");
 
         // 监听浏览器全屏状态变化
         this._fullscreenChangeHandler = () => {
@@ -528,8 +523,10 @@ export default {
 .navbar-microi {
     height: 50px;
     position: relative;
-    background: #fff;
-    box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+    background: var(--el-bg-color, #fff);
+    color: var(--el-text-color-regular, #334155);
+    border-bottom: 1px solid var(--el-border-color, #e2e8f0);
+    box-shadow: var(--mci-shadow-card, 0 1px 4px rgba(0, 21, 41, 0.08));
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -546,7 +543,7 @@ export default {
         flex-shrink: 0;
 
         &:hover {
-            background: rgba(0, 0, 0, 0.025);
+            background: var(--el-fill-color-light, rgba(0, 0, 0, 0.025));
         }
     }
 
@@ -585,7 +582,7 @@ export default {
             padding: 0 8px;
             height: 40px;
             font-size: 18px;
-            color: #5a5e66;
+            color: var(--el-text-color-regular, #5a5e66);
             white-space: nowrap;
 
             &.hover-effect {
@@ -594,13 +591,13 @@ export default {
                 border-radius: 4px;
 
                 &:hover {
-                    background: rgba(0, 0, 0, 0.025);
+                    background: var(--el-fill-color-light, rgba(0, 0, 0, 0.025));
                 }
             }
 
             &.tenant-name {
                 font-size: 13px;
-                color: #606266;
+                color: var(--el-text-color-secondary, #606266);
                 // font-weight: 500;
             }
         }
