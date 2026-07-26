@@ -1,5 +1,6 @@
 using System;
 using System.Data;
+using Dos.Common;
 using Dos.ORM;
 
 namespace Dos.ORM
@@ -39,7 +40,7 @@ namespace Dos.ORM
         /// </summary>
         public override void Commit()
         {
-            Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码调用了Commit()，已拦截忽略。来源: {Source ?? "未知"}。事务生命周期由框架管理，V8代码不应直接调用Commit/Rollback。");
+            RuntimeDiagnostics.Write("Dos.ORM", "UnsafeCommitBlocked", "已拦截 V8 脚本直接提交事务", $"来源：{Source ?? "未知"}。事务生命周期由框架管理。", 2);
         }
 
         /// <summary>
@@ -47,7 +48,7 @@ namespace Dos.ORM
         /// </summary>
         public override void Rollback()
         {
-            Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码调用了Rollback()，已拦截忽略。来源: {Source ?? "未知"}。事务生命周期由框架管理，V8代码不应直接调用Commit/Rollback。");
+            RuntimeDiagnostics.Write("Dos.ORM", "UnsafeRollbackBlocked", "已拦截 V8 脚本直接回滚事务", $"来源：{Source ?? "未知"}。事务生命周期由框架管理。", 2);
         }
 
         /// <summary>
@@ -55,7 +56,7 @@ namespace Dos.ORM
         /// </summary>
         public override void Close()
         {
-            Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[SafeTransactionProxy] V8脚本代码调用了Close()，已拦截忽略。来源: {Source ?? "未知"}");
+            RuntimeDiagnostics.Write("Dos.ORM", "UnsafeCloseBlocked", "已拦截 V8 脚本直接关闭事务", $"来源：{Source ?? "未知"}。事务生命周期由框架管理。", 2);
         }
 
         public override void Dispose()

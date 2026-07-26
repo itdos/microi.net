@@ -41,6 +41,7 @@ export default {
                             TableName: 'sys_menu',
                             TableRowId: self.SysMenuModel.Id,  // 使用TableRowId而不是Id
                             DialogType: "Dialog",
+                            Height: "80vh",
                             FormMode: 'Edit',
                             SubmitEvent: function(formData, callback) {
                                 // 表单提交后的回调

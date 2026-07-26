@@ -65,6 +65,11 @@ namespace Microi.net
         // MongoDB连接配置缓存，避免频繁调用OsClient.GetClient
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _mongoConnectionCache = new();
 
+        private static void WriteWebSocketLog(string osClient, string action, string title, string content, int level = 2, string targetId = null)
+        {
+            MicroiEngine.QueueSystemLog(osClient, "WebSocket", action, title, content, level, false, targetId);
+        }
+
         private static string SafeString(object? value)
         {
             if (value == null)
@@ -119,8 +124,6 @@ namespace Microi.net
                 userId = Context.User.Claims.FirstOrDefault(c => c.Type == "UserId")?.Value;
                 osClient = Context.User.Claims.FirstOrDefault(c => c.Type == "OsClient")?.Value;
                 
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 从 Claims 获取用户信息 - UserId: {userId}, OsClient: {osClient}");
-                
                 if (!string.IsNullOrEmpty(userId) && !string.IsNullOrEmpty(osClient))
                 {
                     // 尝试重新从缓存获取完整用户信息
@@ -130,18 +133,17 @@ namespace Microi.net
                     if (currentToken != null && currentToken.CurrentUser != null)
                     {
                         currentToken.OsClient = osClient;
-                        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 从缓存重新获取用户信息成功");
                     }
                     else
                     {
-                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 缓存中未找到用户信息: Microi:{osClient}:LoginTokenSysUser:{userId}");
+                        WriteWebSocketLog(osClient, "TokenCacheMiss", "WebSocket 未找到登录缓存", "Claims 有效但缓存中没有完整用户信息。", 2, userId);
                     }
                 }
             }
             
             if(currentToken?.CurrentUser == null)
             {
-                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 已拒绝未携带有效Token的连接 - IsAuthenticated: {Context.User?.Identity?.IsAuthenticated}, Claims Count: {Context.User?.Claims?.Count() ?? 0}");
+                WriteWebSocketLog(osClient, "UnauthorizedConnectionRejected", "WebSocket 未授权连接已拒绝", $"IsAuthenticated={Context.User?.Identity?.IsAuthenticated}; ClaimsCount={Context.User?.Claims?.Count() ?? 0}", 3, userId);
                 // 只 return 会让 SignalR 把未初始化的匿名连接保留到超时；明确中止，
                 // 既不恢复旧版按 UserId/OsClient 直接信任的安全漏洞，也避免空连接占用资源。
                 Context.Abort();
@@ -238,11 +240,13 @@ namespace Microi.net
         public override async Task OnDisconnectedAsync(Exception exception)
         {
             string connid = base.Context.ConnectionId;
+            string osClient = null;
+            string userId = null;
             try
             {
                 var currentToken = await DiyToken.GetCurrentToken();
-                var osClient = currentToken?.OsClient;
-                var userId = currentToken?.CurrentUser?["Id"].Val<string>();
+                osClient = currentToken?.OsClient;
+                userId = currentToken?.CurrentUser?["Id"].Val<string>();
                 
                 // 如果通过 token 获取不到用户信息，尝试从 Claims 获取
                 if (string.IsNullOrEmpty(userId) && Context.User?.Identity?.IsAuthenticated == true)
@@ -275,14 +279,13 @@ namespace Microi.net
                             // 没有活跃连接了，移除在线记录
                             await diyCacheBase.RemoveAsync($"Microi:{osClient}:ChatOnline:{userId}");
                         }
-                        Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 用户断开连接 - UserId: {userId}, ConnId: {connid}, 剩余连接: {clientInfo.ConnectionIds.Count}");
                     }
                 }
                 await OnlineTerminalService.TrackDisconnectedAsync(osClient, userId, connid).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] OnDisconnectedAsync 错误: {ex.Message}");
+                WriteWebSocketLog(osClient, "DisconnectCleanupFailed", "WebSocket 断开清理失败", ex.ToString(), 2, userId);
             }
             
             await base.OnDisconnectedAsync(exception);
@@ -319,7 +322,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【后台任务】WebSocket推送任务列表失败：{ex.Message}");
+                WriteWebSocketLog(OsClientDefault.OsClient, "BackgroundTaskPushFailed", "WebSocket 推送后台任务列表失败", ex.ToString(), 2);
             }
         }
 
@@ -499,7 +502,6 @@ namespace Microi.net
                 // 如果接收者是AI用户，自动触发AI回复
                 if (msg.ToUserId == "AI")
                 {
-                    Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 检测到发送给AI的消息: {msg.Content}");
                     var trustedAiToken = await DiyToken.GetCurrentToken();
                     var trustedAiUser = trustedAiToken?.CurrentUser;
                     var trustedAiOsClient = trustedAiToken?.OsClient?.Trim();
@@ -517,17 +519,13 @@ namespace Microi.net
                             msg.FromUserId?.Trim(),
                             StringComparison.OrdinalIgnoreCase))
                     {
-                        Console.WriteLine(
-                            $"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
-                            + "AI聊天身份或租户与当前登录Token不一致，已拒绝后台AI调用。");
+                        WriteWebSocketLog(msg.OsClient, "AiIdentityRejected", "AI 聊天身份或租户不一致，已拒绝调用", "消息身份与当前登录 Token 不一致。", 3, msg.FromUserId);
                         return;
                     }
 
                     if (_microiAI == null || _backgroundHubContext == null)
                     {
-                        Console.WriteLine(
-                            $"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
-                            + "AI自动回复服务或HubContext未注入，已拒绝后台AI调用。");
+                        WriteWebSocketLog(msg.OsClient, "AiServiceUnavailable", "AI 自动回复服务不可用", "IMicroiAI 或 HubContext 未注入，已拒绝后台调用。", 3, msg.FromUserId);
                         return;
                     }
 
@@ -622,7 +620,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] 发送消息失败: {ex.Message}");
+                WriteWebSocketLog(OsClientDefault.OsClient, "MessagePushFailed", "WebSocket 消息推送失败", ex.ToString(), 2, message?.ToUserId);
             }
         }
 
@@ -638,9 +636,6 @@ namespace Microi.net
         {
             try
             {
-                Console.WriteLine(
-                    $"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
-                    + "[WebSocket] 开始处理AI回复...");
                 await HandleAIResponse(
                     microiAI,
                     hubContext,
@@ -650,12 +645,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine(
-                    $"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
-                    + $"AI自动回复失败: {ex.Message}");
-                Console.WriteLine(
-                    $"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】"
-                    + $"堆栈跟踪: {ex.StackTrace}");
+                WriteWebSocketLog(trustedOsClient, "AiBackgroundReplyFailed", "AI 后台自动回复失败", ex.ToString(), 2, originalMsg?.FromUserId);
             }
         }
 
@@ -669,10 +659,6 @@ namespace Microi.net
             object trustedCurrentUser,
             string trustedOsClient)
         {
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复开始 ==========");
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 用户: {originalMsg.FromUserName} (ID: {originalMsg.FromUserId})");
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 问题: {originalMsg.Content}");
-            
             try
             {
                 var chatHost = GetChatHost(trustedOsClient);
@@ -694,7 +680,6 @@ namespace Microi.net
                         if (otherInfo != null && otherInfo.ContainsKey("AiModel"))
                         {
                             clientAiModel = otherInfo["AiModel"];
-                            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 客户端指定模型: {clientAiModel}");
                         }
                         if (otherInfo != null
                             && otherInfo.TryGetValue(
@@ -744,7 +729,6 @@ namespace Microi.net
                             
                             if (isFirstChunk)
                             {
-                                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI流式] 开始发送流式数据...");
                                 isFirstChunk = false;
                             }
                         }
@@ -752,7 +736,7 @@ namespace Microi.net
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI流式] 发送数据块失败: {ex.Message}");
+                        WriteWebSocketLog(trustedOsClient, "AiStreamChunkFailed", "AI 流式数据块发送失败", ex.ToString(), 2, originalMsg.FromUserId);
                     }
                 };
                 
@@ -781,7 +765,6 @@ namespace Microi.net
                         originalMsg.FromUserId, 
                         true  // 已完成
                     );
-                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI流式] 流式输出完成");
                 }
 
                 // 如果是NL2SQL查询且有详细数据，额外发送一条包含QueryResult的消息
@@ -819,12 +802,11 @@ namespace Microi.net
                                 dataMessageDto,
                                 hubContext);
                             await TMongodbHelper<MessageBodyDto>.InsertAsync(chatHost, dataMessageDto);
-                            Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 详细数据已发送到前端（{queryResultArray.Length}条记录）");
                         }
                     }
                     catch (Exception dataEx)
                     {
-                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 发送详细数据失败: {dataEx.Message}");
+                        WriteWebSocketLog(trustedOsClient, "AiDetailPushFailed", "AI 查询明细发送失败", dataEx.ToString(), 2, originalMsg.FromUserId);
                     }
                 }
 
@@ -846,21 +828,15 @@ namespace Microi.net
                     };
                     
                     await TMongodbHelper<MessageBody>.InsertAsync(chatHost, aiReplyMsg);
-                    Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 数据库: {chatHost.DataBase}, 表: {chatHost.Table}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 保存聊天记录失败: {ex.Message}");
+                    WriteWebSocketLog(trustedOsClient, "AiChatPersistenceFailed", "AI 聊天记录保存失败", ex.ToString(), 2, originalMsg.FromUserId);
                 }
-
-                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复完成 ==========");
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 回复统计 - 模式: {aiResult.ResponseType}, 用户: {originalMsg.FromUserName}, 回复长度: {aiResult.Content?.Length ?? 0}字符");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】========== AI自动回复异常 ==========");
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 异常类型: {ex.GetType().Name}, 消息: {ex.Message}");
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[AI] 堆栈跟踪: {ex.StackTrace}");
+                WriteWebSocketLog(trustedOsClient, "AiReplyFailed", "AI 自动回复异常", ex.ToString(), 2, originalMsg.FromUserId);
             }
         }
         /// <summary>
@@ -917,7 +893,7 @@ namespace Microi.net
                 ClientInfo clientInfoFrom2 = await DiyCacheBase.GetAsync<ClientInfo>($"Microi:{msg.OsClient}:ChatOnline:{msg.FromUserId}");
                 if (clientInfoFrom2 == null)
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[WebSocket] SendChatRecordToUser: 用户 {msg.FromUserId} 不在线");
+                    WriteWebSocketLog(msg.OsClient, "ChatRecipientOffline", "聊天记录接收用户不在线", "本次实时推送已跳过。", 1, msg.FromUserId);
                     return;
                 }
                 result2 = result2.OrderBy((MessageBody d) => d.CreateTime).ToList();

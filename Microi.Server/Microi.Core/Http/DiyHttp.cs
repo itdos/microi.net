@@ -375,7 +375,7 @@ namespace Microi.net
             var (allowed, reason) = ValidateSsrfUrl(param.Url, strictSsrf);
             if (!allowed)
             {
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】SSRF 防护拦截：{reason} (URL={RedactUrlForLog(param.Url)})");
+                MicroiEngine.QueueSystemLog(null, "Security", "SsrfRequestBlocked", "SSRF 防护已拦截外部请求", $"{reason}; URL={RedactUrlForLog(param.Url)}", 3);
                 throw new InvalidOperationException(
                     $"SSRF 防护已拦截此请求：{reason}。如需放行请配置 SsrfProtection:AllowedHosts。");
             }

@@ -51,4 +51,65 @@ public class V8MemoryConstraintTests
             Environment.SetEnvironmentVariable(environmentName, original);
         }
     }
+
+    [Fact]
+    public void CreateEngine_TwoGigabyteBudget_DoesNotOverflowIntegerBytes()
+    {
+        var limits = new CreateV8EngineParam
+        {
+            LimitMemory = 2048,
+            MaxLimitMemoryMB = 4096
+        };
+
+        using var engine = new V8Engine().CreateEngine(limits);
+        Assert.Equal(42D, engine.Evaluate("40 + 2").AsNumber());
+    }
+
+    [Fact]
+    public void CreateEngine_PreservesPre414ClrArraySnapshotSemantics()
+    {
+        using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam { LimitMemory = 64 });
+        var values = new[] { 1, 2, 3 };
+        engine.SetValue("values", values);
+
+        Assert.True(engine.Evaluate("Array.isArray(values)").AsBoolean());
+        engine.Execute("values[0] = 99; values.push(4);");
+
+        Assert.Equal(new[] { 1, 2, 3 }, values);
+        Assert.Equal(4D, engine.Evaluate("values.length").AsNumber());
+    }
+
+    [Fact]
+    public async Task SetTimeout_IsDrainedOnTheOwningEngineBeforeDisposal()
+    {
+        using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam
+        {
+            LimitMemory = 64,
+            Timeout = 5
+        });
+        using var host = new JintHostEnvironment();
+        host.InjectTo(engine);
+
+        engine.Execute("var timerResult = 0; setTimeout(function () { timerResult = 42; }, 5);");
+        await host.DrainTimersAsync(engine, TestContext.Current.CancellationToken);
+
+        Assert.Equal(42D, engine.Evaluate("timerResult").AsNumber());
+    }
+
+    [Fact]
+    public async Task ClearTimeout_PreventsTheCallbackFromRunning()
+    {
+        using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam
+        {
+            LimitMemory = 64,
+            Timeout = 5
+        });
+        using var host = new JintHostEnvironment();
+        host.InjectTo(engine);
+
+        engine.Execute("var timerResult = 0; var timerId = setTimeout(function () { timerResult = 42; }, 5); clearTimeout(timerId);");
+        await host.DrainTimersAsync(engine, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0D, engine.Evaluate("timerResult").AsNumber());
+    }
 }

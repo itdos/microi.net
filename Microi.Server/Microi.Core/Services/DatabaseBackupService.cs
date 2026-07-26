@@ -631,7 +631,7 @@ VALUES (@id,@now,@now,@userId,@userName,0,@backupNo,@triggerType,'Queued',0,0,0,
             }
             catch (Exception logError)
             {
-                Console.WriteLine("Microi：写入数据库备份失败状态时出错：" + SafeError(logError));
+                MicroiEngine.QueueSystemLog(RequiredOsClient, "DatabaseBackup", "FailureStateWriteFailed", "写入数据库备份失败状态时出错", logError.ToString(), 3);
             }
         }
 
@@ -763,7 +763,7 @@ ORDER BY `FinishedAt` DESC, `CreateTime` DESC LIMIT 1000;";
         private static void TryDeleteDirectory(string path)
         {
             try { if (Directory.Exists(path)) Directory.Delete(path, true); }
-            catch (Exception ex) { Console.WriteLine("Microi：清理数据库备份临时目录失败：" + SafeError(ex)); }
+            catch (Exception ex) { MicroiEngine.QueueSystemLog(RequiredOsClient, "DatabaseBackup", "TemporaryDirectoryCleanupFailed", "清理数据库备份临时目录失败", ex.ToString(), 2, false, path); }
         }
 
         private sealed class TenantDatabase

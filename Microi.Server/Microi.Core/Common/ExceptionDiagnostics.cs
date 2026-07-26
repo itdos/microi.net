@@ -125,11 +125,11 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 打印报告到控制台
+        /// 将报告写入平台 MongoDB 日志
         /// </summary>
         public static void PrintReport()
         {
-            Console.WriteLine(GetReport());
+            MicroiEngine.QueueSystemLog(null, "ExceptionDiagnostics", "PeriodicReport", "后端异常诊断统计", GetReport(), 2, null);
         }
 
         /// <summary>

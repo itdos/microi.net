@@ -397,9 +397,7 @@ namespace Microi.net
             string value)
         {
             if (string.IsNullOrWhiteSpace(value)) return;
-            Console.WriteLine(
-                $"Microi：【⚠️配置】文件上传配置 {key} 的值无效，"
-                + "已继续回退到下一优先级。");
+            MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "FileUpload", "InvalidConfigurationFallback", "文件上传配置值无效，已回退到下一优先级", $"配置项：{key}", 2, false, key);
         }
     }
 
