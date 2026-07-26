@@ -31,6 +31,10 @@ const renderer = fs.readFileSync(path.join(root, 'src/components/mci-native-fiel
 const nativeForm = fs.readFileSync(path.join(root, 'src/pages/native-form/index.vue'), 'utf8')
 const formRuntime = fs.readFileSync(path.join(root, 'src/platform/native-form.js'), 'utf8')
 const xjyTenantForm = fs.readFileSync(path.join(root, 'src/tenants/xjy/form.js'), 'utf8')
+const xjyProposalCalculation = fs.readFileSync(
+  path.join(root, 'src/tenants/xjy/proposal-calculation.js'),
+  'utf8'
+)
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -68,9 +72,26 @@ for (const token of [
   "['Xianjia']",
   "['GenghuanLXJG']",
   "['Id', 'ID', 'id']",
-  'proposalDefaults(context)'
+  'proposalDefaults(context)',
+  'latestProposalValues(context)',
+  'calculateProposalCosts(context.form)',
+  'handleFieldChange(context, payload)'
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`xjy proposal form rule is missing: ${token}`)
+}
+for (const token of [
+  "ShuizhiYQ: '纳滤'",
+  "DashuiFS: '[\"4\"]'",
+  "JiareFS: '步进式'",
+  "ShuiwenYQ: '[\"2\"]'"
+]) {
+  if (!xjyProposalCalculation.includes(token)) fail(`xjy proposal default is missing: ${token}`)
+}
+if (!nativeForm.includes('@change="handleNativeFieldChange(field, $event)"')) {
+  fail('native form must notify tenant extensions when a field value changes')
+}
+if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
+  fail('native form must support declarative tenant field visibility')
 }
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)
