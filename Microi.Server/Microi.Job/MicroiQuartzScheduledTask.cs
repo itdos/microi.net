@@ -36,6 +36,11 @@ namespace Microi.net
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
         private const string group = "default_group";
+        private static void WriteJobLog(string osClient, string action, string title, string content, int level = 2, string targetId = null, bool? success = false)
+        {
+            MicroiEngine.QueueSystemLog(osClient, "Job", action, title, content, level, success, targetId);
+        }
+
         public MicroiQuartzScheduledTask(ISchedulerFactory schedulerFactory)
         {
             _schedulerFactory = schedulerFactory;
@@ -103,7 +108,7 @@ namespace Microi.net
                     // 启动新的 Scheduler
                     await _scheduler.Start();
                     _isInitialized = true;
-                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【分布式任务调度】 Scheduler 启动成功！");
+                    WriteJobLog(OsClientDefault.OsClient, "SchedulerStarted", "分布式任务调度 Scheduler 启动成功", null, 1, success: true);
                 }
                 catch (Exception ex)
                 {
@@ -123,7 +128,7 @@ namespace Microi.net
         {
             if (!_isInitialized)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Scheduler 未初始化，请先调用 InitializeAsync 方法");
+                WriteJobLog(OsClientDefault.OsClient, "SchedulerNotInitialized", "任务调度器尚未初始化", "Scheduler 未初始化，请先调用 InitializeAsync 方法。", 2);
             }
         }
         /// <summary>
@@ -174,7 +179,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】获取所有job异常：{ex}");
+                WriteJobLog(jobModel?.OsClient, "QueryJobsFailed", "获取全部定时任务失败", ex.ToString(), 2);
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -224,7 +229,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】依据任务名称列表获取job异常：{ex}");
+                WriteJobLog(OsClientDefault.OsClient, "QueryJobsByNamesFailed", "按名称获取定时任务失败", ex.ToString(), 2);
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -253,7 +258,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】依据任务名称获取job异常：{ex.Message}");
+                WriteJobLog(jobModel?.OsClient, "QueryJobFailed", "获取定时任务详情失败", ex.ToString(), 2, jobModel?.Name);
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -667,16 +672,16 @@ namespace Microi.net
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时同步租户[{osClient}]任务出现异常：{ex.Message}");
+                                WriteJobLog(osClient, "TenantScheduleSyncFailed", "租户定时任务同步失败", ex.ToString(), 2);
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现异常：{ex.Message}");
+                        WriteJobLog(OsClientDefault.OsClient, "ScheduleSyncLoopFailed", "任务调度后台同步循环异常", ex.ToString(), 2);
                     }
                 }
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度后台同步任务已停止");
+                WriteJobLog(OsClientDefault.OsClient, "ScheduleSyncStopped", "任务调度后台同步已停止", "后台同步任务已正常停止。", 1, success: true);
             }, _cts.Token);
         }
 
@@ -723,12 +728,12 @@ namespace Microi.net
                         }
                         else
                         {
-                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现问题（{osClient}）：{detailResult.Msg}");
+                            WriteJobLog(osClient, "ScheduleDetailSyncFailed", "定时任务状态同步失败", detailResult.Msg, 2, Convert.ToString(data.Id));
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎定时执行出现异常（{osClient}）：{ex.Message}");
+                        WriteJobLog(osClient, "ScheduleDetailSyncException", "定时任务状态同步异常", ex.ToString(), 2, Convert.ToString(data.Id));
                     }
                 }
             }
@@ -742,11 +747,11 @@ namespace Microi.net
             try
             {
                 _cts.Cancel();
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎正在停止...");
+                WriteJobLog(OsClientDefault.OsClient, "SchedulerStopping", "任务调度引擎正在停止", "已发出后台任务取消信号。", 1, success: true);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】任务调度引擎停止失败：{ex.Message}");
+                WriteJobLog(OsClientDefault.OsClient, "SchedulerStopFailed", "任务调度引擎停止失败", ex.ToString(), 3);
             }
         }
     }

@@ -13,9 +13,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，V8引擎注入。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>6.7.0</Version>
-    <AssemblyVersion>6.7.0</AssemblyVersion>
-    <FileVersion>6.7.0</FileVersion>
+    <Version>6.7.3</Version>
+    <AssemblyVersion>6.7.3</AssemblyVersion>
+    <FileVersion>6.7.3</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -34,20 +34,22 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AlibabaCloud.SDK.Alidns20150109" Version="3.5.8" />
-    <PackageReference Include="AlibabaCloud.SDK.ESA20240910" Version="2.33.3" />
-    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="2.4.0" />
-    <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.448" />
-    <!-- AlipaySDKNet.OpenAPI 2.4.0 depends on vulnerable log4net 2.0.12; force the compatible fixed release. -->
+    <PackageReference Include="AlibabaCloud.SDK.Alidns20150109" Version="4.5.0" />
+    <PackageReference Include="AlibabaCloud.SDK.ESA20240910" Version="3.10.0" />
+    <PackageReference Include="AlipaySDKNet.OpenAPI" Version="3.0.57" />
+    <PackageReference Include="AlipaySDKNet.Standard" Version="4.9.1234" />
+    <!-- Force the current fixed log4net release across payment SDK transitive dependencies. -->
     <PackageReference Include="log4net" Version="3.3.2" />
-    <!-- 使用 Portable.BouncyCastle 1.9.0 解决版本冲突 -->
-    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
-    <!-- 排除传递依赖引入的新版 BouncyCastle -->
-    <PackageReference Include="BouncyCastle.Cryptography" Version="2.3.1">
-      <ExcludeAssets>all</ExcludeAssets>
-    </PackageReference>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />
+    <!--
+      最新 Alipay SDK 仍传递 Portable.BouncyCastle 1.8.x。它与官方新包导出相同类型，
+      但 Microi 只使用新版实现，因此保留依赖解析、排除旧程序集的编译和运行时资产。
+    -->
+    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0"
+                      ExcludeAssets="compile;runtime"
+                      PrivateAssets="all" />
     <!-- DWG/DXF 文件处理库 -->
-    <PackageReference Include="ACadSharp" Version="3.0.0" />
+    <PackageReference Include="ACadSharp" Version="3.6.35" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resource\microi-blue-256.png">

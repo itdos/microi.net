@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using Dos.Common;
@@ -316,10 +317,12 @@ namespace Dos.ORM
                                    column_type,
                                    character_maximum_length
                                 from information_schema.columns
-                                where table_name = '{0}' 
+                                where table_name = ?tableName
                                    and table_schema = (select database()) 
                                 order by ordinal_position;";
-            var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
+            var realFieldList = param.DbSession.FromSql(getAllFieldSql)
+                .AddInParameter("tableName", DbType.String, param.TableName)
+                .ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
 

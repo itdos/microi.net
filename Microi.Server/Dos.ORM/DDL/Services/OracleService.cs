@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Reflection.Emit;
 using Dos.Common;
@@ -426,17 +427,35 @@ namespace Dos.ORM
         /// <returns></returns>
         public DosResultList<information_schema_columns> GetColumns(DbServiceParam param)
         {
-            var getAllFieldSql = @"SELECT 
-                                            COLUMN_NAME as ""column_name"", 
-                                            DATA_TYPE as ""data_type"",
-                                            COLUMN_NAME as ""column_comment"",
-                                            'YES' as ""is_nullable"",
-                                            DATA_TYPE as ""column_type"",
-                                            CHAR_LENGTH as ""character_maximum_length""
-                                            FROM all_tab_columns
-                                            WHERE OWNER = USER
-                                              AND table_name = UPPER('{0}')";
-            var realFieldList = param.DbSession.FromSql(string.Format(getAllFieldSql, param.TableName)).ToList<information_schema_columns>();
+            if (param.TableName.DosIsNullOrWhiteSpace() || param.DbSession == null)
+                return new DosResultList<information_schema_columns>(0, null, "参数错误");
+
+            var getAllFieldSql = @"SELECT
+                                            c.COLUMN_NAME as ""column_name"",
+                                            c.DATA_TYPE as ""data_type"",
+                                            NVL(cc.COMMENTS, '') as ""column_comment"",
+                                            CASE WHEN pk.COLUMN_NAME IS NULL THEN '' ELSE 'PRI' END as ""column_key"",
+                                            CASE WHEN c.NULLABLE = 'Y' THEN 'YES' ELSE 'NO' END as ""is_nullable"",
+                                            c.DATA_TYPE as ""column_type"",
+                                            c.CHAR_LENGTH as ""character_maximum_length""
+                                            FROM USER_TAB_COLUMNS c
+                                            LEFT JOIN USER_COL_COMMENTS cc
+                                              ON cc.TABLE_NAME = c.TABLE_NAME
+                                             AND cc.COLUMN_NAME = c.COLUMN_NAME
+                                            LEFT JOIN (
+                                                SELECT cols.TABLE_NAME, cols.COLUMN_NAME
+                                                FROM USER_CONSTRAINTS cons
+                                                INNER JOIN USER_CONS_COLUMNS cols
+                                                  ON cons.CONSTRAINT_NAME = cols.CONSTRAINT_NAME
+                                                WHERE cons.CONSTRAINT_TYPE = 'P'
+                                            ) pk
+                                              ON pk.TABLE_NAME = c.TABLE_NAME
+                                             AND pk.COLUMN_NAME = c.COLUMN_NAME
+                                            WHERE c.TABLE_NAME = UPPER(:tableName)
+                                            ORDER BY c.COLUMN_ID";
+            var realFieldList = param.DbSession.FromSql(getAllFieldSql)
+                .AddInParameter("tableName", DbType.String, param.TableName)
+                .ToList<information_schema_columns>();
             return new DosResultList<information_schema_columns>(1, realFieldList);
         }
 

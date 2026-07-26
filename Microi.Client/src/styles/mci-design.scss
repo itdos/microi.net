@@ -31,26 +31,33 @@
     --mci-color-danger: #E8294A;
     --mci-color-info: #2196F3;
 
-    /* 背景 */
-    --mci-bg-base: #F5F5FA;
+    /* 官网 mainstream 亮色层级 */
+    --mci-bg-base: #F7F9FC;
+    --mci-bg-page: #F7F9FC;
+    --mci-bg-page-alt: #EEF2F7;
     --mci-bg-elevated: #FFFFFF;
-    --mci-bg-surface: #F0F0F8;
-    --mci-bg-card: rgba(255, 255, 255, 0.92);
-    --mci-bg-card-hover: #FFFFFF;
-    --mci-bg-glass: rgba(255, 255, 255, 0.7);
-    --mci-bg-glass-border: rgba(0, 0, 0, 0.06);
-    --mci-bg-mask: rgba(15, 18, 30, 0.45);
+    --mci-bg-header: #FFFFFF;
+    --mci-bg-content: #FFFFFF;
+    --mci-bg-sidebar: #6C2BD9;
+    --mci-bg-surface: #F1F5F9;
+    --mci-bg-soft: #F1F5F9;
+    --mci-bg-card: #FFFFFF;
+    --mci-bg-card-hover: #F1F5F9;
+    --mci-bg-glass: rgba(255, 255, 255, 0.94);
+    --mci-bg-glass-border: #E2E8F0;
+    --mci-bg-mask: rgba(15, 23, 42, 0.42);
 
     /* 文字 */
-    --mci-text-primary: #1A1A2E;
-    --mci-text-secondary: #5A5A78;
-    --mci-text-tertiary: #9090A8;
-    --mci-text-disabled: #C0C0D0;
+    --mci-text-primary: #0F172A;
+    --mci-text-secondary: #334155;
+    --mci-text-tertiary: #64748B;
+    --mci-text-disabled: #A8B3C4;
     --mci-text-on-primary: #FFFFFF;
 
     /* 边框 */
-    --mci-border-color: rgba(15, 18, 30, 0.06);
-    --mci-border-color-hover: rgba(15, 18, 30, 0.12);
+    --mci-border-color: #E2E8F0;
+    --mci-border-color-hover: #B9CCF8;
+    --mci-border-strong: #CBD5E1;
     --mci-border-glow: rgba(108, 43, 217, 0.25);
 
     /* 渐变 */
@@ -61,12 +68,12 @@
     --mci-gradient-bg: radial-gradient(ellipse at 20% 50%, rgba(108, 43, 217, 0.05) 0%, transparent 60%);
 }
 
-/* 暗黑主题（可选切换） */
+/* 暗色层级的静态回退值；运行时由 theme-color.js 按 palette 低饱和染色。 */
 :root[data-theme="dark"] {
-    --mci-color-primary: #722BFF;
-    --mci-color-primary-light: #9B5FFF;
-    --mci-color-primary-dark: #5A1FCC;
-    --mci-color-primary-glow: rgba(114, 43, 255, 0.35);
+    --mci-color-primary: #5B8CFF;
+    --mci-color-primary-light: #82A8FF;
+    --mci-color-primary-dark: #246BFD;
+    --mci-color-primary-glow: rgba(91, 140, 255, 0.28);
 
     --mci-color-accent-red: #FF2E63;
     --mci-color-accent-blue: #29B8FF;
@@ -79,30 +86,43 @@
     --mci-color-danger: #FF2E63;
     --mci-color-info: #29B8FF;
 
-    --mci-bg-base: #0A0A0F;
-    --mci-bg-elevated: #121218;
-    --mci-bg-surface: #1A1A24;
-    --mci-bg-card: rgba(255, 255, 255, 0.04);
-    --mci-bg-card-hover: rgba(255, 255, 255, 0.08);
-    --mci-bg-glass: rgba(255, 255, 255, 0.06);
-    --mci-bg-glass-border: rgba(255, 255, 255, 0.1);
-    --mci-bg-mask: rgba(0, 0, 0, 0.6);
+    --mci-bg-base: #0B1120;
+    --mci-bg-page: #0B1120;
+    --mci-bg-page-alt: #0F172A;
+    --mci-bg-elevated: #111827;
+    --mci-bg-header: #111827;
+    --mci-bg-content: #111827;
+    --mci-bg-sidebar: #111827;
+    --mci-bg-surface: #172033;
+    --mci-bg-soft: #172033;
+    --mci-bg-card: #111827;
+    --mci-bg-card-hover: #172033;
+    --mci-bg-glass: rgba(17, 24, 39, 0.94);
+    --mci-bg-glass-border: #273449;
+    --mci-bg-mask: rgba(2, 6, 23, 0.72);
 
-    --mci-text-primary: #FFFFFF;
-    --mci-text-secondary: #A0A0B8;
-    --mci-text-tertiary: #6B6B80;
-    --mci-text-disabled: #4A4A5A;
+    --mci-text-primary: #F8FAFC;
+    --mci-text-secondary: #CBD5E1;
+    --mci-text-tertiary: #94A3B8;
+    --mci-text-disabled: #526079;
     --mci-text-on-primary: #FFFFFF;
 
-    --mci-border-color: rgba(255, 255, 255, 0.08);
-    --mci-border-color-hover: rgba(255, 255, 255, 0.15);
-    --mci-border-glow: rgba(114, 43, 255, 0.3);
+    --mci-border-color: #273449;
+    --mci-border-color-hover: #46659B;
+    --mci-border-strong: #3B4A63;
+    --mci-border-glow: rgba(91, 140, 255, 0.30);
 
-    --mci-gradient-primary: linear-gradient(135deg, #722BFF 0%, #29B8FF 100%);
+    --mci-gradient-primary: linear-gradient(135deg, #5B8CFF 0%, #82A8FF 100%);
     --mci-gradient-hot: linear-gradient(135deg, #FF2E63 0%, #FF6EC7 100%);
     --mci-gradient-gold: linear-gradient(135deg, #FFD100 0%, #FF8C00 100%);
     --mci-gradient-cyber: linear-gradient(135deg, #00F5D4 0%, #722BFF 50%, #FF2E63 100%);
-    --mci-gradient-bg: radial-gradient(ellipse at 20% 50%, rgba(114, 43, 255, 0.08) 0%, transparent 60%);
+    --mci-gradient-surface: linear-gradient(180deg, #111827 0%, #0F172A 100%);
+    --mci-gradient-bg: linear-gradient(180deg, #0B1120 0%, #0F172A 100%);
+}
+
+:root[data-theme="light"],
+:root {
+    --mci-gradient-surface: linear-gradient(180deg, #FFFFFF 0%, #F7F9FC 100%);
 }
 
 /* ============================================================
@@ -185,27 +205,26 @@
     --mci-tabbar-height: 50px;
 }
 
-/* 暗黑主题下阴影加深 */
+/* 暗色阴影：明确层级，不叠加彩色光晕。 */
 :root[data-theme="dark"] {
-    --mci-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
-    --mci-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3), 0 0 12px var(--mci-color-primary-glow);
-    --mci-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.35), 0 0 20px var(--mci-color-primary-glow);
-    --mci-shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px var(--mci-color-primary-glow);
-    --mci-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(114, 43, 255, 0.08);
-    --mci-shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 25px rgba(114, 43, 255, 0.15);
+    --mci-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.24);
+    --mci-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.26);
+    --mci-shadow-lg: 0 12px 34px rgba(0, 0, 0, 0.28);
+    --mci-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.42);
+    --mci-shadow-card: 0 12px 34px rgba(0, 0, 0, 0.28);
+    --mci-shadow-card-hover: 0 20px 48px rgba(0, 0, 0, 0.38);
     --mci-shadow-button: 0 4px 15px var(--mci-color-primary-glow);
     --mci-shadow-button-hover: 0 8px 25px var(--mci-color-primary-glow);
-    --mci-shadow-dialog: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 50px rgba(114, 43, 255, 0.1);
-    --mci-shadow-dropdown: 0 10px 40px rgba(0, 0, 0, 0.45), 0 0 20px rgba(114, 43, 255, 0.08);
+    --mci-shadow-dialog: 0 24px 72px rgba(0, 0, 0, 0.48);
+    --mci-shadow-dropdown: 0 16px 42px rgba(0, 0, 0, 0.36);
 }
 
 /* ============================================================
  * 深色模式：布局 + Element Plus 组件覆盖
  *
  * 设计要点：
- *   1. 深色不是纯黑！由 utils/theme-color.js 的 applyDarkTintedVars()
- *      根据当前主题色动态计算"主题色调深色"调色板（写入 --el-bg-color
- *      / --mci-bg-* 等变量），让深色背景带主题色微弱色相。
+ *   1. 深色以 microi.doc 官网蓝灰层级为明度骨架；palette 同时驱动
+ *      交互色与低饱和表面染色，避免一色到底或高饱和紫黑/橙黑。
  *   2. element-plus/theme-chalk/dark/css-vars.css 已在 main.js 导入，
  *      JS 写入的 --el-* 内联变量会覆盖 EP 默认深色值。
  *   3. 此处只补充 layout / 个别组件硬编码值，不再硬编码 #0A0A0F。
@@ -275,20 +294,24 @@ html.dark .fixed-header {
 html.dark .hamburger { color: var(--el-text-color-primary) !important; }
 
 /* --- 标签页栏 --- */
-html.dark .tags-view-container {
+html.dark .tags-view-container,
+html.dark .tags-view-container-microi {
     background: var(--el-bg-color);
     border-bottom: 1px solid var(--el-border-color);
 }
 
-html.dark .tags-view-container .tags-view-item {
+html.dark .tags-view-container .tags-view-item,
+html.dark .tags-view-container-microi .tags-view-item-microi {
     background: var(--el-bg-color-overlay) !important;
     border-color: var(--el-border-color) !important;
     color: var(--el-text-color-regular) !important;
 }
 
-html.dark .tags-view-container .tags-view-item.active {
+html.dark .tags-view-container .tags-view-item.active,
+html.dark .tags-view-container-microi .tags-view-item-microi.is-active,
+html.dark .tags-view-container-microi .el-tabs__item.is-active {
     background: var(--el-color-primary) !important;
-    color: #fff !important;
+    color: var(--mci-text-on-primary, #fff) !important;
     border-color: var(--el-color-primary) !important;
 }
 

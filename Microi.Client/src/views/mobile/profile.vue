@@ -106,7 +106,7 @@
                     </div>
                     <div class="mode-switch__item" :class="{ active: darkMode === 'dark' }" @click="changeMode('dark')">
                         <el-icon :size="20"><Moon /></el-icon>
-                        <span>深色</span>
+                        <span>暗色</span>
                     </div>
                 </div>
             </div>
@@ -119,11 +119,11 @@
                     v-for="theme in themeColors"
                     :key="theme.value"
                     class="theme-item"
-                    :class="{ active: currentTheme === theme.value }"
+                    :class="{ active: currentTheme.toUpperCase() === theme.value, 'is-white': theme.key === 'white' }"
                     @click="changeTheme(theme.value)"
                 >
-                    <div class="theme-color" :style="{ background: theme.value }">
-                        <el-icon v-if="currentTheme === theme.value" class="check-icon"><Check /></el-icon>
+                    <div class="theme-color" :style="{ background: theme.swatch, color: theme.onPrimary }">
+                        <el-icon v-if="currentTheme.toUpperCase() === theme.value" class="check-icon"><Check /></el-icon>
                     </div>
                     <span class="theme-name">{{ theme.name }}</span>
                 </div>
@@ -277,7 +277,12 @@ import { removeToken } from '@/utils/auth';
 import LocalStorageManager from '@/utils/localStorage-manager';
 import { useI18n } from 'vue-i18n';
 import { setI18nLocale, SUPPORTED_LOCALES, normalizeLocale } from '@/lang';
-import { setThemeColor as applyThemeColor, setThemeMode, getThemeMode } from '@/utils/theme-color.js';
+import {
+    getThemePalettes,
+    setThemeColor as applyThemeColor,
+    setThemeMode,
+    getThemeMode
+} from '@/utils/theme-color.js';
 
 defineOptions({ name: 'mobile_profile' });
 import { version as appVersion } from '../../../package.json';
@@ -353,21 +358,6 @@ const currentLang = computed(() => {
     return found ? found.label : '简体中文';
 });
 
-const themeColors = [
-    { name: '紫色', value: '#6C2BD9' },
-    { name: '蓝色', value: '#2196F3' },
-    { name: '青色', value: '#06B6D4' },
-    { name: '粉色', value: '#EC4899' },
-    { name: '橙色', value: '#F59E0B' },
-    { name: '红色', value: '#E8294A' },
-    { name: '绿色', value: '#27AE60' },
-    { name: '靛蓝', value: '#3F51B5' },
-    { name: '深橙', value: '#FF5722' },
-    { name: '灰蓝', value: '#607D8B' },
-    { name: '天蓝', value: '#409EFF' },
-    { name: '深紫', value: '#673AB7' },
-];
-
 const showThemePanel = ref(false);
 const showPasswordDialog = ref(false);
 const showAbout = ref(false);
@@ -375,6 +365,8 @@ const showLangSelect = ref(false);
 
 // === 深色模式切换（与 PC 端 ThemeSelect.vue 同步逻辑）===
 const darkMode = ref(getThemeMode());
+// 与 PC 面板一致：每种模式固定 12 色，暗色不展示白色主色。
+const themeColors = computed(() => getThemePalettes(darkMode.value));
 const darkModeIcon = computed(() => darkMode.value === 'dark' ? Sunny : Moon);
 function toggleDark() {
     const next = darkMode.value === 'dark' ? 'light' : 'dark';
@@ -382,10 +374,10 @@ function toggleDark() {
 }
 function changeMode(mode) {
     darkMode.value = mode;
-    setThemeMode(mode);
-    // 切换模式后重新写入主题色，使 MCI 渐变/阴影按当前模式重算
-    const color = currentTheme.value;
-    if (color) applyThemeColor(color);
+    const appliedColor = setThemeMode(mode);
+    if (appliedColor && appliedColor.toUpperCase() !== currentTheme.value.toUpperCase()) {
+        diyStore.setThemeColor(appliedColor);
+    }
 }
 
 // === iOS 检测 ===
@@ -464,8 +456,8 @@ const passwordRules = {
 
 const changeTheme = (color) => {
     // 使用中心化 setter，同时写入 Legacy + Element Plus + MCI 令牌
-    applyThemeColor(color);
-    diyStore.setThemeColor(color);
+    const appliedColor = applyThemeColor(color);
+    diyStore.setThemeColor(appliedColor || color);
     showThemePanel.value = false;
     ElMessage.success('主题已切换');
 };
@@ -902,8 +894,8 @@ function isMiniProgram() {
 
 .theme-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: var(--mci-space-3);
+    grid-template-columns: repeat(6, 1fr);
+    gap: var(--mci-space-2);
 }
 
 .theme-item {
@@ -925,12 +917,16 @@ function isMiniProgram() {
     width: 44px; height: 44px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    color: #fff;
+    color: var(--mci-text-on-primary, #fff);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     transition: box-shadow var(--mci-duration-base);
 }
 
-.check-icon { color: #fff; font-size: 18px; }
+.theme-item.is-white .theme-color {
+    border: 1px solid var(--mci-border-strong, #cbd5e1);
+}
+
+.check-icon { color: currentColor; font-size: 18px; }
 
 .theme-name {
     font-size: var(--mci-text-xs);

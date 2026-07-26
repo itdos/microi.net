@@ -51,7 +51,7 @@ namespace Microi.net
                     });
                     if (addResult.Code != 1)
                     {
-                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】定时任务执行接口引擎后写入日志出错（{osClient}）：{addResult.Msg}");
+                        MicroiEngine.QueueSystemLog(osClient, "Job", "ExecutionLogWriteFailed", "定时任务执行记录写入失败", addResult.Msg, 2, false, context.JobDetail.Key.Name);
                     }
                 }
             }
@@ -64,7 +64,7 @@ namespace Microi.net
                 }
                 errorMsg += $"\n堆栈跟踪: {ex.StackTrace}";
                 
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{errorMsg}");
+                MicroiEngine.QueueSystemLog(osClient, "Job", "ApiEngineJobFailed", "定时任务执行接口引擎失败", errorMsg, 2, false, context.JobDetail.Key.Name);
                 
                 try
                 {
@@ -81,7 +81,7 @@ namespace Microi.net
                 }
                 catch (Exception logEx)
                 {
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】写入日志失败（{osClient}）: {logEx.Message}");
+                    MicroiEngine.QueueSystemLog(osClient, "Job", "FailureLogWriteFailed", "定时任务失败记录写入失败", logEx.ToString(), 2, false, context.JobDetail.Key.Name);
                 }
                 // 2026-05-01 健壮性加固：以 JobExecutionException 包装并向 Quartz 抛出，
                 // 让调度器感知失败状态、生成 misfire 记录，并支持 @DisallowConcurrentExecution 的串行控制。

@@ -199,7 +199,7 @@ watch(
   min-height: 0;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  background: var(--mci-gradient-surface, linear-gradient(180deg, #f8fafc 0%, #ffffff 100%));
 
   .tree-header {
     display: flex;
@@ -208,9 +208,9 @@ watch(
     padding: 16px 20px;
     font-size: 15px;
     font-weight: 600;
-    color: #1e293b;
-    border-bottom: 1px solid #e2e8f0;
-    background: linear-gradient(90deg, #f1f5f9 0%, #ffffff 100%);
+    color: var(--el-text-color-primary, #1e293b);
+    border-bottom: 1px solid var(--el-border-color, #e2e8f0);
+    background: var(--mci-gradient-surface, linear-gradient(90deg, #f1f5f9 0%, #ffffff 100%));
 
     .tree-title {
       display: flex;
@@ -220,18 +220,18 @@ watch(
       .header-icon {
         margin-right: 10px;
         font-size: 20px;
-        color: #3b82f6;
+        color: var(--el-color-primary, #3b82f6);
       }
     }
 
     .header-action {
       width: 30px;
       height: 30px;
-      color: #475569;
+      color: var(--el-text-color-regular, #475569);
 
       &:hover {
-        color: #2563eb;
-        background: #e0ecff;
+        color: var(--el-color-primary, #2563eb);
+        background: var(--mci-bg-primary-soft, #e0ecff);
       }
     }
   }
@@ -248,7 +248,7 @@ watch(
   :deep(.el-tree) {
     padding: 12px 8px;
     background: transparent;
-    --el-tree-node-hover-bg-color: #f1f5f9;
+    --el-tree-node-hover-bg-color: var(--el-fill-color-light, #f1f5f9);
 
     .el-tree-node__content {
       height: 40px;
@@ -257,12 +257,12 @@ watch(
       transition: background-color 0.15s ease;
 
       &:hover {
-        background-color: #f1f5f9;
+        background-color: var(--el-fill-color-light, #f1f5f9);
       }
     }
 
     .el-tree-node__expand-icon {
-      color: #94a3b8;
+      color: var(--el-text-color-placeholder, #94a3b8);
       font-size: 13px;
       padding: 4px;
       
@@ -271,20 +271,20 @@ watch(
       }
       
       &:not(.is-leaf):hover {
-        color: #3b82f6;
+        color: var(--el-color-primary, #3b82f6);
       }
     }
 
     .el-tree-node.is-current > .el-tree-node__content {
-      background: linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%);
-      border: 1px solid #bfdbfe;
+      background: var(--mci-bg-primary-soft, linear-gradient(90deg, #eff6ff 0%, #dbeafe 100%));
+      border: 1px solid var(--el-color-primary-light-7, #bfdbfe);
 
       .folder-icon {
-        color: #3b82f6;
+        color: var(--el-color-primary, #3b82f6);
       }
 
       .folder-name {
-        color: #1d4ed8;
+        color: var(--el-color-primary, #1d4ed8);
         font-weight: 500;
       }
     }
@@ -315,7 +315,7 @@ watch(
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 13px;
-      color: #475569;
+      color: var(--el-text-color-regular, #475569);
       transition: color 0.2s ease;
     }
   }

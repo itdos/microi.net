@@ -23,8 +23,8 @@ namespace Microi.net
         {
             ThrowOnAnyError = false,
             // Respect per-request V8.Http Timeout values; RestSharp uses the lower value between
-            // RestClientOptions.MaxTimeout and RestRequest.Timeout.
-            MaxTimeout = int.MaxValue
+            // RestClientOptions.Timeout and RestRequest.Timeout.
+            Timeout = System.Threading.Timeout.InfiniteTimeSpan
         });
 
         // 严格 SSRF 模式使用独立连接池并禁止自动重定向，避免已通过校验的公网地址
@@ -33,7 +33,7 @@ namespace Microi.net
         {
             ThrowOnAnyError = false,
             FollowRedirects = false,
-            MaxTimeout = int.MaxValue
+            Timeout = System.Threading.Timeout.InfiniteTimeSpan
         });
 
         #region SSRF 防护
@@ -89,9 +89,9 @@ namespace Microi.net
         ///   4. 显式白名单可绕过（通过 SsrfAllowedHosts 配置）
         /// 注：DNS rebinding 攻击通过解析后再次校验真实 IP 缓解。
         /// </summary>
-        private static (bool allowed, string reason) ValidateSsrfUrl(string url)
+        private static (bool allowed, string reason) ValidateSsrfUrl(string url, bool forceStrict = false)
         {
-            if (!IsStrictSsrfProtectionEnabled()) return (true, null);
+            if (!forceStrict && !IsStrictSsrfProtectionEnabled()) return (true, null);
             if (string.IsNullOrWhiteSpace(url)) return (false, "URL 为空");
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             {
@@ -130,8 +130,9 @@ namespace Microi.net
                 catch (Exception ex)
                 {
                     return (false, $"DNS 解析失败: {ex.Message}");
-                }
             }
+        }
+
             foreach (var ip in addresses)
             {
                 if (IsBlockedIp(ip))
@@ -140,6 +141,20 @@ namespace Microi.net
                 }
             }
             return (true, null);
+        }
+
+        private static string RedactUrlForLog(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                var withoutQuery = url.Split(new[] { '?', '#' }, 2)[0];
+                return withoutQuery.Substring(0, Math.Min(256, withoutQuery.Length));
+            }
+
+            var host = uri.HostNameType == UriHostNameType.IPv6 ? $"[{uri.Host}]" : uri.IdnHost;
+            var port = uri.IsDefaultPort ? string.Empty : ":" + uri.Port;
+            return $"{uri.Scheme}://{host}{port}{uri.AbsolutePath}";
         }
 
         /// <summary>
@@ -356,16 +371,17 @@ namespace Microi.net
 
             // 默认关闭并完全保留历史 HTTP 行为；只有显式开启严格 SSRF 模式后
             // ValidateSsrfUrl 才会拦截协议、URL 凭据、私网和云元数据地址。
-            var (allowed, reason) = ValidateSsrfUrl(param.Url);
+            var strictSsrf = param.RequireSsrfProtection || IsStrictSsrfProtectionEnabled();
+            var (allowed, reason) = ValidateSsrfUrl(param.Url, strictSsrf);
             if (!allowed)
             {
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】SSRF 防护拦截：{reason} (URL={param.Url})");
+                MicroiEngine.QueueSystemLog(null, "Security", "SsrfRequestBlocked", "SSRF 防护已拦截外部请求", $"{reason}; URL={RedactUrlForLog(param.Url)}", 3);
                 throw new InvalidOperationException(
                     $"SSRF 防护已拦截此请求：{reason}。如需放行请配置 SsrfProtection:AllowedHosts。");
             }
 
             // 两种模式分别复用连接池：默认模式保留历史自动重定向；严格模式禁止自动重定向。
-            RestClient client = IsStrictSsrfProtectionEnabled()
+            RestClient client = strictSsrf
                 ? _strictSsrfClient
                 : _sharedClient;
 

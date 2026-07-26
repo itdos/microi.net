@@ -147,22 +147,16 @@ import { storeToRefs } from 'pinia'
 import { usePageEngineStore } from '../../stores/pageEngine'
 const pageEngineStore = usePageEngineStore()
 const { formData } = storeToRefs(pageEngineStore)
-import { useDark } from '@vueuse/core'
-
-//是否暗黑模式
-const isDark = useDark()
 const formConfig = computed(() => {
   return formData.value.JsonObj.formConfig
 })
 
-isDark.value = pageEngineStore.dark == 'true' || pageEngineStore.dark == true
-formConfig.value.dark = isDark.value
+formConfig.value.dark = pageEngineStore.dark == 'true' || pageEngineStore.dark == true
 
 watch(
   () => formConfig.value.dark,
   (newVal) => {
-    isDark.value = newVal
-    pageEngineStore.setDark(newVal)
+    pageEngineStore.setDark(Boolean(newVal))
   },
   { immediate: false }
 )

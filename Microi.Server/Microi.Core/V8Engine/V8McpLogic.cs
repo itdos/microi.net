@@ -997,16 +997,22 @@ namespace Microi.net
                 catch { }
 
                 var consoleOutput = new StringBuilder();
-                var originalOut = Console.Out;
-                var stringWriter = new System.IO.StringWriter(consoleOutput);
                 var stopwatch = Stopwatch.StartNew();
 
-                Console.SetOut(stringWriter);
                 try
                 {
-                    var apiResult = await MicroiEngine.ApiEngine.RunAsync(executeParam);
+                    object apiResult;
+                    using (V8ConsoleContext.Capture(entry =>
+                    {
+                        lock (consoleOutput)
+                        {
+                            consoleOutput.AppendLine(entry.Message);
+                        }
+                    }))
+                    {
+                        apiResult = await MicroiEngine.ApiEngine.RunAsync(executeParam);
+                    }
                     stopwatch.Stop();
-                    Console.SetOut(originalOut);
 
                     var resultCode = ExtractResultCode(apiResult, 1);
                     var resultMsg = ExtractResultMsg(apiResult);
@@ -1022,7 +1028,6 @@ namespace Microi.net
                 catch (Exception runEx)
                 {
                     stopwatch.Stop();
-                    Console.SetOut(originalOut);
                     return new DosResult<object>(0, new
                     {
                         ConsoleOutput = SplitConsoleOutput(consoleOutput.ToString()),
@@ -1644,8 +1649,6 @@ namespace Microi.net
                 });
 
                 var consoleOutput = new StringBuilder();
-                var originalOut = Console.Out;
-                var stringWriter = new System.IO.StringWriter(consoleOutput);
 
                 var v8EngineParam = new V8EngineParam()
                 {
@@ -1662,11 +1665,19 @@ namespace Microi.net
                     Action = new Dictionary<string, object>()
                 };
 
-                Console.SetOut(stringWriter);
                 try
                 {
-                    var v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
-                    Console.SetOut(originalOut);
+                    DosResult<V8EngineParam> v8RunResult;
+                    using (V8ConsoleContext.Capture(entry =>
+                    {
+                        lock (consoleOutput)
+                        {
+                            consoleOutput.AppendLine(entry.Message);
+                        }
+                    }))
+                    {
+                        v8RunResult = await MicroiEngine.V8Engine.Run(v8EngineParam);
+                    }
 
                     if (v8RunResult.Code == 1)
                     {
@@ -1689,7 +1700,6 @@ namespace Microi.net
                 }
                 catch (Exception runEx)
                 {
-                    Console.SetOut(originalOut);
                     return new DosResult<object>(0, new
                     {
                         ConsoleOutput = consoleOutput.ToString(),
@@ -2143,6 +2153,13 @@ namespace Microi.net
             return fullWidthComponents.Any(item => item.Equals(component.Trim(), StringComparison.OrdinalIgnoreCase)) ? (int?)24 : null;
         }
 
+        private static bool IsLayoutComponent(string component)
+        {
+            if (string.IsNullOrWhiteSpace(component)) return false;
+            var layoutComponents = new[] { "Divider", "CollapseGroup", "Tabs", "Alert", "StaticText", "Html" };
+            return layoutComponents.Any(item => item.Equals(component.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
         /// <summary>
         /// 将 AI 传入的简洁 data 字符串解析为前端约定的 Data + Config JSON
         /// 支持格式：
@@ -2305,7 +2322,9 @@ namespace Microi.net
                     TableId = tableId,
                     Name = name,
                     Label = label,
-                    Type = NormalizeFieldType(type),
+                    Type = IsLayoutComponent(componentName) && string.IsNullOrWhiteSpace(type)
+                        ? string.Empty
+                        : NormalizeFieldType(type),
                     Component = componentName,
                     Visible = visible,
                     AppVisible = appVisible,
@@ -2325,7 +2344,9 @@ namespace Microi.net
                     Encrypt = encrypt,
                     InTableEdit = inTableEdit,
                     IsDeleted = 0,
-                    _InvokeType = InvokeType.Server.ToString()
+                    _InvokeType = InvokeType.Server.ToString(),
+                    _TrustedServerInvocation = true,
+                    _NotAddDbField = IsLayoutComponent(componentName) && string.IsNullOrWhiteSpace(type)
                 };
 
                 var result = await MicroiEngine.FormEngine.AddDiyField(fieldParam);

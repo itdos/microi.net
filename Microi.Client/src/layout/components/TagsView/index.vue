@@ -84,7 +84,7 @@
             border-radius: 20px;
             font-weight: 400;
             font-size: 13px;
-            color: #606266;
+            color: var(--el-text-color-regular, #606266);
             transition: all 0.2s ease;
             // background: #f5f7fa;
             margin: 0;
@@ -177,10 +177,11 @@
     // 右键菜单样式优化
     .contextmenu {
         position: fixed;
-        background: #ffffff;
+        background: var(--el-bg-color-overlay, #ffffff);
+        border: 1px solid var(--el-border-color, #e2e8f0);
         border-radius: 8px;
         padding: 6px 0;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        box-shadow: var(--mci-shadow-dropdown, 0 4px 20px rgba(0, 0, 0, 0.15));
         z-index: 3000;
         list-style: none;
         margin: 0;
@@ -190,7 +191,7 @@
             align-items: center;
             padding: 8px 16px;
             cursor: pointer;
-            color: #606266;
+            color: var(--el-text-color-regular, #606266);
             font-size: 13px;
             transition: all 0.2s ease;
 
@@ -621,6 +622,7 @@ export default {
                         TableName: "sys_menu",
                         TableRowId: sysMenuId,
                         DialogType: "Dialog",
+                        Height: "80vh",
                         FormMode: "Edit",
                         SubmitEvent: (formData, callback) => {
                             if (callback) callback();
@@ -700,7 +702,7 @@ export default {
 .tags-view-container-microi {
     height: 33px; //修改了值
     width: 100%;
-    background: #fff;
+    background: var(--el-bg-color, #fff);
     border: 0;
     box-shadow:
         0 1px 3px 0 rgba(0, 0, 0, 0.12),
@@ -712,9 +714,9 @@ export default {
             cursor: pointer;
             height: 26px;
             line-height: 26px;
-            border: 1px solid #d8dce5;
-            color: #495060;
-            background: #fff;
+            border: 1px solid var(--el-border-color, #d8dce5);
+            color: var(--el-text-color-regular, #495060);
+            background: var(--el-bg-color-overlay, #fff);
             padding: 0 8px;
             font-size: 12px;
             margin-left: 5px;
@@ -726,12 +728,12 @@ export default {
                 margin-right: 15px;
             }
             &.active {
-                background-color: #42b983;
-                color: #fff;
-                border-color: #42b983;
+                background-color: var(--color-primary, #409eff);
+                color: var(--mci-text-on-primary, #fff);
+                border-color: var(--color-primary, #409eff);
                 &::before {
                     content: "";
-                    background: #fff;
+                    background: currentColor;
                     display: inline-block;
                     width: 8px;
                     height: 8px;
@@ -744,7 +746,7 @@ export default {
     }
     .contextmenu {
         margin: 0;
-        background: #fff;
+        background: var(--el-bg-color-overlay, #fff);
         z-index: 9;
         position: absolute;
         list-style-type: none;
@@ -752,14 +754,15 @@ export default {
         border-radius: 4px;
         font-size: 12px;
         font-weight: 400;
-        color: #333;
-        box-shadow: 2px 2px 3px 0 rgba(0, 0, 0, 0.3);
+        color: var(--el-text-color-regular, #333);
+        border: 1px solid var(--el-border-color, #e2e8f0);
+        box-shadow: var(--mci-shadow-dropdown, 2px 2px 3px 0 rgba(0, 0, 0, 0.3));
         li {
             margin: 0;
             padding: 7px 16px;
             cursor: pointer;
             &:hover {
-                background: #eee;
+                background: var(--el-fill-color-light, #eee);
             }
         }
     }
@@ -801,8 +804,8 @@ export default {
                 vertical-align: -3px;
             }
             &:hover {
-                background-color: #b4bccc;
-                color: #fff;
+                background-color: var(--el-fill-color-darker, #b4bccc);
+                color: var(--el-text-color-primary, #fff);
             }
         }
     }

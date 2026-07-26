@@ -139,6 +139,12 @@ namespace Microi.net.Api
             public string SystemName { get; set; }
         }
 
+        public class UpdateCurrentProfileRequest
+        {
+            public string Name { get; set; }
+            public string Avatar { get; set; }
+        }
+
         private static async Task DefaultParam(SysUserParam param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
@@ -1505,6 +1511,69 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "SSO登录失败，请联系管理员检查服务配置。"));
             }
+        }
+
+        /// <summary>
+        /// 官网账户资料自助修改。字段白名单固定为显示名称和头像，目标用户、租户
+        /// 均来自登录 Token，头像只能保存到当前租户的 member/avatar 目录。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> UpdateCurrentProfile([FromBody] UpdateCurrentProfileRequest param)
+        {
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var currentUser = currentToken?.CurrentUser;
+            if (currentUser == null)
+            {
+                Response.StatusCode = 401;
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            }
+
+            var userId = currentUser["Id"].Val<string>();
+            var osClient = currentToken.OsClient;
+            var name = (param?.Name ?? string.Empty).Trim();
+            if (name.Length < 1 || name.Length > 50)
+            {
+                return Json(new DosResult(0, null, "昵称需为 1 到 50 个字符。"));
+            }
+
+            var avatar = (param?.Avatar ?? string.Empty).Trim();
+            var currentAvatar = currentUser["Avatar"]?.ToString()?.Trim() ?? string.Empty;
+            if (!avatar.DosIsNullOrWhiteSpace()
+                && !string.Equals(avatar, currentAvatar, StringComparison.Ordinal))
+            {
+                try
+                {
+                    avatar = TenantConfigurationSecurity.NormalizeStoragePath(osClient, avatar);
+                    var requiredPrefix = "/" + osClient.ToLowerInvariant() + "/member/avatar/";
+                    if (!avatar.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Json(new DosResult(0, null, "头像文件必须来自账户头像上传目录。"));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return Json(new DosResult(0, null, "头像路径不合法：" + ex.Message));
+                }
+            }
+
+            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+            {
+                Id = userId,
+                Name = name,
+                Avatar = avatar,
+                OsClient = osClient
+            });
+            if (updateResult.Code != 1)
+            {
+                return Json(new DosResult(0, null, updateResult.Msg ?? "账户资料保存失败。"));
+            }
+
+            var refreshResult = await _sysUserLogic.RefreshLoginUser(userId, osClient);
+            if (refreshResult.Code != 1)
+            {
+                return Json(new DosResult(0, null, refreshResult.Msg ?? "账户资料已保存，但登录信息刷新失败。"));
+            }
+            return Json(new DosResult(1, refreshResult.Data, "账户资料已保存。"));
         }
 
     }

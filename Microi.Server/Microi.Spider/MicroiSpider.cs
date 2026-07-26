@@ -1319,7 +1319,7 @@ namespace Microi.net
         {
             if (Environment.GetEnvironmentVariable("MICROI_SPIDER_TRACE") == "1")
             {
-                Console.WriteLine("[MicroiSpider] " + DateTime.Now.ToString("HH:mm:ss") + " " + message);
+                MicroiEngine.QueueSystemLog(null, "Spider", "Trace", "浏览器自动化调试跟踪", message, 1, true);
             }
         }
 

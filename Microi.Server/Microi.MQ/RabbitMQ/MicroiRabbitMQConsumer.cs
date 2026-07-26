@@ -28,6 +28,11 @@ namespace Microi.net
         private Task _backgroundTask;
         private int _started;
 
+        private static void WriteMqLog(string osClient, string action, string title, string content, int level = 2, string targetId = null, bool? success = false)
+        {
+            MicroiEngine.QueueSystemLog(osClient, "RabbitMQ", action, title, content, level, success, targetId);
+        }
+
         public MicroiRabbitMQConsumer(IMicroiMQConnection mqConnection)
         {
             _mqConnection = mqConnection;
@@ -64,7 +69,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【Error异常】MQ 多租户消费者同步失败：{ex.Message}");
+                    WriteMqLog(OsClientDefault.OsClient, "ConsumerReconcileFailed", "MQ 多租户消费者同步失败", ex.ToString(), 2);
                 }
 
                 try
@@ -77,7 +82,7 @@ namespace Microi.net
                 }
             }
 
-            Console.WriteLine("Microi：【信息】MQ 多租户消费者后台同步任务已停止");
+            WriteMqLog(OsClientDefault.OsClient, "ConsumerReconcileStopped", "MQ 多租户消费者后台同步已停止", "后台同步任务已正常停止。", 1, success: true);
         }
 
         private async Task ReconcileAllTenantsAsync(CancellationToken cancellationToken)
@@ -176,15 +181,14 @@ namespace Microi.net
                     }
                     catch (Exception rowException)
                     {
-                        Console.WriteLine(
-                            $"Microi：【Error异常】租户[{osClient}]存在无效 MQ 消费配置，已 fail-closed：{rowException.Message}");
+                        WriteMqLog(osClient, "InvalidConsumerConfiguration", "MQ 消费配置无效，已拒绝启用", rowException.ToString(), 2);
                     }
                 }
             }
             catch (Exception ex)
             {
                 // 某个租户没有 MQ 表或数据库暂时不可用，不得阻断其它租户的消费者。
-                Console.WriteLine($"Microi：【Error异常】读取租户[{osClient}]的 MQ 消费配置失败：{ex.Message}");
+                WriteMqLog(osClient, "LoadConsumerConfigurationFailed", "读取 MQ 消费配置失败", ex.ToString(), 2);
             }
             return result;
         }
@@ -237,9 +241,16 @@ namespace Microi.net
                 var attempt = _failedAttempts.AddOrUpdate(mapKey, 1, (_, oldValue) => oldValue + 1);
                 if (attempt <= 3 || attempt % 10 == 0)
                 {
-                    Console.WriteLine(
-                        $"Microi：【Error异常】注册租户[{item.OsClient}]的 MQ 队列[{item.QueueName}]失败" +
-                        $"（第{attempt}次，未回退主租户凭据）：{ex.Message}");
+                    if (!(ex is TenantRabbitMQConfigurationException))
+                    {
+                        WriteMqLog(
+                            item.OsClient,
+                            "RegisterConsumerFailed",
+                            "注册 MQ 消费队列失败",
+                            $"第{attempt}次失败，未回退主租户凭据。{ex}",
+                            2,
+                            item.QueueName);
+                    }
                 }
                 return false;
             }
@@ -273,8 +284,7 @@ namespace Microi.net
                 if (validationError != null)
                 {
                     statusInfo = validationError;
-                    Console.WriteLine(
-                        $"Microi：【安全】租户[{item.OsClient}]的 MQ 消息 envelope 校验失败，Queue={item.QueueName}：{validationError}");
+                    WriteMqLog(item.OsClient, "EnvelopeRejected", "MQ 消息安全校验失败，已拒绝消费", validationError, 3, item.QueueName);
                     await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
                     return;
                 }
@@ -305,8 +315,7 @@ namespace Microi.net
             catch (Exception ex)
             {
                 statusInfo = "消息处理异常：" + ex.Message;
-                Console.WriteLine(
-                    $"Microi：【Error异常】租户[{item.OsClient}]处理 MQ 消息失败，Queue={item.QueueName}：{ex}");
+                WriteMqLog(item.OsClient, "MessageHandlingFailed", "MQ 消息处理失败", ex.ToString(), 2, item.QueueName);
                 try
                 {
                     if (envelope != null && item.FailToReject)
@@ -475,8 +484,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine(
-                    $"Microi：【Error异常】租户[{item.OsClient}]的 MQ 接收日志写入失败：{ex.Message}");
+                WriteMqLog(item.OsClient, "ReceiveAuditWriteFailed", "MQ 接收记录写入失败", ex.ToString(), 2, item.QueueName);
             }
         }
 
@@ -529,11 +537,11 @@ namespace Microi.net
                     }
                 }
                 _failedAttempts.Clear();
-                Console.WriteLine("Microi：【信息】MQ 多租户消费者已停止");
+                WriteMqLog(OsClientDefault.OsClient, "ConsumerStopped", "MQ 多租户消费者已停止", "消费者连接与通道已释放。", 1, success: true);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【Error异常】MQ 多租户消费者停止失败：{ex.Message}");
+                WriteMqLog(OsClientDefault.OsClient, "ConsumerStopFailed", "MQ 多租户消费者停止失败", ex.ToString(), 3);
             }
         }
     }

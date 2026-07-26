@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -55,6 +56,11 @@ namespace Microi.net
         private const string LogTypeReceive = "Receive";
         private const string LogTypeSubscribe = "Subscribe";
 
+        private static void WriteMqttDiagnostic(string osClient, string action, string title, string content, int level = 2, string targetId = null)
+        {
+            MicroiEngine.QueueSystemLog(osClient, "MQTT", action, title, content, level, false, targetId);
+        }
+
         public IReadOnlyDictionary<string, string> ConnectedClients
             => new Dictionary<string, string>(_connectedClients);
 
@@ -79,11 +85,14 @@ namespace Microi.net
         public async Task StartServerAsync(OsClientSecret clientModel)
         {
             if (IsRunning) return;
+            if (!IsMqttEnabled(clientModel))
+            {
+                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "MQTT", "BrokerDisabled", "MQTT 未启用，已跳过 Broker 启动", null, 1, true);
+                return;
+            }
             var port = 1883;
             try
             {
-                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动中...");
-
                 if (clientModel != null
                     && clientModel.OsClientModel?["MqttPort"] != null
                     && clientModel.OsClientModel["MqttPort"].Val<int>() > 0)
@@ -91,47 +100,10 @@ namespace Microi.net
                     port = clientModel.OsClientModel["MqttPort"].Val<int>();
                 }
 
-                var builder = new MqttServerOptionsBuilder()
-                    .WithDefaultEndpoint()
-                    .WithDefaultEndpointPort(port)
-                    .WithDefaultEndpointBoundIPAddress(IPAddress.Any);
-
-                // TLS 支持：当主租户配置 MqttUseTls=1 时启用
-                var useTls = clientModel?.OsClientModel?["MqttUseTls"]?.Val<int>() == 1;
-                if (useTls)
-                {
-                    var certPath = clientModel.OsClientModel?["MqttCertPath"]?.Val<string>();
-                    var certPwd = clientModel.OsClientModel?["MqttCertPassword"]?.Val<string>();
-                    var tlsPort = clientModel.OsClientModel?["MqttTlsPort"]?.Val<int>() ?? 8883;
-                    if (!string.IsNullOrWhiteSpace(certPath) && File.Exists(certPath))
-                    {
-                        var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certPath, certPwd);
-                        builder
-                            .WithEncryptedEndpoint()
-                            .WithEncryptedEndpointPort(tlsPort)
-                            .WithEncryptedEndpointBoundIPAddress(IPAddress.Any)
-                            .WithEncryptionCertificate(cert.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx))
-                            .WithEncryptionSslProtocol(System.Security.Authentication.SslProtocols.Tls12);
-                        Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT TLS 已启用，端口:{tlsPort}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT TLS 已开启但证书路径无效：{certPath}");
-                    }
-                }
-
-                _mqttServer = new MqttFactory().CreateMqttServer(builder.Build()) as MqttServer;
-
-                _mqttServer.ValidatingConnectionAsync += OnValidateConnection;
-                _mqttServer.ClientConnectedAsync += OnClientConnected;
-                _mqttServer.ClientDisconnectedAsync += OnClientDisconnected;
-                _mqttServer.InterceptingPublishAsync += OnMessageReceived;
-                _mqttServer.InterceptingSubscriptionAsync += OnInterceptingSubscription;
-                _mqttServer.RetainedMessageChangedAsync += OnRetainedMessageChanged;
-                await _mqttServer.StartAsync();
+                await StartBrokerOnPortAsync(clientModel, port);
                 IsRunning = true;
 
-                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动成功！TCP端口:{port}");
+                MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "MQTT", "BrokerStarted", "MQTT Broker 启动成功", $"TCP 端口：{port}", 1, true);
 
                 // 内部写入 mci_mqtt_log（服务启动日志） + 触发所有配置了MqttApiEngine的租户的StartServer V8事件
                 await WriteServerLifecycleLogAsync(LogTypeServerStart, $"MQTT服务启动成功，端口:{port}");
@@ -139,11 +111,104 @@ namespace Microi.net
             }
             catch (System.Net.Sockets.SocketException sox) when (sox.SocketErrorCode == System.Net.Sockets.SocketError.AddressAlreadyInUse)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT启动失败：端口 {port} 已被占用，请检查是否有其他 MQTT Broker 或程序实例正在运行。");
+                await ResetFailedBrokerAsync();
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "PortOccupied", "MQTT Broker 启动失败：端口被占用", $"TCP 端口：{port}", 3);
+            }
+            catch (System.Net.Sockets.SocketException sox) when (
+                RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                && sox.SocketErrorCode == System.Net.Sockets.SocketError.AccessDenied)
+            {
+                await ResetFailedBrokerAsync();
+                var configuredFallbackPort = clientModel?.OsClientModel?["MqttFallbackPort"]?.Val<int>() ?? 0;
+                var fallbackPort = configuredFallbackPort > 0 && configuredFallbackPort <= 65535 && configuredFallbackPort != port
+                    ? configuredFallbackPort
+                    : 21883;
+                try
+                {
+                    await StartBrokerOnPortAsync(clientModel, fallbackPort);
+                    IsRunning = true;
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "MQTT", "FallbackPortUsed", "MQTT Broker 已改用备用端口", $"原端口：{port}；备用端口：{fallbackPort}", 2, true);
+                    await WriteServerLifecycleLogAsync(LogTypeServerStart, $"MQTT服务启动成功，Windows 备用端口:{fallbackPort}");
+                    await FireV8EventForAllTenantsAsync("StartServer", new MqttParam());
+                }
+                catch (Exception fallbackException)
+                {
+                    await ResetFailedBrokerAsync();
+                    WriteMqttDiagnostic(OsClientDefault.OsClient, "FallbackPortFailed", "MQTT Broker 主端口与备用端口均启动失败", $"原端口：{port}；备用端口：{fallbackPort}\n{fallbackException}", 3);
+                }
             }
             catch (System.Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务启动失败：{ex.Message}\n{ex.StackTrace}");
+                await ResetFailedBrokerAsync();
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "BrokerStartFailed", "MQTT Broker 启动失败", ex.ToString(), 3);
+            }
+        }
+
+        private async Task StartBrokerOnPortAsync(OsClientSecret clientModel, int port)
+        {
+            var builder = new MqttServerOptionsBuilder()
+                .WithDefaultEndpoint()
+                .WithDefaultEndpointPort(port)
+                .WithDefaultEndpointBoundIPAddress(IPAddress.Any);
+
+            // TLS 支持：当主租户配置 MqttUseTls=1 时启用
+            var useTls = clientModel?.OsClientModel?["MqttUseTls"]?.Val<int>() == 1;
+            if (useTls)
+            {
+                var certPath = clientModel.OsClientModel?["MqttCertPath"]?.Val<string>();
+                var certPwd = clientModel.OsClientModel?["MqttCertPassword"]?.Val<string>();
+                var tlsPort = clientModel.OsClientModel?["MqttTlsPort"]?.Val<int>() ?? 8883;
+                if (!string.IsNullOrWhiteSpace(certPath) && File.Exists(certPath))
+                {
+                    var cert = new System.Security.Cryptography.X509Certificates.X509Certificate2(certPath, certPwd);
+                    builder
+                        .WithEncryptedEndpoint()
+                        .WithEncryptedEndpointPort(tlsPort)
+                        .WithEncryptedEndpointBoundIPAddress(IPAddress.Any)
+                        .WithEncryptionCertificate(cert.Export(System.Security.Cryptography.X509Certificates.X509ContentType.Pfx))
+                        .WithEncryptionSslProtocol(System.Security.Authentication.SslProtocols.Tls12);
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "MQTT", "TlsEnabled", "MQTT TLS 已启用", $"TLS 端口：{tlsPort}", 1, true);
+                }
+                else
+                {
+                    WriteMqttDiagnostic(OsClientDefault.OsClient, "InvalidTlsCertificatePath", "MQTT TLS 已开启但证书路径无效", $"证书文件：{Path.GetFileName(certPath)}", 3);
+                }
+            }
+
+            _mqttServer = new MqttFactory().CreateMqttServer(builder.Build()) as MqttServer;
+            if (_mqttServer == null)
+            {
+                throw new InvalidOperationException("MQTTnet 未能创建 Broker 实例。");
+            }
+
+            _mqttServer.ValidatingConnectionAsync += OnValidateConnection;
+            _mqttServer.ClientConnectedAsync += OnClientConnected;
+            _mqttServer.ClientDisconnectedAsync += OnClientDisconnected;
+            _mqttServer.InterceptingPublishAsync += OnMessageReceived;
+            _mqttServer.InterceptingSubscriptionAsync += OnInterceptingSubscription;
+            _mqttServer.RetainedMessageChangedAsync += OnRetainedMessageChanged;
+            await _mqttServer.StartAsync();
+        }
+
+        private async Task ResetFailedBrokerAsync()
+        {
+            var failedServer = _mqttServer;
+            _mqttServer = null;
+            IsRunning = false;
+            if (failedServer == null) return;
+
+            failedServer.ValidatingConnectionAsync -= OnValidateConnection;
+            failedServer.ClientConnectedAsync -= OnClientConnected;
+            failedServer.ClientDisconnectedAsync -= OnClientDisconnected;
+            failedServer.InterceptingPublishAsync -= OnMessageReceived;
+            failedServer.InterceptingSubscriptionAsync -= OnInterceptingSubscription;
+            failedServer.RetainedMessageChangedAsync -= OnRetainedMessageChanged;
+            try
+            {
+                await failedServer.StopAsync();
+            }
+            catch
+            {
             }
         }
 
@@ -373,7 +438,7 @@ namespace Microi.net
                 if (!TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
                     || !IsMqttEnabled(clientModel))
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT V8事件：未找到OsClient配置 osClient={osClient}, Event={eventName}");
+                    WriteMqttDiagnostic(osClient, "TenantConfigurationMissing", "MQTT V8 事件未找到租户配置", $"Event={eventName}", 2, mqttParam?.ClientId);
                     return null;
                 }
                 osClient = normalizedTenant;
@@ -433,7 +498,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT V8事件执行异常：osClient={osClient}, Event={eventName}, Error={ex.Message}");
+                WriteMqttDiagnostic(osClient, "V8EventFailed", "MQTT V8 事件执行失败", $"Event={eventName}\n{ex}", 2, mqttParam?.ClientId);
                 // 已配置 V8 策略时执行异常必须 fail-closed，避免脚本故障反而放行消息。
                 return new DosResult(0, null, $"MQTT V8事件执行失败：{ex.Message}");
             }
@@ -502,7 +567,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT {eventName}事件触发异常：osClient={item.Key}, Error={ex.Message}");
+                    WriteMqttDiagnostic(item.Key, "LifecycleEventFailed", "MQTT 生命周期事件触发失败", $"Event={eventName}\n{ex}", 2);
                 }
             }
             if (tasks.Count > 0)
@@ -585,7 +650,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT日志写入异常 OsClient={osClient}, Type={type}, ClientId={clientId}, Error={ex.Message}");
+                WriteMqttDiagnostic(osClient, "BusinessLogWriteFailed", "MQTT 业务日志写入失败", $"Type={type}; Topic={topic}\n{ex}", 2, clientId);
             }
         }
 
@@ -647,7 +712,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT设备表操作异常 OsClient={osClient}, ClientId={clientId}, Error={ex.Message}");
+                WriteMqttDiagnostic(osClient, "ClientStateWriteFailed", "MQTT 设备状态写入失败", ex.ToString(), 2, clientId);
             }
         }
 
@@ -697,10 +762,9 @@ namespace Microi.net
         {
             try
             {
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接开始验证！ ClientId：{args.ClientId}");
                 if (string.IsNullOrEmpty(args.ClientId) || args.ClientId.IndexOf(ClientKeySeparator) >= 0)
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId为空或包含非法字符");
+                    WriteMqttDiagnostic(OsClientDefault.OsClient, "ConnectionRejected", "MQTT 连接被拒绝", "ClientId 为空或包含非法字符。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
                     return Task.CompletedTask;
                 }
@@ -717,7 +781,7 @@ namespace Microi.net
                 {
                     if (!TryResolveTenant(explicitTenant, out osClient, out clientModel))
                     {
-                        Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：未知租户 OsClient={explicitTenant}, ClientId={args.ClientId}");
+                        WriteMqttDiagnostic(OsClientDefault.OsClient, "UnknownTenantRejected", "MQTT 未知租户连接被拒绝", $"OsClient={explicitTenant}", 3, args.ClientId);
                         args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                         return Task.CompletedTask;
                     }
@@ -785,14 +849,14 @@ namespace Microi.net
 
                 if (clientModel == null)
                 {
-                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：未明确解析到租户 ClientId={args.ClientId}");
+                    WriteMqttDiagnostic(OsClientDefault.OsClient, "TenantResolutionFailed", "MQTT 连接未解析到租户，已拒绝", "请求未携带可识别的租户信息。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
 
                 if (!IsMqttEnabled(clientModel))
                 {
-                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：租户未启用 MQTT OsClient={osClient}");
+                    WriteMqttDiagnostic(osClient, "DisabledTenantRejected", "未启用 MQTT 的租户连接被拒绝", "租户未启用 MQTT。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
@@ -805,7 +869,7 @@ namespace Microi.net
                 // 子租户必须使用自身完整账号密码；MqttAllowAnonymous 和 MqttTopicIsolation=0 对子租户不生效。
                 if (isChildTenant && !hasCompleteCredential)
                 {
-                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：子租户未配置独立完整凭据 OsClient={osClient}");
+                    WriteMqttDiagnostic(osClient, "IncompleteCredentialRejected", "MQTT 子租户凭据不完整，已拒绝连接", "子租户必须配置独立账号和密码。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
@@ -823,7 +887,7 @@ namespace Microi.net
                             mqttPwd,
                             otherCredentials))
                     {
-                        Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：子租户账号或密码与其它租户重复，已 fail-closed OsClient={osClient}");
+                        WriteMqttDiagnostic(osClient, "CredentialCollisionRejected", "MQTT 子租户凭据与其它租户重复，已拒绝连接", "检测到跨租户账号或密码重复。", 3, args.ClientId);
                         args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                         return Task.CompletedTask;
                     }
@@ -834,31 +898,30 @@ namespace Microi.net
                     if (!FixedTimeStringEquals(effectiveUserName, mqttAccount)
                         || !FixedTimeStringEquals(args.Password, mqttPwd))
                     {
-                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：用户名或密码不匹配 ClientId：{args.ClientId}, OsClient：{osClient}");
+                        WriteMqttDiagnostic(osClient, "CredentialRejected", "MQTT 用户名或密码不匹配，已拒绝连接", "凭据验证失败。", 3, args.ClientId);
                         args.ReasonCode = MqttConnectReasonCode.BadUserNameOrPassword;
                         return Task.CompletedTask;
                     }
                 }
                 else if (!IsAnonymousAllowed(osClient, clientModel))
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：租户未配置账号密码且未启用匿名（MqttAllowAnonymous） ClientId：{args.ClientId}, OsClient：{osClient}");
+                    WriteMqttDiagnostic(osClient, "AnonymousRejected", "MQTT 匿名连接未启用，已拒绝连接", "租户未配置完整凭据且未启用 MqttAllowAnonymous。", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.NotAuthorized;
                     return Task.CompletedTask;
                 }
 
                 if (!TryRegisterConnectedClient(osClient, args.ClientId, out var existedOsClient))
                 {
-                    Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT验证失败：ClientId 跨租户冲突 ClientId={args.ClientId}, ExistingOsClient={existedOsClient}, OsClient={osClient}");
+                    WriteMqttDiagnostic(osClient, "ClientTenantCollisionRejected", "MQTT ClientId 跨租户冲突，已拒绝连接", $"ExistingOsClient={existedOsClient}", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
                     return Task.CompletedTask;
                 }
 
                 args.ReasonCode = MqttConnectReasonCode.Success;
-                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接验证成功！ ClientId：{args.ClientId}, OsClient：{osClient}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接验证异常：{ex.Message}\n{ex.StackTrace}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "ConnectionValidationFailed", "MQTT 连接验证异常", ex.ToString(), 3, args.ClientId);
                 args.ReasonCode = MqttConnectReasonCode.UnspecifiedError;
             }
             return Task.CompletedTask;
@@ -870,10 +933,9 @@ namespace Microi.net
             var osClient = ResolveOsClient(args.ClientId, args.UserProperties);
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接事件未解析到租户，已跳过 ClientId={args.ClientId}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "ConnectedTenantResolutionFailed", "MQTT 连接事件未解析到租户，已跳过", "不回退主租户。", 3, args.ClientId);
                 return;
             }
-            Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT连接成功！ ClientId：{args.ClientId}, OsClient：{osClient}");
 
             // 内部写入 mci_mqtt_log + 设备表 mci_mqtt_client（同时刷新设备级 ApiEngineId 缓存）
             await UpsertMqttClientAsync(osClient, args.ClientId, true);
@@ -900,11 +962,9 @@ namespace Microi.net
             if (osClient.DosIsNullOrWhiteSpace()) osClient = ResolveOsClient(args.ClientId, args.UserProperties);
             if (osClient.DosIsNullOrWhiteSpace())
             {
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT断开事件未解析到租户，不回退主租户 ClientId={args.ClientId}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "DisconnectedTenantResolutionFailed", "MQTT 断开事件未解析到租户，已跳过", "不回退主租户。", 3, args.ClientId);
                 return;
             }
-
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT断开连接！ ClientId：{args.ClientId}, OsClient：{osClient}");
 
             RemoveConnectedClient(osClient, args.ClientId);
 
@@ -932,7 +992,7 @@ namespace Microi.net
             {
                 args.ProcessSubscription = false;
                 if (args.Response != null) args.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT订阅被拒：未知或未启用租户 ClientId={args.ClientId}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "SubscriptionTenantRejected", "MQTT 订阅被拒绝", "未知租户或租户未启用 MQTT。", 3, args.ClientId);
                 return;
             }
             osClient = normalizedTenant;
@@ -954,7 +1014,7 @@ namespace Microi.net
             {
                 args.ProcessSubscription = false;
                 if (args.Response != null) args.Response.ReasonCode = MqttSubscribeReasonCode.NotAuthorized;
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT订阅被 Topic ACL 拒绝：ClientId={args.ClientId}, OsClient={osClient}, Topic={topic}, Error={ex.Message}");
+                WriteMqttDiagnostic(osClient, "SubscriptionAclRejected", "MQTT 订阅被 Topic ACL 拒绝", $"Topic={topic}\n{ex}", 3, args.ClientId);
                 return;
             }
 
@@ -980,7 +1040,7 @@ namespace Microi.net
                 || !TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
                 || !IsMqttEnabled(clientModel))
             {
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT保留消息未解析到已启用租户，已跳过 ClientId={args.ClientId}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "RetainedMessageTenantRejected", "MQTT 保留消息未解析到已启用租户，已跳过", "不回退主租户。", 3, args.ClientId);
                 return;
             }
             osClient = normalizedTenant;
@@ -993,11 +1053,9 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT保留消息 Topic ACL 拒绝：OsClient={osClient}, Error={ex.Message}");
+                WriteMqttDiagnostic(osClient, "RetainedMessageAclRejected", "MQTT 保留消息被 Topic ACL 拒绝", ex.ToString(), 3, args.ClientId);
                 return;
             }
-
-            Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT消息变更！ topic：{topic}, OsClient：{osClient}");
 
             await RunMqttV8EngineAsync(osClient, "MessageChanged", new MqttParam
             {
@@ -1021,7 +1079,7 @@ namespace Microi.net
                 || !IsMqttEnabled(clientModel))
             {
                 args.ProcessPublish = false;
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT发布被拒：未知或未启用租户 ClientId={args.ClientId}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "PublishTenantRejected", "MQTT 发布被拒绝", "未知租户或租户未启用 MQTT。", 3, args.ClientId);
                 return;
             }
             osClient = normalizedTenant;
@@ -1038,7 +1096,7 @@ namespace Microi.net
             catch (Exception ex)
             {
                 args.ProcessPublish = false;
-                Console.WriteLine($"Microi：【⚠️安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT发布被 Topic ACL 拒绝：ClientId={args.ClientId}, OsClient={osClient}, Topic={topic}, Error={ex.Message}");
+                WriteMqttDiagnostic(osClient, "PublishAclRejected", "MQTT 发布被 Topic ACL 拒绝", $"Topic={topic}\n{ex}", 3, args.ClientId);
                 return;
             }
 
@@ -1069,7 +1127,7 @@ namespace Microi.net
             if (v8Result != null && v8Result.Code != 1)
             {
                 args.ProcessPublish = false;
-                Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT 消息被 V8 拒绝：ClientId={args.ClientId}, OsClient={osClient}, Topic={topic}, Code={v8Result.Code}, Msg={v8Result.Msg}");
+                WriteMqttDiagnostic(osClient, "PublishRejectedByV8", "MQTT 消息被 V8 规则拒绝", $"Topic={topic}; Code={v8Result.Code}; Msg={v8Result.Msg}", 2, args.ClientId);
             }
         }
 
@@ -1100,7 +1158,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】MQTT服务停止异常：{ex.Message}");
+                WriteMqttDiagnostic(OsClientDefault.OsClient, "BrokerStopFailed", "MQTT Broker 停止异常", ex.ToString(), 3);
             }
         }
     }

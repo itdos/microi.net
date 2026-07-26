@@ -2308,9 +2308,7 @@ namespace Microi.net
                         $"向表[{diyTableModel?.Name}/{param.TableId}]导入数据失败",
                         new { TableId = param.TableId, Table = diyTableModel?.Name, Error = ex.Message }, false);
                     await diyCacheBase.SetAsync(startSign, "0");
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]失败：{ex.Message}");
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]lastSql：{lastSqlLog}");
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{diyTableModel?.Name}/{param.TableId}]StackTrace：{ex}");
+                    MicroiEngine.QueueSystemLog(param.OsClient, "Office", "DataImportFailed", "Excel 数据导入失败", ex.ToString(), 2, false, param.TableId);
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：lastSql：{lastSqlLog}");
                     importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ImportBuildExceptionDebug(ex)}");
@@ -2322,7 +2320,7 @@ namespace Microi.net
         catch (Exception ex)
         {
             await diyCacheBase.SetAsync(startSign, "0");
-            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】导入表[{param.TableId}]初始化失败：{ex}");
+            MicroiEngine.QueueSystemLog(param.OsClient, "Office", "DataImportInitializationFailed", "Excel 数据导入初始化失败", ex.ToString(), 2, false, param.TableId);
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：已失败！{ex.Message}");
             importStepList.Add($"{DateTime.Now.ToString(dateTimeFormat)}：调试：{ImportBuildExceptionDebug(ex)}");
             await diyCacheBase.SetAsync(stepSign, importStepList);

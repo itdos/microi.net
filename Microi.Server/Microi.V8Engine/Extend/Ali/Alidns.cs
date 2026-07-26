@@ -43,30 +43,13 @@ namespace Microi.net
             }
             catch (TeaException error)
             {
+                WriteAliDnsFailure("UpdateDomainRecordFailed", "更新阿里云 DNS 解析失败", error, param?.RecordId);
                 return new DosResult(0, null, error.Message);
-
-                // 此处仅做打印展示，请谨慎对待异常处理，在工程项目中切勿直接忽略异常。
-                // 错误 message
-                Console.WriteLine(error.Message);
-                // 诊断地址
-                Console.WriteLine(error.Data["Recommend"]);
-                AlibabaCloud.TeaUtil.Common.AssertAsString(error.Message);
             }
             catch (Exception _error)
             {
+                WriteAliDnsFailure("UpdateDomainRecordFailed", "更新阿里云 DNS 解析失败", _error, param?.RecordId);
                 return new DosResult(0, null, _error.Message);
-
-                TeaException error = new TeaException(new Dictionary<string, object>
-                {
-                    { "message", _error.Message }
-                });
-                // 此处仅做打印展示，请谨慎对待异常处理，在工程项目中切勿直接忽略异常。
-                // 错误 message
-
-                Console.WriteLine(error.Message);
-                // 诊断地址
-                Console.WriteLine(error.Data["Recommend"]);
-                AlibabaCloud.TeaUtil.Common.AssertAsString(error.Message);
             }
         }
         /// <summary>
@@ -110,28 +93,20 @@ namespace Microi.net
             }
             catch (TeaException error)
             {
+                WriteAliDnsFailure("UpdateEsaDomainRecordFailed", "更新阿里云 ESA DNS 解析失败", error, param?.RecordId);
                 return new DosResult(0, null, error.Message);
-                // 此处仅做打印展示，请谨慎对待异常处理，在工程项目中切勿直接忽略异常。
-                // 错误 message
-                Console.WriteLine(error.Message);
-                // 诊断地址
-                Console.WriteLine(error.Data["Recommend"]);
-                AlibabaCloud.TeaUtil.Common.AssertAsString(error.Message);
             }
             catch (Exception _error)
             {
+                WriteAliDnsFailure("UpdateEsaDomainRecordFailed", "更新阿里云 ESA DNS 解析失败", _error, param?.RecordId);
                 return new DosResult(0, null, _error.Message);
-                TeaException error = new TeaException(new Dictionary<string, object>
-                {
-                    { "message", _error.Message }
-                });
-                // 此处仅做打印展示，请谨慎对待异常处理，在工程项目中切勿直接忽略异常。
-                // 错误 message
-                Console.WriteLine(error.Message);
-                // 诊断地址
-                Console.WriteLine(error.Data["Recommend"]);
-                AlibabaCloud.TeaUtil.Common.AssertAsString(error.Message);
             }
+        }
+
+        private static void WriteAliDnsFailure(string action, string title, Exception error, string recordId)
+        {
+            var recommend = error?.Data?["Recommend"]?.ToString();
+            MicroiEngine.QueueSystemLog(null, "AliDNS", action, title, error?.ToString(), 3, false, recordId, recommend);
         }
     }
 }

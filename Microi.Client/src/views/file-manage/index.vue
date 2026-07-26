@@ -1378,7 +1378,7 @@ onUnmounted(() => {
 .file-manage-container {
   display: flex;
   height: calc(100vh - 84px);
-  background: #f1f5f9;
+  background: var(--el-bg-color-page, #f1f5f9);
   position: relative;
 
   // 初始化加载遮罩
@@ -1423,16 +1423,16 @@ onUnmounted(() => {
     border-bottom: 1px solid var(--el-border-color-lighter, #e2e8f0);
     display: flex;
     justify-content: center;
-    background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+    background: var(--mci-gradient-surface, linear-gradient(180deg, #ffffff 0%, #f7fafc 100%));
     flex-shrink: 0;
     
     .el-radio-group {
       width: 100%;
       display: flex;
       padding: 5px;
-      border: 1px solid #dbe5ef;
+      border: 1px solid var(--el-border-color, #dbe5ef);
       border-radius: 8px;
-      background: #eef3f7;
+      background: var(--el-fill-color-light, #eef3f7);
       box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 18px rgba(15, 23, 42, 0.05);
       
       .el-radio-button {
@@ -1447,7 +1447,7 @@ onUnmounted(() => {
           border: none;
           border-radius: 6px;
           background: transparent;
-          color: #526475;
+          color: var(--el-text-color-regular, #526475);
           font-size: 15px;
           font-weight: 700;
           letter-spacing: 0;

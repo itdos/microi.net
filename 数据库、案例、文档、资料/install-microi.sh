@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-07-24
+# 版本：v2026-07-25
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
 #   microi-install-database   - 主数据库（安装前按编号选择）
@@ -18,17 +18,18 @@
 #   microi-install-libretranslate - LibreTranslate 翻译服务（可选）
 # ============================================================
 # 端口分配规则：
-#   默认从 7000 开始顺序 +1 分配 7 个端口；向量检索增加 3 个，翻译服务增加 1 个
-#   若存在端口被占用，则自动从 7100 开始重新检测，以此类推
-#   基础端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, API, Web
-#   向量增强端口顺序: 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console,
-#                  Ollama, Qdrant-HTTP, Qdrant-gRPC, API, Web
-#   同时安装翻译服务时，LibreTranslate 位于可选向量服务之后、API 之前
+#   默认从 61600 开始寻找连续端口块，候选起点冲突时每次 +1，最多递增 100 次
+#   61600 高于 Linux 默认临时端口上限 60999；实际临时端口范围仍以宿主机 ip_local_port_range 为准
+#   第 1 个端口分配给 Web，第 2 个分配给 API；基础组件占 5 个，向量检索增加 3 个，翻译服务增加 1 个
+#   基础端口顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console
+#   向量增强端口顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console,
+#                  Ollama, Qdrant-HTTP, Qdrant-gRPC
+#   同时安装翻译服务时，LibreTranslate 位于其它已选配件之后
 # ============================================================
 
 set -e
 
-SCRIPT_VERSION="v2026-07-24"
+SCRIPT_VERSION="v2026-07-25"
 
 # ============================================================
 # 数据库安装配置
@@ -1168,14 +1169,13 @@ generate_random_data_dir() {
 }
 
 # === 端口检测 ===
-PORT_LABELS=("${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console")
+PORT_LABELS=("Web(microi-install-client)" "API(microi-install-api)" "${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console")
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   PORT_LABELS+=("Ollama" "Qdrant-HTTP" "Qdrant-gRPC")
 fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   PORT_LABELS+=("LibreTranslate")
 fi
-PORT_LABELS+=("API" "Web")
 PORT_COUNT=${#PORT_LABELS[@]}
 
 check_port_in_use() {
@@ -1198,14 +1198,26 @@ check_port_in_use() {
   return 1
 }
 
-echo "Microi：开始按规则分配端口（从 7000 开始顺序 +1，共 ${PORT_COUNT} 个端口）"
+PORT_START=61600
+PORT_MAX_INCREMENT_ATTEMPTS=100
+
+echo "Microi：开始按规则分配端口（共 ${PORT_COUNT} 个连续端口）"
+echo "Microi：候选起点从 ${PORT_START} 开始；冲突时每次 +1，最多递增 ${PORT_MAX_INCREMENT_ATTEMPTS} 次。"
+echo 'Microi：端口顺序固定为 Web、API、其余已选组件。'
 echo ''
 
-PORT_BASE=7000
+PORT_BASE=${PORT_START}
+PORT_INCREMENT_ATTEMPTS=0
 PORT_ALLOCATED=false
 
-while [ ${PORT_BASE} -le 65500 ]; do
-  echo "Microi：检测端口段 ${PORT_BASE}-$((PORT_BASE + PORT_COUNT - 1))..."
+while [ ${PORT_INCREMENT_ATTEMPTS} -le ${PORT_MAX_INCREMENT_ATTEMPTS} ]; do
+  PORT_END=$((PORT_BASE + PORT_COUNT - 1))
+  if [ ${PORT_END} -gt 65535 ]; then
+    echo "Microi：错误：候选端口段 ${PORT_BASE}-${PORT_END} 超出有效端口上限 65535。"
+    break
+  fi
+
+  echo "Microi：检测端口段 ${PORT_BASE}-${PORT_END}..."
   ALL_FREE=true
   CONFLICT_PORTS=""
   for i in $(seq 0 $((PORT_COUNT - 1))); do
@@ -1219,28 +1231,37 @@ while [ ${PORT_BASE} -le 65500 ]; do
 
   if [ "${ALL_FREE}" = true ]; then
     PORT_ALLOCATED=true
-    echo "Microi：端口段 ${PORT_BASE}-$((PORT_BASE + PORT_COUNT - 1)) 全部可用 ✓"
+    echo "Microi：端口段 ${PORT_BASE}-${PORT_END} 全部可用 ✓"
     break
-  else
-    echo "Microi：端口段存在被占用端口:${CONFLICT_PORTS}，尝试下一段 $((PORT_BASE + 100))..."
-    PORT_BASE=$((PORT_BASE + 100))
-    echo ''
   fi
+
+  if [ ${PORT_INCREMENT_ATTEMPTS} -ge ${PORT_MAX_INCREMENT_ATTEMPTS} ]; then
+    break
+  fi
+
+  PORT_INCREMENT_ATTEMPTS=$((PORT_INCREMENT_ATTEMPTS + 1))
+  NEXT_PORT_BASE=$((PORT_BASE + 1))
+  echo "Microi：端口段存在被占用端口:${CONFLICT_PORTS}，候选起点 +1，尝试 ${NEXT_PORT_BASE}-$((NEXT_PORT_BASE + PORT_COUNT - 1))..."
+  PORT_BASE=${NEXT_PORT_BASE}
+  echo ''
 done
 
 if [ "${PORT_ALLOCATED}" = false ]; then
-  echo "Microi：错误：无法找到连续 ${PORT_COUNT} 个可用端口（已尝试至端口段 ${PORT_BASE}），脚本退出。"
+  echo "Microi：错误：从 ${PORT_START} 开始、候选起点最多递增 ${PORT_MAX_INCREMENT_ATTEMPTS} 次后，仍无法找到连续 ${PORT_COUNT} 个可用端口。"
+  echo 'Microi：端口搜索已按上限停止，脚本退出，不会无限循环。'
   exit 1
 fi
 
 # 分配端口
-MYSQL_PORT=$((PORT_BASE + 0))
+VUE_PORT=$((PORT_BASE + 0))
+API_PORT=$((PORT_BASE + 1))
+MYSQL_PORT=$((PORT_BASE + 2))
 DATABASE_PORT=${MYSQL_PORT}
-REDIS_PORT=$((PORT_BASE + 1))
-MONGO_PORT=$((PORT_BASE + 2))
-MINIO_PORT=$((PORT_BASE + 3))
-MINIO_CONSOLE_PORT=$((PORT_BASE + 4))
-NEXT_PORT_OFFSET=5
+REDIS_PORT=$((PORT_BASE + 3))
+MONGO_PORT=$((PORT_BASE + 4))
+MINIO_PORT=$((PORT_BASE + 5))
+MINIO_CONSOLE_PORT=$((PORT_BASE + 6))
+NEXT_PORT_OFFSET=7
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   OLLAMA_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
   QDRANT_HTTP_PORT=$((PORT_BASE + NEXT_PORT_OFFSET + 1))
@@ -1257,12 +1278,12 @@ if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
 else
   LIBRETRANSLATE_PORT=""
 fi
-API_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
-VUE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET + 1))
 
 echo ''
 echo 'Microi：端口分配方案：'
 echo '------------------------------------------------------------------'
+printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
+printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
 printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
@@ -1276,12 +1297,10 @@ fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}"
 fi
-printf '  %-18s %s\n' "API:"           "${API_PORT}"
-printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 echo '------------------------------------------------------------------'
 
-ALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
-FIREWALL_PORTS="${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+ALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+FIREWALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   ALL_PORTS="${ALL_PORTS} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT}"
   FIREWALL_PORTS="${FIREWALL_PORTS} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT}"
@@ -1289,9 +1308,6 @@ fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   ALL_PORTS="${ALL_PORTS} ${LIBRETRANSLATE_PORT}"
 fi
-ALL_PORTS="${ALL_PORTS} ${API_PORT} ${VUE_PORT}"
-FIREWALL_PORTS="${FIREWALL_PORTS} ${API_PORT} ${VUE_PORT}"
-
 echo ''
 echo '[步骤3/11] 端口分配完成 ✓'
 
@@ -2405,7 +2421,7 @@ case "${DATABASE_CHOICE}" in
     ;;
 esac
 
-echo "Microi：API端口: ${API_PORT}, Web端口: ${VUE_PORT}"
+echo "Microi：Web端口: ${VUE_PORT}, API端口: ${API_PORT}"
 
 APP_TRANSLATE_ENV=""
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
@@ -2546,6 +2562,8 @@ echo ''
 echo '------------------------------------------------------------------'
 echo "端口分配（从 ${PORT_BASE} 开始顺序分配）："
 echo '------------------------------------------------------------------'
+printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
+printf '  %-18s %s\n' "API:"           "${API_PORT}"
 printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
 printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
@@ -2559,8 +2577,6 @@ fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}"
 fi
-printf '  %-18s %s\n' "API:"           "${API_PORT}"
-printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
 echo ''
 echo '------------------------------------------------------------------'
 echo '服务信息：'

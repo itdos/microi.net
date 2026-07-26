@@ -121,6 +121,15 @@ function validate(name, content) {
       const buildZipEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_download_build_zip');
       const sourceZipEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_download_source_zip');
       const importerEngine = engines.find(engine => engine.ApiEngineKey === 'import-microi-store-package');
+      const engineVersionNumber = engine => {
+        const parts = String(engine?.Version || '')
+          .replace(/^v/i, '')
+          .split('.')
+          .map(item => Number(item) || 0);
+        return (parts[0] || 0) * 1_000_000
+          + (parts[1] || 0) * 1_000
+          + (parts[2] || 0);
+      };
       const importerVersion = String(importerEngine?.Version || '').replace(/^v/i, '');
       const importerVersionParts = importerVersion.split('.').map(item => Number(item) || 0);
       const importerVersionNumber = (importerVersionParts[0] || 0) * 1_000_000
@@ -139,9 +148,9 @@ function validate(name, content) {
         || !applicationTypeOptions.includes('"Key":"UniApp"')
         || !applicationTypeOptions.includes('"Key":"Web"')
         || !applicationTypeOptions.includes('"Key":"MicroService"')
-        || buildZipEngine?.Version !== 'v1.2.0'
+        || engineVersionNumber(buildZipEngine) < 1_002_000
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
-        || sourceZipEngine?.Version !== 'v1.2.0'
+        || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
         || importerVersionNumber < 1_006_006
         || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')

@@ -1,9 +1,11 @@
 import { defineConfig } from "vitepress";
 import { groupIconMdPlugin, groupIconVitePlugin, localIconLoader } from "vitepress-plugin-group-icons";
 import mdItCustomAttrs from "markdown-it-custom-attrs";
+import { createSeoHead, transformSeoHtml, transformSeoPageData } from './seo'
 
 export const shared = defineConfig({
 	title: "Microi吾码",
+	appearance: "dark",
 	lastUpdated: true,
 	sitemap: {
 		hostname: "https://www.microi.net",
@@ -17,12 +19,14 @@ export const shared = defineConfig({
 	/* prettier-ignore */
 	head: [
 		["meta", { name: "author", content: "Microi风闲" }],
-		["meta", { name: "keywords", content: "Microi吾码,低代码,开源 AI 低代码平台,小吾科技,Microi.net,Microi,iTdos,itdos.com,microios,Dos,Dos.,Dos.ORM,Dos.Common" }],
 		["script", {}, "document.documentElement.setAttribute('data-mci-site-style','mainstream')"],
 		["link", { rel: "icon", href: "/icon.png" }],
 		["link", { rel: "stylesheet", href: "/assets/fancybox.css" }],
 		["script", { src: "/assets/fancybox.umd.js" }],
 	],
+	transformPageData: transformSeoPageData,
+	transformHead: createSeoHead,
+	transformHtml: transformSeoHtml,
 	themeConfig: {
 		logo: "/icon.png",
 		socialLinks: [
@@ -41,7 +45,7 @@ export const shared = defineConfig({
 	vite: {
 		plugins: [],
 		server: {
-			port: 2015,
+			port: 61503,
 			strictPort: false,
 		},
 	},

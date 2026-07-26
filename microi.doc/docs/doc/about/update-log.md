@@ -1,8 +1,26 @@
 # 更新日志
 
-## v6.7.0
+## v6.7.3 - (2026-07-26 18:18)
 
-更新日期：2026-07-25 04:32
+- **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.7.3；Microi VS Code 插件及内置 Skills 升级至 v4.2.0。本次按根仓库、Microi.net、Microi.AI、Microi.VSCode 四个 Git 边界汇总指定提交以来的历史差异和当前非编译产物待提交改动，`dist` 等构建目录不纳入功能变更说明。
+- **统一测试框架与发布门禁（补记根仓库 `84c4237`）**：原 Dos.Common.Tests、Dos.ORM.Tests 等分散用例整合进 Microi.Tests，新增能力样例、数据库方言案例、执行计划断言、测试配置／Profile、Quick／Full 分级运行脚本和完整测试说明；PostgreSQL、KingbaseES 等数据库兼容编译与外部数据库管理能力同步纳入统一验证。接口引擎历史默认内存预算由 1024MB 提升至 2048MB，为大脚本和应用包执行提供基础容量，同时仍保留平台硬上限和用例约束。
+- **Microi.net 唯一性与扩展数据库刷新（补记 `01f6935`）**：新增、修改数据时的唯一字段校验支持排除当前记录，并补齐组合唯一字段更新校验，避免正常编辑被自身旧值误判为重复；扩展数据库配置在事务成功提交后刷新共享运行态，使新连接配置及时生效且不把提交后通知失败伪装成业务回滚。
+- **Microi.AI NL2SQL 与外部库知识（补记 `6eec6dd`）**：NL2SQL 权限检查新增 `diy_lang`、`mic_data_version` 元数据表集合并从普通业务表授权判断中分离；AI 组件补充扩展数据库结构发现、附件迁移、SQL／表单事件／文件／安全等内置 Skills 资料，并升级 Hosting、ONNX Runtime、OpenAI、Qdrant 等依赖。
+- **VS Code v4.2.0 MCP 诊断（补记 `7f1a0e5`）**：插件补充 Microi 数据库类型提示，优化 MCP 状态字段、诊断描述和自动启动策略，减少重复启动请求；移除冗余 Codex CLI 配置同步，增强诊断脚本，并统一忽略 `.tmp` 临时目录。
+- **后台主题与暗色模式重构**：PC 与移动端统一新的主题运行时，浅色／暗色模式各提供 12 套非冲突配色，以语义化 CSS 令牌驱动页面、导航、侧栏、页签、表格、弹窗、日历、文件管理器、工作流和 AI 工作台；暗色模式排除不可读的白色主色，自定义极亮／极暗颜色自动安全回退，并通过主按钮、侧栏激活项和底部波浪区域的 WCAG 对比度回归测试保证可读性。页面引擎和打印引擎设计态不再修改全局明暗状态。
+- **模块数据权限图形设计器**：模块引擎新增可视化数据权限组件，可配置全部／本人／本人及下属／部门／部门及子级／自定义范围、租户隔离、全权限角色／岗位／部门、关联表和组合条件，并实时生成 `SqlWhere`、`SqlJoin` 与 `JoinTables`；图形快照使用平台专用标记无损恢复，手写 SQL 可切换高级模式继续维护。Microi.net 在执行前只移除设计器机器标记和自动说明注释，保留用户自行编写的普通 SQL 注释，相关模块资源、中文文档和回归用例同步更新。
+- **V8 请求级控制台与异步运行时**：新增基于 AsyncLocal 的 `V8ConsoleContext`，接口引擎、MCP 和调试会话按请求捕获 `console.log/error/warn/info`，避免并发脚本通过全局 Console 串日志；Jint 运行时统一预处理异步脚本并在返回前安全排空 `setTimeout`，取消／释放时不再遗留 Timer，调试执行与正式执行保持相同语义，脚本摘要计算也兼容旧目标框架。
+- **MongoDB 系统日志统一收口**：新增从 Dos.Common 到 Microi.Core 的运行诊断桥接和启动期缓冲，普通运行日志统一进入 MongoDB，仅在控制台保留启动、致命异常和日志管道自身故障等平台级信息；缓存、ORM、任务调度、RabbitMQ、MQTT、WebSocket、工作流、HDFS／CAD、OnlyOffice、Office 导入、Spider、AliDNS、模型绑定、SSRF 拦截及后台任务等日志补齐租户、动作、目标、级别和成功状态，系统监控明确区分平台关键控制台日志与普通 MongoDB 日志。
+- **多租户两级缓存与批量写入稳定性**：Redis 订阅器由静态全局状态改为按缓存实例／租户隔离，允许不同租户使用不同 Redis；失效广播串行发送并对瞬时发布失败进行一次短延迟重试和聚合告警，FormEngine 写入与计数缓存失效改为可等待完成，减少批量导入时大量并发命令引发的 SocketClosed、跨节点旧值和日志风暴。
+- **MQTT、RabbitMQ 与分布式任务诊断**：MQTT 未启用时不再启动 Broker，端口占用或启动失败后会解绑事件并完整清理实例；Windows 主端口访问被拒时可回退配置端口或 21883，TLS、租户解析、凭据冲突、Topic ACL、V8 拒绝和生命周期事件均记录结构化安全日志。RabbitMQ 子租户无效配置继续失败关闭且不回退主租户凭据，重复配置错误按租户聚合；Quartz MySQL 连接串在插件边界兼容旧租户 `SslMode=None/false` 等历史写法。
+- **应用商城导入器大包稳定性**：仅把受信任的 `import-microi-store-package` 内存预算提升至 3072MB，普通接口引擎继续使用 2048MB 默认值和平台上限；升级前、资源包安装后都会修正执行限额并清理共享缓存，避免在线旧包把限额覆盖回 2048MB。菜单修复显式转换 dynamic 结果后再调用 JToken 扩展，资源校验改为接受不低于基线的语义版本，并同步应用包断点复用、稳定发布路径和源码／编译资产边界。
+- **官网 Microi AI Studio 与账户资料**：官网首页升级为暗色 AI Studio 入口，登录用户可在个人中心使用服务端模型路由进行流式对话、模型切换、停止生成和本地会话历史；官网登录态会注入 Microi 官方产品身份与按问题检索的 Skills 片段，清理旧会话中“不了解吾码”的失效回答，并把调用方 system 提示降级为不能覆盖官方安全规则的普通补充要求，OpenAI 兼容接口继续保持通用用途。
+- **AI 头像与资料自助维护**：个人中心支持昵称、头像上传和 AI 头像候选生成，服务端复用当前登录用户额度调用 MiniMax `image-01`，上游密钥不下发浏览器；生成结果需由用户选中后上传到当前租户 `member/avatar` 私有目录再保存。资料接口固定白名单为昵称和头像，用户及租户只能来自当前 Token，头像路径执行租户目录校验并在保存后刷新共享登录信息。
+- **官网应用商城与 SEO**：应用商城重构分类、搜索、排序、骨架屏和响应式卡片，新增收藏／取消收藏、收藏量展示及按收藏量排序，详情页与列表统一使用官方公开数据源；VitePress 为每页生成唯一 description、keywords、canonical、Open Graph 和 JSON-LD，默认暗色但保留明暗切换，并把链接检查、站点构建和 SEO 审计串入文档构建流程。
+- **表单弹窗与界面细节**：`OpenForm` 支持传入 `Height`（如 `80vh`）并使用固定高度滚动区，模块按钮打开设计器时可获得更稳定的大屏编辑空间；开发组件传值、表格导航、Tooltip 溢出、文件管理器、日历、AI 会话、移动端个人中心和工作流列表统一适配主题令牌与深色表面层级。
+- **文档、Skills 与回归保护**：中文 FormEngine 文档原位补充数据权限设计器、自动注释清理和手写 SQL 兼容约定，前端架构、缓存、调试与安全 Skills 同步更新；新增主题对比度、V8 控制台并发隔离、缓存／应用升级、数据权限 SQL 注释和 AI 官方知识上下文等回归用例。版本日志只总结源码、配置与资源元数据，未把 `microi.mcp/dist` 等生成目录计入功能范围。
+
+## v6.7.0 - (2026-07-25 04:32)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.7.0；Microi VS Code 插件及内置 Skills 升级至 v4.1.8。本次按根仓库、Microi.net、Microi.AI、Microi.VSCode 四个 Git 边界汇总非编译产物待提交改动，`dist` 等构建目录不纳入功能变更说明。
 - **FormEngine 稀疏写入安全修复**：动态参数已经规范化为 `_RowModel`／`_FormData` 后，不再把完整参数对象及 `Name=""` 等模型默认值二次合并回待写行，确保升级器和服务端可信调用只更新显式传入字段，避免稀疏修改意外清空菜单名称、模块引擎 Key 等既有数据；租户边界回归用例同步覆盖两条动态参数转换路径和缺省字段不落入行模型的断言。
@@ -14,9 +32,7 @@
 - **VS Code MCP 稳定性与 Windows 体验**：向 VS Code、Cursor、Trae 和 Claude 写入 MCP 配置前先比较序列化内容，字节未变化时不重复落盘，避免文件监听器无意义重启全部 stdio 服务；MCP Codex 适配器、Claude／npm 探测、压缩包解压、环境变量设置及 Git 长路径检查统一隐藏 Windows 子进程窗口，减少初始化和配置期间的黑色控制台闪现，并补充静态诊断回归断言。
 - **发布工程维护**：根仓库忽略本轮 API 验证临时目录，版本元数据在客户端、服务器公共包、Microi.net、Microi.AI、VS Code 插件与 Skills 间保持一致；Microi.AI 本轮除 v6.7.0 版本元数据外无额外功能代码调整。
 
-## v6.6.9
-
-更新日期：2026-07-24 20:52
+## v6.6.9 - (2026-07-24 20:52)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.6.9；Microi VS Code 插件及内置 Skills 升级至 v4.1.7。本次汇总根仓库与 Microi.net、Microi.AI、Microi.VSCode 三个子仓库的非编译产物待提交改动，`dist` 等构建目录不纳入功能变更说明。
 - **CodeEditor 源码安全传输**：PC 表单仅在最终网络副本中把 CodeEditor 字段按 UTF-8 Base64URL 信封编码，前端 V8、日志、表单状态和提交回调继续使用明文；Microi.net 在新增、修改、按条件更新和批量写入入口统一校验协议版本、字段列表、大小及 UTF-8 后原子解码，并在服务端 V8 事件和入库前移除传输元数据。未携带信封的历史明文请求保持兼容，非法或部分损坏数据会整体拒绝而不会半解码写入。
@@ -31,9 +47,7 @@
 - **AI 公共模型发现验收规范**：Microi.AI、V8 安全 Skill 与 UniApp 文档明确官方中转模型清单是跨租户、无 Token 的只读公共发现契约，只允许返回模型标识和展示名，禁止泄露 ApiKey、上游 Endpoint 或内部配置；发布验收需要同时验证匿名模型清单非空、Bootstrap 可用及登录普通账号真实 Chat，不能把 `NoAuth` 静默当作空模型或只看到推荐问题页面就判定 AI 可用。
 - **交付与回归保护**：新增 CodeEditor Unicode 编解码、接口引擎缓存对象／双重 JSON／坏值回源、老库字段 Config 严格 JSON、菜单新旧字段同步、官方资源临时故障和离线基线门禁等回归用例；系统交付 Skill 补充“容器已删除但 Compose 文件残留”的安全重装规则，要求按 project 标签确认无运行或停止容器，校验并归档目标 yml 及 SHA-256 后才重新生成，拒绝覆盖身份不明、符号链接或语法损坏的生产编排。
 
-## v6.6.0
-
-更新日期：2026-07-24 12:20
+## v6.6.0 - (2026-07-24 12:20)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.6.0；Microi VS Code 插件及内置 Skills 升级至 v4.1.5。本次同时汇总根仓库与 Microi.net、Microi.AI、Microi.VSCode 三个子仓库的非编译产物改动，`dist` 等构建目录不纳入功能变更说明。
 - **UniApp 多租户与标准小程序架构（补记根仓库 `81d226c`、`76acd06`）**：UniApp 重构为标准版与租户交付版可并存的 Profile 架构，新增租户创建、切换、生成配置和同步脚本，保留集福鲤既有交付能力；补齐原生表单、列表、子表、关联表、上传、选择器、页面壳、AI 助手和业务模块等跨端组件，并以模块注册表、统一 ViewSchema、ActionSchema、指标与清单驱动标准小程序列表／详情／卡片。声明式动作不执行任意前端 V8，标准版与租户版均增加架构、路由、视图协议和交付质量校验。
@@ -61,9 +75,7 @@
 - **官网、文档与 Skills**：官网生产构建统一从环境变量解析 API 地址，非本地站点发现 localhost 配置时回退官方 API，避免发布者本机地址进入线上包；应用商城类型与业务分类从服务端 KeyValue 动态读取并保留 URL 筛选，首页展示数量调整为 8。新增“平台安全与兼容基线”，原位补充 FormEngine、HDFS、AI、应用商城、SaaS、数据源、任务、报表、搜索、采集、翻译、V8 和安装部署文档；Skills v4.1.5 同步更新 45 个规则与数据库参考，并新增 AI、应用商城、数据源、任务、报表、搜索、翻译七类引擎 Skill 及内置 AI 资源。
 - **回归测试与发布边界**：新增 FormEngine 租户／保护表／菜单范围／TableChild／元数据授权、数据源角色、Token 轮换、上传、Office、License、SSRF、Spider、AI NL2SQL、关键词／向量租户隔离、服务池恢复、租约丢失、官方资源三方同步、应用包资产、ViewSchema、MCP 源码完整性、VS Code 模块同步和 Trae 启动握手等测试。版本日志仅总结源码与配置变化，未把 `microi.mcp/dist` 等生成文件计入功能范围。
 
-## v6.5.1
-
-更新日期：2026-07-23 05:43
+## v6.5.1 - (2026-07-23 05:43)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.5.1；Microi VS Code 插件及内置 Skills 升级至 v4.0.6，MCP 的 `dist` 编译产物不纳入功能变更说明。
 - **SaaS 与 V8 租户安全边界（补记根仓库 `b90d6cd`、Microi.net `f25b465`“修复：隔离 SaaS 租户开通流程与 V8 服务”）**：V8 注入的 `OsClientModel / ClientModel / SysConfig` 统一改为独立脱敏副本，移除数据库连接、鉴权密钥、服务器端 V8 代码及 Redis、对象存储、RabbitMQ、MQTT、Search 等共享基础设施凭据；表单配置缓存、语言同步、V8 调试会话和文件能力强制绑定当前 `OsClient`，禁止由参数切换到其它租户。
@@ -83,9 +95,7 @@
 - **VS Code 实时同步命令**：新增 `npm run sync:status`，支持按接口／表单／模块／流程范围或单文件检查，输出不含 Token 与源码正文的 JSON 摘要，可将冲突双方保存到独立目录；只有本地修改和冲突均为 0 时，才允许携带租户确认口令执行拉取。插件 README、生成的 AI 知识库和同步回归脚本同步补齐远端新增、删除、字段 V8、失败关闭及预检约定。
 - **文档、Skills 与工程约定**：官方模块引擎文档与新增 `microi-left-right-layout` Skill 补齐左右结构字段、V8 分页、MCP 幂等写入和桌面／手机验收；文件上传、UniApp、移动端质量、UI 设计和全系统交付 Skills 增加私有头像、HDFS/CDN 大资源、微信胶囊安全区、返回状态栈、真实触摸事件及多人同步规则；根仓库忽略临时 `tmp/` 目录。
 
-## v6.5.0
-
-更新日期：2026-07-22 13:36
+## v6.5.0 - (2026-07-22 13:36)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.5.0；Microi VS Code 插件与内置 Skills 升级至 v4.0.3。
 - **前端构建内存保护**：`npm run build`／`build:clean` 统一接入资源守卫，启动前检查物理内存和可用内存，现代构建默认限制 6GB Node 堆、esbuild 最多 2 个并行进程，构建期间持续监测可用内存和本次任务估算占用，触发保护线时回收完整子进程树；详细日志写入项目临时目录，分析报告只在 `build:analyze` 显式开启，并关闭日常发布中的压缩体积统计以降低末段内存峰值。
@@ -93,9 +103,7 @@
 - **go-view 样式构建去重**：go-view 的全局实体样式改由 `setup.js` 单次加载，Vite 向组件注入的 SCSS 只保留变量、函数、mixin 和 placeholder；过渡、毛玻璃、点阵背景等复用样式统一改用 Sass 占位选择器，避免数百个 Vue 组件重复编译整份 `style.scss`，并同步更新组件引用和开发说明。
 - **构建配置稳定性**：Vite 输出目录支持通过环境变量覆盖，依赖分包路径统一按跨平台格式归一；日常构建不再默认启用可视化分析插件或 gzip 体积计算，一键编译发布脚本同步标注现代构建、legacy 串行转换及内存保护策略。
 
-## v6.4.9
-
-更新日期：2026-07-22 03:03
+## v6.4.9 - (2026-07-22 03:03)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.4.9；Microi VS Code 插件与内置 Skills 升级至 v4.0.2。
 - **V8 高级 Excel 导出**：`V8.Office.ExportExcel` 新增 `ExcelOptions` 与 `ExcelLayout`，标准表格和自由布局可在同一多 Sheet 工作簿中混用；支持 A1 区域、公式、合并单元格、行分组、列宽行高、隐藏／自动宽度、数字格式、字体背景、对齐换行、四边边框、冻结筛选、网格缩放及打印区域、纸张、页眉页脚和页码，并修复多图片字段展开后的表头合并判断。未传新参数时保持旧导出行为。
@@ -106,18 +114,14 @@
 - **前端身份与路由稳定性**：注销请求统一使用 `/api/SysUser/Logout`，不再把租户 Key 拼入控制器路由造成 404；匿名路由跳过全局用户初始化，在旧 Token 失效或动态路由初始化失败时仍允许进入受组件安全校验的公开预览页，同时只清理本次确认失效的 Token，降低并发续签误删风险。
 - **文档、Skills 与 AI 提示同步**：官方中文 Office、后端 V8 和接口引擎文档补齐高级 Excel、匿名预览及 `GET/HEAD` 约定；导入导出、文件上传、接口配置、前端与工作区 Skills、Agents／Claude／Copilot／Cursor 指令及 VS Code 类型提示同步更新。构建资源规则将 6GB／20% 调整为启动规划目标、全机 95% 为硬停止线，并新增“仅明确发版时允许修改更新日志”的保护规则。
 
-## v6.4.7
-
-更新日期：2026-07-20 18:37
+## v6.4.7 - (2026-07-20 18:37)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.4.7；本次 Microi.VSCode 子仓库无待提交代码，插件继续沿用 v4.0.1。
 - **用户行为审计稳定性**：菜单访问和数据详情打开审计统一将动态结果显式转换为强类型对象及字符串，修复 `JValue.Val<T>()` 等扩展方法经动态绑定调用时可能出现的运行时异常；审计旁路增加独立异常隔离，即使审计数据异常或写入失败，也不再把原本成功的菜单、详情查询转成 HTTP 500。
 - **在线终端脏数据兼容**：连接、断开、会话刷新、终端恢复和强制下线流程统一清理 Redis 历史终端列表中的空节点，避免空终端参与查找、裁剪或移除时触发空引用，并允许后续流程继续修复和保存有效终端状态。
 - **异步系统日志租户兼容**：日志入队快照在未显式传入 `OsClient` 时，会从当前 Token／请求上下文补全租户标识，兼容历史 `AddSysLog` 调用方式，避免异步日志队列改造后因租户参数为空而拒绝或遗漏日志。
 
-## v6.4.6
-
-更新日期：2026-07-20 18:06
+## v6.4.6 - (2026-07-20 18:06)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.4.6；Microi VS Code 插件与内置 Skills 按进位规则由 v3.9.6 升级至 v4.0.1。
 - **可信用户行为审计**：菜单访问、数据详情打开／关闭与停留时长、表单新增／修改／删除、V8 按钮、导入导出、登录成功／失败／失效／退出、页面前后台切换及私有附件访问统一进入后端可信审计链路；日志新增 `Category / Action / Source / TargetType / TargetId / SessionId / DurationSeconds / Success / OccurredAt` 等结构化字段，用户显示统一为 `Name(Account)`，敏感字段自动脱敏和限长，前端不能伪造平台保留行为类型。
@@ -131,9 +135,7 @@
 - **分布式与本地资源安全规范**：Quartz 接口引擎任务增加集群同一 JobKey 不重叠执行保护，同时继续要求业务幂等；工作区 Skills、Agents／Claude／Copilot／Cursor 指令和 VS Code 生成模板同步加入多节点租约、幂等、共享状态、滚动升级、健康检查、日志 spool，以及构建前内存检查、单重任务和 OOM 停止阈值等强制规则。
 - **文档与 Skills 同步**：官方中文文档原位补充 V8 代码版本、表单事件命名、`V8.FormSet`、私有文件审计代理、系统日志 spool 和本地运行配置；前端、调试、文件上传、表单事件、性能测试、全系统交付及工作区约定 Skills 与插件内置知识库同步升级至 v4.0.1。
 
-## v6.4.5
-
-更新日期：2026-07-19 20:08
+## v6.4.5 - (2026-07-19 20:08)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.4.5；本次 Microi.VSCode 子仓库无待提交代码，插件继续沿用 v3.9.5。
 - **SaaS 租户数据库账号隔离（补记根仓库 `99a3ae8` 与 Microi.net `cb425c7`）**：MySQL 租户开通改为为每个数据库生成稳定受限账号和 32 位随机强密码，只授予当前租户库权限且不附带授权转授能力；租户连接串会彻底移除主库账号、密码及其历史别名，再写入专属凭据。其它尚未建立受控 DBA 账号契约的数据库类型采用失败关闭，禁止静默回退使用主库账号。
@@ -143,9 +145,7 @@
 - **AI 应用商城发布稳定性**：内置应用商城包由 v6.5.8 升至 v6.5.12，`ai_app_publish_store` 由 v1.4.4 升至 v1.5.1；发布时可复用晚于最近成功构建的已上传 ZIP，减少大型应用同步打包引发的反向代理超时，并支持显式强制重建。微服务始终采用真实运行态 `BuildVersion`，其它应用取构建记录、调用参数、商城记录和应用记录中的最高语义版本，防止版本降级；批量补包未显式传值时继续保留预览图、分类、作者、价格、审核状态和发布路径等商城元数据。
 - **安全回归测试**：新增租户账号命名、数据库级授权、主库凭据移除、非 MySQL 失败关闭、随机密码强度和敏感参数标记测试，覆盖本次 SaaS 数据库隔离与日志脱敏边界。
 
-## v6.4.4
-
-更新日期：2026-07-19 15:35
+## v6.4.4 - (2026-07-19 15:35)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.4.4；Microi VS Code 插件与内置 Skills 升级至 v3.9.5。
 - **Dos.ORM 跨数据库中性架构（补记根仓库 `7ab57de` 起的遗漏提交）**：新增不可变 SQL AST，统一表达名称、类型、参数、表达式、语义函数、SELECT、INSERT／UPDATE／DELETE、DDL、数据库管理与原生 SQL 边界；编译流水线补齐规范化、校验、参数分配、绑定、能力判断、执行计划和受控原生 SQL 入口，并冻结旧公开 API 基线，保证新增架构不破坏历史调用。
@@ -161,9 +161,7 @@
 - **VS Code 文档与 AI 指令模板**：插件 README 重写为完整中文安装、AI 编程、80+ MCP 工具、多服务器、同步、调试、Playwright 和性能测试指南；插件生成的 Agents、Claude、Copilot、Cursor 知识库及 Cursor Skill 规则新增 Microi 工作进度播报规范，确保初始化或重新生成后规则不丢失。
 - **官方文档质量门禁（补记根仓库 `54a4ded`）**：新增独立 VS Code 插件使用文档并修复内部开发文档、License 等失效相对链接；文档开发与构建前自动扫描全部 Markdown 页面死链，官网首页和 Skills 同步补充 Codex、六数据库能力及 AI 应用持久化必须走标准低代码建模的规则。
 
-## v6.4.3
-
-更新日期：2026-07-17 12:11
+## v6.4.3 - (2026-07-17 12:11)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Microi.Upgrade 及服务器端公共组件统一升级至 v6.4.3；Microi VS Code 插件与内置 Skills 升级至 v3.9.1，Skills 发布版本改为直接跟随插件版本，打包时会拒绝版本不一致的资源。
 - **AI应用与应用商城统一**：撤销重复的 `mci_ai_app` 主数据模型，平台应用、Web、UniApp 和微服务统一进入 `sys_microistore`；`ApplicationType / Category / PublisherType` 分别承载运行类型、业务分类和发布来源，`mci_ai_app_file / mci_ai_app_version` 仅保留私有源码与构建版本，工作台、MCP、发布、安装和文档全部切换到统一应用 Id。
@@ -180,9 +178,7 @@
 - **官网账号与个人中心体验**：官网固定使用统一主流视觉并移除旧风格切换，登录页保留顶部导航；登录流程聚焦账号密码，支持记住账号／浏览器凭据、图形验证码加短信验证的安全找回密码以及登录后直接跳转，个人中心侧栏新增 AI Token 余额和使用进度，暗色模式同步完善。
 - **文档、Skills 与 AI 指令同步**：应用商城、微服务、PC 前端、UniApp、移动端质量和 UI 规范同步更新；根目录 Copilot、Cursor、Claude、Agents 指令新增 MCP 连接证据链、短超时回读和 `ByteString` 排查规则，确保插件重新生成后不会丢失本次约束。
 
-## v6.4.1
-
-更新日期：2026-07-16 19:49
+## v6.4.1 - (2026-07-16 19:49)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Microi.Upgrade 及服务器端公共组件统一升级至 v6.4.1；Microi VS Code 插件与内置 Skills 升级至 v3.8.2，并同步更新程序集、NuGet 包、客户端及 Skills 发布元数据。
 - **Windows 7 与旧浏览器兼容**：PC 前端增加 Chrome 49／旧版 360 极速内核可加载的 SystemJS legacy 构建和 AbortController 等兼容能力，移除聊天、显隐规则、公式编辑器及 Monaco 中旧内核不支持的正则后行断言和特殊展开语法；明确 Node.js 构建版本并避免 legacy 分包循环依赖。
@@ -202,9 +198,7 @@
 - **VS Code 同步工作台（补记 `88d920e`）**：前端微服务源码统一进入租户 `AI应用/{appKey}` 目录，构建发布前先同步完整私有源码；新增三方同步基线、冲突／服务器较新／本地未推送分组和持久“同步结果”树，接口、表单、字段、模块按钮、流程及微服务均可按范围查看差异；远端 Key 使用可逆文件名编码，单文件失败不再中断整服务器拉取。
 - **Skills 同步规范（补记 `aade7bd`）**：Skills v3.7.5 补齐前端微服务统一目录、私有源码先同步后发布、三方差异比较、持久同步结果、Windows 安全文件名和分类型容错拉取规则；本次继续同步 `V8.Cache.KeyExist`、旧运行时 SQL 时间函数、MCP 写入超时／Codex 资源降级及 VS Code 输出日志规范。
 
-## v6.4.0
-
-更新日期：2026-07-15 17:01
+## v6.4.0 - (2026-07-15 17:01)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Microi.Upgrade 及服务器端公共组件统一升级至 v6.4.0；Microi VS Code 插件与内置 Skills 升级至 v3.7.1，并同步刷新空数据库模板和各项目程序集、NuGet 包、客户端版本信息。
 - **一键安装主租户配置**：安装脚本新增主租户 `OsClient` 输入与格式校验，自动同步 `sys_osclients.OsClient/ClientName`、API／Web 容器环境变量和最终访问地址；MySQL 5.7／8.0 选择改为输入 `5`／`8`，减少首次安装配置歧义。
@@ -225,9 +219,7 @@
 - **VS Code 通知与日志**：插件全部右下角信息、警告和错误通知同步写入【输出 → Microi 吾码】，操作按钮选择也会留痕；时间戳改用电脑本地时区，后台静默 `GetStatus` 探测不再反复输出空错误，用户主动请求失败时补齐错误码、地址、端口和聚合错误明细。
 - **文档与 Skills**：官网首页和仓库 README 增加更新日志入口；完善一键安装、MinIO、在线应用离线交付、微服务菜单迁移和旧库升级保护文档，并同步更新 PC 前端、文件上传和全系统交付 Skills。
 
-## v6.3.6
-
-更新日期：2026-07-15 03:29
+## v6.3.6 - (2026-07-15 03:29)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI 及服务器端公共组件统一升级至 v6.3.6；同步更新程序集、NuGet 包和客户端版本信息。
 - **Redis 管理器**：新增独立路由 `#/mci-redis-manager`，采用连接／数据库树、Key 空间树、SCAN 列表和内容编辑器三栏布局；支持服务器与内存统计、模式检索、分页加载、类型／TTL／内存查看、单个与批量删除、重命名、TTL 设置，以及 String、Hash、List、Set、Sorted Set 内容维护，Stream 提供分页只读查看。
@@ -244,9 +236,7 @@
 - **Docker 固定网段**：安装脚本可选创建统一的 `microi` bridge 网络，严格校验 IPv4 subnet／gateway 和网络地址范围；已存在同名网络时仅在配置完全一致时复用，不一致则安全退出，不自动删除或修改现有网络，所有独立 Compose 编排可统一通过 external network 接入。
 - **文档与 Skills**：补充 SaaS 引擎 Redis 管理器文档，并同步完善缓存、安全、PC 前端、UniApp、移动端质量和通用前端 SDK Skills，统一终端类型、设备标识、续签时机、租户边界、失效提示及 Redis 管理规范。
 
-## v6.3.5
-
-更新日期：2026-07-14 17:06
+## v6.3.5 - (2026-07-14 17:06)
 
 - **版本发布**：Microi.Client、Microi.net、Microi.AI、Microi.Upgrade 及服务器端公共组件统一升级至 v6.3.5；Microi VS Code 插件升级至 v3.6.5，并同步更新 Skills 发布元数据。
 - **旧库自动升级**：重构服务器端升级流水线，任一步骤失败后立即停止后续迁移，并禁止错误推进 `sys_config.ServerVersion`；启动时额外幂等修复 `AuthSecret`、前端微服务所需字段及超级管理员 `Level=9999`，删除不再执行的旧 `UpgradeSysMenu` 步骤。
@@ -267,2356 +257,3209 @@
 - **官方私钥发现**：Microi.net 的 `LicenseService` 增加源码工作区私钥路径发现，统一判断本地官方服务能力，客户 NuGet 和发布包因不包含私钥不会被误识别为官方应用源。
 - **其它修复**：修复任务调度升级脚本中 `V8.Http.Post` 的 `PostParam` 语法错误；完善后台任务通知、应用商城、模块引擎、前端微服务和 V8 客户端文档；重写完整历史更新日志并补充对应 Microi Skills 规范。
 
-- 2026-07-14：版本发布：v6.3.5 更新日期为 2026-07-14（commit c75fc9a1）
-- 2026-07-14：Microi.VSCode：新增：更新版本号至 3.6.5，新增拉取服务器前端微服务功能及相关命令（commit 80e72cd）
-- 2026-07-14：Microi.AI：新增：更新版本号至6.3.5，优化AI配置解析逻辑，增加配置获取方法（commit 24f4670）
-- 2026-07-14：Microi.net：新增：更新版本号至6.3.5，优化私钥搜索路径逻辑（commit 617ca86）
+- 版本发布：v6.3.5 更新日期为 2026-07-14（commit c75fc9a1）
+- Microi.VSCode：新增：更新版本号至 3.6.5，新增拉取服务器前端微服务功能及相关命令（commit 80e72cd）
+- Microi.AI：新增：更新版本号至6.3.5，优化AI配置解析逻辑，增加配置获取方法（commit 24f4670）
+- Microi.net：新增：更新版本号至6.3.5，优化私钥搜索路径逻辑（commit 617ca86）
 
-## v6.3.4
+## v6.3.4 - (2026-07-13 19:31)
 
-更新日期：2026-07-13 19:31
+- 新增：Word 文档导出支持动态内容（commit d4aec76a）
+- 新增：更新版本至3.5.9，并修改更新时间（commit 170fcade）
 
-- 2026-07-13：新增：Word 文档导出支持动态内容（commit d4aec76a）
-- 2026-07-13：新增：更新版本至3.5.9，并修改更新时间（commit 170fcade）
+- Microi.VSCode：新增：更新版本号至 3.5.6，新增 V8Http 请求参数接口及导出功能（commit 62bead7）
+- Microi.AI：新增：更新版本号至6.3.4，完善V8.Http API文档，添加PATCH请求示例（commit 663a7bd）
+- Microi.net：新增：更新版本号至6.3.4，修复License节点信息更新和查询逻辑（commit 84ef09b）
+- Microi.VSCode：新增：更新版本号至 3.5.9，优化本地路径比较函数及相关逻辑（commit f8b4a09）
 
-- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.6，新增 V8Http 请求参数接口及导出功能（commit 62bead7）
-- 2026-07-13：Microi.AI：新增：更新版本号至6.3.4，完善V8.Http API文档，添加PATCH请求示例（commit 663a7bd）
-- 2026-07-13：Microi.net：新增：更新版本号至6.3.4，修复License节点信息更新和查询逻辑（commit 84ef09b）
-- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.9，优化本地路径比较函数及相关逻辑（commit f8b4a09）
+## v6.3.3 - (2026-07-13 15:52)
 
-## v6.3.3
+- 新增：版本升级至 6.3.3，并内置 Noto Sans CJK SC 字体（commit 4ec17728）
 
-更新日期：2026-07-13 15:52
+## v6.3.2 - (2026-07-13 15:08)
 
-- 2026-07-13：新增：版本升级至 6.3.3，并内置 Noto Sans CJK SC 字体（commit 4ec17728）
+- 新增：增强字体处理逻辑，支持缺失字形自动回退并返回明确错误信息（commit 40c69563）
+- 新增：更新版本至3.5.3，并完善SKILL.md中的ApiKey配置说明（commit b5669ff7）
+- 新增：更新多个组件版本至6.3.2（commit 39c40be5）
 
-## v6.3.2
+- Microi.VSCode：新增：更新版本号至 3.5.3（commit 73578d2）
+- Microi.net：新增：更新版本号至6.3.2，修复版本信息以保持一致性（commit c6ba27f）
+- Microi.AI：新增：更新版本号至6.3.2（commit 7adcedd）
 
-更新日期：2026-07-13 15:08
+## v6.3.1 - (2026-07-13 11:33)
 
-- 2026-07-13：新增：增强字体处理逻辑，支持缺失字形自动回退并返回明确错误信息（commit 40c69563）
-- 2026-07-13：新增：更新版本至3.5.3，并完善SKILL.md中的ApiKey配置说明（commit b5669ff7）
-- 2026-07-13：新增：更新多个组件版本至6.3.2（commit 39c40be5）
+- 新增：更新版本至 3.4.7 在 .microi-skills-version.json（commit 4240cc1e）
+- 新增：更新多个组件的样式以支持响应式布局，并修复弹窗数据传递逻辑（commit 8e6757dc）
+- 新增：更新多个组件版本至6.3.1，并优化数据库导出导入逻辑，增加导入过程中的提示信息（commit ce045710）
 
-- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.3（commit 73578d2）
-- 2026-07-13：Microi.net：新增：更新版本号至6.3.2，修复版本信息以保持一致性（commit c6ba27f）
-- 2026-07-13：Microi.AI：新增：更新版本号至6.3.2（commit 7adcedd）
+- Microi.VSCode：新增：更新版本号至 3.4.6（commit d1c5142）
+- Microi.net：新增：更新版本号至6.3.1，增强MySQL数据库导入功能，优化CDN下载逻辑（commit 26dd8f3）
+- Microi.AI：新增：更新版本号至6.3.1（commit 86b9c2c）
 
-## v6.3.1
+## v6.3.0 - (2026-07-13 08:09)
 
-更新日期：2026-07-13 11:33
+- 新增：更新版本至 6.3.0 用于 Microi.V8Engine，Microi.WeChat 软件包（commit 192db234）
 
-- 2026-07-13：新增：更新版本至 3.4.7 在 .microi-skills-version.json（commit 4240cc1e）
-- 2026-07-13：新增：更新多个组件的样式以支持响应式布局，并修复弹窗数据传递逻辑（commit 8e6757dc）
-- 2026-07-13：新增：更新多个组件版本至6.3.1，并优化数据库导出导入逻辑，增加导入过程中的提示信息（commit ce045710）
+- Microi.AI：新增：更新版本号至6.3.0，添加PromptPreview字段，优化Token使用记录逻辑（commit 3201859）
+- Microi.net：新增：更新版本号至6.3.0，新增后台任务接口和功能授权提供器，增强系统扩展性（commit 8c4acf1）
 
-- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.4.6（commit d1c5142）
-- 2026-07-13：Microi.net：新增：更新版本号至6.3.1，增强MySQL数据库导入功能，优化CDN下载逻辑（commit 26dd8f3）
-- 2026-07-13：Microi.AI：新增：更新版本号至6.3.1（commit 86b9c2c）
+## v6.2.9 - (2026-07-13 05:05)
 
-## v6.3.0
+- 更新版本至 6.2.9 （多个 Microi 组件），新增 new EmptyDatabaseReleaseService 用于 脱敏数据库创建（commit 2638c9d4）
 
-更新日期：2026-07-13 08:09
+- Microi.AI：新增：更新版本号至6.2.9，重构AI授权验证逻辑，优化License管理（commit 039551c）
 
-- 2026-07-13：新增：更新版本至 6.3.0 用于 Microi.V8Engine，Microi.WeChat 软件包（commit 192db234）
+## v6.2.8 - (2026-07-13 04:06)
 
-- 2026-07-13：Microi.AI：新增：更新版本号至6.3.0，添加PromptPreview字段，优化Token使用记录逻辑（commit 3201859）
-- 2026-07-13：Microi.net：新增：更新版本号至6.3.0，新增后台任务接口和功能授权提供器，增强系统扩展性（commit 8c4acf1）
+- 新增：更新版本至 6.2.8 （Microi 组件），更新 后台任务 API engine（commit 926b221f）
 
-## v6.2.9
+- Microi.AI：新增：更新版本号至6.2.8，添加在线AI授权验证功能（commit ebeb0f6）
+- Microi.VSCode：新增：更新版本号至 3.4.5（commit 6ecf34e）
 
-更新日期：2026-07-13 05:05
+## v6.2.6 - (2026-07-13 02:52)
 
-- 2026-07-13：更新版本至 6.2.9 （多个 Microi 组件），新增 new EmptyDatabaseReleaseService 用于 脱敏数据库创建（commit 2638c9d4）
+- 工程维护：更新版本至 6.2.6 （Microi 组件），更新 相关 文档（commit 1c7767b3）
 
-- 2026-07-13：Microi.AI：新增：更新版本号至6.2.9，重构AI授权验证逻辑，优化License管理（commit 039551c）
+- Microi.net：新增：更新版本号至6.2.6，新增License文件刷新功能以支持动态授权验证（commit f75703a）
 
-## v6.2.8
+## v6.3.4 - (2026-07-13)
 
-更新日期：2026-07-13 04:06
+- Microi.VSCode：新增：更新版本号至 3.5.2，优化 MCP 运行时配置以支持独立 Node 和 Electron（commit f60dc3f）
 
-- 2026-07-13：新增：更新版本至 6.2.8 （Microi 组件），更新 后台任务 API engine（commit 926b221f）
+## v6.2.5 - (2026-07-12 20:41)
 
-- 2026-07-13：Microi.AI：新增：更新版本号至6.2.8，添加在线AI授权验证功能（commit ebeb0f6）
-- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.4.5（commit 6ecf34e）
+- Microi.AI：新增：更新版本号至6.2.5，增强中转模型支持与令牌管理功能（commit 1395f5b）
+- Microi.net：新增：更新版本号至6.2.5，新增AI API密钥参数以增强租户系统配置初始化功能（commit ed3f179）
 
-## v6.2.6
+## v6.2.4 - (2026-07-12 14:16)
 
-更新日期：2026-07-13 02:52
+- 新增：增强 界面引擎 并 嵌套渲染，independent state 管理（commit a1eee08f）
+- 新增：更新 Microi 组件版本至 6.2.4，增强 弹窗样式（commit e7dca905）
 
-- 2026-07-12：新增：单行文本字段支持插槽按钮，并增强用户资料组件（commit 505080cf）
-- 2026-07-13：工程维护：更新版本至 6.2.6 （Microi 组件），更新 相关 文档（commit 1c7767b3）
+- Microi.VSCode：新增：更新版本号至 3.3.9，优化 MCP 配置以使用 process.execPath 代替硬编码的 node 命令（commit da48941）
+- Microi.net：新增：更新版本号至6.2.4，新增创建和提取ZIP文件的方法，增强文件处理能力（commit 59839bb）
 
-- 2026-07-12：Microi.VSCode：新增：更新版本号至 3.4.1，新增路由项的 sourceFile 属性以支持文件来源信息（commit 09247fa）
-- 2026-07-13：Microi.net：新增：更新版本号至6.2.6，新增License文件刷新功能以支持动态授权验证（commit f75703a）
+## v6.2.2 - (2026-07-12 01:19)
 
-## v6.2.5
+- 新增：Microi.V8Engine 与 Microi.WeChat 升级至 6.2.2；AiController 增加 ReasoningEffort 参数；更新 SysUserController 的 Token 处理；完善界面引擎与 UI 设计技能文档；在 v8-security 中实现用户退出登录（commit 2a6d1a69）
 
-更新日期：2026-07-12 20:41
+- Microi.net：新增：更新版本号至6.2.2，新增清除用户登录信息的方法，增强安全性（commit 153d59c）
+- Microi.AI：新增：更新版本号至6.2.2，添加推理强度选项支持（commit 1a40cf4）
+- Microi.VSCode：新增：更新版本号至 3.3.3，新增清除用户登录信息功能，优化在线应用规则（commit 12b2f85）
 
-- 2026-07-12：Microi.AI：新增：更新版本号至6.2.5，增强中转模型支持与令牌管理功能（commit 1395f5b）
-- 2026-07-12：Microi.net：新增：更新版本号至6.2.5，新增AI API密钥参数以增强租户系统配置初始化功能（commit ed3f179）
+## v6.2.5 - (2026-07-12)
 
-## v6.2.4
+- 新增：单行文本字段支持插槽按钮，并增强用户资料组件（commit 505080cf）
+- Microi.VSCode：新增：更新版本号至 3.4.1，新增路由项的 sourceFile 属性以支持文件来源信息（commit 09247fa）
 
-更新日期：2026-07-12 14:16
+## v6.2.1 - (2026-07-11 17:48)
 
-- 2026-07-12：新增：增强 界面引擎 并 嵌套渲染，independent state 管理（commit a1eee08f）
-- 2026-07-12：新增：更新 Microi 组件版本至 6.2.4，增强 弹窗样式（commit e7dca905）
+- Microi.net：新增：更新版本号至6.2.1，移除后台任务运行时桥接相关代码，优化JWT AuthSecret提示信息（commit 0a02b69）
+- Microi.AI：新增：更新版本号至6.2.1（commit 99ba92a）
 
-- 2026-07-12：Microi.VSCode：新增：更新版本号至 3.3.9，优化 MCP 配置以使用 process.execPath 代替硬编码的 node 命令（commit da48941）
-- 2026-07-12：Microi.net：新增：更新版本号至6.2.4，新增创建和提取ZIP文件的方法，增强文件处理能力（commit 59839bb）
+## v6.2.1 - (2026-07-11)
 
-## v6.2.2
+- 新增：新增 ai-app-publish-store 脚本 用于 统一应用打包（commit a2a9fc2e）
+- Microi.VSCode：新增：更新版本号至 3.2.8，增强微服务源码同步功能，支持自动上传项目源码至在线 AI 应用（commit d637542）
 
-更新日期：2026-07-12 01:19
+## v6.2.0 - (2026-07-10 14:31)
 
-- 2026-07-10：新增：增强后台任务进度上报和文件同步弹窗（commit a96bf8ff）
-- 2026-07-10：新增：新增 v8-image-processing skill 文档，API 参考（commit 7289e3eb）
-- 2026-07-10：新增：新增 脚本 至 生成 Microi 解决方案报价 在 DOCX 格式（commit b65b4d68）
-- 2026-07-11：新增：新增 ai-app-publish-store 脚本 用于 统一应用打包（commit a2a9fc2e）
-- 2026-07-12：新增：Microi.V8Engine 与 Microi.WeChat 升级至 6.2.2；AiController 增加 ReasoningEffort 参数；更新 SysUserController 的 Token 处理；完善界面引擎与 UI 设计技能文档；在 v8-security 中实现用户退出登录（commit 2a6d1a69）
+- Microi.net：新增：更新版本号至6.2.0，增强JWT AuthSecret生成与持久化逻辑（commit d0fe887）
+- Microi.AI：新增：更新版本号至6.2.0（commit 68c865b）
 
-- 2026-07-10：Microi.VSCode：新增：更新版本号至 3.2.5，增强 API 客户端和认证管理器以支持更灵活的 token 维护和刷新机制（commit 5406d99）
-- 2026-07-11：Microi.VSCode：新增：更新版本号至 3.2.8，增强微服务源码同步功能，支持自动上传项目源码至在线 AI 应用（commit d637542）
-- 2026-07-12：Microi.net：新增：更新版本号至6.2.2，新增清除用户登录信息的方法，增强安全性（commit 153d59c）
-- 2026-07-12：Microi.AI：新增：更新版本号至6.2.2，添加推理强度选项支持（commit 1a40cf4）
-- 2026-07-12：Microi.VSCode：新增：更新版本号至 3.3.3，新增清除用户登录信息功能，优化在线应用规则（commit 12b2f85）
+## v6.1.9 - (2026-07-10 12:07)
 
-## v6.2.1
+- Microi.net：新增：更新版本号至6.1.9，增强后台任务进度更新逻辑，支持当前和总进度参数（commit 3d40096）
+- Microi.AI：新增：更新版本号至6.1.9（commit 9cf1d4d）
 
-更新日期：2026-07-11 17:48
+## v6.2.0 - (2026-07-10)
 
-- 2026-07-11：Microi.net：新增：更新版本号至6.2.1，移除后台任务运行时桥接相关代码，优化JWT AuthSecret提示信息（commit 0a02b69）
-- 2026-07-11：Microi.AI：新增：更新版本号至6.2.1（commit 99ba92a）
+- 新增：增强后台任务进度上报和文件同步弹窗（commit a96bf8ff）
+- 新增：新增 v8-image-processing skill 文档，API 参考（commit 7289e3eb）
+- 新增：新增 脚本 至 生成 Microi 解决方案报价 在 DOCX 格式（commit b65b4d68）
+- Microi.VSCode：新增：更新版本号至 3.2.5，增强 API 客户端和认证管理器以支持更灵活的 token 维护和刷新机制（commit 5406d99）
 
-## v6.2.0
+## v6.1.8 - (2026-07-09 17:36)
 
-更新日期：2026-07-10 14:31
+- 新增：更新 Microi 组件版本至 6.1.8，增强 token 处理（commit aa4e0d31）
 
-- 2026-07-10：Microi.net：新增：更新版本号至6.2.0，增强JWT AuthSecret生成与持久化逻辑（commit d0fe887）
-- 2026-07-10：Microi.AI：新增：更新版本号至6.2.0（commit 68c865b）
+- Microi.VSCode：新增：更新版本号至 3.2.3，优化 API 客户端和认证管理器以支持更灵活的 token 管理和刷新机制（commit 4068440）
 
-## v6.1.9
+## v6.1.7 - (2026-07-09 16:38)
 
-更新日期：2026-07-10 12:07
+- 新增：更新版本至 3.2.2，并修改更新时间（commit b09874ef）
+- 更新版本至 6.1.7 用于 Microi.V8Engine，Microi.WeChat; 更新 SKILL.md 以包含 移动端页面 源码路径（commit a6b9e20a）
 
-- 2026-07-10：Microi.net：新增：更新版本号至6.1.9，增强后台任务进度更新逻辑，支持当前和总进度参数（commit 3d40096）
-- 2026-07-10：Microi.AI：新增：更新版本号至6.1.9（commit 9cf1d4d）
+## v6.1.6 - (2026-07-09 12:11)
 
-## v6.1.8
+- 新增：新增 默认 RSA 公开 key，device ID 至 MicroiClient（commit 1d36f7b5）
+- 新增：更新多个组件版本至 6.1.6，并添加默认登录 RSA 私钥配置（commit 8e156342）
 
-更新日期：2026-07-09 17:36
+- Microi.VSCode：新增：更新版本号至 3.2.1，增强 API 客户端和认证管理器以支持 RSA 公钥登录及认证恢复处理（commit 7ea6a5d）
 
-- 2026-07-09：新增：更新 Microi 组件版本至 6.1.8，增强 token 处理（commit aa4e0d31）
+## v6.1.5 - (2026-07-09 07:45)
 
-- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.2.3，优化 API 客户端和认证管理器以支持更灵活的 token 管理和刷新机制（commit 4068440）
+- 新增：增强 JWT Token 处理和在线终端管理（commit 7d6d143b）
+- 新增：更新 MicroiClient 的 RSA 公钥处理并优化登录流程（commit 3d1cc2b4）
+- 新增：更新多个组件版本至 6.1.5，增强 JSON 表格配置文档（commit 8c915939）
 
-## v6.1.7
+- Microi.VSCode：新增：更新版本号至 3.1.6（commit bc66a58）
+- Microi.VSCode：新增：更新版本号至 3.2.0，增强 API 客户端和认证管理器以支持 RSA 公钥登录及请求体格式化（commit 06690d5）
 
-更新日期：2026-07-09 16:38
+## v6.1.4 - (2026-07-09 05:18)
 
-- 2026-07-09：新增：更新版本至 3.2.2，并修改更新时间（commit b09874ef）
-- 2026-07-09：更新版本至 6.1.7 用于 Microi.V8Engine，Microi.WeChat; 更新 SKILL.md 以包含 移动端页面 源码路径（commit a6b9e20a）
+- Microi.AI：新增：更新版本号至6.1.4（commit c211c06）
+- Microi.net：新增：更新版本号至6.1.4，增强接口启用状态检查逻辑（commit c2781f7）
 
-## v6.1.6
+## v6.1.3 - (2026-07-09 01:26)
 
-更新日期：2026-07-09 12:11
+- Microi.net：新增：更新版本号至6.1.3，增强JWT AuthSecret轮换逻辑，支持安全版本升级（commit 04a9dca）
+- Microi.AI：新增：更新版本号至6.1.3（commit da1dc89）
 
-- 2026-07-09：新增：新增 默认 RSA 公开 key，device ID 至 MicroiClient（commit 1d36f7b5）
-- 2026-07-09：新增：更新多个组件版本至 6.1.6，并添加默认登录 RSA 私钥配置（commit 8e156342）
+## v6.1.1 - (2026-07-09 00:03)
 
-- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.2.1，增强 API 客户端和认证管理器以支持 RSA 公钥登录及认证恢复处理（commit 7ea6a5d）
+- 更新版本至 6.1.1 （多个 Microi 组件），增强 development 登录绕过 功能（commit c9d1a952）
 
-## v6.1.5
+- Microi.net：新增：更新版本号至6.1.1，增强OsClient配置处理逻辑，确保强JWT AuthSecret生成与存储（commit a6cfbfe）
+- Microi.AI：新增：更新版本号至6.1.1（commit c533e7a）
+- Microi.VSCode：新增：更新版本号至 3.1.4（commit 8dd9247）
 
-更新日期：2026-07-09 07:45
+## v6.1.1 - (2026-07-08)
 
-- 2026-07-09：新增：增强 JWT Token 处理和在线终端管理（commit 7d6d143b）
-- 2026-07-09：新增：更新 MicroiClient 的 RSA 公钥处理并优化登录流程（commit 3d1cc2b4）
-- 2026-07-09：新增：更新多个组件版本至 6.1.5，增强 JSON 表格配置文档（commit 8c915939）
+- 新增：新增 一键编排 脚本，增强 installation 流程（commit 901709e4）
 
-- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.1.6（commit bc66a58）
-- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.2.0，增强 API 客户端和认证管理器以支持 RSA 公钥登录及请求体格式化（commit 06690d5）
+## v6.1.0 - (2026-07-07 14:40)
 
-## v6.1.4
+- Microi.net：新增 LicenseServerStore，支持授权持久化与恢复（commit 0e309bb）
+- Microi.net：新增：更新版本号至6.1.0，提升项目版本管理（commit a71a5b8）
 
-更新日期：2026-07-09 05:18
+## v6.0.8 - (2026-07-07 03:16)
 
-- 2026-07-09：Microi.AI：新增：更新版本号至6.1.4（commit c211c06）
-- 2026-07-09：Microi.net：新增：更新版本号至6.1.4，增强接口启用状态检查逻辑（commit c2781f7）
+- 新增：增强 导入-软件包.js 并 物理列同步，优化 AI 意图识别（commit 01f8ceca）
+- 新增：更新所有项目版本号至6.0.8（commit 747b745b）
 
-## v6.1.3
+## v6.0.7 - (2026-07-07 02:53)
 
-更新日期：2026-07-09 01:26
+- Microi.AI：新增：更新版本号至6.0.7，添加 TryBuildBuiltinChatReply 和 ResolveIntentAsync 方法（commit c6c51ef）
 
-- 2026-07-09：Microi.net：新增：更新版本号至6.1.3，增强JWT AuthSecret轮换逻辑，支持安全版本升级（commit 04a9dca）
-- 2026-07-09：Microi.AI：新增：更新版本号至6.1.3（commit da1dc89）
+## v6.1.0 - (2026-07-07)
 
-## v6.1.1
+- 新增：增强 导入-软件包.js 并 后台任务 reporting，版本记录更新（commit 3664a367）
+- 新增：更新 microi_empty_temp.sql.zip 文件（commit 1921109b）
+- Microi.AI：更新 Microi.AI 版本并增强 AI 中转功能（commit e203db6）
+- Microi.VSCode：新增：更新版本号至 3.1.3（commit 41327ff）
 
-更新日期：2026-07-09 00:03
+## v6.0.6 - (2026-07-06 17:25)
 
-- 2026-07-07：新增：增强 导入-软件包.js 并 后台任务 reporting，版本记录更新（commit 3664a367）
-- 2026-07-07：新增：更新 microi_empty_temp.sql.zip 文件（commit 1921109b）
-- 2026-07-08：新增：新增 一键编排 脚本，增强 installation 流程（commit 901709e4）
-- 2026-07-09：更新版本至 6.1.1 （多个 Microi 组件），增强 development 登录绕过 功能（commit c9d1a952）
+- 新增：增强 tenant 管理 UI 并 管理员登录提示，improved 租户卡片布局（commit b068c44f）
+- 新增：优化数据获取逻辑，改进数据库连接和缓存处理（commit 6042ba51）
+- 工程维护：更新软件包版本至 6.0.6 （多个项目）（commit 011de94b）
 
-- 2026-07-07：Microi.AI：更新 Microi.AI 版本并增强 AI 中转功能（commit e203db6）
-- 2026-07-09：Microi.net：新增：更新版本号至6.1.1，增强OsClient配置处理逻辑，确保强JWT AuthSecret生成与存储（commit a6cfbfe）
-- 2026-07-09：Microi.AI：新增：更新版本号至6.1.1（commit c533e7a）
-- 2026-07-09：Microi.VSCode：新增：更新版本号至 3.1.4（commit 8dd9247）
+## v6.0.5 - (2026-07-06 15:32)
 
-## v6.1.0
+- 工程维护：更新 Microi.net 版本至 6.0.5 （所有项目），增强 error 处理 在 Excel 导入 功能（commit a001a4d4）
 
-更新日期：2026-07-07 14:40
+- Microi.net：增强租户开通服务与 V8 引擎集成（commit 09ff591）
+- Microi.net：新增：增强ReloadSingleOsClient方法，添加性能计时和错误处理；版本号更新至6.0.5（commit 9953363）
+- Microi.AI：新增：更新版本号至6.0.5（commit 7f64bfc）
 
-- 2026-07-07：Microi.net：新增 LicenseServerStore，支持授权持久化与恢复（commit 0e309bb）
-- 2026-07-07：Microi.net：新增：更新版本号至6.1.0，提升项目版本管理（commit a71a5b8）
+## v6.0.4 - (2026-07-06 14:12)
 
-## v6.0.8
+- 新增：新增 ProfilePage 组件，profile 管理 功能（commit 83731185）
+- 工程维护：更新版本至 6.0.4 （多个 Microi 组件），更新 README links（commit 380aa963）
 
-更新日期：2026-07-07 03:16
+- Microi.VSCode：新增：更新版本号至 3.0.9，增强 MCP 服务器名称构建逻辑以处理重复身份部分（commit aa0104e）
+- Microi.AI：新增：更新版本号至6.0.4（commit 438f9e0）
 
-- 2026-07-06：新增：更新 ProfilePage 和 UserBar 组件，优化界面与功能（commit 56851871）
-- 2026-07-07：新增：增强 导入-软件包.js 并 物理列同步，优化 AI 意图识别（commit 01f8ceca）
-- 2026-07-07：新增：更新所有项目版本号至6.0.8（commit 747b745b）
+## v6.0.2 - (2026-07-06 07:17)
 
-## v6.0.7
+- 重构代码结构，提升可读性与可维护性（commit 1791dfb8）
+- 新增：增强 AI engine 查询结果 显示，新增 数据 analysis summary（commit 839ffd39）
+- 新增：更新版本至 6.0.2，增强 通知中心（commit 2cf6a331）
 
-更新日期：2026-07-07 02:53
+- Microi.VSCode：新增：更新版本号至 3.0.8，增强 Codex MCP 配置功能（commit 3adc061）
 
-- 2026-07-07：Microi.AI：新增：更新版本号至6.0.7，添加 TryBuildBuiltinChatReply 和 ResolveIntentAsync 方法（commit c6c51ef）
+## v6.0.1 - (2026-07-06 04:57)
 
-## v6.0.6
+- Microi.AI：新增：更新版本号至6.0.1，增强AI模型配置检查和流式响应处理（commit 6ac0279）
+- Microi.net：新增：更新租户开通服务，增强数据库连接和错误处理；版本号更新至6.0.1（commit 2a9b552）
 
-更新日期：2026-07-06 17:25
+## v6.0.6 - (2026-07-06)
 
-- 2026-07-06：新增：增强 tenant 管理 UI 并 管理员登录提示，improved 租户卡片布局（commit b068c44f）
-- 2026-07-06：新增：优化数据获取逻辑，改进数据库连接和缓存处理（commit 6042ba51）
-- 2026-07-06：工程维护：更新软件包版本至 6.0.6 （多个项目）（commit 011de94b）
+- 新增：更新 ProfilePage 和 UserBar 组件，优化界面与功能（commit 56851871）
+- Microi.VSCode：新增：更新版本号至 3.1.0（commit 0397baa）
 
-## v6.0.5
+## v6.0.1 - (2026-07-05)
 
-更新日期：2026-07-06 15:32
+- Microi.VSCode：新增：更新版本号至 3.0.6，增强 Copilot 模型验证和工具限制保护功能（commit e94df04）
 
-- 2026-07-06：工程维护：更新 Microi.net 版本至 6.0.5 （所有项目），增强 error 处理 在 Excel 导入 功能（commit a001a4d4）
+## v6.0.0 - (2026-07-04)
 
-- 2026-07-06：Microi.net：增强租户开通服务与 V8 引擎集成（commit 09ff591）
-- 2026-07-06：Microi.net：新增：增强ReloadSingleOsClient方法，添加性能计时和错误处理；版本号更新至6.0.5（commit 9953363）
-- 2026-07-06：Microi.AI：新增：更新版本号至6.0.5（commit 7f64bfc）
+- 新增：更新多个组件以支持自适应高度和样式优化，修复相关逻辑（commit 2ddcf63c）
+- 新增：更新技能版本至3.0.2，并调整版本规则说明（commit 85243072）
+- 新增：更新技能版本至3.0.3，并更新时间戳（commit aad6fba5）
+- Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 8b30904）
+- Microi.VSCode：新增：更新版本号至 3.0.3，添加 Copilot 同步警告功能（commit 8d349e0）
+- Microi.net：新增：更新ApiEngine和FormEngine以优化V8引擎参数处理；版本号更新至6.0.0（commit fbf3ef6）
+- Microi.AI：新增：更新版本号至6.0.0（commit ef4b347）
 
-## v6.0.4
+## v6.0.0 - (2026-07-02 15:18)
 
-更新日期：2026-07-06 14:12
+- 新增：新增 MicroiCaptchaRecognizer 用于 验证码识别，实现 采集引擎 文档（commit 7483ba8b）
+- 新增：更新版本至 6.0.0，更新 相关 配置 （多个项目）（commit 2aff403f）
 
-- 2026-07-06：新增：新增 ProfilePage 组件，profile 管理 功能（commit 83731185）
-- 2026-07-06：工程维护：更新版本至 6.0.4 （多个 Microi 组件），更新 README links（commit 380aa963）
+## v5.9.9 - (2026-07-02 11:09)
 
-- 2026-07-06：Microi.VSCode：新增：更新版本号至 3.0.9，增强 MCP 服务器名称构建逻辑以处理重复身份部分（commit aa0104e）
-- 2026-07-06：Microi.AI：新增：更新版本号至6.0.4（commit 438f9e0）
+- Microi.net：新增：更新多个文件以优化表单事件处理和内存限制；版本号更新至5.9.9（commit 6e90842）
 
-## v6.0.2
+## v6.0.0 - (2026-07-02)
 
-更新日期：2026-07-06 07:17
+- Microi.VSCode：新增：更新 MCP server key 命名规则，添加诊断 MCP 可调用性功能（commit d61791a）
 
-- 2026-07-04：新增：更新多个组件以支持自适应高度和样式优化，修复相关逻辑（commit 2ddcf63c）
-- 2026-07-04：新增：更新技能版本至3.0.2，并调整版本规则说明（commit 85243072）
-- 2026-07-04：新增：更新技能版本至3.0.3，并更新时间戳（commit aad6fba5）
-- 2026-07-06：重构代码结构，提升可读性与可维护性（commit 1791dfb8）
-- 2026-07-06：新增：增强 AI engine 查询结果 显示，新增 数据 analysis summary（commit 839ffd39）
-- 2026-07-06：新增：更新版本至 6.0.2，增强 通知中心（commit 2cf6a331）
+## v5.9.9 - (2026-07-01)
 
-- 2026-06-29：Microi.VSCode：新增：添加 Codex MCP stdio 适配器，支持与 Microi MCP 服务器的兼容性（commit 2800b9f）
-- 2026-07-02：Microi.VSCode：新增：更新 MCP server key 命名规则，添加诊断 MCP 可调用性功能（commit d61791a）
-- 2026-07-04：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 8b30904）
-- 2026-07-04：Microi.VSCode：新增：更新版本号至 3.0.3，添加 Copilot 同步警告功能（commit 8d349e0）
-- 2026-07-05：Microi.VSCode：新增：更新版本号至 3.0.6，增强 Copilot 模型验证和工具限制保护功能（commit e94df04）
-- 2026-07-06：Microi.VSCode：新增：更新版本号至 3.0.8，增强 Codex MCP 配置功能（commit 3adc061）
+- 新增：增加 diy_field 记录批量更新工具和表单布局规范（commit 8ed5cb4f）
 
-## v6.0.1
+## v5.9.1 - (2026-06-30 12:01)
 
-更新日期：2026-07-06 04:57
+- 新增：更新版本至 5.9.1 （多个项目），增强 导入 功能（commit 9c0c0a89）
 
-- 2026-07-06：Microi.AI：新增：更新版本号至6.0.1，增强AI模型配置检查和流式响应处理（commit 6ac0279）
-- 2026-07-06：Microi.net：新增：更新租户开通服务，增强数据库连接和错误处理；版本号更新至6.0.1（commit 2a9b552）
+## v5.9.0 - (2026-06-30 03:33)
 
-## v6.0.0
+- 新增：更新版本至 5.9.0 （多个项目），增强 Microi.Spider 功能（commit 54f40594）
 
-更新日期：2026-07-02 15:18
+- Microi.net：新增：更新多个文件以增强字段处理和命令超时配置；版本号更新至5.9.0（commit 07ca67e）
 
-- 2026-07-01：新增：增加 diy_field 记录批量更新工具和表单布局规范（commit 8ed5cb4f）
-- 2026-07-02：新增：新增 MicroiCaptchaRecognizer 用于 验证码识别，实现 采集引擎 文档（commit 7483ba8b）
-- 2026-07-02：新增：更新版本至 6.0.0，更新 相关 配置 （多个项目）（commit 2aff403f）
+## v5.8.8 - (2026-06-29 12:03)
 
-- 2026-07-04：Microi.net：新增：更新ApiEngine和FormEngine以优化V8引擎参数处理；版本号更新至6.0.0（commit fbf3ef6）
-- 2026-07-04：Microi.AI：新增：更新版本号至6.0.0（commit ef4b347）
+- Microi.AI：新增：更新版本号至5.8.8（commit f2e1acd）
 
-## v5.9.9
+## v5.8.8 - (2026-06-29)
 
-更新日期：2026-07-02 11:09
+- Microi.VSCode：新增：添加 Codex MCP stdio 适配器，支持与 Microi MCP 服务器的兼容性（commit 2800b9f）
+- 新增：新增 BackgroundTask，SecurityGuard 功能（commit b54ada9c）
+- 新增：增强 工具注册，执行顺序（commit 1f58dfab）
+- Microi.net：新增：添加后台任务进度更新功能；优化V8引擎并增强树懒加载支持（commit 6045388）
 
-- 2026-07-02：Microi.net：新增：更新多个文件以优化表单事件处理和内存限制；版本号更新至5.9.9（commit 6e90842）
+## v5.8.7 - (2026-06-28 06:06)
 
-## v5.9.1
+- 新增：更新版本至 5.8.7，增强 V8 engine 参数（commit 36c3af9f）
 
-更新日期：2026-06-30 12:01
+## v5.8.5 - (2026-06-28 00:41)
 
-- 2026-06-30：新增：更新版本至 5.9.1 （多个项目），增强 导入 功能（commit 9c0c0a89）
+- 新增：更新版本至 5.8.5 （多个项目），增强 API 功能（commit 79346126）
 
-## v5.9.0
+- Microi.AI：新增：更新版本号至5.8.5（commit 0ec05c2）
 
-更新日期：2026-06-30 03:33
+## v5.8.4 - (2026-06-27)
 
-- 2026-06-29：新增：新增 BackgroundTask，SecurityGuard 功能（commit b54ada9c）
-- 2026-06-29：新增：增强 工具注册，执行顺序（commit 1f58dfab）
-- 2026-06-30：新增：更新版本至 5.9.0 （多个项目），增强 Microi.Spider 功能（commit 54f40594）
+- Microi.net：增强表单引擎缓存与翻译能力（commit f8eaea6）
+- Microi.VSCode：新增：更新版本号至 2.5.3，增强 Claude Code 用户级 MCP 配置同步功能（commit 6a45c28）
 
-- 2026-06-27：Microi.net：增强表单引擎缓存与翻译能力（commit f8eaea6）
-- 2026-06-29：Microi.net：新增：添加后台任务进度更新功能；优化V8引擎并增强树懒加载支持（commit 6045388）
-- 2026-06-30：Microi.net：新增：更新多个文件以增强字段处理和命令超时配置；版本号更新至5.9.0（commit 07ca67e）
+## v5.8.1 - (2026-06-25 22:37)
 
-## v5.8.8
+- v5.8.1，完善多语言系统（commit f25d1d0c）
 
-更新日期：2026-06-29 12:03
+## v5.8.0 - (2026-06-25 18:11)
 
-- 2026-06-29：Microi.AI：新增：更新版本号至5.8.8（commit f2e1acd）
+- 优化子菜单样式（commit d012088d）
+- 更新v5.8.0，完善多语言系统（commit 235ea91c）
 
-## v5.8.7
+- Microi.net：新增：增强翻译引擎，添加空值检查和HTTP翻译支持；优化数据返回格式（commit 79758ad）
+- Microi.net：新增：添加租户创建和缓存清理功能；更新版本号至5.8.0（commit df06e64）
 
-更新日期：2026-06-28 06:06
+## v5.8.1 - (2026-06-25)
 
-- 2026-06-28：新增：更新版本至 5.8.7，增强 V8 engine 参数（commit 36c3af9f）
+- Microi.VSCode：新增：更新 MCP 配置支持，添加 Claude Code 项目级 .mcp.json 文件，优化服务器配置读取逻辑（commit f7d45d1）
 
-## v5.8.5
+## v5.8.0 - (2026-06-24)
 
-更新日期：2026-06-28 00:41
+- 新增：增强 widget 数据 标准化，清理图表文本（commit a76e04b4）
+- 新增：新增 周期选择 功能 用于 统计 组件（commit 99f6ff10）
+- 新增：增强 widget 高度计算，标准化（commit 204b03f0）
+- 新增：增强周期筛选功能，优化组件数据处理和标题显示（commit 2706afc7）
+- 新增：增强 SSE 请求体处理，优化 JSON 和文本类型支持，更新版本号至 1.4.6（commit 5e16a822）
+- 修复：允许 release 脚本 至 run via sh（commit a5d4ce46）
+- 维护提交（Anderson）（commit 4fb41d04）
+- 新增：增强 V8 engine，Excel 导出 功能（commit 55b531aa）
+- Microi.VSCode：重构代码结构，提高可读性和可维护性（commit ad04a5f）
+- Microi.net：重构代码结构，提高可读性和可维护性（commit d30260c）
+- Microi.VSCode：新增：更新版本号至 2.5.0（commit acb7746）
+- Microi.AI：新增：更新版本号至5.7.9（commit f2dd374）
 
-- 2026-06-28：新增：更新版本至 5.8.5 （多个项目），增强 API 功能（commit 79346126）
+## v5.7.9 - (2026-06-23 14:22)
 
-- 2026-06-25：Microi.VSCode：新增：更新 MCP 配置支持，添加 Claude Code 项目级 .mcp.json 文件，优化服务器配置读取逻辑（commit f7d45d1）
-- 2026-06-27：Microi.VSCode：新增：更新版本号至 2.5.3，增强 Claude Code 用户级 MCP 配置同步功能（commit 6a45c28）
-- 2026-06-28：Microi.AI：新增：更新版本号至5.8.5（commit 0ec05c2）
+## v5.7.9 - (2026-06-23)
 
-## v5.8.1
+- 新增：更新 diy-select 组件 至 增强 数据 源码 处理，优化 对象 数据 源码 checks（commit c7e66ccd）
 
-更新日期：2026-06-25 22:37
+## v5.7.8 - (2026-06-22)
 
-- 2026-06-25：v5.8.1，完善多语言系统（commit f25d1d0c）
+- 重构代码结构，提升可读性与可维护性（commit a1379935）
+- 新增：增强 Office/PDF preview，editing 能力（commit e1a7cbfe）
 
-## v5.8.0
+## v5.7.6 - (2026-06-21 14:43)
 
-更新日期：2026-06-25 18:11
+- 新增：更新版本至 5.7.6 （多个项目），增强 MicroApp 功能（commit ac63e130）
 
-- 2026-06-22：重构代码结构，提升可读性与可维护性（commit a1379935）
-- 2026-06-22：新增：增强 Office/PDF preview，editing 能力（commit e1a7cbfe）
-- 2026-06-23：新增：更新 diy-select 组件 至 增强 数据 源码 处理，优化 对象 数据 源码 checks（commit c7e66ccd）
-- 2026-06-24：新增：增强 widget 数据 标准化，清理图表文本（commit a76e04b4）
-- 2026-06-24：新增：新增 周期选择 功能 用于 统计 组件（commit 99f6ff10）
-- 2026-06-24：新增：增强 widget 高度计算，标准化（commit 204b03f0）
-- 2026-06-24：新增：增强周期筛选功能，优化组件数据处理和标题显示（commit 2706afc7）
-- 2026-06-24：新增：增强 SSE 请求体处理，优化 JSON 和文本类型支持，更新版本号至 1.4.6（commit 5e16a822）
-- 2026-06-24：修复：允许 release 脚本 至 run via sh（commit a5d4ce46）
-- 2026-06-24：维护提交（Anderson）（commit 4fb41d04）
-- 2026-06-24：新增：增强 V8 engine，Excel 导出 功能（commit 55b531aa）
-- 2026-06-25：优化子菜单样式（commit d012088d）
-- 2026-06-25：更新v5.8.0，完善多语言系统（commit 235ea91c）
+## v5.7.5 - (2026-06-19 04:00)
 
-- 2026-06-12：Microi.net：新增：优化错误信息返回格式，增强可读性和调试信息（commit f13be09）
-- 2026-06-24：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit ad04a5f）
-- 2026-06-24：Microi.net：重构代码结构，提高可读性和可维护性（commit d30260c）
-- 2026-06-24：Microi.VSCode：新增：更新版本号至 2.5.0（commit acb7746）
-- 2026-06-25：Microi.net：新增：增强翻译引擎，添加空值检查和HTTP翻译支持；优化数据返回格式（commit 79758ad）
-- 2026-06-25：Microi.net：新增：添加租户创建和缓存清理功能；更新版本号至5.8.0（commit df06e64）
+- 新增：新增 MicroAppHost 组件，AI 工作流 API（commit d2f06ca1）
+- 新增：更新版本号至 5.7.5，并优化 MicroAppController 中的存储逻辑（commit 774b77d4）
 
-## v5.7.9
+## v5.7.3 - (2026-06-17)
 
-更新日期：2026-06-23 14:22
+- 新增：更新版本号至 1.2.3，并修改更新时间；优化滚动段处理逻辑（commit 40a3f021）
+- 新增：实现 数据 版本管理，回收站模式 功能（commit 5f5de8f7）
+- 新增：增强 DIY form 功能 并 评论回复 功能，数据 版本预览（commit 5d65ef7f）
+- 新增：优化表单和标签组件的样式与功能，增强用户体验（commit c550051f）
 
-- 2026-06-24：Microi.AI：新增：更新版本号至5.7.9（commit f2dd374）
+## v5.7.3 - (2026-06-16)
 
-## v5.7.6
+- 新增：增强 login，theme 处理 在 Microi UI（commit ebdb4c0e）
+- 新增：增强 表 widget 并 自动滚动，分页 功能（commit 49e7829e）
 
-更新日期：2026-06-21 14:43
+## v5.7.3 - (2026-06-14)
 
-- 2026-06-21：新增：更新版本至 5.7.6 （多个项目），增强 MicroApp 功能（commit ac63e130）
+- 重构并统一各项 Microi 技能中 SKILL.md 的说明；增强 Microi V8 前端 SDK 的错误提示与兼容能力；确保文档准确体现使用规范和开发最佳实践（commit 2cb4ff92）
+- 新增：添加 MCP 默认可见性规则，优化未登录提示组件的样式和布局（commit ab99adaf）
+- 新增：更新文档中的术语为中文，添加技能文档中文优先规则（commit b5e1ddb2）
+- 新增：更新版本号至 1.1.9，并修改更新时间（commit 8fcc7f48）
+- 新增：增强 sys_menu 配置，字段 处理（commit 2ea4e6a3）
+- Microi.VSCode：新增：更新版本号至 2.1.9（commit 1129bcf）
 
-## v5.7.5
+## v5.7.2 - (2026-06-13 17:18)
 
-更新日期：2026-06-19 04:00
+- 新增：更新 V8 引擎编码最佳实践，增加移动端应用质量门禁和主题切换规范（commit 905de52f）
+- 新增：更新版本号至 5.7.2，优化 Kestrel 请求处理配置（commit ce0baf62）
 
-- 2026-06-13：修复：set 默认 values 用于 可见性，显示 属性（commit 9938da09）
-- 2026-06-13：新增：更新搜索组件和表格操作，优化下拉框和文本框的处理逻辑（commit 41373f1b）
-- 2026-06-13：新增：更新版本号至 1.1.5，并修改更新时间（commit 33fe9255）
-- 2026-06-14：重构并统一各项 Microi 技能中 SKILL.md 的说明；增强 Microi V8 前端 SDK 的错误提示与兼容能力；确保文档准确体现使用规范和开发最佳实践（commit 2cb4ff92）
-- 2026-06-14：新增：添加 MCP 默认可见性规则，优化未登录提示组件的样式和布局（commit ab99adaf）
-- 2026-06-14：新增：更新文档中的术语为中文，添加技能文档中文优先规则（commit b5e1ddb2）
-- 2026-06-14：新增：更新版本号至 1.1.9，并修改更新时间（commit 8fcc7f48）
-- 2026-06-14：新增：增强 sys_menu 配置，字段 处理（commit 2ea4e6a3）
-- 2026-06-16：新增：增强 login，theme 处理 在 Microi UI（commit ebdb4c0e）
-- 2026-06-16：新增：增强 表 widget 并 自动滚动，分页 功能（commit 49e7829e）
-- 2026-06-17：新增：更新版本号至 1.2.3，并修改更新时间；优化滚动段处理逻辑（commit 40a3f021）
-- 2026-06-17：新增：实现 数据 版本管理，回收站模式 功能（commit 5f5de8f7）
-- 2026-06-17：新增：增强 DIY form 功能 并 评论回复 功能，数据 版本预览（commit 5d65ef7f）
-- 2026-06-17：新增：优化表单和标签组件的样式与功能，增强用户体验（commit c550051f）
-- 2026-06-19：新增：新增 MicroAppHost 组件，AI 工作流 API（commit d2f06ca1）
-- 2026-06-19：新增：更新版本号至 5.7.5，并优化 MicroAppController 中的存储逻辑（commit 774b77d4）
+## v5.7.2 - (2026-06-13)
 
-- 2026-06-13：Microi.VSCode：新增：更新版本号至 2.1.8，添加 MCP 默认可见性参考，优化知识库构建逻辑（commit 296c111）
-- 2026-06-14：Microi.VSCode：新增：更新版本号至 2.1.9（commit 1129bcf）
+- 修复：set 默认 values 用于 可见性，显示 属性（commit 9938da09）
+- 新增：更新搜索组件和表格操作，优化下拉框和文本框的处理逻辑（commit 41373f1b）
+- 新增：更新版本号至 1.1.5，并修改更新时间（commit 33fe9255）
+- Microi.VSCode：新增：更新版本号至 2.1.8，添加 MCP 默认可见性参考，优化知识库构建逻辑（commit 296c111）
 
-## v5.7.2
+## v5.7.2 - (2026-06-12)
 
-更新日期：2026-06-13 17:18
+- Microi.net：新增：优化错误信息返回格式，增强可读性和调试信息（commit f13be09）
+- 新增：新增 设计工具 用于 Microi Page，Print Engine 校验, 构建,，保存（commit bbad781e）
+- 新增：增强图片上传功能，支持替换与预览，优化上传状态管理（commit 1f8d1a0f）
+- 新增：更新个人版说明，增加无限商用和永久有效的描述（commit 08e98359）
+- 新增：添加移动端高品质视觉标准和质量门禁，优化移动应用体验（commit c9959b47）
+- 新增：增强 移动端 UI 组件，视觉规范（commit 8f4f599b）
+- Microi.VSCode：新增：更新版本号至 2.1.3，增强 MCP 服务器管理功能，添加多个 MCP 相关命令和状态监控（commit 9dd65f4）
 
-- 2026-06-02：新增 SKILL.md 用于 uniapp-mall-assets，workspace-conventions（commit c7f49bed）
-- 2026-06-04：修复：修正 Microi V8 引擎代码编写最佳实践中的文件匹配规则，添加对文件上传字段值的兼容性处理（commit fede25e2）
-- 2026-06-04：新增：更新 V8.Db 使用示例，改为链式调用 AddInParameter 以支持参数化查询（commit 8b2088eb）
-- 2026-06-05：新增：更新本地启动约定，优化后端启动命令和文档说明（commit aac3a752）
-- 2026-06-05：新增：更新搜索组件逻辑，优化复选框和下拉选择的处理方式，增强富文本排版规范（commit 887aed83）
-- 2026-06-06：新增：添加移动端分类独立滚动规范和后台直充行按钮实现细则，更新工作区 V8 代码同步收尾约定（commit 1e446586）
-- 2026-06-06：新增：优化表格筛选功能，增加列头筛选和分页筛选支持，调整样式以适应移动端（commit 0626e416）
-- 2026-06-06：新增：更新多个 SKILL 文档，增强移动端展示规范和同步状态检查，明确 Token 优先级及收尾复核要求（commit 68fb7a24）
-- 2026-06-07：新增：更新 SKILL 文档，增加数据页加载态与空态区分规范，明确列表型资料页管理动作要求，添加 V8 缓存刷新约定（commit f18fff5b）
-- 2026-06-07：重构代码结构，提升可读性与可维护性（commit 574449e4）
-- 2026-06-07：新增：新增 Microi.UI runtime 用于 theme 管理，文档（commit 3978a57e）
-- 2026-06-07：新增：Microi UI 增加弹窗、订单卡片、商品卡片、区块、步骤条、Tab、主题面板、时间线和上传器等组件（commit b4ff3809）
-- 2026-06-07：增强 Microi UI 规范，styles 用于 更好的隔离性，一致性（commit 0d35dcb5）
-- 2026-06-08：新增：更新 mci-site.scss 和 SKILL.md，增强 UI 设计和样式一致性（commit 0ed243e4）
-- 2026-06-08：新增：增强 UI 组件，新增 visual 测试 用于 身份验证提示（commit 5ae0c1b9）
-- 2026-06-09：新增：更新技能文档，增加 Microi.UI 设计规范和前端 SDK 相关信息（commit f0e8f805）
-- 2026-06-09：新增：更新表格分页配置，优化 SysConfig 处理逻辑，增强用户体验（commit 24f39389）
-- 2026-06-10：新增：更新文件上传路径和规则，增强上传逻辑和错误处理（commit 9dc18522）
-- 2026-06-10：新增：更新打印功能，优化打印样式和布局，增强打印预览效果（commit 01e00dd3）
-- 2026-06-10：新增：添加在线文档路由，优化 ONLYOFFICE 编辑器界面，增强文件预览和下载功能（commit 75960e54）
-- 2026-06-11：新增：增强 导入-软件包.js 并 ID 重映射，引用同步（commit d48906f0）
-- 2026-06-12：新增：新增 设计工具 用于 Microi Page，Print Engine 校验, 构建,，保存（commit bbad781e）
-- 2026-06-12：新增：增强图片上传功能，支持替换与预览，优化上传状态管理（commit 1f8d1a0f）
-- 2026-06-12：新增：更新个人版说明，增加无限商用和永久有效的描述（commit 08e98359）
-- 2026-06-12：新增：添加移动端高品质视觉标准和质量门禁，优化移动应用体验（commit c9959b47）
-- 2026-06-12：新增：增强 移动端 UI 组件，视觉规范（commit 8f4f599b）
-- 2026-06-13：新增：更新 V8 引擎编码最佳实践，增加移动端应用质量门禁和主题切换规范（commit 905de52f）
-- 2026-06-13：新增：更新版本号至 5.7.2，优化 Kestrel 请求处理配置（commit ce0baf62）
+## v5.7.2 - (2026-06-11)
 
-- 2026-06-01：Microi.VSCode：新增性能测试模块与 V8 版本管理（commit 05b5547）
-- 2026-06-04：Microi.VSCode：更新项目结构并增强功能（commit 8016dde）
-- 2026-06-04：Microi.VSCode：新增：统一 AI 指令文件写入工作区根目录，新增初始化 AI 配置命令，更新 MCP 配置同步（commit eb23321）
-- 2026-06-04：Microi.VSCode：新增：增强插件兼容性，支持 Windows Git 长路径，更新 MCP server key 命名规则（commit 16a8a1a）
-- 2026-06-06：Microi.VSCode：新增：优化同步管理器，增强元数据更新逻辑，处理空代码情况（commit a1de8c1）
-- 2026-06-07：Microi.VSCode：新增：更新版本号至 2.0.1，增强同步管理器以支持本地变更项的处理（commit d435761）
-- 2026-06-09：Microi.VSCode：新增：增强版本管理和同步功能，支持技能版本处理和本地变更汇总（commit 0a48e6c）
-- 2026-06-10：Microi.VSCode：新增：更新版本号至 2.0.9，增强 V8 树节点定位和远程差异显示功能（commit bc540f7）
-- 2026-06-12：Microi.VSCode：新增：更新版本号至 2.1.3，增强 MCP 服务器管理功能，添加多个 MCP 相关命令和状态监控（commit 9dd65f4）
+- 新增：增强 导入-软件包.js 并 ID 重映射，引用同步（commit d48906f0）
 
-## v5.7.1
+## v5.7.2 - (2026-06-10)
 
-更新日期：2026-06-01 21:54
+- 新增：更新文件上传路径和规则，增强上传逻辑和错误处理（commit 9dc18522）
+- 新增：更新打印功能，优化打印样式和布局，增强打印预览效果（commit 01e00dd3）
+- 新增：添加在线文档路由，优化 ONLYOFFICE 编辑器界面，增强文件预览和下载功能（commit 75960e54）
+- Microi.VSCode：新增：更新版本号至 2.0.9，增强 V8 树节点定位和远程差异显示功能（commit bc540f7）
 
-- 2026-05-26：新增：更新资源路径规范，删除旧的 uniapp-mall-assets 规范并添加 microi-uniapp-frontend 规范（commit 9939b9a2）
-- 2026-05-26：新增：更新 SKILL.md 文档，修正头像解析和业务资产选中规则，调整示例数据和接口调用示例（commit 6f1966b4）
-- 2026-05-26：新增：更新 v8-formengine-http skill 并 new mall_product，shopping_cart 配置（commit 85619bcc）
-- 2026-05-27：新增：添加 iframe 路由支持，优化 iframe URL 处理逻辑（commit 3d6b242f）
-- 2026-05-27：新增：更新 SKILL.md，添加用户问题编号跟踪和测试证据绑定需求编号的规范（commit f152665b）
-- 2026-05-27：新增：新增 GET_FIELD_LIST API，实现 字段 list retrieval（commit ff642d3f）
-- 2026-05-29：新增：更新 DiyFormDialog，使其触发 ParentFormSet 事件（commit 36328d54）
-- 2026-05-30：新增：添加高并发性能压力测试规范及相关技能文档（commit 07515067）
-- 2026-05-30：新增：新增 工作流 事件 API，form 数据 管理 tools（commit 371e503e）
-- 2026-06-01：新增：新增 MongoDB logging 功能（commit 42cff4d1）
-- 2026-06-01：新增：增强 批量拖选，行高亮 在 DIY 表（commit 96007bc0）
-- 2026-06-01：工程维护：更新版本至 5.7.1 （多个项目），优化 文档（commit 01a972bd）
+## v5.7.2 - (2026-06-09)
 
-- 2026-05-19：Microi.net：新增 C# Dev Kit 语言服务缓存文件以提升性能（commit 6cfbc66）
-- 2026-06-01：Microi.net：增强 V8 引擎集成与调试能力（commit 7006544）
-- 2026-06-04：Microi.net：新增：更新版本号至5.7.1（commit 74d796b）
-- 2026-06-04：Microi.AI：新增：更新版本号至5.7.1（commit 93a639b）
+- 新增：更新技能文档，增加 Microi.UI 设计规范和前端 SDK 相关信息（commit f0e8f805）
+- 新增：更新表格分页配置，优化 SysConfig 处理逻辑，增强用户体验（commit 24f39389）
+- Microi.VSCode：新增：增强版本管理和同步功能，支持技能版本处理和本地变更汇总（commit 0a48e6c）
 
-## v5.6.8
+## v5.7.2 - (2026-06-08)
 
-更新日期：2026-05-30 13:08
+- 新增：更新 mci-site.scss 和 SKILL.md，增强 UI 设计和样式一致性（commit 0ed243e4）
+- 新增：增强 UI 组件，新增 visual 测试 用于 身份验证提示（commit 5ae0c1b9）
 
-- 2026-06-01：Microi.AI：新增：更新版本号至5.6.8（commit 4125af6）
+## v5.7.2 - (2026-06-07)
 
-## v5.6.0
+- 新增：更新 SKILL 文档，增加数据页加载态与空态区分规范，明确列表型资料页管理动作要求，添加 V8 缓存刷新约定（commit f18fff5b）
+- 重构代码结构，提升可读性与可维护性（commit 574449e4）
+- 新增：新增 Microi.UI runtime 用于 theme 管理，文档（commit 3978a57e）
+- 新增：Microi UI 增加弹窗、订单卡片、商品卡片、区块、步骤条、Tab、主题面板、时间线和上传器等组件（commit b4ff3809）
+- 增强 Microi UI 规范，styles 用于 更好的隔离性，一致性（commit 0d35dcb5）
+- Microi.VSCode：新增：更新版本号至 2.0.1，增强同步管理器以支持本地变更项的处理（commit d435761）
 
-更新日期：2026-05-25 16:59
+## v5.7.2 - (2026-06-06)
 
-- 2026-05-24：新增：增强 GoView 主题支持，优化键盘事件处理和文件响应验证（commit f2890d50）
-- 2026-05-24：新增：更新 ApiEngine 和 FormEngine 路由约定，优化 OsClient 参数处理（commit 50fd81ed）
-- 2026-05-25：新增：更新版本至5.6.0，优化文件上传路径处理和安全性检查（commit d7361426）
+- 新增：添加移动端分类独立滚动规范和后台直充行按钮实现细则，更新工作区 V8 代码同步收尾约定（commit 1e446586）
+- 新增：优化表格筛选功能，增加列头筛选和分页筛选支持，调整样式以适应移动端（commit 0626e416）
+- 新增：更新多个 SKILL 文档，增强移动端展示规范和同步状态检查，明确 Token 优先级及收尾复核要求（commit 68fb7a24）
+- Microi.VSCode：新增：优化同步管理器，增强元数据更新逻辑，处理空代码情况（commit a1de8c1）
 
-## v5.5.9
+## v5.7.2 - (2026-06-05)
 
-更新日期：2026-05-23 18:10
+- 新增：更新本地启动约定，优化后端启动命令和文档说明（commit aac3a752）
+- 新增：更新搜索组件逻辑，优化复选框和下拉选择的处理方式，增强富文本排版规范（commit 887aed83）
 
-- 2026-05-23：新增：更新 Playwright 端到端 文档，重构 V8 resource 管理（commit 4bd44694）
-- 2026-05-23：新增：更新所有组件版本至5.5.9，确保一致性和兼容性（commit b7c5bd69）
+## v5.7.1 - (2026-06-04)
 
-## v5.5.8
+- 修复：修正 Microi V8 引擎代码编写最佳实践中的文件匹配规则，添加对文件上传字段值的兼容性处理（commit fede25e2）
+- 新增：更新 V8.Db 使用示例，改为链式调用 AddInParameter 以支持参数化查询（commit 8b2088eb）
+- Microi.VSCode：更新项目结构并增强功能（commit 8016dde）
+- Microi.VSCode：新增：统一 AI 指令文件写入工作区根目录，新增初始化 AI 配置命令，更新 MCP 配置同步（commit eb23321）
+- Microi.VSCode：新增：增强插件兼容性，支持 Windows Git 长路径，更新 MCP server key 命名规则（commit 16a8a1a）
+- Microi.net：新增：更新版本号至5.7.1（commit 74d796b）
+- Microi.AI：新增：更新版本号至5.7.1（commit 93a639b）
 
-更新日期：2026-05-22 15:13
+## v5.7.2 - (2026-06-02)
 
-- 2026-05-22：新增：增强 API engine，V8 event 处理 并 版本管理，修改 history（commit 2ff39641）
-- 2026-05-22：更新 文档，版本管理 用于 Microi platform（commit fbd48da7）
-- 2026-05-22：新增：更新所有组件版本至5.5.8，确保一致性和兼容性（commit 35fae29a）
+- 新增 SKILL.md 用于 uniapp-mall-assets，workspace-conventions（commit c7f49bed）
 
-## v5.5.5
+## v5.7.1 - (2026-06-01 21:54)
 
-更新日期：2026-05-22 03:27
+- 新增：新增 MongoDB logging 功能（commit 42cff4d1）
+- 新增：增强 批量拖选，行高亮 在 DIY 表（commit 96007bc0）
+- 工程维护：更新版本至 5.7.1 （多个项目），优化 文档（commit 01a972bd）
 
-- 2026-05-22：新增：添加商城 uni-app/Vue 前端图片资源强制 sanitizeAssetUrl 规范（commit 03f2ae7c）
-- 2026-05-22：增强 cache 管理 用于 API engine 更新与新增（commit acadca8e）
-- 2026-05-22：新增：更新所有组件版本至5.5.5，确保一致性和兼容性（commit f8cc5075）
+- Microi.net：增强 V8 引擎集成与调试能力（commit 7006544）
 
-## v5.5.4
+## v5.7.1 - (2026-06-01)
 
-更新日期：2026-05-20 17:47
+- Microi.VSCode：新增性能测试模块与 V8 版本管理（commit 05b5547）
+- Microi.AI：新增：更新版本号至5.6.8（commit 4125af6）
 
-- 2026-05-19：新增：新增 文件 upload 功能，优化 文档（commit b930a42d）
-- 2026-05-20：重构 MicroiClient 至 use Base64 encoding 用于 ApiV8Code（commit 45eb2199）
-- 2026-05-20：新增：更新所有组件版本至5.5.4，确保一致性和兼容性（commit 31eed85d）
+## v5.6.8 - (2026-05-30 13:08)
 
-- 2026-05-19：Microi.VSCode：新增：更新版本至 1.7.6，并增强 V8 引擎类型定义和数据库结构文档（commit 6bb008d）
+## v5.6.8 - (2026-05-30)
 
-## v5.5.3
+- 新增：添加高并发性能压力测试规范及相关技能文档（commit 07515067）
+- 新增：新增 工作流 事件 API，form 数据 管理 tools（commit 371e503e）
 
-更新日期：2026-05-19 09:17
+## v5.6.7 - (2026-05-29)
 
-- 2026-05-19：Microi.AI：新增：更新版本号至5.5.3，并优化V8事件条件判断说明（commit 6d15301）
+- 新增：更新 DiyFormDialog，使其触发 ParentFormSet 事件（commit 36328d54）
 
-## v5.5.2
+## v5.6.7 - (2026-05-27)
 
-更新日期：2026-05-17 16:52
+- 新增：添加 iframe 路由支持，优化 iframe URL 处理逻辑（commit 3d6b242f）
+- 新增：更新 SKILL.md，添加用户问题编号跟踪和测试证据绑定需求编号的规范（commit f152665b）
+- 新增：新增 GET_FIELD_LIST API，实现 字段 list retrieval（commit ff642d3f）
 
-- 2026-05-08：新增：添加源码编辑功能，优化打印模板JSON保存逻辑（commit 9a35e777）
-- 2026-05-08：新增：增强字段显示逻辑，支持管理员查看隐藏字段并优化状态刷新机制（commit b8fb6fec）
-- 2026-05-09：去除折叠组件样式修改，只保留子表搜索输入框样式（commit fe7809a8）
-- 2026-05-09：恢复折叠样式后拉取代码（commit d2d0f097）
-- 2026-05-10：新增：更新文档，添加低代码字段处理和HTTP复测的指导（commit 8d94559a）
-- 2026-05-11：合并远程 master 分支（commit 68b0e3b4）
-- 2026-05-11：新增：新增 业务蓝图工具，smoke test 脚本（commit 0f9d65fc）
-- 2026-05-12：新增：增强 工作流 校验，测试 tools（commit fa97255f）
-- 2026-05-12：5.12拉取周总代码（commit a6ffe569）
-- 2026-05-13：合并远程 master 分支（commit 574de97e）
-- 2026-05-13：5.13修改了手机端通讯论筛选问题，平台配置列表和金额显示权限（commit b0747adb）
-- 2026-05-14：新增：更新 API engine 匿名调用设置，增强 按钮显隐逻辑（commit 9a850af7）
-- 2026-05-14：将手机端通讯录筛选上传（commit 660bfd03）
-- 2026-05-14：合并远程 master 分支（commit 2551fb28）
-- 2026-05-14：新增：重构diy-select组件，优化模型值处理和数据源管理逻辑（commit 9858253f）
-- 2026-05-14：新增：更新diy-form样式，禁用状态边框和圆角处理，调整el-row间距（commit 49b4931d）
-- 2026-05-14：合并远程 master 分支（commit c5f3c431）
-- 2026-05-15：!89 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit da4dd5a3）
-- 2026-05-15：新增：增强 表单引擎诊断，runtime state 管理（commit 6b077c5c）
-- 2026-05-15：合并远程 master 分支（commit b1726eb2）
-- 2026-05-15：新增：添加重置路由功能，优化用户登出流程（commit fe48e3e9）
-- 2026-05-17：新增：更新项目配置，修改环境变量为lsg，优化表单引擎逻辑（commit c1cb33bc）
-- 2026-05-17：新增：优化样式和功能，调整表单和表格组件的布局，增强用户体验（commit b480634d）
-- 2026-05-17：新增：更新部门组件和表格组件，优化数据处理逻辑，调整环境变量为iTdos（commit 0d92581d）
-- 2026-05-17：新增：更新所有组件版本至5.5.2，确保一致性和兼容性（commit 370bfd10）
+## v5.6.7 - (2026-05-26)
 
-## v5.4.9
+- 新增：更新资源路径规范，删除旧的 uniapp-mall-assets 规范并添加 microi-uniapp-frontend 规范（commit 9939b9a2）
+- 新增：更新 SKILL.md 文档，修正头像解析和业务资产选中规则，调整示例数据和接口调用示例（commit 6f1966b4）
+- 新增：更新 v8-formengine-http skill 并 new mall_product，shopping_cart 配置（commit 85619bcc）
 
-更新日期：2026-05-08 15:02
+## v5.6.0 - (2026-05-25 16:59)
 
-- 2026-05-07：合并远程 master 分支（commit d721732f）
-- 2026-05-07：新增：新增 Tabs 组件 并 样式，配置 选项（commit f1de29fd）
-- 2026-05-07：重构：在多个组件中将 DiyConfig 重命名为 SysMenuModel（commit 98f01bc1）
-- 2026-05-07：合并远程 master 分支（commit f59e6c62）
-- 2026-05-07：修改折叠组件样式（commit d53bd691）
-- 2026-05-08：新增：增强 Playwright 上下文获取功能，支持动态页面大小和存储注入（commit b69f8391）
-- 2026-05-08：重构代码结构，提升可读性与可维护性（commit 5a030bde）
-- 2026-05-08：新增：服务器名称增加 Microi 前缀，并优化命名逻辑（commit 491cf63d）
-- 2026-05-08：新增：增强文件上传功能，支持获取支付凭证文件的临时访问地址（commit baae870c）
-- 2026-05-08：新增：更新 ParentFieldList 绑定逻辑，支持按标签分组字段列表（commit d820f9ce）
-- 2026-05-08：新增：添加按钮配置选项以刷新表格，优化点击事件处理逻辑（commit 48f2cb40）
-- 2026-05-08：合并 https://gitee.com/zhao-huiyin/microi.net 的 master 分支（commit 78f14da1）
-- 2026-05-08：新增：更新所有项目版本号至 5.4.9（commit d2a043f8）
+- 新增：更新版本至5.6.0，优化文件上传路径处理和安全性检查（commit d7361426）
 
-- 2026-05-08：Microi.VSCode：新增：更新版本至 1.6.9，增强 Playwright 测试支持和错误处理（commit 27e4213）
+## v5.6.0 - (2026-05-24)
 
-## v5.4.8
+- 新增：增强 GoView 主题支持，优化键盘事件处理和文件响应验证（commit f2890d50）
+- 新增：更新 ApiEngine 和 FormEngine 路由约定，优化 OsClient 参数处理（commit 50fd81ed）
 
-更新日期：2026-05-07 15:29
+## v5.5.9 - (2026-05-23 18:10)
 
-- 2026-05-07：合并远程 master 分支（commit 583f2b88）
-- 2026-05-07：新增：更新版本号至 5.4.8，确保所有模块版本一致（commit e1999ba9）
+- 新增：更新 Playwright 端到端 文档，重构 V8 resource 管理（commit 4bd44694）
+- 新增：更新所有组件版本至5.5.9，确保一致性和兼容性（commit b7c5bd69）
 
-## v5.4.7
+## v5.5.8 - (2026-05-22 15:13)
 
-更新日期：2026-05-07 05:54
+- 新增：增强 API engine，V8 event 处理 并 版本管理，修改 history（commit 2ff39641）
+- 更新 文档，版本管理 用于 Microi platform（commit fbd48da7）
+- 新增：更新所有组件版本至5.5.8，确保一致性和兼容性（commit 35fae29a）
 
-- 2026-05-04：优化mcp（commit 9fad4971）
-- 2026-05-05：新增：更新 V8 引擎编码最佳实践，新增 FormEngine HTTP 路由约定（commit b91c0cbf）
-- 2026-05-06：重构 高级工具，服务端上下文 处理（commit 7fbf3d0a）
-- 2026-05-06：重新修改审核按钮,详情样式调整（commit ea423e9c）
-- 2026-05-06：合并远程 master 分支（commit 6f9c5cca）
-- 2026-05-07：新增：新增 DIY 组件 包括 折叠分组, 滑块, 静态文本, 标签输入,，穿梭框（commit 35e1bbb6）
-- 2026-05-07：新增：增强 工作流 处理，form 数据 管理（commit e39eb595）
-- 2026-05-07：新增：移除选择用户的回调并优化工作流处理逻辑（commit 33f268a5）
-- 2026-05-07：新增：更新版本号至 5.4.7，包含多个模块的版本同步（commit b3ccc1b5）
+## v5.5.5 - (2026-05-22 03:27)
 
-- 2026-05-06：Microi.VSCode：新增 Playwright E2E 集成及命令（commit 09aae98）
-- 2026-05-07：Microi.net：新增：更新版本号至5.4.7，并优化工作流引擎中的条件判断逻辑（commit f64d9d6）
-- 2026-05-07：Microi.AI：新增：更新版本号至5.4.7（commit 881dd6d）
-- 2026-05-07：Microi.VSCode：新增：更新版本至 1.6.5（commit 2f14632）
+- 新增：添加商城 uni-app/Vue 前端图片资源强制 sanitizeAssetUrl 规范（commit 03f2ae7c）
+- 增强 cache 管理 用于 API engine 更新与新增（commit acadca8e）
+- 新增：更新所有组件版本至5.5.5，确保一致性和兼容性（commit f8cc5075）
 
-## v5.4.5
+## v5.5.4 - (2026-05-20 17:47)
 
-更新日期：2026-05-04 15:35
+- 重构 MicroiClient 至 use Base64 encoding 用于 ApiV8Code（commit 45eb2199）
+- 新增：更新所有组件版本至5.5.4，确保一致性和兼容性（commit 31eed85d）
 
-- 2026-05-04：新增：新增 Playwright context API，端到端 测试 能力（commit 064b14c5）
-- 2026-05-04：新增：更新 Playwright 端到端 test 说明，版本升级至 5.4.5 （多个项目）（commit 626edb78）
+## v5.5.3 - (2026-05-19 09:17)
 
-## v5.4.4
+- Microi.AI：新增：更新版本号至5.5.3，并优化V8事件条件判断说明（commit 6d15301）
 
-更新日期：2026-05-04 15:18
+## v5.5.3 - (2026-05-19)
 
-- 2026-05-01：!87 CVE-2023-44270 - PostCSS 注入漏洞修复（commit d1b714c2）
-- 2026-05-02：功能：优化控制台输出编码，增强调试信息，添加 V8 引擎 API 知识库文档（commit ee163fac）
-- 2026-05-03：再一次拆分表格、表单组件代码（commit 9befc897）
-- 2026-05-03：修复：更新 参数 key 在 执行接口引擎的 API 调用 至 'Param' 用于 一致性 新增：扩展 AI 能力 在 README 以包含 7 新工具 用于 enhanced 功能（commit 6ccc8b49）
-- 2026-05-03：特性：为 Microi 服务器集成添加高级工具（commit 9a246049）
-- 2026-05-03：重构代码结构，提升可读性与可维护性（commit 4dada528）
-- 2026-05-04：新增：增强 token 管理，recovery 流程（commit 87cdf2fc）
-- 2026-05-04：新增：增强 createEngine 方法对 ApiAddress 的支持，并新增示例数据初始化工具（commit a003241f）
-- 2026-05-04：新增：新增 V8McpLogic 补丁 用于 字段，表 updates, 架构缓存刷新,，匿名接口引擎设置（commit 60edcbc6）
-- 2026-05-04：新增：实现数据表字段排序自动递增；更新 API 排序说明；完善 Playwright 端到端测试文档及示例；补充 uni-app 主题切换实现，并强制主题色使用 CSS 变量（commit 06f03540）
-- 2026-05-04：新增：更新 Playwright 端到端 test 说明，版本升级至 5.4.4 （多个项目）（commit 0211f7d7）
+- Microi.net：新增 C# Dev Kit 语言服务缓存文件以提升性能（commit 6cfbc66）
+- 新增：新增 文件 upload 功能，优化 文档（commit b930a42d）
+- Microi.VSCode：新增：更新版本至 1.7.6，并增强 V8 引擎类型定义和数据库结构文档（commit 6bb008d）
 
-- 2026-04-23：Microi.VSCode：新增：增加对数据库模式的 Markdown 文件支持，并优化 API 文件命名（commit f3e8e64）
-- 2026-05-03：Microi.VSCode：增强 AI 文档与数据库结构处理（commit 19c84ae）
-- 2026-05-04：Microi.VSCode：新增：更新版本至 1.6.0，并增强数据库结构文档说明（commit 674c08a）
+## v5.5.2 - (2026-05-17 16:52)
 
-## v5.3.8
+- 新增：更新项目配置，修改环境变量为lsg，优化表单引擎逻辑（commit c1cb33bc）
+- 新增：优化样式和功能，调整表单和表格组件的布局，增强用户体验（commit b480634d）
+- 新增：更新部门组件和表格组件，优化数据处理逻辑，调整环境变量为iTdos（commit 0d92581d）
+- 新增：更新所有组件版本至5.5.2，确保一致性和兼容性（commit 370bfd10）
 
-更新日期：2026-05-02 02:43
+## v5.5.2 - (2026-05-15)
 
-- 2026-04-29：删除过时的 AI 引擎文档，并更新相关映射文件以反映最新的文档结构和内容。（commit 35df7b8c）
-- 2026-04-30：升级 element-plus 依赖至 2.13.7；添加菜单权限翻译支持；优化移动端 FAB 操作条，支持拖拽位置保存（commit 4e32cab2）
-- 2026-04-30：修改审核按钮bug，处理冲突后上传新fork（commit f4010469）
-- 2026-05-01：功能：实现对表单处理的替代提交并增强工作流集成（commit a29bfb17）
-- 2026-05-01：优化 sys-log 页面样式，调整内边距为 0；重构个人资料页面功能列表，简化结构并增强可读性；移除不必要的箭头标记（commit e90f019b）
-- 2026-05-01：Auto(全行保存) / Submit(批量提交（commit fbf02d84）
-- 2026-05-01：功能：增强工作流集成并为 Unity WebGL 场景添加全局 API（commit 204b3edd）
-- 2026-04-30：!86 修改审核按钮bug，处理冲突后上传新fork（commit b07ff41c）
-- 2026-05-01：功能：为 Microi 平台添加 V8 调试、Excel 导入/导出、文件上传/下载、前端事件、多租户架构及模板引擎使用的综合文档（commit 954d1eb9）
-- 2026-05-01：平台架构全面优化（commit cfa2a69c）
-- 2026-05-01：安全：修复 CVE-2023-44270 - PostCSS 注入漏洞修复（commit c152f363）
-- 2026-05-02：更新版本号至 5.3.8，确保所有相关项目一致性（commit dc499847）
+- !89 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit da4dd5a3）
+- 新增：增强 表单引擎诊断，runtime state 管理（commit 6b077c5c）
+- 合并远程 master 分支（commit b1726eb2）
+- 新增：添加重置路由功能，优化用户登出流程（commit fe48e3e9）
 
-- 2026-05-01：Microi.net：新增：增强 V8 引擎安全性，添加类型黑名单和安全类型解析器（commit 9b2fc20）
-- 2026-05-03：Microi.AI：新增：更新版本号至5.3.8（commit 3cde37f）
-- 2026-05-03：Microi.net：新增：更新版本号至5.3.8，并优化 OsClient 处理逻辑以增强错误处理和缓存清理（commit 9391354）
+## v5.5.2 - (2026-05-14)
 
-## v5.3.7
+- 新增：更新 API engine 匿名调用设置，增强 按钮显隐逻辑（commit 9a850af7）
+- 将手机端通讯录筛选上传（commit 660bfd03）
+- 合并远程 master 分支（commit 2551fb28）
+- 新增：重构diy-select组件，优化模型值处理和数据源管理逻辑（commit 9858253f）
+- 新增：更新diy-form样式，禁用状态边框和圆角处理，调整el-row间距（commit 49b4931d）
+- 合并远程 master 分支（commit c5f3c431）
 
-更新日期：2026-04-29 17:46
+## v5.5.2 - (2026-05-13)
 
-- 2026-04-27：优化 el-select 组件的选项渲染逻辑，增加 GetOptionLabel 和 GetOptionValue 方法，确保数据源类型处理准确；调整 DiyDataSourceConfig 组件的字段显示与存储配置逻辑，避免不必要的字段显示（commit fd428bb0）
-- 2026-04-29：优化移动端加载更多提示，支持点击触发；调整全局堆栈清理逻辑，避免误清空仍存活的实例；简化字段可见性判断逻辑（commit 26e2a6ab）
-- 2026-04-29：优化权限管理逻辑，修复角色权限获取和保存中的多个问题；调整前端组件以支持权限预览功能（commit 0a16c207）
-- 2026-04-29：优化多语言支持，增加日语和繁体中文语言包；调整语言选择组件，支持动态语言切换；改进语言存储逻辑，确保语言设置同步更新（commit b5172b48）
-- 2026-04-29：将所有组件的版本升级至 5.3.7，并更新文档链接以使用新的域名格式。（commit e773da3c）
+- 合并远程 master 分支（commit 574de97e）
+- 5.13修改了手机端通讯论筛选问题，平台配置列表和金额显示权限（commit b0747adb）
 
-- 2026-05-01：Microi.net：版本更新至 5.3.7，并增强 V8TenantContext 使用（commit d7aebb4）
-- 2026-05-01：Microi.AI：新增：更新版本号至5.3.7（commit 5d0fc92）
+## v5.5.1 - (2026-05-12)
 
-## v5.3.6
+- 新增：增强 工作流 校验，测试 tools（commit fa97255f）
+- 5.12拉取周总代码（commit a6ffe569）
 
-更新日期：2026-04-26 18:18
+## v5.5.0 - (2026-05-11)
 
-- 2026-04-23：完善tab初始值，PC配置页面初始值和列表工作台调整（commit c84d4653）
-- 2026-04-23：合并远程 master 分支（commit ee74b385）
-- 2026-04-23：完善tab初始值，PC配置页面初始值和列表工作台调整（commit 622a4946）
-- 2026-04-23：!82 完善tab初始值，PC配置页面初始值和列表工作台调整（commit 8105f2f3）
-- 2026-04-24：更新 Dockerfile 以替换环境变量，添加对 FileServer 和 OsClientType 的支持；更新 Vite 配置以排除 index.html 的压缩；修改一键编译发布脚本以确保构建镜像时不使用缓存（commit 0d9e02a6）
-- 2026-04-24：合并远程 master 分支（commit 5469c064）
-- 2026-04-24：重构多个组件的字体大小和边距以保持一致性（commit 97e7c4a9）
-- 2026-04-24：调整按钮高度和字体大小以改善样式一致性（commit 1fe461d1）
-- 2026-04-24：优化移动端样式，调整多个组件的内边距以提升用户体验（commit 5f0454c8）
-- 2026-04-24：调整菜单标题字体大小为12px，优化样式一致性；为小屏幕添加表单内边距以改善用户体验（commit 02095bcc）
-- 2026-04-24：优化样式，调整多个组件的内边距和填充以提升一致性和用户体验（commit 88e5f7d7）
-- 2026-04-24：移除菜单项底部填充样式以改善布局一致性（commit fe606409）
-- 2026-04-24：解锁页面滚动，优化加载完成后的用户体验（commit 3b148979）
-- 2026-04-24：优化加载完成后的页面解锁逻辑，增强兼容性和用户体验（commit 96c54228）
-- 2026-04-24：禁用 Brotli 和 Gzip 压缩，改由服务端 nginx 处理，简化本地开发配置（commit d12751e9）
-- 2026-04-24：更新 microi.loading.js 脚本注释，添加修改提示以防止浏览器缓存问题（commit 28d342b9）
-- 2026-04-24：添加 iOS Web App 支持和主屏幕指引，优化用户体验（commit 65e01623）
-- 2026-04-24：调整 el-dialog 最大宽度至 96%，优化对话框显示效果（commit 5420a938）
-- 2026-04-24：优化 DiyTableRowPageSize 的默认值获取逻辑，增强缓存处理和兼容性（commit 82733b02）
-- 2026-04-24：调整 iOS 检测逻辑，注释掉 PWA 主屏幕模式判断（commit 90e47921）
-- 2026-04-24：优化 DiyTableRowPageSize 的默认值设置，简化逻辑（commit a614472f）
-- 2026-04-26：优化表格懒渲染性能，增加内存清理逻辑，调整手机端卡片模式每页显示条数（commit 62191592）
-- 2026-04-26：更新多个组件和样式，调整字体大小，修复数据源处理逻辑，提升用户体验，版本号升级至 5.3.6（commit c0a9b5c4）
+- 合并远程 master 分支（commit 68b0e3b4）
+- 新增：新增 业务蓝图工具，smoke test 脚本（commit 0f9d65fc）
 
-## v5.3.5
+## v5.5.0 - (2026-05-10)
 
-更新日期：2026-04-23 15:51
+- 新增：更新文档，添加低代码字段处理和HTTP复测的指导（commit 8d94559a）
 
-- 2026-04-23：更新所有项目版本号至 5.3.5，并添加 MQTT 设备级 ApiEngineId 缓存及日志功能（commit feb6eec6）
+## v5.5.0 - (2026-05-09)
 
-## v5.3.4
+- 去除折叠组件样式修改，只保留子表搜索输入框样式（commit fe7809a8）
+- 恢复折叠样式后拉取代码（commit d2d0f097）
 
-更新日期：2026-04-23 12:24
+## v5.4.9 - (2026-05-08 15:02)
 
-- 2026-04-20：整理已归档目录（commit 234436be）
-- 2026-04-20：修改页面初始值和页面布局（commit 3c16fb25）
-- 2026-04-21：处理打开抽屉内表格更多按钮弹框无法关闭的问题（commit 0a875bb2）
-- 2026-04-22：修改列表字段和列表样式，小程序分享功能待完善，电脑无法打开分享链接（commit 949b19da）
-- 2026-04-22：重构安装脚本并更新数据库文件（commit 411f50f6）
-- 2026-04-22：!81 修改列表字段和列表样式，小程序分享功能待完善，电脑无法打开分享链接（commit de53c63a）
-- 2026-04-23：在应用启动时初始化主题系统，并在 App.vue 中显示事件（commit 7fce850b）
-- 2026-04-23：更新所有项目版本号至 5.3.4（commit 3f6c2e7f）
+- 新增：增强 Playwright 上下文获取功能，支持动态页面大小和存储注入（commit b69f8391）
+- 重构代码结构，提升可读性与可维护性（commit 5a030bde）
+- 新增：服务器名称增加 Microi 前缀，并优化命名逻辑（commit 491cf63d）
+- 新增：增强文件上传功能，支持获取支付凭证文件的临时访问地址（commit baae870c）
+- 新增：更新 ParentFieldList 绑定逻辑，支持按标签分组字段列表（commit d820f9ce）
+- 新增：添加按钮配置选项以刷新表格，优化点击事件处理逻辑（commit 48f2cb40）
+- 合并 https://gitee.com/zhao-huiyin/microi.net 的 master 分支（commit 78f14da1）
+- 新增：更新所有项目版本号至 5.4.9（commit d2a043f8）
 
-- 2026-04-23：Microi.AI：新增：更新版本号至5.3.4（commit a1014ef）
-- 2026-04-23：Microi.net：新增：更新版本号至5.3.4，新增 OsClient 方法以支持占位模型检测和主租户加载验证（commit 99c2bca）
+- Microi.VSCode：新增：更新版本至 1.6.9，增强 Playwright 测试支持和错误处理（commit 27e4213）
 
-## v5.3.3
+## v5.4.9 - (2026-05-08)
 
-更新日期：2026-04-20 02:13
+- 新增：添加源码编辑功能，优化打印模板JSON保存逻辑（commit 9a35e777）
+- 新增：增强字段显示逻辑，支持管理员查看隐藏字段并优化状态刷新机制（commit b8fb6fec）
 
-- 2026-04-17：**修改**：在多个组件中禁用自动初始化（AutoInit），以支持手动调用初始化逻辑（commit dbe06b9f）
-- 2026-04-17：新增：支持懒加载和远程搜索功能，优化树形选择组件的数据处理（commit 53900465）
-- 2026-04-17：修改：更新多个文件以添加新的数据库结构文件，优化登录和聊天功能的连接状态管理（commit 6abeb30d）
-- 2026-04-17：完善好H5处理抽屉/对话框返回bug，但小程序最后一层抽屉时任然不行（commit a56064e5）
-- 2026-04-17：合并远程 master 分支（commit fddadb90）
-- 2026-04-19：修改：更新 .gitignore 文件以添加新目录，增强 home-glow.scss 中第5个按钮的样式，更新 index.md 以添加新的视频下载器链接（commit 4f34c6cc）
-- 2026-04-19：!80 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit d4356bf9）
-- 2026-04-19：修复：更新 AMap API key placeholder 在 组件.js（commit 1e9d7f2f）
-- 2026-04-19：合并远程 master 分支（commit 5858cd29）
-- 2026-04-20：添加 MCI 设计系统全局样式，支持明暗主题（commit 909b1050）
-- 2026-04-20：更新版本号至 5.3.3，确保所有相关项目一致性（commit d300957c）
+## v5.4.8 - (2026-05-07 15:29)
 
-- 2026-04-20：Microi.net：新增：更新版本号至5.3.3，并优化级联选择器和树形选择器的默认字段配置（commit d87ef03）
-- 2026-04-20：Microi.AI：新增：更新版本号至5.3.3（commit 15fdc99）
+- 合并远程 master 分支（commit 583f2b88）
+- 新增：更新版本号至 5.4.8，确保所有模块版本一致（commit e1999ba9）
 
-## v5.3.2
+## v5.4.7 - (2026-05-07 05:54)
 
-更新日期：2026-04-17 06:12
+- 新增：新增 DIY 组件 包括 折叠分组, 滑块, 静态文本, 标签输入,，穿梭框（commit 35e1bbb6）
+- 新增：增强 工作流 处理，form 数据 管理（commit e39eb595）
+- 新增：移除选择用户的回调并优化工作流处理逻辑（commit 33f268a5）
+- 新增：更新版本号至 5.4.7，包含多个模块的版本同步（commit b3ccc1b5）
 
-- 2026-04-13：合并远程 master 分支（commit 13b2f802）
-- 2026-04-13：实现移动端悬浮操作按钮（FAB）（commit 51545b2c）
-- 2026-04-13：优化工作流页面布局，使用el-row和el-col组件替代传统div结构（commit b995e816）
-- 2026-04-13：合并远程 master 分支（commit db6b3dc2）
-- 2026-04-14：优化移动端组件，使用el-tree-select替代el-cascader，调整样式以提升用户体验（commit 4a4889bd）
-- 2026-04-14：优化移动端界面，移除不必要的元素并实现FAB浮动操作按钮（commit 3469687d）
-- 2026-04-14：优化移动端样式，调整按钮圆角和搜索组件布局，增强用户体验（commit 264085f5）
-- 2026-04-14：合并远程 master 分支（commit 579b76ab）
-- 2026-04-14：修改了售后任务tab（commit 9534fbbf）
-- 2026-04-14：调试好售后tabs（commit db89279f）
-- 2026-04-15：优化移动端样式，调整组件布局和样式，增强用户体验（commit fe420135）
-- 2026-04-15：优化移动端界面，添加FAB浮动操作按钮并调整按钮显示逻辑，提升用户体验（commit 8f1fe21e）
-- 2026-04-15：优化移动端FAB浮动操作按钮显示逻辑，移除对小程序的限制，提升用户体验（commit dbd6d1d2）
-- 2026-04-15：优化搜索框显示逻辑，移除对移动端视图的限制，提升用户体验（commit ead411ab）
-- 2026-04-15：完善好售后和设备tabs（commit a0006a6c）
-- 2026-04-15：完善好售后和设备tabs，先上传好PR（commit a7924123）
-- 2026-04-16：完善好售后和设备tabs，先上传好PR（commit d6bcef6d）
-- 2026-04-16：!78 完善好售后和设备tabs，先上传好PR（commit 29a86949）
-- 2026-04-16：处理抽屉/对话框返回bug（commit fbb674ff）
-- 2026-04-16：合并远程 master 分支（commit 15a61790）
-- 2026-04-16：!79 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit 85cb7b62）
-- 2026-04-17：- **新增**：增强表单组件的数据加载能力，防止重复请求 - 在 `SetFieldData` 和 `GetFieldsData` 方法中增加加载状态管理，避免并发请求。- 更新 `diy-cascader` 和 `diy-select-tree` 组件，确保 `Config` 属性已初始化，避免出现未定义错误。- 优化 `diy-select-tree` 中的树形结构处理，保证数据嵌套正确。- **重构**：调整 `diy-form-full` 在新增条目时复用 `TableRowId`，避免不必要的 API 调用。- **调整**：优化 `diy-form` 的自动初始化逻辑，防止特定模式下出现重复请求。- **优化**：改进 `diy-表` 的移动端搜索界面，提升用户体验。- **版本更新**：将多个项目中的 Microi.net 版本统一升级至 5.3.2。- **配置调整**：修改开发环境的启动配置。（commit 280c0719）
+- Microi.net：新增：更新版本号至5.4.7，并优化工作流引擎中的条件判断逻辑（commit f64d9d6）
+- Microi.AI：新增：更新版本号至5.4.7（commit 881dd6d）
+- Microi.VSCode：新增：更新版本至 1.6.5（commit 2f14632）
 
-- 2026-04-17：Microi.AI：新增：更新版本号至5.3.2（commit 1f596ac）
-- 2026-04-17：Microi.net：新增：更新版本号至5.3.2，并修复树形结构和Where条件的处理逻辑（commit 47ed0dc）
+## v5.4.8 - (2026-05-07)
 
-## v5.3.0
+- 合并远程 master 分支（commit d721732f）
+- 新增：新增 Tabs 组件 并 样式，配置 选项（commit f1de29fd）
+- 重构：在多个组件中将 DiyConfig 重命名为 SysMenuModel（commit 98f01bc1）
+- 合并远程 master 分支（commit f59e6c62）
+- 修改折叠组件样式（commit d53bd691）
 
-更新日期：2026-04-13 04:01
+## v5.4.7 - (2026-05-06)
 
-- 2026-04-10：!76 修复新增按钮展示（commit 55749a77）
-- 2026-04-10：合并远程 master 分支（commit 7d06f1fd）
-- 2026-04-10：权限修改（commit e1148763）
-- 2026-04-10：合并远程 master 分支（commit 04ce2122）
-- 2026-04-11：特性：为 HDFS 实现文件管理 API（commit dbe9eca7）
-- 2026-04-13：特性：版本升级至 5.3.0 并优化工作流移动端界面（commit 9fd639bf）
+- 重构 高级工具，服务端上下文 处理（commit 7fbf3d0a）
+- 重新修改审核按钮,详情样式调整（commit ea423e9c）
+- 合并远程 master 分支（commit 6f9c5cca）
+- Microi.VSCode：新增 Playwright E2E 集成及命令（commit 09aae98）
 
-- 2026-04-13：Microi.AI：新增：更新版本号至5.3.0（commit 906f8e6）
-- 2026-04-13：Microi.net：新增：更新版本号至5.3.0（commit 06b1f73）
+## v5.4.7 - (2026-05-05)
 
-## v5.2.9
+- 新增：更新 V8 引擎编码最佳实践，新增 FormEngine HTTP 路由约定（commit b91c0cbf）
 
-更新日期：2026-04-10 12:34
+## v5.4.5 - (2026-05-04 15:35)
 
-- 2026-04-09：注释权限问题（commit 64ef539e）
-- 2026-04-09：合并远程 master 分支（commit 10cdce67）
-- 2026-04-10：版本升级至 5.2.9，更新多个组件的版本号（commit f4718f41）
+- 新增：新增 Playwright context API，端到端 测试 能力（commit 064b14c5）
+- 新增：更新 Playwright 端到端 test 说明，版本升级至 5.4.5 （多个项目）（commit 626edb78）
 
-- 2026-04-10：Microi.net：新增：更新版本号至5.2.9（commit 3aac4ef）
-- 2026-04-10：Microi.AI：新增：更新版本号至5.2.9（commit 61aefac）
+## v5.4.4 - (2026-05-04 15:18)
 
-## v5.2.8
+- 新增：增强 token 管理，recovery 流程（commit 87cdf2fc）
+- 新增：增强 createEngine 方法对 ApiAddress 的支持，并新增示例数据初始化工具（commit a003241f）
+- 新增：新增 V8McpLogic 补丁 用于 字段，表 updates, 架构缓存刷新,，匿名接口引擎设置（commit 60edcbc6）
+- 新增：实现数据表字段排序自动递增；更新 API 排序说明；完善 Playwright 端到端测试文档及示例；补充 uni-app 主题切换实现，并强制主题色使用 CSS 变量（commit 06f03540）
+- 新增：更新 Playwright 端到端 test 说明，版本升级至 5.4.4 （多个项目）（commit 0211f7d7）
 
-更新日期：2026-04-09 17:26
+- Microi.VSCode：新增：更新版本至 1.6.0，并增强数据库结构文档说明（commit 674c08a）
 
-- 2026-04-08：将级联选择器改为树形选择器（commit 3c5e0d71）
-- 2026-04-08：PC保存级联选择器，移动使用树形选择器（commit 6be08662）
-- 2026-04-08：合并远程 master 分支（commit d75338fe）
-- 2026-04-09：完善好地区树形选择和片区管理新增数据后列表不更新问题（commit 081f881b）
-- 2026-04-09：修复新增按钮展示（commit 2456ff2c）
-- 2026-04-09：修复新增按钮展示（commit 36653151）
-- 2026-04-09：功能：将版本更新至 5.2.8 并增强全屏功能（commit 9f6014c7）
+## v5.4.5 - (2026-05-04)
 
-- 2026-04-09：Microi.AI：新增：更新版本号至5.2.8（commit fc536f6）
-- 2026-04-09：Microi.net：新增：更新版本号至5.2.8，并在加密脚本中添加加密指纹标记功能（commit fdaed74）
+- 优化mcp（commit 9fad4971）
 
-## v5.2.3
+## v5.3.8 - (2026-05-03)
 
-更新日期：2026-04-08 11:57
+- 再一次拆分表格、表单组件代码（commit 9befc897）
+- 修复：更新 参数 key 在 执行接口引擎的 API 调用 至 'Param' 用于 一致性 新增：扩展 AI 能力 在 README 以包含 7 新工具 用于 enhanced 功能（commit 6ccc8b49）
+- 特性：为 Microi 服务器集成添加高级工具（commit 9a246049）
+- 重构代码结构，提升可读性与可维护性（commit 4dada528）
+- Microi.VSCode：增强 AI 文档与数据库结构处理（commit 19c84ae）
+- Microi.AI：新增：更新版本号至5.3.8（commit 3cde37f）
+- Microi.net：新增：更新版本号至5.3.8，并优化 OsClient 处理逻辑以增强错误处理和缓存清理（commit 9391354）
 
-- 2026-04-07：合并远程 master 分支（commit 1fdabdf1）
-- 2026-04-07：特性：为ORM实现PostgreSQL和SQL Server服务（commit ebb6fca2）
-- 2026-04-07：合并远程 master 分支（commit 3c9cc2e4）
-- 2026-04-07：修改级联选择器超屏幕问题（commit d6b66ec9）
-- 2026-04-08：版本升级至5.2.3，并为Dos.ORM增加异步数据检索方法（commit e7621929）
+## v5.3.8 - (2026-05-02 02:43)
 
-- 2026-04-08：Microi.AI：新增：更新版本号至5.2.3（commit 2213a48）
-- 2026-04-08：Microi.net：新增：更新版本号至5.2.3，增强 SQL 注入防护和字段名校验（commit 2c16e8b）
+- 更新版本号至 5.3.8，确保所有相关项目一致性（commit dc499847）
 
-## v5.2.0
+## v5.3.8 - (2026-05-02)
 
-更新日期：2026-04-07 16:48
+- 功能：优化控制台输出编码，增强调试信息，添加 V8 引擎 API 知识库文档（commit ee163fac）
 
-- 2026-04-07：Microi.AI：新增：更新版本号至5.2.0（commit fa4b284）
-- 2026-04-07：Microi.net：重构数据库事务处理，并将版本更新至 5.2.0（commit 4d08735）
+## v5.3.7 - (2026-05-01)
 
-## v5.1.9
+- !87 CVE-2023-44270 - PostCSS 注入漏洞修复（commit d1b714c2）
+- 功能：实现对表单处理的替代提交并增强工作流集成（commit a29bfb17）
+- 优化 sys-log 页面样式，调整内边距为 0；重构个人资料页面功能列表，简化结构并增强可读性；移除不必要的箭头标记（commit e90f019b）
+- Auto(全行保存) / Submit(批量提交（commit fbf02d84）
+- 功能：增强工作流集成并为 Unity WebGL 场景添加全局 API（commit 204b3edd）
+- 功能：为 Microi 平台添加 V8 调试、Excel 导入/导出、文件上传/下载、前端事件、多租户架构及模板引擎使用的综合文档（commit 954d1eb9）
+- 平台架构全面优化（commit cfa2a69c）
+- 安全：修复 CVE-2023-44270 - PostCSS 注入漏洞修复（commit c152f363）
+- Microi.net：新增：增强 V8 引擎安全性，添加类型黑名单和安全类型解析器（commit 9b2fc20）
+- Microi.net：版本更新至 5.3.7，并增强 V8TenantContext 使用（commit d7aebb4）
+- Microi.AI：新增：更新版本号至5.3.7（commit 5d0fc92）
 
-更新日期：2026-04-07 00:58
+## v5.3.8 - (2026-04-30)
 
-- 2026-04-02：!73 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit 3c9e6c98）
-- 2026-04-03：修改日历超屏幕问题（commit 3e89e026）
-- 2026-04-03：安全：修复 CVE-2024-22262 - 新增 URL 校验 至 防止 开放重定向/SSRF（commit ffd4e730）
-- 2026-04-03：!74 AI 队友自动生成：修复 CVE-2024-22262: Spring Framework UriComponentsBuilder 安全漏洞（commit 0bf87317）
-- 2026-04-03：安全：修复 CVE-2024-45296 - 升级 path-至-regexp 至 v6.3.0（commit 97f7f382）
-- 2026-04-03：!75 AI 队友自动生成：[Security-高危] CVE-2024-45296 - Path-至-RegExp 安全漏洞修复（commit 7cea9b82）
-- 2026-04-04：壮举：添加3D模型加载器和预置场景配置（commit 9548c6c0）
-- 2026-04-04：合并远程 master 分支（commit 5c5d56af）
-- 2026-04-04：优化数据库提供程序缓存机制，使用并发字典替代普通字典以提高线程安全性（commit 97d8b406）
-- 2026-04-04：合并远程 master 分支（commit 576cf6a3）
-- 2026-04-04：壮举：将Microi 3D引擎升级到具有新功能的V3（commit 006f6f3a）
-- 2026-04-04：合并远程 master 分支（commit 922eac47）
-- 2026-04-04：更新路径编译方法，使用新的导入方式；调整样式设置以优化预览效果；修改环境变量配置为renyiPro（commit fc40992c）
-- 2026-04-04：删除子模块 任亿3D数字孪生（commit aa1a96c0）
-- 2026-04-04：更新 .gitignore 文件以包含任亿3D数字孪生；优化首页特色卡片样式，增强视觉效果（commit b31d7a0d）
-- 2026-04-04：增强发布助手功能，新增官方网站文档编译选项；优化聊天组件和产品展示样式，提升视觉效果（commit 40979d95）
-- 2026-04-05：添加 @vitejs/plugin-basic-ssl 依赖；调整预览样式为 100vh 和 100vw；更新 Vite 配置以支持 HTTPS 自签名证书（commit eaf4e84b）
-- 2026-04-05：更新构建脚本以使用 cross-env 设置环境变量；新增 cross-env 依赖（commit ff9f650e）
-- 2026-04-05：注释掉 DiyDocumentParam 类中的 _Top 属性（commit d8889a51）
-- 2026-04-06：新增 Docker 容器监控功能，获取容器统计信息并展示在系统监控界面（commit d5263710）
-- 2026-04-06：更新 launchSettings.json 至 修改 ASPNETCORE_ENVIRONMENT 至 'iTdos'（commit 7cc84fb0）
-- 2026-04-07：更新 launchSettings.json 中的 ASPNETCORE_ENVIRONMENT 为 'chongshi'（commit 0e5ca617）
-- 2026-04-07：更新项目版本至 5.1.9 （多个 Microi.Server 组件）（commit 2af1ff1e）
+- 升级 element-plus 依赖至 2.13.7；添加菜单权限翻译支持；优化移动端 FAB 操作条，支持拖拽位置保存（commit 4e32cab2）
+- 修改审核按钮bug，处理冲突后上传新fork（commit f4010469）
+- !86 修改审核按钮bug，处理冲突后上传新fork（commit b07ff41c）
 
-- 2026-04-03：Microi.VSCode：新增：更新 package.json 版本至 1.5.5，并增强设置面板的环境变量管理和用户提示（commit b477a97）
-- 2026-04-03：Microi.VSCode：新增：更新 package.json 版本至 1.5.7，并优化发布脚本以使用 npx 调用 ovsx（commit 563476f）
-- 2026-04-07：Microi.AI：新增：更新版本号至5.1.9（commit c7ac274）
-- 2026-04-07：Microi.net：新增：更新版本号至5.1.9，添加 Windows 路径转换功能以支持 .NET 工具（commit 095f8f0）
+## v5.3.7 - (2026-04-29 17:46)
 
-## v5.1.8
+- 优化移动端加载更多提示，支持点击触发；调整全局堆栈清理逻辑，避免误清空仍存活的实例；简化字段可见性判断逻辑（commit 26e2a6ab）
+- 优化权限管理逻辑，修复角色权限获取和保存中的多个问题；调整前端组件以支持权限预览功能（commit 0a16c207）
+- 优化多语言支持，增加日语和繁体中文语言包；调整语言选择组件，支持动态语言切换；改进语言存储逻辑，确保语言设置同步更新（commit b5172b48）
+- 将所有组件的版本升级至 5.3.7，并更新文档链接以使用新的域名格式。（commit e773da3c）
 
-更新日期：2026-04-04 00:39
+## v5.3.7 - (2026-04-29)
 
-- 2026-04-04：Microi.AI：新增：更新版本号至5.1.8，优化AI配置管理，减少动态类型使用，提升代码安全性和可维护性（commit 41cc3e3）
-- 2026-04-04：Microi.net：新增：更新版本号至5.1.8，统一关闭 HidePrivateApi 设置以避免 DLR 运行时错误（commit 6121165）
+- 删除过时的 AI 引擎文档，并更新相关映射文件以反映最新的文档结构和内容。（commit 35df7b8c）
 
-## v5.1.7
+## v5.3.7 - (2026-04-27)
 
-更新日期：2026-04-02 18:15
+- 优化 el-select 组件的选项渲染逻辑，增加 GetOptionLabel 和 GetOptionValue 方法，确保数据源类型处理准确；调整 DiyDataSourceConfig 组件的字段显示与存储配置逻辑，避免不必要的字段显示（commit fd428bb0）
 
-- 2026-04-02：将页面搜索条件合并同步，联动搜索完成，时间选择超出页面待完善（commit 0a7f31fb）
-- 2026-04-02：将页面搜索条件合并同步，联动搜索完成，时间选择超出页面待完善（commit e945d391）
-- 2026-04-02：合并远程 master 分支（commit 58a46923）
-- 2026-04-02：将所有相关组件版本更新至5.1.7，修复Unity WebGL上下文管理及Blob URL处理（commit b330bcd6）
+## v5.3.6 - (2026-04-26 18:18)
 
-## v5.1.5
+- 优化表格懒渲染性能，增加内存清理逻辑，调整手机端卡片模式每页显示条数（commit 62191592）
+- 更新多个组件和样式，调整字体大小，修复数据源处理逻辑，提升用户体验，版本号升级至 5.3.6（commit c0a9b5c4）
 
-更新日期：2026-04-02 15:28
+## v5.3.6 - (2026-04-24)
 
-- 2026-04-02：将所有相关组件版本更新至5.1.5，添加AI模型选择和对话历史功能（commit ce89e5fa）
+- 更新 Dockerfile 以替换环境变量，添加对 FileServer 和 OsClientType 的支持；更新 Vite 配置以排除 index.html 的压缩；修改一键编译发布脚本以确保构建镜像时不使用缓存（commit 0d9e02a6）
+- 合并远程 master 分支（commit 5469c064）
+- 重构多个组件的字体大小和边距以保持一致性（commit 97e7c4a9）
+- 调整按钮高度和字体大小以改善样式一致性（commit 1fe461d1）
+- 优化移动端样式，调整多个组件的内边距以提升用户体验（commit 5f0454c8）
+- 调整菜单标题字体大小为12px，优化样式一致性；为小屏幕添加表单内边距以改善用户体验（commit 02095bcc）
+- 优化样式，调整多个组件的内边距和填充以提升一致性和用户体验（commit 88e5f7d7）
+- 移除菜单项底部填充样式以改善布局一致性（commit fe606409）
+- 解锁页面滚动，优化加载完成后的用户体验（commit 3b148979）
+- 优化加载完成后的页面解锁逻辑，增强兼容性和用户体验（commit 96c54228）
+- 禁用 Brotli 和 Gzip 压缩，改由服务端 nginx 处理，简化本地开发配置（commit d12751e9）
+- 更新 microi.loading.js 脚本注释，添加修改提示以防止浏览器缓存问题（commit 28d342b9）
+- 添加 iOS Web App 支持和主屏幕指引，优化用户体验（commit 65e01623）
+- 调整 el-dialog 最大宽度至 96%，优化对话框显示效果（commit 5420a938）
+- 优化 DiyTableRowPageSize 的默认值获取逻辑，增强缓存处理和兼容性（commit 82733b02）
+- 调整 iOS 检测逻辑，注释掉 PWA 主屏幕模式判断（commit 90e47921）
+- 优化 DiyTableRowPageSize 的默认值设置，简化逻辑（commit a614472f）
 
-- 2026-04-02：Microi.net：新增：更新版本号至5.1.5（commit e00e794）
-- 2026-04-02：Microi.AI：新增：更新版本号至5.1.5，并优化AI配置管理，减少async方法中的局部变量数量（commit f17c8b5）
+## v5.3.5 - (2026-04-23 15:51)
 
-## v5.1.3
+- 更新所有项目版本号至 5.3.5，并添加 MQTT 设备级 ApiEngineId 缓存及日志功能（commit feb6eec6）
 
-更新日期：2026-04-02 14:17
+## v5.3.4 - (2026-04-23 12:24)
 
-- 2026-04-02：将所有相关组件版本更新至5.1.3，添加Docker镜像推送选项及官方网站文档发布功能（commit 03325439）
+- 在应用启动时初始化主题系统，并在 App.vue 中显示事件（commit 7fce850b）
+- 更新所有项目版本号至 5.3.4（commit 3f6c2e7f）
 
-- 2026-04-02：Microi.net：新增：更新版本号至5.1.3（commit 6a39d26）
-- 2026-04-02：Microi.AI：更新版本号至5.1.3（commit 551f2ef）
+- Microi.AI：新增：更新版本号至5.3.4（commit a1014ef）
+- Microi.net：新增：更新版本号至5.3.4，新增 OsClient 方法以支持占位模型检测和主租户加载验证（commit 99c2bca）
 
-## v5.1.2
+## v5.3.5 - (2026-04-23)
 
-更新日期：2026-04-02 12:33
+- Microi.VSCode：新增：增加对数据库模式的 Markdown 文件支持，并优化 API 文件命名（commit f3e8e64）
+- 完善tab初始值，PC配置页面初始值和列表工作台调整（commit c84d4653）
+- 合并远程 master 分支（commit ee74b385）
+- 完善tab初始值，PC配置页面初始值和列表工作台调整（commit 622a4946）
+- !82 完善tab初始值，PC配置页面初始值和列表工作台调整（commit 8105f2f3）
 
-- 2026-03-31：修复移动端按钮显示逻辑，确保在小程序和手机视图下的功能完整性（commit e54b13ea）
-- 2026-03-31：修改了详情页顶部按钮，推送自己仓库好拉取周总仓库（commit a5c7c33f）
-- 2026-03-31：修改了详情页顶部按钮，图片预览问题（commit cbf57d96）
-- 2026-03-31：!72 修改了详情页顶部按钮，图片预览问题（commit 5b3fb281）
-- 2026-03-31：为系统日志页面添加分步耗时解析功能，优化内容展示（commit 584d98bd）
-- 2026-03-31：恢复PC端返回按钮（commit 43b3389d）
-- 2026-04-01：合并远程 master 分支（commit 6374ed8f）
-- 2026-04-01：在UserBar组件中添加密码设置功能（commit 2174eade）
-- 2026-04-01：全分享、批量删除按钮条件加到最外层元素，移动端更多搜索显隐改变，但更多搜索条件和外层移动端搜索条件还没有同步（commit e1ca3847）
-- 2026-04-01：合并远程 master 分支（commit dd4f33d9）
-- 2026-04-02：壮举：添加micro -offline-prepare.sh脚本，用于创建离线安装包（commit 8e0309f7）
-- 2026-04-02：将所有相关组件版本更新至5.1.2，确保一致性（commit a96d55d4）
+## v5.3.4 - (2026-04-22)
 
-- 2026-04-01：Microi.VSCode：新增：增强 Claude Code 安装路径检测和环境状态显示（commit 387e87f）
-- 2026-04-01：Microi.VSCode：新增：删除 v8-engine 1.1.7 的安装包（commit 3c0e58c）
-- 2026-04-01：Microi.net：增强租户开通与 V8 上下文隔离（commit d911adc）
-- 2026-04-01：Microi.VSCode：新增：更新 package.json 版本至 1.4.8，并增强设置面板的 Claude Code 状态显示和模型配置引导（commit 309a32e）
-- 2026-04-02：Microi.VSCode：新增：更新 package.json 版本至 1.4.9，并增强设置面板的 Claude Code 模型切换提示和环境变量管理（commit 49537ff）
-- 2026-04-02：Microi.net：新增（TenantProvisioningService）：添加从CDN下载空库SQL文件的功能，优化导入逻辑（commit ff8c8c4）
-- 2026-04-02：Microi.AI：新增 Microi V8 引擎安全最佳实践，涵盖 SQL 注入防护、权限校验、输入校验、XSS 防护和敏感数据处理（commit 9600860）
-- 2026-04-02：Microi.AI：更新版本号至5.1.2（commit d0d238c）
-- 2026-04-02：Microi.net：新增：更新版本号至5.1.2（commit 6b51341）
+- 修改列表字段和列表样式，小程序分享功能待完善，电脑无法打开分享链接（commit 949b19da）
+- 重构安装脚本并更新数据库文件（commit 411f50f6）
+- !81 修改列表字段和列表样式，小程序分享功能待完善，电脑无法打开分享链接（commit de53c63a）
 
-## v5.0.9
+## v5.3.4 - (2026-04-21)
 
-更新日期：2026-04-01 11:26
+- 处理打开抽屉内表格更多按钮弹框无法关闭的问题（commit 0a875bb2）
 
-- 2026-04-01：Microi.AI：更新版本号至5.0.9（commit 2f762b1）
+## v5.3.3 - (2026-04-20 02:13)
 
-## v5.0.8
+- 添加 MCI 设计系统全局样式，支持明暗主题（commit 909b1050）
+- 更新版本号至 5.3.3，确保所有相关项目一致性（commit d300957c）
 
-更新日期：2026-03-31 13:02
+- Microi.net：新增：更新版本号至5.3.3，并优化级联选择器和树形选择器的默认字段配置（commit d87ef03）
+- Microi.AI：新增：更新版本号至5.3.3（commit 15fdc99）
 
-- 2026-03-31：将项目版本更新到5.0.8，确保所有相关组件一致性（commit 3807a3d0）
+## v5.3.3 - (2026-04-20)
 
-## v5.0.7
+- 整理已归档目录（commit 234436be）
+- 修改页面初始值和页面布局（commit 3c16fb25）
 
-更新日期：2026-03-31 05:08
+## v5.3.3 - (2026-04-19)
 
-- 2026-03-30：安全：修复 CVE-2025-58754 - 升级 axios 至 ^0.30.2 至 防止 数据: scheme 拒绝服务漏洞（commit cd2b2200）
-- 2026-03-30：!70 AI 队友自动生成：[Security-高危] CVE-2025-58754 - Axios 安全漏洞（commit 69d7e9e4）
-- 2026-03-30：安全：修复 CVE-2023-44270 - PostCSS 注入漏洞（commit be634b4b）
-- 2026-03-30：!69 修复新增按钮展示位置（commit af1714bc）
-- 2026-03-30：!71 AI 队友自动生成：[Security-中危] CVE-2023-44270 - PostCSS 注入漏洞（commit 0d6a200a）
-- 2026-03-31：为Microi低代码平台的本地设置和部署添加文档（commit 99af0c86）
-- 2026-03-31：将项目版本更新到5.0.7，并添加数据库结构文档和相关说明（commit c92ca20c）
+- 修改：更新 .gitignore 文件以添加新目录，增强 home-glow.scss 中第5个按钮的样式，更新 index.md 以添加新的视频下载器链接（commit 4f34c6cc）
+- !80 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit d4356bf9）
+- 修复：更新 AMap API key placeholder 在 组件.js（commit 1e9d7f2f）
+- 合并远程 master 分支（commit 5858cd29）
 
-- 2026-03-29：Microi.VSCode：增强设置面板的 Claude Code 管理，并新增接口引擎创建面板（commit d754078）
-- 2026-03-31：Microi.VSCode：新增：更新 package.json 版本至 1.4.5，并增强设置面板的 Claude Code 安装和检测功能（commit b7b456c）
+## v5.3.2 - (2026-04-17 06:12)
 
-## v5.0.6
+- - **新增**：增强表单组件的数据加载能力，防止重复请求 - 在 `SetFieldData` 和 `GetFieldsData` 方法中增加加载状态管理，避免并发请求。- 更新 `diy-cascader` 和 `diy-select-tree` 组件，确保 `Config` 属性已初始化，避免出现未定义错误。- 优化 `diy-select-tree` 中的树形结构处理，保证数据嵌套正确。- **重构**：调整 `diy-form-full` 在新增条目时复用 `TableRowId`，避免不必要的 API 调用。- **调整**：优化 `diy-form` 的自动初始化逻辑，防止特定模式下出现重复请求。- **优化**：改进 `diy-表` 的移动端搜索界面，提升用户体验。- **版本更新**：将多个项目中的 Microi.net 版本统一升级至 5.3.2。- **配置调整**：修改开发环境的启动配置。（commit 280c0719）
 
-更新日期：2026-03-30 20:49
+- Microi.AI：新增：更新版本号至5.3.2（commit 1f596ac）
+- Microi.net：新增：更新版本号至5.3.2，并修复树形结构和Where条件的处理逻辑（commit 47ed0dc）
 
-- 2026-03-30：主要处理合并冲突的问题上传（commit 759d0c08）
-- 2026-03-30：合并远程 master 分支（commit 64a6afc8）
-- 2026-03-30：修复新增按钮展示位置（commit e6673b62）
-- 2026-03-30：下午修改详情页，待完善（commit 56d17ec4）
-- 2026-03-30：跨多个项目将版本升级到5.0.6，并更新页面引擎功能的API（commit b1dcf3d3）
+## v5.3.2 - (2026-04-17)
 
-## v5.0.5
+- **修改**：在多个组件中禁用自动初始化（AutoInit），以支持手动调用初始化逻辑（commit dbe06b9f）
+- 新增：支持懒加载和远程搜索功能，优化树形选择组件的数据处理（commit 53900465）
+- 修改：更新多个文件以添加新的数据库结构文件，优化登录和聊天功能的连接状态管理（commit 6abeb30d）
+- 完善好H5处理抽屉/对话框返回bug，但小程序最后一层抽屉时任然不行（commit a56064e5）
+- 合并远程 master 分支（commit fddadb90）
 
-更新日期：2026-03-30 13:06
+## v5.3.1 - (2026-04-16)
 
-- 2026-03-29：在sidebar.scss中为链接添加text-decoration: none;样式（commit 74b33ea7）
-- 2026-03-29：壮举：为具有TAB功能的表单设计器添加面板选项卡组件（commit 56d28aa8）
-- 2026-03-29：调整接口引擎相关表单项，优化数据接口填充逻辑（commit fae28f31）
-- 2026-03-30：同步已选中数据源项状态，优化表格数据管理逻辑（commit 30fb9ac9）
-- 2026-03-30：将项目版本更新到5.0.5，修改启动设置，并使用AI集成指南和页面和打印引擎的新技能增强文档。（commit 44f8e7db）
+- 完善好售后和设备tabs，先上传好PR（commit d6bcef6d）
+- !78 完善好售后和设备tabs，先上传好PR（commit 29a86949）
+- 处理抽屉/对话框返回bug（commit fbb674ff）
+- 合并远程 master 分支（commit 15a61790）
+- !79 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit 85cb7b62）
 
-- 2026-03-29：Microi.VSCode：新增：更新模型管理功能，支持 Claude Code 模型的添加、编辑和删除 工程维护：更新版本至 1.3.6，添加 publish-tokens.json 文件 重构：修改路径结构以支持中文目录名（commit e8d6452）
+## v5.3.1 - (2026-04-15)
 
-## v5.0.3
+- 优化移动端样式，调整组件布局和样式，增强用户体验（commit fe420135）
+- 优化移动端界面，添加FAB浮动操作按钮并调整按钮显示逻辑，提升用户体验（commit 8f1fe21e）
+- 优化移动端FAB浮动操作按钮显示逻辑，移除对小程序的限制，提升用户体验（commit dbd6d1d2）
+- 优化搜索框显示逻辑，移除对移动端视图的限制，提升用户体验（commit ead411ab）
+- 完善好售后和设备tabs（commit a0006a6c）
+- 完善好售后和设备tabs，先上传好PR（commit a7924123）
 
-更新日期：2026-03-28 23:37
+## v5.3.1 - (2026-04-14)
 
-- 2026-03-28：更改微型客户端服务名称和映像，更新安装脚本以反映新配置（commit b95ee290）
-- 2026-03-28：移除MQTT消息接收处理中的调试输出（commit 67eebb13）
-- 2026-03-28：壮举：增加了导入-软件包.js的导出支持，并改进了日志记录（commit 1c130a35）
-- 2026-03-28：增加大盟、KingBase和PostgreSQL的数据库服务实现（commit d93f469d）
-- 2026-03-28：更新launchSettings.json中的ASPNETCORE_ENVIRONMENT变量为iTdos（commit 3ddd9663）
-- 2026-03-28：更新所有项目版本号至5.0.3（commit 39713f29）
+- 优化移动端组件，使用el-tree-select替代el-cascader，调整样式以提升用户体验（commit 4a4889bd）
+- 优化移动端界面，移除不必要的元素并实现FAB浮动操作按钮（commit 3469687d）
+- 优化移动端样式，调整按钮圆角和搜索组件布局，增强用户体验（commit 264085f5）
+- 合并远程 master 分支（commit 579b76ab）
+- 修改了售后任务tab（commit 9534fbbf）
+- 调试好售后tabs（commit db89279f）
 
-- 2026-03-28：Microi.net：表单引擎新增数据写入辅助方法，支持自动编号生成、唯一字段校验和 SQL 构建（commit 7382e7c）
-- 2026-03-28：Microi.net：新增（FormEngine）：优化自动编号生成逻辑，使用Redis计数器避免编号重复，增强文档说明（commit cfe5eb7）
-- 2026-03-29：Microi.net：新增：更新版本号至5.0.3（commit c302c9e）
-- 2026-03-29：Microi.AI：更新版本号至5.0.3（commit 093b3a5）
+## v5.3.0 - (2026-04-13 04:01)
 
-## v5.0.2
+- 特性：版本升级至 5.3.0 并优化工作流移动端界面（commit 9fd639bf）
 
-更新日期：2026-03-28 18:26
+- Microi.AI：新增：更新版本号至5.3.0（commit 906f8e6）
+- Microi.net：新增：更新版本号至5.3.0（commit 06b1f73）
 
-- 2026-03-28：Microi.net：新增：更新表单操作日志，使用表名替代原有字段名，优化慢执行警告信息（commit 8139c94）
-- 2026-03-28：Microi.AI：优化日志输出格式，添加时间戳和统一前缀（commit 86c4cc7）
-- 2026-03-28：Microi.net：新增：添加获取表别名和SQL前缀处理方法，优化字段查询逻辑（commit c7a003d）
-- 2026-03-28：Microi.net：新增：优化数据库字段类型处理，增强SQL生成逻辑，支持显式别名和ORDER BY子句附加（commit 5016efb）
-- 2026-03-28：Microi.AI：更新版本号至5.0.2（commit 074f5fc）
-- 2026-03-28：Microi.net：新增：更新版本号至5.0.2（commit 15310a2）
+## v5.3.0 - (2026-04-13)
 
-## v5.0.1
+- 合并远程 master 分支（commit 13b2f802）
+- 实现移动端悬浮操作按钮（FAB）（commit 51545b2c）
+- 优化工作流页面布局，使用el-row和el-col组件替代传统div结构（commit b995e816）
+- 合并远程 master 分支（commit db6b3dc2）
 
-更新日期：2026-03-28 00:57
+## v5.3.0 - (2026-04-11)
 
-- 2026-03-27：壮举：使用综合指标实现系统监控功能（commit 4ca047ab）
-- 2026-03-28：壮举：将Microi.net版本更新到5.0.1，并添加API调用计数跟踪（commit 9e4000e1）
+- 特性：为 HDFS 实现文件管理 API（commit dbe9eca7）
 
-- 2026-03-27：Microi.net：增强 V8 事件日志与慢 SQL 执行跟踪（commit db8b5f1）
-- 2026-03-28：Microi.net：新增：增加异步记录接口调用次数和日志功能，更新版本号至5.0.1（commit 5a6e86b）
-- 2026-03-28：Microi.AI：更新版本号至5.0.1（commit 2252802）
+## v5.2.9 - (2026-04-10 12:34)
 
-## v5.0.0
+- 版本升级至 5.2.9，更新多个组件的版本号（commit f4718f41）
 
-更新日期：2026-03-27 23:47
+- Microi.net：新增：更新版本号至5.2.9（commit 3aac4ef）
+- Microi.AI：新增：更新版本号至5.2.9（commit 61aefac）
 
-- 2026-03-27：Microi.AI：更新版本号至5.0.0（commit 7f6b707）
+## v5.2.9 - (2026-04-10)
 
-## v4.9.9
+- !76 修复新增按钮展示（commit 55749a77）
+- 合并远程 master 分支（commit 7d06f1fd）
+- 权限修改（commit e1148763）
+- 合并远程 master 分支（commit 04ce2122）
 
-更新日期：2026-03-27 15:14
+## v5.2.8 - (2026-04-09 17:26)
 
-- 2026-03-27：删除微型页面引擎和打印引擎子项目（commit 0c8d670a）
-- 2026-03-27：更新版本至4.9.9，修改多个项目文件以反映新版本（commit 6be8fad3）
+- 完善好地区树形选择和片区管理新增数据后列表不更新问题（commit 081f881b）
+- 修复新增按钮展示（commit 2456ff2c）
+- 修复新增按钮展示（commit 36653151）
+- 功能：将版本更新至 5.2.8 并增强全屏功能（commit 9f6014c7）
 
-- 2026-03-27：Microi.AI：更新版本号至4.9.9（commit ea4633d）
+- Microi.AI：新增：更新版本号至5.2.8（commit fc536f6）
+- Microi.net：新增：更新版本号至5.2.8，并在加密脚本中添加加密指纹标记功能（commit fdaed74）
 
-## v4.9.8
+## v5.2.8 - (2026-04-09)
 
-更新日期：2026-03-26 22:26
+- 注释权限问题（commit 64ef539e）
+- 合并远程 master 分支（commit 10cdce67）
 
-- 2026-03-26：更新版本至4.9.8，修改多个项目文件以反映新版本（commit b04ce660）
+## v5.2.3 - (2026-04-08 11:57)
 
-- 2026-03-27：Microi.net：发布版本 v4.9.8（commit 8d64cea）
-- 2026-03-27：Microi.AI：更新版本号至4.9.8，并优化授权检查提示信息（commit af186ac）
+- 版本升级至5.2.3，并为Dos.ORM增加异步数据检索方法（commit e7621929）
 
-## v4.9.7
+- Microi.AI：新增：更新版本号至5.2.3（commit 2213a48）
+- Microi.net：新增：更新版本号至5.2.3，增强 SQL 注入防护和字段名校验（commit 2c16e8b）
 
-更新日期：2026-03-26 19:56
+## v5.2.3 - (2026-04-08)
 
-- 2026-03-26：壮举：更新版本到4.9.7，并为许可证申请添加验证码功能（commit 6d378a8d）
+- 将级联选择器改为树形选择器（commit 3c5e0d71）
+- PC保存级联选择器，移动使用树形选择器（commit 6be08662）
+- 合并远程 master 分支（commit d75338fe）
 
-## v4.9.6
+## v5.2.0 - (2026-04-07 16:48)
 
-更新日期：2026-03-26 16:30
+- Microi.AI：新增：更新版本号至5.2.0（commit fa4b284）
+- Microi.net：重构数据库事务处理，并将版本更新至 5.2.0（commit 4d08735）
 
-- 2026-03-26：更新：在NuGet包替换过程中添加替换前后文件大小的输出信息（commit 1c76cbd5）
-- 2026-03-26：更新版本至4.9.6，修改多个项目文件以反映新版本，更新一键编译发布脚本中的开源地址（commit f1ca3641）
+## v5.1.9 - (2026-04-07 00:58)
 
-## v4.9.5
+- 更新 launchSettings.json 中的 ASPNETCORE_ENVIRONMENT 为 'chongshi'（commit 0e5ca617）
+- 更新项目版本至 5.1.9 （多个 Microi.Server 组件）（commit 2af1ff1e）
 
-更新日期：2026-03-26 14:35
+- Microi.AI：新增：更新版本号至5.1.9（commit c7ac274）
+- Microi.net：新增：更新版本号至5.1.9，添加 Windows 路径转换功能以支持 .NET 工具（commit 095f8f0）
 
-- 2026-03-26：更新项目版本至 4.9.5；增强 LicenseController 自动获取 IP 的能力；删除过时的发布脚本；新增包含 Docker 与 NuGet 配置的完整构建发布脚本（commit bdb11d8f）
+## v5.2.0 - (2026-04-07)
 
-## v4.9.3
+- 合并远程 master 分支（commit 1fdabdf1）
+- 特性：为ORM实现PostgreSQL和SQL Server服务（commit ebb6fca2）
+- 合并远程 master 分支（commit 3c9cc2e4）
+- 修改级联选择器超屏幕问题（commit d6b66ec9）
 
-更新日期：2026-03-26 07:08
+## v5.1.9 - (2026-04-06)
 
-- 2026-03-26：更新版本至4.9.3，添加生成ULID的方法，更新文档以反映新功能（commit c84060c9）
+- 新增 Docker 容器监控功能，获取容器统计信息并展示在系统监控界面（commit d5263710）
+- 更新 launchSettings.json 至 修改 ASPNETCORE_ENVIRONMENT 至 'iTdos'（commit 7cc84fb0）
 
-- 2026-03-26：Microi.net：发布版本 v4.9.3（commit 1fddb21）
+## v5.1.9 - (2026-04-05)
 
-## v4.9.1
+- 添加 @vitejs/plugin-basic-ssl 依赖；调整预览样式为 100vh 和 100vw；更新 Vite 配置以支持 HTTPS 自签名证书（commit eaf4e84b）
+- 更新构建脚本以使用 cross-env 设置环境变量；新增 cross-env 依赖（commit ff9f650e）
+- 注释掉 DiyDocumentParam 类中的 _Top 属性（commit d8889a51）
 
-更新日期：2026-03-25 22:56
+## v5.1.8 - (2026-04-04 00:39)
 
-- 2026-03-24：更新：修正.gitignore文件中的路径格式（commit 613720f4）
-- 2026-03-24：将microi.web修改为Microi.Client（commit 4118773a）
-- 2026-03-24：新增：添加Dockerfile、.gitignore和发布脚本，更新Nginx配置，删除不再使用的子项目（commit d6a1f847）
-- 2026-03-24：更新：调整.gitignore文件，添加对Microi.Server/Microi.AI和Microi.Server/Microi.net目录的忽略规则（commit e25ee80e）
-- 2026-03-24：重构：将 hbuilder-app 移至根目录并更名为 microi.app，更新所有文档和 README 引用（commit 88cd088e）
-- 2026-03-24：壮举：为代码插装和安全序列化添加V8McpService（commit ad370db3）
-- 2026-03-24：更新：修改首页tagline，增加对MCP和Skills的支持描述（commit b9081b60）
-- 2026-03-24：更新：修改README和文档首页描述，增加对MCP和Skills的支持信息（commit 5082feb4）
-- 2026-03-24：更新：从解决方案中移除Microi.AI项目及其配置（commit 909aabc3）
-- 2026-03-24：更新：修改文档中的开源时间为2025年，更新.gitignore以允许跟踪特定配置文件（commit c145077f）
-- 2026-03-24：增强Microi平台的文档：更新索引。md具有新的品牌和功能描述，包括V8引擎集成和改进的AI编程能力。（commit b90ddda3）
-- 2026-03-24：更新：在文档中添加新的预览图像以增强视觉效果（commit 7fea5254）
-- 2026-03-24：更新：修复README和索引文档中的预览图像格式（commit 2a00098d）
-- 2026-03-24：更新：从文档中移除多余的空图像行以优化布局（commit a0f77a58）
-- 2026-03-25：更新v4.9.1（commit 33ff6e8b）
+- Microi.AI：新增：更新版本号至5.1.8，优化AI配置管理，减少动态类型使用，提升代码安全性和可维护性（commit 41cc3e3）
+- Microi.net：新增：更新版本号至5.1.8，统一关闭 HidePrivateApi 设置以避免 DLR 运行时错误（commit 6121165）
 
-- 2026-03-24：Microi.VSCode：工程维护：版本更新至 1.3.4，并增强 MCP 服务器配置（commit 644d058）
-- 2026-03-25：Microi.net：全新授权机制（commit 51a9ec8）
-- 2026-03-25：Microi.net：发布版本 v4.9.1（commit 5493acf）
-- 2026-03-25：Microi.AI：更新版本号至4.9.1（commit 888d61e）
+## v5.1.8 - (2026-04-04)
 
-## v4.8.4
+- 壮举：添加3D模型加载器和预置场景配置（commit 9548c6c0）
+- 合并远程 master 分支（commit 5c5d56af）
+- 优化数据库提供程序缓存机制，使用并发字典替代普通字典以提高线程安全性（commit 97d8b406）
+- 合并远程 master 分支（commit 576cf6a3）
+- 壮举：将Microi 3D引擎升级到具有新功能的V3（commit 006f6f3a）
+- 合并远程 master 分支（commit 922eac47）
+- 更新路径编译方法，使用新的导入方式；调整样式设置以优化预览效果；修改环境变量配置为renyiPro（commit fc40992c）
+- 删除子模块 任亿3D数字孪生（commit aa1a96c0）
+- 更新 .gitignore 文件以包含任亿3D数字孪生；优化首页特色卡片样式，增强视觉效果（commit b31d7a0d）
+- 增强发布助手功能，新增官方网站文档编译选项；优化聊天组件和产品展示样式，提升视觉效果（commit 40979d95）
 
-更新日期：2026-03-24 15:44
+## v5.1.8 - (2026-04-03)
 
-- 2026-03-20：Microi.net：工程维护（commit 015fcd7）
-- 2026-03-24：Microi.AI：更新版本号至4.8.4（commit 726af1f）
-- 2026-03-24：Microi.net：发布版本 v4.8.4（commit 2e27507）
+- 修改日历超屏幕问题（commit 3e89e026）
+- 安全：修复 CVE-2024-22262 - 新增 URL 校验 至 防止 开放重定向/SSRF（commit ffd4e730）
+- !74 AI 队友自动生成：修复 CVE-2024-22262: Spring Framework UriComponentsBuilder 安全漏洞（commit 0bf87317）
+- 安全：修复 CVE-2024-45296 - 升级 path-至-regexp 至 v6.3.0（commit 97f7f382）
+- !75 AI 队友自动生成：[Security-高危] CVE-2024-45296 - Path-至-RegExp 安全漏洞修复（commit 7cea9b82）
+- Microi.VSCode：新增：更新 package.json 版本至 1.5.5，并增强设置面板的环境变量管理和用户提示（commit b477a97）
+- Microi.VSCode：新增：更新 package.json 版本至 1.5.7，并优化发布脚本以使用 npx 调用 ovsx（commit 563476f）
 
-## v4.8.3
+## v5.1.7 - (2026-04-02 18:15)
 
-更新日期：2026-03-24 01:12
+- 将页面搜索条件合并同步，联动搜索完成，时间选择超出页面待完善（commit 0a7f31fb）
+- 将页面搜索条件合并同步，联动搜索完成，时间选择超出页面待完善（commit e945d391）
+- 合并远程 master 分支（commit 58a46923）
+- 将所有相关组件版本更新至5.1.7，修复Unity WebGL上下文管理及Blob URL处理（commit b330bcd6）
 
-- 2026-03-19：禁止接口引擎、V8事件代码中提交/回滚事务，由平台全面自动接管（commit d41162fb）
-- 2026-03-20：优化表内编辑字段判断逻辑，新增 IsInTableEditField 方法以支持多种字段格式（commit 10fb020c）
-- 2026-03-20：壮举：增强了系统中的卡片显示和权限管理（commit d645d14f）
-- 2026-03-20：新增手机号授权登录功能，优化未绑定用户的注册流程（commit 45a388e4）
-- 2026-03-20：安全：修复 CVE-2023-45857 - 升级 axios 从 0.18.1 至 0.28.0（commit f6d90fe6）
-- 2026-03-20：!64 AI 队友自动生成：修复 CVE-2023-45857 - Axios 安全漏洞（commit 544f1028）
-- 2026-03-21：完善 AiController，新增用户订阅管理功能，优化 API 代理转发逻辑（commit 908cdc3b）
-- 2026-03-21：合并远程 master 分支（commit afb4cd93）
-- 2026-03-21：归档不再维护的开源项目（commit 7489afdf）
-- 2026-03-21：合并远程 master 分支（commit 076ce140）
-- 2026-03-21：新增接口引擎创建功能，更新环境变量配置（commit 6db80700）
-- 2026-03-21：壮举：为WebSocket中间件和核心服务添加V8调试支持（commit 3b88d2af）
-- 2026-03-21：更新 AI 编程全指南，合并相关文档并优化内容结构，增强用户体验（commit b8defe37）
-- 2026-03-21：新增支持WebSocket端口的MQTT服务选项，优化启动日志输出（commit 70110b0a）
-- 2026-03-21：优化MQTT服务启动逻辑，移除WebSocket端口配置，简化选项创建（commit 055801be）
-- 2026-03-22：新增3D背景组件，优化主页视觉效果，更新依赖项（commit 763d2905）
-- 2026-03-22：修复：优化el-select组件，确保SQL/DataSource/ApiEngine数据源的字符串值转换为对象，增强选项存在性检查（commit 0f005036）
-- 2026-03-22：新增：创建HeroTitle3D组件，增强主页3D标题效果，优化视觉表现（commit e8aa2411）
-- 2026-03-22：新增：为VPHero组件的名称添加高度样式，优化视觉效果（commit f4942922）
-- 2026-03-22：壮举：更新翻译流程并添加新的文档（commit 1b8753c6）
-- 2026-03-22：重构代码结构以提高可读性和可维护性（commit dbff5f4e）
-- 2026-03-23：更新文档：将“免费试用”改为“在线使用”，并在Docker部署文档中添加一键安装说明（commit 1c7faf28）
-- 2026-03-23：壮举：为V8引擎添加Microi技能文档和实现（commit 612cdf8c）
-- 2026-03-23：新增：添加V8引擎API知识库文档和Copilot指令文件（commit aa586b26）
-- 2026-03-23：壮举：更新V8引擎集成，并添加MongoDB和MQTT技能（commit f77fc964）
-- 2026-03-23：更新：重构V8引擎API知识库文档，添加接口引擎和CRUD操作示例（commit 14f9ddb9）
-- 2026-03-24：跨多个项目将版本升级到4.8.3，并为VS Code插件集成更新README（commit 36368a60）
+## v5.1.5 - (2026-04-02 15:28)
 
-- 2026-03-20：Microi.AI：工程维护（commit bc20bdb）
-- 2026-03-21：Microi.AI：新增：新增 SubscriptionService，用于管理订阅、订单及 API 密钥，支持多服务商（commit 07f49c2）
-- 2026-03-21：Microi.VSCode：Microi吾码 - V8引擎 VS Code 插件（commit 2affc3b）
-- 2026-03-21：Microi.VSCode：重构代码结构以提高可读性和可维护性（commit ebfe7f2）
-- 2026-03-21：Microi.VSCode：新增：重构配置和同步管理（commit 2c547f5）
-- 2026-03-21：Microi.VSCode：新增：增强引擎文件处理和添加数据库模式同步（commit 90b4b27）
-- 2026-03-21：Microi.AI：增强V8引擎和API引擎的文档（commit dd98464）
-- 2026-03-21：Microi.VSCode：更新 README.md，增强 AI 辅助编程功能描述，添加工作原理和使用说明（commit 8afc854）
-- 2026-03-21：Microi.VSCode：重构代码结构以提高可读性和可维护性（commit 2d2e3ba）
-- 2026-03-22：Microi.VSCode：添加3D效果（commit b71fa3c）
-- 2026-03-22：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit b3022d8）
-- 2026-03-22：Microi.VSCode：工程维护：清理代码结构并删除未使用的导入（commit be68aa2）
-- 2026-03-23：Microi.VSCode：重构代码结构以提高可读性和可维护性（commit aa35b01）
-- 2026-03-23：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 6ee6679）
-- 2026-03-23：Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 06fb38e）
-- 2026-03-23：Microi.VSCode：删除过时的 v8 引擎版本文件（commit 5f56b14）
-- 2026-03-24：Microi.VSCode：增强 MCP 配置与 Token 管理（commit 6b30895）
-- 2026-03-24：Microi.VSCode：工程维护：package.json 版本更新至 1.3.0（commit a9cef4f）
-- 2026-03-24：Microi.AI：更新版本号至4.8.3（commit 00a87b4）
+- 将所有相关组件版本更新至5.1.5，添加AI模型选择和对话历史功能（commit ce89e5fa）
 
-## v4.8.1
+- Microi.net：新增：更新版本号至5.1.5（commit e00e794）
+- Microi.AI：新增：更新版本号至5.1.5，并优化AI配置管理，减少async方法中的局部变量数量（commit f17c8b5）
 
-更新日期：2026-03-18 14:06
+## v5.1.3 - (2026-04-02 14:17)
 
-- 2026-03-15：安全：修复 CVE-2022-48285 - jszip 路径遍历漏洞（commit 00486f91）
-- 2026-03-15：安全：修复 CVE-2022-45143 - Apache Tomcat JsonErrorReportValve 注入漏洞（commit b233d5ea）
-- 2026-03-15：安全：修复 CVE-2023-51074 - Jayway JsonPath 安全漏洞（commit 3cb0b34b）
-- 2026-03-15：!9 AI 队友自动生成：[Security-高危] CVE-2022-48285 - jszip 路径遍历漏洞（commit b0601579）
-- 2026-03-15：!11 AI 队友自动生成：安全修复：CVE-2023-51074 Jayway JsonPath 栈溢出漏洞（commit 1cb7cd91）
-- 2026-03-15：!10 AI 队友自动生成：[Security-高危] CVE-2022-45143 - Apache Tomcat 注入漏洞（commit 4a56ed64）
-- 2026-03-15：安全：修复 CVE-2024-24549 - Apache Tomcat HTTP/2 拒绝服务漏洞（commit f51aaf60）
-- 2026-03-15：安全：修复 CVE-2022-3509 - 升级 protobuf-java 至 3.21.7（commit b2d92dab）
-- 2026-03-15：!22 AI 队友自动生成：[Security-高危] CVE-2024-24549 - Apache Tomcat 输入验证错误漏洞（commit db94c452）
-- 2026-03-15：将 gitee.com:ITdos/microi.net 的 master 分支合并到 修复-CVE-2022-3509-Gf0y（commit 059133dd）
-- 2026-03-15：!23 AI 队友自动生成：[Security-高危] CVE-2022-3509 - IBM WebSphere Application Server Liberty 安全漏洞（commit 86232005）
-- 2026-03-15：安全：修复 CVE-2021-23370 - 升级 swiper 至 &gt;=6.5.1 至 防止 XSS 漏洞（commit 01a63a43）
-- 2026-03-15：删除无用大文件（commit 5d5f1ccc）
-- 2026-03-15：合并远程 master 分支（commit 274d09c6）
-- 2026-03-15：!63 AI 队友自动生成：[Security-危急] CVE-2021-23370 - Vlad Tansky swiper 安全漏洞（commit d59d7c3a）
-- 2026-03-15：旧项目归档打包（commit ea05c6c2）
-- 2026-03-15：合并远程 master 分支（commit 78e00682）
-- 2026-03-15：工程维护：更新 .gitignore，忽略构建产物目录和大二进制文件（commit d5204d98）
-- 2026-03-15：anderson（commit a606e0f0）
-- 2026-03-16：更新 Microi.OpenClaw 吾码小龙虾（commit 0781eed3）
-- 2026-03-16：更新官网（commit c7dc8d4e）
-- 2026-03-17：批量更新文档（commit 13c12c4a）
-- 2026-03-18：优化聊天系统、优化移动端（commit 8087e783）
-- 2026-03-18：更新v4.8.1（commit 8d00b5de）
+- 将所有相关组件版本更新至5.1.3，添加Docker镜像推送选项及官方网站文档发布功能（commit 03325439）
 
-## v4.8.0
+- Microi.net：新增：更新版本号至5.1.3（commit 6a39d26）
+- Microi.AI：更新版本号至5.1.3（commit 551f2ef）
 
-更新日期：2026-03-15 09:07
+## v5.1.2 - (2026-04-02 12:33)
 
-- 2026-03-09：优化小程序（commit 35788471）
-- 2026-03-09：完善小程序（commit 349b6696）
-- 2026-03-09：优化移动端页面、修复下拉框表内编辑bug（commit 692bd901）
-- 2026-03-09：优化移动端、小程序（commit 85e4c3d1）
-- 2026-03-10：集成go-view（commit 9b3f4297）
-- 2026-03-10：集成go-view（commit 2a707fd2）
-- 2026-03-10：集成go-view源码并修复bug（commit 4a2147fa）
-- 2026-03-10：修复数据大屏设计器bug（commit 5044bd72）
-- 2026-03-10：优化前端项目构建时间，6分钟降低到3分钟（commit c44a4c43）
-- 2026-03-11：优化数据大屏（commit a9193722）
-- 2026-03-11：修复数据大屏bug（commit c9cd156a）
-- 2026-03-11：优化数据大屏（commit 94d1b38b）
-- 2026-03-11：数据大屏新增Unity WebGL 3D组件（commit 6345f4d0）
-- 2026-03-11：优化数据大屏3D插件（commit 6d759532）
-- 2026-03-12：修复json表格数据源搜索bug（commit bb3533bb）
-- 2026-03-12：修复json表格编辑失去焦点的bug（commit fb8f055f）
-- 2026-03-12：修复搜索不可见bug（commit 8d30336d）
-- 2026-03-12：图片文件上传组件支持保存完整路径、优化平台系统框架（commit ba40f654）
-- 2026-03-12：优化代码编辑器（commit 201ed103）
-- 2026-03-12：修复V8按钮权限bug（commit 56e3ff88）
-- 2026-03-13：修复表格搜索功能bug、优化V8代码编辑器（commit 98bbf71f）
-- 2026-03-13：新增OpenClaw管理平台（commit 384083d6）
-- 2026-03-13：合并远程 master 分支（commit a5b06e9d）
-- 2026-03-13：新增openclaw（commit 26c52dc5）
-- 2026-03-13：合并远程 master 分支（commit 7be39492）
-- 2026-03-13：修复移动端bug（commit 71f10182）
-- 2026-03-15：修复关联表单组件bug（commit e09b6a90）
-- 2026-03-15：更新v4.8.0（commit 334bc59c）
+- 壮举：添加micro -offline-prepare.sh脚本，用于创建离线安装包（commit 8e0309f7）
+- 将所有相关组件版本更新至5.1.2，确保一致性（commit a96d55d4）
 
-## v4.7.9
+- Microi.VSCode：新增：更新 package.json 版本至 1.4.9，并增强设置面板的 Claude Code 模型切换提示和环境变量管理（commit 49537ff）
+- Microi.net：新增（TenantProvisioningService）：添加从CDN下载空库SQL文件的功能，优化导入逻辑（commit ff8c8c4）
+- Microi.AI：新增 Microi V8 引擎安全最佳实践，涵盖 SQL 注入防护、权限校验、输入校验、XSS 防护和敏感数据处理（commit 9600860）
+- Microi.AI：更新版本号至5.1.2（commit d0d238c）
+- Microi.net：新增：更新版本号至5.1.2（commit 6b51341）
 
-更新日期：2026-03-08 23:28
+## v5.1.7 - (2026-04-02)
 
-- 2026-03-04：更新说明（commit ac0d4fa5）
-- 2026-03-04：新增：将 src/config.json 纳入版本库并通过 postinstall 自动忽略本地改动（commit 661540ab）
-- 2026-03-04：更新config规则（commit 0165fefd）
-- 2026-03-05：更新打包apk说明文档（commit df63ea2e）
-- 2026-03-06：[doc]修正前端V8.FieldSet用法说明（commit a9162e20）
-- 2026-03-06：!8 [doc]修正前端V8.FieldSet用法说明 合并拉取请求 !8 从 Cham_Lu/功能/doc（commit 23becc8f）
-- 2026-03-08：优化app打包项目、优化官方文档项目（commit 28008f9d）
-- 2026-03-08：优化移动端页面效果（commit 3581c57d）
-- 2026-03-08：更新v4.7.9，优化架构、新增3D自动转换并预览（commit b49b467c）
+- !73 合并 https://gitee.com/ITdos/microi.net 的 master 分支（commit 3c9e6c98）
 
-## v4.7.8
+## v5.0.9 - (2026-04-01 11:26)
 
-更新日期：2026-03-03 22:02
+- Microi.AI：更新版本号至5.0.9（commit 2f762b1）
 
-- 2026-02-27：修复新版前端不支持V8.ParentV8的bug（commit ffe45668）
-- 2026-02-27：优化前端框架（commit 4f8dfb97）
-- 2026-02-27：优化前端架构（commit fc920a35）
-- 2026-02-27：优化移动端（commit 0a1b6254）
-- 2026-03-01：更新文档（commit 0bc615b9）
-- 2026-03-01：更新文档（commit 1c1236c5）
-- 2026-03-02：优化前端（commit 96a34d54）
-- 2026-03-02：允许局域网网访问前端（commit c08cc3cf）
-- 2026-03-02：修复前端bug（commit 6805aa9e）
-- 2026-03-02：修复批量打印等bug（commit d9f06310）
-- 2026-03-02：优化页面效果（commit 81a3306e）
-- 2026-03-02：优化前端页面效果（commit d7a15469）
-- 2026-03-02：修复apk返回问题、优化前端界面（commit 0331773e）
-- 2026-03-03：修复apk打包bug（commit d8d83659）
-- 2026-03-03：修复apk打包bug（commit 6384da1b）
-- 2026-03-03：修复apk打包后的bug（commit 5060e916）
-- 2026-03-03：彻底修复打包apk后的bug（commit 0dbc0285）
-- 2026-03-03：更新git（commit bff2e71e）
-- 2026-03-03：更新v4.7.8，修复后端模块引擎bug、前端打包apk扫一扫bug（commit 1525e994）
+## v5.0.9 - (2026-04-01)
 
-- 2026-03-06：Microi.net：更新v4.7.8（commit d6aebf1）
-- 2026-03-06：Microi.AI：更新v4.7.8（commit e4f168f）
+- 合并远程 master 分支（commit 6374ed8f）
+- 在UserBar组件中添加密码设置功能（commit 2174eade）
+- 全分享、批量删除按钮条件加到最外层元素，移动端更多搜索显隐改变，但更多搜索条件和外层移动端搜索条件还没有同步（commit e1ca3847）
+- 合并远程 master 分支（commit dd4f33d9）
+- Microi.VSCode：新增：增强 Claude Code 安装路径检测和环境状态显示（commit 387e87f）
+- Microi.VSCode：新增：删除 v8-engine 1.1.7 的安装包（commit 3c0e58c）
+- Microi.net：增强租户开通与 V8 上下文隔离（commit d911adc）
+- Microi.VSCode：新增：更新 package.json 版本至 1.4.8，并增强设置面板的 Claude Code 状态显示和模型配置引导（commit 309a32e）
 
-## v4.7.7
+## v5.0.8 - (2026-03-31 13:02)
 
-更新日期：2026-02-26 08:54
+- 将项目版本更新到5.0.8，确保所有相关组件一致性（commit 3807a3d0）
 
-- 2026-02-11：修复左右树形结构模板bug（commit 7721efe3）
-- 2026-02-11：优化前端框架（commit c6c16fd1）
-- 2026-02-11：优化移动端（commit dbb27d4c）
-- 2026-02-12：优化前端样式（commit b2484b24）
-- 2026-02-17：优化前端（commit 530fd547）
-- 2026-02-24：WebOS源码集成到传统界面中支持切换、新增小程序webview版本、优化前端架构（commit d8843953）
-- 2026-02-24：更新文档（commit 1d5a3ed1）
-- 2026-02-24：更新文档（commit bfaffa9f）
-- 2026-02-24：修复 json表格 添加数据后的提示错误（commit 0da59e7a）
-- 2026-02-25：优化AI编程、完善平台小程序端（commit 7a1247b7）
-- 2026-02-25：修改源码结构（commit b2c1ea1c）
-- 2026-02-25：适配全平台小程序（commit 2d63108a）
-- 2026-02-25：更新文档（commit 73fe3485）
-- 2026-02-26：更新v4.7.7，优化前后端框架，移植并完善旧版移动端的扫一扫、蓝牙打印等功能（commit 81ebb35c）
+## v5.0.7 - (2026-03-31 05:08)
 
-- 2026-02-09：Microi.AI：发布AI编程：新增自然语言转V8引擎代码（commit ea66004）
-- 2026-02-26：Microi.AI：发布版本 v4.7.7（commit 1add39a）
-- 2026-02-26：Microi.net：发布版本 v4.7.7：开源版允许使用工作流了（commit 0e44672）
+- 为Microi低代码平台的本地设置和部署添加文档（commit 99af0c86）
+- 将项目版本更新到5.0.7，并添加数据库结构文档和相关说明（commit c92ca20c）
 
-## v4.7.6
+- Microi.VSCode：新增：更新 package.json 版本至 1.4.5，并增强设置面板的 Claude Code 安装和检测功能（commit b7b456c）
 
-更新日期：2026-02-11 09:44
+## v5.0.8 - (2026-03-31)
 
-- 2026-02-07：临时禁用界面引擎、打印引擎，否则编译打包后会报错（commit c0a3c430）
-- 2026-02-08：优化前端框架（commit cd8bbf4d）
-- 2026-02-08：优化前后端框架（commit 1da7ad04）
-- 2026-02-08：优化前后端框架（commit 326cd7ba）
-- 2026-02-09：修复编译后的无法运行的bug（commit f95ccc3c）
-- 2026-02-09：修改源码目录结构（commit da09f6a8）
-- 2026-02-09：优化前端框架（commit 148d2ee4）
-- 2026-02-09：更新最新版数据库（commit 7e64cf56）
-- 2026-02-09：更新最新版空库（commit 42109f4b）
-- 2026-02-09：修复子表-表单传值bug（commit a0ffb2e0）
-- 2026-02-10：优化前端框架（commit 02489075）
-- 2026-02-10：优化前端框架（commit bb5dfe3e）
-- 2026-02-10：允许跟踪 microi.web/bin/Release 配置文件（commit fc5de550）
-- 2026-02-10：修复: 添加 microi.web/bin/ 例外规则（commit f39b7662）
-- 2026-02-10：使用根路径语法排除 microi.web/bin（commit ce109867）
-- 2026-02-10：调整 microi.web/bin 忽略规则（commit b01a43c1）
-- 2026-02-10：调整 .gitignore: 只跟踪 bin/Release 中的配置文件和 itdos-heart（commit a1e8ec25）
-- 2026-02-10：调整发布文件（commit 62611b15）
-- 2026-02-11：修复阿里云文件上传bug（commit f4d541d9）
-- 2026-02-11：修复图片、文件上传控件bug（commit 9709decc）
-- 2026-02-11：更新v4.7.6，修复新版文件、图片上传等bug（commit 10f5cdd8）
+- 修复移动端按钮显示逻辑，确保在小程序和手机视图下的功能完整性（commit e54b13ea）
+- 修改了详情页顶部按钮，推送自己仓库好拉取周总仓库（commit a5c7c33f）
+- 修改了详情页顶部按钮，图片预览问题（commit cbf57d96）
+- !72 修改了详情页顶部按钮，图片预览问题（commit 5b3fb281）
+- 为系统日志页面添加分步耗时解析功能，优化内容展示（commit 584d98bd）
+- 恢复PC端返回按钮（commit 43b3389d）
 
-## v4.7.5
+## v5.0.6 - (2026-03-30 20:49)
 
-更新日期：2026-02-07 12:43
+- 主要处理合并冲突的问题上传（commit 759d0c08）
+- 合并远程 master 分支（commit 64a6afc8）
+- 修复新增按钮展示位置（commit e6673b62）
+- 下午修改详情页，待完善（commit 56d17ec4）
+- 跨多个项目将版本升级到5.0.6，并更新页面引擎功能的API（commit b1dcf3d3）
 
-- 2026-02-06：编译包含嵌入文件（commit bc7b1747）
-- 2026-02-06：更新文档（commit 270ab5c9）
-- 2026-02-06：优化系统加载效果、优化系统发布后的体积（commit 2965f2f9）
-- 2026-02-06：修复单选框、复选框当数据源为sql或其它动态数据源，加载表单未显示选择项的bug（commit a83f0956）
-- 2026-02-07：更新平台文档、修复模块引擎【不显示列】不生效的bug（commit e15690a5）
-- 2026-02-07：更新v4.7.5，AI编程功能上线（commit eac217dc）
+## v5.0.5 - (2026-03-30 13:06)
 
-- 2026-02-09：Microi.net：发布版本 v4.7.5（commit d5170f8）
+- 同步已选中数据源项状态，优化表格数据管理逻辑（commit 30fb9ac9）
+- 将项目版本更新到5.0.5，修改启动设置，并使用AI集成指南和页面和打印引擎的新技能增强文档。（commit 44f8e7db）
 
-## v4.7.4
+## v5.0.6 - (2026-03-30)
 
-更新日期：2026-02-06 14:15
+- 安全：修复 CVE-2025-58754 - 升级 axios 至 ^0.30.2 至 防止 数据: scheme 拒绝服务漏洞（commit cd2b2200）
+- !70 AI 队友自动生成：[Security-高危] CVE-2025-58754 - Axios 安全漏洞（commit 69d7e9e4）
+- 安全：修复 CVE-2023-44270 - PostCSS 注入漏洞（commit be634b4b）
+- !69 修复新增按钮展示位置（commit af1714bc）
+- !71 AI 队友自动生成：[Security-中危] CVE-2023-44270 - PostCSS 注入漏洞（commit 0d6a200a）
 
-- 2026-02-05：修复表单引擎 关联表单 组件bug（commit 70ae0dbc）
-- 2026-02-06：更新v4.7.4，优化前后端框架、修复bug（commit 8148a144）
+## v5.0.3 - (2026-03-29)
 
-## v4.7.3
+- Microi.VSCode：增强设置面板的 Claude Code 管理，并新增接口引擎创建面板（commit d754078）
+- 在sidebar.scss中为链接添加text-decoration: none;样式（commit 74b33ea7）
+- 壮举：为具有TAB功能的表单设计器添加面板选项卡组件（commit 56d28aa8）
+- 调整接口引擎相关表单项，优化数据接口填充逻辑（commit fae28f31）
+- Microi.VSCode：新增：更新模型管理功能，支持 Claude Code 模型的添加、编辑和删除 工程维护：更新版本至 1.3.6，添加 publish-tokens.json 文件 重构：修改路径结构以支持中文目录名（commit e8d6452）
+- Microi.net：新增：更新版本号至5.0.3（commit c302c9e）
+- Microi.AI：更新版本号至5.0.3（commit 093b3a5）
 
-更新日期：2026-02-05 04:32
+## v5.0.3 - (2026-03-28 23:37)
 
-- 2026-02-04：优化前后端框架（commit 7b3a306b）
-- 2026-02-04：优化应用商城架构（commit afa3a653）
-- 2026-02-04：修复前端/form-page的相关bug（commit f45299f3）
-- 2026-02-05：优化前端框架、优化应用商城（commit 4c2126b6）
-- 2026-02-05：优化前端框架（commit 5afffb3c）
-- 2026-02-05：优化前端框架（commit b8d5642d）
-- 2026-02-05：优化前端框架（commit 3b9f12bc）
-- 2026-02-05：更新v4.7.3，提升应用商城稳定性、优化前端框架（commit 9db05246）
+- 更改微型客户端服务名称和映像，更新安装脚本以反映新配置（commit b95ee290）
+- 移除MQTT消息接收处理中的调试输出（commit 67eebb13）
+- 壮举：增加了导入-软件包.js的导出支持，并改进了日志记录（commit 1c130a35）
+- 增加大盟、KingBase和PostgreSQL的数据库服务实现（commit d93f469d）
+- 更新launchSettings.json中的ASPNETCORE_ENVIRONMENT变量为iTdos（commit 3ddd9663）
+- 更新所有项目版本号至5.0.3（commit 39713f29）
 
-## v4.7.2
+- Microi.net：表单引擎新增数据写入辅助方法，支持自动编号生成、唯一字段校验和 SQL 构建（commit 7382e7c）
+- Microi.net：新增（FormEngine）：优化自动编号生成逻辑，使用Redis计数器避免编号重复，增强文档说明（commit cfe5eb7）
 
-更新日期：2026-02-04 16:02
+## v5.0.2 - (2026-03-28 18:26)
 
-- 2026-02-03：修复后端bug（commit 67d9f3e8）
-- 2026-02-04：现在所有接口同时支持pay-load、form-数据、query了（commit 1de2169b）
-- 2026-02-04：更新v4.7.2，优化应用商城初始化（commit 08b1e49c）
+- Microi.net：新增：更新表单操作日志，使用表名替代原有字段名，优化慢执行警告信息（commit 8139c94）
+- Microi.AI：优化日志输出格式，添加时间戳和统一前缀（commit 86c4cc7）
+- Microi.net：新增：添加获取表别名和SQL前缀处理方法，优化字段查询逻辑（commit c7a003d）
+- Microi.net：新增：优化数据库字段类型处理，增强SQL生成逻辑，支持显式别名和ORDER BY子句附加（commit 5016efb）
+- Microi.AI：更新版本号至5.0.2（commit 074f5fc）
+- Microi.net：新增：更新版本号至5.0.2（commit 15310a2）
 
-## v4.7.1
+## v5.0.1 - (2026-03-28 00:57)
 
-更新日期：2026-02-03 17:45
+- 壮举：将Microi.net版本更新到5.0.1，并添加API调用计数跟踪（commit 9e4000e1）
 
-- 2026-01-31：修复vue3编译后的bug（commit d437e887）
-- 2026-01-31：完善前端系统（commit 869105cf）
-- 2026-02-01：前端框架优化（commit ba1539d7）
-- 2026-02-02：优化前端框架（commit c372880f）
-- 2026-02-02：优化前端框架（commit 27070c02）
-- 2026-02-02：升级前端框架（commit be6130b7）
-- 2026-02-02：优化前端框架（commit 888723d8）
-- 2026-02-02：优化前端框架（commit 47d5b48f）
-- 2026-02-03：优化前端框架（commit 745ffcdc）
-- 2026-02-03：优化前端框架（commit 19b119b0）
-- 2026-02-03：优化前端框架（commit 64e4d1d3）
-- 2026-02-03：修复360极速浏览器样式问题（commit e57bd8c0）
-- 2026-02-03：修复树形选择控件bug（commit d1ca08eb）
-- 2026-02-03：更新v4.7.1，应用商城功能上线（commit a4136bca）
+- Microi.net：新增：增加异步记录接口调用次数和日志功能，更新版本号至5.0.1（commit 5a6e86b）
+- Microi.AI：更新版本号至5.0.1（commit 2252802）
 
-- 2026-01-30：Microi.AI：初始化 Microi.AI 工程（commit eaaa043）
-- 2026-01-30：Microi.AI：向量数据库完善ApiKey、差量同步（commit d56a1d1）
-- 2026-01-31：Microi.AI：自动意图识别（普通聊天 vs 数据查询）（commit 974862b）
-- 2026-01-31：Microi.AI：语义智能识别（commit 2ce8ef9）
-- 2026-02-03：Microi.net：发布版本 v4.7.1（commit d7768f4）
-- 2026-02-03：Microi.AI：发布版本 v4.7.1（commit c1895e8）
+## v5.0.0 - (2026-03-27 23:47)
 
-## v4.7.0
+- Microi.AI：更新版本号至5.0.0（commit 7f6b707）
 
-更新日期：2026-01-31 16:45
+## v4.9.9 - (2026-03-27 15:14)
 
-- 2026-01-27：优化传统界面vue3版本整体样式（commit ab189a5a）
-- 2026-01-28：优化样式（commit 6e243880）
-- 2026-01-28：优化样式（commit e3bb210b）
-- 2026-01-28：优化样式（commit be28bcf6）
-- 2026-01-29：传统界面vue3版本兼容移动端，uni-app移动端不再维护（commit 1b586377）
-- 2026-01-29：优化移动端显示效果（commit 26356389）
-- 2026-01-29：完善vue3（commit f27b1325）
-- 2026-01-29：优化传统界面vue3+兼容移动端（commit 36ac22f9）
-- 2026-01-31：AI数据分析功能上线、参考官方文档部署向量数据库、自动差量同步向量数据库、聊天系统上线、完善传统界面vue3版本、完善移动端版本（commit aaaece54）
-- 2026-01-31：更新v4.7.0：AI数据分析功能上线、参考官方文档部署向量数据库、自动差量同步向量数据库、聊天系统上线、完善传统界面vue3版本、完善移动端版本（commit f3f051be）
+- 删除微型页面引擎和打印引擎子项目（commit 0c8d670a）
+- 更新版本至4.9.9，修改多个项目文件以反映新版本（commit 6be8fad3）
 
-- 2026-01-31：Microi.net：发布版本 v4.7.0（commit 1fa9b2c）
+- Microi.AI：更新版本号至4.9.9（commit ea4633d）
 
-## v4.6.17
+## v4.9.8 - (2026-03-27)
 
-更新日期：2026-01-27 11:25
+- 壮举：使用综合指标实现系统监控功能（commit 4ca047ab）
+- Microi.net：增强 V8 事件日志与慢 SQL 执行跟踪（commit db8b5f1）
+- Microi.net：发布版本 v4.9.8（commit 8d64cea）
+- Microi.AI：更新版本号至4.9.8，并优化授权检查提示信息（commit af186ac）
 
-- 2026-01-27：修复 bug（commit 3483124e）
-- 2026-01-27：更新v4.6.17，修复bug（commit 6cbec4a2）
+## v4.9.8 - (2026-03-26 22:26)
 
-## v4.6.16
+- 更新版本至4.9.8，修改多个项目文件以反映新版本（commit b04ce660）
 
-更新日期：2026-01-27 01:42
+## v4.9.7 - (2026-03-26 19:56)
 
-- 2026-01-25：完善传统界面vue3版本（commit b158b415）
-- 2026-01-25：完善传统界面vue3版本（commit f6c594a9）
-- 2026-01-25：更新文档说明（commit 864a3035）
-- 2026-01-25：更新文档说明（commit 63c8fb1e）
-- 2026-01-25：完善传统界面vue3版本（commit 965e612a）
-- 2026-01-25：完善传统界面vue3版本（commit b5437b41）
-- 2026-01-25：完善传统界面vue3版本（commit 9093cb2e）
-- 2026-01-25：优化样式（commit 0ba68e68）
-- 2026-01-25：完善传统界面vue3版本（commit 2d7e671c）
-- 2026-01-25：优化（commit 353b7170）
-- 2026-01-25：完善传统界面vue3版本（commit 953e7a40）
-- 2026-01-25：合并远程 master 分支（commit 8c75a9b5）
-- 2026-01-26：完善传统界面vue3版本，性能极致优化（commit f1b8cee0）
-- 2026-01-26：完善传统界面vue3版本，体验极致丝滑（commit 601fee56）
-- 2026-01-26：传统界面vue3修复子表、弹出表格bug，优化样式（commit b318978b）
-- 2026-01-26：修复文件柜bug（commit 62c10abd）
-- 2026-01-26：显示文件柜（commit e7bec5ae）
-- 2026-01-26：传统界面vue3文件结构优化，优化本地二次开发时租户切换不方便的问题（commit b0f7f97c）
-- 2026-01-27：更新v4.6.16，修复bug（commit c4498117）
+- 壮举：更新版本到4.9.7，并为许可证申请添加验证码功能（commit 6d378a8d）
 
-## v4.6.15
+## v4.9.6 - (2026-03-26 16:30)
 
-更新日期：2026-01-25 06:27
+- 更新：在NuGet包替换过程中添加替换前后文件大小的输出信息（commit 1c76cbd5）
+- 更新版本至4.9.6，修改多个项目文件以反映新版本，更新一键编译发布脚本中的开源地址（commit f1ca3641）
 
-- 2026-01-23：更新平台文档项目（commit 5bace2f7）
-- 2026-01-23：更新最新版数据库（commit e6463d59）
-- 2026-01-23：传统界面升级至 vue3，完成度 80%，提交git备份下（commit 2282b134）
-- 2026-01-24：请前往系统配置默认语言（commit 2e859c19）
-- 2026-01-24：传统界面升级至 vue3，完成度 95%（commit 452d83b4）
-- 2026-01-24：优化了语言选择，不再从系统设置项配置语言了，默认中文，可以切换英文，其他语言暂时隐藏了，可以切换各种语言。（commit ee8d9d88）
-- 2026-01-24：合并远程 master 分支（commit c887ab7e）
-- 2026-01-24：修复了列表打不开的一些bug（commit f6b1856d）
-- 2026-01-25：传统界面vue3完善（commit d16b1b92）
-- 2026-01-25：从Git中移除src/config.json并添加到.gitignore（commit 3663e019）
-- 2026-01-25：添加 Dockerfile 和 publish-demo.sh 到版本控制（commit 4e3ee842）
-- 2026-01-25：更新 .gitignore，允许提交 bin/Release 下的 Dockerfile 和 publish-demo.sh（commit e799e198）
-- 2026-01-25：更新v4.6.15，完善传统界面vue3，修复后端bug，新增前后端docker发布文件（commit 3246aa4e）
+## v4.9.5 - (2026-03-26 14:35)
 
-- 2026-01-26：Microi.net：发布版本 v4.6.15（commit 839b1df）
+- 更新项目版本至 4.9.5；增强 LicenseController 自动获取 IP 的能力；删除过时的发布脚本；新增包含 Docker 与 NuGet 配置的完整构建发布脚本（commit bdb11d8f）
 
-## v4.6.14
+## v4.9.3 - (2026-03-26 07:08)
 
-更新日期：2026-01-23 12:53
+- 更新版本至4.9.3，添加生成ULID的方法，更新文档以反映新功能（commit c84060c9）
 
-- 2026-01-23：统一一个地方管理ApiBase（commit 3d10cb9f）
-- 2026-01-23：历时 7 年的 vue2 传统界面版本（ v1.0.0 ～ v4.6.13 ）即将落幕，本次提交备份。（commit 551811be）
-- 2026-01-23：vue2传统界面升级至vue3前，删除不再使用的文件。（commit acc30924）
-- 2026-01-23：microi.web.vue2项目启动说明（commit 69c58ab8）
-- 2026-01-23：microi.web.vue在/src/config.json中配置ApiBase（commit 1ee2c974）
-- 2026-01-23：平台vue2版本：当系统设置未配置LoginBottomContent时，默认显示公司名称+系统版本号+当前语言（commit 52b96bcb）
-- 2026-01-23：修复平台vue2版本bug（commit e92c0f0f）
-- 2026-01-23：后端更新v4.6.14，修复bug（commit d9905a0e）
+- Microi.net：发布版本 v4.9.3（commit 1fddb21）
 
-## v4.6.13
+## v4.9.1 - (2026-03-25 22:56)
 
-更新日期：2026-01-22 21:30
+- 更新v4.9.1（commit 33ff6e8b）
 
-- 2026-01-22：更新v4.6.13，优化V8引擎（与JavaScript有更强的兼容性），优化代码编辑器（commit b56afe3f）
+- Microi.net：全新授权机制（commit 51a9ec8）
+- Microi.net：发布版本 v4.9.1（commit 5493acf）
+- Microi.AI：更新版本号至4.9.1（commit 888d61e）
 
-- 2026-01-23：Microi.net：发布版本 v4.6.13（commit 7a36b59）
+## v4.8.4 - (2026-03-24 15:44)
 
-## v4.6.12
+- Microi.AI：更新版本号至4.8.4（commit 726af1f）
+- Microi.net：发布版本 v4.8.4（commit 2e27507）
 
-更新日期：2026-01-22 20:19
+## v4.8.3 - (2026-03-24 01:12)
 
-- 2026-01-22：更新v4.6.12，升级代码编辑器，修复V8引擎bug（commit 0c338280）
+- 跨多个项目将版本升级到4.8.3，并为VS Code插件集成更新README（commit 36368a60）
 
-## v4.6.11
+- Microi.VSCode：增强 MCP 配置与 Token 管理（commit 6b30895）
+- Microi.VSCode：工程维护：package.json 版本更新至 1.3.0（commit a9cef4f）
+- Microi.AI：更新版本号至4.8.3（commit 00a87b4）
 
-更新日期：2026-01-22 15:26
+## v4.8.4 - (2026-03-24)
 
-- 2026-01-22：更新v4.6.11，修复bug（commit c4796968）
+- 更新：修正.gitignore文件中的路径格式（commit 613720f4）
+- 将microi.web修改为Microi.Client（commit 4118773a）
+- 新增：添加Dockerfile、.gitignore和发布脚本，更新Nginx配置，删除不再使用的子项目（commit d6a1f847）
+- 更新：调整.gitignore文件，添加对Microi.Server/Microi.AI和Microi.Server/Microi.net目录的忽略规则（commit e25ee80e）
+- 重构：将 hbuilder-app 移至根目录并更名为 microi.app，更新所有文档和 README 引用（commit 88cd088e）
+- 壮举：为代码插装和安全序列化添加V8McpService（commit ad370db3）
+- 更新：修改首页tagline，增加对MCP和Skills的支持描述（commit b9081b60）
+- 更新：修改README和文档首页描述，增加对MCP和Skills的支持信息（commit 5082feb4）
+- 更新：从解决方案中移除Microi.AI项目及其配置（commit 909aabc3）
+- 更新：修改文档中的开源时间为2025年，更新.gitignore以允许跟踪特定配置文件（commit c145077f）
+- 增强Microi平台的文档：更新索引。md具有新的品牌和功能描述，包括V8引擎集成和改进的AI编程能力。（commit b90ddda3）
+- 更新：在文档中添加新的预览图像以增强视觉效果（commit 7fea5254）
+- 更新：修复README和索引文档中的预览图像格式（commit 2a00098d）
+- 更新：从文档中移除多余的空图像行以优化布局（commit a0f77a58）
+- Microi.VSCode：工程维护：版本更新至 1.3.4，并增强 MCP 服务器配置（commit 644d058）
 
-## v4.6.10
+## v4.8.3 - (2026-03-23)
 
-更新日期：2026-01-22 01:26
+- 更新文档：将“免费试用”改为“在线使用”，并在Docker部署文档中添加一键安装说明（commit 1c7faf28）
+- 壮举：为V8引擎添加Microi技能文档和实现（commit 612cdf8c）
+- 新增：添加V8引擎API知识库文档和Copilot指令文件（commit aa586b26）
+- 壮举：更新V8引擎集成，并添加MongoDB和MQTT技能（commit f77fc964）
+- 更新：重构V8引擎API知识库文档，添加接口引擎和CRUD操作示例（commit 14f9ddb9）
+- Microi.VSCode：重构代码结构以提高可读性和可维护性（commit aa35b01）
+- Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 6ee6679）
+- Microi.VSCode：重构代码结构，提高可读性和可维护性（commit 06fb38e）
+- Microi.VSCode：删除过时的 v8 引擎版本文件（commit 5f56b14）
 
-- 2026-01-22：更新v4.6.10，修复流程引擎bug（commit 4bff96f0）
+## v4.8.3 - (2026-03-22)
 
-## v4.6.9
+- 新增3D背景组件，优化主页视觉效果，更新依赖项（commit 763d2905）
+- 修复：优化el-select组件，确保SQL/DataSource/ApiEngine数据源的字符串值转换为对象，增强选项存在性检查（commit 0f005036）
+- 新增：创建HeroTitle3D组件，增强主页3D标题效果，优化视觉表现（commit e8aa2411）
+- 新增：为VPHero组件的名称添加高度样式，优化视觉效果（commit f4942922）
+- 壮举：更新翻译流程并添加新的文档（commit 1b8753c6）
+- 重构代码结构以提高可读性和可维护性（commit dbff5f4e）
+- Microi.VSCode：添加3D效果（commit b71fa3c）
+- Microi.VSCode：重构代码结构，提高可读性和可维护性（commit b3022d8）
+- Microi.VSCode：工程维护：清理代码结构并删除未使用的导入（commit be68aa2）
 
-更新日期：2026-01-21 23:51
+## v4.8.2 - (2026-03-21)
 
-- 2026-01-21：更新v4.6.9，修复sqlserver下的兼容性bug（commit 1564b574）
+- 完善 AiController，新增用户订阅管理功能，优化 API 代理转发逻辑（commit 908cdc3b）
+- 合并远程 master 分支（commit afb4cd93）
+- 归档不再维护的开源项目（commit 7489afdf）
+- 合并远程 master 分支（commit 076ce140）
+- 新增接口引擎创建功能，更新环境变量配置（commit 6db80700）
+- 壮举：为WebSocket中间件和核心服务添加V8调试支持（commit 3b88d2af）
+- 更新 AI 编程全指南，合并相关文档并优化内容结构，增强用户体验（commit b8defe37）
+- 新增支持WebSocket端口的MQTT服务选项，优化启动日志输出（commit 70110b0a）
+- 优化MQTT服务启动逻辑，移除WebSocket端口配置，简化选项创建（commit 055801be）
+- Microi.AI：新增：新增 SubscriptionService，用于管理订阅、订单及 API 密钥，支持多服务商（commit 07f49c2）
+- Microi.VSCode：Microi吾码 - V8引擎 VS Code 插件（commit 2affc3b）
+- Microi.VSCode：重构代码结构以提高可读性和可维护性（commit ebfe7f2）
+- Microi.VSCode：新增：重构配置和同步管理（commit 2c547f5）
+- Microi.VSCode：新增：增强引擎文件处理和添加数据库模式同步（commit 90b4b27）
+- Microi.AI：增强V8引擎和API引擎的文档（commit dd98464）
+- Microi.VSCode：更新 README.md，增强 AI 辅助编程功能描述，添加工作原理和使用说明（commit 8afc854）
+- Microi.VSCode：重构代码结构以提高可读性和可维护性（commit 2d2e3ba）
 
-## v4.6.8
+## v4.8.2 - (2026-03-20)
 
-更新日期：2026-01-21 22:59
+- Microi.net：工程维护（commit 015fcd7）
+- 优化表内编辑字段判断逻辑，新增 IsInTableEditField 方法以支持多种字段格式（commit 10fb020c）
+- 壮举：增强了系统中的卡片显示和权限管理（commit d645d14f）
+- 新增手机号授权登录功能，优化未绑定用户的注册流程（commit 45a388e4）
+- 安全：修复 CVE-2023-45857 - 升级 axios 从 0.18.1 至 0.28.0（commit f6d90fe6）
+- !64 AI 队友自动生成：修复 CVE-2023-45857 - Axios 安全漏洞（commit 544f1028）
+- Microi.AI：工程维护（commit bc20bdb）
 
-- 2026-01-21：更新v4.6.8，优化架构，修复bug（commit bf3d6bd6）
+## v4.8.2 - (2026-03-19)
 
-## v4.6.7
+- 禁止接口引擎、V8事件代码中提交/回滚事务，由平台全面自动接管（commit d41162fb）
 
-更新日期：2026-01-21 16:38
+## v4.8.1 - (2026-03-18 14:06)
 
-- 2026-01-21：发布v4.6.7，V8编辑器新增完全的V8引擎代码提示功能，修复bug，升级接口引擎配置（commit 6f012453）
+- 优化聊天系统、优化移动端（commit 8087e783）
+- 更新v4.8.1（commit 8d00b5de）
 
-- 2026-01-21：Microi.net：发布版本 v4.6.7（commit 8977556）
+## v4.8.1 - (2026-03-17)
 
-## v4.6.6
+- 批量更新文档（commit 13c12c4a）
 
-更新日期：2026-01-21 05:16
+## v4.8.1 - (2026-03-16)
 
-- 2026-01-20：新增JTokenEx.FromObject替代JToken.FromObject（commit c3ddd8b3）
-- 2026-01-21：更新v4.6.6，应用商城功能即将上线，修复bug（commit c3474be1）
+- 更新 Microi.OpenClaw 吾码小龙虾（commit 0781eed3）
+- 更新官网（commit c7dc8d4e）
 
-## v4.6.5
+## v4.8.0 - (2026-03-15 09:07)
 
-更新日期：2026-01-20 16:24
+- 修复关联表单组件bug（commit e09b6a90）
+- 更新v4.8.0（commit 334bc59c）
 
-- 2026-01-17：优化性能、修复bug（commit 7ff72ffd）
-- 2026-01-17：格式化所有代码（commit 0d1ad70b）
-- 2026-01-19：升平台文档项目（官方文档）且新增首页动画效果（commit 17724386）
-- 2026-01-20：发布v4.6.5，优化性能、优化架构、修复Sqlserver兼容bug（commit 2a894265）
+## v4.8.0 - (2026-03-15)
 
-## v4.6.4
+- 安全：修复 CVE-2022-48285 - jszip 路径遍历漏洞（commit 00486f91）
+- 安全：修复 CVE-2022-45143 - Apache Tomcat JsonErrorReportValve 注入漏洞（commit b233d5ea）
+- 安全：修复 CVE-2023-51074 - Jayway JsonPath 安全漏洞（commit 3cb0b34b）
+- !9 AI 队友自动生成：[Security-高危] CVE-2022-48285 - jszip 路径遍历漏洞（commit b0601579）
+- !11 AI 队友自动生成：安全修复：CVE-2023-51074 Jayway JsonPath 栈溢出漏洞（commit 1cb7cd91）
+- !10 AI 队友自动生成：[Security-高危] CVE-2022-45143 - Apache Tomcat 注入漏洞（commit 4a56ed64）
+- 安全：修复 CVE-2024-24549 - Apache Tomcat HTTP/2 拒绝服务漏洞（commit f51aaf60）
+- 安全：修复 CVE-2022-3509 - 升级 protobuf-java 至 3.21.7（commit b2d92dab）
+- !22 AI 队友自动生成：[Security-高危] CVE-2024-24549 - Apache Tomcat 输入验证错误漏洞（commit db94c452）
+- 将 gitee.com:ITdos/microi.net 的 master 分支合并到 修复-CVE-2022-3509-Gf0y（commit 059133dd）
+- !23 AI 队友自动生成：[Security-高危] CVE-2022-3509 - IBM WebSphere Application Server Liberty 安全漏洞（commit 86232005）
+- 安全：修复 CVE-2021-23370 - 升级 swiper 至 &gt;=6.5.1 至 防止 XSS 漏洞（commit 01a63a43）
+- 删除无用大文件（commit 5d5f1ccc）
+- 合并远程 master 分支（commit 274d09c6）
+- !63 AI 队友自动生成：[Security-危急] CVE-2021-23370 - Vlad Tansky swiper 安全漏洞（commit d59d7c3a）
+- 旧项目归档打包（commit ea05c6c2）
+- 合并远程 master 分支（commit 78e00682）
+- 工程维护：更新 .gitignore，忽略构建产物目录和大二进制文件（commit d5204d98）
+- anderson（commit a606e0f0）
 
-更新日期：2026-01-17 13:18
+## v4.8.0 - (2026-03-13)
 
-- 2026-01-17：类库动态依赖、去除不必要的consone.log（commit 24c2f292）
-- 2026-01-17：更新平台说明（commit 7e75a6d2）
-- 2026-01-17：新增开发环境的内存监控、优化前端内存占用（commit bf137dea）
-- 2026-01-17：修复V8.Db.Firs()无效的bug（commit b86fd075）
-- 2026-01-17：发布v4.6.4（commit fa1839b9）
+- 修复表格搜索功能bug、优化V8代码编辑器（commit 98bbf71f）
+- 新增OpenClaw管理平台（commit 384083d6）
+- 合并远程 master 分支（commit a5b06e9d）
+- 新增openclaw（commit 26c52dc5）
+- 合并远程 master 分支（commit 7be39492）
+- 修复移动端bug（commit 71f10182）
 
-- 2026-01-17：Microi.net：发布版本 v4.6.4（commit b2d3dc3）
+## v4.8.0 - (2026-03-12)
 
-## v4.6.3
+- 修复json表格数据源搜索bug（commit bb3533bb）
+- 修复json表格编辑失去焦点的bug（commit fb8f055f）
+- 修复搜索不可见bug（commit 8d30336d）
+- 图片文件上传组件支持保存完整路径、优化平台系统框架（commit ba40f654）
+- 优化代码编辑器（commit 201ed103）
+- 修复V8按钮权限bug（commit 56e3ff88）
 
-更新日期：2026-01-16 17:26
+## v4.8.0 - (2026-03-11)
 
-- 2026-01-16：修复SqlCount缓存bug（commit 26aaf682）
-- 2026-01-16：修复系统管理角色权限配置bug（commit 8063c905）
-- 2026-01-16：v4.6.3发布，修复新版v4.x的一些bug（commit 3eb140b3）
+- 优化数据大屏（commit a9193722）
+- 修复数据大屏bug（commit c9cd156a）
+- 优化数据大屏（commit 94d1b38b）
+- 数据大屏新增Unity WebGL 3D组件（commit 6345f4d0）
+- 优化数据大屏3D插件（commit 6d759532）
 
-- 2026-01-16：Microi.net：发布版本 v4.6.3（commit 001ce50）
+## v4.8.0 - (2026-03-10)
 
-## v4.6.1
+- 集成go-view（commit 9b3f4297）
+- 集成go-view（commit 2a707fd2）
+- 集成go-view源码并修复bug（commit 4a2147fa）
+- 修复数据大屏设计器bug（commit 5044bd72）
+- 优化前端项目构建时间，6分钟降低到3分钟（commit c44a4c43）
 
-更新日期：2026-01-16 09:05
+## v4.8.0 - (2026-03-09)
 
-- 2026-01-13：修改类库配置（commit 3fdad260）
-- 2026-01-13：优化解决方案目录（commit d0f904ad）
-- 2026-01-13：新增[AI+低代码]开发文档（commit ead5bcd0）
-- 2026-01-16：Microi.net.dll更新v.4.6.1，性能优化、架构优化、修复bug（commit aa3d031e）
+- 优化小程序（commit 35788471）
+- 完善小程序（commit 349b6696）
+- 优化移动端页面、修复下拉框表内编辑bug（commit 692bd901）
+- 优化移动端、小程序（commit 85e4c3d1）
 
-- 2026-01-16：Microi.net：发布版本 v4.6.1（commit ce58f15）
+## v4.7.9 - (2026-03-08 23:28)
 
-## v4.5.0
+- 优化app打包项目、优化官方文档项目（commit 28008f9d）
+- 优化移动端页面效果（commit 3581c57d）
+- 更新v4.7.9，优化架构、新增3D自动转换并预览（commit b49b467c）
 
-更新日期：2026-01-13 00:49
+## v4.7.8 - (2026-03-06)
 
-- 2026-01-07：优化高并发线程处理（commit cc016bb6）
-- 2026-01-08：新增Microi.Core核心库，开放更多后端源码，优化系统架构（commit 7efec1cc）
-- 2026-01-08：优化代码文件目录（commit 142b9aec）
-- 2026-01-08：修改git配置（commit 818d2130）
-- 2026-01-08：优化Dos.ORM（commit 79f44662）
-- 2026-01-08：优化Dos.Common（commit a8f3d99b）
-- 2026-01-08：优化Dos.ORM（commit c7656ff8）
-- 2026-01-08：前后端的Guid均修改为Ulid（commit d9a5c22f）
-- 2026-01-08：优化Office插件（commit 7768e077）
-- 2026-01-08：优化代码（commit 0988043a）
-- 2026-01-09：更新最新demo数据库、空库数据库（commit d79d1d02）
-- 2026-01-09：优化代码（commit 4f62e682）
-- 2026-01-09：优化Microi.ORM库（commit bab3ea15）
-- 2026-01-09：去除不必要的引用（commit c0963d18）
-- 2026-01-09：【重要更新】支持ORM切换了，现在平台支持Dos.ORM与SqlSugar之间的切换了（commit 8076d979）
-- 2026-01-10：完善SqlSugar与Dos.ORM的切换、修复SqlSugar应用bug（commit abd82532）
-- 2026-01-10：更新前端版本号（commit d063328c）
-- 2026-01-10：修改说明（commit d5b4a6a1）
-- 2026-01-10：新增L1、L2多级缓存、所有代码格式化、修复bug、去除_CurrentSysUser（只使用_CurrentUser）（commit cd8f3144）
-- 2026-01-10：更新配置文件（commit e7365e34）
-- 2026-01-10：更新配置文件（commit a1c0415c）
-- 2026-01-10：修复L1级缓存bug、现在_CurrentUser固定为JObject类型（commit d32d74f1）
-- 2026-01-11：修复架构优化后带来的一些bug（commit f1d3e82e）
-- 2026-01-11：更新平台文档，加入AI辅助开发文档（commit 40d04b3b）
-- 2026-01-11：更新平台文档（commit 28b01560）
-- 2026-01-11：更新文档（commit 494e7685）
-- 2026-01-11：更新平台文档（commit 75f53475）
-- 2026-01-12：更新平台文档（commit 03d0efb0）
-- 2026-01-12：修复ORM的.ToArray()方法（commit 29a37c8c）
-- 2026-01-12：更新AI写接口引擎文档（commit 46e4e606）
-- 2026-01-12：修复前端V8.SearchSet()使用新版_Where的bug（commit 6e86126f）
-- 2026-01-12：格式化文件（commit 1d777b8f）
-- 2026-01-12：格式化整个项目（commit 89f07314）
-- 2026-01-12：优化前端性能（commit 085df807）
-- 2026-01-12：优化前端表单引擎性能（commit ce8381ad）
-- 2026-01-12：优化前端框架性能（commit 4d935d51）
-- 2026-01-13：Microi.net.dll发布v4.5.0，优化架构、性能（commit ff6fa01b）
+- [doc]修正前端V8.FieldSet用法说明（commit a9162e20）
+- !8 [doc]修正前端V8.FieldSet用法说明 合并拉取请求 !8 从 Cham_Lu/功能/doc（commit 23becc8f）
+- Microi.net：更新v4.7.8（commit d6aebf1）
+- Microi.AI：更新v4.7.8（commit e4f168f）
 
-- 2026-01-13：Microi.net：发布版本 v4.5.0（commit 736063b）
+## v4.7.8 - (2026-03-05)
 
-## v4.4.2
+- 更新打包apk说明文档（commit df63ea2e）
 
-更新日期：2026-01-10 23:44
+## v4.7.8 - (2026-03-04)
 
-- 2026-01-10：Microi.net：发布版本 v4.4.2（commit 2d1a0e9）
+- 更新说明（commit ac0d4fa5）
+- 新增：将 src/config.json 纳入版本库并通过 postinstall 自动忽略本地改动（commit 661540ab）
+- 更新config规则（commit 0165fefd）
 
-## v4.2.0
+## v4.7.8 - (2026-03-03 22:02)
 
-更新日期：2026-01-09 09:43
+- 修复apk打包bug（commit d8d83659）
+- 修复apk打包bug（commit 6384da1b）
+- 修复apk打包后的bug（commit 5060e916）
+- 彻底修复打包apk后的bug（commit 0dbc0285）
+- 更新git（commit bff2e71e）
+- 更新v4.7.8，修复后端模块引擎bug、前端打包apk扫一扫bug（commit 1525e994）
 
-- 2026-01-09：Microi.net：发布版本 v4.2.0（commit 637e401）
+## v4.7.8 - (2026-03-02)
 
-## v4.1.1
+- 优化前端（commit 96a34d54）
+- 允许局域网网访问前端（commit c08cc3cf）
+- 修复前端bug（commit 6805aa9e）
+- 修复批量打印等bug（commit d9f06310）
+- 优化页面效果（commit 81a3306e）
+- 优化前端页面效果（commit d7a15469）
+- 修复apk返回问题、优化前端界面（commit 0331773e）
 
-更新日期：2026-01-07 02:50
+## v4.7.8 - (2026-03-01)
 
-- 2026-01-04：修复移动端V8.FomEngine.GetTableData的bug（commit e48b7255）
-- 2026-01-04：解决方案添加开源[Microi.MongoDB]项目的引用（commit 053aa85d）
-- 2026-01-05：更新试用地址、平台文档、项目说明（commit 61b11e13）
-- 2026-01-05：更新说明（commit 699b19eb）
-- 2026-01-05：更新平台文档项目（commit 515c5660）
-- 2026-01-06：扩展V8.WeChat.RSAEncrypt函数，微信支付转账api可能会用到。（commit 434bacea）
-- 2026-01-06：更新平台文档项目（commit b45ba368）
-- 2026-01-06：更新平台文档（commit 6a98d2e5）
-- 2026-01-06：移动端打包apk新增支持摄像头扫二维码、条形码，且支持V8函数。（commit c9b628c5）
-- 2026-01-06：移动端打包apk新增支持摄像头扫二维码、条形码，且支持V8函数。（commit fab66eec）
-- 2026-01-07：修复前端报表引擎的子表表内编辑在新增时无法保存的bug（commit eea08497）
-- 2026-01-07：Microi.net.dll更新v4.1.1、更新平台文档（commit 2d5593d7）
-
-## v4.1.0
-
-更新日期：2026-01-04 15:02
-
-- 2024-10-29：Microi吾码 - 低代码平台（commit 8dc8c89c）
-- 2024-10-29：更新说明（commit dd6b314b）
-- 2024-10-29：更新说明（commit 8801fe03）
-- 2024-10-29：更新说明（commit f47ba7f9）
-- 2024-10-29：新增界面引擎试用地址（commit 767a24a9）
-- 2024-10-30：npm microi.net 2.x用于vue2，3.x用于vue3（commit 0aaa5509）
-- 2024-10-31：上传数据库备份文件，更新前端vue2框架源码说明（commit f0236374）
-- 2024-10-31：上传部分案例截图、公司介绍（commit 2daca082）
-- 2024-10-31：资料更新（commit 89a43f14）
-- 2024-11-02：更新介绍（commit a1f8b19c）
-- 2024-11-02：更新文档（commit 70c604ba）
-- 2024-11-03：更新说明（commit 5536de1f）
-- 2024-11-04：修复文件/图片上传接口当Path参数为空时出现两个斜杠 修复接口引擎第一次保存后缓存会更新失败的bug 新增Microi.V8Engine库，可实现扩展接口引擎中V8对象、V8.方法对象 修复接口引擎不支持微信支付加密的bug 修复接口引擎在SaaS模式下，匿名通过get方式调用接收不到OsClient参数的bug 修复地图组件遇到传入空的xy轴加载地图失败的bug 修复VUE v2.6.10自动升级到v2.7.16后，表单设计器由于DOM刷新频繁导致页面卡死的严重bug。（commit c62ba0f5）
-- 2024-11-05：git配置变更（commit 6c42b479）
-- 2024-11-05：更新文档（commit d0d6ee0e）
-- 2024-11-05：更新文档（commit 4333f4ef）
-- 2024-11-05：更新文档（commit 708fcd6c）
-- 2024-11-05：文档更新（commit 7dff0385）
-- 2024-11-05：更新文档（commit 5611b7c8）
-- 2024-11-05：现在通用导出支持单图、多图字段了，多图字段会根据图片数量自动创建列、表头合并列，自动计算图片定位浮在对应的单元格之上 接口引擎现在支持自定义Excel导出了，可自定义表头、自定义数据源，用法见【/文档/进阶：自定义导出Excel.md】 通用导出、自定义导出源码公开在Microi.Office源码中（commit 82888a5c）
-- 2024-11-05：更新说明（commit c71ea9a7）
-- 2024-11-06：更新文档（commit 2e3b656f）
-- 2024-11-11：更新文档（commit 3437bff0）
-- 2024-11-12：修复多图字段导出时若只传了一张图片会抛出合并列异常的bug 修复V8.Http.Get()请求一些特殊大厂接口时会报错的bug 微信支付回调接口引擎自定义地址由于不支持url参数，因此接口引擎新增给地址增加【--OsClient--crm--】后缀以实现OsClient参数 修复.net6升级到.net8后通用导入会报错的bug 修复.net6升级到.net8后添加定时任务无法启动的bug 修复V8.DataSourceEngine数据源引擎无法设置匿名调用的bug（commit ecc35966）
-- 2024-11-19：更新文档（commit 36cf2e00）
-- 2025-02-06：* 传统界面版本前端100%开源 * V8.SearchSe、V8.SearchAppend现在可以传入_Where条件了 * 弹出表格控件的[弹出前事件V8代码]新增V8.OpenTableSetWhere函数 * 修复PC前端v3版本表内编辑下拉框两次选择数据源丢失的bug * PC前端表内编辑新增的数据现在不会再显示详细和编辑按钮了 * 修复PC前端表内编辑未验证通过导致按钮一直loading的bug * 修复OpenTable将脏数据保存到了字段.Config中的bug * 现在数据即使sys_osclients表数据为空，只要环境变量包含了redis配置，系统也能正常运行了 * API接口系统由.net8.0升级至.net9 * RabbitMQ.Client升级至7.0.0 * 移除IS4身份认证，使用.net9.0自带JWT认证 * 新增V8.MongoDb系列操作，见平台文档 * 现在接口引擎返回纯字符串（非json）时，不会再额外返回两个双引号了 * 现在接口引擎支持接收xml参数了，同样使用V8.Param访问参数 * 现在接口引擎支持直接写 return { Code : 1 }了，而不是一定需要写V8.Result = { Code : 1 }; return; * redis键名进行了统一命名优化 * PC前端现在支持绑定微信公众号oepnid了 * 新增V8.TranslateEngine翻译引擎，并且也将diy_lang多语言管理表进行了缓存（非redis） * 现在接口引擎完全支持微信公众号相关接口了，如模板消息、公众号自定义菜单、帐号绑定等等 * 现在模块引擎的【可搜索字段】支持【等值】配置了 * 平台升级全新的消息通知设置，支持SaaS模式，动态配置通知方式（短信、消息模板、接收人、接收角色、触发条件等） * 新增V8.OpenAnyTable()函数，用法见平台文档（commit 74adbc15）
-- 2025-02-06：更新最新数据库（commit 7de7d968）
-- 2025-02-06：修改了说明文档，这里初次git 运行可能会卡在这里，请重点关注！！！（commit fd1f9725）
-- 2025-02-06：合并远程 master 分支（commit 816fff7f）
-- 2025-02-10：自定义导出时，当数据行没有图片自动1行高度，当数据行有图片时自动增加高度。（commit b0a43ff7）
-- 2025-02-10：合并远程 master 分支（commit 841988df）
-- 2025-02-17：修复弹出表格在某些特殊情况下可搜索字段搜索没有效果的bug（commit e1933ecc）
-- 2025-02-18：* 现在表内快速新增也会执行表单进入事件了 * 修复表内快速新增后保存时判断必填项错误的bug（commit 37185293）
-- 2025-02-20：固资的微服务页面 检查该条业务数据是否已删除，已删除则删除对应的流程数据（commit c5bc70ec）
-- 2025-02-25：优化了左边菜单栏，添加了一件换主题（commit e803fd31）
-- 2025-02-27：优化了编辑页tab选项卡从v8引擎进入时默认加载选项，优化了主题色el-tag的color（commit 49b848a2）
-- 2025-02-28：优化了搜索样式优化（commit 2dba22e3）
-- 2025-02-28：新增了一个离开事件（commit 03e7a5cc）
-- 2025-02-28：合并远程 master 分支（commit 4699a73d）
-- 2025-02-28：新增了了技术文档项目（commit 83796cb9）
-- 2025-03-01：代码文件目录结构优化（commit b995519e）
-- 2025-03-01：代码文件目录优化（commit 95def418）
-- 2025-03-01：.net gRPC客户端演示代码提交（commit 2b9f0d90）
-- 2025-03-01：解决git代码冲突（commit 6e40753b）
-- 2025-03-01：修复解决方案文件乱码导致vs code无法正常加载.net解决方案的问题（commit 4a6546d4）
-- 2025-03-01：去除logs的排除（commit 568da95d）
-- 2025-03-01：合并远程 master 分支（commit 5fe0bcc0）
-- 2025-03-01：添加日志，从git排除文件移除（commit da268095）
-- 2025-03-01：优化文档项目（commit 6542c637）
-- 2025-03-01：修复批量审批，取消按钮的bug（commit 272cf02b）
-- 2025-03-01：撤回按钮，DiyCommon not defined 报错的bug（commit 403236dd）
-- 2025-03-03：修复了monaco-editor运行报错的bug，现在不需要手动改了，已升级到0.33.1,(vue2支持最高版本)（commit 774c60a0）
-- 2025-03-04：修复了启动项在VisualStudio 无法启动的问题（commit f29dc2f0）
-- 2025-03-05：修改了issues 和 pull 请求 地址，doc文档迁移到主分支上了，之前地址变掉了。（commit 317dce6f）
-- 2025-03-05：修改了issues 和 pull 请求 地址，doc文档迁移到主分支上了，之前地址变掉了。（commit 7cb17bb0）
-- 2025-03-05：合并远程 master 分支（commit b9a135c2）
-- 2025-03-06：* 修复iframe菜单无法滚动的问题 * 更新microi.net版本（commit 622eb29e）
-- 2025-03-06：microi.doc 软件包-lock.json（commit dc123ce4）
-- 2025-03-06：合并远程 master 分支（commit cea8af96）
-- 2025-03-06：目录优化（commit 9b83926b）
-- 2025-03-06：目录优化（commit 696e0f65）
-- 2025-03-06：目录优化（commit d7b0d29f）
-- 2025-03-06：优化了一些宣传md文档内容（commit 60aa9e95）
-- 2025-03-06：优化发布文件（commit 5c8ad519）
-- 2025-03-06：合并远程 master 分支（commit dfed45f3）
-- 2025-03-07：去除了doc文档 软件包-lock.json 版本控制（commit 2d8b5320）
-- 2025-03-09：更新最新demo数据库和最新empty空库（commit 951cb124）
-- 2025-03-09：合并远程 master 分支（commit 62ad1f3d）
-- 2025-03-10：liucheng 去除表鼠标经过，背景颜色和文字都是深色的bug（commit 837a7927）
-- 2025-03-11：更新文档项目（commit 737029ac）
-- 2025-03-11：合并远程 master 分支（commit 1b49b37d）
-- 2025-03-11：更新文档项目（commit 96714ea5）
-- 2025-03-11：更新文档项目（commit c498966e）
-- 2025-03-11：更新文档项目（commit 9bfc2f80）
-- 2025-03-11：导出Office Excel时现在数字类型字段会生成数字类型单元格，而不是string类型单元格（commit 2dc28865）
-- 2025-03-11：文档项目更新（commit a1e0c4fa）
-- 2025-03-12：更新文档项目源码（commit efde5199）
-- 2025-03-12：更新文档项目源码（commit 84cce421）
-- 2025-03-12：更新文档项目源码（commit a515066e）
-- 2025-03-12：更新文档项目源码（commit 92d4ddbc）
-- 2025-03-12：文档新增最新doc.microi.net文档地址（commit 1b76e710）
-- 2025-03-12：更新文档项目源码（commit 4dce4526）
-- 2025-03-12：更新文档项目源码（commit dda7d109）
-- 2025-03-12：更新文档项目源码（commit 7af99d1e）
-- 2025-03-12：更新文档项目源码（commit 05a5a97a）
-- 2025-03-12：更新文档项目源码（commit 24cf5d7a）
-- 2025-03-13：更新文档项目源码（commit 5f4f080d）
-- 2025-03-14：新增：修改配置（commit eda60d4c）
-- 2025-03-14：新增：上传文档（commit ea57250e）
-- 2025-03-14：文档项目源码更新（commit 470b5067）
-- 2025-03-14：合并远程 master 分支（commit 3f10bcc7）
-- 2025-03-16：注释了 InputInputEvent 触发CommonV8CodeChange 事件，修复了Init()事件内DiyCommon 未指向self的小bug，（commit 19a4d903）
-- 2025-03-16：【代码格式优化】纯格式化代码，没做任何修改（commit d495c6ad）
-- 2025-03-16：修复了组织机构下拉框不显示值的问题（commit cfd5d599）
-- 2025-03-16：zero303 组织机构组建报错（commit d5b1cd6f）
-- 2025-03-16：合并远程 master 分支（commit cf765cbc）
-- 2025-03-17：修复了组织机构组件修改后列表页没有及时刷新的问题（commit 9633800b）
-- 2025-03-17：修改文档说明（commit 6509faf6）
-- 2025-03-17：合并远程 master 分支（commit 4ae4d00e）
-- 2025-03-18：合并远程 master 分支（commit 1a0b481a）
-- 2025-03-18：现在V8导出excel支持根据数据类型判断单元格为数字（commit 40f48076）
-- 2025-03-19：刘诚新增允许角色才可查看表单修改日志（commit cb4c2224）
-- 2025-03-19：合并远程 master 分支（commit f1e6a794）
-- 2025-03-20：更新了fqa页面，将历史fqa记录转移到doc文档（commit 9861847b）
-- 2025-03-20：合并远程 master 分支（commit dd3857ed）
-- 2025-03-20：修改了fqa错误语法，更改为faq（commit 4a79b1e1）
-- 2025-03-20：修复V8.Office.SendEmail()端口的bug（commit 2d37029f）
-- 2025-03-20：默认ApiBase配置为api-china.itdos.com（commit 75d7fd10）
-- 2025-03-20：合并远程 master 分支（commit d828fdf9）
-- 2025-03-21：修复任务调度在暂停状态下，修改后任务又重新启动且没有更改状态为已启动的bug（commit 12383cfa）
-- 2025-03-21：说明文件修改了（commit 0704d338）
-- 2025-03-21：合并远程 master 分支（commit c8025e90）
-- 2025-03-23：更新数据库、MinIO代码优化（commit ee469ce7）
-- 2025-03-24：修复了相同页面不同参数页签不添加的问题，path 改成 fullPath即可（commit d10ccb01）
-- 2025-03-24：编辑和删除可写v8代码控制是否显示（commit 0fa76bf1）
-- 2025-03-24：apibase修改（commit 3d7231a3）
-- 2025-03-24：合并远程 master 分支（commit 9e0a5bd1）
-- 2025-03-24：修改传统界面源码说明文件（commit 654a75ec）
-- 2025-03-24：修改apibase（commit b56cff52）
-- 2025-03-24：合并远程 master 分支（commit 407a4244）
-- 2025-03-24：修复报错字段 not found on DiyMessage.Msg的bug（commit 90641ac0）
-- 2025-03-24：优化了后端接口地址替换的方法，只需在src文件下加一个localConfig.json，即可，该文件已被gitignore忽略。（commit e8edc07b）
-- 2025-03-24：合并远程 master 分支（commit c1b6ea37）
-- 2025-03-24：ApiBase合并（commit 5551f690）
-- 2025-03-24：合并 https://gitee.com/ITdos/microi.net 的 master、master 分支（commit ba8012be）
-- 2025-03-25：开源扩展V8.Alipay支付宝H5支付，演示地址https://os.microios.com:1301/（commit 7b80e26a）
-- 2025-03-25：添加了日文语言，版面全面支持译文，包括侧边栏导航、底部（commit de3d3300）
-- 2025-03-25：config: 添加翻译脚本（commit 2c2c6b63）
-- 2025-03-25：文档：docs lang 更新!（commit 1acb7948）
-- 2025-03-25：回退 "文档：docs lang 更新!"（commit edc2ac70）
-- 2025-03-25：config: 脚本更新（commit 36cc98f2）
-- 2025-03-25：工程维护：脚本更新（commit 53b8286b）
-- 2025-03-25：chroe: 修改翻译脚本目录（commit 0a8a8f11）
-- 2025-03-25：新增：更新多语言文档（commit 4d664984）
-- 2025-03-25：chrome: 补充翻译脚本（commit 87049e91）
-- 2025-03-25：新增：补全index.md文件的翻译（commit 7d0aab96）
-- 2025-03-25：综讯固资数据大屏微服务（commit e0b2dc51）
-- 2025-03-25：合并远程 master 分支（commit f29fd9b2）
-- 2025-03-25：对接支付宝手机网站支付2.0、v3.0，已测试通过，测试地址：https://os.microios.com:1301/（commit 44510bf0）
-- 2025-03-25：合并远程 master 分支（commit 1e16f3a7）
-- 2025-03-26：新增：翻译脚本优化（commit 928dfeed）
-- 2025-03-26：新增：翻译内容更新（commit 232fd2df）
-- 2025-03-26：新增：全量跑了一遍（commit 0d79319e）
-- 2025-03-26：config: 翻译脚本优化（commit 4ccf31eb）
-- 2025-03-26：修复：修改了表的翻译（commit 7a846cfa）
-- 2025-03-26：支持支付宝支付后回调（也支持接口引擎处理回调），演示地址：https://os.microios.com:1301/（commit 58f9b0d4）
-- 2025-03-26：合并远程 master 分支（commit 707bf728）
-- 2025-03-27：删除两个无用测试页面，主要测试数据源引擎的问题（commit 61e5058a）
-- 2025-03-27：新增三套基于吾码的开源项目：企业官网UniApp；图片壁纸、短视频UniApp；支付宝H5手机网站支付。（commit 98d28d7e）
-- 2025-03-27：合并远程 master 分支（commit 710c090b）
-- 2025-03-27：更新接口引擎导入接口替换以及进度文档说明（commit 74c8002e）
-- 2025-03-27：修复首次运行系统多语言加载错误的bug（commit 42b752ec）
-- 2025-03-27：!1 修复首次运行系统多语言加载错误的bug 合并拉取请求 !1 从 吴东明/master（commit b71e3fe3）
-- 2025-03-28：优化文档（commit c6d3d6ad）
-- 2025-03-28：优化文档项目源码（commit 084f6f24）
-- 2025-03-28：新增：脚本优化（commit a0821e02）
-- 2025-03-28：新增：脚本更新（commit f1489838）
-- 2025-03-28：新增：修复所有文档（commit b8a3675c）
-- 2025-03-28：新增：脚本更新（commit f5406c09）
-- 2025-03-28：新增：文档更新（commit 6520415f）
-- 2025-03-28：新增：修复vue（commit d30e6518）
-- 2025-03-28：脚本更新（commit 0cae3e41）
-- 2025-03-28：新增：脚本优化（commit 30d28150）
-- 2025-03-28：文档更新（commit 54ac4854）
-- 2025-03-28：在vue2中内置了界面界面引擎，无需调用官方界面引擎（commit d285acc5）
-- 2025-03-28：修改了界面引擎渲染器的地址（commit cfec811c）
-- 2025-03-28：合并远程 master 分支（commit 80ed648a）
-- 2025-03-29：降低并发 修改翻译key（commit d2e81f3c）
-- 2025-03-29：新增：将剩余的翻译翻译完全（commit cf88a197）
-- 2025-03-29：加一个运行时长优化（commit d65ddaae）
-- 2025-03-29：新增：针对faq优化脚本（commit c20fbbbf）
-- 2025-03-29：新增：faq文档更新（commit d30ac501）
-- 2025-03-29：新增界面引擎默认路由（commit 87ae60f8）
-- 2025-03-29：合并远程 master 分支（commit bbe295a7）
-- 2025-03-29：新增：脚本优化（commit e102db9a）
-- 2025-03-29：合并远程 master 分支（commit d784c854）
-- 2025-03-29：新增：脚本更新（commit 440ef26e）
-- 2025-03-29：更新文档、优化接口引擎、合并PC传统界面组件扩展代码（commit cf8ec88b）
-- 2025-03-29：将打印引擎内置到项目中，不再调用官方demo（commit 8574702c）
-- 2025-03-29：新增根据路由获取界面引擎数据（commit 704456e9）
-- 2025-03-29：合并远程 master 分支（commit e120112e）
-- 2025-03-29：优化了下拉单选数据源引擎（commit 807036b0）
-- 2025-03-29：修复界面引擎路由匹配的bug（commit 7cf839b4）
-- 2025-03-29：合并远程 master 分支（commit 6170975d）
-- 2025-03-29：更新数据库：首页由界面引擎配置（commit ef46adb4）
-- 2025-03-30：ApiBase以docker环境变量最优先（commit 2ed85bb0）
-- 2025-03-30：tabel 组件添加了颜色设置（commit 9be0e0bc）
-- 2025-03-30：优化了内置界面引擎表组件的设置属性，添加了颜色配置（commit 62ba7d04）
-- 2025-03-30：* 新增控件数据源可选择接口引擎配置 * 修复控件数据源为接口引擎、数据源引擎时首次不加载数据的bug（commit 80929536）
-- 2025-03-30：优化了模块引擎的显示内容及分页数量，虚拟表的显示标签（commit a5be5b90）
-- 2025-03-31：新增接口地址（commit 81764df2）
-- 2025-04-02：添加了技术文档侧边栏的模板引擎用法，中英日文同步添加，无需额外翻译了。（commit c0f2d7d3）
-- 2025-04-02：模板引擎添加单图和多图列表显示的用法（commit ad0fc2ee）
-- 2025-04-02：更新数据库、更新一键安装脚本、更新文档（commit 1b0a4257）
-- 2025-04-02：合并远程 master 分支（commit 965f9eea）
-- 2025-04-02：* 一键安装脚本支持ubuntu24.*了，更新mysql版本为5.7、redis版本为7.4.2 * 更新文档（commit e1abd162）
-- 2025-04-02：更新文档（commit d391bf9e）
-- 2025-04-02：更新文档（commit 4c89e064）
-- 2025-04-02：文档：文档更新（commit e0c0c6a0）
-- 2025-04-03：修复了左边菜单栏logo 标题过长换行的问题（commit 3f1b5a99）
-- 2025-04-03：添加了左边菜单标题的字号和截取配置，在系统配置里配置，默认截取12个字符，字号默认20px（commit a9b28b6b）
-- 2025-04-03：* 默认导出现在下拉复选框会正确的只显示名称字段，而不是json * 修复关联表默认导出时关联的表字段未导出值的bug * 更新文档（commit 9a8924a0）
-- 2025-04-03：合并远程 master 分支（commit bca3799b）
-- 2025-04-04：优化了页面左侧底部高度，无查看详情禁止双击查看查看下拉按钮按条件隐藏等（commit c96aaea1）
-- 2025-04-05：优化了界面引擎容器背景颜色配置，优化了滚动条鼠标滚轮失效的问题。（commit 0db2f21e）
-- 2025-04-06：添加了界面引擎容器内组件组局刷新功能，优化了请求封装url异常报错的问题（commit 27cf566d）
-- 2025-04-08：优化了界面引擎统计组件，添加了日期区间筛选条件（commit 581fa677）
-- 2025-04-08：界面引擎大部分组件添加了动态条件和日期筛选（commit ab93331a）
-- 2025-04-09：添加了界面引擎容器动态时间日期，修复了select 第一次未生效的问题（commit e5876b78）
-- 2025-04-09：新增Microi二次开发demo、支付宝H5支付示例2（commit 4d2cee53）
-- 2025-04-09：新增Microi二次开发demo、支付宝H5支付示例2（commit 1d602891）
-- 2025-04-09：修复了界面引擎动态搜索相关问题（commit 2c1e3f84）
-- 2025-04-11：优化了界面引擎动态搜索下拉框初始值问题，添加了@修改事件实时刷新（commit bc09852c）
-- 2025-04-11：优化了界面引擎甘特图和表格组件（commit 14244265）
-- 2025-04-12：现在日期搜索支持时分秒了（commit 0ea84f2e）
-- 2025-04-12：修复了界面引擎更新后老数据的兼容性问题（commit 7ea12ea9）
-- 2025-04-12：新增前端支持子系统模块显示（commit 3393c312）
-- 2025-04-12：新增发布用的Dockerfile文件（commit 45d44bc4）
-- 2025-04-14：重构了界面引擎动态搜索组件，优化了部分组件逻辑，优化了部分素材的来源方式（commit 63810c49）
-- 2025-04-16：默认主题色可以从后台系统配置（commit 28c51b54）
-- 2025-04-16：优化了界面引擎统计组件，添加了子项页面跳转路径（commit 511215aa）
-- 2025-04-16：界面引擎升级更新（commit 1485d01b）
-- 2025-04-20：界面引擎添加了区域钻地图组件，优化了甘特图组件（commit 93e5cf95）
-- 2025-04-21：优化了界面引擎区域地图，添加了回调接口地址和动态渲染宽高（commit adfef94c）
-- 2025-04-21：优化了界面引擎区域地图路由跳转（commit 3782c551）
-- 2025-04-23：修复了定时任务功能新增任务时不填写参数引发的一些列问题（commit 5a42d999）
-- 2025-04-24：更新了界面引擎甘特图，优化了诸多功能（commit 83c4ebe9）
-- 2025-04-25：二级目录页面优化（commit 91b5d48b）
-- 2025-04-26：增加了一种传参格式，便于接口替换的接收参数（commit 784dc0e1）
-- 2025-04-26：修复了表内编辑没有记录日志的bug（commit 923d4fcc）
-- 2025-04-27：修复了界面引擎同时多开设计保存会污染同级页面的问题（commit 4c686e1f）
-- 2025-04-27：优化了界面引擎区域地图点击触发事件跳转路由（commit 95526fb1）
-- 2025-04-29：界面引擎tabel组件添加了表格内部饼图小组件，用于显示占比和进度（commit 233b7b22）
-- 2025-05-01：优化了弹窗的提示框及界面引擎盖的bug（commit a8f6c42b）
-- 2025-05-01：合并远程 master 分支（commit 83762655）
-- 2025-05-06：界面引擎优化了office组件接收中文url参数乱码不识别的问题，描述组件添加了小饼图效果，添加了适配移动端的模式（commit b514375f）
-- 2025-05-06：刘老师转存修改（commit eaf2ca92）
-- 2025-05-06：更新了office-widget组件在iframe方式调用时，从demoObj 配置 filePath 路径（commit f61b13aa）
-- 2025-05-06：优化了界面引擎区域地图组件，默认渲染市级而非省级（commit 5c1f796c）
-- 2025-05-06：新增：二维码组件开发完成（commit 6e7e901d）
-- 2025-05-06：界面引擎修复了在线文档预览功能（commit 78992f28）
-- 2025-05-06：合并远程 master 分支（commit 0990d957）
-- 2025-05-07：修复了系统皮肤的优先级关系，优化了主题色覆盖各种场景的问题，比如加载框，个别按钮的颜色等（commit abf203d7）
-- 2025-05-07：优化了主题色覆盖范围（commit e0729169）
-- 2025-05-08：前端V8.FormEngine支持最新写法（commit 8277bcde）
-- 2025-05-08：本次大量更新：优化搜索、优化样式、修复bug（commit fba9a1a4）
-- 2025-05-09：修复bug（commit 213160fe）
-- 2025-05-09：修复bug（commit e1c0b90c）
-- 2025-05-09：优化了界面引擎甘特图放大缩小没有级联下拉框的问题，修复了表格组件内置饼图多个列共用的问题（commit 49595fa4）
-- 2025-05-10：更改替换后端接口地址方式，localConfig.josn 方式改为.env模式（commit 0c6161e3）
-- 2025-05-10：apiBaseUrl 默认值判断（commit 2f8b1adc）
-- 2025-05-10：test（commit ea8017be）
-- 2025-05-10：111（commit ad67865e）
-- 2025-05-10：测试：check formatting（commit 8484e43b）
-- 2025-05-10：测试：check formatting（commit 83974ca1）
-- 2025-05-10：1111（commit b5556fb0）
-- 2025-05-10：测试：check formatting（commit 411385ca）
-- 2025-05-10：测试：check formatting（commit 5205c7a5）
-- 2025-05-12：!2 测试：check formatting 合并拉取请求 !2 从 毛家顺/功能/master-prettier3（commit f54c8671）
-- 2025-05-12：新增：先把启动报错给解决了（commit 26de18e7）
-- 2025-05-12：去掉了临时的传参代码，并测试出来查询接口替换后的查询，一定要用系统的路径才可以，页面做了提示（commit 5919cd30）
-- 2025-05-12：111（commit 5255261b）
-- 2025-05-12：将 master 分支合并到 功能/master-merge（commit 1dafeb67）
-- 2025-05-12：优化了界面引擎表格组件支持html格式，添加了高级日历组件（commit af2abbf2）
-- 2025-05-12：修复了界面引擎在设计时预览会自动切换移动端模式的bug（commit 7e42349c）
-- 2025-05-13：合并 功能/master-merge 分支（commit 85b06f4b）
-- 2025-05-13：💎界面引擎重大更新,添加了组件和容器的克隆功能，添加了跨页面拷贝粘贴渲染功能，可以复用历史模板，大大增加开发时间（commit d43c1bdc）
-- 2025-05-13：在线文档预览功能bug修复。目前的在线浏览只能浏览office文档，如果附件里传了png和pdf还是不能访问（commit d311b947）
-- 2025-05-16：界面引擎 1.甘特图添加了日列视图宽度自定义，通过数据源来控制编辑状态。2.柱状图表添加了X、Y轴转换。3.支持组件、容器、页面跨端克隆复用。（commit 7c6eed22）
-- 2025-05-16：* 修复地图组件bug * 优化搜索 * 优化样式（commit d090eea4）
-- 2025-05-16：界面引擎甘特图优化了更新提交，可以支持变更手动提交，也可以支持实时提交（commit 7c4f5ef5）
-- 2025-05-16：修复了界面引擎甘特图上一次更新遗留的小问题（commit 5d15dd4e）
-- 2025-05-17：更新了甘特图变更事件传参类型（commit da464260）
-- 2025-05-17：优化文件（commit 75b09f65）
-- 2025-05-17：合并远程 master 分支（commit c62a3526）
-- 2025-05-17：更新[基于吾码的开源项目]（commit af1e976a）
-- 2025-05-17：更新[基于吾码的开源项目]（commit 2b5b1b45）
-- 2025-05-17：重要：开源最新uniapp uni-ui移动端版本（commit c25b324e）
-- 2025-05-19：修改.net9默认调试运行端口为7266（commit 52fef014）
-- 2025-05-19：优化了界面引擎统计组件，加了精度配置，优化了甘特图组件，添加了bar颜色和底色用于区分进度效果（commit 82093304）
-- 2025-05-21：修复搜索区域不显示的bug（commit a39a39cb）
-- 2025-05-22：修复了页签切换时，没有根据fullPath来判断的历史bug（commit 1f020b3b）
-- 2025-05-22：继承了3D模型渲染引擎（commit cb3652fc）
-- 2025-05-23：修复oracle bug、优化样式、更新基于吾码的开源项目（commit 2a7dbfbd）
-- 2025-05-23：修复了页签切换时，没有根据fullPath来判断的历史bug（commit e18bbc75）
-- 2025-05-23：修复了页签切换时，没有根据fullPath来判断的历史bug（commit 354044a4）
-- 2025-05-23：更新了界面引擎适配移动端的问题（commit 3f9e63bc）
-- 2025-05-23：接口地址动态配置还原为localConfig.json 模式（commit bb4e8783）
-- 2025-05-23：界面引擎饼图组件标签显示添加了{b}{c}{d}三种方式（commit a6943ddc）
-- 2025-05-23：二级菜单联动优化（commit 1a874f9a）
-- 2025-05-23：样式优化、移动端显示表格时不再固定详情、更多按钮的操作列。（commit 2f008279）
-- 2025-05-23：搜索截流（commit 0874d016）
-- 2025-05-23：界面引擎适配移动端滚动条问题优化（commit 9ea026d5）
-- 2025-05-23：合并远程 master 分支（commit 5e259044）
-- 2025-05-23：现在查询接口替换、导出接口替换走json格式的请求了，而不再是form-数据（commit 53306538）
-- 2025-05-23：优化了界面引擎移动端没有识别移动模式的问题（commit dbe2fabe）
-- 2025-05-23：合并远程 master 分支（commit 2caaee71）
-- 2025-05-23：彻底修复移动端滚动条滑动不顺畅的问题（commit 36037132）
-- 2025-05-24：修复了界面引擎甘特图实时更新控制失效的bug（commit 8b5028a2）
-- 2025-05-24：删除多余配置文件、修改项目说明（commit e4775e20）
-- 2025-05-24：!4 删除多余配置文件、修改项目说明 合并拉取请求 !4 从 微吾科技/master（commit d83f1cec）
-- 2025-05-24：优化数字输入框精度（commit 2d7d2e85）
-- 2025-05-24：合并远程 master 分支（commit a1e7722e）
-- 2025-05-24：更新文档（commit e1134b00）
-- 2025-05-24：合并 https://gitee.com/microios/microi.net 的 master 分支（commit 9cd59c5c）
-- 2025-05-24：更新文档 合并拉取请求 !5 从 微吾科技/master（commit fb7aa97f）
-- 2025-05-24：更新文档（commit 82a20f40）
-- 2025-05-25：优化PC WEB在移动端的显示（commit 204d5deb）
-- 2025-05-25：更新了搜索的bug和文档的bug（commit dd445933）
-- 2025-05-25：优化了二级栏目分类管理url自动获取（commit 24304be2）
-- 2025-05-25：工业提出列表某个栏目想隐藏默认的序号，列表自己有序号（commit 745e112f）
-- 2025-05-26：优化了界面引擎持久化暗黑模式，添加了页面定时更新，优化了甘特图保存提醒（commit 7dc308d6）
-- 2025-05-26：优化了甘特图回调接口参数（commit 029e682a）
-- 2025-05-26：隐藏列表默认序号（commit c50797f7）
-- 2025-05-27：优化了隐藏列表序列号的bug（commit 0d54b58b）
-- 2025-05-27：表单必填项，颜色全局配置（commit c6a98da8）
-- 2025-05-27：优化了导出按钮，json格式不能导出的问题（commit 7a3fb46e）
-- 2025-05-27：这两个传参还是需要的（commit 70cff14b）
-- 2025-05-27：修复了导出excel Blob格式未处理的问题（commit 0e4eb08f）
-- 2025-05-28：集成腾讯IM接口（commit c901bec7）
-- 2025-05-28：集成了腾讯IM通信，后端提供了两个三个接口，一个/api/Im/GetUserSig，一个批量导入用户接口/api/Im/MultiAccountImport，还一个/api/Im/MultiAccountDelete接口，另外系统配置项添加三个参数，分别是IMSdkAppid、IMSecretKey、Identifier（commit 030bb612）
-- 2025-05-29：对导出格式进行分别判断，一种是json格式的，一种是office文本格式的（commit 5b141a8e）
-- 2025-05-29：优化了移动端审批的bug（commit c7649bf3）
-- 2025-05-29：默认配置（commit 2a7ddd0e）
-- 2025-05-29：合并远程 master 分支（commit ac8031d3）
-- 2025-05-30：优化样式、更新文档（commit 18336617）
-- 2025-05-31：优化了文档（commit d97ef94a）
-- 2025-05-31：docker示例发布文件（commit 800311ba）
-- 2025-05-31：开放更多后端源码、优化部分接口（commit be9fb045）
-- 2025-05-31：更新源码目录结构（commit 23dcae64）
-- 2025-05-31：优化目录结构（commit 64342099）
-- 2025-05-31：优化目录（commit 0cafe05c）
-- 2025-05-31：更新开源协议（commit 58ce0022）
-- 2025-05-31：移动端openanyform优化（commit 2dd7972a）
-- 2025-06-01：打印引擎支持批量打印，数据源改成数组即可（commit 79e3978b）
-- 2025-06-01：优化了序号判断（commit d4ebe32a）
-- 2025-06-01：删除按钮点击，页面卡死，已处理（commit 6631ddb6）
-- 2025-06-01：提交和删除无返回值导致页面卡死（之前代码都能执行，原因未知）（commit 42444530）
-- 2025-06-01：优化了登录页面自定义颜色和是否显示中英文的判断（commit d60fe514）
-- 2025-06-02：优化了语言显示条件，移动端的bug修复，星进 定制页面（commit 5673956e）
-- 2025-06-03：修复日期搜索的bug（commit 718aca0c）
-- 2025-06-03：界面引擎添加了暗黑皮肤持久化，添加了页面定时刷新（commit 7a39f38d）
-- 2025-06-04：优化移动端 使用 openany form时提交子表保存的问题（commit 6126d99f）
-- 2025-06-04：界面引擎优化判断小屏幕适配（commit 9ea496d9）
-- 2025-06-04：修复ShowClassicTop、ShowClassicLeft样式问题（commit 6e38bb2c）
-- 2025-06-06：优化了地图区域空间点击绘制，数据为空会报错。（commit 389854ad）
-- 2025-06-08：优化了搜索框中，下拉菜单选项不正确，加了个文本，把下拉框作为文本搜索，至少能保证有个能用的（commit 89033e52）
-- 2025-06-08：优化了下拉框无数据，直接多了一个转文本框搜索的配置（commit 6beaf836）
-- 2025-06-08：每个控件都匹配了表内编辑的日志记录功能，之前只匹配了文本，现在其他控件也匹配了（commit 91fecf30）
-- 2025-06-09：删除冗余文件（commit e4e13178）
-- 2025-06-09：修复oracle大量bug、SaaS引擎新增CorsAllowOrigins跨域配置、流程引擎现在会自动更新_FlowState审计字段（commit 00b282ac）
-- 2025-06-10：跨域配置支持通配符了（commit c909ff19）
-- 2025-06-11：美勒特活动看板获取数据优化（commit 37c2c127）
-- 2025-06-12：新增APMS测试活动看板（commit 7d490863）
-- 2025-06-12：更新文档项目（commit 92d8ceff）
-- 2025-06-12：合并远程 master 分支（commit 0a19637b）
-- 2025-06-13：更换了语言系统，界面引擎同步更新语言（commit 07ea3b2a）
-- 2025-06-13：流程引擎代码区全屏被左边菜单挡住（commit 38a81846）
-- 2025-06-14：优化了审批界面点击附件打开新页面浏览，不能关闭本窗口的bug（commit db9753e1）
-- 2025-06-14：界面引擎翻译兼容之前语言，默认不做处理，不然需要2秒间隔翻译时间（commit 1650cf98）
-- 2025-06-17：界面引擎重大更新，使用AI协助重构。优化了所有资源配置，拆分了大文件js，优化了性能，修复了一些历史问题。（commit 0a039c6c）
-- 2025-06-18：修复李赛赛多语言代码报错导致系统无法登录的bug、登录接口新增_ClientType标记（如果是PC则会有过期时间）（commit fb05b191）
-- 2025-06-23：界面引擎优化甘特图，添加灯箱相关功能（commit a02c4e15）
-- 2025-06-23：生成活动提交防重（commit 207dab1c）
-- 2025-06-23：合并远程 master 分支（commit 0313a677）
-- 2025-06-24：优化代码（commit c8c508d1）
-- 2025-06-24：优化代码（commit aa4841dc）
-- 2025-06-25：界面引擎优化了甘特图灯箱以及负责人多人情况下不让保存的问题（commit 0425b9cb）
-- 2025-06-25：修复bug（commit 4da474ca）
-- 2025-06-25：优化了平台搜索，添加了防抖1秒延迟，添加了多条件检索缓存优化（commit 231b83ad）
-- 2025-06-25：合并远程 master 分支（commit 2c44b6a0）
-- 2025-06-26：在方式复选框组搜索默认空值改成空数组字符串序列化（commit 50ace860）
-- 2025-06-26：暂时取消组合筛选条件优化，场景太多需要重新规划（commit 96a915b1）
-- 2025-06-27：去除debugger 检索恢复（commit 45af40ae）
-- 2025-06-27：_Keyword 关键词搜索加节流防抖功能1秒，防止连续输入卡顿（commit cd2af09d）
-- 2025-06-27：修复了多语言版本判断时语法错误（commit 2c07fa53）
-- 2025-06-28：修复子表只能加载一个的问题（commit c6ceaec6）
-- 2025-06-28：修复子表查询的问题（commit 2183b25c）
-- 2025-06-29：修复了下拉树代码判断是否显示删除和编辑按钮没生效的bug（commit 44cf0356）
-- 2025-06-30：移动端优化，组件优先级（commit 98d2cd75）
-- 2025-06-30：合并远程 master 分支（commit 01aa5481）
-- 2025-06-30：移动端表单提交验证优化（commit 688d8352）
-- 2025-07-01：V8.ParentV8用法优化（commit 6531d5c9）
-- 2025-07-01：【美勒特】打开apqp生成弹窗默认赋值功能（commit 8191bae3）
-- 2025-07-01：合并远程 master 分支（commit 6f1c586c）
-- 2025-07-02：优化了级联搜索（commit 42d2e613）
-- 2025-07-02：优化了级联搜索重置搜索和默认加载时清空该页级联搜索缓存。（commit 1181deac）
-- 2025-07-03：优化了基本搜索，添加了节流，延迟1秒（commit 086eacf5）
-- 2025-07-03：优化了组织部门页面（commit dff397c4）
-- 2025-07-04：【美勒特】项目团队成员保存优化（commit 89a8a463）
-- 2025-07-04：合并远程 master 分支（commit b2e6a933）
-- 2025-07-05：优化了模块引擎，可以在模块引擎直接建表，无需去表单引擎建表。（commit efd72c39）
-- 2025-07-06：修复了二次模块引擎编辑弹窗时自定义表的下拉菜单zindex过低不显示的问题，修复了新建自定义表没有设置描述时名称多一个-字符的怪异问题（commit 56d94312）
-- 2025-07-09：添加了在表单直接设置表单权限，优化了层级显示顺序等（commit 1ec7ae8e）
-- 2025-07-09：优化了弹出层相关代码（commit d06fc71c）
-- 2025-07-09：app端兼容优化（commit 98da9385）
-- 2025-07-09：合并远程 master 分支（commit b0691160）
-- 2025-07-09：修复了模块引擎无法重置父级的问题，修复了全局主题样式个别组件背景色的问题（commit 39667389）
-- 2025-07-09：合并远程 master 分支（commit 222f6189）
-- 2025-07-09：权限保存提示词修改（commit 622343be）
-- 2025-07-11：大版本更新：新增MQTT服务器、修复bug、Microi.net.dll更新到v2.2.0（commit 1600bc5a）
-- 2025-07-11：修改了甘特图的保存条件（commit 0ef466e8）
-- 2025-07-14：将表单设置权限接口改为后端实现（commit da79492d）
-- 2025-07-15：升级了左右菜单导航方式（commit 67cda1da）
-- 2025-07-15：修复了权限不能级联全选的问题（commit ef4f1070）
-- 2025-07-15：优化了二级菜单的分类点击提交方法（commit 788359fa）
-- 2025-07-16：优化了二级列表的显示（commit 32412557）
-- 2025-07-17：优化了界面引擎，修复了切换mock模版时不能保存成功的问题（commit c76bd534）
-- 2025-07-18：添加了接口引擎日志（commit 7ad396d9）
-- 2025-07-22：修复数据源引擎z-index 层级不显示图标配置页面的问题（commit fec6c2bc）
-- 2025-07-22：修复了富文本框无法上传本地视频的问题（commit 765ffc74）
-- 2025-07-22：星进定制页面，（commit 394da492）
-- 2025-07-22：token bug修复（commit d0d82613）
-- 2025-07-23：修复了列表页下拉框显示value不显示label的问题，修复了编辑框点击模块设计的层级问题（commit 09b903de）
-- 2025-07-23：合并远程 master 分支（commit f0ba41e4）
-- 2025-07-23：解决冲突（commit a7e52263）
-- 2025-07-24：优化了列表页下拉菜单显示的问题（commit 50bdc1df）
-- 2025-07-24：根据标识决定是否执行表单进入事件（子表提交后不执行）（commit 8f31710f）
-- 2025-07-24：合并远程 master 分支（commit 1a4b438c）
-- 2025-07-25：优化了自定义按钮，不能回调父主键的bug（commit c02ac804）
-- 2025-07-26：弹窗背景阴影层（commit ec9d810a）
-- 2025-07-27：优化了移动端，可以公众号认证（commit c304058d）
-- 2025-07-28：【新增】列表删除时执行表单提交离开后事件（commit 456f3c18）
-- 2025-07-28：合并远程 master 分支（commit 420128f0）
-- 2025-07-28：优化（commit a973f545）
-- 2025-07-28：【新增】查看详情删除执行V8事件（commit dc275fce）
-- 2025-07-28：修复层级bug，添加插件商城基础（commit 244aa1c4）
-- 2025-07-28：合并远程 master 分支（commit 9d52f463）
-- 2025-07-28：添加了插件商城研发文档（commit 707a8d38）
-- 2025-07-29：吾码插件商城底座开发完毕，流程清晰，文档齐全。（commit 7f701bb0）
-- 2025-07-29：优化路由和 devDependencies 两个npm包依赖（commit a0da414f）
-- 2025-07-29：【父组件刷新子表】如果子表是隐藏的，则不刷新（commit ae4ca623）
-- 2025-07-29：合并远程 master 分支（commit 70aa6999）
-- 2025-07-29：模块引擎新增【固定列】功能（commit d6ee6c7a）
-- 2025-07-29：去除界面引擎的翻译功能（commit 128cda57）
-- 2025-07-29：合并远程 master 分支（commit 34c8c5df）
-- 2025-07-30：优化了接口引擎日志，解决 Msg: "未处理的异常：Element 'All' does not match any 字段 or property 的 class 日志报错的问题（commit 6ba4a629）
-- 2025-07-31：修复了&lt;i&gt;标签引发的各种问题，i 标签点击事件和鼠标悬停事件不触发，已使用span或者button包裹。（commit 1f6ef056）
-- 2025-07-31：表单设计器优化：单行文本框添加了按钮插槽功能，按钮插槽功能可以级联弹出表格功能（commit 4181cdaf）
-- 2025-07-31：控件类型优化（commit 80e94cb4）
-- 2025-07-31：合并远程 master 分支（commit 4f217511）
-- 2025-08-01：合并远程 master 分支（commit cf80c72a）
-- 2025-08-01：修改了本地开发环境配置项（commit 4694e961）
-- 2025-08-01：降低sass版本 解决开发过程当中的报错（commit 0a9d0ea7）
-- 2025-08-01：插件包验证windows.js 函数使用，已认证可以使用（commit 9a6db757）
-- 2025-08-01：接口引擎日志对type空类型进行了处理（commit 38d144f1）
-- 2025-08-01：修复element表格排序箭头不正常显示正序、倒序颜色的bug（commit 97b048a9）
-- 2025-08-01：更新平台介绍（commit d7d828c2）
-- 2025-08-01：更新平台介绍（commit fa3f92fa）
-- 2025-08-01：更新平台介绍（commit e734348a）
-- 2025-08-01：更新平台文档（commit 12893245）
-- 2025-08-02：新增了一组表格内部标签样式（commit 304b5522）
-- 2025-08-02：优化了readmin.md 文档了，添加平台对goview大屏、three.js 3D模型渲染引擎、腾讯IM集成的介绍。（commit 6fa26a81）
-- 2025-08-03：后端添加了Message控制器，用来验证消息加密解密（commit fca47fb9）
-- 2025-08-04：更新文档（commit 19f93ead）
-- 2025-08-04：合并远程 master 分支（commit dc3bad5d）
-- 2025-08-04：单行文本框插槽按钮单独配置是否只读（commit e19fcb89）
-- 2025-08-04：合并远程 master 分支（commit 04c1ada4）
-- 2025-08-04：新增了表单分组 第一个选项卡固定显示，需要在表单设计添加字段 TabsTop，然后开启表单分栏。（commit 8aca85f0）
-- 2025-08-05：优化了新增按钮v8事件，执行新增和详情v8事件时，应禁止原默认的打开表单事件（commit 6e586c64）
-- 2025-08-06：优化表格操作栏，默认按钮使用text格式，并去除换行。white-space: nowrap;改成 white-space: unset;（commit 14eaab7a）
-- 2025-08-06：合并远程 master 分支（commit b0d5511d）
-- 2025-08-06：优化表格按钮样式（commit 064daf40）
-- 2025-08-06：修复弹框顶部横线颜色没有跟随主题的问题，修复了页面权限列表超出高度没有滚动条的问题，还原了表格右侧操作区域的样式（commit 6eac30dd）
-- 2025-08-07：新增FormDataId URL参数（用法见平台文档）、表单模板引擎只在预览时渲染、更新平台文档项目等（commit 74fc33c7）
-- 2025-08-07：更新平台文档（commit c5edd762）
-- 2025-08-07：完善V8前端函数FormClose等等、完善平台文档（commit 6b34d0d5）
-- 2025-08-08：管理员添加模块菜单默认赋予该页面权限，无需再手动添加（commit 16a6a9b5）
-- 2025-08-09：更新了界面设计引擎，优化了地图组件，地图可以通过url参数接收中心点地址（commit 9a218eee）
-- 2025-08-09：更新文档（commit 3d790b71）
-- 2025-08-09：修复了一下排序不升级，及样式优化（commit b99d5ebc）
-- 2025-08-10：目录树懒加载（commit 810e6ea7）
-- 2025-08-10：优化了目录树结构（commit ed10be22）
-- 2025-08-12：原来写法vue2懒加载不生效，直接改掉了，（commit dc31df29）
-- 2025-08-12：优化了插件商城底座，使其支持路由和实体文件查找两种方式，既支持菜单展示，又支持嵌入form表单内部，可以在表列表显示自定义组件。（commit 9a16c1f5）
-- 2025-08-12：合并远程 master 分支（commit 67f521e7）
-- 2025-08-12：优化表单权限样式、v8 条件的按钮不再 admin 必显示（commit 4225da89）
-- 2025-08-12：默认不显示新增按钮，否则配置了不显示的条件后每次都是先出现再消失（commit 67998325）
-- 2025-08-15：修复了搜索条件下拉树选择不会赋值的问题，这是个vue和elementui的经典问题，涉及到下拉组件的内部机制问题。（commit b72710c0）
-- 2025-08-16：审批意见输入框大一些（commit 409136a4）
-- 2025-08-16：Microi.net.dll发布v2.2.3，diy_table、sys_menu等查询现在会走redis缓存，数据列表、单条数据查询性能提升2-3倍。（commit 8bfff402）
-- 2025-08-18：项目上的文件以及审批意见高度增高、按钮颜色（commit 2df48c13）
-- 2025-08-18：增加了lable宽度（commit d30f1afc）
-- 2025-08-18：修复警告（commit bbaa1802）
-- 2025-08-18：合并远程 master 分支（commit 3db34fdb）
-- 2025-08-19：修复移动端级联下拉没有更新的问题，使用 nextTick 确保 DOM 更新解决（commit f696d353）
-- 2025-08-19：修复了cardDetail.vue 页面diyFormFields参数的问题，使用computed保持响应式并不污染props.diyFormFields，采用深拷贝模式处理。（commit 416d674c）
-- 2025-08-20：修复数据列表开关控件搜索无效的bug（commit c3cf1ed9）
-- 2025-08-20：延迟执行搜索1秒改成500ms（commit 0dff2d41）
-- 2025-08-20：新增V8.SearchParam可访问搜索参数（commit 260cc2d5）
-- 2025-08-20：现在表内编辑的控件事件也能正常的访问V8.OldForm对象了。（commit d4cf7383）
-- 2025-08-24：优化移动端样式（commit 0bc7afe3）
-- 2025-08-25：更新V8.Http用法文档（commit 8b6767ec）
-- 2025-08-25：更新文档（commit f43651a4）
-- 2025-08-29：接口引擎扩展V8.WeChat类、Microi.net发布v2.9.0（commit fb715421）
-- 2025-08-29：修复：值变更事件 现在如果有false的返回值 则 阻止更新事件（commit 1faa0654）
-- 2025-08-29：V8.方法微信相关加密函数通过.net core类实现、V8.WeChat微信相关加密函数通过第三方类实现，效果都一样（commit d73c37ff）
-- 2025-08-29：合并远程 master 分支（commit 914545c8）
-- 2025-08-30：前端增加V8.OsClient访问当前saas租户的OsClient值，与后端一致（commit 8f1511d9）
-- 2025-08-30：下拉框默认开启搜索（commit b8c5e6b9）
-- 2025-08-30：feat：目前值变更事件拦截 支持4种组件数字 单行文本 下拉单选 多行文本（commit 83918d5c）
-- 2025-08-30：优化了下拉树（commit 951b0f64）
-- 2025-08-30：bug修复（commit 5834247f）
-- 2025-08-30：修复：【重大修复】下拉选择 可以正常显示 通过下拉逻辑出来的值了！！！！！！！！！！！！！！（commit 04ba6bd0）
-- 2025-09-02：修复了合并引起的冲突（commit 0bf3c19c）
-- 2025-09-02：回退 "修复了合并引起的冲突"（commit 1fc89b8e）
-- 2025-09-02：回退 "优化了下拉树"（commit 576821a2）
-- 2025-09-02：添加虚拟滚动组件（commit 39f242d9）
-- 2025-09-02：修改虚拟滚动列表名称（commit f755413d）
-- 2025-09-02：新增：改函数 改地址（commit 519ea0b6）
-- 2025-09-02：移动端目录优化了一下，客户的定制页面放到customer去了（commit a34227d7）
-- 2025-09-03：更新说明（commit 1d7b1137）
-- 2025-09-03：增加了移动端的编辑按钮，可执行代码来显隐藏（commit e3ac098f）
-- 2025-09-03：优化了移动端新增按钮，可代码控制（commit edd3e3bd）
-- 2025-09-03：新增数据评论功能、修复移动端表单信息被数据日志层级覆盖显示的样式问题（commit ac2a3ec5）
-- 2025-09-03：合并远程 master 分支（commit af690a48）
-- 2025-09-04：更加严谨了一些 如果有了undefind判定 还是返回真（commit 4e53e186）
-- 2025-09-04：格式化周总评论区部分代码（commit 489fc8eb）
-- 2025-09-04：删除不必要的软件包.json文件，会导致第三方公司扫描误报为高危漏洞（commit cbabe5e3）
-- 2025-09-04：修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit e8482fb0）
-- 2025-09-04：二次修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit 5f5c4972）
-- 2025-09-04：二次修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit 0e1828a6）
-- 2025-09-04：第三次修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit 84b2dec6）
-- 2025-09-05：优化表单组件循环（commit f59822b7）
-- 2025-09-07：优化了移动端获取osclient的方法，更灵活（commit 33072cc3）
-- 2025-09-08：修复表内编辑下拉框第二次下拉无数据的bug、修复循环表单组件时出现的bug（commit 3ec3f84b）
-- 2025-09-08：修复数字控件现在是循环模式的时候产生的bug（commit 74a206f8）
-- 2025-09-09：修复优化循环表单组件后产生的多选下拉框不显示bug（commit ea95cb3e）
-- 2025-09-09：修复表内编辑FormSet不生效的bug（commit 03d33917）
-- 2025-09-09：新增了openanytable的翻页选择功能，选择的数据会先存进临时数据，统一提交（commit 8bc3631e）
-- 2025-09-09：优化了文档，更新了OpenAnyTable的doc使用方法（commit 7764eef3）
-- 2025-09-09：优化了form页关联id不显示的bug（commit c7b7bd15）
-- 2025-09-10：更新平台文档（commit 9144288d）
-- 2025-09-10：更新了左右结构，同时新增了自定义移动端列表显示列（commit 0b24c6f8）
-- 2025-09-11：api接口系统首页由黑客帝国效果修改为官方文档（commit d860f7d5）
-- 2025-09-11：合并远程 master 分支（commit 053396ea）
-- 2025-09-11：api接口系统首页由黑客帝国效果修改为官方文档（commit 09007e93）
-- 2025-09-13：优化项目架构代码（commit 35751faa）
-- 2025-09-13：优化系统架构代码（commit 94c28324）
-- 2025-09-13：修复sqlserver无法修改物理字段名的bug（commit d447a7ad）
-- 2025-09-13：上传SqlServer2017版主库数据库、修复sqlserver修改字段无法修改字段说明的bug（commit 6e1d894e）
-- 2025-09-14：优化架构、修复地址组件bug（注意：若列表表内编辑开启了地址控件类型的字段，会导致列表页DOM渲染非常卡[地址数据量过大]！此问题将来再优化！）（commit bf88ed63）
-- 2025-09-14：表单引擎，如果表名、表描述过长导致换行影响用户查看，虽然现在解决不够完美，暂时保证超过一行用省略号（commit 7e4ab534）
-- 2025-09-14：新增登录成功运行一段代码，可执行业务伙计或者弹窗提示，openanyform等（commit f4383307）
-- 2025-09-15：去掉console代码（commit c2f8bd5d）
-- 2025-09-17：更新平台文档（commit 5e599933）
-- 2025-09-18：优化模块引擎，【查询列、可搜索列】配置现在是以表格展示了（commit 98c04946）
-- 2025-09-18：修复做菜单与右边内容区域的层级关系，提高右边内容区域的层级以防止全屏编辑器被左边菜单树遮盖（commit a0add829）
-- 2025-09-20：修复了搜索下拉框，无法清除已选数据的bug（commit 313800b3）
-- 2025-09-23：新增OnlyOffice支持、现在默认的审计字段也会在表单中显示了（在新建表的时候自动创建对应的字段控件、并且支持模块引擎中排序）（commit 5da6e0bc）
-- 2025-09-23：更新平台文档（commit 8e40eb8e）
-- 2025-09-26：更新文档（commit 936a4ced）
-- 2025-09-26：现在表单搜索字段无视大小写了、修复创建时间默认宽度（commit 67203cf5）
-- 2025-09-26：表单引擎新增进度条控件（commit c37e341e）
-- 2025-09-26：合并远程 master 分支（commit ff0ffbbc）
-- 2025-09-26：详情按钮可用代码控制，sys_menu表需要新增DetailCodeShowV8字段（commit 5834e2fd）
-- 2025-09-26：修复审计字段显示问题（commit e5f8ba3d）
-- 2025-09-26：合并远程 master 分支（commit 8b6502aa）
-- 2025-09-27：现在模块引擎iframe支持接口引擎单点登录到第三方系统了、修复进度条组件在表格不显示的bug、现在进度条会有默认的颜色区分了（commit 4529950d）
-- 2025-09-28：优化进度条组件、修复模块引擎V8按钮代码无法编辑的bug（commit dd9d41ac）
-- 2025-09-28：修复url参数带上Keyword之类的会影响到子表的bug（commit 2cde4db2）
-- 2025-09-29：更新平台集成OnlyOffice文档（commit 32188db8）
-- 2025-09-29：移动端的层级才需要高一点（commit 2559356b）
-- 2025-09-29：修复样式bug（commit 1d13af5e）
-- 2025-09-29：合并远程 master 分支（commit d7840bf1）
-- 2025-09-30：更新接口引擎实战文档：在接口引擎中对文件的接收、下载、上传（commit 090fb7d3）
-- 2025-10-01：更新了左右结构的菜单（commit 8265f38e）
-- 2025-10-01：重要，1,优化了左侧菜单背景颜色浅色，下拉菜单的箭头颜色获取设置的颜色；2,优化了二级下拉菜单背景颜色跟随主系统颜色的bug；*二级下拉菜单右侧的箭头太靠右（commit 126a55e9）
-- 2025-10-08：key重复，值变更会报错（commit 5dd21fc4）
-- 2025-10-08：现在可以根据模块设计里的表内编辑，配置是值变更更新数据，还是最后表单提交一起保存数据（commit f1cd1a65）
-- 2025-10-09：移动端审批页面优化（commit 7e56c1de）
-- 2025-10-09：表内编辑一起提交数据出现bug，先恢复以免影响使用（commit 46210123）
-- 2025-10-09：导出模板支持图片了、新增用户操作记录功能、模块引擎中的iframe接口引擎支持V8.Param.MenuId了。（commit ccb9f707）
-- 2025-10-09：可通过设置隐藏通用搜索框，有些情况下需要固定框精确等值搜索。（commit 6f0be384）
-- 2025-10-10：修复一些特殊格式和段落的模板导出时字段无法被正确替换的问题（commit 7cc1f3a0）
-- 2025-10-10：修复刘老师的代码bug、现在模块引擎的where条件和join条件是代码编辑器了、修复代码编辑器高度无法自定义传入的bug（commit eed539b8）
-- 2025-10-10：修复模块引擎中有多个代码编辑器组件时导致编辑器无法最大小化、最小化的bug（commit 3600f2f4）
-- 2025-10-10：修复一些特殊情况下模板导出子表数据只有一条的bug（commit 33417dc4）
-- 2025-10-10：取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态（commit 956894cd）
-- 2025-10-11：表单字段分组现在跟分组Id进行关联（而不再是分组名称一改导致分组失效）、修复表单分组排序字段是字符串的bug（commit dd9d8f65）
-- 2025-10-12：修复了左右结构的bug（commit 65b189e6）
-- 2025-10-13：表单引擎-日期控件新增【多选天、多选月、多选年】的功能（commit c222d2d7）
-- 2025-10-13：左右结构优化（commit 0d2613d3）
-- 2025-10-14：全新_Where用法上线，用法见平台文档，兼容老版写法（commit 5c5852f3）
-- 2025-10-14：合并远程 master 分支（commit 4833d8e7）
-- 2025-10-14：替换老版_Where为新版_Where格式（commit 902b3266）
-- 2025-10-15：更新平台文档（commit 6a36a95c）
-- 2025-10-15：更新平台文档（commit 6be10de9）
-- 2025-10-15：修复特殊情况下部分表单的字段分组显示不对的bug（commit 3eb00802）
-- 2025-10-15：所有接口替换均支持$ApiBase$、$OsClient$变量了（commit fc6195ac）
-- 2025-10-16：左右结构优化（commit b7dfd2a5）
-- 2025-10-17：Microi.net.dll发布v2.4.5，修复接口引擎缓存初始化在一些特殊情况下会失败的bug（commit 2aac56a6）
-- 2025-10-17：修复接口引擎即使未启用下也能通过接口自定义地址调用的bug（commit 4850aef5）
-- 2025-10-17：优化接口引擎（commit c2c003b5）
-- 2025-10-17：表格批量选择的列宽度降低到合理范围（commit 8cf87f8d）
-- 2025-10-17：模块引擎新增【表格操作列固定宽度】配置（commit 1bccd09b）
-- 2025-10-18：修复V8.ClickFormTab的bug（commit 0fd3300a）
-- 2025-10-18：更新引用版本号（commit 1b8bf9ac）
-- 2025-10-20：更新平台文档（commit 13651ff1）
-- 2025-10-20：修复下拉复选框搜索无效的bug（commit acec8f09）
-- 2025-10-21：修复获取接口引擎列表时也获取了代码导致慢的问题、更新平台文档（commit cdb7af01）
-- 2025-10-23：现在word模板导出时图片字段会取图片的默认宽高（commit 2c2edca3）
-- 2025-10-24：优化了界面引擎甘特图，支持以小时为最小单位，支持读取、编辑动态json列，优化了刻度1格显示1小时（commit 3aa1b0e8）
-- 2025-10-24：优化了表格图片展示，现在可以直接预览图片和多图预览。（commit 588e5aa0）
-- 2025-10-24：优化了表格图片懒加载（commit cadba51c）
-- 2025-10-25：子表表内编辑，如果开启了主表保存后提交，则统一提交生效，否则是编辑了及时生效（commit 1c14c622）
-- 2025-10-25：优化readme文档（commit b5606885）
-- 2025-10-27：下拉多选框的搜索由OR条件修改为在，性能更高。（commit b622fa6a）
-- 2025-10-28：更新文档（commit 6ce81300）
-- 2025-10-28：更新平台文档（commit b4bad271）
-- 2025-10-29：优化了OpenAnyTable弹窗表单新增，编辑和删除是父表的bug，同时对弹窗的左右结构进行了优化，使其选择功能更加强大（commit 4c38ea83）
-- 2025-10-29：修复通用数据列表导出功能不支持新版_Where条件语法的bug、更新平台文档（commit b1b35164）
-- 2025-10-29：优化了插件引擎，支持第三方依赖包CDN引入，这样可以不用污染主框架的依赖包，开发插件更容易插拔，超强，另外不局限于vue2语法了，支持vue3写法。（commit 4ee67e85）
-- 2025-10-29：合并远程 master 分支（commit 1e38519c）
-- 2025-10-29：优化了表内编辑数据状态的命名，避免冲突，DataStatus改为_DataStatus（commit c2a81940）
-- 2025-10-31：优化了登录页，去掉了项目特定代码，标题字号小了一号，在标题太长导致的换行（commit e1be952e）
-- 2025-10-31：新增默认不显示审计字段、修复审计字段显示bug问题（commit 68f884cb）
-- 2025-10-31：合并远程 master 分支（commit 67acab93）
-- 2025-11-01：更新平台文档（commit 7264eb4e）
-- 2025-11-01：更新平台文档（commit eb5a5b82）
-- 2025-11-01：更新平台文档（commit 7fd2278d）
-- 2025-11-01：更新平台文档（commit a59695ce）
-- 2025-11-03：更新静态地址（commit 16bb5f75）
-- 2025-11-05：更新平台文档（commit 7c1c81d6）
-- 2025-11-05：优化了自定义树形组件，添加了层级增加按钮显示的限制条件（commit 3c4518ef）
-- 2025-11-06：优化角色管理、更新平台文档（commit 15e3f4fb）
-- 2025-11-06：登录页面，发送短信验证码会更新图形验证码的bug（commit d8041cac）
-- 2025-11-06：优化登录验证码刷新问题（commit 4a022bed）
-- 2025-11-06：更新平台文档（commit 86aa490a）
-- 2025-11-06：更新平台文档（commit 87642431）
-- 2025-11-06：更新平台文档（commit d52c858f）
-- 2025-11-10：修复新版_Where不支持多表联查搜索关联表字段搜索的问题（commit 7c4ea479）
-- 2025-11-11：修复前端表单提交前V8事件无法通过【return Code : 0】阻止表单提交的bug、修复时间条件无法正常搜索的bug、修复数字控件无法搜索的bug、更新平台文档、后端Microi.net.dll更新v2.6.3（commit 184807df）
-- 2025-11-11：修复数字控件在可搜索列中默认为0的bug（commit 19a2ec27）
-- 2025-11-11：优化左右结构，左边选中，右边新增的bug（commit 21ccabd9）
-- 2025-11-11：彻底修复数字控件在可搜索列中默认为0的bug（commit 88396d05）
-- 2025-11-11：更新平台文档（commit a63a79c6）
-- 2025-11-12：更新平台文档（commit 73efe19c）
-- 2025-11-12：后端Microi.net.dll升级至v2.6.3（commit 9d328698）
-- 2025-11-12：后端Microi.net.dll升级至v2.6.3（commit 29c6e145）
-- 2025-11-13：更新版本引用（commit b569a431）
-- 2025-11-13：更新平台文档、新增V8.SelectedData代替V8.TableRowSelected（commit 1a1de68a）
-- 2025-11-13：更新平台文档（commit a04756e0）
-- 2025-11-13：更新平台文档（commit e4d115a8）
-- 2025-11-14：更新平台文档（commit 8fd36c67）
-- 2025-11-14：更新平台文档（commit 2e49aa35）
-- 2025-11-14：更新平台文档（commit b87b72b6）
-- 2025-11-15：优化了提交代码，左右结构的时候，不要提交的参数校验（commit 65a614c7）
-- 2025-11-17：修复表内编辑一些组件（如开关）在刷新数时但DOM不刷新的bug（commit 11aa18e2）
-- 2025-11-17：合并远程 master 分支（commit 6371a7ca）
-- 2025-11-17：修复下拉框控件当存储字段为Id、显示字段为Name时，在表内编辑时显示的是Id而并不是Name的bug（commit 098eb3df）
-- 2025-11-19：流程信息新增下一节点名称显示、修复ParentId树形控件字段不显示的bug、更新平台文档（commit 95517a6f）
-- 2025-11-20：Microi.net.dll nuget升级至v2.7.0。、考虑到V8代码中处理事务对象的繁琐性，甚至可能出错，现对平台进行了非常强大的升级：【当接口引擎、后端V8事件代码出现return { Code : 不等于1 }、或V8.Result = { Code : 不等于1 }时，平台会自动回滚事务，反之提交事务。】 【之前的V8代码不受影响，仍然兼容】 B、修复V8.方法.AddSysLog()无法在服务器端V8事件中调用的bug C、修复在服务器端V8事件中调用接口引擎传入V8.DbTrans后，会导致报错【Connection must be valid，open 至 rollback transaction】（commit e80d9d5f）
-- 2025-11-20：为了程序业务逻辑的严谨、健壮性，现在表单服务器端提交前、提交后的V8事件代码若出现了异常，也会中止表单的提交、并且回滚事务。【之前并不会，这将可能导致以前事件中的异常bug全出显现出来，然后导致业务单据无法保存】（commit 1243305c）
-- 2025-11-20：Microi.net.dll发布v2.8.0，修复服务器端V8事件与接口引擎之间的相互调用可能会出现V8.DbTrans对象被提前提交或回滚的问题（commit 0895c2bd）
-- 2025-11-20：Microi.net.dll nuget更新至v2.8.5 重大优化升级、修复switch传值bug、更新平台文档（commit 570a2076）
-- 2025-11-20：修复表单引擎下拉框组件显示bug（commit aada51b2）
-- 2025-11-22：更新平台文档（commit ae960a5d）
-- 2025-11-25：优化redis、更新平台文档（commit fc38335a）
-- 2025-11-25：Microi.net.dll升级至v3.0.0（大量更新、升级至.net standard2.1）、更新平台文档（commit 8df3eba2）
-- 2025-11-25：修复了tab点击问题（commit 982fadc8）
-- 2025-11-25：文件优化（commit a548fafe）
-- 2025-11-26：Microi.net.dll nuget更新至v3.0.1、更新平台文档（commit 6450fa51）
-- 2025-11-26：更新平台文档（commit 45358416）
-- 2025-11-26：更新平台文档（commit 217aeed6）
-- 2025-11-26：Microi.net.dll nuget发布v3.1.0、更新平台文档（commit 7f624b3e）
-- 2025-11-26：更新平台文档（commit bb30bcf0）
-- 2025-11-26：更新平台文档（commit 400e7aff）
-- 2025-11-26：新增_ForceUpt参数支持强制修改自动编号字段、更新平台文档（commit 9d6275fe）
-- 2025-11-27：插件引擎文档从microi-web源码迁移至microi-doc平台文档项目中（commit 730f9dfb）
-- 2025-11-27：更新平台文档（commit 7d31bedc）
-- 2025-11-27：界面引擎甘特图组件添加了视图切换配置，修复了项目结束时间计算错误的问题。（commit 1858cb67）
-- 2025-11-27：优化了界面引擎甘特图组件，左边持续时间&gt;24小时转换成天+小时（commit 9cc6868e）
-- 2025-11-28：优化代码（commit 1febe8ea）
-- 2025-11-28：更新平台文档（commit d9b5e627）
-- 2025-11-28：更新平台文档（commit 0f082b26）
-- 2025-11-29：更新平台文档、修复HideFormTab无效的bug（commit 9c5ebb71）
-- 2025-11-29：修复V8.HideFormTab无效的bug（commit fb9e4e13）
-- 2025-11-29：修复V8.HideFormTab()被隐藏后默认不显示的bug（commit 7cce5b10）
-- 2025-11-29：更新平台文档（commit 2c24a3d0）
-- 2025-11-29：Microi.net.dll nuget发布v3.1.3，更新平台文档（commit 79e0ad82）
-- 2025-12-01：更新平台文档（commit b780c680）
-- 2025-12-01：更新平台文档（commit b280b394）
-- 2025-12-01：优化表单设计器样式（commit c0fb5e0d）
-- 2025-12-01：更新平台文档（commit 42c3f743）
-- 2025-12-01：优化OsClient域名匹配机制、更新平台文档（commit e8eceb65）
-- 2025-12-02：更新平台文档（commit d60dd369）
-- 2025-12-02：更新uni-app移动端（commit af57f5ce）
-- 2025-12-02：修复版本号导致的导入功能报错（commit 0ddbfb39）
-- 2025-12-02：更新后端版本号（commit 63dcad4a）
-- 2025-12-03：更新平台文档、uni-app移动端蓝牙打印支持（commit 25968351）
-- 2025-12-04：修复V8.SearchSet的bug（commit 1a4236bf）
-- 2025-12-04：更新平台文档（commit feef3c94）
-- 2025-12-07：更新平台文档（commit e1ed2c75）
-- 2025-12-11：更新平台文档（commit 8d8af042）
-- 2025-12-12：分布式任务调度系统修改为默认CPU核心*10线程（之前默认10线程）、现在允许并发执行执行、更新平台平台（commit 51fc59c4）
-- 2025-12-13：更新平台文档（commit f1d3c986）
-- 2025-12-14：更新平台文档（commit 23f56c26）
-- 2025-12-14：更新平台文档（commit b3e436b6）
-- 2025-12-15：V8引擎扩展新增支持更新阿里云更新ESA DNS、更新平台文档（commit f8d80265）
-- 2025-12-16：升级任务调度引擎、更新平台文档（commit cb718f7f）
-- 2025-12-16：升级任务调度引擎，更稳定、更健壮。（commit def47519）
-- 2025-12-19：平台架构升级、新增开源服务器端自动升级程序（commit e3e337b1）
-- 2025-12-20：优化前端web样式（commit c3b48854）
-- 2025-12-20：优化框架样式（commit 4e95a25f）
-- 2025-12-21：优化界面引擎文件（commit e4738a82）
-- 2025-12-22：移动端弹出表格新增关键词搜索（commit 84a8a9e7）
-- 2025-12-22：修复移动端下拉框远程搜索的bug（commit 0f4980d6）
-- 2025-12-23：优化MQ消息队列、更新MQ文档（commit ab7c23b0）
-- 2025-12-25：修复新版Where可能存在的bug、升级系统功能、更新平台文档（commit 86a9aecc）
-- 2025-12-26：升级至.NET10、修复SaaS引擎主库修改配置后需要重新登录的问题、更新平台文档（commit 8ac35db1）
-- 2025-12-26：升级至.NET10、Docker镜像地址更换、更新平台文档（commit b6ffc00a）
-- 2025-12-26：重要升级：接口引擎、后端V8事件支持await、async等异步操作。（commit a57bba89）
-- 2025-12-26：后端V8引擎支持console、setTimeout两个对象（commit f3cbd140）
-- 2025-12-27：Microi.net.dll发布v3.5.1、优化.net10发布机制、V8引擎增加容错机制（commit 4b4edb4b）
-- 2025-12-27：优化服务器端控制台输出（commit 935711a1）
-- 2025-12-27：vue3 uni-app移动端上线蓝牙标签打印功能（commit 031cd9ca）
-- 2025-12-29：优化移动端蓝牙打印（commit 93657dc0）
-- 2025-12-29：Microi.net.dll发布v3.5.2，放宽V8引擎容错机制（commit 0f74d8da）
-- 2025-12-29：优化错误提示（commit ef1eaa9e）
-- 2025-12-29：修复查看密码功能bug（commit 531cb640）
-- 2026-01-04：【重要更新】平台架构升级、Microi.net.dll升级至v4.0（commit 6e6921c8）
-- 2026-01-04：【重要升级】后端开放更多源码（99%）、Microi.net升级至v4.1.0（commit f96c7826）
-
-- 2024-10-30：Microi.net：工程维护（commit 0f8b8aa）
-- 2024-10-30：Microi.net：更新readme（commit f96c770）
-- 2024-10-31：Microi.net：工程维护（commit f26fe5c）
-- 2024-11-19：Microi.net：工程维护（commit 140dce3）
-- 2025-03-06：Microi.net：工程维护（commit ba1697c）
-- 2025-06-03：Microi.net：工程维护（commit 28f0afd）
-- 2025-08-15：Microi.net：工程维护（commit ca3b8d5）
-- 2025-09-15：Microi.net：工程维护（commit 12c14e9）
-- 2025-10-10：Microi.net：工程维护（commit f605bb8）
-- 2025-10-28：Microi.net：工程维护（commit 4699630）
-- 2025-11-24：Microi.net：工程维护（commit a2967e2）
-- 2025-11-24：Microi.net：bug修复（commit 58707fe）
-- 2025-11-24：Microi.net：优化事务（commit f6b03bb）
-- 2025-11-25：Microi.net：优化代码（commit d6f9b13）
-- 2025-11-26：Microi.net：工程维护（commit 5f19d07）
-- 2025-12-25：Microi.net：发布版本 v3.3.1；工程维护（commit d762198）
-- 2026-01-04：Microi.net：发布v4.0（commit b64a6e1）
-- 2026-01-04：Microi.net：发布版本 v4.1.0（commit e5d6f8f）
-- 2026-07-06：Microi.VSCode：新增：更新版本号至 3.1.0（commit 0397baa）
-- 2026-07-07：Microi.VSCode：新增：更新版本号至 3.1.3（commit 41327ff）
-- 2026-07-13：Microi.VSCode：新增：更新版本号至 3.5.2，优化 MCP 运行时配置以支持独立 Node 和 Electron（commit f60dc3f）
-
-## v4.0.0
-
-更新日期：2024-10-21 17:46
+- 更新文档（commit 0bc615b9）
+- 更新文档（commit 1c1236c5）
+
+## v4.7.8 - (2026-02-27)
+
+- 修复新版前端不支持V8.ParentV8的bug（commit ffe45668）
+- 优化前端框架（commit 4f8dfb97）
+- 优化前端架构（commit fc920a35）
+- 优化移动端（commit 0a1b6254）
+
+## v4.7.7 - (2026-02-26 08:54)
+
+- 更新v4.7.7，优化前后端框架，移植并完善旧版移动端的扫一扫、蓝牙打印等功能（commit 81ebb35c）
+
+- Microi.AI：发布版本 v4.7.7（commit 1add39a）
+- Microi.net：发布版本 v4.7.7：开源版允许使用工作流了（commit 0e44672）
+
+## v4.7.7 - (2026-02-25)
+
+- 优化AI编程、完善平台小程序端（commit 7a1247b7）
+- 修改源码结构（commit b2c1ea1c）
+- 适配全平台小程序（commit 2d63108a）
+- 更新文档（commit 73fe3485）
+
+## v4.7.7 - (2026-02-24)
+
+- WebOS源码集成到传统界面中支持切换、新增小程序webview版本、优化前端架构（commit d8843953）
+- 更新文档（commit 1d5a3ed1）
+- 更新文档（commit bfaffa9f）
+- 修复 json表格 添加数据后的提示错误（commit 0da59e7a）
+
+## v4.7.7 - (2026-02-17)
+
+- 优化前端（commit 530fd547）
+
+## v4.7.7 - (2026-02-12)
+
+- 优化前端样式（commit b2484b24）
+
+## v4.7.6 - (2026-02-11 09:44)
+
+- 修复阿里云文件上传bug（commit f4d541d9）
+- 修复图片、文件上传控件bug（commit 9709decc）
+- 更新v4.7.6，修复新版文件、图片上传等bug（commit 10f5cdd8）
+
+## v4.7.6 - (2026-02-11)
+
+- 修复左右树形结构模板bug（commit 7721efe3）
+- 优化前端框架（commit c6c16fd1）
+- 优化移动端（commit dbb27d4c）
+
+## v4.7.6 - (2026-02-10)
+
+- 优化前端框架（commit 02489075）
+- 优化前端框架（commit bb5dfe3e）
+- 允许跟踪 microi.web/bin/Release 配置文件（commit fc5de550）
+- 修复: 添加 microi.web/bin/ 例外规则（commit f39b7662）
+- 使用根路径语法排除 microi.web/bin（commit ce109867）
+- 调整 microi.web/bin 忽略规则（commit b01a43c1）
+- 调整 .gitignore: 只跟踪 bin/Release 中的配置文件和 itdos-heart（commit a1e8ec25）
+- 调整发布文件（commit 62611b15）
+
+## v4.7.5 - (2026-02-09)
+
+- Microi.AI：发布AI编程：新增自然语言转V8引擎代码（commit ea66004）
+- 修复编译后的无法运行的bug（commit f95ccc3c）
+- 修改源码目录结构（commit da09f6a8）
+- 优化前端框架（commit 148d2ee4）
+- 更新最新版数据库（commit 7e64cf56）
+- 更新最新版空库（commit 42109f4b）
+- 修复子表-表单传值bug（commit a0ffb2e0）
+- Microi.net：发布版本 v4.7.5（commit d5170f8）
+
+## v4.7.6 - (2026-02-08)
+
+- 优化前端框架（commit cd8bbf4d）
+- 优化前后端框架（commit 1da7ad04）
+- 优化前后端框架（commit 326cd7ba）
+
+## v4.7.5 - (2026-02-07 12:43)
+
+- 更新平台文档、修复模块引擎【不显示列】不生效的bug（commit e15690a5）
+- 更新v4.7.5，AI编程功能上线（commit eac217dc）
+
+## v4.7.5 - (2026-02-07)
+
+- 临时禁用界面引擎、打印引擎，否则编译打包后会报错（commit c0a3c430）
+
+## v4.7.4 - (2026-02-06 14:15)
+
+- 更新v4.7.4，优化前后端框架、修复bug（commit 8148a144）
+
+## v4.7.4 - (2026-02-06)
+
+- 编译包含嵌入文件（commit bc7b1747）
+- 更新文档（commit 270ab5c9）
+- 优化系统加载效果、优化系统发布后的体积（commit 2965f2f9）
+- 修复单选框、复选框当数据源为sql或其它动态数据源，加载表单未显示选择项的bug（commit a83f0956）
+
+## v4.7.3 - (2026-02-05 04:32)
+
+- 优化前端框架、优化应用商城（commit 4c2126b6）
+- 优化前端框架（commit 5afffb3c）
+- 优化前端框架（commit b8d5642d）
+- 优化前端框架（commit 3b9f12bc）
+- 更新v4.7.3，提升应用商城稳定性、优化前端框架（commit 9db05246）
+
+## v4.7.3 - (2026-02-05)
+
+- 修复表单引擎 关联表单 组件bug（commit 70ae0dbc）
+
+## v4.7.2 - (2026-02-04 16:02)
+
+- 现在所有接口同时支持pay-load、form-数据、query了（commit 1de2169b）
+- 更新v4.7.2，优化应用商城初始化（commit 08b1e49c）
+
+## v4.7.2 - (2026-02-04)
+
+- 优化前后端框架（commit 7b3a306b）
+- 优化应用商城架构（commit afa3a653）
+- 修复前端/form-page的相关bug（commit f45299f3）
+
+## v4.7.1 - (2026-02-03 17:45)
+
+- 优化前端框架（commit 745ffcdc）
+- 优化前端框架（commit 19b119b0）
+- 优化前端框架（commit 64e4d1d3）
+- 修复360极速浏览器样式问题（commit e57bd8c0）
+- 修复树形选择控件bug（commit d1ca08eb）
+- 更新v4.7.1，应用商城功能上线（commit a4136bca）
+
+- Microi.net：发布版本 v4.7.1（commit d7768f4）
+- Microi.AI：发布版本 v4.7.1（commit c1895e8）
+
+## v4.7.1 - (2026-02-03)
+
+- 修复后端bug（commit 67d9f3e8）
+
+## v4.7.1 - (2026-02-02)
+
+- 优化前端框架（commit c372880f）
+- 优化前端框架（commit 27070c02）
+- 升级前端框架（commit be6130b7）
+- 优化前端框架（commit 888723d8）
+- 优化前端框架（commit 47d5b48f）
+
+## v4.7.1 - (2026-02-01)
+
+- 前端框架优化（commit ba1539d7）
+
+## v4.7.0 - (2026-01-31 16:45)
+
+- AI数据分析功能上线、参考官方文档部署向量数据库、自动差量同步向量数据库、聊天系统上线、完善传统界面vue3版本、完善移动端版本（commit aaaece54）
+- 更新v4.7.0：AI数据分析功能上线、参考官方文档部署向量数据库、自动差量同步向量数据库、聊天系统上线、完善传统界面vue3版本、完善移动端版本（commit f3f051be）
+
+- Microi.net：发布版本 v4.7.0（commit 1fa9b2c）
+
+## v4.7.0 - (2026-01-31)
+
+- 修复vue3编译后的bug（commit d437e887）
+- 完善前端系统（commit 869105cf）
+- Microi.AI：自动意图识别（普通聊天 vs 数据查询）（commit 974862b）
+- Microi.AI：语义智能识别（commit 2ce8ef9）
+
+## v4.7.0 - (2026-01-30)
+
+- Microi.AI：初始化 Microi.AI 工程（commit eaaa043）
+- Microi.AI：向量数据库完善ApiKey、差量同步（commit d56a1d1）
+
+## v4.7.0 - (2026-01-29)
+
+- 传统界面vue3版本兼容移动端，uni-app移动端不再维护（commit 1b586377）
+- 优化移动端显示效果（commit 26356389）
+- 完善vue3（commit f27b1325）
+- 优化传统界面vue3+兼容移动端（commit 36ac22f9）
+
+## v4.7.0 - (2026-01-28)
+
+- 优化样式（commit 6e243880）
+- 优化样式（commit e3bb210b）
+- 优化样式（commit be28bcf6）
+
+## v4.6.17 - (2026-01-27 11:25)
+
+- 修复 bug（commit 3483124e）
+- 更新v4.6.17，修复bug（commit 6cbec4a2）
+
+## v4.6.16 - (2026-01-27 01:42)
+
+- 更新v4.6.16，修复bug（commit c4498117）
+
+## v4.6.17 - (2026-01-27)
+
+- 优化传统界面vue3版本整体样式（commit ab189a5a）
+
+## v4.6.15 - (2026-01-26)
+
+- 完善传统界面vue3版本，性能极致优化（commit f1b8cee0）
+- 完善传统界面vue3版本，体验极致丝滑（commit 601fee56）
+- 传统界面vue3修复子表、弹出表格bug，优化样式（commit b318978b）
+- 修复文件柜bug（commit 62c10abd）
+- 显示文件柜（commit e7bec5ae）
+- 传统界面vue3文件结构优化，优化本地二次开发时租户切换不方便的问题（commit b0f7f97c）
+- Microi.net：发布版本 v4.6.15（commit 839b1df）
+
+## v4.6.15 - (2026-01-25 06:27)
+
+- 传统界面vue3完善（commit d16b1b92）
+- 从Git中移除src/config.json并添加到.gitignore（commit 3663e019）
+- 添加 Dockerfile 和 publish-demo.sh 到版本控制（commit 4e3ee842）
+- 更新 .gitignore，允许提交 bin/Release 下的 Dockerfile 和 publish-demo.sh（commit e799e198）
+- 更新v4.6.15，完善传统界面vue3，修复后端bug，新增前后端docker发布文件（commit 3246aa4e）
+
+## v4.6.15 - (2026-01-25)
+
+- 完善传统界面vue3版本（commit b158b415）
+- 完善传统界面vue3版本（commit f6c594a9）
+- 更新文档说明（commit 864a3035）
+- 更新文档说明（commit 63c8fb1e）
+- 完善传统界面vue3版本（commit 965e612a）
+- 完善传统界面vue3版本（commit b5437b41）
+- 完善传统界面vue3版本（commit 9093cb2e）
+- 优化样式（commit 0ba68e68）
+- 完善传统界面vue3版本（commit 2d7e671c）
+- 优化（commit 353b7170）
+- 完善传统界面vue3版本（commit 953e7a40）
+- 合并远程 master 分支（commit 8c75a9b5）
+
+## v4.6.15 - (2026-01-24)
+
+- 请前往系统配置默认语言（commit 2e859c19）
+- 传统界面升级至 vue3，完成度 95%（commit 452d83b4）
+- 优化了语言选择，不再从系统设置项配置语言了，默认中文，可以切换英文，其他语言暂时隐藏了，可以切换各种语言。（commit ee8d9d88）
+- 合并远程 master 分支（commit c887ab7e）
+- 修复了列表打不开的一些bug（commit f6b1856d）
+
+## v4.6.14 - (2026-01-23 12:53)
+
+- 统一一个地方管理ApiBase（commit 3d10cb9f）
+- 历时 7 年的 vue2 传统界面版本（ v1.0.0 ～ v4.6.13 ）即将落幕，本次提交备份。（commit 551811be）
+- vue2传统界面升级至vue3前，删除不再使用的文件。（commit acc30924）
+- microi.web.vue2项目启动说明（commit 69c58ab8）
+- microi.web.vue在/src/config.json中配置ApiBase（commit 1ee2c974）
+- 平台vue2版本：当系统设置未配置LoginBottomContent时，默认显示公司名称+系统版本号+当前语言（commit 52b96bcb）
+- 修复平台vue2版本bug（commit e92c0f0f）
+- 后端更新v4.6.14，修复bug（commit d9905a0e）
+
+## v4.6.13 - (2026-01-23)
+
+- 更新平台文档项目（commit 5bace2f7）
+- 更新最新版数据库（commit e6463d59）
+- 传统界面升级至 vue3，完成度 80%，提交git备份下（commit 2282b134）
+- Microi.net：发布版本 v4.6.13（commit 7a36b59）
+
+## v4.6.13 - (2026-01-22 21:30)
+
+- 更新v4.6.13，优化V8引擎（与JavaScript有更强的兼容性），优化代码编辑器（commit b56afe3f）
+
+## v4.6.12 - (2026-01-22 20:19)
+
+- 更新v4.6.12，升级代码编辑器，修复V8引擎bug（commit 0c338280）
+
+## v4.6.11 - (2026-01-22 15:26)
+
+- 更新v4.6.11，修复bug（commit c4796968）
+
+## v4.6.10 - (2026-01-22 01:26)
+
+- 更新v4.6.10，修复流程引擎bug（commit 4bff96f0）
+
+## v4.6.9 - (2026-01-21 23:51)
+
+- 更新v4.6.9，修复sqlserver下的兼容性bug（commit 1564b574）
+
+## v4.6.8 - (2026-01-21 22:59)
+
+- 更新v4.6.8，优化架构，修复bug（commit bf3d6bd6）
+
+## v4.6.7 - (2026-01-21 16:38)
+
+- 发布v4.6.7，V8编辑器新增完全的V8引擎代码提示功能，修复bug，升级接口引擎配置（commit 6f012453）
+
+- Microi.net：发布版本 v4.6.7（commit 8977556）
+
+## v4.6.6 - (2026-01-21 05:16)
+
+- 更新v4.6.6，应用商城功能即将上线，修复bug（commit c3474be1）
+
+## v4.6.5 - (2026-01-20 16:24)
+
+- 发布v4.6.5，优化性能、优化架构、修复Sqlserver兼容bug（commit 2a894265）
+
+## v4.6.5 - (2026-01-20)
+
+- 新增JTokenEx.FromObject替代JToken.FromObject（commit c3ddd8b3）
+
+## v4.6.5 - (2026-01-19)
+
+- 升平台文档项目（官方文档）且新增首页动画效果（commit 17724386）
+
+## v4.6.4 - (2026-01-17 13:18)
+
+- 类库动态依赖、去除不必要的consone.log（commit 24c2f292）
+- 更新平台说明（commit 7e75a6d2）
+- 新增开发环境的内存监控、优化前端内存占用（commit bf137dea）
+- 修复V8.Db.Firs()无效的bug（commit b86fd075）
+- 发布v4.6.4（commit fa1839b9）
+
+- Microi.net：发布版本 v4.6.4（commit b2d3dc3）
+
+## v4.6.4 - (2026-01-17)
+
+- 优化性能、修复bug（commit 7ff72ffd）
+- 格式化所有代码（commit 0d1ad70b）
+
+## v4.6.3 - (2026-01-16 17:26)
+
+- 修复SqlCount缓存bug（commit 26aaf682）
+- 修复系统管理角色权限配置bug（commit 8063c905）
+- v4.6.3发布，修复新版v4.x的一些bug（commit 3eb140b3）
+
+- Microi.net：发布版本 v4.6.3（commit 001ce50）
+
+## v4.6.1 - (2026-01-16 09:05)
+
+- Microi.net.dll更新v.4.6.1，性能优化、架构优化、修复bug（commit aa3d031e）
+
+- Microi.net：发布版本 v4.6.1（commit ce58f15）
+
+## v4.5.0 - (2026-01-13 00:49)
+
+- Microi.net.dll发布v4.5.0，优化架构、性能（commit ff6fa01b）
+
+- Microi.net：发布版本 v4.5.0（commit 736063b）
+
+## v4.5.0 - (2026-01-13)
+
+- 修改类库配置（commit 3fdad260）
+- 优化解决方案目录（commit d0f904ad）
+- 新增[AI+低代码]开发文档（commit ead5bcd0）
+
+## v4.5.0 - (2026-01-12)
+
+- 更新平台文档（commit 03d0efb0）
+- 修复ORM的.ToArray()方法（commit 29a37c8c）
+- 更新AI写接口引擎文档（commit 46e4e606）
+- 修复前端V8.SearchSet()使用新版_Where的bug（commit 6e86126f）
+- 格式化文件（commit 1d777b8f）
+- 格式化整个项目（commit 89f07314）
+- 优化前端性能（commit 085df807）
+- 优化前端表单引擎性能（commit ce8381ad）
+- 优化前端框架性能（commit 4d935d51）
+
+## v4.4.3 - (2026-01-11)
+
+- 修复架构优化后带来的一些bug（commit f1d3e82e）
+- 更新平台文档，加入AI辅助开发文档（commit 40d04b3b）
+- 更新平台文档（commit 28b01560）
+- 更新文档（commit 494e7685）
+- 更新平台文档（commit 75f53475）
+
+## v4.4.2 - (2026-01-10 23:44)
+
+- Microi.net：发布版本 v4.4.2（commit 2d1a0e9）
+
+## v4.4.2 - (2026-01-10)
+
+- 完善SqlSugar与Dos.ORM的切换、修复SqlSugar应用bug（commit abd82532）
+- 更新前端版本号（commit d063328c）
+- 修改说明（commit d5b4a6a1）
+- 新增L1、L2多级缓存、所有代码格式化、修复bug、去除_CurrentSysUser（只使用_CurrentUser）（commit cd8f3144）
+- 更新配置文件（commit e7365e34）
+- 更新配置文件（commit a1c0415c）
+- 修复L1级缓存bug、现在_CurrentUser固定为JObject类型（commit d32d74f1）
+
+## v4.2.0 - (2026-01-09 09:43)
+
+- Microi.net：发布版本 v4.2.0（commit 637e401）
+
+## v4.2.0 - (2026-01-09)
+
+- 更新最新demo数据库、空库数据库（commit d79d1d02）
+- 优化代码（commit 4f62e682）
+- 优化Microi.ORM库（commit bab3ea15）
+- 去除不必要的引用（commit c0963d18）
+- 【重要更新】支持ORM切换了，现在平台支持Dos.ORM与SqlSugar之间的切换了（commit 8076d979）
+
+## v4.2.0 - (2026-01-08)
+
+- 新增Microi.Core核心库，开放更多后端源码，优化系统架构（commit 7efec1cc）
+- 优化代码文件目录（commit 142b9aec）
+- 修改git配置（commit 818d2130）
+- 优化Dos.ORM（commit 79f44662）
+- 优化Dos.Common（commit a8f3d99b）
+- 优化Dos.ORM（commit c7656ff8）
+- 前后端的Guid均修改为Ulid（commit d9a5c22f）
+- 优化Office插件（commit 7768e077）
+- 优化代码（commit 0988043a）
+
+## v4.1.1 - (2026-01-07 02:50)
+
+- 修复前端报表引擎的子表表内编辑在新增时无法保存的bug（commit eea08497）
+- Microi.net.dll更新v4.1.1、更新平台文档（commit 2d5593d7）
+
+## v4.1.1 - (2026-01-07)
+
+- 优化高并发线程处理（commit cc016bb6）
+
+## v4.1.1 - (2026-01-06)
+
+- 扩展V8.WeChat.RSAEncrypt函数，微信支付转账api可能会用到。（commit 434bacea）
+- 更新平台文档项目（commit b45ba368）
+- 更新平台文档（commit 6a98d2e5）
+- 移动端打包apk新增支持摄像头扫二维码、条形码，且支持V8函数。（commit c9b628c5）
+- 移动端打包apk新增支持摄像头扫二维码、条形码，且支持V8函数。（commit fab66eec）
+
+## v4.1.1 - (2026-01-05)
+
+- 更新试用地址、平台文档、项目说明（commit 61b11e13）
+- 更新说明（commit 699b19eb）
+- 更新平台文档项目（commit 515c5660）
+
+## v4.1.0 - (2026-01-04 15:02)
+
+- 【重要更新】平台架构升级、Microi.net.dll升级至v4.0（commit 6e6921c8）
+- 【重要升级】后端开放更多源码（99%）、Microi.net升级至v4.1.0（commit f96c7826）
+
+- Microi.net：发布v4.0（commit b64a6e1）
+- Microi.net：发布版本 v4.1.0（commit e5d6f8f）
+
+## v4.1.0 - (2026-01-04)
+
+- 修复移动端V8.FomEngine.GetTableData的bug（commit e48b7255）
+- 解决方案添加开源[Microi.MongoDB]项目的引用（commit 053aa85d）
+
+## v3.5.2 - (2025-12-29)
+
+- 优化移动端蓝牙打印（commit 93657dc0）
+- Microi.net.dll发布v3.5.2，放宽V8引擎容错机制（commit 0f74d8da）
+- 优化错误提示（commit ef1eaa9e）
+- 修复查看密码功能bug（commit 531cb640）
+
+## v3.5.1 - (2025-12-27)
+
+- Microi.net.dll发布v3.5.1、优化.net10发布机制、V8引擎增加容错机制（commit 4b4edb4b）
+- 优化服务器端控制台输出（commit 935711a1）
+- vue3 uni-app移动端上线蓝牙标签打印功能（commit 031cd9ca）
+
+## v3.5.0 - (2025-12-26)
+
+- 升级至.NET10、修复SaaS引擎主库修改配置后需要重新登录的问题、更新平台文档（commit 8ac35db1）
+- 升级至.NET10、Docker镜像地址更换、更新平台文档（commit b6ffc00a）
+- 重要升级：接口引擎、后端V8事件支持await、async等异步操作。（commit a57bba89）
+- 后端V8引擎支持console、setTimeout两个对象（commit f3cbd140）
+
+## v3.3.1 - (2025-12-25)
+
+- 修复新版Where可能存在的bug、升级系统功能、更新平台文档（commit 86a9aecc）
+- Microi.net：发布版本 v3.3.1；工程维护（commit d762198）
+
+## v3.4.0 - (2025-12-23)
+
+- 优化MQ消息队列、更新MQ文档（commit ab7c23b0）
+
+## v3.4.0 - (2025-12-22)
+
+- 移动端弹出表格新增关键词搜索（commit 84a8a9e7）
+- 修复移动端下拉框远程搜索的bug（commit 0f4980d6）
+
+## v3.4.0 - (2025-12-21)
+
+- 优化界面引擎文件（commit e4738a82）
+
+## v3.4.0 - (2025-12-20)
+
+- 优化前端web样式（commit c3b48854）
+- 优化框架样式（commit 4e95a25f）
+
+## v3.3.0 - (2025-12-19)
+
+- 平台架构升级、新增开源服务器端自动升级程序（commit e3e337b1）
+
+## v3.2.0 - (2025-12-16)
+
+- 升级任务调度引擎、更新平台文档（commit cb718f7f）
+- 升级任务调度引擎，更稳定、更健壮。（commit def47519）
+
+## v3.1.4 - (2025-12-15)
+
+- V8引擎扩展新增支持更新阿里云更新ESA DNS、更新平台文档（commit f8d80265）
+
+## v3.1.4 - (2025-12-14)
+
+- 更新平台文档（commit 23f56c26）
+- 更新平台文档（commit b3e436b6）
+
+## v3.1.4 - (2025-12-13)
+
+- 更新平台文档（commit f1d3c986）
+
+## v3.1.4 - (2025-12-12)
+
+- 分布式任务调度系统修改为默认CPU核心*10线程（之前默认10线程）、现在允许并发执行执行、更新平台平台（commit 51fc59c4）
+
+## v3.1.4 - (2025-12-11)
+
+- 更新平台文档（commit 8d8af042）
+
+## v3.1.4 - (2025-12-07)
+
+- 更新平台文档（commit e1ed2c75）
+
+## v3.1.4 - (2025-12-04)
+
+- 修复V8.SearchSet的bug（commit 1a4236bf）
+- 更新平台文档（commit feef3c94）
+
+## v3.1.4 - (2025-12-03)
+
+- 更新平台文档、uni-app移动端蓝牙打印支持（commit 25968351）
+
+## v3.1.4 - (2025-12-02)
+
+- 更新平台文档（commit d60dd369）
+- 更新uni-app移动端（commit af57f5ce）
+- 修复版本号导致的导入功能报错（commit 0ddbfb39）
+- 更新后端版本号（commit 63dcad4a）
+
+## v3.1.4 - (2025-12-01)
+
+- 更新平台文档（commit b780c680）
+- 更新平台文档（commit b280b394）
+- 优化表单设计器样式（commit c0fb5e0d）
+- 更新平台文档（commit 42c3f743）
+- 优化OsClient域名匹配机制、更新平台文档（commit e8eceb65）
+
+## v3.1.3 - (2025-11-29)
+
+- 更新平台文档、修复HideFormTab无效的bug（commit 9c5ebb71）
+- 修复V8.HideFormTab无效的bug（commit fb9e4e13）
+- 修复V8.HideFormTab()被隐藏后默认不显示的bug（commit 7cce5b10）
+- 更新平台文档（commit 2c24a3d0）
+- Microi.net.dll nuget发布v3.1.3，更新平台文档（commit 79e0ad82）
+
+## v3.1.1 - (2025-11-28)
+
+- 优化代码（commit 1febe8ea）
+- 更新平台文档（commit d9b5e627）
+- 更新平台文档（commit 0f082b26）
+
+## v3.1.1 - (2025-11-27)
+
+- 插件引擎文档从microi-web源码迁移至microi-doc平台文档项目中（commit 730f9dfb）
+- 更新平台文档（commit 7d31bedc）
+- 界面引擎甘特图组件添加了视图切换配置，修复了项目结束时间计算错误的问题。（commit 1858cb67）
+- 优化了界面引擎甘特图组件，左边持续时间&gt;24小时转换成天+小时（commit 9cc6868e）
+
+## v3.1.0 - (2025-11-26)
+
+- Microi.net.dll nuget更新至v3.0.1、更新平台文档（commit 6450fa51）
+- 更新平台文档（commit 45358416）
+- 更新平台文档（commit 217aeed6）
+- Microi.net.dll nuget发布v3.1.0、更新平台文档（commit 7f624b3e）
+- 更新平台文档（commit bb30bcf0）
+- 更新平台文档（commit 400e7aff）
+- 新增_ForceUpt参数支持强制修改自动编号字段、更新平台文档（commit 9d6275fe）
+- Microi.net：工程维护（commit 5f19d07）
+
+## v3.0.0 - (2025-11-25)
+
+- 优化redis、更新平台文档（commit fc38335a）
+- Microi.net.dll升级至v3.0.0（大量更新、升级至.net standard2.1）、更新平台文档（commit 8df3eba2）
+- 修复了tab点击问题（commit 982fadc8）
+- 文件优化（commit a548fafe）
+- Microi.net：优化代码（commit d6f9b13）
+
+## v3.0.0 - (2025-11-24)
+
+- Microi.net：工程维护（commit a2967e2）
+- Microi.net：bug修复（commit 58707fe）
+- Microi.net：优化事务（commit f6b03bb）
+
+## v3.0.0 - (2025-11-22)
+
+- 更新平台文档（commit ae960a5d）
+
+## v2.8.5 - (2025-11-20)
+
+- Microi.net.dll nuget升级至v2.7.0。、考虑到V8代码中处理事务对象的繁琐性，甚至可能出错，现对平台进行了非常强大的升级：【当接口引擎、后端V8事件代码出现return { Code : 不等于1 }、或V8.Result = { Code : 不等于1 }时，平台会自动回滚事务，反之提交事务。】 【之前的V8代码不受影响，仍然兼容】 B、修复V8.方法.AddSysLog()无法在服务器端V8事件中调用的bug C、修复在服务器端V8事件中调用接口引擎传入V8.DbTrans后，会导致报错【Connection must be valid，open 至 rollback transaction】（commit e80d9d5f）
+- 为了程序业务逻辑的严谨、健壮性，现在表单服务器端提交前、提交后的V8事件代码若出现了异常，也会中止表单的提交、并且回滚事务。【之前并不会，这将可能导致以前事件中的异常bug全出显现出来，然后导致业务单据无法保存】（commit 1243305c）
+- Microi.net.dll发布v2.8.0，修复服务器端V8事件与接口引擎之间的相互调用可能会出现V8.DbTrans对象被提前提交或回滚的问题（commit 0895c2bd）
+- Microi.net.dll nuget更新至v2.8.5 重大优化升级、修复switch传值bug、更新平台文档（commit 570a2076）
+- 修复表单引擎下拉框组件显示bug（commit aada51b2）
+
+## v2.7.0 - (2025-11-19)
+
+- 流程信息新增下一节点名称显示、修复ParentId树形控件字段不显示的bug、更新平台文档（commit 95517a6f）
+
+## v2.7.0 - (2025-11-17)
+
+- 修复表内编辑一些组件（如开关）在刷新数时但DOM不刷新的bug（commit 11aa18e2）
+- 合并远程 master 分支（commit 6371a7ca）
+- 修复下拉框控件当存储字段为Id、显示字段为Name时，在表内编辑时显示的是Id而并不是Name的bug（commit 098eb3df）
+
+## v2.7.0 - (2025-11-15)
+
+- 优化了提交代码，左右结构的时候，不要提交的参数校验（commit 65a614c7）
+
+## v2.7.0 - (2025-11-14)
+
+- 更新平台文档（commit 8fd36c67）
+- 更新平台文档（commit 2e49aa35）
+- 更新平台文档（commit b87b72b6）
+
+## v2.7.0 - (2025-11-13)
+
+- 更新版本引用（commit b569a431）
+- 更新平台文档、新增V8.SelectedData代替V8.TableRowSelected（commit 1a1de68a）
+- 更新平台文档（commit a04756e0）
+- 更新平台文档（commit e4d115a8）
+
+## v2.6.3 - (2025-11-12)
+
+- 更新平台文档（commit 73efe19c）
+- 后端Microi.net.dll升级至v2.6.3（commit 9d328698）
+- 后端Microi.net.dll升级至v2.6.3（commit 29c6e145）
+
+## v2.6.3 - (2025-11-11)
+
+- 修复前端表单提交前V8事件无法通过【return Code : 0】阻止表单提交的bug、修复时间条件无法正常搜索的bug、修复数字控件无法搜索的bug、更新平台文档、后端Microi.net.dll更新v2.6.3（commit 184807df）
+- 修复数字控件在可搜索列中默认为0的bug（commit 19a2ec27）
+- 优化左右结构，左边选中，右边新增的bug（commit 21ccabd9）
+- 彻底修复数字控件在可搜索列中默认为0的bug（commit 88396d05）
+- 更新平台文档（commit a63a79c6）
+
+## v2.6.2 - (2025-11-10)
+
+- 修复新版_Where不支持多表联查搜索关联表字段搜索的问题（commit 7c4ea479）
+
+## v2.6.0 - (2025-11-06)
+
+- 优化角色管理、更新平台文档（commit 15e3f4fb）
+- 登录页面，发送短信验证码会更新图形验证码的bug（commit d8041cac）
+- 优化登录验证码刷新问题（commit 4a022bed）
+- 更新平台文档（commit 86aa490a）
+- 更新平台文档（commit 87642431）
+- 更新平台文档（commit d52c858f）
+
+## v2.5.0 - (2025-11-05)
+
+- 更新平台文档（commit 7c1c81d6）
+- 优化了自定义树形组件，添加了层级增加按钮显示的限制条件（commit 3c4518ef）
+
+## v2.5.0 - (2025-11-03)
+
+- 更新静态地址（commit 16bb5f75）
+
+## v2.5.0 - (2025-11-01)
+
+- 更新平台文档（commit 7264eb4e）
+- 更新平台文档（commit eb5a5b82）
+- 更新平台文档（commit 7fd2278d）
+- 更新平台文档（commit a59695ce）
+
+## v2.5.0 - (2025-10-31)
+
+- 优化了登录页，去掉了项目特定代码，标题字号小了一号，在标题太长导致的换行（commit e1be952e）
+- 新增默认不显示审计字段、修复审计字段显示bug问题（commit 68f884cb）
+- 合并远程 master 分支（commit 67acab93）
+
+## v2.5.0 - (2025-10-29)
+
+- 优化了OpenAnyTable弹窗表单新增，编辑和删除是父表的bug，同时对弹窗的左右结构进行了优化，使其选择功能更加强大（commit 4c38ea83）
+- 修复通用数据列表导出功能不支持新版_Where条件语法的bug、更新平台文档（commit b1b35164）
+- 优化了插件引擎，支持第三方依赖包CDN引入，这样可以不用污染主框架的依赖包，开发插件更容易插拔，超强，另外不局限于vue2语法了，支持vue3写法。（commit 4ee67e85）
+- 合并远程 master 分支（commit 1e38519c）
+- 优化了表内编辑数据状态的命名，避免冲突，DataStatus改为_DataStatus（commit c2a81940）
+
+## v2.5.0 - (2025-10-28)
+
+- 更新文档（commit 6ce81300）
+- 更新平台文档（commit b4bad271）
+- Microi.net：工程维护（commit 4699630）
+
+## v2.5.0 - (2025-10-27)
+
+- 下拉多选框的搜索由OR条件修改为在，性能更高。（commit b622fa6a）
+
+## v2.5.0 - (2025-10-25)
+
+- 子表表内编辑，如果开启了主表保存后提交，则统一提交生效，否则是编辑了及时生效（commit 1c14c622）
+- 优化readme文档（commit b5606885）
+
+## v2.5.0 - (2025-10-24)
+
+- 优化了界面引擎甘特图，支持以小时为最小单位，支持读取、编辑动态json列，优化了刻度1格显示1小时（commit 3aa1b0e8）
+- 优化了表格图片展示，现在可以直接预览图片和多图预览。（commit 588e5aa0）
+- 优化了表格图片懒加载（commit cadba51c）
+
+## v2.4.6 - (2025-10-23)
+
+- 现在word模板导出时图片字段会取图片的默认宽高（commit 2c2edca3）
+
+## v2.4.6 - (2025-10-21)
+
+- 修复获取接口引擎列表时也获取了代码导致慢的问题、更新平台文档（commit cdb7af01）
+
+## v2.4.6 - (2025-10-20)
+
+- 更新平台文档（commit 13651ff1）
+- 修复下拉复选框搜索无效的bug（commit acec8f09）
+
+## v2.4.6 - (2025-10-18)
+
+- 修复V8.ClickFormTab的bug（commit 0fd3300a）
+- 更新引用版本号（commit 1b8bf9ac）
+
+## v2.4.5 - (2025-10-17)
+
+- Microi.net.dll发布v2.4.5，修复接口引擎缓存初始化在一些特殊情况下会失败的bug（commit 2aac56a6）
+- 修复接口引擎即使未启用下也能通过接口自定义地址调用的bug（commit 4850aef5）
+- 优化接口引擎（commit c2c003b5）
+- 表格批量选择的列宽度降低到合理范围（commit 8cf87f8d）
+- 模块引擎新增【表格操作列固定宽度】配置（commit 1bccd09b）
+
+## v2.4.5 - (2025-10-16)
+
+- 左右结构优化（commit b7dfd2a5）
+
+## v2.4.1 - (2025-10-15)
+
+- 更新平台文档（commit 6a36a95c）
+- 更新平台文档（commit 6be10de9）
+- 修复特殊情况下部分表单的字段分组显示不对的bug（commit 3eb00802）
+- 所有接口替换均支持$ApiBase$、$OsClient$变量了（commit fc6195ac）
+
+## v2.4.0 - (2025-10-14)
+
+- 全新_Where用法上线，用法见平台文档，兼容老版写法（commit 5c5852f3）
+- 合并远程 master 分支（commit 4833d8e7）
+- 替换老版_Where为新版_Where格式（commit 902b3266）
+
+## v2.4.0 - (2025-10-13)
+
+- 表单引擎-日期控件新增【多选天、多选月、多选年】的功能（commit c222d2d7）
+- 左右结构优化（commit 0d2613d3）
+
+## v2.4.0 - (2025-10-12)
+
+- 修复了左右结构的bug（commit 65b189e6）
+
+## v2.4.0 - (2025-10-11)
+
+- 表单字段分组现在跟分组Id进行关联（而不再是分组名称一改导致分组失效）、修复表单分组排序字段是字符串的bug（commit dd9d8f65）
+
+## v2.3.3 - (2025-10-10)
+
+- 修复一些特殊格式和段落的模板导出时字段无法被正确替换的问题（commit 7cc1f3a0）
+- 修复刘老师的代码bug、现在模块引擎的where条件和join条件是代码编辑器了、修复代码编辑器高度无法自定义传入的bug（commit eed539b8）
+- 修复模块引擎中有多个代码编辑器组件时导致编辑器无法最大小化、最小化的bug（commit 3600f2f4）
+- 修复一些特殊情况下模板导出子表数据只有一条的bug（commit 33417dc4）
+- 取消Form表单中的Tabs懒加载功能，此功能会导致每次Tabs切换都刷新Tabs里面的表单内容且不保留状态（commit 956894cd）
+- Microi.net：工程维护（commit f605bb8）
+
+## v2.3.3 - (2025-10-09)
+
+- 移动端审批页面优化（commit 7e56c1de）
+- 表内编辑一起提交数据出现bug，先恢复以免影响使用（commit 46210123）
+- 导出模板支持图片了、新增用户操作记录功能、模块引擎中的iframe接口引擎支持V8.Param.MenuId了。（commit ccb9f707）
+- 可通过设置隐藏通用搜索框，有些情况下需要固定框精确等值搜索。（commit 6f0be384）
+
+## v2.3.3 - (2025-10-08)
+
+- key重复，值变更会报错（commit 5dd21fc4）
+- 现在可以根据模块设计里的表内编辑，配置是值变更更新数据，还是最后表单提交一起保存数据（commit f1cd1a65）
+
+## v2.3.3 - (2025-10-01)
+
+- 更新了左右结构的菜单（commit 8265f38e）
+- 重要，1,优化了左侧菜单背景颜色浅色，下拉菜单的箭头颜色获取设置的颜色；2,优化了二级下拉菜单背景颜色跟随主系统颜色的bug；*二级下拉菜单右侧的箭头太靠右（commit 126a55e9）
+
+## v2.3.3 - (2025-09-30)
+
+- 更新接口引擎实战文档：在接口引擎中对文件的接收、下载、上传（commit 090fb7d3）
+
+## v2.3.3 - (2025-09-29)
+
+- 更新平台集成OnlyOffice文档（commit 32188db8）
+- 移动端的层级才需要高一点（commit 2559356b）
+- 修复样式bug（commit 1d13af5e）
+- 合并远程 master 分支（commit d7840bf1）
+
+## v2.3.3 - (2025-09-28)
+
+- 优化进度条组件、修复模块引擎V8按钮代码无法编辑的bug（commit dd9d41ac）
+- 修复url参数带上Keyword之类的会影响到子表的bug（commit 2cde4db2）
+
+## v2.3.3 - (2025-09-27)
+
+- 现在模块引擎iframe支持接口引擎单点登录到第三方系统了、修复进度条组件在表格不显示的bug、现在进度条会有默认的颜色区分了（commit 4529950d）
+
+## v2.3.3 - (2025-09-26)
+
+- 更新文档（commit 936a4ced）
+- 现在表单搜索字段无视大小写了、修复创建时间默认宽度（commit 67203cf5）
+- 表单引擎新增进度条控件（commit c37e341e）
+- 合并远程 master 分支（commit ff0ffbbc）
+- 详情按钮可用代码控制，sys_menu表需要新增DetailCodeShowV8字段（commit 5834e2fd）
+- 修复审计字段显示问题（commit e5f8ba3d）
+- 合并远程 master 分支（commit 8b6502aa）
+
+## v2.3.3 - (2025-09-23)
+
+- 新增OnlyOffice支持、现在默认的审计字段也会在表单中显示了（在新建表的时候自动创建对应的字段控件、并且支持模块引擎中排序）（commit 5da6e0bc）
+- 更新平台文档（commit 8e40eb8e）
+
+## v2.3.3 - (2025-09-20)
+
+- 修复了搜索下拉框，无法清除已选数据的bug（commit 313800b3）
+
+## v2.3.3 - (2025-09-18)
+
+- 优化模块引擎，【查询列、可搜索列】配置现在是以表格展示了（commit 98c04946）
+- 修复做菜单与右边内容区域的层级关系，提高右边内容区域的层级以防止全屏编辑器被左边菜单树遮盖（commit a0add829）
+
+## v2.3.3 - (2025-09-17)
+
+- 更新平台文档（commit 5e599933）
+
+## v2.3.3 - (2025-09-15)
+
+- 去掉console代码（commit c2f8bd5d）
+- Microi.net：工程维护（commit 12c14e9）
+
+## v2.3.3 - (2025-09-14)
+
+- 优化架构、修复地址组件bug（注意：若列表表内编辑开启了地址控件类型的字段，会导致列表页DOM渲染非常卡[地址数据量过大]！此问题将来再优化！）（commit bf88ed63）
+- 表单引擎，如果表名、表描述过长导致换行影响用户查看，虽然现在解决不够完美，暂时保证超过一行用省略号（commit 7e4ab534）
+- 新增登录成功运行一段代码，可执行业务伙计或者弹窗提示，openanyform等（commit f4383307）
+
+## v2.3.3 - (2025-09-13)
+
+- 优化项目架构代码（commit 35751faa）
+- 优化系统架构代码（commit 94c28324）
+- 修复sqlserver无法修改物理字段名的bug（commit d447a7ad）
+- 上传SqlServer2017版主库数据库、修复sqlserver修改字段无法修改字段说明的bug（commit 6e1d894e）
+
+## v2.3.2 - (2025-09-11)
+
+- api接口系统首页由黑客帝国效果修改为官方文档（commit d860f7d5）
+- 合并远程 master 分支（commit 053396ea）
+- api接口系统首页由黑客帝国效果修改为官方文档（commit 09007e93）
+
+## v2.3.2 - (2025-09-10)
+
+- 更新平台文档（commit 9144288d）
+- 更新了左右结构，同时新增了自定义移动端列表显示列（commit 0b24c6f8）
+
+## v2.3.2 - (2025-09-09)
+
+- 修复优化循环表单组件后产生的多选下拉框不显示bug（commit ea95cb3e）
+- 修复表内编辑FormSet不生效的bug（commit 03d33917）
+- 新增了openanytable的翻页选择功能，选择的数据会先存进临时数据，统一提交（commit 8bc3631e）
+- 优化了文档，更新了OpenAnyTable的doc使用方法（commit 7764eef3）
+- 优化了form页关联id不显示的bug（commit c7b7bd15）
+
+## v2.3.2 - (2025-09-08)
+
+- 修复表内编辑下拉框第二次下拉无数据的bug、修复循环表单组件时出现的bug（commit 3ec3f84b）
+- 修复数字控件现在是循环模式的时候产生的bug（commit 74a206f8）
+
+## v2.3.2 - (2025-09-07)
+
+- 优化了移动端获取osclient的方法，更灵活（commit 33072cc3）
+
+## v2.3.2 - (2025-09-05)
+
+- 优化表单组件循环（commit f59822b7）
+
+## v2.3.2 - (2025-09-04)
+
+- 更加严谨了一些 如果有了undefind判定 还是返回真（commit 4e53e186）
+- 格式化周总评论区部分代码（commit 489fc8eb）
+- 删除不必要的软件包.json文件，会导致第三方公司扫描误报为高危漏洞（commit cbabe5e3）
+- 修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit e8482fb0）
+- 二次修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit 5f5c4972）
+- 二次修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit 0e1828a6）
+- 第三次修复毛总实现[表内编辑阻断数据提交]后，导致的正常表单[值变更事件]不再触发的bug！！！（commit 84b2dec6）
+
+## v2.3.2 - (2025-09-03)
+
+- 更新说明（commit 1d7b1137）
+- 增加了移动端的编辑按钮，可执行代码来显隐藏（commit e3ac098f）
+- 优化了移动端新增按钮，可代码控制（commit edd3e3bd）
+- 新增数据评论功能、修复移动端表单信息被数据日志层级覆盖显示的样式问题（commit ac2a3ec5）
+- 合并远程 master 分支（commit af690a48）
+
+## v2.3.2 - (2025-09-02)
+
+- 修复了合并引起的冲突（commit 0bf3c19c）
+- 回退 "修复了合并引起的冲突"（commit 1fc89b8e）
+- 回退 "优化了下拉树"（commit 576821a2）
+- 添加虚拟滚动组件（commit 39f242d9）
+- 修改虚拟滚动列表名称（commit f755413d）
+- 新增：改函数 改地址（commit 519ea0b6）
+- 移动端目录优化了一下，客户的定制页面放到customer去了（commit a34227d7）
+
+## v2.3.1 - (2025-08-30)
+
+- 前端增加V8.OsClient访问当前saas租户的OsClient值，与后端一致（commit 8f1511d9）
+- 下拉框默认开启搜索（commit b8c5e6b9）
+- feat：目前值变更事件拦截 支持4种组件数字 单行文本 下拉单选 多行文本（commit 83918d5c）
+- 优化了下拉树（commit 951b0f64）
+- bug修复（commit 5834247f）
+- 修复：【重大修复】下拉选择 可以正常显示 通过下拉逻辑出来的值了！！！！！！！！！！！！！！（commit 04ba6bd0）
+
+## v2.9.0 - (2025-08-29)
+
+- 接口引擎扩展V8.WeChat类、Microi.net发布v2.9.0（commit fb715421）
+- 修复：值变更事件 现在如果有false的返回值 则 阻止更新事件（commit 1faa0654）
+- V8.方法微信相关加密函数通过.net core类实现、V8.WeChat微信相关加密函数通过第三方类实现，效果都一样（commit d73c37ff）
+- 合并远程 master 分支（commit 914545c8）
+
+## v2.2.9 - (2025-08-25)
+
+- 更新V8.Http用法文档（commit 8b6767ec）
+- 更新文档（commit f43651a4）
+
+## v2.2.9 - (2025-08-24)
+
+- 优化移动端样式（commit 0bc7afe3）
+
+## v2.2.8 - (2025-08-20)
+
+- 修复数据列表开关控件搜索无效的bug（commit c3cf1ed9）
+- 延迟执行搜索1秒改成500ms（commit 0dff2d41）
+- 新增V8.SearchParam可访问搜索参数（commit 260cc2d5）
+- 现在表内编辑的控件事件也能正常的访问V8.OldForm对象了。（commit d4cf7383）
+
+## v2.2.8 - (2025-08-19)
+
+- 修复移动端级联下拉没有更新的问题，使用 nextTick 确保 DOM 更新解决（commit f696d353）
+- 修复了cardDetail.vue 页面diyFormFields参数的问题，使用computed保持响应式并不污染props.diyFormFields，采用深拷贝模式处理。（commit 416d674c）
+
+## v2.2.6 - (2025-08-18)
+
+- 项目上的文件以及审批意见高度增高、按钮颜色（commit 2df48c13）
+- 增加了lable宽度（commit d30f1afc）
+- 修复警告（commit bbaa1802）
+- 合并远程 master 分支（commit 3db34fdb）
+
+## v2.2.3 - (2025-08-16)
+
+- 审批意见输入框大一些（commit 409136a4）
+- Microi.net.dll发布v2.2.3，diy_table、sys_menu等查询现在会走redis缓存，数据列表、单条数据查询性能提升2-3倍。（commit 8bfff402）
+
+## v2.2.5 - (2025-08-15)
+
+- 修复了搜索条件下拉树选择不会赋值的问题，这是个vue和elementui的经典问题，涉及到下拉组件的内部机制问题。（commit b72710c0）
+- Microi.net：工程维护（commit ca3b8d5）
+
+## v2.2.5 - (2025-08-12)
+
+- 原来写法vue2懒加载不生效，直接改掉了，（commit dc31df29）
+- 优化了插件商城底座，使其支持路由和实体文件查找两种方式，既支持菜单展示，又支持嵌入form表单内部，可以在表列表显示自定义组件。（commit 9a16c1f5）
+- 合并远程 master 分支（commit 67f521e7）
+- 优化表单权限样式、v8 条件的按钮不再 admin 必显示（commit 4225da89）
+- 默认不显示新增按钮，否则配置了不显示的条件后每次都是先出现再消失（commit 67998325）
+
+## v2.2.5 - (2025-08-10)
+
+- 目录树懒加载（commit 810e6ea7）
+- 优化了目录树结构（commit ed10be22）
+
+## v2.2.5 - (2025-08-09)
+
+- 更新了界面设计引擎，优化了地图组件，地图可以通过url参数接收中心点地址（commit 9a218eee）
+- 更新文档（commit 3d790b71）
+- 修复了一下排序不升级，及样式优化（commit b99d5ebc）
+
+## v2.2.5 - (2025-08-08)
+
+- 管理员添加模块菜单默认赋予该页面权限，无需再手动添加（commit 16a6a9b5）
+
+## v2.2.5 - (2025-08-07)
+
+- 新增FormDataId URL参数（用法见平台文档）、表单模板引擎只在预览时渲染、更新平台文档项目等（commit 74fc33c7）
+- 更新平台文档（commit c5edd762）
+- 完善V8前端函数FormClose等等、完善平台文档（commit 6b34d0d5）
+
+## v2.2.5 - (2025-08-06)
+
+- 优化表格操作栏，默认按钮使用text格式，并去除换行。white-space: nowrap;改成 white-space: unset;（commit 14eaab7a）
+- 合并远程 master 分支（commit b0d5511d）
+- 优化表格按钮样式（commit 064daf40）
+- 修复弹框顶部横线颜色没有跟随主题的问题，修复了页面权限列表超出高度没有滚动条的问题，还原了表格右侧操作区域的样式（commit 6eac30dd）
+
+## v2.2.5 - (2025-08-05)
+
+- 优化了新增按钮v8事件，执行新增和详情v8事件时，应禁止原默认的打开表单事件（commit 6e586c64）
+
+## v2.2.5 - (2025-08-04)
+
+- 更新文档（commit 19f93ead）
+- 合并远程 master 分支（commit dc3bad5d）
+- 单行文本框插槽按钮单独配置是否只读（commit e19fcb89）
+- 合并远程 master 分支（commit 04c1ada4）
+- 新增了表单分组 第一个选项卡固定显示，需要在表单设计添加字段 TabsTop，然后开启表单分栏。（commit 8aca85f0）
+
+## v2.2.5 - (2025-08-03)
+
+- 后端添加了Message控制器，用来验证消息加密解密（commit fca47fb9）
+
+## v2.2.5 - (2025-08-02)
+
+- 新增了一组表格内部标签样式（commit 304b5522）
+- 优化了readmin.md 文档了，添加平台对goview大屏、three.js 3D模型渲染引擎、腾讯IM集成的介绍。（commit 6fa26a81）
+
+## v2.2.5 - (2025-08-01)
+
+- 合并远程 master 分支（commit cf80c72a）
+- 修改了本地开发环境配置项（commit 4694e961）
+- 降低sass版本 解决开发过程当中的报错（commit 0a9d0ea7）
+- 插件包验证windows.js 函数使用，已认证可以使用（commit 9a6db757）
+- 接口引擎日志对type空类型进行了处理（commit 38d144f1）
+- 修复element表格排序箭头不正常显示正序、倒序颜色的bug（commit 97b048a9）
+- 更新平台介绍（commit d7d828c2）
+- 更新平台介绍（commit fa3f92fa）
+- 更新平台介绍（commit e734348a）
+- 更新平台文档（commit 12893245）
+
+## v2.2.5 - (2025-07-31)
+
+- 修复了&lt;i&gt;标签引发的各种问题，i 标签点击事件和鼠标悬停事件不触发，已使用span或者button包裹。（commit 1f6ef056）
+- 表单设计器优化：单行文本框添加了按钮插槽功能，按钮插槽功能可以级联弹出表格功能（commit 4181cdaf）
+- 控件类型优化（commit 80e94cb4）
+- 合并远程 master 分支（commit 4f217511）
+
+## v2.2.5 - (2025-07-30)
+
+- 优化了接口引擎日志，解决 Msg: "未处理的异常：Element 'All' does not match any 字段 or property 的 class 日志报错的问题（commit 6ba4a629）
+
+## v2.2.5 - (2025-07-29)
+
+- 吾码插件商城底座开发完毕，流程清晰，文档齐全。（commit 7f701bb0）
+- 优化路由和 devDependencies 两个npm包依赖（commit a0da414f）
+- 【父组件刷新子表】如果子表是隐藏的，则不刷新（commit ae4ca623）
+- 合并远程 master 分支（commit 70aa6999）
+- 模块引擎新增【固定列】功能（commit d6ee6c7a）
+- 去除界面引擎的翻译功能（commit 128cda57）
+- 合并远程 master 分支（commit 34c8c5df）
+
+## v2.2.5 - (2025-07-28)
+
+- 【新增】列表删除时执行表单提交离开后事件（commit 456f3c18）
+- 合并远程 master 分支（commit 420128f0）
+- 优化（commit a973f545）
+- 【新增】查看详情删除执行V8事件（commit dc275fce）
+- 修复层级bug，添加插件商城基础（commit 244aa1c4）
+- 合并远程 master 分支（commit 9d52f463）
+- 添加了插件商城研发文档（commit 707a8d38）
+
+## v2.2.5 - (2025-07-27)
+
+- 优化了移动端，可以公众号认证（commit c304058d）
+
+## v2.2.5 - (2025-07-26)
+
+- 弹窗背景阴影层（commit ec9d810a）
+
+## v2.2.5 - (2025-07-25)
+
+- 优化了自定义按钮，不能回调父主键的bug（commit c02ac804）
+
+## v2.2.5 - (2025-07-24)
+
+- 优化了列表页下拉菜单显示的问题（commit 50bdc1df）
+- 根据标识决定是否执行表单进入事件（子表提交后不执行）（commit 8f31710f）
+- 合并远程 master 分支（commit 1a4b438c）
+
+## v2.2.5 - (2025-07-23)
+
+- 修复了列表页下拉框显示value不显示label的问题，修复了编辑框点击模块设计的层级问题（commit 09b903de）
+- 合并远程 master 分支（commit f0ba41e4）
+- 解决冲突（commit a7e52263）
+
+## v2.2.1 - (2025-07-22)
+
+- 修复数据源引擎z-index 层级不显示图标配置页面的问题（commit fec6c2bc）
+- 修复了富文本框无法上传本地视频的问题（commit 765ffc74）
+- 星进定制页面，（commit 394da492）
+- token bug修复（commit d0d82613）
+
+## v2.2.1 - (2025-07-18)
+
+- 添加了接口引擎日志（commit 7ad396d9）
+
+## v2.2.1 - (2025-07-17)
+
+- 优化了界面引擎，修复了切换mock模版时不能保存成功的问题（commit c76bd534）
+
+## v2.2.1 - (2025-07-16)
+
+- 优化了二级列表的显示（commit 32412557）
+
+## v2.2.1 - (2025-07-15)
+
+- 升级了左右菜单导航方式（commit 67cda1da）
+- 修复了权限不能级联全选的问题（commit ef4f1070）
+- 优化了二级菜单的分类点击提交方法（commit 788359fa）
+
+## v2.2.1 - (2025-07-14)
+
+- 将表单设置权限接口改为后端实现（commit da79492d）
+
+## v2.2.0 - (2025-07-11)
+
+- 大版本更新：新增MQTT服务器、修复bug、Microi.net.dll更新到v2.2.0（commit 1600bc5a）
+- 修改了甘特图的保存条件（commit 0ef466e8）
+
+## v2.2.0 - (2025-07-09)
+
+- 添加了在表单直接设置表单权限，优化了层级显示顺序等（commit 1ec7ae8e）
+- 优化了弹出层相关代码（commit d06fc71c）
+- app端兼容优化（commit 98da9385）
+- 合并远程 master 分支（commit b0691160）
+- 修复了模块引擎无法重置父级的问题，修复了全局主题样式个别组件背景色的问题（commit 39667389）
+- 合并远程 master 分支（commit 222f6189）
+- 权限保存提示词修改（commit 622343be）
+
+## v2.2.0 - (2025-07-06)
+
+- 修复了二次模块引擎编辑弹窗时自定义表的下拉菜单zindex过低不显示的问题，修复了新建自定义表没有设置描述时名称多一个-字符的怪异问题（commit 56d94312）
+
+## v2.2.0 - (2025-07-05)
+
+- 优化了模块引擎，可以在模块引擎直接建表，无需去表单引擎建表。（commit efd72c39）
+
+## v2.2.0 - (2025-07-04)
+
+- 【美勒特】项目团队成员保存优化（commit 89a8a463）
+- 合并远程 master 分支（commit b2e6a933）
+
+## v2.2.0 - (2025-07-03)
+
+- 优化了基本搜索，添加了节流，延迟1秒（commit 086eacf5）
+- 优化了组织部门页面（commit dff397c4）
+
+## v2.2.0 - (2025-07-02)
+
+- 优化了级联搜索（commit 42d2e613）
+- 优化了级联搜索重置搜索和默认加载时清空该页级联搜索缓存。（commit 1181deac）
+
+## v2.2.0 - (2025-07-01)
+
+- V8.ParentV8用法优化（commit 6531d5c9）
+- 【美勒特】打开apqp生成弹窗默认赋值功能（commit 8191bae3）
+- 合并远程 master 分支（commit 6f1c586c）
+
+## v2.2.0 - (2025-06-30)
+
+- 移动端优化，组件优先级（commit 98d2cd75）
+- 合并远程 master 分支（commit 01aa5481）
+- 移动端表单提交验证优化（commit 688d8352）
+
+## v2.2.0 - (2025-06-29)
+
+- 修复了下拉树代码判断是否显示删除和编辑按钮没生效的bug（commit 44cf0356）
+
+## v2.2.0 - (2025-06-28)
+
+- 修复子表只能加载一个的问题（commit c6ceaec6）
+- 修复子表查询的问题（commit 2183b25c）
+
+## v2.2.0 - (2025-06-27)
+
+- 去除debugger 检索恢复（commit 45af40ae）
+- _Keyword 关键词搜索加节流防抖功能1秒，防止连续输入卡顿（commit cd2af09d）
+- 修复了多语言版本判断时语法错误（commit 2c07fa53）
+
+## v2.2.0 - (2025-06-26)
+
+- 在方式复选框组搜索默认空值改成空数组字符串序列化（commit 50ace860）
+- 暂时取消组合筛选条件优化，场景太多需要重新规划（commit 96a915b1）
+
+## v2.2.0 - (2025-06-25)
+
+- 界面引擎优化了甘特图灯箱以及负责人多人情况下不让保存的问题（commit 0425b9cb）
+- 修复bug（commit 4da474ca）
+- 优化了平台搜索，添加了防抖1秒延迟，添加了多条件检索缓存优化（commit 231b83ad）
+- 合并远程 master 分支（commit 2c44b6a0）
+
+## v2.2.0 - (2025-06-24)
+
+- 优化代码（commit c8c508d1）
+- 优化代码（commit aa4841dc）
+
+## v2.2.0 - (2025-06-23)
+
+- 界面引擎优化甘特图，添加灯箱相关功能（commit a02c4e15）
+- 生成活动提交防重（commit 207dab1c）
+- 合并远程 master 分支（commit 0313a677）
+
+## v2.2.0 - (2025-06-18)
+
+- 修复李赛赛多语言代码报错导致系统无法登录的bug、登录接口新增_ClientType标记（如果是PC则会有过期时间）（commit fb05b191）
+
+## v2.2.0 - (2025-06-17)
+
+- 界面引擎重大更新，使用AI协助重构。优化了所有资源配置，拆分了大文件js，优化了性能，修复了一些历史问题。（commit 0a039c6c）
+
+## v2.2.0 - (2025-06-14)
+
+- 优化了审批界面点击附件打开新页面浏览，不能关闭本窗口的bug（commit db9753e1）
+- 界面引擎翻译兼容之前语言，默认不做处理，不然需要2秒间隔翻译时间（commit 1650cf98）
+
+## v2.2.0 - (2025-06-13)
+
+- 更换了语言系统，界面引擎同步更新语言（commit 07ea3b2a）
+- 流程引擎代码区全屏被左边菜单挡住（commit 38a81846）
+
+## v2.2.0 - (2025-06-12)
+
+- 新增APMS测试活动看板（commit 7d490863）
+- 更新文档项目（commit 92d8ceff）
+- 合并远程 master 分支（commit 0a19637b）
+
+## v2.2.0 - (2025-06-11)
+
+- 美勒特活动看板获取数据优化（commit 37c2c127）
+
+## v2.2.0 - (2025-06-10)
+
+- 跨域配置支持通配符了（commit c909ff19）
+
+## v2.2.0 - (2025-06-09)
+
+- 删除冗余文件（commit e4e13178）
+- 修复oracle大量bug、SaaS引擎新增CorsAllowOrigins跨域配置、流程引擎现在会自动更新_FlowState审计字段（commit 00b282ac）
+
+## v2.2.0 - (2025-06-08)
+
+- 优化了搜索框中，下拉菜单选项不正确，加了个文本，把下拉框作为文本搜索，至少能保证有个能用的（commit 89033e52）
+- 优化了下拉框无数据，直接多了一个转文本框搜索的配置（commit 6beaf836）
+- 每个控件都匹配了表内编辑的日志记录功能，之前只匹配了文本，现在其他控件也匹配了（commit 91fecf30）
+
+## v2.2.0 - (2025-06-06)
+
+- 优化了地图区域空间点击绘制，数据为空会报错。（commit 389854ad）
+
+## v2.2.0 - (2025-06-04)
+
+- 优化移动端 使用 openany form时提交子表保存的问题（commit 6126d99f）
+- 界面引擎优化判断小屏幕适配（commit 9ea496d9）
+- 修复ShowClassicTop、ShowClassicLeft样式问题（commit 6e38bb2c）
+
+## v2.2.0 - (2025-06-03)
+
+- 修复日期搜索的bug（commit 718aca0c）
+- 界面引擎添加了暗黑皮肤持久化，添加了页面定时刷新（commit 7a39f38d）
+- Microi.net：工程维护（commit 28f0afd）
+
+## v2.2.0 - (2025-06-02)
+
+- 优化了语言显示条件，移动端的bug修复，星进 定制页面（commit 5673956e）
+
+## v2.2.0 - (2025-06-01)
+
+- 打印引擎支持批量打印，数据源改成数组即可（commit 79e3978b）
+- 优化了序号判断（commit d4ebe32a）
+- 删除按钮点击，页面卡死，已处理（commit 6631ddb6）
+- 提交和删除无返回值导致页面卡死（之前代码都能执行，原因未知）（commit 42444530）
+- 优化了登录页面自定义颜色和是否显示中英文的判断（commit d60fe514）
+
+## v2.1.6 - (2025-05-31)
+
+- 优化了文档（commit d97ef94a）
+- docker示例发布文件（commit 800311ba）
+- 开放更多后端源码、优化部分接口（commit be9fb045）
+- 更新源码目录结构（commit 23dcae64）
+- 优化目录结构（commit 64342099）
+- 优化目录（commit 0cafe05c）
+- 更新开源协议（commit 58ce0022）
+- 移动端openanyform优化（commit 2dd7972a）
+
+## v2.1.6 - (2025-05-30)
+
+- 优化样式、更新文档（commit 18336617）
+
+## v2.1.6 - (2025-05-29)
+
+- 对导出格式进行分别判断，一种是json格式的，一种是office文本格式的（commit 5b141a8e）
+- 优化了移动端审批的bug（commit c7649bf3）
+- 默认配置（commit 2a7ddd0e）
+- 合并远程 master 分支（commit ac8031d3）
+
+## v2.1.6 - (2025-05-28)
+
+- 集成腾讯IM接口（commit c901bec7）
+- 集成了腾讯IM通信，后端提供了两个三个接口，一个/api/Im/GetUserSig，一个批量导入用户接口/api/Im/MultiAccountImport，还一个/api/Im/MultiAccountDelete接口，另外系统配置项添加三个参数，分别是IMSdkAppid、IMSecretKey、Identifier（commit 030bb612）
+
+## v2.1.6 - (2025-05-27)
+
+- 优化了隐藏列表序列号的bug（commit 0d54b58b）
+- 表单必填项，颜色全局配置（commit c6a98da8）
+- 优化了导出按钮，json格式不能导出的问题（commit 7a3fb46e）
+- 这两个传参还是需要的（commit 70cff14b）
+- 修复了导出excel Blob格式未处理的问题（commit 0e4eb08f）
+
+## v2.1.6 - (2025-05-26)
+
+- 优化了界面引擎持久化暗黑模式，添加了页面定时更新，优化了甘特图保存提醒（commit 7dc308d6）
+- 优化了甘特图回调接口参数（commit 029e682a）
+- 隐藏列表默认序号（commit c50797f7）
+
+## v2.1.6 - (2025-05-25)
+
+- 优化PC WEB在移动端的显示（commit 204d5deb）
+- 更新了搜索的bug和文档的bug（commit dd445933）
+- 优化了二级栏目分类管理url自动获取（commit 24304be2）
+- 工业提出列表某个栏目想隐藏默认的序号，列表自己有序号（commit 745e112f）
+
+## v2.1.6 - (2025-05-24)
+
+- 修复了界面引擎甘特图实时更新控制失效的bug（commit 8b5028a2）
+- 删除多余配置文件、修改项目说明（commit e4775e20）
+- !4 删除多余配置文件、修改项目说明 合并拉取请求 !4 从 微吾科技/master（commit d83f1cec）
+- 优化数字输入框精度（commit 2d7d2e85）
+- 合并远程 master 分支（commit a1e7722e）
+- 更新文档（commit e1134b00）
+- 合并 https://gitee.com/microios/microi.net 的 master 分支（commit 9cd59c5c）
+- 更新文档 合并拉取请求 !5 从 微吾科技/master（commit fb7aa97f）
+- 更新文档（commit 82a20f40）
+
+## v2.1.6 - (2025-05-23)
+
+- 修复oracle bug、优化样式、更新基于吾码的开源项目（commit 2a7dbfbd）
+- 修复了页签切换时，没有根据fullPath来判断的历史bug（commit e18bbc75）
+- 修复了页签切换时，没有根据fullPath来判断的历史bug（commit 354044a4）
+- 更新了界面引擎适配移动端的问题（commit 3f9e63bc）
+- 接口地址动态配置还原为localConfig.json 模式（commit bb4e8783）
+- 界面引擎饼图组件标签显示添加了{b}{c}{d}三种方式（commit a6943ddc）
+- 二级菜单联动优化（commit 1a874f9a）
+- 样式优化、移动端显示表格时不再固定详情、更多按钮的操作列。（commit 2f008279）
+- 搜索截流（commit 0874d016）
+- 界面引擎适配移动端滚动条问题优化（commit 9ea026d5）
+- 合并远程 master 分支（commit 5e259044）
+- 现在查询接口替换、导出接口替换走json格式的请求了，而不再是form-数据（commit 53306538）
+- 优化了界面引擎移动端没有识别移动模式的问题（commit dbe2fabe）
+- 合并远程 master 分支（commit 2caaee71）
+- 彻底修复移动端滚动条滑动不顺畅的问题（commit 36037132）
+
+## v2.1.6 - (2025-05-22)
+
+- 修复了页签切换时，没有根据fullPath来判断的历史bug（commit 1f020b3b）
+- 继承了3D模型渲染引擎（commit cb3652fc）
+
+## v2.1.6 - (2025-05-21)
+
+- 修复搜索区域不显示的bug（commit a39a39cb）
+
+## v2.1.6 - (2025-05-19)
+
+- 修改.net9默认调试运行端口为7266（commit 52fef014）
+- 优化了界面引擎统计组件，加了精度配置，优化了甘特图组件，添加了bar颜色和底色用于区分进度效果（commit 82093304）
+
+## v2.1.6 - (2025-05-17)
+
+- 更新了甘特图变更事件传参类型（commit da464260）
+- 优化文件（commit 75b09f65）
+- 合并远程 master 分支（commit c62a3526）
+- 更新[基于吾码的开源项目]（commit af1e976a）
+- 更新[基于吾码的开源项目]（commit 2b5b1b45）
+- 重要：开源最新uniapp uni-ui移动端版本（commit c25b324e）
+
+## v2.1.6 - (2025-05-16)
+
+- 界面引擎 1.甘特图添加了日列视图宽度自定义，通过数据源来控制编辑状态。2.柱状图表添加了X、Y轴转换。3.支持组件、容器、页面跨端克隆复用。（commit 7c6eed22）
+- * 修复地图组件bug * 优化搜索 * 优化样式（commit d090eea4）
+- 界面引擎甘特图优化了更新提交，可以支持变更手动提交，也可以支持实时提交（commit 7c4f5ef5）
+- 修复了界面引擎甘特图上一次更新遗留的小问题（commit 5d15dd4e）
+
+## v2.1.6 - (2025-05-13)
+
+- 合并 功能/master-merge 分支（commit 85b06f4b）
+- 💎界面引擎重大更新,添加了组件和容器的克隆功能，添加了跨页面拷贝粘贴渲染功能，可以复用历史模板，大大增加开发时间（commit d43c1bdc）
+- 在线文档预览功能bug修复。目前的在线浏览只能浏览office文档，如果附件里传了png和pdf还是不能访问（commit d311b947）
+
+## v2.1.6 - (2025-05-12)
+
+- !2 测试：check formatting 合并拉取请求 !2 从 毛家顺/功能/master-prettier3（commit f54c8671）
+- 新增：先把启动报错给解决了（commit 26de18e7）
+- 去掉了临时的传参代码，并测试出来查询接口替换后的查询，一定要用系统的路径才可以，页面做了提示（commit 5919cd30）
+- 111（commit 5255261b）
+- 将 master 分支合并到 功能/master-merge（commit 1dafeb67）
+- 优化了界面引擎表格组件支持html格式，添加了高级日历组件（commit af2abbf2）
+- 修复了界面引擎在设计时预览会自动切换移动端模式的bug（commit 7e42349c）
+
+## v2.1.6 - (2025-05-10)
+
+- 更改替换后端接口地址方式，localConfig.josn 方式改为.env模式（commit 0c6161e3）
+- apiBaseUrl 默认值判断（commit 2f8b1adc）
+- test（commit ea8017be）
+- 111（commit ad67865e）
+- 测试：check formatting（commit 8484e43b）
+- 测试：check formatting（commit 83974ca1）
+- 1111（commit b5556fb0）
+- 测试：check formatting（commit 411385ca）
+- 测试：check formatting（commit 5205c7a5）
+
+## v2.1.6 - (2025-05-09)
+
+- 修复bug（commit 213160fe）
+- 修复bug（commit e1c0b90c）
+- 优化了界面引擎甘特图放大缩小没有级联下拉框的问题，修复了表格组件内置饼图多个列共用的问题（commit 49595fa4）
+
+## v2.1.6 - (2025-05-08)
+
+- 前端V8.FormEngine支持最新写法（commit 8277bcde）
+- 本次大量更新：优化搜索、优化样式、修复bug（commit fba9a1a4）
+
+## v2.1.6 - (2025-05-07)
+
+- 修复了系统皮肤的优先级关系，优化了主题色覆盖各种场景的问题，比如加载框，个别按钮的颜色等（commit abf203d7）
+- 优化了主题色覆盖范围（commit e0729169）
+
+## v2.1.6 - (2025-05-06)
+
+- 界面引擎优化了office组件接收中文url参数乱码不识别的问题，描述组件添加了小饼图效果，添加了适配移动端的模式（commit b514375f）
+- 刘老师转存修改（commit eaf2ca92）
+- 更新了office-widget组件在iframe方式调用时，从demoObj 配置 filePath 路径（commit f61b13aa）
+- 优化了界面引擎区域地图组件，默认渲染市级而非省级（commit 5c1f796c）
+- 新增：二维码组件开发完成（commit 6e7e901d）
+- 界面引擎修复了在线文档预览功能（commit 78992f28）
+- 合并远程 master 分支（commit 0990d957）
+
+## v2.1.6 - (2025-05-01)
+
+- 优化了弹窗的提示框及界面引擎盖的bug（commit a8f6c42b）
+- 合并远程 master 分支（commit 83762655）
+
+## v2.1.5 - (2025-04-29)
+
+- 界面引擎tabel组件添加了表格内部饼图小组件，用于显示占比和进度（commit 233b7b22）
+
+## v2.1.5 - (2025-04-27)
+
+- 修复了界面引擎同时多开设计保存会污染同级页面的问题（commit 4c686e1f）
+- 优化了界面引擎区域地图点击触发事件跳转路由（commit 95526fb1）
+
+## v2.1.5 - (2025-04-26)
+
+- 增加了一种传参格式，便于接口替换的接收参数（commit 784dc0e1）
+- 修复了表内编辑没有记录日志的bug（commit 923d4fcc）
+
+## v2.1.5 - (2025-04-25)
+
+- 二级目录页面优化（commit 91b5d48b）
+
+## v2.1.5 - (2025-04-24)
+
+- 更新了界面引擎甘特图，优化了诸多功能（commit 83c4ebe9）
+
+## v2.1.5 - (2025-04-23)
+
+- 修复了定时任务功能新增任务时不填写参数引发的一些列问题（commit 5a42d999）
+
+## v2.1.5 - (2025-04-21)
+
+- 优化了界面引擎区域地图，添加了回调接口地址和动态渲染宽高（commit adfef94c）
+- 优化了界面引擎区域地图路由跳转（commit 3782c551）
+
+## v2.1.5 - (2025-04-20)
+
+- 界面引擎添加了区域钻地图组件，优化了甘特图组件（commit 93e5cf95）
+
+## v2.1.5 - (2025-04-16)
+
+- 默认主题色可以从后台系统配置（commit 28c51b54）
+- 优化了界面引擎统计组件，添加了子项页面跳转路径（commit 511215aa）
+- 界面引擎升级更新（commit 1485d01b）
+
+## v2.1.5 - (2025-04-14)
+
+- 重构了界面引擎动态搜索组件，优化了部分组件逻辑，优化了部分素材的来源方式（commit 63810c49）
+
+## v2.1.5 - (2025-04-12)
+
+- 现在日期搜索支持时分秒了（commit 0ea84f2e）
+- 修复了界面引擎更新后老数据的兼容性问题（commit 7ea12ea9）
+- 新增前端支持子系统模块显示（commit 3393c312）
+- 新增发布用的Dockerfile文件（commit 45d44bc4）
+
+## v2.1.5 - (2025-04-11)
+
+- 优化了界面引擎动态搜索下拉框初始值问题，添加了@修改事件实时刷新（commit bc09852c）
+- 优化了界面引擎甘特图和表格组件（commit 14244265）
+
+## v2.1.5 - (2025-04-09)
+
+- 添加了界面引擎容器动态时间日期，修复了select 第一次未生效的问题（commit e5876b78）
+- 新增Microi二次开发demo、支付宝H5支付示例2（commit 4d2cee53）
+- 新增Microi二次开发demo、支付宝H5支付示例2（commit 1d602891）
+- 修复了界面引擎动态搜索相关问题（commit 2c1e3f84）
+
+## v2.1.5 - (2025-04-08)
+
+- 优化了界面引擎统计组件，添加了日期区间筛选条件（commit 581fa677）
+- 界面引擎大部分组件添加了动态条件和日期筛选（commit ab93331a）
+
+## v2.1.5 - (2025-04-06)
+
+- 添加了界面引擎容器内组件组局刷新功能，优化了请求封装url异常报错的问题（commit 27cf566d）
+
+## v2.1.5 - (2025-04-05)
+
+- 优化了界面引擎容器背景颜色配置，优化了滚动条鼠标滚轮失效的问题。（commit 0db2f21e）
+
+## v2.1.5 - (2025-04-04)
+
+- 优化了页面左侧底部高度，无查看详情禁止双击查看查看下拉按钮按条件隐藏等（commit c96aaea1）
+
+## v2.1.5 - (2025-04-03)
+
+- 修复了左边菜单栏logo 标题过长换行的问题（commit 3f1b5a99）
+- 添加了左边菜单标题的字号和截取配置，在系统配置里配置，默认截取12个字符，字号默认20px（commit a9b28b6b）
+- * 默认导出现在下拉复选框会正确的只显示名称字段，而不是json * 修复关联表默认导出时关联的表字段未导出值的bug * 更新文档（commit 9a8924a0）
+- 合并远程 master 分支（commit bca3799b）
+
+## v2.1.5 - (2025-04-02)
+
+- 添加了技术文档侧边栏的模板引擎用法，中英日文同步添加，无需额外翻译了。（commit c0f2d7d3）
+- 模板引擎添加单图和多图列表显示的用法（commit ad0fc2ee）
+- 更新数据库、更新一键安装脚本、更新文档（commit 1b0a4257）
+- 合并远程 master 分支（commit 965f9eea）
+- * 一键安装脚本支持ubuntu24.*了，更新mysql版本为5.7、redis版本为7.4.2 * 更新文档（commit e1abd162）
+- 更新文档（commit d391bf9e）
+- 更新文档（commit 4c89e064）
+- 文档：文档更新（commit e0c0c6a0）
+
+## v2.1.5 - (2025-03-31)
+
+- 新增接口地址（commit 81764df2）
+
+## v2.1.5 - (2025-03-30)
+
+- ApiBase以docker环境变量最优先（commit 2ed85bb0）
+- tabel 组件添加了颜色设置（commit 9be0e0bc）
+- 优化了内置界面引擎表组件的设置属性，添加了颜色配置（commit 62ba7d04）
+- * 新增控件数据源可选择接口引擎配置 * 修复控件数据源为接口引擎、数据源引擎时首次不加载数据的bug（commit 80929536）
+- 优化了模块引擎的显示内容及分页数量，虚拟表的显示标签（commit a5be5b90）
+
+## v2.1.5 - (2025-03-29)
+
+- 降低并发 修改翻译key（commit d2e81f3c）
+- 新增：将剩余的翻译翻译完全（commit cf88a197）
+- 加一个运行时长优化（commit d65ddaae）
+- 新增：针对faq优化脚本（commit c20fbbbf）
+- 新增：faq文档更新（commit d30ac501）
+- 新增界面引擎默认路由（commit 87ae60f8）
+- 合并远程 master 分支（commit bbe295a7）
+- 新增：脚本优化（commit e102db9a）
+- 合并远程 master 分支（commit d784c854）
+- 新增：脚本更新（commit 440ef26e）
+- 更新文档、优化接口引擎、合并PC传统界面组件扩展代码（commit cf8ec88b）
+- 将打印引擎内置到项目中，不再调用官方demo（commit 8574702c）
+- 新增根据路由获取界面引擎数据（commit 704456e9）
+- 合并远程 master 分支（commit e120112e）
+- 优化了下拉单选数据源引擎（commit 807036b0）
+- 修复界面引擎路由匹配的bug（commit 7cf839b4）
+- 合并远程 master 分支（commit 6170975d）
+- 更新数据库：首页由界面引擎配置（commit ef46adb4）
+
+## v2.1.5 - (2025-03-28)
+
+- 优化文档（commit c6d3d6ad）
+- 优化文档项目源码（commit 084f6f24）
+- 新增：脚本优化（commit a0821e02）
+- 新增：脚本更新（commit f1489838）
+- 新增：修复所有文档（commit b8a3675c）
+- 新增：脚本更新（commit f5406c09）
+- 新增：文档更新（commit 6520415f）
+- 新增：修复vue（commit d30e6518）
+- 脚本更新（commit 0cae3e41）
+- 新增：脚本优化（commit 30d28150）
+- 文档更新（commit 54ac4854）
+- 在vue2中内置了界面界面引擎，无需调用官方界面引擎（commit d285acc5）
+- 修改了界面引擎渲染器的地址（commit cfec811c）
+- 合并远程 master 分支（commit 80ed648a）
+
+## v2.1.4 - (2025-03-27)
+
+- 删除两个无用测试页面，主要测试数据源引擎的问题（commit 61e5058a）
+- 新增三套基于吾码的开源项目：企业官网UniApp；图片壁纸、短视频UniApp；支付宝H5手机网站支付。（commit 98d28d7e）
+- 合并远程 master 分支（commit 710c090b）
+- 更新接口引擎导入接口替换以及进度文档说明（commit 74c8002e）
+- 修复首次运行系统多语言加载错误的bug（commit 42b752ec）
+- !1 修复首次运行系统多语言加载错误的bug 合并拉取请求 !1 从 吴东明/master（commit b71e3fe3）
+
+## v2.1.4 - (2025-03-26)
+
+- 新增：翻译脚本优化（commit 928dfeed）
+- 新增：翻译内容更新（commit 232fd2df）
+- 新增：全量跑了一遍（commit 0d79319e）
+- config: 翻译脚本优化（commit 4ccf31eb）
+- 修复：修改了表的翻译（commit 7a846cfa）
+- 支持支付宝支付后回调（也支持接口引擎处理回调），演示地址：https://os.microios.com:1301/（commit 58f9b0d4）
+- 合并远程 master 分支（commit 707bf728）
+
+## v2.1.4 - (2025-03-25)
+
+- 开源扩展V8.Alipay支付宝H5支付，演示地址https://os.microios.com:1301/（commit 7b80e26a）
+- 添加了日文语言，版面全面支持译文，包括侧边栏导航、底部（commit de3d3300）
+- config: 添加翻译脚本（commit 2c2c6b63）
+- 文档：docs lang 更新!（commit 1acb7948）
+- 回退 "文档：docs lang 更新!"（commit edc2ac70）
+- config: 脚本更新（commit 36cc98f2）
+- 工程维护：脚本更新（commit 53b8286b）
+- chroe: 修改翻译脚本目录（commit 0a8a8f11）
+- 新增：更新多语言文档（commit 4d664984）
+- chrome: 补充翻译脚本（commit 87049e91）
+- 新增：补全index.md文件的翻译（commit 7d0aab96）
+- 综讯固资数据大屏微服务（commit e0b2dc51）
+- 合并远程 master 分支（commit f29fd9b2）
+- 对接支付宝手机网站支付2.0、v3.0，已测试通过，测试地址：https://os.microios.com:1301/（commit 44510bf0）
+- 合并远程 master 分支（commit 1e16f3a7）
+
+## v2.1.4 - (2025-03-24)
+
+- 修复了相同页面不同参数页签不添加的问题，path 改成 fullPath即可（commit d10ccb01）
+- 编辑和删除可写v8代码控制是否显示（commit 0fa76bf1）
+- apibase修改（commit 3d7231a3）
+- 合并远程 master 分支（commit 9e0a5bd1）
+- 修改传统界面源码说明文件（commit 654a75ec）
+- 修改apibase（commit b56cff52）
+- 合并远程 master 分支（commit 407a4244）
+- 修复报错字段 not found on DiyMessage.Msg的bug（commit 90641ac0）
+- 优化了后端接口地址替换的方法，只需在src文件下加一个localConfig.json，即可，该文件已被gitignore忽略。（commit e8edc07b）
+- 合并远程 master 分支（commit c1b6ea37）
+- ApiBase合并（commit 5551f690）
+- 合并 https://gitee.com/ITdos/microi.net 的 master、master 分支（commit ba8012be）
+
+## v2.1.4 - (2025-03-23)
+
+- 更新数据库、MinIO代码优化（commit ee469ce7）
+
+## v2.1.4 - (2025-03-21)
+
+- 修复任务调度在暂停状态下，修改后任务又重新启动且没有更改状态为已启动的bug（commit 12383cfa）
+- 说明文件修改了（commit 0704d338）
+- 合并远程 master 分支（commit c8025e90）
+
+## v2.1.4 - (2025-03-20)
+
+- 更新了fqa页面，将历史fqa记录转移到doc文档（commit 9861847b）
+- 合并远程 master 分支（commit dd3857ed）
+- 修改了fqa错误语法，更改为faq（commit 4a79b1e1）
+- 修复V8.Office.SendEmail()端口的bug（commit 2d37029f）
+- 默认ApiBase配置为api-china.itdos.com（commit 75d7fd10）
+- 合并远程 master 分支（commit d828fdf9）
+
+## v2.1.4 - (2025-03-19)
+
+- 刘诚新增允许角色才可查看表单修改日志（commit cb4c2224）
+- 合并远程 master 分支（commit f1e6a794）
+
+## v2.1.4 - (2025-03-18)
+
+- 合并远程 master 分支（commit 1a0b481a）
+- 现在V8导出excel支持根据数据类型判断单元格为数字（commit 40f48076）
+
+## v2.1.4 - (2025-03-17)
+
+- 修复了组织机构组件修改后列表页没有及时刷新的问题（commit 9633800b）
+- 修改文档说明（commit 6509faf6）
+- 合并远程 master 分支（commit 4ae4d00e）
+
+## v2.1.4 - (2025-03-16)
+
+- 注释了 InputInputEvent 触发CommonV8CodeChange 事件，修复了Init()事件内DiyCommon 未指向self的小bug，（commit 19a4d903）
+- 【代码格式优化】纯格式化代码，没做任何修改（commit d495c6ad）
+- 修复了组织机构下拉框不显示值的问题（commit cfd5d599）
+- zero303 组织机构组建报错（commit d5b1cd6f）
+- 合并远程 master 分支（commit cf765cbc）
+
+## v2.1.4 - (2025-03-14)
+
+- 新增：修改配置（commit eda60d4c）
+- 新增：上传文档（commit ea57250e）
+- 文档项目源码更新（commit 470b5067）
+- 合并远程 master 分支（commit 3f10bcc7）
+
+## v2.1.4 - (2025-03-13)
+
+- 更新文档项目源码（commit 5f4f080d）
+
+## v2.1.4 - (2025-03-12)
+
+- 更新文档项目源码（commit efde5199）
+- 更新文档项目源码（commit 84cce421）
+- 更新文档项目源码（commit a515066e）
+- 更新文档项目源码（commit 92d4ddbc）
+- 文档新增最新doc.microi.net文档地址（commit 1b76e710）
+- 更新文档项目源码（commit 4dce4526）
+- 更新文档项目源码（commit dda7d109）
+- 更新文档项目源码（commit 7af99d1e）
+- 更新文档项目源码（commit 05a5a97a）
+- 更新文档项目源码（commit 24cf5d7a）
+
+## v2.1.4 - (2025-03-11)
+
+- 更新文档项目（commit 737029ac）
+- 合并远程 master 分支（commit 1b49b37d）
+- 更新文档项目（commit 96714ea5）
+- 更新文档项目（commit c498966e）
+- 更新文档项目（commit 9bfc2f80）
+- 导出Office Excel时现在数字类型字段会生成数字类型单元格，而不是string类型单元格（commit 2dc28865）
+- 文档项目更新（commit a1e0c4fa）
+
+## v2.1.4 - (2025-03-10)
+
+- liucheng 去除表鼠标经过，背景颜色和文字都是深色的bug（commit 837a7927）
+
+## v2.1.4 - (2025-03-09)
+
+- 更新最新demo数据库和最新empty空库（commit 951cb124）
+- 合并远程 master 分支（commit 62ad1f3d）
+
+## v2.1.4 - (2025-03-07)
+
+- 去除了doc文档 软件包-lock.json 版本控制（commit 2d8b5320）
+
+## v2.1.3 - (2025-03-06)
+
+- * 修复iframe菜单无法滚动的问题 * 更新microi.net版本（commit 622eb29e）
+- microi.doc 软件包-lock.json（commit dc123ce4）
+- 合并远程 master 分支（commit cea8af96）
+- 目录优化（commit 9b83926b）
+- 目录优化（commit 696e0f65）
+- 目录优化（commit d7b0d29f）
+- 优化了一些宣传md文档内容（commit 60aa9e95）
+- 优化发布文件（commit 5c8ad519）
+- 合并远程 master 分支（commit dfed45f3）
+- Microi.net：工程维护（commit ba1697c）
+
+## v2.1.2 - (2025-03-05)
+
+- 修改了issues 和 pull 请求 地址，doc文档迁移到主分支上了，之前地址变掉了。（commit 317dce6f）
+- 修改了issues 和 pull 请求 地址，doc文档迁移到主分支上了，之前地址变掉了。（commit 7cb17bb0）
+- 合并远程 master 分支（commit b9a135c2）
+
+## v2.1.2 - (2025-03-04)
+
+- 修复了启动项在VisualStudio 无法启动的问题（commit f29dc2f0）
+
+## v2.1.2 - (2025-03-03)
+
+- 修复了monaco-editor运行报错的bug，现在不需要手动改了，已升级到0.33.1,(vue2支持最高版本)（commit 774c60a0）
+
+## v2.1.1 - (2025-03-01)
+
+- 代码文件目录结构优化（commit b995519e）
+- 代码文件目录优化（commit 95def418）
+- .net gRPC客户端演示代码提交（commit 2b9f0d90）
+- 解决git代码冲突（commit 6e40753b）
+- 修复解决方案文件乱码导致vs code无法正常加载.net解决方案的问题（commit 4a6546d4）
+- 去除logs的排除（commit 568da95d）
+- 合并远程 master 分支（commit 5fe0bcc0）
+- 添加日志，从git排除文件移除（commit da268095）
+- 优化文档项目（commit 6542c637）
+- 修复批量审批，取消按钮的bug（commit 272cf02b）
+- 撤回按钮，DiyCommon not defined 报错的bug（commit 403236dd）
+
+## v2.1.1 - (2025-02-28)
+
+- 优化了搜索样式优化（commit 2dba22e3）
+- 新增了一个离开事件（commit 03e7a5cc）
+- 合并远程 master 分支（commit 4699a73d）
+- 新增了了技术文档项目（commit 83796cb9）
+
+## v2.1.1 - (2025-02-27)
+
+- 优化了编辑页tab选项卡从v8引擎进入时默认加载选项，优化了主题色el-tag的color（commit 49b848a2）
+
+## v2.1.1 - (2025-02-25)
+
+- 优化了左边菜单栏，添加了一件换主题（commit e803fd31）
+
+## v2.1.1 - (2025-02-20)
+
+- 固资的微服务页面 检查该条业务数据是否已删除，已删除则删除对应的流程数据（commit c5bc70ec）
+
+## v2.1.1 - (2025-02-18)
+
+- * 现在表内快速新增也会执行表单进入事件了 * 修复表内快速新增后保存时判断必填项错误的bug（commit 37185293）
+
+## v2.1.1 - (2025-02-17)
+
+- 修复弹出表格在某些特殊情况下可搜索字段搜索没有效果的bug（commit e1933ecc）
+
+## v2.1.1 - (2025-02-10)
+
+- 自定义导出时，当数据行没有图片自动1行高度，当数据行有图片时自动增加高度。（commit b0a43ff7）
+- 合并远程 master 分支（commit 841988df）
+
+## v2.1.1 - (2025-02-06)
+
+- * 传统界面版本前端100%开源 * V8.SearchSe、V8.SearchAppend现在可以传入_Where条件了 * 弹出表格控件的[弹出前事件V8代码]新增V8.OpenTableSetWhere函数 * 修复PC前端v3版本表内编辑下拉框两次选择数据源丢失的bug * PC前端表内编辑新增的数据现在不会再显示详细和编辑按钮了 * 修复PC前端表内编辑未验证通过导致按钮一直loading的bug * 修复OpenTable将脏数据保存到了字段.Config中的bug * 现在数据即使sys_osclients表数据为空，只要环境变量包含了redis配置，系统也能正常运行了 * API接口系统由.net8.0升级至.net9 * RabbitMQ.Client升级至7.0.0 * 移除IS4身份认证，使用.net9.0自带JWT认证 * 新增V8.MongoDb系列操作，见平台文档 * 现在接口引擎返回纯字符串（非json）时，不会再额外返回两个双引号了 * 现在接口引擎支持接收xml参数了，同样使用V8.Param访问参数 * 现在接口引擎支持直接写 return { Code : 1 }了，而不是一定需要写V8.Result = { Code : 1 }; return; * redis键名进行了统一命名优化 * PC前端现在支持绑定微信公众号oepnid了 * 新增V8.TranslateEngine翻译引擎，并且也将diy_lang多语言管理表进行了缓存（非redis） * 现在接口引擎完全支持微信公众号相关接口了，如模板消息、公众号自定义菜单、帐号绑定等等 * 现在模块引擎的【可搜索字段】支持【等值】配置了 * 平台升级全新的消息通知设置，支持SaaS模式，动态配置通知方式（短信、消息模板、接收人、接收角色、触发条件等） * 新增V8.OpenAnyTable()函数，用法见平台文档（commit 74adbc15）
+- 更新最新数据库（commit 7de7d968）
+- 修改了说明文档，这里初次git 运行可能会卡在这里，请重点关注！！！（commit fd1f9725）
+- 合并远程 master 分支（commit 816fff7f）
+
+## v2.1.0 - (2024-11-19)
+
+- 更新文档（commit 36cf2e00）
+- Microi.net：工程维护（commit 140dce3）
+
+## v2.0.3 - (2024-11-12)
+
+- 修复多图字段导出时若只传了一张图片会抛出合并列异常的bug 修复V8.Http.Get()请求一些特殊大厂接口时会报错的bug 微信支付回调接口引擎自定义地址由于不支持url参数，因此接口引擎新增给地址增加【--OsClient--crm--】后缀以实现OsClient参数 修复.net6升级到.net8后通用导入会报错的bug 修复.net6升级到.net8后添加定时任务无法启动的bug 修复V8.DataSourceEngine数据源引擎无法设置匿名调用的bug（commit ecc35966）
+
+## v2.0.3 - (2024-11-11)
+
+- 更新文档（commit 3437bff0）
+
+## v2.0.3 - (2024-11-06)
+
+- 更新文档（commit 2e3b656f）
+
+## v2.0.2 - (2024-11-05)
+
+- git配置变更（commit 6c42b479）
+- 更新文档（commit d0d6ee0e）
+- 更新文档（commit 4333f4ef）
+- 更新文档（commit 708fcd6c）
+- 文档更新（commit 7dff0385）
+- 更新文档（commit 5611b7c8）
+- 现在通用导出支持单图、多图字段了，多图字段会根据图片数量自动创建列、表头合并列，自动计算图片定位浮在对应的单元格之上 接口引擎现在支持自定义Excel导出了，可自定义表头、自定义数据源，用法见【/文档/进阶：自定义导出Excel.md】 通用导出、自定义导出源码公开在Microi.Office源码中（commit 82888a5c）
+- 更新说明（commit c71ea9a7）
+
+## v2.0.1 - (2024-11-04)
+
+- 修复文件/图片上传接口当Path参数为空时出现两个斜杠 修复接口引擎第一次保存后缓存会更新失败的bug 新增Microi.V8Engine库，可实现扩展接口引擎中V8对象、V8.方法对象 修复接口引擎不支持微信支付加密的bug 修复接口引擎在SaaS模式下，匿名通过get方式调用接收不到OsClient参数的bug 修复地图组件遇到传入空的xy轴加载地图失败的bug 修复VUE v2.6.10自动升级到v2.7.16后，表单设计器由于DOM刷新频繁导致页面卡死的严重bug。（commit c62ba0f5）
+
+## v2.0.1 - (2024-11-03)
+
+- 更新说明（commit 5536de1f）
+
+## v2.0.1 - (2024-11-02)
+
+- 更新介绍（commit a1f8b19c）
+- 更新文档（commit 70c604ba）
+
+## v2.0.1 - (2024-10-31)
+
+- 上传数据库备份文件，更新前端vue2框架源码说明（commit f0236374）
+- 上传部分案例截图、公司介绍（commit 2daca082）
+- 资料更新（commit 89a43f14）
+- Microi.net：工程维护（commit f26fe5c）
+
+## v2.0.1 - (2024-10-30)
+
+- npm microi.net 2.x用于vue2，3.x用于vue3（commit 0aaa5509）
+- Microi.net：工程维护（commit 0f8b8aa）
+- Microi.net：更新readme（commit f96c770）
+
+## v2.0.0 - (2024-10-29)
+
+- Microi吾码 - 低代码平台（commit 8dc8c89c）
+- 更新说明（commit dd6b314b）
+- 更新说明（commit 8801fe03）
+- 更新说明（commit f47ba7f9）
+- 新增界面引擎试用地址（commit 767a24a9）
+
+## v4.0.0 - (2024-10-21 17:46)
 
 - Microi v4.0
 - microi v3.x版本已应用数百套产品，因此仍然长期持续维护，新增v4分支
@@ -2638,9 +3481,7 @@
 - 现在树形表格、树形控件支持懒加载了
 - 表格模板引擎现在支持V8.Result = false;来取消模板渲染了。
 
-## v3.17.1
-
-更新日期：2024-10-21 17:41
+## v3.17.1 - (2024-10-21 17:41)
 
 - 【必须】手动去数据库管理工具给【diy_field】表新增字段：【AppVisible、bit、可为空】。
 - 然后去【表单引擎】—>【diy_field】表—>【异常字段 选择 AppVisible 修复】。
@@ -2656,9 +3497,7 @@
 - 接口引擎现在支持直接响应文件了（可以通过get请求接口引擎自定义地址返回任何类型的文件，需在Sys_ApiEngine表新增开关组件：响应文件[ResponseFile]）
 - 平台的默认Upload上传接口现在多文件上传时，可以不再必传Multiple参数了，会自动识别（但如果本身想多文件上传，但又只选择了1个文件，建议传入Multiple=true）
 
-## v3.16.20
-
-更新日期：2024-10-21 17:39
+## v3.16.20 - (2024-10-21 17:39)
 
 - 现在表内编辑也能正确的触发表单属性里面的数据修改接口替换了。
 - 表单引擎、模块引擎新增V8代码加密传输功能，但这导致必须要在sys_menu的表单设计-表单属性-【服务器端数据处理V8事件】和【服务器端表单提交前V8事件】均需要添加这段相同的代码：
@@ -2678,9 +3517,7 @@
 - 兼容oracle 11g一些特性，现在oracle11g可以正常做为saas从库、扩展数据库、V8.Dbs访问oracle11g
 - sys_osclients新增DbVersion字段（值可为：空、12c[oracle为空时默认为12c]、11g），用于判断数据库为oracle11g时的兼容处理.
 
-## v3.16.0
-
-更新日期：2024-10-21 17:35
+## v3.16.0 - (2024-10-21 17:35)
 
 - 现在支持多字段排序了
 - 修复MinIO上传过大或过小的图片报错的bug。
@@ -2747,9 +3584,7 @@
 - 修复_InvokeType默认值为Client导致一些请求不传此参数都被系统误认为是客户端请求的bug，现在默认值为null。
 - 修复特殊情况下V8.Cache.Set时也会将字符串再次序列化的bug。
 
-## v3.15.10
-
-更新日期：2023-08-08 20:48
+## v3.15.10 - (2023-08-08 20:48)
 
 - 兄弟们，大更新来了：）
 - 平台文档进行了大量更新
@@ -2822,9 +3657,7 @@
 - 现在除第1页之外的最后一页如果只有一条数据在被删除后，会自动跳转到上一页，而不是显示空数据。
 - 修复表单以新页面打开后，在添加数据里子表关联未生效的bug。
 
-## v3.13.13
-
-更新日期：2023-06-15 19:05
+## v3.13.13 - (2023-06-15 19:05)
 
 - 由于最近半年项目繁忙，所以半年内未上传更新日志。
 - 本次更新前需要做的重要操作：
@@ -2889,9 +3722,7 @@
 - 新增Nuget依赖注入组件：Microi.WeChat，与Microi.net组件完全解耦，二次开发人员可选择是否引用此包。
 - MySql数据库编码以及连接字符串从utf8全部修改为utf8mb4。
 
-## v3.12.15
-
-更新日期：2022-12-16 01:16
+## v3.12.15 - (2022-12-16 01:16)
 
 - DIY底层通用新增、修改接口代码优化。
 - 修复表单设计-异常字段列表错误的bug。
@@ -2905,9 +3736,7 @@
 - 修复新增其它功能后导致单选框、日期等组件使用V8赋值无效的bug。
 - 现在图片/文件上传后会触发相应值变更V8事件了。
 
-## v3.11.23
-
-更新日期：2022-11-24 16:56
+## v3.11.23 - (2022-11-24 16:56)
 
 - 现在服务器端执行的工作流引擎条件V8代码时，V8.Form.下拉框获取到的值是正确的最终存储的值，而不是object。
 - 工作流引擎现在在节点开始V8代码中，可以使用V8.FieldSet了。
@@ -2934,9 +3763,7 @@
 - 现在退出登陆会有确认提示。
 - 修复一些特殊情况下，字段大小写不一致导致无法匹配、出错的bug。
 
-## v3.10.19
-
-更新日期：2022-10-13 17:37
+## v3.10.19 - (2022-10-13 17:37)
 
 - 修复旧的DiyTable相关接口不支持获取V8.CurrenUser的DIY扩展字段的bug
 - 修复部分老的字符串’null‘脏数据导致流程发起失败的bug
@@ -2954,9 +3781,7 @@
 - 修复Base64组件在前端microi.net组件引用中的版本号问题导致加解密失败的bug。
 - 修复流程设计时，流程属性修改后并不会保存成功的bug。
 
-## v3.9.15
-
-更新日期：2022-09-15 08:47
+## v3.9.15 - (2022-09-15 08:47)
 
 - 修复_Where条件参数的StartLike、EndLike查询报错的bug
 - 现在附件上传后会正确的显示文件体积KB、MB、GB等单位。
@@ -2972,9 +3797,7 @@
 - 修复FormEngine.AddFormData时，数字类型字段赋值空值、开启加密存储报错的bug
 - 修复前端microi.net核心获取OsClicent、ApiBase特殊情况下会出错的bug
 
-## v3.9.2
-
-更新日期：2022-08-25 02:39
+## v3.9.2 - (2022-08-25 02:39)
 
 - 修复文件上传最大不能超过30M的bug
 - 修复字段搜索时，两张表有相同字段偶尔会搜索结果错误的bug
@@ -2995,9 +3818,7 @@
 - 修复某种特殊情况下，下拉框清除选择后，无法保存到数据库。
 - 修复下拉框仅赋值Id时，特殊情况下不显示对应Label的bug。
 
-## v3.8.22
-
-更新日期：2022-08-22 23:04
+## v3.8.22 - (2022-08-22 23:04)
 
 - 现在地址控件直接存储中文，不再是Code。
 - 表单设计新增异常字段列表、修复功能。
@@ -3007,9 +3828,7 @@
 - 修复弹出表格控件新增层级bug
 - 由于工作繁忙，还有部分新增功能、bug修复本次更新暂未写入更新日志。
 
-## v3.8.8
-
-更新日期：2022-08-08 17:26
+## v3.8.8 - (2022-08-08 17:26)
 
 - 新增FormEngine相关接口，可以不再使用_RowModel了
 - 表单引擎新增、修改字段新增内置字段判断。
@@ -3020,9 +3839,7 @@
 - 现在模块引擎部分已经修改为表单引擎驱动了。
 - 由于工作繁忙，还有部分新增功能、bug修复本次更新暂未写入更新日志。
 
-## v3.7.31
-
-更新日期：2022-07-21 15:11
+## v3.7.31 - (2022-07-21 15:11)
 
 - 【重要提示】
 - 1、更新v3.7.31版本之前，一定要先手动将数据库Sys_User表的所有char36字段类型修改为varchar36，否则更新后无法登陆！
@@ -3072,9 +3889,7 @@
 - 现在可以在表单V8离开事件中指定V8.Result = false; ，表单提交后不会关闭表单，新开表单提交后也不会返回上一页，此时可以使用V8.Router.Push()跳转到任意页面。
 - 新增/api/SysUser/DiyLogin登陆接口，当系统设置开启了[Diy系统模块]，则会自动使用此登陆接口，同时兼容老的登陆接口。
 
-## v3.7.22
-
-更新日期：2022-07-13 15:28
+## v3.7.22 - (2022-07-13 15:28)
 
 - 修复特殊情况下偶尔base64解密v8代码报错导致diy数据列表无法显示的bug。
 - 表单新开页面预览详情时新增编辑按钮。
@@ -3107,9 +3922,7 @@
 - 流程引擎—节点名称现在文字增长，节点宽度会自适应
 - 新增核心模块【接口引擎】（未写进更新程序，可手动创建相关表字段，或等待应用商城模块上线在线安装）
 
-## v3.7.18
-
-更新日期：2022-07-07 19:19
+## v3.7.18 - (2022-07-07 19:19)
 
 - 修复流程设计图不存在任何线的时候，偶尔拖动节点后所有节点消失的bug
 - 修复设计流程时，tab页签显示no-name的bug
@@ -3148,9 +3961,7 @@
 - 修复流程引擎保存时，空值生成了null字符串的bug
 - 修复删除流程节点时未找到条件线报参数错误的小bug（不影响使用）
 
-## v3.7.1
-
-更新日期：2022-06-30 01:40
+## v3.7.1 - (2022-06-30 01:40)
 
 - 新增系统更新日志的更新接口，每次版本更新脚本、缓存更新全部集成在此接口
 - 修复富文本编辑器显示在V8引擎代码设计器之上的bug
@@ -3173,9 +3984,7 @@
 - 系统设置新增大量界面风格配置
 - 现在多图上传支持拖动排序、修改图片名称
 
-## v3.6.29
-
-更新日期：2022-06-29 12:41
+## v3.6.29 - (2022-06-29 12:41)
 
 - diy框架样式优化
 - 优化聊天系统log日志
@@ -3210,9 +4019,7 @@
 - V8按钮事件中执行V8.V8Callback()实现按钮loading效果，防止前端重复提交 。
 - 现在支持配置关联表单字段可排序、默认排序了。
 
-## v3.5.27
-
-更新日期：2022-05-27 11:10
+## v3.5.27 - (2022-05-27 11:10)
 
 - 1、diy的字段名、表名，现在会强制替换掉所有的特殊字符，修复一些会导致的奇葩问题
 - 2、恢复聊天系统
@@ -3225,9 +4032,7 @@
 - 9、修复表单引擎->下拉框组件在一些特殊用法中（如sql拼接）保存后再次查看不显示数据的bug
 - 10、修复表单引擎中如果使用了datetime字段类型，空值存储错误的bug
 
-## v3.5.14
-
-更新日期：2022-04-13 14:08
+## v3.5.14 - (2022-04-13 14:08)
 
 - 后端diy接口系统升级至.net 6.0框架，架构优化，性能提升。
 - 现在表单设计中，会实时预览显示子表组件了
@@ -3250,9 +4055,7 @@
 - 修复删除时提前表单前执行v8代码报错row is not defined.
 - 修复前端微服务框架重复调用接口导致页面卡顿的bug（保证app.js在最后引用加载）
 
-## v3.4.13
-
-更新日期：2022-03-18 11:19
+## v3.4.13 - (2022-03-18 11:19)
 
 - 1、2021-09-24至2022-04-11期间已有数十次更新，由于项目繁忙未记录到更新日志，现重新开始记录更新日志。
 - 2、公司npm服务器地址更换为【https://repository.microi.net/repository/npm/】，帐号密码询问Anderson（禁止泄漏）。目前主要包含microi.net（核心库）、dos.fontawesome（图标库）、microi.service（微服务基座）、V8引擎代码设计器、SQL设计器等等组件。需要使用nrm重新添加npm源。
@@ -3273,16 +4076,12 @@
 - 17、系统设置现在可以修改左侧模块背景颜色、文字颜色。
 - 18、新增平台文档模块。
 
-## v2.9.24
-
-更新日期：2021-09-24 00:20
+## v2.9.24 - (2021-09-24 00:20)
 
 - 表单引擎组件【单行文本】、【多行文本】新增失去焦点事件V8引擎代码。
 - 后端DIY接口大量完善，新增TableName、Id参数支持。
 
-## v2.9.9
-
-更新日期：2021-09-09 09:25
+## v2.9.9 - (2021-09-09 09:25)
 
 - V8引擎新增V8.ConfirmTips确认提示框函数。用法：V8.ConfirmTips('确认审批？', okCallback, cancelCallback, option)。 cancelCallback、option为可选参数，option可配置{Title:'',OkText:'',CancelText:'',Icon:''}
 - 表单引擎设计器新增【移动端预览】
@@ -3292,9 +4091,7 @@
 - 恢复保持系统登陆状态。
 - 新增【表单引擎组件管理】模块，
 
-## v2.9.6
-
-更新日期：2021-09-06 16:46
+## v2.9.6 - (2021-09-06 16:46)
 
 - 取消新增数据时添加子表数据会自动提交主表。
 - 优化添加子表数据的前端逻辑，不会再出现不必要的刷新、不必要的数据重新获取。
@@ -3302,9 +4099,7 @@
 - 修复表单非抽屉弹出框执行V8.HideFormBtn()无效的bug。
 - 现在微服务地址可以在系统管理中动态配置了，支持加载多个微服务。
 
-## v2.9.5
-
-更新日期：2021-09-04 16:41
+## v2.9.5 - (2021-09-04 16:41)
 
 - 前端微服务标准框架源码修复首次进去主框架时，访问微服务会出现404的bug。
 - 【表单引擎】表单属性新增【允许匿名读取】、【允许匿名新增】配置，new DiyTableLogic().GetDiyTableRow()/AddDiyTableRow新增参数：_IsAnonymous，传入true表示匿名请求。
@@ -3328,17 +4123,13 @@
 - 现在表单的编辑、删除等按钮，需要等到数据加载完成、DOM渲染完毕后才会变成可点击，并且减少接口重复请求数，提升性能。
 - 修复前端微服务框架i18n的$t报错bug。
 
-## v2.9.3
-
-更新日期：2021-09-03 00:04
+## v2.9.3 - (2021-09-03 00:04)
 
 - 修复子表控件无法被V8引擎代码隐藏的bug。
 - 现在登陆界面支持在url中传入token参数实现自动登陆。
 - 升级前端微服务架构，新增了一些默认组件引用，修复bug，详细请查看gitlab动态。
 
-## v2.9.2
-
-更新日期：2021-09-02 13:59
+## v2.9.2 - (2021-09-02 13:59)
 
 - 解决自动编号组件在设置前缀为数字时，自动增长错乱的Bug。
 - 解决模块引擎->行更多按钮、页面多Tab、批量选择更多按钮 的V8显示条件执行结果有误的bug。
@@ -3348,9 +4139,7 @@
 - 表单详细信息弹出层增加【删除】功能按钮，拥有对应模块删除权限的账户才能看到此按钮。
 - 系统设置增加Logo类型（文字、图形、文字图形）、Logo高度、Logo超链接设置项。
 
-## v2.9.1
-
-更新日期：2021-08-31 15:29
+## v2.9.1 - (2021-08-31 15:29)
 
 - 吾码Microi低代码平台从v1.0.0到v2.9.1，历经上百次更新迭代，现在开始做更新日志记录（之前版本未做更新日志记录）。
 - 全新的系统界面。

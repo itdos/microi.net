@@ -33,8 +33,6 @@ namespace Microi.net.Api
         {
             if (context.Request.Path == "/api/V8Debug/ws" && context.WebSockets.IsWebSocketRequest)
             {
-                Console.WriteLine("Microi：[V8Debug] WebSocket 调试连接请求...");
-
                 // JWT 鉴权
                 dynamic currentToken = null;
                 try
@@ -52,12 +50,12 @@ namespace Microi.net.Api
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：[V8Debug] 鉴权异常: {ex.Message}");
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "V8Debug", "AuthenticationFailed", "V8 调试 WebSocket 鉴权异常", ex.ToString(), 3);
                 }
 
                 if (currentToken == null || currentToken.CurrentUser == null)
                 {
-                    Console.WriteLine("Microi：[V8Debug] 鉴权失败: currentToken 或 CurrentUser 为空");
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "V8Debug", "UnauthorizedConnectionRejected", "V8 调试 WebSocket 未授权连接已拒绝", "currentToken 或 CurrentUser 为空。", 3);
                     context.Response.StatusCode = 401;
                     await context.Response.WriteAsync("Unauthorized");
                     return;
@@ -66,17 +64,15 @@ namespace Microi.net.Api
                 var level = ((JToken)currentToken.CurrentUser["Level"]).Val<int>();
                 if (level < 9999)
                 {
-                    Console.WriteLine($"Microi：[V8Debug] 鉴权失败: Level={level} < 9999");
+                    MicroiEngine.QueueSystemLog(Convert.ToString(currentToken.OsClient), "V8Debug", "InsufficientLevelRejected", "V8 调试 WebSocket 权限不足，已拒绝", $"Level={level}，要求 Level >= 9999。", 3);
                     context.Response.StatusCode = 403;
                     await context.Response.WriteAsync("Forbidden: Level >= 9999 required");
                     return;
                 }
 
-                Console.WriteLine($"Microi：[V8Debug] 鉴权通过，开始 WebSocket 会话");
                 var ws = await context.WebSockets.AcceptWebSocketAsync();
                 var session = new V8McpDebugSession(ws, currentToken, context);
                 await session.RunAsync();
-                Console.WriteLine("Microi：[V8Debug] WebSocket 会话已结束");
             }
             else
             {

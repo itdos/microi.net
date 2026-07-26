@@ -46,7 +46,6 @@ public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>
 
             ConfigureCorsPolicy(options, clientModel);
 
-            Console.WriteLine($"Microi：【成功】动态跨域配置成功，允许的来源: {GetCorsPolicyDescription(clientModel.OsClientModel["CorsAllowOrigins"].Val<string>())}");
         }
         catch (Exception ex)
         {

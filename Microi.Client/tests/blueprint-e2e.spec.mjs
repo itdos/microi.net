@@ -3,14 +3,14 @@
 // 运行: cd Microi.Client && npx playwright test ../tests/blueprint-e2e.spec.mjs --headed --reporter=list
 //
 // 前置：
-//  1. 后端 https://localhost:7266 + iTdos 租户 + MICROI_DEV_TEST_KEY=itdos-smoketest-2026
-//  2. 前端 vite dev http://localhost:1988
+//  1. 后端 https://localhost:61501 + iTdos 租户 + MICROI_DEV_TEST_KEY=itdos-smoketest-2026
+//  2. 前端 vite dev http://localhost:61500
 //  3. 已执行 microi-business-blueprint 三张表的建表 SQL
 
 import { test, expect } from '@playwright/test';
 
-const FRONTEND = process.env.FRONTEND || 'http://localhost:1988';
-const BACKEND = process.env.BACKEND || 'https://localhost:7266';
+const FRONTEND = process.env.FRONTEND || 'http://localhost:61500';
+const BACKEND = process.env.BACKEND || 'https://localhost:61501';
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin';
 const PASSWORD = process.env.PW_TEST_PASSWORD || '123456';
 const OS_CLIENT = process.env.MICROI_OSCLIENT || 'iTdos';

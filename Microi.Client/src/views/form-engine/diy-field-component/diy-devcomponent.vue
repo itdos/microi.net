@@ -1,5 +1,5 @@
 <template>
-    <el-form-item v-show="GetFieldIsShow(field)" class="form-item">
+    <el-form-item v-show="GetFieldIsShow(field)" class="form-item diy-devcomponent-form-item">
         <template #label>
             <span :title="GetFormItemLabel(field)" :style="{ color: !field.Visible ? '#ccc' : '#000' }">
                 <el-tooltip v-if="!DiyCommon.IsNull(field.Description)" class="item" effect="dark" :content="field.Description" placement="left">
@@ -222,6 +222,11 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+.diy-devcomponent-form-item {
+    width: 100%;
+    min-width: 0;
+}
+
 .form-item-tip {
     font-size: 12px;
     color: #909399;

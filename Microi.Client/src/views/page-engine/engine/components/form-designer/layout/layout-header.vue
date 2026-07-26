@@ -89,7 +89,6 @@ import { storeToRefs } from 'pinia'
 import { EventBus } from '../../../utils/eventBus.js'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { ElMessageBox, ElNotification, ElLoading } from 'element-plus'
-import { useDark } from '@vueuse/core'
 import formRenderer from '../../form-renderer/index.vue'
 import {
   Moon,
@@ -134,9 +133,8 @@ const btnLoading = ref(false)
 //页面标题
 const title = ref('界面引擎')
 
-//是否暗黑模式
-const isDark = useDark()
-isDark.value = pageEngineStore.dark == 'true' || pageEngineStore.dark == true
+// 页面配置里的暗黑开关只属于当前设计数据，不再改写后台全局 html.dark。
+const isDark = ref(pageEngineStore.dark == 'true' || pageEngineStore.dark == true)
 
 //json在线编辑器
 const jsonEditorOption = {

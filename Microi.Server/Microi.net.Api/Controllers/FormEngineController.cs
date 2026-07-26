@@ -892,7 +892,7 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 // 审计属于旁路能力，任何数据兼容或日志故障都不能破坏菜单主请求。
-                Console.WriteLine($"Microi: 菜单访问审计失败，已放行业务响应。{ex.Message}");
+                MicroiEngine.QueueSystemLog(param?["OsClient"]?.ToString(), "Audit", "MenuVisitAuditFailed", "菜单访问审计失败，已放行业务响应", ex.ToString(), 2, false, idOrKey);
             }
             return Json(result);
         }
@@ -1650,7 +1650,7 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 // 详情审计失败只能降级，不能把已经成功查询出的业务数据改成500。
-                Console.WriteLine($"Microi: 数据详情审计失败，已放行业务响应。{ex.Message}");
+                MicroiEngine.QueueSystemLog(param?.OsClient, "Audit", "DetailViewAuditFailed", "数据详情审计失败，已放行业务响应", ex.ToString(), 2, false, param?.Id);
             }
         }
 

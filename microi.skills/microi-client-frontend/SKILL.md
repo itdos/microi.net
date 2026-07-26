@@ -346,8 +346,24 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 
 - 运行时：`src/utils/diy.common.js`、`diy-table.vue`、`diy-form.vue`、`diy-form-full.vue` 及其 mixins。
 - Monaco 提示：`src/views/form-engine/diy-components/v8-api-definitions.js`。
+
+### DevComponent 聚合多个原字段
+
+不属于通用表单控件、只服务某张平台配置表的复杂设计器，放在 `src/views/form-engine/diy-components/`，不要加入 `diy-field-component` 标准控件目录。选择一个现有物理字段作为 `DevComponent` 入口，在 `Config` 中写 `DevComponentName/DevComponentPath`；组件通过 `FormDiyTableModel` 读取同表其它字段，并同时发出 `ParentFormSet(fieldName, value)` 与 `CallbackFormValueChange` 更新它们。
+
+`sys_menu` 的数据权限设计器固定使用 `SqlWhere` 作为入口，聚合 `SqlWhere / SqlJoin / JoinTables`：
+
+- 组件路径为 `@/views/form-engine/diy-components/diy-data-permission-designer.vue`，名称为 `DiyDataPermissionDesigner`；旧 `SqlJoin/JoinTables` 字段只隐藏，不删除、不改物理列。
+- 设计器只保留【可见范围 / 关联关系】两个 Tab：桌面端左侧展示图形配置，右侧固定展示实时 SQL；可见范围右侧的单个代码编辑器展示最终 `SqlWhere`，关联关系右侧的只读代码编辑器展示 `SqlJoin`，窄屏才回落为上下布局。禁止重新加入“原始值”Tab，以及“重新读取 / 应用到表单 / 从原始值反推 / 同步原始值”等手工同步按钮。
+- 图形配置变化后应防抖并自动写回 `SqlWhere / SqlJoin / JoinTables`，用户只需保存模块。历史手写 SQL 默认进入高级手写模式；切回自动生成前必须先整体保留旧条件，禁止短暂生成 `1 = 0` 或扩大权限。
+- 自动生成的最终 `SqlWhere` 使用带固定前缀 `-- 【权限说明】` 的单行中文注释，就近解释外层括号、租户隔离、AND/OR 组合、超级管理员、普通用户范围、全量角色/岗位/部门、图形条件、历史条件和闭合括号；不得再生成整段 `/* ... */` 说明。后端还要兼容剥离历史 `-- 【吾码权限说明】`。图形配置的 Base64 marker 只用于机器无损恢复，使用首行 `-- MICROI_DATA_PERMISSION_V1:...` 并确保后面立即换行，设计器不得展示 marker；后端执行前只剥离这些平台专用注释，用户手写注释必须保留。`SqlJoin` 继续保存 JOIN，`JoinTables` 继续保存关联表 JSON，后端协议不变。
+- 有 marker 的配置必须无损回显；没有 marker 的历史手写 SQL 只能原样保留或安全解析提示，禁止把识别片段重新拼成多个 OR 而扩大数据范围。
+- 角色、岗位、部门属于查看者放行规则；本人、本人和下级、部门范围属于行范围。超级管理员默认放行，但启用 TenantId 隔离时也不能跨租户。所有表名、别名和字段名生成前做标识符白名单，固定值转义单引号。
+- 官方 `microi_itdos` 与开发租户更新 `diy_field` 后都要刷新 `sys_menu` 表/字段缓存并回读 `Component/Visible/AppVisible/Config`；应用商城资源同步修改 `Microi.Upgrade/Resource/app.microi.module-engine.json`。
 - 官方文档：`microi.doc/docs/doc/v8-engine/v8-client.md`。
 - Skills：`v8-frontend-events`、`v8-table-event`、`v8-menu-buttons`、`v8-template-engine`、`v8-formengine-http` 和本 Skill。
+
+固定高度的 `diy-form-full` 弹窗只能有一个纵向滚动容器：由弹窗直属 `.el-dialog__body` 承载滚动，Element Plus 的 overlay 和表单顶层 `.el-tabs__content` 必须禁用独立滚动。禁止同时保留 overlay、dialog body、tabs content 三层纵向滚动条；切换表单 Tab 时弹窗外框高度不得变化。
 
 自动化静态检查至少覆盖方法名、事件名、示例参数和危险 HTML；真实页面还要验证表单/列表两种上下文、普通角色菜单范围、跨表历史 V8、TableChild、并发 Token 续签及移动端。
 

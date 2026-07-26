@@ -89,6 +89,47 @@
 
 ---
 
+### 🧪 后端自动化测试与发布门禁
+
+后端测试统一位于 `/Microi.Server/Microi.Tests`。它合并了历史
+`Dos.Common.Tests`、`Dos.ORM.Tests`，并在私有源码存在时条件纳入 AI、
+FormEngine、ApiEngine、安全与多租户边界测试。
+
+日常开发先运行不连接服务器、不会写数据库的 Quick 门禁：
+
+```powershell
+.\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Quick
+```
+
+准备发布 API 前，必须对**隔离测试租户和专用测试表**运行 Full 门禁：
+
+```powershell
+$env:MICROI_TEST_API_BASE = "http://127.0.0.1:1052/"
+$env:MICROI_TEST_OSCLIENT = "integration-test"
+$env:MICROI_TEST_TOKEN = "<测试租户超级管理员Token>"
+$env:MICROI_TEST_FORM_ENGINE_KEY = "mci_release_gate"
+$env:MICROI_TEST_API_ENGINE_KEY = "release_gate_echo"
+$env:MICROI_TEST_ALLOW_WRITES = "YES"
+.\Microi.Server\Microi.Tests\run-tests.ps1 -Mode Full
+```
+
+Full 会依次执行：
+
+1. Release 恢复与编译、全部 Quick 单元/组件回归。
+2. FormEngine 单条、批量、按条件新增/查询/计数/修改/删除的真实 HTTP 闭环。
+3. ApiEngine 的 GET、JSON POST 调用。
+4. 以唯一前缀清理本次测试数据，并输出 TRX/覆盖率结果。
+5. NuGet 易受攻击包和弃用包审计。
+
+测试表至少包含一个可写短文本字段（默认 `Name`，其它名称可通过
+`MICROI_TEST_NAME_FIELD` 指定）。`MICROI_TEST_ALLOW_WRITES=YES` 是强制保护，
+禁止对生产租户设置。测试通过能显著降低发布风险，但不等于证明所有客户
+V8、第三方接口、生产数据和基础设施绝对无误；正式发布还要用两个 API/Worker
+节点连接同一 Redis/数据库，覆盖重复投递、锁持有者退出、依赖短暂故障、
+响应前重启和滚动升级。
+
+---
+
 ### 🐳 本地编译发布到 Docker 镜像
 
 1. 安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/)

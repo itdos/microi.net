@@ -16,7 +16,7 @@
 ::: tip 提示
 `V8.FormEngine` 下所有函数均为单表操作（除 Batch 批量操作外）。后端 V8 可用 `V8.ModuleEngine` 让模块关联配置生效，或使用参数化 SQL 完成受控 JOIN；当前标准前端 V8 没有公开挂载 `V8.ModuleEngine`。
 :::
->* __<font color="red">注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）</font>__
+>* __<span class="mci-doc-danger">注意：从Microi.net.dll v3.0.2开始，在删除、修改数据时若数据库受影响行数为0，仍然返回Code=1成功，并且会额外返回DataCount值为实际受影响行数（之前版本是返回Code=1006）</span>__
 
 ## 🌐 HTTP 直接调用（重要）
 
@@ -90,6 +90,7 @@ Token 只证明“当前请求是谁、属于哪个 `OsClient`”，不能据此
 #### 数据范围和子表委托
 
 - 菜单 `SqlWhere`、`SqlJoin` / `JoinTables` 只进入真实列表、计数和导出 SQL，不能只在界面或查询后过滤；单行详情不应用这些模块列表过滤配置，它们也不是行级写权限。
+- 模块设计器在桌面端采用“左侧图形配置、右侧实时 SQL”的布局，可见范围右侧展示最终 `SqlWhere`，关联关系右侧展示 `SqlJoin`；窄屏自动改为上下布局。自动生成的 `SqlWhere` 会在每个权限语义块前使用 `-- 【权限说明】` 中文行注释，解释租户隔离、AND/OR、角色/部门/本人范围及括号作用；用于无损恢复图形配置的 `-- MICROI_DATA_PERMISSION_V1:...` 首行不会在设计器中展示。服务端执行查询前会移除这些平台专用注释、兼容的历史 `-- 【吾码权限说明】` 以及旧版设计器块注释，数据库最终只接收可执行条件；用户手写 SQL 注释保持原样。
 - 主表新增、修改、删除分别校验菜单或高级表权限中的 `Add`、`Edit`、`Del`，不把菜单查询条件追加到写入 SQL，也不因查询包含跨表 Join 而拒绝。需要“仅可修改本人数据”等业务规则时，在 `SubmitBeforeServerV8` 或专用接口引擎中以服务端可信代码校验。
 - 导入校验菜单 `Import` 权限；导出校验 `Export` 并继续应用查询范围。
 - `TableChild` 隐藏子菜单不要求存量角色逐个补权限。后端会验证父菜单、父表的 TableChild 字段配置、子菜单绑定、父记录数据范围、父键唯一性及子表外键，再把外键条件强制写入查询/写入。伪造 `_TableChildAuth`、跨父记录或脱离父表直接访问都会失败。
@@ -294,7 +295,7 @@ var addResult = V8.FormEngine.AddTableData(addList);
 ```
 
 ## 修改一条数据 UptFormData
->* __<font color="red">注意：仅支持传入Id进行单条数据的修改，若要根据其它条件修改，考虑到安全性（防止批量误操作更新），请使用【UptFormDataByWhere】</font>__
+>* __<span class="mci-doc-danger">注意：仅支持传入Id进行单条数据的修改，若要根据其它条件修改，考虑到安全性（防止批量误操作更新），请使用【UptFormDataByWhere】</span>__
 
 ```javascript
 V8.FormEngine.UptFormData('表名或表Id，不区分大小写', {

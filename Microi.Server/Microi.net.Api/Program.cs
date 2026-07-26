@@ -10,7 +10,7 @@ using Microi.net.Api;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Newtonsoft.Json.Serialization;
 using Senparc.CO2NET;
 using Senparc.Weixin.AspNet;
@@ -30,8 +30,9 @@ using Newtonsoft.Json.Linq;
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-// ⚙️ 注册Console输出拦截器，捕获所有Console.WriteLine到内存环形缓冲区（用于系统监控-应用日志）
+// ⚙️ 注册 Console 分流器：平台级关键日志保留 stdout，其它历史 Console 日志写入 MongoDB。
 Console.SetOut(new Microi.net.ConsoleLogInterceptor(Console.Out));
+Console.SetError(new Microi.net.ConsoleLogInterceptor(Console.Error));
 
 // 🔧 本地环境快速切换：读取 .microi-local 文件（已加入 .gitignore，每位开发者本地独立配置）
 // 优先级：IDE 环境变量（launch.json env / launchSettings.json）> .microi-local > 系统环境变量
@@ -612,7 +613,7 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 
 Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
 timer.Stop();
-Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:7266】");
+Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:61501】");
 Console.WriteLine("------------------------------------------------------------------------------");
 Console.WriteLine("------------------------------------------------------------------------------");
 

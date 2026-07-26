@@ -11,9 +11,9 @@
     <PackageIcon>microi-blue-256.png</PackageIcon>
     <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台 - Microi吾码：验证码组件。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>6.7.0</Version>
-    <AssemblyVersion>6.7.0</AssemblyVersion>
-    <FileVersion>6.7.0</FileVersion>
+    <Version>6.7.3</Version>
+    <AssemblyVersion>6.7.3</AssemblyVersion>
+    <FileVersion>6.7.3</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -27,8 +27,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Lazy.Captcha.Core" Version="2.1.0" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
+    <PackageReference Include="Lazy.Captcha.Core" Version="2.2.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.150.1" />
   </ItemGroup>
   
   <!-- 智能引用 Microi.net：本地存在用ProjectReference，否则用PackageReference -->

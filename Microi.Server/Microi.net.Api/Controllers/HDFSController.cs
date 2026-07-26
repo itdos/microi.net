@@ -980,7 +980,7 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 var traceId = HttpContext.TraceIdentifier;
-                Console.WriteLine($"Microi：[OnlyOfficeSave] 下载文件失败，TraceId={traceId}：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "HDFS", "OnlyOfficeDownloadFailed", "OnlyOffice 导出文件下载失败", ex.ToString(), 2, false, traceId);
                 return Json(new DosResult(0, null, "OnlyOffice导出文件下载异常，请稍后重试！TraceId：" + traceId));
             }
 

@@ -365,7 +365,7 @@ namespace Microi.net
                     timeSpanInterval = new TimeSpan(int.Parse(numUnits), 0, 0, 0);
                     break;
                 default:
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Invalid time units; use seconds, minutes, hours, or days");
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "HDFS", "InvalidSignedUrlDurationUnit", "S3 签名地址有效期单位无效", $"units={units}", 2);
                     break;
             }
             return timeSpanInterval;

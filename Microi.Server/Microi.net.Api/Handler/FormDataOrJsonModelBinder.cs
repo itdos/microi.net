@@ -394,7 +394,7 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【⚠️Warn】FormDataOrJsonModelBinder JSON反序列化失败 [{modelType.Name}]: {ex.Message}");
+                Microi.net.MicroiEngine.QueueSystemLog(null, "ModelBinding", "JsonDeserializationFailed", $"JSON 反序列化失败：{modelType.Name}", ex.ToString(), 2);
                 return false;
             }
         }
@@ -434,7 +434,6 @@ namespace Microi.net.Api
                         if (value != null)
                         {
                             prop.SetValue(model, value);
-                            Console.WriteLine($"Microi：【ℹ️Info】FormDataOrJsonModelBinder 补偿恢复属性 [{modelType.Name}.{prop.Name}]");
                         }
                     }
                     catch { /* 单属性恢复失败时忽略 */ }
