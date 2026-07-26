@@ -116,8 +116,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine(
-                    $"Microi：[FormEngineAuthzCache] 读取租户授权版本失败，将回源数据库：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "FormEngineAuthz", "VersionReadFailed", "读取租户授权版本失败，将回源数据库", ex.ToString(), 2);
                 return null;
             }
         }
@@ -142,8 +141,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine(
-                    $"Microi：[FormEngineAuthzCache] 读取授权快照失败，将回源数据库：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "FormEngineAuthz", "SnapshotReadFailed", "读取授权快照失败，将回源数据库", ex.ToString(), 2, false, userId);
                 return null;
             }
         }
@@ -173,8 +171,7 @@ namespace Microi.net
             {
                 // Cache population is an optimization. The already-loaded database
                 // result remains authoritative for the current request.
-                Console.WriteLine(
-                    $"Microi：[FormEngineAuthzCache] 写入授权快照失败：{ex.Message}");
+                MicroiEngine.QueueSystemLog(osClient, "FormEngineAuthz", "SnapshotWriteFailed", "写入授权快照失败", ex.ToString(), 2, false, userId);
             }
         }
 

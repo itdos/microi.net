@@ -428,3 +428,14 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 5. 只有在客户端不支持热加载、直连 fallback 也无法完成任务，或写操作边界无法确认时，才告知用户需要新开对话、重载 Codex 或检查 MCP 配置。说明必须写清楚：MCP 配置和进程是否可用、当前会话为什么没有注入工具、已经尝试过哪些自动恢复动作。
 6. 如果握手失败，要把失败层级说清楚：配置文件解析失败、路径不存在、token 文件缺失、MCP 进程启动失败、`initialize` 失败、`tools/list` 缺核心工具，不能把这些问题混成“用户没启用 MCP”。
 7. Microi.VSCode 生成 MCP 配置时应清理旧的中文/横杠 Microi MCP key，只保留 `microi_<osClient>` 或 `microi_<osClient>_<host>` 形式，避免不同 AI 客户端因 namespace 不稳定而无法注入工具。
+
+## Windows MCP 控制台闪窗复盘
+
+当用户反馈“打开 Microi.VSCode、添加服务器或初始化 MCP 后连续弹出并立即关闭多个 cmd 窗口”时，应按进程风暴排查，不能只给已有 `spawn` 补 `windowsHide`：
+
+1. MCP 配置文件是各客户端的事实源。内容未变化时必须使用 write-if-changed，禁止仅为“同步”而反复改写文件并触发监听器重启。
+2. 生成 `~/.codex/config.toml` 后，禁止再隐式循环执行 `codex mcp list/remove/add`；服务器数量越多，这类逐项 CLI 同步越会放大成几十个瞬时控制台进程。
+3. VS Code 已配置 `chat.mcp.autostart` 时，插件后台监测只能检查配置和状态，禁止在侧栏显示、定时轮询、登录、添加连接或初始化流程里再次执行 `workbench.mcp.startServer('*')`。
+4. 握手诊断会真实启动每个 stdio MCP，只能由用户显式点击“诊断 MCP 可调用性”触发；常规配置成功提示不得暗中运行整组诊断。
+5. Windows 的 VS Code/Cursor 配置优先复用 GUI Electron 宿主 `process.execPath` 并设置 `ELECTRON_RUN_AS_NODE=1`，避免把控制台子系统的外部 `node.exe` 持久化为每个 MCP 的启动命令。Trae 若因空格路径兼容必须经过 `cmd.exe`，仍需使用固定 launcher 并隐藏窗口。
+6. 回归测试至少静态断言：Codex CLI 批量注册函数不存在、后台 monitor 不包含 `startServer`、自动配置不包含诊断、Codex 配置内容不变时不改写、Windows GUI 宿主检查早于外部 Node 探测。再在扩展开发宿主中覆盖打开侧栏、添加连接、初始化 MCP，观察无连续控制台闪窗。

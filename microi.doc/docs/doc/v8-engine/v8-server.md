@@ -135,7 +135,12 @@ V8.Method.AddSysLog({
     Content: '记录数：20',
     Level: 1
 });
+
+// microi_database 后端提交后事件专用：事务提交后刷新全部节点的 V8.Dbs
+var refreshResult = V8.Method.RefreshExtensionDatabases();
 ```
+
+`RefreshExtensionDatabases(osClient?)` 绑定当前 V8 租户。存在 `V8.DbTrans` 时只注册提交后回调：真实事务提交成功才递增共享 Redis 版本，回滚不刷新；没有事务时立即刷新。它适合“数据库扩展”应用的 `microi_database.SubmitAfterServerV8`，不应暴露成匿名或普通业务接口。
 
 ### V8.Method.Upload
 
@@ -569,15 +574,29 @@ var count = V8.Db.FromSql("select count(1) from sys_user where Status = @p0")
 ## 数据库只读对象 V8.DbRead
 >* 数据库只读对象，用法和V8.Db一样，当数据库未部署读写分离时，此对象与V8.Db对象值一致。
 
-## 扩展数据库对象 V8.Dbs.DbKey
->* 访问多数据库（扩展库）的对象，扩展库管理见：[https://web.microi.net/#/database](https://web.microi.net/#/database)
->* 注意：老的数据库版本上面的表缺少【DbKey】字段，需要更新数据库、或手动添加、或等待应用商城上线【数据库管理】应用安装。
->* 示例：访问oracle扩展库，DbKey的值为OracleDB1，其中V8.Dbs.OracleDB1对象就等同于V8.Db对象。
-```js
-var dataList = V8.Dbs.OracleDB1.FromSql('').ToArray();
+## 扩展数据库对象 V8.Dbs
 
-//扩展数据库的事务用法
-//【注意】emptyExTrans 是扮展库自己创建的事务，与 V8.DbTrans 完全独立，需要手动管理生命周期
+“数据库管理”中启用的连接按 `DbKey` 暴露为 `V8.Dbs.<DbKey>`。当前认证类型为 `MySql`、`SqlServer`、`Oracle`、`PostgreSql`、`DaMeng`、`KingBase`；完整配置、MCP 结构读取和附件迁移说明见[扩展数据库与外部数据迁移](../system-engine/databases.md)。
+
+安装或更新应用商城中的“数据库扩展”后，`microi_database` 的后端提交后事件会调用 `V8.Method.RefreshExtensionDatabases()`。事件在事务提交后递增按 `OsClient` 隔离的 Redis 版本，因此新增、修改、停用或删除连接后，各 API 节点下一次访问 `V8.Dbs` 即可看到新配置，无需重启；短 TTL 仅作为旧版本节点的兼容兜底。
+
+```js
+var dataList = V8.Dbs.OracleDB1
+    .FromSql('SELECT ID, NAME FROM CUSTOMER WHERE STATUS = @p0')
+    .AddInParameter('@p0', 1)
+    .ToArray();
+
+// 不保存到数据库管理：创建仅当前请求使用的临时会话
+// 连接串只能来自可信服务端配置，禁止直接传 V8.Param.ConnectionString
+var tempDb = V8.Dbs.Open(
+    'SqlServer',
+    'Server=127.0.0.1,1433;Database=app;User Id=user;Password=***;TrustServerCertificate=True;'
+);
+var tempRows = tempDb.FromSql('SELECT Id, Name FROM Customer WHERE Status = @p0')
+    .AddInParameter('@p0', 1)
+    .ToArray();
+
+// 扩展数据库事务与 V8.DbTrans 完全独立，需要手动管理生命周期
 var recordId = V8.Param.Id;
 var emptyExTrans = V8.Dbs.EmptyEx.BeginTransaction();
 try {
@@ -594,7 +613,8 @@ try {
     emptyExTrans.Close();
 }
 ```
->* 已知问题：在平台中添加扩展库后，需要重启api的docker容器才会生效
+
+新增或修改保存连接后会清除本节点缓存，并由各节点按短 TTL 自动回源，不需要重启 API。默认 TTL 为 60 秒，可通过 `MICROI_EXTENSION_DATABASE_CACHE_SECONDS` 调整。连接串、密码和鉴权参数不得出现在日志、前端代码或接口返回中。
 
 ## 数据库事务 V8.DbTrans
 >* 数据库事务对象，可以像V8.Db一样使用，如：

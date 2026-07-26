@@ -1,22 +1,15 @@
 <template>
     <div v-if="isExternal" :style="styleExternalIcon" class="svg-external-icon svg-icon" v-bind="$attrs" />
     <svg v-else :class="svgClass" aria-hidden="true" v-bind="$attrs">
-        <use :xlink:href="iconName" :fill="themeColor" />
+        <use :xlink:href="iconName" />
     </svg>
 </template>
 
 <script>
 import { isExternal } from "@/utils/validate";
-import { computed } from "vue";
-import { useDiyStore } from "@/pinia";
 
 export default {
     name: "SvgIcon",
-    setup() {
-        const diyStore = useDiyStore();
-        const themeColor = computed(() => diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff");
-        return { themeColor };
-    },
     props: {
         iconClass: {
             type: String,
@@ -56,7 +49,7 @@ export default {
     width: 1em;
     height: 1em;
     vertical-align: -0.15em;
-    fill: currentColor;
+    fill: var(--mci-color-primary, #409eff);
     overflow: hidden;
 }
 

@@ -29,7 +29,7 @@
             --status-bar-height: env(safe-area-inset-top);
         }
 
-        /* === 主题变量（亮色多彩默认） === */
+        /* === 官网白：与 microi.doc mainstream 主题保持相同表面层级 === */
         :root[data-theme="light"], :root {
             --mci-color-primary: #6C2BD9;
             --mci-color-primary-light: #8B5CF6;
@@ -39,16 +39,16 @@
             --mci-color-accent-pink: #EC4899;
             --mci-color-danger: #E8294A;
 
-            --mci-bg-base: #F5F5FA;
+            --mci-bg-base: #F7F9FC;
             --mci-bg-elevated: #FFFFFF;
             --mci-bg-card: rgba(255, 255, 255, 0.92);
 
-            --mci-text-primary: #1A1A2E;
-            --mci-text-secondary: rgba(26, 26, 46, 0.65);
-            --mci-text-tertiary: rgba(26, 26, 46, 0.45);
-            --mci-text-muted: rgba(26, 26, 46, 0.22);
+            --mci-text-primary: #0F172A;
+            --mci-text-secondary: #334155;
+            --mci-text-tertiary: #64748B;
+            --mci-text-muted: #94A3B8;
 
-            --mci-border-color: rgba(15, 18, 30, 0.08);
+            --mci-border-color: #E2E8F0;
 
             --mci-gradient-primary: linear-gradient(135deg, #6C2BD9 0%, #2196F3 100%);
 
@@ -65,7 +65,7 @@
                 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
         }
 
-        /* === 暗黑主题（可选） === */
+        /* === 官网暗：中性蓝灰表面，不随品牌主色整页染色 === */
         :root[data-theme="dark"] {
             --mci-color-primary: #722BFF;
             --mci-color-primary-light: #9B5FFF;
@@ -75,16 +75,16 @@
             --mci-color-accent-pink: #FF6EC7;
             --mci-color-danger: #FF2E63;
 
-            --mci-bg-base: #0A0A0F;
-            --mci-bg-elevated: #121218;
-            --mci-bg-card: rgba(255, 255, 255, 0.04);
+            --mci-bg-base: #0B1120;
+            --mci-bg-elevated: #111827;
+            --mci-bg-card: #111827;
 
-            --mci-text-primary: #FFFFFF;
-            --mci-text-secondary: rgba(255, 255, 255, 0.55);
-            --mci-text-tertiary: rgba(255, 255, 255, 0.35);
-            --mci-text-muted: rgba(255, 255, 255, 0.18);
+            --mci-text-primary: #F8FAFC;
+            --mci-text-secondary: #CBD5E1;
+            --mci-text-tertiary: #94A3B8;
+            --mci-text-muted: #718096;
 
-            --mci-border-color: rgba(255, 255, 255, 0.08);
+            --mci-border-color: #273449;
 
             --mci-gradient-primary: linear-gradient(135deg, #722BFF 0%, #29B8FF 100%);
 
@@ -581,8 +581,13 @@
           var saved = localStorage.getItem('mci-theme');
           var prefersDark = window.matchMedia &&
               window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.setAttribute('data-theme',
-              saved || (prefersDark ? 'dark' : 'light'));
+          var initialMode = saved || (prefersDark ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', initialMode);
+          if (initialMode === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
         } catch(e) {}
         try {
           // 读取 SysConfig 缓存，更新标题和公司名

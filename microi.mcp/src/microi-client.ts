@@ -720,6 +720,67 @@ export class MicroiClient {
     });
   }
 
+  async getSupportedDatabaseTypes(): Promise<ApiResponse> {
+    return this.post(API.GET_SUPPORTED_DATABASE_TYPES, {});
+  }
+
+  async inspectExternalDatabase(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.INSPECT_EXTERNAL_DATABASE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async queryExternalDatabase(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.QUERY_EXTERNAL_DATABASE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async executeExternalDatabaseSql(data: Record<string, unknown>): Promise<ApiResponse> {
+    const requestedTimeoutSeconds = Number(data.CommandTimeoutSeconds || 0);
+    const executionTimeoutMs = Number.isFinite(requestedTimeoutSeconds) && requestedTimeoutSeconds > 0
+      ? (requestedTimeoutSeconds + 30) * 1000
+      : 630_000;
+    return this.post(API.EXECUTE_EXTERNAL_DATABASE_SQL, {
+      OsClient: this.config.osClient,
+      ...data,
+    }, {
+      timeoutMs: Math.max(
+        this.config.requestTimeoutMs ?? 120_000,
+        this.config.writeRequestTimeoutMs ?? 60_000,
+        executionTimeoutMs,
+      ),
+      operationName: 'execute external database sql',
+    });
+  }
+
+  async saveDatabaseConnection(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.SAVE_DATABASE_CONNECTION, {
+      OsClient: this.config.osClient,
+      ...data,
+    }, { timeoutMs: this.config.writeRequestTimeoutMs, operationName: 'save database connection' });
+  }
+
+  async importExternalAttachment(data: Record<string, unknown>): Promise<ApiResponse> {
+    const requestedTimeoutSeconds = Number(data.TimeoutSeconds || 0);
+    const transferTimeoutMs = Number.isFinite(requestedTimeoutSeconds) && requestedTimeoutSeconds > 0
+      ? (requestedTimeoutSeconds + 30) * 1000
+      : 3_630_000;
+    return this.post(API.IMPORT_EXTERNAL_ATTACHMENT, {
+      OsClient: this.config.osClient,
+      ...data,
+    }, {
+      timeoutMs: Math.max(
+        this.config.requestTimeoutMs ?? 120_000,
+        this.config.writeRequestTimeoutMs ?? 60_000,
+        transferTimeoutMs,
+      ),
+      operationName: 'import external attachment',
+    });
+  }
+
   async getPlaywrightContext(keyword?: string, pageSize?: number): Promise<ApiResponse<PlaywrightContextData>> {
     return this.post(API.GET_PLAYWRIGHT_CONTEXT, {
       OsClient: this.config.osClient,

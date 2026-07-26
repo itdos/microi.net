@@ -20,7 +20,7 @@
 
 ---
 
-## 提供的 AI 能力（35 个 Tools）
+## 提供的 AI 能力
 
 | Tool | 功能 | 读/写 |
 |------|------|-------|
@@ -66,6 +66,20 @@
 | `microi_save_print_template_design` | 保存 AI 生成的打印模板，带规范化和确认 | 读写（需确认） |
 | `microi_save_workflow_package` | 一次性保存工作流设计、节点和连线 | 读写（需确认） |
 | `microi_save_job` | 创建或更新定时任务 | 读写（需确认） |
+| `microi_list_database_types` | 列出 Dos.ORM 已认证数据库类型和脱敏连接示例 | 只读 |
+| `microi_inspect_external_database` | 临时连接或按 DbKey 读取第三方数据库表、列、类型、主键和说明 | 只读 |
+| `microi_query_external_database` | 对第三方数据库执行受限、分页的只读 SELECT/WITH | 只读 |
+| `microi_execute_external_database` | 对第三方数据库执行任意 SQL（DML/DDL/存储过程/多语句） | 读写（需确认，Level >= 9999） |
+| `microi_save_database_connection` | 测试后新增、更新或恢复数据库管理连接，不回显连接串 | 读写（需确认） |
+| `microi_import_external_attachment` | 从 HTTP/HTTPS、本机绝对路径或 UNC 路径流式上传附件 | 读写（需确认，Level >= 9999） |
+
+### 外部数据库与附件迁移
+
+`microi_get_db_schema` 只读取当前吾码租户结构。已知 MySQL、SQL Server、Oracle、PostgreSQL、达梦或人大金仓连接信息时，先调用 `microi_list_database_types`，再使用 `microi_inspect_external_database` 临时读取结构；需要持久化时才调用 `microi_save_database_connection` 并显式确认。连接字符串属于敏感输入，工具结果和日志不得回显。
+
+数据同步可先用 `microi_query_external_database` 做有行数上限的安全抽样。确需数据库最高权限时，使用独立的 `microi_execute_external_database`；它只对后端验证为 `Level >= 9999` 的当前用户开放，显式确认后可执行数据库账号有权执行的任意 SQL，审计只记录 SQL哈希和长度，不记录正文或连接串。
+
+附件字段可直接传 HTTP/HTTPS URL、API 节点可读的本机绝对路径或 UNC 路径给 `microi_import_external_attachment`。工具使用临时文件和文件流，不经过 Base64，也没有固定 20/100 MB 上限；`MaxBytes=0` 或省略表示不设置 MCP 上限，最终受磁盘、网络、对象存储及 API 服务账号权限约束。源 URL、鉴权 Header 和文件路径不会回显或进入审计详情。
 
 ### 高级编排 Manifest
 

@@ -13,6 +13,87 @@ namespace Microi.net
 {
     public class OsClientExtend
     {
+        private static int ExtensionDatabaseCacheSeconds => Math.Max(5,
+            ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_EXTENSION_DATABASE_CACHE_SECONDS",
+                "SaaS:ExtensionDatabaseCacheSeconds",
+                60));
+
+        private static string ExtensionDatabaseVersionKey(string osClient)
+        {
+            return $"Microi:{osClient}:ExtensionDatabase:Epoch";
+        }
+
+        private static bool TryGetExtensionDatabaseVersion(string osClient, out long version)
+        {
+            version = 0;
+            try
+            {
+                if (osClient.DosIsNullOrWhiteSpace()) return false;
+                var value = MicroiEngine.CacheTenant.Cache(osClient)
+                    .GetIDatabase()
+                    .StringGet(ExtensionDatabaseVersionKey(osClient));
+                if (value.IsNullOrEmpty) return true;
+                return long.TryParse(value.ToString(), out version);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static bool IsExtensionDatabaseCacheExpired(OsClientSecret clientModel)
+        {
+            if (clientModel == null
+                || !clientModel.DataBasesInitialized
+                || clientModel.DataBasesLoadedAtUtc == default(DateTime))
+                return true;
+
+            if (TryGetExtensionDatabaseVersion(clientModel.OsClient, out var sharedVersion)
+                && sharedVersion != clientModel.DataBasesVersion)
+                return true;
+
+            return DateTime.UtcNow - clientModel.DataBasesLoadedAtUtc
+                   >= TimeSpan.FromSeconds(ExtensionDatabaseCacheSeconds);
+        }
+
+        /// <summary>
+        /// 递增租户扩展数据库共享版本并清空当前节点会话列表。
+        /// Redis 版本是多节点事实源，本地状态只是可丢失的 L1。
+        /// </summary>
+        public static DosResult InvalidateExtensionDatabaseCache(string osClient)
+        {
+            if (osClient.DosIsNullOrWhiteSpace())
+                return new DosResult(0, null, "OsClient 不能为空");
+            try
+            {
+                var version = (long)MicroiEngine.CacheTenant.Cache(osClient)
+                    .GetIDatabase()
+                    .StringIncrement(ExtensionDatabaseVersionKey(osClient));
+                if (ClientList.TryGetValue(osClient, out var client) && client != null)
+                {
+                    lock (client)
+                    {
+                        client.DataBases = null;
+                        client.DataBasesInitialized = false;
+                        client.DataBasesLoadedAtUtc = default(DateTime);
+                        client.DataBasesVersion = version - 1;
+                    }
+                }
+                return new DosResult(1, new { OsClient = osClient, Version = version }, "扩展数据库缓存版本已刷新");
+            }
+            catch (Exception ex)
+            {
+                if (ClientList.TryGetValue(osClient, out var client) && client != null)
+                {
+                    client.DataBases = null;
+                    client.DataBasesInitialized = false;
+                    client.DataBasesLoadedAtUtc = default(DateTime);
+                }
+                return new DosResult(0, null, "扩展数据库共享缓存刷新失败：" + ex.Message);
+            }
+        }
+
         /// <summary>
         /// 允许获取内置Client的mac
         /// </summary>
@@ -328,7 +409,7 @@ namespace Microi.net
             {
                 if (client == null || client.OsClient.DosIsNullOrWhiteSpace())
                 {
-                    Console.WriteLine("Microi：【Error异常】AddOrUptClient中OsClient不能为空！");
+                    MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "SaaS", "EmptyTenantRejected", "更新租户运行时配置失败", "OsClient 不能为空。", 2);
                     return client;
                 }
 
@@ -339,7 +420,7 @@ namespace Microi.net
                     return client;
                 }
 
-                Console.WriteLine("Microi：【成功】更新OsClient：" + client.OsClient);
+                MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "RuntimeConfigurationUpdated", "租户运行时配置已更新", "本节点 ClientList 已刷新。", 1, true, client.OsClient);
 
                 // 第二步：提取可序列化配置并缓存到L2（Redis）
                 try
@@ -352,19 +433,19 @@ namespace Microi.net
                     {
                         // 缓存配置到Redis（此操作自动触发Pub/Sub通知所有实例）
                         SetToCache(cache, cacheKey, config);
-                        Console.WriteLine($"Microi：【成功】缓存OsClient配置到Redis：{client.OsClient}");
+                        MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "ConfigurationCached", "租户配置已缓存到 Redis", "已发布跨节点缓存失效通知。", 1, true, client.OsClient);
                     }
                 }
                 catch (Exception cacheEx)
                 {
-                    Console.WriteLine($"Microi：【警告】缓存OsClient配置失败（non-critical）：{cacheEx.Message}");
+                    MicroiEngine.QueueSystemLog(client.OsClient, "SaaS", "ConfigurationCacheFailed", "租户配置写入 Redis 失败", cacheEx.ToString(), 2, false, client.OsClient);
                 }
 
                 return client;
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Microi：【Error异常】更新OsClient：" + client.OsClient + "失败！" + ex.Message);
+                MicroiEngine.QueueSystemLog(client?.OsClient, "SaaS", "RuntimeConfigurationUpdateFailed", "更新租户运行时配置失败", ex.ToString(), 2, false, client?.OsClient);
                 return client;
             }
         }
@@ -380,7 +461,9 @@ namespace Microi.net
             {
                 return null;
             }
-            if (clientModel.DataBases == null || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
+            if (IsExtensionDatabaseCacheExpired(clientModel)
+                || clientModel.DataBases == null
+                || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
             {
                 InitOsClientDataBases(clientModel.Db, clientModel);
                 // 这里只初始化当前进程的数据库会话，没有修改 SaaS 配置，
@@ -395,7 +478,7 @@ namespace Microi.net
             if (dataBaseModel.Db == null || dataBaseModel.DbRead == null)
             {
                 // 使用工厂创建会话（Dos.ORM）
-                var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType);
+                var dbType = ExternalDatabaseCatalog.ResolveType(dataBaseModel.DbType);
                 dataBaseModel.Db = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbConn, dbType);
 
                 if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
@@ -406,7 +489,7 @@ namespace Microi.net
                 {
                     dataBaseModel.DbReadType = dataBaseModel.DbType;
                 }
-                var dbReadType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbReadType);
+                var dbReadType = ExternalDatabaseCatalog.ResolveType(dataBaseModel.DbReadType);
                 dataBaseModel.DbRead = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbReadConn, dbReadType);
                 AddOrUptClient(clientModel, publishConfiguration: false);
             }
@@ -423,7 +506,22 @@ namespace Microi.net
 
             try
             {
-                var microiDatabaseList = db.FromSql("select * from microi_database where IsEnable = 1 and IsDeleted=0").ToList<OsClientDataBase>();
+                TryGetExtensionDatabaseVersion(secret.OsClient, out var versionBefore);
+                List<OsClientDataBase> microiDatabaseList = null;
+                var stableVersion = versionBefore;
+                for (var attempt = 0; attempt < 2; attempt++)
+                {
+                    microiDatabaseList = db.FromSql("select * from microi_database where IsEnable = 1 and IsDeleted=0")
+                        .ToList<OsClientDataBase>();
+                    if (!TryGetExtensionDatabaseVersion(secret.OsClient, out var versionAfter)
+                        || versionAfter == versionBefore)
+                    {
+                        stableVersion = versionAfter;
+                        break;
+                    }
+                    versionBefore = versionAfter;
+                    stableVersion = versionAfter;
+                }
                 if (microiDatabaseList.Any())
                 {
                     secret.DataBases = microiDatabaseList;
@@ -437,12 +535,15 @@ namespace Microi.net
                     secret.DataBases = new List<OsClientDataBase>();
                 }
                 secret.DataBasesInitialized = true;
+                secret.DataBasesLoadedAtUtc = DateTime.UtcNow;
+                secret.DataBasesVersion = stableVersion;
                 return secret;
             }
             catch (Exception ex)
             {
                 secret.DataBases = new List<OsClientDataBase>();
                 secret.DataBasesInitialized = false;
+                secret.DataBasesLoadedAtUtc = default(DateTime);
                 return null;
             }
         }
@@ -457,7 +558,9 @@ namespace Microi.net
         {
             if (!dataBaseId.DosIsNullOrWhiteSpace())
             {
-                if (clientModel.DataBases == null || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
+                if (IsExtensionDatabaseCacheExpired(clientModel)
+                    || clientModel.DataBases == null
+                    || !clientModel.DataBases.Any(d => d.Id == dataBaseId))
                 {
                     InitOsClientDataBases(clientModel.Db, clientModel);
                     AddOrUptClient(clientModel, publishConfiguration: false);
@@ -470,14 +573,19 @@ namespace Microi.net
                 if (dataBaseModel.Db == null || dataBaseModel.DbRead == null)
                 {
                     // 使用工厂创建会话
-                    var dbType = (DatabaseType)Enum.Parse(typeof(DatabaseType), dataBaseModel.DbType);
+                    var dbType = ExternalDatabaseCatalog.ResolveType(dataBaseModel.DbType);
                     dataBaseModel.Db = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbConn, dbType);
 
                     if (dataBaseModel.DbReadConn.DosIsNullOrWhiteSpace())
                     {
                         dataBaseModel.DbReadConn = dataBaseModel.DbConn;
                     }
-                    dataBaseModel.DbRead = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbReadConn, dbType);
+                    if (dataBaseModel.DbReadType.DosIsNullOrWhiteSpace())
+                    {
+                        dataBaseModel.DbReadType = dataBaseModel.DbType;
+                    }
+                    var dbReadType = ExternalDatabaseCatalog.ResolveType(dataBaseModel.DbReadType);
+                    dataBaseModel.DbRead = MicroiORMExtensions.CreateDbSession(dataBaseModel.DbReadConn, dbReadType);
                     AddOrUptClient(clientModel, publishConfiguration: false);
                 }
                 return dataBaseModel.Db;

@@ -249,8 +249,15 @@ namespace Microi.net
             }
             catch (Exception logException)
             {
-                Console.WriteLine(
-                    $"Microi：【Error异常】租户[{tenant}]的 MQ 发送日志写入失败：{logException.Message}");
+                MicroiEngine.QueueSystemLog(
+                    tenant,
+                    "RabbitMQ",
+                    "SendAuditWriteFailed",
+                    "MQ 发送记录写入失败",
+                    logException.ToString(),
+                    2,
+                    false,
+                    queueName ?? sendInfo?.QueueName);
             }
         }
     }

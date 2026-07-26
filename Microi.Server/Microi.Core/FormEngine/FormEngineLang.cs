@@ -53,6 +53,11 @@ namespace Microi.net
         private const string DiyLangRootFormEngine = "\u8868\u5355\u5f15\u64ce";
         private const string DiyLangRootSystem = "\u7cfb\u7edf";
 
+        private static void WriteDiyLangLog(string osClient, string action, string title, string content, int level = 2, string targetId = null)
+        {
+            MicroiEngine.QueueSystemLog(osClient, "FormEngineLang", action, title, content, level, false, targetId);
+        }
+
         private sealed class DiyLangFieldConfig
         {
             public string Locale { get; set; }
@@ -173,7 +178,7 @@ namespace Microi.net
             DiyLangDbUnavailable[key] = DateTime.UtcNow;
             if (isFirstMark)
             {
-                Console.WriteLine($"Microi：【多语言】租户[{osClient}]数据库连接压力过高，{DiyLangDbBackoffMinutes}分钟内暂停多语言初始化/同步，原因：{message}");
+                WriteDiyLangLog(osClient, "DatabaseBackoff", "多语言数据库操作已进入退避", $"{DiyLangDbBackoffMinutes} 分钟内暂停初始化/同步。{message}", 2);
             }
         }
 
@@ -682,7 +687,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Resolve diy_table identity failed. OsClient={osClient}, Table={tableName}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "ResolveTableFailed", "多语言解析表身份失败", ex.ToString(), 2, tableName);
                 return null;
             }
         }
@@ -718,7 +723,7 @@ namespace Microi.net
                     }
 
                     var db = OsClientExtend.GetClient(osClient).Db;
-                    EnsurePhysicalColumnExists(db, canonicalTableName, fieldName, type);
+                    EnsurePhysicalColumnExists(db, osClient, canonicalTableName, fieldName, type);
 
                     var rows = db.FromSql(@"SELECT *
                             FROM diy_field
@@ -803,7 +808,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi: Ensure field metadata failed. OsClient={osClient}, Table={tableName}, Field={fieldName}, Msg={ex.Message}");
+                    WriteDiyLangLog(osClient, "EnsureFieldMetadataFailed", "多语言字段元数据补齐失败", ex.ToString(), 2, $"{tableName}.{fieldName}");
                 }
                 return 1;
             });
@@ -888,12 +893,12 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: load physical columns failed. OsClient={osClient}, Table={tableName}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "LoadPhysicalColumnsFailed", "多语言读取物理字段失败", ex.ToString(), 2, tableName);
             }
             return null;
         }
 
-        private static void EnsurePhysicalColumnExists(DbSession db, string tableName, string fieldName, string type)
+        private static void EnsurePhysicalColumnExists(DbSession db, string osClient, string tableName, string fieldName, string type)
         {
             if (db == null || IsBlank(tableName) || IsBlank(fieldName) || IsBlank(type))
             {
@@ -919,7 +924,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Ensure physical column failed. Table={tableName}, Field={fieldName}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "EnsurePhysicalColumnFailed", "多语言物理字段补齐失败", ex.ToString(), 2, $"{tableName}.{fieldName}");
             }
         }
 
@@ -1015,7 +1020,7 @@ namespace Microi.net
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi: Ensure sys_config SysLangs failed. OsClient={osClient}, Msg={ex.Message}");
+                    WriteDiyLangLog(osClient, "EnsureSysLangsFailed", "系统语言配置补齐失败", ex.ToString(), 2, "SysLangs");
                 }
                 await ClearSysConfigCacheAsync(osClient);
             }
@@ -1114,7 +1119,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Ensure sys_config init lang button failed. OsClient={osClient}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "EnsureInitButtonFailed", "多语言初始化按钮补齐失败", ex.ToString(), 2, SysConfigInitLangButtonId);
             }
         }
 
@@ -1206,7 +1211,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Update diy_field metadata failed. OsClient={osClient}, Table={tableName}, Field={fieldName}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "UpdateFieldMetadataFailed", "多语言字段元数据更新失败", ex.ToString(), 2, $"{tableName}.{fieldName}");
             }
         }
 
@@ -1250,7 +1255,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Ensure varchar column capacity failed. OsClient={osClient}, Table={tableName}, Field={fieldName}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "EnsureColumnCapacityFailed", "多语言字段容量补齐失败", ex.ToString(), 2, $"{tableName}.{fieldName}");
             }
         }
 
@@ -1643,7 +1648,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: create diy_lang init log failed. OsClient={osClient}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "CreateInitLogFailed", "多语言初始化记录创建失败", ex.ToString(), 2);
                 return "";
             }
         }
@@ -1679,7 +1684,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: update diy_lang init log failed. OsClient={osClient}, LogId={logId}, Msg={ex.Message}");
+                WriteDiyLangLog(osClient, "UpdateInitLogFailed", "多语言初始化记录更新失败", ex.ToString(), 2, logId);
             }
         }
 
@@ -2398,14 +2403,14 @@ namespace Microi.net
                     if (shouldRemove)
                     {
                         OsClientExtend.ClientList.TryRemove(targetOsClient, out _);
-                        Console.WriteLine($"Microi: OsClient[{targetOsClient}] removed from runtime ClientList.");
+                        WriteDiyLangLog(targetOsClient, "TenantRuntimeRemoved", "租户已从运行时列表移除", "多语言同步检测到租户配置已删除。", 1, targetOsClient);
                         return;
                     }
 
                     var reloadResult = ReloadRuntimeOsClient(targetOsClient);
                     if (reloadResult.Code != 1)
                     {
-                        Console.WriteLine($"Microi: OsClient[{targetOsClient}] runtime reload failed. {reloadResult.Msg}");
+                        WriteDiyLangLog(targetOsClient, "TenantRuntimeReloadFailed", "租户运行时配置重载失败", reloadResult.Msg, 2, targetOsClient);
                     }
                 }
                 catch (Exception ex)
@@ -2476,7 +2481,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Reload diy_lang cache failed. OsClient={osClient}, Error={ex.Message}");
+                WriteDiyLangLog(osClient, "ReloadCacheFailed", "多语言缓存重载失败", ex.ToString(), 2);
             }
         }
 
@@ -2551,7 +2556,7 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi: Clear SaaS config cache failed. OsClient={osClient}, Error={ex.Message}");
+                WriteDiyLangLog(osClient, "ClearTenantCacheFailed", "SaaS 配置缓存清理失败", ex.ToString(), 2);
             }
         }
 
@@ -3305,7 +3310,7 @@ namespace Microi.net
             DiyLangTranslateUnavailable[unavailableCacheKey] = DateTime.UtcNow;
             if (isFirstMark)
             {
-                Console.WriteLine($"Microi：【多语言】租户[{osClient}]自动翻译不可用，10分钟内改为仅同步词条，原因：{message}");
+                WriteDiyLangLog(osClient, "TranslationBackoff", "多语言自动翻译暂不可用，已降级为仅同步词条", $"10 分钟内暂停自动翻译。{message}", 2);
             }
         }
 

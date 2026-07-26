@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using Newtonsoft.Json.Linq;
 
@@ -892,12 +894,24 @@ namespace Microi.net
     }
 
     /// <summary>
-    /// Console输出拦截器，将Console.WriteLine输出同时写入环形缓冲区
+    /// Console 输出分流器：只把影响整个平台启动、日志管道或主租户可用性的关键日志
+    /// 输出到 stdout；其它历史 Console 日志统一进入 MongoDB 异步日志队列。
     /// 在Program.cs中注册：Console.SetOut(new ConsoleLogInterceptor(Console.Out));
     /// </summary>
     public class ConsoleLogInterceptor : TextWriter
     {
+        private sealed class PendingConsoleLog
+        {
+            public string Value { get; set; }
+            public int Level { get; set; }
+        }
+
+        private const int MaxPendingLogs = 500;
+        private static readonly ConcurrentQueue<PendingConsoleLog> PendingLogs = new ConcurrentQueue<PendingConsoleLog>();
+        private static int _pendingLogCount;
         private readonly TextWriter _original;
+        private readonly object _writeLock = new object();
+        private readonly StringBuilder _partialLine = new StringBuilder();
 
         public ConsoleLogInterceptor(TextWriter original)
         {
@@ -906,25 +920,180 @@ namespace Microi.net
 
         public override System.Text.Encoding Encoding => _original.Encoding;
 
+        public override void Write(char value)
+        {
+            lock (_writeLock)
+            {
+                if (value == '\r') return;
+                if (value == '\n')
+                {
+                    RouteLine(_partialLine.ToString());
+                    _partialLine.Clear();
+                    return;
+                }
+                _partialLine.Append(value);
+            }
+        }
+
+        public override void Write(char[] buffer, int index, int count)
+        {
+            if (buffer == null || count <= 0) return;
+            Write(new string(buffer, index, count));
+        }
+
         public override void Write(string value)
         {
-            _original.Write(value);
+            if (string.IsNullOrEmpty(value)) return;
+            lock (_writeLock)
+            {
+                var segments = value.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+                for (var index = 0; index < segments.Length; index++)
+                {
+                    _partialLine.Append(segments[index]);
+                    if (index < segments.Length - 1)
+                    {
+                        RouteLine(_partialLine.ToString());
+                        _partialLine.Clear();
+                    }
+                }
+            }
         }
 
         public override void WriteLine(string value)
         {
-            _original.WriteLine(value);
-            SystemMonitorLogic.WriteLog(value);
+            lock (_writeLock)
+            {
+                if (!string.IsNullOrEmpty(value)) _partialLine.Append(value);
+                RouteLine(_partialLine.ToString());
+                _partialLine.Clear();
+            }
         }
 
         public override void WriteLine()
         {
-            _original.WriteLine();
+            lock (_writeLock)
+            {
+                RouteLine(_partialLine.ToString());
+                _partialLine.Clear();
+            }
         }
 
         public override void Flush()
         {
             _original.Flush();
+        }
+
+        private void RouteLine(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            if (IsPlatformCritical(value))
+            {
+                _original.WriteLine(value);
+                SystemMonitorLogic.WriteLog(value);
+                return;
+            }
+
+            QueueOrBuffer(value, ResolveLevel(value));
+        }
+
+        private static bool IsPlatformCritical(string value)
+        {
+            if (value.IndexOf("Unhandled exception", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("OutOfMemoryException", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("StackOverflowException", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.IndexOf("Fatal process", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            // 日志管道本身故障时不能再写日志队列，否则会递归并丢失唯一诊断出口。
+            if (value.IndexOf("SysLogQueueService", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.Contains("异步日志队列")
+                || value.Contains("日志spool")
+                || value.Contains("日志批次")
+                || value.Contains("日志临时批次")
+                || value.Contains("MongoDB 创建SysLog索引失败"))
+            {
+                return true;
+            }
+
+            if (value.Contains("】开始初始化！")
+                || value.Contains("】Microi所有初始化成功！")
+                || value.Contains("】Microi全部启动成功！")
+                || value.Contains("平台服务器端版本号")
+                || value.Contains("数据库连接保护")
+                || value.Contains("License自动恢复")
+                || value.Contains("主租户[")
+                || value.Contains("环境变量中的OsClient")
+                || value.Contains("动态跨域配置失败")
+                || value.Contains("动态接口地址配置失败")
+                || value.Contains("Now listening on")
+                || value.Contains("Application started")
+                || value.Contains("Application is shutting down")
+                || value.Contains("Hosting environment")
+                || value.Contains("Content root path"))
+            {
+                return true;
+            }
+
+            return value.Contains("注入【")
+                && (value.Contains("失败") || value.Contains("Error") || value.Contains("异常"));
+        }
+
+        private static int ResolveLevel(string value)
+        {
+            return value.Contains("❌")
+                || value.Contains("Error")
+                || value.Contains("异常")
+                || value.Contains("失败")
+                ? 3
+                : value.Contains("Warning")
+                    || value.Contains("Warn")
+                    || value.Contains("警告")
+                    || value.Contains("注意")
+                    ? 2
+                    : 1;
+        }
+
+        private static void QueueOrBuffer(string value, int level)
+        {
+            var content = value.Length <= 32000 ? value : value.Substring(0, 32000);
+            if (TryQueue(content, level))
+            {
+                FlushPendingToMongo();
+                return;
+            }
+
+            PendingLogs.Enqueue(new PendingConsoleLog { Value = content, Level = level });
+            var count = Interlocked.Increment(ref _pendingLogCount);
+            while (count > MaxPendingLogs && PendingLogs.TryDequeue(out _))
+            {
+                count = Interlocked.Decrement(ref _pendingLogCount);
+            }
+        }
+
+        private static bool TryQueue(string value, int level)
+        {
+            var firstLine = value.Split(new[] { '\r', '\n' }, 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(firstLine)) firstLine = "后端运行日志";
+            if (firstLine.Length > 180) firstLine = firstLine.Substring(0, 180);
+            return MicroiEngine.QueueSystemLog(null, "Console", "RoutedConsoleLine", firstLine, value, level, level == 1);
+        }
+
+        /// <summary>
+        /// MicroiEngine 完成依赖注入后刷新早期启动阶段的非关键日志。
+        /// </summary>
+        public static void FlushPendingToMongo()
+        {
+            while (PendingLogs.TryDequeue(out var item))
+            {
+                Interlocked.Decrement(ref _pendingLogCount);
+                if (TryQueue(item.Value, item.Level)) continue;
+
+                PendingLogs.Enqueue(item);
+                Interlocked.Increment(ref _pendingLogCount);
+                break;
+            }
         }
     }
 }

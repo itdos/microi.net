@@ -41,6 +41,12 @@ namespace Microi.net
         /// 
         /// </summary>
         public string Url { get; set; }
+
+        /// <summary>
+        /// 强制本次请求启用严格 SSRF 校验并禁用自动重定向。
+        /// MCP 拉取外部附件等控制面能力必须设置为 true。
+        /// </summary>
+        public bool RequireSsrfProtection { get; set; }
         /// <summary>
         /// 参数类型。可选：Json、Form。默认Form。传入Form则会将new { Key1 = Value1, Key2 = Value2}转换成"key1=value1＆key2=value2"形式。
         /// </summary>

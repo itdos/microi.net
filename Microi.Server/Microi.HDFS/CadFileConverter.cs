@@ -15,6 +15,11 @@ namespace Microi.net
     /// </summary>
     public static class CadFileConverter
     {
+        private static void WriteCadLog(string osClient, string action, string title, string content, int level = 2, string targetId = null, bool? success = false)
+        {
+            MicroiEngine.QueueSystemLog(osClient, "HDFS.CAD", action, title, content, level, success, targetId);
+        }
+
         /// <summary>
         /// 需要转换的CAD文件扩展名（含点，小写）
         /// </summary>
@@ -97,12 +102,12 @@ namespace Microi.net
                     }
                 }
 
-                Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] DwgConverter类未找到，请确保Microi.V8Engine已加载");
+                WriteCadLog(OsClientDefault.OsClient, "DwgConverterMissing", "DWG 转换器未加载", "请确认 Microi.V8Engine 已加载。", 2);
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] DWG→DXF转换失败: {ex.Message}");
+                WriteCadLog(OsClientDefault.OsClient, "DwgConversionFailed", "DWG 转 DXF 失败", ex.ToString(), 2);
                 return null;
             }
         }
@@ -181,7 +186,7 @@ print('STEP_TO_STL_OK')
                 var freecadPath = FindFreecadExecutable();
                 if (freecadPath == null)
                 {
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 未找到FreeCAD，STEP/STP文件将不会被转换。请安装FreeCAD以启用STEP预览功能。");
+                    WriteCadLog(OsClientDefault.OsClient, "FreeCadMissing", "未找到 FreeCAD，STEP/STP 文件无法转换", "可安装 FreeCAD 或配置 FREECAD_PATH。", 2);
                     return null;
                 }
 
@@ -209,13 +214,13 @@ print('STEP_TO_STL_OK')
                 if (process.ExitCode != 0 || !output.Contains("STEP_TO_STL_OK"))
                 {
                     // FreeCAD方式失败，尝试使用Python + OCC方式
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] FreeCAD转换失败(ExitCode={process.ExitCode}), stderr={errorOutput}");
+                    WriteCadLog(OsClientDefault.OsClient, "FreeCadConversionFailed", "FreeCAD 转换失败，正在尝试备用方式", $"ExitCode={process.ExitCode}; stderr={errorOutput}", 2);
 
                     // 尝试直接用python3 + pythonocc调用
                     var convertResult = TryPythonOccConvert(inputFile, stlFile);
                     if (!convertResult)
                     {
-                        Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 所有STEP转换方式均失败");
+                        WriteCadLog(OsClientDefault.OsClient, "StepConversionExhausted", "所有 STEP 转换方式均失败", "FreeCAD 与 Python OCC 均未成功。", 2);
                         return null;
                     }
                 }
@@ -232,7 +237,7 @@ print('STEP_TO_STL_OK')
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] STEP→GLB转换异常: {ex.Message}");
+                WriteCadLog(OsClientDefault.OsClient, "StepConversionFailed", "STEP 转换异常", ex.ToString(), 2);
                 return null;
             }
             finally
@@ -436,7 +441,7 @@ except ImportError:
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 复制文件流失败: {ex.Message}");
+                WriteCadLog(clientModel?.OsClient, "SourceStreamCopyFailed", "CAD 原文件流复制失败", ex.ToString(), 2, originalPath);
                 return;
             }
 
@@ -449,7 +454,7 @@ except ImportError:
             {
                 try
                 {
-                    Console.WriteLine($"Microi：【ℹ️信息】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 开始异步转换 {ext} 文件: {originalPath}");
+                    WriteCadLog(clientModel?.OsClient, "ConversionStarted", "CAD 文件异步转换已开始", $"扩展名：{ext}", 1, originalPath, true);
 
                     byte[] convertedBytes = null;
                     string actualTargetExt = GetTargetExtension(ext);
@@ -481,7 +486,7 @@ except ImportError:
 
                     if (convertedBytes == null || convertedBytes.Length == 0)
                     {
-                        Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 转换失败或无输出: {originalPath}");
+                        WriteCadLog(clientModel?.OsClient, "ConversionEmpty", "CAD 文件转换失败或无输出", "转换器未返回有效文件。", 2, originalPath);
                         return;
                     }
 
@@ -512,17 +517,17 @@ except ImportError:
 
                         if (putResult.Code == 1)
                         {
-                            Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 转换完成并上传成功: {originalPath} → {convertedPath}");
+                            WriteCadLog(clientModel?.OsClient, "ConversionUploaded", "CAD 文件转换并上传成功", $"目标：{convertedPath}", 1, originalPath, true);
                         }
                         else
                         {
-                            Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 转换文件上传失败: {putResult.Msg}");
+                            WriteCadLog(clientModel?.OsClient, "ConvertedFileUploadFailed", "CAD 转换文件上传失败", putResult.Msg, 2, originalPath);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Microi：【❌Error】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】[CadFileConverter] 异步转换异常: {ex.Message}");
+                    WriteCadLog(clientModel?.OsClient, "BackgroundConversionFailed", "CAD 异步转换异常", ex.ToString(), 2, originalPath);
                 }
             });
         }

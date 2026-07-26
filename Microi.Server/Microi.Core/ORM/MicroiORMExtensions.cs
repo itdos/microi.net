@@ -59,25 +59,12 @@ namespace Microi.net
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new ArgumentNullException(nameof(connectionString));
 
-            // MySQL连接字符串补充关键参数
-            if (dbType == Dos.ORM.DatabaseType.MySql)
-            {
-                if (!connectionString.Contains("ConnectionReset", StringComparison.OrdinalIgnoreCase)
-                    && !connectionString.Contains("Connection Reset", StringComparison.OrdinalIgnoreCase))
-                    connectionString = connectionString.TrimEnd(';') + ";Connection Reset=true";
-
-                if (!connectionString.Contains("DefaultCommandTimeout", StringComparison.OrdinalIgnoreCase)
-                    && !connectionString.Contains("Default Command Timeout", StringComparison.OrdinalIgnoreCase))
-                    connectionString = connectionString.TrimEnd(';') + $";Default Command Timeout={DefaultCommandTimeoutSeconds}";
-
-                if (!connectionString.Contains("AllowUserVariables", StringComparison.OrdinalIgnoreCase)
-                    && !connectionString.Contains("Allow User Variables", StringComparison.OrdinalIgnoreCase))
-                    connectionString = connectionString.TrimEnd(';') + ";Allow User Variables=True";
-
-                if (!connectionString.Contains("UseAffectedRows", StringComparison.OrdinalIgnoreCase)
-                    && !connectionString.Contains("Use Affected Rows", StringComparison.OrdinalIgnoreCase))
-                    connectionString = connectionString.TrimEnd(';') + ";Use Affected Rows=False";
-            }
+            connectionString = ConnectionStringCompatibility.Normalize(
+                dbType,
+                connectionString,
+                OsClientDefault.MaxPoolSize,
+                OsClientDefault.ConnectionLifetime,
+                DefaultCommandTimeoutSeconds);
 
             return new DbSession(dbType, connectionString);
         }
@@ -146,7 +133,6 @@ namespace Microi.net
                     }
 
                     var msg = $"慢SQL[{method}] 耗时{elapsedMs}ms（阈值{DiyCommon.SlowSqlThresholdMs}ms）: {sqlText}";
-                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{msg}");
                     _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                     {
                         Type = "数据库慢SQL",
@@ -160,7 +146,6 @@ namespace Microi.net
                     });
                 };
 
-                Console.WriteLine($"Microi：【成功】注入【Dos.ORM数据库引擎】成功！");
                 return services;
             }
             catch (Exception ex)
