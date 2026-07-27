@@ -4409,6 +4409,15 @@ namespace Microi.net
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microistore", new
                 {
                     OsClient = osClient,
+                    // 应用包、富文本和图片字段可能达到数十 MB。列表接口只返回发现/选择所需的
+                    // 轻量字段；完整元数据与源码必须通过 GetApplicationContext 按应用读取。
+                    _SelectFields = new[]
+                    {
+                        "Id", "AppKey", "AppId", "AppName", "Name", "ApplicationType", "AppType",
+                        "Category", "PublisherType", "Description", "AppDetail", "Status", "BuildStatus",
+                        "CurrentVersion", "AppVersion", "PreviewUrl", "PublicPublishPath", "PrivateSourcePath",
+                        "OwnerUserId", "OwnerName", "CreateTime", "UpdateTime"
+                    },
                     _OrderBy = "UpdateTime",
                     _OrderByType = "DESC",
                     _PageSize = 5000
@@ -4704,7 +4713,8 @@ namespace Microi.net
         }
 
         /// <summary>
-        /// 将本地微服务源码同步到在线 AI 应用。源码存私有桶，发布产物仍由 PublishMicroService 管理。
+        /// 将本地 Web、UniApp 或 MicroService 源码同步到在线 AI 应用。
+        /// 源码存私有桶；该方法不安装运行态 sys_microiservice。
         /// </summary>
         public static async Task<DosResult<object>> SyncMicroServiceSource(string osClient, JObject param, dynamic currentToken)
         {
@@ -4714,6 +4724,11 @@ namespace Microi.net
                 var source = UnwrapMicroServiceParam(param);
                 var msKey = NormalizeMicroServiceKey(source?["MsKey"]?.Val<string>() ?? source?["MicroServiceKey"]?.Val<string>() ?? source?["AppKey"]?.Val<string>());
                 if (IsBlank(msKey)) return new DosResult<object>(0, null, "MsKey 不能为空，只允许英文、数字、-、_");
+                var applicationType = source?["ApplicationType"]?.Val<string>() ?? source?["AppType"]?.Val<string>() ?? "MicroService";
+                if (!new[] { "Web", "UniApp", "MicroService" }.Contains(applicationType, StringComparer.OrdinalIgnoreCase))
+                    return new DosResult<object>(0, null, "ApplicationType 仅支持 Web、UniApp 或 MicroService");
+                applicationType = new[] { "Web", "UniApp", "MicroService" }
+                    .First(item => string.Equals(item, applicationType, StringComparison.OrdinalIgnoreCase));
 
                 var files = GetArrayParam(param, "SourceFiles", "sourceFiles", "Files", "files");
                 if (files.Count == 0) return new DosResult<object>(0, null, "SourceFiles 不能为空");
@@ -4735,16 +4750,16 @@ namespace Microi.net
                     ["AppName"] = msName,
                     ["AppKey"] = msKey,
                     ["AppId"] = msKey,
-                    ["AppType"] = "MicroService",
-                    ["ApplicationType"] = "MicroService",
-                    ["Category"] = "platform",
+                    ["AppType"] = applicationType,
+                    ["ApplicationType"] = applicationType,
+                    ["Category"] = source?["Category"]?.Val<string>() ?? "tools",
                     ["PublisherType"] = "官方应用",
                     ["Description"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
                     ["AppDetail"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
                     ["Status"] = "Draft",
                     ["BuildStatus"] = "Changed",
                     ["PrivateSourcePath"] = $"ai-app-source/{appId}",
-                    ["PublicPublishPath"] = $"micro-app/{msKey}/"
+                    ["PublicPublishPath"] = applicationType == "MicroService" ? $"micro-app/{msKey}/" : $"ai-app-publish/{msKey}/"
                 };
                 try
                 {
@@ -4844,12 +4859,12 @@ namespace Microi.net
                 {
                     AppId = appId,
                     AppKey = msKey,
-                    AppType = "MicroService",
+                    AppType = applicationType,
                     FileCount = uploaded.Count,
                     TotalSize = totalSize,
                     RemovedFileCount = removed,
                     Files = uploaded
-                }, "微服务源码已同步到在线 AI 应用");
+                }, "应用源码已同步到在线 AI 应用（未安装运行实例）");
             }
             catch (Exception ex)
             {

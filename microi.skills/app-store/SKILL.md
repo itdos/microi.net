@@ -50,9 +50,17 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 已有 MicroService 优先新增页面/路由；没有时才创建、同步源码、发布构建。复杂安装交互使用 `V8.OpenAppDialog`，后台任务上报进度。
 
+## VS Code 本地应用与发布边界
+
+- `AI应用` 本地树按每个一级目录的 `.microi-micro-app.json` 发现项目；只要 `osClient/apiBaseUrl` 与当前连接一致，就必须显示 `Web / UniApp / MicroService`，不得用 `runtime === "micro-app"` 过滤掉其它应用类型。无效清单应记录诊断，不能静默吞掉整个目录。
+- “安装到当前租户”和“发布到应用商城（不安装）”是两个独立动作。商城发布只能同步 `sys_microistore`、应用源码/构建/版本元数据及安装包，不得新增或修改当前租户的 `sys_microiservice / sys_microiservice_page`；操作前后必须回读运行态确认未变化。
+- 应用项目行必须直接显示商城发布入口，不能只藏在右键菜单；同时保留构建安装和源码同步状态入口。
+
 ## 版本与回滚
 
 - 版本号单调递增，保存变更清单和前后哈希。
+- 公有发布必须同时保留两套入口：`/{OsClient}/ai-app-publish/{AppKey}/index.html` 永远指向最新版，`.../versions/{Version}/index.html` 永远保留该历史版本。先写入最新版的非入口资产，最后切换根 `index.html`，避免发布瞬间引用不存在的资源。
+- 官网、二维码和用户分享只使用无版本号根入口，不追加 `v/apiBase/OsClient`。目标租户的 `ApiBase/OsClient` 在发布或安装时写入入口 HTML 的 `window.__MICROI_APP_CONTEXT__ / MICROI_API_BASE / MICROI_OS_CLIENT`；安装包不得沿用发布端运行上下文。
 - 数据迁移通常只向前；回滚应用版本不能假设自动回滚业务数据。
 - 更新失败保留原版本可运行资源，记录失败阶段；不要清空客户 V8 后再尝试恢复。
 - 私有源码仓库、`Microi.net/License/keys` 和部署密钥不进入公开应用包。
@@ -62,6 +70,8 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - [ ] 同一包重复安装无重复表/字段/菜单/任务
 - [ ] 客户自定义 V8 与非包拥有配置保持不变
 - [ ] 源码包、构建包、Manifest 和数据库版本一致且哈希可核
+- [ ] 无版本号根入口与当前商城版本一致，历史版本 URL 仍可独立访问
+- [ ] 安装到不同 ApiBase/OsClient 后，入口 HTML 使用目标租户上下文且分享 URL 无运行参数
 - [ ] 中断/重启后可恢复，两个节点不会重复副作用
 - [ ] 普通角色不能安装、升级、卸载或读取私有源码
 - [ ] 缓存刷新后远端 API 与真实 UI 通过

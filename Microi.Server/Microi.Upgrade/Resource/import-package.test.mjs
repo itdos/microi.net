@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { compareSemanticVersions } from "./application-store-replica-sync.mjs";
 
 const source = await readFile(new URL("./import-package.js", import.meta.url), "utf8");
 const publishSource = await readFile(new URL("./ai-app-publish-store.js", import.meta.url), "utf8");
@@ -44,6 +45,15 @@ test("PageTabs only preserves a real multi-tab target", () => {
 test("self-contained offline applications prefer embedded files over public ZIP URLs", () => {
   assert.match(source, /embeddedSourceFiles[\s\S]*?embeddedSourceFiles\.length[\s\S]*?downloadApplicationZip\(packageAssets\.SourceZip/);
   assert.match(source, /embeddedBuildAssets[\s\S]*?embeddedBuildAssets\.length[\s\S]*?downloadApplicationZip\(packageAssets\.BuildZip/);
+});
+
+test("installed application HTML receives the target tenant runtime without URL parameters", () => {
+  assert.match(source, /rewriteApplicationRuntimeContext/);
+  assert.match(source, /V8\.SysConfig\s*&&\s*V8\.SysConfig\.ApiBase/);
+  assert.match(source, /OsClient:\s*String\(V8\.OsClient/);
+  assert.match(source, /data-microi-runtime-context=["']true["']/);
+  assert.match(source, /base64\s*=\s*rewriteApplicationRuntimeContext\(rootPath, relativePath, base64\)/);
+  assert.doesNotMatch(source, /MICROI_API_BASE\s*=\s*["']https:\/\/api\.itdos\.com/);
 });
 
 test("application-store PackageOnly output is a self-contained offline package", () => {
@@ -94,11 +104,14 @@ test("application-store upgrade resources carry the canonical resumable importer
     engine => engine.ApiEngineKey === "import-microi-store-package"
   );
   assert.ok(packageImporter, "application-store package should contain its importer");
-  assert.equal(packageModel.PackageInfo.Version, "v6.5.16");
+  assert.ok(
+    compareSemanticVersions(packageModel.PackageInfo.Version, "v6.5.16") >= 0,
+    "application-store package version must not fall below the resumable importer baseline",
+  );
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
   assert.equal(packageImporter.Version, importerSourceVersion);
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical source byte-for-byte");
-  assert.match(source, /Version:\s*v1\.6\.(?:[6-9]|\d{2,})/);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.6.6") >= 0);
   assert.match(source, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
