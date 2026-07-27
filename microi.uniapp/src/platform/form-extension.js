@@ -43,6 +43,10 @@ export async function handleTenantFormFieldSelect(context = {}, payload = {}) {
   return invoke('handleFieldSelect', context, payload)
 }
 
+export async function handleTenantFormFieldChange(context = {}, payload = {}) {
+  return invoke('handleFieldChange', context, payload)
+}
+
 export async function prepareTenantFormSubmit(context = {}) {
   const result = await invoke('beforeSubmit', context)
   return result && typeof result === 'object' ? result : {}
@@ -69,6 +73,7 @@ export default {
   getTenantFormFieldPresentation,
   getTenantFormFieldActions,
   runTenantFormFieldAction,
+  handleTenantFormFieldChange,
   handleTenantFormFieldSelect,
   prepareTenantFormSubmit,
   notifyTenantFormSaved,
