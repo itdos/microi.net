@@ -48,3 +48,29 @@ test("forms without string CodeEditor values remain plaintext and omit metadata"
     assert.equal(metadata, null);
     assert.equal(formData.ApiV8Code, null);
 });
+
+test("duplicate CodeEditor metadata encodes the physical field only once", function () {
+    const source = "V8.Result = V8.Form.Status === '启用';";
+    const formData = { EditCodeShowV8: source };
+
+    const metadata = prepareCodeEditorTransport(formData, [
+        {
+            Id: "13fc8306-bd76-426e-a231-4156d52efacc",
+            Name: "EditCodeShowV8",
+            Component: "CodeEditor"
+        },
+        {
+            Id: "5ec3dcd6-08de-400b-a067-f6e579df1930",
+            Name: "EditCodeShowV8",
+            Component: "CodeEditor"
+        }
+    ]);
+
+    assert.deepEqual(metadata, {
+        Version: 1,
+        Encoding: "base64url",
+        Fields: ["EditCodeShowV8"]
+    });
+    assert.match(formData.EditCodeShowV8, /^MICROI_B64URL_V1:[A-Za-z0-9_-]+$/);
+    assert.equal(decodeBase64Url(formData.EditCodeShowV8), source);
+});
