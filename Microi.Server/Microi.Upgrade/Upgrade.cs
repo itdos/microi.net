@@ -46,6 +46,7 @@ namespace Microi.net
                 EnsureApiEngineRuntimeColumns(osClientSecret);
                 EnsureLegacyFieldMetadataColumns(osClientSecret);
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动前");
+                await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动前");
                 await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret);
                 menuAppDisplaySnapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
             }
@@ -582,6 +583,9 @@ namespace Microi.net
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(
                     osClientSecret,
                     "基础应用包及版本迁移后");
+                await EnsureApiEngineCacheWriteCompatibilityAsync(
+                    osClientSecret,
+                    "基础应用包及版本迁移后");
             }
             catch (Exception ex)
             {
@@ -650,6 +654,150 @@ namespace Microi.net
         {
             public string Id { get; set; }
             public int? AppDisplay { get; set; }
+        }
+
+        private async Task EnsureApiEngineCacheWriteCompatibilityAsync(
+            OsClientSecret osClientSecret,
+            string stage)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null
+                || !TableExists(osClientSecret, "diy_table")
+                || !TableExists(osClientSecret, "sys_apiengine")
+                || !ColumnExists(osClientSecret, "diy_table", "Name")
+                || !ColumnExists(osClientSecret, "diy_table", "SubmitAfterServerV8"))
+            {
+                return;
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>()
+                ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+            var table = osClientSecret.Db
+                .FromSql($@"SELECT {quoteOpen}Id{quoteClose}, {quoteOpen}Name{quoteClose},
+                        {quoteOpen}SubmitAfterServerV8{quoteClose}
+                    FROM {quoteOpen}diy_table{quoteClose}
+                    WHERE LOWER({quoteOpen}Name{quoteClose})=@p0")
+                .AddInParameter("p0", "sys_apiengine")
+                .First<ApiEngineDiyTableRow>();
+            if (table == null || table.Id.DosIsNullOrWhiteSpace()
+                || !ApiEngineCacheCompatibility.TryUpgradeEvent(
+                    table.SubmitAfterServerV8,
+                    out var compatibleCode))
+            {
+                return;
+            }
+
+            var oldCode = table.SubmitAfterServerV8 ?? "";
+            var affected = osClientSecret.Db
+                .FromSql($@"UPDATE {quoteOpen}diy_table{quoteClose}
+                    SET {quoteOpen}SubmitAfterServerV8{quoteClose}=@p0
+                    WHERE {quoteOpen}Id{quoteClose}=@p1
+                      AND ({quoteOpen}SubmitAfterServerV8{quoteClose}=@p2
+                           OR ({quoteOpen}SubmitAfterServerV8{quoteClose} IS NULL AND @p2=''))")
+                .AddInParameter("p0", compatibleCode)
+                .AddInParameter("p1", table.Id)
+                .AddInParameter("p2", oldCode)
+                .ExecuteNonQuery();
+            if (affected == 0)
+            {
+                var reread = osClientSecret.Db
+                    .FromSql($@"SELECT {quoteOpen}Id{quoteClose}, {quoteOpen}Name{quoteClose},
+                            {quoteOpen}SubmitAfterServerV8{quoteClose}
+                        FROM {quoteOpen}diy_table{quoteClose}
+                        WHERE {quoteOpen}Id{quoteClose}=@p0")
+                    .AddInParameter("p0", table.Id)
+                    .First<ApiEngineDiyTableRow>();
+                if (reread == null
+                    || ApiEngineCacheCompatibility.TryUpgradeEvent(
+                        reread.SubmitAfterServerV8,
+                        out _))
+                {
+                    throw new InvalidOperationException(
+                        "sys_apiengine SubmitAfterServerV8发生并发修改，请合并后重试。");
+                }
+            }
+
+            var cache = MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient);
+            await cache.RemoveAsync(
+                $"Microi:{osClientSecret.OsClient}:FormData:diy_table:{table.Id.ToLowerInvariant()}");
+            await cache.RemoveAsync(
+                $"Microi:{osClientSecret.OsClient}:FormData:diy_table:sys_apiengine");
+            var rebuiltAliases = await RebuildLegacyCompatibleApiEngineCacheAsync(
+                osClientSecret.OsClient);
+            Console.WriteLine(
+                $"Microi：【接口引擎缓存兼容修复】【{osClientSecret.OsClient}】【{stage}】" +
+                $"已恢复v3/v6共享JSON写入契约，并重建{rebuiltAliases}个缓存别名。");
+        }
+
+        private static async Task<int> RebuildLegacyCompatibleApiEngineCacheAsync(
+            string osClient)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            var listResult = await MicroiEngine.FormEngine.GetTableDataAsync(new
+            {
+                FormEngineKey = "sys_apiengine",
+                OsClient = osClient,
+                _PageIndex = 1,
+                _PageSize = 100000
+            });
+            if (listResult.Code != 1)
+            {
+                throw new InvalidOperationException(
+                    "读取接口引擎以重建兼容缓存失败：" + listResult.Msg);
+            }
+
+            var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (listResult.Data != null)
+            {
+                foreach (var item in listResult.Data)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    var model = JObject.FromObject((object)item);
+                    var json = JsonConvert.SerializeObject((object)item);
+                    foreach (var alias in new[]
+                    {
+                        model.Value<string>("ApiEngineKey"),
+                        model.Value<string>("Id"),
+                        model.Value<string>("ApiAddress")
+                    })
+                    {
+                        if (!alias.DosIsNullOrWhiteSpace())
+                        {
+                            aliases[alias.ToLowerInvariant()] = json;
+                        }
+                    }
+                }
+            }
+
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            await cache.RemoveParentAsync(
+                $"Microi:{osClient}:FormData:sys_apiengine:*");
+            var pending = new List<Task<bool>>(64);
+            foreach (var alias in aliases)
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                pending.Add(cache.SetAsync(
+                    $"Microi:{osClient}:FormData:sys_apiengine:{alias.Key}",
+                    alias.Value));
+                if (pending.Count < 64) continue;
+
+                await Task.WhenAll(pending);
+                pending.Clear();
+            }
+            if (pending.Count > 0)
+            {
+                await Task.WhenAll(pending);
+            }
+            return aliases.Count;
+        }
+
+        public sealed class ApiEngineDiyTableRow
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public string SubmitAfterServerV8 { get; set; }
         }
 
         private static readonly IReadOnlyDictionary<string, string> LegacyMenuConfigColumnTypes =

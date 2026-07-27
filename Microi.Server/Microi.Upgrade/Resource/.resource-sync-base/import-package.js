@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.6.10
+ * Version: v1.7.0
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -409,6 +409,31 @@ try {
         return index > -1 ? fileName.substring(index + 1).toLowerCase() : 'bin';
     };
 
+    // 安装包是跨租户资产：HTML 中的发布端 ApiBase/OsClient 不能原样带到目标环境。
+    // 每次安装都按目标租户重写运行时上下文，因此公开入口无需查询参数。
+    var rewriteApplicationRuntimeContext = function (rootPath, relativePath, base64) {
+        if (!/^(ai-app-publish|micro-app)\//i.test(String(rootPath || '')) || !/\.html?$/i.test(String(relativePath || ''))) {
+            return base64;
+        }
+        var apiBase = firstTextParam([V8.SysConfig && V8.SysConfig.ApiBase]).replace(/\/+$/g, '');
+        if (!apiBase) throw new Error('SysConfig.ApiBase不能为空，无法写入应用运行时上下文');
+        var contextJson = JSON.stringify({ ApiBase: apiBase, OsClient: String(V8.OsClient || '') })
+            .replace(/</g, '\\u003c')
+            .replace(/\u2028/g, '\\u2028')
+            .replace(/\u2029/g, '\\u2029');
+        var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(String(base64 || '')));
+        var runtimeScript = '<script data-microi-runtime-context="true">(function(){var c=' + contextJson + ';window.__MICROI_APP_CONTEXT__=Object.assign({},window.__MICROI_APP_CONTEXT__||{},c);window.MICROI_API_BASE=c.ApiBase;window.MICROI_OS_CLIENT=c.OsClient;})();<\/script>';
+        var existing = /<script\b[^>]*data-microi-runtime-context=["']true["'][^>]*>[\s\S]*?<\/script>/i;
+        if (existing.test(html)) html = html.replace(existing, runtimeScript);
+        else {
+            var head = /<head\b[^>]*>/i.exec(html);
+            html = head
+                ? html.substring(0, head.index + head[0].length) + runtimeScript + html.substring(head.index + head[0].length)
+                : runtimeScript + html;
+        }
+        return System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html));
+    };
+
     var getUploadedHdfsPath = function (uploadResult) {
         var data = uploadResult && uploadResult.Data ? uploadResult.Data : {};
         if (data && data.length && data[0]) data = data[0];
@@ -423,6 +448,7 @@ try {
             base64 = V8.Base64.StringToBase64(String(file.Content));
         }
         if (!base64) throw new Error('应用资产缺少文件内容：' + relativePath);
+        base64 = rewriteApplicationRuntimeContext(rootPath, relativePath, base64);
         var dir = applicationFileDir(relativePath);
         var files = {};
         files[applicationFileName(relativePath)] = base64;
@@ -438,7 +464,11 @@ try {
         }
         var hdfsPath = getUploadedHdfsPath(result);
         if (!hdfsPath) throw new Error('HDFS 上传成功但未返回文件路径：' + relativePath);
-        return { Path: relativePath, HdfsPath: hdfsPath, FilePathName: hdfsPath, Size: file.Size || 0, Hash: file.Sha256 || file.Hash || file.ContentHash || '' };
+        var actualSize = System.Convert.FromBase64String(base64).Length;
+        var actualHash = V8.EncryptHelper && V8.EncryptHelper.Sha256Hex
+            ? String(V8.EncryptHelper.Sha256Hex(base64)).toLowerCase()
+            : (file.Sha256 || file.Hash || file.ContentHash || '');
+        return { Path: relativePath, HdfsPath: hdfsPath, FilePathName: hdfsPath, Size: actualSize, Hash: actualHash };
     };
 
     var getApplicationRow = function (tableName, rowId, where) {
