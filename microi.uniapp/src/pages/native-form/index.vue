@@ -1,5 +1,7 @@
 <template>
-	<mci-page-shell class="native-form-page" :style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
+	<!-- zhy: 下拉打开时提升表单正文层级，避免被固定栏和悬浮入口遮挡。 -->
+	<mci-page-shell class="native-form-page" :class="{ 'native-form-page--select-open': !!openSelectorField }"
+		:style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
 		@back="goBack">
 		<template #right><button v-if="!loading && !error && mode === 'View' && rowId" class="edit-command"
 				@tap="switchToEdit">编辑</button></template>
@@ -62,57 +64,74 @@
 				</view>
 			</view>
 
+			<!-- zhy: 当前下拉所在分组临时解除卡片裁切。 -->
 			<view v-for="(group, groupIndex) in groups" :key="group.name + groupIndex" class="form-section mci-fade-up"
+				:class="{ 'form-section--select-open': isSelectorGroupOpen(group), 'form-section--collapsed': !isGroupExpanded(group, groupIndex) }"
 				:style="{ animationDelay: `${Math.min(groupIndex, 6) * 45}ms` }">
-				<view class="form-section__header">
-					<view class="form-section__bar"></view>
-					<text>{{ group.name }}</text>
+				<!-- zhy: 新增和编辑页点击分组标题即可折叠或展开字段。 -->
+				<view class="form-section__header" :class="{ expanded: isGroupExpanded(group, groupIndex) }"
+					:hover-class="isEditableMode ? 'form-section__header--pressed' : 'none'"
+					@tap="toggleGroup(group, groupIndex)">
+					<view class="form-section__heading">
+						<view class="form-section__bar"></view>
+						<text class="form-section__title">{{ group.name }}</text>
+						<text v-if="isEditableMode" class="form-section__count">{{ group.fields.length }} 项</text>
+					</view>
+					<text v-if="isEditableMode" class="form-section__toggle"
+						:class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
 				</view>
 
-				<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
-					:class="{ 'form-field--readonly': isReadonly(field) }">
-					<view class="form-field__label">
-						<text>{{ field.Label || field.Name }}</text>
-						<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
-					</view>
-
-					<view v-if="tenantFieldPresentation(field).type === 'map'" class="tenant-field-map">
-						<map v-if="tenantFieldPresentation(field).latitude && tenantFieldPresentation(field).longitude"
-							class="tenant-field-map__canvas"
-							:latitude="tenantFieldPresentation(field).latitude"
-							:longitude="tenantFieldPresentation(field).longitude"
-							:markers="tenantFieldMapMarkers(field)" :show-location="false" :enable-zoom="true" />
-						<view v-else class="tenant-field-map__placeholder">
-							<text class="tenant-field-map__pin">⌖</text>
-							<text>{{ tenantFieldPresentation(field).emptyText || '暂无位置信息' }}</text>
+				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
+				<view v-if="isGroupExpanded(group, groupIndex)" class="form-section__content">
+					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
+						v-show="tenantFieldPresentation(field).visible !== false"
+						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name }">
+						<view class="form-field__label">
+							<text>{{ field.Label || field.Name }}</text>
+							<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
 						</view>
-						<text v-if="tenantFieldPresentation(field).address" class="tenant-field-map__address">
-							{{ tenantFieldPresentation(field).address }}
-						</text>
-						<text v-if="tenantFieldPresentation(field).latitude && tenantFieldPresentation(field).longitude"
-							class="tenant-field-map__coordinate">
-							经度 {{ Number(tenantFieldPresentation(field).longitude).toFixed(6) }}，纬度
-							{{ Number(tenantFieldPresentation(field).latitude).toFixed(6) }}
-						</text>
-					</view>
 
-					<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
-						:table-name="tableName" :form-data="form" :menu-id="menuId"
-						:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
-						@select="handleNativeFieldSelect" />
-
-					<view v-if="tenantFieldActions(field).length" class="tenant-field-actions">
-						<view v-for="action in tenantFieldActions(field)" :key="action.key"
-							class="tenant-field-action"
-							:class="{ 'tenant-field-action--disabled': action.disabled }"
-							hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
-							<text v-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
-							<text>{{ action.label }}</text>
+						<view v-if="tenantFieldPresentation(field).type === 'map'" class="tenant-field-map">
+							<map v-if="tenantFieldPresentation(field).latitude && tenantFieldPresentation(field).longitude"
+								class="tenant-field-map__canvas"
+								:latitude="tenantFieldPresentation(field).latitude"
+								:longitude="tenantFieldPresentation(field).longitude"
+								:markers="tenantFieldMapMarkers(field)" :show-location="false" :enable-zoom="true" />
+							<view v-else class="tenant-field-map__placeholder">
+								<text class="tenant-field-map__pin">⌖</text>
+								<text>{{ tenantFieldPresentation(field).emptyText || '暂无位置信息' }}</text>
+							</view>
+							<text v-if="tenantFieldPresentation(field).address" class="tenant-field-map__address">
+								{{ tenantFieldPresentation(field).address }}
+							</text>
+							<text v-if="tenantFieldPresentation(field).latitude && tenantFieldPresentation(field).longitude"
+								class="tenant-field-map__coordinate">
+								经度 {{ Number(tenantFieldPresentation(field).longitude).toFixed(6) }}，纬度
+								{{ Number(tenantFieldPresentation(field).latitude).toFixed(6) }}
+							</text>
 						</view>
-					</view>
 
-					<text v-if="field.optionError" class="form-field__option-error">选项暂未加载，可稍后重试</text>
-					<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
+						<!-- zhy: 接收下拉开关状态并同步外层层叠样式。 -->
+						<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
+							:table-name="tableName" :form-data="form" :menu-id="menuId"
+							:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
+							@change="handleNativeFieldChange(field, $event)"
+							@select="handleNativeFieldSelect"
+							@selector-toggle="handleSelectorToggle(field, $event)" />
+
+						<view v-if="tenantFieldActions(field).length" class="tenant-field-actions">
+							<view v-for="action in tenantFieldActions(field)" :key="action.key"
+								class="tenant-field-action"
+								:class="{ 'tenant-field-action--disabled': action.disabled }"
+								hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
+								<text v-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
+								<text>{{ action.label }}</text>
+							</view>
+						</view>
+
+						<text v-if="field.optionError" class="form-field__option-error">选项暂未加载，可稍后重试</text>
+						<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
+					</view>
 				</view>
 			</view>
 
@@ -160,7 +179,8 @@
 		hydrateNativeFormOptions,
 		nativeFormDefaultSubmitValues,
 		parseJson,
-		scopeNativeFormDefinition
+		scopeNativeFormDefinition,
+		validateNativeForm
 	} from '@/platform/native-form.js'
 	import {
 		isFormEngineRecordAdapter,
@@ -180,6 +200,7 @@
 		getTenantFormFieldPresentation,
 		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
+		handleTenantFormFieldChange,
 		initializeTenantForm,
 		notifyTenantFormSaved,
 		prepareTenantFormSubmit,
@@ -214,6 +235,10 @@
 				tableChildAuth: null,
 				tenantFormState: {},
 				viewManifest: null,
+				// zhy: 记录当前打开下拉框的字段名。
+				openSelectorField: '',
+				// zhy: 保存新增和编辑页已展开的字段分组。
+				expandedGroupKeys: [],
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
 				formLoadId: 0
 			}
@@ -227,6 +252,9 @@
 			},
 			groups() {
 				return this.definition ? this.definition.groups : []
+			},
+			isEditableMode() {
+				return this.mode === 'Add' || this.mode === 'Edit'
 			},
 			childFields() {
 				return this.showRelated && this.definition ? this.definition.childFields || [] : []
@@ -280,12 +308,14 @@
 		onUnload() {
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
 			this.formLoadId += 1
+			this.openSelectorField = ''
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
 			async loadForm(refresh = false) {
 				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
 				const loadId = ++this.formLoadId
+				this.openSelectorField = ''
 				if (!this.tableName) {
 					this.error = '缺少表单名称'
 					this.loading = false
@@ -356,6 +386,8 @@
 					})
 					// zhy: 核心定义和记录成功后立即结束整页骨架屏，选项数据在页面显示后补齐。
 					this.definition = definition
+					// zhy: 初始化新增和编辑页的字段分组折叠状态。
+					this.initializeGroupExpansion(definition.groups || [])
 					this.loading = false
 					await this.$nextTick()
 					// 必须更新页面持有的响应式定义。直接修改上面的原始 definition 会绕过
@@ -380,6 +412,43 @@
 			},
 			isReadonly(field) {
 				return this.mode === 'View' || !field.editable
+			},
+			// zhy: 使用名称和序号生成稳定的分组折叠标识。
+			groupKey(group, groupIndex) {
+				return `${String(group && group.name || 'group')}:${groupIndex}`
+			},
+			isGroupExpanded(group, groupIndex) {
+				if (!this.isEditableMode) return true
+				return this.expandedGroupKeys.includes(this.groupKey(group, groupIndex))
+			},
+			initializeGroupExpansion(groups) {
+				if (!this.isEditableMode || !groups.length) {
+					this.expandedGroupKeys = []
+					return
+				}
+				// zhy: 新增和编辑页默认展开第一项，其余字段分组保持收起。
+				this.expandedGroupKeys = [this.groupKey(groups[0], 0)]
+			},
+			toggleGroup(group, groupIndex) {
+				if (!this.isEditableMode) return
+				const key = this.groupKey(group, groupIndex)
+				const expanded = this.expandedGroupKeys.includes(key)
+				this.expandedGroupKeys = expanded
+					? this.expandedGroupKeys.filter((item) => item !== key)
+					: [...this.expandedGroupKeys, key]
+				// zhy: 收起包含已打开下拉框的分组时同步恢复页面层级。
+				if (expanded && this.isSelectorGroupOpen(group)) this.openSelectorField = ''
+			},
+			// zhy: 必填校验失败时自动展开对应分组，方便用户直接补充字段。
+			expandFirstInvalidGroup() {
+				const groupIndex = this.groups.findIndex((group) =>
+					group.fields.some((field) => Boolean(validateNativeForm(this.form, [field])))
+				)
+				if (groupIndex < 0) return
+				const key = this.groupKey(this.groups[groupIndex], groupIndex)
+				if (!this.expandedGroupKeys.includes(key)) {
+					this.expandedGroupKeys = [...this.expandedGroupKeys, key]
+				}
 			},
 			handleRelatedChange() {
 				this.form = {
@@ -440,8 +509,34 @@
 			async handleNativeFieldSelect(payload) {
 				await handleTenantFormFieldSelect(this.tenantFormContext(), payload)
 			},
+			async handleNativeFieldChange(field, value) {
+				await handleTenantFormFieldChange(this.tenantFormContext(), {
+					field,
+					value
+				})
+			},
+			// zhy: 根据下拉开关状态提升或恢复对应表单分组。
+			handleSelectorToggle(field, open) {
+				const fieldName = String(field && field.Name || '')
+				if (open) {
+					this.openSelectorField = fieldName
+				} else if (this.openSelectorField === fieldName) {
+					this.openSelectorField = ''
+				}
+			},
+			isSelectorGroupOpen(group) {
+				if (!this.openSelectorField || !group || !Array.isArray(group.fields)) return false
+				return group.fields.some((field) => field.Name === this.openSelectorField)
+			},
 			async submit() {
 				if (this.saving) return
+				const validationError = validateNativeForm(this.form, this.definition ? this.definition.fields : [])
+				if (validationError) {
+					this.expandFirstInvalidGroup()
+					await this.$nextTick()
+					uni.showToast({ title: validationError, icon: 'none' })
+					return
+				}
 				const busyMessage = tenantFormBusyMessage(this.tenantFormContext())
 				if (busyMessage) {
 					uni.showToast({
@@ -523,6 +618,11 @@
 <style scoped>
 	.native-form-page {
 		--form-control-height: 82rpx;
+	}
+
+	/* zhy: 下拉打开时让正文高于固定底栏和 AI 悬浮入口。 */
+	.native-form-page--select-open :deep(.mci-page-shell__body) {
+		z-index: 1000;
 	}
 
 	.edit-command {
@@ -666,6 +766,8 @@
 	}
 
 	.form-section {
+		position: relative;
+		z-index: 0;
 		margin-bottom: 20rpx;
 		background: var(--mci-bg-card, #fff);
 		border: 1px solid var(--mci-border, #e4ecef);
@@ -674,15 +776,74 @@
 		animation: mciNativeFormEnter .32s ease both;
 	}
 
+	/* zhy: 解除当前卡片裁切及动画层叠上下文。 */
+	.form-section--select-open {
+		z-index: 100;
+		overflow: visible;
+		animation: none;
+		transform: none;
+	}
+
 	.form-section__header {
 		height: 84rpx;
 		display: flex;
 		align-items: center;
+		justify-content: space-between;
 		gap: 14rpx;
 		padding: 0 24rpx;
-		border-bottom: 1px solid var(--mci-border, #e7eef0);
+		border-bottom: 0;
 		font-size: 29rpx;
 		font-weight: 700;
+		transition: background-color .16s ease, opacity .16s ease;
+	}
+
+	.form-section__header.expanded {
+		border-bottom: 1px solid var(--mci-border, #e7eef0);
+	}
+
+	.form-section__header--pressed {
+		background: var(--mci-bg-muted, #f4f8fa);
+		opacity: .82;
+	}
+
+	.form-section__heading {
+		min-width: 0;
+		display: flex;
+		align-items: center;
+		gap: 14rpx;
+	}
+
+	.form-section__title {
+		min-width: 0;
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.form-section__count {
+		flex: none;
+		color: var(--mci-text-tertiary, #84969d);
+		font-size: 21rpx;
+		font-weight: 500;
+	}
+
+	.form-section__toggle {
+		flex: none;
+		color: #80969e;
+		font-size: 42rpx;
+		line-height: 1;
+		transform: rotate(90deg);
+		transition: transform .18s ease;
+	}
+
+	.form-section__toggle.expanded {
+		transform: rotate(-90deg);
+	}
+
+	/* zhy: 展开字段分组时使用克制动效，保持与子表折叠交互一致。 */
+	.form-section__content {
+		animation: mciFormSectionExpand .18s ease both;
 	}
 
 	.form-section__bar {
@@ -693,8 +854,14 @@
 	}
 
 	.form-field {
+		position: relative;
 		padding: 24rpx;
 		border-bottom: 1px solid #edf2f4;
+	}
+
+	/* zhy: 保证当前字段中的下拉浮层高于同组其它字段。 */
+	.form-field--select-open {
+		z-index: 101;
 	}
 
 	.form-field:last-child {
@@ -1058,9 +1225,25 @@
 		}
 	}
 
+	@keyframes mciFormSectionExpand {
+		from {
+			opacity: 0;
+			transform: translateY(-6rpx);
+		}
+
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
 	@media (prefers-reduced-motion: reduce) {
-		.form-section {
+		.form-section,
+		.form-section__header,
+		.form-section__toggle,
+		.form-section__content {
 			animation: none;
+			transition: none;
 		}
 	}
 </style>

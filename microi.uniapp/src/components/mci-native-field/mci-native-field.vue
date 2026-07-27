@@ -213,7 +213,8 @@ export default {
     moduleEngineKey: { type: String, default: '' },
     tableChildAuth: { type: Object, default: null }
   },
-  emits: ['update:modelValue', 'change', 'select'],
+  // zhy: 通知表单页同步下拉框的打开状态，便于提升外层卡片层级。
+  emits: ['update:modelValue', 'change', 'select', 'selector-toggle'],
   data() {
     return {
       tagDraft: '',
@@ -349,6 +350,9 @@ export default {
   },
   beforeUnmount() {
     if (this.searchTimer) clearTimeout(this.searchTimer)
+    // zhy: 分组折叠销毁控件时终止尚未完成的下拉选项请求。
+    this.selectorOpen = false
+    this.optionRequestId += 1
   },
   methods: {
     emitValue(value) { this.$emit('update:modelValue', value); this.$emit('change', value) },
@@ -415,6 +419,8 @@ export default {
       this.optionFinished = false
       this.optionError = ''
       this.initializeDraftSelection()
+      // zhy: 下拉打开后让所在表单卡片解除裁切并显示在最上层。
+      this.$emit('selector-toggle', true)
       this.$nextTick(() => this.updateSelectorPlacement())
       await this.loadOptionPage(true)
     },
@@ -431,7 +437,10 @@ export default {
       }
     },
     closeSelector() {
+      if (!this.selectorOpen) return
       this.selectorOpen = false
+      // zhy: 下拉关闭后恢复表单卡片原有层级。
+      this.$emit('selector-toggle', false)
       this.optionRequestId += 1
       if (this.searchTimer) {
         clearTimeout(this.searchTimer)
