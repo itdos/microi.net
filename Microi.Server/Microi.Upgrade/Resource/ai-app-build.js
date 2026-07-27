@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.2.9
+ * Version: v1.3.7
  * Function:
- * - 封版应用真实编译产物；所有 HTML 按当前租户注入运行时上下文，其余资产优先复用分批公有文件。
+ * - AI 应用编译发布引擎：校验真实编译产物，将每个版本发布到不可变历史目录，同时原子提升无版本固定入口为最新版本；支持 VS Code 仅发布应用商城和固定最新版修复。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -14,6 +14,12 @@ function text(value, fallback) {
 }
 function isBlank(value) { return text(value).replace(/^\s+|\s+$/g, "") === ""; }
 function now() { return DateNow("yyyy-MM-dd HH:mm:ss"); }
+function toArray(value) {
+  var list = [];
+  if (!value || value.length === undefined) return list;
+  for (var i = 0; i < value.length; i++) list.push(value[i]);
+  return list;
+}
 
 /* TENANT_RUNTIME_CONTEXT_V1 */
 function runtimeContextJson() {
@@ -201,7 +207,7 @@ function ensureAppKey(app) {
 function getApp(appId) {
   return V8.FormEngine.GetFormData("sys_microistore", {
     _Where: [["Id", "=", appId]],
-    _SelectFields: ["Id", "Name", "AppKey", "AppType", "Description", "Status", "OwnerUserId", "OwnerName", "CurrentVersion", "PreviewUrl", "PublicPublishPath", "PrivateSourcePath", "BuildStatus", "LastBuildTaskId", "LastBuildMsg", "CreateTime", "UpdateTime"]
+    _SelectFields: ["Id", "Name", "AppKey", "AppType", "ApplicationType", "Description", "AppPreview", "Status", "OwnerUserId", "OwnerName", "CurrentVersion", "PreviewUrl", "PublicPublishPath", "PrivateSourcePath", "BuildStatus", "LastBuildTaskId", "LastBuildMsg", "CreateTime", "UpdateTime"]
   });
 }
 function getFiles(appId) {
@@ -229,6 +235,15 @@ function readFileBase64(file) {
   if (!response || !response.RawBytes) return fail("下载源码文件失败：" + file.FilePath);
   return ok(System.Convert.ToBase64String(response.RawBytes));
 }
+function readPublishedBase64(path) {
+  if (isBlank(path)) return fail("公有编译文件地址为空");
+  var url = /^https?:\/\//i.test(text(path)) ? text(path) : publicDomainUrl(path);
+  if (isBlank(url)) url = getFileUrl(path, false);
+  if (isBlank(url)) return fail("读取公有编译文件地址失败");
+  var response = V8.Http.GetResponse({ Url: url, Timeout: 120 });
+  if (!response || !response.RawBytes) return fail("下载公有编译文件失败：" + path);
+  return ok(System.Convert.ToBase64String(response.RawBytes));
+}
 function findBuildRoot(files) {
   var roots = ["dist/", "build/", "unpackage/dist/build/h5/"];
   for (var r = 0; r < roots.length; r++) {
@@ -239,59 +254,178 @@ function findBuildRoot(files) {
   }
   return "";
 }
-function stablePublishFilePath(appKey, relativePath) {
-  return text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + text(appKey) + "/" + normalizePath(relativePath);
+function stablePublishFilePath(appKey, relativePath, versionNo) {
+  var versionRoot = isBlank(versionNo) ? "" : "/versions/" + normalizePath(versionNo);
+  return text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + text(appKey) + versionRoot + "/" + normalizePath(relativePath);
 }
-function publishCompiledFiles(files, buildRoot, appKey) {
-  var publishRoot = "ai-app-publish/" + appKey;
+function publishTextAsset(uploadRoot, appKey, relativePath, versionNo, content) {
+  var upload = uploadText(uploadRoot, relativePath, content, false);
+  if (!upload || upload.Code !== 1) return upload || fail("发布 HTML 失败");
+  var uploadedPath = upload.Data ? upload.Data.HdfsPath || "" : "";
+  var targetPath = stablePublishFilePath(appKey, relativePath, versionNo);
+  var moveResult = movePublicObject(uploadedPath, targetPath);
+  return ok({ Path: moveResult && moveResult.Code === 1 ? targetPath : uploadedPath, Move: moveResult });
+}
+function publishBase64Asset(uploadRoot, appKey, relativePath, versionNo, base64) {
+  var upload = uploadBase64(uploadRoot, relativePath, base64, false);
+  if (!upload || upload.Code !== 1) return upload || fail("发布编译产物失败");
+  var uploadedPath = upload.Data ? upload.Data.HdfsPath || "" : "";
+  var targetPath = stablePublishFilePath(appKey, relativePath, versionNo);
+  var moveResult = movePublicObject(uploadedPath, targetPath);
+  return ok({ Path: moveResult && moveResult.Code === 1 ? targetPath : uploadedPath, Move: moveResult });
+}
+function publishCompiledFiles(files, buildRoot, appKey, versionNo) {
+  // 历史版本与固定最新版各保留一份。非入口资产先发布，index.html 最后切换，
+  // 防止用户在发布瞬间读到引用尚未就绪的新入口。
+  var versionSegment = isBlank(versionNo) ? "" : "/versions/" + normalizePath(versionNo);
+  var versionPublishRoot = "ai-app-publish/" + appKey + versionSegment;
+  var latestPublishRoot = "ai-app-publish/" + appKey;
   var assets = [];
   var entryPath = "";
+  var versionEntryPath = "";
   var totalSize = 0;
-  for (var i = 0; i < files.length; i++) {
-    var sourcePath = normalizePath(files[i].FilePath);
-    if (parseInt(files[i].IsDirectory || 0) === 1 || sourcePath.toLowerCase().indexOf(buildRoot) !== 0) continue;
-    var relativePath = sourcePath.substring(buildRoot.length);
-    if (isBlank(relativePath)) continue;
-    /* REUSE_BATCHED_PUBLIC_BUILD_V1 */
-    var isEntry = relativePath.toLowerCase() === "index.html";
-    var isHtml = /\.html$/i.test(relativePath);
-    var publishedPath = isHtml ? "" : text(files[i].PublishHdfsPath);
-    if (isHtml) {
-      var htmlContent = readText(files[i].HdfsPath, true);
-      if (!htmlContent || htmlContent.Code !== 1) return htmlContent || fail("读取编译 HTML 失败");
-      var publishedHtml = injectRuntimeContext(htmlContent.Data);
-      var htmlUpload = uploadText(publishRoot, relativePath, publishedHtml, false);
-      if (!htmlUpload || htmlUpload.Code !== 1) return htmlUpload || fail("发布编译 HTML 失败");
-      var htmlUploadedPath = htmlUpload.Data ? htmlUpload.Data.HdfsPath || "" : "";
-      var htmlStablePath = stablePublishFilePath(appKey, relativePath);
-      var htmlMoveResult = movePublicObject(htmlUploadedPath, htmlStablePath);
-      publishedPath = htmlMoveResult && htmlMoveResult.Code === 1 ? htmlStablePath : htmlUploadedPath;
-    } else if (isBlank(publishedPath)) {
-      var base64Result = readFileBase64(files[i]);
-      if (!base64Result || base64Result.Code !== 1) return base64Result || fail("读取编译产物失败");
-      var upload = uploadBase64(publishRoot, relativePath, base64Result.Data, false);
-      if (!upload || upload.Code !== 1) return upload || fail("发布编译产物失败");
-      var uploadedPath = upload.Data ? upload.Data.HdfsPath || "" : "";
-      var stablePath = stablePublishFilePath(appKey, relativePath);
-      var moveResult = movePublicObject(uploadedPath, stablePath);
-      publishedPath = moveResult && moveResult.Code === 1 ? stablePath : uploadedPath;
+  for (var pass = 0; pass < 2; pass++) {
+    for (var i = 0; i < files.length; i++) {
+      var sourcePath = normalizePath(files[i].FilePath);
+      if (parseInt(files[i].IsDirectory || 0) === 1 || sourcePath.toLowerCase().indexOf(buildRoot) !== 0) continue;
+      var relativePath = sourcePath.substring(buildRoot.length);
+      if (isBlank(relativePath)) continue;
+      var isEntry = relativePath.toLowerCase() === "index.html";
+      if ((pass === 0 && isEntry) || (pass === 1 && !isEntry)) continue;
+      var isHtml = /\.html$/i.test(relativePath);
+      var versionResult;
+      var latestResult;
+      if (isHtml) {
+        var htmlContent = readText(files[i].HdfsPath, true);
+        if (!htmlContent || htmlContent.Code !== 1) return htmlContent || fail("读取编译 HTML 失败");
+        var publishedHtml = injectRuntimeContext(htmlContent.Data);
+        versionResult = publishTextAsset(versionPublishRoot, appKey, relativePath, versionNo, publishedHtml);
+        if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布历史版本 HTML 失败");
+        latestResult = publishTextAsset(latestPublishRoot, appKey, relativePath, "", publishedHtml);
+      } else {
+        var base64Result = readFileBase64(files[i]);
+        if (!base64Result || base64Result.Code !== 1) return base64Result || fail("读取编译产物失败");
+        versionResult = publishBase64Asset(versionPublishRoot, appKey, relativePath, versionNo, base64Result.Data);
+        if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布历史版本资产失败");
+        latestResult = publishBase64Asset(latestPublishRoot, appKey, relativePath, "", base64Result.Data);
+      }
+      if (!latestResult || latestResult.Code !== 1) return latestResult || fail("发布固定最新版资产失败");
+      var versionPath = versionResult.Data ? versionResult.Data.Path || "" : "";
+      var latestPath = latestResult.Data ? latestResult.Data.Path || "" : "";
+      V8.FormEngine.UptFormData("mci_ai_app_file", {
+        Id: files[i].Id,
+        PublishHdfsPath: latestPath,
+        StorageScope: "PrivateSource+PublicBuild"
+      });
+      if (isEntry) {
+        entryPath = latestPath;
+        versionEntryPath = versionPath;
+      }
+      totalSize += parseInt(files[i].Size || 0);
+      assets.push({
+        Path: relativePath,
+        FilePathName: versionPath,
+        StableFilePathName: latestPath,
+        Size: parseInt(files[i].Size || 0),
+        IsEntry: isEntry
+      });
     }
-    V8.FormEngine.UptFormData("mci_ai_app_file", {
-      Id: files[i].Id,
-      PublishHdfsPath: publishedPath,
-      StorageScope: "PrivateSource+PublicBuild"
-    });
-    if (isEntry) entryPath = publishedPath;
-    totalSize += parseInt(files[i].Size || 0);
-    assets.push({
-      Path: relativePath,
-      FilePathName: publishedPath,
-      Size: parseInt(files[i].Size || 0),
-      IsEntry: isEntry
-    });
   }
   if (isBlank(entryPath)) return fail("真实编译产物缺少 index.html");
-  return ok({ EntryPath: entryPath, Assets: assets, AssetCount: assets.length, TotalSize: totalSize });
+  return ok({ EntryPath: entryPath, VersionEntryPath: versionEntryPath, Assets: assets, AssetCount: assets.length, TotalSize: totalSize });
+}
+function upsertPublishedBuildFile(app, relativePath, source, versionPath, latestPath) {
+  var filePath = "dist/" + normalizePath(relativePath);
+  var existing = V8.FormEngine.GetFormData("mci_ai_app_file", {
+    _Where: [["AppId", "=", app.Id], ["AND", "FilePath", "=", filePath]],
+    _PageSize: 1
+  });
+  var row = {
+    AppId: app.Id,
+    AppName: app.Name || "",
+    FilePath: filePath,
+    FileName: fileNameOf(relativePath),
+    FileType: fileNameOf(relativePath).indexOf(".") >= 0 ? fileNameOf(relativePath).split(".").pop().toLowerCase() : "bin",
+    HdfsPath: versionPath,
+    PublishHdfsPath: latestPath,
+    StorageScope: "PrivateSource+PublicBuild",
+    ContentHash: source.sha256 || source.Sha256 || source.hash || source.Hash || "",
+    Size: parseInt(source.size || source.Size || 0),
+    IsDirectory: 0,
+    Version: 1
+  };
+  if (existing && existing.Code === 1 && existing.Data && existing.Data.Id) {
+    row.Id = existing.Data.Id;
+    return V8.FormEngine.UptFormData("mci_ai_app_file", row);
+  }
+  return V8.FormEngine.AddFormData("mci_ai_app_file", row);
+}
+function promoteStoreAssets(app, appKey, versionNo, rawAssets) {
+  var sourceAssets = toArray(rawAssets);
+  if (!sourceAssets.length) return fail("Assets不能为空");
+  var versionRoot = "ai-app-publish/" + appKey + "/versions/" + normalizePath(versionNo);
+  var latestRoot = "ai-app-publish/" + appKey;
+  var promoted = [];
+  var latestEntry = "";
+  var versionEntry = "";
+  for (var pass = 0; pass < 2; pass++) {
+    for (var i = 0; i < sourceAssets.length; i++) {
+      var source = sourceAssets[i] || {};
+      var relativePath = normalizePath(source.path || source.Path || source.fileName || source.FileName);
+      if (isBlank(relativePath)) continue;
+      var isEntry = source.isEntry === 1 || source.IsEntry === 1 || source.isEntry === true || source.IsEntry === true || relativePath.toLowerCase() === "index.html";
+      if ((pass === 0 && isEntry) || (pass === 1 && !isEntry)) continue;
+      var sourcePath = text(source.filePathName || source.FilePathName || source.hdfsPath || source.HdfsPath || source.url || source.Url);
+      if (isBlank(sourcePath)) return fail("编译资产缺少公有文件地址：" + relativePath);
+      var versionResult;
+      var latestResult;
+      if (/\.html?$/i.test(relativePath)) {
+        var htmlResult = readPublishedBase64(sourcePath);
+        if (!htmlResult || htmlResult.Code !== 1) return htmlResult || fail("读取商城 HTML 失败");
+        var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(htmlResult.Data));
+        html = injectRuntimeContext(html);
+        versionResult = publishTextAsset(versionRoot, appKey, relativePath, versionNo, html);
+        if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布商城历史 HTML 失败");
+        latestResult = publishTextAsset(latestRoot, appKey, relativePath, "", html);
+      } else {
+        var base64Result = readPublishedBase64(sourcePath);
+        if (!base64Result || base64Result.Code !== 1) return base64Result || fail("读取商城编译资产失败");
+        versionResult = publishBase64Asset(versionRoot, appKey, relativePath, versionNo, base64Result.Data);
+        if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布商城历史资产失败");
+        latestResult = publishBase64Asset(latestRoot, appKey, relativePath, "", base64Result.Data);
+      }
+      if (!latestResult || latestResult.Code !== 1) return latestResult || fail("发布商城固定最新版失败");
+      var versionPath = versionResult.Data ? versionResult.Data.Path || "" : "";
+      var latestPath = latestResult.Data ? latestResult.Data.Path || "" : "";
+      var fileUpdate = upsertPublishedBuildFile(app, relativePath, source, versionPath, latestPath);
+      if (!fileUpdate || fileUpdate.Code !== 1) return fileUpdate || fail("写入商城编译资产元数据失败");
+      promoted.push({
+        Path: relativePath,
+        FilePathName: versionPath,
+        StableFilePathName: latestPath,
+        Size: parseInt(source.size || source.Size || 0),
+        Sha256: source.sha256 || source.Sha256 || source.hash || source.Hash || "",
+        IsEntry: isEntry
+      });
+      if (isEntry) {
+        versionEntry = versionPath;
+        latestEntry = latestPath;
+      }
+    }
+  }
+  if (isBlank(latestEntry)) return fail("编译资产缺少 index.html");
+  var latestUrl = publicDomainUrl(latestEntry);
+  if (isBlank(latestUrl)) latestUrl = getFileUrl(latestEntry, false);
+  var versionUrl = publicDomainUrl(versionEntry);
+  if (isBlank(versionUrl)) versionUrl = getFileUrl(versionEntry, false);
+  return ok({
+    PreviewUrl: latestUrl,
+    VersionPreviewUrl: versionUrl,
+    PublishPath: latestEntry,
+    VersionPublishPath: versionEntry,
+    Assets: promoted,
+    AssetCount: promoted.length
+  });
 }
 function latestVersion(appId, versionNo) {
   var where = [["AppId", "=", appId]];
@@ -543,6 +677,76 @@ var appId = text(V8.Param.AppId || V8.Param.ProjectId);
 if (isBlank(appId)) return fail("AppId不能为空");
 var app = getApp(appId);
 if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI应用不存在" };
+var requestedAction = text(V8.Param.Action || "Build");
+if (requestedAction === "PromoteStoreAssets") {
+  var promotedAppKey = ensureAppKey(app.Data);
+  var promotedVersionNo = normalizeVersion(V8.Param.VersionNo || V8.Param.AppVersion || app.Data.CurrentVersion || 1);
+  var promotedResult = promoteStoreAssets(app.Data, promotedAppKey, promotedVersionNo, V8.Param.Assets);
+  if (!promotedResult || promotedResult.Code !== 1) return promotedResult || fail("商城编译资产发布失败");
+  return ok({
+    AppId: appId,
+    AppKey: promotedAppKey,
+    VersionNo: promotedVersionNo,
+    PreviewUrl: promotedResult.Data.PreviewUrl,
+    VersionPreviewUrl: promotedResult.Data.VersionPreviewUrl,
+    PublishPath: promotedResult.Data.PublishPath,
+    VersionPublishPath: promotedResult.Data.VersionPublishPath,
+    Assets: promotedResult.Data.Assets,
+    AssetCount: promotedResult.Data.AssetCount
+  }, "商城编译资产已发布到固定最新版与历史版本目录");
+}
+if (requestedAction === "RepairStableLatest") {
+  var repairLatest = latestVersion(appId);
+  var repairVersionNo = repairLatest && repairLatest.Code === 1 && repairLatest.Data && repairLatest.Data.length
+    ? text(repairLatest.Data[0].VersionNo)
+    : normalizeVersion(app.Data.CurrentVersion || 1);
+  var repairAppKey = ensureAppKey(app.Data);
+  var repairResult = null;
+  // 修复必须以版本表记录的最新不可变资产为事实源，不能拿 mci_ai_app_file.HdfsPath
+  // 中可能残留的旧构建覆盖根入口。
+  if (repairLatest && repairLatest.Code === 1 && repairLatest.Data && repairLatest.Data.length) {
+    var repairBuildLog = {};
+    try { repairBuildLog = JSON.parse(text(repairLatest.Data[0].BuildLog)); } catch (repairLogError) { repairBuildLog = {}; }
+    var repairVersionAssets = toArray(repairBuildLog.Assets);
+    if (repairVersionAssets.length) {
+      repairResult = promoteStoreAssets(app.Data, repairAppKey, repairVersionNo, repairVersionAssets);
+    }
+  }
+  if (!repairResult) {
+    var repairFilesResult = getFiles(appId);
+    if (!repairFilesResult || repairFilesResult.Code !== 1) return repairFilesResult || fail("读取源码失败");
+    var repairFiles = repairFilesResult.Data || [];
+    var repairBuildRoot = findBuildRoot(repairFiles);
+    if (isBlank(repairBuildRoot)) return fail("当前应用没有可修复的真实编译产物");
+    repairResult = publishCompiledFiles(repairFiles, repairBuildRoot, repairAppKey, repairVersionNo);
+  }
+  if (!repairResult || repairResult.Code !== 1) return repairResult || fail("固定最新版入口修复失败");
+  var repairPublicPath = repairResult.Data.PublishPath || repairResult.Data.EntryPath;
+  var repairUrl = publicDomainUrl(repairPublicPath);
+  if (isBlank(repairUrl)) repairUrl = getFileUrl(repairPublicPath, false);
+  var repairRow = {
+    Id: appId,
+    PreviewUrl: repairUrl,
+    PublicPublishPath: repairPublicPath,
+    LastBuildMsg: "已同步固定最新版入口，历史版本 " + repairVersionNo + " 保持可访问。",
+    UpdateTime: now()
+  };
+  var previewVersionSegment = "/versions/" + normalizePath(repairVersionNo) + "/";
+  if (!isBlank(app.Data.AppPreview) && text(app.Data.AppPreview).indexOf(previewVersionSegment) >= 0) {
+    repairRow.AppPreview = text(app.Data.AppPreview).replace(previewVersionSegment, "/");
+  }
+  var repairUpdate = V8.FormEngine.UptFormData("sys_microistore", repairRow);
+  if (!repairUpdate || repairUpdate.Code !== 1) return repairUpdate || fail("固定最新版入口已上传，但商城记录更新失败");
+  return ok({
+    AppId: appId,
+    AppKey: repairAppKey,
+    VersionNo: repairVersionNo,
+    PreviewUrl: repairUrl,
+    PublishPath: repairPublicPath,
+    VersionPublishPath: repairResult.Data.VersionPublishPath || repairResult.Data.VersionEntryPath,
+    AssetCount: repairResult.Data.AssetCount
+  }, "固定最新版入口已修复，历史版本保持不变");
+}
 if (text(app.Data.AppType) === "MicroService") {
   if (isBlank(app.Data.PreviewUrl)) return fail("微服务尚未生成编译产物，请先通过 MCP 或 VS Code 完成首次编译发布。");
   return ok({
@@ -570,16 +774,19 @@ var previewHtml = "";
 var publicPath = "";
 var versionPath = "";
 var url = "";
+var versionUrl = "";
 var buildMode = "LegacyGeneratedPreview";
 var compiledAssets = null;
 if (!isBlank(buildRoot)) {
-  var compiledResult = publishCompiledFiles(files, buildRoot, appKey);
+  var compiledResult = publishCompiledFiles(files, buildRoot, appKey, versionNo);
   if (!compiledResult || compiledResult.Code !== 1) return compiledResult || fail("真实编译产物发布失败");
   compiledAssets = compiledResult.Data;
   publicPath = compiledAssets.EntryPath;
-  versionPath = publicPath;
+  versionPath = compiledAssets.VersionEntryPath || publicPath;
   url = publicDomainUrl(publicPath);
   if (isBlank(url)) url = getFileUrl(publicPath, false);
+  versionUrl = publicDomainUrl(versionPath);
+  if (isBlank(versionUrl)) versionUrl = getFileUrl(versionPath, false);
   buildMode = "CompiledAssets";
 } else {
   previewHtml = injectRuntimeContext(compilePreviewHtml(files, app.Data));
@@ -594,6 +801,8 @@ if (!isBlank(buildRoot)) {
   url = publicDomainUrl(publicPath);
   if (isBlank(url)) url = getFileUrl(publicPath, false);
   if (isBlank(url)) url = previewUrl(appId, versionNo);
+  versionUrl = publicDomainUrl(versionPath);
+  if (isBlank(versionUrl)) versionUrl = getFileUrl(versionPath, false);
 }
 var fileCount = 0;
 var totalSize = 0;
@@ -610,7 +819,7 @@ var version = V8.FormEngine.AddFormData("mci_ai_app_version", {
   Status: "Published",
   SourceSnapshotPath: app.Data.PrivateSourcePath || ("ai-app-source/" + appId),
   PublishPath: versionPath || publicPath || versionRoot,
-  PreviewUrl: url,
+  PreviewUrl: versionUrl || url,
   BuildTaskId: "",
   BuildLog: buildMode === "CompiledAssets" ? JSON.stringify({ Mode: buildMode, AssetCount: compiledAssets.AssetCount, TotalSize: compiledAssets.TotalSize, Assets: compiledAssets.Assets }) : previewHtml,
   ChangeSummary: text(V8.Param.ChangeSummary || (app.Data.AppType === "Web" ? "Web 应用服务端发布" : "UniApp H5 预览编译发布")),

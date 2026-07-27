@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.5.3
+ * Version: v1.5.4
  * Function:
- * - 统一使用 sys_microistore 发布应用商城包；按 source/build 角色生成根目录正确的可编译源码 ZIP 与完整真实 dist ZIP，并保留可移植安装所需表、接口和版本元数据。
+ * - 统一使用 sys_microistore 发布应用商城包；按 source/build 角色生成根目录正确的可编译源码 ZIP 与完整真实 dist ZIP；支持微服务仅发布商城而不预先写入 sys_microiservice，并保留可移植安装所需元数据。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -375,6 +375,14 @@ if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) return fail('不支�
 var versionsResult = getLatestVersion(app.Id);
 var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResult.Data && versionsResult.Data.length ? versionsResult.Data[0] : null;
 var runtime = appType === 'MicroService' ? getMicroService(app.AppKey) : { Service: null, Pages: [] };
+// 商城发布与官方库运行态安装必须解耦。本地开发者可以直接提交构建 ZIP、
+// 微服务元数据和路由，而不必先向发布库写入 sys_microiservice。
+if (appType === 'MicroService' && (!runtime || !runtime.Service) && V8.Param.MicroService) {
+  runtime = {
+    Service: V8.Param.MicroService,
+    Pages: parseArray(V8.Param.Routes || V8.Param.Pages)
+  };
+}
 var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
 var returnPackageModel = V8.Param.ReturnPackageModel === true || V8.Param.ReturnPackageModel === 1 || text(V8.Param.ReturnPackageModel).toLowerCase() === 'true';
 var action = text(V8.Param.Action || 'Package');

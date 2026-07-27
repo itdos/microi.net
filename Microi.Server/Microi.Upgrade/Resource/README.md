@@ -27,13 +27,15 @@
 node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs
 ```
 
-需要把本地合并结果发布到 iTdos 官网时，令牌只通过环境变量注入，不得写入仓库：
+需要把本地合并结果发布到 iTdos 官网时，CI/无人值守环境优先通过环境变量注入令牌，不得写入仓库：
 
 ```powershell
 $env:MICROI_UPGRADE_RESOURCE_TOKEN = '<iTdos 超级管理员 Token>'
 node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish
 Remove-Item Env:MICROI_UPGRADE_RESOURCE_TOKEN
 ```
+
+本地执行一键发布时，如果没有设置该环境变量，同步器会安全复用工作区中已配置并登录的 `microi_itdos` MCP。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，通过同一个官方接口引擎执行 `PublishBatch`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
 
 `Microi一键编译发布.sh` 的后端编译/发布模式会在 `dotnet build` 前自动执行同一条 `--publish` 命令。因此，本地资源或官网资源任一侧更新后，下一次后端发布都会先完成合并、官网写回（如有）、回读和基线更新；冲突、令牌缺失、并发哈希变化或回读不一致都会阻止后端发布。
 
@@ -58,7 +60,7 @@ https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos&Name=
 node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --initialize-base
 ```
 
-该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器与两个独立 JS 文件保持一致，不会访问或修改官网。
+该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器、构建器与三个独立 JS 文件保持一致，不会访问或修改官网。正式同步会把这些独立源码和商城包内嵌代码视为同一组逻辑副本：说明文字、换行或不同代码段的修改可自动合并，只有同一代码位置被改成不同实现时才阻止发布。`ai-app-build.js` 仍是随服务器发布的本地事实源，不扩入官网六项资源白名单。
 
 刷新后必须构建 `Microi.Upgrade`，确认五个运行期升级资源及随服务器发布的 `ai-app-build.js` 均已作为 `EmbeddedResource` 写入程序集；`official-resource-api.js` 是仅供维护发布链路同步官网接口的源码，不写入运行程序集。发布包运行时不依赖这些源码文件存在。
 

@@ -1,6 +1,6 @@
 ---
 name: microi-form-layout
-description: Microi 吾码低代码表单布局分组规范。用于通过 MCP、Manifest、VS Code 插件或 V8 引擎创建/优化 `diy_table` 和 `diy_field` 时，决定使用 `diy_table.Tabs` 表单全局 Tab、字段级 `Tabs` 控件、字段级 `CollapseGroup` 折叠分组，还是直接平铺字段。覆盖"何时分 Tab、何时分折叠分组、字段数判断阈值、JSON 配置示例、回读验收与回滚"。
+description: Microi 吾码低代码表单布局分组规范。用于通过 MCP、Manifest、VS Code 插件或 V8 引擎创建/优化 `diy_table` 和 `diy_field` 时，决定使用 `diy_table.Tabs` 表单全局 Tab、字段级 `Tabs` 控件、字段级 `CollapseGroup` 折叠分组，还是直接平铺字段。覆盖"何时分 Tab、何时分折叠分组、有效表单行判断阈值、JSON 配置示例、回读验收与回滚"。
 ---
 
 # Microi 表单布局分组规范（Tabs vs CollapseGroup）
@@ -15,34 +15,48 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 
 | 能力 | 存储位置 | 控件 | 核心作用 | 适用场景 |
 |------|---------|------|---------|---------|
-| **A. diy_table.Tabs（表级 Tab）** | `diy_table.Tabs`（JSON 字符串） | 表单顶部 Tab 条 | 把整张表的字段切到不同 Tab 中，**同屏只能看一个 Tab** | 单个 Tab 内**字段数 ≥ 8**，且 Tab 之间字段**业务强隔离**（基础信息 vs 业务明细 vs 附件） |
+| **A. diy_table.Tabs（表级 Tab）** | `diy_table.Tabs`（JSON 字符串） | 表单顶部 Tab 条 | 把整张表的字段切到不同 Tab 中，**同屏只能看一个 Tab** | 表单整体很长，单个 Tab 通常占 **≥6 个有效表单行**，且 Tab 之间字段**业务强隔离**（扫码操作 vs 单据信息、主数据 vs 大型子表） |
 | **B. 字段级 Tabs 控件** | `diy_field.Component='Tabs'` + `Config.FieldTabs` | 字段本身就是 Tab 容器 | 多个 Tab 字段组合嵌套，**同屏只能看一个 Tab** | 同一张表内需要二级 Tab，或 Tab 内容互相独立 |
-| **C. 字段级 CollapseGroup（折叠分组）** | `diy_field.Component='CollapseGroup'` + `Config.CollapseGroup` | 字段是折叠面板标题 | **所有分组可在同一页面展开**，用户一屏看到全部标题和分组字段 | Tab 内**字段数 ≤ 7** 的小分组（次要信息、可选信息、补充信息） |
-| **D. 不分组（默认平铺）** | 无 | — | 全部字段在第一屏 | 表单字段总数 ≤ 12，且没有明显业务分组 |
+| **C. 字段级 CollapseGroup（折叠分组）** | `diy_field.Component='CollapseGroup'` + `Config.CollapseGroup` | 字段是折叠面板标题 | **所有分组可在同一页面展开**，用户一屏看到全部标题和分组字段 | 只占 **≤5 个有效表单行** 的小分组（短字段即使有 8~10 个，也常只占 4~5 行） |
+| **D. 不分组（默认平铺）** | 无 | — | 全部字段在第一屏 | 总有效表单行 ≤ 6、没有复杂控件，且没有必须强调的业务分组 |
 
 ## 2. 黄金决策流程（AI 必须按此顺序判断）
+
+### 2.1 先算“有效表单行”，禁止只数字段
+
+字段数不能直接代表视觉高度。AI 必须按 `diy_table.Column` 估算每组字段占用的有效表单行：
+
+- 普通 Text / Select / NumberText / DateTime 等短控件：占 `1 / Column` 行；双列布局中 8 个短字段约为 4 行。
+- `FormWidth=24` 或 Textarea / RichText / FileUpload / ImgUpload / Map：每个至少占 1 行。
+- TableChild / CodeEditor / DevComponent / 大型 JsonTable：视为独立任务区，不能按普通字段数压缩。
+- 隐藏字段、Id、纯布局控件不计入视觉行数，但必须保留其排序和业务配置。
+
+**表级 Tab 的默认准入条件**：表单总有效行通常大于 12 行，并且至少两个 Tab 各自达到 6 个有效行；否则优先平铺或 CollapseGroup。字段达到 8 个不再自动获得独立 Tab 资格。
+
+**强任务隔离例外**：扫码/报工/质检操作区、可独立滚动的大型子表、运行测试、代码编辑、工作流事件等即使行数较少，也可以保留 Tab，因为切换代表任务模式而不是装饰性分组。
 
 ```
 开始
   ↓
-Q1: 表单总字段数（含 TableChild 子表、子表行字段）？
-  ├─ ≤ 12 → D. 不分组（默认平铺）。【不要为 ≤12 字段的表创建任何 Tab】
-  └─ 13 ~ 30
+Q1: 表单总有效行数与复杂控件？
+  ├─ ≤ 6 行且无复杂控件 → D. 不分组（默认平铺）
+  ├─ 7 ~ 12 行且无强任务隔离 → C. CollapseGroup 或平铺
+  └─ > 12 行，或存在复杂控件/强任务隔离
        ↓
        Q2: 字段是否能拆出 ≥ 2 个独立业务域（如"基础信息/明细/附件"）？
        ├─ 否 → D. 不分组，或用 CollapseGroup 把次要字段收起
        └─ 是
             ↓
-            Q3: 每个业务域字段数？
-            ├─ 全部 ≥ 8 → A. diy_table.Tabs（表级 Tab）
-            └─ 存在 ≤ 7 的小业务域
+            Q3: 每个业务域的有效表单行数？
+            ├─ 至少两个业务域均 ≥ 6 行 → A. diy_table.Tabs（表级 Tab）
+            └─ 存在 ≤ 5 行的小业务域
                  ↓
-                 混合方案：Tab 容纳大业务域（≥8 字段）+ CollapseGroup 收起小业务域（≤7 字段）
+                 混合方案：Tab 容纳大业务域（≥6 个有效行）+ CollapseGroup 收起小业务域（≤5 个有效行）
                  ↓
-                 注意：所有 Tab 内的 ≤7 字段小业务域，必须用 CollapseGroup 折叠分组
+                 注意：所有 Tab 内的 ≤5 个有效行小业务域，必须用 CollapseGroup 折叠分组
   ↓
-Q4: 总字段数 > 30？
-  ├─ 是 → 优先 A. diy_table.Tabs，每个 Tab 字段数控制在 6~12；Tab 内若还有 ≤5 字段的小逻辑组，嵌套 CollapseGroup
+Q4: 总有效行数 > 30，或复杂控件较多？
+  ├─ 是 → 优先 A. diy_table.Tabs，每个 Tab 通常控制在 6~12 个有效行；Tab 内若还有 ≤5 个有效行的小逻辑组，嵌套 CollapseGroup
   └─ 否 → 走 Q1 分支
 ```
 
@@ -50,6 +64,7 @@ Q4: 总字段数 > 30？
 
 | 场景 | 推荐方案 | 禁止做法 |
 |------|---------|---------|
+| 13 字段双列表单 + 3 个小业务域（2/9/2 个字段） | 3 个 CollapseGroup，核心业务组默认展开 | 禁止建立 3 个 Tab；9 个短字段通常只有 4.5 行，仍不足以独占一页 |
 | 13 字段表 + 1 个"MRP 运算"子集（3 字段） | C. CollapseGroup 折叠"MRP 运算"分组，剩余 10 字段平铺 | 禁止用 diy_table.Tabs 拆出"MRP 运算"Tab（用户必须点击切换才能看到 3 个字段） |
 | 35 字段表 + 4 个业务域（10/8/9/8） | A. diy_table.Tabs（4 个 Tab） | 禁止把每个 Tab 内 ≤5 字段的"备注/其他"再开 Tab |
 | 42 字段表 + 5 个业务域（14/13/6/5/4） | A. diy_table.Tabs（5 个 Tab），后两个 Tab 内用 C. CollapseGroup 收次要字段 | 禁止为了 4~5 字段"审核信息"单独建 Tab |
@@ -167,13 +182,26 @@ Q4: 总字段数 > 30？
 
 1. **先数字段**：调用 `microi_get_field_list` 拉出全部字段，统计**有效字段数**（排除 `Visible=0` 隐藏字段、`Id`、系统字段）。
 2. **再分业务域**：用 `Sort` 顺序浏览字段，把字段聚类到 2~5 个业务域（基础信息 / 业务明细 / 业主/组织 / 财务 / 附件备注 / 状态 / 时间 / 其他）。
-3. **算每个域字段数**：A. 大于等于 8 → Tab；B. 小于等于 7 → CollapseGroup；C. 等于 0 → 删除该域。
+3. **算每个域有效表单行**：A. 大于等于 6 行且存在强隔离价值 → Tab；B. 小于等于 5 行 → CollapseGroup；C. 等于 0 → 删除该域。
 4. **决定顶层方案**：A. 全 Tab / B. Tab+CollapseGroup 混合 / C. 全 CollapseGroup / D. 平铺。
 5. **写配置**：先写 `diy_table.Tabs`（若有 Tab），再逐字段写 `Tab` 归属或 `Component=CollapseGroup`。
-6. **回读验收**：调用 `microi_get_field_list` 回读，确认 `Tab` 字段、`Config.FieldTabs` / `Config.CollapseGroup` JSON 正确。
-7. **清缓存**：`microi_refresh_schema_cache tables=['表名']`，避免前端看到旧配置。
+6. **回读验收**：调用 `microi_get_field_list` 回读，确认 `Tab` 字段、`Sort`、`Component`、`Config.FieldTabs` / `Config.CollapseGroup` JSON 正确。
+7. **V8 完整性校验**：修改前后比较表级六类 V8 事件、字段 `V8Code/KeyupV8Code/Config`；布局迁移不得覆盖业务代码。若代码出现 `HideFormTab/ShowFormTab/ClickFormTab`，必须先适配或跳过该表。
+8. **清缓存**：`microi_refresh_schema_cache tables=['表名']`，避免前端看到旧配置。
 
-### 4.2 后端实现备忘
+### 4.2 存量表自动审计与安全迁移
+
+当用户要求“检查所有表单设计”时，AI 必须执行自动化盘点，不能只修截图中的一张表：
+
+1. 读取所有 `diy_table.Tabs`，排除只有一个 `none` 默认页签的表。
+2. 一次性读取候选表的 `diy_field`，按 `Tab + Sort + Component + FormWidth + Visible` 计算每组有效行数。
+3. 保留扫码、报工、质检操作、大型子表、代码编辑、运行测试等强任务 Tab。
+4. 将“总有效行 ≤12、每组 ≤5 行、无复杂控件、无 Tab 控制 V8”的表列为高置信迁移候选。
+5. 修改前记录 `Tabs`、字段 `Tab/Sort/Component/Config/V8Code/KeyupV8Code` 和表级 V8 摘要；修改后逐项回读，业务代码摘要必须一致。
+6. 迁移为 CollapseGroup 时，仅新增布局字段、清空原字段 `Tab`、清空表级 `Tabs`；不得重建业务字段，不得改数据源、必填、只读、默认值或 V8。
+7. 平台控制面、安全表和存在歧义的业务表只报告，不自动批量迁移。
+
+### 4.3 后端实现备忘
 
 后端表结构（`diy_table`）：
 - `Tabs` 字段：JSON 字符串，存表级 Tab 列表。
@@ -200,8 +228,8 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 
 ### 5.2 禁止
 
-- ❌ **禁止**为 ≤7 字段的业务域单独创建 Tab（必须改用 CollapseGroup）。
-- ❌ **禁止**为 13~30 字段的表把所有字段平铺（必须用 Tab 或 CollapseGroup 分组）。
+- ❌ **禁止**为 ≤5 个有效表单行的业务域单独创建 Tab（必须改用 CollapseGroup）；8~10 个双列短字段通常仍属于此范围。
+- ❌ **禁止**仅凭 13~30 个原始字段决定平铺或分 Tab；总有效行超过 6 且存在明确业务域时，至少使用 CollapseGroup 分组。
 - ❌ **禁止**为 8~10 字段的简单业务表创建多层 Tab 嵌套（直接用 CollapseGroup 即可）。
 - ❌ **禁止**在用户没有要求时使用 `Tabs` 字段控件（`diy_field.Component='Tabs'`），更优先用 `diy_table.Tabs`。
 - ❌ **禁止**为 `Tabs` / `CollapseGroup` / `Divider` / `Alert` 等布局控件设置 `FormWidth=24`，这些控件天然占整行。
@@ -218,7 +246,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 3. **清缓存**：`microi_refresh_schema_cache tables=['表名']`。
 4. **手动打开表单**：通过 Playwright 或 V8 引擎调用，截图第一屏。
 5. **视觉确认**：
-   - 第一屏必须能看到至少 6~10 个字段（而不是 2~3 个）。
+   - 第一屏必须能看到核心业务信息，通常至少 6~10 个短字段或一个完整任务区（而不是 2~3 个字段加大片空白）。
    - Tab 或 CollapseGroup 标题与说明文字清晰可见。
    - 没有任何"只剩 1 个字段的 Tab"。
 6. **业务闭环**：新建一条测试数据、编辑、查看、删除，验证字段在正确分组中显示。
@@ -240,6 +268,18 @@ diy_table.Tabs = [
 // 不创建 diy_table.Tabs，把"MRP 运算" 3 字段用 CollapseGroup 收在表单末尾（默认展开）
 // 把"备注"也用 CollapseGroup 或 Divider 收
 // 第一屏用户能看到所有基础信息 + MRP 运算
+```
+
+### 反例 1.1：项目收款记录拆成 2/9/2 三个 Tab
+
+```
+❌ 错误：
+项目(2 个短字段) + 收款(9 个短字段) + 附件备注(2 个整行字段)分别建 Tab。
+结果是每页只有 1~5 行内容，桌面抽屉出现大面积空白，用户要切换三次才能看完整记录。
+
+✅ 正确：
+取消表级 Tab，按原顺序建立“项目信息 / 收款信息 / 附件备注”三个 CollapseGroup。
+核心组默认展开，低频附件备注可默认收起；保留原字段、数据源、必填规则和 V8 代码。
 ```
 
 ### 反例 2：13 字段表全平铺

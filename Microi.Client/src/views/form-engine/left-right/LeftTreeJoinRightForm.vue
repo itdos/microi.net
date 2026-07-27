@@ -279,7 +279,11 @@ export default {
 
 <style scoped>
 .forklift-management {
-    height: calc(100vh - 70px);
+    /*
+    这里的 - 75px，跟【.el-tabs.el-tabs--top.parent-tabs】的margin-btoom:10px是有关系的，
+    否则上面空隙就不对等
+    */
+    height: calc(100vh - 75px);
     min-height: 520px;
     padding: 0;
     margin-top: 0;

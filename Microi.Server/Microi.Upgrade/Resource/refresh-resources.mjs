@@ -8,9 +8,18 @@ import {
   canonicalizeResource,
   isTemporaryOfficialResourceFailure,
   mergeResource,
-  normalizeText,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
+import {
+  applicationStorePackageName,
+  assertApplicationStoreEnginesSynchronized,
+  choosePublishablePackageVersion,
+  compareSemanticVersions,
+  mergeApplicationStoreReplicas,
+  publishedApplicationStoreReplicaMappings,
+  synchronizeApplicationStoreEngines,
+} from './application-store-replica-sync.mjs';
+import { publishResourcesViaConfiguredMcp } from './mcp-resource-publisher.mjs';
 
 const resourceNames = [
   'import-package.js',
@@ -210,69 +219,6 @@ async function downloadAllWithRetry(stage) {
   throw lastError;
 }
 
-function synchronizeApplicationStoreEngines(packageContent, importerSource, publisherSource) {
-  const packageModel = JSON.parse(packageContent);
-  const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
-  const synchronize = (apiEngineKey, source) => {
-    const engine = engines.find(item => item.ApiEngineKey === apiEngineKey);
-    if (!engine) throw new Error(`app.microi.store.json 缺少接口引擎 ${apiEngineKey}`);
-    const normalizedSource = normalizeText(source);
-    engine.ApiV8Code = normalizedSource;
-    const versionMatch = normalizedSource.match(/Version\s*:\s*(v?\d+\.\d+\.\d+)/i);
-    if (versionMatch) engine.Version = versionMatch[1].startsWith('v') ? versionMatch[1] : `v${versionMatch[1]}`;
-  };
-
-  synchronize('import-microi-store-package', importerSource);
-  synchronize('ai_app_publish_store', publisherSource);
-  return `${JSON.stringify(packageModel, null, 2)}\n`;
-}
-
-function getEmbeddedEngineSource(packageContent, apiEngineKey) {
-  const packageModel = JSON.parse(packageContent);
-  const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
-  const engine = engines.find(item => item.ApiEngineKey === apiEngineKey);
-  if (!engine) throw new Error(`app.microi.store.json 缺少接口引擎 ${apiEngineKey}`);
-  return normalizeText(engine.ApiV8Code || '');
-}
-
-function reconcileApplicationStoreEngines(merged, bases) {
-  const packageName = 'app.microi.store.json';
-  const packageContent = merged.get(packageName);
-  const mappings = [
-    ['import-package.js', 'import-microi-store-package'],
-    ['ai-app-publish-store.js', 'ai_app_publish_store'],
-  ];
-
-  for (const [resourceName, apiEngineKey] of mappings) {
-    const standalone = normalizeText(merged.get(resourceName));
-    const embedded = getEmbeddedEngineSource(packageContent, apiEngineKey);
-    if (standalone === embedded) continue;
-
-    const basePackage = bases.get(packageName);
-    const baseStandalone = bases.get(resourceName);
-    if (!basePackage || !baseStandalone) {
-      throw new Error(`${resourceName} 与应用商城内嵌 ${apiEngineKey} 不一致，且尚未建立共同基线`);
-    }
-    const standaloneChanged = standalone !== normalizeText(baseStandalone);
-    const embeddedChanged = embedded !== getEmbeddedEngineSource(basePackage, apiEngineKey);
-    if (standaloneChanged && embeddedChanged) {
-      throw new Error(`${resourceName} 与应用商城内嵌 ${apiEngineKey} 被两端分别修改且结果不同，请人工合并`);
-    }
-    if (embeddedChanged) {
-      validate(resourceName, embedded);
-      merged.set(resourceName, canonicalizeResource(resourceName, embedded));
-    }
-  }
-
-  const synchronizedPackage = synchronizeApplicationStoreEngines(
-    packageContent,
-    merged.get('import-package.js'),
-    merged.get('ai-app-publish-store.js'),
-  );
-  validate(packageName, synchronizedPackage);
-  merged.set(packageName, canonicalizeResource(packageName, synchronizedPackage));
-}
-
 async function readOptional(path) {
   try {
     return await readFile(path, 'utf8');
@@ -285,7 +231,17 @@ async function readOptional(path) {
 async function publishResources(changes) {
   const token = String(process.env.MICROI_UPGRADE_RESOURCE_TOKEN || '').trim();
   if (!token) {
-    throw new Error('本地合并结果需要写回官网，请设置 MICROI_UPGRADE_RESOURCE_TOKEN 后使用 --publish');
+    process.stdout.write('未设置 MICROI_UPGRADE_RESOURCE_TOKEN，使用已配置并登录的 microi_itdos MCP 安全发布...\n');
+    try {
+      await publishResourcesViaConfiguredMcp(changes, { startDirectory: outputDirectory });
+      return;
+    } catch (error) {
+      throw new Error(
+        `本地合并结果需要写回官网，但 microi_itdos MCP 发布失败：${error.message}。`
+        + '请登录并正确配置官方 iTdos MCP，或设置 MICROI_UPGRADE_RESOURCE_TOKEN 后重试',
+        { cause: error },
+      );
+    }
   }
   const response = await fetch(publishEndpoint, {
     method: 'POST',
@@ -319,29 +275,40 @@ function printResource(name, content, direction) {
   );
 }
 
-function compareVersions(left, right) {
-  const parts = value => String(value || '')
-    .replace(/^v/i, '')
-    .split('.')
-    .slice(0, 3)
-    .map(item => Number(item) || 0);
-  const leftParts = parts(left);
-  const rightParts = parts(right);
-  for (let index = 0; index < 3; index += 1) {
-    if ((leftParts[index] || 0) !== (rightParts[index] || 0)) {
-      return (leftParts[index] || 0) > (rightParts[index] || 0) ? 1 : -1;
-    }
+async function readCurrentReleaseVersion() {
+  const configured = String(process.env.MICROI_RELEASE_VERSION || '').trim();
+  if (configured) return configured;
+  try {
+    const clientPackage = JSON.parse(
+      await readFile(resolve(outputDirectory, '../../../Microi.Client/package.json'), 'utf8'),
+    );
+    if (clientPackage?.version) return String(clientPackage.version);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
   }
-  return 0;
+  try {
+    const upgradeProject = await readFile(resolve(outputDirectory, '../Microi.Upgrade.csproj'), 'utf8');
+    const versionMatch = upgradeProject.match(/<Version>([^<]+)<\/Version>/i);
+    if (versionMatch) return versionMatch[1].trim();
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+  return '';
 }
 
 await mkdir(outputDirectory, { recursive: true });
 if (process.argv.includes('--synchronize-local')) {
   const importerSource = await readFile(resolve(outputDirectory, 'import-package.js'), 'utf8');
   const publisherSource = await readFile(resolve(outputDirectory, 'ai-app-publish-store.js'), 'utf8');
+  const builderSource = await readFile(resolve(outputDirectory, 'ai-app-build.js'), 'utf8');
   const packagePath = resolve(outputDirectory, 'app.microi.store.json');
   const packageContent = await readFile(packagePath, 'utf8');
-  const synchronized = synchronizeApplicationStoreEngines(packageContent, importerSource, publisherSource);
+  const standaloneContents = new Map([
+    ['import-package.js', importerSource],
+    ['ai-app-publish-store.js', publisherSource],
+    ['ai-app-build.js', builderSource],
+  ]);
+  const synchronized = synchronizeApplicationStoreEngines(packageContent, standaloneContents);
   validate('app.microi.store.json', synchronized);
   await writeFile(packagePath, synchronized, 'utf8');
   printResource('app.microi.store.json', synchronized, '同步本地副本');
@@ -363,6 +330,15 @@ if (process.argv.includes('--synchronize-local')) {
       baseResources.set(name, canonicalizeResource(name, baseContent));
     }
   }
+  const builderPath = resolve(outputDirectory, 'ai-app-build.js');
+  const rawBuilderSource = await readFile(builderPath, 'utf8');
+  const localStandaloneContents = new Map([
+    ...publishedApplicationStoreReplicaMappings.map(mapping => [
+      mapping.resourceName,
+      localResources.get(mapping.resourceName),
+    ]),
+    ['ai-app-build.js', canonicalizeResource('ai-app-build.js', rawBuilderSource)],
+  ]);
 
   let remoteResources;
   try {
@@ -374,13 +350,10 @@ if (process.argv.includes('--synchronize-local')) {
       throw error;
     }
     verifyOfflineReleaseSafety(resourceNames, localResources, baseResources);
-    const reconciledLocalResources = new Map(localResources);
-    reconcileApplicationStoreEngines(reconciledLocalResources, baseResources);
-    for (const name of resourceNames) {
-      if (reconciledLocalResources.get(name) !== localResources.get(name)) {
-        throw new Error(`${name} 与应用商城内嵌接口引擎副本不一致，不能安全使用离线基线`);
-      }
-    }
+    assertApplicationStoreEnginesSynchronized(
+      localResources.get(applicationStorePackageName),
+      localStandaloneContents,
+    );
     process.stderr.write(
       '\n⚠ 官网升级资源接口在重试后仍暂时不可用；6 项本地资源与上次官网成功回读的共同基线完全一致。\n'
       + '  本次仅允许继续后端编译发布：未写入官网、未修改本地资源、未推进共同基线。\n'
@@ -398,7 +371,10 @@ if (process.argv.includes('--synchronize-local')) {
         throw new Error(`${name} 本地与官网尚不一致，不能初始化共同基线`);
       }
     }
-    reconcileApplicationStoreEngines(new Map(localResources), new Map(localResources));
+    assertApplicationStoreEnginesSynchronized(
+      localResources.get(applicationStorePackageName),
+      localStandaloneContents,
+    );
     await mkdir(baseDirectory, { recursive: true });
     for (const name of resourceNames) {
       await writeFile(resolve(baseDirectory, name), localResources.get(name), 'utf8');
@@ -407,8 +383,38 @@ if (process.argv.includes('--synchronize-local')) {
     process.exit(0);
   }
 
+  const replicaBaseReady = baseResources.has(applicationStorePackageName)
+    && publishedApplicationStoreReplicaMappings.every(mapping => baseResources.has(mapping.resourceName));
+  let replicaMerge = null;
+  if (replicaBaseReady) {
+    replicaMerge = await mergeApplicationStoreReplicas({
+      basePackageContent: baseResources.get(applicationStorePackageName),
+      localPackageContent: localResources.get(applicationStorePackageName),
+      remotePackageContent: remoteResources.get(applicationStorePackageName).content,
+      baseStandaloneContents: baseResources,
+      localStandaloneContents,
+      remoteStandaloneContents: new Map(
+        publishedApplicationStoreReplicaMappings.map(mapping => [
+          mapping.resourceName,
+          remoteResources.get(mapping.resourceName).content,
+        ]),
+      ),
+    });
+  }
+
   const mergedResources = new Map();
   for (const name of resourceNames) {
+    if (replicaMerge && name === applicationStorePackageName) {
+      mergedResources.set(name, replicaMerge.packageContent);
+      continue;
+    }
+    const publishedReplica = publishedApplicationStoreReplicaMappings
+      .find(mapping => mapping.resourceName === name);
+    if (replicaMerge && publishedReplica) {
+      mergedResources.set(name, replicaMerge.standaloneContents.get(name));
+      continue;
+    }
+
     const localContent = localResources.get(name);
     const remoteContent = remoteResources.get(name).content;
     const baseContent = baseResources.get(name);
@@ -421,8 +427,15 @@ if (process.argv.includes('--synchronize-local')) {
     }
     mergedResources.set(name, await mergeResource(name, baseContent, localContent, remoteContent));
   }
-  const packageBeforeReplicaReconcile = mergedResources.get('app.microi.store.json');
-  reconcileApplicationStoreEngines(mergedResources, baseResources);
+  if (!replicaMerge) {
+    assertApplicationStoreEnginesSynchronized(
+      mergedResources.get(applicationStorePackageName),
+      localStandaloneContents,
+    );
+  }
+  const resolvedBuilderSource = replicaMerge
+    ? replicaMerge.standaloneContents.get('ai-app-build.js')
+    : localStandaloneContents.get('ai-app-build.js');
   if (process.env.MICROI_UPGRADE_RESOURCE_DEBUG === '1') {
     const digest = value => createHash('sha256').update(value, 'utf8').digest('hex');
     process.stderr.write(`${JSON.stringify({
@@ -430,9 +443,35 @@ if (process.argv.includes('--synchronize-local')) {
       base: digest(baseResources.get('app.microi.store.json')),
       local: digest(localResources.get('app.microi.store.json')),
       remote: digest(remoteResources.get('app.microi.store.json').content),
-      mergedBeforeReplicaReconcile: digest(packageBeforeReplicaReconcile),
-      mergedAfterReplicaReconcile: digest(mergedResources.get('app.microi.store.json')),
+      mergedAfterReplicaReconcile: digest(mergedResources.get(applicationStorePackageName)),
     })}\n`);
+  }
+
+  let currentReleaseVersion;
+  for (const name of resourceNames) {
+    let content = canonicalizeResource(name, mergedResources.get(name));
+    if (name.endsWith('.json') && remoteResources.get(name).content !== content) {
+      const packageModel = JSON.parse(content);
+      const packageVersion = String(packageModel?.PackageInfo?.Version || '');
+      const remoteVersion = remoteResources.get(name).appVersion;
+      if (remoteVersion && compareSemanticVersions(packageVersion, remoteVersion) <= 0) {
+        currentReleaseVersion ??= await readCurrentReleaseVersion();
+        const selectedVersion = choosePublishablePackageVersion(
+          packageVersion,
+          remoteVersion,
+          currentReleaseVersion,
+        );
+        if (!selectedVersion) {
+          throw new Error(
+            `${name} 内容需要写回官网，但包版本 ${packageVersion || '(空)'}、当前发布版本 ${currentReleaseVersion || '(未找到)'} 均未高于官网 ${remoteVersion}；请先提升正式发布版本`,
+          );
+        }
+        packageModel.PackageInfo.Version = selectedVersion;
+        content = canonicalizeResource(name, JSON.stringify(packageModel));
+        process.stdout.write(`${name}\tPackageInfo.Version 自动提升为 ${selectedVersion}\n`);
+      }
+    }
+    mergedResources.set(name, content);
   }
 
   const remoteChanges = [];
@@ -444,21 +483,15 @@ if (process.argv.includes('--synchronize-local')) {
       await writeFile(resolve(outputDirectory, name), content, 'utf8');
     }
     if (remoteResources.get(name).content !== content) {
-      if (name.endsWith('.json')) {
-        const packageVersion = String(JSON.parse(content)?.PackageInfo?.Version || '');
-        const remoteVersion = remoteResources.get(name).appVersion;
-        if (remoteVersion && compareVersions(packageVersion, remoteVersion) <= 0) {
-          throw new Error(
-            `${name} 内容需要写回官网，但包版本 ${packageVersion || '(空)'} 未高于官网 ${remoteVersion}；请先提升 PackageInfo.Version，避免商城自动版本与包内版本不一致`,
-          );
-        }
-      }
       remoteChanges.push({
         name,
         content,
         expectedRemoteSha256: remoteResources.get(name).sha256,
       });
     }
+  }
+  if (canonicalizeResource('ai-app-build.js', rawBuilderSource) !== resolvedBuilderSource) {
+    await writeFile(builderPath, resolvedBuilderSource, 'utf8');
   }
 
   if (remoteChanges.length && !publish) {
@@ -487,4 +520,9 @@ if (process.argv.includes('--synchronize-local')) {
           : '两端一致';
     printResource(name, content, direction);
   }
+  printResource(
+    'ai-app-build.js',
+    resolvedBuilderSource,
+    '本地独立文件与官网商城包内嵌副本一致',
+  );
 }

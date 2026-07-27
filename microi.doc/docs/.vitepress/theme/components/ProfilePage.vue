@@ -1254,12 +1254,22 @@ function isGiteeStarReturn() {
   return new URLSearchParams(window.location.search).get('giteeStar') === 'returned'
 }
 
+function readGiteeStarReturnContext() {
+  if (typeof window === 'undefined') return { reason: '', account: '' }
+  const params = new URLSearchParams(window.location.search)
+  return {
+    reason: String(params.get('reason') || '').trim(),
+    account: String(params.get('giteeAccount') || '').trim()
+  }
+}
+
 function cleanGiteeStarReturnQuery() {
   if (typeof window === 'undefined') return
   const url = new URL(window.location.href)
   url.searchParams.delete('giteeStar')
   url.searchParams.delete('giteeStarStatus')
   url.searchParams.delete('reason')
+  url.searchParams.delete('giteeAccount')
   const search = url.searchParams.toString()
   window.history.replaceState(null, '', `${url.pathname}${search ? `?${search}` : ''}${url.hash || '#/create'}`)
 }
@@ -1271,6 +1281,7 @@ function isVerifiedGiteeStar(data) {
 
 async function handleGiteeStarReturn() {
   if (isCheckingGiteeStar.value || isCreating.value) return
+  const returnContext = readGiteeStarReturnContext()
   cleanGiteeStarReturnQuery()
   navigateProfile('create')
   const draft = consumeGiteeStarTenantDraft()
@@ -1295,8 +1306,16 @@ async function handleGiteeStarReturn() {
       handleSessionExpired()
       return
     }
-    if (result.Code !== 1 || !isVerifiedGiteeStar(result.Data || {})) {
-      createError.value = localizeServerMessage(result.Msg) || t('giteeStarNotVerified')
+    const starData = result.Data || {}
+    if (result.Code !== 1 || !isVerifiedGiteeStar(starData)) {
+      const transientReasons = ['events_request_failed', 'events_response_invalid', 'events_temporarily_unavailable', 'star_page_temporarily_unavailable', 'star_page_response_invalid', 'star_page_limit_reached']
+      const fallbackMessage = transientReasons.includes(returnContext.reason)
+        ? t('giteeStarStatusFailed')
+        : t('giteeStarNotVerified', {
+            account: returnContext.account || starData.GiteeLogin || '（未识别）',
+            repository: starData.Repository || 'ITdos/microi.net'
+          })
+      createError.value = localizeServerMessage(result.Msg) || fallbackMessage
       tenantProgress.value = createError.value
       return
     }

@@ -76,16 +76,25 @@ test("runtime context is XSS-safe and never hardcodes the official API", () => {
 test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runtime context", () => {
   assert.match(source, /var isEntry\s*=\s*relativePath\.toLowerCase\(\)\s*===\s*"index\.html"/);
   assert.match(source, /var isHtml\s*=\s*\/\\\.html\$\/i\.test\(relativePath\)/);
-  assert.match(source, /isHtml\s*\?\s*""\s*:\s*text\(files\[i\]\.PublishHdfsPath\)/);
+  assert.match(source, /var versionSegment\s*=.*"\/versions\/"/);
+  assert.match(source, /var latestPublishRoot\s*=\s*"ai-app-publish\/"\s*\+\s*appKey/);
+  assert.match(source, /StableFilePathName:\s*latestPath/);
+  assert.match(source, /VersionEntryPath:\s*versionEntryPath/);
+  assert.match(source, /for \(var pass = 0; pass < 2; pass\+\+\)/);
+  assert.match(source, /publishCompiledFiles\(files, buildRoot, appKey, versionNo\)/);
+  assert.doesNotMatch(source, /text\(files\[i\]\.PublishHdfsPath\)/);
   assert.match(source, /injectRuntimeContext\(htmlContent\.Data\)/);
-  assert.match(source, /if\s*\(isEntry\)\s*entryPath\s*=\s*publishedPath/);
+  assert.match(source, /entryPath\s*=\s*latestPath/);
   assert.match(source, /previewHtml\s*=\s*injectRuntimeContext\(compilePreviewHtml\(files, app\.Data\)\)/);
+  assert.match(source, /requestedAction\s*===\s*"RepairStableLatest"/);
+  assert.match(source, /requestedAction\s*===\s*"PromoteStoreAssets"/);
+  assert.match(source, /promoteStoreAssets\(app\.Data, promotedAppKey, promotedVersionNo, V8\.Param\.Assets\)/);
 });
 
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.2.9");
+  assert.equal(packaged.Version, "v1.3.7");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.(?:[4-9]|\d{2,})$|^v6\.[6-9]\./);
   assert.match(upgradeSource, /BuildAiAppResourceName\s*=\s*"ai-app-build\.js"/);

@@ -1,6 +1,10 @@
 // ── 全局紧凑布局覆盖（配合 element-variables.scss 中的尺寸变量）──────────────────
 // 目标：在低分辨率屏幕上显示更多内容，不依赖组件 size 属性
 .microi, body {
+    //表单更多按钮功能高度
+    .el-dropdown-menu--small .el-dropdown-menu__item{
+        line-height: 28px;
+    }
     // 表格行高 & 单元格
     .el-table {
         font-size: 12px;
@@ -992,7 +996,7 @@ p {
         padding-top: 0px;
         width: 100%;
         .el-tabs.el-tabs--top.parent-tabs{
-            margin-bottom: 5px;
+            margin-bottom: 10px;
         }   
     }
     .app-main-microi {
