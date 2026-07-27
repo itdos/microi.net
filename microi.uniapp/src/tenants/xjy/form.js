@@ -9,12 +9,34 @@ import {
   V8,
   getUser
 } from '@/utils/request.js'
+import {
+  calculateProposalCosts,
+  isProposalCalculationField,
+  proposalInheritedValues,
+  proposalInitialValues
+} from './proposal-calculation.js'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
 const FOLLOWUP_TABLE = 'diy_genjinjl'
 const CONTACT_TABLE = 'Diy_LianxiR'
+// zhy：客户方案表及设备联动字段集中配置。
+const PROPOSAL_TABLE = 'diy_kehufaxx'
+const PROPOSAL_FIELDS = {
+  deviceModel: 'ShebeiXH',
+  deviceModelId: 'ShebeiXHID',
+  deviceName: 'ShebeiMC',
+  rentalPrice: 'ShebeiDJZL',
+  buyoutPrice: 'ShebeiDJ',
+  filterPrice: 'GenghuanLXJG',
+  expectedCooperationDate: 'YujiHZSJ',
+  bottledWaterPrice: 'TongzhuangSDJ',
+  rentalDeviceCount: 'HezuoHYSSBSL',
+  rentalTrialYears: 'ShisuanNS',
+  buyoutDeviceCount: 'HezuoHYSSBSLMD',
+  buyoutTrialYears: 'ShisuanNSMD'
+}
 const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
 const CUSTOMER_LOCATION_FIELDS = {
   region: 'Chengshi',
@@ -81,6 +103,14 @@ function isCheckinAdd(context) {
 function isFollowupAdd(context) {
   return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE &&
     context.mode === 'Add' && !context.rowId
+}
+
+function isProposalForm(context) {
+  return String(context.tableName || '').toLowerCase() === PROPOSAL_TABLE
+}
+
+function isProposalAdd(context) {
+  return isProposalForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function fieldName(context, expectedName, expectedLabel = '') {
@@ -181,6 +211,45 @@ function currentTimestamp() {
 
 function currentDate() {
   return currentTimestamp().slice(0, 10)
+}
+
+function isEmptyFormValue(value) {
+  return value === undefined || value === null || value === '' ||
+    (Array.isArray(value) && value.length === 0) ||
+    (typeof value === 'string' && value.trim() === '[]')
+}
+
+function proposalDefaults(context) {
+  // zhy：只填充空值，保留路由参数或业务侧已传入的客户方案默认值。
+  const defaults = {
+    [fieldName(context, PROPOSAL_FIELDS.expectedCooperationDate, '预计合作时间')]: currentDate(),
+    ...proposalInitialValues(context.form)
+  }
+  return Object.fromEntries(
+    Object.entries(defaults).filter(([name]) => isEmptyFormValue(context.form[name]))
+  )
+}
+
+async function latestProposalValues(context) {
+  const customerId = context.form[fieldName(context, 'KehuID', '客户Id')]
+  if (!customerId) return { Paixu: 0 }
+  try {
+    const result = await V8.FormEngine.GetTableData(PROPOSAL_TABLE, {
+      _Where: [['KehuID', '=', customerId]],
+      _OrderBy: 'Paixu',
+      _OrderByType: 'DESC',
+      _PageIndex: 1,
+      _PageSize: 1
+    })
+    const source = result && Number(result.Code) === 1 &&
+      Array.isArray(result.Data) && result.Data.length
+      ? result.Data[0]
+      : null
+    return source ? proposalInheritedValues(source) : { Paixu: 0 }
+  } catch (error) {
+    // zhy：继承上一方案是便捷能力，查询失败不阻断用户新建方案。
+    return { Paixu: 0 }
+  }
 }
 
 function currentUserOption() {
@@ -434,7 +503,8 @@ export function createState() {
       address: ''
     },
     currentTime: '',
-    followupInitialized: false
+    followupInitialized: false,
+    proposalInitialized: false
   }
 }
 
@@ -468,6 +538,29 @@ export async function initialize(context) {
       context.form[fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')]
     )
   }
+  if (isProposalAdd(context) && !context.state.proposalInitialized) {
+    // zhy：新增客户方案时补齐 PC 默认值、继承上一方案并生成合作前/后成本。
+    context.state.proposalInitialized = true
+    const inherited = await latestProposalValues(context)
+    const inheritedForm = {
+      ...context.form,
+      ...inherited
+    }
+    // zhy：上一方案的空字段不应覆盖新增默认值，已有有效值则继续保留。
+    const defaults = proposalDefaults({
+      ...context,
+      form: inheritedForm
+    })
+    const initialForm = {
+      ...inheritedForm,
+      ...defaults
+    }
+    context.patchForm({
+      ...inherited,
+      ...defaults,
+      ...calculateProposalCosts(initialForm)
+    })
+  }
 }
 
 export function getPresentation(context) {
@@ -496,6 +589,13 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isProposalForm(context) && field &&
+    String(field.Name || '').toLowerCase() === PROPOSAL_FIELDS.bottledWaterPrice.toLowerCase()) {
+    return {
+      // zhy：与 PC 表单一致，仅桶装水方案显示桶装水单价。
+      visible: String(context.form.DangqianYSFS || '') === '桶装水'
+    }
+  }
   if (!isCustomerForm(context) || !field) return {}
   const label = String(field.Label || '').trim()
   const component = String(field.component || field.Component || '').toLowerCase()
@@ -543,6 +643,32 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isProposalForm(context) && payload && !payload.multiple) {
+    const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
+      const row = payload.raw && typeof payload.raw === 'object'
+        ? payload.raw
+        : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
+          ? payload.option.raw
+          : {}
+      // zhy：移动端选择设备型号后复用 PC 表单的设备名称、价格及型号 Id 联动映射。
+      const updates = {
+        [fieldName(context, PROPOSAL_FIELDS.deviceModelId, '设备型号Id')]: personValue(row, ['Id', 'ID', 'id']),
+        [fieldName(context, PROPOSAL_FIELDS.deviceName, '设备名称')]: personValue(row, ['ShangpinMC']),
+        [fieldName(context, PROPOSAL_FIELDS.rentalPrice, '设备单价（租赁）')]: personValue(row, ['ZulinXJ']),
+        [fieldName(context, PROPOSAL_FIELDS.buyoutPrice, '设备单价（买断）')]: personValue(row, ['Xianjia']),
+        [fieldName(context, PROPOSAL_FIELDS.filterPrice, '更换滤芯价格')]: personValue(row, ['GenghuanLXJG'])
+      }
+      context.patchForm({
+        ...updates,
+        ...calculateProposalCosts({
+          ...context.form,
+          ...updates
+        })
+      })
+      return { handled: true }
+    }
+  }
   if (isFollowupAdd(context) && payload && !payload.multiple) {
     // zhy：用户切换客户后同步客户 Id，清空旧联系人并重新加载该客户的联系人。
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -593,6 +719,16 @@ export async function handleFieldSelect(context, payload) {
   return { handled: true }
 }
 
+export function handleFieldChange(context, payload) {
+  if (!isProposalForm(context) || !payload ||
+    !isProposalCalculationField(payload.field && payload.field.Name)) {
+    return { handled: false }
+  }
+  // zhy：普通输入、开关及选项变化统一重算，避免只在设备型号下拉时更新成本。
+  context.patchForm(calculateProposalCosts(context.form))
+  return { handled: true }
+}
+
 export async function beforeSubmit(context) {
   if (context.state.locating) throw new Error('正在获取位置，请稍候')
   if (isCustomerForm(context)) {
@@ -613,6 +749,10 @@ export async function beforeSubmit(context) {
       [timeName]: context.form[timeName] || context.state.currentTime || currentTimestamp(),
       [userName]: context.form[userName] || (user && user.Name) || ''
     }
+  }
+  if (isProposalForm(context)) {
+    // zhy：保存前再次按最终表单值计算，确保落库金额与页面输入一致。
+    return calculateProposalCosts(context.form)
   }
   return {}
 }
@@ -639,6 +779,7 @@ export default {
   getFieldPresentation,
   getFieldActions,
   runFieldAction,
+  handleFieldChange,
   handleFieldSelect,
   beforeSubmit,
   afterSubmit,

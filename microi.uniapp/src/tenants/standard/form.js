@@ -22,6 +22,8 @@ export async function runFieldAction() {}
 
 export async function handleFieldSelect() {}
 
+export async function handleFieldChange() {}
+
 export async function beforeSubmit() {
   return {}
 }
@@ -42,6 +44,7 @@ export default {
   getFieldPresentation,
   getFieldActions,
   runFieldAction,
+  handleFieldChange,
   handleFieldSelect,
   beforeSubmit,
   afterSubmit,

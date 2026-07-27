@@ -30,6 +30,12 @@ if (unknown.length) fail(`unknown controls: ${unknown.join(', ')}`)
 const renderer = fs.readFileSync(path.join(root, 'src/components/mci-native-field/mci-native-field.vue'), 'utf8')
 const nativeForm = fs.readFileSync(path.join(root, 'src/pages/native-form/index.vue'), 'utf8')
 const formRuntime = fs.readFileSync(path.join(root, 'src/platform/native-form.js'), 'utf8')
+const xjyTenantForm = fs.readFileSync(path.join(root, 'src/tenants/xjy/form.js'), 'utf8')
+const xjyProposalCalculation = fs.readFileSync(
+  path.join(root, 'src/tenants/xjy/proposal-calculation.js'),
+  'utf8'
+)
+const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -40,6 +46,62 @@ if (!formRuntime.includes("return 'ImgUpload'")) fail('avatar/image semantic fal
 if (!formRuntime.includes('SENSITIVE_FIELD_PATTERN')) fail('sensitive field visibility guard is missing')
 if (!nativeForm.includes('hydrateNativeFormOptions(liveDefinition')) {
   fail('async field options must hydrate the live reactive form definition')
+}
+// zhy: 防止下拉层级通知和解除卡片裁切的修复被后续改动移除。
+if (!renderer.includes("'selector-toggle'") || !nativeForm.includes('@selector-toggle="handleSelectorToggle(field, $event)"')) {
+  fail('dropdown selector must notify the form before elevating its stacking context')
+}
+if (!nativeForm.includes('.form-section--select-open') || !nativeForm.includes('overflow: visible')) {
+  fail('open dropdown section must escape card clipping')
+}
+if (!nativeForm.includes('.native-form-page--select-open :deep(.mci-page-shell__body)')) {
+  fail('open dropdown must stack above fixed page controls and floating launchers')
+}
+// zhy: 确保新增和编辑页的字段分组保持可折叠能力。
+if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
+  !nativeForm.includes('initializeGroupExpansion(definition.groups || [])') ||
+  !nativeForm.includes('this.expandedGroupKeys = [this.groupKey(groups[0], 0)]') ||
+  !nativeForm.includes('.form-section__toggle.expanded') ||
+  !nativeForm.includes('this.expandFirstInvalidGroup()')) {
+  fail('native form field groups must support collapsed and expanded states')
+}
+// zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
+for (const token of [
+  'PROPOSAL_FIELDS',
+  "['ShangpinMC']",
+  "['ZulinXJ']",
+  "['Xianjia']",
+  "['GenghuanLXJG']",
+  "['Id', 'ID', 'id']",
+  'proposalDefaults(context)',
+  'latestProposalValues(context)',
+  'calculateProposalCosts(context.form)',
+  'handleFieldChange(context, payload)'
+]) {
+  if (!xjyTenantForm.includes(token)) fail(`xjy proposal form rule is missing: ${token}`)
+}
+for (const token of [
+  "ShuizhiYQ: '纳滤'",
+  "DashuiFS: '[\"4\"]'",
+  "JiareFS: '步进式'",
+  "ShuiwenYQ: '[\"2\"]'"
+]) {
+  if (!xjyProposalCalculation.includes(token)) fail(`xjy proposal default is missing: ${token}`)
+}
+if (!nativeForm.includes('@change="handleNativeFieldChange(field, $event)"')) {
+  fail('native form must notify tenant extensions when a field value changes')
+}
+if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
+  fail('native form must support declarative tenant field visibility')
+}
+// zhy：客户详情应将地图主字段与 _Lat/_Lng 辅助字段合并成内嵌地图。
+for (const token of [
+  'hasTenantDetailMap(field)',
+  'isTenantMapCoordinateHelper(field)',
+  "name.match(/^(.+)_(Lat|Lng)$/i)",
+  "presentation.type === 'map'"
+]) {
+  if (!businessDetail.includes(token)) fail(`business detail map rendering is missing: ${token}`)
 }
 
 console.log(`Native control check passed (${officialNames.length}/${officialNames.length} official controls mapped).`)
