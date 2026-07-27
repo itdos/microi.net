@@ -21,18 +21,21 @@ export function encodeCodeEditorValue(value) {
 
 export function prepareCodeEditorTransport(formData, diyFieldList) {
     const encodedFields = [];
+    const encodedFieldSet = new Set();
     if (!formData || typeof formData !== "object" || !Array.isArray(diyFieldList)) {
         return null;
     }
 
     diyFieldList.forEach(function (field) {
         if (!field || field.Component !== "CodeEditor" || typeof field.Name !== "string") return;
+        if (encodedFieldSet.has(field.Name)) return;
         if (!Object.prototype.hasOwnProperty.call(formData, field.Name)) return;
         const value = formData[field.Name];
         if (typeof value !== "string") return;
 
         formData[field.Name] = encodeCodeEditorValue(value);
         encodedFields.push(field.Name);
+        encodedFieldSet.add(field.Name);
     });
 
     if (encodedFields.length === 0) return null;
