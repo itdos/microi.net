@@ -98,6 +98,17 @@
                                 ? SysMenuModel.AddBtnText
                                 : $t("Msg.Add") }}
                         </el-button>
+                        <el-checkbox
+                            v-if="!IsTrashMode
+                                && (!diyStore.IsPhoneView || _IsTableChild || PropsEmbedded)
+                                && CanShowContinuousSelection()"
+                            v-model="ContinuousSelection"
+                            @change="ContinuousSelectionChange"
+                            border
+                            style="margin: 0 10px;"
+                        >
+                            {{ $t('Msg.ContinuousSelection') }}
+                        </el-checkbox>
                         <!-- 表内编辑【提交一起保存】模式：批量提交 / 取消按钮 -->
                         <template v-if="IsBatchSubmitMode() && SysMenuModel.InTableEdit">
                             <el-button
@@ -138,7 +149,6 @@
                         </template>
                         <!-- 全选，批量分享，批量删除 -->
                         <!--Fix by Anderson for 小赵：下面这一句不能增加【&& !diyStore.IsPhoneView】判断，移动端也需要批量操作功能！！！-->
-
                         <template v-if="!IsTrashMode
                                         && (!diyStore.IsPhoneView || _IsTableChild || PropsEmbedded)
                                         && SysMenuModel
@@ -156,15 +166,6 @@
                                 {{ cardSelection.length > 0 ? `${$t('Msg.Selected')} ${cardSelection.length} ${$t('Msg.Items')}` : $t('Msg.SelectAll') }}
                             </el-checkbox>
                             <template v-for="(btn, btnIndex) in SysMenuModel.BatchSelectMoreBtns">
-                                <el-checkbox
-                                    v-if="btnIndex === 0 && TableMultipleSelection.length > 0"
-                                    v-model="ContinuousSelection"
-                                    @change="ContinuousSelectionChange"
-                                    border
-                                    style="margin: 0 10px;"
-                                >
-                                    {{ $t('Msg.ContinuousSelection') }}
-                                </el-checkbox>
                                 <el-button
                                     v-if="btn.IsVisible"
                                     :key="TypeFieldName + 'more_btn_bs_' + btnIndex"

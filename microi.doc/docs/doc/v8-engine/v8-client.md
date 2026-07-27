@@ -329,6 +329,7 @@ V8.AppendSearchChildTable(V8.Field.XuanzeGLSP, { ShangpinLXZ: '1'});
 
 ##  V8.OpenTableSetWhere
 >* 弹出表格的[弹出前V8事件代码]中为表格指定搜索条件
+>* 该条件属于弹出表格的固定查询范围。弹出表格内继续使用搜索、高级筛选或切换分页时，固定条件仍会以 AND 方式参与查询，不会被同字段的临时筛选覆盖。
 ```js
 V8.OpenTableSetWhere(V8.Field.XuanzeGLSP, [
   ['ShangpinMC', 'Like', '商用直饮机']
