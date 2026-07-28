@@ -58,7 +58,8 @@
           <text class="ai-assistant__generation-badge">AI</text>
           <text>内容由人工智能生成，请注意甄别</text>
         </view>
-        <view class="ai-assistant__toolbar">
+		<!-- zhy先隐藏模型选择 -->
+        <!-- <view class="ai-assistant__toolbar">
           <picker
             v-if="relayOptions.length"
             class="ai-assistant__picker ai-assistant__picker--runtime"
@@ -101,7 +102,7 @@
           >
             <view class="ai-assistant__reasoning">{{ reasoningLabel }}⌄</view>
           </picker>
-        </view>
+        </view> -->
 
         <view v-if="conversationId" class="ai-assistant__conversation-bar">
           <view class="ai-assistant__conversation-title">
