@@ -2,12 +2,17 @@
 import { getToken, V8 } from './utils/request.js'
 import { initializeThemeSystem } from './utils/theme.js'
 import { warmPrimaryTabs } from './platform/preload.js'
+import activeTabBar from './generated/active-tabbar.js'
 
 const AUTH_RESUME_MIN_INTERVAL = 60 * 1000
 let authResumeTimer = null
 let lastAuthResumeAt = 0
 
 export default {
+  globalData: {
+    mciTabBar: activeTabBar,
+    mciAiAssistantEnabled: false
+  },
   onLaunch() {
     console.log('App Launch')
     initializeThemeSystem()

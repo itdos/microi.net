@@ -124,6 +124,19 @@ namespace Microi.net.Api
             {
                 param.Remove("_CurrentUser");
             }
+            // AI 应用允许匿名展示界面，但匿名身份不能由业务参数伪造。
+            // 这里只保留真实 HTTP Header 中的设备标识，核心 ApiEngine 会将其
+            // 单向散列为匿名只读空间；登录后则统一改用服务端 CurrentUser.Id。
+            param.Remove("_DeviceId");
+            try
+            {
+                var deviceId = DiyHttpContext.Current?.Request.Headers["did"].FirstOrDefault()?.Trim();
+                if (!deviceId.DosIsNullOrWhiteSpace())
+                {
+                    param["_DeviceId"] = deviceId.Length > 256 ? deviceId.Substring(0, 256) : deviceId;
+                }
+            }
+            catch (Exception ex) { }
             // HTTP 调用者不得伪造表单引擎内部可信调用标记。
             param.Remove("_TrustedServerInvocation");
             //调用方式 Server、Client

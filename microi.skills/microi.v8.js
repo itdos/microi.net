@@ -220,6 +220,10 @@ function normalizeFileUrlData(data, assetUrl, fallback = '') {
 function getHeaderValue(headers, key) {
   if (!headers) return '';
   const lower = key.toLowerCase();
+  if (typeof headers.get === 'function') {
+    const value = headers.get(key) || headers.get(lower);
+    if (value) return value;
+  }
   for (const name of Object.keys(headers)) {
     if (String(name).toLowerCase() === lower) return headers[name];
   }
@@ -547,6 +551,7 @@ export function createMicroiV8(options = {}) {
     translate: (message) => message,
     requestAdapter: null,
     onAuthExpired: null,
+    onTokenChanged: null,
     toast: null,
     confirm: null,
     ...options
@@ -605,8 +610,15 @@ export function createMicroiV8(options = {}) {
   }
 
   function setToken(token) {
-    config = { ...config, token: token || '' };
-    storage.set(config.tokenKey, token || '');
+    const previousToken = getToken();
+    const nextToken = token || '';
+    config = { ...config, token: nextToken };
+    storage.set(config.tokenKey, nextToken);
+    if (nextToken !== previousToken && typeof config.onTokenChanged === 'function') {
+      try {
+        config.onTokenChanged(nextToken, previousToken, client);
+      } catch (e) {}
+    }
   }
 
   function clearToken() {
@@ -797,6 +809,27 @@ export function createMicroiV8(options = {}) {
     return request({ ...options, url, data, method: 'POST' });
   }
 
+  function postForm(url, data = {}, options = {}) {
+    const body = new URLSearchParams();
+    const formData = config.osClient && data.OsClient === undefined
+      ? { OsClient: config.osClient, ...data }
+      : data;
+    Object.keys(formData || {}).forEach((key) => {
+      const value = formData[key];
+      if (value !== undefined && value !== null) body.set(key, String(value));
+    });
+    return request({
+      ...options,
+      url,
+      data: body.toString(),
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        ...(options.headers || {})
+      }
+    });
+  }
+
   async function refreshToken() {
     if (refreshTokenPromise) return refreshTokenPromise;
     const oldToken = getToken();
@@ -933,6 +966,7 @@ export function createMicroiV8(options = {}) {
         headers: buildUploadHeaders({ ...options, headers: options.headers || {} }),
         body: formData
       });
+      handleReturnedToken(res.headers);
       const text = await res.text();
       return parseMaybeJson(text, text);
     };
@@ -954,7 +988,10 @@ export function createMicroiV8(options = {}) {
               name: options.name || 'file',
               header: buildUploadHeaders({ ...options, headers: options.headers || {} }),
               formData: uploadData,
-              success: (res) => resolve(parseMaybeJson(res.data, res.data)),
+              success: (res) => {
+                handleReturnedToken(res.header || res.headers || {});
+                resolve(parseMaybeJson(res.data, res.data));
+              },
               fail: reject
             });
           });
@@ -1316,6 +1353,7 @@ export function createMicroiV8(options = {}) {
     request,
     get,
     post,
+    postForm,
     toast,
     confirm,
     getToken,

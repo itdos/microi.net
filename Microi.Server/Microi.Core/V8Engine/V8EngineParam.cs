@@ -44,6 +44,12 @@ namespace Microi.net
         public bool? SyncRun { get; set; }
         public MqttParam MQTT { get; set; }
         public HttpContext HttpContext { get; set; }
+        /// <summary>
+        /// Optional host cancellation for durable background tasks. This is linked
+        /// with RequestAborted and the V8 timeout, and is never exposed to scripts.
+        /// </summary>
+        [JsonIgnore]
+        public CancellationToken ExternalCancellationToken { get; set; }
         public bool EnableLog { get; set; }
         public Engine Engine { get; set; }
         public string EventName { get; set; }

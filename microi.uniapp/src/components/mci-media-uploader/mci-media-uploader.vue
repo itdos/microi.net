@@ -31,7 +31,7 @@ export default {
     modelValue: { type: [String, Array, Object], default: '' },
     maxCount: { type: Number, default: 9 },
     mediaType: { type: String, default: 'image' },
-    uploadPath: { type: String, default: 'xjy/native' },
+    uploadPath: { type: String, default: '' },
     readonly: { type: Boolean, default: false },
     shape: { type: String, default: 'square' }
   },
@@ -88,7 +88,12 @@ export default {
         if (this.maxCount === 1) this.items = []
         for (const file of files) {
           const filePath = file.tempFilePath || file.path
-          const result = await V8.uploadFile(filePath, { path: this.uploadPath, multiple: this.maxCount > 1, fileName: file.name })
+          const result = await V8.uploadFile(filePath, {
+            path: this.uploadPath || (this.mediaType === 'image' ? 'img' : 'file'),
+            preview: this.mediaType === 'image',
+            multiple: this.maxCount > 1,
+            fileName: file.name
+          })
           const data = result.Data || {}
           this.items.push({ ...data, Path: data.Path, url: data.Url || filePath, localPath: filePath })
         }

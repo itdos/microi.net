@@ -69,6 +69,13 @@ namespace Microi.net
         public static TimeSpan ResolveClientTokenLifetime(OsClientSecret clientModel, string clientType)
         {
             var normalizedClientType = (clientType ?? "").Trim();
+            if (normalizedClientType.Equals(
+                    UserAccessKeySecurity.ClientType,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var minutes = ReadPositiveInt(clientModel, "AccessKeySessionTimeout");
+                return TimeSpan.FromMinutes(minutes > 0 ? minutes : 20);
+            }
             if (normalizedClientType.Equals("PC", StringComparison.OrdinalIgnoreCase))
             {
                 var minutes = ReadPositiveInt(clientModel, "SessionAuthTimeout");
@@ -492,7 +499,14 @@ namespace Microi.net
                 did = did.DosIsNullOrWhiteSpace() ? "Empty" : did;
                 var ip = IPHelper.GetClientIP(context).Data ?? "";
                 {
-                    JObject currentUser = param.CurrentUser;
+                    // Access-key scope belongs to one terminal token. Never write it
+                    // into the user's shared CurrentUser cache or a normal login on
+                    // another terminal would inherit the narrowed synthetic identity.
+                    JObject currentUser = UserAccessKeySecurity.StripSessionFields(param.CurrentUser);
+                    if (currentUser == null || currentUser["Id"] == null)
+                    {
+                        return new DosResult<CurrentToken>(0, null, "CurrentUser.Id不能为空！");
+                    }
                     List<Claim> claims = new List<Claim>();
                     var userId = currentUser["Id"].ToString();
                     var clientType = param._ClientType.DosIsNullOrWhiteSpace() ? "Empty" : param._ClientType;
@@ -505,6 +519,12 @@ namespace Microi.net
                     claims.Add(new Claim("CreateTime", dateTimeNow.ToString("yyyy-MM-dd HH:mm:ss")));
                     claims.Add(new Claim(AuthVersionClaimType, CurrentAuthVersion));
                     claims.Add(new Claim(TokenIssuedAtClaimType, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString()));
+                    if (!param.AccessKeyId.DosIsNullOrWhiteSpace())
+                    {
+                        claims.Add(new Claim(
+                            UserAccessKeySecurity.ClaimType,
+                            param.AccessKeyId.Trim()));
+                    }
                     #region header返回
                     if (context != null)
                     {
@@ -711,67 +731,8 @@ namespace Microi.net
         /// </summary>
         public static async Task<JObject> GetCurrentUser(string token, string osClient = "")
         {
-            try
-            {
-                token = token.DosTrim().DosReplace("Bearer ", "");
-                if (!token.DosIsNullOrWhiteSpace())
-                {
-                    var jwtHandler = new JwtSecurityTokenHandler();
-                    var claims = new List<Claim>();
-                    JwtSecurityToken jwtToken = null;
-
-                    try
-                    {
-                        jwtToken = jwtHandler.ReadJwtToken(token);
-                        claims = jwtToken?.Claims.ToList();
-                    }
-                    catch (System.Exception)
-                    {
-
-                    }
-
-                    if (jwtToken == null || claims == null || claims.Count == 0)
-                    {
-                        return null;
-                    }
-                    if (jwtToken.ValidTo != DateTime.MinValue && jwtToken.ValidTo < DateTime.UtcNow)
-                    {
-                        return null;
-                    }
-
-                    var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
-                    osClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
-                    var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
-                    clientType = clientType.DosIsNullOrWhiteSpace("Empty");
-
-                    if (!IsCurrentAuthVersion(claims))
-                    {
-                        return null;
-                    }
-
-                    if (!userId.DosIsNullOrWhiteSpace() && !osClient.DosIsNullOrWhiteSpace())
-                    {
-                        var DiyCacheBase = MicroiEngine.CacheTenant.Cache(osClient);
-
-                        var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{osClient}:LoginTokenSysUser:{userId}");
-                        if (tokenModel != null && tokenModel.CurrentUser != null && IsActiveCachedToken(tokenModel, token))
-                        {
-                            return tokenModel.CurrentUser;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
-                {
-                    Type = "GetCurrentToken",
-                    Title = "根据token字符串获取iTdosToken出错",
-                    Content = ex.Message,// + "。" + ex.StackTrace,
-                    OsClient = osClient //必传
-                });
-            }
-            return null;
+            var currentToken = await GetCurrentToken(token, osClient).ConfigureAwait(false);
+            return currentToken?.CurrentUser;
         }
 
         /// <summary>
@@ -825,6 +786,8 @@ namespace Microi.net
                 var attributeList = new List<object>();
                 var userId = claims?.FirstOrDefault(d => d.Type == "UserId")?.Value;
                 var clientType = claims?.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                var accessKeyId = claims?.FirstOrDefault(
+                    d => d.Type == UserAccessKeySecurity.ClaimType)?.Value;
 
 
                 clientType = clientType.DosIsNullOrWhiteSpace("Empty");
@@ -866,8 +829,20 @@ namespace Microi.net
                         Token = token
                     };
                 }
-                tokenModel.OsClient = osClient;
-                return tokenModel;
+                var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
+                        tokenModel.CurrentUser,
+                        accessKeyId,
+                        osClient)
+                    .ConfigureAwait(false);
+                if (scopedUserResult.Code != 1)
+                {
+                    return new CurrentToken
+                    {
+                        OsClient = osClient,
+                        Token = token
+                    };
+                }
+                return CloneCurrentToken(tokenModel, scopedUserResult.Data, osClient, token);
             }
             catch (Exception ex)
             {
@@ -908,6 +883,8 @@ namespace Microi.net
                         return null;
                     }
                     var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                    var accessKeyId = claims.FirstOrDefault(
+                        d => d.Type == UserAccessKeySecurity.ClaimType)?.Value;
                     clientType = clientType.DosIsNullOrWhiteSpace("Empty");
                     if (!IsCurrentAuthVersion(claims))
                     {
@@ -920,8 +897,17 @@ namespace Microi.net
                         var tokenModel = await DiyCacheBase.GetAsync<CurrentToken>($"Microi:{thisOsClient}:LoginTokenSysUser:{userId}");
                         if (tokenModel != null && tokenModel.CurrentUser != null && IsActiveCachedToken(tokenModel, token))
                         {
-                            tokenModel.OsClient = thisOsClient;
-                            return tokenModel;
+                            var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
+                                    tokenModel.CurrentUser,
+                                    accessKeyId,
+                                    thisOsClient)
+                                .ConfigureAwait(false);
+                            if (scopedUserResult.Code != 1) return null;
+                            return CloneCurrentToken(
+                                tokenModel,
+                                scopedUserResult.Data,
+                                thisOsClient,
+                                token);
                         }
                     }
                 }
@@ -937,6 +923,25 @@ namespace Microi.net
                 });
             }
             return null;
+        }
+
+        private static CurrentToken CloneCurrentToken(
+            CurrentToken source,
+            JObject currentUser,
+            string osClient,
+            string requestToken)
+        {
+            if (source == null) return null;
+            return new CurrentToken
+            {
+                CurrentUser = currentUser,
+                CreateTime = source.CreateTime,
+                UpdateTime = source.UpdateTime,
+                Token = requestToken.DosIsNullOrWhiteSpace() ? source.Token : NormalizeBearerToken(requestToken),
+                AuthVersion = source.AuthVersion,
+                Tokens = source.Tokens,
+                OsClient = osClient
+            };
         }
 
         public static async Task<TokenAuthDiagnostic> DiagnoseInactiveTokenDetail(string token, string osClient = "")

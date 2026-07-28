@@ -19,6 +19,30 @@
 
 ---
 
+## 物理数据库索引协议
+
+索引不存放在 `diy_field`，真实状态必须从数据库系统目录读取。Microi MCP 将 MySQL、SQL Server、PostgreSQL、Oracle、达梦和人大金仓统一为以下结构：
+
+| 字段 | 说明 |
+|---|---|
+| `Key_name` / `Name` | 索引名 |
+| `Column_name` | 按顺序拼接的字段名，兼容旧前端 |
+| `Columns` | 有序字段数组，索引设计与验收以此为准 |
+| `Non_unique` / `IsUnique` | `Non_unique=0` 表示唯一；新代码优先读 `IsUnique` |
+| `Index_type` | 数据库索引类型 |
+| `Is_primary` / `IsPrimary` | 主键索引标识；主键禁止通过索引管理删除 |
+
+标准工具：
+
+- `microi_get_table_indexes(tableName)`：读取并聚合真实物理索引。
+- `microi_create_table_index(tableName, columns, indexName?, unique?, confirmExecution)`：校验物理字段、幂等创建并回读。
+- `microi_drop_table_index(tableName, indexName, confirmExecution)`：幂等删除非主键索引并回读。
+- Manifest 使用 `tables[].indexes[] = { name?, columns: string[], unique?: boolean, purpose?: string }`。
+
+索引字段顺序必须来自真实查询：等值租户/业务条件在前，范围或排序字段在后。当前租户在线 DDL 一律走 MCP 标准工具，不能在 V8 或原生 SQL 中绕过。
+
+---
+
 ## 核心关系
 
 | 关联 | 含义 |

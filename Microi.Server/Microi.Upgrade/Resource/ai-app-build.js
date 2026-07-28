@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.3.7
+ * Version: v1.4.4
  * Function:
  * - AI 应用编译发布引擎：校验真实编译产物，将每个版本发布到不可变历史目录，同时原子提升无版本固定入口为最新版本；支持 VS Code 仅发布应用商城和固定最新版修复。
  */
@@ -242,6 +242,17 @@ function readPublishedBase64(path) {
   if (isBlank(url)) return fail("读取公有编译文件地址失败");
   var response = V8.Http.GetResponse({ Url: url, Timeout: 120 });
   if (!response || !response.RawBytes) return fail("下载公有编译文件失败：" + path);
+  var statusCode = parseInt(response.StatusCode || 0);
+  if (statusCode && (statusCode < 200 || statusCode >= 300)) return fail("下载公有编译文件失败，HTTP " + statusCode + "：" + path);
+  var responseContent = text(response.Content).replace(/^\s+|\s+$/g, "");
+  if (responseContent.charAt(0) === "{") {
+    try {
+      var storagePayload = JSON.parse(responseContent);
+      if (storagePayload && parseInt(storagePayload.Code) === 0) {
+        return fail("对象存储文件不可用：" + text(storagePayload.Msg, path));
+      }
+    } catch (storagePayloadError) {}
+  }
   return ok(System.Convert.ToBase64String(response.RawBytes));
 }
 function findBuildRoot(files) {
@@ -264,7 +275,8 @@ function publishTextAsset(uploadRoot, appKey, relativePath, versionNo, content) 
   var uploadedPath = upload.Data ? upload.Data.HdfsPath || "" : "";
   var targetPath = stablePublishFilePath(appKey, relativePath, versionNo);
   var moveResult = movePublicObject(uploadedPath, targetPath);
-  return ok({ Path: moveResult && moveResult.Code === 1 ? targetPath : uploadedPath, Move: moveResult });
+  if (!moveResult || moveResult.Code !== 1) return moveResult || fail("提升 HTML 到固定路径失败：" + relativePath);
+  return ok({ Path: targetPath, Move: moveResult });
 }
 function publishBase64Asset(uploadRoot, appKey, relativePath, versionNo, base64) {
   var upload = uploadBase64(uploadRoot, relativePath, base64, false);
@@ -272,7 +284,8 @@ function publishBase64Asset(uploadRoot, appKey, relativePath, versionNo, base64)
   var uploadedPath = upload.Data ? upload.Data.HdfsPath || "" : "";
   var targetPath = stablePublishFilePath(appKey, relativePath, versionNo);
   var moveResult = movePublicObject(uploadedPath, targetPath);
-  return ok({ Path: moveResult && moveResult.Code === 1 ? targetPath : uploadedPath, Move: moveResult });
+  if (!moveResult || moveResult.Code !== 1) return moveResult || fail("提升编译资产到固定路径失败：" + relativePath);
+  return ok({ Path: targetPath, Move: moveResult });
 }
 function publishCompiledFiles(files, buildRoot, appKey, versionNo) {
   // 历史版本与固定最新版各保留一份。非入口资产先发布，index.html 最后切换，
@@ -376,23 +389,22 @@ function promoteStoreAssets(app, appKey, versionNo, rawAssets) {
       var isEntry = source.isEntry === 1 || source.IsEntry === 1 || source.isEntry === true || source.IsEntry === true || relativePath.toLowerCase() === "index.html";
       if ((pass === 0 && isEntry) || (pass === 1 && !isEntry)) continue;
       var sourcePath = text(source.filePathName || source.FilePathName || source.hdfsPath || source.HdfsPath || source.url || source.Url);
-      if (isBlank(sourcePath)) return fail("编译资产缺少公有文件地址：" + relativePath);
+      var inlineBase64 = text(source.fileByteBase64 || source.FileByteBase64 || source.contentBase64 || source.ContentBase64 || source.base64 || source.Base64);
+      if (isBlank(sourcePath) && isBlank(inlineBase64)) return fail("编译资产缺少公有文件地址或内联内容：" + relativePath);
+      var sourceBase64Result = !isBlank(inlineBase64) ? ok(inlineBase64) : readPublishedBase64(sourcePath);
+      if (!sourceBase64Result || sourceBase64Result.Code !== 1) return sourceBase64Result || fail("读取商城编译资产失败");
       var versionResult;
       var latestResult;
       if (/\.html?$/i.test(relativePath)) {
-        var htmlResult = readPublishedBase64(sourcePath);
-        if (!htmlResult || htmlResult.Code !== 1) return htmlResult || fail("读取商城 HTML 失败");
-        var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(htmlResult.Data));
+        var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(sourceBase64Result.Data));
         html = injectRuntimeContext(html);
         versionResult = publishTextAsset(versionRoot, appKey, relativePath, versionNo, html);
         if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布商城历史 HTML 失败");
         latestResult = publishTextAsset(latestRoot, appKey, relativePath, "", html);
       } else {
-        var base64Result = readPublishedBase64(sourcePath);
-        if (!base64Result || base64Result.Code !== 1) return base64Result || fail("读取商城编译资产失败");
-        versionResult = publishBase64Asset(versionRoot, appKey, relativePath, versionNo, base64Result.Data);
+        versionResult = publishBase64Asset(versionRoot, appKey, relativePath, versionNo, sourceBase64Result.Data);
         if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布商城历史资产失败");
-        latestResult = publishBase64Asset(latestRoot, appKey, relativePath, "", base64Result.Data);
+        latestResult = publishBase64Asset(latestRoot, appKey, relativePath, "", sourceBase64Result.Data);
       }
       if (!latestResult || latestResult.Code !== 1) return latestResult || fail("发布商城固定最新版失败");
       var versionPath = versionResult.Data ? versionResult.Data.Path || "" : "";
@@ -426,6 +438,59 @@ function promoteStoreAssets(app, appKey, versionNo, rawAssets) {
     Assets: promoted,
     AssetCount: promoted.length
   });
+}
+/* PARALLEL_SINGLE_ASSET_PROMOTION_V1
+ * 大型 UniApp 的静态资源可由受信任发布端并发调用本动作；每个请求只处理一个
+ * 文件，index.html 必须由调用端最后提交，从而在其余资源完整后原子切换入口。
+ */
+function promoteStoreAsset(app, appKey, versionNo, source) {
+  source = source || {};
+  var relativePath = normalizePath(source.path || source.Path || source.fileName || source.FileName);
+  if (isBlank(relativePath)) return fail("编译资产路径不能为空");
+  var sourcePath = text(source.filePathName || source.FilePathName || source.hdfsPath || source.HdfsPath || source.url || source.Url);
+  var inlineBase64 = text(source.fileByteBase64 || source.FileByteBase64 || source.contentBase64 || source.ContentBase64 || source.base64 || source.Base64);
+  if (isBlank(sourcePath) && isBlank(inlineBase64)) return fail("编译资产缺少公有文件地址或内联内容：" + relativePath);
+  var sourceBase64Result = !isBlank(inlineBase64) ? ok(inlineBase64) : readPublishedBase64(sourcePath);
+  if (!sourceBase64Result || sourceBase64Result.Code !== 1) return sourceBase64Result || fail("读取商城编译资产失败");
+
+  var normalizedVersion = normalizeVersion(versionNo);
+  var versionRoot = "ai-app-publish/" + appKey + "/versions/" + normalizePath(normalizedVersion);
+  var latestRoot = "ai-app-publish/" + appKey;
+  var isEntry = source.isEntry === 1 || source.IsEntry === 1 || source.isEntry === true || source.IsEntry === true || relativePath.toLowerCase() === "index.html";
+  var versionResult;
+  var latestResult;
+  if (/\.html?$/i.test(relativePath)) {
+    var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(sourceBase64Result.Data));
+    html = injectRuntimeContext(html);
+    versionResult = publishTextAsset(versionRoot, appKey, relativePath, normalizedVersion, html);
+    if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布商城历史 HTML 失败");
+    latestResult = publishTextAsset(latestRoot, appKey, relativePath, "", html);
+  } else {
+    versionResult = publishBase64Asset(versionRoot, appKey, relativePath, normalizedVersion, sourceBase64Result.Data);
+    if (!versionResult || versionResult.Code !== 1) return versionResult || fail("发布商城历史资产失败");
+    latestResult = publishBase64Asset(latestRoot, appKey, relativePath, "", sourceBase64Result.Data);
+  }
+  if (!latestResult || latestResult.Code !== 1) return latestResult || fail("发布商城固定最新版失败");
+
+  var versionPath = versionResult.Data ? versionResult.Data.Path || "" : "";
+  var latestPath = latestResult.Data ? latestResult.Data.Path || "" : "";
+  var fileUpdate = upsertPublishedBuildFile(app, relativePath, source, versionPath, latestPath);
+  if (!fileUpdate || fileUpdate.Code !== 1) return fileUpdate || fail("写入商城编译资产元数据失败");
+  var result = {
+    Path: relativePath,
+    FilePathName: versionPath,
+    StableFilePathName: latestPath,
+    Size: parseInt(source.size || source.Size || 0),
+    Sha256: source.sha256 || source.Sha256 || source.hash || source.Hash || "",
+    IsEntry: isEntry
+  };
+  if (isEntry) {
+    result.PublishPath = latestPath;
+    result.VersionPublishPath = versionPath;
+    result.PreviewUrl = publicDomainUrl(latestPath) || getFileUrl(latestPath, false);
+    result.VersionPreviewUrl = publicDomainUrl(versionPath) || getFileUrl(versionPath, false);
+  }
+  return ok(result, isEntry ? "入口与运行上下文已发布" : "编译资产已发布");
 }
 function latestVersion(appId, versionNo) {
   var where = [["AppId", "=", appId]];
@@ -678,10 +743,42 @@ if (isBlank(appId)) return fail("AppId不能为空");
 var app = getApp(appId);
 if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI应用不存在" };
 var requestedAction = text(V8.Param.Action || "Build");
+if (requestedAction === "PromoteStoreAsset") {
+  var singleAppKey = ensureAppKey(app.Data);
+  var singleVersionNo = normalizeVersion(V8.Param.VersionNo || V8.Param.AppVersion || app.Data.CurrentVersion || 1);
+  var singleAsset = V8.Param.Asset || null;
+  if (!isBlank(V8.Param.AssetJson)) {
+    try {
+      singleAsset = JSON.parse(text(V8.Param.AssetJson));
+    } catch (singleAssetJsonError) {
+      return fail("AssetJson不是有效的 JSON 对象：" + singleAssetJsonError.message);
+    }
+  }
+  var singleResult = promoteStoreAsset(app.Data, singleAppKey, singleVersionNo, singleAsset);
+  if (!singleResult || singleResult.Code !== 1) return singleResult || fail("商城编译资产发布失败");
+  return ok({
+    AppId: appId,
+    AppKey: singleAppKey,
+    VersionNo: singleVersionNo,
+    Asset: singleResult.Data,
+    PreviewUrl: singleResult.Data.PreviewUrl || "",
+    VersionPreviewUrl: singleResult.Data.VersionPreviewUrl || "",
+    PublishPath: singleResult.Data.PublishPath || "",
+    VersionPublishPath: singleResult.Data.VersionPublishPath || ""
+  }, singleResult.Msg);
+}
 if (requestedAction === "PromoteStoreAssets") {
   var promotedAppKey = ensureAppKey(app.Data);
   var promotedVersionNo = normalizeVersion(V8.Param.VersionNo || V8.Param.AppVersion || app.Data.CurrentVersion || 1);
-  var promotedResult = promoteStoreAssets(app.Data, promotedAppKey, promotedVersionNo, V8.Param.Assets);
+  var promotedAssets = V8.Param.Assets;
+  if (!isBlank(V8.Param.AssetsJson)) {
+    try {
+      promotedAssets = JSON.parse(text(V8.Param.AssetsJson));
+    } catch (assetsJsonError) {
+      return fail("AssetsJson不是有效的 JSON 数组：" + assetsJsonError.message);
+    }
+  }
+  var promotedResult = promoteStoreAssets(app.Data, promotedAppKey, promotedVersionNo, promotedAssets);
   if (!promotedResult || promotedResult.Code !== 1) return promotedResult || fail("商城编译资产发布失败");
   return ok({
     AppId: appId,
@@ -702,23 +799,31 @@ if (requestedAction === "RepairStableLatest") {
     : normalizeVersion(app.Data.CurrentVersion || 1);
   var repairAppKey = ensureAppKey(app.Data);
   var repairResult = null;
-  // 修复必须以版本表记录的最新不可变资产为事实源，不能拿 mci_ai_app_file.HdfsPath
-  // 中可能残留的旧构建覆盖根入口。
-  if (repairLatest && repairLatest.Code === 1 && repairLatest.Data && repairLatest.Data.length) {
+  // 优先以当前完整 dist/build 目录为事实源。历史上曾有只发布
+  // index.html + 认证桥接脚本的补丁版本；若直接按该 BuildLog 修复，
+  // 会把稳定入口切到一个缺少哈希 JS/CSS 的不完整版本并造成白板。
+  var repairFilesResult = getFiles(appId);
+  if (!repairFilesResult || repairFilesResult.Code !== 1) return repairFilesResult || fail("读取源码失败");
+  var repairFiles = repairFilesResult.Data || [];
+  var repairBuildRoot = findBuildRoot(repairFiles);
+  if (!isBlank(repairBuildRoot)) {
+    repairResult = publishCompiledFiles(repairFiles, repairBuildRoot, repairAppKey, repairVersionNo);
+  }
+  // 仅当源码记录中没有完整编译目录时，才回退到历史不可变资产清单。
+  if (!repairResult && repairLatest && repairLatest.Code === 1 && repairLatest.Data && repairLatest.Data.length) {
     var repairBuildLog = {};
     try { repairBuildLog = JSON.parse(text(repairLatest.Data[0].BuildLog)); } catch (repairLogError) { repairBuildLog = {}; }
     var repairVersionAssets = toArray(repairBuildLog.Assets);
-    if (repairVersionAssets.length) {
+    var repairHasEntry = false;
+    for (var repairAssetIndex = 0; repairAssetIndex < repairVersionAssets.length; repairAssetIndex++) {
+      if (normalizePath(repairVersionAssets[repairAssetIndex].Path).toLowerCase() === "index.html") repairHasEntry = true;
+    }
+    if (repairHasEntry && repairVersionAssets.length) {
       repairResult = promoteStoreAssets(app.Data, repairAppKey, repairVersionNo, repairVersionAssets);
     }
   }
   if (!repairResult) {
-    var repairFilesResult = getFiles(appId);
-    if (!repairFilesResult || repairFilesResult.Code !== 1) return repairFilesResult || fail("读取源码失败");
-    var repairFiles = repairFilesResult.Data || [];
-    var repairBuildRoot = findBuildRoot(repairFiles);
-    if (isBlank(repairBuildRoot)) return fail("当前应用没有可修复的真实编译产物");
-    repairResult = publishCompiledFiles(repairFiles, repairBuildRoot, repairAppKey, repairVersionNo);
+    return fail("当前应用没有可修复的完整编译产物");
   }
   if (!repairResult || repairResult.Code !== 1) return repairResult || fail("固定最新版入口修复失败");
   var repairPublicPath = repairResult.Data.PublishPath || repairResult.Data.EntryPath;

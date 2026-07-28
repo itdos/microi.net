@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 const GB = 1024 ** 3;
@@ -48,6 +49,15 @@ const rawArgs = process.argv.slice(2);
 const dryRun = rawArgs.includes('--dry-run');
 const legacyOnly = rawArgs.includes('--legacy-only');
 const viteArgs = ['build', ...rawArgs.filter((arg) => arg !== '--dry-run' && arg !== '--legacy-only')];
+const interactiveInput = process.stdin.isTTY || process.env.MICROI_BUILD_INTERACTIVE === '1';
+const skipMemoryWaitFromEnv = /^(?:1|true|yes|on)$/i.test(
+    String(process.env.MICROI_BUILD_SKIP_MEMORY_WAIT || '').trim()
+);
+
+let memoryWaitBypassed = skipMemoryWaitFromEnv;
+let waitingForMemory = false;
+let memoryWaitInput = null;
+let finishMemoryWaitPoll = null;
 
 function formatGb(bytes) {
     return (bytes / GB).toFixed(1);
@@ -144,21 +154,108 @@ function readLogTail(logPath, lineCount = 60) {
     return readFileSync(logPath, 'utf8').split(/\r?\n/).slice(-lineCount).join('\n');
 }
 
-function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+function waitForMemoryPoll(ms) {
+    if (memoryWaitBypassed) return Promise.resolve();
+
+    return new Promise((resolve) => {
+        let settled = false;
+        let timer = null;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (finishMemoryWaitPoll === finish) finishMemoryWaitPoll = null;
+            resolve();
+        };
+        timer = setTimeout(finish, ms);
+        finishMemoryWaitPoll = finish;
+    });
+}
+
+function printMemoryWaitBypassHint() {
+    if (interactiveInput) {
+        console.warn(
+            '[Microi build guard] 如需忽略内存保护继续，请输入 s（或 skip）后按回车。'
+        );
+        return;
+    }
+
+    console.warn(
+        '[Microi build guard] 当前不是交互终端；无人值守时可设置 ' +
+        'MICROI_BUILD_SKIP_MEMORY_WAIT=1 跳过本次构建的内存等待。'
+    );
+}
+
+function bypassMemoryWait(source) {
+    if (memoryWaitBypassed) return;
+
+    memoryWaitBypassed = true;
+    waitingForMemory = false;
+    finishMemoryWaitPoll?.();
+    console.warn(
+        `\n[Microi build guard] 已通过${source}跳过内存等待；` +
+        '本次前端构建余下阶段不再自动等待或暂停。内存不足时仍可能构建失败或影响系统稳定。'
+    );
+
+    if (!pausedForMemory || !activeChild?.pid) return;
+
+    const result = setProcessTreeSuspended(activeChild.pid, false);
+    if (!result.ok) {
+        stoppedForMemory = true;
+        console.error(
+            `[Microi build guard] 无法恢复已暂停的构建进程树（${result.detail}），` +
+            '正在终止本次构建树，避免留下挂起进程。'
+        );
+        stopProcessTree(activeChild.pid);
+        return;
+    }
+
+    pausedForMemory = false;
+    resumeStableSamples = 0;
+    lastProgressAt = Date.now();
+    console.warn(`[Microi build guard] 已强制继续${activePhaseName}。`);
+}
+
+function startMemoryWaitInput() {
+    if (!interactiveInput || !process.stdin.readable || process.stdin.destroyed) return;
+
+    memoryWaitInput = readline.createInterface({
+        input: process.stdin,
+        crlfDelay: Infinity
+    });
+    memoryWaitInput.on('line', (line) => {
+        if (!waitingForMemory) return;
+
+        const command = line.trim().toLowerCase();
+        if (command === 's' || command === 'skip') {
+            bypassMemoryWait('用户指令');
+        } else if (command) {
+            console.warn('[Microi build guard] 未识别该指令；请输入 s（或 skip）后按回车。');
+        }
+    });
+}
+
+function closeMemoryWaitInput() {
+    memoryWaitInput?.close();
+    memoryWaitInput = null;
 }
 
 async function waitForStartMemory(context) {
+    if (memoryWaitBypassed) return;
+
     let available = os.freemem();
     if (available >= requiredStartMemory) return;
 
+    waitingForMemory = true;
     console.warn(
         `[Microi build guard] ${context}前可用内存 ${formatGb(available)} GB，` +
         `低于启动目标 ${formatGb(requiredStartMemory)} GB；暂不启动新构建，等待内存恢复。`
     );
+    printMemoryWaitBypassHint();
     let lastWaitLogAt = 0;
-    while (available < requiredStartMemory) {
-        await delay(5000);
+    while (available < requiredStartMemory && !memoryWaitBypassed) {
+        await waitForMemoryPoll(5000);
+        if (memoryWaitBypassed) break;
         available = os.freemem();
         if (Date.now() - lastWaitLogAt >= 30000) {
             lastWaitLogAt = Date.now();
@@ -169,6 +266,9 @@ async function waitForStartMemory(context) {
             );
         }
     }
+    waitingForMemory = false;
+    if (memoryWaitBypassed) return;
+
     console.log(
         `[Microi build guard] 内存已恢复到 ${formatGb(available)} GB，继续${context}。`
     );
@@ -182,6 +282,11 @@ console.log(
     `[Microi build guard] 启动前保留内存目标 ${formatGb(reserveMemory)} GB；` +
     '全机占用达到 95% 时自动暂停整个构建进程树，降至 90% 并稳定 5 秒后继续。'
 );
+if (skipMemoryWaitFromEnv) {
+    console.warn(
+        '[Microi build guard] 已通过 MICROI_BUILD_SKIP_MEMORY_WAIT 跳过本次构建的全部内存等待和自动暂停。'
+    );
+}
 
 if (!existsSync(viteBin)) {
     console.error('[Microi build guard] 未找到本地 Vite，请先执行 npm install。');
@@ -189,7 +294,9 @@ if (!existsSync(viteBin)) {
 }
 
 if (dryRun) {
-    if (freeMemory < requiredStartMemory) {
+    if (memoryWaitBypassed) {
+        console.log('[Microi build guard] dry-run：实际构建将按配置跳过内存等待和自动暂停。');
+    } else if (freeMemory < requiredStartMemory) {
         console.log(
             `[Microi build guard] dry-run：当前可用 ${formatGb(freeMemory)} GB；` +
             `实际构建会等待到 ${formatGb(requiredStartMemory)} GB 后再启动。`
@@ -208,6 +315,8 @@ let activePhaseName = '';
 let phaseStartFreeMemory = freeMemory;
 let lastProgressAt = 0;
 let warnedForPhaseMemory = false;
+
+startMemoryWaitInput();
 
 mkdirSync(logDir, { recursive: true });
 writeFileSync(guardPidPath, `${process.pid}\n`, 'utf8');
@@ -258,6 +367,7 @@ const monitor = setInterval(() => {
         }
 
         pausedForMemory = false;
+        waitingForMemory = false;
         resumeStableSamples = 0;
         lastProgressAt = Date.now();
         console.log(
@@ -267,7 +377,7 @@ const monitor = setInterval(() => {
         return;
     }
 
-    if (systemMemoryUsageRatio < pauseMemoryUsageRatio || stoppedForMemory) return;
+    if (memoryWaitBypassed || systemMemoryUsageRatio < pauseMemoryUsageRatio || stoppedForMemory) return;
 
     const reason = `全机内存占用已达 ${formatPercent(systemMemoryUsageRatio)}%（可用 ${formatGb(available)} GB）`;
     console.warn(`\n[Microi build guard] ${reason}，正在暂停${activePhaseName}进程树。`);
@@ -281,6 +391,8 @@ const monitor = setInterval(() => {
             `全机占用降至 ${formatPercent(resumeMemoryUsageRatio)}% 并稳定 ` +
             `${resumeStableSampleCount} 秒后自动继续。`
         );
+        waitingForMemory = true;
+        printMemoryWaitBypassHint();
         return;
     }
 
@@ -294,6 +406,7 @@ const monitor = setInterval(() => {
 
 const handleSignal = (signal) => {
     clearInterval(monitor);
+    closeMemoryWaitInput();
     if (pausedForMemory && activeChild?.pid) {
         setProcessTreeSuspended(activeChild.pid, false);
     }
@@ -313,6 +426,7 @@ async function runVitePhase(name, variant, outDir) {
         lastProgressAt = 0;
         warnedForPhaseMemory = false;
         pausedForMemory = false;
+        waitingForMemory = false;
         resumeStableSamples = 0;
 
         mkdirSync(logDir, { recursive: true });
@@ -344,6 +458,7 @@ async function runVitePhase(name, variant, outDir) {
             closeLog();
             activeChild = null;
             pausedForMemory = false;
+            waitingForMemory = false;
             resumeStableSamples = 0;
             reject(new Error(`无法启动 ${name} Vite：${error.message}`));
         });
@@ -351,6 +466,7 @@ async function runVitePhase(name, variant, outDir) {
             closeLog();
             activeChild = null;
             pausedForMemory = false;
+            waitingForMemory = false;
             resumeStableSamples = 0;
             if (stoppedForMemory) {
                 reject(new Error(`${name}构建触发内存保护。`));
@@ -381,6 +497,7 @@ async function runLegacyConversionPhase() {
         lastProgressAt = 0;
         warnedForPhaseMemory = false;
         pausedForMemory = false;
+        waitingForMemory = false;
         resumeStableSamples = 0;
 
         mkdirSync(logDir, { recursive: true });
@@ -414,6 +531,7 @@ async function runLegacyConversionPhase() {
             closeLog();
             activeChild = null;
             pausedForMemory = false;
+            waitingForMemory = false;
             resumeStableSamples = 0;
             reject(new Error(`无法启动 ${name}：${error.message}`));
         });
@@ -421,6 +539,7 @@ async function runLegacyConversionPhase() {
             closeLog();
             activeChild = null;
             pausedForMemory = false;
+            waitingForMemory = false;
             resumeStableSamples = 0;
             if (stoppedForMemory) {
                 reject(new Error(`${name}触发内存保护。`));
@@ -460,5 +579,6 @@ try {
     process.exitCode = stoppedForMemory ? 137 : 1;
 } finally {
     clearInterval(monitor);
+    closeMemoryWaitInput();
     rmSync(guardPidPath, { force: true });
 }

@@ -153,6 +153,9 @@ ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
                     catch { }
                 }
                 retainCount = Math.Max(1, Math.Min(100, retainCount <= 0 ? 7 : retainCount));
+                var scheduledRunKey = param["JobRunId"]?.ToString()
+                                      ?? param["FireTime"]?.ToString()
+                                      ?? DateTime.Now.ToString("yyyyMMddHHmm");
                 var task = BackgroundTaskService.StartApiEngine(
                     DatabaseBackupService.RequiredOsClient,
                     userId,
@@ -163,7 +166,12 @@ ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
                         ["TriggerType"] = "Scheduled",
                         ["RetainCount"] = retainCount
                     },
-                    trustedUser);
+                    trustedUser,
+                    new JObject
+                    {
+                        ["IdempotencyKey"] = $"database-backup:{jobId}:{scheduledRunKey}",
+                        ["ConcurrencyKey"] = "database-backup"
+                    });
                 return new DosResult(1, new
                 {
                     TaskId = task.Id,

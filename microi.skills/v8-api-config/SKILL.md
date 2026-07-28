@@ -93,7 +93,7 @@ return { Code: 1 };
 
 `LockKey` 可包含 `${V8.OsClient}` 实现按租户独立锁。
 
-分布式锁不是“业务只执行一次”的最终保证。扣款、库存、积分、流水、对账等副作用还必须使用稳定幂等键、数据库唯一约束/条件更新、状态机或 outbox/inbox；锁 Key 至少包含 `OsClient + 业务唯一标识`，超时必须大于正常执行时间。
+分布式锁不是“业务只执行一次”的最终保证。扣款、库存、积分、流水、对账等副作用还必须使用稳定幂等键、数据库唯一约束/条件更新、状态机或 outbox/inbox；锁 Key 至少包含 `OsClient + 业务唯一标识`，超时必须大于正常执行时间。所需唯一索引必须写入 Manifest `tables[].indexes` 并通过 `microi_create_table_index` 创建、`microi_get_table_indexes` 回读，接口引擎本身禁止执行索引 DDL。
 
 ## 4. 自定义路径（ApiAddress）
 

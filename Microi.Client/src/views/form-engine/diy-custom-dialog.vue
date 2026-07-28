@@ -27,10 +27,13 @@
                     </div>
                 </div>
             </template>
-            <div class="clear">
-                <template v-if="!DiyCommon.IsNull(ComponentName)">
-                    <component v-if="!DiyCommon.IsNull(ComponentName)" :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
-                </template>
+            <div class="clear diy-custom-dialog__body" :class="{ 'diy-custom-dialog__body--micro-app': isMicroAppDialog }" :style="dialogBodyStyle">
+                <Suspense v-if="!DiyCommon.IsNull(ComponentName)">
+                    <component :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
+                    <template #fallback>
+                        <MicroAppLoadingSkeleton v-if="isMicroAppDialog" />
+                    </template>
+                </Suspense>
             </div>
         </el-dialog>
         <!--以抽屉形式打开Form-->
@@ -59,12 +62,15 @@
                 </div>
             </template>
 
-            <div class="clear">
+            <div class="clear diy-custom-dialog__body" :class="{ 'diy-custom-dialog__body--micro-app': isMicroAppDialog }" :style="dialogBodyStyle">
                 <!-- && !DiyCommon.IsNull(ComponentPath) -->
                 <!-- :DataAppend="GetDataAppend(field)" -->
-                <template v-if="!DiyCommon.IsNull(ComponentName)">
+                <Suspense v-if="!DiyCommon.IsNull(ComponentName)">
                     <component :is="ComponentName" :DataAppend="DataAppend" @FormSet="FormSet" :pageLifetimes="pageLifetimes" />
-                </template>
+                    <template #fallback>
+                        <MicroAppLoadingSkeleton v-if="isMicroAppDialog" />
+                    </template>
+                </Suspense>
             </div>
         </el-drawer>
     </div>
@@ -73,17 +79,29 @@
 <script>
 import { computed } from "vue";
 import { useDiyStore } from "@/pinia";
+import MicroAppLoadingSkeleton from "@/views/micro-app/loading-skeleton.vue";
 export default {
     name: "DiyCustomDialog",
     directives: {},
-    components: {},
+    components: { MicroAppLoadingSkeleton },
     setup() {
         const diyStore = useDiyStore();
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
         const OsClient = computed(() => diyStore.OsClient);
         return { diyStore, GetCurrentUser, OsClient };
     },
-    computed: {},
+    computed: {
+        isMicroAppDialog() {
+            return String(this.ComponentName || "").toLowerCase() === "microappdialog";
+        },
+        dialogBodyStyle() {
+            if (!this.BodyHeight) return {};
+            return {
+                height: this.BodyHeight,
+                minHeight: this.BodyHeight
+            };
+        }
+    },
     props: {
         DataAppend: {
             type: Object,
@@ -104,6 +122,10 @@ export default {
         width: {
             type: String,
             default: "50%"
+        },
+        BodyHeight: {
+            type: String,
+            default: ""
         },
         ComponentName: {
             type: String,
@@ -166,5 +188,15 @@ export default {
 .diy-custom-dialog__actions {
     flex: 0 0 auto;
     margin-left: auto;
+}
+
+.diy-custom-dialog__body--micro-app {
+    overflow: hidden;
+}
+
+.diy-custom-dialog__body--micro-app :deep(.micro-app-skeleton) {
+    height: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
 }
 </style>

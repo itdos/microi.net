@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using System.Threading;
 using Dos.ORM;
 using Newtonsoft.Json.Linq;
 
@@ -11,5 +12,10 @@ namespace Microi.net
     public interface IBackgroundTaskApiEngineRunner
     {
         Task<dynamic> RunBackgroundAsync(dynamic dynamicParam, JObject trustedCurrentUser, DbTrans _trans = null);
+        Task<dynamic> RunBackgroundAsync(
+            dynamic dynamicParam,
+            JObject trustedCurrentUser,
+            CancellationToken cancellationToken,
+            DbTrans _trans = null);
     }
 }

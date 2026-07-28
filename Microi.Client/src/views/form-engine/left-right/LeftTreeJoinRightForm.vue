@@ -109,15 +109,8 @@ export default {
          * 获取页面初始化配置项方法
          * */
         async getPageConfigureItems() {
-            var res = await this.DiyCommon.FormEngine.GetFormData({
-                FormEngineKey: "diy_LeftJoinRightView",
-                _Where: [
-                    {
-                        Name: "GuanlianCD",
-                        Value: this.MenuId,
-                        Type: "Like"
-                    }
-                ]
+            var res = await this.DiyCommon.PostAsync(this.DiyApi.GetLeftRightPageConfig, {
+                SysMenuId: this.MenuId
             });
             if (res.Code !== 1) {
                 this.DiyCommon.Tips(res.Msg, false);

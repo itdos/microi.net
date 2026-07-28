@@ -1,5 +1,14 @@
 <template>
-    <el-dialog :model-value="visible" :title="$t('Msg.IndexManager')" width="900px" draggable @close="$emit('close')" :destroy-on-close="true">
+    <el-dialog
+        :model-value="visible"
+        :title="$t('Msg.IndexManager')"
+        width="min(960px, 94vw)"
+        draggable
+        align-center
+        append-to-body
+        @close="$emit('close')"
+        :destroy-on-close="true"
+    >
         <div class="index-manager">
             <!-- 索引创建建议 -->
             <el-alert
@@ -36,7 +45,7 @@
                     <el-table-column prop="Column_name" :label="$t('Msg.Field')" min-width="140" show-overflow-tooltip />
                     <el-table-column :label="$t('Msg.Unique')" width="80" align="center">
                         <template #default="scope">
-                            <el-tag v-if="scope.row.Non_unique == 0 || scope.row.Non_unique === '0'" size="small" type="success" effect="plain">{{ $t('Msg.Yes') }}</el-tag>
+                            <el-tag v-if="scope.row.IsUnique === true || scope.row.Non_unique == 0 || scope.row.Non_unique === '0'" size="small" type="success" effect="plain">{{ $t('Msg.Yes') }}</el-tag>
                             <el-tag v-else size="small" type="info" effect="plain">{{ $t('Msg.No') }}</el-tag>
                         </template>
                     </el-table-column>
@@ -44,7 +53,7 @@
                     <el-table-column :label="$t('Msg.Action')" width="100" align="center" fixed="right">
                         <template #default="scope">
                             <el-popconfirm
-                                v-if="scope.row.Key_name !== 'PRIMARY'"
+                                v-if="!IsPrimaryIndex(scope.row)"
                                 :title="$t('Msg.ConfirmDeleteIndex') + ' ' + scope.row.Key_name + '?'"
                                 :confirm-button-text="$t('Msg.Delete')"
                                 :cancel-button-text="$t('Msg.Cancel')"
@@ -75,7 +84,7 @@
                         </el-select>
                     </el-form-item>
                     <el-form-item :label="$t('Msg.IndexName')">
-                        <el-input v-model="addForm.IndexName" :placeholder="$t('Msg.IndexNamePlaceholder')" style="width: 100%" />
+                        <el-input v-model="addForm.IndexName" maxlength="64" show-word-limit :placeholder="$t('Msg.IndexNamePlaceholder')" style="width: 100%" />
                     </el-form-item>
                     <el-form-item :label="$t('Msg.UniqueIndex')">
                         <el-switch v-model="addForm.IndexUnique" />
@@ -118,8 +127,13 @@ export default {
     },
     computed: {
         fieldOptions() {
-            if (!this.diyFieldList || this.diyFieldList.length === 0) return [];
-            return this.diyFieldList.filter(f => f.Name && f.Name !== "Id");
+            var result = (this.diyFieldList || []).filter(f => f.Name && f.Name !== "Id").map(f => ({ ...f }));
+            ["OsClient", "CreateTime", "UpdateTime", "CreateUser"].forEach(name => {
+                if (!result.some(field => String(field.Name).toLowerCase() === name.toLowerCase())) {
+                    result.push({ Name: name, Label: name });
+                }
+            });
+            return result;
         }
     },
     mounted() {
@@ -135,6 +149,14 @@ export default {
         }
     },
     methods: {
+        IsPrimaryIndex(row) {
+            return row && (
+                row.IsPrimary === true
+                || row.Is_primary === 1
+                || row.Is_primary === "1"
+                || String(row.Key_name || "").toUpperCase() === "PRIMARY"
+            );
+        },
         GetIndexes() {
             var self = this;
             if (!self.tableName) return;

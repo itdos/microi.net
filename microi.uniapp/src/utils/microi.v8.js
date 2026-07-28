@@ -211,6 +211,18 @@ function normalizeClientUploadPath(value) {
   return parts.join('/');
 }
 
+const INTERACTIVE_UPLOAD_ROOTS = new Set(['file', 'img', 'avatar', 'editor']);
+
+function normalizeInteractiveUploadPath(value, options, action) {
+  const requested = normalizeClientUploadPath(value);
+  if (action !== 'UniappUpload' || options.allowCustomPath === true) return requested;
+  if (!requested.includes('/') && INTERACTIVE_UPLOAD_ROOTS.has(requested.toLowerCase())) {
+    return requested.toLowerCase();
+  }
+  // 后端负责在 HDFS 对象路径中追加 OsClient 和日期；交互式普通用户只提交平台一级目录。
+  return options.preview === false ? 'file' : 'img';
+}
+
 function normalizeFileUrlData(data, assetUrl, fallback = '') {
   const raw = Array.isArray(data) ? (data[0] || '') : (data || '');
   if (typeof raw === 'string') return assetUrl(raw || fallback);
@@ -932,7 +944,11 @@ export function createMicroiV8(options = {}) {
       Preview: options.preview === false ? 'false' : 'true',
       Multiple: options.multiple ? 'true' : 'false'
     };
-    uploadData.Path = normalizeClientUploadPath(options.path || uploadData.Path || uploadData.path || 'upload');
+    uploadData.Path = normalizeInteractiveUploadPath(
+      options.path || uploadData.Path || uploadData.path || (options.preview === false ? 'file' : 'img'),
+      options,
+      action
+    );
     delete uploadData.path;
 
     let body;

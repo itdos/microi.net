@@ -323,7 +323,7 @@
                                         <el-icon><CircleCheck /></el-icon>{{ $t('Msg.MenuPermission') }}
                                     </el-dropdown-item>
                                     <el-dropdown-item divided @click="ShowIndexManager = true">
-                                        <el-icon><Grid /></el-icon>{{ $t('Msg.IndexManager') }}
+                                        <fa-icon icon="fas fa-database" class="mr-1" />{{ $t('Msg.IndexManager') }}
                                     </el-dropdown-item>
                                 </el-dropdown-menu>
                             </template>
@@ -1379,6 +1379,7 @@
             :title="DiyCustomDialogConfig.Title"
             :TitleIcon="DiyCustomDialogConfig.TitleIcon"
             :width="DiyCustomDialogConfig.Width"
+            :BodyHeight="DiyCustomDialogConfig.BodyHeight"
             :ComponentName="DiyCustomDialogConfig.ComponentName"
             :ComponentPath="DiyCustomDialogConfig.ComponentPath"
             ref="refDiyCustomDialog"
