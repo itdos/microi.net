@@ -3,7 +3,8 @@ import {
   reverseGeocode
 } from '@/platform/location.js'
 import {
-  normalizeOptions
+  normalizeOptions,
+  parseJson
 } from '@/platform/native-form.js'
 import {
   V8,
@@ -103,6 +104,10 @@ function isCheckinAdd(context) {
 function isFollowupAdd(context) {
   return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE &&
     context.mode === 'Add' && !context.rowId
+}
+
+function isFollowupForm(context) {
+  return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE
 }
 
 function isProposalForm(context) {
@@ -274,7 +279,7 @@ function setLocalFieldOptions(field, rows) {
     Sql: '',
     DataSourceSqlRemote: false,
     SelectLabel: 'Xingming',
-    SelectSaveField: 'Id'
+    SelectSaveField: ''
   }
   field.Config = JSON.stringify(field.config)
   field.Data = data
@@ -286,6 +291,78 @@ function setLocalFieldOptions(field, rows) {
   field.optionsRemote = false
   field.optionsLoading = false
   field.optionError = ''
+}
+
+function contactSubmitValue(value, rows) {
+  const source = value && typeof value === 'object' ? value : {}
+  const id = String(personValue(source, ['Id', 'ID', 'id']) || value || '').trim()
+  const matched = (Array.isArray(rows) ? rows : []).find((row) =>
+    String(personValue(row, ['Id', 'ID', 'id'])) === id
+  )
+  if (matched && typeof matched === 'object') return { ...matched }
+  return id ? { ...source, Id: id } : null
+}
+
+function normalizeFollowupContactSelection(context, rows, requireNames = false) {
+  const contactName = fieldName(context, FOLLOWUP_FIELDS.contacts, '联系人')
+  const parsed = parseJson(context.form[contactName], context.form[contactName])
+  const values = Array.isArray(parsed) ? parsed : parsed ? [parsed] : []
+  const normalized = values.map((value) => contactSubmitValue(value, rows)).filter(Boolean)
+  if (requireNames && normalized.some((value) => !value.Xingming)) {
+    throw new Error('联系人信息不完整，请重新选择联系人')
+  }
+  if (normalized.length) context.patchForm({ [contactName]: normalized })
+}
+
+function selectedCustomer(context, payload = {}) {
+  if (payload.cleared) return { id: '', name: '' }
+  const row = payload.raw && typeof payload.raw === 'object'
+    ? payload.raw
+    : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
+      ? payload.option.raw
+      : {}
+  const fromSelection = Boolean(payload.field)
+  const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
+  const customerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+  return {
+    id: personValue(row, ['Id', 'ID', 'id', 'KehuID', 'KehuId', 'CustomerId', 'CustomerID']) ||
+      (fromSelection ? '' : context.form[customerIdName] || context.state.followupCustomerId || ''),
+    name: personValue(row, ['KehuMC', 'Name', 'name', 'CustomerName']) ||
+      payload.value || (fromSelection ? '' : context.form[customerNameField] || context.state.followupCustomerName || '')
+  }
+}
+
+async function resolveFollowupCustomer(context, requireUnique = false) {
+  const current = selectedCustomer(context)
+  const normalizedId = String(current.id || '').trim()
+  const normalizedName = String(current.name || '').trim()
+  if (normalizedId) return { id: normalizedId, name: normalizedName }
+  if (!normalizedName) {
+    if (requireUnique) throw new Error('请选择客户')
+    return { id: '', name: '' }
+  }
+
+  const result = await V8.FormEngine.GetTableData(CUSTOMER_TABLE, {
+    _Where: [['KehuMC', '=', normalizedName]],
+    _SelectFields: ['Id', 'KehuMC'],
+    _PageIndex: 1,
+    _PageSize: 2
+  })
+  if (!result || Number(result.Code) !== 1) {
+    if (requireUnique) throw new Error((result && result.Msg) || '客户关联信息加载失败')
+    return { id: '', name: normalizedName }
+  }
+  const rows = Array.isArray(result.Data) ? result.Data : []
+  if (rows.length !== 1) {
+    if (requireUnique) {
+      throw new Error(rows.length > 1 ? '存在同名客户，请重新选择客户' : '未找到所选客户，请重新选择')
+    }
+    return { id: '', name: normalizedName }
+  }
+  return {
+    id: String(personValue(rows[0], ['Id', 'ID', 'id']) || '').trim(),
+    name: String(personValue(rows[0], ['KehuMC', 'Name', 'name']) || normalizedName).trim()
+  }
 }
 
 async function loadFollowupContacts(context, customerId, clearSelection = false) {
@@ -333,6 +410,8 @@ async function loadFollowupContacts(context, customerId, clearSelection = false)
       if (pageRows.length < pageSize || (total > 0 && rows.length >= total)) break
     }
     contactFields.forEach((field) => setLocalFieldOptions(field, rows))
+    // zhy：联系人按平台对象数组契约保存数据源返回的完整行；兼容历史纯 Id 数组。
+    normalizeFollowupContactSelection(context, rows)
   } catch (error) {
     contactFields.forEach((field) => {
       setLocalFieldOptions(field, [])
@@ -504,6 +583,8 @@ export function createState() {
     },
     currentTime: '',
     followupInitialized: false,
+    followupCustomerId: '',
+    followupCustomerName: '',
     proposalInitialized: false
   }
 }
@@ -529,14 +610,21 @@ export async function initialize(context) {
     }
     setTimeout(() => locateCheckin(context, false), 0)
   }
-  if (isFollowupAdd(context) && !context.state.followupInitialized) {
-    // zhy：新增跟进记录时初始化默认值，并加载当前客户绑定的联系人。
-    context.state.followupInitialized = true
-    initializeFollowup(context)
-    await loadFollowupContacts(
-      context,
-      context.form[fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')]
-    )
+  if (isFollowupForm(context)) {
+    // zhy：新增时初始化默认值；新增、编辑和详情都加载联系人选项，避免详情直接显示联系人 Id。
+    if (isFollowupAdd(context) && !context.state.followupInitialized) {
+      context.state.followupInitialized = true
+      initializeFollowup(context)
+    }
+    const customer = await resolveFollowupCustomer(context)
+    context.state.followupCustomerId = customer.id
+    context.state.followupCustomerName = customer.name
+    if (customer.id) {
+      context.patchForm({
+        [fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')]: customer.id
+      })
+    }
+    await loadFollowupContacts(context, customer.id)
   }
   if (isProposalAdd(context) && !context.state.proposalInitialized) {
     // zhy：新增客户方案时补齐 PC 默认值、继承上一方案并生成合作前/后成本。
@@ -669,24 +757,29 @@ export async function handleFieldSelect(context, payload) {
       return { handled: true }
     }
   }
-  if (isFollowupAdd(context) && payload && !payload.multiple) {
+  if (isFollowupForm(context) && payload && !payload.multiple) {
     // zhy：用户切换客户后同步客户 Id，清空旧联系人并重新加载该客户的联系人。
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === FOLLOWUP_FIELDS.customerName.toLowerCase()) {
-      const row = payload.raw && typeof payload.raw === 'object'
-        ? payload.raw
-        : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
-          ? payload.option.raw
-          : {}
-      const customerId = personValue(row, ['Id', 'ID', 'id'])
-      const customerName = personValue(row, ['KehuMC', 'Name', 'name'])
+      let customer = selectedCustomer(context, payload)
       const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
       const customerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+      context.state.followupCustomerId = String(customer.id || '').trim()
+      context.state.followupCustomerName = String(customer.name || '').trim()
       context.patchForm({
-        [customerIdName]: customerId,
-        [customerNameField]: customerName || payload.value || ''
+        [customerIdName]: context.state.followupCustomerId,
+        [customerNameField]: context.state.followupCustomerName
       })
-      await loadFollowupContacts(context, customerId, true)
+      if (!context.state.followupCustomerId && context.state.followupCustomerName) {
+        customer = await resolveFollowupCustomer(context)
+        context.state.followupCustomerId = customer.id
+        context.state.followupCustomerName = customer.name
+        context.patchForm({
+          [customerIdName]: customer.id,
+          [customerNameField]: customer.name
+        })
+      }
+      await loadFollowupContacts(context, context.state.followupCustomerId, true)
       return { handled: true }
     }
   }
@@ -748,6 +841,25 @@ export async function beforeSubmit(context) {
       [addressName]: context.form[addressName] || context.state.checkinLocation.address || '',
       [timeName]: context.form[timeName] || context.state.currentTime || currentTimestamp(),
       [userName]: context.form[userName] || (user && user.Name) || ''
+    }
+  }
+  if (isFollowupForm(context)) {
+    // zhy：KehuID 是隐藏字段，不会进入通用 visible fields 保存列表，提交前必须显式补入。
+    const contactField = findField(context, FOLLOWUP_FIELDS.contacts, '联系人')
+    const contactRows = contactField && Array.isArray(contactField.options)
+      ? contactField.options.map((option) => option.raw).filter(Boolean)
+      : []
+    normalizeFollowupContactSelection(context, contactRows, true)
+    const customer = await resolveFollowupCustomer(context, true)
+    const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
+    const customerNameField = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+    const customerTransferName = fieldName(context, 'KehuMCCD', '客户名称（传递）')
+    context.state.followupCustomerId = customer.id
+    context.state.followupCustomerName = customer.name
+    return {
+      [customerIdName]: customer.id,
+      [customerNameField]: customer.name,
+      [customerTransferName]: customer.name
     }
   }
   if (isProposalForm(context)) {

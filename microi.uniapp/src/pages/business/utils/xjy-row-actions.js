@@ -68,7 +68,9 @@ export function getBusinessRowActions(key, row = {}, user = getUser() || {}) {
   }
   if (key === 'visits') {
     const state = String(row.ShenpiZT || '')
-    if (!/已审批|已驳回/.test(state) && sameTenant(row, user) && hasMenuPermission(MENU_IDS.visits, '审批', user)) {
+    const stateCode = Number(row.ShenpiZTZ)
+    const approvalFinished = /已审批|已驳回/.test(state) || stateCode === 1 || stateCode === 3
+    if (!approvalFinished && sameTenant(row, user) && hasMenuPermission(MENU_IDS.visits, '审批', user)) {
       actions.push({ key: 'visit-approve', label: '审批', tone: 'primary', input: 'optional', inputTitle: '跟进审批', inputPlaceholder: '审批意见（选填）' })
       actions.push({ key: 'visit-reject', label: '驳回', tone: 'danger', input: 'required', inputTitle: '驳回跟进', inputPlaceholder: '请输入驳回原因' })
     }
@@ -103,6 +105,7 @@ export async function loadApprovalOpinions() {
 
 export async function executeBusinessRowAction(actionKey, row = {}, input = '', user = getUser() || {}) {
   const id = row.Id
+  let rowPatch = null
   if (!id) throw new Error('缺少业务数据编号')
   if (actionKey === 'order-copy') ensure(await callApiEngine('dingdan_copy', { Id: id }), '订单复制失败')
   if (actionKey === 'order-approve') ensure(await callApiEngine('dingdan_shenpi', { Id: id, formData: { ShenpiYJ: input } }), '订单审批失败')
@@ -141,6 +144,10 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
       ShenpiZTZ: approved ? 1 : 3,
       _InvokeType: 'Client'
     }), '跟进状态更新失败')
+    rowPatch = {
+      ShenpiZT: approved ? '已审批' : '已驳回',
+      ShenpiZTZ: approved ? 1 : 3
+    }
   }
   if (actionKey === 'visit-message') {
     ensure(await V8.FormEngine.AddFormData('microi_datalog', {
@@ -151,7 +158,7 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
     }), '留言失败')
   }
   removeCachePrefix('module:')
-  return { Code: 1 }
+  return { Code: 1, rowPatch }
 }
 
 export default { hasMenuPermission, getBusinessRowActions, executeBusinessRowAction, loadApprovalOpinions }

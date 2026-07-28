@@ -17,6 +17,7 @@
       :class="{ 'native-control__textarea--code': ['CodeEditor', 'JsonTable'].includes(component) }"
       :value="editableText"
       :placeholder="field.placeholder"
+	  :auto-height="true"
       :maxlength="-1"
       @input="emitValue($event.detail.value)"
     />
@@ -78,26 +79,29 @@
     <view v-else-if="isDropdownOption" class="native-select">
       <view class="native-control__input native-select__trigger" :class="{ open: selectorOpen }" hover-class="native-control__pressed" @tap="openSelector">
         <view class="native-select__content">
-          <view v-if="selectedPreview.length" class="native-select__selection" :class="{ multiple: isMultiple }">
+          <view v-if="selectorOpen" class="native-select__inline-search" @tap.stop>
+            <view v-if="isMultiple && selectedPreview.length" class="native-select__selection multiple">
+              <text v-for="item in selectedPreview" :key="item.key" class="native-select__chip">{{ item.label }}</text>
+              <text v-if="selectedExtraCount" class="native-select__more">+{{ selectedExtraCount }}</text>
+            </view>
+            <input v-model="searchKeyword" class="native-select__search-input" type="text" confirm-type="search"
+              :focus="selectorOpen" :placeholder="hasSelection ? '' : '输入关键词检索'" @input="scheduleSearch"
+              @confirm="loadOptionPage(true)" />
+          </view>
+          <view v-else-if="selectedPreview.length" class="native-select__selection" :class="{ multiple: isMultiple }">
             <text v-for="item in selectedPreview" :key="item.key" :class="{ 'native-select__chip': isMultiple }">{{ item.label }}</text>
             <text v-if="selectedExtraCount" class="native-select__more">+{{ selectedExtraCount }}</text>
           </view>
           <text v-else class="placeholder">{{ field.placeholder }}</text>
         </view>
 
+        <text v-if="hasSelection || searchKeyword" class="native-select__clear" @tap.stop="clearDropdownSelection">×</text>
         <text class="native-select__chevron">›</text>
       </view>
 
       <view v-if="selectorOpen" class="native-select__backdrop" @tap="closeSelector"></view>
       <view v-if="selectorOpen" class="native-select__popover" :class="{ above: selectorPlacement === 'top' }" @tap.stop>
         <view class="native-select__pointer"></view>
-        <view class="native-select__search">
-          <text class="native-select__search-icon">⌕</text>
-          <input v-model="searchKeyword" type="text" confirm-type="search" placeholder="输入关键词检索"
-            @input="scheduleSearch" @confirm="loadOptionPage(true)" />
-          <text v-if="searchKeyword" class="native-select__search-clear" @tap="clearSearch">×</text>
-        </view>
-
         <scroll-view class="native-select__list" scroll-y :lower-threshold="60" @scrolltolower="loadMoreOptions">
           <view v-if="optionLoading && !selectorOptions.length" class="native-select__loading">
             <view v-for="index in 4" :key="index"></view>
@@ -126,10 +130,6 @@
           </view>
         </scroll-view>
 
-        <view v-if="isMultiple" class="native-select__actions">
-          <view @tap="closeSelector"><text>取消</text></view>
-          <view class="confirm" @tap="confirmMultipleSelection"><text>确定{{ draftIds.length ? `（${draftIds.length}）` : '' }}</text></view>
-        </view>
       </view>
     </view>
 
@@ -332,6 +332,7 @@ export default {
     },
     selectedPreview() { return this.selectionItems.slice(0, this.isMultiple ? 2 : 1) },
     selectedExtraCount() { return this.isMultiple ? Math.max(0, this.selectionItems.length - this.selectedPreview.length) : 0 },
+    hasSelection() { return this.currentSelectionValues().length > 0 },
     tagValues() {
       const value = parseJson(this.modelValue, this.modelValue)
       if (Array.isArray(value)) return value.map(String).filter(Boolean)
@@ -357,7 +358,10 @@ export default {
     emitValue(value) { this.$emit('update:modelValue', value); this.$emit('change', value) },
     optionValue(option) {
       const config = this.field.config || {}
-      return this.hasRemoteOptions && config.SelectSaveFormat === 'Json' ? option.raw : option.value
+      const raw = option.raw
+      // zhy：多选与平台保持一致，保存数据源返回的完整行对象，不按 SelectSaveField 裁剪。
+      if (this.isMultiple && raw && typeof raw === 'object') return raw
+      return String(config.SelectSaveFormat || '').toLowerCase() === 'json' ? raw : option.value
     },
     isOptionSelected(option) { return this.multipleValues.includes(String(option.value)) || (!this.isMultiple && String(this.singleValue) === String(option.value)) },
     changeOption(event) { const option = this.field.options[Number(event.detail.value)]; if (option) this.emitValue(this.optionValue(option)) },
@@ -445,6 +449,7 @@ export default {
         clearTimeout(this.searchTimer)
         this.searchTimer = null
       }
+      this.searchKeyword = ''
     },
     scheduleSearch() {
       if (this.searchTimer) clearTimeout(this.searchTimer)
@@ -453,11 +458,25 @@ export default {
         this.loadOptionPage(true)
       }, 300)
     },
-    clearSearch() {
+    clearSearch(reload = true) {
       this.searchKeyword = ''
       if (this.searchTimer) clearTimeout(this.searchTimer)
       this.searchTimer = null
-      this.loadOptionPage(true)
+      if (reload && this.selectorOpen) this.loadOptionPage(true)
+    },
+    clearDropdownSelection() {
+      this.draftIds = []
+      this.draftValues = {}
+      this.emitValue(this.isMultiple ? [] : '')
+      this.$emit('select', {
+        field: this.field,
+        value: this.isMultiple ? [] : '',
+        options: [],
+        raw: this.isMultiple ? [] : null,
+        multiple: this.isMultiple,
+        cleared: true
+      })
+      this.clearSearch()
     },
     filterLocalOptions(options) {
       return filterNativeFieldOptions(options, this.searchKeyword)
@@ -474,6 +493,16 @@ export default {
       })
       this.selectorOptions = rows
       this.rememberOptions(options)
+      if (this.isMultiple && this.draftIds.length) {
+        const values = { ...this.draftValues }
+        ;(Array.isArray(options) ? options : []).forEach((option) => {
+          const key = String(option && option.value)
+          if (this.draftIds.includes(key) && option.raw && typeof option.raw === 'object') {
+            values[key] = option.raw
+          }
+        })
+        this.draftValues = values
+      }
     },
     loadClientOptionPage(reset = false) {
       const source = this.clientOptionRows.length
@@ -590,8 +619,6 @@ export default {
         this.draftIds.push(key)
         this.draftValues = { ...this.draftValues, [key]: this.optionValue(option) }
       }
-    },
-    confirmMultipleSelection() {
       const values = this.draftIds.map((key) => Object.prototype.hasOwnProperty.call(this.draftValues, key) ? this.draftValues[key] : key)
       const options = this.draftIds.map((key) => this.knownOptions.find((option) => String(option.value) === key)).filter(Boolean)
       this.emitValue(values)
@@ -602,7 +629,6 @@ export default {
         raw: options.map((option) => option.raw),
         multiple: true
       })
-      this.closeSelector()
     },
     changeRegion(event) { this.emitValue(JSON.stringify(event.detail.value || [])) },
     chooseLocation() {
@@ -655,6 +681,10 @@ export default {
 .native-select__selection.multiple > text:first-child,.native-select__selection.multiple > text:nth-child(2) { flex: 0 1 auto; }
 .native-select__chip { max-width: 42%; padding: 8rpx 12rpx; border-radius: 6px; color: #365864; background: #edf3f6; font-size: 22rpx; line-height: 30rpx; }
 .native-select__more { flex: none; color: #087da8; font-size: 23rpx; font-weight: 650; }
+.native-select__inline-search { width: 100%; min-width: 0; display: flex; align-items: center; gap: 9rpx; }
+.native-select__inline-search .native-select__selection { width: auto; flex: none; max-width: 68%; }
+.native-select__search-input { flex: 1; min-width: 72rpx; height: 74rpx; color: #294954; font-size: 24rpx; }
+.native-select__clear { width: 34rpx; height: 34rpx; flex: none; border: 1px solid #9aabb2; border-radius: 50%; color: #82959c; font-size: 27rpx; line-height: 30rpx; text-align: center; box-sizing: border-box; }
 .native-select__chevron { flex: none; color: #7d929a; font-size: 34rpx; line-height: 1; transform: rotate(90deg); transition: transform .16s ease; }
 .native-select__trigger.open .native-select__chevron { transform: rotate(-90deg); }
 .native-select__backdrop { position: fixed; inset: 0; z-index: 1; background: transparent; }
@@ -662,11 +692,7 @@ export default {
 .native-select__popover.above { top: auto; bottom: calc(100% + 14rpx); }
 .native-select__pointer { position: absolute; top: -11rpx; left: 50%; width: 20rpx; height: 20rpx; border-top: 1px solid #d9e3e7; border-left: 1px solid #d9e3e7; background: #fff; transform: translateX(-50%) rotate(45deg); }
 .native-select__popover.above .native-select__pointer { top: auto; bottom: -11rpx; border: 0; border-right: 1px solid #d9e3e7; border-bottom: 1px solid #d9e3e7; }
-.native-select__search { position: relative; z-index: 1; height: 76rpx; display: grid; grid-template-columns: 42rpx minmax(0,1fr) 48rpx; align-items: center; margin: 14rpx; padding: 0 10rpx; border: 1px solid #dfe8eb; border-radius: 7px; background: #f7fafb; }
-.native-select__search-icon { color: #7f939b; font-size: 31rpx; text-align: center; }
-.native-select__search input { width: 100%; height: 70rpx; color: #294954; font-size: 24rpx; }
-.native-select__search-clear { color: #82959c; font-size: 32rpx; line-height: 70rpx; text-align: center; }
-.native-select__list { height: 420rpx; border-top: 1px solid #edf2f4; }
+.native-select__list { height: 420rpx; }
 .native-select__option { min-height: 78rpx; display: grid; grid-template-columns: minmax(0,1fr) 44rpx; align-items: center; gap: 12rpx; padding: 0 22rpx; border-bottom: 1px solid #edf2f4; color: #405a64; background: #fff; font-size: 25rpx; transition: background-color .14s ease; box-sizing: border-box; }
 .native-select__option.multiple { grid-template-columns: 48rpx minmax(0,1fr); }
 .native-select__option.selected { color: #1b566c; background: #f0f6f9; }
@@ -681,10 +707,6 @@ export default {
 .native-select__retry { color: #087da8; font-weight: 650; }
 .native-select__loading { padding: 8rpx 20rpx; }
 .native-select__loading view { height: 62rpx; margin-bottom: 10rpx; border-radius: 6px; background: linear-gradient(90deg,#edf2f4 25%,#f8fafb 42%,#edf2f4 62%); background-size: 400% 100%; animation: nativeSelectShimmer 1.2s ease infinite; }
-.native-select__actions { height: 82rpx; display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #dfe8eb; background: #fff; }
-.native-select__actions > view { display: flex; align-items: center; justify-content: center; color: #607781; font-size: 25rpx; }
-.native-select__actions > view + view { border-left: 1px solid #e6edef; }
-.native-select__actions .confirm { color: #087da8; font-weight: 700; }
 .native-control__switch { transform: scale(.9); transform-origin: left center; }
 .native-control__datetime { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14rpx; }
 .native-control__datetime--single { grid-template-columns: 1fr; }
