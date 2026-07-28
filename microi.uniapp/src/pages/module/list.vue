@@ -89,9 +89,10 @@ import { fieldDisplayValue } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
+import { listReturnMixin } from '@/platform/list-return.js'
 
 export default {
-  mixins: [themeMixin],
+  mixins: [themeMixin, listReturnMixin],
   data() {
     return {
       menuId: '',
@@ -277,11 +278,10 @@ export default {
     },
     openDetail(row) {
       if (!row.Id) return
-      uni.navigateTo({
-        url: `/pages/module/detail?menuId=${encodeURIComponent(this.menuId)}&id=${encodeURIComponent(row.Id)}`
-      })
+      this.mciNavigateToDetail(`/pages/module/detail?menuId=${encodeURIComponent(this.menuId)}&id=${encodeURIComponent(row.Id)}`)
     },
     openAdd() {
+      this.mciMarkDetailReturn()
       openForm({
         table: this.config.table,
         mode: 'Add',
@@ -289,6 +289,15 @@ export default {
         menuId: this.config.menuId,
         menuAliases: this.config.menuAliases
       })
+    },
+    shouldMciRefreshForDataChange(event = {}) {
+      const changedTable = String(event.table || '').trim().toLowerCase()
+      const listTable = String(this.config.table || '').trim().toLowerCase()
+      return !changedTable || !listTable || changedTable === listTable
+    },
+    async onMciListDataChanged() {
+      await this.loadView(true)
+      await this.loadData(true, true)
     },
     goBack() {
       uni.navigateBack({ fail: () => uni.switchTab({ url: '/pages/workspace/index' }) })
