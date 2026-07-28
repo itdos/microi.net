@@ -777,18 +777,25 @@ export default {
       this.actionSubmitting = true
       uni.showLoading({ title: '正在处理', mask: true })
       try {
-        await executeBusinessRowAction(action.key, row, input, this.currentUser)
+        const result = await executeBusinessRowAction(action.key, row, input, this.currentUser)
+        if (result && result.rowPatch) this.patchListRow(row.Id, result.rowPatch)
         this.activeAction = null
         this.activeRow = {}
         this.actionInput = ''
         uni.showToast({ title: `${action.label}成功`, icon: 'success' })
         await this.loadData(true, true)
+        if (result && result.rowPatch) this.patchListRow(row.Id, result.rowPatch)
       } catch (error) {
         uni.showToast({ title: error.message || `${action.label}失败`, icon: 'none' })
       } finally {
         uni.hideLoading()
         this.actionSubmitting = false
       }
+    },
+    patchListRow(id, patch) {
+      this.rows = this.rows.map((item) => (
+        String(item.Id || '') === String(id || '') ? { ...item, ...patch } : item
+      ))
     },
     openDetail(row) {
       if (!row.Id) return
@@ -830,6 +837,15 @@ export default {
       const target = Math.max(0, Number(scrollTop || 0))
       this.mciScrollCommand = Math.max(0, target - 1)
       this.$nextTick(() => { this.mciScrollCommand = target })
+    },
+    shouldMciRefreshForDataChange(event = {}) {
+      const changedTable = String(event.table || '').trim().toLowerCase()
+      const listTable = String(this.config.table || this.baseConfig.table || '').trim().toLowerCase()
+      return !changedTable || !listTable || changedTable === listTable
+    },
+    async onMciListDataChanged() {
+      await this.loadViewConfig(true)
+      await this.loadData(true, true)
     },
     openAdd() {
       if (this.key === 'members') {

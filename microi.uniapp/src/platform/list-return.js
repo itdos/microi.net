@@ -7,21 +7,46 @@ export const listReturnMixin = {
       mciCurrentScrollTop: 0,
       mciSavedScrollTop: 0,
       mciScrollCommand: 0,
-      mciDetailReturnPending: false
+      mciDetailReturnPending: false,
+      mciListDataChangedPending: false,
+      mciListDataChangedEvent: null
     }
   },
+  onLoad() {
+    this._mciListDataChangedListener = (event = {}) => {
+      if (typeof this.shouldMciRefreshForDataChange === 'function' &&
+        !this.shouldMciRefreshForDataChange(event)) return
+      this.mciListDataChangedPending = true
+      this.mciListDataChangedEvent = event
+    }
+    uni.$on('microi:data-changed', this._mciListDataChangedListener)
+  },
   onShow() {
-    if (!this.mciDetailReturnPending) return
-    this.mciDetailReturnPending = false
-    pendingListSnapshot = null
-    this.$nextTick(() => {
-      const target = Math.max(0, Number(this.mciSavedScrollTop || 0))
-      this.mciScrollCommand = Math.max(0, target - 1)
-      setTimeout(() => {
-        this.mciScrollCommand = target
-        if (typeof this.onMciListDetailReturned === 'function') this.onMciListDetailReturned(target)
-      }, 24)
-    })
+    const dataChanged = this.mciListDataChangedPending
+    const changedEvent = this.mciListDataChangedEvent
+    this.mciListDataChangedPending = false
+    this.mciListDataChangedEvent = null
+    if (dataChanged && typeof this.onMciListDataChanged === 'function') {
+      Promise.resolve(this.onMciListDataChanged(changedEvent)).catch(() => {})
+    }
+    if (this.mciDetailReturnPending) {
+      this.mciDetailReturnPending = false
+      pendingListSnapshot = null
+      this.$nextTick(() => {
+        const target = Math.max(0, Number(this.mciSavedScrollTop || 0))
+        this.mciScrollCommand = Math.max(0, target - 1)
+        setTimeout(() => {
+          this.mciScrollCommand = target
+          if (typeof this.onMciListDetailReturned === 'function') this.onMciListDetailReturned(target)
+        }, 24)
+      })
+    }
+  },
+  onUnload() {
+    if (this._mciListDataChangedListener) {
+      uni.$off('microi:data-changed', this._mciListDataChangedListener)
+      this._mciListDataChangedListener = null
+    }
   },
   methods: {
     handleMciListScroll(event) {
