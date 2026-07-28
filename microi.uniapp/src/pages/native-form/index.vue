@@ -773,15 +773,14 @@
 		border: 1px solid var(--mci-border, #e4ecef);
 		border-radius: 8px;
 		overflow: hidden;
-		animation: mciNativeFormEnter .32s ease both;
+		/* zhy: 只在首次进入前应用起始帧，结束后释放 transform 层叠上下文。 */
+		animation: mciNativeFormEnter .32s ease backwards;
 	}
 
-	/* zhy: 解除当前卡片裁切及动画层叠上下文。 */
+	/* zhy: 解除当前卡片裁切；不切换 animation，避免关闭下拉时重新播放入场动画造成页面抖动。 */
 	.form-section--select-open {
 		z-index: 100;
 		overflow: visible;
-		animation: none;
-		transform: none;
 	}
 
 	.form-section__header {
