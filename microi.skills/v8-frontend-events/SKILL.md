@@ -141,8 +141,10 @@ V8.OpenAnyForm({ TableName: 'OrderDetail', Id: V8.Form.Id, FormMode: 'View' });
 ### OpenTableBefore — 打开列表前（拦截/初始化筛选）
 
 ```javascript
-// 默认只看自己的数据
-V8.SearchSet({ OwnerId: V8.CurrentUser.Id });
+// 固定弹出表格的可选数据范围；搜索、高级筛选、分页不会移除此条件
+V8.OpenTableSetWhere(V8.Field.CustomerId, [
+  ['OwnerId', '=', V8.CurrentUser.Id]
+]);
 ```
 
 ### OpenTableSubmit — 列表查询提交前（追加条件）
