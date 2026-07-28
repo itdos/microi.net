@@ -1,9 +1,6 @@
 <template>
     <section class="micro-app-dev-component" :style="{ minHeight: `${frameHeight}px` }">
-        <div v-if="loading" class="micro-app-dev-component__loading">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>正在加载定制组件...</span>
-        </div>
+        <micro-app-loading-skeleton v-if="loading" compact />
         <el-alert
             v-else-if="error"
             :title="error"
@@ -28,8 +25,10 @@
 </template>
 
 <script>
-import { Loading } from "@element-plus/icons-vue";
 import { DiyCommon } from "@/utils/diy.common";
+import { buildMicroAppEntryUrl } from "@/utils/microAppEntryUrl.js";
+import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
+import { applyMicroAppToken } from "./token-sync";
 import {
     findLegacyMicroAppPage,
     serializeMicroAppComponentData
@@ -78,7 +77,7 @@ function normalizeRoute(value) {
 
 export default {
     name: "MicroAppDevComponent",
-    components: { Loading },
+    components: { MicroAppLoadingSkeleton },
     inheritAttrs: false,
     props: {
         legacyComponentPath: {
@@ -158,8 +157,12 @@ export default {
                     version = service.BuildVersion || "";
                     this.page.BuildVersion = version;
                 }
-                const versionPart = version ? `/${encodeURIComponent(version)}` : "";
-                this.entryUrl = `${String(DiyCommon.GetApiBase() || "").replace(/\/+$/, "")}/micro-app/${encodeURIComponent(DiyCommon.GetOsClient())}/${encodeURIComponent(page.MicroServiceKey)}${versionPart}/${page.EntryPath || "index.html"}`;
+                this.entryUrl = buildMicroAppEntryUrl({
+                    apiBase: DiyCommon.GetApiBase(),
+                    osClient: DiyCommon.GetOsClient(),
+                    appKey: page.MicroServiceKey,
+                    version
+                });
             } catch (error) {
                 this.error = error?.message || String(error);
             } finally {
@@ -168,6 +171,7 @@ export default {
         },
         handleDataChange(event) {
             const payload = event?.detail?.data ?? event?.detail ?? event ?? {};
+            if (applyMicroAppToken(payload)) return;
             const type = String(payload?.type || payload?.Type || "");
             if (type === "dev-component:resize") {
                 const height = Number(payload.height || payload.Height || 0);
@@ -187,15 +191,6 @@ export default {
 .micro-app-dev-component {
     width: 100%;
     overflow: hidden;
-}
-
-.micro-app-dev-component__loading {
-    display: flex;
-    min-height: 80px;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: var(--el-text-color-secondary);
 }
 
 .micro-app-dev-component__app {

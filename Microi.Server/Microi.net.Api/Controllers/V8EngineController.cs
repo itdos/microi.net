@@ -481,6 +481,52 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        public async Task<IActionResult> GetTableIndexes(
+            string osClient,
+            string tableName,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(
+                osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            tableName = tableName ?? param?["TableName"].Val<string>();
+            return Ok(V8McpLogic.GetTableIndexes(osClient, tableName));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateTableIndex([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "请求参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            var columns = param["Columns"] is JArray columnArray
+                ? columnArray.Values<string>()
+                : (param["IndexColumns"].Val<string>() ?? "")
+                    .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            return Ok(V8McpLogic.CreateTableIndex(
+                osClient,
+                param["TableName"].Val<string>(),
+                param["IndexName"].Val<string>(),
+                columns,
+                param["Unique"].Val<bool?>() ?? param["IndexUnique"].Val<bool?>() ?? false));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DropTableIndex([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "请求参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"].Val<string>(), (object)token);
+            return Ok(V8McpLogic.DropTableIndex(
+                osClient,
+                param["TableName"].Val<string>(),
+                param["IndexName"].Val<string>()));
+        }
+
+        [HttpGet, HttpPost]
         public async Task<IActionResult> GetSupportedDatabaseTypes()
         {
             var (ok, msg, _) = await V8McpLogic.CheckPermission();

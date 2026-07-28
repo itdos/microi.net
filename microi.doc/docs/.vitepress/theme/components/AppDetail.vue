@@ -69,33 +69,40 @@
             </article>
           </section>
 
+          <section class="app-detail-cover-card" aria-label="应用预览图">
+            <img
+              v-if="app.AppPreviewUrl && !previewImageBroken"
+              :src="app.AppPreviewUrl"
+              :alt="`${app.Name}应用预览图`"
+              :class="previewFitClass(app.ApplicationType)"
+              loading="eager"
+              @error="previewImageBroken = true"
+            />
+            <div v-else class="app-detail-cover-empty">
+              <div class="app-detail-icon small" :class="`tone-${app.tone}`">{{ app.icon }}</div>
+              <strong>{{ app.Name }}</strong>
+              <span>应用预览图完善中</span>
+            </div>
+          </section>
+
           <section class="app-detail-content">
-            <div class="app-detail-preview-card">
+            <article class="app-detail-description-card">
               <header>
                 <div>
-                  <span>APP PREVIEW</span>
-                  <h2>应用预览</h2>
+                  <span>APP DETAILS</span>
+                  <h2>应用详情</h2>
                 </div>
-                <button v-if="app.PreviewUrl" type="button" @click="openPreview">新窗口打开</button>
               </header>
-              <div v-if="app.PreviewUrl && app.ApplicationType !== 'Platform'" class="app-detail-browser">
-                <div class="browser-bar">
-                  <i></i><i></i><i></i>
-                  <span>{{ app.Name }}</span>
-                </div>
-                <iframe
-                  :src="versionedPreviewUrl"
-                  :title="`${app.Name}在线预览`"
-                  loading="eager"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                />
-              </div>
-              <div v-else class="app-detail-platform">
-                <div class="app-detail-icon small" :class="`tone-${app.tone}`">{{ app.icon }}</div>
+              <div
+                v-if="app.DetailHtml"
+                class="app-detail-richtext vp-doc"
+                v-html="app.DetailHtml"
+              />
+              <div v-else class="app-detail-description-empty">
                 <strong>{{ app.Name }}</strong>
-                <p>这是吾码平台能力应用，安装后会合并到对应的后台模块中。</p>
+                <p>{{ app.Description }}</p>
               </div>
-            </div>
+            </article>
 
             <aside class="app-detail-about">
               <span>ABOUT THIS APP</span>
@@ -145,8 +152,15 @@ const authToken = ref('')
 const isFavorite = ref(false)
 const favoriteBusy = ref(false)
 const favoriteMessage = ref('')
+const fileServer = ref('')
+const previewImageBroken = ref(false)
 
-const isDetailPage = computed(() => ['/app-detail', '/app-detail.html'].includes(route.path || ''))
+// VitePress 的 route.path 在不同导航方式/版本中可能包含查询串；应用详情页
+// 必须只按 pathname 判断，否则 /app-detail.html?app=xxx 会整页被 v-if 隐藏。
+const isDetailPage = computed(() => {
+  const path = String(route.path || '').split(/[?#]/, 1)[0].replace(/\/$/, '')
+  return ['/app-detail', '/app-detail.html'].includes(path)
+})
 const updatedDate = computed(() => {
   const value = app.value?.AppUpdateTime || app.value?.UpdateTime
   return value ? String(value).slice(0, 10) : '持续更新'
@@ -177,6 +191,77 @@ function plainText(value) {
     .trim()
 }
 
+function normalizeUploadValue(value, depth = 0) {
+  if (depth > 5 || value === null || value === undefined) return ''
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const path = normalizeUploadValue(item, depth + 1)
+      if (path) return path
+    }
+    return ''
+  }
+  if (typeof value === 'object') {
+    for (const key of ['Path', 'FilePathName', 'FullPath', 'Url', 'url', 'src']) {
+      const path = normalizeUploadValue(value[key], depth + 1)
+      if (path) return path
+    }
+    return ''
+  }
+  const source = String(value).trim()
+  if (!source) return ''
+  if (/^[{[]/.test(source)) {
+    try { return normalizeUploadValue(JSON.parse(source), depth + 1) } catch (_) { return source }
+  }
+  return source.replace(/^['"]|['"]$/g, '')
+}
+
+function resolveAssetUrl(value) {
+  const path = normalizeUploadValue(value)
+  if (!path) return ''
+  if (/^(https?:|data:image\/|blob:)/i.test(path)) return path
+  if (path.startsWith('/file/')) return `${APP_API_BASE.replace(/\/+$/, '')}${path}`
+  const server = fileServer.value.replace(/\/+$/, '')
+  return server ? `${server}/${path.replace(/^\/+/, '')}` : path
+}
+
+function sanitizeRichText(value) {
+  const source = String(value || '').trim()
+  if (!source) return ''
+  if (typeof document === 'undefined') return plainText(source)
+  const template = document.createElement('template')
+  template.innerHTML = source
+  template.content.querySelectorAll('script,style,iframe,object,embed,form,input,button,link,meta,base').forEach(node => node.remove())
+  template.content.querySelectorAll('*').forEach(node => {
+    for (const attr of [...node.attributes]) {
+      const name = attr.name.toLowerCase()
+      const rawValue = String(attr.value || '').trim()
+      if (name.startsWith('on') || name === 'srcdoc' || name === 'style') {
+        node.removeAttribute(attr.name)
+        continue
+      }
+      if (name === 'href') {
+        if (!/^(https?:|mailto:|tel:|#|\/)/i.test(rawValue)) node.removeAttribute(attr.name)
+        else {
+          node.setAttribute('target', '_blank')
+          node.setAttribute('rel', 'noopener noreferrer')
+        }
+      }
+      if (name === 'src') {
+        const safeSrc = resolveAssetUrl(rawValue)
+        if (!safeSrc || !/^(https?:|data:image\/|blob:|\/)/i.test(safeSrc)) node.removeAttribute(attr.name)
+        else node.setAttribute('src', safeSrc)
+      }
+    }
+  })
+  return template.innerHTML.trim()
+}
+
+function previewFitClass(applicationType) {
+  return ['uniapp', 'web'].includes(String(applicationType || '').toLowerCase())
+    ? 'preview-fit-contain'
+    : 'preview-fit-cover'
+}
+
 function normalizeApp(item) {
   const applicationType = item.ApplicationType || item.AppType || 'Web'
   const category = item.Category || (applicationType === 'Platform' ? 'platform' : 'other')
@@ -193,7 +278,9 @@ function normalizeApp(item) {
   return {
     ...item,
     Name: item.AppName || item.Name,
-    Description: plainText(item.AppDetail || item.Description) || '基于 Microi吾码构建的在线应用。',
+    Description: plainText(item.Description || item.AppDetail) || '基于 Microi吾码构建的在线应用。',
+    DetailHtml: sanitizeRichText(item.AppDetail || item.Description),
+    AppPreviewUrl: resolveAssetUrl(item.AppPreview),
     AppKey: item.AppKey || item.AppId,
     ApplicationType: applicationType,
     Category: category,
@@ -308,8 +395,10 @@ async function loadApp() {
     })
     const result = await response.json()
     if (result.Code !== 1 || !Array.isArray(result.Data)) throw new Error(result.Msg || '应用读取失败')
+    fileServer.value = String(result.DataAppend?.FileServer || '').trim()
     const matched = result.Data.find(item => String(item.AppKey || item.AppId) === appKey)
     if (!matched) throw new Error('应用不存在或尚未发布')
+    previewImageBroken.value = false
     app.value = normalizeApp(matched)
     await Promise.all([recordView(), loadFavoriteStatus()])
   } catch (error) {
@@ -469,7 +558,8 @@ onBeforeUnmount(() => {
 
 :global(html.dark .app-detail-hero),
 :global(html.dark .app-detail-facts),
-:global(html.dark .app-detail-preview-card),
+:global(html.dark .app-detail-cover-card),
+:global(html.dark .app-detail-description-card),
 :global(html.dark .app-detail-about),
 :global(html.dark .app-detail-state) {
   border-color: rgba(148, 163, 184, .18);
@@ -505,7 +595,7 @@ onBeforeUnmount(() => {
 .tone-blue { background: linear-gradient(145deg, #1769e0, #62a0ff); }
 
 .app-detail-eyebrow,
-.app-detail-preview-card header span,
+.app-detail-description-card header span,
 .app-detail-about > span {
   color: #1769e0;
   font-size: 11px;
@@ -674,7 +764,8 @@ onBeforeUnmount(() => {
   gap: 20px;
 }
 
-.app-detail-preview-card,
+.app-detail-cover-card,
+.app-detail-description-card,
 .app-detail-about {
   overflow: hidden;
   border: 1px solid #e2e7ef;
@@ -682,121 +773,104 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
-.app-detail-preview-card {
+.app-detail-cover-card {
+  display: grid;
+  min-height: 360px;
+  margin-bottom: 20px;
+  place-items: center;
+  background:
+    linear-gradient(135deg, rgba(23, 105, 224, .06), rgba(99, 102, 241, .025)),
+    #fff;
+}
+
+.app-detail-cover-card > img {
+  display: block;
+  width: 100%;
+  height: clamp(360px, 48vw, 680px);
+  background: #f5f7fb;
+}
+
+.app-detail-cover-card > img.preview-fit-contain { object-fit: contain; }
+.app-detail-cover-card > img.preview-fit-cover { object-fit: cover; }
+
+.app-detail-cover-empty {
+  display: grid;
+  min-height: 360px;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  color: #687386;
+  text-align: center;
+}
+
+.app-detail-cover-empty strong {
+  color: #172033;
+  font-size: 22px;
+}
+
+.app-detail-cover-empty span { font-size: 13px; }
+
+:global(html.dark .app-detail-cover-card > img) { background: #07101e; }
+:global(html.dark .app-detail-cover-empty) { color: #94a3b8; }
+:global(html.dark .app-detail-cover-empty strong) { color: #f8fafc; }
+
+.app-detail-description-card {
   padding: 24px;
 }
 
-.app-detail-preview-card header {
+.app-detail-description-card header {
   display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 18px;
+  align-items: flex-end;
   margin-bottom: 18px;
 }
 
-.app-detail-preview-card h2,
+.app-detail-description-card h2,
 .app-detail-about h2 {
   margin: 5px 0 0;
   color: inherit;
   font-size: 24px;
 }
 
-.app-detail-preview-card header button {
-  border: 0;
-  background: transparent;
-  color: #1769e0;
-  cursor: pointer;
-  font-weight: 750;
+.app-detail-richtext {
+  min-height: 300px;
+  color: #3e4a5e;
+  font-size: 15px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
 }
 
-.app-detail-browser {
-  overflow: hidden;
-  border: 1px solid #dfe5ed;
-  border-radius: 18px;
-  background: #eef2f7;
-}
-
-.browser-bar {
-  display: flex;
-  height: 42px;
-  padding: 0 15px;
-  align-items: center;
-  gap: 7px;
-  border-bottom: 1px solid #dfe5ed;
-  background: #f8fafc;
-}
-
-.browser-bar i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #ff6b63;
-}
-
-.browser-bar i:nth-child(2) { background: #f7bf45; }
-.browser-bar i:nth-child(3) { background: #38bd69; }
-
-.browser-bar span {
-  margin-left: 8px;
-  color: #718096;
-  font-size: 11px;
-}
-
-.app-detail-browser iframe {
+.app-detail-richtext :deep(img) {
   display: block;
-  width: 100%;
-  height: min(70vh, 720px);
-  border: 0;
-  background: #fff;
+  max-width: 100%;
+  height: auto;
+  margin: 20px auto;
+  border-radius: 14px;
 }
 
-.app-detail-platform {
+.app-detail-richtext :deep(table) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.app-detail-description-empty {
   display: grid;
-  min-height: 420px;
+  min-height: 300px;
   place-content: center;
   justify-items: center;
-  gap: 14px;
+  gap: 10px;
+  border: 1px dashed #dfe5ed;
   border-radius: 18px;
-  background: linear-gradient(145deg, #eef4ff, #f8faff);
+  color: #687386;
   text-align: center;
 }
 
-.app-detail-platform strong {
-  font-size: 24px;
-}
+.app-detail-description-empty strong { color: #172033; font-size: 22px; }
+.app-detail-description-empty p { max-width: 560px; margin: 0; line-height: 1.75; }
 
-.app-detail-platform p {
-  max-width: 420px;
-  margin: 0;
-  color: #687386;
-  line-height: 1.7;
-}
-
-:global(html.dark .app-detail-browser) {
-  border-color: rgba(148, 163, 184, .2);
-  background: #07101e;
-}
-
-:global(html.dark .browser-bar) {
-  border-bottom-color: rgba(148, 163, 184, .18);
-  background: #0d1726;
-}
-
-:global(html.dark .browser-bar span) { color: #94a3b8; }
-
-:global(html.dark .app-detail-browser iframe) {
-  background: #07101e;
-  color-scheme: dark;
-}
-
-:global(html.dark .app-detail-platform) {
-  background:
-    radial-gradient(circle at 50% 25%, rgba(99, 102, 241, .18), transparent 19rem),
-    linear-gradient(145deg, #0b1423, #0d1727);
-  color: #f8fafc;
-}
-
-:global(html.dark .app-detail-platform p) { color: #94a3b8; }
+:global(html.dark .app-detail-richtext) { color: #cbd5e1; }
+:global(html.dark .app-detail-description-empty) { border-color: rgba(148, 163, 184, .24); color: #94a3b8; }
+:global(html.dark .app-detail-description-empty strong) { color: #f8fafc; }
 
 .app-detail-about {
   padding: 26px;
@@ -904,8 +978,8 @@ onBeforeUnmount(() => {
     display: none;
   }
 
-  .app-detail-browser iframe {
-    height: 68vh;
-  }
+  .app-detail-cover-card { min-height: 240px; }
+  .app-detail-cover-card > img { height: 62vw; min-height: 240px; }
+  .app-detail-description-card { padding: 20px; }
 }
 </style>

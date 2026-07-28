@@ -519,6 +519,8 @@ namespace Microi.net.Api
                 var userId = claims.FirstOrDefault(d => d.Type == "UserId")?.Value;
                 var tokenOsClient = claims.FirstOrDefault(d => d.Type == "OsClient")?.Value;
                 var clientType = claims.FirstOrDefault(d => d.Type == "ClientType")?.Value;
+                var accessKeyId = claims.FirstOrDefault(
+                    d => d.Type == UserAccessKeySecurity.ClaimType)?.Value;
                 clientType = clientType.DosIsNullOrWhiteSpace("Empty");
                 if (userId.DosIsNullOrWhiteSpace() || tokenOsClient.DosIsNullOrWhiteSpace()
                     )
@@ -602,6 +604,38 @@ namespace Microi.net.Api
                     return;
                 }
 
+                // Access-key sessions are detached views of the shared user identity.
+                // The key record is checked on every request (shared Redis cache with
+                // database fallback), so revoke/expiry/account changes work across
+                // all API nodes without sticky sessions.
+                if (!accessKeyId.DosIsNullOrWhiteSpace())
+                {
+                    var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
+                            JObject.FromObject(sysUser),
+                            accessKeyId,
+                            tokenOsClient)
+                        .ConfigureAwait(false);
+                    if (scopedUserResult.Code != 1)
+                    {
+                        context.Result = new JsonResult(new DosResult(
+                            1001,
+                            null,
+                            scopedUserResult.Msg ?? "访问密钥已失效。"));
+                        return;
+                    }
+                    sysUser = scopedUserResult.Data;
+                    if (!UserAccessKeySecurity.IsApiPathAllowed(
+                            scopedUserResult.Data,
+                            context.HttpContext.Request.Path.ToString()))
+                    {
+                        context.Result = new JsonResult(new DosResult(
+                            0,
+                            null,
+                            "当前访问密钥未授权调用此接口。"));
+                        return;
+                    }
+                }
+
                 #region 若token已过期或快过期，则重新获取
                 var tokenLifetime = DiyToken.ResolveClientTokenLifetime(clientModel, clientType);
                 var tokenLifetimeText = DiyToken.DescribeClientTokenLifetime(clientModel, clientType);
@@ -663,7 +697,8 @@ namespace Microi.net.Api
                         CurrentUser = sysUser,
                         OsClient = tokenOsClient,
                         _ClientType = clientType,
-                        RotateFromToken = token
+                        RotateFromToken = token,
+                        AccessKeyId = accessKeyId
                     });
                     if (getTokenResult.Code != 1)
                     {
@@ -672,7 +707,30 @@ namespace Microi.net.Api
                     else
                     {
                         tokenModel = getTokenResult.Data as CurrentToken;
-                        if (tokenModel != null) { sysUser = tokenModel.CurrentUser; }
+                        if (tokenModel != null)
+                        {
+                            if (!accessKeyId.DosIsNullOrWhiteSpace())
+                            {
+                                var scopedUserResult = await UserAccessKeyService.ApplySessionScopeAsync(
+                                        tokenModel.CurrentUser,
+                                        accessKeyId,
+                                        tokenOsClient)
+                                    .ConfigureAwait(false);
+                                if (scopedUserResult.Code != 1)
+                                {
+                                    context.Result = new JsonResult(new DosResult(
+                                        1001,
+                                        null,
+                                        scopedUserResult.Msg ?? "访问密钥已失效。"));
+                                    return;
+                                }
+                                sysUser = scopedUserResult.Data;
+                            }
+                            else
+                            {
+                                sysUser = tokenModel.CurrentUser;
+                            }
+                        }
 
                         #region 最后设置header返回
                         if (tokenModel != null && !tokenModel.Token.DosIsNullOrWhiteSpace())

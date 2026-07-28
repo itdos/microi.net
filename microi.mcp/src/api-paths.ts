@@ -21,6 +21,9 @@ export const API = {
 
   // 数据库结构
   GET_DB_SCHEMA: '/api/V8Engine/GetDbSchema',
+  GET_TABLE_INDEXES: '/api/V8Engine/GetTableIndexes',
+  CREATE_TABLE_INDEX: '/api/V8Engine/CreateTableIndex',
+  DROP_TABLE_INDEX: '/api/V8Engine/DropTableIndex',
   GET_SUPPORTED_DATABASE_TYPES: '/api/V8Engine/GetSupportedDatabaseTypes',
   INSPECT_EXTERNAL_DATABASE: '/api/V8Engine/InspectExternalDatabase',
   QUERY_EXTERNAL_DATABASE: '/api/V8Engine/QueryExternalDatabase',

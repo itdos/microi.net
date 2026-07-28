@@ -401,9 +401,9 @@ export const V8ApiDefinitions = {
                     RunBackground: {
                         label: "RunBackground",
                         kind: "Method",
-                        documentation: "启动后台接口引擎任务：RunBackground(apiEngineKey, params, title, callback?)，返回 Promise。",
+                        documentation: "启动持久化后台接口引擎任务：RunBackground(apiEngineKey, params, title, options?, callback?)，返回 Promise。options 可设置 IdempotencyKey、ConcurrencyKey、MaxAttempts、BusinessTable/BusinessId 及业务状态/任务Id/进度/ETA字段。未知总量显示为估算中，不生成假百分比。",
                         insertText: "RunBackground",
-                        snippet: 'RunBackground("${1:ApiEngineKey}", {\n\t${2:ParamName}: ${3:value}\n}, "${4:任务标题}")'
+                        snippet: 'RunBackground("${1:ApiEngineKey}", {\n\t${2:ParamName}: ${3:value}\n}, "${4:任务标题}", {\n\tIdempotencyKey: ${5:businessId}\n})'
                     }
                 }
             },

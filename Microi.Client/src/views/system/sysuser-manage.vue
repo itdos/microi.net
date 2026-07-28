@@ -102,9 +102,10 @@
                                 </template>
                             </el-table-column>
                             <el-table-column prop="CreateTime" :label="$t('Msg.CreateTime')" width="200" />
-                            <el-table-column fixed="right" :label="$t('Msg.Operation')" width="180">
+                            <el-table-column fixed="right" :label="$t('Msg.Operation')" width="260">
                                 <template #default="scope">
                                     <el-button type="text" class="marginRight5" :icon="QuestionFilled" @click="OpenSysUser(scope.row)">{{ $t("Msg.Edit") }}</el-button>
+                                    <el-button type="text" class="marginRight5" :icon="Key" @click="OpenAccessKeys(scope.row)">访问密钥</el-button>
                                     <el-button type="text" class="marginRight5" :icon="ChatDotRound" @click="$root.OpenDiyChat(scope.row)">{{ "微聊" }}</el-button>
                                     <el-button type="text" class="marginRight5" :icon="QuestionFilled" @click="DelSysUser(scope.row)">{{ $t("Msg.Del") }}</el-button>
                                 </template>
@@ -170,6 +171,9 @@
                                                         ><el-dropdown-menu class="table-more-btn">
                                                             <el-dropdown-item :icon="ChatDotRound" @click="$root.OpenDiyChat(model)">
                                                                 {{ "消息" }}
+                                                            </el-dropdown-item>
+                                                            <el-dropdown-item :icon="Key" @click="OpenAccessKeys(model)">
+                                                                访问密钥
                                                             </el-dropdown-item>
                                                             <el-dropdown-item :icon="Delete" divided @click="DelSysUser(model)">
                                                                 {{ $t("Msg.Delete") }}
@@ -279,7 +283,10 @@
                     </el-col>
                     <el-col :span="8" :xs="24" v-if="GetCurrentUser._IsAdmin === true && !DiyCommon.IsNull(CurrentSysUserModel.Id)">
                         <el-form-item>
-                            <el-button type="primary" @click="GetSysUserPassword">获取密码</el-button>
+                            <el-space wrap>
+                                <el-button type="warning" @click="GetSysUserPassword">显示密码</el-button>
+                                <el-button type="primary" :icon="Key" @click="OpenAccessKeys(CurrentSysUserModel)">访问密钥</el-button>
+                            </el-space>
                         </el-form-item>
                     </el-col>
                     <el-col :span="12" :xs="24">
@@ -385,6 +392,10 @@
                 <el-button :icon="Close" @click="ShowEditModel = false">{{ $t("Msg.Cancel") }}</el-button>
             </template>
         </el-dialog>
+        <user-access-key-dialog
+            v-model="ShowAccessKeyDialog"
+            :user="AccessKeyUser"
+        />
     </div>
 </template>
 
@@ -392,12 +403,15 @@
 import { Menu } from "@element-plus/icons-vue";
 import _ from "underscore";
 import { computed } from "vue";
+import { ElMessageBox } from "element-plus";
 import { useDiyStore } from "@/pinia";
+import UserAccessKeyDialog from "./components/user-access-key-dialog.vue";
 
 export default {
     name: "sys_user",
     components: {
-        Menu
+        Menu,
+        UserAccessKeyDialog
     },
     directives: {},
     setup() {
@@ -468,7 +482,9 @@ export default {
             SysDeptList: [],
             SysDeptListJainZhi: [],
             SysUserAvatarUrls: {},
-            CurrentSysUserAvatarUrl: ""
+            CurrentSysUserAvatarUrl: "",
+            ShowAccessKeyDialog: false,
+            AccessKeyUser: {}
         };
     },
     mounted() {
@@ -482,6 +498,10 @@ export default {
         self.GetSysDept();
     },
     methods: {
+        OpenAccessKeys(user) {
+            this.AccessKeyUser = user || {};
+            this.ShowAccessKeyDialog = true;
+        },
         GetUserAvatar(m) {
             var self = this;
             if (self.DiyCommon.IsNull(m.Avatar)) {
@@ -650,8 +670,17 @@ export default {
                 return "";
             }
         },
-        GetSysUserPassword() {
+        async GetSysUserPassword() {
             var self = this;
+            try {
+                await ElMessageBox.confirm(
+                    "将解密并显示该帐号当前密码，此操作会写入安全审计日志。是否继续？",
+                    "显示系统用户密码",
+                    { type: "warning", confirmButtonText: "继续显示", cancelButtonText: "取消" }
+                );
+            } catch (_) {
+                return;
+            }
             self.DiyCommon.Post(
                 "/api/SysUser/GetSysUserPassword",
                 {

@@ -158,6 +158,7 @@ services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件
 services.AddSingleton<SysLogQueueService>();
 services.AddSingleton<ISysLogQueue>(sp => sp.GetRequiredService<SysLogQueueService>());
 services.AddHostedService(sp => sp.GetRequiredService<SysLogQueueService>());
+services.AddHostedService<BackgroundTaskWorkerService>();
 services.AddSingleton<UserBehaviorSessionTracker>();
 services.AddSingleton<IPrivateFileAuditLinkService, PrivateFileAuditLinkService>();
 services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
@@ -353,7 +354,6 @@ Dos.ORM.Database.OnConnectionGuardEvent += (eventName, guardKey, message) =>
 app.UseMicroi();      // 初始化 SaaS 引擎（同步加载 sys_osclients → ClientList）
 app.UseMicroiJob();   // 启用任务计划
 app.UseMicroiMQ();    // 启用消息队列
-app.UseMicroiUpgrade();// 启用平台自动升级
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
 var realtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>();
 RealtimePushRuntime.Configure((connectionIds, eventName, payload) =>
@@ -374,6 +374,9 @@ if (!OsClient.EnsureHydrated(osClientName))
     Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】主租户[{osClientName}]的 OsClientModel 未能从 sys_osclients 完整挂载，部分 DB 配置项将以默认值生效。");
 }
 var clientModel = OsClient.GetClient(osClientName);
+// 自动升级必须在主租户完成 Hydrate 后启动。否则首次启动时 ClientList 仍为空，
+// 后台任务会静默遍历零个租户，导致本应执行的数据库迁移被跳过。
+app.UseMicroiUpgrade();// 启用平台自动升级
 #endregion
 
 #region Redis

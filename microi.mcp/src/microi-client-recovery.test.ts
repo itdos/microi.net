@@ -325,3 +325,75 @@ test('updateModule rejects a false success when EditCodeShowV8 is not persisted'
     globalThis.fetch = originalFetch;
   }
 });
+
+test('createTableIndex confirms an uncertain DDL write by normalized index readback', async () => {
+  const originalFetch = globalThis.fetch;
+  let indexes: Record<string, unknown>[] = [];
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/api/V8Engine/CreateTableIndex')) {
+        const payload = JSON.parse(String(init?.body || '{}')) as {
+          IndexName?: string;
+          Columns?: string[];
+          Unique?: boolean;
+        };
+        indexes = [{
+          Key_name: payload.IndexName,
+          Column_name: (payload.Columns || []).join(', '),
+          Columns: payload.Columns,
+          Non_unique: payload.Unique ? 0 : 1,
+          IsUnique: Boolean(payload.Unique),
+          Is_primary: 0,
+          IsPrimary: false,
+        }];
+        throw new TypeError('connection reset after CREATE INDEX');
+      }
+      if (url.endsWith('/api/V8Engine/GetTableIndexes')) {
+        return jsonResponse({ Code: 1, Data: indexes, Msg: '' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const result = await createClient().createTableIndex({
+      TableName: 'biz_order',
+      IndexName: 'uk_biz_order_osclient_orderno',
+      Columns: ['OsClient', 'OrderNo'],
+      Unique: true,
+    });
+
+    assert.equal(result.Code, 1);
+    assert.equal((result.Data as Record<string, unknown>).RecoveredAfterTransportError, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('dropTableIndex confirms an uncertain DDL write by absence readback', async () => {
+  const originalFetch = globalThis.fetch;
+  let indexes: Record<string, unknown>[] = [{
+    Key_name: 'idx_biz_order_status',
+    Column_name: 'Status',
+    Columns: ['Status'],
+    Non_unique: 1,
+  }];
+  try {
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      if (url.endsWith('/api/V8Engine/DropTableIndex')) {
+        indexes = [];
+        throw new TypeError('connection reset after DROP INDEX');
+      }
+      if (url.endsWith('/api/V8Engine/GetTableIndexes')) {
+        return jsonResponse({ Code: 1, Data: indexes, Msg: '' });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const result = await createClient().dropTableIndex('biz_order', 'idx_biz_order_status');
+    assert.equal(result.Code, 1);
+    assert.equal((result.Data as Record<string, unknown>).RecoveredAfterTransportError, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

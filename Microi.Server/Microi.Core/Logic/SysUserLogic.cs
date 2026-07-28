@@ -39,6 +39,44 @@ namespace Microi.net
             //Guid.Parse("FF832B1D-41A6-42A9-8E5D-C0874B9D5B33"),
             //Guid.Parse("95B3BC3F-CAEB-4FEB-9F7E-CC7E922E6032"),
         };
+
+        /// <summary>
+        /// Decrypts the platform's reversible legacy DES password storage.
+        /// Custom V8 encodings are not assumed to be reversible. Re-encryption
+        /// is used to distinguish valid ciphertext from DESDecode's historical
+        /// "return source on failure" compatibility behavior.
+        /// </summary>
+        public static DosResult<string> DecodeStoredPassword(
+            string encryptedPassword,
+            string passwordEncoding)
+        {
+            if (encryptedPassword.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<string>(0, null, "该帐号没有可读取的密码。");
+            }
+
+            var encoding = (passwordEncoding ?? "").Trim();
+            if (encoding.Equals("V8", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, "该帐号使用自定义V8密码编码，无法执行通用解密。");
+            }
+            if (!encoding.DosIsNullOrWhiteSpace()
+                && !encoding.Equals("DES", StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult<string>(0, null, $"不支持解密密码编码：{encoding}。");
+            }
+
+            var plainText = EncryptHelper.DESDecode(encryptedPassword);
+            if (plainText.DosIsNullOrWhiteSpace()
+                || !string.Equals(
+                    EncryptHelper.DESEncode(plainText),
+                    encryptedPassword,
+                    StringComparison.Ordinal))
+            {
+                return new DosResult<string>(0, null, "密码密文不是有效的DES格式，无法解密。");
+            }
+            return new DosResult<string>(1, plainText);
+        }
         //public async Task<DosResultList<SysUser>> GetSysUserPublicInfo(SysUserParam param)
         //{
         //    if (param.OsClient.DosIsNullOrWhiteSpace())

@@ -1,17 +1,44 @@
 <template>
-    <div v-if="diyStore.IsPhoneView && !hideTabBar" class="mobile-tabbar">
-        <div 
-            v-for="item in tabbarItems" 
-            :key="item.name"
-            class="tabbar-item"
-            :class="{ active: activeTab === item.name }"
-            @click="handleTabClick(item)"
+    <div
+        v-if="diyStore.IsPhoneView && !hideTabBar"
+        class="mobile-tabbar-shell"
+        :class="{ 'mobile-tabbar-shell--with-ai': aiAssistantEnabled }"
+    >
+        <nav class="mobile-tabbar" aria-label="移动端主导航">
+            <button
+                v-for="item in tabbarItems"
+                :key="item.name"
+                type="button"
+                class="tabbar-item"
+                :class="{ active: activeTab === item.name }"
+                :aria-current="activeTab === item.name ? 'page' : undefined"
+                @click="handleTabClick(item)"
+            >
+                <el-icon class="tabbar-icon" :size="23">
+                    <component :is="item.icon" />
+                </el-icon>
+                <span class="tabbar-label">{{ item.label }}</span>
+            </button>
+        </nav>
+
+        <button
+            v-if="aiAssistantEnabled"
+            type="button"
+            class="mobile-ai-entry"
+            data-testid="mobile-ai-entry"
+            aria-label="打开AI助手"
+            title="AI助手"
+            @click="openAiAssistant"
         >
-            <el-icon class="tabbar-icon" :size="24">
-                <component :is="item.icon" />
-            </el-icon>
-            <span class="tabbar-label">{{ item.label }}</span>
-        </div>
+            <span class="mobile-ai-entry__ring" aria-hidden="true"></span>
+            <img
+                class="mobile-ai-entry__robot"
+                src="/static/mci/ai/assistant-robot.png"
+                alt=""
+                aria-hidden="true"
+            />
+            <span class="mobile-ai-entry__label">AI</span>
+        </button>
     </div>
 </template>
 
@@ -20,10 +47,14 @@ import { ref, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useDiyStore } from '@/pinia';
 import { HomeFilled, Grid, ChatDotRound, User } from '@element-plus/icons-vue';
+import { createMobileAiAssistantRoute, isMobileAiAssistantEnabled } from './mobile-ai-entry.js';
 
 const router = useRouter();
 const route = useRoute();
 const diyStore = useDiyStore();
+
+// 与小程序保持同一开关：只有当前租户明确开启 IsShowAiAssistant 时才展示。
+const aiAssistantEnabled = computed(() => isMobileAiAssistantEnabled(diyStore.SysConfig));
 
 // 支持 URL 参数 hideTabBar=1 隐藏底部菜单（小程序 webview 跳转场景）
 // 同时支持 diyStore.IsMiniProgram 全局标识（避免路由跳转后 URL 参数丢失）
@@ -98,56 +129,162 @@ const handleTabClick = (item) => {
         router.push(item.path);
     }
 };
+
+const openAiAssistant = () => {
+    router.push(createMobileAiAssistantRoute());
+};
 </script>
 
 <style lang="scss" scoped>
-.mobile-tabbar {
+.mobile-tabbar-shell {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 50px;
-    background-color: var(--el-bg-color, #fff);
+    display: flex;
+    align-items: flex-end;
+    gap: 9px;
+    box-sizing: border-box;
+    padding: 4px max(10px, var(--mci-safe-right, env(safe-area-inset-right, 0px)))
+        calc(4px + var(--mci-safe-bottom, env(safe-area-inset-bottom, 0px)))
+        max(10px, var(--mci-safe-left, env(safe-area-inset-left, 0px)));
+    z-index: 999;
+    pointer-events: none;
+}
+
+.mobile-tabbar {
+    min-width: 0;
+    height: 52px;
+    flex: 1;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    border-top: 1px solid var(--el-border-color-lighter, #e4e7ed);
-    z-index: 999;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
-    padding-bottom: env(safe-area-inset-bottom);
+    overflow: hidden;
+    border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e4e7ed));
+    border-radius: 28px;
+    background: var(--mci-bg-elevated, var(--el-bg-color, #fff));
+    box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.06), 0 5px 18px rgba(15, 23, 42, 0.08);
+    pointer-events: auto;
 
     .tabbar-item {
         flex: 1;
+        align-self: stretch;
+        min-width: 44px;
+        min-height: 44px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        appearance: none;
+        border: 0;
+        background: transparent;
         cursor: pointer;
-        transition: all 0.2s ease;
-        padding: 4px 0;
+        transition: color 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
+        padding: 3px 0;
         
         .tabbar-icon {
-            color: var(--el-text-color-secondary, #909399);
+            color: var(--mci-text-tertiary, var(--el-text-color-secondary, #909399));
             margin-bottom: 2px;
-            transition: all 0.2s ease;
+            transition: color 0.2s ease, transform 0.2s ease;
         }
 
         .tabbar-label {
             font-size: 11px;
-            color: var(--el-text-color-secondary, #909399);
-            transition: all 0.2s ease;
+            line-height: 1;
+            color: var(--mci-text-tertiary, var(--el-text-color-secondary, #909399));
+            transition: color 0.2s ease;
         }
 
         &.active {
             .tabbar-icon,
             .tabbar-label {
-                color: var(--color-primary, #409eff);
+                color: var(--mci-color-primary, var(--color-primary, #409eff));
             }
+
+            .tabbar-icon { transform: translateY(-1px) scale(1.06); }
         }
 
         &:active {
             transform: scale(0.95);
+            background: var(--mci-bg-card-hover, rgba(64, 158, 255, 0.08));
         }
     }
+}
+
+.mobile-ai-entry {
+    position: relative;
+    flex: 0 0 54px;
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    min-height: 54px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    box-sizing: border-box;
+    appearance: none;
+    padding: 0;
+    border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e4e7ed));
+    border-radius: 50%;
+    background: var(--mci-bg-elevated, var(--el-bg-color, #fff));
+    color: var(--mci-color-primary, var(--color-primary, #409eff));
+    box-shadow: 0 -2px 10px rgba(15, 23, 42, 0.06), 0 5px 18px rgba(15, 23, 42, 0.12);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.mobile-ai-entry__ring {
+    position: absolute;
+    inset: 3px;
+    border: 1px solid rgba(24, 166, 184, 0.22);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: mobileAiSlotPulse 2.8s ease-in-out infinite;
+}
+
+.mobile-ai-entry__robot {
+    position: relative;
+    z-index: 1;
+    width: 37px;
+    height: 37px;
+    margin-top: -4px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.mobile-ai-entry__label {
+    position: absolute;
+    z-index: 2;
+    right: 0;
+    bottom: 2px;
+    left: 0;
+    color: var(--mci-color-primary, var(--color-primary, #409eff));
+    font-size: 9px;
+    line-height: 11px;
+    font-weight: 800;
+    text-align: center;
+    pointer-events: none;
+}
+
+.mobile-ai-entry:active { transform: scale(0.94); }
+.mobile-ai-entry:focus-visible,
+.tabbar-item:focus-visible {
+    outline: 2px solid var(--mci-color-primary, var(--color-primary, #409eff));
+    outline-offset: 2px;
+}
+
+@keyframes mobileAiSlotPulse {
+    0%, 100% { transform: scale(0.96); opacity: 0.45; }
+    50% { transform: scale(1); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mobile-ai-entry,
+    .mobile-tabbar .tabbar-item,
+    .mobile-tabbar .tabbar-icon { transition: none; }
+    .mobile-ai-entry__ring { animation: none; }
 }
 </style>

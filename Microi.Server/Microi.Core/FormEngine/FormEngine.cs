@@ -302,17 +302,25 @@ namespace Microi.net
                 DbTrans trans = _trans == null ? dbSession.BeginTransaction() : _trans;
                 try
                 {
+                    var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"].Val<string>());
+                    var onlyCreatePhysicalTable = param["_OnlyCreateTable"].Val<bool?>() == true;
                     if (trans.From<DiyTable>().Where(d => d.IsDeleted != 1 && d.Name == tableName).Count() > 0)
                     {
-                        if (_trans == null)
+                        // A previous create can be interrupted after diy_table metadata
+                        // is committed but before the tenant physical table exists. The
+                        // explicit physical-only repair path must be allowed to heal that
+                        // state idempotently; ordinary duplicate creates still fail.
+                        if (!onlyCreatePhysicalTable || dbSessionDataBase.TableExists(tableName))
                         {
-                            trans.Rollback();
+                            if (_trans == null)
+                            {
+                                trans.Rollback();
+                            }
+                            return new DosResult(0, null, DiyMessage.GetLang(osClient, "AlreadyExistData", param["_Lang"].Val<string>()));
                         }
-                        return new DosResult(0, null, DiyMessage.GetLang(osClient, "AlreadyExistData", param["_Lang"].Val<string>()));
                     }
                     try
                     {
-                        var dbSessionDataBase = OsClientExtend.GetClientDbSession(osClientModel, param["DataBaseId"].Val<string>());
                         //可能是扩展库。这里不能传入trans，因为trans是主库的，有可能这张表是要在扩展库中创建。
                         var result = MicroiEngine.ORM(dbInfo.DbType).AddDiyTable(new DbServiceParam()
                         {
@@ -330,7 +338,7 @@ namespace Microi.net
                             return new DosResult(result.Code, result.Data, result.Msg, 0, result.DataAppend);
                         }
                         //如果只是创建实体表，则直接返回
-                        if (param["_OnlyCreateTable"].Val<bool?>() == true)
+                        if (onlyCreatePhysicalTable)
                         {
                             if (_trans == null)
                                 trans.Commit();

@@ -503,7 +503,25 @@ namespace Dos.ORM
                     return new DosResult(0, null, "参数错误");
                 if (!IsValidIdentifier(param.TableName))
                     return new DosResult(0, null, "表名不合法");
-                var sql = $"SELECT INDEX_NAME, COLUMN_NAME, UNIQUENESS, INDEX_TYPE FROM ALL_IND_COLUMNS AIC JOIN ALL_INDEXES AI ON AIC.INDEX_NAME = AI.INDEX_NAME AND AIC.TABLE_NAME = AI.TABLE_NAME WHERE AIC.TABLE_NAME = '{param.TableName.ToUpper()}'";
+                var sql = $@"SELECT
+                                AIC.INDEX_NAME AS ""Key_name"",
+                                AIC.COLUMN_NAME AS ""Column_name"",
+                                CASE WHEN AI.UNIQUENESS = 'UNIQUE' THEN 0 ELSE 1 END AS ""Non_unique"",
+                                AI.INDEX_TYPE AS ""Index_type"",
+                                AIC.COLUMN_POSITION AS ""Seq_in_index"",
+                                CASE WHEN AC.CONSTRAINT_TYPE = 'P' THEN 1 ELSE 0 END AS ""Is_primary""
+                            FROM ALL_IND_COLUMNS AIC
+                            JOIN ALL_INDEXES AI
+                              ON AIC.INDEX_OWNER = AI.OWNER
+                             AND AIC.INDEX_NAME = AI.INDEX_NAME
+                             AND AIC.TABLE_NAME = AI.TABLE_NAME
+                            LEFT JOIN ALL_CONSTRAINTS AC
+                              ON AC.OWNER = AI.OWNER
+                             AND AC.INDEX_NAME = AI.INDEX_NAME
+                             AND AC.TABLE_NAME = AI.TABLE_NAME
+                            WHERE AIC.TABLE_OWNER = USER
+                              AND AIC.TABLE_NAME = '{param.TableName.ToUpper()}'
+                            ORDER BY AIC.INDEX_NAME, AIC.COLUMN_POSITION";
                 var list = param.DbSession.FromSql(sql).ToArray();
                 return new DosResult(1, list);
             }

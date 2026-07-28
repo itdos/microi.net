@@ -202,7 +202,8 @@
 
     /* TabBar / NavBar 高度（移动端常量） */
     --mci-navbar-height: 48px;
-    --mci-tabbar-height: 50px;
+    /* 底栏独立 AI 槽位需要 54px 触控区 + 上下留白，页面内容按总高预留。 */
+    --mci-tabbar-height: 62px;
 }
 
 /* 暗色阴影：明确层级，不叠加彩色光晕。 */

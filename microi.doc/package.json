@@ -13,6 +13,7 @@
 	"scripts": {
 		"check:links": "node scripts/check-dead-links.mjs",
 		"check:seo": "node scripts/check-seo.mjs",
+		"test:site-api": "node --test tests/site-api-base.test.mjs",
 		"docs:dev": "npm run check:links && vitepress dev docs --host",
 		"dev": "npm run check:links && vitepress dev docs --host",
 		"docs:build": "npm run check:links && vitepress build docs && npm run check:seo",

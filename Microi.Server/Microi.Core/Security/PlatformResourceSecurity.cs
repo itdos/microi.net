@@ -61,9 +61,11 @@ namespace Microi.net
 
             // Infrastructure credentials, backup state and security telemetry.
             "mci_database_backup",
+            "mci_background_task",
             "mci_file_remote_connection",
             "mci_redis_connection",
             "mci_license_server",
+            "mci_user_access_key",
             "mci_security_access_log",
             "mci_security_attack_event",
             "mci_security_ip_block",

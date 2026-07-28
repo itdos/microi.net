@@ -50,7 +50,7 @@ if (claim.Code !== 1) return { Code: 1, Msg: '已执行或正在执行' };
 return { Code: 1, Data: { IdempotencyKey: idempotencyKey } };
 ```
 
-实际项目优先由数据库唯一索引和接口引擎事务完成抢占，不能仅用“先查再新增”。
+实际项目优先由数据库唯一索引和接口引擎事务完成抢占，不能仅用“先查再新增”。该唯一索引必须声明在 Manifest `tables[].indexes`，并用 `microi_create_table_index` 创建、`microi_get_table_indexes` 回读；禁止在 Job/V8 内手写 `CREATE INDEX`。任务扫描还应按实际 SQL 建立 `(OsClient, Status, NextRetryTime)` 或 `(OsClient, JobKey, ScheduleTime)` 等组合索引。
 
 ## 失败、重试与停机
 
@@ -61,7 +61,50 @@ return { Code: 1, Data: { IdempotencyKey: idempotencyKey } };
 
 ## 后台按钮
 
-菜单按钮设置 `RunBackground/BackgroundTask/IsBackgroundTask=true` 和 `ApiEngineKey`。接口通过 `V8.Method.UpdateBackgroundTask` 上报进度；进度是共享状态，不能只放当前 API 节点内存。
+满足任一条件即按后台任务设计：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用、总量未知且可能持续运行，或安装/初始化/批量导入/批量生成/全量同步/迁移/备份。预计超过 10 分钟时，仅设置 `RunBackground=true` 仍不够，必须按 checkpoint 分片，每片独立事务。
+
+菜单按钮设置 `RunBackground/BackgroundTask/IsBackgroundTask=true` 和 `ApiEngineKey`，并配置 `BackgroundTaskOptions`：
+
+- `IdempotencyKey` 或 `IdempotencyKeyFields`：跨节点、重试和重复点击保持稳定。
+- `ConcurrencyKey`：DDL、安装等不能并行的工作使用同一租约组。
+- `BusinessTable + BusinessId`：关联业务记录。
+- `BusinessStatusField + BusinessTaskIdField`：业务记录至少标记“后台处理中”和任务 Id；推荐再配置 `BusinessProgressField + BusinessEtaField`。
+
+按钮提交成功后，平台前端会通过当前用户的 `V8.FormEngine` 权限把业务记录标记为“后台处理中”并写入任务 Id；后台服务不能直接相信客户端字段名而绕过表单权限。接口引擎仍必须在最后一片或异常补偿中把该业务记录改成“已完成 / 失败 / 已取消”，并保留任务 Id 供详情追溯：
+
+```js
+var task = V8.Param._BackgroundTask || {};
+if (task.BusinessTable && task.BusinessId) {
+  var patch = { Id: task.BusinessId };
+  patch[task.BusinessStatusField] = '后台处理中';
+  patch[task.BusinessTaskIdField] = task.Id;
+  V8.FormEngine.UptFormData(task.BusinessTable, patch);
+}
+```
+
+不得让通用后台服务按客户端传入的任意表名/字段名直接写库；需要脱离前端自动标记的专用任务，应在受控接口引擎中使用固定表名和固定字段名。
+
+接口通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg,Log})` 上报已提交的真实工作量，`Log`/`AppendLog` 用于追加任务详情（不得包含密码、Token 或密钥）。平台按实际吞吐计算 `EstimatedEndTime`；总量未知时不传 `Total`，通知中心显示“不定进度/估算中”，禁止用固定 10%、阶段占位或计时器伪造进度。失败和取消停在最后真实进度，不得显示 100%。
+
+分片接口在仍有后续工作时返回：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    BackgroundTask: {
+      HasMore: true,
+      Checkpoint: { LastId: lastId },
+      Current: committedCount,
+      Total: totalCount,
+      NextDelaySeconds: 1,
+      Msg: '本批已提交，等待下一批'
+    }
+  }
+};
+```
+
+最后一片返回普通 `Code:1`。每个业务副作用还要用 `_BackgroundTaskIdempotencyKey + 业务行Id` 建唯一约束；`_BackgroundTaskFencingToken` 用于拒绝租约过期旧执行者的写入。
 
 ## MCP 工作流
 
@@ -79,3 +122,7 @@ return { Code: 1, Data: { IdempotencyKey: idempotencyKey } };
 - [ ] 锁持有者退出后可恢复，无永久死锁
 - [ ] 失败可重试、可追踪、可人工补偿
 - [ ] 新旧版本滚动共存，状态和消息合约兼容
+- [ ] 未知总量不显示假百分比；已知总量由 Current/Total 唯一推导
+- [ ] ETA 来自真实吞吐，样本不足时明确显示“估算中”
+- [ ] 业务记录可通过 BackgroundTaskId 跳转通知中心排查
+- [ ] 超过 10 分钟的任务有 checkpoint，重启后从最后已提交批次恢复

@@ -4456,12 +4456,16 @@ var DiyCommon = {
                 }
             }
 
-            if (!DiyCommon.IsNull(data._Child) && data._Child.length > 0) {
-                data._Child.forEach((childData) => {
-                    DiyCommon.ForConvertSysMenu(childData);
-                });
-            }
         });
+
+        // 子菜单只需要转换一次。历史代码把递归放在
+        // SysMenuNeedConvertField.forEach 内，菜单每多一层都会被重复转换 N 次；
+        // 当角色权限页加载上千个 AI 应用菜单时会形成指数级工作量并卡死浏览器。
+        if (!DiyCommon.IsNull(data._Child) && data._Child.length > 0) {
+            data._Child.forEach((childData) => {
+                DiyCommon.ForConvertSysMenu(childData);
+            });
+        }
     },
     FormExportFileV2(url, param, callback, fileName, paramType) {
         param.authorization = "Bearer " + DiyCommon.getToken();
@@ -4772,11 +4776,16 @@ var DiyCommon = {
                 return result;
             }
         },
-        async RunBackground(apiEngineKey, param, title, callback) {
+        async RunBackground(apiEngineKey, param, title, options, callback) {
+            if (typeof options === "function") {
+                callback = options;
+                options = {};
+            }
             var result = await DiyCommon.PostAsync("/api/BackgroundTask/RunApiEngine", {
                 ApiEngineKey: apiEngineKey,
                 Param: param || {},
-                Title: title || apiEngineKey
+                Title: title || apiEngineKey,
+                Options: options || {}
             }, null, null, "json");
             if (callback) {
                 callback(result);

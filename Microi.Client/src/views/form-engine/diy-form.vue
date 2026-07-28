@@ -266,6 +266,7 @@
             :title="DiyCustomDialogConfig.Title"
             :TitleIcon="DiyCustomDialogConfig.TitleIcon"
             :width="DiyCustomDialogConfig.Width"
+            :BodyHeight="DiyCustomDialogConfig.BodyHeight"
             :ComponentName="DiyCustomDialogConfig.ComponentName"
             :ComponentPath="DiyCustomDialogConfig.ComponentPath"
             ref="refDiyCustomDialog"

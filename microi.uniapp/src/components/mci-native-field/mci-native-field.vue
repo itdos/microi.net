@@ -196,7 +196,6 @@ import {
   loadNativeFieldOptionPage,
   parseJson
 } from '@/platform/native-form.js'
-import appConfig from '@/config.js'
 import { V8 } from '@/utils/request.js'
 import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
 
@@ -260,8 +259,8 @@ export default {
     numberValue() { const value = Number(this.modelValue || 0); return Number.isFinite(value) ? value : 0 },
     inputType() { return ['tel', 'number', 'digit', 'idcard'].includes(this.field.inputMode) ? this.field.inputMode : 'text' },
     uploadPath() {
-      const tenant = String(appConfig.osClient || appConfig.tenantKey || 'microi').toLowerCase()
-      return `${tenant}/native/${String(this.tableName || 'form').toLowerCase()}/${this.field.Name}`
+      if (this.isAvatar) return 'avatar'
+      return this.isImage ? 'img' : 'file'
     },
     mediaMaxCount() {
       if (this.isAvatar) return 1

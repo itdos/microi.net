@@ -1,4 +1,5 @@
 export const OFFICIAL_MICROI_API_BASE = 'https://api.itdos.com'
+export const LOCAL_MICROI_API_BASE = 'https://localhost:61501'
 
 function normalizeApiBase(value) {
   return String(value || '').trim().replace(/\/+$/, '')
@@ -26,19 +27,39 @@ function isLoopbackApiBase(value) {
  * Local loopback overrides are valid only for the Vite development server.
  * A production bundle or a non-local website must never call the publisher's localhost.
  */
-export function resolveSiteApiBase(configuredValue, localFallback = 'https://localhost:7266') {
+export function resolveSiteApiBaseForRuntime(configuredValue, runtime = {}) {
+  const {
+    isProduction = false,
+    hostname = '',
+    localFallback = LOCAL_MICROI_API_BASE
+  } = runtime
   const configured = normalizeApiBase(configuredValue)
-  const browserIsLocal = typeof window !== 'undefined' && isLoopbackHostname(window.location.hostname)
+  const browserIsLocal = isLoopbackHostname(hostname)
 
   if (configured) {
-    if (isLoopbackApiBase(configured) && (import.meta.env.PROD || !browserIsLocal)) {
+    if (isLoopbackApiBase(configured) && (isProduction || !browserIsLocal)) {
       return OFFICIAL_MICROI_API_BASE
     }
     return configured
   }
 
-  if (!import.meta.env.PROD && browserIsLocal) {
+  if (!isProduction && browserIsLocal) {
     return normalizeApiBase(localFallback)
   }
   return OFFICIAL_MICROI_API_BASE
+}
+
+export function resolveSiteApiBase(configuredValue, localFallback = LOCAL_MICROI_API_BASE) {
+  return resolveSiteApiBaseForRuntime(configuredValue, {
+    isProduction: Boolean(import.meta.env.PROD),
+    hostname: typeof window !== 'undefined' ? window.location.hostname : '',
+    localFallback
+  })
+}
+
+export function buildSiteApiEngineUrl(apiBase, apiEngineKey, osClient) {
+  const base = normalizeApiBase(apiBase)
+  const key = encodeURIComponent(String(apiEngineKey || '').trim())
+  const client = encodeURIComponent(String(osClient || '').trim())
+  return `${base}/apiengine/${key}--OsClient--${client}--`
 }

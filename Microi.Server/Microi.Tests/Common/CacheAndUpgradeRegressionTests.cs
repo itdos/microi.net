@@ -28,6 +28,51 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public void TwoLevelCache_UsesContainerSafeInstanceIdentityForPubSubInvalidation()
+    {
+        var type = typeof(MicroiTwoLevelCache);
+        var instanceId = type.GetField(
+            "_cacheInstanceId",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var buildInstanceId = type.GetMethod(
+            "BuildCacheInstanceId",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(instanceId);
+        Assert.True(instanceId!.IsStatic);
+        Assert.NotNull(buildInstanceId);
+
+        var first = Assert.IsType<string>(buildInstanceId!.Invoke(null, null));
+        var second = Assert.IsType<string>(buildInstanceId.Invoke(null, null));
+        Assert.NotEqual(first, second);
+        Assert.Contains($":{Environment.ProcessId}:", first);
+    }
+
+    [Fact]
+    public void Upgrade_RepairsOnlyOfficialWebsiteAnonymousApiContract()
+    {
+        var type = typeof(MicroiUpgrade);
+        var keysField = type.GetField(
+            "OfficialWebsiteAnonymousApiEngineKeys",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var tenantCheck = type.GetMethod(
+            "IsOfficialWebsiteTenant",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var repairMethod = type.GetMethod(
+            "EnsureOfficialWebsitePublicApiEngineContractAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(keysField);
+        var keys = Assert.IsType<string[]>(keysField!.GetValue(null));
+        Assert.Equal(new[] { "send_sms_reg" }, keys);
+        Assert.NotNull(tenantCheck);
+        Assert.True(Assert.IsType<bool>(tenantCheck!.Invoke(null, new object[] { "iTdos" })));
+        Assert.False(Assert.IsType<bool>(tenantCheck.Invoke(null, new object[] { "customer" })));
+        Assert.NotNull(repairMethod);
+        Assert.Equal(typeof(Task), repairMethod!.ReturnType);
+    }
+
+    [Fact]
     public void AppStoreBundle_KeepsTrustedImporterAboveJintTwoGigabyteBoundary()
     {
         var loadResources = typeof(UpgradeAppStore).GetMethod(

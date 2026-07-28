@@ -217,7 +217,7 @@ Page 模式要特别注意：
 
 | 文件 | 职责 |
 |------|------|
-| `views/micro-app/dialog.vue` | 按 `AppKey + Version` 解析 `/micro-app/{OsClient}/{AppKey}/{Version}/index.html`，挂载 micro-app 并处理结果协议。 |
+| `views/micro-app/dialog.vue` | 按 `AppKey` 解析稳定入口 `/micro-app/{OsClient}/{AppKey}/index.html?v={Version}`；版本只用于缓存失效，不得写进入口路径。 |
 | `views/form-engine/mixins/diy-table-navigation.mixin.js` | 向列表、PageBtns、MoreBtns、BatchSelectMoreBtns 暴露 `OpenAppDialog`。 |
 | `views/form-engine/mixins/diy-form-navigation.mixin.js` | 向表单 V8 暴露同一套 `OpenAppDialog` 参数。 |
 | `views/form-engine/diy-table.vue`、`diy-form.vue` | 将方法挂到运行时 `V8` 对象并承载通用弹窗。 |
@@ -531,3 +531,12 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 - 个人中心路由本身是公开静态页，不能把“能打开 URL”或本地缓存中的用户对象当成有效登录。必须调用受保护接口验证 Token；收到 `1001/1002` 或明确过期消息后清理用户与 Token 缓存，并携带当前 Hash 跳转登录页，不能一边展示个人信息一边在页面底部提示身份过期。
 - 官网独立页面必须接收每次受保护请求响应头中的新 `authorization` 并立刻覆盖 Token 缓存，再发起后续并发请求；否则服务端轮换 Token 后继续使用旧 Token，会出现主接口成功、次级接口却提示身份过期的矛盾页面。
 - 同一份 ApiKey/Token 摘要在 Overview 与 AI 页面复用同一个组件；Token 额度统一展示“总量/Total”，不要把总量写成“赠送”。复制密钥必须有明确成功或失败提示，并提供 Clipboard API 不可用时的兼容复制。
+
+## 浏览器访问密钥路由
+
+- 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，链接格式为 `/#/access-login?access_key=...&redirect=...`。
+- 管理入口同时保留在“系统管理 → 用户管理”的用户行操作和用户编辑表单中；创建表单支持 90 天、自定义到期和永久三种有效期，永久记录以空 `ExpiresAt` 表示并显示为“永久”。
+- 页面必须先把密钥保存在局部变量，再立即从地址栏清除；不得写入 Cookie、localStorage、sessionStorage、Pinia 或控制台。
+- 兑换通过 `POST /api/SysUserAccessKey/Exchange` 的 JSON Body 完成。响应头中的短期 Token 继续交给平台统一请求层保存和轮换。
+- `_AccessKeySession=true` 时不加载普通动态菜单；前端守卫只允许 `_AccessKeyAllowedRoutes` 中的准确路径。该前端限制只是体验和泄露面收窄，服务端仍必须校验 API、表和引擎权限。
+- 历史 `?token=` 只作兼容：解析后立即清除参数，不输出、不持久化完整 Token，不为新功能生成这种链接。

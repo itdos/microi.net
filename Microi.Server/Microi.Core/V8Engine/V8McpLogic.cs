@@ -20,6 +20,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
+using Dos.ORM;
 using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
 
@@ -2032,12 +2033,55 @@ namespace Microi.net
                 });
                 if (existResult.Code == 1 && existResult.Data != null)
                 {
+                    var existingTableId = (string)existResult.Data.Id;
+                    var client = OsClientExtend.GetClient(osClient);
+                    if (client?.Db == null)
+                    {
+                        return new DosResult<object>(0, null, $"租户 [{osClient}] 数据库连接不存在");
+                    }
+
+                    var repairedPhysicalTable = false;
+                    if (!client.Db.TableExists(name))
+                    {
+                        var repairResult = await MicroiEngine.FormEngine.AddTableAsync(new
+                        {
+                            OsClient = osClient,
+                            Name = name,
+                            Description = description ?? "",
+                            DataBaseId = "",
+                            DataBaseName = "",
+                            _OnlyCreateTable = true
+                        });
+                        repairedPhysicalTable = client.Db.TableExists(name);
+                        if (repairResult.Code != 1 && !repairedPhysicalTable)
+                        {
+                            return new DosResult<object>(
+                                repairResult.Code,
+                                repairResult.Data,
+                                $"表 [{name}] 元数据存在，但物理表修复失败：{repairResult.Msg}");
+                        }
+                        repairedPhysicalTable = true;
+                    }
+
+                    var fixedFieldResult = await EnsureFixedDiyFieldMetadataAsync(
+                        osClient,
+                        existingTableId,
+                        name,
+                        client);
+                    if (fixedFieldResult.Code != 1)
+                    {
+                        return fixedFieldResult;
+                    }
+
                     return new DosResult<object>(1, new
                     {
-                        Message = $"表 [{name}] 已存在，跳过创建（幂等）",
-                        TableId = (string)existResult.Data.Id,
+                        Message = repairedPhysicalTable
+                            ? $"表 [{name}] 元数据已存在，物理表及固定字段已修复"
+                            : $"表 [{name}] 已存在，跳过创建（幂等）",
+                        TableId = existingTableId,
                         Name = name,
-                        Skipped = true
+                        Skipped = !repairedPhysicalTable,
+                        Repaired = repairedPhysicalTable
                     });
                 }
 
@@ -2057,7 +2101,7 @@ namespace Microi.net
                 if (!string.IsNullOrWhiteSpace(formOpenType)) tableData["FormOpenType"] = formOpenType;
                 if (!string.IsNullOrWhiteSpace(formOpenWidth)) tableData["FormOpenWidth"] = formOpenWidth;
 
-                var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_table", tableData);
+                var addResult = await MicroiEngine.FormEngine.AddTableAsync(tableData);
 
                 if (addResult.Code == 1)
                 {
@@ -2075,6 +2119,56 @@ namespace Microi.net
             {
                 return new DosResult<object>(0, null, "创建自定义表失败：" + ex.Message);
             }
+        }
+
+        private static async Task<DosResult<object>> EnsureFixedDiyFieldMetadataAsync(
+            string osClient,
+            string tableId,
+            string tableName,
+            OsClientSecret client)
+        {
+            foreach (var field in DiyCommon.FixedDiyField)
+            {
+                var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "TableId", "=", tableId },
+                        new List<object> { "Name", "=", field.Name }
+                    },
+                    _SelectFields = new[] { "Id", "Name" }
+                });
+                if (existing.Code == 1 && existing.Data != null) continue;
+
+                var addFieldResult = await MicroiEngine.FormEngine.AddFieldAsync(new
+                {
+                    OsClient = osClient,
+                    TableId = tableId,
+                    TableName = tableName,
+                    field.Label,
+                    field.Name,
+                    field.Type,
+                    field.Component,
+                    field.Sort,
+                    IsLockField = 1,
+                    field.Visible,
+                    AppVisible = field.Visible,
+                    Readonly = 1,
+                    NameConfirm = 1,
+                    field.TableWidth,
+                    Unique = 0,
+                    _NotAddDbField = client.Db.ColumnExists(tableName, field.Name)
+                });
+                if (addFieldResult.Code != 1)
+                {
+                    return new DosResult<object>(
+                        addFieldResult.Code,
+                        addFieldResult.Data,
+                        $"恢复表 [{tableName}] 固定字段 [{field.Name}] 元数据失败：{addFieldResult.Msg}");
+                }
+            }
+            return new DosResult<object>(1, new { TableId = tableId, Name = tableName });
         }
 
         #endregion
@@ -3998,6 +4092,38 @@ namespace Microi.net
                         if (fieldName.DosIsNullOrWhiteSpace()) { errors.Add($"表 {name} 中存在无 name 字段定义"); continue; }
                         if (!fieldNames.Contains(fieldName.ToLower())) errors.Add($"表 {name} 缺少字段：{fieldName}");
                     }
+
+                    var manifestIndexes = table["indexes"] as JArray ?? table["Indexes"] as JArray ?? new JArray();
+                    if (manifestIndexes.Count > 0)
+                    {
+                        var indexResult = GetTableIndexes(osClient, name);
+                        if (indexResult.Code != 1)
+                        {
+                            errors.Add($"表 {name} 读取索引失败：{indexResult.Msg}");
+                        }
+                        else
+                        {
+                            foreach (var indexToken in manifestIndexes)
+                            {
+                                if (!(indexToken is JObject index)) continue;
+                                var indexName = index["name"].Val<string>() ?? index["Name"].Val<string>();
+                                var indexColumnsToken = index["columns"] as JArray ?? index["Columns"] as JArray ?? new JArray();
+                                var indexColumns = indexColumnsToken.Values<string>()
+                                    .Where(value => !value.DosIsNullOrWhiteSpace())
+                                    .ToList();
+                                var unique = index["unique"].Val<bool?>() ?? index["Unique"].Val<bool?>() ?? false;
+                                var matched = indexResult.Data.Any(existing =>
+                                    (indexName.DosIsNullOrWhiteSpace()
+                                        || existing.Key_name.Equals(indexName, StringComparison.OrdinalIgnoreCase))
+                                    && existing.IsUnique == unique
+                                    && existing.Columns.SequenceEqual(indexColumns, StringComparer.OrdinalIgnoreCase));
+                                if (!matched)
+                                {
+                                    errors.Add($"表 {name} 缺少索引：{(indexName.DosIsNullOrWhiteSpace() ? string.Join(",", indexColumns) : indexName)}");
+                                }
+                            }
+                        }
+                    }
                 }
 
                 async Task CheckByKey(string tableName, string keyField, JArray items, string itemName)
@@ -4742,6 +4868,10 @@ namespace Microi.net
                 });
 
                 var appId = appResult.Code == 1 && appResult.Data != null ? Convert.ToString(appResult.Data.Id) : Ulid.NewUlid().ToString();
+                var existingApp = appResult.Code == 1 && appResult.Data != null
+                    ? JObject.FromObject(appResult.Data)
+                    : null;
+                var requestedDescription = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>();
                 var appData = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -4754,10 +4884,12 @@ namespace Microi.net
                     ["ApplicationType"] = applicationType,
                     ["Category"] = source?["Category"]?.Val<string>() ?? "tools",
                     ["PublisherType"] = "官方应用",
-                    ["Description"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
-                    ["AppDetail"] = source?["Description"]?.Val<string>() ?? source?["Remark"]?.Val<string>() ?? "",
-                    ["Status"] = "Draft",
-                    ["BuildStatus"] = "Changed",
+                    ["Description"] = !IsBlank(requestedDescription) ? requestedDescription : SafeJString(existingApp, "Description"),
+                    ["AppDetail"] = !IsBlank(requestedDescription) ? requestedDescription : SafeJString(existingApp, "AppDetail"),
+                    // 同步私有源码不能让已经发布的商城应用退回草稿，也不能把现有
+                    // 可用编译产物标成失败。是否重新编译由显式发布动作决定。
+                    ["Status"] = existingApp == null ? "Draft" : SafeJString(existingApp, "Status", "Draft"),
+                    ["BuildStatus"] = existingApp == null ? "Changed" : SafeJString(existingApp, "BuildStatus", "Changed"),
                     ["PrivateSourcePath"] = $"ai-app-source/{appId}",
                     ["PublicPublishPath"] = applicationType == "MicroService" ? $"micro-app/{msKey}/" : $"ai-app-publish/{msKey}/"
                 };
@@ -5107,51 +5239,70 @@ namespace Microi.net
                     }
                 }
 
-                var addedCount = 0;
-                var skippedCount = 0;
-
-                foreach (var menuId in menuIds)
+                DosResult<object> permissionResult = null;
+                var resolvedRoleId = roleId;
+                var lockResult = await MicroiEngine.Lock.ActionLockAsync(new MicroiLockParam
                 {
-                    // 检查是否已存在
-                    var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_rolelimit", new
-                    {
-                        OsClient = osClient,
-                        _Where = new List<object>()
-                        {
-                            new List<object>() { "RoleId", "=", roleId },
-                            new List<object>() { "AND", "FkId", "=", menuId }
-                        }
-                    });
+                    Key = $"V8Mcp:SetRolePermission:{resolvedRoleId}",
+                    OsClient = osClient,
+                    Expiry = TimeSpan.FromMinutes(10),
+                    RetryIntervalMs = 50,
+                    UseExponentialBackoff = true
+                }, async () =>
+                {
+                    var addedCount = 0;
+                    var skippedCount = 0;
 
-                    if (existResult.Code == 1 && existResult.Data != null)
+                    // 同一租户、同一角色的权限写入必须串行。网关 524 后原请求仍可能在
+                    // 服务端继续执行；分布式锁可以让重试等待原请求完成，再通过存在性
+                    // 检查幂等跳过，避免多节点或重试并发插入重复 sys_rolelimit。
+                    foreach (var menuId in menuIds.Distinct(StringComparer.OrdinalIgnoreCase))
                     {
-                        skippedCount++;
-                        continue;
+                        var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_rolelimit", new
+                        {
+                            OsClient = osClient,
+                            _Where = new List<object>()
+                            {
+                                new List<object>() { "RoleId", "=", resolvedRoleId },
+                                new List<object>() { "AND", "FkId", "=", menuId },
+                                new List<object>() { "AND", "Type", "=", "Menu" }
+                            }
+                        });
+
+                        if (existResult.Code == 1 && existResult.Data != null)
+                        {
+                            skippedCount++;
+                            continue;
+                        }
+
+                        var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_rolelimit", new JObject
+                        {
+                            ["Customer"] = osClient,
+                            ["RoleId"] = resolvedRoleId,
+                            ["FkId"] = menuId,
+                            ["Type"] = "Menu",
+                            ["Permission"] = "[\"Add\",\"Edit\",\"Del\",\"Export\",\"Import\"]",
+                            ["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                            ["_InvokeType"] = "Server"
+                        });
+
+                        if (addResult.Code == 1) addedCount++;
                     }
 
-                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_rolelimit", new JObject
+                    permissionResult = new DosResult<object>(1, new
                     {
-                        ["Customer"] = osClient,
-                        ["RoleId"] = roleId,
-                        ["FkId"] = menuId,
-                        ["Type"] = "Menu",
-                        ["Permission"] = "[\"Add\",\"Edit\",\"Del\",\"Export\",\"Import\"]",
-                        ["CreateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
-                        ["_InvokeType"] = "Server"
+                        Message = $"角色权限设置完成：新增 {addedCount} 条，已跳过 {skippedCount} 条",
+                        AddedCount = addedCount,
+                        SkippedCount = skippedCount,
+                        RoleId = resolvedRoleId
                     });
-
-                    if (addResult.Code == 1) addedCount++;
-                }
-
-
-
-                return new DosResult<object>(1, new
-                {
-                    Message = $"角色权限设置完成：新增 {addedCount} 条，已跳过 {skippedCount} 条",
-                    AddedCount = addedCount,
-                    SkippedCount = skippedCount,
-                    RoleId = roleId
                 });
+
+                if (lockResult.Code != 1)
+                {
+                    return new DosResult<object>(0, null, "设置角色权限未获得分布式锁：" + lockResult.Msg);
+                }
+                return permissionResult ?? new DosResult<object>(0, null, "设置角色权限未执行");
             }
             catch (Exception ex)
             {

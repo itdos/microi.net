@@ -284,7 +284,22 @@ namespace Dos.ORM
                     return new DosResult(0, null, "参数错误");
                 if (!IsValidIdentifier(param.TableName))
                     return new DosResult(0, null, "表名不合法");
-                var sql = $"SELECT i.name AS Key_name, c.name AS Column_name, i.is_unique AS Non_unique, i.type_desc AS Index_type FROM sys.indexes i JOIN sys.index_columns ic ON i.object_id = ic.object_id AND i.index_id = ic.index_id JOIN sys.columns c ON ic.object_id = c.object_id AND ic.column_id = c.column_id WHERE i.object_id = OBJECT_ID('{param.TableName}')";
+                var sql = $@"SELECT
+                                i.name AS Key_name,
+                                c.name AS Column_name,
+                                CASE WHEN i.is_unique = 1 THEN 0 ELSE 1 END AS Non_unique,
+                                i.type_desc AS Index_type,
+                                ic.key_ordinal AS Seq_in_index,
+                                CASE WHEN i.is_primary_key = 1 THEN 1 ELSE 0 END AS Is_primary
+                            FROM sys.indexes i
+                            JOIN sys.index_columns ic
+                              ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+                            JOIN sys.columns c
+                              ON ic.object_id = c.object_id AND ic.column_id = c.column_id
+                            WHERE i.object_id = OBJECT_ID('{param.TableName}')
+                              AND i.is_hypothetical = 0
+                              AND ic.is_included_column = 0
+                            ORDER BY i.name, ic.key_ordinal";
                 var list = param.DbSession.FromSql(sql).ToArray();
                 return new DosResult(1, list);
             }

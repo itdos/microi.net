@@ -23,6 +23,13 @@ export const constantRoutes = [
         hidden: true
     },
     {
+        path: "/access-login",
+        name: "access_login",
+        component: () => import("@/views/login/access-login.vue"),
+        hidden: true,
+        meta: { title: "访问密钥登录", anonymous: true, keepAlive: false }
+    },
+    {
         path: "/mci-redis-manager",
         name: "mci_redis_manager",
         component: () => import("@/views/system/mci-redis-manager.vue"),
@@ -113,6 +120,13 @@ export const constantRoutes = [
         component: () => import("@/views/mobile/chat.vue"),
         hidden: true,
         meta: { title: "聊天" }
+    },
+    {
+        path: "/mobile/ai-assistant",
+        name: "mobile_ai_assistant",
+        component: () => import("@/views/mobile/ai-assistant.vue"),
+        hidden: true,
+        meta: { title: "AI助手", keepAlive: false }
     },
     {
         path: "/mobile/profile",

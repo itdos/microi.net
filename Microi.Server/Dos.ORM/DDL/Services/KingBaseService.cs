@@ -276,9 +276,25 @@ namespace Dos.ORM
                     return new DosResult(0, null, "参数错误");
                 if (!IsValidIdentifier(param.TableName))
                     return new DosResult(0, null, "表名不合法");
-                var sql = $@"SELECT indexname AS ""Key_name"", indexdef AS ""Index_type""
-                            FROM pg_indexes
-                            WHERE tablename = '{param.TableName}'";
+                var sql = $@"SELECT
+                                idx.relname AS ""Key_name"",
+                                att.attname AS ""Column_name"",
+                                CASE WHEN ind.indisunique THEN 0 ELSE 1 END AS ""Non_unique"",
+                                am.amname AS ""Index_type"",
+                                key_column.ordinality AS ""Seq_in_index"",
+                                CASE WHEN ind.indisprimary THEN 1 ELSE 0 END AS ""Is_primary""
+                            FROM pg_class tbl
+                            JOIN pg_namespace ns ON ns.oid = tbl.relnamespace
+                            JOIN pg_index ind ON ind.indrelid = tbl.oid
+                            JOIN pg_class idx ON idx.oid = ind.indexrelid
+                            JOIN pg_am am ON am.oid = idx.relam
+                            JOIN LATERAL unnest(ind.indkey) WITH ORDINALITY
+                              AS key_column(attnum, ordinality) ON TRUE
+                            JOIN pg_attribute att
+                              ON att.attrelid = tbl.oid AND att.attnum = key_column.attnum
+                            WHERE lower(tbl.relname) = lower('{param.TableName}')
+                              AND ns.nspname = current_schema()
+                            ORDER BY idx.relname, key_column.ordinality";
                 var list = param.DbSession.FromSql(sql).ToArray();
                 return new DosResult(1, list);
             }

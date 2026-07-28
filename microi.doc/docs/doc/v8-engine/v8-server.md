@@ -102,6 +102,21 @@ var count = V8.Cache.HashGet('Customer:Stats', 'Count');
 
 `setTimeout` 和 `System.Threading.Tasks.Task.Run` 不能作为“请求返回后可靠执行”的方案。`V8Engine.Run` 返回后会释放当前 Jint Engine、租户上下文、事务和并发租约，延迟回调可能面对已失效的上下文。请求内异步 API 使用 `await`；需要脱离请求执行时，使用接口引擎后台任务、Job、MQ 或 outbox，并设计幂等、重试和多节点故障恢复。
 
+后台接口引擎通过 `V8.Method.UpdateBackgroundTask` 上报真实单位进度：
+
+```js
+var taskId = V8.Param._BackgroundTaskId;
+V8.Method.UpdateBackgroundTask({
+  _BackgroundTaskId: taskId,
+  Current: committedCount,
+  Total: totalCount,
+  Msg: '已提交第 ' + committedCount + ' 条',
+  Log: '批次 ' + batchNo + ' 已提交'
+});
+```
+
+`Current` 必须表示已经提交、重试不会重复的工作量；有自然单位时不要同时自行计算 `Progress`。`Log`/`AppendLog` 会追加到任务详情，不得写入密码、Token 或密钥。总量未知时省略 `Total`，平台显示不定进度；ETA 由服务端根据真实吞吐采样计算。失败和取消保留最后进度，只有最终 `Code=1` 才显示 100%。预计超过 10 分钟的接口应分页处理，并通过 `Data.BackgroundTask={HasMore:true,Checkpoint,Current,Total,NextDelaySeconds}` 让平台持久化检查点后重新入队。
+
 ```javascript
 var now = DateNow('yyyy-MM-dd HH:mm:ss');
 var id = V8.Method.NewUlid();

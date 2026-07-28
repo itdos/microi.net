@@ -78,6 +78,9 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_redis_rename_key',
   'microi_redis_set_ttl',
   'microi_get_db_schema',
+  'microi_get_table_indexes',
+  'microi_create_table_index',
+  'microi_drop_table_index',
   'microi_list_database_types',
   'microi_inspect_external_database',
   'microi_query_external_database',
@@ -546,9 +549,10 @@ BOUNDARY RULES:
 1. **microi_get_db_schema** — 先查看已有表结构，了解数据模型
 2. **microi_create_table** — 创建自定义表（写入 diy_table，自动创建 MySQL 表并添加 Id/CreateTime/UpdateTime/CreateUser/OsClient 基础字段）
 3. **microi_add_field** — 逐个添加业务字段（写入 diy_field，执行 ALTER TABLE），需指定 component 组件类型
-4. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
-5. **microi_create_engine** — 复杂业务（审批/工作流/统计/集成）必须创建接口引擎，菜单按钮的 V8Code 通过 V8.ApiEngine.Run 调用
-6. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
+4. **microi_get_table_indexes / microi_create_table_index** — 按真实查询与业务唯一约束创建并回读物理索引
+5. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
+6. **microi_create_engine** — 复杂业务（审批/工作流/统计/集成）必须创建接口引擎，菜单按钮的 V8Code 通过 V8.ApiEngine.Run 调用
+7. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
 
 ## 更高一层编排与验收工具
 - **microi_get_manifest_schema** — Return the full-system Manifest contract and example. In modules, use field names such as listFields/searchFields/sortFields; MCP resolves them to diy_field Id, SelectFields and SearchFieldIds before writing sys_menu.
@@ -564,6 +568,13 @@ BOUNDARY RULES:
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
+
+## 数据库索引（强制通过 MCP）
+- 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
+- 创建前后调用 \`microi_get_table_indexes\` 回读。删除只能调用 \`microi_drop_table_index\`，主键索引禁止删除。
+- 租户业务组合索引通常以 OsClient 开头；业务唯一键/幂等键用租户范围唯一索引；外键、子表回查、待办/重试扫描按真实 WHERE/JOIN/ORDER BY 设计。
+- 不得把 SearchFieldIds、SortFieldIds、StatisticsFields 机械转换为一批单列索引。Status/开关/删除标记等低基数字段不能单独滥建，LIKE '%keyword%' 和长文本也不能依赖普通 B-tree 索引。
+- MCP 创建在 diy_table 物理表上的索引，必须能在 Microi.Client “开发设计 → 索引管理”看到相同名称、有序字段和唯一性。
 
 ## MCP 写入超时与回读规则
 - \`microi_create_engine\`、\`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端短超时回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
@@ -633,11 +644,23 @@ BOUNDARY RULES:
   "RunBackground": false,    // 长任务可设 true
   "BackgroundTask": false,   // 兼容别名
   "IsBackgroundTask": false, // 兼容别名
-  "ApiEngineKey": ""         // 后台任务执行的接口引擎Key
+  "ApiEngineKey": "",        // 后台任务执行的接口引擎Key
+  "Workload": { "ExpectedItems": 2000, "FanOutOperations": 10000, "ExpectedSeconds": 3000 },
+  "BackgroundTaskOptions": {
+    "IdempotencyKeyFields": ["Id", "Version"],
+    "ConcurrencyKey": "seed-test-tasks",
+    "BusinessTable": "biz_batch",
+    "BusinessStatusField": "TaskStatus",
+    "BusinessTaskIdField": "BackgroundTaskId",
+    "BusinessProgressField": "TaskProgress",
+    "BusinessEtaField": "EstimatedEndTime"
+  }
 }
 \`\`\`
 按钮的 V8Code **强烈建议** 调用接口引擎（V8.ApiEngine.Run）执行后端逻辑，前端只负责弹窗、刷新、提示。
-应用安装、初始化多语言、批量导入、批量修复、跨系统同步等长任务应使用后台任务：按钮设置 RunBackground/BackgroundTask/IsBackgroundTask=true 并提供 ApiEngineKey，接口引擎内用 V8.Method.UpdateBackgroundTask 上报进度。
+以下任一条件成立时按长任务设计：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用、总量未知且可能持续运行，或属于安装/初始化/批量导入/批量生成/全量同步/迁移/备份。MCP 会依据 Workload 与动作语义自动启用 RunBackground 并给出警告。
+后台任务不是“把同步接口换个入口”：必须配置稳定幂等键；业务主记录至少保存“处理中”状态和 BackgroundTaskId，建议同时保存真实进度与 EstimatedEndTime；接口引擎用 V8.Method.UpdateBackgroundTask 上报已提交的 Current/Total。未知总量不填 Total，通知中心显示“计算中”，不得伪造百分比。
+预计超过 10 分钟的任务必须分片提交，每片返回 Data.BackgroundTask={HasMore:true,Checkpoint:...,Current,Total,NextDelaySeconds}，平台持久化检查点后重新入队；最后一片返回正常 Code=1。每片独立事务，重试以 IdempotencyKey + FencingToken + 数据库唯一约束保证副作用仅一次。
 详细写法参考 skill 文档：\`microi.skills/v8-menu-buttons/SKILL.md\`
 
 ## 系统级表名前缀
@@ -1113,6 +1136,97 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         }
 
         return { content: [{ type: 'text', text: formatDbTables(tables) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_get_table_indexes',
+    `List normalized physical database indexes for one table in OsClient "${osClient}". Returns one item per index with ordered Columns, IsUnique and IsPrimary. Use this before changing indexes and again for readback verification.`,
+    {
+      tableName: z.string().min(1).describe('Physical table name, e.g. Biz_Order or sys_apiengine.'),
+    },
+    async ({ tableName }) => {
+      try {
+        const result = await client.getTableIndexes(tableName);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({
+          TableName: tableName,
+          IndexCount: result.Data?.length || 0,
+          Indexes: result.Data || [],
+        }, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_create_table_index',
+    `Create an idempotent physical database index for OsClient "${osClient}". The backend validates the real table/columns, skips an equivalent existing index, and verifies the result by readback. Indexes created on a diy_table are immediately visible in Microi.Client's 索引管理 dialog. Requires confirmExecution equal to tableName or EXECUTE.`,
+    {
+      tableName: z.string().min(1).describe('Physical table name.'),
+      columns: z.array(z.string().min(1)).min(1).max(8).describe('Ordered index columns. Put equality/tenant columns first and range/order columns last.'),
+      indexName: z.string().optional().describe('Optional index name. Omit for a stable idx_<table>_<columns> name.'),
+      unique: z.boolean().optional().describe('Create a UNIQUE index. Default false. Use only when this is a real business invariant.'),
+      confirmExecution: z.string().optional().describe('Required. Pass the exact tableName or EXECUTE.'),
+    },
+    async ({ tableName, columns, indexName, unique, confirmExecution }) => {
+      if (confirmExecution !== tableName && confirmExecution !== 'EXECUTE') {
+        return {
+          content: [{
+            type: 'text',
+            text: `执行已拦截：创建数据库索引会执行 DDL，请重新调用并传 confirmExecution="${tableName}" 或 "EXECUTE"。`,
+          }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await client.createTableIndex({
+          TableName: tableName,
+          Columns: columns,
+          IndexName: indexName,
+          Unique: unique,
+        });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}\n${JSON.stringify(result.Data || {}, null, 2)}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_drop_table_index',
+    `Drop a non-primary database index from OsClient "${osClient}". The operation is idempotent, blocks primary-key indexes, and verifies absence by readback. Requires confirmExecution equal to "tableName:indexName" or DROP.`,
+    {
+      tableName: z.string().min(1).describe('Physical table name.'),
+      indexName: z.string().min(1).describe('Exact index name returned by microi_get_table_indexes.'),
+      confirmExecution: z.string().optional().describe('Required. Pass tableName:indexName or DROP.'),
+    },
+    async ({ tableName, indexName, confirmExecution }) => {
+      const exactConfirmation = `${tableName}:${indexName}`;
+      if (confirmExecution !== exactConfirmation && confirmExecution !== 'DROP') {
+        return {
+          content: [{
+            type: 'text',
+            text: `执行已拦截：删除数据库索引会执行破坏性 DDL，请重新调用并传 confirmExecution="${exactConfirmation}" 或 "DROP"。`,
+          }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await client.dropTableIndex(tableName, indexName);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}\n${JSON.stringify(result.Data || {}, null, 2)}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

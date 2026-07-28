@@ -51,8 +51,10 @@ description: Microi 业务架构蓝图（System Blueprint）— 设计期系统�
 2. microi_get_blueprint(id)            # 有则读取作为上下文
 3. microi_get_manifest_schema          # 读 manifest 协议
 4. microi_plan_system / generate_system
-5. microi_save_blueprint               # 同步写入/更新蓝图（含本次新增的表/引擎/菜单引用）
-6. microi_validate_blueprint           # 验收
+5. microi_get_table_indexes / microi_create_table_index
+                                         # 按蓝图查询与业务不变量创建并回读索引
+6. microi_save_blueprint               # 同步写入/更新蓝图（含本次新增的表/引擎/菜单引用）
+7. microi_validate_blueprint           # 验收
 ```
 
 ### 场景 B：用户让 AI 修改某张表 / 加字段 / 改接口引擎
@@ -107,7 +109,11 @@ description: Microi 业务架构蓝图（System Blueprint）— 设计期系统�
   "domainModel": {
     "entities": [
       { "table": "crm_customer", "x": 50, "y": 50,
-        "relations": [{ "to": "crm_contact", "type": "1:N", "via": "CustomerId" }] }
+        "relations": [{ "to": "crm_contact", "type": "1:N", "via": "CustomerId" }],
+        "indexes": [
+          { "name": "uk_crm_customer_osclient_code", "columns": ["OsClient", "Code"], "unique": true, "purpose": "租户内客户编码唯一" },
+          { "name": "idx_crm_customer_osclient_status_createtime", "columns": ["OsClient", "Status", "CreateTime"], "unique": false, "purpose": "客户状态列表" }
+        ] }
     ]
   },
   "menuTree": {
@@ -122,6 +128,8 @@ description: Microi 业务架构蓝图（System Blueprint）— 设计期系统�
 ```
 
 `refs` 内可填的资源类型：`tables` `fields`（"table.field"）`engines` `menus` `v8Events`（"table:eventType"）`dataSources` `printTemplates` `workflows` `pages` `jobs`。
+
+领域层每张实体表还必须描述真实查询需要的 `indexes`（名称、有序字段、唯一性、用途）。关系的 `via` 外键、租户内业务唯一键、幂等键、待办/重试扫描字段都必须评估索引。蓝图或需求一旦明确索引，生成 Manifest 时不得遗漏 `tables[].indexes`，落地必须调用 `microi_create_table_index` 并以 `microi_get_table_indexes` 回读；禁止在 V8 中手写 DDL。
 
 后台菜单必须在蓝图阶段规划为至少两级结构。客户、设备、工单、报告、日志、配置等业务域应先形成父级菜单，再把具体 CRUD/报表/日志页面作为子菜单写入 Manifest/MCP；不要把所有模块平铺为一级菜单。
 

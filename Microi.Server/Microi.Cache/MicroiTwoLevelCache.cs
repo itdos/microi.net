@@ -40,6 +40,12 @@ namespace Microi.net
         private readonly string _osClient;
         private readonly IConnectionMultiplexer _redis;
 
+        // 不能只使用进程 PID 标识发布节点：容器内主进程通常都是 PID 1，
+        // 多个 API 节点会因此把其它容器发布的失效消息误判为“自己发布”，
+        // 从而长期保留旧的权限、接口路由等 L1 缓存。该值只用于区分
+        // 当前运行实例，不承载业务事实，因此每个进程生成一次唯一值即可。
+        private static readonly string _cacheInstanceId = BuildCacheInstanceId();
+
         // L1 本地缓存（进程内存）
         private static readonly ConcurrentDictionary<string, CacheEntry> _localCache
             = new ConcurrentDictionary<string, CacheEntry>();
@@ -122,16 +128,15 @@ namespace Microi.net
                             var msg = message.ToString();
                             if (string.IsNullOrEmpty(msg)) return;
 
-                            // 【修复】解析消息：格式为 {ProcessId}|{Key}
+                            // 解析消息：格式为 {InstanceId}|{Key}
                             var parts = msg.Split('|', 2);
                             if (parts.Length != 2) return;
 
-                            var publisherProcessId = parts[0];
+                            var publisherInstanceId = parts[0];
                             var key = parts[1];
-                            var currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
 
                             // 如果是自己发布的通知，忽略（因为自己已经更新了缓存）
-                            if (publisherProcessId == currentProcessId)
+                            if (publisherInstanceId == _cacheInstanceId)
                             {
                                 return;
                             }
@@ -158,12 +163,11 @@ namespace Microi.net
                             var parts = msg.Split('|', 2);
                             if (parts.Length != 2) return;
 
-                            var publisherProcessId = parts[0];
+                            var publisherInstanceId = parts[0];
                             var pattern = parts[1];
-                            var currentProcessId = System.Diagnostics.Process.GetCurrentProcess().Id.ToString();
 
                             // 忽略自己发布的通知
-                            if (publisherProcessId == currentProcessId)
+                            if (publisherInstanceId == _cacheInstanceId)
                             {
                                 return;
                             }
@@ -620,16 +624,24 @@ namespace Microi.net
 
         #region Pub/Sub 发布
 
+        private static string BuildCacheInstanceId()
+        {
+            var configuredNodeId = Environment.GetEnvironmentVariable("MICROI_NODE_ID");
+            var nodeId = string.IsNullOrWhiteSpace(configuredNodeId)
+                ? Environment.MachineName
+                : configuredNodeId.Trim();
+            return $"{nodeId}:{System.Diagnostics.Process.GetCurrentProcess().Id}:{Guid.NewGuid():N}";
+        }
+
         /// <summary>
         /// 发布缓存失效通知（携带节点标识，避免清除自己的缓存）
-        /// 消息格式：{ProcessId}|{Key}
+        /// 消息格式：{InstanceId}|{Key}
         /// </summary>
         private async Task PublishInvalidateAsync(string key)
         {
             if (!MicroiTwoLevelCacheConfig.Enabled || _redis == null) return;
 
-            // 携带当前进程ID，用于订阅端判断是否是自己发布的
-            var message = $"{System.Diagnostics.Process.GetCurrentProcess().Id}|{key}";
+            var message = $"{_cacheInstanceId}|{key}";
             await PublishWithRetryAsync(
                 RedisChannel.Literal(MicroiTwoLevelCacheConfig.InvalidateChannel),
                 message,
@@ -638,13 +650,13 @@ namespace Microi.net
 
         /// <summary>
         /// 发布模式失效通知（携带节点标识）
-        /// 消息格式：{ProcessId}|{Pattern}
+        /// 消息格式：{InstanceId}|{Pattern}
         /// </summary>
         private async Task PublishInvalidatePatternAsync(string pattern)
         {
             if (!MicroiTwoLevelCacheConfig.Enabled || _redis == null) return;
 
-            var message = $"{System.Diagnostics.Process.GetCurrentProcess().Id}|{pattern}";
+            var message = $"{_cacheInstanceId}|{pattern}";
             await PublishWithRetryAsync(
                 RedisChannel.Literal(MicroiTwoLevelCacheConfig.InvalidatePatternChannel),
                 message,

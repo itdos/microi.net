@@ -1351,11 +1351,75 @@ namespace Microi.net.Api
         [PlatformAdminOnly]
         public async Task<JsonResult> GetSysUserPassword(SysUserParam param)
         {
-            // Passwords are credentials, not administrator-readable profile
-            // data.  Administrators can reset a password through UptSysUser,
-            // but the API never returns the current plaintext password.
-            Response.StatusCode = 403;
-            return Json(new DosResult(0, null, "平台不支持读取用户明文密码，请使用重置密码功能。"));
+            param ??= new SysUserParam();
+            await DefaultParam(param);
+            if (param.Id.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null, "用户Id不能为空。"));
+            }
+
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            if (currentToken?.CurrentUser == null
+                || UserAccessKeySecurity.IsSession(currentToken.CurrentUser))
+            {
+                Response.StatusCode = 403;
+                return Json(new DosResult(0, null, "访问密钥会话不能读取系统用户密码。"));
+            }
+
+            var client = OsClientExtend.GetClient(param.OsClient);
+            if (client?.Db == null)
+            {
+                return Json(new DosResult(0, null, "租户数据库连接不存在。"));
+            }
+
+            var targetUser = client.Db.From<SysUser>()
+                .Select(new SysUser().GetFields())
+                .Where(d => d.Id == param.Id && d.IsDeleted != 1)
+                .First<dynamic>();
+            if (targetUser == null)
+            {
+                return Json(new DosResult(0, null, "系统用户不存在。"));
+            }
+
+            // Dynamic database values can expose NULL as DBNull. Convert through
+            // JObject so legacy rows with an empty PwdEncode still follow DES.
+            JObject targetUserObject = JObject.FromObject((object)targetUser);
+            var decodeResult = SysUserLogic.DecodeStoredPassword(
+                targetUserObject["Pwd"]?.ToString(),
+                targetUserObject["PwdEncode"]?.Type == JTokenType.Null
+                    ? ""
+                    : targetUserObject["PwdEncode"]?.ToString());
+            if (decodeResult.Code != 1)
+            {
+                return Json(decodeResult);
+            }
+
+            Response.Headers.CacheControl = "no-store, no-cache, max-age=0";
+            Response.Headers.Pragma = "no-cache";
+            Response.Headers["Referrer-Policy"] = "no-referrer";
+            MicroiEngine.QueueSysLog(new SysLogParam
+            {
+                OsClient = param.OsClient,
+                UserId = currentToken.CurrentUser["Id"]?.ToString(),
+                UserName = currentToken.CurrentUser["Name"]?.ToString(),
+                Category = "Security",
+                Action = "RevealSysUserPassword",
+                Source = "ServerEndpoint",
+                TargetType = "SysUser",
+                TargetId = param.Id,
+                Type = "安全审计",
+                Title = "管理员查看系统用户密码",
+                Content = JsonConvert.SerializeObject(new
+                {
+                    TargetUserId = param.Id,
+                    TargetAccount = targetUserObject["Account"]?.ToString()
+                }),
+                IP = IPHelper.GetClientIP(HttpContext).Data ?? "",
+                Success = true,
+                OccurredAt = DateTime.Now,
+                Level = 2
+            });
+            return Json(new DosResult(1, decodeResult.Data));
         }
 
         /// <summary>

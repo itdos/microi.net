@@ -26,6 +26,9 @@
 |------|------|-------|
 | `microi_get_status` | 检查 Microi 后端连接状态 | 只读 |
 | `microi_get_db_schema` | 获取数据库表结构（表名、字段、类型、描述） | 只读 |
+| `microi_get_table_indexes` | 获取一张物理表的标准化索引（有序字段、唯一性、主键标识） | 只读 |
+| `microi_create_table_index` | 校验物理字段、幂等创建索引并回读 | 读写（需确认） |
+| `microi_drop_table_index` | 删除非主键索引并回读 | 破坏性写入（需确认） |
 | `microi_list_engines` | 列出所有接口引擎 | 只读 |
 | `microi_get_engine_code` | 获取接口引擎 JavaScript 源码 | 只读 |
 | `microi_save_engine_code` | 保存接口引擎代码 | 读写 |
@@ -99,7 +102,9 @@ Manifest 的 `modules` 支持直接使用字段名配置列表和搜索，不需
 
 未显式配置时，MCP 会按字段语义自动补齐后台菜单体验：`NotShowFields` 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段，`SearchFieldIds` 默认选择名称、标题、编号、状态、分类、负责人、时间等常用筛选，`StatisticsFields` 默认选择金额、价格、数量、积分、余额等数值字段，`MobileListFields` 和卡片标签字段默认选择移动端可读的 3-4 个核心字段。字段较多的表单会优先使用 `diy_table.Tabs` 和字段 `Tab` 做基础信息、联系信息、业务信息、附件备注、扩展信息分组，必要时再使用 `CollapseGroup` / 字段级 `Tabs` 控件美化局部区域。
 
-Manifest 支持的顶层数组：`roles`、`tables`、`dataSources`、`engines`、`events`、`modules`、`permissions`、`pages`、`printTemplates`、`workflows`、`jobs`。
+Manifest 支持的顶层数组：`roles`、`tables`、`dataSources`、`engines`、`events`、`modules`、`permissions`、`pages`、`printTemplates`、`workflows`、`jobs`。每个 `tables[]` 可声明 `indexes: [{name?, columns: string[], unique?, purpose?}]`；生成器会在字段落地后通过标准索引 API 幂等创建，并由 `microi_validate_system` 回读验收。
+
+数据库索引不能通过 V8 或临时 SQL 绕过 MCP。先用 `microi_get_table_indexes` 获取真实状态，再用 `microi_create_table_index` 创建，最后回读；DIY 表上的结果会直接出现在后台“开发设计 → 索引管理”。删除只允许 `microi_drop_table_index`，且主键索引受保护。
 
 ```json
 {

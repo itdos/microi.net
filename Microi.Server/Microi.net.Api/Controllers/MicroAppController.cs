@@ -8,6 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Microi.net.Api
@@ -52,7 +54,13 @@ namespace Microi.net.Api
             }
 
             var version = ResolveVersion(service);
-            return Redirect(BuildAssetUrl(osClient, appKey, version, ResolveEntryPath(service)));
+            return await ServeManagedAsset(
+                osClient,
+                appKey,
+                version,
+                ResolveEntryPath(service),
+                service,
+                rewriteStableEntry: true);
         }
 
         [HttpGet("~/micro-app/{osClient}/{appKey}/{version}/{*assetPath}")]
@@ -74,6 +82,24 @@ namespace Microi.net.Api
             {
                 return NotFound($"MicroApp is not enabled or not found: {appKey}");
             }
+
+            return await ServeManagedAsset(
+                osClient,
+                appKey,
+                version,
+                assetPath,
+                service,
+                rewriteStableEntry: false);
+        }
+
+        private async Task<IActionResult> ServeManagedAsset(
+            string osClient,
+            string appKey,
+            string version,
+            string assetPath,
+            JObject service,
+            bool rewriteStableEntry)
+        {
             if (IsExternalStorage(service))
             {
                 var externalUrl = (service["MsUrl"].Val<string>() ?? "").Trim();
@@ -133,7 +159,14 @@ namespace Microi.net.Api
                     {
                         inlineContentType = GuessContentType(assetPath);
                     }
-                    SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+                    inlineBytes = RewriteStableEntryHtml(
+                        inlineBytes,
+                        inlineContentType,
+                        osClient,
+                        appKey,
+                        currentVersion,
+                        rewriteStableEntry);
+                    SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
                     return File(inlineBytes, inlineContentType);
                 }
 
@@ -151,11 +184,18 @@ namespace Microi.net.Api
                     {
                         proxyContentType = GuessContentType(assetPath);
                     }
-                    SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+                    proxyBytes = RewriteStableEntryHtml(
+                        proxyBytes,
+                        proxyContentType,
+                        osClient,
+                        appKey,
+                        currentVersion,
+                        rewriteStableEntry);
+                    SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
                     return File(proxyBytes, proxyContentType);
                 }
 
-                SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+                SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
                 return StatusCode(502, $"MicroApp file asset could not be read from managed storage: {assetPath}");
             }
 
@@ -181,7 +221,15 @@ namespace Microi.net.Api
                 contentType = GuessContentType(assetPath);
             }
 
-            SetAssetHeaders(appKey, currentVersion, assetPath, asset);
+            bytes = RewriteStableEntryHtml(
+                bytes,
+                contentType,
+                osClient,
+                appKey,
+                currentVersion,
+                rewriteStableEntry);
+
+            SetAssetHeaders(appKey, currentVersion, assetPath, asset, rewriteStableEntry);
 
             return File(bytes, contentType);
         }
@@ -266,6 +314,84 @@ namespace Microi.net.Api
         private static string BuildAssetUrl(string osClient, string appKey, string version, string assetPath)
         {
             return $"/micro-app/{Uri.EscapeDataString(osClient)}/{Uri.EscapeDataString(appKey)}/{Uri.EscapeDataString(version)}/{EscapeAssetPath(assetPath)}";
+        }
+
+        private static byte[] RewriteStableEntryHtml(
+            byte[] bytes,
+            string contentType,
+            string osClient,
+            string appKey,
+            string version,
+            bool rewriteStableEntry)
+        {
+            if (!rewriteStableEntry
+                || bytes == null
+                || bytes.Length == 0
+                || contentType.DosIsNullOrWhiteSpace()
+                || !contentType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+            {
+                return bytes;
+            }
+
+            var html = Encoding.UTF8.GetString(bytes);
+            var assetBase = $"/micro-app/{Uri.EscapeDataString(osClient)}/{Uri.EscapeDataString(appKey)}/{Uri.EscapeDataString(version)}/";
+            var cacheVersion = Uri.EscapeDataString(version ?? DefaultVersion);
+            var rewritten = Regex.Replace(
+                html,
+                "(?<prefix>\\b(?:src|href)\\s*=\\s*[\\\"'])(?<url>[^\\\"']+)(?<suffix>[\\\"'])",
+                match =>
+                {
+                    var originalUrl = match.Groups["url"].Value.Trim();
+                    if (originalUrl.DosIsNullOrWhiteSpace()
+                        || originalUrl.StartsWith("/", StringComparison.Ordinal)
+                        || originalUrl.StartsWith("#", StringComparison.Ordinal)
+                        || originalUrl.StartsWith("//", StringComparison.Ordinal)
+                        || originalUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                        || originalUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                        || originalUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                        || originalUrl.StartsWith("blob:", StringComparison.OrdinalIgnoreCase)
+                        || originalUrl.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)
+                        || originalUrl.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return match.Value;
+                    }
+
+                    var hash = "";
+                    var hashIndex = originalUrl.IndexOf('#');
+                    if (hashIndex >= 0)
+                    {
+                        hash = originalUrl.Substring(hashIndex);
+                        originalUrl = originalUrl.Substring(0, hashIndex);
+                    }
+
+                    var query = "";
+                    var queryIndex = originalUrl.IndexOf('?');
+                    if (queryIndex >= 0)
+                    {
+                        query = originalUrl.Substring(queryIndex + 1);
+                        originalUrl = originalUrl.Substring(0, queryIndex);
+                    }
+
+                    var relativePath = originalUrl.Replace('\\', '/');
+                    while (relativePath.StartsWith("./", StringComparison.Ordinal))
+                    {
+                        relativePath = relativePath.Substring(2);
+                    }
+                    if (relativePath.DosIsNullOrWhiteSpace()
+                        || relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == ".."))
+                    {
+                        return match.Value;
+                    }
+
+                    var rewrittenQuery = query.DosIsNullOrWhiteSpace()
+                        ? $"v={cacheVersion}"
+                        : $"{query}&amp;v={cacheVersion}";
+                    var rewrittenUrl = $"{assetBase}{EscapeAssetPath(relativePath)}?{rewrittenQuery}{hash}";
+                    return $"{match.Groups["prefix"].Value}{rewrittenUrl}{match.Groups["suffix"].Value}";
+                },
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            return Encoding.UTF8.GetBytes(rewritten);
         }
 
         private static string EscapeAssetPath(string assetPath)
@@ -680,15 +806,21 @@ namespace Microi.net.Api
             return "https://static.itdos.com";
         }
 
-        private void SetAssetHeaders(string appKey, string currentVersion, string assetPath, JObject asset)
+        private void SetAssetHeaders(
+            string appKey,
+            string currentVersion,
+            string assetPath,
+            JObject asset,
+            bool rewrittenStableEntry = false)
         {
             var sha256 = GetText(asset, "sha256", "Sha256");
-            if (!sha256.DosIsNullOrWhiteSpace())
+            if (!rewrittenStableEntry && !sha256.DosIsNullOrWhiteSpace())
             {
                 Response.Headers["ETag"] = $"\"{sha256}\"";
             }
             Response.Headers["X-Microi-MicroApp"] = $"{Uri.EscapeDataString(appKey ?? "")}@{Uri.EscapeDataString(currentVersion ?? "")}";
-            Response.Headers["Cache-Control"] = assetPath.Equals("index.html", StringComparison.OrdinalIgnoreCase)
+            Response.Headers["Cache-Control"] = rewrittenStableEntry
+                || Path.GetFileName(assetPath).Equals("index.html", StringComparison.OrdinalIgnoreCase)
                 ? "no-cache, no-store, must-revalidate"
                 : "public, max-age=31536000, immutable";
         }

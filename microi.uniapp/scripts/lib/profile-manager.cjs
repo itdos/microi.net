@@ -28,6 +28,28 @@ function generatedProfileSource(profile) {
   ].join('\n')
 }
 
+function generatedActiveTabBarSource(profile, pagesConfig) {
+  const tabBar = pagesConfig && pagesConfig.tabBar ? pagesConfig.tabBar : {}
+  const config = {
+    profileId: profile.id,
+    custom: tabBar.custom === true,
+    color: tabBar.color || '#80909A',
+    selectedColor: tabBar.selectedColor || profile.config.theme?.brand || '#E54625',
+    backgroundColor: tabBar.backgroundColor || '#FFFFFF',
+    list: Array.isArray(tabBar.list) ? tabBar.list.map((item) => ({
+      pagePath: String(item.pagePath || '').replace(/^\/+/, ''),
+      text: item.text || '',
+      iconPath: item.iconPath || '',
+      selectedIconPath: item.selectedIconPath || item.iconPath || ''
+    })) : []
+  }
+  return [
+    `// Generated from profiles/${profile.id}/pages.json. Use npm profile commands to switch safely.`,
+    `export default ${JSON.stringify(config, null, 2)}`,
+    ''
+  ].join('\n')
+}
+
 function generatedTenantSource(profile) {
   const modulePath = `@/tenants/${profile.tenantModule}/business.js`
   return [
@@ -83,10 +105,12 @@ function getProfileArtifacts(profileId) {
   for (const required of [pagesSource, manifestSource, tenantSource, tenantNativeTableSource, tenantFormSource, tenantRuntimeSource]) {
     if (!fs.existsSync(required)) throw new Error(`Profile 缺少文件: ${required}`)
   }
+  const pagesContent = fs.readFileSync(pagesSource)
+  const pagesConfig = JSON.parse(pagesContent.toString('utf8'))
   return [
     {
       target: path.join(projectRoot, 'src', 'pages.json'),
-      content: fs.readFileSync(pagesSource)
+      content: pagesContent
     },
     {
       target: path.join(projectRoot, 'src', 'manifest.json'),
@@ -95,6 +119,10 @@ function getProfileArtifacts(profileId) {
     {
       target: path.join(projectRoot, 'src', 'generated', 'active-profile.js'),
       content: Buffer.from(generatedProfileSource(profile), 'utf8')
+    },
+    {
+      target: path.join(projectRoot, 'src', 'generated', 'active-tabbar.js'),
+      content: Buffer.from(generatedActiveTabBarSource(profile, pagesConfig), 'utf8')
     },
     {
       target: path.join(projectRoot, 'src', 'generated', 'tenant-business.js'),
@@ -140,6 +168,7 @@ module.exports = {
   getProfileArtifacts,
   activateProfile,
   generatedProfileSource,
+  generatedActiveTabBarSource,
   generatedTenantSource,
   generatedTenantNativeTableSource,
   generatedTenantFormSource,

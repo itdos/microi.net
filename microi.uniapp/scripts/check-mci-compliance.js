@@ -56,6 +56,14 @@ const pagesConfig = JSON.parse(read('src/pages.json'));
 const manifest = JSON.parse(read('src/manifest.json'));
 const aiPage = read('src/pages/ai/index.vue');
 const aiLauncher = read('src/components/mci-ai-launcher/mci-ai-launcher.vue');
+const customTabBarJs = read('src/custom-tab-bar/index.js');
+const customTabBarJson = JSON.parse(read('src/custom-tab-bar/index.json'));
+const customTabBarWxml = read('src/custom-tab-bar/index.wxml');
+const customTabBarWxss = read('src/custom-tab-bar/index.wxss');
+const activeTabBar = read('src/generated/active-tabbar.js');
+const profileManager = read('scripts/lib/profile-manager.cjs');
+const xjyPagesConfig = JSON.parse(read('profiles/xjy/pages.json'));
+const standardPagesConfig = JSON.parse(read('profiles/standard/pages.json'));
 const aiAssistant = read('src/pages/ai/components/mci-ai-assistant/mci-ai-assistant.vue');
 const aiClient = read('src/pages/ai/utils/mci-ai.js');
 const messageChat = read('src/pages/message/chat.vue');
@@ -78,11 +86,45 @@ assert(visualAuthPrompt.includes('workspace-login.png'), 'Visual screenshot chec
 assert(visualAuthPrompt.includes('message-login.png'), 'Visual screenshot check must include the message auth prompt.');
 assert(aiClient.includes("MCI_AI_ENGINE_KEY = 'mci_ai_data_assistant'"), 'AI client must use the canonical mci_ai_data_assistant engine key.');
 assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/index'"), 'The enabled AI launcher must open the dedicated route without an auth request.');
-assert(aiLauncher.includes('v-if="aiAssistantEnabled"') && aiLauncher.includes('getAiAssistantEnabled'), 'AI launcher visibility must be controlled by the server-side system setting.');
+assert(aiLauncher.includes('v-if="aiAssistantEnabled"') && aiLauncher.includes('getAiAssistantEnabled'), 'H5 AI slot visibility must be controlled by the server-side system setting.');
 assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
-assert(aiLauncher.includes('const DRAG_THRESHOLD = 12') && /endDrag\(\)[\s\S]*?this\.openAssistant\(\)/.test(aiLauncher), 'AI launcher must open from touchend after a short touch and reserve movement for a deliberate drag.');
-assert(!/@(?:touchstart|touchmove|touchend|touchcancel|tap)[^=]*\.(?:stop|prevent)/.test(aiLauncher), 'AI launcher events must use bindtouch/bindtap in a UniApp custom component; catchtouch/catchtap can swallow the event bridge in WeChat.');
+assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === true, 'The active profile must use a custom tabBar for the separated navigation capsule and AI slot.');
+assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === true, 'The xjy profile must enable the custom tabBar.');
+assert(standardPagesConfig.tabBar && standardPagesConfig.tabBar.custom === true, 'The standard profile must enable the custom tabBar.');
+assert((pagesConfig.subPackages || []).some((pkgEntry) => (pkgEntry.pages || []).some((page) => `${pkgEntry.root}/${page.path}`.replace(/\/+/g, '/') === 'pages/ai/index')), 'The dedicated AI assistant route must remain registered in pages.json.');
+assert(activeTabBar.includes('"custom": true') && activeTabBar.includes('"profileId": "xjy"'), 'The checked-in generated tabBar bridge must represent the default xjy profile.');
+assert(profileManager.includes("'generated', 'active-tabbar.js'") && profileManager.includes('generatedActiveTabBarSource'), 'Profile switching must regenerate the active tabBar bridge.');
+assert(customTabBarJson.component === true, 'WeChat custom tabBar must be declared as a native component.');
+assert(customTabBarWxml.includes('class="mci-bottom-dock') && customTabBarWxml.includes('class="mci-bottom-dock__nav"'), 'WeChat custom tabBar must render the left navigation capsule.');
+assert(customTabBarWxml.includes('mci-bottom-dock__ai-slot') && customTabBarWxml.includes('wx:if="{{aiAssistantEnabled}}"'), 'WeChat custom tabBar must render a separate, feature-gated AI slot.');
+assert(aiLauncher.includes('class="mci-bottom-dock"') && aiLauncher.includes('mci-bottom-dock__nav') && aiLauncher.includes('mci-bottom-dock__ai-slot'), 'H5 must mirror the separated navigation capsule and AI slot.');
+assert(aiLauncher.includes('mci-ai-launcher--fallback') && aiLauncher.includes('getSafeAreaMetrics') && aiLauncher.includes('safeRight') && aiLauncher.includes('safeBottom'), 'Non-tab pages must retain a fixed, safe-area-aware AI fallback without drag state.');
+assert(customTabBarJs.includes('aiAssistantEnabled: false') && customTabBarJs.includes('!this.data.aiAssistantEnabled'), 'The native AI slot must fail closed before opening the assistant.');
+assert(customTabBarJs.includes("url: '/pages/ai/index'") && customTabBarWxml.includes('bindtap="openAssistant"'), 'The native AI slot must open the dedicated assistant route from a direct tap.');
+assert(customTabBarJs.includes('safeAreaInsets') && customTabBarWxml.includes('{{safeBottom}}') && /position:\s*fixed[\s\S]*bottom:\s*0/.test(customTabBarWxss), 'The native bottom dock must consume the runtime safe area while staying fixed to the bottom.');
+assert(aiLauncher.includes('--mci-safe-bottom') && aiLauncher.includes('env(safe-area-inset-bottom'), 'The H5 bottom dock must consume the shared bottom safe-area variable with an env fallback.');
+assert(customTabBarWxml.includes('mci-bottom-dock--without-ai') && customTabBarWxss.includes('grid-template-columns: minmax(0, 1fr);'), 'The navigation capsule must reclaim the AI column when the feature is disabled.');
+for (const legacyDragToken of [
+  'DRAG_THRESHOLD',
+  'POSITION_KEY',
+  'LEGACY_POSITION_KEY',
+  'dragState',
+  'startDrag',
+  'moveDrag',
+  'endDrag',
+  'cancelDrag',
+  '@touchstart',
+  '@touchmove',
+  '@touchend',
+  'bindtouchstart',
+  'bindtouchmove',
+  'bindtouchend',
+  'setStorageSync'
+]) {
+  assert(!aiLauncher.includes(legacyDragToken) && !customTabBarJs.includes(legacyDragToken) && !customTabBarWxml.includes(legacyDragToken), `Fixed AI slots must not retain draggable launcher behavior: ${legacyDragToken}.`);
+}
 assert(aiLauncher.includes("服务助手打开失败，请重试"), 'Assistant launcher navigation failures must give the user visible feedback.');
+assert(customTabBarJs.includes("服务助手打开失败，请重试"), 'Native assistant slot navigation failures must give the user visible feedback.');
 assert(aiPage.includes('onBackPress') && aiPage.includes('assistant.handleBack'), 'AI page must consume internal back states before leaving the dedicated route.');
 assert(aiPage.includes('getAiAssistantEnabled({ refresh: true })') && aiPage.includes('message-fallback-page') && aiPage.includes('暂无新消息'), 'Direct assistant routes must enforce the server-side switch and render a complete normal message state while disabled.');
 assert(!aiPage.includes('功能暂未开放') && !aiPage.includes('敬请期待') && !aiPage.includes('根据平台配置'), 'Closed assistant state must not expose rollout, review, or incomplete-feature copy.');

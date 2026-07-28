@@ -8,9 +8,7 @@
             show-icon
             :closable="false"
         />
-        <div v-else-if="loading" class="micro-app-host__loading">
-            <el-icon class="is-loading"><Loading /></el-icon>
-        </div>
+        <micro-app-loading-skeleton v-else-if="loading" />
         <micro-app
             v-else-if="entryUrl"
             class="micro-app-host__app"
@@ -23,13 +21,16 @@
             router-mode="pure"
             iframe
             keep-alive
+            @datachange="handleDataChange"
         />
     </div>
 </template>
 
 <script>
-import { Loading } from "@element-plus/icons-vue";
 import { DiyCommon } from "@/utils/diy.common";
+import { buildMicroAppEntryUrl } from "@/utils/microAppEntryUrl.js";
+import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
+import { applyMicroAppToken } from "./token-sync";
 
 function safeDecode(value) {
     if (DiyCommon.IsNull(value)) return "";
@@ -93,6 +94,8 @@ function parseMicroAppPath(value) {
     }
 
     if (parsedUrl) {
+        const version = parsedUrl.searchParams.get("v") || parsedUrl.searchParams.get("version") || "";
+        if (!result.version && version) result.version = safeDecode(version);
         const routePath = parsedUrl.searchParams.get("microRoute") || parsedUrl.searchParams.get("routePath") || "";
         if (routePath) result.routePath = normalizeMicroRoutePath(routePath);
     }
@@ -134,7 +137,7 @@ function joinUrl(baseUrl, path) {
 
 export default {
     name: "MicroAppHost",
-    components: { Loading },
+    components: { MicroAppLoadingSkeleton },
     data() {
         return {
             loading: true,
@@ -185,6 +188,10 @@ export default {
         }
     },
     methods: {
+        handleDataChange(event) {
+            const payload = event?.detail?.data ?? event?.detail ?? event ?? {};
+            applyMicroAppToken(payload);
+        },
         extractRouteConfig() {
             const route = this.$route || {};
             const meta = route.meta || {};
@@ -221,6 +228,11 @@ export default {
                     microRoutePath = microAppUrlConfig.routePath;
                 }
                 if (microAppUrlConfig.isFriendlyRoute) {
+                    microAppUrl = "";
+                }
+                if (microAppUrlConfig.isEntryUrl) {
+                    // Managed micro-app entries always use the stable, versionless
+                    // endpoint. BuildVersion is only a cache-busting query value.
                     microAppUrl = "";
                 }
                 try {
@@ -270,8 +282,11 @@ export default {
                 }
 
                 if (!url && config.appKey) {
-                    const versionPart = config.version ? `/${encodeURIComponent(config.version)}` : "";
-                    url = `/micro-app/${encodeURIComponent(DiyCommon.GetOsClient())}/${encodeURIComponent(config.appKey)}${versionPart}/index.html`;
+                    url = buildMicroAppEntryUrl({
+                        osClient: DiyCommon.GetOsClient(),
+                        appKey: config.appKey,
+                        version: config.version
+                    });
                 }
 
                 if (!url) {
@@ -308,15 +323,6 @@ export default {
 .micro-app-host__alert {
     margin: 12px;
     width: auto;
-}
-
-.micro-app-host__loading {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - 100px);
-    color: var(--el-color-primary);
-    font-size: 24px;
 }
 
 .micro-app-host__app {

@@ -27,6 +27,9 @@
 
             <ThemeSelect class="right-menu-item hover-effect" />
 
+            <!-- PC AI助手：与移动端、小程序复用同一机器人和同一接口能力 -->
+            <DesktopAiAssistant />
+
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
@@ -137,6 +140,7 @@ import LangSelect from "@/components/LangSelect";
 import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
 import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
+import DesktopAiAssistant from "@/components/DesktopAiAssistant/index.vue";
 import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
@@ -149,7 +153,8 @@ export default {
         LangSelect,
         Search,
         ThemeSelect,
-        BackgroundTaskCenter
+        BackgroundTaskCenter,
+        DesktopAiAssistant
     },
     setup() {
         const diyStore = useDiyStore();

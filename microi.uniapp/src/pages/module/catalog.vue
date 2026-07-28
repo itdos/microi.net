@@ -31,7 +31,6 @@
       <text class="state-panel__title">暂无可用应用</text>
       <text class="state-panel__text">当前账号尚未分配移动端业务菜单</text>
     </view>
-    <mci-ai-launcher />
   </mci-page-shell>
 </template>
 

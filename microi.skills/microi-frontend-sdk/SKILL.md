@@ -59,6 +59,7 @@ export function createApp() {
 - 上传使用 `V8.uploadFile`。
 - 图片、头像、富文本图片、二维码、付款凭证、证件和私有文件使用 `V8.assetUrl`、`V8.resolveFileUrl` 或 `V8.resolveAvatarUrl`。
 - Token 与用户缓存使用 `V8.getToken`、`V8.setToken`、`V8.clearToken`、`V8.getUser` 和 `V8.setUser`。
+- 公有 HDFS 上的 AI 应用使用 `microi-ai-app-auth.js` 统一桥接登录：页面和只读演示保持匿名可见，首次持久化 `app_*` 操作弹出登录框，登录成功后携带 Token 重试。后端必须再次识别写代码并以 `V8.CurrentUser.Id` 覆盖 `ClientKey`、`ActorKey`、`UserId`，禁止只靠前端按钮判断。
 - JavaScript 需要平台安全区数值时使用 `V8.getSafeArea`；CSS 仍使用 `env(safe-area-inset-*)`。
 
 `Microi.Client` 主后台运行时已内置前后端同构的 `V8.Http.Get/Post/Patch` 及对应 Response 方法；表单事件、按钮 V8 等宿主前端新代码必须优先使用 `V8.Http`，旧 `V8.Post/Get` 仅作兼容保留，其参数和兼容规则以 `v8-http-integration/SKILL.md` 为准。独立项目使用本 SDK、且不在主后台 V8 宿主中时，才使用 SDK 自身的小写 `V8.get/post`、`ApiEngine`、`FormEngine`；不要把它们与宿主旧版大写 `V8.Post/Get` 混为一谈，也不要假设浏览器可以绕过第三方接口的 CORS。
@@ -201,6 +202,7 @@ const result = await V8.refreshToken();
 - 项目薄封装要通过 `{ ...options, path: options.path || defaultPath }` 透传全部选项，避免丢失页面级 `headers`、`action`、`anonymous`、`file`、`formData` 和 `silentError`。
 - H5 页面要保留 `uni.chooseImage` 返回的真实 `File` 对象（可用时为 `tempFiles[0].file`）。如果 H5 只返回 `tempFiles[0]` 或 `blob:` / `data:` 临时路径，也要继续传入，不要丢弃。调用 `V8.uploadFile(..., { file, preferFetch:true })`。SDK 必须识别 `File` / `Blob`、`file` / `raw` / `blob` / `originFileObj` 等常见嵌套字段，以及 `blob:` / `data:` 路径，然后优先使用 `fetch + FormData`，必要时在 `uni.uploadFile` 与 fetch 之间回退。
 - 上传提交处理不得使用空 `catch`。要用 `body.Msg` / `error.message` 提示用户，记录错误便于诊断，并在 `finally` 中重置上传状态。
+- 上传响应与普通请求一样可能通过 `Authorization` / `Token` 响应头轮换登录令牌；`fetch(FormData)` 和 `uni.uploadFile` 成功回调都必须先接收新 Token，再发起后续接口。
 
 当上传突然报 `移动端文件上传路径不合法！` 时，先检查实际 multipart 表单字段和请求头。在 Microi 移动端/会员 Token 流程中，后端会在 HDFS 上传前校验 `Path`；错误的 `Content-Type` 会导致后端读不到表单字段，并表现为路径错误。
 
@@ -278,14 +280,25 @@ SDK 负责平台能力，MCI-UI 负责产品界面。新的 Microi Vue3 项目�
 
 ## MicroApp 宿主 Token 同步
 
-Vue3 前端微服务通过 `window.microApp.getData()` 接收主平台上下文时，不能只把 `token` 放进普通配置对象后假设请求会自动携带。标准 `microi.v8.js` 必须支持 `config.token`，且 `getToken()` 要优先读取运行时 token，再回退到 `storage[tokenKey]`。
+Vue3 前端微服务通过 `window.microApp.getData()` 接收主平台上下文时，不能只把 `token` 放进普通配置对象后假设请求会自动携带。标准 `microi.v8.js` 必须支持 `config.token`，且 `getToken()` 要优先读取运行时 token，再回退到 `storage[tokenKey]`。微服务必须复用同一个 V8 客户端实例，不能在每次按钮点击时重新 `createMicroiV8()`。
 
-微服务项目的 `configureMicroiV8()` 必须同时执行：
+`getData()` 中的 Token 是宿主传入的快照，只能用于首次引导或宿主确实下发了不同值时更新；不能在每次 `configureMicroiV8()` 时用旧快照覆盖 SDK 已从响应头取得的新 Token。推荐同时配置 `onTokenChanged`，把新 Token 与发起请求所用的旧 Token 回传宿主，宿主通过 `DiyCommon.ApplyAuthorizationToken(newToken, requestToken)` 接力并防止多标签页旧响应回写：
 
 ```js
-const next = { apiBase: ctx.apiBase, osClient: ctx.osClient, token: ctx.token };
-microiV8.configure(next);
-if (ctx.token) microiV8.setToken?.(ctx.token);
+const microiV8 = V8; // 模块级单例
+let appliedHostToken = '';
+
+microiV8.configure({
+  apiBase: ctx.apiBase,
+  osClient: ctx.osClient,
+  onTokenChanged: (token, requestToken) => {
+    window.microApp?.dispatch?.({ type: 'micro-app:token', data: { token, requestToken } });
+  }
+});
+if (ctx.token && ctx.token !== appliedHostToken) {
+  appliedHostToken = ctx.token;
+  microiV8.setToken(ctx.token);
+}
 ```
 
-验收时必须点击一个需要登录态的 `V8.FormEngine` 或 `V8.ApiEngine` 按钮，确认返回 `Code=1`，不能只看页面首屏渲染成功。
+普通 `request`、浏览器 `fetch(FormData)` 上传和 `uni.uploadFile` 都必须读取响应头的新 Token。验收时必须连续执行至少两个需要登录态的请求（前一个允许发生 Token 轮换），确认后一个仍返回 `Code=1`；不能只看页面首屏渲染成功。
