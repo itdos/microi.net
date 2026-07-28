@@ -1,58 +1,30 @@
 import _u from "underscore";
 import { markRaw } from "vue";
 import { debounce } from "lodash";
+import {
+    appendWhereList,
+    cloneWhereItem,
+    cloneWhereList,
+    composeTableWhere,
+    mergeWhereList
+} from "../utils/diy-table-where.js";
 
 export default {
     methods: {
         cloneWhereItem(item) {
-            if (!item) return item;
-            if (Array.isArray(item)) {
-                var clonedArray = item.slice();
-                Object.keys(item).forEach(function(key) {
-                    if (!/^\d+$/.test(key)) {
-                        clonedArray[key] = item[key];
-                    }
-                });
-                return clonedArray;
-            }
-            if (typeof item === "object") {
-                return Object.assign({}, item);
-            }
-            return item;
+            return cloneWhereItem(item);
         },
         cloneWhereList(whereList) {
-            var self = this;
-            if (!Array.isArray(whereList) || whereList.length === 0) {
-                return [];
-            }
-            return whereList.map(function(item) {
-                return self.cloneWhereItem(item);
-            }).filter(function(item) {
-                return !!item;
-            });
+            return cloneWhereList(whereList);
         },
         mergeWhereList(baseWhere, appendWhere) {
-            var self = this;
-            var result = self.cloneWhereList(baseWhere);
-            if (!Array.isArray(appendWhere) || appendWhere.length === 0) {
-                return result;
-            }
-            appendWhere.forEach(function(item) {
-                if (!item) return;
-                if (Array.isArray(item)) {
-                    result.push(self.cloneWhereItem(item));
-                    return;
-                }
-                var index = result.findIndex(function(d) {
-                    return d && !Array.isArray(d) && d.Name == item.Name;
-                });
-                if (index === -1) {
-                    result.push(self.cloneWhereItem(item));
-                } else {
-                    result[index] = Object.assign({}, result[index], item);
-                }
-            });
-            return result;
+            return mergeWhereList(baseWhere, appendWhere);
+        },
+        appendWhereList(baseWhere, appendWhere) {
+            return appendWhereList(baseWhere, appendWhere);
+        },
+        composeTableWhere(requestWhere, runtimeWhere, fixedWhere) {
+            return composeTableWhere(requestWhere, runtimeWhere, fixedWhere);
         },
         IsDiyTableTreeLazy() {
             var model = this.CurrentDiyTableModel || {};
@@ -730,28 +702,11 @@ export default {
                 delete param._Where;
             }
 
-            if (self.PropsWhere && self.PropsWhere.length > 0) {
-                param._Where = self.mergeWhereList(param._Where, self.PropsWhere);
-            }
-
-            //2024-12-14新增
-            if (self.Where.length > 0) {
-                if (!param._Where) {
-                    param._Where = [];
-                }
-                self.Where.forEach((item) => {
-                    //2026-01-12 Anderson：支持新版_Where
-                    if (Array.isArray(item)) {
-                        param._Where.push(self.cloneWhereItem(item));
-                    } else {
-                        const index = param._Where.findIndex((d) => d.Name == item.Name);
-                        if (index === -1) {
-                            param._Where.push(self.cloneWhereItem(item));
-                        } else {
-                            param._Where[index] = { ...param._Where[index], ...item };
-                        }
-                    }
-                });
+            // OpenTableSetWhere 是弹窗固定查询范围，必须在搜索、高级筛选等临时条件之后追加，
+            // 防止同字段筛选覆盖固定条件，同时兼容旧版对象与新版数组 _Where。
+            // self.Where 为页面 Tab、高级筛选等运行时条件，继续保留原有的同字段覆盖规则。
+            if (self.Where.length > 0 || (self.PropsWhere && self.PropsWhere.length > 0)) {
+                param._Where = self.composeTableWhere(param._Where, self.Where, self.PropsWhere);
             }
 
             if (self.Keyword) {
