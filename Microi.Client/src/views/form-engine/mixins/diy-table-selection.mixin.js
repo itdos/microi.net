@@ -207,6 +207,15 @@ export default {
         CanUseTableSelection() {
             return this.TableEnableBatch === true && (this.HasBatchSelectMoreBtns() || this.EnableMultipleSelect === true);
         },
+        CanShowContinuousSelection() {
+            if (!this.CanUseTableSelection() || !this.TableMultipleSelection || this.TableMultipleSelection.length === 0) {
+                return false;
+            }
+            if (this.PropsTableType === 'OpenTable') {
+                return this.EnableMultipleSelect === true;
+            }
+            return this.HasBatchSelectMoreBtns();
+        },
         CanBatchDragSelection() {
             return this.TableDisplayMode === 'Table' && this.CanUseTableSelection();
         },
