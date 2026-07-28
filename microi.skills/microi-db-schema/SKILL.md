@@ -40,6 +40,37 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 - 建模完成后必须回读验收：`microi_get_db_schema` 能看到物理表及字段；`diy_table.Name` 唯一对应物理表；`diy_field.TableId` 均正确关联；至少执行一次 FormEngine 查询或可回滚 CRUD 验证。发现“物理表存在、表单引擎不可见”时，应补齐标准元数据或删除孤儿物理表，不能把它当作已交付。
 - 统计表数量时必须区分三个口径：物理表总数、有效 `diy_table` 元数据数、应用安装包内表引用数。安装包引用数可能包含平台基础表并跨应用重复，不能直接相加后当成租户实际唯一表数。
 
+## 数据库索引建模与 MCP 执行规则（强制）
+
+数据库索引是低代码数据模型的一部分，不是上线后的临时 SQL 调优。只要需求、蓝图、接口、Job、工作流或评审明确指出“某表的某些字段需要索引/唯一约束”，就必须把索引写入 Manifest 的 `tables[].indexes`，并通过 `microi_create_table_index` 创建；禁止用 `V8.Db`、接口引擎、原生 FormEngine、一次性维护引擎或手写 `CREATE INDEX` 绕过 MCP。
+
+标准流程：
+
+1. `microi_get_db_schema` 核对表和字段。
+2. `microi_get_table_indexes(tableName)` 读取真实物理索引，不能根据 `diy_field.Unique` 或源码猜测。
+3. 根据真实查询的 `WHERE / JOIN / ORDER BY / GROUP BY` 设计有序字段，先写入 Manifest `tables[].indexes`。
+4. `microi_plan_system` / `microi_generate_system(dryRun:true)` 检查字段引用；单独变更时直接调用 `microi_create_table_index`，并传 `confirmExecution=tableName`。
+5. 再次调用 `microi_get_table_indexes` 回读；DIY 表还必须在 `Microi.Client` 的“开发设计 → 索引管理”中看到同名索引、正确字段顺序和唯一性。
+6. 删除前先回读精确名称，只能用 `microi_drop_table_index`；主键索引禁止删除，删除确认值使用 `tableName:indexName`。
+
+必须评估并通常建立索引的字段组合：
+
+- 租户业务表：所有租户内高频查询的组合索引通常以 `OsClient` 开头，例如 `(OsClient, Status, CreateTime)`；不能只给 `Status` 建低选择性单列索引。
+- 业务唯一键和幂等键：订单号、外部流水号、`EventId`、`IdempotencyKey` 等必须按真实隔离边界建立唯一索引，例如 `(OsClient, OrderNo)`，不能只做“先查再新增”。
+- 外键和子表回查：高频 `JOIN`、`TableChildFkFieldName`、`XxxId` 明细列表必须覆盖关联字段；如果查询同时固定租户和状态，按等值字段在前、范围/排序字段在后的顺序设计组合索引。
+- 待办、Job、outbox/inbox、重试队列：按实际抢占语句建立 `(OsClient, Status, NextRetryTime)`、`(OsClient, JobKey, ScheduleTime)` 等索引，并为稳定事件/任务键增加唯一索引。
+- 高频时间范围列表：常用租户/类型/状态等值条件在前，`CreateTime`、`UpdateTime` 等范围或排序字段在后。
+
+禁止机械建索引：
+
+- 不得把 `SearchFieldIds`、`SortFieldIds`、`StatisticsFields` 中每个字段都自动变成单列索引；必须结合真实查询与选择性。
+- `Status`、开关、性别、删除标记等低基数字段通常不能单独建索引；只有作为高频组合索引的一部分才有价值。
+- `LIKE '%keyword%'`、富文本、长文本、JSON、上传、地图、布局、子表控件等不能靠普通 B-tree 索引解决；应改为前缀查询、专用搜索引擎、生成列或其它明确方案。
+- 组合索引遵守最左前缀；重复/被更长索引左前缀完全覆盖的索引应合并。索引过多会增加写放大和锁等待，必须在交付中说明查询依据。
+- 唯一索引是业务约束。创建前必须检查并处理历史重复数据与 `NULL` 语义；不得为了让 DDL 通过而静默删改生产数据。
+
+平台核心表的发布变更还必须同步正式升级资源/迁移，确保新租户和旧租户升级一致；但对指定在线租户的实际创建、修复和回读仍必须通过上述 MCP 索引工具完成，不能只提交迁移源码便宣称线上已生效。
+
 ## diy_table 命名规则
 
 创建或修复 `diy_table` 时必须区分三个字段职责：

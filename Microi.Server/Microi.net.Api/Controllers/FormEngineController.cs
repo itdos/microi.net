@@ -897,6 +897,84 @@ namespace Microi.net.Api
             return Json(result);
         }
         /// <summary>
+        /// 获取当前已授权菜单对应的左右结构页面配置。
+        /// 普通用户不能通过通用 FormEngine 直接读取 diy_LeftJoinRightView，
+        /// 因此由服务端校验精确菜单权限后，仅返回与该菜单关联的一条配置。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetLeftRightPageConfig([FromBody] JObject param)
+        {
+            param = await DefaultParam(param);
+            var menuId = param["SysMenuId"].Val<string>();
+            if (menuId.DosIsNullOrWhiteSpace())
+            {
+                menuId = param["Id"].Val<string>();
+            }
+            if (menuId.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null,
+                    DiyMessage.GetLang(param["OsClient"].Val<string>(), "ParamError", param["_Lang"].Val<string>())));
+            }
+
+            var menuAuthorization = await MicroiEngine.FormEngine
+                .AuthorizeClientMenuMetadataOperationAsync(new DiyTableRowParam
+                {
+                    _SysMenuId = menuId,
+                    _InvokeType = InvokeType.Client.ToString(),
+                    _CurrentUser = param["_CurrentUser"] as JObject,
+                    OsClient = param["OsClient"].Val<string>(),
+                    _Lang = param["_Lang"].Val<string>()
+                });
+            if (menuAuthorization.Code != 1)
+            {
+                return Json(menuAuthorization);
+            }
+
+            var query = new DiyTableRowParam
+            {
+                FormEngineKey = "diy_LeftJoinRightView",
+                OsClient = param["OsClient"].Val<string>(),
+                _Lang = param["_Lang"].Val<string>(),
+                _InvokeType = InvokeType.Server.ToString(),
+                _TrustedServerInvocation = true,
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere
+                    {
+                        Name = "GuanlianCD",
+                        Value = menuId,
+                        Type = "Like"
+                    }
+                }
+            };
+            var result = await MicroiEngine.FormEngine.GetFormDataAsync(query);
+            if (result?.Code == 1 && result.Data != null)
+            {
+                var config = JObject.FromObject((object)result.Data);
+                var linkedMenuIds = config["GuanlianCD"]?.Val<string>();
+                var isExactMenuMatch = false;
+                if (!linkedMenuIds.DosIsNullOrWhiteSpace())
+                {
+                    try
+                    {
+                        isExactMenuMatch = JArray.Parse(linkedMenuIds)
+                            .Values<string>()
+                            .Any(id => string.Equals(id, menuId, StringComparison.OrdinalIgnoreCase));
+                    }
+                    catch
+                    {
+                        isExactMenuMatch = false;
+                    }
+                }
+                if (!isExactMenuMatch)
+                {
+                    return Json(new DosResult(0, null,
+                        DiyMessage.GetLang(param["OsClient"].Val<string>(), "NoAuth", param["_Lang"].Val<string>())));
+                }
+            }
+            return Json(result);
+        }
+        /// <summary>
         /// 传入Id或Name，
         /// 获取一张表（表单属性）（带缓存）
         /// </summary>
@@ -1827,6 +1905,7 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost, HttpGet]
         [HttpPost("~/api/DiyTable/GetTableIndexes"), HttpGet("~/api/DiyTable/GetTableIndexes")]
+        [PlatformAdminOnly]
         public async Task<JsonResult> GetTableIndexes(DiyTableParam param)
         {
             await DefaultDiyTableParam(param);
@@ -1835,14 +1914,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "无权限"));
             if (param.TableName.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, "TableName不能为空"));
-            var osClient = OsClient.GetClient(param.OsClient);
-            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
-            var result = dbService.GetTableIndexes(new DbServiceParam
-            {
-                TableName = param.TableName,
-                DbSession = osClient.Db,
-                OsClient = param.OsClient
-            });
+            var result = V8McpLogic.GetTableIndexes(param.OsClient, param.TableName);
             return Json(result);
         }
 
@@ -1860,17 +1932,12 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "无权限"));
             if (param.TableName.DosIsNullOrWhiteSpace() || param.IndexName.DosIsNullOrWhiteSpace() || param.IndexColumns.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, "参数不完整"));
-            var osClient = OsClient.GetClient(param.OsClient);
-            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
-            var result = dbService.AddIndex(new DbServiceParam
-            {
-                TableName = param.TableName,
-                IndexName = param.IndexName,
-                IndexColumns = param.IndexColumns,
-                IndexUnique = param.IndexUnique == true,
-                DbSession = osClient.Db,
-                OsClient = param.OsClient
-            });
+            var result = V8McpLogic.CreateTableIndex(
+                param.OsClient,
+                param.TableName,
+                param.IndexName,
+                param.IndexColumns.Split(','),
+                param.IndexUnique == true);
             return Json(result);
         }
 
@@ -1888,15 +1955,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "无权限"));
             if (param.TableName.DosIsNullOrWhiteSpace() || param.IndexName.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, "参数不完整"));
-            var osClient = OsClient.GetClient(param.OsClient);
-            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
-            var result = dbService.DropIndex(new DbServiceParam
-            {
-                TableName = param.TableName,
-                IndexName = param.IndexName,
-                DbSession = osClient.Db,
-                OsClient = param.OsClient
-            });
+            var result = V8McpLogic.DropTableIndex(param.OsClient, param.TableName, param.IndexName);
             return Json(result);
         }
 
@@ -1916,7 +1975,6 @@ namespace Microi.net.Api
 
             var osClient = OsClient.GetClient(param.OsClient);
             var db = osClient.Db;
-            var dbService = MicroiEngine.ORM(DiyCommon.GetDbInfo(osClient.OsClientModel["DbType"].Val<string>()).DbType);
 
             // 1. 查询sys_menu模块配置
             var sysMenu = db.From<SysMenu>()
@@ -2069,102 +2127,75 @@ namespace Microi.net.Api
             sortColumns.Remove("Id");
             statColumns.Remove("Id");
 
-            // 5. 按优先级合并并限制总数（最多8个索引，避免写入性能下降）
-            const int maxIndexes = 8;
-            var indexColumns = new List<string>();
-            // 优先级：默认排序 > 搜索字段 > 排序字段 > 统计字段
-            foreach (var col in orderByColumns)
+            // 5. 生成少量、租户优先的组合索引建议。
+            // 不再把 StatisticsFields/所有排序字段机械转换成单列索引；低选择性字段单列索引通常无效，
+            // 且会带来明显写放大。第一个搜索条件与默认排序合成一个最左前缀索引。
+            const int maxIndexes = 6;
+            var indexSpecs = new List<List<string>>();
+            var primaryOrderColumn = orderByColumns.FirstOrDefault()
+                ?? sortColumns.FirstOrDefault()
+                ?? "CreateTime";
+            if (searchColumns.Count > 0)
             {
-                if (indexColumns.Count >= maxIndexes) break;
-                indexColumns.Add(col);
+                var first = new List<string> { "OsClient", searchColumns[0] };
+                if (!primaryOrderColumn.DosIsNullOrWhiteSpace()
+                    && !first.Contains(primaryOrderColumn, StringComparer.OrdinalIgnoreCase))
+                {
+                    first.Add(primaryOrderColumn);
+                }
+                indexSpecs.Add(first);
+
+                foreach (var column in searchColumns.Skip(1))
+                {
+                    if (indexSpecs.Count >= maxIndexes) break;
+                    indexSpecs.Add(new List<string> { "OsClient", column });
+                }
             }
-            foreach (var col in searchColumns)
+            else if (!primaryOrderColumn.DosIsNullOrWhiteSpace())
             {
-                if (indexColumns.Count >= maxIndexes) break;
-                if (!indexColumns.Contains(col, StringComparer.OrdinalIgnoreCase))
-                    indexColumns.Add(col);
-            }
-            foreach (var col in sortColumns)
-            {
-                if (indexColumns.Count >= maxIndexes) break;
-                if (!indexColumns.Contains(col, StringComparer.OrdinalIgnoreCase))
-                    indexColumns.Add(col);
-            }
-            foreach (var col in statColumns)
-            {
-                if (indexColumns.Count >= maxIndexes) break;
-                if (!indexColumns.Contains(col, StringComparer.OrdinalIgnoreCase))
-                    indexColumns.Add(col);
+                indexSpecs.Add(new List<string> { "OsClient", primaryOrderColumn });
             }
 
-            var totalRequested = allColumns.Count;
-            var truncated = totalRequested > maxIndexes;
-
-            if (indexColumns.Count == 0)
+            var totalRequested = indexSpecs.Count;
+            var truncated = searchColumns.Count + (primaryOrderColumn.DosIsNullOrWhiteSpace() ? 0 : 1) > maxIndexes;
+            if (indexSpecs.Count == 0)
                 return Json(new DosResult(0, null, "未找到需要建索引的字段"));
 
-            // 6. 获取已有索引，提取已有索引覆盖的列名
-            var existingResult = dbService.GetTableIndexes(new DbServiceParam
-            {
-                TableName = tableName,
-                DbSession = osClient.Db,
-                OsClient = param.OsClient
-            });
-            var existingIndexColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (existingResult?.Code == 1 && existingResult.Data != null)
-            {
-                try
-                {
-                    var existingList = JArray.FromObject(existingResult.Data);
-                    foreach (var idx in existingList)
-                    {
-                        var colName = idx["Column_name"]?.ToString();
-                        if (!colName.DosIsNullOrWhiteSpace())
-                            existingIndexColumns.Add(colName);
-                    }
-                }
-                catch { }
-            }
-
-            // 7. 逐个创建缺失的索引（跳过已有的，捕获异常优雅处理）
+            // 6. 通过公共索引服务逐个幂等创建；公共服务负责真实字段校验、等价索引识别与回读。
             var created = new List<string>();
             var skipped = new List<string>();
             var failed = new List<string>();
-            foreach (var col in indexColumns)
+            foreach (var columns in indexSpecs)
             {
-                if (existingIndexColumns.Contains(col))
-                {
-                    skipped.Add(col);
-                    continue;
-                }
-                var idxName = $"idx_{tableName}_{col}".ToLower();
+                var displayColumns = string.Join(",", columns);
                 try
                 {
-                    var addResult = dbService.AddIndex(new DbServiceParam
-                    {
-                        TableName = tableName,
-                        IndexName = idxName,
-                        IndexColumns = col,
-                        IndexUnique = false,
-                        DbSession = osClient.Db,
-                        OsClient = param.OsClient
-                    });
+                    var addResult = V8McpLogic.CreateTableIndex(
+                        param.OsClient, tableName, null, columns, false);
                     if (addResult?.Code == 1)
-                        created.Add(col);
+                    {
+                        var data = addResult.Data is JObject objectData
+                            ? objectData
+                            : addResult.Data == null ? null : JObject.FromObject(addResult.Data);
+                        if (data?["Skipped"].Val<bool?>() == true)
+                            skipped.Add(displayColumns);
+                        else
+                            created.Add(displayColumns);
+                    }
                     else
-                        failed.Add($"{col}: {addResult?.Msg}");
+                        failed.Add($"{displayColumns}: {addResult?.Msg}");
                 }
                 catch (Exception ex)
                 {
-                    // 可能是索引已存在（名称不同但列相同）等情况，优雅跳过
-                    failed.Add($"{col}: {ex.Message}");
+                    failed.Add($"{displayColumns}: {ex.Message}");
                 }
             }
 
             var msg = $"新建 {created.Count} 个索引";
             if (skipped.Count > 0) msg += $"，跳过 {skipped.Count} 个已有索引";
             if (failed.Count > 0) msg += $"，失败 {failed.Count} 个";
-            if (truncated) msg += $"（共 {totalRequested} 个字段需要索引，已按优先级选取前 {maxIndexes} 个，建议减少可搜索字段数量）";
+            if (truncated) msg += $"（候选条件较多，已按优先级限制为 {maxIndexes} 个组合索引）";
+            msg += "。自动结果只覆盖模块常见列表查询，复杂 JOIN/范围/幂等约束仍需按真实 SQL 通过 MCP 显式建模";
 
             return Json(new DosResult(1, new { Created = created, Skipped = skipped, Failed = failed, Truncated = truncated, TotalRequested = totalRequested }, msg));
         }

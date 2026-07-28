@@ -161,6 +161,7 @@ var DiyApi = {
         return "/api/" + DiyCommon.GetApiClientUrl() + "SysMenu/GetSysMenuStep";
     },
     GetSysMenuModel: "/api/FormEngine/GetSysMenuModel",
+    GetLeftRightPageConfig: "/api/FormEngine/GetLeftRightPageConfig",
 
     /**
      * 获取微信编辑器模板

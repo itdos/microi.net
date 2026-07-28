@@ -172,6 +172,19 @@ export interface DbField {
   AllowNull?: boolean;
 }
 
+export interface TableIndexInfo {
+  Key_name: string;
+  Column_name: string;
+  Non_unique: number;
+  Index_type?: string;
+  Seq_in_index?: number;
+  Is_primary?: number;
+  Name?: string;
+  Columns?: string[];
+  IsUnique?: boolean;
+  IsPrimary?: boolean;
+}
+
 export interface ApiEngine {
   Id: string;
   ApiName: string;
@@ -718,6 +731,85 @@ export class MicroiClient {
     return this.post(API.GET_DB_SCHEMA, {
       OsClient: this.config.osClient,
     });
+  }
+
+  async getTableIndexes(
+    tableName: string,
+    readback = false,
+  ): Promise<ApiResponse<TableIndexInfo[]>> {
+    return this.post(API.GET_TABLE_INDEXES, {
+      OsClient: this.config.osClient,
+      TableName: tableName,
+    }, readback ? this.readbackOptions(`回读表 ${tableName} 索引`) : {});
+  }
+
+  async createTableIndex(data: {
+    TableName: string;
+    IndexName?: string;
+    Columns: string[];
+    Unique?: boolean;
+  }): Promise<ApiResponse> {
+    const payload = { OsClient: this.config.osClient, ...data };
+    try {
+      return await this.post(API.CREATE_TABLE_INDEX, payload, {
+        timeoutMs: this.writeRequestTimeoutMs,
+        operationName: `创建索引 ${data.IndexName || `${data.TableName}:${data.Columns.join(',')}`}`,
+      });
+    } catch (error) {
+      if (!this.isUncertainWriteError(error)) throw error;
+      const readback = await this.pollReadback(
+        () => this.getTableIndexes(data.TableName, true),
+        (indexes) => indexes.some((index) => {
+          const nameMatches = data.IndexName
+            ? String(index.Key_name || index.Name || '').toLowerCase() === data.IndexName.toLowerCase()
+            : true;
+          const columns = index.Columns?.length
+            ? index.Columns
+            : String(index.Column_name || '').split(',').map((value) => value.trim()).filter(Boolean);
+          const unique = index.IsUnique ?? Number(index.Non_unique) === 0;
+          return nameMatches
+            && unique === Boolean(data.Unique)
+            && columns.length === data.Columns.length
+            && columns.every((value, position) =>
+              value.toLowerCase() === data.Columns[position].toLowerCase());
+        }),
+      );
+      if (readback.matched) {
+        return this.recoveredWriteResult('创建数据库索引', error, {
+          TableName: data.TableName,
+          IndexName: data.IndexName,
+          Columns: data.Columns,
+        });
+      }
+      throw this.uncertainWriteFailure('创建数据库索引', error, readback.lastError);
+    }
+  }
+
+  async dropTableIndex(tableName: string, indexName: string): Promise<ApiResponse> {
+    try {
+      return await this.post(API.DROP_TABLE_INDEX, {
+        OsClient: this.config.osClient,
+        TableName: tableName,
+        IndexName: indexName,
+      }, {
+        timeoutMs: this.writeRequestTimeoutMs,
+        operationName: `删除索引 ${indexName}`,
+      });
+    } catch (error) {
+      if (!this.isUncertainWriteError(error)) throw error;
+      const readback = await this.pollReadback(
+        () => this.getTableIndexes(tableName, true),
+        (indexes) => !indexes.some((index) =>
+          String(index.Key_name || index.Name || '').toLowerCase() === indexName.toLowerCase()),
+      );
+      if (readback.matched) {
+        return this.recoveredWriteResult('删除数据库索引', error, {
+          TableName: tableName,
+          IndexName: indexName,
+        });
+      }
+      throw this.uncertainWriteFailure('删除数据库索引', error, readback.lastError);
+    }
   }
 
   async getSupportedDatabaseTypes(): Promise<ApiResponse> {

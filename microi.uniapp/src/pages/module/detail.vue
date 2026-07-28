@@ -62,7 +62,6 @@
         :parent-form="row" />
       <view class="detail-bottom-space"></view>
     </view>
-    <mci-ai-launcher />
   </mci-page-shell>
 </template>
 

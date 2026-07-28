@@ -713,7 +713,7 @@ V8.OpenAppDialog({
 | `AppKey` | `string` | 是 | - | 在线微服务的唯一标识，对应 `sys_microiservice.MsKey`。应用必须已经编译发布。 |
 | `RoutePath` | `string` | 否 | `/` | 微服务内部路由，例如 `/create`。未以 `/` 开头时会自动补齐。 |
 | `MicroRoute` | `string` | 否 | `/` | `RoutePath` 的兼容别名；两者同时传入时优先使用 `RoutePath`。 |
-| `Version` | `string` | 否 | 当前发布版本 | 指定构建版本，例如 `v1.0.2`。不传时自动读取 `sys_microiservice.BuildVersion`。 |
+| `Version` | `string` | 否 | 当前发布版本 | 缓存版本标识，例如 `v1.0.2`。宿主始终访问固定的 `/{AppKey}/index.html?v={Version}` 入口；不传时自动读取 `sys_microiservice.BuildVersion`。 |
 | `Title` | `string` | 否 | `应用` | 弹窗或抽屉标题。 |
 | `TitleIcon` | `string` | 否 | `fas fa-window-maximize` | 标题左侧图标 class。 |
 | `Width` | `string` | 否 | `min(920px, calc(100vw - 32px))` | 弹窗/抽屉宽度，支持 `px`、`%`、`vw`、`min(...)` 等 CSS 宽度值。 |
@@ -831,13 +831,25 @@ V8.ApiEngine.Run('ApiEngineKey', { Param1: '1' }, function (r) {
   V8.Tips(r.Code == 1 ? '执行成功' : r.Msg, r.Code == 1);
 });
 
-// 长任务：返回 Promise，也可传第 4 个 callback
+// 长任务：返回 Promise；第 4 个参数是持久化任务选项，第 5 个可传 callback
 await V8.ApiEngine.RunBackground(
   'ApiEngineKey',
   { Param1: '1' },
-  '后台任务标题'
+  '后台任务标题',
+  {
+    IdempotencyKey: 'import:' + V8.Form.Id,
+    ConcurrencyKey: 'customer-import',
+    BusinessTable: 'biz_import',
+    BusinessId: V8.Form.Id,
+    BusinessStatusField: 'TaskStatus',
+    BusinessTaskIdField: 'BackgroundTaskId',
+    BusinessProgressField: 'TaskProgress',
+    BusinessEtaField: 'EstimatedEndTime'
+  }
 );
 ```
+
+预计超过 2 分钟、500 条、1000 个扇出子操作、100 次外部调用，或安装/初始化/迁移/备份类动作，应使用后台任务。未知总量不要伪造百分比；超过 10 分钟必须由后端按 checkpoint 分片。详见[任务调度与后台任务](../system-engine/job)。
 
 ## V8.DataSourceEngine
 >* 数据源引擎。`Run` 返回 Promise，并兼容回调；旧 `GetData` 已弃用

@@ -304,7 +304,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createOpenClawAuthBridge } from '../openclaw-auth-bridge'
 import { siteStyle } from '../site-style'
-import { resolveSiteApiBase } from '../utils/site-api-base.js'
+import { buildSiteApiEngineUrl, resolveSiteApiBase } from '../utils/site-api-base.js'
 
 const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const OS_CLIENT = 'iTdos'
@@ -469,7 +469,7 @@ function authHeaders() {
 }
 
 function apiEngineUrl(key) {
-  return `${API_BASE}/apiengine/${key}?OsClient=${OS_CLIENT}`
+  return buildSiteApiEngineUrl(API_BASE, key, OS_CLIENT)
 }
 
 function switchAuthTab(tab) {
@@ -517,7 +517,7 @@ async function sendRegisterSmsCode() {
     return
   }
   try {
-    const resp = await fetch(`${API_BASE}/apiengine/send-sms-reg?OsClient=${OS_CLIENT}`, {
+    const resp = await fetch(apiEngineUrl('send-sms-reg'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

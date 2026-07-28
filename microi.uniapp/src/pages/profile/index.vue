@@ -89,7 +89,7 @@
         </button>
       </view>
     </view>
-    <mci-ai-launcher v-if="featureEnabled('ai')" />
+    <mci-ai-launcher />
   </view>
 </template>
 

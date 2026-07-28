@@ -485,6 +485,53 @@ IsPermission(type) {
             param.Btn = btn;
             return param;
         },
+        BuildBackgroundTaskOptions(btn, row, apiEngineKey) {
+            var source = btn && (btn.BackgroundTaskOptions || btn.backgroundTaskOptions);
+            if (typeof source === "string") {
+                try { source = JSON.parse(source); } catch (_) { source = {}; }
+            }
+            var options = source && typeof source === "object" ? { ...source } : {};
+            var fields = options.IdempotencyKeyFields || options.idempotencyKeyFields;
+            if (!options.IdempotencyKey && Array.isArray(fields) && fields.length > 0) {
+                var parts = fields.map(function (field) {
+                    return row && row[field] !== undefined && row[field] !== null ? String(row[field]) : "";
+                });
+                options.IdempotencyKey = [apiEngineKey].concat(parts).join(":");
+            }
+            if (typeof options.IdempotencyKey === "string") {
+                options.IdempotencyKey = options.IdempotencyKey.replace(/\$?\{([^}]+)\}/g, function (_, field) {
+                    return row && row[field] !== undefined && row[field] !== null ? String(row[field]) : "";
+                });
+            }
+            if (options.BusinessTable && !options.BusinessId && row && row.Id) {
+                options.BusinessId = row.Id;
+            }
+            delete options.IdempotencyKeyFields;
+            delete options.idempotencyKeyFields;
+            return options;
+        },
+        async MarkBackgroundTaskSubmitted(V8, options, result) {
+            var safeName = function (value) {
+                return typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(value);
+            };
+            var table = options && options.BusinessTable;
+            var businessId = options && options.BusinessId;
+            var statusField = options && options.BusinessStatusField;
+            var taskIdField = options && options.BusinessTaskIdField;
+            var progressField = options && options.BusinessProgressField;
+            var etaField = options && options.BusinessEtaField;
+            var taskData = result && result.Data;
+            var taskId = taskData && (taskData.Id || taskData.TaskId);
+            if (!safeName(table) || !businessId || !safeName(statusField) || !safeName(taskIdField) || !taskId) {
+                return { Code: 1, Skipped: true };
+            }
+            var patch = { Id: businessId };
+            patch[statusField] = "后台处理中";
+            patch[taskIdField] = taskId;
+            if (safeName(progressField)) patch[progressField] = 0;
+            if (safeName(etaField)) patch[etaField] = null;
+            return await V8.FormEngine.UptFormData(table, patch);
+        },
         NotifyBackgroundTaskStarted(result) {
             var self = this;
             try {
@@ -598,12 +645,17 @@ IsPermission(type) {
                         if (backgroundParam.AppName) {
                             backgroundTitle += "应用：" + backgroundParam.AppName;
                         }
-                        var backgroundResult = await V8.ApiEngine.RunBackground(backgroundApiEngineKey, backgroundParam, backgroundTitle, function () {
+                        var backgroundOptions = self.BuildBackgroundTaskOptions(btn, row, backgroundApiEngineKey);
+                        var backgroundResult = await V8.ApiEngine.RunBackground(backgroundApiEngineKey, backgroundParam, backgroundTitle, backgroundOptions, function () {
                             self.BtnV8Loading = false;
                         });
                         if (!backgroundResult || backgroundResult.Code !== 1) {
                             self.DiyCommon.Tips((backgroundResult && (backgroundResult.Msg || backgroundResult.Message)) || "后台任务创建失败", false);
                             return;
+                        }
+                        var markResult = await self.MarkBackgroundTaskSubmitted(V8, backgroundOptions, backgroundResult);
+                        if (markResult && markResult.Code !== 1) {
+                            self.DiyCommon.Tips("后台任务已创建，但业务记录未能标记任务状态：" + (markResult.Msg || "请检查表单编辑权限"), false);
                         }
                         self.DiyCommon.Tips("后台任务已提交，请在右上角通知中心查看进度。");
                         self.NotifyBackgroundTaskStarted(backgroundResult);

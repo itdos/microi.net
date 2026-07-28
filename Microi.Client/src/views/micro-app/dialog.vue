@@ -1,10 +1,7 @@
 <template>
     <section class="micro-app-dialog">
         <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
-        <div v-else-if="loading" class="micro-app-dialog__loading">
-            <el-icon class="is-loading"><Loading /></el-icon>
-            <span>正在加载应用...</span>
-        </div>
+        <micro-app-loading-skeleton v-else-if="loading" />
         <micro-app
             v-else-if="entryUrl"
             class="micro-app-dialog__app"
@@ -21,8 +18,10 @@
 </template>
 
 <script>
-import { Loading } from "@element-plus/icons-vue";
 import { DiyCommon } from "@/utils/diy.common";
+import { buildMicroAppEntryUrl } from "@/utils/microAppEntryUrl.js";
+import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
+import { applyMicroAppToken } from "./token-sync";
 
 function normalizeName(value) {
     let result = String(value || "app-dialog").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -37,7 +36,7 @@ function normalizeRoute(value) {
 
 export default {
     name: "MicroAppDialog",
-    components: { Loading },
+    components: { MicroAppLoadingSkeleton },
     props: {
         DataAppend: { type: Object, default: () => ({}) }
     },
@@ -109,8 +108,12 @@ export default {
                     version = service.BuildVersion || "";
                 }
                 this.appVersion = version;
-                const versionPart = version ? `/${encodeURIComponent(version)}` : "";
-                this.entryUrl = `${String(DiyCommon.GetApiBase() || "").replace(/\/+$/, "")}/micro-app/${encodeURIComponent(DiyCommon.GetOsClient())}/${encodeURIComponent(this.appKey)}${versionPart}/index.html`;
+                this.entryUrl = buildMicroAppEntryUrl({
+                    apiBase: DiyCommon.GetApiBase(),
+                    osClient: DiyCommon.GetOsClient(),
+                    appKey: this.appKey,
+                    version
+                });
             } catch (error) {
                 this.error = error?.message || String(error);
                 this.invokeCallback("OnError", { message: this.error });
@@ -120,6 +123,7 @@ export default {
         },
         handleDataChange(event) {
             const payload = event?.detail?.data ?? event?.detail ?? event ?? {};
+            if (applyMicroAppToken(payload)) return;
             const type = String(payload?.type || payload?.Type || "").toLowerCase();
             const data = payload?.data ?? payload?.Data ?? payload;
             if (type === "app-dialog:success" || type === "success") {
@@ -147,23 +151,18 @@ export default {
 
 <style lang="scss" scoped>
 .micro-app-dialog {
+    height: 100%;
+    min-height: 100%;
     overflow: hidden;
     border: 1px solid var(--el-border-color-lighter);
     border-radius: 8px;
     background: var(--el-bg-color-page);
 }
 
-.micro-app-dialog__loading {
-    display: flex;
-    min-height: 360px;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    color: var(--el-text-color-secondary);
-}
-
 .micro-app-dialog__app {
     display: block;
     width: 100%;
+    height: 100%;
+    min-height: 100%;
 }
 </style>

@@ -126,7 +126,7 @@
                     </el-col>
                     <el-col :span="24" :xs="24">
                         <el-form-item label="权限明细">
-                            <div v-loading="tableLoading" class="role-menu-permission-tree">
+                            <div v-loading="MenuLoading" class="role-menu-permission-tree">
                                 <div class="role-menu-header">
                                     <div>名称</div>
                                     <div>权限</div>
@@ -326,6 +326,8 @@ export default {
                 label: "Name"
             },
             SysMenuList: [],
+            MenuLoaded: false,
+            MenuLoading: false,
             MenuParentMap: Object.create(null)
         };
     },
@@ -448,7 +450,6 @@ export default {
             // self.DiyCommon.SetWin10Loading(false)
             // self.ActiveLeftMenu = self.leftMenulist[0]
             self.GetSysRole();
-            self.GetSysMenu();
             self.GetSysDept();
             // self.$nextTick(function () {
             //     //self.FastClick.attach(document.querySelector('.layx-window'))
@@ -642,39 +643,42 @@ export default {
             self.GetSysRole(true);
         },
 
-        GetSysMenu() {
+        async GetSysMenu() {
             var self = this;
-            // self.LoadingCount++;
-            self.tableLoading = true;
-            // self.DiyCommon.Post(self.DiyApi.GetSysMenuStep(), {
-            //这里需要返回按钮的数据，以做权限配置
-            self.DiyCommon.Post(
-                self.DiyApi.GetDiyTableRowTree,
-                {
+            if (self.MenuLoaded) return true;
+            if (self._getSysMenuPromise) return self._getSysMenuPromise;
+
+            self.MenuLoading = true;
+            self._getSysMenuPromise = (async function () {
+                // 菜单权限数据只在打开角色编辑器时加载。进入角色列表页不再
+                // 一次性下载和转换包含全部 AI 应用的整棵菜单树。
+                var result = await self.DiyCommon.PostAsync(self.DiyApi.GetDiyTableRowTree, {
                     _SelectFields: ["Id", "Name", "IconClass", "ParentId", "Sort", "MoreBtns", "FormBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs"],
-                    // OsClient: self.OsClient,
                     TableName: "Sys_Menu",
                     _OrderBy: "Sort",
                     _OrderByType: "ASC",
                     _All: true,
                     _TreeLazy: 0
-                },
-                function (result) {
-                    // self.LoadingCount--;
-                    if (self.DiyCommon.Result(result)) {
-                        self.ForSysMenuList(result.Data);
+                });
+                if (!self.DiyCommon.Result(result)) return false;
 
-                        result.Data.forEach((element) => {
-                            self.DiyCommon.ForConvertSysMenu(element);
-                        });
+                self.ForSysMenuList(result.Data);
+                result.Data.forEach((element) => {
+                    self.DiyCommon.ForConvertSysMenu(element);
+                });
+                self.MenuParentMap = Object.create(null);
+                self.BuildMenuParentMap(result.Data, null);
+                self.SysMenuList = result.Data;
+                self.MenuLoaded = true;
+                return true;
+            })();
 
-                        self.MenuParentMap = Object.create(null);
-                        self.BuildMenuParentMap(result.Data, null);
-                        self.SysMenuList = result.Data;
-                    }
-                    self.tableLoading = false;
-                }
-            );
+            try {
+                return await self._getSysMenuPromise;
+            } finally {
+                self.MenuLoading = false;
+                self._getSysMenuPromise = null;
+            }
         },
         ForSysMenuList(sysMenuList) {
             var self = this;
@@ -801,8 +805,9 @@ export default {
             }
             return result;
         },
-        OpenSysRole(m) {
+        async OpenSysRole(m) {
             var self = this;
+            if (!(await self.GetSysMenu())) return;
             var title = self.$t("Msg.Add");
             var url = self.DiyApi.UptSysRole();
             if (self.DiyCommon.IsNull(m)) {

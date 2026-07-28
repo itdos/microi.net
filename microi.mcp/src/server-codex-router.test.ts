@@ -66,6 +66,34 @@ test('microi_codex discovers and invokes existing tools through one entry point'
     assert.match(databaseCatalogText, /microi_execute_external_database/);
     assert.match(databaseCatalogText, /microi_save_database_connection/);
 
+    const indexCatalog = await client.callTool({
+      name: 'microi_codex',
+      arguments: { action: 'list_tools', params: { keyword: 'index' } },
+    }) as CallToolResult;
+    const indexCatalogText = indexCatalog.content[0]?.type === 'text'
+      ? indexCatalog.content[0].text
+      : '';
+    assert.match(indexCatalogText, /microi_get_table_indexes/);
+    assert.match(indexCatalogText, /microi_create_table_index/);
+    assert.match(indexCatalogText, /microi_drop_table_index/);
+
+    const blockedIndexCreate = await client.callTool({
+      name: 'microi_codex',
+      arguments: {
+        action: 'microi_create_table_index',
+        params: {
+          tableName: 'biz_order',
+          columns: ['OsClient', 'OrderNo'],
+          unique: true,
+        },
+      },
+    }) as CallToolResult;
+    const blockedIndexCreateText = blockedIndexCreate.content[0]?.type === 'text'
+      ? blockedIndexCreate.content[0].text
+      : '';
+    assert.equal(blockedIndexCreate.isError, true);
+    assert.match(blockedIndexCreateText, /confirmExecution="biz_order"/);
+
     const administrativeSqlDryRun = await client.callTool({
       name: 'microi_codex',
       arguments: {

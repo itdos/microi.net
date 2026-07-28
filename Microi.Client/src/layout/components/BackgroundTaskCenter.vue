@@ -72,6 +72,18 @@
                                         <span class="task-detail__label">{{ $t("Msg.BackgroundTaskMessage") }}</span>
                                         <span class="task-detail__message">{{ row.Msg || "-" }}</span>
                                     </div>
+                                    <div class="task-detail__row">
+                                        <span class="task-detail__label">{{ $t("Msg.BackgroundTaskEta") }}</span>
+                                        <span class="task-detail__message">{{ getTaskEta(row) }}</span>
+                                    </div>
+                                    <div v-if="row.BusinessTable || row.BusinessId" class="task-detail__row">
+                                        <span class="task-detail__label">{{ $t("Msg.BackgroundTaskBusiness") }}</span>
+                                        <span class="task-detail__message">{{ [row.BusinessTable, row.BusinessId].filter(Boolean).join(" / ") }}</span>
+                                    </div>
+                                    <div class="task-detail__row task-detail__row--result">
+                                        <span class="task-detail__label">{{ $t("Msg.BackgroundTaskLog") }}</span>
+                                        <pre>{{ row.Log || "-" }}</pre>
+                                    </div>
                                     <div class="task-detail__row task-detail__row--result">
                                         <span class="task-detail__label">{{ $t("Msg.BackgroundTaskResult") }}</span>
                                         <pre>{{ formatTaskResult(row) }}</pre>
@@ -90,10 +102,19 @@
                         <el-table-column :label="$t('Msg.BackgroundTaskProgress')" min-width="150">
                             <template #default="{ row }">
                                 <div class="task-progress-cell">
-                                    <el-progress :percentage="Number(row.Progress || 0)" :stroke-width="5" :show-text="false" />
-                                    <span>{{ Number(row.Progress || 0) }}%</span>
+                                    <el-progress
+                                        :percentage="getTaskProgress(row).indeterminate ? 100 : getTaskProgress(row).percentage"
+                                        :indeterminate="getTaskProgress(row).indeterminate"
+                                        :duration="2"
+                                        :stroke-width="5"
+                                        :show-text="false"
+                                    />
+                                    <span>{{ getTaskProgress(row).text }}</span>
                                 </div>
                             </template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.BackgroundTaskEta')" min-width="190" show-overflow-tooltip>
+                            <template #default="{ row }">{{ getTaskEta(row) }}</template>
                         </el-table-column>
                         <el-table-column prop="Msg" :label="$t('Msg.BackgroundTaskMessage')" min-width="220" show-overflow-tooltip>
                             <template #default="{ row }">{{ row.Msg || "-" }}</template>
@@ -232,6 +253,13 @@ import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, Us
 import { ElMessage, ElMessageBox } from "element-plus";
 import { useDiyStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
+import {
+    getBackgroundTaskEta,
+    getBackgroundTaskProgress,
+    isActiveBackgroundTask,
+    isTerminalBackgroundTask,
+    shouldPollBackgroundTasks
+} from "@/utils/background-task-display";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
 const MASTER_STORE_LIST_URL = "https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos";
@@ -259,6 +287,7 @@ export default {
             loading: false,
             storeLoading: false,
             terminalLoading: false,
+            taskPollTimer: null,
             lastStoreCheckTime: 0,
             storeCheckTimer: null,
             Delete,
@@ -301,10 +330,13 @@ export default {
         this.startOfficialAppChecker();
         window.addEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.addEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
+        document.addEventListener("visibilitychange", this.handleTaskVisibilityChange);
     },
     beforeUnmount() {
         window.removeEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.removeEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
+        document.removeEventListener("visibilitychange", this.handleTaskVisibilityChange);
+        this.stopTaskPolling();
         this.stopOfficialAppChecker();
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
@@ -329,6 +361,9 @@ export default {
             if (!value && this.activeTab === "onlineUsers") {
                 this.activeTab = "tasks";
             }
+        },
+        tasks() {
+            this.scheduleTaskPolling();
         }
     },
     methods: {
@@ -366,6 +401,12 @@ export default {
         },
         handleTaskList(data) {
             this.tasks = Array.isArray(data) ? data : [];
+        },
+        handleTaskVisibilityChange() {
+            if (!document.hidden && shouldPollBackgroundTasks(this.tasks)) {
+                this.loadTasks();
+            }
+            this.scheduleTaskPolling();
         },
         handleOnlineTerminalChanged() {
             if (this.visible) {
@@ -413,6 +454,22 @@ export default {
                 }
             } finally {
                 this.loading = false;
+                this.scheduleTaskPolling();
+            }
+        },
+        scheduleTaskPolling() {
+            this.stopTaskPolling();
+            if (!shouldPollBackgroundTasks(this.tasks)) return;
+            const delay = document.hidden ? 10000 : this.visible ? 3000 : 5000;
+            this.taskPollTimer = window.setTimeout(async () => {
+                this.taskPollTimer = null;
+                await this.loadTasks();
+            }, delay);
+        },
+        stopTaskPolling() {
+            if (this.taskPollTimer) {
+                window.clearTimeout(this.taskPollTimer);
+                this.taskPollTimer = null;
             }
         },
         async loadTerminals() {
@@ -551,10 +608,24 @@ export default {
             }
         },
         isTerminalTask(item) {
-            return item && ["Succeeded", "Failed", "Canceled"].includes(item.Status);
+            return isTerminalBackgroundTask(item);
         },
         canCancel(item) {
-            return item && (item.Status === "Pending" || item.Status === "Running");
+            return isActiveBackgroundTask(item);
+        },
+        getTaskProgress(item) {
+            return getBackgroundTaskProgress(item, {
+                calculating: this.$t("Msg.BackgroundTaskCalculating"),
+                waiting: this.$t("Msg.BackgroundTaskWaiting")
+            });
+        },
+        getTaskEta(item) {
+            return getBackgroundTaskEta(item, {
+                calculating: this.$t("Msg.BackgroundTaskEtaCalculating"),
+                confidenceLow: this.$t("Msg.BackgroundTaskConfidenceLow"),
+                confidenceMedium: this.$t("Msg.BackgroundTaskConfidenceMedium"),
+                confidenceHigh: this.$t("Msg.BackgroundTaskConfidenceHigh")
+            });
         },
         getTaskDownloadUrl(item) {
             if (!item || item.Status !== "Succeeded") return "";
@@ -576,7 +647,7 @@ export default {
         getTaskStatusType(status) {
             if (status === "Succeeded") return "success";
             if (status === "Failed" || status === "Canceled") return "danger";
-            if (status === "Running" || status === "Pending") return "warning";
+            if (status === "Running" || status === "Pending" || status === "Retrying") return "warning";
             return "info";
         },
         formatTaskResult(item) {
@@ -780,11 +851,15 @@ export default {
 
 .task-progress-cell {
     display: grid;
-    grid-template-columns: minmax(72px, 1fr) 34px;
+    grid-template-columns: minmax(72px, 1fr) auto;
     align-items: center;
     gap: 6px;
     font-size: 11px;
     color: var(--mci-text-color-secondary, #909399);
+
+    span {
+        white-space: nowrap;
+    }
 }
 
 .task-detail {

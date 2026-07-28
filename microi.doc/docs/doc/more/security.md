@@ -227,6 +227,51 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 - `JwtExpired`、`SessionExpired`、`SessionMissing`、`AuthVersionChanged` 仅清理受影响的租户/连接，不应让其它连接全局退出。
 - 管理员禁用用户时应先通过平台统一能力吊销该用户全部终端 Token，再修改用户状态并记录审计。
 
+### 浏览器访问密钥与免登录页面
+
+吾码支持为同一个帐号创建多个浏览器访问密钥，适合会议室电视、车间看板、信息屏等固定页面。它不是把帐号密码或长期 Token 放进 URL，也不是 Gitee/GitHub 私人令牌的网页登录翻版；访问密钥只负责兑换短期吾码会话。
+
+设计参考：[GitHub fine-grained PAT 权限模型](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens)、[GitHub OAuth 临时代码流程](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps?apiVersion=2022-11-28)、[OWASP URL Token 安全要求](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html) 和 [Gitee 私人令牌](https://gitee.com/help/articles/4336)。API/Git 令牌与浏览器会话的用途不同，因此吾码使用“长期访问密钥兑换短期受限会话”，而不是直接把长期登录 Token 当作页面凭据。
+
+核心规则：
+
+- 每个帐号最多 20 个有效密钥；创建时可选择默认 90 天、自定义到期时间（最长 365 天）或永久，可分别命名和吊销。永久密钥只用于受控固定终端，并应定期人工轮换。
+- 明文格式为 `microi_ak_<48-bit公开前缀>.<128-bit随机秘密>`，当前总长度 41 个字符，只在创建成功时显示一次；`mci_user_access_key` 只保存 SHA-256 哈希、前缀、范围和使用审计。
+- `mci_user_access_key` 是平台安全控制面表，不创建普通业务菜单，也不允许普通客户端通过通用 FormEngine 直接读取。
+- 密钥权限只能收窄，最终权限始终是“帐号当前角色/菜单权限 ∩ 密钥范围”。帐号停用、角色变化、密钥到期或吊销都会影响后续请求。
+- 默认范围为 `page:open + form:read`；可继续限定准确页面路由、表名、接口引擎 Key 和数据源引擎 Key。写权限、文件读取和引擎运行必须显式启用。
+- 密钥兑换得到的 `_ClientType=AccessKey` 会话默认 20 分钟，通过正常 Token 轮换续期；每次请求仍校验共享 Redis/数据库中的密钥状态，不依赖单机内存或粘性会话。
+- 兑换接口只接收 JSON Body，不接受 Query String。前端链接把密钥放在 Hash 路由参数中，首次解析后立即从地址栏清除，避免它随初始 HTTP 请求进入反向代理和 Referer 日志。
+- 仍应使用 HTTPS，并为看板创建独立的只读帐号。链接本身属于敏感凭据，复制到聊天、截图或浏览器同步历史都可能泄露，应按密钥处理。
+
+管理员在“系统管理 → 用户管理”中创建：可以点击用户列表每一行的【访问密钥】，也可以打开用户编辑表单后点击密码右侧的【访问密钥】。看板示例：
+
+```text
+https://os.example.com/#/access-login?access_key=microi_ak_xxx.yyy&redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F看板Id
+```
+
+旧版 `?token=` 自动登录仅保留兼容，不应再生成新链接。前端会立即清除该参数，且不会再把完整 Token 输出到控制台或 `sessionStorage`。
+
+常用权限范围：
+
+| Scope | 说明 |
+|---|---|
+| `page:open` | 打开密钥配置的准确前端路由；浏览器密钥必选 |
+| `form:read` | 只读访问配置的准确表名，仍受帐号实时菜单/表权限约束 |
+| `form:write` | 写配置表，默认关闭，高风险 |
+| `form:export` | 导出配置表，默认关闭 |
+| `api-engine:run` | 运行配置的准确 `ApiEngineKey` |
+| `data-source:run` | 运行配置的准确 `DataSourceKey` |
+| `file:read` | 调用文件读取 API，默认关闭 |
+
+配置大屏时至少允许目标路由和 `mic_data_dashboard` 表。如果大屏组件还会调用接口引擎或数据源引擎，只添加实际使用的 Key，禁止填写全局通配符。
+
+### 管理员显示系统用户密码
+
+存量部署将 `sys_user.Pwd` 以可逆 DES 保存时，平台超级管理员可以在“系统管理 → 用户管理 → 编辑用户”中点击【显示密码】。`POST /api/SysUser/GetSysUserPassword` 只允许普通管理员登录会话调用；访问密钥会话和普通角色均拒绝。接口只解密 `PwdEncode=DES`（历史空值按 DES 兼容），自定义 V8 密码编码不做通用解密；成功查看会写安全审计日志，响应禁止缓存且日志不记录明文密码。
+
+这是存量可逆密码方案的兼容管理能力，不应扩展给业务 V8、接口引擎、普通菜单或匿名接口。新系统仍建议逐步迁移到不可逆的专用密码哈希；完成迁移后只能重置，不能读取原密码。
+
 ---
 
 ## 九、运行时资源保护

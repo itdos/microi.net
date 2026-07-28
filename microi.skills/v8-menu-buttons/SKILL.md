@@ -288,7 +288,7 @@ return V8.ClientType != 'PC';
 
 ## 8. 模式 F：后台任务按钮（长任务）
 
-应用安装、初始化多语言、批量导入、批量修复、跨系统同步等可能超过浏览器或网关等待时间的操作，必须优先设计为后台任务。前端按钮只负责提交任务，后台任务列表通过 WebSocket/SignalR 推送进度。
+应用安装、初始化多语言、批量导入、批量修复、跨系统同步等可能超过浏览器或网关等待时间的操作，必须优先设计为后台任务。判断阈值：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用，或总量未知且可能持续运行。前端按钮只负责提交任务，后台任务列表通过 WebSocket/SignalR 推送并以轮询兜底。
 
 推荐直接使用按钮字段：
 
@@ -299,6 +299,16 @@ return V8.ClientType != 'PC';
   "ShowRow": true,
   "RunBackground": true,
   "ApiEngineKey": "import-microi-store-package",
+  "Workload": { "ExpectedItems": 2000, "FanOutOperations": 10000, "ExpectedSeconds": 3000 },
+  "BackgroundTaskOptions": {
+    "IdempotencyKeyFields": ["Id", "Version"],
+    "ConcurrencyKey": "microi-store-install",
+    "BusinessTable": "sys_microistore",
+    "BusinessStatusField": "TaskStatus",
+    "BusinessTaskIdField": "BackgroundTaskId",
+    "BusinessProgressField": "TaskProgress",
+    "BusinessEtaField": "EstimatedEndTime"
+  },
   "V8Code": "return { Package: V8.Form, _BackgroundTaskTitle: '安装应用：' + (V8.Form.Name || '') };"
 }
 ```
@@ -308,20 +318,37 @@ return V8.ClientType != 'PC';
 ```js
 V8.ApiEngine.RunBackground('import-microi-store-package', {
   Package: V8.Form
-}, '安装应用：' + (V8.Form.Name || ''));
+}, '安装应用：' + (V8.Form.Name || ''), {
+  IdempotencyKey: 'install:' + V8.Form.Id + ':' + (V8.Form.Version || ''),
+  ConcurrencyKey: 'microi-store-install',
+  BusinessTable: 'sys_microistore',
+  BusinessId: V8.Form.Id,
+  BusinessStatusField: 'TaskStatus',
+  BusinessTaskIdField: 'BackgroundTaskId',
+  BusinessProgressField: 'TaskProgress',
+  BusinessEtaField: 'EstimatedEndTime'
+});
 ```
+
+`Business*` 字段用于业务关联与受权限保护的状态标记。按钮提交成功后，前端使用当前用户的 `V8.FormEngine` 权限写入“后台处理中”和任务 Id；通用后台服务不会信任客户端传来的任意表名/字段名去绕过权限。接口引擎应在成功、失败和取消补偿路径用固定业务表/字段更新最终状态，任务 Id 始终保留用于打开通知中心详情。
 
 接口引擎中必须上报真实进度。平台创建后台任务时会自动把 `_BackgroundTaskId` 注入 `V8.Param`，V8 代码不要自己生成任务 Id，也不要只在结束时写一个固定百分比。
 
 ```js
 var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var backgroundTask = V8.Param._BackgroundTask || {};
+if (backgroundTask.BusinessTable && backgroundTask.BusinessId) {
+  var taskPatch = { Id: backgroundTask.BusinessId };
+  taskPatch[backgroundTask.BusinessStatusField] = '后台处理中';
+  taskPatch[backgroundTask.BusinessTaskIdField] = backgroundTaskId;
+  V8.FormEngine.UptFormData(backgroundTask.BusinessTable, taskPatch);
+}
 var reportProgress = function(current, total, msg) {
   if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
   V8.Method.UpdateBackgroundTask({
     _BackgroundTaskId: backgroundTaskId,
     Current: current,
     Total: total,
-    Progress: Math.floor(current * 100 / total),
     Msg: msg,
     Message: msg
   });
@@ -333,9 +360,11 @@ reportProgress(2, 5, '正在写入表结构');
 // ...执行第 2 阶段
 ```
 
-推荐用“阶段数”或“已处理条数 / 总条数”上报 `Current/Total`，平台会同步写入 Redis 并推送通知中心百分比。耗时循环中每处理一批数据都应调用一次 `reportProgress`，例如每 50 或 100 条更新一次，避免用户看到长期停留。
+推荐用“已提交条数 / 总条数”上报 `Current/Total`，平台以共享数据库为事实源，Redis/SignalR 仅作缓存和推送，并根据真实吞吐估算结束时间。总量未知时只上报 `Current + Msg`，通知中心显示“计算进度中”，不要填写假的 `Total=100`。耗时循环中每提交一批数据调用一次，例如每 50 或 100 条更新；不能用计时器匀速增加百分比。
 
-后台任务不能隐藏真实失败。失败时返回 `Code:0` 和清晰 `Msg`，并把关键阶段写入任务进度或系统日志。接口引擎成功返回 `Code:1` 时平台会把任务置为 100%；不要在中途把 `Progress` 写到 100。
+后台任务不能隐藏真实失败。失败时返回 `Code:0` 和清晰 `Msg`，并把关键阶段写入任务进度或系统日志。只有最终成功才显示 100%；失败/取消保留最后真实进度。
+
+预计超过 10 分钟的任务必须分页/分片。每片只处理可在较短事务内提交的一批，仍有后续时返回 `Data.BackgroundTask.HasMore=true + Checkpoint + Current/Total`，平台持久化检查点并重新入队；最后一片返回普通 `Code:1`。重试副作用必须用稳定幂等键、数据库唯一约束和 `_BackgroundTaskFencingToken` 条件写入，不能依赖锁本身。
 
 ### 复盘：主租户默认值误清空子租户后台任务身份
 

@@ -88,13 +88,21 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   assert.match(source, /previewHtml\s*=\s*injectRuntimeContext\(compilePreviewHtml\(files, app\.Data\)\)/);
   assert.match(source, /requestedAction\s*===\s*"RepairStableLatest"/);
   assert.match(source, /requestedAction\s*===\s*"PromoteStoreAssets"/);
-  assert.match(source, /promoteStoreAssets\(app\.Data, promotedAppKey, promotedVersionNo, V8\.Param\.Assets\)/);
+  assert.match(source, /JSON\.parse\(text\(V8\.Param\.AssetsJson\)\)/);
+  assert.match(source, /promoteStoreAssets\(app\.Data, promotedAppKey, promotedVersionNo, promotedAssets\)/);
+  assert.match(source, /if \(!moveResult \|\| moveResult\.Code !== 1\) return moveResult/);
+  assert.match(source, /source\.fileByteBase64\s*\|\|\s*source\.FileByteBase64/);
+  assert.match(source, /parseInt\(storagePayload\.Code\)\s*===\s*0/);
+  assert.match(source, /优先以当前完整 dist\/build 目录为事实源/);
+  assert.match(source, /if \(!isBlank\(repairBuildRoot\)\)/);
+  assert.match(source, /repairHasEntry && repairVersionAssets\.length/);
+  assert.match(source, /当前应用没有可修复的完整编译产物/);
 });
 
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.3.7");
+  assert.equal(packaged.Version, "v1.4.4");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.(?:[4-9]|\d{2,})$|^v6\.[6-9]\./);
   assert.match(upgradeSource, /BuildAiAppResourceName\s*=\s*"ai-app-build\.js"/);

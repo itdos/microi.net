@@ -14,6 +14,11 @@ namespace Microi.net
     /// </summary>
 	public class MicroiUpgrade : IMicroiUpgrade
     {
+        private static readonly string[] OfficialWebsiteAnonymousApiEngineKeys =
+        {
+            "send_sms_reg"
+        };
+
         /// <summary>
         /// 
         /// </summary>
@@ -47,6 +52,7 @@ namespace Microi.net
                 EnsureLegacyFieldMetadataColumns(osClientSecret);
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动前");
                 await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动前");
+                await EnsureOfficialWebsitePublicApiEngineContractAsync(osClientSecret);
                 await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret);
                 menuAppDisplaySnapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
             }
@@ -574,6 +580,68 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级20 --2026-07-28【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade20.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade20().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级20 - 2026-07-28】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级20 - 2026-07-28】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade20.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级20失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级20 - 2026-07-28】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级21 --2026-07-28【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade21.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade21().Run(osClientSecret.OsClient);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级21 - 2026-07-28】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级21 - 2026-07-28】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade21.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级21失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级21 - 2026-07-28】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {
@@ -654,6 +722,103 @@ namespace Microi.net
         {
             public string Id { get; set; }
             public int? AppDisplay { get; set; }
+        }
+
+        private static bool IsOfficialWebsiteTenant(string osClient)
+        {
+            return string.Equals(osClient, "iTdos", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 官网注册短信属于固定的匿名入口。iTdos 官方库曾因历史配置保留
+        /// AllowAnonymous=0，导致每次发布后官网重新出现 NoAuth。这里把该契约放到
+        /// 受分布式升级租约保护的启动不变量中，并同步清理所有接口引擎缓存别名。
+        /// 仅作用于官方 iTdos，不改变客户租户对同名接口的自主配置。
+        /// </summary>
+        private async Task EnsureOfficialWebsitePublicApiEngineContractAsync(
+            OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null
+                || !IsOfficialWebsiteTenant(osClientSecret.OsClient)
+                || !TableExists(osClientSecret, "sys_apiengine")
+                || !ColumnExists(osClientSecret, "sys_apiengine", "AllowAnonymous")
+                || !ColumnExists(osClientSecret, "sys_apiengine", "StopHttp")
+                || !ColumnExists(osClientSecret, "sys_apiengine", "IsEnable"))
+            {
+                return;
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>()
+                ?? OsClientDefault.OsClientDbType;
+            var quoteOpen = dbType == "SqlServer" ? "[" : "`";
+            var quoteClose = dbType == "SqlServer" ? "]" : "`";
+            var cache = MicroiEngine.CacheTenant.Cache(osClientSecret.OsClient);
+            var repaired = 0;
+
+            foreach (var apiEngineKey in OfficialWebsiteAnonymousApiEngineKeys)
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                var row = osClientSecret.Db.FromSql($@"SELECT
+                        {quoteOpen}Id{quoteClose},
+                        {quoteOpen}ApiEngineKey{quoteClose},
+                        {quoteOpen}ApiAddress{quoteClose},
+                        {quoteOpen}AllowAnonymous{quoteClose},
+                        {quoteOpen}StopHttp{quoteClose},
+                        {quoteOpen}IsEnable{quoteClose}
+                    FROM {quoteOpen}sys_apiengine{quoteClose}
+                    WHERE {quoteOpen}ApiEngineKey{quoteClose}=@p0
+                      AND ({quoteOpen}IsDeleted{quoteClose}=0 OR {quoteOpen}IsDeleted{quoteClose} IS NULL)")
+                    .AddInParameter("p0", apiEngineKey)
+                    .First<OfficialWebsiteApiEngineRow>();
+                if (row == null || row.Id.DosIsNullOrWhiteSpace())
+                {
+                    continue;
+                }
+
+                if (row.AllowAnonymous != 1 || row.StopHttp != 0 || row.IsEnable != 1)
+                {
+                    var affected = osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_apiengine{quoteClose}
+                            SET {quoteOpen}AllowAnonymous{quoteClose}=@p0,
+                                {quoteOpen}StopHttp{quoteClose}=@p1,
+                                {quoteOpen}IsEnable{quoteClose}=@p2
+                            WHERE {quoteOpen}Id{quoteClose}=@p3")
+                        .AddInParameter("p0", 1)
+                        .AddInParameter("p1", 0)
+                        .AddInParameter("p2", 1)
+                        .AddInParameter("p3", row.Id)
+                        .ExecuteNonQuery();
+                    if (affected > 0)
+                    {
+                        repaired++;
+                    }
+                }
+
+                foreach (var alias in new[] { row.Id, row.ApiEngineKey, row.ApiAddress })
+                {
+                    if (!alias.DosIsNullOrWhiteSpace())
+                    {
+                        await cache.RemoveAsync(
+                            $"Microi:{osClientSecret.OsClient}:FormData:sys_apiengine:{alias.ToLowerInvariant()}");
+                    }
+                }
+            }
+
+            if (repaired > 0)
+            {
+                Console.WriteLine(
+                    $"Microi：【官网匿名接口修复】【{osClientSecret.OsClient}】已恢复 {repaired} 个注册入口的匿名 HTTP 契约。");
+            }
+        }
+
+        private sealed class OfficialWebsiteApiEngineRow
+        {
+            public string Id { get; set; }
+            public string ApiEngineKey { get; set; }
+            public string ApiAddress { get; set; }
+            public int? AllowAnonymous { get; set; }
+            public int? StopHttp { get; set; }
+            public int? IsEnable { get; set; }
         }
 
         private async Task EnsureApiEngineCacheWriteCompatibilityAsync(

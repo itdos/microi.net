@@ -212,7 +212,8 @@ namespace Microi.net
             {
                 fielPah = "upload";
             }
-            var yearMonth = DateTime.Now.ToString("yyyyMMdd");
+            // 按月分目录，避免单目录长期累计海量文件，同时避免按日产生过多目录。
+            var yearMonth = DateTime.Now.ToString("yyyyMM");
             fielPah = ("/" + param.OsClient
                         + "/" + fielPah
                         + "/" + yearMonth

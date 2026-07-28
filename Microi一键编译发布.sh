@@ -258,7 +258,13 @@ run_client_build() {
 
     MICROI_ACTIVE_GUARD_PID_FILE="$PWD/.tmp/build-logs/guard.pid"
     rm -f "$MICROI_ACTIVE_GUARD_PID_FILE"
-    "$_node_cmd" scripts/build-with-memory-guard.mjs &
+    # Bash 非交互脚本会默认把后台命令的 stdin 指向 /dev/null；显式继承当前 stdin，
+    # 让构建守护器在内存等待期间可以读取 s/skip 指令。CI 等非终端场景仍保持自动等待。
+    if [ -t 0 ]; then
+        MICROI_BUILD_INTERACTIVE=1 "$_node_cmd" scripts/build-with-memory-guard.mjs <&0 &
+    else
+        "$_node_cmd" scripts/build-with-memory-guard.mjs &
+    fi
     MICROI_ACTIVE_BUILD_PID=$!
 
     local _exit_code=0

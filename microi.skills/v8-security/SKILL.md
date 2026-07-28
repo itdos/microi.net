@@ -258,6 +258,8 @@ if (old.Code === 1 && old.Data) {
 
 业务 V8 禁止自行查询 `sys_user`、保存密码或用 MD5/SHA1/SHA256 直接哈希密码。统一使用平台登录、重置密码和管理员用户管理接口；新密码存储必须由后端使用带盐、可调成本的专用密码哈希，并支持版本与轮换。登录 RSA 只隐藏传输报文中的明文外观，不能替代 HTTPS，也不能用于密码存储。
 
+存量 `PwdEncode=DES` 的兼容例外只能位于 `[PlatformAdminOnly]` 的 `GetSysUserPassword`：还要拒绝访问密钥会话、按当前 `OsClient` 和准确用户 Id 查询、用“解密后重新加密等于原密文”验证结果、返回 `no-store` 并写不含明文的安全审计。`PwdEncode=V8` 不假定可逆。不得把该能力暴露给 FormEngine、V8、普通角色或匿名端点。
+
 ### 脱敏返回
 
 ```javascript
@@ -380,3 +382,19 @@ try {
 - 根因：Redis 保留了旧结构的授权快照，新字段反序列化为 `0/false`；同时更新前旧记录读取或动态新增字段把已校验上下文降成裸 `JObject` / 匿名参数，丢失管理员或可信服务端来源。批量字段保存若逐字段调用完整 CRUD，还会把授权、V8 和缓存工作放大 N 倍。
 - 通用规则：授权快照使用独立契约版本；内部嵌套调用必须显式传递原始客户端管理员上下文，或由真正的服务端任务构造不可伪造的强类型可信参数，不能依赖 `_InvokeType` 或 CLR/JObject 猜测。
 - 自动化检查：预置缺少新字段的旧 Redis 快照后验证新版本 Key 不命中；分别覆盖管理员设计器批量字段保存/新增字段、普通用户直接写保护表被拒绝、升级程序可信写入成功，以及 HTTP JSON 伪造可信字段仍失败。
+
+## 浏览器访问密钥
+
+固定看板、电视和信息屏免输入帐号密码时，使用平台 `mci_user_access_key`，禁止自行在接口引擎中保存明文 Secret，也禁止把长期登录 Token 拼进 URL。
+
+- 一个帐号可有多个密钥；每个密钥独立名称、到期时间（90天/自定义/永久）、范围、使用审计和吊销状态。永久密钥必须可单独吊销并建议定期人工轮换。
+- 密钥格式固定为 `microi_ak_<48-bit公开前缀>.<128-bit随机秘密>`，当前总长度 41 个字符；只保存完整密钥的 SHA-256 哈希，明文只在创建时返回一次。日志、MongoDB、Redis、异常和回答中不得出现完整密钥。
+- 浏览器链接使用 `/#/access-login?access_key=...&redirect=...`。`access_key` 位于 Hash 中，前端解析后立即 `history.replaceState` 清除；后端兑换只接受 JSON Body。
+- 兑换得到短期 `_ClientType=AccessKey` Token。JWT 只保存 `MicroiAccessKeyId`，权限范围从共享数据库/Redis实时加载，不能把范围写进共享 `CurrentToken.CurrentUser`。
+- 密钥权限只能收窄：帐号实时角色/菜单/行范围与 `Scopes + AllowedRoutes + AllowedTableNames + AllowedApiEngineKeys + AllowedDataSourceKeys` 取交集。检查必须位于管理员快捷放行之前。
+- 默认只允许 `page:open + form:read`；`form:write/form:export/file:read/api-engine:run/data-source:run` 必须显式启用，且表名和引擎 Key 使用准确白名单，不支持 `*`。
+- 管理操作只允许普通登录会话的本人或管理员；访问密钥会话不能创建或吊销密钥。
+- 多节点共享 Redis 只作为短 TTL 缓存和限流；数据库是事实源，吊销主动清除缓存。不得使用 `static` 字典、本机文件或本地定时器保存密钥状态。
+- 对外仍要求 HTTPS。固定终端使用独立只读帐号，不能用超级管理员帐号创建看板密钥。
+
+验收至少覆盖：明文只返回一次、错误密钥固定时间比较、过期/吊销/停用帐号失败、指定页面成功而其它路由失败、允许表成功而其它表失败、接口/数据源 Key 精确限制、普通帐号权限变化即时收窄、两个 API 节点吊销一致生效。

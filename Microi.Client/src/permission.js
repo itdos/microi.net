@@ -9,7 +9,34 @@ import { getToken } from "@/utils/auth.js"; // get token from cookie
 import getPageTitle from "@/utils/get-page-title";
 import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
-const whiteList = ["/login", "/auth-redirect", "/mci-redis-manager"]; // no redirect whitelist
+const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
+
+function removeCredentialParameter(paramName) {
+    if (!paramName) return;
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete(paramName);
+        const rawHash = url.hash || "";
+        const queryIndex = rawHash.indexOf("?");
+        if (queryIndex >= 0) {
+            const hashPath = rawHash.substring(0, queryIndex);
+            const hashQuery = new URLSearchParams(rawHash.substring(queryIndex + 1));
+            hashQuery.delete(paramName);
+            url.hash = hashPath + (hashQuery.toString() ? "?" + hashQuery.toString() : "");
+        }
+        window.history.replaceState(window.history.state, document.title, url.toString());
+    } catch (_) {}
+}
+
+function getAccessKeyAllowedRoutes(currentUser) {
+    if (!currentUser || currentUser._AccessKeySession !== true) return [];
+    const routes = Array.isArray(currentUser._AccessKeyAllowedRoutes)
+        ? currentUser._AccessKeyAllowedRoutes
+        : [];
+    return routes
+        .map((path) => normalizeMenuRoutePath(String(path || "").split("?")[0]))
+        .filter(Boolean);
+}
 
 function isAuthenticationFailure(error) {
     if (!error) return false;
@@ -52,7 +79,10 @@ router.beforeEach(async (to, from, next) => {
     //   document.title = getPageTitle(to.meta.title)
     //2022-09-14 所有页面均需要token自动登录
     var diySsoArray = sessionStorage.getItem("Diy_Sso");
-    var lastSsoToken = sessionStorage.getItem("LastSsoToken");
+    // Never persist an incoming credential in sessionStorage. Existing deployments
+    // may still contain the legacy value, so remove it during the compatibility pass.
+    try { sessionStorage.removeItem("LastSsoToken"); } catch (_) { }
+    var lastSsoToken = DiyCommon.getToken();
     if (!diySsoArray) {
         var diySsoResult = await DiyCommon.PostAsync("/api/FormEngine/GetTableDataAnonymous", {
             FormEngineKey: "Diy_Sso",
@@ -84,9 +114,8 @@ router.beforeEach(async (to, from, next) => {
         directTokenMatch = /[?&]token%3D([^&;#]+)/i.exec(location.href);
     }
     var directToken = directTokenMatch ? decodeURIComponent(directTokenMatch[1].replace(/\+/g, "%20")) : null;
+    if (directToken) removeCredentialParameter("token");
     if (directToken && ((directToken !== lastSsoToken) || !DiyCommon.getToken()) && directToken != "$V8.CurrentToken$") {
-        console.log("-------> SsoLogin direct token permission.js：" + directToken);
-        sessionStorage.setItem("LastSsoToken", directToken);
         var newtoken = directToken.replace("Bearer%20", "").replace("Bearer ", "");
         DiyCommon.setToken(newtoken);
         var directLoginResult = await DiyCommon.PostAsync(DiyApi.TokenLogin(), {
@@ -147,8 +176,7 @@ router.beforeEach(async (to, from, next) => {
         // console.log('-------> SsoAutoLogin token：' + token);
         if (((token && token !== lastSsoToken) || (token && !DiyCommon.getToken())) && token != "$V8.CurrentToken$") {
             // && token != DiyCommon.getToken()
-            console.log("-------> SsoLogin token permission.js：" + token);
-            sessionStorage.setItem("LastSsoToken", token);
+            removeCredentialParameter(diySso.TokenName);
             //登录
             if (diySso.ClientSsoApi.toLowerCase() == DiyApi.TokenLogin().toLowerCase()) {
                 var newtoken = token.replace("Bearer%20", "").replace("Bearer ", "");
@@ -203,6 +231,25 @@ router.beforeEach(async (to, from, next) => {
     const hasToken = DiyCommon.getToken();
 
     if (hasToken) {
+        if (to.path === "/access-login") {
+            next();
+            return;
+        }
+        const accessKeyDiyStore = useDiyStore(pinia);
+        const accessKeyAllowedRoutes = getAccessKeyAllowedRoutes(accessKeyDiyStore.GetCurrentUser);
+        if (accessKeyAllowedRoutes.length > 0) {
+            const targetPath = normalizeMenuRoutePath(to.path || "/");
+            if (accessKeyAllowedRoutes.includes(targetPath)) {
+                const accessKeyUserStore = useUserStore(pinia);
+                if (!accessKeyUserStore.roles || accessKeyUserStore.roles.length === 0) {
+                    accessKeyUserStore.setRoles(["access-key"]);
+                }
+                next();
+            } else {
+                next({ path: accessKeyAllowedRoutes[0], replace: true });
+            }
+            return;
+        }
         if (to.path === "/login") {
             next({ path: "/" });
         } else {

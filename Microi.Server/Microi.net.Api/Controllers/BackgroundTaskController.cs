@@ -92,13 +92,28 @@ namespace Microi.net.Api
             apiParam["OsClient"] = identity.OsClient;
 
             var title = param["Title"]?.ToString();
-            var item = BackgroundTaskService.StartApiEngine(
-                identity.OsClient,
-                identity.UserKey,
-                title,
-                apiParam,
-                identity.CurrentUser);
-            return Json(new DosResult(1, item, "后台任务已提交"));
+            var options = param["Options"] as JObject
+                          ?? apiParam["_BackgroundTaskOptions"] as JObject
+                          ?? new JObject();
+            apiParam.Remove("_BackgroundTaskOptions");
+            try
+            {
+                var item = BackgroundTaskService.StartApiEngine(
+                    identity.OsClient,
+                    identity.UserKey,
+                    title,
+                    apiParam,
+                    identity.CurrentUser,
+                    options);
+                return Json(new DosResult(1, item,
+                    item.ExecutionCount > 0 || item.Status != "Pending"
+                        ? "已返回相同幂等键的后台任务"
+                        : "后台任务已持久化并进入队列"));
+            }
+            catch (System.Exception ex)
+            {
+                return Json(new DosResult(0, null, "后台任务提交失败：" + ex.Message));
+            }
         }
 
         private static async Task<RequestIdentity> GetIdentity(JObject param)

@@ -233,6 +233,31 @@ function stringifyConfig(value: unknown): string | undefined {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
+export function analyzeBackgroundWorkload(buttonInput: unknown): { required: boolean; reasons: string[] } {
+  const button = asRecord(buttonInput);
+  const workload = asRecord(button.Workload ?? button.workload ?? button.BackgroundWorkload ?? button.backgroundWorkload);
+  const reasons: string[] = [];
+  const expectedSeconds = getNumber(workload, 'ExpectedSeconds', 'expectedSeconds') ?? 0;
+  const expectedItems = getNumber(workload, 'ExpectedItems', 'expectedItems', 'EstimatedRows', 'estimatedRows') ?? 0;
+  const fanOut = getNumber(workload, 'FanOutOperations', 'fanOutOperations', 'FanOut', 'fanOut') ?? 0;
+  const externalCalls = getNumber(workload, 'ExternalCalls', 'externalCalls') ?? 0;
+  if (expectedSeconds >= 120) reasons.push(`预计耗时 ${expectedSeconds}s >= 120s`);
+  if (expectedItems >= 500) reasons.push(`预计处理 ${expectedItems} 条 >= 500 条`);
+  if (fanOut >= 1000) reasons.push(`预计扇出 ${fanOut} 个子操作 >= 1000`);
+  if (externalCalls >= 100) reasons.push(`预计外部调用 ${externalCalls} 次 >= 100 次`);
+  if (getBoolean(workload, 'UnknownTotal', 'unknownTotal') === true) reasons.push('总工作量未知且可能长时间运行');
+
+  const semanticText = [
+    getString(button, 'Name', 'name'),
+    getString(button, 'ApiEngineKey', 'apiEngineKey'),
+    getString(button, 'V8Code', 'v8Code'),
+  ].join(' ');
+  if (/(批量.{0,4}(导入|生成|修复|处理)|安装|初始化|全量同步|数据迁移|数据库备份|批量任务)/i.test(semanticText)) {
+    reasons.push('动作语义属于典型长任务');
+  }
+  return { required: reasons.length > 0, reasons };
+}
+
 function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean; value?: string; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -251,8 +276,29 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
     const button = asRecord(item);
     const name = getString(button, 'Name', 'name');
     if (!name) errors.push(`${fieldName}[${index}].Name 不能为空`);
-    const runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
+    const workloadAnalysis = analyzeBackgroundWorkload(button);
+    let runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
     const apiEngineKey = getString(button, 'ApiEngineKey', 'apiEngineKey');
+    if (workloadAnalysis.required && runBackground !== true) {
+      if (apiEngineKey) {
+        runBackground = true;
+        warnings.push(`${fieldName}[${index}] 已识别为长任务并自动启用 RunBackground：${workloadAnalysis.reasons.join('；')}`);
+      } else {
+        errors.push(`${fieldName}[${index}] 已识别为长任务，但缺少 ApiEngineKey：${workloadAnalysis.reasons.join('；')}`);
+      }
+    }
+    const backgroundTaskOptions = asRecord(button.BackgroundTaskOptions ?? button.backgroundTaskOptions);
+    if (runBackground === true) {
+      if (!getString(backgroundTaskOptions, 'IdempotencyKey', 'idempotencyKey')
+          && !getStringArray(backgroundTaskOptions, 'IdempotencyKeyFields', 'idempotencyKeyFields').length) {
+        warnings.push(`${fieldName}[${index}] 后台任务未配置 IdempotencyKey 或 IdempotencyKeyFields；涉及写操作时必须补稳定业务幂等键`);
+      }
+      if (getString(backgroundTaskOptions, 'BusinessTable', 'businessTable')
+          && (!getString(backgroundTaskOptions, 'BusinessStatusField', 'businessStatusField')
+              || !getString(backgroundTaskOptions, 'BusinessTaskIdField', 'businessTaskIdField'))) {
+        warnings.push(`${fieldName}[${index}] 已关联业务表，但缺少 BusinessStatusField/BusinessTaskIdField`);
+      }
+    }
     const targetSysMenuId = getString(button, 'TargetSysMenuId', 'targetSysMenuId');
     const hasRelatedModule = fieldName === 'PageTabs' && !!targetSysMenuId;
     if (!getString(button, 'V8Code', 'v8Code') && !getString(button, 'Url', 'url') && !(runBackground && apiEngineKey) && !hasRelatedModule) {
@@ -285,6 +331,10 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
       BackgroundTask: button.BackgroundTask ?? button.backgroundTask ?? undefined,
       IsBackgroundTask: button.IsBackgroundTask ?? button.isBackgroundTask ?? undefined,
       ApiEngineKey: apiEngineKey || undefined,
+      Workload: Object.keys(asRecord(button.Workload ?? button.workload)).length
+        ? asRecord(button.Workload ?? button.workload)
+        : undefined,
+      BackgroundTaskOptions: Object.keys(backgroundTaskOptions).length ? backgroundTaskOptions : undefined,
       TargetSysMenuId: targetSysMenuId || undefined,
     });
   });
@@ -326,6 +376,20 @@ function normalizeAllMenuJson(data: JsonRecord): { data: JsonRecord; errors: str
     if (normalized.value !== undefined) result.ViewSchema = normalized.value;
   }
   return { data: result, errors, warnings };
+}
+
+function getBoolean(record: JsonRecord, ...keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'string' && value.trim()) {
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes'].includes(normalized)) return true;
+      if (['false', '0', 'no'].includes(normalized)) return false;
+    }
+  }
+  return undefined;
 }
 
 const VIEW_SCHEMA_SCENES = ['Detail', 'Edit', 'List', 'Card'];
@@ -1017,6 +1081,28 @@ function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; wa
       if (name && label) manifestFieldsByTable.get(name.toLowerCase())?.add(label.toLowerCase());
       plan.push(`add_field ${name}.${fieldName}`);
     });
+    const indexableFields = new Set(
+      getArray(table, 'fields', 'Fields')
+        .map((field) => getString(field, 'name', 'Name').toLowerCase())
+        .filter(Boolean),
+    );
+    ['id', 'createtime', 'updatetime', 'createuser', 'osclient'].forEach((field) => indexableFields.add(field));
+    getArray(table, 'indexes', 'Indexes').forEach((index, indexPosition) => {
+      const columns = getStringArray(index, 'columns', 'Columns');
+      if (!columns.length) {
+        errors.push(`tables[${tableIndex}].indexes[${indexPosition}].columns 至少需要一个字段`);
+      }
+      for (const column of columns) {
+        if (!indexableFields.has(column.toLowerCase())) {
+          errors.push(`tables[${tableIndex}].indexes[${indexPosition}] references unknown physical field "${column}" on table "${name}"`);
+        }
+      }
+      if (columns.some((column, position) =>
+        columns.findIndex((other) => other.toLowerCase() === column.toLowerCase()) !== position)) {
+        errors.push(`tables[${tableIndex}].indexes[${indexPosition}] 包含重复字段`);
+      }
+      plan.push(`create_index ${name}.${getString(index, 'name', 'Name') || columns.join('_')}`);
+    });
   });
   dataSources.forEach((item) => plan.push(`save_data_source ${getString(item, 'dataSourceKey', 'DataSourceKey')}`));
   engines.forEach((item) => plan.push(`upsert_engine ${getString(item, 'apiEngineKey', 'ApiEngineKey')}`));
@@ -1435,6 +1521,10 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
           { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', tab: 'basic', notEmpty: 1, tableWidth: 160, sort: 20 },
           { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, sort: 30 },
         ],
+        indexes: [
+          { name: 'uk_biz_order_osclient_orderno', columns: ['OsClient', 'OrderNo'], unique: true, purpose: 'Tenant-scoped order number invariant' },
+          { name: 'idx_biz_order_osclient_status_createtime', columns: ['OsClient', 'Status', 'CreateTime'], unique: false, purpose: 'Status list ordered by creation time' },
+        ],
       }],
       engines: [{ apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', code: "return { Code: 1, Data: V8.Param };" }],
       events: [{ formEngineKey: 'Biz_Order', eventType: 'SubmitBeforeServerV8', code: "if (!V8.Form.OrderNo) return { Code: 0, Msg: 'OrderNo required' };" }],
@@ -1517,6 +1607,7 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
       tables: {
         tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
         column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
+        indexes: 'Physical database indexes. Declare ordered columns and unique. Required indexes must be created by microi_create_table_index or manifest generation, never by ad-hoc SQL. Tenant tables should usually lead with OsClient.',
       },
       fields: {
         component: 'Use the real Microi component name. Available controls include Text, Textarea, NumberText, DateTime, Select, MultipleSelect, Radio, Checkbox, Switch, Rate, Progress, Slider, ColorPicker, AutoNumber, Divider, CollapseGroup, Tabs, Alert, StaticText, Html, RichText, CodeEditor, JsonTable, ImgUpload, FileUpload, Autocomplete, TagInput, Transfer, Cascader, Address, Department, SelectTree, TreeCheckbox, OpenTable, JoinTable, JoinForm, TableChild, Map, MapArea, Qrcode, FontAwesome, DevComponent.',
@@ -1733,6 +1824,33 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
                 component: getString(fieldPayload, 'Component') || 'Text',
                 type: getString(fieldPayload, 'Type') || 'varchar(255)',
               });
+            }
+          }
+
+          for (const index of getArray(table, 'indexes', 'Indexes')) {
+            const columns = getStringArray(index, 'columns', 'Columns');
+            const indexName = getString(index, 'name', 'Name');
+            const indexResponse = await client.createTableIndex({
+              TableName: tableName,
+              IndexName: indexName || undefined,
+              Columns: columns,
+              Unique: getBoolean(index, 'unique', 'Unique') ?? false,
+            });
+            results.push({
+              step: 'createTableIndex',
+              tableName,
+              indexName: indexName || columns.join('_'),
+              response: indexResponse,
+            });
+            if (indexResponse.Code !== 1) {
+              return textResult(JSON.stringify({
+                ok: false,
+                failedAt: 'createTableIndex',
+                tableName,
+                index,
+                response: indexResponse,
+                results,
+              }, null, 2), true);
             }
           }
         }

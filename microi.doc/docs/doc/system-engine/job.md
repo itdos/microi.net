@@ -52,10 +52,41 @@ return { Code: 1, Data: { JobRunId: runId } };
 
 ## 后台按钮
 
-长耗时菜单按钮设置 `RunBackground/BackgroundTask/IsBackgroundTask=true` 并绑定 `ApiEngineKey`。接口通过 `V8.Method.UpdateBackgroundTask` 上报进度；进度保存在共享存储，不只放当前节点内存。
+以下任一条件成立时按后台任务设计：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用、总量未知且可能持续运行，或属于安装、初始化、批量导入/生成、全量同步、迁移、备份。
+
+长耗时菜单按钮设置 `RunBackground/BackgroundTask/IsBackgroundTask=true` 并绑定 `ApiEngineKey`。`BackgroundTaskOptions` 至少配置稳定 `IdempotencyKey`；需要串行执行的 DDL/安装配置 `ConcurrencyKey`；关联业务数据时配置 `BusinessTable/BusinessId/BusinessStatusField/BusinessTaskIdField`，业务记录至少写“后台处理中”和任务 Id，用户即可去通知中心查看详情。
+
+按钮提交成功后，前端通过当前用户正常的 `V8.FormEngine` 权限写入上述状态；通用后台服务不会按客户端传入的任意表名/字段名直接写库。接口引擎需要在完成、失败或取消补偿路径更新业务记录的最终状态。专用无人值守任务应在接口引擎中固定表名和字段名，不能把任意写库权限交给请求参数。
+
+接口通过 `V8.Method.UpdateBackgroundTask({Current,Total,Msg})` 上报已提交的真实工作量。平台根据采样吞吐计算预计结束时间并标记可信度：
+
+- 已知总量：百分比只由 `Current/Total` 推导。
+- 未知总量：不要传 `Total=100`，界面显示“不定进度/积累真实样本后估算”。
+- 失败或取消：停在最后真实进度，只有最终成功显示 100%。
+- SignalR 仅负责实时推送，页面会轮询共享数据库兜底。
+
+预计超过 10 分钟的任务必须分片。每片在短事务内提交一批，仍有后续时返回 `Data.BackgroundTask`：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    BackgroundTask: {
+      HasMore: true,
+      Checkpoint: { LastId: lastId },
+      Current: committedCount,
+      Total: totalCount,
+      NextDelaySeconds: 1,
+      Msg: '本批已提交，等待下一批'
+    }
+  }
+};
+```
+
+平台持久化 checkpoint 后重新入队；最后一片返回普通 `Code:1`。节点异常时租约过期后由其它节点恢复，旧节点的写入由 fencing token 和业务唯一约束拒绝。
 
 ## 最低验收
 
-至少启动两个节点连接同一数据库/Redis，覆盖：同时到点、重复投递、锁持有者中途退出、Redis 短暂故障、写入后响应前重启和滚动升级。最终断言业务副作用仅一次、无永久死锁、未完成任务可恢复。
+至少启动两个节点连接同一数据库/Redis，覆盖：同时到点、重复投递、锁持有者中途退出、Redis 短暂故障、写入后响应前重启和滚动升级。最终断言业务副作用仅一次、无永久死锁、未完成任务可恢复，并核对通知中心的真实分子/分母、ETA、日志以及失败/取消不显示 100%。
 
 完整规范见 `microi.skills/job-engine/SKILL.md` 与[平台安全与兼容基线](../more/security)。
