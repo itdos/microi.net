@@ -1360,6 +1360,10 @@
 							key: 'visits',
 							field: 'KehuID',
 							value: this.detail.Id,
+							defaultValues: {
+								KehuID: this.detail.Id,
+								KehuMC: this.detail.KehuMC
+							},
 							icon: icon('business/baifang.png')
 						},
 						{
