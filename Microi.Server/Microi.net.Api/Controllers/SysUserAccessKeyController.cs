@@ -25,6 +25,7 @@ namespace Microi.net.Api
             public string Name { get; set; }
             public List<string> Scopes { get; set; }
             public List<string> AllowedRoutes { get; set; }
+            public string RedirectPath { get; set; }
             public List<string> AllowedTableNames { get; set; }
             public List<string> AllowedApiEngineKeys { get; set; }
             public List<string> AllowedDataSourceKeys { get; set; }
@@ -120,6 +121,7 @@ namespace Microi.net.Api
                     request.Name,
                     request.Scopes,
                     request.AllowedRoutes,
+                    request.RedirectPath,
                     request.AllowedTableNames,
                     request.AllowedApiEngineKeys,
                     request.AllowedDataSourceKeys,

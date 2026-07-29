@@ -25,6 +25,7 @@ namespace Microi.net
         public const int DefaultExpiryDays = 90;
         public const int MaxExpiryDays = 365;
         public const int ExchangeAttemptsPerMinute = 30;
+        public const string ScopeWildcard = "*";
 
         private static readonly string[] SessionFieldNames =
         {
@@ -111,6 +112,9 @@ namespace Microi.net
         {
             var value = (route ?? "").Trim();
             if (value.DosIsNullOrWhiteSpace()) return "";
+            // `/*` was emitted by the first access-key UI when users entered
+            // `*`; keep it as a compatibility alias and canonicalize to `*`.
+            if (value == ScopeWildcard || value == "/*") return ScopeWildcard;
             if (Uri.TryCreate(value, UriKind.Absolute, out var absolute))
             {
                 value = absolute.Fragment?.TrimStart('#') ?? "";
@@ -127,6 +131,29 @@ namespace Microi.net
             return value;
         }
 
+        public static string ResolveRedirectPath(
+            IEnumerable<string> allowedRoutes,
+            string requestedRedirect)
+        {
+            var routes = (allowedRoutes ?? Array.Empty<string>())
+                .Select(NormalizeRoute)
+                .Where(route => !route.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (routes.Length == 0) return "";
+
+            var requested = NormalizeRoute(requestedRedirect);
+            var requestedIsSafe = !requested.DosIsNullOrWhiteSpace()
+                                  && requested != ScopeWildcard
+                                  && !requested.Equals("/login", StringComparison.OrdinalIgnoreCase)
+                                  && !requested.Equals("/access-login", StringComparison.OrdinalIgnoreCase);
+            if (routes.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase))
+                return requestedIsSafe ? requested : "/";
+            if (requestedIsSafe && routes.Contains(requested, StringComparer.OrdinalIgnoreCase))
+                return requested;
+            return routes.FirstOrDefault(route => route != ScopeWildcard) ?? "";
+        }
+
         public static bool HasScope(JObject currentUser, string scope)
         {
             return !scope.DosIsNullOrWhiteSpace()
@@ -138,10 +165,12 @@ namespace Microi.net
         {
             if (!IsSession(currentUser)) return true;
             var normalized = NormalizeRoute(route);
+            var allowedRoutes = ParseStringList(currentUser["_AccessKeyAllowedRoutes"])
+                .Select(NormalizeRoute)
+                .ToArray();
             return !normalized.DosIsNullOrWhiteSpace()
-                   && ParseStringList(currentUser["_AccessKeyAllowedRoutes"])
-                       .Select(NormalizeRoute)
-                       .Contains(normalized, StringComparer.OrdinalIgnoreCase);
+                   && (allowedRoutes.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                       || allowedRoutes.Contains(normalized, StringComparer.OrdinalIgnoreCase));
         }
 
         public static bool IsTableOperationAllowed(
@@ -153,8 +182,9 @@ namespace Microi.net
             if (!IsSession(currentUser)) return true;
             var requiredScope = isExport ? "form:export" : isRead ? "form:read" : "form:write";
             if (!HasScope(currentUser, requiredScope)) return false;
-            return ParseStringList(currentUser["_AccessKeyAllowedTableNames"])
-                .Contains((tableName ?? "").Trim(), StringComparer.OrdinalIgnoreCase);
+            var allowedTables = ParseStringList(currentUser["_AccessKeyAllowedTableNames"]);
+            return allowedTables.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                   || allowedTables.Contains((tableName ?? "").Trim(), StringComparer.OrdinalIgnoreCase);
         }
 
         public static bool IsApiEngineAllowed(JObject currentUser, string apiEngineKey)
@@ -205,7 +235,19 @@ namespace Microi.net
             }
             if (path.StartsWith("/api/hdfs/", StringComparison.Ordinal))
             {
-                return HasScope(currentUser, "file:read");
+                if (!HasScope(currentUser, "file:read")) return false;
+
+                // file:read is deliberately an exact read-only facade. Never
+                // authorize Upload/Save/Delete/Move/MinioSync merely because
+                // they share the HDFS controller prefix.
+                var readActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "/api/hdfs/mallfileurl",
+                    "/api/hdfs/getprivatefileurl",
+                    "/api/hdfs/getofficefilemeta",
+                    "/api/hdfs/openprivatefile"
+                };
+                return readActions.Contains(path);
             }
             return false;
         }
@@ -415,6 +457,7 @@ namespace Microi.net
             string name,
             IEnumerable<string> scopes,
             IEnumerable<string> allowedRoutes,
+            string redirectPath,
             IEnumerable<string> allowedTableNames,
             IEnumerable<string> allowedApiEngineKeys,
             IEnumerable<string> allowedDataSourceKeys,
@@ -460,6 +503,42 @@ namespace Microi.net
                 return new DosResult(0, null, "至少需要指定一个允许访问的页面路由。");
             if (routes.Any(route => route.Length > 500))
                 return new DosResult(0, null, "页面路由不能超过500个字符。");
+
+            var normalizedRedirectPath = UserAccessKeySecurity.ResolveRedirectPath(routes, redirectPath);
+            if (normalizedRedirectPath.DosIsNullOrWhiteSpace())
+                return new DosResult(0, null, "登录后打开的页面不在允许页面范围内。");
+
+            var tableNames = (allowedTableNames ?? Array.Empty<string>())
+                .Where(item => !item.DosIsNullOrWhiteSpace())
+                .Select(item => item.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (tableNames.Length == 0)
+                return new DosResult(0, null, "至少需要指定一个允许读取的数据范围。");
+            if (tableNames.Any(item => item.Length > 200))
+                return new DosResult(0, null, "数据表名不能超过200个字符。");
+
+            var apiEngineKeys = (allowedApiEngineKeys ?? Array.Empty<string>())
+                .Where(item => !item.DosIsNullOrWhiteSpace())
+                .Select(item => item.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var dataSourceKeys = (allowedDataSourceKeys ?? Array.Empty<string>())
+                .Where(item => !item.DosIsNullOrWhiteSpace())
+                .Select(item => item.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            if (apiEngineKeys.Contains(UserAccessKeySecurity.ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                || dataSourceKeys.Contains(UserAccessKeySecurity.ScopeWildcard, StringComparer.OrdinalIgnoreCase))
+            {
+                return new DosResult(0, null, "接口引擎和数据源引擎必须使用准确 Key，不支持全部放行。");
+            }
+            if (normalizedScopes.Contains("api-engine:run", StringComparer.OrdinalIgnoreCase)
+                && apiEngineKeys.Length == 0)
+                return new DosResult(0, null, "启用接口引擎权限时至少需要选择一个接口引擎 Key。");
+            if (normalizedScopes.Contains("data-source:run", StringComparer.OrdinalIgnoreCase)
+                && dataSourceKeys.Length == 0)
+                return new DosResult(0, null, "启用数据源引擎权限时至少需要选择一个数据源引擎 Key。");
 
             var expiry = DateTime.Now.AddDays(UserAccessKeySecurity.DefaultExpiryDays);
             if (!permanent && !expiresAt.DosIsNullOrWhiteSpace()
@@ -525,9 +604,9 @@ namespace Microi.net
                     ["SecretHash"] = UserAccessKeySecurity.HashCredential(generated.Credential),
                     ["Scopes"] = UserAccessKeySecurity.SerializeStringList(normalizedScopes),
                     ["AllowedRoutes"] = UserAccessKeySecurity.SerializeStringList(routes),
-                    ["AllowedTableNames"] = UserAccessKeySecurity.SerializeStringList(allowedTableNames),
-                    ["AllowedApiEngineKeys"] = UserAccessKeySecurity.SerializeStringList(allowedApiEngineKeys),
-                    ["AllowedDataSourceKeys"] = UserAccessKeySecurity.SerializeStringList(allowedDataSourceKeys),
+                    ["AllowedTableNames"] = UserAccessKeySecurity.SerializeStringList(tableNames),
+                    ["AllowedApiEngineKeys"] = UserAccessKeySecurity.SerializeStringList(apiEngineKeys),
+                    ["AllowedDataSourceKeys"] = UserAccessKeySecurity.SerializeStringList(dataSourceKeys),
                     ["ExpiresAt"] = permanent
                         ? JValue.CreateNull()
                         : new JValue(expiry.ToString("yyyy-MM-dd HH:mm:ss")),
@@ -552,7 +631,7 @@ namespace Microi.net
                         LoginPath = "/#/access-login?access_key="
                                     + Uri.EscapeDataString(generated.Credential)
                                     + "&redirect="
-                                    + Uri.EscapeDataString(routes[0]),
+                                    + Uri.EscapeDataString(normalizedRedirectPath),
                         Record = ToPublicRow(row)
                     }, "访问密钥创建成功。明文仅本次返回，请立即妥善保存。")
                     : new DosResult(addResult.Code, null, addResult.Msg);
@@ -805,9 +884,7 @@ namespace Microi.net
 
             var allowedRouteValues = UserAccessKeySecurity.ParseStringList(
                 (JToken)scopedUser.Data["_AccessKeyAllowedRoutes"]);
-            var redirectPath = allowedRouteValues
-                .Select(route => UserAccessKeySecurity.NormalizeRoute(route))
-                .FirstOrDefault();
+            var redirectPath = UserAccessKeySecurity.ResolveRedirectPath(allowedRouteValues, null);
             return new DosResult(
                 1,
                 scopedUser.Data,

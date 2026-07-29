@@ -100,6 +100,9 @@ namespace Microi.net
                 {
                     validation.RemainingNonTemplateUsers,
                     validation.RemainingAppPhysicalTables,
+                    validation.RemainingApplicationPhysicalTables,
+                    validation.RemainingApplicationTableDefinitions,
+                    validation.RemainingApplicationFieldDefinitions,
                     validation.RemainingAppApiEngines,
                     validation.RemainingAppTableDefinitions,
                     validation.RemainingAppFieldDefinitions,
@@ -171,6 +174,13 @@ namespace Microi.net
                     ZipSize = primaryPackage.ZipSize,
                     PublishedTableCount = exportResult.TableCount,
                     PublishedRowCount = exportResult.RowCount,
+                    PublishedNonEmptyTableCount = exportResult.TableRowCounts.Count(item => item.Value > 0),
+                    TableRowRanking = exportResult.TableRowCounts
+                        .Where(item => item.Value > 0)
+                        .OrderByDescending(item => item.Value)
+                        .ThenBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+                        .Select(item => new { TableName = item.Key, RowCount = item.Value })
+                        .ToList(),
                     RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers,
                     RemainingAppArtifacts = validation.RemainingAppArtifacts,
                     PlatformServiceCount = validation.PlatformServiceCount,
@@ -251,15 +261,26 @@ namespace Microi.net
                 throw new InvalidOperationException("主库不是 MySql，已拒绝执行。");
             }
 
-            var builder = new MySqlConnectionStringBuilder(OsClientDefault.OsClientDbConn)
-            {
-                AllowUserVariables = true
-            };
+            var builder = BuildSourceConnectionStringBuilder(OsClientDefault.OsClientDbConn);
             if (!string.Equals(builder.Database, RequiredSourceDatabase, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("主库连接必须明确指向 itdos，已拒绝执行。");
             }
             return builder;
+        }
+
+        private static MySqlConnectionStringBuilder BuildSourceConnectionStringBuilder(string connectionString)
+        {
+            var normalized = Dos.ORM.ConnectionStringCompatibility.Normalize(
+                Dos.ORM.DatabaseType.MySql,
+                connectionString,
+                OsClientDefault.MaxPoolSize,
+                OsClientDefault.ConnectionLifetime,
+                600);
+            return new MySqlConnectionStringBuilder(normalized)
+            {
+                AllowUserVariables = true
+            };
         }
 
         private static void ValidateSanitizationSql(string sql)
@@ -466,6 +487,7 @@ namespace Microi.net
         {
             using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
             var tables = GetBaseTables(connection, TargetDatabase);
+            var removableApplicationTables = GetRemovableApplicationTableNames(sourceBuilder);
             var requiredTables = new[]
             {
                 "sys_user", "sys_menu", "sys_apiengine", "diy_table", "diy_field", "sys_microistore"
@@ -485,6 +507,15 @@ SELECT COUNT(*) FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_TYPE = 'BASE TABLE'
   AND LEFT(LOWER(TABLE_NAME), 4) = 'app_';"),
+                RemainingApplicationPhysicalTables = tables.LongCount(removableApplicationTables.Contains),
+                RemainingApplicationTableDefinitions = CountMatchingTableNames(
+                    connection,
+                    "SELECT `Name` FROM `diy_table`;",
+                    removableApplicationTables),
+                RemainingApplicationFieldDefinitions = CountMatchingTableNames(
+                    connection,
+                    "SELECT DISTINCT `TableName` FROM `diy_field` WHERE COALESCE(`TableName`, '') <> '';",
+                    removableApplicationTables),
                 RemainingAppApiEngines = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_apiengine`
 WHERE LEFT(LOWER(COALESCE(`ApiEngineKey`, '')), 4) = 'app_'
@@ -498,11 +529,7 @@ WHERE LEFT(LOWER(COALESCE(`TableName`, '')), 4) = 'app_';"),
                 RemainingAiStoreApps = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
 WHERE LOWER(COALESCE(`AppKey`, '')) <> 'microi-platform-service'
-  AND (
-    COALESCE(`PublisherType`, '') = 'AI应用'
-    OR COALESCE(`AppType`, '') = 'AI应用'
-    OR COALESCE(`ApplicationType`, '') IN ('UniApp', 'Web', 'MicroService')
-  );"),
+  AND UPPER(COALESCE(NULLIF(TRIM(`ApplicationType`), ''), NULLIF(TRIM(`AppType`), ''), '')) <> 'PLATFORM';"),
                 PlatformServiceCount = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
 WHERE `AppKey` = 'microi-platform-service';")
@@ -561,6 +588,18 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             {
                 violations.Add($"app_ 物理表={validation.RemainingAppPhysicalTables}");
             }
+            if (validation.RemainingApplicationPhysicalTables > 0)
+            {
+                violations.Add($"应用包业务物理表={validation.RemainingApplicationPhysicalTables}");
+            }
+            if (validation.RemainingApplicationTableDefinitions > 0)
+            {
+                violations.Add($"应用包业务表定义={validation.RemainingApplicationTableDefinitions}");
+            }
+            if (validation.RemainingApplicationFieldDefinitions > 0)
+            {
+                violations.Add($"应用包业务字段定义={validation.RemainingApplicationFieldDefinitions}");
+            }
             if (validation.RemainingAppApiEngines > 0)
             {
                 violations.Add($"app_ 接口引擎={validation.RemainingAppApiEngines}");
@@ -575,7 +614,7 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             }
             if (validation.RemainingAiStoreApps > 0)
             {
-                violations.Add($"AI 应用商城记录={validation.RemainingAiStoreApps}");
+                violations.Add($"非平台应用商城记录={validation.RemainingAiStoreApps}");
             }
             if (validation.RemainingLegacyAiRows > 0)
             {
@@ -609,12 +648,169 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
 
+        private static long CountMatchingTableNames(
+            MySqlConnection connection,
+            string sql,
+            ISet<string> expectedNames)
+        {
+            long count = 0;
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = 0;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (!reader.IsDBNull(0) && expectedNames.Contains(reader.GetString(0))) count++;
+            }
+            return count;
+        }
+
+        private static HashSet<string> GetRemovableApplicationTableNames(
+            MySqlConnectionStringBuilder sourceBuilder)
+        {
+            using var connection = OpenConnection(sourceBuilder);
+            var packageTablesByStoreId = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var platformTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var applicationTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT `Id`, `AppKey`, `ApplicationType`, `AppType`, `AppPakcet`
+FROM `sys_microistore`;";
+                command.CommandTimeout = 0;
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var storeId = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                    var appKey = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    var applicationType = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                    var appType = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                    var packageText = reader.IsDBNull(4) ? "" : reader.GetString(4);
+                    var tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(packageText))
+                    {
+                        try
+                        {
+                            CollectPackageTableNames(JToken.Parse(packageText), tables);
+                        }
+                        catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is FormatException)
+                        {
+                            throw new InvalidOperationException(
+                                $"应用商城记录 {storeId} 的 AppPakcet 不是合法 JSON，无法安全判断空库清理范围。",
+                                ex);
+                        }
+                    }
+                    if (!string.IsNullOrWhiteSpace(storeId)) packageTablesByStoreId[storeId] = tables;
+                    var isPlatform = string.Equals(appKey, "microi-platform-service", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(applicationType, "Platform", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(appType, "Platform", StringComparison.OrdinalIgnoreCase);
+                    (isPlatform ? platformTables : applicationTables).UnionWith(tables);
+                }
+            }
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT m.`StoreId`, COALESCE(NULLIF(m.`DiyTableName`, ''), t.`Name`) AS `TableName`
+FROM `sys_menu` m
+LEFT JOIN `diy_table` t ON t.`Id` = m.`DiyTableId`
+WHERE COALESCE(m.`StoreId`, '') <> '';";
+                command.CommandTimeout = 0;
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var storeId = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                    var tableName = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    if (packageTablesByStoreId.TryGetValue(storeId, out var tables))
+                    {
+                        AddSafeTableName(tables, tableName);
+                    }
+                }
+            }
+
+            // Menu-linked names are added after the first classification pass, so classify once more.
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT `Id`, `AppKey`, `ApplicationType`, `AppType`
+FROM `sys_microistore`;";
+                command.CommandTimeout = 0;
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    var storeId = reader.IsDBNull(0) ? "" : reader.GetString(0);
+                    if (!packageTablesByStoreId.TryGetValue(storeId, out var tables)) continue;
+                    var appKey = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                    var applicationType = reader.IsDBNull(2) ? "" : reader.GetString(2);
+                    var appType = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                    var isPlatform = string.Equals(appKey, "microi-platform-service", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(applicationType, "Platform", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(appType, "Platform", StringComparison.OrdinalIgnoreCase);
+                    (isPlatform ? platformTables : applicationTables).UnionWith(tables);
+                }
+            }
+
+            applicationTables.ExceptWith(platformTables);
+            return applicationTables;
+        }
+
+        private static void CollectPackageTableNames(JToken token, ISet<string> tables)
+        {
+            if (token is JObject obj)
+            {
+                foreach (var property in obj.Properties())
+                {
+                    if (string.Equals(property.Name, "TableName", StringComparison.OrdinalIgnoreCase)
+                        && property.Value.Type == JTokenType.String)
+                    {
+                        AddSafeTableName(tables, property.Value.ToString());
+                    }
+                    if (string.Equals(property.Name, "DiyTables", StringComparison.OrdinalIgnoreCase)
+                        && property.Value is JArray diyTables)
+                    {
+                        foreach (var table in diyTables.OfType<JObject>())
+                        {
+                            AddSafeTableName(tables, table["Name"]?.ToString());
+                        }
+                    }
+                    if (string.Equals(property.Name, "DDL", StringComparison.OrdinalIgnoreCase)
+                        && property.Value.Type == JTokenType.String)
+                    {
+                        foreach (Match match in Regex.Matches(
+                                     property.Value.ToString(),
+                                     @"\bCREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+[`""']?([A-Za-z0-9_]+)",
+                                     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                        {
+                            AddSafeTableName(tables, match.Groups[1].Value);
+                        }
+                    }
+                    CollectPackageTableNames(property.Value, tables);
+                }
+                return;
+            }
+            if (token is JArray array)
+            {
+                foreach (var item in array) CollectPackageTableNames(item, tables);
+            }
+        }
+
+        private static void AddSafeTableName(ISet<string> tables, string value)
+        {
+            var tableName = (value ?? "").Trim().Trim('`', '"');
+            if (Regex.IsMatch(tableName, @"^[A-Za-z0-9_]+$", RegexOptions.CultureInvariant))
+            {
+                tables.Add(tableName);
+            }
+        }
+
         private ExportResult ExportDatabase(MySqlConnectionStringBuilder sourceBuilder, string sqlPath)
         {
             var targetBuilder = WithDatabase(sourceBuilder, TargetDatabase);
             using var connection = OpenConnection(targetBuilder);
             var tables = GetBaseTables(connection, TargetDatabase);
             long rowCount = 0;
+            var tableRowCounts = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             using var writer = new StreamWriter(sqlPath, false, new UTF8Encoding(false), 1024 * 1024);
             writer.WriteLine("-- Microi 吾码脱敏空数据库");
             writer.WriteLine("-- Generated: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
@@ -634,7 +830,13 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
                 if (columns.Count > 0)
                 {
                     var columnDataTypes = GetColumnDataTypes(connection, TargetDatabase, table, columns);
-                    rowCount += ExportTableRows(connection, writer, table, columns, columnDataTypes);
+                    var tableRowCount = ExportTableRows(connection, writer, table, columns, columnDataTypes);
+                    rowCount += tableRowCount;
+                    tableRowCounts[table] = tableRowCount;
+                }
+                else
+                {
+                    tableRowCounts[table] = 0;
                 }
                 if (index == tables.Count || index % 20 == 0)
                 {
@@ -645,7 +847,12 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
 
             writer.WriteLine("SET FOREIGN_KEY_CHECKS=1;");
             writer.Flush();
-            return new ExportResult { TableCount = tables.Count, RowCount = rowCount };
+            return new ExportResult
+            {
+                TableCount = tables.Count,
+                RowCount = rowCount,
+                TableRowCounts = tableRowCounts
+            };
         }
 
         private static long ExportTableRows(MySqlConnection connection, TextWriter writer, string table,
@@ -1022,6 +1229,8 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
         {
             public int TableCount { get; set; }
             public long RowCount { get; set; }
+            public IReadOnlyDictionary<string, long> TableRowCounts { get; set; }
+                = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         }
 
         private sealed class ReleasePackageArtifact
@@ -1042,6 +1251,9 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
         {
             public long RemainingNonTemplateUsers { get; set; }
             public long RemainingAppPhysicalTables { get; set; }
+            public long RemainingApplicationPhysicalTables { get; set; }
+            public long RemainingApplicationTableDefinitions { get; set; }
+            public long RemainingApplicationFieldDefinitions { get; set; }
             public long RemainingAppApiEngines { get; set; }
             public long RemainingAppTableDefinitions { get; set; }
             public long RemainingAppFieldDefinitions { get; set; }
@@ -1052,10 +1264,10 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
             public long PlatformServiceSourceFileCount { get; set; }
 
             public long RemainingAppArtifacts =>
-                RemainingAppPhysicalTables
+                RemainingApplicationPhysicalTables
                 + RemainingAppApiEngines
-                + RemainingAppTableDefinitions
-                + RemainingAppFieldDefinitions
+                + RemainingApplicationTableDefinitions
+                + RemainingApplicationFieldDefinitions
                 + RemainingAiStoreApps
                 + RemainingLegacyAiRows;
         }

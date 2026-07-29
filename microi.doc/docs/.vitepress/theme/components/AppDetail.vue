@@ -138,6 +138,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
 import { withPreviewVersion } from '../utils/app-preview-url.js'
+import { buildApplicationLaunchUrl } from '../utils/uniapp-preview-mode.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
 
 const route = useRoute()
@@ -429,7 +430,8 @@ async function recordView() {
 
 function openPreview() {
   if (!versionedPreviewUrl.value) return
-  window.open(versionedPreviewUrl.value, '_blank', 'noopener,noreferrer')
+  const launchUrl = buildApplicationLaunchUrl(app.value, versionedPreviewUrl.value, window)
+  window.open(launchUrl, '_blank', 'noopener,noreferrer')
 }
 
 function typeLabel(value) {

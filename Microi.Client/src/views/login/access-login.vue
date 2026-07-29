@@ -21,6 +21,11 @@ import { useRoute, useRouter } from "vue-router";
 import { CircleCheckFilled, Loading, WarningFilled } from "@element-plus/icons-vue";
 import { useDiyStore, useUserStore } from "@/pinia";
 import { DiyCommon } from "@/utils/microi.net.import";
+import {
+    isAccessRouteAllowed,
+    isWildcardAccessScope,
+    normalizeAccessRoute
+} from "@/views/system/components/user-access-key-utils";
 
 const route = useRoute();
 const router = useRouter();
@@ -54,20 +59,28 @@ function scrubAccessKeyFromAddressBar() {
     }
 }
 
-function normalizeRoutePath(value) {
-    let path = String(value || "").trim();
-    if (!path) return "";
-    try {
-        path = decodeURIComponent(path);
-    } catch (_) {}
-    if (!path.startsWith("/")) path = "/" + path;
-    path = path.split("?")[0].replace(/\/+$/, "") || "/";
-    return path;
+function withTimeout(promise, timeoutMs) {
+    return new Promise((resolve, reject) => {
+        const timer = window.setTimeout(
+            () => reject(new Error("访问密钥验证超时，请检查租户参数或 API 服务。")),
+            timeoutMs
+        );
+        Promise.resolve(promise).then(
+            (value) => {
+                window.clearTimeout(timer);
+                resolve(value);
+            },
+            (error) => {
+                window.clearTimeout(timer);
+                reject(error);
+            }
+        );
+    });
 }
 
 onMounted(async () => {
     const accessKey = String(route.query.access_key || route.query.secret || "").trim();
-    const requestedRedirect = normalizeRoutePath(route.query.redirect);
+    const requestedRedirect = normalizeAccessRoute(route.query.redirect);
     scrubAccessKeyFromAddressBar();
     if (!accessKey) {
         state.value = "error";
@@ -75,17 +88,28 @@ onMounted(async () => {
         return;
     }
 
+    const osClient = String(
+        DiyCommon.GetOsClient()
+        || new URLSearchParams(window.location.search).get("OsClient")
+        || ""
+    ).trim();
+    if (!osClient) {
+        state.value = "error";
+        message.value = "自动登录链接缺少 OsClient 租户参数，请重新生成链接。";
+        return;
+    }
+
     try {
-        const result = await DiyCommon.PostAsync(
+        const result = await withTimeout(DiyCommon.PostAsync(
             "/api/SysUserAccessKey/Exchange",
             {
                 AccessKey: accessKey,
-                OsClient: DiyCommon.GetOsClient()
+                OsClient: osClient
             },
             null,
             null,
             "json"
-        );
+        ), 20000);
         if (result?.Code !== 1 || !result.Data) {
             state.value = "error";
             message.value = result?.Msg || "访问密钥无效、已过期或已被吊销。";
@@ -96,12 +120,13 @@ onMounted(async () => {
         diyStore.setCurrentUser(result.Data);
         userStore.setRoles(["access-key"]);
         const allowedRoutes = Array.isArray(result.Data._AccessKeyAllowedRoutes)
-            ? result.Data._AccessKeyAllowedRoutes.map(normalizeRoutePath)
+            ? result.Data._AccessKeyAllowedRoutes.map(normalizeAccessRoute).filter(Boolean)
             : [];
-        const serverRedirect = normalizeRoutePath(result.DataAppend?.RedirectPath);
-        const destination = allowedRoutes.includes(requestedRedirect)
+        const serverRedirect = normalizeAccessRoute(result.DataAppend?.RedirectPath);
+        const allowAllPages = isWildcardAccessScope(allowedRoutes);
+        const destination = requestedRedirect && isAccessRouteAllowed(allowedRoutes, requestedRedirect)
             ? requestedRedirect
-            : serverRedirect || allowedRoutes[0];
+            : serverRedirect || (allowAllPages ? "/" : allowedRoutes[0]);
         if (!destination) {
             state.value = "error";
             message.value = "该访问密钥没有配置可访问页面。";

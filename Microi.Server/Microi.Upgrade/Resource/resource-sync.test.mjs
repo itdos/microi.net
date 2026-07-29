@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import test from 'node:test';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   canonicalizeResource,
   isTemporaryOfficialResourceFailure,
   mergeJavascriptResource,
   mergeJsonResource,
+  validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
 import {
@@ -16,7 +18,11 @@ import {
   getEmbeddedEngineSource,
   mergeApplicationStoreReplicas,
 } from './application-store-replica-sync.mjs';
-import { validateItDosMcpServer } from './mcp-resource-publisher.mjs';
+import {
+  findItDosMcpServer,
+  resolveItDosMcpLaunch,
+  validateItDosMcpServer,
+} from './mcp-resource-publisher.mjs';
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const refreshSource = await readFile(resolve(testDirectory, 'refresh-resources.mjs'), 'utf8');
@@ -187,6 +193,54 @@ test('JS 同一代码行冲突时阻止发布', async () => {
   );
 });
 
+test('官网停留共同基线时允许本地新版进入三方合并并向前发布', async () => {
+  const baseAndRemote = engineSource(
+    'import-microi-store-package',
+    'v1.7.3',
+    'var readiness = "PRUNE_ASSET_IDS_WITH_DELFORM_V1";\nreturn readiness;',
+  );
+  const local = baseAndRemote
+    .replace('Version: v1.7.3', 'Version: v1.7.4')
+    .replace(
+      'return readiness;',
+      'var bootstrap = "BACKGROUND_TASK_BOOTSTRAP_READINESS_V1";\nreturn readiness + bootstrap;',
+    );
+
+  assert.doesNotThrow(() => validateReadableOfficialResource('import-package.js', baseAndRemote));
+  const merged = await mergeJavascriptResource(
+    'import-package.js',
+    baseAndRemote,
+    local,
+    baseAndRemote,
+  );
+  assert.equal(merged, canonicalizeResource('import-package.js', local));
+  assert.match(merged, /Version: v1\.7\.4/);
+  assert.match(merged, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
+});
+
+test('官网读取门只校验稳定身份和可解析性，不把旧版本误判为网络故障', () => {
+  assert.doesNotThrow(() => validateReadableOfficialResource(
+    'ai-app-publish-store.js',
+    engineSource('ai_app_publish_store', 'v1.0.0', 'return { Code: 1 };'),
+  ));
+  assert.doesNotThrow(() => validateReadableOfficialResource(
+    'app.microi.store.json',
+    JSON.stringify({ PackageInfo: { Name: '应用商城', Version: 'v1.0.0' } }),
+  ));
+  assert.throws(
+    () => validateReadableOfficialResource('import-package.js', '/* missing identity */'),
+    /缺少稳定资源标识/,
+  );
+  assert.throws(
+    () => validateReadableOfficialResource('app.microi.store.json', '{bad json'),
+    /不是有效 JSON/,
+  );
+  assert.throws(
+    () => validateReadableOfficialResource('unknown.js', 'content'),
+    /固定白名单/,
+  );
+});
+
 test('应用商城逻辑副本自动消除同版本同正文的说明文字误冲突', async () => {
   const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
   const builder = engineSource('ai_app_build', 'v1.0.0', 'return { Code: 1 };');
@@ -299,10 +353,12 @@ test('ai-app-build 保持本地事实源并同步写入官网商城包内嵌副�
   assert.equal(getEmbeddedEngineSource(merged.packageContent, 'ai_app_build'), localBuilder);
 });
 
-test('商城包写回时可使用更高的当前发布版本自动推进 PackageInfo.Version', () => {
+test('商城包写回时优先使用更高正式版本，否则独立递增包补丁版本', () => {
   assert.equal(choosePublishablePackageVersion('v6.6.1', 'v6.6.1', '6.7.4'), 'v6.7.4');
   assert.equal(choosePublishablePackageVersion('v6.7.5', 'v6.6.1', '6.7.4'), 'v6.7.5');
-  assert.equal(choosePublishablePackageVersion('v6.6.1', 'v6.7.4', '6.7.4'), null);
+  assert.equal(choosePublishablePackageVersion('v6.8.0', 'v6.8.0', '6.7.9'), 'v6.8.1');
+  assert.equal(choosePublishablePackageVersion('v6.6.1', 'v6.7.4', '6.7.4'), 'v6.7.5');
+  assert.equal(choosePublishablePackageVersion('v6.6.1', 'not-semver', '6.7.4'), null);
 });
 
 test('资源规范化统一换行和 JSON 缩进', () => {
@@ -338,10 +394,12 @@ test('后端发布前强制执行官网三方同步和发布后回读', () => {
   assert.match(refreshSource, /发布后回读与合并结果不一致，未推进共同基线/);
   assert.match(refreshSource, /ExpectedRemoteSha256/);
   assert.match(refreshSource, /PackageInfo\.Version 自动提升为/);
-  assert.match(refreshSource, /当前发布版本[\s\S]*?均未高于官网/);
+  assert.match(refreshSource, /无法根据包版本[\s\S]*?生成更高的语义版本/);
   assert.match(refreshSource, /未写入官网、未修改本地资源、未推进共同基线/);
   assert.match(refreshSource, /publishResourcesViaConfiguredMcp/);
   assert.match(refreshSource, /MICROI_UPGRADE_RESOURCE_TOKEN/);
+  assert.match(refreshSource, /validateReadableOfficialResource\(name, content\)/);
+  assert.match(refreshSource, /validateReleaseCandidate\(name, content\)/);
 });
 
 test('无显式 Token 时只允许复用绑定官方 iTdos 的 MCP', () => {
@@ -359,6 +417,58 @@ test('无显式 Token 时只允许复用绑定官方 iTdos 的 MCP', () => {
   assert.throws(
     () => validateItDosMcpServer({ ...valid, env: { ...valid.env, MICROI_OS_CLIENT: 'other' } }),
     /未绑定 iTdos 租户/,
+  );
+});
+
+test('官网 MCP 发布器在插件升级后自动改用最新可用入口和当前 Node', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'microi-mcp-launch-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const extensionsRoot = join(root, 'extensions');
+  const oldEntry = join(extensionsRoot, 'microi.v8-engine-4.2.9', 'dist', 'mcp-server.js');
+  const currentExtensionRoot = join(extensionsRoot, 'microi.v8-engine-4.10.0');
+  const currentEntry = join(currentExtensionRoot, 'dist', 'mcp-server.js');
+  await mkdir(dirname(currentEntry), { recursive: true });
+  await writeFile(currentEntry, '/* test MCP server */\n', 'utf8');
+
+  const server = {
+    type: 'stdio',
+    command: 'C:\\old-editor\\Code.exe',
+    args: [oldEntry],
+    cwd: dirname(dirname(oldEntry)),
+    env: {
+      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_OS_CLIENT: 'itdos',
+      MICROI_TOKEN_FILE: join(root, 'token.json'),
+    },
+  };
+  const configPath = join(root, '.mcp.json');
+  await writeFile(configPath, JSON.stringify({ mcpServers: { microi_itdos: server } }), 'utf8');
+
+  const launch = await resolveItDosMcpLaunch(server, configPath);
+  assert.equal(launch.command, process.execPath);
+  assert.equal(launch.args[0], currentEntry);
+  assert.equal(launch.cwd, currentExtensionRoot);
+  assert.equal(launch.launchSource, 'newest-installed-extension');
+  assert.equal(launch.env.MICROI_TOKEN_FILE, server.env.MICROI_TOKEN_FILE);
+
+  const found = await findItDosMcpServer(root, configPath);
+  assert.equal(found.path, configPath);
+  assert.equal(found.server.args[0], currentEntry);
+});
+
+test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'microi-mcp-missing-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const configPath = join(root, '.mcp.json');
+  const server = {
+    type: 'stdio',
+    command: 'missing-editor',
+    args: [join(root, 'extensions', 'microi.v8-engine-9.9.9', 'dist', 'other-server.js')],
+    env: { MICROI_API_URL: 'https://api.itdos.com', MICROI_OS_CLIENT: 'itdos' },
+  };
+  await assert.rejects(
+    resolveItDosMcpLaunch(server, configPath),
+    /args 中缺少 mcp-server\.js/,
   );
 });
 

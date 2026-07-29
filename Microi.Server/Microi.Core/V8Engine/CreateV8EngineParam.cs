@@ -13,11 +13,21 @@ namespace Microi.net
         public static int MaxLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_MEMORY_MB", "V8Limits:MaxLimitMemoryMB", 4096);
         public static int DefaultLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_RECURSION", "V8Limits:DefaultLimitRecursion", 2000);
         public static int MaxLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_RECURSION", "V8Limits:MaxLimitRecursion", 5000);
+        public static int DefaultCallTreeLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_CALL_TREE_LIMIT_MEMORY_MB", "V8Limits:CallTreeLimitMemoryMB", 8192);
+        public static int MaxCallTreeLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_CALL_TREE_LIMIT_MEMORY_MB", "V8Limits:MaxCallTreeLimitMemoryMB", 32768);
+        public static int DefaultNestedApiDepth => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_NESTED_API_DEPTH", "V8Limits:NestedApiDepth", 32);
+        public static int MaxNestedApiDepth => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_NESTED_API_DEPTH", "V8Limits:MaxNestedApiDepth", 64);
+        public static bool DefaultIsolateNestedApiMemory => ConfigHelper.GetEnvOrConfigurationBool(
+            "MICROI_V8_ISOLATE_NESTED_API_MEMORY",
+            "V8Limits:IsolateNestedApiMemory",
+            true);
 
         public int MaxTimeoutSeconds { get; set; } = MaxTimeout;
         public int MaxStatementsLimitValue { get; set; } = MaxStatementsLimit;
         public int MaxLimitMemoryMB { get; set; } = MaxLimitMemory;
         public int MaxLimitRecursionDepth { get; set; } = MaxLimitRecursion;
+        public int MaxCallTreeLimitMemoryMB { get; set; } = MaxCallTreeLimitMemory;
+        public int MaxNestedApiDepthValue { get; set; } = MaxNestedApiDepth;
 
         /// <summary>
         /// V8/Jint script timeout in seconds.
@@ -39,6 +49,23 @@ namespace Microi.net
         /// </summary>
         public int LimitRecursion { get; set; } = DefaultLimitRecursion;
 
+        /// <summary>
+        /// Cumulative allocation budget for the whole nested V8/API call tree, in MB.
+        /// Individual engines still use <see cref="LimitMemory"/> as their own budget.
+        /// </summary>
+        public int CallTreeLimitMemory { get; set; } = DefaultCallTreeLimitMemory;
+
+        /// <summary>
+        /// Maximum V8 nesting depth for one logical invocation tree. The root is depth 1.
+        /// </summary>
+        public int NestedApiDepth { get; set; } = DefaultNestedApiDepth;
+
+        /// <summary>
+        /// Prevents child interface engines from being charged repeatedly to every parent
+        /// engine's individual allocation budget. The root call-tree budget remains active.
+        /// </summary>
+        public bool IsolateNestedApiMemory { get; set; } = DefaultIsolateNestedApiMemory;
+
         public static CreateV8EngineParam FromSysConfig(object sysConfig)
         {
             var param = new CreateV8EngineParam();
@@ -58,11 +85,19 @@ namespace Microi.net
             MaxStatementsLimitValue = NormalizeMaxLimit(GetConfigInt(sysConfig, MaxStatementsLimitValue, "V8MaxStatements"), MaxStatementsLimitValue, MaxStatementsLimit);
             MaxLimitMemoryMB = NormalizeMaxLimit(GetConfigInt(sysConfig, MaxLimitMemoryMB, "V8MaxLimitMemoryMB", "V8MaxLimitMemory"), MaxLimitMemoryMB, MaxLimitMemory);
             MaxLimitRecursionDepth = NormalizeMaxLimit(GetConfigInt(sysConfig, MaxLimitRecursionDepth, "V8MaxLimitRecursion"), MaxLimitRecursionDepth, MaxLimitRecursion);
+            MaxCallTreeLimitMemoryMB = NormalizeMaxLimit(GetConfigInt(sysConfig, MaxCallTreeLimitMemoryMB, "V8MaxCallTreeLimitMemoryMB", "V8MaxCallTreeLimitMemory"), MaxCallTreeLimitMemoryMB, MaxCallTreeLimitMemory);
+            MaxNestedApiDepthValue = NormalizeMaxLimit(GetConfigInt(sysConfig, MaxNestedApiDepthValue, "V8MaxNestedApiDepth"), MaxNestedApiDepthValue, MaxNestedApiDepth);
 
             Timeout = ClampPositive(GetConfigInt(sysConfig, Timeout, "V8DefaultTimeoutSeconds"), Timeout, MaxTimeoutSeconds);
             MaxStatements = ClampPositive(GetConfigInt(sysConfig, MaxStatements, "V8DefaultMaxStatements"), MaxStatements, MaxStatementsLimitValue);
             LimitMemory = ClampPositive(GetConfigInt(sysConfig, LimitMemory, "V8DefaultLimitMemoryMB", "V8DefaultLimitMemory"), LimitMemory, MaxLimitMemoryMB);
             LimitRecursion = ClampPositive(GetConfigInt(sysConfig, LimitRecursion, "V8DefaultLimitRecursion"), LimitRecursion, MaxLimitRecursionDepth);
+            CallTreeLimitMemory = ClampPositive(GetConfigInt(sysConfig, CallTreeLimitMemory, "V8CallTreeLimitMemoryMB", "V8CallTreeLimitMemory"), CallTreeLimitMemory, MaxCallTreeLimitMemoryMB);
+            NestedApiDepth = ClampPositive(GetConfigInt(sysConfig, NestedApiDepth, "V8NestedApiDepth"), NestedApiDepth, MaxNestedApiDepthValue);
+            IsolateNestedApiMemory = DynamicHelper.GetDynamicBoolValue(
+                sysConfig,
+                "V8IsolateNestedApiMemory",
+                IsolateNestedApiMemory);
 
             Normalize();
         }
@@ -73,6 +108,8 @@ namespace Microi.net
             MaxStatements = NormalizeMaxStatementsValue(MaxStatements);
             LimitMemory = NormalizeLimitMemoryValue(LimitMemory);
             LimitRecursion = NormalizeLimitRecursionValue(LimitRecursion);
+            CallTreeLimitMemory = NormalizeCallTreeLimitMemoryValue(CallTreeLimitMemory);
+            NestedApiDepth = NormalizeNestedApiDepthValue(NestedApiDepth);
         }
 
         public int NormalizeTimeoutValue(int value)
@@ -93,6 +130,17 @@ namespace Microi.net
         public int NormalizeLimitRecursionValue(int value)
         {
             return ClampPositive(value, LimitRecursion, MaxLimitRecursionDepth);
+        }
+
+        public int NormalizeCallTreeLimitMemoryValue(int value)
+        {
+            var normalized = ClampPositive(value, CallTreeLimitMemory, MaxCallTreeLimitMemoryMB);
+            return Math.Max(LimitMemory, normalized);
+        }
+
+        public int NormalizeNestedApiDepthValue(int value)
+        {
+            return ClampPositive(value, NestedApiDepth, MaxNestedApiDepthValue);
         }
 
         public static int NormalizeTimeout(int value)

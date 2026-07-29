@@ -355,9 +355,9 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 
 - 组件路径为 `@/views/form-engine/diy-components/diy-data-permission-designer.vue`，名称为 `DiyDataPermissionDesigner`；旧 `SqlJoin/JoinTables` 字段只隐藏，不删除、不改物理列。
 - 设计器只保留【可见范围 / 关联关系】两个 Tab：桌面端左侧展示图形配置，右侧固定展示实时 SQL；可见范围右侧的单个代码编辑器展示最终 `SqlWhere`，关联关系右侧的只读代码编辑器展示 `SqlJoin`，窄屏才回落为上下布局。禁止重新加入“原始值”Tab，以及“重新读取 / 应用到表单 / 从原始值反推 / 同步原始值”等手工同步按钮。
-- 图形配置变化后应防抖并自动写回 `SqlWhere / SqlJoin / JoinTables`，用户只需保存模块。历史手写 SQL 默认进入高级手写模式；切回自动生成前必须先整体保留旧条件，禁止短暂生成 `1 = 0` 或扩大权限。
-- 自动生成的最终 `SqlWhere` 使用带固定前缀 `-- 【权限说明】` 的单行中文注释，就近解释外层括号、租户隔离、AND/OR 组合、超级管理员、普通用户范围、全量角色/岗位/部门、图形条件、历史条件和闭合括号；不得再生成整段 `/* ... */` 说明。后端还要兼容剥离历史 `-- 【吾码权限说明】`。图形配置的 Base64 marker 只用于机器无损恢复，使用首行 `-- MICROI_DATA_PERMISSION_V1:...` 并确保后面立即换行，设计器不得展示 marker；后端执行前只剥离这些平台专用注释，用户手写注释必须保留。`SqlJoin` 继续保存 JOIN，`JoinTables` 继续保存关联表 JSON，后端协议不变。
-- 有 marker 的配置必须无损回显；没有 marker 的历史手写 SQL 只能原样保留或安全解析提示，禁止把识别片段重新拼成多个 OR 而扩大数据范围。
+- 图形配置变化后应防抖并自动写回 `SqlWhere / SqlJoin / JoinTables`，用户只需保存模块。最终 `SqlWhere` 代码编辑器始终允许手动编辑，不设置“自动生成 / 高级手写”模式开关；只有左侧图形配置变化时才重新生成并覆盖右侧正文，直接手写时以编辑器正文为准。历史手写 SQL 原样进入编辑器，禁止自动拆解成多个 OR 或短暂生成 `1 = 0`。
+- 自动生成的最终 `SqlWhere` 使用带固定前缀 `-- 【权限说明】` 的单行中文注释，就近解释外层括号、租户隔离、AND/OR 组合、超级管理员、普通用户范围、全量角色/岗位/部门、图形条件和闭合括号；不得再生成整段 `/* ... */` 说明。后端还要兼容剥离历史 `-- 【吾码权限说明】`。图形配置使用首行紧凑明文 JSON `-- MICROI_DATA_PERMISSION_CONFIG:{...}` 恢复，省略默认值且不重复保存 `SqlJoin/JoinTables`；旧 `-- MICROI_DATA_PERMISSION_V1:...` Base64 marker 只读兼容、不再生成，设计器不得展示 marker。后端执行前只剥离这些平台专用注释，用户手写注释必须保留。`SqlJoin` 继续保存 JOIN，`JoinTables` 继续保存关联表 JSON，后端协议不变。
+- 有新旧 marker 的配置必须无损回显；没有 marker 的历史手写 SQL 只能原样保留或安全解析字段提示。标准表单对 `CodeEditor` 使用的 `_CodeEditorTransport` 必须由 FormEngine 控制器在进入业务逻辑前统一解码，数据库只保存明文；非法批次不得产生部分解码。
 - 角色、岗位、部门属于查看者放行规则；本人、本人和下级、部门范围属于行范围。超级管理员默认放行，但启用 TenantId 隔离时也不能跨租户。所有表名、别名和字段名生成前做标识符白名单，固定值转义单引号。
 - 官方 `microi_itdos` 与开发租户更新 `diy_field` 后都要刷新 `sys_menu` 表/字段缓存并回读 `Component/Visible/AppVisible/Config`；应用商城资源同步修改 `Microi.Upgrade/Resource/app.microi.module-engine.json`。
 - 官方文档：`microi.doc/docs/doc/v8-engine/v8-client.md`。
@@ -534,9 +534,11 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 
 ## 浏览器访问密钥路由
 
-- 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，链接格式为 `/#/access-login?access_key=...&redirect=...`。
-- 管理入口同时保留在“系统管理 → 用户管理”的用户行操作和用户编辑表单中；创建表单支持 90 天、自定义到期和永久三种有效期，永久记录以空 `ExpiresAt` 表示并显示为“永久”。
+- 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，链接格式为 `/?OsClient={当前租户}#/access-login?access_key=...&redirect=...`。生成器只复制当前 `OsClient`，不能把其它页面查询参数带进凭据链接。
+- 管理入口是【系统账号】（`/#/mic-sys-user`）：该路由当前由通用 `form-engine/diy-table.vue` 承载，不能只修改旧的专用用户组件。表格和默认卡片视图都必须把【访问密钥】作为帐号行/卡片的直接按钮显示，不能藏入【更多】，也不能要求用户先进入编辑表单。创建表单支持 90 天、自定义到期和永久三种有效期，永久记录以空 `ExpiresAt` 表示并显示为“永久”。
 - 页面必须先把密钥保存在局部变量，再立即从地址栏清除；不得写入 Cookie、localStorage、sessionStorage、Pinia 或控制台。
 - 兑换通过 `POST /api/SysUserAccessKey/Exchange` 的 JSON Body 完成。响应头中的短期 Token 继续交给平台统一请求层保存和轮换。
-- `_AccessKeySession=true` 时不加载普通动态菜单；前端守卫只允许 `_AccessKeyAllowedRoutes` 中的准确路径。该前端限制只是体验和泄露面收窄，服务端仍必须校验 API、表和引擎权限。
+- 创建界面默认按页面名称勾选，也支持粘贴完整页面网址自动解析；不能要求普通用户手写路由和物理表名。页面/数据均可选择“全部已授权”，内部值为 `*`，含义只是取消密钥层二次白名单，仍与目标帐号实时菜单、表单和行权限取交集。接口引擎与数据源引擎 Key 仍必须准确选择。
+- `_AccessKeySession=true` 且页面为准确白名单时只允许清单路径；页面范围为 `*` 时才加载目标帐号实时可用的动态路由，以便全部已授权菜单可访问。该前端限制只是体验和泄露面收窄，服务端仍必须校验 API、表和引擎权限。
+- `/access-login` 必须在普通 SSO 发现之前直接放行，兑换最多等待 20 秒并给出明确错误，不能让页面永久停在“正在自动登录”。
 - 历史 `?token=` 只作兼容：解析后立即清除参数，不输出、不持久化完整 Token，不为新功能生成这种链接。

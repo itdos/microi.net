@@ -8,6 +8,7 @@ import {
   canonicalizeResource,
   isTemporaryOfficialResourceFailure,
   mergeResource,
+  validateReadableOfficialResource,
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
 import {
@@ -36,7 +37,7 @@ const publishEndpoint = process.env.MICROI_UPGRADE_RESOURCE_PUBLISH_API
 const outputDirectory = dirname(fileURLToPath(import.meta.url));
 const baseDirectory = resolve(outputDirectory, '.resource-sync-base');
 
-function validate(name, content) {
+function validateReleaseCandidate(name, content) {
   if (!content.trim()) throw new Error(`${name} 内容为空`);
   if (name === 'import-package.js') {
     if (!content.includes('import-microi-store-package')) {
@@ -46,7 +47,7 @@ function validate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_006_006
+    if (versionNumber < 1_007_004
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -62,8 +63,9 @@ function validate(name, content) {
       || !content.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
       || !content.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')
       || !content.includes('DB_RUNTIME_BUILD_ASSETS_V1')
-      || !content.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')) {
-      throw new Error(`${name} 低于 v1.6.6 或缺少断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
+      || !content.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')
+      || !content.includes('BACKGROUND_TASK_BOOTSTRAP_READINESS_V1')) {
+      throw new Error(`${name} 低于 v1.7.4 或缺少后台任务基础包完整回读、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -161,11 +163,12 @@ function validate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_006_006
+        || importerVersionNumber < 1_007_004
         || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
         || !importerCode.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')
         || !importerCode.includes('DB_RUNTIME_BUILD_ASSETS_V1')
-        || !importerCode.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')) {
+        || !importerCode.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')
+        || !importerCode.includes('BACKGROUND_TASK_BOOTSTRAP_READINESS_V1')) {
         throw new Error(`${name} 版本过旧，或缺少统一商城及严格 SourceZip/BuildZip 资产边界能力`);
       }
     }
@@ -184,10 +187,15 @@ async function download(name) {
   const content = typeof payload.Data.Content === 'string'
     ? payload.Data.Content
     : `${JSON.stringify(payload.Data.Content, null, 2)}\n`;
-  validate(name, content);
+  validateReadableOfficialResource(name, content);
+  const downloadedSha256 = createHash('sha256').update(content, 'utf8').digest('hex');
+  const reportedSha256 = String(payload.Data.Sha256 || '').toLowerCase();
+  if (reportedSha256 && reportedSha256 !== downloadedSha256) {
+    throw new Error(`${name} 官网返回内容与 Sha256 不一致`);
+  }
   return {
     content: canonicalizeResource(name, content),
-    sha256: String(payload.Data.Sha256 || createHash('sha256').update(content, 'utf8').digest('hex')).toLowerCase(),
+    sha256: reportedSha256 || downloadedSha256,
     appVersion: String(payload.Data.AppVersion || ''),
   };
 }
@@ -309,7 +317,7 @@ if (process.argv.includes('--synchronize-local')) {
     ['ai-app-build.js', builderSource],
   ]);
   const synchronized = synchronizeApplicationStoreEngines(packageContent, standaloneContents);
-  validate('app.microi.store.json', synchronized);
+  validateReleaseCandidate('app.microi.store.json', synchronized);
   await writeFile(packagePath, synchronized, 'utf8');
   printResource('app.microi.store.json', synchronized, '同步本地副本');
 } else {
@@ -323,7 +331,7 @@ if (process.argv.includes('--synchronize-local')) {
     const rawLocalContent = await readFile(resolve(outputDirectory, name), 'utf8');
     rawLocalResources.set(name, rawLocalContent);
     const localContent = canonicalizeResource(name, rawLocalContent);
-    validate(name, localContent);
+    validateReleaseCandidate(name, localContent);
     localResources.set(name, localContent);
     const baseContent = await readOptional(resolve(baseDirectory, name));
     if (baseContent !== null) {
@@ -463,7 +471,7 @@ if (process.argv.includes('--synchronize-local')) {
         );
         if (!selectedVersion) {
           throw new Error(
-            `${name} 内容需要写回官网，但包版本 ${packageVersion || '(空)'}、当前发布版本 ${currentReleaseVersion || '(未找到)'} 均未高于官网 ${remoteVersion}；请先提升正式发布版本`,
+            `${name} 内容需要写回官网，但无法根据包版本 ${packageVersion || '(空)'}、当前发布版本 ${currentReleaseVersion || '(未找到)'} 和官网版本 ${remoteVersion} 生成更高的语义版本`,
           );
         }
         packageModel.PackageInfo.Version = selectedVersion;
@@ -477,7 +485,7 @@ if (process.argv.includes('--synchronize-local')) {
   const remoteChanges = [];
   for (const name of resourceNames) {
     const content = canonicalizeResource(name, mergedResources.get(name));
-    validate(name, content);
+    validateReleaseCandidate(name, content);
     mergedResources.set(name, content);
     if (rawLocalResources.get(name) !== content) {
       await writeFile(resolve(outputDirectory, name), content, 'utf8');

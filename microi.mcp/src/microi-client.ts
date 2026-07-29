@@ -9,7 +9,7 @@ import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-in
 import { prepareV8VersionedCode } from './v8-version.js';
 
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
-const NO_LOGIN_CODE = 1001;
+const AUTH_FAILURE_CODES = new Set([1001, 1002]);
 const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
 XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
@@ -22,11 +22,17 @@ export interface MicroiConfig {
   username: string;
   password: string;
   osClient?: string;
+  /** SaaS tenant type used to disambiguate profiles sharing the same API and OsClient. */
+  osClientType?: string;
+  /** SaaS tenant network used to disambiguate profiles sharing the same API, OsClient and type. */
+  osClientNetwork?: string;
   rsaPublicKey?: string;
   /** 直接传入已有 Token（跳过帐号密码登录，适用于需要验证码的服务器） */
   token?: string;
   /** Token 文件路径（VS Code 扩展写入；MCP 自身刷新时也会回写以保持同步） */
   tokenFilePath?: string;
+  /** MCP 仅写入无密恢复请求；VS Code 扩展使用 SecretStorage 中的凭据完成重登。 */
+  authRecoveryRequestDir?: string;
   /** 普通 HTTP 请求超时，默认 120 秒 */
   requestTimeoutMs?: number;
   /** V8 代码、菜单等写请求超时，默认 60 秒 */
@@ -35,12 +41,74 @@ export interface MicroiConfig {
   readbackRequestTimeoutMs?: number;
 }
 
+/**
+ * Return token-file keys from the most specific tenant identity to legacy keys.
+ * New writers use api|os|type|network, while readers keep accepting the older
+ * api|os|type, api|os and api layouts during migration.
+ */
+export function buildTokenFileLookupKeys(
+  apiBaseUrl: string,
+  osClient = '',
+  osClientType = '',
+  osClientNetwork = '',
+): string[] {
+  const apiUrl = String(apiBaseUrl || '').replace(/\/+$/, '');
+  const tenant = String(osClient || '').trim();
+  const tenantType = String(osClientType || '').trim();
+  const tenantNetwork = String(osClientNetwork || '').trim();
+  const keys: string[] = [];
+
+  if (tenant && (tenantType || tenantNetwork)) {
+    keys.push(`${apiUrl}|${tenant}|${tenantType}|${tenantNetwork}`);
+  }
+  if (tenant && tenantType) {
+    keys.push(`${apiUrl}|${tenant}|${tenantType}`);
+  }
+  if (tenant) {
+    keys.push(`${apiUrl}|${tenant}`);
+  }
+  keys.push(apiUrl);
+  return Array.from(new Set(keys.filter(Boolean)));
+}
+
 export interface ApiResponse<T = unknown> {
   Code: number;
   Data: T;
   Msg: string;
   Total?: number;
   DataCount?: number;
+  DataAppend?: {
+    ReasonCode?: string;
+    UserMessage?: string;
+    Hint?: string;
+    AppendMsg?: string;
+    [key: string]: unknown;
+  };
+}
+
+export function isTenantConfigurationFailureResponse(result?: Partial<ApiResponse> | null): boolean {
+  const reasonCode = String(result?.DataAppend?.ReasonCode || '').trim();
+  if (/^(InvalidTenant|InvalidOsClient|TenantNotFound|TenantDisabled)$/i.test(reasonCode)) {
+    return true;
+  }
+  const message = [result?.Msg, result?.DataAppend?.UserMessage, result?.DataAppend?.Hint]
+    .filter(Boolean)
+    .join(' ');
+  return /无效的租户标识|租户不存在|租户.*未启用|invalid\s+(tenant|osclient)|tenant\s+not\s+found|unknown\s+tenant/i.test(message);
+}
+
+export function isAuthenticationFailureResponse(result?: Partial<ApiResponse> | null): boolean {
+  if (!result || isTenantConfigurationFailureResponse(result)) { return false; }
+  if (AUTH_FAILURE_CODES.has(Number(result.Code))) { return true; }
+
+  const reasonCode = String(result.DataAppend?.ReasonCode || '').trim();
+  if (/^(MissingToken|MalformedToken|MissingClaims|TenantMismatch|AuthVersionChanged|JwtExpired|SessionExpired|SessionMissing|TokenReplaced|SignatureMismatch)$/i.test(reasonCode)) {
+    return true;
+  }
+  const message = [result.Msg, result.DataAppend?.UserMessage, result.DataAppend?.AppendMsg]
+    .filter(Boolean)
+    .join(' ');
+  return /Token签名|Token.*(无效|失效|过期)|登录.*(无效|失效|过期)|invalid\s*token|token\s*invalid|signature\s*mismatch/i.test(message);
 }
 
 export interface ListEnvelope<T> {
@@ -260,6 +328,44 @@ export interface MongodbLogWrite {
   appId?: string;
 }
 
+export interface UserAccessKeyRecord {
+  Id: string;
+  Name?: string;
+  KeyPrefix?: string;
+  Scopes?: string;
+  AllowedRoutes?: string;
+  AllowedTableNames?: string;
+  AllowedApiEngineKeys?: string;
+  AllowedDataSourceKeys?: string;
+  ExpiresAt?: string | null;
+  State?: number;
+  RevokedAt?: string;
+  LastUsedAt?: string;
+  LastUsedDid?: string;
+  UseCount?: number;
+  Remark?: string;
+  CreateTime?: string;
+}
+
+export interface CreateUserAccessKeyInput {
+  name: string;
+  scopes?: string[];
+  allowedRoutes: string[];
+  redirectPath?: string;
+  allowedTableNames: string[];
+  allowedApiEngineKeys?: string[];
+  allowedDataSourceKeys?: string[];
+  expiresAt?: string;
+  remark?: string;
+}
+
+export interface CreateUserAccessKeyResult {
+  /** Plaintext credential. The backend returns it exactly once. */
+  AccessKey: string;
+  LoginPath?: string;
+  Record?: UserAccessKeyRecord;
+}
+
 export interface PlaywrightEngineInfo {
   Id: string;
   ApiName: string;
@@ -323,6 +429,8 @@ export class MicroiClient {
   private readonly readbackRequestTimeoutMs: number;
   /** 同一时刻只允许一个刷新请求在飞 */
   private inflightRefresh?: Promise<boolean>;
+  /** 同一时刻只允许一条完整身份恢复链路，避免并发重登或重复写恢复请求。 */
+  private inflightAuthRecovery?: Promise<boolean>;
 
   constructor(config: MicroiConfig) {
     this.config = config;
@@ -481,9 +589,13 @@ export class MicroiClient {
     if (!filePath) return false;
     try {
       const tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, string>;
-      const apiUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
-      const osClient = this.config.osClient || '';
-      const fileToken = osClient ? tokens[`${apiUrl}|${osClient}`] : tokens[apiUrl];
+      const lookupKeys = buildTokenFileLookupKeys(
+        this.config.apiBaseUrl,
+        this.config.osClient,
+        this.config.osClientType,
+        this.config.osClientNetwork,
+      );
+      const fileToken = lookupKeys.map(key => tokens[key]).find(Boolean);
       const normalizedFileToken = normalizeAuthorizationToken(fileToken);
       if (normalizedFileToken && normalizedFileToken !== this.token) {
         this.token = normalizedFileToken;
@@ -502,13 +614,14 @@ export class MicroiClient {
       try {
         tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, string>;
       } catch { /* file may not exist yet */ }
-      const apiUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
-      const osClient = this.config.osClient || '';
-      if (osClient) {
-        tokens[`${apiUrl}|${osClient}`] = this.token;
-      } else {
-        tokens[apiUrl] = this.token;
-      }
+      const [tokenKey] = buildTokenFileLookupKeys(
+        this.config.apiBaseUrl,
+        this.config.osClient,
+        this.config.osClientType,
+        this.config.osClientNetwork,
+      );
+      if (!tokenKey) return;
+      tokens[tokenKey] = this.token;
       const dir = path.dirname(filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(filePath, JSON.stringify(tokens, null, 2), { encoding: 'utf-8', mode: 0o600 });
@@ -517,13 +630,69 @@ export class MicroiClient {
     }
   }
 
-  /** 检测是否是 token 失效响应（Code=1001 NoLogin），若是则尝试恢复 token。
+  private async requestVsCodeCredentialRecovery(failedToken: string): Promise<boolean> {
+    const recoveryDir = this.config.authRecoveryRequestDir;
+    const tokenFilePath = this.config.tokenFilePath;
+    if (!recoveryDir || !tokenFilePath) { return false; }
+
+    try {
+      if (!fs.existsSync(recoveryDir)) fs.mkdirSync(recoveryDir, { recursive: true });
+      const apiBaseUrl = this.config.apiBaseUrl.replace(/\/+$/, '');
+      const osClient = this.config.osClient || '';
+      const osClientType = this.config.osClientType || '';
+      const osClientNetwork = this.config.osClientNetwork || '';
+      const identity = `${apiBaseUrl}|${osClient}|${osClientType}|${osClientNetwork}`;
+      // 同一租户可能被多个编辑器/MCP 进程同时使用。请求文件必须唯一，
+      // 避免 Windows 上 rename 覆盖既有文件失败而让其中一个进程失去恢复机会。
+      const identityHash = crypto.createHash('sha256').update(identity).digest('hex').slice(0, 24);
+      const fileName = `${identityHash}-${process.pid}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.json`;
+      const requestPath = path.join(recoveryDir, fileName);
+      const tempPath = `${requestPath}.${process.pid}.tmp`;
+      const payload = {
+        version: 1,
+        apiBaseUrl,
+        osClient,
+        osClientType,
+        osClientNetwork,
+        requestedAt: Date.now(),
+        failedTokenHash: crypto.createHash('sha256').update(failedToken || '').digest('hex'),
+      };
+      fs.writeFileSync(tempPath, JSON.stringify(payload), { encoding: 'utf-8', mode: 0o600 });
+      fs.renameSync(tempPath, requestPath);
+
+      // 扩展宿主每秒处理恢复请求；这里只等待 token 文件出现不同值，不读取任何密码。
+      for (let attempt = 0; attempt < 40; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        if (this.reloadTokenFromFile()) {
+          console.error('[microi-mcp] Token recovered by VS Code SecretStorage broker');
+          return true;
+        }
+      }
+    } catch (e) {
+      console.error('[microi-mcp] VS Code credential recovery request failed:', e);
+    }
+    return false;
+  }
+
+  /** 检测 token 身份失效响应，若是则尝试恢复 token。
    *  恢复策略：1) 重新读取 token 文件（VS Code 扩展可能刚写入新 token）；
    *           2) 若 token 没变化或仍失效，调用 RefreshToken API 主动刷新；
-   *           3) 仍失败则用 username/password 重新登录（兜底）。
+   *           3) 仍失败且 MCP 独立配置了凭据时重新登录；
+   *           4) VS Code 托管模式写入无密请求，由扩展通过 SecretStorage 重登。
    *  返回 true 表示 token 已更新，调用方可重试请求。
    */
   private async tryRecoverFromAuthFailure(): Promise<boolean> {
+    if (this.inflightAuthRecovery) { return this.inflightAuthRecovery; }
+    this.inflightAuthRecovery = this.tryRecoverFromAuthFailureCore();
+    try {
+      return await this.inflightAuthRecovery;
+    } finally {
+      this.inflightAuthRecovery = undefined;
+    }
+  }
+
+  private async tryRecoverFromAuthFailureCore(): Promise<boolean> {
+    const failedToken = this.token;
     // 1. 先尝试读文件，可能 VS Code 已经刷过了
     if (this.reloadTokenFromFile()) {
       console.error('[microi-mcp] Token reloaded from file after auth failure');
@@ -531,22 +700,23 @@ export class MicroiClient {
     }
     // 2. 主动刷新
     if (await this.refreshTokenNow()) return true;
-    // 3. 兜底：用账号密码重新登录
+    // 3. 独立 MCP 配置的兜底：用账号密码重新登录
     if (this.config.username && this.config.password) {
       try {
-        const oldToken = this.token;
         this.token = '';
         await this.login();
-        if (this.token && this.token !== oldToken) {
+        if (this.token && this.token !== failedToken) {
           this.writeTokenToFile();
           console.error('[microi-mcp] Re-logged in after auth failure');
           return true;
         }
       } catch (e) {
+        this.token = failedToken;
         console.error('[microi-mcp] Re-login failed:', e);
       }
     }
-    return false;
+    // 4. VS Code 托管模式：请求扩展宿主使用 SecretStorage 重登。
+    return this.requestVsCodeCredentialRecovery(failedToken);
   }
 
   /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
@@ -643,9 +813,9 @@ export class MicroiClient {
       throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
     }
 
-    // Microi 用 Code=1001 表达"登录身份已过期"（HTTP 仍是 200）
-    if (parsed?.Code === NO_LOGIN_CODE && allowRetryOnAuthFailure) {
-      console.error(`[microi-mcp] Auth expired (Code=${NO_LOGIN_CODE}: ${parsed.Msg || ''}), attempting recovery...`);
+    // Microi 历史版本可能用 Code=1001/1002、ReasonCode 或签名失败文本表达身份失效。
+    if (isAuthenticationFailureResponse(parsed) && allowRetryOnAuthFailure) {
+      console.error(`[microi-mcp] Auth expired (Code=${parsed.Code}: ${parsed.Msg || ''}), attempting recovery...`);
       if (await this.tryRecoverFromAuthFailure()) {
         return this.requestJson<T>(method, reqPath, body, params, false, options);
       }
@@ -725,6 +895,41 @@ export class MicroiClient {
 
   async getStatus(): Promise<ApiResponse> {
     return this.get(API.GET_STATUS);
+  }
+
+  async listMyUserAccessKeys(): Promise<ApiResponse<UserAccessKeyRecord[]>> {
+    // Deliberately omit TargetUserId: the backend binds the operation to the
+    // authenticated user and prevents an access-key session from managing keys.
+    return this.post<UserAccessKeyRecord[]>(API.LIST_USER_ACCESS_KEYS, {});
+  }
+
+  async createMyUserAccessKey(
+    input: CreateUserAccessKeyInput,
+  ): Promise<ApiResponse<CreateUserAccessKeyResult>> {
+    // Permanent keys are intentionally not exposed through MCP. The backend
+    // applies its bounded default expiry (currently 90 days) when ExpiresAt is absent.
+    return this.post<CreateUserAccessKeyResult>(API.CREATE_USER_ACCESS_KEY, {
+      Name: input.name,
+      Scopes: input.scopes,
+      AllowedRoutes: input.allowedRoutes,
+      RedirectPath: input.redirectPath,
+      AllowedTableNames: input.allowedTableNames,
+      AllowedApiEngineKeys: input.allowedApiEngineKeys,
+      AllowedDataSourceKeys: input.allowedDataSourceKeys,
+      ExpiresAt: input.expiresAt,
+      Remark: input.remark,
+      Permanent: false,
+    }, {
+      timeoutMs: this.writeRequestTimeoutMs,
+      operationName: `创建当前用户访问密钥 ${input.name}`,
+    });
+  }
+
+  async revokeMyUserAccessKey(id: string): Promise<ApiResponse<UserAccessKeyRecord>> {
+    return this.post<UserAccessKeyRecord>(API.REVOKE_USER_ACCESS_KEY, { Id: id }, {
+      timeoutMs: this.writeRequestTimeoutMs,
+      operationName: `吊销当前用户访问密钥 ${id}`,
+    });
   }
 
   async getDbSchema(): Promise<ApiResponse<{ Tables: DbTable[] }>> {
