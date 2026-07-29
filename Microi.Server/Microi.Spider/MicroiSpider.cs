@@ -624,11 +624,9 @@ namespace Microi.net
                 }
 
                 var maxSessionsTotal = GetPositiveConfiguration(
-                    "MICROI_SPIDER_MAX_SESSIONS_TOTAL",
                     "Spider:MaxSessionsTotal",
                     DefaultMaxSessionsTotal);
                 var maxSessionsPerScope = GetPositiveConfiguration(
-                    "MICROI_SPIDER_MAX_SESSIONS_PER_SCOPE",
                     "Spider:MaxSessionsPerScope",
                     DefaultMaxSessionsPerScope);
                 if (_sessions.Count >= maxSessionsTotal)
@@ -1271,12 +1269,10 @@ namespace Microi.net
         }
 
         private static int GetPositiveConfiguration(
-            string environmentKey,
             string configurationPath,
             int defaultValue)
         {
-            return ConfigHelper.GetEnvOrConfigurationInt(
-                environmentKey,
+            return ConfigHelper.GetRuntimeConfigurationInt(
                 configurationPath,
                 defaultValue);
         }
@@ -1285,11 +1281,9 @@ namespace Microi.net
         {
             var now = DateTime.Now;
             var idleMinutes = GetPositiveConfiguration(
-                "MICROI_SPIDER_SESSION_IDLE_MINUTES",
                 "Spider:SessionIdleMinutes",
                 DefaultSessionIdleMinutes);
             var maxHours = GetPositiveConfiguration(
-                "MICROI_SPIDER_SESSION_MAX_HOURS",
                 "Spider:SessionMaxHours",
                 DefaultSessionMaxHours);
 
@@ -1317,7 +1311,7 @@ namespace Microi.net
 
         private static void TraceSpider(string message)
         {
-            if (Environment.GetEnvironmentVariable("MICROI_SPIDER_TRACE") == "1")
+            if (ConfigHelper.GetRuntimeConfigurationBool("Spider:TraceEnabled", false))
             {
                 MicroiEngine.QueueSystemLog(null, "Spider", "Trace", "浏览器自动化调试跟踪", message, 1, true);
             }

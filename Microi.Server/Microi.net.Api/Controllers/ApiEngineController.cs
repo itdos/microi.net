@@ -153,6 +153,50 @@ namespace Microi.net.Api
             param["OsClient"] = routeOsClient;
         }
 
+        private static async Task<DosResult> AuthorizeAccessKeyApiEngineAsync(JObject param)
+        {
+            var currentUser = param?["_CurrentUser"] as JObject;
+            if (!UserAccessKeySecurity.IsSession(currentUser))
+            {
+                return new DosResult(1);
+            }
+
+            var currentToken = await DiyToken.GetCurrentToken().ConfigureAwait(false);
+            var targetOsClient = param?["OsClient"]?.ToString();
+            if (currentToken == null
+                || currentToken.OsClient.DosIsNullOrWhiteSpace()
+                || targetOsClient.DosIsNullOrWhiteSpace()
+                || !string.Equals(
+                    currentToken.OsClient,
+                    targetOsClient,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return new DosResult(0, null, "访问密钥不能跨租户运行接口引擎。");
+            }
+
+            var modelResult = await MicroiEngine.ApiEngine.GetApiEngineModel(
+                    new ApiEngineParam
+                    {
+                        ApiEngineKey = param["ApiEngineKey"]?.ToString(),
+                        ApiKey = param["ApiKey"]?.ToString(),
+                        ApiAddress = param["ApiAddress"]?.ToString(),
+                        OsClient = targetOsClient,
+                        _CurrentUser = currentUser
+                    })
+                .ConfigureAwait(false);
+            if (modelResult.Code != 1 || modelResult.Data == null)
+            {
+                return new DosResult(0, null, "当前访问密钥未授权运行此接口引擎。");
+            }
+
+            var model = modelResult.Data as JObject
+                        ?? JObject.FromObject((object)modelResult.Data);
+            var resolvedKey = model["ApiEngineKey"]?.ToString();
+            return UserAccessKeySecurity.IsApiEngineAllowed(currentUser, resolvedKey)
+                ? new DosResult(1)
+                : new DosResult(0, null, "当前访问密钥未授权运行此接口引擎。");
+        }
+
         private static void XmlToJObject(XElement element, JObject param)
         {
             foreach (var node in element.Nodes())
@@ -435,6 +479,8 @@ namespace Microi.net.Api
             ApplyRouteOsClient(param, osClient);
             apiPath = Regex.Replace(apiPath ?? "", osClientPattern, "");
             param["ApiAddress"] = apiPath;
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
@@ -510,6 +556,8 @@ namespace Microi.net.Api
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
 
             if (result != null && result.GetType().Name == "String")
@@ -563,6 +611,8 @@ namespace Microi.net.Api
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
@@ -634,6 +684,8 @@ namespace Microi.net.Api
 
             #endregion 接口引擎接收文件，将文件流转为byte[]，再转为string
 
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {
@@ -729,6 +781,8 @@ namespace Microi.net.Api
 
             param["ApiAddress"] = apiPath;
 
+            var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
+            if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             try
             {

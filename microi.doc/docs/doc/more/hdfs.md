@@ -25,33 +25,72 @@ Token 只用于确认用户和租户。普通帐号不能因为持有 Token 就�
 
 所有 HTTP、FormEngine、V8 和移动端上传入口共用服务端限制。上传限制分为三层：租户业务配置、平台独立灾难保护上限、HTTP 请求解析上限。前端 `FileUpload` / `ImgUpload` 字段配置只能进一步收紧最终结果。
 
-业务值按 `sys_osclients` 当前租户 → 环境变量 → `appsettings` → 代码默认值取第一项，因此租户可以按业务需要提高或降低 `appsettings` 的默认业务值：
+业务值只按 `sys_osclients` 当前租户 → 代码默认值解析，管理员无需维护额外环境变量或修改 `appsettings.json`：
 
-| 环境变量 | `appsettings` 业务默认值 | 代码默认值 | 租户覆盖字段 |
-|---|---|---:|---|
-| `MICROI_FILE_UPLOAD_ENABLED` | `FileUploadSecurity:UploadEnabled` | `true` | `FileUploadEnabled` |
-| `MICROI_FILE_UPLOAD_MAX_FILE_MB` | `FileUploadSecurity:MaxFileMB` | 100 MB | `FileUploadMaxFileMB` |
-| `MICROI_FILE_UPLOAD_MAX_TOTAL_MB` | `FileUploadSecurity:MaxTotalMB` | 200 MB | `FileUploadMaxRequestMB` |
-| `MICROI_FILE_UPLOAD_MAX_COUNT` | `FileUploadSecurity:MaxFileCount` | 10 | `FileUploadMaxCount` |
-| `MICROI_FILE_UPLOAD_DAILY_USER_QUOTA_MB` | `FileUploadSecurity:DailyUserQuotaMB` | 2048 MB | `FileUploadDailyUserQuotaMB` |
-| `MICROI_FILE_UPLOAD_DAILY_TENANT_QUOTA_MB` | `FileUploadSecurity:DailyTenantQuotaMB` | 20480 MB | `FileUploadDailyTenantQuotaMB` |
+| SaaS 引擎字段 | 代码默认值 |
+|---|---:|
+| `FileUploadEnabled` | `true` |
+| `FileUploadMaxFileMB` | 100 MB |
+| `FileUploadMaxRequestMB` | 200 MB |
+| `FileUploadMaxCount` | 10 |
+| `FileUploadDailyUserQuotaMB` | 2048 MB |
+| `FileUploadDailyTenantQuotaMB` | 20480 MB |
 
-业务值最终再与独立的 `AbsoluteMaxFileMB`（默认 1024 MB）、`AbsoluteMaxTotalMB`（默认 2048 MB）、`AbsoluteMaxFileCount`（默认 100）、`AbsoluteDailyUserQuotaMB` / `AbsoluteDailyTenantQuotaMB`（默认各 10 TB）取较小值。`ForceDisabled=true` 是全局紧急熔断。它们可由对应 `MICROI_FILE_UPLOAD_ABSOLUTE_*` 环境变量或 `appsettings` 运维配置调整，但不接受租户覆盖。
+业务值最终再与平台代码中的固定灾难保护上限取较小值：单文件 1024 MB、单次总量 2048 MB、单次 100 个文件、帐号和租户日额度各 10 TB。这些硬上限不是安装配置项，普通租户不能放大。
 
-Kestrel 的 `MaxRequestBodyMB`、Multipart 的 `MaxMultipartBodyMB` 和表单值的 `MaxFormValueMB` 在进程启动时确定，是所有租户共享的解析硬顶，也不接受 SaaS 运行期放大。若某租户业务上限需要超过默认 256 MB，运维人员必须同步提高反向代理和这些解析上限；租户业务配置仍然负责其自身的最终额度。
+Kestrel HTTP 正文和 Multipart 接收硬顶统一为 2048 MB，普通表单单值硬顶为 128 MB；它们是所有租户共享的安全边界，不要求安装者再配置环境变量。租户业务配置仍负责其自身的最终额度，反向代理还必须允许请求进入 API。
+
+#### nginx 413 与大文件上传
+
+`413 Content Too Large` 如果响应正文是 nginx 的 HTML，表示请求尚未进入吾码 API，SaaS 引擎缓存、HDFS Controller 和全局异常处理都没有机会执行。实际可上传大小是“nginx → Kestrel HTTP → Multipart → 租户单文件/单次额度 → Absolute 灾难保护”各层上限的最小值。禁止只提高 `sys_osclients.FileUploadMaxFileMB`，也禁止用 `client_max_body_size 0` 关闭网关保护。
+
+例如需要支持 1000 MB 文件，应在 **API 域名的 nginx `server` 块**中至少配置：
+
+```nginx
+# 支持1000MB文件，并为multipart封装留出余量
+client_max_body_size 1024m;
+
+# 慢速大文件上传的请求体读取空闲超时
+client_body_timeout 600s;
+
+# 避免 nginx 先把整个大文件重复缓冲到本机磁盘；HDFS/API 仍执行自身校验。
+proxy_request_buffering off;
+
+# 分块请求关闭缓冲时使用HTTP/1.1，并给上游读写保留足够时间
+proxy_http_version 1.1;
+proxy_connect_timeout 60s;
+proxy_send_timeout 600s;
+proxy_read_timeout 600s;
+
+# nginx 自己拒绝的请求无法进入 ASP.NET Core，需在代理层保持吾码 DosResult 合约。
+error_page 413 = @microi_upload_too_large;
+location @microi_upload_too_large {
+    default_type application/json;
+    charset utf-8;
+    add_header Cache-Control "no-store" always;
+    # 跨域部署时，此处必须显式复用正常API代理的CORS白名单/include；不能依赖后端补响应头。
+    return 200 '{"Code":0,"Data":null,"Msg":"上传请求在进入吾码 HDFS 前已超过反向代理请求体上限。SaaS 引擎上传额度不能放大 nginx/Kestrel/Multipart 上限；请运维同步提高各层上限后重试。","DataAppend":{"ErrorType":"UploadRequestTooLarge","Layer":"ReverseProxy"}}';
+}
+```
+
+这些 `proxy_*` 指令可放在 API 域名的 `server` 层供代理 `location` 继承，也可合并进现有的 `location ^~ /`；不要新建第二个重复 location。`proxy_request_buffering off` 只关闭 nginx 预缓冲，不能用响应方向的 `proxy_buffering off` 代替，也不会绕过 API/HDFS 校验。
+
+修改 nginx 后先执行 `nginx -t`，成功后再 reload。吾码 API 已内置 2048 MB HTTP/Multipart 接收硬顶；无需增加上传相关环境变量。最终仍不能突破平台固定的单文件 1024 MB、单次总量 2048 MB 灾难保护上限。若前面还有 CDN、WAF、负载均衡或 Ingress，还要同步检查这些上游的请求体和空闲超时限制。
+
+请求进入吾码 API 后，如果 Kestrel 或 Multipart 再触发超限，全局异常处理会返回 HTTP 200、`Code=0`、`DataAppend.ErrorType=UploadRequestTooLarge`，并在响应头给出 `X-Microi-Upload-Max-Request-MB` 与 `X-Microi-Upload-Max-Multipart-MB`，方便定位实际生效的 API 启动配置。
 
 Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
 
 | SaaS 引擎字段 | 作用 | 空值行为 |
 |---|---|---|
-| `FileUploadEnabled` | 是否允许当前租户交互式上传 | 继续向环境变量、`appsettings`、代码默认值回退 |
-| `FileUploadMaxFileMB` | 单文件大小 | 继续向环境变量、`appsettings`、代码默认值回退 |
-| `FileUploadMaxRequestMB` | 单次全部文件大小 | 继续向环境变量、`appsettings`、代码默认值回退 |
-| `FileUploadMaxCount` | 单次文件数量 | 继续向环境变量、`appsettings`、代码默认值回退 |
+| `FileUploadEnabled` | 是否允许当前租户交互式上传 | 使用代码默认值 |
+| `FileUploadMaxFileMB` | 单文件大小 | 使用代码默认值 |
+| `FileUploadMaxRequestMB` | 单次全部文件大小 | 使用代码默认值 |
+| `FileUploadMaxCount` | 单次文件数量 | 使用代码默认值 |
 | `FileUploadDailyUserQuotaMB` | 单帐号每日额度 | 使用平台默认额度 |
 | `FileUploadDailyTenantQuotaMB` | 单租户每日额度 | 使用平台默认额度 |
 
-租户配置可以高于 `appsettings` 的业务默认值，但不能突破独立 `Absolute*`、HTTP/Multipart/Form 解析上限以及反向代理限制。`FileUploadEnabled=0` 表示停止该租户的交互式上传，而不是关闭安全检查；平台内部受控任务仍受平台灾难保护上限。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
+租户配置可以高于代码业务默认值，但不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`FileUploadEnabled=0` 表示停止该租户的交互式上传，而不是关闭安全检查；平台内部受控任务仍受平台灾难保护上限。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
 
 帐号与租户额度使用共享 Redis 原子预留，适用于多 API 节点；Redis 不可用时上传失败关闭，不会降级成无限上传。额度按 UTC 日期统计，为避免并发重试绕过限制，上传后续失败也不退回已预留额度。反向代理、Ingress/IIS 还应设置不高于平台配置的请求体限制。
 
@@ -75,7 +114,38 @@ Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
 }
 ```
 
-提高配额不会清零当日已经预留的字节数，而是立即按“新上限减去今日已用量”计算剩余额度。每日计数按 UTC 日期切换（北京时间每日 08:00 进入新的 UTC 统计日）；失败上传为防重试绕过也不会退回预留额度。除非用户明确授权事故处置，AI 不得删除共享 Redis 配额 Key。`Absolute*`、`ForceDisabled`、Kestrel/Multipart/Form 和反向代理限制属于平台运维边界，不能通过租户侧 `sys_osclients` 或普通 MCP 表单更新突破。
+提高配额不会清零当日已经预留的字节数，而是立即按“新上限减去今日已用量”计算剩余额度。每日计数按 UTC 日期切换（北京时间每日 08:00 进入新的 UTC 统计日）；失败上传为防重试绕过也不会退回预留额度。除非用户明确授权事故处置，AI 不得删除共享 Redis 配额 Key。平台固定灾难保护、Kestrel/Multipart/Form 和反向代理限制不能通过租户侧 `sys_osclients` 或普通 MCP 表单更新突破。
+
+#### AI 应用编译产物流式发布
+
+Web、UniApp 和 MicroService 的真实编译目录应使用 MCP 工具 `microi_publish_application_directory_stream` 发布。该链路不会把文件转为 Base64，也不会让文件体进入接口引擎/Jint：
+
+1. MCP 在本机按文件流计算 SHA-256，先拒绝符号链接、`.git`、`node_modules`、密钥/环境文件、超过 20000 个文件或超过 20 GB 的异常目录。
+2. 每个文件以 `multipart/form-data` 原始字节流调用 `/api/V8Engine/UploadApplicationAssetStream`，API 校验登录租户、超级管理员身份、大小、每日额度和 SHA-256 后直接写入 HDFS 不可变版本目录。
+3. 所有文件写完后，MCP 只提交路径、大小和摘要清单到 `/api/V8Engine/FinalizeApplicationStreamPublish`。API 回读版本对象与完整性标记，再使用阿里云 OSS、MinIO 或 S3 的服务端 `CopyObject` 切换稳定地址。
+4. 非入口资源先切换，`index.html` 最后切换；同一应用使用跨节点分布式锁串行发布，避免两个版本并发产生混合资源。
+
+```text
+历史版本：{tenant}/ai-app-publish/{appKey}/versions/v1.2.3/index.html
+稳定地址：{tenant}/ai-app-publish/{appKey}/index.html
+latest别名：{tenant}/ai-app-publish/{appKey}/latest/index.html
+```
+
+微服务历史目录保持 `{tenant}/micro-app/{appKey}/v1.2.3/`，稳定入口同样不带版本号。数据库只保存路径、大小、SHA-256、版本和路由等元数据。失败后可以用相同版本和摘要安全重试；完整清单确认前不会切换稳定入口。
+
+几十 MB 不是 Jint 的固定内存上限，HDFS 本身也没有这种限制。旧发布流程的问题是先把二进制扩成约 `4/3` 大小的 Base64，再经 JSON、Jint 字符串和多层复制产生累计分配；具体何时失败取决于文件数量、并发和进程内存。普通小型 V8 上传可继续使用 `V8.Method.Upload`，真实编译目录和数百 MB 资产必须使用上述流式发布。最终可上传大小仍取反向代理、Kestrel/Multipart、单文件、单次和每日额度的最小值。
+
+调用示例：
+
+```json
+{
+  "appIdOrKey": "microi-developer-toolbox",
+  "versionNo": "v1.1.0",
+  "directory": "D:/build/microi-developer-toolbox/dist",
+  "entryPath": "index.html",
+  "confirmExecution": "microi-developer-toolbox"
+}
+```
 
 普通交互式上传默认强制写入私有桶，即使篡改客户端 `Limit=false` 也不会变成公有文件；普通用户仅能使用 `file`、`img`、`avatar`、`editor` 四个安全一级目录，不能提交多级目录、绝对路径或 `..`。确需公开的产品图、Banner 等文件，应由经过授权的发布流程或超级管理员显式写入公有桶，不能把“是否公开”交给普通客户端决定。
 

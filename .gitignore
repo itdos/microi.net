@@ -145,4 +145,5 @@ tmp/
 .codex-verify-api-20260725/
 .codex-runtime/
 artifacts/
+.codex-artifacts/
 

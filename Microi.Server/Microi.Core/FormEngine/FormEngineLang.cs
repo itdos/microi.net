@@ -45,6 +45,11 @@ namespace Microi.net
         private const int DiyLangDbOperationDelayMs = 15;
         private const int DiyLangMetadataQueueMax = 2000;
         private const int DiyLangTextColumnLength = 2000;
+        private const int DiyLangRuntimeCacheDefaultPageSize = 500;
+        private const int DiyLangRuntimeCacheDefaultMaxRows = 10000;
+        private const int DiyLangRuntimeCacheDefaultMaxCharacters = 5000000;
+        private const int DiyLangRuntimeCacheDefaultCommandTimeoutSeconds = 30;
+        private const int DiyLangRuntimeCacheKeyLength = 500;
         private const string DefaultSysLangsValue = "zh-CN,zh-TW,en";
         private const string SysConfigInitLangButtonId = "sys-config-init-langs";
         private const string SysConfigInitLangButtonName = "\u521d\u59cb\u5316\u591a\u8bed\u8a00";
@@ -2442,47 +2447,261 @@ namespace Microi.net
             }
         }
 
-        private static async Task ReloadDiyLangCacheAsync(string osClient)
+        /// <summary>
+        /// 安全重载多语言运行时缓存。禁止整表一次性物化，并同时限制原始行数、
+        /// 投影字段和值字符数，避免异常数据或依赖故障把 API 进程内存耗尽。
+        /// </summary>
+        public async Task<DosResult> ReloadDiyLangCacheAsync(string osClient = "")
         {
             if (IsBlank(osClient))
             {
-                return;
+                return new DosResult(0, null, "OsClient不能为空。");
             }
+
+            var pageSize = Math.Max(100, Math.Min(2000, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_DIY_LANG_CACHE_PAGE_SIZE",
+                "DiyLang:RuntimeCachePageSize",
+                DiyLangRuntimeCacheDefaultPageSize)));
+            var maxRows = Math.Max(1000, Math.Min(200000, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_DIY_LANG_CACHE_MAX_ROWS",
+                "DiyLang:RuntimeCacheMaxRows",
+                DiyLangRuntimeCacheDefaultMaxRows)));
+            var maxCharacters = Math.Max(1000000, Math.Min(128000000, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_DIY_LANG_CACHE_MAX_CHARACTERS",
+                "DiyLang:RuntimeCacheMaxCharacters",
+                DiyLangRuntimeCacheDefaultMaxCharacters)));
+            var commandTimeoutSeconds = Math.Max(5, Math.Min(120, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_DIY_LANG_CACHE_COMMAND_TIMEOUT_SECONDS",
+                "DiyLang:RuntimeCacheCommandTimeoutSeconds",
+                DiyLangRuntimeCacheDefaultCommandTimeoutSeconds)));
             try
             {
-                var result = await RunDiyLangDbOperationAsync(osClient, () =>
-                    MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_lang", new
-                    {
-                        OsClient = osClient,
-                        _InvokeType = "Server",
-                        _Lang = "cn",
-                        _PageIndex = 1,
-                        _PageSize = 200000
-                    }));
-                if (result.Code != 1 || result.Data == null)
+                var client = OsClientExtend.GetClient(osClient);
+                var db = client?.Db;
+                if (db == null)
                 {
-                    return;
+                    return new DosResult(0, null, $"租户[{osClient}]数据库运行时不可用。");
+                }
+                var configuredSysLangs = DefaultSysLangsValue;
+                try
+                {
+                    configuredSysLangs = await RunDiyLangDbOperationAsync(osClient, () =>
+                    {
+                        var command = db.FromSql(
+                            "SELECT SysLangs FROM `sys_config` WHERE IsEnable = @isEnable LIMIT 1");
+                        command.SetCommandTimeout(commandTimeoutSeconds);
+                        var value = command
+                            .AddInParameter("@isEnable", 1)
+                            .ToScalar<string>();
+                        return Task.FromResult(IsBlank(value) ? DefaultSysLangsValue : value);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    WriteDiyLangLog(
+                        osClient,
+                        "RuntimeCacheLangConfigFallback",
+                        "多语言运行时缓存使用默认语言列",
+                        ex.Message,
+                        2);
+                }
+                var runtimeLangFields = ParseSysLangs(configuredSysLangs)
+                    .Select(item => item.Field)
+                    .Concat(new[] { "ZhCN" })
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var requestedFields = new[] { "Id", "Key", "Code" }
+                    .Concat(runtimeLangFields)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                var physicalColumns = GetPhysicalColumnNames(db, osClient, "diy_lang");
+                var selectFields = requestedFields
+                    .Where(field => IsSafeSqlIdentifier(field)
+                                    && (physicalColumns == null || physicalColumns.Contains(field)))
+                    .ToArray();
+                if (!selectFields.Contains("Id", StringComparer.OrdinalIgnoreCase)
+                    || !selectFields.Contains("Key", StringComparer.OrdinalIgnoreCase))
+                {
+                    return new DosResult(0, null, "多语言表缺少运行时缓存所需的Id或Key字段。");
+                }
+                var selectSql = string.Join(", ", selectFields.Select(field => $"`{field}`"));
+                var activeRowPredicate = physicalColumns?.Contains("IsDeleted") == true
+                    ? "(`IsDeleted` <> 1 OR `IsDeleted` IS NULL)"
+                    : "";
+                var sourceRowCount = await RunDiyLangDbOperationAsync(osClient, () =>
+                {
+                    var sql = "SELECT COUNT(*) FROM `diy_lang`";
+                    if (!IsBlank(activeRowPredicate)) sql += " WHERE " + activeRowPredicate;
+                    var command = db.FromSql(sql);
+                    command.SetCommandTimeout(commandTimeoutSeconds);
+                    return Task.FromResult(command.ToLong());
+                });
+                if (sourceRowCount > maxRows)
+                {
+                    var rejectedStats = new JObject
+                    {
+                        ["OsClient"] = osClient,
+                        ["SourceRows"] = sourceRowCount,
+                        ["LoadedRows"] = 0,
+                        ["MaxRows"] = maxRows,
+                        ["MaxCharacters"] = maxCharacters,
+                        ["CommandTimeoutSeconds"] = commandTimeoutSeconds,
+                        ["LanguageFields"] = new JArray(runtimeLangFields),
+                        ["Truncated"] = true
+                    };
+                    WriteDiyLangLog(
+                        osClient,
+                        "RuntimeCacheBudgetRejected",
+                        "多语言运行时缓存加载前已超过安全预算",
+                        rejectedStats.ToString(Newtonsoft.Json.Formatting.None),
+                        2);
+                    return new DosResult(
+                        0,
+                        rejectedStats,
+                        "多语言有效数据行数超过运行时缓存安全预算，未执行物化并已保留旧缓存；请清理异常数据或显式调整预算。",
+                        0,
+                        rejectedStats);
                 }
                 var rows = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
-                foreach (var item in result.Data)
+                var rawRowCount = 0;
+                long totalCharacters = 0;
+                var truncated = false;
+                var lastId = "";
+
+                while (rawRowCount < maxRows && totalCharacters < maxCharacters)
                 {
-                    var row = ToJObjectSafe(item);
-                    var key = TokenString(row, "Key");
-                    if (!IsBlank(key))
+                    var remainingRows = maxRows - rawRowCount;
+                    var currentPageSize = Math.Min(pageSize, remainingRows);
+                    var result = await RunDiyLangDbOperationAsync(osClient, () =>
                     {
-                        rows[key] = row;
+                        var predicates = new List<string>();
+                        if (!IsBlank(activeRowPredicate)) predicates.Add(activeRowPredicate);
+                        if (!IsBlank(lastId))
+                        {
+                            predicates.Add("`Id` > @lastId");
+                        }
+                        var sql = $"SELECT {selectSql} FROM `diy_lang`";
+                        if (predicates.Count > 0) sql += " WHERE " + string.Join(" AND ", predicates);
+                        sql += $" ORDER BY `Id` ASC LIMIT {currentPageSize}";
+                        var command = db.FromSql(sql);
+                        command.SetCommandTimeout(commandTimeoutSeconds);
+                        if (!IsBlank(lastId))
+                        {
+                            command.AddInParameter("@lastId", lastId);
+                        }
+                        var data = command.ToList<dynamic>()
+                            .Select(ToJObjectSafe)
+                            .ToList();
+                        return Task.FromResult(data);
+                    });
+
+                    if (result == null)
+                    {
+                        return new DosResult(0, null, "读取多语言缓存数据失败。");
                     }
+                    var pageRows = result;
+                    if (pageRows.Count == 0)
+                    {
+                        break;
+                    }
+                    var nextLastId = TokenString(pageRows[pageRows.Count - 1], "Id");
+                    if (IsBlank(nextLastId)
+                        || string.Equals(nextLastId, lastId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult(0, null, "多语言缓存游标未前进，已中止加载并保留旧缓存。");
+                    }
+                    lastId = nextLastId;
+                    foreach (var source in pageRows)
+                    {
+                        rawRowCount++;
+                        var key = LimitDiyLangRuntimeText(TokenString(source, "Key"), DiyLangRuntimeCacheKeyLength);
+                        if (IsBlank(key))
+                        {
+                            continue;
+                        }
+
+                        var projected = new JObject
+                        {
+                            ["Id"] = LimitDiyLangRuntimeText(TokenString(source, "Id"), 128),
+                            ["Key"] = key,
+                            ["Code"] = LimitDiyLangRuntimeText(TokenString(source, "Code"), DiyLangRuntimeCacheKeyLength)
+                        };
+                        long rowCharacters = projected["Id"].ToString().Length
+                                             + key.Length
+                                             + projected["Code"].ToString().Length;
+                        foreach (var lang in SupportedDiyLangFields)
+                        {
+                            var value = LimitDiyLangRuntimeText(TokenString(source, lang.Field), DiyLangTextColumnLength);
+                            projected[lang.Field] = value;
+                            rowCharacters += value.Length;
+                        }
+
+                        if (totalCharacters + rowCharacters > maxCharacters)
+                        {
+                            truncated = true;
+                            break;
+                        }
+                        totalCharacters += rowCharacters;
+                        rows[key] = projected;
+                    }
+
+                    if (truncated || pageRows.Count < currentPageSize)
+                    {
+                        break;
+                    }
+                }
+
+                if (sourceRowCount > rawRowCount) truncated = true;
+                var stats = new JObject
+                {
+                    ["OsClient"] = osClient,
+                    ["SourceRows"] = sourceRowCount,
+                    ["LoadedRows"] = rows.Count,
+                    ["ScannedRows"] = rawRowCount,
+                    ["TotalCharacters"] = totalCharacters,
+                    ["PageSize"] = pageSize,
+                    ["MaxRows"] = maxRows,
+                    ["MaxCharacters"] = maxCharacters,
+                    ["CommandTimeoutSeconds"] = commandTimeoutSeconds,
+                    ["LanguageFields"] = new JArray(runtimeLangFields),
+                    ["Truncated"] = truncated
+                };
+                if (truncated)
+                {
+                    WriteDiyLangLog(
+                        osClient,
+                        "RuntimeCacheBudgetReached",
+                        "多语言运行时缓存达到安全预算",
+                        stats.ToString(Newtonsoft.Json.Formatting.None),
+                        2);
+                    return new DosResult(
+                        0,
+                        stats,
+                        "多语言数据超过运行时缓存安全预算，已保留旧缓存；请检查异常数据或显式调整预算。",
+                        rows.Count,
+                        stats);
                 }
                 lock (DiyLangCacheLock)
                 {
                     DiyMessage.Msg[osClient] = rows;
                     DiyMessage.ClearSourceTextCache(osClient);
                 }
+                return new DosResult(1, stats, "多语言缓存重载成功。", rows.Count, stats);
             }
             catch (Exception ex)
             {
                 WriteDiyLangLog(osClient, "ReloadCacheFailed", "多语言缓存重载失败", ex.ToString(), 2);
+                return new DosResult(0, null, "多语言缓存重载失败：" + ex.Message);
             }
+        }
+
+        private static string LimitDiyLangRuntimeText(string value, int maxLength)
+        {
+            if (IsBlank(value))
+            {
+                return "";
+            }
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength);
         }
 
         protected void AfterMetadataFormDataSaved(DiyTableRowParam param, DosResult result, DbTrans trans)
@@ -3209,17 +3428,6 @@ namespace Microi.net
                 {
                     keys.Add(configKey);
                 }
-            }
-
-            var envUrl = Environment.GetEnvironmentVariable("MICROI_TRANSLATE_URL");
-            if (!IsBlank(envUrl))
-            {
-                var envProvider = Environment.GetEnvironmentVariable("MICROI_TRANSLATE_PROVIDER");
-                if (IsBlank(envProvider))
-                {
-                    envProvider = "libretranslate";
-                }
-                keys.Add($"{envProvider.Trim().ToLower()}:{envUrl}");
             }
 
             return string.Join("|", keys.Distinct(StringComparer.OrdinalIgnoreCase));

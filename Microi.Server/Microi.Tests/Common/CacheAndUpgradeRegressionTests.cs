@@ -1,12 +1,170 @@
 using System.Reflection;
 using Dos.Common;
 using Microi.net;
+using Microi.net.Api;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
 public class CacheAndUpgradeRegressionTests
 {
+    [Fact]
+    public void DiyLangRuntimeCache_ExposesBoundedReloadContract()
+    {
+        var contract = typeof(IFormEngine).GetMethod(nameof(IFormEngine.ReloadDiyLangCacheAsync));
+        var implementation = typeof(FormEngineExtend).GetMethod(
+            nameof(IFormEngine.ReloadDiyLangCacheAsync),
+            BindingFlags.Instance | BindingFlags.Public);
+
+        Assert.NotNull(contract);
+        Assert.Equal(typeof(Task<DosResult>), contract!.ReturnType);
+        Assert.NotNull(implementation);
+        Assert.False(implementation!.IsStatic);
+        Assert.Equal(typeof(Task<DosResult>), implementation.ReturnType);
+
+        var pageSize = typeof(FormEngineExtend).GetField(
+            "DiyLangRuntimeCacheDefaultPageSize",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var maxRows = typeof(FormEngineExtend).GetField(
+            "DiyLangRuntimeCacheDefaultMaxRows",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var maxCharacters = typeof(FormEngineExtend).GetField(
+            "DiyLangRuntimeCacheDefaultMaxCharacters",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var commandTimeout = typeof(FormEngineExtend).GetField(
+            "DiyLangRuntimeCacheDefaultCommandTimeoutSeconds",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.InRange(Assert.IsType<int>(pageSize!.GetRawConstantValue()), 100, 2000);
+        Assert.InRange(Assert.IsType<int>(maxRows!.GetRawConstantValue()), 1000, 200000);
+        Assert.InRange(Assert.IsType<int>(maxCharacters!.GetRawConstantValue()), 1_000_000, 128_000_000);
+        Assert.InRange(Assert.IsType<int>(commandTimeout!.GetRawConstantValue()), 5, 120);
+    }
+
+    [Fact]
+    public void ProcessMemoryGuard_EvaluatesSoftAndHardThresholds()
+    {
+        var options = new ProcessMemoryGuardOptions
+        {
+            Enabled = true,
+            SoftLimitBytes = 100,
+            HardLimitBytes = 200
+        };
+
+        Assert.Equal(ProcessMemoryPressureLevel.Normal, options.Evaluate(99));
+        Assert.Equal(ProcessMemoryPressureLevel.Soft, options.Evaluate(100));
+        Assert.Equal(ProcessMemoryPressureLevel.Soft, options.Evaluate(199));
+        Assert.Equal(ProcessMemoryPressureLevel.Hard, options.Evaluate(200));
+    }
+
+    [Fact]
+    public void ProcessMemoryGuard_UsesResidentMemory_NotReservedPrivateAddressSpace()
+    {
+        var options = new ProcessMemoryGuardOptions
+        {
+            Enabled = true,
+            SoftLimitBytes = 4L * 1024 * 1024 * 1024,
+            HardLimitBytes = 5L * 1024 * 1024 * 1024
+        };
+        var state = new ProcessMemoryPressureState(options);
+        var update = typeof(ProcessMemoryPressureState).GetMethod(
+            "Update",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+
+        Assert.NotNull(update);
+        update!.Invoke(state, new object[]
+        {
+            512L * 1024 * 1024,
+            271_000L * 1024 * 1024,
+            94L * 1024 * 1024,
+            false
+        });
+
+        var snapshot = state.GetSnapshot();
+        Assert.Equal(512L * 1024 * 1024, snapshot.ProcessBytes);
+        Assert.Equal(512L * 1024 * 1024, snapshot.WorkingSetBytes);
+        Assert.Equal(271_000L * 1024 * 1024, snapshot.PrivateBytes);
+        Assert.Equal(ProcessMemoryPressureLevel.Normal, options.Evaluate(snapshot.ProcessBytes));
+    }
+
+    [Fact]
+    public void ProcessMemoryGuard_ReadsExplicitConfiguration()
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["ProcessMemoryGuard:Enabled"] = "true",
+            ["ProcessMemoryGuard:SoftLimitMB"] = "640",
+            ["ProcessMemoryGuard:HardLimitMB"] = "768",
+            ["ProcessMemoryGuard:PollSeconds"] = "5",
+            ["ProcessMemoryGuard:HardSamples"] = "4",
+            ["ProcessMemoryGuard:ExitGraceSeconds"] = "7",
+            ["ProcessMemoryGuard:HardExit"] = "false"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
+            .Build();
+        var environment = new BoundedQueueHostEnvironment();
+
+        var options = ProcessMemoryGuardOptions.FromConfiguration(environment, configuration);
+
+        Assert.True(options.Enabled);
+        Assert.Equal(640L * 1024 * 1024, options.SoftLimitBytes);
+        Assert.Equal(768L * 1024 * 1024, options.HardLimitBytes);
+        Assert.Equal(5, options.PollSeconds);
+        Assert.Equal(4, options.ConsecutiveHardSamples);
+        Assert.Equal(7, options.ExitGraceSeconds);
+        Assert.False(options.HardExit);
+    }
+
+    [Fact]
+    public void SysLogQueue_UsesBoundedOverflowAndDurableEmergencySpool()
+    {
+        var spool = Path.Combine(Path.GetTempPath(), "microi-syslog-bounded-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(spool);
+        try
+        {
+            var mongo = DispatchProxy.Create<IMongoDB, NoopMongoProxy>();
+            var environment = new BoundedQueueHostEnvironment { ContentRootPath = spool };
+            var service = new SysLogQueueService(
+                mongo,
+                NullLogger<SysLogQueueService>.Instance,
+                environment,
+                new SysLogQueueOptions
+                {
+                    Capacity = 2,
+                    OverflowCapacity = 1,
+                    BatchSize = 10,
+                    SpoolDirectory = spool
+                });
+
+            for (var index = 0; index < 5; index++)
+            {
+                Assert.True(service.Enqueue(new SysLogParam
+                {
+                    OsClient = "bounded-test",
+                    EventId = "bounded-" + index,
+                    Action = "Enqueue"
+                }));
+            }
+
+            var health = service.GetHealth();
+            Assert.Equal(2, health.Capacity);
+            Assert.Equal(1, health.OverflowCapacity);
+            Assert.Equal(1, health.OverflowPending);
+            Assert.Equal(2, health.EmergencySpooled);
+            Assert.Equal(0, health.Dropped);
+            Assert.Equal(5, health.Pending);
+            Assert.Equal(2, Directory.EnumerateFiles(spool, "*.json").Count());
+        }
+        finally
+        {
+            if (Directory.Exists(spool)) Directory.Delete(spool, true);
+        }
+    }
+
     [Fact]
     public void TwoLevelCache_BoundsPublishConcurrencyPerTenant()
     {
@@ -197,4 +355,20 @@ public class CacheAndUpgradeRegressionTests
 
         Assert.Null(exception);
     }
+}
+
+public class NoopMongoProxy : DispatchProxy
+{
+    protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+    {
+        throw new NotSupportedException($"Bounded queue test did not expect IMongoDB.{targetMethod?.Name}");
+    }
+}
+
+public sealed class BoundedQueueHostEnvironment : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = Environments.Development;
+    public string ApplicationName { get; set; } = "Microi.Tests";
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+    public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
 }

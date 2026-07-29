@@ -39,6 +39,8 @@ export const API = {
     CREATE_ENGINE: '/api/V8Engine/CreateApiEngine',
     EXECUTE_ENGINE: '/api/V8Engine/ExecuteApiEngine',
     UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
+    UPLOAD_APPLICATION_ASSET_STREAM: '/api/V8Engine/UploadApplicationAssetStream',
+    FINALIZE_APPLICATION_STREAM_PUBLISH: '/api/V8Engine/FinalizeApplicationStreamPublish',
     // 微服务 / 微应用
     LIST_APPLICATIONS: '/api/V8Engine/ListApplications',
     GET_APPLICATION_CONTEXT: '/api/V8Engine/GetApplicationContext',

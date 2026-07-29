@@ -8,28 +8,43 @@ using Newtonsoft.Json;
 
 namespace Microi.net.Api;
 
+public sealed class SysLogQueueOptions
+{
+    public int Capacity { get; init; } = 4096;
+    public int OverflowCapacity { get; init; } = 512;
+    public int BatchSize { get; init; } = 250;
+    public string? SpoolDirectory { get; init; }
+
+    public static SysLogQueueOptions FromConfiguration()
+    {
+        return new SysLogQueueOptions
+        {
+            Capacity = 4096,
+            OverflowCapacity = 512,
+            BatchSize = 250,
+            // Spool目录属于节点本地持久卷，不是租户业务参数。
+            SpoolDirectory = ConfigHelper.GetEnvOrConfiguration(
+                "MICROI_SYSLOG_SPOOL_DIR",
+                "SysLogQueue:SpoolDirectory")
+        };
+    }
+}
+
 /// <summary>
 /// 用户行为/系统日志后台队列：请求线程只入队；单消费者批量、幂等写MongoDB。
 /// 每个批次先写本地spool再写Mongo，故障批次由后台持续重放，正常停机时会完整排空到spool。
 /// </summary>
 public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 {
-    private const int Capacity = 65536;
-    private const int BatchSize = 500;
     private static readonly TimeSpan BatchWindow = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan ReplayInterval = TimeSpan.FromSeconds(5);
     private static readonly Regex SensitiveJson = new(
         "(?i)(\\\"?(?:password|pwd|token|authorization|apikey|secret|connectionstring)\\\"?\\s*[:=]\\s*\\\"?)[^\\\",}&\\s]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    private readonly Channel<SysLogParam> _channel = Channel.CreateBounded<SysLogParam>(new BoundedChannelOptions(Capacity)
-    {
-        SingleReader = true,
-        SingleWriter = false,
-        FullMode = BoundedChannelFullMode.Wait,
-        AllowSynchronousContinuations = false
-    });
+    private readonly Channel<SysLogParam> _channel;
     private readonly ConcurrentQueue<SysLogParam> _overflow = new();
+    private readonly SysLogQueueOptions _options;
     private readonly IMongoDB _mongo;
     private readonly ILogger<SysLogQueueService> _logger;
     private readonly string _spoolDirectory;
@@ -39,15 +54,37 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     private long _retried;
     private long _inMemory;
     private long _failedBatches;
+    private long _overflowCount;
+    private long _emergencySpooled;
+    private long _dropped;
+    private long _lastOverflowDiagnosticTicks;
+    private int _stopping;
     private string? _lastError;
     private long _lastPersistedTicks;
 
     public SysLogQueueService(IMongoDB mongo, ILogger<SysLogQueueService> logger, IHostEnvironment environment)
+        : this(mongo, logger, environment, SysLogQueueOptions.FromConfiguration())
+    {
+    }
+
+    public SysLogQueueService(
+        IMongoDB mongo,
+        ILogger<SysLogQueueService> logger,
+        IHostEnvironment environment,
+        SysLogQueueOptions options)
     {
         _mongo = mongo;
         _logger = logger;
+        _options = options ?? SysLogQueueOptions.FromConfiguration();
+        _channel = Channel.CreateBounded<SysLogParam>(new BoundedChannelOptions(_options.Capacity)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait,
+            AllowSynchronousContinuations = false
+        });
         _nodeId = NormalizeNodeId(Environment.GetEnvironmentVariable("MICROI_NODE_ID").DosIsNullOrWhiteSpace(Environment.MachineName));
-        var configured = Environment.GetEnvironmentVariable("MICROI_SYSLOG_SPOOL_DIR");
+        var configured = _options.SpoolDirectory;
         var candidate = string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(environment.ContentRootPath, "logs", "syslog-spool")
             : Path.GetFullPath(configured);
@@ -77,8 +114,10 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
             Interlocked.Increment(ref _enqueued);
             Interlocked.Increment(ref _inMemory);
-            if (!_channel.Writer.TryWrite(snapshot)) _overflow.Enqueue(snapshot);
-            return true;
+            if (Volatile.Read(ref _stopping) == 1)
+                return TryEmergencySpool(snapshot, "服务正在停机");
+            if (_channel.Writer.TryWrite(snapshot) || TryEnqueueOverflow(snapshot)) return true;
+            return TryEmergencySpool(snapshot, "内存日志队列达到容量上限");
         }
         catch (Exception ex)
         {
@@ -107,7 +146,11 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             Persisted = Interlocked.Read(ref _persisted),
             Retried = Interlocked.Read(ref _retried),
             Pending = Interlocked.Read(ref _inMemory) + spoolFiles,
-            OverflowPending = _overflow.Count,
+            Capacity = _options.Capacity,
+            OverflowCapacity = _options.OverflowCapacity,
+            OverflowPending = Interlocked.Read(ref _overflowCount),
+            EmergencySpooled = Interlocked.Read(ref _emergencySpooled),
+            Dropped = Interlocked.Read(ref _dropped),
             FailedBatches = Interlocked.Read(ref _failedBatches),
             LastError = _lastError,
             LastPersistedAt = last,
@@ -124,8 +167,8 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Microi异步日志队列已启动，NodeId={NodeId}, Capacity={Capacity}, BatchSize={BatchSize}, Spool={Spool}",
-            _nodeId, Capacity, BatchSize, _spoolDirectory);
+        _logger.LogInformation("Microi异步日志队列已启动，NodeId={NodeId}, Capacity={Capacity}, OverflowCapacity={OverflowCapacity}, BatchSize={BatchSize}, Spool={Spool}",
+            _nodeId, _options.Capacity, _options.OverflowCapacity, _options.BatchSize, _spoolDirectory);
         await ReplaySpoolAsync(stoppingToken, int.MaxValue).ConfigureAwait(false);
         var nextReplay = DateTime.UtcNow.Add(ReplayInterval);
 
@@ -153,15 +196,16 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        Volatile.Write(ref _stopping, 1);
         _channel.Writer.TryComplete();
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<List<SysLogParam>> ReadBatchAsync(CancellationToken cancellationToken)
     {
-        var batch = new List<SysLogParam>(BatchSize);
-        while (batch.Count < BatchSize && _overflow.TryDequeue(out var overflowItem)) batch.Add(overflowItem);
-        while (batch.Count < BatchSize && _channel.Reader.TryRead(out var item)) batch.Add(item);
+        var batch = new List<SysLogParam>(_options.BatchSize);
+        while (batch.Count < _options.BatchSize && TryDequeueOverflow(out var overflowItem)) batch.Add(overflowItem);
+        while (batch.Count < _options.BatchSize && _channel.Reader.TryRead(out var item)) batch.Add(item);
         if (batch.Count == 0)
         {
             if (!await _channel.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false)) return batch;
@@ -169,9 +213,9 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         }
 
         // 一旦事件已从Channel取出，就必须完成本批次落盘；正常停机取消不能丢掉局部批次。
-        if (batch.Count < BatchSize) await Task.Delay(BatchWindow, CancellationToken.None).ConfigureAwait(false);
-        while (batch.Count < BatchSize && _overflow.TryDequeue(out var overflowItem)) batch.Add(overflowItem);
-        while (batch.Count < BatchSize && _channel.Reader.TryRead(out var item)) batch.Add(item);
+        if (batch.Count < _options.BatchSize) await Task.Delay(BatchWindow, CancellationToken.None).ConfigureAwait(false);
+        while (batch.Count < _options.BatchSize && TryDequeueOverflow(out var overflowItem)) batch.Add(overflowItem);
+        while (batch.Count < _options.BatchSize && _channel.Reader.TryRead(out var item)) batch.Add(item);
         return batch;
     }
 
@@ -196,8 +240,11 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             _logger.LogWarning(ex, "Microi日志批次持久化失败，已保留spool；Count={Count}, File={File}", batch.Count, spoolPath);
             if (spoolPath == null)
             {
-                // 连本地spool都暂时不可用时保留在进程内存，绝不丢弃。
-                foreach (var item in batch) _overflow.Enqueue(item);
+                // 内存重试区也必须有硬上限；超过上限时同步尝试耐久化，禁止无界堆积。
+                foreach (var item in batch)
+                {
+                    if (!TryEnqueueOverflow(item)) TryEmergencySpool(item, "日志批次journal失败且内存重试区已满");
+                }
             }
         }
     }
@@ -234,20 +281,81 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 
     private async Task DrainToSpoolAsync()
     {
-        var batch = new List<SysLogParam>(BatchSize);
-        while (_overflow.TryDequeue(out var overflowItem) || _channel.Reader.TryRead(out overflowItem))
+        var batch = new List<SysLogParam>(_options.BatchSize);
+        while (TryDequeueOverflow(out var overflowItem) || _channel.Reader.TryRead(out overflowItem))
         {
             batch.Add(overflowItem);
-            if (batch.Count < BatchSize) continue;
+            if (batch.Count < _options.BatchSize) continue;
             try { await WriteSpoolAsync(batch, CancellationToken.None).ConfigureAwait(false); Interlocked.Add(ref _inMemory, -batch.Count); }
-            catch { foreach (var item in batch) _overflow.Enqueue(item); break; }
-            batch = new List<SysLogParam>(BatchSize);
+            catch { EmergencySpoolBatch(batch, "服务停机排空日志批次失败"); }
+            batch = new List<SysLogParam>(_options.BatchSize);
         }
         if (batch.Count > 0)
         {
             try { await WriteSpoolAsync(batch, CancellationToken.None).ConfigureAwait(false); Interlocked.Add(ref _inMemory, -batch.Count); }
-            catch { foreach (var item in batch) _overflow.Enqueue(item); }
+            catch { EmergencySpoolBatch(batch, "服务停机排空尾批次失败"); }
         }
+    }
+
+    private bool TryEnqueueOverflow(SysLogParam item)
+    {
+        if (_options.OverflowCapacity <= 0) return false;
+        while (true)
+        {
+            var current = Interlocked.Read(ref _overflowCount);
+            if (current >= _options.OverflowCapacity) return false;
+            if (Interlocked.CompareExchange(ref _overflowCount, current + 1, current) != current) continue;
+            _overflow.Enqueue(item);
+            return true;
+        }
+    }
+
+    private bool TryDequeueOverflow(out SysLogParam item)
+    {
+        if (_overflow.TryDequeue(out item!))
+        {
+            Interlocked.Decrement(ref _overflowCount);
+            return true;
+        }
+        item = null!;
+        return false;
+    }
+
+    private bool TryEmergencySpool(SysLogParam item, string reason)
+    {
+        try
+        {
+            WriteSpoolSynchronously(new List<SysLogParam>(1) { item });
+            Interlocked.Decrement(ref _inMemory);
+            var count = Interlocked.Increment(ref _emergencySpooled);
+            if (count == 1 || count % 1000 == 0)
+            {
+                WriteOverflowDiagnostic($"{reason}，已同步写入持久化spool；累计={count}。", false);
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Decrement(ref _inMemory);
+            Interlocked.Increment(ref _dropped);
+            _lastError = $"{reason}，且紧急spool失败：{ex.Message}";
+            WriteOverflowDiagnostic(_lastError, true);
+            return false;
+        }
+    }
+
+    private void EmergencySpoolBatch(IEnumerable<SysLogParam> batch, string reason)
+    {
+        foreach (var item in batch) TryEmergencySpool(item, reason);
+    }
+
+    private void WriteOverflowDiagnostic(string message, bool force)
+    {
+        var now = DateTime.UtcNow.Ticks;
+        var previous = Interlocked.Read(ref _lastOverflowDiagnosticTicks);
+        if (previous > 0 && new TimeSpan(now - previous) < TimeSpan.FromSeconds(30)) return;
+        if (Interlocked.CompareExchange(ref _lastOverflowDiagnosticTicks, now, previous) != previous) return;
+        Console.Error.WriteLine($"Microi：【{(force ? "Error异常" : "⚠️警告")}】SysLogQueueService：{message}");
     }
 
     private async Task<string> WriteSpoolAsync(List<SysLogParam> batch, CancellationToken cancellationToken)
@@ -264,6 +372,23 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         {
             await stream.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            stream.Flush(true);
+        }
+        File.Move(temp, final);
+        return final;
+    }
+
+    private string WriteSpoolSynchronously(List<SysLogParam> batch)
+    {
+        Directory.CreateDirectory(_spoolDirectory);
+        var name = $"{DateTime.UtcNow:yyyyMMddHHmmssfffffff}_{_nodeId}_{batch[0].EventId}.json";
+        var final = Path.Combine(_spoolDirectory, name);
+        var temp = final + ".tmp";
+        var bytes = Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(batch, Formatting.None));
+        using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.Read,
+                   64 * 1024, FileOptions.WriteThrough))
+        {
+            stream.Write(bytes, 0, bytes.Length);
             stream.Flush(true);
         }
         File.Move(temp, final);

@@ -45,7 +45,7 @@
   },
 ```
 
-本地与存量部署的 CORS 在未配置来源时默认允许任意来源；只有在主 SaaS 配置或 `Cors:AllowOrigins` 中填写来源后才收紧。严格 SSRF 模式同样默认关闭。不要为了本地调试删除登录 RSA 历史兼容密钥或私有授权密钥；完整规则见 [平台安全与兼容基线](../more/security)。
+本地与存量部署的 CORS 在未配置来源时默认允许任意来源；只有在 SaaS 引擎主租户的 `CorsAllowOrigins` 中填写来源后才收紧。严格 SSRF 模式同样默认关闭，并由主租户 `SsrfProtectionEnabled` 控制。不要为了本地调试删除登录 RSA 历史兼容密钥或私有授权密钥；完整规则见 [平台安全与兼容基线](../more/security)。
 
 ::: warning 注意事项
 - 拉取源码后，请**优先将 `Microi.net.dll` 更新至最新版本**

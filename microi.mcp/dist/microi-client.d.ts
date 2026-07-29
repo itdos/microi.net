@@ -3,6 +3,10 @@ export interface MicroiConfig {
     username: string;
     password: string;
     osClient?: string;
+    /** SaaS tenant type used to disambiguate profiles sharing the same API and OsClient. */
+    osClientType?: string;
+    /** SaaS tenant network used to disambiguate profiles sharing the same API, OsClient and type. */
+    osClientNetwork?: string;
     rsaPublicKey?: string;
     /** 直接传入已有 Token（跳过帐号密码登录，适用于需要验证码的服务器） */
     token?: string;
@@ -17,6 +21,12 @@ export interface MicroiConfig {
     /** 写请求响应不确定时，单次远端回读超时，默认 5 秒 */
     readbackRequestTimeoutMs?: number;
 }
+/**
+ * Return token-file keys from the most specific tenant identity to legacy keys.
+ * New writers use api|os|type|network, while readers keep accepting the older
+ * api|os|type, api|os and api layouts during migration.
+ */
+export declare function buildTokenFileLookupKeys(apiBaseUrl: string, osClient?: string, osClientType?: string, osClientNetwork?: string): string[];
 export interface ApiResponse<T = unknown> {
     Code: number;
     Data: T;
@@ -286,6 +296,12 @@ export declare class MicroiClient {
     /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
     private get;
     private requestJson;
+    /**
+     * Stream one local file as multipart without materializing it as Base64 or a
+     * whole-file Buffer. A retry constructs a fresh file stream, so auth recovery
+     * remains safe for large immutable application assets.
+     */
+    private requestMultipartFile;
     private isUncertainWriteError;
     private readbackOptions;
     private pollReadback;
@@ -341,6 +357,15 @@ export declare class MicroiClient {
         TargetId?: string;
         TargetField?: string;
     }): Promise<ApiResponse>;
+    uploadApplicationAssetStream(data: {
+        AppIdOrKey: string;
+        VersionNo: string;
+        RelativePath: string;
+        ExpectedSha256: string;
+        FilePath: string;
+        TimeoutMs?: number;
+    }): Promise<ApiResponse>;
+    finalizeApplicationStreamPublish(data: Record<string, unknown>): Promise<ApiResponse>;
     getMicroService(msKey: string): Promise<ApiResponse>;
     listApplications(data?: Record<string, unknown>): Promise<ApiResponse>;
     getApplicationContext(data: Record<string, unknown>): Promise<ApiResponse>;
@@ -438,6 +463,11 @@ export declare class MicroiClient {
         MobileListFields?: string;
         CardTitleTagFields?: string;
         CardBottomTagFields?: string;
+        IsMicroiService?: number;
+        MicroServiceId?: string;
+        MicroServicePageId?: string;
+        MicroServiceRoutePath?: string;
+        MicroServiceKey?: string;
     }): Promise<ApiResponse>;
     setRolePermission(roleId: string, menuIds: string[]): Promise<ApiResponse>;
     listRoles(keyword?: string): Promise<ApiResponse>;

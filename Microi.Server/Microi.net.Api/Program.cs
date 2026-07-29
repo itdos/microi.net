@@ -67,41 +67,12 @@ Console.WriteLine(
 #region Microi.net 初始化
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 // ------- 文件上传大小限制 -------
-static int ReadBoundedMegabytes(
-    IConfiguration configuration,
-    string environmentName,
-    string configurationKey,
-    int defaultValue,
-    int minimum,
-    int maximum)
-{
-    var rawValue = Environment.GetEnvironmentVariable(environmentName)
-        ?? configuration[configurationKey];
-    var value = int.TryParse(rawValue, out var configured) ? configured : defaultValue;
-    return Math.Clamp(value, minimum, maximum);
-}
-
-var maxRequestBodyMb = ReadBoundedMegabytes(
-    builder.Configuration,
-    "MICROI_HTTP_MAX_REQUEST_BODY_MB",
-    "FileUploadSecurity:MaxRequestBodyMB",
-    256,
-    1,
-    2048);
-var maxMultipartBodyMb = ReadBoundedMegabytes(
-    builder.Configuration,
-    "MICROI_FILE_UPLOAD_MAX_MULTIPART_MB",
-    "FileUploadSecurity:MaxMultipartBodyMB",
-    256,
-    1,
-    maxRequestBodyMb);
-var maxFormValueMb = ReadBoundedMegabytes(
-    builder.Configuration,
-    "MICROI_FILE_UPLOAD_MAX_FORM_VALUE_MB",
-    "FileUploadSecurity:MaxFormValueMB",
-    128,
-    1,
-    Math.Min(maxRequestBodyMb, 512));
+// 启动接收层只负责提供统一的固定安全硬顶；租户业务开关、单文件、单次总量、
+// 文件数与日额度均在请求进入 HDFS 后从 sys_osclients 动态读取。
+// 不再要求安装者用额外环境变量重复维护同一套配置。
+const int maxRequestBodyMb = 2048;
+const int maxMultipartBodyMb = 2048;
+const int maxFormValueMb = 128;
 var maxRequestBodyBytes = maxRequestBodyMb * 1024L * 1024L;
 var maxMultipartBodyBytes = maxMultipartBodyMb * 1024L * 1024L;
 var maxFormValueBytes = maxFormValueMb * 1024L * 1024L;
@@ -155,9 +126,16 @@ services.AddMicroiCache();//【必须】注入【分布式缓存】插件
 services.AddMicroiHttp();//【必须】注入【Http】插件
 services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件
 // 所有SysLog/用户行为日志统一由单消费者后台服务批量、幂等持久化。
+services.AddSingleton(SysLogQueueOptions.FromConfiguration());
 services.AddSingleton<SysLogQueueService>();
 services.AddSingleton<ISysLogQueue>(sp => sp.GetRequiredService<SysLogQueueService>());
 services.AddHostedService(sp => sp.GetRequiredService<SysLogQueueService>());
+// 进程级内存最后防线：软阈值退出流量，硬阈值有界停机，避免单节点拖垮宿主机。
+services.AddSingleton(ProcessMemoryGuardOptions.FromConfiguration(
+    builder.Environment,
+    builder.Configuration));
+services.AddSingleton<ProcessMemoryPressureState>();
+services.AddHostedService<ProcessMemoryGuardService>();
 services.AddHostedService<BackgroundTaskWorkerService>();
 services.AddSingleton<UserBehaviorSessionTracker>();
 services.AddSingleton<IPrivateFileAuditLinkService, PrivateFileAuditLinkService>();
@@ -289,14 +267,35 @@ var app = builder.Build();
 #region .Net 系统默认
 //app.MapGrpcService<GreeterService>();
 
-// ========== 全局异常处理中间件（必须在最前面） ==========
-app.UseGlobalExceptionHandler();
-
+// Production 内置异常页先注册为外层保险；吾码全局异常处理必须在其内层，
+// 否则 UseExceptionHandler 会先吞掉 Kestrel/Multipart 异常，无法返回标准 DosResult。
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
+
+// ========== 吾码全局异常处理中间件 ==========
+app.UseGlobalExceptionHandler();
+
+// HDFS 上传响应暴露当前 API 进程的启动级解析硬顶，便于区分租户业务额度与
+// nginx/Kestrel/Multipart 限制。这里只返回容量，不包含任何租户密钥或连接信息。
+app.Use(async (context, next) =>
+{
+    if (RequestBodyLimitError.IsHdfsUploadPath(context.Request.Path))
+    {
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers["X-Microi-Upload-Max-Request-MB"] = maxRequestBodyMb.ToString();
+            context.Response.Headers["X-Microi-Upload-Max-Multipart-MB"] = maxMultipartBodyMb.ToString();
+            context.Response.Headers["X-Microi-Upload-Limit-Source"] = "api-startup";
+            return Task.CompletedTask;
+        });
+    }
+
+    await next();
+});
+
 app.UseHttpsRedirection();
 app.MapStaticAssets();
 app.Use(async (context, next) =>
@@ -415,14 +414,8 @@ if (scheduleLicenseRestoreRetry)
     {
         _ = Task.Run(async () =>
         {
-            var maxAttempts = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",
-                "License:RestoreMaxAttempts",
-                3));
-            var retrySeconds = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_LICENSE_RESTORE_RETRY_SECONDS",
-                "License:RestoreRetrySeconds",
-                10));
+            const int maxAttempts = 3;
+            const int retrySeconds = 10;
 
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
@@ -555,8 +548,7 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
             // 接口引擎初始化（并行，租户数量可能较大）
             try
             {
-                var maxConcurrency = ConfigHelper.GetEnvOrConfigurationInt(
-                    "MICROI_STARTUP_DYNAMIC_ROUTE_MAX_CONCURRENCY",
+                var maxConcurrency = ConfigHelper.GetRuntimeConfigurationInt(
                     "StartupLimits:DynamicRouteInitMaxConcurrency",
                     2);
                 var startupGate = new System.Threading.SemaphoreSlim(maxConcurrency, maxConcurrency);

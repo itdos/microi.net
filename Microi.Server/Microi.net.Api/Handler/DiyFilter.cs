@@ -107,6 +107,236 @@ namespace Microi.net.Api
             return token.DosTrim().DosReplace("Bearer ", "");
         }
 
+        private static IEnumerable<string> GetAccessKeyTableReferences(
+            object value,
+            bool includeIdAsTableReference)
+        {
+            if (value == null) yield break;
+
+            if (value is JObject json)
+            {
+                var scalarNames = new List<string>
+                {
+                    "FormEngineKey", "_FormEngineKey", "TableName", "_TableName",
+                    "TableId", "_TableId"
+                };
+                if (includeIdAsTableReference)
+                {
+                    scalarNames.Add("Id");
+                    scalarNames.Add("Name");
+                }
+                foreach (var propertyName in scalarNames)
+                {
+                    var reference = json[propertyName]?.ToString()?.Trim();
+                    if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+                }
+                foreach (var propertyName in new[] { "TableIds", "TableNames" })
+                {
+                    foreach (var reference in UserAccessKeySecurity.ParseStringList(json[propertyName]))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            if (value is JArray jsonArray)
+            {
+                foreach (var item in jsonArray)
+                {
+                    foreach (var reference in GetAccessKeyTableReferences(
+                                 item,
+                                 includeIdAsTableReference))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            if (value is System.Collections.IEnumerable values && !(value is string))
+            {
+                foreach (var item in values)
+                {
+                    foreach (var reference in GetAccessKeyTableReferences(
+                                 item,
+                                 includeIdAsTableReference))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            var type = value.GetType();
+            var scalarProperties = new List<string>
+            {
+                "FormEngineKey", "_FormEngineKey", "TableName", "_TableName",
+                "TableId", "_TableId"
+            };
+            if (includeIdAsTableReference)
+            {
+                scalarProperties.Add("Id");
+                scalarProperties.Add("Name");
+            }
+            foreach (var propertyName in scalarProperties)
+            {
+                var property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                var reference = property?.GetValue(value)?.ToString()?.Trim();
+                if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+            }
+            foreach (var propertyName in new[] { "TableIds", "TableNames" })
+            {
+                var property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                var propertyValue = property?.GetValue(value);
+                if (!(propertyValue is System.Collections.IEnumerable references)
+                    || propertyValue is string)
+                {
+                    continue;
+                }
+                foreach (var referenceValue in references)
+                {
+                    var reference = referenceValue?.ToString()?.Trim();
+                    if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+                }
+            }
+        }
+
+        private static IEnumerable<string> GetAccessKeyFieldReferences(object? value)
+        {
+            if (value == null) yield break;
+
+            if (value is JObject json)
+            {
+                foreach (var propertyName in new[] { "_FieldId", "FormEngineFieldKey" })
+                {
+                    var reference = json[propertyName]?.ToString()?.Trim();
+                    if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+                }
+                foreach (var propertyName in new[] { "FieldIds", "FormEngineFieldKeys" })
+                {
+                    foreach (var reference in UserAccessKeySecurity.ParseStringList(json[propertyName]))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            if (value is JArray jsonArray)
+            {
+                foreach (var item in jsonArray)
+                {
+                    foreach (var reference in GetAccessKeyFieldReferences(item))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            if (value is System.Collections.IEnumerable values && !(value is string))
+            {
+                foreach (var item in values)
+                {
+                    foreach (var reference in GetAccessKeyFieldReferences(item))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            var type = value.GetType();
+            foreach (var propertyName in new[] { "_FieldId", "FormEngineFieldKey" })
+            {
+                var property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                var reference = property?.GetValue(value)?.ToString()?.Trim();
+                if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+            }
+            foreach (var propertyName in new[] { "FieldIds", "FormEngineFieldKeys" })
+            {
+                var property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                var propertyValue = property?.GetValue(value);
+                if (!(propertyValue is System.Collections.IEnumerable references)
+                    || propertyValue is string)
+                {
+                    continue;
+                }
+                foreach (var referenceValue in references)
+                {
+                    var reference = referenceValue?.ToString()?.Trim();
+                    if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+                }
+            }
+        }
+
+        private static bool AuthorizeAccessKeyTableOperation(ActionExecutingContext context)
+        {
+            var currentUser = context.HttpContext.Items[
+                UserAccessKeySecurity.ScopedUserHttpContextItemKey] as JObject;
+            if (!UserAccessKeySecurity.IsSession(currentUser)) return true;
+
+            var requestPath = context.HttpContext.Request.Path.ToString();
+            if (!UserAccessKeySecurity.TryGetTableOperation(
+                    requestPath,
+                    out var isRead,
+                    out var isExport))
+            {
+                return true;
+            }
+
+            var includeIdAsTableReference =
+                UserAccessKeySecurity.IsTableModelLookupPath(requestPath);
+            var tableReferences = context.ActionArguments.Values
+                .SelectMany(value => GetAccessKeyTableReferences(
+                    value,
+                    includeIdAsTableReference))
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var isFieldDataLookup = UserAccessKeySecurity.IsFieldDataLookupPath(requestPath);
+            var fieldReferences = isFieldDataLookup
+                ? context.ActionArguments.Values
+                    .SelectMany(GetAccessKeyFieldReferences)
+                    .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+                : Array.Empty<string>();
+            var hasAnyReference = tableReferences.Length > 0 || fieldReferences.Length > 0;
+            var tablesAllowed = tableReferences.Length == 0
+                || UserAccessKeySecurity.AreTableReferencesAllowed(
+                    currentUser,
+                    tableReferences,
+                    isRead,
+                    isExport);
+            var fieldsAllowed = fieldReferences.Length == 0
+                || UserAccessKeySecurity.AreFieldReferencesAllowed(
+                    currentUser,
+                    fieldReferences);
+            if (hasAnyReference
+                && tablesAllowed
+                && fieldsAllowed
+                && (tableReferences.Length > 0 || isFieldDataLookup))
+            {
+                return true;
+            }
+
+            context.Result = new JsonResult(new DosResult(
+                0,
+                null,
+                "当前访问密钥未授权访问请求中的表。"));
+            return false;
+        }
+
         private static async Task<DosResult> BuildTokenAuthFailureAsync(
             string osClient,
             string lang,
@@ -145,6 +375,10 @@ namespace Microi.net.Api
                 var timer = new Stopwatch();
                 timer.Start();
                 context.HttpContext.Items[TimerKey] = timer;
+                if (!AuthorizeAccessKeyTableOperation(context))
+                {
+                    return;
+                }
                 //可以直接tostring，即使不存在lang
                 var lang = context.HttpContext.Request.Headers["lang"].ToString();
                 if (lang.DosIsNullOrWhiteSpace() || lang == "null")
@@ -624,6 +858,8 @@ namespace Microi.net.Api
                         return;
                     }
                     sysUser = scopedUserResult.Data;
+                    context.HttpContext.Items[
+                        UserAccessKeySecurity.ScopedUserHttpContextItemKey] = scopedUserResult.Data;
                     if (!UserAccessKeySecurity.IsApiPathAllowed(
                             scopedUserResult.Data,
                             context.HttpContext.Request.Path.ToString()))

@@ -82,6 +82,15 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "登录身份已失效，请重新登录后再提交后台任务"));
             }
+            if (!UserAccessKeySecurity.IsApiEngineAllowed(
+                    identity.CurrentUser,
+                    apiEngineKey))
+            {
+                return Json(new DosResult(
+                    0,
+                    null,
+                    "当前访问密钥未授权运行此接口引擎。"));
+            }
 
             // 客户端业务参数不允许决定执行身份。身份由服务端从当前登录令牌读取，
             // 并作为后台任务的可信快照单独传给执行器。

@@ -201,10 +201,26 @@ var uploadResult = V8.Method.Upload({
 
 `GetPrivateFileUrl` 返回的是后端短期票据代理地址，而不是可泄露的对象存储真实签名地址。后端会分别记录链接签发和实际 `GET/HEAD` 打开/下载行为；登录用户记录为 `Name(Account)`，转发链接被无身份访问时记录为匿名访问。代理支持 `Range` 流式响应并对分片请求短时去重，失败时不会退回未经审计的真实签名地址。`Limit:false` 的公有文件仍可直接走 CDN/公有桶，不记录此类行为日志。
 
-系统日志调用会先进入后端有界内存队列，由单一后台消费者按批次写入 MongoDB；请求线程不等待 MongoDB。每批日志在写 MongoDB 前先写入本地 `logs/syslog-spool`，MongoDB 暂时不可用或服务正常重启时会自动幂等重放。可通过环境变量 `MICROI_SYSLOG_SPOOL_DIR` 指定持久化目录，容器部署时应把该目录挂载到持久卷；多节点实例还应设置稳定且唯一的 `MICROI_NODE_ID`。所有节点共享 MongoDB/Redis，日志按全局 `EventId` 幂等 upsert，详情停留状态和私有附件票据可跨节点继续读取。
+系统日志调用会先进入后端真正有界的内存队列，由单一后台消费者按批次写入 MongoDB；请求线程通常不等待 MongoDB。平台固定使用主队列 4096 条、内存重试区 512 条、每批 250 条，安装者无需维护队列容量环境变量。两级内存都满时会同步写持久化 spool 形成回压，禁止用无界内存队列继续堆积；健康信息会公开 `Capacity`、`OverflowPending`、`EmergencySpooled` 和 `Dropped`，其中 `Dropped` 必须保持为 0。
+
+每批日志在写 MongoDB 前先写入本地 `logs/syslog-spool`，MongoDB 暂时不可用或服务正常重启时会自动幂等重放。可通过环境变量 `MICROI_SYSLOG_SPOOL_DIR` 指定持久化目录，容器部署时应把该目录挂载到持久卷；多节点实例还应设置稳定且唯一的 `MICROI_NODE_ID`。所有节点共享 MongoDB/Redis，日志按全局 `EventId` 幂等 upsert，详情停留状态和私有附件票据可跨节点继续读取。
 
 平台内置用户行为日志还会记录 `Category`、`Action`、`Source`、`TargetType`、`TargetId`、`SessionId`、`DurationSeconds`、`Success`、`OccurredAt` 等结构化字段。用户显示统一采用 `Name(Account)`；密码、Token、Authorization、Secret、ApiKey、连接字符串等敏感内容会在进入队列时脱敏和限长。
 :::
+
+### API 进程内存保护
+
+API 默认启用进程级内存保护。达到软阈值后节点会停止接收普通请求并返回 HTTP 503；连续达到硬阈值后先请求宿主有界停机，宽限期结束仍未释放时以退出码 137 强制结束，由 Docker/Kubernetes/服务管理器重启，避免单个节点耗尽整台宿主机内存。`GET /api/Diagnostics/health` 同时承担 readiness：内存保护期间返回 503；`GET /api/Diagnostics/liveness` 只表示进程仍存活。
+
+保护阈值统一依据进程实际驻留内存（Windows Working Set / Linux RSS），不能依据 Linux 下的 `PrivateMemorySize64`。后者可能包含 .NET GC 预留但尚未占用物理内存的巨大虚拟地址空间，数值甚至会超过宿主机物理内存数倍，只能作为诊断值。健康接口会同时返回 `PressureMetric=ResidentSet`、`WorkingSetMB`、`PrivateAddressSpaceMB` 与 `ManagedHeapMB`，其中只有驻留内存参与熔断判断。
+
+默认硬阈值取“检测到的可用内存 70%”与 4096 MB 的较小值；软阈值默认为硬阈值的 80%。平台自动采用安全轮询、连续样本和有界退出策略。确有更大内存需求时必须按单节点实测后显式配置，不能把宿主机全部内存交给一个 API 进程。
+
+可用 `MICROI_PROCESS_MEMORY_GUARD_ENABLED`、`MICROI_PROCESS_MEMORY_GUARD_SOFT_LIMIT_MB`、`MICROI_PROCESS_MEMORY_GUARD_HARD_LIMIT_MB`、`MICROI_PROCESS_MEMORY_GUARD_POLL_SECONDS`、`MICROI_PROCESS_MEMORY_GUARD_HARD_SAMPLES`、`MICROI_PROCESS_MEMORY_GUARD_EXIT_GRACE_SECONDS`、`MICROI_PROCESS_MEMORY_GUARD_HARD_EXIT` 调整保护参数；同名 `ProcessMemoryGuard:*` 配置也受支持。软阈值必须低于硬阈值，生产环境不建议关闭保护。
+
+阈值应按单个 API 节点配置，不能用某个进程占满宿主机的额度。生产环境必须配置自动重启和 readiness 摘除；多节点滚动发布时，一个节点进入内存保护不能影响其它节点继续服务。
+
+启动缓存和批量预热也必须自身有界。例如多语言运行时缓存先做有效行数预算检查，只读取租户实际启用的语言列，再按 `Id` 游标分页；默认每页 500、最多扫描 10000 行、最多保留 5000000 字符、单条 SQL 最长 30 秒。超过行数预算时不会先物化预算上限内的巨大对象图，而是立即拒绝本次重载并保留旧缓存。可通过 `MICROI_DIY_LANG_CACHE_PAGE_SIZE`、`MICROI_DIY_LANG_CACHE_MAX_ROWS`、`MICROI_DIY_LANG_CACHE_MAX_CHARACTERS`、`MICROI_DIY_LANG_CACHE_COMMAND_TIMEOUT_SECONDS` 或对应的 `DiyLang:RuntimeCache*` 配置调整；提高上限前必须测量单节点峰值内存。禁止使用 `SELECT *` 后一次性 `ToList`，再复制为第二份字典；数据库异常时保留旧缓存并失败关闭。
 
 ## V8.Base64
 >* Base64转换，与System.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串
@@ -655,7 +671,7 @@ try {
 }
 ```
 
-新增或修改保存连接后会清除本节点缓存，并由各节点按短 TTL 自动回源，不需要重启 API。默认 TTL 为 60 秒，可通过 `MICROI_EXTENSION_DATABASE_CACHE_SECONDS` 调整。连接串、密码和鉴权参数不得出现在日志、前端代码或接口返回中。
+新增或修改保存连接后会递增共享 Redis 版本，各节点在下一次访问时立即回源，不需要重启 API。默认兜底 TTL 为 60 秒，需要调整时修改 SaaS 引擎主租户的 `ExtensionDatabaseCacheSeconds`。连接串、密码和鉴权参数不得出现在日志、前端代码或接口返回中。
 
 ## 数据库事务 V8.DbTrans
 >* 数据库事务对象，可以像V8.Db一样使用，如：
@@ -832,7 +848,7 @@ var uploadText = V8.Http.Post({
 
 接口引擎中必须使用对象参数格式，例如 `V8.Http.Get({ Url: url })`。不要使用 `V8.Http.Get(url)`；旧的 .NET 同名异步重载可能被 Jint 解析为 Promise。
 
-后端 `V8.Http` 的严格 SSRF 防护默认关闭，未配置时完全保留历史行为：不限制协议、URL 内嵌凭据、`localhost`、私网、链路本地或云元数据地址，并继续自动处理重定向。只有显式设置 `SsrfProtection:Enabled=true` 或环境变量 `MICROI_SSRF_PROTECTION_ENABLED=true` 后，才只允许 HTTP(S)，拒绝 URL 内嵌凭据、回环、私网、链路本地、云元数据和其它特殊地址，同时禁止自动跟随 3xx；受控目标可通过 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 精确放行。白名单匹配主机，不匹配 URL 子串；严格模式下需要跳转时，先用 `GetResponse/PostResponse/PatchResponse` 检查状态码和 `Location`，再显式发起下一次请求。兼容旧配置的优先级和租户配置方法见 [平台安全总览](../more/security.md)。
+后端 `V8.Http` 的严格 SSRF 防护默认关闭，未配置时完全保留历史行为：不限制协议、URL 内嵌凭据、`localhost`、私网、链路本地或云元数据地址，并继续自动处理重定向。只有在 SaaS 引擎主租户启用 `SsrfProtectionEnabled` 后，才只允许 HTTP(S)，拒绝 URL 内嵌凭据、回环、私网、链路本地、云元数据和其它特殊地址，同时禁止自动跟随 3xx；受控目标可通过 `SsrfAllowedHosts` 精确放行。白名单匹配主机，不匹配 URL 子串；严格模式下需要跳转时，先用 `GetResponse/PostResponse/PatchResponse` 检查状态码和 `Location`，再显式发起下一次请求。租户配置方法见 [平台安全总览](../more/security.md)。
 
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。

@@ -712,7 +712,7 @@
 | `ClientSecrets` | Token密钥 | `varchar(50)` | `Text` | 废弃字段 |
 | `MQVitrualHost` | VitrualHost | `varchar(50)` | `Text` | VitrualHost |
 | `DbReadConn` | 数据库连接字符串（读） | `varchar(500)` | `Text` | 为空则取DbConn |
-| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 主租户此字段与 `Cors:AllowOrigins` 都为空时默认允许任意来源；填写后按精确来源或通配符收紧。示例：`http://localhost:2009;https://os.itdos.com;https://*.microi.net`。CORS 不是鉴权边界。 |
+| `CorsAllowOrigins` | 跨域配置 | `mediumtext` | `Textarea` | 主租户此字段为空时默认允许任意来源；填写后按精确来源或通配符收紧，`CorsAllowAnyWhenUnconfigured` 可调整未配置时的兼容行为。示例：`http://localhost:2009;https://os.itdos.com;https://*.microi.net`。CORS 不是鉴权边界。 |
 | `SessionAuthTimeout` | Token过期时间（PC） | `varchar(50)` | `Text` | 单位：分钟，默认20分钟 |
 | `MQUserName` | 用户名 | `varchar(50)` | `Text` | 用户名 |
 | `DomainName` | 域名 | `mediumtext` | `Text` | 多个域名使用英文分号分割，移动端建议使用m-开头。 |

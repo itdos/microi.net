@@ -475,6 +475,15 @@ VS Code 插件执行前端微服务构建前必须先安全清理当前项目自
 
 “构建并推送前端微服务”必须在本地构建通过后，先把完整受管源码同步到当前租户私有 HDFS（主数据写入 `sys_microistore`，源码清单写入 `mci_ai_app_file`），再发布公有 HDFS 编译产物并更新 `sys_microiservice / sys_microiservice_page`。源码同步失败必须终止发布并向用户报错，禁止吞掉异常后留下“新运行产物已发布但没有对应源码”的半完成状态。
 
+### MCP 创建本地 Vue 微服务闭环
+
+- VS Code 生成本地 stdio MCP 配置时必须注入 `MICROI_WORKSPACE_ROOT`、`MICROI_SYNC_ROOT` 和当前服务器/租户的 `MICROI_AI_APPLICATIONS_DIR`。路径由插件的服务器目录名、`OsClient.Type.Network` 和 `AI应用` 规则计算，AI 不得根据 MCP 进程 `cwd` 猜工作区或租户目录。
+- 新建 Vue 微服务先调用 `microi_scaffold_vue_microservice` 且不传 `confirmExecution`，核对目标目录、路由和文件清单；确认后把 `confirmExecution` 精确设为 `appKey`。工具只能写入真实且名为 `AI应用` 的目录，按 AppKey 原子创建，目标存在且不是同一清单时必须拒绝覆盖。
+- `routes` 是页面源码、`microi.routes.json`、发布路由和菜单绑定的共同事实源；一条路由只生成一个页面文件，必须明确 `path/name/title/sourceFile/isHome`。不能为了提供默认首页额外生成一个未被需求或菜单使用的第三页面。
+- 脚手架完成后依次执行：`npm install`、本地构建、`microi_create_microservice`、`microi_sync_microservice_source`、`microi_publish_application_directory_stream`。真实编译目录优先流式发布；只有当前服务器尚未部署流式端点且产物很小时，才允许临时使用兼容的 `microi_publish_microservice`，并在交付结论中如实注明。
+- 发布回读取得 `sys_microiservice.Id` 与每条 `sys_microiservice_page.Id` 后，使用 `microi_create_module` 一次传入 `openType=MicroService`、`microServiceId`、`microServicePageId`、`microServiceRoutePath`、`microServiceKey`。菜单工具必须写后回读这些字段；不得长期依赖“先建普通 URL 菜单，再手工补字段”的两步绕路。
+- 最终通过 `microi_get_application_context`、`microi_get_microservice`、`microi_get_module` 和真实登录后的两个友好菜单路由逐层验收；连续切换两个菜单，检查页面标题、MicroApp 上下文、Vue 交互、无 404/5xx/白屏/实例冲突，并保存 fullPage 截图后用 `view_image` 复核。
+
 ### 表单下拉 Data 动态对象选项
 
 表单 V8 通过 `V8.FieldSet('字段名', 'Data', objectRows)` 动态写入下拉数据时，如果 `objectRows` 是对象数组，即使 `diy_field.Config.DataSource='Data'`，前端也必须按对象数据源处理，并使用 `SelectLabel/SelectSaveField` 或常见字段兜底生成 label/value。禁止把对象数组按普通字符串 Data 源过滤，否则会出现接口已有数据但下拉显示“无数据”的回归。
@@ -540,5 +549,7 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 - 兑换通过 `POST /api/SysUserAccessKey/Exchange` 的 JSON Body 完成。响应头中的短期 Token 继续交给平台统一请求层保存和轮换。
 - 创建界面默认按页面名称勾选，也支持粘贴完整页面网址自动解析；不能要求普通用户手写路由和物理表名。页面/数据均可选择“全部已授权”，内部值为 `*`，含义只是取消密钥层二次白名单，仍与目标帐号实时菜单、表单和行权限取交集。接口引擎与数据源引擎 Key 仍必须准确选择。
 - `_AccessKeySession=true` 且页面为准确白名单时只允许清单路径；页面范围为 `*` 时才加载目标帐号实时可用的动态路由，以便全部已授权菜单可访问。该前端限制只是体验和泄露面收窄，服务端仍必须校验 API、表和引擎权限。
+- 全部页面模式会调用 `/api/SysMenu/GetSysMenuStep`，服务端只能在 `page:open + AllowedRoutes=*` 时放行；准确页面模式不得为了省事请求完整菜单树。页面渲染过程中使用 `FormEngineKey` 或 `TableId` 的请求都必须能被服务端映射到同一份表范围，不能通过换参数名绕过。
+- 不要因为底层帐号是管理员而在访问密钥会话展示控制面入口或触发控制面预加载。`_AccessKeySession=true` 时，密码显示、密钥管理、表/字段/菜单设计、缓存/服务器管理、查看或踢出其它终端等功能必须保持不可用；后台任务中心最多读取和管理当前用户自己的任务。
 - `/access-login` 必须在普通 SSO 发现之前直接放行，兑换最多等待 20 秒并给出明确错误，不能让页面永久停在“正在自动登录”。
 - 历史 `?token=` 只作兼容：解析后立即清除参数，不输出、不持久化完整 Token，不为新功能生成这种链接。

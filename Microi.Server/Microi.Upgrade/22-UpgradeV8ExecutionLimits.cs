@@ -35,7 +35,7 @@ namespace Microi.net
                     "NumberText",
                     4800,
                     "32768",
-                    "租户可配置的整棵V8调用树累计分配硬上限，默认32768MB；实际仍受API节点appsettings或环境变量硬上限约束。"),
+                    "租户可配置的整棵V8调用树累计分配硬上限，默认32768MB；最终仍受平台代码固定安全边界约束。"),
                 Field(
                     "V8NestedApiDepth",
                     "V8接口嵌套深度",
@@ -49,7 +49,7 @@ namespace Microi.net
                     "NumberText",
                     5000,
                     "64",
-                    "租户可配置的V8接口嵌套深度硬上限，默认64；实际仍受API节点appsettings或环境变量硬上限约束。"),
+                    "租户可配置的V8接口嵌套深度硬上限，默认64；最终仍受平台代码固定安全边界约束。"),
                 Field(
                     "V8IsolateNestedApiMemory",
                     "隔离嵌套分配计数",
@@ -73,7 +73,7 @@ namespace Microi.net
                 Metadata("V8DefaultLimitMemoryMB", "V8单层分配预算(MB)",
                     "单个V8引擎默认累计分配预算，默认2048MB。它统计执行期间的分配流量，不是实时堆占用；开启嵌套隔离后不会重复计入子接口分配。"),
                 Metadata("V8MaxLimitMemoryMB", "V8单层最大预算(MB)",
-                    "租户或接口可配置的单层累计分配硬上限，默认4096MB；实际仍受API节点appsettings或环境变量硬上限约束。"),
+                    "租户或接口可配置的单层累计分配硬上限，默认4096MB；最终仍受平台代码固定安全边界约束。"),
                 Metadata("V8DefaultLimitRecursion", null,
                     "单个JavaScript脚本函数递归的默认深度上限，默认2000；不等同于接口引擎嵌套层数。"),
                 Metadata("V8MaxLimitRecursion", null,

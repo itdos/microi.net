@@ -192,7 +192,7 @@
                         <el-table-column :label="$t('Msg.LastActiveTime')" min-width="150">
                             <template #default="{ row }">{{ formatDateTime(row.LastActiveTime || row.ConnectedTime) }}</template>
                         </el-table-column>
-                        <el-table-column :label="$t('Msg.Operation')" width="120" fixed="right">
+                        <el-table-column v-if="!isAccessKeySession" :label="$t('Msg.Operation')" width="120" fixed="right">
                             <template #default="{ row }">
                                 <el-button link type="danger" size="small" :icon="SwitchButton" @click="kickTerminal(row, currentUser.Id)">
                                     {{ $t("Msg.KickOffline") }}
@@ -301,7 +301,12 @@ export default {
         currentUser() {
             return this.diyStore?.GetCurrentUser || {};
         },
+        isAccessKeySession() {
+            const value = this.currentUser?._AccessKeySession;
+            return value === true || value === 1 || value === "1" || value === "true";
+        },
         isAdmin() {
+            if (this.isAccessKeySession) return false;
             const user = this.currentUser;
             return user._IsAdmin === true
                 || user._IsAdmin === 1
@@ -309,7 +314,8 @@ export default {
                 || user._IsAdmin === "true";
         },
         isSuperAdmin() {
-            return Number(this.currentUser?.Level || 0) >= 9999;
+            return !this.isAccessKeySession
+                && Number(this.currentUser?.Level || 0) >= 9999;
         },
         runningCount() {
             return this.tasks.filter((item) => item.Status === "Pending" || item.Status === "Running").length;

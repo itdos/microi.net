@@ -356,16 +356,16 @@ namespace Microi.net
         {
             var options = new RequestPressureGuardOptions
             {
-                Enabled = ConfigHelper.GetEnvOrConfigurationBool("MICROI_PRESSURE_GUARD_ENABLED", "PressureGuard:Enabled", true),
-                GlobalMaxConcurrentRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_GLOBAL_MAX", "PressureGuard:GlobalMaxConcurrentRequests", 2000),
-                TenantMaxConcurrentRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_TENANT_MAX", "PressureGuard:TenantMaxConcurrentRequests", 600),
-                RouteMaxConcurrentRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_ROUTE_MAX", "PressureGuard:RouteMaxConcurrentRequests", 400),
-                ApiEngineMaxConcurrentRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_APIENGINE_MAX", "PressureGuard:ApiEngineMaxConcurrentRequests", 80),
-                V8GlobalMaxConcurrentRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_V8_GLOBAL_MAX", "PressureGuard:V8GlobalMaxConcurrentRequests", 128),
-                V8TenantMaxConcurrentRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_V8_TENANT_MAX", "PressureGuard:V8TenantMaxConcurrentRequests", 32),
-                WaitMilliseconds = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_WAIT_MS", "PressureGuard:WaitMilliseconds", 10000),
-                LongRunningWaitMilliseconds = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_LONG_RUNNING_WAIT_MS", "PressureGuard:LongRunningWaitMilliseconds", 1800000),
-                RetryAfterSeconds = ConfigHelper.GetEnvOrConfigurationInt("MICROI_PRESSURE_RETRY_AFTER_SECONDS", "PressureGuard:RetryAfterSeconds", 3)
+                Enabled = ConfigHelper.GetRuntimeConfigurationBool("PressureGuard:Enabled", true),
+                GlobalMaxConcurrentRequests = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:GlobalMaxConcurrentRequests", 2000),
+                TenantMaxConcurrentRequests = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:TenantMaxConcurrentRequests", 600),
+                RouteMaxConcurrentRequests = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:RouteMaxConcurrentRequests", 400),
+                ApiEngineMaxConcurrentRequests = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:ApiEngineMaxConcurrentRequests", 80),
+                V8GlobalMaxConcurrentRequests = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:V8GlobalMaxConcurrentRequests", 128),
+                V8TenantMaxConcurrentRequests = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:V8TenantMaxConcurrentRequests", 32),
+                WaitMilliseconds = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:WaitMilliseconds", 10000),
+                LongRunningWaitMilliseconds = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:LongRunningWaitMilliseconds", 1800000),
+                RetryAfterSeconds = ConfigHelper.GetRuntimeConfigurationInt("PressureGuard:RetryAfterSeconds", 3)
             };
             return options;
         }

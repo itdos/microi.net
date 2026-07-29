@@ -174,7 +174,10 @@ namespace Microi.net
                             osClient,
                             TableName,
                             "ux_mci_user_access_key_prefix",
-                            new[] { "OsClient", "KeyPrefix" },
+                            // OsClient selects the tenant database and is not a
+                            // physical column on FormEngine tables. KeyPrefix is
+                            // therefore unique inside the already isolated DB.
+                            new[] { "KeyPrefix" },
                             true));
                     AddIndexResult(
                         messages,

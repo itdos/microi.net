@@ -6,8 +6,8 @@ namespace Microi.net
 {
     /// <summary>
     /// 在 SaaS 引擎表中补齐租户级文件上传开关与限额。
-    /// 所有数值均可空：业务优先级为租户 > 环境变量 > appsettings > 代码默认值，
-    /// 最终仍受平台独立 Absolute* 与 HTTP 请求解析上限保护。
+    /// 所有数值均可空：业务优先级为租户 SaaS 配置 > 代码默认值，
+    /// 最终仍受平台固定 Absolute* 与 HTTP 请求解析上限保护。
     /// </summary>
     public class Upgrade16
     {
@@ -25,28 +25,28 @@ namespace Microi.net
                     Component = "Switch",
                     DefaultValue = "1",
                     Sort = 9870,
-                    Description = "关闭后禁止当前租户的交互式文件上传；空值依次使用环境变量、appsettings和代码默认值。全局ForceDisabled紧急熔断不能被租户重新开启。"
+                    Description = "关闭后禁止当前租户的交互式文件上传；空值使用平台代码默认值。"
                 },
                 new FileUploadTenantField
                 {
                     Name = "FileUploadMaxFileMB",
                     Label = "单文件上限MB",
                     Sort = 9880,
-                    Description = "当前租户动态单文件上限；优先于环境变量和appsettings，最终不能突破平台AbsoluteMaxFileMB及请求解析上限。"
+                    Description = "当前租户动态单文件上限；最终不能突破平台固定的1024MB单文件灾难保护上限及请求解析上限。"
                 },
                 new FileUploadTenantField
                 {
                     Name = "FileUploadMaxRequestMB",
                     Label = "单次总量上限MB",
                     Sort = 9890,
-                    Description = "当前租户一次上传所有文件的合计大小；优先于环境变量和appsettings，最终受AbsoluteMaxTotalMB及HTTP/Multipart上限约束。"
+                    Description = "当前租户一次上传所有文件的合计大小；最终受平台固定的2048MB单次灾难保护上限及HTTP/Multipart上限约束。"
                 },
                 new FileUploadTenantField
                 {
                     Name = "FileUploadMaxCount",
                     Label = "单次文件数上限",
                     Sort = 9900,
-                    Description = "当前租户一次上传文件数；优先于环境变量和appsettings，必须为正整数且不能突破AbsoluteMaxFileCount。"
+                    Description = "当前租户一次上传文件数；必须为正整数且不能突破平台固定的100个文件灾难保护上限。"
                 },
                 new FileUploadTenantField
                 {
