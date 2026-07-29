@@ -36,6 +36,7 @@ const xjyProposalCalculation = fs.readFileSync(
   'utf8'
 )
 const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
+const moduleDetail = fs.readFileSync(path.join(root, 'src/pages/module/detail.vue'), 'utf8')
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -82,10 +83,35 @@ if (!renderer.includes("this.isMultiple && raw && typeof raw === 'object'") ||
 // zhy: 确保新增和编辑页的字段分组保持可折叠能力。
 if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
   !nativeForm.includes('initializeGroupExpansion(definition.groups || [])') ||
-  !nativeForm.includes('this.expandedGroupKeys = [this.groupKey(groups[0], 0)]') ||
+  !nativeForm.includes("group.defaultExpanded !== false") ||
   !nativeForm.includes('.form-section__toggle.expanded') ||
   !nativeForm.includes('this.expandFirstInvalidGroup()')) {
   fail('native form field groups must support collapsed and expanded states')
+}
+if (!formRuntime.includes("field.component === 'CollapseGroup'") ||
+  !formRuntime.includes("source: 'CollapseGroup'") ||
+  !formRuntime.includes('collapse.DefaultCollapsed') ||
+  !formRuntime.includes('collapse.FieldCount')) {
+  fail('native form field groups must follow platform CollapseGroup metadata')
+}
+if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
+  fail('readonly platform fields must remain visible but non-editable')
+}
+if (!formRuntime.includes("if (value === null || value === undefined || value === '') return '-'")) {
+  fail('empty platform fields must render as dash values')
+}
+if (!businessDetail.includes('const groups = this.definition?.groups || []') ||
+  businessDetail.includes('(this.preset.sections || []).forEach') ||
+  !moduleDetail.includes('const groups = this.config.definition?.groups || []')) {
+  fail('detail pages must use platform CollapseGroup groups instead of local preset sections')
+}
+if (!formRuntime.includes('normalizeTableTabs(table)') ||
+  !formRuntime.includes('field.formTabKey') ||
+  !nativeForm.includes('v-if="formTabs.length > 1"') ||
+  !moduleDetail.includes('v-if="formTabs.length > 1"') ||
+  !businessDetail.includes('v-if="formTabs.length > 1"') ||
+  !businessDetail.includes(':active-key="activeFormTabKey"')) {
+  fail('form tabs must use platform diy_table.Tabs and hide when only one tab exists')
 }
 // zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
 for (const token of [
