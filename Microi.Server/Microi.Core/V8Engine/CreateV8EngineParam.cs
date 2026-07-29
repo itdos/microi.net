@@ -5,22 +5,19 @@ namespace Microi.net
 {
     public class CreateV8EngineParam
     {
-        public static int DefaultTimeout => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_TIMEOUT_SECONDS", "V8Limits:DefaultTimeoutSeconds", 600);
-        public static int MaxTimeout => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_TIMEOUT_SECONDS", "V8Limits:MaxTimeoutSeconds", 3600);
-        public static int DefaultMaxStatements => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_MAX_STATEMENTS", "V8Limits:DefaultMaxStatements", 50_000_000);
-        public static int MaxStatementsLimit => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_STATEMENTS", "V8Limits:MaxStatements", 500_000_000);
-        public static int DefaultLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_MEMORY_MB", "V8Limits:DefaultLimitMemoryMB", 2048);
-        public static int MaxLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_MEMORY_MB", "V8Limits:MaxLimitMemoryMB", 4096);
-        public static int DefaultLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_DEFAULT_LIMIT_RECURSION", "V8Limits:DefaultLimitRecursion", 2000);
-        public static int MaxLimitRecursion => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_LIMIT_RECURSION", "V8Limits:MaxLimitRecursion", 5000);
-        public static int DefaultCallTreeLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_CALL_TREE_LIMIT_MEMORY_MB", "V8Limits:CallTreeLimitMemoryMB", 8192);
-        public static int MaxCallTreeLimitMemory => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_CALL_TREE_LIMIT_MEMORY_MB", "V8Limits:MaxCallTreeLimitMemoryMB", 32768);
-        public static int DefaultNestedApiDepth => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_NESTED_API_DEPTH", "V8Limits:NestedApiDepth", 32);
-        public static int MaxNestedApiDepth => ConfigHelper.GetEnvOrConfigurationInt("MICROI_V8_MAX_NESTED_API_DEPTH", "V8Limits:MaxNestedApiDepth", 64);
-        public static bool DefaultIsolateNestedApiMemory => ConfigHelper.GetEnvOrConfigurationBool(
-            "MICROI_V8_ISOLATE_NESTED_API_MEMORY",
-            "V8Limits:IsolateNestedApiMemory",
-            true);
+        public const int DefaultTimeout = 600;
+        public const int MaxTimeout = 3600;
+        public const int DefaultMaxStatements = 50_000_000;
+        public const int MaxStatementsLimit = 500_000_000;
+        public const int DefaultLimitMemory = 2048;
+        public const int MaxLimitMemory = 4096;
+        public const int DefaultLimitRecursion = 2000;
+        public const int MaxLimitRecursion = 5000;
+        public const int DefaultCallTreeLimitMemory = 8192;
+        public const int MaxCallTreeLimitMemory = 32768;
+        public const int DefaultNestedApiDepth = 32;
+        public const int MaxNestedApiDepth = 64;
+        public const bool DefaultIsolateNestedApiMemory = true;
 
         public int MaxTimeoutSeconds { get; set; } = MaxTimeout;
         public int MaxStatementsLimitValue { get; set; } = MaxStatementsLimit;

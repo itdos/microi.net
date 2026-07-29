@@ -19,11 +19,13 @@
 
 V8 脚本不能传 `ExecutablePath` 或 `UserDataDir`。平台按 `OsClient + ApiEngineKey/EventName + SessionId/ProfileKey` 隔离浏览器目录与会话。默认资源边界：
 
-- 当前节点最多 32 个会话：`MICROI_SPIDER_MAX_SESSIONS_TOTAL` / `Spider:MaxSessionsTotal`；
-- 每个租户与引擎作用域最多 4 个：`MICROI_SPIDER_MAX_SESSIONS_PER_SCOPE` / `Spider:MaxSessionsPerScope`；
-- 空闲 30 分钟回收：`MICROI_SPIDER_SESSION_IDLE_MINUTES` / `Spider:SessionIdleMinutes`；
-- 最长 8 小时：`MICROI_SPIDER_SESSION_MAX_HOURS` / `Spider:SessionMaxHours`；
+- 当前节点最多 32 个会话：SaaS 引擎主租户字段 `SpiderMaxSessionsTotal`；
+- 每个租户与引擎作用域最多 4 个：`SpiderMaxSessionsPerScope`；
+- 空闲 30 分钟回收：`SpiderSessionIdleMinutes`；
+- 最长 8 小时：`SpiderSessionMaxHours`；
 - 抓包响应体默认 200,000 字符、硬上限 1,000,000，每会话最多 100 条。
+
+这些参数统一在 SaaS 引擎主租户的“平台运行配置”中维护，保存后由共享配置刷新生效，不需要给每个 API/Worker 容器重复配置环境变量。
 
 浏览器会话和会话数配额目前是节点进程内状态。多节点复用登录态需粘性路由或独立 Spider Worker；可靠任务状态、幂等键和结果必须写共享数据库/MQ，不能把浏览器进程当可恢复事实源。
 

@@ -85,18 +85,45 @@ test('current-user access-key tools require confirmation and expose plaintext on
         assert.equal(blockedCreate.isError, true);
         assert.match(toolText(blockedCreate), /confirmExecution/);
         assert.equal(created.length, 0);
+        const confirmation = JSON.parse(toolText(blockedCreate));
+        assert.match(confirmation.RequiredConfirmationSha256, /^[a-f0-9]{64}$/);
+        assert.deepEqual(confirmation.NormalizedGrant.scopes, ['form:read', 'page:open']);
+        const tamperedCreate = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_create_my_access_key',
+                params: {
+                    ...createParams,
+                    allowedTableNames: ['biz_order', 'sys_user'],
+                    confirmExecution: confirmation.RequiredConfirmationSha256,
+                },
+            },
+        });
+        assert.equal(tamperedCreate.isError, true);
+        assert.match(toolText(tamperedCreate), /RequiredConfirmationSha256/);
+        assert.equal(created.length, 0);
         const create = await client.callTool({
             name: 'microi_codex',
             arguments: {
                 action: 'microi_create_my_access_key',
-                params: { ...createParams, confirmExecution: createParams.name },
+                params: { ...createParams, confirmExecution: confirmation.RequiredConfirmationSha256 },
             },
         });
         assert.equal(create.isError, undefined);
         assert.equal(created.length, 1);
-        assert.equal(created[0]?.scopes, undefined);
+        assert.deepEqual(created[0]?.scopes, ['form:read', 'page:open']);
         assert.equal((toolText(create).match(/one-time-fixture/g) || []).length, 1);
         assert.doesNotMatch(toolText(create), /LoginPath|access-login/);
+        const unsupportedScope = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_create_my_access_key',
+                params: { ...createParams, scopes: ['form:write'] },
+            },
+        });
+        assert.equal(unsupportedScope.isError, true);
+        assert.match(toolText(unsupportedScope), /form:write|Invalid|invalid/i);
+        assert.equal(created.length, 1);
         const blockedRevoke = await client.callTool({
             name: 'microi_codex',
             arguments: { action: 'microi_revoke_my_access_key', params: { id: 'key-1' } },

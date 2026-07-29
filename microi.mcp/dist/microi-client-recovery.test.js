@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { isAuthenticationFailureResponse, isTenantConfigurationFailureResponse, MicroiClient, } from './microi-client.js';
+import { buildTokenFileLookupKeys, isAuthenticationFailureResponse, isTenantConfigurationFailureResponse, MicroiClient, } from './microi-client.js';
 function jsonResponse(body) {
     return new Response(JSON.stringify(body), {
         status: 200,
@@ -44,6 +45,15 @@ test('authentication failure detection covers signature/version errors but not i
         Msg: '无效的租户标识：demo',
     }), false);
 });
+test('token-file lookup prefers exact tenant identity and retains legacy fallbacks', () => {
+    assert.deepEqual(buildTokenFileLookupKeys('https://microi.test/', 'demo', 'Product', 'Internal'), [
+        'https://microi.test|demo|Product|Internal',
+        'https://microi.test|demo|Product',
+        'https://microi.test|demo',
+        'https://microi.test',
+    ]);
+    assert.deepEqual(buildTokenFileLookupKeys('https://microi.test/', 'demo'), ['https://microi.test|demo', 'https://microi.test']);
+});
 test('MCP requests credential-free VS Code recovery and reloads the rotated token file', async () => {
     const originalFetch = globalThis.fetch;
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mcp-auth-recovery-'));
@@ -51,10 +61,13 @@ test('MCP requests credential-free VS Code recovery and reloads the rotated toke
     const recoveryDir = path.join(tempDir, 'recovery');
     const apiBaseUrl = 'https://microi.test';
     const osClient = 'demo';
-    const tokenKey = `${apiBaseUrl}|${osClient}`;
+    const osClientType = 'Product';
+    const osClientNetwork = 'Internal';
+    const tokenKey = `${apiBaseUrl}|${osClient}|${osClientType}|${osClientNetwork}`;
     fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: 'old-token' }));
     let statusCalls = 0;
     let refreshCalls = 0;
+    const recoveryPayloads = [];
     let brokerTimer;
     try {
         globalThis.fetch = async (input, init) => {
@@ -91,6 +104,9 @@ test('MCP requests credential-free VS Code recovery and reloads the rotated toke
             if (requests.length === 0) {
                 return;
             }
+            for (const request of requests) {
+                recoveryPayloads.push(JSON.parse(fs.readFileSync(path.join(recoveryDir, request), 'utf8')));
+            }
             fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: 'new-token' }));
             for (const request of requests)
                 fs.rmSync(path.join(recoveryDir, request), { force: true });
@@ -100,6 +116,8 @@ test('MCP requests credential-free VS Code recovery and reloads the rotated toke
             username: '',
             password: '',
             osClient,
+            osClientType,
+            osClientNetwork,
             token: 'old-token',
             tokenFilePath,
             authRecoveryRequestDir: recoveryDir,
@@ -109,6 +127,12 @@ test('MCP requests credential-free VS Code recovery and reloads the rotated toke
         assert.equal(result.Code, 1);
         assert.equal(statusCalls, 2);
         assert.equal(refreshCalls, 1);
+        assert.equal(recoveryPayloads.length, 1);
+        assert.equal(recoveryPayloads[0]?.apiBaseUrl, apiBaseUrl);
+        assert.equal(recoveryPayloads[0]?.osClient, osClient);
+        assert.equal(recoveryPayloads[0]?.osClientType, osClientType);
+        assert.equal(recoveryPayloads[0]?.osClientNetwork, osClientNetwork);
+        assert.equal(recoveryPayloads[0]?.failedTokenHash, crypto.createHash('sha256').update('old-token').digest('hex'));
     }
     finally {
         if (brokerTimer)
@@ -384,6 +408,66 @@ test('updateModule rejects a false success when EditCodeShowV8 is not persisted'
         assert.equal(result.Code, 0);
         assert.match(result.Msg || '', /EditCodeShowV8/);
         assert.deepEqual(result.Data.Mismatches, ['EditCodeShowV8']);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
+test('createModule completes and verifies MicroService menu linkage after the idempotent create call', async () => {
+    const originalFetch = globalThis.fetch;
+    const requests = [];
+    try {
+        globalThis.fetch = async (input, init) => {
+            const url = String(input);
+            const body = JSON.parse(String(init?.body || '{}'));
+            requests.push({ url, body });
+            if (url.endsWith('/api/V8Engine/CreateModule')) {
+                return jsonResponse({ Code: 1, Data: { ModuleId: 'menu-1', Url: '/micro-app/mcp-ai-vue-test/context-test' }, Msg: '' });
+            }
+            if (url.endsWith('/api/V8Engine/UpdateModule')) {
+                return jsonResponse({ Code: 1, Data: { ModuleId: 'menu-1' }, Msg: '' });
+            }
+            if (url.endsWith('/api/V8Engine/GetModule')) {
+                return jsonResponse({
+                    Code: 1,
+                    Data: {
+                        Id: 'menu-1',
+                        IsMicroiService: 1,
+                        OpenType: 'MicroService',
+                        ComponentName: 'MicroService',
+                        ComponentPath: '/micro-app/host',
+                        Url: '/micro-app/mcp-ai-vue-test/context-test',
+                        MicroServiceId: 'service-1',
+                        MicroServicePageId: 'page-1',
+                        MicroServiceRoutePath: '/context-test',
+                    },
+                    Msg: '',
+                });
+            }
+            throw new Error(`Unexpected URL: ${url}`);
+        };
+        const result = await createClient().createModule({
+            Name: '上下文测试',
+            ParentId: 'test-parent',
+            OpenType: 'MicroService',
+            ComponentName: 'MicroService',
+            ComponentPath: '/micro-app/host',
+            Url: '/micro-app/mcp-ai-vue-test/context-test',
+            IsMicroiService: 1,
+            MicroServiceId: 'service-1',
+            MicroServicePageId: 'page-1',
+            MicroServiceRoutePath: '/context-test',
+            MicroServiceKey: 'mcp-ai-vue-test',
+        });
+        assert.equal(result.Code, 1);
+        assert.equal(result.Data.MicroServiceBindingVerified, true);
+        assert.equal(requests.filter(request => request.url.endsWith('/api/V8Engine/CreateModule')).length, 1);
+        assert.equal(requests.filter(request => request.url.endsWith('/api/V8Engine/UpdateModule')).length, 1);
+        assert.equal(requests.filter(request => request.url.endsWith('/api/V8Engine/GetModule')).length, 1);
+        const update = requests.find(request => request.url.endsWith('/api/V8Engine/UpdateModule'))?.body;
+        assert.equal(update?.MicroServicePageId, 'page-1');
+        assert.equal(update?.MicroServiceRoutePath, '/context-test');
+        assert.equal(update?.MicroServiceKey, undefined);
     }
     finally {
         globalThis.fetch = originalFetch;

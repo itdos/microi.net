@@ -44,11 +44,11 @@
 - 普通帐号即使拥有 Token 或错误配置了菜单/高级表权限，也不能通过通用 FormEngine 访问 SaaS 配置、接口引擎、菜单角色、任务、数据源等平台保护表。相关控制面管理接口要求 `Level >= 9999`。
 - 主租户由运行环境中的 `OsClient` 或 `AppSettings:OsClient` 决定，不应在业务代码中写死为 `master`、`iTdos` 或其它固定值。
 
-影响整个 API 进程的端口、HTTP 解析、并发和数据库连接等配置，以环境变量、主租户运行配置和 `appsettings` 为准，子租户不能抬高这些进程级上限。文件上传的租户业务值是例外：按当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值解析，租户可以提高或降低业务默认值，但最终仍受独立 `Absolute*`、HTTP 解析和反向代理边界保护。配置保存后应走 SaaS 引擎的共享缓存刷新流程并回读验证，不依赖逐节点重启。
+数据库、Redis、主租户标识等启动基础设施仍由安装编排中的少量基础参数提供；普通业务和运行参数统一由 SaaS 引擎主租户或系统设置管理，未填写时使用代码安全默认值。子租户只能在平台允许的字段上配置自身额度，不能抬高节点级硬边界。文件上传业务值按当前租户 `sys_osclients` → 代码默认值解析，最终仍受 API 固定接收硬顶和反向代理边界保护。配置保存后应走 SaaS 引擎的共享缓存刷新流程并回读验证，不依赖逐节点重启。
 
 ### CORS 兼容规则
 
-主租户 `sys_osclients.CorsAllowOrigins` 与 `Cors:AllowOrigins` 都为空时，平台默认允许任意来源跨域，兼容本地开发、独立前端、H5 和存量租户；只有配置来源后才按精确来源或 `https://*.example.com` 这类通配符收紧。可用 `MICROI_CORS_ALLOW_ANY_WHEN_UNCONFIGURED` / `Cors:AllowAnyWhenUnconfigured` 显式调整兼容开关，默认值为允许。
+主租户 `sys_osclients.CorsAllowOrigins` 为空时，平台默认允许任意来源跨域，兼容本地开发、独立前端、H5 和存量租户；只有配置来源后才按精确来源或 `https://*.example.com` 这类通配符收紧。SaaS 引擎主租户字段 `CorsAllowAnyWhenUnconfigured` 可调整未配置时的兼容开关，默认值为允许。
 
 CORS 不是鉴权边界。即使默认允许跨域，服务端仍会校验 Token、`OsClient`、菜单/表权限、数据范围和保护表基线。平台会暴露 `authorization`、`osclient`、`did` 等续签所需响应 Header。
 
@@ -65,7 +65,7 @@ Upgrade16 会在 `sys_osclients` 增加以下可空字段：
 | `FileUploadDailyUserQuotaMB` | 单帐号 UTC 日额度 MB |
 | `FileUploadDailyTenantQuotaMB` | 单租户 UTC 日额度 MB |
 
-这些字段优先于环境变量和 `appsettings` 的业务默认值，可以按租户提高或降低；独立 `Absolute*` 灾难保护、`ForceDisabled` 以及 HTTP/Multipart/Form 解析上限不接受租户覆盖。帐号与租户日额度由共享 Redis 原子统计，Redis 不可用时上传失败关闭。完整说明见 [分布式存储与文件安全](../more/hdfs)。
+这些字段未填写时使用平台代码默认值，可以按租户提高或降低；平台固定灾难保护、API HTTP/Multipart 接收硬顶以及反向代理上限不接受租户覆盖。帐号与租户日额度由共享 Redis 原子统计，Redis 不可用时上传失败关闭。完整说明见 [分布式存储与文件安全](../more/hdfs)。
 
 ## 基础配置
 >* 支持数据库读写分离，支持指定存储介质

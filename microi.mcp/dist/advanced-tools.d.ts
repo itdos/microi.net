@@ -5,6 +5,12 @@ export declare function analyzeBackgroundWorkload(buttonInput: unknown): {
     required: boolean;
     reasons: string[];
 };
+export declare function analyzeClientChunking(buttonInput: unknown): {
+    declared: boolean;
+    valid: boolean;
+    maxItemsPerChunk: number;
+    resumable: boolean;
+};
 export declare function normalizeViewSchemaJson(raw: unknown): {
     ok: boolean;
     value?: string;

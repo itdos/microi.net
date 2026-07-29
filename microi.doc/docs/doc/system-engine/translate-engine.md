@@ -38,16 +38,7 @@ LibreTranslate 是动态翻译的可选供应商，不是平台必装依赖，�
 
 加载语言越多，首次模型下载和健康检查时间越长。一键安装脚本会生成随机 API Key，等待服务就绪并确认 Key 注册成功；LibreTranslate 端口不会默认加入宿主机防火墙放行列表。
 
-平台 API 可使用服务端环境变量连接：
-
-```text
-MICROI_TRANSLATE_PROVIDER=libretranslate
-MICROI_TRANSLATE_URL=http://翻译服务地址:端口
-MICROI_TRANSLATE_API_KEY=随机强密钥
-MICROI_TRANSLATE_TIMEOUT=120
-```
-
-也可在 SaaS 引擎的租户配置中维护 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`。环境变量适合整套部署的服务端兜底；租户配置适合不同租户使用不同供应商或密钥。所有地址和密钥都只允许服务端读取。
+平台 API 统一从 SaaS 引擎租户配置读取 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`。一键安装脚本会写入主租户并立即回读验证；不同租户也可维护各自的供应商与密钥。无需给 API 容器增加翻译环境变量，所有地址和密钥都只允许服务端读取。
 
 完整的语言清单、ASCII 编排目录、`docker compose -p microi-libretranslate` 命令和安全注意事项见 [Docker 部署一键安装](../getting-started/docker-run)。
 

@@ -13,8 +13,7 @@ namespace Microi.net.Api
         [HttpGet]
         public IActionResult OAuth(string code, string state)
         {
-            var expectedState = ConfigHelper.GetEnvOrConfiguration(
-                "MICROI_CHANJET_OAUTH_STATE",
+            var expectedState = ConfigHelper.GetRuntimeConfigurationValue(
                 "Integrations:Chanjet:OAuthState");
             if (expectedState.DosIsNullOrWhiteSpace()
                 || code.DosIsNullOrWhiteSpace()
@@ -33,11 +32,9 @@ namespace Microi.net.Api
         {
             try
             {
-                var aesKey = ConfigHelper.GetEnvOrConfiguration(
-                    "MICROI_CHANJET_AES_KEY",
+                var aesKey = ConfigHelper.GetRuntimeConfigurationValue(
                     "Integrations:Chanjet:AesKey");
-                var expectedAppKey = ConfigHelper.GetEnvOrConfiguration(
-                    "MICROI_CHANJET_APP_KEY",
+                var expectedAppKey = ConfigHelper.GetRuntimeConfigurationValue(
                     "Integrations:Chanjet:AppKey");
                 var enMsg = encryptMsg?.GetEncryptMsg();
                 var keyLength = Encoding.UTF8.GetByteCount(aesKey ?? "");

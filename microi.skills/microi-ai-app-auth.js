@@ -37,6 +37,27 @@ let modal = null;
 let sysConfig = {};
 let captchaId = '';
 let captchaObjectUrl = '';
+let lastUserIntentAt = 0;
+const USER_INTENT_WINDOW_MS = 30000;
+
+function installUserIntentTracking() {
+  if (document.documentElement.dataset.microiAiUserIntentTracking === 'true') return;
+  document.documentElement.dataset.microiAiUserIntentTracking = 'true';
+  const mark = event => {
+    if (event && event.isTrusted === false) return;
+    lastUserIntentAt = Date.now();
+  };
+  ['pointerdown', 'keydown', 'input', 'change', 'submit'].forEach(type => {
+    document.addEventListener(type, mark, true);
+  });
+}
+
+function hasRecentUserIntent() {
+  const active = typeof navigator !== 'undefined' && navigator.userActivation
+    ? navigator.userActivation.isActive
+    : false;
+  return active || Date.now() - lastUserIntentAt <= USER_INTENT_WINDOW_MS;
+}
 
 function flag(value) {
   if (value === true || value === 1) return true;
@@ -274,6 +295,7 @@ function injectStyles() {
     .mci-auth-title{font-size:25px;line-height:1.25;margin:22px 0 6px;font-weight:760}.mci-auth-sub{font-size:14px;color:#64748b;margin:0 0 22px}
     .mci-auth-field{display:block;margin:0 0 14px}.mci-auth-field span{display:block;font-size:13px;font-weight:650;margin:0 0 7px}.mci-auth-field input{box-sizing:border-box;width:100%;height:46px;border:1px solid #dbe3ef;border-radius:11px;padding:0 13px;font-size:15px;outline:0;background:#f8fafc;color:#172033}.mci-auth-field input:focus{border-color:#1769ff;box-shadow:0 0 0 3px rgba(23,105,255,.12);background:#fff}
     .mci-auth-captcha{display:grid;grid-template-columns:1fr 120px;gap:10px}.mci-auth-captcha img{width:120px;height:46px;object-fit:cover;border-radius:10px;border:1px solid #dbe3ef;cursor:pointer}
+    .mci-auth-captcha-field[hidden],.mci-auth-privacy[hidden]{display:none!important}
     .mci-auth-privacy{display:flex;gap:8px;align-items:flex-start;color:#64748b;font-size:13px;margin:2px 0 14px}.mci-auth-privacy input{margin-top:2px}.mci-auth-message{min-height:20px;margin:0 0 8px;color:#dc2626;font-size:13px}.mci-auth-submit{width:100%;height:46px;border:0;border-radius:11px;background:linear-gradient(135deg,#1769ff,#0e88d8);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 10px 26px rgba(23,105,255,.25)}.mci-auth-submit:disabled{opacity:.65;cursor:wait}
     .mci-auth-links{display:flex;justify-content:space-between;margin-top:16px;font-size:13px}.mci-auth-links a{color:#1769ff;text-decoration:none}.mci-auth-note{margin:18px 0 0;padding:12px 14px;border-radius:11px;background:#eff6ff;color:#475569;font-size:12px;line-height:1.65}
     @media(prefers-color-scheme:dark){.mci-auth-card{background:#111827;color:#f8fafc;border-color:#334155}.mci-auth-field input{background:#0f172a;border-color:#334155;color:#f8fafc}.mci-auth-sub,.mci-auth-privacy,.mci-auth-note{color:#aab6c8}.mci-auth-note{background:#172554}}
@@ -502,17 +524,18 @@ async function fetchWithAuth(input, init = {}, retried = false) {
   const appRequest = isAppEngineUrl(rawUrl);
   if (!appRequest) return nativeFetch(input, init);
   const writeRequest = isLikelyWrite(rawUrl) || bodyLikelyWrites(init.body, init.headers);
+  const promptAllowed = hasRecentUserIntent();
   document.documentElement.dataset.microiLastEngine = appEngineKey(rawUrl) || '';
   document.documentElement.dataset.microiWriteDetected = writeRequest ? 'true' : 'false';
   document.documentElement.dataset.microiHasToken = V8.getToken() ? 'true' : 'false';
-  if (!retried && writeRequest && !V8.getToken()) await showLogin();
+  if (!retried && writeRequest && !V8.getToken() && promptAllowed) await showLogin();
   const headers = setRequestHeaders(init.headers || (input && input.headers));
   const target = typeof input === 'string' || input instanceof URL ? rewriteApiUrl(rawUrl) : input;
   const requestBody = applyIdentityToBody(init.body, headers);
   const response = await nativeFetch(target, { ...init, headers, body: requestBody });
   let responseBody = null;
   try { responseBody = await response.clone().json(); } catch (error) {}
-  if (!retried && bodyAuthExpired(responseBody, response.status)) {
+  if (!retried && bodyAuthExpired(responseBody, response.status) && promptAllowed) {
     V8.clearToken();
     await showLogin();
     return fetchWithAuth(input, init, true);
@@ -541,6 +564,7 @@ function installXhrBridge() {
   };
   NativeXHR.prototype.send = function (body) {
     if (!isAppEngineUrl(this.__microiUrl)) return send.call(this, body);
+    const promptAllowed = hasRecentUserIntent();
     const execute = () => {
       const resolved = runtime();
       setRequestHeader.call(this, 'osclient', resolved.osClient);
@@ -553,7 +577,7 @@ function installXhrBridge() {
       this.addEventListener('load', () => {
         try {
           const result = JSON.parse(this.responseText || '{}');
-          if (bodyAuthExpired(result, this.status)) {
+          if (bodyAuthExpired(result, this.status) && promptAllowed) {
             V8.clearToken();
             void showLogin();
           }
@@ -562,7 +586,7 @@ function installXhrBridge() {
       const requestBody = applyIdentityToBody(body, { 'content-type': this.__microiContentType || '' });
       send.call(this, requestBody);
     };
-    if ((isLikelyWrite(this.__microiUrl) || bodyLikelyWrites(body, { 'content-type': this.__microiContentType || '' })) && !V8.getToken()) {
+    if ((isLikelyWrite(this.__microiUrl) || bodyLikelyWrites(body, { 'content-type': this.__microiContentType || '' })) && !V8.getToken() && promptAllowed) {
       void showLogin().then(execute).catch(() => {});
       return;
     }
@@ -578,6 +602,7 @@ function installXhrBridge() {
 }
 
 runtime();
+installUserIntentTracking();
 installFetchBridge();
 installXhrBridge();
 window.MicroiV8 = window.MicroiV8 || V8;

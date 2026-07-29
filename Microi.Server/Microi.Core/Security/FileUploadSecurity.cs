@@ -12,8 +12,8 @@ namespace Microi.net
 {
     /// <summary>
     /// 文件上传的租户动态限制与平台绝对安全上限。
-    /// 业务配置优先级：当前租户 sys_osclients > 环境变量 > appsettings > 代码默认值；
-    /// 最终结果仍不能突破独立的 Absolute* 灾难保护上限。
+    /// 业务配置只从当前租户 sys_osclients 读取；未填写时使用代码默认值，
+    /// 最终结果仍不能突破不可配置的 Absolute* 灾难保护上限。
     /// </summary>
     public sealed class FileUploadSecurityOptions
     {
@@ -40,75 +40,31 @@ namespace Microi.net
         public bool UploadEnabled { get; set; } = true;
 
         /// <summary>
-        /// 按“租户 > 环境变量 > appsettings > 代码默认值”加载业务限额，
-        /// 再应用独立的 Absolute* 平台灾难保护上限。
+        /// 按“当前租户 SaaS 配置 > 代码默认值”加载业务限额，
+        /// 再应用独立、不可由安装参数放大的 Absolute* 平台灾难保护上限。
         /// </summary>
         public static FileUploadSecurityOptions Load(JObject tenantConfig = null)
         {
             var fallbackDefaults = new FileUploadSecurityOptions
             {
-                MaxFileBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_MAX_FILE_MB",
-                    "FileUploadSecurity:MaxFileMB",
-                    DefaultMaxFileMegabytes),
-                MaxTotalBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_MAX_TOTAL_MB",
-                    "FileUploadSecurity:MaxTotalMB",
-                    DefaultMaxTotalMegabytes),
-                MaxFileCount = ReadConfiguredPositiveInt(
-                    "MICROI_FILE_UPLOAD_MAX_COUNT",
-                    "FileUploadSecurity:MaxFileCount",
-                    DefaultMaxFileCount),
-                DailyUserQuotaBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_DAILY_USER_QUOTA_MB",
-                    "FileUploadSecurity:DailyUserQuotaMB",
-                    DefaultDailyUserQuotaMegabytes),
-                DailyTenantQuotaBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_DAILY_TENANT_QUOTA_MB",
-                    "FileUploadSecurity:DailyTenantQuotaMB",
-                    DefaultDailyTenantQuotaMegabytes),
-                UploadEnabled = ReadConfiguredBoolean(
-                    "MICROI_FILE_UPLOAD_ENABLED",
-                    "FileUploadSecurity:UploadEnabled",
-                    true)
-            };
-            var absoluteCaps = new FileUploadSecurityOptions
-            {
-                MaxFileBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_ABSOLUTE_MAX_FILE_MB",
-                    "FileUploadSecurity:AbsoluteMaxFileMB",
-                    DefaultAbsoluteMaxFileMegabytes),
-                MaxTotalBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_ABSOLUTE_MAX_TOTAL_MB",
-                    "FileUploadSecurity:AbsoluteMaxTotalMB",
-                    DefaultAbsoluteMaxTotalMegabytes),
-                MaxFileCount = ReadConfiguredPositiveInt(
-                    "MICROI_FILE_UPLOAD_ABSOLUTE_MAX_COUNT",
-                    "FileUploadSecurity:AbsoluteMaxFileCount",
-                    DefaultAbsoluteMaxFileCount),
-                DailyUserQuotaBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_ABSOLUTE_DAILY_USER_QUOTA_MB",
-                    "FileUploadSecurity:AbsoluteDailyUserQuotaMB",
-                    DefaultAbsoluteDailyQuotaMegabytes),
-                DailyTenantQuotaBytes = ReadConfiguredPositiveMegabytes(
-                    "MICROI_FILE_UPLOAD_ABSOLUTE_DAILY_TENANT_QUOTA_MB",
-                    "FileUploadSecurity:AbsoluteDailyTenantQuotaMB",
-                    DefaultAbsoluteDailyQuotaMegabytes),
-                UploadEnabled = !ReadConfiguredBoolean(
-                    "MICROI_FILE_UPLOAD_FORCE_DISABLED",
-                    "FileUploadSecurity:ForceDisabled",
-                    false)
+                MaxFileBytes = DefaultMaxFileMegabytes * 1024L * 1024L,
+                MaxTotalBytes = DefaultMaxTotalMegabytes * 1024L * 1024L,
+                MaxFileCount = DefaultMaxFileCount,
+                DailyUserQuotaBytes =
+                    DefaultDailyUserQuotaMegabytes * 1024L * 1024L,
+                DailyTenantQuotaBytes =
+                    DefaultDailyTenantQuotaMegabytes * 1024L * 1024L,
+                UploadEnabled = true
             };
 
             return ApplyTenantOverrides(
                 fallbackDefaults,
                 tenantConfig,
-                absoluteCaps);
+                CreateCodeAbsoluteCaps());
         }
 
         /// <summary>
-        /// 将 sys_osclients 的租户级配置优先应用到环境变量/appsettings 默认值，
-        /// 最后再应用独立绝对上限。
+        /// 将 sys_osclients 的租户级配置应用到代码默认值，最后再应用独立绝对上限。
         /// 此方法为纯函数，便于升级兼容和单元测试。
         /// </summary>
         public static FileUploadSecurityOptions ApplyTenantOverrides(
@@ -268,137 +224,6 @@ namespace Microi.net
             };
         }
 
-        private static long ReadConfiguredPositiveMegabytes(
-            string envKey,
-            string configPath,
-            int defaultMegabytes)
-        {
-            var megabytes = ReadConfiguredPositiveLong(
-                envKey,
-                configPath,
-                defaultMegabytes);
-            try
-            {
-                return checked(megabytes * 1024L * 1024L);
-            }
-            catch (OverflowException)
-            {
-                return defaultMegabytes * 1024L * 1024L;
-            }
-        }
-
-        private static int ReadConfiguredPositiveInt(
-            string envKey,
-            string configPath,
-            int defaultValue)
-        {
-            var value = ReadConfiguredPositiveLong(
-                envKey,
-                configPath,
-                defaultValue);
-            return (int)Math.Min(int.MaxValue, value);
-        }
-
-        private static long ReadConfiguredPositiveLong(
-            string envKey,
-            string configPath,
-            long defaultValue)
-        {
-            var envValue =
-                Environment.GetEnvironmentVariable(
-                    envKey,
-                    EnvironmentVariableTarget.Process)
-                ?? Environment.GetEnvironmentVariable(envKey);
-            if (TryReadPositiveLong(envValue, out var parsed))
-            {
-                return parsed;
-            }
-            LogInvalidConfiguration(envKey, envValue);
-
-            var configValue = ConfigHelper.GetConfiguration(configPath);
-            if (TryReadPositiveLong(configValue, out parsed))
-            {
-                return parsed;
-            }
-            LogInvalidConfiguration(configPath, configValue);
-            return defaultValue;
-        }
-
-        private static bool ReadConfiguredBoolean(
-            string envKey,
-            string configPath,
-            bool defaultValue)
-        {
-            var envValue =
-                Environment.GetEnvironmentVariable(
-                    envKey,
-                    EnvironmentVariableTarget.Process)
-                ?? Environment.GetEnvironmentVariable(envKey);
-            if (TryReadBoolean(envValue, out var parsed))
-            {
-                return parsed;
-            }
-            LogInvalidConfiguration(envKey, envValue);
-
-            var configValue = ConfigHelper.GetConfiguration(configPath);
-            if (TryReadBoolean(configValue, out parsed))
-            {
-                return parsed;
-            }
-            LogInvalidConfiguration(configPath, configValue);
-            return defaultValue;
-        }
-
-        private static bool TryReadPositiveLong(
-            string text,
-            out long value)
-        {
-            value = 0;
-            return !string.IsNullOrWhiteSpace(text)
-                   && long.TryParse(text.Trim(), out value)
-                   && value > 0;
-        }
-
-        private static bool TryReadBoolean(
-            string text,
-            out bool value)
-        {
-            value = true;
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            if (string.Equals(
-                    text.Trim(),
-                    "1",
-                    StringComparison.OrdinalIgnoreCase)
-                || string.Equals(
-                    text.Trim(),
-                    "true",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                value = true;
-                return true;
-            }
-            if (string.Equals(
-                    text.Trim(),
-                    "0",
-                    StringComparison.OrdinalIgnoreCase)
-                || string.Equals(
-                    text.Trim(),
-                    "false",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                value = false;
-                return true;
-            }
-            return false;
-        }
-
-        private static void LogInvalidConfiguration(
-            string key,
-            string value)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return;
-            MicroiEngine.QueueSystemLog(OsClientDefault.OsClient, "FileUpload", "InvalidConfigurationFallback", "文件上传配置值无效，已回退到下一优先级", $"配置项：{key}", 2, false, key);
-        }
     }
 
     /// <summary>

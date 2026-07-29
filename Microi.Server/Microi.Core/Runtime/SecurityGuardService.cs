@@ -574,22 +574,22 @@ namespace Microi.net
         {
             var options = new SecurityGuardOptions
             {
-                Enabled = ConfigHelper.GetEnvOrConfigurationBool("MICROI_SECURITY_GUARD_ENABLED", "SecurityGuard:Enabled", true),
-                WindowSeconds = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_WINDOW_SECONDS", "SecurityGuard:WindowSeconds", 10),
-                PerIpMaxRequests = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_PER_IP_MAX_REQUESTS", "SecurityGuard:PerIpMaxRequests", 600),
-                PerIpMaxErrors = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_PER_IP_MAX_ERRORS", "SecurityGuard:PerIpMaxErrors", 120),
-                BlockMinutes = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_BLOCK_MINUTES", "SecurityGuard:BlockMinutes", 30),
-                RecentAccessMaxCount = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_RECENT_ACCESS_MAX_COUNT", "SecurityGuard:RecentAccessMaxCount", 5000),
-                LogIntervalSeconds = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_LOG_INTERVAL_SECONDS", "SecurityGuard:LogIntervalSeconds", 60),
-                AccessPersistIntervalSeconds = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_ACCESS_PERSIST_INTERVAL_SECONDS", "SecurityGuard:AccessPersistIntervalSeconds", 10),
-                RespectForwardedHeaders = ConfigHelper.GetEnvOrConfigurationBool("MICROI_SECURITY_RESPECT_FORWARDED_HEADERS", "SecurityGuard:RespectForwardedHeaders", true),
-                LogBlockedToSysLog = ConfigHelper.GetEnvOrConfigurationBool("MICROI_SECURITY_LOG_BLOCKED_TO_SYSLOG", "SecurityGuard:LogBlockedToSysLog", true),
-                PersistSecurityTables = ConfigHelper.GetEnvOrConfigurationBool("MICROI_SECURITY_PERSIST_TABLES", "SecurityGuard:PersistSecurityTables", true),
-                PersistAllAccess = ConfigHelper.GetEnvOrConfigurationBool("MICROI_SECURITY_PERSIST_ALL_ACCESS", "SecurityGuard:PersistAllAccess", false),
-                PersistQueueMaxCount = ConfigHelper.GetEnvOrConfigurationInt("MICROI_SECURITY_PERSIST_QUEUE_MAX", "SecurityGuard:PersistQueueMaxCount", 10000)
+                Enabled = ConfigHelper.GetRuntimeConfigurationBool("SecurityGuard:Enabled", true),
+                WindowSeconds = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:WindowSeconds", 10),
+                PerIpMaxRequests = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:PerIpMaxRequests", 600),
+                PerIpMaxErrors = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:PerIpMaxErrors", 120),
+                BlockMinutes = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:BlockMinutes", 30),
+                RecentAccessMaxCount = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:RecentAccessMaxCount", 5000),
+                LogIntervalSeconds = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:LogIntervalSeconds", 60),
+                AccessPersistIntervalSeconds = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:AccessPersistIntervalSeconds", 10),
+                RespectForwardedHeaders = ConfigHelper.GetRuntimeConfigurationBool("SecurityGuard:RespectForwardedHeaders", true),
+                LogBlockedToSysLog = ConfigHelper.GetRuntimeConfigurationBool("SecurityGuard:LogBlockedToSysLog", true),
+                PersistSecurityTables = ConfigHelper.GetRuntimeConfigurationBool("SecurityGuard:PersistSecurityTables", true),
+                PersistAllAccess = ConfigHelper.GetRuntimeConfigurationBool("SecurityGuard:PersistAllAccess", false),
+                PersistQueueMaxCount = ConfigHelper.GetRuntimeConfigurationInt("SecurityGuard:PersistQueueMaxCount", 10000)
             };
 
-            var whitelist = ConfigHelper.GetEnvOrConfiguration("MICROI_SECURITY_WHITELIST_IPS", "SecurityGuard:WhitelistIps")
+            var whitelist = ConfigHelper.GetRuntimeConfigurationValue("SecurityGuard:WhitelistIps")
                             ?? "127.0.0.1,::1";
             options.WhitelistIps = whitelist
                 .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)

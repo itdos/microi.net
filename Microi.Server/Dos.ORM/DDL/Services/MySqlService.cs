@@ -15,9 +15,9 @@ namespace Dos.ORM
     {
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> TableDdlGates = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
 
-        private static int DdlLockWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_DDL_LOCK_WAIT_SECONDS", "OrmLimits:DdlLockWaitSeconds", 8);
+        private static int DdlLockWaitSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:DdlLockWaitSeconds", 8);
 
-        private static int DdlQueueWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_DDL_QUEUE_WAIT_SECONDS", "OrmLimits:DdlQueueWaitSeconds", 600);
+        private static int DdlQueueWaitSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:DdlQueueWaitSeconds", 600);
 
         /// <summary>
         /// 修改表名

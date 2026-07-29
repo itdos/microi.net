@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzeBackgroundWorkload } from './advanced-tools.js';
+import { analyzeBackgroundWorkload, analyzeClientChunking } from './advanced-tools.js';
 
 test('classifies estimated long-running work as a background task', () => {
   const result = analyzeBackgroundWorkload({
@@ -20,4 +20,33 @@ test('does not force a small synchronous row action into the queue', () => {
     Workload: { ExpectedItems: 1, ExpectedSeconds: 2 },
   });
   assert.deepEqual(result, { required: false, reasons: [] });
+});
+
+test('accepts an explicit resumable client chunking contract', () => {
+  const result = analyzeClientChunking({
+    Name: '批量生成主构件码',
+    Workload: {
+      ExecutionMode: 'ClientChunked',
+      MaxItemsPerChunk: 40,
+      Resumable: true,
+    },
+  });
+  assert.deepEqual(result, {
+    declared: true,
+    valid: true,
+    maxItemsPerChunk: 40,
+    resumable: true,
+  });
+});
+
+test('rejects incomplete client chunking declarations', () => {
+  const result = analyzeClientChunking({
+    Name: '批量处理',
+    Workload: {
+      ExecutionMode: 'ClientChunked',
+      MaxItemsPerChunk: 0,
+    },
+  });
+  assert.equal(result.declared, true);
+  assert.equal(result.valid, false);
 });

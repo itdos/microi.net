@@ -45,7 +45,9 @@ LibreTranslate 是可选动态翻译供应商，不是 `diy_lang` 的替代品�
 
 用户可追加经过白名单校验的语言 Key。语言越多，首次模型下载越慢；部署流程必须等待健康检查和 API Key 注册成功，超时或容器退出应明确失败，不能吞掉 `ltmanage` 错误后报告成功。
 
-服务端环境变量为 `MICROI_TRANSLATE_PROVIDER=libretranslate`、`MICROI_TRANSLATE_URL`、`MICROI_TRANSLATE_API_KEY`、`MICROI_TRANSLATE_TIMEOUT`。租户级配置使用 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`。密钥不得进入前端、日志或文档示例的固定默认值。
+服务端统一从 SaaS 引擎租户配置读取 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`；不要再为翻译供应商增加 API 容器环境变量。密钥不得进入前端、日志或文档示例的固定默认值。
+
+一键安装在服务健康且 API Key 注册成功后，必须把当前 `OsClient` 的 `TranslateProvider=LibreTranslate`、局域网基础地址 `TranslateUrl`、匹配的 `TranslateApiKey` 和超时写入 `sys_osclients`，并立即回读一致性；任一步失败都应终止安装。日志只显示 Provider 与 URL，禁止输出密钥。
 
 独立编排应使用 ASCII 目录和显式项目名 `docker compose -p microi-libretranslate`；只供平台 API 调用时，不默认开放 LibreTranslate 宿主机防火墙端口。需要公网调用时必须由运维显式配置 TLS、反向代理、访问控制、限流和强 API Key。
 
@@ -73,3 +75,10 @@ LibreTranslate 是可选动态翻译供应商，不是 `diy_lang` 的替代品�
 - [ ] LibreTranslate 内部端口未被安装脚本默认加入防火墙放行列表
 - [ ] 缓存按租户/供应商/语言隔离
 - [ ] 多节点配置失效与批量幂等通过
+
+### 复盘：模型下载期间健康检查误报成功导致 API Key 注册失败
+
+- 触发场景：一键安装日志仍显示 `Updating Language models` / `Downloading ...`，脚本却已经进入 API Key 注册并报失败。
+- 根因：LibreTranslate 1.9.6 的 `scripts/healthcheck.py` 在 `/tmp/booting.flag` 存在时直接返回成功；这只表示容器仍处于受支持的启动阶段，不表示 HTTP 服务或 `api_keys.db` 已就绪。
+- 通用规则：安装就绪必须同时满足启动标记已消失、真实 HTTP `/health` 成功、API Key 数据库存在且非空；注册 Key 后还要使用该 Key 完成一次真实翻译请求，不能把容器运行或自带 healthcheck 单独当作可用证明。
+- 自动化检查：用同版本镜像构造 booting flag 存在但数据库缺失的阶段，断言安装器继续等待；再等待 Web 与数据库就绪，执行 `ltmanage keys add` 和带 Key 的 `en -> zh` 翻译烟测，最后清理隔离容器与卷。

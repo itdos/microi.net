@@ -906,7 +906,6 @@ performance_schema = ON
 ```
 :::
 
-
 ---
 
 ### 3️⃣ Redis 编排
@@ -1165,6 +1164,41 @@ services:
 ```
 :::
 
+#### 大文件上传的 nginx 反向代理配置
+
+SaaS 引擎中的“单文件上限 MB”和“单次总量上限 MB”只在请求进入吾码 API 后生效，不能放大 nginx 的请求体上限。若 nginx 先返回 `413 Content Too Large`，请在 **API 域名对应的 `server` 块**中加入下面的配置；支持 1000 MB 文件时，需要为 multipart 封装留出余量。下列 `proxy_*` 指令可以放在 `server` 层由真实代理 `location` 继承；如果 `location` 或宝塔 `include` 中重复配置，以更近层级的值为准，必须确认没有重新开启请求缓冲或缩短超时：
+
+```nginx
+# 支持1000MB文件，并为multipart封装留出余量
+client_max_body_size 1024m;
+
+# 慢速大文件上传：这是两次读取请求体数据之间的超时，不是整个上传总时长
+client_body_timeout 600s;
+
+# 大文件直接流式转发给吾码API，避免nginx先把整个请求体落到代理临时目录
+proxy_request_buffering off;
+
+# HTTP/1.1可避免分块请求在关闭request buffering后仍被强制缓冲
+proxy_http_version 1.1;
+proxy_connect_timeout 60s;
+proxy_send_timeout 600s;
+proxy_read_timeout 600s;
+
+error_page 413 = @microi_upload_too_large;
+location @microi_upload_too_large {
+    default_type application/json;
+    charset utf-8;
+    add_header Cache-Control "no-store" always;
+    # 若Web与API跨域，必须在这里显式复用正常API代理的CORS白名单/include。
+    # 请求已被nginx拒绝，不会进入ASP.NET Core，因此不能依赖后端补CORS响应头。
+    return 200 '{"Code":0,"Data":null,"Msg":"上传请求超过了反向代理允许的最大容量。SaaS引擎中的上传额度不能放大nginx或API启动级上限，请联系运维同步提高client_max_body_size以及吾码API请求体上限。","DataAppend":{"ErrorType":"UploadRequestTooLarge","Layer":"ReverseProxy"}}';
+}
+```
+
+吾码 API 已内置统一的 2048 MB HTTP/Multipart 接收硬顶，不需要再为上传大小增加额外环境变量；真正的单文件、单次文件数、单次总量及帐号/租户日额度统一在 SaaS 引擎中配置。`proxy_request_buffering off` 只关闭 nginx 的请求体预缓冲，不代表绕过吾码 API 的 Multipart、权限、配额和 HDFS 校验，也不能用响应方向的 `proxy_buffering off` 代替。
+
+修改后先执行 `nginx -t`，确认成功再 reload nginx。若仍返回原生 413 HTML，请继续检查宝塔生成的全局配置和 `include` 文件中是否存在更小的 `client_max_body_size`；若大文件上传到固定时长后中断，则继续检查 CDN、WAF、负载均衡、Ingress 及宝塔上游是否还有独立的请求体或空闲超时限制。
+
 
 ---
 
@@ -1191,7 +1225,7 @@ LibreTranslate 用于动态内容翻译，不影响 `diy_lang` 固定界面词�
 | 意大利语 | `it` | 荷兰语 | `nl` | 土耳其语 | `tr` |
 | 波兰语 | `pl` | 乌克兰语 | `uk` |  |  |
 
-一键安装脚本默认不安装 LibreTranslate。选择安装后可选套餐 1/2/3，还可输入额外语言 Key；脚本会自动分配端口、生成随机 API Key，并把翻译服务地址与密钥注入 Microi API 容器。
+一键安装脚本默认不安装 LibreTranslate。选择安装后可选套餐 1/2/3，还可输入额外语言 Key；脚本会自动分配端口、生成随机 API Key，并把翻译服务地址与密钥写入 SaaS 引擎主租户配置后回读验证。
 
 手动部署时可使用项目中的 `数据库、案例、文档、资料/docker-compose.libretranslate.yml`，并根据服务器修改宿主机目录、端口、`LT_LOAD_ONLY` 和 API Key。由于 Docker Compose 可能把全中文目录名归一化为空项目名，建议复制到 ASCII 目录，并始终显式指定项目名：
 
@@ -1224,8 +1258,8 @@ services:
       - LT_LOAD_ONLY=zh,zt,en
       - LT_API_KEYS=true
       - LT_API_KEYS_DB_PATH=/app/db/api_keys.db
-      # 请替换为随机强密钥，并与 Microi API 的 MICROI_TRANSLATE_API_KEY 保持一致。
-      - MICROI_TRANSLATE_API_KEY=replace-with-a-random-strong-key
+      # 仅用于首次向 LibreTranslate 注册密钥；请替换为随机强密钥。
+      - LT_BOOTSTRAP_API_KEY=replace-with-a-random-strong-key
       - LT_WORKERS=1
       - LT_TIMEOUT=120
     entrypoint: /bin/sh
@@ -1235,7 +1269,7 @@ services:
       (
         for i in $$(seq 1 90); do
           if [ -f \"$${LT_API_KEYS_DB_PATH:-/app/db/api_keys.db}\" ]; then
-            ltmanage keys --api-keys-db-path \"$${LT_API_KEYS_DB_PATH:-/app/db/api_keys.db}\" add 1000000 --key \"$${MICROI_TRANSLATE_API_KEY}\" || true;
+            ltmanage keys --api-keys-db-path \"$${LT_API_KEYS_DB_PATH:-/app/db/api_keys.db}\" add 1000000 --key \"$${LT_BOOTSTRAP_API_KEY}\" || true;
             break;
           fi;
           sleep 2;
@@ -1255,15 +1289,7 @@ services:
 ```
 ::::
 
-Microi API 连接该服务时，设置以下服务端环境变量；密钥不得写入前端：
-
-```yaml
-environment:
-  - MICROI_TRANSLATE_PROVIDER=libretranslate
-  - MICROI_TRANSLATE_URL=http://宿主机IP:1469
-  - MICROI_TRANSLATE_API_KEY=与LibreTranslate编排一致的随机强密钥
-  - MICROI_TRANSLATE_TIMEOUT=120
-```
+Microi API 不需要增加翻译环境变量。请在 SaaS 引擎主租户记录中设置 `TranslateProvider=LibreTranslate`、`TranslateUrl=http://宿主机IP:1469`、`TranslateApiKey=与上面一致的随机强密钥`、`TranslateTimeout=120`；保存后由 SaaS 引擎刷新共享 Redis 配置。一键安装脚本会自动写入并回读验证这些字段。
 
 ---
 

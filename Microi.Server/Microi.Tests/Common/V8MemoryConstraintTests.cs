@@ -37,25 +37,15 @@ public class V8MemoryConstraintTests
     [Fact]
     public void DefaultMemoryBudget_IsRaisedWithoutRemovingTheHardMaximum()
     {
-        const string environmentName = "MICROI_V8_DEFAULT_LIMIT_MEMORY_MB";
-        var original = Environment.GetEnvironmentVariable(environmentName);
-        try
-        {
-            Environment.SetEnvironmentVariable(environmentName, null);
-            var limits = new CreateV8EngineParam();
+        var limits = new CreateV8EngineParam();
 
-            Assert.Equal(2048, limits.LimitMemory);
-            Assert.Equal(4096, limits.MaxLimitMemoryMB);
-            Assert.Equal(8192, limits.CallTreeLimitMemory);
-            Assert.Equal(32768, limits.MaxCallTreeLimitMemoryMB);
-            Assert.Equal(32, limits.NestedApiDepth);
-            Assert.Equal(64, limits.MaxNestedApiDepthValue);
-            Assert.True(limits.IsolateNestedApiMemory);
-        }
-        finally
-        {
-            Environment.SetEnvironmentVariable(environmentName, original);
-        }
+        Assert.Equal(2048, limits.LimitMemory);
+        Assert.Equal(4096, limits.MaxLimitMemoryMB);
+        Assert.Equal(8192, limits.CallTreeLimitMemory);
+        Assert.Equal(32768, limits.MaxCallTreeLimitMemoryMB);
+        Assert.Equal(32, limits.NestedApiDepth);
+        Assert.Equal(64, limits.MaxNestedApiDepthValue);
+        Assert.True(limits.IsolateNestedApiMemory);
     }
 
     [Fact]
