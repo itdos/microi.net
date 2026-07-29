@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
 import { API } from './api-paths.js';
 import { resolveMcpDid } from './mcp-did.js';
 import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
@@ -150,6 +151,8 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_WRITE_REQUEST_TIMEOUT_MS = 60_000;
 const DEFAULT_READBACK_REQUEST_TIMEOUT_MS = 5_000;
 const WRITE_READBACK_DELAYS_MS = [0, 300, 800, 1_500, 3_000];
+const DEFAULT_STREAM_UPLOAD_TIMEOUT_MS = 30 * 60_000;
+const MAX_STREAM_UPLOAD_TIMEOUT_MS = 2 * 60 * 60_000;
 const MENU_JSON_ARRAY_FIELDS = new Set([
   'MoreBtns',
   'FormBtns',
@@ -172,6 +175,47 @@ function resolveTimeoutMs(value: unknown, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 1_000) return fallback;
   return Math.min(10 * 60_000, Math.round(parsed));
+}
+
+function resolveStreamUploadTimeoutMs(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1_000) return DEFAULT_STREAM_UPLOAD_TIMEOUT_MS;
+  return Math.min(MAX_STREAM_UPLOAD_TIMEOUT_MS, Math.round(parsed));
+}
+
+function buildMultipartFileBody(
+  fields: Record<string, string>,
+  filePath: string,
+  fileName: string,
+  boundary: string,
+): { body: Readable; contentLength: number } {
+  const chunks: Buffer[] = [];
+  for (const [name, value] of Object.entries(fields)) {
+    chunks.push(Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
+      'utf8',
+    ));
+  }
+  chunks.push(Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+    'utf8',
+  ));
+  const prefix = Buffer.concat(chunks);
+  const suffix = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf8');
+  const fileSize = fs.statSync(filePath).size;
+
+  async function* streamParts(): AsyncGenerator<Buffer> {
+    yield prefix;
+    for await (const chunk of fs.createReadStream(filePath)) {
+      yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    }
+    yield suffix;
+  }
+
+  return {
+    body: Readable.from(streamParts()),
+    contentLength: prefix.length + fileSize + suffix.length,
+  };
 }
 
 function normalizeCodeForComparison(value: unknown): string {
@@ -823,6 +867,88 @@ export class MicroiClient {
     return parsed;
   }
 
+  /**
+   * Stream one local file as multipart without materializing it as Base64 or a
+   * whole-file Buffer. A retry constructs a fresh file stream, so auth recovery
+   * remains safe for large immutable application assets.
+   */
+  private async requestMultipartFile<T = unknown>(
+    reqPath: string,
+    fields: Record<string, string>,
+    filePath: string,
+    fileName: string,
+    allowRetryOnAuthFailure = true,
+    timeoutMs?: number,
+  ): Promise<ApiResponse<T>> {
+    const boundary = `----microi-mcp-${crypto.randomBytes(24).toString('hex')}`;
+    const multipart = buildMultipartFileBody(fields, filePath, fileName, boundary);
+    const controller = new AbortController();
+    const effectiveTimeout = resolveStreamUploadTimeoutMs(timeoutMs);
+    const timer = setTimeout(() => controller.abort(), effectiveTimeout);
+    let res: Response;
+    let text: string;
+    try {
+      res = await fetch(`${this.config.apiBaseUrl}${reqPath}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          did: this.did,
+          ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+          'Content-Length': String(multipart.contentLength),
+        },
+        body: multipart.body as unknown as BodyInit,
+        // Node.js fetch requires duplex for a streaming request body.
+        duplex: 'half',
+        signal: controller.signal,
+      } as RequestInit & { duplex: 'half' });
+      text = await res.text();
+    } catch (error) {
+      const isTimeout = controller.signal.aborted;
+      throw new MicroiTransportError(
+        isTimeout
+          ? `应用资产流式上传超时（${effectiveTimeout}ms）`
+          : `应用资产流式上传网络失败：${error instanceof Error ? error.message : String(error)}`,
+        {
+          kind: isTimeout ? 'timeout' : 'network',
+          requestPath: reqPath,
+          uncertainOutcome: true,
+          cause: error,
+        },
+      );
+    } finally {
+      clearTimeout(timer);
+      multipart.body.destroy();
+    }
+
+    const newToken = res.headers.get('authorization');
+    if (newToken) {
+      this.token = normalizeAuthorizationToken(newToken);
+      this.writeTokenToFile();
+    }
+    if (res.status === 401 && allowRetryOnAuthFailure) {
+      if (await this.tryRecoverFromAuthFailure()) {
+        return this.requestMultipartFile<T>(reqPath, fields, filePath, fileName, false, timeoutMs);
+      }
+      throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${text.slice(0, 200)}`);
+    if (!text) throw new Error(`HTTP ${res.status} — empty response body`);
+
+    let parsed: ApiResponse<T>;
+    try {
+      parsed = JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
+    }
+    if (isAuthenticationFailureResponse(parsed) && allowRetryOnAuthFailure) {
+      if (await this.tryRecoverFromAuthFailure()) {
+        return this.requestMultipartFile<T>(reqPath, fields, filePath, fileName, false, timeoutMs);
+      }
+    }
+    return parsed;
+  }
+
   private isUncertainWriteError(error: unknown): error is MicroiTransportError {
     return error instanceof MicroiTransportError && error.uncertainOutcome;
   }
@@ -1267,6 +1393,49 @@ export class MicroiClient {
     });
   }
 
+  async uploadApplicationAssetStream(data: {
+    AppIdOrKey: string;
+    VersionNo: string;
+    RelativePath: string;
+    ExpectedSha256: string;
+    FilePath: string;
+    TimeoutMs?: number;
+  }): Promise<ApiResponse> {
+    const localPath = path.resolve(data.FilePath);
+    const stat = fs.lstatSync(localPath);
+    if (!stat.isFile() || stat.isSymbolicLink()) {
+      throw new Error(`应用资产必须是普通文件且不能是符号链接：${localPath}`);
+    }
+    const fileName = path.posix.basename(String(data.RelativePath || '').replace(/\\/g, '/'));
+    if (!fileName || /[\r\n"]/u.test(fileName)) {
+      throw new Error('RelativePath 的文件名不合法');
+    }
+    return this.requestMultipartFile(
+      API.UPLOAD_APPLICATION_ASSET_STREAM,
+      {
+        OsClient: this.config.osClient || '',
+        AppIdOrKey: data.AppIdOrKey,
+        VersionNo: data.VersionNo,
+        RelativePath: data.RelativePath,
+        ExpectedSha256: data.ExpectedSha256,
+      },
+      localPath,
+      fileName,
+      true,
+      data.TimeoutMs,
+    );
+  }
+
+  async finalizeApplicationStreamPublish(data: Record<string, unknown>): Promise<ApiResponse> {
+    return this.post(API.FINALIZE_APPLICATION_STREAM_PUBLISH, {
+      OsClient: this.config.osClient,
+      ...data,
+    }, {
+      timeoutMs: 10 * 60_000,
+      operationName: 'finalize application stream publish',
+    });
+  }
+
   async getMicroService(msKey: string): Promise<ApiResponse> {
     return this.post(API.GET_MICRO_SERVICE, {
       OsClient: this.config.osClient,
@@ -1561,13 +1730,71 @@ export class MicroiClient {
     InTableEdit?: number; InTableEditFields?: string;
     MobileListFields?: string;
     CardTitleTagFields?: string; CardBottomTagFields?: string;
+    IsMicroiService?: number;
+    MicroServiceId?: string;
+    MicroServicePageId?: string;
+    MicroServiceRoutePath?: string;
+    MicroServiceKey?: string;
   }): Promise<ApiResponse> {
-    return this.post(API.CREATE_MODULE, {
+    const result = await this.post(API.CREATE_MODULE, {
       OsClient: this.config.osClient,
       ...data,
       Display: data.Display ?? 1,
       AppDisplay: data.AppDisplay ?? 1,
     });
+    if (result.Code !== 1) return result;
+
+    const hasMicroServiceBinding = Boolean(
+      data.IsMicroiService === 1
+      || data.MicroServiceId
+      || data.MicroServicePageId
+      || data.MicroServiceRoutePath,
+    );
+    if (!hasMicroServiceBinding) return result;
+
+    const responseData = result.Data && typeof result.Data === 'object'
+      ? result.Data as Record<string, unknown>
+      : {};
+    const moduleId = String(responseData.ModuleId || responseData.Id || '');
+    if (!moduleId) {
+      return {
+        Code: 0,
+        Data: { CreateResponse: result.Data },
+        Msg: '菜单已创建，但返回结果缺少 ModuleId，无法写入并回读微服务关联字段。',
+      };
+    }
+
+    const bindingPatch: Record<string, unknown> = {
+      ModuleId: moduleId,
+      IsMicroiService: 1,
+      OpenType: data.OpenType || 'MicroService',
+      ComponentName: data.ComponentName || 'MicroService',
+      ComponentPath: data.ComponentPath || '/micro-app/host',
+      Url: data.Url,
+      MicroServiceId: data.MicroServiceId,
+      MicroServicePageId: data.MicroServicePageId,
+      MicroServiceRoutePath: data.MicroServiceRoutePath,
+    };
+    const bindingResult = await this.updateModule(bindingPatch);
+    if (bindingResult.Code !== 1) {
+      return {
+        Code: 0,
+        Data: {
+          ModuleId: moduleId,
+          CreateResponse: result.Data,
+          BindingResponse: bindingResult.Data,
+        },
+        Msg: `菜单基础记录已创建，但微服务关联字段写入或回读失败：${bindingResult.Msg || '未知错误'}`,
+      };
+    }
+    return {
+      ...result,
+      Data: {
+        ...responseData,
+        MicroServiceBindingVerified: true,
+        BindingVerification: bindingResult.Data,
+      },
+    };
   }
 
   async setRolePermission(roleId: string, menuIds: string[]): Promise<ApiResponse> {

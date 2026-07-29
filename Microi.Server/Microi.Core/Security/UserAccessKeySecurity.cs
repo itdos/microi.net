@@ -26,6 +26,103 @@ namespace Microi.net
         public const int MaxExpiryDays = 365;
         public const int ExchangeAttemptsPerMinute = 30;
         public const string ScopeWildcard = "*";
+        public const string ScopedUserHttpContextItemKey = "__Microi_AccessKey_ScopedUser__";
+
+        private static readonly HashSet<string> FormReadActions = new HashSet<string>(
+            new[]
+            {
+                "getformdata", "gettabledata", "getformrelateddata", "gettabledatacount",
+                "gettabletree", "gettabledatatree", "getfielddata", "getdiytable",
+                "getdiytablemodel", "getdiytablerow", "getdiytablerowtree",
+                "getdiytablerowmodel", "getdiyfieldsqldata", "getdiyfieldsqldatafrombody",
+                "getfieldsdata", "getfieldsdatafrombody", "getdiyfield", "getdiyfieldlist",
+                "getdiyfieldbydiytables"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> FormWriteActions = new HashSet<string>(
+            new[]
+            {
+                "uptformdata", "uptformdatabywhere", "uptformdatabatch", "upttabledata",
+                "addformdata", "addformdatabatch", "addtabledata", "savebatch",
+                "delformdata", "delformdatabatch", "deltabledata", "delformdatabywhere",
+                "adddiytablerow", "adddiytablerowbatch", "uptdiytablerow",
+                "uptdiytablerowbatch", "uptdiydatalistbywhere", "deldiytablerow",
+                "deldiytablerowbatch", "deldiydatalistbywhere", "getimportdiytablerowstep",
+                "delimportdiytablerowstep", "importdiytablerow"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> FormExportActions = new HashSet<string>(
+            new[] { "exportdiytablerow", "exportdiytablerowfrombody" },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> PageMetadataActions = new HashSet<string>(
+            new[]
+            {
+                "getsysmenu", "getsysmenumodel", "getleftrightpageconfig", "newguid",
+                "getsysconfig", "getlangbundle"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> RuntimePageSupportPaths = new HashSet<string>(
+            new[]
+            {
+                "/api/os/getdatetimenow",
+                "/api/userbehavior/signal"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> ModuleRuntimeReadPaths = new HashSet<string>(
+            new[]
+            {
+                "/api/moduleengine/gettabledata",
+                "/api/moduleengine/gettabledatacount",
+                "/api/moduleengine/gettabletree",
+                "/api/moduleengine/gettabledatatree"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> WorkflowRuntimeReadPaths = new HashSet<string>(
+            new[]
+            {
+                "/api/workflow/getwfhistory",
+                "/api/workflow/getwfwork",
+                "/api/workflow/getwfflow",
+                "/api/workflow/getwfstats",
+                "/api/workflow/getwfnodeModel",
+                "/api/workflow/getstartwfnode",
+                "/api/workflow/getnextnodeconfirmusers"
+            }.Select(item => item.ToLowerInvariant()),
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly HashSet<string> WorkflowRuntimeWritePaths = new HashSet<string>(
+            new[]
+            {
+                "/api/workflow/recallwork",
+                "/api/workflow/cancelflow",
+                "/api/workflow/handoverwork",
+                "/api/workflow/startwork",
+                "/api/workflow/sendwork",
+                "/api/workflow/startworkwithform",
+                "/api/workflow/sendworkwithform"
+            },
+            StringComparer.OrdinalIgnoreCase);
+
+        private static readonly Dictionary<string, string> RuntimeReferenceTablePaths =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["/api/sysdept/getsysdept"] = "Sys_Dept",
+                ["/api/sysdept/getsysdeptmodel"] = "Sys_Dept",
+                ["/api/sysdept/getsysdeptstep"] = "Sys_Dept",
+                ["/api/sysbasedata/getsysbasedata"] = "Sys_BaseData",
+                ["/api/sysbasedata/getsysbasedatastep"] = "Sys_BaseData",
+                ["/api/sysbasedata/getsysbasedatapa"] = "Sys_BaseData",
+                ["/api/sysrichtext/getsysrichtext"] = "Sys_RichText",
+                ["/api/sysrichtext/getsysrichtextstep"] = "Sys_RichText",
+                ["/api/sysuserfk/getsysuserfk"] = "Sys_User",
+                ["/api/sysuser/getsysuserpublicinfo"] = "Sys_User"
+            };
 
         private static readonly string[] SessionFieldNames =
         {
@@ -35,6 +132,8 @@ namespace Microi.net
             "_AccessKeyScopes",
             "_AccessKeyAllowedRoutes",
             "_AccessKeyAllowedTableNames",
+            "_AccessKeyAllowedTableIds",
+            "_AccessKeyAllowedFieldIds",
             "_AccessKeyAllowedApiEngineKeys",
             "_AccessKeyAllowedDataSourceKeys",
             "_AccessKeyExpiresAt"
@@ -175,7 +274,7 @@ namespace Microi.net
 
         public static bool IsTableOperationAllowed(
             JObject currentUser,
-            string tableName,
+            string tableNameOrId,
             bool isRead,
             bool isExport = false)
         {
@@ -183,8 +282,60 @@ namespace Microi.net
             var requiredScope = isExport ? "form:export" : isRead ? "form:read" : "form:write";
             if (!HasScope(currentUser, requiredScope)) return false;
             var allowedTables = ParseStringList(currentUser["_AccessKeyAllowedTableNames"]);
-            return allowedTables.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
-                   || allowedTables.Contains((tableName ?? "").Trim(), StringComparer.OrdinalIgnoreCase);
+            var allowedTableIds = ParseStringList(currentUser["_AccessKeyAllowedTableIds"]);
+            var requestedTable = (tableNameOrId ?? "").Trim();
+            return !requestedTable.DosIsNullOrWhiteSpace()
+                   && (allowedTables.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                       || allowedTableIds.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                       || allowedTables.Contains(requestedTable, StringComparer.OrdinalIgnoreCase)
+                       || allowedTableIds.Contains(requestedTable, StringComparer.OrdinalIgnoreCase));
+        }
+
+        private static bool HasAllAuthorizedData(JObject currentUser)
+        {
+            return ParseStringList(currentUser?["_AccessKeyAllowedTableNames"])
+                       .Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                   || ParseStringList(currentUser?["_AccessKeyAllowedTableIds"])
+                       .Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public static bool AreTableReferencesAllowed(
+            JObject currentUser,
+            IEnumerable<string> tableReferences,
+            bool isRead,
+            bool isExport = false)
+        {
+            if (!IsSession(currentUser)) return true;
+            var references = (tableReferences ?? Array.Empty<string>())
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return references.Length > 0
+                   && references.All(reference => IsTableOperationAllowed(
+                       currentUser,
+                       reference,
+                       isRead,
+                       isExport));
+        }
+
+        public static bool AreFieldReferencesAllowed(
+            JObject currentUser,
+            IEnumerable<string> fieldReferences)
+        {
+            if (!IsSession(currentUser)) return true;
+            if (!HasScope(currentUser, "form:read")) return false;
+            var references = (fieldReferences ?? Array.Empty<string>())
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var allowedFields = ParseStringList(currentUser["_AccessKeyAllowedFieldIds"]);
+            return references.Length > 0
+                   && (allowedFields.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                       || references.All(reference => allowedFields.Contains(
+                           reference,
+                           StringComparer.OrdinalIgnoreCase)));
         }
 
         public static bool IsApiEngineAllowed(JObject currentUser, string apiEngineKey)
@@ -208,28 +359,74 @@ namespace Microi.net
             if (!IsSession(currentUser)) return true;
             var path = (requestPath ?? "").Trim().TrimEnd('/').ToLowerInvariant();
             if (path == "/api/sysuser/tokenlogin"
-                || path == "/api/sysuser/getcurrentuser")
+                || path == "/api/sysuser/getcurrentuser"
+                || path == "/api/sysuser/refreshtoken"
+                || path == "/api/sysuser/logout")
             {
                 return true;
             }
-            if (path.StartsWith("/api/formengine/", StringComparison.Ordinal))
+            if (path == "/api/sysmenu/getsysmenustep")
             {
-                var action = path.Substring("/api/formengine/".Length);
-                var readActions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                {
-                    "getformdata",
-                    "gettabledata",
-                    "gettabletree",
-                    "gettabledataanonymous",
-                    "getformdataanonymous"
-                };
-                return readActions.Contains(action) && HasScope(currentUser, "form:read");
+                // Only wildcard page keys need the complete dynamic route tree.
+                // Exact-route keys use the route already embedded in the link and
+                // must not gain visibility of every other account-authorized menu.
+                return HasScope(currentUser, "page:open")
+                       && ParseStringList(currentUser["_AccessKeyAllowedRoutes"])
+                           .Select(NormalizeRoute)
+                           .Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase);
             }
-            if (path == "/api/apiengine/run")
+            if (RuntimePageSupportPaths.Contains(path))
+            {
+                return HasScope(currentUser, "page:open");
+            }
+            if (ModuleRuntimeReadPaths.Contains(path))
+            {
+                // ModuleEngine resolves its physical table after entering the
+                // controller. Only the explicit "all authorized data" mode can
+                // safely use that indirection; account/menu/row permissions still apply.
+                return HasScope(currentUser, "form:read") && HasAllAuthorizedData(currentUser);
+            }
+            if (WorkflowRuntimeReadPaths.Contains(path))
+            {
+                return HasScope(currentUser, "form:read") && HasAllAuthorizedData(currentUser);
+            }
+            if (WorkflowRuntimeWritePaths.Contains(path))
+            {
+                return HasScope(currentUser, "form:write") && HasAllAuthorizedData(currentUser);
+            }
+            if (RuntimeReferenceTablePaths.TryGetValue(path, out var referenceTable))
+            {
+                return IsTableOperationAllowed(currentUser, referenceTable, true);
+            }
+            if (TryGetTableOperation(path, out var isRead, out var isExport))
+            {
+                return HasScope(
+                    currentUser,
+                    isExport ? "form:export" : isRead ? "form:read" : "form:write");
+            }
+            if (IsPageMetadataPath(path))
+            {
+                return HasScope(currentUser, "page:open");
+            }
+            if (path == "/api/backgroundtask/list"
+                || path == "/api/backgroundtask/clearcompleted"
+                || path == "/api/backgroundtask/remove"
+                || path == "/api/backgroundtask/cancel"
+                || path == "/api/onlineterminal/mine")
+            {
+                return HasScope(currentUser, "page:open");
+            }
+            if (path == "/api/backgroundtask/runapiengine"
+                || path == "/api/apiengine/run"
+                || path == "/api/apiengine/run_formdata"
+                || path == "/api/apiengine/run_request_get"
+                || path == "/api/apiengine/run_response_file"
+                || path == "/api/apiengine/run_response_html")
             {
                 return HasScope(currentUser, "api-engine:run");
             }
-            if (path == "/api/datasourceengine/run")
+            if (path == "/api/datasourceengine/run"
+                || path == "/api/datasourceengine/getdata")
             {
                 return HasScope(currentUser, "data-source:run");
             }
@@ -250,6 +447,79 @@ namespace Microi.net
                 return readActions.Contains(path);
             }
             return false;
+        }
+
+        public static bool TryGetTableOperation(
+            string requestPath,
+            out bool isRead,
+            out bool isExport)
+        {
+            isRead = false;
+            isExport = false;
+            var path = (requestPath ?? "").Trim().TrimEnd('/').ToLowerInvariant();
+            var parts = path.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 3 || !parts[0].Equals("api", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var controller = parts[1];
+            var action = parts[2];
+            if (!controller.Equals("formengine", StringComparison.OrdinalIgnoreCase)
+                && !controller.Equals("diytable", StringComparison.OrdinalIgnoreCase)
+                && !controller.Equals("diyfield", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (FormReadActions.Contains(action))
+            {
+                isRead = true;
+                return true;
+            }
+            if (FormWriteActions.Contains(action))
+            {
+                return true;
+            }
+            if (FormExportActions.Contains(action))
+            {
+                isRead = true;
+                isExport = true;
+                return true;
+            }
+            return false;
+        }
+
+        public static bool IsTableModelLookupPath(string requestPath)
+        {
+            var path = (requestPath ?? "").Trim().TrimEnd('/').ToLowerInvariant();
+            return path == "/api/formengine/getdiytable"
+                   || path == "/api/formengine/getdiytablemodel"
+                   || path == "/api/diytable/getdiytable"
+                   || path == "/api/diytable/getdiytablemodel";
+        }
+
+        public static bool IsFieldDataLookupPath(string requestPath)
+        {
+            var path = (requestPath ?? "").Trim().TrimEnd('/').ToLowerInvariant();
+            return path == "/api/formengine/getdiyfieldsqldata"
+                   || path == "/api/formengine/getdiyfieldsqldatafrombody"
+                   || path == "/api/formengine/getfieldsdata"
+                   || path == "/api/formengine/getfieldsdatafrombody"
+                   || path == "/api/diytable/getdiyfieldsqldata"
+                   || path == "/api/diytable/getdiyfieldsqldatafrombody"
+                   || path == "/api/diytable/getfieldsdata"
+                   || path == "/api/diytable/getfieldsdatafrombody";
+        }
+
+        private static bool IsPageMetadataPath(string path)
+        {
+            var parts = (path ?? "")
+                .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length == 3
+                   && parts[0].Equals("api", StringComparison.OrdinalIgnoreCase)
+                   && parts[1].Equals("formengine", StringComparison.OrdinalIgnoreCase)
+                   && PageMetadataActions.Contains(parts[2]);
         }
 
         public static string HashCredential(string credential)
@@ -331,6 +601,8 @@ namespace Microi.net
         public string Scopes { get; set; }
         public string AllowedRoutes { get; set; }
         public string AllowedTableNames { get; set; }
+        public string AllowedTableIds { get; set; }
+        public string AllowedFieldIds { get; set; }
         public string AllowedApiEngineKeys { get; set; }
         public string AllowedDataSourceKeys { get; set; }
         public string ExpiresAt { get; set; }
@@ -343,7 +615,98 @@ namespace Microi.net
 
         private static string RuntimeCacheKey(string osClient, string id)
         {
-            return $"Microi:{osClient}:UserAccessKey:Runtime:{id}";
+            // Version the cache contract whenever runtime-only derived fields change.
+            return $"Microi:{osClient}:UserAccessKey:Runtime:v3:{id}";
+        }
+
+        private static async Task<string> ResolveAllowedTableIdsAsync(
+            string osClient,
+            string allowedTableNames)
+        {
+            var names = UserAccessKeySecurity.ParseStringList(
+                JToken.FromObject(allowedTableNames ?? ""));
+            if (names.Contains(UserAccessKeySecurity.ScopeWildcard, StringComparer.OrdinalIgnoreCase))
+            {
+                return UserAccessKeySecurity.SerializeStringList(
+                    new[] { UserAccessKeySecurity.ScopeWildcard });
+            }
+            if (names.Count == 0) return "[]";
+
+            try
+            {
+                var tableResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(
+                        "diy_table",
+                        new
+                        {
+                            OsClient = osClient,
+                            _Where = new List<object>
+                            {
+                                new List<object> { "Name", "In", names.ToArray() }
+                            },
+                            _SelectFields = new[] { "Id", "Name" },
+                            _PageSize = Math.Max(names.Count, 1)
+                        })
+                    .ConfigureAwait(false);
+                if (tableResult.Code != 1 || tableResult.Data == null) return "[]";
+                var rows = JArray.FromObject((object)tableResult.Data);
+                return UserAccessKeySecurity.SerializeStringList(
+                    rows
+                        .OfType<JObject>()
+                        .Where(row => names.Contains(
+                            row["Name"]?.ToString(),
+                            StringComparer.OrdinalIgnoreCase))
+                        .Select(row => row["Id"]?.ToString()));
+            }
+            catch
+            {
+                // Fail closed. A transient metadata error must not turn a
+                // name-restricted key into an unrestricted table key.
+                return "[]";
+            }
+        }
+
+        private static async Task<string> ResolveAllowedFieldIdsAsync(
+            string osClient,
+            string allowedTableIds)
+        {
+            var tableIds = UserAccessKeySecurity.ParseStringList(
+                JToken.FromObject(allowedTableIds ?? ""));
+            if (tableIds.Contains(UserAccessKeySecurity.ScopeWildcard, StringComparer.OrdinalIgnoreCase))
+            {
+                return UserAccessKeySecurity.SerializeStringList(
+                    new[] { UserAccessKeySecurity.ScopeWildcard });
+            }
+            if (tableIds.Count == 0) return "[]";
+
+            try
+            {
+                var fieldResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(
+                        "diy_field",
+                        new
+                        {
+                            OsClient = osClient,
+                            _Where = new List<object>
+                            {
+                                new List<object> { "TableId", "In", tableIds.ToArray() }
+                            },
+                            _SelectFields = new[] { "Id", "TableId" },
+                            _PageSize = 10000
+                        })
+                    .ConfigureAwait(false);
+                if (fieldResult.Code != 1 || fieldResult.Data == null) return "[]";
+                var rows = JArray.FromObject((object)fieldResult.Data);
+                return UserAccessKeySecurity.SerializeStringList(
+                    rows
+                        .OfType<JObject>()
+                        .Where(row => tableIds.Contains(
+                            row["TableId"]?.ToString(),
+                            StringComparer.OrdinalIgnoreCase))
+                        .Select(row => row["Id"]?.ToString()));
+            }
+            catch
+            {
+                return "[]";
+            }
         }
 
         private static JObject ToPublicRow(object data)
@@ -401,6 +764,14 @@ namespace Microi.net
             JObject row = JObject.FromObject((object)result.Data);
             var runtime = row.ToObject<UserAccessKeyRuntime>();
             if (!IsRuntimeActive(runtime)) return null;
+            runtime.AllowedTableIds = await ResolveAllowedTableIdsAsync(
+                    osClient,
+                    runtime.AllowedTableNames)
+                .ConfigureAwait(false);
+            runtime.AllowedFieldIds = await ResolveAllowedFieldIdsAsync(
+                    osClient,
+                    runtime.AllowedTableIds)
+                .ConfigureAwait(false);
             try
             {
                 await cache.SetAsync(cacheKey, runtime, RuntimeCacheTtl).ConfigureAwait(false);
@@ -441,6 +812,10 @@ namespace Microi.net
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedRoutes ?? "")));
             cleanUser["_AccessKeyAllowedTableNames"] = JArray.FromObject(
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedTableNames ?? "")));
+            cleanUser["_AccessKeyAllowedTableIds"] = JArray.FromObject(
+                UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedTableIds ?? "")));
+            cleanUser["_AccessKeyAllowedFieldIds"] = JArray.FromObject(
+                UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedFieldIds ?? "")));
             cleanUser["_AccessKeyAllowedApiEngineKeys"] = JArray.FromObject(
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedApiEngineKeys ?? "")));
             cleanUser["_AccessKeyAllowedDataSourceKeys"] = JArray.FromObject(

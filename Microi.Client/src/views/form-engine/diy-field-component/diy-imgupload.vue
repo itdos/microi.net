@@ -19,6 +19,7 @@
             :before-upload="(file) => BeforeImgUpload(file)"
             :on-exceed="() => onExceed()"
             :on-success="(result, file, fileList) => ImgUploadSuccess(result, file, fileList)"
+            :on-error="(error, file, fileList) => ImgUploadError(error, file, fileList)"
             :on-remove="(file, fileList) => ImgUploadRemove(file, fileList)"
             :show-file-list="false"
         >
@@ -262,6 +263,7 @@ import { UploadFilled, Delete, Rank, Edit } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useDiyStore } from "@/pinia";
+import { getUploadErrorMessage } from "@/utils/upload-error";
 
 // 禁用属性继承
 defineOptions({
@@ -631,6 +633,33 @@ const ImgUploadRemove = (file, fileList) => {
     }
 };
 
+const clearFailedImgUpload = (file) => {
+    if (getMultipleFlag.value) {
+        const currentImages = Array.isArray(props.FormDiyTableModel[props.field.Name])
+            ? props.FormDiyTableModel[props.field.Name]
+            : [];
+        const failedUid = file && file.uid;
+        const nextImages = currentImages.filter(item => !(
+            item
+            && item.State === 0
+            && String(item.Id) === String(failedUid)
+        ));
+        props.FormDiyTableModel[props.field.Name] = nextImages;
+        emit('update:modelValue', nextImages);
+        return;
+    }
+
+    if (props.FormDiyTableModel[props.field.Name] === '正在上传中...') {
+        props.FormDiyTableModel[props.field.Name] = '';
+        emit('update:modelValue', '');
+    }
+};
+
+const ImgUploadError = (error, file) => {
+    clearFailedImgUpload(file);
+    DiyCommon.Tips(getUploadErrorMessage(error, file && (file.raw || file)), false, 12);
+};
+
 // 上传成功的钩子
 const ImgUploadSuccess = (result, file, fileList) => {
     console.log('=== ImgUploadSuccess 被调用了 ===');
@@ -719,6 +748,7 @@ const ImgUploadSuccess = (result, file, fileList) => {
 
         console.log('=== ImgUploadSuccess END ===');
     } else {
+        clearFailedImgUpload(file);
         console.error('【上传失败】接口返回失败:', result);
     }
 };

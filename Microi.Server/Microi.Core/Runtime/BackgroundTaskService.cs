@@ -316,8 +316,7 @@ namespace Microi.net
         public static async Task RunWorkerLoopAsync(CancellationToken stoppingToken)
         {
             var parallelism = Clamp(
-                ConfigHelper.GetEnvOrConfigurationInt(
-                    "MICROI_BACKGROUND_TASK_MAX_PARALLEL",
+                ConfigHelper.GetRuntimeConfigurationInt(
                     "BackgroundTasks:MaxParallelTasks",
                     4),
                 1,

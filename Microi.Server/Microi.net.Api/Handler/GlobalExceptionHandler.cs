@@ -7,9 +7,73 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MySql.Data.MySqlClient;
 using Jint.Runtime;
+using System.IO;
 
 namespace Microi.net.Api
 {
+    /// <summary>
+    /// 识别请求体在进入 Controller/HDFS 业务校验前被 ASP.NET Core 拒绝的场景。
+    /// 反向代理在进程外返回的 413 不会进入此分类器，必须由代理自身提高上限或改写响应。
+    /// </summary>
+    public static class RequestBodyLimitError
+    {
+        public const string ErrorType = "UploadRequestTooLarge";
+        public const string Layer = "Microi.Api";
+        public const string Solution =
+            "请提高反向代理 nginx 的 client_max_body_size，使其大于实际 multipart 请求总大小；" +
+            "吾码 API 已提供统一的 2048MB 接收硬顶，租户业务额度请在 SaaS 引擎中配置。";
+
+        public static bool IsRequestBodyTooLarge(Exception ex)
+        {
+            for (var current = ex; current != null; current = current.InnerException)
+            {
+                if (current is BadHttpRequestException badRequest
+                    && badRequest.StatusCode == StatusCodes.Status413PayloadTooLarge)
+                {
+                    return true;
+                }
+
+                var message = current.Message ?? string.Empty;
+                if ((current is InvalidDataException || current is BadHttpRequestException)
+                    && ContainsLimitMarker(message))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static bool IsHdfsUploadPath(PathString path)
+        {
+            return path.StartsWithSegments("/api/HDFS/Upload", StringComparison.OrdinalIgnoreCase)
+                   || path.StartsWithSegments("/api/HDFS/UploadAnonymous", StringComparison.OrdinalIgnoreCase)
+                   || path.StartsWithSegments("/api/HDFS/FileManageUpload", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string GetUserMessage(PathString path)
+        {
+            var prefix = IsHdfsUploadPath(path)
+                ? "上传请求在进入 HDFS 业务校验前超过了吾码 API 的 HTTP/Multipart 解析上限。"
+                : "请求正文在进入业务接口前超过了吾码 API 的 HTTP/Multipart 解析上限。";
+            return prefix
+                   + "SaaS 引擎中的单文件上限和单次总量只负责租户业务额度，不能放大启动级 HTTP 上限。"
+                   + Solution;
+        }
+
+        private static bool ContainsLimitMarker(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return false;
+            return message.IndexOf("request body too large", StringComparison.OrdinalIgnoreCase) >= 0
+                   || message.IndexOf("request body size", StringComparison.OrdinalIgnoreCase) >= 0
+                   || message.IndexOf("multipart body length limit", StringComparison.OrdinalIgnoreCase) >= 0
+                   || message.IndexOf("multipart body length", StringComparison.OrdinalIgnoreCase) >= 0
+                   || message.IndexOf("content too large", StringComparison.OrdinalIgnoreCase) >= 0
+                   || message.IndexOf("request entity too large", StringComparison.OrdinalIgnoreCase) >= 0
+                   || message.IndexOf("413 payload too large", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+    }
+
     /// <summary>
     /// 全局异常处理中间件
     /// 自动追踪和诊断所有未处理的异常
@@ -31,6 +95,10 @@ namespace Microi.net.Api
             }
             catch (Exception ex)
             {
+                if (context.Response.HasStarted)
+                {
+                    throw;
+                }
                 await HandleExceptionAsync(context, ex);
             }
         }
@@ -39,20 +107,28 @@ namespace Microi.net.Api
         {
             // 请求级异常进入异步MongoDB日志，不再污染平台启动/致命故障Console。
             var exceptionContext = $"{context.Request.Method} {context.Request.Path}";
-            _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+            try
             {
-                Type = "全局异常",
-                Title = $"全局异常捕获: {exceptionContext}",
-                Content = ex.Message,
-                OtherInfo = ex.StackTrace?.Length > 2000 ? ex.StackTrace.Substring(0, 2000) : ex.StackTrace,
-                Level = 3,
-                Api = context.Request.Path.ToString(),
-                IP = context.Connection?.RemoteIpAddress?.ToString()
-            });
+                _ = MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
+                {
+                    Type = "全局异常",
+                    Title = $"全局异常捕获: {exceptionContext}",
+                    Content = ex.Message,
+                    OtherInfo = ex.StackTrace?.Length > 2000 ? ex.StackTrace.Substring(0, 2000) : ex.StackTrace,
+                    Level = 3,
+                    Api = context.Request.Path.ToString(),
+                    IP = context.Connection?.RemoteIpAddress?.ToString()
+                });
+            }
+            catch
+            {
+                // 异常日志基础设施不可用时，仍必须把标准 DosResult 返回给调用方。
+            }
 
             // 根据异常类型返回不同的错误信息
-            var (statusCode, userMessage) = GetErrorResponse(ex);
+            var (statusCode, userMessage, errorType, layer, solution) = GetErrorResponse(ex, context.Request.Path);
 
+            context.Response.Clear();
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)statusCode;
 
@@ -64,6 +140,9 @@ namespace Microi.net.Api
                 DataAppend = new
                 {
                     TraceId = context.TraceIdentifier,
+                    ErrorType = errorType,
+                    Layer = layer,
+                    Solution = solution,
                     ExceptionType = IsDevelopment() ? ex.GetType().Name : null,
                     Path = context.Request.Path.ToString(),
                     Method = context.Request.Method,
@@ -80,16 +159,27 @@ namespace Microi.net.Api
         /// <summary>
         /// 根据异常类型返回合适的错误信息
         /// </summary>
-        private (HttpStatusCode statusCode, string message) GetErrorResponse(Exception ex)
+        private (HttpStatusCode statusCode, string message, string? errorType, string? layer, string? solution)
+            GetErrorResponse(Exception ex, PathString requestPath)
         {
+            if (RequestBodyLimitError.IsRequestBodyTooLarge(ex))
+            {
+                return (
+                    HttpStatusCode.OK,
+                    RequestBodyLimitError.GetUserMessage(requestPath),
+                    RequestBodyLimitError.ErrorType,
+                    RequestBodyLimitError.Layer,
+                    RequestBodyLimitError.Solution);
+            }
+
             if (IsPressureException(ex))
             {
-                return (HttpStatusCode.OK, "系统繁忙，当前请求较多或数据库连接压力较高，请稍后重试。");
+                return (HttpStatusCode.OK, "系统繁忙，当前请求较多或数据库连接压力较高，请稍后重试。", null, null, null);
             }
 
             if (ex is TimeoutException)
             {
-                return (HttpStatusCode.OK, "系统处理超时，请稍后重试。");
+                return (HttpStatusCode.OK, "系统处理超时，请稍后重试。", null, null, null);
             }
 
             return ex switch
@@ -133,7 +223,10 @@ namespace Microi.net.Api
                 // 默认异常
                 _ => (
                     HttpStatusCode.OK,//InternalServerError,
-                    IsDevelopment() ? ex.Message : "服务器内部错误，请稍后重试。"
+                    IsDevelopment() ? ex.Message : "服务器内部错误，请稍后重试。",
+                    null,
+                    null,
+                    null
                 )
             };
         }

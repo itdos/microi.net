@@ -1001,7 +1001,8 @@ namespace Microi.net
             if (value.IndexOf("Unhandled exception", StringComparison.OrdinalIgnoreCase) >= 0
                 || value.IndexOf("OutOfMemoryException", StringComparison.OrdinalIgnoreCase) >= 0
                 || value.IndexOf("StackOverflowException", StringComparison.OrdinalIgnoreCase) >= 0
-                || value.IndexOf("Fatal process", StringComparison.OrdinalIgnoreCase) >= 0)
+                || value.IndexOf("Fatal process", StringComparison.OrdinalIgnoreCase) >= 0
+                || value.Contains("API进程内存保护"))
             {
                 return true;
             }

@@ -1,6 +1,6 @@
 ---
 name: v8-file-upload
-description: Microi V8 文件上传下载指南。用于处理 V8.FilesByteBase64、V8.Method.Upload、私有文件 URL、文件响应、HDFS、OSS、MinIO 和 S3 存储。
+description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 应用发布、V8.FilesByteBase64、V8.Method.Upload、私有文件 URL、文件响应、HDFS、OSS、MinIO 和 S3 存储。
 ---
 
 # Microi V8 文件上传下载
@@ -63,43 +63,24 @@ var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 
 Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入口必须在解码 Base64、解析图片或调用对象存储前执行服务端校验。上传限制分为四层，不能把租户业务值误称为平台硬上限：
 
-1. **租户业务配置**：有效正数/布尔值按 `sys_osclients` 当前租户 → 自定义环境变量 → `appsettings` → 代码默认值取第一项。租户可以按业务需要提高或降低默认值。
-2. **平台绝对上限**：最终业务值再与独立 `Absolute*` 取较小值；`ForceDisabled=true` 是最高优先级全局紧急熔断，任何租户都不能重新开启。
-3. **HTTP 解析上限**：Kestrel 请求正文、Multipart 和表单值上限在进程启动时确定，是所有租户共享的请求解析硬顶，不能由 SaaS 动态配置放大。
+1. **租户业务配置**：有效正数/布尔值按 `sys_osclients` 当前租户 → 代码默认值解析。租户可以按业务需要提高或降低默认值，不要求安装者维护额外环境变量或修改 `appsettings`。
+2. **平台绝对上限**：最终业务值再与代码内固定灾难保护上限取较小值，租户和安装参数都不能放大。
+3. **HTTP 解析上限**：Kestrel 请求正文与 Multipart 固定为 2048 MB，普通表单单值固定为 128 MB，是所有租户共享的请求解析硬顶。
 4. **字段级限制**：前端 `FileUpload` / `ImgUpload` 的 `MaxSize`、`MaxCount` 等只能与当前租户有效值取更小值，不能提高后端上限，也不能替代服务端校验。
 
-业务默认值及其回退配置：
+业务配置与固定边界：
 
-| 环境变量 | `appsettings` 配置 | 代码默认值 | `sys_osclients` 覆盖字段 |
-|---|---|---:|---|
-| `MICROI_FILE_UPLOAD_ENABLED` | `FileUploadSecurity:UploadEnabled` | `true` | `FileUploadEnabled` |
-| `MICROI_FILE_UPLOAD_MAX_FILE_MB` | `FileUploadSecurity:MaxFileMB` | 100 MB | `FileUploadMaxFileMB` |
-| `MICROI_FILE_UPLOAD_MAX_TOTAL_MB` | `FileUploadSecurity:MaxTotalMB` | 200 MB | `FileUploadMaxRequestMB` |
-| `MICROI_FILE_UPLOAD_MAX_COUNT` | `FileUploadSecurity:MaxFileCount` | 10 | `FileUploadMaxCount` |
-| `MICROI_FILE_UPLOAD_DAILY_USER_QUOTA_MB` | `FileUploadSecurity:DailyUserQuotaMB` | 2048 MB | `FileUploadDailyUserQuotaMB` |
-| `MICROI_FILE_UPLOAD_DAILY_TENANT_QUOTA_MB` | `FileUploadSecurity:DailyTenantQuotaMB` | 20480 MB | `FileUploadDailyTenantQuotaMB` |
+| `sys_osclients` 字段 | 代码默认值 | 平台固定边界 |
+|---|---:|---:|
+| `FileUploadEnabled` | `true` | — |
+| `FileUploadMaxFileMB` | 100 MB | 1024 MB |
+| `FileUploadMaxRequestMB` | 200 MB | 2048 MB |
+| `FileUploadMaxCount` | 10 | 100 |
+| `FileUploadDailyUserQuotaMB` | 2048 MB | 10 TB |
+| `FileUploadDailyTenantQuotaMB` | 20480 MB | 10 TB |
 
-平台灾难保护配置不接受租户覆盖：
-
-| 环境变量 | `appsettings` 配置 | 代码默认值 |
-|---|---|---:|
-| `MICROI_FILE_UPLOAD_ABSOLUTE_MAX_FILE_MB` | `FileUploadSecurity:AbsoluteMaxFileMB` | 1024 MB |
-| `MICROI_FILE_UPLOAD_ABSOLUTE_MAX_TOTAL_MB` | `FileUploadSecurity:AbsoluteMaxTotalMB` | 2048 MB |
-| `MICROI_FILE_UPLOAD_ABSOLUTE_MAX_COUNT` | `FileUploadSecurity:AbsoluteMaxFileCount` | 100 |
-| `MICROI_FILE_UPLOAD_ABSOLUTE_DAILY_USER_QUOTA_MB` | `FileUploadSecurity:AbsoluteDailyUserQuotaMB` | 10485760 MB（10 TB） |
-| `MICROI_FILE_UPLOAD_ABSOLUTE_DAILY_TENANT_QUOTA_MB` | `FileUploadSecurity:AbsoluteDailyTenantQuotaMB` | 10485760 MB（10 TB） |
-| `MICROI_FILE_UPLOAD_FORCE_DISABLED` | `FileUploadSecurity:ForceDisabled` | `false` |
-
-HTTP 请求解析硬顶同样不接受租户覆盖：
-
-| 环境变量 | `appsettings` 配置 | 默认值 | 代码边界 |
-|---|---|---:|---|
-| `MICROI_HTTP_MAX_REQUEST_BODY_MB` | `FileUploadSecurity:MaxRequestBodyMB` | 256 MB | 1～2048 MB |
-| `MICROI_FILE_UPLOAD_MAX_MULTIPART_MB` | `FileUploadSecurity:MaxMultipartBodyMB` | 256 MB | 1 MB～HTTP 正文上限 |
-| `MICROI_FILE_UPLOAD_MAX_FORM_VALUE_MB` | `FileUploadSecurity:MaxFormValueMB` | 128 MB | 1 MB～`min(HTTP, 512 MB)` |
-
-- `sys_osclients` 六个字段全部可空；空值、无效值或老数据库缺列时继续向环境变量、`appsettings` 和代码默认值回退，不会因升级自动停用上传。`FileUploadMaxRequestMB` 指一次上传所有文件的业务合计大小，不等于 Kestrel HTTP 请求正文上限。
-- `Absolute*`、`ForceDisabled` 和 HTTP/Multipart/Form 解析上限是平台运维边界；租户值即使更大也会被这些边界截断。最终单次总量还不能超过帐号或租户的有效日额度，单文件不能超过最终单次总量。
+- `sys_osclients` 六个字段全部可空；空值、无效值或老数据库缺列时使用代码默认值，不会因升级自动停用上传。`FileUploadMaxRequestMB` 指一次上传所有文件的业务合计大小，不等于 Kestrel HTTP 请求正文上限。
+- 固定灾难保护和 HTTP/Multipart/Form 解析上限不属于安装配置；租户值即使更大也会被这些边界截断。最终单次总量还不能超过帐号或租户的有效日额度，单文件不能超过最终单次总量。
 - `FileUploadEnabled=0` 表示禁用当前租户的交互式上传，不表示绕过限制。平台内部受控任务仍受全局大小硬上限；租户配置刷新应走现有 SaaS 引擎重载和共享 Redis 发布订阅，不能依赖单节点内存。
 - 帐号与租户每日额度在共享 Redis 中用单次原子脚本预留，支持多节点；Redis 不可用时失败关闭，不能降级成无限上传。
 - 额度按 UTC 日期统计。为防并发重试绕过限制，后续对象存储失败也不退还已经预留的额度。
@@ -117,7 +98,7 @@ HTTP 请求解析硬顶同样不接受租户覆盖：
 4. 保存后逐条远程回读；FormEngine 会排队重载 SaaS 运行配置，再用真实小文件上传做生效冒烟。只看到 MCP 返回“更新成功”不算验收。
 5. 提高每日配额保留当天已用计数，剩余额度为新上限减已用量。计数按 UTC 日期，失败上传不退款；除非用户明确授权事故处置，不得删除 Redis 配额 Key。
 
-租户 MCP 只能调整业务层配置；`Absolute*`、`ForceDisabled`、HTTP/Multipart/Form 解析上限和反向代理上限必须由平台运维配置，不能通过 `sys_osclients` 绕过。写入 `sys_osclients` 属于控制面操作，只允许当前租户的 `Level >= 9999` 管理身份，并且必须保留 MCP 审计与写后回读。
+租户 MCP 只能调整业务层配置；平台固定灾难保护、HTTP/Multipart/Form 解析上限和反向代理上限不能通过 `sys_osclients` 绕过。写入 `sys_osclients` 属于控制面操作，只允许当前租户的 `Level >= 9999` 管理身份，并且必须保留 MCP 审计与写后回读。
 
 ### UniApp / H5 客户端直传路径规则
 
@@ -133,7 +114,7 @@ HTTP 请求解析硬顶同样不接受租户覆盖：
 
 ### 应用商城 ZIP
 
-应用商城的 AI 应用/微服务资产禁止逐文件 Base64 持久化到数据库。编译产物打成公有 ZIP，源码 ZIP 默认不生成、由发布者逐应用勾选；数据库只保存路径和校验元数据。
+应用商城的 AI 应用/微服务资产禁止逐文件 Base64 持久化到数据库。源码/安装包场景可以生成 ZIP；真实在线编译目录优先使用下节的 MCP 流式发布。数据库只保存路径和校验元数据。
 
 ```javascript
 var zipResult = V8.Method.CreateZip({
@@ -154,6 +135,33 @@ var extractResult = V8.Method.ExtractZip({
 ```
 
 `System.IO` 在 Jint 沙箱中被禁止，不能在 V8 代码里直接构造 `MemoryStream/ZipArchive`；必须使用以上受控方法。
+
+### AI 应用编译目录流式发布（首选）
+
+发布 Web、UniApp、MicroService 的 `dist` / H5 编译目录时，必须优先使用 `microi_publish_application_directory_stream`，不要把每个文件读成 Base64 后传给 `ai_app_build`、`microi_publish_microservice` 或普通 JSON 接口。旧工具仅为小文件兼容保留。
+
+标准流程：
+
+1. 先运行不带 `confirmExecution` 的预检。MCP 按流计算 SHA-256，拒绝符号链接、`.git`、`node_modules`、密钥/`.env`、路径穿越、超过 20000 个文件或超过 20 GB 的垃圾目录；默认不发布 `.map`。
+2. 确认后把 `confirmExecution` 精确设为 `appIdOrKey`。每个文件通过 multipart 原始流进入 `/api/V8Engine/UploadApplicationAssetStream`，不构造整文件 `Buffer`、Base64 或 JSON 文件体。
+3. 文件只写不可变版本目录。全部成功后，清单确认接口只接收 `Path/Sha256/Size`，由 HDFS Provider 的 `CopyObject` 在服务端复制到 root 与 `latest`；非入口先复制，入口最后复制。
+4. 历史版本 URL 保留语义版本；分享/在线使用 URL 使用不含版本号的 root 稳定地址。重试必须复用同一版本与摘要，不能覆盖已有但缺少完整性证明的历史对象。
+5. 该控制面只允许当前 Token 租户的 `Level >= 9999` 交互式管理员；访问密钥会话不得发布。单文件、HTTP/Multipart 和每日额度仍然生效，不能把“使用流”理解成无限上传。
+
+几十 MB **不是** Jint 或 HDFS 的固定上限。旧链路失败的原因是二进制先膨胀为约 `4/3` 的 Base64，又在 JSON、Jint 字符串、.NET 字符串/字节数组之间产生多份累计分配；文件数量、并发和当前进程内存共同决定触发点。描述问题时必须明确“旧 Base64/Jint 发布链路的累计分配”，不得写成“几十 MB 就达到 Jint 硬上限”。HDFS 上传本身应走二进制流。
+
+```json
+{
+  "appIdOrKey": "flower-store",
+  "versionNo": "v1.2.0",
+  "directory": "D:/build/flower-store/dist",
+  "entryPath": "index.html",
+  "changeSummary": "修复移动端布局",
+  "confirmExecution": "flower-store"
+}
+```
+
+底层断点式单文件工具是 `microi_upload_application_asset_stream`。除诊断或精确恢复单文件外，不要只调用它而遗漏最终清单确认，否则稳定入口不会切换。
 
 | 类型 | `Limit` | 访问 URL | 用途 |
 |------|---------|---------|------|

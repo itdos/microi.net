@@ -15,6 +15,13 @@ namespace Microi.net.Api
     [ApiController]
     public class DiagnosticsController : ControllerBase
     {
+        private readonly ProcessMemoryPressureState _memoryPressure;
+
+        public DiagnosticsController(ProcessMemoryPressureState memoryPressure)
+        {
+            _memoryPressure = memoryPressure;
+        }
+
         /// <summary>
         /// 健康检查端点
         /// </summary>
@@ -22,12 +29,37 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public ActionResult<DosResult> HealthCheck()
         {
-            return Ok(new DosResult(1, new
+            var memory = _memoryPressure.GetSnapshot();
+            var data = new
             {
-                Status = "Healthy",
+                Status = memory.RejectingRequests ? "Degraded" : "Healthy",
                 Timestamp = DateTime.Now,
-                Message = "系统运行正常"
-            }));
+                Message = memory.RejectingRequests ? "当前节点处于内存压力保护状态" : "系统运行正常",
+                Memory = new
+                {
+                    memory.RejectingRequests,
+                    memory.ShutdownRequested,
+                    PressureMetric = "ResidentSet",
+                    ProcessMB = memory.ProcessBytes / (1024L * 1024L),
+                    WorkingSetMB = memory.WorkingSetBytes / (1024L * 1024L),
+                    PrivateAddressSpaceMB = memory.PrivateBytes / (1024L * 1024L),
+                    ManagedHeapMB = memory.ManagedHeapBytes / (1024L * 1024L),
+                    SoftLimitMB = memory.SoftLimitBytes / (1024L * 1024L),
+                    HardLimitMB = memory.HardLimitBytes / (1024L * 1024L),
+                    memory.SampledAt
+                }
+            };
+            return memory.RejectingRequests
+                ? StatusCode(StatusCodes.Status503ServiceUnavailable, new DosResult(0, data, "当前节点处于内存压力保护状态。"))
+                : Ok(new DosResult(1, data));
+        }
+
+        /// <summary>仅表示进程仍存活，不代表节点适合继续接收业务流量。</summary>
+        [HttpGet("liveness")]
+        [AllowAnonymous]
+        public ActionResult<DosResult> Liveness()
+        {
+            return Ok(new DosResult(1, new { Status = "Alive", Timestamp = DateTime.Now }));
         }
     }
 }

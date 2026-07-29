@@ -71,6 +71,10 @@ namespace Microi.net
         DosResult QueueDiyLangFullSyncForAllClients(bool includeClientText = true, string source = "startup");
         DosResult ResetDiyLangFullSync(string osClient = "", string reason = "manual");
         DosResult ReloadDiyLangRuntimeConfig(string osClient = "");
+        /// <summary>
+        /// 以分页、字段白名单和总量预算安全重载多语言运行时缓存。
+        /// </summary>
+        Task<DosResult> ReloadDiyLangCacheAsync(string osClient = "");
         Task<DosResult> SyncDiyLangFullAsync(string osClient = "", bool includeClientText = true, string source = "api");
         Task<DosResult> RepairMissingDiyLangTranslationsAsync(string osClient = "", string source = "api");
 

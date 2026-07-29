@@ -42,34 +42,23 @@ namespace Microi.net
         /// 未显式开启时完全保留历史 HTTP 行为，不做协议、URL 凭据、私网或云元数据拦截。
         /// 显式开启后才执行 ValidateSsrfUrl 的完整校验。
         ///
-        /// 配置优先级：环境变量 MICROI_SSRF_PROTECTION_ENABLED >
-        /// 主租户 sys_osclients 运行配置 > appsettings.json SsrfProtection:Enabled。
-        /// 历史 AppSettings:DisableSsrfProtection=true 继续兼容，并始终优先关闭严格模式。
+        /// 配置来源：主租户 sys_osclients.SsrfProtectionEnabled。
         /// </summary>
         private static bool IsStrictSsrfProtectionEnabled()
         {
-            if (IsTruthy(ConfigHelper.GetAppSettings("DisableSsrfProtection")))
-            {
-                return false;
-            }
-
-            return ConfigHelper.GetEnvOrConfigurationBool(
-                "MICROI_SSRF_PROTECTION_ENABLED",
+            return ConfigHelper.GetRuntimeConfigurationBool(
                 "SsrfProtection:Enabled",
                 false);
         }
 
         /// <summary>
-        /// 严格模式下的 SSRF 主机白名单。新配置为
-        /// SsrfProtection:AllowedHosts / MICROI_SSRF_ALLOWED_HOSTS，
-        /// 同时兼容历史 AppSettings:SsrfAllowedHosts。
+        /// 严格模式下的 SSRF 主机白名单来自主租户
+        /// sys_osclients.SsrfAllowedHosts。
         /// </summary>
         private static HashSet<string> GetSsrfAllowedHosts()
         {
-            var configuredHosts = ConfigHelper.GetEnvOrConfiguration(
-                                      "MICROI_SSRF_ALLOWED_HOSTS",
+            var configuredHosts = ConfigHelper.GetRuntimeConfigurationValue(
                                       "SsrfProtection:AllowedHosts")
-                                  ?? ConfigHelper.GetAppSettings("SsrfAllowedHosts")
                                   ?? "";
 
             return new HashSet<string>(
@@ -199,14 +188,6 @@ namespace Microi.net
             return false;
         }
 
-        private static bool IsTruthy(string value)
-        {
-            return !string.IsNullOrWhiteSpace(value)
-                   && (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase));
-        }
         #endregion
 
         public DiyHttpParam DynamicToDiyHttpParam(dynamic dynamicParam)
@@ -377,7 +358,7 @@ namespace Microi.net
             {
                 MicroiEngine.QueueSystemLog(null, "Security", "SsrfRequestBlocked", "SSRF 防护已拦截外部请求", $"{reason}; URL={RedactUrlForLog(param.Url)}", 3);
                 throw new InvalidOperationException(
-                    $"SSRF 防护已拦截此请求：{reason}。如需放行请配置 SsrfProtection:AllowedHosts。");
+                    $"SSRF 防护已拦截此请求：{reason}。如需放行请在 SaaS 引擎配置 SsrfAllowedHosts。");
             }
 
             // 两种模式分别复用连接池：默认模式保留历史自动重定向；严格模式禁止自动重定向。
