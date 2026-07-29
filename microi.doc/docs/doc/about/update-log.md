@@ -1,8 +1,8 @@
 # 更新日志
 
-## v6.8.3 - (2026-07-29 19:16)
+## v6.8.4 - (2026-07-29 19:16)
 
-- **版本发布与仓库边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.8.3；Microi VS Code 插件及内置 Skills 升级至 v4.3.7。本次继续按根仓库、`Microi.Server/Microi.net`、`Microi.Server/Microi.AI`、`Microi.VSCode` 四个 Git 边界汇总，`microi.mcp/dist` 等编译产物及本地诊断日志不纳入功能变更说明。
+- **版本发布与仓库边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.8.4；Microi VS Code 插件及内置 Skills 升级至 v4.3.7。本次继续按根仓库、`Microi.Server/Microi.net`、`Microi.Server/Microi.AI`、`Microi.VSCode` 四个 Git 边界汇总，`microi.mcp/dist` 等编译产物及本地诊断日志不纳入功能变更说明。
 - **指定历史范围与合并去重**：根仓库 `baab78a`、Microi.net `c5b3500`、Microi.VSCode `478eb16` 都是各自当前 `HEAD`，从指定提交到 `HEAD` 的范围均只有该提交本身，且三者都是单父普通提交，没有后续提交、自动 merge 或额外冲突解决代码；因此分别按根仓库 122 个非 `dist` 文件、Microi.net 13 个文件、VS Code 7 个文件的净差异审计。`baab78a` 中已写入 v6.7.7 的访问密钥、AI 助手、应用商城等基础能力不重复累计，本节以下只补记尚未覆盖的实际增量。
 - **数据权限设计器、字段唯一方式与定制组件保存（补记根仓库 `baab78a`）**：数据权限可视化配置以可读的 `MICROI_DATA_PERMISSION_CONFIG` 注释随最终 SQL 持久化，重新打开时可恢复图形规则，同时最终 SQL 始终允许直接编辑；提交前统一刷新 Monaco／定制组件的防抖值，服务端执行时只剥离图形恢复标记，避免刚输入的条件丢失或标记进入真实查询。字段设计器新增“单独唯一（允许空值重复）／同时唯一（组合约束）”并兼容历史 Config；物理 `DevComponent` 字段识别、值回写和保存链路同步修复。
 - **V8 嵌套调用预算与结构化诊断（补记根仓库 `baab78a`、Microi.net `c5b3500`）**：新增单层 Jint 累计分配预算、根调用树总预算、接口嵌套深度和嵌套内存隔离，子接口不再被每层父接口重复计费，同时整棵调用树仍有总上限；嵌套调用复用全局／租户并发名额、同 Key 重入避免自锁，并传递取消信号。超时、语句数、递归、单层／调用树内存和并发等待统一返回 `V8Limit` 诊断，脚本可通过 `V8.Limits` 查看本片有效预算；Upgrade22 幂等补充租户配置字段并纠正“累计分配量不等于实时堆内存”的历史描述。
