@@ -152,6 +152,11 @@ if (!relatedBusinessList.includes('class="search-row"') ||
   !relatedBusinessList.includes('buildFilterWhere()')) {
   fail('related business lists must preserve standalone search and advanced filters')
 }
+if (!relatedBusinessList.includes('!waitingForParentSave') ||
+  !relatedBusinessList.includes('保存当前表单后可新增') ||
+  !relatedBusinessList.includes('this.loading = false')) {
+  fail('new parent forms must not leave related lists in a permanent skeleton state')
+}
 if (!taskList.includes('<mci-task-card') ||
   !taskList.includes('components: { MciTaskCard }') ||
   !relatedBusinessList.includes('<mci-task-card') ||
@@ -205,6 +210,12 @@ for (const token of [
 }
 if (!nativeForm.includes('@change="handleNativeFieldChange(field, $event)"')) {
   fail('native form must notify tenant extensions when a field value changes')
+}
+if (!nativeForm.includes('function createDraftRowId()') ||
+  !nativeForm.includes(':parent-id="relationParentId"') ||
+  !nativeForm.includes('Id: this.draftRowId') ||
+  !nativeForm.includes("this.mode === 'Add' && !this.rowId && isFormEngineRecordAdapter(this.recordAdapter)")) {
+  fail('new native forms must preallocate and preserve a parent row id for related records')
 }
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')
