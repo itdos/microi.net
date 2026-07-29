@@ -15,17 +15,14 @@ public sealed class SysLogQueueOptions
     public int BatchSize { get; init; } = 250;
     public string? SpoolDirectory { get; init; }
 
-    public static SysLogQueueOptions FromConfiguration()
+    public static SysLogQueueOptions CreateDefault()
     {
         return new SysLogQueueOptions
         {
             Capacity = 4096,
             OverflowCapacity = 512,
             BatchSize = 250,
-            // Spool目录属于节点本地持久卷，不是租户业务参数。
-            SpoolDirectory = ConfigHelper.GetEnvOrConfiguration(
-                "MICROI_SYSLOG_SPOOL_DIR",
-                "SysLogQueue:SpoolDirectory")
+            SpoolDirectory = null
         };
     }
 }
@@ -63,7 +60,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     private long _lastPersistedTicks;
 
     public SysLogQueueService(IMongoDB mongo, ILogger<SysLogQueueService> logger, IHostEnvironment environment)
-        : this(mongo, logger, environment, SysLogQueueOptions.FromConfiguration())
+        : this(mongo, logger, environment, SysLogQueueOptions.CreateDefault())
     {
     }
 
@@ -75,7 +72,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     {
         _mongo = mongo;
         _logger = logger;
-        _options = options ?? SysLogQueueOptions.FromConfiguration();
+        _options = options ?? SysLogQueueOptions.CreateDefault();
         _channel = Channel.CreateBounded<SysLogParam>(new BoundedChannelOptions(_options.Capacity)
         {
             SingleReader = true,
@@ -83,7 +80,6 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             FullMode = BoundedChannelFullMode.Wait,
             AllowSynchronousContinuations = false
         });
-        _nodeId = NormalizeNodeId(Environment.GetEnvironmentVariable("MICROI_NODE_ID").DosIsNullOrWhiteSpace(Environment.MachineName));
         var configured = _options.SpoolDirectory;
         var candidate = string.IsNullOrWhiteSpace(configured)
             ? Path.Combine(environment.ContentRootPath, "logs", "syslog-spool")
@@ -100,6 +96,7 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             Directory.CreateDirectory(_spoolDirectory);
             _logger.LogError(ex, "配置的日志spool目录不可用，已降级到临时目录 {Spool}", _spoolDirectory);
         }
+        _nodeId = NormalizeNodeId(Environment.MachineName);
         RecoverTempSpools();
     }
 

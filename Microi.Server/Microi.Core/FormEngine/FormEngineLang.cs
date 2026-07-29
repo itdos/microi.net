@@ -2458,20 +2458,16 @@ namespace Microi.net
                 return new DosResult(0, null, "OsClient不能为空。");
             }
 
-            var pageSize = Math.Max(100, Math.Min(2000, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_DIY_LANG_CACHE_PAGE_SIZE",
+            var pageSize = Math.Max(100, Math.Min(2000, ConfigHelper.GetRuntimeConfigurationInt(
                 "DiyLang:RuntimeCachePageSize",
                 DiyLangRuntimeCacheDefaultPageSize)));
-            var maxRows = Math.Max(1000, Math.Min(200000, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_DIY_LANG_CACHE_MAX_ROWS",
+            var maxRows = Math.Max(1000, Math.Min(200000, ConfigHelper.GetRuntimeConfigurationInt(
                 "DiyLang:RuntimeCacheMaxRows",
                 DiyLangRuntimeCacheDefaultMaxRows)));
-            var maxCharacters = Math.Max(1000000, Math.Min(128000000, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_DIY_LANG_CACHE_MAX_CHARACTERS",
+            var maxCharacters = Math.Max(1000000, Math.Min(128000000, ConfigHelper.GetRuntimeConfigurationInt(
                 "DiyLang:RuntimeCacheMaxCharacters",
                 DiyLangRuntimeCacheDefaultMaxCharacters)));
-            var commandTimeoutSeconds = Math.Max(5, Math.Min(120, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_DIY_LANG_CACHE_COMMAND_TIMEOUT_SECONDS",
+            var commandTimeoutSeconds = Math.Max(5, Math.Min(120, ConfigHelper.GetRuntimeConfigurationInt(
                 "DiyLang:RuntimeCacheCommandTimeoutSeconds",
                 DiyLangRuntimeCacheDefaultCommandTimeoutSeconds)));
             try

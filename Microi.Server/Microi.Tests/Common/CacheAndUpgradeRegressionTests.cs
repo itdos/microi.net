@@ -5,7 +5,6 @@ using Microi.net.Api;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
@@ -38,10 +37,10 @@ public class CacheAndUpgradeRegressionTests
         var commandTimeout = typeof(FormEngineExtend).GetField(
             "DiyLangRuntimeCacheDefaultCommandTimeoutSeconds",
             BindingFlags.Static | BindingFlags.NonPublic);
-        Assert.InRange(Assert.IsType<int>(pageSize!.GetRawConstantValue()), 100, 2000);
-        Assert.InRange(Assert.IsType<int>(maxRows!.GetRawConstantValue()), 1000, 200000);
-        Assert.InRange(Assert.IsType<int>(maxCharacters!.GetRawConstantValue()), 1_000_000, 128_000_000);
-        Assert.InRange(Assert.IsType<int>(commandTimeout!.GetRawConstantValue()), 5, 120);
+        Assert.Equal(500, Assert.IsType<int>(pageSize!.GetRawConstantValue()));
+        Assert.Equal(10_000, Assert.IsType<int>(maxRows!.GetRawConstantValue()));
+        Assert.Equal(5_000_000, Assert.IsType<int>(maxCharacters!.GetRawConstantValue()));
+        Assert.Equal(30, Assert.IsType<int>(commandTimeout!.GetRawConstantValue()));
     }
 
     [Fact]
@@ -91,32 +90,34 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
-    public void ProcessMemoryGuard_ReadsExplicitConfiguration()
+    public void ProcessMemoryGuard_DefaultsToNinetyFiveAndNinetyEightPercentOf48GiB()
     {
-        var values = new Dictionary<string, string?>
-        {
-            ["ProcessMemoryGuard:Enabled"] = "true",
-            ["ProcessMemoryGuard:SoftLimitMB"] = "640",
-            ["ProcessMemoryGuard:HardLimitMB"] = "768",
-            ["ProcessMemoryGuard:PollSeconds"] = "5",
-            ["ProcessMemoryGuard:HardSamples"] = "4",
-            ["ProcessMemoryGuard:ExitGraceSeconds"] = "7",
-            ["ProcessMemoryGuard:HardExit"] = "false"
-        };
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(values)
-            .Build();
-        var environment = new BoundedQueueHostEnvironment();
+        const long gib = 1024L * 1024 * 1024;
+        const long mib = 1024L * 1024;
+        var options = ProcessMemoryGuardOptions.ForCapacity(
+            new ProcessMemoryCapacity(48L * gib, "Test48GiB"));
 
-        var options = ProcessMemoryGuardOptions.FromConfiguration(environment, configuration);
+        Assert.Equal(46_694L * mib, options.SoftLimitBytes);
+        Assert.Equal(48_168L * mib, options.HardLimitBytes);
+        Assert.Equal(48L * gib, options.EffectiveMemoryBytes);
+        Assert.Equal("Test48GiB", options.EffectiveMemorySource);
+        Assert.Equal(95, options.SoftLimitPercent);
+        Assert.Equal(98, options.HardLimitPercent);
+        Assert.Equal(ProcessMemoryPressureLevel.Normal, options.Evaluate(3_940L * mib));
+    }
 
-        Assert.True(options.Enabled);
-        Assert.Equal(640L * 1024 * 1024, options.SoftLimitBytes);
-        Assert.Equal(768L * 1024 * 1024, options.HardLimitBytes);
-        Assert.Equal(5, options.PollSeconds);
-        Assert.Equal(4, options.ConsecutiveHardSamples);
-        Assert.Equal(7, options.ExitGraceSeconds);
-        Assert.False(options.HardExit);
+    [Fact]
+    public void ProcessMemoryGuard_PrefersContainerLimitOverLargerHost()
+    {
+        const long gib = 1024L * 1024 * 1024;
+
+        var capacity = ProcessMemoryCapacity.SelectForTest(
+            hostBytes: 48L * gib,
+            cgroupBytes: 8L * gib,
+            cgroupSource: "TestCgroupV2");
+
+        Assert.Equal(8L * gib, capacity.TotalBytes);
+        Assert.Equal("TestCgroupV2", capacity.Source);
     }
 
     [Fact]
