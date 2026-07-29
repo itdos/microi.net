@@ -42,11 +42,16 @@ export default {
 .related-tabs {
   position: relative;
   z-index: 2;
+  display: block;
+  width: 100%;
+  margin: 0;
   border-bottom: 1px solid var(--mci-border, #e5edef);
   background: var(--mci-card, #fff);
+  box-sizing: border-box;
 }
 
 .related-tabs__scroll {
+  display: block;
   width: 100%;
   white-space: nowrap;
 }
@@ -54,7 +59,7 @@ export default {
 .related-tabs__track {
   display: inline-flex;
   min-width: 100%;
-  padding: 0 18rpx;
+  padding: 0;
   box-sizing: border-box;
 }
 

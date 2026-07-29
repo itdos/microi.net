@@ -64,22 +64,8 @@
 				</view>
 			</view>
 
-			<mci-related-tabs v-if="formTabs.length > 1" :items="formTabs" :active-key="activeFormTabKey"
+			<mci-related-tabs v-if="formTabs.length > 1" class="form-tabs--full" :items="formTabs" :active-key="activeFormTabKey"
 				@select="selectFormTab" />
-			<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
-				<mci-child-table v-if="relatedTab.type === 'child'" :field="relatedTab.field"
-					:parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
-					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-					:parent-mode="mode" :readonly="mode === 'View'" />
-				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
-					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
-				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
-					:parent-table="tableName" :parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
-					:readonly="mode === 'View' || isConfiguredReadonly(relatedTab.field)"
-					@change="handleRelatedChange" />
-				<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
-					:parent-form="form" :parent-menu-id="menuId" />
-			</view>
 
 			<!-- zhy: 当前下拉所在分组临时解除卡片裁切。 -->
 			<view v-for="(group, groupIndex) in groups" :key="group.key || group.name + groupIndex"
@@ -155,6 +141,22 @@
 				</view>
 			</view>
 
+			<!-- 平台同一 Tab 中的普通字段按 Sort 展示在关联子表标题之前。 -->
+			<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+				<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+					:parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+					:parent-mode="mode" />
+				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
+				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+					:parent-table="tableName" :parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+					:readonly="mode === 'View' || isConfiguredReadonly(relatedTab.field)"
+					@change="handleRelatedChange" />
+				<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
+					:parent-form="form" :parent-menu-id="menuId" />
+			</view>
+
 			<view class="form-bottom-space"></view>
 		</view>
 
@@ -212,8 +214,10 @@
 		runTenantFormPresentationAction,
 		tenantFormBusyMessage
 	} from '@/platform/form-extension.js'
+	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 
 	export default {
+		components: { MciBusinessRelatedList },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -698,6 +702,13 @@
 
 	.native-form {
 		padding: 20rpx 22rpx 0;
+	}
+
+	.form-tabs--full {
+		width: calc(100% + 44rpx);
+		margin-right: -22rpx;
+		margin-bottom: 18rpx;
+		margin-left: -22rpx;
 	}
 
 	.stale-tip {

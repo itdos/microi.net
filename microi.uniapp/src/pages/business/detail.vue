@@ -81,20 +81,6 @@
 				<mci-related-tabs v-if="formTabs.length > 1" :items="formTabs"
 					:active-key="activeFormTabKey" @select="selectFormTab" />
 
-				<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
-					<mci-child-table v-if="relatedTab.type === 'child'" :field="relatedTab.field"
-						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
-						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-						parent-mode="View" readonly />
-					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
-						:parent-form="detail" parent-mode="View" readonly />
-					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
-						:parent-table="moduleConfig.table" :parent-id="detail.Id || id"
-						:parent-form="detail" :parent-menu-id="menuId" readonly />
-					<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
-						:parent-form="detail" :parent-menu-id="menuId" />
-				</view>
-
 				<view class="info-band" :class="{ 'info-band--ungrouped': section.source === 'Ungrouped' }"
 					v-for="(section, sectionIndex) in visibleSections" :key="section.key">
 					<view v-if="section.source === 'CollapseGroup'"
@@ -152,6 +138,20 @@
 							</view>
 						</view>
 					</view>
+				</view>
+
+				<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+					<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
+						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						parent-mode="View" />
+					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+						:parent-form="detail" parent-mode="View" readonly />
+					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+						:parent-table="moduleConfig.table" :parent-id="detail.Id || id"
+						:parent-form="detail" :parent-menu-id="menuId" readonly />
+					<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
+						:parent-form="detail" :parent-menu-id="menuId" />
 				</view>
 
 				<view v-if="summaryBlocks.length" class="info-band">
@@ -303,6 +303,7 @@
 	import {
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
+	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 
 	const icon = (path) => `/static/xjy/${path}`
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
@@ -1119,6 +1120,7 @@
 	}
 
 	export default {
+		components: { MciBusinessRelatedList },
 		mixins: [themeMixin],
 		data() {
 			return {
