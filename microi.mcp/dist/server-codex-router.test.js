@@ -45,6 +45,102 @@ test('microi_codex discovers and invokes existing tools through one entry point'
         });
         const catalogText = catalog.content[0]?.type === 'text' ? catalog.content[0].text : '';
         assert.match(catalogText, /microi_get_status/);
+        const databaseCatalog = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'list_tools', params: { keyword: 'database' } },
+        });
+        const databaseCatalogText = databaseCatalog.content[0]?.type === 'text'
+            ? databaseCatalog.content[0].text
+            : '';
+        assert.match(databaseCatalogText, /microi_inspect_external_database/);
+        assert.match(databaseCatalogText, /microi_execute_external_database/);
+        assert.match(databaseCatalogText, /microi_save_database_connection/);
+        const indexCatalog = await client.callTool({
+            name: 'microi_codex',
+            arguments: { action: 'list_tools', params: { keyword: 'index' } },
+        });
+        const indexCatalogText = indexCatalog.content[0]?.type === 'text'
+            ? indexCatalog.content[0].text
+            : '';
+        assert.match(indexCatalogText, /microi_get_table_indexes/);
+        assert.match(indexCatalogText, /microi_create_table_index/);
+        assert.match(indexCatalogText, /microi_drop_table_index/);
+        const blockedIndexCreate = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_create_table_index',
+                params: {
+                    tableName: 'biz_order',
+                    columns: ['OsClient', 'OrderNo'],
+                    unique: true,
+                },
+            },
+        });
+        const blockedIndexCreateText = blockedIndexCreate.content[0]?.type === 'text'
+            ? blockedIndexCreate.content[0].text
+            : '';
+        assert.equal(blockedIndexCreate.isError, true);
+        assert.match(blockedIndexCreateText, /confirmExecution="biz_order"/);
+        const administrativeSqlDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_execute_external_database',
+                params: {
+                    dbKey: 'erp_sqlserver',
+                    mode: 'NonQuery',
+                    sql: 'DROP TABLE audit_example',
+                },
+            },
+        });
+        const administrativeSqlDryRunText = administrativeSqlDryRun.content[0]?.type === 'text'
+            ? administrativeSqlDryRun.content[0].text
+            : '';
+        assert.match(administrativeSqlDryRunText, /"dryRun": true/);
+        assert.match(administrativeSqlDryRunText, /"sqlSha256": "[a-f0-9]{64}"/);
+        assert.doesNotMatch(administrativeSqlDryRunText, /DROP TABLE/);
+        const saveDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_save_database_connection',
+                params: {
+                    dbKey: 'erp_sqlserver',
+                    databaseType: 'SqlServer',
+                    connectionString: 'Server=db.example;User Id=admin;Password=top-secret;',
+                },
+            },
+        });
+        const saveDryRunText = saveDryRun.content[0]?.type === 'text' ? saveDryRun.content[0].text : '';
+        assert.match(saveDryRunText, /"dryRun": true/);
+        assert.doesNotMatch(saveDryRunText, /top-secret|db\.example|admin/);
+        const attachmentDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_import_external_attachment',
+                params: {
+                    sourceUrl: 'https://files.example.com/invoice.pdf?token=signed-secret',
+                    headers: { Authorization: 'Bearer header-secret' },
+                },
+            },
+        });
+        const attachmentDryRunText = attachmentDryRun.content[0]?.type === 'text'
+            ? attachmentDryRun.content[0].text
+            : '';
+        assert.match(attachmentDryRunText, /https:\/\/files\.example\.com\/\[REDACTED\]/);
+        assert.doesNotMatch(attachmentDryRunText, /invoice\.pdf|signed-secret|header-secret/);
+        const localAttachmentDryRun = await client.callTool({
+            name: 'microi_codex',
+            arguments: {
+                action: 'microi_import_external_attachment',
+                params: {
+                    sourcePath: '\\\\fileserver\\finance-secret\\annual-report-500mb.zip',
+                },
+            },
+        });
+        const localAttachmentDryRunText = localAttachmentDryRun.content[0]?.type === 'text'
+            ? localAttachmentDryRun.content[0].text
+            : '';
+        assert.match(localAttachmentDryRunText, /LOCAL_OR_UNC_SOURCE/);
+        assert.doesNotMatch(localAttachmentDryRunText, /annual-report-500mb\.zip|finance-secret|fileserver/);
         const status = await client.callTool({
             name: 'microi_codex',
             arguments: { action: 'microi_get_status', params: {} },

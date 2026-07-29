@@ -33,6 +33,25 @@ using Dos.ORM;
 namespace Microi.net
 {
     /// <summary>
+    /// Effective execution budgets exposed to diagnostics and to V8 scripts as
+    /// <c>V8.Limits</c>. These values describe one execution slice, not the total
+    /// duration of a durable background task.
+    /// </summary>
+    public sealed class V8ExecutionLimitInfo
+    {
+        public int TimeoutSeconds { get; set; }
+        public int MaxStatements { get; set; }
+        public int LimitMemoryMB { get; set; }
+        public int CallTreeLimitMemoryMB { get; set; }
+        public int LimitRecursion { get; set; }
+        public int NestedApiDepthLimit { get; set; }
+        public int CurrentDepth { get; set; }
+        public bool IsBackgroundTask { get; set; }
+        public bool IsolateNestedApiMemory { get; set; }
+        public string MemoryAccounting { get; set; } = "CumulativeAllocatedBytes";
+    }
+
+    /// <summary>
     /// V8引擎参数类
     /// 
     /// 继承自 V8EngineExtend 以获得扩展功能（如 Alipay、WeChat 等）
@@ -41,6 +60,7 @@ namespace Microi.net
     public partial class V8EngineParam : V8EngineExtend
     {
         public int? Timeout { get; set; }
+        public V8ExecutionLimitInfo Limits { get; set; }
         public bool? SyncRun { get; set; }
         public MqttParam MQTT { get; set; }
         public HttpContext HttpContext { get; set; }

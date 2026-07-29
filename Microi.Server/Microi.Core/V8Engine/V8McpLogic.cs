@@ -837,6 +837,11 @@ namespace Microi.net
                 var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                // Keep MCP-created engines aligned with the tenant/runtime limits.  The old
+                // literal values (notably LimitRecursion=10000) could exceed the runtime hard
+                // ceiling and made a freshly-created engine's persisted configuration lie.
+                var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                var defaultLimits = CreateV8EngineParam.FromSysConfig(sysConfigResult?.Data);
                 var addParam = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -852,10 +857,10 @@ namespace Microi.net
                     ["ApiRole"] = "[]",
                     ["EnableLog"] = 0,
                     ["StopHttp"] = 0,
-                    ["Timeout"] = 600,
-                    ["MaxStatements"] = 100000000,
-                    ["LimitMemory"] = 2048,
-                    ["LimitRecursion"] = 10000,
+                    ["Timeout"] = defaultLimits.Timeout,
+                    ["MaxStatements"] = defaultLimits.MaxStatements,
+                    ["LimitMemory"] = defaultLimits.LimitMemory,
+                    ["LimitRecursion"] = defaultLimits.LimitRecursion,
                     ["Files"] = "[]",
                     ["IsDeleted"] = 0,
                     ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),

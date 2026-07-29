@@ -23,7 +23,7 @@ AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目
  */
 ```
 
-同步流程：`确认后端可达（不可达则自动启动 Microi.Server/Microi.net.Api/Microi.net.Api.csproj） -> 读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认代码头 Version 与 sys_apiengine.Version 一致 -> 用 HTTP /apiengine/{key}--OsClient--{osClient}-- 复测`。只用 MCP 保存成功不算完成，必须至少做回读或 HTTP 验证。
+同步流程：`确认后端可达（不可达则自动启动 Microi.Server/Microi.net.Api/Microi.net.Api.csproj） -> 读取远端 -> 修改本地并递增语义版本头 -> JS 语法检查 -> 保存远端 -> 回读远端确认代码头 Version 与 sys_apiengine.Version 一致 -> 用 HTTP /apiengine/{key} + osclient Header 复测`。只用 MCP 保存成功不算完成，必须至少做回读或 HTTP 验证。普通 POST/PUT/PATCH/DELETE 禁止无脑追加 `--OsClient--...--`；该特殊路径仅保留给确实无法传 Header/Form/Query 的 GET/HEAD 或第三方回调场景。
 
 如果保存或回读时出现 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听等服务不可达问题，不能提前中止。需要启动或重启本地 API 时，必须在 `Microi.Server/Microi.net.Api` 目录通过 VS Code 可见终端执行 `dotnet run --launch-profile Microi.net.Api`，让开发者能肉眼看到并手动停止；不要用隐藏后台 shell 启动长期占用端口的 API 进程。若工具当前无法打开可见终端，应先说明限制并让用户启动/重启后继续验证。涉及 PC 页面联调或 Playwright 时，`Microi.Client` 也必须使用可见终端执行：`npm run dev -- --host 0.0.0.0 --port 1988`。只有启动失败、依赖缺失、数据库连接失败或端口冲突无法处理时才报告阻塞。
 

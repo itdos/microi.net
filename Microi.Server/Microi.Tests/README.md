@@ -3,11 +3,16 @@
 `Microi.Tests` 是吾码后端统一自动化测试入口，合并了原
 `Dos.Common.Tests` 与 `Dos.ORM.Tests`，并在私有源码存在时条件纳入
 `Microi.AI.Tests`、FormEngine、ApiEngine、安全与多租户边界回归。
+测试代码统一由此入口编排，但被测源码仍归属各自仓库；例如空数据库 V8
+接口源码保留在 `Microi-V8-Engine`，其 Node 回归测试放在本项目 `V8/`
+目录并由 `run-tests.ps1` 自动执行，避免复制线上脚本到 C# 测试夹具。
 
 ## 两级门禁
 
 - `Quick`：不连接服务器、不写数据库。覆盖 Dos.Common、Dos.ORM、多数据库
   SQL 编译、图片/Office、安全边界、租户隔离、升级兼容、Jint 约束等。
+  当同级 `Microi-V8-Engine` 存在时，还会执行空数据库接口引擎语法检查和
+  Node 行为回归；缺少 Node.js 时失败关闭。
 - `Full`：先执行 Quick 和完整后端 Release 构建，再对一个隔离测试租户真实
   执行 FormEngine 单条、批量、按条件 CRUD、查询、计数，以及 ApiEngine
   GET/POST 调用，最后清理本次唯一前缀的数据；同时覆盖 API 实际启动、健康

@@ -444,10 +444,24 @@ IsPermission(type) {
             var selected = await self.SelectMicroiStoreOfflinePackageFile();
             var packageInfo = selected.Package.PackageInfo || {};
             var packageName = packageInfo.Name || packageInfo.PackageName || selected.File.name;
+            var importParam = { Package: selected.Package, PackageFileName: selected.File.name };
+
+            // 后台任务基础包必须先以前台方式完成安装，不能依赖它尚未补齐的任务表来自举。
+            if (self.IsBackgroundTaskBootstrapPackage(packageInfo)) {
+                var foregroundResult = await V8.ApiEngine.Run("import-microi-store-package", importParam);
+                self.BtnV8Loading = false;
+                if (!foregroundResult || Number(foregroundResult.Code) !== 1) {
+                    throw new Error((foregroundResult && (foregroundResult.Msg || foregroundResult.Message)) || "后台任务基础能力安装失败");
+                }
+                self.DiyCommon.Tips("后台任务基础能力安装成功，后续大型应用将使用后台任务安装。", true);
+                if (typeof self.DiyCommon.RefreshAppStores === "function") await self.DiyCommon.RefreshAppStores();
+                if (typeof self.GetDiyTableRow === "function") self.GetDiyTableRow({ _PageIndex: self.DiyTableRowPageIndex || 1 });
+                return;
+            }
 
             var result = await V8.ApiEngine.RunBackground(
                 "import-microi-store-package",
-                { Package: selected.Package, PackageFileName: selected.File.name },
+                importParam,
                 "安装离线包应用：" + packageName,
                 function () { self.BtnV8Loading = false; }
             );
@@ -484,6 +498,16 @@ IsPermission(type) {
             param.AppStoreOsClient = row && (row.AppStoreOsClient || row.StoreOsClient || self.DiyCommon.GetAppStoreSourceOsClient(row));
             param.Btn = btn;
             return param;
+        },
+        IsBackgroundTaskBootstrapPackage(value) {
+            var packageInfo = value && value.PackageInfo && typeof value.PackageInfo === "object"
+                ? value.PackageInfo
+                : value;
+            var appId = packageInfo && (
+                packageInfo.AppId || packageInfo.AppKey || packageInfo.SourceAppId
+                || packageInfo.SourceAppKey || packageInfo.appId || packageInfo.appKey
+            );
+            return String(appId || "").trim().toLowerCase() === "app.microi.background-task";
         },
         BuildBackgroundTaskOptions(btn, row, apiEngineKey) {
             var source = btn && (btn.BackgroundTaskOptions || btn.backgroundTaskOptions);
@@ -557,6 +581,21 @@ IsPermission(type) {
 
             var backgroundParam = self.BuildMicroiStoreInstallParam(btn, row);
             var backgroundTitle = actionName + "应用：" + appName;
+
+            // 该包自身负责创建/修复后台任务表，若先提交后台任务会形成循环依赖。
+            if (self.IsBackgroundTaskBootstrapPackage(row)) {
+                var foregroundResult = await V8.ApiEngine.Run("import-microi-store-package", backgroundParam);
+                self.BtnV8Loading = false;
+                if (!foregroundResult || Number(foregroundResult.Code) !== 1) {
+                    self.DiyCommon.Tips((foregroundResult && (foregroundResult.Msg || foregroundResult.Message)) || (actionName + "失败"), false);
+                    return;
+                }
+                self.DiyCommon.Tips(actionName + "成功，后台任务基础能力已就绪。", true);
+                if (typeof self.DiyCommon.RefreshAppStores === "function") await self.DiyCommon.RefreshAppStores();
+                if (typeof self.GetDiyTableRow === "function") self.GetDiyTableRow({ _PageIndex: self.DiyTableRowPageIndex || 1 });
+                return;
+            }
+
             var result = await V8.ApiEngine.RunBackground("import-microi-store-package", backgroundParam, backgroundTitle, function () {
                 self.BtnV8Loading = false;
             });

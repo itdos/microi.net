@@ -12,6 +12,7 @@
         </template>
         <component
             v-if="!DiyCommon.IsNull(DevComponents[field.Config.DevComponentName]) && !DiyCommon.IsNull(DevComponents[field.Config.DevComponentName].Path)"
+            ref="devComponentRef"
             :is="field.Config.DevComponentName"
             :model-value="modelValue"
             :TableRowId="TableRowId"
@@ -143,6 +144,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["update:modelValue", "FormSet", "ParentFormSet", "CallbackFormValueChange"]);
+const devComponentRef = ref(null);
 
 const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
@@ -192,6 +194,14 @@ const FormSet = (...args) => {
     }
 };
 
+const FlushPendingValue = async () => {
+    const component = Array.isArray(devComponentRef.value) ? devComponentRef.value[0] : devComponentRef.value;
+    if (component && typeof component.flushPendingSync === "function") {
+        return await component.flushPendingSync();
+    }
+    return true;
+};
+
 // 打开配置弹窗
 const openConfig = () => {
     if (!props.field.Config) {
@@ -217,7 +227,8 @@ const saveConfig = () => {
 // 暴露方法供外部调用
 defineExpose({
     openConfig,
-    saveConfig
+    saveConfig,
+    FlushPendingValue
 });
 </script>
 

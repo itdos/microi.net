@@ -19,7 +19,11 @@
 
                 <div v-if="!embedded" class="mobile-ai-identity">
                     <span class="mobile-ai-identity__avatar" aria-hidden="true">
-                        <el-icon><Avatar /></el-icon>
+                        <img
+                            src="/static/mci/ai/assistant-robot.png"
+                            alt=""
+                            data-testid="mobile-ai-avatar"
+                        />
                         <i></i>
                     </span>
                     <span class="mobile-ai-identity__copy">
@@ -72,8 +76,8 @@
 
         <main v-else-if="!enabled" class="mobile-ai-state">
             <span class="mobile-ai-state__icon"><el-icon><Warning /></el-icon></span>
-            <h1>{{ featureEnabled ? '当前角色暂未开通 AI 助手' : '当前系统未开启 AI 助手' }}</h1>
-            <p>{{ bootstrapError || '请联系管理员配置可用模型、业务域和数据范围。' }}</p>
+            <h1>{{ unavailableTitle }}</h1>
+            <p>{{ unavailableDescription }}</p>
             <button type="button" class="mobile-ai-secondary-button" @click="goBack">返回</button>
         </main>
 
@@ -315,7 +319,6 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
     ArrowLeft,
-    Avatar,
     Clock,
     Close,
     CopyDocument,
@@ -332,13 +335,16 @@ import { useDiyStore } from "@/pinia";
 import { DiyCommon } from "@/utils/diy.common";
 import { isMobileAiAssistantEnabled } from "@/components/MobileTabBar/mobile-ai-entry.js";
 import {
+    MOBILE_AI_BOOTSTRAP_FAILURES,
     clearMobileAiBootstrapCache,
+    classifyMobileAiBootstrapFailure,
     formatMobileAiModelName,
     formatMobileAiRelayName,
     isMobileAiRelayStation,
     listMobileAiConversations,
     listMobileAiMessages,
     loadMobileAiBootstrap,
+    makeMobileAiBootstrapFailure,
     makeMobileAiId,
     mobileAiModelSupportsReasoning,
     newMobileAiConversation,
@@ -366,7 +372,7 @@ const assistantName = "AI助手";
 
 const ready = ref(false);
 const enabled = ref(false);
-const bootstrapError = ref("");
+const bootstrapFailure = ref(null);
 const scopeLabel = ref("");
 const roleText = ref("");
 const models = ref([]);
@@ -425,8 +431,18 @@ const canSend = computed(() => {
 const headerScopeText = computed(() => {
     if (!isAuthenticated.value) return "登录后启用 · 匿名状态不读取数据";
     if (!ready.value) return "正在校验账号与数据权限";
-    if (!enabled.value) return featureEnabled.value ? "当前角色未授权" : "系统未开启";
+    if (!enabled.value) return featureEnabled.value
+        ? (bootstrapFailure.value?.header || "当前角色未授权")
+        : "系统未开启";
     return `${scopeLabel.value || roleText.value || "当前角色"} · 数据权限已校验`;
+});
+const unavailableTitle = computed(() => {
+    if (!featureEnabled.value) return "当前系统未开启 AI助手";
+    return bootstrapFailure.value?.title || "当前角色暂未开通 AI助手";
+});
+const unavailableDescription = computed(() => {
+    if (!featureEnabled.value) return "请联系管理员开启 AI助手功能。";
+    return bootstrapFailure.value?.description || "请联系管理员配置可用模型、业务域和数据范围。";
 });
 const filteredConversations = computed(() => {
     const archived = historyTab.value === "archived";
@@ -484,7 +500,7 @@ watch(reasoningEffort, saveSelections);
 async function loadBootstrap(force = false, generation = sessionGeneration) {
     ready.value = false;
     enabled.value = false;
-    bootstrapError.value = "";
+    bootstrapFailure.value = null;
     if (!isAuthenticated.value) {
         ready.value = true;
         return;
@@ -504,10 +520,15 @@ async function loadBootstrap(force = false, generation = sessionGeneration) {
         relayModels.value = Array.isArray(data.RelayModels) ? data.RelayModels : [];
         prompts.value = Array.isArray(data.Prompts) ? data.Prompts : [];
         restoreSelections();
-        if (!models.value.length) enabled.value = false;
+        if (!enabled.value) {
+            bootstrapFailure.value = makeMobileAiBootstrapFailure(MOBILE_AI_BOOTSTRAP_FAILURES.unauthorized);
+        } else if (!models.value.length) {
+            enabled.value = false;
+            bootstrapFailure.value = makeMobileAiBootstrapFailure(MOBILE_AI_BOOTSTRAP_FAILURES.modelMissing);
+        }
     } catch (error) {
         if (!isCurrentSession(generation)) return;
-        bootstrapError.value = error.message || "AI 助手加载失败";
+        bootstrapFailure.value = classifyMobileAiBootstrapFailure(error);
         enabled.value = false;
     } finally {
         if (isCurrentSession(generation)) ready.value = true;
@@ -898,6 +919,12 @@ button { font: inherit; }
     color: var(--mci-color-primary);
     background: #fff;
     font-size: 25px;
+}
+.mobile-ai-identity__avatar img {
+    width: 36px;
+    height: 36px;
+    display: block;
+    object-fit: contain;
 }
 .mobile-ai-identity__avatar i {
     position: absolute;

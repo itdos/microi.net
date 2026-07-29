@@ -171,6 +171,20 @@
                                         @CallbackGetDiyField="CallbackGetDiyField_FieldProperties"
                                         @CallbackFormValueChange="CallbackFormValueChange_DiyField"
                                     ></DiyForm>
+                                    <div v-if="IsUniqueFieldEnabled(CurrentDiyFieldModel)" class="unique-mode-config">
+                                        <div class="unique-mode-config__label">唯一方式</div>
+                                        <el-radio-group
+                                            v-model="CurrentDiyFieldModel.Config.Unique.Type"
+                                            class="unique-mode-config__options"
+                                            @change="CallbackUniqueModeChange"
+                                        >
+                                            <el-radio value="Alone">单独唯一（允许空值重复）</el-radio>
+                                            <el-radio value="All">同时唯一（组合约束）</el-radio>
+                                        </el-radio-group>
+                                        <div class="unique-mode-config__tip">
+                                            “同时唯一”会把本表中所有选择该方式的字段组成一组联合唯一条件。
+                                        </div>
+                                    </div>
                                 </div>
                             </el-tab-pane>
 
@@ -239,6 +253,10 @@ import DiyV8Design from "./diy-components/diy-v8design";
 import lodash, { set } from "lodash";
 import { defineAsyncComponent } from "vue";
 import LocalDiyComponentList from "./diy-field-component/diy-component-list.json";
+import {
+    ensureDiyFieldUniqueConfig,
+    isDiyFieldUniqueEnabled
+} from "../../utils/diy-field-unique.js";
 
 // 异步加载完整表单组件用于预览（与 diy-table 保持一致的复用方式）
 const DiyFormDialog = defineAsyncComponent(() => import("@/views/form-engine/diy-form-full.vue"));
@@ -559,9 +577,23 @@ export default {
 
             // self.FlowDesignModel[field.Name] = _rowModel[field.Name];
             self.CurrentDiyFieldModel[field.Name] = _rowModel[field.Name];
+            if (field.Name === "Unique" && isDiyFieldUniqueEnabled(self.CurrentDiyFieldModel)) {
+                ensureDiyFieldUniqueConfig(self.CurrentDiyFieldModel);
+            }
             self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel);
             
             // self.CurrentDiyFieldModel[field.Name] = value;
+        },
+        IsUniqueFieldEnabled(field) {
+            return isDiyFieldUniqueEnabled(field);
+        },
+        CallbackUniqueModeChange() {
+            var self = this;
+            if (!self.CurrentDiyFieldModel) return;
+            ensureDiyFieldUniqueConfig(self.CurrentDiyFieldModel);
+            if (self.$refs.fieldForm && typeof self.$refs.fieldForm.UptDiyFieldArr === "function") {
+                self.$refs.fieldForm.UptDiyFieldArr(self.CurrentDiyFieldModel);
+            }
         },
         CallbackForm_Table(){
             var self = this;
@@ -1304,6 +1336,9 @@ export default {
             var self = this;
             //console.log('CallbackSelectField:', field);
             self.NormalizeLegacyFieldTab(field);
+            if (isDiyFieldUniqueEnabled(field)) {
+                ensureDiyFieldUniqueConfig(field);
+            }
             //2024-10-31:无意义的代码，注释。 --by anderson
             // if (!self.DiyCommon.IsNull(field.Config) && self.DiyCommon.IsNull(field.Config)) {
             //     field.Config = ''
@@ -1785,6 +1820,9 @@ export default {
             needBool2Int.forEach((item) => {
                 data[item] = data[item] ? 1 : 0;
             });
+            if (isDiyFieldUniqueEnabled(data)) {
+                ensureDiyFieldUniqueConfig(data);
+            }
 
             //2023-08-11注释 oracle可能是使用NUMBER(11)，所以不需要这个判断
             // if (
@@ -1889,7 +1927,6 @@ export default {
                 FileUpload: ["FileUpload", "Upload"],
                 Button: ["Button"],
                 Autocomplete: ["Autocomplete"],
-                Unique: ["Unique"],
                 OpenTable: ["OpenTable"],
                 Department: ["Department"],
                 Cascader: ["Cascader"],
@@ -1939,6 +1976,9 @@ export default {
                         self.DiyCommon.DiyFieldConfigStrToJson(result.Data);
                         self.$refs.fieldForm.DiyFieldStrToJson(result.Data);
                         self.DiyCommon.Base64DecodeDiyField(result.Data);
+                        if (isDiyFieldUniqueEnabled(result.Data)) {
+                            ensureDiyFieldUniqueConfig(result.Data);
+                        }
                         self.CurrentDiyFieldModel = result.Data;
                         self.FormDiyTableModel[self.CurrentDiyFieldModel.Name] = self.CurrentDiyFieldModel.Data;
                     }
@@ -1955,6 +1995,34 @@ export default {
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+}
+.unique-mode-config {
+    margin: 0 5px 20px;
+    padding: 12px;
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 6px;
+    background: var(--el-fill-color-light);
+
+    &__label {
+        margin-bottom: 10px;
+        color: var(--el-text-color-regular);
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    &__options {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    &__tip {
+        margin-top: 10px;
+        color: var(--el-text-color-secondary);
+        font-size: 12px;
+        line-height: 1.6;
     }
 }
 .diy-design-container {

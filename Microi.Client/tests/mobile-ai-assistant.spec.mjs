@@ -5,7 +5,9 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+    MOBILE_AI_BOOTSTRAP_FAILURES,
     clearMobileAiBootstrapCache,
+    classifyMobileAiBootstrapFailure,
     listMobileAiConversations,
     listMobileAiMessages,
     loadMobileAiBootstrap,
@@ -135,6 +137,22 @@ test("new conversation is local reset and history messages retain thinking detai
     assert.equal(mobileAiModelSupportsReasoning({ AiModel: "gpt-4.1" }), false);
 });
 
+test("Bootstrap failures distinguish missing installation from role authorization without exposing SQL", () => {
+    const missing = classifyMobileAiBootstrapFailure(new Error(
+        "不存在的数据！<br>表名：sys_apiengine<br>条件：WHERE ApiEngineKey = 'mci_ai_data_assistant'"
+    ));
+    assert.equal(missing.kind, MOBILE_AI_BOOTSTRAP_FAILURES.serviceMissing);
+    assert.equal(missing.title, "当前租户尚未安装 AI助手");
+    assert.doesNotMatch(missing.description, /sys_apiengine|WHERE|mci_ai_data_assistant/);
+
+    const unauthorized = classifyMobileAiBootstrapFailure(new Error("当前角色未开通 AI 数据分析权限"));
+    assert.equal(unauthorized.kind, MOBILE_AI_BOOTSTRAP_FAILURES.unauthorized);
+    assert.equal(unauthorized.header, "当前角色未授权");
+
+    const incomplete = classifyMobileAiBootstrapFailure(new Error("表 mci_ai_data_domain 不存在"));
+    assert.equal(incomplete.kind, MOBILE_AI_BOOTSTRAP_FAILURES.installIncomplete);
+});
+
 test("dedicated page exposes stable automation hooks and persistent capability controls", () => {
     for (const testId of [
         "mobile-ai-assistant",
@@ -155,7 +173,12 @@ test("dedicated page exposes stable automation hooks and persistent capability c
     assert.doesNotMatch(pageSource, /v-if="supportsReasoning"/);
     assert.match(pageSource, /内容由人工智能生成，请注意甄别/);
     assert.match(pageSource, /const assistantName = "AI助手"/);
+    assert.match(pageSource, /data-testid="mobile-ai-avatar"/);
+    assert.match(pageSource, /src="\/static\/mci\/ai\/assistant-robot\.png"/);
+    assert.doesNotMatch(pageSource, /<Avatar\s*\/>/);
     assert.doesNotMatch(pageSource, /吾码\s*AI\s*助手|吾码AI助手/);
+    assert.match(pageSource, /bootstrapFailure\.value\?\.header/);
+    assert.match(pageSource, /classifyMobileAiBootstrapFailure\(error\)/);
     assert.match(routerSource, /path:\s*"\/mobile\/ai-assistant"/);
     assert.match(routerSource, /import\("@\/views\/mobile\/ai-assistant\.vue"\)/);
 });

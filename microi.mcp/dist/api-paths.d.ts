@@ -5,6 +5,9 @@
 export declare const API: {
     readonly LOGIN: "/api/SysUser/Login";
     readonly REFRESH_TOKEN: "/api/SysUser/RefreshToken";
+    readonly LIST_USER_ACCESS_KEYS: "/api/SysUserAccessKey/List";
+    readonly CREATE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Create";
+    readonly REVOKE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Revoke";
     readonly GET_STATUS: "/api/V8Engine/GetStatus";
     readonly REDIS_STATISTICS: "/api/Cache/redis/statistics";
     readonly REDIS_KEYS: "/api/Cache/redis/keys";
@@ -14,6 +17,15 @@ export declare const API: {
     readonly REDIS_RENAME_KEY: "/api/Cache/redis/key/rename";
     readonly REDIS_SET_TTL: "/api/Cache/redis/key/ttl";
     readonly GET_DB_SCHEMA: "/api/V8Engine/GetDbSchema";
+    readonly GET_TABLE_INDEXES: "/api/V8Engine/GetTableIndexes";
+    readonly CREATE_TABLE_INDEX: "/api/V8Engine/CreateTableIndex";
+    readonly DROP_TABLE_INDEX: "/api/V8Engine/DropTableIndex";
+    readonly GET_SUPPORTED_DATABASE_TYPES: "/api/V8Engine/GetSupportedDatabaseTypes";
+    readonly INSPECT_EXTERNAL_DATABASE: "/api/V8Engine/InspectExternalDatabase";
+    readonly QUERY_EXTERNAL_DATABASE: "/api/V8Engine/QueryExternalDatabase";
+    readonly EXECUTE_EXTERNAL_DATABASE_SQL: "/api/V8Engine/ExecuteExternalDatabaseSql";
+    readonly SAVE_DATABASE_CONNECTION: "/api/V8Engine/SaveDatabaseConnection";
+    readonly IMPORT_EXTERNAL_ATTACHMENT: "/api/V8Engine/ImportExternalAttachment";
     readonly GET_PLAYWRIGHT_CONTEXT: "/api/V8Engine/GetPlaywrightContext";
     readonly GET_ENGINE_LIST: "/api/V8Engine/GetApiEngineList";
     readonly GET_ENGINE_CODE: "/api/V8Engine/GetApiEngineCode";

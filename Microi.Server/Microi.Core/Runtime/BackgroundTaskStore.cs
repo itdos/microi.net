@@ -40,14 +40,24 @@ BusinessProgressField,BusinessEtaField";
 
         public static bool IsAvailable(string osClient)
         {
-            try
+            return TryGetAvailability(osClient, out _);
+        }
+
+        /// <summary>
+        /// Validates the complete projection in one database round-trip. A table-only
+        /// check can report a half-installed package as ready, while checking columns
+        /// one by one is too expensive for every worker scan.
+        /// </summary>
+        internal static bool TryGetAvailability(string osClient, out string reason)
+        {
+            reason = "";
+            var client = GetClient(osClient);
+            if (client?.Db == null)
             {
-                return GetClient(osClient)?.Db?.TableExists(TableName) == true;
-            }
-            catch
-            {
+                reason = $"租户 {osClient} 的数据库连接不可用";
                 return false;
             }
+            return ValidateSchema(client, out reason);
         }
 
         public static BackgroundTaskRecord FindByIdempotency(string osClient, string idempotencyKey)
@@ -491,9 +501,39 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
         {
             var client = GetClient(osClient);
             if (client?.Db == null) throw new InvalidOperationException($"租户 {osClient} 的数据库连接不可用。");
-            if (!client.Db.TableExists(TableName))
-                throw new InvalidOperationException($"租户 {osClient} 尚未完成后台任务表升级，请等待平台自动升级后重试。");
+            if (!ValidateSchema(client, out var reason))
+                throw new InvalidOperationException($"租户 {osClient} 的后台任务表尚未就绪：{reason}。");
             return client;
+        }
+
+        private static bool ValidateSchema(OsClientSecret client, out string reason)
+        {
+            reason = "";
+            try
+            {
+                if (client?.Db?.TableExists(TableName) != true)
+                {
+                    reason = $"物理表 {TableName} 不存在";
+                    return false;
+                }
+
+                // WHERE 1=0 never reads business rows, but the database must still
+                // resolve every runtime column and alias used by the worker.
+                client.Db.FromSql($"SELECT {Projection} FROM {TableName} WHERE 1=0").ToArray();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                reason = SafeSchemaError(ex);
+                return false;
+            }
+        }
+
+        private static string SafeSchemaError(Exception error)
+        {
+            var text = error?.GetBaseException()?.Message ?? error?.Message ?? "物理字段校验失败";
+            text = text.Replace("\r", " ").Replace("\n", " ").Trim();
+            return text.Length <= 500 ? text : text.Substring(0, 500);
         }
 
         private static string FirstSql(OsClientSecret client, string sql)

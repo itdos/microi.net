@@ -133,7 +133,7 @@ formData（页面）
 
 **接口引擎地址格式：**
 ```
-$ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--
+$ApiBase$/apiengine/{ApiEngineKey}
 ```
 
 ## 所有组件类型
@@ -278,7 +278,7 @@ $ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--
   "label": "Office/PDF预览",
   "widgetOption": { "span": 24, "height": 720 },
   "widgetParams": [
-    { "sort": 0, "label": "接口引擎地址", "type": "textarea", "value": "$ApiBase$/apiengine/{ApiEngineKey}--OsClient--$OsClient$--" },
+    { "sort": 0, "label": "接口引擎地址", "type": "textarea", "value": "$ApiBase$/apiengine/{ApiEngineKey}" },
     { "sort": 1, "label": "静态文件地址", "type": "input", "value": "" },
     { "sort": 2, "label": "文件类型", "type": "select", "value": "pdf" },
     { "sort": 3, "label": "初始页码", "type": "number", "value": 1 },
@@ -377,7 +377,7 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 3. **高度合理**：容器高度 >= 内部组件高度之和
 4. **widgetParams 完整**：必须包含该组件定义的所有参数，不能遗漏
 5. **栅格布局**：span 总和 24 为一行，如 span=12 的两个容器为两列布局
-6. **数据来源**：接口引擎 value 格式 `$ApiBase$/apiengine/{Key}--OsClient--$OsClient$--`
+6. **数据来源**：接口引擎 value 使用稳定路径 `$ApiBase$/apiengine/{Key}`，由运行时通过 `osclient` Header 传入 `$OsClient$`；只有无法设置 Header/Form/Query 的 GET/HEAD 或第三方回调才使用特殊租户路径
 7. **formConfig 完整**：所有字段都应包含，不能省略
 8. **选项卡容器**：组件放在 `tabWidgetMap[tabKey][]` 中，不放在 `widgetList` 中
 ## 经营看板周期筛选与布局规则

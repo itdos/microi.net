@@ -119,7 +119,7 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 ### 5. V8 接口引擎与事件
 
 - 接口引擎代码必须格式化、语义版本可追踪、可回读。
-- 保存后必须走 HTTP `/apiengine/{ApiEngineKey}--OsClient--{osClient}--` smoke test；只用内部 run 通过不够。
+- 保存后必须走 HTTP 稳定路径 `/apiengine/{ApiEngineKey}` 并通过 `osclient` Header 传租户做 smoke test；只用内部 run 通过不够。普通 POST/PUT/PATCH/DELETE 禁止追加 `--OsClient--...--`。
 - 返回必须是标准 DosResult，除明确文件/HTML场景外，不允许返回字符串 `null`、空响应、非 JSON。
 - 业务异常必须给用户可理解的 `Msg`，不能吞异常或只 `catch(e){}`。
 - 定时任务、超时取消、VIP 过期、自动拒绝、库存释放等跨时间逻辑，必须建 Job 或可被 Job 调用的接口引擎。

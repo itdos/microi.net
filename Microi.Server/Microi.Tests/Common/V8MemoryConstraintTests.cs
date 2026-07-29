@@ -1,5 +1,6 @@
 using Jint;
 using Microi.net;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
@@ -45,11 +46,92 @@ public class V8MemoryConstraintTests
 
             Assert.Equal(2048, limits.LimitMemory);
             Assert.Equal(4096, limits.MaxLimitMemoryMB);
+            Assert.Equal(8192, limits.CallTreeLimitMemory);
+            Assert.Equal(32768, limits.MaxCallTreeLimitMemoryMB);
+            Assert.Equal(32, limits.NestedApiDepth);
+            Assert.Equal(64, limits.MaxNestedApiDepthValue);
+            Assert.True(limits.IsolateNestedApiMemory);
         }
         finally
         {
             Environment.SetEnvironmentVariable(environmentName, original);
         }
+    }
+
+    [Fact]
+    public void NestedAllocationExclusion_DoesNotChargeTheParentIndividualBudget()
+    {
+        var constraint = new MicroiV8MemoryConstraint(1024 * 1024);
+        constraint.Reset();
+
+        byte[] childAllocation;
+        using (constraint.ExcludeNestedExecution())
+        {
+            childAllocation = new byte[2 * 1024 * 1024];
+            childAllocation[0] = 1;
+        }
+
+        constraint.Check();
+        Assert.True(constraint.AllocatedBytes < constraint.MemoryLimit);
+        GC.KeepAlive(childAllocation);
+    }
+
+    [Fact]
+    public void NestedAllocationExclusion_StillLeavesTheRootCallTreeGuardActive()
+    {
+        var individual = new MicroiV8MemoryConstraint(8 * 1024 * 1024);
+        using var engine = new Engine(options =>
+        {
+            options.Constraint(individual);
+            options.LimitMemory(1024 * 1024);
+        });
+        engine.Constraints.Reset();
+
+        byte[] childAllocation;
+        using (individual.ExcludeNestedExecution())
+        {
+            childAllocation = new byte[2 * 1024 * 1024];
+            childAllocation[0] = 1;
+        }
+
+        individual.Check();
+        var exception = Assert.ThrowsAny<Exception>(() => engine.Constraints.Check());
+        Assert.Contains("MemoryLimit", exception.GetType().Name, StringComparison.OrdinalIgnoreCase);
+        GC.KeepAlive(childAllocation);
+    }
+
+    [Fact]
+    public void CallTreeBudget_CannotBeLowerThanTheIndividualEngineBudget()
+    {
+        var limits = new CreateV8EngineParam
+        {
+            LimitMemory = 4096,
+            CallTreeLimitMemory = 1024,
+            MaxCallTreeLimitMemoryMB = 32768
+        };
+
+        limits.Normalize();
+
+        Assert.Equal(4096, limits.CallTreeLimitMemory);
+    }
+
+    [Fact]
+    public void TenantSettings_ClampCallTreeAndDepthToNodeHardLimits()
+    {
+        var limits = CreateV8EngineParam.FromSysConfig(new JObject
+        {
+            ["V8MaxCallTreeLimitMemoryMB"] = 16384,
+            ["V8CallTreeLimitMemoryMB"] = 20000,
+            ["V8MaxNestedApiDepth"] = 48,
+            ["V8NestedApiDepth"] = 60,
+            ["V8IsolateNestedApiMemory"] = 0
+        });
+
+        Assert.Equal(16384, limits.MaxCallTreeLimitMemoryMB);
+        Assert.Equal(16384, limits.CallTreeLimitMemory);
+        Assert.Equal(48, limits.MaxNestedApiDepthValue);
+        Assert.Equal(48, limits.NestedApiDepth);
+        Assert.False(limits.IsolateNestedApiMemory);
     }
 
     [Fact]

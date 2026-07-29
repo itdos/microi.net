@@ -68,9 +68,20 @@ return {
   用户脚本以及脚本调用的 CLR/FormEngine 逻辑仍受同一阶段预算限制。
 - 默认单次执行预算为 2048 MB，硬上限仍为 4096 MB。存量接口仅把仍等于
   历史默认值 1024 MB 的记录迁移到 2048 MB；客户明确设置的其它值不覆盖。
+- 旧版嵌套接口会让子引擎的初始化、查询、JSON 和业务分配被每一层父引擎
+  重复计数，因此四层、少量数据也可能提前触发 2GB。新版默认启用父子单层
+  预算隔离，每层独立计数，同时由根调用树默认 8192MB 的总预算兜底。
+- `LimitRecursion` 只限制当前 JavaScript 函数递归，不限制
+  `V8.ApiEngine.Run` 层数；接口嵌套默认 32、节点硬上限默认 64。
 - 排查时记录 `ApiEngineKey`、实际 `LimitMemory`、返回行数、选择字段、
-  分页大小和重现脚本。若 2048 MB 仍触发，继续减少一次性对象图、流式或
+  分页大小、`V8.Limits`、`DataAppend.V8Limit` 调用路径和重现脚本。若
+  2048 MB 仍触发，继续减少一次性对象图、流式或
   分批处理；不得把上限无限提高或取消。
+- `V8_MEMORY_LIMIT` 表示单层预算，`V8_CALL_TREE_MEMORY_LIMIT` 表示整棵
+  调用树，`V8_STATEMENTS_LIMIT`、`V8_RECURSION_LIMIT`、`V8_TIMEOUT`、
+  `V8_NESTED_DEPTH_LIMIT` 和 `V8_EXECUTION_QUEUE_TIMEOUT` 必须分别处理。
+- 后台任务总时长可以超过 10/30 分钟，但单片仍受上述预算；使用
+  `HasMore + Checkpoint` 续跑，不要只提高单次超时或内存。
 - 回归至少验证 Jint 包版本、约束重置、默认/硬上限，以及 400 行左右普通
   FormEngine 查询与数据加工不会被平台准备阶段的累计分配误伤。
 

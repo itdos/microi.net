@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
-import { MicroiClient, type MicroiConfig } from './microi-client.js';
+import { buildTokenFileLookupKeys, MicroiClient, type MicroiConfig } from './microi-client.js';
 import { createMcpServer, type McpServerContext } from './server.js';
 import { resolveMcpLabel } from './mcp-label.js';
 
@@ -12,13 +12,18 @@ interface SseSession {
 }
 
 /** 从 VS Code 扩展写入的 token 文件中读取指定服务器的 token */
-function readTokenFromFile(filePath: string, apiUrl: string, osClient: string): string | undefined {
+function readTokenFromFile(
+  filePath: string,
+  apiUrl: string,
+  osClient: string,
+  osClientType = '',
+  osClientNetwork = '',
+): string | undefined {
   try {
     const tokens: Record<string, string> = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    if (osClient) {
-      return tokens[`${apiUrl}|${osClient}`] || undefined;
-    }
-    return tokens[apiUrl] || undefined;
+    return buildTokenFileLookupKeys(apiUrl, osClient, osClientType, osClientNetwork)
+      .map(key => tokens[key])
+      .find(Boolean);
   } catch {
     return undefined;
   }
@@ -55,6 +60,8 @@ async function main(): Promise<void> {
     username: process.env.MICROI_USERNAME || '',
     password: process.env.MICROI_PASSWORD || '',
     osClient: process.env.MICROI_OS_CLIENT || '',
+    osClientType: process.env.MICROI_OS_CLIENT_TYPE || '',
+    osClientNetwork: process.env.MICROI_OS_CLIENT_NETWORK || '',
     rsaPublicKey: process.env.MICROI_RSA_PUBLIC_KEY || undefined,
     token: process.env.MICROI_TOKEN || undefined,
   };
@@ -69,7 +76,14 @@ async function main(): Promise<void> {
   const tokenFilePath = process.env.MICROI_TOKEN_FILE;
   if (tokenFilePath) {
     config.tokenFilePath = tokenFilePath;
-    const fileToken = readTokenFromFile(tokenFilePath, config.apiBaseUrl, config.osClient || '');
+    config.authRecoveryRequestDir = process.env.MICROI_AUTH_RECOVERY_DIR || undefined;
+    const fileToken = readTokenFromFile(
+      tokenFilePath,
+      config.apiBaseUrl,
+      config.osClient || '',
+      config.osClientType || '',
+      config.osClientNetwork || '',
+    );
     if (fileToken) {
       config.token = fileToken;
     }
@@ -94,11 +108,14 @@ async function main(): Promise<void> {
       console.error('Missing required environment variables:');
       console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
       console.error('  MICROI_TOKEN_FILE   - Token file path (preferred, auto-managed by VS Code extension)');
+      console.error('  MICROI_AUTH_RECOVERY_DIR - Optional credential-free VS Code recovery request directory');
       console.error('  MICROI_TOKEN        - JWT token (fallback)');
       console.error('  MICROI_USERNAME     - Login username (fallback if no token)');
       console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');
       console.error('Optional:');
       console.error('  MICROI_OS_CLIENT    - OsClient identifier');
+      console.error('  MICROI_OS_CLIENT_TYPE - Optional OsClient type for exact token identity');
+      console.error('  MICROI_OS_CLIENT_NETWORK - Optional OsClient network for exact token identity');
       process.exit(1);
     }
     const client = new MicroiClient(config);
@@ -115,7 +132,13 @@ async function main(): Promise<void> {
     // 监听 token 文件变化（VS Code 扩展每 14 分钟刷新 token 并写入文件）
     if (tokenFilePath) {
       fs.watchFile(tokenFilePath, { interval: 5000 }, () => {
-        const newToken = readTokenFromFile(tokenFilePath, config.apiBaseUrl, config.osClient || '');
+        const newToken = readTokenFromFile(
+          tokenFilePath,
+          config.apiBaseUrl,
+          config.osClient || '',
+          config.osClientType || '',
+          config.osClientNetwork || '',
+        );
         if (newToken) {
           client.updateToken(newToken);
           console.error('[microi-mcp] Token updated from file');
@@ -175,6 +198,8 @@ async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void
         username,
         password,
         osClient,
+        osClientType: defaultConfig.osClientType,
+        osClientNetwork: defaultConfig.osClientNetwork,
         rsaPublicKey: defaultConfig.rsaPublicKey,
       });
       await client.login();
