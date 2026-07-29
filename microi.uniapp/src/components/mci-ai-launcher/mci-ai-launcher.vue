@@ -1,8 +1,7 @@
 <template>
   <view
     v-if="isH5Dock"
-    class="mci-bottom-dock"
-    :class="{ 'mci-bottom-dock--without-ai': !aiAssistantEnabled }"
+    class="mci-bottom-dock mci-bottom-dock--without-ai"
     aria-label="底部导航"
   >
     <view class="mci-bottom-dock__nav">
@@ -25,35 +24,27 @@
       </view>
     </view>
 
-    <view
-      v-if="aiAssistantEnabled"
-      class="mci-ai-launcher mci-bottom-dock__ai-slot"
-      hover-class="mci-ai-launcher--pressed"
-      role="button"
-      aria-label="打开AI助手"
-      @tap="openAssistant"
-    >
-      <view class="mci-ai-launcher__ring" />
-      <image class="mci-ai-launcher__robot" src="/static/mci/ai/assistant-robot.png" mode="aspectFit" />
-      <text class="mci-ai-launcher__label">AI</text>
-    </view>
   </view>
 
   <view
-    v-else-if="isFallbackLauncher"
+    v-if="isFallbackLauncher"
     class="mci-ai-launcher mci-ai-launcher--fallback"
     :style="fallbackStyle"
     hover-class="mci-ai-launcher--pressed"
     role="button"
     aria-label="打开AI助手"
-    @tap="openAssistant"
+    @touchstart.stop="handleDragStart"
+    @touchmove.stop.prevent="handleDragMove"
+    @touchend.stop="handleDragEnd"
+    @touchcancel.stop="handleDragEnd"
+    @tap="handleLauncherTap"
   >
     <view class="mci-ai-launcher__ring" />
     <image class="mci-ai-launcher__robot" src="/static/mci/ai/assistant-robot.png" mode="aspectFit" />
     <text class="mci-ai-launcher__label">AI</text>
   </view>
 
-  <view v-else class="mci-ai-launcher-bridge" aria-hidden="true" />
+  <view v-else-if="!isH5Dock" class="mci-ai-launcher-bridge" aria-hidden="true" />
 </template>
 
 <script>
@@ -76,6 +67,10 @@ const normalizeAssetPath = (value) => {
   if (!path || /^(?:https?:|data:|blob:|\/)/i.test(path)) return path
   return `/${path}`
 }
+const DRAG_THRESHOLD = 8
+const EDGE_MARGIN = 12
+const ACTION_SAFE_HEIGHT = 190
+const POSITION_STORAGE_VERSION = 1
 
 export default {
   name: 'MciAiLauncher',
@@ -85,8 +80,19 @@ export default {
       opening: false,
       switching: false,
       aiAssistantEnabled: false,
+      safeTop: 0,
+      safeHeaderHeight: 44,
+      safeLeft: 0,
       safeRight: 0,
-      safeBottom: 0
+      safeBottom: 0,
+      windowWidth: 0,
+      windowHeight: 0,
+      launcherX: null,
+      launcherY: null,
+      dragState: null,
+      dragging: false,
+      suppressTap: false,
+      resizeHandler: null
     }
   },
   computed: {
@@ -105,10 +111,17 @@ export default {
       return runtimeTarget === 'h5' && this.isTabBarPage
     },
     isFallbackLauncher() {
-      const runtimeUsesNativeDock = runtimeTarget === 'h5' || runtimeTarget === 'mp-weixin'
-      return this.aiAssistantEnabled && (!this.isTabBarPage || !runtimeUsesNativeDock)
+      return this.aiAssistantEnabled
     },
     fallbackStyle() {
+      if (Number.isFinite(this.launcherX) && Number.isFinite(this.launcherY)) {
+        return {
+          left: `${this.launcherX}px`,
+          top: `${this.launcherY}px`,
+          right: 'auto',
+          bottom: 'auto'
+        }
+      }
       return {
         right: `calc(18rpx + ${this.safeRight}px)`,
         bottom: `calc(160rpx + ${this.safeBottom}px)`
@@ -117,6 +130,10 @@ export default {
   },
   mounted() {
     this.activate()
+    this.resizeHandler = () => this.refreshSafeArea()
+    try {
+      if (typeof uni.onWindowResize === 'function') uni.onWindowResize(this.resizeHandler)
+    } catch (error) {}
   },
   activated() {
     this.activate()
@@ -126,6 +143,11 @@ export default {
   },
   beforeUnmount() {
     this.releaseH5Dock()
+    try {
+      if (this.resizeHandler && typeof uni.offWindowResize === 'function') {
+        uni.offWindowResize(this.resizeHandler)
+      }
+    } catch (error) {}
   },
   methods: {
     activate() {
@@ -138,8 +160,14 @@ export default {
     },
     refreshSafeArea() {
       const metrics = getSafeAreaMetrics()
+      this.safeTop = Number(metrics && metrics.top) || 0
+      this.safeHeaderHeight = Number(metrics && metrics.headerHeight) || this.safeTop + 44
+      this.safeLeft = Number(metrics && metrics.left) || 0
       this.safeRight = Number(metrics && metrics.right) || 0
       this.safeBottom = Number(metrics && metrics.bottom) || 0
+      this.windowWidth = Number(metrics && metrics.windowWidth) || 375
+      this.windowHeight = Number(metrics && metrics.windowHeight) || 667
+      this.ensureLauncherPosition()
     },
     currentRoute() {
       try {
@@ -181,6 +209,7 @@ export default {
       this.aiAssistantEnabled = enabled
       this.updateGlobalAiState(enabled)
       this.syncWeixinTabBar()
+      if (enabled) this.$nextTick(() => this.ensureLauncherPosition())
     },
     updateGlobalAiState(enabled) {
       try {
@@ -205,6 +234,138 @@ export default {
           aiAssistantEnabled: this.aiAssistantEnabled
         })
       } catch (error) {}
+    },
+    launcherStorageKey() {
+      return `mci:ai-launcher-position:${appConfig.osClient || 'default'}`
+    },
+    launcherSize() {
+      return Math.max(44, (this.windowWidth || 375) * 112 / 750)
+    },
+    launcherBounds() {
+      const size = this.launcherSize()
+      const bottomReserve = this.isTabBarPage ? 76 : 18
+      const minX = this.safeLeft + EDGE_MARGIN
+      const maxX = Math.max(minX, this.windowWidth - this.safeRight - size - EDGE_MARGIN)
+      const minY = Math.max(this.safeTop, this.safeHeaderHeight) + EDGE_MARGIN
+      const maxY = Math.max(
+        minY,
+        this.windowHeight - this.safeBottom - size - bottomReserve
+      )
+      return { size, minX, maxX, minY, maxY }
+    },
+    clampLauncherPosition(x, y) {
+      const bounds = this.launcherBounds()
+      return {
+        x: Math.min(bounds.maxX, Math.max(bounds.minX, Number(x) || 0)),
+        y: Math.min(bounds.maxY, Math.max(bounds.minY, Number(y) || 0))
+      }
+    },
+    routeHasBottomAction() {
+      return /^(?:pages\/business\/(?:list|detail)|pages\/task\/list|pages\/native-form\/index|pages\/module\/detail)$/
+        .test(this.currentRoute())
+    },
+    avoidBottomAction(position) {
+      const bounds = this.launcherBounds()
+      const rightSide = position.x >= bounds.maxX - 2
+      if (!rightSide || !this.routeHasBottomAction()) return position
+      const reservedTop = this.windowHeight - this.safeBottom - ACTION_SAFE_HEIGHT
+      if (position.y + bounds.size <= reservedTop) return position
+      return this.clampLauncherPosition(position.x, reservedTop - bounds.size - EDGE_MARGIN)
+    },
+    defaultLauncherPosition() {
+      const bounds = this.launcherBounds()
+      const bottomReserve = this.isTabBarPage ? 80 : 92
+      const position = this.clampLauncherPosition(
+        bounds.maxX,
+        this.windowHeight - this.safeBottom - bounds.size - bottomReserve
+      )
+      return this.avoidBottomAction(position)
+    },
+    readLauncherPosition() {
+      try {
+        const stored = uni.getStorageSync(this.launcherStorageKey())
+        if (!stored || Number(stored.version) !== POSITION_STORAGE_VERSION) return null
+        if (!Number.isFinite(Number(stored.x)) || !Number.isFinite(Number(stored.y))) return null
+        return this.avoidBottomAction(this.clampLauncherPosition(stored.x, stored.y))
+      } catch (error) {
+        return null
+      }
+    },
+    persistLauncherPosition() {
+      try {
+        uni.setStorageSync(this.launcherStorageKey(), {
+          version: POSITION_STORAGE_VERSION,
+          x: this.launcherX,
+          y: this.launcherY
+        })
+      } catch (error) {}
+    },
+    ensureLauncherPosition() {
+      if (!this.windowWidth || !this.windowHeight) return
+      const current = Number.isFinite(this.launcherX) && Number.isFinite(this.launcherY)
+        ? this.avoidBottomAction(this.clampLauncherPosition(this.launcherX, this.launcherY))
+        : (this.readLauncherPosition() || this.defaultLauncherPosition())
+      this.launcherX = current.x
+      this.launcherY = current.y
+    },
+    touchPoint(event, changed = false) {
+      const source = changed ? event?.changedTouches : event?.touches
+      const touch = source && source.length ? source[0] : null
+      if (!touch) return null
+      const x = Number(touch.clientX ?? touch.pageX)
+      const y = Number(touch.clientY ?? touch.pageY)
+      return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+    },
+    handleDragStart(event) {
+      const point = this.touchPoint(event)
+      if (!point) return
+      this.ensureLauncherPosition()
+      this.dragState = {
+        startX: point.x,
+        startY: point.y,
+        originX: this.launcherX,
+        originY: this.launcherY,
+        moved: false
+      }
+      this.dragging = false
+    },
+    handleDragMove(event) {
+      if (!this.dragState) return
+      const point = this.touchPoint(event)
+      if (!point) return
+      const deltaX = point.x - this.dragState.startX
+      const deltaY = point.y - this.dragState.startY
+      if (!this.dragState.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD) return
+      this.dragState.moved = true
+      this.dragging = true
+      const position = this.clampLauncherPosition(
+        this.dragState.originX + deltaX,
+        this.dragState.originY + deltaY
+      )
+      this.launcherX = position.x
+      this.launcherY = position.y
+    },
+    handleDragEnd() {
+      const moved = Boolean(this.dragState && this.dragState.moved)
+      this.dragState = null
+      this.dragging = false
+      if (!moved) return
+      const bounds = this.launcherBounds()
+      const sideX = this.launcherX + bounds.size / 2 <= this.windowWidth / 2
+        ? bounds.minX
+        : bounds.maxX
+      const position = this.avoidBottomAction(
+        this.clampLauncherPosition(sideX, this.launcherY)
+      )
+      this.launcherX = position.x
+      this.launcherY = position.y
+      this.persistLauncherPosition()
+      this.suppressTap = true
+      setTimeout(() => { this.suppressTap = false }, 180)
+    },
+    handleLauncherTap() {
+      if (this.suppressTap || this.dragging) return
+      this.openAssistant()
     },
     switchTab(item, index) {
       if (this.switching || index === this.activeIndex) return
@@ -333,6 +494,9 @@ export default {
   right: max(18rpx, var(--mci-safe-right, 0px));
   bottom: calc(160rpx + var(--mci-safe-bottom, env(safe-area-inset-bottom, 0px)));
   z-index: 980;
+  touch-action: none;
+  user-select: none;
+  will-change: left, top, transform;
 }
 .mci-ai-launcher-bridge { position: fixed; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 @keyframes mciAiSlotPulse { 0%, 100% { transform: scale(.96); opacity: .45; } 50% { transform: scale(1); opacity: .9; } }
