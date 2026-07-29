@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
-import { MicroiClient } from './microi-client.js';
+import {
+  buildTokenFileLookupKeys,
+  isAuthenticationFailureResponse,
+  isTenantConfigurationFailureResponse,
+  MicroiClient,
+} from './microi-client.js';
 
 function jsonResponse(body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -20,6 +29,133 @@ function createClient(): MicroiClient {
     writeRequestTimeoutMs: 1_000,
   });
 }
+
+test('authentication failure detection covers signature/version errors but not invalid tenant configuration', () => {
+  assert.equal(isAuthenticationFailureResponse({
+    Code: 1001,
+    Msg: 'Token签名验证失败，请重新登录',
+    DataAppend: { ReasonCode: 'AuthVersionChanged' },
+  }), true);
+  assert.equal(isAuthenticationFailureResponse({
+    Code: 1002,
+    Msg: '身份验证失败',
+  }), true);
+  assert.equal(isAuthenticationFailureResponse({
+    Code: 0,
+    Msg: 'Token签名验证失败，请重新登录',
+  }), true);
+  assert.equal(isTenantConfigurationFailureResponse({
+    Code: 1001,
+    Msg: '无效的租户标识：demo',
+  }), true);
+  assert.equal(isAuthenticationFailureResponse({
+    Code: 1001,
+    Msg: '无效的租户标识：demo',
+  }), false);
+});
+
+test('token-file lookup prefers exact tenant identity and retains legacy fallbacks', () => {
+  assert.deepEqual(
+    buildTokenFileLookupKeys('https://microi.test/', 'demo', 'Product', 'Internal'),
+    [
+      'https://microi.test|demo|Product|Internal',
+      'https://microi.test|demo|Product',
+      'https://microi.test|demo',
+      'https://microi.test',
+    ],
+  );
+  assert.deepEqual(
+    buildTokenFileLookupKeys('https://microi.test/', 'demo'),
+    ['https://microi.test|demo', 'https://microi.test'],
+  );
+});
+
+test('MCP requests credential-free VS Code recovery and reloads the rotated token file', async () => {
+  const originalFetch = globalThis.fetch;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mcp-auth-recovery-'));
+  const tokenFilePath = path.join(tempDir, 'tokens.json');
+  const recoveryDir = path.join(tempDir, 'recovery');
+  const apiBaseUrl = 'https://microi.test';
+  const osClient = 'demo';
+  const osClientType = 'Product';
+  const osClientNetwork = 'Internal';
+  const tokenKey = `${apiBaseUrl}|${osClient}|${osClientType}|${osClientNetwork}`;
+  fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: 'old-token' }));
+  let statusCalls = 0;
+  let refreshCalls = 0;
+  const recoveryPayloads: Array<Record<string, unknown>> = [];
+  let brokerTimer: ReturnType<typeof setInterval> | undefined;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/api/SysUser/RefreshToken')) {
+        refreshCalls += 1;
+        return jsonResponse({
+          Code: 1001,
+          Data: null,
+          Msg: 'Token签名验证失败，请重新登录',
+          DataAppend: { ReasonCode: 'AuthVersionChanged' },
+        });
+      }
+      if (url.endsWith('/api/V8Engine/GetStatus')) {
+        statusCalls += 1;
+        const headers = new Headers(init?.headers);
+        if (headers.get('Authorization') === 'Bearer new-token') {
+          return jsonResponse({ Code: 1, Data: { ok: true }, Msg: '' });
+        }
+        return jsonResponse({
+          Code: 1001,
+          Data: null,
+          Msg: 'Token签名验证失败，请重新登录',
+          DataAppend: { ReasonCode: 'AuthVersionChanged' },
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    brokerTimer = setInterval(() => {
+      if (!fs.existsSync(recoveryDir)) { return; }
+      const requests = fs.readdirSync(recoveryDir).filter(name => name.endsWith('.json'));
+      if (requests.length === 0) { return; }
+      for (const request of requests) {
+        recoveryPayloads.push(JSON.parse(fs.readFileSync(path.join(recoveryDir, request), 'utf8')) as Record<string, unknown>);
+      }
+      fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: 'new-token' }));
+      for (const request of requests) fs.rmSync(path.join(recoveryDir, request), { force: true });
+    }, 25);
+
+    const client = new MicroiClient({
+      apiBaseUrl,
+      username: '',
+      password: '',
+      osClient,
+      osClientType,
+      osClientNetwork,
+      token: 'old-token',
+      tokenFilePath,
+      authRecoveryRequestDir: recoveryDir,
+      requestTimeoutMs: 1_000,
+    });
+    const result = await client.getStatus();
+    assert.equal(result.Code, 1);
+    assert.equal(statusCalls, 2);
+    assert.equal(refreshCalls, 1);
+    assert.equal(recoveryPayloads.length, 1);
+    assert.equal(recoveryPayloads[0]?.apiBaseUrl, apiBaseUrl);
+    assert.equal(recoveryPayloads[0]?.osClient, osClient);
+    assert.equal(recoveryPayloads[0]?.osClientType, osClientType);
+    assert.equal(recoveryPayloads[0]?.osClientNetwork, osClientNetwork);
+    assert.equal(
+      recoveryPayloads[0]?.failedTokenHash,
+      crypto.createHash('sha256').update('old-token').digest('hex'),
+    );
+  } finally {
+    if (brokerTimer) clearInterval(brokerTimer);
+    globalThis.fetch = originalFetch;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
 
 test('saveEngineCode confirms an uncertain write by readback', async () => {
   const originalFetch = globalThis.fetch;

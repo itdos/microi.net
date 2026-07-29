@@ -57,9 +57,8 @@ export function resolveSiteApiBase(configuredValue, localFallback = LOCAL_MICROI
   })
 }
 
-export function buildSiteApiEngineUrl(apiBase, apiEngineKey, osClient) {
+export function buildSiteApiEngineUrl(apiBase, apiEngineKey) {
   const base = normalizeApiBase(apiBase)
   const key = encodeURIComponent(String(apiEngineKey || '').trim())
-  const client = encodeURIComponent(String(osClient || '').trim())
-  return `${base}/apiengine/${key}--OsClient--${client}--`
+  return `${base}/apiengine/${key}`
 }

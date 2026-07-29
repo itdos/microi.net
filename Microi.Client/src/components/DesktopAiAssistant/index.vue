@@ -20,7 +20,7 @@
         <el-dialog
             v-model="dialogVisible"
             class="desktop-ai-dialog"
-            width="min(960px, calc(100vw - 48px))"
+            width="min(1320px, calc(100vw - 48px))"
             draggable
             align-center
             append-to-body
@@ -39,7 +39,7 @@
                 </div>
             </template>
 
-            <MobileAiAssistant embedded @close="closeAssistant" />
+            <AiEngine embedded />
         </el-dialog>
     </div>
 </template>
@@ -47,7 +47,7 @@
 <script setup>
 import { computed, ref, watch } from "vue";
 import { useDiyStore } from "@/pinia";
-import MobileAiAssistant from "@/views/mobile/ai-assistant.vue";
+import AiEngine from "@/views/ai-engine/index.vue";
 import { isMobileAiAssistantEnabled } from "@/components/MobileTabBar/mobile-ai-entry.js";
 
 defineOptions({ name: "DesktopAiAssistant" });
@@ -78,8 +78,8 @@ watch(aiAssistantEnabled, (enabled) => {
 
 .desktop-ai-entry {
     position: relative;
-    width: 42px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -113,8 +113,8 @@ watch(aiAssistantEnabled, (enabled) => {
 .desktop-ai-entry__robot {
     position: relative;
     z-index: 1;
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     object-fit: contain;
     pointer-events: none;
 }
@@ -154,7 +154,7 @@ watch(aiAssistantEnabled, (enabled) => {
 }
 
 .desktop-ai-dialog .el-dialog__body {
-    height: min(720px, calc(100vh - 140px));
+    height: min(760px, calc(100vh - 140px));
     min-height: 480px;
     padding: 0;
     overflow: hidden;
