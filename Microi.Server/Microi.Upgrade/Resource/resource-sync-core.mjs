@@ -16,6 +16,18 @@ const identityFields = [
   'DataSourceKey',
 ];
 
+const readableResourceIdentities = {
+  'import-package.js': 'import-microi-store-package',
+  'ai-app-publish-store.js': 'ai_app_publish_store',
+  'official-resource-api.js': 'ApiEngineKey: get-microi-upgrade-resource',
+};
+
+const readablePackageNames = {
+  'app.microi.form-engine.json': '表单引擎',
+  'app.microi.module-engine.json': '模块引擎',
+  'app.microi.store.json': '应用商城',
+};
+
 export function normalizeText(content) {
   return `${String(content ?? '').replace(/\r\n?/g, '\n').replace(/\n*$/g, '')}\n`;
 }
@@ -24,6 +36,39 @@ export function canonicalizeResource(name, content) {
   const normalized = normalizeText(content);
   if (!name.endsWith('.json')) return normalized;
   return `${JSON.stringify(JSON.parse(normalized), null, 2)}\n`;
+}
+
+// Remote resources are one side of a three-way merge and are allowed to lag
+// behind the local release candidate. This gate only proves that the response
+// has the expected stable identity and can be parsed safely. The strict feature
+// and minimum-version gate remains in refresh-resources.mjs and is applied to
+// local input and the final merged candidate before any write or publication.
+export function validateReadableOfficialResource(name, content) {
+  const text = String(content ?? '');
+  if (!text.trim()) throw new Error(`${name} 内容为空`);
+
+  if (Object.hasOwn(readableResourceIdentities, name)) {
+    const expectedIdentity = readableResourceIdentities[name];
+    if (!text.includes(expectedIdentity)) {
+      throw new Error(`${name} 缺少稳定资源标识 ${expectedIdentity}`);
+    }
+    return;
+  }
+
+  if (Object.hasOwn(readablePackageNames, name)) {
+    let packageModel;
+    try {
+      packageModel = JSON.parse(text);
+    } catch (error) {
+      throw new Error(`${name} 不是有效 JSON：${error.message}`, { cause: error });
+    }
+    if (packageModel?.PackageInfo?.Name !== readablePackageNames[name]) {
+      throw new Error(`${name} 的 PackageInfo.Name 不正确`);
+    }
+    return;
+  }
+
+  throw new Error(`不允许读取未列入固定白名单的官网升级资源：${name}`);
 }
 
 export function isTemporaryOfficialResourceFailure(error) {

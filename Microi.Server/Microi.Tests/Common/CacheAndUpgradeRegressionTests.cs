@@ -93,6 +93,74 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public void OfficialBundles_DoNotPersistRecursionAboveRuntimeHardCeiling()
+    {
+        var loadResources = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(loadResources);
+
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            loadResources!.Invoke(null, null));
+        var checkedEngines = 0;
+
+        foreach (var resourceName in new[] { "app.microi.store.json", "app.microi.form-engine.json" })
+        {
+            var package = JObject.Parse(resources[resourceName]);
+            foreach (var engine in package["SysApiEngines"]?.Children<JObject>() ?? [])
+            {
+                checkedEngines++;
+                var limitRecursion = engine["LimitRecursion"]?.Value<int>() ?? 0;
+                Assert.InRange(limitRecursion, 0, CreateV8EngineParam.MaxLimitRecursion);
+            }
+        }
+
+        Assert.True(checkedEngines > 0, "The official bundles must contain interface engines to validate.");
+    }
+
+    [Fact]
+    public void AppStoreRefresh_RejectsPersistedRecursionAboveEffectiveRuntimeCeiling()
+    {
+        var hasExpectedSettings = typeof(UpgradeAppStore).GetMethod(
+            "HasExpectedPublisherSettings",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(hasExpectedSettings);
+
+        var effectiveCeiling = Math.Min(5000, CreateV8EngineParam.MaxLimitRecursion);
+        JObject Settings(int limitRecursion) => new()
+        {
+            ["StopHttp"] = 0,
+            ["Timeout"] = 3600,
+            ["MaxStatements"] = 100_000_000,
+            ["LimitMemory"] = 2048,
+            ["LimitRecursion"] = limitRecursion,
+            ["Lock"] = 1
+        };
+
+        Assert.True(Assert.IsType<bool>(hasExpectedSettings!.Invoke(null, new object[] { Settings(effectiveCeiling) })));
+        Assert.False(Assert.IsType<bool>(hasExpectedSettings.Invoke(null, new object[] { Settings(effectiveCeiling + 1) })));
+    }
+
+    [Fact]
+    public void AppStorePackageImport_ClampsOnlineResourceRecursionBeforeInstall()
+    {
+        var normalizePackage = typeof(UpgradeAppStore).GetMethod(
+            "NormalizePackageExecutionLimits",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(normalizePackage);
+
+        const string packageText = """
+        {"SysApiEngines":[{"ApiEngineKey":"old","LimitRecursion":10000},{"ApiEngineKey":"normal","LimitRecursion":2000}]}
+        """;
+        var normalized = Assert.IsType<string>(normalizePackage!.Invoke(null, new object[] { packageText }));
+        var engines = JObject.Parse(normalized)["SysApiEngines"]!.Children<JObject>().ToArray();
+        var effectiveCeiling = Math.Min(5000, CreateV8EngineParam.MaxLimitRecursion);
+
+        Assert.Equal(effectiveCeiling, engines[0]["LimitRecursion"]!.Value<int>());
+        Assert.Equal(2000, engines[1]["LimitRecursion"]!.Value<int>());
+    }
+
+    [Fact]
     public void UpgradeMenuPatch_ConvertsDynamicDataBeforeUsingJTokenExtensions()
     {
         dynamic data = JObject.Parse("""{"Id":"menu-a","Name":null}""");

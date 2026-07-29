@@ -111,7 +111,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
   assert.equal(packageImporter.Version, importerSourceVersion);
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical source byte-for-byte");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.6.6") >= 0);
+  assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
+  assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.7.4") >= 0);
   assert.match(source, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -127,6 +129,11 @@ test("application-store upgrade resources carry the canonical resumable importer
     /FormData:sys_apiengine:[^`]+`, latest\)/,
     "never pass a Jint object to the string-only V8 cache API"
   );
+  assert.match(source, /var classifyDdlStatement = function/);
+  assert.match(source, /INFORMATION_SCHEMA\.STATISTICS/);
+  assert.match(source, /ddl_race_skip_/);
+  assert.match(source, /ddlInfo\.Kind == 'index' \|\| ddlTablesChecked\[ddlTableKey\]/);
+  assert.match(source, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
   assert.match(source, /var legacyMenuDiyConfigFields = \[/);
   assert.match(source, /syncLegacyMenuDiyConfig\([\s\S]*?existingMenuVisibility \? existingMenuVisibility\.DiyConfig/);
   assert.match(source, /_SelectFields:\s*\['Display', 'AppDisplay', 'DiyConfig'\]/);
@@ -140,22 +147,95 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 6, 6\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.6.6 floor");
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 7, 4\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.7.4 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 7, 4\)/);
   assert.match(appStoreUpgradeSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(appStoreUpgradeSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(appStoreUpgradeSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(appStoreUpgradeSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
+  assert.match(appStoreUpgradeSource, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 16\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_006_006/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_007_004/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
+  assert.match(refreshSource, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_004_004/);
   assert.match(refreshSource, /versionNumber\s*<\s*6_005_014/);
+});
+
+test("reinstall DDL classifies existing indexes for idempotent skipping", () => {
+  const classifierSource = source.match(
+    /var classifyDdlStatement = function \(ddl, fallbackTableName\) \{[\s\S]*?\n    \};/
+  );
+  assert.ok(classifierSource, "DDL classifier should be extractable");
+  const context = {};
+  vm.runInNewContext(`${classifierSource[0]}; result = classifyDdlStatement;`, context);
+  const classify = context.result;
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(classify(
+      "CREATE TABLE IF NOT EXISTS `mci_background_task` (`Id` varchar(36))",
+      "mci_background_task",
+    ))),
+    { Kind: "table", TableName: "mci_background_task", IndexName: "" },
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(classify(
+      "CREATE INDEX `ix_mci_background_task_concurrency` ON `mci_background_task` (`OsClient`)",
+      "mci_background_task",
+    ))),
+    {
+      Kind: "index",
+      TableName: "mci_background_task",
+      IndexName: "ix_mci_background_task_concurrency",
+    },
+  );
+});
+
+test("background-task bootstrap is verified from physical columns and indexes before success", () => {
+  const requiredColumns = [
+    "Id", "OsClient", "UserKey", "Title", "ApiEngineKey", "Status", "Progress",
+    "WorkCurrent", "WorkTotal", "EstimatedEndTime", "IdempotencyKey", "ConcurrencyKey",
+    "LeaseOwner", "LeaseExpiresAt", "FencingToken", "CheckpointJson", "BusinessEtaField",
+  ];
+  const requiredIndexes = [
+    "ux_mci_background_task_idempotency",
+    "ix_mci_background_task_claim",
+    "ix_mci_background_task_user",
+    "ix_mci_background_task_concurrency",
+  ];
+
+  assert.match(source, /var validateBackgroundTaskBootstrapReadiness = function/);
+  assert.match(source, /getTargetPhysicalColumns\(tableName\)/);
+  for (const column of requiredColumns) assert.match(source, new RegExp(`'${column}'`));
+  for (const index of requiredIndexes) assert.match(source, new RegExp(`'${index}'`));
+  assert.match(source, /actualColumns != requiredColumnText \|\| actualIndex\.Unique != requiredIndex\.Unique/);
+  assert.ok(
+    source.indexOf("validateBackgroundTaskBootstrapReadiness()")
+      < source.indexOf("正在写入应用安装版本记录"),
+    "physical readiness must fail the transaction before recording an installed version",
+  );
+});
+
+test("reinstall skips unchanged diy_field definitions before FormEngine update", () => {
+  const helperSource = source.match(
+    /var comparableFieldValue = function \(value\) \{[\s\S]*?var fieldDefinitionNeedsUpdate = function \(oldField, fieldCopy\) \{[\s\S]*?\n    \};/
+  );
+  assert.ok(helperSource, "field comparison helpers should be extractable");
+  const context = { JSON, Object, String };
+  vm.runInNewContext(`${helperSource[0]}; result = fieldDefinitionNeedsUpdate;`, context);
+  const needsUpdate = context.result;
+
+  const current = { Id: "f1", Name: "Status", Label: "状态", Visible: 1, UpdateTime: "old" };
+  assert.equal(needsUpdate(current, { Id: "f1", Name: "Status", Label: "状态", Visible: 1 }), false);
+  assert.equal(needsUpdate(current, { Id: "f1", Name: "Status", Label: "任务状态", Visible: 1 }), true);
+  assert.match(source, /!fieldDefinitionNeedsUpdate\(oldFieldResult\.Data, fieldCopy\)/);
+  assert.match(source, /stats\.FieldSkipped\+\+/);
 });
 
 test("legacy databases receive application-store bootstrap columns before upgrade 13", () => {

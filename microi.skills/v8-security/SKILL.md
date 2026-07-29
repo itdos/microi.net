@@ -392,7 +392,8 @@ try {
 - 浏览器链接使用 `/#/access-login?access_key=...&redirect=...`。`access_key` 位于 Hash 中，前端解析后立即 `history.replaceState` 清除；后端兑换只接受 JSON Body。
 - 兑换得到短期 `_ClientType=AccessKey` Token。JWT 只保存 `MicroiAccessKeyId`，权限范围从共享数据库/Redis实时加载，不能把范围写进共享 `CurrentToken.CurrentUser`。
 - 密钥权限只能收窄：帐号实时角色/菜单/行范围与 `Scopes + AllowedRoutes + AllowedTableNames + AllowedApiEngineKeys + AllowedDataSourceKeys` 取交集。检查必须位于管理员快捷放行之前。
-- 默认只允许 `page:open + form:read`；`form:write/form:export/file:read/api-engine:run/data-source:run` 必须显式启用，且表名和引擎 Key 使用准确白名单，不支持 `*`。
+- 默认只允许 `page:open + form:read`；`form:write/form:export/file:read/api-engine:run/data-source:run` 必须显式启用。`AllowedRoutes` 和 `AllowedTableNames` 可以使用单独值 `*` 表示“全部目标帐号已授权资源”，但检查仍必须位于管理员快捷放行之前并继续执行帐号菜单、表单、部门和行权限；旧 UI 误存的路由值 `/*` 只作为该通配值的兼容别名。`AllowedApiEngineKeys` 和 `AllowedDataSourceKeys` 必须是准确白名单，禁止 `*`。
+- 自动登录 URL 必须携带当前 `OsClient`；前端进入 `/access-login` 时先清除 Hash 中的密钥，再用 JSON Body 兑换，并设置有限超时。禁止等待与兑换无关的 SSO 初始化导致无限加载。
 - 管理操作只允许普通登录会话的本人或管理员；访问密钥会话不能创建或吊销密钥。
 - 多节点共享 Redis 只作为短 TTL 缓存和限流；数据库是事实源，吊销主动清除缓存。不得使用 `static` 字典、本机文件或本地定时器保存密钥状态。
 - 对外仍要求 HTTPS。固定终端使用独立只读帐号，不能用超级管理员帐号创建看板密钥。

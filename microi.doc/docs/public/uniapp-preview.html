@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,follow">
+  <meta name="description" content="Microi吾码低代码平台为 AI 应用提供响应式 UniApp H5 预览容器，并通过 V8 引擎连接真实业务能力。">
+  <meta name="keywords" content="Microi吾码,低代码,low-code,AI应用,V8引擎,UniApp,H5预览">
+  <link rel="canonical" href="https://www.microi.net/uniapp-preview.html">
+  <meta property="og:title" content="Microi UniApp H5 Preview">
+  <meta property="og:description" content="Microi吾码低代码平台为 AI 应用提供响应式 UniApp H5 预览容器，并通过 V8 引擎连接真实业务能力。">
+  <meta property="og:url" content="https://www.microi.net/uniapp-preview.html">
+  <meta property="og:image" content="https://www.microi.net/icon.png">
+  <title>Microi UniApp H5 Preview</title>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Microi UniApp H5 Preview","url":"https://www.microi.net/uniapp-preview.html","applicationCategory":"DeveloperApplication","operatingSystem":"Web","description":"Microi吾码低代码平台的 AI 应用与 V8 引擎 UniApp H5 响应式预览容器。"}</script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      display: grid;
+      min-height: 100vh;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 18% 10%, rgba(50, 108, 255, .13), transparent 34%),
+        #eef2f7;
+      color: #172033;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .preview-phone {
+      display: flex;
+      width: min(430px, 100%);
+      height: min(880px, calc(100vh - 48px));
+      min-height: 680px;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid #d9e0ea;
+      border-radius: 34px;
+      background: #fff;
+      box-shadow: 0 28px 90px rgba(31, 42, 68, .2);
+    }
+    .preview-status {
+      display: flex;
+      height: 30px;
+      flex: 0 0 30px;
+      align-items: center;
+      justify-content: center;
+      border-bottom: 1px solid #edf0f5;
+      background: #fff;
+      color: #8a94a6;
+      font-size: 11px;
+      letter-spacing: .02em;
+    }
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      flex: 1;
+      border: 0;
+      background: #fff;
+    }
+    .preview-error {
+      display: none;
+      min-height: 100%;
+      padding: 32px;
+      place-items: center;
+      color: #64748b;
+      line-height: 1.8;
+      text-align: center;
+    }
+    body.invalid .preview-error { display: grid; }
+    body.invalid iframe { display: none; }
+    @media (max-width: 767px), (pointer: coarse) and (max-width: 1024px) {
+      html, body { background: #fff; }
+      body { display: block; padding: 0; }
+      .preview-phone {
+        width: 100%;
+        height: 100vh;
+        min-height: 100vh;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+      .preview-status { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="preview-phone">
+    <div class="preview-status">Microi UniApp H5 Preview</div>
+    <iframe id="microi-preview-frame" title="UniApp 应用预览" allow="clipboard-read; clipboard-write; geolocation"></iframe>
+    <div class="preview-error" role="alert">应用地址无效，请返回应用详情页后重新打开。</div>
+  </main>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search)
+      var source = params.get('src') || ''
+      var name = params.get('name') || ''
+      var frame = document.getElementById('microi-preview-frame')
+      var isMobile = matchMedia('(max-width: 767px), (pointer: coarse) and (max-width: 1024px)').matches
+
+      function safeUrl(value) {
+        try {
+          var url = new URL(value, location.origin)
+          var localHttp = url.protocol === 'http:' && /^(localhost|127\.0\.0\.1|\[::1\])$/i.test(url.hostname)
+          if (url.protocol !== 'https:' && !localHttp) return null
+          return url
+        } catch (_) {
+          return null
+        }
+      }
+
+      var target = safeUrl(source)
+      if (!target) {
+        document.body.classList.add('invalid')
+        return
+      }
+      if (name) {
+        document.title = name + ' - Microi UniApp H5 Preview'
+        frame.title = name
+      }
+
+      // This compatibility page is opened only for audited historical UniApp
+      // roots that do not own a desktop shell. Their root index is the actual,
+      // working application; app.html is not a stable standalone entry in every
+      // historical package and using it can produce a blank iframe.
+      frame.src = target.href
+    })()
+  </script>
+</body>
+</html>

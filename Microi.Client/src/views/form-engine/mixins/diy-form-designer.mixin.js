@@ -1,3 +1,31 @@
+// 只有实际暴露 openConfig() 的字段组件才显示“组件配置”。
+// Switch 等基础组件仍可在右侧字段属性中配置，但没有独立配置弹窗。
+const standaloneConfigComponents = new Set([
+    "Text",
+    "Guid",
+    "Input",
+    "Textarea",
+    "NumberText",
+    "InputNumber",
+    "DateTime",
+    "Select",
+    "MultipleSelect",
+    "Radio",
+    "Checkbox",
+    "Autocomplete",
+    "Cascader",
+    "SelectTree",
+    "Department",
+    "AutoNumber",
+    "Button",
+    "Slider",
+    "TagInput",
+    "Transfer",
+    "Html",
+    "HTML",
+    "JsonTable"
+]);
+
 export default {
     methods: {
 FieldIsVisible(field) {
@@ -193,19 +221,29 @@ hideFieldToolbar() {
         },
 hasComponentConfig(field) {
             var self = this;
-            return true;
-            // 定义支持独立配置的组件类型
-            var configComponents = ['JsonTable', 'Select'];
-            return configComponents.includes(field.Component);
+            if (!field) return false;
+            var refComponent = field.Name ? self.getRefComponent(field.Name) : null;
+            return Boolean(
+                (refComponent && typeof refComponent.openConfig === "function") ||
+                standaloneConfigComponents.has(field.Component)
+            );
         },
 openComponentConfig(field) {
             var self = this;
-            var refComponent = self.getRefComponent(field.Name);
-            if (refComponent && typeof refComponent.openConfig === 'function') {
-                refComponent.openConfig();
-            } else {
-                self.DiyCommon.Tips('该组件不支持配置', false);
-            }
+            if (!field) return;
+
+            // 双击基础组件仍然选中字段并打开右侧属性，不能误报“不支持配置”。
+            self.SelectField(field);
+            if (!self.hasComponentConfig(field)) return;
+
+            self.$nextTick(function () {
+                var refComponent = self.getRefComponent(field.Name);
+                if (refComponent && typeof refComponent.openConfig === "function") {
+                    refComponent.openConfig();
+                    return;
+                }
+                self.DiyCommon.Tips("组件配置正在加载，请稍后重试", false);
+            });
         },
 duplicateField(field) {
             var self = this;

@@ -53,6 +53,30 @@ function createInjector(apiBase = "https://tenant-api.example.com/", osClient = 
   return context.result;
 }
 
+function createUniAppShellHelpers() {
+  const context = {
+    JSON,
+    String,
+    escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    },
+  };
+  vm.runInNewContext(`
+    function text(value, fallback) { return value === null || value === undefined ? (fallback || "") : String(value); }
+    ${extractFunction("applicationTypeOf")}
+    ${extractFunction("isUniAppApplication")}
+    ${extractFunction("hasUniAppPreviewShell")}
+    ${extractFunction("createUniAppPreviewShell")}
+    result = { applicationTypeOf, isUniAppApplication, hasUniAppPreviewShell, createUniAppPreviewShell };
+  `, context);
+  return context.result;
+}
+
 test("published entry injects the current tenant runtime context before application scripts", () => {
   const inject = createInjector();
   const html = inject("<!doctype html><html><head><script src=\"app.js\"></script></head><body></body></html>");
@@ -74,6 +98,19 @@ test("runtime context is XSS-safe and never hardcodes the official API", () => {
 });
 
 test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runtime context", () => {
+  assert.match(source, /var roots = \["build\/", "dist\/", "unpackage\/dist\/build\/h5\/"\]/);
+  assert.match(source, /isBlank\(versionNo\) \? "\/latest" : "\/versions\/"/);
+  assert.match(source, /ai-app-publish\/" \+ text\(appKey\) \+ "\/latest\/index\.html"/);
+  assert.match(source, /ALIYUN_CDN_STABLE_ASSET_REFRESH_V1/);
+  assert.match(source, /Action:\s*"RefreshObjectCaches"/);
+  assert.match(source, /ObjectType:\s*"File"/);
+  assert.match(source, /HMACSHA1/);
+  assert.match(source, /refreshStableCdnPaths\(stableAssetPaths\)/);
+  assert.match(source, /requestedAction\s*===\s*"RefreshStableCdn"/);
+  assert.match(source, /requestedAction\s*===\s*"PromoteStoreAssetsBatch"/);
+  assert.match(source, /requestedAction\s*===\s*"FinalizeStoreAssets"/);
+  assert.match(source, /source\.sourceFileId\s*\|\|\s*source\.SourceFileId/);
+  assert.match(source, /requireEntry !== false/);
   assert.match(source, /var isEntry\s*=\s*relativePath\.toLowerCase\(\)\s*===\s*"index\.html"/);
   assert.match(source, /var isHtml\s*=\s*\/\\\.html\$\/i\.test\(relativePath\)/);
   assert.match(source, /var versionSegment\s*=.*"\/versions\/"/);
@@ -81,7 +118,7 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   assert.match(source, /StableFilePathName:\s*latestPath/);
   assert.match(source, /VersionEntryPath:\s*versionEntryPath/);
   assert.match(source, /for \(var pass = 0; pass < 2; pass\+\+\)/);
-  assert.match(source, /publishCompiledFiles\(files, buildRoot, appKey, versionNo\)/);
+  assert.match(source, /publishCompiledFiles\(files, buildRoot, app\.Data, appKey, versionNo\)/);
   assert.doesNotMatch(source, /text\(files\[i\]\.PublishHdfsPath\)/);
   assert.match(source, /injectRuntimeContext\(htmlContent\.Data\)/);
   assert.match(source, /entryPath\s*=\s*latestPath/);
@@ -90,7 +127,8 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   assert.match(source, /requestedAction\s*===\s*"PromoteStoreAssets"/);
   assert.match(source, /JSON\.parse\(text\(V8\.Param\.AssetsJson\)\)/);
   assert.match(source, /promoteStoreAssets\(app\.Data, promotedAppKey, promotedVersionNo, promotedAssets\)/);
-  assert.match(source, /if \(!moveResult \|\| moveResult\.Code !== 1\) return moveResult/);
+  assert.match(source, /提升编译资产到固定路径失败/);
+  assert.match(source, /存储错误=.*moveResult && moveResult\.Msg/);
   assert.match(source, /source\.fileByteBase64\s*\|\|\s*source\.FileByteBase64/);
   assert.match(source, /parseInt\(storagePayload\.Code\)\s*===\s*0/);
   assert.match(source, /优先以当前完整 dist\/build 目录为事实源/);
@@ -99,10 +137,42 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   assert.match(source, /当前应用没有可修复的完整编译产物/);
 });
 
+test("UniApp runtime type takes ApplicationType over historical AppType", () => {
+  const helpers = createUniAppShellHelpers();
+  assert.equal(helpers.applicationTypeOf({ ApplicationType: "UniApp", AppType: "AI应用" }), "UniApp");
+  assert.equal(helpers.isUniAppApplication({ ApplicationType: "UniApp", AppType: "Web" }), true);
+  assert.equal(helpers.isUniAppApplication({ ApplicationType: "Web", AppType: "UniApp" }), false);
+  assert.equal(helpers.applicationTypeOf({ AppType: "Official" }), "Web");
+  assert.equal(helpers.applicationTypeOf({ AppType: "Community" }), "Web");
+  assert.equal(helpers.applicationTypeOf({ AppType: "UniApp" }), "UniApp");
+});
+
+test("generated UniApp entry shows a phone shell on PC and removes it on mobile", () => {
+  const helpers = createUniAppShellHelpers();
+  const html = helpers.createUniAppPreviewShell("smart-business-card", "智能资讯名片", "v1.0.8");
+  assert.match(html, /Microi UniApp H5 Preview/);
+  assert.match(html, /data-microi-preview-shell="true"/);
+  assert.match(html, /new URL\("\.\/app\.html",current\)/);
+  assert.match(html, /\(pointer:coarse\) and \(max-width:1024px\)/);
+  assert.match(html, /\.preview-status\{display:none\}/);
+  assert.equal(helpers.hasUniAppPreviewShell(html), true);
+  assert.equal(helpers.hasUniAppPreviewShell('<p>Microi UniApp H5 Preview 使用说明</p>'), false);
+  assert.equal(helpers.hasUniAppPreviewShell('<main data-microi-preview-shell="true"></main>'), true);
+});
+
+test("all compiled and marketplace promotion paths wrap raw UniApp entries only", () => {
+  assert.match(source, /function publishCompiledFiles\(files, buildRoot, app, appKey, versionNo\)/);
+  assert.match(source, /isEntry && isUniAppApplication\(app\) && !hasUniAppPreviewShell\(publishedHtml\)/);
+  assert.match(source, /isEntry && isUniAppApplication\(app\) && !hasUniAppPreviewShell\(html\)/);
+  assert.match(source, /publishTextAsset\([^\n]+"app\.html"/);
+  assert.match(source, /applicationTypeOf\(app\.Data\)\.toLowerCase\(\) === "microservice"/);
+  assert.match(source, /UNIFIED_UNIAPP_PREVIEW_SHELL_V1/);
+});
+
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.4.4");
+  assert.equal(packaged.Version, "v1.5.2");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.(?:[4-9]|\d{2,})$|^v6\.[6-9]\./);
   assert.match(upgradeSource, /BuildAiAppResourceName\s*=\s*"ai-app-build\.js"/);

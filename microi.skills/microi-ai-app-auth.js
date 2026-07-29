@@ -17,7 +17,14 @@ const AUTH_CODES = new Set([401, -1, 1001, 1002]);
 // Stop before Microi's `--OsClient--tenant--` suffix. Interface-engine keys
 // created for AI applications use the shared app_ prefix and underscore words.
 const APP_ENGINE_PATH = /\/apiengine\/(app_[a-z0-9_]+)/i;
-const READ_ENGINE_KEY = /(?:^|_)(query|list|detail|get|overview|stats|statistics|dashboard|catalog|search|options|context|preview|bootstrap|public|meta|health|config|lookup|tree|summary|timeline|calendar|map|ranking|leaderboard)$/i;
+// This is intentionally a positive write list. A naming heuristic must never
+// block an anonymous first screen merely because a read-only engine uses a
+// domain verb such as `calculate`, `convert`, `trend` or `status`. Unknown
+// operations are sent anonymously first; the server-side user guard remains
+// authoritative and returns Code=1001 for a persistent write, at which point
+// the bridge opens the login dialog and retries once.
+const WRITE_ENGINE_KEY = /(?:^|_)(accept|ack|activate|add|adjust|allocate|append|apply|approve|archive|arrive|assign|attach|bind|book|cancel|certify|change|checkin|checkout|claim|clear|clock|close|collect|complete|confirm|consume|create|decide|decline|delete|depart|detach|dispatch|drop|end|event|execute|expire|finalize|finish|handover|hide|hold|import|ingest|initialize|insert|invite|issue|join|leave|lock|mark|move|occupy|open|order|pack|pass|pause|pay|pick|post|prepare|process|propose|publish|quarantine|raise|rebuild|receive|recall|reconcile|record|redeem|refund|register|reject|release|remove|reopen|reorder|replace|request|reschedule|reset|resolve|restore|resume|retire|retry|return|reverse|review|revoke|rollback|rotate|run|save|schedule|scrap|seal|seat|send|serve|set|settle|ship|simulate|skip|snapshot|start|submit|suspend|take|toggle|transfer|transition|unassign|update|upt|vacate|verify|vote|watched|withdraw)(?:_|$)/i;
+const OSCLIENT_SUFFIX = /--OsClient--[^/]*--$/i;
 const DEFAULT_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
 XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
@@ -67,6 +74,39 @@ function runtime() {
   if (!apiBase) apiBase = window.location.origin;
   if (!osClient) osClient = localStorage.getItem('OsClient') || 'iTdos';
   apiBase = normalizeBase(apiBase);
+  window.__MICROI_APP_CONTEXT__ = {
+    ...context,
+    apiBase,
+    ApiBase: apiBase,
+    osClient: String(osClient),
+    OsClient: String(osClient)
+  };
+  window.MicroiApiBase = apiBase;
+  window.MicroiOsClient = String(osClient);
+  document.documentElement.dataset.microiAiAuthReady = 'true';
+  document.documentElement.dataset.microiOsClient = String(osClient);
+  try {
+    // Many generated applications read `window.microApp.getData()` first and
+    // use `{}` as the fallback. In a standalone HDFS page that empty object is
+    // truthy and masks `__MICROI_APP_CONTEXT__`, so expose the same context
+    // through a tiny compatible microApp facade. A real host-provided getData
+    // function is preserved and merged with the portable runtime defaults.
+    const microApp = window.microApp || (window.microApp = {});
+    if (typeof microApp.getData !== 'function') {
+      const getData = function () { return { ...(window.__MICROI_APP_CONTEXT__ || {}) }; };
+      getData.__microiRuntimeFallback = true;
+      microApp.getData = getData;
+    } else if (!microApp.getData.__microiRuntimeFallback) {
+      const originalGetData = microApp.getData.bind(microApp);
+      const getData = function () {
+        let current = {};
+        try { current = originalGetData() || {}; } catch (error) {}
+        return { ...(window.__MICROI_APP_CONTEXT__ || {}), ...current };
+      };
+      getData.__microiRuntimeFallback = true;
+      microApp.getData = getData;
+    }
+  } catch (error) {}
   V8.configure({
     apiBase,
     osClient: String(osClient),
@@ -90,7 +130,7 @@ function appEngineKey(value) {
 
 function isLikelyWrite(value) {
   const key = appEngineKey(value);
-  return Boolean(key) && !READ_ENGINE_KEY.test(key);
+  return Boolean(key) && WRITE_ENGINE_KEY.test(key);
 }
 
 function rewriteApiUrl(value) {
@@ -100,9 +140,11 @@ function rewriteApiUrl(value) {
     const target = new URL(raw, window.location.href);
     const current = new URL(window.location.href);
     const resolved = runtime();
+    target.pathname = target.pathname.replace(OSCLIENT_SUFFIX, '');
     if (target.origin === current.origin && resolved.apiBase !== current.origin) {
       return resolved.apiBase + target.pathname + target.search + target.hash;
     }
+    return target.toString();
   } catch (error) {}
   return raw;
 }
@@ -110,7 +152,7 @@ function rewriteApiUrl(value) {
 function setRequestHeaders(headers) {
   const resolved = runtime();
   const next = new Headers(headers || {});
-  next.set('OsClient', resolved.osClient);
+  next.delete('OsClient');
   next.set('osclient', resolved.osClient);
   next.set('did', V8.getDid());
   const token = normalizeToken(V8.getToken());
@@ -185,7 +227,33 @@ function applyIdentityToBody(body, headers) {
 }
 
 function bodyAuthExpired(body, status) {
-  return Number(status) === 401 || AUTH_CODES.has(Number(body && body.Code));
+  if (Number(status) === 401 || AUTH_CODES.has(Number(body && body.Code))) return true;
+  if (V8.getToken()) return false;
+  const message = String(body && (body.Msg || body.Message || body.message) || '');
+  return /(?:请先|需要|尚未|未)登录|登录后|没有权限|无权限|身份验证|Token.*(?:失效|缺失)/i.test(message);
+}
+
+function bodyAction(body, headers) {
+  let value = body;
+  if (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) {
+    value = Object.fromEntries(body.entries());
+  } else if (typeof FormData !== 'undefined' && body instanceof FormData) {
+    value = Object.fromEntries(body.entries());
+  } else if (typeof body === 'string') {
+    const contentType = String(new Headers(headers || {}).get('content-type') || '').toLowerCase();
+    try {
+      value = contentType.includes('application/x-www-form-urlencoded')
+        ? Object.fromEntries(new URLSearchParams(body).entries())
+        : JSON.parse(body);
+    } catch (error) { value = null; }
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  return String(value.Action || value.action || value.Command || value.command || value.Operation || value.operation || '');
+}
+
+function bodyLikelyWrites(body, headers) {
+  const action = bodyAction(body, headers);
+  return Boolean(action) && WRITE_ENGINE_KEY.test(`_${action}_`);
 }
 
 function registerUrl(path) {
@@ -272,29 +340,47 @@ async function loadSysConfig() {
   const resolved = runtime();
   const result = await jsonRequest('/api/FormEngine/GetSysConfig', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', OsClient: resolved.osClient, did: V8.getDid() },
+    headers: { 'Content-Type': 'application/json', osclient: resolved.osClient, did: V8.getDid() },
     body: JSON.stringify({ OsClient: resolved.osClient, _SearchEqual: { IsEnable: 1 } })
   });
-  if (result.body && result.body.Code === 1) sysConfig = result.body.Data || {};
+  if (!result.body || Number(result.body.Code) !== 1) {
+    throw new Error((result.body && result.body.Msg) || '系统登录配置加载失败');
+  }
+  sysConfig = result.body.Data || {};
   return sysConfig;
 }
 
 async function loadCaptcha() {
   const view = ensureModal();
+  view.captchaField.hidden = true;
+  view.captchaImage.removeAttribute('src');
   if (!flag(sysConfig.EnableCaptcha)) {
-    view.captchaField.hidden = true;
     captchaId = '';
     return;
   }
   const resolved = runtime();
   const response = await nativeFetch(`${resolved.apiBase}/api/Captcha/GetCaptcha?OsClient=${encodeURIComponent(resolved.osClient)}`, {
-    headers: { OsClient: resolved.osClient, did: V8.getDid() }
+    headers: { osclient: resolved.osClient, did: V8.getDid() }
   });
   if (!response.ok) throw new Error('验证码加载失败');
   captchaId = response.headers.get('captchaid') || '';
+  if (!captchaId) throw new Error('验证码标识缺失，请刷新后重试');
+  const captchaBlob = await response.blob();
+  if (!captchaBlob.size) throw new Error('验证码图片为空，请刷新后重试');
   if (captchaObjectUrl) URL.revokeObjectURL(captchaObjectUrl);
-  captchaObjectUrl = URL.createObjectURL(await response.blob());
-  view.captchaImage.src = captchaObjectUrl;
+  captchaObjectUrl = URL.createObjectURL(captchaBlob);
+  await new Promise((resolve, reject) => {
+    const done = (callback) => {
+      window.clearTimeout(timer);
+      view.captchaImage.onload = null;
+      view.captchaImage.onerror = null;
+      callback();
+    };
+    const timer = window.setTimeout(() => done(() => reject(new Error('验证码图片加载超时'))), 8000);
+    view.captchaImage.onload = () => done(resolve);
+    view.captchaImage.onerror = () => done(() => reject(new Error('验证码图片解析失败')));
+    view.captchaImage.src = captchaObjectUrl;
+  });
   view.captchaField.hidden = false;
 }
 
@@ -333,7 +419,7 @@ async function performLogin() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      OsClient: resolved.osClient,
+      osclient: resolved.osClient,
       did: V8.getDid()
     },
     body: data.toString()
@@ -360,6 +446,7 @@ async function showLogin() {
   if (V8.getToken()) return V8.getUser();
   if (loginPromise) return loginPromise;
   const view = ensureModal();
+  document.documentElement.dataset.microiAiAuthState = 'prompt';
   view.mask.hidden = false;
   view.message.textContent = '';
   view.submit.disabled = false;
@@ -414,7 +501,11 @@ async function fetchWithAuth(input, init = {}, retried = false) {
   const rawUrl = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
   const appRequest = isAppEngineUrl(rawUrl);
   if (!appRequest) return nativeFetch(input, init);
-  if (!retried && isLikelyWrite(rawUrl) && !V8.getToken()) await showLogin();
+  const writeRequest = isLikelyWrite(rawUrl) || bodyLikelyWrites(init.body, init.headers);
+  document.documentElement.dataset.microiLastEngine = appEngineKey(rawUrl) || '';
+  document.documentElement.dataset.microiWriteDetected = writeRequest ? 'true' : 'false';
+  document.documentElement.dataset.microiHasToken = V8.getToken() ? 'true' : 'false';
+  if (!retried && writeRequest && !V8.getToken()) await showLogin();
   const headers = setRequestHeaders(init.headers || (input && input.headers));
   const target = typeof input === 'string' || input instanceof URL ? rewriteApiUrl(rawUrl) : input;
   const requestBody = applyIdentityToBody(init.body, headers);
@@ -442,6 +533,7 @@ function installXhrBridge() {
   if (!NativeXHR || NativeXHR.prototype.__microiAiAuthBridge) return;
   const open = NativeXHR.prototype.open;
   const send = NativeXHR.prototype.send;
+  const setRequestHeader = NativeXHR.prototype.setRequestHeader;
   NativeXHR.prototype.open = function (method, url, async, user, password) {
     this.__microiMethod = method;
     this.__microiUrl = String(url || '');
@@ -451,12 +543,12 @@ function installXhrBridge() {
     if (!isAppEngineUrl(this.__microiUrl)) return send.call(this, body);
     const execute = () => {
       const resolved = runtime();
-      this.setRequestHeader('OsClient', resolved.osClient);
-      this.setRequestHeader('did', V8.getDid());
+      setRequestHeader.call(this, 'osclient', resolved.osClient);
+      setRequestHeader.call(this, 'did', V8.getDid());
       const token = normalizeToken(V8.getToken());
       if (token) {
-        this.setRequestHeader('Token', token);
-        this.setRequestHeader('Authorization', `Bearer ${token}`);
+        setRequestHeader.call(this, 'Token', token);
+        setRequestHeader.call(this, 'Authorization', `Bearer ${token}`);
       }
       this.addEventListener('load', () => {
         try {
@@ -470,15 +562,16 @@ function installXhrBridge() {
       const requestBody = applyIdentityToBody(body, { 'content-type': this.__microiContentType || '' });
       send.call(this, requestBody);
     };
-    if (isLikelyWrite(this.__microiUrl) && !V8.getToken()) {
+    if ((isLikelyWrite(this.__microiUrl) || bodyLikelyWrites(body, { 'content-type': this.__microiContentType || '' })) && !V8.getToken()) {
       void showLogin().then(execute).catch(() => {});
       return;
     }
     execute();
   };
-  const setRequestHeader = NativeXHR.prototype.setRequestHeader;
   NativeXHR.prototype.setRequestHeader = function (name, value) {
-    if (String(name || '').toLowerCase() === 'content-type') this.__microiContentType = String(value || '');
+    const normalized = String(name || '').toLowerCase();
+    if (normalized === 'content-type') this.__microiContentType = String(value || '');
+    if (normalized === 'osclient') return;
     return setRequestHeader.call(this, name, value);
   };
   NativeXHR.prototype.__microiAiAuthBridge = true;

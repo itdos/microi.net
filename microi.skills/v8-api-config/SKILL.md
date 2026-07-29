@@ -25,6 +25,15 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 | `LogParam` | 是否记录请求参数到 `sys_log` | `false` |
 | `LogResult` | 是否记录返回值到 `sys_log` | `false` |
 
+### 资源预算与嵌套调用（强制理解）
+
+- `LimitMemory` 是单个 Jint 引擎的**累计托管分配预算**，不是实时堆占用或服务器预留内存。默认 2048MB、节点硬上限默认 4096MB。
+- `V8.ApiEngine.Run` 多层嵌套是正常能力。新版默认隔离父子引擎的单层分配计数，子层不会再被每个父层重复计费；根调用树另有默认 8192MB 总预算。
+- 接口嵌套深度默认 32、节点硬上限默认 64；它与 `LimitRecursion` 的 JavaScript 函数递归不是同一限制。
+- 嵌套调用不重复占用全局/租户并发名额，同一调用树重入同 Key 也不会自锁；不同子接口 Key 仍受自己的 Key 并发门保护。
+- `V8.Limits` 可读取本片有效预算和当前深度。异常优先检查 `DataAppend.V8Limit.Code`，不要看到“2GB”就判断服务器真实吃满 2GB。
+- 后台任务使用同一执行引擎。总任务可以运行数小时，但单片仍受 `Timeout/MaxStatements/LimitMemory` 约束；超过 10 分钟必须返回 `HasMore + Checkpoint` 分片续跑，不能只把 `Timeout` 调到 1800/3600。
+
 ## 1. 匿名调用（IsAnonymous）
 
 公开接口（登录、注册、忘记密码、验证码、扫码登录、第三方回调）必须开启：
@@ -153,9 +162,9 @@ LogResult = true    # 记录每次返回
 `microi_run_engine` 只能证明引擎代码在 MCP/内部执行上下文可运行，不能证明移动端或外部 HTTP 能调用。新建或更新接口后必须再走一次真实 HTTP 路径：
 
 ```text
-POST /apiengine/{ApiEngineKey}--OsClient--{OsClient}--
-Headers: Content-Type=application/json, OsClient={OsClient}, apiengine=1
-Body: {"Action":"Bootstrap"}
+POST /apiengine/{ApiEngineKey}
+Headers: Content-Type=application/json, osclient={OsClient}, apiengine=1
+Body: {"Action":"Bootstrap","OsClient":"{OsClient}"}
 
 # 兼容旧入口
 POST /api/ApiEngine/Run
@@ -170,7 +179,7 @@ Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 - HTTP 请求中的 `_CurrentUser`、`_InvokeType:'Server'`、`_TrustedServerInvocation` 都不能建立可信服务端身份；当前用户和调用类型必须由认证中间件与接口层重新写入。
 - `ApiAddress` 不能为空字符串；空字符串可能导致 404。
 - 响应不能是空 body、字符串 `null`、非 JSON；业务接口必须返回标准 DosResult。
-- Header `OsClient` 只能作为补充，URL 路径里的 `--OsClient--{OsClient}--` 更稳。避免用 `?OsClient=` 做 ApiEngine 复测；部分动态路由会把 querystring 参与 `ApiAddress` 匹配并误报引擎不存在。
+- 普通 `POST/PUT/PATCH/DELETE` 必须使用稳定路径 `/apiengine/{ApiEngineKey}`，租户放在唯一的 `osclient` Header，并可在 JSON/Form Body 中冗余传入；禁止无脑给路径追加 `--OsClient--...--`。普通 GET 优先 Header 或 `?OsClient=`。只有第三方回调、浏览器直接下载等确实无法设置 Header/Form/Query 的 GET/HEAD 场景，才使用 `--OsClient--{OsClient}--` 特殊路径。
 - 更新接口代码时保留 HTTP 元数据，避免只覆盖 JS 代码却把匿名、启用、自定义地址等配置冲掉。
 
 ## 请求内异步与可靠后台任务
@@ -190,7 +199,7 @@ return { Code: 1, Data: resp.Content };
 
 禁止用 `setTimeout` 或 `System.Threading.Tasks.Task.Run` 实现“接口先返回、后台继续执行”：`V8Engine.Run` 返回后会释放 Jint Engine、租户上下文、事务和并发租约，回调不可靠，也没有持久化、重试、幂等或重启恢复保证。
 
-需要先响应再处理时，使用接口引擎后台任务按钮（`RunBackground + ApiEngineKey`）、Job、MQ 或 outbox；消费者按全局 `EventId` 幂等处理并持久化进度。见 `v8-menu-buttons`、`v8-mq-mqtt` 和 `microi-system-delivery`。
+需要先响应再处理时，使用接口引擎后台任务按钮（`RunBackground + ApiEngineKey`）、Job、MQ 或 outbox；消费者按全局 `EventId` 幂等处理并持久化进度。AI 发现预计超过 2 分钟、500 条、1000 个扇出子操作、100 次外部调用，或安装/初始化/迁移/备份/全量生成等任务时，必须主动切换为后台任务；预计超过 10 分钟时还必须设计 checkpoint 分片。见 `job-engine`、`v8-menu-buttons`、`v8-mq-mqtt` 和 `microi-system-delivery`。
 
 ## 接口安全检查清单
 
@@ -203,7 +212,9 @@ return { Code: 1, Data: resp.Content };
 - [ ] 文件响应接口是否开启 `IsResponseFile`？
 - [ ] 接口代码内是否仍校验 `V8.CurrentUser`（`IsAnonymous=true` 时尤其重要）？
 - [ ] 是否没有使用 `setTimeout` / `Task.Run` 承担请求外后台任务？
-- [ ] 保存后是否通过 `/apiengine/{key}--OsClient--{osClient}--` 做过 HTTP 复测？
+- [ ] 大任务是否按阈值主动使用后台任务，超过 10 分钟是否有 `HasMore + Checkpoint`？
+- [ ] 是否区分累计分配、调用树预算、JS递归与接口嵌套，而不是盲目抬高全部限制？
+- [ ] 保存后是否通过稳定路径 `/apiengine/{key}` + `osclient` Header 做过 HTTP 复测？特殊 GET/HEAD 路径是否仅用于无法设置 Header/Form/Query 的场景？
 
 ## 常见错误
 

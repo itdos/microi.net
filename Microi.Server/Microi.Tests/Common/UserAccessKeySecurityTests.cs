@@ -59,6 +59,22 @@ public class UserAccessKeySecurityTests
     }
 
     [Fact]
+    public void RouteWildcard_AllowsAnyRouteAndUsesSafeRedirect()
+    {
+        var user = NewScopedUser();
+        user["_AccessKeyAllowedRoutes"] = new JArray("*");
+
+        Assert.True(UserAccessKeySecurity.IsRouteAllowed(user, "/mic/any-authorized-page"));
+        Assert.Equal(
+            "/mic/any-authorized-page",
+            UserAccessKeySecurity.ResolveRedirectPath(
+                new[] { "*" },
+                "/mic/any-authorized-page?ShowClassicTop=0"));
+        Assert.Equal("/", UserAccessKeySecurity.ResolveRedirectPath(new[] { "*" }, null));
+        Assert.Equal("*", UserAccessKeySecurity.NormalizeRoute("/*"));
+    }
+
+    [Fact]
     public void TableScope_NarrowsReadAndDeniesWriteByDefault()
     {
         var user = NewScopedUser();
@@ -75,6 +91,18 @@ public class UserAccessKeySecurityTests
             user,
             "mic_data_dashboard",
             false));
+    }
+
+    [Fact]
+    public void TableWildcard_AllowsAccountAuthorizedReadsButStillRequiresScope()
+    {
+        var user = NewScopedUser();
+        user["_AccessKeyAllowedTableNames"] = new JArray("*");
+
+        Assert.True(UserAccessKeySecurity.IsTableOperationAllowed(user, "business_table", true));
+        Assert.False(UserAccessKeySecurity.IsTableOperationAllowed(user, "business_table", false));
+        user["_AccessKeyScopes"] = new JArray("page:open");
+        Assert.False(UserAccessKeySecurity.IsTableOperationAllowed(user, "business_table", true));
     }
 
     [Fact]
@@ -104,6 +132,32 @@ public class UserAccessKeySecurityTests
         Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
             user,
             "/api/SysUserAccessKey/Create"));
+    }
+
+    [Fact]
+    public void FileReadScope_AllowsOnlyExactHdfsReadFacade()
+    {
+        var user = NewScopedUser();
+        user["_AccessKeyScopes"] = new JArray("page:open", "file:read");
+
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/api/HDFS/GetPrivateFileUrl"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/api/HDFS/OpenPrivateFile/"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/api/HDFS/Upload"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/api/HDFS/SaveOfficeDocument"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/api/HDFS/DeleteObject"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            user,
+            "/api/HDFS/SyncMinioObject"));
     }
 
     [Fact]

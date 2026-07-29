@@ -163,6 +163,7 @@
                                             </div>
                                             <div style="float: right">
                                                 <el-button type="text" class="marginRight5" :icon="QuestionFilled" @click="OpenSysUser(model)">{{ $t("Msg.Edit") }}</el-button>
+                                                <el-button type="text" class="marginRight5" :icon="Key" @click="OpenAccessKeys(model)">访问密钥</el-button>
                                                 <el-dropdown trigger="click">
                                                     <el-button type="text">
                                                         {{ $t("Msg.More") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -171,9 +172,6 @@
                                                         ><el-dropdown-menu class="table-more-btn">
                                                             <el-dropdown-item :icon="ChatDotRound" @click="$root.OpenDiyChat(model)">
                                                                 {{ "消息" }}
-                                                            </el-dropdown-item>
-                                                            <el-dropdown-item :icon="Key" @click="OpenAccessKeys(model)">
-                                                                访问密钥
                                                             </el-dropdown-item>
                                                             <el-dropdown-item :icon="Delete" divided @click="DelSysUser(model)">
                                                                 {{ $t("Msg.Delete") }}

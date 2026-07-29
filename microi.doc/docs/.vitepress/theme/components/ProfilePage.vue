@@ -432,6 +432,9 @@ let openClawAuthBridge = null
 
 const GITEE_STAR_DRAFT_KEY = 'microi_gitee_star_tenant_draft'
 const GITEE_STAR_DRAFT_TTL_MS = 10 * 60 * 1000
+const TENANT_BOOTSTRAP_CREDENTIAL_TTL_MS = 10 * 60 * 1000
+const tenantBootstrapCredentials = new Map()
+const tenantCredentialDeliveryIds = new Map()
 
 const menus = computed(() => [
   { key: 'overview', name: t('overview'), icon: '⌂' },
@@ -551,8 +554,8 @@ const TenantList = defineComponent({
       ]),
       h('div', { class: 'tenant-password-tip' }, [
         h('span', t('defaultAdmin')),
-        h('b', `admin / ${tenant.AdminDefaultPassword || tenant.OsClient || '-'}`),
-        h('small', t('changePassword'))
+        h('b', tenant.AdminDefaultPassword ? `admin / ${tenant.AdminDefaultPassword}` : 'admin'),
+        h('small', tenant.AdminDefaultPassword ? t('changePassword') : t('initialPasswordHidden'))
       ]),
       h('div', { class: 'tenant-card-actions' }, [
         h('a', {
@@ -865,6 +868,8 @@ function clearSession() {
   localStorage.removeItem('microi_doc_tenant')
   localStorage.removeItem('microi_doc_tenant_url')
   localStorage.removeItem('microi_doc_phone')
+  tenantBootstrapCredentials.clear()
+  tenantCredentialDeliveryIds.clear()
   authToken.value = ''
   currentUser.value = null
   tenants.value = []
@@ -879,6 +884,70 @@ function handleSessionExpired() {
   if (isOpenClawBridgeMode()) return
   const redirect = '/profile.html' + (window.location.hash || '#/overview')
   window.location.replace(`/login.html?redirect=${encodeURIComponent(redirect)}&reason=expired`)
+}
+
+function purgeTenantBootstrapCredentials() {
+  const now = Date.now()
+  const ownerUserId = currentProfileUserId()
+  for (const [key, credential] of tenantBootstrapCredentials.entries()) {
+    if (!ownerUserId || credential.OwnerUserId !== ownerUserId || credential.ExpiresAt <= now) {
+      tenantBootstrapCredentials.delete(key)
+    }
+  }
+}
+
+function rememberTenantBootstrapCredential(osClient, password, taskId) {
+  const tenant = String(osClient || '').trim()
+  const secret = String(password || '').trim()
+  const ownerUserId = currentProfileUserId()
+  if (!tenant || !secret || !ownerUserId) return
+  purgeTenantBootstrapCredentials()
+  tenantBootstrapCredentials.set(`${ownerUserId}:${tenant.toLowerCase()}`, {
+    OwnerUserId: ownerUserId,
+    TaskId: String(taskId || '').trim(),
+    Password: secret,
+    ExpiresAt: Date.now() + TENANT_BOOTSTRAP_CREDENTIAL_TTL_MS
+  })
+}
+
+function mergeTenantBootstrapCredentials(list) {
+  purgeTenantBootstrapCredentials()
+  const ownerUserId = currentProfileUserId()
+  return list.map(tenant => {
+    const osClient = String(tenant?.OsClient || '').trim().toLowerCase()
+    const credential = osClient ? tenantBootstrapCredentials.get(`${ownerUserId}:${osClient}`) : null
+    const password = String(credential?.Password || '').trim()
+    return password ? { ...tenant, AdminDefaultPassword: password } : { ...tenant, AdminDefaultPassword: '' }
+  })
+}
+
+function getTenantCredentialDeliveryId(traceId) {
+  const ownerUserId = currentProfileUserId()
+  const taskId = String(traceId || '').trim()
+  if (!ownerUserId || !taskId) return ''
+  const key = `${ownerUserId}:${taskId}`
+  if (!tenantCredentialDeliveryIds.has(key)) {
+    tenantCredentialDeliveryIds.set(key, createTraceId())
+  }
+  return tenantCredentialDeliveryIds.get(key)
+}
+
+async function acknowledgeTenantBootstrapCredential(traceId, deliveryId) {
+  if (!traceId || !deliveryId) return
+  try {
+    await authenticatedFetch(apiEngineUrl('official_create_tenant_progress'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        TraceId: traceId,
+        CredentialDeliveryId: deliveryId,
+        AcknowledgeCredential: 1,
+        _Lang: locale.value
+      })
+    })
+  } catch {
+    // 未确认时服务端凭据仍只保留短 TTL；不影响租户创建结果。
+  }
 }
 
 async function refreshCenter() {
@@ -901,7 +970,7 @@ async function refreshCenter() {
       return false
     }
     tenantCenter.value = result.Data || {}
-    tenants.value = Array.isArray(result.Data?.Tenants) ? result.Data.Tenants : []
+    tenants.value = mergeTenantBootstrapCredentials(Array.isArray(result.Data?.Tenants) ? result.Data.Tenants : [])
     if (tenants.value[0]) {
       localStorage.setItem('microi_doc_tenant', tenants.value[0].OsClient || '')
       localStorage.setItem('microi_doc_tenant_url', tenants.value[0].Url || '')
@@ -1337,42 +1406,39 @@ async function createTenant() {
   let keepPollingAfterRequestError = false
   startTenantProgress(traceId)
   try {
-    const resp = await authenticatedFetch(apiEngineUrl('official_create_tenant'), {
+    const resp = await authenticatedFetch(`${API_BASE}/api/BackgroundTask/RunApiEngine`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ TenantKey: tenantKey.value, SystemName: systemName.value, TraceId: traceId, _Lang: locale.value })
+      headers: { 'Content-Type': 'application/json', osclient: OS_CLIENT },
+      body: JSON.stringify({
+        OsClient: OS_CLIENT,
+        // 先进入兼容提交器，再由其内部调用 StopHttp=1 的 worker。这样当前已部署
+        // 后端与未来支持 TrustedServerInvocation 的后端都能安全执行。
+        ApiEngineKey: 'official_create_tenant',
+        Title: t('createTenant'),
+        Param: {
+          TenantKey: tenantKey.value,
+          SystemName: systemName.value,
+          TraceId: traceId,
+          TaskId: traceId,
+          _Lang: locale.value
+        },
+        Options: {
+          IdempotencyKey: `official-create-tenant:${currentProfileUserId()}:${traceId}`,
+          // 同一租户 Key 在所有用户之间串行，避免两个账号同时抢占同名数据库。
+          ConcurrencyKey: `official-create-tenant:${tenantKey.value.trim().toLowerCase()}`,
+          MaxAttempts: 1,
+          RetryOnFailure: false
+        }
+      })
     })
     const result = await resp.json()
-    mergeTenantSteps(result.DataAppend?.Steps || result.Data?.Steps)
     if (result.Code !== 1) {
       createError.value = result.Msg || t('tenantCreateFailed')
       tenantProgress.value = createError.value
-      const reason = result.Data?.Reason || result.DataAppend?.Reason || ''
-      if (reason === 'GITEE_STAR_REQUIRED') {
-        showStarReminder.value = true
-        await nextTick()
-        starContinueButton.value?.focus()
-      }
       return
     }
-    const data = result.Data || {}
-    const returnedTraceId = data.TraceId || data.TaskId || result.DataAppend?.TraceId || result.DataAppend?.TaskId || traceId
-    if (returnedTraceId && returnedTraceId !== tenantProgressTraceId) {
-      startTenantProgress(returnedTraceId)
-    }
-    if (data.Status === 'running' || data.TaskId || data.TraceId) {
-      tenantProgress.value = result.Msg || t('taskSubmitted')
-      keepPollingAfterRequestError = true
-      return
-    }
-    const url = data.Url || (data.DomainName ? `https://${data.DomainName}` : `https://${tenantKey.value}.microi.net`)
-    localStorage.setItem('microi_doc_tenant', data.OsClient || tenantKey.value)
-    localStorage.setItem('microi_doc_tenant_url', url)
-    tenantProgress.value = t('tenantCreatedAt', { url })
-    tenantKey.value = ''
-    systemName.value = ''
-    await refreshCenter()
-    navigateProfile('overview')
+    tenantProgress.value = result.Msg || t('taskSubmitted')
+    keepPollingAfterRequestError = true
   } catch {
     keepPollingAfterRequestError = true
     createError.value = ''
@@ -1457,10 +1523,11 @@ function markTenantStep(key, status, detail) {
 async function pollTenantProgress(traceId) {
   if (!traceId || traceId !== tenantProgressTraceId) return
   try {
+    const credentialDeliveryId = getTenantCredentialDeliveryId(traceId)
     const resp = await authenticatedFetch(apiEngineUrl('official_create_tenant_progress'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ TraceId: traceId, _Lang: locale.value })
+      body: JSON.stringify({ TraceId: traceId, CredentialDeliveryId: credentialDeliveryId, _Lang: locale.value })
     })
     const result = await resp.json()
     const data = result.Data || {}
@@ -1468,6 +1535,10 @@ async function pollTenantProgress(traceId) {
     if (data.Status === 'success') {
       const payload = data.Data || {}
       const url = payload.Url || (payload.DomainName ? `https://${payload.DomainName}` : `https://${payload.OsClient || tenantKey.value}.microi.net`)
+      rememberTenantBootstrapCredential(payload.OsClient || tenantKey.value, payload.AdminDefaultPassword, traceId)
+      if (payload.AdminDefaultPassword) {
+        void acknowledgeTenantBootstrapCredential(traceId, credentialDeliveryId)
+      }
       localStorage.setItem('microi_doc_tenant', payload.OsClient || tenantKey.value)
       localStorage.setItem('microi_doc_tenant_url', url)
       tenantProgress.value = t('tenantCreatedAt', { url })

@@ -83,13 +83,19 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
 WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     .AddInParameter("p0", "import-microi-store-package")
                     .ToScalar()?.ToString();
+                var importerLimitRecursionText = client.Db.FromSql(@"SELECT LimitRecursion FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "import-microi-store-package")
+                    .ToScalar()?.ToString();
                 var versionMatch = Regex.Match(code, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 6, 6) ||
+                    importerVersion < new System.Version(1, 7, 4) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
+                    !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
+                    importerLimitRecursion != PrivilegedEngineLimitRecursion ||
                     !code.Contains("field_primary_recovered_") ||
                     !code.Contains("rename_skipped_target_exists_") ||
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
@@ -108,7 +114,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
                     !code.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
                     !code.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
-                    !code.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
+                    !code.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1") ||
+                    !code.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -154,8 +161,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var builderVersionMatch = Regex.Match(builderCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!builderVersionMatch.Success ||
                     !System.Version.TryParse(builderVersionMatch.Groups[1].Value, out var builderVersion) ||
-                    builderVersion < new System.Version(1, 2, 9) ||
+                    builderVersion < new System.Version(1, 4, 5) ||
                     !builderCode.Contains("TENANT_RUNTIME_CONTEXT_V1") ||
+                    !builderCode.Contains("UNIFIED_UNIAPP_PREVIEW_SHELL_V1") ||
                     !builderCode.Contains("injectRuntimeContext") ||
                     !builderCode.Contains("V8.SysConfig && V8.SysConfig.ApiBase"))
                 {
@@ -303,9 +311,15 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                    && TryGetLong(settings, "Timeout", out var timeout) && timeout >= 3600
                    && TryGetLong(settings, "MaxStatements", out var maxStatements) && maxStatements >= 100000000
                    && TryGetLong(settings, "LimitMemory", out var limitMemory) && limitMemory >= 2048
-                   && TryGetLong(settings, "LimitRecursion", out var limitRecursion) && limitRecursion >= 10000
+                   && TryGetLong(settings, "LimitRecursion", out var limitRecursion) && limitRecursion == PrivilegedEngineLimitRecursion
                    && TryGetLong(settings, "Lock", out var lockValue) && lockValue == 1;
         }
+
+        // These official engines historically persisted 10000 although the V8 runtime
+        // hard ceiling is 5000 by default. Keep the privileged engines at the effective
+        // ceiling without writing a value that the runtime will silently truncate.
+        private static int PrivilegedEngineLimitRecursion =>
+            Math.Min(5000, CreateV8EngineParam.MaxLimitRecursion);
 
         private static bool TryGetLong(JObject model, string name, out long value)
         {
@@ -462,7 +476,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 6, 6) ||
+                    importerVersion < new System.Version(1, 7, 4) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -479,7 +493,8 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
                     !content.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
                     !content.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
-                    !content.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
+                    !content.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1") ||
+                    !content.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
@@ -510,8 +525,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!content.Contains("ApiEngineKey: ai_app_build") ||
                     !builderVersionMatch.Success ||
                     !System.Version.TryParse(builderVersionMatch.Groups[1].Value, out var builderVersion) ||
-                    builderVersion < new System.Version(1, 2, 9) ||
+                    builderVersion < new System.Version(1, 4, 5) ||
                     !content.Contains("TENANT_RUNTIME_CONTEXT_V1") ||
+                    !content.Contains("UNIFIED_UNIAPP_PREVIEW_SHELL_V1") ||
                     !content.Contains("injectRuntimeContext") ||
                     !content.Contains("V8.SysConfig && V8.SysConfig.ApiBase"))
                 {
@@ -554,7 +570,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
                     packageVersion < new System.Version(6, 5, 16) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 6, 4) ||
+                    embeddedImporterVersion < new System.Version(1, 7, 4) ||
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
                     !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
@@ -563,7 +579,8 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
                     !importerEngineCode.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
                     !importerEngineCode.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
-                    !importerEngineCode.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1"))
+                    !importerEngineCode.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1") ||
+                    !importerEngineCode.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
                 }
@@ -572,7 +589,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
 
         private static async Task InstallUpgradePackage(string osClient, List<string> msgs, string resourceName, string packageName, IReadOnlyDictionary<string, string> resources)
         {
-            var packageContent = resources[resourceName];
+            var packageContent = NormalizePackageExecutionLimits(resources[resourceName]);
             Console.WriteLine($"Microi：【基础应用升级】开始导入{packageName}：{resourceName}");
             var installResult = await MicroiEngine.ApiEngine.RunAsync("import-microi-store-package", new
             {
@@ -588,6 +605,22 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             Console.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
         }
 
+        private static string NormalizePackageExecutionLimits(string packageContent)
+        {
+            if (string.IsNullOrWhiteSpace(packageContent)) return packageContent;
+
+            var package = JObject.Parse(packageContent);
+            var changed = false;
+            foreach (var engine in package["SysApiEngines"]?.Children<JObject>() ?? Enumerable.Empty<JObject>())
+            {
+                var persistedLimit = engine["LimitRecursion"]?.Value<int>() ?? 0;
+                if (persistedLimit <= PrivilegedEngineLimitRecursion) continue;
+                engine["LimitRecursion"] = PrivilegedEngineLimitRecursion;
+                changed = true;
+            }
+            return changed ? package.ToString(Formatting.None) : packageContent;
+        }
+
         private static void EnsureImporterExecutionLimits(string osClient)
         {
             var client = OsClient.GetClient(osClient);
@@ -600,7 +633,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 .AddInParameter("p0", 3600)
                 .AddInParameter("p1", 100000000)
                 .AddInParameter("p2", ImporterLimitMemoryMb)
-                .AddInParameter("p3", 10000)
+                .AddInParameter("p3", PrivilegedEngineLimitRecursion)
                 .AddInParameter("p4", "import-microi-store-package")
                 .ExecuteNonQuery();
         }
@@ -625,7 +658,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 .AddInParameter("p0", 3600)
                 .AddInParameter("p1", 100000000)
                 .AddInParameter("p2", 2048)
-                .AddInParameter("p3", 10000)
+                .AddInParameter("p3", PrivilegedEngineLimitRecursion)
                 .AddInParameter("p4", "ai_app_publish_store")
                 .ExecuteNonQuery();
         }
@@ -657,9 +690,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 Timeout = 600,
                 MaxStatements = 100000000,
                 LimitMemory = 2048,
-                LimitRecursion = 10000,
+                LimitRecursion = PrivilegedEngineLimitRecursion,
                 Lock = 0,
-                Version = "v1.2.9",
+                Version = "v1.4.5",
                 ApiV8Code = engineCode
             };
             DosResult result;
@@ -889,7 +922,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     Timeout = 3600,
                     MaxStatements = 100000000,
                     LimitMemory = ImporterLimitMemoryMb,
-                    LimitRecursion = 10000,
+                    LimitRecursion = PrivilegedEngineLimitRecursion,
                     Lock = 1,
                     OsClient = osClient,
                     ApiV8Code = importV8
@@ -911,7 +944,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     Timeout = 3600,
                     MaxStatements = 100000000,
                     LimitMemory = ImporterLimitMemoryMb,
-                    LimitRecursion = 10000,
+                    LimitRecursion = PrivilegedEngineLimitRecursion,
                     Lock = 1,
                     OsClient = osClient,
                     ApiV8Code = importV8
@@ -985,7 +1018,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     Timeout = 3600,
                     MaxStatements = 100000000,
                     LimitMemory = 2048,
-                    LimitRecursion = 10000,
+                    LimitRecursion = PrivilegedEngineLimitRecursion,
                     Lock = 1,
                     ApiV8Code = publishAiAppV8
                 });
@@ -1003,7 +1036,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
                     Timeout = 3600,
                     MaxStatements = 100000000,
                     LimitMemory = 2048,
-                    LimitRecursion = 10000,
+                    LimitRecursion = PrivilegedEngineLimitRecursion,
                     Lock = 1,
                     ApiV8Code = publishAiAppV8
                 });

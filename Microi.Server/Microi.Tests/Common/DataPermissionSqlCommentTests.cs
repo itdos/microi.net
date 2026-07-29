@@ -43,6 +43,18 @@ namespace Microi.Tests.Common
         }
 
         [Fact]
+        public void Normalize_RemovesReadableDesignerConfigMarker()
+        {
+            var source = @"-- MICROI_DATA_PERMISSION_CONFIG:{""scopeMode"":""department"",""departmentField"":""DepartmentId""}
+A.DepartmentId = '$CurrentUser.DeptId$'";
+
+            var normalized = Normalize(source);
+
+            Assert.DoesNotContain("MICROI_DATA_PERMISSION_CONFIG", normalized);
+            Assert.Equal("A.DepartmentId = '$CurrentUser.DeptId$'", normalized);
+        }
+
+        [Fact]
         public void Normalize_RemovesLegacyBlockDescriptionAndBlockMarker()
         {
             var source = @"/*

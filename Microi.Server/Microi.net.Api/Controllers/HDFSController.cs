@@ -65,6 +65,10 @@ namespace Microi.net.Api
 
         private static DosResult RequirePlatformAdmin(DiyUploadParam param)
         {
+            if (UserAccessKeySecurity.IsSession(param?._CurrentUser))
+            {
+                return new DosResult(0, null, "访问密钥会话不能使用文件管理接口！");
+            }
             return IsPlatformAdmin(param)
                 ? null
                 : new DosResult(0, null, "仅平台超级管理员可以使用文件管理接口！");

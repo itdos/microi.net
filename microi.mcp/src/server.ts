@@ -37,6 +37,53 @@ function getStringField(data: unknown, ...keys: string[]): string {
   return '';
 }
 
+interface AccessKeyCreationConfirmationInput {
+  name: string;
+  allowedRoutes: string[];
+  allowedTableNames: string[];
+  scopes?: string[];
+  redirectPath?: string;
+  allowedApiEngineKeys?: string[];
+  allowedDataSourceKeys?: string[];
+  expiresAt?: string;
+  remark?: string;
+}
+
+function normalizeAccessKeyStringList(values: string[] | undefined, lowerCase = false): string[] {
+  const normalized = (values || [])
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .map(value => lowerCase ? value.toLowerCase() : value);
+  return Array.from(new Set(normalized)).sort((left, right) => left.localeCompare(right));
+}
+
+/**
+ * Canonicalize the effective access-key grant before asking for confirmation.
+ * The returned SHA-256 binds confirmation to scopes, allowlists and expiry,
+ * rather than only to a reusable display name.
+ */
+export function buildAccessKeyCreationConfirmation(input: AccessKeyCreationConfirmationInput): {
+  normalized: Required<AccessKeyCreationConfirmationInput>;
+  sha256: string;
+} {
+  const normalized: Required<AccessKeyCreationConfirmationInput> = {
+    name: String(input.name || '').trim(),
+    allowedRoutes: normalizeAccessKeyStringList(input.allowedRoutes),
+    allowedTableNames: normalizeAccessKeyStringList(input.allowedTableNames),
+    scopes: normalizeAccessKeyStringList(input.scopes || ['page:open', 'form:read'], true),
+    redirectPath: String(input.redirectPath || '').trim(),
+    allowedApiEngineKeys: normalizeAccessKeyStringList(input.allowedApiEngineKeys),
+    allowedDataSourceKeys: normalizeAccessKeyStringList(input.allowedDataSourceKeys),
+    expiresAt: String(input.expiresAt || '').trim(),
+    remark: String(input.remark || '').trim(),
+  };
+  const sha256 = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(normalized), 'utf8')
+    .digest('hex');
+  return { normalized, sha256 };
+}
+
 function includesKeyword(value: unknown, keyword?: string): boolean {
   if (!keyword) return true;
   return String(value || '').toLowerCase().includes(keyword.toLowerCase());
@@ -568,6 +615,7 @@ BOUNDARY RULES:
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
+- **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
 
 ## 数据库索引（强制通过 MCP）
 - 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
@@ -950,6 +998,155 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         return { content: [{ type: 'text', text: `⚠️ Server returned Code=${result.Code}: ${result.Msg}` }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `❌ Connection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_list_my_access_keys',
+    `List the current authenticated user's access keys for OsClient "${osClient}". The response contains only public metadata and never returns the credential or its hash. Access-key sessions cannot manage keys. Requires confirmExecution="LIST" because key prefixes and usage metadata are security-sensitive.`,
+    {
+      confirmExecution: z.string().optional().describe('Required. Pass LIST.'),
+    },
+    async ({ confirmExecution }) => {
+      if (confirmExecution !== 'LIST') {
+        return {
+          content: [{ type: 'text', text: '执行已拦截：访问密钥列表包含安全元数据，请重新调用并传 confirmExecution="LIST"。' }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await client.listMyUserAccessKeys();
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `读取访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data || [], null, 2) }] };
+      } catch (e: unknown) {
+        return {
+          content: [{ type: 'text', text: `读取访问密钥失败：${e instanceof Error ? e.message : String(e)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_create_my_access_key',
+    `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. The first call is a dry confirmation step and returns RequiredConfirmationSha256; repeat the exact same payload with confirmExecution equal to that SHA-256.`,
+    {
+      name: z.string().min(1).max(200).describe('Human-readable key name.'),
+      allowedRoutes: z.array(z.string().min(1).max(500)).min(1).max(100).describe('Exact allowed routes. Use * only after explicit risk review.'),
+      allowedTableNames: z.array(z.string().min(1).max(200)).min(1).max(100).describe('Exact table names. Use * only after explicit risk review.'),
+      scopes: z.array(z.enum([
+        'page:open',
+        'form:read',
+        'api-engine:run',
+        'data-source:run',
+        'file:read',
+      ])).min(1).max(5).optional().describe('Omit for minimum page:open + form:read. MCP does not expose form:write/form:export until the backend path facade supports them.'),
+      redirectPath: z.string().max(500).optional().describe('Initial route; must be included in allowedRoutes.'),
+      allowedApiEngineKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with api-engine:run. Wildcards are rejected.'),
+      allowedDataSourceKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with data-source:run. Wildcards are rejected.'),
+      expiresAt: z.string().optional().describe('Optional server-local expiry time, later than now and no more than 365 days. Omit for the bounded default.'),
+      remark: z.string().max(1000).optional(),
+      confirmExecution: z.string().optional().describe('Required for the real create. First omit it; then pass the returned RequiredConfirmationSha256 with the exact same payload.'),
+    },
+    async ({ name, allowedRoutes, allowedTableNames, scopes, redirectPath, allowedApiEngineKeys, allowedDataSourceKeys, expiresAt, remark, confirmExecution }) => {
+      const confirmation = buildAccessKeyCreationConfirmation({
+        name,
+        allowedRoutes,
+        allowedTableNames,
+        scopes,
+        redirectPath,
+        allowedApiEngineKeys,
+        allowedDataSourceKeys,
+        expiresAt,
+        remark,
+      });
+      if (String(confirmExecution || '').trim().toLowerCase() !== confirmation.sha256) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              Blocked: true,
+              Message: '创建访问密钥会产生新的登录凭据。请核对以下规范化权限载荷，并使用对应 SHA-256 确认。',
+              NormalizedGrant: confirmation.normalized,
+              RequiredConfirmationSha256: confirmation.sha256,
+              Next: '保持其它参数完全不变，并将 confirmExecution 设置为 RequiredConfirmationSha256。',
+            }, null, 2),
+          }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await client.createMyUserAccessKey({
+          name: confirmation.normalized.name,
+          allowedRoutes: confirmation.normalized.allowedRoutes,
+          allowedTableNames: confirmation.normalized.allowedTableNames,
+          scopes: confirmation.normalized.scopes,
+          redirectPath: confirmation.normalized.redirectPath || undefined,
+          allowedApiEngineKeys: confirmation.normalized.allowedApiEngineKeys,
+          allowedDataSourceKeys: confirmation.normalized.allowedDataSourceKeys,
+          expiresAt: confirmation.normalized.expiresAt || undefined,
+          remark: confirmation.normalized.remark || undefined,
+        });
+        if (result.Code !== 1 || !result.Data?.AccessKey) {
+          return { content: [{ type: 'text', text: `创建访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
+        }
+        // Do not return LoginPath because it embeds a second plaintext copy in a URL.
+        // The credential below is the one and only MCP response containing plaintext.
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              AccessKey: result.Data.AccessKey,
+              Record: result.Data.Record || null,
+              Notice: '明文仅本次返回。请立即存入安全凭据库；后续列表和日志不会再次显示。',
+            }, null, 2),
+          }],
+        };
+      } catch (e: unknown) {
+        return {
+          content: [{ type: 'text', text: `创建访问密钥失败：${e instanceof Error ? e.message : String(e)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_revoke_my_access_key',
+    `Revoke one access key owned by the current authenticated user on OsClient "${osClient}". Revocation is idempotent and invalidates the shared runtime cache. Requires confirmExecution equal to id. For rotation, create a new bounded key first, securely store its one-time plaintext, then revoke the old id.`,
+    {
+      id: z.string().min(1).max(100).describe('Access key record Id from microi_list_my_access_keys.'),
+      confirmExecution: z.string().optional().describe('Required. Pass the exact id.'),
+    },
+    async ({ id, confirmExecution }) => {
+      if (confirmExecution !== id) {
+        return {
+          content: [{
+            type: 'text',
+            text: `执行已拦截：吊销后该访问密钥将立即失效，请重新调用并传 confirmExecution="${id}"。`,
+          }],
+          isError: true,
+        };
+      }
+      try {
+        const result = await client.revokeMyUserAccessKey(id);
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `吊销访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify({
+          Id: id,
+          Revoked: true,
+          Record: result.Data || null,
+          Message: result.Msg || '访问密钥已吊销。',
+        }, null, 2) }] };
+      } catch (e: unknown) {
+        return {
+          content: [{ type: 'text', text: `吊销访问密钥失败：${e instanceof Error ? e.message : String(e)}` }],
+          isError: true,
+        };
       }
     },
   );

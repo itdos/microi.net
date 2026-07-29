@@ -469,7 +469,11 @@ function authHeaders() {
 }
 
 function apiEngineUrl(key) {
-  return buildSiteApiEngineUrl(API_BASE, key, OS_CLIENT)
+  return buildSiteApiEngineUrl(API_BASE, key)
+}
+
+function apiEngineHeaders(extra = {}) {
+  return { osclient: OS_CLIENT, ...extra }
 }
 
 function switchAuthTab(tab) {
@@ -519,7 +523,7 @@ async function sendRegisterSmsCode() {
   try {
     const resp = await fetch(apiEngineUrl('send-sms-reg'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         Phone: registerPhone.value,
         _CaptchaId: captchaId.value,
@@ -568,7 +572,7 @@ async function sendResetSmsCode() {
   try {
     const resp = await fetch(apiEngineUrl('official_password_reset_send_sms'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         Phone: resetPhone.value,
         _CaptchaId: captchaId.value,
@@ -613,7 +617,7 @@ async function resetPassword() {
   try {
     const resp = await fetch(apiEngineUrl('official_password_reset'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         Phone: resetPhone.value,
         SmsCode: resetSmsCode.value,
@@ -672,7 +676,7 @@ async function handleLogin() {
     }
     const resp = await fetch(apiEngineUrl('official_sms_login'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     })
     const result = await resp.json()
@@ -718,7 +722,7 @@ async function handleRegister() {
   try {
     const resp = await fetch(apiEngineUrl('official_sms_login'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         Action: 'register',
         LoginType: 'sms',
@@ -793,7 +797,7 @@ async function createTenant() {
   try {
     const resp = await fetch(apiEngineUrl('official_create_tenant'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json', ...authHeaders() }),
       body: JSON.stringify({
         TenantKey: tenantKey.value,
         SystemName: systemName.value,
@@ -879,7 +883,7 @@ async function pollTenantProgress(traceId) {
   try {
     const resp = await fetch(apiEngineUrl('official_create_tenant_progress'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: apiEngineHeaders({ 'Content-Type': 'application/json', ...authHeaders() }),
       body: JSON.stringify({ TraceId: traceId, _Lang: 'zh-CN' })
     })
     const result = await resp.json()

@@ -66,14 +66,21 @@ export function compareSemanticVersions(left, right) {
 }
 
 export function choosePublishablePackageVersion(currentVersion, remoteVersion, releaseVersion) {
-  if (!remoteVersion || compareSemanticVersions(currentVersion, remoteVersion) > 0) {
+  if (!remoteVersion) {
     return currentVersion;
   }
+  const remoteMatch = String(remoteVersion).trim().match(/^v?(\d+)\.(\d+)\.(\d+)$/i);
+  if (!remoteMatch) return null;
+  if (compareSemanticVersions(currentVersion, remoteVersion) > 0) return currentVersion;
   if (releaseVersion && compareSemanticVersions(releaseVersion, remoteVersion) > 0) {
     const normalized = String(releaseVersion).replace(/^v/i, '');
     return `v${normalized}`;
   }
-  return null;
+  // Application package versions are independent monotonic delivery versions.
+  // A platform release can legitimately be lower than an application package
+  // that has already advanced several times. In that case, bump the remote
+  // package patch version instead of forcing a manual platform-version change.
+  return `v${Number(remoteMatch[1])}.${Number(remoteMatch[2])}.${Number(remoteMatch[3]) + 1}`;
 }
 
 function executableBody(source) {

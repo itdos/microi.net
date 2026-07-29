@@ -13,11 +13,13 @@
 	"scripts": {
 		"check:links": "node scripts/check-dead-links.mjs",
 		"check:seo": "node scripts/check-seo.mjs",
+		"check:theme": "node scripts/check-default-dark.mjs",
+		"test:app-preview": "node --test tests/uniapp-preview-mode.test.mjs",
 		"test:site-api": "node --test tests/site-api-base.test.mjs",
 		"docs:dev": "npm run check:links && vitepress dev docs --host",
 		"dev": "npm run check:links && vitepress dev docs --host",
-		"docs:build": "npm run check:links && vitepress build docs && npm run check:seo",
-		"build": "npm run check:links && vitepress build docs && npm run check:seo",
+		"docs:build": "npm run check:links && vitepress build docs && npm run check:theme && npm run check:seo",
+		"build": "npm run check:links && vitepress build docs && npm run check:theme && npm run check:seo",
 		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {
