@@ -53,7 +53,11 @@
           </view>
           <view class="child-row__actions">
             <text class="child-row__arrow">›</text>
-            <text v-if="canMaintain" class="child-row__delete" @tap.stop="deleteRow(row)">删除</text>
+          </view>
+          <view v-if="canMaintain" class="child-row__delete" hover-class="child-row__delete--pressed"
+            @tap.stop="deleteRow(row)">
+            <text class="child-row__delete-icon">×</text>
+            <text>删除此条</text>
           </view>
         </view>
       </view>
@@ -270,13 +274,13 @@ export default {
 .child-table__bar { width: 7rpx; height: 30rpx; border-radius: 4rpx; background: linear-gradient(180deg, #0b86d4, #20b6b2); }
 .child-table__title { max-width: 360rpx; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #17313b; font-size: 29rpx; font-weight: 700; }
 .child-table__count { color: #8699a0; font-size: 21rpx; font-weight: 500; }
-.child-table__add { flex: none; gap: 4rpx; color: #087fbf; font-size: 24rpx; font-weight: 650; transition: transform .16s ease, opacity .16s ease; }
-.child-table__add-icon { font-size: 31rpx; line-height: 1; }
-.child-table__commands { flex: none; gap: 16rpx; }
-.child-table__toggle { color: #80969e; font-size: 42rpx; line-height: 1; transform: rotate(90deg); transition: transform .18s ease; }
+.child-table__add { flex: none; min-height: 58rpx; gap: 5rpx; padding: 0 16rpx; border-radius: 29rpx; color: #087fbf; background: #edf8fc; font-size: 24rpx; font-weight: 700; transition: transform .16s ease, opacity .16s ease; box-sizing: border-box; }
+.child-table__add-icon { font-size: 30rpx; line-height: 1; }
+.child-table__commands { flex: none; gap: 26rpx; }
+.child-table__toggle { width: 42rpx; color: #80969e; font-size: 42rpx; line-height: 1; text-align: center; transform: rotate(90deg); transition: transform .18s ease; }
 .child-table__toggle.expanded { transform: rotate(-90deg); }
 .child-table__rows { padding: 0 20rpx; }
-.child-row { min-height: 130rpx; display: grid; grid-template-columns: 48rpx minmax(0, 1fr) 58rpx; align-items: start; gap: 14rpx; padding: 22rpx 0; border-bottom: 1px solid #edf2f4; transition: transform .16s ease, opacity .16s ease; }
+.child-row { min-height: 130rpx; display: grid; grid-template-columns: 48rpx minmax(0, 1fr) 42rpx; align-items: start; gap: 14rpx; padding: 22rpx 0; border-bottom: 1px solid #edf2f4; transition: transform .16s ease, opacity .16s ease; }
 .child-row:last-child { border-bottom: 0; }
 .child-row__index { width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #087fbf; background: #eaf7fc; font-size: 21rpx; font-weight: 700; }
 .child-row__content { min-width: 0; }
@@ -284,9 +288,11 @@ export default {
 .child-row__line { min-width: 0; display: grid; grid-template-columns: 132rpx minmax(0, 1fr); gap: 10rpx; margin-top: 8rpx; font-size: 22rpx; line-height: 1.45; }
 .child-row__label { color: #899ba2; }
 .child-row__value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #506972; }
-.child-row__actions { min-height: 74rpx; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; }
+.child-row__actions { min-height: 44rpx; display: flex; align-items: flex-start; justify-content: flex-end; }
 .child-row__arrow { color: #91a4ab; font-size: 38rpx; line-height: 1; }
-.child-row__delete { padding: 8rpx 0 0 10rpx; color: #c94a34; font-size: 21rpx; }
+.child-row__delete { grid-column: 1 / -1; min-height: 64rpx; display: flex; align-items: center; justify-content: center; gap: 8rpx; margin-top: 10rpx; border: 1px solid #f2c9c1; border-radius: 8rpx; color: #bd402e; background: #fff4f1; font-size: 23rpx; font-weight: 700; transition: transform .16s ease, background-color .16s ease; }
+.child-row__delete-icon { width: 28rpx; height: 28rpx; border-radius: 50%; color: #fff; background: #d6533d; font-size: 22rpx; font-weight: 800; line-height: 26rpx; text-align: center; }
+.child-row__delete--pressed { background: #ffe9e4; transform: scale(.985); }
 .child-table__empty { min-height: 160rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14rpx; padding: 28rpx; color: #84969d; font-size: 24rpx; text-align: center; }
 .child-table__empty--pending { min-height: 112rpx; background: #fafcfd; }
 .child-table__retry { color: #087fbf; font-weight: 650; }

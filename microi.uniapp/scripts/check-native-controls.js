@@ -37,6 +37,16 @@ const xjyProposalCalculation = fs.readFileSync(
 )
 const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
 const moduleDetail = fs.readFileSync(path.join(root, 'src/pages/module/detail.vue'), 'utf8')
+const formTabs = fs.readFileSync(path.join(root, 'src/components/mci-related-tabs/mci-related-tabs.vue'), 'utf8')
+const childTable = fs.readFileSync(path.join(root, 'src/components/mci-child-table/mci-child-table.vue'), 'utf8')
+const businessCard = fs.readFileSync(path.join(root, 'src/components/mci-business-card/mci-business-card.vue'), 'utf8')
+const relatedBusinessList = fs.readFileSync(
+  path.join(root, 'src/components/mci-business-related-list/mci-business-related-list.vue'),
+  'utf8'
+)
+const businessList = fs.readFileSync(path.join(root, 'src/pages/business/list.vue'), 'utf8')
+const taskCard = fs.readFileSync(path.join(root, 'src/components/mci-task-card/mci-task-card.vue'), 'utf8')
+const taskList = fs.readFileSync(path.join(root, 'src/pages/task/list.vue'), 'utf8')
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -112,6 +122,51 @@ if (!formRuntime.includes('normalizeTableTabs(table)') ||
   !businessDetail.includes('v-if="formTabs.length > 1"') ||
   !businessDetail.includes(':active-key="activeFormTabKey"')) {
   fail('form tabs must use platform diy_table.Tabs and hide when only one tab exists')
+}
+if (nativeForm.indexOf('v-for="(group, groupIndex) in groups"') > nativeForm.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
+  moduleDetail.indexOf('v-for="(group, index) in groups"') > moduleDetail.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
+  businessDetail.indexOf('v-for="(section, sectionIndex) in visibleSections"') > businessDetail.indexOf('v-for="relatedTab in activeRelatedTabs"')) {
+  fail('ordinary tab fields must render before related table titles')
+}
+if (!nativeForm.includes('class="form-tabs--full"') ||
+  !formTabs.includes('width: 100%') ||
+  !formTabs.includes('padding: 0;')) {
+  fail('form tab bar must fill the available page width')
+}
+if (!childTable.includes('删除此条') ||
+  !childTable.includes('grid-column: 1 / -1') ||
+  !childTable.includes('child-table__commands { flex: none; gap: 26rpx; }')) {
+  fail('child table actions must keep add separate from toggle and place a large delete action below each row')
+}
+if (!businessList.includes('<mci-business-card') ||
+  !businessList.includes('components: { MciBusinessCard }') ||
+  !relatedBusinessList.includes('<mci-business-card') ||
+  !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard }') ||
+  !relatedBusinessList.includes('getBusinessRowActions') ||
+  !relatedBusinessList.includes('loadModuleViewManifest') ||
+  !relatedBusinessList.includes('class="floating-add"')) {
+  fail('standalone and related business lists must share cards, view metadata, row permissions and floating add')
+}
+if (!relatedBusinessList.includes('class="search-row"') ||
+  !relatedBusinessList.includes('openAdvancedFilters') ||
+  !relatedBusinessList.includes('buildFilterWhere()')) {
+  fail('related business lists must preserve standalone search and advanced filters')
+}
+if (!taskList.includes('<mci-task-card') ||
+  !taskList.includes('components: { MciTaskCard }') ||
+  !relatedBusinessList.includes('<mci-task-card') ||
+  !taskCard.includes('task-card__bottom')) {
+  fail('standalone and related task lists must share the task card presentation')
+}
+for (const page of [nativeForm, moduleDetail, businessDetail]) {
+  if (!page.includes('<mci-business-related-list v-if="relatedTab.type === \'child\'"') ||
+    page.includes('<mci-child-table v-if="relatedTab.type === \'child\'"') ||
+    !page.includes('components: { MciBusinessRelatedList }')) {
+    fail('form tab child tables must use the same business list presentation as standalone entries')
+  }
+}
+if (!businessCard.includes('card-actions') || !businessCard.includes('查看详情')) {
+  fail('shared business card must preserve list row actions and detail navigation')
 }
 // zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
 for (const token of [

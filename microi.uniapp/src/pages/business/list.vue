@@ -86,53 +86,23 @@
       </view>
 
       <view v-else-if="rows.length" class="data-list">
-        <view
+        <mci-business-card
           v-for="(row, index) in rows"
           :key="row.Id || index"
-          class="data-card"
-          hover-class="data-card--pressed"
-          @tap="openDetail(row)"
-        >
-          <view class="card-top">
-            <view class="card-title-wrap">
-              <text class="card-index">{{ index + 1 }}</text>
-              <text class="card-title">{{ getTitle(row) }}</text>
-            </view>
-            <text v-if="getStatus(row)" class="status-chip" :class="getStatusClass(row)">{{ getStatus(row) }}</text>
-          </view>
-
-          <view v-if="getTags(row).length" class="tag-row">
-            <text v-for="tag in getTags(row)" :key="tag" class="data-tag">{{ tag }}</text>
-          </view>
-
-          <view class="field-list">
-            <view v-for="line in visibleLines(row)" :key="line.field" class="field-row">
-              <text class="field-label">{{ line.label }}</text>
-              <text class="field-value">{{ displayValue(row, line) }}</text>
-              <view v-if="line.format === 'phone' && row[line.field]" class="phone-action" @tap.stop="callPhone(row[line.field])">
-                <image src="/static/xjy/UI-call.png" mode="aspectFit" />
-              </view>
-            </view>
-          </view>
-
-          <text v-if="config.summaryField && row[config.summaryField]" class="card-summary">{{ summaryValue(row) }}</text>
-
-          <view v-if="rowActions(row).length" class="card-actions" @tap.stop>
-            <view
-              v-for="action in rowActions(row)"
-              :key="action.key"
-              class="card-action"
-              :class="[`card-action--${action.tone || 'default'}`]"
-              hover-class="card-action--pressed"
-              @tap.stop="triggerRowAction(action, row)"
-            ><text>{{ action.label }}</text></view>
-          </view>
-
-          <view class="card-bottom">
-            <text>{{ formatCreateTime(row.CreateTime || row.UpdateTime) }}</text>
-            <text class="detail-link">查看详情 ›</text>
-          </view>
-        </view>
+          :row="row"
+          :index="index"
+          :title="getTitle(row)"
+          :status="getStatus(row)"
+          :status-class="getStatusClass(row)"
+          :tags="getTags(row)"
+          :lines="cardLines(row)"
+          :summary="config.summaryField ? summaryValue(row) : ''"
+          :actions="rowActions(row)"
+          :time="formatCreateTime(row.CreateTime || row.UpdateTime)"
+          @open="openDetail"
+          @phone="callPhone"
+          @action="triggerRowAction"
+        />
 
         <view class="load-state">
           <text v-if="loading">正在加载...</text>
@@ -244,6 +214,7 @@ import {
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { parseJson } from '@/platform/native-form.js'
+import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import {
   formatDateTime,
   formatFieldValue,
@@ -267,6 +238,7 @@ function createRelationshipId() {
 }
 
 export default {
+  components: { MciBusinessCard },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -647,6 +619,13 @@ export default {
     },
     displayValue(row, line) {
       return formatFieldValue(row[line.field], line.format)
+    },
+    cardLines(row) {
+      return this.visibleLines(row).map((line) => ({
+        ...line,
+        value: this.displayValue(row, line),
+        rawValue: row[line.field]
+      }))
     },
     periodCount(item) {
       if (Object.prototype.hasOwnProperty.call(this.periodCounts, item.value)) return this.periodCounts[item.value]

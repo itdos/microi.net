@@ -161,6 +161,7 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
   if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
+  if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   if (options.status && moduleConfig.statusField) {
     payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
   }
@@ -169,7 +170,8 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   const requestKey = [
     'module', currentIdentityKey(), moduleConfig.table, pageIndex, pageSize, options.keyword || '', options.status || '',
     options.period || 'all', options.orderBy || '', options.orderType || '',
-    JSON.stringify(options.customRange || []), JSON.stringify(payload._Where)
+    JSON.stringify(options.customRange || []), JSON.stringify(payload._Where),
+    JSON.stringify(options.tableChildAuth || {})
   ].join(':')
   const cached = await cachedRequest(requestKey, () => post('/api/ModuleEngine/GetTableData', payload, true), {
     maxAge: Number(options.cacheAge ?? (pageIndex === 1 ? 45 * 1000 : 10 * 1000)),
