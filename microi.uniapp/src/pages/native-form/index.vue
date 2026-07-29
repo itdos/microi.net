@@ -144,13 +144,13 @@
 			<!-- 平台同一 Tab 中的普通字段按 Sort 展示在关联子表标题之前。 -->
 			<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
 				<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
-					:parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 					:parent-mode="mode" />
 				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
 				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
-					:parent-table="tableName" :parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+					:parent-table="tableName" :parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:readonly="mode === 'View' || isConfiguredReadonly(relatedTab.field)"
 					@change="handleRelatedChange" />
 				<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
@@ -216,6 +216,15 @@
 	} from '@/platform/form-extension.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 
+	function createDraftRowId() {
+		let seed = Date.now()
+		return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (token) => {
+			const value = (seed + Math.random() * 16) % 16 | 0
+			seed = Math.floor(seed / 16)
+			return (token === 'x' ? value : (value & 0x3) | 0x8).toString(16)
+		})
+	}
+
 	export default {
 		components: { MciBusinessRelatedList },
 		mixins: [themeMixin],
@@ -224,6 +233,7 @@
 				tableName: '',
 				menuId: '',
 				rowId: '',
+				draftRowId: '',
 				mode: 'View',
 				title: '',
 				definition: null,
@@ -272,6 +282,9 @@
 			},
 			isEditableMode() {
 				return this.mode === 'Add' || this.mode === 'Edit'
+			},
+			relationParentId() {
+				return this.rowId || this.draftRowId || ''
 			},
 			childFields() {
 				return this.showRelated && this.definition ? this.definition.childFields || [] : []
@@ -335,6 +348,13 @@
 			this.excludeNames = parseJson(decodeURIComponent(options.excludeFields || ''), []) || []
 			this.readonlyNames = parseJson(decodeURIComponent(options.readonlyFields || ''), []) || []
 			this.recordAdapter = normalizeFormRecordAdapter(decodeURIComponent(options.recordAdapter || 'form-engine'))
+			if (this.mode === 'Add' && !this.rowId && isFormEngineRecordAdapter(this.recordAdapter)) {
+				this.draftRowId = String(this.defaultValues.Id || this.defaultValues.id || createDraftRowId())
+				this.defaultValues = {
+					...this.defaultValues,
+					Id: this.draftRowId
+				}
+			}
 			this.moduleEngineKey = decodeURIComponent(options.moduleEngineKey || '')
 			this.tableChildAuth = parseJson(decodeURIComponent(options.tableChildAuth || ''), null)
 			this.tenantFormState = createTenantFormState(this.tenantFormContext())
@@ -614,12 +634,17 @@
 						fields: this.definition.fields,
 						extraValues: {
 							...nativeFormDefaultSubmitValues(this.definition, this.defaultValues),
-							...tenantSubmitValues
+							...tenantSubmitValues,
+							...(wasAdd && this.draftRowId ? { Id: this.draftRowId } : {})
 						},
 						menuId: this.menuId,
 						tableChildAuth: this.tableChildAuth
 					})
-					if (!this.rowId && result.Data) this.rowId = result.Data.Id || result.Data
+					if (!this.rowId) {
+						this.rowId = result.Data?.Id ||
+							(typeof result.Data === 'string' ? result.Data : '') ||
+							this.draftRowId
+					}
 					const currentUser = getUser() || {}
 					if (String(this.tableName).toLowerCase() === 'sys_user' && currentUser.Id && String(currentUser
 						.Id) === String(this.rowId)) {
