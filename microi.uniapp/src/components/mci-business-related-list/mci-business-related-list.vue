@@ -294,15 +294,18 @@ export default {
         })
         const matched = this.resolveBusinessModule(this.table.Name)
         this.moduleKey = matched.key
-        this.menuId = this.childMenuId
-        if (!this.menuId) {
-          const menu = await findMenu(matched.config.menuAliases || [], this.table.Name, refresh)
-          this.menuId = menu?.Id || ''
-        }
+        const menu = await findMenu(
+          matched.config.menuAliases || [],
+          this.table.Name,
+          refresh,
+          this.childMenuId
+        )
+        this.menuId = menu?.Id || this.childMenuId || ''
         this.config = {
           ...matched.config,
           table: this.table.Name,
-          menuId: this.menuId
+          menuId: this.menuId,
+          moduleEngineKey: menu?.ModuleEngineKey || ''
         }
         await this.loadViewConfig(refresh)
         await this.loadData(true, refresh)
