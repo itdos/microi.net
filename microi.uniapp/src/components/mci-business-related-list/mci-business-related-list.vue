@@ -10,7 +10,7 @@
       <view class="search-button" @tap="search"><text>搜索</text></view>
     </view>
 
-    <view v-if="loading && pageIndex === 1" class="related-skeleton">
+    <view v-if="loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
       <view v-for="item in 3" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
         <view class="skeleton-line"></view>
@@ -44,8 +44,13 @@
     </view>
 
     <view v-else class="related-empty">
-      <text>暂无{{ config.title || sectionTitle }}</text>
-      <text v-if="canAdd">点击右下角加号新增</text>
+      <template v-if="waitingForParentSave">
+        <text>保存当前表单后可新增{{ config.title || sectionTitle }}</text>
+      </template>
+      <template v-else>
+        <text>暂无{{ config.title || sectionTitle }}</text>
+        <text v-if="canAdd">点击右下角加号新增</text>
+      </template>
     </view>
 
     <view v-if="canAdd" class="floating-add" :style="floatingStyle"
@@ -219,6 +224,9 @@ export default {
       const parentField = this.childConfig.PrimaryTableFieldName
       return unwrapValue(parentField ? this.parentForm[parentField] : this.parentId)
     },
+    waitingForParentSave() {
+      return String(this.parentMode || '').toLowerCase() === 'add' && !this.relationValue
+    },
     tableChildAuth() {
       if (!this.field.Id || !this.parentTableId || !this.parentMenuId || !this.parentId || !this.relationValue) return null
       return {
@@ -308,6 +316,13 @@ export default {
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }
         await this.loadViewConfig(refresh)
+        if (this.waitingForParentSave) {
+          this.rows = []
+          this.count = 0
+          this.finished = true
+          this.loading = false
+          return
+        }
         await this.loadData(true, refresh)
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
