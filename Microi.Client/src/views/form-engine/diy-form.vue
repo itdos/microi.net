@@ -1629,6 +1629,29 @@ export default {
                 self.ModifiedFields.push(fieldName);
             }
         },
+        async FlushPendingFieldValues() {
+            var self = this;
+            var visited = new Set();
+            try {
+                for (const field of self.DiyFieldList || []) {
+                    if (!field || !field.Name) continue;
+                    var fieldRef = self.$refs["ref_" + field.Name];
+                    var fieldRefs = Array.isArray(fieldRef) ? fieldRef : [fieldRef];
+                    for (const target of fieldRefs) {
+                        if (!target || visited.has(target) || typeof target.FlushPendingValue !== "function") continue;
+                        visited.add(target);
+                        if (await target.FlushPendingValue() === false) {
+                            self.DiyCommon.Tips("请先完成当前字段配置后再保存。", false);
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            } catch (error) {
+                self.DiyCommon.Tips(error?.message || "同步字段最新值失败，请重试。", false);
+                return false;
+            }
+        },
         //注意：这里是触发子表的ParentFormSet（现在是以子表单的身份），但最终还是最回调到此页面的FormSet
         ParentFormSet(fieldName, value) {
             var self = this;
@@ -1867,6 +1890,11 @@ export default {
                 // var formDiyTableModel = {
                 //     ...self.$refs.fieldForm.FormDiyTableModel
                 // }
+                if (await self.FlushPendingFieldValues() === false) {
+                    formParam.SaveLoading = false;
+                    callback(false);
+                    return;
+                }
                 self.RestoreBusinessDataTranslations();
                 self.GetFormDataAndCheck(async function (formData) {
                     if (self.DiyCommon.IsNull(formData)) {

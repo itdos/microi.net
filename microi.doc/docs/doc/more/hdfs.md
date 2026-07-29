@@ -57,6 +57,26 @@ Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
 
 每日配额用于阻断短时间滥用，不等于租户全生命周期容量上限。生产对象存储还必须按租户或桶配置独立的总容量/账单告警与生命周期规则，并定期以对象存储实际用量对账；否则用户即使每天都低于应用配额，长期累计仍可能消耗大量空间。应用层 Redis 计数不能代替存储提供方的硬容量边界。
 
+#### 通过 MCP 调整租户上传配额
+
+平台超级管理员可以通过标准 MCP 工具修改 `sys_osclients` 中的六项租户业务配置，无需编写临时 SQL 或清空 Redis。容量字段单位均为 MB，例如 20 GB 应写为 `20480`。
+
+1. 先调用 `microi_get_table_data` 查询 `sys_osclients`，按目标 `OsClient` 和 `IsEnable=1` 筛选，并回读 `Id`、`OsClientType`、`OsClientNetwork` 以及六个 `FileUpload*` 字段。
+2. 同一租户可能同时存在 `Internal`、`Internet` 等多条启用记录。对每条记录调用 `microi_update_form_data`，传入 `tableName: "sys_osclients"`、包含 `Id` 的字段补丁以及 `confirmExecution: "sys_osclients"`，避免负载均衡节点读取到不同配置。
+3. 再次调用 `microi_get_table_data` 逐条回读。FormEngine 保存 `sys_osclients` 后会触发 SaaS 运行配置重载；等待重载完成后，用一次真实小文件上传验证错误提示中的有效额度或上传结果。
+
+示例字段补丁：
+
+```json
+{
+  "Id": "<sys_osclients.Id>",
+  "FileUploadDailyUserQuotaMB": 20480,
+  "FileUploadDailyTenantQuotaMB": 20480
+}
+```
+
+提高配额不会清零当日已经预留的字节数，而是立即按“新上限减去今日已用量”计算剩余额度。每日计数按 UTC 日期切换（北京时间每日 08:00 进入新的 UTC 统计日）；失败上传为防重试绕过也不会退回预留额度。除非用户明确授权事故处置，AI 不得删除共享 Redis 配额 Key。`Absolute*`、`ForceDisabled`、Kestrel/Multipart/Form 和反向代理限制属于平台运维边界，不能通过租户侧 `sys_osclients` 或普通 MCP 表单更新突破。
+
 普通交互式上传默认强制写入私有桶，即使篡改客户端 `Limit=false` 也不会变成公有文件；普通用户仅能使用 `file`、`img`、`avatar`、`editor` 四个安全一级目录，不能提交多级目录、绝对路径或 `..`。确需公开的产品图、Banner 等文件，应由经过授权的发布流程或超级管理员显式写入公有桶，不能把“是否公开”交给普通客户端决定。
 
 接口引擎、后端表单 V8 和平台内部任务调用 `V8.Method.Upload` 属于可信服务端上传，可以由业务代码选择安全路径和公私有桶；但仍受全局文件数量、单文件和单次总量硬限制。浏览器、移动端和普通 HTTP 客户端不能通过伪造 `_TrustedServerInvocation`、`Limit` 或 `Path` 获得这种信任。

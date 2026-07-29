@@ -7,6 +7,11 @@ export const API = {
   LOGIN: '/api/SysUser/Login',
   REFRESH_TOKEN: '/api/SysUser/RefreshToken',
 
+  // 当前用户访问密钥（明文仅创建时返回一次）
+  LIST_USER_ACCESS_KEYS: '/api/SysUserAccessKey/List',
+  CREATE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Create',
+  REVOKE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Revoke',
+
   // 服务器状态
   GET_STATUS: '/api/V8Engine/GetStatus',
 

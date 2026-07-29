@@ -6,6 +6,10 @@ export const API = {
     // 登录 & Token
     LOGIN: '/api/SysUser/Login',
     REFRESH_TOKEN: '/api/SysUser/RefreshToken',
+    // 当前用户访问密钥（明文仅创建时返回一次）
+    LIST_USER_ACCESS_KEYS: '/api/SysUserAccessKey/List',
+    CREATE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Create',
+    REVOKE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Revoke',
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
     // Redis 管理器（默认当前租户连接，可指定已保存连接）
@@ -18,6 +22,15 @@ export const API = {
     REDIS_SET_TTL: '/api/Cache/redis/key/ttl',
     // 数据库结构
     GET_DB_SCHEMA: '/api/V8Engine/GetDbSchema',
+    GET_TABLE_INDEXES: '/api/V8Engine/GetTableIndexes',
+    CREATE_TABLE_INDEX: '/api/V8Engine/CreateTableIndex',
+    DROP_TABLE_INDEX: '/api/V8Engine/DropTableIndex',
+    GET_SUPPORTED_DATABASE_TYPES: '/api/V8Engine/GetSupportedDatabaseTypes',
+    INSPECT_EXTERNAL_DATABASE: '/api/V8Engine/InspectExternalDatabase',
+    QUERY_EXTERNAL_DATABASE: '/api/V8Engine/QueryExternalDatabase',
+    EXECUTE_EXTERNAL_DATABASE_SQL: '/api/V8Engine/ExecuteExternalDatabaseSql',
+    SAVE_DATABASE_CONNECTION: '/api/V8Engine/SaveDatabaseConnection',
+    IMPORT_EXTERNAL_ATTACHMENT: '/api/V8Engine/ImportExternalAttachment',
     GET_PLAYWRIGHT_CONTEXT: '/api/V8Engine/GetPlaywrightContext',
     // 接口引擎
     GET_ENGINE_LIST: '/api/V8Engine/GetApiEngineList',

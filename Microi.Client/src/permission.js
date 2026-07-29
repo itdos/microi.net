@@ -9,6 +9,7 @@ import { getToken } from "@/utils/auth.js"; // get token from cookie
 import getPageTitle from "@/utils/get-page-title";
 import { DiyCommon, DiyApi } from "@/utils/microi.net.import";
 import Cookies from "js-cookie";
+import { normalizeAccessRoute } from "@/views/system/components/user-access-key-utils";
 const whiteList = ["/login", "/auth-redirect", "/access-login", "/mci-redis-manager"]; // no redirect whitelist
 
 function removeCredentialParameter(paramName) {
@@ -34,7 +35,7 @@ function getAccessKeyAllowedRoutes(currentUser) {
         ? currentUser._AccessKeyAllowedRoutes
         : [];
     return routes
-        .map((path) => normalizeMenuRoutePath(String(path || "").split("?")[0]))
+        .map((path) => normalizeAccessRoute(path))
         .filter(Boolean);
 }
 
@@ -76,6 +77,12 @@ router.beforeEach(async (to, from, next) => {
     // 避免任意 await 抛错导致 next() 不被调用而出现"白屏永久无法导航"。
     try {
     const isAnonymousRoute = to.matched.some((record) => record.meta?.anonymous === true);
+    // The access-key exchange page must not wait for unrelated SSO discovery.
+    // A fresh browser may have no tenant cache yet; the URL carries OsClient.
+    if (to.path === "/access-login") {
+        next();
+        return;
+    }
     //   document.title = getPageTitle(to.meta.title)
     //2022-09-14 所有页面均需要token自动登录
     var diySsoArray = sessionStorage.getItem("Diy_Sso");
@@ -239,6 +246,46 @@ router.beforeEach(async (to, from, next) => {
         const accessKeyAllowedRoutes = getAccessKeyAllowedRoutes(accessKeyDiyStore.GetCurrentUser);
         if (accessKeyAllowedRoutes.length > 0) {
             const targetPath = normalizeMenuRoutePath(to.path || "/");
+            const allowAllPages = accessKeyAllowedRoutes.includes("*");
+            if (allowAllPages) {
+                const accessKeyUserStore = useUserStore(pinia);
+                const permissionStore = usePermissionStore(pinia);
+                if (!accessKeyUserStore.roles || accessKeyUserStore.roles.length === 0) {
+                    accessKeyUserStore.setRoles(["access-key"]);
+                }
+                if (!permissionStore.addRoutes || permissionStore.addRoutes.length === 0) {
+                    const accessRoutes = await permissionStore.generateRoutes(["access-key"]);
+                    accessRoutes.forEach((route) => {
+                        try {
+                            router.addRoute(route);
+                        } catch (routeError) {
+                            console.warn("[permission] add access-key route failed:", route && route.path, routeError);
+                        }
+                    });
+                    if (targetPath === "/") {
+                        const firstPath = getFirstValidRoutePath(accessRoutes);
+                        if (firstPath) {
+                            next({ path: firstPath, replace: true });
+                            return;
+                        }
+                    }
+                    if (!accessRoutes || accessRoutes.length === 0) {
+                        next();
+                        return;
+                    }
+                    next({ ...to, replace: true });
+                    return;
+                }
+                if (targetPath === "/") {
+                    const firstPath = getFirstValidRoutePath(permissionStore.addRoutes);
+                    if (firstPath) {
+                        next({ path: firstPath, replace: true });
+                        return;
+                    }
+                }
+                next();
+                return;
+            }
             if (accessKeyAllowedRoutes.includes(targetPath)) {
                 const accessKeyUserStore = useUserStore(pinia);
                 if (!accessKeyUserStore.roles || accessKeyUserStore.roles.length === 0) {

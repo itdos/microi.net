@@ -153,6 +153,22 @@ namespace Microi.net
             return !component.DosIsNullOrWhiteSpace()
                    && NotRealField.Any(d => d.Equals(component, StringComparison.OrdinalIgnoreCase));
         }
+
+        /// <summary>
+        /// 判断运行时表单数据字段是否为非物理字段。
+        /// DevComponent 既可用于纯展示组件，也可绑定已有物理列；只要字段配置了数据库类型，
+        /// 就必须参与查询和增改。字段设计阶段仍使用单参数重载，避免为纯展示组件误建列。
+        /// </summary>
+        public static bool IsNotRealDataField(string component, string fieldType)
+        {
+            if (string.Equals(component, "DevComponent", StringComparison.OrdinalIgnoreCase)
+                && !fieldType.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            return IsNotRealFieldComponent(component);
+        }
         /// <summary>
         /// 
         /// </summary>

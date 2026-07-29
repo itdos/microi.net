@@ -71,6 +71,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     const consoleErrors = [];
     const semanticAuthFailures = [];
     const responseAudits = [];
+    let bootstrapResponseSeen = null;
     let authPhase = "pre-login";
 
     page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -88,6 +89,7 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
     });
     page.on("response", (response) => {
         if (!/\/api\//i.test(response.url())) return;
+        if (isAiBootstrapResponse(response)) bootstrapResponseSeen = response;
         const audit = response.json().then((json) => {
             const candidates = [json, json?.Data].filter((item) => item && typeof item === "object");
             const denied = candidates.find((item) => (
@@ -173,13 +175,19 @@ test("真实登录后展示独立 AI 槽并打开同协议移动助手", async (
         fullPage: false
     });
 
-    const bootstrapResponsePromise = page.waitForResponse(isAiBootstrapResponse, {
-        timeout: 30_000
-    });
+    const bootstrapResponsePromise = bootstrapResponseSeen
+        ? Promise.resolve(bootstrapResponseSeen)
+        : page.waitForResponse(isAiBootstrapResponse, { timeout: 30_000 });
     await aiEntry.click();
     await expect(page).toHaveURL(/\/mobile\/ai-assistant(?:\?|$)/, { timeout: 20_000 });
     await expect(page.getByTestId("mobile-ai-assistant")).toBeVisible();
     await expect(page.getByText("AI助手", { exact: true })).toBeVisible();
+    const mobileAiAvatar = page.getByTestId("mobile-ai-avatar");
+    await expect(mobileAiAvatar).toBeVisible();
+    expect(await mobileAiAvatar.evaluate((image) => ({
+        width: image.naturalWidth,
+        height: image.naturalHeight
+    }))).toEqual({ width: 256, height: 256 });
 
     const bootstrapResponse = await bootstrapResponsePromise;
     expect(bootstrapResponse.status()).toBe(200);
@@ -311,17 +319,26 @@ test("PC 顶栏机器人打开并拖动完整 AI 助手弹窗", async ({ page },
         fullPage: false
     });
 
-    const bootstrapResponsePromise = page.waitForResponse(isAiBootstrapResponse, {
-        timeout: 30_000
-    });
     await desktopEntry.click();
 
     const dialog = page.locator(".desktop-ai-dialog");
+    const unifiedAssistant = dialog.getByTestId("unified-ai-assistant");
     await expect(dialog).toBeVisible();
-    await expect(page.getByText("AI助手", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("mobile-ai-assistant")).toBeVisible();
-    await expect(page.getByTestId("mobile-ai-model")).toBeVisible({ timeout: 30_000 });
-    expect((await bootstrapResponsePromise).status()).toBe(200);
+    await expect(page.getByText("AI助手", { exact: true }).first()).toBeVisible();
+    await expect(unifiedAssistant).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-history")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-new-conversation")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-history-active")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-history-archived")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-model")).toBeVisible({ timeout: 30_000 });
+    await expect(unifiedAssistant.getByTestId("unified-ai-mode")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-input")).toBeVisible();
+    await expect(unifiedAssistant.getByTestId("unified-ai-send")).toBeVisible();
+    await expect(unifiedAssistant.locator(".secure-scope-tag")).toBeVisible();
+    const quickPrompts = unifiedAssistant.locator(".quick-prompts");
+    await expect(quickPrompts).toContainText("本月新增了多少张表单？");
+    await expect(quickPrompts).toContainText("当前表单引擎建设情况？");
+    await expect(quickPrompts).not.toContainText("安全数据分析1");
 
     const dragHandle = page.getByTestId("desktop-ai-dialog-drag-handle");
     const [beforeDrag, handleBox] = await Promise.all([dialog.boundingBox(), dragHandle.boundingBox()]);

@@ -9,7 +9,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$testRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$testRoot = $PSScriptRoot
 $serverRoot = Split-Path -Parent $testRoot
 $solution = Join-Path $serverRoot "Microi.Anderson.sln"
 $project = Join-Path $testRoot "Microi.Tests.csproj"
@@ -48,6 +48,38 @@ if ($Mode -eq "Full") {
 }
 
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
+
+$v8Test = Join-Path $testRoot "V8\empty-database-sanitization.test.mjs"
+$v8Repository = Join-Path (Split-Path -Parent $serverRoot) "Microi-V8-Engine"
+if (Test-Path -LiteralPath $v8Repository) {
+    $v8TenantRoots = @(Get-ChildItem -LiteralPath $v8Repository -Directory | ForEach-Object {
+        $candidate = Join-Path $_.FullName "iTdos.Product.Internal"
+        if (Test-Path -LiteralPath $candidate) { $candidate }
+    })
+    if ($v8TenantRoots.Count -ne 1) {
+        throw "Expected exactly one iTdos.Product.Internal source root, found $($v8TenantRoots.Count)."
+    }
+    $v8Sources = @(Get-ChildItem -LiteralPath $v8TenantRoots[0] -Recurse -File `
+        -Filter "*admin_get_empty_database_sanitization_sql*.js" -ErrorAction SilentlyContinue)
+    if ($v8Sources.Count -ne 1) {
+        throw "Expected exactly one empty-database sanitization source, found $($v8Sources.Count)."
+    }
+    $v8Source = $v8Sources[0].FullName
+    if (-not (Test-Path -LiteralPath $v8Test)) {
+        throw "The unified V8 regression test is missing: $v8Test"
+    }
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        throw "Node.js is required for the V8 interface-engine regression gate."
+    }
+    Write-Host "Checking and testing the empty-database V8 interface engine..."
+    node --check $v8Source
+    if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine syntax check failed with exit code $LASTEXITCODE." }
+    node --test $v8Test
+    if ($LASTEXITCODE -ne 0) { throw "V8 interface-engine regression tests failed with exit code $LASTEXITCODE." }
+}
+else {
+    Write-Host "Microi-V8-Engine is not present; skipping its repository-owned source gate."
+}
 
 Write-Host "Restoring Microi.Tests with one restore worker..."
 dotnet restore $project --disable-parallel --force-evaluate -v:minimal

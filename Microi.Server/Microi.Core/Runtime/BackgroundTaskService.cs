@@ -89,10 +89,11 @@ namespace Microi.net
         {
             osClient = osClient ?? "";
             userKey = userKey ?? "";
-            if (!BackgroundTaskStore.IsAvailable(osClient))
+            if (!BackgroundTaskStore.TryGetAvailability(osClient, out var unavailableReason))
             {
                 throw new InvalidOperationException(
-                    $"租户 {osClient} 尚未完成 mci_background_task 升级，后台任务未入队，请等待平台升级完成后重试。");
+                    $"租户 {osClient} 尚未完成 mci_background_task 升级，后台任务未入队。"
+                    + $"当前校验结果：{unavailableReason}。请先安装或重新安装“后台任务基础能力”。");
             }
 
             var param = apiParam == null ? new JObject() : (JObject)apiParam.DeepClone();
@@ -435,6 +436,10 @@ namespace Microi.net
                     param["_BackgroundTaskAttempt"] = item.AttemptCount + 1;
                     param["OsClient"] = item.OsClient;
                     param["_InvokeType"] = "Client";
+                    // 后台任务由服务端持久队列恢复可信用户快照后执行，不是外部 HTTP
+                    // 调用。保留 Client 业务语义，同时用独立 provenance 标记允许调用
+                    // StopHttp=1 的内部 worker；HTTP 控制器会主动剥离该标记。
+                    param["_TrustedServerInvocation"] = true;
                     param.Remove("_CurrentUser");
                     param["_BackgroundTask"] = JObject.FromObject(new
                     {
@@ -462,6 +467,7 @@ namespace Microi.net
                         nextParam.Remove("_BackgroundTask");
                         nextParam.Remove("_BackgroundTaskFencingToken");
                         nextParam.Remove("_BackgroundTaskAttempt");
+                        nextParam.Remove("_TrustedServerInvocation");
                         var checkpoint = continuation["Checkpoint"];
                         if (checkpoint != null) nextParam["_BackgroundTaskCheckpoint"] = checkpoint.DeepClone();
                         if (continuation["ParamPatch"] is JObject patch)

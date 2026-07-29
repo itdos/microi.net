@@ -107,6 +107,18 @@ HTTP 请求解析硬顶同样不接受租户覆盖：
 - 普通交互式用户无论客户端是否传 `Limit:false`，服务端都强制使用私有桶，并只允许平台预定义安全一级目录；公有资产必须经过授权的发布流程或超级管理员。
 - 反向代理、Ingress/IIS 的请求体上限应与进程级 HTTP 解析硬顶协调。字段自身的类型、后缀、大小和数量配置只能进一步收紧当前租户有效值，不能替代平台硬顶。
 
+### AI / MCP 调整租户上传配额
+
+用户明确授权修改某个租户的上传额度时，AI 可以直接使用标准 MCP 完成，不要把应用层提示误判成阿里云 OSS、MinIO 或 S3 的存储配额，也不要先清 Redis：
+
+1. `microi_get_table_data(tableName: "sys_osclients")` 按 `OsClient`、`IsEnable=1` 查询，选择 `Id/OsClientType/OsClientNetwork` 和六个 `FileUpload*` 配额字段。
+2. 同一 `OsClient` 的所有启用 `Internal/Internet` 记录都要保持一致；逐条调用 `microi_update_form_data`，`row` 必须包含 `Id`，并传 `confirmExecution: "sys_osclients"`。
+3. MB 是存储单位：`20 GB = 20480 MB`。可修改字段为 `FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。
+4. 保存后逐条远程回读；FormEngine 会排队重载 SaaS 运行配置，再用真实小文件上传做生效冒烟。只看到 MCP 返回“更新成功”不算验收。
+5. 提高每日配额保留当天已用计数，剩余额度为新上限减已用量。计数按 UTC 日期，失败上传不退款；除非用户明确授权事故处置，不得删除 Redis 配额 Key。
+
+租户 MCP 只能调整业务层配置；`Absolute*`、`ForceDisabled`、HTTP/Multipart/Form 解析上限和反向代理上限必须由平台运维配置，不能通过 `sys_osclients` 绕过。写入 `sys_osclients` 属于控制面操作，只允许当前租户的 `Level >= 9999` 管理身份，并且必须保留 MCP 审计与写后回读。
+
 ### UniApp / H5 客户端直传路径规则
 
 移动端通过 `/api/HDFS/UniappUpload` 上传时，前端必须走 `microi.v8.js` 的 `V8.uploadFile`，不要在页面里手写 `uni.uploadFile`。客户端上传的 `Path` 与服务端 `V8.Method.Upload` 示例不同，必须是安全相对路径：

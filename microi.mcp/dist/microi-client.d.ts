@@ -8,6 +8,8 @@ export interface MicroiConfig {
     token?: string;
     /** Token 文件路径（VS Code 扩展写入；MCP 自身刷新时也会回写以保持同步） */
     tokenFilePath?: string;
+    /** MCP 仅写入无密恢复请求；VS Code 扩展使用 SecretStorage 中的凭据完成重登。 */
+    authRecoveryRequestDir?: string;
     /** 普通 HTTP 请求超时，默认 120 秒 */
     requestTimeoutMs?: number;
     /** V8 代码、菜单等写请求超时，默认 60 秒 */
@@ -21,7 +23,16 @@ export interface ApiResponse<T = unknown> {
     Msg: string;
     Total?: number;
     DataCount?: number;
+    DataAppend?: {
+        ReasonCode?: string;
+        UserMessage?: string;
+        Hint?: string;
+        AppendMsg?: string;
+        [key: string]: unknown;
+    };
 }
+export declare function isTenantConfigurationFailureResponse(result?: Partial<ApiResponse> | null): boolean;
+export declare function isAuthenticationFailureResponse(result?: Partial<ApiResponse> | null): boolean;
 export interface ListEnvelope<T> {
     OsClient?: string;
     OsClientType?: string;
@@ -59,6 +70,18 @@ export interface DbField {
     Component: string;
     IsPrimaryKey?: boolean;
     AllowNull?: boolean;
+}
+export interface TableIndexInfo {
+    Key_name: string;
+    Column_name: string;
+    Non_unique: number;
+    Index_type?: string;
+    Seq_in_index?: number;
+    Is_primary?: number;
+    Name?: string;
+    Columns?: string[];
+    IsUnique?: boolean;
+    IsPrimary?: boolean;
 }
 export interface ApiEngine {
     Id: string;
@@ -129,6 +152,41 @@ export interface MongodbLogWrite {
     result?: string;
     appId?: string;
 }
+export interface UserAccessKeyRecord {
+    Id: string;
+    Name?: string;
+    KeyPrefix?: string;
+    Scopes?: string;
+    AllowedRoutes?: string;
+    AllowedTableNames?: string;
+    AllowedApiEngineKeys?: string;
+    AllowedDataSourceKeys?: string;
+    ExpiresAt?: string | null;
+    State?: number;
+    RevokedAt?: string;
+    LastUsedAt?: string;
+    LastUsedDid?: string;
+    UseCount?: number;
+    Remark?: string;
+    CreateTime?: string;
+}
+export interface CreateUserAccessKeyInput {
+    name: string;
+    scopes?: string[];
+    allowedRoutes: string[];
+    redirectPath?: string;
+    allowedTableNames: string[];
+    allowedApiEngineKeys?: string[];
+    allowedDataSourceKeys?: string[];
+    expiresAt?: string;
+    remark?: string;
+}
+export interface CreateUserAccessKeyResult {
+    /** Plaintext credential. The backend returns it exactly once. */
+    AccessKey: string;
+    LoginPath?: string;
+    Record?: UserAccessKeyRecord;
+}
 export interface PlaywrightEngineInfo {
     Id: string;
     ApiName: string;
@@ -189,6 +247,8 @@ export declare class MicroiClient {
     private readonly readbackRequestTimeoutMs;
     /** 同一时刻只允许一个刷新请求在飞 */
     private inflightRefresh?;
+    /** 同一时刻只允许一条完整身份恢复链路，避免并发重登或重复写恢复请求。 */
+    private inflightAuthRecovery?;
     constructor(config: MicroiConfig);
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
     private rsaEncrypt;
@@ -211,13 +271,16 @@ export declare class MicroiClient {
     reloadTokenFromFile(): boolean;
     /** 把当前 token 回写到 token 文件（保持与 VS Code 扩展同步） */
     private writeTokenToFile;
-    /** 检测是否是 token 失效响应（Code=1001 NoLogin），若是则尝试恢复 token。
+    private requestVsCodeCredentialRecovery;
+    /** 检测 token 身份失效响应，若是则尝试恢复 token。
      *  恢复策略：1) 重新读取 token 文件（VS Code 扩展可能刚写入新 token）；
      *           2) 若 token 没变化或仍失效，调用 RefreshToken API 主动刷新；
-     *           3) 仍失败则用 username/password 重新登录（兜底）。
+     *           3) 仍失败且 MCP 独立配置了凭据时重新登录；
+     *           4) VS Code 托管模式写入无密请求，由扩展通过 SecretStorage 重登。
      *  返回 true 表示 token 已更新，调用方可重试请求。
      */
     private tryRecoverFromAuthFailure;
+    private tryRecoverFromAuthFailureCore;
     /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
     private post;
     /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
@@ -229,9 +292,26 @@ export declare class MicroiClient {
     private recoveredWriteResult;
     private uncertainWriteFailure;
     getStatus(): Promise<ApiResponse>;
+    listMyUserAccessKeys(): Promise<ApiResponse<UserAccessKeyRecord[]>>;
+    createMyUserAccessKey(input: CreateUserAccessKeyInput): Promise<ApiResponse<CreateUserAccessKeyResult>>;
+    revokeMyUserAccessKey(id: string): Promise<ApiResponse<UserAccessKeyRecord>>;
     getDbSchema(): Promise<ApiResponse<{
         Tables: DbTable[];
     }>>;
+    getTableIndexes(tableName: string, readback?: boolean): Promise<ApiResponse<TableIndexInfo[]>>;
+    createTableIndex(data: {
+        TableName: string;
+        IndexName?: string;
+        Columns: string[];
+        Unique?: boolean;
+    }): Promise<ApiResponse>;
+    dropTableIndex(tableName: string, indexName: string): Promise<ApiResponse>;
+    getSupportedDatabaseTypes(): Promise<ApiResponse>;
+    inspectExternalDatabase(data: Record<string, unknown>): Promise<ApiResponse>;
+    queryExternalDatabase(data: Record<string, unknown>): Promise<ApiResponse>;
+    executeExternalDatabaseSql(data: Record<string, unknown>): Promise<ApiResponse>;
+    saveDatabaseConnection(data: Record<string, unknown>): Promise<ApiResponse>;
+    importExternalAttachment(data: Record<string, unknown>): Promise<ApiResponse>;
     getPlaywrightContext(keyword?: string, pageSize?: number): Promise<ApiResponse<PlaywrightContextData>>;
     getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
     getEngineCode(apiEngineKey: string, options?: RequestOptions): Promise<ApiResponse<ApiEngine>>;
@@ -239,6 +319,7 @@ export declare class MicroiClient {
     saveEngineCode(apiEngineKey: string, code: string, options?: {
         functionDescription?: string;
         changeSummary?: string;
+        confirmLargeReduction?: boolean;
     }): Promise<ApiResponse>;
     createEngine(data: {
         ApiEngineKey: string;
@@ -336,7 +417,10 @@ export declare class MicroiClient {
         TableDiyFieldIds?: string;
         DefaultOrderBy?: string;
         SqlWhere?: string;
-        DiyConfig?: string;
+        EnableViewSchema?: number;
+        ViewSchemaVersion?: string;
+        ViewConfigVersion?: number;
+        ViewSchema?: string;
         MoreBtns?: string;
         FormBtns?: string;
         BatchSelectMoreBtns?: string;

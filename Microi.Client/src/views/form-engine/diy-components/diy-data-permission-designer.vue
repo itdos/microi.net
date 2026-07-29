@@ -19,7 +19,7 @@
             type="warning"
             :closable="false"
             show-icon
-            title="已载入历史手写条件。当前使用高级手写模式，原有权限不会被自动拆解或扩大。"
+            title="已载入历史手写条件，右侧 SQL 已原样保留；调整左侧图形配置后会按新配置重新生成。"
         />
 
         <el-alert
@@ -28,7 +28,7 @@
             :closable="false"
             show-icon
             title="使用方法：选择普通用户能看哪些数据，再按需设置可看全部数据的角色、岗位或部门。"
-            description="所有修改都会自动同步到当前模块，无需点击应用；配置完成后直接保存模块即可。"
+            description="左侧修改会实时生成右侧 SQL；右侧也可随时手写。所有修改都会自动同步，配置完成后直接保存模块即可。"
         />
 
         <el-tabs v-model="activeTab" class="designer-tabs">
@@ -170,39 +170,21 @@
                         <div class="card-title-row">
                             <div>
                                 <div class="card-title">最终数据权限条件</div>
-                                <div class="form-tip">右侧实时显示图形配置生成的 SQL；确有图形配置无法表达的规则时，才切换到高级手写。</div>
+                                <div class="form-tip">始终允许手动编辑；修改左侧图形配置时，这里会立即按最新配置重新生成。</div>
                             </div>
-                            <el-switch
-                                v-model="config.whereMode"
-                                :disabled="readonly"
-                                active-value="manual"
-                                inactive-value="visual"
-                                active-text="高级手写"
-                                inactive-text="自动生成"
-                                @change="onWhereModeChange"
-                            />
                         </div>
                         <div class="permission-summary">
                             <el-tag v-for="item in permissionSummary" :key="item" effect="plain">{{ item }}</el-tag>
                         </div>
-                        <el-alert
-                            v-if="config.whereMode === 'manual'"
-                            class="preview-error"
-                            type="warning"
-                            :closable="false"
-                            show-icon
-                            title="当前使用高级手写条件：这里的 SQL 将作为最终权限条件，左侧图形范围暂不参与生成。"
-                        />
-                        <el-alert v-if="previewResult.error" class="preview-error" type="warning" :closable="false" show-icon :title="previewResult.error" />
                         <div class="designer-code-editor preview-editor">
                             <DiyCodeEditor
-                                :model-value="previewResult.sql"
+                                :model-value="finalSql"
                                 :field="finalSqlEditorField"
                                 height="52vh"
                                 :FormData="FormData"
                                 :FormDiyTableModel="FormDiyTableModel"
                                 :FormMode="FormMode"
-                                :FieldReadonly="readonly || config.whereMode !== 'manual'"
+                                :FieldReadonly="readonly"
                                 v8-code-type="server"
                                 @update:modelValue="setFinalSql"
                             />
@@ -292,6 +274,11 @@
 <script setup>
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { Delete, Plus } from "@element-plus/icons-vue";
+import {
+    composeDataPermissionSql,
+    extractDataPermissionConfig,
+    stripDataPermissionMarker
+} from "@/utils/data-permission-config.js";
 import DiyCodeEditor from "../diy-field-component/diy-code-editor.vue";
 
 defineOptions({ name: "DiyDataPermissionDesigner", inheritAttrs: false });
@@ -312,25 +299,24 @@ const { proxy } = getCurrentInstance();
 const DiyCommon = proxy.DiyCommon;
 const DiyApi = proxy.DiyApi;
 
-// 同时兼容旧版块注释 marker 与新版行注释 marker；marker 只用于机器无损恢复，不在预览区展示。
-const MARKER_PATTERN = /(?:\/\*\s*MICROI_DATA_PERMISSION_V1:([A-Za-z0-9_-]+)\s*\*\/|^[ \t]*--[ \t]*MICROI_DATA_PERMISSION_V1:([A-Za-z0-9_-]+)[ \t]*$)/m;
 const activeTab = ref("scope");
 const loading = ref(false);
 const hydrating = ref(true);
 const dirty = ref(false);
 const syncError = ref("");
 const legacyMode = ref(false);
-const hasMarker = ref(false);
 const tables = ref([]);
 const roles = ref([]);
 const departments = ref([]);
 const fieldsByTable = reactive({});
 const moduleContext = reactive({ DiyTableId: "", DiyTableName: "" });
 const raw = reactive({ sqlWhere: "", sqlJoin: "", joinTables: "" });
+const finalSql = ref("");
 const finalSqlEditorField = createEditorField("PermissionFinalSql", "最终数据权限条件", "sql", 280);
 const sqlJoinEditorField = createEditorField("PermissionSqlJoin", "Join 关联", "sql", 240);
 let syncTimer = 0;
 let syncRequestId = 0;
+let pendingSyncMode = null;
 
 const config = reactive(defaultConfig());
 
@@ -378,21 +364,11 @@ const allFieldOptions = computed(() => {
     });
     return result;
 });
-const previewResult = computed(() => {
-    try {
-        const snapshot = buildSnapshot();
-        return { sql: buildReadableSqlWhere(snapshot), error: "" };
-    } catch (error) {
-        const message = error?.message || "当前配置暂时无法生成 SQL。";
-        return { sql: `-- ${message}`, error: message };
-    }
-});
 const generatedSqlJoin = computed(() => {
     const completeJoins = buildSnapshot().joins.filter(isJoinComplete);
     return completeJoins.length > 0 ? buildSqlJoin(completeJoins) : "-- 暂无关联关系";
 });
 const permissionSummary = computed(() => {
-    if (config.whereMode === "manual") return ["高级手写：直接使用下方最终条件"];
     const result = [];
     if (config.superAdminAll) result.push(`超级管理员：Level ≥ ${Number(config.superAdminLevel || 9999)}`);
     if (config.tenantIsolation) result.push(`租户隔离：A.${config.tenantField || "TenantId"}`);
@@ -401,7 +377,6 @@ const permissionSummary = computed(() => {
     appendSelectionSummary(result, "全量岗位", config.fullAccessPostIds, roles.value);
     appendSelectionSummary(result, "全量部门", config.fullAccessDeptIds, departments.value);
     if (config.rules.length) result.push(`高级图形条件：${config.rules.length} 条`);
-    if (String(config.customSql || "").trim()) result.push("包含历史兼容条件");
     return result;
 });
 const syncStateText = computed(() => {
@@ -443,9 +418,6 @@ function defaultConfig() {
         fullAccessDeptIds: [],
         ruleMatch: "any",
         rules: [],
-        whereMode: "visual",
-        manualSql: "",
-        customSql: "",
         joins: []
     };
 }
@@ -544,26 +516,24 @@ function readRawFromForm() {
 }
 
 async function importRawValues(showTip = true) {
-    const markerConfig = extractMarkerConfig(raw.sqlWhere);
-    hasMarker.value = !!markerConfig;
-    legacyMode.value = !markerConfig && !!(raw.sqlWhere.trim() || raw.sqlJoin.trim() || raw.joinTables.trim());
+    const markerState = extractDataPermissionConfig(raw.sqlWhere);
+    legacyMode.value = !markerState && !!(raw.sqlWhere.trim() || raw.sqlJoin.trim() || raw.joinTables.trim());
 
-    const next = markerConfig ? normalizeConfig(markerConfig) : inferLegacyConfig();
+    const next = markerState ? normalizeConfig(markerState.config) : inferLegacyConfig();
+    if (next.joins.length === 0) next.joins = parseLegacyJoins();
     Object.assign(config, next);
+    finalSql.value = stripDataPermissionMarker(raw.sqlWhere) || buildAnnotatedSqlWhere(buildSnapshot());
     for (const join of config.joins) {
         if (join.tableId) await loadFields(join.tableId);
     }
-    if (showTip) DiyCommon.Tips(markerConfig ? "已恢复数据权限配置。" : "已保留历史手写权限条件。", true);
+    if (showTip) DiyCommon.Tips(markerState ? "已恢复数据权限配置。" : "已保留历史手写权限条件。", true);
     dirty.value = false;
 }
 
 function inferLegacyConfig() {
     const next = defaultConfig();
     next.joins = parseLegacyJoins();
-    const whereWithoutMarker = stripMarker(raw.sqlWhere).trim();
-    next.whereMode = "manual";
-    next.manualSql = whereWithoutMarker;
-    next.customSql = "";
+    const whereWithoutMarker = stripDataPermissionMarker(raw.sqlWhere).trim();
     // 历史 SQL 只做字段提示，不自动拆成多个 OR 放行分支；否则重新应用时可能扩大权限。
     next.superAdminAll = false;
     next.tenantIsolation = false;
@@ -622,58 +592,78 @@ function parseLegacyJoins() {
 
 function scheduleAutoSync() {
     clearTimeout(syncTimer);
+    pendingSyncMode = "visual";
     const requestId = ++syncRequestId;
-    syncTimer = setTimeout(() => autoSyncToForm(requestId), 320);
+    syncTimer = setTimeout(() => autoSyncToForm(requestId, true), 320);
 }
 
-async function autoSyncToForm(requestId) {
-    if (readonly.value || hydrating.value) return;
-    try {
-        await ensureModuleContext();
-        await ensureMainTableAvailable();
-        if (config.whereMode !== "manual") await ensureSystemUserJoin();
-        validateConfig();
-        if (requestId !== syncRequestId) return;
-        const snapshot = buildSnapshot();
-        const sqlJoin = buildSqlJoin(snapshot.joins);
-        const joinTables = buildJoinTables(snapshot.joins);
-        const sqlWhereBody = buildReadableSqlWhere(snapshot);
-        const marker = `-- MICROI_DATA_PERMISSION_V1:${encodeMarker(snapshot)}`;
-        // 行注释 marker 必须放在首行并紧跟换行，避免后端追加的右括号被行注释吞掉。
-        const sqlWhere = `${marker}\n${sqlWhereBody}`.trim();
+function scheduleEditedSqlSync() {
+    clearTimeout(syncTimer);
+    pendingSyncMode = "manual";
+    const requestId = ++syncRequestId;
+    // 手写 SQL 不依赖异步元数据，立即写回表单，避免输入后马上保存时丢失最后一次修改。
+    void autoSyncToForm(requestId, false);
+}
 
-        raw.sqlJoin = sqlJoin;
-        raw.joinTables = JSON.stringify(joinTables, null, 2);
+async function autoSyncToForm(requestId, regenerateSql) {
+    if (readonly.value || hydrating.value) return false;
+    try {
+        if (regenerateSql) {
+            await ensureModuleContext();
+            await ensureMainTableAvailable();
+            await ensureSystemUserJoin();
+            validateConfig();
+        } else if (!String(finalSql.value || "").trim()) {
+            throw new Error("请填写最终数据权限条件。");
+        }
+        if (requestId !== syncRequestId) return false;
+        const snapshot = buildSnapshot();
+        if (regenerateSql) finalSql.value = buildAnnotatedSqlWhere(snapshot);
+        const sqlWhere = composeDataPermissionSql(snapshot, finalSql.value);
         raw.sqlWhere = sqlWhere;
-        writeFormValues(sqlWhere, sqlJoin, JSON.stringify(joinTables));
+        if (regenerateSql) {
+            const sqlJoin = buildSqlJoin(snapshot.joins);
+            const joinTables = buildJoinTables(snapshot.joins);
+            raw.sqlJoin = sqlJoin;
+            raw.joinTables = JSON.stringify(joinTables, null, 2);
+            writeFormValues(sqlWhere, sqlJoin, JSON.stringify(joinTables));
+        } else {
+            setFormValue("SqlWhere", sqlWhere);
+            emit("update:modelValue", sqlWhere);
+        }
         dirty.value = false;
         syncError.value = "";
         legacyMode.value = false;
-        hasMarker.value = true;
+        pendingSyncMode = null;
+        return true;
     } catch (error) {
         syncError.value = error.message || "数据权限配置尚未完整";
+        return false;
     }
 }
 
-function onWhereModeChange(mode) {
-    if (mode === "manual") {
-        try {
-            config.manualSql = buildSqlWhere({ ...buildSnapshot(), whereMode: "visual", manualSql: "" });
-        } catch (error) {
-            config.manualSql = stripMarker(raw.sqlWhere);
-        }
-    } else {
-        // 历史手写条件切到自动生成时先作为兼容条件整体保留，禁止出现权限意外收紧或丢失。
-        const previousManualSql = String(config.manualSql || "").trim();
-        if (previousManualSql) config.customSql = previousManualSql;
+async function flushPendingSync() {
+    if (readonly.value) return true;
+
+    // 图形配置可能需要异步补齐表、字段或 Sys_User 关联。模块保存前强制排空，
+    // 保证父表单取得的是最后一次图形/手写修改，而不是 320ms 防抖前的旧快照。
+    for (let attempt = 0; attempt < 4; attempt++) {
+        if (pendingSyncMode === null && !dirty.value) return !syncError.value;
+        clearTimeout(syncTimer);
+        const regenerateSql = pendingSyncMode !== "manual";
+        pendingSyncMode = null;
+        const requestId = ++syncRequestId;
+        const success = await autoSyncToForm(requestId, regenerateSql);
+        if (success && pendingSyncMode === null && !dirty.value) return true;
+        if (syncError.value && pendingSyncMode === null) return false;
     }
-    markDirty();
+    return false;
 }
 
 function setFinalSql(value) {
-    if (config.whereMode !== "manual") return;
-    config.manualSql = stripMarker(stringValue(value));
+    finalSql.value = stripDataPermissionMarker(stringValue(value));
     markDirty();
+    scheduleEditedSqlSync();
 }
 
 function createEditorField(id, label, language, height) {
@@ -706,12 +696,8 @@ function setFormValue(name, value) {
 
 function validateConfig() {
     if (!mainTableId.value || !mainTableName.value) throw new Error("请先选择模块绑定的数据表。");
-    if (config.whereMode !== "manual") {
-        if (needsOwnerField.value && !safeIdentifier(config.ownerField)) throw new Error("请配置合法的数据负责人字段。");
-        if (needsDepartmentField.value && !safeIdentifier(config.departmentField)) throw new Error("请配置合法的数据所属部门字段。");
-    } else if (!String(config.manualSql || "").trim()) {
-        throw new Error("请填写最终数据权限条件。");
-    }
+    if (needsOwnerField.value && !safeIdentifier(config.ownerField)) throw new Error("请配置合法的数据负责人字段。");
+    if (needsDepartmentField.value && !safeIdentifier(config.departmentField)) throw new Error("请配置合法的数据所属部门字段。");
     config.joins.forEach((join, index) => {
         const table = tableForJoin(join);
         if (!table || !safeIdentifier(table.Name) || !safeAlias(join.alias) || !safeAlias(join.leftAlias) || !safeIdentifier(join.leftField) || !safeIdentifier(join.rightField)) {
@@ -737,9 +723,6 @@ async function ensureSystemUserJoin() {
 function buildSnapshot() {
     return {
         version: 1,
-        updatedAt: new Date().toISOString(),
-        mainTableId: mainTableId.value,
-        mainTableName: mainTableName.value,
         superAdminAll: !!config.superAdminAll,
         superAdminLevel: Number(config.superAdminLevel || 9999),
         tenantIsolation: !!config.tenantIsolation,
@@ -754,21 +737,8 @@ function buildSnapshot() {
         fullAccessDeptIds: unique(config.fullAccessDeptIds),
         ruleMatch: config.ruleMatch === "all" ? "all" : "any",
         rules: config.rules.map((rule) => ({ field: rule.field, operator: rule.operator, valueSource: rule.valueSource, value: rule.value })),
-        whereMode: config.whereMode === "manual" ? "manual" : "visual",
-        manualSql: String(config.manualSql || "").trim(),
-        customSql: String(config.customSql || "").trim(),
         joins: config.joins.map((join) => ({ ...join, tableName: tableForJoin(join)?.Name || join.tableName || "" }))
     };
-}
-
-function buildEffectiveSqlWhere(snapshot) {
-    if (snapshot.whereMode === "manual") return String(snapshot.manualSql || "").trim() || "1 = 0";
-    return buildSqlWhere(snapshot);
-}
-
-function buildReadableSqlWhere(snapshot) {
-    if (snapshot.whereMode === "manual") return buildEffectiveSqlWhere(snapshot);
-    return buildAnnotatedSqlWhere(snapshot);
 }
 
 function permissionLineComment(text) {
@@ -857,14 +827,6 @@ function buildJoinTables(joins) {
     });
 }
 
-function buildSqlWhere(snapshot) {
-    const accessBranches = buildAccessBranches(snapshot).map((branch) => branch.sql);
-
-    const accessSql = accessBranches.length === 1 ? accessBranches[0] : `(\n    ${accessBranches.join("\n    OR ")}\n  )`;
-    if (!snapshot.tenantIsolation) return accessSql;
-    return `(\n  A.${snapshot.tenantField} = '$CurrentUser.TenantId$'\n  AND ${accessSql}\n)`;
-}
-
 function buildAccessBranches(snapshot) {
     const branches = [];
     const sqlSeen = new Set();
@@ -894,9 +856,6 @@ function buildAccessBranches(snapshot) {
     if (graphicalRules.length > 0) {
         const joiner = snapshot.ruleMatch === "all" ? " AND " : " OR ";
         addBranch(`高级图形条件：共 ${graphicalRules.length} 条，条件之间按“${snapshot.ruleMatch === "all" ? "全部满足（AND）" : "任一满足（OR）"}”组合。`, `(${graphicalRules.map(buildRuleSql).join(joiner)})`);
-    }
-    if (snapshot.customSql) {
-        addBranch("历史兼容条件：整体原样保留；满足这段历史 SQL 时也允许查看。", `(${snapshot.customSql})`);
     }
     if (branches.length === 0) addBranch("默认拒绝：尚未配置任何放行规则，因此任何普通用户都不能查看。", "1 = 0");
     return branches;
@@ -968,7 +927,10 @@ function fieldLabel(field) { return field.Label ? `${field.Name} · ${field.Labe
 function isPostRole(role) { return /post|job|position|岗位|职位/i.test(`${role.Class || ""} ${role.Remark || ""} ${role.Name || ""}`); }
 
 function normalizeConfig(value) {
-    const next = Object.assign(defaultConfig(), value || {});
+    const next = defaultConfig();
+    Object.keys(next).forEach((key) => {
+        if (value && value[key] !== undefined) next[key] = value[key];
+    });
     next.fullAccessRoleIds = Array.isArray(next.fullAccessRoleIds) ? next.fullAccessRoleIds : [];
     next.fullAccessPostIds = Array.isArray(next.fullAccessPostIds) ? next.fullAccessPostIds : [];
     next.fullAccessDeptIds = Array.isArray(next.fullAccessDeptIds) ? next.fullAccessDeptIds : [];
@@ -1007,24 +969,6 @@ function appendSelectionSummary(target, prefix, ids, options) {
     target.push(`${prefix}：${names.join("、")}`);
 }
 
-function extractMarkerConfig(sqlWhere) {
-    const match = String(sqlWhere || "").match(MARKER_PATTERN);
-    if (!match) return null;
-    try { return JSON.parse(decodeMarker(match[1] || match[2])); } catch (error) { return null; }
-}
-function stripMarker(value) { return String(value || "").replace(MARKER_PATTERN, "").trim(); }
-function encodeMarker(value) {
-    const bytes = new TextEncoder().encode(JSON.stringify(value));
-    let binary = "";
-    bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-function decodeMarker(value) {
-    const base64 = value.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - value.length % 4) % 4);
-    const binary = atob(base64);
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
-}
 function parseJoinTables(value) {
     try {
         const parsed = typeof value === "string" ? JSON.parse(value || "[]") : value;
@@ -1052,6 +996,8 @@ function nextAlias(joins) {
     while (used.has(`T${index}`)) index++;
     return `T${index}`;
 }
+
+defineExpose({ flushPendingSync });
 </script>
 
 <style scoped lang="scss">

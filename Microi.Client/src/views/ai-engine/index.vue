@@ -1,6 +1,10 @@
 <template>
-    <div class="ai-engine-page" :class="{ 'is-app-workspace': activeWorkspace === 'apps', 'is-embedded': embedded, 'is-compact': compact }">
-        <aside class="ai-engine-sidebar">
+    <div
+        class="ai-engine-page"
+        :class="{ 'is-app-workspace': activeWorkspace === 'apps', 'is-embedded': embedded, 'is-compact': compact }"
+        data-testid="unified-ai-assistant"
+    >
+        <aside class="ai-engine-sidebar" data-testid="unified-ai-history">
             <div class="workspace-tabs" :class="{ 'single-tab': !isAiAdmin }">
                 <button
                     type="button"
@@ -24,7 +28,12 @@
 
             <template v-if="activeWorkspace === 'chat'">
                 <div class="sidebar-actions">
-                    <el-button class="new-chat-btn" :icon="EditPen" @click="newConversation">新建AI对话</el-button>
+                    <el-button
+                        class="new-chat-btn"
+                        :icon="EditPen"
+                        data-testid="unified-ai-new-conversation"
+                        @click="newConversation"
+                    >新建AI对话</el-button>
                     <el-input
                         v-model="historyKeyword"
                         clearable
@@ -37,6 +46,7 @@
                 <div class="history-tabs" aria-label="对话状态">
                     <button
                         type="button"
+                        data-testid="unified-ai-history-active"
                         :class="{ active: historyView === 'active' }"
                         @click="historyView = 'active'"
                     >
@@ -45,6 +55,7 @@
                     </button>
                     <button
                         type="button"
+                        data-testid="unified-ai-history-archived"
                         :class="{ active: historyView === 'archived' }"
                         @click="historyView = 'archived'"
                     >
@@ -55,12 +66,15 @@
                 <div class="conversation-list" v-loading="historyLoading">
                     <div
                         v-for="item in filteredConversations"
-                        :key="item.id"
+                        :key="item.key || `${item.source || SOURCE}:${item.id}`"
                         class="conversation-item"
-                        :class="{ active: item.id === currentConversationId }"
+                        :class="{ active: isCurrentConversation(item) }"
                     >
                         <button type="button" class="conversation-select" @click="selectConversation(item)">
-                            <span class="conversation-title">{{ item.title }}</span>
+                            <span class="conversation-title">
+                                {{ item.title }}
+                                <em v-if="item.source === SECURE_DATA_SOURCE">安全数据</em>
+                            </span>
                             <small>{{ item.lastTime || "-" }}</small>
                         </button>
                         <el-tooltip content="修改标题" placement="top">
@@ -110,8 +124,22 @@
                         <button type="button" @click="activeWorkspace = 'chat'">AI对话</button>
                         <button type="button" class="active" @click="activeWorkspace = 'apps'">AI应用</button>
                     </div>
-                    <h2>{{ activeWorkspace === "apps" ? "AI应用" : "AI引擎" }}</h2>
+                    <h2>{{ activeWorkspace === "apps" ? "AI应用" : "AI助手" }}</h2>
                     <el-tag size="small" effect="plain">{{ osClient }}</el-tag>
+                    <el-tooltip v-if="secureAssistantAvailable" :content="secureAssistantRoleText" placement="bottom">
+                        <el-tag class="secure-scope-tag" size="small" type="success" effect="plain">
+                            {{ secureAssistantScopeLabel }} · 数据权限已校验
+                        </el-tag>
+                    </el-tooltip>
+                    <el-tooltip
+                        v-else-if="secureAssistantFailure"
+                        :content="secureAssistantFailure.description"
+                        placement="bottom"
+                    >
+                        <el-tag class="secure-scope-tag" size="small" type="warning" effect="plain">
+                            {{ secureAssistantFailure.header }}
+                        </el-tag>
+                    </el-tooltip>
                 </div>
                 <div class="header-tools">
                     <el-button class="store-link-btn" type="primary" plain :icon="ShoppingBag" @click="goMicroiStore">
@@ -126,7 +154,7 @@
                 <div v-if="messages.length === 0" class="empty-state">
                     <div class="empty-hero">
                         <span class="hero-kicker">AI引擎</span>
-                        <h1>让 AI 直接进入你的业务现场</h1>
+                        <h1>让 AI 助手直接进入你的业务现场</h1>
                         <p>描述目标即可连续对话，我会结合 Skills、MCP 建模能力和当前租户上下文，辅助你分析数据、编写 V8、创建低代码模块。</p>
                         <p class="hero-local-tip">AI 深度融合 V8 引擎，强烈建议使用本地 VS Code Codex / Copilot / Claude / Cursor + MCP + Skills，进行真正意义的零代码 AI 编程。</p>
                     </div>
@@ -140,7 +168,7 @@
                     <div class="quick-prompts">
                         <button
                             v-for="prompt in quickPrompts"
-                            :key="prompt.title"
+                            :key="prompt.key || prompt.title"
                             type="button"
                             class="quick-prompt"
                             @click="useQuickPrompt(prompt)"
@@ -166,7 +194,7 @@
                         </div>
                         <div class="message-body">
                             <div class="message-meta">
-                                <strong>{{ message.role === "user" ? currentUserName : "AI引擎" }}</strong>
+                                <strong>{{ message.role === "user" ? currentUserName : "AI助手" }}</strong>
                                 <span>{{ message.time }}</span>
                                 <el-tag v-if="message.modelId" size="small" effect="plain">{{ message.modelId }}</el-tag>
                                 <el-tag v-if="message.mode" size="small" effect="plain">{{ modeName(message.mode) }}</el-tag>
@@ -279,6 +307,7 @@
                 <div class="composer-box">
                     <el-input
                         v-model="inputText"
+                        data-testid="unified-ai-input"
                         type="textarea"
                         resize="none"
                         :autosize="{ minRows: 2, maxRows: 8 }"
@@ -317,6 +346,7 @@
                             <span class="semantic-label">语义分析</span>
                             <el-select
                                 v-model="semanticMode"
+                                data-testid="unified-ai-mode"
                                 size="small"
                                 class="semantic-select"
                                 :disabled="sending"
@@ -326,6 +356,7 @@
                                     :key="item.value"
                                     :label="item.label"
                                     :value="item.value"
+                                    :disabled="item.disabled"
                                 />
                             </el-select>
                             <el-tooltip
@@ -371,6 +402,7 @@
                             </el-select>
                             <el-select
                                 v-model="selectedAiModel"
+                                data-testid="unified-ai-model"
                                 value-key="Id"
                                 filterable
                                 :loading="modelLoading"
@@ -388,12 +420,22 @@
                             <el-button
                                 v-else
                                 class="send-btn"
+                                data-testid="unified-ai-send"
                                 type="primary"
                                 :icon="Top"
                                 :disabled="sendDisabled"
                                 @click="sendMessage"
                             />
                         </div>
+                    </div>
+                    <div class="ai-generation-disclaimer">
+                        <span>内容由人工智能生成，请注意甄别</span>
+                        <small v-if="secureAssistantAvailable">
+                            安全业务数据模式仅使用 {{ secureAssistantScopeLabel }} 范围内的限量、脱敏数据
+                        </small>
+                        <small v-else-if="secureAssistantFailure" class="secure-assistant-unavailable">
+                            安全业务数据：{{ secureAssistantFailure.description }}
+                        </small>
                     </div>
                 </div>
             </footer>
@@ -445,6 +487,19 @@ import {
     User
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
+import {
+    MOBILE_AI_BOOTSTRAP_FAILURES,
+    classifyMobileAiBootstrapFailure,
+    listMobileAiConversations,
+    listMobileAiMessages,
+    loadMobileAiBootstrap,
+    makeMobileAiBootstrapFailure,
+    makeMobileAiId,
+    normalizeMobileAiMessages,
+    renameMobileAiConversation,
+    sendMobileAiQuestion,
+    setMobileAiConversationArchived
+} from "@/views/mobile/ai-assistant-api.js";
 
 const DiyTable = defineAsyncComponent(() => import("@/views/form-engine/diy-table.vue"));
 const props = defineProps({
@@ -465,6 +520,7 @@ const DiyCommon = proxy.DiyCommon;
 const diyStore = useDiyStore();
 
 const SOURCE = "ai-engine-workbench";
+const SECURE_DATA_SOURCE = "mci-ai-data-assistant";
 const AI_DATA_PERMISSION = { id: "AiDataAnalysis", name: "AI数据分析" };
 const AI_BUILDER_PERMISSION = { id: "AiLowCodeModeling", name: "低代码建模" };
 const ACTION_ENDPOINTS = {
@@ -494,6 +550,7 @@ const historyActionLoading = ref("");
 const conversations = ref([]);
 const messages = ref([]);
 const currentConversationId = ref(makeId("chat"));
+const currentConversationSource = ref(SOURCE);
 const inputText = ref("");
 const sending = ref(false);
 const messageWrapRef = ref(null);
@@ -518,14 +575,29 @@ const actionContext = reactive({
     lastTableId: "",
     lastTableName: ""
 });
+const secureAssistantAvailable = ref(false);
+const secureAssistantScopeLabel = ref("当前角色");
+const secureAssistantRoleText = ref("已授权用户");
+const secureAssistantModels = ref([]);
+const secureAssistantRelayModels = ref([]);
+const secureAssistantPrompts = ref([]);
+const secureAssistantError = ref("");
+const secureAssistantFailure = ref(null);
 let abortController = null;
 
-const semanticModeOptions = [
+const semanticModeOptions = computed(() => [
     { label: "自动识别", value: "auto" },
     { label: "AI对话", value: "chat" },
-    { label: "数据分析", value: "data" },
+    {
+        label: secureAssistantAvailable.value
+            ? "安全业务数据"
+            : (secureAssistantFailure.value?.optionLabel || "安全业务数据（未配置）"),
+        value: "secure-data",
+        disabled: !secureAssistantAvailable.value
+    },
+    { label: "高级数据查询", value: "data" },
     { label: "低代码建模", value: "builder" }
-];
+]);
 
 const reasoningEffortOptions = [
     { label: "模型默认", value: "auto" },
@@ -534,26 +606,44 @@ const reasoningEffortOptions = [
     { label: "高", value: "high" }
 ];
 
-const quickPrompts = computed(() => [
-    {
-        title: "创建业务模块",
-        desc: "生成表、字段、菜单和按钮方案",
-        icon: MagicStick,
-        text: "帮我创建一个客户跟进管理模块，包含客户、联系人、跟进记录三张表，并生成后台菜单。"
-    },
-    {
-        title: "编写 V8 代码",
-        desc: "根据需求生成接口引擎或表单事件代码",
-        icon: Cpu,
-        text: "帮我写一个接口引擎，查询最近 30 天新增客户数量，并按天分组返回。"
-    },
-    {
-        title: "分析数据",
-        desc: "用自然语言查询当前租户数据",
-        icon: DataAnalysis,
-        text: "帮我分析本月新增数据最多的业务表。"
-    }
-]);
+const quickPrompts = computed(() => {
+    const securePromptCards = secureAssistantPrompts.value
+        .map((text) => String(text || "").trim())
+        .filter(Boolean)
+        .map((text, index) => ({
+            key: `secure-data:${index}:${text}`,
+            title: text,
+            desc: `查询范围：${secureAssistantScopeLabel.value}`,
+            icon: DataAnalysis,
+            text,
+            mode: "secure-data"
+        }));
+
+    return [
+        ...securePromptCards,
+        {
+            key: "builder",
+            title: "创建业务模块",
+            desc: "生成表、字段、菜单和按钮方案",
+            icon: MagicStick,
+            text: "帮我创建一个客户跟进管理模块，包含客户、联系人、跟进记录三张表，并生成后台菜单。"
+        },
+        {
+            key: "v8-code",
+            title: "编写 V8 代码",
+            desc: "根据需求生成接口引擎或表单事件代码",
+            icon: Cpu,
+            text: "帮我写一个接口引擎，查询最近 30 天新增客户数量，并按天分组返回。"
+        },
+        {
+            key: "data-analysis",
+            title: "分析数据",
+            desc: "用自然语言查询当前租户数据",
+            icon: DataAnalysis,
+            text: "帮我分析本月新增数据最多的业务表。"
+        }
+    ];
+});
 
 const filteredConversations = computed(() => {
     const keyword = historyKeyword.value.trim().toLowerCase();
@@ -632,9 +722,10 @@ const statCards = computed(() => [
 
 onMounted(async () => {
     if (await redirectLegacyAiAppWorkspace()) return;
-    const tasks = [loadAiModels(), loadHistory(), loadAiEngineMeta()];
+    const tasks = [loadAiModels(), loadAiEngineMeta(), loadSecureAssistantBootstrap()];
     if (isAiAdmin.value) tasks.push(loadPlatformStats());
     await Promise.all(tasks);
+    await loadHistory();
 });
 
 watch(reasoningEffort, (value) => {
@@ -656,6 +747,10 @@ watch(() => [route.query.workspace, route.query.appId], () => {
 watch(selectedAiModel, () => {
     if (!selectedModelSupportsReasoning.value) reasoningEffort.value = "auto";
     if (isRelayStationSelected.value) loadRelayModels();
+});
+
+watch(semanticMode, (mode) => {
+    if (mode === "secure-data") selectAuthorizedSecureModel();
 });
 
 async function loadRelayModels() {
@@ -716,7 +811,8 @@ function modeName(mode) {
         auto: "自动识别",
         chat: "AI对话",
         code: "V8 编程",
-        data: "数据分析",
+        "secure-data": "安全业务数据",
+        data: "高级数据查询",
         builder: "低代码建模"
     };
     return map[mode] || mode;
@@ -866,6 +962,7 @@ async function loadAiModels() {
         }
         if (isOk(result)) {
             aiModelList.value = getData(result) || [];
+            mergeAuthorizedSecureModels();
             if (!selectedAiModel.value && aiModelList.value.length) {
                 selectedAiModel.value = aiModelList.value[0];
             }
@@ -875,6 +972,76 @@ async function loadAiModels() {
     } finally {
         modelLoading.value = false;
     }
+}
+
+async function loadSecureAssistantBootstrap(force = false) {
+    secureAssistantAvailable.value = false;
+    secureAssistantError.value = "";
+    secureAssistantFailure.value = null;
+    secureAssistantModels.value = [];
+    secureAssistantRelayModels.value = [];
+    secureAssistantPrompts.value = [];
+    if (!currentUser.value?.Id) return;
+    try {
+        const data = await loadMobileAiBootstrap(DiyCommon, currentUser.value.Id, force);
+        secureAssistantModels.value = Array.isArray(data.Models) ? data.Models : [];
+        secureAssistantRelayModels.value = Array.isArray(data.RelayModels) ? data.RelayModels : [];
+        secureAssistantPrompts.value = (Array.isArray(data.Prompts) ? data.Prompts : [])
+            .map((item) => typeof item === "string" ? item : item?.Text || item?.Question || item?.Title || "")
+            .map((item) => String(item || "").trim())
+            .filter(Boolean);
+        secureAssistantScopeLabel.value = String(data.ScopeLabel || "当前角色");
+        secureAssistantRoleText.value = String(data.RoleText || "已授权用户");
+        const assistantEnabled = data.Enabled === true || Number(data.Enabled) === 1;
+        secureAssistantAvailable.value = assistantEnabled && secureAssistantModels.value.length > 0;
+        if (!assistantEnabled) {
+            secureAssistantFailure.value = makeMobileAiBootstrapFailure(MOBILE_AI_BOOTSTRAP_FAILURES.unauthorized);
+        } else if (!secureAssistantModels.value.length) {
+            secureAssistantFailure.value = makeMobileAiBootstrapFailure(MOBILE_AI_BOOTSTRAP_FAILURES.modelMissing);
+        }
+        secureAssistantError.value = secureAssistantFailure.value?.description || "";
+        mergeAuthorizedSecureModels();
+        if (semanticMode.value === "secure-data") selectAuthorizedSecureModel();
+    } catch (error) {
+        secureAssistantFailure.value = classifyMobileAiBootstrapFailure(error);
+        secureAssistantError.value = secureAssistantFailure.value.description;
+        secureAssistantAvailable.value = false;
+    }
+}
+
+function mergeAuthorizedSecureModels() {
+    if (!secureAssistantModels.value.length) return;
+    const merged = new Map(aiModelList.value.map((item) => [String(item?.Id || ""), item]));
+    secureAssistantModels.value.forEach((item) => {
+        const id = String(item?.Id || "");
+        if (id && !merged.has(id)) merged.set(id, item);
+    });
+    aiModelList.value = Array.from(merged.values());
+}
+
+function selectAuthorizedSecureModel() {
+    if (!secureAssistantModels.value.length) return null;
+    const selectedId = String(selectedAiModel.value?.Id || "");
+    const authorized = secureAssistantModels.value.find((item) => String(item?.Id || "") === selectedId)
+        || secureAssistantModels.value[0];
+    if (authorized && String(selectedAiModel.value?.Id || "") !== String(authorized.Id || "")) {
+        selectedAiModel.value = authorized;
+    }
+    if (isSecureRelayStation(authorized)) {
+        const allowedRelayIds = secureAssistantRelayModels.value
+            .map((item) => String(item?.Id || item?.id || ""))
+            .filter(Boolean);
+        if (!allowedRelayIds.includes(selectedRelayModel.value)) {
+            selectedRelayModel.value = allowedRelayIds[0] || "";
+        }
+    }
+    return authorized;
+}
+
+function isSecureRelayStation(model) {
+    return model?.IsRelayStation === true
+        || Number(model?.IsRelayStation || 0) === 1
+        || /Microi(?:吾码)?\.?(?:AI)?中转站/i.test(`${model?.Name || ""} ${model?.AiModel || ""}`);
 }
 
 async function loadPlatformStats() {
@@ -897,48 +1064,76 @@ async function loadPlatformStats() {
 async function loadHistory() {
     historyLoading.value = true;
     try {
-        const result = await DiyCommon.FormEngine.GetTableData("mic_ai_record", {
-            _Where: currentUser.value?.Id ? [["UserId", "=", currentUser.value.Id]] : [],
-            _OrderBy: "CreateTime",
-            _OrderByType: "DESC",
-            _PageSize: 500
-        });
-        if (!isOk(result)) return;
+        const unified = [];
         const grouped = new Map();
-        (getData(result) || []).forEach((row) => {
-            const record = parseRecord(row.Content);
-            if (!record || record.Source !== SOURCE || !record.ConversationId) return;
-            record.__rowId = row.Id;
-            record.CreatedAt = record.CreatedAt || row.CreateTime || "";
-            record.Archived = record.Archived === true || Number(record.Archived || 0) === 1;
-            const recordTimestamp = toTimestamp(record.CreatedAt);
-            if (!grouped.has(record.ConversationId)) {
-                grouped.set(record.ConversationId, {
-                    id: record.ConversationId,
-                    title: record.Title || firstLine(record.Content) || "新对话",
-                    lastTime: formatHistoryTime(record.CreatedAt) || record.Time || "",
-                    lastTimestamp: recordTimestamp,
-                    archived: false,
-                    records: []
+        try {
+            const result = await DiyCommon.FormEngine.GetTableData("mic_ai_record", {
+                _Where: currentUser.value?.Id ? [["UserId", "=", currentUser.value.Id]] : [],
+                _OrderBy: "CreateTime",
+                _OrderByType: "DESC",
+                _PageSize: 500
+            });
+            if (isOk(result)) {
+                (getData(result) || []).forEach((row) => {
+                    const record = parseRecord(row.Content);
+                    if (!record || record.Source !== SOURCE || !record.ConversationId) return;
+                    record.__rowId = row.Id;
+                    record.CreatedAt = record.CreatedAt || row.CreateTime || "";
+                    record.Archived = record.Archived === true || Number(record.Archived || 0) === 1;
+                    const recordTimestamp = toTimestamp(record.CreatedAt);
+                    if (!grouped.has(record.ConversationId)) {
+                        grouped.set(record.ConversationId, {
+                            id: record.ConversationId,
+                            key: `${SOURCE}:${record.ConversationId}`,
+                            source: SOURCE,
+                            title: record.Title || firstLine(record.Content) || "新对话",
+                            lastTime: formatHistoryTime(record.CreatedAt) || record.Time || "",
+                            lastTimestamp: recordTimestamp,
+                            archived: false,
+                            records: []
+                        });
+                    }
+                    const group = grouped.get(record.ConversationId);
+                    group.records.push(record);
+                    group.archived = group.archived || record.Archived;
+                    if (recordTimestamp > group.lastTimestamp) {
+                        group.lastTimestamp = recordTimestamp;
+                        group.lastTime = formatHistoryTime(record.CreatedAt) || record.Time || "";
+                    }
+                    if (record.Role === "user" && (!group.title || group.title === "新对话")) {
+                        group.title = firstLine(record.Content);
+                    }
                 });
             }
-            const group = grouped.get(record.ConversationId);
-            group.records.push(record);
-            group.archived = group.archived || record.Archived;
-            if (recordTimestamp > group.lastTimestamp) {
-                group.lastTimestamp = recordTimestamp;
-                group.lastTime = formatHistoryTime(record.CreatedAt) || record.Time || "";
-            }
-            if (record.Role === "user" && (!group.title || group.title === "新对话")) {
-                group.title = firstLine(record.Content);
-            }
-        });
-        conversations.value = Array.from(grouped.values())
+        } catch (error) {
+            console.warn("[AiAssistant] load workbench history failed", error);
+        }
+        unified.push(...Array.from(grouped.values())
             .map((item) => ({
                 ...item,
                 records: item.records.sort((a, b) => toTimestamp(a.CreatedAt) - toTimestamp(b.CreatedAt))
-            }))
-            .sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+            })));
+
+        if (secureAssistantAvailable.value) {
+            try {
+                const data = await listMobileAiConversations(DiyCommon);
+                const secureItems = (Array.isArray(data.Conversations) ? data.Conversations : []).map((item) => ({
+                    id: String(item.Id || ""),
+                    key: `${SECURE_DATA_SOURCE}:${String(item.Id || "")}`,
+                    source: SECURE_DATA_SOURCE,
+                    title: item.Title || "安全数据分析",
+                    lastTime: formatHistoryTime(item.LastTime || item.UpdateTime || item.CreateTime || ""),
+                    lastTimestamp: toTimestamp(item.LastTime || item.UpdateTime || item.CreateTime || ""),
+                    archived: item.Archived === true || Number(item.Archived || 0) === 1,
+                    messageCount: Number(item.MessageCount || 0),
+                    records: null
+                })).filter((item) => item.id);
+                unified.push(...secureItems);
+            } catch (error) {
+                console.warn("[AiAssistant] load secure data history failed", error);
+            }
+        }
+        conversations.value = unified.sort((a, b) => b.lastTimestamp - a.lastTimestamp);
     } finally {
         historyLoading.value = false;
     }
@@ -963,7 +1158,9 @@ function firstLine(text) {
 function newConversation() {
     cancelRequest();
     historyView.value = "active";
-    currentConversationId.value = makeId("chat");
+    const secureMode = semanticMode.value === "secure-data";
+    currentConversationSource.value = secureMode ? SECURE_DATA_SOURCE : SOURCE;
+    currentConversationId.value = secureMode ? "" : makeId("chat");
     messages.value = [];
     inputText.value = "";
     selectedFiles.value = [];
@@ -971,8 +1168,27 @@ function newConversation() {
     actionContext.lastTableName = "";
 }
 
+function isCurrentConversation(item) {
+    return String(item?.id || "") === String(currentConversationId.value || "")
+        && String(item?.source || SOURCE) === String(currentConversationSource.value || SOURCE);
+}
+
 async function setConversationArchived(item, archived) {
     if (!item?.id || historyActionLoading.value) return;
+    if (item.source === SECURE_DATA_SOURCE) {
+        historyActionLoading.value = item.id;
+        try {
+            await setMobileAiConversationArchived(DiyCommon, item.id, archived);
+            if (archived && isCurrentConversation(item)) newConversation();
+            await loadHistory();
+            ElMessage.success(archived ? "对话已归档" : "对话已还原");
+        } catch (error) {
+            ElMessage.error(`${archived ? "归档" : "还原"}失败：${error?.message || "未知错误"}`);
+        } finally {
+            historyActionLoading.value = "";
+        }
+        return;
+    }
     const records = (item.records || []).filter((record) => record.__rowId);
     if (!records.length) {
         ElMessage.warning("该对话暂无可归档记录");
@@ -1018,12 +1234,16 @@ async function editConversationTitle(item) {
         if (!title || title === item.title) return;
 
         historyActionLoading.value = item.id;
-        const result = await DiyCommon.PostAsync("/api/Ai/UpdateConversationTitle", {
-            ConversationId: item.id,
-            Title: title,
-            Source: SOURCE
-        }, null, null, "json");
-        if (!isOk(result)) throw new Error(unwrapDosResult(result)?.Msg || "保存失败");
+        if (item.source === SECURE_DATA_SOURCE) {
+            await renameMobileAiConversation(DiyCommon, item.id, title);
+        } else {
+            const result = await DiyCommon.PostAsync("/api/Ai/UpdateConversationTitle", {
+                ConversationId: item.id,
+                Title: title,
+                Source: SOURCE
+            }, null, null, "json");
+            if (!isOk(result)) throw new Error(unwrapDosResult(result)?.Msg || "保存失败");
+        }
         await loadHistory();
         ElMessage.success("标题已修改");
     } catch (error) {
@@ -1034,10 +1254,43 @@ async function editConversationTitle(item) {
     }
 }
 
-function selectConversation(item) {
+async function selectConversation(item) {
     cancelRequest();
     currentConversationId.value = item.id;
+    currentConversationSource.value = item.source || SOURCE;
     selectedFiles.value = [];
+    if (item.source === SECURE_DATA_SOURCE) {
+        semanticMode.value = "secure-data";
+        historyLoading.value = true;
+        try {
+            const data = await listMobileAiMessages(DiyCommon, item.id);
+            messages.value = normalizeMobileAiMessages(data).map((record) => ({
+                id: record.id,
+                role: record.role,
+                mode: "secure-data",
+                content: record.text,
+                rawContent: record.text,
+                thinking: Array.isArray(record.thinking) ? record.thinking.join("\n\n") : "",
+                thinkingCollapsed: true,
+                streaming: false,
+                error: "",
+                code: "",
+                actions: [],
+                queryRows: [],
+                attachments: [],
+                modelId: "",
+                reasoningEffort: "auto",
+                time: record.time || ""
+            }));
+            scrollToBottom();
+        } catch (error) {
+            ElMessage.error(error?.message || "安全数据对话加载失败");
+        } finally {
+            historyLoading.value = false;
+        }
+        return;
+    }
+    if (semanticMode.value === "secure-data") semanticMode.value = "auto";
     messages.value = (item.records || []).map((record) => {
         const role = record.Role || "assistant";
         const content = normalizeLoadedMessageContent(record, role);
@@ -1075,6 +1328,7 @@ function normalizeLoadedMessageContent(record, role) {
 
 function useQuickPrompt(prompt) {
     inputText.value = prompt.text;
+    if (prompt.mode) semanticMode.value = prompt.mode;
 }
 
 function handleEnter(event) {
@@ -1200,6 +1454,7 @@ async function sendMessage() {
     await nextTick();
 
     let userSaved = false;
+    let persistedBySecureAssistant = false;
     try {
         const attachmentPayload = await readAttachments(files);
         const mode = await resolveSemanticMode(text, attachmentPayload);
@@ -1207,8 +1462,13 @@ async function sendMessage() {
         userMessage.mode = mode;
         assistantMessage.mode = mode;
         assistantMessage.thinking = "正在组织回答...";
-        await saveMessage(userMessage);
-        userSaved = true;
+        switchConversationSourceForMode(mode);
+        if (mode === "secure-data") {
+            persistedBySecureAssistant = true;
+        } else {
+            await saveMessage(userMessage);
+            userSaved = true;
+        }
 
         const deniedText = getModePermissionDeniedText(mode);
         if (deniedText) {
@@ -1219,7 +1479,9 @@ async function sendMessage() {
             return;
         }
 
-        if (mode === "code") {
+        if (mode === "secure-data") {
+            await sendSecureDataQuestion(visibleText, assistantMessage);
+        } else if (mode === "code") {
             await sendCodeQuestion(visibleText, assistantMessage);
         } else if (mode === "data") {
             await sendDataQuestion(visibleText, assistantMessage);
@@ -1243,11 +1505,15 @@ async function sendMessage() {
             assistantMessage.content = "AI 暂无可显示内容，请稍后重试或切换模型。";
         }
         assistantMessage.streaming = false;
-        if (!userSaved) {
-            await saveMessage(userMessage);
+        if (!persistedBySecureAssistant) {
+            if (!userSaved) {
+                await saveMessage(userMessage);
+            }
+            await saveMessage(assistantMessage);
+            refreshCurrentConversationTitle(userMessage);
+        } else {
+            await loadHistory();
         }
-        await saveMessage(assistantMessage);
-        refreshCurrentConversationTitle(userMessage);
         sending.value = false;
         abortController = null;
         scrollToBottom();
@@ -1264,6 +1530,12 @@ function normalizeWorkMode(mode) {
         对话: "chat",
         data: "data",
         数据分析: "data",
+        "secure-data": "secure-data",
+        securedata: "secure-data",
+        安全业务数据: "secure-data",
+        安全数据分析: "secure-data",
+        nl2sql: "data",
+        高级数据查询: "data",
         builder: "builder",
         lowcode: "builder",
         低代码建模: "builder",
@@ -1305,7 +1577,7 @@ async function resolveSemanticMode(text, attachments = []) {
             const data = getData(result) || {};
             const mode = normalizeWorkMode(data.Mode || data.mode);
             if (mode && mode !== "auto") {
-                return mode;
+                return mode === "data" && secureAssistantAvailable.value ? "secure-data" : mode;
             }
         }
         console.warn("[AiEngine] intent recognition returned invalid result", result);
@@ -1329,6 +1601,9 @@ function validateModePermission(mode) {
 }
 
 function getModePermissionDeniedText(mode) {
+    if (mode === "secure-data" && !secureAssistantAvailable.value) {
+        return secureAssistantError.value || "当前角色尚未配置安全业务数据权限，请联系管理员配置 AI 数据策略。";
+    }
     if (mode === "data" && !hasAiPermission(AI_DATA_PERMISSION)) {
         return "当前角色未配置 AI 数据分析权限，请联系管理员在角色权限中授权后再使用。";
     }
@@ -1336,6 +1611,16 @@ function getModePermissionDeniedText(mode) {
         return "当前账号没有低代码建模权限。为避免误操作创建或修改表、字段、菜单、接口引擎，只有管理员可以执行该能力。";
     }
     return "";
+}
+
+function switchConversationSourceForMode(mode) {
+    const targetSource = mode === "secure-data" ? SECURE_DATA_SOURCE : SOURCE;
+    if (currentConversationSource.value === targetSource) return;
+    currentConversationSource.value = targetSource;
+    currentConversationId.value = targetSource === SECURE_DATA_SOURCE ? "" : makeId("chat");
+    // 一个会话只能由一个后端事实源负责持久化。切换安全边界时保留本次待发送消息，
+    // 旧会话仍可从左侧历史继续打开，避免跨来源记录重复或串线。
+    messages.value = messages.value.slice(-2);
 }
 
 function hasAiPermission(permission) {
@@ -1543,6 +1828,38 @@ async function sendChatStream(payload, assistantMessage, options = {}) {
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     await readChatSse(response, assistantMessage, options);
+}
+
+async function sendSecureDataQuestion(text, assistantMessage) {
+    const authorizedModel = selectAuthorizedSecureModel();
+    if (!secureAssistantAvailable.value || !authorizedModel?.Id) {
+        throw new Error(secureAssistantError.value || "当前角色没有可用的安全业务数据模型");
+    }
+    const relayIds = secureAssistantRelayModels.value
+        .map((item) => String(item?.Id || item?.id || ""))
+        .filter(Boolean);
+    const relayModel = isSecureRelayStation(authorizedModel)
+        ? (relayIds.includes(selectedRelayModel.value) ? selectedRelayModel.value : relayIds[0] || "")
+        : "";
+    const existing = conversations.value.find((item) => isCurrentConversation(item));
+    const data = await sendMobileAiQuestion(DiyCommon, {
+        Question: text,
+        AiModelId: authorizedModel.Id,
+        RelayModel: relayModel,
+        ReasoningEffort: effectiveReasoningEffort.value,
+        ConversationId: currentConversationId.value || "",
+        RequestId: makeMobileAiId("request"),
+        Title: existing?.title || firstLine(text)
+    });
+    currentConversationSource.value = SECURE_DATA_SOURCE;
+    currentConversationId.value = String(data.ConversationId || currentConversationId.value || "");
+    assistantMessage.modelId = String(authorizedModel.AiModel || relayModel || authorizedModel.Name || "");
+    assistantMessage.thinking = Array.isArray(data.Thinking)
+        ? data.Thinking.map(String).filter(Boolean).join("\n\n")
+        : String(data.Thinking || "");
+    assistantMessage.thinkingCollapsed = true;
+    assistantMessage.content = String(data.Answer || "暂未获得分析结果");
+    assistantMessage.rawContent = assistantMessage.content;
 }
 
 async function sendDataQuestion(text, assistantMessage) {
@@ -1911,7 +2228,7 @@ async function saveMessage(message) {
             Content: JSON.stringify({
                 Source: SOURCE,
                 ConversationId: currentConversationId.value,
-                Archived: Boolean(conversations.value.find((item) => item.id === currentConversationId.value)?.archived),
+                Archived: Boolean(conversations.value.find((item) => isCurrentConversation(item))?.archived),
                 Title: firstLine(messages.value.find((item) => item.role === "user")?.content || message.content),
                 Role: message.role,
                 Mode: message.mode || resolvedMode.value,
@@ -1943,7 +2260,7 @@ async function saveMessage(message) {
 
 function refreshCurrentConversationTitle(userMessage) {
     const latestAt = new Date().toISOString();
-    const existing = conversations.value.find((item) => item.id === currentConversationId.value);
+    const existing = conversations.value.find((item) => isCurrentConversation(item));
     if (existing) {
         existing.title = firstLine(userMessage.content);
         existing.lastTimestamp = toTimestamp(latestAt);
@@ -1951,6 +2268,8 @@ function refreshCurrentConversationTitle(userMessage) {
     } else {
         conversations.value.unshift({
             id: currentConversationId.value,
+            key: `${SOURCE}:${currentConversationId.value}`,
+            source: SOURCE,
             title: firstLine(userMessage.content),
             lastTimestamp: toTimestamp(latestAt),
             lastTime: formatHistoryTime(latestAt),
@@ -2390,6 +2709,16 @@ async function copyText(text) {
     font-size: 14px;
 }
 
+.conversation-title em {
+    margin-left: 5px;
+    padding: 1px 5px;
+    border-radius: var(--mci-radius-xs, 4px);
+    color: var(--el-color-success);
+    background: var(--el-color-success-light-9);
+    font-size: 9px;
+    font-style: normal;
+}
+
 .conversation-item small {
     color: #90988f;
     font-size: 12px;
@@ -2476,6 +2805,13 @@ async function copyText(text) {
     margin: 0;
     font-size: 18px;
     font-weight: 750;
+}
+
+.secure-scope-tag {
+    max-width: min(360px, 34vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .message-wrap {
@@ -2626,6 +2962,12 @@ async function copyText(text) {
 .quick-prompt strong {
     color: #20242c;
     font-size: 15px;
+    line-height: 1.45;
+    display: -webkit-box;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
 }
 
 .quick-prompt span {
@@ -2996,7 +3338,27 @@ async function copyText(text) {
     justify-content: space-between;
     gap: 12px;
     padding: 4px 10px 10px 12px;
+    border-radius: 0;
+}
+
+.ai-generation-disclaimer {
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 14px 8px;
     border-radius: 0 0 13px 13px;
+    color: var(--mci-text-tertiary, var(--el-text-color-secondary));
+    font-size: 11px;
+    line-height: 16px;
+}
+
+.ai-generation-disclaimer small {
+    overflow: hidden;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .composer-left,

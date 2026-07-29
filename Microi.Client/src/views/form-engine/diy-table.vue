@@ -699,7 +699,7 @@
                     </el-table-column>
                     <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
                     <!-- 性能优化V3：简化DOM结构，移除不必要的包装div -->
-                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth">
+                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth + (IsSystemAccountTable() ? 110 : 0)">
                         <template #default="scope">
                             <div style="display: flex;justify-content: right;align-items: center;">
                                 <el-button
@@ -750,6 +750,15 @@
                                     @click.stop="RestoreTrashRow(scope.row)"
                                 >
                                     恢复
+                                </el-button>
+                                <el-button
+                                    v-if="CanManageUserAccessKey(scope.row)"
+                                    type="warning"
+                                    plain
+                                    @click.stop="OpenUserAccessKeys(scope.row)"
+                                >
+                                    <fa-icon icon="fas fa-key" class="mr-1" />
+                                    访问密钥
                                 </el-button>
                                 <!--如果子表是只读，不显示编辑等按钮 2021-01-30 && TableChild!field.Readonly-->
                                 <!-- 性能优化V3：使用原生按钮+全局共享菜单，避免每行实例化popover -->
@@ -1048,6 +1057,18 @@
                                     >
                                         <el-icon><Edit /></el-icon>
                                         {{ $t('Msg.Edit') }}
+                                    </el-button>
+                                    <el-button
+                                        v-if="CanManageUserAccessKey(item)"
+                                        class="card-action-btn"
+                                        @click.stop="OpenUserAccessKeys(item)"
+                                        size="small"
+                                        round
+                                        type="warning"
+                                        plain
+                                    >
+                                        <fa-icon icon="fas fa-key" class="mr-1" />
+                                        访问密钥
                                     </el-button>
                                     <el-button
                                         v-if="IsTrashMode"
@@ -1521,6 +1542,12 @@
             @close="ShowIndexManager = false"
         />
 
+        <UserAccessKeyDialog
+            v-if="IsSystemAccountTable()"
+            v-model="ShowUserAccessKeyDialog"
+            :user="AccessKeyUser"
+        />
+
         <!-- 移动端搜索抽屉 -->
         <el-drawer
             v-model="showMobileSearch"
@@ -1591,6 +1618,7 @@ import DiyPermissionDialog from "@/views/form-engine/diy-components/DiyPermissio
 import DiyIndexManager from "@/views/form-engine/diy-components/DiyIndexManager.vue";
 import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
+import UserAccessKeyDialog from "@/views/system/components/user-access-key-dialog.vue";
 export default {
     name: "DiyTableRowlist",
     directives: {},
@@ -1615,8 +1643,15 @@ export default {
         DiyIndexManager,
         DiySearch,
         DiyModleSearch,
+        UserAccessKeyDialog,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
         DiyTableChild: defineAsyncComponent(() => import("@/views/form-engine/diy-table"))
+    },
+    data() {
+        return {
+            ShowUserAccessKeyDialog: false,
+            AccessKeyUser: {}
+        };
     },
     setup(props) {
         const diyStore = useDiyStore();
@@ -1749,6 +1784,29 @@ export default {
         }
     },
     methods: {
+        IsSystemAccountTable() {
+            var tableName = this.CurrentDiyTableModel && this.CurrentDiyTableModel.Name
+                ? this.CurrentDiyTableModel.Name
+                : this.TableName;
+            return String(tableName || "").toLowerCase() === "sys_user";
+        },
+        CanManageUserAccessKey(user) {
+            if (!this.IsSystemAccountTable()
+                || this.IsTrashMode
+                || !user
+                || !user.Id
+                || !this.GetCurrentUser
+                || this.GetCurrentUser._AccessKeySession === true) {
+                return false;
+            }
+            return this.GetCurrentUser._IsAdmin === true
+                || String(this.GetCurrentUser.Id || "").toLowerCase() === String(user.Id).toLowerCase();
+        },
+        OpenUserAccessKeys(user) {
+            if (!this.CanManageUserAccessKey(user)) return;
+            this.AccessKeyUser = user;
+            this.ShowUserAccessKeyDialog = true;
+        },
         ApplyTableChildAuthContext(param) {
             if (param && this.TableChildAuth) {
                 param._TableChildAuth = this.TableChildAuth;

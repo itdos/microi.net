@@ -47,6 +47,57 @@ public class AiApplicationApiEngineSecurityTests
         Assert.Equal(expected, (bool)Invoke("IsAiApplicationReadEngineKey", key)!);
     }
 
+    [Theory]
+    [InlineData("app_baby_care_api", "Bootstrap", true)]
+    [InlineData("app_baby_care_api", "List", true)]
+    [InlineData("app_baby_care_api", "Save", false)]
+    [InlineData("app_baby_care_api", "Delete", false)]
+    [InlineData("app_wr_weekly_trend", null, true)]
+    [InlineData("app_wrd_daily_status", null, true)]
+    [InlineData("app_cln_doctor_status", null, false)]
+    public void AiApplicationReadRequest_SeparatesGenericReadAndWriteActions(
+        string key,
+        string? action,
+        bool expected)
+    {
+        var param = new JObject();
+        if (action != null) param["Action"] = action;
+        const string source = "var action = text(V8.Param.Action, 'Bootstrap'); return V8.FormEngine.AddFormData('app_x', {});";
+
+        Assert.Equal(expected, (bool)Invoke("IsAiApplicationReadRequest", key, param, source)!);
+    }
+
+    [Theory]
+    [InlineData("action", "list", true)]
+    [InlineData("command", "save", false)]
+    [InlineData("Operation", "Delete", false)]
+    public void AiApplicationReadRequest_AcceptsCaseInsensitiveActionAliases(
+        string field,
+        string action,
+        bool expected)
+    {
+        var param = new JObject { [field] = action };
+        const string source = "var action = text(V8.Param.Action, 'Bootstrap'); return V8.FormEngine.AddFormData('app_x', {});";
+
+        Assert.Equal(expected, (bool)Invoke("IsAiApplicationReadRequest", "app_baby_care_api", param, source)!);
+    }
+
+    [Fact]
+    public void AiApplicationGenericApi_OnlyDefaultsToReadWhenSourceDeclaresBootstrap()
+    {
+        var param = new JObject();
+        Assert.True((bool)Invoke(
+            "IsAiApplicationReadRequest",
+            "app_baby_care_api",
+            param,
+            "var action = text(V8.Param.Action, 'Bootstrap');")!);
+        Assert.False((bool)Invoke(
+            "IsAiApplicationReadRequest",
+            "app_unknown_api",
+            param,
+            "return V8.FormEngine.AddFormData('app_x', V8.Param);")!);
+    }
+
     [Fact]
     public void AuthenticatedIdentity_OverridesSpoofedIsolationFields()
     {
