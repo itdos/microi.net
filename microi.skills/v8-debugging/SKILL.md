@@ -148,8 +148,8 @@ V8.Method.AddSysLog({
 
 日志保存在按租户、月份拆分的 MongoDB 系统日志集合中，可在系统日志菜单查看并按 Type 过滤。所有 `AddSysLog` 调用统一进入后端异步队列，由后台批量写 MongoDB；批次先写本地 spool，MongoDB 故障和正常重启后自动幂等重放，因此业务请求不得自行启动线程或直接并发写 MongoDB。
 
-- 容器环境把 `logs/syslog-spool`（或 `MICROI_SYSLOG_SPOOL_DIR`）挂载到持久卷。
-- 分布式部署为每个实例设置稳定且唯一的 `MICROI_NODE_ID`；spool 文件带节点标识，所有节点写同一 MongoDB 时仍按全局 `EventId` upsert。详情状态和私有文件票据存共享 Redis，本机内存只作故障兜底，不能依赖粘性会话。
+- 容器环境把固定目录 `logs/syslog-spool` 挂载到持久卷，不为路径增加环境变量。
+- 分布式部署的节点标识由平台自动生成；所有节点写同一 MongoDB 时仍按全局 `EventId` upsert。详情状态和私有文件票据存共享 Redis，本机内存只作故障兜底，不能依赖粘性会话。
 - 多节点可能同时观察到的菜单、详情关闭、附件分片和登录生命周期事件要使用确定性 `EventId`，不能只靠本机字典去重；服务正常停止会落盘排空，重启会自动重放。
 - 平台用户行为统一使用结构化字段 `Category`、`Action`、`Source`、`TargetType`、`TargetId`、`SessionId`、`DurationSeconds`、`Success`、`OccurredAt`。
 - 用户显示采用 `Name(Account)`；禁止记录密码、原始 Token、Authorization、Secret、ApiKey、连接字符串，内容还必须限长。

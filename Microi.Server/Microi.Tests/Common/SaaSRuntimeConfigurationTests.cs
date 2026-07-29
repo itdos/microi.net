@@ -86,6 +86,40 @@ public class SaaSRuntimeConfigurationTests
         Assert.DoesNotContain("MICROI_SYSLOG_BATCH_SIZE", officialChineseDocs);
     }
 
+    [Fact]
+    public void RuntimeSources_DoNotReadBusinessTuningEnvironmentVariables()
+    {
+        var root = FindRepositoryRoot();
+        string Read(params string[] segments) => File.ReadAllText(
+            Path.Combine(new[] { root }.Concat(segments).ToArray()));
+
+        var processMemoryGuard = Read(
+            "Microi.Server", "Microi.net.Api", "Services", "ProcessMemoryGuardService.cs");
+        var sysLogQueue = Read(
+            "Microi.Server", "Microi.net.Api", "Services", "SysLogQueueService.cs");
+        var diyLangCache = Read(
+            "Microi.Server", "Microi.Core", "FormEngine", "FormEngineLang.cs");
+        var cache = Read(
+            "Microi.Server", "Microi.Cache", "MicroiTwoLevelCache.cs");
+        var translateEngine = Read(
+            "Microi.Server", "Microi.net", "TranslateEngine", "TranslateEngine.cs");
+        var v8Engine = Read(
+            "Microi.Server", "Microi.net", "V8Engine", "V8Engine.cs");
+        var runtimeConfigurationMap = Read(
+            "Microi.Server", "Microi.net", "Common", "OsClient.cs");
+
+        Assert.DoesNotContain("MICROI_PROCESS_MEMORY_GUARD_", processMemoryGuard);
+        Assert.DoesNotContain("MICROI_SYSLOG_", sysLogQueue);
+        Assert.DoesNotContain("MICROI_DIY_LANG_CACHE_", diyLangCache);
+        Assert.DoesNotContain("MICROI_NODE_ID", cache);
+        Assert.DoesNotContain("MICROI_TRANSLATE_", translateEngine);
+        Assert.DoesNotContain("MICROI_V8_", v8Engine);
+        Assert.DoesNotContain("DOS_ORM_", runtimeConfigurationMap);
+        Assert.DoesNotContain("MICROI_PRESSURE_", runtimeConfigurationMap);
+        Assert.DoesNotContain("MICROI_STARTUP_", runtimeConfigurationMap);
+        Assert.DoesNotContain("MICROI_SECURITY_", runtimeConfigurationMap);
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

@@ -203,7 +203,7 @@ var uploadResult = V8.Method.Upload({
 
 系统日志调用会先进入后端真正有界的内存队列，由单一后台消费者按批次写入 MongoDB；请求线程通常不等待 MongoDB。平台固定使用主队列 4096 条、内存重试区 512 条、每批 250 条，安装者无需维护队列容量环境变量。两级内存都满时会同步写持久化 spool 形成回压，禁止用无界内存队列继续堆积；健康信息会公开 `Capacity`、`OverflowPending`、`EmergencySpooled` 和 `Dropped`，其中 `Dropped` 必须保持为 0。
 
-每批日志在写 MongoDB 前先写入本地 `logs/syslog-spool`，MongoDB 暂时不可用或服务正常重启时会自动幂等重放。可通过环境变量 `MICROI_SYSLOG_SPOOL_DIR` 指定持久化目录，容器部署时应把该目录挂载到持久卷；多节点实例还应设置稳定且唯一的 `MICROI_NODE_ID`。所有节点共享 MongoDB/Redis，日志按全局 `EventId` 幂等 upsert，详情停留状态和私有附件票据可跨节点继续读取。
+每批日志在写 MongoDB 前先写入固定目录 `logs/syslog-spool`，MongoDB 暂时不可用或服务正常重启时会自动幂等重放。容器部署时应直接把该目录挂载到持久卷，节点标识由平台自动生成，不需要额外环境变量。所有节点共享 MongoDB/Redis，日志按全局 `EventId` 幂等 upsert，详情停留状态和私有附件票据可跨节点继续读取。
 
 平台内置用户行为日志还会记录 `Category`、`Action`、`Source`、`TargetType`、`TargetId`、`SessionId`、`DurationSeconds`、`Success`、`OccurredAt` 等结构化字段。用户显示统一采用 `Name(Account)`；密码、Token、Authorization、Secret、ApiKey、连接字符串等敏感内容会在进入队列时脱敏和限长。
 :::
@@ -214,13 +214,13 @@ API 默认启用进程级内存保护。达到软阈值后节点会停止接收�
 
 保护阈值统一依据进程实际驻留内存（Windows Working Set / Linux RSS），不能依据 Linux 下的 `PrivateMemorySize64`。后者可能包含 .NET GC 预留但尚未占用物理内存的巨大虚拟地址空间，数值甚至会超过宿主机物理内存数倍，只能作为诊断值。健康接口会同时返回 `PressureMetric=ResidentSet`、`WorkingSetMB`、`PrivateAddressSpaceMB` 与 `ManagedHeapMB`，其中只有驻留内存参与熔断判断。
 
-默认硬阈值取“检测到的可用内存 70%”与 4096 MB 的较小值；软阈值默认为硬阈值的 80%。平台自动采用安全轮询、连续样本和有界退出策略。确有更大内存需求时必须按单节点实测后显式配置，不能把宿主机全部内存交给一个 API 进程。
+默认先识别 Linux cgroup v2/v1 容器内存上限；容器未限额时使用宿主机物理内存，其他平台回退到 .NET GC 可用内存。软阈值固定为该有效内存额度的 95%，硬阈值固定为 98%，不再固定封顶为 4096 MB。例如 48 GiB 单节点默认约为 Soft=46694 MB、Hard=48168 MB，RSS 3.94 GB 不会触发保护。平台仍采用安全轮询、连续样本和有界退出策略。
 
-可用 `MICROI_PROCESS_MEMORY_GUARD_ENABLED`、`MICROI_PROCESS_MEMORY_GUARD_SOFT_LIMIT_MB`、`MICROI_PROCESS_MEMORY_GUARD_HARD_LIMIT_MB`、`MICROI_PROCESS_MEMORY_GUARD_POLL_SECONDS`、`MICROI_PROCESS_MEMORY_GUARD_HARD_SAMPLES`、`MICROI_PROCESS_MEMORY_GUARD_EXIT_GRACE_SECONDS`、`MICROI_PROCESS_MEMORY_GUARD_HARD_EXIT` 调整保护参数；同名 `ProcessMemoryGuard:*` 配置也受支持。软阈值必须低于硬阈值，生产环境不建议关闭保护。
+内存保护不增加任何专用环境变量，也不要求在 `appsettings.json` 中维护一组节点参数。95%/98% 属于平台自动安全边界；后续确需面向用户开放调整时，应进入 SaaS 引擎或系统设置统一管理。
 
-阈值应按单个 API 节点配置，不能用某个进程占满宿主机的额度。生产环境必须配置自动重启和 readiness 摘除；多节点滚动发布时，一个节点进入内存保护不能影响其它节点继续服务。
+阈值按单个 API 节点的有效内存额度计算。单节点独占宿主机时直接使用默认 95%/98%；多个 API/Worker 或数据库共用同一宿主机时，必须由容器编排层给每个容器设置独立 memory limit，避免所有节点都按整机额度计算造成超卖。生产环境必须配置自动重启和 readiness 摘除；多节点滚动发布时，一个节点进入内存保护不能影响其它节点继续服务。
 
-启动缓存和批量预热也必须自身有界。例如多语言运行时缓存先做有效行数预算检查，只读取租户实际启用的语言列，再按 `Id` 游标分页；默认每页 500、最多扫描 10000 行、最多保留 5000000 字符、单条 SQL 最长 30 秒。超过行数预算时不会先物化预算上限内的巨大对象图，而是立即拒绝本次重载并保留旧缓存。可通过 `MICROI_DIY_LANG_CACHE_PAGE_SIZE`、`MICROI_DIY_LANG_CACHE_MAX_ROWS`、`MICROI_DIY_LANG_CACHE_MAX_CHARACTERS`、`MICROI_DIY_LANG_CACHE_COMMAND_TIMEOUT_SECONDS` 或对应的 `DiyLang:RuntimeCache*` 配置调整；提高上限前必须测量单节点峰值内存。禁止使用 `SELECT *` 后一次性 `ToList`，再复制为第二份字典；数据库异常时保留旧缓存并失败关闭。
+启动缓存和批量预热也必须自身有界。例如多语言运行时缓存先做有效行数预算检查，只读取租户实际启用的语言列，再按 `Id` 游标分页；默认每页 500、最多扫描 10000 行、最多保留 5000000 字符、单条 SQL 最长 30 秒。超过行数预算时不会先物化预算上限内的巨大对象图，而是立即拒绝本次重载并保留旧缓存。分页数、最大行数、最大字符数和 SQL 超时统一在主租户 SaaS 引擎的“平台运行配置”中维护，不增加环境变量；提高上限前必须测量单节点峰值内存。禁止使用 `SELECT *` 后一次性 `ToList`，再复制为第二份字典；数据库异常时保留旧缓存并失败关闭。
 
 ## V8.Base64
 >* Base64转换，与System.Convert.ToBase64String(bytes)不同的是V8.Base64若遇异常会直接返回源字符串

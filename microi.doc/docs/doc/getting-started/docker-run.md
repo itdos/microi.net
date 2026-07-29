@@ -1169,29 +1169,31 @@ services:
 SaaS 引擎中的“单文件上限 MB”和“单次总量上限 MB”只在请求进入吾码 API 后生效，不能放大 nginx 的请求体上限。若 nginx 先返回 `413 Content Too Large`，请在 **API 域名对应的 `server` 块**中加入下面的配置；支持 1000 MB 文件时，需要为 multipart 封装留出余量。下列 `proxy_*` 指令可以放在 `server` 层由真实代理 `location` 继承；如果 `location` 或宝塔 `include` 中重复配置，以更近层级的值为准，必须确认没有重新开启请求缓冲或缩短超时：
 
 ```nginx
-# 支持1000MB文件，并为multipart封装留出余量
-client_max_body_size 1024m;
+server {
+  # 支持1000MB文件，并为multipart封装留出余量
+  client_max_body_size 1024m;
 
-# 慢速大文件上传：这是两次读取请求体数据之间的超时，不是整个上传总时长
-client_body_timeout 600s;
+  # 慢速大文件上传：这是两次读取请求体数据之间的超时，不是整个上传总时长
+  client_body_timeout 600s;
 
-# 大文件直接流式转发给吾码API，避免nginx先把整个请求体落到代理临时目录
-proxy_request_buffering off;
+  # 大文件直接流式转发给吾码API，避免nginx先把整个请求体落到代理临时目录
+  proxy_request_buffering off;
 
-# HTTP/1.1可避免分块请求在关闭request buffering后仍被强制缓冲
-proxy_http_version 1.1;
-proxy_connect_timeout 60s;
-proxy_send_timeout 600s;
-proxy_read_timeout 600s;
+  # HTTP/1.1可避免分块请求在关闭request buffering后仍被强制缓冲
+  proxy_http_version 1.1;
+  proxy_connect_timeout 60s;
+  proxy_send_timeout 600s;
+  proxy_read_timeout 600s;
 
-error_page 413 = @microi_upload_too_large;
-location @microi_upload_too_large {
-    default_type application/json;
-    charset utf-8;
-    add_header Cache-Control "no-store" always;
-    # 若Web与API跨域，必须在这里显式复用正常API代理的CORS白名单/include。
-    # 请求已被nginx拒绝，不会进入ASP.NET Core，因此不能依赖后端补CORS响应头。
-    return 200 '{"Code":0,"Data":null,"Msg":"上传请求超过了反向代理允许的最大容量。SaaS引擎中的上传额度不能放大nginx或API启动级上限，请联系运维同步提高client_max_body_size以及吾码API请求体上限。","DataAppend":{"ErrorType":"UploadRequestTooLarge","Layer":"ReverseProxy"}}';
+  error_page 413 = @microi_upload_too_large;
+  location @microi_upload_too_large {
+      default_type application/json;
+      charset utf-8;
+      add_header Cache-Control "no-store" always;
+      # 若Web与API跨域，必须在这里显式复用正常API代理的CORS白名单/include。
+      # 请求已被nginx拒绝，不会进入ASP.NET Core，因此不能依赖后端补CORS响应头。
+      return 200 '{"Code":0,"Data":null,"Msg":"上传请求超过了反向代理允许的最大容量。SaaS引擎中的上传额度不能放大nginx或API启动级上限，请联系运维同步提高client_max_body_size以及吾码API请求体上限。","DataAppend":{"ErrorType":"UploadRequestTooLarge","Layer":"ReverseProxy"}}';
+  }
 }
 ```
 

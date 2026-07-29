@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 
 namespace Microi.net.Api;
 
@@ -7,6 +8,105 @@ public enum ProcessMemoryPressureLevel
     Normal = 0,
     Soft = 1,
     Hard = 2
+}
+
+public readonly record struct ProcessMemoryCapacity(long TotalBytes, string Source)
+{
+    private const long MinimumUsefulCapacityBytes = 128L * 1024 * 1024;
+
+    public static ProcessMemoryCapacity Detect()
+    {
+        var hostBytes = TryReadLinuxHostMemory();
+        var cgroup = TryReadCgroupLimit();
+        if (cgroup.TotalBytes >= MinimumUsefulCapacityBytes)
+        {
+            return hostBytes >= MinimumUsefulCapacityBytes && hostBytes < cgroup.TotalBytes
+                ? new ProcessMemoryCapacity(hostBytes, "LinuxMemTotal")
+                : cgroup;
+        }
+
+        if (hostBytes >= MinimumUsefulCapacityBytes)
+        {
+            return new ProcessMemoryCapacity(hostBytes, "LinuxMemTotal");
+        }
+
+        var gcBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+        return gcBytes >= MinimumUsefulCapacityBytes && gcBytes < long.MaxValue / 2
+            ? new ProcessMemoryCapacity(gcBytes, "GC.TotalAvailableMemoryBytes")
+            : new ProcessMemoryCapacity(64L * 1024 * 1024 * 1024, "Fallback64GiB");
+    }
+
+    public static ProcessMemoryCapacity SelectForTest(
+        long hostBytes,
+        long cgroupBytes,
+        string cgroupSource = "CgroupMemoryLimit")
+    {
+        if (cgroupBytes >= MinimumUsefulCapacityBytes)
+        {
+            return hostBytes >= MinimumUsefulCapacityBytes && hostBytes < cgroupBytes
+                ? new ProcessMemoryCapacity(hostBytes, "HostPhysicalMemory")
+                : new ProcessMemoryCapacity(cgroupBytes, cgroupSource);
+        }
+
+        return hostBytes >= MinimumUsefulCapacityBytes
+            ? new ProcessMemoryCapacity(hostBytes, "HostPhysicalMemory")
+            : new ProcessMemoryCapacity(64L * 1024 * 1024 * 1024, "Fallback64GiB");
+    }
+
+    private static ProcessMemoryCapacity TryReadCgroupLimit()
+    {
+        if (!OperatingSystem.IsLinux()) return default;
+
+        var candidates = new[]
+        {
+            (Path: "/sys/fs/cgroup/memory.max", Source: "CgroupV2MemoryMax"),
+            (Path: "/sys/fs/cgroup/memory/memory.limit_in_bytes", Source: "CgroupV1MemoryLimit")
+        };
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                if (!File.Exists(candidate.Path)) continue;
+                var raw = File.ReadAllText(candidate.Path).Trim();
+                if (string.Equals(raw, "max", StringComparison.OrdinalIgnoreCase)) continue;
+                if (long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var bytes)
+                    && bytes >= MinimumUsefulCapacityBytes
+                    && bytes < long.MaxValue / 2)
+                {
+                    return new ProcessMemoryCapacity(bytes, candidate.Source);
+                }
+            }
+            catch
+            {
+                // 诊断保护不能因 cgroup 文件读取失败阻止 API 启动，继续回退到宿主机/GC 指标。
+            }
+        }
+
+        return default;
+    }
+
+    private static long TryReadLinuxHostMemory()
+    {
+        if (!OperatingSystem.IsLinux()) return 0;
+        try
+        {
+            foreach (var line in File.ReadLines("/proc/meminfo"))
+            {
+                if (!line.StartsWith("MemTotal:", StringComparison.OrdinalIgnoreCase)) continue;
+                var parts = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                return parts.Length >= 2
+                       && long.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var kb)
+                    ? checked(kb * 1024)
+                    : 0;
+            }
+        }
+        catch
+        {
+            // 非 Linux 或受限容器中回退到 GC 可用内存。
+        }
+
+        return 0;
+    }
 }
 
 public sealed class ProcessMemoryGuardOptions
@@ -18,119 +118,50 @@ public sealed class ProcessMemoryGuardOptions
     public int ConsecutiveHardSamples { get; init; } = 3;
     public int ExitGraceSeconds { get; init; } = 10;
     public bool HardExit { get; init; } = true;
+    public long EffectiveMemoryBytes { get; init; }
+    public string EffectiveMemorySource { get; init; } = "Unknown";
+    public int SoftLimitPercent { get; init; }
+    public int HardLimitPercent { get; init; }
 
-    public static ProcessMemoryGuardOptions FromConfiguration(
-        IHostEnvironment environment,
-        IConfiguration? configuration = null)
+    public static ProcessMemoryGuardOptions CreateDefault()
+    {
+        return ForCapacity(ProcessMemoryCapacity.Detect());
+    }
+
+    public static ProcessMemoryGuardOptions ForCapacity(ProcessMemoryCapacity capacity)
     {
         const long mb = 1024L * 1024L;
-        var reportedAvailableBytes = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
-        var reportedAvailableMb = reportedAvailableBytes > 0 && reportedAvailableBytes < long.MaxValue / 2
-            ? reportedAvailableBytes / mb
-            : 0;
-        // A single API node must never be allowed to consume an entire 32-48GB
-        // host. Four gigabytes is a deliberately conservative per-process
-        // ceiling; operators may raise it explicitly after measuring their
-        // workload and accounting for co-located API/Worker nodes.
-        const long defaultCeilingMb = 4096;
-        var defaultHardMb = reportedAvailableMb > 0
-            ? Math.Min(defaultCeilingMb, Math.Max(512, reportedAvailableMb * 70 / 100))
-            : defaultCeilingMb;
-        var hardMb = Math.Clamp(ReadLong(
-            configuration,
-            "ProcessMemoryGuard:HardLimitMB",
-            "MICROI_PROCESS_MEMORY_GUARD_HARD_LIMIT_MB",
-            defaultHardMb), 512, 262144);
-        var defaultSoftMb = Math.Max(384, hardMb * 80 / 100);
-        var softMb = Math.Clamp(ReadLong(
-            configuration,
-            "ProcessMemoryGuard:SoftLimitMB",
-            "MICROI_PROCESS_MEMORY_GUARD_SOFT_LIMIT_MB",
-            defaultSoftMb), 256, Math.Max(256, hardMb - 128));
+        const int softPercent = 95;
+        const int hardPercent = 98;
+        var effectiveBytes = capacity.TotalBytes >= 128L * mb
+            ? capacity.TotalBytes
+            : 64L * 1024 * mb;
+        var effectiveMb = Math.Max(512, effectiveBytes / mb);
+        var hardMb = Math.Max(512, effectiveMb * hardPercent / 100);
+        var softMb = Math.Max(384, effectiveMb * softPercent / 100);
 
         return new ProcessMemoryGuardOptions
         {
-            Enabled = ReadBool(
-                configuration,
-                "ProcessMemoryGuard:Enabled",
-                "MICROI_PROCESS_MEMORY_GUARD_ENABLED",
-                true),
+            Enabled = true,
             SoftLimitBytes = softMb * mb,
             HardLimitBytes = hardMb * mb,
-            PollSeconds = Math.Clamp(ReadInt(
-                configuration,
-                "ProcessMemoryGuard:PollSeconds",
-                "MICROI_PROCESS_MEMORY_GUARD_POLL_SECONDS",
-                2), 1, 60),
-            ConsecutiveHardSamples = Math.Clamp(ReadInt(
-                configuration,
-                "ProcessMemoryGuard:HardSamples",
-                "MICROI_PROCESS_MEMORY_GUARD_HARD_SAMPLES",
-                3), 1, 30),
-            ExitGraceSeconds = Math.Clamp(ReadInt(
-                configuration,
-                "ProcessMemoryGuard:ExitGraceSeconds",
-                "MICROI_PROCESS_MEMORY_GUARD_EXIT_GRACE_SECONDS",
-                10), 1, 120),
-            HardExit = ReadBool(
-                configuration,
-                "ProcessMemoryGuard:HardExit",
-                "MICROI_PROCESS_MEMORY_GUARD_HARD_EXIT",
-                true)
+            EffectiveMemoryBytes = effectiveBytes,
+            EffectiveMemorySource = string.IsNullOrWhiteSpace(capacity.Source)
+                ? "Fallback64GiB"
+                : capacity.Source,
+            SoftLimitPercent = ToPercent(softMb, effectiveMb),
+            HardLimitPercent = ToPercent(hardMb, effectiveMb),
+            PollSeconds = 2,
+            ConsecutiveHardSamples = 3,
+            ExitGraceSeconds = 10,
+            HardExit = true
         };
     }
 
-    private static string? ReadValue(
-        IConfiguration? configuration,
-        string configKey,
-        string environmentKey)
+    private static int ToPercent(long limitMb, long effectiveMb)
     {
-        var value = Environment.GetEnvironmentVariable(environmentKey);
-        if (!string.IsNullOrWhiteSpace(value)) return value;
-        value = configuration?[environmentKey];
-        if (!string.IsNullOrWhiteSpace(value)) return value;
-        return configuration?[configKey];
-    }
-
-    private static long ReadLong(
-        IConfiguration? configuration,
-        string configKey,
-        string environmentKey,
-        long defaultValue)
-    {
-        return long.TryParse(ReadValue(configuration, configKey, environmentKey), out var value)
-               && value > 0
-            ? value
-            : defaultValue;
-    }
-
-    private static int ReadInt(
-        IConfiguration? configuration,
-        string configKey,
-        string environmentKey,
-        int defaultValue)
-    {
-        return int.TryParse(ReadValue(configuration, configKey, environmentKey), out var value)
-               && value > 0
-            ? value
-            : defaultValue;
-    }
-
-    private static bool ReadBool(
-        IConfiguration? configuration,
-        string configKey,
-        string environmentKey,
-        bool defaultValue)
-    {
-        var value = ReadValue(configuration, configKey, environmentKey);
-        if (bool.TryParse(value, out var parsed)) return parsed;
-        if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase)) return true;
-        if (string.Equals(value, "0", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(value, "no", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase)) return false;
-        return defaultValue;
+        if (effectiveMb <= 0) return 0;
+        return (int)Math.Clamp((limitMb * 100 + effectiveMb / 2) / effectiveMb, 0, 999);
     }
 
     public ProcessMemoryPressureLevel Evaluate(long processBytes)
@@ -152,6 +183,10 @@ public sealed class ProcessMemorySnapshot
     public long ManagedHeapBytes { get; init; }
     public long SoftLimitBytes { get; init; }
     public long HardLimitBytes { get; init; }
+    public long EffectiveMemoryBytes { get; init; }
+    public string EffectiveMemorySource { get; init; } = "Unknown";
+    public int SoftLimitPercent { get; init; }
+    public int HardLimitPercent { get; init; }
     public DateTime SampledAt { get; init; }
 }
 
@@ -208,6 +243,10 @@ public sealed class ProcessMemoryPressureState
             ManagedHeapBytes = Interlocked.Read(ref _managedHeapBytes),
             SoftLimitBytes = _options.SoftLimitBytes,
             HardLimitBytes = _options.HardLimitBytes,
+            EffectiveMemoryBytes = _options.EffectiveMemoryBytes,
+            EffectiveMemorySource = _options.EffectiveMemorySource,
+            SoftLimitPercent = _options.SoftLimitPercent,
+            HardLimitPercent = _options.HardLimitPercent,
             SampledAt = ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : DateTime.MinValue
         };
     }
@@ -244,8 +283,10 @@ public sealed class ProcessMemoryGuardService : BackgroundService
         }
 
         Console.WriteLine(
-            $"Microi：【信息】API进程内存保护已启动：Soft={ToMb(_options.SoftLimitBytes)}MB，" +
-            $"Hard={ToMb(_options.HardLimitBytes)}MB，Metric=ResidentSet，" +
+            $"Microi：【信息】API进程内存保护已启动：Capacity={ToMb(_options.EffectiveMemoryBytes)}MB，" +
+            $"Source={_options.EffectiveMemorySource}，Soft={ToMb(_options.SoftLimitBytes)}MB" +
+            $"({_options.SoftLimitPercent}%)，Hard={ToMb(_options.HardLimitBytes)}MB" +
+            $"({_options.HardLimitPercent}%)，Metric=ResidentSet，" +
             $"Samples={_options.ConsecutiveHardSamples}。");
 
         while (!stoppingToken.IsCancellationRequested)
