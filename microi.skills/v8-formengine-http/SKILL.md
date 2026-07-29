@@ -62,7 +62,7 @@ URL 中的表名小写最稳，平台不区分大小写。匿名版本目前**�
 | `authorization` | 鉴权接口必填 | `Bearer <Token>`；兼容旧客户端的 `Token` Header |
 | `did` | 登录及鉴权接口推荐 | 当前终端稳定设备标识；首次生成后持久化，不能每次请求随机变化 |
 
-注意：上表是 FormEngine 路由约定。ApiEngine HTTP 复测和移动端 `callEngine` 推荐使用 `/apiengine/{key}--OsClient--{osClient}--`，同时带 Header `OsClient`；不要优先用 `?OsClient=`，部分动态路由会把 querystring 参与 `ApiAddress` 匹配。
+注意：上表是 FormEngine 路由约定。ApiEngine HTTP 复测和移动端 `callEngine` 使用稳定路径 `/apiengine/{key}`，租户通过唯一的 `osclient` Header 传递，JSON/Form Body 可冗余携带 `OsClient`。普通 POST/PUT/PATCH/DELETE 禁止追加 `--OsClient--...--`；特殊路径只用于无法设置 Header/Form/Query 的 GET/HEAD 或第三方回调。
 
 平台可能通过响应 Header `authorization`（兼容 `token`）续签或替换 Token。客户端必须立即保存新 Token，并保证并发旧响应不能覆盖已经写入的新 Token。跨域部署还必须在 CORS 中暴露 `authorization`、`token` 等需要读取的响应 Header。Token 属于凭据，禁止写入 URL、日志、错误上报和页面源码。
 

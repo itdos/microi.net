@@ -1,6 +1,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import crypto from 'node:crypto';
 import { z } from 'zod';
-import { registerAdvancedTools } from './advanced-tools.js';
+import { normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
@@ -66,6 +67,15 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_redis_rename_key',
     'microi_redis_set_ttl',
     'microi_get_db_schema',
+    'microi_get_table_indexes',
+    'microi_create_table_index',
+    'microi_drop_table_index',
+    'microi_list_database_types',
+    'microi_inspect_external_database',
+    'microi_query_external_database',
+    'microi_execute_external_database',
+    'microi_save_database_connection',
+    'microi_import_external_attachment',
     'microi_get_field_list',
     'microi_add_field',
     'microi_update_field',
@@ -483,9 +493,10 @@ BOUNDARY RULES:
 1. **microi_get_db_schema** — 先查看已有表结构，了解数据模型
 2. **microi_create_table** — 创建自定义表（写入 diy_table，自动创建 MySQL 表并添加 Id/CreateTime/UpdateTime/CreateUser/OsClient 基础字段）
 3. **microi_add_field** — 逐个添加业务字段（写入 diy_field，执行 ALTER TABLE），需指定 component 组件类型
-4. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
-5. **microi_create_engine** — 复杂业务（审批/工作流/统计/集成）必须创建接口引擎，菜单按钮的 V8Code 通过 V8.ApiEngine.Run 调用
-6. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
+4. **microi_get_table_indexes / microi_create_table_index** — 按真实查询与业务唯一约束创建并回读物理索引
+5. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
+6. **microi_create_engine** — 复杂业务（审批/工作流/统计/集成）必须创建接口引擎，菜单按钮的 V8Code 通过 V8.ApiEngine.Run 调用
+7. **microi_set_role_permission** — 设置角色权限（写入 sys_rolelimit）。roleId 传 "admin" 可自动查找管理员角色
 
 ## 更高一层编排与验收工具
 - **microi_get_manifest_schema** — Return the full-system Manifest contract and example. In modules, use field names such as listFields/searchFields/sortFields; MCP resolves them to diy_field Id, SelectFields and SearchFieldIds before writing sys_menu.
@@ -501,6 +512,14 @@ BOUNDARY RULES:
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
+- **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；默认仅 page:open + form:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
+
+## 数据库索引（强制通过 MCP）
+- 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
+- 创建前后调用 \`microi_get_table_indexes\` 回读。删除只能调用 \`microi_drop_table_index\`，主键索引禁止删除。
+- 租户业务组合索引通常以 OsClient 开头；业务唯一键/幂等键用租户范围唯一索引；外键、子表回查、待办/重试扫描按真实 WHERE/JOIN/ORDER BY 设计。
+- 不得把 SearchFieldIds、SortFieldIds、StatisticsFields 机械转换为一批单列索引。Status/开关/删除标记等低基数字段不能单独滥建，LIKE '%keyword%' 和长文本也不能依赖普通 B-tree 索引。
+- MCP 创建在 diy_table 物理表上的索引，必须能在 Microi.Client “开发设计 → 索引管理”看到相同名称、有序字段和唯一性。
 
 ## MCP 写入超时与回读规则
 - \`microi_create_engine\`、\`microi_save_engine_code\`、\`microi_save_event_code\`、\`microi_update_module\` 已内置请求超时和远端短超时回读确认。若响应中出现 \`RecoveredAfterTransportError:true\`，表示客户端响应异常但远端写入已经确认成功。
@@ -570,11 +589,23 @@ BOUNDARY RULES:
   "RunBackground": false,    // 长任务可设 true
   "BackgroundTask": false,   // 兼容别名
   "IsBackgroundTask": false, // 兼容别名
-  "ApiEngineKey": ""         // 后台任务执行的接口引擎Key
+  "ApiEngineKey": "",        // 后台任务执行的接口引擎Key
+  "Workload": { "ExpectedItems": 2000, "FanOutOperations": 10000, "ExpectedSeconds": 3000 },
+  "BackgroundTaskOptions": {
+    "IdempotencyKeyFields": ["Id", "Version"],
+    "ConcurrencyKey": "seed-test-tasks",
+    "BusinessTable": "biz_batch",
+    "BusinessStatusField": "TaskStatus",
+    "BusinessTaskIdField": "BackgroundTaskId",
+    "BusinessProgressField": "TaskProgress",
+    "BusinessEtaField": "EstimatedEndTime"
+  }
 }
 \`\`\`
 按钮的 V8Code **强烈建议** 调用接口引擎（V8.ApiEngine.Run）执行后端逻辑，前端只负责弹窗、刷新、提示。
-应用安装、初始化多语言、批量导入、批量修复、跨系统同步等长任务应使用后台任务：按钮设置 RunBackground/BackgroundTask/IsBackgroundTask=true 并提供 ApiEngineKey，接口引擎内用 V8.Method.UpdateBackgroundTask 上报进度。
+以下任一条件成立时按长任务设计：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用、总量未知且可能持续运行，或属于安装/初始化/批量导入/批量生成/全量同步/迁移/备份。MCP 会依据 Workload 与动作语义自动启用 RunBackground 并给出警告。
+后台任务不是“把同步接口换个入口”：必须配置稳定幂等键；业务主记录至少保存“处理中”状态和 BackgroundTaskId，建议同时保存真实进度与 EstimatedEndTime；接口引擎用 V8.Method.UpdateBackgroundTask 上报已提交的 Current/Total。未知总量不填 Total，通知中心显示“计算中”，不得伪造百分比。
+预计超过 10 分钟的任务必须分片提交，每片返回 Data.BackgroundTask={HasMore:true,Checkpoint:...,Current,Total,NextDelaySeconds}，平台持久化检查点后重新入队；最后一片返回正常 Code=1。每片独立事务，重试以 IdempotencyKey + FencingToken + 数据库唯一约束保证副作用仅一次。
 详细写法参考 skill 文档：\`microi.skills/v8-menu-buttons/SKILL.md\`
 
 ## 系统级表名前缀
@@ -836,6 +867,125 @@ export function createMcpServer(client, context) {
             return { content: [{ type: 'text', text: `❌ Connection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
+    server.tool('microi_list_my_access_keys', `List the current authenticated user's access keys for OsClient "${osClient}". The response contains only public metadata and never returns the credential or its hash. Access-key sessions cannot manage keys. Requires confirmExecution="LIST" because key prefixes and usage metadata are security-sensitive.`, {
+        confirmExecution: z.string().optional().describe('Required. Pass LIST.'),
+    }, async ({ confirmExecution }) => {
+        if (confirmExecution !== 'LIST') {
+            return {
+                content: [{ type: 'text', text: '执行已拦截：访问密钥列表包含安全元数据，请重新调用并传 confirmExecution="LIST"。' }],
+                isError: true,
+            };
+        }
+        try {
+            const result = await client.listMyUserAccessKeys();
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `读取访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data || [], null, 2) }] };
+        }
+        catch (e) {
+            return {
+                content: [{ type: 'text', text: `读取访问密钥失败：${e instanceof Error ? e.message : String(e)}` }],
+                isError: true,
+            };
+        }
+    });
+    server.tool('microi_create_my_access_key', `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. Requires confirmExecution equal to name.`, {
+        name: z.string().min(1).max(200).describe('Human-readable key name.'),
+        allowedRoutes: z.array(z.string().min(1).max(500)).min(1).max(100).describe('Exact allowed routes. Use * only after explicit risk review.'),
+        allowedTableNames: z.array(z.string().min(1).max(200)).min(1).max(100).describe('Exact table names. Use * only after explicit risk review.'),
+        scopes: z.array(z.enum([
+            'page:open',
+            'form:read',
+            'form:write',
+            'form:export',
+            'api-engine:run',
+            'data-source:run',
+            'file:read',
+        ])).min(1).max(7).optional().describe('Omit for minimum page:open + form:read. page:open is always required by the backend.'),
+        redirectPath: z.string().max(500).optional().describe('Initial route; must be included in allowedRoutes.'),
+        allowedApiEngineKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with api-engine:run. Wildcards are rejected.'),
+        allowedDataSourceKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with data-source:run. Wildcards are rejected.'),
+        expiresAt: z.string().optional().describe('Optional server-local expiry time, later than now and no more than 365 days. Omit for the bounded default.'),
+        remark: z.string().max(1000).optional(),
+        confirmExecution: z.string().optional().describe('Required. Pass the exact name after reviewing scopes and allowlists.'),
+    }, async ({ name, allowedRoutes, allowedTableNames, scopes, redirectPath, allowedApiEngineKeys, allowedDataSourceKeys, expiresAt, remark, confirmExecution }) => {
+        if (confirmExecution !== name) {
+            return {
+                content: [{
+                        type: 'text',
+                        text: `执行已拦截：创建访问密钥会产生新的登录凭据，请核对期限、权限和允许范围后，重新调用并传 confirmExecution="${name}"。`,
+                    }],
+                isError: true,
+            };
+        }
+        try {
+            const result = await client.createMyUserAccessKey({
+                name,
+                allowedRoutes,
+                allowedTableNames,
+                scopes,
+                redirectPath,
+                allowedApiEngineKeys,
+                allowedDataSourceKeys,
+                expiresAt,
+                remark,
+            });
+            if (result.Code !== 1 || !result.Data?.AccessKey) {
+                return { content: [{ type: 'text', text: `创建访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
+            }
+            // Do not return LoginPath because it embeds a second plaintext copy in a URL.
+            // The credential below is the one and only MCP response containing plaintext.
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            AccessKey: result.Data.AccessKey,
+                            Record: result.Data.Record || null,
+                            Notice: '明文仅本次返回。请立即存入安全凭据库；后续列表和日志不会再次显示。',
+                        }, null, 2),
+                    }],
+            };
+        }
+        catch (e) {
+            return {
+                content: [{ type: 'text', text: `创建访问密钥失败：${e instanceof Error ? e.message : String(e)}` }],
+                isError: true,
+            };
+        }
+    });
+    server.tool('microi_revoke_my_access_key', `Revoke one access key owned by the current authenticated user on OsClient "${osClient}". Revocation is idempotent and invalidates the shared runtime cache. Requires confirmExecution equal to id. For rotation, create a new bounded key first, securely store its one-time plaintext, then revoke the old id.`, {
+        id: z.string().min(1).max(100).describe('Access key record Id from microi_list_my_access_keys.'),
+        confirmExecution: z.string().optional().describe('Required. Pass the exact id.'),
+    }, async ({ id, confirmExecution }) => {
+        if (confirmExecution !== id) {
+            return {
+                content: [{
+                        type: 'text',
+                        text: `执行已拦截：吊销后该访问密钥将立即失效，请重新调用并传 confirmExecution="${id}"。`,
+                    }],
+                isError: true,
+            };
+        }
+        try {
+            const result = await client.revokeMyUserAccessKey(id);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `吊销访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify({
+                            Id: id,
+                            Revoked: true,
+                            Record: result.Data || null,
+                            Message: result.Msg || '访问密钥已吊销。',
+                        }, null, 2) }] };
+        }
+        catch (e) {
+            return {
+                content: [{ type: 'text', text: `吊销访问密钥失败：${e instanceof Error ? e.message : String(e)}` }],
+                isError: true,
+            };
+        }
+    });
     server.tool('microi_redis_statistics', `Get Redis server/keyspace statistics for OsClient "${osClient}". Uses the current tenant Redis by default; pass connectionId only for a connection previously saved in mci_redis_connection. Never pass Redis passwords through MCP.`, {
         database: z.number().int().min(0).max(1023).optional().describe('Redis database index. Default: 0.'),
         connectionId: z.string().optional().describe('Optional saved mci_redis_connection Id. Omit for current tenant Redis.'),
@@ -987,6 +1137,331 @@ export function createMcpServer(client, context) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
+    server.tool('microi_get_table_indexes', `List normalized physical database indexes for one table in OsClient "${osClient}". Returns one item per index with ordered Columns, IsUnique and IsPrimary. Use this before changing indexes and again for readback verification.`, {
+        tableName: z.string().min(1).describe('Physical table name, e.g. Biz_Order or sys_apiengine.'),
+    }, async ({ tableName }) => {
+        try {
+            const result = await client.getTableIndexes(tableName);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify({
+                            TableName: tableName,
+                            IndexCount: result.Data?.length || 0,
+                            Indexes: result.Data || [],
+                        }, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_create_table_index', `Create an idempotent physical database index for OsClient "${osClient}". The backend validates the real table/columns, skips an equivalent existing index, and verifies the result by readback. Indexes created on a diy_table are immediately visible in Microi.Client's 索引管理 dialog. Requires confirmExecution equal to tableName or EXECUTE.`, {
+        tableName: z.string().min(1).describe('Physical table name.'),
+        columns: z.array(z.string().min(1)).min(1).max(8).describe('Ordered index columns. Put equality/tenant columns first and range/order columns last.'),
+        indexName: z.string().optional().describe('Optional index name. Omit for a stable idx_<table>_<columns> name.'),
+        unique: z.boolean().optional().describe('Create a UNIQUE index. Default false. Use only when this is a real business invariant.'),
+        confirmExecution: z.string().optional().describe('Required. Pass the exact tableName or EXECUTE.'),
+    }, async ({ tableName, columns, indexName, unique, confirmExecution }) => {
+        if (confirmExecution !== tableName && confirmExecution !== 'EXECUTE') {
+            return {
+                content: [{
+                        type: 'text',
+                        text: `执行已拦截：创建数据库索引会执行 DDL，请重新调用并传 confirmExecution="${tableName}" 或 "EXECUTE"。`,
+                    }],
+                isError: true,
+            };
+        }
+        try {
+            const result = await client.createTableIndex({
+                TableName: tableName,
+                Columns: columns,
+                IndexName: indexName,
+                Unique: unique,
+            });
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}\n${JSON.stringify(result.Data || {}, null, 2)}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_drop_table_index', `Drop a non-primary database index from OsClient "${osClient}". The operation is idempotent, blocks primary-key indexes, and verifies absence by readback. Requires confirmExecution equal to "tableName:indexName" or DROP.`, {
+        tableName: z.string().min(1).describe('Physical table name.'),
+        indexName: z.string().min(1).describe('Exact index name returned by microi_get_table_indexes.'),
+        confirmExecution: z.string().optional().describe('Required. Pass tableName:indexName or DROP.'),
+    }, async ({ tableName, indexName, confirmExecution }) => {
+        const exactConfirmation = `${tableName}:${indexName}`;
+        if (confirmExecution !== exactConfirmation && confirmExecution !== 'DROP') {
+            return {
+                content: [{
+                        type: 'text',
+                        text: `执行已拦截：删除数据库索引会执行破坏性 DDL，请重新调用并传 confirmExecution="${exactConfirmation}" 或 "DROP"。`,
+                    }],
+                isError: true,
+            };
+        }
+        try {
+            const result = await client.dropTableIndex(tableName, indexName);
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}\n${JSON.stringify(result.Data || {}, null, 2)}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_list_database_types', 'List all database types certified by the current Microi Dos.ORM runtime, including aliases, default ports, and redacted connection-string examples.', {}, async () => {
+        try {
+            const result = await client.getSupportedDatabaseTypes();
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_inspect_external_database', `Connect to an external database through Dos.ORM for OsClient "${osClient}" and return physical tables, columns, native types, nullability, keys, and comments. Prefer dbKey after saving a connection so credentials are not repeatedly passed to AI tools. This tool never returns the connection string.`, {
+        dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred over passing connectionString.'),
+        databaseType: z.string().optional().describe('Required only with a temporary connectionString. Call microi_list_database_types for certified values.'),
+        connectionString: z.string().optional().describe('Temporary database connection string. Sensitive: never place it in generated code, logs, or narrative output.'),
+        tableName: z.string().optional().describe('Optional case-insensitive partial table-name filter.'),
+        maxTables: z.number().int().min(1).max(5000).optional().describe('Maximum returned tables. Default 500.'),
+        includeColumns: z.boolean().optional().describe('Whether to load columns for each table. Default true.'),
+        commandTimeoutSeconds: z.number().int().min(1).max(600).optional().describe('Metadata query timeout. Default 60 seconds.'),
+    }, async ({ dbKey, databaseType, connectionString, tableName, maxTables, includeColumns, commandTimeoutSeconds }) => {
+        if (!dbKey && (!databaseType || !connectionString)) {
+            return { content: [{ type: 'text', text: 'Error: pass dbKey, or both databaseType and connectionString.' }], isError: true };
+        }
+        try {
+            const result = await client.inspectExternalDatabase({
+                DbKey: dbKey,
+                DatabaseType: databaseType,
+                ConnectionString: connectionString,
+                TableName: tableName,
+                MaxTables: maxTables,
+                IncludeColumns: includeColumns,
+                CommandTimeoutSeconds: commandTimeoutSeconds,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_query_external_database', `Run a bounded, parameterized, read-only SELECT/CTE query against an external Dos.ORM database for OsClient "${osClient}". Use this after schema inspection to read source rows for migration or synchronization. Multi-statement, DML, DDL, procedures, and file-reading SQL are rejected.`, {
+        sql: z.string().min(1).describe('Single read-only SELECT or WITH ... SELECT statement. Use named parameters.'),
+        parameters: z.record(z.unknown()).optional().describe('Named SQL parameter values, e.g. { status: 1 }. Never concatenate dynamic values into SQL.'),
+        dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred.'),
+        databaseType: z.string().optional().describe('Required only with a temporary connectionString.'),
+        connectionString: z.string().optional().describe('Temporary connection string. Sensitive and never returned.'),
+        maxRows: z.number().int().min(1).max(5000).optional().describe('Maximum returned rows. Default 200.'),
+        commandTimeoutSeconds: z.number().int().min(1).max(600).optional().describe('Query timeout. Default 60 seconds.'),
+    }, async ({ sql, parameters, dbKey, databaseType, connectionString, maxRows, commandTimeoutSeconds }) => {
+        if (!dbKey && (!databaseType || !connectionString)) {
+            return { content: [{ type: 'text', text: 'Error: pass dbKey, or both databaseType and connectionString.' }], isError: true };
+        }
+        try {
+            const result = await client.queryExternalDatabase({
+                Sql: sql,
+                Parameters: parameters,
+                DbKey: dbKey,
+                DatabaseType: databaseType,
+                ConnectionString: connectionString,
+                MaxRows: maxRows,
+                CommandTimeoutSeconds: commandTimeoutSeconds,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_execute_external_database', `Execute explicitly confirmed administrative SQL against an external Dos.ORM database for OsClient "${osClient}". This Level >= 9999 control-plane tool intentionally permits DML, DDL, stored procedures, provider-specific commands, and driver-supported multi-statement scripts. The SQL text and connection string are never written to audit logs.`, {
+        sql: z.string().min(1).describe('Raw administrative SQL. It may change schema/data or invoke provider-specific capabilities.'),
+        mode: z.enum(['Query', 'Scalar', 'NonQuery']).describe('How Dos.ORM should consume the result. Use NonQuery for DML/DDL/scripts.'),
+        parameters: z.record(z.unknown()).optional().describe('Optional named parameters. Use parameters for dynamic values whenever the provider supports them.'),
+        dbKey: z.string().optional().describe('Saved and enabled microi_database DbKey. Preferred.'),
+        databaseType: z.string().optional().describe('Required only with a temporary connectionString.'),
+        connectionString: z.string().optional().describe('Temporary connection string. Sensitive and never returned or audited.'),
+        maxRows: z.number().int().min(1).max(100000).optional().describe('Query response cap only; it does not limit SQL permissions. Default 1000.'),
+        commandTimeoutSeconds: z.number().int().min(1).max(86400).optional().describe('Default 600 seconds.'),
+        confirmExecution: z.string().optional().describe('Required. Pass EXECUTE or the SHA-256 shown by the dry run.'),
+    }, async ({ sql, mode, parameters, dbKey, databaseType, connectionString, maxRows, commandTimeoutSeconds, confirmExecution }) => {
+        if (!dbKey && (!databaseType || !connectionString)) {
+            return { content: [{ type: 'text', text: 'Error: pass dbKey, or both databaseType and connectionString.' }], isError: true };
+        }
+        const sqlSha256 = crypto.createHash('sha256').update(sql, 'utf8').digest('hex');
+        if (confirmExecution !== 'EXECUTE' && confirmExecution?.toLowerCase() !== sqlSha256) {
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            dryRun: true,
+                            action: 'execute_external_database_sql',
+                            target: dbKey ? `DbKey:${dbKey}` : `temporary:${databaseType}`,
+                            mode,
+                            sqlSha256,
+                            sqlLength: sql.length,
+                            parameterNames: Object.keys(parameters || {}),
+                            connectionStringProvided: !!connectionString,
+                            requiresConfirmation: 'EXECUTE or sqlSha256',
+                        }, null, 2),
+                    }],
+            };
+        }
+        try {
+            const result = await client.executeExternalDatabaseSql({
+                Sql: sql,
+                Mode: mode,
+                Parameters: parameters,
+                DbKey: dbKey,
+                DatabaseType: databaseType,
+                ConnectionString: connectionString,
+                MaxRows: maxRows,
+                CommandTimeoutSeconds: commandTimeoutSeconds,
+                ConfirmExecution: confirmExecution,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_save_database_connection', `Validate and add or update a connection in the protected microi_database table for OsClient "${osClient}". The backend tests the connection before writing, never returns the secret, and invalidates the local V8.Dbs cache. Requires explicit confirmation.`, {
+        dbKey: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]{0,49}$/).describe('Stable V8 key used as V8.Dbs.{DbKey}.'),
+        dbName: z.string().max(100).optional().describe('Display name. Defaults to dbKey.'),
+        databaseType: z.string().describe('Certified type returned by microi_list_database_types.'),
+        connectionString: z.string().min(1).describe('Sensitive database connection string. It is validated and never echoed.'),
+        dbReadConn: z.string().optional().describe('Optional read-replica connection string of the same database type.'),
+        dbVersion: z.string().optional(),
+        remark: z.string().optional(),
+        isEnable: z.number().int().min(0).max(1).optional().describe('Default 1.'),
+        commandTimeoutSeconds: z.number().int().min(5).max(120).optional().describe('Connection validation timeout. Default 30 seconds.'),
+        confirmExecution: z.string().optional().describe('Required. Pass the exact dbKey or EXECUTE.'),
+    }, async ({ dbKey, dbName, databaseType, connectionString, dbReadConn, dbVersion, remark, isEnable, commandTimeoutSeconds, confirmExecution }) => {
+        if (confirmExecution !== dbKey && confirmExecution !== 'EXECUTE') {
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            dryRun: true,
+                            action: 'save_database_connection',
+                            dbKey,
+                            dbName: dbName || dbKey,
+                            databaseType,
+                            connectionStringProvided: true,
+                            requiresConfirmation: dbKey,
+                        }, null, 2),
+                    }],
+            };
+        }
+        try {
+            const result = await client.saveDatabaseConnection({
+                DbKey: dbKey,
+                DbName: dbName,
+                DatabaseType: databaseType,
+                ConnectionString: connectionString,
+                DbReadConn: dbReadConn,
+                DbVersion: dbVersion,
+                Remark: remark,
+                IsEnable: isEnable,
+                CommandTimeoutSeconds: commandTimeoutSeconds,
+                ConfirmExecution: confirmExecution,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_import_external_attachment', `Stream one attachment from HTTP(S), an absolute server-local path, or a UNC path into Microi storage for OsClient "${osClient}". This Level >= 9999 control-plane tool intentionally permits private-network and server-filesystem access. It bypasses Base64 buffering and has no fixed MCP size ceiling; MaxBytes is an optional caller safety limit. Requires explicit confirmation and writes a redacted audit record.`, {
+        sourceUrl: z.string().url().refine(value => /^https?:\/\//i.test(value), 'sourceUrl must use http or https').optional().describe('HTTP(S) attachment URL. Provide exactly one of sourceUrl/sourcePath.'),
+        sourcePath: z.string().optional().describe('Absolute path visible to the API service account, including Windows UNC paths such as \\\\server\\share\\file.bin. Provide exactly one source.'),
+        headers: z.record(z.string()).optional().describe('Optional authentication headers. Sensitive values are never returned.'),
+        fileName: z.string().optional(),
+        path: z.string().optional().describe('Target Microi storage directory.'),
+        filePathName: z.string().optional().describe('Exact tenant-scoped target path; bucket visibility follows limit.'),
+        limit: z.boolean().optional(),
+        preview: z.boolean().optional(),
+        maxBytes: z.number().int().nonnegative().optional().describe('Optional caller limit in bytes. Omit or pass 0 for no MCP-level size cap.'),
+        timeoutSeconds: z.number().int().min(5).max(86400).optional().describe('HTTP transfer timeout. Default 3600 seconds.'),
+        targetTable: z.string().optional(),
+        targetId: z.string().optional(),
+        targetField: z.string().optional(),
+        confirmExecution: z.string().optional().describe('Required. Pass EXECUTE, the exact source value, or its dry-run SHA-256.'),
+    }, async ({ sourceUrl, sourcePath, headers, fileName, path, filePathName, limit, preview, maxBytes, timeoutSeconds, targetTable, targetId, targetField, confirmExecution }) => {
+        if (!!sourceUrl === !!sourcePath) {
+            return { content: [{ type: 'text', text: 'Error: provide exactly one of sourceUrl or sourcePath.' }], isError: true };
+        }
+        const source = sourceUrl || sourcePath || '';
+        const sourceSha256 = crypto.createHash('sha256').update(source, 'utf8').digest('hex');
+        if (confirmExecution !== source && confirmExecution !== 'EXECUTE'
+            && confirmExecution?.toLowerCase() !== sourceSha256) {
+            let redactedSource = sourcePath ? '[LOCAL_OR_UNC_SOURCE]' : '[INVALID_URL]';
+            if (sourceUrl) {
+                try {
+                    const parsed = new URL(sourceUrl);
+                    redactedSource = `${parsed.protocol}//${parsed.host}/[REDACTED]`;
+                }
+                catch {
+                    // Zod already validates URL; retain defensive fallback.
+                }
+            }
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            dryRun: true,
+                            action: 'import_external_attachment',
+                            source: redactedSource,
+                            sourceKind: sourcePath ? 'LocalOrUncPath' : 'Http',
+                            sourceSha256,
+                            headersProvided: !!headers && Object.keys(headers).length > 0,
+                            targetTable,
+                            targetId,
+                            targetField,
+                            requiresConfirmation: 'EXECUTE, exact source, or sourceSha256',
+                        }, null, 2),
+                    }],
+            };
+        }
+        try {
+            const result = await client.importExternalAttachment({
+                SourceUrl: sourceUrl,
+                SourcePath: sourcePath,
+                Headers: headers,
+                FileName: fileName,
+                Path: path,
+                FilePathName: filePathName,
+                Limit: limit,
+                Preview: preview,
+                MaxBytes: maxBytes,
+                TimeoutSeconds: timeoutSeconds,
+                TargetTable: targetTable,
+                TargetId: targetId,
+                TargetField: targetField,
+                ConfirmExecution: confirmExecution,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
     // ========================
     // Tool: 获取 Playwright 测试上下文
     // ========================
@@ -1075,9 +1550,11 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 获取引擎源码
     // ========================
-    server.tool('microi_get_engine_code', `Get JavaScript source code of a specific API engine (OsClient: ${osClient}).`, {
+    server.tool('microi_get_engine_code', `Get JavaScript source code of a specific API engine (OsClient: ${osClient}). Large source is returned in explicit character chunks so the MCP host cannot silently replace missing code with a "tokens truncated" marker. Read every chunk before editing; never save a single partial chunk as complete source.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
-    }, async ({ apiEngineKey }) => {
+        charOffset: z.number().int().nonnegative().optional().describe('Zero-based character offset. Start with 0, then use nextCharOffset until hasMore=false.'),
+        maxChars: z.number().int().min(1000).max(16000).optional().describe('Characters per chunk (default 6000, max 16000).'),
+    }, async ({ apiEngineKey, charOffset, maxChars }) => {
         try {
             const result = await client.getEngineCode(apiEngineKey);
             if (result.Code !== 1) {
@@ -1085,15 +1562,25 @@ export function createMcpServer(client, context) {
             }
             const engine = result.Data;
             const code = getStringField(engine, 'ApiV8Code', 'Code', 'V8Code');
+            const start = Math.min(charOffset || 0, code.length);
+            const chunkSize = maxChars || 6000;
+            const end = Math.min(start + chunkSize, code.length);
+            const chunk = code.slice(start, end);
+            const hasMore = end < code.length;
+            const sha256 = crypto.createHash('sha256').update(code, 'utf8').digest('hex');
             const lines = [
                 `## API Engine: ${engine?.ApiEngineKey || apiEngineKey}`,
                 engine?.ApiName ? `- **Name**: ${engine.ApiName}` : '',
                 engine?.Category ? `- **Category**: ${engine.Category}` : '',
                 engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
                 engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
+                `- **Source completeness**: ${hasMore || start > 0 ? 'PARTIAL CHUNK — do not save this chunk alone' : 'COMPLETE'}`,
+                `- **Character range**: [${start}, ${end}) of ${code.length}`,
+                `- **Full source SHA-256**: ${sha256}`,
+                hasMore ? `- **Next call**: charOffset=${end}, maxChars=${chunkSize}` : '- **Has more**: false',
                 '',
                 '```javascript',
-                code || '// No code available',
+                chunk || '// No code available',
                 '```',
             ].filter(Boolean);
             return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -1262,9 +1749,14 @@ export function createMcpServer(client, context) {
         code: z.string().describe('The complete JavaScript source code to save'),
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
-    }, async ({ apiEngineKey, code, functionDescription, changeSummary }) => {
+        confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
+    }, async ({ apiEngineKey, code, functionDescription, changeSummary, confirmLargeReduction }) => {
         try {
-            const result = await client.saveEngineCode(apiEngineKey, code, { functionDescription, changeSummary });
+            const result = await client.saveEngineCode(apiEngineKey, code, {
+                functionDescription,
+                changeSummary,
+                confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
+            });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
@@ -1950,7 +2442,10 @@ export function createMcpServer(client, context) {
         tableDiyFieldIds: z.string().optional().describe('Comma-separated field Ids to show as table columns (e.g. "fieldId1,fieldId2,fieldId3"). Controls which fields appear in the list view.'),
         defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
         sqlWhere: z.string().optional().describe('Fixed SQL WHERE clause for data filtering (e.g. "Status=1", "IsDeleted=0")'),
-        diyConfig: z.string().optional().describe('Advanced module config JSON string'),
+        enableViewSchema: z.number().optional().describe('Enable the versioned cross-client ViewSchema (1=yes, 0=no). Default: 0.'),
+        viewSchemaVersion: z.string().optional().describe('ViewSchema protocol version stored in sys_menu.ViewSchemaVersion. Default: "1.0".'),
+        viewConfigVersion: z.number().optional().describe('Monotonic configuration version stored in sys_menu.ViewConfigVersion. Default: 1.'),
+        viewSchema: z.string().optional().describe('Versioned cross-client view JSON stored in the physical sys_menu.ViewSchema column. Supports Detail/Edit/List/Card views and PC/Mobile/All device scopes.'),
         moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
         formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required.'),
         batchSelectMoreBtns: z.string().optional().describe('Batch action buttons (after selecting multiple rows) JSON ARRAY (string). Same item shape as moreBtns. Use V8.TableRowSelected to access selected rows.'),
@@ -1968,15 +2463,26 @@ export function createMcpServer(client, context) {
         mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile/card list. If omitted and diyTableId is bound, backend picks compact title/status/summary fields.'),
         cardTitleTagFields: z.string().optional().describe('JSON array of fields shown as title tags on mobile/card view.'),
         cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
-    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, diyConfig, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields }) => {
+    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields }) => {
         try {
+            const normalizedViewSchema = normalizeViewSchemaJson(viewSchema);
+            if (!normalizedViewSchema.ok) {
+                return {
+                    content: [{ type: 'text', text: `Error: ${normalizedViewSchema.errors.join('\n')}` }],
+                    isError: true,
+                };
+            }
             const result = await client.createModule({
                 Name: name, DiyTableId: diyTableId, ParentId: parentId,
                 ComponentName: componentName, ComponentPath: componentPath,
                 Display: display ?? 1, AppDisplay: appDisplay ?? 1,
                 OpenType: openType, Url: url, Sort: sort,
                 Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
-                DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere, DiyConfig: diyConfig,
+                DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere,
+                EnableViewSchema: enableViewSchema ?? 0,
+                ViewSchemaVersion: viewSchemaVersion ?? '1.0',
+                ViewConfigVersion: viewConfigVersion ?? 1,
+                ViewSchema: normalizedViewSchema.value,
                 MoreBtns: moreBtns, FormBtns: formBtns, BatchSelectMoreBtns: batchSelectMoreBtns,
                 PageTabs: pageTabs, ExportMoreBtns: exportMoreBtns, PageBtns: pageBtns,
                 SortFieldIds: sortFieldIds, NotShowFields: notShowFields,

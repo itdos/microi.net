@@ -1765,7 +1765,9 @@ namespace Microi.net
                     if(param._OnlyRealField == true)
                     {
                         diyTableCache = diyTableCache.Where(d => d["Type"] != null && d["Type"].Val<string>() != ""
-                                        && !DiyCommon.IsNotRealFieldComponent(d["Component"].Val<string>())).ToList();
+                                        && !DiyCommon.IsNotRealDataField(
+                                            d["Component"].Val<string>(),
+                                            d["Type"].Val<string>())).ToList();
                     }
                     if (param._SelectFields != null && param._SelectFields.Any())
                     {
@@ -1855,7 +1857,9 @@ namespace Microi.net
                     if(param._OnlyRealField == true)
                     {
                         result = result.Where(d => d["Type"] != null && d["Type"].Val<string>() != ""
-                                        && !DiyCommon.IsNotRealFieldComponent(d["Component"].Val<string>())).ToList();
+                                        && !DiyCommon.IsNotRealDataField(
+                                            d["Component"].Val<string>(),
+                                            d["Type"].Val<string>())).ToList();
                     }
                     if (param._SelectFields != null && param._SelectFields.Any())
                     {

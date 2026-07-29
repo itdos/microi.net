@@ -504,23 +504,21 @@ export const microiEnv = {
   loginEngine: process.env.PW_LOGIN_ENGINE || 'member_login'
 };
 
-export function withOsClient(url) {
-  if (url.includes('/apiengine/') && !url.includes('--OsClient--') && !url.includes('?')) {
-    return `${url}--OsClient--${encodeURIComponent(microiEnv.osClient)}--`;
-  }
+// 仅用于需要在 URL 中显式携带租户的普通 GET；POST 不调用此函数。
+export function withOsClientQuery(url) {
   const sep = url.includes('?') ? '&' : '?';
   return `${url}${sep}OsClient=${encodeURIComponent(microiEnv.osClient)}`;
 }
 
 export async function callEngine(request, apiEngineKey, data = {}, token = '') {
-  const res = await request.post(withOsClient(`${microiEnv.apiBase}/apiengine/${apiEngineKey}`), {
+  const res = await request.post(`${microiEnv.apiBase}/apiengine/${apiEngineKey}`, {
     headers: {
       'Content-Type': 'application/json',
       apiengine: '1',
-      OsClient: microiEnv.osClient,
+      osclient: microiEnv.osClient,
       ...(token ? { Token: token } : {})
     },
-    data
+    data: { ...data, OsClient: data.OsClient || microiEnv.osClient }
   });
   expect(res.ok(), `${apiEngineKey} HTTP status`).toBeTruthy();
   const json = await res.json();
@@ -639,7 +637,7 @@ tests/e2e/
 3. 写操作必须做“前置清理 → 执行动作 → 后端查询确认 → 用例清理”。
 4. UI 点击不能只断言 toast；必须用 `page.waitForResponse()` 捕捉对应接口，并验证响应体。
 5. 任何 FormEngine HTTP 路由必须使用 `/api/formengine/{action}-{table}`，不要生成 `/formengine/{table}/{action}`。
-6. ApiEngine 动态路由必须显式携带 OsClient：推荐 `/apiengine/{ApiEngineKey}--OsClient--{osClient}--`，同时补充 Header `OsClient`。部分引擎会把 querystring 参与 `ApiAddress` 匹配，`?OsClient=` 可能误报“sys_apiengine 不存在”。
+6. ApiEngine 使用稳定路径 `/apiengine/{ApiEngineKey}`，并通过唯一的 `osclient` Header 传租户；JSON/Form Body 可冗余携带 `OsClient`。普通 POST/PUT/PATCH/DELETE 禁止追加 `--OsClient--...--`。仅第三方回调或无法设置 Header/Form/Query 的 GET/HEAD 才允许特殊路径。
 7. 页面级测试必须把 `请求失败`、`网络错误`、`null`、`待开发`、`开发中` 当成失败信号；这些文案如果出现在页面或 toast 中，说明功能未交付或接口契约错误。
 8. 新增、保存、结算、转赠、确认、上传等按钮不能只弹“成功/待开发”toast；必须调用真实业务接口，并通过后端查询验证状态变化。
 9. 源码守卫可作为兜底：递归扫描 `src/**/*.vue`、`src/**/*.js`，禁止残留 `待开发|开发中` 占位文案。
@@ -670,7 +668,7 @@ tests/e2e/
 - `microi_get_playwright_context`：获取可测菜单 URL、接口引擎、匿名配置。
 - `microi_plan_playwright_e2e`：生成推荐的测试文件、环境变量和冒烟路径。
 - `microi_run_engine`：调试单个接口引擎，不替代浏览器 E2E。
-- `microi_set_engine_anonymous`：登录、注册、公开首页接口需要匿名访问时使用；设置后仍要验证 HTTP `/apiengine/{key}--OsClient--{osClient}--` 返回标准 DosResult。
+- `microi_set_engine_anonymous`：登录、注册、公开首页接口需要匿名访问时使用；设置后仍要验证 HTTP `/apiengine/{key}` + `osclient` Header 返回标准 DosResult。
 
 ## 与 VS Code 插件的配合
 

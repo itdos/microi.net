@@ -60,6 +60,32 @@ var result2 = V8.ApiEngine.Run('ApiEngineKey', {
 - 嵌套调用传入外层事务时，最终提交或回滚由外层调用者决定。
 - `V8.DbTrans.Commit()`、`Rollback()`、`Close()` 会被安全代理忽略，不要在脚本中手动管理平台事务。
 
+### 接口嵌套与 Jint 资源预算
+
+`V8.ApiEngine.Run` 嵌套调用是平台支持的正常编排方式。新版默认允许 32 层、节点硬上限默认 64 层；实际业务可以有 5、10 甚至更多层，但仍应避免循环调用，并让每层保持单一职责。这里的“接口嵌套深度”与 JavaScript 函数递归深度不是同一个概念。
+
+Jint 的 `LimitMemory` 统计当前执行线程自约束重置后的**累计托管分配字节数**，不是当前仍存活的对象、进程工作集，也不会预留 2GB 物理内存。因此，一个接口触发“2GB累计分配上限”不等于服务器当时真实占用了 2GB；100 个并发接口也不能据此直接推算为 200GB 实时内存。大量临时对象、重复 JSON 序列化/反序列化、整表加载和数组复制都会快速累加，即使对象随后已被 GC 回收。
+
+旧版中，父引擎执行子接口时，子接口初始化、查询、JSON 和业务对象分配还会被每一层父引擎重复计入，四层编排可能远早于预期触发父层 2GB。新版默认启用嵌套隔离：
+
+- 每个接口引擎拥有自己的单层累计分配预算，默认 2048MB、节点硬上限默认 4096MB；
+- 子接口分配不再重复计入每个父接口的单层预算；
+- 根调用树仍有独立累计分配总预算，默认 8192MB、节点硬上限默认 32768MB，防止通过无限嵌套绕过整体保护；
+- 嵌套调用不会重复占用全局和租户并发名额；同一调用树重入同一个 Key 也不会再次抢占自己的 Key 名额，循环调用最终由嵌套深度上限终止。
+
+当前片段的有效预算可从 `V8.Limits` 查看：
+
+```javascript
+console.log(JSON.stringify(V8.Limits));
+// TimeoutSeconds, MaxStatements, LimitMemoryMB,
+// CallTreeLimitMemoryMB, LimitRecursion, NestedApiDepthLimit,
+// CurrentDepth, IsBackgroundTask, IsolateNestedApiMemory, MemoryAccounting
+```
+
+资源异常会在 `DataAppend.V8Limit` 返回结构化分类，例如 `V8_MEMORY_LIMIT`、`V8_CALL_TREE_MEMORY_LIMIT`、`V8_STATEMENTS_LIMIT`、`V8_RECURSION_LIMIT`、`V8_TIMEOUT`、`V8_NESTED_DEPTH_LIMIT` 或 `V8_EXECUTION_QUEUE_TIMEOUT`，同时包含限制值、调用深度和调用路径。排查时应按分类处理，不要把所有异常都归为“服务器内存不足”。
+
+后台任务仍通过接口引擎执行，所以**一个未分片的 30 分钟脚本仍会受同一套单片超时、语句和累计分配预算约束**。后台任务的总时长可以是数小时，但每片应控制在默认 600 秒以内，在提交本片事务后返回 `HasMore + Checkpoint`，由 Worker 创建新的执行片段继续；新片会获得新的超时、语句和累计分配预算。
+
 ## 表单引擎 V8.FormEngine
 
 见平台文档：[FormEngine 用法](https://microi.net/doc/v8-engine/form-engine.html)。
@@ -1362,7 +1388,7 @@ WFNodeStart：流程节点开始V8事件
 
 常见上下文包括 `V8.Param`、`V8.Header`、`V8.CurrentUser`、`V8.OsClient`、`V8.Form`、`V8.OldForm`、`V8.TableModel`、`V8.TableData`、`V8.FormSubmitAction`、`V8.EventName`、`V8.InvokeType`、`V8.RowIndex`、`V8.CacheData`、`V8.NotSaveField`、`V8.LineValue`、`V8.NextNodeId`、`V8.FilesByteBase64` 和 `V8.WF`。`Engine`、`HttpContext`、执行租约等宿主对象属于内部实现，不要保存到静态变量、缓存或延迟回调。
 
-平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同限制单次脚本和单节点资源。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
+平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同限制单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；单个接口可用 `sys_apiengine.Timeout/MaxStatements/LimitMemory/LimitRecursion` 下调或在节点硬上限内覆盖。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
 
 脚本应主动控制：
 

@@ -515,10 +515,10 @@
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
-| `Timeout` | 超时时间 | `int` | `Text` | V8引擎执行超时时间，默认10分钟，单位秒 |
-| `MaxStatements` | 最大语句数 | `int` | `NumberText` | 【最大语句数】执行的JavaScript语句数量上限，1亿条语句约等于：10万条数据 × 每条1000条语句的处理逻辑，超出后抛出 StatementsCountOverflowException，最大值2147483647 |
-| `LimitMemory` | 内存限制 | `int` | `Text` | 【内存限制】V8引擎可使用的最大内存（2GB），防止恶意代码或内存泄漏导致服务器OOM，超出后抛出 MemoryLimitExceededException，单位MB |
-| `LimitRecursion` | 递归深度限制 | `int` | `NumberText` | 【递归深度限制】函数调用栈的最大深度，防止无限递归导致栈溢出，10000层足够大多数场景，超出后抛出 RecursionDepthOverflowException |
+| `Timeout` | 超时时间 | `int` | `Text` | 单个V8执行片段超时，单位秒，默认600；后台任务总时长可超过此值，但每片仍受限 |
+| `MaxStatements` | 最大语句数 | `int` | `NumberText` | 当前单个Jint引擎的JavaScript语句预算，默认50000000；嵌套子接口拥有独立预算 |
+| `LimitMemory` | 累计分配预算(MB) | `int` | `Text` | 当前单层Jint执行的累计托管分配预算，不是实时内存；默认2048MB，嵌套隔离后子接口不再被父层重复计费 |
+| `LimitRecursion` | 递归深度限制 | `int` | `NumberText` | 当前JavaScript函数递归深度，默认2000、节点硬上限默认5000；不等同于接口引擎嵌套层数 |
 | `ApiAddress` | 自定义接口地址 | `varchar(255)` | `Text` | 建议统一使用/apiengine/开头，如：/apiengine/get-product-list |
 | `EnableLog` | 开启日志 | `int` | `Switch` | 开启日志 |
 | `LockKey` | 分布式锁Key | `varchar(50)` | `Text` | 可填写参数名称，如调用此接口传入了Id='xxxx-xxxx'，那么分布式锁Key可以直接填写Id即可。不填则该接口引擎使用统一的锁，并发性能较低。 |

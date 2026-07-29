@@ -13,8 +13,8 @@ const navbarSource = fs.readFileSync(
     path.resolve(testDir, "../src/layout/components/Navbar.vue"),
     "utf8"
 );
-const assistantSource = fs.readFileSync(
-    path.resolve(testDir, "../src/views/mobile/ai-assistant.vue"),
+const aiEngineSource = fs.readFileSync(
+    path.resolve(testDir, "../src/views/ai-engine/index.vue"),
     "utf8"
 );
 
@@ -27,12 +27,39 @@ test("PC navbar exposes the same feature-gated robot entry", () => {
     assert.doesNotMatch(desktopSource, /吾码\s*AI\s*助手|吾码AI助手/);
 });
 
-test("PC entry opens a movable dialog backed by the complete assistant", () => {
+test("PC entry opens a movable dialog backed by the unified AI core", () => {
     assert.match(desktopSource, /<el-dialog[\s\S]*?draggable[\s\S]*?destroy-on-close/);
     assert.match(desktopSource, /data-testid="desktop-ai-dialog-drag-handle"/);
-    assert.match(desktopSource, /<MobileAiAssistant embedded @close="closeAssistant"\s*\/>/);
-    assert.match(desktopSource, /height:\s*min\(720px, calc\(100vh - 140px\)\)/);
-    assert.match(assistantSource, /defineProps\(\{[\s\S]*embedded:/);
-    assert.match(assistantSource, /if \(embedded\.value\)[\s\S]*emit\("close"\)/);
-    assert.match(assistantSource, /\.mobile-ai-page--embedded \.mobile-ai-history-mask[\s\S]*position:\s*absolute/);
+    assert.match(desktopSource, /<AiEngine embedded\s*\/>/);
+    assert.match(desktopSource, /height:\s*min\(760px, calc\(100vh - 140px\)\)/);
+    assert.match(aiEngineSource, /data-testid="unified-ai-assistant"/);
+    assert.match(aiEngineSource, /data-testid="unified-ai-history"/);
+    assert.match(aiEngineSource, /data-testid="unified-ai-new-conversation"/);
+    assert.match(aiEngineSource, /data-testid="unified-ai-history-archived"/);
+    assert.match(aiEngineSource, /value:\s*"secure-data"/);
+    assert.match(aiEngineSource, /sendMobileAiQuestion/);
+    assert.match(aiEngineSource, /sendChatStream/);
+    assert.match(aiEngineSource, /sendDataQuestion/);
+    assert.match(aiEngineSource, /sendCodeQuestion/);
+    assert.match(aiEngineSource, /sendBuilderQuestion/);
+});
+
+test("unified core preserves both conversation protocols and security boundaries", () => {
+    assert.match(aiEngineSource, /const SOURCE = "ai-engine-workbench"/);
+    assert.match(aiEngineSource, /const SECURE_DATA_SOURCE = "mci-ai-data-assistant"/);
+    assert.match(aiEngineSource, /loadMobileAiBootstrap/);
+    assert.match(aiEngineSource, /listMobileAiConversations/);
+    assert.match(aiEngineSource, /listMobileAiMessages/);
+    assert.match(aiEngineSource, /renameMobileAiConversation/);
+    assert.match(aiEngineSource, /setMobileAiConversationArchived/);
+    assert.match(aiEngineSource, /\/api\/Ai\/ChatStream/);
+    assert.match(aiEngineSource, /\/api\/Ai\/NL2SQL/);
+    assert.match(aiEngineSource, /\/api\/Ai\/NL2V8Engine/);
+    assert.match(aiEngineSource, /内容由人工智能生成，请注意甄别/);
+    assert.match(aiEngineSource, /数据权限已校验/);
+    assert.match(aiEngineSource, /secureAssistantFailure\.description/);
+    assert.match(aiEngineSource, /classifyMobileAiBootstrapFailure\(error\)/);
+    assert.match(aiEngineSource, /安全业务数据：\{\{ secureAssistantFailure\.description \}\}/);
+    assert.match(aiEngineSource, /title:\s*text,[\s\S]*?desc:\s*`查询范围：\$\{secureAssistantScopeLabel\.value\}`/);
+    assert.doesNotMatch(aiEngineSource, /title:\s*`安全数据分析\$\{/);
 });

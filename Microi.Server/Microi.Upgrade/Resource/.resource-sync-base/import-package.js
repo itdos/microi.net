@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.7.0
+ * Version: v1.7.4
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -297,6 +297,35 @@ try {
         return result;
     };
 
+    // Reinstalling a package must not run the expensive diy_field update path
+    // for definitions that already match. Besides unnecessary DDL/cache work,
+    // dozens of no-op FormEngine updates can exhaust Jint's allocation budget.
+    var comparableFieldValue = function (value) {
+        if (value === undefined) return '__undefined__';
+        if (value === null) return '__null__';
+        if (typeof value == 'object') {
+            try { return JSON.stringify(value); } catch (error) { return String(value); }
+        }
+        return String(value);
+    };
+    var fieldDefinitionNeedsUpdate = function (oldField, fieldCopy) {
+        if (!oldField) return true;
+        var ignored = {
+            Id: true,
+            CreateTime: true,
+            UpdateTime: true,
+            CreateUser: true,
+            CreateUserId: true,
+            UserId: true,
+            UserName: true
+        };
+        for (var fieldKey in fieldCopy) {
+            if (!Object.prototype.hasOwnProperty.call(fieldCopy, fieldKey) || ignored[fieldKey]) continue;
+            if (comparableFieldValue(oldField[fieldKey]) != comparableFieldValue(fieldCopy[fieldKey])) return true;
+        }
+        return false;
+    };
+
     // ==================== 统计变量 ====================
 
     var stats = {
@@ -305,6 +334,7 @@ try {
         TableIdRemapped: 0,
         FieldInserted: 0,
         FieldUpdated: 0,
+        FieldSkipped: 0,
         FieldIdRemapped: 0,
         MenuInserted: 0,
         MenuUpdated: 0,
@@ -1409,6 +1439,49 @@ try {
         return isNaN(numberValue) ? 0 : numberValue;
     };
 
+    // DDLStatements may contain CREATE TABLE and standalone index statements.
+    // Classify them before executing so reinstalling the same package is
+    // idempotent instead of treating an existing index as an install failure.
+    var classifyDdlStatement = function (ddl, fallbackTableName) {
+        var sql = String(ddl || '');
+        var createTable = sql.match(/^\s*CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+[`"\[]?([A-Za-z0-9_]+)/i);
+        if (createTable) {
+            return { Kind: 'table', TableName: createTable[1], IndexName: '' };
+        }
+
+        var createIndex = sql.match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+[`"\[]?([A-Za-z0-9_]+)[`"\]]?\s+ON\s+[`"\[]?([A-Za-z0-9_]+)/i);
+        if (createIndex) {
+            return { Kind: 'index', TableName: createIndex[2], IndexName: createIndex[1] };
+        }
+
+        var alterIndex = sql.match(/^\s*ALTER\s+TABLE\s+[`"\[]?([A-Za-z0-9_]+)[`"\]]?\s+ADD\s+(?:UNIQUE\s+)?(?:INDEX|KEY)\s+[`"\[]?([A-Za-z0-9_]+)/i);
+        if (alterIndex) {
+            return { Kind: 'index', TableName: alterIndex[1], IndexName: alterIndex[2] };
+        }
+
+        return { Kind: 'other', TableName: String(fallbackTableName || ''), IndexName: '' };
+    };
+
+    var ddlTableExists = function (tableName) {
+        if (!isSafeIdentifier(tableName)) return false;
+        var rows = V8.Db.FromSql(
+            'SELECT COUNT(1) AS ObjectCount FROM INFORMATION_SCHEMA.TABLES ' +
+            'WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0)'
+        ).AddInParameter('@p0', tableName).ToArray();
+        return rows && rows.length > 0 && getScalarCount(rows[0], ['ObjectCount', 'OBJECTCOUNT', 'objectcount']) > 0;
+    };
+
+    var ddlIndexExists = function (tableName, indexName) {
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(indexName)) return false;
+        var rows = V8.Db.FromSql(
+            'SELECT COUNT(1) AS ObjectCount FROM INFORMATION_SCHEMA.STATISTICS ' +
+            'WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0) AND LOWER(INDEX_NAME) = LOWER(@p1)'
+        ).AddInParameter('@p0', tableName)
+            .AddInParameter('@p1', indexName)
+            .ToArray();
+        return rows && rows.length > 0 && getScalarCount(rows[0], ['ObjectCount', 'OBJECTCOUNT', 'objectcount']) > 0;
+    };
+
     // MySQL 严格模式不允许把历史 varchar 空字符串直接改成 int/decimal。
     // 空字符串在平台旧数据中表示“未填写”，可安全规范为 NULL；其它非数字内容必须阻止迁移，不能静默转成 0。
     var prepareNumericColumnData = function (tableName, columnName, sourceColumn, sourceType, targetType) {
@@ -1590,25 +1663,136 @@ try {
         return map;
     };
 
+    /* BACKGROUND_TASK_BOOTSTRAP_READINESS_V1 */
+    var isBackgroundTaskBootstrapPackage = function () {
+        var packageInfo = Package.PackageInfo || {};
+        var appKey = firstTextParam([
+            V8.Param.AppId,
+            V8.Param.AppKey,
+            packageInfo.AppId,
+            packageInfo.AppKey,
+            packageInfo.SourceAppId,
+            packageInfo.SourceAppKey
+        ]);
+        return appKey.toLowerCase() == 'app.microi.background-task';
+    };
+
+    // The bootstrap package is installed in the foreground because it cannot
+    // enqueue itself. Do not report success until the complete worker schema and
+    // all distributed-runtime indexes can be read back from the physical database.
+    var validateBackgroundTaskBootstrapReadiness = function () {
+        if (!isBackgroundTaskBootstrapPackage()) return null;
+
+        var tableName = 'mci_background_task';
+        var requiredColumns = [
+            'Id', 'CreateTime', 'UpdateTime', 'UserId', 'UserName', 'IsDeleted', 'OsClient',
+            'UserKey', 'Title', 'Type', 'ApiEngineKey', 'Status', 'StatusText', 'Progress',
+            'ProgressMode', 'WorkCurrent', 'WorkTotal', 'Msg', 'Log', 'StartTime', 'EndTime',
+            'HeartbeatTime', 'EstimatedEndTime', 'RemainingSeconds', 'EstimateConfidence',
+            'CancelRequested', 'ResultJson', 'ParamJson', 'TrustedUserJson', 'IdempotencyKey',
+            'ConcurrencyKey', 'LeaseOwner', 'LeaseExpiresAt', 'FencingToken', 'AttemptCount',
+            'MaxAttempts', 'ExecutionCount', 'RetryOnFailure', 'NextRunTime', 'ProgressSampleTime',
+            'ProgressSampleCurrent', 'ThroughputPerSecond', 'ProgressSampleCount', 'CheckpointJson',
+            'LastError', 'BusinessTable', 'BusinessId', 'BusinessStatusField',
+            'BusinessTaskIdField', 'BusinessProgressField', 'BusinessEtaField'
+        ];
+        var physicalColumns = getTargetPhysicalColumns(tableName);
+        var missingColumns = [];
+        for (var columnIndex = 0; columnIndex < requiredColumns.length; columnIndex++) {
+            var requiredColumn = requiredColumns[columnIndex];
+            if (!physicalColumns[String(requiredColumn).toLowerCase()]) missingColumns.push(requiredColumn);
+        }
+        if (missingColumns.length > 0) {
+            throw new Error(
+                '后台任务基础能力未就绪：物理表 ' + tableName + ' 缺少字段 ' + missingColumns.join(',')
+                + '；本次安装不会标记为成功，请修复安装包后重试'
+            );
+        }
+
+        var indexRows = V8.Db.FromSql(
+            'SELECT INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX, NON_UNIQUE FROM INFORMATION_SCHEMA.STATISTICS ' +
+            'WHERE TABLE_SCHEMA = DATABASE() AND LOWER(TABLE_NAME) = LOWER(@p0) ORDER BY INDEX_NAME, SEQ_IN_INDEX'
+        ).AddInParameter('@p0', tableName).ToArray() || [];
+        var actualIndexes = {};
+        for (var indexRowIndex = 0; indexRowIndex < indexRows.length; indexRowIndex++) {
+            var indexRow = indexRows[indexRowIndex] || {};
+            var indexName = getPhysicalValue(indexRow, ['INDEX_NAME', 'IndexName', 'Key_name', 'Name']);
+            var indexColumn = getPhysicalValue(indexRow, ['COLUMN_NAME', 'ColumnName']);
+            var sequence = parseInt(getPhysicalValue(indexRow, ['SEQ_IN_INDEX', 'SeqInIndex']) || 1, 10);
+            var nonUnique = parseInt(getPhysicalValue(indexRow, ['NON_UNIQUE', 'NonUnique']) || 0, 10);
+            if (!indexName || !indexColumn) continue;
+            var indexKey = String(indexName).toLowerCase();
+            if (!actualIndexes[indexKey]) actualIndexes[indexKey] = { Columns: [], Unique: nonUnique == 0 };
+            actualIndexes[indexKey].Columns[Math.max(0, sequence - 1)] = String(indexColumn);
+        }
+
+        var requiredIndexes = [
+            { Name: 'ux_mci_background_task_idempotency', Columns: ['OsClient', 'IdempotencyKey'], Unique: true },
+            { Name: 'ix_mci_background_task_claim', Columns: ['OsClient', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
+            { Name: 'ix_mci_background_task_user', Columns: ['OsClient', 'UserKey', 'IsDeleted', 'CreateTime'], Unique: false },
+            { Name: 'ix_mci_background_task_concurrency', Columns: ['OsClient', 'ConcurrencyKey', 'Status', 'LeaseExpiresAt'], Unique: false }
+        ];
+        var invalidIndexes = [];
+        for (var requiredIndexIndex = 0; requiredIndexIndex < requiredIndexes.length; requiredIndexIndex++) {
+            var requiredIndex = requiredIndexes[requiredIndexIndex];
+            var actualIndex = actualIndexes[requiredIndex.Name.toLowerCase()];
+            var actualColumns = actualIndex ? actualIndex.Columns.join(',').toLowerCase() : '';
+            var requiredColumnText = requiredIndex.Columns.join(',').toLowerCase();
+            if (!actualIndex || actualColumns != requiredColumnText || actualIndex.Unique != requiredIndex.Unique) {
+                invalidIndexes.push(requiredIndex.Name + '(' + requiredIndex.Columns.join(',') + ')');
+            }
+        }
+        if (invalidIndexes.length > 0) {
+            throw new Error(
+                '后台任务基础能力未就绪：缺少或不匹配的物理索引 ' + invalidIndexes.join('；')
+                + '；请先更新“应用商城”后再重新安装本应用'
+            );
+        }
+
+        return { ColumnCount: requiredColumns.length, IndexCount: requiredIndexes.length };
+    };
+
+    var ddlTablesChecked = {};
     for (var i = 0; i < ddlStatements.length; i++) {
         var ddlItem = ddlStatements[i];
         if (!ddlItem.DDL || !ddlItem.TableName) continue;
 
-        var tableCreated = false;
+        var ddlInfo = classifyDdlStatement(ddlItem.DDL, ddlItem.TableName);
+        var ddlLogKey = ddlInfo.TableName + (ddlInfo.IndexName ? '_' + ddlInfo.IndexName : '_' + i);
+        var alreadyExists = ddlInfo.Kind == 'table'
+            ? ddlTableExists(ddlInfo.TableName)
+            : (ddlInfo.Kind == 'index' ? ddlIndexExists(ddlInfo.TableName, ddlInfo.IndexName) : false);
 
-        try {
-            // 先尝试创建表（CREATE TABLE IF NOT EXISTS）
-            V8.Db.FromSql(ddlItem.DDL).ExecuteNonQuery();
-            tableCreated = true;
-            ddlExecuted++;
-            debugLog['ddl_create_' + ddlItem.TableName] = '表创建成功';
-        } catch (ddlError) {
-            // 创建失败（表可能已存在）
-            debugLog['ddl_create_error_' + ddlItem.TableName] = ddlError.message;
+        if (alreadyExists) {
             ddlSkipped++;
+            debugLog['ddl_skip_' + ddlLogKey] = ddlInfo.Kind == 'index' ? '索引已存在' : '表已存在';
+        } else {
+            try {
+                V8.Db.FromSql(ddlItem.DDL).ExecuteNonQuery();
+                ddlExecuted++;
+                debugLog['ddl_execute_' + ddlLogKey] = ddlInfo.Kind == 'index' ? '索引创建成功' : 'DDL执行成功';
+            } catch (ddlError) {
+                // 多节点或重复请求可能在存在性检查之后抢先创建对象。
+                // 失败后再次回读；对象已存在即按幂等成功处理。
+                var existsAfterError = ddlInfo.Kind == 'table'
+                    ? ddlTableExists(ddlInfo.TableName)
+                    : (ddlInfo.Kind == 'index' ? ddlIndexExists(ddlInfo.TableName, ddlInfo.IndexName) : false);
+                if (existsAfterError) {
+                    ddlSkipped++;
+                    debugLog['ddl_race_skip_' + ddlLogKey] = '其它节点已创建，按幂等成功跳过';
+                } else {
+                    debugLog['ddl_execute_error_' + ddlLogKey] = ddlError.message;
+                    ddlSkipped++;
+                }
+            }
         }
 
-        // 无论表是新创建还是已存在，都检查并补充缺失的字段
+        // 每张表只检查一次字段；索引语句不能重复触发相同的物理字段同步。
+        var ddlTableKey = String(ddlInfo.TableName || ddlItem.TableName).toLowerCase();
+        if (ddlInfo.Kind == 'index' || ddlTablesChecked[ddlTableKey]) continue;
+        ddlTablesChecked[ddlTableKey] = true;
+
+        // 无论表是新创建还是已存在，都检查并补充缺失的字段。
         try {
             // 查询表的所有字段
             var checkColumnsSQL = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + ddlItem.TableName + "'";
@@ -2031,7 +2215,11 @@ try {
                 debugLog['★SelectApi_oldData_TableId'] = oldFieldResult.Data ? oldFieldResult.Data.TableId : null;
             }
 
-            if (isZombieRecord) {
+            if (!isZombieRecord && oldFieldResult.Code == 1 && oldFieldResult.Data
+                && !fieldDefinitionNeedsUpdate(oldFieldResult.Data, fieldCopy)) {
+                stats.FieldSkipped++;
+                debugLog['field_unchanged_' + field.Id] = '字段定义未变化，按幂等安装跳过';
+            } else if (isZombieRecord) {
                 // 僵尸记录：用直接 SQL 全量覆盖所有字段
                 // 使用 sqle()/sqln() 转义，0个SQL参数，彻底绕过 Jint 的 params object[] 限制
                 var sqle = function(s) { return s == null ? 'NULL' : "'" + String(s).replace(/'/g, "''") + "'"; };
@@ -2521,6 +2709,13 @@ try {
     stats.PhysicalFieldsRenamed = (stats.PhysicalFieldsRenamed || 0) + physicalFieldsRenamed;
     stats.PhysicalFieldsModified = (stats.PhysicalFieldsModified || 0) + physicalFieldsModified;
     debugLog.step2_5Result = '物理表字段同步完成：重命名' + physicalFieldsRenamed + '，修改' + physicalFieldsModified + '，新增' + physicalFieldsAdded;
+
+    var backgroundTaskReadiness = validateBackgroundTaskBootstrapReadiness();
+    if (backgroundTaskReadiness) {
+        debugLog.background_task_readiness_verified =
+            '后台任务基础能力已完成物理回读：字段' + backgroundTaskReadiness.ColumnCount
+            + '个，运行索引' + backgroundTaskReadiness.IndexCount + '个';
+    }
 
     // ==================== 步骤3：处理sys_menu数据 ====================
 
@@ -3407,7 +3602,7 @@ try {
         执行概览: {
             DDL建表: '执行' + (stats.DDLExecuted || 0) + '条，跳过' + (stats.DDLSkipped || 0) + '条，补充物理字段' + (stats.FieldsAdded || 0) + '个',
             表结构: '新增' + stats.TableInserted + '条，修改' + stats.TableUpdated + '条，Id对齐' + stats.TableIdRemapped + '条',
-            字段定义: '新增' + stats.FieldInserted + '条，修改' + stats.FieldUpdated + '条，Id对齐' + stats.FieldIdRemapped + '条',
+            字段定义: '新增' + stats.FieldInserted + '条，修改' + stats.FieldUpdated + '条，幂等跳过' + (stats.FieldSkipped || 0) + '条，Id对齐' + stats.FieldIdRemapped + '条',
             物理字段同步: '重命名' + (stats.PhysicalFieldsRenamed || 0) + '个，修改' + (stats.PhysicalFieldsModified || 0) + '个，新增' + (stats.PhysicalFieldsAdded || 0) + '个',
             菜单: '新增' + stats.MenuInserted + '条，修改' + stats.MenuUpdated + '条，Id对齐' + stats.MenuIdRemapped + '条',
             引用修复: '更新' + stats.ReferenceRowsUpdated + '行',

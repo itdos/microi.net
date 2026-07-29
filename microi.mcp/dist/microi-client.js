@@ -5,15 +5,42 @@ import path from 'node:path';
 import { API } from './api-paths.js';
 import { resolveMcpDid } from './mcp-did.js';
 import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
+import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-integrity.js';
 import { prepareV8VersionedCode } from './v8-version.js';
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
-const NO_LOGIN_CODE = 1001;
+const AUTH_FAILURE_CODES = new Set([1001, 1002]);
 const DEFAULT_LOGIN_RSA_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC7q21EG3HiSFNO9XFUJoMeyz2R
 XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 1rS/MVn4i6CsPgP9Q7nFV6dZvbxro1byH/E3CV/Q1CgCDeue9FzQUlWQ+UZld8Jg
 1DsI9VJ7gTHGL3R7sQIDAQAB
 -----END PUBLIC KEY-----`;
+export function isTenantConfigurationFailureResponse(result) {
+    const reasonCode = String(result?.DataAppend?.ReasonCode || '').trim();
+    if (/^(InvalidTenant|InvalidOsClient|TenantNotFound|TenantDisabled)$/i.test(reasonCode)) {
+        return true;
+    }
+    const message = [result?.Msg, result?.DataAppend?.UserMessage, result?.DataAppend?.Hint]
+        .filter(Boolean)
+        .join(' ');
+    return /无效的租户标识|租户不存在|租户.*未启用|invalid\s+(tenant|osclient)|tenant\s+not\s+found|unknown\s+tenant/i.test(message);
+}
+export function isAuthenticationFailureResponse(result) {
+    if (!result || isTenantConfigurationFailureResponse(result)) {
+        return false;
+    }
+    if (AUTH_FAILURE_CODES.has(Number(result.Code))) {
+        return true;
+    }
+    const reasonCode = String(result.DataAppend?.ReasonCode || '').trim();
+    if (/^(MissingToken|MalformedToken|MissingClaims|TenantMismatch|AuthVersionChanged|JwtExpired|SessionExpired|SessionMissing|TokenReplaced|SignatureMismatch)$/i.test(reasonCode)) {
+        return true;
+    }
+    const message = [result.Msg, result.DataAppend?.UserMessage, result.DataAppend?.AppendMsg]
+        .filter(Boolean)
+        .join(' ');
+    return /Token签名|Token.*(无效|失效|过期)|登录.*(无效|失效|过期)|invalid\s*token|token\s*invalid|signature\s*mismatch/i.test(message);
+}
 export class MicroiTransportError extends Error {
     kind;
     requestPath;
@@ -82,7 +109,7 @@ function modulePatchMatches(expected, actual) {
         if (ignoredFields.has(field) || expectedValue === undefined)
             continue;
         const actualValue = actual[field];
-        if (MENU_JSON_ARRAY_FIELDS.has(field) || field === 'DiyConfig') {
+        if (MENU_JSON_ARRAY_FIELDS.has(field) || field === 'ViewSchema') {
             const expectedJson = canonicalMenuJson(expectedValue);
             const actualJson = canonicalMenuJson(actualValue);
             if (!expectedJson || !actualJson || expectedJson !== actualJson) {
@@ -112,6 +139,8 @@ export class MicroiClient {
     readbackRequestTimeoutMs;
     /** 同一时刻只允许一个刷新请求在飞 */
     inflightRefresh;
+    /** 同一时刻只允许一条完整身份恢复链路，避免并发重登或重复写恢复请求。 */
+    inflightAuthRecovery;
     constructor(config) {
         this.config = config;
         this.rsaPublicKey = config.rsaPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
@@ -295,13 +324,66 @@ export class MicroiClient {
             console.error('[microi-mcp] Write token file failed:', e);
         }
     }
-    /** 检测是否是 token 失效响应（Code=1001 NoLogin），若是则尝试恢复 token。
+    async requestVsCodeCredentialRecovery(failedToken) {
+        const recoveryDir = this.config.authRecoveryRequestDir;
+        const tokenFilePath = this.config.tokenFilePath;
+        if (!recoveryDir || !tokenFilePath) {
+            return false;
+        }
+        try {
+            if (!fs.existsSync(recoveryDir))
+                fs.mkdirSync(recoveryDir, { recursive: true });
+            const identity = `${this.config.apiBaseUrl.replace(/\/+$/, '')}|${this.config.osClient || ''}`;
+            // 同一租户可能被多个编辑器/MCP 进程同时使用。请求文件必须唯一，
+            // 避免 Windows 上 rename 覆盖既有文件失败而让其中一个进程失去恢复机会。
+            const identityHash = crypto.createHash('sha256').update(identity).digest('hex').slice(0, 24);
+            const fileName = `${identityHash}-${process.pid}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.json`;
+            const requestPath = path.join(recoveryDir, fileName);
+            const tempPath = `${requestPath}.${process.pid}.tmp`;
+            const payload = {
+                version: 1,
+                apiBaseUrl: this.config.apiBaseUrl.replace(/\/+$/, ''),
+                osClient: this.config.osClient || '',
+                requestedAt: Date.now(),
+                failedTokenHash: crypto.createHash('sha256').update(failedToken || '').digest('hex'),
+            };
+            fs.writeFileSync(tempPath, JSON.stringify(payload), { encoding: 'utf-8', mode: 0o600 });
+            fs.renameSync(tempPath, requestPath);
+            // 扩展宿主每秒处理恢复请求；这里只等待 token 文件出现不同值，不读取任何密码。
+            for (let attempt = 0; attempt < 40; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 250));
+                if (this.reloadTokenFromFile()) {
+                    console.error('[microi-mcp] Token recovered by VS Code SecretStorage broker');
+                    return true;
+                }
+            }
+        }
+        catch (e) {
+            console.error('[microi-mcp] VS Code credential recovery request failed:', e);
+        }
+        return false;
+    }
+    /** 检测 token 身份失效响应，若是则尝试恢复 token。
      *  恢复策略：1) 重新读取 token 文件（VS Code 扩展可能刚写入新 token）；
      *           2) 若 token 没变化或仍失效，调用 RefreshToken API 主动刷新；
-     *           3) 仍失败则用 username/password 重新登录（兜底）。
+     *           3) 仍失败且 MCP 独立配置了凭据时重新登录；
+     *           4) VS Code 托管模式写入无密请求，由扩展通过 SecretStorage 重登。
      *  返回 true 表示 token 已更新，调用方可重试请求。
      */
     async tryRecoverFromAuthFailure() {
+        if (this.inflightAuthRecovery) {
+            return this.inflightAuthRecovery;
+        }
+        this.inflightAuthRecovery = this.tryRecoverFromAuthFailureCore();
+        try {
+            return await this.inflightAuthRecovery;
+        }
+        finally {
+            this.inflightAuthRecovery = undefined;
+        }
+    }
+    async tryRecoverFromAuthFailureCore() {
+        const failedToken = this.token;
         // 1. 先尝试读文件，可能 VS Code 已经刷过了
         if (this.reloadTokenFromFile()) {
             console.error('[microi-mcp] Token reloaded from file after auth failure');
@@ -310,23 +392,24 @@ export class MicroiClient {
         // 2. 主动刷新
         if (await this.refreshTokenNow())
             return true;
-        // 3. 兜底：用账号密码重新登录
+        // 3. 独立 MCP 配置的兜底：用账号密码重新登录
         if (this.config.username && this.config.password) {
             try {
-                const oldToken = this.token;
                 this.token = '';
                 await this.login();
-                if (this.token && this.token !== oldToken) {
+                if (this.token && this.token !== failedToken) {
                     this.writeTokenToFile();
                     console.error('[microi-mcp] Re-logged in after auth failure');
                     return true;
                 }
             }
             catch (e) {
+                this.token = failedToken;
                 console.error('[microi-mcp] Re-login failed:', e);
             }
         }
-        return false;
+        // 4. VS Code 托管模式：请求扩展宿主使用 SecretStorage 重登。
+        return this.requestVsCodeCredentialRecovery(failedToken);
     }
     /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
     async post(reqPath, body, options = {}) {
@@ -402,9 +485,9 @@ export class MicroiClient {
         catch {
             throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
         }
-        // Microi 用 Code=1001 表达"登录身份已过期"（HTTP 仍是 200）
-        if (parsed?.Code === NO_LOGIN_CODE && allowRetryOnAuthFailure) {
-            console.error(`[microi-mcp] Auth expired (Code=${NO_LOGIN_CODE}: ${parsed.Msg || ''}), attempting recovery...`);
+        // Microi 历史版本可能用 Code=1001/1002、ReasonCode 或签名失败文本表达身份失效。
+        if (isAuthenticationFailureResponse(parsed) && allowRetryOnAuthFailure) {
+            console.error(`[microi-mcp] Auth expired (Code=${parsed.Code}: ${parsed.Msg || ''}), attempting recovery...`);
             if (await this.tryRecoverFromAuthFailure()) {
                 return this.requestJson(method, reqPath, body, params, false, options);
             }
@@ -463,9 +546,150 @@ export class MicroiClient {
     async getStatus() {
         return this.get(API.GET_STATUS);
     }
+    async listMyUserAccessKeys() {
+        // Deliberately omit TargetUserId: the backend binds the operation to the
+        // authenticated user and prevents an access-key session from managing keys.
+        return this.post(API.LIST_USER_ACCESS_KEYS, {});
+    }
+    async createMyUserAccessKey(input) {
+        // Permanent keys are intentionally not exposed through MCP. The backend
+        // applies its bounded default expiry (currently 90 days) when ExpiresAt is absent.
+        return this.post(API.CREATE_USER_ACCESS_KEY, {
+            Name: input.name,
+            Scopes: input.scopes,
+            AllowedRoutes: input.allowedRoutes,
+            RedirectPath: input.redirectPath,
+            AllowedTableNames: input.allowedTableNames,
+            AllowedApiEngineKeys: input.allowedApiEngineKeys,
+            AllowedDataSourceKeys: input.allowedDataSourceKeys,
+            ExpiresAt: input.expiresAt,
+            Remark: input.remark,
+            Permanent: false,
+        }, {
+            timeoutMs: this.writeRequestTimeoutMs,
+            operationName: `创建当前用户访问密钥 ${input.name}`,
+        });
+    }
+    async revokeMyUserAccessKey(id) {
+        return this.post(API.REVOKE_USER_ACCESS_KEY, { Id: id }, {
+            timeoutMs: this.writeRequestTimeoutMs,
+            operationName: `吊销当前用户访问密钥 ${id}`,
+        });
+    }
     async getDbSchema() {
         return this.post(API.GET_DB_SCHEMA, {
             OsClient: this.config.osClient,
+        });
+    }
+    async getTableIndexes(tableName, readback = false) {
+        return this.post(API.GET_TABLE_INDEXES, {
+            OsClient: this.config.osClient,
+            TableName: tableName,
+        }, readback ? this.readbackOptions(`回读表 ${tableName} 索引`) : {});
+    }
+    async createTableIndex(data) {
+        const payload = { OsClient: this.config.osClient, ...data };
+        try {
+            return await this.post(API.CREATE_TABLE_INDEX, payload, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: `创建索引 ${data.IndexName || `${data.TableName}:${data.Columns.join(',')}`}`,
+            });
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            const readback = await this.pollReadback(() => this.getTableIndexes(data.TableName, true), (indexes) => indexes.some((index) => {
+                const nameMatches = data.IndexName
+                    ? String(index.Key_name || index.Name || '').toLowerCase() === data.IndexName.toLowerCase()
+                    : true;
+                const columns = index.Columns?.length
+                    ? index.Columns
+                    : String(index.Column_name || '').split(',').map((value) => value.trim()).filter(Boolean);
+                const unique = index.IsUnique ?? Number(index.Non_unique) === 0;
+                return nameMatches
+                    && unique === Boolean(data.Unique)
+                    && columns.length === data.Columns.length
+                    && columns.every((value, position) => value.toLowerCase() === data.Columns[position].toLowerCase());
+            }));
+            if (readback.matched) {
+                return this.recoveredWriteResult('创建数据库索引', error, {
+                    TableName: data.TableName,
+                    IndexName: data.IndexName,
+                    Columns: data.Columns,
+                });
+            }
+            throw this.uncertainWriteFailure('创建数据库索引', error, readback.lastError);
+        }
+    }
+    async dropTableIndex(tableName, indexName) {
+        try {
+            return await this.post(API.DROP_TABLE_INDEX, {
+                OsClient: this.config.osClient,
+                TableName: tableName,
+                IndexName: indexName,
+            }, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: `删除索引 ${indexName}`,
+            });
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            const readback = await this.pollReadback(() => this.getTableIndexes(tableName, true), (indexes) => !indexes.some((index) => String(index.Key_name || index.Name || '').toLowerCase() === indexName.toLowerCase()));
+            if (readback.matched) {
+                return this.recoveredWriteResult('删除数据库索引', error, {
+                    TableName: tableName,
+                    IndexName: indexName,
+                });
+            }
+            throw this.uncertainWriteFailure('删除数据库索引', error, readback.lastError);
+        }
+    }
+    async getSupportedDatabaseTypes() {
+        return this.post(API.GET_SUPPORTED_DATABASE_TYPES, {});
+    }
+    async inspectExternalDatabase(data) {
+        return this.post(API.INSPECT_EXTERNAL_DATABASE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async queryExternalDatabase(data) {
+        return this.post(API.QUERY_EXTERNAL_DATABASE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async executeExternalDatabaseSql(data) {
+        const requestedTimeoutSeconds = Number(data.CommandTimeoutSeconds || 0);
+        const executionTimeoutMs = Number.isFinite(requestedTimeoutSeconds) && requestedTimeoutSeconds > 0
+            ? (requestedTimeoutSeconds + 30) * 1000
+            : 630_000;
+        return this.post(API.EXECUTE_EXTERNAL_DATABASE_SQL, {
+            OsClient: this.config.osClient,
+            ...data,
+        }, {
+            timeoutMs: Math.max(this.config.requestTimeoutMs ?? 120_000, this.config.writeRequestTimeoutMs ?? 60_000, executionTimeoutMs),
+            operationName: 'execute external database sql',
+        });
+    }
+    async saveDatabaseConnection(data) {
+        return this.post(API.SAVE_DATABASE_CONNECTION, {
+            OsClient: this.config.osClient,
+            ...data,
+        }, { timeoutMs: this.config.writeRequestTimeoutMs, operationName: 'save database connection' });
+    }
+    async importExternalAttachment(data) {
+        const requestedTimeoutSeconds = Number(data.TimeoutSeconds || 0);
+        const transferTimeoutMs = Number.isFinite(requestedTimeoutSeconds) && requestedTimeoutSeconds > 0
+            ? (requestedTimeoutSeconds + 30) * 1000
+            : 3_630_000;
+        return this.post(API.IMPORT_EXTERNAL_ATTACHMENT, {
+            OsClient: this.config.osClient,
+            ...data,
+        }, {
+            timeoutMs: Math.max(this.config.requestTimeoutMs ?? 120_000, this.config.writeRequestTimeoutMs ?? 60_000, transferTimeoutMs),
+            operationName: 'import external attachment',
         });
     }
     async getPlaywrightContext(keyword, pageSize) {
@@ -495,6 +719,7 @@ export class MicroiClient {
         });
     }
     async saveEngineCode(apiEngineKey, code, options) {
+        assertSourceIntegrity(code, `保存接口引擎 ${apiEngineKey}`);
         let remote;
         try {
             const remoteResult = await this.getEngineCode(apiEngineKey);
@@ -502,6 +727,14 @@ export class MicroiClient {
         }
         catch {
             remote = undefined;
+        }
+        const remoteSource = normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code);
+        const nextSource = normalizeCodeForComparison(code);
+        if (remoteSource.length >= 8000
+            && nextSource.length < remoteSource.length * 0.85
+            && !options?.confirmLargeReduction) {
+            throw new Error(`保存接口引擎 ${apiEngineKey} 已拦截：新源码 ${nextSource.length} 字符，远端源码 ${remoteSource.length} 字符，`
+                + `减少超过 15%。这可能是长工具结果被截断；确认确需大幅删减时请传 confirmLargeReduction="${apiEngineKey}"。`);
         }
         const prepared = prepareV8VersionedCode({
             kind: 'ApiEngine',
@@ -546,6 +779,7 @@ export class MicroiClient {
             ...data,
         };
         const code = typeof payload.Code === 'string' ? payload.Code : (typeof payload.ApiV8Code === 'string' ? payload.ApiV8Code : '');
+        assertSourceIntegrity(code, `创建接口引擎 ${data.ApiEngineKey}`);
         const prepared = prepareV8VersionedCode({
             kind: 'ApiEngine',
             key: data.ApiEngineKey,
@@ -690,6 +924,7 @@ export class MicroiClient {
         }, options);
     }
     async saveEventCode(formEngineKey, eventType, code, options) {
+        assertSourceIntegrity(code, `保存 V8 事件 ${formEngineKey}/${eventType}`);
         let remote;
         try {
             const remoteResult = await this.getEventCode(formEngineKey, eventType);
@@ -758,6 +993,7 @@ export class MicroiClient {
         });
     }
     async saveWorkflowV8EventCode(nodeId, eventType, code, options) {
+        assertSourceIntegrity(code, `保存流程节点 V8 ${nodeId}/${eventType}`);
         let remote;
         try {
             const remoteResult = await this.getWorkflowV8EventCode(nodeId, eventType, options?.flowDesignId);
@@ -895,6 +1131,7 @@ export class MicroiClient {
         };
         const moduleId = String(payload.ModuleId || payload.Id || '');
         const operation = `更新菜单模块 ${moduleId || payload.Name || ''}`.trim();
+        assertPayloadSourceIntegrity(payload, operation);
         const verify = async () => {
             if (!moduleId)
                 return { matched: false, mismatches: ['ModuleId'] };

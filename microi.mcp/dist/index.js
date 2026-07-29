@@ -58,6 +58,7 @@ async function main() {
     const tokenFilePath = process.env.MICROI_TOKEN_FILE;
     if (tokenFilePath) {
         config.tokenFilePath = tokenFilePath;
+        config.authRecoveryRequestDir = process.env.MICROI_AUTH_RECOVERY_DIR || undefined;
         const fileToken = readTokenFromFile(tokenFilePath, config.apiBaseUrl, config.osClient || '');
         if (fileToken) {
             config.token = fileToken;
@@ -82,6 +83,7 @@ async function main() {
             console.error('Missing required environment variables:');
             console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
             console.error('  MICROI_TOKEN_FILE   - Token file path (preferred, auto-managed by VS Code extension)');
+            console.error('  MICROI_AUTH_RECOVERY_DIR - Optional credential-free VS Code recovery request directory');
             console.error('  MICROI_TOKEN        - JWT token (fallback)');
             console.error('  MICROI_USERNAME     - Login username (fallback if no token)');
             console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');

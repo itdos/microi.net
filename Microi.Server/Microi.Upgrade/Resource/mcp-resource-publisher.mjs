@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
-import { dirname, isAbsolute, parse, resolve } from 'node:path';
+import { access, readFile, readdir } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
 
 const officialApiBaseUrl = 'https://api.itdos.com';
 const officialOsClient = 'itdos';
@@ -47,6 +48,144 @@ async function readJson(path) {
   }
 }
 
+async function pathExists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function resolveServerPath(value, configDirectory, configuredCwd = '') {
+  const path = String(value || '').trim();
+  if (!path) return '';
+  if (isAbsolute(path)) return resolve(path);
+  const cwd = String(configuredCwd || '').trim();
+  const base = cwd
+    ? (isAbsolute(cwd) ? cwd : resolve(configDirectory, cwd))
+    : configDirectory;
+  return resolve(base, path);
+}
+
+function extensionVersion(directoryName) {
+  const match = String(directoryName || '').match(/^microi\.v8-engine-(\d+)\.(\d+)\.(\d+)(?:[-.].*)?$/i);
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function compareExtensionDirectories(left, right) {
+  const leftVersion = extensionVersion(basename(left)) || [0, 0, 0];
+  const rightVersion = extensionVersion(basename(right)) || [0, 0, 0];
+  for (let index = 0; index < 3; index += 1) {
+    if (leftVersion[index] !== rightVersion[index]) return rightVersion[index] - leftVersion[index];
+  }
+  return String(right).localeCompare(String(left));
+}
+
+async function newestMcpServerInExtensionRoot(extensionRoot) {
+  if (!extensionRoot || !await pathExists(extensionRoot)) return '';
+  let entries;
+  try {
+    entries = await readdir(extensionRoot, { withFileTypes: true });
+  } catch {
+    return '';
+  }
+  const candidates = entries
+    .filter(entry => entry.isDirectory() && extensionVersion(entry.name))
+    .map(entry => join(extensionRoot, entry.name))
+    .sort(compareExtensionDirectories);
+  for (const candidate of candidates) {
+    const mcpServerPath = join(candidate, 'dist', 'mcp-server.js');
+    if (await pathExists(mcpServerPath)) return mcpServerPath;
+  }
+  return '';
+}
+
+function workspaceMcpCandidates(configPath) {
+  const candidates = [];
+  let current = dirname(configPath);
+  while (true) {
+    candidates.push(resolve(current, 'Microi.VSCode', 'dist', 'mcp-server.js'));
+    const parent = dirname(current);
+    if (parent === current || current === parse(current).root) break;
+    current = parent;
+  }
+  return candidates;
+}
+
+/**
+ * Keep the official tenant/authentication settings from the generated config,
+ * but do not couple publishing to a VS Code executable, extension version or
+ * cwd that may disappear after an extension update. The release script already
+ * runs under Node, so a verified mcp-server.js can be started with that same
+ * runtime on every supported editor.
+ */
+export async function resolveItDosMcpLaunch(server, configPath) {
+  const validated = validateItDosMcpServer(server, configPath);
+  const configDirectory = dirname(configPath);
+  const configuredEntryIndex = validated.args.findIndex(value => (
+    basename(String(value || '')).toLowerCase() === 'mcp-server.js'
+  ));
+  if (configuredEntryIndex < 0) {
+    throw new Error(`${configPath} 的 microi_itdos args 中缺少 mcp-server.js`);
+  }
+
+  const configuredEntry = resolveServerPath(
+    validated.args[configuredEntryIndex],
+    configDirectory,
+    validated.cwd,
+  );
+  let selectedEntry = await pathExists(configuredEntry) ? configuredEntry : '';
+  let launchSource = selectedEntry ? 'configured' : '';
+
+  if (!selectedEntry) {
+    const configuredExtensionRoot = dirname(dirname(configuredEntry));
+    const siblingExtensionsRoot = dirname(configuredExtensionRoot);
+    selectedEntry = await newestMcpServerInExtensionRoot(siblingExtensionsRoot);
+    if (selectedEntry) launchSource = 'newest-installed-extension';
+  }
+
+  if (!selectedEntry) {
+    for (const candidate of workspaceMcpCandidates(configPath)) {
+      if (await pathExists(candidate)) {
+        selectedEntry = candidate;
+        launchSource = 'workspace-bundle';
+        break;
+      }
+    }
+  }
+
+  if (!selectedEntry) {
+    const standardExtensionRoots = [
+      resolve(homedir(), '.vscode', 'extensions'),
+      resolve(homedir(), '.cursor', 'extensions'),
+    ];
+    for (const extensionRoot of standardExtensionRoots) {
+      selectedEntry = await newestMcpServerInExtensionRoot(extensionRoot);
+      if (selectedEntry) {
+        launchSource = 'newest-user-extension';
+        break;
+      }
+    }
+  }
+
+  if (!selectedEntry) {
+    throw new Error(
+      `${configPath} 配置的 MCP 插件入口已不存在，且未找到可用的 Microi VS Code 插件或工作区 MCP 服务`,
+    );
+  }
+
+  const selectedExtensionRoot = dirname(dirname(selectedEntry));
+  return {
+    ...validated,
+    command: process.execPath,
+    args: [selectedEntry],
+    cwd: selectedExtensionRoot,
+    launchSource,
+    configuredEntry,
+  };
+}
+
 export async function findItDosMcpServer(startDirectory, explicitConfigPath = '') {
   const explicit = String(explicitConfigPath || '').trim();
   const candidates = [];
@@ -67,6 +206,7 @@ export async function findItDosMcpServer(startDirectory, explicitConfigPath = ''
   }
 
   let foundConfig = false;
+  const launchErrors = [];
   for (const path of candidates) {
     const config = await readJson(path);
     if (!config) continue;
@@ -76,11 +216,19 @@ export async function findItDosMcpServer(startDirectory, explicitConfigPath = ''
       if (explicit) throw new Error(`${path} 中缺少 microi_itdos`);
       continue;
     }
-    const server = validateItDosMcpServer(servers.microi_itdos, path);
-    return { path, server };
+    const validated = validateItDosMcpServer(servers.microi_itdos, path);
+    try {
+      const server = await resolveItDosMcpLaunch(validated, path);
+      return { path, server };
+    } catch (error) {
+      if (explicit) throw error;
+      launchErrors.push(`${path}: ${error.message}`);
+    }
   }
   throw new Error(
-    foundConfig
+    launchErrors.length
+      ? `已找到 microi_itdos，但无法解析可运行的 MCP：${launchErrors.join('；')}`
+      : foundConfig
       ? '已找到 MCP 配置，但其中没有 microi_itdos'
       : '未找到 .mcp.json、.vscode/mcp.json 或 .cursor/mcp.json',
   );
