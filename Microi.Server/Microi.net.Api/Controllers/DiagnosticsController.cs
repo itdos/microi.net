@@ -44,8 +44,12 @@ namespace Microi.net.Api
                     WorkingSetMB = memory.WorkingSetBytes / (1024L * 1024L),
                     PrivateAddressSpaceMB = memory.PrivateBytes / (1024L * 1024L),
                     ManagedHeapMB = memory.ManagedHeapBytes / (1024L * 1024L),
+                    EffectiveMemoryMB = memory.EffectiveMemoryBytes / (1024L * 1024L),
+                    memory.EffectiveMemorySource,
                     SoftLimitMB = memory.SoftLimitBytes / (1024L * 1024L),
                     HardLimitMB = memory.HardLimitBytes / (1024L * 1024L),
+                    memory.SoftLimitPercent,
+                    memory.HardLimitPercent,
                     memory.SampledAt
                 }
             };

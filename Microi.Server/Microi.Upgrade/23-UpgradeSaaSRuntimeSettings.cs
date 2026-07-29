@@ -11,7 +11,7 @@ namespace Microi.net
     /// </summary>
     public sealed class Upgrade23
     {
-        public static string Version = "6.7.9.1";
+        public static string Version = "6.8.4.1";
 
         private const string PlatformTab = "平台运行配置";
 
@@ -32,10 +32,12 @@ namespace Microi.net
                     "仅主租户有效。单个Worker节点并行执行后台任务的数量，代码边界为1到16。"),
                 Number("DiyLangRuntimeCachePageSize", "多语言缓存分页数", "500", 10070,
                     "仅主租户有效。重载diy_lang运行缓存时每页读取的行数，代码边界为100到2000。"),
-                Number("DiyLangRuntimeCacheMaxRows", "多语言缓存最大行数", "50000", 10080,
+                Number("DiyLangRuntimeCacheMaxRows", "多语言缓存最大行数", "10000", 10080,
                     "仅主租户有效。单个租户多语言运行缓存允许加载的最大原始行数。"),
-                Number("DiyLangRuntimeCacheMaxCharacters", "多语言缓存最大字符", "20000000", 10090,
+                Number("DiyLangRuntimeCacheMaxCharacters", "多语言缓存最大字符", "5000000", 10090,
                     "仅主租户有效。单个租户多语言运行缓存允许加载的最大字符数。"),
+                Number("DiyLangRuntimeCacheCommandTimeoutSeconds", "多语言缓存SQL超时秒", "30", 10099,
+                    "仅主租户有效。单次多语言缓存分页SQL允许执行的最长秒数，代码边界为5到120。"),
                 Text("OAuthReturnUrlOrigins", "OAuth可信返回域名", "", 10091,
                     "仅主租户有效。允许OAuth回跳的精确HTTPS Origin，多个值用英文逗号或分号分隔。"),
                 Text("ChanjetOAuthState", "畅捷通OAuth State", "", 10092,

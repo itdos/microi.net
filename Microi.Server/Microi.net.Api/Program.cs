@@ -126,14 +126,12 @@ services.AddMicroiCache();//【必须】注入【分布式缓存】插件
 services.AddMicroiHttp();//【必须】注入【Http】插件
 services.AddMicroiMongoDB();//【可选】注入【MongoDB】插件
 // 所有SysLog/用户行为日志统一由单消费者后台服务批量、幂等持久化。
-services.AddSingleton(SysLogQueueOptions.FromConfiguration());
+services.AddSingleton(SysLogQueueOptions.CreateDefault());
 services.AddSingleton<SysLogQueueService>();
 services.AddSingleton<ISysLogQueue>(sp => sp.GetRequiredService<SysLogQueueService>());
 services.AddHostedService(sp => sp.GetRequiredService<SysLogQueueService>());
 // 进程级内存最后防线：软阈值退出流量，硬阈值有界停机，避免单节点拖垮宿主机。
-services.AddSingleton(ProcessMemoryGuardOptions.FromConfiguration(
-    builder.Environment,
-    builder.Configuration));
+services.AddSingleton(ProcessMemoryGuardOptions.CreateDefault());
 services.AddSingleton<ProcessMemoryPressureState>();
 services.AddHostedService<ProcessMemoryGuardService>();
 services.AddHostedService<BackgroundTaskWorkerService>();

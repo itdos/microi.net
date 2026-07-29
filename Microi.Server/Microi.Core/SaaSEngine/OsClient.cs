@@ -21,6 +21,7 @@ namespace Microi.net
                 ["DiyLang:RuntimeCachePageSize"] = new[] { "DiyLangRuntimeCachePageSize" },
                 ["DiyLang:RuntimeCacheMaxRows"] = new[] { "DiyLangRuntimeCacheMaxRows" },
                 ["DiyLang:RuntimeCacheMaxCharacters"] = new[] { "DiyLangRuntimeCacheMaxCharacters" },
+                ["DiyLang:RuntimeCacheCommandTimeoutSeconds"] = new[] { "DiyLangRuntimeCacheCommandTimeoutSeconds" },
                 ["Security:OAuthReturnUrlOrigins"] = new[] { "OAuthReturnUrlOrigins" },
                 ["Integrations:Chanjet:OAuthState"] = new[] { "ChanjetOAuthState" },
                 ["Integrations:Chanjet:AesKey"] = new[] { "ChanjetAesKey" },

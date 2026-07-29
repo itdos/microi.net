@@ -84,7 +84,7 @@
 | 无 Elasticsearch | 无法使用搜索引擎 |
 
 ::: warning 系统日志 spool
-生产/容器环境请将后端 `logs/syslog-spool` 挂载到持久卷，或通过 `MICROI_SYSLOG_SPOOL_DIR` 指定持久化目录。该目录用于 MongoDB 故障和服务正常重启时的日志重放，不应放在容器临时层。多节点部署还应为每个实例配置稳定且唯一的 `MICROI_NODE_ID`（StatefulSet 可用稳定 Pod 名），用于定位各节点 spool；所有节点连接同一 MongoDB 时按全局 `EventId` 幂等写入。
+生产/容器环境请将后端固定目录 `logs/syslog-spool` 挂载到持久卷。该目录用于 MongoDB 故障和服务正常重启时的日志重放，不应放在容器临时层。节点标识由平台根据当前节点自动生成，不需要增加环境变量；所有节点连接同一 MongoDB 时按全局 `EventId` 幂等写入。
 :::
 
 ---
