@@ -36,13 +36,35 @@
         </view>
       </view>
 
-      <view v-for="(group, index) in groups" :key="group.name + index" class="detail-section mci-fade-up"
+      <mci-related-tabs v-if="formTabs.length > 1" :items="formTabs" :active-key="activeFormTabKey"
+        @select="selectFormTab" />
+      <view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+        <mci-child-table v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+          :parent-id="rowId" :parent-form="row" readonly />
+        <mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+          :parent-form="row" parent-mode="View" readonly />
+        <mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+          :parent-table="config.table" :parent-id="rowId" :parent-form="row" readonly />
+        <mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
+          :parent-form="row" />
+      </view>
+
+      <view v-for="(group, index) in groups" :key="group.key || group.name + index"
+        class="detail-section mci-fade-up"
+        :class="{ 'detail-section--ungrouped': group.source === 'Ungrouped' }"
         :style="{ animationDelay: `${Math.min(index, 6) * 45}ms` }">
-        <view class="detail-section__header" @tap="toggleGroup(index)">
-          <view><text class="detail-section__bar"></text><text>{{ group.name }}</text><text>{{ group.fields.length }} 项</text></view>
+        <view v-if="group.source === 'CollapseGroup'" class="detail-section__header" @tap="toggleGroup(group, index)">
+          <view>
+            <text class="detail-section__bar"></text>
+            <view class="detail-section__copy">
+              <text>{{ group.name }}</text>
+              <text v-if="group.description">{{ group.description }}</text>
+            </view>
+            <text v-if="group.showFieldCount !== false">{{ group.fields.length }} 项</text>
+          </view>
           <text>{{ expanded[index] ? '⌃' : '⌄' }}</text>
         </view>
-        <view v-if="expanded[index]" class="detail-section__body">
+        <view v-if="group.source === 'Ungrouped' || expanded[index]" class="detail-section__body">
           <view v-for="field in group.fields" :key="field.Id || field.Name" class="detail-field">
             <text class="detail-field__label">{{ field.Label || field.Name }}</text>
             <view class="detail-field__value">
@@ -51,15 +73,6 @@
           </view>
         </view>
       </view>
-
-      <mci-child-table v-for="field in related.childFields" :key="field.Id || field.Name" :field="field"
-        :parent-id="rowId" :parent-form="row" readonly />
-      <mci-join-form v-for="field in related.joinFields" :key="field.Id || field.Name" :field="field"
-        :parent-form="row" parent-mode="View" readonly />
-      <mci-table-selector v-for="field in related.openTableFields" :key="field.Id || field.Name" :field="field"
-        :parent-table="config.table" :parent-id="rowId" :parent-form="row" readonly />
-      <mci-related-table v-for="field in related.joinTableFields" :key="field.Id || field.Name" :field="field"
-        :parent-form="row" />
       <view class="detail-bottom-space"></view>
     </view>
   </mci-page-shell>
@@ -88,6 +101,7 @@ export default {
       loading: true,
       error: '',
       expanded: {},
+      activeFormTabKey: '',
       actionRunning: false,
       metricValues: {}
     }
@@ -131,24 +145,15 @@ export default {
       return (this.preset.actions || []).filter((action) => isActionVisible(action, this.row))
     },
     groups() {
-      const configured = this.preset.sections || []
-      if (!configured.length) return this.config.definition?.groups || []
-      const byName = new Map((this.config.definition?.fields || []).map((field) => [field.Name, field]))
-      const used = new Set()
-      const result = configured.map((section) => ({
-        name: section.title || '详细信息',
-        fields: (section.fields || []).map((item) => {
-          const name = item.name || item.Name
-          const field = byName.get(name)
-          if (field) used.add(name)
-          return field
-        }).filter(Boolean),
-        defaultExpanded: section.defaultExpanded !== false
-      })).filter((group) => group.fields.length)
-      const remaining = (this.config.definition?.groups || []).flatMap((group) => group.fields || [])
-        .filter((field) => !used.has(field.Name))
-      if (remaining.length) result.push({ name: '更多信息', fields: remaining, defaultExpanded: false })
-      return result
+      const groups = this.config.definition?.groups || []
+      if (!this.formTabs.length) return groups
+      return groups.filter((group) => group.tabKey === this.activeFormTabKey)
+    },
+    formTabs() {
+      return (this.config.definition?.formTabs || []).map((tab) => ({
+        ...tab,
+        label: tab.name
+      }))
     },
     related() {
       const definition = this.config.definition || {}
@@ -158,6 +163,24 @@ export default {
         openTableFields: definition.openTableFields || [],
         joinTableFields: definition.joinTableFields || []
       }
+    },
+    relatedTabs() {
+      const toTabs = (fields, type) => fields.map((field) => ({
+        key: `${type}:${field.Id || field.Name}`,
+        label: field.Label || field.Name || '关联业务',
+        type,
+        field
+      }))
+      return [
+        ...toTabs(this.related.childFields, 'child'),
+        ...toTabs(this.related.joinFields, 'join'),
+        ...toTabs(this.related.openTableFields, 'openTable'),
+        ...toTabs(this.related.joinTableFields, 'joinTable')
+      ]
+    },
+    activeRelatedTabs() {
+      if (!this.formTabs.length) return this.relatedTabs
+      return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
     }
   },
   onLoad(options) {
@@ -195,8 +218,9 @@ export default {
         })
         this.expanded = {}
         this.$nextTick(() => {
+          this.initializeFormTabs()
           this.groups.forEach((group, index) => {
-            this.expanded[index] = group.defaultExpanded !== false && index < 2
+            this.expanded[index] = group.source === 'Ungrouped' || group.defaultExpanded !== false
           })
         })
       } catch (error) {
@@ -212,8 +236,24 @@ export default {
       const field = this.field(name)
       return field ? fieldDisplayValue(field, value) : String(value ?? '-')
     },
-    toggleGroup(index) {
+    toggleGroup(group, index) {
+      if (!group || group.source !== 'CollapseGroup') return
       this.expanded[index] = !this.expanded[index]
+    },
+    initializeFormTabs() {
+      if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
+        this.activeFormTabKey = this.formTabs[0]?.key || ''
+      }
+    },
+    selectFormTab(tab) {
+      if (!tab || !tab.key) return
+      this.activeFormTabKey = tab.key
+      this.expanded = {}
+      this.$nextTick(() => {
+        this.groups.forEach((group, index) => {
+          this.expanded[index] = group.source === 'Ungrouped' || group.defaultExpanded !== false
+        })
+      })
     },
     async runAction(action) {
       if (this.actionRunning) return
@@ -270,10 +310,14 @@ export default {
 .action-grid > view { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8rpx; padding: 10rpx 2rpx; color: #35525c; font-size: 22rpx; transition: transform .16s ease; }
 .action-grid__item--pressed { transform: scale(.96); }
 .action-grid__icon { color: #087da8; font-size: 36rpx; }
+.related-tab-panel { margin-top: 14rpx; background: #fff; }
 .detail-section { margin-top: 16rpx; border-top: 1px solid #e5edef; border-bottom: 1px solid #e5edef; background: #fff; }
 .detail-section__header { min-height: 86rpx; display: flex; align-items: center; justify-content: space-between; padding: 0 26rpx; color: #17313b; font-size: 28rpx; font-weight: 750; }
 .detail-section__header > view { display: flex; align-items: center; gap: 12rpx; }
 .detail-section__bar { width: 7rpx; height: 32rpx; border-radius: 4rpx; background: linear-gradient(180deg, #e54625, #ff7b42); }
+.detail-section__copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4rpx; }
+.detail-section__copy text:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-section__copy text:last-child:not(:first-child) { overflow: hidden; color: #94a3a8; font-size: 20rpx; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .detail-section__header > view text:last-child { color: #94a3a8; font-size: 20rpx; font-weight: 500; }
 .detail-section__header > text { color: #81969d; font-size: 26rpx; }
 .detail-section__body { padding: 0 26rpx; }

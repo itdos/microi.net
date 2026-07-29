@@ -161,7 +161,7 @@ export function normalizeField(field) {
     multiple: isNativeFieldMultiple({ ...field, component, config }),
     optionsRemote: isRemoteNativeFieldOptions({ ...field, component, config }),
     inputMode: inputMode(field, component),
-    editable: Number(field.Readonly || 0) !== 1 &&
+    editable: !configBoolean(field.Readonly ?? field.ReadOnly, false) &&
       !LAYOUT_COMPONENTS.has(component) &&
       !RELATED_COMPONENTS.has(component) &&
       !READONLY_COMPONENTS.has(component) &&
@@ -174,45 +174,123 @@ export function normalizeField(field) {
   }
 }
 
-function parseTableTabs(tableModel) {
-  const tabs = parseJson(tableModel && tableModel.Tabs, [])
-  const result = new Map()
-  ;(Array.isArray(tabs) ? tabs : []).forEach((tab) => {
-    const id = String(tab.Id || tab.id || tab.Name || tab.name || '')
-    const name = String(tab.Name || tab.name || tab.Label || id || '')
-    if (id) result.set(id, name)
-    if (name) result.set(name, name)
+export function normalizeTableTabs(tableModel = {}) {
+  const rawTabs = parseJson(tableModel.Tabs, [])
+  if (!Array.isArray(rawTabs)) return []
+  return rawTabs
+    .map((tab, index) => {
+      const source = tab && typeof tab === 'object' ? tab : { Name: tab }
+      const name = String(source.Name || source.Label || source._RawName || source.EnName || '').trim()
+      const id = String(source.Id || source.id || '').trim()
+      const key = id || name || `tab:${index}`
+      return {
+        key,
+        id,
+        name,
+        label: name,
+        icon: String(source.Icon || '').trim(),
+        sort: Number.isFinite(Number(source.Sort)) ? Number(source.Sort) : index,
+        sourceIndex: index,
+        display: configBoolean(source.Display, true),
+        aliases: [id, name, source.EnName, source._RawName]
+          .map((value) => String(value || '').trim().toLowerCase())
+          .filter(Boolean)
+      }
+    })
+    .filter((tab) => tab.display && tab.name)
+    .sort((left, right) => left.sort - right.sort || left.sourceIndex - right.sourceIndex)
+}
+
+function assignFieldFormTabs(fields, tableTabs) {
+  const tabs = Array.isArray(tableTabs) ? tableTabs : []
+  const fallback = tabs[0] || null
+  ;(fields || []).forEach((field) => {
+    const value = String(field.Tab || '').trim().toLowerCase()
+    const matched = tabs.find((tab) => tab.aliases.includes(value)) || fallback
+    field.formTabKey = matched ? matched.key : '__basic__'
+    field.formTabName = matched ? matched.name : ''
   })
-  return result
 }
 
 export function groupFields(fields, tableModel = {}) {
-  const tabNames = parseTableTabs(tableModel)
-  const groups = new Map()
-  const currentSection = new Map()
-  const ensureGroup = (key, name) => {
-    if (!groups.has(key)) groups.set(key, { name, fields: [] })
-    return groups.get(key)
+  const groups = []
+  const activeGroups = new Map()
+  const looseGroups = new Map()
+  const createLooseGroup = (tabKey) => {
+    const group = {
+      key: `ungrouped:${tabKey}:${groups.length}`,
+      name: '',
+      fields: [],
+      source: 'Ungrouped',
+      defaultExpanded: true,
+      tabKey,
+      tabName: ''
+    }
+    looseGroups.set(tabKey, group)
+    groups.push(group)
+    return group
   }
   fields.forEach((field) => {
     if (!field.visible) return
     const rawTab = field.Tab && field.Tab !== 'none' ? String(field.Tab) : ''
-    const tabName = tabNames.get(rawTab) || rawTab || '基本信息'
-    const tabKey = rawTab || '__basic__'
-    if (field.component === 'CollapseGroup' || field.component === 'Divider') {
-      currentSection.set(tabKey, field.Label || tabName || '更多信息')
+    const tabKey = field.formTabKey || rawTab || '__basic__'
+    if (field.component === 'CollapseGroup') {
+      const collapse = field.config?.CollapseGroup || {}
+      const scopeMode = String(collapse.ScopeMode || 'UntilNextGroup').toLowerCase()
+      const configuredCount = Math.max(0, Number(collapse.FieldCount || 0))
+      const fieldCount = scopeMode === 'fieldcount'
+        ? (configuredCount || Number.POSITIVE_INFINITY)
+        : Number.POSITIVE_INFINITY
+      const group = {
+        key: String(field.Id || field.Name || `collapse:${groups.length}`),
+        name: String(field.Label || field.Name || '').trim(),
+        fields: [],
+        source: 'CollapseGroup',
+        defaultExpanded: !configBoolean(collapse.DefaultCollapsed, false),
+        description: String(collapse.Description || field.Description || '').trim(),
+        icon: String(collapse.Icon || '').trim(),
+        theme: String(collapse.Theme || 'default').trim(),
+        showFieldCount: configBoolean(collapse.ShowFieldCount, true),
+        scopeMode: scopeMode === 'fieldcount' ? 'FieldCount' : 'UntilNextGroup',
+        fieldCount,
+        tabKey,
+        tabName: field.formTabName || ''
+      }
+      groups.push(group)
+      activeGroups.set(tabKey, { group, remaining: fieldCount })
+      looseGroups.delete(tabKey)
       return
     }
-    if (LAYOUT_COMPONENTS.has(field.component) || RELATED_COMPONENTS.has(field.component) || GUARDED_COMPONENTS.has(field.component)) return
-    const sectionName = currentSection.get(tabKey)
-    const groupName = sectionName || tabName
-    ensureGroup(`${tabKey}:${groupName}`, groupName).fields.push(field)
+    if (LAYOUT_COMPONENTS.has(field.component)) {
+      activeGroups.delete(tabKey)
+      looseGroups.delete(tabKey)
+      return
+    }
+    if (RELATED_COMPONENTS.has(field.component) || GUARDED_COMPONENTS.has(field.component)) return
+
+    const active = activeGroups.get(tabKey)
+    if (active && active.remaining > 0) {
+      active.group.fields.push(field)
+      if (Number.isFinite(active.remaining)) {
+        active.remaining -= 1
+        if (active.remaining <= 0) {
+          activeGroups.delete(tabKey)
+          looseGroups.delete(tabKey)
+        }
+      }
+      return
+    }
+
+    const loose = looseGroups.get(tabKey) || createLooseGroup(tabKey)
+    loose.fields.push(field)
   })
-  const result = [...groups.values()].filter((group) => group.fields.length)
-  return result.length ? result : [{ name: tableModel.Description || '基本信息', fields: [] }]
+  return groups.filter((group) => group.fields.length)
 }
 
 function buildDefinition(table, fields, layoutFields = fields) {
+  const formTabs = normalizeTableTabs(table)
+  assignFieldFormTabs(layoutFields, formTabs)
+  if (layoutFields !== fields) assignFieldFormTabs(fields, formTabs)
   const uniqueRelated = (component) => {
     const seen = new Set()
     return fields.filter((field) => {
@@ -234,6 +312,7 @@ function buildDefinition(table, fields, layoutFields = fields) {
     table,
     fields,
     layoutFields,
+    formTabs,
     groups: groupFields(fields, table),
     childFields: uniqueRelated('TableChild'),
     joinFields: uniqueRelated('JoinForm'),
@@ -248,7 +327,7 @@ export function createNativeFormDefinition(table = {}, rawFields = []) {
   return buildDefinition(table, fields, layoutFields)
 }
 
-export const NATIVE_FORM_SCHEMA_VERSION = 3
+export const NATIVE_FORM_SCHEMA_VERSION = 5
 const FORM_VERSION_MAX_AGE = 30 * 1000
 const FORM_DEFINITION_MAX_AGE = 30 * 24 * 60 * 60 * 1000
 
@@ -386,6 +465,7 @@ export function scopeNativeFormDefinition(definition, options = {}) {
   const fields = (definition.fields || []).filter((field) => {
     const name = String(field.Name || '').toLowerCase()
     if (exclude.has(name)) return false
+    if (LAYOUT_COMPONENTS.has(field.component)) return true
     return !include.size || include.has(name)
   }).map((field) => ({
     ...field,
@@ -398,55 +478,42 @@ export function applyNativeFormViewDefinition(definition, formConfig) {
   if (!definition || !formConfig || !Array.isArray(formConfig.sections) || !formConfig.sections.length) {
     return definition
   }
-  const byName = new Map((definition.fields || []).map((field) => [
-    String(field.Name || '').toLowerCase(),
-    field
-  ]))
-  const used = new Set()
+  const viewFields = new Map()
   const hidden = new Set()
-  const groups = formConfig.sections.map((section) => {
-    const fields = (section.fields || []).map((item) => {
+  formConfig.sections.forEach((section) => {
+    ;(section.fields || []).forEach((item) => {
       const name = String(item.name || item.Name || '').toLowerCase()
-      if (!name) return null
-      used.add(name)
+      if (!name) return
       if (item.hidden === true || item.Hidden === true) {
         hidden.add(name)
-        return null
+        return
       }
-      const field = byName.get(name)
-      if (!field) return null
-      return {
-        ...field,
-        Label: item.label || item.Label || field.Label,
+      viewFields.set(name, {
+        label: item.label || item.Label || '',
         viewWidth: item.mobileWidth || item.MobileWidth || item.width || item.Width || null,
         viewFormat: item.format || item.Format || ''
-      }
-    }).filter(Boolean)
-    return {
-      name: section.title || section.Title || '基本信息',
-      fields,
-      defaultExpanded: section.defaultExpanded !== false && section.DefaultExpanded !== false,
-      columns: Number(section.columns || section.Columns || 1)
-    }
-  }).filter((group) => group.fields.length)
-
-  ;(definition.groups || []).forEach((group) => {
-    const fields = (group.fields || []).filter((field) => {
-      const name = String(field.Name || '').toLowerCase()
-      return !used.has(name) && !hidden.has(name)
-    })
-    if (fields.length) {
-      groups.push({
-        ...group,
-        fields,
-        defaultExpanded: false
       })
-    }
+    })
   })
 
+  const fields = (definition.fields || []).filter((field) => {
+    if (LAYOUT_COMPONENTS.has(field.component)) return true
+    return !hidden.has(String(field.Name || '').toLowerCase())
+  }).map((field) => {
+    const viewField = viewFields.get(String(field.Name || '').toLowerCase())
+    if (!viewField) return field
+    return {
+      ...field,
+      Label: viewField.label || field.Label,
+      viewWidth: viewField.viewWidth,
+      viewFormat: viewField.viewFormat
+    }
+  })
+  const result = buildDefinition(definition.table || {}, fields, definition.layoutFields || definition.fields || [])
   return {
-    ...definition,
-    groups: groups.length ? groups : definition.groups,
+    ...result,
+    schemaFingerprint: definition.schemaFingerprint,
+    schemaVersion: definition.schemaVersion,
     viewConfig: formConfig
   }
 }
@@ -729,7 +796,7 @@ export function fieldDisplayValue(field, value) {
   const parsed = parseJson(value, value)
   if (field.component === 'Address') return formatRegionValue(parsed) || '-'
   if (['Map', 'MapArea'].includes(field.component) && parsed && typeof parsed === 'object') return parsed.address || parsed.name || parsed.Address || parsed.Name || '已选择位置'
-  return formatStructuredValue(parsed, { preferredKeys })
+  return formatStructuredValue(parsed, { preferredKeys, empty: '-' })
 }
 
 export default {
@@ -737,6 +804,7 @@ export default {
   normalizeOptions,
   inferNativeComponent,
   normalizeField,
+  normalizeTableTabs,
   createNativeFormDefinition,
   isNativeFieldMultiple,
   nativeFieldOptionSource,

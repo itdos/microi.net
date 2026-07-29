@@ -43,7 +43,7 @@
 					</view>
 				</view>
 
-				<view v-if="key === 'customers'" class="quick-band">
+				<!-- <view v-if="key === 'customers'" class="quick-band">
 					<view class="quick-action" hover-class="quick-action--pressed" @tap="addCustomerVisit">
 						<image src="/static/xjy/business/baifang.png" mode="aspectFit" />
 						<text>新增跟进</text>
@@ -63,7 +63,7 @@
 						<image src="/static/xjy/repair/renwu.png" mode="aspectFit" />
 						<text>售后任务</text>
 					</view>
-				</view>
+				</view> -->
 				<view v-if="dynamicActions.length" class="quick-band quick-band--dynamic">
 					<view
 						v-for="action in dynamicActions"
@@ -78,33 +78,35 @@
 					</view>
 				</view>
 
-				<view v-if="relationActions.length" class="info-band relation-panel">
-					<view class="section-heading section-heading--toggle" hover-class="section-heading--pressed"
-						@tap="relationExpanded = !relationExpanded">
-						<view class="section-heading__copy">
-							<view class="section-mark"></view>
-							<text>关联业务</text>
-							<text class="section-count">{{ relationActions.length }} 项</text>
-						</view>
-						<text class="section-toggle" :class="{ expanded: relationExpanded }">›</text>
-					</view>
-					<view v-if="relationExpanded" class="relation-band">
-						<view class="relation-item" v-for="action in relationActions" :key="action.label"
-							hover-class="relation-item--pressed" @tap="runRelation(action)">
-							<image :src="action.icon" mode="aspectFit" />
-							<text>{{ action.label }}</text>
-							<text class="relation-arrow">›</text>
-						</view>
-					</view>
+				<mci-related-tabs v-if="formTabs.length > 1" :items="formTabs"
+					:active-key="activeFormTabKey" @select="selectFormTab" />
+
+				<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+					<mci-child-table v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
+						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						parent-mode="View" readonly />
+					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+						:parent-form="detail" parent-mode="View" readonly />
+					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+						:parent-table="moduleConfig.table" :parent-id="detail.Id || id"
+						:parent-form="detail" :parent-menu-id="menuId" readonly />
+					<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
+						:parent-form="detail" :parent-menu-id="menuId" />
 				</view>
 
-				<view class="info-band" v-for="(section, sectionIndex) in visibleSections" :key="section.key">
-					<view class="section-heading section-heading--toggle" hover-class="section-heading--pressed"
+				<view class="info-band" :class="{ 'info-band--ungrouped': section.source === 'Ungrouped' }"
+					v-for="(section, sectionIndex) in visibleSections" :key="section.key">
+					<view v-if="section.source === 'CollapseGroup'"
+						class="section-heading section-heading--toggle" hover-class="section-heading--pressed"
 						@tap="toggleSection(section, sectionIndex)">
 						<view class="section-heading__copy">
 							<view class="section-mark"></view>
-							<text>{{ section.title }}</text>
-							<text class="section-count">{{ section.fields.length }} 项</text>
+							<view class="section-heading__text">
+								<text>{{ section.title }}</text>
+								<text v-if="section.description" class="section-description">{{ section.description }}</text>
+							</view>
+							<text v-if="section.showFieldCount !== false" class="section-count">{{ section.fields.length }} 项</text>
 						</view>
 						<text class="section-toggle"
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
@@ -309,12 +311,6 @@
 		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Department', 'SelectTree',
 		'TreeCheckbox', 'Cascader', 'ColorPicker', 'Progress', 'Rate', 'Qrcode', 'Alert'
 	])
-
-	function hasDisplayValue(value) {
-		if (value === null || value === undefined || value === '') return false
-		if (Array.isArray(value)) return value.length > 0
-		return true
-	}
 
 	function detailFieldFormat(field) {
 		const component = String(field.component || field.Component || '')
@@ -1148,7 +1144,7 @@
 				viewManifest: null,
 				metricValues: {},
 				expandedSections: {},
-				relationExpanded: false
+				activeFormTabKey: ''
 			}
 		},
 		computed: {
@@ -1171,7 +1167,10 @@
 					}] : []
 				}
 				const dynamic = compileDetailPreset(this.viewManifest)
-				if (!dynamic) return base
+				if (!dynamic) return {
+					...base,
+					sections: []
+				}
 				return {
 					...base,
 					...dynamic,
@@ -1183,7 +1182,7 @@
 					metaField: dynamic.metaField || base.metaField,
 					phoneFields: dynamic.phoneFields?.length ? dynamic.phoneFields : base.phoneFields,
 					metrics: dynamic.metrics?.length ? dynamic.metrics : base.metrics,
-					sections: dynamic.sections?.length ? dynamic.sections : base.sections,
+					sections: [],
 					summaries: dynamic.summaries?.length ? dynamic.summaries : base.summaries
 				}
 			},
@@ -1243,61 +1242,56 @@
 				return map
 			},
 			visibleSections() {
-				const sections = []
-				const sectionByTitle = new Map()
-				const used = new Set()
-				const appendSection = (title, fields) => {
-					const rows = fields.map((field) => {
-						const name = String(field.name || '')
-						const nativeField = field.nativeField || this.fieldDefinitionMap.get(name
-							.toLowerCase()) || null
-						return {
-							...field,
-							label: field.label || nativeField?.Label || name,
-							format: field.format || (nativeField ? detailFieldFormat(nativeField) : ''),
-							nativeField
-						}
-					}).filter((field) =>
-						!this.isTenantMapCoordinateHelper(field) &&
-						(hasDisplayValue(this.detail[field.name]) || this.hasTenantDetailMap(field))
-					)
-					if (!rows.length) return
-					if (!sectionByTitle.has(title)) {
-						const section = {
-							title,
-							fields: []
-						}
-						sectionByTitle.set(title, section)
-						sections.push(section)
-					}
-					const target = sectionByTitle.get(title)
-					rows.forEach((field) => {
-						const name = String(field.name || '')
-						if (!name || used.has(name.toLowerCase())) return
-						target.fields.push(field)
-						used.add(name.toLowerCase())
-					})
-				}
-
-				;
-				(this.preset.sections || []).forEach((section) => appendSection(section.title, section.fields || []));
-				(this.definition?.groups || []).forEach((group) => {
-					const fields = (group.fields || []).filter((field) => {
+				const groups = this.definition?.groups || []
+				const activeGroups = this.formTabs.length
+					? groups.filter((group) => group.tabKey === this.activeFormTabKey)
+					: groups
+				return activeGroups.map((group, index) => {
+					const rows = (group.fields || []).filter((field) => {
 						const name = String(field.Name || '')
-						return name && !DETAIL_EXCLUDED_FIELDS.has(name) && !used.has(name.toLowerCase())
+						return name && !DETAIL_EXCLUDED_FIELDS.has(name)
 					}).map((field) => ({
 						label: field.Label || field.Name,
 						name: field.Name,
 						format: detailFieldFormat(field),
 						nativeField: field
-					}))
-					appendSection(group.name || '更多资料', fields)
+					})).filter((field) => !this.isTenantMapCoordinateHelper(field))
+					return {
+						title: group.name || '',
+						fields: rows,
+						source: group.source,
+						description: group.description || '',
+						showFieldCount: group.showFieldCount,
+						defaultExpanded: group.defaultExpanded !== false,
+						key: group.key || `${group.name || 'ungrouped'}:${index}`
+					}
 				})
-
-				return sections.filter((section) => section.fields.length).map((section, index) => ({
-					...section,
-					key: `${section.title}:${index}`
+				.filter((section) => section.fields.length)
+			},
+			formTabs() {
+				return (this.definition?.formTabs || []).map((tab) => ({
+					...tab,
+					label: tab.name
 				}))
+			},
+			relatedTabs() {
+				const definition = this.definition || {}
+				const toTabs = (fields, type) => (fields || []).map((field) => ({
+					key: `${type}:${field.Id || field.Name}`,
+					label: field.Label || field.Name || '关联业务',
+					type,
+					field
+				}))
+				return [
+					...toTabs(definition.childFields, 'child'),
+					...toTabs(definition.joinFields, 'join'),
+					...toTabs(definition.openTableFields, 'openTable'),
+					...toTabs(definition.joinTableFields, 'joinTable')
+				]
+			},
+			activeRelatedTabs() {
+				if (!this.formTabs.length) return this.relatedTabs
+				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			summaryBlocks() {
 				return (this.preset.summaries || []).map((item) => {
@@ -1328,13 +1322,14 @@
 			},
 			relationActions() {
 				if (this.key === 'customers') {
-					return [{
-							label: '分享客户给商家',
-							type: 'customer-share',
-							icon: icon('business/xiezuo.png')
-						},
+					return [
+						// {
+						// 	label: '分享客户给商家',
+						// 	type: 'customer-share',
+						// 	icon: icon('business/xiezuo.png')
+						// },
 						{
-							label: '客户其它地址',
+							label: '客户地址管理',
 							type: 'list',
 							key: 'customerAddresses',
 							field: 'KehuID',
@@ -1692,7 +1687,10 @@
 					if (!result || result.Code !== 1 || !result.Data) throw new Error((result && result.Msg) ||
 						'未找到该条业务数据')
 					this.detail = result.Data
-					if (definitionResult) this.definition = definitionResult
+					if (definitionResult) {
+						this.definition = definitionResult
+						this.initializeFormTabs()
+					}
 					this.metricValues = await loadViewMetricValues(this.preset.metrics || [], {
 						form: this.detail,
 						user: this.currentUser,
@@ -1806,7 +1804,9 @@
 				}
 			},
 			displayField(field) {
-				return formatFieldValue(this.detail[field.name], field.format)
+				return formatFieldValue(this.detail[field.name], field.format, {
+					empty: '-'
+				})
 			},
 			usesNativeDisplay(field) {
 				return Boolean(field.nativeField && DETAIL_NATIVE_COMPONENTS.has(String(field.nativeField.component ||
@@ -1858,11 +1858,13 @@
 				return normalizeRichTextHtml(this.detail[field.name])
 			},
 			isSectionExpanded(section, index) {
+				if (section.source === 'Ungrouped') return true
 				if (Object.prototype.hasOwnProperty.call(this.expandedSections, section.key)) return this.expandedSections[
 					section.key]
-				return index === 0
+				return section.defaultExpanded !== false
 			},
 			toggleSection(section, index) {
+				if (section.source !== 'CollapseGroup') return
 				this.expandedSections = {
 					...this.expandedSections,
 					[section.key]: !this.isSectionExpanded(section, index)
@@ -1909,6 +1911,15 @@
 				uni.navigateTo({
 					url: `/pages/business/list?${params.join('&')}`
 				})
+			},
+			selectFormTab(tab) {
+				if (!tab || !tab.key) return
+				this.activeFormTabKey = tab.key
+			},
+			initializeFormTabs() {
+				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
+					this.activeFormTabKey = this.formTabs[0]?.key || ''
+				}
 			},
 			async runRelation(action) {
 				if (action.type === 'detail') {
@@ -2570,6 +2581,11 @@
 		background: #f3f8fa;
 	}
 
+	.related-tab-panel {
+		margin-top: 14rpx;
+		background: #fff;
+	}
+
 	.info-band {
 		margin-top: 14rpx;
 		padding: 0 28rpx 10rpx;
@@ -2588,8 +2604,34 @@
 
 	.section-heading__copy {
 		min-width: 0;
+		flex: 1;
 		display: flex;
 		align-items: center;
+	}
+
+	.section-heading__text {
+		min-width: 0;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 4rpx;
+		padding: 12rpx 0;
+	}
+
+	.section-heading__text>text:first-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.section-description {
+		overflow: hidden;
+		color: #8ca0a8;
+		font-size: 20rpx;
+		font-weight: 400;
+		line-height: 1.35;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.section-heading--toggle {
