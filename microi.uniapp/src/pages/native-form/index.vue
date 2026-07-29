@@ -64,21 +64,41 @@
 				</view>
 			</view>
 
+			<mci-related-tabs v-if="formTabs.length > 1" :items="formTabs" :active-key="activeFormTabKey"
+				@select="selectFormTab" />
+			<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+				<mci-child-table v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+					:parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+					:parent-mode="mode" :readonly="mode === 'View'" />
+				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
+				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+					:parent-table="tableName" :parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
+					:readonly="mode === 'View' || isConfiguredReadonly(relatedTab.field)"
+					@change="handleRelatedChange" />
+				<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
+					:parent-form="form" :parent-menu-id="menuId" />
+			</view>
+
 			<!-- zhy: 当前下拉所在分组临时解除卡片裁切。 -->
-			<view v-for="(group, groupIndex) in groups" :key="group.name + groupIndex" class="form-section mci-fade-up"
-				:class="{ 'form-section--select-open': isSelectorGroupOpen(group), 'form-section--collapsed': !isGroupExpanded(group, groupIndex) }"
+			<view v-for="(group, groupIndex) in groups" :key="group.key || group.name + groupIndex"
+				class="form-section mci-fade-up"
+				:class="{ 'form-section--ungrouped': group.source === 'Ungrouped', 'form-section--select-open': isSelectorGroupOpen(group), 'form-section--collapsed': !isGroupExpanded(group, groupIndex) }"
 				:style="{ animationDelay: `${Math.min(groupIndex, 6) * 45}ms` }">
-				<!-- zhy: 新增和编辑页点击分组标题即可折叠或展开字段。 -->
-				<view class="form-section__header" :class="{ expanded: isGroupExpanded(group, groupIndex) }"
-					:hover-class="isEditableMode ? 'form-section__header--pressed' : 'none'"
+				<view v-if="group.source === 'CollapseGroup'" class="form-section__header"
+					:class="{ expanded: isGroupExpanded(group, groupIndex) }"
+					hover-class="form-section__header--pressed"
 					@tap="toggleGroup(group, groupIndex)">
 					<view class="form-section__heading">
 						<view class="form-section__bar"></view>
-						<text class="form-section__title">{{ group.name }}</text>
-						<text v-if="isEditableMode" class="form-section__count">{{ group.fields.length }} 项</text>
+						<view class="form-section__copy">
+							<text class="form-section__title">{{ group.name }}</text>
+							<text v-if="group.description" class="form-section__description">{{ group.description }}</text>
+						</view>
+						<text v-if="group.showFieldCount !== false" class="form-section__count">{{ group.fields.length }} 项</text>
 					</view>
-					<text v-if="isEditableMode" class="form-section__toggle"
-						:class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
+					<text class="form-section__toggle" :class="{ expanded: isGroupExpanded(group, groupIndex) }">›</text>
 				</view>
 
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
@@ -134,22 +154,6 @@
 					</view>
 				</view>
 			</view>
-
-			<mci-child-table v-for="field in childFields" :key="field.Id || field.Name" :field="field"
-				:parent-id="rowId" :parent-form="form" :parent-menu-id="menuId"
-				:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-				:parent-mode="mode" :readonly="mode === 'View'" />
-
-			<mci-join-form v-for="field in joinFields" :key="field.Id || field.Name" :field="field" :parent-form="form"
-				:parent-mode="mode" :readonly="mode === 'View'" />
-
-			<mci-table-selector v-for="field in openTableFields" :key="field.Id || field.Name" :field="field"
-				:parent-table="tableName" :parent-id="rowId" :parent-form="form"
-				:parent-menu-id="menuId"
-				:readonly="mode === 'View' || Number(field.Readonly || 0) === 1" @change="handleRelatedChange" />
-
-			<mci-related-table v-for="field in joinTableFields" :key="field.Id || field.Name" :field="field"
-				:parent-form="form" :parent-menu-id="menuId" />
 
 			<view class="form-bottom-space"></view>
 		</view>
@@ -239,6 +243,7 @@
 				openSelectorField: '',
 				// zhy: 保存新增和编辑页已展开的字段分组。
 				expandedGroupKeys: [],
+				activeFormTabKey: '',
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
 				formLoadId: 0
 			}
@@ -251,7 +256,15 @@
 				return this.definition && this.definition.table ? this.definition.table.Description || '' : ''
 			},
 			groups() {
-				return this.definition ? this.definition.groups : []
+				const groups = this.definition ? this.definition.groups : []
+				if (!this.formTabs.length) return groups
+				return groups.filter((group) => group.tabKey === this.activeFormTabKey)
+			},
+			formTabs() {
+				return (this.definition?.formTabs || []).map((tab) => ({
+					...tab,
+					label: tab.name
+				}))
 			},
 			isEditableMode() {
 				return this.mode === 'Add' || this.mode === 'Edit'
@@ -271,6 +284,24 @@
 			hasRelatedFields() {
 				return this.childFields.length + this.joinFields.length + this.openTableFields.length + this
 					.joinTableFields.length > 0
+			},
+			relatedTabs() {
+				const toTabs = (fields, type) => fields.map((field) => ({
+					key: `${type}:${field.Id || field.Name}`,
+					label: field.Label || field.Name || '关联业务',
+					type,
+					field
+				}))
+				return [
+					...toTabs(this.childFields, 'child'),
+					...toTabs(this.joinFields, 'join'),
+					...toTabs(this.openTableFields, 'openTable'),
+					...toTabs(this.joinTableFields, 'joinTable')
+				]
+			},
+			activeRelatedTabs() {
+				if (!this.formTabs.length) return this.relatedTabs
+				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
@@ -388,6 +419,7 @@
 					this.definition = definition
 					// zhy: 初始化新增和编辑页的字段分组折叠状态。
 					this.initializeGroupExpansion(definition.groups || [])
+					this.initializeFormTabs()
 					this.loading = false
 					await this.$nextTick()
 					// 必须更新页面持有的响应式定义。直接修改上面的原始 definition 会绕过
@@ -413,24 +445,32 @@
 			isReadonly(field) {
 				return this.mode === 'View' || !field.editable
 			},
+			isConfiguredReadonly(field) {
+				const value = field && (field.Readonly ?? field.ReadOnly)
+				return value === true || Number(value) === 1 || String(value).toLowerCase() === 'true'
+			},
 			// zhy: 使用名称和序号生成稳定的分组折叠标识。
 			groupKey(group, groupIndex) {
-				return `${String(group && group.name || 'group')}:${groupIndex}`
+				return String(group && group.key || `${String(group && group.name || 'group')}:${groupIndex}`)
 			},
 			isGroupExpanded(group, groupIndex) {
-				if (!this.isEditableMode) return true
+				if (group && group.source === 'Ungrouped') return true
 				return this.expandedGroupKeys.includes(this.groupKey(group, groupIndex))
 			},
 			initializeGroupExpansion(groups) {
-				if (!this.isEditableMode || !groups.length) {
+				if (!groups.length) {
 					this.expandedGroupKeys = []
 					return
 				}
-				// zhy: 新增和编辑页默认展开第一项，其余字段分组保持收起。
-				this.expandedGroupKeys = [this.groupKey(groups[0], 0)]
+				this.expandedGroupKeys = groups.reduce((keys, group, index) => {
+					if (group.source === 'Ungrouped' || group.defaultExpanded !== false) {
+						keys.push(this.groupKey(group, index))
+					}
+					return keys
+				}, [])
 			},
 			toggleGroup(group, groupIndex) {
-				if (!this.isEditableMode) return
+				if (!group || group.source !== 'CollapseGroup') return
 				const key = this.groupKey(group, groupIndex)
 				const expanded = this.expandedGroupKeys.includes(key)
 				this.expandedGroupKeys = expanded
@@ -439,13 +479,26 @@
 				// zhy: 收起包含已打开下拉框的分组时同步恢复页面层级。
 				if (expanded && this.isSelectorGroupOpen(group)) this.openSelectorField = ''
 			},
+			initializeFormTabs() {
+				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
+					this.activeFormTabKey = this.formTabs[0]?.key || ''
+				}
+			},
+			selectFormTab(tab) {
+				if (!tab || !tab.key) return
+				this.activeFormTabKey = tab.key
+				this.initializeGroupExpansion(this.groups)
+			},
 			// zhy: 必填校验失败时自动展开对应分组，方便用户直接补充字段。
 			expandFirstInvalidGroup() {
-				const groupIndex = this.groups.findIndex((group) =>
+				const allGroups = this.definition?.groups || []
+				const groupIndex = allGroups.findIndex((group) =>
 					group.fields.some((field) => Boolean(validateNativeForm(this.form, [field])))
 				)
 				if (groupIndex < 0) return
-				const key = this.groupKey(this.groups[groupIndex], groupIndex)
+				const group = allGroups[groupIndex]
+				if (group.tabKey) this.activeFormTabKey = group.tabKey
+				const key = this.groupKey(group, groupIndex)
 				if (!this.expandedGroupKeys.includes(key)) {
 					this.expandedGroupKeys = [...this.expandedGroupKeys, key]
 				}
@@ -784,7 +837,7 @@
 	}
 
 	.form-section__header {
-		height: 84rpx;
+		min-height: 84rpx;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -807,15 +860,35 @@
 
 	.form-section__heading {
 		min-width: 0;
+		flex: 1;
 		display: flex;
 		align-items: center;
 		gap: 14rpx;
 	}
 
-	.form-section__title {
+	.form-section__copy {
 		min-width: 0;
 		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 5rpx;
+		padding: 14rpx 0;
+	}
+
+	.form-section__title {
+		display: block;
 		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.form-section__description {
+		display: block;
+		overflow: hidden;
+		color: var(--mci-text-tertiary, #84969d);
+		font-size: 20rpx;
+		font-weight: 400;
+		line-height: 1.35;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
