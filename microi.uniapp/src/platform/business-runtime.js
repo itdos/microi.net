@@ -154,7 +154,6 @@ export async function loadModuleRows(moduleConfig, options = {}) {
   const moduleEngineKey = String(
     moduleConfig.moduleEngineKey ||
     moduleConfig.ModuleEngineKey ||
-    moduleConfig.menuId ||
     moduleConfig.table ||
     ''
   ).trim()
