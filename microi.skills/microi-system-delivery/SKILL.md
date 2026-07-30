@@ -42,6 +42,8 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 ### 2. MCP 建模阶段
 
+- 开始任何 MCP 盘点前先调用 `microi_get_status` 验证当前连接、API Server
+  与 `OsClient`，再读取结构；“配置文件里有 MCP”不能证明当前真实可用。
 - 创建复杂系统优先使用 Manifest：表、字段、菜单、按钮、接口引擎、权限、页面、打印、工作流、任务统一规划。
 - 先 dry-run：`microi_plan_system` / `microi_generate_system dryRun:true`。
 - 用户确认后真实写入，并立即 `microi_validate_system`。
@@ -50,6 +52,9 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 - 写入菜单时，业务按钮一次性配齐 `MoreBtns`、`FormBtns`、`PageBtns`、`BatchSelectMoreBtns`、`PageTabs`，按钮前端只负责交互，后端逻辑放接口引擎。
 - 写入后台菜单时必须至少规划两级菜单树：先创建业务域父菜单，再把 CRUD、报表、日志、设置模块挂到对应父菜单。不要把客户、设备、工单、报告、日志、配置等所有模块直接创建为一级菜单。Manifest dry-run 和最终交付说明都必须列出菜单树。
 - 新建前端 MicroService 时，必须先 `microi_list_applications` 盘点，再用 `microi_scaffold_vue_microservice` 在当前租户 `AI应用/{appKey}` 做预演和确认创建；构建后依次同步私有源码、发布公有产物、回读页面 Id。每个菜单通过 `microi_create_module` 一次绑定 `MicroServiceId/MicroServicePageId/MicroServiceRoutePath/MicroServiceKey`，写后用 `microi_get_module` 回读，不得把普通 URL 菜单的创建成功误报成微服务菜单已交付。
+- Windows 上脚手架从临时目录原子改名时，杀毒软件或索引器可能短暂返回 `EPERM/EACCES/EBUSY`；MCP 应做有上限的短重试并保持原子改名，重试仍失败才清理临时目录并报错，禁止改成逐文件覆盖目标目录。
+- 编译产物优先调用 `microi_publish_application_directory_stream`。流式端点失败时必须检查 `uploadedCount/retrySafe`：只有 `uploadedCount=0` 且 `retrySafe=true`、并且产物较小时，才可临时回退 `microi_publish_microservice`；已上传部分文件时先按版本和哈希回读，禁止无判断重复发布。回退与远端版本缺口必须写进交付结论。
+- `microi_get_application_context` 返回文件清单不等于源码可读；必须检查 `ContentsComplete/ContentErrorCount` 以及逐文件 `ContentReadError`。MinIO 服务端读取私有源码应走内网端点，不能因公网代理拒绝私有桶而把 `IncludedContents=true` 误判为完整上下文。
 - 用户明确要求通过 MCP 修正当前后台菜单时，不能只更新 Skill 或文档后停下。必须回读 `sys_menu`，创建缺失的父级 `SecondMenu`，更新现有子菜单 `ParentId` / `Sort`，给管理员角色补父菜单权限，最后再次回读验证树结构。
 - 表单布局默认遵守平台约定，例如 PC 双列；字段显示顺序要跟业务表单顺序一致。
 - 平台通用功能除了改源码，还必须同步到官方主租户 `iTdos` 的应用商城母版并回读验证；项目专属视图、字段和业务动作只写目标租户，不能混入官方母版。

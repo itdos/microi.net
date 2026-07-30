@@ -1,6 +1,6 @@
 ---
 name: v8-frontend-events
-description: Microi 前端 V8 事件指南。用于编写浏览器端字段事件、按钮、列表事件、V8.EventName、V8.Form、动态显隐、校验和界面交互。
+description: Microi 前端 V8 事件与客户端能力指南。用于编写浏览器端字段、按钮、列表事件，或使用 V8.EventName、V8.Form、V8.Print 蓝牙打印、扫码、弹窗、表单联动和界面交互。
 ---
 
 # Microi V8 前端事件大全
@@ -10,6 +10,13 @@ description: Microi 前端 V8 事件指南。用于编写浏览器端字段事�
 > **表单生命周期事件**（InFormV8、SubmitFormV8、SubmitBeforeServerV8、SubmitAfterServerV8、OutFormV8、DataFilterV8）见 `v8-table-event/SKILL.md`。  
 > **菜单按钮事件**（MoreBtns/FormBtns 等）见 `v8-menu-buttons/SKILL.md`。  
 > 本文重点是 **字段事件、按钮事件、列表事件、模板引擎、其它前端钩子**。
+
+## 能力路由
+
+- 查询前端 V8 全部上下文、导航、表单、列表、网络、引擎与工具入口时，读取 `../v8-utilities/references/client-api-index.md`。
+- 需求包含“蓝牙打印、标签打印、TSC/TSPL、ESC/POS、小票打印、佳博打印机”时，必须先读取 `references/bluetooth-print.md`；需要完整指令签名、编码或位图参数时，再读取 `references/bluetooth-print-api.md`。
+- 浏览器模板打印、PDF/纸张模板、`mic_print`、`PageObj`、`PrintObj` 使用 `print-engine/SKILL.md`，不要与直接蓝牙指令混为一套 API。
+- 扫码使用 `V8.Method.ScanCode`，结果从 Promise/回调取得；`V8.ScanCodeRes` 只作兼容结果槽，详见客户端 API 索引。
 
 ## 字段事件（在【字段属性】中配置）
 
@@ -189,6 +196,45 @@ V8.RefreshTable({ _PageIndex: 1 });
 | `V8.ApiEngine.Run({ApiEngineKey, ...})` | 调接口引擎（前端，参数对象格式） |
 | `V8.FormEngine.GetTableData(name, params, cb)` | 前端查列表（参数对象、回调或 await） |
 | `V8.Post(url, data, cb, errCb, headers, contentType)` | 通用 POST |
+| `V8.Method.ScanCode({...})` | 调用当前终端支持的扫码能力 |
+| `V8.Print.isConnected()` | 检查当前蓝牙写特征是否仍可用 |
+| `V8.Print.OpenBluetoothPage()` | 在用户手势中打开蓝牙连接页，返回 Promise |
+| `V8.Print.prepareSend(bytes)` | 串行分包发送 TSC 或 ESC/POS 字节，必须 `await` |
+
+`V8.OpenAnyForm` 只发起打开动作，不返回“用户关闭后的 Promise”。需要替换
+子表单保存时，通过 `EventReplace.Submit(v8, param, callback)` 注册提交替换；
+其中小写 `v8` 是子表单上下文，外层 `V8` 仍是父上下文。自定义提交结束后
+必须调用 `callback(DosResult)`，否则子表单会一直等待。
+
+### 蓝牙打印最小安全流程
+
+```javascript
+if (!V8.Print) {
+  V8.Tips('当前客户端未加载蓝牙打印能力', false);
+  return;
+}
+
+if (!V8.Print.isConnected()) {
+  var connected = await V8.Print.OpenBluetoothPage();
+  if (!connected || !V8.Print.isConnected()) return;
+}
+
+var command = V8.Print.createNew(); // TSC/TSPL 标签
+command.setSize(60, 40);
+command.setGap(2);
+command.setCls();
+command.setText(20, 20, 'TSS24.BF2', 1, 1, '测试标签');
+command.setPagePrint();
+
+try {
+  await V8.Print.prepareSend(command.getData());
+  V8.Tips('打印数据已发送', true);
+} catch (error) {
+  V8.Tips('发送失败：' + (error.message || error), false);
+}
+```
+
+`prepareSend` 成功只证明字节已经写入蓝牙特征，不代表打印机已走纸、无缺纸或无硬件故障。批量打印必须逐条 `await`，不得用固定 `setTimeout` 猜测完成时间，也不得用 `Promise.all` 并发写同一设备。完整挂载范围、连接语义、批量恢复、安全与硬件验收见 `references/bluetooth-print.md`；源码级 TSC/ESC 方法表见 `references/bluetooth-print-api.md`。
 
 ### 常用上下文差异
 

@@ -27,6 +27,10 @@ test('buildLocalApplicationAssetManifest hashes ordinary files and skips source 
     const js = manifest.assets.find(asset => asset.relativePath === 'assets/app.js');
     assert.equal(js?.sha256, crypto.createHash('sha256').update('window.microiStreamTest = true;').digest('hex'));
     assert.equal(manifest.assets.find(asset => asset.relativePath === 'empty.txt')?.size, 0);
+    const expectedManifestHash = crypto.createHash('sha256')
+      .update(manifest.assets.map(asset => `${asset.relativePath}\t${asset.sha256}\t${asset.size}`).join('\n'))
+      .digest('hex');
+    assert.equal(manifest.manifestHash, expectedManifestHash);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

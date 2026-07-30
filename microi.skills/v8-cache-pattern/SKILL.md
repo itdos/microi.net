@@ -15,10 +15,31 @@ description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租
 | `V8.Cache.Get(key)` | 获取缓存 | `string \| null` |
 | `V8.Cache.Remove(key)` | 删除缓存 | `boolean` |
 | `V8.Cache.KeyExist(key)` | 是否存在（兼容旧版运行时的真实方法名） | `boolean` |
+| `V8.Cache.HashSet(key, field, value)` | 写入 Hash 字段 | `boolean` |
+| `V8.Cache.HashGet(key, field)` | 读取 Hash 字段 | `string \| null` |
+| `V8.Cache.HashGetAll(key)` | 读取全部 Hash 字段 | Hash 条目数组 |
+| `V8.Cache.HashDelete(key, field)` | 删除 Hash 字段 | `boolean` |
+| `V8.Cache.HashIncrement(key, field, amount)` | 原子增减数值字段 | `number` |
 
 > 需要把接口引擎复制到不同版本的 Microi 环境时，统一使用 `V8.Cache.KeyExist(key)`。部分新版本可能提供 `Exists` 别名，但旧版运行时没有该方法。
 
 > 新运行时把逻辑 Key 自动规范为 `Microi:${V8.OsClient}:{逻辑Key}`；已带当前租户完整前缀的历史 Key 不会重复添加。任何其它租户的 `Microi:` 前缀都会被拒绝，而不是改写后继续执行。
+
+Hash 适合保存同一对象的多个独立字段或原子计数：
+
+```javascript
+var hashKey = 'ProductStock:' + V8.Param.productId;
+V8.Cache.HashSet(hashKey, 'Available', '120');
+V8.Cache.HashSet(hashKey, 'Reserved', '8');
+
+var available = V8.Cache.HashGet(hashKey, 'Available');
+var allFields = V8.Cache.HashGetAll(hashKey);
+var reserved = V8.Cache.HashIncrement(hashKey, 'Reserved', 1);
+
+V8.Cache.HashDelete(hashKey, 'Reserved');
+```
+
+`HashIncrement` 的 `amount` 可以为负数。当前 V8 Hash API 不提供独立 TTL 设置；需要自动过期时，优先把对象序列化为 String 后用 `Set(key, value, expire)`，或由受控 Redis 管理流程设置整 Key 的 TTL。
 
 ## Redis 管理器与 MCP
 
@@ -176,7 +197,7 @@ var result = V8.FormEngine.GetTableData('Product', {
   _PageSize: pageSize
 });
 
-var response = { Code: 1, Data: result.Data, Total: result.DataCount };
+var response = { Code: 1, Data: result.Data, DataCount: result.DataCount };
 
 // 列表缓存时间短一些（5 分钟）
 V8.Cache.Set(cacheKey, JSON.stringify(response), '0.00:05:00');

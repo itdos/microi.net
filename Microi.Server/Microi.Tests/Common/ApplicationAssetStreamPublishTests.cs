@@ -1,4 +1,7 @@
 using Microi.net;
+using Newtonsoft.Json.Linq;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Dos.Common.Tests;
 
@@ -46,5 +49,39 @@ public class ApplicationAssetStreamPublishTests
     public void NormalizeVersion_RejectsNonSemanticVersion(string input)
     {
         Assert.Throws<ArgumentException>(() => V8McpLogic.NormalizeApplicationAssetVersion(input));
+    }
+
+    [Fact]
+    public void ValidateApplicationAssetContent_AcceptsVerifiedHtmlEntry()
+    {
+        var bytes = Encoding.UTF8.GetBytes("<!doctype html><html><head></head><body><div id=\"app\"></div></body></html>");
+        var sha256 = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+
+        var error = V8McpLogic.ValidateApplicationAssetContent("index.html", bytes.Length, sha256, bytes, true);
+
+        Assert.Null(error);
+    }
+
+    [Theory]
+    [InlineData("app.js", "<html><head></head><body></body></html>", "入口必须是 HTML")]
+    [InlineData("index.html", "<div id=\"app\"></div>", "不是完整 HTML")]
+    public void ValidateApplicationAssetContent_RejectsInvalidEntry(string path, string content, string expected)
+    {
+        var bytes = Encoding.UTF8.GetBytes(content);
+
+        var error = V8McpLogic.ValidateApplicationAssetContent(path, bytes.Length, "", bytes, true);
+
+        Assert.Contains(expected, error);
+    }
+
+    [Fact]
+    public void ComputeMicroServiceManifestHash_IsStableAcrossInputOrder()
+    {
+        var left = JArray.Parse("[{\"Path\":\"index.html\",\"Sha256\":\"aa\",\"Size\":2},{\"Path\":\"assets/app.js\",\"Sha256\":\"bb\",\"Size\":3}]");
+        var right = new JArray(left.Reverse());
+
+        Assert.Equal(
+            V8McpLogic.ComputeMicroServiceManifestHash(left),
+            V8McpLogic.ComputeMicroServiceManifestHash(right));
     }
 }

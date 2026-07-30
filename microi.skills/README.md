@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 48 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 55 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -29,6 +29,7 @@
 | **v8-export-import** | Excel 自定义导入导出（含进度跟踪） | `v8-export-import/SKILL.md` |
 | **v8-debugging** | 调试模式、异常捕获、系统日志 | `v8-debugging/SKILL.md` |
 | **v8-security** | 安全最佳实践（权限/输入验证/防注入） | `v8-security/SKILL.md` |
+| **v8-utilities** | 前后端 V8 上下文、通用函数、扫码、消息、Base64、加密和专项 API 索引 | `v8-utilities/SKILL.md` |
 | **spider-engine** | 爬虫/浏览器采集 Worker、会话、目标地址、配额与交付边界 | `spider-engine/SKILL.md` |
 
 ### V8 引擎核心（前端）
@@ -48,8 +49,11 @@
 | **print-engine** | 打印引擎模板 JSON 生成 | `print-engine/SKILL.md` |
 | **ui-design** | Microi吾码设计规范（阴影/动效/主题/性能） | `ui-design/SKILL.md` |
 | **microi-ui** | 吾码UI（Microi.UI / MCI-UI）组件库、主题 palette、圆角/扁平、Web/UniApp 用法 | `microi-ui/SKILL.md` |
+| **microi-form-engine** | 表单设计器、字段组件、数据源、事件和物理类型 | `microi-form-engine/SKILL.md` |
 | **microi-form-layout** | 表单布局分组规范：Tabs vs CollapseGroup 决策、字段数阈值、回读验收 | `microi-form-layout/SKILL.md` |
 | **microi-db-schema** | 数据库字典、核心表关系、字段归属与 V8 配置存储位置 | `microi-db-schema/SKILL.md` |
+| **module-engine** | sys_menu 菜单模块、查询列、打开方式、ViewSchema 和多表查询 | `module-engine/SKILL.md` |
+| **dos-orm** | Dos.ORM 实体、查询、事务、Provider、批量写入与 CodeFirst | `dos-orm/SKILL.md` |
 | **microi-left-right-layout** | 模块引擎“树形+表格/表单”左右布局与主外键过滤 | `microi-left-right-layout/SKILL.md` |
 | **datasource-engine** | SQL/V8/JSON 数据源设计、租户与权限、字段供数和验收 | `datasource-engine/SKILL.md` |
 | **job-engine** | 定时/后台任务、多节点租约、幂等、恢复和进度 | `job-engine/SKILL.md` |
@@ -65,6 +69,9 @@
 |-------|------|------|
 | **business-blueprint** | 从需求生成业务蓝图、模块边界、数据模型与接口清单 | `business-blueprint/SKILL.md` |
 | **microi-system-delivery** | 自然语言到完整系统交付的总控、MCP 编排、验收和复盘 | `microi-system-delivery/SKILL.md` |
+| **microi-deployment** | Docker/Windows/源码部署、配置、升级和多节点运行验收 | `microi-deployment/SKILL.md` |
+| **microi-microservice** | 前端微服务/微应用源码、路由、发布、宿主上下文和运行时交付 | `microi-microservice/SKILL.md` |
+| **microi-docs-coverage** | 中文官网文档到 Skills 的能力映射、V8 API 漏项审计和同步流程 | `microi-docs-coverage/SKILL.md` |
 | **microi-solution-quotation** | 生成紧凑的一页式 Microi吾码解决方案、市场预估价、优惠报价与开发周期 Word | `microi-solution-quotation/SKILL.md` |
 | **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token终端会话/续签、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
 | **microi-uniapp-frontend** | Microi UniApp/H5 通用前端规范、安全区、资源解析、骨架屏、主题与页面质量 | `microi-uniapp-frontend/SKILL.md` |
@@ -89,7 +96,7 @@
 
 ### 推荐：VS Code 插件零配置安装
 
-安装 Microi 吾码 VS Code 插件后，在工作区执行初始化/拉取。插件会安装当前版本的完整 `microi.skills`，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成 `AGENTS.md`、`.github/copilot-instructions.md`、`CLAUDE.md` 和 Cursor rules；不需要手工维护 48 条 Skill 引用。
+安装 Microi 吾码 VS Code 插件后，在工作区执行初始化/拉取。插件会安装当前版本的完整 `microi.skills`，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成 `AGENTS.md`、`.github/copilot-instructions.md`、`CLAUDE.md` 和 Cursor rules；不需要手工维护 55 条 Skill 引用。
 
 插件升级采用清单和内容哈希做差异更新：未被用户修改的官方 Skill 自动升级，用户已经修改的文件不被整文件覆盖，新增 Skill 自动补齐。发布插件时必须比对源 Skills、插件 `dist`、VSIX 和空工作区初始化产物的相对路径与 SHA-256，不能只检查文件数量。
 

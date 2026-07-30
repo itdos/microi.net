@@ -58,4 +58,37 @@ public class MicroAppStableEntryTests
 
         Assert.Equal(html, rewritten);
     }
+
+    [Fact]
+    public void RuntimePageLookup_DoesNotRequireOptionalPageNameColumn()
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "GetPageSelectFields",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var fields = Assert.IsAssignableFrom<IEnumerable<string>>(method!.Invoke(null, null));
+        Assert.DoesNotContain("PageName", fields);
+        Assert.Contains("PageTitle", fields);
+        Assert.Contains("RoutePath", fields);
+    }
+
+    [Fact]
+    public void RuntimeResolve_DoesNotLoadCompiledAssetPayloads()
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "GetServiceSelectFields",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var metadataFields = Assert.IsAssignableFrom<IEnumerable<string>>(method!.Invoke(null, new object[] { false }));
+        Assert.DoesNotContain("AssetManifestJson", metadataFields);
+        Assert.DoesNotContain("AssetsJson", metadataFields);
+        Assert.Contains("StorageMode", metadataFields);
+        Assert.DoesNotContain("SourceDirName", metadataFields);
+
+        var assetFields = Assert.IsAssignableFrom<IEnumerable<string>>(method.Invoke(null, new object[] { true }));
+        Assert.Contains("AssetManifestJson", assetFields);
+        Assert.Contains("AssetsJson", assetFields);
+    }
 }

@@ -505,6 +505,21 @@ export const asyncRoutes = [
             { path: "settings", name: "openclaw_settings", component: () => import("@/views/openclaw/settings/index.vue"), meta: { title: "系统设置" } }
         ]
     },
+    // MicroService 友好路由由 sys_microiservice_page 作为页面事实源。
+    // sys_menu 只负责导航与角色权限展示；内部按钮页无需伪造可见菜单。
+    {
+        path: "/micro-app/:appKey/:microPath(.*)*",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "micro_app_friendly",
+                component: () => import("@/views/micro-app/host.vue"),
+                meta: { title: "微服务", microAppFriendlyRoute: true }
+            }
+        ]
+    },
     // Vue Router 4: 使用 pathMatch 替代 * ，此路由放到最后
     {
         path: "/:pathMatch(.*)*",

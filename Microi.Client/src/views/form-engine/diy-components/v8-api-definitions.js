@@ -640,32 +640,32 @@ export const V8ApiDefinitions = {
             Print: {
                 label: "Print",
                 kind: "Module",
-                documentation: "蓝牙打印模块\n\n提供蓝牙 BLE 打印能力，支持 TSC(TSPL) 标签打印和 ESC/POS 票据打印。\n基于 Web Bluetooth API 实现，需要 Chrome/Edge 浏览器。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- V8.Print.OpenBluetoothPage() — 打开蓝牙连接页面\n- V8.Print.prepareSend(data) — 发送打印数据\n- V8.Print.isConnected() — 检测蓝牙是否连接\n- V8.Print.disconnect() — 断开蓝牙连接\n- V8.Print.BLEInformation — 蓝牙连接信息对象",
+                documentation: "蓝牙打印模块\n\n提供 TSC(TSPL) 标签和 ESC/POS 小票的 BLE 直连打印。5+App 使用 plus.bluetooth；存在 navigator.bluetooth.requestDevice 的 PC/H5 浏览器使用 Web Bluetooth。V8.Print 存在不等于当前环境可连接，必须调用 isConnected() 并处理连接页结果。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- await V8.Print.OpenBluetoothPage() — 打开连接页，关闭时返回是否已连接\n- await V8.Print.prepareSend(data) — 串行分包写入打印数据\n- V8.Print.Send(data) — 内部分包状态机，业务代码不要直接调用\n- V8.Print.isConnected() — 检测当前连接\n- V8.Print.disconnect() — 断开连接\n- V8.Print.BLEInformation — 仅作诊断的连接元数据\n\n不同前端 V8 上下文可能共享发送状态，禁止 Promise.all 或多个按钮并发打印。",
                 insertText: "Print",
                 methods: {
                     createNew: {
                         label: "createNew()",
-                        documentation: '创建 TSC(TSPL) 标签打印指令构建器\n\n返回一个指令对象，可链式调用以下方法：\n- setSize(w, h) 设置标签尺寸(mm)\n- setGap(gap) 设置间隙(mm)\n- setCls() 清除缓存\n- setText(x, y, font, xM, yM, str) 打印文字\n- setQR(x, y, level, width, mode, content) 打印二维码\n- setBarCode(x, y, type, h, readable, narrow, wide, content) 打印条形码\n- setBar(x, y, w, h) 画线\n- setBox(x1, y1, x2, y2, thickness) 画框\n- setBitmap(x, y, mode, canvas) 打印图片\n- setPagePrint() 打印页面\n- getData() 获取指令字节数组\n\n示例:\nvar cmd = V8.Print.createNew();\ncmd.setSize(75, 65);\ncmd.setGap(2);\ncmd.setCls();\ncmd.setText(10, 10, "TSS24.BF2", 1, 1, "Hello");\ncmd.setQR(100, 100, "L", 5, "A", "https://microi.net");\ncmd.setPagePrint();\nV8.Print.prepareSend(cmd.getData());',
+                        documentation: '创建 TSC(TSPL) 标签打印指令构建器\n\n全部28个源码方法：init、addCommand、setSize、setSpeed、setDensity、setGap、setBline、setCountry、setCodepage、setCls、setFeed、setBackFeed、setDirection、setReference、setFromfeed、setHome、setSound、setLimitfeed、setBar、setBox、setErase、setReverse、setText、setQR、setBarCode、setBitmap、setPagePrint、getData。低层 addCommand 只允许固定可信命令。\n\n文字、二维码和条码内容会拼入协议字段，应移除引号、换行和控制字符并限制长度。setBitmap 需要 ImageData 风格的 {width,height,data}。\n\n示例:\nvar cmd = V8.Print.createNew();\ncmd.setSize(75, 65);\ncmd.setGap(2);\ncmd.setCls();\ncmd.setText(10, 10, "TSS24.BF2", 1, 1, "Hello");\ncmd.setQR(100, 100, "L", 5, "A", "https://microi.net");\ncmd.setPagePrint();\nawait V8.Print.prepareSend(cmd.getData());',
                         snippet: 'createNew()'
                     },
                     createNewESC: {
                         label: "createNewESC()",
-                        documentation: '创建 ESC/POS 票据打印指令构建器\n\n返回一个指令对象，可调用以下方法：\n- init() 初始化\n- setText(content) 设置文本\n- bold(n) 加粗\n- setFontSize(n) 字号\n- setSelectJustification(n) 对齐(0左/1中/2右)\n- setAbsolutePrintPosition(pos) 绝对位置\n- rowSpace(n) 行间距\n- setPrint() 打印并换行\n- setPrintAndFeed(feed) 打印并走纸\n- getData() 获取指令字节数组\n\n示例:\nvar cmd = V8.Print.createNewESC();\ncmd.init();\ncmd.bold(1);\ncmd.setFontSize(16);\ncmd.setSelectJustification(1);\ncmd.setText("标题");\ncmd.setPrint();\nV8.Print.prepareSend(cmd.getData());',
+                        documentation: '创建 ESC/POS 票据打印指令构建器\n\n全部25个源码方法：init、setText、setFontSize、bold、setUnderline、setUnderline2、setSelectSizeOfModuleForQRCode、setSelectErrorCorrectionLevelForQRCode、setStoreQRCodeData、setPrintQRCode、setHorTab、setAbsolutePrintPosition、setRelativePrintPositon、setSelectJustification、space、setLeftMargin、textMarginRight、rowSpace、setPrintingAreaWidth、setSound、setBitmap、setPrint、setPrintAndFeed、setPrintAndFeedRow、getData。注意源码公开拼写是 setRelativePrintPositon。\n\n示例:\nvar cmd = V8.Print.createNewESC();\ncmd.init();\ncmd.bold(1);\ncmd.setFontSize(16);\ncmd.setSelectJustification(1);\ncmd.setText("标题\\n");\ncmd.setPrintAndFeedRow(3);\nawait V8.Print.prepareSend(cmd.getData());',
                         snippet: 'createNewESC()'
                     },
                     OpenBluetoothPage: {
                         label: "OpenBluetoothPage()",
-                        documentation: '打开蓝牙连接页面\n\n弹出蓝牙设备搜索/连接对话框，用户选择并连接打印机后关闭。\n\n示例:\nif (!V8.Print.BLEInformation.deviceId) {\n    await V8.Print.OpenBluetoothPage();\n}',
+                        documentation: '打开蓝牙连接页面\n\n返回 Promise<boolean>，在弹窗关闭时解析；boolean 表示关闭时是否已连接。必须由用户点击等手势触发。不要用 BLEInformation.deviceId 替代实时连接判断。\n\n示例:\nif (!V8.Print.isConnected()) {\n    var connected = await V8.Print.OpenBluetoothPage();\n    if (!connected || !V8.Print.isConnected()) return;\n}',
                         snippet: 'OpenBluetoothPage()'
                     },
                     prepareSend: {
                         label: "prepareSend(data)",
-                        documentation: '发送打印数据到蓝牙打印机\n\n自动分包发送，支持大数据量。如果蓝牙未连接会自动弹出连接页面。\n\n参数：data — 指令字节数组（由 createNew().getData() 或 createNewESC().getData() 返回）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
+                        documentation: '发送打印数据到蓝牙打印机\n\n异步检查连接并串行分包写入；未连接时会打开连接页。必须 await，禁止 Promise.all 或多按钮并发。成功只表示 BLE 写入完成，不代表物理走纸或无缺纸故障。\n\n参数：data — 非空指令字节数组（由 createNew().getData() 或 createNewESC().getData() 返回）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
                         snippet: 'prepareSend(${1:data})'
                     },
                     isConnected: {
                         label: "isConnected()",
-                        documentation: '检测蓝牙是否已连接\n\n返回 boolean\n\n示例:\nif (V8.Print.isConnected()) {\n    // 已连接，可以打印\n}',
+                        documentation: '检测蓝牙是否已连接\n\n返回 boolean。Web 端检查实时 GATT 和写特征；5+App 当前只检查已保存的设备/写特征 ID，发送时仍需捕获物理断线。\n\n示例:\nif (V8.Print.isConnected()) {\n    // 可以尝试发送，仍需捕获写入异常\n}',
                         snippet: 'isConnected()'
                     },
                     disconnect: {
@@ -675,12 +675,12 @@ export const V8ApiDefinitions = {
                     },
                     setOneTimeData: {
                         label: "setOneTimeData(bytes)",
-                        documentation: '设置每次发送的字节数\n\n参数：bytes — 每次发送字节数（建议20-200，默认20）\n\n示例:\nV8.Print.setOneTimeData(100);',
+                        documentation: '设置每次发送的字节数\n\n参数：bytes — 已实机验证的正整数；默认20，内置候选20-190（步长10）。源码不做入参校验，错误值可能破坏分包状态。\n\n示例:\nV8.Print.setOneTimeData(100);',
                         snippet: 'setOneTimeData(${1:100})'
                     },
                     setPrinterNum: {
                         label: "setPrinterNum(num)",
-                        documentation: '设置打印份数\n\n参数：num — 打印份数（默认1）\n\n示例:\nV8.Print.setPrinterNum(3); // 打印3份',
+                        documentation: '设置同一缓冲区的重复发送份数\n\n参数：num — 已验证的整数1-9，默认1；源码不做入参校验。不同内容的批次应逐条 await prepareSend，不使用此方法代替循环。\n\n示例:\nV8.Print.setPrinterNum(3); // 同一内容发送3份',
                         snippet: 'setPrinterNum(${1:1})'
                     }
                 }

@@ -7,6 +7,25 @@ description: 生成和审查 Microi 打印引擎 Print Engine 模板 JSON。用�
 
 你正在为 Microi 吾码平台生成打印引擎模板的 JSON 数据。打印模板包含 PageObj（模板定义）和 PrintObj（打印数据）。
 
+## 设计器源码事件
+
+扩展打印设计器源码时，可通过 `EventBus.on('savePrintJson', handler)` 接收
+保存后的模板 JSON，并在组件卸载时调用 `EventBus.off('savePrintJson')`。
+这是设计器内部生命周期接口，不属于运行时打印模板 JSON，也不能替代模板的
+服务端保存与回读。
+
+## 与蓝牙直连打印的边界
+
+本 Skill 负责 `mic_print`、`PageObj`、`PrintObj`、浏览器预览和模板化纸张输出。
+如果需求明确是蓝牙标签机/小票机、TSC/TSPL、ESC/POS 或
+`V8.Print.prepareSend`，应同时读取
+`../v8-frontend-events/references/bluetooth-print.md`：
+
+- Print Engine 决定“页面/模板如何排版”，适合 A4、PDF、浏览器打印和统一模板。
+- `V8.Print` 生成打印机原生命令并通过 BLE 写特征，适合标签和热敏小票。
+- 两者可以由同一个按钮按设备能力选择，但不能把 `PageObj` 直接交给
+  `V8.Print.prepareSend`，也不能把 TSC/ESC 字节当作 Print Engine JSON。
+
 ## 数据模型
 
 打印模板存储在 `mic_print` 表中：

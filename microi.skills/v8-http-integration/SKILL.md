@@ -1,6 +1,6 @@
 ---
 name: v8-http-integration
-description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch 及对应 Response 方法调用接口，处理请求头、JSON/form/XML 载荷、超时、文件和响应解析，并兼容前后端 V8。
+description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch、对应 Response 方法及后端 Async 方法调用接口，处理请求头、JSON/form/XML 载荷、超时、文件和响应解析，并兼容前后端 V8。
 ---
 
 # Microi V8 HTTP 外部接口集成
@@ -20,7 +20,34 @@ description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch �
 | `V8.Http.PostResponse({...})` | POST（完整响应） | `{ Content, Headers, StatusCode }` |
 | `V8.Http.PatchResponse({...})` | PATCH（完整响应） | `{ Content, Headers, StatusCode }` |
 
-前端与后端统一使用上表中的 PascalCase 对象参数格式。唯一无法统一的是执行模型：后端接口引擎为同步返回，前端浏览器请求必须使用 `await`（返回 `Promise`）。旧版前端 `V8.Post/Get` 继续兼容，不得删除。
+后端接口引擎还提供真实异步方法：
+
+| 方法 | 说明 |
+|------|------|
+| `await V8.Http.GetAsync({...})` | 异步 GET，返回响应字符串 |
+| `await V8.Http.PostAsync({...})` | 异步 POST，返回响应字符串 |
+| `await V8.Http.PatchAsync({...})` | 异步 PATCH，返回响应字符串 |
+| `await V8.Http.GetResponseAsync({...})` | 异步 GET，返回完整响应 |
+| `await V8.Http.PostResponseAsync({...})` | 异步 POST，返回完整响应 |
+| `await V8.Http.PatchResponseAsync({...})` | 异步 PATCH，返回完整响应 |
+| `await V8.Http.GetStreamAsync({...})` | 异步获取响应流，供当前请求内继续处理 |
+
+前端与后端统一使用 PascalCase 对象参数格式。执行模型不同：后端既可调用同步方法，也可在本次请求内调用显式 `*Async` 方法并 `await`；前端浏览器调用无 `Async` 后缀的方法，但必须 `await` 其 `Promise`。旧版前端 `V8.Post/Get` 继续兼容，不得删除。
+
+```javascript
+// 后端接口引擎：请求内异步 I/O
+var resp = await V8.Http.PostResponseAsync({
+  Url: 'https://api.example.com/orders',
+  PostParam: { OrderNo: V8.Param.orderNo },
+  ParamType: 'json',
+  Timeout: 10
+});
+if (resp.StatusCode < 200 || resp.StatusCode >= 300) {
+  return { Code: 0, Msg: '上游接口调用失败' };
+}
+```
+
+异步方法只保证当前请求内等待完成，不能替代 Job、MQ、outbox 或平台后台任务。不得用未等待的 Promise、`setTimeout` 或 `Task.Run` 实现“响应后继续处理”。
 
 通用参数：
 

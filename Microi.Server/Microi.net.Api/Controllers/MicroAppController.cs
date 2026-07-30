@@ -235,37 +235,91 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
-        public async Task<IActionResult> Resolve(string osClient, string appKey, string version = null, [FromBody] JObject param = null)
+        public async Task<IActionResult> Resolve(string osClient, string appKey, string version = null, string routePath = null, bool requirePage = false, [FromBody] JObject param = null)
         {
             osClient = osClient ?? param?["OsClient"].Val<string>();
             appKey = appKey ?? param?["AppKey"].Val<string>();
             version = version ?? param?["Version"].Val<string>();
+            routePath = routePath ?? param?["RoutePath"].Val<string>() ?? param?["MicroRoute"].Val<string>();
+            requirePage = requirePage || param?["RequirePage"].Val<bool?>() == true;
 
-            if (osClient.DosIsNullOrWhiteSpace())
+            var token = await DiyToken.GetCurrentToken(false);
+            var tokenOsClient = Convert.ToString(token?.OsClient);
+            if (tokenOsClient.DosIsNullOrWhiteSpace())
             {
-                var token = await DiyToken.GetCurrentToken(false);
-                osClient = token?.OsClient;
+                return Ok(new DosResult(1001, null, "登录状态已失效，请重新登录。"));
             }
+            if (!osClient.DosIsNullOrWhiteSpace()
+                && !string.Equals(osClient, tokenOsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                return Ok(new DosResult(0, new { ReasonCode = "TENANT_MISMATCH" }, "当前登录租户与请求租户不一致。"));
+            }
+            osClient = tokenOsClient;
             if (osClient.DosIsNullOrWhiteSpace() || appKey.DosIsNullOrWhiteSpace())
             {
                 return Ok(new DosResult(0, null, "OsClient and AppKey are required."));
             }
 
-            var service = await GetService(osClient, appKey);
+            // Resolve only needs lightweight runtime metadata. Loading the
+            // compiled asset payload here makes every menu navigation scale
+            // with the complete application size and is not viable for large
+            // streamed micro-services.
+            var service = await GetService(osClient, appKey, includeAssetPayloads: false);
             if (!IsUsable(service))
             {
-                return Ok(new DosResult(0, null, "MicroApp is not enabled or not found."));
+                return Ok(new DosResult(0, new { ReasonCode = "MICRO_APP_NOT_AVAILABLE" }, "微服务不存在或已停用。"));
             }
 
             var resolvedVersion = ResolveVersion(service);
             if (!version.DosIsNullOrWhiteSpace() && !string.Equals(version, resolvedVersion, StringComparison.OrdinalIgnoreCase))
             {
-                return Ok(new DosResult(0, null, "Requested version is not current."));
+                return Ok(new DosResult(0, new { ReasonCode = "MICRO_APP_VERSION_MISMATCH" }, "Requested version is not current."));
             }
 
+            var resolvedEntryPath = ResolveEntryPath(service);
             var entryUrl = IsManagedStorage(service)
-                ? BuildAssetUrl(osClient, appKey, resolvedVersion, ResolveEntryPath(service))
+                ? $"/micro-app/{Uri.EscapeDataString(osClient)}/{Uri.EscapeDataString(appKey)}/index.html"
                 : service["MsUrl"].Val<string>();
+            var versionedEntryUrl = IsManagedStorage(service)
+                ? BuildAssetUrl(osClient, appKey, resolvedVersion, resolvedEntryPath)
+                : entryUrl;
+            JObject page = null;
+            // Only the generic friendly route requires a page record. Existing
+            // sys_menu integrations must not touch this optional table at all:
+            // customer sub-tenants can legitimately be on an older page schema
+            // while their published micro-service runtime is otherwise healthy.
+            if (requirePage)
+            {
+                try
+                {
+                    page = await ResolvePage(osClient, GetText(service, "Id"), routePath);
+                }
+                catch (Exception ex)
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "MicroApp",
+                        "ResolvePageFailed",
+                        "微服务页面元数据解析失败",
+                        $"TraceId={HttpContext?.TraceIdentifier}; AppKey={appKey}; RoutePath={NormalizeRoutePath(routePath)}; ErrorType={ex.GetType().FullName}; Message={ex.Message}",
+                        3);
+                    return Ok(new DosResult(0, new
+                    {
+                        ReasonCode = "MICRO_APP_PAGE_RESOLVE_FAILED",
+                        AppKey = appKey,
+                        RoutePath = NormalizeRoutePath(routePath)
+                    }, "暂时无法读取微服务页面配置，请稍后重试。"));
+                }
+            }
+            if (requirePage && !routePath.DosIsNullOrWhiteSpace() && page == null)
+            {
+                return Ok(new DosResult(2, new
+                {
+                    ReasonCode = "MICRO_APP_PAGE_NOT_FOUND",
+                    AppKey = appKey,
+                    RoutePath = NormalizeRoutePath(routePath)
+                }, "微服务页面不存在或已停用。"));
+            }
 
             return Ok(new DosResult(1, new
             {
@@ -273,9 +327,65 @@ namespace Microi.net.Api
                 AppKey = appKey,
                 Version = resolvedVersion,
                 EntryUrl = entryUrl,
+                VersionedEntryUrl = versionedEntryUrl,
+                EntryPath = resolvedEntryPath,
+                PublishStatus = "Published",
+                AssetSource = IsDbStorage(service) ? "database-inline" : IsFileStorage(service) ? "tenant-managed-file" : "external",
                 StorageMode = service["StorageMode"].Val<string>(),
-                Runtime = service["Runtime"].Val<string>()
+                Runtime = service["Runtime"].Val<string>(),
+                Page = page
             }));
+        }
+
+        private static string NormalizeRoutePath(string routePath)
+        {
+            var value = (routePath ?? "/").Trim();
+            if (value.DosIsNullOrWhiteSpace()) return "/";
+            return value.StartsWith("/", StringComparison.Ordinal) ? value : "/" + value;
+        }
+
+        private static async Task<JObject> ResolvePage(string osClient, string serviceId, string routePath)
+        {
+            if (serviceId.DosIsNullOrWhiteSpace()) return null;
+            routePath = NormalizeRoutePath(routePath);
+            var page = await GetPageByField(osClient, serviceId, "RoutePath", routePath);
+            if (page != null) return page;
+            if (routePath != "/") return null;
+            return await GetPageByField(osClient, serviceId, "IsHome", 1);
+        }
+
+        private static async Task<JObject> GetPageByField(string osClient, string serviceId, string fieldName, object fieldValue)
+        {
+            var param = new DiyTableRowParam
+            {
+                FormEngineKey = "sys_microiservice_page",
+                OsClient = osClient,
+                _InvokeType = InvokeType.Server.ToString(),
+                _TrustedServerInvocation = true,
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere { Name = "MicroServiceId", Type = "=", Value = serviceId },
+                    new DiyWhere { Name = fieldName, Type = "=", Value = fieldValue, AndOr = "AND" }
+                },
+                _SelectFields = GetPageSelectFields()
+            };
+            dynamic result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
+            if (result.Code != 1) return null;
+            var page = ToJObject(result.Data);
+            var isEnable = page?["IsEnable"];
+            return isEnable != null && isEnable.Type != JTokenType.Null && isEnable.Val<int>() == 0 ? null : page;
+        }
+
+        private static List<string> GetPageSelectFields()
+        {
+            // PageName was added after the first sys_microiservice_page schema
+            // shipped. Some customer tenants only have PageTitle. Keep the
+            // runtime resolver on the cross-version field set so an optional
+            // display-name column cannot take down the whole micro-app.
+            return new List<string>
+            {
+                "Id", "PageKey", "PageTitle", "RoutePath", "EntryPath", "IsEnable"
+            };
         }
 
         private static string NormalizeAssetPath(string assetPath)
@@ -412,9 +522,9 @@ namespace Microi.net.Api
             return JObject.FromObject(data);
         }
 
-        private static async Task<JObject> GetService(string osClient, string appKey)
+        private static async Task<JObject> GetService(string osClient, string appKey, bool includeAssetPayloads = true)
         {
-            var service = await GetServiceByField(osClient, "MsKey", appKey);
+            var service = await GetServiceByField(osClient, "MsKey", appKey, includeAssetPayloads);
             if (service != null)
             {
                 return service;
@@ -422,10 +532,14 @@ namespace Microi.net.Api
 
             // Older clients and already-saved menus may still use the service Id in
             // /micro-app/{appKey}. Keep those URLs working while new clients prefer MsKey.
-            return await GetServiceByField(osClient, "Id", appKey);
+            return await GetServiceByField(osClient, "Id", appKey, includeAssetPayloads);
         }
 
-        private static async Task<JObject> GetServiceByField(string osClient, string fieldName, string fieldValue)
+        private static async Task<JObject> GetServiceByField(
+            string osClient,
+            string fieldName,
+            string fieldValue,
+            bool includeAssetPayloads)
         {
             // The public asset endpoint is anonymous, but resolving its published
             // runtime metadata is an internal platform read. sys_microiservice is a
@@ -449,31 +563,32 @@ namespace Microi.net.Api
                         Value = fieldValue
                     }
                 },
-                _SelectFields = new List<string>
-                {
-                    "Id",
-                    "MsKey",
-                    "MsName",
-                    "MsUrl",
-                    "MsDevUrl",
-                    "MsType",
-                    "IsEnable",
-                    "StorageMode",
-                    "Runtime",
-                    "BuildVersion",
-                    "EntryPath",
-                    "AssetManifestJson",
-                    "AssetsJson",
-                    "DistHash",
-                    "AssetCount",
-                    "TotalSize",
-                    "PublishTime",
-                    "SourceDirName"
-                }
+                _SelectFields = GetServiceSelectFields(includeAssetPayloads)
             };
 
             dynamic result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             return result.Code == 1 ? ToJObject(result.Data) : null;
+        }
+
+        private static List<string> GetServiceSelectFields(bool includeAssetPayloads)
+        {
+            var fields = new List<string>
+            {
+                "Id",
+                "MsKey",
+                "MsUrl",
+                "IsEnable",
+                "StorageMode",
+                "Runtime",
+                "BuildVersion",
+                "EntryPath"
+            };
+            if (includeAssetPayloads)
+            {
+                fields.Add("AssetManifestJson");
+                fields.Add("AssetsJson");
+            }
+            return fields;
         }
 
         private static bool IsUsable(JObject service)
@@ -494,6 +609,12 @@ namespace Microi.net.Api
                 return storageMode.Equals("db", StringComparison.OrdinalIgnoreCase)
                     || storageMode.Equals("database", StringComparison.OrdinalIgnoreCase);
             }
+            var legacyUrl = (service?["MsUrl"].Val<string>() ?? "").Trim();
+            if (legacyUrl.Equals("db", StringComparison.OrdinalIgnoreCase)
+                || legacyUrl.Equals("database", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
             return HasDbAssetBundle(service);
         }
 
@@ -504,6 +625,8 @@ namespace Microi.net.Api
             {
                 return IsFileStorageMode(storageMode);
             }
+            var legacyUrl = (service?["MsUrl"].Val<string>() ?? "").Trim();
+            if (IsFileStorageMode(legacyUrl)) return true;
             return HasFileAssetManifest(service);
         }
 

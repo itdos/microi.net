@@ -36,6 +36,9 @@ test('Vue MicroService scaffold preflight declares exactly one page file per rou
             'src/pages/InteractionTestPage.vue',
         ]);
         assert.equal(plan.files.filter(file => file.relativePath.startsWith('src/pages/')).length, 2);
+        const styles = plan.fileContents.get('src/style.css') || '';
+        assert.match(styles, /min-height:\s*var\(--micro-app-available-height,\s*100vh\)/u);
+        assert.doesNotMatch(styles, /min-height:\s*100vh/u);
         assert.equal(fs.existsSync(plan.targetDirectory), false);
     }
     finally {
@@ -62,6 +65,30 @@ test('Vue MicroService scaffold writes atomically and reruns without overwriting
         assert.match(fs.readFileSync(appVue, 'utf8'), /preserved-local-edit/u);
     }
     finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('Vue MicroService scaffold retries transient Windows rename failures', () => {
+    const { root, aiApplicationsDirectory } = createAiApplicationsDirectory();
+    const renameSync = fs.renameSync;
+    let attempts = 0;
+    try {
+        fs.renameSync = ((oldPath, newPath) => {
+            attempts += 1;
+            if (attempts < 3) {
+                const error = new Error('temporary directory lock');
+                error.code = 'EPERM';
+                throw error;
+            }
+            renameSync(oldPath, newPath);
+        });
+        const result = scaffoldVueMicroService(scaffoldOptions(aiApplicationsDirectory));
+        assert.equal(result.created, true);
+        assert.equal(attempts, 3);
+        assert.equal(fs.existsSync(result.targetDirectory), true);
+    }
+    finally {
+        fs.renameSync = renameSync;
         fs.rmSync(root, { recursive: true, force: true });
     }
 });

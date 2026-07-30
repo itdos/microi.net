@@ -276,8 +276,9 @@ var result = V8.FormEngine.AddFormData('表名或表Id，不区分大小写', {
 _InvokeType : 'Client',//若是在服务器端V8代码中传入此参数值，则也会触发表单属性服务器端V8事件（反之不会触发表单属性服务器端V8事件）。其它方法同理。
 
 //返回 { Code : 1/0, Data : {新增后的数据对象，包含Id、CreateTime、UserId等默认字段}, Msg : '错误信息！' }
-//值得注意的是：当表单属性中开启了【允许匿名新增数据】，那么则可以不传入token使用V8.FormEngine.AddFormDataAnonymous()新增数据
-//参数与上面一致，但需要新增一个OsClient的参数。
+//当表单属性中开启【允许匿名新增数据】时，未登录客户端可调用
+//POST /api/formengine/AddFormDataAnonymous；参数与上面一致，并传入 OsClient。
+//当前后端 V8.FormEngine 不公开匿名新增方法，V8 内部代码仍使用 AddFormData 并遵守当前执行身份。
 ```
 
 ## 批量新增数据 AddTableData

@@ -17,6 +17,12 @@ namespace Microi.net
     /// </summary>
 	public class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
     {
+        private static bool ShouldUseInternetEndpoint(bool? networkIsInternet, string returnFileType)
+        {
+            return networkIsInternet
+                ?? !string.Equals(returnFileType, "Byte", StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// 获取私有文件的临时访问url
         /// </summary>
@@ -32,7 +38,15 @@ namespace Microi.net
                 //如果MinIOEndPoint填写的是局域网IP+端口，虽然上传走了内网，但返回的地址用域名是不能访问此文件的
                 //所以临时建议MinIOEndPoint填写外网地址：也就是9010映射的file.microios.com
                 //2023-08-22：如果是S3，可能私有、公有是2个不同的EndPoint，所以不能单纯的使用MinIOEndPointInternet
-                var endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>().DosIsNullOrWhiteSpace(clientModel.OsClientModel["MinIOEndPoint"].Val<string>());
+                var internalEndPoint = clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
+                var internetEndPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
+                // Server-side byte reads (AI source context, exports, templates) must prefer
+                // the internal MinIO endpoint. The internet endpoint can sit behind a public
+                // proxy whose policy intentionally denies the private bucket.
+                var useInternet = ShouldUseInternetEndpoint(param.NetworkIsInternet, param.ReturnFileType);
+                var endPoint = useInternet
+                    ? internetEndPoint.DosIsNullOrWhiteSpace(internalEndPoint)
+                    : internalEndPoint.DosIsNullOrWhiteSpace(internetEndPoint);
 
                 var minioClient = new MinioClient()
                                     .WithEndpoint(endPoint)
@@ -40,7 +54,7 @@ namespace Microi.net
 
                 //只有GetPrivateFileUrl才需要用到这个判断。
                 //--2024-03-29补充，不仅是GetPrivateFileUrl才用到MinIOEndPointSSL判断
-                if (!clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>().DosIsNullOrWhiteSpace())
+                if (useInternet)
                 {
                     if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
                     {

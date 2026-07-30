@@ -159,6 +159,12 @@ LogResult = true    # 记录每次返回
 
 ## 8. 保存后 HTTP 复测
 
+通过 MCP 维护接口引擎时，先用 `microi_list_engines` 发现现有接口，再用
+`microi_get_engine_code` 读取源码；修改后使用 `microi_save_engine_code`
+保存并回读。只有确认目标不存在时才调用创建工具，避免重复
+`ApiEngineKey`。`microi_run_engine` 适合做引擎上下文内的最小调试，但不能
+代替下方真实 HTTP 复测。
+
 `microi_run_engine` 只能证明引擎代码在 MCP/内部执行上下文可运行，不能证明移动端或外部 HTTP 能调用。新建或更新接口后必须再走一次真实 HTTP 路径：
 
 ```text
@@ -184,7 +190,7 @@ Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 
 ## 请求内异步与可靠后台任务
 
-接口默认同步返回。对本次请求必须完成的异步 I/O，调用真实的 `*Async` 方法并 `await`：
+接口默认同步返回。对本次请求必须完成的异步 I/O，调用真实的 `*Async` 方法并 `await`。常用入口包括 `V8.Http.*Async`、`V8.FormEngine.GetTableDataAsync` 和 `V8.ApiEngine.RunAsync`：
 
 ```javascript
 var resp = await V8.Http.GetResponseAsync({
@@ -194,7 +200,17 @@ var resp = await V8.Http.GetResponseAsync({
 if (resp.StatusCode < 200 || resp.StatusCode >= 300) {
   return { Code: 0, Msg: '上游调用失败' };
 }
-return { Code: 1, Data: resp.Content };
+
+var users = await V8.FormEngine.GetTableDataAsync('SysUser', {
+  _Where: [['Status', '=', 1]],
+  _SelectFields: ['Id', 'Name'],
+  _PageSize: 20
+});
+
+var summary = await V8.ApiEngine.RunAsync('build-user-summary', {
+  Users: users.Data
+});
+return { Code: 1, Data: { Upstream: resp.Content, Summary: summary.Data } };
 ```
 
 禁止用 `setTimeout` 或 `System.Threading.Tasks.Task.Run` 实现“接口先返回、后台继续执行”：`V8Engine.Run` 返回后会释放 Jint Engine、租户上下文、事务和并发租约，回调不可靠，也没有持久化、重试、幂等或重启恢复保证。

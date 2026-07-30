@@ -213,8 +213,11 @@ namespace Microi.net.Api
         /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
-        [RequestSizeLimit(1090519040L)]
-        [RequestFormLimits(MultipartBodyLengthLimit = 1090519040L)]
+        // One streamed asset may be very large. The business layer enforces the
+        // 20GB application-delivery cap; the slightly larger HTTP envelope leaves
+        // room for multipart metadata without imposing the old 1GB ceiling.
+        [RequestSizeLimit(22548578304L)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 22548578304L)]
         public async Task<IActionResult> UploadApplicationAssetStream()
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -322,7 +325,7 @@ namespace Microi.net.Api
             var result = await V8McpLogic.GetApplicationContext(
                 osClient,
                 param["AppIdOrKey"]?.Val<string>() ?? param["AppId"]?.Val<string>() ?? param["AppKey"]?.Val<string>(),
-                param["IncludeContents"]?.Val<bool?>() ?? true,
+                param["IncludeContents"]?.Val<bool?>() ?? false,
                 param["MaxFileBytes"]?.Val<long?>() ?? 2 * 1024 * 1024,
                 param["MaxTotalBytes"]?.Val<long?>() ?? 50 * 1024 * 1024);
             return Ok(result);

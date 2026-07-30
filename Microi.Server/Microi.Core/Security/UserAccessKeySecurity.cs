@@ -57,6 +57,26 @@ namespace Microi.net
             new[] { "exportdiytablerow", "exportdiytablerowfrombody" },
             StringComparer.OrdinalIgnoreCase);
 
+        // This is the single source of truth used by both DynamicApiEngine and
+        // access-key authorization. These friendly routes keep their original
+        // Request.Path even after ASP.NET maps them to the ordinary action.
+        // Without normalizing here, an allowed GetTableData-table-key request
+        // is rejected as an unknown API path before table authorization runs.
+        private static readonly IReadOnlyDictionary<string, string> DynamicFormActionPrefixes =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["getformdata-"] = "GetFormData",
+                ["get-formdata-"] = "GetFormData",
+                ["gettabledata-"] = "GetTableData",
+                ["get-tabledata-"] = "GetTableData",
+                ["uptformdata-"] = "UptFormData",
+                ["upt-formdata-"] = "UptFormData",
+                ["delformdata-"] = "DelFormData",
+                ["del-formdata-"] = "DelFormData",
+                ["addformdata-"] = "AddFormData",
+                ["add-formdata-"] = "AddFormData"
+            };
+
         private static readonly HashSet<string> PageMetadataActions = new HashSet<string>(
             new[]
             {
@@ -464,7 +484,7 @@ namespace Microi.net
             }
 
             var controller = parts[1];
-            var action = parts[2];
+            var action = NormalizeFormEngineAction(parts[2]);
             if (!controller.Equals("formengine", StringComparison.OrdinalIgnoreCase)
                 && !controller.Equals("diytable", StringComparison.OrdinalIgnoreCase)
                 && !controller.Equals("diyfield", StringComparison.OrdinalIgnoreCase))
@@ -486,6 +506,46 @@ namespace Microi.net
                 isRead = true;
                 isExport = true;
                 return true;
+            }
+            return false;
+        }
+
+        public static bool TryGetDynamicFormEngineAction(
+            string requestPath,
+            out string action)
+        {
+            action = "";
+            var path = (requestPath ?? "").Trim().TrimEnd('/');
+            const string routePrefix = "/api/formengine/";
+            if (!path.StartsWith(routePrefix, StringComparison.OrdinalIgnoreCase)) return false;
+
+            var actionWithTableKey = path.Substring(routePrefix.Length);
+            if (actionWithTableKey.Contains("/")) return false;
+            return TryNormalizeDynamicFormEngineAction(actionWithTableKey, out action);
+        }
+
+        private static string NormalizeFormEngineAction(string action)
+        {
+            var value = (action ?? "").Trim();
+            return TryNormalizeDynamicFormEngineAction(value, out var normalized)
+                ? normalized
+                : value;
+        }
+
+        private static bool TryNormalizeDynamicFormEngineAction(
+            string actionWithTableKey,
+            out string action)
+        {
+            action = "";
+            var value = (actionWithTableKey ?? "").Trim();
+            foreach (var dynamicAction in DynamicFormActionPrefixes)
+            {
+                if (value.Length > dynamicAction.Key.Length
+                    && value.StartsWith(dynamicAction.Key, StringComparison.OrdinalIgnoreCase))
+                {
+                    action = dynamicAction.Value;
+                    return true;
+                }
             }
             return false;
         }

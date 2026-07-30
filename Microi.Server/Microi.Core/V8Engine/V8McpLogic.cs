@@ -4679,7 +4679,7 @@ namespace Microi.net
         /// <summary>
         /// 获取单个在线 AI 应用的元数据、完整文件清单与源码内容。
         /// </summary>
-        public static async Task<DosResult<object>> GetApplicationContext(string osClient, string appIdOrKey, bool includeContents = true, long maxFileBytes = 2 * 1024 * 1024, long maxTotalBytes = 50 * 1024 * 1024)
+        public static async Task<DosResult<object>> GetApplicationContext(string osClient, string appIdOrKey, bool includeContents = false, long maxFileBytes = 2 * 1024 * 1024, long maxTotalBytes = 50 * 1024 * 1024)
         {
             try
             {
@@ -4691,6 +4691,7 @@ namespace Microi.net
                 var files = await GetAiApplicationFiles(osClient, SafeJString(app, "Id"));
                 var outputFiles = new JArray();
                 long scheduledBytes = 0;
+                var contentErrorCount = 0;
                 foreach (var token in files)
                 {
                     if (!(token is JObject file)) continue;
@@ -4703,6 +4704,7 @@ namespace Microi.net
                         output["ContentReadError"] = $"应用源码超过总读取限制 {maxTotalBytes} bytes";
                     }
                     if (canRead) scheduledBytes += fileSize;
+                    if (output["ContentReadError"] != null) contentErrorCount++;
                     outputFiles.Add(output);
                 }
 
@@ -4718,6 +4720,8 @@ namespace Microi.net
                     Files = outputFiles,
                     FileCount = outputFiles.Count,
                     IncludedContents = includeContents,
+                    ContentsComplete = includeContents && contentErrorCount == 0,
+                    ContentErrorCount = contentErrorCount,
                     Runtime = runtime
                 }, "已获取在线应用上下文");
             }
@@ -4795,6 +4799,107 @@ namespace Microi.net
                 major++;
             }
             return $"v{major}.{minor}.{patch}";
+        }
+
+        private const long MaxInlineMicroServiceBytes = 5L * 1024 * 1024;
+        private const int MaxInlineMicroServiceAssetCount = 256;
+
+        /// <summary>
+        /// Validate one built asset before a publish pointer can be switched.
+        /// Public so the invariant can be covered without a live HDFS/database.
+        /// </summary>
+        public static string ValidateApplicationAssetContent(
+            string relativePath,
+            long expectedSize,
+            string expectedSha256,
+            byte[] bytes,
+            bool isEntry)
+        {
+            relativePath = SafeString(relativePath).Trim().Replace("\\", "/");
+            if (bytes == null || bytes.Length == 0) return $"发布资产为空：{relativePath}";
+            if (expectedSize > 0 && expectedSize != bytes.LongLength)
+                return $"发布资产大小不一致：{relativePath}";
+
+            var actualSha256 = HashMicroServiceSource(bytes);
+            var normalizedExpectedHash = SafeString(expectedSha256).Trim().ToLowerInvariant();
+            if (!normalizedExpectedHash.DosIsNullOrWhiteSpace()
+                && !string.Equals(normalizedExpectedHash, actualSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"发布资产 SHA-256 不一致：{relativePath}";
+            }
+
+            if (!isEntry) return null;
+            if (!relativePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+                return $"微服务入口必须是 HTML 文件：{relativePath}";
+
+            var html = Encoding.UTF8.GetString(bytes);
+            if (html.IndexOf("<html", StringComparison.OrdinalIgnoreCase) < 0
+                || html.IndexOf("<head", StringComparison.OrdinalIgnoreCase) < 0
+                || html.IndexOf("<body", StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                return $"微服务入口不是完整 HTML 文档：{relativePath}";
+            }
+            return null;
+        }
+
+        public static string ComputeMicroServiceManifestHash(JArray assets)
+        {
+            var canonical = string.Join("\n", (assets ?? new JArray())
+                .OfType<JObject>()
+                .Select(asset => new
+                {
+                    Path = SafeJString(asset, "Path", SafeJString(asset, "RelativePath")).Replace("\\", "/").TrimStart('/'),
+                    Sha256 = SafeJString(asset, "Sha256", SafeJString(asset, "Hash")).ToLowerInvariant(),
+                    Size = asset["Size"]?.Val<long?>() ?? 0L
+                })
+                .OrderBy(asset => asset.Path, StringComparer.Ordinal)
+                .Select(asset => $"{asset.Path}\t{asset.Sha256}\t{asset.Size}"));
+            return HashMicroServiceSource(Encoding.UTF8.GetBytes(canonical));
+        }
+
+        private static async Task<byte[]> ReadPublishedMicroServiceAssetBytes(string osClient, JObject asset)
+        {
+            var inlineBase64 = SafeJString(asset, "ContentBase64", SafeJString(asset, "contentBase64"));
+            if (!inlineBase64.DosIsNullOrWhiteSpace())
+            {
+                try { return Convert.FromBase64String(NormalizeBase64Payload(inlineBase64)); }
+                catch { return null; }
+            }
+
+            var filePathName = SafeJString(asset, "FilePathName", SafeJString(asset, "HdfsPath"));
+            if (filePathName.DosIsNullOrWhiteSpace()) return null;
+            var readResult = await MicroiEngine.HDFS.GetPrivateFileByte(new DiyUploadParam
+            {
+                OsClient = osClient,
+                FilePathName = filePathName,
+                Limit = false
+            }).ConfigureAwait(false);
+            if (readResult.Code != 1 || readResult.Data == null) return null;
+            if (readResult.Data is byte[] bytes) return bytes;
+            return Encoding.UTF8.GetBytes(Convert.ToString(readResult.Data));
+        }
+
+        private static async Task<string> ValidatePublishedMicroServiceAssets(
+            string osClient,
+            JArray assets,
+            string entryPath)
+        {
+            foreach (var asset in (assets ?? new JArray()).OfType<JObject>())
+            {
+                var relativePath = SafeJString(asset, "Path");
+                var isEntry = asset["IsEntry"]?.Val<bool?>() == true
+                    || string.Equals(relativePath, entryPath, StringComparison.OrdinalIgnoreCase);
+                var bytes = await ReadPublishedMicroServiceAssetBytes(osClient, asset).ConfigureAwait(false);
+                if (bytes == null) return $"发布资产无法从当前租户存储回读：{relativePath}";
+                var validationError = ValidateApplicationAssetContent(
+                    relativePath,
+                    asset["Size"]?.Val<long?>() ?? 0L,
+                    SafeJString(asset, "Sha256"),
+                    bytes,
+                    isEntry);
+                if (validationError != null) return validationError;
+            }
+            return null;
         }
 
         private static JObject UnwrapMicroServiceParam(JObject param)
@@ -5079,6 +5184,7 @@ namespace Microi.net
                     }
                 }
 
+                var sourceManifestHash = ComputeMicroServiceManifestHash(uploaded);
                 return new DosResult<object>(1, new
                 {
                     AppId = appId,
@@ -5086,6 +5192,7 @@ namespace Microi.net
                     AppType = applicationType,
                     FileCount = uploaded.Count,
                     TotalSize = totalSize,
+                    SourceManifestHash = sourceManifestHash,
                     RemovedFileCount = removed,
                     Files = uploaded
                 }, "应用源码已同步到在线 AI 应用（未安装运行实例）");
@@ -5110,6 +5217,7 @@ namespace Microi.net
                 if (assets.Count == 0) return new DosResult<object>(0, null, "Assets 不能为空");
 
                 string currentVersion = "";
+                JObject existingService = null;
                 var existingResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice", new
                 {
                     OsClient = osClient,
@@ -5117,64 +5225,134 @@ namespace Microi.net
                 });
                 if (existingResult.Code == 1 && existingResult.Data != null)
                 {
-                    var existing = JObject.FromObject(existingResult.Data);
-                    currentVersion = SafeJString(existing, "BuildVersion");
-                    if (source["Id"] == null) source["Id"] = SafeJString(existing, "Id");
+                    existingService = JObject.FromObject(existingResult.Data);
+                    currentVersion = SafeJString(existingService, "BuildVersion");
+                    if (source["Id"] == null) source["Id"] = SafeJString(existingService, "Id");
                 }
+                if (source["Id"] == null) source["Id"] = Ulid.NewUlid().ToString();
 
                 var buildVersion = NormalizeMicroServiceVersion(source["BuildVersion"]?.Val<string>());
                 if (buildVersion.DosIsNullOrWhiteSpace()) buildVersion = NextMicroServiceBuildVersion(currentVersion);
+                var deliveryBatchId = SafeJString(param, "DeliveryBatchId", SafeJString(source, "DeliveryBatchId"));
+                if (deliveryBatchId.DosIsNullOrWhiteSpace()) deliveryBatchId = Ulid.NewUlid().ToString();
+                var sourceManifestHash = SafeJString(param, "SourceManifestHash", SafeJString(source, "SourceManifestHash"));
+                var storageMode = SafeJString(source, "StorageMode", "file").Trim().ToLowerInvariant();
+                if (storageMode == "database") storageMode = "db";
+                if (storageMode != "file" && storageMode != "db")
+                    return new DosResult<object>(0, null, "StorageMode 仅支持 file 或 db");
 
-                var uploadedAssets = new JArray();
-                var totalSize = 0L;
-                var entryPath = source["EntryPath"]?.Val<string>() ?? "";
+                var preparedAssets = new List<(JObject Source, string Path, string FileName, byte[] Bytes, bool ExplicitEntry)>();
+                long totalSize = 0;
                 for (var i = 0; i < assets.Count; i++)
                 {
                     if (!(assets[i] is JObject asset)) continue;
                     var relativePath = asset["Path"]?.Val<string>() ?? asset["RelativePath"]?.Val<string>() ?? asset["FilePath"]?.Val<string>() ?? asset["FileName"]?.Val<string>();
-                    relativePath = SafeString(relativePath).Trim().TrimStart('/', '\\').Replace("\\", "/");
-                    if (relativePath.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"Assets[{i}].Path 不能为空");
+                    relativePath = NormalizeApplicationAssetRelativePath(relativePath);
                     var fileName = asset["FileName"]?.Val<string>() ?? Path.GetFileName(relativePath);
                     var base64 = asset["FileByteBase64"]?.Val<string>() ?? asset["ContentBase64"]?.Val<string>() ?? asset["Base64"]?.Val<string>();
                     if (base64.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, $"Assets[{i}].FileByteBase64 不能为空");
+                    byte[] bytes;
+                    try { bytes = Convert.FromBase64String(NormalizeBase64Payload(base64)); }
+                    catch { return new DosResult<object>(0, null, $"Assets[{i}] 不是有效的 Base64：{relativePath}"); }
+                    totalSize += bytes.LongLength;
+                    var explicitEntry = asset["IsEntry"]?.Val<bool?>() == true || asset["Entry"]?.Val<bool?>() == true;
+                    var preliminaryError = ValidateApplicationAssetContent(
+                        relativePath,
+                        asset["Size"]?.Val<long?>() ?? 0L,
+                        asset["Sha256"]?.Val<string>() ?? asset["Hash"]?.Val<string>(),
+                        bytes,
+                        false);
+                    if (preliminaryError != null) return new DosResult<object>(0, null, preliminaryError);
+                    preparedAssets.Add((asset, relativePath, fileName, bytes, explicitEntry));
+                }
 
-                    var uploadDir = $"micro-app/{msKey}/{buildVersion}/{Path.GetDirectoryName(relativePath)?.Replace("\\", "/")}".TrimEnd('/');
-                    var uploadResult = await UploadFileBase64(osClient, fileName, base64, uploadDir, "", false, true, "", "", "", currentToken);
-                    if (uploadResult.Code != 1) return new DosResult<object>(uploadResult.Code, uploadResult.Data, $"发布微服务文件失败：{relativePath}，{uploadResult.Msg}");
+                if (storageMode == "db" && (preparedAssets.Count > MaxInlineMicroServiceAssetCount || totalSize > MaxInlineMicroServiceBytes))
+                {
+                    return new DosResult<object>(0, null,
+                        $"StorageMode=db 仅用于小型恢复包，最多 {MaxInlineMicroServiceAssetCount} 个文件且总计不超过 {MaxInlineMicroServiceBytes} bytes；请改用流式 HDFS 发布");
+                }
 
-                    var uploadObj = JObject.FromObject(uploadResult.Data);
-                    var filePathName = SafeJString(uploadObj, "FilePathName");
-                    var size = asset["Size"]?.Val<long?>() ?? 0L;
-                    totalSize += size;
-                    var isEntry = asset["IsEntry"]?.Val<bool?>() == true || asset["Entry"]?.Val<bool?>() == true;
-                    if (isEntry || entryPath.DosIsNullOrWhiteSpace())
+                var explicitEntries = preparedAssets.Where(asset => asset.ExplicitEntry).ToList();
+                if (explicitEntries.Count > 1) return new DosResult<object>(0, null, "Assets 只能标记一个入口文件");
+                var requestedEntryPath = SafeString(source["EntryPath"]?.Val<string>()).Trim();
+                var entryPath = !requestedEntryPath.DosIsNullOrWhiteSpace()
+                    ? NormalizeApplicationAssetRelativePath(requestedEntryPath)
+                    : explicitEntries.FirstOrDefault().Path;
+                if (entryPath.DosIsNullOrWhiteSpace())
+                {
+                    entryPath = preparedAssets.FirstOrDefault(asset => string.Equals(asset.Path, "index.html", StringComparison.OrdinalIgnoreCase)).Path
+                        ?? preparedAssets.FirstOrDefault(asset => asset.Path.EndsWith(".html", StringComparison.OrdinalIgnoreCase)).Path;
+                }
+                if (entryPath.DosIsNullOrWhiteSpace() || !preparedAssets.Any(asset => string.Equals(asset.Path, entryPath, StringComparison.OrdinalIgnoreCase)))
+                    return new DosResult<object>(0, null, "入口文件不存在于 Assets 清单");
+
+                var entryAsset = preparedAssets.First(asset => string.Equals(asset.Path, entryPath, StringComparison.OrdinalIgnoreCase));
+                var entryError = ValidateApplicationAssetContent(entryPath, entryAsset.Bytes.LongLength, HashMicroServiceSource(entryAsset.Bytes), entryAsset.Bytes, true);
+                if (entryError != null) return new DosResult<object>(0, null, entryError);
+
+                var uploadedAssets = new JArray();
+                foreach (var prepared in preparedAssets)
+                {
+                    var filePathName = "";
+                    if (storageMode == "file")
                     {
-                        if (relativePath.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || isEntry) entryPath = relativePath;
+                        var relativeDir = Path.GetDirectoryName(prepared.Path)?.Replace("\\", "/");
+                        var uploadDir = $"micro-app/{msKey}/{buildVersion}/{relativeDir}".TrimEnd('/');
+                        var uploadResult = await UploadFileBase64(
+                            osClient,
+                            prepared.FileName,
+                            Convert.ToBase64String(prepared.Bytes),
+                            uploadDir,
+                            "",
+                            false,
+                            true,
+                            "",
+                            "",
+                            "",
+                            currentToken).ConfigureAwait(false);
+                        if (uploadResult.Code != 1)
+                            return new DosResult<object>(uploadResult.Code, uploadResult.Data, $"发布微服务文件失败：{prepared.Path}，{uploadResult.Msg}");
+                        filePathName = SafeJString(JObject.FromObject(uploadResult.Data), "FilePathName");
                     }
 
+                    var isEntry = string.Equals(prepared.Path, entryPath, StringComparison.OrdinalIgnoreCase);
                     uploadedAssets.Add(new JObject
                     {
-                        ["Path"] = relativePath,
-                        ["FileName"] = fileName,
+                        ["Path"] = prepared.Path,
+                        ["FileName"] = prepared.FileName,
                         ["FilePathName"] = filePathName,
-                        ["ContentType"] = asset["ContentType"]?.Val<string>() ?? "",
-                        ["Size"] = size,
-                        ["Sha256"] = asset["Sha256"]?.Val<string>() ?? asset["Hash"]?.Val<string>() ?? "",
+                        ["ContentBase64"] = storageMode == "db" ? Convert.ToBase64String(prepared.Bytes) : null,
+                        ["ContentType"] = prepared.Source["ContentType"]?.Val<string>() ?? "",
+                        ["Size"] = prepared.Bytes.LongLength,
+                        ["Sha256"] = HashMicroServiceSource(prepared.Bytes),
                         ["IsEntry"] = isEntry
                     });
                 }
 
-                if (entryPath.DosIsNullOrWhiteSpace()) entryPath = "index.html";
+                var runtimeValidationError = await ValidatePublishedMicroServiceAssets(osClient, uploadedAssets, entryPath).ConfigureAwait(false);
+                if (runtimeValidationError != null)
+                    return new DosResult<object>(0, null, runtimeValidationError + "；旧运行版本未切换");
+
+                var runtimeManifestHash = ComputeMicroServiceManifestHash(uploadedAssets);
                 source["EntryPath"] = entryPath;
                 source["BuildVersion"] = buildVersion;
+                source["StorageMode"] = storageMode;
+                source["DistHash"] = runtimeManifestHash;
                 source["AssetCount"] = uploadedAssets.Count;
-                if (source["TotalSize"] == null) source["TotalSize"] = totalSize.ToString();
+                source["TotalSize"] = totalSize;
 
                 var assetManifestJson = new JObject
                 {
+                    ["SchemaVersion"] = 2,
                     ["MsKey"] = msKey,
                     ["BuildVersion"] = buildVersion,
                     ["EntryPath"] = entryPath,
+                    ["StorageMode"] = storageMode,
+                    ["PublishStatus"] = "Verified",
+                    ["DeliveryBatchId"] = deliveryBatchId,
+                    ["SourceManifestHash"] = sourceManifestHash,
+                    ["RuntimeManifestHash"] = runtimeManifestHash,
+                    ["VerifiedAt"] = DateTime.UtcNow.ToString("O"),
                     ["Assets"] = uploadedAssets
                 }.ToString(Newtonsoft.Json.Formatting.None);
 
@@ -5187,18 +5365,30 @@ namespace Microi.net
                 var detailObj = JObject.FromObject(detailResult.Data);
                 var service = detailObj["Service"] as JObject;
                 var serviceId = SafeJString(service, "Id");
-                var routeWarnings = await SyncMicroServicePages(osClient, serviceId, msKey, buildVersion, entryPath, GetArrayParam(param, "Routes", "routes", "Pages", "pages"));
+                var routeResult = await SyncMicroServicePages(osClient, serviceId, msKey, buildVersion, entryPath, GetArrayParam(param, "Routes", "routes", "Pages", "pages"));
+                if (routeResult.Code != 1)
+                {
+                    var rollbackWarning = await RestoreMicroServiceSnapshot(osClient, existingService, serviceId).ConfigureAwait(false);
+                    return new DosResult<object>(0, routeResult.Data,
+                        routeResult.Msg + (rollbackWarning.DosIsNullOrWhiteSpace() ? "；旧运行版本已恢复" : "；运行版本回滚异常：" + rollbackWarning));
+                }
 
                 return new DosResult<object>(1, new
                 {
                     MsKey = msKey,
                     BuildVersion = buildVersion,
                     EntryPath = entryPath,
+                    StorageMode = storageMode,
                     AssetCount = uploadedAssets.Count,
                     Assets = uploadedAssets,
-                    RouteWarnings = routeWarnings,
+                    DeliveryBatchId = deliveryBatchId,
+                    SourceManifestHash = sourceManifestHash,
+                    RuntimeManifestHash = runtimeManifestHash,
+                    PublishStatus = "Verified",
+                    RuntimeVerified = true,
+                    RouteSync = routeResult.Data,
                     Service = service
-                }, "微服务发布完成");
+                }, "微服务资产已校验并切换运行版本");
             }
             catch (Exception ex)
             {
@@ -5206,13 +5396,81 @@ namespace Microi.net
             }
         }
 
-        private static async Task<List<string>> SyncMicroServicePages(string osClient, string serviceId, string msKey, string buildVersion, string entryPath, JArray routes)
+        private static async Task<string> RestoreMicroServiceSnapshot(string osClient, JObject previousService, string currentServiceId)
+        {
+            DosResult rollback;
+            if (previousService != null)
+            {
+                var snapshot = (JObject)previousService.DeepClone();
+                snapshot["OsClient"] = osClient;
+                rollback = await MicroiEngine.FormEngine.UptFormDataAsync("sys_microiservice", snapshot).ConfigureAwait(false);
+            }
+            else if (!currentServiceId.DosIsNullOrWhiteSpace())
+            {
+                rollback = await MicroiEngine.FormEngine.DelFormDataAsync("sys_microiservice", new JObject
+                {
+                    ["OsClient"] = osClient,
+                    ["Id"] = currentServiceId
+                }).ConfigureAwait(false);
+            }
+            else
+            {
+                return "无法确定需要回滚的微服务记录";
+            }
+            return rollback.Code == 1 ? "" : rollback.Msg ?? "微服务运行指针回滚失败";
+        }
+
+        private static async Task<List<JObject>> CaptureMicroServicePageSnapshots(string osClient, string serviceId)
+        {
+            if (serviceId.DosIsNullOrWhiteSpace()) return new List<JObject>();
+            var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_microiservice_page", new
+            {
+                OsClient = osClient,
+                _Where = new List<object> { new List<object> { "MicroServiceId", "=", serviceId } },
+                _PageIndex = 1,
+                _PageSize = 20000
+            }).ConfigureAwait(false);
+            if (result.Code != 1 || result.Data == null) return new List<JObject>();
+            var snapshots = new List<JObject>();
+            foreach (var item in (IEnumerable<dynamic>)result.Data)
+            {
+                snapshots.Add(JObject.FromObject(item));
+            }
+            return snapshots;
+        }
+
+        private static async Task<string> RestoreMicroServicePageSnapshots(string osClient, string serviceId, List<JObject> snapshots)
+        {
+            if (serviceId.DosIsNullOrWhiteSpace()) return "无法确定需要回滚的微服务页面";
+            var warnings = new List<string>();
+            var current = await CaptureMicroServicePageSnapshots(osClient, serviceId).ConfigureAwait(false);
+            foreach (var page in current)
+            {
+                var delete = await MicroiEngine.FormEngine.DelFormDataAsync("sys_microiservice_page", new JObject
+                {
+                    ["OsClient"] = osClient,
+                    ["Id"] = SafeJString(page, "Id")
+                }).ConfigureAwait(false);
+                if (delete.Code != 1) warnings.Add(delete.Msg ?? "删除新页面快照失败");
+            }
+            foreach (var page in snapshots ?? new List<JObject>())
+            {
+                var snapshot = (JObject)page.DeepClone();
+                snapshot["OsClient"] = osClient;
+                var add = await MicroiEngine.FormEngine.AddFormDataAsync(
+                    "sys_microiservice_page",
+                    BuildTrustedMcpFormWriteParam(osClient, snapshot)).ConfigureAwait(false);
+                if (add.Code != 1) warnings.Add(add.Msg ?? "恢复旧页面快照失败");
+            }
+            return string.Join("；", warnings.Distinct());
+        }
+
+        private static async Task<DosResult<object>> SyncMicroServicePages(string osClient, string serviceId, string msKey, string buildVersion, string entryPath, JArray routes)
         {
             var warnings = new List<string>();
             if (serviceId.DosIsNullOrWhiteSpace())
             {
-                warnings.Add("未获取到微服务 Id，跳过页面路由同步。");
-                return warnings;
+                return new DosResult<object>(0, null, "未获取到微服务 Id，拒绝切换运行版本");
             }
 
             if (routes == null || routes.Count == 0)
@@ -5241,15 +5499,30 @@ namespace Microi.net
                 var routeMetaJson = routeMetaToken?.Type == JTokenType.String
                     ? routeMetaToken.Val<string>()
                     : routeMetaToken?.ToString(Newtonsoft.Json.Formatting.None);
+                JObject routeMeta;
+                try
+                {
+                    routeMeta = routeMetaJson.DosIsNullOrWhiteSpace()
+                        ? new JObject()
+                        : JObject.Parse(routeMetaJson);
+                }
+                catch
+                {
+                    return new DosResult<object>(0, new { SyncedCount = i }, $"路由 {routePath} 的 RouteMetaJson 不是合法 JSON");
+                }
                 if (routeMetaJson.DosIsNullOrWhiteSpace())
                 {
-                    var routeMeta = new JObject();
                     var sourceFile = route["SourceFile"] ?? route["sourceFile"];
                     var meta = route["Meta"] ?? route["meta"];
                     if (sourceFile != null) routeMeta["SourceFile"] = CloneToken(sourceFile);
                     if (meta != null) routeMeta["Meta"] = CloneToken(meta);
-                    routeMetaJson = routeMeta.ToString(Newtonsoft.Json.Formatting.None);
                 }
+                // InternalOnly is a first-class route property. Merge it even
+                // when callers also supplied RouteMetaJson instead of silently
+                // discarding it.
+                if (route["InternalOnly"] != null || route["internalOnly"] != null)
+                    routeMeta["InternalOnly"] = route["InternalOnly"]?.Val<bool?>() ?? route["internalOnly"]?.Val<bool?>() ?? false;
+                routeMetaJson = routeMeta.ToString(Newtonsoft.Json.Formatting.None);
                 var pageData = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -5293,10 +5566,11 @@ namespace Microi.net
                 if (opResult.Code != 1)
                 {
                     warnings.Add($"路由 {routePath} 同步失败：{opResult.Msg}");
+                    return new DosResult<object>(0, new { Warnings = warnings, SyncedCount = i }, warnings.Last());
                 }
             }
 
-            return warnings;
+            return new DosResult<object>(1, new { Warnings = warnings, SyncedCount = routes.Count });
         }
 
         #endregion

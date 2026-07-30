@@ -50,6 +50,7 @@ export declare const API: {
     readonly UPDATE_WORKFLOW_V8_EVENT_CODE: "/api/V8Engine/UpdateWorkflowV8EventCode";
     readonly CREATE_TABLE: "/api/V8Engine/CreateTable";
     readonly ADD_FIELD: "/api/V8Engine/AddField";
+    readonly DELETE_FIELD: "/api/DiyField/DelDiyField";
     readonly GET_FIELD_LIST: "/api/V8Engine/GetFieldList";
     readonly UPDATE_FIELD: "/api/V8Engine/UpdateField";
     readonly UPDATE_FIELD_LIST: "/api/V8Engine/UpdateFieldList";

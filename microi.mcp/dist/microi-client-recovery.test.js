@@ -4,7 +4,41 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { buildTokenFileLookupKeys, isAuthenticationFailureResponse, isTenantConfigurationFailureResponse, MicroiClient, } from './microi-client.js';
+import { buildMicroAppEntryUrl, buildTokenFileLookupKeys, isAuthenticationFailureResponse, isTenantConfigurationFailureResponse, MicroiClient, } from './microi-client.js';
+test('micro-app entry URL preserves tenant binding and escapes path segments', () => {
+    assert.equal(buildMicroAppEntryUrl('https://microi.test/', 'junchi tenant', 'mcp/vue-test'), 'https://microi.test/micro-app/junchi%20tenant/mcp%2Fvue-test/index.html');
+});
+test('micro-app runtime probe distinguishes readable HTML from gateway failure', async () => {
+    const originalFetch = globalThis.fetch;
+    try {
+        const completeHtml = '<!doctype html><html><head></head><body><div id="app"></div></body></html>';
+        globalThis.fetch = async () => new Response(completeHtml, {
+            status: 200,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+        const success = await createClient().probeMicroAppEntry('mcp-ai-vue-test');
+        assert.equal(success.ok, true);
+        assert.equal(success.status, 200);
+        assert.equal(success.bodyBytes, Buffer.byteLength(completeHtml));
+        assert.equal(success.hasHead, true);
+        assert.equal(success.hasBody, true);
+        globalThis.fetch = async () => new Response('<div id="app"></div>', {
+            status: 200,
+            headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        });
+        const fragment = await createClient().probeMicroAppEntry('mcp-ai-vue-test');
+        assert.equal(fragment.ok, false);
+        assert.match(fragment.error || '', /complete HTML/u);
+        globalThis.fetch = async () => new Response('upstream storage unavailable', { status: 502 });
+        const failure = await createClient().probeMicroAppEntry('mcp-ai-vue-test');
+        assert.equal(failure.ok, false);
+        assert.equal(failure.status, 502);
+        assert.match(failure.error || '', /HTTP 502/u);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+    }
+});
 function jsonResponse(body) {
     return new Response(JSON.stringify(body), {
         status: 200,

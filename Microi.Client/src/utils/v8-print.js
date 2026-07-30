@@ -9,22 +9,25 @@
  * - TSC (TSPL) 标签打印指令构建器 (V8.Print.createNew)
  * - ESC/POS 票据打印指令构建器 (V8.Print.createNewESC)
  * - 自动分包发送 (V8.Print.prepareSend)
- * - BLE 设备管理与状态持久化 (sessionStorage)
+ * - BLE 设备管理与会话元数据写入 (sessionStorage 不会恢复 GATT 连接)
  * - 蓝牙连接对话框 UI (V8.Print.OpenBluetoothPage)
  *
- * V8引擎代码使用示例（与旧 uni-app 完全兼容）：
- *   if (!V8.Print || !V8.Print.BLEInformation || !V8.Print.BLEInformation.deviceId) {
- *       V8.Print.OpenBluetoothPage();
- *   } else {
- *       var cmd = V8.Print.createNew();
- *       cmd.setSize(75, 65);
- *       cmd.setGap(2);
- *       cmd.setCls();
- *       cmd.setText(220, 10, "TSS24.BF2", 1, 1, "产品标识卡");
- *       cmd.setQR(420, 300, "L", 5, "A", "https://microi.net");
- *       cmd.setPagePrint();
- *       V8.Print.prepareSend(cmd.getData());
+ * V8 引擎代码使用示例（必须在用户手势触发的 async 事件中执行）：
+ *   if (!V8.Print) throw new Error("当前客户端未加载蓝牙打印能力");
+ *   if (!V8.Print.isConnected()) {
+ *       var connected = await V8.Print.OpenBluetoothPage();
+ *       if (!connected || !V8.Print.isConnected()) return;
  *   }
+ *   var cmd = V8.Print.createNew();
+ *   cmd.setSize(75, 65);
+ *   cmd.setGap(2);
+ *   cmd.setCls();
+ *   cmd.setText(220, 10, "TSS24.BF2", 1, 1, "产品标识卡");
+ *   cmd.setQR(420, 300, "L", 5, "A", "https://microi.net");
+ *   cmd.setPagePrint();
+ *   await V8.Print.prepareSend(cmd.getData());
+ *
+ * Print 的分包游标是共享可变状态，所有业务发送必须串行 await，禁止 Promise.all。
  */
 
 import { tsc } from "./ble/tsc.js";

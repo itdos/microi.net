@@ -58,20 +58,6 @@ namespace Microi.net.Api
             "/itdos-heart"  // 特殊路由：心跳检测
         };
 
-        // FormEngine 路由映射表（避免多个 if-else）
-        private static readonly Dictionary<string, (string controller, string action)> FormEngineRoutes = new(StringComparer.OrdinalIgnoreCase)
-        {
-            { "/api/formengine/getformdata-", ("FormEngine", "GetFormData") },
-            { "/api/formengine/get-formdata-", ("FormEngine", "GetFormData") },
-            { "/api/formengine/gettabledata-", ("FormEngine", "GetTableData") },
-            { "/api/formengine/get-tabledata-", ("FormEngine", "GetTableData") },
-            { "/api/formengine/uptformdata-", ("FormEngine", "UptFormData") },
-            { "/api/formengine/upt-formdata-", ("FormEngine", "UptFormData") },
-            { "/api/formengine/delformdata-", ("FormEngine", "DelFormData") },
-            { "/api/formengine/del-formdata-", ("FormEngine", "DelFormData") },
-            { "/api/formengine/addformdata-", ("FormEngine", "AddFormData") },
-            { "/api/formengine/add-formdata-", ("FormEngine", "AddFormData") }
-        };
         public async Task<DosResult> Init(OsClientSecret clientModel)
         {
             try
@@ -155,14 +141,11 @@ namespace Microi.net.Api
         /// </summary>
         private bool TryMapFormEngineRoute(string apiPath, RouteValueDictionary values)
         {
-            foreach (var route in FormEngineRoutes)
+            if (UserAccessKeySecurity.TryGetDynamicFormEngineAction(apiPath, out var action))
             {
-                if (apiPath.StartsWith(route.Key, StringComparison.OrdinalIgnoreCase))
-                {
-                    values["controller"] = route.Value.controller;
-                    values["action"] = route.Value.action;
-                    return true;
-                }
+                values["controller"] = "FormEngine";
+                values["action"] = action;
+                return true;
             }
             return false;
         }
