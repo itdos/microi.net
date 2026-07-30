@@ -32,7 +32,7 @@
 						<text class="tenant-form-location__title">
 							{{ tenantFormPresentation.location.title || '现场位置' }}
 						</text>
-						<view class="tenant-form-location__action"
+						<view v-if="tenantFormPresentation.location.actionKey" class="tenant-form-location__action"
 							@tap="runTenantPresentationAction(tenantFormPresentation.location.actionKey)">
 							{{ tenantFormPresentation.location.actionLabel || '重新定位' }}
 						</view>
@@ -138,11 +138,24 @@
 						<text v-if="field.optionError" class="form-field__option-error">选项暂未加载，可稍后重试</text>
 						<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
 					</view>
+					<mci-business-related-list
+						v-for="relatedTab in customerAddressRelatedForGroup(group)"
+						:key="relatedTab.key"
+						class="form-section__related-preview"
+						:field="relatedTab.field"
+						:parent-id="relationParentId"
+						:parent-form="form"
+						:parent-menu-id="menuId"
+						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						:parent-mode="mode"
+						display-mode="preview"
+						:preview-limit="2"
+					/>
 				</view>
 			</view>
 
 			<!-- 平台同一 Tab 中的普通字段按 Sort 展示在关联子表标题之前。 -->
-			<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+			<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
 				<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
 					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
@@ -204,6 +217,7 @@
 		disposeTenantForm,
 		getTenantFormFieldActions,
 		getTenantFormFieldPresentation,
+		getTenantFormRelatedPresentation,
 		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
 		handleTenantFormFieldChange,
@@ -270,9 +284,12 @@
 				return this.definition && this.definition.table ? this.definition.table.Description || '' : ''
 			},
 			groups() {
-				const groups = this.definition ? this.definition.groups : []
-				if (!this.formTabs.length) return groups
-				return groups.filter((group) => group.tabKey === this.activeFormTabKey)
+				const groups = this.definition ? this.definition.relatedGroups || this.definition.groups || [] : []
+				const visibleGroups = groups.filter((group) =>
+					(group.fields || []).length || this.customerAddressRelatedForGroup(group).length
+				)
+				if (!this.formTabs.length) return visibleGroups
+				return visibleGroups.filter((group) => group.tabKey === this.activeFormTabKey)
 			},
 			formTabs() {
 				return (this.definition?.formTabs || []).map((tab) => ({
@@ -319,6 +336,9 @@
 			activeRelatedTabs() {
 				if (!this.formTabs.length) return this.relatedTabs
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
+			},
+			standaloneRelatedTabs() {
+				return this.activeRelatedTabs.filter((item) => !this.isCustomerAddressRelated(item))
 			},
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
@@ -367,6 +387,19 @@
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
+			isCustomerAddressRelated(item) {
+				if (item?.type !== 'child') return false
+				const presentation = getTenantFormRelatedPresentation(
+					this.tenantFormContext(),
+					item.field || {}
+				)
+				return presentation.embedInLayoutGroup === true
+			},
+			customerAddressRelatedForGroup(group) {
+				return this.activeRelatedTabs.filter((item) =>
+					this.isCustomerAddressRelated(item) && item.field.layoutGroupKey === group.key
+				)
+			},
 			async loadForm(refresh = false) {
 				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
 				const loadId = ++this.formLoadId
@@ -964,6 +997,11 @@
 	/* zhy: 展开字段分组时使用克制动效，保持与子表折叠交互一致。 */
 	.form-section__content {
 		animation: mciFormSectionExpand .18s ease both;
+	}
+
+	.form-section__related-preview {
+		display: block;
+		margin: 8rpx 22rpx 22rpx;
 	}
 
 	.form-section__bar {

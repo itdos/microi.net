@@ -131,7 +131,10 @@ if (!formRuntime.includes('normalizeTableTabs(table)') ||
   !businessDetail.includes(':active-key="activeFormTabKey"')) {
   fail('form tabs must use platform diy_table.Tabs and hide when only one tab exists')
 }
-if (nativeForm.indexOf('v-for="(group, groupIndex) in groups"') > nativeForm.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
+const nativeStandaloneRelatedLoop = nativeForm.includes('v-for="relatedTab in standaloneRelatedTabs"')
+  ? 'v-for="relatedTab in standaloneRelatedTabs"'
+  : 'v-for="relatedTab in activeRelatedTabs"'
+if (nativeForm.indexOf('v-for="(group, groupIndex) in groups"') > nativeForm.indexOf(nativeStandaloneRelatedLoop) ||
   moduleDetail.indexOf('v-for="(group, index) in groups"') > moduleDetail.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
   businessDetail.indexOf('v-for="(section, sectionIndex) in visibleSections"') > businessDetail.indexOf('v-for="relatedTab in standaloneRelatedTabs"')) {
   fail('ordinary tab fields must render before related table titles')
@@ -252,6 +255,14 @@ for (const token of [
   'if (this.mergeDraftChangedRow(payload)) return'
 ]) {
   if (!relatedBusinessList.includes(token)) fail(`draft related-row merge is missing: ${token}`)
+}
+for (const token of [
+  'customerAddressRelatedForGroup(group)',
+  'getTenantFormRelatedPresentation',
+  'display-mode="preview"',
+  'v-for="relatedTab in standaloneRelatedTabs"'
+]) {
+  if (!nativeForm.includes(token)) fail(`embedded related CollapseGroup rendering is missing: ${token}`)
 }
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')
