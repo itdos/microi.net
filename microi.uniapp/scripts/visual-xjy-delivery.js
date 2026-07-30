@@ -85,6 +85,24 @@ const customerDetail = {
   Beizhu: '暑期完成设备巡检后进入新学期保障。'
 };
 
+const privateCustomerDetail = {
+  ...customerDetail,
+  Id: 'customer-private-001',
+  KehuMC: '私有客户按钮验证',
+  KehuGJZT: null,
+  KehuGJZTZ: null,
+  FuzeR: '张服务',
+  FuzeRID: 'user-001'
+};
+
+const otherOwnerPrivateCustomerDetail = {
+  ...privateCustomerDetail,
+  Id: 'customer-private-other-001',
+  KehuMC: '其他负责人私有客户',
+  FuzeR: '其他测试负责人',
+  FuzeRID: 'user-other'
+};
+
 const leadDetail = {
   Id: 'lead-001',
   XiansuoMC: '未来科技园直饮水项目',
@@ -271,7 +289,21 @@ const targets = [
   },
   {
     name: 'customer-detail', route: '/#/pages/business/detail?key=customers&id=customer-001', selector: '.detail-page',
-    required: ['.hero-band', '.quick-band', '.bottom-actions']
+    required: ['.hero-band', '.quick-band', '.bottom-actions'],
+    expectedText: ['领取客户'],
+    forbiddenText: ['移入公海']
+  },
+  {
+    name: 'customer-private-detail', route: '/#/pages/business/detail?key=customers&id=customer-private-001', selector: '.detail-page',
+    required: ['.hero-band', '.quick-band', '.bottom-actions'],
+    expectedText: ['移入公海'],
+    forbiddenText: ['领取客户']
+  },
+  {
+    name: 'customer-private-other-owner', route: '/#/pages/business/detail?key=customers&id=customer-private-other-001', selector: '.detail-page',
+    required: ['.hero-band', '.quick-band', '.bottom-actions'],
+    expectedText: ['生成任务'],
+    forbiddenText: ['领取客户', '移入公海']
   },
   {
     name: 'merchant-list', route: '/#/pages/business/list?key=stores', selector: '.list-page',
@@ -644,6 +676,8 @@ function buildMockResponse(request) {
     return { Code: 1, Data: deviceDetail };
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Kehu' || lowerUrl.includes('diy_kehu'))) {
+    if (body.Id === privateCustomerDetail.Id) return { Code: 1, Data: privateCustomerDetail };
+    if (body.Id === otherOwnerPrivateCustomerDetail.Id) return { Code: 1, Data: otherOwnerPrivateCustomerDetail };
     return { Code: 1, Data: customerDetail };
   }
   if (lowerUrl.includes('getformdata') && (table === 'Diy_Tenant' || lowerUrl.includes('diy_tenant'))) {

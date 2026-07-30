@@ -28,8 +28,7 @@ Component({
     safeRight: 0,
     safeBottom: 0,
     safeLeft: 0,
-    switching: false,
-    opening: false
+    switching: false
   },
 
   lifetimes: {
@@ -139,21 +138,6 @@ Component({
         },
         complete: () => {
           setTimeout(() => this.setData({ switching: false }), 280)
-        }
-      })
-    },
-
-    openAssistant() {
-      if (!this.data.aiAssistantEnabled || this.data.opening) return
-      this.setData({ opening: true })
-      wx.navigateTo({
-        url: '/pages/ai/index',
-        fail: (error) => {
-          console.error('[MciAiLauncher] navigate failed:', error)
-          wx.showToast({ title: '服务助手打开失败，请重试', icon: 'none' })
-        },
-        complete: () => {
-          setTimeout(() => this.setData({ opening: false }), 280)
         }
       })
     }

@@ -1,8 +1,9 @@
 <template>
   <view class="native-control" :class="[`native-control--${component.toLowerCase()}`, { 'native-control--readonly': readonly, 'native-control--avatar': isAvatar, 'native-control--select-open': selectorOpen }]">
     <template v-if="readonly">
-      <mci-media-uploader v-if="isImage" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" readonly />
-      <mci-media-uploader v-else-if="isFile" :model-value="modelValue" media-type="file" readonly />
+      <mci-media-uploader v-if="isImage && hasModelValue" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" readonly />
+      <mci-media-uploader v-else-if="isFile && hasModelValue" :model-value="modelValue" media-type="file" readonly />
+      <text v-else-if="isImage || isFile" class="native-control__value">-</text>
       <rich-text v-else-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
       <view v-else-if="component === 'Progress'" class="native-control__progress"><progress :percent="numberValue" activeColor="#087da8" /><text>{{ numberValue }}%</text></view>
       <view v-else-if="component === 'ColorPicker'" class="native-control__color-readonly"><view :style="{ backgroundColor: String(modelValue || '#ffffff') }"></view><text>{{ displayText }}</text></view>
@@ -241,6 +242,12 @@ export default {
     component() { return String(this.field.component || 'Text') },
     isImage() { return this.component === 'ImgUpload' },
     isFile() { return this.component === 'FileUpload' },
+    hasModelValue() {
+      if (this.modelValue === null || this.modelValue === undefined || this.modelValue === '') return false
+      if (Array.isArray(this.modelValue)) return this.modelValue.length > 0
+      if (typeof this.modelValue === 'object') return Object.keys(this.modelValue).length > 0
+      return true
+    },
     isAvatar() { return /avatar|headimg|touxiang/i.test(String(this.field.Name || '')) || /头像/.test(String(this.field.Label || '')) },
     isMultiple() { return isNativeFieldMultiple(this.field) },
     isOptionComponent() { return OPTION_COMPONENTS.has(this.component) },

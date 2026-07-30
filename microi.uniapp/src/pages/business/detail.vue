@@ -43,7 +43,7 @@
 					</view>
 				</view>
 
-				<view v-if="key === 'customers'" class="quick-band">
+				<!-- <view v-if="key === 'customers'" class="quick-band">
 					<view class="quick-action" hover-class="quick-action--pressed" @tap="addCustomerVisit">
 						<image src="/static/xjy/business/baifang.png" mode="aspectFit" />
 						<text>新增跟进</text>
@@ -63,7 +63,7 @@
 						<image src="/static/xjy/repair/renwu.png" mode="aspectFit" />
 						<text>售后任务</text>
 					</view>
-				</view>
+				</view> -->
 				<view v-if="dynamicActions.length" class="quick-band quick-band--dynamic">
 					<view
 						v-for="action in dynamicActions"
@@ -78,33 +78,21 @@
 					</view>
 				</view>
 
-				<view v-if="relationActions.length" class="info-band relation-panel">
-					<view class="section-heading section-heading--toggle" hover-class="section-heading--pressed"
-						@tap="relationExpanded = !relationExpanded">
-						<view class="section-heading__copy">
-							<view class="section-mark"></view>
-							<text>关联业务</text>
-							<text class="section-count">{{ relationActions.length }} 项</text>
-						</view>
-						<text class="section-toggle" :class="{ expanded: relationExpanded }">›</text>
-					</view>
-					<view v-if="relationExpanded" class="relation-band">
-						<view class="relation-item" v-for="action in relationActions" :key="action.label"
-							hover-class="relation-item--pressed" @tap="runRelation(action)">
-							<image :src="action.icon" mode="aspectFit" />
-							<text>{{ action.label }}</text>
-							<text class="relation-arrow">›</text>
-						</view>
-					</view>
-				</view>
+				<mci-related-tabs v-if="formTabs.length > 1" :items="formTabs"
+					:active-key="activeFormTabKey" @select="selectFormTab" />
 
-				<view class="info-band" v-for="(section, sectionIndex) in visibleSections" :key="section.key">
-					<view class="section-heading section-heading--toggle" hover-class="section-heading--pressed"
+				<view class="info-band" :class="{ 'info-band--ungrouped': section.source === 'Ungrouped' }"
+					v-for="(section, sectionIndex) in visibleSections" :key="section.key">
+					<view v-if="section.source === 'CollapseGroup'"
+						class="section-heading section-heading--toggle" hover-class="section-heading--pressed"
 						@tap="toggleSection(section, sectionIndex)">
 						<view class="section-heading__copy">
 							<view class="section-mark"></view>
-							<text>{{ section.title }}</text>
-							<text class="section-count">{{ section.fields.length }} 项</text>
+							<view class="section-heading__text">
+								<text>{{ section.title }}</text>
+								<text v-if="section.description" class="section-description">{{ section.description }}</text>
+							</view>
+							<text v-if="section.showFieldCount !== false && section.fields.length" class="section-count">{{ section.fields.length }} 项</text>
 						</view>
 						<text class="section-toggle"
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
@@ -149,7 +137,34 @@
 									@tap="callPhone(detail[field.name])">拨打</view>
 							</view>
 						</view>
+						<mci-business-related-list
+							v-for="relatedTab in section.relatedTabs"
+							:key="relatedTab.key"
+							class="section-related-preview"
+							:field="relatedTab.field"
+							:parent-id="detail.Id || id"
+							:parent-form="detail"
+							:parent-menu-id="menuId"
+							:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+							parent-mode="View"
+							display-mode="preview"
+							:preview-limit="2"
+						/>
 					</view>
+				</view>
+
+				<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+					<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
+						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						parent-mode="View" />
+					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
+						:parent-form="detail" parent-mode="View" readonly />
+					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
+						:parent-table="moduleConfig.table" :parent-id="detail.Id || id"
+						:parent-form="detail" :parent-menu-id="menuId" readonly />
+					<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
+						:parent-form="detail" :parent-menu-id="menuId" />
 				</view>
 
 				<view v-if="summaryBlocks.length" class="info-band">
@@ -200,10 +215,18 @@
 				<button class="action-button action-button--secondary" @tap="openDeviceRepair">一键报修</button>
 			</template>
 			<template v-else-if="key === 'customers'">
-				<button v-if="canClaimCustomer" class="action-button action-button--primary" :disabled="submitting"
-					@tap="claimCustomer">领取客户</button>
-				<button v-if="canReleaseCustomer" class="action-button action-button--plain" :disabled="submitting"
-					@tap="releaseCustomer">移入公海</button>
+				<button v-if="canClaimCustomer"
+					class="action-button action-button--primary action-button--with-icon" :disabled="submitting"
+					@tap="claimCustomer">
+					<image class="action-button__icon" :src="customerClaimIcon" mode="aspectFit" />
+					<text>{{ submitting ? '领取中...' : '领取客户' }}</text>
+				</button>
+				<button v-if="canReleaseCustomer"
+					class="action-button action-button--plain action-button--with-icon" :disabled="submitting"
+					@tap="releaseCustomer">
+					<image class="action-button__icon" :src="customerReleaseIcon" mode="aspectFit" />
+					<text>{{ submitting ? '移入中...' : '移入公海' }}</text>
+				</button>
 				<button v-if="canGeneratePeriodicTasks" class="action-button action-button--secondary"
 					:disabled="submitting" @tap="generatePeriodicTasks">生成任务</button>
 			</template>
@@ -301,6 +324,7 @@
 	import {
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
+	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 
 	const icon = (path) => `/static/xjy/${path}`
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
@@ -309,12 +333,6 @@
 		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Department', 'SelectTree',
 		'TreeCheckbox', 'Cascader', 'ColorPicker', 'Progress', 'Rate', 'Qrcode', 'Alert'
 	])
-
-	function hasDisplayValue(value) {
-		if (value === null || value === undefined || value === '') return false
-		if (Array.isArray(value)) return value.length > 0
-		return true
-	}
 
 	function detailFieldFormat(field) {
 		const component = String(field.component || field.Component || '')
@@ -1123,6 +1141,7 @@
 	}
 
 	export default {
+		components: { MciBusinessRelatedList },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -1148,7 +1167,9 @@
 				viewManifest: null,
 				metricValues: {},
 				expandedSections: {},
-				relationExpanded: false
+				activeFormTabKey: '',
+				customerClaimIcon: icon('business/kehu.png'),
+				customerReleaseIcon: icon('business/xiezuo.png')
 			}
 		},
 		computed: {
@@ -1171,7 +1192,10 @@
 					}] : []
 				}
 				const dynamic = compileDetailPreset(this.viewManifest)
-				if (!dynamic) return base
+				if (!dynamic) return {
+					...base,
+					sections: []
+				}
 				return {
 					...base,
 					...dynamic,
@@ -1183,7 +1207,7 @@
 					metaField: dynamic.metaField || base.metaField,
 					phoneFields: dynamic.phoneFields?.length ? dynamic.phoneFields : base.phoneFields,
 					metrics: dynamic.metrics?.length ? dynamic.metrics : base.metrics,
-					sections: dynamic.sections?.length ? dynamic.sections : base.sections,
+					sections: [],
 					summaries: dynamic.summaries?.length ? dynamic.summaries : base.summaries
 				}
 			},
@@ -1243,61 +1267,62 @@
 				return map
 			},
 			visibleSections() {
-				const sections = []
-				const sectionByTitle = new Map()
-				const used = new Set()
-				const appendSection = (title, fields) => {
-					const rows = fields.map((field) => {
-						const name = String(field.name || '')
-						const nativeField = field.nativeField || this.fieldDefinitionMap.get(name
-							.toLowerCase()) || null
-						return {
-							...field,
-							label: field.label || nativeField?.Label || name,
-							format: field.format || (nativeField ? detailFieldFormat(nativeField) : ''),
-							nativeField
-						}
-					}).filter((field) =>
-						!this.isTenantMapCoordinateHelper(field) &&
-						(hasDisplayValue(this.detail[field.name]) || this.hasTenantDetailMap(field))
-					)
-					if (!rows.length) return
-					if (!sectionByTitle.has(title)) {
-						const section = {
-							title,
-							fields: []
-						}
-						sectionByTitle.set(title, section)
-						sections.push(section)
-					}
-					const target = sectionByTitle.get(title)
-					rows.forEach((field) => {
-						const name = String(field.name || '')
-						if (!name || used.has(name.toLowerCase())) return
-						target.fields.push(field)
-						used.add(name.toLowerCase())
-					})
-				}
-
-				;
-				(this.preset.sections || []).forEach((section) => appendSection(section.title, section.fields || []));
-				(this.definition?.groups || []).forEach((group) => {
-					const fields = (group.fields || []).filter((field) => {
+				const groups = this.definition?.relatedGroups || this.definition?.groups || []
+				const activeGroups = this.formTabs.length
+					? groups.filter((group) => group.tabKey === this.activeFormTabKey)
+					: groups
+				return activeGroups.map((group, index) => {
+					const rows = (group.fields || []).filter((field) => {
 						const name = String(field.Name || '')
-						return name && !DETAIL_EXCLUDED_FIELDS.has(name) && !used.has(name.toLowerCase())
+						return name && !DETAIL_EXCLUDED_FIELDS.has(name)
 					}).map((field) => ({
 						label: field.Label || field.Name,
 						name: field.Name,
 						format: detailFieldFormat(field),
 						nativeField: field
-					}))
-					appendSection(group.name || '更多资料', fields)
+					})).filter((field) => !this.isTenantMapCoordinateHelper(field))
+					return {
+						title: group.name || '',
+						fields: rows,
+						relatedTabs: this.activeRelatedTabs.filter((item) =>
+							this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
+						),
+						source: group.source,
+						description: group.description || '',
+						showFieldCount: group.showFieldCount,
+						defaultExpanded: group.defaultExpanded !== false,
+						key: group.key || `${group.name || 'ungrouped'}:${index}`
+					}
 				})
-
-				return sections.filter((section) => section.fields.length).map((section, index) => ({
-					...section,
-					key: `${section.title}:${index}`
+				.filter((section) => section.fields.length || section.relatedTabs.length)
+			},
+			formTabs() {
+				return (this.definition?.formTabs || []).map((tab) => ({
+					...tab,
+					label: tab.name
 				}))
+			},
+			relatedTabs() {
+				const definition = this.definition || {}
+				const toTabs = (fields, type) => (fields || []).map((field) => ({
+					key: `${type}:${field.Id || field.Name}`,
+					label: field.Label || field.Name || '关联业务',
+					type,
+					field
+				}))
+				return [
+					...toTabs(definition.childFields, 'child'),
+					...toTabs(definition.joinFields, 'join'),
+					...toTabs(definition.openTableFields, 'openTable'),
+					...toTabs(definition.joinTableFields, 'joinTable')
+				]
+			},
+			activeRelatedTabs() {
+				if (!this.formTabs.length) return this.relatedTabs
+				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
+			},
+			standaloneRelatedTabs() {
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
 			},
 			summaryBlocks() {
 				return (this.preset.summaries || []).map((item) => {
@@ -1328,13 +1353,14 @@
 			},
 			relationActions() {
 				if (this.key === 'customers') {
-					return [{
-							label: '分享客户给商家',
-							type: 'customer-share',
-							icon: icon('business/xiezuo.png')
-						},
+					return [
+						// {
+						// 	label: '分享客户给商家',
+						// 	type: 'customer-share',
+						// 	icon: icon('business/xiezuo.png')
+						// },
 						{
-							label: '客户其它地址',
+							label: '客户地址管理',
 							type: 'list',
 							key: 'customerAddresses',
 							field: 'KehuID',
@@ -1627,17 +1653,35 @@
 			canApproveOrder() {
 				return this.key === 'orders' && this.roleProfile.isInternal && /待审批/.test(String(this.statusText))
 			},
+			customerFollowScope() {
+				const status = String(this.detail.KehuGJZT || '').trim()
+				if (status.includes('公海')) return 'public'
+				if (status.includes('私有')) return 'private'
+				const statusValue = Number(this.detail.KehuGJZTZ || 0)
+				if (statusValue === 2) return 'public'
+				if (statusValue === 1) return 'private'
+				if (this.detail.FuzeRID || this.detail.FuzeR) return 'private'
+				return ''
+			},
+			canManageCustomerFollowScope() {
+				return this.key === 'customers' && !!this.currentUser.Id && !this.roleProfile.isCustomer
+			},
 			canClaimCustomer() {
-				return this.key === 'customers' && this.roleProfile.isInternal && String(this.detail.KehuGJZT || '') ===
-					'公海'
+				return this.canManageCustomerFollowScope && this.customerFollowScope === 'public'
 			},
 			canReleaseCustomer() {
-				if (this.key !== 'customers' || !this.roleProfile.isInternal || this.canClaimCustomer) return false
-				const ownerId = String(this.detail.FuzeRID || '')
-				const ownerName = String(this.detail.FuzeR || '')
-				return this.roleProfile.isAdmin ||
-					(!!ownerId && ownerId === String(this.currentUser.Id || '')) ||
-					(!!ownerName && ownerName === String(this.currentUser.Name || ''))
+				if (!this.canManageCustomerFollowScope || this.customerFollowScope !== 'private') return false
+				if (this.roleProfile.isAdmin) return true
+				const ownerId = String(this.detail.FuzeRID || '').trim()
+				const currentUserId = String(this.currentUser.Id || '').trim()
+				if (ownerId && currentUserId && ownerId === currentUserId) return true
+				const normalizeName = (value) => String(value || '')
+					.replace(/\s+/g, '')
+					.replace(/[（(]/g, '(')
+					.replace(/[）)]/g, ')')
+				const ownerName = normalizeName(this.detail.FuzeR)
+				const currentUserName = normalizeName(this.currentUser.Name)
+				return !!ownerName && !!currentUserName && ownerName === currentUserName
 			},
 			canGeneratePeriodicTasks() {
 				if (this.key !== 'customers' || !this.roleProfile.isInternal || this.canClaimCustomer) return false
@@ -1692,7 +1736,10 @@
 					if (!result || result.Code !== 1 || !result.Data) throw new Error((result && result.Msg) ||
 						'未找到该条业务数据')
 					this.detail = result.Data
-					if (definitionResult) this.definition = definitionResult
+					if (definitionResult) {
+						this.definition = definitionResult
+						this.initializeFormTabs()
+					}
 					this.metricValues = await loadViewMetricValues(this.preset.metrics || [], {
 						form: this.detail,
 						user: this.currentUser,
@@ -1806,7 +1853,9 @@
 				}
 			},
 			displayField(field) {
-				return formatFieldValue(this.detail[field.name], field.format)
+				return formatFieldValue(this.detail[field.name], field.format, {
+					empty: '-'
+				})
 			},
 			usesNativeDisplay(field) {
 				return Boolean(field.nativeField && DETAIL_NATIVE_COMPONENTS.has(String(field.nativeField.component ||
@@ -1858,15 +1907,20 @@
 				return normalizeRichTextHtml(this.detail[field.name])
 			},
 			isSectionExpanded(section, index) {
+				if (section.source === 'Ungrouped') return true
 				if (Object.prototype.hasOwnProperty.call(this.expandedSections, section.key)) return this.expandedSections[
 					section.key]
-				return index === 0
+				return section.defaultExpanded !== false
 			},
 			toggleSection(section, index) {
+				if (section.source !== 'CollapseGroup') return
 				this.expandedSections = {
 					...this.expandedSections,
 					[section.key]: !this.isSectionExpanded(section, index)
 				}
+			},
+			isEmbeddedChildRelated(item) {
+				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
 			callPhone(phone) {
 				if (phone) uni.makePhoneCall({
@@ -1909,6 +1963,15 @@
 				uni.navigateTo({
 					url: `/pages/business/list?${params.join('&')}`
 				})
+			},
+			selectFormTab(tab) {
+				if (!tab || !tab.key) return
+				this.activeFormTabKey = tab.key
+			},
+			initializeFormTabs() {
+				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
+					this.activeFormTabKey = this.formTabs[0]?.key || ''
+				}
 			},
 			async runRelation(action) {
 				if (action.type === 'detail') {
@@ -2570,6 +2633,11 @@
 		background: #f3f8fa;
 	}
 
+	.related-tab-panel {
+		margin-top: 14rpx;
+		background: #fff;
+	}
+
 	.info-band {
 		margin-top: 14rpx;
 		padding: 0 28rpx 10rpx;
@@ -2588,8 +2656,34 @@
 
 	.section-heading__copy {
 		min-width: 0;
+		flex: 1;
 		display: flex;
 		align-items: center;
+	}
+
+	.section-heading__text {
+		min-width: 0;
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 4rpx;
+		padding: 12rpx 0;
+	}
+
+	.section-heading__text>text:first-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.section-description {
+		overflow: hidden;
+		color: #8ca0a8;
+		font-size: 20rpx;
+		font-weight: 400;
+		line-height: 1.35;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	.section-heading--toggle {
@@ -2865,6 +2959,23 @@
 
 	.action-button::after {
 		border: none;
+	}
+
+	.action-button--with-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10rpx;
+		line-height: 1;
+	}
+
+	.action-button__icon {
+		width: 34rpx;
+		height: 34rpx;
+		padding: 4rpx;
+		box-sizing: border-box;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.92);
 	}
 
 	.action-button--primary {
