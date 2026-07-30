@@ -245,6 +245,7 @@ export function groupFields(fields, tableModel = {}) {
         key: String(field.Id || field.Name || `collapse:${groups.length}`),
         name: String(field.Label || field.Name || '').trim(),
         fields: [],
+        relatedFields: [],
         source: 'CollapseGroup',
         defaultExpanded: !configBoolean(collapse.DefaultCollapsed, false),
         description: String(collapse.Description || field.Description || '').trim(),
@@ -266,7 +267,22 @@ export function groupFields(fields, tableModel = {}) {
       looseGroups.delete(tabKey)
       return
     }
-    if (RELATED_COMPONENTS.has(field.component) || GUARDED_COMPONENTS.has(field.component)) return
+    if (RELATED_COMPONENTS.has(field.component)) {
+      const active = activeGroups.get(tabKey)
+      if (active && active.remaining > 0) {
+        field.layoutGroupKey = active.group.key
+        active.group.relatedFields.push(field)
+        if (Number.isFinite(active.remaining)) {
+          active.remaining -= 1
+          if (active.remaining <= 0) {
+            activeGroups.delete(tabKey)
+            looseGroups.delete(tabKey)
+          }
+        }
+      }
+      return
+    }
+    if (GUARDED_COMPONENTS.has(field.component)) return
 
     const active = activeGroups.get(tabKey)
     if (active && active.remaining > 0) {
@@ -284,13 +300,14 @@ export function groupFields(fields, tableModel = {}) {
     const loose = looseGroups.get(tabKey) || createLooseGroup(tabKey)
     loose.fields.push(field)
   })
-  return groups.filter((group) => group.fields.length)
+  return groups.filter((group) => group.fields.length || group.relatedFields?.length)
 }
 
 function buildDefinition(table, fields, layoutFields = fields) {
   const formTabs = normalizeTableTabs(table)
   assignFieldFormTabs(layoutFields, formTabs)
   if (layoutFields !== fields) assignFieldFormTabs(fields, formTabs)
+  const layoutGroups = groupFields(fields, table)
   const uniqueRelated = (component) => {
     const seen = new Set()
     return fields.filter((field) => {
@@ -313,7 +330,8 @@ function buildDefinition(table, fields, layoutFields = fields) {
     fields,
     layoutFields,
     formTabs,
-    groups: groupFields(fields, table),
+    groups: layoutGroups.filter((group) => group.fields.length),
+    relatedGroups: layoutGroups,
     childFields: uniqueRelated('TableChild'),
     joinFields: uniqueRelated('JoinForm'),
     openTableFields: uniqueRelated('OpenTable'),
@@ -327,7 +345,7 @@ export function createNativeFormDefinition(table = {}, rawFields = []) {
   return buildDefinition(table, fields, layoutFields)
 }
 
-export const NATIVE_FORM_SCHEMA_VERSION = 5
+export const NATIVE_FORM_SCHEMA_VERSION = 6
 const FORM_VERSION_MAX_AGE = 30 * 1000
 const FORM_DEFINITION_MAX_AGE = 30 * 24 * 60 * 60 * 1000
 

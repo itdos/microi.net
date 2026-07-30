@@ -44,6 +44,7 @@ const relatedBusinessList = fs.readFileSync(
   path.join(root, 'src/components/mci-business-related-list/mci-business-related-list.vue'),
   'utf8'
 )
+const relatedBusinessPage = fs.readFileSync(path.join(root, 'src/pages/business/related-list.vue'), 'utf8')
 const businessList = fs.readFileSync(path.join(root, 'src/pages/business/list.vue'), 'utf8')
 const taskCard = fs.readFileSync(path.join(root, 'src/components/mci-task-card/mci-task-card.vue'), 'utf8')
 const taskList = fs.readFileSync(path.join(root, 'src/pages/task/list.vue'), 'utf8')
@@ -104,13 +105,20 @@ if (!formRuntime.includes("field.component === 'CollapseGroup'") ||
   !formRuntime.includes('collapse.FieldCount')) {
   fail('native form field groups must follow platform CollapseGroup metadata')
 }
+if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
+  !formRuntime.includes('active.group.relatedFields.push(field)') ||
+  !formRuntime.includes('groups: layoutGroups.filter((group) => group.fields.length)') ||
+  !formRuntime.includes('relatedGroups: layoutGroups') ||
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 6')) {
+  fail('related fields must preserve their platform CollapseGroup ownership')
+}
 if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
   fail('readonly platform fields must remain visible but non-editable')
 }
 if (!formRuntime.includes("if (value === null || value === undefined || value === '') return '-'")) {
   fail('empty platform fields must render as dash values')
 }
-if (!businessDetail.includes('const groups = this.definition?.groups || []') ||
+if (!businessDetail.includes('const groups = this.definition?.relatedGroups || this.definition?.groups || []') ||
   businessDetail.includes('(this.preset.sections || []).forEach') ||
   !moduleDetail.includes('const groups = this.config.definition?.groups || []')) {
   fail('detail pages must use platform CollapseGroup groups instead of local preset sections')
@@ -125,7 +133,7 @@ if (!formRuntime.includes('normalizeTableTabs(table)') ||
 }
 if (nativeForm.indexOf('v-for="(group, groupIndex) in groups"') > nativeForm.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
   moduleDetail.indexOf('v-for="(group, index) in groups"') > moduleDetail.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
-  businessDetail.indexOf('v-for="(section, sectionIndex) in visibleSections"') > businessDetail.indexOf('v-for="relatedTab in activeRelatedTabs"')) {
+  businessDetail.indexOf('v-for="(section, sectionIndex) in visibleSections"') > businessDetail.indexOf('v-for="relatedTab in standaloneRelatedTabs"')) {
   fail('ordinary tab fields must render before related table titles')
 }
 if (!nativeForm.includes('class="form-tabs--full"') ||
@@ -151,6 +159,19 @@ if (!relatedBusinessList.includes('class="search-row"') ||
   !relatedBusinessList.includes('openAdvancedFilters') ||
   !relatedBusinessList.includes('buildFilterWhere()')) {
   fail('related business lists must preserve standalone search and advanced filters')
+}
+if (!relatedBusinessList.includes('displayMode: { type: String') ||
+  !relatedBusinessList.includes('class="preview-actions"') ||
+  !relatedBusinessList.includes('openMore()') ||
+  !relatedBusinessPage.includes('<mci-business-related-list') ||
+  !relatedBusinessPage.includes("'related-list-context'")) {
+  fail('related business lists must provide a reusable preview and full-list page')
+}
+if (!businessDetail.includes('isCustomerAddressRelated(item)') ||
+  !businessDetail.includes('display-mode="preview"') ||
+  !businessDetail.includes('section.relatedTabs') ||
+  !businessDetail.includes('groups.filter((group) => group.tabKey === this.activeFormTabKey)')) {
+  fail('customer addresses must render inside their CollapseGroup as a preview list')
 }
 if (!relatedBusinessList.includes('!waitingForParentSave') ||
   !relatedBusinessList.includes('保存当前表单后可新增') ||
