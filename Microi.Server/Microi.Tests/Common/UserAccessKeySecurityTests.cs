@@ -15,6 +15,8 @@ public class UserAccessKeySecurityTests
             ["_AccessKeyScopes"] = new JArray("page:open", "form:read", "api-engine:run"),
             ["_AccessKeyAllowedRoutes"] = new JArray("/mic/data-dashboard/preview/dashboard-1"),
             ["_AccessKeyAllowedTableNames"] = new JArray("mic_data_dashboard"),
+            ["_AccessKeyAllowedTableIds"] = new JArray("table-dashboard-id"),
+            ["_AccessKeyAllowedFieldIds"] = new JArray("field-dashboard-id"),
             ["_AccessKeyAllowedApiEngineKeys"] = new JArray("dashboard_summary"),
             ["_AccessKeyAllowedDataSourceKeys"] = new JArray()
         };
@@ -106,6 +108,60 @@ public class UserAccessKeySecurityTests
     }
 
     [Fact]
+    public void TableScope_AcceptsDerivedTableIdForMetadataRequests()
+    {
+        var user = NewScopedUser();
+
+        Assert.True(UserAccessKeySecurity.IsTableOperationAllowed(
+            user,
+            "table-dashboard-id",
+            true));
+        Assert.False(UserAccessKeySecurity.IsTableOperationAllowed(
+            user,
+            "table-other-id",
+            true));
+    }
+
+    [Fact]
+    public void TableScope_FailsClosedForMissingOrMixedBatchReferences()
+    {
+        var user = NewScopedUser();
+
+        Assert.False(UserAccessKeySecurity.AreTableReferencesAllowed(
+            user,
+            Array.Empty<string>(),
+            true));
+        Assert.True(UserAccessKeySecurity.AreTableReferencesAllowed(
+            user,
+            new[] { "mic_data_dashboard", "table-dashboard-id" },
+            true));
+        Assert.False(UserAccessKeySecurity.AreTableReferencesAllowed(
+            user,
+            new[] { "mic_data_dashboard", "table-other-id" },
+            true));
+    }
+
+    [Fact]
+    public void FieldScope_AllowsSqlDataForFieldsOwnedByAllowedTablesOnly()
+    {
+        var user = NewScopedUser();
+
+        Assert.True(UserAccessKeySecurity.AreFieldReferencesAllowed(
+            user,
+            new[] { "field-dashboard-id" }));
+        Assert.False(UserAccessKeySecurity.AreFieldReferencesAllowed(
+            user,
+            Array.Empty<string>()));
+        Assert.False(UserAccessKeySecurity.AreFieldReferencesAllowed(
+            user,
+            new[] { "field-other-id" }));
+        Assert.True(UserAccessKeySecurity.IsFieldDataLookupPath(
+            "/api/FormEngine/GetDiyFieldSqlData"));
+        Assert.True(UserAccessKeySecurity.IsFieldDataLookupPath(
+            "/api/DiyTable/GetFieldsData"));
+    }
+
+    [Fact]
     public void EngineScopes_RequireExactKey()
     {
         var user = NewScopedUser();
@@ -132,6 +188,123 @@ public class UserAccessKeySecurityTests
         Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
             user,
             "/api/SysUserAccessKey/Create"));
+    }
+
+    [Fact]
+    public void WildcardPageScope_AllowsDynamicMenuBootstrapOnlyForWildcardRoutes()
+    {
+        var exactRouteUser = NewScopedUser();
+        var wildcardRouteUser = NewScopedUser();
+        wildcardRouteUser["_AccessKeyAllowedRoutes"] = new JArray("*");
+
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            exactRouteUser,
+            "/api/SysMenu/GetSysMenuStep"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            wildcardRouteUser,
+            "/api/SysMenu/GetSysMenuStep"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            wildcardRouteUser,
+            "/api/SysUser/RefreshToken"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            wildcardRouteUser,
+            "/api/SysUser/Logout"));
+    }
+
+    [Fact]
+    public void FullAccessKeyFacade_CoversRuntimeCapabilitiesButBlocksControlPlane()
+    {
+        var user = NewScopedUser();
+        user["_AccessKeyScopes"] = new JArray(
+            "page:open",
+            "form:read",
+            "form:write",
+            "form:export",
+            "api-engine:run",
+            "data-source:run",
+            "file:read");
+        user["_AccessKeyAllowedRoutes"] = new JArray("*");
+        user["_AccessKeyAllowedTableNames"] = new JArray("*");
+        user["_AccessKeyAllowedTableIds"] = new JArray("*");
+        user["_AccessKeyAllowedFieldIds"] = new JArray("*");
+        user["_AccessKeyAllowedDataSourceKeys"] = new JArray("dashboard_source");
+
+        var allowedPaths = new[]
+        {
+            "/api/SysUser/GetCurrentUser",
+            "/api/SysMenu/GetSysMenuStep",
+            "/api/FormEngine/GetSysConfig",
+            "/api/FormEngine/GetLangBundle",
+            "/api/FormEngine/GetSysMenuModel",
+            "/api/FormEngine/GetDiyTableModel",
+            "/api/FormEngine/GetDiyFieldByDiyTables",
+            "/api/FormEngine/GetTableDataCount",
+            "/api/FormEngine/AddFormData",
+            "/api/FormEngine/ExportDiyTableRow",
+            "/api/SysDept/GetSysDeptStep",
+            "/api/SysBaseData/GetSysBaseDataStep",
+            "/api/SysUserFk/GetSysUserFk",
+            "/api/ApiEngine/Run",
+            "/api/DataSourceEngine/Run",
+            "/api/BackgroundTask/List",
+            "/api/BackgroundTask/RunApiEngine",
+            "/api/OnlineTerminal/Mine",
+            "/api/Os/GetDateTimeNow",
+            "/api/UserBehavior/Signal",
+            "/api/ModuleEngine/GetTableData",
+            "/api/WorkFlow/GetWFHistory",
+            "/api/WorkFlow/StartWork",
+            "/api/HDFS/GetPrivateFileUrl"
+        };
+        foreach (var path in allowedPaths)
+        {
+            Assert.True(
+                UserAccessKeySecurity.IsApiPathAllowed(user, path),
+                $"Expected runtime path to be allowed: {path}");
+        }
+
+        var deniedPaths = new[]
+        {
+            "/api/SysUser/GetSysUserPassword",
+            "/api/SysUserAccessKey/Create",
+            "/api/SysMenu/UptSysMenu",
+            "/api/WorkFlow/SaveWFFlowDesign",
+            "/api/FormEngine/GetTableIndexes",
+            "/api/FormEngine/AddDiyField",
+            "/api/OnlineTerminal/List",
+            "/api/OnlineTerminal/Kick",
+            "/api/HDFS/Upload"
+        };
+        foreach (var path in deniedPaths)
+        {
+            Assert.False(
+                UserAccessKeySecurity.IsApiPathAllowed(user, path),
+                $"Expected control-plane path to be denied: {path}");
+        }
+    }
+
+    [Fact]
+    public void IndirectRuntimeEngines_RequireAllAuthorizedDataMode()
+    {
+        var selectedTableUser = NewScopedUser();
+
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            selectedTableUser,
+            "/api/ModuleEngine/GetTableData"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            selectedTableUser,
+            "/api/WorkFlow/GetWFHistory"));
+
+        selectedTableUser["_AccessKeyAllowedTableNames"] = new JArray("*");
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            selectedTableUser,
+            "/api/ModuleEngine/GetTableData"));
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(
+            selectedTableUser,
+            "/api/WorkFlow/GetWFHistory"));
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(
+            selectedTableUser,
+            "/api/WorkFlow/StartWork"));
     }
 
     [Fact]

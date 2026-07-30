@@ -13,9 +13,107 @@ namespace Microi.net
 {
     public class OsClientExtend
     {
+        private static readonly IReadOnlyDictionary<string, string[]> RuntimeConfigurationFields =
+            new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["SaaS:ExtensionDatabaseCacheSeconds"] = new[] { "ExtensionDatabaseCacheSeconds" },
+                ["BackgroundTasks:MaxParallelTasks"] = new[] { "BackgroundTaskMaxParallel" },
+                ["DiyLang:RuntimeCachePageSize"] = new[] { "DiyLangRuntimeCachePageSize" },
+                ["DiyLang:RuntimeCacheMaxRows"] = new[] { "DiyLangRuntimeCacheMaxRows" },
+                ["DiyLang:RuntimeCacheMaxCharacters"] = new[] { "DiyLangRuntimeCacheMaxCharacters" },
+                ["DiyLang:RuntimeCacheCommandTimeoutSeconds"] = new[] { "DiyLangRuntimeCacheCommandTimeoutSeconds" },
+                ["Security:OAuthReturnUrlOrigins"] = new[] { "OAuthReturnUrlOrigins" },
+                ["Integrations:Chanjet:OAuthState"] = new[] { "ChanjetOAuthState" },
+                ["Integrations:Chanjet:AesKey"] = new[] { "ChanjetAesKey" },
+                ["Integrations:Chanjet:AppKey"] = new[] { "ChanjetAppKey" },
+                ["Integrations:WeChat:TemplateAppId"] = new[] { "WeChatTemplateAppId" },
+                ["Integrations:WeChat:TemplateAppSecret"] = new[] { "WeChatTemplateAppSecret" },
+                ["Integrations:WeChat:TemplateId"] = new[] { "WeChatTemplateId" },
+                ["Integrations:WeChat:MiniProgramAppId"] = new[] { "WeChatMiniProgramAppId" },
+                ["Cors:AllowOrigins"] = new[] { "CorsAllowOrigins" },
+                ["Cors:AllowAnyWhenUnconfigured"] = new[] { "CorsAllowAnyWhenUnconfigured" },
+                ["SsrfProtection:Enabled"] = new[] { "SsrfProtectionEnabled" },
+                ["SsrfProtection:AllowedHosts"] = new[] { "SsrfAllowedHosts" },
+                ["StartupLimits:DynamicRouteInitMaxConcurrency"] = new[] { "StartupDynamicRouteMaxConcurrency" },
+                ["SecurityGuard:Enabled"] = new[] { "SecurityGuardEnabled" },
+                ["SecurityGuard:WindowSeconds"] = new[] { "SecurityWindowSeconds" },
+                ["SecurityGuard:PerIpMaxRequests"] = new[] { "SecurityPerIpMaxRequests" },
+                ["SecurityGuard:PerIpMaxErrors"] = new[] { "SecurityPerIpMaxErrors" },
+                ["SecurityGuard:BlockMinutes"] = new[] { "SecurityBlockMinutes" },
+                ["SecurityGuard:RecentAccessMaxCount"] = new[] { "SecurityRecentAccessMaxCount" },
+                ["SecurityGuard:LogIntervalSeconds"] = new[] { "SecurityLogIntervalSeconds" },
+                ["SecurityGuard:AccessPersistIntervalSeconds"] = new[] { "SecurityAccessPersistIntervalSeconds" },
+                ["SecurityGuard:RespectForwardedHeaders"] = new[] { "SecurityRespectForwardedHeaders" },
+                ["SecurityGuard:LogBlockedToSysLog"] = new[] { "SecurityLogBlockedToSysLog" },
+                ["SecurityGuard:PersistSecurityTables"] = new[] { "SecurityPersistTables" },
+                ["SecurityGuard:PersistAllAccess"] = new[] { "SecurityPersistAllAccess" },
+                ["SecurityGuard:PersistQueueMaxCount"] = new[] { "SecurityPersistQueueMaxCount" },
+                ["SecurityGuard:WhitelistIps"] = new[] { "SecurityWhitelistIps" },
+                ["PressureGuard:Enabled"] = new[] { "PressureGuardEnabled" },
+                ["PressureGuard:GlobalMaxConcurrentRequests"] = new[] { "PressGlobalMax", "PressureGlobalMaxConcurrentRequests" },
+                ["PressureGuard:TenantMaxConcurrentRequests"] = new[] { "PressTenantMax", "PressureTenantMaxConcurrentRequests" },
+                ["PressureGuard:RouteMaxConcurrentRequests"] = new[] { "PressRouteMax", "PressureRouteMaxConcurrentRequests" },
+                ["PressureGuard:ApiEngineMaxConcurrentRequests"] = new[] { "PressApiMax", "PressureApiEngineMaxConcurrentRequests" },
+                ["PressureGuard:V8GlobalMaxConcurrentRequests"] = new[] { "PressV8GlobalMax", "PressureV8GlobalMaxConcurrentRequests" },
+                ["PressureGuard:V8TenantMaxConcurrentRequests"] = new[] { "PressV8ReqMax", "PressureV8TenantMaxConcurrentRequests" },
+                ["PressureGuard:WaitMilliseconds"] = new[] { "PressureWaitMilliseconds" },
+                ["PressureGuard:LongRunningWaitMilliseconds"] = new[] { "PressLongWaitMs", "PressureLongRunningWaitMilliseconds" },
+                ["PressureGuard:RetryAfterSeconds"] = new[] { "PressRetryAfter", "PressureRetryAfterSeconds" },
+                ["OrmLimits:MaxConcurrentConnectionOpens"] = new[] { "OrmMaxConcurrentConnectionOpens" },
+                ["OrmLimits:ConnectionOpenWaitSeconds"] = new[] { "OrmConnectionOpenWaitSeconds" },
+                ["OrmLimits:ConnectionPressureBackoffSeconds"] = new[] { "OrmConnectionPressureBackoffSeconds" },
+                ["OrmLimits:DefaultCommandTimeoutSeconds"] = new[] { "OrmDefaultCommandTimeoutSeconds" },
+                ["OrmLimits:MySqlHostCacheAutoRepairEnabled"] = new[] { "OrmMySqlHostCacheAutoRepairEnabled" },
+                ["OrmLimits:MySqlHostCacheRepairCooldownSeconds"] = new[] { "OrmMySqlHostCacheRepairCooldownSeconds" },
+                ["OrmLimits:DdlLockWaitSeconds"] = new[] { "OrmDdlLockWaitSeconds" },
+                ["OrmLimits:DdlQueueWaitSeconds"] = new[] { "OrmDdlQueueWaitSeconds" },
+                ["Spider:MaxSessionsTotal"] = new[] { "SpiderMaxSessionsTotal" },
+                ["Spider:MaxSessionsPerScope"] = new[] { "SpiderMaxSessionsPerScope" },
+                ["Spider:SessionIdleMinutes"] = new[] { "SpiderSessionIdleMinutes" },
+                ["Spider:SessionMaxHours"] = new[] { "SpiderSessionMaxHours" },
+                ["Spider:TraceEnabled"] = new[] { "SpiderTraceEnabled" }
+            };
+
+        static OsClientExtend()
+        {
+            ConfigHelper.SetRuntimeConfigurationReader(ReadMainTenantRuntimeConfiguration);
+        }
+
+        private static string ReadMainTenantRuntimeConfiguration(string configPath)
+        {
+            if (configPath.DosIsNullOrWhiteSpace()) return null;
+            var mainTenant = GetConfigOsClient();
+            if (mainTenant.DosIsNullOrWhiteSpace()) mainTenant = OsClientDefault.OsClient;
+            if (mainTenant.DosIsNullOrWhiteSpace()) return null;
+            if (!ClientList.TryGetValue(mainTenant, out var client)
+                || client?.OsClientModel == null)
+            {
+                return null;
+            }
+
+            if (!RuntimeConfigurationFields.TryGetValue(configPath, out var fields))
+            {
+                var separatorIndex = configPath.LastIndexOf(':');
+                fields = new[]
+                {
+                    separatorIndex >= 0
+                        ? configPath.Substring(separatorIndex + 1)
+                        : configPath
+                };
+            }
+
+            foreach (var field in fields)
+            {
+                var token = client.OsClientModel[field];
+                if (token == null || token.Type == JTokenType.Null) continue;
+                var value = token.ToString().Trim();
+                if (!value.DosIsNullOrWhiteSpace()) return value;
+            }
+            return null;
+        }
+
         private static int ExtensionDatabaseCacheSeconds => Math.Max(5,
-            ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_EXTENSION_DATABASE_CACHE_SECONDS",
+            ConfigHelper.GetRuntimeConfigurationInt(
                 "SaaS:ExtensionDatabaseCacheSeconds",
                 60));
 

@@ -57,8 +57,7 @@ namespace Microi.net.Api.Controllers
                 return false;
             }
 
-            var configuredOrigins = ConfigHelper.GetEnvOrConfiguration(
-                "MICROI_OAUTH_RETURN_URL_ORIGINS",
+            var configuredOrigins = ConfigHelper.GetRuntimeConfigurationValue(
                 "Security:OAuthReturnUrlOrigins");
             if (configuredOrigins.DosIsNullOrWhiteSpace()) return false;
 
@@ -165,17 +164,13 @@ return ''";
         {
             try
             {
-                var appId = ConfigHelper.GetEnvOrConfiguration(
-                    "MICROI_WECHAT_TEMPLATE_APP_ID",
+                var appId = ConfigHelper.GetRuntimeConfigurationValue(
                     "Integrations:WeChat:TemplateAppId");
-                var appSecret = ConfigHelper.GetEnvOrConfiguration(
-                    "MICROI_WECHAT_TEMPLATE_APP_SECRET",
+                var appSecret = ConfigHelper.GetRuntimeConfigurationValue(
                     "Integrations:WeChat:TemplateAppSecret");
-                var templateId = ConfigHelper.GetEnvOrConfiguration(
-                    "MICROI_WECHAT_TEMPLATE_ID",
+                var templateId = ConfigHelper.GetRuntimeConfigurationValue(
                     "Integrations:WeChat:TemplateId");
-                var miniProgramAppId = ConfigHelper.GetEnvOrConfiguration(
-                    "MICROI_WECHAT_MINI_PROGRAM_APP_ID",
+                var miniProgramAppId = ConfigHelper.GetRuntimeConfigurationValue(
                     "Integrations:WeChat:MiniProgramAppId");
                 if (openId.DosIsNullOrWhiteSpace()
                     || appId.DosIsNullOrWhiteSpace()

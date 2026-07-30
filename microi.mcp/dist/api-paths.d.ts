@@ -33,6 +33,8 @@ export declare const API: {
     readonly CREATE_ENGINE: "/api/V8Engine/CreateApiEngine";
     readonly EXECUTE_ENGINE: "/api/V8Engine/ExecuteApiEngine";
     readonly UPLOAD_FILE_BASE64: "/api/V8Engine/UploadFileBase64";
+    readonly UPLOAD_APPLICATION_ASSET_STREAM: "/api/V8Engine/UploadApplicationAssetStream";
+    readonly FINALIZE_APPLICATION_STREAM_PUBLISH: "/api/V8Engine/FinalizeApplicationStreamPublish";
     readonly LIST_APPLICATIONS: "/api/V8Engine/ListApplications";
     readonly GET_APPLICATION_CONTEXT: "/api/V8Engine/GetApplicationContext";
     readonly GET_APPLICATION_FILE: "/api/V8Engine/GetApplicationFile";

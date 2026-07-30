@@ -316,8 +316,7 @@ namespace Microi.net
         public static async Task RunWorkerLoopAsync(CancellationToken stoppingToken)
         {
             var parallelism = Clamp(
-                ConfigHelper.GetEnvOrConfigurationInt(
-                    "MICROI_BACKGROUND_TASK_MAX_PARALLEL",
+                ConfigHelper.GetRuntimeConfigurationInt(
                     "BackgroundTasks:MaxParallelTasks",
                     4),
                 1,
@@ -777,8 +776,6 @@ namespace Microi.net
 
         private static string BuildNodeId()
         {
-            var configured = Environment.GetEnvironmentVariable("MICROI_NODE_ID", EnvironmentVariableTarget.Process);
-            if (!configured.DosIsNullOrWhiteSpace()) return Limit(configured, 100);
             return Limit($"{Environment.MachineName}-{System.Diagnostics.Process.GetCurrentProcess().Id}", 100);
         }
 

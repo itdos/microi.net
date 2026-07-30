@@ -89,6 +89,8 @@ Schema 索引缓存按 `OsClient` 隔离，使用 FormEngine 授权/结构版本
 
 向量知识库是可选增强，不是平台在线 AI 的必装依赖。未开启 `EnableVectorDatabase` 时，不部署 Ollama、`nomic-embed-text` 和 Qdrant 也必须完整支持关键词 Schema 检索、NL2SQL 与 NL2V8。
 
+吾码一键安装固定使用轻量默认模式，不提示也不部署 Ollama、`nomic-embed-text` 或 Qdrant；原安装片段可以注释保留，不能进入默认执行路径。只有运维另行准备并验证向量服务、且租户显式设置 `EnableVectorDatabase=1` 时，才启用高级向量召回。
+
 启用后，Schema collection 必须按租户隔离。Skill 文档 collection 使用嵌入文档 SHA-256 版本片段命名；新旧节点滚动期间使用各自版本，确定性 point id 幂等写入，不在启动时删除其它节点的 collection。
 
 向量库是检索索引，不是文档事实源。源码 `microi.skills/*/SKILL.md` 为事实源，嵌入资源应机械同步并做哈希校验。

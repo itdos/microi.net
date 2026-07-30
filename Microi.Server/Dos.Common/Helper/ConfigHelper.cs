@@ -24,8 +24,8 @@ namespace Dos.Common
         private static Func<string, string> RuntimeConfigurationReader { get; set; }
 
         /// <summary>
-        /// 注册运行期配置读取器。用于让主租户 sys_osclients 中的平台级配置参与统一配置优先级：
-        /// 环境变量 > 主租户 sys_osclients > appsettings.json > 代码默认值。
+        /// 注册运行期配置读取器。普通业务/运行参数由主租户 sys_osclients 提供；
+        /// 数据库、Redis、节点身份和密钥等启动基础设施仍走各自的专用配置路径。
         /// </summary>
         public static void SetRuntimeConfigurationReader(Func<string, string> reader)
         {
@@ -253,6 +253,51 @@ namespace Dos.Common
                 return false;
             }
 
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// 只读取 SaaS 运行配置，不读取环境变量或 appsettings。
+        /// 用于可在 SaaS 引擎/系统设置中维护的普通业务与资源参数。
+        /// </summary>
+        public static string GetRuntimeConfigurationValue(string configPath)
+        {
+            return GetRuntimeConfiguration(configPath);
+        }
+
+        public static int GetRuntimeConfigurationInt(
+            string configPath,
+            int defaultValue)
+        {
+            var value = GetRuntimeConfiguration(configPath);
+            return int.TryParse(
+                       value,
+                       NumberStyles.Integer,
+                       CultureInfo.InvariantCulture,
+                       out var parsed)
+                   && parsed > 0
+                ? parsed
+                : defaultValue;
+        }
+
+        public static bool GetRuntimeConfigurationBool(
+            string configPath,
+            bool defaultValue)
+        {
+            var value = GetRuntimeConfiguration(configPath);
+            if (bool.TryParse(value, out var parsed)) return parsed;
+            if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            if (string.Equals(value, "0", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "no", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
             return defaultValue;
         }
 

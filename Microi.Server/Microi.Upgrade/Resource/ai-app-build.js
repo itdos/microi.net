@@ -1,10 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.5.2
+ * Version: v1.5.4
  * Function:
- * - AI 应用编译发布引擎：校验真实编译产物，将每个版本发布到不可变历史目录，同时原子提升无版本固定入口为最新版本；支持 VS Code 仅发布应用商城和固定最新版修复。
- * - UNIFIED_UNIAPP_PREVIEW_SHELL_V1：ApplicationType=UniApp 的真实 H5 产物统一生成 PC 手机壳，移动视口自动去壳铺满。
+ * - AI应用编译发布、固定最新版发布与受控静态资源热修。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -72,6 +71,7 @@ function hasUniAppPreviewShell(html) {
     && source.indexOf('class="preview-status"') >= 0
     && source.indexOf('id="microi-preview-frame"') >= 0;
 }
+/* UNIFIED_UNIAPP_PREVIEW_SHELL_V1 */
 function createUniAppPreviewShell(appKey, appName, buildVersion) {
   var safeKey = escapeHtml(appKey);
   var safeName = escapeHtml(appName);
@@ -239,7 +239,7 @@ function aliyunPercentEncode(value) {
 function osClientSecretValue(name) {
   try { return text(V8.OsClientModel && V8.OsClientModel[name]); } catch (e) { return ""; }
 }
-function refreshStableCdnPaths(paths) {
+function refreshStableCdnPaths(paths, allowMutableAssets) {
   var fileServer = "";
   try { fileServer = text(V8.SysConfig && V8.SysConfig.FileServer).replace(/\/+$/, ""); } catch (e) {}
   if (!/^https?:\/\//i.test(fileServer)) return ok({ Skipped: true, Reason: "FileServer不是HTTP CDN地址" });
@@ -252,7 +252,7 @@ function refreshStableCdnPaths(paths) {
   for (var i = 0; i < sourcePaths.length; i++) {
     var normalized = normalizePath(sourcePaths[i]);
     var lower = normalized.toLowerCase();
-    if (!/(^|\/)(index\.html|app\.html|microi-ai-app-auth\.js)$/.test(lower)) continue;
+    if (!allowMutableAssets && !/(^|\/)(index\.html|app\.html|microi-ai-app-auth\.js)$/.test(lower)) continue;
     var url = publicDomainUrl(normalized);
     if (isBlank(url) || seen[url]) continue;
     seen[url] = true;
@@ -419,6 +419,19 @@ function publishBase64Asset(uploadRoot, appKey, relativePath, versionNo, base64)
   var moveResult = movePublicObject(uploadedPath, targetPath);
   if (!moveResult || moveResult.Code !== 1) {
     return fail("提升编译资产到固定路径失败：" + relativePath
+      + "；源=" + uploadedPath
+      + "；目标=" + targetPath
+      + "；存储错误=" + text(moveResult && moveResult.Msg, "未知"));
+  }
+  return ok({ Path: targetPath, Move: moveResult });
+}
+function publishBase64ToExactPublicPath(uploadRoot, relativePath, targetPath, base64) {
+  var upload = uploadBase64(uploadRoot, relativePath, base64, false);
+  if (!upload || upload.Code !== 1) return upload || fail("上传固定路径资源失败");
+  var uploadedPath = upload.Data ? upload.Data.HdfsPath || "" : "";
+  var moveResult = movePublicObject(uploadedPath, targetPath);
+  if (!moveResult || moveResult.Code !== 1) {
+    return fail("提升资源到固定路径失败：" + relativePath
       + "；源=" + uploadedPath
       + "；目标=" + targetPath
       + "；存储错误=" + text(moveResult && moveResult.Msg, "未知"));
@@ -634,6 +647,105 @@ function promoteStoreAssets(app, appKey, versionNo, rawAssets, requireEntry) {
     Assets: promoted,
     AssetCount: promoted.length
   });
+}
+/* STABLE_ASSET_HOTFIX_V1
+ * 只覆盖 latest 固定最新版，用于修复已经发布过但内容异常的静态素材。
+ * 历史版本目录保持不可变；调用方必须传入该文件原有的历史版本路径，避免
+ * 源码同步后 mci_ai_app_file.HdfsPath 被私有源码路径覆盖。
+ */
+function promoteStableStoreAssets(app, appKey, rawAssets) {
+  var sourceAssets = toArray(rawAssets);
+  if (!sourceAssets.length) return fail("Assets不能为空");
+  if (sourceAssets.length > 100) return fail("稳定资源热修单批不能超过100个文件");
+  var latestRoot = "ai-app-publish/" + appKey;
+  var promoted = [];
+  var stablePaths = [];
+  for (var i = 0; i < sourceAssets.length; i++) {
+    var source = sourceAssets[i] || {};
+    var relativePath = normalizePath(source.path || source.Path || source.fileName || source.FileName);
+    if (isBlank(relativePath)) return fail("稳定资源热修路径不能为空");
+    var sourcePath = text(source.filePathName || source.FilePathName || source.hdfsPath || source.HdfsPath || source.url || source.Url);
+    var inlineBase64 = text(source.fileByteBase64 || source.FileByteBase64 || source.contentBase64 || source.ContentBase64 || source.base64 || source.Base64);
+    var sourceFileId = text(source.sourceFileId || source.SourceFileId);
+    if (isBlank(sourcePath) && isBlank(inlineBase64) && isBlank(sourceFileId)) return fail("稳定资源热修缺少源码文件：" + relativePath);
+    var sourceBase64Result;
+    if (!isBlank(inlineBase64)) {
+      sourceBase64Result = ok(inlineBase64);
+    } else if (!isBlank(sourcePath)) {
+      sourceBase64Result = readPublishedBase64(sourcePath);
+    } else {
+      var sourceFileResult = V8.FormEngine.GetFormData("mci_ai_app_file", {
+        _Where: [["Id", "=", sourceFileId], ["AND", "AppId", "=", app.Id]],
+        _PageSize: 1
+      });
+      if (!sourceFileResult || sourceFileResult.Code !== 1 || !sourceFileResult.Data) return fail("稳定资源热修源码文件不存在：" + relativePath);
+      sourceBase64Result = readFileBase64(sourceFileResult.Data);
+    }
+    if (!sourceBase64Result || sourceBase64Result.Code !== 1) return sourceBase64Result || fail("读取稳定资源热修源码失败");
+    var versionPath = text(source.versionFilePathName || source.VersionFilePathName);
+    if (isBlank(versionPath)) {
+      var publishedFile = V8.FormEngine.GetFormData("mci_ai_app_file", {
+        _Where: [["AppId", "=", app.Id], ["AND", "FilePath", "=", "dist/" + relativePath]],
+        _PageSize: 1
+      });
+      if (publishedFile && publishedFile.Code === 1 && publishedFile.Data && /\/versions\//i.test(text(publishedFile.Data.HdfsPath))) {
+        versionPath = text(publishedFile.Data.HdfsPath);
+      }
+    }
+    if (isBlank(versionPath)) {
+      var snapshotVersionNo = normalizeVersion(source.snapshotVersionNo || source.SnapshotVersionNo || app.CurrentVersion || 1);
+      versionPath = stablePublishFilePath(appKey, relativePath, snapshotVersionNo);
+      var previousPaths = toArray(source.previousFilePathNames || source.PreviousFilePathNames);
+      var singlePreviousPath = text(source.previousFilePathName || source.PreviousFilePathName);
+      if (!isBlank(singlePreviousPath)) previousPaths.unshift(singlePreviousPath);
+      previousPaths.push(text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + appKey + "/" + relativePath);
+      previousPaths.push(stablePublishFilePath(appKey, relativePath, ""));
+      var previousBase64Result = null;
+      for (var previousIndex = 0; previousIndex < previousPaths.length; previousIndex++) {
+        var previousPath = normalizePath(previousPaths[previousIndex]);
+        if (isBlank(previousPath) || /\/versions\//i.test(previousPath)) continue;
+        var candidatePrevious = readPublishedBase64(previousPath);
+        if (candidatePrevious && candidatePrevious.Code === 1 && !isBlank(candidatePrevious.Data)) {
+          previousBase64Result = candidatePrevious;
+          break;
+        }
+      }
+      var allowCreateMissingHistory = source.allowCreateMissingHistory === true || source.AllowCreateMissingHistory === true
+        || parseInt(source.allowCreateMissingHistory || source.AllowCreateMissingHistory || 0) === 1;
+      if ((!previousBase64Result || previousBase64Result.Code !== 1) && !allowCreateMissingHistory) {
+        return fail("稳定资源热修无法快照旧资源：" + relativePath);
+      }
+      var snapshotBase64 = previousBase64Result && previousBase64Result.Code === 1
+        ? previousBase64Result.Data
+        : sourceBase64Result.Data;
+      var snapshotResult = publishBase64ToExactPublicPath(latestRoot + "/snapshot", relativePath, versionPath, snapshotBase64);
+      if (!snapshotResult || snapshotResult.Code !== 1) return snapshotResult || fail("稳定资源热修历史快照失败：" + relativePath);
+    }
+    if (!/\/versions\//i.test(versionPath)) return fail("稳定资源热修缺少不可变历史路径：" + relativePath);
+
+    var rootPath = text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + appKey + "/" + relativePath;
+    var latestResult;
+    var rootResult;
+    if (/\.html?$/i.test(relativePath)) {
+      var html = System.Text.Encoding.UTF8.GetString(System.Convert.FromBase64String(sourceBase64Result.Data));
+      var runtimeHtml = injectRuntimeContext(html);
+      var runtimeHtmlBase64 = System.Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(runtimeHtml));
+      latestResult = publishTextAsset(latestRoot, appKey, relativePath, "", runtimeHtml);
+      rootResult = publishBase64ToExactPublicPath(latestRoot, relativePath, rootPath, runtimeHtmlBase64);
+    } else {
+      latestResult = publishBase64Asset(latestRoot, appKey, relativePath, "", sourceBase64Result.Data);
+      rootResult = publishBase64ToExactPublicPath(latestRoot, relativePath, rootPath, sourceBase64Result.Data);
+    }
+    if (!latestResult || latestResult.Code !== 1) return latestResult || fail("稳定资源热修发布失败：" + relativePath);
+    if (!rootResult || rootResult.Code !== 1) return rootResult || fail("稳定资源根路径热修发布失败：" + relativePath);
+    var latestPath = latestResult.Data ? latestResult.Data.Path || "" : "";
+    var fileUpdate = upsertPublishedBuildFile(app, relativePath, source, versionPath, latestPath);
+    if (!fileUpdate || fileUpdate.Code !== 1) return fileUpdate || fail("写入稳定资源热修元数据失败：" + relativePath);
+    promoted.push({ Path: relativePath, StableFilePathName: latestPath, RootFilePathName: rootPath, VersionFilePathName: versionPath, Size: parseInt(source.size || source.Size || 0) });
+    stablePaths.push(latestPath);
+    stablePaths.push(rootPath);
+  }
+  return ok({ Assets: promoted, AssetCount: promoted.length, StablePaths: stablePaths }, "稳定资源热修发布成功");
 }
 /* PARALLEL_SINGLE_ASSET_PROMOTION_V1
  * 大型 UniApp 的静态资源可由受信任发布端并发调用本动作；每个请求只处理一个
@@ -961,14 +1073,44 @@ if (!app || app.Code !== 1 || !app.Data) return { Code: 2, Data: null, Msg: "AI�
 var requestedAction = text(V8.Param.Action || "Build");
 if (requestedAction === "RefreshStableCdn") {
   var refreshAppKey = ensureAppKey(app.Data);
-  var refreshBasePath = text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + refreshAppKey + "/latest/";
-  var manualRefreshResult = refreshStableCdnPaths([
+  var refreshAppRoot = text(V8.OsClient).toLowerCase() + "/ai-app-publish/" + refreshAppKey + "/";
+  var refreshBasePath = refreshAppRoot + "latest/";
+  var manualRefreshPaths = [
     refreshBasePath + "index.html",
     refreshBasePath + "app.html",
     refreshBasePath + "microi-ai-app-auth.js"
-  ]);
+  ];
+  var explicitRefreshPaths = [];
+  if (!isBlank(V8.Param.PathsJson)) {
+    try { explicitRefreshPaths = toArray(JSON.parse(text(V8.Param.PathsJson))); }
+    catch (refreshPathsJsonError) { return fail("PathsJson不是有效的 JSON 数组：" + refreshPathsJsonError.message); }
+  }
+  if (explicitRefreshPaths.length > 100) return fail("单次CDN刷新不能超过100个显式路径");
+  for (var refreshIndex = 0; refreshIndex < explicitRefreshPaths.length; refreshIndex++) {
+    var explicitPath = normalizePath(explicitRefreshPaths[refreshIndex]);
+    var fullRefreshPath = explicitPath.toLowerCase().indexOf(refreshAppRoot.toLowerCase()) === 0
+      ? explicitPath
+      : refreshBasePath + explicitPath;
+    var fullRefreshPathLower = fullRefreshPath.toLowerCase();
+    if (fullRefreshPathLower.indexOf(refreshAppRoot.toLowerCase()) !== 0 || fullRefreshPathLower.indexOf("/versions/") >= 0) {
+      return fail("CDN刷新路径超出当前应用可变发布目录");
+    }
+    manualRefreshPaths.push(fullRefreshPath);
+  }
+  var manualRefreshResult = refreshStableCdnPaths(manualRefreshPaths, explicitRefreshPaths.length > 0);
   if (!manualRefreshResult || manualRefreshResult.Code !== 1) return manualRefreshResult || fail("固定最新版CDN刷新失败");
-  return ok({ AppId: appId, AppKey: refreshAppKey, CdnRefresh: manualRefreshResult.Data }, "固定最新版CDN刷新任务已提交");
+  return ok({ AppId: appId, AppKey: refreshAppKey, ExplicitPathCount: explicitRefreshPaths.length, CdnRefresh: manualRefreshResult.Data }, "固定最新版CDN刷新任务已提交");
+}
+if (requestedAction === "PromoteStableAssetsBatch") {
+  var stableAppKey = ensureAppKey(app.Data);
+  var stableAssets = V8.Param.Assets;
+  if (!isBlank(V8.Param.AssetsJson)) {
+    try { stableAssets = JSON.parse(text(V8.Param.AssetsJson)); }
+    catch (stableAssetsJsonError) { return fail("AssetsJson不是有效的 JSON 数组：" + stableAssetsJsonError.message); }
+  }
+  var stableResult = promoteStableStoreAssets(app.Data, stableAppKey, stableAssets);
+  if (!stableResult || stableResult.Code !== 1) return stableResult || fail("稳定资源热修失败");
+  return stableResult;
 }
 if (requestedAction === "PromoteStoreAsset") {
   var singleAppKey = ensureAppKey(app.Data);

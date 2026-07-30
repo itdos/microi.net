@@ -49,7 +49,7 @@ namespace Microi.net
     public static class MicroiORMExtensions
     {
         private static int DefaultCommandTimeoutSeconds =>
-            ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_DEFAULT_COMMAND_TIMEOUT_SECONDS", "OrmLimits:DefaultCommandTimeoutSeconds", 600);
+            ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:DefaultCommandTimeoutSeconds", 600);
 
         /// <summary>
         /// 创建 Dos.ORM DbSession（含 MySQL 连接字符串自动补充参数）

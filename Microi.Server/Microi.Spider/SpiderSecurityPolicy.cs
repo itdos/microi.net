@@ -16,13 +16,7 @@ namespace Microi.net
     {
         internal static bool IsStrictProtectionEnabled()
         {
-            if (IsTruthy(ConfigHelper.GetAppSettings("DisableSsrfProtection")))
-            {
-                return false;
-            }
-
-            return ConfigHelper.GetEnvOrConfigurationBool(
-                "MICROI_SSRF_PROTECTION_ENABLED",
+            return ConfigHelper.GetRuntimeConfigurationBool(
                 "SsrfProtection:Enabled",
                 false);
         }
@@ -89,10 +83,8 @@ namespace Microi.net
 
         private static HashSet<string> GetAllowedHosts()
         {
-            var configuredHosts = ConfigHelper.GetEnvOrConfiguration(
-                                      "MICROI_SSRF_ALLOWED_HOSTS",
+            var configuredHosts = ConfigHelper.GetRuntimeConfigurationValue(
                                       "SsrfProtection:AllowedHosts")
-                                  ?? ConfigHelper.GetAppSettings("SsrfAllowedHosts")
                                   ?? "";
 
             return new HashSet<string>(
@@ -148,13 +140,5 @@ namespace Microi.net
             return false;
         }
 
-        private static bool IsTruthy(string value)
-        {
-            return !string.IsNullOrWhiteSpace(value)
-                   && (string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
-                       || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase));
-        }
     }
 }

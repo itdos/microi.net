@@ -1,10 +1,13 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
+import { buildVueMicroServiceScaffoldPlan, resolveMicroiSdkSource, scaffoldVueMicroService, } from './microservice-scaffold.js';
 function unwrapList(data) {
     if (Array.isArray(data))
         return data;
@@ -27,6 +30,132 @@ function getStringField(data, ...keys) {
             return value;
     }
     return '';
+}
+const FORBIDDEN_APPLICATION_ASSET_DIRECTORIES = new Set(['.git', '.svn', '.hg', 'node_modules']);
+const FORBIDDEN_APPLICATION_ASSET_FILES = [
+    /^\.env(?:\.|$)/iu,
+    /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
+    /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
+];
+function normalizeLocalApplicationRelativePath(value) {
+    const normalized = String(value || '').trim().replace(/\\/g, '/').replace(/^\.\//, '');
+    const segments = normalized.split('/');
+    if (!normalized
+        || normalized.startsWith('/')
+        || normalized.includes('//')
+        || normalized.includes(':')
+        || segments.some(segment => !segment || segment === '.' || segment === '..')
+        || /[\u0000-\u001f\u007f<>"|?*]/u.test(normalized)) {
+        throw new Error(`应用资产相对路径不合法：${value}`);
+    }
+    if (['versions', 'latest', '.microi-integrity'].includes(segments[0].toLowerCase())) {
+        throw new Error(`应用资产占用了发布器保留目录：${value}`);
+    }
+    return normalized;
+}
+async function sha256LocalFile(filePath) {
+    const hash = crypto.createHash('sha256');
+    for await (const chunk of fs.createReadStream(filePath))
+        hash.update(chunk);
+    return hash.digest('hex');
+}
+/**
+ * Inspect and hash a built directory without loading any file wholly into RAM.
+ * The hard caps also stop accidental node_modules/.git/trash-directory loops.
+ */
+export async function buildLocalApplicationAssetManifest(rootDirectory, entryPath = 'index.html', options = {}) {
+    const root = path.resolve(rootDirectory);
+    const rootStat = fs.lstatSync(root);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+        throw new Error(`发布根目录必须是真实目录且不能是符号链接：${root}`);
+    }
+    const rootRealPath = fs.realpathSync(root);
+    const normalizedEntry = normalizeLocalApplicationRelativePath(entryPath);
+    const maxFiles = Math.min(20_000, Math.max(1, options.maxFiles ?? 20_000));
+    const maxTotalBytes = Math.min(20 * 1024 * 1024 * 1024, Math.max(1, options.maxTotalBytes ?? 20 * 1024 * 1024 * 1024));
+    const pending = [rootRealPath];
+    const files = [];
+    const skippedSourceMaps = [];
+    let totalSize = 0;
+    while (pending.length > 0) {
+        const current = pending.pop();
+        for (const item of fs.readdirSync(current, { withFileTypes: true })) {
+            const absolutePath = path.join(current, item.name);
+            const itemStat = fs.lstatSync(absolutePath);
+            if (itemStat.isSymbolicLink())
+                throw new Error(`发布目录不允许符号链接：${absolutePath}`);
+            const relativePath = normalizeLocalApplicationRelativePath(path.relative(rootRealPath, absolutePath));
+            const resolvedRealPath = fs.realpathSync(absolutePath);
+            if (resolvedRealPath !== rootRealPath && !resolvedRealPath.startsWith(rootRealPath + path.sep)) {
+                throw new Error(`发布资产越过了根目录：${absolutePath}`);
+            }
+            if (itemStat.isDirectory()) {
+                if (FORBIDDEN_APPLICATION_ASSET_DIRECTORIES.has(item.name.toLowerCase())) {
+                    throw new Error(`发布目录包含禁止上传的目录 ${item.name}；请传入真实编译输出目录，而不是项目根目录。`);
+                }
+                pending.push(absolutePath);
+                continue;
+            }
+            if (!itemStat.isFile())
+                throw new Error(`发布目录包含非普通文件：${absolutePath}`);
+            if (FORBIDDEN_APPLICATION_ASSET_FILES.some(pattern => pattern.test(item.name))) {
+                throw new Error(`发布目录疑似包含密钥或环境配置，已拒绝上传：${relativePath}`);
+            }
+            if (!options.includeSourceMaps && relativePath.toLowerCase().endsWith('.map')) {
+                skippedSourceMaps.push(relativePath);
+                continue;
+            }
+            files.push({ absolutePath, relativePath, size: itemStat.size });
+            totalSize += itemStat.size;
+            if (files.length > maxFiles)
+                throw new Error(`发布文件超过上限 ${maxFiles}，请检查是否误选项目根目录或产生垃圾文件。`);
+            if (totalSize > maxTotalBytes)
+                throw new Error(`发布总大小超过上限 ${maxTotalBytes} bytes，已在上传前中止。`);
+        }
+    }
+    files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+    if (!files.some(file => file.relativePath.toLowerCase() === normalizedEntry.toLowerCase())) {
+        throw new Error(`发布目录缺少入口文件：${normalizedEntry}`);
+    }
+    const assets = [];
+    for (const file of files) {
+        assets.push({
+            ...file,
+            sha256: await sha256LocalFile(file.absolutePath),
+            isEntry: file.relativePath.toLowerCase() === normalizedEntry.toLowerCase(),
+        });
+    }
+    return { rootDirectory: rootRealPath, entryPath: normalizedEntry, assets, totalSize, skippedSourceMaps };
+}
+function normalizeAccessKeyStringList(values, lowerCase = false) {
+    const normalized = (values || [])
+        .map(value => String(value || '').trim())
+        .filter(Boolean)
+        .map(value => lowerCase ? value.toLowerCase() : value);
+    return Array.from(new Set(normalized)).sort((left, right) => left.localeCompare(right));
+}
+/**
+ * Canonicalize the effective access-key grant before asking for confirmation.
+ * The returned SHA-256 binds confirmation to scopes, allowlists and expiry,
+ * rather than only to a reusable display name.
+ */
+export function buildAccessKeyCreationConfirmation(input) {
+    const normalized = {
+        name: String(input.name || '').trim(),
+        allowedRoutes: normalizeAccessKeyStringList(input.allowedRoutes),
+        allowedTableNames: normalizeAccessKeyStringList(input.allowedTableNames),
+        scopes: normalizeAccessKeyStringList(input.scopes || ['page:open', 'form:read'], true),
+        redirectPath: String(input.redirectPath || '').trim(),
+        allowedApiEngineKeys: normalizeAccessKeyStringList(input.allowedApiEngineKeys),
+        allowedDataSourceKeys: normalizeAccessKeyStringList(input.allowedDataSourceKeys),
+        expiresAt: String(input.expiresAt || '').trim(),
+        remark: String(input.remark || '').trim(),
+    };
+    const sha256 = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(normalized), 'utf8')
+        .digest('hex');
+    return { normalized, sha256 };
 }
 function includesKeyword(value, keyword) {
     if (!keyword)
@@ -82,6 +211,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_refresh_schema_cache',
     'microi_create_table',
     'microi_create_module',
+    'microi_scaffold_vue_microservice',
     'microi_get_event_code',
     'microi_save_event_code',
     'microi_list_events',
@@ -512,7 +642,7 @@ BOUNDARY RULES:
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
-- **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；默认仅 page:open + form:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
+- **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
 
 ## 数据库索引（强制通过 MCP）
 - 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
@@ -604,6 +734,7 @@ BOUNDARY RULES:
 \`\`\`
 按钮的 V8Code **强烈建议** 调用接口引擎（V8.ApiEngine.Run）执行后端逻辑，前端只负责弹窗、刷新、提示。
 以下任一条件成立时按长任务设计：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用、总量未知且可能持续运行，或属于安装/初始化/批量导入/批量生成/全量同步/迁移/备份。MCP 会依据 Workload 与动作语义自动启用 RunBackground 并给出警告。
+若按钮已经在前端将任务拆成多个独立 HTTP 请求，并且每片事务可独立提交、失败后可按业务剩余量恢复，可显式配置 \`Workload: { ExecutionMode: "ClientChunked", MaxItemsPerChunk: 40, Resumable: true }\`；逐条串行请求可用 \`ClientSequential\`。该声明只豁免名称语义触发的后台任务强制转换，缺少单片上限或不可恢复时仍会被 MCP 拦截。
 后台任务不是“把同步接口换个入口”：必须配置稳定幂等键；业务主记录至少保存“处理中”状态和 BackgroundTaskId，建议同时保存真实进度与 EstimatedEndTime；接口引擎用 V8.Method.UpdateBackgroundTask 上报已提交的 Current/Total。未知总量不填 Total，通知中心显示“计算中”，不得伪造百分比。
 预计超过 10 分钟的任务必须分片提交，每片返回 Data.BackgroundTask={HasMore:true,Checkpoint:...,Current,Total,NextDelaySeconds}，平台持久化检查点后重新入队；最后一片返回正常 Code=1。每片独立事务，重试以 IdempotencyKey + FencingToken + 数据库唯一约束保证副作用仅一次。
 详细写法参考 skill 文档：\`microi.skills/v8-menu-buttons/SKILL.md\`
@@ -890,46 +1021,61 @@ export function createMcpServer(client, context) {
             };
         }
     });
-    server.tool('microi_create_my_access_key', `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. Requires confirmExecution equal to name.`, {
+    server.tool('microi_create_my_access_key', `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. The first call is a dry confirmation step and returns RequiredConfirmationSha256; repeat the exact same payload with confirmExecution equal to that SHA-256.`, {
         name: z.string().min(1).max(200).describe('Human-readable key name.'),
         allowedRoutes: z.array(z.string().min(1).max(500)).min(1).max(100).describe('Exact allowed routes. Use * only after explicit risk review.'),
         allowedTableNames: z.array(z.string().min(1).max(200)).min(1).max(100).describe('Exact table names. Use * only after explicit risk review.'),
         scopes: z.array(z.enum([
             'page:open',
             'form:read',
-            'form:write',
-            'form:export',
             'api-engine:run',
             'data-source:run',
             'file:read',
-        ])).min(1).max(7).optional().describe('Omit for minimum page:open + form:read. page:open is always required by the backend.'),
+        ])).min(1).max(5).optional().describe('Omit for minimum page:open + form:read. MCP does not expose form:write/form:export until the backend path facade supports them.'),
         redirectPath: z.string().max(500).optional().describe('Initial route; must be included in allowedRoutes.'),
         allowedApiEngineKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with api-engine:run. Wildcards are rejected.'),
         allowedDataSourceKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with data-source:run. Wildcards are rejected.'),
         expiresAt: z.string().optional().describe('Optional server-local expiry time, later than now and no more than 365 days. Omit for the bounded default.'),
         remark: z.string().max(1000).optional(),
-        confirmExecution: z.string().optional().describe('Required. Pass the exact name after reviewing scopes and allowlists.'),
+        confirmExecution: z.string().optional().describe('Required for the real create. First omit it; then pass the returned RequiredConfirmationSha256 with the exact same payload.'),
     }, async ({ name, allowedRoutes, allowedTableNames, scopes, redirectPath, allowedApiEngineKeys, allowedDataSourceKeys, expiresAt, remark, confirmExecution }) => {
-        if (confirmExecution !== name) {
+        const confirmation = buildAccessKeyCreationConfirmation({
+            name,
+            allowedRoutes,
+            allowedTableNames,
+            scopes,
+            redirectPath,
+            allowedApiEngineKeys,
+            allowedDataSourceKeys,
+            expiresAt,
+            remark,
+        });
+        if (String(confirmExecution || '').trim().toLowerCase() !== confirmation.sha256) {
             return {
                 content: [{
                         type: 'text',
-                        text: `执行已拦截：创建访问密钥会产生新的登录凭据，请核对期限、权限和允许范围后，重新调用并传 confirmExecution="${name}"。`,
+                        text: JSON.stringify({
+                            Blocked: true,
+                            Message: '创建访问密钥会产生新的登录凭据。请核对以下规范化权限载荷，并使用对应 SHA-256 确认。',
+                            NormalizedGrant: confirmation.normalized,
+                            RequiredConfirmationSha256: confirmation.sha256,
+                            Next: '保持其它参数完全不变，并将 confirmExecution 设置为 RequiredConfirmationSha256。',
+                        }, null, 2),
                     }],
                 isError: true,
             };
         }
         try {
             const result = await client.createMyUserAccessKey({
-                name,
-                allowedRoutes,
-                allowedTableNames,
-                scopes,
-                redirectPath,
-                allowedApiEngineKeys,
-                allowedDataSourceKeys,
-                expiresAt,
-                remark,
+                name: confirmation.normalized.name,
+                allowedRoutes: confirmation.normalized.allowedRoutes,
+                allowedTableNames: confirmation.normalized.allowedTableNames,
+                scopes: confirmation.normalized.scopes,
+                redirectPath: confirmation.normalized.redirectPath || undefined,
+                allowedApiEngineKeys: confirmation.normalized.allowedApiEngineKeys,
+                allowedDataSourceKeys: confirmation.normalized.allowedDataSourceKeys,
+                expiresAt: confirmation.normalized.expiresAt || undefined,
+                remark: confirmation.normalized.remark || undefined,
             });
             if (result.Code !== 1 || !result.Data?.AccessKey) {
                 return { content: [{ type: 'text', text: `创建访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
@@ -2434,8 +2580,8 @@ export function createMcpServer(client, context) {
         componentPath: z.string().optional().describe('Component path. Default: "/diy/diy-table-rowlist"'),
         display: z.number().optional().describe('Show in PC menu (1=yes, 0=no). Default: 1'),
         appDisplay: z.number().optional().describe('Show in mobile menu (1=yes, 0=no). Default: 1'),
-        openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page"'),
-        url: z.string().optional().describe('URL if openType is "Url"'),
+        openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService"'),
+        url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
         sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
         icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
         searchFieldIds: z.string().optional().describe('SearchFieldIds JSON/object-array string. If omitted and diyTableId is bound, backend infers common searchable fields such as title/name/no/status/type/category/person/time.'),
@@ -2463,8 +2609,64 @@ export function createMcpServer(client, context) {
         mobileListFields: z.string().optional().describe('JSON array of fields shown in mobile/card list. If omitted and diyTableId is bound, backend picks compact title/status/summary fields.'),
         cardTitleTagFields: z.string().optional().describe('JSON array of fields shown as title tags on mobile/card view.'),
         cardBottomTagFields: z.string().optional().describe('JSON array of fields shown as bottom tags on mobile/card view.'),
-    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields }) => {
+        microServiceId: z.string().optional().describe('sys_microiservice.Id. Required when openType=MicroService.'),
+        microServicePageId: z.string().optional().describe('sys_microiservice_page.Id for this menu route. Required when openType=MicroService.'),
+        microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService.'),
+        microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
+        confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
+    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
         try {
+            const isMicroService = String(openType || '').toLowerCase() === 'microservice'
+                || Boolean(microServiceId || microServicePageId || microServiceRoutePath || microServiceKey);
+            let effectiveOpenType = openType;
+            let effectiveComponentName = componentName;
+            let effectiveComponentPath = componentPath;
+            let effectiveUrl = url;
+            let effectiveMicroServiceRoutePath = microServiceRoutePath;
+            if (isMicroService) {
+                const missing = [
+                    !microServiceId ? 'microServiceId' : '',
+                    !microServicePageId ? 'microServicePageId' : '',
+                    !microServiceRoutePath ? 'microServiceRoutePath' : '',
+                    !microServiceKey ? 'microServiceKey' : '',
+                ].filter(Boolean);
+                if (missing.length) {
+                    return { content: [{ type: 'text', text: `Error: MicroService 菜单缺少字段：${missing.join(', ')}` }], isError: true };
+                }
+                const routePath = String(microServiceRoutePath || '').trim().replace(/\\/gu, '/');
+                if (!/^\/(?:[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)*)?$/u.test(routePath) || routePath.includes('..')) {
+                    return { content: [{ type: 'text', text: `Error: microServiceRoutePath 不合法：${microServiceRoutePath}` }], isError: true };
+                }
+                effectiveMicroServiceRoutePath = routePath;
+                effectiveOpenType = 'MicroService';
+                effectiveComponentName = componentName || 'MicroService';
+                effectiveComponentPath = componentPath || '/micro-app/host';
+                const encodedRoute = routePath === '/'
+                    ? ''
+                    : '/' + routePath.slice(1).split('/').map(segment => encodeURIComponent(segment)).join('/');
+                effectiveUrl = url || `/micro-app/${encodeURIComponent(String(microServiceKey))}${encodedRoute}`;
+            }
+            if (confirmExecution !== name && confirmExecution !== 'EXECUTE') {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({
+                                dryRun: true,
+                                confirmationRequired: name,
+                                module: {
+                                    Name: name,
+                                    ParentId: parentId,
+                                    OpenType: effectiveOpenType || 'Diy',
+                                    ComponentName: effectiveComponentName,
+                                    ComponentPath: effectiveComponentPath,
+                                    Url: effectiveUrl,
+                                    IsMicroiService: isMicroService ? 1 : 0,
+                                    MicroServiceId: microServiceId,
+                                    MicroServicePageId: microServicePageId,
+                                    MicroServiceRoutePath: effectiveMicroServiceRoutePath,
+                                    MicroServiceKey: microServiceKey,
+                                },
+                            }, null, 2) }],
+                };
+            }
             const normalizedViewSchema = normalizeViewSchemaJson(viewSchema);
             if (!normalizedViewSchema.ok) {
                 return {
@@ -2474,9 +2676,9 @@ export function createMcpServer(client, context) {
             }
             const result = await client.createModule({
                 Name: name, DiyTableId: diyTableId, ParentId: parentId,
-                ComponentName: componentName, ComponentPath: componentPath,
+                ComponentName: effectiveComponentName, ComponentPath: effectiveComponentPath,
                 Display: display ?? 1, AppDisplay: appDisplay ?? 1,
-                OpenType: openType, Url: url, Sort: sort,
+                OpenType: effectiveOpenType, Url: effectiveUrl, Sort: sort,
                 Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
                 DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere,
                 EnableViewSchema: enableViewSchema ?? 0,
@@ -2491,6 +2693,11 @@ export function createMcpServer(client, context) {
                 InTableEdit: inTableEdit, InTableEditFields: inTableEditFields,
                 MobileListFields: mobileListFields,
                 CardTitleTagFields: cardTitleTagFields, CardBottomTagFields: cardBottomTagFields,
+                IsMicroiService: isMicroService ? 1 : undefined,
+                MicroServiceId: microServiceId,
+                MicroServicePageId: microServicePageId,
+                MicroServiceRoutePath: effectiveMicroServiceRoutePath,
+                MicroServiceKey: microServiceKey,
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -2680,6 +2887,69 @@ export function createMcpServer(client, context) {
         }
     });
     // ========================
+    // Tool: 在本地 AI 应用目录创建 Vue 微服务脚手架
+    // ========================
+    server.tool('microi_scaffold_vue_microservice', `Create a safe Vue 3 + Vite MicroService scaffold inside the local tenant AI应用 directory for OsClient "${osClient}". The tool writes .microi-micro-app.json, microi.routes.json and one Vue component per declared route. It only accepts a real absolute directory whose basename is AI应用, never overwrites a different existing project, and performs a dry run until confirmExecution exactly equals appKey. After scaffolding, use microi_create_microservice, microi_sync_microservice_source and microi_publish_application_directory_stream (or the legacy publisher for a tiny compatibility payload).`, {
+        appKey: z.string().regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/u).describe('Stable lowercase application key and local directory name.'),
+        name: z.string().min(1).max(120).describe('Human-readable MicroService name.'),
+        description: z.string().optional().describe('Optional application description.'),
+        aiApplicationsDirectory: z.string().optional().describe('Absolute tenant AI应用 directory. Defaults to MICROI_AI_APPLICATIONS_DIR injected by Microi.VSCode.'),
+        buildVersion: z.string().regex(/^v\d+\.\d+\.\d+$/u).optional().default('v0.1.0').describe('Initial semantic build version. Default v0.1.0.'),
+        routes: z.array(z.object({
+            path: z.string().describe('Internal route path such as /context-test.'),
+            name: z.string().describe('Stable route key such as context-test.'),
+            title: z.string().describe('Page/menu title.'),
+            description: z.string().optional().describe('Optional visible page explanation.'),
+            isHome: z.boolean().optional().describe('Mark one route as the default page. The first route is used when omitted.'),
+        })).min(1).max(50).describe('Vue pages and MicroService internal routes. One .vue file is generated per item.'),
+        confirmExecution: z.string().optional().describe('Required for filesystem writes and must exactly equal appKey. Omit for a local preflight only.'),
+    }, async ({ appKey, name, description, aiApplicationsDirectory, buildVersion, routes, confirmExecution }) => {
+        try {
+            const targetRoot = String(aiApplicationsDirectory || process.env.MICROI_AI_APPLICATIONS_DIR || '').trim();
+            if (!targetRoot) {
+                return {
+                    content: [{ type: 'text', text: 'Error: 缺少 AI 应用目录。请由 Microi.VSCode 注入 MICROI_AI_APPLICATIONS_DIR，或显式传入 aiApplicationsDirectory。' }],
+                    isError: true,
+                };
+            }
+            if (confirmExecution && confirmExecution !== appKey) {
+                return { content: [{ type: 'text', text: `Error: confirmExecution 必须精确等于 ${appKey}` }], isError: true };
+            }
+            const scaffoldOptions = {
+                aiApplicationsDirectory: targetRoot,
+                appKey,
+                name,
+                description,
+                apiBaseUrl: context.apiBaseUrl,
+                osClient,
+                buildVersion,
+                routes,
+                sdkSource: resolveMicroiSdkSource(process.env.MICROI_WORKSPACE_ROOT),
+            };
+            const plan = buildVueMicroServiceScaffoldPlan(scaffoldOptions);
+            if (confirmExecution !== appKey) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({
+                                dryRun: true,
+                                confirmationRequired: appKey,
+                                targetDirectory: plan.targetDirectory,
+                                appKey: plan.appKey,
+                                buildVersion: plan.buildVersion,
+                                routeCount: plan.routes.length,
+                                routes: plan.routes.map(route => ({ path: route.path, name: route.name, title: route.title, sourceFile: route.sourceFile, isHome: route.isHome })),
+                                fileCount: plan.files.length,
+                                files: plan.files.map(file => ({ Path: file.relativePath, Size: file.size, Sha256: file.sha256 })),
+                            }, null, 2) }],
+                };
+            }
+            const result = scaffoldVueMicroService(scaffoldOptions);
+            return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
     // Tool: 查询微服务 / 微应用
     // ========================
     server.tool('microi_get_microservice', `Get one Microi microservice / micro-app by MsKey for OsClient "${osClient}". Use this before publishing to inspect current BuildVersion, EntryPath and asset manifest.`, {
@@ -2745,12 +3015,145 @@ export function createMcpServer(client, context) {
         }
     });
     // ========================
+    // Tool: 流式上传单个应用资产
+    // ========================
+    server.tool('microi_upload_application_asset_stream', `Stream one local built asset directly to the immutable HDFS version directory for OsClient "${osClient}". The file is never encoded as Base64 and never enters Jint. This is a low-level resumable primitive; normally use microi_publish_application_directory_stream to upload and atomically promote a complete directory.`, {
+        appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
+        versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
+        relativePath: z.string().min(1).describe('POSIX-style path inside the compiled output, e.g. assets/index-abcd.js.'),
+        localFilePath: z.string().min(1).describe('Absolute or workspace-relative path of one local ordinary file.'),
+        sha256: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional expected SHA-256. MCP computes and verifies it when omitted.'),
+        timeoutMs: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes; maximum 2 hours.'),
+        confirmExecution: z.string().optional().describe('Required for the real upload and must exactly equal appIdOrKey.'),
+    }, async ({ appIdOrKey, versionNo, relativePath, localFilePath, sha256, timeoutMs, confirmExecution }) => {
+        try {
+            const normalizedPath = normalizeLocalApplicationRelativePath(relativePath);
+            const absolutePath = path.resolve(localFilePath);
+            const stat = fs.lstatSync(absolutePath);
+            if (!stat.isFile() || stat.isSymbolicLink())
+                throw new Error(`本地资产必须是普通文件且不能是符号链接：${absolutePath}`);
+            const actualSha256 = await sha256LocalFile(absolutePath);
+            if (sha256 && sha256.toLowerCase() !== actualSha256)
+                throw new Error('本地文件 SHA-256 与传入值不一致');
+            const summary = { appIdOrKey, versionNo, relativePath: normalizedPath, size: stat.size, sha256: actualSha256 };
+            if (confirmExecution !== appIdOrKey) {
+                return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, confirmationRequired: appIdOrKey, ...summary }, null, 2) }] };
+            }
+            const result = await client.uploadApplicationAssetStream({
+                AppIdOrKey: appIdOrKey,
+                VersionNo: versionNo,
+                RelativePath: normalizedPath,
+                ExpectedSha256: actualSha256,
+                FilePath: absolutePath,
+                TimeoutMs: timeoutMs,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 流式发布完整应用目录
+    // ========================
+    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using constant-memory multipart streams. MCP hashes and uploads each file to an immutable semantic version, then sends a metadata-only manifest so HDFS performs server-side copies to short root/latest URLs. It rejects symlinks, secrets, node_modules/.git and runaway file counts before uploading. This is the preferred publisher for compiled applications; file bytes do not pass through JSON, Base64 or Jint.`, {
+        appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
+        versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
+        directory: z.string().min(1).describe('Local compiled output directory such as dist or unpackage/dist/build/h5.'),
+        entryPath: z.string().optional().default('index.html').describe('Entry file relative to directory. Default index.html.'),
+        routes: z.array(jsonRecordSchema).optional().describe('Optional MicroService page/route metadata.'),
+        changeSummary: z.string().optional().describe('Version change summary stored in mci_ai_app_version.'),
+        includeSourceMaps: z.boolean().optional().default(false).describe('Publish *.map source maps. Defaults to false to avoid source disclosure.'),
+        maxFiles: z.number().int().min(1).max(20_000).optional().describe('Safety cap checked before upload. Default and hard maximum 20,000.'),
+        maxTotalMegabytes: z.number().positive().max(20_480).optional().describe('Safety cap checked before upload. Default and hard maximum 20GB.'),
+        timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
+        confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),
+    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, changeSummary, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, confirmExecution }) => {
+        try {
+            if (confirmExecution && confirmExecution !== appIdOrKey) {
+                return { content: [{ type: 'text', text: `Error: confirmExecution 必须精确等于 ${appIdOrKey}` }], isError: true };
+            }
+            const manifest = await buildLocalApplicationAssetManifest(directory, entryPath, {
+                includeSourceMaps,
+                maxFiles,
+                maxTotalBytes: maxTotalMegabytes ? Math.floor(maxTotalMegabytes * 1024 * 1024) : undefined,
+            });
+            if (confirmExecution !== appIdOrKey) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({
+                                dryRun: true,
+                                confirmationRequired: appIdOrKey,
+                                rootDirectory: manifest.rootDirectory,
+                                entryPath: manifest.entryPath,
+                                assetCount: manifest.assets.length,
+                                totalSize: manifest.totalSize,
+                                skippedSourceMaps: manifest.skippedSourceMaps,
+                                assetsPreview: manifest.assets.slice(0, 200).map(asset => ({ Path: asset.relativePath, Size: asset.size, Sha256: asset.sha256 })),
+                                previewTruncated: manifest.assets.length > 200,
+                            }, null, 2) }],
+                };
+            }
+            let uploadedCount = 0;
+            const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
+            for (const asset of uploadOrder) {
+                const result = await client.uploadApplicationAssetStream({
+                    AppIdOrKey: appIdOrKey,
+                    VersionNo: versionNo,
+                    RelativePath: asset.relativePath,
+                    ExpectedSha256: asset.sha256,
+                    FilePath: asset.absolutePath,
+                    TimeoutMs: timeoutMsPerFile,
+                });
+                if (result.Code !== 1) {
+                    return {
+                        content: [{ type: 'text', text: JSON.stringify({
+                                    error: result.Msg,
+                                    failedPath: asset.relativePath,
+                                    uploadedCount,
+                                    totalCount: manifest.assets.length,
+                                    retrySafe: true,
+                                }, null, 2) }],
+                        isError: true,
+                    };
+                }
+                uploadedCount += 1;
+                if (uploadedCount === 1 || uploadedCount % 25 === 0 || uploadedCount === manifest.assets.length) {
+                    console.error(`[microi-mcp] Stream publish ${appIdOrKey} ${versionNo}: ${uploadedCount}/${manifest.assets.length}`);
+                }
+            }
+            const finalizeResult = await client.finalizeApplicationStreamPublish({
+                AppIdOrKey: appIdOrKey,
+                VersionNo: versionNo,
+                EntryPath: manifest.entryPath,
+                Assets: manifest.assets.map(asset => ({ Path: asset.relativePath, Sha256: asset.sha256, Size: asset.size })),
+                Routes: routes || [],
+                ChangeSummary: changeSummary || 'MCP 二进制流式发布',
+            });
+            if (finalizeResult.Code !== 1) {
+                return { content: [{ type: 'text', text: JSON.stringify({ error: finalizeResult.Msg, uploadedCount, stablePromoted: false, retrySafe: true }, null, 2) }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify({
+                            ...(finalizeResult.Data && typeof finalizeResult.Data === 'object' ? finalizeResult.Data : {}),
+                            uploadedCount,
+                            totalSize: manifest.totalSize,
+                            skippedSourceMaps: manifest.skippedSourceMaps,
+                            transport: 'multipart-stream-to-hdfs',
+                            jintFileBytes: 0,
+                        }, null, 2) }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
     // Tool: 发布微服务 / 微应用文件资产
     // ========================
-    server.tool('microi_publish_microservice', `Publish generated microservice / micro-app files for OsClient "${osClient}". Uploads assets to Microi HDFS, upserts sys_microiservice and syncs sys_microiservice_page routes.`, {
+    server.tool('microi_publish_microservice', `Legacy small-payload publisher for generated microservice / micro-app files in Base64. For real compiled directories or large assets, use microi_publish_application_directory_stream so bytes stream directly to HDFS and never enter JSON/Jint.`, {
         microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: BuildVersion, EntryPath, SourceDirName.'),
         assets: z.array(jsonRecordSchema).describe('Built asset files. Each item needs Path/RelativePath/FileName and FileByteBase64/ContentBase64. Mark the main HTML/JS entry with IsEntry=true or Entry=true.'),
-        routes: z.array(jsonRecordSchema).optional().describe('Optional route/page records for sys_microiservice_page. Fields: PageKey, PageName, PageTitle, RoutePath, EntryPath, Sort, IsHome.'),
+        routes: z.array(jsonRecordSchema).optional().describe('Optional route/page records for sys_microiservice_page. Fields: PageKey, PageName, PageTitle, RoutePath, EntryPath, SourceDirName, SourceFile, RouteMetaJson, Sort, IsHome.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
     }, async ({ microService, assets, routes, confirmExecution }) => {
         if (!confirmExecution) {

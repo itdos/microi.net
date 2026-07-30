@@ -36,12 +36,12 @@ namespace Dos.ORM
     public sealed class Database : ILogable
     {
         private DbProvider dbProvider;
-        private static int MaxConcurrentConnectionOpens => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_MAX_CONCURRENT_CONNECTION_OPENS", "OrmLimits:MaxConcurrentConnectionOpens", 64);
-        private static int ConnectionOpenWaitSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_OPEN_WAIT_SECONDS", "OrmLimits:ConnectionOpenWaitSeconds", 600);
-        private static int ConnectionPressureBackoffSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_CONNECTION_PRESSURE_BACKOFF_SECONDS", "OrmLimits:ConnectionPressureBackoffSeconds", 120);
-        private static bool MySqlHostCacheAutoRepairEnabled => ConfigHelper.GetEnvOrConfigurationBool("DOS_ORM_MYSQL_HOST_CACHE_AUTO_REPAIR_ENABLED", "OrmLimits:MySqlHostCacheAutoRepairEnabled", true);
-        private static int MySqlHostCacheRepairCooldownSeconds => ConfigHelper.GetEnvOrConfigurationInt("DOS_ORM_MYSQL_HOST_CACHE_REPAIR_COOLDOWN_SECONDS", "OrmLimits:MySqlHostCacheRepairCooldownSeconds", 300);
-        private static string MySqlHostCacheRepairConnectionString => ConfigHelper.GetEnvOrConfiguration("DOS_ORM_MYSQL_HOST_CACHE_REPAIR_CONN", "OrmLimits:MySqlHostCacheRepairConnectionString");
+        private static int MaxConcurrentConnectionOpens => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:MaxConcurrentConnectionOpens", 64);
+        private static int ConnectionOpenWaitSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:ConnectionOpenWaitSeconds", 600);
+        private static int ConnectionPressureBackoffSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:ConnectionPressureBackoffSeconds", 120);
+        private static bool MySqlHostCacheAutoRepairEnabled => ConfigHelper.GetRuntimeConfigurationBool("OrmLimits:MySqlHostCacheAutoRepairEnabled", true);
+        private static int MySqlHostCacheRepairCooldownSeconds => ConfigHelper.GetRuntimeConfigurationInt("OrmLimits:MySqlHostCacheRepairCooldownSeconds", 300);
+        private static string MySqlHostCacheRepairConnectionString => null;
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> ConnectionOpenSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
         private static readonly ConcurrentDictionary<string, DateTime> ConnectionBackoffUntil = new ConcurrentDictionary<string, DateTime>();
         private static readonly ConcurrentDictionary<string, DateTime> MySqlHostCacheRepairCooldownUntil = new ConcurrentDictionary<string, DateTime>();

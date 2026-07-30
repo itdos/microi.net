@@ -33,7 +33,7 @@ var openaiKey = 'sk-xxxxxxxxxx';
 
 吾码现有多端兼容约定是：主 SaaS 引擎 `sys_osclients.CorsAllowOrigins` 为空时默认允许全部跨域，便于本地开发、独立前端、H5 和不同租户域名访问；配置了来源后才按精确来源或通配符限制。安全修复不得把“未配置”改成默认拒绝，否则会造成所有存量部署和本地调试突然失效。CORS 不是鉴权边界，权限仍必须依赖 Token、租户隔离、菜单/表权限和服务端数据范围。
 
-吾码既有客户大量通过 `V8.Http` 访问内网设备、InfluxDB、内部 ApiEngine 和本机 sidecar。严格 SSRF 防护必须默认关闭：未配置时不得限制协议、URL 内嵌凭据、回环、私网、链路本地、云元数据或重定向。只有客户显式设置 `SsrfProtection:Enabled=true` / `MICROI_SSRF_PROTECTION_ENABLED=true` 后才进入严格模式，并用精确 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 放行。
+吾码既有客户大量通过 `V8.Http` 访问内网设备、InfluxDB、内部 ApiEngine 和本机 sidecar。严格 SSRF 防护必须默认关闭：未配置时不得限制协议、URL 内嵌凭据、回环、私网、链路本地、云元数据或重定向。只有客户在 SaaS 引擎主租户启用 `SsrfProtectionEnabled` 后才进入严格模式，并用精确 `SsrfAllowedHosts` 放行；不要为这类普通运行参数增加 API 容器环境变量。
 
 外部数据库与附件迁移属于更高风险的控制面操作：
 
@@ -393,9 +393,12 @@ try {
 - 兑换得到短期 `_ClientType=AccessKey` Token。JWT 只保存 `MicroiAccessKeyId`，权限范围从共享数据库/Redis实时加载，不能把范围写进共享 `CurrentToken.CurrentUser`。
 - 密钥权限只能收窄：帐号实时角色/菜单/行范围与 `Scopes + AllowedRoutes + AllowedTableNames + AllowedApiEngineKeys + AllowedDataSourceKeys` 取交集。检查必须位于管理员快捷放行之前。
 - 默认只允许 `page:open + form:read`；`form:write/form:export/file:read/api-engine:run/data-source:run` 必须显式启用。`AllowedRoutes` 和 `AllowedTableNames` 可以使用单独值 `*` 表示“全部目标帐号已授权资源”，但检查仍必须位于管理员快捷放行之前并继续执行帐号菜单、表单、部门和行权限；旧 UI 误存的路由值 `/*` 只作为该通配值的兼容别名。`AllowedApiEngineKeys` 和 `AllowedDataSourceKeys` 必须是准确白名单，禁止 `*`。
+- API 放行必须使用按 capability 分类的运行时矩阵，不能靠零散补一个报错路径：页面范围为 `*` 且具有 `page:open` 时才允许 `SysMenu/GetSysMenuStep`；指定页面密钥不得读取完整菜单树。只允许会话启动、页面元数据、表单 CRUD/导出、本人后台任务和本人终端信息等明确运行面；显示密码、密钥管理、菜单/表/字段设计、索引、缓存、服务器、其它终端管理等控制面保持拒绝。
+- FormEngine 通过 action filter 对模型绑定后的 `FormEngineKey/TableName/TableId/TableIds` 逐项校验。`AllowedTableNames` 在共享数据库回源时派生为 `AllowedTableIds + AllowedFieldIds`，放进带契约版本的短 TTL Redis 运行时缓存；解析失败必须 fail closed。这样只传表 Id 的元数据接口，以及只传 `_FieldId/FieldIds` 的字段 SQL/批量下拉数据接口，都不能绕过表名白名单。
+- `ApiEngineController` 的 Run 系列即使标记了 `[AllowAnonymous]`，检测到访问密钥会话后也必须解析实际命中的引擎模型并校验准确 `ApiEngineKey`；数据源运行和后台接口任务同样校验准确 Key。禁止只在 MVC 授权过滤器中检查粗粒度路径，因为匿名兼容入口会跳过该过滤器。
 - 自动登录 URL 必须携带当前 `OsClient`；前端进入 `/access-login` 时先清除 Hash 中的密钥，再用 JSON Body 兑换，并设置有限超时。禁止等待与兑换无关的 SSO 初始化导致无限加载。
 - 管理操作只允许普通登录会话的本人或管理员；访问密钥会话不能创建或吊销密钥。
 - 多节点共享 Redis 只作为短 TTL 缓存和限流；数据库是事实源，吊销主动清除缓存。不得使用 `static` 字典、本机文件或本地定时器保存密钥状态。
 - 对外仍要求 HTTPS。固定终端使用独立只读帐号，不能用超级管理员帐号创建看板密钥。
 
-验收至少覆盖：明文只返回一次、错误密钥固定时间比较、过期/吊销/停用帐号失败、指定页面成功而其它路由失败、允许表成功而其它表失败、接口/数据源 Key 精确限制、普通帐号权限变化即时收窄、两个 API 节点吊销一致生效。
+验收至少覆盖：明文只返回一次、错误密钥固定时间比较、过期/吊销/停用帐号失败、指定页面成功而其它路由失败、全部页面可加载 `GetSysMenuStep`、允许表名及对应表 Id 成功而其它表失败、FormEngine 设计接口仍拒绝、接口/数据源 Key 精确限制且动态/后台入口不能绕过、普通帐号权限变化即时收窄、两个 API 节点吊销一致生效。

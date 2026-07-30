@@ -33,7 +33,18 @@ namespace Microi.net.Api
         [HttpGet, HttpPost]
         public async Task<JsonResult> Run([FromBody] JObject param)
         {
+            param ??= new JObject();
             await DefaultParam(param);
+            var currentUser = param["_CurrentUser"] as JObject;
+            if (!UserAccessKeySecurity.IsDataSourceAllowed(
+                    currentUser,
+                    param["DataSourceKey"]?.ToString()))
+            {
+                return Json(new DosResult(
+                    0,
+                    null,
+                    "当前访问密钥未授权运行此数据源引擎。"));
+            }
             var result = await MicroiEngine.DataSource.RunAsync(param);
             return Json(result);
         }

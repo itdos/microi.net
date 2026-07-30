@@ -21,7 +21,11 @@ namespace Microi.net
         public long Persisted { get; set; }
         public long Retried { get; set; }
         public long Pending { get; set; }
+        public int Capacity { get; set; }
+        public int OverflowCapacity { get; set; }
         public long OverflowPending { get; set; }
+        public long EmergencySpooled { get; set; }
+        public long Dropped { get; set; }
         public long FailedBatches { get; set; }
         public string LastError { get; set; }
         public DateTime? LastPersistedAt { get; set; }

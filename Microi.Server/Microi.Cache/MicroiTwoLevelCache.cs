@@ -626,11 +626,7 @@ namespace Microi.net
 
         private static string BuildCacheInstanceId()
         {
-            var configuredNodeId = Environment.GetEnvironmentVariable("MICROI_NODE_ID");
-            var nodeId = string.IsNullOrWhiteSpace(configuredNodeId)
-                ? Environment.MachineName
-                : configuredNodeId.Trim();
-            return $"{nodeId}:{System.Diagnostics.Process.GetCurrentProcess().Id}:{Guid.NewGuid():N}";
+            return $"{Environment.MachineName}:{System.Diagnostics.Process.GetCurrentProcess().Id}:{Guid.NewGuid():N}";
         }
 
         /// <summary>

@@ -107,6 +107,15 @@ test("compiled wrapper, nested app HTML, and legacy paths all receive fresh runt
   assert.match(source, /HMACSHA1/);
   assert.match(source, /refreshStableCdnPaths\(stableAssetPaths\)/);
   assert.match(source, /requestedAction\s*===\s*"RefreshStableCdn"/);
+  assert.match(source, /requestedAction\s*===\s*"PromoteStableAssetsBatch"/);
+  assert.match(source, /function promoteStableStoreAssets\(/);
+  assert.match(source, /function publishBase64ToExactPublicPath\(/);
+  assert.match(source, /STABLE_ASSET_HOTFIX_V1/);
+  assert.match(source, /snapshotVersionNo/);
+  assert.match(source, /RootFilePathName:\s*rootPath/);
+  assert.match(source, /stablePaths\.push\(rootPath\)/);
+  assert.match(source, /explicitRefreshPaths\.length > 100/);
+  assert.match(source, /refreshStableCdnPaths\(manualRefreshPaths, explicitRefreshPaths\.length > 0\)/);
   assert.match(source, /requestedAction\s*===\s*"PromoteStoreAssetsBatch"/);
   assert.match(source, /requestedAction\s*===\s*"FinalizeStoreAssets"/);
   assert.match(source, /source\.sourceFileId\s*\|\|\s*source\.SourceFileId/);
@@ -172,7 +181,7 @@ test("all compiled and marketplace promotion paths wrap raw UniApp entries only"
 test("application-store package and server upgrade both carry the fixed builder", () => {
   const packaged = packageModel.SysApiEngines.find(item => item.ApiEngineKey === "ai_app_build");
   assert.ok(packaged);
-  assert.equal(packaged.Version, "v1.5.2");
+  assert.equal(packaged.Version, "v1.5.4");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
   assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.(?:[4-9]|\d{2,})$|^v6\.[6-9]\./);
   assert.match(upgradeSource, /BuildAiAppResourceName\s*=\s*"ai-app-build\.js"/);
