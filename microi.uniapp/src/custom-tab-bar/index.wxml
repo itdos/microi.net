@@ -1,5 +1,5 @@
 <view
-  class="mci-bottom-dock {{aiAssistantEnabled ? '' : 'mci-bottom-dock--without-ai'}}"
+  class="mci-bottom-dock mci-bottom-dock--without-ai"
   style="padding: 8rpx calc(16rpx + {{safeRight}}px) calc(8rpx + {{safeBottom}}px) calc(16rpx + {{safeLeft}}px);"
   aria-label="底部导航"
 >
@@ -23,23 +23,5 @@
       />
       <text class="mci-bottom-dock__label">{{item.text}}</text>
     </view>
-  </view>
-
-  <view
-    wx:if="{{aiAssistantEnabled}}"
-    class="mci-ai-launcher mci-bottom-dock__ai-slot"
-    bindtap="openAssistant"
-    hover-class="mci-ai-launcher--pressed"
-    hover-stay-time="120"
-    aria-role="button"
-    aria-label="打开AI助手"
-  >
-    <view class="mci-ai-launcher__ring" />
-    <image
-      class="mci-ai-launcher__robot"
-      src="/static/mci/ai/assistant-robot.png"
-      mode="aspectFit"
-    />
-    <text class="mci-ai-launcher__label">AI</text>
   </view>
 </view>

@@ -151,8 +151,15 @@ export function buildPeriodRange(period, customRange = null) {
 export async function loadModuleRows(moduleConfig, options = {}) {
   const pageIndex = Number(options.pageIndex || 1)
   const pageSize = Number(options.pageSize || moduleConfig.pageSize || 15)
+  const moduleEngineKey = String(
+    moduleConfig.moduleEngineKey ||
+    moduleConfig.ModuleEngineKey ||
+    moduleConfig.table ||
+    ''
+  ).trim()
+  if (!moduleEngineKey) throw new Error('业务模块未配置菜单标识')
   const payload = {
-    ModuleEngineKey: moduleConfig.table,
+    ModuleEngineKey: moduleEngineKey,
     _PageIndex: pageIndex,
     _PageSize: pageSize,
     _Keyword: options.keyword || '',
@@ -161,15 +168,18 @@ export async function loadModuleRows(moduleConfig, options = {}) {
     _Where: [...(moduleConfig.fixedWhere || []), ...(options.extraWhere || [])]
   }
   if (moduleConfig.menuId) payload._SysMenuId = moduleConfig.menuId
+  if (options.tableChildAuth) payload._TableChildAuth = options.tableChildAuth
   if (options.status && moduleConfig.statusField) {
     payload._Where.push({ Name: moduleConfig.statusField, Type: '=', Value: options.status })
   }
   const range = buildPeriodRange(options.period, options.customRange)
   if (range) payload._SearchDateTime = { [moduleConfig.periodField || 'CreateTime']: range }
   const requestKey = [
-    'module', currentIdentityKey(), moduleConfig.table, pageIndex, pageSize, options.keyword || '', options.status || '',
+    'module', currentIdentityKey(), moduleEngineKey, moduleConfig.menuId || '', moduleConfig.table,
+    pageIndex, pageSize, options.keyword || '', options.status || '',
     options.period || 'all', options.orderBy || '', options.orderType || '',
-    JSON.stringify(options.customRange || []), JSON.stringify(payload._Where)
+    JSON.stringify(options.customRange || []), JSON.stringify(payload._Where),
+    JSON.stringify(options.tableChildAuth || {})
   ].join(':')
   const cached = await cachedRequest(requestKey, () => post('/api/ModuleEngine/GetTableData', payload, true), {
     maxAge: Number(options.cacheAge ?? (pageIndex === 1 ? 45 * 1000 : 10 * 1000)),

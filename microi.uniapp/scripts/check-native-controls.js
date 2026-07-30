@@ -36,6 +36,18 @@ const xjyProposalCalculation = fs.readFileSync(
   'utf8'
 )
 const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
+const moduleDetail = fs.readFileSync(path.join(root, 'src/pages/module/detail.vue'), 'utf8')
+const formTabs = fs.readFileSync(path.join(root, 'src/components/mci-related-tabs/mci-related-tabs.vue'), 'utf8')
+const childTable = fs.readFileSync(path.join(root, 'src/components/mci-child-table/mci-child-table.vue'), 'utf8')
+const businessCard = fs.readFileSync(path.join(root, 'src/components/mci-business-card/mci-business-card.vue'), 'utf8')
+const relatedBusinessList = fs.readFileSync(
+  path.join(root, 'src/components/mci-business-related-list/mci-business-related-list.vue'),
+  'utf8'
+)
+const relatedBusinessPage = fs.readFileSync(path.join(root, 'src/pages/business/related-list.vue'), 'utf8')
+const businessList = fs.readFileSync(path.join(root, 'src/pages/business/list.vue'), 'utf8')
+const taskCard = fs.readFileSync(path.join(root, 'src/components/mci-task-card/mci-task-card.vue'), 'utf8')
+const taskList = fs.readFileSync(path.join(root, 'src/pages/task/list.vue'), 'utf8')
 
 for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 'Radio', 'Checkbox', 'Switch', 'Rate', 'RichText']) {
   if (!renderer.includes(control)) fail(`renderer does not cover ${control}`)
@@ -82,10 +94,108 @@ if (!renderer.includes("this.isMultiple && raw && typeof raw === 'object'") ||
 // zhy: 确保新增和编辑页的字段分组保持可折叠能力。
 if (!nativeForm.includes('@tap="toggleGroup(group, groupIndex)"') ||
   !nativeForm.includes('initializeGroupExpansion(definition.groups || [])') ||
-  !nativeForm.includes('this.expandedGroupKeys = [this.groupKey(groups[0], 0)]') ||
+  !nativeForm.includes("group.defaultExpanded !== false") ||
   !nativeForm.includes('.form-section__toggle.expanded') ||
   !nativeForm.includes('this.expandFirstInvalidGroup()')) {
   fail('native form field groups must support collapsed and expanded states')
+}
+if (!formRuntime.includes("field.component === 'CollapseGroup'") ||
+  !formRuntime.includes("source: 'CollapseGroup'") ||
+  !formRuntime.includes('collapse.DefaultCollapsed') ||
+  !formRuntime.includes('collapse.FieldCount')) {
+  fail('native form field groups must follow platform CollapseGroup metadata')
+}
+if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
+  !formRuntime.includes('active.group.relatedFields.push(field)') ||
+  !formRuntime.includes('groups: layoutGroups.filter((group) => group.fields.length)') ||
+  !formRuntime.includes('relatedGroups: layoutGroups') ||
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 6')) {
+  fail('related fields must preserve their platform CollapseGroup ownership')
+}
+if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
+  fail('readonly platform fields must remain visible but non-editable')
+}
+if (!formRuntime.includes("if (value === null || value === undefined || value === '') return '-'")) {
+  fail('empty platform fields must render as dash values')
+}
+if (!businessDetail.includes('const groups = this.definition?.relatedGroups || this.definition?.groups || []') ||
+  businessDetail.includes('(this.preset.sections || []).forEach') ||
+  !moduleDetail.includes('const groups = this.config.definition?.groups || []')) {
+  fail('detail pages must use platform CollapseGroup groups instead of local preset sections')
+}
+if (!formRuntime.includes('normalizeTableTabs(table)') ||
+  !formRuntime.includes('field.formTabKey') ||
+  !nativeForm.includes('v-if="formTabs.length > 1"') ||
+  !moduleDetail.includes('v-if="formTabs.length > 1"') ||
+  !businessDetail.includes('v-if="formTabs.length > 1"') ||
+  !businessDetail.includes(':active-key="activeFormTabKey"')) {
+  fail('form tabs must use platform diy_table.Tabs and hide when only one tab exists')
+}
+const nativeStandaloneRelatedLoop = nativeForm.includes('v-for="relatedTab in standaloneRelatedTabs"')
+  ? 'v-for="relatedTab in standaloneRelatedTabs"'
+  : 'v-for="relatedTab in activeRelatedTabs"'
+if (nativeForm.indexOf('v-for="(group, groupIndex) in groups"') > nativeForm.indexOf(nativeStandaloneRelatedLoop) ||
+  moduleDetail.indexOf('v-for="(group, index) in groups"') > moduleDetail.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
+  businessDetail.indexOf('v-for="(section, sectionIndex) in visibleSections"') > businessDetail.indexOf('v-for="relatedTab in standaloneRelatedTabs"')) {
+  fail('ordinary tab fields must render before related table titles')
+}
+if (!nativeForm.includes('class="form-tabs--full"') ||
+  !formTabs.includes('width: 100%') ||
+  !formTabs.includes('padding: 0;')) {
+  fail('form tab bar must fill the available page width')
+}
+if (!childTable.includes('删除此条') ||
+  !childTable.includes('grid-column: 1 / -1') ||
+  !childTable.includes('child-table__commands { flex: none; gap: 26rpx; }')) {
+  fail('child table actions must keep add separate from toggle and place a large delete action below each row')
+}
+if (!businessList.includes('<mci-business-card') ||
+  !businessList.includes('components: { MciBusinessCard }') ||
+  !relatedBusinessList.includes('<mci-business-card') ||
+  !relatedBusinessList.includes('components: { MciBusinessCard, MciTaskCard }') ||
+  !relatedBusinessList.includes('getBusinessRowActions') ||
+  !relatedBusinessList.includes('loadModuleViewManifest') ||
+  !relatedBusinessList.includes('class="floating-add"')) {
+  fail('standalone and related business lists must share cards, view metadata, row permissions and floating add')
+}
+if (!relatedBusinessList.includes('class="search-row"') ||
+  !relatedBusinessList.includes('openAdvancedFilters') ||
+  !relatedBusinessList.includes('buildFilterWhere()')) {
+  fail('related business lists must preserve standalone search and advanced filters')
+}
+if (!relatedBusinessList.includes('displayMode: { type: String') ||
+  !relatedBusinessList.includes('class="preview-actions"') ||
+  !relatedBusinessList.includes('openMore()') ||
+  !relatedBusinessPage.includes('<mci-business-related-list') ||
+  !relatedBusinessPage.includes("'related-list-context'")) {
+  fail('related business lists must provide a reusable preview and full-list page')
+}
+if (!businessDetail.includes('isEmbeddedChildRelated(item)') ||
+  !businessDetail.includes('display-mode="preview"') ||
+  !businessDetail.includes('section.relatedTabs') ||
+  !businessDetail.includes('groups.filter((group) => group.tabKey === this.activeFormTabKey)')) {
+  fail('TableChild fields must render inside their CollapseGroup as a preview list')
+}
+if (!relatedBusinessList.includes('!waitingForParentSave') ||
+  !relatedBusinessList.includes('保存当前表单后可新增') ||
+  !relatedBusinessList.includes('this.loading = false')) {
+  fail('new parent forms must not leave related lists in a permanent skeleton state')
+}
+if (!taskList.includes('<mci-task-card') ||
+  !taskList.includes('components: { MciTaskCard }') ||
+  !relatedBusinessList.includes('<mci-task-card') ||
+  !taskCard.includes('task-card__bottom')) {
+  fail('standalone and related task lists must share the task card presentation')
+}
+for (const page of [nativeForm, moduleDetail, businessDetail]) {
+  if (!page.includes('<mci-business-related-list v-if="relatedTab.type === \'child\'"') ||
+    page.includes('<mci-child-table v-if="relatedTab.type === \'child\'"') ||
+    !page.includes('components: { MciBusinessRelatedList }')) {
+    fail('form tab child tables must use the same business list presentation as standalone entries')
+  }
+}
+if (!businessCard.includes('card-actions') || !businessCard.includes('查看详情')) {
+  fail('shared business card must preserve list row actions and detail navigation')
 }
 // zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
 for (const token of [
@@ -124,6 +234,48 @@ for (const token of [
 }
 if (!nativeForm.includes('@change="handleNativeFieldChange(field, $event)"')) {
   fail('native form must notify tenant extensions when a field value changes')
+}
+if (!nativeForm.includes('function createDraftRowId()') ||
+  !nativeForm.includes(':parent-id="relationParentId"') ||
+  !nativeForm.includes('Id: this.draftRowId') ||
+  !nativeForm.includes("this.mode === 'Add' && !this.rowId && isFormEngineRecordAdapter(this.recordAdapter)")) {
+  fail('new native forms must preallocate and preserve a parent row id for related records')
+}
+// zhy：未保存客户新增联系人后，必须通过保存事件回传完整记录并在父页草稿列表即时合并。
+for (const token of [
+  'row: savedRow',
+  "parentValue: this.tableChildAuth?.ParentValue || ''"
+]) {
+  if (!nativeForm.includes(token)) fail(`native form saved-row event is missing: ${token}`)
+}
+for (const token of [
+  'mergeDraftChangedRow(payload = {})',
+  "String(this.parentMode || '').toLowerCase() !== 'add'",
+  'payload.parentValue || row[this.childFkField]',
+  'if (this.mergeDraftChangedRow(payload)) return'
+]) {
+  if (!relatedBusinessList.includes(token)) fail(`draft related-row merge is missing: ${token}`)
+}
+for (const token of [
+  'embeddedChildRelatedForGroup(group)',
+  "item?.type === 'child' && Boolean(item.field?.layoutGroupKey)",
+  'display-mode="preview"',
+  'v-for="relatedTab in standaloneRelatedTabs"'
+]) {
+  if (!nativeForm.includes(token)) fail(`embedded related CollapseGroup rendering is missing: ${token}`)
+}
+for (const [source, name] of [
+  [businessDetail, 'business detail'],
+  [moduleDetail, 'module detail']
+]) {
+  for (const token of [
+    'isEmbeddedChildRelated(item)',
+    'item.field.layoutGroupKey === group.key',
+    'display-mode="preview"',
+    'v-for="relatedTab in standaloneRelatedTabs"'
+  ]) {
+    if (!source.includes(token)) fail(`${name} embedded child rendering is missing: ${token}`)
+  }
 }
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')

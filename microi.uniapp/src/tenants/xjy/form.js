@@ -16,8 +16,13 @@ import {
   proposalInheritedValues,
   proposalInitialValues
 } from './proposal-calculation.js'
+import {
+  CUSTOMER_FOLLOW_FIELDS,
+  customerFollowScopeValues
+} from './customer-follow-scope.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
+const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
 const FOLLOWUP_TABLE = 'diy_genjinjl'
@@ -94,6 +99,14 @@ function isCustomerAdd(context) {
 
 function isCustomerForm(context) {
   return String(context.tableName || '').toLowerCase() === CUSTOMER_TABLE
+}
+
+function isCustomerAddressForm(context) {
+  return String(context.tableName || '').toLowerCase() === CUSTOMER_ADDRESS_TABLE
+}
+
+function isCustomerAddressAdd(context) {
+  return isCustomerAddressForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function isCheckinAdd(context) {
@@ -175,6 +188,22 @@ function personnelLink(field) {
     link.sourceNames.some((item) => String(item).toLowerCase() === name) ||
     link.sourceLabels.includes(label)
   )
+}
+
+function isCustomerOwnerField(field) {
+  const name = String(field && field.Name || '').toLowerCase()
+  const label = String(field && field.Label || '').trim()
+  return name === CUSTOMER_FOLLOW_FIELDS.owner.toLowerCase() || label === '负责人'
+}
+
+function applyCustomerFollowScope(context, overrides = {}) {
+  const values = customerFollowScopeValues({
+    ...context.form,
+    ...overrides
+  })
+  context.patchForm(values)
+  context.state.customerFollowScopeValues = values
+  return values
 }
 
 function selectedPersonId(payload, row) {
@@ -482,7 +511,9 @@ function applyCustomerLocation(context, location) {
 }
 
 async function locateCustomer(context, chooseFromMap) {
-  if (!isCustomerAdd(context) || context.state.locating) return
+  const editableLocationForm = (isCustomerForm(context) || isCustomerAddressForm(context)) &&
+    ['Add', 'Edit'].includes(context.mode)
+  if (!editableLocationForm || context.state.locating) return
   context.state.locating = true
   try {
     const source = chooseFromMap
@@ -585,12 +616,18 @@ export function createState() {
     followupInitialized: false,
     followupCustomerId: '',
     followupCustomerName: '',
-    proposalInitialized: false
+    proposalInitialized: false,
+    customerFollowScopeValues: {}
   }
 }
 
 export async function initialize(context) {
-  if (isCustomerAdd(context) && !context.state.locationInitialized) {
+  if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode)) {
+    // zhy：新增、编辑客户统一按负责人归一跟进状态，兼容历史记录状态为空的情况。
+    applyCustomerFollowScope(context)
+  }
+  if ((isCustomerAdd(context) || isCustomerAddressAdd(context)) &&
+    !context.state.locationInitialized) {
     context.state.locationInitialized = true
     setTimeout(() => locateCustomer(context, false), 0)
   }
@@ -652,25 +689,49 @@ export async function initialize(context) {
 }
 
 export function getPresentation(context) {
-  if (!isCheckinAdd(context)) return {}
-  const location = context.state.checkinLocation || {}
-  return {
-    location: {
-      title: '现场位置',
-      actionKey: 'xjy-checkin-location',
-      actionLabel: context.state.locating ? '定位中…' : '重新定位',
-      locating: Boolean(context.state.locating),
-      latitude: Number(location.latitude || 0),
-      longitude: Number(location.longitude || 0),
-      address: String(location.address || ''),
-      emptyText: '点击获取当前位置'
+  if (isCheckinAdd(context)) {
+    const location = context.state.checkinLocation || {}
+    return {
+      location: {
+        title: '现场位置',
+        actionKey: 'xjy-checkin-location',
+        actionLabel: context.state.locating ? '定位中…' : '重新定位',
+        locating: Boolean(context.state.locating),
+        latitude: Number(location.latitude || 0),
+        longitude: Number(location.longitude || 0),
+        address: String(location.address || ''),
+        emptyText: '点击获取当前位置'
+      }
     }
   }
+  if (isCustomerAddressForm(context)) {
+    const latitudeName = fieldName(context, CUSTOMER_LOCATION_FIELDS.latitude)
+    const longitudeName = fieldName(context, CUSTOMER_LOCATION_FIELDS.longitude)
+    const addressName = fieldName(context, CUSTOMER_LOCATION_FIELDS.address, '详细地址')
+    const editable = context.mode !== 'View'
+    return {
+      location: {
+        title: '地址定位',
+        actionKey: editable ? 'xjy-customer-address-location' : '',
+        actionLabel: context.state.locating ? '定位中…' : '重新定位',
+        locating: Boolean(context.state.locating),
+        latitude: Number(context.form[latitudeName] || 0),
+        longitude: Number(context.form[longitudeName] || 0),
+        address: String(context.form[addressName] || ''),
+        emptyText: editable ? '点击选择地址位置' : '该地址暂未保存坐标'
+      }
+    }
+  }
+  return {}
 }
 
 export async function runPresentationAction(context, action) {
   if (action && action.key === 'xjy-checkin-location') {
     await locateCheckin(context, true)
+    return { handled: true }
+  }
+  if (action && action.key === 'xjy-customer-address-location') {
+    await locateCustomer(context, true)
     return { handled: true }
   }
   return { handled: false }
@@ -706,11 +767,28 @@ export function getFieldPresentation(context, field) {
   }
 }
 
+export function getRelatedPresentation(context, field) {
+  if (!isCustomerForm(context) || !field || !field.layoutGroupKey) return {}
+  const config = field.config || {}
+  const title = [
+    field.Label,
+    field.Name,
+    config.TableChildSysMenuName,
+    config.TableChild?.Title
+  ].filter(Boolean).join(' ')
+  if (!/客户地址/.test(title)) return {}
+  return {
+    embedInLayoutGroup: true,
+    displayMode: 'preview',
+    previewLimit: 2
+  }
+}
+
 export function getFieldActions(context, field) {
   if (!field) return []
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
-  if (isCustomerAdd(context) &&
+  if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode) &&
     (name === CUSTOMER_LOCATION_FIELDS.address.toLowerCase() || label === '详细地址')) {
     return [{
       key: 'xjy-customer-location',
@@ -798,10 +876,22 @@ export async function handleFieldSelect(context, payload) {
   const updates = { [phoneName]: phone }
   const submitValues = { [phoneName]: phone }
 
-  if (link.idName && personId !== '') {
+  if (link.idName && payload.cleared) {
+    const idName = fieldName(context, link.idName)
+    updates[idName] = ''
+    submitValues[idName] = ''
+  } else if (link.idName && personId !== '') {
     const idName = fieldName(context, link.idName)
     updates[idName] = personId
     submitValues[idName] = personId
+  }
+
+  if (isCustomerOwnerField(payload.field)) {
+    Object.assign(updates, customerFollowScopeValues({
+      ...context.form,
+      ...updates,
+      [CUSTOMER_FOLLOW_FIELDS.owner]: payload.cleared ? '' : payload.value
+    }))
   }
 
   context.patchForm(updates)
@@ -809,10 +899,37 @@ export async function handleFieldSelect(context, payload) {
     ...(context.state.personnelValues || {}),
     ...submitValues
   }
+  if (isCustomerOwnerField(payload.field)) {
+    context.state.customerFollowScopeValues = customerFollowScopeValues({
+      ...context.form,
+      ...updates
+    })
+  }
   return { handled: true }
 }
 
 export function handleFieldChange(context, payload) {
+  if (isCustomerForm(context) && payload && isCustomerOwnerField(payload.field)) {
+    const ownerName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.owner, '负责人')
+    const ownerIdName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.ownerId)
+    const ownerPhoneName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.ownerPhone, '负责人电话')
+    const ownerCleared = isEmptyFormValue(payload.value)
+    const personnelValues = ownerCleared
+      ? {
+          [ownerIdName]: '',
+          [ownerPhoneName]: ''
+        }
+      : {}
+    context.state.personnelValues = {
+      ...(context.state.personnelValues || {}),
+      ...personnelValues
+    }
+    applyCustomerFollowScope(context, {
+      ...personnelValues,
+      [ownerName]: payload.value
+    })
+    return { handled: true }
+  }
   if (!isProposalForm(context) || !payload ||
     !isProposalCalculationField(payload.field && payload.field.Name)) {
     return { handled: false }
@@ -825,9 +942,21 @@ export function handleFieldChange(context, payload) {
 export async function beforeSubmit(context) {
   if (context.state.locating) throw new Error('正在获取位置，请稍候')
   if (isCustomerForm(context)) {
+    // zhy：隐藏状态字段也必须提交，最终负责人为空时写公海/2，否则写私有/1。
+    const personnelValues = context.state.personnelValues || {}
+    const followScopeValues = customerFollowScopeValues({
+      ...context.form,
+      ...personnelValues
+    })
     return {
       ...(isCustomerAdd(context) ? context.state.locationValues : {}),
-      ...context.state.personnelValues
+      ...personnelValues,
+      ...followScopeValues
+    }
+  }
+  if (isCustomerAddressForm(context)) {
+    return {
+      ...(context.state.locationValues || {})
     }
   }
   if (isCheckinAdd(context)) {
@@ -889,6 +1018,7 @@ export default {
   getPresentation,
   runPresentationAction,
   getFieldPresentation,
+  getRelatedPresentation,
   getFieldActions,
   runFieldAction,
   handleFieldChange,
