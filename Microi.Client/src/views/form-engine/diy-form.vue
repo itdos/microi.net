@@ -995,7 +995,9 @@ export default {
                      _RawMetadata: rawMetadata
                 };
                 if (self.TableId) {
-                    // getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
+                    // GetDiyFieldList 是字段元数据专用接口，后端从顶层 TableId 做参数校验和权限校验。
+                    // 同时保留 _Where，兼容历史 ApiReplace.GetDiyField 指向通用表查询接口的场景。
+                    getFieldListParam.TableId = self.TableId;
                     getFieldListParam._Where = [["TableId", "=", self.TableId]];
                 }
                 // if(self.TableName){
