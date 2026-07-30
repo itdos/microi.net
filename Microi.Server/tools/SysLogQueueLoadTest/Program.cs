@@ -14,7 +14,6 @@ const int distributedUnique = 20_000;
 const int restartRecoveryCount = 1_000;
 
 var spool = Path.Combine(Path.GetTempPath(), "microi-syslog-load-" + Guid.NewGuid().ToString("N"));
-Environment.SetEnvironmentVariable("MICROI_SYSLOG_SPOOL_DIR", spool);
 Directory.CreateDirectory(spool);
 
 try
@@ -23,7 +22,7 @@ try
     var fake = (FakeMongoProxy)(object)mongo;
     fake.FailuresRemaining = simulatedMongoFailures;
     var environment = new TestHostEnvironment { ContentRootPath = spool };
-    var queue = new SysLogQueueService(mongo, NullLogger<SysLogQueueService>.Instance, environment);
+    var queue = CreateQueue(mongo, environment, spool);
     await queue.StartAsync(CancellationToken.None);
 
     var latencies = new long[total];
@@ -81,12 +80,8 @@ try
     // 两个节点连接同一Mongo：相同EventId即使被重复投递，也只能形成一条最终记录。
     var node1Spool = Path.Combine(spool, "node-1");
     var node2Spool = Path.Combine(spool, "node-2");
-    Environment.SetEnvironmentVariable("MICROI_SYSLOG_SPOOL_DIR", node1Spool);
-    Environment.SetEnvironmentVariable("MICROI_NODE_ID", "load-node-1");
-    var node1 = new SysLogQueueService(mongo, NullLogger<SysLogQueueService>.Instance, environment);
-    Environment.SetEnvironmentVariable("MICROI_SYSLOG_SPOOL_DIR", node2Spool);
-    Environment.SetEnvironmentVariable("MICROI_NODE_ID", "load-node-2");
-    var node2 = new SysLogQueueService(mongo, NullLogger<SysLogQueueService>.Instance, environment);
+    var node1 = CreateQueue(mongo, environment, node1Spool);
+    var node2 = CreateQueue(mongo, environment, node2Spool);
     await node1.StartAsync(CancellationToken.None);
     await node2.StartAsync(CancellationToken.None);
     Parallel.For(0, distributedUnique, new ParallelOptions { MaxDegreeOfParallelism = producerConcurrency }, i =>
@@ -105,10 +100,8 @@ try
 
     // 模拟Mongo故障时节点退出，并把一个完整json改为异常中断可能遗留的json.tmp；新实例必须自动恢复重放。
     var recoverySpool = Path.Combine(spool, "restart-node");
-    Environment.SetEnvironmentVariable("MICROI_SYSLOG_SPOOL_DIR", recoverySpool);
-    Environment.SetEnvironmentVariable("MICROI_NODE_ID", "stable-restart-node");
     Interlocked.Exchange(ref fake.FailuresRemaining, 1000);
-    var beforeRestart = new SysLogQueueService(mongo, NullLogger<SysLogQueueService>.Instance, environment);
+    var beforeRestart = CreateQueue(mongo, environment, recoverySpool);
     await beforeRestart.StartAsync(CancellationToken.None);
     for (var i = 0; i < restartRecoveryCount; i++)
         beforeRestart.Enqueue(new SysLogParam
@@ -125,7 +118,7 @@ try
     File.Move(recoveryFile, recoveryFile + ".tmp");
 
     Interlocked.Exchange(ref fake.FailuresRemaining, 0);
-    var afterRestart = new SysLogQueueService(mongo, NullLogger<SysLogQueueService>.Instance, environment);
+    var afterRestart = CreateQueue(mongo, environment, recoverySpool);
     await afterRestart.StartAsync(CancellationToken.None);
     var recoveryDeadline = DateTime.UtcNow.AddSeconds(30);
     while (fake.UniqueEvents.Count < total + distributedUnique + restartRecoveryCount && DateTime.UtcNow < recoveryDeadline)
@@ -141,14 +134,27 @@ try
 }
 finally
 {
-    Environment.SetEnvironmentVariable("MICROI_SYSLOG_SPOOL_DIR", null);
-    Environment.SetEnvironmentVariable("MICROI_NODE_ID", null);
     var resolvedSpool = Path.GetFullPath(spool);
     var resolvedTemp = Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
     if (resolvedSpool.StartsWith(resolvedTemp, StringComparison.OrdinalIgnoreCase)
         && Path.GetFileName(resolvedSpool).StartsWith("microi-syslog-load-", StringComparison.Ordinal)
         && Directory.Exists(resolvedSpool))
         Directory.Delete(resolvedSpool, true);
+}
+
+static SysLogQueueService CreateQueue(IMongoDB mongo, IHostEnvironment environment, string spoolDirectory)
+{
+    return new SysLogQueueService(
+        mongo,
+        NullLogger<SysLogQueueService>.Instance,
+        environment,
+        new SysLogQueueOptions
+        {
+            Capacity = 4096,
+            OverflowCapacity = 512,
+            BatchSize = 250,
+            SpoolDirectory = spoolDirectory
+        });
 }
 
 public class FakeMongoProxy : DispatchProxy

@@ -462,6 +462,68 @@ test('updateModule rejects a false success when EditCodeShowV8 is not persisted'
   }
 });
 
+test('createModule completes and verifies MicroService menu linkage after the idempotent create call', async () => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+      requests.push({ url, body });
+      if (url.endsWith('/api/V8Engine/CreateModule')) {
+        return jsonResponse({ Code: 1, Data: { ModuleId: 'menu-1', Url: '/micro-app/mcp-ai-vue-test/context-test' }, Msg: '' });
+      }
+      if (url.endsWith('/api/V8Engine/UpdateModule')) {
+        return jsonResponse({ Code: 1, Data: { ModuleId: 'menu-1' }, Msg: '' });
+      }
+      if (url.endsWith('/api/V8Engine/GetModule')) {
+        return jsonResponse({
+          Code: 1,
+          Data: {
+            Id: 'menu-1',
+            IsMicroiService: 1,
+            OpenType: 'MicroService',
+            ComponentName: 'MicroService',
+            ComponentPath: '/micro-app/host',
+            Url: '/micro-app/mcp-ai-vue-test/context-test',
+            MicroServiceId: 'service-1',
+            MicroServicePageId: 'page-1',
+            MicroServiceRoutePath: '/context-test',
+          },
+          Msg: '',
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    const result = await createClient().createModule({
+      Name: '上下文测试',
+      ParentId: 'test-parent',
+      OpenType: 'MicroService',
+      ComponentName: 'MicroService',
+      ComponentPath: '/micro-app/host',
+      Url: '/micro-app/mcp-ai-vue-test/context-test',
+      IsMicroiService: 1,
+      MicroServiceId: 'service-1',
+      MicroServicePageId: 'page-1',
+      MicroServiceRoutePath: '/context-test',
+      MicroServiceKey: 'mcp-ai-vue-test',
+    });
+
+    assert.equal(result.Code, 1);
+    assert.equal((result.Data as Record<string, unknown>).MicroServiceBindingVerified, true);
+    assert.equal(requests.filter(request => request.url.endsWith('/api/V8Engine/CreateModule')).length, 1);
+    assert.equal(requests.filter(request => request.url.endsWith('/api/V8Engine/UpdateModule')).length, 1);
+    assert.equal(requests.filter(request => request.url.endsWith('/api/V8Engine/GetModule')).length, 1);
+    const update = requests.find(request => request.url.endsWith('/api/V8Engine/UpdateModule'))?.body;
+    assert.equal(update?.MicroServicePageId, 'page-1');
+    assert.equal(update?.MicroServiceRoutePath, '/context-test');
+    assert.equal(update?.MicroServiceKey, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test('createTableIndex confirms an uncertain DDL write by normalized index readback', async () => {
   const originalFetch = globalThis.fetch;
   let indexes: Record<string, unknown>[] = [];

@@ -56,7 +56,7 @@ try {
 }
 ```
 
-“数据库扩展”应用包为 `microi_database` 配置后端提交后 V8 事件。新增、修改、启用、停用或删除连接提交成功后，事件调用 `V8.Method.RefreshExtensionDatabases()`；该方法在数据库事务真正提交后递增当前租户的共享 Redis 版本，所有 API 节点在下一次访问 `V8.Dbs` 时立即重载，事务回滚则不会发布错误版本。默认 60 秒 TTL（`MICROI_EXTENSION_DATABASE_CACHE_SECONDS`）只作为旧节点或异常情况下的兜底，不再要求重启 API。
+“数据库扩展”应用包为 `microi_database` 配置后端提交后 V8 事件。新增、修改、启用、停用或删除连接提交成功后，事件调用 `V8.Method.RefreshExtensionDatabases()`；该方法在数据库事务真正提交后递增当前租户的共享 Redis 版本，所有 API 节点在下一次访问 `V8.Dbs` 时立即重载，事务回滚则不会发布错误版本。默认 60 秒 TTL 只作为旧节点或异常情况下的兜底；需要调整时修改 SaaS 引擎主租户的 `ExtensionDatabaseCacheSeconds`，不再要求重启 API。
 
 `DbType` 选项、`DbKey`、长连接串控件和不同数据库的连接串填写提示属于“数据库扩展”应用的表单设计。请在应用商城安装或更新该应用；平台启动升级程序不会修改这些非启动关键元数据。
 

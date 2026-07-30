@@ -107,7 +107,7 @@ SaaS 配置、接口引擎、表/字段元数据、菜单、角色、用户、�
 
 ### 1. 租户业务配置与独立灾难保护上限
 
-下列值是环境变量、`appsettings` 和代码提供的业务默认值，不是租户不可突破的硬上限：
+下列值是平台代码提供的租户业务默认值，不是租户不可突破的硬上限：
 
 | 配置 | 默认值 |
 |---|---:|
@@ -121,7 +121,7 @@ Upgrade16 会在 `sys_osclients` 增加六个可空租户字段：
 
 `FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。
 
-有效业务值按当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值取第一项，租户可以提高或降低业务默认值。最终结果仍受独立 `Absolute*` 灾难保护、`ForceDisabled` 紧急熔断、HTTP/Multipart/Form 解析和反向代理上限约束；这些运维边界不接受租户覆盖。帐号与租户日额度在共享 Redis 中原子预留，适用于多节点；Redis 不可用时失败关闭。普通交互式上传强制使用私有桶，且一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后台任务仍受平台灾难保护上限。
+有效业务值按当前租户 `sys_osclients` → 代码默认值取第一项，租户可以提高或降低业务默认值。最终结果仍受平台固定灾难保护、API 接收硬顶和反向代理上限约束；这些边界不接受租户覆盖。帐号与租户日额度在共享 Redis 中原子预留，适用于多节点；Redis 不可用时失败关闭。普通交互式上传强制使用私有桶，且一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后台任务仍受平台灾难保护上限。
 
 ### 2. 私有文件不是“知道路径即可访问”
 
@@ -182,13 +182,12 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 
 ### CORS
 
-为兼容本地开发、独立前端、H5 和存量租户，主 SaaS 配置 `sys_osclients.CorsAllowOrigins` 与 `Cors:AllowOrigins` 都未配置时，默认允许任意来源跨域（等价于 `*` 的来源匹配，同时支持凭据）。只有配置来源后，才按精确来源或通配符收紧。
+为兼容本地开发、独立前端、H5 和存量租户，主 SaaS 配置 `sys_osclients.CorsAllowOrigins` 未配置时，默认允许任意来源跨域（等价于 `*` 的来源匹配，同时支持凭据）。只有配置来源后，才按精确来源或通配符收紧。
 
-可使用：
+统一在 SaaS 引擎主租户的“平台运行配置”中维护：
 
-- `MICROI_CORS_ALLOW_ORIGINS` / `Cors:AllowOrigins`
-- `MICROI_CORS_ALLOW_ANY_WHEN_UNCONFIGURED` / `Cors:AllowAnyWhenUnconfigured`
-- 主租户 `sys_osclients.CorsAllowOrigins`
+- `CorsAllowOrigins`：允许的精确来源或通配来源；
+- `CorsAllowAnyWhenUnconfigured`：来源未配置时是否保持兼容放行，默认开启。
 
 默认兼容开关为允许。跨域响应暴露 `authorization`、`osclient`、`did` 等会话续签所需 Header。CORS 不是鉴权边界，不能代替 Token、菜单、表权限和数据范围。
 
@@ -202,7 +201,7 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 - 云元数据地址
 - HTTP 重定向
 
-只有显式设置 `SsrfProtection:Enabled=true` 或 `MICROI_SSRF_PROTECTION_ENABLED=true` 后才进入严格模式。严格模式仅允许 HTTP(S)，拒绝 URL 凭据、私网/特殊地址和重定向；使用 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 精确放行主机。历史 `DisableSsrfProtection=true` 和 `SsrfAllowedHosts` 继续兼容。
+只有在 SaaS 引擎主租户的“平台运行配置”中启用 `SsrfProtectionEnabled` 后才进入严格模式。严格模式仅允许 HTTP(S)，拒绝 URL 凭据、私网/特殊地址和重定向；使用 `SsrfAllowedHosts` 精确放行主机。保存后由 SaaS 引擎刷新共享配置，无需给 API 容器增加环境变量。
 
 ---
 
@@ -241,6 +240,9 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 - 密钥权限只能收窄，最终权限始终是“帐号当前角色/菜单权限 ∩ 密钥范围”。帐号停用、角色变化、密钥到期或吊销都会影响后续请求。
 - 默认范围为 `page:open + form:read`。创建界面通过页面名称勾选或粘贴完整页面网址自动解析，不要求普通用户手写路由或物理表名；写权限、文件读取和引擎运行必须显式启用。
 - 页面和表单数据可以选择“全部已授权”，内部用单独的 `*` 范围值表示。这里的“全部”仅取消访问密钥自身的二次白名单，最终仍与目标帐号实时菜单、表单、部门和行级权限取交集，不能扩大帐号权限。接口引擎 Key 和数据源引擎 Key 不允许 `*`，仍须准确选择。
+- 页面范围为“全部已授权”时，受限会话可以调用 `GetSysMenuStep` 加载该帐号实时菜单树；指定页面密钥不加载完整菜单树。平台只开放页面启动、表单运行、本人后台任务和本人终端信息所需的运行时接口，并按 scope 再校验每个表、接口引擎和数据源。显示密码、访问密钥管理、菜单/表结构设计、服务器与缓存管理、查看或踢出其它终端等控制面接口始终拒绝访问密钥会话。
+- 表单范围保存的是易于管理的表名；运行时会从共享数据库解析成对应 `diy_table.Id` 和所属 `diy_field.Id`，并写入带版本的短 TTL Redis 缓存，因此只传 `TableId` 的字段元数据请求以及只传 `_FieldId/FieldIds` 的下拉数据源请求也会执行同一份精确白名单。解析失败时按未授权处理，不能降级为全部表。
+- `ApiEngineController` 的动态运行入口虽然兼容匿名接口，但只要请求携带访问密钥会话，就必须先解析实际命中的接口模型，再核对准确 `ApiEngineKey`；数据源和后台接口任务同样核对准确 Key，禁止用 URL 别名或异步任务绕过白名单。
 - 密钥兑换得到的 `_ClientType=AccessKey` 会话默认 20 分钟，通过正常 Token 轮换续期；每次请求仍校验共享 Redis/数据库中的密钥状态，不依赖单机内存或粘性会话。
 - 兑换接口只接收 JSON Body，不接受 Query String。前端链接把密钥放在 Hash 路由参数中，首次解析后立即从地址栏清除，避免它随初始 HTTP 请求进入反向代理和 Referer 日志。
 - 仍应使用 HTTPS，并为看板创建独立的只读帐号。链接本身属于敏感凭据，复制到聊天、截图或浏览器同步历史都可能泄露，应按密钥处理。
@@ -269,6 +271,8 @@ https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yy
 
 配置大屏时优先勾选目标页面，并选择“全部已授权数据”，避免普通用户判断底层表名；使用专用只读帐号即可继续限制实际数据范围。如果大屏组件还会调用接口引擎或数据源引擎，只添加实际使用的准确 Key，禁止为引擎填写通配符。
 
+排错时如果 `GetSysMenuStep` 返回“当前访问密钥未授权调用此接口”，先确认密钥页面范围是否为“全部已授权”。指定页面密钥不需要该接口；若全部页面密钥仍被拒绝，说明 API 服务尚未部署支持访问密钥运行时接口矩阵的版本。不要为了临时放行把整个 `SysMenu`、`FormEngine` 或其它 Controller 加入无条件白名单。
+
 ### 管理员显示系统用户密码
 
 存量部署将 `sys_user.Pwd` 以可逆 DES 保存时，平台超级管理员可以在【系统账号】页面（/#/mic-sys-user）打开帐号编辑表单后点击【显示密码】。`POST /api/SysUser/GetSysUserPassword` 只允许普通管理员登录会话调用；访问密钥会话和普通角色均拒绝。接口只解密 `PwdEncode=DES`（历史空值按 DES 兼容），自定义 V8 密码编码不做通用解密；成功查看会写安全审计日志，响应禁止缓存且日志不记录明文密码。
@@ -279,7 +283,7 @@ https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yy
 
 ## 九、运行时资源保护
 
-`SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 用于限制高频异常请求、并发 V8、数据库连接打开、启动并发和资源压力。全局上限由环境变量、主租户运行配置和 `appsettings` 控制；子租户隔离值只能降低自己的额度，不能抬高整个进程上限。
+恶意访问防护、请求压力保护、ORM、启动并发等普通运行参数统一在 SaaS 引擎主租户的“平台运行配置”中维护；V8 执行额度在系统设置中维护，并继续受代码固定硬边界约束。子租户隔离值只能降低自己的额度，不能抬高整个进程上限。
 
 限流、并发控制和熔断需要按多节点语义设计。进程内计数只代表当前节点；平台级配额、授权版本、会话、票据和任务租约应使用共享 Redis、数据库或可靠消息系统。
 
@@ -289,12 +293,12 @@ https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yy
 
 默认资源边界为：
 
-| 配置 | 默认值 | 环境变量 / 配置路径 |
+| 配置 | 默认值 | SaaS 引擎主租户字段 |
 |---|---:|---|
-| 当前节点全部会话 | 32 | `MICROI_SPIDER_MAX_SESSIONS_TOTAL` / `Spider:MaxSessionsTotal` |
-| 每个租户与引擎作用域会话 | 4 | `MICROI_SPIDER_MAX_SESSIONS_PER_SCOPE` / `Spider:MaxSessionsPerScope` |
-| 空闲回收 | 30 分钟 | `MICROI_SPIDER_SESSION_IDLE_MINUTES` / `Spider:SessionIdleMinutes` |
-| 最长生命周期 | 8 小时 | `MICROI_SPIDER_SESSION_MAX_HOURS` / `Spider:SessionMaxHours` |
+| 当前节点全部会话 | 32 | `SpiderMaxSessionsTotal` |
+| 每个租户与引擎作用域会话 | 4 | `SpiderMaxSessionsPerScope` |
+| 空闲回收 | 30 分钟 | `SpiderSessionIdleMinutes` |
+| 最长生命周期 | 8 小时 | `SpiderSessionMaxHours` |
 | 单条抓包响应体 | 默认 200,000 字符，硬上限 1,000,000 | 调用参数 `CaptureResponseBodyMaxLength` 只能在硬上限内收紧 |
 | 每会话抓包条数 | 100 | 超出后移除最旧记录 |
 

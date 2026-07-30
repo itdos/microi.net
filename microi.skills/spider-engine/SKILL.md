@@ -135,7 +135,7 @@ OpenClaw Worker 应做到：
 - V8 调用禁止传 `ExecutablePath`、`UserDataDir`，平台按 `OsClient + ApiEngineKey/EventName + SessionId/ProfileKey` 隔离浏览器目录。
 - 默认当前节点最多 32 个会话、每租户/引擎作用域最多 4 个；空闲 30 分钟或总生命周期 8 小时回收。
 - 抓包响应体默认最多 200,000 字符、硬上限 1,000,000，每会话保留最近 100 条。
-- 配置项：`Spider:MaxSessionsTotal`、`Spider:MaxSessionsPerScope`、`Spider:SessionIdleMinutes`、`Spider:SessionMaxHours`；环境变量对应 `MICROI_SPIDER_*`。
+- 会话额度统一在 SaaS 引擎主租户配置 `SpiderMaxSessionsTotal`、`SpiderMaxSessionsPerScope`、`SpiderSessionIdleMinutes`、`SpiderSessionMaxHours`；不要为普通采集运行参数增加 API/Worker 环境变量。
 - 浏览器会话和会话数配额当前是节点内状态。多节点复用登录态必须使用粘性路由或独立 Spider Worker；任务状态、幂等键、checkpoint 和结果必须写共享数据库/MQ。
 - SSRF 默认兼容不等于任意用户都可提交 URL。采集目标仍应由受控规则/白名单决定，普通用户不能创建任意采集脚本。
 

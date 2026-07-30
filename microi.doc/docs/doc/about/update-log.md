@@ -1,5 +1,27 @@
 # 更新日志
 
+## v6.8.4 - (2026-07-29 19:16)
+
+- **版本发布与仓库边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.8.4；Microi VS Code 插件及内置 Skills 升级至 v4.3.7。本次继续按根仓库、`Microi.Server/Microi.net`、`Microi.Server/Microi.AI`、`Microi.VSCode` 四个 Git 边界汇总，`microi.mcp/dist` 等编译产物及本地诊断日志不纳入功能变更说明。
+- **指定历史范围与合并去重**：根仓库 `baab78a`、Microi.net `c5b3500`、Microi.VSCode `478eb16` 都是各自当前 `HEAD`，从指定提交到 `HEAD` 的范围均只有该提交本身，且三者都是单父普通提交，没有后续提交、自动 merge 或额外冲突解决代码；因此分别按根仓库 122 个非 `dist` 文件、Microi.net 13 个文件、VS Code 7 个文件的净差异审计。`baab78a` 中已写入 v6.7.7 的访问密钥、AI 助手、应用商城等基础能力不重复累计，本节以下只补记尚未覆盖的实际增量。
+- **数据权限设计器、字段唯一方式与定制组件保存（补记根仓库 `baab78a`）**：数据权限可视化配置以可读的 `MICROI_DATA_PERMISSION_CONFIG` 注释随最终 SQL 持久化，重新打开时可恢复图形规则，同时最终 SQL 始终允许直接编辑；提交前统一刷新 Monaco／定制组件的防抖值，服务端执行时只剥离图形恢复标记，避免刚输入的条件丢失或标记进入真实查询。字段设计器新增“单独唯一（允许空值重复）／同时唯一（组合约束）”并兼容历史 Config；物理 `DevComponent` 字段识别、值回写和保存链路同步修复。
+- **V8 嵌套调用预算与结构化诊断（补记根仓库 `baab78a`、Microi.net `c5b3500`）**：新增单层 Jint 累计分配预算、根调用树总预算、接口嵌套深度和嵌套内存隔离，子接口不再被每层父接口重复计费，同时整棵调用树仍有总上限；嵌套调用复用全局／租户并发名额、同 Key 重入避免自锁，并传递取消信号。超时、语句数、递归、单层／调用树内存和并发等待统一返回 `V8Limit` 诊断，脚本可通过 `V8.Limits` 查看本片有效预算；Upgrade22 幂等补充租户配置字段并纠正“累计分配量不等于实时堆内存”的历史描述。
+- **可信后台身份与主租户授权闭环（补记根仓库 `baab78a`、Microi.net `c5b3500`）**：持久化后台任务从服务端保存的认证快照恢复 `AsyncLocal` 可信身份，允许内部 Worker 调用 `StopHttp=1` 接口并保留 `_InvokeType=Client` 业务事件语义，修复无 HTTP Token 时的 Code=1001；可信身份不暴露给 `V8.Param`，脚本参数不能伪造管理员。主租户创建 SaaS 租户继续要求实时主租户超级管理员授权，后台执行不放宽租户边界，取消和节点停止信号可传入 V8 执行片段。
+- **空数据库发布残留审计（补记根仓库 `baab78a`）**：空库发布进一步识别并删除 AI 应用／商城相关物理表、表字段元数据及遗留运行数据，保留平台必需服务；发布结果新增非空表数量和行数排行，连接串先经 Dos.ORM 兼容规范化，再执行多数据库包生成及零残留门禁，便于定位异常大表和模板污染。
+- **VS Code 身份恢复与 V8 类型提示（补记 `478eb16`）**：插件把 Token 新增、轮换和清理实时同步到 MCP Token 文件，MCP 身份失效时只写入不含凭据的短期恢复请求，由扩展宿主从 SecretStorage 按 `ApiBase + OsClient + 产品类型 + 网络环境` 精确恢复；同一身份采用 single-flight 合并并发恢复，校验失败 Token 的 SHA-256、请求时效和失败冷却，避免多连接串号或递归重登。同步识别签名／安全版本失效、验证码登录和租户配置错误，并为 `V8.Limits` 补齐超时、语句、递归、嵌套和累计分配类型声明。
+- **SaaS 主租户运行参数集中管理**：普通运行、安全和集成参数从环境变量／`appsettings.json` 迁入主租户 `sys_osclients`，Upgrade23 幂等增加跨域、SSRF、后台任务、多语言缓存、OAuth、畅捷通、微信、安全防护、请求压力、ORM 连接／DDL 和采集会话等字段；API、FormEngine、Dos.ORM、Spider、微信／消息控制器统一通过运行态读取器取值。数据库、Redis、节点 Id、持久卷和密钥等启动基础设施仍保留专用配置路径，避免把节点级机密混入业务参数。
+- **API 进程内存、流量退出与有界停机**：新增基于常驻集 RSS 的进程级内存软／硬阈值保护，软阈值停止接收普通新请求并让 readiness 返回降级，liveness 保持存活；硬阈值连续命中后先退出流量、请求宿主停止，宽限期后仍失控可用退出码 137 交由编排器重启。请求压力中间件同步返回 503 与 `Retry-After`，诊断接口公开当前 RSS、托管堆、阈值和停机状态，节点恢复到回滞线以下后再接单。
+- **系统日志有界队列与故障 spool**：异步系统日志改为 4096 主队列、512 溢出区和分批写入，消除无界内存增长；每批先以 WriteThrough 写入带稳定节点标识的本地 spool，再写 MongoDB，队列已满、Mongo 故障或服务排空时同步进入紧急 spool，启动后自动恢复临时文件并幂等重放。监控增加队列、溢出、紧急落盘、丢弃和 spool 文件数；生产多节点应为每个 `MICROI_NODE_ID` 挂载独立持久卷。
+- **文件上传限额与 413 全链路诊断**：ASP.NET Core 接收层统一提供 2GB 请求／multipart 硬上限，租户业务限额继续从 `sys_osclients` 与代码默认值读取；全局异常处理覆盖请求体过大、multipart 解析失败和 Controller 之前的 413，返回接收层、业务层、HDFS 层及 nginx 调整建议，并在 HDFS 响应头回传限额信息。PC 图片／文件控件新增失败回调和用户可读诊断，清理“正在上传”占位与失败文件，避免前端误报成功或残留假记录。
+- **多语言运行时缓存安全重载**：`diy_lang` 缓存从一次性读取 20 万行改为按 Id 游标分页、物理字段白名单和命令超时加载，只投影配置语言列；加载前校验有效行数，并限制行数、字符总量、Key 与翻译文本长度。达到预算、游标异常或依赖失败时保留旧缓存并记录统计，不再用异常大表耗尽 API 内存；页大小和预算由 SaaS 主租户配置维护。
+- **访问密钥运行态授权继续收口**：精确白名单扩展到 FormEngine、模块／流程、页面元数据、接口引擎、数据源、HDFS 和后台任务等受限运行接口，同时解析表 Key、表 Id、字段 Id 和间接菜单／流程引用；缺少引用、混合越权或无法证明范围时失败关闭。接口引擎按真实 Key／Address 回读授权，导出、数据源和后台任务再次执行控制器级校验；访问密钥会话不能获得管理员／超级管理员界面能力、踢出其它终端或进入应用资产发布控制面。
+- **MCP Vue 微服务脚手架与二进制流式发布**：新增 `microi_scaffold_vue_microservice`，只允许在真实的租户“AI应用”目录中通过 dry-run 与精确确认创建 Vue 3 + Vite、多页面路由、MicroApp 上下文和 V8 SDK 脚手架，不覆盖不同项目或跟随符号链接。新增单文件与整目录流式发布：本地逐文件计算 SHA-256，拒绝 `.git`、`node_modules`、密钥、环境文件、越界路径和失控文件量，以 multipart 常量内存直达不可变 HDFS 版本目录，不经过 JSON、Base64 或 Jint；完整清单和完整性标记校验通过后才由服务端复制切换 root／latest 稳定入口，失败可安全重试。
+- **微服务菜单绑定与可恢复客户端分片**：MCP 创建模块支持 `OpenType=MicroService`，同时校验服务 Id、页面 Id、稳定 Key 和内部路由的归属关系，并保存 `IsMicroiService`、页面与路由绑定，避免菜单指向其它服务。长操作若已在前端按独立事务分片，可声明 `ClientChunked`／`ClientSequential + MaxItemsPerChunk + Resumable` 保留客户端执行；缺少单片上限或不可恢复时仍按后台任务规则阻止伪分片。
+- **一键安装与 LibreTranslate 闭环**：默认固定使用内置 Skills 与权限感知 Schema 搜索，不再询问或部署 Ollama、`nomic-embed-text`、Qdrant；MinIO 桶初始化改用吾码阿里云镜像中的官方 `mc`，避免直连海外下载站。LibreTranslate 固定 1.9.6 镜像，必须等待 booting 标记消失、HTTP 健康和 API Key 数据库就绪，注册随机 Key 后执行真实翻译烟测，再把 Provider、URL、Key 和超时写入当前租户 `sys_osclients` 并回读一致；终端和错误日志不输出 Key 明文。
+- **Microi.AI 子仓库待提交内容**：程序集从 v6.7.7 升级至 v6.8.3；内嵌 AI Skill 明确一键安装不启用向量依赖、只有运维验证服务且租户显式开启后才使用向量召回；翻译 Skill 补充 SaaS 配置写后回读、LibreTranslate 启动误报根因、API Key 注册和真实翻译验证规则。
+- **VS Code 与 MCP 工作区衔接**：插件当前待提交版本由 v4.3.4 升至 v4.3.7，并向每个 MCP 配置注入 `MICROI_WORKSPACE_ROOT`、`MICROI_SYNC_ROOT`、`MICROI_AI_APPLICATIONS_DIR`，使脚手架和应用发布准确定位当前租户工作区、同步根及“AI应用”目录；Microi.net 子仓库当前待提交内容仅为 v6.8.2 到 v6.8.3 的版本元数据升级。
+- **回归、文档与 Skills 同步**：新增上传错误、请求体超限、SaaS 运行配置、多语言预算、应用资产流式发布、微服务脚手架、访问密钥、V8 内存、SSRF、采集安全、缓存升级、后台任务分片、LibreTranslate 和应用商城构建等回归用例；Docker／本地运行、数据库、HDFS、安全、SaaS、采集、翻译、V8 服务端及 MCP／Skills 文档同步更新。以上仅表示源码与用例已纳入本次待提交范围，不把未执行的完整构建、真实多节点部署或生产环境验收表述为已通过。
+
 ## v6.7.7 - (2026-07-28 22:07)
 
 - **版本发布与仓库边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.7.7；Microi VS Code 插件及内置 Skills 升级至 v4.2.9。Microi.AI 子仓库本轮除版本元数据外无其它待提交功能代码；本次继续按根仓库、Microi.net、Microi.AI、Microi.VSCode 四个 Git 边界汇总，`dist` 等编译产物不纳入功能变更说明。

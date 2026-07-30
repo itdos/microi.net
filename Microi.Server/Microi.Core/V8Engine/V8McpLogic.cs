@@ -2778,6 +2778,20 @@ namespace Microi.net
         /// <summary>
         /// 新增功能模块（sys_menu）
         /// </summary>
+        private static string NormalizeMcpMicroServiceRoutePath(string value)
+        {
+            var routePath = (value ?? "").Trim().Replace('\\', '/');
+            if (routePath.DosIsNullOrWhiteSpace()) return "/";
+            if (!routePath.StartsWith("/")) routePath = "/" + routePath;
+            while (routePath.Contains("//")) routePath = routePath.Replace("//", "/");
+            if (routePath.IndexOf('?') >= 0 || routePath.IndexOf('#') >= 0
+                || routePath.Split('/').Any(segment => segment == ".."))
+            {
+                throw new ArgumentException("MicroServiceRoutePath 不合法。");
+            }
+            return routePath.Length > 1 ? routePath.TrimEnd('/') : routePath;
+        }
+
         public static async Task<DosResult<object>> CreateModule(
             string osClient, string name, string diyTableId,
             string componentName, string componentPath,
@@ -2796,10 +2810,75 @@ namespace Microi.net
             string mobileListFields = null,
             string cardTitleTagFields = null, string cardBottomTagFields = null,
             int enableViewSchema = 0, string viewSchemaVersion = "1.0",
-            int viewConfigVersion = 1, string viewSchema = null)
+            int viewConfigVersion = 1, string viewSchema = null,
+            int isMicroiService = 0, string microServiceId = null,
+            string microServicePageId = null, string microServiceRoutePath = null,
+            string microServiceKey = null)
         {
             try
             {
+                var isMicroServiceMenu = isMicroiService == 1
+                    || string.Equals(openType, "MicroService", StringComparison.OrdinalIgnoreCase)
+                    || !microServiceId.DosIsNullOrWhiteSpace()
+                    || !microServicePageId.DosIsNullOrWhiteSpace()
+                    || !microServiceRoutePath.DosIsNullOrWhiteSpace();
+                if (isMicroServiceMenu)
+                {
+                    var hasRoutePath = !microServiceRoutePath.DosIsNullOrWhiteSpace();
+                    microServiceKey = NormalizeMicroServiceKey(microServiceKey);
+                    microServiceRoutePath = NormalizeMcpMicroServiceRoutePath(microServiceRoutePath);
+                    if (microServiceId.DosIsNullOrWhiteSpace()
+                        || microServicePageId.DosIsNullOrWhiteSpace()
+                        || !hasRoutePath
+                        || microServiceKey.DosIsNullOrWhiteSpace())
+                    {
+                        return new DosResult<object>(0, null,
+                            "MicroService 菜单必须同时提供 MicroServiceId、MicroServicePageId、MicroServiceRoutePath 和 MicroServiceKey。");
+                    }
+
+                    var serviceResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice", new
+                    {
+                        OsClient = osClient,
+                        Id = microServiceId,
+                        _SelectFields = new[] { "Id", "MsKey", "IsEnable" }
+                    });
+                    if (serviceResult.Code != 1 || serviceResult.Data == null)
+                    {
+                        return new DosResult<object>(0, null, "MicroServiceId 对应的微服务不存在。");
+                    }
+                    var savedServiceKey = NormalizeMicroServiceKey((string)serviceResult.Data.MsKey);
+                    if (!string.Equals(savedServiceKey, microServiceKey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult<object>(0, null, "MicroServiceKey 与 MicroServiceId 对应的微服务不一致。");
+                    }
+
+                    var pageResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice_page", new
+                    {
+                        OsClient = osClient,
+                        Id = microServicePageId,
+                        _SelectFields = new[] { "Id", "MicroServiceId", "RoutePath", "IsEnable" }
+                    });
+                    if (pageResult.Code != 1 || pageResult.Data == null
+                        || !string.Equals((string)pageResult.Data.MicroServiceId, microServiceId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult<object>(0, null, "MicroServicePageId 不存在或不属于指定微服务。");
+                    }
+                    var savedRoutePath = NormalizeMcpMicroServiceRoutePath((string)pageResult.Data.RoutePath);
+                    if (!string.Equals(savedRoutePath, microServiceRoutePath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return new DosResult<object>(0, null, "MicroServiceRoutePath 与微服务页面记录不一致。");
+                    }
+
+                    openType = "MicroService";
+                    componentName = componentName.DosIsNullOrWhiteSpace() ? "MicroService" : componentName;
+                    componentPath = componentPath.DosIsNullOrWhiteSpace() ? "/micro-app/host" : componentPath;
+                    if (url.DosIsNullOrWhiteSpace())
+                    {
+                        url = "/micro-app/" + Uri.EscapeDataString(microServiceKey)
+                            + (microServiceRoutePath == "/" ? "" : microServiceRoutePath);
+                    }
+                }
+
                 // 检查模块名是否已存在（同 ParentId 下 Name 唯一即视为重复，幂等返回该模块）
                 var existWhere = new List<object>()
                 {
@@ -2968,6 +3047,13 @@ namespace Microi.net
                 if (!string.IsNullOrWhiteSpace(mobileListFields)) menuData["MobileListFields"] = mobileListFields;
                 if (!string.IsNullOrWhiteSpace(cardTitleTagFields)) menuData["CardTitleTagFields"] = cardTitleTagFields;
                 if (!string.IsNullOrWhiteSpace(cardBottomTagFields)) menuData["CardBottomTagFields"] = cardBottomTagFields;
+                if (isMicroServiceMenu)
+                {
+                    menuData["IsMicroiService"] = 1;
+                    menuData["MicroServiceId"] = microServiceId;
+                    menuData["MicroServicePageId"] = microServicePageId;
+                    menuData["MicroServiceRoutePath"] = microServiceRoutePath;
+                }
 
                 // 并发安全：插入时若仍命中"已存在唯一值"（最常见为 Url 列），自动追加随机后缀重试最多 5 次
                 DosResult addResult = null;
@@ -3812,6 +3898,7 @@ namespace Microi.net
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
                     "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText",
                     "DefaultPageSize", "TableCardCol", "TableCardImgField", "TableCardImgStyle", "TableCardImgPosition", "GeneralSeaarch", "HiddenIndex",
+                    "IsMicroiService", "MicroServiceId", "MicroServicePageId", "MicroServiceRoutePath",
                     "AddCodeShowV8", "EditCodeShowV8", "DelCodeShowV8", "DetailPageV8"
                 };
                 var data = BuildDataFromParam(osClient, param, allowed, moduleId);
@@ -5150,6 +5237,19 @@ namespace Microi.net
                 if (!(routes[i] is JObject route)) continue;
                 var routePath = route["RoutePath"]?.Val<string>() ?? route["Path"]?.Val<string>() ?? "/";
                 if (routePath.DosIsNullOrWhiteSpace()) routePath = "/";
+                var routeMetaToken = route["RouteMetaJson"];
+                var routeMetaJson = routeMetaToken?.Type == JTokenType.String
+                    ? routeMetaToken.Val<string>()
+                    : routeMetaToken?.ToString(Newtonsoft.Json.Formatting.None);
+                if (routeMetaJson.DosIsNullOrWhiteSpace())
+                {
+                    var routeMeta = new JObject();
+                    var sourceFile = route["SourceFile"] ?? route["sourceFile"];
+                    var meta = route["Meta"] ?? route["meta"];
+                    if (sourceFile != null) routeMeta["SourceFile"] = CloneToken(sourceFile);
+                    if (meta != null) routeMeta["Meta"] = CloneToken(meta);
+                    routeMetaJson = routeMeta.ToString(Newtonsoft.Json.Formatting.None);
+                }
                 var pageData = new JObject
                 {
                     ["OsClient"] = osClient,
@@ -5160,12 +5260,13 @@ namespace Microi.net
                     ["PageTitle"] = route["PageTitle"]?.Val<string>() ?? route["Title"]?.Val<string>() ?? route["PageName"]?.Val<string>() ?? $"页面{i + 1}",
                     ["RoutePath"] = routePath,
                     ["EntryPath"] = route["EntryPath"]?.Val<string>() ?? entryPath,
+                    ["SourceDirName"] = route["SourceDirName"]?.Val<string>() ?? route["sourceDirName"]?.Val<string>() ?? msKey,
                     ["MenuUrl"] = route["MenuUrl"]?.Val<string>() ?? $"/micro-app/{msKey}{routePath}",
                     ["Sort"] = route["Sort"]?.Val<int?>() ?? i,
                     ["IsHome"] = route["IsHome"]?.Val<int?>() ?? (i == 0 ? 1 : 0),
                     ["IsEnable"] = route["IsEnable"]?.Val<int?>() ?? 1,
                     ["BuildVersion"] = buildVersion,
-                    ["RouteMetaJson"] = route.ToString(Newtonsoft.Json.Formatting.None)
+                    ["RouteMetaJson"] = routeMetaJson
                 };
 
                 var exist = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice_page", new

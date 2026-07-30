@@ -9,10 +9,54 @@ export interface McpServerContext {
     /** Codex compatibility mode exposes only microi_codex at protocol level. */
     codexMode?: boolean;
 }
+export interface LocalApplicationAsset {
+    absolutePath: string;
+    relativePath: string;
+    size: number;
+    sha256: string;
+    isEntry: boolean;
+}
+export interface LocalApplicationAssetManifest {
+    rootDirectory: string;
+    entryPath: string;
+    assets: LocalApplicationAsset[];
+    totalSize: number;
+    skippedSourceMaps: string[];
+}
+/**
+ * Inspect and hash a built directory without loading any file wholly into RAM.
+ * The hard caps also stop accidental node_modules/.git/trash-directory loops.
+ */
+export declare function buildLocalApplicationAssetManifest(rootDirectory: string, entryPath?: string, options?: {
+    includeSourceMaps?: boolean;
+    maxFiles?: number;
+    maxTotalBytes?: number;
+}): Promise<LocalApplicationAssetManifest>;
+interface AccessKeyCreationConfirmationInput {
+    name: string;
+    allowedRoutes: string[];
+    allowedTableNames: string[];
+    scopes?: string[];
+    redirectPath?: string;
+    allowedApiEngineKeys?: string[];
+    allowedDataSourceKeys?: string[];
+    expiresAt?: string;
+    remark?: string;
+}
+/**
+ * Canonicalize the effective access-key grant before asking for confirmation.
+ * The returned SHA-256 binds confirmation to scopes, allowlists and expiry,
+ * rather than only to a reusable display name.
+ */
+export declare function buildAccessKeyCreationConfirmation(input: AccessKeyCreationConfirmationInput): {
+    normalized: Required<AccessKeyCreationConfirmationInput>;
+    sha256: string;
+};
 /**
  * 创建 MCP Server 并注册所有工具
  * @param client - Microi API 客户端
  * @param context - 服务器上下文（OsClient、API地址），用于在 instructions 中标识身份
  */
 export declare function createMcpServer(client: MicroiClient, context: McpServerContext): McpServer;
+export {};
 //# sourceMappingURL=server.d.ts.map

@@ -124,7 +124,11 @@ namespace Microi.net.Api
                 health.Persisted,
                 health.Retried,
                 health.Pending,
+                health.Capacity,
+                health.OverflowCapacity,
                 health.OverflowPending,
+                health.EmergencySpooled,
+                health.Dropped,
                 health.FailedBatches,
                 health.LastError,
                 health.LastPersistedAt

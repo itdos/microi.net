@@ -207,6 +207,83 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        /// <summary>
+        /// 将一个已编译应用资产以 multipart 二进制流直接写入 HDFS 历史版本目录。
+        /// 文件体不会进入 JSON、Base64 或 Jint；稳定入口由完整清单确认接口统一切换。
+        /// </summary>
+        [HttpPost]
+        [Consumes("multipart/form-data")]
+        [RequestSizeLimit(1090519040L)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 1090519040L)]
+        public async Task<IActionResult> UploadApplicationAssetStream()
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (!Request.HasFormContentType) return Ok(new DosResult(0, null, "请求必须是 multipart/form-data"));
+
+            try
+            {
+                var form = await Request.ReadFormAsync(HttpContext.RequestAborted);
+                if (form.Files.Count != 1) return Ok(new DosResult(0, null, "每次必须且只能上传一个应用资产文件"));
+                var file = form.Files[0];
+                var osClient = V8McpLogic.ResolveOsClient(form["OsClient"].ToString(), (object)token);
+                if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                var relativePath = form["RelativePath"].ToString();
+                var normalizedFileName = (relativePath ?? string.Empty).Replace('\\', '/');
+                var lastSlash = normalizedFileName.LastIndexOf('/');
+                if (lastSlash >= 0) normalizedFileName = normalizedFileName.Substring(lastSlash + 1);
+
+                await using var stream = file.OpenReadStream();
+                var result = await V8McpLogic.UploadApplicationAssetStream(
+                    osClient,
+                    form["AppIdOrKey"].ToString(),
+                    form["VersionNo"].ToString(),
+                    relativePath,
+                    form["ExpectedSha256"].ToString(),
+                    normalizedFileName,
+                    stream,
+                    file.Length,
+                    token,
+                    HttpContext.RequestAborted);
+                return Ok(result);
+            }
+            catch (OperationCanceledException)
+            {
+                return Ok(new DosResult(0, null, "应用资产流式上传已取消"));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "应用资产流式上传请求失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 校验完整版本清单，并通过 HDFS 服务端复制切换 root/latest 稳定入口。
+        /// 请求只包含路径、大小、SHA-256 与路由元数据，不包含文件体。
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> FinalizeApplicationStreamPublish([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+                if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                var result = await V8McpLogic.FinalizeApplicationStreamPublish(
+                    osClient,
+                    param,
+                    token,
+                    HttpContext.RequestAborted);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "确认应用流式发布失败：" + ex.Message));
+            }
+        }
+
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetMicroService(string osClient, string msKey, [FromBody] JObject param = null)
         {
@@ -722,7 +799,12 @@ namespace Microi.net.Api
                 param["EnableViewSchema"]?.Val<int>() ?? 0,
                 param["ViewSchemaVersion"].Val<string>() ?? "1.0",
                 param["ViewConfigVersion"]?.Val<int>() ?? 1,
-                param["ViewSchema"].Val<string>());
+                param["ViewSchema"].Val<string>(),
+                param["IsMicroiService"]?.Val<int>() ?? 0,
+                param["MicroServiceId"].Val<string>(),
+                param["MicroServicePageId"].Val<string>(),
+                param["MicroServiceRoutePath"].Val<string>(),
+                param["MicroServiceKey"].Val<string>());
             return Ok(result);
         }
 

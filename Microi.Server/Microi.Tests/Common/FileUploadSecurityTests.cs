@@ -274,7 +274,7 @@ public class FileUploadSecurityTests
     }
 
     [Fact]
-    public void MissingTenantValues_KeepEnvironmentOrAppsettingsFallback()
+    public void MissingTenantValues_KeepPlatformCodeDefaults()
     {
         var fallback = new FileUploadSecurityOptions
         {

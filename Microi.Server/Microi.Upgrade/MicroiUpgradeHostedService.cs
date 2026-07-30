@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Microsoft.Extensions.Hosting;
-using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -138,16 +136,13 @@ namespace Microi.net
 
             try
             {
-                var langList = runtimeClient.Db.FromSql("select * from diy_lang").ToList<dynamic>();
-                var langLevel2 = new Dictionary<string, JObject>(StringComparer.OrdinalIgnoreCase);
-                foreach (var item in langList)
+                var reloadResult = await MicroiEngine.FormEngine
+                    .ReloadDiyLangCacheAsync(runtimeClient.OsClient)
+                    .ConfigureAwait(false);
+                if (reloadResult.Code != 1)
                 {
-                    var itemObj = JObject.FromObject(item);
-                    var key = itemObj["Key"]?.ToString()?.Trim();
-                    if (!key.DosIsNullOrWhiteSpace()) langLevel2[key] = itemObj;
+                    Console.WriteLine($"Microi：【Error异常】【{tenantName}】加载多语言运行时缓存失败：{reloadResult.Msg}");
                 }
-                DiyMessage.Msg[runtimeClient.OsClient] = langLevel2;
-                DiyMessage.ClearSourceTextCache(runtimeClient.OsClient);
             }
             catch (Exception ex)
             {

@@ -290,6 +290,23 @@ return V8.ClientType != 'PC';
 
 应用安装、初始化多语言、批量导入、批量修复、跨系统同步等可能超过浏览器或网关等待时间的操作，必须优先设计为后台任务。判断阈值：预计超过 2 分钟、500 条以上、1000 个以上扇出子操作、100 次以上外部调用，或总量未知且可能持续运行。前端按钮只负责提交任务，后台任务列表通过 WebSocket/SignalR 推送并以轮询兜底。
 
+少量数据也可能因为单次 V8 根执行的累计分配量过大而需要拆分。如果业务天然支持“每片独立事务提交、失败后按剩余量安全恢复”，按钮可以在前端发起多个独立 HTTP 请求，并声明客户端分片协议：
+
+```jsonc
+{
+  "Name": "批量生成主构件码",
+  "Workload": {
+    "ExecutionMode": "ClientChunked",
+    "MaxItemsPerChunk": 40,
+    "Resumable": true,
+    "ExpectedItems": 200
+  },
+  "V8Code": "// 按 MaxItemsPerChunk 构造切片，并逐片 await V8.ApiEngine.Run(...)"
+}
+```
+
+逐条独立调用可使用 `ExecutionMode: "ClientSequential"` 和 `MaxItemsPerChunk: 1`。该声明必须与真实代码一致，且每片是新的 HTTP 请求；在同一次接口引擎调用中仅把大数组切成多个循环，不会重置 Jint 累计内存。缺少明确单片上限、不能恢复、预计总耗时超过 2 分钟或总量未知时，仍应使用后台任务和持久化检查点。
+
 推荐直接使用按钮字段：
 
 ```jsonc

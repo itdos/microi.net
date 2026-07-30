@@ -9,16 +9,13 @@ namespace Microi.net.Api;
 
 public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>
 {
-    private readonly IConfiguration _configuration;
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CorsOptionsConfigurator> _logger;
 
     public CorsOptionsConfigurator(
-        IConfiguration configuration,
         IServiceProvider serviceProvider,
         ILogger<CorsOptionsConfigurator> logger)
     {
-        _configuration = configuration;
         _serviceProvider = serviceProvider;
         _logger = logger;
     }
@@ -175,33 +172,14 @@ public class CorsOptionsConfigurator : IConfigureNamedOptions<CorsOptions>
 
     private string GetConfigAllowOrigins()
     {
-        return Environment.GetEnvironmentVariable("MICROI_CORS_ALLOW_ORIGINS")
-            ?? _configuration["Cors:AllowOrigins"]
-            ?? string.Empty;
+        return string.Empty;
     }
 
     private bool GetAllowAnyWhenUnconfigured()
     {
-        var env = Environment.GetEnvironmentVariable("MICROI_CORS_ALLOW_ANY_WHEN_UNCONFIGURED");
-        var value = string.IsNullOrWhiteSpace(env)
-            ? _configuration["Cors:AllowAnyWhenUnconfigured"]
-            : env;
-
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return true;
-        }
-
-        return IsTruthy(value);
-    }
-
-    private static bool IsTruthy(string? value)
-    {
-        return value != null &&
-            (value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-             value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
-             value.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
-             value.Equals("y", StringComparison.OrdinalIgnoreCase));
+        return ConfigHelper.GetRuntimeConfigurationBool(
+            "Cors:AllowAnyWhenUnconfigured",
+            true);
     }
 
     private static bool IsAllowAnyOriginPattern(string pattern)
