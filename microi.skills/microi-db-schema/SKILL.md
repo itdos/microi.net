@@ -104,13 +104,32 @@ AI 或 MCP 生成低代码系统时，必须默认遵守此规则。发现已有
 
 字段较多的表单不要全部堆在一页：优先设置 `diy_table.Tabs`，并给字段写入 `diy_field.Tab`，常见分组为基础信息、联系信息、业务信息、附件备注、扩展信息。局部区域再用 `CollapseGroup` 或字段级 `Tabs` 控件做折叠/分段；`Textarea`、`RichText`、`CodeEditor`、上传、地图、子表、布局/自定义控件等使用 `FormWidth=24` 独占整行。
 
-`TableChild` 子表控件如需支持单独导入子表数据，应在 `diy_field.Config.TableChild` 中同时配置子表表名/Id、关联子表列名，以及导入反查主表关系：
+### 1:N 子表建模门禁
+
+- “子表、明细、清单、条目、行项目、多个记录”默认表示主表 1:N 子表；必须创建独立子表，
+  并把真实外键放在子表。不得创建主表 `XxxId` 后用 `JoinForm` 冒充子表。
+- `JoinForm` 仅用于主表保存一个目标 Id 并嵌入一条独立目标记录；目标表不能与当前表相同。
+  关系基数不明确时，MCP 写入前必须询问，不能把 `JoinForm` 当安全默认值。
+- 子表外键通常建立 `(OsClient, ParentId)` 组合索引。子表还要有绑定同一子表的隐藏菜单，
+  `Display=0`、`AppDisplay=0`、`HasChild=0`。
+- Manifest/蓝图审查时，只要发现 1:N 关系对应 `JoinForm`、缺少子表外键、缺少隐藏子菜单
+  或缺少回查索引，就必须判定计划不合格，停止写入。
+- 新建子表的 `diy_table.Id` / `sys_menu.Id` 尚未回读时，分两阶段创建并用
+  `microi_update_field` 补 `TableChild` Config；不得猜 Id，也不得为了单次生成而换成
+  `JoinForm`。
+
+`TableChild` 配置中的表、菜单和外键位于 `diy_field.Config` 根节点；主表列名和导入选项
+位于 `diy_field.Config.TableChild`。例如：
 
 ```json
 {
+  "TableChildTableId": "子表 diy_table.Id",
+  "TableChildSysMenuId": "子表 sys_menu.Id",
+  "TableChildSysMenuName": "项目成品清单",
+  "TableChildFkFieldName": "XiangmuId",
+  "TableChildCallbackField": "",
   "TableChild": {
-    "TableChildTableId": "子表 diy_table.Id",
-    "TableChildFkFieldName": "XiangmuID",
+    "PrimaryTableFieldName": "Id",
     "ImportAutoFillFk": true,
     "ImportRelations": [
       { "Parent": "Code", "Child": "XiangmuBM" }
@@ -118,12 +137,13 @@ AI 或 MCP 生成低代码系统时，必须默认遵守此规则。发现已有
     "ImportBackfillFields": [
       { "Parent": "Code", "Child": "XiangmuBM" },
       { "Parent": "Name", "Child": "XiangmuMC" }
-    ]
+    ],
+    "DisablePagination": false
   }
 }
 ```
 
-`ImportRelations` 中 `Parent` 和 `Child` 可填字段名或字段标题；多组关系表示组合匹配。典型场景是 Excel 只有项目编号/客户名称，没有主表 Id，导入引擎通过 `Parent` 字段批量查主表 Id，再写入子表 `TableChildFkFieldName`。不要只依赖猜测字段名；业务关键子表必须显式配置 `ImportRelations`，并在修改后刷新结构缓存。
+`ImportRelations` 中 `Parent` 和 `Child` 可填字段名或字段标题；多组关系表示组合匹配。典型场景是 Excel 只有项目编号/客户名称，没有主表 Id，导入引擎通过 `Parent` 字段批量查主表 Id，再写入 Config 根节点指定的 `TableChildFkFieldName`。不要只依赖猜测字段名；业务关键子表必须显式配置 `ImportRelations`，并在修改后刷新结构缓存。
 
 `ImportBackfillFields` 用于把已匹配到的主表字段回填到子表字段，例如项目主表的 `Code`、`Name` 回填到成品清单的 `XiangmuBM`、`XiangmuMC`。当 Excel 缺少这些展示冗余列，但导入发生在主表子表弹窗或可通过 `ImportRelations` 找到主表时，导入引擎会批量查询主表并补齐；Excel 已传值时不覆盖。旧版根节点 `Config.TableChildCallbackField` 保存的同类 JSON 数组也会被导入引擎兼容读取。
 

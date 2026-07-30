@@ -16,6 +16,9 @@ public class UserAccessKeySecurityTests
             ["_AccessKeyAllowedRoutes"] = new JArray("/mic/data-dashboard/preview/dashboard-1"),
             ["_AccessKeyAllowedTableNames"] = new JArray("mic_data_dashboard"),
             ["_AccessKeyAllowedTableIds"] = new JArray("table-dashboard-id"),
+            ["_AccessKeyAllowedMenuReferences"] = new JArray(
+                "menu-dashboard-id",
+                "module-dashboard-key"),
             ["_AccessKeyAllowedFieldIds"] = new JArray("field-dashboard-id"),
             ["_AccessKeyAllowedApiEngineKeys"] = new JArray("dashboard_summary"),
             ["_AccessKeyAllowedDataSourceKeys"] = new JArray()
@@ -105,6 +108,59 @@ public class UserAccessKeySecurityTests
         Assert.False(UserAccessKeySecurity.IsTableOperationAllowed(user, "business_table", false));
         user["_AccessKeyScopes"] = new JArray("page:open");
         Assert.False(UserAccessKeySecurity.IsTableOperationAllowed(user, "business_table", true));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RuntimeScope_PreservesLiveAccountAdministratorState(bool isAdmin)
+    {
+        var user = new JObject
+        {
+            ["Id"] = "user-1",
+            ["Account"] = "tester",
+            ["_IsAdmin"] = isAdmin,
+            ["_AccessKeySession"] = true,
+            ["_AccessKeyId"] = "old-key"
+        };
+        var runtime = new UserAccessKeyRuntime
+        {
+            Id = "key-1",
+            TargetUserId = "user-1",
+            Name = "screen",
+            State = 1,
+            Scopes = "[\"page:open\",\"form:read\"]",
+            AllowedRoutes = "[\"*\"]",
+            AllowedTableNames = "[\"*\"]",
+            AllowedTableIds = "[\"*\"]",
+            AllowedMenuReferences = "[\"*\"]",
+            AllowedFieldIds = "[\"*\"]",
+            AllowedApiEngineKeys = "[]",
+            AllowedDataSourceKeys = "[]"
+        };
+
+        var result = UserAccessKeyService.ApplyRuntimeScope(user, runtime);
+
+        Assert.Equal(1, result.Code);
+        Assert.Equal(isAdmin, result.Data["_IsAdmin"]?.Value<bool>());
+        Assert.Equal("key-1", result.Data["_AccessKeyId"]?.ToString());
+        Assert.Equal("old-key", user["_AccessKeyId"]?.ToString());
+    }
+
+    [Fact]
+    public void RuntimeScope_FailsClosedForRevokedRuntime()
+    {
+        var result = UserAccessKeyService.ApplyRuntimeScope(
+            new JObject { ["Id"] = "user-1", ["_IsAdmin"] = true },
+            new UserAccessKeyRuntime
+            {
+                Id = "key-1",
+                TargetUserId = "user-1",
+                State = 2
+            });
+
+        Assert.Equal(1001, result.Code);
+        Assert.Null(result.Data);
     }
 
     [Fact]
@@ -207,9 +263,76 @@ public class UserAccessKeySecurityTests
         Assert.True(UserAccessKeySecurity.TryGetDynamicFormEngineAction(
             path,
             out var dynamicAction));
+        Assert.True(UserAccessKeySecurity.TryGetDynamicFormEngineRoute(
+            path,
+            out var parsedAction,
+            out var routeReference));
+        Assert.Equal(dynamicAction, parsedAction);
+        Assert.False(string.IsNullOrWhiteSpace(routeReference));
         Assert.Contains(dynamicAction, new[] { "GetTableData", "GetFormData" });
         Assert.True(isRead);
         Assert.False(isExport);
+    }
+
+    [Fact]
+    public void DynamicFormEngineRoute_ModuleEngineKeyUsesDerivedMenuScope()
+    {
+        var user = NewScopedUser();
+
+        Assert.True(UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
+            user,
+            "/api/FormEngine/GetTableData-menu-dashboard-id",
+            Array.Empty<string>(),
+            new[] { "menu-dashboard-id" },
+            Array.Empty<string>()));
+        Assert.False(UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
+            user,
+            "/api/FormEngine/GetTableData-menu-other-id",
+            Array.Empty<string>(),
+            new[] { "menu-other-id" },
+            Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void DynamicFormEngineRoute_FullDataScopeAllowsMenuIdRequestBody()
+    {
+        var user = NewScopedUser();
+        user["_AccessKeyAllowedTableNames"] = new JArray("*");
+        user["_AccessKeyAllowedTableIds"] = new JArray("*");
+        user["_AccessKeyAllowedMenuReferences"] = new JArray("*");
+        const string menuId = "01kk9865pn34c97fg0w8af33pb";
+
+        Assert.True(UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
+            user,
+            "/api/FormEngine/GetTableData-" + menuId,
+            Array.Empty<string>(),
+            new[] { menuId },
+            Array.Empty<string>()));
+    }
+
+    [Fact]
+    public void DynamicFormEngineRoute_RequiresBodyReferenceAndMatchingSuffix()
+    {
+        var user = NewScopedUser();
+
+        Assert.True(UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
+            user,
+            "/api/FormEngine/GetTableData-mic-data-dashboard",
+            new[] { "mic_data_dashboard" },
+            Array.Empty<string>(),
+            Array.Empty<string>()));
+        Assert.False(UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
+            user,
+            "/api/FormEngine/GetTableData-mic-data-dashboard",
+            new[] { "other_table" },
+            Array.Empty<string>(),
+            Array.Empty<string>()));
+        Assert.False(UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
+            user,
+            "/api/FormEngine/GetTableData-mic-data-dashboard",
+            Array.Empty<string>(),
+            Array.Empty<string>(),
+            Array.Empty<string>()));
     }
 
     [Theory]
@@ -251,6 +374,10 @@ public class UserAccessKeySecurityTests
             out _,
             out _));
         Assert.False(UserAccessKeySecurity.TryGetDynamicFormEngineAction(path, out _));
+        Assert.False(UserAccessKeySecurity.TryGetDynamicFormEngineRoute(
+            path,
+            out _,
+            out _));
     }
 
     [Fact]
@@ -289,6 +416,7 @@ public class UserAccessKeySecurityTests
         user["_AccessKeyAllowedRoutes"] = new JArray("*");
         user["_AccessKeyAllowedTableNames"] = new JArray("*");
         user["_AccessKeyAllowedTableIds"] = new JArray("*");
+        user["_AccessKeyAllowedMenuReferences"] = new JArray("*");
         user["_AccessKeyAllowedFieldIds"] = new JArray("*");
         user["_AccessKeyAllowedDataSourceKeys"] = new JArray("dashboard_source");
 

@@ -80,6 +80,7 @@ public sealed class EmptyDatabaseReleaseServiceTests
     [Fact]
     public void ReleaseTargets_AreFixedAndCannotComeFromRuntimeInput()
     {
+        Assert.Equal("admin_build_sanitized_empty_database", EmptyDatabaseReleaseService.WorkerApiEngineKey);
         Assert.Equal("iTdos", ReadPrivateConstant("RequiredOsClient"));
         Assert.Equal("itdos", ReadPrivateConstant("RequiredSourceDatabase"));
         Assert.Equal("microi_empty_temp", ReadPrivateConstant("TargetDatabase"));

@@ -22,6 +22,10 @@ import { createV8Http } from "./v8-http.js";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
 import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
 import { prepareCodeEditorTransport } from "./code-editor-transport.js";
+import {
+    hasAuthorizationIdentityChanged,
+    normalizeAuthorizationToken
+} from "./auth-transition.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -1851,12 +1855,26 @@ var DiyCommon = {
         // });
     },
     NormalizeAuthorizationToken: function (token) {
-        return String(token || "").replace(/^Bearer\s+/i, "").trim();
+        return normalizeAuthorizationToken(token);
     },
     HasTokenChangedSinceRequest: function (requestToken) {
-        var requested = DiyCommon.NormalizeAuthorizationToken(requestToken);
-        var current = DiyCommon.NormalizeAuthorizationToken(DiyCommon.getToken());
-        return !DiyCommon.IsNull(requested) && !DiyCommon.IsNull(current) && requested !== current;
+        return hasAuthorizationIdentityChanged(requestToken, DiyCommon.getToken());
+    },
+    BeginAuthTransition: function () {
+        DiyCommon._AuthTransitionActive = true;
+        DiyCommon._AuthRedirecting = false;
+        DiyCommon._LoginPending = false;
+        if (DiyCommon._TokenReplacementRecoveryTimer) {
+            window.clearTimeout(DiyCommon._TokenReplacementRecoveryTimer);
+            DiyCommon._TokenReplacementRecoveryTimer = null;
+        }
+    },
+    EndAuthTransition: function () {
+        DiyCommon._AuthTransitionActive = false;
+        DiyCommon._AuthRedirecting = false;
+    },
+    IsAuthTransitionActive: function () {
+        return DiyCommon._AuthTransitionActive === true;
     },
     GetAuthFailureReason: function (result) {
         if (!result || typeof result !== "object") return "";
@@ -2006,6 +2024,10 @@ var DiyCommon = {
                 || authMessage.indexOf("token失效") > -1
                 || authMessage.indexOf("请重新登录") > -1;
             if (isAuthenticationFailure) {
+                if (DiyCommon.IsAuthTransitionActive()) {
+                    console.warn("[Auth] 登录身份正在安全切换，忽略旧请求的认证失败结果。");
+                    return false;
+                }
                 // TokenReplaced 通常表示另一个并发请求刚完成续签。新 Token 的响应可能
                 // 还在网络中，不能先清空共享 Token，否则详情初始化的后续请求都会变成
                 // MissingToken。等待短暂窗口后仍未收到新 Token，才要求重新登录。
@@ -2148,19 +2170,27 @@ var DiyCommon = {
 
         DiyCommon.UseAxios(axiosOption);
     },
-    PostAsync: async function (url, param, callback, errorCallback, paramType) {
+    PostAsync: async function (url, param, callback, errorCallback, paramType, requestOptions) {
         var self = this;
         var realUrl = "";
         var header = {};
         var other = "";
+        requestOptions = requestOptions || {};
         if (typeof url == "object") {
+            var requestConfig = url;
             realUrl = url.url;
             param = url.data;
             callback = url.success;
-            errorCallback = url.fail;
+            errorCallback = url.error || url.fail;
             other = url.other;
             paramType = url.dataType;
-            header = url.header;
+            header = url.header || {};
+            requestOptions = Object.assign({}, requestOptions, {
+                skipAuthorization: requestConfig.skipAuthorization === true,
+                suppressAuthFailure: requestConfig.suppressAuthFailure === true,
+                suppressErrorNotification: requestConfig.suppressErrorNotification === true,
+                timeout: requestConfig.timeout
+            });
         } else {
             realUrl = url;
         }
@@ -2184,7 +2214,11 @@ var DiyCommon = {
                 resolve: resolve,
                 reject: reject,
                 paramType: paramType,
-                header: header
+                header: header,
+                skipAuthorization: requestOptions.skipAuthorization === true,
+                suppressAuthFailure: requestOptions.suppressAuthFailure === true,
+                suppressErrorNotification: requestOptions.suppressErrorNotification === true,
+                timeout: requestOptions.timeout
             });
         });
     },
@@ -2290,12 +2324,17 @@ var DiyCommon = {
     UseAxios: function (params) {
         var self = this;
         var { url, param, callback, errorCallback, method, sync, other, resolve, reject, paramType, header } = params;
-        var requestToken = DiyCommon.getToken();
-        if (!header) {
-            header = {};
-        }
+        var skipAuthorization = params.skipAuthorization === true;
+        var suppressAuthFailure = params.suppressAuthFailure === true;
+        var suppressErrorNotification = params.suppressErrorNotification === true;
+        var requestToken = skipAuthorization ? "" : DiyCommon.getToken();
+        header = Object.assign({}, header || {});
         header.did = DiyCommon.GetDid();
-        if (!DiyCommon.IsNull(requestToken)) {
+        if (skipAuthorization) {
+            delete header.authorization;
+            delete header.Authorization;
+            delete header["X-Token"];
+        } else if (!DiyCommon.IsNull(requestToken)) {
             header.authorization = "Bearer " + requestToken;
         }
         header.macaddress = LocalStorageManager.get("MacAddress") || "";
@@ -2310,6 +2349,9 @@ var DiyCommon = {
             changeOrigin: true,
             headers: header
         };
+        if (Number(params.timeout) > 0) {
+            axiosOption.timeout = Number(params.timeout);
+        }
         if (method == "post") {
             axiosOption.data = param;
             // if (paramType && paramType.toLowerCase() == "json") {
@@ -2367,35 +2409,39 @@ var DiyCommon = {
                 if (error.response) {
                     if (error.response.status == 401) {
                         console.log(error);
-                        if (DiyCommon.HasTokenChangedSinceRequest(requestToken)) {
+                        if (suppressAuthFailure || DiyCommon.IsAuthTransitionActive()) {
+                            console.warn("[Auth] 忽略身份切换期间的旧请求 401。");
+                        } else if (DiyCommon.HasTokenChangedSinceRequest(requestToken)) {
                             console.warn("[Auth] 忽略旧 Token 请求返回的 401。");
                             if (!DiyCommon.IsNull(reject)) {
                                 reject(error);
                             }
                             return;
                         }
-                        DiyCommon.setToken("");
-                        removeToken();
-                        var isRedisManagerRoute = DiyCommon.IsRedisManagerRoute();
-                        if (isRedisManagerRoute) {
-                            window.dispatchEvent(new CustomEvent("microi-redis-auth-expired", { detail: error.response.data }));
-                        }
-                        // 弹出登录（并发节流：多个请求同时 401 只弹一次）
-                        if (!isRedisManagerRoute && !DiyCommon._LoginPending) {
-                            DiyCommon._LoginPending = true;
-                            try {
-                                var ret = DiyCommon.OpenLogin();
-                                if (ret && typeof ret.finally === "function") {
-                                    ret.finally(function () { DiyCommon._LoginPending = false; });
-                                } else {
-                                    setTimeout(function () { DiyCommon._LoginPending = false; }, 3000);
+                        if (!suppressAuthFailure && !DiyCommon.IsAuthTransitionActive()) {
+                            DiyCommon.setToken("");
+                            removeToken();
+                            var isRedisManagerRoute = DiyCommon.IsRedisManagerRoute();
+                            if (isRedisManagerRoute) {
+                                window.dispatchEvent(new CustomEvent("microi-redis-auth-expired", { detail: error.response.data }));
+                            }
+                            // 弹出登录（并发节流：多个请求同时 401 只弹一次）
+                            if (!isRedisManagerRoute && !DiyCommon._LoginPending) {
+                                DiyCommon._LoginPending = true;
+                                try {
+                                    var ret = DiyCommon.OpenLogin();
+                                    if (ret && typeof ret.finally === "function") {
+                                        ret.finally(function () { DiyCommon._LoginPending = false; });
+                                    } else {
+                                        setTimeout(function () { DiyCommon._LoginPending = false; }, 3000);
+                                    }
+                                } catch (e) {
+                                    DiyCommon._LoginPending = false;
                                 }
-                            } catch (e) {
-                                DiyCommon._LoginPending = false;
                             }
                         }
                     }
-                    if (!DiyCommon.IsRedisManagerRoute()) {
+                    if (!suppressErrorNotification && !DiyCommon.IsRedisManagerRoute()) {
                         DiyCommon.Tips(error.response.status + " " + error.message, false);
                     }
                 } else {

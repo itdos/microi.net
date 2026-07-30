@@ -88,7 +88,11 @@ service.interceptors.response.use(
                 && DiyCommon
                 && typeof DiyCommon.HasTokenChangedSinceRequest === "function"
                 && DiyCommon.HasTokenChangedSinceRequest(requestToken);
-            if (tokenChanged) {
+            const authTransitionActive = isAuthFailure
+                && DiyCommon
+                && typeof DiyCommon.IsAuthTransitionActive === "function"
+                && DiyCommon.IsAuthTransitionActive();
+            if (tokenChanged || authTransitionActive) {
                 return Promise.reject(new Error(res.Msg || "Stale token request failed"));
             }
             Message({
@@ -116,11 +120,16 @@ service.interceptors.response.use(
             method: error.config?.method
         });
         console.log("err" + error); // for debug
-        Message({
-            message: error.message,
-            type: "error",
-            duration: 5 * 1000
-        });
+        const authTransitionActive = DiyCommon
+            && typeof DiyCommon.IsAuthTransitionActive === "function"
+            && DiyCommon.IsAuthTransitionActive();
+        if (!authTransitionActive) {
+            Message({
+                message: error.message,
+                type: "error",
+                duration: 5 * 1000
+            });
+        }
         return Promise.reject(error);
     }
 );

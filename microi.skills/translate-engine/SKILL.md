@@ -43,11 +43,11 @@ LibreTranslate 是可选动态翻译供应商，不是 `diy_lang` 的替代品�
 2. 预设 1 加 `ja,ko,vi,th,id,ms,tl`；
 3. 安装脚本列出的全部语言。
 
-用户可追加经过白名单校验的语言 Key。语言越多，首次模型下载越慢；部署流程必须等待健康检查和 API Key 注册成功，超时或容器退出应明确失败，不能吞掉 `ltmanage` 错误后报告成功。
+用户可追加经过白名单校验的语言 Key。语言越多，首次模型下载越慢；一键安装不得等待模型下载或 HTTP 就绪。应先用同版本镜像独立初始化持久化 `api_keys.db`、写入并回读随机 API Key，再启动正式容器并确认其进入运行状态，让语言模型在容器中继续初始化，不阻塞吾码主体安装。
 
 服务端统一从 SaaS 引擎租户配置读取 `TranslateProvider`、`TranslateUrl`（兼容 `TranslateApiUrl` / `LibreTranslateUrl`）、`TranslateApiKey`（兼容 `TranslateKey`）和 `TranslateTimeout`；不要再为翻译供应商增加 API 容器环境变量。密钥不得进入前端、日志或文档示例的固定默认值。
 
-一键安装在服务健康且 API Key 注册成功后，必须把当前 `OsClient` 的 `TranslateProvider=LibreTranslate`、局域网基础地址 `TranslateUrl`、匹配的 `TranslateApiKey` 和超时写入 `sys_osclients`，并立即回读一致性；任一步失败都应终止安装。日志只显示 Provider 与 URL，禁止输出密钥。
+一键安装在 API Key 数据库预初始化成功、正式容器进入运行状态后，必须把当前 `OsClient` 的 `TranslateProvider=LibreTranslate`、局域网基础地址 `TranslateUrl`、匹配的 `TranslateApiKey` 和超时写入 `sys_osclients`，并立即回读一致性；任一步失败都应终止安装。日志只显示 Provider 与 URL，禁止输出密钥。模型尚未完成时翻译能力可以暂时不可用，但不得拖住其它服务的安装。
 
 独立编排应使用 ASCII 目录和显式项目名 `docker compose -p microi-libretranslate`；只供平台 API 调用时，不默认开放 LibreTranslate 宿主机防火墙端口。需要公网调用时必须由运维显式配置 TLS、反向代理、访问控制、限流和强 API Key。
 
@@ -71,7 +71,7 @@ LibreTranslate 是可选动态翻译供应商，不是 `diy_lang` 的替代品�
 - [ ] 普通租户无法伪造 `OsClient`
 - [ ] 密钥、原始隐私文本和供应商堆栈不泄露
 - [ ] 长度、批量、超时、限流和费用上限生效
-- [ ] LibreTranslate 未选择时不部署；选择后健康检查与随机 API Key 注册成功
+- [ ] LibreTranslate 未选择时不部署；选择后 API Key 数据库预初始化成功且正式容器已启动
 - [ ] LibreTranslate 内部端口未被安装脚本默认加入防火墙放行列表
 - [ ] 缓存按租户/供应商/语言隔离
 - [ ] 多节点配置失效与批量幂等通过
@@ -80,5 +80,12 @@ LibreTranslate 是可选动态翻译供应商，不是 `diy_lang` 的替代品�
 
 - 触发场景：一键安装日志仍显示 `Updating Language models` / `Downloading ...`，脚本却已经进入 API Key 注册并报失败。
 - 根因：LibreTranslate 1.9.6 的 `scripts/healthcheck.py` 在 `/tmp/booting.flag` 存在时直接返回成功；这只表示容器仍处于受支持的启动阶段，不表示 HTTP 服务或 `api_keys.db` 已就绪。
-- 通用规则：安装就绪必须同时满足启动标记已消失、真实 HTTP `/health` 成功、API Key 数据库存在且非空；注册 Key 后还要使用该 Key 完成一次真实翻译请求，不能把容器运行或自带 healthcheck 单独当作可用证明。
-- 自动化检查：用同版本镜像构造 booting flag 存在但数据库缺失的阶段，断言安装器继续等待；再等待 Web 与数据库就绪，执行 `ltmanage keys add` 和带 Key 的 `en -> zh` 翻译烟测，最后清理隔离容器与卷。
+- 通用规则：不能把自带 healthcheck 当作模型和 HTTP 已就绪证明，也不能因此在一键安装中持续等待。安装器应在正式容器启动前独立创建并验证 API Key 数据库，容器启动只证明服务已安装；真实翻译可用性由运行期健康检查体现。
+- 自动化检查：用同版本镜像在不执行入口脚本、不下载模型的条件下创建临时 `api_keys.db`，回读 Key 后启动正式容器；断言安装脚本不存在模型等待循环，随后清理隔离容器与卷。
+
+### 复盘：首次语言模型下载阻塞整套一键安装
+
+- 触发场景：国内服务器下载 LibreTranslate 语言模型极慢或网络不可达，一键安装每 30 秒输出一次等待状态，直到 3600 秒后失败，导致吾码其它服务无法继续安装。
+- 根因：安装脚本把“翻译服务容器已安装”与“全部语言模型和 HTTP 已可用”绑定成同一个同步完成条件，并把 API Key 数据库初始化放在模型下载之后。
+- 通用规则：API Key 数据库必须由同版本镜像在启动正式服务前预初始化并持久化；Compose 启动成功且容器进入运行状态后立即继续吾码安装。语言模型初始化属于服务自身后台过程，不得设置为主体安装的同步门禁，也不得循环输出累计等待秒数。
+- 自动化检查：静态断言脚本没有模型等待、3600 秒超时及真实翻译同步烟测；隔离运行密钥初始化命令，验证数据库非空、随机 Key 可回读且终端不输出 Key，再验证正式容器能够使用同一持久卷启动。

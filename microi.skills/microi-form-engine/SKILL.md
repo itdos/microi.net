@@ -59,15 +59,85 @@ MCP 建模只使用：
 推荐保存稳定 Key、显示可翻译 Label。修改 `Data/Config/KeyValue` 后必须
 `microi_get_field_list` 回读，并执行 `microi_refresh_schema_cache`。
 
-## 关联与子表
+## `JoinForm` 与 `TableChild` 硬性判定
 
-- `JoinForm`：保存关联记录 Id，同时配置显示字段。
-- `OpenTable`：通过弹出列表选择数据；固定授权范围用 `V8.OpenTableSetWhere`。
-- `TableChild`：子表必须有真实外键并为回查建立合适的租户组合索引。
-- `JoinTable`：用于展示关联集合；不要用前端拼接代替数据权限。
+这两个控件都能在表单内显示另一张表，但数据关系和运行组件完全不同，生成表/字段前
+必须先确定基数，不得因为名称里出现“关联”就默认使用 `JoinForm`。
 
-索引一律在 Manifest `tables[].indexes` 声明，通过
-`microi_get_table_indexes` → `microi_create_table_index` → 回读完成。
+| 判断项 | `JoinForm`（关联表单） | `TableChild`（子表） |
+|---|---|---|
+| 关系 | 当前记录关联**一个**独立目标记录，通常为 N:1 或 1:1 | 一条主表记录拥有 0..N 条明细，标准 1:N |
+| 关系存储 | 主表字段保存目标记录 `Id` | **子表物理外键**保存主表 `Id`/指定主键值 |
+| 界面 | 嵌入一张 `diy-form`，只展示/编辑一条目标记录 | 嵌入一张 `diy-table`，提供明细列表、分页及行级增删改 |
+| 核心配置 | `Config.JoinForm.{TableId,TableName,JoinFieldName,FormMode,Id,_SearchEqual}` | `Config` 根节点的子表/菜单/外键 Id，加 `Config.TableChild` 运行选项 |
+| 目标限制 | 目标表必须与当前表不同；相同则组件拒绝渲染 | 子表应是独立明细表，并通过外键限定到当前父记录 |
+
+### 决策规则（强制）
+
+- 需求出现“子表、明细、清单、条目、行项目、多个、若干条、记录列表”，且没有明确说明
+  “只关联一条已有记录”时，默认建模为 `TableChild`。
+- 只要一条父记录可能有 0..N 条目标记录，或需要在父表单内列表、分页、新增、编辑、删除
+  多行，就必须用 `TableChild`。
+- 只有主表保存一个目标记录 Id、并需要把该独立记录的完整表单嵌入当前表单时，才用
+  `JoinForm`。选择一条记录但无需嵌入完整表单时，优先 `OpenTable`/`Select`。
+- 语义仍不明确时必须在任何 MCP 写入前询问基数；禁止静默退化为 `JoinForm`。
+- 禁止把“明细”设计为主表 `XxxId + JoinForm`；禁止让 `JoinForm.TableId/TableName`
+  指向当前表；禁止把 1:N 外键放在主表。
+- MCP 的组件枚举、Manifest 结构检查或 `dryRun` 即使通过，也不代表关系基数正确；AI 必须
+  单独执行本节语义门禁。
+
+示例：
+
+- “订单包含多个商品明细” → `order_detail.OrderId` + `TableChild`。
+- “访客单包含多件携带物品” → `fk_carry_item.VisitId` + `TableChild`，不能用
+  `GuestId + JoinForm`，也不能把 `JoinForm` 指回 `fk_carry_item` 自己。
+- “工单关联一个客户，并在工单内展开客户档案” → 主表 `CustomerId` + `JoinForm`。
+
+### MCP 创建 `TableChild` 的两阶段流程
+
+1. 创建主表和独立子表；在子表创建真实外键（如 `VisitId varchar(50)`）。
+2. 在子表为回查创建租户组合索引（通常 `(OsClient, VisitId)`），索引写入 Manifest
+   `tables[].indexes`，并以 `microi_get_table_indexes` 回读。
+3. 为子表创建绑定其 `diyTableId` 的隐藏 CRUD 菜单：`Display=0`、`AppDisplay=0`、
+   `HasChild=0`。
+4. 回读真实的子表 `diy_table.Id`、子菜单 `sys_menu.Id` 与子表外键名后，再在主表
+   新增/更新 `Component=TableChild`、`FormWidth=24` 的配置字段。工具还不能在一次
+   Manifest 中解析这些新建 Id 时，必须分两阶段执行；禁止编造 Id 或改用 `JoinForm`。
+5. `TableChild` 控件字段通常只是表单配置位，关系事实存放在子表外键。至少保存：
+
+```json
+{
+  "TableChildTableId": "<子表 diy_table.Id>",
+  "TableChildSysMenuId": "<子表 sys_menu.Id>",
+  "TableChildSysMenuName": "携带物品明细",
+  "TableChildFkFieldName": "VisitId",
+  "TableChildCallbackField": "",
+  "TableChild": {
+    "PrimaryTableFieldName": "Id",
+    "Data": [],
+    "SearchAppend": {},
+    "ImportAutoFillFk": true,
+    "ImportRelations": [],
+    "ImportBackfillFields": [],
+    "LastTableId": "",
+    "LastSysMenuId": "",
+    "LastSysMenuName": "",
+    "DisablePagination": false,
+    "NoneDefaultHeight": false
+  }
+}
+```
+
+`OpenTable` 用于弹出列表选择数据，固定授权范围用 `V8.OpenTableSetWhere`；`JoinTable`
+用于展示关联集合，不能用前端拼接代替数据权限。
+
+### 子表验收与复盘
+
+- 回读主表字段、子表字段、隐藏子菜单和索引，确认配置中的表 Id、菜单 Id、外键名均真实存在。
+- 用父记录 A 新增/编辑/删除多条子记录；打开父记录 B，确认 A 的数据不可见且不可越权操作。
+- 新增主表尚无真实 Id 时，不得产生孤儿子记录；保存后重新打开仍能正确回显。
+- 若曾误选组件，复盘必须记录：触发用语、误判基数、正确关系、应增加的生成前断言；通用结论
+  回写本节，不能只修一张业务表。
 
 ## 自定义组件边界
 

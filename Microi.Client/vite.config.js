@@ -131,6 +131,8 @@ export default defineConfig({
     },
     server: {
         port: 61500,
+        // 后端固定使用 61501；前端端口被占用时直接提示，禁止自动顺延并抢占 API 端口。
+        strictPort: true,
         open: true,
         host: '0.0.0.0',
         https: false,

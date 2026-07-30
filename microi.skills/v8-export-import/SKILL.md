@@ -510,13 +510,18 @@ var base64 = System.Convert.ToBase64String(bytes);
 
 当单独导入 `TableChild` 子表时，Excel 经常没有主表 Id，只带项目编号、客户名称等业务字段。默认导入引擎支持通过子表控件配置批量反查主表，并自动补齐子表外键。
 
-在主表 `TableChild` 字段的 `Config.TableChild` 中配置：
+本节只适用于“主表 1:N 子表”；单条独立记录关联应使用 `JoinForm`，不能把明细导入模型
+设计成 `JoinForm`。在主表 `TableChild` 字段的 `Config` 中配置，其中子表、菜单和外键
+位于 Config 根节点，导入选项位于 `Config.TableChild`：
 
 ```json
 {
+  "TableChildTableId": "子表 diy_table.Id",
+  "TableChildSysMenuId": "子表 sys_menu.Id",
+  "TableChildSysMenuName": "项目成品清单",
+  "TableChildFkFieldName": "XiangmuId",
   "TableChild": {
-    "TableChildTableId": "子表 diy_table.Id",
-    "TableChildFkFieldName": "XiangmuID",
+    "PrimaryTableFieldName": "Id",
     "ImportAutoFillFk": true,
     "ImportRelations": [
       { "Parent": "Code", "Child": "XiangmuBM" }
@@ -530,7 +535,11 @@ var base64 = System.Convert.ToBase64String(bytes);
 
 配置含义：
 
-- `ImportAutoFillFk`：是否在导入子表时自动补齐 `TableChildFkFieldName`；默认建议开启。
+- 根节点 `TableChildTableId` / `TableChildSysMenuId` / `TableChildFkFieldName` 必须是
+  回读后的真实子表、隐藏子菜单和子表物理外键，不能猜 Id，也不能放进内层
+  `Config.TableChild`。
+- `ImportAutoFillFk`：是否在导入子表时自动补齐 Config 根节点指定的
+  `TableChildFkFieldName`；默认建议开启。
 - `ImportRelations`：主表字段与子表/Excel 字段的匹配关系，`Parent` 和 `Child` 可填字段名或字段标题。可配置多组，作为组合条件匹配。
 - `ImportBackfillFields`：主表字段回填到子表字段的映射。用于 Excel 没有项目编号、项目名称、客户名称等冗余展示列时，在找到主表后自动把主表值写入子表列。
 - 兼容旧配置：`ImportParentMatchFieldName` + `ImportChildMatchFieldName` 仍可使用，但新配置优先使用 `ImportRelations`。

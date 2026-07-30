@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-labelledby="title desc">
+  <title id="title">吾码UI六种设计模式桌面端原创案例</title>
+  <desc id="desc">深色界面中展示品牌叙事、产品流程、趋势构图、沉浸互动、动态首屏和数据工作台六种设计模式。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081225"/><stop offset="1" stop-color="#0d1830"/></linearGradient>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6b87ff"/><stop offset="1" stop-color="#38dcff"/></linearGradient>
+    <linearGradient id="orb" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eaffff"/><stop offset=".28" stop-color="#50e4ff"/><stop offset=".68" stop-color="#6558ef"/><stop offset="1" stop-color="#26135f"/></linearGradient>
+    <pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><path d="M36 0H0V36" fill="none" stroke="#6b87ff" stroke-opacity=".07"/></pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#020711" flood-opacity=".48"/></filter>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1200" height="750" rx="28" fill="url(#bg)"/>
+  <rect width="1200" height="750" rx="28" fill="url(#grid)"/>
+  <circle cx="105" cy="8" r="210" fill="#4165ef" opacity=".12"/>
+  <path d="M40 78H1160" stroke="#9cb0de" stroke-opacity=".18"/>
+  <rect x="42" y="26" width="34" height="34" rx="11" fill="url(#brand)"/>
+  <text x="59" y="49" text-anchor="middle" fill="white" font-family="Arial,Microsoft YaHei,sans-serif" font-size="16" font-weight="800">M</text>
+  <text x="88" y="48" fill="#f4f7ff" font-family="Arial,Microsoft YaHei,sans-serif" font-size="14" font-weight="700">Microi Pattern Lab</text>
+  <text x="869" y="48" fill="#9aa9c6" font-family="Arial,Microsoft YaHei,sans-serif" font-size="11">设计模式　 产品流程　 设计契约</text>
+  <rect x="1104" y="29" width="54" height="28" rx="14" fill="#172744" stroke="#a0b5e3" stroke-opacity=".18"/>
+  <circle cx="1142" cy="43" r="10" fill="#6b87ff"/>
+
+  <text x="42" y="116" fill="#38dcff" font-family="Arial,Microsoft YaHei,sans-serif" font-size="9" font-weight="800" letter-spacing="2">MICROI ORIGINAL PATTERNS</text>
+  <text x="42" y="164" fill="#f4f7ff" font-family="Arial,Microsoft YaHei,sans-serif" font-size="38" font-weight="800">六种模式，一套品牌语言</text>
+  <text x="42" y="190" fill="#9aa9c6" font-family="Arial,Microsoft YaHei,sans-serif" font-size="13">同一套 token、组件状态、响应式与无障碍规则，形成清晰而不重复的产品界面。</text>
+
+  <g filter="url(#shadow)">
+    <g transform="translate(42 224)">
+      <rect width="354" height="205" rx="22" fill="#f2f0e8"/>
+      <circle cx="318" cy="190" r="88" fill="#ff4f3d"/>
+      <text x="22" y="39" fill="#606060" font-family="Arial,sans-serif" font-size="9" font-weight="700">01 / STORY</text>
+      <text x="22" y="103" fill="#141414" font-family="Arial,sans-serif" font-size="45" font-weight="900" letter-spacing="-3">MAKE</text>
+      <text x="22" y="144" fill="#3e52df" font-family="Arial,sans-serif" font-size="45" font-weight="900" letter-spacing="-3">MEANING</text>
+      <path d="M22 174H332" stroke="#141414" stroke-opacity=".26"/>
+      <text x="22" y="192" fill="#303030" font-family="Arial,Microsoft YaHei,sans-serif" font-size="9">品牌叙事 · 单一主张与章节节奏</text>
+    </g>
+
+    <g transform="translate(423 224)">
+      <rect width="354" height="205" rx="22" fill="#f4f7fc"/>
+      <text x="22" y="39" fill="#6b7690" font-family="Arial,sans-serif" font-size="9" font-weight="700">02 / FLOW</text>
+      <rect x="47" y="53" width="260" height="128" rx="17" fill="white" stroke="#dce4f2"/>
+      <rect x="63" y="68" width="22" height="22" rx="7" fill="#5b7cfa"/>
+      <text x="96" y="83" fill="#18233c" font-family="Arial,Microsoft YaHei,sans-serif" font-size="11" font-weight="700">创建协作空间</text>
+      <rect x="63" y="101" width="228" height="28" rx="9" fill="#f2f5ff" stroke="#5b7cfa"/>
+      <circle cx="77" cy="115" r="7" fill="#5b7cfa"/>
+      <path d="m74 115 2 2 4-5" fill="none" stroke="white" stroke-width="1.5"/>
+      <text x="91" y="119" fill="#29344d" font-family="Arial,Microsoft YaHei,sans-serif" font-size="9">团队协作 · 已选择</text>
+      <rect x="63" y="139" width="228" height="26" rx="8" fill="#f7f8fb" stroke="#e4e8f0"/>
+      <text x="76" y="156" fill="#69758c" font-family="Arial,Microsoft YaHei,sans-serif" font-size="8">默认　加载　错误　成功</text>
+    </g>
+
+    <g transform="translate(804 224)">
+      <rect width="354" height="205" rx="22" fill="#ffcd55"/>
+      <text x="22" y="39" fill="#5b4815" font-family="Arial,sans-serif" font-size="9" font-weight="700">03 / LAYOUT</text>
+      <text x="20" y="128" fill="#181818" font-family="Arial,sans-serif" font-size="94" font-weight="900" letter-spacing="-8">32</text>
+      <text x="158" y="79" fill="#181818" font-family="Arial,Microsoft YaHei,sans-serif" font-size="13" font-weight="700">编辑式留白</text>
+      <text x="158" y="98" fill="#544410" font-family="Arial,Microsoft YaHei,sans-serif" font-size="10">不对称，但保持秩序</text>
+      <g transform="translate(184 119) rotate(-7)"><rect width="182" height="85" fill="#3527a5"/><circle cx="28" cy="28" r="17" fill="#ff6257"/><circle cx="55" cy="28" r="17" fill="#5ce3cc" stroke="white"/><text x="20" y="70" fill="white" font-family="Arial,Microsoft YaHei,sans-serif" font-size="13" font-weight="700">一主两辅</text></g>
+    </g>
+
+    <g transform="translate(42 454)">
+      <rect width="354" height="205" rx="22" fill="#07101e" stroke="#395d88" stroke-opacity=".38"/>
+      <path d="M0 41H354M0 82H354M0 123H354M0 164H354M70 0V205M140 0V205M210 0V205M280 0V205" stroke="#42d8f2" stroke-opacity=".06"/>
+      <text x="22" y="38" fill="#8da1c2" font-family="Arial,sans-serif" font-size="9" font-weight="700">04 / SPACE</text>
+      <ellipse cx="177" cy="111" rx="88" ry="34" fill="none" stroke="#55deff" stroke-opacity=".34"/>
+      <ellipse cx="177" cy="111" rx="34" ry="88" fill="none" stroke="#6c80ff" stroke-opacity=".32"/>
+      <circle cx="177" cy="111" r="50" fill="url(#orb)" filter="url(#glow)"/>
+      <text x="22" y="185" fill="#8da1c2" font-family="Arial,Microsoft YaHei,sans-serif" font-size="9">沉浸互动 · 焦点对象与静态降级</text>
+    </g>
+
+    <g transform="translate(423 454)">
+      <rect width="354" height="205" rx="22" fill="#f8f7fc"/>
+      <circle cx="325" cy="-4" r="117" fill="#795cff" opacity=".82"/>
+      <circle cx="290" cy="28" r="78" fill="#4de4ff" opacity=".5"/>
+      <text x="22" y="39" fill="#6d7891" font-family="Arial,sans-serif" font-size="9" font-weight="700">05 / MOTION · 0—1200MS</text>
+      <text x="22" y="105" fill="#111525" font-family="Arial,Microsoft YaHei,sans-serif" font-size="37" font-weight="900">第一秒</text>
+      <text x="22" y="143" fill="#111525" font-family="Arial,Microsoft YaHei,sans-serif" font-size="37" font-weight="900">说清楚</text>
+      <rect x="22" y="176" width="310" height="4" rx="2" fill="#dfe3ed"/>
+      <rect x="22" y="176" width="174" height="4" rx="2" fill="#5b7cfa"/>
+    </g>
+
+    <g transform="translate(804 454)">
+      <rect width="354" height="205" rx="22" fill="#0c1729" stroke="#31455f" stroke-opacity=".55"/>
+      <text x="22" y="34" fill="#f4f7ff" font-family="Arial,Microsoft YaHei,sans-serif" font-size="11" font-weight="700">06 / DATA · 运营总览</text>
+      <rect x="296" y="20" width="38" height="17" rx="8.5" fill="#163d37"/><text x="315" y="32" text-anchor="middle" fill="#68e9cc" font-family="Arial,Microsoft YaHei,sans-serif" font-size="7">实时</text>
+      <g font-family="Arial,Microsoft YaHei,sans-serif"><rect x="22" y="54" width="96" height="49" rx="10" fill="#13213a"/><text x="32" y="70" fill="#8391ac" font-size="7">服务中</text><text x="32" y="93" fill="white" font-size="20" font-weight="700">128</text><rect x="129" y="54" width="96" height="49" rx="10" fill="#13213a"/><text x="139" y="70" fill="#8391ac" font-size="7">完成率</text><text x="139" y="93" fill="white" font-size="20" font-weight="700">96%</text><rect x="236" y="54" width="96" height="49" rx="10" fill="#13213a"/><text x="246" y="70" fill="#8391ac" font-size="7">风险项</text><text x="246" y="93" fill="#ffca68" font-size="20" font-weight="700">07</text></g>
+      <g fill="url(#brand)"><rect x="24" y="148" width="31" height="33" rx="4"/><rect x="64" y="132" width="31" height="49" rx="4"/><rect x="104" y="143" width="31" height="38" rx="4"/><rect x="144" y="112" width="31" height="69" rx="4"/><rect x="184" y="125" width="31" height="56" rx="4"/><rect x="224" y="105" width="31" height="76" rx="4"/><rect x="264" y="120" width="31" height="61" rx="4"/><rect x="304" y="114" width="28" height="67" rx="4"/></g>
+    </g>
+  </g>
+  <text x="42" y="711" fill="#7385a4" font-family="Arial,Microsoft YaHei,sans-serif" font-size="10">MICROI.UI ORIGINAL ASSET · NO EXTERNAL DEPENDENCY</text>
+  <text x="1158" y="711" text-anchor="end" fill="#7385a4" font-family="Arial,Microsoft YaHei,sans-serif" font-size="10">1440 / RESPONSIVE</text>
+</svg>

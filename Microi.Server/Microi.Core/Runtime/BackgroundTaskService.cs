@@ -122,7 +122,8 @@ namespace Microi.net
             var concurrencyKey = Limit(options["ConcurrencyKey"]?.ToString(), 200);
             if (concurrencyKey.DosIsNullOrWhiteSpace()
                 && (string.Equals(apiEngineKey, "import-microi-store-package", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(apiEngineKey, DatabaseBackupService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)))
+                    || string.Equals(apiEngineKey, DatabaseBackupService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(apiEngineKey, EmptyDatabaseReleaseService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)))
             {
                 concurrencyKey = apiEngineKey;
             }

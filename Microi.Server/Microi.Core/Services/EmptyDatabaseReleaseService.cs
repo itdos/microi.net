@@ -24,6 +24,7 @@ namespace Microi.net
     /// </summary>
     public sealed class EmptyDatabaseReleaseService
     {
+        public const string WorkerApiEngineKey = "admin_build_sanitized_empty_database";
         internal const string RequiredOsClient = "iTdos";
         internal const string RequiredSourceDatabase = "itdos";
         internal const string TargetDatabase = "microi_empty_temp";
@@ -92,26 +93,23 @@ namespace Microi.net
             try
             {
                 sourceBuilder = BuildAndValidateSourceConnection();
+                // Worker may be restarted after the sanitization committed but before
+                // its checkpoint response was persisted. Recognize the fully sanitized
+                // target and return success instead of re-running non-idempotent cleanup SQL.
+                try
+                {
+                    var completedValidation = ValidateSanitizedDatabase(sourceBuilder);
+                    return CreateSanitizationSuccess(completedValidation, true);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Expected for a freshly copied or partially sanitized database.
+                }
                 ValidateSanitizationSql(sanitizationSql);
                 Report(5, 8, "正在执行线上脱敏 SQL 接口引擎脚本");
                 ExecuteSanitizationScript(sourceBuilder, sanitizationSql);
                 var validation = ValidateSanitizedDatabase(sourceBuilder);
-                return new DosResult(1, new
-                {
-                    validation.RemainingNonTemplateUsers,
-                    validation.RemainingAppPhysicalTables,
-                    validation.RemainingApplicationPhysicalTables,
-                    validation.RemainingApplicationTableDefinitions,
-                    validation.RemainingApplicationFieldDefinitions,
-                    validation.RemainingAppApiEngines,
-                    validation.RemainingAppTableDefinitions,
-                    validation.RemainingAppFieldDefinitions,
-                    validation.RemainingAiStoreApps,
-                    validation.RemainingLegacyAiRows,
-                    validation.PlatformServiceCount,
-                    validation.PlatformServiceRuntimeCount,
-                    validation.PlatformServiceSourceFileCount
-                }, "脱敏 SQL 已完整执行并通过零残留与平台应用保留校验。");
+                return CreateSanitizationSuccess(validation, false);
             }
             catch (Exception ex)
             {
@@ -123,6 +121,31 @@ namespace Microi.net
                 MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "SanitizationFailed", "空数据库脱敏失败", ex.ToString(), 3);
                 return new DosResult(0, null, "执行脱敏 SQL 失败，已删除临时数据库。错误：" + ex.Message);
             }
+        }
+
+        private static DosResult CreateSanitizationSuccess(
+            SanitizationValidation validation,
+            bool alreadySanitized)
+        {
+            return new DosResult(1, new
+            {
+                validation.RemainingNonTemplateUsers,
+                validation.RemainingAppPhysicalTables,
+                validation.RemainingApplicationPhysicalTables,
+                validation.RemainingApplicationTableDefinitions,
+                validation.RemainingApplicationFieldDefinitions,
+                validation.RemainingAppApiEngines,
+                validation.RemainingAppTableDefinitions,
+                validation.RemainingAppFieldDefinitions,
+                validation.RemainingAiStoreApps,
+                validation.RemainingLegacyAiRows,
+                validation.PlatformServiceCount,
+                validation.PlatformServiceRuntimeCount,
+                validation.PlatformServiceSourceFileCount,
+                AlreadySanitized = alreadySanitized
+            }, alreadySanitized
+                ? "临时数据库已完成脱敏并通过校验，本片按持久化结果幂等续跑。"
+                : "脱敏 SQL 已完整执行并通过零残留与平台应用保留校验。");
         }
 
         public DosResult Publish(JObject currentUser, string osClient)

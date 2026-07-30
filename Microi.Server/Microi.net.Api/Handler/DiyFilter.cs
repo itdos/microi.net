@@ -279,6 +279,59 @@ namespace Microi.net.Api
             }
         }
 
+        private static IEnumerable<string> GetAccessKeyMenuReferences(object? value)
+        {
+            if (value == null) yield break;
+
+            var propertyNames = new[]
+            {
+                "ModuleEngineKey", "_ModuleEngineKey", "_SysMenuId", "SysMenuId"
+            };
+            if (value is JObject json)
+            {
+                foreach (var propertyName in propertyNames)
+                {
+                    var reference = json[propertyName]?.ToString()?.Trim();
+                    if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+                }
+                yield break;
+            }
+
+            if (value is JArray jsonArray)
+            {
+                foreach (var item in jsonArray)
+                {
+                    foreach (var reference in GetAccessKeyMenuReferences(item))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            if (value is System.Collections.IEnumerable values && !(value is string))
+            {
+                foreach (var item in values)
+                {
+                    foreach (var reference in GetAccessKeyMenuReferences(item))
+                    {
+                        yield return reference;
+                    }
+                }
+                yield break;
+            }
+
+            var type = value.GetType();
+            foreach (var propertyName in propertyNames)
+            {
+                var property = type.GetProperty(
+                    propertyName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+                var reference = property?.GetValue(value)?.ToString()?.Trim();
+                if (!reference.DosIsNullOrWhiteSpace()) yield return reference;
+            }
+        }
+
         private static bool AuthorizeAccessKeyTableOperation(ActionExecutingContext context)
         {
             var currentUser = context.HttpContext.Items[
@@ -303,6 +356,11 @@ namespace Microi.net.Api
                 .Where(reference => !reference.DosIsNullOrWhiteSpace())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            var menuReferences = context.ActionArguments.Values
+                .SelectMany(GetAccessKeyMenuReferences)
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
             var isFieldDataLookup = UserAccessKeySecurity.IsFieldDataLookupPath(requestPath);
             var fieldReferences = isFieldDataLookup
                 ? context.ActionArguments.Values
@@ -311,21 +369,12 @@ namespace Microi.net.Api
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray()
                 : Array.Empty<string>();
-            var hasAnyReference = tableReferences.Length > 0 || fieldReferences.Length > 0;
-            var tablesAllowed = tableReferences.Length == 0
-                || UserAccessKeySecurity.AreTableReferencesAllowed(
+            if (UserAccessKeySecurity.AreFormEngineRequestReferencesAllowed(
                     currentUser,
+                    requestPath,
                     tableReferences,
-                    isRead,
-                    isExport);
-            var fieldsAllowed = fieldReferences.Length == 0
-                || UserAccessKeySecurity.AreFieldReferencesAllowed(
-                    currentUser,
-                    fieldReferences);
-            if (hasAnyReference
-                && tablesAllowed
-                && fieldsAllowed
-                && (tableReferences.Length > 0 || isFieldDataLookup))
+                    menuReferences,
+                    fieldReferences))
             {
                 return true;
             }
@@ -577,9 +626,6 @@ namespace Microi.net.Api
                 }
             }
             
-            var currentToken = await DiyToken.GetCurrentToken();
-            var osClient = currentToken.OsClient;
-
             var _Lang = context.HttpContext.Request.Headers["lang"].ToString();
             if (_Lang.DosIsNullOrWhiteSpace() || _Lang == "null")
             {
@@ -587,15 +633,20 @@ namespace Microi.net.Api
             }
             var headerOrFormOsClient = context.HttpContext.Request.Headers["osclient"].ToString();
             var requestToken = GetRequestAuthorizationToken(context.HttpContext);
-            if (context.Filters.Any(item => item is IAllowAnonymousFilter))
-            {
-                return;
-            }
             var endpoint = context.HttpContext.GetEndpoint();
-            if (endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null)
+            var allowsAnonymous = context.Filters.Any(item => item is IAllowAnonymousFilter)
+                                  || endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null;
+            if (allowsAnonymous)
             {
+                // Anonymous actions must be decided before resolving an optional
+                // bearer token. Access-key exchange and tenant bootstrap can carry
+                // a stale browser token; resolving it here re-enters access-key
+                // runtime loading and previously amplified one request into an OOM.
                 return;
             }
+
+            var currentToken = await DiyToken.GetCurrentToken();
+            var osClient = currentToken.OsClient;
             //--end
             if (!(context.ActionDescriptor is ControllerActionDescriptor))
             {

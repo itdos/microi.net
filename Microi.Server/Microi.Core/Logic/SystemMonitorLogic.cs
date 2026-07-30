@@ -1002,7 +1002,10 @@ namespace Microi.net
                 || value.IndexOf("OutOfMemoryException", StringComparison.OrdinalIgnoreCase) >= 0
                 || value.IndexOf("StackOverflowException", StringComparison.OrdinalIgnoreCase) >= 0
                 || value.IndexOf("Fatal process", StringComparison.OrdinalIgnoreCase) >= 0
-                || value.Contains("API进程内存保护"))
+                || value.Contains("API进程内存保护")
+                || value.Contains("【❌启动失败】")
+                || value.Contains("【解决方案】")
+                || value.Contains("【原因】"))
             {
                 return true;
             }
@@ -1033,6 +1036,14 @@ namespace Microi.net
                 || value.Contains("Application is shutting down")
                 || value.Contains("Hosting environment")
                 || value.Contains("Content root path"))
+            {
+                return true;
+            }
+
+            if (value.Contains("插件")
+                && (value.Contains("成功")
+                    || value.Contains("失败")
+                    || value.Contains("未能启动")))
             {
                 return true;
             }

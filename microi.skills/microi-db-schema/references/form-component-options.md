@@ -177,12 +177,46 @@
 | --- | --- | --- |
 | `OpenTable` | `varchar(50)` | `OpenTable.BtnName`、`ShowDialog`、`MultipleSelect`、`BeforeOpenV8`、`SubmitV8`、`SearchAppend`。 |
 | `JoinTable` | `varchar(50)` | `JoinTable.TableId`、`ModuleName`、`ModuleId`、`Where`。 |
-| `JoinForm` | `varchar(50)` | `JoinForm.TableId`、`TableName`、`Id`、`FormMode`、`_SearchEqual`。 |
-| `TableChild` | 通常不建物理业务列 | 根节点：`TableChildTableId`、`TableChildSysMenuId`、`TableChildSysMenuName`、`TableChildFkFieldName`、`TableChildCallbackField`、`TableChildRowClickV8`。 |
+| `JoinForm` | `varchar(50)` | `JoinForm.TableId`、`TableName`、`JoinFieldName`、`Id`、`FormMode`、`_SearchEqual`。主表字段保存一个目标记录 Id。 |
+| `TableChild` | 控件字段通常不承担关系存储 | 根节点：`TableChildTableId`、`TableChildSysMenuId`、`TableChildSysMenuName`、`TableChildFkFieldName`、`TableChildCallbackField`、`TableChildRowClickV8`。真实关系列必须建在子表。 |
 | `TableChild` | - | `TableChild.PrimaryTableFieldName`：主表关联字段，默认 `Id`；`DisablePagination`：子表是否禁用分页；`NoneDefaultHeight`：是否不使用默认高度；`Data`、`SearchAppend`、`LastTableId`、`LastSysMenuId`、`LastSysMenuName`。 |
 | `TableChild` | - | `TableChild.ImportAutoFillFk`：导入子表时自动补外键；`ImportRelations[{Parent,Child}]`：用主表字段和子表/Excel 字段批量匹配主表；`ImportBackfillFields[{Parent,Child}]`：匹配到主表后把主表值回填到子表字段。 |
 
-### TableChild 导入示例
+### `JoinForm` / `TableChild` 选择门禁
+
+| 业务问题 | 正确组件 |
+| --- | --- |
+| 当前记录保存一个目标 Id，并内嵌该独立目标记录的完整表单 | `JoinForm` |
+| 一条父记录拥有 0..N 条明细，需要列表、分页或多行增删改 | `TableChild` |
+| 只需从列表选择一条/多条，不需要内嵌完整目标表单 | `OpenTable` |
+
+- “明细、子表、清单、条目、行项目、多个记录”默认选择 `TableChild`；基数不清楚时先询问。
+- `JoinForm` 渲染单条 `diy-form`，目标 `TableId/TableName` 必须与当前表不同；指回当前表时
+  组件不会初始化。`JoinFieldName` 是**当前主表中保存目标 Id 的字段名**。
+- `TableChild` 渲染 `diy-table`。子表必须有物理外键，控件必须同时拿到真实的子表 Id、
+  子表菜单 Id 和外键字段名；不得猜 Id 或用 `JoinForm` 代替未完成的两阶段配置。
+- 例：订单商品明细应为 `order_detail.OrderId + TableChild`；工单内嵌一个客户档案才是
+  `work_order.CustomerId + JoinForm`。
+
+### JoinForm 示例
+
+```json
+{
+  "JoinForm": {
+    "TableId": "<目标 diy_table.Id>",
+    "TableName": "",
+    "JoinFieldName": "CustomerId",
+    "FormMode": "View",
+    "Id": "",
+    "_SearchEqual": {}
+  }
+}
+```
+
+字段设计器选择 `TableId` 时会清空 `TableName`；动态配置也可以只给目标 `TableName`，
+二者至少提供一个，不要把当前表作为目标表。
+
+### TableChild 完整示例
 
 ```json
 {
@@ -193,6 +227,8 @@
   "TableChildCallbackField": "[{\"Parent\":\"Code\",\"Child\":\"XiangmuBM\"},{\"Parent\":\"Name\",\"Child\":\"XiangmuMC\"}]",
   "TableChild": {
     "PrimaryTableFieldName": "Id",
+    "Data": [],
+    "SearchAppend": {},
     "ImportAutoFillFk": true,
     "ImportRelations": [
       { "Parent": "Code", "Child": "XiangmuBM" }
@@ -200,7 +236,12 @@
     "ImportBackfillFields": [
       { "Parent": "Code", "Child": "XiangmuBM" },
       { "Parent": "Name", "Child": "XiangmuMC" }
-    ]
+    ],
+    "LastTableId": "",
+    "LastSysMenuId": "",
+    "LastSysMenuName": "",
+    "DisablePagination": false,
+    "NoneDefaultHeight": false
   }
 }
 ```

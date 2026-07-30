@@ -131,6 +131,19 @@ description: Microi 业务架构蓝图（System Blueprint）— 设计期系统�
 
 领域层每张实体表还必须描述真实查询需要的 `indexes`（名称、有序字段、唯一性、用途）。关系的 `via` 外键、租户内业务唯一键、幂等键、待办/重试扫描字段都必须评估索引。蓝图或需求一旦明确索引，生成 Manifest 时不得遗漏 `tables[].indexes`，落地必须调用 `microi_create_table_index` 并以 `microi_get_table_indexes` 回读；禁止在 V8 中手写 DDL。
 
+### 关系基数先于表单控件（强制）
+
+- 每条领域关系必须先写清 `1:1`、`N:1` 或 `1:N`，再决定控件。自然语言中的“子表、
+  明细、清单、条目、行项目、多个记录”默认按 `1:N` 建模，除非用户明确说明只关联一条。
+- `1:N` 的 `via` 必须是**子表上的真实外键**，例如
+  `order -> order_detail, type: 1:N, via: OrderId`；Manifest 同时生成子表外键、
+  `(OsClient, OrderId)` 回查索引、隐藏子菜单和主表 `TableChild` 控件。
+- `JoinForm` 只映射“主表保存一个目标 Id，并内嵌一条独立目标记录”的 `N:1`/`1:1`
+  关系。禁止把 `1:N` 蓝图映射为 `JoinForm`，禁止让 `JoinForm` 指向当前表。
+- 如果蓝图写了 `1:N`，而 Manifest 只有主表 `XxxId`/`JoinForm`，或缺少子表 `via`
+  外键、子菜单、回查索引，蓝图检查必须失败，不能进入 `dryRun:false`。
+- 基数仍有歧义时，在任何 MCP 写入前询问用户；不得为了避免询问而选择 `JoinForm`。
+
 后台菜单必须在蓝图阶段规划为至少两级结构。客户、设备、工单、报告、日志、配置等业务域应先形成父级菜单，再把具体 CRUD/报表/日志页面作为子菜单写入 Manifest/MCP；不要把所有模块平铺为一级菜单。
 
 如果是改造已生成系统，蓝图不能停留在建议层。必须列出现有一级菜单、目标父级菜单、每个子菜单的 `ParentId` 迁移关系，并通过 MCP 回读 `sys_menu` 验证迁移完成。

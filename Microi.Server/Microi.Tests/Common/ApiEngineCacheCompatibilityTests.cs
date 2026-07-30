@@ -17,6 +17,12 @@ public class ApiEngineCacheCompatibilityTests
             BindingFlags.NonPublic | BindingFlags.Static)
         ?? throw new InvalidOperationException("接口引擎缓存兼容方法不存在。");
 
+    private static readonly MethodInfo AuthoritativeReadPolicyMethod =
+        typeof(ApiEngine).GetMethod(
+            "RequireAuthoritativeApiEngineModel",
+            BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new InvalidOperationException("后台接口引擎权威读取策略不存在。");
+
     private static readonly MethodInfo UpgradeEventMethod =
         UpgradeCacheCompatibilityType.GetMethod(
             "TryUpgradeEvent",
@@ -70,6 +76,19 @@ public class ApiEngineCacheCompatibilityTests
 
         Assert.True(success);
         Assert.Same(cachedValue, arguments[1]);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void DurableBackgroundExecutionRequiresAuthoritativeDatabaseRead(
+        bool preserveTrustedCurrentUser,
+        bool expected)
+    {
+        var actual = Assert.IsType<bool>(
+            AuthoritativeReadPolicyMethod.Invoke(null, new object?[] { preserveTrustedCurrentUser }));
+
+        Assert.Equal(expected, actual);
     }
 
     [Fact]

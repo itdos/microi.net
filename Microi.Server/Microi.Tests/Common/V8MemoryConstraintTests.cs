@@ -40,7 +40,7 @@ public class V8MemoryConstraintTests
         var limits = new CreateV8EngineParam();
 
         Assert.Equal(2048, limits.LimitMemory);
-        Assert.Equal(4096, limits.MaxLimitMemoryMB);
+        Assert.Equal(8192, limits.MaxLimitMemoryMB);
         Assert.Equal(8192, limits.CallTreeLimitMemory);
         Assert.Equal(32768, limits.MaxCallTreeLimitMemoryMB);
         Assert.Equal(32, limits.NestedApiDepth);
@@ -130,11 +130,25 @@ public class V8MemoryConstraintTests
         var limits = new CreateV8EngineParam
         {
             LimitMemory = 2048,
-            MaxLimitMemoryMB = 4096
+            MaxLimitMemoryMB = 8192
         };
 
         using var engine = new V8Engine().CreateEngine(limits);
         Assert.Equal(42D, engine.Evaluate("40 + 2").AsNumber());
+    }
+
+    [Fact]
+    public void HighMemoryNode_CanExplicitlyUseEightGigabyteCeilingWithoutChangingDefault()
+    {
+        var limits = CreateV8EngineParam.FromSysConfig(new JObject
+        {
+            ["V8MaxLimitMemoryMB"] = 8192,
+            ["V8DefaultLimitMemoryMB"] = 6144
+        });
+
+        Assert.Equal(8192, limits.MaxLimitMemoryMB);
+        Assert.Equal(6144, limits.LimitMemory);
+        Assert.Equal(2048, CreateV8EngineParam.DefaultLimitMemory);
     }
 
     [Fact]

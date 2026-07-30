@@ -309,5 +309,21 @@ export default {
     min-height: 0;
     padding-bottom: var(--micro-app-safe-area-bottom);
     box-sizing: border-box;
+    overflow: hidden;
+}
+
+// micro-app 的 iframe 沙箱会把子应用 body 投影成 light DOM 的
+// micro-app-body。弹窗本身必须保持固定高度，但没有自行声明滚动区的
+// 历史微服务也不能因此被裁掉；这里提供统一、单一的纵向滚动兜底。
+.micro-app-dialog__app :deep(> micro-app-body) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
 }
 </style>

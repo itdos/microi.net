@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-CN" data-mci-theme="dark" data-mci-shape="rounded">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <title>Microi 设计模式实验室</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="mci-lab" data-mci-ui-root>
+    <header class="mci-lab__nav">
+      <a class="mci-lab__brand" href="#top" aria-label="返回顶部">
+        <span class="mci-lab__brand-mark" aria-hidden="true">M</span>
+        <span>Microi Pattern Lab</span>
+      </a>
+      <nav class="mci-lab__nav-links" aria-label="页面导航">
+        <a href="#patterns">设计模式</a>
+        <a href="#flow">产品流程</a>
+        <a href="#contract">设计契约</a>
+      </nav>
+      <button class="mci-icon-button" id="themeToggle" type="button" aria-label="切换明暗主题" aria-pressed="false">
+        <span class="mci-icon-button__sun" aria-hidden="true">☀</span>
+        <span class="mci-icon-button__moon" aria-hidden="true">◐</span>
+      </button>
+    </header>
+
+    <section class="mci-hero" id="top">
+      <div class="mci-hero__ambient" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <div class="mci-hero__content">
+        <span class="mci-eyebrow">MICROI ORIGINAL DESIGN SYSTEM</span>
+        <h1>让业务界面先有<br><em>清晰的设计意图</em></h1>
+        <p>六类内置设计模式覆盖品牌、产品流程、趋势构图、沉浸互动、动态首屏与数据工作台。每一种模式都复用同一套 Microi token、状态和响应式规则。</p>
+        <div class="mci-hero__actions">
+          <a class="mci-button mci-button--primary" href="#patterns">浏览设计模式 <span aria-hidden="true">↘</span></a>
+          <a class="mci-button mci-button--quiet" href="#flow">查看真实流程</a>
+        </div>
+      </div>
+      <div class="mci-hero__console" aria-label="设计系统实时状态">
+        <div class="mci-console__head"><span></span><span></span><span></span><b>MCI-DESIGN</b></div>
+        <div class="mci-console__orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div class="mci-console__metric"><small>组件状态覆盖率</small><strong>08</strong><span>default → error</span></div>
+        <div class="mci-console__footer"><span>responsive</span><span>accessible</span><span>reduced-motion</span></div>
+      </div>
+    </section>
+
+    <section class="mci-section" id="patterns">
+      <div class="mci-section__head">
+        <div><span class="mci-eyebrow">PATTERN LIBRARY</span><h2>六种模式，一套品牌语言</h2></div>
+        <div class="mci-filter" role="group" aria-label="设计模式筛选">
+          <button class="is-active" type="button" data-filter="all">全部</button>
+          <button type="button" data-filter="story">叙事</button>
+          <button type="button" data-filter="product">产品</button>
+          <button type="button" data-filter="motion">互动</button>
+          <button type="button" data-filter="data">数据</button>
+        </div>
+      </div>
+
+      <div class="mci-pattern-grid">
+        <article class="mci-pattern mci-pattern--story" data-kind="story">
+          <div class="mci-pattern__visual">
+            <span class="mci-pattern__index">01</span>
+            <div class="mci-story-word">MAKE<br><em>MEANING</em></div>
+            <i class="mci-story-line"></i>
+          </div>
+          <div class="mci-pattern__copy"><span>品牌叙事</span><h3>用观点建立首屏记忆</h3><p>大标题、单一主张、章节节奏与克制的行动路径。</p></div>
+        </article>
+
+        <article class="mci-pattern mci-pattern--product" data-kind="product">
+          <div class="mci-pattern__visual">
+            <span class="mci-pattern__index">02</span>
+            <div class="mci-phone-card">
+              <div class="mci-phone-card__bar"><i></i><span>新建空间</span><b>2 / 3</b></div>
+              <div class="mci-phone-card__progress"><i></i></div>
+              <strong>选择工作方式</strong>
+              <div class="mci-phone-card__choice is-selected"><i>✓</i><span>团队协作<small>角色与权限可配置</small></span></div>
+              <div class="mci-phone-card__choice"><i></i><span>个人项目<small>从轻量空间开始</small></span></div>
+            </div>
+          </div>
+          <div class="mci-pattern__copy"><span>真实产品流程</span><h3>状态比装饰更重要</h3><p>从登录到成功页，覆盖加载、空、错误、禁用与权限状态。</p></div>
+        </article>
+
+        <article class="mci-pattern mci-pattern--editorial" data-kind="story">
+          <div class="mci-pattern__visual">
+            <span class="mci-pattern__index">03</span>
+            <div class="mci-editorial-type"><b>32</b><span>结构化构图<br>打破均匀排版</span></div>
+            <div class="mci-editorial-card"><i></i><i></i><i></i><strong>一主两辅</strong></div>
+          </div>
+          <div class="mci-pattern__copy"><span>趋势构图</span><h3>不对称但保持秩序</h3><p>超大字号、编辑式留白、几何切片与明确阅读顺序。</p></div>
+        </article>
+
+        <article class="mci-pattern mci-pattern--immersive" data-kind="motion">
+          <div class="mci-pattern__visual">
+            <span class="mci-pattern__index">04</span>
+            <div class="mci-orb" aria-hidden="true"><i></i><i></i><i></i><b></b></div>
+            <div class="mci-orb-copy"><strong>FOCUS OBJECT</strong><span>界面 → 氛围 → 焦点对象</span></div>
+          </div>
+          <div class="mci-pattern__copy"><span>沉浸互动</span><h3>互动服务于理解</h3><p>场景只强化产品对象，并准备静态、低配和无动效降级。</p></div>
+        </article>
+
+        <article class="mci-pattern mci-pattern--motion" data-kind="motion">
+          <div class="mci-pattern__visual">
+            <span class="mci-pattern__index">05</span>
+            <div class="mci-motion-copy"><small>0—1200 MS</small><strong>第一秒<br>说清楚</strong></div>
+            <div class="mci-motion-track"><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="mci-pattern__copy"><span>动态首屏</span><h3>用时间线组织注意力</h3><p>标题、说明、主操作依次出现；循环动效不制造操作噪声。</p></div>
+        </article>
+
+        <article class="mci-pattern mci-pattern--data" data-kind="data">
+          <div class="mci-pattern__visual">
+            <span class="mci-pattern__index">06</span>
+            <div class="mci-data-head"><span>运营总览</span><b>实时</b></div>
+            <div class="mci-data-metrics"><span><small>服务中</small><b>128</b></span><span><small>完成率</small><b>96%</b></span><span><small>风险项</small><b>07</b></span></div>
+            <div class="mci-data-chart" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="mci-pattern__copy"><span>数据工作台</span><h3>先异常，再趋势，后明细</h3><p>紧凑密度、统一数值格式、筛选回显与可追溯数据状态。</p></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="mci-flow" id="flow">
+      <div class="mci-flow__intro">
+        <span class="mci-eyebrow">REAL PRODUCT FLOW</span>
+        <h2>流程不是一张好看的静态图</h2>
+        <p>这个原创演示包含真实输入、校验、加载和成功反馈。界面在任何状态下都保持稳定尺寸，避免闪烁和跳动。</p>
+        <ul>
+          <li><span>01</span>默认状态可理解</li>
+          <li><span>02</span>错误状态可恢复</li>
+          <li><span>03</span>成功状态有下一步</li>
+        </ul>
+      </div>
+      <form class="mci-flow-card" id="flowForm" novalidate>
+        <div class="mci-flow-card__head"><span>创建协作空间</span><small>安全演示 · 不会提交数据</small></div>
+        <label class="mci-field"><span>空间名称</span><input id="workspaceName" name="workspace" autocomplete="organization" placeholder="例如：品牌增长中心"><small>2—24 个字符</small></label>
+        <fieldset class="mci-plan-group"><legend>协作规模</legend><label><input type="radio" name="plan" value="small" checked><span><b>轻量团队</b><small>1—10 人</small></span></label><label><input type="radio" name="plan" value="growth"><span><b>成长团队</b><small>11—50 人</small></span></label></fieldset>
+        <div class="mci-flow-card__status" id="formStatus" role="status" aria-live="polite">填写名称后即可创建演示空间。</div>
+        <button class="mci-button mci-button--primary mci-flow-card__submit" id="flowSubmit" type="submit"><span>创建演示空间</span><i aria-hidden="true">→</i></button>
+      </form>
+    </section>
+
+    <section class="mci-contract" id="contract">
+      <div class="mci-contract__copy"><span class="mci-eyebrow">MCI-DESIGN CONTRACT</span><h2>让下一位开发者与 AI 都能延续同一套界面</h2><p>设计模式、token、组件状态、页面顺序、响应式和降级策略都写进项目契约，不依赖口头描述。</p></div>
+      <div class="mci-contract__tokens" aria-label="设计 token 示例">
+        <span style="--token:#5b7cfa"><i></i><b>Primary</b><small>#5B7CFA</small></span>
+        <span style="--token:#26d7b0"><i></i><b>Success</b><small>#26D7B0</small></span>
+        <span style="--token:#ffca68"><i></i><b>Warning</b><small>#FFCA68</small></span>
+        <span style="--token:#ff6b88"><i></i><b>Danger</b><small>#FF6B88</small></span>
+      </div>
+      <pre class="mci-contract__code"><code><span>mode</span>: data-workspace
+<span>density</span>: compact
+<span>states</span>: [default, loading, empty, error, success]
+<span>responsive</span>: [390, 768, 1440]
+<span>motion</span>: reduced-motion-ready</code></pre>
+    </section>
+
+    <footer class="mci-lab__footer"><span>Microi.UI Original Pattern Asset</span><span>Local only · No external dependency</span></footer>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>

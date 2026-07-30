@@ -52,6 +52,7 @@ namespace Microi.net
                     {
                         var maxConcurrency = Math.Max(4 * 10, Environment.ProcessorCount * 10);
                         tp.MaxConcurrency = maxConcurrency;
+                        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】配置【分布式任务调度】插件线程最多[{maxConcurrency}]个！");
                     });
                 });
 
@@ -61,6 +62,7 @@ namespace Microi.net
                     options.StartDelay = TimeSpan.FromSeconds(10); // 延迟启动
                 });
                 services.AddSingleton<IMicroiJob, MicroiQuartzScheduledTask>();
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【分布式任务调度】插件成功！");
                 return services;
             }
             catch (Exception ex)
@@ -82,6 +84,7 @@ namespace Microi.net
                 // scheduledTask.InitializeAsync(osClientModel.DbConn).GetAwaiter().GetResult();
 
                 scheduledTask.SyncTaskTime();
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【分布式任务调度】插件启动成功！");
                 return app;
             }
             catch (System.Exception ex)

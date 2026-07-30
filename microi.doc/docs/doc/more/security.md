@@ -241,8 +241,8 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 - 默认范围为 `page:open + form:read`。创建界面通过页面名称勾选或粘贴完整页面网址自动解析，不要求普通用户手写路由或物理表名；写权限、文件读取和引擎运行必须显式启用。
 - 页面和表单数据可以选择“全部已授权”，内部用单独的 `*` 范围值表示。这里的“全部”仅取消访问密钥自身的二次白名单，最终仍与目标帐号实时菜单、表单、部门和行级权限取交集，不能扩大帐号权限。接口引擎 Key 和数据源引擎 Key 不允许 `*`，仍须准确选择。
 - 页面范围为“全部已授权”时，受限会话可以调用 `GetSysMenuStep` 加载该帐号实时菜单树；指定页面密钥不加载完整菜单树。平台只开放页面启动、表单运行、本人后台任务和本人终端信息所需的运行时接口，并按 scope 再校验每个表、接口引擎和数据源。显示密码、访问密钥管理、菜单/表结构设计、服务器与缓存管理、查看或踢出其它终端等控制面接口始终拒绝访问密钥会话。
-- 表单范围保存的是易于管理的表名；运行时会从共享数据库解析成对应 `diy_table.Id` 和所属 `diy_field.Id`，并写入带版本的短 TTL Redis 缓存，因此只传 `TableId` 的字段元数据请求以及只传 `_FieldId/FieldIds` 的下拉数据源请求也会执行同一份精确白名单。解析失败时按未授权处理，不能降级为全部表。
-- 列表和表单使用的 `GetTableData-{table-key}`、`Get-TableData-{table-key}`、`GetFormData-{table-key}` 等动态友好地址，会先归一化为标准 FormEngine action，再校验 scope 和请求体中的准确表引用。路由转换与密钥鉴权共用同一份映射；空 Key、伪造相似前缀和额外路径段不会被放行。
+- 表单范围保存的是易于管理的表名；运行时会从共享数据库解析成对应 `diy_table.Id`、所属 `diy_field.Id`，以及绑定这些表的 `sys_menu.Id/ModuleEngineKey`，并写入带版本的短 TTL Redis 缓存。因此只传 `TableId` 的字段元数据请求、只传 `_FieldId/FieldIds` 的下拉数据源请求，以及标准列表页只传 `ModuleEngineKey/_SysMenuId` 的请求，都会执行同一份精确白名单。解析失败时按未授权处理，不能降级为全部表。
+- 列表和表单使用的 `GetTableData-{table-key}`、`Get-TableData-{table-key}`、`GetFormData-{table-key}` 等动态友好地址，会先归一化为标准 FormEngine action，再校验 scope、URL 后缀和请求体中的准确表或菜单引用。URL 后缀必须与 `FormEngineKey/TableId/ModuleEngineKey/_SysMenuId` 中的实际引用一致；路由转换与密钥鉴权共用同一份映射，空 Key、前后缀不一致、伪造相似前缀和额外路径段不会被放行。
 - `ApiEngineController` 的动态运行入口虽然兼容匿名接口，但只要请求携带访问密钥会话，就必须先解析实际命中的接口模型，再核对准确 `ApiEngineKey`；数据源和后台接口任务同样核对准确 Key，禁止用 URL 别名或异步任务绕过白名单。
 - 密钥兑换得到的 `_ClientType=AccessKey` 会话默认 20 分钟，通过正常 Token 轮换续期；每次请求仍校验共享 Redis/数据库中的密钥状态，不依赖单机内存或粘性会话。
 - 兑换接口只接收 JSON Body，不接受 Query String。前端链接把密钥放在 Hash 路由参数中，首次解析后立即从地址栏清除，避免它随初始 HTTP 请求进入反向代理和 Referer 日志。
@@ -251,8 +251,18 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 管理员在【系统账号】页面（`/#/mic-sys-user`）中创建：表格视图和默认卡片视图都会在每个帐号旁直接显示【访问密钥】，无需进入帐号编辑表单或展开【更多】。创建时选择指定页面或全部已授权页面、指定表单或全部已授权数据，并单独设置“登录后打开”的页面。看板示例：
 
 ```text
-https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yyy&redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F看板Id
+https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yyy&redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX
 ```
+
+通用格式为：
+
+```text
+{Microi.Client前端WebBase}/?OsClient={租户Key}#/access-login?access_key={密钥}&redirect={encodeURIComponent后的站内Hash路由}
+```
+
+`redirect` 保存的是以 `/` 开头的站内 Hash 路由原值，拼接链接时要对整个路由执行一次 `encodeURIComponent`。例如原值 `/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX` 应编码为 `%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX`；该原值还必须位于密钥允许页面范围内。域名必须使用用户实际访问的 Microi.Client 前端地址，不能误用 API Server 地址。
+
+固定电视、看板和信息屏应把**完整的 `/access-login` 自动登录链接**保存为浏览器开机主页或受控书签，而不是只保存兑换后的预览页地址。首次兑换成功后，地址栏变成不含 `access_key` 的目标页面属于预期的安全清理；页面随后使用请求头中的短期受限 Token，并按平台协议自动轮换。永久密钥表示密钥记录没有计划到期时间，不表示生成永久 JWT；浏览器会话丢失、缓存被清理或服务端登录态重建后，重新打开原启动链接即可再次自动兑换，全程不需要输入帐号密码。不要给目标页面重复追加密钥，也不要新增 `permanent=1`、`keep_login=1` 等由客户端决定密钥寿命的 URL 参数。
 
 生成链接必须携带当前租户的 `OsClient`，否则全新浏览器没有租户缓存时无法确定兑换数据库。`/access-login` 不等待普通 SSO 菜单初始化，兑换超过 20 秒会显示明确错误，不会一直停留在“正在自动登录”。
 
@@ -272,7 +282,7 @@ https://os.example.com/?OsClient=iTdos#/access-login?access_key=microi_ak_xxx.yy
 
 配置大屏时优先勾选目标页面，并选择“全部已授权数据”，避免普通用户判断底层表名；使用专用只读帐号即可继续限制实际数据范围。如果大屏组件还会调用接口引擎或数据源引擎，只添加实际使用的准确 Key，禁止为引擎填写通配符。
 
-排错时如果 `GetSysMenuStep` 返回“当前访问密钥未授权调用此接口”，先确认密钥页面范围是否为“全部已授权”。指定页面密钥不需要该接口；若全部页面密钥仍被拒绝，说明 API 服务尚未部署支持访问密钥运行时接口矩阵的版本。如果 `GetTableData-xxxx` 或 `GetFormData-xxxx` 返回同一提示，应确认 API 已部署支持动态 FormEngine 路由归一化的版本；这类请求不需要把每张表对应的 URL 单独加入 API 白名单。不要为了临时放行把整个 `SysMenu`、`FormEngine` 或其它 Controller 加入无条件白名单。
+排错时如果 `GetSysMenuStep` 返回“当前访问密钥未授权调用此接口”，先确认密钥页面范围是否为“全部已授权”。指定页面密钥不需要该接口；若全部页面密钥仍被拒绝，说明 API 服务尚未部署支持访问密钥运行时接口矩阵的版本。如果 `GetTableData-xxxx` 或 `GetFormData-xxxx` 返回“当前访问密钥未授权访问请求中的表”，还应检查请求体是否只传了 `ModuleEngineKey`：旧版 API 未把菜单 Id 映射到其绑定的 `DiyTableId`，升级到支持菜单引用派生的版本即可，无需把菜单 Id 当物理表名手工加入白名单。不要为了临时放行把整个 `SysMenu`、`FormEngine` 或其它 Controller 加入无条件白名单。
 
 ### 管理员显示系统用户密码
 

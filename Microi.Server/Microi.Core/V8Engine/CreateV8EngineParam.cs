@@ -10,7 +10,10 @@ namespace Microi.net
         public const int DefaultMaxStatements = 50_000_000;
         public const int MaxStatementsLimit = 500_000_000;
         public const int DefaultLimitMemory = 2048;
-        public const int MaxLimitMemory = 4096;
+        // 2GB remains the safe default for arbitrary tenant scripts. High-memory nodes
+        // may explicitly raise a trusted engine up to 8GB; this is a ceiling, not a
+        // reservation or a new default, and concurrency guards still apply.
+        public const int MaxLimitMemory = 8192;
         public const int DefaultLimitRecursion = 2000;
         public const int MaxLimitRecursion = 5000;
         public const int DefaultCallTreeLimitMemory = 8192;
