@@ -92,7 +92,7 @@
 								<text>{{ section.title }}</text>
 								<text v-if="section.description" class="section-description">{{ section.description }}</text>
 							</view>
-							<text v-if="section.showFieldCount !== false" class="section-count">{{ section.fields.length }} 项</text>
+							<text v-if="section.showFieldCount !== false && section.fields.length" class="section-count">{{ section.fields.length }} 项</text>
 						</view>
 						<text class="section-toggle"
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
@@ -137,10 +137,23 @@
 									@tap="callPhone(detail[field.name])">拨打</view>
 							</view>
 						</view>
+						<mci-business-related-list
+							v-for="relatedTab in section.relatedTabs"
+							:key="relatedTab.key"
+							class="section-related-preview"
+							:field="relatedTab.field"
+							:parent-id="detail.Id || id"
+							:parent-form="detail"
+							:parent-menu-id="menuId"
+							:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+							parent-mode="View"
+							display-mode="preview"
+							:preview-limit="2"
+						/>
 					</view>
 				</view>
 
-				<view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+				<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
 					<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
@@ -1254,7 +1267,7 @@
 				return map
 			},
 			visibleSections() {
-				const groups = this.definition?.groups || []
+				const groups = this.definition?.relatedGroups || this.definition?.groups || []
 				const activeGroups = this.formTabs.length
 					? groups.filter((group) => group.tabKey === this.activeFormTabKey)
 					: groups
@@ -1271,6 +1284,9 @@
 					return {
 						title: group.name || '',
 						fields: rows,
+						relatedTabs: this.activeRelatedTabs.filter((item) =>
+							this.isCustomerAddressRelated(item) && item.field.layoutGroupKey === group.key
+						),
 						source: group.source,
 						description: group.description || '',
 						showFieldCount: group.showFieldCount,
@@ -1278,7 +1294,7 @@
 						key: group.key || `${group.name || 'ungrouped'}:${index}`
 					}
 				})
-				.filter((section) => section.fields.length)
+				.filter((section) => section.fields.length || section.relatedTabs.length)
 			},
 			formTabs() {
 				return (this.definition?.formTabs || []).map((tab) => ({
@@ -1304,6 +1320,9 @@
 			activeRelatedTabs() {
 				if (!this.formTabs.length) return this.relatedTabs
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
+			},
+			standaloneRelatedTabs() {
+				return this.activeRelatedTabs.filter((item) => !this.isCustomerAddressRelated(item))
 			},
 			summaryBlocks() {
 				return (this.preset.summaries || []).map((item) => {
@@ -1899,6 +1918,18 @@
 					...this.expandedSections,
 					[section.key]: !this.isSectionExpanded(section, index)
 				}
+			},
+			isCustomerAddressRelated(item) {
+				if (this.key !== 'customers' || item?.type !== 'child') return false
+				const field = item.field || {}
+				const config = field.config || {}
+				const title = [
+					field.Label,
+					field.Name,
+					config.TableChildSysMenuName,
+					config.TableChild?.Title
+				].filter(Boolean).join(' ')
+				return /客户地址/.test(title) && Boolean(field.layoutGroupKey)
 			},
 			callPhone(phone) {
 				if (phone) uni.makePhoneCall({
