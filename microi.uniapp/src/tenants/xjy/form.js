@@ -16,6 +16,10 @@ import {
   proposalInheritedValues,
   proposalInitialValues
 } from './proposal-calculation.js'
+import {
+  CUSTOMER_FOLLOW_FIELDS,
+  customerFollowScopeValues
+} from './customer-follow-scope.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 const CHECKIN_TABLE = 'diy_location'
@@ -175,6 +179,22 @@ function personnelLink(field) {
     link.sourceNames.some((item) => String(item).toLowerCase() === name) ||
     link.sourceLabels.includes(label)
   )
+}
+
+function isCustomerOwnerField(field) {
+  const name = String(field && field.Name || '').toLowerCase()
+  const label = String(field && field.Label || '').trim()
+  return name === CUSTOMER_FOLLOW_FIELDS.owner.toLowerCase() || label === '负责人'
+}
+
+function applyCustomerFollowScope(context, overrides = {}) {
+  const values = customerFollowScopeValues({
+    ...context.form,
+    ...overrides
+  })
+  context.patchForm(values)
+  context.state.customerFollowScopeValues = values
+  return values
 }
 
 function selectedPersonId(payload, row) {
@@ -585,11 +605,16 @@ export function createState() {
     followupInitialized: false,
     followupCustomerId: '',
     followupCustomerName: '',
-    proposalInitialized: false
+    proposalInitialized: false,
+    customerFollowScopeValues: {}
   }
 }
 
 export async function initialize(context) {
+  if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode)) {
+    // zhy：新增、编辑客户统一按负责人归一跟进状态，兼容历史记录状态为空的情况。
+    applyCustomerFollowScope(context)
+  }
   if (isCustomerAdd(context) && !context.state.locationInitialized) {
     context.state.locationInitialized = true
     setTimeout(() => locateCustomer(context, false), 0)
@@ -798,10 +823,22 @@ export async function handleFieldSelect(context, payload) {
   const updates = { [phoneName]: phone }
   const submitValues = { [phoneName]: phone }
 
-  if (link.idName && personId !== '') {
+  if (link.idName && payload.cleared) {
+    const idName = fieldName(context, link.idName)
+    updates[idName] = ''
+    submitValues[idName] = ''
+  } else if (link.idName && personId !== '') {
     const idName = fieldName(context, link.idName)
     updates[idName] = personId
     submitValues[idName] = personId
+  }
+
+  if (isCustomerOwnerField(payload.field)) {
+    Object.assign(updates, customerFollowScopeValues({
+      ...context.form,
+      ...updates,
+      [CUSTOMER_FOLLOW_FIELDS.owner]: payload.cleared ? '' : payload.value
+    }))
   }
 
   context.patchForm(updates)
@@ -809,10 +846,37 @@ export async function handleFieldSelect(context, payload) {
     ...(context.state.personnelValues || {}),
     ...submitValues
   }
+  if (isCustomerOwnerField(payload.field)) {
+    context.state.customerFollowScopeValues = customerFollowScopeValues({
+      ...context.form,
+      ...updates
+    })
+  }
   return { handled: true }
 }
 
 export function handleFieldChange(context, payload) {
+  if (isCustomerForm(context) && payload && isCustomerOwnerField(payload.field)) {
+    const ownerName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.owner, '负责人')
+    const ownerIdName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.ownerId)
+    const ownerPhoneName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.ownerPhone, '负责人电话')
+    const ownerCleared = isEmptyFormValue(payload.value)
+    const personnelValues = ownerCleared
+      ? {
+          [ownerIdName]: '',
+          [ownerPhoneName]: ''
+        }
+      : {}
+    context.state.personnelValues = {
+      ...(context.state.personnelValues || {}),
+      ...personnelValues
+    }
+    applyCustomerFollowScope(context, {
+      ...personnelValues,
+      [ownerName]: payload.value
+    })
+    return { handled: true }
+  }
   if (!isProposalForm(context) || !payload ||
     !isProposalCalculationField(payload.field && payload.field.Name)) {
     return { handled: false }
@@ -825,9 +889,16 @@ export function handleFieldChange(context, payload) {
 export async function beforeSubmit(context) {
   if (context.state.locating) throw new Error('正在获取位置，请稍候')
   if (isCustomerForm(context)) {
+    // zhy：隐藏状态字段也必须提交，最终负责人为空时写公海/2，否则写私有/1。
+    const personnelValues = context.state.personnelValues || {}
+    const followScopeValues = customerFollowScopeValues({
+      ...context.form,
+      ...personnelValues
+    })
     return {
       ...(isCustomerAdd(context) ? context.state.locationValues : {}),
-      ...context.state.personnelValues
+      ...personnelValues,
+      ...followScopeValues
     }
   }
   if (isCheckinAdd(context)) {
