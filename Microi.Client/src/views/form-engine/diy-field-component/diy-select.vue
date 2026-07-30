@@ -91,6 +91,7 @@ import _ from "underscore";
 import { ArrowDown } from "@element-plus/icons-vue";
 import { markRaw } from "vue";
 import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
+import { mergeCurrentSelectOptions } from "@/utils/select-option-merge";
 
 export default {
     name: "diy-select",
@@ -1092,7 +1093,18 @@ export default {
                     if (requestId !== field._SelectRemoteRequestId) return;
                     try {
                         self.NeedResetDataSourse = false;
-                        var nextData = Array.isArray(data) ? data : [];
+                        // zhy：远程接口控制当前可选数据范围，仅补回表单已保存或当前已选的数据，
+                        // zhy：避免查看、编辑历史记录时关联值显示为空，同时不扩大接口授权范围。
+                        var currentValue = self.ModelValue;
+                        if (self._isEmptySelectValue(currentValue) && self.FormDiyTableModel) {
+                            currentValue = self.FormDiyTableModel[field.Name];
+                        }
+                        var nextData = mergeCurrentSelectOptions(
+                            data,
+                            currentValue,
+                            field.Config,
+                            self._isMultipleSelect()
+                        );
                         if (!self._isSameOptionList(field.Data, nextData)) {
                             field.Data = nextData;
                         }
