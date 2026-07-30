@@ -1285,7 +1285,7 @@
 						title: group.name || '',
 						fields: rows,
 						relatedTabs: this.activeRelatedTabs.filter((item) =>
-							this.isCustomerAddressRelated(item) && item.field.layoutGroupKey === group.key
+							this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
 						),
 						source: group.source,
 						description: group.description || '',
@@ -1322,7 +1322,7 @@
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isCustomerAddressRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
 			},
 			summaryBlocks() {
 				return (this.preset.summaries || []).map((item) => {
@@ -1919,17 +1919,8 @@
 					[section.key]: !this.isSectionExpanded(section, index)
 				}
 			},
-			isCustomerAddressRelated(item) {
-				if (this.key !== 'customers' || item?.type !== 'child') return false
-				const field = item.field || {}
-				const config = field.config || {}
-				const title = [
-					field.Label,
-					field.Name,
-					config.TableChildSysMenuName,
-					config.TableChild?.Title
-				].filter(Boolean).join(' ')
-				return /客户地址/.test(title) && Boolean(field.layoutGroupKey)
+			isEmbeddedChildRelated(item) {
+				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
 			callPhone(phone) {
 				if (phone) uni.makePhoneCall({
