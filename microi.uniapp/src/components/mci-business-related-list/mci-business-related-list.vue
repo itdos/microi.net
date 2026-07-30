@@ -779,8 +779,33 @@ export default {
       })
     },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },
+    // zhy：未保存主表时，后端关联查询尚不能以父记录完成授权，直接合并子表保存事件中的真实记录。
+    mergeDraftChangedRow(payload = {}) {
+      if (String(this.parentMode || '').toLowerCase() !== 'add') return false
+      const row = payload.row && typeof payload.row === 'object' ? payload.row : null
+      if (!row) return false
+      const payloadRelation = payload.parentValue || row[this.childFkField] || ''
+      if (!payloadRelation || String(payloadRelation) !== String(this.relationValue)) return false
+      const rowId = row.Id || payload.id
+      if (!rowId) return false
+      const savedRow = { ...row, Id: rowId }
+      const index = this.rows.findIndex((item) => String(item.Id || '') === String(rowId))
+      if (index >= 0) {
+        this.rows = this.rows.map((item, itemIndex) =>
+          itemIndex === index ? { ...item, ...savedRow } : item
+        )
+      } else {
+        this.rows = [savedRow, ...this.rows]
+      }
+      this.count = this.rows.length
+      this.error = ''
+      this.loading = false
+      return true
+    },
     handleDataChanged(payload = {}) {
       if (String(payload.table || '').toLowerCase() === String(this.config.table || '').toLowerCase()) {
+        // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
+        if (this.mergeDraftChangedRow(payload)) return
         this.loadData(true, true)
       }
     }

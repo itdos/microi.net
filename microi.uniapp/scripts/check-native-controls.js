@@ -217,6 +217,21 @@ if (!nativeForm.includes('function createDraftRowId()') ||
   !nativeForm.includes("this.mode === 'Add' && !this.rowId && isFormEngineRecordAdapter(this.recordAdapter)")) {
   fail('new native forms must preallocate and preserve a parent row id for related records')
 }
+// zhy：未保存客户新增联系人后，必须通过保存事件回传完整记录并在父页草稿列表即时合并。
+for (const token of [
+  'row: savedRow',
+  "parentValue: this.tableChildAuth?.ParentValue || ''"
+]) {
+  if (!nativeForm.includes(token)) fail(`native form saved-row event is missing: ${token}`)
+}
+for (const token of [
+  'mergeDraftChangedRow(payload = {})',
+  "String(this.parentMode || '').toLowerCase() !== 'add'",
+  'payload.parentValue || row[this.childFkField]',
+  'if (this.mergeDraftChangedRow(payload)) return'
+]) {
+  if (!relatedBusinessList.includes(token)) fail(`draft related-row merge is missing: ${token}`)
+}
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')
 }
