@@ -765,6 +765,13 @@ else
   exit 1
 fi
 
+# === 在线 AI 向量依赖固定停用 ===
+INSTALL_ONLINE_AI=0
+echo ''
+echo 'Microi：平台使用内置 Skills + 权限感知 Schema 搜索，本次不安装 Ollama、nomic-embed-text 与 Qdrant。'
+
+# 原在线 AI 向量依赖安装交互完整保留，但固定注释，不再提示用户是否安装。
+: <<'MICROI_DISABLED_VECTOR_INSTALL_PROMPT'
 # === 在线 AI 引擎依赖安装选择 ===
 echo ''
 echo '=================================================================='
@@ -789,6 +796,7 @@ else
   echo 'Microi：错误：无效的输入，脚本退出。'
   exit 1
 fi
+MICROI_DISABLED_VECTOR_INSTALL_PROMPT
 
 # === LibreTranslate 翻译服务安装选择 ===
 echo ''
@@ -2071,49 +2079,47 @@ if [ "${MINIO_READY}" != "true" ]; then
 fi
 echo 'Microi：MinIO API 已就绪 ✓'
 
-# 使用官方 mc 客户端初始化桶；配置放在临时目录，避免污染安装用户的 ~/.mc。
-case "$(uname -m)" in
-  x86_64|amd64) MINIO_MC_ARCH="amd64" ;;
-  aarch64|arm64) MINIO_MC_ARCH="arm64" ;;
-  ppc64le) MINIO_MC_ARCH="ppc64le" ;;
-  *)
-    echo "Microi：错误：当前 CPU 架构 $(uname -m) 暂不支持自动下载 MinIO mc 客户端。"
-    exit 1
-    ;;
-esac
-MINIO_MC_BIN="/tmp/microi-minio-mc"
+# 使用吾码阿里云镜像中的官方 mc 客户端初始化桶，避免服务器直接访问海外下载站。
+MINIO_MC_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/minio-mc:RELEASE.2025-08-13T08-35-41Z"
 MINIO_MC_CONFIG_DIR="/tmp/microi-minio-mc-config"
-rm -f "${MINIO_MC_BIN}"
 rm -rf "${MINIO_MC_CONFIG_DIR}"
 mkdir -p "${MINIO_MC_CONFIG_DIR}"
-echo 'Microi：下载 MinIO 官方 mc 客户端并初始化存储桶...'
-if ! curl -fSL -o "${MINIO_MC_BIN}" "https://dl.min.io/client/mc/release/linux-${MINIO_MC_ARCH}/mc"; then
-  echo 'Microi：错误：MinIO mc 客户端下载失败。'
+echo "Microi：拉取吾码 MinIO mc 镜像 ${MINIO_MC_IMAGE}..."
+if ! docker pull "${MINIO_MC_IMAGE}"; then
+  echo 'Microi：错误：吾码 MinIO mc 镜像拉取失败。'
   exit 1
 fi
-chmod +x "${MINIO_MC_BIN}"
+
+run_minio_mc() {
+  docker run --rm \
+    -v "${MINIO_MC_CONFIG_DIR}:/root/.mc" \
+    "${MINIO_MC_IMAGE}" --config-dir /root/.mc "$@"
+}
 
 MINIO_MC_ALIAS="microi-local"
 MINIO_PRIVATE_BUCKET="mci-private"
 MINIO_PUBLIC_BUCKET="mci-public"
-if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" alias set "${MINIO_MC_ALIAS}" "http://${LAN_IP}:${MINIO_PORT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
+if ! run_minio_mc alias set "${MINIO_MC_ALIAS}" "http://${LAN_IP}:${MINIO_PORT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
   echo 'Microi：错误：MinIO mc 无法连接已安装的 MinIO 服务。'
+  rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
 fi
-if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
+if ! run_minio_mc mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PRIVATE_BUCKET}"; then
   echo "Microi：错误：MinIO 私有桶 ${MINIO_PRIVATE_BUCKET} 创建失败。"
+  rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
 fi
-if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
+if ! run_minio_mc mb --ignore-existing "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
   echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 创建失败。"
+  rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
 fi
-if ! "${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" anonymous set download "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
+if ! run_minio_mc anonymous set download "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"; then
   echo "Microi：错误：MinIO 公有桶 ${MINIO_PUBLIC_BUCKET} 的 public 下载权限设置失败。"
+  rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
 fi
-"${MINIO_MC_BIN}" --config-dir "${MINIO_MC_CONFIG_DIR}" anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"
-rm -f "${MINIO_MC_BIN}"
+run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"
 rm -rf "${MINIO_MC_CONFIG_DIR}"
 echo "Microi：MinIO 桶已初始化：${MINIO_PRIVATE_BUCKET}（私有）、${MINIO_PUBLIC_BUCKET}（public）✓"
 
@@ -2169,6 +2175,8 @@ echo ''
 echo '[步骤10/11] 部署可选服务与平台应用'
 echo '------------------------------------------------------------------'
 
+# 原 Ollama、nomic-embed-text、Qdrant 部署步骤完整保留，但固定注释，不参与一键安装。
+: <<'MICROI_DISABLED_VECTOR_DEPLOYMENT'
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo 'Microi：已选择安装向量检索增强，将部署 Ollama、nomic-embed-text 与 Qdrant。'
   echo ''
@@ -2304,6 +2312,8 @@ EOF
 else
   echo 'Microi：使用平台内置轻量 Schema 搜索，跳过 Ollama、nomic-embed-text 与 Qdrant。'
 fi
+MICROI_DISABLED_VECTOR_DEPLOYMENT
+echo 'Microi：已固定跳过 Ollama、nomic-embed-text 与 Qdrant。'
 
 # --- LibreTranslate ---
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
@@ -2320,7 +2330,7 @@ if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
 version: '3.8'
 services:
   microi-translate:
-    image: libretranslate/libretranslate:latest
+    image: registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6
     container_name: microi-install-libretranslate
 ${COMPOSE_SERVICE_NETWORK}
     user: "0:0"
@@ -2361,27 +2371,40 @@ EOF
       docker logs microi-install-libretranslate 2>&1 | tail -100 || true
       exit 1
     fi
-    if docker exec microi-install-libretranslate ./venv/bin/python scripts/healthcheck.py > /dev/null 2>&1; then
+    # LibreTranslate 1.9.6 的 healthcheck.py 在 /tmp/booting.flag 存在时会直接返回成功；
+    # 必须额外确认模型初始化已经结束、HTTP 健康且 API Key 数据库已创建。
+    LIBRETRANSLATE_BOOTING=0
+    if docker exec microi-install-libretranslate test -e /tmp/booting.flag; then
+      LIBRETRANSLATE_BOOTING=1
+    fi
+    if [ "${LIBRETRANSLATE_BOOTING}" != "1" ] \
+      && docker exec microi-install-libretranslate ./venv/bin/python scripts/healthcheck.py > /dev/null 2>&1 \
+      && docker exec microi-install-libretranslate test -s /app/db/api_keys.db; then
       LIBRETRANSLATE_READY=1
       break
     fi
     if [ $((_libretranslate_wait % 15)) -eq 0 ]; then
-      echo "Microi：LibreTranslate 仍在准备语言模型，已等待 $((_libretranslate_wait * 2)) 秒..."
+      if [ "${LIBRETRANSLATE_BOOTING}" = "1" ]; then
+        echo "Microi：LibreTranslate 仍在下载或初始化语言模型，已等待 $((_libretranslate_wait * 2)) 秒..."
+      else
+        echo "Microi：LibreTranslate 模型阶段已结束，正在等待 HTTP 服务与 API Key 数据库，已等待 $((_libretranslate_wait * 2)) 秒..."
+      fi
     fi
     sleep 2
   done
   if [ "${LIBRETRANSLATE_READY}" != "1" ]; then
-    echo 'Microi：错误：LibreTranslate 在 60 分钟内未通过健康检查。'
+    echo 'Microi：错误：LibreTranslate 在 60 分钟内未完成模型初始化、HTTP 健康检查或 API Key 数据库初始化。'
     docker logs microi-install-libretranslate 2>&1 | tail -100 || true
     exit 1
   fi
 
   echo 'Microi：LibreTranslate 已就绪，正在注册随机 API Key...'
   LIBRETRANSLATE_KEY_READY=0
+  LIBRETRANSLATE_KEY_ERROR=""
   for _libretranslate_key_wait in $(seq 1 30); do
-    if docker exec microi-install-libretranslate \
+    if LIBRETRANSLATE_KEY_ERROR=$(docker exec microi-install-libretranslate \
       ltmanage keys --api-keys-db-path /app/db/api_keys.db \
-      add 1000000 --key "${LIBRETRANSLATE_API_KEY}" > /dev/null 2>&1; then
+      add 1000000 --key "${LIBRETRANSLATE_API_KEY}" 2>&1); then
       LIBRETRANSLATE_KEY_READY=1
       break
     fi
@@ -2389,12 +2412,64 @@ EOF
   done
   if [ "${LIBRETRANSLATE_KEY_READY}" != "1" ]; then
     echo 'Microi：错误：LibreTranslate 已启动，但随机 API Key 注册失败。'
+    LIBRETRANSLATE_KEY_ERROR_SAFE="${LIBRETRANSLATE_KEY_ERROR//${LIBRETRANSLATE_API_KEY}/***REDACTED***}"
+    printf '%s\n' "${LIBRETRANSLATE_KEY_ERROR_SAFE}" | tail -20
+    docker logs microi-install-libretranslate 2>&1 | tail -100 || true
+    exit 1
+  fi
+
+  echo 'Microi：验证 LibreTranslate API Key 与基础翻译请求...'
+  LIBRETRANSLATE_API_READY=0
+  LIBRETRANSLATE_API_ERROR=""
+  for _libretranslate_api_wait in $(seq 1 3); do
+    if LIBRETRANSLATE_API_ERROR=$(docker exec \
+      -e MICROI_LT_API_KEY="${LIBRETRANSLATE_API_KEY}" \
+      microi-install-libretranslate ./venv/bin/python -c \
+      'import os, requests; response = requests.post("http://127.0.0.1:5000/translate", json={"q":"Hello","source":"en","target":"zh","format":"text","api_key":os.environ["MICROI_LT_API_KEY"]}, timeout=60); response.raise_for_status(); data = response.json(); assert isinstance(data.get("translatedText"), str) and data["translatedText"].strip()' 2>&1); then
+      LIBRETRANSLATE_API_READY=1
+      break
+    fi
+    sleep 2
+  done
+  if [ "${LIBRETRANSLATE_API_READY}" != "1" ]; then
+    echo 'Microi：错误：LibreTranslate API Key 已写入，但真实翻译请求验证失败。'
+    LIBRETRANSLATE_API_ERROR_SAFE="${LIBRETRANSLATE_API_ERROR//${LIBRETRANSLATE_API_KEY}/***REDACTED***}"
+    printf '%s\n' "${LIBRETRANSLATE_API_ERROR_SAFE}" | tail -20
     docker logs microi-install-libretranslate 2>&1 | tail -100 || true
     exit 1
   fi
 
   echo ''
-  echo 'Microi：LibreTranslate 健康检查与 API Key 注册完成 ✓'
+  echo 'Microi：LibreTranslate 模型、HTTP、API Key 与真实翻译请求验证完成 ✓'
+
+  TRANSLATE_SERVICE_URL="http://${LAN_IP}:${LIBRETRANSLATE_PORT}"
+  case "${DATABASE_CHOICE}" in
+    1|2)
+      TRANSLATE_CONFIG_SQL="UPDATE sys_osclients SET TranslateProvider='LibreTranslate', TranslateUrl='${TRANSLATE_SERVICE_URL}', TranslateApiKey='${LIBRETRANSLATE_API_KEY}', TranslateTimeout=120 WHERE OsClient='${OS_CLIENT}' AND IFNULL(IsDeleted, 0) = 0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND TranslateProvider='LibreTranslate' AND TranslateUrl='${TRANSLATE_SERVICE_URL}' AND TranslateApiKey='${LIBRETRANSLATE_API_KEY}' AND TranslateTimeout=120 AND IFNULL(IsDeleted, 0) = 0;"
+      ;;
+    3)
+      TRANSLATE_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [TranslateProvider]=N'LibreTranslate', [TranslateUrl]=N'${TRANSLATE_SERVICE_URL}', [TranslateApiKey]=N'${LIBRETRANSLATE_API_KEY}', [TranslateTimeout]=120 WHERE [OsClient]=N'${OS_CLIENT}' AND COALESCE([IsDeleted], 0) = 0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT N'MICROI_TRANSLATE_CONFIG_OK' FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [TranslateProvider]=N'LibreTranslate' AND [TranslateUrl]=N'${TRANSLATE_SERVICE_URL}' AND [TranslateApiKey]=N'${LIBRETRANSLATE_API_KEY}' AND [TranslateTimeout]=120 AND COALESCE([IsDeleted], 0) = 0;"
+      ;;
+    5|6)
+      TRANSLATE_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"TranslateProvider\"='LibreTranslate', \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}', \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}', \"TranslateTimeout\"=120 WHERE \"OsClient\"='${OS_CLIENT}' AND COALESCE(\"IsDeleted\", 0) = 0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"TranslateProvider\"='LibreTranslate' AND \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}' AND \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}' AND \"TranslateTimeout\"=120 AND COALESCE(\"IsDeleted\", 0) = 0;"
+      ;;
+  esac
+
+  echo 'Microi：写入 SaaS 引擎 LibreTranslate 配置...'
+  if ! database_exec_sql "${TRANSLATE_CONFIG_SQL}" > /dev/null; then
+    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置更新失败。'
+    exit 1
+  fi
+  if TRANSLATE_CONFIG_READBACK=$(database_exec_sql "${TRANSLATE_CONFIG_VERIFY_SQL}" 2>&1) \
+    && printf '%s\n' "${TRANSLATE_CONFIG_READBACK}" | grep -q 'MICROI_TRANSLATE_CONFIG_OK'; then
+    echo "Microi：SaaS 引擎翻译配置更新完成：TranslateProvider=LibreTranslate, TranslateUrl=${TRANSLATE_SERVICE_URL} ✓"
+  else
+    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置写入后回读不一致。'
+    exit 1
+  fi
 else
   echo 'Microi：已选择不安装 LibreTranslate，跳过翻译服务。'
 fi
@@ -2423,14 +2498,6 @@ esac
 
 echo "Microi：Web端口: ${VUE_PORT}, API端口: ${API_PORT}"
 
-APP_TRANSLATE_ENV=""
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  APP_TRANSLATE_ENV="      - MICROI_TRANSLATE_PROVIDER=libretranslate
-      - MICROI_TRANSLATE_URL=http://${LAN_IP}:${LIBRETRANSLATE_PORT}
-      - MICROI_TRANSLATE_API_KEY=${LIBRETRANSLATE_API_KEY}
-      - MICROI_TRANSLATE_TIMEOUT=120"
-fi
-
 mkdir -p "${APP_DIR}"
 cat > "${APP_DIR}/docker-compose.yml" <<EOF
 version: '3.8'
@@ -2455,7 +2522,6 @@ ${COMPOSE_SERVICE_NETWORK}
       - OsClientRedisPort=${REDIS_PORT}
       - OsClientRedisPwd=${REDIS_PASSWORD}
       - AuthServer=http://${LAN_IP}:${API_PORT}
-${APP_TRANSLATE_ENV}
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -2629,7 +2695,7 @@ fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo "LibreTranslate: 容器 microi-install-libretranslate, 端口 ${LIBRETRANSLATE_PORT}"
   echo "             加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
-  echo "             API Key: ${LIBRETRANSLATE_API_KEY}"
+  echo "             API Key: 已随机生成并写入 SaaS 租户配置（终端不输出明文）"
   echo "             数据目录: /microi/libretranslate/"
   echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-libretranslate/"
   echo ""

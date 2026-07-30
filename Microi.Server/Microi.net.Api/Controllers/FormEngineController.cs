@@ -1865,6 +1865,18 @@ namespace Microi.net.Api
             {
                 return new ContentResult() { Content = DiyMessage.GetLang(param.OsClient, "NoLogin", param._Lang) };
             }
+            if (!UserAccessKeySecurity.IsTableOperationAllowed(
+                    param._CurrentUser,
+                    param.TableId,
+                    true,
+                    true))
+            {
+                return new ContentResult
+                {
+                    Content = "当前访问密钥未授权导出此表。",
+                    ContentType = "text/plain; charset=utf-8"
+                };
+            }
             param.IsDeleted = 0;
             var exportAuth = await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(param, "Export");
             if (exportAuth.Code != 1)

@@ -159,9 +159,9 @@ var resp = V8.Http.PatchResponse({
 ### 后端 SSRF 与重定向边界
 
 - 严格 SSRF 防护默认关闭；未配置时完全保留历史行为，不限制协议、URL 内嵌凭据、回环、私网、链路本地或云元数据地址，并继续自动处理重定向。
-- 只有显式设置 `SsrfProtection:Enabled=true` 或 `MICROI_SSRF_PROTECTION_ENABLED=true` 后，后端才只允许 HTTP(S)，拒绝 URL 内嵌凭据、回环、私网、链路本地、云元数据和其它特殊地址，并禁止自动跟随 3xx。
+- 只有在 SaaS 引擎主租户启用 `SsrfProtectionEnabled` 后，后端才只允许 HTTP(S)，拒绝 URL 内嵌凭据、回环、私网、链路本地、云元数据和其它特殊地址，并禁止自动跟随 3xx。
 - 严格模式需要跳转时读取完整响应的 `StatusCode` / `Headers`，经业务判断后显式发起下一次调用，使每一跳重新校验。
-- 严格模式的 `SsrfProtection:AllowedHosts` / `MICROI_SSRF_ALLOWED_HOSTS` 只能加入受控且固定的精确主机，不接受用户输入，不要配置通配。
+- 严格模式的 SaaS 字段 `SsrfAllowedHosts` 只能加入受控且固定的精确主机，不接受用户输入，不要配置通配。
 - DNS 校验不能代替网络层出站 ACL。生产环境还应在容器、主机或网关阻断云元数据和非必要私网段。
 
 ## 前端 V8 行为与兼容性

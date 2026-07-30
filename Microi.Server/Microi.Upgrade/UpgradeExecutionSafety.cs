@@ -120,11 +120,7 @@ namespace Microi.net
             var keyPrefix = "Microi:{" + NormalizeKeySegment(osClient) + "}:ServerUpgrade";
             var lockKey = keyPrefix + ":Lease";
             var fenceKey = keyPrefix + ":FencingToken";
-            var nodeId = Environment.GetEnvironmentVariable("MICROI_NODE_ID");
-            if (nodeId.DosIsNullOrWhiteSpace())
-            {
-                nodeId = Environment.MachineName + "-" + Process.GetCurrentProcess().Id;
-            }
+            var nodeId = Environment.MachineName + "-" + Process.GetCurrentProcess().Id;
             var instanceToken = NormalizeKeySegment(nodeId) + ":" + Guid.NewGuid().ToString("N");
 
             const string acquireScript = @"

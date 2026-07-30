@@ -16,6 +16,7 @@
             :before-upload="(file) => BeforeFileUpload(file)"
             :on-exceed="() => onExceed()"
             :on-success="(result, file, fileList) => FileUploadSuccess(result, file, fileList)"
+            :on-error="(error, file, fileList) => FileUploadError(error, file, fileList)"
             :on-remove="(file, fileList) => FileUploadRemove(file, fileList)"
             :show-file-list="false"
         >
@@ -284,6 +285,7 @@ import { UploadFilled, Document, Delete, Rank, Picture, FolderOpened, Grid, Vide
 import { ElMessageBox, ElImageViewer } from 'element-plus';
 import Sortable from 'sortablejs';
 import { useDiyStore } from "@/pinia";
+import { getUploadErrorMessage } from "@/utils/upload-error";
 
 // 禁用属性继承
 defineOptions({
@@ -765,6 +767,34 @@ const FileUploadRemove = (file, fileList) => {
     }
 };
 
+// 清理上传失败后遗留的“正在上传中”或多文件占位项，避免表单一直处于假加载状态。
+const clearFailedFileUpload = (file) => {
+    if (getMultipleFlag.value) {
+        const currentFiles = Array.isArray(props.FormDiyTableModel[props.field.Name])
+            ? props.FormDiyTableModel[props.field.Name]
+            : [];
+        const failedUid = file && file.uid;
+        const nextFiles = currentFiles.filter(item => !(
+            item
+            && item.State === 0
+            && String(item.Id) === String(failedUid)
+        ));
+        props.FormDiyTableModel[props.field.Name] = nextFiles;
+        emit('update:modelValue', nextFiles);
+        return;
+    }
+
+    if (props.FormDiyTableModel[props.field.Name] === '正在上传中...') {
+        props.FormDiyTableModel[props.field.Name] = '';
+        emit('update:modelValue', '');
+    }
+};
+
+const FileUploadError = (error, file) => {
+    clearFailedFileUpload(file);
+    DiyCommon.Tips(getUploadErrorMessage(error, file && (file.raw || file)), false, 12);
+};
+
 // 上传成功的钩子
 const FileUploadSuccess = (result, file, fileList) => {
     console.log('=== FileUploadSuccess 被调用了 ===');
@@ -867,6 +897,7 @@ const FileUploadSuccess = (result, file, fileList) => {
         
         console.log('=== FileUploadSuccess END ===');
     } else {
+        clearFailedFileUpload(file);
         console.error('【上传失败】接口返回失败:', result);
     }
 };

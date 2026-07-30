@@ -258,6 +258,28 @@ export function analyzeBackgroundWorkload(buttonInput: unknown): { required: boo
   return { required: reasons.length > 0, reasons };
 }
 
+export function analyzeClientChunking(buttonInput: unknown): {
+  declared: boolean;
+  valid: boolean;
+  maxItemsPerChunk: number;
+  resumable: boolean;
+} {
+  const button = asRecord(buttonInput);
+  const workload = asRecord(button.Workload ?? button.workload ?? button.BackgroundWorkload ?? button.backgroundWorkload);
+  const mode = getString(workload, 'ExecutionMode', 'executionMode').trim().toLowerCase();
+  const declared = getBoolean(workload, 'ClientChunked', 'clientChunked') === true
+    || mode === 'clientchunked'
+    || mode === 'clientsequential';
+  const maxItemsPerChunk = getNumber(workload, 'MaxItemsPerChunk', 'maxItemsPerChunk') ?? 0;
+  const resumable = getBoolean(workload, 'Resumable', 'resumable') === true;
+  return {
+    declared,
+    valid: declared && maxItemsPerChunk > 0 && resumable,
+    maxItemsPerChunk,
+    resumable,
+  };
+}
+
 function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean; value?: string; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -277,10 +299,15 @@ function normalizeMenuJsonArray(fieldName: string, raw?: unknown): { ok: boolean
     const name = getString(button, 'Name', 'name');
     if (!name) errors.push(`${fieldName}[${index}].Name 不能为空`);
     const workloadAnalysis = analyzeBackgroundWorkload(button);
+    const clientChunking = analyzeClientChunking(button);
     let runBackground = button.RunBackground ?? button.runBackground ?? button.BackgroundTask ?? button.backgroundTask ?? button.IsBackgroundTask ?? button.isBackgroundTask;
     const apiEngineKey = getString(button, 'ApiEngineKey', 'apiEngineKey');
     if (workloadAnalysis.required && runBackground !== true) {
-      if (apiEngineKey) {
+      if (clientChunking.declared && !clientChunking.valid) {
+        errors.push(`${fieldName}[${index}] 声明客户端分片时必须设置 Workload.MaxItemsPerChunk > 0 且 Workload.Resumable=true`);
+      } else if (clientChunking.valid) {
+        warnings.push(`${fieldName}[${index}] 已声明客户端可恢复分片，单片最多 ${clientChunking.maxItemsPerChunk} 条；保留前端分片执行：${workloadAnalysis.reasons.join('；')}`);
+      } else if (apiEngineKey) {
         runBackground = true;
         warnings.push(`${fieldName}[${index}] 已识别为长任务并自动启用 RunBackground：${workloadAnalysis.reasons.join('；')}`);
       } else {
