@@ -662,9 +662,21 @@
 						title: '保存成功',
 						icon: 'success'
 					})
+					// zhy：把本次保存后的完整记录随事件带回上一页，供未保存主表的关联列表即时回显。
+					const savedRow = {
+						...this.form,
+						...tenantSubmitValues,
+						...(result.Data && typeof result.Data === 'object' && !Array.isArray(result.Data)
+							? result.Data
+							: {}),
+						Id: this.rowId
+					}
 					const changedEvent = {
 						table: this.tableName,
-						id: this.rowId
+						id: this.rowId,
+						row: savedRow,
+						parentRowId: this.tableChildAuth?.ParentRowId || '',
+						parentValue: this.tableChildAuth?.ParentValue || ''
 					}
 					uni.$emit('microi:data-changed', changedEvent)
 					await notifyTenantFormSaved(this.tenantFormContext({
