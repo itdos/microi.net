@@ -39,6 +39,10 @@ export function buildTokenFileLookupKeys(apiBaseUrl, osClient = '', osClientType
     keys.push(apiUrl);
     return Array.from(new Set(keys.filter(Boolean)));
 }
+export function buildMicroAppEntryUrl(apiBaseUrl, osClient, msKey) {
+    const apiUrl = String(apiBaseUrl || '').replace(/\/+$/, '');
+    return `${apiUrl}/micro-app/${encodeURIComponent(String(osClient || '').trim())}/${encodeURIComponent(String(msKey || '').trim())}/index.html`;
+}
 export function isTenantConfigurationFailureResponse(result) {
     const reasonCode = String(result?.DataAppend?.ReasonCode || '').trim();
     if (/^(InvalidTenant|InvalidOsClient|TenantNotFound|TenantDisabled)$/i.test(reasonCode)) {
@@ -1050,6 +1054,66 @@ export class MicroiClient {
             ...data,
         });
     }
+    async probeMicroAppEntry(msKey) {
+        const url = buildMicroAppEntryUrl(this.config.apiBaseUrl, this.config.osClient || '', msKey);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10_000);
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { Accept: 'text/html,application/xhtml+xml' },
+                redirect: 'follow',
+                signal: controller.signal,
+            });
+            const contentType = response.headers.get('content-type') || '';
+            const contentLength = Number(response.headers.get('content-length') || 0);
+            if (Number.isFinite(contentLength) && contentLength > 2 * 1024 * 1024) {
+                await response.body?.cancel();
+                return {
+                    ok: false,
+                    url,
+                    status: response.status,
+                    contentType,
+                    bodyBytes: contentLength,
+                    error: 'MicroApp entry exceeds the 2MB probe limit',
+                };
+            }
+            const body = Buffer.from(await response.arrayBuffer());
+            const bodyBytes = body.byteLength;
+            const html = body.toString('utf8');
+            const hasHead = /<head(?:\s|>)/iu.test(html);
+            const hasBody = /<body(?:\s|>)/iu.test(html);
+            const ok = response.ok
+                && contentType.toLowerCase().includes('text/html')
+                && bodyBytes > 0
+                && hasHead
+                && hasBody;
+            return {
+                ok,
+                url,
+                status: response.status,
+                contentType,
+                bodyBytes,
+                hasHead,
+                hasBody,
+                ...(!response.ok
+                    ? { error: `HTTP ${response.status} ${response.statusText}` }
+                    : !ok ? { error: 'MicroApp entry is not a complete HTML document with <head> and <body>' } : {}),
+            };
+        }
+        catch (error) {
+            return {
+                ok: false,
+                url,
+                error: controller.signal.aborted
+                    ? 'MicroApp entry probe timed out after 10000ms'
+                    : error instanceof Error ? error.message : String(error),
+            };
+        }
+        finally {
+            clearTimeout(timer);
+        }
+    }
     async getTableData(tableName, query = {}) {
         return this.post(API.FORM_GET_TABLE_DATA, {
             OsClient: this.config.osClient,
@@ -1200,6 +1264,12 @@ export class MicroiClient {
             ...data,
             Visible: data.Visible ?? 1,
             AppVisible: data.AppVisible ?? 1,
+        });
+    }
+    async deleteField(data) {
+        return this.post(API.DELETE_FIELD, {
+            OsClient: this.config.osClient,
+            ...data,
         });
     }
     async updateField(patch) {

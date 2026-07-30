@@ -85,47 +85,20 @@ return result;
 详见：[V8 函数列表（后端）](https://microi.net/doc/v8-engine/v8-server.html) 与 [接口引擎配置 Skill](https://gitee.com/ITdos/microi.net/tree/master/microi.skills/v8-api-config)。
 
 ## 扩展接口引擎
->* 详见[`Microi.V8Engine`](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.V8Engine)类库，在[`V8EngineExtend`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8EngineExtend.cs)类中扩展
-::: details 展开查看 JavaScript 代码（40 行）
-```js
-using System;
-using Dos.Common;
-using Microi.Model.Aliyun;
-namespace Microi.net
+>* 当前扩展统一通过[`Microi.V8Engine/V8Extend.cs`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8Extend.cs)中的 `V8ExtensionRegistry` 注册，不再修改旧 `V8EngineExtend` partial 属性。
+>* 官方内置注册包括 `V8.Alipay`、`V8.AlipayV3`、`V8.WeChat`、`V8.Alidns`、`V8.System` 和 `V8.Image`；实际可用清单以当前部署源码为准。
+>* 支付、微信、DNS 等扩展会接触私钥和供应商凭据，只能从当前租户受控配置读取，不得写死在 V8、日志或响应中。
+::: details 展开查看 C# 注册示例
+```csharp
+public static class V8Extend
 {
-    public partial class V8EngineExtend
+    internal static void Initialize()
     {
-        /// <summary>
-        /// 这种方式支持。测试扩展V8.TestV8Extend3('test')方法
-        /// </summary>
-        /// <returns></returns>
-        public string TestV8Extend3(string testParam)
-        {
-            return "TestV8Extend3：" + testParam;
-        }
-        /// <summary>
-        /// 新增V8.Alipay对象。
-        /// 这种方式支持V8.Alipay.Test22('test')，也支持V8.Alipay.CreatePay({ AppId : '11' })
-        /// </summary>
-        public Alipay Alipay
-        {
-            get { return new Alipay(); }
-        }
-        /// <summary>
-        /// 新增V8.WeChat对象。
-        /// </summary>
-        public WeChat WeChat
-        {
-            get { return new WeChat(); }
-        }
-        public AlipayV3 AlipayV3
-        {
-            get { return new AlipayV3(); }
-        }
-        public Alidns Alidns
-        {
-            get { return new Alidns(); }
-        }
+        V8ExtensionRegistry.Register("Alipay", () => new Alipay());
+        V8ExtensionRegistry.Register("WeChat", () => new WeChat());
+
+        // 自定义扩展示例：
+        V8ExtensionRegistry.Register("CustomService", () => new CustomService());
     }
 }
 ```
@@ -379,7 +352,7 @@ var isDebugLog = true;//也可以使用系统设置全局变量：var isDebugLog
 //【第二步】定义需要向前端输出的日志内容
 var debugLog = {};
 //获取业务数据
-var list1Result = V8.FormEngineGetTableData({
+var list1Result = V8.FormEngine.GetTableData({
     FormEngineKey: 'test1',
     _Where: [
       ['field1', '=', '1']

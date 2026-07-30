@@ -1,9 +1,17 @@
 <template>
-    <section class="micro-app-dialog">
-        <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" />
+    <section ref="host" class="micro-app-dialog" data-mci-ui-root>
+        <micro-app-runtime-error
+            v-if="error"
+            :message="error"
+            :details="runtimeDiagnostics"
+            @retry="retry"
+            @back="close"
+            @copy="copyDiagnostics"
+        />
         <micro-app-loading-skeleton v-else-if="loading" />
         <micro-app
             v-else-if="entryUrl"
+            ref="microApp"
             class="micro-app-dialog__app"
             :key="microAppKey"
             :name="microAppName"
@@ -13,14 +21,18 @@
             router-mode="pure"
             iframe
             @datachange="handleDataChange"
+            @mounted="handleMounted"
+            @unmount="handleUnmount"
+            @error="handleMicroAppError"
         />
     </section>
 </template>
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { buildMicroAppEntryUrl } from "@/utils/microAppEntryUrl.js";
+import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
+import MicroAppRuntimeError from "./runtime-error.vue";
 import { applyMicroAppToken } from "./token-sync";
 
 function normalizeName(value) {
@@ -36,7 +48,7 @@ function normalizeRoute(value) {
 
 export default {
     name: "MicroAppDialog",
-    components: { MicroAppLoadingSkeleton },
+    components: { MicroAppLoadingSkeleton, MicroAppRuntimeError },
     props: {
         DataAppend: { type: Object, default: () => ({}) }
     },
@@ -46,6 +58,16 @@ export default {
             error: "",
             entryUrl: "",
             appVersion: "",
+            pageKey: "",
+            publishStatus: "",
+            assetSource: "",
+            httpStatus: "",
+            reasonCode: "",
+            mountState: "idle",
+            retryKey: 0,
+            hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
+            resizeObserver: null,
+            visualViewportHandler: null,
             instanceId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         };
     },
@@ -60,7 +82,7 @@ export default {
             return normalizeName(`${this.appKey}-${this.instanceId}`);
         },
         microAppKey() {
-            return `${this.microAppName}@${this.entryUrl}`;
+            return `${this.microAppName}@${this.entryUrl}@${this.retryKey}`;
         },
         microAppData() {
             return {
@@ -69,56 +91,112 @@ export default {
                 token: DiyCommon.getToken(),
                 appKey: this.appKey,
                 version: this.appVersion,
+                hostViewport: this.hostViewport,
                 microRoute: this.routePath,
                 dialog: true,
                 dialogData: this.DataAppend?.Data || {},
                 route: { microRoute: this.routePath, microRoutePath: this.routePath }
+            };
+        },
+        runtimeDiagnostics() {
+            return {
+                appKey: this.appKey,
+                pageKey: this.pageKey,
+                routePath: this.routePath,
+                version: this.appVersion,
+                entryUrl: this.entryUrl,
+                httpStatus: this.httpStatus,
+                publishStatus: this.publishStatus,
+                assetSource: this.assetSource,
+                mountState: this.mountState,
+                reasonCode: this.reasonCode
             };
         }
     },
     created() {
         this.resolveEntryUrl();
     },
+    mounted() {
+        this.startViewportContract();
+    },
+    beforeUnmount() {
+        this.stopViewportContract();
+    },
     methods: {
         async resolveEntryUrl() {
             this.loading = true;
             this.error = "";
+            this.entryUrl = "";
+            this.httpStatus = "";
+            this.reasonCode = "";
+            this.mountState = "resolving";
             try {
                 if (!this.appKey) throw new Error("OpenAppDialog 缺少 AppKey");
-                let version = String(this.DataAppend?.Version || "").trim();
-                if (!version) {
-                    // GetFormData 在部分老库会被历史字段元数据影响；列表查询只取首条，
-                    // 并兼容旧前端/网关的不同 DosResult 包装结构。
-                    const result = await DiyCommon.FormEngine.GetTableData("sys_microiservice", {
-                        _Where: [["MsKey", "=", this.appKey]],
-                        _PageIndex: 1,
-                        _PageSize: 1
+                const requestedVersion = String(this.DataAppend?.Version || "").trim();
+                let result = null;
+                try {
+                    result = await DiyCommon.PostAsync("/api/MicroApp/Resolve", {
+                        OsClient: DiyCommon.GetOsClient(),
+                        AppKey: this.appKey,
+                        Version: requestedVersion,
+                        RoutePath: this.routePath
                     });
-                    const rows = Array.isArray(result)
-                        ? result
-                        : (Array.isArray(result?.Data)
-                            ? result.Data
-                            : (Array.isArray(result?.Data?.Data) ? result.Data.Data : []));
-                    const resultCode = result?.Code ?? result?.code;
-                    const service = rows[0];
-                    if ((resultCode !== undefined && resultCode !== null && Number(resultCode) !== 1) || !service) {
-                        throw new Error(`未找到已发布微服务：${this.appKey}`);
-                    }
-                    if (Number(service.IsEnable) === 0) throw new Error(`微服务已停用：${this.appKey}`);
-                    version = service.BuildVersion || "";
+                } catch (resolveError) {
+                    if (!shouldUseMicroAppResolveFallback(null, { requestedVersion })) throw resolveError;
                 }
-                this.appVersion = version;
-                this.entryUrl = buildMicroAppEntryUrl({
-                    apiBase: DiyCommon.GetApiBase(),
-                    osClient: DiyCommon.GetOsClient(),
-                    appKey: this.appKey,
-                    version
-                });
+                const usingFallback = Number(result?.Code) !== 1;
+                if (usingFallback) {
+                    if (!shouldUseMicroAppResolveFallback(result, { requestedVersion })) {
+                        const error = new Error(result?.Msg || `未找到已发布微服务：${this.appKey}`);
+                        error.reasonCode = result?.Data?.ReasonCode || "MICRO_APP_RESOLVE_FAILED";
+                        throw error;
+                    }
+                }
+                const runtime = result?.Data || {};
+                this.appVersion = String(runtime.Version || requestedVersion || "");
+                this.pageKey = String(runtime.Page?.PageKey || "");
+                this.publishStatus = String(runtime.PublishStatus || (usingFallback ? "CompatibilityFallback" : ""));
+                this.assetSource = String(runtime.AssetSource || runtime.StorageMode || (usingFallback ? "managed-stable-entry" : ""));
+                let url = String(runtime.EntryUrl || "");
+                if (!url) {
+                    url = buildMicroAppEntryUrl({
+                        apiBase: DiyCommon.GetApiBase(),
+                        osClient: DiyCommon.GetOsClient(),
+                        appKey: this.appKey,
+                        version: usingFallback ? "" : this.appVersion
+                    });
+                }
+                if (url.startsWith("/")) url = String(DiyCommon.GetApiBase() || "").replace(/\/+$/, "") + url;
+                await this.probeEntry(url);
+                this.entryUrl = url;
+                this.mountState = "mounting";
             } catch (error) {
                 this.error = error?.message || String(error);
-                this.invokeCallback("OnError", { message: this.error });
+                this.httpStatus = String(error?.httpStatus || "");
+                this.reasonCode = String(error?.reasonCode || "MICRO_APP_LOAD_FAILED");
+                this.mountState = "error";
+                this.invokeCallback("OnError", { message: this.error, errorType: "load", handled: false, reasonCode: this.reasonCode });
             } finally {
                 this.loading = false;
+            }
+        },
+        async probeEntry(url) {
+            this.mountState = "probing";
+            const response = await fetch(url, { method: "GET", headers: { Accept: "text/html,application/xhtml+xml" }, cache: "no-store" });
+            this.httpStatus = String(response.status);
+            const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+            const text = await response.text();
+            if (!response.ok) {
+                const error = new Error(`运行入口请求失败（HTTP ${response.status}）`);
+                error.httpStatus = response.status;
+                error.reasonCode = "MICRO_APP_ENTRY_HTTP_ERROR";
+                throw error;
+            }
+            if (!contentType.includes("text/html") || !/<head[\s>]/i.test(text) || !/<body[\s>]/i.test(text)) {
+                const error = new Error("运行入口未返回完整 HTML 文档");
+                error.httpStatus = response.status;
+                error.reasonCode = "MICRO_APP_ENTRY_INVALID_HTML";
+                throw error;
             }
         },
         handleDataChange(event) {
@@ -133,8 +211,66 @@ export default {
                 this.invokeCallback("OnCancel", data);
                 this.close();
             } else if (type === "app-dialog:error" || type === "error") {
-                this.invokeCallback("OnError", data);
+                const handled = payload?.handled === true || payload?.Handled === true || data?.handled === true || data?.Handled === true;
+                if (!handled) this.invokeCallback("OnError", { ...data, handled: false, errorType: data?.errorType || "business" });
             }
+        },
+        handleMounted() {
+            this.mountState = "mounted";
+            this.pushViewportContract();
+        },
+        handleUnmount() {
+            if (!this.error) this.mountState = "unmounted";
+        },
+        handleMicroAppError(event) {
+            const detail = event?.detail ?? event ?? {};
+            this.error = detail?.message || detail?.error?.message || "微服务挂载失败";
+            this.reasonCode = "MICRO_APP_MOUNT_FAILED";
+            this.mountState = "error";
+            this.invokeCallback("OnError", { message: this.error, errorType: "load", handled: false, reasonCode: this.reasonCode });
+        },
+        retry() {
+            this.retryKey += 1;
+            this.resolveEntryUrl();
+        },
+        async copyDiagnostics() {
+            const text = JSON.stringify({ ...this.runtimeDiagnostics, message: this.error }, null, 2);
+            try {
+                await navigator.clipboard.writeText(text);
+                this.$message?.success?.("诊断信息已复制");
+            } catch (_) {
+                console.info("[MicroAppDialog] diagnostics", text);
+            }
+        },
+        startViewportContract() {
+            this.updateViewportContract();
+            if (typeof ResizeObserver !== "undefined" && this.$refs.host) {
+                this.resizeObserver = new ResizeObserver(() => this.updateViewportContract());
+                this.resizeObserver.observe(this.$refs.host);
+            }
+            this.visualViewportHandler = () => this.updateViewportContract();
+            window.visualViewport?.addEventListener("resize", this.visualViewportHandler);
+            window.addEventListener("resize", this.visualViewportHandler);
+        },
+        stopViewportContract() {
+            this.resizeObserver?.disconnect?.();
+            if (this.visualViewportHandler) {
+                window.visualViewport?.removeEventListener("resize", this.visualViewportHandler);
+                window.removeEventListener("resize", this.visualViewportHandler);
+            }
+        },
+        updateViewportContract() {
+            const host = this.$refs.host;
+            if (!host) return;
+            const rect = host.getBoundingClientRect();
+            this.hostViewport = { width: Math.round(rect.width), height: Math.round(rect.height), safeAreaBottom: 0 };
+            host.style.setProperty("--micro-app-available-width", `${Math.round(rect.width)}px`);
+            host.style.setProperty("--micro-app-available-height", `${Math.round(rect.height)}px`);
+            this.pushViewportContract();
+        },
+        pushViewportContract() {
+            const app = this.$refs.microApp;
+            if (app && typeof app.setData === "function") app.setData({ ...this.microAppData, type: "host:resize" });
         },
         invokeCallback(name, data) {
             const callback = this.DataAppend?.[name];
@@ -151,18 +287,27 @@ export default {
 
 <style lang="scss" scoped>
 .micro-app-dialog {
+    --micro-app-available-width: 100%;
+    --micro-app-available-height: 100%;
+    --micro-app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex;
+    flex-direction: column;
     height: 100%;
     min-height: 100%;
     overflow: hidden;
     border: 1px solid var(--el-border-color-lighter);
-    border-radius: 8px;
-    background: var(--el-bg-color-page);
+    border-radius: var(--mci-shape-panel, var(--mci-radius-lg, 16px));
+    background: var(--mci-bg-base, var(--el-bg-color-page));
 }
 
 .micro-app-dialog__app {
     display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 100%;
+    flex: 1 1 auto;
+    width: var(--micro-app-available-width);
+    height: var(--micro-app-available-height);
+    min-width: 0;
+    min-height: 0;
+    padding-bottom: var(--micro-app-safe-area-bottom);
+    box-sizing: border-box;
 }
 </style>

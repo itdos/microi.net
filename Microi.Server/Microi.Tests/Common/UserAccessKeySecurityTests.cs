@@ -190,6 +190,69 @@ public class UserAccessKeySecurityTests
             "/api/SysUserAccessKey/Create"));
     }
 
+    [Theory]
+    [InlineData("/api/FormEngine/GetTableData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/Get-TableData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/GetFormData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/Get-FormData-mic-data-dashboard")]
+    public void DynamicFormEngineReadRoutes_AreAuthorizedBeforeRouteTransformation(string path)
+    {
+        var user = NewScopedUser();
+
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(user, path));
+        Assert.True(UserAccessKeySecurity.TryGetTableOperation(
+            path,
+            out var isRead,
+            out var isExport));
+        Assert.True(UserAccessKeySecurity.TryGetDynamicFormEngineAction(
+            path,
+            out var dynamicAction));
+        Assert.Contains(dynamicAction, new[] { "GetTableData", "GetFormData" });
+        Assert.True(isRead);
+        Assert.False(isExport);
+    }
+
+    [Theory]
+    [InlineData("/api/FormEngine/AddFormData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/Add-FormData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/UptFormData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/Upt-FormData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/DelFormData-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/Del-FormData-mic-data-dashboard")]
+    public void DynamicFormEngineWriteRoutes_RequireWriteScope(string path)
+    {
+        var user = NewScopedUser();
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(user, path));
+
+        user["_AccessKeyScopes"] = new JArray("page:open", "form:read", "form:write");
+        Assert.True(UserAccessKeySecurity.IsApiPathAllowed(user, path));
+        Assert.True(UserAccessKeySecurity.TryGetTableOperation(
+            path,
+            out var isRead,
+            out var isExport));
+        Assert.True(UserAccessKeySecurity.TryGetDynamicFormEngineAction(path, out _));
+        Assert.False(isRead);
+        Assert.False(isExport);
+    }
+
+    [Theory]
+    [InlineData("/api/FormEngine/GetTableDataX-mic-data-dashboard")]
+    [InlineData("/api/FormEngine/GetTableData-")]
+    [InlineData("/api/FormEngine/Get-TableData-")]
+    [InlineData("/api/FormEngine/GetTableData-mic-data-dashboard/extra")]
+    [InlineData("/api/ApiEngine/GetTableData-mic-data-dashboard")]
+    public void DynamicFormEngineRouteLookalikes_RemainDenied(string path)
+    {
+        var user = NewScopedUser();
+
+        Assert.False(UserAccessKeySecurity.IsApiPathAllowed(user, path));
+        Assert.False(UserAccessKeySecurity.TryGetTableOperation(
+            path,
+            out _,
+            out _));
+        Assert.False(UserAccessKeySecurity.TryGetDynamicFormEngineAction(path, out _));
+    }
+
     [Fact]
     public void WildcardPageScope_AllowsDynamicMenuBootstrapOnlyForWildcardRoutes()
     {
@@ -239,7 +302,12 @@ public class UserAccessKeySecurityTests
             "/api/FormEngine/GetDiyTableModel",
             "/api/FormEngine/GetDiyFieldByDiyTables",
             "/api/FormEngine/GetTableDataCount",
+            "/api/FormEngine/GetTableData-mic-data-dashboard",
+            "/api/FormEngine/GetFormData-mic-data-dashboard",
             "/api/FormEngine/AddFormData",
+            "/api/FormEngine/AddFormData-mic-data-dashboard",
+            "/api/FormEngine/UptFormData-mic-data-dashboard",
+            "/api/FormEngine/DelFormData-mic-data-dashboard",
             "/api/FormEngine/ExportDiyTableRow",
             "/api/SysDept/GetSysDeptStep",
             "/api/SysBaseData/GetSysBaseDataStep",

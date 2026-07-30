@@ -395,10 +395,11 @@ try {
 - 默认只允许 `page:open + form:read`；`form:write/form:export/file:read/api-engine:run/data-source:run` 必须显式启用。`AllowedRoutes` 和 `AllowedTableNames` 可以使用单独值 `*` 表示“全部目标帐号已授权资源”，但检查仍必须位于管理员快捷放行之前并继续执行帐号菜单、表单、部门和行权限；旧 UI 误存的路由值 `/*` 只作为该通配值的兼容别名。`AllowedApiEngineKeys` 和 `AllowedDataSourceKeys` 必须是准确白名单，禁止 `*`。
 - API 放行必须使用按 capability 分类的运行时矩阵，不能靠零散补一个报错路径：页面范围为 `*` 且具有 `page:open` 时才允许 `SysMenu/GetSysMenuStep`；指定页面密钥不得读取完整菜单树。只允许会话启动、页面元数据、表单 CRUD/导出、本人后台任务和本人终端信息等明确运行面；显示密码、密钥管理、菜单/表/字段设计、索引、缓存、服务器、其它终端管理等控制面保持拒绝。
 - FormEngine 通过 action filter 对模型绑定后的 `FormEngineKey/TableName/TableId/TableIds` 逐项校验。`AllowedTableNames` 在共享数据库回源时派生为 `AllowedTableIds + AllowedFieldIds`，放进带契约版本的短 TTL Redis 运行时缓存；解析失败必须 fail closed。这样只传表 Id 的元数据接口，以及只传 `_FieldId/FieldIds` 的字段 SQL/批量下拉数据接口，都不能绕过表名白名单。
+- FormEngine 的动态友好路由（如 `GetTableData-{table-key}`、`Get-TableData-{table-key}`、`GetFormData-{table-key}` 及写入别名）必须在 API capability 鉴权前归一化。动态路由转换器与访问密钥鉴权必须复用同一个别名解析器，禁止各维护一份前缀清单；归一化只决定所需 scope，模型绑定后的准确表引用仍要再次校验，空 Key、额外路径段和相似前缀必须拒绝。
 - `ApiEngineController` 的 Run 系列即使标记了 `[AllowAnonymous]`，检测到访问密钥会话后也必须解析实际命中的引擎模型并校验准确 `ApiEngineKey`；数据源运行和后台接口任务同样校验准确 Key。禁止只在 MVC 授权过滤器中检查粗粒度路径，因为匿名兼容入口会跳过该过滤器。
 - 自动登录 URL 必须携带当前 `OsClient`；前端进入 `/access-login` 时先清除 Hash 中的密钥，再用 JSON Body 兑换，并设置有限超时。禁止等待与兑换无关的 SSO 初始化导致无限加载。
 - 管理操作只允许普通登录会话的本人或管理员；访问密钥会话不能创建或吊销密钥。
 - 多节点共享 Redis 只作为短 TTL 缓存和限流；数据库是事实源，吊销主动清除缓存。不得使用 `static` 字典、本机文件或本地定时器保存密钥状态。
 - 对外仍要求 HTTPS。固定终端使用独立只读帐号，不能用超级管理员帐号创建看板密钥。
 
-验收至少覆盖：明文只返回一次、错误密钥固定时间比较、过期/吊销/停用帐号失败、指定页面成功而其它路由失败、全部页面可加载 `GetSysMenuStep`、允许表名及对应表 Id 成功而其它表失败、FormEngine 设计接口仍拒绝、接口/数据源 Key 精确限制且动态/后台入口不能绕过、普通帐号权限变化即时收窄、两个 API 节点吊销一致生效。
+验收至少覆盖：明文只返回一次、错误密钥固定时间比较、过期/吊销/停用帐号失败、指定页面成功而其它路由失败、全部页面可加载 `GetSysMenuStep`、标准与动态 `GetTableData/GetFormData` 路由均可读取允许表、动态写路由仍要求 `form:write`、空 Key/相似前缀/额外路径段失败、允许表名及对应表 Id 成功而其它表失败、FormEngine 设计接口仍拒绝、接口/数据源 Key 精确限制且动态/后台入口不能绕过、普通帐号权限变化即时收窄、两个 API 节点吊销一致生效。

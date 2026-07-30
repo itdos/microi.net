@@ -21,6 +21,7 @@ export interface LocalApplicationAssetManifest {
     entryPath: string;
     assets: LocalApplicationAsset[];
     totalSize: number;
+    manifestHash: string;
     skippedSourceMaps: string[];
 }
 /**

@@ -1035,155 +1035,218 @@ var rowResult = await V8.FormEngine.GetFormData({
 
 业务 V8 不得手工构造、缓存、跨父记录复用或向其它表传播 `_TableChildAuth`。存量项目也不需要给每个隐藏子表菜单逐角色补权限，合法子表访问由上述父记录范围内的委托授权完成。
 
-## 移动端函数
-### 蓝牙打印
-::: details 展开查看 JavaScript 代码（143 行）
-```js
-//单条打印
-if(V8.ClientType == 'PC'){
-    var ids = JSON.stringify([V8.Form.Id]);
-    var Dydz = 'f606ae5e-1ada-45d0-971c-53533b70a461';
-    V8.OpenDialog({    
-        ComponentName:'OpenIframe',//必传，其余参数可选。组件名称，二次开发必须提前预注册。    
-        Title: '打印',    
-        OpenType:'Drawer',//可传：Drawer    
-        TitleIcon: 'fas fa-plus',//标题左侧的图标   
-        Width: '800px',   
-        DataAppend:{//传入自定义附加数据，DataAppend为固定参数名称
-            Url:'/autoprint/#/doprint',        
-            PrintId:Dydz,
-            DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?OsClient=${V8.SysConfig.OsClient}&Id=${ids}`
-        }
-    });
-}else{
-    console.log('Microi：移动端蓝牙打印准备开始！');
-    //如果没有连接，则打开蓝牙连接页面
-    if(!V8.Print || !V8.Print.BLEInformation || !V8.Print.BLEInformation.deviceId){
-        console.log('Microi：移动端准备蓝牙连接！');
-        V8.Print.OpenBluetoothPage();
-        console.log('Microi：移动端已打开蓝牙连接页面！');
-    }else{//如果已连接，直接开始打印
-        console.log('Microi：移动端准备开始打印！');
-        var command = V8.Print.createNew();
-        command.setSize(75, 65);//设置页面大小，单位mm
-        command.setGap(2);//传感器
-        command.setCls();//清除打印机缓存
-        command.setText(0, 30, "TSS24.BF2", 1, 1, "图片");//打印文字
-        command.setQR(40, 120, "L", 5, "A", "www.baidu.com佳博");//打印二维码
-        command.setText(60, 90, "TSS24.BF2", 1, 1, "佳博");//打印文字
-        command.setText(170, 50, "TSS24.BF2", 1, 1, "小程序测试");//打印文字
-        command.setText(170, 90, "TSS24.BF2", 1, 1, "测试数字12345678");//打印文字
-        command.setText(170, 120, "TSS24.BF2", 1, 1, "测试英文abcdefg");//打印文字
-        command.setText(170, 150, "TSS24.BF2", 1, 1, "测试符号/*-+!@#$");//打印文字
-        command.setBarCode(170, 180, "EAN8", 64, 1, 3, 3, "1234567");//打印条形码
-        command.setPagePrint();//打印页面
-        V8.Print.prepareSend(command.getData());//准备发送，根据每次发送字节数来处理分包数量
-        console.log('Microi：移动端打印结束！');
-    }
-}
+## 蓝牙打印（`V8.Print`）
 
-//批量打印
-if (V8.ClientType == 'PC') {
-    var ids = JSON.stringify([V8.Form.Id]);
-    var Dydz = '38fa78e7-a5c6-4311-8e5d-2879e7e4b45a';
-    V8.OpenDialog({
-        ComponentName: 'OpenIframe', //必传，其余参数可选。组件名称，二次开发必须提前预注册。    
-        Title: '打印',
-        OpenType: 'Drawer', //可传：Drawer    
-        TitleIcon: 'fas fa-plus', //标题左侧的图标   
-        Width: '800px',
-        DataAppend: { //传入自定义附加数据，DataAppend为固定参数名称
-            Url: '/autoprint/#/doprint',
-            PrintId: Dydz,
-            // DataApi: `${V8.SysConfig.ApiBase}/apiengine/print_bgxm?OsClient=${V8.SysConfig.OsClient}&Id=${ids}`
-            DataApi: `${V8.SysConfig.ApiBase}/apiengine/print-demo?OsClient=${encodeURIComponent(V8.OsClient)}&Id=${ids}`
-        }
-    });
-} else {
-    //2025-01-04 Anderson：实现批量打印
-    //如果没有连接，则打开蓝牙连接页面
-    if(!V8.Print || !V8.Print.BLEInformation || !V8.Print.BLEInformation.deviceId){
-        console.log('Microi：移动端准备蓝牙连接！');
-        V8.Print.OpenBluetoothPage();
-        console.log('Microi：移动端已打开蓝牙连接页面！');
-    }else{
-        var bgdId = V8.Form.DangqianBGDID;
-        var resXMlist = await V8.FormEngine.GetTableData('diy_kjbgxm', {
-            _Where: [
-                ['DangqianBGDID', '=', bgdId]
-            ],
-            _SelectFields: [
-                'Xiangma', // 箱码（二维码内容）
-                'Cunhuo', // 物料代码
-                'CreateTime', // 生产日期
-                'ShengchanPH', // 批次
-                'ZhuangxiangSL', // 数量
-                'GuigeXH' // 图号
-            ]
-        });
-        if (resXMlist.Code != 1) {
-            V8.Tips(resXMlist.Msg, false);
-            return;
-        }
-        var dataXMList = resXMlist.Data;
-        //2025-01-04 Anderson：for循环太快，改为3秒执行一次
-        var index = 0;
-        console.log(`Microi：移动端准备批量打印：共[${dataXMList.length}]条！`);
-        V8.Tips(`移动端准备批量打印：共[${dataXMList.length}]条！`);
-        if(dataXMList.length >= 100){
-            V8.Tips(`条数【${dataXMList.length }】过多！`, false);
-            return;
-        }
-        function forPrint(row){
-            if(index >= dataXMList.length){
-                console.log(`Microi：移动端批量打印结束！`);
-                V8.Tips(`移动端批量打印结束！`);
-                return;
-            }
-            console.log(`Microi：移动端开始批量打印：第[${index + 1}]条！`);
-            V8.Tips(`移动端开始批量打印：第[${index}]条！`);
-            //--打印内容
-            {
-                var cmd = V8.Print.createNew();
-                cmd.setSize(75, 65);
-                cmd.setGap(2);
-                cmd.setCls();
-                /* 标题 */
-                cmd.setText(220, 10, "TSS24.BF2", 1, 1, "【试运行】产品标识卡");
-                /* 左侧字段 */
-                cmd.setText(10, 60, "TSS24.BF2", 1, 1, "物料代码");
-                cmd.setText(10, 100, "TSS24.BF2", 1, 1, "物料名称");
-                cmd.setText(10, 140, "TSS24.BF2", 1, 1, "生产日期");
-                cmd.setText(10, 180, "TSS24.BF2", 1, 1, "批次");
-                cmd.setText(10, 220, "TSS24.BF2", 1, 1, "数量");
-                cmd.setText(10, 260, "TSS24.BF2", 1, 1, "图号");
-                /* 右侧数据：用当前行数据 */
-                cmd.setText(180, 60, "TSS24.BF2", 1, 1, row.Cunhuo || '');
-                cmd.setText(180, 100, "TSS24.BF2", 1, 1, row.Cunhuo || ''); // 物料名称如不同字段再改
-                cmd.setText(180, 140, "TSS24.BF2", 1, 1, row.CreateTime || '');
-                cmd.setText(180, 180, "TSS24.BF2", 1, 1, row.ShengchanPH || '');
-                cmd.setText(180, 220, "TSS24.BF2", 1, 1, row.ZhuangxiangSL || '');
-                cmd.setText(180, 260, "TSS24.BF2", 1, 1, row.GuigeXH || '');
-                /* 右侧二维码：当前箱码 */
-                cmd.setQR(420, 300, "L", 5, "A", row.Xiangma || '');
-                cmd.setPagePrint();
-                /* 3. 一次性发送 */
-                V8.Print.prepareSend(cmd.getData());
-            }
-            index++;
-            setTimeout(function(){
-                forPrint(dataXMList[index])
-            }, 3000);
-        }
-        forPrint(dataXMList[0]);
-        /* 2. 拼打印数据 */
-        // for (var i = 0; i < dataXMList.length; i++) {
-        //     var row = dataXMList[i];
-        // }
-    }
+`V8.Print` 是前端 BLE 直连打印能力，支持 TSC/TSPL 标签指令和 ESC/POS
+小票指令。它不是“仅移动端函数”：5+App 使用 `plus.bluetooth`，存在
+`navigator.bluetooth.requestDevice` 的 PC/H5 浏览器使用 Web Bluetooth。
+浏览器模板、PDF、A4 和 Print Engine JSON 请使用[打印引擎](/doc/system-engine/print-engine)，
+不要把两套打印协议混用。
+
+### 已挂载到哪些前端 V8
+
+当前源码在三处调用幂等的 `initV8Print(V8)`：
+
+| 源码位置 | 可使用 `V8.Print` 的场景 |
+|---|---|
+| `Microi.Client/src/utils/diy.common.js` | 通用前端 V8 基础对象和常规按钮流程 |
+| `Microi.Client/src/views/form-engine/diy-form.vue` | 表单、字段、表单按钮 V8 |
+| `Microi.Client/src/views/form-engine/diy-table.vue` | 列表、菜单按钮、行按钮等表格 V8 |
+
+租户脚本无需直接导入 `utils/ble/tsc.js` 或 `esc.js`。后端接口引擎、后端表单
+V8 和微信小程序原生 BLE 不在这条挂载链中。多个前端 V8 上下文可能共享同一个
+`Print` 状态，因此所有打印任务都必须串行。
+
+### 环境与连接判断
+
+| 环境 | 实现 | 注意事项 |
+|---|---|---|
+| 5+App APK/IPA | `plus.bluetooth` | 扫描并查找可写特征 |
+| 支持 Web Bluetooth 的浏览器 | `navigator.bluetooth` | 通常要求 HTTPS/localhost 和用户点击手势 |
+| 其它 H5/浏览器 | 无可用引擎 | `V8.Print` 仍可能存在，但连接会失败并提示 |
+| 微信小程序 | 不属于此模块 | 使用小程序/UniApp 专用 BLE 实现 |
+
+不要使用 `V8.ClientType === 'PC'` 排除蓝牙，也不要用
+`BLEInformation.deviceId` 判断实时连接。标准流程：
+
+```javascript
+async function ensurePrinterConnected() {
+  if (!V8.Print) throw new Error('当前前端未加载蓝牙打印能力');
+  if (V8.Print.isConnected()) return;
+
+  // 必须由用户点击等手势触发；连接后关闭弹窗，此 Promise 才会结束。
+  var connected = await V8.Print.OpenBluetoothPage();
+  if (!connected || !V8.Print.isConnected()) {
+    throw new Error('未连接蓝牙打印机');
+  }
 }
 ```
-:::
+
+`OpenBluetoothPage()` 返回 `Promise<boolean>`，在连接弹窗关闭时解析；重复打开
+同一个弹窗会返回 `false`。Web 端 `isConnected()` 会检查实时 GATT 和写特征，
+5+App 端当前只检查设备/写特征 ID，所以即使返回 `true` 也必须捕获写入失败。
+
+源码会把连接元数据写入 `sessionStorage`，但当前 `restoreBLEInfo()` 没有进入
+初始化调用链；页面刷新后不会自动恢复可发送的连接引用，应重新连接。
+
+### 核心 API
+
+| API | 返回/作用 | 使用要求 |
+|---|---|---|
+| `V8.Print.createNew()` | TSC/TSPL 构建器 | 标签打印 |
+| `V8.Print.createNewESC()` | ESC/POS 构建器 | 热敏小票 |
+| `V8.Print.OpenBluetoothPage()` | `Promise<boolean>` | 用户手势中打开并 `await` |
+| `V8.Print.isConnected()` | `boolean` | 推荐的连接判断 |
+| `V8.Print.prepareSend(bytes)` | `Promise<void>` | 自动检查连接、分包、串行写入；必须 `await` |
+| `V8.Print.Send(bytes)` | 内部状态机入口 | 依赖 `prepareSend` 设置的共享游标，业务代码不要直接调用 |
+| `V8.Print.setOneTimeData(bytes)` | 设置 BLE 包长 | 默认 20；内置候选 20–190、步长 10；源码不校验 |
+| `V8.Print.setPrinterNum(num)` | 同一缓冲区重复发送 | 使用已验证的整数 1–9；源码不校验 |
+| `V8.Print.disconnect()` | 主动断开并清理状态 | 切换设备、注销或排障 |
+| `V8.Print.BLEInformation` | 设备与特征元数据 | 只作诊断，不是连接状态或打印回执 |
+
+### TSC/TSPL 标签示例
+
+TSC 的 `setText`、`setQR`、`setBarCode` 会把内容拼入带双引号的协议字段，
+必须移除引号、换行、NUL/控制字符并限制长度：
+
+```javascript
+function cleanCommandText(value, maxLength) {
+  return String(value == null ? '' : value)
+    .replace(/[\r\n\"\x00-\x1f]/g, ' ')
+    .slice(0, maxLength || 120);
+}
+
+async function printLabel(order) {
+  await ensurePrinterConnected();
+
+  var cmd = V8.Print.createNew();
+  cmd.setSize(60, 40);
+  cmd.setGap(2);
+  cmd.setSpeed(4);
+  cmd.setDensity(8);
+  cmd.setDirection(1);
+  cmd.setCls();
+  cmd.setText(20, 20, 'TSS24.BF2', 1, 1, cleanCommandText(order.Name, 40));
+  cmd.setBarCode(20, 80, '128', 60, 1, 2, 2, cleanCommandText(order.Code, 40));
+  cmd.setQR(340, 30, 'L', 5, 'A', cleanCommandText(order.Id, 120));
+  cmd.setPagePrint();
+
+  await V8.Print.prepareSend(cmd.getData());
+  V8.Tips('打印数据已发送', true);
+}
+```
+
+TSC 构建器的 28 个源码方法：
+
+| 类别 | 方法 |
+|---|---|
+| 初始化/原始命令 | `init()`、`addCommand(content)` |
+| 纸张/质量 | `setSize(w,h)`、`setSpeed(n)`、`setDensity(n)`、`setGap(mm)`、`setBline(mm)`、`setCountry(v)`、`setCodepage(v)` |
+| 走纸/方向 | `setFeed(n)`、`setBackFeed(n)`、`setDirection(n)`、`setReference(x,y)`、`setFromfeed()`、`setHome()`、`setLimitfeed(n)` |
+| 蜂鸣/绘制 | `setSound(level,interval)`、`setBar(...)`、`setBox(...)`、`setErase(...)`、`setReverse(...)`、`setBitmap(x,y,mode,imageData)` |
+| 内容/输出 | `setCls()`、`setText(...)`、`setQR(...)`、`setBarCode(...)`、`setPagePrint()`、`getData()` |
+
+`setFromfeed()` 是当前公开拼写，实际生成 `FORMFEED`。`addCommand` 是低层接口，
+只能接受固定、受审查的指令，不能传入表单或接口返回的任意命令。
+
+### ESC/POS 小票示例
+
+```javascript
+async function printReceipt(order) {
+  await ensurePrinterConnected();
+
+  var esc = V8.Print.createNewESC();
+  esc.init();
+  esc.setSelectJustification(1);
+  esc.bold(1);
+  esc.setFontSize(16);
+  esc.setText(cleanCommandText(order.ShopName, 50) + '\n');
+  esc.bold(0);
+  esc.setFontSize(0);
+  esc.setSelectJustification(0);
+  esc.setText('单号：' + cleanCommandText(order.Code, 50) + '\n');
+  esc.setText('金额：' + Number(order.Amount || 0).toFixed(2) + '\n');
+  esc.setPrintAndFeedRow(3);
+
+  await V8.Print.prepareSend(esc.getData());
+}
+```
+
+ESC/POS 构建器的 25 个源码方法：
+
+| 类别 | 方法 |
+|---|---|
+| 初始化/文本 | `init()`、`setText(content)`、`setFontSize(n)`、`bold(n)`、`setUnderline(n)`、`setUnderline2(n)` |
+| 二维码 | `setSelectSizeOfModuleForQRCode(n)`、`setSelectErrorCorrectionLevelForQRCode(n)`、`setStoreQRCodeData(content)`、`setPrintQRCode()` |
+| 位置/间距 | `setHorTab()`、`setAbsolutePrintPosition(n)`、`setRelativePrintPositon(n)`、`setSelectJustification(n)`、`space(n)`、`setLeftMargin(n)`、`textMarginRight(n)`、`rowSpace(n)`、`setPrintingAreaWidth(n)` |
+| 其它/输出 | `setSound(n,t)`、`setBitmap(imageData)`、`setPrint()`、`setPrintAndFeed(n)`、`setPrintAndFeedRow(n)`、`getData()` |
+
+`setRelativePrintPositon` 中的 `Positon` 是源码历史拼写，调用时不能改成
+`Position`。ESC/POS 源码目前没有公开条形码方法；不要因为内部存在条码类型数组而
+虚构 `setBarCode`。
+
+### 编码、图片与打印机兼容
+
+- TSC 文本命令、ESC 文本和二维码内容使用本地
+  `utils/ble/encoding.js` + `encoding-indexes.js` 转为 GB18030，不会在运行时联网。
+  编码成功不代表目标打印机具有中文字库、代码页或 Emoji 支持。
+- `setBitmap` 接受 ImageData 风格的 `{ width, height, data }` RGBA 数据，不接受
+  URL、Base64 或 DOM 图片。当前黑白转换较简单，大图先缩放、二值化并实机验证。
+- Web Bluetooth 只把常见服务 `18f0`、`ff00`、
+  `49535343-fe7d-4ae5-8fa9-9fafd205e455`、
+  `e7810a71-73ae-499d-8c15-faa9aef0c3f2` 放进 `optionalServices`，并选择发现的
+  第一个可写特征。当前没有公开的自定义服务 UUID 配置，特殊型号需要扩展源码。
+
+### 批量打印
+
+同一写特征和共享分包状态只能串行使用：
+
+```javascript
+async function printBatch(rows, startIndex) {
+  var list = Array.isArray(rows) ? rows : [];
+  var begin = Math.max(0, Number(startIndex || 0));
+  var limit = Math.min(list.length, begin + 100);
+
+  for (var i = begin; i < limit; i++) {
+    try {
+      await printLabel(list[i]);
+      V8.Tips('已发送 ' + (i + 1) + '/' + list.length, true);
+    } catch (error) {
+      return {
+        Code: 0,
+        Msg: '第 ' + (i + 1) + ' 条发送失败：' + (error.message || error),
+        NextIndex: i
+      };
+    }
+  }
+
+  return { Code: 1, Data: { NextIndex: limit, HasMore: limit < list.length } };
+}
+```
+
+- 不用固定 `setTimeout(3000)` 猜测上一张是否完成，也不用 `Promise.all` 并发。
+- 大批次分段保存 `NextIndex`；断连后从失败位置人工确认再恢复。
+- `setPrinterNum(n)` 只适合同一缓冲区重复发送，不适合每张内容不同的批次。
+- `prepareSend` 默认每包 20 字节、包间约 20ms，多份之间约 100ms；这些只是
+  BLE 写节奏，不是纸张完成时间。
+
+### 当前实现限制与安全边界
+
+- `prepareSend` 当前用 `floor(length / packetSize) + 1` 计算包数。数据长度恰好
+  整除包长时会尝试额外写一个 0 字节末包；目标 BLE 栈若拒绝空包，应修复适配器并
+  回归，不能并发发送或吞掉异常。
+- 包长必须是已实测的正整数，份数使用 1–9，空缓冲区不要发送；相关 setter 当前
+  不做入参校验。
+- 源码会发现 read/notify 特征，但尚未订阅或解析状态。`prepareSend` 成功只表示
+  字节写入完成，不代表已走纸、无缺纸或物理打印成功。
+- 设备名称、ID、服务与特征是外部输入。展示时用文本方式转义，不拼 `innerHTML`；
+  不记录或上传完整 `BLEInformation`。
+- 业务保存与蓝牙打印不是原子事务。用稳定业务单号支持受控重打，避免打印失败后
+  重复执行业务写入。
+- 至少用目标型号验证首次授权、重连、刷新、主动断开、中文/条码/二维码/图片、
+  连续 20 张串行发送、长度恰好整除包长、关机/缺纸/离开范围后的失败恢复。
+
+## 移动端函数
 
 ### 二维码、条形码扫码 V8.Method?.ScanCode
 >* 支持H5、小程序、APP

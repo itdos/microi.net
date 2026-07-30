@@ -27,6 +27,7 @@ export interface MicroiConfig {
  * api|os|type, api|os and api layouts during migration.
  */
 export declare function buildTokenFileLookupKeys(apiBaseUrl: string, osClient?: string, osClientType?: string, osClientNetwork?: string): string[];
+export declare function buildMicroAppEntryUrl(apiBaseUrl: string, osClient: string, msKey: string): string;
 export interface ApiResponse<T = unknown> {
     Code: number;
     Data: T;
@@ -373,6 +374,16 @@ export declare class MicroiClient {
     createMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
     syncMicroServiceSource(data: Record<string, unknown>): Promise<ApiResponse>;
     publishMicroService(data: Record<string, unknown>): Promise<ApiResponse>;
+    probeMicroAppEntry(msKey: string): Promise<{
+        ok: boolean;
+        url: string;
+        status?: number;
+        contentType?: string;
+        bodyBytes?: number;
+        hasHead?: boolean;
+        hasBody?: boolean;
+        error?: string;
+    }>;
     getTableData(tableName: string, query?: Record<string, unknown>): Promise<ApiResponse>;
     addFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
     updateFormData(tableName: string, row: Record<string, unknown>): Promise<ApiResponse>;
@@ -419,6 +430,11 @@ export declare class MicroiClient {
         Description?: string;
         Encrypt?: number;
         InTableEdit?: number;
+    }): Promise<ApiResponse>;
+    deleteField(data: {
+        Id: string;
+        TableId?: string;
+        Name?: string;
     }): Promise<ApiResponse>;
     updateField(patch: Record<string, unknown>): Promise<ApiResponse>;
     updateFieldList(patch: Record<string, unknown>): Promise<ApiResponse>;

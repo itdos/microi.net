@@ -21,6 +21,7 @@ namespace Microi.net
     public static partial class V8McpLogic
     {
         private const int MaxStreamPublishAssetCount = 20_000;
+        private const long MaxStreamPublishTotalBytes = 20L * 1024 * 1024 * 1024;
 
         private sealed class ApplicationAssetPaths
         {
@@ -100,13 +101,29 @@ namespace Microi.net
             }
         }
 
-        private static DosResult ValidateStreamPublishOperator(dynamic currentToken)
+        private static DosResult<object> ValidateStreamPublishOperator(
+            dynamic currentToken,
+            string osClient,
+            string action,
+            string resource)
         {
             var currentUser = GetMcpOperator(currentToken);
-            if (currentUser["Level"].Val<int>() < DiyCommon.MaxRoleLevel)
-                return new DosResult(0, null, "仅平台超级管理员可以发布应用资产。");
+            var userId = SafeJString(currentUser, "Id", SafeJString(currentUser, "UserId"));
+            var roleLevel = currentUser["Level"].Val<int>();
+            object Diagnostic(string reasonCode, string rule) => new
+            {
+                ReasonCode = reasonCode,
+                CurrentUserId = userId,
+                RoleLevel = roleLevel,
+                Action = action,
+                Resource = resource,
+                Rule = rule,
+                OsClient = osClient
+            };
+            if (roleLevel < DiyCommon.MaxRoleLevel)
+                return new DosResult<object>(0, Diagnostic("ROLE_LEVEL_DENIED", $"RoleLevel >= {DiyCommon.MaxRoleLevel}"), "仅平台超级管理员可以发布应用资产。");
             if (UserAccessKeySecurity.IsSession(currentUser))
-                return new DosResult(0, null, "访问密钥会话不能发布应用资产。");
+                return new DosResult<object>(0, Diagnostic("ACCESS_KEY_SESSION_DENIED", "InteractiveAdminSessionRequired"), "访问密钥会话不能发布应用资产。");
             return null;
         }
 
@@ -114,7 +131,13 @@ namespace Microi.net
         {
             clientModel = OsClientExtend.GetClient(osClient);
             if (clientModel?.OsClientModel == null) throw new InvalidOperationException("当前租户 HDFS 配置不可用。");
-            var hdfs = clientModel.OsClientModel["HDFS"].Val<string>() ?? "Aliyun";
+            // Keep this boundary strongly typed. Some rolling-upgrade combinations still
+            // expose OsClientModel through a dynamic member; invoking the Val<T> extension
+            // on a dynamically-bound JValue then fails at runtime even though the token is
+            // otherwise valid. Normalizing to JObject also keeps old/new API nodes compatible.
+            var tenantConfig = clientModel.OsClientModel as JObject
+                ?? JObject.FromObject(clientModel.OsClientModel);
+            var hdfs = SafeJString(tenantConfig, "HDFS", "Aliyun");
             return hdfs switch
             {
                 "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
@@ -290,8 +313,8 @@ namespace Microi.net
         {
             try
             {
-                var operatorError = ValidateStreamPublishOperator(currentToken);
-                if (operatorError != null) return new DosResult<object>(operatorError.Code, null, operatorError.Msg);
+                var operatorError = ValidateStreamPublishOperator(currentToken, osClient, "application-asset:upload", appIdOrKey);
+                if (operatorError != null) return operatorError;
                 if (IsBlank(osClient)) return new DosResult<object>(0, null, "OsClient 不能为空");
                 if (fileStream == null) return new DosResult<object>(0, null, "未接收到应用资产文件流");
 
@@ -322,8 +345,23 @@ namespace Microi.net
                     return new DosResult<object>(0, null, "Content-Length 与实际文件长度不一致");
 
                 var currentUser = GetMcpOperator(currentToken);
-                var uploadOptions = FileUploadSecurityOptions.Load(OsClientExtend.GetClient(osClient)?.OsClientModel);
-                if (!uploadOptions.UploadEnabled) return new DosResult<object>(0, null, "当前租户已停用文件上传");
+                var tenantUploadOptions = FileUploadSecurityOptions.Load(OsClientExtend.GetClient(osClient)?.OsClientModel);
+                if (!tenantUploadOptions.UploadEnabled) return new DosResult<object>(0, null, "当前租户已停用文件上传");
+                // Application delivery is a super-admin-only, immutable-version
+                // stream and must not inherit the interactive attachment default
+                // of 100MB. It has its own 20GB hard ceiling and daily quotas;
+                // ordinary form/file uploads continue using the smaller policy.
+                var uploadOptions = new FileUploadSecurityOptions
+                {
+                    MaxFileBytes = MaxStreamPublishTotalBytes,
+                    MaxTotalBytes = MaxStreamPublishTotalBytes,
+                    MaxFileCount = 1,
+                    DailyUserQuotaBytes = MaxStreamPublishTotalBytes,
+                    DailyTenantQuotaBytes = Math.Max(
+                        MaxStreamPublishTotalBytes,
+                        tenantUploadOptions.DailyTenantQuotaBytes),
+                    UploadEnabled = true
+                };
                 var payload = new DiyUploadParam
                 {
                     OsClient = osClient,
@@ -481,7 +519,11 @@ namespace Microi.net
             string previewUrl,
             int fileCount,
             long totalSize,
-            string changeSummary)
+            string changeSummary,
+            string deliveryBatchId,
+            string sourceManifestHash,
+            string runtimeManifestHash,
+            string publishStatus)
         {
             var appId = SafeJString(app, "Id");
             var existing = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app_version", new
@@ -499,12 +541,22 @@ namespace Microi.net
                 ["AppName"] = SafeJString(app, "Name", SafeJString(app, "AppName")),
                 ["VersionNo"] = versionNo,
                 ["VersionName"] = versionNo,
-                ["Status"] = "Published",
+                ["Status"] = publishStatus,
                 ["SourceSnapshotPath"] = SafeJString(app, "PrivateSourcePath", "ai-app-source/" + appId),
                 ["PublishPath"] = entryVersionPath,
                 ["PreviewUrl"] = previewUrl,
                 ["BuildTaskId"] = "",
-                ["BuildLog"] = JsonConvert.SerializeObject(new { Mode = "StreamedAssets", AssetCount = fileCount, TotalSize = totalSize }),
+                ["BuildLog"] = JsonConvert.SerializeObject(new
+                {
+                    Mode = "StreamedAssets",
+                    DeliveryBatchId = deliveryBatchId,
+                    SourceManifestHash = sourceManifestHash,
+                    RuntimeManifestHash = runtimeManifestHash,
+                    PublishStatus = publishStatus,
+                    RuntimeVerified = true,
+                    AssetCount = fileCount,
+                    TotalSize = totalSize
+                }),
                 ["ChangeSummary"] = changeSummary.DosIsNullOrWhiteSpace() ? "二进制流式发布" : changeSummary,
                 ["FileCount"] = fileCount,
                 ["TotalSize"] = totalSize
@@ -535,11 +587,11 @@ namespace Microi.net
         {
             try
             {
-                var operatorError = ValidateStreamPublishOperator(currentToken);
-                if (operatorError != null) return new DosResult<object>(operatorError.Code, null, operatorError.Msg);
+                var appIdOrKey = param?["AppIdOrKey"]?.Val<string>() ?? param?["AppId"]?.Val<string>() ?? param?["AppKey"]?.Val<string>();
+                var operatorError = ValidateStreamPublishOperator(currentToken, osClient, "application:publish", appIdOrKey);
+                if (operatorError != null) return operatorError;
                 if (param == null) return new DosResult<object>(0, null, "发布清单不能为空");
 
-                var appIdOrKey = param["AppIdOrKey"]?.Val<string>() ?? param["AppId"]?.Val<string>() ?? param["AppKey"]?.Val<string>();
                 var app = await FindAiApplication(osClient, appIdOrKey).ConfigureAwait(false);
                 if (app == null) return new DosResult<object>(2, null, "在线 AI 应用不存在");
                 var appKey = NormalizeMicroServiceKey(SafeJString(app, "AppKey", SafeJString(app, "AppId")));
@@ -584,11 +636,11 @@ namespace Microi.net
         {
             try
             {
-                var operatorError = ValidateStreamPublishOperator(currentToken);
-                if (operatorError != null) return new DosResult<object>(operatorError.Code, null, operatorError.Msg);
                 if (param == null) return new DosResult<object>(0, null, "发布清单不能为空");
 
                 var appIdOrKey = param["AppIdOrKey"]?.Val<string>() ?? param["AppId"]?.Val<string>() ?? param["AppKey"]?.Val<string>();
+                var operatorError = ValidateStreamPublishOperator(currentToken, osClient, "application:publish", appIdOrKey);
+                if (operatorError != null) return operatorError;
                 var app = await FindAiApplication(osClient, appIdOrKey).ConfigureAwait(false);
                 if (app == null) return new DosResult<object>(2, null, "在线 AI 应用不存在");
                 var appKey = NormalizeMicroServiceKey(SafeJString(app, "AppKey", SafeJString(app, "AppId")));
@@ -616,6 +668,8 @@ namespace Microi.net
                     if (size < 0) return new DosResult<object>(0, null, "发布清单文件大小不合法：" + relativePath);
                     if (totalSize > long.MaxValue - size) return new DosResult<object>(0, null, "发布清单总大小溢出");
                     totalSize += size;
+                    if (totalSize > MaxStreamPublishTotalBytes)
+                        return new DosResult<object>(0, null, $"单次应用发布总大小不能超过 {MaxStreamPublishTotalBytes} bytes");
                     assets.Add(new StreamPublishAsset
                     {
                         RelativePath = relativePath,
@@ -627,6 +681,18 @@ namespace Microi.net
                 }
                 if (!assets.Any(asset => asset.IsEntry)) return new DosResult<object>(0, null, "发布清单缺少入口文件：" + entryPath);
 
+                var deliveryBatchId = SafeJString(param, "DeliveryBatchId");
+                if (deliveryBatchId.DosIsNullOrWhiteSpace()) deliveryBatchId = Ulid.NewUlid().ToString();
+                var sourceManifestHash = SafeJString(param, "SourceManifestHash");
+                var runtimeManifestAssets = new JArray(assets.Select(asset => new JObject
+                {
+                    ["Path"] = asset.RelativePath,
+                    ["Sha256"] = asset.Sha256,
+                    ["Size"] = asset.Size,
+                    ["IsEntry"] = asset.IsEntry
+                }));
+                var runtimeManifestHash = ComputeMicroServiceManifestHash(runtimeManifestAssets);
+
                 var hdfs = ResolveApplicationAssetHdfs(osClient, out var clientModel);
                 foreach (var asset in assets)
                 {
@@ -637,6 +703,24 @@ namespace Microi.net
                     if (markerExists.Error != null) return new DosResult<object>(0, null, markerExists.Error.Msg);
                     if (!versionExists.Exists || !markerExists.Exists)
                         return new DosResult<object>(0, null, "版本资产或完整性标记不存在，拒绝切换稳定入口：" + asset.RelativePath);
+
+                    // Existence markers prove upload ordering, but they do not prove the
+                    // customer node can read the tenant's actual bytes. Read through the
+                    // tenant-aware HDFS facade and verify size/hash before changing any
+                    // runtime pointer. This catches child-tenant MinIO endpoint drift.
+                    var bytes = await ReadPublishedMicroServiceAssetBytes(osClient, new JObject
+                    {
+                        ["FilePathName"] = asset.Paths.VersionPath
+                    }).ConfigureAwait(false);
+                    if (bytes == null)
+                        return new DosResult<object>(0, null, "版本资产无法从当前租户存储回读，拒绝切换稳定入口：" + asset.RelativePath);
+                    var contentError = ValidateApplicationAssetContent(
+                        asset.RelativePath,
+                        asset.Size,
+                        asset.Sha256,
+                        bytes,
+                        asset.IsEntry);
+                    if (contentError != null) return new DosResult<object>(0, null, contentError + "；稳定入口尚未切换");
                 }
 
                 // 单文件上传阶段不改数据库“当前发布文件”元数据。只有完整清单都存在时才更新，
@@ -677,6 +761,13 @@ namespace Microi.net
                     }
                 }).ConfigureAwait(false);
                 var versionAlreadyRecorded = existingVersion.Code == 1 && existingVersion.Data != null;
+                var existingVersionData = versionAlreadyRecorded ? JObject.FromObject(existingVersion.Data) : null;
+                var initialVersionStatus = string.Equals(
+                    SafeJString(existingVersionData, "Status"),
+                    "Published",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "Published"
+                    : "Verified";
                 var versionResult = await UpsertStreamPublishVersion(
                     osClient,
                     app,
@@ -685,40 +776,30 @@ namespace Microi.net
                     previewUrl,
                     assets.Count,
                     totalSize,
-                    param["ChangeSummary"]?.Val<string>()).ConfigureAwait(false);
+                    param["ChangeSummary"]?.Val<string>(),
+                    deliveryBatchId,
+                    sourceManifestHash,
+                    runtimeManifestHash,
+                    initialVersionStatus).ConfigureAwait(false);
                 if (versionResult.Code != 1) return new DosResult<object>(versionResult.Code, versionResult.Data, "保存应用版本失败：" + versionResult.Msg);
 
-                var appUpdate = new JObject
-                {
-                    ["Id"] = SafeJString(app, "Id"),
-                    ["AppKey"] = appKey,
-                    ["CurrentVersion"] = SafeJInt(app, "CurrentVersion") + (versionAlreadyRecorded ? 0 : 1),
-                    ["Status"] = "Published",
-                    ["BuildStatus"] = "Success",
-                    ["PreviewUrl"] = previewUrl,
-                    ["PublicPublishPath"] = entry.Paths.RootPath,
-                    ["LastBuildTaskId"] = "",
-                    ["LastBuildMsg"] = $"真实编译产物已通过流式 HDFS 发布，共 {assets.Count} 个文件。",
-                    ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                };
-                var appUpdateResult = await MicroiEngine.FormEngine.UptFormDataAsync(
-                    "sys_microistore",
-                    BuildTrustedMcpFormWriteParam(osClient, appUpdate)).ConfigureAwait(false);
-                if (appUpdateResult.Code != 1)
-                    return new DosResult<object>(appUpdateResult.Code, appUpdateResult.Data, "稳定资产已切换，但应用商城元数据更新失败：" + appUpdateResult.Msg);
-
                 object microServiceInfo = null;
+                JObject previousMicroService = null;
+                string switchedServiceId = null;
+                List<JObject> previousPageSnapshots = null;
                 if (string.Equals(applicationType, "MicroService", StringComparison.OrdinalIgnoreCase))
                 {
                     var source = new JObject
                     {
                         ["MsKey"] = appKey,
                         ["MsName"] = SafeJString(app, "Name", SafeJString(app, "AppName", appKey)),
+                        ["StorageMode"] = "file",
                         ["BuildVersion"] = versionNo,
                         ["EntryPath"] = entryPath,
                         ["AssetCount"] = assets.Count,
                         ["TotalSize"] = totalSize,
-                        ["MsUrl"] = previewUrl,
+                        ["DistHash"] = runtimeManifestHash,
+                        ["MsUrl"] = $"/micro-app/{Uri.EscapeDataString(osClient)}/{Uri.EscapeDataString(appKey)}/index.html",
                         ["Description"] = SafeJString(app, "Description", SafeJString(app, "AppDetail"))
                     };
                     var publishedAssets = new JArray(assets.Select(asset => new JObject
@@ -732,11 +813,33 @@ namespace Microi.net
                     }));
                     var manifest = new JObject
                     {
+                        ["SchemaVersion"] = 2,
                         ["MsKey"] = appKey,
                         ["BuildVersion"] = versionNo,
                         ["EntryPath"] = entryPath,
+                        ["StorageMode"] = "file",
+                        ["PublishStatus"] = "Published",
+                        ["VerificationStatus"] = "Verified",
+                        ["DeliveryBatchId"] = deliveryBatchId,
+                        ["SourceManifestHash"] = sourceManifestHash,
+                        ["RuntimeManifestHash"] = runtimeManifestHash,
+                        ["VerifiedAt"] = DateTime.UtcNow.ToString("O"),
+                        ["PublishedAt"] = DateTime.UtcNow.ToString("O"),
                         ["Assets"] = publishedAssets
                     };
+                    var previousServiceResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_microiservice", new
+                    {
+                        OsClient = osClient,
+                        _Where = new List<object> { new List<object> { "MsKey", "=", appKey } }
+                    }).ConfigureAwait(false);
+                    if (previousServiceResult.Code == 1 && previousServiceResult.Data != null)
+                    {
+                        previousMicroService = JObject.FromObject(previousServiceResult.Data);
+                        source["Id"] = SafeJString(previousMicroService, "Id");
+                    }
+                    if (source["Id"] == null) source["Id"] = Ulid.NewUlid().ToString();
+                    switchedServiceId = SafeJString(source, "Id");
+                    previousPageSnapshots = await CaptureMicroServicePageSnapshots(osClient, switchedServiceId).ConfigureAwait(false);
                     var serviceData = BuildMicroServiceData(
                         osClient,
                         source,
@@ -747,20 +850,102 @@ namespace Microi.net
                     if (serviceUpsert.Code != 1)
                         return new DosResult<object>(serviceUpsert.Code, serviceUpsert.Data, "应用商城已发布，但微服务运行元数据更新失败：" + serviceUpsert.Msg);
                     var detailResult = await GetMicroService(osClient, appKey).ConfigureAwait(false);
+                    if (detailResult.Code != 1 || detailResult.Data == null)
+                    {
+                        var serviceRollback = await RestoreMicroServiceSnapshot(osClient, previousMicroService, switchedServiceId).ConfigureAwait(false);
+                        return new DosResult<object>(0, detailResult.Data,
+                            "微服务运行指针写入后无法回读，已拒绝完成发布" + (serviceRollback.DosIsNullOrWhiteSpace() ? "；旧运行版本已恢复" : "；回滚异常：" + serviceRollback));
+                    }
                     if (detailResult.Code == 1 && detailResult.Data != null)
                     {
                         var detail = JObject.FromObject(detailResult.Data);
                         var service = detail["Service"] as JObject;
                         var routes = GetArrayParam(param, "Routes", "routes", "Pages", "pages");
-                        var routeWarnings = await SyncMicroServicePages(
+                        var routeResult = await SyncMicroServicePages(
                             osClient,
                             SafeJString(service, "Id"),
                             appKey,
                             versionNo,
                             entryPath,
                             routes).ConfigureAwait(false);
-                        microServiceInfo = new { Service = service, RouteWarnings = routeWarnings };
+                        if (routeResult.Code != 1)
+                        {
+                            var rollbackWarning = await RestoreMicroServiceSnapshot(osClient, previousMicroService, SafeJString(service, "Id")).ConfigureAwait(false);
+                            var pageRollbackWarning = await RestoreMicroServicePageSnapshots(osClient, switchedServiceId, previousPageSnapshots).ConfigureAwait(false);
+                            var rollbackMessages = new[] { rollbackWarning, pageRollbackWarning }
+                                .Where(item => !item.DosIsNullOrWhiteSpace());
+                            return new DosResult<object>(0, routeResult.Data,
+                                routeResult.Msg + (!rollbackMessages.Any() ? "；旧运行版本与页面已恢复" : "；运行版本回滚异常：" + string.Join("；", rollbackMessages)));
+                        }
+                        microServiceInfo = new { Service = service, RouteSync = routeResult.Data };
                     }
+                }
+
+                // sys_microiservice is the runtime pointer. Only after it and its
+                // page facts are verified do we mark the AI application delivery
+                // successful. If this final metadata step fails, restore both
+                // runtime pointer and pages so the delivery is never half-current.
+                var appUpdate = new JObject
+                {
+                    ["Id"] = SafeJString(app, "Id"),
+                    ["AppKey"] = appKey,
+                    ["CurrentVersion"] = SafeJInt(app, "CurrentVersion") + (versionAlreadyRecorded ? 0 : 1),
+                    ["Status"] = "Published",
+                    ["BuildStatus"] = "Success",
+                    ["PreviewUrl"] = previewUrl,
+                    ["PublicPublishPath"] = entry.Paths.RootPath,
+                    ["LastBuildTaskId"] = deliveryBatchId,
+                    ["LastBuildMsg"] = $"真实编译产物已完成租户存储回读与哈希校验，共 {assets.Count} 个文件，运行清单 {runtimeManifestHash}。",
+                    ["UpdateTime"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+                var appUpdateResult = await MicroiEngine.FormEngine.UptFormDataAsync(
+                    "sys_microistore",
+                    BuildTrustedMcpFormWriteParam(osClient, appUpdate)).ConfigureAwait(false);
+                if (appUpdateResult.Code != 1)
+                {
+                    var rollbackWarnings = new List<string>();
+                    if (string.Equals(applicationType, "MicroService", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var serviceRollback = await RestoreMicroServiceSnapshot(osClient, previousMicroService, switchedServiceId).ConfigureAwait(false);
+                        var pageRollback = await RestoreMicroServicePageSnapshots(osClient, switchedServiceId, previousPageSnapshots).ConfigureAwait(false);
+                        if (!serviceRollback.DosIsNullOrWhiteSpace()) rollbackWarnings.Add(serviceRollback);
+                        if (!pageRollback.DosIsNullOrWhiteSpace()) rollbackWarnings.Add(pageRollback);
+                    }
+                    return new DosResult<object>(appUpdateResult.Code, appUpdateResult.Data,
+                        "应用发布最终元数据更新失败；" + (rollbackWarnings.Count == 0 ? "运行指针已恢复" : "回滚异常：" + string.Join("；", rollbackWarnings)));
+                }
+
+                var publishVersionResult = await UpsertStreamPublishVersion(
+                    osClient,
+                    app,
+                    versionNo,
+                    entry.Paths.VersionPath,
+                    previewUrl,
+                    assets.Count,
+                    totalSize,
+                    param["ChangeSummary"]?.Val<string>(),
+                    deliveryBatchId,
+                    sourceManifestHash,
+                    runtimeManifestHash,
+                    "Published").ConfigureAwait(false);
+                if (publishVersionResult.Code != 1)
+                {
+                    var rollbackWarnings = new List<string>();
+                    var appSnapshot = (JObject)app.DeepClone();
+                    appSnapshot["OsClient"] = osClient;
+                    var appRollback = await MicroiEngine.FormEngine.UptFormDataAsync(
+                        "sys_microistore",
+                        BuildTrustedMcpFormWriteParam(osClient, appSnapshot)).ConfigureAwait(false);
+                    if (appRollback.Code != 1) rollbackWarnings.Add(appRollback.Msg ?? "应用主数据回滚失败");
+                    if (string.Equals(applicationType, "MicroService", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var serviceRollback = await RestoreMicroServiceSnapshot(osClient, previousMicroService, switchedServiceId).ConfigureAwait(false);
+                        var pageRollback = await RestoreMicroServicePageSnapshots(osClient, switchedServiceId, previousPageSnapshots).ConfigureAwait(false);
+                        if (!serviceRollback.DosIsNullOrWhiteSpace()) rollbackWarnings.Add(serviceRollback);
+                        if (!pageRollback.DosIsNullOrWhiteSpace()) rollbackWarnings.Add(pageRollback);
+                    }
+                    return new DosResult<object>(publishVersionResult.Code, publishVersionResult.Data,
+                        "版本状态无法从 Verified 切换为 Published；" + (rollbackWarnings.Count == 0 ? "旧运行状态已恢复" : "回滚异常：" + string.Join("；", rollbackWarnings)));
                 }
 
                 return new DosResult<object>(1, new
@@ -776,6 +961,12 @@ namespace Microi.net
                     VersionPath = entry.Paths.VersionPath,
                     AssetCount = assets.Count,
                     TotalSize = totalSize,
+                    DeliveryBatchId = deliveryBatchId,
+                    SourceManifestHash = sourceManifestHash,
+                    RuntimeManifestHash = runtimeManifestHash,
+                    PublishStatus = "Published",
+                    VerificationStatus = "Verified",
+                    RuntimeVerified = true,
                     Streamed = true,
                     StablePromoted = true,
                     IdempotentVersion = versionAlreadyRecorded,

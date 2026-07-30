@@ -1,16 +1,17 @@
 <template>
-    <div class="micro-app-host">
-        <el-alert
+    <div ref="host" class="micro-app-host" data-mci-ui-root>
+        <micro-app-runtime-error
             v-if="error"
-            class="micro-app-host__alert"
-            :title="error"
-            type="error"
-            show-icon
-            :closable="false"
+            :message="error"
+            :details="runtimeDiagnostics"
+            @retry="retry"
+            @back="goBack"
+            @copy="copyDiagnostics"
         />
         <micro-app-loading-skeleton v-else-if="loading" />
         <micro-app
             v-else-if="entryUrl"
+            ref="microApp"
             class="micro-app-host__app"
             :key="microAppKey"
             :name="microAppName"
@@ -22,14 +23,19 @@
             iframe
             keep-alive
             @datachange="handleDataChange"
+            @mounted="handleMounted"
+            @unmount="handleUnmount"
+            @error="handleMicroAppError"
         />
     </div>
 </template>
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { buildMicroAppEntryUrl } from "@/utils/microAppEntryUrl.js";
+import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
+import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
+import MicroAppRuntimeError from "./runtime-error.vue";
 import { applyMicroAppToken } from "./token-sync";
 
 function safeDecode(value) {
@@ -137,7 +143,7 @@ function joinUrl(baseUrl, path) {
 
 export default {
     name: "MicroAppHost",
-    components: { MicroAppLoadingSkeleton },
+    components: { MicroAppLoadingSkeleton, MicroAppRuntimeError },
     data() {
         return {
             loading: true,
@@ -145,7 +151,17 @@ export default {
             entryUrl: "",
             appKey: "",
             appVersion: "",
-            microRoutePath: ""
+            microRoutePath: "",
+            pageKey: "",
+            publishStatus: "",
+            assetSource: "",
+            httpStatus: "",
+            reasonCode: "",
+            mountState: "idle",
+            retryKey: 0,
+            hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
+            resizeObserver: null,
+            visualViewportHandler: null
         };
     },
     computed: {
@@ -154,7 +170,7 @@ export default {
             return normalizeMicroAppName(`${this.appKey || this.$route?.meta?.title || this.$route?.name}-${routeKey}`);
         },
         microAppKey() {
-            return `${this.microAppName}@${this.entryUrl}`;
+            return `${this.microAppName}@${this.entryUrl}@${this.retryKey}`;
         },
         baseRoute() {
             return this.$route?.path || "/";
@@ -168,6 +184,7 @@ export default {
                 menuName: this.$route?.meta?.title || "",
                 appKey: this.appKey,
                 version: this.appVersion,
+                hostViewport: this.hostViewport,
                 microRoute: this.microRoutePath,
                 route: {
                     path: this.$route?.path || "",
@@ -177,10 +194,30 @@ export default {
                     microRoutePath: this.microRoutePath
                 }
             };
+        },
+        runtimeDiagnostics() {
+            return {
+                appKey: this.appKey,
+                pageKey: this.pageKey,
+                routePath: this.microRoutePath,
+                version: this.appVersion,
+                entryUrl: this.entryUrl,
+                httpStatus: this.httpStatus,
+                publishStatus: this.publishStatus,
+                assetSource: this.assetSource,
+                mountState: this.mountState,
+                reasonCode: this.reasonCode
+            };
         }
     },
     created() {
         this.resolveEntryUrl();
+    },
+    mounted() {
+        this.startViewportContract();
+    },
+    beforeUnmount() {
+        this.stopViewportContract();
     },
     watch: {
         "$route.fullPath"() {
@@ -190,7 +227,160 @@ export default {
     methods: {
         handleDataChange(event) {
             const payload = event?.detail?.data ?? event?.detail ?? event ?? {};
-            applyMicroAppToken(payload);
+            if (applyMicroAppToken(payload)) return;
+            const type = String(payload?.type || payload?.Type || "").toLowerCase();
+            const handled = payload?.handled === true || payload?.Handled === true;
+            const errorType = String(payload?.errorType || payload?.ErrorType || "business").toLowerCase();
+            if ((type === "error" || type === "app:error") && !handled && ["load", "protocol", "runtime"].includes(errorType)) {
+                const data = payload?.data ?? payload?.Data ?? payload;
+                this.setRuntimeError(data?.message || data?.Msg || "微服务运行异常", {
+                    reasonCode: data?.reasonCode || data?.ReasonCode || "MICRO_APP_RUNTIME_ERROR"
+                });
+            }
+        },
+        handleMounted() {
+            this.mountState = "mounted";
+            this.pushViewportContract();
+        },
+        handleUnmount() {
+            if (!this.error) this.mountState = "unmounted";
+        },
+        handleMicroAppError(event) {
+            const detail = event?.detail ?? event ?? {};
+            this.setRuntimeError(detail?.message || detail?.error?.message || "微服务挂载失败", {
+                reasonCode: "MICRO_APP_MOUNT_FAILED"
+            });
+        },
+        setRuntimeError(message, extra = {}) {
+            this.error = String(message || "微服务运行异常");
+            this.mountState = "error";
+            if (extra.httpStatus !== undefined) this.httpStatus = String(extra.httpStatus || "");
+            if (extra.reasonCode !== undefined) this.reasonCode = String(extra.reasonCode || "");
+        },
+        async resolveManagedRuntime(config) {
+            const requirePage = this.$route?.meta?.microAppFriendlyRoute === true;
+            let result = null;
+            try {
+                result = await DiyCommon.PostAsync("/api/MicroApp/Resolve", {
+                    OsClient: DiyCommon.GetOsClient(),
+                    AppKey: config.appKey,
+                    Version: config.version,
+                    RoutePath: config.microRoutePath,
+                    RequirePage: requirePage
+                });
+            } catch (resolveError) {
+                if (!shouldUseMicroAppResolveFallback(null, { requirePage, requestedVersion: config.version })) {
+                    throw resolveError;
+                }
+            }
+            if (Number(result?.Code) !== 1) {
+                if (shouldUseMicroAppResolveFallback(result, { requirePage, requestedVersion: config.version })) {
+                    this.publishStatus = "CompatibilityFallback";
+                    this.assetSource = "managed-stable-entry";
+                    return buildMicroAppEntryUrl({
+                        apiBase: DiyCommon.GetApiBase(),
+                        osClient: DiyCommon.GetOsClient(),
+                        appKey: config.appKey
+                    });
+                }
+                const error = new Error(result?.Msg || "无法解析微服务运行入口");
+                error.reasonCode = result?.Data?.ReasonCode || "MICRO_APP_RESOLVE_FAILED";
+                throw error;
+            }
+            const runtime = result.Data || {};
+            this.appVersion = String(runtime.Version || config.version || "");
+            this.pageKey = String(runtime.Page?.PageKey || "");
+            this.publishStatus = String(runtime.PublishStatus || "");
+            this.assetSource = String(runtime.AssetSource || runtime.StorageMode || "");
+            return String(runtime.EntryUrl || "");
+        },
+        async probeEntry(url) {
+            let parsed = null;
+            try { parsed = new URL(url, window.location.origin); } catch (_) { return; }
+            if (parsed.origin !== window.location.origin && parsed.origin !== new URL(DiyCommon.GetApiBase(), window.location.origin).origin) {
+                return;
+            }
+            this.mountState = "probing";
+            const response = await fetch(parsed.toString(), {
+                method: "GET",
+                headers: { Accept: "text/html,application/xhtml+xml" },
+                cache: "no-store"
+            });
+            this.httpStatus = String(response.status);
+            const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+            const text = await response.text();
+            if (!response.ok) {
+                const error = new Error(`运行入口请求失败（HTTP ${response.status}）`);
+                error.httpStatus = response.status;
+                error.reasonCode = "MICRO_APP_ENTRY_HTTP_ERROR";
+                throw error;
+            }
+            if (!contentType.includes("text/html") || !/<head[\s>]/i.test(text) || !/<body[\s>]/i.test(text)) {
+                const error = new Error("运行入口未返回完整 HTML 文档");
+                error.httpStatus = response.status;
+                error.reasonCode = "MICRO_APP_ENTRY_INVALID_HTML";
+                throw error;
+            }
+        },
+        retry() {
+            this.retryKey += 1;
+            this.resolveEntryUrl();
+        },
+        goBack() {
+            if (window.history.length > 1) this.$router.back();
+            else this.$router.push("/");
+        },
+        async copyDiagnostics() {
+            const text = JSON.stringify({ ...this.runtimeDiagnostics, message: this.error, pageUrl: window.location.href }, null, 2);
+            try {
+                await navigator.clipboard.writeText(text);
+                this.$message?.success?.("诊断信息已复制");
+            } catch (_) {
+                const textarea = document.createElement("textarea");
+                textarea.value = text;
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand("copy");
+                textarea.remove();
+                this.$message?.success?.("诊断信息已复制");
+            }
+        },
+        startViewportContract() {
+            this.updateViewportContract();
+            if (typeof ResizeObserver !== "undefined" && this.$refs.host) {
+                this.resizeObserver = new ResizeObserver(() => this.updateViewportContract());
+                this.resizeObserver.observe(this.$refs.host);
+            }
+            this.visualViewportHandler = () => this.updateViewportContract();
+            window.visualViewport?.addEventListener("resize", this.visualViewportHandler);
+            window.addEventListener("resize", this.visualViewportHandler);
+        },
+        stopViewportContract() {
+            this.resizeObserver?.disconnect?.();
+            if (this.visualViewportHandler) {
+                window.visualViewport?.removeEventListener("resize", this.visualViewportHandler);
+                window.removeEventListener("resize", this.visualViewportHandler);
+            }
+        },
+        updateViewportContract() {
+            const host = this.$refs.host;
+            if (!host) return;
+            const rect = host.getBoundingClientRect();
+            const viewportHeight = window.innerHeight || document.documentElement?.clientHeight || rect.height;
+            this.hostViewport = resolveMicroAppHostViewport(rect, window.visualViewport, viewportHeight);
+            host.style.height = `${this.hostViewport.height}px`;
+            host.style.minHeight = `${this.hostViewport.height}px`;
+            host.style.setProperty("--micro-app-available-width", `${this.hostViewport.width}px`);
+            host.style.setProperty("--micro-app-available-height", `${this.hostViewport.height}px`);
+            this.pushViewportContract();
+        },
+        pushViewportContract() {
+            const app = this.$refs.microApp;
+            if (app && typeof app.setData === "function") {
+                app.setData({ ...this.microAppData, type: "host:resize" });
+            }
         },
         extractRouteConfig() {
             const route = this.$route || {};
@@ -261,6 +451,9 @@ export default {
             this.loading = true;
             this.error = "";
             this.entryUrl = "";
+            this.httpStatus = "";
+            this.reasonCode = "";
+            this.mountState = "resolving";
 
             try {
                 const config = this.extractRouteConfig();
@@ -282,11 +475,14 @@ export default {
                 }
 
                 if (!url && config.appKey) {
-                    url = buildMicroAppEntryUrl({
-                        osClient: DiyCommon.GetOsClient(),
-                        appKey: config.appKey,
-                        version: config.version
-                    });
+                    url = await this.resolveManagedRuntime(config);
+                    if (!url) {
+                        url = buildMicroAppEntryUrl({
+                            osClient: DiyCommon.GetOsClient(),
+                            appKey: config.appKey,
+                            version: config.version
+                        });
+                    }
                 }
 
                 if (!url) {
@@ -303,9 +499,14 @@ export default {
                     url = joinUrl(DiyCommon.GetApiBase(), url);
                 }
 
+                await this.probeEntry(url);
                 this.entryUrl = url;
+                this.mountState = "mounting";
             } catch (error) {
-                this.error = error?.message || String(error);
+                this.setRuntimeError(error?.message || String(error), {
+                    httpStatus: error?.httpStatus,
+                    reasonCode: error?.reasonCode || "MICRO_APP_LOAD_FAILED"
+                });
             } finally {
                 this.loading = false;
             }
@@ -316,17 +517,29 @@ export default {
 
 <style lang="scss" scoped>
 .micro-app-host {
-    min-height: calc(100vh - 100px);
-    background: var(--el-bg-color);
-}
-
-.micro-app-host__alert {
-    margin: 12px;
-    width: auto;
+    --micro-app-available-width: 100%;
+    --micro-app-available-height: 100%;
+    --micro-app-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    min-height: 1px;
+    overflow: auto;
+    background: var(--mci-bg-base, var(--el-bg-color));
 }
 
 .micro-app-host__app {
     display: block;
-    min-height: calc(100vh - 100px);
+    flex: 1 1 auto;
+    width: var(--micro-app-available-width);
+    height: var(--micro-app-available-height);
+    min-width: 0;
+    min-height: var(--micro-app-available-height);
+    padding-bottom: var(--micro-app-safe-area-bottom);
+    box-sizing: border-box;
 }
 </style>

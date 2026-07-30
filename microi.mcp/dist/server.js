@@ -125,7 +125,10 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
             isEntry: file.relativePath.toLowerCase() === normalizedEntry.toLowerCase(),
         });
     }
-    return { rootDirectory: rootRealPath, entryPath: normalizedEntry, assets, totalSize, skippedSourceMaps };
+    const manifestHash = crypto.createHash('sha256')
+        .update(assets.map(asset => `${asset.relativePath}\t${asset.sha256}\t${asset.size}`).join('\n'))
+        .digest('hex');
+    return { rootDirectory: rootRealPath, entryPath: normalizedEntry, assets, totalSize, manifestHash, skippedSourceMaps };
 }
 function normalizeAccessKeyStringList(values, lowerCase = false) {
     const normalized = (values || [])
@@ -207,6 +210,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_import_external_attachment',
     'microi_get_field_list',
     'microi_add_field',
+    'microi_delete_field',
     'microi_update_field',
     'microi_refresh_schema_cache',
     'microi_create_table',
@@ -2246,6 +2250,54 @@ export function createMcpServer(client, context) {
         }
     });
     // ========================
+    // Tool: 删除字段（走平台 DelDiyField，软删除元数据并清缓存）
+    // ========================
+    server.tool('microi_delete_field', `Delete one non-system DIY field from OsClient "${osClient}" through the platform DelDiyField API. The platform performs a metadata soft delete and cache invalidation; it intentionally preserves the physical column for backward compatibility. Requires exact field readback and confirmExecution equal to the field Id or DELETE.`, {
+        id: z.string().min(1).describe('Exact diy_field Id returned by microi_get_field_list.'),
+        tableName: z.string().optional().describe('Owning table name used for safety readback.'),
+        tableId: z.string().optional().describe('Owning diy_table Id used for safety readback.'),
+        confirmExecution: z.string().describe('Must equal the exact field Id or DELETE.'),
+    }, async ({ id, tableName, tableId, confirmExecution }) => {
+        try {
+            if (confirmExecution !== id && confirmExecution !== 'DELETE') {
+                return { content: [{ type: 'text', text: `Error: confirmExecution must equal "${id}" or DELETE.` }], isError: true };
+            }
+            if (!tableName && !tableId) {
+                return { content: [{ type: 'text', text: 'Error: tableName or tableId is required for ownership readback.' }], isError: true };
+            }
+            const before = await client.getFieldList(tableName, tableId);
+            if (before.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${before.Msg}` }], isError: true };
+            const fields = unwrapList(before.Data);
+            const field = fields.find(item => String(item.Id || '') === id);
+            if (!field)
+                return { content: [{ type: 'text', text: `Error: field ${id} does not belong to the requested table.` }], isError: true };
+            const fieldName = String(field.Name || '');
+            const protectedFields = new Set(['Id', 'CreateTime', 'UpdateTime', 'UserId', 'UserName', 'IsDeleted']);
+            if (protectedFields.has(fieldName) || Number(field.IsLockField || 0) === 1) {
+                return { content: [{ type: 'text', text: `Error: protected platform field ${fieldName} cannot be deleted.` }], isError: true };
+            }
+            const result = await client.deleteField({
+                Id: id,
+                TableId: String(field.TableId || tableId || ''),
+                Name: fieldName,
+            });
+            if (result.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            const after = await client.getFieldList(tableName, tableId);
+            if (after.Code !== 1)
+                return { content: [{ type: 'text', text: `Error: delete succeeded but readback failed: ${after.Msg}` }], isError: true };
+            const remaining = unwrapList(after.Data);
+            if (remaining.some(item => String(item.Id || '') === id)) {
+                return { content: [{ type: 'text', text: `Error: field ${fieldName} is still active after delete readback.` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: `✅ Field ${fieldName}(${id}) deleted and readback confirmed.` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
     // Tool: 添加外键关联字段对（Id 隐藏 + Name 可见 Select+SQL）
     // ========================
     server.tool('microi_add_join_field', `Add a foreign-key field PAIR to a custom table for OsClient "${osClient}". Creates TWO fields atomically: (1) {baseName}Id — hidden varchar(50) Text storing the FK Id; (2) {baseName}Name — visible varchar(200) Select with DataSource:Sql showing and storing the Name, plus a FieldValueChange V8Code that copies the selected option's Id into the {baseName}Id field. This is the CORRECT pattern for any FK relationship in Microi — do NOT use a single Id-only field, as the list view cannot show the related Name without a join. IDEMPOTENT.`, {
@@ -2840,23 +2892,34 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 获取应用完整源码上下文
     // ========================
-    server.tool('microi_get_application_context', `Get one Web, UniApp or MicroService application by Id/AppKey for OsClient "${osClient}", with its full file manifest and all readable source-code contents by default. MicroService responses also include sys_microiservice runtime/pages. Use this after microi_list_applications before editing an existing app.`, {
+    server.tool('microi_get_application_context', `Get one Web, UniApp or MicroService application by Id/AppKey for OsClient "${osClient}". It returns metadata and the full file manifest by default without embedding source bodies; set includeContents=true only when the complete source is actually needed, or use microi_get_application_file for one exact file. MicroService responses also include sys_microiservice runtime/pages.`, {
         appIdOrKey: z.string().describe('sys_microistore.Id or AppKey.'),
-        includeContents: z.boolean().optional().default(true).describe('Read private HDFS source contents. Defaults to true.'),
+        includeContents: z.boolean().optional().default(false).describe('Read private HDFS source contents. Defaults to false; prefer microi_get_application_file for targeted reads.'),
         maxFileBytes: z.number().int().positive().optional().describe('Maximum bytes read per source file. Default 2MB.'),
         maxTotalBytes: z.number().int().positive().optional().describe('Maximum total bytes read for this app. Default 50MB.'),
     }, async ({ appIdOrKey, includeContents, maxFileBytes, maxTotalBytes }) => {
         try {
             const result = await client.getApplicationContext({
                 AppIdOrKey: appIdOrKey,
-                IncludeContents: includeContents !== false,
+                IncludeContents: includeContents === true,
                 ...(maxFileBytes ? { MaxFileBytes: maxFileBytes } : {}),
                 ...(maxTotalBytes ? { MaxTotalBytes: maxTotalBytes } : {}),
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+            const data = result.Data;
+            const files = Array.isArray(data?.Files) ? data.Files : [];
+            const contentErrorCount = files.filter(file => typeof file?.ContentReadError === 'string' && file.ContentReadError).length;
+            const payload = {
+                ...data,
+                McpReadSummary: {
+                    RequestedContents: includeContents === true,
+                    ContentsComplete: includeContents !== true || contentErrorCount === 0,
+                    ContentErrorCount: contentErrorCount,
+                },
+            };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -3065,12 +3128,14 @@ export function createMcpServer(client, context) {
         entryPath: z.string().optional().default('index.html').describe('Entry file relative to directory. Default index.html.'),
         routes: z.array(jsonRecordSchema).optional().describe('Optional MicroService page/route metadata.'),
         changeSummary: z.string().optional().describe('Version change summary stored in mci_ai_app_version.'),
+        sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional source-manifest SHA-256 returned by microi_sync_microservice_source, tying source and runtime to one delivery.'),
+        deliveryBatchId: z.string().min(1).max(128).optional().describe('Optional stable delivery batch id. MCP generates one when omitted.'),
         includeSourceMaps: z.boolean().optional().default(false).describe('Publish *.map source maps. Defaults to false to avoid source disclosure.'),
         maxFiles: z.number().int().min(1).max(20_000).optional().describe('Safety cap checked before upload. Default and hard maximum 20,000.'),
         maxTotalMegabytes: z.number().positive().max(20_480).optional().describe('Safety cap checked before upload. Default and hard maximum 20GB.'),
         timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
         confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),
-    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, changeSummary, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, confirmExecution }) => {
+    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, changeSummary, sourceManifestHash, deliveryBatchId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, confirmExecution }) => {
         try {
             if (confirmExecution && confirmExecution !== appIdOrKey) {
                 return { content: [{ type: 'text', text: `Error: confirmExecution 必须精确等于 ${appIdOrKey}` }], isError: true };
@@ -3089,12 +3154,14 @@ export function createMcpServer(client, context) {
                                 entryPath: manifest.entryPath,
                                 assetCount: manifest.assets.length,
                                 totalSize: manifest.totalSize,
+                                runtimeManifestHash: manifest.manifestHash,
                                 skippedSourceMaps: manifest.skippedSourceMaps,
                                 assetsPreview: manifest.assets.slice(0, 200).map(asset => ({ Path: asset.relativePath, Size: asset.size, Sha256: asset.sha256 })),
                                 previewTruncated: manifest.assets.length > 200,
                             }, null, 2) }],
                 };
             }
+            const effectiveDeliveryBatchId = deliveryBatchId || crypto.randomUUID();
             let uploadedCount = 0;
             const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
             for (const asset of uploadOrder) {
@@ -3130,18 +3197,38 @@ export function createMcpServer(client, context) {
                 Assets: manifest.assets.map(asset => ({ Path: asset.relativePath, Sha256: asset.sha256, Size: asset.size })),
                 Routes: routes || [],
                 ChangeSummary: changeSummary || 'MCP 二进制流式发布',
+                DeliveryBatchId: effectiveDeliveryBatchId,
+                SourceManifestHash: sourceManifestHash || '',
+                RuntimeManifestHash: manifest.manifestHash,
             });
             if (finalizeResult.Code !== 1) {
                 return { content: [{ type: 'text', text: JSON.stringify({ error: finalizeResult.Msg, uploadedCount, stablePromoted: false, retrySafe: true }, null, 2) }], isError: true };
             }
-            return { content: [{ type: 'text', text: JSON.stringify({
-                            ...(finalizeResult.Data && typeof finalizeResult.Data === 'object' ? finalizeResult.Data : {}),
-                            uploadedCount,
-                            totalSize: manifest.totalSize,
-                            skippedSourceMaps: manifest.skippedSourceMaps,
-                            transport: 'multipart-stream-to-hdfs',
-                            jintFileBytes: 0,
-                        }, null, 2) }] };
+            const publishedAppKey = String(finalizeResult.Data?.AppKey || appIdOrKey);
+            let runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
+            for (const delayMs of [250, 750, 1_500]) {
+                if (runtimeProbe.ok)
+                    break;
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
+            }
+            const payload = {
+                ...(finalizeResult.Data && typeof finalizeResult.Data === 'object' ? finalizeResult.Data : {}),
+                deliveryBatchId: effectiveDeliveryBatchId,
+                sourceManifestHash: sourceManifestHash || '',
+                runtimeManifestHash: manifest.manifestHash,
+                RuntimeProbe: runtimeProbe,
+                PublishedButUnavailable: !runtimeProbe.ok,
+                uploadedCount,
+                totalSize: manifest.totalSize,
+                skippedSourceMaps: manifest.skippedSourceMaps,
+                transport: 'multipart-stream-to-hdfs',
+                jintFileBytes: 0,
+            };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+                ...(!runtimeProbe.ok ? { isError: true } : {}),
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -3154,19 +3241,50 @@ export function createMcpServer(client, context) {
         microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: BuildVersion, EntryPath, SourceDirName.'),
         assets: z.array(jsonRecordSchema).describe('Built asset files. Each item needs Path/RelativePath/FileName and FileByteBase64/ContentBase64. Mark the main HTML/JS entry with IsEntry=true or Entry=true.'),
         routes: z.array(jsonRecordSchema).optional().describe('Optional route/page records for sys_microiservice_page. Fields: PageKey, PageName, PageTitle, RoutePath, EntryPath, SourceDirName, SourceFile, RouteMetaJson, Sort, IsHome.'),
+        sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional source-manifest SHA-256 returned by source sync.'),
+        deliveryBatchId: z.string().min(1).max(128).optional().describe('Optional stable delivery batch id. MCP generates one when omitted.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
-    }, async ({ microService, assets, routes, confirmExecution }) => {
+    }, async ({ microService, assets, routes, sourceManifestHash, deliveryBatchId, confirmExecution }) => {
         if (!confirmExecution) {
             return {
                 content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, assetCount: assets.length, routes: routes || [] }, null, 2) }],
             };
         }
         try {
-            const result = await client.publishMicroService({ microService, assets, routes: routes || [] });
+            const result = await client.publishMicroService({
+                microService,
+                assets,
+                routes: routes || [],
+                DeliveryBatchId: deliveryBatchId || crypto.randomUUID(),
+                SourceManifestHash: sourceManifestHash || '',
+            });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+            const msKey = String(microService.MsKey || microService.MicroServiceKey || microService.AppKey || '').trim();
+            let runtimeProbe = msKey ? await client.probeMicroAppEntry(msKey) : {
+                ok: false,
+                url: '',
+                error: 'Cannot probe runtime because MsKey is missing',
+            };
+            for (const delayMs of [250, 750, 1_500]) {
+                if (runtimeProbe.ok || !msKey)
+                    break;
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+                runtimeProbe = await client.probeMicroAppEntry(msKey);
+            }
+            const payload = {
+                ...(result.Data && typeof result.Data === 'object' ? result.Data : {}),
+                RuntimeProbe: runtimeProbe,
+                PublishedButUnavailable: !runtimeProbe.ok,
+                ...(!runtimeProbe.ok ? {
+                    Warning: '发布元数据和资产写入已完成，但稳定入口不可用。请检查 API 节点到租户 HDFS/MinIO 公有桶的服务端读取链路；不要无判断重复发布。',
+                } : {}),
+            };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+                ...(!runtimeProbe.ok ? { isError: true } : {}),
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };

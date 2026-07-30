@@ -12,7 +12,7 @@
 ```js
 //如果是新增数据
 if(V8.FormMode == 'Add'){//FormMode可能的值：Add（新增）、Edit（编辑）、View（预览）
-    V8.FormSe('Name', V8.CurrentUser.Name);//设置默认值
+    V8.FormSet('Name', V8.CurrentUser.Name);//设置默认值
 }
 ```
 
