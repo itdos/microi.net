@@ -30,6 +30,11 @@ export function getTenantFormFieldPresentation(context = {}, field = {}) {
   return presentation && typeof presentation === 'object' ? presentation : {}
 }
 
+export function getTenantFormRelatedPresentation(context = {}, field = {}) {
+  const presentation = invoke('getRelatedPresentation', context, field)
+  return presentation && typeof presentation === 'object' ? presentation : {}
+}
+
 export function getTenantFormFieldActions(context = {}, field = {}) {
   const actions = invoke('getFieldActions', context, field)
   return Array.isArray(actions) ? actions.filter((item) => item && item.key && item.label) : []
@@ -71,6 +76,7 @@ export default {
   getTenantFormPresentation,
   runTenantFormPresentationAction,
   getTenantFormFieldPresentation,
+  getTenantFormRelatedPresentation,
   getTenantFormFieldActions,
   runTenantFormFieldAction,
   handleTenantFormFieldChange,

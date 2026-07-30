@@ -578,7 +578,13 @@ export default {
         .find((field) => row[field])
       return fallback ? formatFieldValue(row[fallback], '', { empty: '' }) : `记录 ${String(row.Id || '').slice(-6)}`
     },
-    getStatus(row) { return formatFieldValue(row[this.config.statusField], '', { empty: '' }) },
+    getStatus(row) {
+      if (this.moduleKey === 'customerAddresses') {
+        const defaultAddressCode = String(this.parentForm?.AddressBH || '')
+        if (defaultAddressCode && String(row.AddressBH || '') === defaultAddressCode) return '默认地址'
+      }
+      return formatFieldValue(row[this.config.statusField], '', { empty: '' })
+    },
     getStatusClass(row) {
       const text = String(this.getStatus(row))
       if (/完成|结束|正常|合作|通过|审批/.test(text)) return 'is-success'
