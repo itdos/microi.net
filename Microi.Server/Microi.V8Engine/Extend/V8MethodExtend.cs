@@ -10,12 +10,23 @@ namespace Microi.net
     public partial class V8EngineMethodExtend
     {
         /// <summary>
+        /// 由宿主程序集覆盖，用于把已经过权限校验、具备独立并发与资源保护的
+        /// 平台长任务从当前 Jint Engine 的独享累计分配预算中排除。
+        /// 根调用树预算仍由宿主保留，普通 V8 CRUD/HTTP 等能力不得使用此作用域。
+        /// </summary>
+        protected virtual IDisposable BeginTrustedHostAllocationScope()
+        {
+            return null;
+        }
+
+        /// <summary>
         /// 重建并复制 iTdos 主库到固定临时数据库。
         /// </summary>
         public DosResult PrepareEmptyDatabaseRelease(dynamic dynamicParam)
         {
             try
             {
+                using var allocationScope = BeginTrustedHostAllocationScope();
                 var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
                 return request.Service.Prepare(request.CurrentUser, request.OsClient);
             }
@@ -32,6 +43,7 @@ namespace Microi.net
         {
             try
             {
+                using var allocationScope = BeginTrustedHostAllocationScope();
                 var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
                 return request.Service.ApplySanitization(
                     request.CurrentUser,
@@ -51,6 +63,7 @@ namespace Microi.net
         {
             try
             {
+                using var allocationScope = BeginTrustedHostAllocationScope();
                 var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
                 return request.Service.Publish(request.CurrentUser, request.OsClient);
             }
@@ -67,6 +80,7 @@ namespace Microi.net
         {
             try
             {
+                using var allocationScope = BeginTrustedHostAllocationScope();
                 var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
                 return request.Service.Cleanup(request.CurrentUser, request.OsClient);
             }
@@ -83,6 +97,7 @@ namespace Microi.net
         {
             try
             {
+                using var allocationScope = BeginTrustedHostAllocationScope();
                 var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
                 var currentUser = param["CurrentUser"] as JObject
                                   ?? param["_CurrentUser"] as JObject

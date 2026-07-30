@@ -21,6 +21,25 @@ Microi.UI 不只是组件集合，它是 AI 构建软件的视觉交付标准：
 - 每个列表、详情、表单都应基于可复用场景模式构建，而不是复制一次性 CSS。
 - 每个移动端页面都必须处理安全区、加载状态、按下反馈和底部操作。
 
+## 内置设计模式
+
+当需求只说“主流、高级、好看”时，先为页面确定一种主模式，再开始选组件和写样式：
+
+| 主模式 | 首要目标 | 推荐组合 |
+| --- | --- | --- |
+| 品牌叙事 | 用单一观点和章节节奏建立记忆 | `MciPage + MciSection + MciButton` |
+| 真实产品流程 | 让登录、创建、支付、权限、设置等任务完整可恢复 | `MciFormField + MciButton + MciDataState` |
+| 趋势构图 | 用编辑式留白、字号和不对称栅格建立视觉张力 | `MciSection + MciCard + 项目级 mci-*` |
+| 沉浸互动 | 用产品对象、Canvas/WebGL 或空间层次辅助理解 | `MciPage + MciHeroPanel + 静态降级资源` |
+| 动态首屏 | 用 0—1200ms 时间线组织标题、说明和主操作 | `MciHeroPanel + MciButton + reduced-motion` |
+| 数据工作台 | 优先异常、趋势、明细和筛选回显 | `MciMetricCard + MciFilterBar + MciDataState` |
+
+- 一页只能有一个主模式，辅助能力最多两项；禁止把六种风格堆成拼盘。
+- 先完成默认、加载、空、错误、禁用、权限、成功状态，再增加装饰和动效。
+- 涉及完整产品设计时，读取 [设计模式库](../ui-design/references/design-pattern-library.md)；涉及登录、订阅、支付、权限、搜索和设置时读取 [产品流程配方](../ui-design/references/product-flow-recipes.md)；涉及动效、Canvas/WebGL、图片或视频时读取 [动效与媒体规范](../ui-design/references/motion-and-media.md)。
+- 整站或长期维护项目必须在项目根目录维护 `MCI-DESIGN.md`，按 [设计契约规范](../ui-design/references/mci-design-contract.md) 描述 token、组件状态、动效、响应式和降级策略；可复制 [契约模板](../ui-design/assets/templates/MCI-DESIGN.md)。
+- [原创模式案例](../ui-design/assets/pattern-showcase/index.html) 只用于理解结构、状态和视觉差异，业务项目应替换为自己的信息架构和合法资产。
+
 ## 源码结构
 
 - `Microi.UI/src/theme/tokens.css`：设计变量、色板、圆角、阴影、动效、移动端场景变量。

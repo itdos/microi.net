@@ -146,6 +146,7 @@ namespace Microi.net
                     });
                 };
 
+                Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】注入【Dos.ORM数据库引擎】插件成功！");
                 return services;
             }
             catch (Exception ex)

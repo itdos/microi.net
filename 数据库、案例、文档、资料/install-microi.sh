@@ -2322,6 +2322,7 @@ if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo '------------------------------------------------------------------'
 
   LIBRETRANSLATE_DIR="${COMPOSE_BASE_DIR}/microi-install-libretranslate"
+  LIBRETRANSLATE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6"
   echo "Microi：LibreTranslate 端口: ${LIBRETRANSLATE_PORT}"
   echo "Microi：LibreTranslate 加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
 
@@ -2330,7 +2331,7 @@ if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
 version: '3.8'
 services:
   microi-translate:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6
+    image: ${LIBRETRANSLATE_IMAGE}
     container_name: microi-install-libretranslate
 ${COMPOSE_SERVICE_NETWORK}
     user: "0:0"
@@ -2360,87 +2361,34 @@ ${COMPOSE_EXTERNAL_NETWORKS}
 EOF
   echo 'Microi：LibreTranslate 编排文件已生成 ✓'
 
+  # 语言模型可能需要数小时下载，不能阻塞吾码主体安装。先独立创建 API Key
+  # 数据库并写入随机 Key，正式容器启动后可直接复用；模型由容器后台初始化。
+  echo 'Microi：初始化 LibreTranslate 随机 API Key...'
+  if ! printf '%s' "${LIBRETRANSLATE_API_KEY}" | docker run --rm -i \
+    --user '0:0' \
+    -v /microi/libretranslate/api-keys:/app/db \
+    --entrypoint ./venv/bin/python \
+    "${LIBRETRANSLATE_IMAGE}" -c \
+    'import sys; from libretranslate.api_keys import Database; key = sys.stdin.read(); assert key; db = Database("/app/db/api_keys.db"); db.add(1000000, key); assert db.lookup(key) is not None' \
+    > /dev/null; then
+    echo 'Microi：错误：LibreTranslate 随机 API Key 初始化失败。'
+    exit 1
+  fi
+  if [ ! -s /microi/libretranslate/api-keys/api_keys.db ]; then
+    echo 'Microi：错误：LibreTranslate API Key 数据库未生成。'
+    exit 1
+  fi
+  echo 'Microi：LibreTranslate 随机 API Key 初始化完成 ✓'
+
   compose_up "${LIBRETRANSLATE_DIR}"
-
-  echo 'Microi：等待 LibreTranslate 下载语言模型并通过健康检查（首次安装可能需要较长时间）...'
-  LIBRETRANSLATE_READY=0
-  for _libretranslate_wait in $(seq 1 1800); do
-    if ! docker inspect microi-install-libretranslate > /dev/null 2>&1 \
-      || [ "$(docker inspect microi-install-libretranslate --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
-      echo 'Microi：错误：LibreTranslate 容器已停止。'
-      docker logs microi-install-libretranslate 2>&1 | tail -100 || true
-      exit 1
-    fi
-    # LibreTranslate 1.9.6 的 healthcheck.py 在 /tmp/booting.flag 存在时会直接返回成功；
-    # 必须额外确认模型初始化已经结束、HTTP 健康且 API Key 数据库已创建。
-    LIBRETRANSLATE_BOOTING=0
-    if docker exec microi-install-libretranslate test -e /tmp/booting.flag; then
-      LIBRETRANSLATE_BOOTING=1
-    fi
-    if [ "${LIBRETRANSLATE_BOOTING}" != "1" ] \
-      && docker exec microi-install-libretranslate ./venv/bin/python scripts/healthcheck.py > /dev/null 2>&1 \
-      && docker exec microi-install-libretranslate test -s /app/db/api_keys.db; then
-      LIBRETRANSLATE_READY=1
-      break
-    fi
-    if [ $((_libretranslate_wait % 15)) -eq 0 ]; then
-      if [ "${LIBRETRANSLATE_BOOTING}" = "1" ]; then
-        echo "Microi：LibreTranslate 仍在下载或初始化语言模型，已等待 $((_libretranslate_wait * 2)) 秒..."
-      else
-        echo "Microi：LibreTranslate 模型阶段已结束，正在等待 HTTP 服务与 API Key 数据库，已等待 $((_libretranslate_wait * 2)) 秒..."
-      fi
-    fi
-    sleep 2
-  done
-  if [ "${LIBRETRANSLATE_READY}" != "1" ]; then
-    echo 'Microi：错误：LibreTranslate 在 60 分钟内未完成模型初始化、HTTP 健康检查或 API Key 数据库初始化。'
-    docker logs microi-install-libretranslate 2>&1 | tail -100 || true
-    exit 1
-  fi
-
-  echo 'Microi：LibreTranslate 已就绪，正在注册随机 API Key...'
-  LIBRETRANSLATE_KEY_READY=0
-  LIBRETRANSLATE_KEY_ERROR=""
-  for _libretranslate_key_wait in $(seq 1 30); do
-    if LIBRETRANSLATE_KEY_ERROR=$(docker exec microi-install-libretranslate \
-      ltmanage keys --api-keys-db-path /app/db/api_keys.db \
-      add 1000000 --key "${LIBRETRANSLATE_API_KEY}" 2>&1); then
-      LIBRETRANSLATE_KEY_READY=1
-      break
-    fi
-    sleep 2
-  done
-  if [ "${LIBRETRANSLATE_KEY_READY}" != "1" ]; then
-    echo 'Microi：错误：LibreTranslate 已启动，但随机 API Key 注册失败。'
-    LIBRETRANSLATE_KEY_ERROR_SAFE="${LIBRETRANSLATE_KEY_ERROR//${LIBRETRANSLATE_API_KEY}/***REDACTED***}"
-    printf '%s\n' "${LIBRETRANSLATE_KEY_ERROR_SAFE}" | tail -20
-    docker logs microi-install-libretranslate 2>&1 | tail -100 || true
-    exit 1
-  fi
-
-  echo 'Microi：验证 LibreTranslate API Key 与基础翻译请求...'
-  LIBRETRANSLATE_API_READY=0
-  LIBRETRANSLATE_API_ERROR=""
-  for _libretranslate_api_wait in $(seq 1 3); do
-    if LIBRETRANSLATE_API_ERROR=$(docker exec \
-      -e MICROI_LT_API_KEY="${LIBRETRANSLATE_API_KEY}" \
-      microi-install-libretranslate ./venv/bin/python -c \
-      'import os, requests; response = requests.post("http://127.0.0.1:5000/translate", json={"q":"Hello","source":"en","target":"zh","format":"text","api_key":os.environ["MICROI_LT_API_KEY"]}, timeout=60); response.raise_for_status(); data = response.json(); assert isinstance(data.get("translatedText"), str) and data["translatedText"].strip()' 2>&1); then
-      LIBRETRANSLATE_API_READY=1
-      break
-    fi
-    sleep 2
-  done
-  if [ "${LIBRETRANSLATE_API_READY}" != "1" ]; then
-    echo 'Microi：错误：LibreTranslate API Key 已写入，但真实翻译请求验证失败。'
-    LIBRETRANSLATE_API_ERROR_SAFE="${LIBRETRANSLATE_API_ERROR//${LIBRETRANSLATE_API_KEY}/***REDACTED***}"
-    printf '%s\n' "${LIBRETRANSLATE_API_ERROR_SAFE}" | tail -20
+  if [ "$(docker inspect microi-install-libretranslate --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
+    echo 'Microi：错误：LibreTranslate 容器启动失败。'
     docker logs microi-install-libretranslate 2>&1 | tail -100 || true
     exit 1
   fi
 
   echo ''
-  echo 'Microi：LibreTranslate 模型、HTTP、API Key 与真实翻译请求验证完成 ✓'
+  echo 'Microi：LibreTranslate 翻译服务已安装并启动 ✓'
 
   TRANSLATE_SERVICE_URL="http://${LAN_IP}:${LIBRETRANSLATE_PORT}"
   case "${DATABASE_CHOICE}" in

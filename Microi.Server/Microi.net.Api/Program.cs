@@ -63,6 +63,14 @@ Console.WriteLine(
     $"Microi：【诊断】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】EnvironmentName={builder.Environment.EnvironmentName}，" +
     "ASPNETCORE_ENVIRONMENT=" + (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "(null)") + "，" +
     "DOTNET_ENVIRONMENT=" + (Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT") ?? "(null)"));
+var startupAddresses = StartupDiagnostics.GetConfiguredAddresses(builder.Configuration);
+var startupOccupiedAddresses = StartupDiagnostics.FindOccupiedAddresses(startupAddresses);
+if (startupOccupiedAddresses.Count > 0)
+{
+    StartupDiagnostics.WriteAddressInUseMessage(startupOccupiedAddresses);
+    Environment.ExitCode = 1;
+    return;
+}
 
 #region Microi.net 初始化
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
@@ -468,6 +476,14 @@ if (clientModel.OsClientModel["MqttEnable"].Val<int>() == 1)
                 var latest = OsClient.GetClient(osClientName);
                 var mqttService = app.Services.GetRequiredService<IMicroiMQTT>();
                 await mqttService.StartServerAsync(latest);
+                if (mqttService.IsRunning)
+                {
+                    Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【MQTT】插件启动成功！");
+                }
+                else
+                {
+                    Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】【MQTT】插件未能启动，请查看系统日志中的 MQTT 诊断信息。");
+                }
             }
             catch (Exception ex)
             {
@@ -541,6 +557,13 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
     var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
     lifetime.ApplicationStarted.Register(() =>
     {
+        timer.Stop();
+        var listeningAddresses = StartupDiagnostics.GetConfiguredAddresses(app);
+        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
+        Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始访问系统吧！访问地址：【{string.Join("、", listeningAddresses)}】");
+        Console.WriteLine("------------------------------------------------------------------------------");
+        Console.WriteLine("------------------------------------------------------------------------------");
+
         _ = Task.Run(async () =>
         {
             // 接口引擎初始化（并行，租户数量可能较大）
@@ -604,10 +627,20 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
 }
 #endregion
 
-Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】Microi全部启动成功！总耗时：{timer.ElapsedMilliseconds}ms");
-timer.Stop();
-Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开始访问系统吧！访问地址一般是【/Microi.net.Api/Properties/launchSettings.json】里的applicationUrl属性值【https://localhost:61501】");
-Console.WriteLine("------------------------------------------------------------------------------");
-Console.WriteLine("------------------------------------------------------------------------------");
-
-app.Run();
+var configuredAddresses = StartupDiagnostics.GetConfiguredAddresses(app);
+try
+{
+    app.Run();
+}
+catch (Exception ex) when (StartupDiagnostics.IsAddressAlreadyInUse(ex))
+{
+    timer.Stop();
+    StartupDiagnostics.WriteAddressInUseMessage(configuredAddresses);
+    Environment.ExitCode = 1;
+}
+catch (Exception ex)
+{
+    timer.Stop();
+    StartupDiagnostics.WriteUnexpectedStartupFailure(ex);
+    Environment.ExitCode = 1;
+}

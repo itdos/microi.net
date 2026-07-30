@@ -543,14 +543,15 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 
 ## 浏览器访问密钥路由
 
-- 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，链接格式为 `/?OsClient={当前租户}#/access-login?access_key=...&redirect=...`。生成器只复制当前 `OsClient`，不能把其它页面查询参数带进凭据链接。
+- 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，完整链接格式为 `{Microi.Client前端WebBase}/?OsClient={当前租户}#/access-login?access_key={密钥}&redirect={encodeURIComponent后的站内Hash路由}`。例如目标路由 `/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX` 必须生成 `redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX`。生成器只复制当前 `OsClient`，不能把其它页面查询参数带进凭据链接，也不能把 API Server 当成前端 WebBase。
+- 固定电视、看板和信息屏应保存完整 `/access-login` 链接作为开机主页或受控书签；兑换后的干净目标页不能作为唯一恢复入口。前端清除地址栏中的 `access_key` 后使用短期受限 Token 并接收响应头轮换；永久密钥不等于永久 JWT。浏览器会话丢失时重新打开启动链接即可免密码兑换，禁止在目标页面重复追加密钥或支持 `permanent=1/keep_login=1` 等 URL 参数。
 - 管理入口是【系统账号】（`/#/mic-sys-user`）：该路由当前由通用 `form-engine/diy-table.vue` 承载，不能只修改旧的专用用户组件。表格和默认卡片视图都必须把【访问密钥】作为帐号行/卡片的直接按钮显示，不能藏入【更多】，也不能要求用户先进入编辑表单。创建表单支持 90 天、自定义到期和永久三种有效期，永久记录以空 `ExpiresAt` 表示并显示为“永久”。
 - 页面必须先把密钥保存在局部变量，再立即从地址栏清除；不得写入 Cookie、localStorage、sessionStorage、Pinia 或控制台。
 - 兑换通过 `POST /api/SysUserAccessKey/Exchange` 的 JSON Body 完成。响应头中的短期 Token 继续交给平台统一请求层保存和轮换。
 - 创建界面默认按页面名称勾选，也支持粘贴完整页面网址自动解析；不能要求普通用户手写路由和物理表名。页面/数据均可选择“全部已授权”，内部值为 `*`，含义只是取消密钥层二次白名单，仍与目标帐号实时菜单、表单和行权限取交集。接口引擎与数据源引擎 Key 仍必须准确选择。
 - `_AccessKeySession=true` 且页面为准确白名单时只允许清单路径；页面范围为 `*` 时才加载目标帐号实时可用的动态路由，以便全部已授权菜单可访问。该前端限制只是体验和泄露面收窄，服务端仍必须校验 API、表和引擎权限。
-- 全部页面模式会调用 `/api/SysMenu/GetSysMenuStep`，服务端只能在 `page:open + AllowedRoutes=*` 时放行；准确页面模式不得为了省事请求完整菜单树。页面渲染过程中使用 `FormEngineKey` 或 `TableId` 的请求都必须能被服务端映射到同一份表范围，不能通过换参数名绕过。
-- 列表和表单会把表 Key 放进动态友好地址，例如 `/api/FormEngine/GetTableData-{table-key}` 和 `/api/FormEngine/GetFormData-{table-key}`。访问密钥服务端必须先把这些地址归一化为标准 action，再按 `form:read/form:write` 与请求体中的表引用做双重校验；不能要求前端为了密钥会话退回另一套 URL，也不能对整个 `FormEngine` Controller 无条件放行。
+- 全部页面模式会调用 `/api/SysMenu/GetSysMenuStep`，服务端只能在 `page:open + AllowedRoutes=*` 时放行；准确页面模式不得为了省事请求完整菜单树。页面渲染过程中使用 `FormEngineKey`、`TableId`、`ModuleEngineKey` 或 `_SysMenuId` 的请求都必须能被服务端映射到同一份表范围，不能通过换参数名绕过，也不能把合法的菜单 Id 请求误判为缺少表引用。
+- 列表和表单会把表 Key 或菜单 Id 放进动态友好地址，例如 `/api/FormEngine/GetTableData-{table-key}` 和 `/api/FormEngine/GetFormData-{table-key}`。访问密钥服务端必须先把这些地址归一化为标准 action，再按 `form:read/form:write` 对 URL 后缀与请求体中的表/菜单引用做一致性校验，并把菜单 Id 映射回绑定的 `DiyTableId` 校验数据范围；不能要求前端为了密钥会话退回另一套 URL，也不能对整个 `FormEngine` Controller 无条件放行。
 - 不要因为底层帐号是管理员而在访问密钥会话展示控制面入口或触发控制面预加载。`_AccessKeySession=true` 时，密码显示、密钥管理、表/字段/菜单设计、缓存/服务器管理、查看或踢出其它终端等功能必须保持不可用；后台任务中心最多读取和管理当前用户自己的任务。
 - `/access-login` 必须在普通 SSO 发现之前直接放行，兑换最多等待 20 秒并给出明确错误，不能让页面永久停在“正在自动登录”。
 - 历史 `?token=` 只作兼容：解析后立即清除参数，不输出、不持久化完整 Token，不为新功能生成这种链接。

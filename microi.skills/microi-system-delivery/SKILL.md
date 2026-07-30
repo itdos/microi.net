@@ -94,9 +94,23 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 表单控件选择必须参考 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`，包括文本、数字、日期、选择、树、部门、地址、关联表单、弹窗选表、子表、上传、富文本、代码、地图、二维码、布局控件等；普通字段不手动设置 `FormWidth`，整行控件才设 `24`。
 
-### 3. 关联字段与表单设计
+### 3. 主子表与关联表单设计
 
-外键字段不能只生成一个 `XxxId`。
+先判定关系基数，再生成字段：
+
+- “子表、明细、清单、条目、行项目、多个记录”默认是主表 1:N 子表，使用
+  `TableChild`。创建独立子表，在子表放真实父级外键，建立 `(OsClient, ParentId)`
+  回查索引，并创建 `Display=0`、`AppDisplay=0`、`HasChild=0` 的子表菜单。
+- `JoinForm` 只用于主表保存一个目标 Id、并嵌入一条独立目标记录完整表单的 N:1/1:1
+  场景；目标表不能是当前表。需要列表、多行增删改或可能有多条记录时禁止使用。
+- `TableChild` 的 `TableChildTableId`、`TableChildSysMenuId`、`TableChildFkFieldName`
+  必须引用回读后的真实资源。资源尚未创建时分两阶段写入，禁止猜 Id，禁止退化成
+  `JoinForm`。
+- 基数不清楚时必须在远端写入前询问用户。调用 `microi_plan_system` / `dryRun` 前先做
+  关系语义审查；即使工具没有报错，AI 发现“1:N + JoinForm”、缺子表外键、缺隐藏
+  子菜单或缺回查索引时仍必须阻断。
+
+`JoinForm` / `OpenTable` 等单记录关联仍需兼顾可读字段，不能只生成一个裸 `XxxId`。
 
 推荐模式：
 
@@ -299,6 +313,10 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 - 校验字段按钮 V8Code 中引用的字段名真实存在，尤其是历史 `TableChildxxx`、`Textxxx`、`Buttonxxx` 重命名后不能遗留旧引用。
 - 字段按钮点击后必须守卫前端错误提示、`pageerror`、控制台 `TypeError/ReferenceError/SyntaxError`，并截图保留展开后的关联子表。
 - 详情页测试选择器要限定在当前表格操作列和当前详情弹层内部，避免误点侧边菜单或其它同名按钮。
+- `TableChild` 验收必须在父记录 A 新增/编辑/删除多条子记录，再打开父记录 B 验证
+  不串数据且不能跨父记录操作；同时回读子表外键、隐藏子菜单和组合索引。
+- `JoinForm` 验收必须确认目标表与当前表不同，`JoinFieldName` 的值确实是目标记录 Id，
+  并分别覆盖空 Id 与有效 Id 的渲染行为。
 
 ### 视觉与布局
 

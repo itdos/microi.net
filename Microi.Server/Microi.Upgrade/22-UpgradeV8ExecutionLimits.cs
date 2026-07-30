@@ -73,7 +73,7 @@ namespace Microi.net
                 Metadata("V8DefaultLimitMemoryMB", "V8单层分配预算(MB)",
                     "单个V8引擎默认累计分配预算，默认2048MB。它统计执行期间的分配流量，不是实时堆占用；开启嵌套隔离后不会重复计入子接口分配。"),
                 Metadata("V8MaxLimitMemoryMB", "V8单层最大预算(MB)",
-                    "租户或接口可配置的单层累计分配硬上限，默认4096MB；最终仍受平台代码固定安全边界约束。"),
+                    "租户或接口可配置的单层累计分配硬上限，默认8192MB；普通脚本仍默认2048MB，仅建议高内存节点为受控后台接口按需放宽。"),
                 Metadata("V8DefaultLimitRecursion", null,
                     "单个JavaScript脚本函数递归的默认深度上限，默认2000；不等同于接口引擎嵌套层数。"),
                 Metadata("V8MaxLimitRecursion", null,
