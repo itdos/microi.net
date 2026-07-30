@@ -12,6 +12,7 @@
       <div class="mci-ui-hero__actions">
         <a href="#快速接入">快速接入</a>
         <a href="#组件预览">组件预览</a>
+        <a href="#内置设计模式">设计模式</a>
         <a href="#ai-开发规则">AI 开发规则</a>
       </div>
     </div>
@@ -532,30 +533,14 @@ toggleMciTheme();</code></pre>
   </div>
 </section>
 
-## 系统模板预览
+## 系统模板组合
 
-<section class="mci-ui-template-grid">
-  <article>
-    <div class="mci-template-shot is-site"><span></span><b>企业官网</b><em>Hero / Feature / CTA</em></div>
-    <strong>企业官网 / 产品站</strong>
-    <p>用 `MciPage`、`MciSection`、`MciCard`、主题 palette 构建品牌展示与转化路径。</p>
-  </article>
-  <article>
-    <div class="mci-template-shot is-mobile"><span></span><b>会员中心</b><em>Profile / Asset / Menu</em></div>
-    <strong>移动端会员中心</strong>
-    <p>用 `MciNavbar`、`MciAvatar`、`MciAssetCard`、`MciCell`、`MciThemePanel` 组合。</p>
-  </article>
-  <article>
-    <div class="mci-template-shot is-dashboard"><span></span><b>数据看板</b><em>Metric / Filter / State</em></div>
-    <strong>资产与数据看板</strong>
-    <p>用 `MciMetricCard`、`MciFilterBar`、`MciDataState`、`MciSkeleton` 统一数据体验。</p>
-  </article>
-  <article>
-    <div class="mci-template-shot is-service"><span></span><b>服务工单</b><em>Order / Steps / Timeline</em></div>
-    <strong>订单 / 审批 / 工单</strong>
-    <p>用 `MciOrderCard`、`MciSteps`、`MciTimeline`、`MciModal` 承载流程与操作。</p>
-  </article>
-</section>
+| 场景 | 页面结构 | 推荐组件 |
+| --- | --- | --- |
+| 企业官网 / 产品站 | Hero → 核心能力 → 信任证据 → CTA | `MciPage`、`MciSection`、`MciCard`、`MciButton` |
+| 移动端会员中心 | 身份头 → 资产概览 → 常用入口 → 设置 | `MciNavbar`、`MciAvatar`、`MciAssetCard`、`MciCell` |
+| 资产与数据看板 | 异常 → 指标 → 趋势 → 筛选 → 明细 | `MciMetricCard`、`MciFilterBar`、`MciDataState`、`MciSkeleton` |
+| 订单 / 审批 / 工单 | 当前状态 → 主操作 → 阶段 → 时间线 | `MciOrderCard`、`MciSteps`、`MciTimeline`、`MciModal` |
 
 ## 高级移动端视觉规范
 
@@ -577,6 +562,65 @@ Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让�
 </section>
 
 移动端常用公共样式包括 <code>.mci-mobile-hero</code>、<code>.mci-mobile-panel</code>、<code>.mci-mobile-bottom-nav</code>、<code>.mci-mobile-rich-card</code>、<code>.mci-mobile-meta-grid</code>、<code>.mci-mobile-option-grid</code>、<code>.mci-mobile-photo-grid</code>、<code>.mci-mobile-sheet</code>、<code>.mci-mobile-chart-card</code>、<code>.mci-mobile-kpi-strip</code> 和 <code>.mci-mobile-empty-result</code>。当同一结构出现在两个以上页面时，应沉淀为 <code>Mci*</code> 组件或项目级 <code>mci-*</code> 封装。
+
+## 内置设计模式
+
+“主流、高级、好看”并不是一种可以直接执行的设计要求。吾码UI把常见产品目标归纳为六种内置模式：每个页面选择一种主模式，最多叠加两种辅助能力，再用同一套 `--mci-*` token 和 `Mci*` 组件实现。这样既能形成明显差异，也不会把多个视觉方向堆成拼盘。
+
+<section class="mci-ui-mode-grid">
+  <article class="is-story"><span>01 / STORY</span><i></i><h3>品牌叙事</h3><p>用单一观点、超大标题、章节节奏和克制 CTA 建立首屏记忆。</p><small>适合官网、产品发布、品牌介绍</small></article>
+  <article class="is-product"><span>02 / FLOW</span><i></i><h3>真实产品流程</h3><p>先完成登录、创建、支付、权限、设置和异常恢复，再进行视觉装饰。</p><small>适合 SaaS、商城、会员与业务系统</small></article>
+  <article class="is-editorial"><span>03 / LAYOUT</span><i></i><h3>趋势构图</h3><p>通过编辑式留白、字号对比、不对称栅格建立清晰阅读顺序。</p><small>适合内容、创意、活动与作品展示</small></article>
+  <article class="is-immersive"><span>04 / SPACE</span><i></i><h3>沉浸互动</h3><p>用产品对象、空间层次或 Canvas/WebGL 辅助理解，并提供静态降级。</p><small>适合 3D、硬件、空间和互动产品</small></article>
+  <article class="is-motion"><span>05 / MOTION</span><i></i><h3>动态首屏</h3><p>用 0—1200ms 时间线依次呈现标题、说明和主操作，避免持续噪声。</p><small>适合发布页、活动页与重点功能入口</small></article>
+  <article class="is-data"><span>06 / DATA</span><i></i><h3>数据工作台</h3><p>先异常、再趋势、后明细；筛选回显、数值格式和状态必须一致。</p><small>适合运营、监控、经营和分析场景</small></article>
+</section>
+
+### 原创可运行案例
+
+下面的案例完全使用吾码自有内容、`--mci-*` token、`mci-*` 类名和本地资源实现，不依赖外部图片、字体、组件库或网络请求。它用于展示六种模式之间的结构差异、明暗主题、响应式重排、筛选、表单校验、加载和成功反馈；业务项目应替换成自己的信息架构和合法素材，而不是逐像素复制案例。
+
+<section class="mci-ui-case-gallery">
+  <figure>
+    <img src="/images/microi-ui/pattern-showcase-desktop.svg" alt="吾码UI六种设计模式桌面端原创案例">
+    <figcaption><b>桌面端</b><span>1440px：首屏锚点、两列模式卡片与稳定内容宽度。</span></figcaption>
+  </figure>
+  <figure class="is-mobile">
+    <img src="/images/microi-ui/pattern-showcase-mobile.svg" alt="吾码UI六种设计模式移动端原创案例">
+    <figcaption><b>移动端</b><span>390px：单列重排、满宽主操作、安全间距与无横向滚动。</span></figcaption>
+  </figure>
+</section>
+
+## 产品流程完整性
+
+视觉案例不能只有“默认状态”。登录、注册、订阅、支付、搜索、设置、创建和编辑等流程，至少应覆盖下面状态，并在同一容器中稳定切换，不能因为骨架屏、错误提示或分页出现而导致页面跳动。
+
+<section class="mci-ui-state-matrix">
+  <article><b>Default</b><span>字段标签、说明、主次操作与返回路径完整。</span></article>
+  <article><b>Loading</b><span>使用结构等高的骨架屏或局部 loading，保留布局尺寸。</span></article>
+  <article><b>Empty</b><span>说明为什么为空，并提供可执行的下一步。</span></article>
+  <article><b>Error</b><span>错误靠近问题来源，保留用户输入并允许重试。</span></article>
+  <article><b>Permission</b><span>解释所需权限、用途、拒绝结果与重新授权入口。</span></article>
+  <article><b>Disabled</b><span>禁用原因可见，不能只降低透明度。</span></article>
+  <article><b>Success</b><span>确认结果、关键编号与下一步，不显示无意义成功页。</span></article>
+  <article><b>Offline</b><span>网络中断时保留草稿，并明确同步或重试状态。</span></article>
+</section>
+
+## MCI-DESIGN 设计契约
+
+整站、复杂应用或需要多人和 AI 持续维护的项目，应在项目根目录维护 <code>MCI-DESIGN.md</code>。它不是灵感说明，而是可执行的界面契约，至少包含：产品目标、主设计模式、信息架构、token、字体层级、组件状态、动效时间线、响应式重排、媒体预算、静态降级和截图验收清单。
+
+```yaml
+mode: data-workspace
+density: compact
+states: [default, loading, empty, error, permission, disabled, success]
+responsive: [390, 768, 1440]
+motion: reduced-motion-ready
+tokens: --mci-*
+components: MciPage / MciCard / MciDataState / project-level mci-*
+```
+
+AI 或开发者接手页面时，先读取契约再实现；如果实际页面发生结构性调整，要同时更新契约。项目里的颜色、间距、圆角和状态不得只存在于截图或聊天记录中。
 
 ## AI 开发规则
 
@@ -1156,14 +1200,14 @@ Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让�
   font-weight: 950;
 }
 
-.mci-template-shot em {
+.mci-template-shot small {
   color: rgba(255,255,255,.78);
   font-size: 12px;
   font-style: normal;
 }
 
 .mci-template-shot.is-mobile { background: linear-gradient(135deg, #d9a23a, #f7c65d); color: #3a2500; }
-.mci-template-shot.is-mobile em { color: rgba(58,37,0,.72); }
+.mci-template-shot.is-mobile small { color: rgba(58,37,0,.72); }
 .mci-template-shot.is-dashboard { background: linear-gradient(135deg, #2563eb, #0891b2); }
 .mci-template-shot.is-service { background: linear-gradient(135deg, #111827, #374151); }
 
@@ -2858,6 +2902,174 @@ Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让�
     linear-gradient(135deg, #b51220, #f04438) !important;
 }
 
+.mci-ui-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 24px 0 36px;
+}
+
+.mci-ui-mode-grid article {
+  position: relative;
+  min-height: 230px;
+  padding: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(15,23,42,.09);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15,23,42,.08);
+}
+
+.mci-ui-mode-grid article > span {
+  position: relative;
+  z-index: 2;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.mci-ui-mode-grid article > i {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 72px;
+  margin: 17px 0 16px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #eff3fa;
+}
+
+.mci-ui-mode-grid article > i::before,
+.mci-ui-mode-grid article > i::after {
+  position: absolute;
+  content: "";
+}
+
+.mci-ui-mode-grid h3 {
+  position: relative;
+  z-index: 2;
+  margin: 0 0 8px;
+  color: #172033;
+  font-size: 18px;
+}
+
+.mci-ui-mode-grid p,
+.mci-ui-mode-grid small {
+  position: relative;
+  z-index: 2;
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.mci-ui-mode-grid small {
+  margin-top: 11px;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.mci-ui-mode-grid .is-story > i { background: #f2efe6; }
+.mci-ui-mode-grid .is-story > i::before { top: 13px; left: 14px; color: #171717; content: "IDEA"; font-size: 35px; font-weight: 900; letter-spacing: -.08em; }
+.mci-ui-mode-grid .is-story > i::after { right: -18px; bottom: -30px; width: 88px; height: 88px; border-radius: 50%; background: #f04b38; }
+.mci-ui-mode-grid .is-product > i { background: #eef3ff; }
+.mci-ui-mode-grid .is-product > i::before { inset: 12px 50px 12px 12px; border: 1px solid #dbe3f4; border-radius: 9px; background: #fff; box-shadow: 44px 13px 0 -7px #5b7cfa; }
+.mci-ui-mode-grid .is-product > i::after { top: 23px; left: 24px; width: 54%; height: 5px; border-radius: 6px; background: #d9e1f1; box-shadow: 0 13px 0 #e7ebf4, 0 26px 0 #e7ebf4; }
+.mci-ui-mode-grid .is-editorial > i { background: #ffcf5b; }
+.mci-ui-mode-grid .is-editorial > i::before { top: 4px; left: 12px; content: "32"; font-size: 57px; font-weight: 900; letter-spacing: -.12em; }
+.mci-ui-mode-grid .is-editorial > i::after { right: -8px; bottom: -11px; width: 90px; height: 55px; transform: rotate(-8deg); background: #4233bd; }
+.mci-ui-mode-grid .is-immersive > i { background: radial-gradient(circle at 50% 50%, #3c68b7, #081221 68%); }
+.mci-ui-mode-grid .is-immersive > i::before { top: 50%; left: 50%; width: 42px; height: 42px; border-radius: 43% 57% 66% 34%; background: radial-gradient(circle at 30% 25%, #fff, #50e4ff 22%, #6558ef 64%); filter: drop-shadow(0 0 16px #4edcff); transform: translate(-50%, -50%); }
+.mci-ui-mode-grid .is-immersive > i::after { inset: 13px 30%; border: 1px solid rgba(95,231,255,.45); border-radius: 50%; }
+.mci-ui-mode-grid .is-motion > i { background: linear-gradient(120deg, #f9f8fc 54%, #8a70ff); }
+.mci-ui-mode-grid .is-motion > i::before { top: 12px; left: 14px; content: "01 SEC"; font-size: 24px; font-weight: 900; letter-spacing: -.06em; }
+.mci-ui-mode-grid .is-motion > i::after { right: 12px; bottom: 12px; left: 12px; height: 3px; border-radius: 4px; background: linear-gradient(90deg, #5b7cfa 52%, #dfe4ee 52%); }
+.mci-ui-mode-grid .is-data > i { background: #0c1729; }
+.mci-ui-mode-grid .is-data > i::before { right: 12px; bottom: 12px; left: 12px; height: 38px; background: repeating-linear-gradient(90deg, #5b7cfa 0 12px, transparent 12px 18px); clip-path: polygon(0 70%, 15% 45%, 30% 80%, 45% 20%, 60% 40%, 75% 5%, 90% 30%, 100% 12%, 100% 100%, 0 100%); }
+.mci-ui-mode-grid .is-data > i::after { top: 11px; right: 12px; width: 36px; height: 9px; border-radius: 8px; background: #26d7b0; }
+
+.mci-ui-case-gallery {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(250px, .72fr);
+  gap: 16px;
+  align-items: stretch;
+  margin: 24px 0 42px;
+}
+
+.mci-ui-case-gallery figure {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(15,23,42,.09);
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 16px 42px rgba(15,23,42,.08);
+}
+
+.mci-ui-case-gallery img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 14px;
+  background: #0b1425;
+}
+
+.mci-ui-case-gallery .is-mobile img {
+  aspect-ratio: 9 / 14;
+  object-fit: cover;
+  object-position: top;
+}
+
+.mci-ui-case-gallery figcaption {
+  display: grid;
+  gap: 4px;
+  padding: 14px 8px 7px;
+}
+
+.mci-ui-case-gallery figcaption b { color: #172033; font-size: 14px; }
+.mci-ui-case-gallery figcaption span { color: #64748b; font-size: 11px; line-height: 1.6; }
+
+.mci-ui-state-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 22px 0 40px;
+}
+
+.mci-ui-state-matrix article {
+  min-height: 116px;
+  padding: 16px;
+  border: 1px solid rgba(15,23,42,.09);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fff, #f8fafc);
+}
+
+.mci-ui-state-matrix b,
+.mci-ui-state-matrix span { display: block; }
+.mci-ui-state-matrix b { margin-bottom: 8px; color: #2563eb; font-size: 12px; letter-spacing: .04em; }
+.mci-ui-state-matrix span { color: #64748b; font-size: 11px; line-height: 1.65; }
+
+.dark .mci-ui-mode-grid article,
+.dark .mci-ui-case-gallery figure,
+.dark .mci-ui-state-matrix article {
+  border-color: rgba(255,255,255,.10);
+  background: linear-gradient(145deg, rgba(30,41,59,.96), rgba(15,23,42,.96));
+  box-shadow: 0 18px 46px rgba(0,0,0,.28);
+}
+
+.dark .mci-ui-mode-grid h3,
+.dark .mci-ui-case-gallery figcaption b { color: #e2e8f0; }
+.dark .mci-ui-mode-grid p,
+.dark .mci-ui-mode-grid small,
+.dark .mci-ui-case-gallery figcaption span,
+.dark .mci-ui-state-matrix span { color: #aebbd0; }
+
 @media (max-width: 960px) {
   .mci-ui-hero {
     grid-template-columns: 1fr;
@@ -2891,6 +3103,11 @@ Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让�
   .mci-ui-third-panel {
     grid-template-columns: 1fr;
   }
+
+  .mci-ui-mode-grid,
+  .mci-ui-state-matrix {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -2914,6 +3131,16 @@ Microi.UI 的移动端目标不是把后台页面缩小到手机里，而是让�
   .mci-ui-guard-grid,
   .mci-ui-theme-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mci-ui-mode-grid,
+  .mci-ui-case-gallery,
+  .mci-ui-state-matrix {
+    grid-template-columns: 1fr;
+  }
+
+  .mci-ui-case-gallery .is-mobile {
+    max-width: 360px;
   }
 
   .mci-ui-runtime-panel pre,

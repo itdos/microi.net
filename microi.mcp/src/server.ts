@@ -185,6 +185,19 @@ function normalizeAccessKeyStringList(values: string[] | undefined, lowerCase = 
   return Array.from(new Set(normalized)).sort((left, right) => left.localeCompare(right));
 }
 
+function buildBrowserAccessKeyLoginUrlTemplates(osClient: string, redirectPath?: string): {
+  relative: string;
+  absolute: string;
+} {
+  const tenant = encodeURIComponent(String(osClient || '').trim());
+  const redirect = String(redirectPath || '').trim() || '/';
+  const relative = `/?OsClient=${tenant}#/access-login?access_key=<AccessKey>&redirect=${encodeURIComponent(redirect)}`;
+  return {
+    relative,
+    absolute: `https://<Microi前端域名>${relative}`,
+  };
+}
+
 /**
  * Canonicalize the effective access-key grant before asking for confirmation.
  * The returned SHA-256 binds confirmation to scopes, allowlists and expiry,
@@ -746,6 +759,7 @@ BOUNDARY RULES:
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
+- **固定看板启动 URL 规范** — 使用 Microi.Client 前端 WebBase（不是 API Server）拼接 \`/?OsClient=${ctx.osClient}#/access-login?access_key=<密钥>&redirect=<encodeURIComponent后的站内Hash路由>\`。例如 redirect 原值为 \`/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX\` 时编码为 \`%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX\`。完整自动登录链接应保存为电视/看板的启动页；兑换成功后地址栏变为不含 \`access_key\` 的目标页是安全设计，禁止给目标页再次追加密钥，也禁止新增 \`permanent=1\` 一类由客户端决定有效期的参数
 
 ## 数据库索引（强制通过 MCP）
 - 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
@@ -1163,7 +1177,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
 
   server.tool(
     'microi_create_my_access_key',
-    `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. The first call is a dry confirmation step and returns RequiredConfirmationSha256; repeat the exact same payload with confirmExecution equal to that SHA-256.`,
+    `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. For a browser kiosk, combine the one-time AccessKey with the Microi.Client frontend origin using /?OsClient=${encodeURIComponent(osClient)}#/access-login?access_key=<AccessKey>&redirect=<encodeURIComponent(redirectPath)>; do not use the API origin and do not append the key to the destination page. The first call is a dry confirmation step and returns RequiredConfirmationSha256; repeat the exact same payload with confirmExecution equal to that SHA-256.`,
     {
       name: z.string().min(1).max(200).describe('Human-readable key name.'),
       allowedRoutes: z.array(z.string().min(1).max(500)).min(1).max(100).describe('Exact allowed routes. Use * only after explicit risk review.'),
@@ -1175,7 +1189,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         'data-source:run',
         'file:read',
       ])).min(1).max(5).optional().describe('Omit for minimum page:open + form:read. MCP does not expose form:write/form:export until the backend path facade supports them.'),
-      redirectPath: z.string().max(500).optional().describe('Initial route; must be included in allowedRoutes.'),
+      redirectPath: z.string().max(500).optional().describe('Internal Hash route beginning with /; must be included in allowedRoutes. Example: /mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX. MCP URL-encodes the entire value into the browser login redirect parameter.'),
       allowedApiEngineKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with api-engine:run. Wildcards are rejected.'),
       allowedDataSourceKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with data-source:run. Wildcards are rejected.'),
       expiresAt: z.string().optional().describe('Optional server-local expiry time, later than now and no more than 365 days. Omit for the bounded default.'),
@@ -1224,6 +1238,10 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         if (result.Code !== 1 || !result.Data?.AccessKey) {
           return { content: [{ type: 'text', text: `创建访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
         }
+        const loginUrlTemplates = buildBrowserAccessKeyLoginUrlTemplates(
+          osClient,
+          confirmation.normalized.redirectPath,
+        );
         // Do not return LoginPath because it embeds a second plaintext copy in a URL.
         // The credential below is the one and only MCP response containing plaintext.
         return {
@@ -1233,6 +1251,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
               AccessKey: result.Data.AccessKey,
               Record: result.Data.Record || null,
               Notice: '明文仅本次返回。请立即存入安全凭据库；后续列表和日志不会再次显示。',
+              LoginUrlRelativeTemplate: loginUrlTemplates.relative,
+              LoginUrlTemplate: loginUrlTemplates.absolute,
+              LoginUrlNotice: '请用 Microi.Client 前端域名替换占位符，并用本次 AccessKey 替换 <AccessKey>。固定终端应保存完整 access-login 启动链接；登录后目标页面不再显示 access_key 属于正常的安全清理。',
             }, null, 2),
           }],
         };

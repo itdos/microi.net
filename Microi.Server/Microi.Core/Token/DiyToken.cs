@@ -365,6 +365,23 @@ namespace Microi.net
         /// </summary>
         public JObject SetSysUserRoleInfo(dynamic userModel, string osClient)
         {
+            return SetSysUserRoleInfo(userModel, osClient, false);
+        }
+
+        /// <summary>
+        /// Build the credential-exchange identity without consulting an unrelated
+        /// bearer token that may still be present on the anonymous HTTP request.
+        /// </summary>
+        internal JObject SetSysUserRoleInfoForCredentialExchange(dynamic userModel, string osClient)
+        {
+            return SetSysUserRoleInfo(userModel, osClient, true);
+        }
+
+        private JObject SetSysUserRoleInfo(
+            dynamic userModel,
+            string osClient,
+            bool suppressAmbientUser)
+        {
             #region GetSysUserOtherInfo
             JObject sysUser = JObject.FromObject(userModel);
 
@@ -406,9 +423,10 @@ namespace Microi.net
                                                 Value = JsonHelper.Serialize(roleIds),
                                                 Type = "In"
                                             }
-                                        },
+                        },
                         //Ids = roleIds,
-                        OsClient = osClient
+                        OsClient = osClient,
+                        _CurrentUser = suppressAmbientUser ? new JObject() : null
                     }).GetAwaiter().GetResult();
 
                     sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
@@ -430,7 +448,8 @@ namespace Microi.net
                                                 Type = "In"
                                             }
                                         },
-                        OsClient = osClient
+                        OsClient = osClient,
+                        _CurrentUser = suppressAmbientUser ? new JObject() : null
                     }).GetAwaiter().GetResult();
                     if (sysMenuLimits.Code == 1)
                     {

@@ -17,6 +17,12 @@ namespace Microi.Tests.Common
 
             interceptor.WriteLine("Microi：【✅成功】【2026-07-26 00:00:00】Microi全部启动成功！");
             Assert.Contains("Microi全部启动成功", original.ToString());
+
+            interceptor.WriteLine("Microi：【✅成功】【2026-07-30 00:00:00】注入【MQ消息队列】插件成功！");
+            Assert.Contains("注入【MQ消息队列】插件成功", original.ToString());
+
+            interceptor.WriteLine("Microi：【❌Error】【2026-07-30 00:00:01】【MQ消息队列】插件启动失败：连接不可用");
+            Assert.Contains("【MQ消息队列】插件启动失败", original.ToString());
         }
 
         [Fact]

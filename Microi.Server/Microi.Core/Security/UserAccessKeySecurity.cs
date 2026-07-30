@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json;
@@ -153,6 +155,7 @@ namespace Microi.net
             "_AccessKeyAllowedRoutes",
             "_AccessKeyAllowedTableNames",
             "_AccessKeyAllowedTableIds",
+            "_AccessKeyAllowedMenuReferences",
             "_AccessKeyAllowedFieldIds",
             "_AccessKeyAllowedApiEngineKeys",
             "_AccessKeyAllowedDataSourceKeys",
@@ -339,6 +342,29 @@ namespace Microi.net
                        isExport));
         }
 
+        public static bool AreMenuReferencesAllowed(
+            JObject currentUser,
+            IEnumerable<string> menuReferences,
+            bool isRead,
+            bool isExport = false)
+        {
+            if (!IsSession(currentUser)) return true;
+            var requiredScope = isExport ? "form:export" : isRead ? "form:read" : "form:write";
+            if (!HasScope(currentUser, requiredScope)) return false;
+            var references = (menuReferences ?? Array.Empty<string>())
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var allowedMenus = ParseStringList(
+                currentUser["_AccessKeyAllowedMenuReferences"]);
+            return references.Length > 0
+                   && (allowedMenus.Contains(ScopeWildcard, StringComparer.OrdinalIgnoreCase)
+                       || references.All(reference => allowedMenus.Contains(
+                           reference,
+                           StringComparer.OrdinalIgnoreCase)));
+        }
+
         public static bool AreFieldReferencesAllowed(
             JObject currentUser,
             IEnumerable<string> fieldReferences)
@@ -514,36 +540,157 @@ namespace Microi.net
             string requestPath,
             out string action)
         {
+            return TryGetDynamicFormEngineRoute(
+                requestPath,
+                out action,
+                out _);
+        }
+
+        public static bool TryGetDynamicFormEngineRoute(
+            string requestPath,
+            out string action,
+            out string resourceReference)
+        {
             action = "";
+            resourceReference = "";
             var path = (requestPath ?? "").Trim().TrimEnd('/');
             const string routePrefix = "/api/formengine/";
             if (!path.StartsWith(routePrefix, StringComparison.OrdinalIgnoreCase)) return false;
 
             var actionWithTableKey = path.Substring(routePrefix.Length);
             if (actionWithTableKey.Contains("/")) return false;
-            return TryNormalizeDynamicFormEngineAction(actionWithTableKey, out action);
+            return TryNormalizeDynamicFormEngineAction(
+                actionWithTableKey,
+                out action,
+                out resourceReference);
+        }
+
+        public static bool AreDynamicFormEngineReferencesEquivalent(
+            string routeReference,
+            string requestReference)
+        {
+            static string Normalize(string value)
+            {
+                return (value ?? "")
+                    .Trim()
+                    .Replace('_', '-')
+                    .ToLowerInvariant();
+            }
+
+            var normalizedRoute = Normalize(routeReference);
+            var normalizedRequest = Normalize(requestReference);
+            return !normalizedRoute.DosIsNullOrWhiteSpace()
+                   && !normalizedRequest.DosIsNullOrWhiteSpace()
+                   && string.Equals(
+                       normalizedRoute,
+                       normalizedRequest,
+                       StringComparison.Ordinal);
+        }
+
+        public static bool AreFormEngineRequestReferencesAllowed(
+            JObject currentUser,
+            string requestPath,
+            IEnumerable<string> tableReferences,
+            IEnumerable<string> menuReferences,
+            IEnumerable<string> fieldReferences)
+        {
+            if (!IsSession(currentUser)) return true;
+            if (!TryGetTableOperation(requestPath, out var isRead, out var isExport))
+            {
+                return true;
+            }
+
+            var tables = (tableReferences ?? Array.Empty<string>())
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var menus = (menuReferences ?? Array.Empty<string>())
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var fields = (fieldReferences ?? Array.Empty<string>())
+                .Where(reference => !reference.DosIsNullOrWhiteSpace())
+                .Select(reference => reference.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var isFieldDataLookup = IsFieldDataLookupPath(requestPath);
+            var hasAnyReference = tables.Length > 0
+                                  || menus.Length > 0
+                                  || fields.Length > 0;
+            var tablesAllowed = tables.Length == 0
+                                || AreTableReferencesAllowed(
+                                    currentUser,
+                                    tables,
+                                    isRead,
+                                    isExport);
+            var menusAllowed = menus.Length == 0
+                               || AreMenuReferencesAllowed(
+                                   currentUser,
+                                   menus,
+                                   isRead,
+                                   isExport);
+            var fieldsAllowed = fields.Length == 0
+                                || AreFieldReferencesAllowed(currentUser, fields);
+
+            var routeMatchesRequest = true;
+            if (TryGetDynamicFormEngineRoute(
+                    requestPath,
+                    out _,
+                    out var routeReference))
+            {
+                routeMatchesRequest = tables
+                    .Concat(menus)
+                    .Any(reference => AreDynamicFormEngineReferencesEquivalent(
+                        routeReference,
+                        reference));
+            }
+
+            return hasAnyReference
+                   && tablesAllowed
+                   && menusAllowed
+                   && fieldsAllowed
+                   && routeMatchesRequest
+                   && (tables.Length > 0 || menus.Length > 0 || isFieldDataLookup);
         }
 
         private static string NormalizeFormEngineAction(string action)
         {
             var value = (action ?? "").Trim();
-            return TryNormalizeDynamicFormEngineAction(value, out var normalized)
+            return TryNormalizeDynamicFormEngineAction(
+                    value,
+                    out var normalized,
+                    out _)
                 ? normalized
                 : value;
         }
 
         private static bool TryNormalizeDynamicFormEngineAction(
             string actionWithTableKey,
-            out string action)
+            out string action,
+            out string resourceReference)
         {
             action = "";
+            resourceReference = "";
             var value = (actionWithTableKey ?? "").Trim();
             foreach (var dynamicAction in DynamicFormActionPrefixes)
             {
                 if (value.Length > dynamicAction.Key.Length
                     && value.StartsWith(dynamicAction.Key, StringComparison.OrdinalIgnoreCase))
                 {
+                    var reference = value.Substring(dynamicAction.Key.Length).Trim();
+                    if (reference.DosIsNullOrWhiteSpace()
+                        || reference.Contains("/")
+                        || reference.Contains("\\")
+                        || reference.Contains("?")
+                        || reference.Contains("#")
+                        || reference.Any(char.IsWhiteSpace))
+                    {
+                        return false;
+                    }
                     action = dynamicAction.Value;
+                    resourceReference = reference;
                     return true;
                 }
             }
@@ -662,6 +809,7 @@ namespace Microi.net
         public string AllowedRoutes { get; set; }
         public string AllowedTableNames { get; set; }
         public string AllowedTableIds { get; set; }
+        public string AllowedMenuReferences { get; set; }
         public string AllowedFieldIds { get; set; }
         public string AllowedApiEngineKeys { get; set; }
         public string AllowedDataSourceKeys { get; set; }
@@ -672,14 +820,19 @@ namespace Microi.net
     public static class UserAccessKeyService
     {
         private static readonly TimeSpan RuntimeCacheTtl = TimeSpan.FromSeconds(30);
+        private const int ControlPlaneCommandTimeoutSeconds = 10;
+        private const int MetadataQueryBatchSize = 200;
+        private static readonly ConcurrentDictionary<string, Lazy<Task<UserAccessKeyRuntime>>>
+            RuntimeLoads = new ConcurrentDictionary<string, Lazy<Task<UserAccessKeyRuntime>>>(
+                StringComparer.Ordinal);
 
         private static string RuntimeCacheKey(string osClient, string id)
         {
             // Version the cache contract whenever runtime-only derived fields change.
-            return $"Microi:{osClient}:UserAccessKey:Runtime:v3:{id}";
+            return $"Microi:{osClient}:UserAccessKey:Runtime:v4:{id}";
         }
 
-        private static async Task<string> ResolveAllowedTableIdsAsync(
+        private static string ResolveAllowedTableIds(
             string osClient,
             string allowedTableNames)
         {
@@ -694,24 +847,32 @@ namespace Microi.net
 
             try
             {
-                var tableResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(
-                        "diy_table",
-                        new
-                        {
-                            OsClient = osClient,
-                            _Where = new List<object>
-                            {
-                                new List<object> { "Name", "In", names.ToArray() }
-                            },
-                            _SelectFields = new[] { "Id", "Name" },
-                            _PageSize = Math.Max(names.Count, 1)
-                        })
-                    .ConfigureAwait(false);
-                if (tableResult.Code != 1 || tableResult.Data == null) return "[]";
-                var rows = JArray.FromObject((object)tableResult.Data);
+                // The DbSession is already selected from the requested OsClient.
+                // Core metadata tables do not consistently expose a physical
+                // OsClient column, so tenant isolation belongs at connection scope.
+                var db = OsClientExtend.GetClient(osClient)?.Db;
+                if (db == null) return "[]";
+                var rows = new List<JObject>();
+                for (var offset = 0; offset < names.Count; offset += MetadataQueryBatchSize)
+                {
+                    var batch = names.Skip(offset).Take(MetadataQueryBatchSize).ToArray();
+                    var parameterNames = batch
+                        .Select((_, index) => "@name" + index)
+                        .ToArray();
+                    var section = db.FromSql(
+                            "SELECT Id, Name FROM diy_table " +
+                            "WHERE (IsDeleted<>1 OR IsDeleted IS NULL) " +
+                            "AND Name IN (" + string.Join(",", parameterNames) + ")");
+                    for (var index = 0; index < batch.Length; index++)
+                    {
+                        section.AddInParameter(parameterNames[index], batch[index]);
+                    }
+                    section.SetCommandTimeout(ControlPlaneCommandTimeoutSeconds);
+                    rows.AddRange((section.ToList<dynamic>() ?? new List<dynamic>())
+                        .Select(item => JObject.FromObject((object)item)));
+                }
                 return UserAccessKeySecurity.SerializeStringList(
                     rows
-                        .OfType<JObject>()
                         .Where(row => names.Contains(
                             row["Name"]?.ToString(),
                             StringComparer.OrdinalIgnoreCase))
@@ -725,7 +886,7 @@ namespace Microi.net
             }
         }
 
-        private static async Task<string> ResolveAllowedFieldIdsAsync(
+        private static string ResolveAllowedFieldIds(
             string osClient,
             string allowedTableIds)
         {
@@ -740,28 +901,89 @@ namespace Microi.net
 
             try
             {
-                var fieldResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(
-                        "diy_field",
-                        new
-                        {
-                            OsClient = osClient,
-                            _Where = new List<object>
-                            {
-                                new List<object> { "TableId", "In", tableIds.ToArray() }
-                            },
-                            _SelectFields = new[] { "Id", "TableId" },
-                            _PageSize = 10000
-                        })
-                    .ConfigureAwait(false);
-                if (fieldResult.Code != 1 || fieldResult.Data == null) return "[]";
-                var rows = JArray.FromObject((object)fieldResult.Data);
+                // Tenant isolation is provided by the selected DbSession; do not
+                // append an OsClient predicate to legacy metadata tables.
+                var db = OsClientExtend.GetClient(osClient)?.Db;
+                if (db == null) return "[]";
+                var rows = new List<JObject>();
+                for (var offset = 0; offset < tableIds.Count; offset += MetadataQueryBatchSize)
+                {
+                    var batch = tableIds.Skip(offset).Take(MetadataQueryBatchSize).ToArray();
+                    var parameterNames = batch
+                        .Select((_, index) => "@tableId" + index)
+                        .ToArray();
+                    var section = db.FromSql(
+                            "SELECT Id, TableId FROM diy_field " +
+                            "WHERE (IsDeleted<>1 OR IsDeleted IS NULL) " +
+                            "AND TableId IN (" + string.Join(",", parameterNames) + ")");
+                    for (var index = 0; index < batch.Length; index++)
+                    {
+                        section.AddInParameter(parameterNames[index], batch[index]);
+                    }
+                    section.SetCommandTimeout(ControlPlaneCommandTimeoutSeconds);
+                    rows.AddRange((section.ToList<dynamic>() ?? new List<dynamic>())
+                        .Select(item => JObject.FromObject((object)item)));
+                }
                 return UserAccessKeySecurity.SerializeStringList(
                     rows
-                        .OfType<JObject>()
                         .Where(row => tableIds.Contains(
                             row["TableId"]?.ToString(),
                             StringComparer.OrdinalIgnoreCase))
                         .Select(row => row["Id"]?.ToString()));
+            }
+            catch
+            {
+                return "[]";
+            }
+        }
+
+        private static string ResolveAllowedMenuReferences(
+            string osClient,
+            string allowedTableIds)
+        {
+            var tableIds = UserAccessKeySecurity.ParseStringList(
+                JToken.FromObject(allowedTableIds ?? ""));
+            if (tableIds.Contains(UserAccessKeySecurity.ScopeWildcard, StringComparer.OrdinalIgnoreCase))
+            {
+                return UserAccessKeySecurity.SerializeStringList(
+                    new[] { UserAccessKeySecurity.ScopeWildcard });
+            }
+            if (tableIds.Count == 0) return "[]";
+
+            try
+            {
+                var db = OsClientExtend.GetClient(osClient)?.Db;
+                if (db == null) return "[]";
+                var rows = new List<JObject>();
+                for (var offset = 0; offset < tableIds.Count; offset += MetadataQueryBatchSize)
+                {
+                    var batch = tableIds.Skip(offset).Take(MetadataQueryBatchSize).ToArray();
+                    var parameterNames = batch
+                        .Select((_, index) => "@tableId" + index)
+                        .ToArray();
+                    var section = db.FromSql(
+                            "SELECT Id, ModuleEngineKey, DiyTableId FROM sys_menu " +
+                            "WHERE (IsDeleted<>1 OR IsDeleted IS NULL) " +
+                            "AND DiyTableId IN (" + string.Join(",", parameterNames) + ")");
+                    for (var index = 0; index < batch.Length; index++)
+                    {
+                        section.AddInParameter(parameterNames[index], batch[index]);
+                    }
+                    section.SetCommandTimeout(ControlPlaneCommandTimeoutSeconds);
+                    rows.AddRange((section.ToList<dynamic>() ?? new List<dynamic>())
+                        .Select(item => JObject.FromObject((object)item)));
+                }
+
+                return UserAccessKeySecurity.SerializeStringList(
+                    rows
+                        .Where(row => tableIds.Contains(
+                            row["DiyTableId"]?.ToString(),
+                            StringComparer.OrdinalIgnoreCase))
+                        .SelectMany(row => new[]
+                        {
+                            row["Id"]?.ToString(),
+                            row["ModuleEngineKey"]?.ToString()
+                        }));
             }
             catch
             {
@@ -787,6 +1009,45 @@ namespace Microi.net
             return UserAccessKeySecurity.IsExpiryActive(runtime.ExpiresAt, DateTime.Now);
         }
 
+        private static async Task<UserAccessKeyRuntime> LoadRuntimeAsync(
+            string osClient,
+            string accessKeyId,
+            string cacheKey)
+        {
+            var db = OsClientExtend.GetClient(osClient)?.Db;
+            if (db == null) return null;
+            // This session is tenant-bound. mci_user_access_key is compatible with
+            // existing installations that do not have a physical OsClient column.
+            var section = db.FromSql(
+                    "SELECT Id, TargetUserId, Name, Scopes, AllowedRoutes, " +
+                    "AllowedTableNames, AllowedApiEngineKeys, AllowedDataSourceKeys, " +
+                    "ExpiresAt, State FROM mci_user_access_key " +
+                    "WHERE Id=@id " +
+                    "AND (IsDeleted<>1 OR IsDeleted IS NULL)")
+                .AddInParameter("@id", accessKeyId);
+            section.SetCommandTimeout(ControlPlaneCommandTimeoutSeconds);
+            var rowData = section.ToList<dynamic>()?.FirstOrDefault();
+            if (rowData == null) return null;
+            var row = JObject.FromObject((object)rowData);
+            var runtime = row.ToObject<UserAccessKeyRuntime>();
+            if (!IsRuntimeActive(runtime)) return null;
+            runtime.AllowedTableIds = ResolveAllowedTableIds(osClient, runtime.AllowedTableNames);
+            runtime.AllowedFieldIds = ResolveAllowedFieldIds(osClient, runtime.AllowedTableIds);
+            runtime.AllowedMenuReferences = ResolveAllowedMenuReferences(
+                osClient,
+                runtime.AllowedTableIds);
+            try
+            {
+                await MicroiEngine.CacheTenant.Cache(osClient)
+                    .SetAsync(cacheKey, runtime, RuntimeCacheTtl)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+            }
+            return runtime;
+        }
+
         private static async Task<UserAccessKeyRuntime> GetRuntimeAsync(
             string osClient,
             string accessKeyId)
@@ -796,64 +1057,98 @@ namespace Microi.net
                 return null;
             }
 
-            var cache = MicroiEngine.CacheTenant.Cache(osClient);
             var cacheKey = RuntimeCacheKey(osClient, accessKeyId);
             try
             {
-                var cached = await cache.GetAsync<UserAccessKeyRuntime>(cacheKey).ConfigureAwait(false);
+                var cached = await MicroiEngine.CacheTenant.Cache(osClient)
+                    .GetAsync<UserAccessKeyRuntime>(cacheKey)
+                    .ConfigureAwait(false);
                 if (cached != null) return IsRuntimeActive(cached) ? cached : null;
             }
             catch
             {
             }
 
-            var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
-                UserAccessKeySecurity.TableName,
-                new
-                {
-                    OsClient = osClient,
-                    Id = accessKeyId,
-                    _SelectFields = new[]
-                    {
-                        "Id", "TargetUserId", "Name", "Scopes", "AllowedRoutes",
-                        "AllowedTableNames", "AllowedApiEngineKeys", "AllowedDataSourceKeys",
-                        "ExpiresAt", "State"
-                    }
-                }).ConfigureAwait(false);
-            if (result.Code != 1 || result.Data == null) return null;
-            JObject row = JObject.FromObject((object)result.Data);
-            var runtime = row.ToObject<UserAccessKeyRuntime>();
-            if (!IsRuntimeActive(runtime)) return null;
-            runtime.AllowedTableIds = await ResolveAllowedTableIdsAsync(
-                    osClient,
-                    runtime.AllowedTableNames)
-                .ConfigureAwait(false);
-            runtime.AllowedFieldIds = await ResolveAllowedFieldIdsAsync(
-                    osClient,
-                    runtime.AllowedTableIds)
-                .ConfigureAwait(false);
+            // The database and shared cache remain authoritative. This process-local
+            // single-flight only prevents a cold-key request burst from issuing the
+            // same bounded control-plane query hundreds of times on one API node.
+            var load = RuntimeLoads.GetOrAdd(
+                cacheKey,
+                _ => new Lazy<Task<UserAccessKeyRuntime>>(
+                    () => LoadRuntimeAsync(osClient, accessKeyId, cacheKey),
+                    LazyThreadSafetyMode.ExecutionAndPublication));
             try
             {
-                await cache.SetAsync(cacheKey, runtime, RuntimeCacheTtl).ConfigureAwait(false);
+                return await load.Value.ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
+                MicroiEngine.QueueSystemLog(
+                    osClient,
+                    "UserAccessKey",
+                    "RuntimeLookupFailed",
+                    "访问密钥运行时读取失败",
+                    ex.GetType().Name + ": " + ex.Message,
+                    3,
+                    false,
+                    accessKeyId);
+                return null;
             }
-            return runtime;
+            finally
+            {
+                RuntimeLoads.TryRemove(cacheKey, out _);
+            }
         }
 
-        public static async Task<DosResult<JObject>> ApplySessionScopeAsync(
-            JObject sharedCurrentUser,
-            string accessKeyId,
-            string osClient)
+        private static void LogControlPlaneFailure(
+            string osClient,
+            string stage,
+            Exception exception)
         {
-            if (accessKeyId.DosIsNullOrWhiteSpace())
+            var safeStage = (stage ?? "Unknown").Trim();
+            var safeType = exception?.GetType().Name ?? "UnknownException";
+            var safeMessage = exception?.Message ?? "Unknown error";
+            Console.Error.WriteLine(
+                $"Microi：【❌访问密钥】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】" +
+                $"控制面读取失败：Stage={safeStage}，Type={safeType}，Message={safeMessage}");
+            MicroiEngine.QueueSystemLog(
+                osClient,
+                "UserAccessKey",
+                "ControlPlaneFailure",
+                "访问密钥控制面读取失败",
+                $"Stage={safeStage}; Type={safeType}; {exception}",
+                3);
+        }
+
+        private static DosResult ControlPlaneFailure(
+            string stage,
+            string message,
+            Exception exception)
+        {
+#if DEBUG
+            var diagnostics = new
             {
-                return new DosResult<JObject>(1, UserAccessKeySecurity.StripSessionFields(sharedCurrentUser));
-            }
-            var runtime = await GetRuntimeAsync(osClient, accessKeyId).ConfigureAwait(false);
+                DiagnosticStage = (stage ?? "Unknown").Trim(),
+                DiagnosticType = exception?.GetType().Name ?? "UnknownException",
+                DiagnosticDetail = exception?.Message ?? "Unknown error"
+            };
+#else
+            var diagnostics = new { DiagnosticStage = (stage ?? "Unknown").Trim() };
+#endif
+            return new DosResult(
+                0,
+                null,
+                message,
+                null,
+                diagnostics);
+        }
+
+        public static DosResult<JObject> ApplyRuntimeScope(
+            JObject sharedCurrentUser,
+            UserAccessKeyRuntime runtime)
+        {
             var cleanUser = UserAccessKeySecurity.StripSessionFields(sharedCurrentUser);
-            if (runtime == null
+            if (!IsRuntimeActive(runtime)
                 || cleanUser == null
                 || !string.Equals(
                     cleanUser["Id"]?.ToString(),
@@ -874,6 +1169,8 @@ namespace Microi.net
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedTableNames ?? "")));
             cleanUser["_AccessKeyAllowedTableIds"] = JArray.FromObject(
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedTableIds ?? "")));
+            cleanUser["_AccessKeyAllowedMenuReferences"] = JArray.FromObject(
+                UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedMenuReferences ?? "")));
             cleanUser["_AccessKeyAllowedFieldIds"] = JArray.FromObject(
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedFieldIds ?? "")));
             cleanUser["_AccessKeyAllowedApiEngineKeys"] = JArray.FromObject(
@@ -881,8 +1178,24 @@ namespace Microi.net
             cleanUser["_AccessKeyAllowedDataSourceKeys"] = JArray.FromObject(
                 UserAccessKeySecurity.ParseStringList(JToken.FromObject(runtime.AllowedDataSourceKeys ?? "")));
             cleanUser["_AccessKeyExpiresAt"] = runtime.ExpiresAt ?? "";
-            cleanUser["_IsAdmin"] = false;
+            // A key inherits the live account identity and then narrows it through
+            // scopes/routes/tables. Downgrading a real administrator to non-admin
+            // here makes every existing role/menu check fail; preserving false for
+            // ordinary users still guarantees a key can never elevate its owner.
             return new DosResult<JObject>(1, cleanUser);
+        }
+
+        public static async Task<DosResult<JObject>> ApplySessionScopeAsync(
+            JObject sharedCurrentUser,
+            string accessKeyId,
+            string osClient)
+        {
+            if (accessKeyId.DosIsNullOrWhiteSpace())
+            {
+                return new DosResult<JObject>(1, UserAccessKeySecurity.StripSessionFields(sharedCurrentUser));
+            }
+            var runtime = await GetRuntimeAsync(osClient, accessKeyId).ConfigureAwait(false);
+            return ApplyRuntimeScope(sharedCurrentUser, runtime);
         }
 
         public static async Task<DosResult> CreateAsync(
@@ -1218,25 +1531,40 @@ namespace Microi.net
                     2);
             }
 
-            var lookup = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
-                UserAccessKeySecurity.TableName,
-                new
-                {
-                    OsClient = osClient,
-                    _Where = new List<object>
-                    {
-                        new List<object> { "KeyPrefix", "=", prefix },
-                        new List<object> { "State", "=", 1 }
-                    },
-                    _SelectFields = new[]
-                    {
-                        "Id", "TargetUserId", "SecretHash", "ExpiresAt", "State"
-                    }
-                }).ConfigureAwait(false);
-            if (lookup.Code != 1 || lookup.Data == null)
+            var db = OsClientExtend.GetClient(osClient)?.Db;
+            if (db == null)
+                return new DosResult(0, null, "租户数据库连接不存在。");
+
+            // Credential exchange is an anonymous control-plane operation. Never
+            // route these lookups through FormEngine: a stale bearer header could
+            // otherwise resolve the very same access-key session recursively.
+            // The selected DbSession is already tenant-bound; system tables in
+            // existing databases do not universally contain an OsClient column.
+            dynamic keyData;
+            try
+            {
+                var keySection = db.FromSql(
+                        "SELECT Id, TargetUserId, SecretHash, ExpiresAt, State " +
+                        "FROM mci_user_access_key " +
+                        "WHERE KeyPrefix=@prefix AND State=@state " +
+                        "AND (IsDeleted<>1 OR IsDeleted IS NULL)")
+                    .AddInParameter("@prefix", prefix)
+                    .AddInParameter("@state", 1);
+                keySection.SetCommandTimeout(ControlPlaneCommandTimeoutSeconds);
+                keyData = keySection.ToList<dynamic>()?.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                LogControlPlaneFailure(osClient, "CredentialLookup", ex);
+                return ControlPlaneFailure(
+                    "CredentialLookup",
+                    "访问密钥校验服务暂时不可用，请稍后重试。",
+                    ex);
+            }
+            if (keyData == null)
                 return new DosResult(1002, null, "访问密钥无效。");
 
-            JObject keyRow = JObject.FromObject((object)lookup.Data);
+            var keyRow = JObject.FromObject((object)keyData);
             var calculatedHash = UserAccessKeySecurity.HashCredential((credential ?? "").Trim());
             if (!UserAccessKeySecurity.FixedTimeHashEquals(
                     calculatedHash,
@@ -1250,29 +1578,33 @@ namespace Microi.net
                 return new DosResult(1001, null, "访问密钥已过期。");
             }
 
-            var userResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>(
-                "sys_user",
-                new
-                {
-                    OsClient = osClient,
-                    _Where = new List<object>
-                    {
-                        new List<object> { "Id", "=", keyRow["TargetUserId"]?.ToString() },
-                        new List<object> { "State", "=", 1 },
-                        new List<object> { "IsDeleted", "<>", 1 }
-                    },
-                    _SelectFields = new[]
-                    {
-                        "Id", "No", "Account", "Name", "DeptId", "DeptName", "DeptCode",
-                        "DeptIds", "RoleIds", "Phone", "State", "Remark", "Avatar", "Sex",
-                        "Email", "Level", "CreateTime", "UpdateTime"
-                    }
-                }).ConfigureAwait(false);
-            if (userResult.Code != 1 || userResult.Data == null)
+            dynamic userData;
+            try
+            {
+                var userSection = db.FromSql(
+                        "SELECT Id, No, Account, Name, DeptId, DeptName, DeptCode, DeptIds, " +
+                        "RoleIds, Phone, State, Remark, Avatar, Sex, Email, Level, " +
+                        "CreateTime, UpdateTime FROM sys_user " +
+                        "WHERE Id=@userId AND State=@state " +
+                        "AND (IsDeleted<>1 OR IsDeleted IS NULL)")
+                    .AddInParameter("@userId", keyRow["TargetUserId"]?.ToString() ?? "")
+                    .AddInParameter("@state", 1);
+                userSection.SetCommandTimeout(ControlPlaneCommandTimeoutSeconds);
+                userData = userSection.ToList<dynamic>()?.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                LogControlPlaneFailure(osClient, "UserLookup", ex);
+                return ControlPlaneFailure(
+                    "UserLookup",
+                    "访问密钥所属帐号读取失败，请稍后重试。",
+                    ex);
+            }
+            if (userData == null)
                 return new DosResult(1001, null, "访问密钥所属帐号已停用或不存在。");
 
-            JObject currentUser = new DiyToken().SetSysUserRoleInfo(
-                (object)userResult.Data,
+            JObject currentUser = new DiyToken().SetSysUserRoleInfoForCredentialExchange(
+                (object)userData,
                 osClient);
             var accessKeyId = keyRow["Id"]?.ToString();
             var tokenResult = await new DiyToken().GetAccessToken(new DiyTokenParam
@@ -1293,8 +1625,7 @@ namespace Microi.net
 
             try
             {
-                var db = OsClientExtend.GetClient(osClient)?.Db;
-                db?.FromSql(
+                db.FromSql(
                         "UPDATE mci_user_access_key " +
                         "SET LastUsedAt=@p0, LastUsedIp=@p1, LastUsedDid=@p2, " +
                         "UseCount=COALESCE(UseCount,0)+1, UpdateTime=@p0 WHERE Id=@p3")
