@@ -61,9 +61,22 @@
               <mci-native-field :model-value="row[field.Name]" :field="field" readonly :table-name="config.table" />
             </view>
           </view>
+          <mci-business-related-list
+            v-for="relatedTab in group.relatedTabs"
+            :key="relatedTab.key"
+            class="detail-section__related-preview"
+            :field="relatedTab.field"
+            :parent-id="rowId"
+            :parent-form="row"
+            :parent-menu-id="config.menuId"
+            :parent-table-id="config.definition && config.definition.table ? config.definition.table.Id : ''"
+            parent-mode="View"
+            display-mode="preview"
+            :preview-limit="2"
+          />
         </view>
       </view>
-      <view v-for="relatedTab in activeRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
+      <view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
         <mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
           :parent-id="rowId" :parent-form="row" :parent-menu-id="config.menuId"
           :parent-table-id="config.definition && config.definition.table ? config.definition.table.Id : ''"
@@ -149,9 +162,14 @@ export default {
       return (this.preset.actions || []).filter((action) => isActionVisible(action, this.row))
     },
     groups() {
-      const groups = this.config.definition?.groups || []
-      if (!this.formTabs.length) return groups
-      return groups.filter((group) => group.tabKey === this.activeFormTabKey)
+      const groups = this.config.definition?.relatedGroups || this.config.definition?.groups || []
+      const activeGroups = this.formTabs.length
+        ? groups.filter((group) => group.tabKey === this.activeFormTabKey)
+        : groups
+      return activeGroups.map((group) => ({
+        ...group,
+        relatedTabs: this.embeddedChildRelatedForGroup(group)
+      })).filter((group) => (group.fields || []).length || group.relatedTabs.length)
     },
     formTabs() {
       return (this.config.definition?.formTabs || []).map((tab) => ({
@@ -185,6 +203,9 @@ export default {
     activeRelatedTabs() {
       if (!this.formTabs.length) return this.relatedTabs
       return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
+    },
+    standaloneRelatedTabs() {
+      return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
     }
   },
   onLoad(options) {
@@ -193,6 +214,14 @@ export default {
     this.loadDetail()
   },
   methods: {
+    isEmbeddedChildRelated(item) {
+      return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
+    },
+    embeddedChildRelatedForGroup(group) {
+      return this.activeRelatedTabs.filter((item) =>
+        this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
+      )
+    },
     async loadDetail(refresh = false) {
       this.loading = true
       this.error = ''
