@@ -170,11 +170,11 @@ if (!relatedBusinessList.includes('displayMode: { type: String') ||
   !relatedBusinessPage.includes("'related-list-context'")) {
   fail('related business lists must provide a reusable preview and full-list page')
 }
-if (!businessDetail.includes('isCustomerAddressRelated(item)') ||
+if (!businessDetail.includes('isEmbeddedChildRelated(item)') ||
   !businessDetail.includes('display-mode="preview"') ||
   !businessDetail.includes('section.relatedTabs') ||
   !businessDetail.includes('groups.filter((group) => group.tabKey === this.activeFormTabKey)')) {
-  fail('customer addresses must render inside their CollapseGroup as a preview list')
+  fail('TableChild fields must render inside their CollapseGroup as a preview list')
 }
 if (!relatedBusinessList.includes('!waitingForParentSave') ||
   !relatedBusinessList.includes('保存当前表单后可新增') ||
@@ -257,12 +257,25 @@ for (const token of [
   if (!relatedBusinessList.includes(token)) fail(`draft related-row merge is missing: ${token}`)
 }
 for (const token of [
-  'customerAddressRelatedForGroup(group)',
-  'getTenantFormRelatedPresentation',
+  'embeddedChildRelatedForGroup(group)',
+  "item?.type === 'child' && Boolean(item.field?.layoutGroupKey)",
   'display-mode="preview"',
   'v-for="relatedTab in standaloneRelatedTabs"'
 ]) {
   if (!nativeForm.includes(token)) fail(`embedded related CollapseGroup rendering is missing: ${token}`)
+}
+for (const [source, name] of [
+  [businessDetail, 'business detail'],
+  [moduleDetail, 'module detail']
+]) {
+  for (const token of [
+    'isEmbeddedChildRelated(item)',
+    'item.field.layoutGroupKey === group.key',
+    'display-mode="preview"',
+    'v-for="relatedTab in standaloneRelatedTabs"'
+  ]) {
+    if (!source.includes(token)) fail(`${name} embedded child rendering is missing: ${token}`)
+  }
 }
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')

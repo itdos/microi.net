@@ -139,7 +139,7 @@
 						<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
 					</view>
 					<mci-business-related-list
-						v-for="relatedTab in customerAddressRelatedForGroup(group)"
+						v-for="relatedTab in embeddedChildRelatedForGroup(group)"
 						:key="relatedTab.key"
 						class="form-section__related-preview"
 						:field="relatedTab.field"
@@ -217,7 +217,6 @@
 		disposeTenantForm,
 		getTenantFormFieldActions,
 		getTenantFormFieldPresentation,
-		getTenantFormRelatedPresentation,
 		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
 		handleTenantFormFieldChange,
@@ -286,7 +285,7 @@
 			groups() {
 				const groups = this.definition ? this.definition.relatedGroups || this.definition.groups || [] : []
 				const visibleGroups = groups.filter((group) =>
-					(group.fields || []).length || this.customerAddressRelatedForGroup(group).length
+					(group.fields || []).length || this.embeddedChildRelatedForGroup(group).length
 				)
 				if (!this.formTabs.length) return visibleGroups
 				return visibleGroups.filter((group) => group.tabKey === this.activeFormTabKey)
@@ -338,7 +337,7 @@
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isCustomerAddressRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
 			},
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
@@ -387,17 +386,12 @@
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
-			isCustomerAddressRelated(item) {
-				if (item?.type !== 'child') return false
-				const presentation = getTenantFormRelatedPresentation(
-					this.tenantFormContext(),
-					item.field || {}
-				)
-				return presentation.embedInLayoutGroup === true
+			isEmbeddedChildRelated(item) {
+				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
-			customerAddressRelatedForGroup(group) {
+			embeddedChildRelatedForGroup(group) {
 				return this.activeRelatedTabs.filter((item) =>
-					this.isCustomerAddressRelated(item) && item.field.layoutGroupKey === group.key
+					this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
 				)
 			},
 			async loadForm(refresh = false) {
