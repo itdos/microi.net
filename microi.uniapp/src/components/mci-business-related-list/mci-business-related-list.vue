@@ -1,6 +1,6 @@
 <template>
-  <view class="related-business-list">
-    <view class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
+  <view class="related-business-list" :class="{ 'related-business-list--preview': isPreview }">
+    <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
       <input v-model="keyword" class="search-input" type="text" confirm-type="search"
         :placeholder="`搜索${config.title || sectionTitle}`" @confirm="search" />
       <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }"
@@ -11,7 +11,7 @@
     </view>
 
     <view v-if="loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
-      <view v-for="item in 3" :key="item" class="skeleton-card">
+      <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
         <view class="skeleton-line"></view>
         <view class="skeleton-line short"></view>
@@ -20,22 +20,22 @@
 
     <view v-else-if="rows.length" class="related-data-list">
       <template v-if="moduleKey === 'tasks'">
-        <mci-task-card v-for="(row, index) in rows" :key="row.Id || index"
+        <mci-task-card v-for="(row, index) in displayedRows" :key="row.Id || index"
           :item="taskCardRow(row)" :index="index" :state-class="taskStatusClass(row)"
           @open="openDetail" @phone="callPhone" />
       </template>
       <template v-else>
-        <mci-business-card v-for="(row, index) in rows" :key="row.Id || index"
+        <mci-business-card v-for="(row, index) in displayedRows" :key="row.Id || index"
           :row="row" :index="index" :title="getTitle(row)" :status="getStatus(row)"
           :status-class="getStatusClass(row)" :tags="getTags(row)" :lines="cardLines(row)"
           :summary="config.summaryField ? summaryValue(row) : ''" :actions="rowActions(row)"
           :time="formatCreateTime(row.CreateTime || row.UpdateTime)"
           @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
       </template>
-      <view v-if="!finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
+      <view v-if="!isPreview && !finished" class="load-more" hover-class="load-more--pressed" @tap="loadMore">
         <text>{{ loading ? '正在加载' : '加载更多' }}</text>
       </view>
-      <view v-else class="load-finished"><text>共 {{ count }} 条</text></view>
+      <view v-else-if="!isPreview" class="load-finished"><text>共 {{ count }} 条</text></view>
     </view>
 
     <view v-else-if="error" class="related-empty">
@@ -49,14 +49,24 @@
       </template>
       <template v-else>
         <text>暂无{{ config.title || sectionTitle }}</text>
-        <text v-if="canAdd">点击右下角加号新增</text>
+        <text v-if="canAdd && !isPreview">点击右下角加号新增</text>
       </template>
     </view>
 
-    <view v-if="canAdd" class="floating-add" :style="floatingStyle"
+    <view v-if="canAdd && !isPreview" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
-    <view v-if="filterOpen" class="filter-mask" @tap="closeAdvancedFilters">
+    <view v-if="isPreview && !waitingForParentSave" class="preview-actions"
+      :class="{ 'preview-actions--single': !canAdd }">
+      <view class="preview-action preview-action--more" hover-class="preview-action--pressed" @tap="openMore">
+        <text class="preview-action__icon">···</text><text>查看更多</text>
+      </view>
+      <view v-if="canAdd" class="preview-action preview-action--add" hover-class="preview-action--pressed" @tap="openAdd">
+        <text class="preview-action__icon">＋</text><text>新增</text>
+      </view>
+    </view>
+
+    <view v-if="filterOpen && !isPreview" class="filter-mask" @tap="closeAdvancedFilters">
       <view class="filter-sheet" @tap.stop>
         <view class="filter-sheet__head">
           <view><text>更多筛选</text><text>{{ config.title }} · {{ activeFilterCount }} 项已选</text></view>
@@ -182,7 +192,10 @@ export default {
     parentForm: { type: Object, default: () => ({}) },
     parentMenuId: { type: String, default: '' },
     parentTableId: { type: String, default: '' },
-    parentMode: { type: String, default: 'View' }
+    parentMode: { type: String, default: 'View' },
+    displayMode: { type: String, default: 'full' },
+    previewLimit: { type: Number, default: 2 },
+    relationValueOverride: { type: [String, Number], default: '' }
   },
   data() {
     return {
@@ -220,7 +233,12 @@ export default {
     sectionTitle() {
       return this.field.Label || this.fieldConfig.TableChildSysMenuName || this.table?.Description || this.field.Name || '关联数据'
     },
+    isPreview() { return String(this.displayMode || '').toLowerCase() === 'preview' },
+    displayedRows() { return this.isPreview ? this.rows.slice(0, Math.max(1, this.previewLimit)) : this.rows },
     relationValue() {
+      if (this.relationValueOverride !== '' && this.relationValueOverride !== null && this.relationValueOverride !== undefined) {
+        return unwrapValue(this.relationValueOverride)
+      }
       const parentField = this.childConfig.PrimaryTableFieldName
       return unwrapValue(parentField ? this.parentForm[parentField] : this.parentId)
     },
@@ -401,7 +419,7 @@ export default {
       try {
         const result = await loadModuleRows(this.config, {
           pageIndex: this.pageIndex,
-          pageSize: this.config.pageSize || 15,
+          pageSize: this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15),
           keyword: this.keyword.trim(),
           refresh,
           cacheAge: 0,
@@ -413,7 +431,8 @@ export default {
         })
         this.rows = reset ? result.rows : [...this.rows, ...result.rows]
         this.count = result.count
-        this.finished = this.rows.length >= result.count || result.rows.length < (this.config.pageSize || 15)
+        const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
+        this.finished = this.rows.length >= result.count || result.rows.length < pageSize
         if (!this.finished) this.pageIndex += 1
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
@@ -423,6 +442,31 @@ export default {
     },
     search() { this.loadData(true, true) },
     loadMore() { this.loadData(false) },
+    openMore() {
+      const query = [
+        `fieldId=${encodeURIComponent(this.field.Id || '')}`,
+        `parentId=${encodeURIComponent(this.parentId || '')}`,
+        `parentMenuId=${encodeURIComponent(this.parentMenuId || '')}`,
+        `parentTableId=${encodeURIComponent(this.parentTableId || '')}`,
+        `relationValue=${encodeURIComponent(this.relationValue || '')}`,
+        `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`
+      ].join('&')
+      uni.navigateTo({
+        url: `/pages/business/related-list?${query}`,
+        success: (result) => {
+          result.eventChannel?.emit('related-list-context', {
+            field: this.field,
+            parentId: this.parentId,
+            parentForm: this.parentForm,
+            parentMenuId: this.parentMenuId,
+            parentTableId: this.parentTableId,
+            parentMode: this.parentMode,
+            relationValue: this.relationValue,
+            title: this.config.title || this.sectionTitle
+          })
+        }
+      })
+    },
     buildFilterWhere() {
       const result = []
       this.filterFields.forEach((field) => {
@@ -815,6 +859,7 @@ export default {
 
 <style scoped>
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
+.related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -862,6 +907,12 @@ export default {
 .related-empty view, .related-empty text:last-child:not(:first-child), .load-more { color: #0b86d4; }
 .load-more, .load-finished { min-height: 72rpx; display: flex; align-items: center; justify-content: center; color: #8298a1; font-size: 23rpx; }
 .load-more--pressed { opacity: .7; }
+.preview-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12rpx; margin-top: 18rpx; }
+.preview-actions--single { grid-template-columns: 1fr; }
+.preview-action { height: 76rpx; display: flex; align-items: center; justify-content: center; gap: 8rpx; border: 1rpx solid rgba(229, 70, 37, .45); border-radius: 10rpx; color: #d9472b; background: rgba(229, 70, 37, .05); font-size: 25rpx; font-weight: 650; transition: transform 150ms ease, opacity 150ms ease; }
+.preview-action--add { border-color: #d9472b; color: #fff; background: #d9472b; }
+.preview-action__icon { font-size: 28rpx; line-height: 1; }
+.preview-action--pressed { transform: scale(.98); opacity: .82; }
 .floating-add { position: fixed; right: 28rpx; z-index: 12; width: 92rpx; height: 92rpx; display: flex; align-items: center; justify-content: center; border: 4rpx solid rgba(255, 255, 255, .88); border-radius: 50%; color: #fff; background: #e94b2c; box-shadow: 0 10rpx 28rpx rgba(233, 75, 44, .3); font-size: 44rpx; transition: transform 150ms ease; }
 .floating-add--pressed { transform: scale(.9); }
 .filter-mask { position: fixed; inset: 0; z-index: 28; display: flex; align-items: flex-end; background: rgba(13, 37, 48, .42); }
