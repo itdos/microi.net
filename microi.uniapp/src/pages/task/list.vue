@@ -64,33 +64,9 @@
       <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
 
       <view v-else-if="rows.length" class="task-list">
-        <view v-for="(item, index) in rows" :key="item.Id || index" class="task-card mci-fade-up" :style="{ animationDelay: `${Math.min(index, 7) * 35}ms` }" hover-class="task-card--pressed" @tap="openTask(item)">
-          <view class="task-card__top">
-            <view class="task-card__identity">
-              <view class="task-card__type"><text>{{ shortType(item.type) }}</text></view>
-              <view class="task-card__heading">
-                <text class="task-card__title">{{ item.customer || item.no || '售后任务' }}</text>
-                <text class="task-card__no">{{ item.no || '暂无任务编号' }}</text>
-              </view>
-            </view>
-            <text class="status-pill" :class="taskStateClass(item.state)">{{ item.state || '状态未知' }}</text>
-          </view>
-
-          <view class="task-card__content">
-            <text v-if="item.content" class="task-card__summary">{{ item.content }}</text>
-            <view class="task-card__line"><text class="line-icon">◷</text><text class="line-label">计划服务</text><text class="line-value">{{ formatTime(item.planTime) || '暂未安排' }}</text></view>
-            <view class="task-card__line"><text class="line-icon">⌖</text><text class="line-label">服务地址</text><text class="line-value">{{ item.address || '暂无地址' }}</text></view>
-            <view class="task-card__line"><text class="line-icon">人</text><text class="line-label">服务人员</text><text class="line-value">{{ item.serviceUser || '待领取/指派' }}</text></view>
-          </view>
-
-          <view class="task-card__bottom">
-            <text class="task-card__tag">{{ item.type }}</text>
-            <view class="task-card__actions">
-              <view v-if="item.phone" class="icon-action" @tap.stop="callPhone(item.phone)"><text>☎</text></view>
-              <text class="task-card__detail">进入任务</text><text class="task-card__arrow">›</text>
-            </view>
-          </view>
-        </view>
+        <mci-task-card v-for="(item, index) in rows" :key="item.Id || index"
+          :item="taskCardItem(item)" :index="index"
+          :state-class="taskStateClass(item.state)" @open="openTask" @phone="callPhone" />
         <view class="load-state"><text v-if="loading">正在加载...</text><text v-else-if="finished">共 {{ count }} 个任务，已全部加载</text><text v-else>上拉加载更多</text></view>
       </view>
 
@@ -145,6 +121,7 @@
 import { themeMixin } from '@/utils/theme.js'
 import { formatDateTime, openForm, scanDevice } from '@/platform/business-runtime.js'
 import { listReturnMixin } from '@/platform/list-return.js'
+import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import {
   TASK_DATE_FIELDS,
   TASK_PERIODS,
@@ -162,6 +139,7 @@ const STATE_COUNT_KEYS = {
 }
 
 export default {
+  components: { MciTaskCard },
   mixins: [themeMixin, listReturnMixin],
   data() {
     return {
@@ -279,6 +257,12 @@ export default {
     },
     shortType(value) { return String(value || '服务').slice(0, 2) },
     formatTime(value) { return formatDateTime(value) },
+    taskCardItem(item) {
+      return {
+        ...item,
+        planTimeText: this.formatTime(item.planTime)
+      }
+    },
     search() { this.loadData(true, true) },
     clearKeyword() { this.keyword = ''; this.loadData(true, true) },
     changeState(value) { if (this.state === value) return; this.state = value; this.loadData(true, true) },
