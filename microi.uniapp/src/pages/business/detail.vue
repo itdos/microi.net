@@ -202,10 +202,18 @@
 				<button class="action-button action-button--secondary" @tap="openDeviceRepair">一键报修</button>
 			</template>
 			<template v-else-if="key === 'customers'">
-				<button v-if="canClaimCustomer" class="action-button action-button--primary" :disabled="submitting"
-					@tap="claimCustomer">领取客户</button>
-				<button v-if="canReleaseCustomer" class="action-button action-button--plain" :disabled="submitting"
-					@tap="releaseCustomer">移入公海</button>
+				<button v-if="canClaimCustomer"
+					class="action-button action-button--primary action-button--with-icon" :disabled="submitting"
+					@tap="claimCustomer">
+					<image class="action-button__icon" :src="customerClaimIcon" mode="aspectFit" />
+					<text>{{ submitting ? '领取中...' : '领取客户' }}</text>
+				</button>
+				<button v-if="canReleaseCustomer"
+					class="action-button action-button--plain action-button--with-icon" :disabled="submitting"
+					@tap="releaseCustomer">
+					<image class="action-button__icon" :src="customerReleaseIcon" mode="aspectFit" />
+					<text>{{ submitting ? '移入中...' : '移入公海' }}</text>
+				</button>
 				<button v-if="canGeneratePeriodicTasks" class="action-button action-button--secondary"
 					:disabled="submitting" @tap="generatePeriodicTasks">生成任务</button>
 			</template>
@@ -1146,7 +1154,9 @@
 				viewManifest: null,
 				metricValues: {},
 				expandedSections: {},
-				activeFormTabKey: ''
+				activeFormTabKey: '',
+				customerClaimIcon: icon('business/kehu.png'),
+				customerReleaseIcon: icon('business/xiezuo.png')
 			}
 		},
 		computed: {
@@ -1624,17 +1634,35 @@
 			canApproveOrder() {
 				return this.key === 'orders' && this.roleProfile.isInternal && /待审批/.test(String(this.statusText))
 			},
+			customerFollowScope() {
+				const status = String(this.detail.KehuGJZT || '').trim()
+				if (status.includes('公海')) return 'public'
+				if (status.includes('私有')) return 'private'
+				const statusValue = Number(this.detail.KehuGJZTZ || 0)
+				if (statusValue === 2) return 'public'
+				if (statusValue === 1) return 'private'
+				if (this.detail.FuzeRID || this.detail.FuzeR) return 'private'
+				return ''
+			},
+			canManageCustomerFollowScope() {
+				return this.key === 'customers' && !!this.currentUser.Id && !this.roleProfile.isCustomer
+			},
 			canClaimCustomer() {
-				return this.key === 'customers' && this.roleProfile.isInternal && String(this.detail.KehuGJZT || '') ===
-					'公海'
+				return this.canManageCustomerFollowScope && this.customerFollowScope === 'public'
 			},
 			canReleaseCustomer() {
-				if (this.key !== 'customers' || !this.roleProfile.isInternal || this.canClaimCustomer) return false
-				const ownerId = String(this.detail.FuzeRID || '')
-				const ownerName = String(this.detail.FuzeR || '')
-				return this.roleProfile.isAdmin ||
-					(!!ownerId && ownerId === String(this.currentUser.Id || '')) ||
-					(!!ownerName && ownerName === String(this.currentUser.Name || ''))
+				if (!this.canManageCustomerFollowScope || this.customerFollowScope !== 'private') return false
+				if (this.roleProfile.isAdmin) return true
+				const ownerId = String(this.detail.FuzeRID || '').trim()
+				const currentUserId = String(this.currentUser.Id || '').trim()
+				if (ownerId && currentUserId && ownerId === currentUserId) return true
+				const normalizeName = (value) => String(value || '')
+					.replace(/\s+/g, '')
+					.replace(/[（(]/g, '(')
+					.replace(/[）)]/g, ')')
+				const ownerName = normalizeName(this.detail.FuzeR)
+				const currentUserName = normalizeName(this.currentUser.Name)
+				return !!ownerName && !!currentUserName && ownerName === currentUserName
 			},
 			canGeneratePeriodicTasks() {
 				if (this.key !== 'customers' || !this.roleProfile.isInternal || this.canClaimCustomer) return false
@@ -2909,6 +2937,23 @@
 
 	.action-button::after {
 		border: none;
+	}
+
+	.action-button--with-icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10rpx;
+		line-height: 1;
+	}
+
+	.action-button__icon {
+		width: 34rpx;
+		height: 34rpx;
+		padding: 4rpx;
+		box-sizing: border-box;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.92);
 	}
 
 	.action-button--primary {
