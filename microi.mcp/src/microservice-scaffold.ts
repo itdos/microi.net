@@ -403,7 +403,8 @@ function buildStyles(): string {
     '  font-synthesis: none;',
     '}',
     '* { box-sizing: border-box; }',
-    'body { margin: 0; min-width: 320px; min-height: 100vh; background: #f3f6fb; }',
+    'html, body { min-height: 100%; }',
+    'body { margin: 0; min-width: 320px; background: #f3f6fb; }',
     'button { font: inherit; }',
     '.mci-page {',
     '  --mci-primary: #2563eb;',
@@ -413,7 +414,7 @@ function buildStyles(): string {
     '  --mci-border: #d9e2ef;',
     '  --mci-text: #172033;',
     '  --mci-text-muted: #526176;',
-    '  min-height: 100vh;',
+    '  min-height: var(--micro-app-available-height, 100vh);',
     '  padding: clamp(16px, 3vw, 32px);',
     '  color: var(--mci-text);',
     '}',
@@ -595,7 +596,7 @@ export function scaffoldVueMicroService(options: VueMicroServiceScaffoldOptions)
       fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
       fs.writeFileSync(absolutePath, content, 'utf8');
     }
-    fs.renameSync(temporaryDirectory, plan.targetDirectory);
+    renameScaffoldDirectoryWithRetry(temporaryDirectory, plan.targetDirectory);
   } catch (error) {
     if (fs.existsSync(temporaryDirectory)) fs.rmSync(temporaryDirectory, { recursive: true, force: true });
     throw error;
@@ -609,4 +610,21 @@ export function scaffoldVueMicroService(options: VueMicroServiceScaffoldOptions)
     fileCount: plan.files.length,
     routes: plan.routes,
   };
+}
+
+function renameScaffoldDirectoryWithRetry(sourceDirectory: string, targetDirectory: string): void {
+  const retryableCodes = new Set(['EPERM', 'EACCES', 'EBUSY']);
+  const delays = [25, 50, 100, 200];
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      fs.renameSync(sourceDirectory, targetDirectory);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code || '';
+      if (!retryableCodes.has(code) || attempt >= delays.length) throw error;
+      // Windows Defender/indexers can briefly hold a newly-created directory.
+      // Keep the atomic rename contract and retry only bounded transient errors.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delays[attempt]);
+    }
+  }
 }

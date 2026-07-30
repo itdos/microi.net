@@ -20,6 +20,14 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 - **氛围**：默认亮色多彩主题（colorful + gradient + soft shadow），暗黑主题作为可选切换；避免廉价装饰，优先用布局、层级、动效和真实内容建立高级感。
 - **参考吸收**：可参考成熟移动端 UI 灵感库的组件完整度、色彩节奏、入场动效和模板化能力，但 Microi 视觉必须通过 `--mci-*` token 与 MCI-UI 组件形成自己的品牌系统，不照搬第三方外观，也不在吾码源码、文档或样式命名中保留外部 UI 品牌痕迹。
 
+### 参考驱动设计工作流（必须）
+
+- 当需求只描述“高级、主流、好看”而没有明确视觉方向时，先按业务类型选择参考来源：品牌官网优先 Awwwards / Recent / MotionSites，真实产品流程优先 Mobbin，局部 WebGL 动效优先 Unicorn Studio，设计 token 与组件规则优先 Refero Styles。
+- 参考结果必须被拆成可执行规则，而不是一句“参考某网站”：至少记录首屏目标、信息层级、栅格与最大宽度、字体层级、颜色 token、间距 token、圆角/阴影、组件状态、动效时间线、移动端降级和 `prefers-reduced-motion` 方案。
+- 同一个页面最多选 1 个主参考和 2 个辅助参考。禁止把多个潮流效果叠加成视觉拼盘；业务可用性、加载性能、可访问性和 Microi 品牌一致性优先于视觉炫技。
+- 只能吸收布局规律、交互路径和设计系统，不复制第三方页面、代码、图片、字体、3D 模型或商标素材。所有成品必须使用 Microi 自有内容、`--mci-*` token 和 `mci-*` 组件/类名重新表达。
+- 实施前、实施中和截图验收的完整方法、六站定位与检查表见 [references/design-reference-workflow.md](references/design-reference-workflow.md)。
+
 ---
 
 ## 样式隔离与抗覆盖

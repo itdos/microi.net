@@ -103,8 +103,25 @@ var result = V8.FormEngine.GetTableData('SysUser', {
   _PageSize: V8.Param.pageSize || 20
 });
 
-return { Code: 1, Data: result.Data, Total: result.DataCount, Msg: '成功' };
+return { Code: 1, Data: result.Data, DataCount: result.DataCount, Msg: '成功' };
 ```
+
+### 请求内异步查询
+
+后端接口引擎可在本次请求内使用真实异步查询；前端 V8 不使用这个方法名：
+
+```javascript
+var result = await V8.FormEngine.GetTableDataAsync('SysUser', {
+  _Where: [['Status', '=', 1]],
+  _SelectFields: ['Id', 'Account', 'Name'],
+  _PageIndex: 1,
+  _PageSize: 20
+});
+
+return { Code: 1, Data: result.Data, DataCount: result.DataCount };
+```
+
+必须 `await` 结果。需要接口先返回、后续再批量处理时，应改用平台后台任务、Job、MQ 或 outbox，而不是丢弃 Promise。
 
 ### 多字段排序
 
@@ -123,6 +140,13 @@ var result = V8.FormEngine.GetTableDataAnonymous('Article', {
   _PageSize: 10
 });
 ```
+
+匿名新增的公开入口是
+`POST /api/formengine/AddFormDataAnonymous`，且目标表必须显式允许匿名新增。
+当前后端 `V8.FormEngine` 接口不公开
+`V8.FormEngine.AddFormDataAnonymous`；接口引擎内部仍使用
+`V8.FormEngine.AddFormData(...)` 并遵守可信执行身份。不要仅因为历史文档出现
+该名称就为匿名业务接口关闭服务端校验。
 
 ### 获取树形数据
 

@@ -7,6 +7,13 @@ description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。用�
 
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
+## 设计器源码事件
+
+只有在扩展界面引擎设计器源码时才使用全局事件总线。用
+`EventBus.on(eventName, handler)` 监听保存、日期选择或组件跳转等事件，并在
+组件卸载时逐项调用 `EventBus.off(eventName)`。重复挂载不解绑会造成一次操作
+触发多次；普通页面 JSON 生成不需要注册事件总线。
+
 ## 核心数据结构
 
 ```
