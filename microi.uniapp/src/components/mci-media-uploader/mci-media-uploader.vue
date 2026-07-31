@@ -3,9 +3,9 @@
     <view class="mci-media-uploader__grid">
       <view v-for="(item, index) in items" :key="item.Path || item.localPath || index" class="mci-media-uploader__item" :class="{ 'mci-media-uploader__item--file': mediaType === 'file', 'mci-media-uploader__item--circle': shape === 'circle' }">
         <view v-if="mediaType === 'file'" class="mci-media-uploader__file" @tap="previewFile(item)"><text class="mci-media-uploader__file-icon">文</text><text class="mci-media-uploader__file-name">{{ item.Name || item.name || fileName(item.Path) }}</text></view>
-        <video v-if="mediaType === 'video'" class="mci-media-uploader__media" :src="item.url" controls></video>
+        <video v-if="mediaType === 'video' && item.url" class="mci-media-uploader__media" :src="item.url" controls @error="handleMediaError(item)"></video>
         <image v-else-if="mediaType !== 'file' && item.url" class="mci-media-uploader__media" :src="item.url" mode="aspectFill" @error="handleMediaError(item)" @tap="preview(index)" />
-        <view v-else-if="mediaType !== 'file'" class="mci-media-uploader__missing"><text>图片暂不可用</text></view>
+        <view v-else-if="mediaType !== 'file'" class="mci-media-uploader__missing"><text>{{ mediaType === 'video' ? '视频暂不可用' : '图片暂不可用' }}</text></view>
         <view v-if="!readonly" class="mci-media-uploader__remove" @tap.stop="remove(index)"><text>×</text></view>
       </view>
       <view v-if="!readonly && items.length < maxCount" class="mci-media-uploader__add" :class="{ 'mci-media-uploader__add--circle': shape === 'circle' }" hover-class="mci-media-uploader__add--pressed" @tap="choose">
@@ -32,30 +32,57 @@ export default {
     maxCount: { type: Number, default: 9 },
     mediaType: { type: String, default: 'image' },
     uploadPath: { type: String, default: '' },
+    fileContext: { type: Object, default: () => ({}) },
     readonly: { type: Boolean, default: false },
     shape: { type: String, default: 'square' }
   },
   emits: ['update:modelValue', 'change'],
   data() {
-    return { items: [], uploading: false, syncing: false }
+    return { items: [], uploading: false, syncing: false, lastEmittedValue: null }
   },
   watch: {
-    modelValue: { immediate: true, handler() { this.syncItems() } }
+    modelValue: {
+      immediate: true,
+      handler(value) {
+        if (this.lastEmittedValue !== null && value === this.lastEmittedValue) {
+          this.lastEmittedValue = null
+          return
+        }
+        this.syncItems()
+      }
+    }
   },
   methods: {
     async syncItems() {
       if (this.syncing) return
       this.syncing = true
-      const rows = parseValue(this.modelValue)
-      this.items = await Promise.all(rows.filter(Boolean).map(async (item) => {
-        const raw = typeof item === 'string' ? { Path: item } : item
-        const path = raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath || raw.url || raw.Url || raw.src || ''
-        const publicUrl = V8.assetUrl(path)
-        let url = raw.localPath || ''
-        if (!url && path) url = await V8.resolveFileUrl(raw)
-        return { ...raw, Path: path, url: url || publicUrl, publicUrl }
-      }))
-      this.syncing = false
+      try {
+        const rows = parseValue(this.modelValue)
+        this.items = await Promise.all(rows.filter(Boolean).map((item) => this.resolveItem(item)))
+      } finally {
+        this.syncing = false
+      }
+    },
+    async resolveItem(item, forceServer = false, preferProvidedUrl = false) {
+      const raw = typeof item === 'string' ? { Path: item } : item
+      const path = raw.Path || raw.FilePathName || raw.FilePath || raw.FullPath || raw.url || raw.Url || raw.src || ''
+      const localPath = forceServer ? '' : (raw.localPath || '')
+      const providedUrl = raw.Url || raw.FileUrl || raw.FileURL || raw.PreviewUrl || raw.PreviewURL || raw.FullUrl || ''
+      let url = localPath || (preferProvidedUrl ? providedUrl : '')
+      if (!url && path) {
+        url = await V8.resolveFileUrl(
+          { ...raw, Path: path, Url: '', url: '', localPath: '' },
+          this.fileContext
+        )
+      }
+      return {
+        ...raw,
+        Path: path,
+        url: url || V8.assetUrl(path),
+        localPath,
+        resolving: false,
+        resolveFailures: 0
+      }
     },
     choose() {
       if (this.uploading) return
@@ -95,7 +122,14 @@ export default {
             fileName: file.name
           })
           const data = result.Data || {}
-          this.items.push({ ...data, Path: data.Path, url: data.Url || filePath, localPath: filePath })
+          // 本次选择后优先使用小程序临时文件立即展示；临时路径不写入表单。
+          // 保存后重新进入页面时，再按持久 Path 和记录权限获取服务端地址。
+          const uploaded = await this.resolveItem({
+            ...data,
+            Path: data.Path,
+            localPath: filePath
+          }, false, true)
+          this.items.push(uploaded)
         }
         this.emitValue()
       } catch (error) {
@@ -111,9 +145,19 @@ export default {
     preview(index) {
       uni.previewImage({ current: index, urls: this.items.map((item) => item.url).filter(Boolean) })
     },
-    handleMediaError(item) {
-      if (item.publicUrl && item.url !== item.publicUrl) item.url = item.publicUrl
-      else item.url = ''
+    async handleMediaError(item) {
+      if (!item || item.resolving || Number(item.resolveFailures || 0) >= 1) return
+      item.resolving = true
+      item.resolveFailures = Number(item.resolveFailures || 0) + 1
+      item.url = ''
+      try {
+        const refreshed = await this.resolveItem(item, true)
+        item.url = refreshed.url
+      } catch (error) {
+        item.url = ''
+      } finally {
+        item.resolving = false
+      }
     },
     fileName(path) { return String(path || '文件').split(/[\\/]/).pop() || '文件' },
     previewFile(item) {
@@ -130,12 +174,25 @@ export default {
     },
     emitValue() {
       const savedItems = this.items.map((item) => {
-        const { url, localPath, ...saved } = item
+        const {
+          url,
+          Url,
+          FileUrl,
+          FileURL,
+          PreviewUrl,
+          PreviewURL,
+          FullUrl,
+          localPath,
+          resolving,
+          resolveFailures,
+          ...saved
+        } = item
         return saved
       })
       const value = this.maxCount === 1
         ? (savedItems[0] ? JSON.stringify(savedItems[0]) : '')
         : JSON.stringify(savedItems)
+      this.lastEmittedValue = value
       this.$emit('update:modelValue', value)
       this.$emit('change', value)
     }

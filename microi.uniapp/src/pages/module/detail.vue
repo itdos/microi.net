@@ -58,7 +58,7 @@
           <view v-for="field in group.fields" :key="field.Id || field.Name" class="detail-field">
             <text class="detail-field__label">{{ field.Label || field.Name }}</text>
             <view class="detail-field__value">
-              <mci-native-field :model-value="row[field.Name]" :field="field" readonly :table-name="config.table" />
+              <mci-native-field :model-value="row[field.Name]" :field="field" readonly :table-name="config.table" :form-data="row" :menu-id="config.menuId" />
             </view>
           </view>
           <mci-business-related-list
