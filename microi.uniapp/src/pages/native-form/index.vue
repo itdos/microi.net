@@ -147,6 +147,7 @@
 						:parent-form="form"
 						:parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						:parent-table-child-auth="tableChildAuth"
 						:parent-mode="mode"
 						display-mode="preview"
 						:preview-limit="2"
@@ -159,6 +160,7 @@
 				<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
 					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode" />
 				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />

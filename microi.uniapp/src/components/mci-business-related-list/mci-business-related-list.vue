@@ -53,7 +53,7 @@
       </template>
     </view>
 
-    <view v-if="canAdd && !isPreview" class="floating-add" :style="floatingStyle"
+    <view v-if="showFloatingAdd && canAdd && !isPreview" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
     <view v-if="isPreview && !waitingForParentSave" class="preview-actions"
@@ -195,8 +195,11 @@ export default {
     parentMode: { type: String, default: 'View' },
     displayMode: { type: String, default: 'full' },
     previewLimit: { type: Number, default: 2 },
-    relationValueOverride: { type: [String, Number], default: '' }
+    relationValueOverride: { type: [String, Number], default: '' },
+    showFloatingAdd: { type: Boolean, default: true },
+    parentTableChildAuth: { type: Object, default: null }
   },
+  emits: ['floating-add-state'],
   data() {
     return {
       table: null,
@@ -247,7 +250,7 @@ export default {
     },
     tableChildAuth() {
       if (!this.field.Id || !this.parentTableId || !this.parentMenuId || !this.parentId || !this.relationValue) return null
-      return {
+      const result = {
         ParentFieldId: this.field.Id,
         ParentTableId: this.parentTableId,
         ParentSysMenuId: this.parentMenuId,
@@ -255,6 +258,11 @@ export default {
         ParentValue: String(this.relationValue),
         ParentFormMode: this.parentMode || 'View'
       }
+      // zhy：嵌套子表必须保留上一级 TableChild 授权链，例如
+      // 客户 -> 项目合伙人跟进记录 -> 客户关怀；否则孙表虽能新增落库，
+      // 详情查询会因服务端无法验证父记录来源而返回空列表。
+      if (this.parentTableChildAuth) result.Parent = this.parentTableChildAuth
+      return result
     },
     canAdd() {
       return Boolean(this.relationValue && this.childFkField && this.config.table)
@@ -281,6 +289,12 @@ export default {
     }
   },
   watch: {
+    canAdd: {
+      immediate: true,
+      handler(value) {
+        this.$emit('floating-add-state', Boolean(value))
+      }
+    },
     relationValue: {
       immediate: true,
       handler(value) {
@@ -417,21 +431,44 @@ export default {
       this.loading = true
       this.error = ''
       try {
-        const result = await loadModuleRows(this.config, {
-          pageIndex: this.pageIndex,
-          pageSize: this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15),
-          keyword: this.keyword.trim(),
-          refresh,
-          cacheAge: 0,
-          tableChildAuth: this.tableChildAuth,
-          extraWhere: [
-            { Name: this.childFkField, Type: '=', Value: this.relationValue },
-            ...this.buildFilterWhere()
-          ]
-        })
+        const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
+        const extraWhere = [
+          { Name: this.childFkField, Type: '=', Value: this.relationValue },
+          ...this.buildFilterWhere()
+        ]
+        let result
+        if (this.tableChildAuth) {
+          // zhy：TableChild 列表必须通过表单引擎携带完整父子授权链查询。
+          // ModuleEngine 的子菜单数据范围会把已经正确绑定的孙表记录过滤成 0 条；
+          // 此处不传子菜单 Id，由后端按 _TableChildAuth 逐层校验并用外键条件限定数据。
+          const response = await V8.FormEngine.GetTableData(this.config.table, {
+            _PageIndex: this.pageIndex,
+            _PageSize: pageSize,
+            _Keyword: this.keyword.trim(),
+            _OrderBy: this.config.defaultOrderBy || 'CreateTime',
+            _OrderByType: this.config.defaultOrderType || 'DESC',
+            _Where: extraWhere,
+            _TableChildAuth: this.tableChildAuth
+          })
+          if (!response || Number(response.Code) !== 1) {
+            throw new Error((response && response.Msg) || '关联数据加载失败')
+          }
+          result = {
+            rows: Array.isArray(response.Data) ? response.Data : [],
+            count: Number(response.DataCount || 0)
+          }
+        } else {
+          result = await loadModuleRows(this.config, {
+            pageIndex: this.pageIndex,
+            pageSize,
+            keyword: this.keyword.trim(),
+            refresh,
+            cacheAge: 0,
+            extraWhere
+          })
+        }
         this.rows = reset ? result.rows : [...this.rows, ...result.rows]
         this.count = result.count
-        const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
         this.finished = this.rows.length >= result.count || result.rows.length < pageSize
         if (!this.finished) this.pageIndex += 1
       } catch (error) {
@@ -449,6 +486,7 @@ export default {
         `parentMenuId=${encodeURIComponent(this.parentMenuId || '')}`,
         `parentTableId=${encodeURIComponent(this.parentTableId || '')}`,
         `relationValue=${encodeURIComponent(this.relationValue || '')}`,
+        `parentTableChildAuth=${encodeURIComponent(JSON.stringify(this.parentTableChildAuth || null))}`,
         `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`
       ].join('&')
       uni.navigateTo({
@@ -461,6 +499,7 @@ export default {
             parentMenuId: this.parentMenuId,
             parentTableId: this.parentTableId,
             parentMode: this.parentMode,
+            parentTableChildAuth: this.parentTableChildAuth,
             relationValue: this.relationValue,
             title: this.config.title || this.sectionTitle
           })
@@ -758,6 +797,19 @@ export default {
         const child = item.Child || item.child
         if (father && child && this.parentForm[father] !== undefined) result[child] = this.parentForm[father]
       })
+      if (this.moduleKey === 'customerCare') {
+        const rawContacts = parseJson(this.parentForm.BeibaiFR, this.parentForm.BeibaiFR)
+        const contact = Array.isArray(rawContacts) ? rawContacts[0] : rawContacts
+        const contactRow = contact && typeof contact === 'object' ? contact : {}
+        const contactText = typeof contact === 'string' ? contact.trim() : ''
+        const contactTextIsId = /^[0-9a-f-]{32,36}$/i.test(contactText) || /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(contactText)
+        if (!result.KehuID) result.KehuID = this.parentForm.KehuID || ''
+        if (!result.KehuMC) result.KehuMC = this.parentForm.KehuMC || ''
+        if (!result.LianxiRID) {
+          result.LianxiRID = contactRow.Id || contactRow.id || (contactTextIsId ? contactText : '')
+        }
+        if (!result.LianxiR) result.LianxiR = Array.isArray(rawContacts) ? rawContacts : (contact ? [contact] : [])
+      }
       if (this.moduleKey === 'contacts' && !result.Guid70) result.Guid70 = relationshipId()
       return result
     },
@@ -785,7 +837,7 @@ export default {
         menuAliases: this.config.menuAliases || [],
         defaultValues: this.callbackDefaults(),
         tableChildAuth: this.tableChildAuth,
-        includeRelated: false
+        includeRelated: true
       })
     },
     openDetail(row) {
@@ -825,7 +877,7 @@ export default {
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
-        includeRelated: false
+        includeRelated: true
       })
     },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },

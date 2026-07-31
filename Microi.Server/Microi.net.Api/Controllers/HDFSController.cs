@@ -576,6 +576,54 @@ namespace Microi.net.Api
 
             return fieldValue.Children().Any(child => FieldValueReferencesPath(child, requestedPath));
         }
+
+        // zhy：上传成功后为当前上传请求补充短期预览地址，业务字段仍只持久化 Path。
+        /// <summary>
+        /// 上传成功后为本次响应补充可立即预览的地址。该地址只作为短期能力返回给
+        /// 当前上传请求，业务字段仍只保存 Path；后续读取继续走记录级权限校验。
+        /// </summary>
+        private async Task<DosResult> AttachUploadedFileUrls(DosResult result, DiyUploadParam param)
+        {
+            if (result?.Code != 1 || result.Data == null) return result;
+
+            try
+            {
+                var dataToken = JToken.FromObject(result.Data);
+                var rows = dataToken is JArray array
+                    ? array.OfType<JObject>().ToList()
+                    : dataToken is JObject row
+                        ? new List<JObject> { row }
+                        : new List<JObject>();
+
+                foreach (var item in rows)
+                {
+                    var path = TokenString(item["Path"] ?? item["FilePathName"]);
+                    if (path.DosIsNullOrWhiteSpace()) continue;
+
+                    var urlResult = await MicroiEngine.HDFS.GetPrivateFileUrl(new DiyUploadParam
+                    {
+                        OsClient = param.OsClient,
+                        FilePathName = path,
+                        Limit = param.Limit,
+                        _CurrentUser = param._CurrentUser,
+                        _InvokeType = param._InvokeType
+                    });
+                    if (urlResult?.Code == 1 && urlResult.Data != null)
+                    {
+                        item["Url"] = Convert.ToString(urlResult.Data);
+                    }
+                    item["Limit"] = param.Limit != false;
+                }
+
+                result.Data = dataToken;
+            }
+            catch
+            {
+                // 文件已经上传成功时不因预览地址生成异常改变上传结果。
+            }
+            return result;
+        }
+
         /// <summary>
         /// 上传文件、图片。返回/路径。支持单文件、多文件。
         /// Multiple：是否多文件
@@ -598,7 +646,8 @@ namespace Microi.net.Api
             //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
             //var result = await DiyCommon.Upload(param);//, HttpContext
             var result = await MicroiEngine.HDFS.Upload(param);//, HttpContext
-            return Json(result);
+            // zhy：普通上传接口同步返回本次上传文件的可预览地址。
+            return Json(await AttachUploadedFileUrls(result, param));
         }
         /// <summary>
         /// Uniapp上传，移除Consumes。
@@ -641,7 +690,8 @@ namespace Microi.net.Api
             if (fileError != null) return Json(fileError);
 
             var result = await MicroiEngine.HDFS.Upload(param);
-            return Json(result);
+            // zhy：UniApp 上传接口同步返回本次上传文件的可预览地址。
+            return Json(await AttachUploadedFileUrls(result, param));
         }
 
         /// <summary>
