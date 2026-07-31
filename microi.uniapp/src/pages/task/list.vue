@@ -7,7 +7,7 @@
     <view class="task-toolbar">
       <view class="search-box">
         <text class="search-box__icon">⌕</text>
-        <input v-model="keyword" confirm-type="search" placeholder="客户、任务编号、类型或服务人员" @confirm="search" />
+        <input v-model="keyword" confirm-type="search" placeholder="客户、任务编号、类型或服务人员" @input="scheduleSearch" @confirm="search" />
         <view v-if="keyword" class="search-box__clear" @tap="clearKeyword"><text>×</text></view>
       </view>
       <view class="filter-button" :class="{ active: activeFilterCount }" hover-class="filter-button--pressed" @tap="filterVisible = true">
@@ -170,7 +170,8 @@ export default {
       filterVisible: false,
       taskDataChanged: false,
       changedListener: null,
-      loadRequestId: 0
+      loadRequestId: 0,
+      searchTimer: null
     }
   },
   computed: {
@@ -192,6 +193,7 @@ export default {
     uni.$on('xjy:task-changed', this.changedListener)
   },
   onUnload() {
+    clearTimeout(this.searchTimer)
     if (this.changedListener) uni.$off('xjy:task-changed', this.changedListener)
   },
   methods: {
@@ -263,8 +265,20 @@ export default {
         planTimeText: this.formatTime(item.planTime)
       }
     },
-    search() { this.loadData(true, true) },
-    clearKeyword() { this.keyword = ''; this.loadData(true, true) },
+    search() {
+      clearTimeout(this.searchTimer)
+      this.loadData(true, true)
+    },
+    // zhy：售后任务列表输入关键词后自动防抖检索。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadData(true, true), 350)
+    },
+    clearKeyword() {
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.loadData(true, true)
+    },
     changeState(value) { if (this.state === value) return; this.state = value; this.loadData(true, true) },
     changeType(value) { if (this.type === value) return; this.type = value; this.loadData(true, true) },
     selectPeriod(value) { this.period = value; if (value === 'custom') this.filterVisible = true; else this.loadData(true, true) },

@@ -17,15 +17,16 @@ const SHARE_TITLES = { ...FALLBACK_SHARE_TITLES, ...(appConfig.shareTitles || {}
 const PUBLIC_POLICIES = {
   'pages/workspace/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH, timeline: true },
   'pages/mall/index': { title: SHARE_TITLES.mall, image: 'mall', sharePath: '/pages/mall/index', timeline: true },
-  'pages/mall/detail': { title: SHARE_TITLES.mall, image: 'mall', sharePath: '/pages/mall/detail', allowedQuery: ['id'], timeline: true },
+  'pages/mall/detail': { title: SHARE_TITLES.mall, image: 'mall', sharePath: '/pages/mall/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true },
   'pages/news/index': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/index', timeline: true },
-  'pages/news/detail': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/detail', allowedQuery: ['id'], timeline: true },
+  'pages/news/detail': { title: SHARE_TITLES.news, image: 'news', sharePath: '/pages/news/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true },
   'pages/privacy/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: '/pages/privacy/index', timeline: true },
   'pages/about/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: '/pages/about/index', timeline: true }
 }
 
-// Internal pages never expose record ids, search terms or login-state content.
-// Their friend share opens a safe landing page; timeline sharing stays hidden.
+// Internal pages only retain the minimum route parameters required to restore the
+// current page. Authentication and authorization are still enforced when the
+// receiver opens the link; tokens and other login-state data are never shared.
 const INTERNAL_POLICIES = {
   'pages/message/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
   'pages/profile/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
@@ -34,15 +35,15 @@ const INTERNAL_POLICIES = {
   'pages/ai/index': { title: SHARE_TITLES.platform, image: 'platform', sharePath: HOME_PATH },
   'pages/business/list': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
   'pages/business/catalog': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/catalog' },
-  'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
+  'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/detail', allowedQuery: ['key', 'id', 'menuId'], timeline: true, pageSnapshot: true },
   'pages/business/related-list': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list', allowedQuery: ['key'] },
   'pages/business/stats': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
   'pages/module/catalog': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/catalog' },
   'pages/module/list': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/list', allowedQuery: ['key'] },
-  'pages/module/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/list', allowedQuery: ['key'] },
+  'pages/module/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/detail', allowedQuery: ['id', 'menuId'], timeline: true, pageSnapshot: true },
   'pages/native-form/index': { title: SHARE_TITLES.business, image: 'business', sharePath: HOME_PATH },
   'pages/task/list': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
-  'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
+  'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true },
   'pages/task/device': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
   'pages/task/consumable': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
   'pages/task/add-devices': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' },
@@ -132,13 +133,17 @@ export function buildSharePayload(vm) {
   const query = encodeQuery(safeQuery)
   const path = query ? `${policy.sharePath}?${query}` : policy.sharePath
 
-  return {
+  const payload = {
     title: policy.title,
     path,
     query: policy.timeline && policy.sharePath === normalizePath(route.path) ? query : '',
-    imageUrl: getShareImage(policy.image),
     timeline: Boolean(policy.timeline)
   }
+  // WeChat generates a thumbnail from the current page when imageUrl is absent.
+  // This is preferable for detail pages because it reflects the record the user
+  // is actually sharing instead of reusing a generic module cover.
+  if (!policy.pageSnapshot) payload.imageUrl = getShareImage(policy.image)
+  return payload
 }
 
 export function buildInviteSharePayload(inviteType, currentUser = {}) {
@@ -186,10 +191,18 @@ export default {
   },
   onShareAppMessage() {
     const payload = buildSharePayload(this)
-    return { title: payload.title, path: payload.path, imageUrl: payload.imageUrl }
+    return {
+      title: payload.title,
+      path: payload.path,
+      ...(payload.imageUrl ? { imageUrl: payload.imageUrl } : {})
+    }
   },
   onShareTimeline() {
     const payload = buildSharePayload(this)
-    return { title: payload.title, query: payload.query, imageUrl: payload.imageUrl }
+    return {
+      title: payload.title,
+      query: payload.query,
+      ...(payload.imageUrl ? { imageUrl: payload.imageUrl } : {})
+    }
   }
 }

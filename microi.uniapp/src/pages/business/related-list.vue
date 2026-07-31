@@ -27,6 +27,7 @@
 				:parent-form="parentForm"
 				:parent-menu-id="parentMenuId"
 				:parent-table-id="parentTableId"
+				:parent-table-child-auth="parentTableChildAuth"
 				:parent-mode="parentMode"
 				:relation-value-override="relationValue"
 			/>
@@ -59,6 +60,7 @@
 				parentForm: {},
 				parentMenuId: '',
 				parentTableId: '',
+				parentTableChildAuth: null,
 				parentMode: 'View',
 				relationValue: '',
 				pageTitle: '关联列表',
@@ -71,6 +73,11 @@
 			this.parentId = decodeOption(options.parentId)
 			this.parentMenuId = decodeOption(options.parentMenuId)
 			this.parentTableId = decodeOption(options.parentTableId)
+			try {
+				this.parentTableChildAuth = JSON.parse(decodeOption(options.parentTableChildAuth) || 'null')
+			} catch (error) {
+				this.parentTableChildAuth = null
+			}
 			this.relationValue = decodeOption(options.relationValue)
 			this.pageTitle = decodeOption(options.title) || '关联列表'
 			this.parentForm = { Id: this.parentId }
@@ -94,6 +101,7 @@
 				this.parentForm = context.parentForm || this.parentForm
 				this.parentMenuId = context.parentMenuId || this.parentMenuId
 				this.parentTableId = context.parentTableId || this.parentTableId
+				this.parentTableChildAuth = context.parentTableChildAuth || this.parentTableChildAuth
 				this.parentMode = context.parentMode || this.parentMode
 				this.relationValue = context.relationValue ?? this.relationValue
 				this.pageTitle = context.title || this.pageTitle

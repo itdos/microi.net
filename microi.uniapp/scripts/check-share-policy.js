@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const vm = require('vm')
 
 const root = path.resolve(__dirname, '..')
 const pagesJson = JSON.parse(fs.readFileSync(path.join(root, 'src', 'pages.json'), 'utf8'))
@@ -51,10 +52,70 @@ assert(
 
 const profileSource = fs.readFileSync(path.join(root, 'src', 'pages', 'profile', 'index.vue'), 'utf8')
 assert(profileSource.includes('buildInviteSharePayload'), 'Profile invitation must use the centralized safe share builder')
-assert(shareSource.includes("'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/list' }"), 'Task details must share the safe task-list landing page')
-assert(shareSource.includes("'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/list'"), 'Business details must share the safe business-list landing page')
-assert(shareSource.includes("'pages/module/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/list'"), 'Generic module details must share the safe authorized module-list landing page')
+assert(
+  shareSource.includes("'pages/task/detail': { title: SHARE_TITLES.service, image: 'service', sharePath: '/pages/task/detail', allowedQuery: ['id'], timeline: true, pageSnapshot: true }"),
+  'Task details must share the current detail page with its record id'
+)
+assert(
+  shareSource.includes("'pages/business/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/business/detail', allowedQuery: ['key', 'id', 'menuId'], timeline: true, pageSnapshot: true }"),
+  'Business details must share the current detail page with its module, record and menu context'
+)
+assert(
+  shareSource.includes("'pages/module/detail': { title: SHARE_TITLES.business, image: 'business', sharePath: '/pages/module/detail', allowedQuery: ['id', 'menuId'], timeline: true, pageSnapshot: true }"),
+  'Generic module details must share the current detail page with its record and menu context'
+)
 assert(shareSource.includes("allowedQuery: ['id']"), 'Public detail pages must explicitly allow only their public id')
 assert(shareSource.includes("uni.hideShareMenu({ menus: ['shareTimeline'] })"), 'Sensitive pages must hide timeline sharing')
+
+let currentPage = null
+const executableShareSource = shareSource
+  .replace(
+    "import appConfig from '@/config.js'",
+    "const appConfig = { platformName: 'Microi', appName: 'Microi', workspaceSubTitle: 'Workspace', cdnAssets: {} }"
+  )
+  .replace(/\bexport const PAGE_POLICIES\b/, 'const PAGE_POLICIES')
+  .replace(/\bexport function buildSharePayload\b/, 'function buildSharePayload')
+  .replace(/\bexport function buildInviteSharePayload\b/, 'function buildInviteSharePayload')
+  .replace(/\bexport default\s*\{/, 'const shareMixin = {')
+
+const shareSandbox = {
+  getCurrentPages: () => currentPage ? [currentPage] : [],
+  uni: {},
+  globalThis: null
+}
+shareSandbox.globalThis = shareSandbox
+vm.runInNewContext(
+  `${executableShareSource}\nglobalThis.__shareTest = { buildSharePayload, shareMixin };`,
+  shareSandbox,
+  { filename: 'src/utils/share.js' }
+)
+
+function assertSharePath(route, options, expectedPath) {
+  currentPage = { route, options }
+  const payload = shareSandbox.__shareTest.buildSharePayload()
+  assert(payload.path === expectedPath, `Unexpected friend-share path for ${route}: ${payload.path}`)
+  assert(payload.query === expectedPath.split('?')[1], `Unexpected timeline query for ${route}: ${payload.query}`)
+  assert(!Object.prototype.hasOwnProperty.call(payload, 'imageUrl'), `Detail page ${route} must use WeChat's current-page thumbnail`)
+  const friendShare = shareSandbox.__shareTest.shareMixin.onShareAppMessage()
+  const timelineShare = shareSandbox.__shareTest.shareMixin.onShareTimeline()
+  assert(!Object.prototype.hasOwnProperty.call(friendShare, 'imageUrl'), `Friend share for ${route} must omit a fixed imageUrl`)
+  assert(!Object.prototype.hasOwnProperty.call(timelineShare, 'imageUrl'), `Timeline share for ${route} must omit a fixed imageUrl`)
+}
+
+assertSharePath(
+  'pages/business/detail',
+  { key: 'customers', id: 'customer 001', menuId: 'menu/001', Authorization: 'secret' },
+  '/pages/business/detail?key=customers&id=customer%20001&menuId=menu%2F001'
+)
+assertSharePath(
+  'pages/module/detail',
+  { id: 'row-001', menuId: 'menu-001', AccessToken: 'secret' },
+  '/pages/module/detail?id=row-001&menuId=menu-001'
+)
+assertSharePath(
+  'pages/task/detail',
+  { id: 'task-001', CustomerToken: 'secret' },
+  '/pages/task/detail?id=task-001'
+)
 
 process.stdout.write(`Share policy check passed: ${pagePaths.length}/${pagePaths.length} pages, ${coverKeys.length} branded covers, runtime titles disabled.\n`)

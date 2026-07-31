@@ -8,18 +8,24 @@
       </view>
 
       <view class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
-        <input
-          v-model="keyword"
-          class="search-input"
-          type="text"
-          confirm-type="search"
-          :placeholder="`搜索${config.title || '业务数据'}`"
-          @confirm="search"
-        />
+        <view class="search-input-wrap">
+          <input
+            v-model="keyword"
+            class="search-input"
+            type="text"
+            confirm-type="search"
+            :placeholder="`搜索${config.title || '业务数据'}`"
+            @input="scheduleSearch"
+            @confirm="search"
+          />
+          <view v-if="keyword" class="search-clear" hover-class="search-clear--pressed" @tap.stop="clearKeyword">
+            <text>×</text>
+          </view>
+        </view>
         <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }" @tap="openAdvancedFilters">
           <text>筛选</text><text v-if="activeFilterCount">{{ activeFilterCount }}</text>
         </view>
-        <view class="search-button" @tap="search">搜索</view>
+        <view class="search-button" @tap="resetSearch">重置</view>
       </view>
 
       <scroll-view class="period-tabs" scroll-x :show-scrollbar="false">
@@ -276,7 +282,8 @@ export default {
       filterValues: {},
       filterOptions: {},
       viewManifest: null,
-      loadRequestId: 0
+      loadRequestId: 0,
+      searchTimer: null
     }
   },
   computed: {
@@ -321,6 +328,9 @@ export default {
     this.currentUser = getUser() || {}
     const restored = this.restoreMciListSnapshot()
     this.initializeList(restored)
+  },
+  onUnload() {
+    clearTimeout(this.searchTimer)
   },
   methods: {
     async initializeList(restored = false, refresh = false) {
@@ -461,6 +471,31 @@ export default {
       }
     },
     search() {
+      clearTimeout(this.searchTimer)
+      this.loadData(true, true)
+    },
+    // zhy：关键词输入采用 350ms 防抖自动检索。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadData(true, true), 350)
+    },
+    // zhy：重置搜索栏、筛选面板、状态和时间范围，恢复列表默认条件。
+    resetSearch() {
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.filterValues = {}
+      this.filterOpen = false
+      this.period = 'all'
+      this.status = ''
+      this.customStart = ''
+      this.customEnd = ''
+      this.loadData(true, true)
+    },
+    // zhy：列表搜索支持一键清空，并立即恢复未检索的数据。
+    clearKeyword() {
+      if (!this.keyword) return
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
       this.loadData(true, true)
     },
     changePeriod(value) {
@@ -927,6 +962,7 @@ export default {
 }
 
 .search-row--simple { grid-template-columns: minmax(0, 1fr) auto; }
+.search-input-wrap { position: relative; min-width: 0; }
 
 .filter-button {
   position: relative;
@@ -944,13 +980,31 @@ export default {
 
 .search-input {
   box-sizing: border-box;
+  width: 100%;
   height: 72rpx;
-  padding: 0 24rpx;
+  padding: 0 68rpx 0 24rpx;
   border: 1rpx solid #dce8ed;
   border-radius: 14rpx;
   background: #f4f8fa;
   font-size: 26rpx;
 }
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  color: #fff;
+  background: #a9b7bd;
+  font-size: 28rpx;
+  line-height: 38rpx;
+  transform: translateY(-50%);
+}
+.search-clear--pressed { opacity: .68; }
 
 .search-button {
   display: flex;

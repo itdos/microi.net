@@ -7,8 +7,11 @@
         <view class="module-nav__button module-nav__button--add" hover-class="module-nav__button--pressed" @tap="openAdd"><text>＋</text></view>
       </view>
       <view class="search-row">
-        <input v-model="keyword" class="search-input" confirm-type="search" :placeholder="`搜索${config.title || '业务数据'}`" @confirm="search" />
-        <view class="search-button" @tap="search">搜索</view>
+        <view class="search-input-wrap">
+          <input v-model="keyword" class="search-input" confirm-type="search" :placeholder="`搜索${config.title || '业务数据'}`" @input="scheduleSearch" @confirm="search" />
+          <view v-if="keyword" class="search-clear" hover-class="search-clear--pressed" @tap.stop="clearKeyword"><text>×</text></view>
+        </view>
+        <view class="search-button" @tap="resetSearch">重置</view>
       </view>
       <scroll-view class="period-scroll" scroll-x :show-scrollbar="false">
         <view class="period-row">
@@ -113,7 +116,8 @@ export default {
       error: '',
       requestId: 0,
       actionRunning: false,
-      viewManifest: null
+      viewManifest: null,
+      searchTimer: null
     }
   },
   computed: {
@@ -131,6 +135,9 @@ export default {
   onLoad(options) {
     this.menuId = decodeURIComponent(options.menuId || '')
     this.initialize()
+  },
+  onUnload() {
+    clearTimeout(this.searchTimer)
   },
   methods: {
     async initialize(refresh = false) {
@@ -217,7 +224,30 @@ export default {
         }
       }
     },
-    search() { this.loadData(true, true) },
+    search() {
+      clearTimeout(this.searchTimer)
+      this.loadData(true, true)
+    },
+    // zhy：动态模块列表输入关键词后自动防抖检索。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadData(true, true), 350)
+    },
+    // zhy：重置关键词、时间周期和状态筛选。
+    resetSearch() {
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.period = 'all'
+      this.status = ''
+      this.loadData(true, true)
+    },
+    // zhy：动态模块列表搜索支持一键清空并立即刷新。
+    clearKeyword() {
+      if (!this.keyword) return
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.loadData(true, true)
+    },
     changePeriod(value) {
       if (this.period === value) return
       this.period = value
@@ -315,7 +345,10 @@ export default {
 .module-nav__button--pressed { background: #edf5f8; }
 .module-nav__title { overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-size: 31rpx; font-weight: 750; }
 .search-row { display: grid; grid-template-columns: minmax(0, 1fr) 108rpx; gap: 12rpx; padding: 12rpx 22rpx 16rpx; }
-.search-input { height: 76rpx; padding: 0 22rpx; border: 1px solid #dce7eb; border-radius: 8px; background: #f6f9fa; font-size: 25rpx; }
+.search-input-wrap { position: relative; min-width: 0; }
+.search-input { box-sizing: border-box; width: 100%; height: 76rpx; padding: 0 68rpx 0 22rpx; border: 1px solid #dce7eb; border-radius: 8px; background: #f6f9fa; font-size: 25rpx; }
+.search-clear { position: absolute; top: 50%; right: 16rpx; display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; border-radius: 50%; color: #fff; background: #a9b7bd; font-size: 28rpx; transform: translateY(-50%); }
+.search-clear--pressed { opacity: .68; }
 .search-button { display: flex; align-items: center; justify-content: center; color: #087da8; font-size: 26rpx; font-weight: 700; }
 .period-scroll, .status-scroll { width: 100%; white-space: nowrap; }
 .period-row, .status-row { display: inline-flex; min-width: 100%; padding: 0 22rpx 14rpx; box-sizing: border-box; }

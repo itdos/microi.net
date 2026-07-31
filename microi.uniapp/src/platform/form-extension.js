@@ -52,6 +52,10 @@ export async function handleTenantFormFieldChange(context = {}, payload = {}) {
   return invoke('handleFieldChange', context, payload)
 }
 
+export async function handleTenantFormRelatedCount(context = {}, payload = {}) {
+  return invoke('handleRelatedCount', context, payload)
+}
+
 export async function prepareTenantFormSubmit(context = {}) {
   const result = await invoke('beforeSubmit', context)
   return result && typeof result === 'object' ? result : {}
@@ -81,6 +85,7 @@ export default {
   runTenantFormFieldAction,
   handleTenantFormFieldChange,
   handleTenantFormFieldSelect,
+  handleTenantFormRelatedCount,
   prepareTenantFormSubmit,
   notifyTenantFormSaved,
   tenantFormBusyMessage,

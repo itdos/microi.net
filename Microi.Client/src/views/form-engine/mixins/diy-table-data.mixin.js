@@ -733,6 +733,13 @@ export default {
             if (!param.ModuleEngineKey && !param.FormEngineKey) {
                 param.FormEngineKey = self.TableId;
             }
+            if (self.IsTableChild() && self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name) {
+                // zhy：TableChild 必须以物理表名配合 _TableChildAuth 查询。
+                // zhy：使用子菜单 ModuleEngineKey 会再次套用子菜单数据范围，导致已经按外键
+                // zhy：正确绑定的数据被过滤成 0 条；后端仍会逐层校验 TableChild 授权链。
+                delete param.ModuleEngineKey;
+                param.FormEngineKey = self.CurrentDiyTableModel.Name;
+            }
 
             //注意：这个是由主表传过来的主表行Id，需要在这里子表加入条件：where 外键Id=TableChildFkFieldName
             if (self.IsTrashMode) {

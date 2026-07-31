@@ -120,7 +120,7 @@ if (!formRuntime.includes("if (value === null || value === undefined || value ==
 }
 if (!businessDetail.includes('const groups = this.definition?.relatedGroups || this.definition?.groups || []') ||
   businessDetail.includes('(this.preset.sections || []).forEach') ||
-  !moduleDetail.includes('const groups = this.config.definition?.groups || []')) {
+  !moduleDetail.includes('const groups = this.config.definition?.relatedGroups || this.config.definition?.groups || []')) {
   fail('detail pages must use platform CollapseGroup groups instead of local preset sections')
 }
 if (!formRuntime.includes('normalizeTableTabs(table)') ||
@@ -134,8 +134,11 @@ if (!formRuntime.includes('normalizeTableTabs(table)') ||
 const nativeStandaloneRelatedLoop = nativeForm.includes('v-for="relatedTab in standaloneRelatedTabs"')
   ? 'v-for="relatedTab in standaloneRelatedTabs"'
   : 'v-for="relatedTab in activeRelatedTabs"'
+const moduleStandaloneRelatedLoop = moduleDetail.includes('v-for="relatedTab in standaloneRelatedTabs"')
+  ? 'v-for="relatedTab in standaloneRelatedTabs"'
+  : 'v-for="relatedTab in activeRelatedTabs"'
 if (nativeForm.indexOf('v-for="(group, groupIndex) in groups"') > nativeForm.indexOf(nativeStandaloneRelatedLoop) ||
-  moduleDetail.indexOf('v-for="(group, index) in groups"') > moduleDetail.indexOf('v-for="relatedTab in activeRelatedTabs"') ||
+  moduleDetail.indexOf('v-for="(group, index) in groups"') > moduleDetail.indexOf(moduleStandaloneRelatedLoop) ||
   businessDetail.indexOf('v-for="(section, sectionIndex) in visibleSections"') > businessDetail.indexOf('v-for="relatedTab in standaloneRelatedTabs"')) {
   fail('ordinary tab fields must render before related table titles')
 }
@@ -208,9 +211,36 @@ for (const token of [
   'proposalDefaults(context)',
   'latestProposalValues(context)',
   'calculateProposalCosts(context.form)',
-  'handleFieldChange(context, payload)'
+  'handleFieldChange(context, payload)',
+  "installationPositionCount: 'ChangsuoDWSL'",
+  'handleRelatedCount(context, payload = {})',
+  'isProposalInstallationChild(payload.field)',
+  'handleRelatedCount,',
+  'V8.FormEngine.UptFormData(PROPOSAL_TABLE'
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`xjy proposal form rule is missing: ${token}`)
+}
+if (!nativeForm.includes('@data-count="handleRelatedCount"') ||
+  !nativeForm.includes('handleTenantFormRelatedCount(this.tenantFormContext(), payload)') ||
+  !nativeForm.includes('...(wasAdd && this.draftRowId ? { Id: this.draftRowId } : {})') ||
+  !relatedBusinessList.includes("'data-count'") ||
+  !relatedBusinessList.includes('if (notifyCount) this.emitDataCount()') ||
+  !relatedBusinessList.includes('uniqueRowsById(reset ? incomingRows') ||
+  !xjyProposalCalculation.includes("'ChangsuoDWSL'")) {
+  fail('native proposal form must link the installation child DataCount to its position count field')
+}
+if (!relatedBusinessList.includes('search-input-wrap') ||
+  !relatedBusinessList.includes('@input="scheduleSearch"') ||
+  !relatedBusinessList.includes('@tap="resetSearch"><text>重置</text>') ||
+  !relatedBusinessList.includes(':adjust-position="false"') ||
+  !relatedBusinessList.includes(':hold-keyboard="true"') ||
+  relatedBusinessList.includes(':always-embed="true"')) {
+  fail('related-list search must preserve the enhanced search UI without enabling the unstable native embed mode')
+}
+if (!relatedBusinessList.includes('<root-portal v-if="filterOpen && !isPreview">') ||
+  !relatedBusinessList.includes('@touchmove.stop.prevent="noop"') ||
+  !relatedBusinessList.includes('z-index: 9999')) {
+  fail('related-list filter sheet must render at the page root and lock background scrolling')
 }
 // zhy：跟进详情必须将联系人 Id 解析为姓名，保存时必须显式补入隐藏客户 Id。
 for (const token of [
@@ -255,6 +285,89 @@ for (const token of [
   'if (this.mergeDraftChangedRow(payload)) return'
 ]) {
   if (!relatedBusinessList.includes(token)) fail(`draft related-row merge is missing: ${token}`)
+}
+for (const token of [
+  "this.moduleKey === 'customerCare'",
+  'this.parentForm.BeibaiFR',
+  'result.LianxiRID',
+  'includeRelated: true',
+  'showFloatingAdd',
+  "this.$emit('floating-add-state'"
+]) {
+  if (!relatedBusinessList.includes(token)) fail(`nested related-form defaults are missing: ${token}`)
+}
+for (const token of [
+  'parentTableChildAuth',
+  'result.Parent = this.parentTableChildAuth',
+  'parentTableChildAuth=${encodeURIComponent(JSON.stringify(this.parentTableChildAuth || null))}',
+  'V8.FormEngine.GetTableData(this.config.table',
+  '_TableChildAuth: this.tableChildAuth',
+  'ModuleEngine 的子菜单数据范围会把已经正确绑定的孙表记录过滤成 0 条'
+]) {
+  if (!relatedBusinessList.includes(token)) fail(`nested TableChild authorization chain is missing: ${token}`)
+}
+if (!nativeForm.includes(':parent-table-child-auth="tableChildAuth"')) {
+  fail('native nested related lists must forward the parent TableChild authorization chain')
+}
+for (const token of [
+  'class="related-floating-add"',
+  ':show-floating-add="false"',
+  'openStandaloneRelatedAdd()',
+  'setStandaloneRelatedAddState(tab, available)',
+  '客户详情 Tab 的新增按钮必须挂在 scroll-view 外'
+]) {
+  if (!businessDetail.includes(token)) fail(`page-level related-list floating action is missing: ${token}`)
+}
+for (const token of [
+  'CUSTOMER_CARE_FIELDS',
+  'customerCareTotalValues(context',
+  'loadCustomerCareContacts(context)',
+  "field.component = 'MultipleSelect'",
+  "CUSTOMER_CARE_FIELDS.quantity.toLowerCase()",
+  "CUSTOMER_CARE_FIELDS.unitPrice.toLowerCase()",
+  '项目合伙人跟进记录与普通跟进记录使用同一组核心字段',
+  '].every((name) => Boolean(findField(context, name)))',
+  "!String((context.defaultValues || {})[timeName] || '').trim()"
+]) {
+  if (!xjyTenantForm.includes(token)) fail(`customer-care form linkage is missing: ${token}`)
+}
+const mediaUploader = fs.readFileSync(path.join(root, 'src/components/mci-media-uploader/mci-media-uploader.vue'), 'utf8')
+const microiV8 = fs.readFileSync(path.join(root, 'src/utils/microi.v8.js'), 'utf8')
+const hdfsController = fs.readFileSync(
+  path.join(workspaceRoot, 'Microi.Server/Microi.net.Api/Controllers/HDFSController.cs'),
+  'utf8'
+)
+for (const token of [
+  'localPath: filePath',
+  '@error="handleMediaError(item)"',
+  'PreviewURL,',
+  'resolveFailures',
+  'lastEmittedValue',
+  'preferProvidedUrl'
+]) {
+  if (!mediaUploader.includes(token)) fail(`durable media preview handling is missing: ${token}`)
+}
+for (const token of [
+  'FormEngineKey: options.formEngineKey',
+  'FormDataId: options.formDataId',
+  'FieldId: options.fieldId',
+  'SysMenuId: options.sysMenuId'
+]) {
+  if (!microiV8.includes(token)) fail(`private media authorization context is missing: ${token}`)
+}
+for (const token of [
+  'AttachUploadedFileUrls',
+  'item["Url"]',
+  'item["Limit"]',
+  'GetPrivateFileUrl(new DiyUploadParam'
+]) {
+  if (!hdfsController.includes(token)) fail(`upload response preview capability is missing: ${token}`)
+}
+if (microiV8.includes('xjy\\/img|xjyimg|upload')) {
+  fail('private form uploads must not be classified as permanent public assets')
+}
+if (!childTable.includes('includeRelated: true')) {
+  fail('legacy TableChild forms must preserve nested related records')
 }
 for (const token of [
   'embeddedChildRelatedForGroup(group)',

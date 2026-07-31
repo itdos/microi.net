@@ -1,7 +1,7 @@
 <template>
   <mci-page-shell class="scan-page" :style="mciTokenStyle" title="扫码做任务" subtitle="识别设备并进入最近任务" @back="goBack">
     <template #right><view class="scan-action" hover-class="scan-action--pressed" @tap="scan"><image :src="xjyAssets.scan" mode="aspectFit" /></view></template>
-    <view class="device-code-band"><view class="code-input"><text>设备</text><input v-model="deviceId" confirm-type="search" placeholder="扫描设备码或输入设备 Id" @confirm="loadTasks" /><view @tap="loadTasks"><text>查询</text></view></view></view>
+    <view class="device-code-band"><view class="code-input"><text>设备</text><input v-model="deviceId" confirm-type="search" placeholder="扫描设备码或输入设备 Id" @input="scheduleSearch" @confirm="search" /><view @tap="resetSearch"><text>重置</text></view></view></view>
     <mci-skeleton v-if="loading" type="list" :rows="5" />
     <scroll-view v-else class="task-scroll" scroll-y>
       <view v-if="tasks.length" class="task-list">
@@ -25,12 +25,21 @@ import { taskStateClass } from '@/utils/xjy-task.js'
 
 export default {
   mixins:[themeMixin],
-  data(){return{deviceId:'',tasks:[],loading:false,submitting:false,currentUser:{}}},
+  data(){return{deviceId:'',tasks:[],loading:false,submitting:false,currentUser:{},searchTimer:null,loadRequestId:0}},
   onLoad(options){this.currentUser=getUser()||{};this.deviceId=decodeURIComponent(options.deviceId||'');if(this.deviceId)this.loadTasks()},
+  onUnload(){clearTimeout(this.searchTimer)},
   methods:{
     taskStateClass,formatTime:formatDateTime,
+    search(){clearTimeout(this.searchTimer);this.loadTasks()},
+    // zhy：设备编号输入后自动防抖查询，右侧按钮重置编号和结果。
+    scheduleSearch(){
+      clearTimeout(this.searchTimer)
+      if(!this.deviceId.trim()){this.tasks=[];this.loading=false;this.loadRequestId+=1;return}
+      this.searchTimer=setTimeout(()=>this.loadTasks(),350)
+    },
+    resetSearch(){clearTimeout(this.searchTimer);this.deviceId='';this.tasks=[];this.loading=false;this.loadRequestId+=1},
     scan(){uni.scanCode({onlyFromCamera:false,success:(result)=>{const id=parseDeviceId(result.result)||String(result.result||'').trim();if(!id)return uni.showToast({title:'未识别有效设备编号',icon:'none'});this.deviceId=id;this.loadTasks()},fail:(error)=>{if(!(error&&error.errMsg&&error.errMsg.includes('cancel')))uni.showToast({title:'扫码失败，请重试',icon:'none'})}})},
-    async loadTasks(){if(!this.deviceId.trim())return uni.showToast({title:'请输入设备编号',icon:'none'});this.loading=true;try{const result=await callApiEngine('getrenwu-by-shebeiid',{Id:this.deviceId.trim()});if(result&&Number(result.Code)===0)throw new Error(result.Msg||'任务查询失败');const rows=Array.isArray(result)?result:(result&&Array.isArray(result.Data)?result.Data:[]);this.tasks=rows}catch(error){this.tasks=[];uni.showToast({title:error.message||'任务查询失败',icon:'none'})}finally{this.loading=false}},
+    async loadTasks(){if(!this.deviceId.trim())return;const requestId=++this.loadRequestId;this.loading=true;try{const result=await callApiEngine('getrenwu-by-shebeiid',{Id:this.deviceId.trim()});if(result&&Number(result.Code)===0)throw new Error(result.Msg||'任务查询失败');const rows=Array.isArray(result)?result:(result&&Array.isArray(result.Data)?result.Data:[]);if(requestId===this.loadRequestId)this.tasks=rows}catch(error){if(requestId===this.loadRequestId){this.tasks=[];uni.showToast({title:error.message||'任务查询失败',icon:'none'})}}finally{if(requestId===this.loadRequestId)this.loading=false}},
     async openDevice(item){if(this.submitting)return;this.submitting=true;uni.showLoading({title:'正在进入',mask:true});try{if(item.Zhuangtai==='待接单'){const result=await callApiEngine('automatic-order\u200c',{Id:item.BID});if(!result||Number(result.Code)!==1)throw new Error((result&&result.Msg)||'自动接单失败')}uni.navigateTo({url:`/pages/task/device?id=${encodeURIComponent(item.AID)}&taskId=${encodeURIComponent(item.BID)}&taskType=${encodeURIComponent(item.Leixing||'')}`})}catch(error){uni.showToast({title:error.message||'无法进入设备任务',icon:'none'})}finally{uni.hideLoading();this.submitting=false}},
     async finishTask(item){if(this.submitting)return;if(String(this.currentUser.Id||'')!==String(item.ShouhouRYID||'')){uni.showToast({title:'仅当前服务人员可提交任务',icon:'none'});return}const confirmed=await new Promise((resolve)=>uni.showModal({title:'确认提交任务',content:'系统会检查此任务下所有设备是否已完成。',success:(r)=>resolve(!!r.confirm),fail:()=>resolve(false)}));if(!confirmed)return;this.submitting=true;uni.showLoading({title:'正在检查',mask:true});try{const result=await callApiEngine('scan-code-tasks',{shouhouspId:item.AID,ShouhouDDId:item.BID});if(!result||Number(result.Code)!==1)throw new Error((result&&result.Msg)||'任务提交失败');uni.showToast({title:'任务已提交',icon:'success'});await this.loadTasks()}catch(error){uni.showToast({title:error.message||'任务提交失败',icon:'none'})}finally{uni.hideLoading();this.submitting=false}},
     callPhone(phone){uni.makePhoneCall({phoneNumber:String(phone)})},goBack(){uni.navigateBack({fail:()=>uni.switchTab({url:'/pages/workspace/index'})})}

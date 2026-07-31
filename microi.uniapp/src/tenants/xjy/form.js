@@ -27,6 +27,7 @@ const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
 const FOLLOWUP_TABLE = 'diy_genjinjl'
 const CONTACT_TABLE = 'Diy_LianxiR'
+const CUSTOMER_CARE_TABLE = 'diy_kehuguanhuai'
 // zhy：客户方案表及设备联动字段集中配置。
 const PROPOSAL_TABLE = 'diy_kehufaxx'
 const PROPOSAL_FIELDS = {
@@ -36,6 +37,7 @@ const PROPOSAL_FIELDS = {
   rentalPrice: 'ShebeiDJZL',
   buyoutPrice: 'ShebeiDJ',
   filterPrice: 'GenghuanLXJG',
+  installationPositionCount: 'ChangsuoDWSL',
   expectedCooperationDate: 'YujiHZSJ',
   bottledWaterPrice: 'TongzhuangSDJ',
   rentalDeviceCount: 'HezuoHYSSBSL',
@@ -63,6 +65,15 @@ const FOLLOWUP_FIELDS = {
   user: 'BaifangR',
   time: 'GenjinSJ',
   effective: 'GuanjianJCR'
+}
+const CUSTOMER_CARE_FIELDS = {
+  customerId: 'KehuID',
+  customerName: 'KehuMC',
+  contact: 'LianxiR',
+  contactId: 'LianxiRID',
+  quantity: 'Shuliang',
+  unitPrice: 'Danjia',
+  totalPrice: 'Zongjia'
 }
 const CUSTOMER_PERSONNEL_LINKS = [
   {
@@ -115,12 +126,23 @@ function isCheckinAdd(context) {
 }
 
 function isFollowupAdd(context) {
-  return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE &&
-    context.mode === 'Add' && !context.rowId
+  return isFollowupForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function isFollowupForm(context) {
-  return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE
+  if (String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE) return true
+  // zhy：项目合伙人跟进记录与普通跟进记录使用同一组核心字段，
+  // 不依赖租户动态表名，按字段结构复用当前用户、当天日期及客户联系人联动。
+  return [
+    FOLLOWUP_FIELDS.customerName,
+    FOLLOWUP_FIELDS.contacts,
+    FOLLOWUP_FIELDS.user,
+    FOLLOWUP_FIELDS.time
+  ].every((name) => Boolean(findField(context, name)))
+}
+
+function isCustomerCareForm(context) {
+  return String(context.tableName || '').toLowerCase() === CUSTOMER_CARE_TABLE
 }
 
 function isProposalForm(context) {
@@ -129,6 +151,17 @@ function isProposalForm(context) {
 
 function isProposalAdd(context) {
   return isProposalForm(context) && context.mode === 'Add' && !context.rowId
+}
+
+function isProposalInstallationChild(field = {}) {
+  const config = field.config || {}
+  const title = [
+    field.Label,
+    field.Name,
+    config.TableChildSysMenuName,
+    config.TableChild?.Title
+  ].filter(Boolean).join(' ')
+  return /安装点位|安装位置/.test(title)
 }
 
 function fieldName(context, expectedName, expectedLabel = '') {
@@ -322,6 +355,117 @@ function setLocalFieldOptions(field, rows) {
   field.optionError = ''
 }
 
+function setCustomerCareContactOptions(field, rows) {
+  if (!field) return
+  const data = Array.isArray(rows) ? rows : []
+  field.component = 'MultipleSelect'
+  field.Component = 'MultipleSelect'
+  field.config = {
+    ...(field.config || {}),
+    DataSource: 'Data',
+    Sql: '',
+    DataSourceSqlRemote: false,
+    SelectLabel: 'Xingming',
+    SelectSaveField: ''
+  }
+  field.Config = JSON.stringify(field.config)
+  field.Data = data
+  field.options = normalizeOptions({
+    ...field,
+    Data: data,
+    Config: field.config
+  })
+  field.optionsRemote = false
+  field.optionsLoading = false
+  field.optionError = ''
+}
+
+function customerCareTotalValues(context, overrides = {}) {
+  const quantityName = fieldName(context, CUSTOMER_CARE_FIELDS.quantity, '数量')
+  const unitPriceName = fieldName(context, CUSTOMER_CARE_FIELDS.unitPrice, '单价')
+  const totalPriceName = fieldName(context, CUSTOMER_CARE_FIELDS.totalPrice, '总价')
+  const source = {
+    ...context.form,
+    ...overrides
+  }
+  const numberValue = (value) => {
+    const result = Number(String(value ?? '').replace(/,/g, ''))
+    return Number.isFinite(result) ? result : 0
+  }
+  const total = Math.round(numberValue(source[quantityName]) * numberValue(source[unitPriceName]) * 100) / 100
+  return { [totalPriceName]: total }
+}
+
+async function loadCustomerCareContacts(context) {
+  const contactFields = findFieldCopies(context, CUSTOMER_CARE_FIELDS.contact, '客户联系人')
+  const contactField = contactFields[0]
+  if (!contactField) return
+  const customerIdName = fieldName(context, CUSTOMER_CARE_FIELDS.customerId, '客户Id')
+  const contactIdName = fieldName(context, CUSTOMER_CARE_FIELDS.contactId, '客户联系人Id')
+  const contactName = fieldName(context, CUSTOMER_CARE_FIELDS.contact, '客户联系人')
+  const customerId = String(context.form[customerIdName] || '').trim()
+  if (!customerId) {
+    contactFields.forEach((field) => setCustomerCareContactOptions(field, []))
+    return
+  }
+
+  contactFields.forEach((field) => {
+    field.optionsLoading = true
+    field.optionError = ''
+  })
+  try {
+    const result = await V8.FormEngine.GetTableData(CONTACT_TABLE, {
+      _Where: [['KehuID', '=', customerId]],
+      _SelectFields: ['Id', 'Xingming', 'ShoujiH', 'Zhiwu', 'Bumen', 'GuanjianJCR', 'KehuID'],
+      _OrderBy: 'CreateTime',
+      _OrderByType: 'ASC',
+      _PageIndex: 1,
+      _PageSize: 500
+    })
+    if (!result || Number(result.Code) !== 1) {
+      throw new Error((result && result.Msg) || '客户联系人加载失败')
+    }
+    const rows = Array.isArray(result.Data) ? result.Data : []
+    contactFields.forEach((field) => setCustomerCareContactOptions(field, rows))
+    const selectedId = String(context.form[contactIdName] || '').trim()
+    const parsedSelection = parseJson(context.form[contactName], context.form[contactName])
+    const currentSelection = Array.isArray(parsedSelection)
+      ? parsedSelection
+      : parsedSelection
+        ? [parsedSelection]
+        : []
+    const selectedIds = new Set(currentSelection.map((item) =>
+      String(item && typeof item === 'object' ? personValue(item, ['Id', 'ID', 'id']) : item || '')
+    ).filter(Boolean))
+    const selectedNames = new Set(currentSelection.map((item) =>
+      String(item && typeof item === 'object'
+        ? personValue(item, ['Xingming', 'Name', 'name'])
+        : item || '')
+    ).filter(Boolean))
+    const selectedRows = rows.filter((row) =>
+      (selectedId && String(row.Id || '') === selectedId) ||
+      selectedIds.has(String(row.Id || '')) ||
+      selectedNames.has(String(row.Xingming || ''))
+    )
+    if (selectedRows.length) {
+      context.patchForm({
+        [contactIdName]: selectedRows[0].Id || '',
+        [contactName]: selectedRows
+      })
+    }
+  } catch (error) {
+    contactFields.forEach((field) => {
+      setCustomerCareContactOptions(field, [])
+      field.optionError = error.message || error.Msg || '客户联系人加载失败'
+    })
+    uni.showToast({ title: contactField.optionError, icon: 'none' })
+  } finally {
+    contactFields.forEach((field) => {
+      field.optionsLoading = false
+    })
+  }
+}
+
 function contactSubmitValue(value, rows) {
   const source = value && typeof value === 'object' ? value : {}
   const id = String(personValue(source, ['Id', 'ID', 'id']) || value || '').trim()
@@ -466,7 +610,7 @@ function initializeFollowup(context) {
   const effectiveName = fieldName(context, FOLLOWUP_FIELDS.effective, '是否有效拜访')
 
   if (user) updates[userName] = [user]
-  if (!Object.prototype.hasOwnProperty.call(context.defaultValues || {}, timeName)) {
+  if (!String((context.defaultValues || {})[timeName] || '').trim()) {
     updates[timeName] = currentDate()
   }
   if (!Object.prototype.hasOwnProperty.call(context.defaultValues || {}, effectiveName)) {
@@ -622,6 +766,12 @@ export function createState() {
 }
 
 export async function initialize(context) {
+  if (isProposalAdd(context) &&
+    isEmptyFormValue(context.form[fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')])) {
+    context.patchForm({
+      [fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')]: 0
+    })
+  }
   if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode)) {
     // zhy：新增、编辑客户统一按负责人归一跟进状态，兼容历史记录状态为空的情况。
     applyCustomerFollowScope(context)
@@ -663,6 +813,10 @@ export async function initialize(context) {
     }
     await loadFollowupContacts(context, customer.id)
   }
+  if (isCustomerCareForm(context)) {
+    context.patchForm(customerCareTotalValues(context))
+    await loadCustomerCareContacts(context)
+  }
   if (isProposalAdd(context) && !context.state.proposalInitialized) {
     // zhy：新增客户方案时补齐 PC 默认值、继承上一方案并生成合作前/后成本。
     context.state.proposalInitialized = true
@@ -686,6 +840,27 @@ export async function initialize(context) {
       ...calculateProposalCosts(initialForm)
     })
   }
+}
+
+// zhy：客户方案的场所点位数量始终取安装点位子表接口返回的完整总数，空子表显示 0。
+export async function handleRelatedCount(context, payload = {}) {
+  if (!isProposalForm(context) || payload.filtered || !isProposalInstallationChild(payload.field)) return
+  const count = Number(payload.count)
+  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
+  const value = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+  if (Number(context.form[field] || 0) === value) return
+  // zhy：已保存方案的子表发生变化后直接持久化派生数量；写入固定值可安全重试且不会新增主表。
+  if (context.rowId) {
+    const result = await V8.FormEngine.UptFormData(PROPOSAL_TABLE, {
+      Id: context.rowId,
+      [field]: value,
+      _InvokeType: 'Client'
+    })
+    if (!result || Number(result.Code) !== 1) {
+      throw new Error((result && result.Msg) || '场所点位数量同步失败')
+    }
+  }
+  context.patchForm({ [field]: value })
 }
 
 export function getPresentation(context) {
@@ -809,6 +984,27 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  if (isCustomerCareForm(context) && payload) {
+    const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    if (selectedFieldName === CUSTOMER_CARE_FIELDS.contact.toLowerCase()) {
+      const rows = payload.multiple
+        ? (Array.isArray(payload.raw) ? payload.raw : [])
+        : payload.raw && typeof payload.raw === 'object'
+          ? [payload.raw]
+          : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
+            ? [payload.option.raw]
+            : []
+      context.patchForm({
+        [fieldName(context, CUSTOMER_CARE_FIELDS.contactId, '客户联系人Id')]: payload.cleared
+          ? ''
+          : personValue(rows[0], ['Id', 'ID', 'id']),
+        [fieldName(context, CUSTOMER_CARE_FIELDS.contact, '客户联系人')]: payload.cleared
+          ? []
+          : rows
+      })
+      return { handled: true }
+    }
+  }
   if (isProposalForm(context) && payload && !payload.multiple) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === PROPOSAL_FIELDS.deviceModel.toLowerCase()) {
@@ -909,6 +1105,18 @@ export async function handleFieldSelect(context, payload) {
 }
 
 export function handleFieldChange(context, payload) {
+  if (isCustomerCareForm(context) && payload) {
+    const fieldNameValue = String(payload.field && payload.field.Name || '').toLowerCase()
+    if ([
+      CUSTOMER_CARE_FIELDS.quantity.toLowerCase(),
+      CUSTOMER_CARE_FIELDS.unitPrice.toLowerCase()
+    ].includes(fieldNameValue)) {
+      context.patchForm(customerCareTotalValues(context, {
+        [payload.field.Name]: payload.value
+      }))
+      return { handled: true }
+    }
+  }
   if (isCustomerForm(context) && payload && isCustomerOwnerField(payload.field)) {
     const ownerName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.owner, '负责人')
     const ownerIdName = fieldName(context, CUSTOMER_FOLLOW_FIELDS.ownerId)
@@ -958,6 +1166,9 @@ export async function beforeSubmit(context) {
     return {
       ...(context.state.locationValues || {})
     }
+  }
+  if (isCustomerCareForm(context)) {
+    return customerCareTotalValues(context)
   }
   if (isCheckinAdd(context)) {
     // zhy：提交打卡记录时再次兜底打卡人，确保保存当前登录用户 Name。
@@ -1023,6 +1234,7 @@ export default {
   runFieldAction,
   handleFieldChange,
   handleFieldSelect,
+  handleRelatedCount,
   beforeSubmit,
   afterSubmit,
   getBusyMessage,
