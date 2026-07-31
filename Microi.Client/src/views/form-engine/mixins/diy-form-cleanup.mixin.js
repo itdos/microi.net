@@ -139,6 +139,9 @@ beforeUnmount() {
             });
             self._V8BaseInstance = null;
         }
+        self._V8FieldCache = new WeakMap();
+        self._V8RootInstance = null;
+        self._V8FieldCacheContext = "";
 
         // ========== 11. 清理已渲染标签页记录 ==========
         if (self.renderedTabs) {
@@ -146,6 +149,15 @@ beforeUnmount() {
         }
         // 🔥 新增：清理渲染字段计数
         self.renderedFieldCounts = {};
+        if (self._tabRenderTimers) {
+            Object.values(self._tabRenderTimers).forEach((timer) => clearTimeout(timer));
+        }
+        self._tabRenderTimers = {};
+        if (self._tabActivationFrames) {
+            const cancelFrame = typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : clearTimeout;
+            Object.values(self._tabActivationFrames).forEach((frame) => cancelFrame(frame));
+        }
+        self._tabActivationFrames = {};
 
         // ========== 12. 清理子组件引用 ==========
         // 清理通过 $refs 持有的子组件引用，并主动调用子组件的清理方法

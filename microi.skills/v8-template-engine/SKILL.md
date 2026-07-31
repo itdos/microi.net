@@ -120,6 +120,12 @@ V8.Result = '<div><b>' + escapeHtml(name) + '</b><br/><small style="color:#999;"
   + escapeHtml(phone) + '</small></div>';
 ```
 
+模块引擎已有更轻量的声明式方案：`ViewSchema.Layout.List.Columns` 可用 `Field + Lines +
+TrailingFields` 组成多行列，`Layout.Card` 可配置移动端顶部、右侧、正文、元信息和底部字段。
+仅需要多字段排版、图标、`Tone/Color/Prefix/Suffix` 时优先使用声明式配置；需要复杂条件
+HTML 时再给被引用的 `diy_field` 配置 `V8TmpEngineTable`。两种方式都会复用净化后的模板
+结果，且所有引用字段仍必须在模块查询列或 `_SelectFields` 中。
+
 ## 条件性图标
 
 ```javascript

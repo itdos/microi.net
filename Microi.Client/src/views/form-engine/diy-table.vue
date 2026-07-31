@@ -6,6 +6,45 @@
             padding: _IsTableChild ? '0px' : '0px',
             paddingTop : (_IsTableChild || diyStore.IsPhoneView) ? '0px' : '0px' }"
     >
+        <!-- 模块门头始终位于 PageTabs 上方：默认紧凑标题，ViewSchema 可追加副标题与动态指标。 -->
+        <section
+            v-if="HasModuleHero && !diyStore.IsPhoneView"
+            class="module-presentation-header module-presentation-header--desktop"
+            :class="{
+                'has-metrics': ModuleMetricItems.length > 0,
+                'is-default': IsDefaultModuleHero
+            }"
+        >
+            <div class="module-presentation-copy">
+                <div v-if="ModuleHero.Eyebrow" class="module-presentation-eyebrow">
+                    <span class="module-presentation-dot"></span>{{ ModuleHero.Eyebrow }}
+                </div>
+                <h1 class="module-presentation-title">{{ ModuleHero.Title }}</h1>
+                <span v-if="ModuleHero.Description" class="module-presentation-description">{{ ModuleHero.Description }}</span>
+            </div>
+            <div v-if="ModuleMetricItems.length" class="module-metric-strip">
+                <div
+                    v-for="(item, metricIndex) in ModuleMetricItems"
+                    :key="item.Id"
+                    class="module-metric-item"
+                    :class="item.Tone ? 'is-' + item.Tone.toLowerCase() : ''"
+                    :style="[
+                        item.Color ? { '--metric-color': item.Color } : undefined,
+                        { '--metric-index': metricIndex > 6 ? 6 : metricIndex }
+                    ]"
+                >
+                    <span v-if="item.Icon" class="module-metric-icon"><fa-icon :icon="item.Icon" /></span>
+                    <div class="module-metric-content">
+                        <div class="module-metric-label">{{ item.Label }}</div>
+                        <div class="module-metric-value">
+                            <span v-if="item.Loading" class="module-metric-loading">···</span>
+                            <template v-else><small v-if="item.Prefix">{{ item.Prefix }}</small>{{ FormatTableReportValue(item.Value) }}<small v-if="item.Suffix">{{ item.Suffix }}</small></template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- type="border-card" -->
         <!-- 设备tabs(设备、服务数据) -->
         <el-tabs
@@ -20,6 +59,7 @@
                 <el-tab-pane v-if="tab.IsVisible" :name="tab.Id" :lazy="true">
                     <template #label>
                        <span
+                            class="page-tab-label"
                             :style="{
                                 color: TableRowListActiveTab !== tab.Id ? ' var(--el-text-color-regular, #606266) !important' : ''
                             }"
@@ -31,6 +71,12 @@
                                 }"
                             />
                             {{ tab.Name }}
+                            <span
+                                v-if="GetButtonBadge(tab) !== null"
+                                class="button-stat-badge page-tab-stat-badge"
+                                :class="'is-' + GetButtonBadgeTone(tab)"
+                                :style="GetButtonBadgeStyle(tab)"
+                            >{{ GetButtonBadge(tab) }}</span>
                         </span>
                     </template>
                     <!--原先<el-row>是放在这里的，后面移出去了-->
@@ -49,6 +95,7 @@
                     </div>
                     <div class="mobile-header-center">
                         <span class="mobile-title">{{ SysMenuModel.Name || $t('Msg.TableList') }}</span>
+                        <span v-if="DiyTableRowCount !== null && DiyTableRowCount !== undefined" class="mobile-title-count">{{ DiyTableRowCount }} 条</span>
                     </div>
                     <!-- <div class="mobile-header-right">
                         <el-icon class="search-icon" @click="showMobileSearch = true">
@@ -56,6 +103,28 @@
                         </el-icon>
                     </div> -->
                 </div>
+
+                <!-- 移动端沿用原生标题，仅显示可横向滚动的动态指标，避免重复门头。 -->
+                <section v-if="diyStore.IsPhoneView && ModuleMetricItems.length" class="module-presentation-mobile-metrics">
+                    <div class="module-metric-strip">
+                        <div
+                            v-for="(item, metricIndex) in ModuleMetricItems"
+                            :key="'mobile_' + item.Id"
+                            class="module-metric-item"
+                            :class="item.Tone ? 'is-' + item.Tone.toLowerCase() : ''"
+                            :style="[
+                                item.Color ? { '--metric-color': item.Color } : undefined,
+                                { '--metric-index': metricIndex > 6 ? 6 : metricIndex }
+                            ]"
+                        >
+                            <div class="module-metric-label">{{ item.Label }}</div>
+                            <div class="module-metric-value">
+                                <span v-if="item.Loading" class="module-metric-loading">···</span>
+                                <template v-else><small v-if="item.Prefix">{{ item.Prefix }}</small>{{ FormatTableReportValue(item.Value) }}<small v-if="item.Suffix">{{ item.Suffix }}</small></template>
+                            </div>
+                        </div>
+                    </div>
+                </section>
 
                 <!--DIY功能按钮区域（新增、导入、导出...） 新版-->
                 <!--  把 全选，批量分享，批量删除的条件加上，不然整个当数据都为空时列表上方会出现一个空的大方框-->
@@ -144,6 +213,7 @@
                                 >
                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                     {{ btn.Name }}
+                                    <span v-if="GetButtonBadge(btn) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn) }}</span>
                                 </el-button>
                             </template>
                         </template>
@@ -174,6 +244,7 @@
                                 >
                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                     {{ btn.Name }}
+                                    <span v-if="GetButtonBadge(btn) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn) }}</span>
                                 </el-button>
                             </template>
                         </template>
@@ -206,6 +277,7 @@
                                                 <el-dropdown-item v-if="btn.IsVisible" :key="TypeFieldName + 'more_btn_export_' + btnIndex" @click="ExportDiyTableRow(btn)">
                                                     <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                                     {{ btn.Name }}
+                                                    <span v-if="GetButtonBadge(btn) !== null" class="global-more-menu-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn) }}</span>
                                                 </el-dropdown-item>
                                             </template>
                                         </template>
@@ -308,8 +380,8 @@
                         </template>
                     </el-dropdown>
                     <div class="admin-action-group" v-if="!PropsHideAdminDesign && GetCurrentUser._IsAdmin && !diyStore.IsPhoneView">
-                        <el-dropdown trigger="click">
-                            <el-button type="primary">
+                        <el-dropdown trigger="click" @visible-change="(visible) => visible && WarmupDiyFormDialog()">
+                            <el-button type="primary" @mouseenter="WarmupDiyFormDialog" @focus="WarmupDiyFormDialog">
                                 <el-icon style="margin-right: 4px"><Setting /></el-icon>{{ $t('Msg.DevDesign') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
                             </el-button>
                             <template #dropdown>
@@ -332,10 +404,10 @@
                     </div>
                 </div>
 
-                <!-- 统计面板（数据来自 sys_menu.TableReport，卡片模式追加 StatisticsFields） -->
-                <div v-if="tableReportItems && tableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
+                <!-- 旧 TableReport/StatisticsFields 兼容区；ViewSchema 指标已由上方紧凑指标条展示。 -->
+                <div v-if="secondaryTableReportItems.length > 0" class="table-report-panel" :style="{ 'grid-template-columns': tableReportGridCols }">
                     <div
-                        v-for="item in tableReportItems"
+                        v-for="item in secondaryTableReportItems"
                         :key="item.Id || item.Label"
                         :class="['table-report-card', item.Source === 'StatisticsFields' ? 'table-report-card--statistics' : '']"
                         :style="{ '--report-color': item.Color || '#409eff' }"
@@ -351,7 +423,7 @@
                 </div>
 
                 <!--DIY移动端浮动操作按钮（FAB）-->
-                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && ShowAddByRoute && !IsTrashMode" :style="GetFabContainerStyle()">
+                <div class="mobile-fab-container" v-if="diyStore.IsPhoneView && !PropsEmbedded && ShowAddByRoute && !IsTrashMode && cardSelection.length === 0" :style="GetFabContainerStyle()">
                     <!--遮罩层-->
                     <transition name="fab-overlay">
                         <div class="mobile-fab-overlay" v-if="showMobileFabMenu" @click="showMobileFabMenu = false"></div>
@@ -375,6 +447,7 @@
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
                                         <div class="mobile-fab-menu-icon v8"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
                                         <span class="mobile-fab-menu-label">{{ btn.Name }}</span>
+                                        <span v-if="GetButtonBadge(btn) !== null" class="button-stat-badge mobile-fab-stat" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn) }}</span>
                                     </div>
                                 </template>
                             </template>
@@ -384,6 +457,7 @@
                                     <div class="mobile-fab-menu-item" v-if="btn.IsVisible" @click="showMobileFabMenu = false; RunMoreBtn(btn)">
                                         <div class="mobile-fab-menu-icon batch"><fa-icon :icon="DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon" /></div>
                                         <span class="mobile-fab-menu-label">{{ btn.Name }}</span>
+                                        <span v-if="GetButtonBadge(btn) !== null" class="button-stat-badge mobile-fab-stat" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn) }}</span>
                                     </div>
                                 </template>
                             </template>
@@ -502,7 +576,7 @@
                         v-if="DiyCommon.IsNull(SysMenuModel) || (!DiyCommon.IsNull(SysMenuModel) && !SysMenuModel.HiddenIndex)"
                     >
                     </el-table-column>
-                    <template v-for="(field, fieldIndex) in ShowDiyFieldList" :key="TypeFieldName + 'table_column_fieldid_' + field.Id">
+                    <template v-for="(field, fieldIndex) in PresentationTableFieldList" :key="TypeFieldName + 'table_column_fieldid_' + field.Id">
                         <el-table-column
                             :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                             :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
@@ -526,8 +600,53 @@
                                 </div>
                             </template>
                             <template #default="scope">
+                                <!-- ViewSchema List 复合列：主值、多行附加字段及右侧图标/状态。 -->
+                                <template v-if="GetListColumnConfig(field)">
+                                    <div class="module-composite-cell">
+                                        <div class="module-composite-content">
+                                            <div class="module-composite-primary">
+                                                <span v-if="isMuban(field, scope)" v-safe-html="scope.row[field.Name + '_TmpEngineResult']"></span>
+                                                <span v-else>{{ GetColValue(scope, field) }}</span>
+                                            </div>
+                                            <div
+                                                v-for="lineField in GetListColumnLines(field)"
+                                                :key="'line-' + field.Id + '-' + lineField.Id"
+                                                class="module-composite-line"
+                                                :class="'is-' + GetPresentationTone(lineField)"
+                                                :style="GetPresentationFieldStyle(lineField)"
+                                            >
+                                                <fa-icon v-if="lineField.Icon" :icon="lineField.Icon" />
+                                                <span v-if="lineField.ShowLabel" class="module-composite-label">{{ lineField.Label }}：</span>
+                                                <span v-if="isMuban(lineField, scope)" v-safe-html="scope.row[lineField.Name + '_TmpEngineResult']"></span>
+                                                <span v-else>{{ GetPresentationFieldValue(scope.row, lineField) }}</span>
+                                            </div>
+                                        </div>
+                                        <div v-if="GetListColumnTrailingFields(field).length" class="module-composite-trailing">
+                                            <template
+                                                v-for="trailingField in GetListColumnTrailingFields(field)"
+                                                :key="'trailing-' + field.Id + '-' + trailingField.Id"
+                                            >
+                                                <!-- 模板结果已经自带完整视觉，避免再包一层胶囊或重复图标。 -->
+                                                <span
+                                                    v-if="isMuban(trailingField, scope)"
+                                                    class="module-composite-template-result"
+                                                    v-safe-html="scope.row[trailingField.Name + '_TmpEngineResult']"
+                                                ></span>
+                                                <span
+                                                    v-else
+                                                    class="module-composite-chip"
+                                                    :class="'is-' + GetPresentationTone(trailingField)"
+                                                    :style="GetPresentationFieldStyle(trailingField)"
+                                                >
+                                                    <fa-icon v-if="trailingField.Icon" :icon="trailingField.Icon" />
+                                                    <span>{{ GetPresentationFieldValue(scope.row, trailingField) }}</span>
+                                                </span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
                                 <!--如果使用了模板引擎-->
-                                <template v-if="isMuban(field, scope)">
+                                <template v-else-if="isMuban(field, scope)">
                                     <div style="line-height: 22px" v-safe-html="scope.row[field.Name + '_TmpEngineResult']"></div>
                                 </template>
                                 <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
@@ -723,6 +842,7 @@
                                     >
                                         <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                                         {{ btn.Name }}
+                                        <span v-if="GetButtonBadge(btn, scope.row) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn, scope.row) }}</span>
                                     </el-button>
                                 </template>
                                 <!--工作流-去处理 按钮（OpenType=='WorkFlow' 时显示，放在【详情】之前）-->
@@ -897,58 +1017,77 @@
                                     />
                                     <!-- 卡片内容区域 -->
                                     <div class="card-body" style="flex: 1;">
-                                        <!-- ====== 第一行：序号 + 标题 + CardTitleTagFields ====== -->
-                                        <div class="card-title-row" v-if="CardShowDiyFieldList.length > 0">
-                                            <!-- 序号 -->
-                                            <span class="card-index-badge">{{ getCardIndex(index) }}</span>
-                                            <!-- 批量选择复选框 -->
-
-                                            <!-- 标题内容（第一个字段） -->
-                                            <span class="card-title-text">
-                                                <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardShowDiyFieldList[0].Id) && NeedDiyTemplateFieldLst.indexOf(CardShowDiyFieldList[0].Component) === -1">
-                                                    <div class="card-inline-edit-item" @click.stop>
-                                                        <div class="card-inline-edit-control">
-                                                            <component
-                                                                v-model="item[DiyCommon.IsNull(CardShowDiyFieldList[0].AsName) ? CardShowDiyFieldList[0].Name : CardShowDiyFieldList[0].AsName]"
-                                                                :TableInEdit="true"
-                                                                :field="CardShowDiyFieldList[0]"
-                                                                :FormDiyTableModel="item"
-                                                                :FormMode="TableChildFormMode"
-                                                                :TableId="TableId"
-                                                                :TableName="TableName"
-                                                                :SysMenuModel="SysMenuModel"
-                                                                :FieldReadonly="GetFieldIsReadOnly(CardShowDiyFieldList[0])"
-                                                                :DiyTableModel="CurrentDiyTableModel"
-                                                                :DiyFieldList="DiyFieldList"
-                                                                :LoadType="'Table'"
-                                                                @CallbackRunV8Code="({ field, thisValue, v8codeKey, callback }) => RunV8Code({ field, thisValue, v8codeKey, row: item, callback })"
-                                                                @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
-                                                                @CallbackInTableEditSave="OnInTableEditSave"
-                                                                :is="'Diy' + CardShowDiyFieldList[0].Component"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </template>
-                                                <template v-else-if="isMuban(CardShowDiyFieldList[0], { row: item })">
-                                                    <span v-safe-html="item[CardShowDiyFieldList[0].Name + '_TmpEngineResult']"></span>
-                                                </template>
-                                                <template v-else>
-                                                    {{ GetColValue({ row: item }, CardShowDiyFieldList[0]) }}
-                                                </template>
-                                            </span>
-                                            <!-- CardTitleTagFields 标签 -->
-                                            <div class="card-title-tags" v-if="CardTitleTagFieldList && CardTitleTagFieldList.length > 0">
-                                                <template v-for="tagField in CardTitleTagFieldList" :key="'title-tag-' + tagField.Id">
-                                                    <template v-if="item[(tagField.AsName || tagField.Name)] != null && item[(tagField.AsName || tagField.Name)] !== ''">
-                                                        <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
-                                                        <el-tag v-else size="small" class="card-title-tag" effect="light">{{ GetColValue({ row: item }, tagField) }}</el-tag>
+                                        <!-- ====== 卡片头：头像/序号、顶部标签、标题、右侧多字段 ====== -->
+                                        <div class="card-title-row" v-if="CardPrimaryField">
+                                            <span v-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
+                                            <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
+                                            <div class="card-title-main">
+                                                <div class="card-title-tags" v-if="CardTopFieldList.length > 0">
+                                                    <template v-for="tagField in CardTopFieldList" :key="'title-tag-' + tagField.Id">
+                                                        <template v-if="HasPresentationFieldValue(item, tagField)">
+                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <span v-else class="card-title-tag" :class="'is-' + GetPresentationTone(tagField)" :style="GetPresentationFieldStyle(tagField)">
+                                                                <fa-icon v-if="tagField.Icon" :icon="tagField.Icon" />
+                                                                {{ GetPresentationFieldValue(item, tagField) }}
+                                                            </span>
+                                                        </template>
                                                     </template>
-                                                </template>
+                                                </div>
+                                                <div class="card-title-text">
+                                                    <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardPrimaryField.Id) && NeedDiyTemplateFieldLst.indexOf(CardPrimaryField.Component) === -1">
+                                                        <div class="card-inline-edit-item" @click.stop>
+                                                            <div class="card-inline-edit-control">
+                                                                <component
+                                                                    v-model="item[DiyCommon.IsNull(CardPrimaryField.AsName) ? CardPrimaryField.Name : CardPrimaryField.AsName]"
+                                                                    :TableInEdit="true"
+                                                                    :field="CardPrimaryField"
+                                                                    :FormDiyTableModel="item"
+                                                                    :FormMode="TableChildFormMode"
+                                                                    :TableId="TableId"
+                                                                    :TableName="TableName"
+                                                                    :SysMenuModel="SysMenuModel"
+                                                                    :FieldReadonly="GetFieldIsReadOnly(CardPrimaryField)"
+                                                                    :DiyTableModel="CurrentDiyTableModel"
+                                                                    :DiyFieldList="DiyFieldList"
+                                                                    :LoadType="'Table'"
+                                                                    @CallbackRunV8Code="({ field, thisValue, v8codeKey, callback }) => RunV8Code({ field, thisValue, v8codeKey, row: item, callback })"
+                                                                    @CallbakOnKeyup="(event, field) => FieldOnKeyup(event, field, { $index: index, row: item })"
+                                                                    @CallbackInTableEditSave="OnInTableEditSave"
+                                                                    :is="'Diy' + CardPrimaryField.Component"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                    <span v-else-if="isMuban(CardPrimaryField, { row: item })" v-safe-html="item[CardPrimaryField.Name + '_TmpEngineResult']"></span>
+                                                    <span v-else>{{ GetPresentationFieldValue(item, CardPrimaryField) }}</span>
+                                                </div>
+                                                <div v-if="HasAnyPresentationFieldValue(item, CardSubtitleFieldList)" class="card-subtitle-row">
+                                                    <template v-for="subtitleField in CardSubtitleFieldList" :key="'subtitle-' + subtitleField.Id">
+                                                        <template v-if="HasPresentationFieldValue(item, subtitleField)">
+                                                            <span v-if="isMuban(subtitleField, { row: item })" v-safe-html="item[subtitleField.Name + '_TmpEngineResult']"></span>
+                                                            <span v-else :style="GetPresentationFieldStyle(subtitleField)">{{ GetPresentationFieldValue(item, subtitleField) }}</span>
+                                                        </template>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div v-if="HasAnyPresentationFieldValue(item, CardRightFieldList)" class="card-right-fields">
+                                                <div
+                                                    v-for="rightField in CardRightFieldList"
+                                                    v-show="HasPresentationFieldValue(item, rightField)"
+                                                    :key="'right-' + rightField.Id"
+                                                    class="card-right-field"
+                                                    :class="['is-' + GetPresentationTone(rightField), rightField.DisplayStyle ? 'is-' + rightField.DisplayStyle.toLowerCase() : '']"
+                                                    :style="GetPresentationFieldStyle(rightField)"
+                                                >
+                                                    <span v-if="rightField.ShowLabel" class="card-right-label">{{ rightField.Label }}</span>
+                                                    <span v-if="isMuban(rightField, { row: item })" v-safe-html="item[rightField.Name + '_TmpEngineResult']"></span>
+                                                    <span v-else>{{ GetPresentationDecoratedFieldValue(item, rightField) }}</span>
+                                                </div>
                                             </div>
                                         </div>
                                         <!-- ====== 中间行：其余字段 ====== -->
                                         <div
-                                            v-for="(field, fieldIndex) in CardShowDiyFieldList.slice(1)"
+                                            v-for="(field, fieldIndex) in GetVisibleCardContentFields(item)"
                                             v-show="!cardCompactMode || fieldIndex === 0"
                                             :key="field.Id"
                                             class="card-field-row"
@@ -986,30 +1125,45 @@
                                             <!-- V8TmpEngineTable 模板引擎 -->
                                             <template v-else-if="isMuban(field, { row: item })">
                                                 <span class="card-field-label">{{ field.Label }}</span>
-                                                <span class="card-field-value" v-safe-html="item[field.Name + '_TmpEngineResult']"></span>
+                                                <span class="card-field-value" :style="GetPresentationFieldStyle(field)" v-safe-html="item[field.Name + '_TmpEngineResult']"></span>
                                             </template>
                                             <!--普通字段-->
                                             <template v-else>
                                                 <span class="card-field-label">{{ field.Label }}</span>
-                                                <span class="card-field-value">{{ GetColValue({ row: item }, field) }}</span>
+                                                <span class="card-field-value" :style="GetPresentationFieldStyle(field)">{{ GetColValue({ row: item }, field) }}</span>
+                                            </template>
+                                        </div>
+                                        <div v-if="HasAnyPresentationFieldValue(item, CardMetaFieldList)" class="card-meta-row">
+                                            <template v-for="metaField in CardMetaFieldList" :key="'meta-' + metaField.Id">
+                                                <template v-if="HasPresentationFieldValue(item, metaField)">
+                                                    <span class="card-meta-item" :class="'is-' + GetPresentationTone(metaField)" :style="GetPresentationFieldStyle(metaField)">
+                                                        <fa-icon v-if="metaField.Icon" :icon="metaField.Icon" />
+                                                        <span v-if="metaField.ShowLabel">{{ metaField.Label }} </span>
+                                                        <span v-if="isMuban(metaField, { row: item })" v-safe-html="item[metaField.Name + '_TmpEngineResult']"></span>
+                                                        <span v-else>{{ GetPresentationFieldValue(item, metaField) }}</span>
+                                                    </span>
+                                                </template>
                                             </template>
                                         </div>
                                         <!-- ====== 底部行：CardBottomTagFields + 创建时间/更新时间 ====== -->
                                         <div class="card-bottom-row">
                                             <div class="card-bottom-tags">
-                                                <template v-if="CardBottomTagFieldList && CardBottomTagFieldList.length > 0">
-                                                    <template v-for="tagField in CardBottomTagFieldList" :key="'bottom-tag-' + tagField.Id">
-                                                        <template v-if="item[(tagField.AsName || tagField.Name)] != null && item[(tagField.AsName || tagField.Name)] !== ''">
+                                                <template v-if="CardBottomFieldList.length > 0">
+                                                    <template v-for="tagField in CardBottomFieldList" :key="'bottom-tag-' + tagField.Id">
+                                                        <template v-if="HasPresentationFieldValue(item, tagField)">
                                                             <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
-                                                            <el-tag v-else size="small" class="card-bottom-tag" effect="plain" type="info">{{ GetColValue({ row: item }, tagField) }}</el-tag>
+                                                            <span v-else class="card-bottom-tag" :class="'is-' + GetPresentationTone(tagField)" :style="GetPresentationFieldStyle(tagField)">
+                                                                <fa-icon v-if="tagField.Icon" :icon="tagField.Icon" />
+                                                                <span v-if="tagField.ShowLabel">{{ tagField.Label }} </span>{{ GetPresentationFieldValue(item, tagField) }}
+                                                            </span>
                                                         </template>
                                                     </template>
                                                 </template>
-                                                <template v-else>
+                                                <template v-else-if="!PresentationCardConfig || PresentationCardConfig.ShowUpdateTime">
                                                     <span class="card-update-time" v-if="item.UpdateTime">更新 {{ formatCardTime(item.UpdateTime) }}</span>
                                                 </template>
                                             </div>
-                                            <span class="card-create-time" v-if="item.CreateTime">创建 {{ formatCardTime(item.CreateTime) }}</span>
+                                            <span class="card-create-time" v-if="item.CreateTime && (!PresentationCardConfig || PresentationCardConfig.ShowCreateTime)">创建 {{ formatCardTime(item.CreateTime) }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1043,8 +1197,9 @@
                                         size="small"
                                         round
                                     >
-                                        <fa-icon :icon="btn.Icon || 'fa-solid fa-file-code'" />
-                                        {{ btn.Name }}
+                                         <fa-icon :icon="btn.Icon || 'fa-solid fa-file-code'" />
+                                         {{ btn.Name }}
+                                         <span v-if="GetButtonBadge(btn, item) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn, item) }}</span>
                                     </el-button>
                                     <el-button
                                         v-if="!IsWorkFlowMenu() && _LimitEdit && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleEdit"
@@ -1106,8 +1261,9 @@
                                             round
                                             plain
                                         >
-                                            <fa-icon :icon="!btn.Icon ? 'far fa-check-circle' : btn.Icon" class="mr-1" />
-                                            {{ btn.Name }}
+                                             <fa-icon :icon="!btn.Icon ? 'far fa-check-circle' : btn.Icon" class="mr-1" />
+                                             {{ btn.Name }}
+                                             <span v-if="GetButtonBadge(btn, item) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn, item) }}</span>
                                         </el-button>
                                     </template>
                                     <!-- 更多操作（三点菜单） -->
@@ -1133,6 +1289,20 @@
                             </el-card>
                         </el-col>
                 </el-row>
+                <div v-if="diyStore.IsPhoneView && TableDisplayMode === 'Card' && cardSelection.length > 0" class="mobile-card-selection-bar" @click.stop>
+                    <strong>已选 <span>{{ cardSelection.length }}</span></strong>
+                    <div class="mobile-card-selection-actions">
+                        <template v-for="(btn, btnIndex) in (SysMenuModel.BatchSelectMoreBtns || [])" :key="'mobile_selected_btn_' + btnIndex">
+                            <button v-if="btn.IsVisible" type="button" class="mobile-card-selection-action" @click="RunMoreBtn(btn)">
+                                <fa-icon v-if="btn.Icon" :icon="btn.Icon" />{{ btn.Name }}
+                                <span v-if="GetButtonBadge(btn) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)">{{ GetButtonBadge(btn) }}</span>
+                            </button>
+                        </template>
+                        <button type="button" class="mobile-card-selection-close" aria-label="取消选择" @click="toggleCardSelectAll(false)">
+                            <el-icon><Close /></el-icon>
+                        </button>
+                    </div>
+                </div>
                 <el-pagination
                     v-if="(!TableChildConfig || (TableChildConfig && !TableChildConfig.DisablePagination)) && !diyStore.IsPhoneView"
                     style="margin-top: 10px; float: left; margin-bottom: 5px; clear: both; margin-left: 10px"
@@ -1186,6 +1356,7 @@
                         <div v-if="btn.IsVisible" class="global-more-menu-item" @click="handleMoreMenuAction('custom', btn)">
                             <fa-icon :icon="'more-btn mr-1 ' + (DiyCommon.IsNull(btn.Icon) ? 'far fa-check-circle' : btn.Icon)" />
                             <span>{{ btn.Name }}</span>
+                            <span v-if="GetButtonBadge(btn, _moreMenuRow) !== null" class="global-more-menu-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn, _moreMenuRow) }}</span>
                         </div>
                     </template>
                 </template>
@@ -1606,6 +1777,7 @@ import {
     diyTableUiMixin,
     diyTableActionsMixin,
     diyTableStateMixin,
+    diyTablePresentationMixin,
     diyTableSchemaMixin,
     diyTableDataMixin,
     diyTableSelectionMixin,
@@ -1629,6 +1801,7 @@ export default {
         diyTableUiMixin,
         diyTableActionsMixin,
         diyTableStateMixin,
+        diyTablePresentationMixin,
         diyTableSchemaMixin,
         diyTableDataMixin,
         diyTableSelectionMixin,

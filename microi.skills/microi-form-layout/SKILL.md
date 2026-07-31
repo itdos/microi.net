@@ -31,20 +31,22 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 - TableChild / CodeEditor / DevComponent / 大型 JsonTable：视为独立任务区，不能按普通字段数压缩。
 - 隐藏字段、Id、纯布局控件不计入视觉行数，但必须保留其排序和业务配置。
 
-**表级 Tab 的默认准入条件**：表单总有效行通常大于 12 行，并且至少两个 Tab 各自达到 6 个有效行；否则优先平铺或 CollapseGroup。字段达到 8 个不再自动获得独立 Tab 资格。
+**一级字段数门槛**：`<=6` 个核心可见字段优先平铺；`7~29` 个字段按基础、业务、状态、附件等信息域使用 CollapseGroup；`30+` 个字段优先评估表级 Tabs。字段数只是一级门槛，仍须结合下方“有效表单行”和任务隔离判断。
+
+**表级 Tab 的默认准入条件**：除 `30+` 字段外，表单总有效行通常大于 12 行，并且至少两个 Tab 各自达到 6 个有效行；否则优先平铺或 CollapseGroup。多个大型子表，或扫码、代码编辑、运行测试等强任务域，可以直接进入 Tabs 评估；字段达到 8 个不再自动获得独立 Tab 资格。
 
 **强任务隔离例外**：扫码/报工/质检操作区、可独立滚动的大型子表、运行测试、代码编辑、工作流事件等即使行数较少，也可以保留 Tab，因为切换代表任务模式而不是装饰性分组。
 
 ```
 开始
   ↓
-Q1: 表单总有效行数与复杂控件？
-  ├─ ≤ 6 行且无复杂控件 → D. 不分组（默认平铺）
-  ├─ 7 ~ 12 行且无强任务隔离 → C. CollapseGroup 或平铺
-  └─ > 12 行，或存在复杂控件/强任务隔离
+Q1: 核心可见字段数、子表和强任务域？
+  ├─ ≤ 6 字段且无复杂控件 → D. 不分组（默认平铺）
+  ├─ 7 ~ 29 字段且无多个大型子表/强任务域 → 按信息域使用 C. CollapseGroup
+  └─ ≥ 30 字段，或多个大型子表/强任务域 → 优先评估 A. diy_table.Tabs
        ↓
-       Q2: 字段是否能拆出 ≥ 2 个独立业务域（如"基础信息/明细/附件"）？
-       ├─ 否 → D. 不分组，或用 CollapseGroup 把次要字段收起
+       Q2: 是否至少有两个需要切换的独立业务域？
+       ├─ 否 → D. 平铺，或用 CollapseGroup 收起次要字段
        └─ 是
             ↓
             Q3: 每个业务域的有效表单行数？
@@ -54,10 +56,6 @@ Q1: 表单总有效行数与复杂控件？
                  混合方案：Tab 容纳大业务域（≥6 个有效行）+ CollapseGroup 收起小业务域（≤5 个有效行）
                  ↓
                  注意：所有 Tab 内的 ≤5 个有效行小业务域，必须用 CollapseGroup 折叠分组
-  ↓
-Q4: 总有效行数 > 30，或复杂控件较多？
-  ├─ 是 → 优先 A. diy_table.Tabs，每个 Tab 通常控制在 6~12 个有效行；Tab 内若还有 ≤5 个有效行的小逻辑组，嵌套 CollapseGroup
-  └─ 否 → 走 Q1 分支
 ```
 
 **简明决策表**：
@@ -184,7 +182,7 @@ Q4: 总有效行数 > 30，或复杂控件较多？
 2. **再分业务域**：用 `Sort` 顺序浏览字段，把字段聚类到 2~5 个业务域（基础信息 / 业务明细 / 业主/组织 / 财务 / 附件备注 / 状态 / 时间 / 其他）。
 3. **算每个域有效表单行**：A. 大于等于 6 行且存在强隔离价值 → Tab；B. 小于等于 5 行 → CollapseGroup；C. 等于 0 → 删除该域。
 4. **决定顶层方案**：A. 全 Tab / B. Tab+CollapseGroup 混合 / C. 全 CollapseGroup / D. 平铺。
-5. **写配置**：先写 `diy_table.Tabs`（若有 Tab），再逐字段写 `Tab` 归属或 `Component=CollapseGroup`。
+5. **写配置**：先写 `diy_table.Tabs`（若有 Tab），再逐字段写 `Tab` 归属；新增 `Component=CollapseGroup/Tabs/Divider/Alert` 等布局节点时，只能使用明确标注为“仅元数据”的布局专用路径，不能使用会同步建业务列的普通新增字段接口。
 6. **回读验收**：调用 `microi_get_field_list` 回读，确认 `Tab` 字段、`Sort`、`Component`、`Config.FieldTabs` / `Config.CollapseGroup` JSON 正确。
 7. **V8 完整性校验**：修改前后比较表级六类 V8 事件、字段 `V8Code/KeyupV8Code/Config`；布局迁移不得覆盖业务代码。若代码出现 `HideFormTab/ShowFormTab/ClickFormTab`，必须先适配或跳过该表。
 8. **清缓存**：`microi_refresh_schema_cache tables=['表名']`，避免前端看到旧配置。
@@ -198,7 +196,7 @@ Q4: 总有效行数 > 30，或复杂控件较多？
 3. 保留扫码、报工、质检操作、大型子表、代码编辑、运行测试等强任务 Tab。
 4. 将“总有效行 ≤12、每组 ≤5 行、无复杂控件、无 Tab 控制 V8”的表列为高置信迁移候选。
 5. 修改前记录 `Tabs`、字段 `Tab/Sort/Component/Config/V8Code/KeyupV8Code` 和表级 V8 摘要；修改后逐项回读，业务代码摘要必须一致。
-6. 迁移为 CollapseGroup 时，仅新增布局字段、清空原字段 `Tab`、清空表级 `Tabs`；不得重建业务字段，不得改数据源、必填、只读、默认值或 V8。
+6. 迁移为 CollapseGroup 时，只能通过布局专用的“仅元数据”路径新增布局节点，再清空原字段 `Tab` 和表级 `Tabs`；不得重建业务字段，不得改数据源、必填、只读、默认值或 V8。普通新增字段可能触发物理 DDL，严禁把通用 `AddFormData(diy_field)` 或普通字段创建接口当作元数据写入捷径。
 7. 平台控制面、安全表和存在歧义的业务表只报告，不自动批量迁移。
 
 ### 4.3 后端实现备忘
@@ -225,6 +223,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - 任何 Tab / CollapseGroup 都必须有 `Description` 解释分组用途，不要只放一个标题。
 - 修改 `diy_table.Tabs` 或 `diy_field.Tab` / `Config.CollapseGroup` / `Config.FieldTabs` 后，必须调用 `microi_refresh_schema_cache`。
 - Tab 内嵌套 CollapseGroup 时，CollapseGroup 必须设 `DefaultCollapsed=true`（默认收起），避免 Tab 内继续被折叠分组抢首屏空间。
+- 新增布局节点后必须同时回读 `diy_field` 元数据和目标业务表结构，确认没有新增物理业务列；若当前工具不提供仅元数据能力，只报告设计建议，不得绕过后端直接写表。
 
 ### 5.2 禁止
 
@@ -236,13 +235,14 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - ❌ **禁止**只创建 Tab 不写字段的 `Tab` 归属（每个 Tab 必须有至少 1 个非空 `Tab` 的字段）。
 - ❌ **禁止**用 Tabs 控件的 `FieldCount` 跨过 CollapseGroup 或 Divider 计数（不同布局控件的计数是隔离的）。
 - ❌ **禁止**把高频访问的字段（如单据编号、项目名称）放进默认收起的 CollapseGroup。
+- ❌ **禁止**用普通新增字段或通用表单数据写入创建布局节点；这类路径可能对目标业务表执行物理 DDL。
 
 ## 6. 验收清单
 
 修改或新建表单布局后，AI 必须按以下顺序验收：
 
 1. **回读字段**：`microi_get_field_list` 检查 `Tab` / `Component` / `Config` 与设计一致。
-2. **回读表**：`microi_get_table_data _SelectFields=['Id'] _PageSize=1` 验证表可读。
+2. **回读表与结构**：`microi_get_table_data _SelectFields=['Id'] _PageSize=1` 验证表可读，并检查实时表结构未因纯布局节点新增物理业务列。
 3. **清缓存**：`microi_refresh_schema_cache tables=['表名']`。
 4. **手动打开表单**：通过 Playwright 或 V8 引擎调用，截图第一屏。
 5. **视觉确认**：
