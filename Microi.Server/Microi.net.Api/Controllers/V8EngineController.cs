@@ -47,6 +47,14 @@ namespace Microi.net.Api
             return defaultValue;
         }
 
+        private static string StringOrCompactJson(JToken token)
+        {
+            if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined) return null;
+            return token.Type == JTokenType.String
+                ? token.Val<string>()
+                : token.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
         [HttpGet, HttpPost]
         public async Task<IActionResult> GetStatus()
         {
@@ -799,10 +807,12 @@ namespace Microi.net.Api
                 param["InTableEdit"]?.Val<int>() ?? 0, param["InTableEditFields"].Val<string>(),
                 param["MobileListFields"].Val<string>(),
                 param["CardTitleTagFields"].Val<string>(), param["CardBottomTagFields"].Val<string>(),
+                param["MenuBadgeEnabled"]?.Val<int>() ?? 0,
+                param["MenuBadgeApiEngineKey"].Val<string>(),
                 param["EnableViewSchema"]?.Val<int>() ?? 0,
                 param["ViewSchemaVersion"].Val<string>() ?? "1.0",
                 param["ViewConfigVersion"]?.Val<int>() ?? 1,
-                param["ViewSchema"].Val<string>(),
+                StringOrCompactJson(param["ViewSchema"]),
                 param["IsMicroiService"]?.Val<int>() ?? 0,
                 param["MicroServiceId"].Val<string>(),
                 param["MicroServicePageId"].Val<string>(),

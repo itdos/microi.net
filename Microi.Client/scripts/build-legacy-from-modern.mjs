@@ -4,25 +4,112 @@ import transformDynamicImport from '@babel/plugin-transform-dynamic-import';
 import transformModulesSystemjs from '@babel/plugin-transform-modules-systemjs';
 import presetEnv from '@babel/preset-env';
 import * as esbuild from 'esbuild';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+    copyFileSync,
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    readdirSync,
+    renameSync,
+    rmSync,
+    statSync,
+    writeFileSync
+} from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { minify } from 'terser';
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+const scriptPath = fileURLToPath(import.meta.url);
+const scriptDir = path.dirname(scriptPath);
 const projectDir = path.resolve(scriptDir, '..');
 const distDir = path.join(projectDir, 'bin', 'Release', 'dist');
 const modernJsDir = path.join(distDir, 'static', 'js');
 const legacyJsDir = path.join(distDir, 'static', 'js-legacy');
 const indexPath = path.join(distDir, 'index.html');
+const packageLockPath = path.join(projectDir, 'package-lock.json');
+const legacyCacheRoot = path.join(projectDir, '.tmp', 'build-cache', 'chrome49-legacy');
+const legacyCacheMaxBytes = 1024 ** 3;
+const legacyCacheMaxAgeMs = 45 * 24 * 60 * 60 * 1000;
 const targetBrowsers = ['Chrome >= 49'];
 const legacyStartMarker = '<!-- microi-legacy-start -->';
 const legacyEndMarker = '<!-- microi-legacy-end -->';
+const pipelineFingerprint = createHash('sha256')
+    .update(readFileSync(scriptPath))
+    .update(existsSync(packageLockPath) ? readFileSync(packageLockPath) : Buffer.from('no-package-lock'))
+    .digest('hex');
 
 function assertInside(parent, target) {
     const relative = path.relative(parent, target);
     if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
         throw new Error(`拒绝操作目标目录之外的路径：${target}`);
+    }
+}
+
+function cachePathFor(sourceCode, relative) {
+    const key = createHash('sha256')
+        .update(pipelineFingerprint)
+        .update('\0')
+        .update(relative.replaceAll('\\', '/'))
+        .update('\0')
+        .update(sourceCode)
+        .digest('hex');
+    return path.join(legacyCacheRoot, pipelineFingerprint.slice(0, 16), key.slice(0, 2), `${key}.js`);
+}
+
+function restoreCachedChunk(cachePath, targetPath) {
+    if (!existsSync(cachePath)) return false;
+    try {
+        const cachedCode = readFileSync(cachePath, 'utf8');
+        if (!cachedCode.includes('System.register')) {
+            rmSync(cachePath, { force: true });
+            return false;
+        }
+        writeFileSync(targetPath, cachedCode, 'utf8');
+        return true;
+    } catch {
+        rmSync(cachePath, { force: true });
+        return false;
+    }
+}
+
+function commitValidatedCacheFile(cachePath, targetPath) {
+    if (existsSync(cachePath)) return;
+    mkdirSync(path.dirname(cachePath), { recursive: true });
+    const temporaryPath = `${cachePath}.${process.pid}.tmp`;
+    try {
+        copyFileSync(targetPath, temporaryPath);
+        if (!existsSync(cachePath)) renameSync(temporaryPath, cachePath);
+    } finally {
+        rmSync(temporaryPath, { force: true });
+    }
+}
+
+function listCacheFiles(directory, files = []) {
+    if (!existsSync(directory)) return files;
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+            listCacheFiles(entryPath, files);
+        } else if (entry.isFile()) {
+            files.push(entryPath);
+        }
+    }
+    return files;
+}
+
+function pruneLegacyCache() {
+    const now = Date.now();
+    const cacheFiles = listCacheFiles(legacyCacheRoot)
+        .map((filePath) => ({ filePath, stat: statSync(filePath) }))
+        .sort((left, right) => left.stat.mtimeMs - right.stat.mtimeMs);
+    let totalBytes = cacheFiles.reduce((total, item) => total + item.stat.size, 0);
+
+    for (const item of cacheFiles) {
+        const expired = now - item.stat.mtimeMs > legacyCacheMaxAgeMs;
+        if (!expired && totalBytes <= legacyCacheMaxBytes) continue;
+        rmSync(item.filePath, { force: true });
+        totalBytes -= item.stat.size;
     }
 }
 
@@ -273,12 +360,16 @@ const entryUrl = entryMatch[1].split(/[?#]/, 1)[0];
 const entryPath = path.join(distDir, entryUrl.replace(/^\//, ''));
 
 assertInside(distDir, legacyJsDir);
+assertInside(projectDir, legacyCacheRoot);
 rmSync(legacyJsDir, { recursive: true, force: true });
 mkdirSync(legacyJsDir, { recursive: true });
 
 const chunks = await discoverChunks(entryPath);
 chunks.sort((left, right) => statSync(left).size - statSync(right).size);
 console.log(`[Microi legacy] 发现 ${chunks.length} 个真实 ESM chunk，开始逐文件转换...`);
+let cacheHits = 0;
+let cacheMisses = 0;
+const pendingCacheWrites = [];
 
 for (let index = 0; index < chunks.length; index += 1) {
     const sourcePath = chunks[index];
@@ -289,12 +380,25 @@ for (let index = 0; index < chunks.length; index += 1) {
     let sourceCode = readFileSync(sourcePath, 'utf8')
         .replaceAll('/static/js/', '/static/js-legacy/')
         .replaceAll('static/js/', 'static/js-legacy/');
+    const cachePath = cachePathFor(sourceCode, relative);
+    if (restoreCachedChunk(cachePath, targetPath)) {
+        cacheHits += 1;
+        sourceCode = null;
+        globalThis.gc?.();
+        if ((index + 1) % 25 === 0 || index + 1 === chunks.length) {
+            console.log(`[Microi legacy] 转换进度 ${index + 1}/${chunks.length}（缓存命中 ${cacheHits}）`);
+        }
+        continue;
+    }
+
+    cacheMisses += 1;
     let legacyCode = await transpileToLegacySystemJs(sourceCode, relative);
     sourceCode = null;
     globalThis.gc?.();
     const minifiedCode = await minifyLegacyCode(legacyCode, relative);
     legacyCode = null;
     writeFileSync(targetPath, minifiedCode, 'utf8');
+    pendingCacheWrites.push({ cachePath, targetPath });
     globalThis.gc?.();
 
     if ((index + 1) % 25 === 0 || index + 1 === chunks.length) {
@@ -305,4 +409,9 @@ for (let index = 0; index < chunks.length; index += 1) {
 await buildPolyfills();
 mergeLegacyHtml(entryUrl);
 validateLegacyOutput(chunks);
+for (const item of pendingCacheWrites) {
+    commitValidatedCacheFile(item.cachePath, item.targetPath);
+}
+pruneLegacyCache();
+console.log(`[Microi legacy] 增量缓存：命中 ${cacheHits}，转换 ${cacheMisses}。`);
 console.log(`[Microi legacy] Chrome 49 SystemJS 产物生成完成，共 ${chunks.length} 个 chunk。`);

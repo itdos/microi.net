@@ -16,8 +16,11 @@ export default {
         tableReportItems() {
             var self = this;
             var reportItems = [];
+            var viewMetricItems = self.ModuleMetricItems || [];
             var statisticItems = self.TableDisplayMode === 'Card' ? self.statisticsReportItems : [];
-            if (!self.SysMenuModel || self.DiyCommon.IsNull(self.SysMenuModel.TableReport)) return statisticItems;
+            if (!self.SysMenuModel || self.DiyCommon.IsNull(self.SysMenuModel.TableReport)) {
+                return viewMetricItems.concat(statisticItems);
+            }
             try {
                 var items = typeof self.SysMenuModel.TableReport === 'string'
                     ? JSON.parse(self.SysMenuModel.TableReport)
@@ -26,7 +29,7 @@ export default {
             } catch (e) {
                 reportItems = [];
             }
-            return reportItems.concat(statisticItems);
+            return viewMetricItems.concat(reportItems, statisticItems);
         },
         // 卡片模式统计列数据（来自接口返回 DataAppend.StatisticsFields）
         statisticsReportItems() {
@@ -64,7 +67,7 @@ export default {
         },
         // 自适应列数
         tableReportGridCols() {
-            var n = this.tableReportItems.length;
+            var n = this.secondaryTableReportItems.length;
             if (n <= 0) return '';
             if (n <= 2) return 'repeat(' + n + ', minmax(180px, 1fr))';
             if (n <= 4) return 'repeat(' + n + ', minmax(160px, 1fr))';
@@ -78,6 +81,9 @@ export default {
             if (self._OrderBys && self._OrderBys[fieldName]) return String(self._OrderBys[fieldName]).toLowerCase();
             if (self._OrderBy === fieldName && self._OrderByType) return self._OrderByType.toLowerCase() || '';
             return '';
+        },
+        secondaryTableReportItems() {
+            return (this.tableReportItems || []).filter(function (item) { return item.Source !== 'ViewSchema'; });
         },
         // 性能优化：将频繁调用的方法转换为计算属性
         _IsTableChild() {
@@ -103,10 +109,8 @@ export default {
                         return item.Id === element || item.Id === (element && element.Id) || (!self.DiyCommon.IsNull(element && element.Name) && item.Name === element.Name);
                     });
                     if (found && !self.DiyCommon.IsNull(found.Id)) {
-                        // 保留别名
-                        if (element && element.AsName) {
-                            found = Object.assign({}, found, { AsName: element.AsName });
-                        }
+                        // 保留别名及新卡片声明式展示属性；旧字符串/Id 配置继续兼容。
+                        if (element && typeof element === 'object') found = Object.assign({}, found, element);
                         result.push(found);
                     }
                 });
@@ -126,9 +130,7 @@ export default {
                     return item.Id === element || item.Id === (element && element.Id) || (!self.DiyCommon.IsNull(element && element.Name) && item.Name === element.Name);
                 });
                 if (found && !self.DiyCommon.IsNull(found.Id)) {
-                    if (element && element.AsName) {
-                        found = Object.assign({}, found, { AsName: element.AsName });
-                    }
+                    if (element && typeof element === 'object') found = Object.assign({}, found, element);
                     result.push(found);
                 }
             });
@@ -145,9 +147,7 @@ export default {
                     return item.Id === element || item.Id === (element && element.Id) || (!self.DiyCommon.IsNull(element && element.Name) && item.Name === element.Name);
                 });
                 if (found && !self.DiyCommon.IsNull(found.Id)) {
-                    if (element && element.AsName) {
-                        found = Object.assign({}, found, { AsName: element.AsName });
-                    }
+                    if (element && typeof element === 'object') found = Object.assign({}, found, element);
                     result.push(found);
                 }
             });
@@ -467,6 +467,9 @@ export default {
             // ========== 延迟渲染控制标志 ==========
             _shouldRenderDiyCustomDialog: false,
             _shouldRenderDiyFormDialog: false,
+            _diyFormDialogWarmupPromise: null,
+            _diyFormDialogWarmupTimer: null,
+            _diyFormDialogWarmupIdle: null,
 
             ShowAnyTable: false,
             OpenAnyTableParam: {},
@@ -658,6 +661,20 @@ export default {
         self.PageType = self.$route.query.PageType;
         if (self.ParentFormLoadFinish !== false) {
             self.Init();
+        }
+        // 主列表首帧与交互优先；浏览器空闲后预加载表单弹窗代码，避免用户
+        // 第一次点详情/模块设计时才下载并解析整套表单引擎。
+        if (!self.TableChildTableId && !self.TableChildSysMenuId) {
+            const warmup = () => {
+                self._diyFormDialogWarmupIdle = null;
+                self._diyFormDialogWarmupTimer = null;
+                self.WarmupDiyFormDialog();
+            };
+            if (typeof window.requestIdleCallback === "function") {
+                self._diyFormDialogWarmupIdle = window.requestIdleCallback(warmup, { timeout: 1500 });
+            } else {
+                self._diyFormDialogWarmupTimer = setTimeout(warmup, 600);
+            }
         }
 
         // 🔥 监听全局刷新事件

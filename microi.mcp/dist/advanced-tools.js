@@ -330,7 +330,7 @@ function normalizeMenuJsonArray(fieldName, raw) {
     });
     return { ok: errors.length === 0, value: JSON.stringify(normalized), errors, warnings };
 }
-function normalizeAllMenuJson(data) {
+export function normalizeAllMenuJson(data) {
     const result = { ...data };
     const errors = [];
     const warnings = [];
@@ -356,6 +356,29 @@ function normalizeAllMenuJson(data) {
         warnings.push(...normalized.warnings);
         if (normalized.ok && normalized.value !== undefined)
             result[canonical] = normalized.value;
+    }
+    const numericAliases = [
+        ['MenuBadgeEnabled', 'menuBadgeEnabled'],
+        ['EnableViewSchema', 'enableViewSchema'],
+        ['ViewConfigVersion', 'viewConfigVersion'],
+    ];
+    for (const [canonical, alias] of numericAliases) {
+        if (data[canonical] === undefined && data[alias] === undefined)
+            continue;
+        const value = getNumber(data, canonical, alias);
+        if (value !== undefined)
+            result[canonical] = canonical.endsWith('Enabled') ? (value === 1 ? 1 : 0) : value;
+        delete result[alias];
+    }
+    const stringAliases = [
+        ['MenuBadgeApiEngineKey', 'menuBadgeApiEngineKey'],
+        ['ViewSchemaVersion', 'viewSchemaVersion'],
+    ];
+    for (const [canonical, alias] of stringAliases) {
+        if (data[canonical] === undefined && data[alias] === undefined)
+            continue;
+        result[canonical] = getString(data, canonical, alias);
+        delete result[alias];
     }
     const viewSchemaKey = ['ViewSchema', 'viewSchema'].find((candidate) => data[candidate] !== undefined);
     if (viewSchemaKey) {
@@ -1423,6 +1446,8 @@ function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
         MobileListFields: getExplicitJsonString(module, 'mobileListFields', 'MobileListFields') || resolvedFields.MobileListFields,
         CardTitleTagFields: getExplicitJsonString(module, 'cardTitleTagFields', 'CardTitleTagFields') || resolvedFields.CardTitleTagFields,
         CardBottomTagFields: getExplicitJsonString(module, 'cardBottomTagFields', 'CardBottomTagFields') || resolvedFields.CardBottomTagFields,
+        MenuBadgeEnabled: getNumber(module, 'menuBadgeEnabled', 'MenuBadgeEnabled'),
+        MenuBadgeApiEngineKey: getString(module, 'menuBadgeApiEngineKey', 'MenuBadgeApiEngineKey'),
         EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema'),
         ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion'),
         ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion'),
@@ -1520,7 +1545,25 @@ function manifestGuide(osClient) {
                         { name: 'idx_biz_order_osclient_status_createtime', columns: ['OsClient', 'Status', 'CreateTime'], unique: false, purpose: 'Status list ordered by creation time' },
                     ],
                 }],
-            engines: [{ apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', code: "return { Code: 1, Data: V8.Param };" }],
+            engines: [
+                { apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', code: "return { Code: 1, Data: V8.Param };" },
+                {
+                    apiEngineKey: 'biz_order_metrics',
+                    apiName: 'Order metrics',
+                    category: 'Biz_Order',
+                    code: [
+                        "var result = V8.FormEngine.GetTableData('Biz_Order', {",
+                        "  _Where: [['Status', '=', 'Submitted']],",
+                        "  _SelectFields: ['Id'],",
+                        "  _PageIndex: 1,",
+                        "  _PageSize: 1",
+                        "});",
+                        "if (result.Code !== 1) return result;",
+                        "var count = result.DataCount || 0;",
+                        "return { Code: 1, Data: { Value: count, Pending: count } };",
+                    ].join('\n'),
+                },
+            ],
             events: [{ formEngineKey: 'Biz_Order', eventType: 'SubmitBeforeServerV8', code: "if (!V8.Form.OrderNo) return { Code: 0, Msg: 'OrderNo required' };" }],
             modules: [{
                     name: 'Orders',
@@ -1530,11 +1573,33 @@ function manifestGuide(osClient) {
                     searchFields: ['OrderNo', 'CustomerName', 'Status'],
                     sortFields: ['CreateTime'],
                     defaultOrderBy: [{ field: 'CreateTime', type: 'DESC' }],
+                    menuBadgeEnabled: 1,
+                    menuBadgeApiEngineKey: 'biz_order_metrics',
                     enableViewSchema: 1,
                     viewSchemaVersion: '1.0',
                     viewConfigVersion: 1,
                     viewSchema: {
                         Views: [
+                            {
+                                Scene: 'List',
+                                Device: 'PC',
+                                Priority: 100,
+                                Layout: {
+                                    Hero: {
+                                        Title: 'Orders',
+                                        Metrics: [{ Key: 'pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', Tone: 'warning' }],
+                                    },
+                                    List: {
+                                        Density: 'Comfortable',
+                                        Columns: [{
+                                                Field: 'OrderNo',
+                                                Lines: [{ Name: 'CustomerName', Label: 'Customer', ShowLabel: true, Tone: 'info' }],
+                                                TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                                                RequiredFields: ['CustomerName', 'Status'],
+                                            }],
+                                    },
+                                },
+                            },
                             {
                                 Scene: 'Detail',
                                 Device: 'All',
@@ -1550,9 +1615,15 @@ function manifestGuide(osClient) {
                                 Priority: 100,
                                 Layout: {
                                     Card: {
+                                        AvatarTextField: 'CustomerName',
                                         TitleField: 'OrderNo',
+                                        SubtitleFields: ['CustomerName'],
                                         StatusField: 'Status',
+                                        TopFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                                        RightFields: [{ Name: 'Amount', Format: 'currency', Tone: 'danger' }],
                                         Fields: [{ Name: 'CustomerName', Label: 'Customer' }, { Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
+                                        MetaFields: [{ Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
+                                        BottomFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
                                     },
                                 },
                             },
@@ -1618,8 +1689,10 @@ function manifestGuide(osClient) {
                 cardTitleFields: 'Field names/labels/ids for card title tags. Produces CardTitleTagFields. When omitted, generator picks status/type/category fields.',
                 cardBottomFields: 'Field names/labels/ids for card bottom tags. Produces CardBottomTagFields. When omitted, generator picks amount/count/date fields.',
                 statisticsFields: 'Field names/labels/ids for table footer statistics. When omitted, generator sums amount/price/count/point/balance numeric fields.',
+                menuBadgeEnabled: 'Set to 1 for important menus that need a sidebar statistic badge.',
+                menuBadgeApiEngineKey: 'API engine used by the sidebar statistic badge. Return {Code:1,Data:{Value:number}}; keep the query tenant-scoped and inexpensive.',
                 enableViewSchema: 'Set to 1 to enable the versioned cross-client view protocol stored in physical sys_menu columns.',
-                viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Use declarative blocks and ActionSchema only; never place arbitrary client V8Code in mobile actions.',
+                viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Layout.List supports multi-line columns and trailing fields; Layout.Card supports top/right/body/meta/bottom field groups. The full declarative object is preserved. Use ActionSchema only; never place arbitrary client V8Code in mobile actions.',
             },
         },
         rules: [
@@ -1911,7 +1984,7 @@ export function registerAdvancedTools(server, client, context) {
     });
     server.tool('microi_list_modules', `List menu modules for OsClient ${osClient}.`, { keyword: z.string().optional() }, async ({ keyword }) => apiText('Modules', await client.listModules(keyword)));
     server.tool('microi_get_module', `Get one menu module by ModuleId for OsClient ${osClient}.`, { moduleId: z.string() }, async ({ moduleId }) => apiText('Module Detail', await client.getModule(moduleId)));
-    server.tool('microi_update_module', `Incrementally update an existing menu module, including button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
+    server.tool('microi_update_module', `Incrementally update an existing menu module, including MenuBadgeEnabled/MenuBadgeApiEngineKey, full ViewSchema Layout.List/Layout.Card configuration, and button/tab JSON. OsClient ${osClient}. The tool validates JSON and verifies the saved fields by remote readback, including recovery after uncertain transport timeouts. Pass plain JSON arrays for MoreBtns/FormBtns/PageTabs etc.; never Base64-encode them or bypass this tool with raw FormEngine/SQL writes.`, { module: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ module, confirmExecution }) => {
         const normalized = normalizeAllMenuJson(module);
         if (normalized.errors.length)
             return textResult(JSON.stringify(normalized, null, 2), true);

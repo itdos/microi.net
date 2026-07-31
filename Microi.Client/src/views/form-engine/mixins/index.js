@@ -18,6 +18,7 @@ export { default as diyTableCleanupMixin } from './diy-table-cleanup.mixin.js';
 export { default as diyTableUiMixin } from './diy-table-ui.mixin.js';
 export { default as diyTableActionsMixin } from './diy-table-actions.mixin.js';
 export { default as diyTableStateMixin } from './diy-table-state.mixin.js';
+export { default as diyTablePresentationMixin } from './diy-table-presentation.mixin.js';
 export { default as diyTableSchemaMixin } from './diy-table-schema.mixin.js';
 export { default as diyTableDataMixin } from './diy-table-data.mixin.js';
 export { default as diyTableSelectionMixin } from './diy-table-selection.mixin.js';

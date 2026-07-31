@@ -1351,8 +1351,12 @@ export default {
 
         // 初始化拖拽排序
         let sortableInstance = null;
+        let sortableInitPending = false;
         const initSortable = () => {
+            if (sortableInitPending) return;
+            sortableInitPending = true;
             nextTick(() => {
+                sortableInitPending = false;
                 // 先销毁旧实例
                 if (sortableInstance) {
                     sortableInstance.destroy();
@@ -1471,9 +1475,14 @@ export default {
         // 监听 tableData 变化（仅监听数组长度变化，不深度监听，减少性能开销）
         watch(
             () => tableData.value.length,
-            () => {
+            (length) => {
                 if (dataSourceLoaded.value) {
                     syncDataSourceSelected();
+                }
+                // 空表或单行表没有可拖拽的排序价值，避免每个隐藏/刚显示的
+                // JSON 表都创建 Sortable 与全套监听器。
+                if (length > 1 && !sortableInstance && !GetFieldReadOnly(props.field)) {
+                    initSortable();
                 }
             }
         );
@@ -1507,14 +1516,9 @@ export default {
         );
 
         onMounted(() => {
-            // 初始化数据
-            const initialValue = props.modelValue || props.FormDiyTableModel?.[props.field?.Name];
-            if (initialValue) {
-                tableData.value = parseData(initialValue);
-                syncIfIdFixed();
-            }
-            // 初始化拖拽
-            if (!GetFieldReadOnly(props.field)) {
+            // modelValue 已由上面的 immediate watcher 完成解析，避免挂载时重复
+            // JSON.parse 和重建所有行对象。仅有两行以上时才初始化拖拽。
+            if (tableData.value.length > 1 && !GetFieldReadOnly(props.field)) {
                 initSortable();
             }
         });
@@ -1525,6 +1529,7 @@ export default {
                 sortableInstance.destroy();
                 sortableInstance = null;
             }
+            sortableInitPending = false;
             if (configSortableInstance) {
                 configSortableInstance.destroy();
                 configSortableInstance = null;

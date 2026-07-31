@@ -73,10 +73,12 @@ test('current-user access-key tools require confirmation and expose plaintext on
         assert.equal(list.isError, undefined);
         assert.match(toolText(list), /microi_ak_test/);
         assert.doesNotMatch(toolText(list), /SecretHash|one-time-fixture/);
+        const previewRoute = '/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX';
         const createParams = {
             name: 'MCP 只读开发会话',
-            allowedRoutes: ['/'],
+            allowedRoutes: [previewRoute],
             allowedTableNames: ['biz_order'],
+            redirectPath: previewRoute,
         };
         const blockedCreate = await client.callTool({
             name: 'microi_codex',
@@ -113,7 +115,10 @@ test('current-user access-key tools require confirmation and expose plaintext on
         assert.equal(created.length, 1);
         assert.deepEqual(created[0]?.scopes, ['form:read', 'page:open']);
         assert.equal((toolText(create).match(/one-time-fixture/g) || []).length, 1);
-        assert.doesNotMatch(toolText(create), /LoginPath|access-login/);
+        assert.doesNotMatch(toolText(create), /"LoginPath"/);
+        assert.match(toolText(create), /"LoginUrlRelativeTemplate"/);
+        assert.match(toolText(create), /\/\?OsClient=iTdos#\/access-login\?access_key=<AccessKey>&redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX/);
+        assert.match(toolText(create), /Microi\.Client 前端域名|Microi前端域名/);
         const unsupportedScope = await client.callTool({
             name: 'microi_codex',
             arguments: {
