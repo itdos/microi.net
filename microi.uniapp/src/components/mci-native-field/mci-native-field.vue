@@ -1,8 +1,8 @@
 <template>
   <view class="native-control" :class="[`native-control--${component.toLowerCase()}`, { 'native-control--readonly': readonly, 'native-control--avatar': isAvatar, 'native-control--select-open': selectorOpen }]">
     <template v-if="readonly">
-      <mci-media-uploader v-if="isImage && hasModelValue" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" readonly />
-      <mci-media-uploader v-else-if="isFile && hasModelValue" :model-value="modelValue" media-type="file" readonly />
+      <mci-media-uploader v-if="isImage && hasModelValue" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" :file-context="fileAccessContext" readonly />
+      <mci-media-uploader v-else-if="isFile && hasModelValue" :model-value="modelValue" media-type="file" :file-context="fileAccessContext" readonly />
       <text v-else-if="isImage || isFile" class="native-control__value">-</text>
       <rich-text v-else-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
       <view v-else-if="component === 'Progress'" class="native-control__progress"><progress :percent="numberValue" activeColor="#087da8" /><text>{{ numberValue }}%</text></view>
@@ -160,6 +160,7 @@
       :max-count="mediaMaxCount"
       :shape="isAvatar ? 'circle' : 'square'"
       :upload-path="uploadPath"
+      :file-context="fileAccessContext"
       @update:model-value="emitValue"
     />
 
@@ -169,6 +170,7 @@
       media-type="file"
       :max-count="mediaMaxCount"
       :upload-path="uploadPath"
+      :file-context="fileAccessContext"
       @update:model-value="emitValue"
     />
 
@@ -268,6 +270,15 @@ export default {
     uploadPath() {
       if (this.isAvatar) return 'avatar'
       return this.isImage ? 'img' : 'file'
+    },
+    fileAccessContext() {
+      return {
+        formEngineKey: this.tableName,
+        formDataId: this.formData && (this.formData.Id || this.formData.id) || '',
+        fieldId: this.field.Id || this.field.id || '',
+        sysMenuId: this.menuId,
+        tableChildAuth: this.tableChildAuth
+      }
     },
     mediaMaxCount() {
       if (this.isAvatar) return 1

@@ -210,7 +210,7 @@ export default {
         title: `${this.sectionTitle}详情`,
         menuId: this.childMenuId,
         tableChildAuth: this.tableChildAuth,
-        includeRelated: false
+        includeRelated: true
       })
     },
     async addRow() {
@@ -228,7 +228,7 @@ export default {
         menuId: this.childMenuId,
         tableChildAuth: this.tableChildAuth,
         defaultValues: { [this.childFkField]: this.relationValue },
-        includeRelated: false
+        includeRelated: true
       })
     },
     deleteRow(row) {

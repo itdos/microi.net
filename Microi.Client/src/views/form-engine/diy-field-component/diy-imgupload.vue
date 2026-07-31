@@ -423,28 +423,61 @@ defineExpose({
     openConfig
 });
 
+// zhy：统一 PC、小程序和历史 ImgUpload 的值结构。
+// zhy：小程序上传成功记录可能没有 State；只要存在有效 Path，默认视为已上传，
+// zhy：避免 PC 端图片正常显示但状态被误判为“失败”。
+const normalizeUploadItem = (item, index = 0) => {
+    if (DiyCommon.IsNull(item)) return null;
+    if (typeof item === 'string') {
+        const path = item.trim();
+        if (!path) return null;
+        return {
+            Id: `legacy_${index}_${path.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+            Name: path.split('/').pop() || path,
+            Size: '',
+            CreateTime: '',
+            Path: path,
+            State: 1
+        };
+    }
+    if (typeof item !== 'object') return null;
+    const path = item.Path || item.FilePathName || item.FullPath || item.Url || item.url || item.src || '';
+    if (!path) return null;
+    const rawState = item.State ?? item.state;
+    return {
+        ...item,
+        Id: item.Id || item.id || `legacy_${index}_${String(path).replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+        Name: item.Name || item.FileName || item.name || String(path).split('/').pop() || '',
+        Size: item.Size ?? item.size ?? '',
+        CreateTime: item.CreateTime || item.createTime || '',
+        Path: path,
+        State: rawState === undefined || rawState === null || rawState === '' ? 1 : rawState
+    };
+};
+
 // 处理兼容老数据：将字符串转换为对象格式
 const normalizeValue = (value) => {
     if (DiyCommon.IsNull(value) || value === '正在上传中...') {
         return value;
     }
 
-    // 如果是数组，直接返回
+    // zhy：数组中的每一项都需要补齐 Path/Id/State。
     if (Array.isArray(value)) {
-        return value;
+        return value.map((item, index) => normalizeUploadItem(item, index)).filter(Boolean);
     }
 
-    // 如果已经是对象，直接返回
+    // zhy：如果已经是对象，补齐跨端兼容字段。
     if (typeof value === 'object' && value !== null) {
-        return value;
+        return normalizeUploadItem(value);
     }
 
     // 如果是字符串
     if (typeof value === 'string') {
-        // 如果以{开头，说明是JSON字符串，解析它
-        if (value.startsWith('{')) {
+        const trimmed = value.trim();
+        // zhy：同时兼容单图对象和多图数组 JSON。
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
             try {
-                return JSON.parse(value);
+                return normalizeValue(JSON.parse(trimmed));
             } catch (e) {
                 console.error('JSON解析失败:', e);
                 // 解析失败，按老数据处理
@@ -452,16 +485,8 @@ const normalizeValue = (value) => {
         }
 
         // 老数据（纯路径字符串），包装成新格式
-        if (value && value !== '[]' && value !== '[ ]') {
-            const fileName = value.split('/').pop();
-            return {
-                Id: 'legacy_' + new Date().getTime(),
-                Name: fileName,
-                Size: '',
-                CreateTime: '',
-                Path: value,
-                State: 1
-            };
+        if (trimmed && trimmed !== '[]' && trimmed !== '[ ]') {
+            return normalizeUploadItem(trimmed);
         }
     }
 
@@ -475,16 +500,14 @@ const getMultipleFlag = computed(() => {
 
 // 是否显示多图片列表
 const showMultipleImgList = computed(() => {
-    return !DiyCommon.IsNull(props.modelValue) &&
-           props.modelValue != '正在上传中...' &&
-           Array.isArray(props.modelValue) &&
-           props.modelValue.length > 0;
+    const normalized = normalizeValue(props.modelValue);
+    return Array.isArray(normalized) && normalized.length > 0;
 });
 
 // 图片列表计算属性
 const imageListComputed = computed(() => {
-    if (!Array.isArray(props.modelValue)) return [];
-    return props.modelValue.filter(img => img && img.Id);
+    const normalized = normalizeValue(props.modelValue);
+    return Array.isArray(normalized) ? normalized.filter(img => img && img.Id && img.Path) : [];
 });
 
 // 验证单图片值是否有效
@@ -925,11 +948,8 @@ const getSingleImgSize = () => {
 
 // 获取多图片预览列表
 const GetImgUploadImgs = () => {
-    const arr = props.FormDiyTableModel[props.field.Name];
-    if (!Array.isArray(arr)) return [];
-
     const result = [];
-    arr.forEach((img) => {
+    imageListComputed.value.forEach((img) => {
         const path = props.FormDiyTableModel[props.field.Name + '_' + img.Id + '_RealPath'];
         if (!DiyCommon.IsNull(path) && path !== './static/img/loading.gif') {
             result.push(path);
@@ -1030,8 +1050,8 @@ watch(
             await nextTick();
             initSortable();
             // 为多图片初始化 RealPath（编辑模式和查看模式都需要）
-            if (Array.isArray(props.modelValue)) {
-                props.modelValue.forEach((img) => {
+            if (imageListComputed.value.length) {
+                imageListComputed.value.forEach((img) => {
                     if (img && img.Id && img.Path) {
                         const pathKey = props.field.Name + '_' + img.Id + '_RealPath';
                         // 只在 RealPath 未设置或为 loading.gif 时才设置
@@ -1056,8 +1076,8 @@ onMounted(() => {
     }
 
     // 为已有的多图片初始化 RealPath（编辑模式和查看模式都需要）
-    if (getMultipleFlag.value && Array.isArray(props.modelValue) && props.modelValue.length > 0) {
-        props.modelValue.forEach((img) => {
+    if (getMultipleFlag.value && imageListComputed.value.length > 0) {
+        imageListComputed.value.forEach((img) => {
             if (img && img.Id && img.Path) {
                 const pathKey = props.field.Name + '_' + img.Id + '_RealPath';
                 // 只在 RealPath 未设置或为 loading.gif 时才设置
