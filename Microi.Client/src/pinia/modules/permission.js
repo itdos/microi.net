@@ -316,11 +316,25 @@ function GetMenuGridComponent() {
 }
 
 function buildMeta(item, extra = {}) {
+    var menuBadgeOptions = {};
+    if (item.MenuBadgeConfig && typeof item.MenuBadgeConfig === "object") {
+        menuBadgeOptions = item.MenuBadgeConfig;
+    } else if (typeof item.MenuBadgeConfig === "string" && item.MenuBadgeConfig.trim()) {
+        try {
+            menuBadgeOptions = JSON.parse(item.MenuBadgeConfig);
+        } catch (error) {
+            menuBadgeOptions = {};
+        }
+    }
     return appendMicroAppMeta({
         Id: item.Id,
         DiyTableId: item.DiyTableId,
         Display: item.Display,
         AppDisplay : item.AppDisplay,
+        MenuBadgeConfig: Object.assign({}, menuBadgeOptions, {
+            Enabled: item.MenuBadgeEnabled,
+            ApiEngineKey: item.MenuBadgeApiEngineKey || menuBadgeOptions.ApiEngineKey
+        }),
         UrlParam: item.UrlParam,
         title: item.Name,
         icon: item.IconClass ? item.IconClass : "",
@@ -630,7 +644,7 @@ export const usePermissionStore = defineStore("permission", {
                 DiyCommon.Post(
                     DiyApi.GetSysMenuStep(),
                     {
-                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
+                        _SelectFields : [ "Id", "Name", "Icon", "IconClass", "Display", "AppDisplay", "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "IsMicroiService", "OpenType", "ComponentName", "ComponentPath", "PageTemplate", "Url", "UrlApiEngineId", "DiyTableId", "MicroServiceId", "MicroServiceKey", "MsKey", "MicroServicePageId", "MicroServiceRoutePath", "ParentId", "Sort"],
                         OsClient: osClient,
                         TableName: "Sys_Menu",
                         _OrderBy: "Sort",

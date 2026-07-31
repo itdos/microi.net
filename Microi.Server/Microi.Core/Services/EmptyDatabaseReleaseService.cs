@@ -5,13 +5,16 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Dos.Common;
 using Dos.ORM.SeedConversion;
 using MySql.Data.MySqlClient;
 using Newtonsoft.Json.Linq;
+using StackExchange.Redis;
 
 namespace Microi.net
 {
@@ -31,6 +34,9 @@ namespace Microi.net
         internal const string SqlFileName = DatabaseSeedConverter.MySql57SqlFileName;
         internal const string PublicObjectDirectory = "/install/";
         internal const string PublicDownloadBaseUrl = DatabaseSeedConverter.PublicReleaseBaseUrl;
+        internal const int TableOperationMaxAttempts = 3;
+        private const int ReleaseLeaseMilliseconds = 15 * 60 * 1000;
+        private const string ReleaseLeaseKey = "Microi:iTdos:EmptyDatabaseRelease:Lease";
 
         private readonly string _backgroundTaskId;
 
@@ -50,6 +56,7 @@ namespace Microi.net
             MySqlConnectionStringBuilder sourceBuilder = null;
             try
             {
+                EnsureReleaseLease();
                 Report(1, 8, "正在检查主库配置");
                 sourceBuilder = BuildAndValidateSourceConnection();
                 Report(2, 8, "正在重建临时空数据库");
@@ -71,13 +78,13 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                if (sourceBuilder != null)
+                if (sourceBuilder != null && IsReleaseLeaseOwner())
                 {
                     TryDropTargetDatabase(sourceBuilder);
                 }
                 Report(0, 8, "复制失败，已清理未完成的临时数据库");
                 MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "PrepareFailed", "准备主库空数据库失败", ex.ToString(), 3);
-                return new DosResult(0, null, "准备主库空数据库失败，已清理临时数据库。错误：" + ex.Message);
+                return new DosResult(0, null, "准备主库空数据库失败，已清理临时数据库。错误：" + DescribeExceptionChain(ex));
             }
         }
 
@@ -92,6 +99,7 @@ namespace Microi.net
             MySqlConnectionStringBuilder sourceBuilder = null;
             try
             {
+                EnsureReleaseLease();
                 sourceBuilder = BuildAndValidateSourceConnection();
                 // Worker may be restarted after the sanitization committed but before
                 // its checkpoint response was persisted. Recognize the fully sanitized
@@ -113,13 +121,13 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                if (sourceBuilder != null)
+                if (sourceBuilder != null && IsReleaseLeaseOwner())
                 {
                     TryDropTargetDatabase(sourceBuilder);
                 }
                 Report(0, 8, "脱敏失败，已删除可能含敏感数据的临时数据库");
                 MicroiEngine.QueueSystemLog(osClient, "DatabaseRelease", "SanitizationFailed", "空数据库脱敏失败", ex.ToString(), 3);
-                return new DosResult(0, null, "执行脱敏 SQL 失败，已删除临时数据库。错误：" + ex.Message);
+                return new DosResult(0, null, "执行脱敏 SQL 失败，已删除临时数据库。错误：" + DescribeExceptionChain(ex));
             }
         }
 
@@ -160,6 +168,7 @@ namespace Microi.net
             var uploadedFiles = new List<string>();
             try
             {
+                EnsureReleaseLease();
                 var sourceBuilder = BuildAndValidateSourceConnection();
                 var validation = ValidateSanitizedDatabase(sourceBuilder);
                 workDirectory = Path.Combine(Path.GetTempPath(), "microi-empty-release", Guid.NewGuid().ToString("N"));
@@ -172,6 +181,7 @@ namespace Microi.net
                 var packages = CreateReleasePackages(sqlPath, workDirectory, exportResult);
                 for (var packageIndex = 0; packageIndex < packages.Count; packageIndex++)
                 {
+                    EnsureReleaseLease();
                     var package = packages[packageIndex];
                     var progress = 88 + Convert.ToInt32(Math.Floor(
                         packageIndex * 11m / Math.Max(1, packages.Count)));
@@ -185,6 +195,7 @@ namespace Microi.net
                     uploadedFiles.Add(package.FileName);
                 }
                 Report(8, 8, "全部数据库发布包上传完成");
+                TryReleaseReleaseLease();
 
                 var primaryPackage = packages[0];
 
@@ -230,7 +241,7 @@ namespace Microi.net
                 return new DosResult(0, new
                 {
                     UploadedFiles = uploadedFiles
-                }, "发布主库空数据库失败；已上传文件已列入 Data，未上传文件保持线上旧版。错误：" + ex.Message);
+                }, "发布主库空数据库失败；已上传文件已列入 Data，未上传文件保持线上旧版。错误：" + DescribeExceptionChain(ex));
             }
             finally
             {
@@ -250,12 +261,17 @@ namespace Microi.net
             }
             try
             {
+                EnsureReleaseLease();
                 TryDropTargetDatabase(BuildAndValidateSourceConnection());
                 return new DosResult(1, null, "临时空数据库已清理。");
             }
             catch (Exception ex)
             {
-                return new DosResult(0, null, "清理临时空数据库失败：" + ex.Message);
+                return new DosResult(0, null, "清理临时空数据库失败：" + DescribeExceptionChain(ex));
+            }
+            finally
+            {
+                TryReleaseReleaseLease();
             }
         }
 
@@ -449,54 +465,132 @@ namespace Microi.net
             ExecuteNonQuery(connection, $"CREATE DATABASE `{TargetDatabase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;");
         }
 
-        private static List<string> CopyTableStructures(MySqlConnectionStringBuilder sourceBuilder)
+        private List<string> CopyTableStructures(MySqlConnectionStringBuilder sourceBuilder)
         {
             var tables = GetBaseTables(sourceBuilder, RequiredSourceDatabase);
-            var targetBuilder = WithDatabase(sourceBuilder, TargetDatabase);
-            using var source = OpenConnection(sourceBuilder);
-            using var target = OpenConnection(targetBuilder);
-            ExecuteNonQuery(target, "SET FOREIGN_KEY_CHECKS=0;");
-            foreach (var table in tables)
-            {
-                var createSql = GetCreateTableSql(source, RequiredSourceDatabase, table);
-                ExecuteNonQuery(target, createSql);
-            }
-            ExecuteNonQuery(target, "SET FOREIGN_KEY_CHECKS=1;");
-            return tables;
-        }
-
-        private long CopyTableData(MySqlConnectionStringBuilder sourceBuilder, IReadOnlyCollection<string> tables)
-        {
-            var targetBuilder = WithDatabase(sourceBuilder, TargetDatabase);
-            long copiedRows = 0;
-            using var connection = OpenConnection(targetBuilder);
-            ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=0;");
             var index = 0;
             foreach (var table in tables)
             {
                 index++;
-                var columns = GetInsertableColumns(connection, RequiredSourceDatabase, table);
-                if (columns.Count == 0)
+                ExecuteTableOperationWithRetry(
+                    "复制表结构",
+                    table,
+                    () =>
+                    {
+                        CopySingleTableStructure(sourceBuilder, table);
+                        return true;
+                    });
+                if (index == tables.Count || index % 20 == 0)
                 {
-                    continue;
+                    var percent = 25 + Convert.ToInt32(Math.Floor(index * 12m / Math.Max(1, tables.Count)));
+                    BackgroundTaskRuntime.TryUpdateProgress(
+                        _backgroundTaskId,
+                        percent,
+                        $"正在复制表结构（{index}/{tables.Count}）",
+                        index,
+                        tables.Count);
                 }
-                var fields = string.Join(",", columns.Select(QuoteIdentifier));
-                using var command = connection.CreateCommand();
-                command.CommandTimeout = 0;
-                command.CommandText = $"INSERT INTO `{TargetDatabase}`.{QuoteIdentifier(table)} ({fields}) SELECT {fields} FROM `{RequiredSourceDatabase}`.{QuoteIdentifier(table)};";
-                var affected = command.ExecuteNonQuery();
-                if (affected > 0)
+            }
+            return tables;
+        }
+
+        private static void CopySingleTableStructure(
+            MySqlConnectionStringBuilder sourceBuilder,
+            string table)
+        {
+            using var source = OpenConnection(sourceBuilder);
+            using var target = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
+            ExecuteNonQuery(target, "SET FOREIGN_KEY_CHECKS=0;");
+            try
+            {
+                var createSql = GetCreateTableSql(source, RequiredSourceDatabase, table);
+                ExecuteNonQuery(target, $"DROP TABLE IF EXISTS {QuoteIdentifier(table)};");
+                ExecuteNonQuery(target, createSql);
+            }
+            finally
+            {
+                if (target.State == ConnectionState.Open)
                 {
-                    copiedRows += affected;
+                    try { ExecuteNonQuery(target, "SET FOREIGN_KEY_CHECKS=1;"); } catch { }
                 }
+            }
+        }
+
+        private long CopyTableData(MySqlConnectionStringBuilder sourceBuilder, IReadOnlyCollection<string> tables)
+        {
+            long copiedRows = 0;
+            var index = 0;
+            foreach (var table in tables)
+            {
+                index++;
+                copiedRows += ExecuteTableOperationWithRetry(
+                    "复制表数据",
+                    table,
+                    () => CopySingleTableData(sourceBuilder, table));
                 if (index == tables.Count || index % 20 == 0)
                 {
                     var percent = 38 + Convert.ToInt32(Math.Floor(index * 10m / Math.Max(1, tables.Count)));
                     BackgroundTaskRuntime.TryUpdateProgress(_backgroundTaskId, percent, $"正在复制表数据（{index}/{tables.Count}）", index, tables.Count);
                 }
             }
-            ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=1;");
             return copiedRows;
+        }
+
+        private long CopySingleTableData(
+            MySqlConnectionStringBuilder sourceBuilder,
+            string table)
+        {
+            using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
+            ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=0;");
+            var columns = GetInsertableColumns(connection, RequiredSourceDatabase, table);
+            if (columns.Count == 0)
+            {
+                ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=1;");
+                return 0;
+            }
+
+            var fields = string.Join(",", columns.Select(QuoteIdentifier));
+            using var transaction = connection.BeginTransaction(IsolationLevel.RepeatableRead);
+            try
+            {
+                ExecuteNonQuery(
+                    connection,
+                    transaction,
+                    $"DELETE FROM `{TargetDatabase}`.{QuoteIdentifier(table)};");
+                EnsureReleaseLease();
+                using var copyCommand = connection.CreateCommand();
+                copyCommand.Transaction = transaction;
+                copyCommand.CommandTimeout = 0;
+                copyCommand.CommandText =
+                    $"INSERT INTO `{TargetDatabase}`.{QuoteIdentifier(table)} ({fields})"
+                    + $" SELECT {fields} FROM `{RequiredSourceDatabase}`.{QuoteIdentifier(table)};";
+                var copiedRows = copyCommand.ExecuteNonQuery();
+
+                var targetRowCount = ExecuteScalarCount(
+                    connection,
+                    transaction,
+                    $"SELECT COUNT(*) FROM `{TargetDatabase}`.{QuoteIdentifier(table)};");
+                if (copiedRows >= 0 && copiedRows != targetRowCount)
+                {
+                    throw new InvalidOperationException(
+                        $"单表原子复制计数不一致：写入={copiedRows}，目标={targetRowCount}。");
+                }
+
+                transaction.Commit();
+                return targetRowCount;
+            }
+            catch
+            {
+                try { transaction.Rollback(); } catch { }
+                throw;
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    try { ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=1;"); } catch { }
+                }
+            }
         }
 
         private static void ExecuteSanitizationScript(MySqlConnectionStringBuilder sourceBuilder, string sql)
@@ -666,6 +760,18 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
         private static long ExecuteScalarCount(MySqlConnection connection, string sql)
         {
             using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = 0;
+            return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+        }
+
+        private static long ExecuteScalarCount(
+            MySqlConnection connection,
+            MySqlTransaction transaction,
+            string sql)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
             command.CommandText = sql;
             command.CommandTimeout = 0;
             return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
@@ -1201,6 +1307,198 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
             command.CommandText = sql;
             command.CommandTimeout = 0;
             return command.ExecuteNonQuery();
+        }
+
+        private static int ExecuteNonQuery(
+            MySqlConnection connection,
+            MySqlTransaction transaction,
+            string sql)
+        {
+            using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = sql;
+            command.CommandTimeout = 0;
+            return command.ExecuteNonQuery();
+        }
+
+        private T ExecuteTableOperationWithRetry<T>(
+            string stage,
+            string table,
+            Func<T> operation)
+        {
+            Exception lastException = null;
+            for (var attempt = 1; attempt <= TableOperationMaxAttempts; attempt++)
+            {
+                try
+                {
+                    EnsureReleaseLease();
+                    return operation();
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    if (attempt >= TableOperationMaxAttempts || !IsTransientDatabaseFailure(ex))
+                    {
+                        throw CreateTableOperationException(stage, table, attempt, ex);
+                    }
+
+                    MicroiEngine.QueueSystemLog(
+                        RequiredOsClient,
+                        "DatabaseRelease",
+                        "TransientMySqlRetry",
+                        $"{stage}遇到瞬时 MySQL 异常，准备重试：{table}",
+                        $"Attempt={attempt}/{TableOperationMaxAttempts}; Detail={DescribeExceptionChain(ex)}",
+                        2);
+                    Thread.Sleep(500 * attempt);
+                }
+            }
+
+            throw CreateTableOperationException(
+                stage,
+                table,
+                TableOperationMaxAttempts,
+                lastException ?? new InvalidOperationException("未知数据库异常。"));
+        }
+
+        private static InvalidOperationException CreateTableOperationException(
+            string stage,
+            string table,
+            int attempt,
+            Exception exception)
+        {
+            return new InvalidOperationException(
+                $"{stage}失败：表={table}，尝试={attempt}/{TableOperationMaxAttempts}，详情={DescribeExceptionChain(exception)}",
+                exception);
+        }
+
+        private static bool IsTransientDatabaseFailure(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                if (current is IOException || current is SocketException || current is TimeoutException)
+                {
+                    return true;
+                }
+
+                if (current is MySqlException mySqlException
+                    && new[] { 1040, 1042, 1158, 1159, 1160, 1161, 1205, 1213, 2002, 2003, 2006, 2013 }
+                        .Contains(mySqlException.Number))
+                {
+                    return true;
+                }
+
+                var message = current.Message ?? "";
+                if (message.IndexOf("reading from the stream", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("transport connection", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("connection was aborted", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("connection was reset", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("forcibly closed", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("server has gone away", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("lost connection", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("unable to connect", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static string DescribeExceptionChain(Exception exception)
+        {
+            var messages = new List<string>();
+            for (var current = exception; current != null && messages.Count < 8; current = current.InnerException)
+            {
+                var message = Regex.Replace(current.Message ?? "", @"\s+", " ").Trim();
+                if (message.Length == 0) continue;
+                var item = current.GetType().Name + ": " + message;
+                if (!messages.Contains(item, StringComparer.Ordinal))
+                {
+                    messages.Add(item);
+                }
+            }
+            var result = string.Join(" -> ", messages);
+            if (result.Length > 4000)
+            {
+                result = result.Substring(0, 4000) + "...";
+            }
+            return result.Length == 0 ? "未知异常" : result;
+        }
+
+        private void EnsureReleaseLease()
+        {
+            if (string.IsNullOrWhiteSpace(_backgroundTaskId))
+            {
+                throw new InvalidOperationException("空数据库发布必须通过持久化后台任务执行。缺少 BackgroundTaskId。");
+            }
+
+            var database = MicroiEngine.CacheTenant.Cache(RequiredOsClient).GetIDatabase();
+            if (database == null)
+            {
+                throw new InvalidOperationException("Redis 不可用，已拒绝在无分布式发布租约时制作空数据库。");
+            }
+
+            const string script = @"
+local owner = redis.call('get', KEYS[1])
+if (not owner) or owner == ARGV[1] then
+  redis.call('psetex', KEYS[1], ARGV[2], ARGV[1])
+  return 1
+end
+return 0";
+            var acquired = (long)database.ScriptEvaluate(
+                script,
+                new RedisKey[] { ReleaseLeaseKey },
+                new RedisValue[] { _backgroundTaskId, ReleaseLeaseMilliseconds });
+            if (acquired != 1)
+            {
+                throw new InvalidOperationException("另一项主库空数据库发布任务仍在执行，当前任务未修改临时数据库。");
+            }
+        }
+
+        private bool IsReleaseLeaseOwner()
+        {
+            if (string.IsNullOrWhiteSpace(_backgroundTaskId)) return false;
+            try
+            {
+                var database = MicroiEngine.CacheTenant.Cache(RequiredOsClient).GetIDatabase();
+                return database != null
+                    && string.Equals(
+                        database.StringGet(ReleaseLeaseKey).ToString(),
+                        _backgroundTaskId,
+                        StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void TryReleaseReleaseLease()
+        {
+            if (string.IsNullOrWhiteSpace(_backgroundTaskId)) return;
+            try
+            {
+                var database = MicroiEngine.CacheTenant.Cache(RequiredOsClient).GetIDatabase();
+                if (database == null) return;
+                const string script = @"
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  return redis.call('del', KEYS[1])
+end
+return 0";
+                database.ScriptEvaluate(
+                    script,
+                    new RedisKey[] { ReleaseLeaseKey },
+                    new RedisValue[] { _backgroundTaskId });
+            }
+            catch (Exception ex)
+            {
+                MicroiEngine.QueueSystemLog(
+                    RequiredOsClient,
+                    "DatabaseRelease",
+                    "ReleaseLeaseCleanupFailed",
+                    "释放主库空数据库发布租约失败",
+                    DescribeExceptionChain(ex),
+                    2);
+            }
         }
 
         private static string QuoteIdentifier(string value)

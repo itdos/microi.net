@@ -7,7 +7,12 @@
             <span>
                 <app-link v-if="onlyOneChild.meta" :to="resolvePath(onlyOneChild)">
                     <el-menu-item :index="resolvePath(onlyOneChild)" :class="{ 'submenu-title-noDropdown-microi': !isNest }">
-                        <item :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)" :title="generateTitle(onlyOneChild.meta.title)" />
+                        <item
+                            :icon="onlyOneChild.meta.icon || (item.meta && item.meta.icon)"
+                            :title="generateTitle(onlyOneChild.meta.title)"
+                            :menu-id="onlyOneChild.meta.Id"
+                            :badge-config="onlyOneChild.meta.MenuBadgeConfig"
+                        />
                     </el-menu-item>
                 </app-link>
             </span>
@@ -15,7 +20,13 @@
         <el-sub-menu v-else ref="subMenu" :index="getItemPath(item)" popper-append-to-body>
             <template #title>
                 <span class="submenu-title-link" @click="handleSubMenuTitleClick(item)">
-                    <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="generateTitle(item?.meta?.title)" />
+                    <item
+                        v-if="item.meta"
+                        :icon="item.meta && item.meta.icon"
+                        :title="generateTitle(item?.meta?.title)"
+                        :menu-id="item.meta.Id"
+                        :badge-config="item.meta.MenuBadgeConfig"
+                    />
                 </span>
             </template>
             <sidebar-item
@@ -117,7 +128,15 @@ export default {
             return item.path || "";
         },
         handleSubMenuTitleClick(item) {
-            this.MenuClick(item);
+            // A parent menu title is responsible for expanding/collapsing its children.
+            // Do not route it to the first child, and keep compatibility with hosts that
+            // inject the historical MenuClick hook without assuming that it exists.
+            if (typeof this.MenuClick === "function") {
+                this.MenuClick(item);
+            }
+            if (Array.isArray(item?.children) && item.children.some((child) => child?.Display !== 0)) {
+                return;
+            }
             const targetPath = this.resolvePath(item);
             if (!targetPath || this.$route?.path === targetPath || this.$route?.fullPath === targetPath) {
                 return;

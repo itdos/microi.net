@@ -458,6 +458,8 @@ export declare class MicroiClient {
         TableDiyFieldIds?: string;
         DefaultOrderBy?: string;
         SqlWhere?: string;
+        MenuBadgeEnabled?: number;
+        MenuBadgeApiEngineKey?: string;
         EnableViewSchema?: number;
         ViewSchemaVersion?: string;
         ViewConfigVersion?: number;

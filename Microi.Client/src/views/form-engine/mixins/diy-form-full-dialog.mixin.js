@@ -44,10 +44,8 @@ export default {
                     self.OpenDetailHandler(tableRowModel, formMode, isDefaultOpen, isOpenWorkFlowForm, wfParam);
                 });
 
-                // 加载数据日志 + 评论（角色权限校验在 LoadDataLog 内部完成）
-                self.LoadDataLog();
-                self.LoadDataComment();
-                self.LoadDataVersion();
+                // 日志、评论、版本由 FormRightPanel 在对应 Tab 首次可见时按需加载。
+                // 这里不再无条件三连请求，避免每次打开表单都等待隐藏侧栏数据。
             }
         },
         // ========== 加载数据日志（可重复调用：保存后、切换 Tab 时） ==========

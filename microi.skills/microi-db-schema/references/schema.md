@@ -370,7 +370,7 @@
 | `EnableViewSchema` | `int` | `Switch` | 是否启用跨端统一视图协议 |
 | `ViewSchemaVersion` | `varchar(25)` | `Text` | 跨端统一视图协议版本 |
 | `ViewConfigVersion` | `int` | `NumberText` | 视图配置递增版本 |
-| `ViewSchema` | `mediumtext` | `CodeEditor` | Detail/Edit/List/Card 的版本化跨端视图 JSON |
+| `ViewSchema` | `mediumtext` | `DevComponent` | 模块展示设计器，保存 Detail/Edit/List/Card 的版本化跨端视图 JSON |
 | `PageTemplate` | `varchar(255)` | `Text` | 界面模板 |
 | `ReportId` | `varchar(36)` | `Guid` | 报表 Id |
 | `ReportName` | `varchar(100)` | `Select` | 报表 |

@@ -816,7 +816,10 @@ export default {
                                 || self.ShowHideFieldsList.indexOf(search1.Name) > -1) &&
                             !self.DiyCommon.IsNull(search1.Id)
                         ) {
-                            search1["AsName"] = element.AsName || "";
+                            // 不修改共享 diy_field 元数据，保留 SelectFields 中的模块级复合列声明。
+                            search1 = Object.assign({}, search1, (element && typeof element === 'object') ? element : {}, {
+                                AsName: (element && element.AsName) || ""
+                            });
                             //这里要根据 SelectFields 赋值别名
                             // if (self.SysMenuModel.SelectFields && Array.isArray(self.SysMenuModel.SelectFields)) {
                             //     var search2 = _u.where(self.SysMenuModel.SelectFields, {

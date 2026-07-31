@@ -274,6 +274,61 @@ run_client_build() {
     return "$_exit_code"
 }
 
+# 在版本号和其它源码被修改前先检查前端构建资源。资源不足时快速失败，
+# 避免后端已编译/发布后才长时间等待内存恢复。
+run_client_preflight() {
+    local _node_cmd="node"
+    if is_windows_shell && command -v node.exe >/dev/null 2>&1; then
+        _node_cmd="node.exe"
+    fi
+    if ! command -v "$_node_cmd" >/dev/null 2>&1; then
+        echo "未找到 Node.js：$_node_cmd" >&2
+        return 127
+    fi
+    (
+        cd Microi.Client
+        "$_node_cmd" scripts/build-with-memory-guard.mjs --preflight-only
+    )
+}
+
+# publish 是唯一后端镜像输入。日志/spool 属于节点运行态，PDB 属于调试符号，
+# 两者都不能进入正式发布目录。只允许清理固定的 publish 目录，避免误删源码日志。
+cleanup_publish_artifacts() {
+    local target_dir="$1"
+    if [ ! -d "$target_dir" ]; then
+        print_fail "发布目录不存在，拒绝清理: $target_dir"
+    fi
+
+    local resolved_target expected_target
+    resolved_target=$(cd "$target_dir" && pwd -P)
+    expected_target=$(cd "Microi.Server/Microi.net.Api/bin/Release/publish" && pwd -P)
+    if [ "$resolved_target" != "$expected_target" ]; then
+        print_fail "发布目录越界，拒绝清理: $resolved_target"
+    fi
+
+    local pdb_count=0
+    pdb_count=$(find "$target_dir" -type f -iname '*.pdb' 2>/dev/null | wc -l | tr -d '[:space:]')
+    rm -rf "$target_dir/logs"
+    find "$target_dir" -type f -iname '*.pdb' -delete
+    print_info "发布产物清理完成：logs 已移除，PDB 已移除 ${pdb_count:-0} 个"
+}
+
+validate_publish_artifacts() {
+    local target_dir="$1"
+    for required_file in Microi.net.Api.dll Microi.net.Api.deps.json Microi.net.Api.runtimeconfig.json; do
+        if [ ! -f "$target_dir/$required_file" ]; then
+            print_fail "发布产物缺少必需文件: $required_file"
+        fi
+    done
+    if [ -d "$target_dir/logs" ]; then
+        print_fail "发布产物仍包含运行态 logs 目录"
+    fi
+    if find "$target_dir" -type f -iname '*.pdb' -print -quit | grep -q .; then
+        print_fail "发布产物仍包含 PDB 调试符号"
+    fi
+    print_info "发布产物守卫通过：必需运行文件完整，logs/PDB 均为 0"
+}
+
 # 跨平台 sed -i
 sed_inplace() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -409,9 +464,29 @@ if [ -z "$CURRENT_VERSION" ]; then
     print_fail "无法从 Directory.Build.props 读取 MicroiNetVersion"
 fi
 
-NEXT_VERSION=$(auto_increment_version "$CURRENT_VERSION")
+HEAD_VERSION=""
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    HEAD_VERSION=$(git show HEAD:Microi.Server/Directory.Build.props 2>/dev/null \
+        | grep -o '<MicroiNetVersion>[0-9]*\.[0-9]*\.[0-9]*</MicroiNetVersion>' \
+        | grep -o '[0-9]*\.[0-9]*\.[0-9]*' \
+        | head -1 || true)
+fi
+
+# 发布失败后，版本号通常已经更新但尚未提交。此时默认继续当前工作区版本，
+# 避免用户直接回车把 6.9.1 误递增成 6.9.2；当前版本提交后才进入正常 patch+1。
+REUSE_CURRENT_VERSION=false
+if [ -n "$HEAD_VERSION" ] && [ "$HEAD_VERSION" != "$CURRENT_VERSION" ]; then
+    NEXT_VERSION="$CURRENT_VERSION"
+    REUSE_CURRENT_VERSION=true
+else
+    NEXT_VERSION=$(auto_increment_version "$CURRENT_VERSION")
+fi
 echo -e "  当前版本: ${BOLD}${CURRENT_VERSION}${NC}"
-echo -e "  默认版本: ${BOLD}${GREEN}${NEXT_VERSION}${NC}（自动递增）"
+if [ "$REUSE_CURRENT_VERSION" = true ]; then
+    echo -e "  默认版本: ${BOLD}${GREEN}${NEXT_VERSION}${NC}（检测到 HEAD=${HEAD_VERSION}，继续未提交版本）"
+else
+    echo -e "  默认版本: ${BOLD}${GREEN}${NEXT_VERSION}${NC}（自动递增）"
+fi
 
 echo ""
 read -r -p "  是否手动指定版本号？直接回车使用默认版本 ${NEXT_VERSION}: " _version_input
@@ -607,7 +682,11 @@ echo -e "  ${BOLD}════════════════════�
 echo ""
 echo -e "  发布模式: ${BOLD}${_mode_names[$DEPLOY_MODE]}${NC}"
 if [ "$BUMP_VERSION" = true ]; then
-    echo -e "  版本号:   ${BOLD}${CURRENT_VERSION} → ${GREEN}${VERSION}${NC}"
+    if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+        echo -e "  版本号:   ${BOLD}${GREEN}${VERSION}${NC}（继续当前未提交版本）"
+    else
+        echo -e "  版本号:   ${BOLD}${CURRENT_VERSION} → ${GREEN}${VERSION}${NC}"
+    fi
 else
     echo -e "  版本号:   ${BOLD}${CURRENT_VERSION}${NC}（不变）"
 fi
@@ -644,9 +723,23 @@ sleep 1
 # 开始执行
 # ══════════════════════════════════════════════════════════════
 
+# 前端资源预检必须发生在版本号、升级资源和其它源码变更之前。
+if [ "$BUILD_CLIENT" = true ]; then
+    print_phase "发布前资源预检"
+    print_step "检查前端完整构建所需内存..."
+    if ! run_client_preflight; then
+        print_fail "前端构建资源不足，尚未修改版本号或启动其它重任务。请释放内存后重新执行。"
+    fi
+    print_success "前端构建资源预检通过"
+fi
+
 # ─── 阶段（条件）: 更新版本号 ─────────────────────────────
 if [ "$BUMP_VERSION" = true ]; then
-    print_phase "更新版本号（前后端统一: ${CURRENT_VERSION} → ${VERSION}）"
+    if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+        print_phase "确认版本号（前后端统一继续发布: ${VERSION}）"
+    else
+        print_phase "更新版本号（前后端统一: ${CURRENT_VERSION} → ${VERSION}）"
+    fi
 
     print_step "更新 Directory.Build.props → $VERSION"
     sed_inplace "s/<MicroiNetVersion>[0-9]*\.[0-9]*\.[0-9]*<\/MicroiNetVersion>/<MicroiNetVersion>$VERSION<\/MicroiNetVersion>/g" "Microi.Server/Directory.Build.props"
@@ -693,6 +786,23 @@ if [ "$PUBLISH_BACKEND" = true ]; then
         print_fail "升级资源同步失败；已阻止后端发布，避免官网与内置应用商城互相覆盖"
     fi
     print_success "升级资源安全检查已完成（实时同步或已验证离线基线，详见上方明细）"
+fi
+
+# 前端优先于 .NET 全量编译执行，避免后端编译产生的文件缓存和短期内存占用
+# 挤压 Vite 启动空间；现代浏览器和 Chrome 49 两套产物及完整校验保持不变。
+if [ "$BUILD_CLIENT" = true ]; then
+    print_phase "编译前端 Microi.Client"
+
+    print_step "前端受保护构建（现代 Node 堆最高 6GB、legacy 2GB；全机 95% 自动暂停，恢复后继续）..."
+    echo ""
+    cd Microi.Client
+    if ! run_client_build; then
+        cd ..
+        print_fail "前端编译失败"
+    fi
+    cd ..
+    echo ""
+    print_success "前端编译成功"
 fi
 
 # Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）
@@ -744,17 +854,22 @@ if [ "$PUBLISH_BACKEND" = true ]; then
 
 print_step "清理旧发布文件..."
 cd Microi.Server/Microi.net.Api
-dotnet clean -c Release > /dev/null 2>&1 || true
+# 完整删除旧 publish 即可；不能 dotnet clean，否则会把刚完成的解决方案编译产物删掉，
+# 导致 publish 再次编译整条项目引用链。
 rm -rf ./bin/Release/publish
 
-print_step "dotnet publish -c Release $_BUILD_EXTRA_ARGS..."
+print_step "dotnet publish -c Release --no-build --no-restore $_BUILD_EXTRA_ARGS（复用已验证的 Release 编译产物）..."
 echo ""
-if ! dotnet publish -c Release $_BUILD_EXTRA_ARGS -o ./bin/Release/publish; then
+if ! dotnet publish -c Release --no-build --no-restore $_BUILD_EXTRA_ARGS \
+    -p:DebugType=None -p:DebugSymbols=false \
+    -o ./bin/Release/publish; then
     cd ../..
     print_fail "Microi.net.Api 发布失败"
 fi
 cd ../..
 echo ""
+cleanup_publish_artifacts "$PUBLISH_DIR"
+validate_publish_artifacts "$PUBLISH_DIR"
 print_success "Microi.net.Api 发布成功"
 
 # --- 生成 NuGet 包（独立打包，避免编译期文件锁）---
@@ -775,6 +890,19 @@ if [ "$PUSH_NUGET" = true ] || [ "$HAS_ENCRYPT" = true ]; then
     rm -f "$_PACK_LOG"
     echo ""
     print_success "NuGet 包生成成功"
+fi
+
+# --- DLL 加密（仅源码作者环境） ---
+# 必须发生在冒烟测试之前，确保最终进入 NuGet 和 Docker 的混淆后 DLL
+# 已经真实完成启动验证，而不是只验证未混淆原件。
+if [ "$HAS_ENCRYPT" = true ]; then
+    print_divider
+    print_step "加密 DLL（Microi.net.dll + Microi.AI.dll）..."
+    if ! bash "$ENCRYPT_SCRIPT" "$PUBLISH_DIR"; then
+        print_fail "DLL 加密失败！请查看上方 Obfuscar 具体错误（工具缺失或依赖解析失败）"
+    fi
+    DLL_ENCRYPTED=true
+    print_success "DLL 加密完成"
 fi
 
 # --- 冒烟测试前：注入当前环境的 appsettings ---
@@ -858,51 +986,82 @@ if [ "$SMOKE_INJECTED" = true ]; then
 fi
 
 # --- 冒烟测试 ---
-# 成功标记：Program.cs:506 打印的 "开始访问系统吧"（Kestrel 已绑定端口并接受请求），
-# 而 Program.cs:178 打印的 "Microi所有初始化成功" 只是 Quartz 之后、Kestrel 之前，
-# 间隔约 5s（看历史日志 .tmp-api-out-run.log）。30s 太短，Quartz 集群锁竞争/加载 Job
-# 在数据库/Redis 慢时会超 30s。改成 90s + 以 Kestrel 真开始监听为准。
+# 启动成功必须以真实 liveness HTTP 200 为准，不能依赖 Program.cs 的中文提示文案；
+# 文案可能随版本调整，即使 Kestrel 已监听也会造成假超时。90s 用于容纳数据库/Redis
+# 较慢时的初始化，冒烟结束时对本次启动的进程执行有界关闭。
 SMOKE_TIMEOUT=${SMOKE_TIMEOUT:-90}
+SMOKE_PORT=${SMOKE_PORT:-18080}
+SMOKE_URL="http://127.0.0.1:${SMOKE_PORT}/api/Diagnostics/liveness"
 print_divider
 print_step "冒烟测试: 验证程序能否正常启动（超时 ${SMOKE_TIMEOUT}s）..."
 SMOKE_LOG="$(mktemp /tmp/microi-smoke-test.XXXXXX.log)"
 if ! (
     cd "$PUBLISH_DIR"
-    dotnet Microi.net.Api.dll --urls=http://0.0.0.0:8080 > "$SMOKE_LOG" 2>&1 &
+
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "  ❌ 冒烟测试失败: 未找到 curl，无法验证 liveness HTTP 状态！"
+        exit 1
+    fi
+    if timeout 1 bash -c "</dev/tcp/127.0.0.1/${SMOKE_PORT}" 2>/dev/null; then
+        echo "  ❌ 冒烟测试失败: 本机端口 ${SMOKE_PORT} 已被占用；可通过 SMOKE_PORT 指定其它空闲端口。"
+        exit 1
+    fi
+
+    dotnet Microi.net.Api.dll --urls="http://127.0.0.1:${SMOKE_PORT}" > "$SMOKE_LOG" 2>&1 &
     SMOKE_PID=$!
-    # 两个任一出现即视为成功：提前的 "Microi所有初始化成功" + 最终的 "开始访问系统吧"
-    for i in $(seq 1 "$SMOKE_TIMEOUT"); do
-        if grep -qE "开始访问系统吧|Microi所有初始化成功" "$SMOKE_LOG" 2>/dev/null; then
-            if grep -q "开始访问系统吧" "$SMOKE_LOG" 2>/dev/null; then
-                echo "  ✅ 冒烟测试通过: Kestrel 已开始监听端口！"
-            else
-                echo "  ✅ 冒烟测试通过: Microi所有初始化成功（${i}s）"
-            fi
-            kill $SMOKE_PID 2>/dev/null; wait $SMOKE_PID 2>/dev/null || true
-            rm -f "$SMOKE_LOG"; exit 0
+
+    stop_smoke_process() {
+        if ! kill -0 "$SMOKE_PID" 2>/dev/null; then
+            wait "$SMOKE_PID" 2>/dev/null || true
+            return 0
         fi
-        if ! kill -0 $SMOKE_PID 2>/dev/null; then
-            if grep -qE "开始访问系统吧|Microi所有初始化成功" "$SMOKE_LOG" 2>/dev/null; then
-                echo "  ✅ 冒烟测试通过！（进程已正常退出）"
-                rm -f "$SMOKE_LOG"; exit 0
-            else
-                echo "  ❌ 冒烟测试失败: 程序异常退出！"
-                echo "--- 启动日志 ---"; cat "$SMOKE_LOG"; echo "----------------"
-                rm -f "$SMOKE_LOG"; exit 1
-            fi
+        kill -TERM "$SMOKE_PID" 2>/dev/null || true
+        local _shutdown_wait=0
+        while kill -0 "$SMOKE_PID" 2>/dev/null && [ "$_shutdown_wait" -lt 50 ]; do
+            sleep 0.1
+            ((_shutdown_wait++)) || true
+        done
+        if kill -0 "$SMOKE_PID" 2>/dev/null; then
+            echo "  ⚠️  冒烟进程 5 秒内未退出，正在强制结束本次临时进程。"
+            kill -KILL "$SMOKE_PID" 2>/dev/null || true
+        fi
+        wait "$SMOKE_PID" 2>/dev/null || true
+    }
+    trap stop_smoke_process EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM HUP
+
+    for i in $(seq 1 "$SMOKE_TIMEOUT"); do
+        if ! kill -0 "$SMOKE_PID" 2>/dev/null; then
+            echo "  ❌ 冒烟测试失败: 程序异常退出！"
+            echo "--- 启动日志（前 80 行 + 后 120 行）---"
+            sed -n '1,80p' "$SMOKE_LOG"
+            tail -n 120 "$SMOKE_LOG"
+            echo "----------------"
+            exit 1
+        fi
+        _smoke_http_status=$(curl --silent --show-error --max-time 2 \
+            --output /dev/null --write-out '%{http_code}' "$SMOKE_URL" 2>/dev/null || true)
+        if [ "$_smoke_http_status" = "200" ]; then
+            echo "  ✅ 冒烟测试通过: ${SMOKE_URL} 返回 HTTP 200（${i}s）！"
+            exit 0
         fi
         sleep 1
     done
     echo "  ❌ 冒烟测试失败: 启动超时（${SMOKE_TIMEOUT}秒）！"
-    echo "--- 启动日志 ---"; cat "$SMOKE_LOG"; echo "----------------"
-    kill $SMOKE_PID 2>/dev/null; wait $SMOKE_PID 2>/dev/null || true
-    rm -f "$SMOKE_LOG"; exit 1
+    echo "--- 启动日志（前 80 行 + 后 120 行）---"
+    sed -n '1,80p' "$SMOKE_LOG"
+    tail -n 120 "$SMOKE_LOG"
+    echo "----------------"
+    exit 1
 ); then
     rm -f "$SMOKE_LOG" 2>/dev/null
     # 先还原 appsettings，再让脚本整体中止，避免把临时配置留给发布产物
     if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
         mv "$SMOKE_BACKUP" "$PUBLISH_DIR/appsettings.json"
     fi
+    # 失败路径同样清理本次冒烟生成的临时 logs/PDB，避免反复失败后 publish 膨胀。
+    cleanup_publish_artifacts "$PUBLISH_DIR"
     print_fail "冒烟测试失败，请检查编译产物"
 fi
 rm -f "$SMOKE_LOG" 2>/dev/null
@@ -914,16 +1073,11 @@ if [ "$SMOKE_INJECTED" = true ] && [ -f "$SMOKE_BACKUP" ]; then
     print_info "已还原发布目录的 appsettings.json"
 fi
 
-# --- DLL 加密（仅源码作者环境） ---
-if [ "$HAS_ENCRYPT" = true ]; then
-    print_divider
-    print_step "加密 DLL（Microi.net.dll + Microi.AI.dll）..."
-    if ! bash "$ENCRYPT_SCRIPT" "$PUBLISH_DIR"; then
-        print_fail "DLL 加密失败！请查看上方 Obfuscar 具体错误（工具缺失或依赖解析失败）"
-    fi
-    DLL_ENCRYPTED=true
-    print_success "DLL 加密完成"
-fi
+# 冒烟启动会按运行时约定重新创建 logs/syslog-spool；验证结束后必须再次清理，
+# 保证待推送镜像只包含可部署程序文件。
+cleanup_publish_artifacts "$PUBLISH_DIR"
+
+validate_publish_artifacts "$PUBLISH_DIR"
 
 fi  # END: if PUBLISH_BACKEND
 
@@ -1050,22 +1204,6 @@ if [ "$PUSH_NUGET" = true ]; then
     fi
 fi
 
-# ─── 阶段（条件）: 编译前端 ───────────────────────────────
-if [ "$BUILD_CLIENT" = true ]; then
-    print_phase "编译前端 Microi.Client"
-
-    print_step "前端受保护构建（现代 Node 堆最高 6GB、legacy 2GB；全机 95% 自动暂停，恢复后继续）..."
-    echo ""
-    cd Microi.Client
-    if ! run_client_build; then
-        cd ..
-        print_fail "前端编译失败"
-    fi
-    cd ..
-    echo ""
-    print_success "前端编译成功"
-fi
-
 # ─── 阶段（条件）: 推送 Docker 镜像 ──────────────────────
 
 # 确保 Docker 已启动（Windows 启动 Docker Desktop，macOS 启动 Docker.app）
@@ -1119,6 +1257,50 @@ ensure_docker_running() {
     print_success "Docker 已就绪（等待 ${_waited}s）"
 }
 
+# 为现有 Dockerfile 生成最小上下文白名单。Docker 构建目录仍保持兼容，
+# 但后端只能读取 publish，前端只能读取 dist/default.conf，net10.0 永不发送。
+prepare_docker_context() {
+    local plan_type="$1"
+    local build_dir=""
+    if [ "$plan_type" = "api" ]; then
+        build_dir="Microi.Server/Microi.net.Api/bin/Release"
+        cleanup_publish_artifacts "$PUBLISH_DIR"
+        validate_publish_artifacts "$PUBLISH_DIR"
+        cat > "$build_dir/.dockerignore" <<'EOF'
+*
+!Dockerfile
+!publish/
+!publish/**
+publish/logs/
+publish/**/*.pdb
+EOF
+        print_info "后端 Docker 上下文已限制为 publish/（net10.0 已排除）"
+    elif [ "$plan_type" = "client" ]; then
+        build_dir="Microi.Client/bin/Release"
+        if [ ! -f "$build_dir/dist/index.html" ]; then
+            print_fail "前端发布产物缺少 dist/index.html"
+        fi
+        cat > "$build_dir/.dockerignore" <<'EOF'
+*
+!Dockerfile
+!default.conf
+!dist/
+!dist/**
+EOF
+        print_info "前端 Docker 上下文已限制为 dist/ 和 default.conf"
+    else
+        print_fail "未知 Docker 方案类型: $plan_type"
+    fi
+}
+
+docker_registry_login() {
+    print_step "登录 ${DOCKER_REGISTRY}..."
+    if ! printf '%s' "$DOCKER_PASSWORD" | docker login \
+        --username "$DOCKER_USERNAME" --password-stdin "$DOCKER_REGISTRY"; then
+        print_fail "Docker 镜像仓库登录失败"
+    fi
+}
+
 # Docker 推送函数（内联执行，不依赖外部脚本）
 docker_push_plan() {
     local plan="$1"
@@ -1142,18 +1324,10 @@ docker_push_plan() {
         print_fail "构建目录不存在: $build_dir"
     fi
 
-    # 登录 Docker 镜像仓库
-    print_step "登录 ${DOCKER_REGISTRY}..."
-    docker login --username="${DOCKER_USERNAME}" --password="${DOCKER_PASSWORD}" "${DOCKER_REGISTRY}"
-
-    # 清理闲置镜像，释放 Docker VM 磁盘空间（避免 no space left on device）
-    print_step "清理闲置 Docker 镜像..."
-    docker image prune -a -f --filter "label!=keep" 2>/dev/null || true
-    print_info "磁盘使用: $(docker system df --format '镜像: {{.ImagesSize}}' 2>/dev/null || echo '(无法获取)')"
-
-    # 构建镜像（--no-cache 确保 Dockerfile 修改和最新产物都进入新镜像，避免旧缓存层污染）
+    # 使用 Docker 内容摘要缓存；publish/dist 内容变化会自动使 COPY 层失效。
+    # --pull 仍会检查基础镜像更新，不会因为启用缓存而固化旧基础镜像。
     print_step "构建镜像: $local_image"
-    (cd "$build_dir" && docker build --no-cache -t "$local_image" .)
+    (cd "$build_dir" && docker build --pull -t "$local_image" .)
 
     # 推送每个远程镜像
     IFS=',' read -ra _images <<< "$remote_images"
@@ -1177,6 +1351,16 @@ if [ ${#SELECTED_API_PLANS[@]} -gt 0 ] || [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]
 
     # 确保 Docker 已启动
     ensure_docker_running
+
+    # 在登录和构建前验证并收紧上下文；同一轮发布只登录一次，不破坏刚生成的缓存层。
+    if [ ${#SELECTED_API_PLANS[@]} -gt 0 ]; then
+        prepare_docker_context "api"
+    fi
+    if [ ${#SELECTED_CLIENT_PLANS[@]} -gt 0 ]; then
+        prepare_docker_context "client"
+    fi
+    docker_registry_login
+    print_info "Docker 磁盘使用: $(docker system df --format '{{.Type}}={{.Size}}（可回收 {{.Reclaimable}}）' 2>/dev/null | tr '\n' ';' || echo '(无法获取)')"
 
     # 模式5（跳过编译直接推送）：通过加密指纹文件 + MD5 验证确认 DLL 已加密
     if [ "$DEPLOY_MODE" = "5" ] && [ "$HAS_ENCRYPT" = true ] && [ "$DLL_ENCRYPTED" != true ]; then
@@ -1300,7 +1484,11 @@ echo -e "${BOLD}${GREEN}╚═════════════════�
 echo ""
 echo -e "  发布模式: ${BOLD}${_mode_names_final[$DEPLOY_MODE]}${NC}"
 if [ "$BUMP_VERSION" = true ]; then
-    echo -e "  版本号:   ${BOLD}${CURRENT_VERSION} → ${GREEN}${VERSION}${NC}"
+    if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+        echo -e "  版本号:   ${BOLD}${GREEN}${VERSION}${NC}（继续当前未提交版本）"
+    else
+        echo -e "  版本号:   ${BOLD}${CURRENT_VERSION} → ${GREEN}${VERSION}${NC}"
+    fi
 else
     echo -e "  版本号:   ${BOLD}${CURRENT_VERSION}${NC}（不变）"
 fi

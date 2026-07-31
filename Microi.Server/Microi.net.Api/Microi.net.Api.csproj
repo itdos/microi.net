@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-    <!-- 本地发布项目：dotnet clean && dotnet publish -c Release -o ./bin/Release/publish -->
+    <!-- 本地发布项目：先完成 Release build，再让 publish 复用已编译且已还原的产物输出到 bin/Release/publish。 -->
     <!-- 本地运行编译后的项目：dotnet Microi.net.Api.dll __urls=http://0.0.0.0:8080 【需替换__urls】 -->
     <!-- 本地运行项目：dotnet run __launch-profile Microi.net.Api -->
     <MicroiLocalRunCommand>Push-Location Microi.Server/Microi.net.Api; dotnet run --launch-profile Microi.net.Api; Pop-Location</MicroiLocalRunCommand>
@@ -41,7 +41,18 @@
     <Content Update="appsettings.*.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
     <Content Remove="artifacts\**\*" />
     <None Remove="artifacts\**\*" />
+    <!-- 日志与故障 spool 是当前节点的运行态数据。保留源目录用于重放，但绝不复制到编译/发布产物。 -->
+    <Content Remove="logs\**\*" />
+    <None Remove="logs\**\*" />
   </ItemGroup>
+
+  <!-- 发布包不携带调试符号；项目引用和第三方包产生的 PDB 也统一从发布清单移除。 -->
+  <Target Name="RemoveDebugSymbolsFromPublish" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
 
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <WarningLevel>4</WarningLevel>

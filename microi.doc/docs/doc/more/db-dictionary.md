@@ -86,6 +86,8 @@
 | `sys_menu` | `ViewSchemaVersion` | 前端/模块 | 跨端统一视图协议版本。 |
 | `sys_menu` | `ViewConfigVersion` | 前端/模块 | 视图配置递增版本，用于缓存失效。 |
 | `sys_menu` | `ViewSchema` | 前端/模块 | Detail/Edit/List/Card 的版本化跨端视图 JSON。 |
+| `sys_menu` | `MenuBadgeEnabled` | 前端/菜单 | 左侧菜单统计角标开关。 |
+| `sys_menu` | `MenuBadgeApiEngineKey` | 前端/菜单 | 菜单统计接口引擎 Key，标准值路径为 `Data.Value`。 |
 | `sys_menu` | `SqlJoin` | 后端查询 | 列表查询 JOIN 片段。默认主表别名为 A。 |
 | `sys_menu` | `SqlWhere` | 后端查询 | 模块级 Where 片段，可使用 CurrentUser 变量。 |
 | `sys_menu` | `ImportV8` | 导入 | 导入处理扩展。 |
@@ -458,7 +460,9 @@
 | `EnableViewSchema` | 启用跨端视图 | `int` | `Switch` | 1 表示启用 `ViewSchema` |
 | `ViewSchemaVersion` | 视图协议版本 | `varchar(25)` | `Text` | 当前协议语义版本 |
 | `ViewConfigVersion` | 视图配置版本 | `int` | `NumberText` | 每次发布配置时递增 |
-| `ViewSchema` | 跨端视图协议 | `mediumtext` | `CodeEditor` | Detail/Edit/List/Card 的版本化 JSON |
+| `ViewSchema` | 模块展示设计器 | `mediumtext` | `DevComponent` | 可视化配置 List/Card，保存 Detail/Edit/List/Card 版本化 JSON |
+| `MenuBadgeEnabled` | 显示菜单统计 | `int` | `Switch` | 1 表示调用统计接口并在左侧菜单显示角标 |
+| `MenuBadgeApiEngineKey` | 菜单统计接口 | `varchar(100)` | `Select` | 接口引擎 Key，返回 `Data.Value` |
 | `Url` | Url地址 | `varchar(500)` | `Text` | Url地址 |
 | `IconClass` | 图标 | `varchar(500)` | `FontAwesome` | 图标 |
 | `EditCodeShowV8` | [编辑]按钮显示条件 | `mediumtext` | `CodeEditor` | [编辑]按钮显示条件 |

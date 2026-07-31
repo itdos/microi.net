@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
+import { normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
@@ -137,6 +137,15 @@ function normalizeAccessKeyStringList(values, lowerCase = false) {
         .map(value => lowerCase ? value.toLowerCase() : value);
     return Array.from(new Set(normalized)).sort((left, right) => left.localeCompare(right));
 }
+function buildBrowserAccessKeyLoginUrlTemplates(osClient, redirectPath) {
+    const tenant = encodeURIComponent(String(osClient || '').trim());
+    const redirect = String(redirectPath || '').trim() || '/';
+    const relative = `/?OsClient=${tenant}#/access-login?access_key=<AccessKey>&redirect=${encodeURIComponent(redirect)}`;
+    return {
+        relative,
+        absolute: `https://<Microi前端域名>${relative}`,
+    };
+}
 /**
  * Canonicalize the effective access-key grant before asking for confirmation.
  * The returned SHA-256 binds confirmation to scopes, allowlists and expiry,
@@ -210,6 +219,8 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_import_external_attachment',
     'microi_get_field_list',
     'microi_add_field',
+    'microi_add_layout_field',
+    'microi_bulk_apply_form_layout',
     'microi_delete_field',
     'microi_update_field',
     'microi_refresh_schema_cache',
@@ -234,8 +245,10 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_create_engine',
     'microi_get_module',
     'microi_update_module',
+    'microi_bulk_apply_module_presentation',
     'microi_list_modules',
     'microi_update_table',
+    'microi_bulk_update_table_features',
     'microi_set_role_permission',
     'microi_set_engine_anonymous',
 ];
@@ -647,6 +660,7 @@ BOUNDARY RULES:
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
+- **固定看板启动 URL 规范** — 使用 Microi.Client 前端 WebBase（不是 API Server）拼接 \`/?OsClient=${ctx.osClient}#/access-login?access_key=<密钥>&redirect=<encodeURIComponent后的站内Hash路由>\`。例如 redirect 原值为 \`/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX\` 时编码为 \`%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX\`。完整自动登录链接应保存为电视/看板的启动页；兑换成功后地址栏变为不含 \`access_key\` 的目标页是安全设计，禁止给目标页再次追加密钥，也禁止新增 \`permanent=1\` 一类由客户端决定有效期的参数
 
 ## 数据库索引（强制通过 MCP）
 - 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
@@ -826,6 +840,8 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
 - componentPath 默认 /diy/diy-table-rowlist
 - openType: Diy（低代码页面）, Url（外部链接）, Page（自定义前端页面）
 - 绑定 diyTableId 后，平台自动提供完整 CRUD 功能（列表、搜索、新增、编辑、删除、导入、导出）
+- 重要菜单可配置 menuBadgeEnabled=1 和 menuBadgeApiEngineKey，在侧栏显示接口引擎统计值；接口应返回 {Code:1,Data:{Value:number}}，并保持轻量、租户隔离。
+- ViewSchema 可直接传 JSON 对象或字符串；Layout.List 的多行列/尾随字段与 Layout.Card 的顶部、右侧、正文、元数据、底部字段组会完整保存。
 
 ## V8 事件类型（microi_get_event_code / microi_save_event_code 的 eventType）
 | eventType | 运行端 | 触发时机 |
@@ -1025,7 +1041,7 @@ export function createMcpServer(client, context) {
             };
         }
     });
-    server.tool('microi_create_my_access_key', `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. The first call is a dry confirmation step and returns RequiredConfirmationSha256; repeat the exact same payload with confirmExecution equal to that SHA-256.`, {
+    server.tool('microi_create_my_access_key', `Create one revocable, bounded access key for the current authenticated user on OsClient "${osClient}". This is not a permanent admin/MCP bypass: the backend stores only a SHA-256 hash, returns plaintext exactly once, and exchanges the key for a short scoped session. The MCP surface never creates permanent keys; omitting expiresAt uses the backend's bounded default (currently 90 days). Omit scopes for the minimum page:open + form:read permissions. For a browser kiosk, combine the one-time AccessKey with the Microi.Client frontend origin using /?OsClient=${encodeURIComponent(osClient)}#/access-login?access_key=<AccessKey>&redirect=<encodeURIComponent(redirectPath)>; do not use the API origin and do not append the key to the destination page. The first call is a dry confirmation step and returns RequiredConfirmationSha256; repeat the exact same payload with confirmExecution equal to that SHA-256.`, {
         name: z.string().min(1).max(200).describe('Human-readable key name.'),
         allowedRoutes: z.array(z.string().min(1).max(500)).min(1).max(100).describe('Exact allowed routes. Use * only after explicit risk review.'),
         allowedTableNames: z.array(z.string().min(1).max(200)).min(1).max(100).describe('Exact table names. Use * only after explicit risk review.'),
@@ -1036,7 +1052,7 @@ export function createMcpServer(client, context) {
             'data-source:run',
             'file:read',
         ])).min(1).max(5).optional().describe('Omit for minimum page:open + form:read. MCP does not expose form:write/form:export until the backend path facade supports them.'),
-        redirectPath: z.string().max(500).optional().describe('Initial route; must be included in allowedRoutes.'),
+        redirectPath: z.string().max(500).optional().describe('Internal Hash route beginning with /; must be included in allowedRoutes. Example: /mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX. MCP URL-encodes the entire value into the browser login redirect parameter.'),
         allowedApiEngineKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with api-engine:run. Wildcards are rejected.'),
         allowedDataSourceKeys: z.array(z.string().min(1).max(200)).max(100).optional().describe('Exact keys; required only with data-source:run. Wildcards are rejected.'),
         expiresAt: z.string().optional().describe('Optional server-local expiry time, later than now and no more than 365 days. Omit for the bounded default.'),
@@ -1084,6 +1100,7 @@ export function createMcpServer(client, context) {
             if (result.Code !== 1 || !result.Data?.AccessKey) {
                 return { content: [{ type: 'text', text: `创建访问密钥失败：${result.Msg || `Code=${result.Code}`}` }], isError: true };
             }
+            const loginUrlTemplates = buildBrowserAccessKeyLoginUrlTemplates(osClient, confirmation.normalized.redirectPath);
             // Do not return LoginPath because it embeds a second plaintext copy in a URL.
             // The credential below is the one and only MCP response containing plaintext.
             return {
@@ -1093,6 +1110,9 @@ export function createMcpServer(client, context) {
                             AccessKey: result.Data.AccessKey,
                             Record: result.Data.Record || null,
                             Notice: '明文仅本次返回。请立即存入安全凭据库；后续列表和日志不会再次显示。',
+                            LoginUrlRelativeTemplate: loginUrlTemplates.relative,
+                            LoginUrlTemplate: loginUrlTemplates.absolute,
+                            LoginUrlNotice: '请用 Microi.Client 前端域名替换占位符，并用本次 AccessKey 替换 <AccessKey>。固定终端应保存完整 access-login 启动链接；登录后目标页面不再显示 access_key 属于正常的安全清理。',
                         }, null, 2),
                     }],
             };
@@ -2250,6 +2270,388 @@ export function createMcpServer(client, context) {
         }
     });
     // ========================
+    // Tool: 添加纯元数据布局控件（不执行 ALTER TABLE）
+    // ========================
+    server.tool('microi_add_layout_field', `Add a metadata-only form layout field for OsClient "${osClient}". Supports CollapseGroup, Divider and Tabs. The backend receives an empty physical Type and therefore must not create or alter a database column. Use this instead of microi_add_field for layout nodes. The operation is idempotent and verifies the saved metadata by readback.`, {
+        tableId: z.string().describe('Owning diy_table Id.'),
+        name: z.string().describe('Stable metadata field name, unique inside the table.'),
+        label: z.string().describe('Visible layout title.'),
+        component: z.enum(['CollapseGroup', 'Divider', 'Tabs']).describe('Layout component type.'),
+        tab: z.string().optional().describe('Optional owning form Tab id/name.'),
+        sort: z.number().optional().describe('Display order. Place the layout node immediately before the fields it controls.'),
+        visible: z.number().optional().describe('PC visibility. Default: 1.'),
+        appVisible: z.number().optional().describe('Mobile visibility. Default: 1.'),
+        config: z.union([z.string(), jsonRecordSchema]).optional().describe('Component Config JSON. CollapseGroup should normally set DefaultCollapsed=false, Description, Icon, Theme and ShowFieldCount.'),
+        description: z.string().optional(),
+        confirmExecution: z.string().describe('Must equal the exact layout field name or EXECUTE.'),
+    }, async ({ tableId, name, label, component, tab, sort, visible, appVisible, config, description, confirmExecution }) => {
+        try {
+            if (confirmExecution !== name && confirmExecution !== 'EXECUTE') {
+                return { content: [{ type: 'text', text: `Error: confirmExecution must equal "${name}" or EXECUTE.` }], isError: true };
+            }
+            const configText = config === undefined
+                ? undefined
+                : (typeof config === 'string' ? config : JSON.stringify(config));
+            if (configText)
+                JSON.parse(configText);
+            const result = await client.addField({
+                TableId: tableId,
+                Name: name,
+                Label: label,
+                Type: '',
+                Component: component,
+                Visible: visible ?? 1,
+                AppVisible: appVisible ?? 1,
+                Tab: tab,
+                TableWidth: 120,
+                Sort: sort ?? nextSortFor(tableId),
+                Data: '[]',
+                Config: configText,
+                Description: description,
+            });
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            const readback = await client.getFieldList(undefined, tableId);
+            if (readback.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: layout field write succeeded but readback failed: ${readback.Msg}` }], isError: true };
+            }
+            const saved = unwrapList(readback.Data)
+                .find(item => String(item.Name || '') === name && String(item.Component || '') === component);
+            if (!saved) {
+                return { content: [{ type: 'text', text: `Error: layout field ${name} was not found after readback.` }], isError: true };
+            }
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            ok: true,
+                            id: saved.Id,
+                            tableId,
+                            name,
+                            component,
+                            metadataOnly: true,
+                            skipped: Boolean(result.Data?.Skipped),
+                        }, null, 2),
+                    }],
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: 批量应用表单布局（并发指纹保护 + V8 不变校验）
+    // ========================
+    server.tool('microi_bulk_apply_form_layout', `Read, plan or apply metadata-only form layout changes for OsClient "${osClient}". A dry-run may omit expectedFingerprint to obtain the current SHA-256 state; real writes require that fingerprint, preventing stale AI snapshots from overwriting another developer's changes. The tool may add CollapseGroup/Divider/Tabs metadata nodes, patch only Tab/Sort/Config/FormWidth/TableWidth on explicitly listed fields, and patch diy_table.Tabs. It verifies the final layout and proves table/field V8 code plus field Data remain unchanged. Re-running a partially completed batch is safe.`, {
+        plans: z.array(z.object({
+            tableId: z.string().min(1),
+            tableName: z.string().min(1),
+            expectedFingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional(),
+            tableTabs: z.string().optional().describe('Final diy_table.Tabs JSON string. Omit to preserve.'),
+            layoutFields: z.array(z.object({
+                name: z.string().min(1),
+                label: z.string().min(1),
+                component: z.enum(['CollapseGroup', 'Divider', 'Tabs']),
+                tab: z.string().optional(),
+                sort: z.number(),
+                visible: z.number().optional(),
+                appVisible: z.number().optional(),
+                config: z.union([z.string(), jsonRecordSchema]).optional(),
+                description: z.string().optional(),
+            })).optional(),
+            fieldPatches: z.array(z.object({
+                id: z.string().min(1),
+                tab: z.string().optional(),
+                sort: z.number().optional(),
+                config: z.string().optional(),
+                formWidth: z.number().nullable().optional(),
+                tableWidth: z.number().int().min(60).max(600).optional(),
+            })).optional(),
+        })).min(1).max(100),
+        dryRun: z.boolean().optional().describe('Default true. Set false for real writes.'),
+        confirmExecution: z.string().optional().describe('Required when dryRun=false; must be EXECUTE.'),
+    }, async ({ plans, dryRun, confirmExecution }) => {
+        const planning = dryRun !== false;
+        if (!planning && confirmExecution !== 'EXECUTE') {
+            return { content: [{ type: 'text', text: 'Error: real layout writes require dryRun=false and confirmExecution="EXECUTE".' }], isError: true };
+        }
+        const tableSelectFields = [
+            'Id', 'Name', 'Tabs', 'SubmitFormV8', 'SubmitBeforeServerV8', 'SubmitAfterServerV8',
+            'InFormV8', 'OutFormV8', 'ServerDataV8', 'UpdateTime',
+        ];
+        const fieldSelectFields = [
+            'Id', 'TableId', 'Name', 'Label', 'Component', 'Sort', 'Visible', 'AppVisible',
+            'FormWidth', 'TableWidth', 'Tab', 'Data', 'Config', 'V8Code', 'KeyupV8Code', 'UpdateTime', 'IsDeleted',
+        ];
+        const readState = async (tableId) => {
+            const tableResponse = await client.getTableData('diy_table', {
+                _Where: [['Id', '=', tableId]],
+                _SelectFields: tableSelectFields,
+                _PageIndex: 1,
+                _PageSize: 2,
+            });
+            if (tableResponse.Code !== 1)
+                throw new Error(tableResponse.Msg || '读取 diy_table 失败');
+            const tableRows = unwrapList(tableResponse.Data);
+            if (tableRows.length !== 1)
+                throw new Error(tableRows.length ? 'TableId 命中多张表' : '未找到表');
+            const fieldResponse = await client.getTableData('diy_field', {
+                _Where: [['TableId', '=', tableId], ['IsDeleted', '=', 0]],
+                _SelectFields: fieldSelectFields,
+                _OrderBy: 'Sort',
+                _OrderByType: 'ASC',
+                _PageIndex: 1,
+                _PageSize: 500,
+            });
+            if (fieldResponse.Code !== 1)
+                throw new Error(fieldResponse.Msg || '读取 diy_field 失败');
+            return {
+                table: tableRows[0],
+                fields: unwrapList(fieldResponse.Data),
+            };
+        };
+        const canonicalState = (state) => ({
+            table: {
+                Id: state.table.Id ?? '',
+                Name: state.table.Name ?? '',
+                Tabs: state.table.Tabs ?? '',
+                SubmitFormV8: state.table.SubmitFormV8 ?? '',
+                SubmitBeforeServerV8: state.table.SubmitBeforeServerV8 ?? '',
+                SubmitAfterServerV8: state.table.SubmitAfterServerV8 ?? '',
+                InFormV8: state.table.InFormV8 ?? '',
+                OutFormV8: state.table.OutFormV8 ?? '',
+                ServerDataV8: state.table.ServerDataV8 ?? '',
+            },
+            fields: state.fields
+                .map(field => ({
+                Id: field.Id ?? '',
+                Name: field.Name ?? '',
+                Component: field.Component ?? '',
+                Sort: field.Sort ?? null,
+                Visible: field.Visible ?? null,
+                AppVisible: field.AppVisible ?? null,
+                FormWidth: field.FormWidth ?? null,
+                TableWidth: field.TableWidth ?? null,
+                Tab: field.Tab ?? '',
+                Data: field.Data ?? '',
+                Config: field.Config ?? '',
+                V8Code: field.V8Code ?? '',
+                KeyupV8Code: field.KeyupV8Code ?? '',
+            }))
+                .sort((a, b) => String(a.Id).localeCompare(String(b.Id))),
+        });
+        const fingerprint = (state) => crypto
+            .createHash('sha256')
+            .update(JSON.stringify(canonicalState(state)), 'utf8')
+            .digest('hex');
+        const matchesExpectedJson = (actual, expected) => {
+            if (Array.isArray(expected)) {
+                return Array.isArray(actual)
+                    && actual.length === expected.length
+                    && expected.every((item, index) => matchesExpectedJson(actual[index], item));
+            }
+            if (expected && typeof expected === 'object') {
+                if (!actual || typeof actual !== 'object' || Array.isArray(actual))
+                    return false;
+                const actualObject = actual;
+                return Object.entries(expected)
+                    .filter(([key]) => !key.startsWith('_'))
+                    .every(([key, value]) => Object.prototype.hasOwnProperty.call(actualObject, key)
+                    && matchesExpectedJson(actualObject[key], value));
+            }
+            return (actual ?? null) === (expected ?? null);
+        };
+        const desiredLayoutMatches = (state, plan) => {
+            if (plan.tableTabs !== undefined) {
+                try {
+                    if (!matchesExpectedJson(JSON.parse(String(state.table.Tabs || '[]')), JSON.parse(plan.tableTabs || '[]')))
+                        return false;
+                }
+                catch {
+                    return false;
+                }
+            }
+            const fieldsById = new Map(state.fields.map(field => [String(field.Id || ''), field]));
+            for (const patch of plan.fieldPatches || []) {
+                const field = fieldsById.get(patch.id);
+                if (!field)
+                    return false;
+                if (patch.tab !== undefined && String(field.Tab || '') !== patch.tab)
+                    return false;
+                if (patch.sort !== undefined && Number(field.Sort) !== patch.sort)
+                    return false;
+                if (patch.config !== undefined && String(field.Config || '') !== patch.config)
+                    return false;
+                if (patch.formWidth !== undefined && (field.FormWidth ?? null) !== patch.formWidth)
+                    return false;
+                if (patch.tableWidth !== undefined && Number(field.TableWidth) !== patch.tableWidth)
+                    return false;
+            }
+            for (const layoutField of plan.layoutFields || []) {
+                const field = state.fields.find(item => String(item.Name || '') === layoutField.name);
+                if (!field || String(field.Component || '') !== layoutField.component)
+                    return false;
+            }
+            return true;
+        };
+        const immutableState = (state, newNames) => ({
+            tableEvents: {
+                SubmitFormV8: state.table.SubmitFormV8 ?? '',
+                SubmitBeforeServerV8: state.table.SubmitBeforeServerV8 ?? '',
+                SubmitAfterServerV8: state.table.SubmitAfterServerV8 ?? '',
+                InFormV8: state.table.InFormV8 ?? '',
+                OutFormV8: state.table.OutFormV8 ?? '',
+                ServerDataV8: state.table.ServerDataV8 ?? '',
+            },
+            fields: state.fields
+                .filter(field => !newNames.has(String(field.Name || '')))
+                .map(field => ({
+                Id: field.Id ?? '',
+                Name: field.Name ?? '',
+                Component: field.Component ?? '',
+                Data: field.Data ?? '',
+                V8Code: field.V8Code ?? '',
+                KeyupV8Code: field.KeyupV8Code ?? '',
+            }))
+                .sort((a, b) => String(a.Id).localeCompare(String(b.Id))),
+        });
+        const summary = {
+            ok: true,
+            dryRun: planning,
+            requested: plans.length,
+            matched: 0,
+            planned: 0,
+            updated: 0,
+            unchanged: 0,
+            verified: 0,
+            stale: 0,
+            states: [],
+            failures: [],
+        };
+        for (const plan of plans) {
+            try {
+                const before = await readState(plan.tableId);
+                if (String(before.table.Name || '').toLowerCase() !== plan.tableName.toLowerCase()) {
+                    throw new Error(`TableId 当前绑定 ${String(before.table.Name || '')}，与计划 ${plan.tableName} 不一致`);
+                }
+                const actualFingerprint = fingerprint(before);
+                summary.states.push({
+                    tableId: plan.tableId,
+                    tableName: String(before.table.Name || ''),
+                    updateTime: before.table.UpdateTime,
+                    fingerprint: actualFingerprint,
+                    fieldCount: before.fields.length,
+                });
+                if (plan.expectedFingerprint && actualFingerprint.toLowerCase() !== plan.expectedFingerprint.toLowerCase()) {
+                    summary.stale++;
+                    throw new Error(`STALE_LAYOUT_FINGERPRINT：当前 ${actualFingerprint}，计划 ${plan.expectedFingerprint}`);
+                }
+                if (!planning && !plan.expectedFingerprint) {
+                    throw new Error('真实写入必须提供 dry-run 返回的 expectedFingerprint');
+                }
+                summary.matched++;
+                summary.planned++;
+                if (planning)
+                    continue;
+                if (desiredLayoutMatches(before, plan)) {
+                    summary.unchanged++;
+                    summary.verified++;
+                    continue;
+                }
+                const newNames = new Set((plan.layoutFields || []).map(field => field.name));
+                const immutableBefore = immutableState(before, newNames);
+                for (const layoutField of plan.layoutFields || []) {
+                    const configText = layoutField.config === undefined
+                        ? undefined
+                        : (typeof layoutField.config === 'string' ? layoutField.config : JSON.stringify(layoutField.config));
+                    if (configText)
+                        JSON.parse(configText);
+                    const addResult = await client.addField({
+                        TableId: plan.tableId,
+                        Name: layoutField.name,
+                        Label: layoutField.label,
+                        Type: '',
+                        Component: layoutField.component,
+                        Visible: layoutField.visible ?? 1,
+                        AppVisible: layoutField.appVisible ?? 1,
+                        Tab: layoutField.tab,
+                        TableWidth: 120,
+                        Sort: layoutField.sort,
+                        Data: '[]',
+                        Config: configText,
+                        Description: layoutField.description,
+                    });
+                    if (addResult.Code !== 1)
+                        throw new Error(`新增布局节点 ${layoutField.name} 失败：${addResult.Msg || ''}`);
+                }
+                if ((plan.fieldPatches || []).length) {
+                    const updateResult = await client.updateFieldList({
+                        TableId: plan.tableId,
+                        FieldList: (plan.fieldPatches || []).map(field => ({
+                            Id: field.id,
+                            ...(field.tab !== undefined ? { Tab: field.tab } : {}),
+                            ...(field.sort !== undefined ? { Sort: field.sort } : {}),
+                            ...(field.config !== undefined ? { Config: field.config } : {}),
+                            ...(field.formWidth !== undefined ? { FormWidth: field.formWidth } : {}),
+                            ...(field.tableWidth !== undefined ? { TableWidth: field.tableWidth } : {}),
+                        })),
+                    });
+                    if (updateResult.Code !== 1)
+                        throw new Error(`批量更新字段失败：${updateResult.Msg || ''}`);
+                }
+                if (plan.tableTabs !== undefined) {
+                    JSON.parse(plan.tableTabs || '[]');
+                    const updateTableResult = await client.updateTable({ Id: plan.tableId, Tabs: plan.tableTabs });
+                    if (updateTableResult.Code !== 1)
+                        throw new Error(`更新表单 Tabs 失败：${updateTableResult.Msg || ''}`);
+                }
+                summary.updated++;
+                const after = await readState(plan.tableId);
+                if (JSON.stringify(immutableState(after, newNames)) !== JSON.stringify(immutableBefore)) {
+                    throw new Error('IMMUTABLE_GUARD：表事件、字段 V8 或字段 Data 在布局写入后发生变化');
+                }
+                if (plan.tableTabs !== undefined) {
+                    const expectedTabs = JSON.parse(plan.tableTabs || '[]');
+                    const actualTabs = JSON.parse(String(after.table.Tabs || '[]'));
+                    if (!matchesExpectedJson(actualTabs, expectedTabs))
+                        throw new Error('回读 diy_table.Tabs 与计划不一致');
+                }
+                const afterById = new Map(after.fields.map(field => [String(field.Id || ''), field]));
+                for (const fieldPatch of plan.fieldPatches || []) {
+                    const saved = afterById.get(fieldPatch.id);
+                    if (!saved)
+                        throw new Error(`回读未找到字段 ${fieldPatch.id}`);
+                    if (fieldPatch.tab !== undefined && String(saved.Tab || '') !== fieldPatch.tab)
+                        throw new Error(`字段 ${fieldPatch.id} Tab 回读不一致`);
+                    if (fieldPatch.sort !== undefined && Number(saved.Sort) !== fieldPatch.sort)
+                        throw new Error(`字段 ${fieldPatch.id} Sort 回读不一致`);
+                    if (fieldPatch.config !== undefined && String(saved.Config || '') !== fieldPatch.config)
+                        throw new Error(`字段 ${fieldPatch.id} Config 回读不一致`);
+                    if (fieldPatch.formWidth !== undefined && (saved.FormWidth ?? null) !== fieldPatch.formWidth)
+                        throw new Error(`字段 ${fieldPatch.id} FormWidth 回读不一致`);
+                    if (fieldPatch.tableWidth !== undefined && Number(saved.TableWidth) !== fieldPatch.tableWidth)
+                        throw new Error(`字段 ${fieldPatch.id} TableWidth 回读不一致`);
+                }
+                for (const layoutField of plan.layoutFields || []) {
+                    const saved = after.fields.find(field => String(field.Name || '') === layoutField.name);
+                    if (!saved || String(saved.Component || '') !== layoutField.component)
+                        throw new Error(`布局节点 ${layoutField.name} 回读失败`);
+                }
+                summary.verified++;
+            }
+            catch (e) {
+                summary.ok = false;
+                summary.failures.push({
+                    tableId: plan.tableId,
+                    tableName: plan.tableName,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }], isError: !summary.ok && summary.matched === 0 };
+    });
+    // ========================
     // Tool: 删除字段（走平台 DelDiyField，软删除元数据并清缓存）
     // ========================
     server.tool('microi_delete_field', `Delete one non-system DIY field from OsClient "${osClient}" through the platform DelDiyField API. The platform performs a metadata soft delete and cache invalidation; it intentionally preserves the physical column for backward compatibility. Requires exact field readback and confirmExecution equal to the field Id or DELETE.`, {
@@ -2551,7 +2953,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 修改 diy_table 属性（如表单列数 Column）
     // ========================
-    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (e.g. set Column=2 for a two-column form layout, change Description, IsTree, etc). Automatically clears diy_table + diy_table_field_list Redis caches.`, {
+    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (for example form layout, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`, {
         id: z.string().optional().describe('TableId (preferred locator)'),
         name: z.string().optional().describe('Table Name (alternative locator)'),
         column: z.number().optional().describe('Form columns: 1, 2 or 3'),
@@ -2560,6 +2962,9 @@ export function createMcpServer(client, context) {
         tabs: z.string().optional(),
         formOpenType: z.string().optional(),
         formOpenWidth: z.string().optional(),
+        enableDataLog: z.number().optional().describe('1 enables per-row data change logs; 0 disables.'),
+        enableDataComment: z.number().optional().describe('1 enables per-row comments; 0 disables.'),
+        enableDataVersion: z.number().optional().describe('1 enables data versions; 0 disables.'),
     }, async (args) => {
         try {
             const patch = {};
@@ -2579,6 +2984,12 @@ export function createMcpServer(client, context) {
                 patch.FormOpenType = args.formOpenType;
             if (args.formOpenWidth !== undefined)
                 patch.FormOpenWidth = args.formOpenWidth;
+            if (args.enableDataLog !== undefined)
+                patch.EnableDataLog = args.enableDataLog === 1 ? 1 : 0;
+            if (args.enableDataComment !== undefined)
+                patch.EnableDataComment = args.enableDataComment === 1 ? 1 : 0;
+            if (args.enableDataVersion !== undefined)
+                patch.EnableDataVersion = args.enableDataVersion === 1 ? 1 : 0;
             const result = await client.updateTable(patch);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -2587,6 +2998,332 @@ export function createMcpServer(client, context) {
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
+    });
+    // ========================
+    // Tool: 批量开启/关闭 diy_table 数据能力，逐表回读并可安全续跑
+    // ========================
+    server.tool('microi_bulk_update_table_features', `Plan or apply data-log, data-comment and data-version switches to many diy_table records for OsClient "${osClient}". Each table is read immediately before writing, patched independently through UpdateTable, and verified by readback. Existing V8 events, Tabs and unrelated table metadata are never sent or overwritten. Re-running the same batch is safe and resumes by skipping already-matched rows.`, {
+        tables: z.array(z.object({
+            id: z.string().optional(),
+            name: z.string().optional(),
+        }).refine(value => Boolean(value.id || value.name), 'Each table needs id or name')).min(1).max(1000),
+        enableDataLog: z.number().optional().describe('Desired value, default 1.'),
+        enableDataComment: z.number().optional().describe('Desired value, default 1.'),
+        enableDataVersion: z.number().optional().describe('Desired value, default 1.'),
+        dryRun: z.boolean().optional().describe('Default true. Set false for real writes.'),
+        confirmExecution: z.string().optional().describe('Required when dryRun=false; must be EXECUTE.'),
+    }, async ({ tables, enableDataLog, enableDataComment, enableDataVersion, dryRun, confirmExecution }) => {
+        const desired = {
+            EnableDataLog: enableDataLog === undefined ? 1 : (enableDataLog === 1 ? 1 : 0),
+            EnableDataComment: enableDataComment === undefined ? 1 : (enableDataComment === 1 ? 1 : 0),
+            EnableDataVersion: enableDataVersion === undefined ? 1 : (enableDataVersion === 1 ? 1 : 0),
+        };
+        const planning = dryRun !== false;
+        if (!planning && confirmExecution !== 'EXECUTE') {
+            return { content: [{ type: 'text', text: 'Error: real bulk writes require dryRun=false and confirmExecution="EXECUTE".' }], isError: true };
+        }
+        const summary = {
+            ok: true,
+            dryRun: planning,
+            requested: tables.length,
+            matched: 0,
+            alreadyCorrect: 0,
+            planned: 0,
+            updated: 0,
+            verified: 0,
+            failures: [],
+        };
+        const readTable = async (locator) => {
+            const where = locator.id
+                ? [['Id', '=', locator.id]]
+                : [['Name', '=', locator.name]];
+            const response = await client.getTableData('diy_table', {
+                _Where: where,
+                _SelectFields: ['Id', 'Name', 'EnableDataLog', 'EnableDataComment', 'EnableDataVersion', 'UpdateTime'],
+                _PageIndex: 1,
+                _PageSize: 2,
+            });
+            if (response.Code !== 1)
+                throw new Error(response.Msg || '读取 diy_table 失败');
+            const rows = unwrapList(response.Data);
+            if (rows.length !== 1)
+                throw new Error(rows.length ? '定位到多张同名表，请改用 TableId' : '未找到表');
+            return rows[0];
+        };
+        for (const locator of tables) {
+            try {
+                const before = await readTable(locator);
+                summary.matched++;
+                const needsUpdate = Object.entries(desired)
+                    .some(([key, value]) => Number(before[key] ?? 0) !== value);
+                if (!needsUpdate) {
+                    summary.alreadyCorrect++;
+                    continue;
+                }
+                summary.planned++;
+                if (planning)
+                    continue;
+                const tableId = String(before.Id || '');
+                const result = await client.updateTable({ Id: tableId, ...desired });
+                if (result.Code !== 1)
+                    throw new Error(result.Msg || 'UpdateTable 返回失败');
+                summary.updated++;
+                const after = await readTable({ id: tableId });
+                const mismatches = Object.entries(desired)
+                    .filter(([key, value]) => Number(after[key] ?? 0) !== value)
+                    .map(([key]) => key);
+                if (mismatches.length)
+                    throw new Error(`回读不一致：${mismatches.join(', ')}`);
+                summary.verified++;
+            }
+            catch (e) {
+                summary.ok = false;
+                summary.failures.push({
+                    id: locator.id,
+                    name: locator.name,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+        return {
+            content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+            isError: !summary.ok,
+        };
+    });
+    // ========================
+    // Tool: 批量应用模块展示配置（并发指纹 + 业务逻辑不变保护）
+    // ========================
+    server.tool('microi_bulk_apply_module_presentation', `Read, plan or apply presentation-only sys_menu changes for OsClient "${osClient}". The tool supports ViewSchema Hero/List/Card, statistics/mobile/card fields, menu badges and badge-only changes to existing buttons/PageTabs. It fingerprints the complete current module before writing, rejects stale snapshots, and proves routes, table binding, SQL/data permissions, API replacements and button V8/business actions remain unchanged. New PageTabs require an explicit per-plan opt-in.`, {
+        plans: z.array(z.object({
+            moduleId: z.string().min(1),
+            expectedFingerprint: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional(),
+            allowCreatePageTabs: z.boolean().optional(),
+            patch: z.object({
+                EnableViewSchema: z.number().optional(),
+                ViewSchemaVersion: z.string().optional(),
+                ViewConfigVersion: z.number().int().min(0).optional(),
+                ViewSchema: z.union([z.string(), jsonRecordSchema]).optional(),
+                StatisticsFields: z.string().optional(),
+                MobileListFields: z.string().optional(),
+                CardTitleTagFields: z.string().optional(),
+                CardBottomTagFields: z.string().optional(),
+                MenuBadgeEnabled: z.number().optional(),
+                MenuBadgeApiEngineKey: z.string().optional(),
+                MoreBtns: z.string().optional(),
+                FormBtns: z.string().optional(),
+                BatchSelectMoreBtns: z.string().optional(),
+                PageTabs: z.string().optional(),
+                ExportMoreBtns: z.string().optional(),
+                PageBtns: z.string().optional(),
+            }).strict(),
+        })).min(1).max(50),
+        dryRun: z.boolean().optional().describe('Default true. Dry-run returns the current full-module fingerprint and presentation projection.'),
+        confirmExecution: z.string().optional().describe('Required when dryRun=false; must be EXECUTE.'),
+    }, async ({ plans, dryRun, confirmExecution }) => {
+        const planning = dryRun !== false;
+        if (!planning && confirmExecution !== 'EXECUTE') {
+            return { content: [{ type: 'text', text: 'Error: real module presentation writes require dryRun=false and confirmExecution="EXECUTE".' }], isError: true };
+        }
+        const presentationFields = new Set([
+            'EnableViewSchema', 'ViewSchemaVersion', 'ViewConfigVersion', 'ViewSchema',
+            'StatisticsFields', 'MobileListFields', 'CardTitleTagFields', 'CardBottomTagFields',
+            'MenuBadgeEnabled', 'MenuBadgeApiEngineKey',
+            'MoreBtns', 'FormBtns', 'BatchSelectMoreBtns', 'PageTabs', 'ExportMoreBtns', 'PageBtns',
+        ]);
+        const buttonFields = ['MoreBtns', 'FormBtns', 'BatchSelectMoreBtns', 'PageTabs', 'ExportMoreBtns', 'PageBtns'];
+        const parseJson = (value) => {
+            let parsed = value;
+            for (let index = 0; index < 2 && typeof parsed === 'string'; index++) {
+                const text = parsed.trim();
+                if (!text || (!text.startsWith('[') && !text.startsWith('{') && !text.startsWith('"')))
+                    break;
+                try {
+                    parsed = JSON.parse(text);
+                }
+                catch {
+                    break;
+                }
+            }
+            return parsed;
+        };
+        const stableValue = (value) => {
+            const parsed = parseJson(value);
+            if (Array.isArray(parsed))
+                return parsed.map(stableValue);
+            if (!parsed || typeof parsed !== 'object')
+                return parsed ?? null;
+            return Object.fromEntries(Object.entries(parsed)
+                .filter(([key]) => !key.startsWith('_'))
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, item]) => [key, stableValue(item)]));
+        };
+        const canonical = (value) => JSON.stringify(stableValue(value));
+        const moduleState = (value, immutableOnly = false) => Object.fromEntries(Object.entries(value)
+            .filter(([key]) => !key.startsWith('_'))
+            .filter(([key]) => !immutableOnly || (!presentationFields.has(key) && key !== 'UpdateTime'))
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, item]) => [key, stableValue(item)]));
+        const fingerprint = (value) => crypto
+            .createHash('sha256')
+            .update(JSON.stringify(moduleState(value)), 'utf8')
+            .digest('hex');
+        const presentationProjection = (value) => Object.fromEntries([...presentationFields]
+            .filter((key) => value[key] !== undefined)
+            .map((key) => [key, value[key]]));
+        const stableButtonValue = (value) => {
+            const parsed = parseJson(value);
+            if (typeof parsed === 'string')
+                return parsed.replace(/\r\n/gu, '\n').trim();
+            if (Array.isArray(parsed))
+                return parsed.map(stableButtonValue);
+            if (!parsed || typeof parsed !== 'object')
+                return parsed ?? null;
+            return Object.fromEntries(Object.entries(parsed)
+                .filter(([key]) => !key.startsWith('_'))
+                .sort(([left], [right]) => left.localeCompare(right))
+                .map(([key, item]) => [key, stableButtonValue(item)]));
+        };
+        const buttonBusinessSignature = (value, fieldName) => {
+            const parsed = parseJson(value);
+            if (!Array.isArray(parsed))
+                return canonical([]);
+            const clean = parsed.map((raw, index) => {
+                if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+                    return raw;
+                const source = raw;
+                const normalized = Object.fromEntries(Object.entries(source)
+                    .filter(([key, item]) => !key.startsWith('_')
+                    && !/^Badge/iu.test(key)
+                    && item !== ''
+                    && item !== null
+                    && item !== undefined)
+                    .sort(([left], [right]) => left.localeCompare(right))
+                    .map(([key, item]) => [
+                    key,
+                    key === 'Sort' && Number.isFinite(Number(item))
+                        ? Number(item)
+                        : stableButtonValue(item),
+                ]));
+                if (normalized.Sort === undefined)
+                    normalized.Sort = index * 10;
+                if (normalized.IsVisible === undefined)
+                    normalized.IsVisible = true;
+                if (fieldName === 'MoreBtns' && normalized.ShowRow === undefined)
+                    normalized.ShowRow = true;
+                return normalized;
+            });
+            return JSON.stringify(clean.map(stableButtonValue));
+        };
+        const isEmptyButtonList = (value) => {
+            const parsed = parseJson(value);
+            return !Array.isArray(parsed) || parsed.length === 0;
+        };
+        const readModule = async (moduleId) => {
+            const response = await client.getModule(moduleId);
+            if (response.Code !== 1 || !response.Data || typeof response.Data !== 'object') {
+                throw new Error(response.Msg || '读取 sys_menu 失败');
+            }
+            return response.Data;
+        };
+        const summary = {
+            ok: true,
+            dryRun: planning,
+            requested: plans.length,
+            matched: 0,
+            planned: 0,
+            updated: 0,
+            verified: 0,
+            stale: 0,
+            states: [],
+            failures: [],
+        };
+        for (const plan of plans) {
+            let moduleName = '';
+            try {
+                const before = await readModule(plan.moduleId);
+                moduleName = String(before.Name || '');
+                const currentFingerprint = fingerprint(before);
+                const stateIndex = summary.states.length;
+                summary.states.push({
+                    moduleId: plan.moduleId,
+                    name: moduleName,
+                    diyTableId: before.DiyTableId,
+                    updateTime: before.UpdateTime,
+                    fingerprint: currentFingerprint,
+                    presentation: presentationProjection(before),
+                });
+                if (plan.expectedFingerprint && currentFingerprint.toLowerCase() !== plan.expectedFingerprint.toLowerCase()) {
+                    summary.stale++;
+                    throw new Error(`STALE_MODULE_FINGERPRINT：当前 ${currentFingerprint}，计划 ${plan.expectedFingerprint}`);
+                }
+                if (!planning && !plan.expectedFingerprint) {
+                    throw new Error('真实写入必须提供 dry-run 返回的 expectedFingerprint');
+                }
+                summary.matched++;
+                const normalized = normalizeAllMenuJson({ ModuleId: plan.moduleId, ...plan.patch });
+                if (normalized.errors.length)
+                    throw new Error(normalized.errors.join('；'));
+                const normalizedPatch = normalized.data;
+                const buttonBefore = Object.fromEntries(buttonFields.map((field) => [field, buttonBusinessSignature(before[field], field)]));
+                for (const field of buttonFields) {
+                    if (normalizedPatch[field] === undefined)
+                        continue;
+                    const currentEmpty = isEmptyButtonList(before[field]);
+                    const nextEmpty = isEmptyButtonList(normalizedPatch[field]);
+                    if (field === 'PageTabs' && currentEmpty && !nextEmpty) {
+                        if (!plan.allowCreatePageTabs)
+                            throw new Error('新增 PageTabs 必须显式设置 allowCreatePageTabs=true');
+                        continue;
+                    }
+                    if (buttonBusinessSignature(normalizedPatch[field], field) !== buttonBefore[field]) {
+                        throw new Error(`${field} 仅允许增加/调整 Badge* 展示字段，业务动作、V8、顺序与显隐必须保持不变`);
+                    }
+                }
+                summary.planned++;
+                if (planning)
+                    continue;
+                const immutableBefore = canonical(moduleState(before, true));
+                const result = await client.updateModule({ ModuleId: plan.moduleId, ...normalizedPatch });
+                if (result.Code !== 1)
+                    throw new Error(result.Msg || 'UpdateModule 返回失败');
+                summary.updated++;
+                const after = await readModule(plan.moduleId);
+                if (canonical(moduleState(after, true)) !== immutableBefore) {
+                    throw new Error('IMMUTABLE_GUARD：菜单路由、表绑定、权限/SQL 条件、接口替换或其它业务配置发生变化');
+                }
+                for (const field of buttonFields) {
+                    if (normalizedPatch[field] === undefined)
+                        continue;
+                    if (field === 'PageTabs' && isEmptyButtonList(before[field]) && plan.allowCreatePageTabs)
+                        continue;
+                    if (buttonBusinessSignature(after[field], field) !== buttonBefore[field]) {
+                        throw new Error(`IMMUTABLE_GUARD：${field} 的业务动作或 V8 发生变化`);
+                    }
+                }
+                summary.states[stateIndex] = {
+                    moduleId: plan.moduleId,
+                    name: moduleName,
+                    diyTableId: after.DiyTableId,
+                    updateTime: after.UpdateTime,
+                    fingerprint: fingerprint(after),
+                    previousFingerprint: currentFingerprint,
+                    presentation: presentationProjection(after),
+                };
+                summary.verified++;
+            }
+            catch (e) {
+                summary.ok = false;
+                summary.failures.push({
+                    moduleId: plan.moduleId,
+                    name: moduleName || undefined,
+                    error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+        return {
+            content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+            isError: !summary.ok && summary.matched === 0,
+        };
     });
     // ========================
     // Tool: 手动刷新表结构 Redis 缓存
@@ -2636,6 +3373,8 @@ export function createMcpServer(client, context) {
         url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
         sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
         icon: z.string().optional().describe('Menu icon class name (e.g. "el-icon-user", "el-icon-s-order", "fa fa-home")'),
+        menuBadgeEnabled: z.number().optional().describe('Show a dynamic statistic badge beside this sidebar menu (1=yes, 0=no). Important menus with actionable counts should normally enable it.'),
+        menuBadgeApiEngineKey: z.string().optional().describe('ApiEngineKey for the sidebar badge. Recommended response: {Code:1,Data:{Value:number}}. Keep it tenant-scoped, inexpensive, and side-effect free.'),
         searchFieldIds: z.string().optional().describe('SearchFieldIds JSON/object-array string. If omitted and diyTableId is bound, backend infers common searchable fields such as title/name/no/status/type/category/person/time.'),
         tableDiyFieldIds: z.string().optional().describe('Comma-separated field Ids to show as table columns (e.g. "fieldId1,fieldId2,fieldId3"). Controls which fields appear in the list view.'),
         defaultOrderBy: z.string().optional().describe('Default sort expression (e.g. "CreateTime DESC", "Sort ASC")'),
@@ -2643,13 +3382,13 @@ export function createMcpServer(client, context) {
         enableViewSchema: z.number().optional().describe('Enable the versioned cross-client ViewSchema (1=yes, 0=no). Default: 0.'),
         viewSchemaVersion: z.string().optional().describe('ViewSchema protocol version stored in sys_menu.ViewSchemaVersion. Default: "1.0".'),
         viewConfigVersion: z.number().optional().describe('Monotonic configuration version stored in sys_menu.ViewConfigVersion. Default: 1.'),
-        viewSchema: z.string().optional().describe('Versioned cross-client view JSON stored in the physical sys_menu.ViewSchema column. Supports Detail/Edit/List/Card views and PC/Mobile/All device scopes.'),
+        viewSchema: z.union([z.string(), jsonRecordSchema]).optional().describe('Versioned cross-client view JSON object/string stored in sys_menu.ViewSchema. Supports Detail/Edit/List/Card and PC/Mobile/All. Layout.List keeps multi-line Columns[].Lines, TrailingFields and RequiredFields; Layout.Card keeps AvatarTextField, TitleField, SubtitleFields, StatusFields, TopFields, RightFields, Fields, MetaFields and BottomFields.'),
         moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
-        formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required.'),
-        batchSelectMoreBtns: z.string().optional().describe('Batch action buttons (after selecting multiple rows) JSON ARRAY (string). Same item shape as moreBtns. Use V8.TableRowSelected to access selected rows.'),
+        formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required. Buttons may configure BadgeEnabled, BadgeApiEngineKey, BadgeValuePath, BadgeTone, BadgeMax, BadgeShowZero and BadgeRefreshSeconds.'),
+        batchSelectMoreBtns: z.string().optional().describe('Batch action buttons JSON ARRAY (string). Same item and optional Badge* fields as moreBtns. Use V8.TableRowSelected to access selected rows; badge APIs must batch current-page Ids instead of calling once per row.'),
         pageTabs: z.string().optional().describe('Page top tabs JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,V8Code,V8CodeShow,TargetSysMenuId}. TargetSysMenuId associates another module; clicking it replaces the current route and reloads that module. V8Code typically calls V8.SearchSet({field:value}) for tabs within the current module.'),
-        exportMoreBtns: z.string().optional().describe('Export menu extra buttons JSON ARRAY (string).'),
-        pageBtns: z.string().optional().describe('Page-level top buttons JSON ARRAY (string).'),
+        exportMoreBtns: z.string().optional().describe('Export menu extra buttons JSON ARRAY (string). Supports the same optional Badge* fields as formBtns.'),
+        pageBtns: z.string().optional().describe('Page-level top buttons JSON ARRAY (string). Supports the same optional Badge* fields; page counts normally come from Data.Buttons.'),
         sortFieldIds: z.string().optional().describe('Comma-separated field Ids that user can sort by. JSON array string also accepted.'),
         notShowFields: z.string().optional().describe('JSON array string of field Ids hidden from the list. If omitted and diyTableId is bound, backend hides Id-like fields, foreign keys, system fields, layout controls and heavy fields such as upload/rich text/map/child table.'),
         sqlJoin: z.string().optional().describe('Custom SQL JOIN clause for the list query (e.g. "LEFT JOIN Diy_Customer C ON A.CustomerId=C.Id"). Use aliases A=main table, B/C/D=joined tables.'),
@@ -2666,7 +3405,7 @@ export function createMcpServer(client, context) {
         microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService.'),
         microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
-    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
+    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
         try {
             const isMicroService = String(openType || '').toLowerCase() === 'microservice'
                 || Boolean(microServiceId || microServicePageId || microServiceRoutePath || microServiceKey);
@@ -2710,6 +3449,10 @@ export function createMcpServer(client, context) {
                                     ComponentName: effectiveComponentName,
                                     ComponentPath: effectiveComponentPath,
                                     Url: effectiveUrl,
+                                    MenuBadgeEnabled: menuBadgeEnabled ?? 0,
+                                    MenuBadgeApiEngineKey: menuBadgeApiEngineKey,
+                                    EnableViewSchema: enableViewSchema ?? 0,
+                                    ViewSchema: viewSchema,
                                     IsMicroiService: isMicroService ? 1 : 0,
                                     MicroServiceId: microServiceId,
                                     MicroServicePageId: microServicePageId,
@@ -2731,7 +3474,10 @@ export function createMcpServer(client, context) {
                 ComponentName: effectiveComponentName, ComponentPath: effectiveComponentPath,
                 Display: display ?? 1, AppDisplay: appDisplay ?? 1,
                 OpenType: effectiveOpenType, Url: effectiveUrl, Sort: sort,
-                Icon: icon, SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
+                Icon: icon,
+                MenuBadgeEnabled: menuBadgeEnabled ?? 0,
+                MenuBadgeApiEngineKey: menuBadgeApiEngineKey,
+                SearchFieldIds: searchFieldIds, TableDiyFieldIds: tableDiyFieldIds,
                 DefaultOrderBy: defaultOrderBy, SqlWhere: sqlWhere,
                 EnableViewSchema: enableViewSchema ?? 0,
                 ViewSchemaVersion: viewSchemaVersion ?? '1.0',

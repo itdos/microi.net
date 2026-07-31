@@ -18,7 +18,7 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
 | `MoreBtns` | 列表每行尾的"…更多"操作 | `Id, Name, V8Code`，建议 `ShowRow:true` |
 | `FormBtns` | 表单右上角 / 移动端 FAB | `Id, Name, V8Code` |
 | `BatchSelectMoreBtns` | 列表勾选多行后顶部出现 | `Id, Name, V8Code`，按钮里用 `V8.TableRowSelected` 取选中行 |
-| `PageTabs` | 列表页顶部页签切换 | `Id, Name`，当前模块筛选用 `V8Code`；跨模块切换用 `TargetSysMenuId` |
+| `PageTabs` | 列表页模块 Hero 下方的页签切换 | `Id, Name`，当前模块筛选用 `V8Code`；跨模块切换用 `TargetSysMenuId` |
 | `ExportMoreBtns` | 列表"导出"下拉的扩展 | `Id, Name, V8Code` |
 | `PageBtns` | 页面级顶部按钮 | `Id, Name, V8Code` |
 
@@ -42,12 +42,47 @@ description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBt
   "RunBackground": false,      // 可选：true 时以后台任务执行接口引擎
   "BackgroundTask": false,     // 可选：兼容别名
   "IsBackgroundTask": false,   // 可选：兼容别名
-  "ApiEngineKey": ""           // 可选：后台任务要执行的接口引擎 Key
+  "ApiEngineKey": "",          // 可选：后台任务要执行的接口引擎 Key
+  "BadgeEnabled": true,         // 可选：显示统计角标
+  "BadgeApiEngineKey": "button_counts",
+  "BadgeValuePath": "",        // 可选：如 Data.Rows.{RowId}.button-id
+  "BadgeField": "",            // 行按钮读当前行；PageTab/页面按钮读模块 StatisticsFields，不请求接口
+  "BadgeTone": "primary",      // primary/success/warning/danger/info
+  "BadgeMax": 99,
+  "BadgeShowZero": false,
+  "BadgeRefreshSeconds": 60
 }
 ```
 
+### 统计角标接口契约
+
+角标适用于附件数、日志数、未处理子记录等“点击按钮后有明确行动”的数量。
+`PageTabs/MoreBtns/PageBtns/BatchSelectMoreBtns/ExportMoreBtns/FormBtns` 都可配置。前端按不同
+`BadgeApiEngineKey` 分组，每个接口仅调用一次，并传入 `Ids`（当前页行 Id）、
+`ButtonKeys`、`SysMenuId/_SysMenuId`、`DiyTableId` 和筛选上下文。
+
+推荐一次返回页面级与逐行结果：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    Buttons: { 'button-id': 12 },
+    Rows: {
+      'row-id-1': { 'button-id': 2 },
+      'row-id-2': { 'button-id': 0 }
+    }
+  }
+};
+```
+
+按钮和 PageTab 必须有稳定 `Id`，否则只能回退用 `Name` 匹配。`Data.Buttons` 同时用于页面按钮和 PageTabs；页签可通过 `BadgeValuePath=Data.Buttons.{TabId}` 显式取值。PageTabs/页面按钮若使用 `BadgeField`，必须同时把该字段加入模块 `StatisticsFields`，读取页面汇总值。不要在按钮 V8、Tab V8、模板引擎或每行
+生命周期里单独查数量；后端应按 `Ids` 批量 `GROUP BY`，并继续应用租户、菜单和数据权限。
+统计失败只隐藏角标，不能阻断按钮本身或 PageTab 切换。
+
 ### PageTabs 关联模块
 
+- 列表页固定顺序为“模块 Hero（标题/副标题/动态指标）→ PageTabs → 查询与表格”；PageTabs 不能渲染到 Hero 上方，也不能重复承担模块标题。
 - `TargetSysMenuId` 为空时，页签仍在当前模块执行 `V8Code` 和重新查询。
 - `TargetSysMenuId` 指向其它模块时，点击会替换当前路由，并使用目标模块自己的表单引擎、字段、查询接口替换、按钮和分页配置完整初始化。
 - 目标模块可以设置 `Display=0、AppDisplay=0` 隐藏左侧菜单，但必须给使用角色分配菜单权限，否则动态路由中找不到目标模块。
