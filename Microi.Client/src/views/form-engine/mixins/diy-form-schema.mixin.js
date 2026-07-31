@@ -113,7 +113,9 @@ export default {
             var self = this;
             self.DiyTableModel.Tabs.forEach((tab) => {
                 if (tab.Name == tabName || tab.Id == tabName) {
-                    self.FieldActiveTab = tab.Id || tab.Name;
+                    var tabKey = tab.Id || tab.Name;
+                    self.FieldActiveTab = tabKey;
+                    self.QueueTabRender(tabKey);
                 }
             });
         },
@@ -124,12 +126,73 @@ export default {
             this.FieldActiveTab = tabKey; //切换索引
             this.currentTabIndex = tab.index; //当前索引lisaisai
 
-            // 标记该 tab 已渲染（懒加载）
-            if (!self.renderedTabs.has(tabKey)) {
-                self.renderedTabs.add(tabKey);
-                // 🔥 新增：初始化该 tab 的渲染字段计数
-                self.renderedFieldCounts[tabKey] = self.BATCH_SIZE_FIRST;
+            // 首次访问时先单独提交 Tab 选中态，再挂载重型表单内容，避免一次渲染阻塞点击反馈。
+            self.QueueTabRender(tabKey);
+        },
+        QueueTabRender(tabKey) {
+            if (!tabKey) return;
+            if (this.renderedTabs.has(tabKey)) {
+                this.StartProgressiveTabRender(tabKey);
+                return;
             }
+            const self = this;
+            const scheduleFrame = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (callback) => setTimeout(callback, 16);
+            if (self._tabActivationFrames[tabKey]) return;
+            self.$nextTick(() => {
+                if (self._isDestroyed || self.FieldActiveTab !== tabKey) return;
+                const firstFrame = scheduleFrame(() => {
+                    const secondFrame = scheduleFrame(() => {
+                        delete self._tabActivationFrames[tabKey];
+                        if (!self._isDestroyed && self.FieldActiveTab === tabKey) self.EnsureTabRendered(tabKey);
+                    });
+                    self._tabActivationFrames[tabKey] = secondFrame;
+                });
+                self._tabActivationFrames[tabKey] = firstFrame;
+            });
+        },
+        EnsureTabRendered(tabKey) {
+            if (!tabKey) return;
+            if (!this.renderedTabs.has(tabKey)) this.renderedTabs.add(tabKey);
+            this.StartProgressiveTabRender(tabKey);
+        },
+        GetRenderedTabFields(tabKey) {
+            const fields = this.DiyFieldListGrouped[tabKey] || [];
+            if (!this.ShouldProgressivelyRenderTab(fields, tabKey)) return fields;
+            const count = Number(this.renderedFieldCounts[tabKey] || this.BATCH_SIZE_FIRST);
+            return fields.slice(0, Math.max(this.BATCH_SIZE_FIRST, count));
+        },
+        IsModuleDesignProgressiveRender() {
+            const tableName = String(this.TableName || (this.DiyTableModel && this.DiyTableModel.Name) || "")
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, "");
+            return this.CodeEditorMini === true && tableName === "sysmenu";
+        },
+        ShouldProgressivelyRenderTab(fields, tabKey) {
+            // 普通业务表单以及首次展示 Tab 一律完整渲染，避免出现只显示 1～2 个字段的回归。
+            if (!this.IsModuleDesignProgressiveRender() || (tabKey && tabKey === this._initialRenderedTabKey)) return false;
+            if (this.LoadMode === "Design" || !Array.isArray(fields) || fields.length <= this.BATCH_SIZE_FIRST) return false;
+            const heavyComponents = new Set(["JsonTable", "CodeEditor", "DevComponent", "TableChild", "RichText", "ImgUpload", "FileUpload", "Map"]);
+            return fields.filter((field) => field && heavyComponents.has(field.Component)).length >= 2;
+        },
+        StartProgressiveTabRender(tabKey) {
+            const fields = this.DiyFieldListGrouped[tabKey] || [];
+            if (!this.ShouldProgressivelyRenderTab(fields, tabKey)) {
+                this.renderedFieldCounts = Object.assign({}, this.renderedFieldCounts, { [tabKey]: fields.length });
+                return;
+            }
+            const current = Number(this.renderedFieldCounts[tabKey] || 0);
+            if (current >= fields.length) return;
+            if (this._tabRenderTimers[tabKey]) clearTimeout(this._tabRenderTimers[tabKey]);
+            if (current === 0) {
+                this.renderedFieldCounts = Object.assign({}, this.renderedFieldCounts, { [tabKey]: Math.min(this.BATCH_SIZE_FIRST, fields.length) });
+            }
+            this._tabRenderTimers[tabKey] = setTimeout(() => {
+                delete this._tabRenderTimers[tabKey];
+                if (this._isDestroyed || this.FieldActiveTab !== tabKey) return;
+                const next = Math.min(Number(this.renderedFieldCounts[tabKey] || this.BATCH_SIZE_FIRST) + this.BATCH_SIZE_NEXT, fields.length);
+                this.renderedFieldCounts = Object.assign({}, this.renderedFieldCounts, { [tabKey]: next });
+                if (next < fields.length) this.StartProgressiveTabRender(tabKey);
+            }, 0);
         },
         GetDiyTableModel() {
             // var self = this

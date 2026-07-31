@@ -758,6 +758,9 @@ namespace Microi.net
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         // Legacy compatibility only. New module configuration uses physical columns.
         public string DiyConfig { get; set; }
+        public int? MenuBadgeEnabled { get; set; }
+        [DisplayFormat(ConvertEmptyStringToNull = false)]
+        public string MenuBadgeApiEngineKey { get; set; }
         public int? EnableViewSchema { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ViewSchemaVersion { get; set; }

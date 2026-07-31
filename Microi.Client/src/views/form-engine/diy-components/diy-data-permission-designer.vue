@@ -32,7 +32,7 @@
         />
 
         <el-tabs v-model="activeTab" class="designer-tabs">
-            <el-tab-pane label="可见范围" name="scope">
+            <el-tab-pane label="可见范围" name="scope" lazy>
                 <div class="visual-preview-layout scope-layout">
                     <div class="visual-config-column">
                         <div class="scope-grid">
@@ -109,12 +109,38 @@
                         <div class="card-title">可查看全部数据的角色 / 岗位</div>
                         <el-form label-position="top">
                             <el-form-item label="角色">
-                                <el-select v-model="config.fullAccessRoleIds" multiple filterable collapse-tags :disabled="readonly" placeholder="选择角色" @change="markDirty">
+                                <el-select
+                                    v-model="config.fullAccessRoleIds"
+                                    multiple
+                                    filterable
+                                    remote
+                                    reserve-keyword
+                                    collapse-tags
+                                    :remote-method="searchRolesRemote"
+                                    :loading="roleSearchLoading"
+                                    :disabled="readonly"
+                                    placeholder="搜索并选择角色"
+                                    @visible-change="onRoleSelectVisible"
+                                    @change="markDirty"
+                                >
                                     <el-option v-for="role in normalRoles" :key="role.Id" :label="role.Name" :value="role.Id" />
                                 </el-select>
                             </el-form-item>
                             <el-form-item label="岗位">
-                                <el-select v-model="config.fullAccessPostIds" multiple filterable collapse-tags :disabled="readonly" placeholder="选择岗位角色" @change="markDirty">
+                                <el-select
+                                    v-model="config.fullAccessPostIds"
+                                    multiple
+                                    filterable
+                                    remote
+                                    reserve-keyword
+                                    collapse-tags
+                                    :remote-method="searchRolesRemote"
+                                    :loading="roleSearchLoading"
+                                    :disabled="readonly"
+                                    placeholder="搜索并选择岗位角色"
+                                    @visible-change="onRoleSelectVisible"
+                                    @change="markDirty"
+                                >
                                     <el-option v-for="role in postRoles" :key="role.Id" :label="role.Name" :value="role.Id" />
                                 </el-select>
                                 <div class="form-tip">吾码岗位沿用岗位角色数据；若租户没有区分角色类型，这里仍可选择全部角色。</div>
@@ -124,7 +150,20 @@
 
                             <section class="permission-card">
                         <div class="card-title">可查看全部数据的部门</div>
-                        <el-select v-model="config.fullAccessDeptIds" multiple filterable collapse-tags :disabled="readonly" placeholder="选择部门（包含其下级部门）" @change="markDirty">
+                        <el-select
+                            v-model="config.fullAccessDeptIds"
+                            multiple
+                            filterable
+                            remote
+                            reserve-keyword
+                            collapse-tags
+                            :remote-method="searchDepartmentsRemote"
+                            :loading="departmentSearchLoading"
+                            :disabled="readonly"
+                            placeholder="搜索部门（包含其下级部门）"
+                            @visible-change="onDepartmentSelectVisible"
+                            @change="markDirty"
+                        >
                             <el-option v-for="dept in departments" :key="dept.Id" :label="dept.Name" :value="dept.Id" />
                         </el-select>
                         <div class="form-tip">按当前用户 DeptIds 判断；选中父部门后，该部门及其下级部门用户均可放行。</div>
@@ -193,7 +232,7 @@
                 </div>
             </el-tab-pane>
 
-            <el-tab-pane label="关联关系" name="joins">
+            <el-tab-pane label="关联关系" name="joins" lazy>
                 <div class="visual-preview-layout join-layout">
                     <div class="visual-config-column">
                         <div class="join-head">
@@ -220,7 +259,18 @@
                                     <el-option label="左关联 LEFT JOIN" value="LEFT" />
                                     <el-option label="内关联 INNER JOIN" value="INNER" />
                                 </el-select>
-                                <el-select v-model="join.tableId" filterable :disabled="readonly" placeholder="选择关联表" @change="onJoinTableChange(join)">
+                                <el-select
+                                    v-model="join.tableId"
+                                    filterable
+                                    remote
+                                    reserve-keyword
+                                    :remote-method="searchTablesRemote"
+                                    :loading="tableSearchLoading"
+                                    :disabled="readonly"
+                                    placeholder="搜索关联表"
+                                    @visible-change="onTableSelectVisible"
+                                    @change="onJoinTableChange(join)"
+                                >
                                     <el-option v-for="table in tables" :key="table.Id" :label="tableLabel(table)" :value="table.Id" />
                                 </el-select>
                                 <el-input v-model="join.alias" :disabled="readonly" placeholder="别名" maxlength="12" @input="markDirty" />
@@ -272,11 +322,13 @@
 </template>
 
 <script setup>
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import { Delete, Plus } from "@element-plus/icons-vue";
 import {
     composeDataPermissionSql,
     extractDataPermissionConfig,
+    resolveDataPermissionSqlShape,
+    shouldClearGeneratedDefaultDenySql,
     stripDataPermissionMarker
 } from "@/utils/data-permission-config.js";
 import DiyCodeEditor from "../diy-field-component/diy-code-editor.vue";
@@ -305,9 +357,12 @@ const hydrating = ref(true);
 const dirty = ref(false);
 const syncError = ref("");
 const legacyMode = ref(false);
-const tables = ref([]);
-const roles = ref([]);
-const departments = ref([]);
+const tables = shallowRef([]);
+const roles = shallowRef([]);
+const departments = shallowRef([]);
+const tableSearchLoading = ref(false);
+const roleSearchLoading = ref(false);
+const departmentSearchLoading = ref(false);
 const fieldsByTable = reactive({});
 const moduleContext = reactive({ DiyTableId: "", DiyTableName: "" });
 const raw = reactive({ sqlWhere: "", sqlJoin: "", joinTables: "" });
@@ -317,6 +372,18 @@ const sqlJoinEditorField = createEditorField("PermissionSqlJoin", "Join 关联",
 let syncTimer = 0;
 let syncRequestId = 0;
 let pendingSyncMode = null;
+let tableSearchTimer = 0;
+let roleSearchTimer = 0;
+let departmentSearchTimer = 0;
+let tableSearchRequestId = 0;
+let roleSearchRequestId = 0;
+let departmentSearchRequestId = 0;
+let tableOptionsLoaded = false;
+let roleOptionsLoaded = false;
+let departmentOptionsLoaded = false;
+let referenceHydrationDepth = 0;
+const tableLookupPromises = new Map();
+const fieldLookupPromises = new Map();
 
 const config = reactive(defaultConfig());
 
@@ -387,7 +454,15 @@ const syncStateText = computed(() => {
 const syncStateType = computed(() => syncError.value ? "danger" : (dirty.value ? "warning" : "success"));
 
 onMounted(reload);
-onBeforeUnmount(() => clearTimeout(syncTimer));
+onBeforeUnmount(() => {
+    clearTimeout(syncTimer);
+    clearTimeout(tableSearchTimer);
+    clearTimeout(roleSearchTimer);
+    clearTimeout(departmentSearchTimer);
+    tableSearchRequestId++;
+    roleSearchRequestId++;
+    departmentSearchRequestId++;
+});
 watch(
     [() => props.FormDiyTableModel?.DiyTableId, () => props.FormData?.DiyTableId, () => props.TableRowId],
     async () => {
@@ -396,10 +471,13 @@ watch(
     }
 );
 watch(config, () => {
-    if (hydrating.value || loading.value || readonly.value) return;
+    if (hydrating.value || referenceHydrationDepth > 0 || loading.value || readonly.value) return;
     markDirty();
     scheduleAutoSync();
 }, { deep: true });
+watch(activeTab, (value) => {
+    if (value === "joins") void prepareJoinReferenceData();
+});
 
 function defaultConfig() {
     return {
@@ -426,16 +504,29 @@ async function reload() {
     hydrating.value = true;
     loading.value = true;
     try {
-        await Promise.all([loadTables(), loadViewerOptions()]);
-        await ensureModuleContext();
-        await ensureMainTableAvailable();
         readRawFromForm();
-        await importRawValues(false);
+        importRawValues(false);
         dirty.value = false;
         syncError.value = "";
+    } catch (error) {
+        syncError.value = error?.message || "数据权限配置加载失败";
     } finally {
+        // 配置回显不依赖任何远程字典。先移除根遮罩并完成首帧，再在后台
+        // 补充表、字段、角色和部门，避免模块表单被全量元数据请求阻塞。
         loading.value = false;
+        await nextTick();
         hydrating.value = false;
+    }
+    void loadBackgroundReferences();
+}
+
+async function loadBackgroundReferences() {
+    void loadViewerOptions();
+    try {
+        await ensureModuleContext();
+        await Promise.all([ensureMainTableAvailable(), ensureConfiguredTables()]);
+    } catch (error) {
+        console.warn("[DataPermissionDesigner] 后台加载表元数据失败", error);
     }
 }
 
@@ -456,57 +547,272 @@ async function ensureModuleContext() {
 async function ensureMainTableAvailable() {
     const tableId = mainTableId.value;
     if (!tableId) return;
-    if (!tables.value.some((item) => normalizeEntityId(item.Id) === tableId)) {
-        try {
-            const result = await DiyCommon.FormEngine.GetFormData("diy_table", {
-                Id: tableId,
-                _SelectFields: ["Id", "Name", "Description"]
-            });
-            if (result && Number(result.Code) === 1 && result.Data) tables.value.push(result.Data);
-        } catch (error) {
-            console.warn("[DataPermissionDesigner] 读取绑定表元数据失败", error);
-        }
-    }
+    await ensureTableById(tableId);
     if (mainTableName.value) moduleContext.DiyTableName = mainTableName.value;
     await loadFields(tableId);
 }
 
-async function loadTables() {
-    const result = await DiyCommon.FormEngine.GetTableData("diy_table", {
-        _SelectFields: ["Id", "Name", "Description"],
-        _Where: [["IsDeleted", "<>", 1]],
-        _OrderBy: "Name",
-        _OrderByType: "ASC",
-        _PageIndex: 1,
-        _PageSize: 10000
+function searchTablesRemote(keyword) {
+    clearTimeout(tableSearchTimer);
+    tableSearchTimer = setTimeout(() => void queryTables(keyword), 180);
+}
+
+function onTableSelectVisible(visible) {
+    if (visible) void prepareJoinReferenceData();
+}
+
+async function queryTables(keyword = "") {
+    const requestId = ++tableSearchRequestId;
+    const text = String(keyword || "").trim();
+    const where = [["IsDeleted", "<>", 1]];
+    if (text) {
+        where.push(["AND", "(", "Name", "Like", text]);
+        where.push(["OR", "Description", "Like", text, ")"]);
+    }
+    tableSearchLoading.value = true;
+    try {
+        const result = await DiyCommon.FormEngine.GetTableData("diy_table", {
+            _SelectFields: ["Id", "Name", "Description"],
+            _Where: where,
+            _OrderBy: "Name",
+            _OrderByType: "ASC",
+            _PageIndex: 1,
+            _PageSize: 50
+        });
+        if (requestId !== tableSearchRequestId) return [];
+        const rows = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : [];
+        tableOptionsLoaded = true;
+        mergeTableOptions(rows, true);
+        return rows;
+    } catch (error) {
+        if (requestId === tableSearchRequestId) console.warn("[DataPermissionDesigner] 搜索数据表失败", error);
+        return [];
+    } finally {
+        if (requestId === tableSearchRequestId) tableSearchLoading.value = false;
+    }
+}
+
+async function prepareJoinReferenceData() {
+    // 下拉候选与已配置关联表的精确回填并行启动，避免首次展开时被
+    // 逐表元数据读取串行挡住；精确回填结果会与远程搜索页安全合并。
+    if (!tableOptionsLoaded && !tableSearchLoading.value) void queryTables("");
+    await ensureConfiguredTables();
+    const fieldTasks = config.joins.map((join) => normalizeEntityId(join.tableId)).filter(Boolean).map((tableId) => loadFields(tableId));
+    if (fieldTasks.length) void Promise.allSettled(fieldTasks);
+}
+
+async function ensureConfiguredTables() {
+    const joins = config.joins.slice();
+    const resolved = await Promise.all(joins.map((join) => {
+        const tableId = normalizeEntityId(join.tableId);
+        return tableId ? ensureTableById(tableId) : ensureTableByName(join.tableName);
+    }));
+    const assignments = [];
+    resolved.forEach((table, index) => {
+        if (!table) return;
+        const join = joins[index];
+        if (!normalizeEntityId(join.tableId)) assignments.push(() => { join.tableId = table.Id; });
+        if (!join.tableName) assignments.push(() => { join.tableName = table.Name; });
     });
-    if (result && Number(result.Code) === 1 && Array.isArray(result.Data)) tables.value = result.Data;
+    if (assignments.length) {
+        referenceHydrationDepth++;
+        try {
+            assignments.forEach((apply) => apply());
+            await nextTick();
+        } finally {
+            referenceHydrationDepth--;
+        }
+    }
+}
+
+async function ensureTableById(tableId) {
+    const id = normalizeEntityId(tableId);
+    if (!id) return null;
+    const existing = tables.value.find((item) => normalizeEntityId(item.Id) === id);
+    if (existing) return existing;
+    return await lookupTable(`id:${id}`, { Id: id });
+}
+
+async function ensureTableByName(tableName) {
+    const name = String(tableName || "").trim();
+    if (!name) return null;
+    const existing = tables.value.find((item) => String(item.Name || "").toLowerCase() === name.toLowerCase());
+    if (existing) return existing;
+    return await lookupTable(`name:${name.toLowerCase()}`, { _Where: [["Name", "=", name], ["AND", "IsDeleted", "<>", 1]] });
+}
+
+async function lookupTable(cacheKey, param) {
+    if (tableLookupPromises.has(cacheKey)) return await tableLookupPromises.get(cacheKey);
+    const promise = (async () => {
+        try {
+            const result = await DiyCommon.FormEngine.GetFormData("diy_table", {
+                ...param,
+                _SelectFields: ["Id", "Name", "Description"]
+            });
+            const table = result && Number(result.Code) === 1 && result.Data ? result.Data : null;
+            if (table) mergeTableOptions([table]);
+            return table;
+        } catch (error) {
+            console.warn("[DataPermissionDesigner] 精确读取数据表失败", error);
+            return null;
+        } finally {
+            tableLookupPromises.delete(cacheKey);
+        }
+    })();
+    tableLookupPromises.set(cacheKey, promise);
+    return await promise;
+}
+
+function mergeTableOptions(rows, replaceSearch = false) {
+    const referencedIds = new Set([mainTableId.value, ...config.joins.map((join) => normalizeEntityId(join.tableId))].filter(Boolean));
+    const referencedNames = new Set(config.joins.map((join) => String(join.tableName || "").toLowerCase()).filter(Boolean));
+    const preserved = replaceSearch
+        ? tables.value.filter((table) => referencedIds.has(normalizeEntityId(table.Id)) || referencedNames.has(String(table.Name || "").toLowerCase()))
+        : tables.value;
+    tables.value = uniqueRows([...preserved, ...(rows || [])], (item) => normalizeEntityId(item.Id) || String(item.Name || "").toLowerCase());
 }
 
 async function loadViewerOptions() {
-    const [roleResult, deptResult] = await Promise.all([
-        DiyCommon.FormEngine.GetTableData("sys_role", {
-            _SelectFields: ["Id", "Name", "Class", "Remark", "Sort"],
-            _Where: [["IsDeleted", "<>", 1]],
-            _OrderBy: "Sort",
-            _PageSize: 5000
-        }),
-        DiyCommon.FormEngine.GetTableData("sys_dept", {
-            _SelectFields: ["Id", "Name", "ParentId", "Sort"],
-            _Where: [["IsDeleted", "<>", 1]],
-            _OrderBy: "Sort",
-            _PageSize: 5000
-        })
+    await Promise.allSettled([
+        loadSelectedRoleOptions(),
+        loadSelectedDepartmentOptions(),
+        queryRoles(""),
+        queryDepartments("")
     ]);
-    roles.value = roleResult && Number(roleResult.Code) === 1 && Array.isArray(roleResult.Data) ? roleResult.Data : [];
-    departments.value = deptResult && Number(deptResult.Code) === 1 && Array.isArray(deptResult.Data) ? deptResult.Data : [];
+}
+
+function searchRolesRemote(keyword) {
+    clearTimeout(roleSearchTimer);
+    roleSearchTimer = setTimeout(() => void queryRoles(keyword), 180);
+}
+
+function searchDepartmentsRemote(keyword) {
+    clearTimeout(departmentSearchTimer);
+    departmentSearchTimer = setTimeout(() => void queryDepartments(keyword), 180);
+}
+
+function onRoleSelectVisible(visible) {
+    if (visible && !roleOptionsLoaded && !roleSearchLoading.value) void queryRoles("");
+}
+
+function onDepartmentSelectVisible(visible) {
+    if (visible && !departmentOptionsLoaded && !departmentSearchLoading.value) void queryDepartments("");
+}
+
+async function queryRoles(keyword = "") {
+    const requestId = ++roleSearchRequestId;
+    const text = String(keyword || "").trim();
+    const where = [["IsDeleted", "<>", 1]];
+    if (text) {
+        where.push(["AND", "(", "Name", "Like", text]);
+        where.push(["OR", "Class", "Like", text]);
+        where.push(["OR", "Remark", "Like", text, ")"]);
+    }
+    roleSearchLoading.value = true;
+    try {
+        const result = await DiyCommon.FormEngine.GetTableData("sys_role", {
+            _SelectFields: ["Id", "Name", "Class", "Remark", "Sort"],
+            _Where: where,
+            _OrderBy: "Sort",
+            _PageIndex: 1,
+            _PageSize: 50
+        });
+        if (requestId !== roleSearchRequestId) return [];
+        const rows = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : [];
+        roleOptionsLoaded = true;
+        mergeRoleOptions(rows, true);
+        return rows;
+    } catch (error) {
+        if (requestId === roleSearchRequestId) console.warn("[DataPermissionDesigner] 搜索角色失败", error);
+        return [];
+    } finally {
+        if (requestId === roleSearchRequestId) roleSearchLoading.value = false;
+    }
+}
+
+async function queryDepartments(keyword = "") {
+    const requestId = ++departmentSearchRequestId;
+    const text = String(keyword || "").trim();
+    const where = [["IsDeleted", "<>", 1]];
+    if (text) where.push(["AND", "Name", "Like", text]);
+    departmentSearchLoading.value = true;
+    try {
+        const result = await DiyCommon.FormEngine.GetTableData("sys_dept", {
+            _SelectFields: ["Id", "Name", "ParentId", "Sort"],
+            _Where: where,
+            _OrderBy: "Sort",
+            _PageIndex: 1,
+            _PageSize: 50
+        });
+        if (requestId !== departmentSearchRequestId) return [];
+        const rows = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : [];
+        departmentOptionsLoaded = true;
+        mergeDepartmentOptions(rows, true);
+        return rows;
+    } catch (error) {
+        if (requestId === departmentSearchRequestId) console.warn("[DataPermissionDesigner] 搜索部门失败", error);
+        return [];
+    } finally {
+        if (requestId === departmentSearchRequestId) departmentSearchLoading.value = false;
+    }
+}
+
+async function loadSelectedRoleOptions() {
+    const ids = unique([...config.fullAccessRoleIds, ...config.fullAccessPostIds]);
+    const rows = await loadRowsByIds("sys_role", ids, ["Id", "Name", "Class", "Remark", "Sort"]);
+    mergeRoleOptions(rows);
+}
+
+async function loadSelectedDepartmentOptions() {
+    const ids = unique(config.fullAccessDeptIds);
+    const rows = await loadRowsByIds("sys_dept", ids, ["Id", "Name", "ParentId", "Sort"]);
+    mergeDepartmentOptions(rows);
+}
+
+async function loadRowsByIds(tableName, ids, selectFields) {
+    if (!ids.length) return [];
+    const chunks = [];
+    for (let index = 0; index < ids.length; index += 50) chunks.push(ids.slice(index, index + 50));
+    const results = await Promise.allSettled(chunks.map((chunk) => DiyCommon.FormEngine.GetTableData(tableName, {
+        _SelectFields: selectFields,
+        _Where: [["Id", "In", chunk]],
+        _PageIndex: 1,
+        _PageSize: 50
+    })));
+    return results.flatMap((item) => item.status === "fulfilled" && Number(item.value?.Code) === 1 && Array.isArray(item.value.Data) ? item.value.Data : []);
+}
+
+function mergeRoleOptions(rows, replaceSearch = false) {
+    const selected = new Set(unique([...config.fullAccessRoleIds, ...config.fullAccessPostIds]));
+    const preserved = replaceSearch ? roles.value.filter((item) => selected.has(String(item.Id))) : roles.value;
+    roles.value = uniqueRows([...preserved, ...(rows || [])], (item) => String(item.Id || ""));
+}
+
+function mergeDepartmentOptions(rows, replaceSearch = false) {
+    const selected = new Set(unique(config.fullAccessDeptIds));
+    const preserved = replaceSearch ? departments.value.filter((item) => selected.has(String(item.Id))) : departments.value;
+    departments.value = uniqueRows([...preserved, ...(rows || [])], (item) => String(item.Id || ""));
 }
 
 async function loadFields(tableId) {
-    if (!tableId || fieldsByTable[tableId]) return fieldsByTable[tableId] || [];
-    const result = await DiyCommon.PostAsync(DiyApi.GetDiyFieldByDiyTables, { TableIds: [tableId] });
-    fieldsByTable[tableId] = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : [];
-    return fieldsByTable[tableId];
+    const id = normalizeEntityId(tableId);
+    if (!id || fieldsByTable[id]) return fieldsByTable[id] || [];
+    if (fieldLookupPromises.has(id)) return await fieldLookupPromises.get(id);
+    const promise = (async () => {
+        try {
+            const result = await DiyCommon.PostAsync(DiyApi.GetDiyFieldByDiyTables, { TableIds: [id] });
+            const rows = result && Number(result.Code) === 1 && Array.isArray(result.Data) ? result.Data : [];
+            fieldsByTable[id] = rows.map((field) => ({ Id: field.Id, Name: field.Name, Label: field.Label, Type: field.Type }));
+            return fieldsByTable[id];
+        } catch (error) {
+            console.warn("[DataPermissionDesigner] 读取数据表字段失败", error);
+            return [];
+        } finally {
+            fieldLookupPromises.delete(id);
+        }
+    })();
+    fieldLookupPromises.set(id, promise);
+    return await promise;
 }
 
 function readRawFromForm() {
@@ -515,18 +821,29 @@ function readRawFromForm() {
     raw.joinTables = formatJoinTables(readFormField("JoinTables"));
 }
 
-async function importRawValues(showTip = true) {
+function importRawValues(showTip = true) {
     const markerState = extractDataPermissionConfig(raw.sqlWhere);
-    legacyMode.value = !markerState && !!(raw.sqlWhere.trim() || raw.sqlJoin.trim() || raw.joinTables.trim());
+    // “历史手写条件”只描述 SqlWhere；空 JoinTables（常见值为 []）或单独的
+    // SqlJoin 不应让一个真正无条件的模块看起来仍藏着权限 SQL。
+    legacyMode.value = !markerState && !!raw.sqlWhere.trim();
 
     const next = markerState ? normalizeConfig(markerState.config) : inferLegacyConfig();
     if (next.joins.length === 0) next.joins = parseLegacyJoins();
     Object.assign(config, next);
-    finalSql.value = stripDataPermissionMarker(raw.sqlWhere) || buildAnnotatedSqlWhere(buildSnapshot());
-    for (const join of config.joins) {
-        if (join.tableId) await loadFields(join.tableId);
+    const clearGeneratedDefaultDeny = shouldClearGeneratedDefaultDenySql(raw.sqlWhere, markerState);
+    const storedSqlBody = stripDataPermissionMarker(raw.sqlWhere);
+    finalSql.value = clearGeneratedDefaultDeny ? "" : (storedSqlBody || buildAnnotatedSqlWhere(buildSnapshot()));
+    if (clearGeneratedDefaultDeny) {
+        raw.sqlWhere = "";
+        setFormValue("SqlWhere", "");
+        emit("update:modelValue", "");
     }
-    if (showTip) DiyCommon.Tips(markerState ? "已恢复数据权限配置。" : "已保留历史手写权限条件。", true);
+    if (showTip) {
+        const message = clearGeneratedDefaultDeny
+            ? "已移除旧版设计器自动生成的默认拒绝条件。"
+            : (markerState ? "已恢复数据权限配置。" : "已保留历史手写权限条件。");
+        DiyCommon.Tips(message, true);
+    }
     dirty.value = false;
 }
 
@@ -613,8 +930,6 @@ async function autoSyncToForm(requestId, regenerateSql) {
             await ensureMainTableAvailable();
             await ensureSystemUserJoin();
             validateConfig();
-        } else if (!String(finalSql.value || "").trim()) {
-            throw new Error("请填写最终数据权限条件。");
         }
         if (requestId !== syncRequestId) return false;
         const snapshot = buildSnapshot();
@@ -710,7 +1025,7 @@ async function ensureSystemUserJoin() {
     if (!needsOwnerJoin.value) return;
     const existing = config.joins.find((join) => String(tableForJoin(join)?.Name || join.tableName || "").toLowerCase() === "sys_user" && join.leftAlias === "A" && join.leftField === config.ownerField);
     if (existing) return;
-    const userTable = tables.value.find((table) => String(table.Name || "").toLowerCase() === "sys_user");
+    const userTable = tables.value.find((table) => String(table.Name || "").toLowerCase() === "sys_user") || await ensureTableByName("sys_user");
     if (!userTable) throw new Error("未找到 sys_user 表，无法生成本人和下级的层级权限。");
     const join = {
         id: createId(), joinType: "LEFT", tableId: userTable.Id, tableName: userTable.Name,
@@ -747,12 +1062,21 @@ function permissionLineComment(text) {
 
 function buildAnnotatedSqlWhere(snapshot) {
     const branches = buildAccessBranches(snapshot);
+    const shape = resolveDataPermissionSqlShape(snapshot, branches.length);
+    if (shape === "empty") return "";
+    if (shape === "tenant-only") {
+        return [
+            permissionLineComment(`租户隔离：当前行 A.${snapshot.tenantField} 必须属于当前租户。`),
+            `A.${snapshot.tenantField} = '$CurrentUser.TenantId$'`
+        ].join("\n");
+    }
+
     const lines = [];
 
     lines.push(permissionLineComment("总条件开始：外层括号保证本权限条件与模块其它筛选条件组合时优先级不变。"));
     lines.push("(");
 
-    if (snapshot.tenantIsolation) {
+    if (shape === "tenant-and-branches") {
         lines.push(`  ${permissionLineComment(`租户隔离：当前行 A.${snapshot.tenantField} 必须属于当前租户。`)}`);
         lines.push(`  A.${snapshot.tenantField} = '$CurrentUser.TenantId$'`);
         lines.push(`  ${permissionLineComment("组合关系：必须先满足租户隔离，并且再满足下方任意一个放行条件。")}`);
@@ -783,8 +1107,10 @@ function appendAnnotatedBranches(lines, branches, indent) {
 }
 
 function appendSqlWithPrefix(lines, sql, indent, prefix) {
-    const sqlLines = String(sql || "").replace(/\r\n/g, "\n").split("\n");
-    lines.push(`${indent}${prefix}${sqlLines[0] || "1 = 0"}`);
+    const normalizedSql = String(sql || "").trim();
+    if (!normalizedSql) return;
+    const sqlLines = normalizedSql.replace(/\r\n/g, "\n").split("\n");
+    lines.push(`${indent}${prefix}${sqlLines[0]}`);
     const continuationIndent = `${indent}${" ".repeat(prefix.length)}`;
     sqlLines.slice(1).forEach((line) => lines.push(`${continuationIndent}${line}`));
 }
@@ -799,7 +1125,7 @@ function scopeModeDescription(snapshot) {
         department: `仅查看本部门数据（${department} = 当前部门 Id）`,
         departmentAndSubDepartments: `查看本部门及下级部门用户负责的数据（负责人字段 ${owner}）`,
         custom: "仅按高级图形条件或历史兼容条件判断"
-    })[snapshot.scopeMode] || "未配置，默认不放行";
+    })[snapshot.scopeMode] || "未配置额外范围";
 }
 
 function safeCommentText(value) {
@@ -828,6 +1154,9 @@ function buildJoinTables(joins) {
 }
 
 function buildAccessBranches(snapshot) {
+    // “全部数据”本身就是不附加范围条件；若同时启用租户隔离，最终只保留租户条件。
+    if (snapshot.scopeMode === "all") return [];
+
     const branches = [];
     const sqlSeen = new Set();
     const addBranch = (description, sql) => {
@@ -857,7 +1186,6 @@ function buildAccessBranches(snapshot) {
         const joiner = snapshot.ruleMatch === "all" ? " AND " : " OR ";
         addBranch(`高级图形条件：共 ${graphicalRules.length} 条，条件之间按“${snapshot.ruleMatch === "all" ? "全部满足（AND）" : "任一满足（OR）"}”组合。`, `(${graphicalRules.map(buildRuleSql).join(joiner)})`);
     }
-    if (branches.length === 0) addBranch("默认拒绝：尚未配置任何放行规则，因此任何普通用户都不能查看。", "1 = 0");
     return branches;
 }
 
@@ -866,7 +1194,7 @@ function selectionDisplayName(id, options) {
 }
 
 function buildScopeBranch(snapshot) {
-    if (snapshot.scopeMode === "all") return "1 = 1";
+    if (snapshot.scopeMode === "all") return "";
     if (snapshot.scopeMode === "self") return `A.${snapshot.ownerField} = '$CurrentUser.Id$'`;
     if (snapshot.scopeMode === "department") return `A.${snapshot.departmentField} = '$CurrentUser.DeptId$'`;
     if (snapshot.scopeMode === "custom") return "";
@@ -920,7 +1248,11 @@ function fieldsForAlias(alias) {
     const join = config.joins.find((item) => item.alias === alias);
     return join ? fieldsForTable(join.tableId) : [];
 }
-function tableForJoin(join) { return tables.value.find((item) => item.Id === join.tableId) || null; }
+function tableForJoin(join) {
+    const tableId = normalizeEntityId(join?.tableId);
+    const tableName = String(join?.tableName || "").toLowerCase();
+    return tables.value.find((item) => (tableId && normalizeEntityId(item.Id) === tableId) || (tableName && String(item.Name || "").toLowerCase() === tableName)) || null;
+}
 function joinDisplayName(join) { return `${join.alias} · ${tableForJoin(join)?.Name || join.tableName || "关联表"}`; }
 function tableLabel(table) { return table.Description ? `${table.Name} · ${table.Description}` : table.Name; }
 function fieldLabel(field) { return field.Label ? `${field.Name} · ${field.Label}` : field.Name; }
@@ -980,6 +1312,18 @@ function formatJoinTables(value) {
     return parsed.length > 0 ? JSON.stringify(parsed, null, 2) : stringValue(value);
 }
 function unique(values) { return Array.from(new Set((values || []).filter(Boolean).map(String))); }
+function uniqueRows(values, keySelector) {
+    const result = [];
+    const seen = new Set();
+    (values || []).forEach((item) => {
+        if (!item) return;
+        const key = String(keySelector(item) || "");
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        result.push(item);
+    });
+    return result;
+}
 function stringValue(value) { return value == null ? "" : (typeof value === "string" ? value : JSON.stringify(value)); }
 function safeIdentifier(value) { return /^[A-Za-z_][A-Za-z0-9_$]*$/.test(String(value || "")); }
 function safeAlias(value) { return /^[A-Za-z][A-Za-z0-9_]*$/.test(String(value || "")); }

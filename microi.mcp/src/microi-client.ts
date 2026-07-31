@@ -1799,6 +1799,7 @@ export class MicroiClient {
     OpenType?: string; Url?: string; Sort?: number;
     Icon?: string; SearchFieldIds?: string; TableDiyFieldIds?: string;
     DefaultOrderBy?: string; SqlWhere?: string;
+    MenuBadgeEnabled?: number; MenuBadgeApiEngineKey?: string;
     EnableViewSchema?: number; ViewSchemaVersion?: string;
     ViewConfigVersion?: number; ViewSchema?: string;
     // 业务按钮 / 高级配置（JSON 字符串）

@@ -87,6 +87,32 @@ public sealed class EmptyDatabaseReleaseServiceTests
         Assert.Equal("microi_empty_mysql57.sql", ReadPrivateConstant("SqlFileName"));
         Assert.Equal("/install/", ReadPrivateConstant("PublicObjectDirectory"));
         Assert.Equal("https://static.itdos.com/install/", ReadPrivateConstant("PublicDownloadBaseUrl"));
+        Assert.Equal(3, ReadPrivateIntConstant("TableOperationMaxAttempts"));
+    }
+
+    [Fact]
+    public void DescribeExceptionChain_PreservesNestedTransportCause()
+    {
+        var exception = new InvalidOperationException(
+            "Fatal error encountered during command execution",
+            new IOException("Unable to read data from the transport connection"));
+
+        var result = Assert.IsType<string>(InvokePrivateStatic("DescribeExceptionChain", exception));
+
+        Assert.Contains("InvalidOperationException: Fatal error encountered during command execution", result);
+        Assert.Contains("IOException: Unable to read data from the transport connection", result);
+    }
+
+    [Fact]
+    public void IsTransientDatabaseFailure_DetectsTransportErrorsOnly()
+    {
+        var transient = new InvalidOperationException(
+            "Fatal error encountered during command execution",
+            new IOException("Unable to read data from the transport connection"));
+        var validation = new InvalidOperationException("单表原子复制计数不一致");
+
+        Assert.True(Assert.IsType<bool>(InvokePrivateStatic("IsTransientDatabaseFailure", transient)));
+        Assert.False(Assert.IsType<bool>(InvokePrivateStatic("IsTransientDatabaseFailure", validation)));
     }
 
     [Fact]
@@ -118,5 +144,14 @@ public sealed class EmptyDatabaseReleaseServiceTests
             BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
         Assert.NotNull(field);
         return Assert.IsType<string>(field!.GetRawConstantValue());
+    }
+
+    private static int ReadPrivateIntConstant(string name)
+    {
+        var field = typeof(EmptyDatabaseReleaseService).GetField(
+            name,
+            BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+        Assert.NotNull(field);
+        return Assert.IsType<int>(field!.GetRawConstantValue());
     }
 }

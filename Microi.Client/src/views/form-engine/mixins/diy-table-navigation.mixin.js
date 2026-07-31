@@ -1,6 +1,19 @@
 
 export default {
     methods: {
+        WarmupDiyFormDialog() {
+            if (!this._diyFormDialogWarmupPromise) {
+                // diy-form 在弹窗组件内部仍是异步组件；两者一起预热，才能真正消除首次打开时的二次下载和解析。
+                this._diyFormDialogWarmupPromise = Promise.all([
+                    import("@/views/form-engine/diy-form-full.vue"),
+                    import("@/views/form-engine/diy-form.vue")
+                ]).catch((error) => {
+                    this._diyFormDialogWarmupPromise = null;
+                    console.warn("[DiyTable] 表单弹窗预加载失败，将在打开时重试", error);
+                });
+            }
+            return this._diyFormDialogWarmupPromise;
+        },
         CloseThisDialog() {
             var self = this;
             self.$refs.refDiyCustomDialog.CloseDialog();

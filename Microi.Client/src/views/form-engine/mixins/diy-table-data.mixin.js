@@ -99,6 +99,14 @@ export default {
             if (!param.ModuleEngineKey && !param.FormEngineKey) {
                 param.FormEngineKey = self.TableId;
             }
+            // ViewSchema 的复合列/卡片区域可能引用不单独显示的依赖字段。
+            // 显式与既有 SelectFields 求并集，默认接口与自定义 SelectApi 都可据此返回完整展示数据。
+            if (self.PresentationRequiredFieldNames && self.PresentationRequiredFieldNames.length > 0) {
+                var configuredSelectNames = (Array.isArray(self.SysMenuModel.SelectFields) ? self.SysMenuModel.SelectFields : [])
+                    .map(function (field) { return typeof field === 'string' ? field : (field.Name || field.AsName); })
+                    .filter(Boolean);
+                param._SelectFields = Array.from(new Set(['Id'].concat(configuredSelectNames, self.PresentationRequiredFieldNames)));
+            }
             return param;
         },
         FilterTreeLazyDirectChildren(rows, tree, treeParentField) {
@@ -874,15 +882,25 @@ export default {
 
                         // 性能优化：找出需要模板引擎处理的字段
                         var templateEngineFields = tempShowDiyFieldList.filter((field) => !self.DiyCommon.IsNull(field.V8TmpEngineTable));
-                        // 卡片模式下，CardTitleTagFields/CardBottomTagFields中的V8TmpEngineTable字段也需处理
+                        // 卡片/复合列模式下，ViewSchema 与旧卡片配置引用的模板字段也需处理。
                         if (self.TableDisplayMode === 'Card') {
-                            var extraTagFields = [].concat(self.CardTitleTagFieldList || [], self.CardBottomTagFieldList || [], self.CardShowDiyFieldList || []);
+                            var extraTagFields = [].concat(
+                                self.CardTitleTagFieldList || [],
+                                self.CardBottomTagFieldList || [],
+                                self.CardShowDiyFieldList || [],
+                                self.PresentationCardFieldList || []
+                            );
                             extraTagFields.forEach(function(f) {
                                 if (f && !self.DiyCommon.IsNull(f.V8TmpEngineTable) && !templateEngineFields.some(function(e) { return e.Id === f.Id; })) {
                                     templateEngineFields.push(f);
                                 }
                             });
                         }
+                        (self.PresentationListFieldList || []).forEach(function(f) {
+                            if (f && !self.DiyCommon.IsNull(f.V8TmpEngineTable) && !templateEngineFields.some(function(e) { return e.Id === f.Id; })) {
+                                templateEngineFields.push(f);
+                            }
+                        });
 
                         // 性能优化：先设置基础数据，让用户快速看到列表
                         var isMicroiStoreMenu = self._IsMicroiStoreMenu === true;
@@ -1156,6 +1174,9 @@ export default {
                                     // 🔥 PC端：重置懒渲染窗口（首屏只渲染前 _lazyRenderInitial 行，后续滚动追加）
                                     self.ResetLazyRender();
                                 }
+                            }
+                            if (typeof self.RefreshModulePresentation === 'function') {
+                                self.RefreshModulePresentation(param, result.Data);
                             }
                             if (typeof self.AutoTranslateBusinessDataIfNeeded === "function") {
                                 self.AutoTranslateBusinessDataIfNeeded().catch(function (error) {

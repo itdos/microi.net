@@ -2809,6 +2809,7 @@ namespace Microi.net
             int inTableEdit = 0, string inTableEditFields = null,
             string mobileListFields = null,
             string cardTitleTagFields = null, string cardBottomTagFields = null,
+            int menuBadgeEnabled = 0, string menuBadgeApiEngineKey = null,
             int enableViewSchema = 0, string viewSchemaVersion = "1.0",
             int viewConfigVersion = 1, string viewSchema = null,
             int isMicroiService = 0, string microServiceId = null,
@@ -3017,6 +3018,7 @@ namespace Microi.net
                     ["AppDisplay"] = appDisplay,
                     ["OpenType"] = openType ?? "Diy",
                     ["Url"] = effectiveUrl ?? "",
+                    ["MenuBadgeEnabled"] = menuBadgeEnabled == 1 ? 1 : 0,
                     ["EnableViewSchema"] = enableViewSchema == 1 ? 1 : 0,
                     ["ViewSchemaVersion"] = viewSchemaVersion.DosIsNullOrWhiteSpace() ? "1.0" : viewSchemaVersion,
                     ["ViewConfigVersion"] = viewConfigVersion < 1 ? 1 : viewConfigVersion,
@@ -3024,6 +3026,7 @@ namespace Microi.net
                     ["_InvokeType"] = "Server"
                 };
                 if (!string.IsNullOrWhiteSpace(icon)) menuData["Icon"] = icon;
+                if (!string.IsNullOrWhiteSpace(menuBadgeApiEngineKey)) menuData["MenuBadgeApiEngineKey"] = menuBadgeApiEngineKey.Trim();
                 if (!string.IsNullOrWhiteSpace(searchFieldIds)) menuData["SearchFieldIds"] = searchFieldIds;
                 if (!string.IsNullOrWhiteSpace(tableDiyFieldIds)) menuData["TableDiyFieldIds"] = tableDiyFieldIds;
                 if (!string.IsNullOrWhiteSpace(defaultOrderBy)) menuData["DefaultOrderBy"] = defaultOrderBy;
@@ -3739,6 +3742,11 @@ namespace Microi.net
             return data;
         }
 
+        private static int NormalizeMenuBadgeEnabledToken(JToken token)
+        {
+            return token?.ToObject<int>() == 1 ? 1 : 0;
+        }
+
         private static async Task<DosResult<object>> UpsertRecordByIdOrKey(
             string osClient, string tableName, JObject data, string uniqueField, string displayName)
         {
@@ -3847,7 +3855,7 @@ namespace Microi.net
                         "Id", "Name", "ParentId", "DiyTableId", "DiyTableName", "Url", "ComponentName", "ComponentPath",
                         "OpenType", "Display", "AppDisplay", "Sort", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds",
                         "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns",
-                        "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "UpdateTime"
+                        "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema", "UpdateTime"
                     },
                     _Where = BuildKeywordWhere(keyword, "Name", "Url", "DiyTableName"),
                     _OrderBy = "Sort",
@@ -3893,7 +3901,7 @@ namespace Microi.net
                 var allowed = new[] {
                     "Name", "Description", "DiyTableId", "DiyTableName", "ParentId", "Sort", "ComponentName", "ComponentPath", "Display", "AppDisplay",
                     "OpenType", "Url", "Icon", "IconClass", "SearchFieldIds", "TableDiyFieldIds", "DefaultOrderBy", "SqlWhere",
-                    "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
+                    "MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema",
                     "MoreBtns", "FormBtns", "BatchSelectMoreBtns", "PageTabs", "ExportMoreBtns", "PageBtns", "SortFieldIds", "NotShowFields",
                     "SqlJoin", "JoinTables", "SelectFields", "StatisticsFields", "InTableEdit", "InTableEditFields", "MobileListFields",
                     "CardTitleTagFields", "CardBottomTagFields", "SelectApi", "ImportApi", "ExportApi", "AddBtnText", "SaveBtnText",
@@ -3902,6 +3910,10 @@ namespace Microi.net
                     "AddCodeShowV8", "EditCodeShowV8", "DelCodeShowV8", "DetailPageV8"
                 };
                 var data = BuildDataFromParam(osClient, param, allowed, moduleId);
+                if (data["MenuBadgeEnabled"] != null)
+                {
+                    data["MenuBadgeEnabled"] = NormalizeMenuBadgeEnabledToken(data["MenuBadgeEnabled"]);
+                }
                 var warnings = new List<string>();
                 foreach (var field in MenuJsonArrayFields)
                 {
@@ -3916,8 +3928,69 @@ namespace Microi.net
                     if (!normalized.Ok) return new DosResult<object>(0, null, normalized.Msg);
                     data["ViewSchema"] = normalized.Value;
                 }
+
+                // MenuBadgeEnabled/MenuBadgeApiEngineKey are resource-installed fields. A node may
+                // still hold the sys_menu diy_field list cached before those fields were installed;
+                // FormEngine then silently skips the unknown properties while returning Code=1.
+                // Clear both the name-keyed and Id-keyed shared caches before a badge update so every
+                // node reloads the current metadata. Do this only for badge patches to avoid adding a
+                // schema-cache round trip to ordinary module updates.
+                var hasMenuBadgePatch = data["MenuBadgeEnabled"] != null
+                    || data["MenuBadgeApiEngineKey"] != null;
+                if (hasMenuBadgePatch)
+                {
+                    var schemaKeys = new List<string> { "sys_menu" };
+                    var tableResult = await MicroiEngine.FormEngine.GetDiyTable("sys_menu", osClient);
+                    if (tableResult.Code == 1 && tableResult.Data != null)
+                    {
+                        var sysMenuTableId = JObject.FromObject(tableResult.Data)["Id"]?.ToObject<string>();
+                        if (!sysMenuTableId.DosIsNullOrWhiteSpace()) schemaKeys.Add(sysMenuTableId);
+                    }
+                    var refreshResult = await RefreshSchemaCache(osClient, schemaKeys);
+                    if (refreshResult.Code != 1)
+                    {
+                        return new DosResult<object>(
+                            refreshResult.Code,
+                            refreshResult.Data,
+                            "刷新 sys_menu 字段元数据缓存失败：" + refreshResult.Msg);
+                    }
+                }
+
                 var result = await MicroiEngine.FormEngine.UptFormDataAsync("sys_menu", data);
                 if (result.Code != 1) return new DosResult<object>(result.Code, result.Data, result.Msg);
+
+                // Do not report a successful module update when FormEngine ignored a newly installed
+                // metadata field. The MCP client also verifies readback, but this server-side assertion
+                // protects every caller of UpdateModule and makes the failure actionable.
+                if (hasMenuBadgePatch)
+                {
+                    var readbackResult = await GetModule(osClient, moduleId);
+                    if (readbackResult.Code != 1 || readbackResult.Data == null)
+                    {
+                        return new DosResult<object>(0, null, "菜单模块已更新，但菜单角标字段回读失败");
+                    }
+                    var readback = JObject.FromObject(readbackResult.Data);
+                    var enabledMismatch = data["MenuBadgeEnabled"] != null
+                        && NormalizeMenuBadgeEnabledToken(readback["MenuBadgeEnabled"])
+                            != NormalizeMenuBadgeEnabledToken(data["MenuBadgeEnabled"]);
+                    var apiKeyMismatch = data["MenuBadgeApiEngineKey"] != null
+                        && !string.Equals(
+                            readback["MenuBadgeApiEngineKey"]?.ToObject<string>() ?? "",
+                            data["MenuBadgeApiEngineKey"]?.ToObject<string>() ?? "",
+                            StringComparison.Ordinal);
+                    if (enabledMismatch || apiKeyMismatch)
+                    {
+                        return new DosResult<object>(
+                            0,
+                            new
+                            {
+                                ModuleId = moduleId,
+                                MenuBadgeEnabled = NormalizeMenuBadgeEnabledToken(readback["MenuBadgeEnabled"]),
+                                MenuBadgeApiEngineKey = readback["MenuBadgeApiEngineKey"]?.ToObject<string>()
+                            },
+                            "菜单模块更新接口执行成功，但菜单角标字段回读不一致；请确认模块引擎资源已安装并重试");
+                    }
+                }
                 return new DosResult<object>(1, new { ModuleId = moduleId, Message = "菜单模块已更新", Warnings = warnings });
             }
             catch (Exception ex)

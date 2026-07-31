@@ -2,6 +2,14 @@ import { formTrace, isAdvancedFieldLayoutRuntimeEnabled } from "@/utils/form-eng
 
 export default {
     watch: {
+        FieldActiveTab(tabKey) {
+            // 初始化和代码切换 Tab 时也要续跑已中断的重型字段批次，不能只依赖鼠标 tab-click。
+            this.$nextTick(() => {
+                if (!this._isDestroyed && tabKey && this.renderedTabs && this.renderedTabs.has(tabKey)) {
+                    this.StartProgressiveTabRender(tabKey);
+                }
+            });
+        },
         ShowHideField() {
             this.ScheduleRefreshDiyFieldRuntimeState();
         },
@@ -846,9 +854,13 @@ export default {
             // 性能优化：渐进式渲染字段
             // 每个 tab 已渲染的字段数量（tab key -> number）
             renderedFieldCounts: {},
-            // 每批渲染的字段数量（首批20个，后续每批10个）
-            BATCH_SIZE_FIRST: 20,
-            BATCH_SIZE_NEXT: 10,
+            // 首次打开的 Tab 必须完整渲染；渐进式批次只服务于模块设计的后续重型 Tab。
+            _initialRenderedTabKey: "",
+            // 重型 Tab 分批挂载，先让 Tab 立即响应，再逐批补齐 JSON 表/编辑器。
+            BATCH_SIZE_FIRST: 2,
+            BATCH_SIZE_NEXT: 2,
+            _tabRenderTimers: {},
+            _tabActivationFrames: {},
             BtnLoading: false,
             GetDiyTableRowModelFinish: false,
             DiyCustomDialogConfig: {},
@@ -863,6 +875,11 @@ export default {
             IsFirstLoadForm: true,
             // V8 基础对象实例（存储通用函数，避免每次重新创建）
             _V8BaseInstance: null,
+            // 字段组件使用稳定的 ParentV8 引用，避免每次 Tab 切换都重新初始化
+            // 扫码、打印和 FormEngine 绑定。字段对象可能在子表中被复制，因此使用 WeakMap。
+            _V8FieldCache: new WeakMap(),
+            _V8RootInstance: null,
+            _V8FieldCacheContext: "",
             searchOption: {
                 // city: '宁波', //默认全国
                 // citylimit: true //默认false

@@ -24,6 +24,8 @@
 | `CardTitleTagFields` | 卡片标题/标签字段 |
 | `CardBottomTagFields` | 卡片底部字段 |
 | `DefaultOrderBy` | 默认排序 |
+| `MenuBadgeEnabled` | 左侧菜单统计角标开关 |
+| `MenuBadgeApiEngineKey` | 菜单统计接口引擎 Key，返回 `Data.Value` |
 
 默认隐藏 Id、外键、系统字段、布局字段、上传、富文本、地图和子表等重字段。
 默认搜索优先名称、标题、编号、状态、类型、分类、负责人和时间；统计优先金额、
@@ -80,6 +82,8 @@
 | `ViewConfigVersion` | 每次发布递增，驱动缓存失效 |
 | `ViewSchema` | Detail/Edit/List/Card JSON |
 
+顶层 PC 列表不依赖 `EnableViewSchema` 才采用新样式：平台始终显示紧凑模块标题。模块表单中的 `DiyModulePresentationDesigner` 负责可视化编辑默认 List-PC 与 Card-Mobile 视图，并保留 Detail/Edit、角色视图及未知 JSON 字段。
+
 视图项常用字段：`Key`、`Scene`、`Device`、`RoleIds`、`Priority`、`Layout`。
 标准区块包括 `EntityHero`、`MetricStrip`、`ActionGrid`、
 `ResponsiveSection`。声明式动作包括：
@@ -90,6 +94,29 @@
 `ParamMap` 可使用经过白名单处理的 `$form.Field`、`$user.Field`、
 `$menu.Field`。小程序端不下载/执行任意 V8Code。
 
+### List / Card 展示协议
+
+| 配置路径 | 用途 | 核心字段 |
+|---|---|---|
+| `Layout.Hero` | 模块眉题、标题、说明、统计条 | `Eyebrow/Title/Description/Metrics` |
+| `Hero.Metrics[]` | 内置、字段或接口引擎指标 | `Key/Label/Source/Field/ApiEngineKey/ValuePath/Prefix/Suffix/Tone/RefreshSeconds` |
+| `Layout.List.Columns[]` | PC 复合列 | `Field/Lines/TrailingFields/RequiredFields/Align/MinWidth` |
+| `Layout.Card` | 移动端业务卡片 | `AvatarTextField/TitleField/TopFields/SubtitleFields/RightFields/Fields/MetaFields/BottomFields` |
+
+字段引用对象支持 `Name/AsName/Label/ShowLabel/Icon/Tone/Color/Prefix/Suffix/
+FontWeight/DisplayStyle`。运行时会把引用字段并入 `_SelectFields`；查询接口替换也必须
+返回这些字段。多字段模板沿用对应 `diy_field.V8TmpEngineTable`，不在 ViewSchema 内保存
+可执行脚本。
+
+Hero 必须在 PageTabs 上方渲染。PC 无指标/含指标头部分别为 `44px / 58px`，连同间距的
+总纵向占用约 `50px / 64px`。只允许一次性入场与一次性轻量光效，禁止持续循环动画；
+`prefers-reduced-motion: reduce` 下关闭动画和过渡。
+
+`Hero.Metrics[].Source` 可直接配置 `DataCount`（当前筛选总记录数）或 `PageCount`（本页
+加载数），两者复用列表结果且不请求接口。字段汇总使用 `Field`。动态指标接口按
+`ApiEngineKey` 分组调用，参数包含 `MetricKeys`、当前模块/表、租户和筛选上下文；同一接口
+应一次返回多个指标。`ValuePath` 例：`Data.UnpaidAmount`。
+
 ## 动态按钮位置
 
 | 字段 | 位置 |
@@ -97,12 +124,28 @@
 | `MoreBtns` | 行操作 |
 | `FormBtns` | 表单底部 |
 | `BatchSelectMoreBtns` | 批量勾选后 |
-| `PageTabs` | 页面顶部 Tab |
+| `PageTabs` | 页面顶部 Tab，固定在模块 Hero 下方 |
 | `PageBtns` | 页面级 |
 | `ExportMoreBtns` | 导出扩展 |
 
 按钮对象必须有稳定唯一 Id、Sort、Name、显隐逻辑和动作。后台任务按钮还要配置
 ApiEngineKey、Workload、幂等字段、并发 Key、业务状态/任务 Id/进度/ETA 字段。
+
+`PageTabs` 与五类按钮共用统计字段：`BadgeEnabled`、`BadgeApiEngineKey`、`BadgeValuePath`、`BadgeField`、
+`BadgeTone`、`BadgeColor`、`BadgeMax`、`BadgeShowZero`、`BadgeRefreshSeconds`。接口一次接收当前页 `Ids` 与
+`ButtonKeys`，推荐返回：
+
+```json
+{
+  "Code": 1,
+  "Data": {
+    "Buttons": { "button-id": 12 },
+    "Rows": { "row-id": { "button-id": 2 } }
+  }
+}
+```
+
+行按钮的 `BadgeField` 直接读取当前行已有字段；PageTabs/页面按钮的 `BadgeField` 读取模块 `StatisticsFields` 页面汇总值，必须同时配置“统计列”。字段模式不调用接口；其它行统计必须批量聚合，禁止 N+1。
 
 ## 接口替换
 
@@ -118,6 +161,10 @@ ApiEngineKey、Workload、幂等字段、并发 Key、业务状态/任务 Id/进
 
 - 无目标菜单：在当前模块执行 V8，通常 `V8.SearchSet(...)`。
 - 有 `TargetSysMenuId`：加载目标模块。目标菜单即使隐藏导航，也必须给角色权限。
+
+PageTabs 可以通过 `BadgeApiEngineKey` 显示数字角标。接口按 `ButtonKeys` 一次返回所有 Tab 数量到 `Data.Buttons`，`BadgeValuePath` 可显式指定 `Data.Buttons.{TabId}`；失败只隐藏角标，不能阻断页签切换。
+
+PageTabs 只表达当前模块的数据类别/状态，不能取代模块 Hero，也不能渲染到 Hero 上方。
 
 跨表 Tab 应让每个目标菜单配置同一组 PageTabs，不在前端按菜单名写死。
 

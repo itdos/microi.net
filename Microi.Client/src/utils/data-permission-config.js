@@ -51,6 +51,9 @@ export function createDataPermissionMarker(snapshot) {
 
 export function composeDataPermissionSql(snapshot, sqlBody) {
     const body = stripDataPermissionMarker(sqlBody);
+    // 空权限必须保持真正的空 SqlWhere。只保存配置标记会让后端仍收到一段
+    // SQL 文本，也会在重新打开设计器时把“无条件”误还原成默认图形规则。
+    if (!body) return "";
     return `${createDataPermissionMarker(snapshot)}\n${body}`.trim();
 }
 
@@ -82,6 +85,44 @@ export function stripDataPermissionMarker(value) {
         .replace(readableMarkerPattern, "")
         .replace(legacyMarkerPattern, "")
         .trim();
+}
+
+/**
+ * 识别旧版设计器自动补出的“默认拒绝”SQL。必须同时包含固定说明文字，
+ * 且去掉说明和成对外括号后只有 1 = 0，避免误判用户手写条件。
+ */
+export function isGeneratedDefaultDenySql(value) {
+    const body = stripDataPermissionMarker(value);
+    if (!/^[ \t]*--[ \t]*【(?:吾码)?权限说明】默认拒绝：尚未配置任何放行规则/m.test(body)) return false;
+
+    const executable = body
+        .split(/\r?\n/)
+        .filter((line) => !/^[ \t]*--[ \t]*【(?:吾码)?权限说明】/.test(line))
+        .join("")
+        .replace(/\s+/g, "");
+    const match = executable.match(/^(\(*)1=0(\)*)$/);
+    return !!match && match[1].length === match[2].length;
+}
+
+/**
+ * 只迁移带设计器标记的自动默认拒绝；历史高级手写配置始终保留。
+ */
+export function shouldClearGeneratedDefaultDenySql(value, markerState = extractDataPermissionConfig(value)) {
+    if (!markerState) return false;
+    const config = markerState.config || {};
+    if (config.whereMode === "manual" && String(config.manualSql || "").trim()) return false;
+    return isGeneratedDefaultDenySql(value);
+}
+
+/**
+ * 返回生成器应输出的最小 SQL 结构，杜绝空条件被包成 ()。
+ */
+export function resolveDataPermissionSqlShape(snapshot, branchCount) {
+    const hasTenant = !!snapshot?.tenantIsolation;
+    const hasBranches = snapshot?.scopeMode !== "all" && Number(branchCount || 0) > 0;
+    if (!hasTenant && !hasBranches) return "empty";
+    if (hasTenant && !hasBranches) return "tenant-only";
+    return hasTenant ? "tenant-and-branches" : "branches";
 }
 
 function decodeLegacyMarker(value) {
