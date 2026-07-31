@@ -498,13 +498,13 @@ const getMultipleFlag = computed(() => {
     return props.field.Config.ImgUpload.Multiple === true || props.field.Config.ImgUpload.Multiple === 'true';
 });
 
-// 是否显示多图片列表
+// zhy：使用跨端归一化后的数据判断是否显示多图片列表。
 const showMultipleImgList = computed(() => {
     const normalized = normalizeValue(props.modelValue);
     return Array.isArray(normalized) && normalized.length > 0;
 });
 
-// 图片列表计算属性
+// zhy：图片列表统一过滤无 Id 或无 Path 的异常上传记录。
 const imageListComputed = computed(() => {
     const normalized = normalizeValue(props.modelValue);
     return Array.isArray(normalized) ? normalized.filter(img => img && img.Id && img.Path) : [];
@@ -946,7 +946,7 @@ const getSingleImgSize = () => {
     return formatFileSize(size);
 };
 
-// 获取多图片预览列表
+// zhy：多图片预览统一使用归一化列表获取真实访问地址。
 const GetImgUploadImgs = () => {
     const result = [];
     imageListComputed.value.forEach((img) => {
@@ -1049,7 +1049,7 @@ watch(
         if (newVal) {
             await nextTick();
             initSortable();
-            // 为多图片初始化 RealPath（编辑模式和查看模式都需要）
+            // zhy：为归一化后的多图片初始化 RealPath（编辑模式和查看模式都需要）。
             if (imageListComputed.value.length) {
                 imageListComputed.value.forEach((img) => {
                     if (img && img.Id && img.Path) {
@@ -1075,7 +1075,7 @@ onMounted(() => {
         });
     }
 
-    // 为已有的多图片初始化 RealPath（编辑模式和查看模式都需要）
+    // zhy：为已有的归一化多图片初始化 RealPath（编辑模式和查看模式都需要）。
     if (getMultipleFlag.value && imageListComputed.value.length > 0) {
         imageListComputed.value.forEach((img) => {
             if (img && img.Id && img.Path) {

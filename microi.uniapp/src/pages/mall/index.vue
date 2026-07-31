@@ -13,6 +13,7 @@
             :placeholder="t('mall.searchPlaceholder')"
             placeholder-style="color:#bbb;font-size:13px;"
             confirm-type="search"
+            @input="scheduleSearch"
             @confirm="onSearch"
           />
           <view v-if="keyword" class="search-clear" @tap="clearSearch">✕</view>
@@ -206,6 +207,7 @@ export default {
       statusBarHeight: 0,
       capsuleWidth: 0,
       keyword: '',
+      searchTimer: null,
       // 分类树
       categoryTree: [],
       currentMainId: null,    // 当前选中的一级分类Id
@@ -258,6 +260,9 @@ export default {
     const snapshot = readMallSnapshot()
     if (snapshot) this.applyInitialSnapshot(snapshot)
     this.loadInitialSnapshot()
+  },
+  onUnload() {
+    clearTimeout(this.searchTimer)
   },
 
   methods: {
@@ -404,11 +409,19 @@ export default {
 
     // 搜索
     onSearch() {
+      clearTimeout(this.searchTimer)
       this.loadProducts()
+    },
+
+    // zhy：商城搜索输入后自动防抖检索，保留原筛选入口。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadProducts(), 350)
     },
 
     // 清除搜索
     clearSearch() {
+      clearTimeout(this.searchTimer)
       this.keyword = ''
       this.loadProducts()
     },

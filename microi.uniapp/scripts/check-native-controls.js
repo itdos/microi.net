@@ -211,9 +211,36 @@ for (const token of [
   'proposalDefaults(context)',
   'latestProposalValues(context)',
   'calculateProposalCosts(context.form)',
-  'handleFieldChange(context, payload)'
+  'handleFieldChange(context, payload)',
+  "installationPositionCount: 'ChangsuoDWSL'",
+  'handleRelatedCount(context, payload = {})',
+  'isProposalInstallationChild(payload.field)',
+  'handleRelatedCount,',
+  'V8.FormEngine.UptFormData(PROPOSAL_TABLE'
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`xjy proposal form rule is missing: ${token}`)
+}
+if (!nativeForm.includes('@data-count="handleRelatedCount"') ||
+  !nativeForm.includes('handleTenantFormRelatedCount(this.tenantFormContext(), payload)') ||
+  !nativeForm.includes('...(wasAdd && this.draftRowId ? { Id: this.draftRowId } : {})') ||
+  !relatedBusinessList.includes("'data-count'") ||
+  !relatedBusinessList.includes('if (notifyCount) this.emitDataCount()') ||
+  !relatedBusinessList.includes('uniqueRowsById(reset ? incomingRows') ||
+  !xjyProposalCalculation.includes("'ChangsuoDWSL'")) {
+  fail('native proposal form must link the installation child DataCount to its position count field')
+}
+if (!relatedBusinessList.includes('search-input-wrap') ||
+  !relatedBusinessList.includes('@input="scheduleSearch"') ||
+  !relatedBusinessList.includes('@tap="resetSearch"><text>重置</text>') ||
+  !relatedBusinessList.includes(':adjust-position="false"') ||
+  !relatedBusinessList.includes(':hold-keyboard="true"') ||
+  relatedBusinessList.includes(':always-embed="true"')) {
+  fail('related-list search must preserve the enhanced search UI without enabling the unstable native embed mode')
+}
+if (!relatedBusinessList.includes('<root-portal v-if="filterOpen && !isPreview">') ||
+  !relatedBusinessList.includes('@touchmove.stop.prevent="noop"') ||
+  !relatedBusinessList.includes('z-index: 9999')) {
+  fail('related-list filter sheet must render at the page root and lock background scrolling')
 }
 // zhy：跟进详情必须将联系人 Id 解析为姓名，保存时必须显式补入隐藏客户 Id。
 for (const token of [

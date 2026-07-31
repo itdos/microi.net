@@ -37,6 +37,7 @@ const PROPOSAL_FIELDS = {
   rentalPrice: 'ShebeiDJZL',
   buyoutPrice: 'ShebeiDJ',
   filterPrice: 'GenghuanLXJG',
+  installationPositionCount: 'ChangsuoDWSL',
   expectedCooperationDate: 'YujiHZSJ',
   bottledWaterPrice: 'TongzhuangSDJ',
   rentalDeviceCount: 'HezuoHYSSBSL',
@@ -150,6 +151,17 @@ function isProposalForm(context) {
 
 function isProposalAdd(context) {
   return isProposalForm(context) && context.mode === 'Add' && !context.rowId
+}
+
+function isProposalInstallationChild(field = {}) {
+  const config = field.config || {}
+  const title = [
+    field.Label,
+    field.Name,
+    config.TableChildSysMenuName,
+    config.TableChild?.Title
+  ].filter(Boolean).join(' ')
+  return /安装点位|安装位置/.test(title)
 }
 
 function fieldName(context, expectedName, expectedLabel = '') {
@@ -754,6 +766,12 @@ export function createState() {
 }
 
 export async function initialize(context) {
+  if (isProposalAdd(context) &&
+    isEmptyFormValue(context.form[fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')])) {
+    context.patchForm({
+      [fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')]: 0
+    })
+  }
   if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode)) {
     // zhy：新增、编辑客户统一按负责人归一跟进状态，兼容历史记录状态为空的情况。
     applyCustomerFollowScope(context)
@@ -822,6 +840,27 @@ export async function initialize(context) {
       ...calculateProposalCosts(initialForm)
     })
   }
+}
+
+// zhy：客户方案的场所点位数量始终取安装点位子表接口返回的完整总数，空子表显示 0。
+export async function handleRelatedCount(context, payload = {}) {
+  if (!isProposalForm(context) || payload.filtered || !isProposalInstallationChild(payload.field)) return
+  const count = Number(payload.count)
+  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
+  const value = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+  if (Number(context.form[field] || 0) === value) return
+  // zhy：已保存方案的子表发生变化后直接持久化派生数量；写入固定值可安全重试且不会新增主表。
+  if (context.rowId) {
+    const result = await V8.FormEngine.UptFormData(PROPOSAL_TABLE, {
+      Id: context.rowId,
+      [field]: value,
+      _InvokeType: 'Client'
+    })
+    if (!result || Number(result.Code) !== 1) {
+      throw new Error((result && result.Msg) || '场所点位数量同步失败')
+    }
+  }
+  context.patchForm({ [field]: value })
 }
 
 export function getPresentation(context) {
@@ -1195,6 +1234,7 @@ export default {
   runFieldAction,
   handleFieldChange,
   handleFieldSelect,
+  handleRelatedCount,
   beforeSubmit,
   afterSubmit,
   getBusyMessage,
