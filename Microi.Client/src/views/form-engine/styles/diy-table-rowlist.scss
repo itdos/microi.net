@@ -37,6 +37,19 @@
   background-color: var(--el-table-current-row-bg-color, #ecf5ff) !important;
 }
 
+// 固定操作列覆盖在可横向滚动的普通列之上。主题的当前行颜色可能是半透明色，
+// 直接作为 background-color 会让后方的创建时间等文字穿透；先铺页面底色，
+// 再以背景图叠加当前行色，视觉一致且最终像素保持不透明。
+:deep(.table-data .el-table__body tr.diy-current-row > td.el-table__cell.el-table-fixed-column--right) {
+  background-color: var(--el-bg-color, #fff) !important;
+  background-image: linear-gradient(
+    var(--el-table-current-row-bg-color, #ecf5ff),
+    var(--el-table-current-row-bg-color, #ecf5ff)
+  ) !important;
+  background-clip: padding-box;
+  isolation: isolate;
+}
+
 .search-box{
      display: flex;
      justify-content: space-between;

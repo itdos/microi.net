@@ -6,7 +6,7 @@
         <el-icon v-else class="sub-el-icon svg-icon">
             <List />
         </el-icon>
-        <span v-if="title" class="menu-title">{{ title }}</span>
+        <span v-if="title" class="menu-title" :title="title" :aria-label="title">{{ title }}</span>
         <span
             v-if="badgeText !== null"
             class="menu-stat-badge"

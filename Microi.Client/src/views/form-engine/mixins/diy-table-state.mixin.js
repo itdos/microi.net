@@ -281,29 +281,33 @@ export default {
         },
         GetActionWidth: function () {
             var self = this;
-            if (self.SysMenuModel.TableActionFixedWidth) {
-                return self.SysMenuModel.TableActionFixedWidth;
-            }
+            // 人工配置作为最小宽度，而不是允许内容被截断的强制宽度。
+            var configuredWidth = Number(self.SysMenuModel && self.SysMenuModel.TableActionFixedWidth) || 0;
             var baseWidth = 0;//30;
             var isWF = self.IsWorkFlowMenu();
             // 工作流-去处理 按钮
             if (isWF) {
-                baseWidth += 100;
+                baseWidth += 84;
             }
             // 详情按钮
             if (self.IsPermission('NoDetail')) {
-                baseWidth += 80;
+                baseWidth += 68;
             }
             if (self.IsTrashMode) {
-                baseWidth += 90;
+                baseWidth += 68;
             }
             // 更多按钮（编辑/删除/内部自定义按钮）
             // WF 模式下仅考虑删除与内部自定义按钮（编辑项被隐藏）；非WF模式下考虑编辑+删除+内部按钮
             var canEdit = !isWF && self.TableChildFormMode != 'View' && self._LimitEdit;
             if (canEdit || self._LimitDel || self.HasVisibleMoreBtnsIn) {
-                baseWidth += 100;
+                baseWidth += 72;
             }
-            return baseWidth + self.MaxRowBtnsOut;
+            // 固定列的 .cell 仍有水平内边距；未预留时 flex-end 会把首个按钮推到列外。
+            var cellReserveWidth = typeof self.GetActionCellReserveWidth === 'function'
+                ? self.GetActionCellReserveWidth()
+                : 32;
+            var automaticWidth = baseWidth + self.MaxRowBtnsOut + cellReserveWidth;
+            return configuredWidth > 0 ? Math.max(configuredWidth, automaticWidth) : automaticWidth;
         },
         ShowSelectLabel: function () {
             var self = this;

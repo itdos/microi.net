@@ -23,6 +23,11 @@ function uniqueFields(fields) {
     });
 }
 
+function withoutUsedFields(fields, usedFields) {
+    const used = new Set(uniqueFields(usedFields).map((field) => field.AsName || field.Name || field.Id));
+    return uniqueFields(fields).filter((field) => !used.has(field.AsName || field.Name || field.Id));
+}
+
 export default {
     data() {
         return {
@@ -47,9 +52,19 @@ export default {
             });
         },
         ModuleCardView() {
+            const device = this.diyStore.IsPhoneView ? "Mobile" : "PC";
+            const preferred = selectModuleView(this.SysMenuModel, {
+                scene: "Card",
+                device,
+                user: this.GetCurrentUser
+            });
+            if (preferred) return preferred;
+
+            // 卡片字段编排本身是跨端协议。当前设计器只生成“移动端卡片”，
+            // 当桌面模块直接采用卡片模式时应复用该配置，不能退回已被去重隐藏的旧字段列表。
             return selectModuleView(this.SysMenuModel, {
                 scene: "Card",
-                device: this.diyStore.IsPhoneView ? "Mobile" : "PC",
+                device: device === "PC" ? "Mobile" : "PC",
                 user: this.GetCurrentUser
             });
         },
@@ -150,15 +165,40 @@ export default {
         },
         CardContentFieldList() {
             const configured = this.ResolvePresentationFields(this.PresentationCardConfig?.Fields);
-            if (configured.length) return configured.filter((field) => field.Name !== this.CardPrimaryField?.Name);
-            return (this.CardShowDiyFieldList || []).filter((field) => field.Name !== this.CardPrimaryField?.Name);
+            const source = configured.length ? configured : (this.CardShowDiyFieldList || []);
+            return withoutUsedFields(source, [
+                this.CardPrimaryField,
+                this.CardAvatarField,
+                ...this.CardSubtitleFieldList,
+                ...this.CardTopFieldList,
+                ...this.CardRightFieldList
+            ]);
         },
         CardMetaFieldList() {
-            return this.ResolvePresentationFields(this.PresentationCardConfig?.MetaFields);
+            return withoutUsedFields(
+                this.ResolvePresentationFields(this.PresentationCardConfig?.MetaFields),
+                [
+                    this.CardPrimaryField,
+                    this.CardAvatarField,
+                    ...this.CardSubtitleFieldList,
+                    ...this.CardTopFieldList,
+                    ...this.CardRightFieldList,
+                    ...this.CardContentFieldList
+                ]
+            );
         },
         CardBottomFieldList() {
             const configured = this.ResolvePresentationFields(this.PresentationCardConfig?.BottomFields);
-            return configured.length ? configured : (this.CardBottomTagFieldList || []);
+            const source = configured.length ? configured : (this.CardBottomTagFieldList || []);
+            return withoutUsedFields(source, [
+                this.CardPrimaryField,
+                this.CardAvatarField,
+                ...this.CardSubtitleFieldList,
+                ...this.CardTopFieldList,
+                ...this.CardRightFieldList,
+                ...this.CardContentFieldList,
+                ...this.CardMetaFieldList
+            ]);
         },
         PresentationCardFieldList() {
             return uniqueFields([
@@ -211,12 +251,18 @@ export default {
         },
         HasPresentationFieldValue(row, field) {
             if (!field || !row) return false;
+            const value = row[field.AsName || field.Name];
+            const hasRawValue = value !== undefined && value !== null && value !== "";
             if (this.isMuban && this.isMuban(field, { row })) {
                 const templateValue = row[field.Name + "_TmpEngineResult"];
-                return templateValue !== undefined && templateValue !== null && templateValue !== "";
+                // 模板通常会把空值格式化为“—”。跨端卡片应隐藏空区域，
+                // 不能因为占位模板存在就在标题区渲染一个没有业务含义的标签。
+                return hasRawValue
+                    && templateValue !== undefined
+                    && templateValue !== null
+                    && templateValue !== "";
             }
-            const value = row[field.AsName || field.Name];
-            return value !== undefined && value !== null && value !== "";
+            return hasRawValue;
         },
         HasAnyPresentationFieldValue(row, fields) {
             return (Array.isArray(fields) ? fields : [])

@@ -3369,16 +3369,25 @@ async function copyText(text) {
     min-width: 0;
 }
 
+.composer-left {
+    flex: 1 1 auto;
+}
+
 .semantic-label {
+    flex: 0 0 auto;
     color: #767e8a;
     font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .semantic-select {
+    flex: 0 0 132px;
     width: 132px;
 }
 
 .reasoning-select {
+    flex: 0 0 102px;
     width: 102px;
 }
 

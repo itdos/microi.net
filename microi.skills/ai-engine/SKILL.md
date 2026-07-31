@@ -30,6 +30,12 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - 发布目标是日志只记录 trace id、模型、耗时、token 计数和状态，Prompt/Answer 按租户策略脱敏，密码、Token、连接串和完整业务数据不落日志。该目标必须用源码和真实数据回读证明。
 - OpenAI 代理流式接口会传递 HTTP 请求取消信号；普通 `ChatStream` 与 `NL2V8` 当前主要使用内部超时 Token。不要声称浏览器断开一定立即终止上游调用或计费。
 
+## 跨端 AI 助手与商城交付
+
+- PC 与移动端复用 `mci_ai_data_assistant`。`Bootstrap` 返回的 `Enabled`、`Models`、`AllowedDomains` 和 `Prompts` 是跨端共同事实源；快捷问题来自启用的 `mci_ai_data_domain.PromptExamples`，前端不能维护另一套固定文案。
+- 普通角色必须匹配启用的 `mci_ai_role_policy`。只有后端可信的 `V8.CurrentUser.Level >= 9999` 可以在新安装租户缺少角色策略时获得安全兜底：从目标租户动态读取已启用业务域和模型，范围为 `All`，仍保持 `AllowRawSql=false`、敏感字段默认关闭。不得相信客户端提交的 Level、角色名或账号名。
+- 商城包不能携带发布租户的角色 Id、模型 Id 或密钥；应携带业务域定义和接口引擎，由安装后的目标租户动态发现自己的启用模型。发布后回读 `sys_microistore.AppVersion/AppPakcet`，并真实执行 `Bootstrap` 验证超级管理员可用、模型非空、快捷问题存在。
+
 ## Schema 检索双模式
 
 ### 默认关键词模式

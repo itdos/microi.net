@@ -1,6 +1,6 @@
 <template>
     <div class="diy-design-container">
-        <div style="display: flex; align-items: center; gap: 10px; justify-content: flex-start; padding:10px;border-bottom: solid 1px #ccc;">
+        <div class="diy-design-toolbar">
             <el-button :loading="SaveAllDiyFieldLoding" type="primary" :icon="UploadFilled" @click="SaveAllDiyField">{{ $t("Msg.Save") }}</el-button>
             <!-- 预览（3选1：抽屉 / 弹窗 / 新页面），方便设计时即时查看运行效果 -->
             <el-dropdown trigger="click" @command="PreviewForm">
@@ -2029,7 +2029,11 @@ export default {
     margin-top: 10px;
     border-radius: 4px;
     height: calc(100vh - 80px);
-    background-color: #fff;
+    overflow: hidden;
+    background-color: var(--el-bg-color-page, #f5f7fa);
+    color: var(--el-text-color-regular, #334155);
+    border: 1px solid var(--el-border-color, #e4e7ed);
+    box-shadow: var(--mci-shadow-card, 0 10px 28px rgba(15, 23, 42, 0.08));
     :deep(.keyword-search) {
         // border-bottom: solid 1px #ccc;
         padding-left: 20px;
@@ -2040,13 +2044,27 @@ export default {
     }
 }
 
+.diy-design-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 52px;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    background: var(--el-bg-color-overlay, #fff);
+    border-bottom: 1px solid var(--mci-divider-color, var(--el-border-color, #e4e7ed));
+}
+
 :deep(.field-container) {
     .el-tabs__content{
         overflow: visible;//这里如果不设置，会导致设计表单时，第一行字段右上角的复制字段、删除字段等功能图标显示不全
     }
     height: calc(100vh - 135px);
+    background: var(--el-bg-color, #fff);
     .aside {
-        background: transparent;
+        background: var(--el-bg-color-overlay, #fff);
         padding-left: 10px;
         padding-right: 10px;
         padding-top: 0;
@@ -2055,7 +2073,7 @@ export default {
     }
 
     .aside-left {
-        border-right: 1px solid #e6ebf5 !important;
+        border-right: 1px solid var(--mci-divider-color, var(--el-border-color, #e6ebf5)) !important;
         padding-bottom: 0;
         
         // vuedraggable 组件包装器样式
@@ -2065,7 +2083,7 @@ export default {
     }
 
     .aside-right {
-        border-left: 1px solid #e6ebf5 !important;
+        border-left: 1px solid var(--mci-divider-color, var(--el-border-color, #e6ebf5)) !important;
         padding-left: 0;
         padding-right: 0;
         padding-bottom: 0;
@@ -2073,7 +2091,7 @@ export default {
 
     .center-main {
         // border: '1px dashed #ff6c04' 
-        background-color: transparent;
+        background-color: var(--el-bg-color, #fff);
         padding: 10px;
         // height: calc(100vh - 84px);
         // margin: 10px;
@@ -2088,21 +2106,21 @@ export default {
             // vuedraggable 拖拽时的占位符样式
             .sortable-ghost {
                 opacity: 0.4;
-                background: #f0f0f0;
-                border: 2px dashed #ff6c04;
+                background: var(--mci-bg-primary-soft, var(--el-color-primary-light-9, #ecf5ff));
+                border: 2px dashed var(--el-color-primary, #409eff);
             }
 
             // vuedraggable 拖拽中的元素样式
             .sortable-drag {
                 opacity: 0.8;
-                border: 2px solid #ff6c04;
+                border: 2px solid var(--el-color-primary, #409eff);
             }
 
             // 兼容旧的 dragula 样式
             .gu-transit.field-drag {
                 width: 100%;
                 height: 30px;
-                border: 1px dashed #ff6c04;
+                border: 1px dashed var(--el-color-primary, #409eff);
 
                 // background-color: #ff6c04;
                 .el-tag {
@@ -2130,7 +2148,7 @@ export default {
     }
 
     .right-main {
-        background-color: transparent;
+        background-color: var(--el-bg-color-overlay, #fff);
         padding: 0;
         // height: calc(100vh - 120px); // - 50px
         margin-bottom: 0px;
@@ -2183,7 +2201,7 @@ export default {
     }
 
     .right-footer {
-        border-top: 1px solid #e6ebf5 !important;
+        border-top: 1px solid var(--mci-divider-color, var(--el-border-color, #e6ebf5)) !important;
     }
 
     .row-field {
@@ -2201,7 +2219,7 @@ export default {
             text-align: left;
             line-height: 28px;
             // border-radius: 0;
-            color: #171717;
+            color: var(--el-text-color-regular, #171717);
             padding-left: 7px;
             // border: solid 1px rgba(255, 106, 0, 0.1);
             // background-color: rgba(255, 106, 0, 0.1);
@@ -2222,36 +2240,63 @@ export default {
         }
 
         .component-tag--base {
-            color: #1f3f78;
-            background: #eef5ff;
-            border-color: #cfe2ff;
+            color: var(--el-color-primary, #1f3f78);
+            background: color-mix(in srgb, var(--el-color-primary, #409eff) 12%, var(--el-bg-color-overlay, #fff));
+            border-color: color-mix(in srgb, var(--el-color-primary, #409eff) 28%, transparent);
         }
 
         .component-tag--layout {
-            color: #5b32a3;
-            background: #f3edff;
-            border-color: #ddccff;
+            color: var(--el-color-info, #5b32a3);
+            background: color-mix(in srgb, var(--el-color-info, #909399) 12%, var(--el-bg-color-overlay, #fff));
+            border-color: color-mix(in srgb, var(--el-color-info, #909399) 28%, transparent);
         }
 
         .component-tag--advanced {
-            color: #0f5f59;
-            background: #eaf8f5;
-            border-color: #c5ece4;
+            color: var(--el-color-success, #0f5f59);
+            background: color-mix(in srgb, var(--el-color-success, #67c23a) 12%, var(--el-bg-color-overlay, #fff));
+            border-color: color-mix(in srgb, var(--el-color-success, #67c23a) 28%, transparent);
         }
 
         .component-tag--relation {
-            color: #7a4a08;
-            background: #fff5df;
-            border-color: #f5dfad;
+            color: var(--el-color-warning, #7a4a08);
+            background: color-mix(in srgb, var(--el-color-warning, #e6a23c) 13%, var(--el-bg-color-overlay, #fff));
+            border-color: color-mix(in srgb, var(--el-color-warning, #e6a23c) 30%, transparent);
         }
 
         .el-tag:hover {
-            background-color: rgba(255, 106, 0, 0.2);
-            border: 1px dashed #ff6c04;
+            background-color: var(--mci-bg-primary-soft, var(--el-color-primary-light-9, #ecf5ff));
+            border: 1px dashed var(--el-color-primary, #409eff);
             // border-left: solid 2px #242B49;
-            color: #171717;
+            color: var(--el-text-color-primary, #171717);
             cursor: move;
         }
     }
+}
+
+// WangEditor does not consume Element Plus theme tokens by default.  Bridge it
+// here so a rich-text field cannot leave a large white island in dark themes.
+.diy-design-container :deep(.w-e-bar),
+.diy-design-container :deep(.w-e-toolbar),
+.diy-design-container :deep(.w-e-text-container),
+.diy-design-container :deep(.w-e-text-container .w-e-scroll),
+.diy-design-container :deep(.w-e-text-container [data-slate-editor]) {
+    background: var(--el-bg-color-overlay, #fff) !important;
+    color: var(--el-text-color-regular, #334155) !important;
+    border-color: var(--mci-divider-color, var(--el-border-color, #e4e7ed)) !important;
+}
+
+.diy-design-container :deep(.w-e-bar-item button) {
+    color: var(--el-text-color-regular, #334155) !important;
+    background: transparent !important;
+    border-radius: 5px;
+}
+
+.diy-design-container :deep(.w-e-bar-item button:hover) {
+    background: color-mix(in srgb, var(--el-color-primary, #409eff) 13%, transparent) !important;
+    color: var(--el-color-primary, #409eff) !important;
+}
+
+.diy-design-container :deep(.w-e-text-placeholder) {
+    color: var(--el-text-color-placeholder, #a8abb2) !important;
 }
 </style>

@@ -1,3 +1,17 @@
+const ROW_ACTION_ASCII_LABEL_WIDTH = 7;
+const ROW_ACTION_WIDE_LABEL_WIDTH = 12;
+const ROW_ACTION_BUTTON_CHROME_WIDTH = 40;
+const ROW_ACTION_BUTTON_GAP_WIDTH = 6;
+const ROW_ACTION_CELL_RESERVE_WIDTH = 32;
+
+function getRowActionLabelWidth(label) {
+    return Array.from(String(label || "")).reduce(function (total, character) {
+        return total + (/^[\u0000-\u00ff]$/.test(character)
+            ? ROW_ACTION_ASCII_LABEL_WIDTH
+            : ROW_ACTION_WIDE_LABEL_WIDTH);
+    }, 0);
+}
+
 /**
  * 表格工具函数 Mixin
  * 包含 diy-table-rowlist.vue 专用的表格处理函数
@@ -64,6 +78,38 @@ export default {
                     self.GetDiyTableRow({ _PageIndex: 1 });
                 }
             }
+
+            // el-table 从 v-if 的卡片模式重新挂载后，需要在 DOM 更新完成时
+            // 主动重算固定列；否则固定操作列仍可能沿用切换前的偏移量。
+            if (self.TableDisplayMode === "Table" && typeof self.$nextTick === "function") {
+                self.$nextTick(function () {
+                    var tableRef = self.$refs && self.$refs["diy-table-" + self.TableId];
+                    if (Array.isArray(tableRef)) tableRef = tableRef[0];
+                    if (tableRef && typeof tableRef.doLayout === "function") {
+                        tableRef.doLayout();
+                    }
+                });
+            }
+        },
+
+        /**
+         * 统一估算行外 V8 按钮占用宽度。
+         * 中文/宽字符与 ASCII 分别估算，除文字外还包含图标、紧凑内边距和
+         * flex gap，避免低分辨率下过度占宽，同时保留固定列安全余量。
+         */
+        GetRowActionButtonsWidth(buttons) {
+            var visibleButtons = (Array.isArray(buttons) ? buttons : [])
+                .filter(function (button) { return button && (button.IsVisible === true || button.IsVisible === 1); });
+            return visibleButtons.reduce(function (total, button) {
+                return total
+                    + getRowActionLabelWidth(button.Name)
+                    + ROW_ACTION_BUTTON_CHROME_WIDTH
+                    + ROW_ACTION_BUTTON_GAP_WIDTH;
+            }, 0);
+        },
+
+        GetActionCellReserveWidth() {
+            return ROW_ACTION_CELL_RESERVE_WIDTH;
         },
 
         IsBusinessTranslateField(field) {

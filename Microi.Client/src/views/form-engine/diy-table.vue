@@ -818,9 +818,9 @@
                     </el-table-column>
                     <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
                     <!-- 性能优化V3：简化DOM结构，移除不必要的包装div -->
-                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth + (IsSystemAccountTable() ? 110 : 0)">
+                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth + (IsSystemAccountTable() ? 94 : 0)">
                         <template #default="scope">
-                            <div style="display: flex;justify-content: right;align-items: center;">
+                            <div class="diy-table-action-content">
                                 <el-button
                                     v-if="scope.row.__TreeLazyLoadMore"
                                     type="primary"
@@ -997,15 +997,13 @@
                                 @click="CardItemClick(item)"
                             >
                                 <div
-                                    :class="SysMenuModel.TableCardImgPosition === 'Left' ? 'card-content-horizontal' : 'card-content-vertical'"
+                                    :class="GetCardContentLayoutClass()"
                                 >
                                     <!-- 卡片图片区域 -->
                                     <img
-                                        v-if="SysMenuModel.TableCardImgField"
+                                        v-if="SysMenuModel.TableCardImgField && GetCardImageValue(item, SysMenuModel.TableCardImgField)"
                                         :src="
-                                            item[SysMenuModel.TableCardImgField]
-                                                ? GetCardImageUrl(item, SysMenuModel.TableCardImgField)
-                                                : bodyBgSvg
+                                            GetCardImageUrl(item, SysMenuModel.TableCardImgField)
                                         "
                                         class="preview"
                                         :style="
@@ -1014,13 +1012,29 @@
                                                 ? 'width:120px;height:100%;object-fit:cover;flex-shrink:0;'
                                                 : 'height:100px;width:100%;object-fit:cover;')
                                         "
+                                        @error="$event.target.src = bodyBgSvg"
                                     />
+                                    <div
+                                        v-else-if="SysMenuModel.TableCardImgField"
+                                        class="preview card-image-fallback"
+                                        :style="
+                                            SysMenuModel.TableCardImgStyle ||
+                                            (SysMenuModel.TableCardImgPosition === 'Left'
+                                                ? 'width:120px;height:100%;flex-shrink:0;'
+                                                : 'height:100px;width:100%;')
+                                        "
+                                        aria-hidden="true"
+                                    >
+                                        <span>{{ GetCardImageFallbackText(item) }}</span>
+                                    </div>
                                     <!-- 卡片内容区域 -->
                                     <div class="card-body" style="flex: 1;">
                                         <!-- ====== 卡片头：头像/序号、顶部标签、标题、右侧多字段 ====== -->
                                         <div class="card-title-row" v-if="CardPrimaryField">
-                                            <span v-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
-                                            <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
+                                            <template v-if="!SysMenuModel.TableCardImgField">
+                                                <span v-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
+                                                <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
+                                            </template>
                                             <div class="card-title-main">
                                                 <div class="card-title-tags" v-if="CardTopFieldList.length > 0">
                                                     <template v-for="tagField in CardTopFieldList" :key="'title-tag-' + tagField.Id">
@@ -1250,25 +1264,12 @@
                                         <fa-icon icon="far fa-clipboard-check" />
                                         去处理
                                     </el-button>
-                                    <template v-if="!IsTrashMode && item._RowMoreBtnsIn && item._RowMoreBtnsIn.length > 0">
-                                        <el-button
-                                            v-for="(btn, btnIndex) in item._RowMoreBtnsIn"
-                                            :key="TypeFieldName + 'card_btn_in_' + item.Id + btnIndex"
-                                            v-show="btn.IsVisible && !TableChildField.Readonly"
-                                            class="card-action-btn"
-                                            @click.stop="RunMoreBtn(btn, item)"
-                                            size="small"
-                                            round
-                                            plain
-                                        >
-                                             <fa-icon :icon="!btn.Icon ? 'far fa-check-circle' : btn.Icon" class="mr-1" />
-                                             {{ btn.Name }}
-                                             <span v-if="GetButtonBadge(btn, item) !== null" class="button-stat-badge" :class="'is-' + GetButtonBadgeTone(btn)" :style="GetButtonBadgeStyle(btn)">{{ GetButtonBadge(btn, item) }}</span>
-                                        </el-button>
-                                    </template>
                                     <!-- 更多操作（三点菜单） -->
                                     <el-dropdown
-                                        v-if="_LimitDel && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleDel"
+                                        v-if="!IsTrashMode && (
+                                            (item._RowMoreBtnsIn && item._RowMoreBtnsIn.some(btn => btn.IsVisible) && !TableChildField.Readonly) ||
+                                            (_LimitDel && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleDel)
+                                        )"
                                         trigger="click"
                                         @click.stop
                                     >
@@ -1278,7 +1279,27 @@
                                         </el-button>
                                         <template #dropdown>
                                             <el-dropdown-menu>
-                                                <el-dropdown-item @click="DelDiyTableRow(item)" style="color: #f56c6c;">
+                                                <template v-for="(btn, btnIndex) in item._RowMoreBtnsIn" :key="TypeFieldName + 'card_btn_in_' + item.Id + btnIndex">
+                                                    <el-dropdown-item
+                                                        v-if="btn.IsVisible && !TableChildField.Readonly"
+                                                        @click="RunMoreBtn(btn, item)"
+                                                    >
+                                                        <fa-icon :icon="!btn.Icon ? 'far fa-check-circle' : btn.Icon" class="mr-1" />
+                                                        <span>{{ btn.Name }}</span>
+                                                        <span
+                                                            v-if="GetButtonBadge(btn, item) !== null"
+                                                            class="global-more-menu-badge"
+                                                            :class="'is-' + GetButtonBadgeTone(btn)"
+                                                            :style="GetButtonBadgeStyle(btn)"
+                                                        >{{ GetButtonBadge(btn, item) }}</span>
+                                                    </el-dropdown-item>
+                                                </template>
+                                                <el-dropdown-item
+                                                    v-if="_LimitDel && TableChildFormMode != 'View' && !TableChildField.Readonly && item.IsVisibleDel"
+                                                    :divided="item._RowMoreBtnsIn && item._RowMoreBtnsIn.some(btn => btn.IsVisible)"
+                                                    @click="DelDiyTableRow(item)"
+                                                    style="color: #f56c6c;"
+                                                >
                                                     <el-icon><Delete /></el-icon>
                                                     {{ $t('Msg.Delete') }}
                                                 </el-dropdown-item>
