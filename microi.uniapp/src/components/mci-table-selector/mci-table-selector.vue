@@ -22,7 +22,7 @@
 
         <view class="selector-search">
           <text class="selector-search__icon">⌕</text>
-          <input v-model="keyword" class="selector-search__input" placeholder="搜索名称、编号或关键词" confirm-type="search" @confirm="loadRows(true)" />
+          <input v-model="keyword" class="selector-search__input" placeholder="搜索名称、编号或关键词" confirm-type="search" @input="scheduleSearch" @confirm="search" />
           <text v-if="keyword" class="selector-search__clear" @tap="clearSearch">×</text>
         </view>
 
@@ -100,7 +100,9 @@ export default {
       total: 0,
       loading: false,
       submitting: false,
-      error: ''
+      error: '',
+      searchTimer: null,
+      loadRequestId: 0
     }
   },
   computed: {
@@ -119,6 +121,9 @@ export default {
       return this.columns.find((item) => preferred.test(item.Label || '')) || this.columns[0] || null
     },
     secondaryColumns() { return this.columns.filter((item) => item !== this.titleColumn).slice(0, 2) }
+  },
+  beforeUnmount() {
+    clearTimeout(this.searchTimer)
   },
   methods: {
     async resolveTable() {
@@ -146,10 +151,28 @@ export default {
       this.pageIndex = 1
       await this.loadRows(true)
     },
-    closeSelector() { if (!this.submitting) this.visible = false },
-    clearSearch() { this.keyword = ''; this.loadRows(true) },
+    closeSelector() {
+      if (this.submitting) return
+      clearTimeout(this.searchTimer)
+      this.visible = false
+    },
+    search() {
+      clearTimeout(this.searchTimer)
+      this.loadRows(true)
+    },
+    // zhy：通用开表选择器输入关键词后自动防抖检索。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadRows(true), 350)
+    },
+    clearSearch() {
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.loadRows(true)
+    },
     async loadRows(reset = false) {
-      if (this.loading) return
+      if (this.loading && !reset) return
+      const requestId = ++this.loadRequestId
       if (reset) { this.pageIndex = 1; this.rows = []; this.total = 0 }
       this.loading = true
       this.error = ''
@@ -165,13 +188,14 @@ export default {
           _PageSize: this.pageSize
         })
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '数据加载失败')
+        if (requestId !== this.loadRequestId) return
         const nextRows = Array.isArray(result.Data) ? result.Data : []
         this.rows = reset ? nextRows : [...this.rows, ...nextRows]
         this.total = Number(result.DataCount || this.rows.length)
       } catch (error) {
-        this.error = error.message || error.Msg || '数据加载失败'
+        if (requestId === this.loadRequestId) this.error = error.message || error.Msg || '数据加载失败'
       } finally {
-        this.loading = false
+        if (requestId === this.loadRequestId) this.loading = false
       }
     },
     loadMore() {

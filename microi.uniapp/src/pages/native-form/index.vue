@@ -147,9 +147,11 @@
 						:parent-form="form"
 						:parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
+						:parent-table-child-auth="tableChildAuth"
 						:parent-mode="mode"
 						display-mode="preview"
 						:preview-limit="2"
+						@data-count="handleRelatedCount"
 					/>
 				</view>
 			</view>
@@ -159,7 +161,8 @@
 				<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
 					:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-					:parent-mode="mode" />
+					:parent-table-child-auth="tableChildAuth"
+					:parent-mode="mode" @data-count="handleRelatedCount" />
 				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
 				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
@@ -220,6 +223,7 @@
 		getTenantFormPresentation,
 		handleTenantFormFieldSelect,
 		handleTenantFormFieldChange,
+		handleTenantFormRelatedCount,
 		initializeTenantForm,
 		notifyTenantFormSaved,
 		prepareTenantFormSubmit,
@@ -557,6 +561,16 @@
 			handleRelatedChange() {
 				this.form = {
 					...this.form
+				}
+			},
+			async handleRelatedCount(payload) {
+				try {
+					await handleTenantFormRelatedCount(this.tenantFormContext(), payload)
+				} catch (error) {
+					uni.showToast({
+						title: error.message || error.Msg || '关联数量同步失败',
+						icon: 'none'
+					})
 				}
 			},
 			async switchToEdit() {

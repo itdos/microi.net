@@ -1,13 +1,20 @@
 <template>
   <view class="related-business-list" :class="{ 'related-business-list--preview': isPreview }">
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
-      <input v-model="keyword" class="search-input" type="text" confirm-type="search"
-        :placeholder="`搜索${config.title || sectionTitle}`" @confirm="search" />
+      <view class="search-input-wrap">
+        <input v-model="keyword" class="search-input" type="text" confirm-type="search"
+          :placeholder="`搜索${config.title || sectionTitle}`"
+          :adjust-position="false" :hold-keyboard="true" :cursor-spacing="16"
+          @input="scheduleSearch" @confirm="search" />
+        <view v-if="keyword" class="search-clear" hover-class="search-clear--pressed" @tap.stop="clearKeyword">
+          <text>×</text>
+        </view>
+      </view>
       <view v-if="filterFields.length" class="filter-button" :class="{ active: activeFilterCount > 0 }"
         @tap="openAdvancedFilters">
         <text>筛选</text><text v-if="activeFilterCount">{{ activeFilterCount }}</text>
       </view>
-      <view class="search-button" @tap="search"><text>搜索</text></view>
+      <view class="search-button" @tap="resetSearch"><text>重置</text></view>
     </view>
 
     <view v-if="loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
@@ -53,7 +60,7 @@
       </template>
     </view>
 
-    <view v-if="canAdd && !isPreview" class="floating-add" :style="floatingStyle"
+    <view v-if="showFloatingAdd && canAdd && !isPreview" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
     <view v-if="isPreview && !waitingForParentSave" class="preview-actions"
@@ -66,8 +73,10 @@
       </view>
     </view>
 
-    <view v-if="filterOpen && !isPreview" class="filter-mask" @tap="closeAdvancedFilters">
-      <view class="filter-sheet" @tap.stop>
+    <!-- zhy：筛选弹窗必须脱离详情页 scroll-view，否则微信端上滑时 fixed 遮罩会被滚动容器裁剪。 -->
+    <root-portal v-if="filterOpen && !isPreview">
+      <view class="filter-mask" @tap="closeAdvancedFilters" @touchmove.stop.prevent="noop">
+      <view class="filter-sheet" @tap.stop @touchmove.stop>
         <view class="filter-sheet__head">
           <view><text>更多筛选</text><text>{{ config.title }} · {{ activeFilterCount }} 项已选</text></view>
           <view class="filter-sheet__close" @tap="closeAdvancedFilters"><text>×</text></view>
@@ -116,7 +125,8 @@
           <view @tap="applyAdvancedFilters"><text>查看结果</text></view>
         </view>
       </view>
-    </view>
+      </view>
+    </root-portal>
 
     <view v-if="activeAction" class="action-mask" @tap="closeActionInput">
       <view class="action-dialog" @tap.stop>
@@ -168,6 +178,12 @@ import {
 } from '@/pages/business/utils/xjy-row-actions.js'
 
 const LAYOUT_COMPONENTS = new Set(['Divider', 'CollapseGroup', 'Tabs', 'Alert', 'StaticText', 'Html'])
+const RANGE_FIELD_TYPES = /^(int|integer|long|short|float|double|decimal|number|numeric|money)$/i
+const RANGE_COMPONENTS = new Set(['NumberText'])
+const KEYWORD_EXCLUDED_COMPONENTS = new Set([
+  'ImgUpload', 'FileUpload', 'VideoUpload', 'AudioUpload', 'RichText', 'Map', 'MapArea',
+  'DateTime', 'Date', 'Time', 'TableChild', 'JoinTable', 'OpenTable'
+])
 
 function unwrapValue(value) {
   if (value && typeof value === 'object') return value.Id ?? value.Value ?? value.value ?? ''
@@ -183,6 +199,88 @@ function relationshipId() {
   })
 }
 
+// zhy：把后台菜单 SearchFieldIds 转换为小程序通用筛选字段，并兼容旧版纯 Id 配置。
+function resolveMenuSearchFields(value, definitionFields = []) {
+  const source = parseJson(value, value)
+  const items = Array.isArray(source) ? source : []
+  return items.map((item, index) => {
+    const config = item && typeof item === 'object' ? item : { Id: item }
+    // zhy：PC 的 Out 仅表示字段展示在外部搜索区；小程序统一收进筛选面板，不能因此丢失按钮。
+    if (config.Hide === true) return null
+    const field = definitionFields.find((candidate) =>
+      String(candidate.Id || '') === String(config.Id || '') ||
+      (config.Name && String(candidate.Name || '').toLowerCase() === String(config.Name).toLowerCase())
+    )
+    if (!field || !field.Name || LAYOUT_COMPONENTS.has(field.component)) return null
+    const options = (Array.isArray(field.options) ? field.options : []).map((option) => ({
+      label: option.label ?? option.Label ?? option.Name ?? option.Value ?? option.value,
+      value: option.value ?? option.Value ?? option.Id ?? option.Key ?? option.label
+    })).filter((option) => option.label !== undefined && option.label !== null && option.label !== '')
+    const isRange = RANGE_COMPONENTS.has(field.component) || RANGE_FIELD_TYPES.test(String(field.Type || ''))
+    return {
+      key: `menu-search-${field.Id || field.Name || index}`,
+      label: config.Label || field.Label || field.Name,
+      field: field.Name,
+      type: isRange ? 'range' : (options.length ? 'options' : 'text'),
+      multiple: options.length > 0,
+      options,
+      component: field.component || '',
+      fieldType: field.Type || ''
+    }
+  }).filter(Boolean)
+}
+
+function mergeFilterFields(existing = [], configured = []) {
+  const result = [...existing]
+  configured.forEach((field) => {
+    const index = result.findIndex((item) => String(item.field || '').toLowerCase() === String(field.field).toLowerCase())
+    if (index < 0) result.push(field)
+  })
+  return result
+}
+
+// zhy：菜单 SqlJoin 可能因一对多子表返回重复主记录，关联卡片必须按主表 Id 去重。
+function uniqueRowsById(rows = []) {
+  const result = []
+  const indexes = new Map()
+  ;(Array.isArray(rows) ? rows : []).forEach((row) => {
+    const id = String(row?.Id || '').trim().toLowerCase()
+    if (!id) {
+      result.push(row)
+      return
+    }
+    if (!indexes.has(id)) {
+      indexes.set(id, result.length)
+      result.push(row)
+      return
+    }
+    const index = indexes.get(id)
+    result[index] = { ...result[index], ...row }
+  })
+  return result
+}
+
+// zhy：物理表子表查询不会自动解析菜单 _Keyword，这里按 SearchFieldIds 生成同组 OR 模糊条件。
+function buildKeywordWhere(fields = [], keyword = '') {
+  const value = String(keyword || '').trim()
+  if (!value) return []
+  const searchable = fields.filter((field) =>
+    field.field &&
+    !['range', 'sort', 'toggle'].includes(field.type) &&
+    !RANGE_FIELD_TYPES.test(String(field.fieldType || '')) &&
+    !RANGE_COMPONENTS.has(field.component) &&
+    !KEYWORD_EXCLUDED_COMPONENTS.has(field.component)
+  )
+  return searchable.map((field, index) => ({
+    Name: field.field,
+    Type: 'Like',
+    Value: value,
+    AndOr: index === 0 ? 'AND' : 'OR',
+    GroupStart: index === 0,
+    GroupEnd: index === searchable.length - 1
+  }))
+}
+
 export default {
   name: 'MciBusinessRelatedList',
   components: { MciBusinessCard, MciTaskCard },
@@ -195,18 +293,23 @@ export default {
     parentMode: { type: String, default: 'View' },
     displayMode: { type: String, default: 'full' },
     previewLimit: { type: Number, default: 2 },
-    relationValueOverride: { type: [String, Number], default: '' }
+    relationValueOverride: { type: [String, Number], default: '' },
+    showFloatingAdd: { type: Boolean, default: true },
+    parentTableChildAuth: { type: Object, default: null }
   },
+  emits: ['floating-add-state', 'filter-open-state', 'data-count'],
   data() {
     return {
       table: null,
       definition: null,
+      menu: null,
       moduleKey: '',
       config: {},
       menuId: '',
       viewManifest: null,
       rows: [],
       count: 0,
+      duplicateRowCount: 0,
       pageIndex: 1,
       loading: true,
       finished: false,
@@ -216,12 +319,15 @@ export default {
       filterLoading: false,
       filterValues: {},
       filterOptions: {},
+      keywordSearchFields: [],
       currentUser: getUser() || {},
       activeAction: null,
       activeRow: {},
       actionInput: '',
       approvalOpinions: [],
-      actionSubmitting: false
+      actionSubmitting: false,
+      searchTimer: null,
+      loadRequestId: 0
     }
   },
   computed: {
@@ -247,7 +353,7 @@ export default {
     },
     tableChildAuth() {
       if (!this.field.Id || !this.parentTableId || !this.parentMenuId || !this.parentId || !this.relationValue) return null
-      return {
+      const result = {
         ParentFieldId: this.field.Id,
         ParentTableId: this.parentTableId,
         ParentSysMenuId: this.parentMenuId,
@@ -255,6 +361,11 @@ export default {
         ParentValue: String(this.relationValue),
         ParentFormMode: this.parentMode || 'View'
       }
+      // zhy：嵌套子表必须保留上一级 TableChild 授权链，例如
+      // 客户 -> 项目合伙人跟进记录 -> 客户关怀；否则孙表虽能新增落库，
+      // 详情查询会因服务端无法验证父记录来源而返回空列表。
+      if (this.parentTableChildAuth) result.Parent = this.parentTableChildAuth
+      return result
     },
     canAdd() {
       return Boolean(this.relationValue && this.childFkField && this.config.table)
@@ -281,6 +392,19 @@ export default {
     }
   },
   watch: {
+    canAdd: {
+      immediate: true,
+      handler(value) {
+        this.$emit('floating-add-state', Boolean(value))
+      }
+    },
+    // zhy：将筛选遮罩开关同步给外层详情页，统一处理跨组件固定层级。
+    filterOpen: {
+      immediate: true,
+      handler(value) {
+        this.$emit('filter-open-state', Boolean(value))
+      }
+    },
     relationValue: {
       immediate: true,
       handler(value) {
@@ -299,8 +423,11 @@ export default {
   },
   beforeUnmount() {
     uni.$off('microi:data-changed', this.handleDataChanged)
+    clearTimeout(this.searchTimer)
+    this.$emit('filter-open-state', false)
   },
   methods: {
+    noop() {},
     async initialize(refresh = false) {
       if (!this.childTableId) {
         this.error = '关联表未配置数据表'
@@ -326,6 +453,7 @@ export default {
           refresh,
           this.childMenuId
         )
+        this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
         this.config = {
           ...matched.config,
@@ -333,6 +461,7 @@ export default {
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }
+        this.applyMenuSearchFields(menu?.SearchFieldIds)
         await this.loadViewConfig(refresh)
         if (this.waitingForParentSave) {
           this.rows = []
@@ -394,6 +523,7 @@ export default {
             refresh
           })
         }
+        this.applyMenuSearchFields(manifest?.Legacy?.SearchFieldIds)
         const dynamic = compileListConfig(manifest)
         if (!dynamic) return
         this.viewManifest = manifest
@@ -408,39 +538,117 @@ export default {
         this.config = merged
       } catch (error) {}
     },
-    async loadData(reset = false, refresh = false) {
+    applyMenuSearchFields(value) {
+      const configured = resolveMenuSearchFields(value, this.definition?.fields || [])
+      if (!configured.length) return
+      this.keywordSearchFields = configured
+      this.config = {
+        ...this.config,
+        filterFields: mergeFilterFields(this.config.filterFields || [], configured)
+      }
+    },
+    async loadData(reset = false, refresh = false, notifyCount = false) {
       if (!this.relationValue || !this.config.table || (this.loading && !reset) || (!reset && this.finished)) return
+      const requestId = ++this.loadRequestId
       if (reset) {
         this.pageIndex = 1
         this.finished = false
+        this.duplicateRowCount = 0
       }
       this.loading = true
       this.error = ''
       try {
-        const result = await loadModuleRows(this.config, {
-          pageIndex: this.pageIndex,
-          pageSize: this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15),
-          keyword: this.keyword.trim(),
-          refresh,
-          cacheAge: 0,
-          tableChildAuth: this.tableChildAuth,
-          extraWhere: [
-            { Name: this.childFkField, Type: '=', Value: this.relationValue },
-            ...this.buildFilterWhere()
-          ]
-        })
-        this.rows = reset ? result.rows : [...this.rows, ...result.rows]
-        this.count = result.count
         const pageSize = this.isPreview ? Math.max(1, this.previewLimit) : (this.config.pageSize || 15)
-        this.finished = this.rows.length >= result.count || result.rows.length < pageSize
+        const keywordWhere = buildKeywordWhere(
+          this.keywordSearchFields.length ? this.keywordSearchFields : this.filterFields,
+          this.keyword
+        )
+        const extraWhere = [
+          { Name: this.childFkField, Type: '=', Value: this.relationValue },
+          ...this.buildFilterWhere(),
+          ...keywordWhere
+        ]
+        let result
+        if (this.tableChildAuth) {
+          // zhy：TableChild 列表必须通过表单引擎携带完整父子授权链查询。
+          // ModuleEngine 的子菜单数据范围会把已经正确绑定的孙表记录过滤成 0 条；
+          // 此处不传子菜单 Id，由后端按 _TableChildAuth 逐层校验并用外键条件限定数据。
+          const response = await V8.FormEngine.GetTableData(this.config.table, {
+            _PageIndex: this.pageIndex,
+            _PageSize: pageSize,
+            _Keyword: keywordWhere.length ? '' : this.keyword.trim(),
+            _OrderBy: this.config.defaultOrderBy || 'CreateTime',
+            _OrderByType: this.config.defaultOrderType || 'DESC',
+            _Where: extraWhere,
+            _TableChildAuth: this.tableChildAuth
+          })
+          if (!response || Number(response.Code) !== 1) {
+            throw new Error((response && response.Msg) || '关联数据加载失败')
+          }
+          result = {
+            rows: Array.isArray(response.Data) ? response.Data : [],
+            count: Number(response.DataCount || 0)
+          }
+        } else {
+          result = await loadModuleRows(this.config, {
+            pageIndex: this.pageIndex,
+            pageSize,
+            keyword: this.keyword.trim(),
+            refresh,
+            cacheAge: 0,
+            extraWhere
+          })
+        }
+        if (requestId !== this.loadRequestId) return
+        const incomingRows = Array.isArray(result.rows) ? result.rows : []
+        const combinedRows = uniqueRowsById(reset ? incomingRows : [...this.rows, ...incomingRows])
+        const combinedSourceCount = reset ? incomingRows.length : this.rows.length + incomingRows.length
+        this.duplicateRowCount += Math.max(0, combinedSourceCount - combinedRows.length)
+        this.rows = combinedRows
+        this.count = Math.max(this.rows.length, Number(result.count || 0) - this.duplicateRowCount)
+        this.finished = this.rows.length >= this.count || incomingRows.length < pageSize
         if (!this.finished) this.pageIndex += 1
+        if (notifyCount) this.emitDataCount()
       } catch (error) {
-        this.error = error.message || error.Msg || '关联数据加载失败'
+        if (requestId === this.loadRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
       } finally {
-        this.loading = false
+        if (requestId === this.loadRequestId) this.loading = false
       }
     },
-    search() { this.loadData(true, true) },
+    search() {
+      clearTimeout(this.searchTimer)
+      this.loadData(true, true)
+    },
+    // zhy：搜索词输入后防抖自动检索，减少逐字请求并避免依赖搜索按钮。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadData(true, true), 350)
+    },
+    // zhy：右侧重置同时清空关键词与子菜单筛选面板中的全部条件。
+    resetSearch() {
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.filterValues = {}
+      this.filterOpen = false
+      this.loadData(true, true)
+    },
+    clearKeyword() {
+      if (!this.keyword) return
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.loadData(true, true)
+    },
+    // zhy：将接口返回的完整 DataCount 交给父表单做字段联动；筛选状态一并上送，避免误用局部数量。
+    emitDataCount() {
+      const count = Number(this.count)
+      this.$emit('data-count', {
+        field: this.field,
+        table: this.config.table || this.table?.Name || '',
+        title: this.config.title || this.sectionTitle || '',
+        count: Number.isFinite(count) && count > 0 ? Math.floor(count) : 0,
+        filtered: Boolean(String(this.keyword || '').trim() || this.activeFilterCount)
+      })
+    },
     loadMore() { this.loadData(false) },
     openMore() {
       const query = [
@@ -449,6 +657,7 @@ export default {
         `parentMenuId=${encodeURIComponent(this.parentMenuId || '')}`,
         `parentTableId=${encodeURIComponent(this.parentTableId || '')}`,
         `relationValue=${encodeURIComponent(this.relationValue || '')}`,
+        `parentTableChildAuth=${encodeURIComponent(JSON.stringify(this.parentTableChildAuth || null))}`,
         `title=${encodeURIComponent(this.config.title || this.sectionTitle || '关联列表')}`
       ].join('&')
       uni.navigateTo({
@@ -461,6 +670,7 @@ export default {
             parentMenuId: this.parentMenuId,
             parentTableId: this.parentTableId,
             parentMode: this.parentMode,
+            parentTableChildAuth: this.parentTableChildAuth,
             relationValue: this.relationValue,
             title: this.config.title || this.sectionTitle
           })
@@ -742,7 +952,7 @@ export default {
         this.actionInput = ''
         this.approvalOpinions = []
         uni.showToast({ title: `${action.label}成功`, icon: 'success' })
-        await this.loadData(true, true)
+        await this.loadData(true, true, true)
       } catch (error) {
         uni.showToast({ title: error.message || `${action.label}失败`, icon: 'none' })
       } finally {
@@ -758,6 +968,19 @@ export default {
         const child = item.Child || item.child
         if (father && child && this.parentForm[father] !== undefined) result[child] = this.parentForm[father]
       })
+      if (this.moduleKey === 'customerCare') {
+        const rawContacts = parseJson(this.parentForm.BeibaiFR, this.parentForm.BeibaiFR)
+        const contact = Array.isArray(rawContacts) ? rawContacts[0] : rawContacts
+        const contactRow = contact && typeof contact === 'object' ? contact : {}
+        const contactText = typeof contact === 'string' ? contact.trim() : ''
+        const contactTextIsId = /^[0-9a-f-]{32,36}$/i.test(contactText) || /^[0-9A-HJKMNP-TV-Z]{26}$/i.test(contactText)
+        if (!result.KehuID) result.KehuID = this.parentForm.KehuID || ''
+        if (!result.KehuMC) result.KehuMC = this.parentForm.KehuMC || ''
+        if (!result.LianxiRID) {
+          result.LianxiRID = contactRow.Id || contactRow.id || (contactTextIsId ? contactText : '')
+        }
+        if (!result.LianxiR) result.LianxiR = Array.isArray(rawContacts) ? rawContacts : (contact ? [contact] : [])
+      }
       if (this.moduleKey === 'contacts' && !result.Guid70) result.Guid70 = relationshipId()
       return result
     },
@@ -785,7 +1008,7 @@ export default {
         menuAliases: this.config.menuAliases || [],
         defaultValues: this.callbackDefaults(),
         tableChildAuth: this.tableChildAuth,
-        includeRelated: false
+        includeRelated: true
       })
     },
     openDetail(row) {
@@ -825,7 +1048,7 @@ export default {
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
         tableChildAuth: this.tableChildAuth,
-        includeRelated: false
+        includeRelated: true
       })
     },
     callPhone(phone) { uni.makePhoneCall({ phoneNumber: String(phone) }) },
@@ -850,13 +1073,15 @@ export default {
       this.count = this.rows.length
       this.error = ''
       this.loading = false
+      this.emitDataCount()
       return true
     },
     handleDataChanged(payload = {}) {
       if (String(payload.table || '').toLowerCase() === String(this.config.table || '').toLowerCase()) {
         // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
         if (this.mergeDraftChangedRow(payload)) return
-        this.loadData(true, true)
+        // zhy：只有子表真实保存后才通知父表更新派生总数，普通打开、搜索和筛选不改主表字段。
+        this.loadData(true, true, true)
       }
     }
   }
@@ -873,15 +1098,34 @@ export default {
   margin: -2rpx -2rpx 16rpx;
 }
 .search-row--simple { grid-template-columns: minmax(0, 1fr) auto; }
+.search-input-wrap { position: relative; min-width: 0; }
 .search-input {
   box-sizing: border-box;
+  width: 100%;
   height: 72rpx;
-  padding: 0 24rpx;
+  padding: 0 68rpx 0 24rpx;
   border: 1rpx solid #dce8ed;
   border-radius: 14rpx;
   background: #fff;
   font-size: 26rpx;
 }
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 50%;
+  color: #fff;
+  background: #a9b7bd;
+  font-size: 28rpx;
+  line-height: 38rpx;
+  transform: translateY(-50%);
+}
+.search-clear--pressed { opacity: .68; }
 .filter-button {
   position: relative;
   display: flex;
@@ -921,7 +1165,7 @@ export default {
 .preview-action--pressed { transform: scale(.98); opacity: .82; }
 .floating-add { position: fixed; right: 28rpx; z-index: 12; width: 92rpx; height: 92rpx; display: flex; align-items: center; justify-content: center; border: 4rpx solid rgba(255, 255, 255, .88); border-radius: 50%; color: #fff; background: #e94b2c; box-shadow: 0 10rpx 28rpx rgba(233, 75, 44, .3); font-size: 44rpx; transition: transform 150ms ease; }
 .floating-add--pressed { transform: scale(.9); }
-.filter-mask { position: fixed; inset: 0; z-index: 28; display: flex; align-items: flex-end; background: rgba(13, 37, 48, .42); }
+.filter-mask { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 9999; display: flex; align-items: flex-end; overflow: hidden; background: rgba(13, 37, 48, .42); }
 .filter-sheet { box-sizing: border-box; width: 100%; height: min(82vh, 1160rpx); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; border-radius: 16rpx 16rpx 0 0; overflow: hidden; background: #fff; }
 .filter-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; min-height: 104rpx; padding: 0 26rpx; border-bottom: 1rpx solid #e8eff2; }
 .filter-sheet__head > view:first-child { min-width: 0; }

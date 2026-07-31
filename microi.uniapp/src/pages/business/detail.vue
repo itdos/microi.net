@@ -1,5 +1,6 @@
 <template>
-	<view class="detail-page" :style="mciTokenStyle">
+	<view class="detail-page" :class="{ 'detail-page--related-filter-open': standaloneRelatedFilterOpen }"
+		:style="mciTokenStyle">
 		<view class="page-nav mci-safe-top">
 			<view class="nav-row mci-safe-nav-row">
 				<view class="nav-button" hover-class="nav-button--pressed" @tap="goBack">‹</view>
@@ -129,7 +130,8 @@
 								</view>
 								<mci-native-field v-else-if="usesNativeDisplay(field)"
 									class="field-value field-value--native" :field="field.nativeField"
-									:model-value="detail[field.name]" :table-name="moduleConfig.table" readonly />
+									:model-value="detail[field.name]" :table-name="moduleConfig.table"
+									:form-data="detail" :menu-id="menuId" readonly />
 								<rich-text v-else-if="isFieldRich(field)" class="field-value field-value--rich"
 									:nodes="fieldRichHtml(field)" />
 								<text v-else class="field-value">{{ displayField(field) }}</text>
@@ -154,10 +156,13 @@
 				</view>
 
 				<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
-					<mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
+					<mci-business-related-list v-if="relatedTab.type === 'child'" ref="standaloneRelatedList"
+						:field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-						parent-mode="View" />
+						parent-mode="View" :show-floating-add="false"
+						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
+						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
 					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 						:parent-form="detail" parent-mode="View" readonly />
 					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
@@ -195,7 +200,14 @@
 			</template>
 		</scroll-view>
 
-		<view v-if="!loading && !error && hasBottomActions" class="bottom-actions">
+		<!-- zhy：客户详情 Tab 的新增按钮必须挂在 scroll-view 外，避免随列表内容滚动。 -->
+		<view v-if="showStandaloneRelatedAdd" class="related-floating-add"
+			:style="relatedFloatingStyle" hover-class="related-floating-add--pressed"
+			@tap="openStandaloneRelatedAdd"><text>＋</text></view>
+
+		<!-- zhy：子表筛选打开时收起详情页外置业务操作栏，让遮罩完整覆盖到底部安全区。 -->
+		<view v-if="!loading && !error && hasBottomActions && !standaloneRelatedFilterOpen"
+			class="bottom-actions">
 			<template v-if="key === 'tasks'">
 				<button v-if="canAcceptTask" class="action-button action-button--primary" :disabled="submitting"
 					@tap="claimTask">接单</button>
@@ -1168,6 +1180,10 @@
 				metricValues: {},
 				expandedSections: {},
 				activeFormTabKey: '',
+				standaloneRelatedAddKey: '',
+				standaloneRelatedAddAvailable: false,
+				standaloneRelatedFilterKey: '',
+				standaloneRelatedFilterOpen: false,
 				customerClaimIcon: icon('business/kehu.png'),
 				customerReleaseIcon: icon('business/xiezuo.png')
 			}
@@ -1323,6 +1339,21 @@
 			},
 			standaloneRelatedTabs() {
 				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
+			},
+			standaloneChildTab() {
+				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
+			},
+			showStandaloneRelatedAdd() {
+				return !this.loading && !this.error && !this.standaloneRelatedFilterOpen &&
+					this.standaloneRelatedAddAvailable &&
+					Boolean(this.standaloneChildTab && this.standaloneRelatedAddKey === this.standaloneChildTab.key)
+			},
+			relatedFloatingStyle() {
+				return {
+					bottom: this.hasBottomActions
+						? 'calc(132rpx + var(--mci-safe-bottom))'
+						: 'calc(34rpx + var(--mci-safe-bottom))'
+				}
 			},
 			summaryBlocks() {
 				return (this.preset.summaries || []).map((item) => {
@@ -1966,7 +1997,33 @@
 			},
 			selectFormTab(tab) {
 				if (!tab || !tab.key) return
+				this.standaloneRelatedAddAvailable = false
+				this.standaloneRelatedAddKey = ''
+				this.standaloneRelatedFilterOpen = false
+				this.standaloneRelatedFilterKey = ''
 				this.activeFormTabKey = tab.key
+			},
+			setStandaloneRelatedAddState(tab, available) {
+				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
+				this.standaloneRelatedAddKey = tab.key
+				this.standaloneRelatedAddAvailable = Boolean(available)
+			},
+			// zhy：详情页 Tab 子表筛选打开时提升列表层级，并压住外置悬浮按钮。
+			setStandaloneRelatedFilterState(tab, open) {
+				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
+				this.standaloneRelatedFilterKey = open ? tab.key : ''
+				this.standaloneRelatedFilterOpen = Boolean(open)
+			},
+			openStandaloneRelatedAdd() {
+				const tab = this.standaloneChildTab
+				if (!tab) return
+				const refs = this.$refs.standaloneRelatedList
+				const candidates = Array.isArray(refs) ? refs : [refs]
+				const target = candidates.find((item) =>
+					item && item.field && String(item.field.Id || item.field.id || '') ===
+						String(tab.field && (tab.field.Id || tab.field.id) || '')
+				) || candidates.find(Boolean)
+				if (target && typeof target.openAdd === 'function') target.openAdd()
 			},
 			initializeFormTabs() {
 				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
@@ -2333,6 +2390,38 @@
 	.detail-scroll {
 		flex: 1;
 		min-height: 0;
+	}
+
+	/* zhy：筛选遮罩位于子表组件内，打开时将整个滚动内容提升到外置新增按钮和底部操作栏之上。 */
+	.detail-page--related-filter-open .detail-scroll {
+		position: relative;
+		z-index: 40;
+	}
+
+	.detail-page--related-filter-open .page-nav {
+		z-index: 45;
+	}
+
+	.related-floating-add {
+		position: fixed;
+		right: 28rpx;
+		z-index: 18;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 92rpx;
+		height: 92rpx;
+		border: 4rpx solid rgba(255, 255, 255, .88);
+		border-radius: 50%;
+		color: #fff;
+		background: #e94b2c;
+		box-shadow: 0 10rpx 28rpx rgba(233, 75, 44, .3);
+		font-size: 44rpx;
+		transition: transform 150ms ease;
+	}
+
+	.related-floating-add--pressed {
+		transform: scale(.9);
 	}
 
 	.loading-state {

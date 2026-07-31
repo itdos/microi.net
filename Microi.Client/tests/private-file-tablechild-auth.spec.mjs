@@ -18,6 +18,11 @@ const onlyOfficeSource = await readFile(
     new URL("../src/views/form-engine/diy-components/onlyoffice.vue", import.meta.url),
     "utf8"
 );
+// zhy：加载 TableChild 数据查询源码，用于锁定物理表查询和授权链回归。
+const tableDataSource = await readFile(
+    new URL("../src/views/form-engine/mixins/diy-table-data.mixin.js", import.meta.url),
+    "utf8"
+);
 
 function occurrenceCount(source, value) {
     return source.split(value).length - 1;
@@ -47,6 +52,28 @@ test("private file and image URL requests preserve the delegated context", () =>
         ),
         2
     );
+});
+
+// zhy：验证 PC TableChild 不再被子菜单数据范围误过滤。
+test("TableChild rows query the physical table without child-menu data-scope filtering", () => {
+    assert.match(
+        tableDataSource,
+        /if \(self\.IsTableChild\(\) && self\.CurrentDiyTableModel && self\.CurrentDiyTableModel\.Name\)/
+    );
+    assert.match(tableDataSource, /delete param\.ModuleEngineKey/);
+    assert.match(tableDataSource, /param\.FormEngineKey = self\.CurrentDiyTableModel\.Name/);
+    assert.match(tableDataSource, /self\.ApplyTableChildAuthContext\(param\)/);
+});
+
+// zhy：验证小程序图片缺少 State 时，PC 仍识别为已上传。
+test("cross-client image records with Path but no State are treated as uploaded", () => {
+    assert.match(imgUploadSource, /const normalizeUploadItem = \(item, index = 0\)/);
+    assert.match(
+        imgUploadSource,
+        /State: rawState === undefined \|\| rawState === null \|\| rawState === '' \? 1 : rawState/
+    );
+    assert.match(imgUploadSource, /trimmed\.startsWith\('\['\)/);
+    assert.match(imgUploadSource, /item\.FilePathName \|\| item\.FullPath \|\| item\.Url/);
 });
 
 test("OnlyOffice session, private URL, metadata and save requests preserve the context", () => {

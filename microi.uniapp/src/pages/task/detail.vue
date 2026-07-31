@@ -92,7 +92,7 @@
       <view v-for="action in bottomActions" :key="action.key" class="bottom-button" :class="`bottom-button--${action.style || 'plain'}`" :disabled="submitting" hover-class="bottom-button--pressed" @tap="runBottomAction(action.key)"><text>{{ action.label }}</text></view>
     </view>
 
-    <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>指派服务人员</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、帐号或部门" confirm-type="search" @confirm="loadUsers" /><text @tap="loadUsers">搜索</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.DeptName, user.RoleName, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>确认指派</text></view></view></view></view>
+    <view v-if="assignVisible" class="sheet-mask" @tap="assignVisible = false"><view class="bottom-sheet" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>指派服务人员</text><view @tap="assignVisible = false"><text>×</text></view></view><view class="sheet-search"><input v-model="userKeyword" placeholder="搜索姓名、帐号或部门" confirm-type="search" @input="scheduleUserSearch" @confirm="searchUsers" /><text @tap="resetUserSearch">重置</text></view><scroll-view class="user-list" scroll-y><mci-skeleton v-if="usersLoading" type="list" :rows="4" /><template v-else><view v-for="user in users" :key="user.Id" class="user-row" :class="{ active: selectedUser && selectedUser.Id === user.Id }" @tap="selectedUser = user"><view class="user-avatar"><text>{{ (user.Name || user.Account || '人').slice(0,1) }}</text></view><view><text class="user-name">{{ user.Name || user.Account }}</text><text class="user-meta">{{ [user.DeptName, user.RoleName, user.Phone].filter(Boolean).join(' · ') }}</text></view><text class="user-check">{{ selectedUser && selectedUser.Id === user.Id ? '✓' : '' }}</text></view></template></scroll-view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="assignVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="confirmAssign"><text>确认指派</text></view></view></view></view>
 
     <view v-if="timeVisible" class="sheet-mask" @tap="timeVisible = false"><view class="bottom-sheet bottom-sheet--compact" @tap.stop><view class="sheet-handle"></view><view class="sheet-heading"><text>{{ timeEditor.label }}</text><view @tap="timeVisible = false"><text>×</text></view></view><view class="datetime-grid"><picker mode="date" :value="editorDate" @change="editorDate = $event.detail.value"><view class="picker-control"><text>{{ editorDate || '选择日期' }}</text></view></picker><picker mode="time" :value="editorTime" @change="editorTime = $event.detail.value"><view class="picker-control"><text>{{ editorTime || '选择时间' }}</text></view></picker></view><view class="sheet-actions"><view class="sheet-button sheet-button--plain" @tap="timeVisible = false"><text>取消</text></view><view class="sheet-button sheet-button--primary" @tap="saveTime"><text>保存时间</text></view></view></view></view>
 
@@ -133,7 +133,7 @@ export default {
       id: '', task: {}, devices: [], currentUser: {}, loading: true, devicesLoading: true, refreshing: false,
       stale: false, error: '', submitting: false, assignVisible: false, usersLoading: false, users: [],
       metadataDefinition: null, expandedMetadata: {},
-      selectedUser: null, userKeyword: '', timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
+      selectedUser: null, userKeyword: '', userSearchTimer: null, userLoadRequestId: 0, timeVisible: false, timeEditor: {}, editorDate: '', editorTime: '',
       rejectVisible: false, rejectMode: 'merchant', rejectReason: '', evaluateVisible: false,
       evaluation: { rate: 5, deviceRate: 5, staffRate: 5, tags: [], content: '' },
       evaluationTags: ['响应及时', '技术专业', '服务热情', '现场整洁', '问题解决'],
@@ -199,6 +199,7 @@ export default {
     this.loadAll()
   },
   onShow() { if (!this.loading && this.id) this.loadAll(true, false) },
+  onUnload() { clearTimeout(this.userSearchTimer) },
   methods: {
     taskStateClass,
     async loadAll(refresh = false, showLoading = true) {
@@ -279,9 +280,31 @@ export default {
       if (!(await this.confirm(confirms[key] || '确认执行该操作吗？'))) return
       await this.withSubmit(async () => { await runTaskAction(key, this.task); await this.loadAll(true, false); uni.showToast({ title: '操作成功', icon: 'success' }) })
     },
+    searchUsers() {
+      clearTimeout(this.userSearchTimer)
+      this.loadUsers()
+    },
+    // zhy：人员选择输入后自动检索，右侧操作统一重置搜索词。
+    scheduleUserSearch() {
+      clearTimeout(this.userSearchTimer)
+      this.userSearchTimer = setTimeout(() => this.loadUsers(), 350)
+    },
+    resetUserSearch() {
+      clearTimeout(this.userSearchTimer)
+      this.userKeyword = ''
+      this.loadUsers()
+    },
     async loadUsers() {
+      const requestId = ++this.userLoadRequestId
       this.usersLoading = true
-      try { this.users = await loadServiceUsers(this.userKeyword.trim()) } catch (error) { uni.showToast({ title: error.message || '人员加载失败', icon: 'none' }) } finally { this.usersLoading = false }
+      try {
+        const users = await loadServiceUsers(this.userKeyword.trim())
+        if (requestId === this.userLoadRequestId) this.users = users
+      } catch (error) {
+        if (requestId === this.userLoadRequestId) uni.showToast({ title: error.message || '人员加载失败', icon: 'none' })
+      } finally {
+        if (requestId === this.userLoadRequestId) this.usersLoading = false
+      }
     },
     async confirmAssign() {
       if (!this.selectedUser) { uni.showToast({ title: '请选择服务人员', icon: 'none' }); return }
