@@ -12,6 +12,51 @@ namespace Microi.Tests.Common;
 public class CacheAndUpgradeRegressionTests
 {
     [Fact]
+    public void Upgrade21_CoversEveryBackgroundTaskRuntimeColumn_AndCanAdoptLegacyPhysicalTable()
+    {
+        var requiredColumnsMethod = typeof(Upgrade21).GetMethod(
+            "GetRequiredPhysicalColumnNames",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        var adoptMethod = typeof(Upgrade21).GetMethod(
+            "AdoptExistingPhysicalTableAsync",
+            BindingFlags.Static | BindingFlags.NonPublic);
+
+        Assert.NotNull(requiredColumnsMethod);
+        Assert.NotNull(adoptMethod);
+        Assert.Equal(typeof(Task<DosResult>), adoptMethod!.ReturnType);
+
+        var requiredColumns = Assert.IsType<string[]>(requiredColumnsMethod!.Invoke(null, null));
+        Assert.Equal(
+            requiredColumns.Length,
+            requiredColumns.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+        var storeType = typeof(BackgroundTaskService).Assembly.GetType(
+            "Microi.net.BackgroundTaskStore",
+            throwOnError: true);
+        var projectionField = storeType!.GetField(
+            "Projection",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(projectionField);
+
+        var projection = Assert.IsType<string>(projectionField!.GetRawConstantValue());
+        var runtimeReadColumns = projection
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(part => part.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0]);
+
+        foreach (var column in runtimeReadColumns.Concat(new[]
+                 {
+                     "UpdateTime", "UserId", "UserName", "IsDeleted"
+                 }))
+        {
+            Assert.Contains(
+                requiredColumns,
+                candidate => string.Equals(candidate, column, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    [Fact]
     public void DiyLangRuntimeCache_ExposesBoundedReloadContract()
     {
         var contract = typeof(IFormEngine).GetMethod(nameof(IFormEngine.ReloadDiyLangCacheAsync));

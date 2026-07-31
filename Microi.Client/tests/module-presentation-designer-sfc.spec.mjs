@@ -80,6 +80,7 @@ test("module presentation designer compiles and exposes every standard list/card
     assert.match(source, /value: "DataCount"/);
     assert.match(source, /fieldRequestId/);
     assert.match(source, /cloneJson\(shared\)/);
+    assert.match(source, /跨端视图负责字段编排，字段模板负责复杂渲染，两者可以叠加使用/);
     assert.doesNotMatch(source, /\beval\s*\(|new Function\s*\(/);
 });
 

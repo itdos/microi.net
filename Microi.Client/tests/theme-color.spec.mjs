@@ -56,7 +56,11 @@ function applyPalette(nextMode, palette) {
         "--sidebar-footer-text-color",
         "--sidebar-active-text-color",
         "--mci-color-primary",
-        "--mci-text-on-primary"
+        "--mci-text-on-primary",
+        "--mci-presentation-header-bg",
+        "--mci-presentation-metric-strip-bg",
+        "--mci-presentation-metric-bg",
+        "--mci-presentation-primary-text"
     ].map(name => [name, properties.get(name)]));
 }
 
@@ -145,6 +149,20 @@ test("every palette keeps primary controls readable in both modes", () => {
                 ) >= 4.5,
                 `${nextMode} ${palette.key} primary contrast`
             );
+            assert.ok(
+                theme.getContrastRatio(
+                    tokens["--mci-presentation-primary-text"],
+                    properties.get("--mci-bg-card")
+                ) >= 4.5,
+                `${nextMode} ${palette.key} presentation contrast`
+            );
+            const primaryRgb = theme.hexToRgb(tokens["--mci-color-primary"]);
+            assert.match(
+                tokens["--mci-presentation-header-bg"],
+                new RegExp(`rgba\\(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b},`)
+            );
+            assert.match(tokens["--mci-presentation-metric-strip-bg"], /linear-gradient/);
+            assert.match(tokens["--mci-presentation-metric-bg"], /linear-gradient/);
         }
     }
 

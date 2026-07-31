@@ -325,11 +325,19 @@ function getReadableAccent(color, background) {
 
     const { h, s, l } = hexToHsl(primary);
     const saturation = Math.max(18, Math.min(78, s));
-    for (let lightness = Math.max(58, l); lightness <= 92; lightness += 3) {
+    if (getRelativeLuminance(background) < 0.35) {
+        for (let lightness = Math.max(58, l); lightness <= 92; lightness += 3) {
+            const candidate = hslToHex(h, saturation, lightness);
+            if (getContrastRatio(candidate, background) >= 4.5) return candidate;
+        }
+        return "#F8FAFC";
+    }
+
+    for (let lightness = Math.min(42, l); lightness >= 12; lightness -= 3) {
         const candidate = hslToHex(h, saturation, lightness);
         if (getContrastRatio(candidate, background) >= 4.5) return candidate;
     }
-    return "#F8FAFC";
+    return "#0F172A";
 }
 
 function createDarkSurfaceTint(profile) {
@@ -486,6 +494,11 @@ function applySurfaceVars(profile, mode) {
     }
 
     const surfaceRgb = hexToRgb(surface.surface);
+    const presentationPrimaryText = getReadableAccent(profile.value, surface.surface);
+    const presentationHeaderBg = `linear-gradient(105deg, rgba(${r}, ${g}, ${b}, ${isDark ? 0.16 : 0.10}) 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.07 : 0.035}) 36%, transparent 64%), ${surface.surface}`;
+    const presentationHeaderBgSubtle = `linear-gradient(105deg, rgba(${r}, ${g}, ${b}, ${isDark ? 0.10 : 0.055}) 0%, transparent 44%), ${surface.surface}`;
+    const presentationMetricStripBg = `linear-gradient(135deg, rgba(${surfaceRgb.r}, ${surfaceRgb.g}, ${surfaceRgb.b}, ${isDark ? 0.96 : 0.90}) 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.10 : 0.055}) 100%)`;
+    const presentationMetricBg = `linear-gradient(135deg, ${surface.surface} 0%, rgba(${r}, ${g}, ${b}, ${isDark ? 0.12 : 0.045}) 100%)`;
     const footerTint = isDark && profile.key === "black" ? profile.value : surface.tint;
     const footerWave = isDark
         ? mixColors(surface.sidebar, footerTint, 0.42)
@@ -566,6 +579,25 @@ function applySurfaceVars(profile, mode) {
         "--mci-border-strong": surface.borderStrong,
         "--mci-tooltip-bg": surface.tooltip,
         "--mci-tooltip-text": surface.tooltipText,
+        "--mci-presentation-header-bg": presentationHeaderBg,
+        "--mci-presentation-header-bg-subtle": presentationHeaderBgSubtle,
+        "--mci-presentation-header-border": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.28 : 0.17})`,
+        "--mci-presentation-header-shadow": isDark
+            ? "0 4px 16px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.035)"
+            : "0 2px 12px rgba(15, 23, 42, 0.065), inset 0 1px 0 rgba(255, 255, 255, 0.72)",
+        "--mci-presentation-accent-gradient": `linear-gradient(180deg, ${lighten(profile.value, isDark ? 16 : 22)} 0%, ${profile.value} 55%, ${profile.strong} 100%)`,
+        "--mci-presentation-sheen": `linear-gradient(90deg, transparent, rgba(${r}, ${g}, ${b}, ${isDark ? 0.82 : 0.68}), transparent)`,
+        "--mci-presentation-metric-strip-bg": presentationMetricStripBg,
+        "--mci-presentation-metric-bg": presentationMetricBg,
+        "--mci-presentation-metric-border": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.24 : 0.12})`,
+        "--mci-presentation-metric-hover-border": `rgba(${r}, ${g}, ${b}, ${isDark ? 0.48 : 0.30})`,
+        "--mci-presentation-metric-icon-bg": surface.primarySoft,
+        "--mci-presentation-primary-text": presentationPrimaryText,
+        "--mci-presentation-success-text": isDark ? "#34D399" : "#047857",
+        "--mci-presentation-warning-text": isDark ? "#FBBF24" : "#92400E",
+        "--mci-presentation-danger-text": isDark ? "#FB7185" : "#BE123C",
+        "--mci-presentation-info-text": isDark ? "#A5B4FC" : "#475569",
+        "--mci-presentation-muted-text": surface.muted,
         "--mci-primary-color": profile.value,
         "--mci-primary-rgb": `${r}, ${g}, ${b}`,
         "--mci-gradient-surface": `linear-gradient(180deg, ${surface.surface} 0%, ${surface.pageAlt} 100%)`,
@@ -575,10 +607,10 @@ function applySurfaceVars(profile, mode) {
         "--sidebar-footer-text-color": footerText,
         "--mci-shadow-card": isDark
             ? "0 12px 34px rgba(0, 0, 0, 0.28)"
-            : "0 10px 30px rgba(15, 23, 42, 0.07)",
+            : "0 1px 2px rgba(15, 23, 42, 0.09), 0 8px 24px rgba(15, 23, 42, 0.11), 0 20px 46px rgba(15, 23, 42, 0.06)",
         "--mci-shadow-card-hover": isDark
             ? "0 20px 48px rgba(0, 0, 0, 0.38)"
-            : "0 18px 44px rgba(15, 23, 42, 0.11)",
+            : `0 2px 4px rgba(15, 23, 42, 0.10), 0 14px 34px rgba(15, 23, 42, 0.15), 0 28px 64px rgba(${r}, ${g}, ${b}, 0.10)`,
         "--mci-shadow-dialog": isDark
             ? "0 24px 72px rgba(0, 0, 0, 0.48)"
             : "0 24px 72px rgba(15, 23, 42, 0.18)",

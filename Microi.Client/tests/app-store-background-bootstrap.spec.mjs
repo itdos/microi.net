@@ -10,6 +10,7 @@ const source = await readFile(
 test("background-task foundation package installs in foreground to break the bootstrap cycle", () => {
   assert.match(source, /IsBackgroundTaskBootstrapPackage\(value\)/);
   assert.match(source, /app\.microi\.background-task/);
+  assert.match(source, /packageInfo\.Name[\s\S]*?后台任务基础能力/);
   assert.match(
     source,
     /IsBackgroundTaskBootstrapPackage\(row\)[\s\S]*?ApiEngine\.Run\("import-microi-store-package", backgroundParam\)/,

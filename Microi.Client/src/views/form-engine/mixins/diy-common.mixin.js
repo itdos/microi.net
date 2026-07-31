@@ -55,11 +55,86 @@ export default {
         },
 
         /**
+         * 解析卡片图片字段。
+         *
+         * 历史 sys_menu.TableCardImgField 保存的是 diy_field.Id，新配置也可能保存 Name / AsName。
+         * 卡片行数据只会以 Name / AsName 为属性，不能把字段 Id 直接当成对象 Key 使用。
+         */
+        ResolveCardImageField(fieldReference) {
+            var self = this;
+            var reference = fieldReference && typeof fieldReference === "object"
+                ? (fieldReference.Id || fieldReference.AsName || fieldReference.Name)
+                : fieldReference;
+            if (self.DiyCommon.IsNull(reference)) return null;
+
+            return Array.isArray(self.DiyFieldList)
+                ? self.DiyFieldList.find(function (item) {
+                    return item && (
+                        item.Id === reference
+                        || item.Name === reference
+                        || item.AsName === reference
+                    );
+                }) || null
+                : null;
+        },
+
+        GetCardImageFieldName(fieldReference) {
+            var field = this.ResolveCardImageField(fieldReference);
+            if (field) return field.AsName || field.Name;
+            if (fieldReference && typeof fieldReference === "object") {
+                return fieldReference.AsName || fieldReference.Name || fieldReference.Id || "";
+            }
+            return String(fieldReference || "");
+        },
+
+        GetCardImageValue(row, fieldReference) {
+            if (!row) return null;
+            var field = this.ResolveCardImageField(fieldReference);
+            var candidates = field
+                ? [field.AsName, field.Name, field.Id]
+                : [this.GetCardImageFieldName(fieldReference), fieldReference];
+            for (var index = 0; index < candidates.length; index++) {
+                var key = candidates[index];
+                if (!key || !Object.prototype.hasOwnProperty.call(row, key)) continue;
+                var value = row[key];
+                if (value !== undefined && value !== null && value !== "") return value;
+            }
+            return null;
+        },
+
+        GetCardImageFallbackText(row) {
+            var fields = [
+                this.CardPrimaryField,
+                ...(this.CardShowDiyFieldList || []),
+                ...(this.MobileShowFieldList || [])
+            ].filter(Boolean);
+            for (var index = 0; index < fields.length; index++) {
+                var field = fields[index];
+                var value = row && row[field.AsName || field.Name];
+                if (value === undefined || value === null || String(value).trim() === "") continue;
+                return Array.from(String(value).trim())[0].toUpperCase();
+            }
+            return "#";
+        },
+
+        GetCardContentLayoutClass() {
+            var style = String((this.SysMenuModel && this.SysMenuModel.TableCardImgStyle) || "");
+            var imageUsesFullWidth = /(?:^|;)\s*width\s*:\s*100%\s*(?:;|$)/i.test(style);
+            return this.SysMenuModel
+                && this.SysMenuModel.TableCardImgPosition === "Left"
+                && !imageUsesFullWidth
+                ? "card-content-horizontal"
+                : "card-content-vertical";
+        },
+
+        /**
          * 卡片图片字段是否属于私有文件。
          * sys_user.Avatar 是系统安全约定，即使旧缓存暂未带回字段 Config 也必须按私有文件处理。
          */
-        IsPrivateCardImageField(fieldName) {
+        IsPrivateCardImageField(fieldReference) {
             var self = this;
+            var field = self.ResolveCardImageField(fieldReference);
+            var fieldName = field ? field.Name : self.GetCardImageFieldName(fieldReference);
             var tableName = String(
                 (self.CurrentDiyTableModel && self.CurrentDiyTableModel.Name)
                 || (self.SysMenuModel && self.SysMenuModel.DiyTableName)
@@ -70,11 +145,6 @@ export default {
                 return true;
             }
 
-            var field = Array.isArray(self.DiyFieldList)
-                ? self.DiyFieldList.find(function (item) {
-                    return item && (item.Name === fieldName || item.AsName === fieldName);
-                })
-                : null;
             if (!field || !field.Config) return false;
 
             var config = field.Config;
@@ -93,11 +163,13 @@ export default {
         /**
          * 获取卡片图片地址。私有图片首次渲染先显示占位图，签名完成后由响应式缓存自动替换。
          */
-        GetCardImageUrl(row, fieldName) {
+        GetCardImageUrl(row, fieldReference) {
             var self = this;
-            var rawValue = row && row[fieldName];
+            var field = self.ResolveCardImageField(fieldReference);
+            var fieldName = field ? field.Name : self.GetCardImageFieldName(fieldReference);
+            var rawValue = self.GetCardImageValue(row, fieldReference);
             if (!rawValue) return self.bodyBgSvg;
-            if (!self.IsPrivateCardImageField(fieldName)) return self.GetFileServerUrl(rawValue);
+            if (!self.IsPrivateCardImageField(fieldReference)) return self.GetFileServerUrl(rawValue);
 
             var rawKey;
             try {
@@ -111,11 +183,6 @@ export default {
                 || self.TableName
                 || ""
             ).toLowerCase();
-            var field = Array.isArray(self.DiyFieldList)
-                ? self.DiyFieldList.find(function (item) {
-                    return item && (item.Name === fieldName || item.AsName === fieldName);
-                })
-                : null;
             var currentUser = self.GetCurrentUser || (self.diyStore && self.diyStore.GetCurrentUser) || {};
             var cacheKey = [
                 currentUser.Id || "",
