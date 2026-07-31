@@ -133,6 +133,7 @@
                             v-if="TableId && TableRowId"
                             v-show="!UseViewSchemaDetail"
                             ref="fieldFormPage"
+                            :CodeEditorMini="UseMiniCodeEditor"
                             :FormMode="FormMode"
                             :LoadMode="'Page'"
                             :TableId="TableId"
@@ -432,6 +433,7 @@
                     <DiyForm
                         v-show="!UseViewSchemaDetail"
                         ref="fieldForm"
+                        :CodeEditorMini="UseMiniCodeEditor"
                         :AutoInit="false"
                         :FormWF="FormWF"
                         :LoadMode="''"
@@ -752,6 +754,7 @@
                     <DiyForm
                         v-show="!UseViewSchemaDetail"
                         ref="fieldForm"
+                        :CodeEditorMini="UseMiniCodeEditor"
                         :AutoInit="false"
                         :FormWF="FormWF"
                         :LoadMode="''"
@@ -965,6 +968,7 @@
                 v-if="ShowDataVersionPreviewDialog && TableId"
                 :key="'data_version_preview_' + PreviewDataVersionKey"
                 ref="fieldFormDataVersionPreview"
+                :CodeEditorMini="UseMiniCodeEditor"
                 :FormMode="'View'"
                 :LoadMode="'DataVersionPreview'"
                 :TableId="TableId"
@@ -1100,6 +1104,9 @@ export default {
         FormViewRenderer: defineAsyncComponent(() => import("./form-view-blocks/form-view-renderer.vue"))
     },
     computed: {
+        UseMiniCodeEditor() {
+            return String(this.TableName || "").toLowerCase() === "sys_menu";
+        },
         UseViewSchemaDetail() {
             return this.FormMode === "View" &&
                 !this.diyStore.IsPhoneView &&

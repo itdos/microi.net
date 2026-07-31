@@ -48,7 +48,12 @@ const resumeStableSampleCount = 5;
 const rawArgs = process.argv.slice(2);
 const dryRun = rawArgs.includes('--dry-run');
 const legacyOnly = rawArgs.includes('--legacy-only');
-const viteArgs = ['build', ...rawArgs.filter((arg) => arg !== '--dry-run' && arg !== '--legacy-only')];
+const preflightOnly = rawArgs.includes('--preflight-only');
+const viteArgs = ['build', ...rawArgs.filter((arg) => ![
+    '--dry-run',
+    '--legacy-only',
+    '--preflight-only'
+].includes(arg))];
 const interactiveInput = process.stdin.isTTY || process.env.MICROI_BUILD_INTERACTIVE === '1';
 const skipMemoryWaitFromEnv = /^(?:1|true|yes|on)$/i.test(
     String(process.env.MICROI_BUILD_SKIP_MEMORY_WAIT || '').trim()
@@ -291,6 +296,22 @@ if (skipMemoryWaitFromEnv) {
 if (!existsSync(viteBin)) {
     console.error('[Microi build guard] 未找到本地 Vite，请先执行 npm install。');
     process.exit(1);
+}
+if (!existsSync(legacyBuilder)) {
+    console.error(`[Microi build guard] 未找到 Chrome 49 转换器：${legacyBuilder}`);
+    process.exit(1);
+}
+
+if (preflightOnly) {
+    if (!memoryWaitBypassed && freeMemory < requiredStartMemory) {
+        console.error(
+            `[Microi build guard] 发布前资源预检未通过：当前可用 ${formatGb(freeMemory)} GB，` +
+            `需要至少 ${formatGb(requiredStartMemory)} GB。请先关闭不需要的 WSL、后端、浏览器或其它重任务后重试。`
+        );
+        process.exit(2);
+    }
+    console.log('[Microi build guard] 发布前资源预检通过，未启动 Vite。');
+    process.exit(0);
 }
 
 if (dryRun) {

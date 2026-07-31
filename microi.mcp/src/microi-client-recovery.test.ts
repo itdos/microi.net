@@ -446,6 +446,38 @@ test('updateModule verifies menu JSON after an uncertain write', async () => {
 
     const result = await createClient().updateModule({
       ModuleId: 'menu-1',
+      MenuBadgeEnabled: 1,
+      MenuBadgeApiEngineKey: 'purchase_contract_menu_badge',
+      EnableViewSchema: 1,
+      ViewSchema: JSON.stringify({
+        Views: [
+          {
+            Scene: 'List',
+            Device: 'PC',
+            Layout: {
+              List: {
+                Columns: [{
+                  Field: 'ContractName',
+                  Lines: ['ContractName', 'SignerName'],
+                  TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                }],
+              },
+            },
+          },
+          {
+            Scene: 'Card',
+            Device: 'Mobile',
+            Layout: {
+              Card: {
+                TitleField: 'ContractName',
+                TopFields: ['Status'],
+                RightFields: [{ Name: 'Amount', Format: 'currency' }],
+                BottomFields: ['ContractNo'],
+              },
+            },
+          },
+        ],
+      }),
       MoreBtns: JSON.stringify([{
         Id: 'button-1',
         Name: '测试',
@@ -457,6 +489,11 @@ test('updateModule verifies menu JSON after an uncertain write', async () => {
     assert.equal(result.Code, 1);
     assert.equal((result.Data as Record<string, unknown>).RecoveredAfterTransportError, true);
     assert.equal((result.Data as Record<string, unknown>).Verified, true);
+    assert.equal(storedModule.MenuBadgeEnabled, 1);
+    assert.equal(storedModule.MenuBadgeApiEngineKey, 'purchase_contract_menu_badge');
+    const savedSchema = JSON.parse(String(storedModule.ViewSchema)) as { Views: Array<{ Layout: Record<string, unknown> }> };
+    assert.ok(savedSchema.Views[0].Layout.List);
+    assert.ok(savedSchema.Views[1].Layout.Card);
   } finally {
     globalThis.fetch = originalFetch;
   }

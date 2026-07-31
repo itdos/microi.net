@@ -5,6 +5,32 @@
 ![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 
+## 左侧菜单统计角标
+
+对库存预警、待审批、未读消息、待回款等需要用户持续关注的菜单，可在模块引擎配置：
+
+| 物理字段 | 说明 |
+| --- | --- |
+| `MenuBadgeEnabled` | 是否在左侧菜单右侧显示统计角标；默认关闭。 |
+| `MenuBadgeApiEngineKey` | 统计接口引擎 Key；开启角标时必填。 |
+
+前端按菜单调用一次接口引擎，并携带 `_SysMenuId`、`SysMenuId`、`OsClient`。接口使用统一返回协议：
+
+```js
+// MenuBadgeApiEngineKey = inventory_warning_badge
+var countResult = V8.FormEngine.GetTableDataCount('diy_product', {
+  _Where: [['Stock', '<', 10]]
+});
+return {
+  Code: 1,
+  Data: { Value: Number(countResult.Data || 0) }
+};
+```
+
+`Data.Value=0` 时默认不显示，超过 99 显示 `99+`；统计失败只隐藏角标，不阻断菜单导航。客户端对同一用户、菜单和接口结果做短缓存并定时刷新。接口引擎必须继续执行当前租户和当前用户的数据权限，不能为了统计总数改成匿名接口或绕开模块权限。
+
+以下菜单通常应主动考虑角标：待办/待审批、库存或余额预警、未读消息、逾期合同、待付款/待回款、失败任务。普通资料维护、低频设置、无明确行动含义的总数不建议配置，以免侧栏充满噪声。
+
 ## 跨端统一视图
 
 跨端视图属于模块引擎，因为同一张表可能被多个 `sys_menu` 以不同角色、业务场景和卡片样式复用。配置保存在 `sys_menu` 的专用物理字段中，不放在 SaaS 引擎、`diy_table` 或 `DiyConfig`：
@@ -15,6 +41,12 @@
 | `ViewSchemaVersion` | 协议语义版本，例如 `1.0`。 |
 | `ViewConfigVersion` | 配置递增版本；每次发布视图时递增，用于客户端缓存失效。 |
 | `ViewSchema` | Detail、Edit、List、Card 的版本化 JSON。 |
+
+所有顶层 PC 数据模块默认使用紧凑的新列表外观，即使 `EnableViewSchema=0`，也会显示以模块名称为标题的模块头部；子表、关联表和嵌入表不会重复显示。模块头部在**页面多 Tab（PageTabs）上方**渲染，固定信息层级为“模块标题/副标题/动态指标 → 页面多 Tab → 查询与表格”。无指标时头部高度为 `44px`，含指标时为 `58px`，连同区块间距的总纵向占用约为 `50px / 64px`，不能为了视觉效果挤占低分辨率电脑的表格首屏。`EnableViewSchema` 只控制个性化内容，例如标题文案、动态指标、复合列和移动卡片，不再决定是否采用平台默认新样式。移动端继续由固定导航栏显示模块名，只有配置了动态指标时才追加指标区，避免重复标题和空白占位。
+
+模块头部只允许一次性入场和一次性轻量光效，不得使用持续循环的位移、呼吸、渐变或阴影动画。所有动效必须支持 `prefers-reduced-motion: reduce`：命中时关闭动画与过渡，保证低性能终端、无障碍用户和长时间停留页面不会卡顿。
+
+模块引擎表单的“跨端视图”页签提供“模块展示设计器”，可视化配置标题与指标、PC 复合列、移动卡片和高级 JSON。普通用户无需手写 `ViewSchema`；高级 JSON 用于 Detail/Edit、角色优先级等完整协议能力。设计器保存时会同步 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion` 和 `ViewSchema`。
 
 `diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均已废弃。旧字段只保留历史读取兼容，新功能必须增加专用物理列，并通过 `diy_field` 元数据提供设计控件。
 
@@ -69,6 +101,165 @@
 - `RoleIds`：空数组表示所有已获模块权限的角色；配置角色后优先选择角色专属视图。
 - `Priority`：同场景、同终端命中多个视图时选择优先级更高者。
 - 没有新视图、配置损坏或客户端暂不支持某个区块时，必须回退到现有 `sys_menu + diy_table + diy_field` 渲染，不能白屏。
+
+### 列表页模块标题与动态指标
+
+`Scene=List` 的 `Layout.Hero` 可以配置模块眉题、标题、说明和最多 6 个动态指标。指标来源有三类：`Source="DataCount"` 读取当前筛选条件下的总记录数，`Source="PageCount"` 读取本页已加载记录数，配置 `Field` 时读取列表返回的 `StatisticsFields`，配置 `ApiEngineKey + ValuePath` 时调用接口引擎。`DataCount/PageCount` 是前端已有列表结果，不产生额外统计请求：
+
+```json
+{
+  "Key": "purchase-list",
+  "Scene": "List",
+  "Device": "PC",
+  "Priority": 10,
+  "Layout": {
+    "Hero": {
+      "Eyebrow": "PURCHASE CONTRACT",
+      "Title": "采购合同",
+      "Description": "统一查看合同金额、付款与入库状态",
+      "Metrics": [
+        {
+          "Key": "totalCount",
+          "Label": "总记录数",
+          "Source": "DataCount",
+          "Suffix": "条",
+          "Tone": "primary"
+        },
+        {
+          "Key": "contractCount",
+          "Label": "数量",
+          "ApiEngineKey": "purchase_contract_stats",
+          "ValuePath": "Data.ContractCount",
+          "Tone": "primary",
+          "DefaultValue": 0,
+          "RefreshSeconds": 60
+        },
+        {
+          "Key": "unpaidAmount",
+          "Label": "未付款",
+          "ApiEngineKey": "purchase_contract_stats",
+          "ValuePath": "Data.UnpaidAmount",
+          "Prefix": "¥",
+          "Tone": "danger"
+        }
+      ]
+    }
+  }
+}
+```
+
+相同 `ApiEngineKey` 的指标会合并为一次请求；接口收到 `MetricKeys` 和当前模块、表、租户及筛选上下文，应该一次返回全部值：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    ContractCount: 176,
+    UnpaidAmount: 13971000
+  }
+};
+```
+
+列表首次加载、筛选、翻页和刷新后会同步刷新指标；配置 `RefreshSeconds` 时还会按最短周期刷新。禁止每个指标或每一行各查一次数据库；同一模块的指标应由一个聚合接口批量计算。模块 Hero 始终位于 PageTabs 上方；是否配置 PageTabs 都不能改变该顺序或重复渲染标题。
+
+### PC 复合列：多行值与右侧状态
+
+`Scene=List` 的 `Layout.List.Columns` 可把一个查询列声明为复合列。`Field` 是主字段，`Lines` 在下方显示多个附加字段，`TrailingFields` 在右侧显示图标、状态或预警：
+
+```json
+{
+  "List": {
+    "Density": "Comfortable",
+    "Columns": [
+      {
+        "Field": "ContractName",
+        "MinWidth": 260,
+        "Lines": [
+          { "Name": "Signer", "Label": "签约", "ShowLabel": true, "Tone": "info" },
+          { "Name": "CustomerName", "Icon": "fas fa-building", "Color": "#64748b" }
+        ],
+        "TrailingFields": [
+          { "Name": "StockWarning", "Icon": "fas fa-triangle-exclamation", "Tone": "danger" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+字段声明支持 `Label`、`ShowLabel`、`Icon`、`Tone`、`Color`、`Prefix`、`Suffix`、`FontWeight` 和 `AsName`。若该 `diy_field` 配置了【表格 V8 模板引擎】，主值、附加行和右侧字段都会复用净化后的模板结果。运行时会把引用字段并入 `_SelectFields`；自定义查询接口仍必须识别该参数并返回这些字段。
+
+### 移动端业务卡片
+
+`Scene=Card, Device=Mobile` 的 `Layout.Card` 支持头像、顶部标签、标题、副标题、右侧金额/状态、正文、元信息和底部标签：
+
+```json
+{
+  "Key": "sales-contract-mobile",
+  "Scene": "Card",
+  "Device": "Mobile",
+  "Layout": {
+    "Card": {
+      "Preset": "Business",
+      "AvatarTextField": "CustomerName",
+      "TitleField": "ContractName",
+      "TopFields": [
+        { "Name": "DeliveryStatus", "DisplayStyle": "Tag", "Tone": "warning" },
+        { "Name": "Category", "DisplayStyle": "Tag", "Tone": "success" }
+      ],
+      "SubtitleFields": ["CustomerName", "OwnerName"],
+      "RightFields": [
+        { "Name": "Amount", "Prefix": "¥", "Tone": "primary", "FontWeight": "700" },
+        { "Name": "UnpaidAmount", "Prefix": "未 ¥", "Tone": "danger" }
+      ],
+      "Fields": ["SignDate"],
+      "MetaFields": ["ContractNo", "CreateUserName"],
+      "BottomFields": [
+        { "Name": "AttachmentCount", "Icon": "fas fa-paperclip", "ShowLabel": true }
+      ],
+      "HideIndex": true,
+      "ShowCreateTime": true
+    }
+  }
+}
+```
+
+未配置 Card 视图时继续兼容 `MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`。移动端卡片会保留至少 40 至 44px 的触控目标、清晰的选择状态和底部批量操作条；不要通过业务定制 CSS 写死表名、菜单名或字段名。
+
+### 按钮统计角标
+
+`PageTabs`、`MoreBtns`、`PageBtns`、`BatchSelectMoreBtns`、`ExportMoreBtns`、`FormBtns` 的对象都可增加：
+
+```json
+{
+  "Id": "01K...",
+  "Name": "附件",
+  "ShowRow": true,
+  "BadgeEnabled": true,
+  "BadgeApiEngineKey": "contract_button_counts",
+  "BadgeValuePath": "Data.Rows.{RowId}.01K...",
+  "BadgeTone": "primary",
+  "BadgeMax": 99,
+  "BadgeShowZero": false
+}
+```
+
+前端按当前页的 `Ids`、`ButtonKeys` 和 `SysMenuId`，以“每个不同接口引擎一次请求”的方式批量取数。若不配置 `BadgeValuePath`，推荐返回：
+
+```js
+return {
+  Code: 1,
+  Data: {
+    Buttons: { '01K...': 12 },
+    Rows: {
+      'row-id-1': { '01K...': 2 },
+      'row-id-2': { '01K...': 0 }
+    }
+  }
+};
+```
+
+`Buttons` 用于 PageTabs 和页面级按钮，Key 优先使用稳定 `Id`；`Rows` 用于行按钮。行按钮配置 `BadgeField` 时直接读取当前行已查询字段；PageTabs/页面按钮配置 `BadgeField` 时读取模块 `StatisticsFields` 的页面汇总值，因此还要把该字段加入模块“统计列”。这两种字段模式都不调用接口引擎。严禁在每一行渲染时单独调用统计接口；附件、日志、子表等数量应一次批量聚合。接口失败时只隐藏角标，不阻断页签切换、按钮点击或列表加载。
 
 ### 标准视图区块
 
@@ -383,8 +574,12 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
 
 页面多Tab支持两种动态模式：
 
+页面多 Tab 位于模块 Hero 下方、查询工具栏上方；Hero 与页签不能互换顺序。这样切换筛选页签时模块名称和全局指标保持稳定，页签只表达当前模块的数据分组。
+
 - 不配置【关联模块】：在当前模块执行 `V8Code`，通常使用 `V8.SearchSet(...)` 切换筛选条件。
 - 配置【关联模块】：保存目标 `sys_menu.Id` 到 `TargetSysMenuId`。点击后替换当前路由并完整加载目标模块；目标菜单可以设置 `Display=0、AppDisplay=0` 隐藏导航入口，但仍需给当前角色分配菜单权限。
+
+每个 PageTab 还可配置 `BadgeEnabled` 和 `BadgeApiEngineKey` 显示数字角标；`BadgeValuePath` 可直接指定返回路径，例如 `Data.Buttons.pending-tab`。同一接口引擎会按页签合并调用，并收到 `ButtonKeys`、当前筛选条件和模块上下文，适合“待办 12 / 已完成 86 / 异常 3”这类可行动统计。若使用 `BadgeField`，它读取模块“统计列”的页面汇总值；不要在 Tab 的 `V8Code` 中再次单独请求数量。
 
 关联模块适合一个业务入口下不同页签分别使用不同 `diy_table`、字段、列表模板、查询接口替换或按钮配置的场景。所有关联模块建议配置同一组 PageTabs，才能从任意页签无感切回其它模块；不要在前端 mixin 中按菜单名或表名写死数据源。
 
@@ -395,7 +590,12 @@ V8.ConfirmTips(`确认批量删除选中的[${selectData.length}]条数据？`, 
     "Sort": 10,
     "Name": "本地记录",
     "TargetSysMenuId": "目标sys_menu.Id",
-    "IsVisible": true
+    "IsVisible": true,
+    "BadgeEnabled": true,
+    "BadgeApiEngineKey": "module_tab_counts",
+    "BadgeValuePath": "Data.Buttons.01K...",
+    "BadgeTone": "danger",
+    "BadgeRefreshSeconds": 60
   }
 ]
 ```

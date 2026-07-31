@@ -31,7 +31,7 @@
                     <!-- 数据就绪检查：确保 DiyTableModel 和 DiyFieldList 都已加载 -->
                     <div v-if="renderedTabs.has(tab.Id || tab.Name) && DiyTableModel && DiyTableModel.Id"
                         :id="'field-form-' + tabIndex"
-                        :data-tab="FieldActiveTab"
+                        :data-tab="tab.Id || tab.Name"
                         :class="formContainerClass">
                         <el-form
                             :rules="FormRules"
@@ -174,7 +174,7 @@
                                     但如果不设置又会导致表单字段与字段直接挨在一起了-->
                             <el-row v-else :gutter="10" @click="handleFieldClick">
                                 <el-col
-                                    v-for="field in DiyFieldListGrouped[tab.Id || tab.Name] || []"
+                                    v-for="field in GetRenderedTabFields(tab.Id || tab.Name)"
                                     v-show="field._isShow"
                                     :class="[CurrentDiyFieldModel.Id == field.Id ? field._activeClass : field._class, field._collapseClass]"
                                     :key="'el_col_fieldid_' + field.Id"
@@ -542,6 +542,7 @@ export default {
                 tableRowId: self.TableRowId
             });
             self.GetDiyTableRowModelFinish = false;
+            self.ResetV8FieldCache();
             self.IsFirstLoadForm = true;
             self.DiyImgUploadRealPath = [];
             self.DiyFileUploadRealPath = [];
@@ -614,8 +615,23 @@ export default {
         },
         GetV8(field) {
             var self = this;
-            var v8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
-            self.SetV8DefaultValue(v8);
+            var context = [self.TableId, self.TableName, self.DiyTableModel && self.DiyTableModel.Id, self.TableRowId, self.SysMenuId, self.FormMode, self.LoadMode].join("|");
+            if (self._V8FieldCacheContext !== context) {
+                self.ResetV8FieldCache(context);
+            }
+            var isFieldObject = field && typeof field === "object";
+            var v8 = isFieldObject ? self._V8FieldCache.get(field) : self._V8RootInstance;
+            if (!v8) {
+                v8 = self.DiyCommon.InitV8CodeSync({}, self.$router);
+                self.SetV8DefaultValue(v8);
+                if (isFieldObject) {
+                    self._V8FieldCache.set(field, v8);
+                } else {
+                    self._V8RootInstance = v8;
+                }
+            } else {
+                self.RefreshCachedV8Context(v8);
+            }
             //2021-12-10新增，有可能用户自定义父级model，如点击A子表一行数据，更新B子表数据
             if (field && !self.DiyCommon.IsNull(field._ParentFormModel)) {
                 v8.Form = Object.assign(
@@ -627,6 +643,30 @@ export default {
                 v8.ParentForm = self.FormDiyTableModel;
             }
             return v8;
+        },
+        ResetV8FieldCache(context) {
+            this._V8FieldCache = new WeakMap();
+            this._V8RootInstance = null;
+            this._V8FieldCacheContext = context || "";
+        },
+        RefreshCachedV8Context(V8) {
+            var self = this;
+            V8.DataAppend = self.DataAppend;
+            V8.FormWF = self.FormWf;
+            V8.Form = self.FormDiyTableModel;
+            V8.OldForm = self.OldForm;
+            V8.Field = self.GetDiyFieldListObject;
+            V8.TableRowId = self.TableRowId;
+            V8.ApiReplace = self.ApiReplace;
+            V8.ParentForm = self.ParentForm;
+            V8.ParentV8 = self.ParentV8;
+            V8.FormMode = self.FormMode;
+            V8.LoadMode = self.LoadMode;
+            V8.TableId = self.TableId;
+            V8.TableName = self.TableName;
+            V8.TableModel = self.DiyTableModel;
+            V8.CurrentTableData = self.CurrentTableData;
+            V8.SysMenuId = self.SysMenuId;
         },
         async OpenTableEventByInput(fieldName) {
             var self = this;
@@ -995,7 +1035,9 @@ export default {
                      _RawMetadata: rawMetadata
                 };
                 if (self.TableId) {
-                    // getFieldListParam._Where = [{ Name: "TableId", Value: self.TableId, Type: "=" }];
+                    // GetDiyFieldList 是字段元数据专用接口，后端从顶层 TableId 做参数校验和权限校验。
+                    // 同时保留 _Where，兼容历史 ApiReplace.GetDiyField 指向通用表查询接口的场景。
+                    getFieldListParam.TableId = self.TableId;
                     getFieldListParam._Where = [["TableId", "=", self.TableId]];
                 }
                 // if(self.TableName){
@@ -1062,17 +1104,28 @@ export default {
                     self.FieldTabsState = {};
 
                     // 性能优化：初始化第一个 tab 为已渲染（懒加载优化）
+                    Object.values(self._tabRenderTimers || {}).forEach((timer) => clearTimeout(timer));
+                    self._tabRenderTimers = {};
+                    if (self._tabActivationFrames) {
+                        const cancelFrame = typeof cancelAnimationFrame === "function" ? cancelAnimationFrame : clearTimeout;
+                        Object.values(self._tabActivationFrames).forEach((frame) => cancelFrame(frame));
+                    }
+                    self._tabActivationFrames = {};
+                    self.renderedFieldCounts = {};
                     self.renderedTabs.clear(); // 清空之前的记录
                     if (self.FormTabs && self.FormTabs.length > 0) {
                         // Bug修复：标记第一个tab和当前激活的tab都为已渲染
                         const firstTab = self.FormTabs[0];
                         const firstTabKey = firstTab.Id || firstTab.Name;
                         self.renderedTabs.add(firstTabKey);
+                        self._initialRenderedTabKey = self.FieldActiveTab || firstTabKey;
 
                         // 如果当前激活的不是第一个tab，也要标记为已渲染
                         if (self.FieldActiveTab && self.FieldActiveTab !== firstTabKey) {
                             self.renderedTabs.add(self.FieldActiveTab);
                         }
+                    } else {
+                        self._initialRenderedTabKey = "";
                     }
 
                     var resultGetDiyField = results[1];
@@ -1372,6 +1425,7 @@ export default {
                 });
             }
             self.GetDiyTableRowModelFinish = true;
+            self.$nextTick(() => self.StartProgressiveTabRender(self.FieldActiveTab));
         },
         CommonV8CodeChange(item, field, v8codeKey) {
             var self = this;

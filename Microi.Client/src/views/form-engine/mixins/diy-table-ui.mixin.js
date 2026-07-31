@@ -1256,7 +1256,8 @@ LoadFabPosition() {
 
         GetColWidth(field, fieldIndex) {
             var self = this;
-            if (fieldIndex == self.ShowDiyFieldList.length - 1) {
+            var visibleFields = self.PresentationTableFieldList || self.ShowDiyFieldList || [];
+            if (fieldIndex == visibleFields.length - 1) {
                 return "";
             }
             if (!field.TableWidth) {

@@ -46,10 +46,19 @@ function normalizeField(field) {
     const result = { Name: name };
     const label = String(source.Label || source.label || "").trim();
     const format = String(source.Format || source.format || "").trim();
+    const asName = String(source.AsName || source.asName || "").trim();
     const width = Number(source.Width || source.width || source.Span || source.span);
     if (label) result.Label = label;
     if (format) result.Format = format;
+    if (asName) result.AsName = asName;
     if (Number.isFinite(width) && width > 0) result.Width = Math.min(24, width);
+    ["Icon", "Tone", "Color", "Position", "DisplayStyle", "Prefix", "Suffix", "FontWeight"].forEach((key) => {
+        const value = source[key] ?? source[key.charAt(0).toLowerCase() + key.slice(1)];
+        if (String(value || "").trim()) result[key] = String(value).trim();
+    });
+    if (source.ShowLabel !== undefined || source.showLabel !== undefined) {
+        result.ShowLabel = ![false, 0, "0", "false"].includes(source.ShowLabel ?? source.showLabel);
+    }
     return result;
 }
 
@@ -57,17 +66,78 @@ function normalizeMetric(metric) {
     const source = metric || {};
     const field = String(source.Field || source.field || "").trim();
     const apiEngineKey = String(source.ApiEngineKey || source.apiEngineKey || "").trim();
-    if (!field && !apiEngineKey) return null;
+    const declaredSource = canonical(source.Source || source.source, ["Field", "ApiEngine", "DataCount", "PageCount"], "");
+    const metricSource = apiEngineKey
+        ? "ApiEngine"
+        : (field ? "Field" : (declaredSource === "DataCount" || declaredSource === "PageCount" ? declaredSource : ""));
+    if (!metricSource) return null;
+    const sourceLabel = metricSource === "DataCount" ? "总记录数" : (metricSource === "PageCount" ? "本页加载" : "指标");
     return {
-        Key: String(source.Key || source.key || field || apiEngineKey),
-        Label: String(source.Label || source.label || field || "指标"),
+        Key: String(source.Key || source.key || field || apiEngineKey || metricSource),
+        Label: String(source.Label || source.label || field || sourceLabel),
         Field: field,
         ApiEngineKey: apiEngineKey,
-        Source: apiEngineKey ? "ApiEngine" : "Field",
+        Source: metricSource,
+        ValuePath: String(source.ValuePath || source.valuePath || ""),
+        TrendPath: String(source.TrendPath || source.trendPath || ""),
+        TrendLabel: String(source.TrendLabel || source.trendLabel || ""),
+        Prefix: String(source.Prefix || source.prefix || ""),
         Suffix: String(source.Suffix || source.suffix || source.Unit || source.unit || ""),
         Format: String(source.Format || source.format || ""),
         Icon: String(source.Icon || source.icon || ""),
-        Color: String(source.Color || source.color || "")
+        Color: String(source.Color || source.color || ""),
+        Tone: String(source.Tone || source.tone || ""),
+        DefaultValue: source.DefaultValue !== undefined ? source.DefaultValue : source.defaultValue,
+        RefreshSeconds: Math.min(3600, Math.max(0, Number(source.RefreshSeconds || source.refreshSeconds || 0))),
+        ParamMap: normalizeParamValue(source.ParamMap || source.paramMap || source.Params || source.params) || {}
+    };
+}
+
+function normalizeColumn(column, index) {
+    const source = typeof column === "string" ? { Field: column } : (column || {});
+    const field = String(source.Field || source.field || source.Name || source.name || "").trim();
+    if (!field) return null;
+    const lines = source.Lines || source.lines || source.SubFields || source.subFields || [];
+    const trailing = source.TrailingFields || source.trailingFields || source.Trailing || source.trailing || [];
+    const required = source.RequiredFields || source.requiredFields || [];
+    return {
+        Key: String(source.Key || source.key || `column:${index}`),
+        Field: field,
+        Lines: (Array.isArray(lines) ? lines : stringList(lines)).map(normalizeField).filter(Boolean).slice(0, 6),
+        TrailingFields: (Array.isArray(trailing) ? trailing : stringList(trailing)).map(normalizeField).filter(Boolean).slice(0, 4),
+        RequiredFields: stringList(required).slice(0, 20),
+        Align: canonical(source.Align || source.align, ["Left", "Center", "Right"], "Left"),
+        MinWidth: Math.min(1200, Math.max(0, Number(source.MinWidth || source.minWidth || 0)))
+    };
+}
+
+function normalizeCard(value) {
+    const source = parseObject(value);
+    const normalizeFields = (...names) => {
+        const raw = names.map((name) => source[name]).find((item) => item !== undefined && item !== null) || [];
+        return (Array.isArray(raw) ? raw : stringList(raw)).map(normalizeField).filter(Boolean).slice(0, 12);
+    };
+    const statusFields = normalizeFields("StatusFields", "statusFields");
+    const statusField = String(source.StatusField || source.statusField || "").trim();
+    if (statusField && !statusFields.some((item) => item.Name === statusField)) {
+        statusFields.unshift({ Name: statusField, DisplayStyle: "Tag" });
+    }
+    return {
+        Preset: String(source.Preset || source.preset || "Business"),
+        AvatarField: String(source.AvatarField || source.avatarField || ""),
+        AvatarTextField: String(source.AvatarTextField || source.avatarTextField || ""),
+        TitleField: String(source.TitleField || source.titleField || ""),
+        AccentField: String(source.AccentField || source.accentField || ""),
+        SubtitleFields: normalizeFields("SubtitleFields", "subtitleFields"),
+        StatusFields: statusFields,
+        TopFields: normalizeFields("TopFields", "topFields"),
+        RightFields: normalizeFields("RightFields", "rightFields"),
+        Fields: normalizeFields("Fields", "fields"),
+        MetaFields: normalizeFields("MetaFields", "metaFields"),
+        BottomFields: normalizeFields("BottomFields", "bottomFields"),
+        HideIndex: [true, 1, "1", "true"].includes(source.HideIndex ?? source.hideIndex),
+        ShowCreateTime: ![false, 0, "0", "false"].includes(source.ShowCreateTime ?? source.showCreateTime),
+        ShowUpdateTime: [true, 1, "1", "true"].includes(source.ShowUpdateTime ?? source.showUpdateTime)
     };
 }
 
@@ -171,13 +241,18 @@ function normalizeBlock(block, index) {
 function normalizeLayout(value) {
     const source = parseObject(value);
     const heroSource = source.Hero || source.hero || {};
+    const listSource = source.List || source.list || {};
+    const cardSource = source.Card || source.card || {};
     const blocks = source.Blocks || source.blocks || source.Sections || source.sections || [];
     const metrics = heroSource.Metrics || heroSource.metrics || [];
     const actions = source.Actions || source.actions || source.ActionSchema || source.actionSchema || [];
+    const columns = listSource.Columns || listSource.columns || [];
     return {
         Preset: String(source.Preset || source.preset || ""),
         Hero: {
             Title: String(heroSource.Title || heroSource.title || ""),
+            Eyebrow: String(heroSource.Eyebrow || heroSource.eyebrow || ""),
+            Description: String(heroSource.Description || heroSource.description || ""),
             Icon: String(heroSource.Icon || heroSource.icon || ""),
             Background: String(heroSource.Background || heroSource.background || ""),
             ImageField: String(heroSource.ImageField || heroSource.imageField || ""),
@@ -187,9 +262,83 @@ function normalizeLayout(value) {
             MetaField: String(heroSource.MetaField || heroSource.metaField || ""),
             Metrics: (Array.isArray(metrics) ? metrics : []).map(normalizeMetric).filter(Boolean).slice(0, 6)
         },
+        List: {
+            Density: canonical(listSource.Density || listSource.density, ["Compact", "Comfortable"], "Comfortable"),
+            Columns: (Array.isArray(columns) ? columns : []).map(normalizeColumn).filter(Boolean).slice(0, 80)
+        },
+        Card: normalizeCard(cardSource),
         Blocks: (Array.isArray(blocks) ? blocks : []).map(normalizeBlock).slice(0, 50),
         Actions: (Array.isArray(actions) ? actions : []).map(normalizeAction).filter(Boolean).slice(0, 30)
     };
+}
+
+export function getModuleViewFieldNames(view) {
+    if (!view || !view.Layout) return [];
+    const names = [];
+    const push = (value) => {
+        const name = typeof value === "string" ? value : value?.Name;
+        if (name && !names.includes(name)) names.push(name);
+    };
+    const hero = view.Layout.Hero || {};
+    [hero.ImageField, hero.TitleField, hero.FallbackTitleField, hero.StatusField, hero.MetaField].forEach(push);
+    (hero.Metrics || []).forEach((metric) => push(metric.Field));
+    ((view.Layout.List || {}).Columns || []).forEach((column) => {
+        push(column.Field);
+        (column.Lines || []).forEach(push);
+        (column.TrailingFields || []).forEach(push);
+        (column.RequiredFields || []).forEach(push);
+    });
+    const card = view.Layout.Card || {};
+    [card.AvatarField, card.AvatarTextField, card.TitleField, card.AccentField].forEach(push);
+    ["SubtitleFields", "StatusFields", "TopFields", "RightFields", "Fields", "MetaFields", "BottomFields"]
+        .forEach((key) => (card[key] || []).forEach(push));
+    return names;
+}
+
+function fieldReferenceKeys(reference) {
+    if (!reference) return [];
+    if (typeof reference === "string") {
+        const value = reference.trim();
+        return value ? [value] : [];
+    }
+    if (typeof reference !== "object") return [];
+    return [...new Set([
+        reference.Name,
+        reference.name,
+        reference.Field,
+        reference.field,
+        reference.AsName,
+        reference.asName,
+        reference.Id,
+        reference.id
+    ].map((value) => String(value || "").trim()).filter(Boolean))];
+}
+
+/**
+ * Remove fields already rendered as composite-column lines/trailing values from
+ * the ordinary table columns. A field declared as any composite column's
+ * primary Field always wins, even when another column also references it as an
+ * auxiliary value.
+ */
+export function filterStandaloneListFields(fields, view) {
+    const source = Array.isArray(fields) ? fields : [];
+    const columns = view?.Layout?.List?.Columns;
+    if (!Array.isArray(columns) || !columns.length) return source;
+
+    const primaryKeys = new Set();
+    const auxiliaryKeys = new Set();
+    columns.forEach((column) => {
+        fieldReferenceKeys(column?.Field).forEach((key) => primaryKeys.add(key));
+        [...(column?.Lines || []), ...(column?.TrailingFields || [])]
+            .forEach((reference) => fieldReferenceKeys(reference).forEach((key) => auxiliaryKeys.add(key)));
+    });
+    if (!auxiliaryKeys.size) return source;
+
+    return source.filter((field) => {
+        const keys = fieldReferenceKeys(field);
+        if (keys.some((key) => primaryKeys.has(key))) return true;
+        return !keys.some((key) => auxiliaryKeys.has(key));
+    });
 }
 
 function roleIds(user) {
@@ -277,5 +426,7 @@ export function isActionVisible(action, form) {
 export default {
     selectModuleView,
     hasModuleDetailView,
+    getModuleViewFieldNames,
+    filterStandaloneListFields,
     isActionVisible
 };
