@@ -243,7 +243,9 @@ function hasPublicUploadFlag(value) {
 }
 
 function isKnownPublicUploadPath(path) {
-  return /^\/?(?:xjy\/img|xjyimg|upload|public|mci-public|xjy\/xjy\/miniapp-assets)\//i.test(String(path || ''));
+  // Ordinary form uploads such as /xjy/img and /xjy/file are private by default.
+  // They must go through GetPrivateFileUrl instead of being mistaken for CDN assets.
+  return /^\/?(?:public|mci-public|xjy\/xjy\/miniapp-assets|xjy\/miniapp\/share)\//i.test(String(path || ''));
 }
 
 function getHeaderValue(headers, key) {
@@ -920,7 +922,16 @@ export function createMicroiV8(options = {}) {
 
     async function requestPrivate(action) {
       try {
-        const body = await post(`/api/HDFS/${action}?FilePathName=${encodeURIComponent(path)}`, { OsClient: config.osClient }, {
+        const body = await post(`/api/HDFS/${action}`, {
+          OsClient: config.osClient,
+          FilePathName: path,
+          FormEngineKey: options.formEngineKey || options.FormEngineKey,
+          FormDataId: options.formDataId || options.FormDataId,
+          FieldId: options.fieldId || options.FieldId,
+          SysMenuId: options.sysMenuId || options.SysMenuId || options.menuId || options.MenuId,
+          _TableChildAuth: options.tableChildAuth || options._TableChildAuth,
+          HDFS: options.hdfs || options.HDFS
+        }, {
           checkCode: false,
           silentError: true
         });

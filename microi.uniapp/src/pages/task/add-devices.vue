@@ -1,6 +1,6 @@
 <template>
   <mci-page-shell class="select-page" :style="mciTokenStyle" title="选择售后设备" :subtitle="selectedIds.length ? `已选择 ${selectedIds.length} 台` : '从客户设备中选择'" @back="goBack">
-    <view class="search-band"><view class="search-box"><text>⌕</text><input v-model="keyword" confirm-type="search" placeholder="搜索设备名称、型号、编号或位置" @confirm="loadDevices(true)" /><view v-if="keyword" @tap="clearKeyword"><text>×</text></view></view></view>
+    <view class="search-band"><view class="search-box"><text>⌕</text><input v-model="keyword" confirm-type="search" placeholder="搜索设备名称、型号、编号或位置" @input="scheduleSearch" @confirm="search" /><view v-if="keyword" @tap="clearKeyword"><text>×</text></view></view></view>
     <mci-skeleton v-if="loading && pageIndex === 1" type="list" :rows="6" />
     <scroll-view v-else class="device-scroll" scroll-y :refresher-enabled="true" :refresher-triggered="refreshing" @refresherrefresh="refresh" @scrolltolower="loadMore">
       <view v-if="rows.length" class="device-list">
@@ -23,13 +23,14 @@ import { addTaskDevices, loadTaskDevices } from '@/utils/xjy-task.js'
 
 export default {
   mixins: [themeMixin],
-  data() { return { taskId: '', customerId: '', keyword: '', rows: [], existingIds: [], selected: {}, count: 0, pageIndex: 1, pageSize: 20, loading: true, refreshing: false, finished: false, submitting: false, loadRequestId: 0 } },
+  data() { return { taskId: '', customerId: '', keyword: '', rows: [], existingIds: [], selected: {}, count: 0, pageIndex: 1, pageSize: 20, loading: true, refreshing: false, finished: false, submitting: false, loadRequestId: 0, searchTimer: null } },
   computed: {
     selectedIds() { return Object.keys(this.selected).filter((id) => this.selected[id]) },
     selectableRows() { return this.rows.filter((row) => !this.isExisting(row)) },
     allSelectableSelected() { return this.selectableRows.length > 0 && this.selectableRows.every((row) => this.isSelected(row)) }
   },
   onLoad(options) { this.taskId = decodeURIComponent(options.taskId || ''); this.customerId = decodeURIComponent(options.customerId || ''); this.initialize() },
+  onUnload() { clearTimeout(this.searchTimer) },
   methods: {
     async initialize() {
       try { const existing = await loadTaskDevices(this.taskId, true); this.existingIds = existing.map((item) => String(item.KehuSBID || item.ShebeiID || '')).filter(Boolean) } catch (error) {}
@@ -58,7 +59,20 @@ export default {
     isSelected(row) { return !!this.selected[row.Id] },
     toggle(row) { if (this.isExisting(row)) return; this.selected[row.Id] = !this.selected[row.Id] },
     toggleAll() { const value = !this.allSelectableSelected; this.selectableRows.forEach((row) => { this.selected[row.Id] = value }) },
-    clearKeyword() { this.keyword = ''; this.loadDevices(true) },
+    search() {
+      clearTimeout(this.searchTimer)
+      this.loadDevices(true)
+    },
+    // zhy：设备选择列表输入关键词后自动防抖检索。
+    scheduleSearch() {
+      clearTimeout(this.searchTimer)
+      this.searchTimer = setTimeout(() => this.loadDevices(true), 350)
+    },
+    clearKeyword() {
+      clearTimeout(this.searchTimer)
+      this.keyword = ''
+      this.loadDevices(true)
+    },
     async refresh() { this.refreshing = true; try { await this.loadDevices(true) } finally { this.refreshing = false } },
     loadMore() { this.loadDevices(false) },
     async submit() {
