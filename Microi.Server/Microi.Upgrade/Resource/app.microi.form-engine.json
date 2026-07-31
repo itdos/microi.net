@@ -8006,7 +8006,7 @@
   "DataSets": [],
   "SysApiEngines": [
     {
-      "LimitRecursion": 10000,
+      "LimitRecursion": 5000,
       "LimitMemory": 2048,
       "MaxStatements": 100000000,
       "Timeout": 600,

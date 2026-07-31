@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -67,6 +68,7 @@ namespace Microi.net
         public async Task<List<string>> Run(string osClient)
         {
             var messages = new List<string>();
+            var repairedPhysicalColumns = new List<string>();
             try
             {
                 UpgradeExecutionLeaseContext.ThrowIfLost();
@@ -120,35 +122,62 @@ namespace Microi.net
                     table = await GetTableAsync(osClient);
                 }
 
+                if ((table.Code != 1 || table.Data == null) && physicalExists)
+                {
+                    var adopt = await AdoptExistingPhysicalTableAsync(osClient, client);
+                    table = await GetTableAsync(osClient);
+                    if ((adopt.Code != 1) && (table.Code != 1 || table.Data == null))
+                    {
+                        messages.Add($"接管现有 {TableName} 物理表失败：{adopt.Msg}");
+                        return messages;
+                    }
+                    Console.WriteLine(
+                        $"Microi：【兼容修复】【{osClient}】已接管半安装的 {TableName} 物理表并补齐表单引擎元数据。");
+                }
+
                 if (table.Code != 1 || table.Data == null)
                 {
-                    messages.Add($"{TableName} 物理表已存在但缺少 diy_table 元数据；请通过 Microi MCP 认领该表后重试升级。");
+                    messages.Add($"{TableName} 创建或接管后仍无法读取 diy_table 元数据。");
                     return messages;
                 }
+
+                var tableId = Convert.ToString(table.Data.Id);
+                await EnsureFixedFieldsAsync(
+                    messages,
+                    repairedPhysicalColumns,
+                    osClient,
+                    client,
+                    tableId);
+                if (messages.Count > 0) return messages;
 
                 // OsClient is a platform control column, not an ordinary diy_field;
                 // the MCP correctly rejects it as a user-defined field. Add it via
                 // the cross-database ORM DDL abstraction so tenant predicates and
                 // unique indexes are valid on every supported database.
-                EnsurePhysicalColumn(messages, client, "OsClient", "varchar(50)", "租户标识");
+                if (EnsurePhysicalColumn(messages, client, "OsClient", "varchar(50)", "租户标识"))
+                    repairedPhysicalColumns.Add("OsClient");
                 if (messages.Count > 0) return messages;
 
-                var tableId = Convert.ToString(table.Data.Id);
                 foreach (var field in Fields)
                 {
                     UpgradeExecutionLeaseContext.ThrowIfLost();
-                    var existing = await MicroiEngine.FormEngine.GetFormDataAsync("diy_field", new
+                    // Physical schema and metadata are repaired independently. A
+                    // killed installer can leave either side committed on its own;
+                    // retrying AddField against existing metadata would never add
+                    // the missing physical column.
+                    if (EnsurePhysicalColumn(
+                        messages,
+                        client,
+                        field.Name,
+                        field.Type,
+                        field.Label))
                     {
-                        OsClient = osClient,
-                        _Where = new List<object>
-                        {
-                            new List<object> { "TableId", "=", tableId },
-                            new List<object> { "Name", "=", field.Name }
-                        },
-                        _SelectFields = new[] { "Id", "Name" }
-                    });
-                    if (existing.Code == 1 && existing.Data != null && client.Db.ColumnExists(TableName, field.Name))
-                        continue;
+                        repairedPhysicalColumns.Add(field.Name);
+                    }
+                    if (messages.Count > 0) break;
+
+                    var existing = await GetFieldAsync(osClient, tableId, field.Name);
+                    if (existing.Code == 1 && existing.Data != null) continue;
 
                     var add = await MicroiEngine.FormEngine.AddFieldAsync(new
                     {
@@ -164,9 +193,14 @@ namespace Microi.net
                         field.Visible,
                         AppVisible = field.Visible,
                         Readonly = 1,
-                        _NotAddDbField = client.Db.ColumnExists(TableName, field.Name)
+                        _NotAddDbField = true
                     });
-                    if (add.Code != 1) messages.Add($"新增 {TableName}.{field.Name} 失败：{add.Msg}");
+                    if (add.Code != 1)
+                    {
+                        var reread = await GetFieldAsync(osClient, tableId, field.Name);
+                        if (reread.Code != 1 || reread.Data == null)
+                            messages.Add($"新增 {TableName}.{field.Name} 元数据失败：{add.Msg}");
+                    }
                 }
 
                 if (messages.Count == 0)
@@ -179,6 +213,26 @@ namespace Microi.net
                         new[] { "OsClient", "UserKey", "IsDeleted", "CreateTime" });
                     AddIndex(messages, osClient, "ix_mci_background_task_concurrency",
                         new[] { "OsClient", "ConcurrencyKey", "Status", "LeaseExpiresAt" });
+                }
+
+                if (messages.Count == 0)
+                {
+                    var missingColumns = GetRequiredPhysicalColumnNames()
+                        .Where(name => !client.Db.ColumnExists(TableName, name))
+                        .ToArray();
+                    if (missingColumns.Length > 0)
+                    {
+                        messages.Add(
+                            $"{TableName} 修复后严格回读仍缺少物理字段：{string.Join(",", missingColumns)}");
+                    }
+                }
+
+                await ClearMetadataCacheAsync(osClient, tableId);
+                if (messages.Count == 0 && repairedPhysicalColumns.Count > 0)
+                {
+                    Console.WriteLine(
+                        $"Microi：【后台任务兼容修复】【{osClient}】已补齐 {TableName} 物理字段"
+                        + $"{repairedPhysicalColumns.Count}个：{string.Join(",", repairedPhysicalColumns)}。");
                 }
             }
             catch (Exception ex)
@@ -199,14 +253,14 @@ namespace Microi.net
             if (result?.Code != 1) messages.Add(result?.Msg ?? $"创建索引 {name} 失败。");
         }
 
-        private static void EnsurePhysicalColumn(
+        private static bool EnsurePhysicalColumn(
             List<string> messages,
             OsClientSecret client,
             string fieldName,
             string fieldType,
             string fieldLabel)
         {
-            if (client.Db.ColumnExists(TableName, fieldName)) return;
+            if (client.Db.ColumnExists(TableName, fieldName)) return false;
             var dbInfo = DiyCommon.GetDbInfo(client.OsClientModel["DbType"].Val<string>());
             var result = MicroiEngine.ORM(dbInfo.DbType).AddColumn(new DbServiceParam
             {
@@ -224,6 +278,176 @@ namespace Microi.net
             if (result?.Code != 1 || !client.Db.ColumnExists(TableName, fieldName))
             {
                 messages.Add($"新增 {TableName}.{fieldName} 系统列失败：{result?.Msg}");
+                return false;
+            }
+            return true;
+        }
+
+        private static async Task EnsureFixedFieldsAsync(
+            List<string> messages,
+            List<string> repairedPhysicalColumns,
+            string osClient,
+            OsClientSecret client,
+            string tableId)
+        {
+            foreach (var field in DiyCommon.FixedDiyField)
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                if (EnsurePhysicalColumn(
+                    messages,
+                    client,
+                    field.Name,
+                    field.Type,
+                    field.Label))
+                {
+                    repairedPhysicalColumns.Add(field.Name);
+                }
+                if (messages.Count > 0) return;
+
+                var existing = await GetFieldAsync(osClient, tableId, field.Name);
+                if (existing.Code == 1 && existing.Data != null) continue;
+
+                var add = await UpgradeTrustedFormEngine.AddAsync(
+                    "diy_field",
+                    osClient,
+                    new
+                    {
+                        TableId = tableId,
+                        TableName,
+                        field.Label,
+                        field.Name,
+                        field.Type,
+                        field.Component,
+                        field.Sort,
+                        IsLockField = 1,
+                        field.Visible,
+                        AppVisible = field.Visible,
+                        Readonly = 1,
+                        NameConfirm = 1,
+                        field.TableWidth,
+                        Unique = 0,
+                        IsDeleted = 0
+                    });
+                if (add.Code != 1)
+                {
+                    var reread = await GetFieldAsync(osClient, tableId, field.Name);
+                    if (reread.Code != 1 || reread.Data == null)
+                        messages.Add($"补充 {TableName}.{field.Name} 固定字段元数据失败：{add.Msg}");
+                }
+            }
+        }
+
+        private static async Task<DosResult> AdoptExistingPhysicalTableAsync(
+            string osClient,
+            OsClientSecret client)
+        {
+            var tableId = Guid.NewGuid().ToString();
+            var trans = client.Db.BeginTransaction();
+            try
+            {
+                var addTable = await UpgradeTrustedFormEngine.AddAsync(
+                    "diy_table",
+                    osClient,
+                    new
+                    {
+                        Id = tableId,
+                        Name = TableName,
+                        Description = "分布式可恢复后台任务控制面",
+                        DataBaseId = "",
+                        DataBaseName = "",
+                        IsDeleted = 0
+                    },
+                    trans);
+                if (addTable.Code != 1)
+                {
+                    trans.Rollback();
+                    return addTable;
+                }
+
+                foreach (var field in DiyCommon.FixedDiyField)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    var addField = await UpgradeTrustedFormEngine.AddAsync(
+                        "diy_field",
+                        osClient,
+                        new
+                        {
+                            TableId = tableId,
+                            TableName,
+                            field.Label,
+                            field.Name,
+                            field.Type,
+                            field.Component,
+                            field.Sort,
+                            IsLockField = 1,
+                            field.Visible,
+                            AppVisible = field.Visible,
+                            Readonly = 1,
+                            NameConfirm = 1,
+                            field.TableWidth,
+                            Unique = 0,
+                            IsDeleted = 0
+                        },
+                        trans);
+                    if (addField.Code == 1) continue;
+
+                    trans.Rollback();
+                    return addField;
+                }
+
+                trans.Commit();
+                return new DosResult(1);
+            }
+            catch (Exception ex)
+            {
+                trans.Rollback();
+                return new DosResult(0, null, ex.Message);
+            }
+            finally
+            {
+                trans.Close();
+            }
+        }
+
+        private static Task<DosResult<dynamic>> GetFieldAsync(
+            string osClient,
+            string tableId,
+            string fieldName)
+        {
+            return MicroiEngine.FormEngine.GetFormDataAsync("diy_field", new
+            {
+                OsClient = osClient,
+                _Where = new List<object>
+                {
+                    new List<object> { "TableId", "=", tableId },
+                    new List<object> { "Name", "=", fieldName }
+                },
+                _SelectFields = new[] { "Id", "Name" }
+            });
+        }
+
+        private static string[] GetRequiredPhysicalColumnNames()
+        {
+            return DiyCommon.FixedDiyField
+                .Select(field => field.Name)
+                .Concat(new[] { "OsClient" })
+                .Concat(Fields.Select(field => field.Name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        private static async Task ClearMetadataCacheAsync(string osClient, string tableId)
+        {
+            var cache = MicroiEngine.CacheTenant.Cache(osClient);
+            foreach (var key in new[]
+            {
+                $"Microi:{osClient}:FormData:diy_table:{tableId.ToLowerInvariant()}",
+                $"Microi:{osClient}:FormData:diy_table:{TableName}",
+                $"Microi:{osClient}:FormData:diy_table_field_list:{tableId.ToLowerInvariant()}",
+                $"Microi:{osClient}:FormData:diy_table_field_list:{TableName}"
+            })
+            {
+                await cache.RemoveAsync(key);
             }
         }
 

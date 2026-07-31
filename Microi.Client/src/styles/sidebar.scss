@@ -1,14 +1,14 @@
 #app-microi {
     .main-container-microi {
         min-height: 100%;
-        transition: margin-left 0.28s;
+        transition: none;
         margin-left: 240px;
         position: relative;
         z-index: 1;
     }
 
     .sidebar-container-microi {
-        transition: width 0.28s;
+        transition: background-color 0.2s ease, color 0.2s ease;
         width: 240px; // !important
         background-color: $menuBg;
         height: 100%;
@@ -98,9 +98,6 @@
     }
 
     .hideSidebar {
-        .menu-item-wrapper{
-            
-        }
         .sidebar-container-microi {
             width: 54px !important;
             .el-menu {
@@ -112,71 +109,66 @@
             margin-left: 54px;
         }
 
-        .submenu-title-noDropdown-microi {
-            padding: 12px !important;
-            position: relative;
-
-            .el-tooltip {
-                padding: 0 !important;
-
-                .svg-icon {
-                    margin-left: 20px;
-                }
-
-                .sub-el-icon {
-                    margin-left: 19px;
-                }
-            }
-        }
-
-        .el-submenu {
+        .sidebar-main-menu--compact {
+            width: 54px !important;
             overflow: hidden;
+            --el-menu-icon-width: 20px;
+            --el-menu-base-level-padding: 0px;
 
-            & > .el-submenu__title {
-                padding: 0 !important;
+            > .sidebar-menu-node {
+                width: 54px;
+                overflow: visible;
 
-                .svg-icon {
-                    margin-left: 20px;
-                }
-
-                .sub-el-icon {
-                    margin-left: 19px;
-                }
-
-                // 隐藏收起状态下的箭头图标
-                .el-submenu__icon-arrow {
+                // 展开态菜单树常驻 DOM，以避免点击收缩时递归重建数千个节点；
+                // 收缩态只隐藏内联子树，悬浮子级由按需级联面板承载。
+                > .el-sub-menu > .el-menu {
                     display: none !important;
                 }
-            }
-        }
 
-        .el-menu--collapse {
-            .el-submenu {
-                & > .el-submenu__title {
-                    & > span {
-                        height: 0;
-                        width: 0;
-                        overflow: hidden;
-                        visibility: hidden;
-                        display: inline-block;
-                    }
-                    
-                    // 确保箭头图标在收起状态下隐藏
-                    .el-submenu__icon-arrow {
-                        display: none !important;
-                    }
+                > span > a > .el-menu-item,
+                > .el-sub-menu > .el-sub-menu__title {
+                    box-sizing: border-box;
+                    width: 46px !important;
+                    min-width: 46px !important;
+                    margin: 2px 4px !important;
+                    padding: 0 !important;
+                    justify-content: center;
+                }
+
+                > .el-sub-menu > .el-sub-menu__title > .submenu-title-link {
+                    flex: 0 0 20px;
+                    width: 20px;
+                    min-width: 20px;
+                    justify-content: center;
+                    overflow: visible;
+                }
+
+                .menu-item-wrapper {
+                    flex: 0 0 20px;
+                    width: 20px;
+                    justify-content: center;
+                    gap: 0;
+                }
+
+                .menu-title,
+                .menu-stat-badge,
+                .el-sub-menu__icon-arrow {
+                    display: none !important;
+                }
+
+                .el-menu-tooltip__trigger {
+                    inset: 0;
+                    width: 46px;
+                    padding: 0 !important;
+                    justify-content: center;
+                }
+
+                .svg-icon,
+                .sub-el-icon {
+                    margin: 0 !important;
                 }
             }
-            
-            // 全局隐藏收起菜单的箭头图标
-            .el-submenu__icon-arrow {
-                display: none !important;
-            }
         }
-    }
-
-    .el-menu--collapse .el-menu .el-submenu {
-        min-width: 240px !important;
     }
 
     // mobile responsive
@@ -207,133 +199,183 @@
     }
 }
 
-// when menu collapsed - 弹出菜单继承主题色
-.el-menu--vertical {
-    & > .el-menu {
-        .svg-icon {
-            margin-right: 16px;
+// 收缩菜单的 2～4 级悬浮面板。主菜单保持轻量 CSS 收缩，只有当前
+// 悬停路径会按需 teleport 到 body 并依次向右展开；所有层级共用主题
+// 变量，避免只有首层跟随主题、深层又回到默认白色。
+.el-popper.mci-sidebar-menu-popper,
+.mci-sidebar-menu-popper.el-menu--popup-container,
+.mci-sidebar-compact-flyout {
+    padding: 0 !important;
+    border: 1px solid color-mix(in srgb, var(--sidebar-text-color, #fff) 14%, transparent) !important;
+    border-radius: 10px !important;
+    background: var(--sidebar-bg-color, #304156) !important;
+    box-shadow: var(--mci-shadow-dropdown, 0 14px 38px rgba(15, 23, 42, 0.28)) !important;
+    color: var(--sidebar-text-color, #fff) !important;
+}
+
+.mci-sidebar-menu-popper {
+    // 必须允许可见溢出，否则第 3、4 级 right-start 面板会被上一层裁掉。
+    overflow: visible !important;
+
+    .el-menu--popup {
+        min-width: 214px;
+        max-width: min(286px, calc(100vw - 72px));
+        margin: 0;
+        padding: 5px;
+        overflow: visible !important;
+        border: 0 !important;
+        border-radius: 9px;
+        background: var(--sidebar-bg-color, #304156) !important;
+        box-shadow: none !important;
+    }
+
+    .sidebar-menu-node {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .el-menu-item,
+    .el-sub-menu__title {
+        box-sizing: border-box;
+        width: calc(100% - 4px) !important;
+        min-width: 0 !important;
+        height: 40px;
+        margin: 2px;
+        padding: 0 12px !important;
+        border-radius: 7px;
+        line-height: 40px;
+        background: transparent !important;
+        color: var(--sidebar-text-color, #fff) !important;
+        transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+
+        &:hover,
+        &:focus-visible {
+            background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.14)) !important;
+            color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff)) !important;
+            transform: translateX(2px);
         }
-        .sub-el-icon {
-            margin-right: 12px;
-            margin-left: -2px;
+
+        &.is-active {
+            background: var(--sidebar-active-bg, rgba(255, 255, 255, 0.22)) !important;
+            color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff)) !important;
+            font-weight: 600;
         }
     }
 
-    .nest-menu .el-submenu > .el-submenu__title,
-    .el-menu-item {
-        // 使用主题色变量
-        // background-color: var(--sidebar-bg-color, #304156) !important;
-        color: var(--sidebar-text-color, #bfcbd9) !important;
-
-        &:hover {
-            background-color: var(--sidebar-hover-bg, #263445) !important;
-            color: #fff !important;
-        }
+    .el-sub-menu.is-active > .el-sub-menu__title {
+        background: var(--sidebar-parent-active-bg, rgba(255, 255, 255, 0.1)) !important;
+        color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff)) !important;
     }
 
-    // 确保嵌套二级菜单的悬停效果正确 - 背景色由动态样式控制
-    .nest-menu .el-submenu .el-submenu__title:hover {
-        background-color: var(--sidebar-hover-bg, #263445) !important;
-        color: #fff !important;
+    .submenu-title-link,
+    .menu-item-wrapper {
+        display: flex;
+        flex: 1;
+        min-width: 0;
+        align-items: center;
     }
 
-    // 使用更高优先级的选择器，确保二级菜单悬停文字颜色正确
-    #app-microi .sidebar-container-microi .nest-menu .el-submenu .el-submenu__title:hover {
-        background-color: var(--sidebar-hover-bg, #263445) !important;
-        color: #fff !important;
+    .sub-el-icon,
+    .svg-icon {
+        flex: 0 0 20px;
+        width: 20px;
+        height: 20px;
+        margin: 0 9px 0 0 !important;
+        color: currentColor !important;
     }
 
-    // the scroll bar appears when the subMenu is too long
-    // 弹出菜单继承主题色
-    > .el-menu--popup {
-        max-height: 100vh;
-        overflow-y: auto;
-        background-color: var(--sidebar-bg-color, #304156) !important;
-        border: none !important;
+    .menu-title {
+        display: block !important;
+        min-width: 0;
+        overflow: hidden;
+        color: currentColor !important;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 
-        &::-webkit-scrollbar-track-piece {
-            background: #d3dce6;
-        }
+    .menu-stat-badge {
+        display: inline-flex !important;
+        margin-left: 8px;
+    }
 
-        &::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        &::-webkit-scrollbar-thumb {
-            background: #99a9bf;
-            border-radius: 20px;
-        }
-        
-        // 弹出菜单项样式
-        .el-menu-item {
-            background-color: var(--sidebar-bg-color, #304156) !important;
-            color: var(--sidebar-text-color, #bfcbd9) !important;
-            
-            &:hover {
-                background-color: var(--sidebar-hover-bg, #263445) !important;
-                color: #fff !important;
-            }
-            
-            &.is-active {
-                background-color: var(--sidebar-active-bg, var(--color-primary)) !important;
-                color: #fff !important;
-            }
-        }
-        
-        // 弹出子菜单标题
-        .el-submenu__title {
-            background-color: var(--sidebar-bg-color, #304156) !important;
-            color: var(--sidebar-text-color, #bfcbd9) !important;
-            
-            &:hover {
-                background-color: var(--sidebar-hover-bg, #263445) !important;
-                color: #fff !important;
-            }
-        }
+    .el-sub-menu__icon-arrow {
+        right: 11px;
+        display: inline-flex !important;
+        color: currentColor !important;
     }
 }
 
-// 全局弹出菜单样式（el-menu popper 追加到 body 时）
-.el-popper.is-pure.is-light.el-menu--popup-container {
-    background-color: var(--sidebar-bg-color, #304156) !important;
-    border: none !important;
-    
-    .el-menu--popup {
-        background-color: var(--sidebar-bg-color, #304156) !important;
-        min-width: 200px;
-        
-        .el-menu-item {
-            background-color: var(--sidebar-bg-color, #304156) !important;
-            color: var(--sidebar-text-color, #bfcbd9) !important;
-            height: 50px;
-            line-height: 50px;
-            
-            &:hover {
-                background-color: var(--sidebar-hover-bg, #263445) !important;
-                color: #fff !important;
-            }
-            
-            &.is-active {
-                background-color: var(--sidebar-active-bg, var(--color-primary)) !important;
-                color: #fff !important;
-            }
+.mci-sidebar-compact-flyout {
+    position: fixed;
+    z-index: 3100;
+    box-sizing: border-box;
+    width: 214px;
+    max-width: min(286px, calc(100vw - 72px));
+    max-height: calc(100vh - 16px);
+    padding: 5px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--sidebar-text-color, #fff) 30%, transparent);
+    }
+
+    .mci-sidebar-flyout-item {
+        position: relative;
+        display: flex;
+        box-sizing: border-box;
+        width: calc(100% - 4px);
+        min-width: 0;
+        height: 40px;
+        margin: 2px;
+        padding: 0 11px;
+        align-items: center;
+        border-radius: 7px;
+        outline: none;
+        background: transparent;
+        color: var(--sidebar-text-color, #fff);
+        cursor: pointer;
+        transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+
+        &:hover,
+        &:focus-visible {
+            background: var(--sidebar-hover-bg, rgba(255, 255, 255, 0.14));
+            color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff));
+            transform: translateX(2px);
         }
-        
-        .el-submenu__title {
-            background-color: var(--sidebar-bg-color, #304156) !important;
-            color: var(--sidebar-text-color, #bfcbd9) !important;
-            height: 50px;
-            line-height: 50px;
-            
-            &:hover {
-                background-color: var(--sidebar-hover-bg, #263445) !important;
-                color: #fff !important;
-            }
-            
-            // 隐藏弹出菜单中的箭头
-            .el-submenu__icon-arrow {
-                color: var(--sidebar-text-color, #bfcbd9) !important;
-            }
+
+        &.is-active {
+            background: var(--sidebar-active-bg, rgba(255, 255, 255, 0.22));
+            color: var(--sidebar-active-text-color, var(--sidebar-text-color, #fff));
+            font-weight: 600;
         }
+    }
+
+    .menu-item-wrapper {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+    }
+
+    .mci-sidebar-flyout-arrow {
+        flex: 0 0 16px;
+        width: 16px;
+        height: 16px;
+        margin-left: 6px;
+        color: currentColor;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .mci-sidebar-menu-popper .el-menu-item,
+    .mci-sidebar-menu-popper .el-sub-menu__title,
+    .mci-sidebar-compact-flyout .mci-sidebar-flyout-item {
+        transition: none;
     }
 }

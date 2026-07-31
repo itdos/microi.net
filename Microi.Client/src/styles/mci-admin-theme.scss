@@ -47,6 +47,11 @@ html[data-theme="dark"] {
     color: var(--el-text-color-regular, #334155);
 }
 
+.navbar-microi .hamburger-container-microi svg {
+    color: inherit !important;
+    fill: currentColor !important;
+}
+
 .navbar-microi .right-menu-item.hover-effect:hover,
 .navbar-microi .hamburger-container-microi:hover {
     background-color: var(--el-fill-color-light, #f1f5f9) !important;
@@ -207,6 +212,37 @@ html[data-theme="dark"] .el-table__body tr.current-row > td.el-table__cell {
 .el-range-input,
 .el-date-editor .el-range-separator {
     color: var(--el-text-color-regular) !important;
+}
+
+/* 只读/禁用字段使用完整连续的表面，避免 input-number 两端露出白色底块。 */
+.itdos-diy-form .el-input.is-disabled .el-input__wrapper,
+.itdos-diy-form .el-input-number.is-disabled,
+.itdos-diy-form .el-input-number.is-disabled .el-input__wrapper,
+.itdos-diy-form .el-textarea.is-disabled .el-textarea__inner,
+.itdos-diy-form .el-select.is-disabled .el-select__wrapper,
+.itdos-diy-form .el-date-editor.is-disabled,
+.itdos-diy-form .el-input__wrapper:has(.el-input__inner[readonly]) {
+    overflow: hidden;
+    background: var(--mci-bg-soft, var(--el-fill-color-light)) !important;
+    border-color: var(--mci-divider-color, var(--el-border-color)) !important;
+    box-shadow: 0 0 0 1px var(--mci-divider-color, var(--el-border-color)) inset !important;
+}
+
+.itdos-diy-form .el-input.is-disabled .el-input__inner,
+.itdos-diy-form .el-input-number.is-disabled .el-input__inner,
+.itdos-diy-form .el-input__inner[readonly],
+.itdos-diy-form .el-textarea.is-disabled .el-textarea__inner {
+    background: transparent !important;
+    color: var(--el-text-color-regular) !important;
+    -webkit-text-fill-color: var(--el-text-color-regular) !important;
+    opacity: 1;
+}
+
+.itdos-diy-form .el-input-number.is-disabled .el-input-number__decrease,
+.itdos-diy-form .el-input-number.is-disabled .el-input-number__increase {
+    background: color-mix(in srgb, var(--el-fill-color, #f0f2f5) 82%, var(--el-bg-color-overlay, #fff)) !important;
+    border-color: var(--mci-divider-color, var(--el-border-color)) !important;
+    color: var(--el-text-color-placeholder) !important;
 }
 
 .el-dialog,

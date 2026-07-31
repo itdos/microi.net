@@ -93,7 +93,9 @@ namespace Microi.net
             {
                 throw new InvalidOperationException(
                     $"租户 {osClient} 尚未完成 mci_background_task 升级，后台任务未入队。"
-                    + $"当前校验结果：{unavailableReason}。请先安装或重新安装“后台任务基础能力”。");
+                    + $"当前校验结果：{unavailableReason}。"
+                    + "请先升级并重启最新版后端，由启动期幂等迁移修复该表；"
+                    + "仅在后端自动升级被禁用时，才以前台方式安装“后台任务基础能力”。");
             }
 
             var param = apiParam == null ? new JObject() : (JObject)apiParam.DeepClone();

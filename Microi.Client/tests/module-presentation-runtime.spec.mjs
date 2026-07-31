@@ -127,3 +127,22 @@ test("mobile cards hide empty configured regions and avoid duplicate field suffi
     assert.match(mixinSource, /valueTrimmed\.endsWith\(suffix\.trim\(\)\)/);
     assert.match(mixinSource, /canInlineEdit \|\| this\.HasPresentationFieldValue\(row, field\)/);
 });
+
+test("module header, metric strip and compound search consume runtime theme tokens", () => {
+    const styleSource = fs.readFileSync(new URL("../src/styles/diy-table.scss", import.meta.url), "utf8");
+    const buttonSource = fs.readFileSync(new URL("../src/styles/itdos.diy.scss", import.meta.url), "utf8");
+    const headerStart = styleSource.indexOf(".module-presentation-header {");
+    const headerBlock = headerStart >= 0 ? styleSource.slice(headerStart, headerStart + 9000) : "";
+    const searchStart = styleSource.indexOf(".keyword-search {");
+    const searchBlock = searchStart >= 0 ? styleSource.slice(searchStart, searchStart + 6500) : "";
+
+    assert.match(headerBlock, /--mci-presentation-header-bg/);
+    assert.match(headerBlock, /--mci-presentation-metric-strip-bg/);
+    assert.match(headerBlock, /--mci-presentation-metric-bg/);
+    assert.match(headerBlock, /--mci-presentation-accent-gradient/);
+    assert.doesNotMatch(headerBlock, /background:\s*rgba\(248,\s*250,\s*252,\s*0\.68\)/);
+    assert.match(searchBlock, /focus-within/);
+    assert.match(searchBlock, /--mci-gradient-primary/);
+    assert.match(searchBlock, /overflow:\s*hidden/);
+    assert.match(buttonSource, /height:\s*100%[\s\S]*?border-radius:\s*inherit/);
+});

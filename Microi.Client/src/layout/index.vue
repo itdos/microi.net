@@ -202,7 +202,7 @@ export default {
     right: 0;
     z-index: 101;
     width: calc(100% - #{$sideBarWidth});
-    transition: width 0.28s;
+    transition: none;
 }
 
 .hideSidebar .fixed-header-microi {

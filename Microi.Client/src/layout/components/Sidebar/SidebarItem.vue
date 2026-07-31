@@ -1,5 +1,11 @@
 <template>
-    <div v-if="item.Display !== 0 && !item.hidden">
+    <div
+        v-if="item.Display !== 0 && !item.hidden"
+        class="sidebar-menu-node"
+        :data-menu-level="normalizedLevel"
+        :data-compact-index="normalizedLevel === 0 && compactIndex >= 0 ? compactIndex : undefined"
+        :style="menuLevelStyle"
+    >
         <template v-if="hasOneShowingChild(item.children, item) && (!onlyOneChild.children || onlyOneChild.noShowingChildren) && !item.alwaysShow">
             <!-- :to="resolvePath(DiyCommon.IsNull(onlyOneChild.Link) ? onlyOneChild.path : onlyOneChild.Link)" -->
             <!-- :to="resolvePath(onlyOneChild.path)" -->
@@ -33,6 +39,7 @@
                 v-for="child in item.children?.filter((c) => c.Display !== 0)"
                 :key="child.path"
                 :is-nest="true"
+                :level="normalizedLevel + 1"
                 :item="child"
                 :base-path="resolvePath(child)"
                 class="nest-menu"
@@ -42,7 +49,7 @@
 </template>
 
 <script>
-import { useDiyStore } from "@/pinia";
+import { useDiyStore, useAppStore } from "@/pinia";
 import { computed } from "vue";
 // Element Plus 组件已全局注册，无需本地导入
 // 使用浏览器兼容的 path 工具
@@ -70,15 +77,25 @@ export default {
         basePath: {
             type: String,
             default: ""
+        },
+        level: {
+            type: Number,
+            default: 0
+        },
+        compactIndex: {
+            type: Number,
+            default: -1
         }
     },
     setup() {
         const diyStore = useDiyStore();
+        const appStore = useAppStore();
         const SysConfig = computed(() => diyStore.SysConfig);
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
 
         return {
             diyStore,
+            appStore,
             SysConfig,
             GetCurrentUser
         };
@@ -86,6 +103,22 @@ export default {
     data() {
         this.onlyOneChild = null;
         return {};
+    },
+    computed: {
+        normalizedLevel() {
+            const level = Number(this.level);
+            return Number.isFinite(level) && level > 0 ? Math.floor(level) : 0;
+        },
+        menuLevelStyle() {
+            // Element Plus 默认每层增加 20px，再叠加子菜单容器 padding。
+            // 复杂业务菜单达到三级后文字区会被压缩到只剩约两个汉字。
+            // 使用 10px 的紧凑层级节奏并在第三级封顶，既保留树形关系，
+            // 也让更深层级继续拥有稳定的可读宽度。
+            const indent = 20 + Math.min(this.normalizedLevel, 3) * 10;
+            return {
+                "--mci-sidebar-menu-indent": `${indent}px`
+            };
+        }
     },
     methods: {
         hasOneShowingChild(children = [], parent) {
@@ -128,6 +161,12 @@ export default {
             return item.path || "";
         },
         handleSubMenuTitleClick(item) {
+            // 紧凑态不再让 Element Plus 递归折叠整棵菜单树；点击一级父菜单时
+            // 先恢复完整侧栏，再由用户选择子项，避免隐藏菜单在窄栏中展开。
+            if (this.normalizedLevel === 0 && !this.appStore.sidebar.opened) {
+                this.appStore.toggleSideBar();
+                return;
+            }
             // A parent menu title is responsible for expanding/collapsing its children.
             // Do not route it to the first child, and keep compatibility with hosts that
             // inject the historical MenuClick hook without assuming that it exists.

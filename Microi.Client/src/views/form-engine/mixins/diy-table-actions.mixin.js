@@ -507,7 +507,14 @@ IsPermission(type) {
                 packageInfo.AppId || packageInfo.AppKey || packageInfo.SourceAppId
                 || packageInfo.SourceAppKey || packageInfo.appId || packageInfo.appKey
             );
-            return String(appId || "").trim().toLowerCase() === "app.microi.background-task";
+            var packageName = packageInfo && (
+                packageInfo.Name || packageInfo.PackageName || packageInfo.AppName || packageInfo.Title
+                || packageInfo.name || packageInfo.packageName || packageInfo.appName || packageInfo.title
+            );
+            return String(appId || "").trim().toLowerCase() === "app.microi.background-task"
+                // 很老的应用商城记录可能没有回填稳定 AppId，只能保留历史中文包名。
+                // 使用精确名称兜底，避免把其它应用误判为启动基础包。
+                || String(packageName || "").trim() === "后台任务基础能力";
         },
         BuildBackgroundTaskOptions(btn, row, apiEngineKey) {
             var source = btn && (btn.BackgroundTaskOptions || btn.backgroundTaskOptions);

@@ -117,6 +117,14 @@
                             <el-button size="small" :icon="Plus" :disabled="readonly" @click="addColumn">添加复合列</el-button>
                         </div>
                     </div>
+                    <el-alert
+                        class="designer-alert composite-guidance"
+                        type="info"
+                        show-icon
+                        :closable="false"
+                        title="跨端视图负责字段编排，字段模板负责复杂渲染，两者可以叠加使用"
+                        description="字段已经配置表格模板时，主字段、次要行和右侧附加字段会直接复用其安全渲染结果；简单多行布局优先在这里配置，复杂条件、组合标签或自定义 HTML 再使用字段模板。"
+                    />
                     <el-empty v-if="listView.Layout.List.Columns.length === 0" description="尚未配置 PC 复合列" :image-size="52" />
                     <article v-for="(column, columnIndex) in listView.Layout.List.Columns" :key="`column_${columnIndex}`" class="config-block">
                         <div class="block-head">

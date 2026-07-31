@@ -1081,10 +1081,7 @@ export default {
                                 row._RowMoreBtnsIn = rowBtnsIn;
 
                                 // 计算操作列宽度
-                                var allOutBtn = row._RowMoreBtnsOut.filter(item => item.IsVisible === true || item.IsVisible === 1);
-                                var allOutBtnLength = 0;
-                                allOutBtn.forEach(el => { allOutBtnLength += el.Name.length; });
-                                var newWidth = allOutBtnLength * 15 + allOutBtn.length * 45;
+                                var newWidth = self.GetRowActionButtonsWidth(row._RowMoreBtnsOut);
                                 if (self.MaxRowBtnsOut < newWidth) self.MaxRowBtnsOut = newWidth;
 
                                 // 追踪是否有可见的内部按钮（用于动态计算操作列宽度）
@@ -1273,14 +1270,8 @@ export default {
 
                 //取列表数据中可能存在的最多按钮数量
                 // var maxLength = _rowMoreBtnsOutCopy.filter(item => item.IsVisible === true || item.IsVisible === 1).length;
-                var allOutBtn = _rowMoreBtnsOutCopy.filter(item => item.IsVisible === true || item.IsVisible === 1);
-                var allOutBtnLength = 0;
-                allOutBtn.forEach((element) => {
-                    allOutBtnLength += element.Name.length;
-                });
-                //之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来 2022-07-24
-                //定在一个字：15   一个按钮  30  还有2个按钮的空隙 15
-                var newWidth = allOutBtnLength * 20 + allOutBtn.length * 50;
+                // 普通列表与树形列表共用同一估算规则，避免相同按钮在两种数据模式下列宽不同。
+                var newWidth = self.GetRowActionButtonsWidth(_rowMoreBtnsOutCopy);
                 // if (self.MaxRowBtnsOut < maxLength) {
                 if (self.MaxRowBtnsOut < newWidth) {
                     // self.MaxRowBtnsOut = maxLength;
