@@ -47,6 +47,7 @@ namespace Microi.net
                 EnsureMicroServiceColumns(osClientSecret);
                 EnsureSecurityLevels(osClientSecret);
                 EnsureMobileVisibilityColumns(osClientSecret);
+                EnsureMenuBadgeColumns(osClientSecret);
                 EnsureModuleViewSchemaColumns(osClientSecret);
                 EnsureApiEngineRuntimeColumns(osClientSecret);
                 EnsureLegacyFieldMetadataColumns(osClientSecret);
@@ -1409,6 +1410,30 @@ if (_microiLegacyMenuConfigChanged) {
                     SET {quoteOpen}ViewConfigVersion{quoteClose}=1
                     WHERE {quoteOpen}ViewConfigVersion{quoteClose} IS NULL
                        OR {quoteOpen}ViewConfigVersion{quoteClose}<1")
+                .ExecuteNonQuery();
+        }
+
+        private void EnsureMenuBadgeColumns(OsClientSecret osClientSecret)
+        {
+            UpgradeExecutionLeaseContext.ThrowIfLost();
+            if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
+            if (!TableExists(osClientSecret, "sys_menu"))
+            {
+                return;
+            }
+
+            var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
+            var isSqlServer = string.Equals(dbType, "SqlServer", StringComparison.OrdinalIgnoreCase);
+            var isOracle = string.Equals(dbType, "Oracle", StringComparison.OrdinalIgnoreCase);
+            var quoteOpen = isSqlServer ? "[" : isOracle ? "\"" : "`";
+            var quoteClose = isSqlServer ? "]" : isOracle ? "\"" : "`";
+
+            EnsureColumn(osClientSecret, "sys_menu", "MenuBadgeEnabled", "int");
+            EnsureColumn(osClientSecret, "sys_menu", "MenuBadgeApiEngineKey", "varchar(100)");
+
+            osClientSecret.Db.FromSql($@"UPDATE {quoteOpen}sys_menu{quoteClose}
+                    SET {quoteOpen}MenuBadgeEnabled{quoteClose}=0
+                    WHERE {quoteOpen}MenuBadgeEnabled{quoteClose} IS NULL")
                 .ExecuteNonQuery();
         }
 
