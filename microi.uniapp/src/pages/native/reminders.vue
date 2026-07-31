@@ -49,7 +49,7 @@
       <view class="customer-sheet" @tap.stop>
         <view class="sheet-handle"></view>
         <view class="sheet-head"><text class="sheet-title">选择客户</text><text class="sheet-close" @tap="customerVisible = false">×</text></view>
-        <view class="search-row"><input v-model="customerKeyword" class="search-input" placeholder="搜索客户名称" confirm-type="search" @confirm="loadCustomers" /><button class="search-button" @tap="loadCustomers">搜索</button></view>
+        <view class="search-row"><input v-model="customerKeyword" class="search-input" placeholder="搜索客户名称" confirm-type="search" @input="scheduleCustomerSearch" @confirm="searchCustomers" /><button class="search-button" @tap="resetCustomerSearch">重置</button></view>
         <mci-skeleton v-if="customerLoading" type="list" :rows="3" />
         <scroll-view v-else class="customer-list" scroll-y>
           <view v-for="item in customers" :key="item.Id" class="customer-row" @tap="selectCustomer(item)"><text>{{ item.KehuMC || item.Name || item.Bianhao || '未命名客户' }}</text><text>›</text></view>
@@ -76,6 +76,7 @@ export default {
     return {
       loading: true, tab: 'pending', tabs: [{ key: 'pending', label: '待完成' }, { key: 'all', label: '全部' }, { key: 'done', label: '已完成' }],
       rows: [], editorVisible: false, customerVisible: false, customerLoading: false, customerKeyword: '', customers: [],
+      customerSearchTimer: null, customerLoadRequestId: 0,
       form: { Id: '', CustomerId: '', CustomerName: '', date: '', time: '', Title: '', Content: '', Done: false, CreateTime: '' }
     }
   },
@@ -91,6 +92,7 @@ export default {
     pendingCount() { return this.rows.filter((row) => !row.Done).length }
   },
   onLoad() { setTimeout(() => { this.refresh(); this.loading = false }, 80) },
+  onUnload() { clearTimeout(this.customerSearchTimer) },
   methods: {
     displayContent(value) { return formatStructuredValue(value, { empty: '' }) },
     goBack() { uni.navigateBack() },
@@ -100,16 +102,35 @@ export default {
     addReminder() { this.form = this.blankForm(); this.editorVisible = true; if (!this.customers.length) this.loadCustomers() },
     editReminder(row) { const parts = String(row.RemindTime || '').split(' '); this.form = { ...row, date: parts[0] || '', time: (parts[1] || '').slice(0, 5) }; this.editorVisible = true; if (!this.customers.length) this.loadCustomers() },
     closeEditor() { this.editorVisible = false },
+    searchCustomers() {
+      clearTimeout(this.customerSearchTimer)
+      this.loadCustomers()
+    },
+    // zhy：客户选择输入后自动检索，重置时恢复全部客户。
+    scheduleCustomerSearch() {
+      clearTimeout(this.customerSearchTimer)
+      this.customerSearchTimer = setTimeout(() => this.loadCustomers(), 350)
+    },
+    resetCustomerSearch() {
+      clearTimeout(this.customerSearchTimer)
+      this.customerKeyword = ''
+      this.loadCustomers()
+    },
     async loadCustomers() {
+      const requestId = ++this.customerLoadRequestId
       this.customerLoading = true
       try {
         const result = await V8.FormEngine.GetTableData('Diy_Kehu', { _Keyword: this.customerKeyword.trim(), _SelectFields: ['Id', 'KehuMC', 'Name', 'Bianhao'], _OrderBy: 'CreateTime', _OrderByType: 'DESC', _PageIndex: 1, _PageSize: 100 })
         if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || '客户加载失败')
-        this.customers = Array.isArray(result.Data) ? result.Data : []
+        if (requestId === this.customerLoadRequestId) this.customers = Array.isArray(result.Data) ? result.Data : []
       } catch (error) {
-        this.customers = []
-        uni.showToast({ title: error.message || '客户加载失败', icon: 'none' })
-      } finally { this.customerLoading = false }
+        if (requestId === this.customerLoadRequestId) {
+          this.customers = []
+          uni.showToast({ title: error.message || '客户加载失败', icon: 'none' })
+        }
+      } finally {
+        if (requestId === this.customerLoadRequestId) this.customerLoading = false
+      }
     },
     selectCustomer(item) { this.form.CustomerId = item.Id; this.form.CustomerName = item.KehuMC || item.Name || item.Bianhao || ''; this.customerVisible = false },
     save() {

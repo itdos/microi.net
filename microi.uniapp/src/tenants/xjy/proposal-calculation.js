@@ -66,6 +66,7 @@ export function proposalInheritedValues(source = {}) {
     'CreateUser',
     'OsClient',
     'AnzhuangCS',
+    'ChangsuoDWSL',
     // zhy：新增方案的用水偏好使用产品默认值，不继承上一方案的历史选择。
     'ShuizhiYQ',
     'DashuiFS',

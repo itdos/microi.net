@@ -1,5 +1,6 @@
 <template>
-	<view class="detail-page" :style="mciTokenStyle">
+	<view class="detail-page" :class="{ 'detail-page--related-filter-open': standaloneRelatedFilterOpen }"
+		:style="mciTokenStyle">
 		<view class="page-nav mci-safe-top">
 			<view class="nav-row mci-safe-nav-row">
 				<view class="nav-button" hover-class="nav-button--pressed" @tap="goBack">‹</view>
@@ -160,7 +161,8 @@
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 						parent-mode="View" :show-floating-add="false"
-						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)" />
+						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
+						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
 					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 						:parent-form="detail" parent-mode="View" readonly />
 					<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
@@ -203,7 +205,9 @@
 			:style="relatedFloatingStyle" hover-class="related-floating-add--pressed"
 			@tap="openStandaloneRelatedAdd"><text>＋</text></view>
 
-		<view v-if="!loading && !error && hasBottomActions" class="bottom-actions">
+		<!-- zhy：子表筛选打开时收起详情页外置业务操作栏，让遮罩完整覆盖到底部安全区。 -->
+		<view v-if="!loading && !error && hasBottomActions && !standaloneRelatedFilterOpen"
+			class="bottom-actions">
 			<template v-if="key === 'tasks'">
 				<button v-if="canAcceptTask" class="action-button action-button--primary" :disabled="submitting"
 					@tap="claimTask">接单</button>
@@ -1178,6 +1182,8 @@
 				activeFormTabKey: '',
 				standaloneRelatedAddKey: '',
 				standaloneRelatedAddAvailable: false,
+				standaloneRelatedFilterKey: '',
+				standaloneRelatedFilterOpen: false,
 				customerClaimIcon: icon('business/kehu.png'),
 				customerReleaseIcon: icon('business/xiezuo.png')
 			}
@@ -1338,7 +1344,8 @@
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
 			},
 			showStandaloneRelatedAdd() {
-				return !this.loading && !this.error && this.standaloneRelatedAddAvailable &&
+				return !this.loading && !this.error && !this.standaloneRelatedFilterOpen &&
+					this.standaloneRelatedAddAvailable &&
 					Boolean(this.standaloneChildTab && this.standaloneRelatedAddKey === this.standaloneChildTab.key)
 			},
 			relatedFloatingStyle() {
@@ -1992,12 +1999,20 @@
 				if (!tab || !tab.key) return
 				this.standaloneRelatedAddAvailable = false
 				this.standaloneRelatedAddKey = ''
+				this.standaloneRelatedFilterOpen = false
+				this.standaloneRelatedFilterKey = ''
 				this.activeFormTabKey = tab.key
 			},
 			setStandaloneRelatedAddState(tab, available) {
 				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
 				this.standaloneRelatedAddKey = tab.key
 				this.standaloneRelatedAddAvailable = Boolean(available)
+			},
+			// zhy：详情页 Tab 子表筛选打开时提升列表层级，并压住外置悬浮按钮。
+			setStandaloneRelatedFilterState(tab, open) {
+				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
+				this.standaloneRelatedFilterKey = open ? tab.key : ''
+				this.standaloneRelatedFilterOpen = Boolean(open)
 			},
 			openStandaloneRelatedAdd() {
 				const tab = this.standaloneChildTab
@@ -2375,6 +2390,16 @@
 	.detail-scroll {
 		flex: 1;
 		min-height: 0;
+	}
+
+	/* zhy：筛选遮罩位于子表组件内，打开时将整个滚动内容提升到外置新增按钮和底部操作栏之上。 */
+	.detail-page--related-filter-open .detail-scroll {
+		position: relative;
+		z-index: 40;
+	}
+
+	.detail-page--related-filter-open .page-nav {
+		z-index: 45;
 	}
 
 	.related-floating-add {
