@@ -17,6 +17,69 @@ namespace Microi.net
     /// </summary>
 	public class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
     {
+        public sealed class MinioEndpointConfiguration
+        {
+            public string Host { get; set; }
+            public int Port { get; set; }
+            public bool UseSsl { get; set; }
+        }
+
+        /// <summary>
+        /// Accept both the historical host[:port] form and full http(s) URLs.
+        /// MinioClient.WithEndpoint(string) treats a scheme-bearing value as a host
+        /// and later fails with "hostname could not be parsed". Normalize once and
+        /// use the host/port overload in every object operation.
+        /// </summary>
+        public static MinioEndpointConfiguration NormalizeEndpoint(string endpoint, bool configuredSsl)
+        {
+            var text = (endpoint ?? "").Trim();
+            if (text.DosIsNullOrWhiteSpace()) throw new ArgumentException("MinIO Endpoint不能为空。");
+
+            var hasScheme = text.Contains("://", StringComparison.Ordinal);
+            var candidate = hasScheme
+                ? text
+                : (configuredSsl ? "https://" : "http://") + text;
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri)
+                || uri.Host.DosIsNullOrWhiteSpace()
+                || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new ArgumentException("MinIO Endpoint格式不正确，请填写 host:port 或 http(s)://host:port。");
+            }
+            if (!uri.UserInfo.DosIsNullOrWhiteSpace()
+                || !uri.Query.DosIsNullOrWhiteSpace()
+                || !uri.Fragment.DosIsNullOrWhiteSpace()
+                || (uri.AbsolutePath != "/" && !uri.AbsolutePath.DosIsNullOrWhiteSpace()))
+            {
+                throw new ArgumentException("MinIO Endpoint只能包含协议、主机和端口，不能包含凭据、路径、查询或片段。");
+            }
+
+            var useSsl = hasScheme
+                ? string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                : configuredSsl;
+            return new MinioEndpointConfiguration
+            {
+                Host = uri.Host,
+                Port = uri.IsDefaultPort ? (useSsl ? 443 : 80) : uri.Port,
+                UseSsl = useSsl
+            };
+        }
+
+        private static IMinioClient BuildMinioClient(
+            string endpoint,
+            bool configuredSsl,
+            string accessKey,
+            string secretKey,
+            string region = null)
+        {
+            var normalized = NormalizeEndpoint(endpoint, configuredSsl);
+            var builder = new MinioClient()
+                .WithEndpoint(normalized.Host, normalized.Port)
+                .WithCredentials(accessKey, secretKey);
+            if (normalized.UseSsl) builder = builder.WithSSL();
+            if (!region.DosIsNullOrWhiteSpace()) builder = builder.WithRegion(region);
+            return builder.Build();
+        }
+
         private static bool ShouldUseInternetEndpoint(bool? networkIsInternet, string returnFileType)
         {
             return networkIsInternet
@@ -48,32 +111,14 @@ namespace Microi.net
                     ? internetEndPoint.DosIsNullOrWhiteSpace(internalEndPoint)
                     : internalEndPoint.DosIsNullOrWhiteSpace(internetEndPoint);
 
-                var minioClient = new MinioClient()
-                                    .WithEndpoint(endPoint)
-                                    .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
-
-                //只有GetPrivateFileUrl才需要用到这个判断。
-                //--2024-03-29补充，不仅是GetPrivateFileUrl才用到MinIOEndPointSSL判断
-                if (useInternet)
-                {
-                    if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
-                    {
-                        minioClient = minioClient.WithSSL();
-                    }
-                }
-                else
-                {
-                    if (clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1)
-                    {
-                        minioClient = minioClient.WithSSL();
-                    }
-                }
-
-                if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
-                {
-                    minioClient.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());//"ap-southeast-1"
-                }
-                minioClient = minioClient.Build();
+                var minioClient = BuildMinioClient(
+                    endPoint,
+                    useInternet
+                        ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
+                        : clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1,
+                    clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
+                    clientModel.OsClientModel["MinIOSecretKey"].Val<string>(),
+                    clientModel.OsClientModel["MinIORegion"].Val<string>());
                 var bucketName = param.Limit == false
                     ? clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>()
                     : clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>();
@@ -176,28 +221,14 @@ namespace Microi.net
             //    endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
             //}
 
-            minIOClient = new MinioClient()
-                                .WithEndpoint(endPoint)
-                                .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
-
-            //只有GetPrivateFileUrl才需要用到这个判断
-            //if (clientModel.MinIOEndPointSSL == 1)
-            if (param.NetworkIsInternet == true)
-            {
-                if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
-                {
-                    minIOClient = minIOClient.WithSSL();
-                }
-            }
-            else
-            {
-                if (clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1)
-                {
-                    minIOClient = minIOClient.WithSSL();
-                }
-            }
-
-            minIOClient = minIOClient.Build();
+            minIOClient = BuildMinioClient(
+                endPoint,
+                param.NetworkIsInternet == true
+                    ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
+                    : clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1,
+                clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
+                clientModel.OsClientModel["MinIOSecretKey"].Val<string>(),
+                clientModel.OsClientModel["MinIORegion"].Val<string>());
             var objectExist = false;
             if (param.Limit == true)
             {
@@ -269,29 +300,14 @@ namespace Microi.net
             //    endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
             //}
 
-            minIOClient = new MinioClient()
-                                .WithEndpoint(endPoint)
-                                .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
-
-            //只有GetPrivateFileUrl才需要用到这个判断
-            //2024-03-29有些客户的【MinIOPrivateEndPoint】也是https，因此这里其实是可能需要WithSSL【MinIOPrivateEndPointSSL】
-            //if (clientModel.MinIOEndPointSSL == 1)
-            if (param.NetworkIsInternet == true)
-            {
-                if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
-                {
-                    minIOClient = minIOClient.WithSSL();
-                }
-            }
-            else
-            {
-                if (clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1)
-                {
-                    minIOClient = minIOClient.WithSSL();
-                }
-            }
-
-            minIOClient = minIOClient.Build();
+            minIOClient = BuildMinioClient(
+                endPoint,
+                param.NetworkIsInternet == true
+                    ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
+                    : clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1,
+                clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
+                clientModel.OsClientModel["MinIOSecretKey"].Val<string>(),
+                clientModel.OsClientModel["MinIORegion"].Val<string>());
 
             if (param.Limit == true)
             {
@@ -331,14 +347,7 @@ namespace Microi.net
                                 .WithObjectSize(param.FileStream.Length)
                                 .WithContentType(contentType)
                                 ;
-                if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
-                {
-                    minIOClient.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());//"ap-southeast-1"
-                }
-                else
-                {
-                    putObjParam = putObjParam.WithBucket(bucketName);
-                }
+                putObjParam = putObjParam.WithBucket(bucketName);
                 var result = await minIOClient.PutObjectAsync(putObjParam);
                 if (result.ResponseStatusCode == HttpStatusCode.OK)
                 {
@@ -361,26 +370,14 @@ namespace Microi.net
                 endPoint = clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
             }
 
-            var minioClient = new MinioClient()
-                .WithEndpoint(endPoint)
-                .WithCredentials(clientModel.OsClientModel["MinIOAccessKey"].Val<string>(), clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
-
-            if (osClientNetwork == "Internet")
-            {
-                if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
-                {
-                    minioClient = minioClient.WithSSL();
-                }
-            }
-            else
-            {
-                if (clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1)
-                {
-                    minioClient = minioClient.WithSSL();
-                }
-            }
-
-            return minioClient.Build();
+            return BuildMinioClient(
+                endPoint,
+                osClientNetwork == "Internet"
+                    ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
+                    : clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1,
+                clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
+                clientModel.OsClientModel["MinIOSecretKey"].Val<string>(),
+                clientModel.OsClientModel["MinIORegion"].Val<string>());
         }
 
         private string GetBucketName(OsClientSecret clientModel, bool isPrivate)

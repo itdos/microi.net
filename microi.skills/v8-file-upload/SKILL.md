@@ -88,12 +88,20 @@ Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入
 - 普通交互式用户无论客户端是否传 `Limit:false`，服务端都强制使用私有桶，并只允许平台预定义安全一级目录；公有资产必须经过授权的发布流程或超级管理员。
 - 反向代理、Ingress/IIS 的请求体上限应与进程级 HTTP 解析硬顶协调。字段自身的类型、后缀、大小和数量配置只能进一步收紧当前租户有效值，不能替代平台硬顶。
 
+### 复盘：“当前租户已停用文件上传”
+
+- 该提示只表示当前运行环境命中的 `sys_osclients.FileUploadEnabled` 被明确设置为 `0/false`。缺列、空值、无效值和新租户都按默认 `true`，不要先把问题归因于 MinIO/HDFS。
+- 新版响应同时返回 `DataAppend.ErrorType=TenantFileUploadDisabled`、`OsClient`、`ConfigField=FileUploadEnabled` 和文档地址；客户端必须保留后端 `Msg/DataAppend`，不能只显示“上传失败”。
+- 处理时先读取当前 API 进程的 `OsClient + OsClientType + OsClientNetwork`，再精确回读同三元组的启用记录并把 `FileUploadEnabled` 改为 `1`。不能仅按租户名批量覆盖其它网络或环境记录。
+- 保存后等待 SaaS 共享配置重载，再分别验证一个小公有图片和一个小私有文件。只有错误转为 endpoint、bucket、签名或 `Invalid URI` 后，才进入对象存储配置排查。
+- 不要通过删除 Redis 日额度 Key、扩大文件大小上限或改成公有桶来解除租户停用；这些动作与开关无关，还会扩大安全风险。
+
 ### AI / MCP 调整租户上传配额
 
 用户明确授权修改某个租户的上传额度时，AI 可以直接使用标准 MCP 完成，不要把应用层提示误判成阿里云 OSS、MinIO 或 S3 的存储配额，也不要先清 Redis：
 
 1. `microi_get_table_data(tableName: "sys_osclients")` 按 `OsClient`、`IsEnable=1` 查询，选择 `Id/OsClientType/OsClientNetwork` 和六个 `FileUpload*` 配额字段。
-2. 同一 `OsClient` 的所有启用 `Internal/Internet` 记录都要保持一致；逐条调用 `microi_update_form_data`，`row` 必须包含 `Id`，并传 `confirmExecution: "sys_osclients"`。
+2. 先以当前服务器的 `OsClientType + OsClientNetwork` 收窄到实际生效记录；只有用户明确要求多个环境保持一致时才扩展范围。逐条调用 `microi_update_form_data`，`row` 必须包含 `Id`，并传 `confirmExecution: "sys_osclients"`。
 3. MB 是存储单位：`20 GB = 20480 MB`。可修改字段为 `FileUploadEnabled`、`FileUploadMaxFileMB`、`FileUploadMaxRequestMB`、`FileUploadMaxCount`、`FileUploadDailyUserQuotaMB`、`FileUploadDailyTenantQuotaMB`。
 4. 保存后逐条远程回读；FormEngine 会排队重载 SaaS 运行配置，再用真实小文件上传做生效冒烟。只看到 MCP 返回“更新成功”不算验收。
 5. 提高每日配额保留当天已用计数，剩余额度为新上限减已用量。计数按 UTC 日期，失败上传不退款；除非用户明确授权事故处置，不得删除 Redis 配额 Key。
@@ -115,6 +123,8 @@ Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入
 ### 应用商城 ZIP
 
 应用商城的 AI 应用/微服务资产禁止逐文件 Base64 持久化到数据库。源码/安装包场景可以生成 ZIP；真实在线编译目录优先使用下节的 MCP 流式发布。数据库只保存路径和校验元数据。
+
+在线商城安装的后台任务只传 `StoreId/StoreApiBase/StoreOsClient` 等定位信息，不能复制整行、`Form/Row/Btn` 或 `AppPakcet`。兼容旧 Base64 包的导入器必须按片限制真实上传数量/体积，片间靠已提交的 `AppId + FilePath + Hash` 复用；上传后统计大小优先使用包内 `Size/Sha256`，禁止再次 `FromBase64String` 构造完整字节数组。
 
 ```javascript
 var zipResult = V8.Method.CreateZip({
@@ -171,6 +181,7 @@ var extractResult = V8.Method.ExtractZip({
 ### 默认 MinIO 桶名与安装验收
 
 - Microi 一键安装的默认私有桶固定为 `mci-private`，默认公有桶固定为 `mci-public`；禁止使用 `mci-publish` 等近似名称。
+- `MinIOEndPointInternet` / `MinIOPrivateEndPoint` 同时兼容 `host:port` 与 `http(s)://host:port`。Provider 必须先归一化为 Host、Port、UseSsl，再调用 MinIO SDK 的 host/port 重载；不得把包含协议的整串 URL 直接作为 hostname，否则会出现 `Invalid URI: The hostname could not be parsed.`。显式 URL 的协议优先于历史 SSL 开关；端点禁止携带用户名密码、桶路径、查询或片段。
 - 安装脚本创建 `mci-public` 后必须设置匿名下载权限，并把 `HDFS=MinIO`、内外网端点、AccessKey/SecretKey、`MinIOPrivateBucketName=mci-private`、`MinIOPublicBucketName=mci-public` 同步写入当前租户的 `sys_osclients`。
 - 安装脚本还必须同步当前有效 `sys_config`：`ApiBase` 使用对外可访问的 API 端口，`FileServer` 使用 `http://<访问IP>:<MinIO API端口>/mci-public`。`ApiBase` 不能误用 Web 前端端口，因为 V8 代码会直接在其后拼接 `/api/...` 或 `/apiengine/...`。
 - 安装验收必须使用真实登录 Token 分别执行一次 `Limit=false` 和 `Limit=true` 上传：公有文件匿名访问应返回 `200`，私有文件匿名访问应返回 `403`，私有文件通过签名 URL 访问应返回 `200`，并核对下载内容与上传内容一致。

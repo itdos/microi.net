@@ -130,6 +130,117 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
         .digest('hex');
     return { rootDirectory: rootRealPath, entryPath: normalizedEntry, assets, totalSize, manifestHash, skippedSourceMaps };
 }
+const LEGACY_STREAM_COMPATIBILITY_MAX_FILES = 256;
+const LEGACY_STREAM_COMPATIBILITY_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * A short-lived compatibility detector for API nodes that predate the strongly
+ * typed HDFS selector fix. Those nodes fail before writing the first asset when
+ * the dynamic runtime tries to invoke Dos.Common.Val<T> on a JValue.
+ */
+export function isLegacyApplicationStreamJValueFailure(result) {
+    if (!result || Number(result.Code) === 1)
+        return false;
+    const message = String(result.Msg || '');
+    return /Newtonsoft\.Json\.Linq\.JValue/iu.test(message)
+        && /does not contain a definition for ['‘’"]?Val|\.Val(?:<|\b)/iu.test(message);
+}
+function asJsonRecord(value) {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? value
+        : {};
+}
+/**
+ * Bridge a rolling-upgrade window without retrying the broken stream endpoint.
+ * The fallback is deliberately restricted to small existing MicroServices: it
+ * uses the legacy C# PublishMicroService JSON endpoint, never Jint, and refuses
+ * Web/UniApp or large directories rather than silently changing their runtime.
+ */
+export async function tryLegacyMicroServiceStreamPublishFallback(client, manifest, input) {
+    if (manifest.assets.length > LEGACY_STREAM_COMPATIBILITY_MAX_FILES) {
+        return {
+            attempted: false,
+            reason: `旧节点兼容发布最多允许 ${LEGACY_STREAM_COMPATIBILITY_MAX_FILES} 个文件；当前 ${manifest.assets.length} 个`,
+        };
+    }
+    if (manifest.totalSize > LEGACY_STREAM_COMPATIBILITY_MAX_BYTES) {
+        return {
+            attempted: false,
+            reason: `旧节点兼容发布最多允许 ${LEGACY_STREAM_COMPATIBILITY_MAX_BYTES} bytes；当前 ${manifest.totalSize} bytes`,
+        };
+    }
+    const contextResult = await client.getApplicationContext({
+        AppIdOrKey: input.appIdOrKey,
+        IncludeContents: false,
+        MaxFileBytes: 1,
+        MaxTotalBytes: 1,
+    });
+    if (contextResult.Code !== 1) {
+        return {
+            attempted: false,
+            reason: `无法确认兼容发布目标：${contextResult.Msg || '应用上下文读取失败'}`,
+        };
+    }
+    const context = asJsonRecord(contextResult.Data);
+    const application = asJsonRecord(context.Application || contextResult.Data);
+    const applicationType = getStringField(application, 'ApplicationType', 'AppType');
+    if (applicationType.toLowerCase() !== 'microservice') {
+        return {
+            attempted: false,
+            reason: `旧节点兼容发布只支持 MicroService；当前类型 ${applicationType || '未知'}`,
+        };
+    }
+    const appKey = getStringField(application, 'AppKey', 'AppId');
+    if (!appKey) {
+        return { attempted: false, reason: '应用上下文缺少服务端确认的 AppKey' };
+    }
+    const assets = [];
+    for (const asset of manifest.assets) {
+        const bytes = await fs.promises.readFile(asset.absolutePath);
+        if (bytes.byteLength !== asset.size) {
+            return {
+                attempted: false,
+                reason: `本地资产在清单生成后发生变化：${asset.relativePath}`,
+            };
+        }
+        const actualSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+        if (actualSha256 !== asset.sha256) {
+            return {
+                attempted: false,
+                reason: `本地资产在清单生成后哈希发生变化：${asset.relativePath}`,
+            };
+        }
+        assets.push({
+            Path: asset.relativePath,
+            FileName: path.posix.basename(asset.relativePath),
+            FileByteBase64: bytes.toString('base64'),
+            Size: asset.size,
+            Sha256: asset.sha256,
+            IsEntry: asset.isEntry,
+        });
+    }
+    const appName = getStringField(application, 'AppName', 'Name') || appKey;
+    const response = await client.publishMicroService({
+        microService: {
+            MsKey: appKey,
+            MsName: appName,
+            Name: appName,
+            ApplicationType: 'MicroService',
+            BuildVersion: input.versionNo,
+            EntryPath: manifest.entryPath,
+            StorageMode: 'file',
+        },
+        assets,
+        routes: input.routes || [],
+        DeliveryBatchId: input.deliveryBatchId,
+        SourceManifestHash: input.sourceManifestHash || '',
+    });
+    return {
+        attempted: true,
+        reason: '目标 API 节点命中旧版 JValue.Val 流式发布缺陷，已使用受限的小型 MicroService C# 兼容发布路径',
+        appKey,
+        response,
+    };
+}
 function normalizeAccessKeyStringList(values, lowerCase = false) {
     const normalized = (values || [])
         .map(value => String(value || '').trim())
@@ -3867,7 +3978,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 流式发布完整应用目录
     // ========================
-    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using constant-memory multipart streams. MCP hashes and uploads each file to an immutable semantic version, then sends a metadata-only manifest so HDFS performs server-side copies to short root/latest URLs. It rejects symlinks, secrets, node_modules/.git and runaway file counts before uploading. This is the preferred publisher for compiled applications; file bytes do not pass through JSON, Base64 or Jint.`, {
+    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using constant-memory multipart streams. MCP hashes and uploads each file to an immutable semantic version, then sends a metadata-only manifest so HDFS performs server-side copies to short root/latest URLs. It rejects symlinks, secrets, node_modules/.git and runaway file counts before uploading. This is the preferred publisher for compiled applications; file bytes do not pass through JSON, Base64 or Jint. During a rolling upgrade only, an exact pre-write JValue.Val defect on an old API node may use the bounded legacy C# path for an existing MicroService of at most 256 files / 5MB; Web, UniApp and larger builds fail closed until the API node is upgraded.`, {
         appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
         versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
         directory: z.string().min(1).describe('Local compiled output directory such as dist or unpackage/dist/build/h5.'),
@@ -3920,6 +4031,66 @@ export function createMcpServer(client, context) {
                     TimeoutMs: timeoutMsPerFile,
                 });
                 if (result.Code !== 1) {
+                    if (uploadedCount === 0 && isLegacyApplicationStreamJValueFailure(result)) {
+                        const fallback = await tryLegacyMicroServiceStreamPublishFallback(client, manifest, {
+                            appIdOrKey,
+                            versionNo,
+                            routes: routes || [],
+                            deliveryBatchId: effectiveDeliveryBatchId,
+                            sourceManifestHash: sourceManifestHash || '',
+                        });
+                        if (fallback.attempted && fallback.response?.Code === 1) {
+                            const fallbackData = asJsonRecord(fallback.response.Data);
+                            const publishedAppKey = getStringField(fallbackData, 'MsKey', 'AppKey')
+                                || fallback.appKey
+                                || appIdOrKey;
+                            let runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
+                            for (const delayMs of [250, 750, 1_500]) {
+                                if (runtimeProbe.ok)
+                                    break;
+                                await new Promise(resolve => setTimeout(resolve, delayMs));
+                                runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
+                            }
+                            const payload = {
+                                ...fallbackData,
+                                deliveryBatchId: effectiveDeliveryBatchId,
+                                sourceManifestHash: sourceManifestHash || '',
+                                runtimeManifestHash: getStringField(fallbackData, 'RuntimeManifestHash') || manifest.manifestHash,
+                                RuntimeProbe: runtimeProbe,
+                                PublishedButUnavailable: !runtimeProbe.ok,
+                                uploadedCount: 0,
+                                legacyUploadedCount: manifest.assets.length,
+                                totalSize: manifest.totalSize,
+                                skippedSourceMaps: manifest.skippedSourceMaps,
+                                transport: 'legacy-base64-csharp-compatibility',
+                                CompatibilityFallback: true,
+                                CompatibilityReason: fallback.reason,
+                                StreamFailure: result.Msg,
+                                StablePromoted: true,
+                                jintFileBytes: 0,
+                            };
+                            return {
+                                content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+                                ...(!runtimeProbe.ok ? { isError: true } : {}),
+                            };
+                        }
+                        return {
+                            content: [{ type: 'text', text: JSON.stringify({
+                                        error: fallback.attempted
+                                            ? fallback.response?.Msg || '旧节点兼容发布失败'
+                                            : result.Msg,
+                                        failedPath: asset.relativePath,
+                                        uploadedCount,
+                                        totalCount: manifest.assets.length,
+                                        retrySafe: !fallback.attempted,
+                                        compatibilityFallbackAttempted: fallback.attempted,
+                                        compatibilityFallbackReason: fallback.reason,
+                                        compatibilityFallbackRetryRequiresReadback: fallback.attempted,
+                                        streamFailure: result.Msg,
+                                    }, null, 2) }],
+                            isError: true,
+                        };
+                    }
                     return {
                         content: [{ type: 'text', text: JSON.stringify({
                                     error: result.Msg,

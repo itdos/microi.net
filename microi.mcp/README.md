@@ -69,6 +69,8 @@
 | `microi_save_print_template_design` | 保存 AI 生成的打印模板，带规范化和确认 | 读写（需确认） |
 | `microi_save_workflow_package` | 一次性保存工作流设计、节点和连线 | 读写（需确认） |
 | `microi_save_job` | 创建或更新定时任务 | 读写（需确认） |
+| `microi_install_store_application` | 仅用 StoreId 和商城源定位信息提交可恢复应用安装后台任务 | 读写（需确认） |
+| `microi_update_store_application` | 仅用 StoreId 和商城源定位信息提交可恢复应用更新后台任务 | 读写（需确认） |
 | `microi_list_database_types` | 列出 Dos.ORM 已认证数据库类型和脱敏连接示例 | 只读 |
 | `microi_inspect_external_database` | 临时连接或按 DbKey 读取第三方数据库表、列、类型、主键和说明 | 只读 |
 | `microi_query_external_database` | 对第三方数据库执行受限、分页的只读 SELECT/WITH | 只读 |

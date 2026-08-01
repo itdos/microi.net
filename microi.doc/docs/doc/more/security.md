@@ -180,6 +180,41 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 
 ## 七、兼容优先的网络安全默认值
 
+### IP 访问频率保护、VS Code 拉取与解封
+
+平台普通访问默认按“同一 IP 10 秒 600 次请求、120 次异常状态码”保护，超过后默认临时封禁 30 分钟。被拦截时后端仍返回 HTTP 200 的标准 `DosResult`，其中 `Code=0`、`DataAppend.SecurityBlocked=true`，并保留 `Ip`、`Reason`、`ReasonKey`、`BlockedAtUtc`、`ExpiresAtUtc`、`RetryAfterSeconds`、解除建议和本文档地址。PC 前端必须显示这些原始信息，不能把它改写成“后端 API 服务暂时不可用”。安全中间件必须位于 CORS 之后，使独立域名部署的浏览器也能读取该 JSON。
+
+吾码 VS Code 插件一次拉取多个服务器的 V8 源码时不降低并发或请求量。只读的 `/api/V8Debug/Get*`、`/api/V8Debug/List*` 请求在同时满足下列全部条件后使用独立计数桶，默认阈值为 10 秒 6000 次请求、1200 次异常状态码：
+
+- 后端从共享登录态确认当前用户 `Level >= 9999`；
+- 当前请求的 Bearer Token 是仍有效的活动 Token，且该 Token 的 `ClientType` 精确为 `VSCode`；
+- 请求 `did` 与活动 Token 保存的 `Did` 完全一致，且为插件生成的 `VSCode:` 稳定设备标识；
+- 路由属于上述 V8Debug 只读拉取；`Update/Create/Execute/Upload/Finalize` 以及普通 FormEngine 写请求不适用。
+
+服务端不读取 `X-User-Level`、`ClientType`、User-Agent 等自报 Header 建立信任。伪造 `did`、只写 `ClientType=VSCode`、普通帐号或拿 PC Token 调用，都仍使用普通阈值。普通请求统一计入当前 API 主运行实例的安全域，请求方轮换 `OsClient` Query/Header 即使碰巧是已加载租户也不会获得新计数桶；只有通过上述联合校验的 VS Code 请求，才按活动 Token 服务端绑定的租户使用独立桶。独立阈值可通过当前服务器实际命中的 `sys_osclients.SecurityTrustedVsCodePerIpMaxRequests` 和 `SecurityTrustedVsCodePerIpMaxErrors` 调整；不要把普通 `SecurityPerIpMaxRequests` 全局放大，也不要关闭安全防护。
+
+#### 反向代理后的真实 IP
+
+安全防护只读取 ASP.NET Core 已验证后的 `HttpContext.Connection.RemoteIpAddress`，不会直接解析客户端发送的 `X-Forwarded-For`、`X-Real-IP`。因此伪造 `X-Forwarded-For: 127.0.0.1` 不能命中本机白名单。框架默认只信任安全的 loopback 直连代理；Nginx、Ingress、SLB、CDN 或其它 API 节点若不是 loopback，必须在后端配置其**直接连接 Kestrel 的最后一跳** IP 或 CIDR：
+
+```json
+{
+  "ForwardedHeaders": {
+    "KnownProxies": ["10.20.0.12"],
+    "KnownNetworks": ["10.20.0.0/24"]
+  }
+}
+```
+
+容器环境可等价使用 `ForwardedHeaders__KnownProxies__0=10.20.0.12`、`ForwardedHeaders__KnownNetworks__0=10.20.0.0/24`。只配置实际受控的代理地址，禁止填 `0.0.0.0/0`、`::/0` 或为了“拿到真实 IP”清空已知代理校验。每次只接受离 Kestrel 最近的一跳；多级代理应让最后一跳覆盖并清洗来自公网的转发头。历史租户字段 `SecurityRespectForwardedHeaders` 不再赋予原始 Header 信任，真实 IP 的信任根只在上述宿主级配置中维护。
+
+解除方式：
+
+1. 等待 `ExpiresAtUtc`，到期后平台自动解除；错误页的“检测是否已解除”会重新探测。
+2. 需立即处理时，从**未被该 IP 封禁的管理网络**登录平台超级管理员，进入【系统日志 → 安全防护】找到该 IP 并解除；对应受保护接口是 `/api/SecurityGuard/UnblockIp`。被封禁的同一出口无法调用自己的解封接口，这是预期的安全边界。
+3. 固定办公出口或受控代理确需长期放行时，可将准确公网 IP 加入当前服务器匹配记录的 `SecurityWhitelistIps`，保存后等待运行配置重载。禁止加入 `0.0.0.0/0`、宽泛网段、动态家庭宽带或用户提交的任意 IP。
+4. 多节点部署必须让封禁、解封与租约状态进入共享 Redis/数据库。Redis 可用且共享封禁字段不存在时，表示全局权威的“已解封”，节点必须丢弃本机旧缓存，绝不能把它重新写回 Redis；只有 Redis 不可用时才允许本机降级保护。逐节点重启或只删某个节点内存不能作为正式解封方案。验收至少从同一负载均衡入口命中两个 API 节点，确认提示、到期和管理员解除一致。
+
 ### CORS
 
 为兼容本地开发、独立前端、H5 和存量租户，主 SaaS 配置 `sys_osclients.CorsAllowOrigins` 未配置时，默认允许任意来源跨域（等价于 `*` 的来源匹配，同时支持凭据）。只有配置来源后，才按精确来源或通配符收紧。

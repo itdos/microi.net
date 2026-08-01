@@ -12,6 +12,25 @@ export declare function analyzeClientChunking(buttonInput: unknown): {
     maxItemsPerChunk: number;
     resumable: boolean;
 };
+export type StoreApplicationOperation = 'install' | 'update';
+export interface StoreApplicationTaskInput {
+    operation: StoreApplicationOperation;
+    storeId: string;
+    requestId: string;
+    storeApiBase?: string;
+    storeOsClient?: string;
+    appId?: string;
+    appName?: string;
+    appVersion?: string;
+    installParentSysMenuId?: string;
+    resumeInstall?: boolean;
+}
+export declare function buildStoreApplicationBackgroundRequest(input: StoreApplicationTaskInput): {
+    ApiEngineKey: string;
+    Title: string;
+    Param: JsonRecord;
+    Options: JsonRecord;
+};
 export declare function normalizeAllMenuJson(data: JsonRecord): {
     data: JsonRecord;
     errors: string[];

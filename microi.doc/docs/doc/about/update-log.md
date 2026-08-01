@@ -1,5 +1,22 @@
 # 更新日志
 
+## v6.9.5 - (2026-08-01 21:16)
+
+- **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.9.5；Microi VS Code 插件及内置 Skills 保持 v4.5.1。写入本日志前的非 `dist` 待提交基线为：根仓库 91 个已跟踪文件和 18 个未跟踪文件，Microi.net 4 个已跟踪文件和 1 个未跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 工作区干净；四仓均无暂存内容，`microi.mcp/dist` 等编译产物不纳入功能分析。
+- **应用商城大包安装与可恢复续跑**：商城安装／更新请求只持久化 `StoreId`、目标租户、父菜单等定位信息，不再把整行 `Form/Row/Btn` 或 `AppPakcet` Base64 包体在浏览器、HTTP、后台任务和 Jint 之间反复复制；导入器按稳定后台任务 Id、持久化 Checkpoint 和字段冲突映射分阶段处理 Schema、应用资源与收尾，构建／源码文件按文件数和 Base64 字符数切成有界批次，已上传的 `AppId + FilePath + Hash` 可跨节点、跨重启复用并清理陈旧资源。旧库安装前会回读物理列与索引并补齐后台任务引导结构，重复安装保留客户已有记录、菜单显隐和定时任务配置。
+- **后台任务运行域隔离与滚动升级**：`mci_background_task` 新增 `RuntimeOsClientType/RuntimeOsClientNetwork`，领取、重试、取消、完成清理、并发租约、Redis 任务列表、SignalR 在线连接和通知均按 `OsClient + 运行类型 + 网络` 隔离；幂等与领取索引先创建并回读新的运行域版本，再移除旧窄索引，避免多节点迁移窗口丢失最终唯一边界。定时生产者在入队前检查同类存活任务，稳定的单次触发幂等键继续承担跨节点竞态兜底，历史无运行域记录在滚动升级期间可单向兼容接管。
+- **SaaS 数据库备份控制面**：新增超级管理员可用的租户清单、手动备份、计划设置读取／保存及 MCP 工具，候选库由服务端按当前 `OsClientType + OsClientNetwork` 过滤且不返回连接串；定时任务使用计划触发时间生成稳定运行键，限制过密 Cron，并把数据库备份作为平台原生后台任务执行，不再依赖可能缺失或版本漂移的商城 V8 Worker。执行链使用可续租 Redis 租约、fencing token、数据库 CAS、稳定备份记录 Id 和按尝试隔离的私有 HDFS 路径，旧持有者不能覆盖新结果；失败尝试、强杀遗留对象和过期备份可幂等清理，ZIP、SHA-256、库级进度、成功／失败数及保留状态写回审计表。
+- **跨节点安全防护与可信代理边界**：IP 请求窗口和封禁记录以租户隔离的共享 Redis 原子计数／Hash 为跨节点事实源，Redis 不可用时才降级为进程内保护；Redis 已恢复且无共享封禁时不会被旧本机状态“复活”。普通请求不能通过伪造 `OsClient` 切换限流域，客户端自报 `X-Forwarded-For` 不再直接采信，只有 `ForwardedHeaders.KnownProxies/KnownNetworks` 明确配置的直接代理可投影真实来源 IP。VS Code 高频只读访问仅在服务端验证 Token、设备标识、超级管理员与只读路径后进入独立阈值，手工／自动封禁、自动到期、解除和访问风险继续异步落审计表。
+- **安全拦截页与运维诊断**：PC 前端可识别后端明确返回的 `DataAppend.SecurityBlocked`，展示被拦截 IP、原因、共享 Redis／本节点状态源、自动解除时间、请求位置和恢复说明，并在到期后自动探测；普通业务 `Code=0`、响应 Header 或单接口失败不会误触发全局拦截页。`health/liveness` 增加进程内稳定 `InstanceId`，便于双节点验收确认两个直连地址确实落在不同 API 进程；安全防护的 CORS 顺序也前移，独立部署前端能够读取标准 DosResult，而不是把封禁误报成网络中断。
+- **用户资料与上传恢复提示**：系统用户稀疏更新改为把非空补丁合并到数据库完整实体，修复修改密码等自助入口把未提交的帐号、姓名、角色和状态字段覆盖为空的问题；平台管理员 JObject 判断及 MCP 表结构读取消除 dynamic 扩展绑定异常。租户显式关闭上传时，HDFS、控制器和安全层统一返回 `TenantFileUploadDisabled`、准确配置字段、默认兼容语义及文档地址，便于直接在 SaaS 引擎恢复，而不是只提示“已停用”。
+- **多人游戏实时失效协议**：新增 `/game-realtime` SignalR Hub，以服务端网关接口校验订阅身份、应用和房间回显，组名按租户、`AppKey`、`RoomId` 隔离；接口引擎业务事务完成后只从成功结果的标准 `DataAppend` 提取六个公开失效字段，再以 `EventId` 指纹、版本和 Redis 最新快照状态幂等发布。相同事件重放可安全去重、同 Id 不同内容会拒绝，Redis／SignalR 超时或故障不会把已提交的出牌／结算伪装成失败，客户端按权威 Snapshot 轮询收敛。
+- **HDFS、MinIO 与大文件可靠性**：MinIO Endpoint 统一解析 `host:port` 与 `http(s)://host:port`，严格拒绝凭据、路径和查询串，按公开／私有端点分别应用 SSL、端口和 Region，修复带 scheme 时被 SDK 当成主机名导致的解析失败。对象存储参数新增单次超时，普通上传保持原默认，数据库备份等受控长任务可在 5 秒至 2 小时内显式放宽；应用资产流式发布同时修复动态 `JObject.FromObject` 绑定问题并继续校验入口 HTML、版本、Manifest 哈希和目标存储类型。
+- **V8 商城导入内存保护**：仅主租户、服务端可信超级管理员、持久化后台任务且接口 Key 精确为 `import-microi-store-package` 时，允许一个有界导入切片跳过 Jint“累计已分配字节”计数，改由容器感知的进程常驻内存保护承担硬边界；95% 时停止接收新请求、98% 时有界停机的节点保护仍生效。普通 V8、前台调用、子租户、嵌套调用和不可信身份继续使用原有单引擎／调用树内存上限，不能通过请求参数开启该模式。
+- **MCP 备份、商城与发布恢复**：MCP 新增数据库备份租户盘点和确认执行工具，以及只允许官方 `https://api.itdos.com`／`iTdos` 商城源、要求稳定 RequestId 和 `confirmExecution=StoreId` 的应用安装／更新工具；请求仅携带资源标识并使用稳定幂等键。刷新得到的新 Token 若立即被拒绝，会在同一有界请求中依次升级到 VS Code broker Token 和凭据重登录，避免再次进入刷新死循环；新增可脱敏错误的 stdio 单工具调用助手。滚动升级期间仅对旧 API 精确的 `JValue.Val` 流式发布缺陷开放现有 MicroService 最多 256 文件／5MB 的 C# 兼容路径，Web、UniApp 和更大构建继续失败关闭并要求升级 API。
+- **官网登录态与应用商城检索**：官网登录、详情、收藏和商城列表统一复用稳定 ASCII `did`、标准 Authorization／Token Header、响应 Token 轮换和精确失效判断，普通权限不足不再误清登录态；同一浏览器优先复用 Microi.Client 已建立的设备标识。应用分类、排序和关键词写入可分享、可前进后退恢复的 URL 查询参数，无精确结果时可展示相关／热门建议并把当前需求带入需求中心，桌面和移动空状态、搜索提示及收藏回读同步完善。
+- **Microi.net 与 Microi.AI 子仓库**：Microi.net 由 v6.9.3 升级至 v6.9.5，并新增上述可信商城导入常驻内存策略、ApiEngine 注入与 V8 运行时执行口径，XML API 元数据同步；Microi.AI 仅将程序集、文件和 NuGet 版本由 v6.9.3 升级至 v6.9.5，没有其它源码差异。Microi.VSCode 本轮没有待提交代码，因此不虚构插件功能或版本变更。
+- **文档、Skills 与回归覆盖**：安全防护、文件上传、数据库备份和 V8 服务端文档原位补充，应用商城、调试、文件与安全 Skills 同步可恢复任务、租户边界和内存口径；新增安全代理／共享封禁、用户稀疏更新、上传停用、MinIO Endpoint、数据库备份运行域与 fencing、游戏实时契约、商城分片 Checkpoint、应用流式发布、MCP Token 恢复、官网会话和查询状态等定向回归。发布日志只总结源码、协议、配置和测试覆盖，不把 `microi.mcp/dist` 等生成文件或尚未执行的真实生产／双节点故障验收表述为新增能力。
+
 ## v6.9.3 - (2026-07-31 21:38)
 
 - **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.9.3；Microi VS Code 插件及内置 Skills 升级至 v4.5.1。写入本日志前的非 `dist` 待提交基线为：根仓库 51 个已跟踪文件和 4 个未跟踪测试文件，Microi.net 1 个文件，Microi.AI 1 个文件，Microi.VSCode 3 个文件；四仓均无暂存内容，`microi.mcp/dist` 等编译产物不纳入功能分析。

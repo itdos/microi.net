@@ -29,12 +29,26 @@ namespace Microi.net
             string concurrencyKey,
             string owner)
         {
+            return TryAcquire(osClient, concurrencyKey, owner, "", "");
+        }
+
+        public static BackgroundTaskConcurrencyLease TryAcquire(
+            string osClient,
+            string concurrencyKey,
+            string owner,
+            string runtimeOsClientType,
+            string runtimeOsClientNetwork)
+        {
             if (string.IsNullOrWhiteSpace(concurrencyKey)) return null;
             var database = MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase();
             if (database == null)
                 throw new InvalidOperationException("Redis 不可用，已拒绝在无分布式并发租约时执行串行后台任务。");
 
-            var lockKey = $"Microi:{osClient}:BackgroundTask:Concurrency:{Hash(concurrencyKey)}";
+            var scope = string.IsNullOrWhiteSpace(runtimeOsClientType)
+                        && string.IsNullOrWhiteSpace(runtimeOsClientNetwork)
+                ? concurrencyKey
+                : $"{runtimeOsClientType ?? ""}\n{runtimeOsClientNetwork ?? ""}\n{concurrencyKey}";
+            var lockKey = $"Microi:{osClient}:BackgroundTask:Concurrency:{Hash(scope)}";
             const string script = @"
 if redis.call('exists', KEYS[1]) == 0 then
   redis.call('psetex', KEYS[1], ARGV[2], ARGV[1])

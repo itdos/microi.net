@@ -13,6 +13,7 @@ const appStoreUpgradeSource = await readFile(new URL("../13-UpgradeAppStore.cs",
 const sysMenuLogicSource = await readFile(new URL("../../Microi.Core/Logic/SysMenuLogic.cs", import.meta.url), "utf8");
 const microAppControllerSource = await readFile(new URL("../../Microi.net.Api/Controllers/MicroAppController.cs", import.meta.url), "utf8");
 const apiProgramSource = await readFile(new URL("../../Microi.net.Api/Program.cs", import.meta.url), "utf8");
+const tableActionsSource = await readFile(new URL("../../../Microi.Client/src/views/form-engine/mixins/diy-table-actions.mixin.js", import.meta.url), "utf8");
 const functionSource = source.match(/var countPageTabs = function \(value\) \{[\s\S]*?\n\};/);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
@@ -20,6 +21,74 @@ assert.ok(functionSource, "countPageTabs helper should exist");
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
 const countPageTabs = context.result;
+const dataSetImportSource = source.match(
+  /\/\/ DATASET_INSERT_IF_MISSING_V1[\s\S]*?(?=\n    var hasInstallErrorsBeforeVersion)/
+);
+
+assert.ok(dataSetImportSource, "InsertIfMissing dataset importer should be extractable");
+
+function runDataSetImportFixture(options = {}) {
+  const noData = { Code: 2, Data: null, Msg: "NoExistData" };
+  const idResults = options.idResults || [noData];
+  const conflictResults = options.conflictResults || [noData];
+  let idReadIndex = 0;
+  let conflictReadIndex = 0;
+  const calls = { add: [], update: [], conflictWhere: [] };
+  const row = {
+    Id: "01KXZSKQYCB2N9QGWEACYT20ZS",
+    JobName: "microiDatabaseBackupScheduler",
+    JobParam: "{\"Enabled\":false}",
+    Status: "暂停",
+    CreateTime: "2026-08-01 00:00:00",
+    UpdateTime: "2026-08-01 00:00:00",
+    UserId: "source-user",
+    UserName: "source-admin",
+    OsClient: "iTdos",
+    ...(options.row || {}),
+  };
+  const dataSet = {
+    TableName: "diy_schedule_job",
+    ConflictPolicy: options.conflictPolicy || "InsertIfMissing",
+    ConflictFields: options.conflictFields || ["JobName"],
+    Rows: [row],
+  };
+  const fixtureContext = {
+    Package: { DataSets: [dataSet] },
+    V8: {
+      OsClient: "target-tenant",
+      FormEngine: {
+        GetFormData(tableName, query) {
+          if (tableName === "diy_table") return { Code: 1, Data: { Id: "table-id", Name: "diy_schedule_job" } };
+          if (query && query.Id) {
+            const selected = idResults[Math.min(idReadIndex, idResults.length - 1)];
+            idReadIndex++;
+            return selected;
+          }
+          calls.conflictWhere.push(JSON.parse(JSON.stringify(query?._Where || [])));
+          const selected = conflictResults[Math.min(conflictReadIndex, conflictResults.length - 1)];
+          conflictReadIndex++;
+          return selected;
+        },
+        AddFormData(_tableName, targetRow) {
+          calls.add.push(JSON.parse(JSON.stringify(targetRow)));
+          return options.addResult || { Code: 1, Data: { Id: targetRow.Id } };
+        },
+        UptFormData(_tableName, targetRow) {
+          calls.update.push(JSON.parse(JSON.stringify(targetRow)));
+          return options.updateResult || { Code: 1, Data: { Id: targetRow.Id } };
+        },
+      },
+    },
+    stats: { DataSetCount: 0, DataInserted: 0, DataUpdated: 0, DataSkipped: 0 },
+    debugLog: {},
+    reportProgress() {},
+    JSON,
+    Object,
+    String,
+  };
+  vm.runInNewContext(`(function () { ${dataSetImportSource[0]} }).call(this);`, fixtureContext);
+  return { calls, stats: fixtureContext.stats, debugLog: fixtureContext.debugLog };
+}
 
 test("PageTabs only preserves a real multi-tab target", () => {
   const cases = [
@@ -40,6 +109,56 @@ test("PageTabs only preserves a real multi-tab target", () => {
     assert.equal(countPageTabs(value), expected, `unexpected count for ${JSON.stringify(value)}`);
   }
   assert.match(source, /existingPageTabsCount\s*>\s*1/);
+});
+
+test("InsertIfMissing never overwrites a configured row with the same Id", () => {
+  const result = runDataSetImportFixture({
+    idResults: [{ Code: 1, Data: { Id: "01KXZSKQYCB2N9QGWEACYT20ZS", JobParam: "{\"Enabled\":true}" } }],
+  });
+  assert.equal(result.calls.add.length, 0);
+  assert.equal(result.calls.update.length, 0);
+  assert.equal(result.stats.DataSkipped, 1);
+  assert.equal(result.stats.DataInserted, 0);
+  assert.equal(result.stats.DataUpdated, 0);
+});
+
+test("InsertIfMissing also preserves a legacy row matched by JobName", () => {
+  const result = runDataSetImportFixture({
+    idResults: [{ Code: 2, Data: null, Msg: "NoExistData" }],
+    conflictResults: [{ Code: 1, Data: { Id: "legacy-id" } }],
+  });
+  assert.deepEqual(result.calls.conflictWhere, [[
+    ["JobName", "=", "microiDatabaseBackupScheduler"],
+  ]]);
+  assert.equal(result.calls.add.length, 0);
+  assert.equal(result.calls.update.length, 0);
+  assert.equal(result.stats.DataSkipped, 1);
+});
+
+test("InsertIfMissing inserts a portable row and strips source audit identity", () => {
+  const result = runDataSetImportFixture();
+  assert.equal(result.calls.add.length, 1);
+  assert.equal(result.calls.update.length, 0);
+  assert.equal(result.stats.DataInserted, 1);
+  assert.equal(result.calls.add[0].OsClient, "target-tenant");
+  for (const field of ["CreateTime", "UpdateTime", "UserId", "UserName"]) {
+    assert.equal(Object.hasOwn(result.calls.add[0], field), false, `${field} must not cross tenants`);
+  }
+});
+
+test("InsertIfMissing treats a concurrent deterministic-Id insert as idempotent success", () => {
+  const result = runDataSetImportFixture({
+    idResults: [
+      { Code: 2, Data: null, Msg: "NoExistData" },
+      { Code: 1, Data: { Id: "01KXZSKQYCB2N9QGWEACYT20ZS" } },
+    ],
+    conflictResults: [{ Code: 2, Data: null, Msg: "NoExistData" }],
+    addResult: { Code: 0, Msg: "duplicate primary key" },
+  });
+  assert.equal(result.calls.add.length, 1);
+  assert.equal(result.calls.update.length, 0);
+  assert.equal(result.stats.DataInserted, 0);
+  assert.equal(result.stats.DataSkipped, 1);
 });
 
 test("self-contained offline applications prefer embedded files over public ZIP URLs", () => {
@@ -99,13 +218,188 @@ test("large application installs resume uploaded assets instead of restarting th
   assert.doesNotMatch(source, /if \(sourceFiles && sourceFiles\.length\) \{[\s\S]{0,500}DelFormDataByWhere\('mci_ai_app_file'/);
 });
 
+test("background application assets are committed in bounded resumable slices", () => {
+  assert.match(source, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
+  assert.match(source, /ApplicationAssetChunkMaxFiles \|\| 8/);
+  assert.match(source, /ApplicationAssetChunkMaxBase64Chars \|\| \(32 \* 1024 \* 1024\)/);
+  assert.match(source, /HasMore:\s*true[\s\S]*?Checkpoint:/);
+  assert.match(source, /shouldContinueApplicationAssets\(sourceFile\)/);
+  assert.match(source, /shouldContinueApplicationAssets\(buildFile\)/);
+  assert.match(source, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
+  assert.doesNotThrow(() => new Function(source), "canonical importer must remain valid function-body JavaScript");
+
+  const chunkHelpers = source.match(
+    /var backgroundTaskId = [\s\S]*?(?=var installUser =)/
+  );
+  assert.ok(chunkHelpers, "background asset chunk helpers should be extractable");
+  const context = {
+    V8: {
+      Param: {
+        _BackgroundTaskId: "task-1",
+        _TrustedServerInvocation: true,
+        ApplicationAssetChunkMaxFiles: 2,
+        ApplicationAssetChunkMaxBase64Chars: 1024 * 1024
+      }
+    }
+  };
+  vm.runInNewContext(
+    `${chunkHelpers[0]}\nresult = { shouldContinueApplicationAssets, markApplicationAssetUploaded, buildApplicationAssetContinuation };`,
+    context
+  );
+
+  context.result.markApplicationAssetUploaded({ FileByteBase64: "a" });
+  assert.equal(context.result.shouldContinueApplicationAssets({ FileByteBase64: "b" }), false);
+  context.result.markApplicationAssetUploaded({ FileByteBase64: "b" });
+  assert.equal(context.result.shouldContinueApplicationAssets({ FileByteBase64: "c" }), true);
+  const continuation = context.result.buildApplicationAssetContinuation(1, "Build", 2, 10);
+  assert.equal(continuation.Code, 1);
+  assert.equal(continuation.Data.BackgroundTask.HasMore, true);
+  assert.equal(continuation.Data.BackgroundTask.Checkpoint.BundleIndex, 1);
+  assert.equal(continuation.Data.BackgroundTask.Checkpoint.AssetKind, "Build");
+});
+
+test("schema import uses durable bounded phases before application assets", () => {
+  assert.match(source, /SCHEMA_BACKGROUND_CHUNKS_V1/);
+  assert.match(source, /SchemaDdlChunkSize \|\| 1/);
+  assert.match(source, /SchemaTableChunkSize \|\| 2/);
+  assert.match(source, /SchemaFieldPlanChunkSize \|\| 32/);
+  assert.match(source, /SchemaFieldChunkSize \|\| 8/);
+  assert.match(source, /SchemaPhysicalTableChunkSize \|\| 1/);
+  assert.match(source, /nextDdlPhase[\s\S]*?'Tables'/);
+  assert.match(source, /nextTablePhase[\s\S]*?'PlanFields'/);
+  assert.match(source, /nextFieldPlanPhase[\s\S]*?'Fields'/);
+  assert.match(source, /nextFieldPhase[\s\S]*?'Physical'/);
+  assert.match(source, /nextPhysicalPhase[\s\S]*?'ApplicationAssets'/);
+  assert.match(source, /'PostSchema'[\s\S]*?菜单、流程、接口和随包数据/);
+  assert.match(source, /backgroundCheckpointPhase == 'ApplicationAssets'/);
+  assert.match(source, /PostSchema:\s*true/);
+  assert.match(source, /assertSchemaChunkSucceeded\('字段定义'\)/);
+  assert.match(source, /TaskId:\s*String\(backgroundTaskId/);
+  assert.match(source, /Checkpoint:\s*buildPersistentCheckpoint\('ApplicationAssets'/);
+  assert.match(source, /PACKAGE_REPLAY_VERSION_GUARD_V1/);
+  assert.match(source, /checkpoint\.PackageVersion\s*=\s*checkpointPackageVersion/);
+  assert.match(source, /应用包版本在后台分片期间发生变化/);
+  assert.match(source, /snapshotPersistentSchemaStats/);
+  assert.match(source, /checkpoint\.SchemaStats\s*=\s*schemaStats/);
+  assert.match(source, /checkpoint\.IdMapsPlanned\s*=\s*true/);
+  assert.match(source, /rebuildLegacyCheckpointIdMaps/);
+});
+
+test("field conflict maps survive retries without process memory", () => {
+  const mappingHelpers = source.match(
+    /var normalizeId = function \(id\) \{[\s\S]*?restorePersistentIdMaps\(\);/
+  );
+  assert.ok(mappingHelpers, "field mapping helpers should be extractable");
+
+  const runPlanning = (checkpoint, failOnNewId = false) => {
+    const planningContext = {
+      Package: {
+        DiyFields: [
+          { Id: "field-a", TableId: "target-table", Name: "A" },
+          { Id: "field-b", TableId: "target-table", Name: "B" }
+        ],
+        SysMenus: [],
+        DDLStatements: []
+      },
+      V8: {
+        Db: {
+          FromSql(sql) {
+            const values = {};
+            return {
+              AddInParameter(name, value) { values[name] = value; return this; },
+              First() {
+                if (sql.includes("TableId = @p0") && values["@p1"] === "A") {
+                  return { Id: "existing-a", TableId: "target-table", Name: "A" };
+                }
+                if (sql.includes("TableId = @p0") && values["@p1"] === "B") return null;
+                if (sql.includes("WHERE Id = @p0") && values["@p0"] === "field-b") {
+                  return { Id: "field-b", TableId: "other-table", Name: "Other" };
+                }
+                return null;
+              }
+            };
+          }
+        },
+        Method: {
+          NewUlid() {
+            if (failOnNewId) throw new Error("retry must reuse the persisted field id");
+            return "generated-b";
+          },
+          NewGuid() { return "generated-guid"; }
+        }
+      },
+      idMaps: { Table: {}, Field: {}, Menu: {} },
+      stats: { TableIdRemapped: 0, FieldIdRemapped: 0, MenuIdRemapped: 0 },
+      debugLog: {},
+      menuJsonFields: [],
+      fieldJsonFields: [],
+      backgroundChunkingEnabled: true,
+      backgroundCheckpoint: checkpoint,
+      backgroundTaskId: "task-1",
+      copyPersistentIdMaps(sourceMaps) {
+        return JSON.parse(JSON.stringify(sourceMaps || { Table: {}, Field: {} }));
+      }
+    };
+    vm.runInNewContext(
+      `${mappingHelpers[0]}\nplanPackageFieldIdMaps(0, 2); result = snapshotPersistentIdMaps();`,
+      planningContext
+    );
+    return planningContext.result;
+  };
+
+  const firstMaps = runPlanning({ TaskId: "task-1", IdMaps: { Table: {}, Field: {} } });
+  assert.equal(firstMaps.Field["field-a"], "existing-a");
+  assert.equal(firstMaps.Field["field-b"], "generated-b");
+
+  const retryMaps = runPlanning({ TaskId: "task-1", IdMaps: firstMaps }, true);
+  assert.equal(retryMaps.Field["field-b"], "generated-b");
+});
+
+test("only worker-owned checkpoints can skip schema phases", () => {
+  const chunkHelpers = source.match(/var backgroundTaskId = [\s\S]*?(?=var installUser =)/);
+  assert.ok(chunkHelpers);
+  const readPhase = checkpoint => {
+    const phaseContext = {
+      V8: {
+        Param: {
+          _BackgroundTaskId: "task-1",
+          _TrustedServerInvocation: true,
+          _BackgroundTaskCheckpoint: checkpoint
+        }
+      }
+    };
+    vm.runInNewContext(`${chunkHelpers[0]}\nresult = backgroundCheckpointPhase;`, phaseContext);
+    return phaseContext.result;
+  };
+
+  assert.equal(readPhase({ Phase: "PostSchema" }), "Ddl", "caller-supplied phase must be ignored");
+  assert.equal(
+    readPhase({ Phase: "ApplicationAssets", AssetKind: "Build", ApplicationAssetUploaded: 8 }),
+    "ApplicationAssets",
+    "v1.8.0 asset checkpoints remain resumable during a rolling importer upgrade"
+  );
+  assert.equal(readPhase({ TaskId: "task-1", Phase: "Fields", Index: 16 }), "Fields");
+  assert.equal(readPhase({ TaskId: "another-task", Phase: "Fields", Index: 16 }), "Ddl");
+});
+
+test("online marketplace background tasks persist identifiers instead of the full package row", () => {
+  assert.match(tableActionsSource, /STORE_INSTALL_IDENTIFIER_ONLY_V1/);
+  const builder = tableActionsSource.match(
+    /BuildMicroiStoreInstallParam\(btn, row\) \{[\s\S]*?\n        \},\n        IsBackgroundTaskBootstrapPackage/
+  );
+  assert.ok(builder, "marketplace install parameter builder should be extractable");
+  assert.match(builder[0], /StoreId:\s*row\.StoreId \|\| row\.Id/);
+  assert.match(builder[0], /ResumeInstall:\s*true/);
+  assert.doesNotMatch(builder[0], /param\.Form|param\.Row|AppPakcet\s*:|Object\.keys\(row\)/);
+});
+
 test("application-store upgrade resources carry the canonical resumable importer", () => {
   const packageImporter = packageModel.SysApiEngines.find(
     engine => engine.ApiEngineKey === "import-microi-store-package"
   );
   assert.ok(packageImporter, "application-store package should contain its importer");
   assert.ok(
-    compareSemanticVersions(packageModel.PackageInfo.Version, "v6.5.16") >= 0,
+    compareSemanticVersions(packageModel.PackageInfo.Version, "v6.9.7") >= 0,
     "application-store package version must not fall below the resumable importer baseline",
   );
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
@@ -113,7 +407,11 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical source byte-for-byte");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.7.4") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.8.3") >= 0);
+  assert.match(source, /SCHEMA_BACKGROUND_CHUNKS_V1/);
+  assert.match(source, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
+  assert.match(source, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
+  assert.match(source, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(source, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -147,23 +445,30 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 7, 4\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.7.4 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 7, 4\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 8, 3\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.8.3 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 8, 3\)/);
   assert.match(appStoreUpgradeSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(appStoreUpgradeSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(appStoreUpgradeSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(appStoreUpgradeSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(appStoreUpgradeSource, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
+  assert.match(appStoreUpgradeSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
+  assert.match(appStoreUpgradeSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
+  assert.match(appStoreUpgradeSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 16\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_007_004/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_008_003/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
+  assert.match(refreshSource, /SCHEMA_BACKGROUND_CHUNKS_V1/);
+  assert.match(refreshSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
+  assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
+  assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_004_004/);
   assert.match(refreshSource, /versionNumber\s*<\s*6_005_014/);
 });
@@ -202,10 +507,11 @@ test("background-task bootstrap is verified from physical columns and indexes be
     "Id", "OsClient", "UserKey", "Title", "ApiEngineKey", "Status", "Progress",
     "WorkCurrent", "WorkTotal", "EstimatedEndTime", "IdempotencyKey", "ConcurrencyKey",
     "LeaseOwner", "LeaseExpiresAt", "FencingToken", "CheckpointJson", "BusinessEtaField",
+    "RuntimeOsClientType", "RuntimeOsClientNetwork",
   ];
   const requiredIndexes = [
-    "ux_mci_background_task_idempotency",
-    "ix_mci_background_task_claim",
+    "ux_mci_bg_task_runtime_idem",
+    "ix_mci_bg_task_runtime_claim",
     "ix_mci_background_task_user",
     "ix_mci_background_task_concurrency",
   ];
@@ -214,7 +520,7 @@ test("background-task bootstrap is verified from physical columns and indexes be
   assert.match(source, /getTargetPhysicalColumns\(tableName\)/);
   for (const column of requiredColumns) assert.match(source, new RegExp(`'${column}'`));
   for (const index of requiredIndexes) assert.match(source, new RegExp(`'${index}'`));
-  assert.match(source, /actualColumns != requiredColumnText \|\| actualIndex\.Unique != requiredIndex\.Unique/);
+  assert.match(source, /candidateNames = \[requiredIndex\.Name\]\.concat\(requiredIndex\.Aliases \|\| \[\]\)/);
   assert.ok(
     source.indexOf("validateBackgroundTaskBootstrapReadiness()")
       < source.indexOf("正在写入应用安装版本记录"),
@@ -361,13 +667,18 @@ test("fully reused build assets skip object moves and reach stale-row pruning", 
     applicationFileType() {
       return "text/plain";
     },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
     reportProgress() {},
     pruneApplicationAssets() {
       calls.prune++;
     }
   };
 
-  vm.runInNewContext(buildStageSource[0], buildContext);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    buildContext
+  );
 
   assert.equal(calls.upload, 0, "reused build assets should not upload again");
   assert.equal(calls.move, 0, "reused build assets should not move again");
@@ -425,11 +736,16 @@ test("fresh microservice build moves to a tenant-prefixed stable public HDFS key
     },
     applicationFileName(value) { return String(value || "").split("/").pop(); },
     applicationFileType() { return "html"; },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
     reportProgress() {},
     pruneApplicationAssets() {}
   };
 
-  vm.runInNewContext(buildStageSource[0], buildContext);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    buildContext
+  );
 
   const stablePath = "loctek-lowcode/micro-app/demo-service/v1.0.0/index.html";
   assert.equal(calls.move.length, 1);
@@ -499,11 +815,16 @@ test("database runtime build keeps the HDFS copy and embeds the package bytes", 
     },
     applicationFileName(value) { return String(value || "").split("/").pop(); },
     applicationFileType() { return "html"; },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
     reportProgress() {},
     pruneApplicationAssets() {}
   };
 
-  vm.runInNewContext(buildStageSource[0], buildContext);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; this.runtimeDbAssets = runtimeDbAssets; }).call(this);`,
+    buildContext
+  );
 
   assert.equal(calls.upload, 1, "DB runtime must still upload the HDFS build asset");
   assert.equal(calls.move, 1, "DB runtime must still move the HDFS build asset to its stable key");
@@ -582,11 +903,16 @@ test("legacy reused microservice build with a broken key is reuploaded and repai
     },
     applicationFileName(value) { return String(value || "").split("/").pop(); },
     applicationFileType() { return "html"; },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
     reportProgress() {},
     pruneApplicationAssets() {}
   };
 
-  vm.runInNewContext(buildStageSource[0], buildContext);
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; }).call(this);`,
+    buildContext
+  );
 
   const stablePath = "loctek-lowcode/micro-app/demo-service/v1.0.0/index.html";
   assert.equal(calls.move.length, 2, "broken legacy object should retry after reupload");

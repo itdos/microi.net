@@ -347,6 +347,17 @@ try {
 - 收到 `TokenReplaced` 时先检查同一终端是否已有新 Token，避免并发旧响应误清新登录态。
 - 用户提示可以显示过期时长、终端类型和租户 Key，但日志、Toast、URL、截图禁止输出完整 Token。
 
+### IP 高频拦截、受信 VS Code 独立阈值与解除
+
+- `DataAppend.SecurityBlocked=true` 是服务端已可达但当前 IP 被临时拦截，不是网络断开。前端必须展示原始 `Msg`、`Reason`、`ExpiresAtUtc`、IP 和解除建议；不能把它转换成“后端 API 服务暂时不可用”。直接返回该结果的安全中间件必须在 CORS 之后。
+- 普通访问默认阈值为 10 秒 600 请求/120 异常。VS Code 多服务器源码拉取不能通过减少并发或请求量规避；符合条件的只读 V8Debug `Get/List` 使用独立桶，默认 10 秒 6000 请求/1200 异常。
+- 受信判断必须同时满足：服务端共享登录态确认 `Level >= 9999`、请求 Token 是活动 `ClientType=VSCode` Token、请求 `did` 与该 Token 保存的 Did 完全一致、路由为只读 `/api/V8Debug/Get*` 或 `/api/V8Debug/List*`。自报 `ClientType`、User-Agent、`X-User-Level`、单独伪造 did 都不可信；Update/Create/Execute/Upload/Finalize 和 FormEngine 写入不放宽。
+- 普通请求的计数 scope 固定为当前 API 主运行实例，不能使用请求方可控的 `OsClient` Query/Header 选择 Redis 桶；只有已通过上述联合校验的 VS Code profile 才能使用活动 Token 服务端绑定的租户 scope。测试必须覆盖轮换两个真实租户 Key 仍落入同一普通桶。
+- SecurityGuard 只读取 `Connection.RemoteIpAddress`，不得直接解析 `X-Forwarded-For`/`X-Real-IP`。宿主在 `UseForwardedHeaders` 中只信任 `ForwardedHeaders:KnownProxies` 的精确 IP 和 `KnownNetworks` 的受控 CIDR（环境变量可用 `ForwardedHeaders__KnownProxies__0` / `ForwardedHeaders__KnownNetworks__0`）；禁止 `0.0.0.0/0`、`::/0`。历史 `SecurityRespectForwardedHeaders` 字段不能建立 Header 信任。测试必须覆盖公网 Remote IP 携带伪造 `X-Forwarded-For: 127.0.0.1` 时仍识别公网 IP。
+- 自动封禁按 `ExpiresAtUtc` 到期解除。立即解除只能从未被封禁的管理网络，以平台超级管理员进入【系统日志 → 安全防护】操作 `/api/SecurityGuard/UnblockIp`；同一被封出口不能给自己解封。
+- 固定可信出口才可精确加入当前服务器匹配 `sys_osclients.SecurityWhitelistIps`。禁止全网段、动态用户 IP 或请求参数自动入白名单，也不要关闭安全防护或全局放大普通阈值。
+- 多节点封禁、解封和到期状态必须进入共享 Redis/数据库；本机静态字典只能做缓存。Redis 可用且共享 block 不存在就是权威已解封，节点必须删除本机旧 block，禁止把旧状态回写复活；Redis 不可用时才允许本机降级。验收要让同一出口分别命中至少两个 API 节点，覆盖普通阈值、受信读取、伪造 Header、手动解除和自动到期。
+
 ## 10. Jint 运行时升级边界
 
 升级 Jint 时必须逐版阅读官方 release notes，并至少验证以下兼容面，不能只以编译通过作为验收：

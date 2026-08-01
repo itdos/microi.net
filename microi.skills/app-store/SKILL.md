@@ -42,11 +42,10 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 ## MCP 工作流
 
-1. `microi_list_applications` / `microi_get_application_context` 盘点在线应用源码。
-2. `microi_get_manifest_schema` 获取 Manifest 合约。
-3. `microi_plan_system` 与 `microi_generate_system(dryRun:true)` 先做干跑。
-4. 用户明确确认后才真实安装/升级。
-5. `microi_validate_system` 和远端回读验收。
+1. 安装/更新现成商城应用时，先调用 `microi_install_store_application` / `microi_update_store_application` 且不传 `confirmExecution`，核对目标租户、商城源、StoreId 和幂等请求 Id 的预检结果。
+2. 用户明确确认后，把 `confirmExecution` 精确设为 `StoreId`，提交真实持久化后台任务；只传 StoreId、版本和商城源定位信息，不通过 MCP/HTTP 传完整 `AppPakcet`。
+3. 自建应用或低代码系统先用 `microi_list_applications` / `microi_get_application_context` 盘点源码，再用 `microi_get_manifest_schema`、`microi_plan_system` 与 `microi_generate_system(dryRun:true)` 干跑。
+4. 安装任务必须回读至 `Succeeded`，再执行 `microi_validate_system`、远端资源回读和真实 UI 验收；仅返回 TaskId 不代表安装成功。
 
 已有 MicroService 优先新增页面/路由；没有时才创建、同步源码、发布构建。复杂安装交互使用 `V8.OpenAppDialog`，后台任务上报进度。
 
@@ -82,9 +81,10 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - `app.microi.background-task` 自身负责创建/修复后台任务表，首次安装和离线安装必须以前台接口完成；不能先调用 `RunBackground`，否则旧库缺少 `OsClient` 等字段时会在导入开始前失败。
 - 后台任务可用性不能只检查表存在，还要检查运行时必需列；部分升级的旧表必须返回“能力尚未就绪”，不能继续拼接包含缺失列的 SQL。
 - 应用包中的独立 `CREATE INDEX` 必须按表名和索引名做执行前回读；并发创建失败后再次回读，已存在则按幂等成功处理。索引 DDL 不能重复触发整张表的字段同步。
-- 基础包必须同时携带 `OsClient` 的 `PhysicalColumns` 定义、建表内联索引与 4 条独立索引 DDL；新表靠建表一次成型，旧表靠物理列同步和独立 DDL 修复。安装前先把“应用商城”更新到包含 `BACKGROUND_TASK_BOOTSTRAP_READINESS_V1` 的 v1.7.4+ 导入器；安装成功前必须回读全部运行字段及索引，验收覆盖首次安装、部分旧表修复、重复安装和两节点竞态。
+- 基础包必须同时携带 `OsClient` 的 `PhysicalColumns` 定义、建表内联索引与 4 条独立索引 DDL；新表靠建表一次成型，旧表靠物理列同步和独立 DDL 修复。安装前先把“应用商城”更新到包含 `BACKGROUND_TASK_BOOTSTRAP_READINESS_V1`、`APPLICATION_ASSET_BACKGROUND_CHUNKS_V1` 的 v1.8.0+ 导入器；安装成功前必须回读全部运行字段及索引，验收覆盖首次安装、部分旧表修复、重复安装和两节点竞态。
 - 其它用户更新吾码 VS Code 插件并执行“初始化 AI 配置/拉取 Skills”后，AI 应自动识别本规范：大任务优先提交真实后台任务；若基础能力未就绪，先指导用户更新应用商城并以前台方式安装 `app.microi.background-task`，不得伪造进度或让基础包自举入队。
-- 重复安装先比较应用包拥有的字段定义，完全一致就跳过 `UptFormData`。Jint 的 `LimitMemory` 统计累计托管分配而非当前存活堆；大量无效字段更新即使被 GC 回收也会耗尽预算。只为经过审查的可信导入器提高上限，不能用抬高全局限制代替幂等和分批处理。
+- 重复安装先比较应用包拥有的字段定义，完全一致就跳过 `UptFormData`。Jint 的 `LimitMemory` 统计累计托管分配而非当前存活堆；大量无效字段更新即使被 GC 回收也会耗尽预算。v1.8.0 导入器每个后台片最多实际上传 8 个文件，并以约 32 MB Base64 为分片目标；为避免单个大文件无限空转，每片至少允许处理一个文件。片末返回 `HasMore + Checkpoint`，下一片按 `AppId + FilePath + Hash` 复用已提交资产，并禁止为统计再次解码整文件 Base64。
+- 只有固定 Key `import-microi-store-package`、服务端可信身份、`Level >= 9999`、当前进程主租户、持久化后台 TaskId 五项同时成立时，后端才使用 `ResidentMemoryGuardOnly`，跳过会永久累计已回收分配的 Jint 内存约束。该特例仍受容器优先的进程 RSS 防线保护：95% 停止接收新工作，98% 有界停机并由持久任务恢复。普通/前台/子租户/其它 V8 不得借用此特例。
 
 ## 复盘：官网升级资源同步的三道门
 

@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using Microi.net;
@@ -25,7 +26,8 @@ namespace Microi.net.Api
                 return;
             }
 
-            var decision = SecurityGuardService.CheckBeforeRequest(context, options);
+            var profile = await SecurityGuardTrustResolver.ResolveAsync(context).ConfigureAwait(false);
+            var decision = SecurityGuardService.CheckBeforeRequest(context, options, profile);
             if (decision.IsBlocked)
             {
                 await WriteBlockedResponse(context, decision).ConfigureAwait(false);
@@ -40,7 +42,7 @@ namespace Microi.net.Api
             finally
             {
                 watch.Stop();
-                SecurityGuardService.RecordAfterRequest(context, options, decision.Ip, watch.ElapsedMilliseconds);
+                SecurityGuardService.RecordAfterRequest(context, options, decision, watch.ElapsedMilliseconds);
             }
         }
 
@@ -66,9 +68,14 @@ namespace Microi.net.Api
                 return;
             }
 
+            var expiresAtUtc = decision.BlockedIp?.ExpiresAtUtc;
+            var retryAfterSeconds = expiresAtUtc.HasValue
+                ? Math.Max(1, (int)Math.Ceiling((expiresAtUtc.Value - DateTime.UtcNow).TotalSeconds))
+                : 60;
+
             context.Response.StatusCode = StatusCodes.Status200OK;
             context.Response.ContentType = "application/json; charset=utf-8";
-            context.Response.Headers["Retry-After"] = "60";
+            context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString();
             var payload = new
             {
                 Code = 0,
@@ -80,7 +87,15 @@ namespace Microi.net.Api
                     SecurityBlocked = true,
                     decision.Ip,
                     decision.BlockedIp?.Reason,
-                    decision.BlockedIp?.ExpiresAtUtc
+                    decision.BlockedIp?.ReasonKey,
+                    decision.BlockedIp?.BlockedAtUtc,
+                    SecurityScope = decision.BlockedIp?.SecurityScope ?? decision.SecurityScope,
+                    StateBackend = decision.BlockedIp?.StateBackend ?? decision.StateBackend,
+                    ExpiresAtUtc = expiresAtUtc,
+                    RetryAfterSeconds = retryAfterSeconds,
+                    AutoUnblock = true,
+                    UnblockAdvice = "到期后会自动解除。需立即解除时，请从未被封禁的网络使用平台超级管理员进入系统日志的安全防护页解除该 IP；固定可信出口可谨慎加入 SaaS 引擎 SecurityWhitelistIps。",
+                    DocumentationUrl = "https://microi.net/doc/more/security"
                 }
             };
             await context.Response.WriteAsync(JsonConvert.SerializeObject(payload)).ConfigureAwait(false);

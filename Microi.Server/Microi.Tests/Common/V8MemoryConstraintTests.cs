@@ -152,6 +152,79 @@ public class V8MemoryConstraintTests
     }
 
     [Fact]
+    public void TrustedMarketplaceImporter_CanUseResidentMemoryGuardWithoutJintCumulativeAccounting()
+    {
+        using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam
+        {
+            LimitMemory = 1,
+            ResidentMemoryGuardOnly = true
+        });
+
+        // Jint's allocation constraint observes allocations on the execution thread.
+        // The trusted importer mode intentionally leaves this allocation to the
+        // process-wide container-aware resident-memory guard instead.
+        var reclaimedBetweenAssetUploads = new byte[3 * 1024 * 1024];
+        reclaimedBetweenAssetUploads[0] = 1;
+
+        Assert.Equal(42D, engine.Evaluate("40 + 2").AsNumber());
+        GC.KeepAlive(reclaimedBetweenAssetUploads);
+    }
+
+    [Fact]
+    public void TrustedMarketplaceImporterPolicy_AllowsOnlyMasterTenantSuperAdminBackgroundExecution()
+    {
+        var trustedAdmin = new JObject
+        {
+            ["Id"] = "admin-user",
+            ["Level"] = 9999
+        };
+
+        Assert.True(V8TrustedResidentMemoryPolicy.IsAllowed(
+            "import-microi-store-package",
+            "master",
+            "master",
+            preserveTrustedCurrentUser: true,
+            backgroundTaskId: "task-1",
+            trustedAdmin));
+
+        Assert.False(V8TrustedResidentMemoryPolicy.IsAllowed(
+            "import-microi-store-package",
+            "child",
+            "master",
+            preserveTrustedCurrentUser: true,
+            backgroundTaskId: "task-1",
+            trustedAdmin));
+        Assert.False(V8TrustedResidentMemoryPolicy.IsAllowed(
+            "import-microi-store-package",
+            "master",
+            "master",
+            preserveTrustedCurrentUser: false,
+            backgroundTaskId: "task-1",
+            trustedAdmin));
+        Assert.False(V8TrustedResidentMemoryPolicy.IsAllowed(
+            "import-microi-store-package",
+            "master",
+            "master",
+            preserveTrustedCurrentUser: true,
+            backgroundTaskId: "",
+            trustedAdmin));
+        Assert.False(V8TrustedResidentMemoryPolicy.IsAllowed(
+            "ordinary-tenant-script",
+            "master",
+            "master",
+            preserveTrustedCurrentUser: true,
+            backgroundTaskId: "task-1",
+            trustedAdmin));
+        Assert.False(V8TrustedResidentMemoryPolicy.IsAllowed(
+            "import-microi-store-package",
+            "master",
+            "master",
+            preserveTrustedCurrentUser: true,
+            backgroundTaskId: "task-1",
+            new JObject { ["Id"] = "ordinary-user", ["Level"] = 100 }));
+    }
+
+    [Fact]
     public void CreateEngine_PreservesPre414ClrArraySnapshotSemantics()
     {
         using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam { LimitMemory = 64 });

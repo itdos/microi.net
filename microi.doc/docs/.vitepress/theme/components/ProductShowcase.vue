@@ -50,7 +50,7 @@
             <label class="ai-app-search">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
               <span class="sr-only">{{ copy.search }}</span>
-              <input v-model="keyword" type="search" :placeholder="copy.search" @input="scheduleKeywordSearch" />
+              <input v-model="keyword" type="search" :placeholder="copy.search" @input="scheduleKeywordSearch" @search="commitKeywordSearch" />
             </label>
           </div>
         </div>
@@ -66,15 +66,34 @@
         </article>
       </div>
 
-      <div v-else-if="loadError && !liveApps.length" class="ai-app-state">
+      <aside
+        v-if="!showInitialSkeleton && suggestionMode"
+        class="ai-app-search-notice"
+        :class="`is-${searchMeta.MatchMode}`"
+        role="status"
+        aria-live="polite"
+      >
+        <div>
+          <span>{{ suggestionBadge }}</span>
+          <h3>{{ suggestionTitle }}</h3>
+          <p>{{ suggestionDescription }}</p>
+        </div>
+        <button type="button" @click="openDemandCenter">{{ copy.describeNeed }}</button>
+      </aside>
+
+      <div v-if="!showInitialSkeleton && loadError && !displayApps.length" class="ai-app-state">
         <p>{{ loadError }}</p>
         <button type="button" @click="resetAndLoad">重新加载</button>
       </div>
-      <div v-else-if="!liveApps.length" class="ai-app-state">{{ copy.empty }}</div>
+      <div v-else-if="!showInitialSkeleton && !displayApps.length" class="ai-app-state ai-app-empty" aria-live="polite">
+        <strong>{{ copy.empty }}</strong>
+        <p>{{ copy.emptyHelp }}</p>
+        <button type="button" @click="openDemandCenter">{{ copy.describeNeed }}</button>
+      </div>
 
-      <div v-else class="ai-app-grid" :aria-busy="isLoading">
+      <div v-else-if="!showInitialSkeleton" class="ai-app-grid" :aria-busy="isLoading">
         <article
-          v-for="app in liveApps"
+          v-for="app in displayApps"
           :key="app.Id || app.AppKey"
           class="ai-app-card"
           tabindex="0"
@@ -148,6 +167,14 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vitepress'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
+import { buildMarketplaceHref, readMarketplaceState } from '../utils/marketplace-query-state.js'
+import {
+  buildSiteSessionHeaders,
+  getOrCreateSiteDid,
+  isSiteSessionExpired,
+  normalizeSiteToken,
+  readRotatedSiteToken
+} from '../utils/site-session.js'
 
 const props = defineProps({
   locale: { type: String, default: 'zh-CN' }
@@ -159,6 +186,9 @@ const OS_CLIENT = 'iTdos'
 const pageSize = 12
 
 const liveApps = ref([])
+const suggestedApps = ref([])
+const searchMeta = ref({ MatchMode: 'browse', FallbackMode: '', ExactCount: 0, RelatedCount: 0, SuggestionCount: 0 })
+const demandCenter = ref(null)
 const activeCategory = ref('all')
 const keyword = ref('')
 const sortBy = ref('AppUpdateTime')
@@ -175,6 +205,7 @@ const brokenPreviewKeys = ref(new Set())
 const favoriteIds = ref(new Set())
 const favoriteBusyIds = ref(new Set())
 const authToken = ref('')
+const authDid = ref('')
 let requestController = null
 let keywordTimer = null
 let observer = null
@@ -183,10 +214,20 @@ let requestSequence = 0
 const isEnglish = computed(() => props.locale === 'en-US' || /^\/en(?:\/|$)/.test(route.path || ''))
 const copy = computed(() => isEnglish.value ? {
   apps: 'AI Apps', categories: 'App categories', sort: 'Sort', sortLabel: 'Sort applications', search: 'Search apps',
-  empty: 'No matching applications found.', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', finished: 'All applications loaded'
+  empty: 'No exact or related application was found.', emptyHelp: 'Tell us what you need. Your text is only submitted after you choose to continue.',
+  relatedBadge: 'Related apps', relatedTitle: 'No exact match — these are related runnable apps',
+  relatedDescription: 'Matched by role, industry, or workflow. They may not fully satisfy your original requirement.',
+  popularBadge: 'Popular suggestions', popularTitle: 'No exact match — here are popular apps to explore',
+  popularDescription: 'These are clearly labeled popular suggestions, not exact search results.',
+  describeNeed: 'Describe and generate my software', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', finished: 'All applications loaded'
 } : {
   apps: 'AI 应用', categories: '应用分类', sort: '排序', sortLabel: '应用排序', search: '搜索应用',
-  empty: '没有找到匹配的应用。', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', finished: '已加载全部应用'
+  empty: '暂时没有找到精确或相关应用。', emptyHelp: '请描述你要解决的问题；只有点击继续后，需求才会被明确提交。',
+  relatedBadge: '相关可用软件', relatedTitle: '没有完全匹配，以下是相关且可运行的软件',
+  relatedDescription: '这些候选按行业、角色或流程匹配，可能不能完整替代你原本想找的软件。',
+  popularBadge: '热门推荐', popularTitle: '没有完全匹配，先看看热门软件',
+  popularDescription: '以下是明确标注的热门推荐，不是对搜索词的精确命中。',
+  describeNeed: '描述并生成我要的软件', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', finished: '已加载全部应用'
 })
 
 const defaultBusinessCategories = [
@@ -223,7 +264,12 @@ const selectedSortLabel = computed(() => sortOptions.value.find(item => item.val
 
 const currentPath = computed(() => route.path || (typeof window !== 'undefined' ? window.location.pathname : ''))
 const shouldRender = computed(() => ['/', '/index', '/index.html', '/en/', '/en/index', '/en/index.html', '/apps', '/apps.html'].includes(currentPath.value))
-const showInitialSkeleton = computed(() => isLoading.value && !liveApps.value.length)
+const displayApps = computed(() => liveApps.value.length ? liveApps.value : suggestedApps.value)
+const suggestionMode = computed(() => Boolean(keyword.value.trim()) && !liveApps.value.length && suggestedApps.value.length > 0 && ['related', 'popular'].includes(searchMeta.value.MatchMode))
+const suggestionBadge = computed(() => searchMeta.value.MatchMode === 'related' ? copy.value.relatedBadge : copy.value.popularBadge)
+const suggestionTitle = computed(() => searchMeta.value.MatchMode === 'related' ? copy.value.relatedTitle : copy.value.popularTitle)
+const suggestionDescription = computed(() => searchMeta.value.MatchMode === 'related' ? copy.value.relatedDescription : copy.value.popularDescription)
+const showInitialSkeleton = computed(() => isLoading.value && !displayApps.value.length)
 
 function plainText(value) {
   return String(value || '')
@@ -323,21 +369,34 @@ function previewFitClass(applicationType) {
     : 'preview-fit-cover'
 }
 
-function normalizeToken(raw) {
-  return String(raw || '').replace(/^Bearer\s+/i, '').trim()
-}
-
 function syncAuth() {
   if (typeof window === 'undefined') return
-  const token = normalizeToken(localStorage.getItem('microi_doc_token'))
+  const token = normalizeSiteToken(localStorage.getItem('microi_doc_token'))
   let hasUser = false
   try { hasUser = Boolean(JSON.parse(localStorage.getItem('microi_doc_user') || 'null')?.Id) } catch (_) {}
   authToken.value = token && hasUser ? token : ''
+  authDid.value = getOrCreateSiteDid(localStorage, window.crypto)
   if (!authToken.value) favoriteIds.value = new Set()
 }
 
 function authHeaders() {
-  return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
+  return buildSiteSessionHeaders({ token: authToken.value, osClient: OS_CLIENT, did: authDid.value })
+}
+
+function syncTokenFromResponse(response) {
+  const token = readRotatedSiteToken(response)
+  if (!token || token === authToken.value) return
+  authToken.value = token
+  localStorage.setItem('microi_doc_token', token)
+  window.dispatchEvent(new CustomEvent('microi-token-refreshed'))
+}
+
+function expireAuth() {
+  authToken.value = ''
+  favoriteIds.value = new Set()
+  localStorage.removeItem('microi_doc_token')
+  localStorage.removeItem('microi_doc_user')
+  window.dispatchEvent(new CustomEvent('microi-logout'))
 }
 
 async function loadFavoriteStatus(appIds) {
@@ -348,7 +407,12 @@ async function loadFavoriteStatus(appIds) {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ Action: 'Status', AppIds: appIds })
     })
+    syncTokenFromResponse(response)
     const result = await response.json()
+    if (isSiteSessionExpired(result, response.status)) {
+      expireAuth()
+      return
+    }
     if (result.Code !== 1) return
     const next = new Set(favoriteIds.value)
     for (const id of result.Data?.FavoriteIds || []) next.add(String(id))
@@ -385,6 +449,18 @@ async function loadApplications() {
     if (sequence !== requestSequence) return
     fileServer.value = String(result.DataAppend?.FileServer || '').trim()
     businessCategories.value = keyValueOptions(result.DataAppend?.Categories)
+    const nextSearchMeta = result.DataAppend?.Search || {}
+    searchMeta.value = {
+      MatchMode: String(nextSearchMeta.MatchMode || (keyword.value.trim() ? 'none' : 'browse')),
+      FallbackMode: String(nextSearchMeta.FallbackMode || ''),
+      ExactCount: Number(nextSearchMeta.ExactCount || 0),
+      RelatedCount: Number(nextSearchMeta.RelatedCount || 0),
+      SuggestionCount: Number(nextSearchMeta.SuggestionCount || 0)
+    }
+    demandCenter.value = nextSearchMeta.DemandCenter ? normalizeApp(nextSearchMeta.DemandCenter) : demandCenter.value
+    suggestedApps.value = pageIndex.value === 1 && Array.isArray(nextSearchMeta.RelatedApps)
+      ? nextSearchMeta.RelatedApps.map(normalizeApp)
+      : suggestedApps.value
     totalCount.value = Number(result.DataCount || 0)
     const rows = result.Data.map(normalizeApp)
     const known = new Set(liveApps.value.map(item => item.Id || item.AppKey))
@@ -392,7 +468,7 @@ async function loadApplications() {
     liveApps.value = [...liveApps.value, ...appended]
     hasMore.value = rows.length === pageSize && liveApps.value.length < totalCount.value
     pageIndex.value += 1
-    await loadFavoriteStatus(appended.map(item => item.Id).filter(Boolean))
+    await loadFavoriteStatus([...appended, ...suggestedApps.value].map(item => item.Id).filter(Boolean))
   } catch (error) {
     if (error?.name !== 'AbortError' && sequence === requestSequence) loadError.value = `AI 应用暂时无法读取：${error?.message || '网络异常'}`
   } finally {
@@ -419,6 +495,8 @@ function resetAndLoad() {
   isLoading.value = false
   requestController = null
   liveApps.value = []
+  suggestedApps.value = []
+  searchMeta.value = { MatchMode: keyword.value.trim() ? 'none' : 'browse', FallbackMode: '', ExactCount: 0, RelatedCount: 0, SuggestionCount: 0 }
   pageIndex.value = 1
   totalCount.value = 0
   hasMore.value = true
@@ -427,9 +505,41 @@ function resetAndLoad() {
   nextTick(loadApplications)
 }
 
+function syncFiltersFromLocation() {
+  if (typeof window === 'undefined') return false
+  const state = readMarketplaceState(window.location.search)
+  const changed = activeCategory.value !== state.category || sortBy.value !== state.sort || keyword.value !== state.q
+  activeCategory.value = state.category
+  sortBy.value = state.sort
+  keyword.value = state.q
+  return changed
+}
+
+function persistFiltersToUrl(mode = 'push') {
+  if (typeof window === 'undefined') return
+  const href = buildMarketplaceHref(window.location, {
+    category: activeCategory.value,
+    sort: sortBy.value,
+    q: keyword.value
+  })
+  const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  if (href === current) return
+  const method = mode === 'replace' ? 'replaceState' : 'pushState'
+  window.history[method]({ ...window.history.state, microiMarketplace: true }, '', href)
+}
+
+function handleMarketplacePopState() {
+  if (keywordTimer) {
+    clearTimeout(keywordTimer)
+    keywordTimer = null
+  }
+  if (syncFiltersFromLocation()) resetAndLoad()
+}
+
 function selectCategory(value) {
   if (activeCategory.value === value) return
   activeCategory.value = value
+  persistFiltersToUrl()
   resetAndLoad()
 }
 
@@ -445,6 +555,7 @@ function selectSort(value) {
   closeSortMenu()
   if (sortBy.value === value) return
   sortBy.value = value
+  persistFiltersToUrl()
   resetAndLoad()
 }
 
@@ -455,7 +566,14 @@ function handleDocumentPointerDown(event) {
 
 function scheduleKeywordSearch() {
   if (keywordTimer) clearTimeout(keywordTimer)
-  keywordTimer = setTimeout(resetAndLoad, 320)
+  keywordTimer = setTimeout(commitKeywordSearch, 320)
+}
+
+function commitKeywordSearch() {
+  if (keywordTimer) clearTimeout(keywordTimer)
+  keywordTimer = null
+  persistFiltersToUrl()
+  resetAndLoad()
 }
 
 function markPreviewBroken(key) {
@@ -466,6 +584,15 @@ function markPreviewBroken(key) {
 
 function openDetail(app) {
   if (typeof window !== 'undefined') window.location.href = `/app-detail.html?app=${encodeURIComponent(app.AppKey || app.Id)}`
+}
+
+function openDemandCenter() {
+  if (typeof window === 'undefined') return
+  const target = demandCenter.value?.PreviewUrl || '/app-detail.html?app=software-demand-studio'
+  const url = new URL(target, window.location.origin)
+  const need = keyword.value.trim().slice(0, 200)
+  url.hash = need ? `need=${encodeURIComponent(need)}` : 'start'
+  window.location.href = url.toString()
 }
 
 async function setFavorite(app) {
@@ -484,11 +611,12 @@ async function setFavorite(app) {
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ Action: 'Set', AppId: app.Id, IsFavorite: desired })
     })
+    syncTokenFromResponse(response)
     const result = await response.json()
     if (result.Code !== 1) {
-      if ([1001, 1002].includes(Number(result.Code)) || /登录|权限|Token/i.test(result.Msg || '')) {
-        authToken.value = ''
-        window.location.href = `/login.html?redirect=${encodeURIComponent(`${window.location.pathname}#ai-apps`)}`
+      if (isSiteSessionExpired(result, response.status)) {
+        expireAuth()
+        window.location.href = `/login.html?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}#ai-apps`)}`
         return
       }
       throw new Error(result.Msg || '收藏失败')
@@ -521,11 +649,16 @@ function handleAuthChange() {
   if (authToken.value) loadFavoriteStatus(liveApps.value.map(item => item.Id).filter(Boolean))
 }
 
-watch(currentPath, resetAndLoad)
+watch(currentPath, () => {
+  syncFiltersFromLocation()
+  resetAndLoad()
+})
 
 onMounted(() => {
+  syncFiltersFromLocation()
   syncAuth()
   setupObserver()
+  window.addEventListener('popstate', handleMarketplacePopState)
   window.addEventListener('storage', handleAuthChange)
   window.addEventListener('microi-login-success', handleAuthChange)
   window.addEventListener('microi-logout', handleAuthChange)
@@ -538,6 +671,7 @@ onBeforeUnmount(() => {
   requestController?.abort()
   observer?.disconnect()
   if (keywordTimer) clearTimeout(keywordTimer)
+  window.removeEventListener('popstate', handleMarketplacePopState)
   window.removeEventListener('storage', handleAuthChange)
   window.removeEventListener('microi-login-success', handleAuthChange)
   window.removeEventListener('microi-logout', handleAuthChange)
@@ -576,6 +710,15 @@ onBeforeUnmount(() => {
 .ai-app-search svg { width: 17px; fill: none; stroke: #8a8a8a; stroke-width: 1.8; }
 .ai-app-search input { width: 100%; border: 0; outline: 0; background: transparent; color: #f7f7f7; font: inherit; font-size: 13px; }
 .ai-app-search input::placeholder { color: #777; }
+.ai-app-search-notice { display: flex; align-items: center; justify-content: space-between; gap: var(--mci-space-5, 20px); margin: 0 0 var(--mci-space-6, 24px); padding: var(--mci-space-4, 16px) var(--mci-space-5, 20px); border: 1px solid rgba(37,99,235,.34); border-radius: var(--mci-radius-lg, 12px); background: linear-gradient(135deg, rgba(37,99,235,.13), rgba(24,28,37,.72)); }
+.ai-app-search-notice.is-popular { border-color: rgba(217,162,58,.34); background: linear-gradient(135deg, rgba(217,162,58,.12), rgba(24,28,37,.72)); }
+.ai-app-search-notice > div { min-width: 0; }
+.ai-app-search-notice span { display: inline-flex; min-height: 24px; align-items: center; padding: 0 9px; border-radius: var(--mci-radius-pill, 999px); background: rgba(37,99,235,.18); color: #9fc1ff; font-size: var(--mci-text-xs, 12px); font-weight: 700; }
+.ai-app-search-notice.is-popular span { background: rgba(217,162,58,.16); color: #f2cf83; }
+.ai-app-search-notice h3 { margin: 8px 0 3px; color: var(--mci-text-primary, #f8fafc); font-size: var(--mci-text-lg, 17px); line-height: 1.45; }
+.ai-app-search-notice p { margin: 0; color: var(--mci-text-secondary, #cbd5e1); font-size: var(--mci-text-sm, 13px); line-height: 1.55; }
+.ai-app-search-notice button, .ai-app-empty button { flex: 0 0 auto; min-height: 40px; padding: 0 16px; border: 1px solid rgba(255,255,255,.2); border-radius: var(--mci-radius-md, 8px); background: var(--mci-color-primary, #b51220); color: var(--mci-text-on-primary, #fff); font: inherit; font-size: var(--mci-text-sm, 13px); font-weight: 700; cursor: pointer; }
+.ai-app-search-notice button:hover, .ai-app-search-notice button:focus-visible, .ai-app-empty button:hover, .ai-app-empty button:focus-visible { outline: 2px solid rgba(255,255,255,.8); outline-offset: 2px; filter: brightness(1.08); }
 .ai-app-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px 16px; }
 .ai-app-card { min-width: 0; cursor: pointer; border-radius: 12px; outline: none; }
 .ai-app-card:focus-visible { box-shadow: 0 0 0 2px #f7f7f7; }
@@ -611,7 +754,10 @@ onBeforeUnmount(() => {
 .ai-app-copy p { overflow: hidden; margin: 5px 0 0; color: #8a8a8a; font-size: 12px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .ai-app-state { min-height: 220px; display: grid; place-content: center; gap: 12px; text-align: center; color: #888; }
 .ai-app-state p { margin: 0; }
+.ai-app-empty strong { color: var(--mci-text-primary, #f8fafc); font-size: var(--mci-text-lg, 17px); }
+.ai-app-empty p { max-width: 560px; color: var(--mci-text-secondary, #cbd5e1); line-height: 1.6; }
 .ai-app-state button, .ai-app-sentinel button { min-height: 38px; padding: 0 16px; border: 1px solid #444; border-radius: 10px; background: #232323; color: #ddd; cursor: pointer; }
+.ai-app-empty button { background: var(--mci-color-primary, #b51220); color: var(--mci-text-on-primary, #fff); }
 .ai-app-sentinel { min-height: 76px; display: grid; place-items: center; color: #696969; font-size: 12px; }
 .ai-app-loading { display: inline-flex; align-items: center; gap: 8px; }
 .ai-app-loading i { width: 14px; height: 14px; border: 2px solid #444; border-top-color: #eee; border-radius: 50%; animation: app-spin .8s linear infinite; }
@@ -629,6 +775,6 @@ onBeforeUnmount(() => {
 @media (max-width: 1180px) { .ai-app-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 1080px) { .ai-app-toolbar { align-items: stretch; flex-direction: column-reverse; gap: 12px; } .ai-app-controls { justify-content: flex-end; } }
 @media (max-width: 900px) { .ai-app-controls { justify-content: flex-start; } .ai-app-search { flex-basis: auto; width: min(100%, 360px); } .ai-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .ai-app-shell { width: min(100% - 28px, 1440px); padding-bottom: 64px; } .ai-app-controls { align-items: stretch; flex-direction: column; } .ai-app-sort, .ai-app-search { width: 100%; box-sizing: border-box; } .ai-app-sort-trigger { flex: 1; } .ai-app-sort-menu { left: 0; right: 0; width: auto; } .ai-app-grid { grid-template-columns: 1fr; gap: 24px; } .ai-app-stats { opacity: 1; transform: none; } .ai-app-author { max-width: 90px; } }
+@media (max-width: 640px) { .ai-app-shell { width: min(100% - 28px, 1440px); padding-bottom: 64px; } .ai-app-controls { align-items: stretch; flex-direction: column; } .ai-app-sort, .ai-app-search { width: 100%; box-sizing: border-box; } .ai-app-sort-trigger { flex: 1; } .ai-app-sort-menu { left: 0; right: 0; width: auto; } .ai-app-search-notice { align-items: stretch; flex-direction: column; } .ai-app-search-notice button { width: 100%; } .ai-app-grid { grid-template-columns: 1fr; gap: 24px; } .ai-app-stats { opacity: 1; transform: none; } .ai-app-author { max-width: 90px; } }
 @media (prefers-reduced-motion: reduce) { .ai-app-preview > img, .ai-app-stats, .skeleton, .ai-app-loading i { transition: none; animation: none; } }
 </style>

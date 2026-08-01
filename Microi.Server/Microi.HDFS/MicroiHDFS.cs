@@ -138,7 +138,7 @@ namespace Microi.net
             var fileUploadOptions = GetFileUploadSecurityOptions(param.OsClient);
             if (isInteractiveRequest && !fileUploadOptions.UploadEnabled)
             {
-                return new DosResult(0, null, "当前租户已停用文件上传！");
+                return FileUploadSecurity.CreateTenantUploadDisabledResult(param.OsClient);
             }
 
             var payloadError = FileUploadSecurity.ValidatePayload(

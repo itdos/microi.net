@@ -239,6 +239,62 @@ export function analyzeClientChunking(buttonInput) {
         resumable,
     };
 }
+const OFFICIAL_STORE_API_BASE = 'https://api.itdos.com';
+const OFFICIAL_STORE_OSCLIENT = 'iTdos';
+export function buildStoreApplicationBackgroundRequest(input) {
+    const storeId = String(input.storeId || '').trim();
+    const requestId = String(input.requestId || '').trim();
+    if (!/^[A-Za-z0-9:._-]{1,100}$/u.test(storeId)) {
+        throw new Error('storeId 只能包含字母、数字、冒号、点、下划线和连字符，长度 1-100。');
+    }
+    if (!/^[A-Za-z0-9:._-]{8,100}$/u.test(requestId)) {
+        throw new Error('requestId 必须是调用方保存并在重试时复用的稳定幂等 Id，长度 8-100。');
+    }
+    const rawStoreApiBase = String(input.storeApiBase || OFFICIAL_STORE_API_BASE).trim();
+    let storeUrl;
+    try {
+        storeUrl = new URL(rawStoreApiBase);
+    }
+    catch {
+        throw new Error('storeApiBase 必须是有效的 HTTP/HTTPS 服务根地址。');
+    }
+    if (storeUrl.protocol !== 'https:'
+        || storeUrl.username
+        || storeUrl.password
+        || (storeUrl.pathname && storeUrl.pathname !== '/')
+        || storeUrl.search
+        || storeUrl.hash
+        || storeUrl.origin !== OFFICIAL_STORE_API_BASE) {
+        throw new Error(`storeApiBase 仅允许吾码官方商城 ${OFFICIAL_STORE_API_BASE}，且不能包含凭据、路径、查询、片段或自定义端口。`);
+    }
+    const storeApiBase = OFFICIAL_STORE_API_BASE;
+    const storeOsClient = String(input.storeOsClient || OFFICIAL_STORE_OSCLIENT).trim();
+    if (storeOsClient.toLowerCase() !== OFFICIAL_STORE_OSCLIENT.toLowerCase()) {
+        throw new Error(`storeOsClient 仅允许吾码官方商城租户 ${OFFICIAL_STORE_OSCLIENT}。`);
+    }
+    const operationText = input.operation === 'update' ? '更新' : '安装';
+    return {
+        ApiEngineKey: 'import-microi-store-package',
+        Title: `${operationText}应用：${String(input.appName || input.appId || storeId).trim()}`,
+        // STORE_APPLICATION_MCP_IDENTIFIER_ONLY_V1: never carry Package/AppPakcet/Form/Row.
+        Param: compactObject({
+            StoreId: storeId,
+            AppId: input.appId,
+            AppName: input.appName,
+            AppVersion: input.appVersion,
+            StoreApiBase: storeApiBase,
+            StoreOsClient: storeOsClient,
+            InstallParentSysMenuId: input.installParentSysMenuId,
+            ResumeInstall: input.resumeInstall !== false,
+        }),
+        Options: {
+            IdempotencyKey: `mcp:store:${input.operation}:${storeId}:${requestId}`,
+            ConcurrencyKey: 'import-microi-store-package',
+            MaxAttempts: 3,
+            RetryOnFailure: true,
+        },
+    };
+}
 function normalizeMenuJsonArray(fieldName, raw) {
     const errors = [];
     const warnings = [];
@@ -2045,5 +2101,84 @@ export function registerAdvancedTools(server, client, context) {
         await audit(client, 'microi_save_job', name, payload);
         return apiText('Save Job', await client.saveJob(payload));
     });
+    server.tool('microi_list_database_backup_tenants', `List the enabled MySQL tenants eligible for database backup on the current backend runtime. The server strictly filters sys_osclients by its own OsClientType and OsClientNetwork and never returns connection strings. OsClient ${osClient}.`, {}, async () => (apiText('Database Backup Tenants', await client.listDatabaseBackupTenants())));
+    server.tool('microi_run_database_backup', `Queue a durable database backup task for the current backend runtime. Omit tenantOsClients to back up every eligible tenant; when provided, every key must be in microi_list_database_backup_tenants. idempotencyKey is caller-generated and must be reused after timeout or any uncertain response. The server serializes execution with a renewable Redis lease and uploads only to the main tenant private HDFS. OsClient ${osClient}.`, {
+        tenantOsClients: z.array(z.string().regex(/^[A-Za-z0-9._-]{1,100}$/)).min(1).max(2000).optional(),
+        retainCount: z.number().int().min(1).max(100).optional(),
+        idempotencyKey: z.string().regex(/^[A-Za-z0-9:._-]{8,128}$/).describe('Stable caller request id; reuse the exact value for uncertain retries'),
+        confirmExecution: z.literal('DATABASE_BACKUP').optional(),
+    }, async ({ tenantOsClients, retainCount, idempotencyKey, confirmExecution }) => {
+        if (confirmExecution !== 'DATABASE_BACKUP') {
+            return textResult('执行已拦截：请传 confirmExecution="DATABASE_BACKUP"。', true);
+        }
+        const payload = {
+            TenantOsClients: tenantOsClients,
+            RetainCount: retainCount ?? 7,
+            IdempotencyKey: idempotencyKey,
+            SelectionMode: tenantOsClients === undefined ? 'AllEligible' : 'Selected',
+        };
+        await audit(client, 'microi_run_database_backup', payload.SelectionMode, payload);
+        return apiText('Run Database Backup', await client.runDatabaseBackup({
+            tenantOsClients,
+            retainCount,
+            idempotencyKey,
+        }));
+    });
+    const storeApplicationSchema = {
+        storeId: z.string().regex(/^[A-Za-z0-9:._-]{1,100}$/).describe('商城 sys_microistore 记录 Id'),
+        requestId: z.string().regex(/^[A-Za-z0-9:._-]{8,100}$/).describe('调用方生成并在不确定重试时复用的稳定幂等 Id'),
+        appId: z.string().max(100).optional(),
+        appName: z.string().max(200).optional(),
+        appVersion: z.string().max(50).optional(),
+        installParentSysMenuId: z.string().max(100).optional(),
+        resumeInstall: z.boolean().optional(),
+        confirmExecution: z.string().optional().describe('真实执行时必须精确等于 storeId'),
+    };
+    const registerStoreApplicationTool = (toolName, operation) => {
+        const operationText = operation === 'update' ? '更新' : '安装';
+        server.tool(toolName, `${operationText}一个应用商城应用到当前 MCP 绑定租户 ${osClient}。任务只传 StoreId 和商城源定位信息，由服务端持久队列调用 import-microi-store-package；首次调用不传 confirmExecution 只返回预检，真实执行后必须轮询后台任务至 Succeeded。`, storeApplicationSchema, async (input) => {
+            let request;
+            try {
+                request = buildStoreApplicationBackgroundRequest({
+                    operation,
+                    storeId: input.storeId,
+                    requestId: input.requestId,
+                    appId: input.appId,
+                    appName: input.appName,
+                    appVersion: input.appVersion,
+                    installParentSysMenuId: input.installParentSysMenuId,
+                    resumeInstall: input.resumeInstall,
+                });
+            }
+            catch (error) {
+                return textResult(error instanceof Error ? error.message : String(error), true);
+            }
+            if (input.confirmExecution !== input.storeId) {
+                return textResult(JSON.stringify({
+                    DryRun: true,
+                    Operation: operation,
+                    TargetOsClient: osClient,
+                    Request: request,
+                    Confirmation: `确认后传 confirmExecution="${input.storeId}"`,
+                    NextStep: '真实提交后轮询右上角后台任务/共享任务表至 Succeeded，再做远端资源与 UI 验收。',
+                }, null, 2));
+            }
+            await audit(client, toolName, input.storeId, {
+                Operation: operation,
+                StoreId: input.storeId,
+                StoreApiBase: request.Param.StoreApiBase,
+                StoreOsClient: request.Param.StoreOsClient,
+                IdempotencyKey: request.Options.IdempotencyKey,
+            });
+            return apiText(`${operationText}商城应用`, await client.runBackgroundApiEngine({
+                apiEngineKey: request.ApiEngineKey,
+                title: request.Title,
+                param: request.Param,
+                options: request.Options,
+            }));
+        });
+    };
+    registerStoreApplicationTool('microi_install_store_application', 'install');
+    registerStoreApplicationTool('microi_update_store_application', 'update');
 }
 //# sourceMappingURL=advanced-tools.js.map

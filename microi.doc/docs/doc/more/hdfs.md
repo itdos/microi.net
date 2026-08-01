@@ -92,6 +92,17 @@ Upgrade16 会在 `sys_osclients` 为每个租户补齐下列可空字段：
 
 租户配置可以高于代码业务默认值，但不能突破平台固定灾难保护、HTTP/Multipart/Form 解析上限以及反向代理限制。`FileUploadEnabled=0` 表示停止该租户的交互式上传，而不是关闭安全检查；平台内部受控任务仍受平台灾难保护上限。修改 SaaS 引擎配置后应通过平台现有的租户重载流程刷新共享 Redis 配置，使所有 API 节点生效。
 
+#### “当前租户已停用文件上传”如何处理
+
+`FileUploadEnabled` 缺列、为空或无法解析时，平台默认按 `true` 处理；新租户的字段默认值也是 `1`。因此看到“当前租户已停用文件上传”时，不是 MinIO/HDFS 地址或桶权限故障，而是当前 API 运行环境实际命中的 `sys_osclients` 记录把 `FileUploadEnabled` 明确设成了 `0/false`。
+
+1. 在 SaaS 引擎查询目标 `OsClient`，同时核对当前后端进程的 `OsClientType`、`OsClientNetwork`。同一租户存在内网、外网或开发/生产多条记录时，只修改当前服务器实际命中的启用记录，不能凭租户名称批量覆盖其它环境。
+2. 将该记录的 `FileUploadEnabled` 改为 `1` 并保存。返回结果中的 `DataAppend.ConfigField=FileUploadEnabled`、`DataAppend.OsClient` 可用于确认目标。
+3. 等待 SaaS 配置重载和共享 Redis 发布订阅完成；多 API 节点应全部收到同一版本，不能只清某个节点的进程内缓存。
+4. 分别用一个很小的公有图片和一个私有文件做真实上传、读取测试。若错误变成 endpoint、bucket、签名或 `Invalid URI`，再按 MinIO/HDFS 配置排查；不要继续修改 `FileUploadEnabled`，也不要删除每日配额 Redis Key。
+
+平台超级管理员也可按下文 MCP 流程精确更新，但写入前后都要回读同一组 `OsClient + OsClientType + OsClientNetwork` 数据。禁止为了消除提示而把所有租户、所有网络环境无差别改为允许。
+
 帐号与租户额度使用共享 Redis 原子预留，适用于多 API 节点；Redis 不可用时上传失败关闭，不会降级成无限上传。额度按 UTC 日期统计，为避免并发重试绕过限制，上传后续失败也不退回已预留额度。反向代理、Ingress/IIS 还应设置不高于平台配置的请求体限制。
 
 每日配额用于阻断短时间滥用，不等于租户全生命周期容量上限。生产对象存储还必须按租户或桶配置独立的总容量/账单告警与生命周期规则，并定期以对象存储实际用量对账；否则用户即使每天都低于应用配额，长期累计仍可能消耗大量空间。应用层 Redis 计数不能代替存储提供方的硬容量边界。

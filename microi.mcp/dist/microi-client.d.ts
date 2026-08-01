@@ -260,6 +260,8 @@ export declare class MicroiClient {
     private inflightRefresh?;
     /** 同一时刻只允许一条完整身份恢复链路，避免并发重登或重复写恢复请求。 */
     private inflightAuthRecovery?;
+    /** 刷新签发的替代 Token 仍被拒绝时，凭据恢复阶段也必须 single-flight。 */
+    private inflightCredentialRecovery?;
     constructor(config: MicroiConfig);
     /** RSA 加密（PKCS1_PADDING，兼容 Microi 前端 JSEncrypt） */
     private rsaEncrypt;
@@ -500,6 +502,18 @@ export declare class MicroiClient {
     savePrintTemplate(data: Record<string, unknown>): Promise<ApiResponse>;
     saveWorkflowPackage(data: Record<string, unknown>): Promise<ApiResponse>;
     saveJob(data: Record<string, unknown>): Promise<ApiResponse>;
+    listDatabaseBackupTenants(): Promise<ApiResponse>;
+    runDatabaseBackup(options: {
+        tenantOsClients?: string[];
+        retainCount?: number;
+        idempotencyKey: string;
+    }): Promise<ApiResponse>;
+    runBackgroundApiEngine(data: {
+        apiEngineKey: string;
+        title: string;
+        param: Record<string, unknown>;
+        options?: Record<string, unknown>;
+    }): Promise<ApiResponse>;
     validateLowCodeSystem(manifest: Record<string, unknown>): Promise<ApiResponse>;
     writeAuditLog(action: string, target: string, content: string): Promise<ApiResponse>;
     queryMongodbLogs(query?: MongodbLogQuery): Promise<ApiResponse>;

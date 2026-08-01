@@ -60,6 +60,90 @@ var result2 = V8.ApiEngine.Run('ApiEngineKey', {
 - 嵌套调用传入外层事务时，最终提交或回滚由外层调用者决定。
 - `V8.DbTrans.Commit()`、`Rollback()`、`Close()` 会被安全代理忽略，不要在脚本中手动管理平台事务。
 
+### 多人游戏实时失效通知（SignalR）
+
+发牌、出牌、碰杠胡、结算、捕鱼命中等规则必须在接口引擎中执行，并用数据库事务、`RequestId`、`ExpectedVersion`、唯一索引和行锁维护权威状态。SignalR 不承载这些业务命令，也不发送手牌；它只在接口引擎成功提交后通知同房玩家“房间版本已变化”，客户端随后重新调用 gateway 的 `Snapshot`。
+
+写操作成功时，gateway 返回固定大小写的 `DataAppend.RealtimeInvalidation`。对象只能包含以下六个公开字段：
+
+```javascript
+return {
+  Code: 1,
+  Data: snapshot,
+  DataAppend: {
+    RealtimeInvalidation: {
+      EventId: requestId,              // 全局稳定，重试时保持不变
+      AppKey: 'landlord-arena',
+      RoomId: room.Id,
+      Version: room.VersionNo,
+      Command: 'Play',
+      OccurredAt: DateNow('yyyy-MM-dd HH:mm:ss')
+    }
+  }
+};
+```
+
+平台只在 `ApiEngine.RunAsync` 返回、接口引擎事务已经提交后读取该对象；`Code !== 1` 或回滚结果不会广播。宿主会重新生成 `OccurredAt`，并丢弃对象中任何额外字段，因此误放入 `PrivateHand/UserId/StateJson` 也不会进入 SignalR。共享 Redis 按 `OsClient + EventId` 保存 24 小时去重，同一个 `EventId` 若对应不同 `AppKey/RoomId/Version/Command` 会被判为冲突并拒绝广播。多 API 节点通过现有 SignalR Redis backplane 发送；Redis 或 SignalR 短暂故障不能反写已经提交的业务结果。
+
+Hub 固定契约：
+
+| 项目 | 值 |
+|---|---|
+| URL | `/game-realtime` |
+| 订阅方法 | `SubscribeGameRoom` |
+| 取消订阅 | `UnsubscribeGameRoom` |
+| 客户端事件 | `GameRoomChanged` |
+| 事件字段 | `EventId/AppKey/RoomId/Version/Command/OccurredAt` |
+
+订阅参数为 `{ AppKey, GatewayKey, RoomId }`，其中 `GatewayKey` 必须符合 `app_*_gateway`。Hub 不接受客户端传入的 `UserId/_CurrentUser/OsClient`：它从当前有效登录 Token 恢复用户和租户，再以服务端可信身份调用对应 gateway 的 `Command='AuthorizeRealtime'`。gateway 必须复用 `Snapshot` 相同的房间成员校验，并精确回显房间：
+
+```javascript
+if (V8.Param.Command === 'AuthorizeRealtime') {
+  // 先按 V8.CurrentUser.Id 查询房间成员；不要信任 V8.Param.UserId
+  var member = getCurrentRoomMember(V8.CurrentUser.Id, V8.Param.RoomId);
+  if (!member) return { Code: 0, Msg: '您不是该房间成员' };
+  return {
+    Code: 1,
+    Data: {
+      Authorized: true,
+      AppKey: V8.Param.AppKey,
+      RoomId: V8.Param.RoomId,
+      Version: member.VersionNo
+    }
+  };
+}
+```
+
+浏览器使用项目本地打包的 `@microsoft/signalr`，不要依赖运行时 CDN：
+
+```javascript
+const connection = new signalR.HubConnectionBuilder()
+  .withUrl(apiBase + '/game-realtime', {
+    accessTokenFactory: () => loginToken
+  })
+  .withAutomaticReconnect()
+  .build();
+
+const seenEventIds = new Set();
+let snapshotVersion = 0;
+connection.on('GameRoomChanged', async event => {
+  if (seenEventIds.has(event.EventId) || event.Version <= snapshotVersion) return;
+  seenEventIds.add(event.EventId);
+  const snapshot = await runGateway({ Command: 'Snapshot', RoomId: event.RoomId });
+  snapshotVersion = snapshot.Data.Version;
+  render(snapshot.Data);
+});
+
+await connection.start();
+await connection.invoke('SubscribeGameRoom', {
+  AppKey: 'landlord-arena',
+  GatewayKey: 'app_ddz_gateway',
+  RoomId: roomId
+});
+```
+
+SignalR 是低延迟提示，不是事实源：通知可能丢失、重复或乱序，客户端必须按 `EventId` 去重、按 `Version` 忽略旧通知，并保留约 1.2 秒的 `Snapshot` 轮询兜底。滚动升级期间旧节点可能暂时没有 Hub，客户端应继续轮询并自动重连，不能因此允许本地发牌或本地判定胜负。
+
 ### 接口嵌套与 Jint 资源预算
 
 `V8.ApiEngine.Run` 嵌套调用是平台支持的正常编排方式。新版默认允许 32 层、节点硬上限默认 64 层；实际业务可以有 5、10 甚至更多层，但仍应避免循环调用，并让每层保持单一职责。这里的“接口嵌套深度”与 JavaScript 函数递归深度不是同一个概念。
