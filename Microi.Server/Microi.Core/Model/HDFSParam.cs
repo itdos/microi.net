@@ -15,6 +15,11 @@ namespace Microi.net
         public bool Preview { get; set; }
         public string ReturnFileType { get; set; }
         public bool? NetworkIsInternet { get; set; }
+        /// <summary>
+        /// 单次对象存储请求超时（秒）。为空时由具体存储实现使用原有默认值；
+        /// 大型备份等受控后台任务可显式放宽，但不改变普通文件上传的超时。
+        /// </summary>
+        public int? TimeoutSeconds { get; set; }
         public string _Lang = DiyMessage.Lang;
 
         /// <summary>

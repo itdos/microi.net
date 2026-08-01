@@ -16,6 +16,14 @@ namespace Microi.net
         // Must remain newer than Upgrade20 and the already deployed 6.7.6 schema.
         public static string Version = "6.7.6.2";
         private const string TableName = "mci_background_task";
+        internal const string ScopedIdempotencyIndexName = "ux_mci_bg_task_runtime_idem";
+        internal const string ScopedClaimIndexName = "ix_mci_bg_task_runtime_claim";
+        private const string LegacyIdempotencyIndexName = "ux_mci_background_task_idempotency";
+        private const string LegacyClaimIndexName = "ix_mci_background_task_claim";
+        internal static readonly string[] ScopedIdempotencyIndexColumns =
+            { "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "IdempotencyKey" };
+        internal static readonly string[] ScopedClaimIndexColumns =
+            { "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "Status", "NextRunTime", "LeaseExpiresAt", "CreateTime" };
 
         private static readonly IReadOnlyList<FieldDefinition> Fields = new List<FieldDefinition>
         {
@@ -62,7 +70,9 @@ namespace Microi.net
             Field("BusinessStatusField", "业务状态字段", "varchar(100)", "Text", 410, null, false),
             Field("BusinessTaskIdField", "业务任务Id字段", "varchar(100)", "Text", 420, null, false),
             Field("BusinessProgressField", "业务进度字段", "varchar(100)", "Text", 430, null, false),
-            Field("BusinessEtaField", "业务预计完成字段", "varchar(100)", "Text", 440, null, false)
+            Field("BusinessEtaField", "业务预计完成字段", "varchar(100)", "Text", 440, null, false),
+            Field("RuntimeOsClientType", "运行环境类型", "varchar(50)", "Text", 450, null, false),
+            Field("RuntimeOsClientNetwork", "运行环境网络", "varchar(50)", "Text", 460, null, false)
         };
 
         public async Task<List<string>> Run(string osClient)
@@ -205,13 +215,26 @@ namespace Microi.net
 
                 if (messages.Count == 0)
                 {
-                    AddIndex(messages, osClient, "ux_mci_background_task_idempotency",
-                        new[] { "OsClient", "IdempotencyKey" }, true);
-                    AddIndex(messages, osClient, "ix_mci_background_task_claim",
+                    // Never replace the old unique index in place. A killed node in
+                    // the DROP -> CREATE window would remove the final idempotency
+                    // boundary for every API/Worker node. Create and read back a
+                    // short, cross-Oracle-compatible name first; only then remove
+                    // the legacy narrow definition.
+                    MigrateScopedIndex(messages, osClient,
+                        ScopedIdempotencyIndexName,
+                        ScopedIdempotencyIndexColumns,
+                        true,
+                        LegacyIdempotencyIndexName,
+                        new[] { "OsClient", "IdempotencyKey" });
+                    MigrateScopedIndex(messages, osClient,
+                        ScopedClaimIndexName,
+                        ScopedClaimIndexColumns,
+                        false,
+                        LegacyClaimIndexName,
                         new[] { "OsClient", "Status", "NextRunTime", "LeaseExpiresAt", "CreateTime" });
-                    AddIndex(messages, osClient, "ix_mci_background_task_user",
+                    EnsureIndex(messages, osClient, "ix_mci_background_task_user",
                         new[] { "OsClient", "UserKey", "IsDeleted", "CreateTime" });
-                    AddIndex(messages, osClient, "ix_mci_background_task_concurrency",
+                    EnsureIndex(messages, osClient, "ix_mci_background_task_concurrency",
                         new[] { "OsClient", "ConcurrencyKey", "Status", "LeaseExpiresAt" });
                 }
 
@@ -242,7 +265,7 @@ namespace Microi.net
             return messages;
         }
 
-        private static void AddIndex(
+        private static void EnsureIndex(
             List<string> messages,
             string osClient,
             string name,
@@ -251,6 +274,76 @@ namespace Microi.net
         {
             var result = V8McpLogic.CreateTableIndex(osClient, TableName, name, columns, unique);
             if (result?.Code != 1) messages.Add(result?.Msg ?? $"创建索引 {name} 失败。");
+        }
+
+        private static void MigrateScopedIndex(
+            List<string> messages,
+            string osClient,
+            string scopedName,
+            string[] scopedColumns,
+            bool unique,
+            string legacyName,
+            string[] legacyColumns)
+        {
+            if (messages.Count > 0) return;
+            var before = V8McpLogic.GetTableIndexes(osClient, TableName);
+            if (before?.Code != 1)
+            {
+                messages.Add(before?.Msg ?? $"读取索引 {scopedName} 失败。");
+                return;
+            }
+
+            var scoped = FindIndex(before.Data, scopedColumns, unique);
+            if (scoped == null)
+            {
+                var create = V8McpLogic.CreateTableIndex(
+                    osClient, TableName, scopedName, scopedColumns, unique);
+                if (create?.Code != 1)
+                {
+                    messages.Add(create?.Msg ?? $"创建索引 {scopedName} 失败。");
+                    return;
+                }
+
+                // CreateTableIndex already performs a readback, but repeat the
+                // independent invariant check before any destructive legacy cleanup.
+                var verified = V8McpLogic.GetTableIndexes(osClient, TableName);
+                if (verified?.Code != 1)
+                {
+                    messages.Add(verified?.Msg ?? $"回读索引 {scopedName} 失败。");
+                    return;
+                }
+                scoped = FindIndex(verified.Data, scopedColumns, unique);
+                if (scoped == null)
+                {
+                    messages.Add($"创建索引 {scopedName} 后未回读到预期字段和唯一性。");
+                    return;
+                }
+                before = verified;
+            }
+
+            var legacy = before.Data?.FirstOrDefault(index =>
+                string.Equals(index.Key_name, legacyName, StringComparison.OrdinalIgnoreCase));
+            if (legacy == null
+                || ReferenceEquals(legacy, scoped)
+                || legacy.IsUnique != unique
+                || !legacy.Columns.SequenceEqual(legacyColumns, StringComparer.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var drop = V8McpLogic.DropTableIndex(osClient, TableName, legacyName);
+            if (drop?.Code != 1)
+                messages.Add(drop?.Msg ?? $"删除旧索引 {legacyName} 失败。");
+        }
+
+        private static V8McpLogic.TableIndexInfo FindIndex(
+            IEnumerable<V8McpLogic.TableIndexInfo> indexes,
+            string[] columns,
+            bool unique)
+        {
+            return indexes?.FirstOrDefault(index =>
+                index.IsUnique == unique
+                && index.Columns.SequenceEqual(columns, StringComparer.OrdinalIgnoreCase));
         }
 
         private static bool EnsurePhysicalColumn(

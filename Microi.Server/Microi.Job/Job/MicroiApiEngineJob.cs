@@ -35,8 +35,20 @@ namespace Microi.net
                 JObject param = JObject.FromObject(context.JobDetail.JobDataMap);
                 // SaaS多租户：确保接口引擎使用正确的租户上下文
                 param["OsClient"] = osClient;
-                //调用接口引擎
-                var result = await MicroiEngine.ApiEngine.RunAsync(param);
+                param["JobName"] = context.JobDetail.Key.Name;
+                param["JobId"] = context.JobDetail.Key.Name;
+                param["JobRunId"] = context.FireInstanceId;
+                param["ScheduledFireTime"] = context.ScheduledFireTimeUtc?.UtcDateTime.ToString("O")
+                                             ?? DateTime.UtcNow.ToString("O");
+                param["FireTime"] = param["ScheduledFireTime"]?.DeepClone();
+                // 数据库备份是宿主原生能力。固定 Job 直接写入持久后台任务，
+                // 不再要求每个租户都安装 database-backup-scheduler V8 引擎。
+                dynamic result = string.Equals(
+                        context.JobDetail.Key.Name,
+                        DatabaseBackupService.ScheduledJobId,
+                        StringComparison.Ordinal)
+                    ? DatabaseBackupControlService.QueueScheduledBackup(param)
+                    : await MicroiEngine.ApiEngine.RunAsync(param);
                 if (result != null)
                 {
                     var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(new

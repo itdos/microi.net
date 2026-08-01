@@ -15,6 +15,11 @@ namespace Microi.net.Api
     [ApiController]
     public class DiagnosticsController : ControllerBase
     {
+        // Process-local identity is diagnostic-only. It must never be used as
+        // business ownership or distributed state, but lets deployment probes
+        // prove that two direct URLs actually terminate on different API
+        // processes instead of two aliases for the same node.
+        private static readonly string RuntimeInstanceId = Guid.NewGuid().ToString("N");
         private readonly ProcessMemoryPressureState _memoryPressure;
 
         public DiagnosticsController(ProcessMemoryPressureState memoryPressure)
@@ -33,6 +38,7 @@ namespace Microi.net.Api
             var data = new
             {
                 Status = memory.RejectingRequests ? "Degraded" : "Healthy",
+                InstanceId = RuntimeInstanceId,
                 Timestamp = DateTime.Now,
                 Message = memory.RejectingRequests ? "当前节点处于内存压力保护状态" : "系统运行正常",
                 Memory = new
@@ -63,7 +69,12 @@ namespace Microi.net.Api
         [AllowAnonymous]
         public ActionResult<DosResult> Liveness()
         {
-            return Ok(new DosResult(1, new { Status = "Alive", Timestamp = DateTime.Now }));
+            return Ok(new DosResult(1, new
+            {
+                Status = "Alive",
+                InstanceId = RuntimeInstanceId,
+                Timestamp = DateTime.Now
+            }));
         }
     }
 }

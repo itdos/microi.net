@@ -93,7 +93,9 @@ namespace Microi.net
             try
             {
                 if (currentToken?.CurrentUser is JObject currentUser) return currentUser;
-                return currentToken?.CurrentUser == null ? new JObject() : JObject.FromObject(currentToken.CurrentUser);
+                return currentToken?.CurrentUser == null
+                    ? new JObject()
+                    : JObject.FromObject((object)currentToken.CurrentUser);
             }
             catch
             {
@@ -131,19 +133,27 @@ namespace Microi.net
         {
             clientModel = OsClientExtend.GetClient(osClient);
             if (clientModel?.OsClientModel == null) throw new InvalidOperationException("当前租户 HDFS 配置不可用。");
-            // Keep this boundary strongly typed. Some rolling-upgrade combinations still
-            // expose OsClientModel through a dynamic member; invoking the Val<T> extension
-            // on a dynamically-bound JValue then fails at runtime even though the token is
-            // otherwise valid. Normalizing to JObject also keeps old/new API nodes compatible.
-            var tenantConfig = clientModel.OsClientModel as JObject
-                ?? JObject.FromObject(clientModel.OsClientModel);
-            var hdfs = SafeJString(tenantConfig, "HDFS", "Aliyun");
+            var hdfs = NormalizeApplicationAssetHdfsType((object)clientModel.OsClientModel);
             return hdfs switch
             {
                 "MinIO" => MicroiEngine.HDFSFactory(HDFSType.MinIO),
                 "S3" => MicroiEngine.HDFSFactory(HDFSType.AmazonS3),
                 _ => MicroiEngine.HDFSFactory(HDFSType.Aliyun)
             };
+        }
+
+        /// <summary>
+        /// Normalize the tenant HDFS selector at the object boundary before reading
+        /// any JToken value. The explicit object/JObject conversion is intentional:
+        /// invoking Val&lt;T&gt; on a dynamically-bound JValue is not supported by the
+        /// C# runtime binder and previously aborted the first streamed asset upload.
+        /// Public for a focused rolling-upgrade regression test.
+        /// </summary>
+        public static string NormalizeApplicationAssetHdfsType(object tenantConfig)
+        {
+            if (tenantConfig == null) return "Aliyun";
+            var config = tenantConfig as JObject ?? JObject.FromObject(tenantConfig);
+            return SafeJString(config, "HDFS", "Aliyun");
         }
 
         private static string Sha256Hex(string value)
@@ -278,7 +288,7 @@ namespace Microi.net
 
             if (existing.Code == 1 && existing.Data != null)
             {
-                var old = JObject.FromObject(existing.Data);
+                var old = JObject.FromObject((object)existing.Data);
                 row["Id"] = SafeJString(old, "Id");
                 var unchanged = string.Equals(SafeJString(old, "ContentHash"), asset.Sha256, StringComparison.OrdinalIgnoreCase)
                                 && string.Equals(SafeJString(old, "HdfsPath"), asset.Paths.VersionPath, StringComparison.OrdinalIgnoreCase);
@@ -346,7 +356,11 @@ namespace Microi.net
 
                 var currentUser = GetMcpOperator(currentToken);
                 var tenantUploadOptions = FileUploadSecurityOptions.Load(OsClientExtend.GetClient(osClient)?.OsClientModel);
-                if (!tenantUploadOptions.UploadEnabled) return new DosResult<object>(0, null, "当前租户已停用文件上传");
+                if (!tenantUploadOptions.UploadEnabled)
+                {
+                    var disabled = FileUploadSecurity.CreateTenantUploadDisabledResult(osClient);
+                    return new DosResult<object>(disabled.Code, null, disabled.Msg, disabled.DataAppend);
+                }
                 // Application delivery is a super-admin-only, immutable-version
                 // stream and must not inherit the interactive attachment default
                 // of 100MB. It has its own 20GB hard ceiling and daily quotas;
@@ -502,7 +516,7 @@ namespace Microi.net
                 var result = await MicroiEngine.FormEngine.GetSysConfig(osClient).ConfigureAwait(false);
                 if (result.Code == 1 && result.Data != null)
                 {
-                    var config = result.Data is JObject obj ? obj : JObject.FromObject(result.Data);
+                    var config = result.Data is JObject obj ? obj : JObject.FromObject((object)result.Data);
                     var fileServer = SafeJString(config, "FileServer").TrimEnd('/');
                     if (!fileServer.DosIsNullOrWhiteSpace()) return fileServer + "/" + path.TrimStart('/');
                 }
@@ -563,7 +577,8 @@ namespace Microi.net
             };
             if (existing.Code == 1 && existing.Data != null)
             {
-                row["Id"] = Convert.ToString(existing.Data.Id);
+                var existingRow = JObject.FromObject((object)existing.Data);
+                row["Id"] = SafeJString(existingRow, "Id");
                 return await MicroiEngine.FormEngine.UptFormDataAsync(
                     "mci_ai_app_version",
                     BuildTrustedMcpFormWriteParam(osClient, row)).ConfigureAwait(false);
@@ -761,7 +776,7 @@ namespace Microi.net
                     }
                 }).ConfigureAwait(false);
                 var versionAlreadyRecorded = existingVersion.Code == 1 && existingVersion.Data != null;
-                var existingVersionData = versionAlreadyRecorded ? JObject.FromObject(existingVersion.Data) : null;
+                var existingVersionData = versionAlreadyRecorded ? JObject.FromObject((object)existingVersion.Data) : null;
                 var initialVersionStatus = string.Equals(
                     SafeJString(existingVersionData, "Status"),
                     "Published",
@@ -834,7 +849,7 @@ namespace Microi.net
                     }).ConfigureAwait(false);
                     if (previousServiceResult.Code == 1 && previousServiceResult.Data != null)
                     {
-                        previousMicroService = JObject.FromObject(previousServiceResult.Data);
+                        previousMicroService = JObject.FromObject((object)previousServiceResult.Data);
                         source["Id"] = SafeJString(previousMicroService, "Id");
                     }
                     if (source["Id"] == null) source["Id"] = Ulid.NewUlid().ToString();
@@ -858,7 +873,7 @@ namespace Microi.net
                     }
                     if (detailResult.Code == 1 && detailResult.Data != null)
                     {
-                        var detail = JObject.FromObject(detailResult.Data);
+                        var detail = JObject.FromObject((object)detailResult.Data);
                         var service = detail["Service"] as JObject;
                         var routes = GetArrayParam(param, "Routes", "routes", "Pages", "pages");
                         var routeResult = await SyncMicroServicePages(

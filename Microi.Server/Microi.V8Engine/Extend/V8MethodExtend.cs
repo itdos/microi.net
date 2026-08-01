@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Dos.Common;
@@ -109,11 +110,18 @@ namespace Microi.net
                 var retainCountText = param["RetainCount"]?.ToString();
                 int retainCount;
                 int.TryParse(retainCountText, out retainCount);
+                var selectedTenants = param["TenantOsClients"] is JArray tenantArray
+                    ? tenantArray.Select(token => token?.ToString())
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToArray()
+                    : null;
                 return new DatabaseBackupService(backgroundTaskId).Run(
                     currentUser,
                     osClient,
                     param["TriggerType"]?.ToString() ?? "Manual",
-                    retainCount);
+                    retainCount,
+                    selectedTenants);
             }
             catch (Exception ex)
             {
@@ -128,71 +136,8 @@ namespace Microi.net
         {
             try
             {
-                var param = JsonHelper.ToJObject(dynamicParam) ?? new JObject();
-                var osClient = param["OsClient"]?.ToString() ?? "";
-                var jobId = param["Id"]?.ToString() ?? param["JobId"]?.ToString() ?? "";
-                if (!string.Equals(osClient, DatabaseBackupService.RequiredOsClient, StringComparison.OrdinalIgnoreCase)
-                    || !string.Equals(jobId, DatabaseBackupService.ScheduledJobId, StringComparison.Ordinal))
-                {
-                    return new DosResult(0, null, "仅固定的 iTdos 数据库备份任务可投递后台任务。");
-                }
-
-                var client = OsClientExtend.GetClient(DatabaseBackupService.RequiredOsClient);
-                if (client?.DbRead == null)
-                {
-                    return new DosResult(0, null, "iTdos 主租户读取连接不可用。");
-                }
-                var admin = client.DbRead.FromSql(@"SELECT `Id`,`Account`,`Name`,`Level`
-FROM `Sys_User` WHERE (`IsDeleted`=0 OR `IsDeleted` IS NULL) AND `Level`>=9999
-ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
-                if (admin == null)
-                {
-                    return new DosResult(0, null, "未找到可接收定时备份通知的超级管理员。");
-                }
-                var trustedUser = JObject.FromObject(admin);
-                var userId = trustedUser["Id"]?.ToString() ?? "";
-                if (string.IsNullOrWhiteSpace(userId))
-                {
-                    return new DosResult(0, null, "定时备份通知管理员 Id 为空。");
-                }
-
-                var retainCount = 7;
-                var jobParamText = param["JobParam"]?.ToString();
-                if (!string.IsNullOrWhiteSpace(jobParamText))
-                {
-                    try
-                    {
-                        var settings = JObject.Parse(jobParamText);
-                        int.TryParse(settings["RetainCount"]?.ToString(), out retainCount);
-                    }
-                    catch { }
-                }
-                retainCount = Math.Max(1, Math.Min(100, retainCount <= 0 ? 7 : retainCount));
-                var scheduledRunKey = param["JobRunId"]?.ToString()
-                                      ?? param["FireTime"]?.ToString()
-                                      ?? DateTime.Now.ToString("yyyyMMddHHmm");
-                var task = BackgroundTaskService.StartApiEngine(
-                    DatabaseBackupService.RequiredOsClient,
-                    userId,
-                    "数据库定时备份",
-                    new JObject
-                    {
-                        ["ApiEngineKey"] = DatabaseBackupService.WorkerApiEngineKey,
-                        ["TriggerType"] = "Scheduled",
-                        ["RetainCount"] = retainCount
-                    },
-                    trustedUser,
-                    new JObject
-                    {
-                        ["IdempotencyKey"] = $"database-backup:{jobId}:{scheduledRunKey}",
-                        ["ConcurrencyKey"] = "database-backup"
-                    });
-                return new DosResult(1, new
-                {
-                    TaskId = task.Id,
-                    task.Status,
-                    task.StatusText
-                }, "数据库定时备份已进入后台任务队列。");
+                return DatabaseBackupControlService.QueueScheduledBackup(
+                    JsonHelper.ToJObject(dynamicParam) ?? new JObject());
             }
             catch (Exception ex)
             {

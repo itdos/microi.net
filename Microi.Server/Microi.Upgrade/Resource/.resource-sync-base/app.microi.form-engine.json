@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v6.2.7",
+    "Version": "v6.9.4",
     "CreateTime": "2026-07-12T13:55:37.022Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -8006,7 +8006,7 @@
   "DataSets": [],
   "SysApiEngines": [
     {
-      "LimitRecursion": 10000,
+      "LimitRecursion": 5000,
       "LimitMemory": 2048,
       "MaxStatements": 100000000,
       "Timeout": 600,

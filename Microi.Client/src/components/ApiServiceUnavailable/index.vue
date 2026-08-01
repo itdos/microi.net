@@ -13,18 +13,45 @@
                     </div>
                 </div>
 
-                <div class="api-service-unavailable__content">
+                <div class="api-service-unavailable__content" :class="{ 'is-security-blocked': isSecurity }">
                     <div class="api-service-unavailable__eyebrow">
                         <span class="api-service-unavailable__status-dot"></span>
-                        服务连接异常
+                        {{ isSecurity ? "安全防护临时拦截" : "服务连接异常" }}
                     </div>
-                    <h1>后端 API 服务暂时不可用</h1>
+                    <h1>{{ isSecurity ? state.message : "后端 API 服务暂时不可用" }}</h1>
                     <p class="api-service-unavailable__summary">
-                        前端界面已正常启动，但当前无法与后端服务建立连接。请检查 API 服务、
-                        反向代理、HTTPS 证书或跨域配置是否正常。
+                        <template v-if="isSecurity">
+                            {{ state.reason || "当前出口 IP 的请求频率触发了平台安全阈值。" }}
+                        </template>
+                        <template v-else>
+                            前端界面已正常启动，但当前无法与后端服务建立连接。请检查 API 服务、
+                            反向代理、HTTPS 证书或跨域配置是否正常。
+                        </template>
                     </p>
 
-                    <dl class="api-service-unavailable__details">
+                    <dl v-if="isSecurity" class="api-service-unavailable__details">
+                        <div>
+                            <dt>被拦截 IP</dt>
+                            <dd>{{ state.ip || "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>自动解除时间</dt>
+                            <dd :title="state.expiresAtUtc">{{ formatUtc(state.expiresAtUtc) }}</dd>
+                        </div>
+                        <div>
+                            <dt>拦截原因</dt>
+                            <dd class="api-service-unavailable__details-long" :title="state.reason">{{ state.reason || "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>保护状态</dt>
+                            <dd>{{ state.stateBackend === "SharedRedis" ? "共享 Redis（跨节点）" : "本节点安全降级" }}</dd>
+                        </div>
+                        <div>
+                            <dt>请求位置</dt>
+                            <dd :title="state.requestPath">{{ state.requestPath || "-" }}</dd>
+                        </div>
+                    </dl>
+                    <dl v-else class="api-service-unavailable__details">
                         <div>
                             <dt>ApiBase</dt>
                             <dd :title="state.apiBase">{{ state.apiBase || "-" }}</dd>
@@ -51,7 +78,10 @@
                             @click="retry"
                         >
                             <el-icon><RefreshRight /></el-icon>
-                            重新连接
+                            {{ isSecurity ? "检测是否已解除" : "重新连接" }}
+                        </el-button>
+                        <el-button v-if="isSecurity" size="large" @click="openDocumentation">
+                            查看解除说明
                         </el-button>
                         <el-button size="large" @click="copyDiagnostic">
                             <el-icon><DocumentCopy /></el-icon>
@@ -61,7 +91,10 @@
 
                     <div class="api-service-unavailable__hint">
                         <el-icon><Monitor /></el-icon>
-                        <span>服务恢复后刷新页面即可继续使用，当前页面不会提交任何业务数据。</span>
+                        <span v-if="isSecurity">
+                            {{ state.unblockAdvice || "到期后会自动解除；需立即解除时请联系平台超级管理员。" }}
+                        </span>
+                        <span v-else>服务恢复后刷新页面即可继续使用，当前页面不会提交任何业务数据。</span>
                     </div>
                 </div>
             </div>
@@ -70,6 +103,7 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { Connection, DocumentCopy, Monitor, RefreshRight } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
 import {
@@ -78,13 +112,29 @@ import {
     getApiServiceDiagnostic,
 } from "@/utils/api-service-status.js";
 
+const isSecurity = computed(function () {
+    return state.mode === "security";
+});
+
+function formatUtc(value) {
+    if (!value) return "等待后端返回";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 async function retry() {
     const reachable = await checkApiServiceNow();
     if (reachable) {
         window.location.reload();
         return;
     }
-    ElMessage.warning("后端 API 服务仍不可用，请稍后重试");
+    ElMessage.warning(isSecurity.value
+        ? "当前 IP 仍在临时拦截期，请等待自动解除或联系平台超级管理员"
+        : "后端 API 服务仍不可用，请稍后重试");
+}
+
+function openDocumentation() {
+    window.open(state.documentationUrl || "https://microi.net/doc/more/security", "_blank", "noopener,noreferrer");
 }
 
 async function copyDiagnostic() {
@@ -300,6 +350,17 @@ async function copyDiagnostic() {
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.api-service-unavailable__details dd.api-service-unavailable__details-long {
+    overflow: visible;
+    line-height: 1.45;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.api-service-unavailable__content.is-security-blocked h1 {
+    font-size: 26px;
 }
 
 .api-service-unavailable__actions {

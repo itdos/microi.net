@@ -130,6 +130,14 @@ interface RequestOptions {
   operationName?: string;
 }
 
+type AuthRecoveryStage = 'initial' | 'replacement-token' | 'broker-token' | 'credential-token';
+
+function nextAuthRecoveryStage(stage: AuthRecoveryStage): AuthRecoveryStage {
+  if (stage === 'initial') { return 'replacement-token'; }
+  if (stage === 'replacement-token') { return 'broker-token'; }
+  return 'credential-token';
+}
+
 export class MicroiTransportError extends Error {
   readonly kind: 'timeout' | 'network';
   readonly requestPath: string;
@@ -480,6 +488,8 @@ export class MicroiClient {
   private inflightRefresh?: Promise<boolean>;
   /** 同一时刻只允许一条完整身份恢复链路，避免并发重登或重复写恢复请求。 */
   private inflightAuthRecovery?: Promise<boolean>;
+  /** 刷新签发的替代 Token 仍被拒绝时，凭据恢复阶段也必须 single-flight。 */
+  private inflightCredentialRecovery?: Promise<boolean>;
 
   constructor(config: MicroiConfig) {
     this.config = config;
@@ -730,9 +740,33 @@ export class MicroiClient {
    *           4) VS Code 托管模式写入无密请求，由扩展通过 SecretStorage 重登。
    *  返回 true 表示 token 已更新，调用方可重试请求。
    */
-  private async tryRecoverFromAuthFailure(): Promise<boolean> {
+  private async tryRecoverFromAuthFailure(
+    rejectedToken: string,
+    credentialOnly = false,
+  ): Promise<boolean> {
+    // 其它并发请求已更新了当前 Token，直接复用新状态。
+    if (this.token && rejectedToken && this.token !== rejectedToken) { return true; }
+
+    if (credentialOnly) {
+      if (this.inflightCredentialRecovery) { return this.inflightCredentialRecovery; }
+      const primaryRecovery = this.inflightAuthRecovery;
+      this.inflightCredentialRecovery = (async () => {
+        // 若首段刷新仍在飞，先等它收敛；只要它已换成其它 Token，当前请求可直接重试。
+        if (primaryRecovery) { await primaryRecovery; }
+        if (this.token && rejectedToken && this.token !== rejectedToken) { return true; }
+        return this.tryRecoverFromAuthFailureCore(rejectedToken, true);
+      })();
+      try {
+        return await this.inflightCredentialRecovery;
+      } finally {
+        this.inflightCredentialRecovery = undefined;
+      }
+    }
+
+    // 更强的凭据恢复已在执行时，首段请求应复用它，不再并发刷新。
+    if (this.inflightCredentialRecovery) { return this.inflightCredentialRecovery; }
     if (this.inflightAuthRecovery) { return this.inflightAuthRecovery; }
-    this.inflightAuthRecovery = this.tryRecoverFromAuthFailureCore();
+    this.inflightAuthRecovery = this.tryRecoverFromAuthFailureCore(rejectedToken, false);
     try {
       return await this.inflightAuthRecovery;
     } finally {
@@ -740,15 +774,19 @@ export class MicroiClient {
     }
   }
 
-  private async tryRecoverFromAuthFailureCore(): Promise<boolean> {
-    const failedToken = this.token;
+  private async tryRecoverFromAuthFailureCore(
+    failedToken: string,
+    credentialOnly: boolean,
+  ): Promise<boolean> {
+    if (this.token && failedToken && this.token !== failedToken) { return true; }
     // 1. 先尝试读文件，可能 VS Code 已经刷过了
     if (this.reloadTokenFromFile()) {
       console.error('[microi-mcp] Token reloaded from file after auth failure');
       return true;
     }
-    // 2. 主动刷新
-    if (await this.refreshTokenNow()) return true;
+    // 2. 只有首段恢复才允许主动刷新。刷新签发的 Token 若立即被拒绝，
+    // 第二段必须跳过 RefreshToken，否则会在同一枚无效 Token 上循环。
+    if (!credentialOnly && await this.refreshTokenNow()) return true;
     // 3. 独立 MCP 配置的兜底：用账号密码重新登录
     if (this.config.username && this.config.password) {
       try {
@@ -774,7 +812,7 @@ export class MicroiClient {
     body: unknown,
     options: RequestOptions = {},
   ): Promise<ApiResponse<T>> {
-    return this.requestJson<T>('POST', reqPath, body, undefined, true, options);
+    return this.requestJson<T>('POST', reqPath, body, undefined, 'initial', options);
   }
 
   /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
@@ -783,7 +821,7 @@ export class MicroiClient {
     params?: Record<string, string>,
     options: RequestOptions = {},
   ): Promise<ApiResponse<T>> {
-    return this.requestJson<T>('GET', reqPath, undefined, params, true, options);
+    return this.requestJson<T>('GET', reqPath, undefined, params, 'initial', options);
   }
 
   private async requestJson<T = unknown>(
@@ -791,7 +829,7 @@ export class MicroiClient {
     reqPath: string,
     body?: unknown,
     params?: Record<string, string>,
-    allowRetryOnAuthFailure = true,
+    authRecoveryStage: AuthRecoveryStage = 'initial',
     options: RequestOptions = {},
   ): Promise<ApiResponse<T>> {
     let url = `${this.config.apiBaseUrl}${reqPath}`;
@@ -800,7 +838,8 @@ export class MicroiClient {
       if (qs) url += `?${qs}`;
     }
 
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}`, did: this.did };
+    const requestToken = this.token;
+    const headers: Record<string, string> = { Authorization: `Bearer ${requestToken}`, did: this.did };
     if (this.config.osClient) headers.OsClient = this.config.osClient;
     if (method === 'POST') headers['Content-Type'] = 'application/json';
 
@@ -841,10 +880,23 @@ export class MicroiClient {
       this.writeTokenToFile();
     }
 
-    // HTTP 401 → 刷新后重试一次
-    if (res.status === 401 && allowRetryOnAuthFailure) {
-      if (await this.tryRecoverFromAuthFailure()) {
-        return this.requestJson<T>(method, reqPath, body, params, false, options);
+    // HTTP 401 → 首段允许刷新；后续阶段只允许凭据恢复。
+    // Broker 第一次可能只同步 VS Code 已有的不同 Token；若它也被拒绝，
+    // 再提交一次它的失败哈希，扩展就能安全确认需要 SecretStorage 重登。
+    if (res.status === 401 && authRecoveryStage !== 'credential-token') {
+      const credentialOnly = authRecoveryStage !== 'initial';
+      if (credentialOnly) {
+        console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
+      }
+      if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
+        return this.requestJson<T>(
+          method,
+          reqPath,
+          body,
+          params,
+          nextAuthRecoveryStage(authRecoveryStage),
+          options,
+        );
       }
       throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
     }
@@ -863,10 +915,21 @@ export class MicroiClient {
     }
 
     // Microi 历史版本可能用 Code=1001/1002、ReasonCode 或签名失败文本表达身份失效。
-    if (isAuthenticationFailureResponse(parsed) && allowRetryOnAuthFailure) {
+    if (isAuthenticationFailureResponse(parsed) && authRecoveryStage !== 'credential-token') {
       console.error(`[microi-mcp] Auth expired (Code=${parsed.Code}: ${parsed.Msg || ''}), attempting recovery...`);
-      if (await this.tryRecoverFromAuthFailure()) {
-        return this.requestJson<T>(method, reqPath, body, params, false, options);
+      const credentialOnly = authRecoveryStage !== 'initial';
+      if (credentialOnly) {
+        console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
+      }
+      if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
+        return this.requestJson<T>(
+          method,
+          reqPath,
+          body,
+          params,
+          nextAuthRecoveryStage(authRecoveryStage),
+          options,
+        );
       }
     }
     return parsed;
@@ -882,9 +945,10 @@ export class MicroiClient {
     fields: Record<string, string>,
     filePath: string,
     fileName: string,
-    allowRetryOnAuthFailure = true,
+    authRecoveryStage: AuthRecoveryStage = 'initial',
     timeoutMs?: number,
   ): Promise<ApiResponse<T>> {
+    const requestToken = this.token;
     const boundary = `----microi-mcp-${crypto.randomBytes(24).toString('hex')}`;
     const multipart = buildMultipartFileBody(fields, filePath, fileName, boundary);
     const controller = new AbortController();
@@ -896,7 +960,7 @@ export class MicroiClient {
       res = await fetch(`${this.config.apiBaseUrl}${reqPath}`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${this.token}`,
+          Authorization: `Bearer ${requestToken}`,
           did: this.did,
           ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
           'Content-Type': `multipart/form-data; boundary=${boundary}`,
@@ -931,9 +995,20 @@ export class MicroiClient {
       this.token = normalizeAuthorizationToken(newToken);
       this.writeTokenToFile();
     }
-    if (res.status === 401 && allowRetryOnAuthFailure) {
-      if (await this.tryRecoverFromAuthFailure()) {
-        return this.requestMultipartFile<T>(reqPath, fields, filePath, fileName, false, timeoutMs);
+    if (res.status === 401 && authRecoveryStage !== 'credential-token') {
+      const credentialOnly = authRecoveryStage !== 'initial';
+      if (credentialOnly) {
+        console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
+      }
+      if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
+        return this.requestMultipartFile<T>(
+          reqPath,
+          fields,
+          filePath,
+          fileName,
+          nextAuthRecoveryStage(authRecoveryStage),
+          timeoutMs,
+        );
       }
       throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
     }
@@ -946,9 +1021,20 @@ export class MicroiClient {
     } catch {
       throw new Error(`HTTP ${res.status} — invalid JSON: ${text.slice(0, 200)}`);
     }
-    if (isAuthenticationFailureResponse(parsed) && allowRetryOnAuthFailure) {
-      if (await this.tryRecoverFromAuthFailure()) {
-        return this.requestMultipartFile<T>(reqPath, fields, filePath, fileName, false, timeoutMs);
+    if (isAuthenticationFailureResponse(parsed) && authRecoveryStage !== 'credential-token') {
+      const credentialOnly = authRecoveryStage !== 'initial';
+      if (credentialOnly) {
+        console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
+      }
+      if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
+        return this.requestMultipartFile<T>(
+          reqPath,
+          fields,
+          filePath,
+          fileName,
+          nextAuthRecoveryStage(authRecoveryStage),
+          timeoutMs,
+        );
       }
     }
     return parsed;
@@ -1426,7 +1512,7 @@ export class MicroiClient {
       },
       localPath,
       fileName,
-      true,
+      'initial',
       data.TimeoutMs,
     );
   }
@@ -2041,6 +2127,49 @@ export class MicroiClient {
     return this.post(API.SAVE_JOB, {
       OsClient: this.config.osClient,
       ...data,
+    });
+  }
+
+  async listDatabaseBackupTenants(): Promise<ApiResponse> {
+    return this.post(API.LIST_DATABASE_BACKUP_TENANTS, {
+      OsClient: this.config.osClient,
+    });
+  }
+
+  async runDatabaseBackup(options: {
+    tenantOsClients?: string[];
+    retainCount?: number;
+    idempotencyKey: string;
+  }): Promise<ApiResponse> {
+    if (!/^[A-Za-z0-9:._-]{8,128}$/.test(options?.idempotencyKey || '')) {
+      throw new Error('database backup idempotencyKey is required (8-128 safe characters) and must be reused for uncertain retries');
+    }
+    return this.post(API.RUN_DATABASE_BACKUP, {
+      OsClient: this.config.osClient,
+      ConfirmExecution: 'DATABASE_BACKUP',
+      RetainCount: options.retainCount ?? 7,
+      ...(options.tenantOsClients === undefined
+        ? {}
+        : { TenantOsClients: options.tenantOsClients }),
+      IdempotencyKey: options.idempotencyKey,
+    });
+  }
+
+  async runBackgroundApiEngine(data: {
+    apiEngineKey: string;
+    title: string;
+    param: Record<string, unknown>;
+    options?: Record<string, unknown>;
+  }): Promise<ApiResponse> {
+    return this.post(API.RUN_BACKGROUND_API_ENGINE, {
+      OsClient: this.config.osClient,
+      ApiEngineKey: data.apiEngineKey,
+      Title: data.title,
+      Param: data.param,
+      Options: data.options || {},
+    }, {
+      timeoutMs: this.writeRequestTimeoutMs,
+      operationName: `queue background API engine ${data.apiEngineKey}`,
     });
   }
 

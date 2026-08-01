@@ -1,4 +1,5 @@
 import { reactive } from "vue";
+import { readSecurityBlockedResult, SECURITY_GUARD_DOCUMENTATION_URL } from "./security-blocked.js";
 
 const NETWORK_STATUS_CODES = [502, 503, 504];
 const HEALTH_CHECK_PATH = "/api/Diagnostics/health";
@@ -11,6 +12,7 @@ const MIN_OUTAGE_DURATION = 1800;
 export const apiServiceState = reactive({
     active: false,
     checking: false,
+    mode: "connection",
     apiBase: "",
     osClient: "",
     requestUrl: "",
@@ -18,7 +20,18 @@ export const apiServiceState = reactive({
     reason: "",
     errorCode: "",
     statusCode: 0,
-    occurredAt: ""
+    occurredAt: "",
+    message: "",
+    ip: "",
+    reasonKey: "",
+    securityScope: "",
+    stateBackend: "",
+    blockedAtUtc: "",
+    expiresAtUtc: "",
+    retryAfterSeconds: 0,
+    autoUnblock: true,
+    unblockAdvice: "",
+    documentationUrl: SECURITY_GUARD_DOCUMENTATION_URL
 });
 
 let healthCheckTimer = 0;
@@ -28,6 +41,7 @@ let evidenceApiBase = "";
 let firstFailureAt = 0;
 let healthFailureCount = 0;
 let pendingFailure = null;
+let securityCheckTimer = 0;
 
 function trimSlash(value) {
     return String(value || "").trim().replace(/\/+$/, "");
@@ -77,6 +91,12 @@ function clearHealthCheckTimer() {
     healthCheckTimer = 0;
 }
 
+function clearSecurityCheckTimer() {
+    if (!securityCheckTimer) return;
+    window.clearTimeout(securityCheckTimer);
+    securityCheckTimer = 0;
+}
+
 function resetOutageEvidence(options = {}) {
     evidenceVersion += 1;
     clearHealthCheckTimer();
@@ -85,10 +105,55 @@ function resetOutageEvidence(options = {}) {
     firstFailureAt = 0;
     healthFailureCount = 0;
     pendingFailure = null;
+    clearSecurityCheckTimer();
     apiServiceState.checking = false;
     if (options.hide !== false) {
         apiServiceState.active = false;
+        apiServiceState.mode = "connection";
     }
+}
+
+function scheduleSecurityExpiryCheck(expiresAtUtc) {
+    clearSecurityCheckTimer();
+    const expiresAt = Date.parse(expiresAtUtc || "");
+    if (!Number.isFinite(expiresAt)) return;
+    const delay = Math.max(250, expiresAt - Date.now() + 500);
+    if (delay > 2147483647) return;
+    securityCheckTimer = window.setTimeout(function () {
+        securityCheckTimer = 0;
+        checkApiServiceNow();
+    }, delay);
+    if (typeof securityCheckTimer?.unref === "function") securityCheckTimer.unref();
+}
+
+function activateSecurityBlock(info, context = {}) {
+    resetOutageEvidence({ hide: false });
+    const apiBase = trimSlash(context.apiBase) || trimSlash(window.location.origin);
+    const requestUrl = getRequestUrl(context);
+    apiServiceState.active = true;
+    apiServiceState.checking = false;
+    apiServiceState.mode = "security";
+    apiServiceState.apiBase = apiBase;
+    apiServiceState.osClient = String(context.osClient || "").trim() || apiServiceState.osClient || "未识别";
+    apiServiceState.requestUrl = requestUrl;
+    apiServiceState.requestPath = getRequestPath(requestUrl, apiBase);
+    apiServiceState.message = info.message;
+    apiServiceState.ip = info.ip;
+    apiServiceState.reason = info.reason;
+    apiServiceState.reasonKey = info.reasonKey;
+    apiServiceState.securityScope = info.securityScope;
+    apiServiceState.stateBackend = info.stateBackend;
+    apiServiceState.blockedAtUtc = info.blockedAtUtc;
+    apiServiceState.expiresAtUtc = info.expiresAtUtc;
+    apiServiceState.retryAfterSeconds = info.retryAfterSeconds;
+    apiServiceState.autoUnblock = info.autoUnblock;
+    apiServiceState.unblockAdvice = info.unblockAdvice;
+    apiServiceState.documentationUrl = info.documentationUrl || SECURITY_GUARD_DOCUMENTATION_URL;
+    apiServiceState.errorCode = "SecurityBlocked";
+    apiServiceState.statusCode = 200;
+    apiServiceState.occurredAt = new Date().toLocaleString();
+    scheduleSecurityExpiryCheck(info.expiresAtUtc);
+    return true;
 }
 
 function updateDiagnostic(error, context, apiBase, requestUrl, statusCode) {
@@ -103,7 +168,7 @@ function updateDiagnostic(error, context, apiBase, requestUrl, statusCode) {
 }
 
 async function probeApiService(apiBase) {
-    if (typeof window.fetch !== "function") return false;
+    if (typeof window.fetch !== "function") return { reachable: false, securityInfo: null };
 
     const controller = typeof AbortController === "undefined" ? null : new AbortController();
     const timeoutId = window.setTimeout(function () {
@@ -122,10 +187,22 @@ async function probeApiService(apiBase) {
             signal: controller?.signal
         });
 
+        let responseData = null;
+        if (typeof response.json === "function") {
+            try {
+                responseData = await response.json();
+            } catch (error) {
+                responseData = null;
+            }
+        }
+        const securityInfo = readSecurityBlockedResult(responseData);
         // 404/401/500 等响应仍能证明 API 服务可达；只有网关级不可用才视为整体故障。
-        return NETWORK_STATUS_CODES.indexOf(Number(response.status || 0)) === -1;
+        return {
+            reachable: NETWORK_STATUS_CODES.indexOf(Number(response.status || 0)) === -1,
+            securityInfo
+        };
     } catch (error) {
-        return false;
+        return { reachable: false, securityInfo: null };
     } finally {
         window.clearTimeout(timeoutId);
     }
@@ -147,12 +224,22 @@ async function runHealthCheck(version) {
     apiServiceState.checking = apiServiceState.active;
     const currentProbe = probeApiService(apiBase);
     healthCheckPromise = currentProbe;
-    const reachable = await currentProbe;
+    const probeResult = await currentProbe;
+    const reachable = probeResult.reachable;
     if (healthCheckPromise === currentProbe) {
         healthCheckPromise = null;
     }
 
     if (version !== evidenceVersion) return reachable;
+
+    if (probeResult.securityInfo) {
+        activateSecurityBlock(probeResult.securityInfo, {
+            apiBase,
+            osClient: apiServiceState.osClient,
+            url: HEALTH_CHECK_PATH
+        });
+        return false;
+    }
 
     if (reachable) {
         resetOutageEvidence();
@@ -176,6 +263,10 @@ async function runHealthCheck(version) {
 
 export function reportApiServiceFailure(error, context = {}) {
     if (typeof window === "undefined" || !error || isCanceledRequest(error)) return false;
+
+    const securityInfo = readSecurityBlockedResult(error?.response?.data);
+    if (securityInfo) return activateSecurityBlock(securityInfo, context);
+    if (apiServiceState.active && apiServiceState.mode === "security") return true;
 
     const apiBase = trimSlash(context.apiBase);
     const requestUrl = getRequestUrl(context);
@@ -201,7 +292,16 @@ export function reportApiServiceFailure(error, context = {}) {
     return true;
 }
 
+export function reportApiServiceResponse(responseData, context = {}) {
+    if (typeof window === "undefined") return false;
+    const securityInfo = readSecurityBlockedResult(responseData);
+    return securityInfo ? activateSecurityBlock(securityInfo, context) : false;
+}
+
 export function reportApiServiceRecovered(context = {}) {
+    if (reportApiServiceResponse(context.responseData, context)) return;
+    // 并发请求中可能仍有其它正常响应，不能让它覆盖当前 IP 的明确拦截事实。
+    if (apiServiceState.active && apiServiceState.mode === "security") return;
     if (!apiServiceState.active && !pendingFailure) return;
     const apiBase = trimSlash(context.apiBase || apiServiceState.apiBase);
     const requestUrl = getRequestUrl(context);
@@ -212,8 +312,16 @@ export function reportApiServiceRecovered(context = {}) {
 export async function checkApiServiceNow() {
     if (typeof window === "undefined") return false;
     apiServiceState.checking = true;
-    const reachable = await probeApiService(apiServiceState.apiBase);
-    if (reachable) {
+    const probeResult = await probeApiService(apiServiceState.apiBase);
+    if (probeResult.securityInfo) {
+        activateSecurityBlock(probeResult.securityInfo, {
+            apiBase: apiServiceState.apiBase,
+            osClient: apiServiceState.osClient,
+            url: HEALTH_CHECK_PATH
+        });
+        return false;
+    }
+    if (probeResult.reachable) {
         resetOutageEvidence();
         return true;
     }
@@ -223,11 +331,15 @@ export async function checkApiServiceNow() {
 
 export function getApiServiceDiagnostic() {
     return [
-        "Microi 后端 API 服务诊断",
+        apiServiceState.mode === "security" ? "Microi 安全防护拦截诊断" : "Microi 后端 API 服务诊断",
         `ApiBase: ${apiServiceState.apiBase || "-"}`,
         `OsClient: ${apiServiceState.osClient || "-"}`,
         `请求地址: ${apiServiceState.requestPath || "-"}`,
         `故障原因: ${apiServiceState.reason || "-"}`,
+        `拦截IP: ${apiServiceState.ip || "-"}`,
+        `安全状态源: ${apiServiceState.stateBackend || "-"}`,
+        `自动解除时间(UTC): ${apiServiceState.expiresAtUtc || "-"}`,
+        `解除说明: ${apiServiceState.unblockAdvice || "-"}`,
         `HTTP 状态: ${apiServiceState.statusCode || "-"}`,
         `错误代码: ${apiServiceState.errorCode || "-"}`,
         `发生时间: ${apiServiceState.occurredAt || "-"}`

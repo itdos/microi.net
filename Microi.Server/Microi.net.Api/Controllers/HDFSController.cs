@@ -986,7 +986,7 @@ namespace Microi.net.Api
                 fileLimits = MicroiHDFS.GetFileUploadSecurityOptions(osClient);
                 if (!fileLimits.UploadEnabled)
                 {
-                    return Json(new DosResult(0, null, "当前租户已停用文件上传！"));
+                    return Json(FileUploadSecurity.CreateTenantUploadDisabledResult(osClient));
                 }
                 using var handler = new HttpClientHandler
                 {

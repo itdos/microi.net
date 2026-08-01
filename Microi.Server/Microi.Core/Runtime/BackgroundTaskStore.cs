@@ -25,6 +25,8 @@ namespace Microi.net
         public int ProgressSampleCount { get; set; }
         public string CheckpointJson { get; set; }
         public string LastError { get; set; }
+        public string RuntimeOsClientType { get; set; }
+        public string RuntimeOsClientNetwork { get; set; }
     }
 
     internal static class BackgroundTaskStore
@@ -36,7 +38,9 @@ HeartbeatTime,EstimatedEndTime,RemainingSeconds,EstimateConfidence,CancelRequest
 TrustedUserJson,IdempotencyKey,ConcurrencyKey,LeaseOwner,LeaseExpiresAt,FencingToken,AttemptCount,MaxAttempts,
 ExecutionCount,RetryOnFailure,NextRunTime,ProgressSampleTime,ProgressSampleCurrent,ThroughputPerSecond,
 ProgressSampleCount,CheckpointJson,LastError,BusinessTable,BusinessId,BusinessStatusField,BusinessTaskIdField,
-BusinessProgressField,BusinessEtaField";
+BusinessProgressField,BusinessEtaField,RuntimeOsClientType,RuntimeOsClientNetwork";
+        internal const string RuntimeScopePredicate = @"(RuntimeOsClientType IS NULL OR RuntimeOsClientType='' OR RuntimeOsClientType=@runtimeType)
+  AND (RuntimeOsClientNetwork IS NULL OR RuntimeOsClientNetwork='' OR RuntimeOsClientNetwork=@runtimeNetwork)";
 
         public static bool IsAvailable(string osClient)
         {
@@ -66,10 +70,36 @@ BusinessProgressField,BusinessEtaField";
             var client = GetRequiredClient(osClient);
             var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND IdempotencyKey=@p1
+  AND {RuntimeScopePredicate}
 ORDER BY CreateTime DESC");
             return Hydrate(client.Db.FromSql(sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", idempotencyKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
+                .ToFirst<BackgroundTaskRecord>());
+        }
+
+        /// <summary>
+        /// Returns the oldest live task for a native/API-engine worker. Scheduled
+        /// producers use this read before enqueueing the next occurrence so a
+        /// long-running job cannot accumulate an unbounded backlog. The stable
+        /// per-fire idempotency key remains the final cross-node race guard.
+        /// </summary>
+        public static BackgroundTaskRecord FindActiveByApiEngineKey(string osClient, string apiEngineKey)
+        {
+            if (apiEngineKey.DosIsNullOrWhiteSpace()) return null;
+            var client = GetRequiredClient(osClient);
+            var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND ApiEngineKey=@p1
+  AND {RuntimeScopePredicate}
+  AND CancelRequested=0 AND Status IN ('Pending','Retrying','Running')
+ORDER BY CreateTime ASC");
+            return Hydrate(client.Db.FromSql(sql)
+                .AddInParameter("p0", osClient)
+                .AddInParameter("p1", apiEngineKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ToFirst<BackgroundTaskRecord>());
         }
 
@@ -81,12 +111,12 @@ ORDER BY CreateTime DESC");
  Progress,ProgressMode,WorkCurrent,WorkTotal,Msg,Log,CancelRequested,ResultJson,ParamJson,TrustedUserJson,
  IdempotencyKey,ConcurrencyKey,FencingToken,AttemptCount,MaxAttempts,ExecutionCount,RetryOnFailure,
  ProgressSampleCurrent,ProgressSampleCount,BusinessTable,BusinessId,BusinessStatusField,BusinessTaskIdField,
- BusinessProgressField,BusinessEtaField)
+ BusinessProgressField,BusinessEtaField,RuntimeOsClientType,RuntimeOsClientNetwork)
 VALUES
 (@id,@now,@now,@userId,@userName,0,@osClient,@userKey,@title,'ApiEngine',@apiEngineKey,'Pending','排队中',
  0,'Indeterminate',0,0,'','',0,'',@paramJson,@trustedUserJson,@idempotencyKey,@concurrencyKey,0,0,@maxAttempts,0,
  @retryOnFailure,0,0,@businessTable,@businessId,@businessStatusField,@businessTaskIdField,
- @businessProgressField,@businessEtaField)";
+ @businessProgressField,@businessEtaField,@runtimeType,@runtimeNetwork)";
             var command = client.Db.FromSql(sql)
                 .AddInParameter("id", item.Id)
                 .AddInParameter("now", DbTime(item.CreateTime))
@@ -107,7 +137,9 @@ VALUES
                 .AddInParameter("businessStatusField", item.BusinessStatusField ?? "")
                 .AddInParameter("businessTaskIdField", item.BusinessTaskIdField ?? "")
                 .AddInParameter("businessProgressField", item.BusinessProgressField ?? "")
-                .AddInParameter("businessEtaField", item.BusinessEtaField ?? "");
+                .AddInParameter("businessEtaField", item.BusinessEtaField ?? "")
+                .AddInParameter("runtimeType", item.RuntimeOsClientType ?? "")
+                .AddInParameter("runtimeNetwork", item.RuntimeOsClientNetwork ?? "");
             command.ExecuteNonQuery();
         }
 
@@ -117,10 +149,13 @@ VALUES
             take = Math.Max(1, Math.Min(500, take));
             var sql = TakeSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND UserKey=@p1
+  AND {RuntimeScopePredicate}
 ORDER BY CreateTime DESC", take);
             return client.Db.FromSql(sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", userKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ToList<BackgroundTaskRecord>()
                 .Select(Hydrate)
                 .Where(item => item != null)
@@ -131,10 +166,13 @@ ORDER BY CreateTime DESC", take);
         {
             var client = GetRequiredClient(osClient);
             var sql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
-WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND Id=@p1");
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND Id=@p1
+  AND {RuntimeScopePredicate}");
             return Hydrate(client.Db.FromSql(sql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", taskId)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ToFirst<BackgroundTaskRecord>());
         }
 
@@ -143,10 +181,13 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND Id=@p1");
             var client = GetRequiredClient(osClient);
             return client.Db.FromSql($@"UPDATE {TableName} SET IsDeleted=1,
 IdempotencyKey={ArchivedIdempotencySql(client)},UpdateTime=@p0
-WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Status='Succeeded'")
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Status='Succeeded'
+  AND {RuntimeScopePredicate}")
                 .AddInParameter("p0", DbTime(DateTime.Now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("p2", userKey)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ExecuteNonQuery();
         }
 
@@ -156,11 +197,14 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND St
             return client.Db.FromSql($@"UPDATE {TableName} SET IsDeleted=1,
 IdempotencyKey={ArchivedIdempotencySql(client)},UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id=@p3
+  AND {RuntimeScopePredicate}
   AND Status IN ('Succeeded','Failed','Canceled')")
                 .AddInParameter("p0", DbTime(DateTime.Now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("p2", userKey)
                 .AddInParameter("p3", taskId)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ExecuteNonQuery();
         }
 
@@ -175,11 +219,14 @@ SET CancelRequested=1,Status=CASE WHEN Status='Pending' THEN 'Canceled' ELSE Sta
     EndTime=CASE WHEN Status='Pending' THEN @p0 ELSE EndTime END,
     EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id=@p3
+  AND {RuntimeScopePredicate}
   AND Status NOT IN ('Succeeded','Failed','Canceled')")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("p2", userKey)
                 .AddInParameter("p3", taskId)
+                .AddInParameter("runtimeType", CurrentRuntimeOsClientType())
+                .AddInParameter("runtimeNetwork", CurrentRuntimeOsClientNetwork())
                 .ExecuteNonQuery();
         }
 
@@ -229,6 +276,8 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
         {
             var client = GetRequiredClient(osClient);
             var now = DateTime.Now;
+            var runtimeType = CurrentRuntimeOsClientType();
+            var runtimeNetwork = CurrentRuntimeOsClientNetwork();
             // Heal cancellation races and cancellations whose owning node died.
             // A running task is finalized only after its lease expires; pending or
             // retrying work has no active owner and can be finalized immediately.
@@ -238,13 +287,17 @@ SET Status='Canceled',StatusText='已停止',
     EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
     LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p0
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=1
+  AND {RuntimeScopePredicate}
   AND (Status IN ('Pending','Retrying')
        OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p0)))")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
+                .AddInParameter("runtimeType", runtimeType)
+                .AddInParameter("runtimeNetwork", runtimeNetwork)
                 .ExecuteNonQuery();
             var candidateSql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
+  AND {RuntimeScopePredicate}
   AND AttemptCount < MaxAttempts
   AND (NextRunTime IS NULL OR NextRunTime<=@p1)
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p1)))
@@ -252,6 +305,8 @@ ORDER BY CreateTime ASC");
             var candidate = Hydrate(client.Db.FromSql(candidateSql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", DbTime(now))
+                .AddInParameter("runtimeType", runtimeType)
+                .AddInParameter("runtimeNetwork", runtimeNetwork)
                 .ToFirst<BackgroundTaskRecord>());
             if (candidate == null) return null;
 
@@ -260,9 +315,12 @@ ORDER BY CreateTime ASC");
             var affected = client.Db.FromSql($@"UPDATE {TableName}
 SET Status='Running',StatusText='执行中',LeaseOwner=@p0,LeaseExpiresAt=@p1,HeartbeatTime=@p2,
     StartTime=CASE WHEN StartTime IS NULL THEN @p2 ELSE StartTime END,
+    RuntimeOsClientType=CASE WHEN RuntimeOsClientType IS NULL OR RuntimeOsClientType='' THEN @runtimeType ELSE RuntimeOsClientType END,
+    RuntimeOsClientNetwork=CASE WHEN RuntimeOsClientNetwork IS NULL OR RuntimeOsClientNetwork='' THEN @runtimeNetwork ELSE RuntimeOsClientNetwork END,
     FencingToken=FencingToken+1,ExecutionCount=ExecutionCount+1,
     AttemptCount=AttemptCount+@p3,UpdateTime=@p2
 WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
+  AND {RuntimeScopePredicate}
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p2)))")
                 .AddInParameter("p0", owner)
                 .AddInParameter("p1", DbTime(now.AddSeconds(90)))
@@ -270,6 +328,8 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
                 .AddInParameter("p3", staleRecovery ? 1 : 0)
                 .AddInParameter("p4", candidate.Id)
                 .AddInParameter("p5", osClient)
+                .AddInParameter("runtimeType", runtimeType)
+                .AddInParameter("runtimeNetwork", runtimeNetwork)
                 .ExecuteNonQuery();
             return affected == 1 ? Get(osClient, candidate.Id) : null;
         }
@@ -568,6 +628,22 @@ WHERE Id=@ownerId AND OsClient=@ownerOsClient AND Status='Running'
             var text = error?.Message ?? "后台任务执行异常。";
             text = text.Replace("\r", " ").Replace("\n", " ").Trim();
             return text.Length <= 2000 ? text : text.Substring(0, 2000);
+        }
+
+        internal static string CurrentRuntimeOsClientType()
+        {
+            return NormalizeRuntimeScopeValue(OsClientDefault.OsClientType);
+        }
+
+        internal static string CurrentRuntimeOsClientNetwork()
+        {
+            return NormalizeRuntimeScopeValue(OsClientDefault.OsClientNetwork);
+        }
+
+        internal static string NormalizeRuntimeScopeValue(string value)
+        {
+            var normalized = (value ?? "").Trim();
+            return normalized.Length <= 50 ? normalized : normalized.Substring(0, 50);
         }
 
         private static string DbTime(DateTime value)

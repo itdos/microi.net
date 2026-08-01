@@ -115,16 +115,19 @@ namespace Microi.net
             OssClient ossClientPrivate = null;
             OssClient ossClient = null;
 
-            // 创建配置对象，使用合理的超时时间
+            // 普通上传保持原 60 秒；数据库备份等已授权长任务可按单次请求
+            // 显式放宽。上限 2 小时，避免把错误端点变成无限挂起。
+            var uploadTimeoutSeconds = Math.Max(5, Math.Min(7200, param.TimeoutSeconds ?? 60));
+            var uploadTimeoutMilliseconds = checked(uploadTimeoutSeconds * 1000);
             var configPrivate = new ClientConfiguration
             {
-                ConnectionTimeout = 60000, // 60秒超时
+                ConnectionTimeout = uploadTimeoutMilliseconds,
                 MaxErrorRetry = 3,
                 EnableCrcCheck = false // 禁用CRC校验，可能影响某些上传
             };
             var configPublic = new ClientConfiguration
             {
-                ConnectionTimeout = 60000,
+                ConnectionTimeout = uploadTimeoutMilliseconds,
                 MaxErrorRetry = 3,
                 EnableCrcCheck = false
             };

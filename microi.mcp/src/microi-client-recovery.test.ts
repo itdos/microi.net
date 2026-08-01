@@ -198,6 +198,104 @@ test('MCP requests credential-free VS Code recovery and reloads the rotated toke
   }
 });
 
+test('MCP escalates to VS Code recovery when a refresh-issued token is immediately rejected', async () => {
+  const originalFetch = globalThis.fetch;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mcp-rejected-refresh-'));
+  const tokenFilePath = path.join(tempDir, 'tokens.json');
+  const recoveryDir = path.join(tempDir, 'recovery');
+  const apiBaseUrl = 'https://microi.test';
+  const osClient = 'demo';
+  const osClientType = 'Product';
+  const osClientNetwork = 'Internal';
+  const tokenKey = `${apiBaseUrl}|${osClient}|${osClientType}|${osClientNetwork}`;
+  const refreshIssuedToken = 'refresh-issued-but-rejected-token';
+  const extensionHeldToken = 'different-extension-held-token';
+  const recoveredToken = 'secret-storage-relogin-token';
+  fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: 'old-token' }));
+  let statusCalls = 0;
+  let refreshCalls = 0;
+  const recoveryPayloads: Array<Record<string, unknown>> = [];
+  let brokerTimer: ReturnType<typeof setInterval> | undefined;
+
+  try {
+    globalThis.fetch = async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/api/SysUser/RefreshToken')) {
+        refreshCalls += 1;
+        return new Response(JSON.stringify({ Code: 1, Data: {}, Msg: '' }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            authorization: `Bearer ${refreshIssuedToken}`,
+          },
+        });
+      }
+      if (url.endsWith('/api/V8Engine/GetStatus')) {
+        statusCalls += 1;
+        const headers = new Headers(init?.headers);
+        if (headers.get('Authorization') === `Bearer ${recoveredToken}`) {
+          return jsonResponse({ Code: 1, Data: { ok: true }, Msg: '' });
+        }
+        return jsonResponse({
+          Code: 1001,
+          Data: null,
+          Msg: 'Token签名验证失败，请重新登录',
+          DataAppend: { ReasonCode: 'AuthVersionChanged' },
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    brokerTimer = setInterval(() => {
+      if (!fs.existsSync(recoveryDir)) { return; }
+      const requests = fs.readdirSync(recoveryDir).filter(name => name.endsWith('.json'));
+      if (requests.length === 0) { return; }
+      for (const request of requests) {
+        recoveryPayloads.push(JSON.parse(fs.readFileSync(path.join(recoveryDir, request), 'utf8')) as Record<string, unknown>);
+      }
+      // 真实 VS Code broker 会先同步扩展宿主已持有的不同 Token；
+      // 若该 Token 也被后端拒绝，第二个请求的哈希与宿主当前 Token 一致，才会触发重登。
+      const brokerToken = recoveryPayloads.length === 1 ? extensionHeldToken : recoveredToken;
+      fs.writeFileSync(tokenFilePath, JSON.stringify({ [tokenKey]: brokerToken }));
+      for (const request of requests) fs.rmSync(path.join(recoveryDir, request), { force: true });
+    }, 25);
+
+    const client = new MicroiClient({
+      apiBaseUrl,
+      username: '',
+      password: '',
+      osClient,
+      osClientType,
+      osClientNetwork,
+      token: 'old-token',
+      tokenFilePath,
+      authRecoveryRequestDir: recoveryDir,
+      requestTimeoutMs: 1_000,
+    });
+    const result = await client.getStatus();
+    assert.equal(result.Code, 1);
+    assert.equal(statusCalls, 4);
+    assert.equal(refreshCalls, 1, 'rejected replacement token must not enter another refresh loop');
+    assert.equal(recoveryPayloads.length, 2);
+    assert.equal(
+      recoveryPayloads[0]?.failedTokenHash,
+      crypto.createHash('sha256').update(refreshIssuedToken).digest('hex'),
+      'VS Code broker must receive the hash of the replacement token that was actually rejected',
+    );
+    assert.equal(
+      recoveryPayloads[1]?.failedTokenHash,
+      crypto.createHash('sha256').update(extensionHeldToken).digest('hex'),
+      'a rejected extension-held token must trigger the broker relogin branch in the same bounded request',
+    );
+    const storedTokens = JSON.parse(fs.readFileSync(tokenFilePath, 'utf8')) as Record<string, string>;
+    assert.equal(storedTokens[tokenKey], recoveredToken);
+  } finally {
+    if (brokerTimer) clearInterval(brokerTimer);
+    globalThis.fetch = originalFetch;
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('saveEngineCode confirms an uncertain write by readback', async () => {
   const originalFetch = globalThis.fetch;
   let storedCode = '';

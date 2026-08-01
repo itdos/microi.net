@@ -2377,7 +2377,8 @@ var DiyCommon = {
             .then(async function (req, b, c) {
                 reportApiServiceRecovered({
                     apiBase: DiyCommon.GetApiBase(),
-                    url: url
+                    url: url,
+                    responseData: req.data
                 });
                 // 拿到token，存起来
                 DiyCommon.ApplyAuthorizationToken(req.headers.authorization, requestToken);
@@ -2509,6 +2510,11 @@ var DiyCommon = {
                 });
                 var returnData = [];
                 results.forEach((result) => {
+                    reportApiServiceRecovered({
+                        apiBase: DiyCommon.GetApiBase(),
+                        url: result.config?.url || firstRequestUrl,
+                        responseData: result.data
+                    });
                     // 批量请求中的任意一个响应都可能完成 Token 续签。必须逐个处理；
                     // 只读取第一个响应会丢失其它响应携带的新 Token。
                     var authorization = result.headers.authorization;

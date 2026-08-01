@@ -140,6 +140,13 @@ import { useRoute } from 'vitepress'
 import { withPreviewVersion } from '../utils/app-preview-url.js'
 import { buildApplicationLaunchUrl } from '../utils/uniapp-preview-mode.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
+import {
+  buildSiteSessionHeaders,
+  getOrCreateSiteDid,
+  isSiteSessionExpired,
+  normalizeSiteToken,
+  readRotatedSiteToken
+} from '../utils/site-session.js'
 
 const route = useRoute()
 // 应用详情与列表使用同一官方公开源，防止开发环境误读其它租户。
@@ -150,6 +157,7 @@ const app = ref(null)
 const loading = ref(false)
 const errorMessage = ref('')
 const authToken = ref('')
+const authDid = ref('')
 const isFavorite = ref(false)
 const favoriteBusy = ref(false)
 const favoriteMessage = ref('')
@@ -293,33 +301,34 @@ function normalizeApp(item) {
   }
 }
 
-function normalizeToken(raw) {
-  return String(raw || '').replace(/^Bearer\s+/i, '').trim()
-}
-
 function syncAuth() {
   if (typeof window === 'undefined') return
   let hasUser = false
   try { hasUser = Boolean(JSON.parse(localStorage.getItem('microi_doc_user') || 'null')?.Id) } catch (_) {}
-  const token = normalizeToken(localStorage.getItem('microi_doc_token'))
+  const token = normalizeSiteToken(localStorage.getItem('microi_doc_token'))
   authToken.value = token && hasUser ? token : ''
+  authDid.value = getOrCreateSiteDid(localStorage, window.crypto)
   if (!authToken.value) isFavorite.value = false
 }
 
 function authHeaders() {
-  return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
+  return buildSiteSessionHeaders({ token: authToken.value, osClient: OS_CLIENT, did: authDid.value })
 }
 
 function syncTokenFromResponse(response) {
-  const token = normalizeToken(response?.headers?.get?.('authorization'))
+  const token = readRotatedSiteToken(response)
   if (!token || token === authToken.value) return
   authToken.value = token
   localStorage.setItem('microi_doc_token', token)
   window.dispatchEvent(new CustomEvent('microi-token-refreshed'))
 }
 
-function isSessionExpired(result) {
-  return [1001, 1002].includes(Number(result?.Code)) || /登录|权限|Token/i.test(result?.Msg || '')
+function expireAuth() {
+  authToken.value = ''
+  isFavorite.value = false
+  localStorage.removeItem('microi_doc_token')
+  localStorage.removeItem('microi_doc_user')
+  window.dispatchEvent(new CustomEvent('microi-logout'))
 }
 
 async function loadFavoriteStatus() {
@@ -332,8 +341,8 @@ async function loadFavoriteStatus() {
     })
     syncTokenFromResponse(response)
     const result = await response.json()
-    if (isSessionExpired(result)) {
-      authToken.value = ''
+    if (isSiteSessionExpired(result, response.status)) {
+      expireAuth()
       return
     }
     if (result.Code === 1) {
@@ -362,8 +371,8 @@ async function setFavorite() {
     syncTokenFromResponse(response)
     const result = await response.json()
     if (result.Code !== 1) {
-      if (isSessionExpired(result)) {
-        authToken.value = ''
+      if (isSiteSessionExpired(result, response.status)) {
+        expireAuth()
         window.location.href = `/login.html?redirect=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}`
         return
       }
