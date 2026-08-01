@@ -144,6 +144,14 @@ export function isLegacyApplicationStreamJValueFailure(result) {
     return /Newtonsoft\.Json\.Linq\.JValue/iu.test(message)
         && /does not contain a definition for ['‘’"]?Val|\.Val(?:<|\b)/iu.test(message);
 }
+export function resolveLegacyApplicationStreamFallbackPolicy(result, uploadedCount, allowLegacyFallback = true) {
+    const matched = uploadedCount === 0 && isLegacyApplicationStreamJValueFailure(result);
+    return {
+        matched,
+        attemptFallback: matched && allowLegacyFallback,
+        requireMultipartStream: matched && !allowLegacyFallback,
+    };
+}
 function asJsonRecord(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? value
@@ -3991,8 +3999,9 @@ export function createMcpServer(client, context) {
         maxFiles: z.number().int().min(1).max(20_000).optional().describe('Safety cap checked before upload. Default and hard maximum 20,000.'),
         maxTotalMegabytes: z.number().positive().max(20_480).optional().describe('Safety cap checked before upload. Default and hard maximum 20GB.'),
         timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
+        allowLegacyFallback: z.boolean().optional().default(true).describe('Allow the bounded legacy Base64 C# fallback only for a small existing MicroService when an old API node hits the exact pre-write JValue.Val defect. Set false for deliveries that require multipart streaming end to end.'),
         confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),
-    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, changeSummary, sourceManifestHash, deliveryBatchId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, confirmExecution }) => {
+    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, changeSummary, sourceManifestHash, deliveryBatchId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
         try {
             if (confirmExecution && confirmExecution !== appIdOrKey) {
                 return { content: [{ type: 'text', text: `Error: confirmExecution 必须精确等于 ${appIdOrKey}` }], isError: true };
@@ -4031,7 +4040,24 @@ export function createMcpServer(client, context) {
                     TimeoutMs: timeoutMsPerFile,
                 });
                 if (result.Code !== 1) {
-                    if (uploadedCount === 0 && isLegacyApplicationStreamJValueFailure(result)) {
+                    const fallbackPolicy = resolveLegacyApplicationStreamFallbackPolicy(result, uploadedCount, allowLegacyFallback);
+                    if (fallbackPolicy.requireMultipartStream) {
+                        return {
+                            content: [{ type: 'text', text: JSON.stringify({
+                                        error: result.Msg,
+                                        failedPath: asset.relativePath,
+                                        uploadedCount,
+                                        totalCount: manifest.assets.length,
+                                        retrySafe: true,
+                                        allowLegacyFallback: false,
+                                        compatibilityFallbackAttempted: false,
+                                        requiresMultipartStream: true,
+                                        transport: 'multipart-stream-required',
+                                    }, null, 2) }],
+                            isError: true,
+                        };
+                    }
+                    if (fallbackPolicy.attemptFallback) {
                         const fallback = await tryLegacyMicroServiceStreamPublishFallback(client, manifest, {
                             appIdOrKey,
                             versionNo,
