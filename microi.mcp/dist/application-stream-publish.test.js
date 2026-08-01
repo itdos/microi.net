@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { MicroiClient } from './microi-client.js';
-import { buildLocalApplicationAssetManifest, isLegacyApplicationStreamJValueFailure, tryLegacyMicroServiceStreamPublishFallback, } from './server.js';
+import { buildLocalApplicationAssetManifest, isLegacyApplicationStreamJValueFailure, resolveLegacyApplicationStreamFallbackPolicy, tryLegacyMicroServiceStreamPublishFallback, } from './server.js';
 function createTempDirectory() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'microi-stream-publish-'));
 }
@@ -108,6 +108,33 @@ test('legacy stream detector only matches the pre-write Newtonsoft JValue.Val de
         Data: null,
         Msg: "'Newtonsoft.Json.Linq.JValue' does not contain a definition for 'Val'",
     }), false);
+});
+test('legacy stream fallback policy is fail-closed when multipart streaming is required', () => {
+    const defect = {
+        Code: 0,
+        Data: null,
+        Msg: "应用资产流式上传失败：'Newtonsoft.Json.Linq.JValue' does not contain a definition for 'Val'",
+    };
+    assert.deepEqual(resolveLegacyApplicationStreamFallbackPolicy(defect, 0, false), {
+        matched: true,
+        attemptFallback: false,
+        requireMultipartStream: true,
+    });
+    assert.deepEqual(resolveLegacyApplicationStreamFallbackPolicy(defect, 0, true), {
+        matched: true,
+        attemptFallback: true,
+        requireMultipartStream: false,
+    });
+    assert.deepEqual(resolveLegacyApplicationStreamFallbackPolicy(defect, 1, false), {
+        matched: false,
+        attemptFallback: false,
+        requireMultipartStream: false,
+    });
+    assert.deepEqual(resolveLegacyApplicationStreamFallbackPolicy({ ...defect, Msg: 'ordinary upload failure' }, 0, false), {
+        matched: false,
+        attemptFallback: false,
+        requireMultipartStream: false,
+    });
 });
 test('small existing MicroService can use bounded legacy CSharp publish compatibility', async () => {
     const root = createTempDirectory();

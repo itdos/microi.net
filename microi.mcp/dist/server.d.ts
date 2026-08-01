@@ -45,6 +45,11 @@ export interface LegacyStreamPublishFallbackResult {
  * the dynamic runtime tries to invoke Dos.Common.Val<T> on a JValue.
  */
 export declare function isLegacyApplicationStreamJValueFailure(result?: Partial<ApiResponse> | null): boolean;
+export declare function resolveLegacyApplicationStreamFallbackPolicy(result: Partial<ApiResponse> | null | undefined, uploadedCount: number, allowLegacyFallback?: boolean): {
+    matched: boolean;
+    attemptFallback: boolean;
+    requireMultipartStream: boolean;
+};
 /**
  * Bridge a rolling-upgrade window without retrying the broken stream endpoint.
  * The fallback is deliberately restricted to small existing MicroServices: it
