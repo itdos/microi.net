@@ -203,6 +203,29 @@ namespace Microi.net
                     };
                 }
                 await diyCacheBase.SetAsync($"Microi:{osClient}:ChatOnline:{userId}", clientInfo);
+                // Background-task notifications are runtime-scoped. Keep the
+                // historic chat key for ordinary chat compatibility while writing
+                // an isolated connection projection for task pushes.
+                var scopedChatOnlineKey = BackgroundTaskService.GetScopedChatOnlineKey(
+                    osClient, userId, OsClientDefault.OsClientType, OsClientDefault.OsClientNetwork);
+                var scopedClientInfo = await diyCacheBase.GetAsync<ClientInfo>(scopedChatOnlineKey)
+                    ?? new ClientInfo
+                    {
+                        GroupName = groupName,
+                        UserId = userId,
+                        UserName = userName,
+                        UserAvatar = userAvatar,
+                        OtherInfo = otherInfo,
+                        Ip = httpContext.Connection.RemoteIpAddress?.ToString(),
+                        ConnectedTime = DateTime.Now
+                    };
+                scopedClientInfo.LastConnectionId = connid;
+                scopedClientInfo.ConnectionIds ??= new List<string>();
+                scopedClientInfo.ConnectionIds.Remove(connid);
+                scopedClientInfo.ConnectionIds.Insert(0, connid);
+                scopedClientInfo.ConnectionIds = scopedClientInfo.ConnectionIds.Take(10).ToList();
+                if (IsNotBlank(deviceClientId)) scopedClientInfo.DeviceClientId = deviceClientId;
+                await diyCacheBase.SetAsync(scopedChatOnlineKey, scopedClientInfo);
                 await OnlineTerminalService.TrackConnectedAsync(
                     osClient,
                     sysUser,
@@ -279,6 +302,20 @@ namespace Microi.net
                             // 没有活跃连接了，移除在线记录
                             await diyCacheBase.RemoveAsync($"Microi:{osClient}:ChatOnline:{userId}");
                         }
+                    }
+                    var scopedChatOnlineKey = BackgroundTaskService.GetScopedChatOnlineKey(
+                        osClient, userId, OsClientDefault.OsClientType, OsClientDefault.OsClientNetwork);
+                    var scopedClientInfo = await diyCacheBase.GetAsync<ClientInfo>(scopedChatOnlineKey);
+                    if (scopedClientInfo != null)
+                    {
+                        scopedClientInfo.ConnectionIds ??= new List<string>();
+                        scopedClientInfo.ConnectionIds.Remove(connid);
+                        if (scopedClientInfo.LastConnectionId == connid)
+                            scopedClientInfo.LastConnectionId = scopedClientInfo.ConnectionIds.FirstOrDefault();
+                        if (scopedClientInfo.ConnectionIds.Count > 0)
+                            await diyCacheBase.SetAsync(scopedChatOnlineKey, scopedClientInfo);
+                        else
+                            await diyCacheBase.RemoveAsync(scopedChatOnlineKey);
                     }
                 }
                 await OnlineTerminalService.TrackDisconnectedAsync(osClient, userId, connid).ConfigureAwait(false);

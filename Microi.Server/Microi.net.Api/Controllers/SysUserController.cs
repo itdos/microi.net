@@ -152,10 +152,10 @@ namespace Microi.net.Api
             param.OsClient = currentTokenDynamic?.OsClient;
         }
 
-        private static bool IsPlatformAdmin(dynamic currentUser)
+        private static bool IsPlatformAdmin(JObject currentUser)
         {
-            return currentUser?["_IsAdmin"].Val<bool>() == true
-                || currentUser?["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+            return currentUser?["_IsAdmin"]?.Val<bool>() == true
+                || currentUser?["Level"]?.Val<int>() >= DiyCommon.MaxRoleLevel;
         }
 
         /// <summary>

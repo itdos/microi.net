@@ -3943,8 +3943,14 @@ namespace Microi.net
                     var tableResult = await MicroiEngine.FormEngine.GetDiyTable("sys_menu", osClient);
                     if (tableResult.Code == 1 && tableResult.Data != null)
                     {
-                        var sysMenuTableId = JObject.FromObject(tableResult.Data)["Id"]?.ToObject<string>();
-                        if (!sysMenuTableId.DosIsNullOrWhiteSpace()) schemaKeys.Add(sysMenuTableId);
+                        // GetDiyTable returns DosResult<dynamic>. Without the explicit object cast,
+                        // dynamic binding propagates through JObject.FromObject and the following
+                        // string extension call is resolved at runtime (where extension methods are
+                        // not considered), producing: 'string' does not contain a definition for
+                        // 'DosIsNullOrWhiteSpace'. Keep this path statically typed.
+                        var tableData = JObject.FromObject((object)tableResult.Data);
+                        var sysMenuTableId = tableData["Id"]?.ToObject<string>();
+                        if (!string.IsNullOrWhiteSpace(sysMenuTableId)) schemaKeys.Add(sysMenuTableId);
                     }
                     var refreshResult = await RefreshSchemaCache(osClient, schemaKeys);
                     if (refreshResult.Code != 1)

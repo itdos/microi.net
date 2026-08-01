@@ -541,6 +541,23 @@ namespace Microi.net
                     return new MicroiJobResult(0, "job不存在");
                 }
 
+                // UpdateJob historically changed only the trigger. That left the
+                // old JobParam/ApiEngineKey/OsClient in the durable Quartz row, so
+                // edited backup scope and retention settings never reached the
+                // next execution. Replace the durable job data atomically before
+                // rescheduling the trigger.
+                job.JobDataMap[MicroiJobConst.Id] = addJobModel.JobName;
+                job.JobDataMap[MicroiJobConst.JobType] = addJobModel.JobType ?? "";
+                job.JobDataMap[MicroiJobConst.OsClient] = addJobModel.OsClient.IsNullOrWhiteSpace()
+                    ? OsClientDefault.OsClient
+                    : addJobModel.OsClient;
+                job.JobDataMap[MicroiJobConst.JobParam] = addJobModel.JobParam ?? "";
+                if (addJobModel.JobType == MicroiJobConst.JobTypeApiEngineKey)
+                {
+                    job.JobDataMap[MicroiJobConst.ApiEngineKey] = addJobModel.ApiEngineKey ?? "";
+                }
+                await _scheduler.AddJob(job, true);
+
                 // 获取任务的当前状态
                 var jobKey = new JobKey(addJobModel.JobName, group);
                 var triggers = await _scheduler.GetTriggersOfJob(jobKey);

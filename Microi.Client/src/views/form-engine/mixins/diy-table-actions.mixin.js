@@ -479,25 +479,30 @@ IsPermission(type) {
         },
         BuildMicroiStoreInstallParam(btn, row) {
             var self = this;
-            var param = {};
-            if (row && typeof row === "object") {
-                Object.keys(row).forEach(function (key) {
-                    param[key] = row[key];
-                });
-            }
-            param.Form = row;
-            param.Row = row;
-            param.Id = row && row.Id;
-            param.StoreId = row && (row.StoreId || row.Id);
-            param.AppId = row && (row.AppId || row.AppKey || row.Id);
-            param.AppName = row && (row.AppName || row.Name || row.Title);
-            param.AppVersion = row && (row.AppVersion || row.Version);
-            param.StoreApiBase = row && (row.StoreApiBase || row.AppStoreApiBase || self.DiyCommon.GetAppStoreSourceApiBase(row));
-            param.AppStoreApiBase = row && (row.AppStoreApiBase || row.StoreApiBase || self.DiyCommon.GetAppStoreSourceApiBase(row));
-            param.StoreOsClient = row && (row.StoreOsClient || row.AppStoreOsClient || self.DiyCommon.GetAppStoreSourceOsClient(row));
-            param.AppStoreOsClient = row && (row.AppStoreOsClient || row.StoreOsClient || self.DiyCommon.GetAppStoreSourceOsClient(row));
-            param.Btn = btn;
-            return param;
+            row = row && typeof row === "object" ? row : {};
+            var storeApiBase = row.StoreApiBase || row.AppStoreApiBase || self.DiyCommon.GetAppStoreSourceApiBase(row);
+            var storeOsClient = row.StoreOsClient || row.AppStoreOsClient || row.SourceOsClient
+                || self.DiyCommon.GetAppStoreSourceOsClient(row);
+
+            // STORE_INSTALL_IDENTIFIER_ONLY_V1：后台任务只持久化商城定位信息。
+            // 禁止复制整行/Form/Row/Btn，更不能把 AppPakcet 的 Base64 资源在
+            // 浏览器、HTTP、任务表和 Jint 之间重复序列化；导入器按 StoreId
+            // 从受信任商城源读取一次包体，并通过 checkpoint 分片续跑。
+            return {
+                Id: row.Id,
+                StoreId: row.StoreId || row.Id,
+                AppId: row.AppId || row.AppKey || row.Id,
+                AppKey: row.AppKey || row.AppId,
+                AppName: row.AppName || row.Name || row.Title,
+                AppVersion: row.AppVersion || row.Version,
+                AppAuthor: row.AppAuthor || row.Author,
+                StoreApiBase: storeApiBase,
+                AppStoreApiBase: storeApiBase,
+                StoreOsClient: storeOsClient,
+                AppStoreOsClient: storeOsClient,
+                InstallParentSysMenuId: row.InstallParentSysMenuId,
+                ResumeInstall: true
+            };
         },
         IsBackgroundTaskBootstrapPackage(value) {
             var packageInfo = value && value.PackageInfo && typeof value.PackageInfo === "object"

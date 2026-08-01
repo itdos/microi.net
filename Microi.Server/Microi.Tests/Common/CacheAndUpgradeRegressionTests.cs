@@ -57,6 +57,39 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public void BackgroundTasks_ArePartitionedByRuntimeScope_WithLegacyWildcardCompatibility()
+    {
+        var storeType = typeof(BackgroundTaskService).Assembly.GetType(
+            "Microi.net.BackgroundTaskStore",
+            throwOnError: true)!;
+        var predicate = Assert.IsType<string>(storeType.GetField(
+            "RuntimeScopePredicate",
+            BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue());
+        Assert.Contains("RuntimeOsClientType IS NULL", predicate);
+        Assert.Contains("RuntimeOsClientType=''", predicate);
+        Assert.Contains("RuntimeOsClientType=@runtimeType", predicate);
+        Assert.Contains("RuntimeOsClientNetwork IS NULL", predicate);
+        Assert.Contains("RuntimeOsClientNetwork=@runtimeNetwork", predicate);
+
+        var normalize = storeType.GetMethod(
+            "NormalizeRuntimeScopeValue",
+            BindingFlags.Static | BindingFlags.NonPublic)!;
+        Assert.Equal("Product", normalize.Invoke(null, new object?[] { "  Product  " }));
+        Assert.Equal(50, Assert.IsType<string>(normalize.Invoke(null, new object?[] { new string('x', 80) })).Length);
+
+        var scopedIdempotencyColumns = Assert.IsType<string[]>(typeof(Upgrade21).GetField(
+            "ScopedIdempotencyIndexColumns",
+            BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null));
+        Assert.Equal(new[]
+        {
+            "OsClient", "RuntimeOsClientType", "RuntimeOsClientNetwork", "IdempotencyKey"
+        }, scopedIdempotencyColumns);
+        Assert.NotEqual(
+            BackgroundTaskService.GetScopedChatOnlineKey("iTdos", "admin", "Product", "Internet"),
+            BackgroundTaskService.GetScopedChatOnlineKey("iTdos", "admin", "Product", "Internal"));
+    }
+
+    [Fact]
     public void DiyLangRuntimeCache_ExposesBoundedReloadContract()
     {
         var contract = typeof(IFormEngine).GetMethod(nameof(IFormEngine.ReloadDiyLangCacheAsync));

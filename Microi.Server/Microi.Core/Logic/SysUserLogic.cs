@@ -1896,6 +1896,18 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
 
             return new DosResult<SysUser>(1, model);
         }
+
+        /// <summary>
+        /// 将用户修改参数作为非空补丁合并到数据库完整实体。
+        /// 修改密码等稀疏请求不得清空未提交的帐号、角色、部门和状态字段。
+        /// </summary>
+        public static SysUser MergeUpdateModel(SysUserParam param, SysUser existing)
+        {
+            if (param == null) throw new ArgumentNullException(nameof(param));
+            if (existing == null) throw new ArgumentNullException(nameof(existing));
+            return MapperHelper.MapNotNull<object, SysUser>(param, existing);
+        }
+
         /// <summary>
         /// 修改用户。必传：Id或Account
         /// </summary>
@@ -1926,11 +1938,11 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             var modelDynamic = dbSession.From<SysUser>()
                                 .Select(new SysUser().GetFields())
                                 .Where(d => d.Id == param.Id).First<dynamic>();
-            var model = ((JObject)JObject.FromObject(modelDynamic)).ToObject<SysUser>();
-            if (model == null)
+            if (modelDynamic == null)
             {
                 return new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "NoAccount", param._Lang));
             }
+            var model = ((JObject)JObject.FromObject(modelDynamic)).ToObject<SysUser>();
             var oldRoleIds = model.RoleIds;
             var oldLevel = model.Level;
             var oldState = model.State;
@@ -2060,7 +2072,10 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
             //    }
             //}
             //model = JsonHelper.Deserialize<SysUser>(JsonHelper.Serialize(modelJson));
-            model = MapperHelper.MapNotNull<object, SysUser>(param);
+            // 修改密码等自助入口只提交 Id/Pwd/NewPwd。必须把非空补丁合并到
+            // 已从数据库读取的完整实体，不能从稀疏参数重新创建 SysUser 后整行
+            // Update，否则 Account、Name、RoleIds、State 等未提交字段会被写成空值。
+            model = MergeUpdateModel(param, model);
             #endregion end
             //if (model.DeptId == null)
             //{

@@ -257,6 +257,28 @@ return {1, userNext, tenantNext}";
             };
 
         /// <summary>
+        /// 返回可直接定位 SaaS 配置的停用提示。FileUploadEnabled 未配置或为空时
+        /// 默认允许上传；只有显式配置为 0/false 或平台全局强制关闭才会进入这里。
+        /// </summary>
+        public static DosResult CreateTenantUploadDisabledResult(string osClient)
+        {
+            return new DosResult(
+                0,
+                null,
+                "当前租户已停用文件上传！请在 SaaS 引擎中将 FileUploadEnabled 设为 1，保存并等待租户配置重载后重试。",
+                0,
+                new
+                {
+                    ErrorType = "TenantFileUploadDisabled",
+                    OsClient = osClient ?? "",
+                    ConfigField = "FileUploadEnabled",
+                    ExpectedValue = 1,
+                    DefaultEnabled = true,
+                    DocumentationUrl = "https://microi.net/doc/more/hdfs"
+                });
+        }
+
+        /// <summary>
         /// 交互式普通用户只能上传私有文件，并只能使用平台预定义的一级目录。
         /// 超级管理员仍可显式选择公有桶和自定义安全子目录。
         /// </summary>
@@ -396,7 +418,7 @@ return {1, userNext, tenantNext}";
             options ??= FileUploadSecurityOptions.Load();
             if (!options.UploadEnabled)
             {
-                return new DosResult(0, null, "当前租户已停用文件上传！");
+                return CreateTenantUploadDisabledResult(osClient);
             }
             var utcNow = DateTime.UtcNow;
             var keys = BuildDailyQuotaKeys(osClient, userId, utcNow);

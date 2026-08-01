@@ -55,7 +55,8 @@ service.interceptors.response.use(
     (response) => {
         reportApiServiceRecovered({
             apiBase: DiyCommon.GetApiBase(),
-            url: response.config?.url
+            url: response.config?.url,
+            responseData: response.data
         });
         const requestToken = response.config && response.config.__microiRequestToken;
         if (DiyCommon && typeof DiyCommon.ApplyAuthorizationToken === "function") {

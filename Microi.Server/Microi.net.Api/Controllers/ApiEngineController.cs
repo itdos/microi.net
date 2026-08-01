@@ -153,6 +153,82 @@ namespace Microi.net.Api
             param["OsClient"] = routeOsClient;
         }
 
+        /// <summary>
+        /// 只在 ApiEngine.RunAsync 已返回（其自有事务已经提交或回滚）后处理游戏失效通知。
+        /// 广播失败不能把已提交的出牌/结算伪装成业务失败，客户端以 Snapshot 轮询收敛。
+        /// </summary>
+        private static async Task PublishRealtimeInvalidationAfterCommitAsync(
+            object result,
+            JObject param)
+        {
+            try
+            {
+                var osClient = param?["OsClient"]?.ToString();
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = DiyToken.GetCurrentOsClient();
+                }
+                if (!GameRealtimeRuntime.TryReadInvalidation(
+                        result,
+                        osClient,
+                        out var invalidation,
+                        out var contractError))
+                {
+                    if (!contractError.DosIsNullOrWhiteSpace())
+                    {
+                        MicroiEngine.QueueSystemLog(
+                            osClient,
+                            "GameRealtime",
+                            "InvalidationContractRejected",
+                            "游戏实时失效通知契约不合法",
+                            contractError,
+                            2);
+                    }
+                    return;
+                }
+
+                var publishResult = await GameRealtimeRuntime.PublishAfterCommitWithinBudgetAsync(
+                        osClient,
+                        invalidation)
+                    .ConfigureAwait(false);
+                if (publishResult.Conflict)
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "GameRealtime",
+                        "EventIdConflictRejected",
+                        "游戏实时 EventId 重放内容不一致，已拒绝广播",
+                        $"EventId={invalidation.EventId}; AppKey={invalidation.AppKey}; RoomId={invalidation.RoomId}",
+                        3,
+                        false,
+                        invalidation.EventId);
+                }
+                else if (!publishResult.RedisError.DosIsNullOrWhiteSpace()
+                         || !publishResult.BroadcastError.DosIsNullOrWhiteSpace())
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "GameRealtime",
+                        "InvalidationBroadcastDegraded",
+                        "游戏实时通知已降级为 Snapshot 轮询",
+                        $"Redis={publishResult.RedisError}; SignalR={publishResult.BroadcastError}",
+                        2,
+                        false,
+                        invalidation.EventId);
+                }
+            }
+            catch (Exception ex)
+            {
+                MicroiEngine.QueueSystemLog(
+                    param?["OsClient"]?.ToString(),
+                    "GameRealtime",
+                    "InvalidationBroadcastFailed",
+                    "游戏实时通知处理异常，已降级为 Snapshot 轮询",
+                    ex.ToString(),
+                    2);
+            }
+        }
+
         private static async Task<DosResult> AuthorizeAccessKeyApiEngineAsync(JObject param)
         {
             var currentUser = param?["_CurrentUser"] as JObject;
@@ -482,6 +558,7 @@ namespace Microi.net.Api
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
+            await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             try
             {
                 //#region 接口引擎接收文件，将文件流转为byte[]，再转为string
@@ -559,6 +636,7 @@ namespace Microi.net.Api
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
+            await PublishRealtimeInvalidationAfterCommitAsync(result, param);
 
             if (result != null && result.GetType().Name == "String")
             {
@@ -614,6 +692,7 @@ namespace Microi.net.Api
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
+            await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -687,6 +766,7 @@ namespace Microi.net.Api
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
+            await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -784,6 +864,7 @@ namespace Microi.net.Api
             var accessKeyAuthorization = await AuthorizeAccessKeyApiEngineAsync(param);
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
+            await PublishRealtimeInvalidationAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;

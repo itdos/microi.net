@@ -47,7 +47,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_007_004
+    if (versionNumber < 1_008_003
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -64,8 +64,13 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')
       || !content.includes('DB_RUNTIME_BUILD_ASSETS_V1')
       || !content.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')
-      || !content.includes('BACKGROUND_TASK_BOOTSTRAP_READINESS_V1')) {
-      throw new Error(`${name} 低于 v1.7.4 或缺少后台任务基础包完整回读、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
+      || !content.includes('BACKGROUND_TASK_BOOTSTRAP_READINESS_V1')
+      || !content.includes('BACKGROUND_TASK_RUNTIME_SCOPE_V1')
+      || !content.includes('SCHEMA_BACKGROUND_CHUNKS_V1')
+      || !content.includes('APPLICATION_ASSET_BACKGROUND_CHUNKS_V1')
+      || !content.includes('ASSET_METADATA_WITHOUT_SECOND_DECODE_V1')
+      || !content.includes('DATASET_INSERT_IF_MISSING_V1')) {
+      throw new Error(`${name} 低于 v1.8.3 或缺少后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -163,12 +168,17 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_007_004
+        || importerVersionNumber < 1_008_003
         || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
         || !importerCode.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')
         || !importerCode.includes('DB_RUNTIME_BUILD_ASSETS_V1')
         || !importerCode.includes('PRUNE_ASSET_IDS_WITH_DELFORM_V1')
-        || !importerCode.includes('BACKGROUND_TASK_BOOTSTRAP_READINESS_V1')) {
+        || !importerCode.includes('BACKGROUND_TASK_BOOTSTRAP_READINESS_V1')
+        || !importerCode.includes('BACKGROUND_TASK_RUNTIME_SCOPE_V1')
+        || !importerCode.includes('SCHEMA_BACKGROUND_CHUNKS_V1')
+      || !importerCode.includes('APPLICATION_ASSET_BACKGROUND_CHUNKS_V1')
+      || !importerCode.includes('ASSET_METADATA_WITHOUT_SECOND_DECODE_V1')
+      || !importerCode.includes('DATASET_INSERT_IF_MISSING_V1')) {
         throw new Error(`${name} 版本过旧，或缺少统一商城及严格 SourceZip/BuildZip 资产边界能力`);
       }
     }
@@ -255,6 +265,9 @@ async function publishResources(changes) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      // Retain the legacy header for older ApiEngine gateways while making the
+      // authenticated ASP.NET identity available to V8.CurrentUser.
       Token: token,
       OsClient: 'iTdos',
       apiengine: '1',

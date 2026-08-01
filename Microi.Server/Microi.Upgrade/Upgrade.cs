@@ -39,6 +39,8 @@ namespace Microi.net
             var migrationFailed = false;
             var migrationErrors = new List<string>();
             var menuAppDisplaySnapshot = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var backgroundTaskRuntimeInvariantApplied = false;
+            var databaseBackupRuntimeInvariantApplied = false;
 
             try
             {
@@ -55,6 +57,25 @@ namespace Microi.net
                 await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动前");
                 await EnsureOfficialWebsitePublicApiEngineContractAsync(osClientSecret);
                 await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret);
+                // 持久后台任务是所有长任务的事实源。其运行环境路由字段必须在
+                // Worker 启动领取任务前存在，不能依赖可能已经错误推进的版本号。
+                var backgroundTaskInvariantMessages = await new Upgrade21()
+                    .Run(osClientSecret.OsClient).ConfigureAwait(false);
+                if (backgroundTaskInvariantMessages.Count > 0)
+                {
+                    throw new InvalidOperationException(string.Join("；", backgroundTaskInvariantMessages));
+                }
+                backgroundTaskRuntimeInvariantApplied = true;
+                // 数据库备份控制面是运行时基础设施，不能只依赖 ServerVersion。
+                // 历史环境可能已经推进版本号，但物理表仍缺少后续补充的字段；每次启动
+                // 都在分布式升级租约内做一次幂等回读/修复，避免业务代码先于结构上线。
+                var databaseBackupInvariantMessages = await new Upgrade24()
+                    .Run(osClientSecret.OsClient).ConfigureAwait(false);
+                if (databaseBackupInvariantMessages.Count > 0)
+                {
+                    throw new InvalidOperationException(string.Join("；", databaseBackupInvariantMessages));
+                }
+                databaseBackupRuntimeInvariantApplied = true;
                 menuAppDisplaySnapshot = CaptureMenuAppDisplaySnapshot(osClientSecret);
             }
             catch (Exception ex)
@@ -617,7 +638,9 @@ namespace Microi.net
             {
                 try
                 {
-                    var msgs = await new Upgrade21().Run(osClientSecret.OsClient);
+                    var msgs = backgroundTaskRuntimeInvariantApplied
+                        ? new List<string>()
+                        : await new Upgrade21().Run(osClientSecret.OsClient).ConfigureAwait(false);
                     if (msgs.Count > 0)
                     {
                         migrationFailed = true;
@@ -701,6 +724,39 @@ namespace Microi.net
                     migrationFailed = true;
                     migrationErrors.Add("升级23失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级23 - 2026-07-29】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级24 --2026-08-01【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade24.Version))
+            {
+                try
+                {
+                    var msgs = databaseBackupRuntimeInvariantApplied
+                        ? new List<string>()
+                        : await new Upgrade24().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级24 - 2026-08-01】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级24 - 2026-08-01】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade24.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级24失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级24 - 2026-08-01】失败：{ex.Message}");
                 }
             }
             #endregion

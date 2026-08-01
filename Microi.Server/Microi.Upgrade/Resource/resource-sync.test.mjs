@@ -398,6 +398,8 @@ test('后端发布前强制执行官网三方同步和发布后回读', () => {
   assert.match(refreshSource, /未写入官网、未修改本地资源、未推进共同基线/);
   assert.match(refreshSource, /publishResourcesViaConfiguredMcp/);
   assert.match(refreshSource, /MICROI_UPGRADE_RESOURCE_TOKEN/);
+  assert.match(refreshSource, /Authorization:\s*`Bearer \$\{token\}`/);
+  assert.match(refreshSource, /Token:\s*token/);
   assert.match(refreshSource, /validateReadableOfficialResource\(name, content\)/);
   assert.match(refreshSource, /validateReleaseCandidate\(name, content\)/);
 });

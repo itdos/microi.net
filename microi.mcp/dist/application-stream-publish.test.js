@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { MicroiClient } from './microi-client.js';
-import { buildLocalApplicationAssetManifest } from './server.js';
+import { buildLocalApplicationAssetManifest, isLegacyApplicationStreamJValueFailure, tryLegacyMicroServiceStreamPublishFallback, } from './server.js';
 function createTempDirectory() {
     return fs.mkdtempSync(path.join(os.tmpdir(), 'microi-stream-publish-'));
 }
@@ -89,6 +89,106 @@ test('uploadApplicationAssetStream sends raw multipart bytes without Base64 mate
     }
     finally {
         globalThis.fetch = originalFetch;
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('legacy stream detector only matches the pre-write Newtonsoft JValue.Val defect', () => {
+    assert.equal(isLegacyApplicationStreamJValueFailure({
+        Code: 0,
+        Data: null,
+        Msg: "应用资产流式上传失败：'Newtonsoft.Json.Linq.JValue' does not contain a definition for 'Val'",
+    }), true);
+    assert.equal(isLegacyApplicationStreamJValueFailure({
+        Code: 0,
+        Data: null,
+        Msg: 'HDFS 上传失败',
+    }), false);
+    assert.equal(isLegacyApplicationStreamJValueFailure({
+        Code: 1,
+        Data: null,
+        Msg: "'Newtonsoft.Json.Linq.JValue' does not contain a definition for 'Val'",
+    }), false);
+});
+test('small existing MicroService can use bounded legacy CSharp publish compatibility', async () => {
+    const root = createTempDirectory();
+    let publishedPayload;
+    try {
+        fs.mkdirSync(path.join(root, 'assets'));
+        fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html><html><head></head><body>ok</body></html>');
+        fs.writeFileSync(path.join(root, 'assets', 'app.js'), 'window.compat = true;');
+        const manifest = await buildLocalApplicationAssetManifest(root);
+        const fakeClient = {
+            getApplicationContext: async () => ({
+                Code: 1,
+                Data: {
+                    Application: {
+                        Id: 'app-row-id',
+                        AppKey: 'microi-platform-service',
+                        AppName: '平台服务',
+                        ApplicationType: 'MicroService',
+                    },
+                },
+                Msg: '',
+            }),
+            publishMicroService: async (payload) => {
+                publishedPayload = payload;
+                return {
+                    Code: 1,
+                    Data: { MsKey: 'microi-platform-service', RuntimeManifestHash: manifest.manifestHash },
+                    Msg: '',
+                };
+            },
+        };
+        const fallback = await tryLegacyMicroServiceStreamPublishFallback(fakeClient, manifest, {
+            appIdOrKey: 'app-row-id',
+            versionNo: 'v1.2.0',
+            routes: [{ PageKey: 'home', RoutePath: '/' }],
+            deliveryBatchId: 'delivery-1',
+            sourceManifestHash: 'a'.repeat(64),
+        });
+        assert.equal(fallback.attempted, true);
+        assert.equal(fallback.response?.Code, 1);
+        const microService = publishedPayload?.microService;
+        assert.equal(microService.MsKey, 'microi-platform-service');
+        assert.equal(microService.BuildVersion, 'v1.2.0');
+        assert.equal(microService.StorageMode, 'file');
+        const assets = publishedPayload?.assets;
+        assert.equal(assets.length, 2);
+        const entry = assets.find(asset => asset.Path === 'index.html');
+        assert.equal(entry?.IsEntry, true);
+        assert.match(Buffer.from(String(entry?.FileByteBase64), 'base64').toString('utf8'), /<!doctype html>/u);
+    }
+    finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('legacy compatibility fails closed for Web applications', async () => {
+    const root = createTempDirectory();
+    let publishCalls = 0;
+    try {
+        fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html><html><head></head><body>web</body></html>');
+        const manifest = await buildLocalApplicationAssetManifest(root);
+        const fakeClient = {
+            getApplicationContext: async () => ({
+                Code: 1,
+                Data: { Application: { AppKey: 'web-app', ApplicationType: 'Web' } },
+                Msg: '',
+            }),
+            publishMicroService: async () => {
+                publishCalls += 1;
+                return { Code: 1, Data: {}, Msg: '' };
+            },
+        };
+        const fallback = await tryLegacyMicroServiceStreamPublishFallback(fakeClient, manifest, {
+            appIdOrKey: 'web-app',
+            versionNo: 'v1.0.1',
+            deliveryBatchId: 'delivery-web',
+        });
+        assert.equal(fallback.attempted, false);
+        assert.match(fallback.reason, /只支持 MicroService/u);
+        assert.equal(publishCalls, 0);
+    }
+    finally {
         fs.rmSync(root, { recursive: true, force: true });
     }
 });

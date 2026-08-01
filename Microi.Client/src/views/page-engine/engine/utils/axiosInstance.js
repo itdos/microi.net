@@ -39,7 +39,8 @@ axiosInstance.interceptors.response.use(
   (response) => {
     reportApiServiceRecovered({
       apiBase: DiyCommon.GetApiBase(),
-      url: response.config?.url
+      url: response.config?.url,
+      responseData: response.data
     })
     return response
   },

@@ -984,6 +984,76 @@ namespace Microi.net.Api
             return Ok(result);
         }
 
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListDatabaseBackupTenants(
+            string osClient,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(
+                osClient ?? param?["OsClient"]?.Val<string>(),
+                (object)token);
+            var currentUser = JObject.FromObject((object)token.CurrentUser);
+            return Ok(V8McpLogic.ListDatabaseBackupTenants(osClient, currentUser));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RunDatabaseBackup([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            if (!string.Equals(param["ConfirmExecution"]?.ToString(), "DATABASE_BACKUP",
+                    StringComparison.Ordinal))
+            {
+                return Ok(new DosResult(0, null,
+                    "执行已拦截：ConfirmExecution 必须为 DATABASE_BACKUP。"));
+            }
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var currentUser = JObject.FromObject((object)token.CurrentUser);
+            return Ok(V8McpLogic.RunDatabaseBackup(osClient, currentUser, param));
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetDatabaseBackupSettings(
+            string osClient,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(
+                osClient ?? param?["OsClient"]?.Val<string>(),
+                (object)token);
+            var currentUser = JObject.FromObject((object)token.CurrentUser);
+            try
+            {
+                return Ok(await V8McpLogic.GetDatabaseBackupSettings(osClient, currentUser));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "读取数据库备份设置失败：" + ex.Message));
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveDatabaseBackupSettings([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            var osClient = V8McpLogic.ResolveOsClient(param["OsClient"]?.Val<string>(), (object)token);
+            var currentUser = JObject.FromObject((object)token.CurrentUser);
+            try
+            {
+                return Ok(await V8McpLogic.SaveDatabaseBackupSettings(osClient, currentUser, param));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "保存数据库备份设置失败：" + ex.Message));
+            }
+        }
+
         [HttpPost]
         public async Task<IActionResult> ValidateLowCodeSystem([FromBody] JObject param)
         {

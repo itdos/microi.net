@@ -66,6 +66,14 @@ namespace Microi.net
         /// </summary>
         public bool IsolateNestedApiMemory { get; set; } = DefaultIsolateNestedApiMemory;
 
+        /// <summary>
+        /// Disables Jint's cumulative-allocation constraints for one server-authenticated
+        /// platform maintenance slice. The API process resident-memory guard remains the
+        /// hard safety boundary (95% soft rejection / 98% hard shutdown). This flag must
+        /// never be populated from tenant configuration or an HTTP/V8 request.
+        /// </summary>
+        public bool ResidentMemoryGuardOnly { get; set; }
+
         public static CreateV8EngineParam FromSysConfig(object sysConfig)
         {
             var param = new CreateV8EngineParam();

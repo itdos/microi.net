@@ -39,6 +39,8 @@ namespace Microi.net
                 ["SecurityGuard:WindowSeconds"] = new[] { "SecurityWindowSeconds" },
                 ["SecurityGuard:PerIpMaxRequests"] = new[] { "SecurityPerIpMaxRequests" },
                 ["SecurityGuard:PerIpMaxErrors"] = new[] { "SecurityPerIpMaxErrors" },
+                ["SecurityGuard:TrustedVsCodePerIpMaxRequests"] = new[] { "SecurityTrustedVsCodePerIpMaxRequests" },
+                ["SecurityGuard:TrustedVsCodePerIpMaxErrors"] = new[] { "SecurityTrustedVsCodePerIpMaxErrors" },
                 ["SecurityGuard:BlockMinutes"] = new[] { "SecurityBlockMinutes" },
                 ["SecurityGuard:RecentAccessMaxCount"] = new[] { "SecurityRecentAccessMaxCount" },
                 ["SecurityGuard:LogIntervalSeconds"] = new[] { "SecurityLogIntervalSeconds" },

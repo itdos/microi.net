@@ -32,6 +32,7 @@ export declare const API: {
     readonly UPDATE_ENGINE_CODE: "/api/V8Engine/UpdateApiEngineCode";
     readonly CREATE_ENGINE: "/api/V8Engine/CreateApiEngine";
     readonly EXECUTE_ENGINE: "/api/V8Engine/ExecuteApiEngine";
+    readonly RUN_BACKGROUND_API_ENGINE: "/api/BackgroundTask/RunApiEngine";
     readonly UPLOAD_FILE_BASE64: "/api/V8Engine/UploadFileBase64";
     readonly UPLOAD_APPLICATION_ASSET_STREAM: "/api/V8Engine/UploadApplicationAssetStream";
     readonly FINALIZE_APPLICATION_STREAM_PUBLISH: "/api/V8Engine/FinalizeApplicationStreamPublish";
@@ -70,6 +71,8 @@ export declare const API: {
     readonly SAVE_PRINT_TEMPLATE: "/api/V8Engine/SavePrintTemplate";
     readonly SAVE_WORKFLOW_PACKAGE: "/api/V8Engine/SaveWorkflowPackage";
     readonly SAVE_JOB: "/api/V8Engine/SaveJob";
+    readonly LIST_DATABASE_BACKUP_TENANTS: "/api/V8Engine/ListDatabaseBackupTenants";
+    readonly RUN_DATABASE_BACKUP: "/api/V8Engine/RunDatabaseBackup";
     readonly VALIDATE_LOW_CODE_SYSTEM: "/api/V8Engine/ValidateLowCodeSystem";
     readonly WRITE_MCP_AUDIT_LOG: "/api/V8Engine/WriteMcpAuditLog";
     readonly QUERY_MONGODB_LOGS: "/api/V8Engine/QueryMongodbLogs";

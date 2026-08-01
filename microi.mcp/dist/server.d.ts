@@ -1,5 +1,5 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { MicroiClient } from './microi-client.js';
+import type { ApiResponse, MicroiClient } from './microi-client.js';
 /** MCP Server 上下文（用于区分不同租户） */
 export interface McpServerContext {
     osClient: string;
@@ -33,6 +33,31 @@ export declare function buildLocalApplicationAssetManifest(rootDirectory: string
     maxFiles?: number;
     maxTotalBytes?: number;
 }): Promise<LocalApplicationAssetManifest>;
+export interface LegacyStreamPublishFallbackResult {
+    attempted: boolean;
+    reason: string;
+    appKey?: string;
+    response?: ApiResponse;
+}
+/**
+ * A short-lived compatibility detector for API nodes that predate the strongly
+ * typed HDFS selector fix. Those nodes fail before writing the first asset when
+ * the dynamic runtime tries to invoke Dos.Common.Val<T> on a JValue.
+ */
+export declare function isLegacyApplicationStreamJValueFailure(result?: Partial<ApiResponse> | null): boolean;
+/**
+ * Bridge a rolling-upgrade window without retrying the broken stream endpoint.
+ * The fallback is deliberately restricted to small existing MicroServices: it
+ * uses the legacy C# PublishMicroService JSON endpoint, never Jint, and refuses
+ * Web/UniApp or large directories rather than silently changing their runtime.
+ */
+export declare function tryLegacyMicroServiceStreamPublishFallback(client: MicroiClient, manifest: LocalApplicationAssetManifest, input: {
+    appIdOrKey: string;
+    versionNo: string;
+    routes?: Array<Record<string, unknown>>;
+    deliveryBatchId: string;
+    sourceManifestHash?: string;
+}): Promise<LegacyStreamPublishFallbackResult>;
 interface AccessKeyCreationConfirmationInput {
     name: string;
     allowedRoutes: string[];

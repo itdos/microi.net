@@ -91,7 +91,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 7, 4) ||
+                    importerVersion < new System.Version(1, 8, 3) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -115,7 +115,11 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
                     !code.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
                     !code.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1") ||
-                    !code.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1"))
+                    !code.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1") ||
+                    !code.Contains("BACKGROUND_TASK_RUNTIME_SCOPE_V1") ||
+                    !code.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
+                    !code.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
+                    !code.Contains("DATASET_INSERT_IF_MISSING_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -476,7 +480,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 7, 4) ||
+                    importerVersion < new System.Version(1, 8, 3) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -494,7 +498,11 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
                     !content.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
                     !content.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1") ||
-                    !content.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1"))
+                    !content.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1") ||
+                    !content.Contains("BACKGROUND_TASK_RUNTIME_SCOPE_V1") ||
+                    !content.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
+                    !content.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
+                    !content.Contains("DATASET_INSERT_IF_MISSING_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
@@ -570,7 +578,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
                     packageVersion < new System.Version(6, 5, 16) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 7, 4) ||
+                    embeddedImporterVersion < new System.Version(1, 8, 3) ||
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
                     !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
@@ -580,7 +588,11 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("MICRO_APP_PUBLIC_HDFS_PATH_V1") ||
                     !importerEngineCode.Contains("DB_RUNTIME_BUILD_ASSETS_V1") ||
                     !importerEngineCode.Contains("PRUNE_ASSET_IDS_WITH_DELFORM_V1") ||
-                    !importerEngineCode.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1"))
+                    !importerEngineCode.Contains("BACKGROUND_TASK_BOOTSTRAP_READINESS_V1") ||
+                    !importerEngineCode.Contains("BACKGROUND_TASK_RUNTIME_SCOPE_V1") ||
+                    !importerEngineCode.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
+                    !importerEngineCode.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
+                    !importerEngineCode.Contains("DATASET_INSERT_IF_MISSING_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
                 }

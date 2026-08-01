@@ -16,6 +16,7 @@
 		"check:theme": "node scripts/check-default-dark.mjs",
 		"test:app-preview": "node --test tests/uniapp-preview-mode.test.mjs",
 		"test:site-api": "node --test tests/site-api-base.test.mjs",
+		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
 		"docs:dev": "npm run check:links && vitepress dev docs --host",
 		"dev": "npm run check:links && vitepress dev docs --host",
 		"docs:build": "npm run check:links && vitepress build docs && npm run check:theme && npm run check:seo",

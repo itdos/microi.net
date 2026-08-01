@@ -13,9 +13,10 @@ namespace Microi.net.Api
     public class SecurityGuardController : Controller
     {
         [HttpGet, HttpPost]
-        public JsonResult ListBlocked()
+        public async Task<JsonResult> ListBlocked()
         {
-            return Json(new DosResult(1, SecurityGuardService.GetBlockedIps()));
+            var identity = await GetOperatorIdentity().ConfigureAwait(false);
+            return Json(new DosResult(1, SecurityGuardService.GetBlockedIps(identity.OsClient)));
         }
 
         [HttpGet, HttpPost]

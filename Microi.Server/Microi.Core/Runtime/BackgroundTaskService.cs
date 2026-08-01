@@ -161,7 +161,9 @@ namespace Microi.net
                 BusinessStatusField = Limit(options["BusinessStatusField"]?.ToString(), 100),
                 BusinessTaskIdField = Limit(options["BusinessTaskIdField"]?.ToString(), 100),
                 BusinessProgressField = Limit(options["BusinessProgressField"]?.ToString(), 100),
-                BusinessEtaField = Limit(options["BusinessEtaField"]?.ToString(), 100)
+                BusinessEtaField = Limit(options["BusinessEtaField"]?.ToString(), 100),
+                RuntimeOsClientType = BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                RuntimeOsClientNetwork = BackgroundTaskStore.CurrentRuntimeOsClientNetwork()
             };
             try
             {
@@ -378,11 +380,27 @@ namespace Microi.net
 
         public static async Task SendTaskListToUserAsync(string osClient, string userKey)
         {
+            await SendTaskListToUserAsync(
+                    osClient,
+                    userKey,
+                    BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                    BackgroundTaskStore.CurrentRuntimeOsClientNetwork())
+                .ConfigureAwait(false);
+        }
+
+        private static async Task SendTaskListToUserAsync(
+            string osClient,
+            string userKey,
+            string runtimeOsClientType,
+            string runtimeOsClientNetwork)
+        {
             if (!RealtimePushRuntime.IsConfigured || osClient.DosIsNullOrWhiteSpace() || userKey.DosIsNullOrWhiteSpace()) return;
             try
             {
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                var clientInfo = await cache.GetAsync<ClientInfo>($"Microi:{osClient}:ChatOnline:{userKey}").ConfigureAwait(false);
+                var clientInfo = await cache.GetAsync<ClientInfo>(GetScopedChatOnlineKey(
+                        osClient, userKey, runtimeOsClientType, runtimeOsClientNetwork))
+                    .ConfigureAwait(false);
                 if (clientInfo?.ConnectionIds == null || !clientInfo.ConnectionIds.Any()) return;
                 await RealtimePushRuntime.SendAsync(
                         clientInfo.ConnectionIds,
@@ -403,7 +421,12 @@ namespace Microi.net
             {
                 try
                 {
-                    concurrencyLease = BackgroundTaskConcurrencyLease.TryAcquire(item.OsClient, item.ConcurrencyKey, item.LeaseOwner);
+                    concurrencyLease = BackgroundTaskConcurrencyLease.TryAcquire(
+                        item.OsClient,
+                        item.ConcurrencyKey,
+                        item.LeaseOwner,
+                        item.RuntimeOsClientType,
+                        item.RuntimeOsClientNetwork);
                     if (concurrencyLease == null)
                     {
                         BackgroundTaskStore.ReleaseToPending(item, "等待同一并发组的上一项任务完成", 2);
@@ -456,9 +479,33 @@ namespace Microi.net
                         item.BusinessEtaField
                     });
 
-                    dynamic rawResult = await MicroiEngine.BackgroundTaskApiEngine
-                        .RunBackgroundAsync(param, trustedUser, cancellation.Token)
-                        .ConfigureAwait(false);
+                    dynamic rawResult;
+                    if (string.Equals(item.ApiEngineKey, DatabaseBackupService.WorkerApiEngineKey,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Database backup is a platform capability, not tenant V8
+                        // source. Keeping the durable task envelope while executing
+                        // native code removes the historic dependency on an app-store
+                        // worker engine that may be missing or version-skewed.
+                        var selectedTenants = param["TenantOsClients"] is JArray tenantArray
+                            ? tenantArray.Select(token => token?.ToString())
+                                .Where(value => !value.DosIsNullOrWhiteSpace())
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToArray()
+                            : null;
+                        rawResult = new DatabaseBackupService(item.Id, item.FencingToken).Run(
+                            trustedUser,
+                            item.OsClient,
+                            param["TriggerType"]?.ToString() ?? "Manual",
+                            ParseInt(param["RetainCount"], 7),
+                            selectedTenants);
+                    }
+                    else
+                    {
+                        rawResult = await MicroiEngine.BackgroundTaskApiEngine
+                            .RunBackgroundAsync(param, trustedUser, cancellation.Token)
+                            .ConfigureAwait(false);
+                    }
                     var result = SafeToJObject(rawResult);
                     var continuation = GetContinuation(result);
                     if (continuation != null && IsTrue(continuation["HasMore"]))
@@ -630,7 +677,8 @@ namespace Microi.net
         private static void QueueNotification(BackgroundTaskItem item)
         {
             if (item == null) return;
-            _ = SendTaskListToUserAsync(item.OsClient, item.UserKey);
+            var scope = GetItemRuntimeScope(item);
+            _ = SendTaskListToUserAsync(item.OsClient, item.UserKey, scope.Type, scope.Network);
         }
 
         private static void CacheProjection(BackgroundTaskItem item)
@@ -640,8 +688,13 @@ namespace Microi.net
             try
             {
                 var cache = MicroiEngine.CacheTenant.Cache(item.OsClient);
-                cache.HashSet(GetTaskHashKey(item.OsClient, item.UserKey), item.Id, ApplyRuntimeFields(item));
-                PruneTaskHash(cache, item.OsClient, item.UserKey);
+                var scope = GetItemRuntimeScope(item);
+                cache.HashSet(GetTaskHashKey(item.OsClient, item.UserKey, scope.Type, scope.Network),
+                    item.Id, ApplyRuntimeFields(item));
+                // Do not leave a stale pre-scope projection behind after an upgraded
+                // node has persisted the authoritative scoped projection.
+                cache.HashDelete(GetLegacyTaskHashKey(item.OsClient, item.UserKey), item.Id);
+                PruneTaskHash(cache, item.OsClient, item.UserKey, scope.Type, scope.Network);
             }
             catch (Exception ex)
             {
@@ -654,8 +707,16 @@ namespace Microi.net
             try
             {
                 var cache = MicroiEngine.CacheTenant.Cache(osClient ?? "");
-                return cache.HashGetAllValues<BackgroundTaskItem>(GetTaskHashKey(osClient, userKey))
-                       ?? new List<BackgroundTaskItem>();
+                var scoped = cache.HashGetAllValues<BackgroundTaskItem>(GetTaskHashKey(
+                    osClient, userKey,
+                    BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                    BackgroundTaskStore.CurrentRuntimeOsClientNetwork())) ?? new List<BackgroundTaskItem>();
+                // One-way rolling-upgrade compatibility. New writes remove their
+                // corresponding legacy entry, so this fallback naturally disappears.
+                return scoped.Count > 0
+                    ? scoped
+                    : cache.HashGetAllValues<BackgroundTaskItem>(GetLegacyTaskHashKey(osClient, userKey))
+                      ?? new List<BackgroundTaskItem>();
             }
             catch { return new List<BackgroundTaskItem>(); }
         }
@@ -665,7 +726,9 @@ namespace Microi.net
             try
             {
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                var key = GetTaskHashKey(osClient, userKey);
+                var key = GetTaskHashKey(osClient, userKey,
+                    BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                    BackgroundTaskStore.CurrentRuntimeOsClientNetwork());
                 var removeIds = cache.HashGetAllValues<BackgroundTaskItem>(key)
                     ?.Where(item => item != null
                                     && (taskId.DosIsNullOrWhiteSpace() || item.Id == taskId)
@@ -674,21 +737,34 @@ namespace Microi.net
                     .Where(id => !id.DosIsNullOrWhiteSpace())
                     .ToArray();
                 if (removeIds?.Length > 0) cache.HashDelete(key, removeIds);
+                if (removeIds?.Length > 0) cache.HashDelete(GetLegacyTaskHashKey(osClient, userKey), removeIds);
             }
             catch { }
         }
 
         private static void DeleteProjection(string osClient, string userKey, string taskId)
         {
-            try { MicroiEngine.CacheTenant.Cache(osClient).HashDelete(GetTaskHashKey(osClient, userKey), taskId); }
+            try
+            {
+                var cache = MicroiEngine.CacheTenant.Cache(osClient);
+                cache.HashDelete(GetTaskHashKey(osClient, userKey,
+                    BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                    BackgroundTaskStore.CurrentRuntimeOsClientNetwork()), taskId);
+                cache.HashDelete(GetLegacyTaskHashKey(osClient, userKey), taskId);
+            }
             catch { }
         }
 
-        private static void PruneTaskHash(IMicroiCache cache, string osClient, string userKey)
+        private static void PruneTaskHash(
+            IMicroiCache cache,
+            string osClient,
+            string userKey,
+            string runtimeOsClientType,
+            string runtimeOsClientNetwork)
         {
             try
             {
-                var key = GetTaskHashKey(osClient, userKey);
+                var key = GetTaskHashKey(osClient, userKey, runtimeOsClientType, runtimeOsClientNetwork);
                 var list = cache.HashGetAllValues<BackgroundTaskItem>(key) ?? new List<BackgroundTaskItem>();
                 if (list.Count <= 100) return;
                 var removeIds = list.OrderByDescending(item => IsTerminal(item.Status))
@@ -725,9 +801,47 @@ namespace Microi.net
             return $"{seconds / 86400}d {(seconds % 86400) / 3600}h {(seconds % 3600) / 60}m";
         }
 
-        private static string GetTaskHashKey(string osClient, string userKey)
+        internal static string GetTaskHashKey(
+            string osClient,
+            string userKey,
+            string runtimeOsClientType,
+            string runtimeOsClientNetwork)
+        {
+            return $"Microi:{osClient ?? ""}:BackgroundTasks:{ScopeKey(runtimeOsClientType, runtimeOsClientNetwork)}:{userKey ?? ""}";
+        }
+
+        public static string GetScopedChatOnlineKey(
+            string osClient,
+            string userKey,
+            string runtimeOsClientType,
+            string runtimeOsClientNetwork)
+        {
+            return $"Microi:{osClient ?? ""}:ChatOnline:{ScopeKey(runtimeOsClientType, runtimeOsClientNetwork)}:{userKey ?? ""}";
+        }
+
+        private static string GetLegacyTaskHashKey(string osClient, string userKey)
         {
             return $"Microi:{osClient ?? ""}:BackgroundTasks:{userKey ?? ""}";
+        }
+
+        private static (string Type, string Network) GetItemRuntimeScope(BackgroundTaskItem item)
+        {
+            if (item is BackgroundTaskRecord record)
+            {
+                var type = BackgroundTaskStore.NormalizeRuntimeScopeValue(record.RuntimeOsClientType);
+                var network = BackgroundTaskStore.NormalizeRuntimeScopeValue(record.RuntimeOsClientNetwork);
+                if (!type.DosIsNullOrWhiteSpace() || !network.DosIsNullOrWhiteSpace())
+                    return (type, network);
+            }
+            return (BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                BackgroundTaskStore.CurrentRuntimeOsClientNetwork());
+        }
+
+        private static string ScopeKey(string runtimeOsClientType, string runtimeOsClientNetwork)
+        {
+            return Uri.EscapeDataString(BackgroundTaskStore.NormalizeRuntimeScopeValue(runtimeOsClientType))
+                   + ":"
+                   + Uri.EscapeDataString(BackgroundTaskStore.NormalizeRuntimeScopeValue(runtimeOsClientNetwork));
         }
 
         private static bool IsTerminal(string status)

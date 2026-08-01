@@ -8,6 +8,42 @@ namespace Dos.Common.Tests;
 public class ApplicationAssetStreamPublishTests
 {
     [Theory]
+    [InlineData("MinIO", "MinIO")]
+    [InlineData("S3", "S3")]
+    [InlineData("", "Aliyun")]
+    public void NormalizeApplicationAssetHdfsType_HandlesJValueWithoutDynamicBinding(
+        string configuredType,
+        string expected)
+    {
+        dynamic rollingUpgradeConfig = new JObject
+        {
+            ["HDFS"] = new JValue(configuredType)
+        };
+
+        var actual = V8McpLogic.NormalizeApplicationAssetHdfsType((object)rollingUpgradeConfig);
+
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public void NormalizeApplicationAssetHdfsType_HandlesObjectShapedLegacyConfig()
+    {
+        object legacyConfig = new Dictionary<string, object>
+        {
+            ["HDFS"] = new JValue("MinIO")
+        };
+
+        Assert.Equal("MinIO", V8McpLogic.NormalizeApplicationAssetHdfsType(legacyConfig));
+    }
+
+    [Fact]
+    public void NormalizeApplicationAssetHdfsType_DefaultsToAliyunWhenConfigurationIsMissing()
+    {
+        Assert.Equal("Aliyun", V8McpLogic.NormalizeApplicationAssetHdfsType(null));
+        Assert.Equal("Aliyun", V8McpLogic.NormalizeApplicationAssetHdfsType(new JObject()));
+    }
+
+    [Theory]
     [InlineData("index.html", "index.html")]
     [InlineData("assets\\app.js", "assets/app.js")]
     [InlineData("css/theme.dark.css", "css/theme.dark.css")]

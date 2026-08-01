@@ -48,6 +48,7 @@ namespace Microi.net
         public int CurrentDepth { get; set; }
         public bool IsBackgroundTask { get; set; }
         public bool IsolateNestedApiMemory { get; set; }
+        public bool ResidentMemoryGuardOnly { get; set; }
         public string MemoryAccounting { get; set; } = "CumulativeAllocatedBytes";
     }
 

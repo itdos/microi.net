@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.7.4
+ * Version: v1.8.3
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -35,6 +35,199 @@ if (invokeType == 'client') {
 }
 
 var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var backgroundTaskEnvelope = V8.Param._BackgroundTask || {};
+var backgroundChunkingEnabled = !!backgroundTaskId && (
+    V8.Param._TrustedServerInvocation === true
+    || String(V8.Param._TrustedServerInvocation || '').toLowerCase() == 'true'
+    || (String(backgroundTaskEnvelope.Id || '') == String(backgroundTaskId)
+        && V8.Param._BackgroundTaskFencingToken !== null
+        && V8.Param._BackgroundTaskFencingToken !== undefined)
+);
+// APPLICATION_ASSET_BACKGROUND_CHUNKS_V1：商城应用资产必须按后台任务切片。
+// Jint 的 LimitMemory 统计的是当前执行片段的累计托管分配，不是存活堆；即使
+// 单个文件上传完成并被 GC 回收，长循环仍会把历史分配全部累计到同一片段。
+// 每片只做少量真实上传，已完成文件按 AppId + FilePath + Hash 在下一片复用，
+// 最后一片才切换运行元数据和清理旧资产。旧后端仍可依靠 3GB 片段预算完成大包。
+var backgroundCheckpoint = V8.Param._BackgroundTaskCheckpoint || {};
+if (typeof backgroundCheckpoint == 'string') {
+    try { backgroundCheckpoint = JSON.parse(backgroundCheckpoint); } catch (checkpointError) { backgroundCheckpoint = {}; }
+}
+var checkpointTaskId = String(backgroundCheckpoint.TaskId || '');
+if (checkpointTaskId && checkpointTaskId != String(backgroundTaskId || '')) backgroundCheckpoint = {};
+if (!backgroundChunkingEnabled && backgroundCheckpoint.Phase) backgroundCheckpoint = {};
+if (backgroundChunkingEnabled && backgroundCheckpoint.Phase && !checkpointTaskId) {
+    var isLegacyAssetCheckpoint = String(backgroundCheckpoint.Phase) == 'ApplicationAssets'
+        && (backgroundCheckpoint.AssetKind
+            || backgroundCheckpoint.ApplicationAssetUploaded !== null
+                && backgroundCheckpoint.ApplicationAssetUploaded !== undefined);
+    if (!isLegacyAssetCheckpoint) backgroundCheckpoint = {};
+}
+// SCHEMA_BACKGROUND_CHUNKS_V1：旧后端仍使用 Jint 累计分配预算，因此在应用
+// 资产之前的 DDL、表定义、字段 Id 规划、字段写入和物理列复核也必须独立提交。
+// 检查点只保存阶段、游标和非同值 Id 映射；Package 仍由持久任务 ParamJson 持有，
+// 不依赖进程内对象，节点重启或租约转移后可以从最后一次已提交分片继续。
+var backgroundCheckpointPhase = String(backgroundCheckpoint.Phase || 'Ddl');
+var supportedBackgroundCheckpointPhases = {
+    Ddl: true,
+    Tables: true,
+    PlanFields: true,
+    Fields: true,
+    Physical: true,
+    ApplicationAssets: true,
+    PostSchema: true
+};
+if (!supportedBackgroundCheckpointPhases[backgroundCheckpointPhase]) backgroundCheckpointPhase = 'Ddl';
+var backgroundCheckpointIndex = parseInt(backgroundCheckpoint.Index || 0, 10);
+if (isNaN(backgroundCheckpointIndex) || backgroundCheckpointIndex < 0) backgroundCheckpointIndex = 0;
+var schemaDdlChunkSize = parseInt(V8.Param.SchemaDdlChunkSize || 1, 10);
+if (isNaN(schemaDdlChunkSize)) schemaDdlChunkSize = 1;
+schemaDdlChunkSize = Math.max(1, Math.min(4, schemaDdlChunkSize));
+var schemaTableChunkSize = parseInt(V8.Param.SchemaTableChunkSize || 2, 10);
+if (isNaN(schemaTableChunkSize)) schemaTableChunkSize = 2;
+schemaTableChunkSize = Math.max(1, Math.min(4, schemaTableChunkSize));
+var schemaFieldPlanChunkSize = parseInt(V8.Param.SchemaFieldPlanChunkSize || 32, 10);
+if (isNaN(schemaFieldPlanChunkSize)) schemaFieldPlanChunkSize = 32;
+schemaFieldPlanChunkSize = Math.max(1, Math.min(64, schemaFieldPlanChunkSize));
+var schemaFieldChunkSize = parseInt(V8.Param.SchemaFieldChunkSize || 8, 10);
+if (isNaN(schemaFieldChunkSize)) schemaFieldChunkSize = 8;
+schemaFieldChunkSize = Math.max(1, Math.min(16, schemaFieldChunkSize));
+var schemaPhysicalTableChunkSize = parseInt(V8.Param.SchemaPhysicalTableChunkSize || 1, 10);
+if (isNaN(schemaPhysicalTableChunkSize)) schemaPhysicalTableChunkSize = 1;
+schemaPhysicalTableChunkSize = Math.max(1, Math.min(2, schemaPhysicalTableChunkSize));
+
+var copyPersistentIdMaps = function (sourceMaps) {
+    var result = { Table: {}, Field: {} };
+    if (!sourceMaps || typeof sourceMaps != 'object') return result;
+    var names = ['Table', 'Field'];
+    for (var nameIndex = 0; nameIndex < names.length; nameIndex++) {
+        var mapName = names[nameIndex];
+        var sourceMap = sourceMaps[mapName];
+        if (!sourceMap || typeof sourceMap != 'object') continue;
+        for (var sourceId in sourceMap) {
+            if (!Object.prototype.hasOwnProperty.call(sourceMap, sourceId)) continue;
+            var targetId = sourceMap[sourceId];
+            if (sourceId && targetId && String(sourceId) != String(targetId)) {
+                result[mapName][String(sourceId)] = String(targetId);
+            }
+        }
+    }
+    return result;
+};
+
+var buildPersistentCheckpoint = function (phase, index, extra) {
+    var checkpoint = {
+        Version: 1,
+        TaskId: String(backgroundTaskId || ''),
+        Phase: phase,
+        Index: Math.max(0, parseInt(index || 0, 10) || 0)
+    };
+    var checkpointPackageInfo = typeof Package != 'undefined' && Package && Package.PackageInfo
+        ? Package.PackageInfo
+        : {};
+    var checkpointPackageVersion = String(
+        checkpointPackageInfo.Version || checkpointPackageInfo.AppVersion || V8.Param.AppVersion || ''
+    );
+    var checkpointPackageIdentity = String(
+        checkpointPackageInfo.AppId || checkpointPackageInfo.AppKey || V8.Param.AppId
+        || V8.Param.AppKey || V8.Param.StoreId || checkpointPackageInfo.Name || ''
+    );
+    if (checkpointPackageVersion) checkpoint.PackageVersion = checkpointPackageVersion;
+    if (checkpointPackageIdentity) checkpoint.PackageIdentity = checkpointPackageIdentity;
+    if (backgroundCheckpoint.IdMapsPlanned === true
+        || phase == 'Fields'
+        || phase == 'Physical'
+        || phase == 'ApplicationAssets'
+        || phase == 'PostSchema') {
+        checkpoint.IdMapsPlanned = true;
+    }
+    var maps = null;
+    try {
+        if (typeof snapshotPersistentIdMaps == 'function') maps = snapshotPersistentIdMaps();
+    } catch (snapshotError) { maps = null; }
+    if (!maps) maps = copyPersistentIdMaps(backgroundCheckpoint.IdMaps);
+    if (maps && (Object.keys(maps.Table).length > 0 || Object.keys(maps.Field).length > 0)) {
+        checkpoint.IdMaps = maps;
+    }
+    var schemaStats = null;
+    try {
+        if (typeof snapshotPersistentSchemaStats == 'function') schemaStats = snapshotPersistentSchemaStats();
+    } catch (schemaStatsError) { schemaStats = null; }
+    if (!schemaStats && backgroundCheckpoint.SchemaStats) schemaStats = backgroundCheckpoint.SchemaStats;
+    if (schemaStats) checkpoint.SchemaStats = schemaStats;
+    extra = extra || {};
+    for (var extraKey in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, extraKey)) checkpoint[extraKey] = extra[extraKey];
+    }
+    return checkpoint;
+};
+
+var buildSchemaContinuation = function (phase, index, progress, msg) {
+    return {
+        Code: 1,
+        Data: {
+            BackgroundTask: {
+                HasMore: true,
+                Checkpoint: buildPersistentCheckpoint(phase, index),
+                Progress: progress,
+                Msg: msg
+            }
+        },
+        Msg: msg
+    };
+};
+var applicationAssetChunkMaxFiles = parseInt(V8.Param.ApplicationAssetChunkMaxFiles || 8, 10);
+if (isNaN(applicationAssetChunkMaxFiles)) applicationAssetChunkMaxFiles = 8;
+applicationAssetChunkMaxFiles = Math.max(1, Math.min(50, applicationAssetChunkMaxFiles));
+var applicationAssetChunkMaxBase64Chars = parseInt(V8.Param.ApplicationAssetChunkMaxBase64Chars || (32 * 1024 * 1024), 10);
+if (isNaN(applicationAssetChunkMaxBase64Chars)) applicationAssetChunkMaxBase64Chars = 32 * 1024 * 1024;
+applicationAssetChunkMaxBase64Chars = Math.max(1024 * 1024, Math.min(256 * 1024 * 1024, applicationAssetChunkMaxBase64Chars));
+var applicationAssetChunkUploads = 0;
+var applicationAssetChunkBase64Chars = 0;
+var applicationAssetPreviouslyUploaded = parseInt(backgroundCheckpoint.ApplicationAssetUploaded || 0, 10);
+if (isNaN(applicationAssetPreviouslyUploaded)) applicationAssetPreviouslyUploaded = 0;
+
+var applicationAssetContentLength = function (file) {
+    file = file || {};
+    var value = file.FileByteBase64 || file.ContentBase64 || file.Base64;
+    if (value !== null && value !== undefined) return String(value).length;
+    if (file.Content !== null && file.Content !== undefined) return String(file.Content).length * 2;
+    return 0;
+};
+
+var shouldContinueApplicationAssets = function (file) {
+    if (!backgroundChunkingEnabled || applicationAssetChunkUploads <= 0) return false;
+    var nextLength = applicationAssetContentLength(file);
+    return applicationAssetChunkUploads >= applicationAssetChunkMaxFiles
+        || applicationAssetChunkBase64Chars + nextLength > applicationAssetChunkMaxBase64Chars;
+};
+
+var markApplicationAssetUploaded = function (file) {
+    applicationAssetChunkUploads++;
+    applicationAssetChunkBase64Chars += applicationAssetContentLength(file);
+};
+
+var buildApplicationAssetContinuation = function (bundleIndex, assetKind, assetIndex, totalAssets) {
+    var uploaded = applicationAssetPreviouslyUploaded + applicationAssetChunkUploads;
+    return {
+        Code: 1,
+        Data: {
+            BackgroundTask: {
+                HasMore: true,
+                Checkpoint: buildPersistentCheckpoint('ApplicationAssets', 0, {
+                    BundleIndex: bundleIndex,
+                    AssetKind: assetKind,
+                    AssetIndex: assetIndex,
+                    ApplicationAssetUploaded: uploaded
+                }),
+                Current: uploaded,
+                Total: totalAssets > 0 ? totalAssets : null,
+                Progress: 65,
+                Msg: '应用资产已完成一个安全分片，将从持久化检查点继续'
+            }
+        },
+        Msg: '应用资产分片已提交，后台任务将自动继续'
+    };
+};
 var installUser = V8.CurrentUser || (typeof currentUser !== 'undefined' ? currentUser : {}) || {};
 if ((!installUser || !installUser.Id) && V8.Method && V8.Method.GetCurrentToken) {
     try {
@@ -162,6 +355,35 @@ if (!Package.PackageInfo) {
         Code: 0,
         Msg: '参数错误：Package.PackageInfo不能为空'
     };
+}
+
+// PACKAGE_REPLAY_VERSION_GUARD_V1：identifier-only 后台任务会在每片从商城源
+// 重新读取包体。发布方若在任务中途切换版本，旧检查点不能与新包混用；宁可让
+// 当前任务明确失败并以新幂等请求重新开始，也不能把两个版本的 DDL/字段拼在一起。
+if (backgroundChunkingEnabled) {
+    var currentPackageVersion = String(
+        Package.PackageInfo.Version || Package.PackageInfo.AppVersion || V8.Param.AppVersion || ''
+    );
+    var currentPackageIdentity = String(
+        Package.PackageInfo.AppId || Package.PackageInfo.AppKey || V8.Param.AppId
+        || V8.Param.AppKey || V8.Param.StoreId || Package.PackageInfo.Name || ''
+    );
+    if (backgroundCheckpoint.PackageVersion
+        && String(backgroundCheckpoint.PackageVersion) != currentPackageVersion) {
+        return {
+            Code: 0,
+            Msg: '应用包版本在后台分片期间发生变化：检查点='
+                + backgroundCheckpoint.PackageVersion + '，当前=' + currentPackageVersion
+                + '。已停止混合安装，请重新提交更新任务。'
+        };
+    }
+    if (backgroundCheckpoint.PackageIdentity
+        && String(backgroundCheckpoint.PackageIdentity) != currentPackageIdentity) {
+        return {
+            Code: 0,
+            Msg: '应用包身份与后台检查点不一致，已停止混合安装，请重新提交更新任务。'
+        };
+    }
 }
 
 // 仅检查包体结构，不写数据库、不上传文件。用于发布前及跨平台安装前的安全验收。
@@ -364,6 +586,45 @@ try {
         DataSkipped: 0
     };
 
+    var persistentSchemaStatNames = [
+        'DDLExecuted', 'DDLSkipped', 'FieldsAdded',
+        'TableInserted', 'TableUpdated', 'TableIdRemapped',
+        'FieldInserted', 'FieldUpdated', 'FieldSkipped', 'FieldIdRemapped',
+        'PhysicalFieldsAdded', 'PhysicalFieldsRenamed', 'PhysicalFieldsModified',
+        'PhysicalFieldsSkipped', 'PhysicalFieldsErrors'
+    ];
+    var snapshotPersistentSchemaStats = function () {
+        var result = {};
+        for (var schemaStatIndex = 0; schemaStatIndex < persistentSchemaStatNames.length; schemaStatIndex++) {
+            var schemaStatName = persistentSchemaStatNames[schemaStatIndex];
+            var schemaStatValue = Number(stats[schemaStatName] || 0);
+            if (schemaStatValue) result[schemaStatName] = schemaStatValue;
+        }
+        return result;
+    };
+    if (backgroundChunkingEnabled
+        && backgroundCheckpoint.SchemaStats
+        && String(backgroundCheckpoint.TaskId || '') == String(backgroundTaskId || '')) {
+        for (var restoreStatIndex = 0; restoreStatIndex < persistentSchemaStatNames.length; restoreStatIndex++) {
+            var restoreStatName = persistentSchemaStatNames[restoreStatIndex];
+            var restoreStatValue = Number(backgroundCheckpoint.SchemaStats[restoreStatName] || 0);
+            if (!isNaN(restoreStatValue) && restoreStatValue >= 0) stats[restoreStatName] = restoreStatValue;
+        }
+    }
+
+    var assertSchemaChunkSucceeded = function (label) {
+        var chunkErrors = [];
+        for (var chunkLogKey in debugLog) {
+            if (Object.prototype.hasOwnProperty.call(debugLog, chunkLogKey)
+                && chunkLogKey.indexOf('_error_') > -1) {
+                chunkErrors.push(chunkLogKey + ': ' + String(debugLog[chunkLogKey] || '未知错误'));
+            }
+        }
+        if (chunkErrors.length > 0) {
+            throw new Error(label + '分片存在' + chunkErrors.length + '个错误：' + chunkErrors.slice(0, 3).join('；'));
+        }
+    };
+
     // 微服务页面安装完成后，再按路由元数据迁移目标库中的历史 Vue 菜单。
     // 保留旧 Url 兼容书签，只把运行入口切换到已发布的微服务宿主。
     var applicationMenuBindings = [];
@@ -470,6 +731,13 @@ try {
         return firstTextParam([data.FilePathName, data.FilePath, data.Path, data.Url, data.url]);
     };
 
+    var base64DecodedSize = function (value) {
+        var text = String(value || '').replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+        if (!text) return 0;
+        var padding = text.substring(Math.max(0, text.length - 2)).replace(/[^=]/g, '').length;
+        return Math.max(0, Math.floor(text.length * 3 / 4) - padding);
+    };
+
     var uploadApplicationAsset = function (rootPath, file, limit) {
         var relativePath = normalizeApplicationPath(file.Path || file.FilePath || file.RelativePath || file.FileName);
         if (!relativePath) throw new Error('应用资产路径不能为空');
@@ -478,7 +746,9 @@ try {
             base64 = V8.Base64.StringToBase64(String(file.Content));
         }
         if (!base64) throw new Error('应用资产缺少文件内容：' + relativePath);
+        var originalBase64 = base64;
         base64 = rewriteApplicationRuntimeContext(rootPath, relativePath, base64);
+        var runtimeContextChanged = base64 !== originalBase64;
         var dir = applicationFileDir(relativePath);
         var files = {};
         files[applicationFileName(relativePath)] = base64;
@@ -494,10 +764,18 @@ try {
         }
         var hdfsPath = getUploadedHdfsPath(result);
         if (!hdfsPath) throw new Error('HDFS 上传成功但未返回文件路径：' + relativePath);
-        var actualSize = System.Convert.FromBase64String(base64).Length;
-        var actualHash = V8.EncryptHelper && V8.EncryptHelper.Sha256Hex
-            ? String(V8.EncryptHelper.Sha256Hex(base64)).toLowerCase()
-            : (file.Sha256 || file.Hash || file.ContentHash || '');
+        // ASSET_METADATA_WITHOUT_SECOND_DECODE_V1：Upload 已经完成一次 Base64 解码，
+        // 非 HTML 资产直接复用包内摘要/大小，禁止为了统计再次构造完整 byte[]。
+        var packagedSize = Number(file.Size || 0);
+        var packagedHash = firstTextParam([file.Sha256, file.Hash, file.ContentHash]).toLowerCase();
+        var actualSize = !runtimeContextChanged && packagedSize > 0
+            ? packagedSize
+            : base64DecodedSize(base64);
+        var actualHash = !runtimeContextChanged && packagedHash
+            ? packagedHash
+            : (V8.EncryptHelper && V8.EncryptHelper.Sha256Hex
+                ? String(V8.EncryptHelper.Sha256Hex(base64)).toLowerCase()
+                : packagedHash);
         return { Path: relativePath, HdfsPath: hdfsPath, FilePathName: hdfsPath, Size: actualSize, Hash: actualHash };
     };
 
@@ -651,7 +929,7 @@ try {
         return value;
     };
 
-    var installApplicationBundle = function (bundle) {
+    var installApplicationBundle = function (bundle, bundleIndex) {
         if (!bundle) return;
 
         var app = bundle.Application || bundle.App || {};
@@ -694,12 +972,19 @@ try {
         }
         var uploadedSource = [];
         reportProgress(60, '正在写入' + appType + '应用私有源码');
+        var totalBundleAssets = sourceFiles.length;
         for (var i = 0; i < sourceFiles.length; i++) {
             var sourceFile = sourceFiles[i] || {};
             var sourcePath = normalizeApplicationPath(sourceFile.Path || sourceFile.FilePath || sourceFile.RelativePath || sourceFile.FileName);
             expectedApplicationPaths[sourcePath.toLowerCase()] = true;
-            var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile)
-                || uploadApplicationAsset(sourceRoot, sourceFile, true);
+            var sourceUpload = reuseApplicationAsset(existingApplicationAssets, sourcePath, sourceFile);
+            if (!sourceUpload) {
+                if (shouldContinueApplicationAssets(sourceFile)) {
+                    return buildApplicationAssetContinuation(bundleIndex, 'Source', i, totalBundleAssets);
+                }
+                sourceUpload = uploadApplicationAsset(sourceRoot, sourceFile, true);
+                markApplicationAssetUploaded(sourceFile);
+            }
             uploadedSource.push(sourceUpload);
             if (sourceUpload.Reused) {
                 stats.ApplicationSourceFilesReused++;
@@ -735,6 +1020,7 @@ try {
         var buildAssets = embeddedBuildAssets && embeddedBuildAssets.length !== undefined && embeddedBuildAssets.length
             ? embeddedBuildAssets
             : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []);
+        totalBundleAssets += buildAssets.length;
         var uploadedBuild = [];
         var runtimeDbAssets = [];
         var moveBuildToStablePath = function (buildUpload, stableBuildPath) {
@@ -776,7 +1062,11 @@ try {
                 buildUpload.Path = buildRelativePath;
                 stats.ApplicationBuildAssetsReused++;
             } else {
+                if (shouldContinueApplicationAssets(buildFile)) {
+                    return buildApplicationAssetContinuation(bundleIndex, 'Build', b, totalBundleAssets);
+                }
                 buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
+                markApplicationAssetUploaded(buildFile);
             }
             var normalizedBuildPath = normalizeApplicationPath(buildUpload.Path);
             // MICRO_APP_PUBLIC_HDFS_PATH_V1：公有桶对象 Key 必须带租户前缀。
@@ -789,7 +1079,11 @@ try {
             // SKIP_MOVE_FOR_REUSED_BUILD_V1：已处于当前租户稳定 Key 的断点资产不重复移动。
             // 旧版错误 Key 若已被移动或删除，则从本次自包含包重传，再尝试写入正确 Key。
             if (buildWasReused && !buildPathRepaired) {
+                if (shouldContinueApplicationAssets(buildFile)) {
+                    return buildApplicationAssetContinuation(bundleIndex, 'BuildRepair', b, totalBundleAssets);
+                }
                 buildUpload = uploadApplicationAsset(buildRoot, buildFile, false);
+                markApplicationAssetUploaded(buildFile);
                 buildUpload.Path = buildRelativePath;
                 stats.ApplicationBuildAssetsReused--;
                 buildWasReused = false;
@@ -1281,12 +1575,147 @@ try {
         return 0;
     };
 
+    var snapshotPersistentIdMaps = function () {
+        return copyPersistentIdMaps(idMaps);
+    };
+
+    var restorePersistentIdMaps = function () {
+        if (!backgroundChunkingEnabled
+            || !backgroundCheckpoint.IdMaps
+            || String(backgroundCheckpoint.TaskId || '') != String(backgroundTaskId || '')) {
+            return;
+        }
+        var storedMaps = copyPersistentIdMaps(backgroundCheckpoint.IdMaps);
+        var mapNames = ['Table', 'Field'];
+        for (var mapIndex = 0; mapIndex < mapNames.length; mapIndex++) {
+            var mapName = mapNames[mapIndex];
+            var storedMap = storedMaps[mapName] || {};
+            for (var storedId in storedMap) {
+                if (!Object.prototype.hasOwnProperty.call(storedMap, storedId)) continue;
+                var storedTarget = String(storedMap[storedId] || '');
+                if (!storedId || !storedTarget || storedId == storedTarget) continue;
+                idMaps[mapName][storedId] = storedTarget;
+                idMaps[mapName][String(storedId).toLowerCase()] = storedTarget;
+            }
+        }
+    };
+
+    var rebuildLegacyCheckpointIdMaps = function () {
+        if (!backgroundChunkingEnabled
+            || backgroundCheckpoint.IdMapsPlanned === true
+            || (backgroundCheckpointPhase != 'ApplicationAssets' && backgroundCheckpointPhase != 'PostSchema')) {
+            return;
+        }
+        var packageTables = Package.DiyTables || [];
+        for (var legacyTableIndex = 0; legacyTableIndex < packageTables.length; legacyTableIndex++) {
+            var legacyTable = packageTables[legacyTableIndex] || {};
+            if (!legacyTable.Id || !legacyTable.Name) continue;
+            var targetTable = V8.Db.FromSql(
+                'SELECT Id FROM diy_table WHERE LOWER(Name) = LOWER(@p0) ORDER BY IsDeleted ASC LIMIT 1'
+            ).AddInParameter('@p0', legacyTable.Name).First();
+            if (targetTable && targetTable.Id) {
+                addIdMap('Table', legacyTable.Id, String(targetTable.Id), legacyTable.Name + '旧检查点表主键恢复');
+            }
+        }
+        applyPackageIdMaps();
+        var packageFields = Package.DiyFields || [];
+        for (var legacyFieldIndex = 0; legacyFieldIndex < packageFields.length; legacyFieldIndex++) {
+            var legacyField = packageFields[legacyFieldIndex] || {};
+            if (!legacyField.Id || !legacyField.TableId || !legacyField.Name) continue;
+            var targetField = V8.Db.FromSql(
+                'SELECT Id FROM diy_field WHERE TableId = @p0 AND LOWER(Name) = LOWER(@p1) ORDER BY IsDeleted ASC LIMIT 1'
+            ).AddInParameter('@p0', legacyField.TableId)
+                .AddInParameter('@p1', legacyField.Name)
+                .First();
+            if (targetField && targetField.Id) {
+                addIdMap('Field', legacyField.Id, String(targetField.Id), legacyField.Name + '旧检查点字段主键恢复');
+            }
+        }
+        applyPackageIdMaps();
+    };
+
+    var fieldMapTarget = function (sourceId) {
+        var key = normalizeId(sourceId);
+        return idMaps.Field[key] || idMaps.Field[key.toLowerCase()] || '';
+    };
+
+    // Id 映射先规划、后写入。这样字段 A 的 JSON 即使引用稍后才处理且发生
+    // 主键冲突的字段 B，A 在保存前也已经拿到 B 的最终目标 Id。随机生成的冲突
+    // Id 会进入共享 CheckpointJson；重试同一分片或换节点不会再次生成新 Id。
+    var planPackageFieldIdMaps = function (startIndex, endIndex) {
+        var packageFields = Package.DiyFields || [];
+        for (var planIndex = startIndex; planIndex < endIndex; planIndex++) {
+            var packageField = packageFields[planIndex] || {};
+            var sourceFieldId = normalizeId(packageField.Id);
+            var targetTableId = normalizeId(packageField.TableId);
+            var fieldName = String(packageField.Name || '');
+            if (!sourceFieldId || !targetTableId || !fieldName) continue;
+
+            var naturalField = V8.Db.FromSql(
+                'SELECT Id, TableId, Name FROM diy_field WHERE TableId = @p0 AND LOWER(Name) = LOWER(@p1) ORDER BY IsDeleted ASC LIMIT 1'
+            ).AddInParameter('@p0', targetTableId)
+                .AddInParameter('@p1', fieldName)
+                .First();
+            if (naturalField && naturalField.Id) {
+                addIdMap('Field', sourceFieldId, String(naturalField.Id), fieldName + '字段主键预对齐');
+                continue;
+            }
+
+            var rawSource = V8.Db.FromSql(
+                'SELECT Id, TableId, Name FROM diy_field WHERE Id = @p0 LIMIT 1'
+            ).AddInParameter('@p0', sourceFieldId).First();
+            var rawSourceMatches = rawSource && rawSource.Id
+                && normalizeId(rawSource.TableId).toLowerCase() == targetTableId.toLowerCase()
+                && String(rawSource.Name || '').toLowerCase() == fieldName.toLowerCase();
+            if (rawSourceMatches) continue;
+
+            var plannedTargetId = fieldMapTarget(sourceFieldId);
+            if (plannedTargetId) {
+                var rawPlanned = V8.Db.FromSql(
+                    'SELECT Id, TableId, Name FROM diy_field WHERE Id = @p0 LIMIT 1'
+                ).AddInParameter('@p0', plannedTargetId).First();
+                var plannedTargetSafe = !rawPlanned || !rawPlanned.Id
+                    || (normalizeId(rawPlanned.TableId).toLowerCase() == targetTableId.toLowerCase()
+                        && String(rawPlanned.Name || '').toLowerCase() == fieldName.toLowerCase());
+                if (plannedTargetSafe) continue;
+            }
+
+            if (rawSource && rawSource.Id) {
+                var generatedTargetId = '';
+                for (var idAttempt = 0; idAttempt < 5 && !generatedTargetId; idAttempt++) {
+                    var candidateId = String(V8.Method.NewUlid ? V8.Method.NewUlid() : V8.Method.NewGuid());
+                    var candidateExists = V8.Db.FromSql(
+                        'SELECT Id FROM diy_field WHERE Id = @p0 LIMIT 1'
+                    ).AddInParameter('@p0', candidateId).First();
+                    if (!candidateExists || !candidateExists.Id) generatedTargetId = candidateId;
+                }
+                if (!generatedTargetId) throw new Error('字段主键冲突规划失败：' + fieldName);
+                addIdMap('Field', sourceFieldId, generatedTargetId, fieldName + '字段主键冲突预规划');
+            }
+        }
+    };
+
+    restorePersistentIdMaps();
+    rebuildLegacyCheckpointIdMaps();
+
     // ==================== 步骤0：执行DDL创建表和字段 ====================
 
     reportProgress(10, '正在创建和检查物理表');
     debugLog.step0 = '开始执行DDL创建表';
 
-    var ddlStatements = Package.DDLStatements || [];
+    var allDdlStatements = Package.DDLStatements || [];
+    var ddlChunkStart = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Ddl'
+        ? Math.min(backgroundCheckpointIndex, allDdlStatements.length)
+        : 0;
+    var ddlChunkEnd = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Ddl'
+        ? Math.min(allDdlStatements.length, ddlChunkStart + schemaDdlChunkSize)
+        : allDdlStatements.length;
+    var ddlStatements = [];
+    if (!backgroundChunkingEnabled || backgroundCheckpointPhase == 'Ddl') {
+        for (var ddlCopyIndex = ddlChunkStart; ddlCopyIndex < ddlChunkEnd; ddlCopyIndex++) {
+            ddlStatements.push(allDdlStatements[ddlCopyIndex]);
+        }
+    }
     var ddlExecuted = 0;
     var ddlSkipped = 0;
     var fieldsAdded = 0;
@@ -1542,7 +1971,7 @@ try {
         return map;
     };
 
-    var groupPackagePhysicalColumns = function (columns) {
+    var groupPackagePhysicalColumns = function (columns, tableFilterMap) {
         var grouped = {};
         columns = columns || [];
         for (var i = 0; i < columns.length; i++) {
@@ -1552,6 +1981,7 @@ try {
             if (!tableName || !columnName || !isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) continue;
 
             var tableKey = String(tableName).toLowerCase();
+            if (tableFilterMap && !tableFilterMap[tableKey]) continue;
             if (!grouped[tableKey]) {
                 grouped[tableKey] = {
                     TableName: String(tableName),
@@ -1565,7 +1995,7 @@ try {
 
     var syncPhysicalColumnsFromPackage = function (tableFilterMap) {
         var columns = Package.PhysicalColumns || [];
-        var grouped = groupPackagePhysicalColumns(columns);
+        var grouped = groupPackagePhysicalColumns(columns, tableFilterMap);
         var result = { Added: 0, Modified: 0, Skipped: 0, Errors: 0 };
 
         for (var tableKey in grouped) {
@@ -1664,6 +2094,7 @@ try {
     };
 
     /* BACKGROUND_TASK_BOOTSTRAP_READINESS_V1 */
+    /* BACKGROUND_TASK_RUNTIME_SCOPE_V1 */
     var isBackgroundTaskBootstrapPackage = function () {
         var packageInfo = Package.PackageInfo || {};
         var appKey = firstTextParam([
@@ -1694,7 +2125,8 @@ try {
             'MaxAttempts', 'ExecutionCount', 'RetryOnFailure', 'NextRunTime', 'ProgressSampleTime',
             'ProgressSampleCurrent', 'ThroughputPerSecond', 'ProgressSampleCount', 'CheckpointJson',
             'LastError', 'BusinessTable', 'BusinessId', 'BusinessStatusField',
-            'BusinessTaskIdField', 'BusinessProgressField', 'BusinessEtaField'
+            'BusinessTaskIdField', 'BusinessProgressField', 'BusinessEtaField',
+            'RuntimeOsClientType', 'RuntimeOsClientNetwork'
         ];
         var physicalColumns = getTargetPhysicalColumns(tableName);
         var missingColumns = [];
@@ -1727,8 +2159,8 @@ try {
         }
 
         var requiredIndexes = [
-            { Name: 'ux_mci_background_task_idempotency', Columns: ['OsClient', 'IdempotencyKey'], Unique: true },
-            { Name: 'ix_mci_background_task_claim', Columns: ['OsClient', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
+            { Name: 'ux_mci_background_task_idempotency', Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'IdempotencyKey'], Unique: true },
+            { Name: 'ix_mci_background_task_claim', Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
             { Name: 'ix_mci_background_task_user', Columns: ['OsClient', 'UserKey', 'IsDeleted', 'CreateTime'], Unique: false },
             { Name: 'ix_mci_background_task_concurrency', Columns: ['OsClient', 'ConcurrencyKey', 'Status', 'LeaseExpiresAt'], Unique: false }
         ];
@@ -1925,24 +2357,53 @@ try {
         }
     }
 
-    stats.DDLExecuted = ddlExecuted;
-    stats.DDLSkipped = ddlSkipped;
-    stats.FieldsAdded = fieldsAdded;
+    stats.DDLExecuted = (stats.DDLExecuted || 0) + ddlExecuted;
+    stats.DDLSkipped = (stats.DDLSkipped || 0) + ddlSkipped;
+    stats.FieldsAdded = (stats.FieldsAdded || 0) + fieldsAdded;
     debugLog.step0Result = 'DDL执行完成：创建表' + ddlExecuted + '，跳过' + ddlSkipped + '，添加字段' + fieldsAdded;
 
-    var earlyPhysicalSync = syncPhysicalColumnsFromPackage(null);
+    var earlyPhysicalSync = backgroundChunkingEnabled
+        ? { Added: 0, Modified: 0, Skipped: 0, Errors: 0 }
+        : syncPhysicalColumnsFromPackage(null);
     stats.PhysicalFieldsAdded = (stats.PhysicalFieldsAdded || 0) + earlyPhysicalSync.Added;
     stats.PhysicalFieldsModified = (stats.PhysicalFieldsModified || 0) + earlyPhysicalSync.Modified;
     stats.PhysicalFieldsSkipped = (stats.PhysicalFieldsSkipped || 0) + earlyPhysicalSync.Skipped;
     stats.PhysicalFieldsErrors = (stats.PhysicalFieldsErrors || 0) + earlyPhysicalSync.Errors;
     debugLog.step0_5Result = '真实物理字段预同步完成：修改' + earlyPhysicalSync.Modified + '，新增' + earlyPhysicalSync.Added + '，跳过' + earlyPhysicalSync.Skipped + '，异常' + earlyPhysicalSync.Errors;
 
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Ddl') {
+        assertSchemaChunkSucceeded('DDL');
+        var nextDdlPhase = ddlChunkEnd < allDdlStatements.length ? 'Ddl' : 'Tables';
+        var nextDdlIndex = ddlChunkEnd < allDdlStatements.length ? ddlChunkEnd : 0;
+        var ddlProgress = allDdlStatements.length > 0
+            ? 10 + Math.floor(10 * ddlChunkEnd / allDdlStatements.length)
+            : 20;
+        return buildSchemaContinuation(
+            nextDdlPhase,
+            nextDdlIndex,
+            ddlProgress,
+            nextDdlPhase == 'Ddl' ? 'DDL 分片已提交，将继续创建物理结构' : 'DDL 已提交，将继续导入表定义'
+        );
+    }
+
     // ==================== 步骤1：处理diy_table数据 ====================
 
     reportProgress(25, '正在导入表单引擎表定义');
     debugLog.step1 = '开始处理diy_table数据';
 
-    var diyTables = Package.DiyTables || [];
+    var allDiyTables = Package.DiyTables || [];
+    var tableChunkStart = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Tables'
+        ? Math.min(backgroundCheckpointIndex, allDiyTables.length)
+        : 0;
+    var tableChunkEnd = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Tables'
+        ? Math.min(allDiyTables.length, tableChunkStart + schemaTableChunkSize)
+        : allDiyTables.length;
+    var diyTables = [];
+    if (!backgroundChunkingEnabled || backgroundCheckpointPhase == 'Tables') {
+        for (var tableCopyIndex = tableChunkStart; tableCopyIndex < tableChunkEnd; tableCopyIndex++) {
+            diyTables.push(allDiyTables[tableCopyIndex]);
+        }
+    }
 
     for (var i = 0; i < diyTables.length; i++) {
         var table = diyTables[i];
@@ -2033,12 +2494,71 @@ try {
 
     debugLog.step1Result = '表数据处理完成：新增' + stats.TableInserted + '，修改' + stats.TableUpdated;
 
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Tables') {
+        assertSchemaChunkSucceeded('表定义');
+        var nextTablePhase = tableChunkEnd < allDiyTables.length ? 'Tables' : 'PlanFields';
+        var nextTableIndex = tableChunkEnd < allDiyTables.length ? tableChunkEnd : 0;
+        var tableProgress = allDiyTables.length > 0
+            ? 20 + Math.floor(15 * tableChunkEnd / allDiyTables.length)
+            : 35;
+        return buildSchemaContinuation(
+            nextTablePhase,
+            nextTableIndex,
+            tableProgress,
+            nextTablePhase == 'Tables' ? '表定义分片已提交，将继续处理' : '表定义已提交，将规划字段主键映射'
+        );
+    }
+
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'PlanFields') {
+        var fieldsForPlanning = Package.DiyFields || [];
+        var fieldPlanStart = Math.min(backgroundCheckpointIndex, fieldsForPlanning.length);
+        var fieldPlanEnd = Math.min(fieldsForPlanning.length, fieldPlanStart + schemaFieldPlanChunkSize);
+        planPackageFieldIdMaps(fieldPlanStart, fieldPlanEnd);
+        assertSchemaChunkSucceeded('字段主键规划');
+        var nextFieldPlanPhase = fieldPlanEnd < fieldsForPlanning.length ? 'PlanFields' : 'Fields';
+        var nextFieldPlanIndex = fieldPlanEnd < fieldsForPlanning.length ? fieldPlanEnd : 0;
+        var fieldPlanProgress = fieldsForPlanning.length > 0
+            ? 35 + Math.floor(5 * fieldPlanEnd / fieldsForPlanning.length)
+            : 40;
+        return buildSchemaContinuation(
+            nextFieldPlanPhase,
+            nextFieldPlanIndex,
+            fieldPlanProgress,
+            nextFieldPlanPhase == 'PlanFields'
+                ? '字段主键映射规划分片已持久化，将继续规划'
+                : '字段主键映射已持久化，将开始导入字段定义'
+        );
+    }
+
     // ==================== 步骤2：处理diy_field数据 ====================
 
     reportProgress(40, '正在导入字段定义');
     debugLog.step2 = '开始处理diy_field数据';
 
-    var diyFields = Package.DiyFields || [];
+    var allDiyFields = Package.DiyFields || [];
+    var fieldChunkStart = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Fields'
+        ? Math.min(backgroundCheckpointIndex, allDiyFields.length)
+        : 0;
+    var fieldChunkEnd = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Fields'
+        ? Math.min(allDiyFields.length, fieldChunkStart + schemaFieldChunkSize)
+        : allDiyFields.length;
+    var diyFields = [];
+    if (!backgroundChunkingEnabled || backgroundCheckpointPhase == 'Fields') {
+        for (var fieldCopyIndex = fieldChunkStart; fieldCopyIndex < fieldChunkEnd; fieldCopyIndex++) {
+            var sourceFieldForChunk = allDiyFields[fieldCopyIndex] || {};
+            var fieldForChunk = {};
+            for (var sourceFieldKey in sourceFieldForChunk) {
+                if (Object.prototype.hasOwnProperty.call(sourceFieldForChunk, sourceFieldKey)) {
+                    fieldForChunk[sourceFieldKey] = sourceFieldForChunk[sourceFieldKey];
+                }
+            }
+            if (sourceFieldForChunk && sourceFieldForChunk.Id) {
+                var plannedFieldTargetId = fieldMapTarget(sourceFieldForChunk.Id);
+                if (plannedFieldTargetId) fieldForChunk.Id = plannedFieldTargetId;
+            }
+            diyFields.push(fieldForChunk);
+        }
+    }
     debugLog.step2_totalFields = diyFields.length;
     var fieldChanges = []; // 记录字段的变化（Name、Type、Label）
 
@@ -2058,7 +2578,10 @@ try {
             continue;
         }
 
-        var packageFieldId = field.Id;
+        var packageFieldId = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Fields'
+            && allDiyFields[fieldChunkStart + i]
+            ? allDiyFields[fieldChunkStart + i].Id
+            : field.Id;
         var exists = checkExists('diy_field', field.Id);
 
         // FormEngine 默认会过滤软删除或租户标识异常的数据，但物理主键仍然存在。
@@ -2412,8 +2935,76 @@ try {
     var physicalFieldsAdded = 0;
     var physicalFieldsRenamed = 0;
     var physicalFieldsModified = 0;
-    var diyTables = Package.DiyTables || [];
-    var diyFields = Package.DiyFields || [];
+    var fieldChunkDefinitions = diyFields || [];
+    var packageTablesForPhysicalSync = Package.DiyTables || [];
+    var packageFieldsForPhysicalSync = Package.DiyFields || [];
+    var physicalPackageTableNames = [];
+    var physicalPackageTableNameMap = {};
+    var packagePhysicalColumns = Package.PhysicalColumns || [];
+    for (var physicalNameIndex = 0; physicalNameIndex < packagePhysicalColumns.length; physicalNameIndex++) {
+        var physicalName = String(getPhysicalValue(packagePhysicalColumns[physicalNameIndex], ['TABLE_NAME', 'TableName']) || '');
+        var physicalNameKey = physicalName.toLowerCase();
+        if (physicalName && !physicalPackageTableNameMap[physicalNameKey]) {
+            physicalPackageTableNameMap[physicalNameKey] = true;
+            physicalPackageTableNames.push(physicalName);
+        }
+    }
+    var physicalChunkStart = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Physical'
+        ? Math.min(backgroundCheckpointIndex, physicalPackageTableNames.length)
+        : 0;
+    var physicalChunkEnd = backgroundChunkingEnabled && backgroundCheckpointPhase == 'Physical'
+        ? Math.min(physicalPackageTableNames.length, physicalChunkStart + schemaPhysicalTableChunkSize)
+        : physicalPackageTableNames.length;
+    var activePhysicalTableNames = {};
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Fields') {
+        for (var touchedFieldIndex = 0; touchedFieldIndex < fieldChunkDefinitions.length; touchedFieldIndex++) {
+            var touchedTableId = normalizeId(fieldChunkDefinitions[touchedFieldIndex] && fieldChunkDefinitions[touchedFieldIndex].TableId).toLowerCase();
+            if (touchedTableId) activePhysicalTableNames['id:' + touchedTableId] = true;
+        }
+    } else if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Physical') {
+        for (var physicalBatchIndex = physicalChunkStart; physicalBatchIndex < physicalChunkEnd; physicalBatchIndex++) {
+            activePhysicalTableNames['name:' + physicalPackageTableNames[physicalBatchIndex].toLowerCase()] = true;
+        }
+    }
+
+    var diyTables = [];
+    var diyFields = [];
+    if (!backgroundChunkingEnabled) {
+        diyTables = packageTablesForPhysicalSync;
+        diyFields = packageFieldsForPhysicalSync;
+    } else if (backgroundCheckpointPhase == 'Fields') {
+        diyFields = fieldChunkDefinitions;
+        for (var touchedTableIndex = 0; touchedTableIndex < packageTablesForPhysicalSync.length; touchedTableIndex++) {
+            var touchedTableSource = packageTablesForPhysicalSync[touchedTableIndex] || {};
+            var touchedTableTargetId = idMaps.Table[touchedTableSource.Id]
+                || idMaps.Table[String(touchedTableSource.Id || '').toLowerCase()]
+                || touchedTableSource.Id;
+            if (!activePhysicalTableNames['id:' + normalizeId(touchedTableTargetId).toLowerCase()]) continue;
+            var touchedTableCopy = {};
+            for (var touchedTableKey in touchedTableSource) {
+                if (Object.prototype.hasOwnProperty.call(touchedTableSource, touchedTableKey)) {
+                    touchedTableCopy[touchedTableKey] = touchedTableSource[touchedTableKey];
+                }
+            }
+            touchedTableCopy.Id = touchedTableTargetId;
+            diyTables.push(touchedTableCopy);
+        }
+    } else if (backgroundCheckpointPhase == 'Physical') {
+        for (var physicalTableIndex = 0; physicalTableIndex < packageTablesForPhysicalSync.length; physicalTableIndex++) {
+            var physicalTableSource = packageTablesForPhysicalSync[physicalTableIndex] || {};
+            if (!activePhysicalTableNames['name:' + String(physicalTableSource.Name || '').toLowerCase()]) continue;
+            var physicalTableCopy = {};
+            for (var physicalTableKey in physicalTableSource) {
+                if (Object.prototype.hasOwnProperty.call(physicalTableSource, physicalTableKey)) {
+                    physicalTableCopy[physicalTableKey] = physicalTableSource[physicalTableKey];
+                }
+            }
+            physicalTableCopy.Id = idMaps.Table[physicalTableSource.Id]
+                || idMaps.Table[String(physicalTableSource.Id || '').toLowerCase()]
+                || physicalTableSource.Id;
+            diyTables.push(physicalTableCopy);
+        }
+    }
 
     // 辅助函数：判断字段Type是否为虚拟字段
     var isVirtualFieldType = function (fieldType) {
@@ -2694,10 +3285,18 @@ try {
     }
 
     var physicalSyncTableNames = [];
-    for (var ps = 0; ps < diyTables.length; ps++) {
-        if (diyTables[ps] && diyTables[ps].Name) physicalSyncTableNames.push(diyTables[ps].Name);
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Physical') {
+        for (var activePhysicalIndex = physicalChunkStart; activePhysicalIndex < physicalChunkEnd; activePhysicalIndex++) {
+            physicalSyncTableNames.push(physicalPackageTableNames[activePhysicalIndex]);
+        }
+    } else {
+        for (var ps = 0; ps < diyTables.length; ps++) {
+            if (diyTables[ps] && diyTables[ps].Name) physicalSyncTableNames.push(diyTables[ps].Name);
+        }
     }
-    var packagePhysicalSync = syncPhysicalColumnsFromPackage(buildPhysicalTableFilter(physicalSyncTableNames));
+    var packagePhysicalSync = (!backgroundChunkingEnabled || backgroundCheckpointPhase == 'Physical')
+        ? syncPhysicalColumnsFromPackage(buildPhysicalTableFilter(physicalSyncTableNames))
+        : { Added: 0, Modified: 0, Skipped: 0, Errors: 0 };
     physicalFieldsAdded += packagePhysicalSync.Added;
     physicalFieldsModified += packagePhysicalSync.Modified;
     stats.PhysicalFieldsSkipped = (stats.PhysicalFieldsSkipped || 0) + packagePhysicalSync.Skipped;
@@ -2710,27 +3309,83 @@ try {
     stats.PhysicalFieldsModified = (stats.PhysicalFieldsModified || 0) + physicalFieldsModified;
     debugLog.step2_5Result = '物理表字段同步完成：重命名' + physicalFieldsRenamed + '，修改' + physicalFieldsModified + '，新增' + physicalFieldsAdded;
 
-    var backgroundTaskReadiness = validateBackgroundTaskBootstrapReadiness();
+    var shouldValidateBackgroundTaskReadiness = !backgroundChunkingEnabled
+        || (backgroundCheckpointPhase == 'Physical' && physicalChunkEnd >= physicalPackageTableNames.length);
+    var backgroundTaskReadiness = shouldValidateBackgroundTaskReadiness
+        ? validateBackgroundTaskBootstrapReadiness()
+        : null;
     if (backgroundTaskReadiness) {
         debugLog.background_task_readiness_verified =
             '后台任务基础能力已完成物理回读：字段' + backgroundTaskReadiness.ColumnCount
             + '个，运行索引' + backgroundTaskReadiness.IndexCount + '个';
     }
 
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Fields') {
+        assertSchemaChunkSucceeded('字段定义');
+        var nextFieldPhase = fieldChunkEnd < allDiyFields.length ? 'Fields' : 'Physical';
+        var nextFieldIndex = fieldChunkEnd < allDiyFields.length ? fieldChunkEnd : 0;
+        var fieldProgress = allDiyFields.length > 0
+            ? 40 + Math.floor(15 * fieldChunkEnd / allDiyFields.length)
+            : 55;
+        return buildSchemaContinuation(
+            nextFieldPhase,
+            nextFieldIndex,
+            fieldProgress,
+            nextFieldPhase == 'Fields'
+                ? '字段定义与对应物理列分片已提交，将继续处理'
+                : '字段定义已提交，将复核包内物理列'
+        );
+    }
+
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'Physical') {
+        assertSchemaChunkSucceeded('物理列复核');
+        var nextPhysicalPhase = physicalChunkEnd < physicalPackageTableNames.length ? 'Physical' : 'ApplicationAssets';
+        var nextPhysicalIndex = physicalChunkEnd < physicalPackageTableNames.length ? physicalChunkEnd : 0;
+        var physicalProgress = physicalPackageTableNames.length > 0
+            ? 55 + Math.floor(5 * physicalChunkEnd / physicalPackageTableNames.length)
+            : 60;
+        return buildSchemaContinuation(
+            nextPhysicalPhase,
+            nextPhysicalIndex,
+            physicalProgress,
+            nextPhysicalPhase == 'Physical'
+                ? '物理列复核分片已提交，将继续处理'
+                : 'Schema 已全部提交，将继续安装在线应用资产'
+        );
+    }
+
     // ==================== 步骤3：处理sys_menu数据 ====================
 
     // 应用资产依赖 sys_microistore / mci_ai_app_file / sys_microiservice 等基础表，必须在 DDL、表定义、字段和物理列完成后再安装。
     var applicationBundles = [];
-    var packageBundles = Package.ApplicationBundles;
-    if (packageBundles && packageBundles.length != null) {
-        for (var bundleIndex = 0; bundleIndex < packageBundles.length; bundleIndex++) {
-            if (packageBundles[bundleIndex]) applicationBundles.push(packageBundles[bundleIndex]);
+    var shouldInstallApplicationBundles = !backgroundChunkingEnabled
+        || backgroundCheckpointPhase == 'ApplicationAssets';
+    if (shouldInstallApplicationBundles) {
+        var packageBundles = Package.ApplicationBundles;
+        if (packageBundles && packageBundles.length != null) {
+            for (var bundleIndex = 0; bundleIndex < packageBundles.length; bundleIndex++) {
+                if (packageBundles[bundleIndex]) applicationBundles.push(packageBundles[bundleIndex]);
+            }
+        }
+        var singleApplicationBundle = Package.ApplicationBundle || Package.AiApplication || Package.FrontendApplication;
+        if (singleApplicationBundle) applicationBundles.push(singleApplicationBundle);
+    }
+    for (var installBundleIndex = 0; installBundleIndex < applicationBundles.length; installBundleIndex++) {
+        var applicationBundleResult = installApplicationBundle(applicationBundles[installBundleIndex], installBundleIndex);
+        if (applicationBundleResult && applicationBundleResult.Data && applicationBundleResult.Data.BackgroundTask
+            && applicationBundleResult.Data.BackgroundTask.HasMore === true) {
+            return applicationBundleResult;
         }
     }
-    var singleApplicationBundle = Package.ApplicationBundle || Package.AiApplication || Package.FrontendApplication;
-    if (singleApplicationBundle) applicationBundles.push(singleApplicationBundle);
-    for (var installBundleIndex = 0; installBundleIndex < applicationBundles.length; installBundleIndex++) {
-        installApplicationBundle(applicationBundles[installBundleIndex]);
+
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'ApplicationAssets') {
+        assertSchemaChunkSucceeded('在线应用资产');
+        return buildSchemaContinuation(
+            'PostSchema',
+            0,
+            70,
+            '在线应用资产已提交，将在新执行片中导入菜单、流程、接口和随包数据'
+        );
     }
 
     reportProgress(70, '正在导入菜单和按钮配置');
@@ -3470,6 +4125,9 @@ try {
 
     // ==================== 步骤8：导入应用随包数据 ====================
 
+    // DATASET_INSERT_IF_MISSING_V1：配置种子可声明 InsertIfMissing，并用
+    // ConflictFields 做稳定业务键存在性检查。应用更新不得覆盖客户已经修改过的
+    // 定时任务等配置；并发安装在 Add 失败后回读，已由其它节点插入则按幂等跳过。
     var packageDataSets = Package.DataSets || [];
     if (typeof packageDataSets == 'string') packageDataSets = JSON.parse(packageDataSets || '[]');
     var dataSets = [];
@@ -3487,6 +4145,98 @@ try {
     var isSafeDataTableName = function (name) {
         return /^[A-Za-z_][A-Za-z0-9_]*$/.test(String(name || ''));
     };
+    var isMissingDataResult = function (result) {
+        if (!result) return false;
+        if (result.Code == 2) return true;
+        return result.Code == 0 && String(result.Msg || '').indexOf('NoExistData') >= 0;
+    };
+    var normalizeDataConflictFields = function (dataSet, sourceRow, dataTableName, conflictPolicy) {
+        if (conflictPolicy != 'InsertIfMissing') return ['Id'];
+        var rawFields = dataSet.ConflictFields || ['Id'];
+        if (typeof rawFields == 'string') {
+            try { rawFields = JSON.parse(rawFields || '[]'); }
+            catch (conflictFieldsError) {
+                throw new Error('应用数据导入失败：表 ' + dataTableName + ' 的 ConflictFields 不是有效JSON');
+            }
+        }
+        var fields = [];
+        var fieldMap = {};
+        if (rawFields && rawFields.length != null) {
+            for (var conflictFieldIndex = 0; conflictFieldIndex < rawFields.length; conflictFieldIndex++) {
+                var conflictField = String(rawFields[conflictFieldIndex] || '');
+                if (!isSafeDataTableName(conflictField)) {
+                    throw new Error('应用数据导入失败：表 ' + dataTableName + ' 存在不合法的 ConflictFields 字段');
+                }
+                var conflictFieldKey = conflictField.toLowerCase();
+                if (!fieldMap[conflictFieldKey]) {
+                    fields.push(conflictField);
+                    fieldMap[conflictFieldKey] = true;
+                }
+            }
+        }
+        if (fields.length == 0) fields.push('Id');
+        if (fields.length > 5) {
+            throw new Error('应用数据导入失败：表 ' + dataTableName + ' 的 ConflictFields 最多5个字段');
+        }
+        for (var validateConflictIndex = 0; validateConflictIndex < fields.length; validateConflictIndex++) {
+            var validateConflictField = fields[validateConflictIndex];
+            if (validateConflictField == 'Id') continue;
+            if (!Object.prototype.hasOwnProperty.call(sourceRow, validateConflictField)) {
+                throw new Error('应用数据导入失败：表 ' + dataTableName + ' 的冲突字段缺少值：' + validateConflictField);
+            }
+            var conflictValue = sourceRow[validateConflictField];
+            var conflictValueType = typeof conflictValue;
+            if (conflictValue === null || conflictValue === undefined || String(conflictValue).trim() === ''
+                || (conflictValueType != 'string' && conflictValueType != 'number' && conflictValueType != 'boolean')
+                || String(conflictValue).length > 500) {
+                throw new Error('应用数据导入失败：表 ' + dataTableName + ' 的冲突字段值不安全：' + validateConflictField);
+            }
+        }
+        return fields;
+    };
+    var findExistingPackageData = function (dataTableName, sourceRow, conflictPolicy, conflictFields) {
+        var existingById = V8.FormEngine.GetFormData(dataTableName, { Id: String(sourceRow.Id) });
+        if (existingById && existingById.Code == 1 && existingById.Data) {
+            return { Exists: true, Match: 'Id', Result: existingById };
+        }
+        if (!isMissingDataResult(existingById)) {
+            throw new Error('应用数据导入失败：读取表 ' + dataTableName + ' 的既有 Id 失败，'
+                + ((existingById && existingById.Msg) || '接口无返回'));
+        }
+        if (conflictPolicy != 'InsertIfMissing') return { Exists: false, Match: '', Result: existingById };
+
+        var conflictWhere = [];
+        for (var conflictWhereIndex = 0; conflictWhereIndex < conflictFields.length; conflictWhereIndex++) {
+            var conflictWhereField = conflictFields[conflictWhereIndex];
+            if (conflictWhereField == 'Id') continue;
+            conflictWhere.push([conflictWhereField, '=', sourceRow[conflictWhereField]]);
+        }
+        if (conflictWhere.length == 0) return { Exists: false, Match: '', Result: existingById };
+        var existingByConflict = V8.FormEngine.GetFormData(dataTableName, {
+            _Where: conflictWhere,
+            _SelectFields: ['Id'],
+            _PageSize: 1
+        });
+        if (existingByConflict && existingByConflict.Code == 1 && existingByConflict.Data) {
+            return { Exists: true, Match: conflictFields.join(','), Result: existingByConflict };
+        }
+        if (!isMissingDataResult(existingByConflict)) {
+            throw new Error('应用数据导入失败：读取表 ' + dataTableName + ' 的业务冲突键失败，'
+                + ((existingByConflict && existingByConflict.Msg) || '接口无返回'));
+        }
+        return { Exists: false, Match: '', Result: existingByConflict };
+    };
+    var protectedDataRowFields = {
+        osclient: true,
+        createtime: true,
+        updatetime: true,
+        userid: true,
+        username: true,
+        createuserid: true,
+        updateuserid: true,
+        createuser: true,
+        updateuser: true
+    };
 
     if (dataSets.length > 0) {
         reportProgress(96, '正在导入应用随包数据');
@@ -3498,8 +4248,9 @@ try {
         if (!isSafeDataTableName(dataTableName) || protectedDataTables[lowerDataTableName] || lowerDataTableName.indexOf('wf_') == 0) {
             throw new Error('应用数据导入被拒绝：表 ' + dataTableName + ' 不允许写入');
         }
-        if (String(dataSet.ConflictPolicy || 'UpsertById') != 'UpsertById') {
-            throw new Error('应用数据导入失败：表 ' + dataTableName + ' 仅支持 UpsertById 冲突策略');
+        var conflictPolicy = String(dataSet.ConflictPolicy || 'UpsertById');
+        if (conflictPolicy != 'UpsertById' && conflictPolicy != 'InsertIfMissing') {
+            throw new Error('应用数据导入失败：表 ' + dataTableName + ' 仅支持 UpsertById 或 InsertIfMissing 冲突策略');
         }
 
         var tableDefinitionResult = V8.FormEngine.GetFormData('diy_table', {
@@ -3527,22 +4278,40 @@ try {
                 stats.DataSkipped++;
                 throw new Error('应用数据导入失败：表 ' + dataTableName + ' 第' + (dataRowIndex + 1) + '条数据缺少Id');
             }
+            var conflictFields = normalizeDataConflictFields(dataSet, sourceRow, dataTableName, conflictPolicy);
+            var existingData = findExistingPackageData(dataTableName, sourceRow, conflictPolicy, conflictFields);
+            if (conflictPolicy == 'InsertIfMissing' && existingData.Exists) {
+                stats.DataSkipped++;
+                debugLog['data_insert_if_missing_skip_' + dataTableName + '_' + dataRowIndex]
+                    = '已存在，匹配字段：' + existingData.Match;
+                continue;
+            }
             var targetRow = {};
             for (var dataFieldName in sourceRow) {
-                if (dataFieldName == 'OsClient' || dataFieldName.indexOf('_Raw') == 0 || dataFieldName.charAt(0) == '_') continue;
+                if (!Object.prototype.hasOwnProperty.call(sourceRow, dataFieldName)) continue;
+                if (protectedDataRowFields[String(dataFieldName).toLowerCase()]
+                    || dataFieldName.indexOf('_Raw') == 0 || dataFieldName.charAt(0) == '_') continue;
                 targetRow[dataFieldName] = sourceRow[dataFieldName];
             }
             targetRow.Id = String(sourceRow.Id);
             targetRow.OsClient = V8.OsClient;
 
-            var existingDataResult = V8.FormEngine.GetFormData(dataTableName, { Id: targetRow.Id });
             var writeDataResult;
-            if (existingDataResult && existingDataResult.Code == 1 && existingDataResult.Data) {
+            if (existingData.Exists) {
                 writeDataResult = V8.FormEngine.UptFormData(dataTableName, targetRow);
                 if (writeDataResult && writeDataResult.Code == 1) stats.DataUpdated++;
             } else {
                 writeDataResult = V8.FormEngine.AddFormData(dataTableName, targetRow);
                 if (writeDataResult && writeDataResult.Code == 1) stats.DataInserted++;
+                if ((!writeDataResult || writeDataResult.Code != 1) && conflictPolicy == 'InsertIfMissing') {
+                    var concurrentData = findExistingPackageData(dataTableName, sourceRow, conflictPolicy, conflictFields);
+                    if (concurrentData.Exists) {
+                        stats.DataSkipped++;
+                        debugLog['data_insert_if_missing_race_' + dataTableName + '_' + dataRowIndex]
+                            = '并发节点已插入，匹配字段：' + concurrentData.Match;
+                        continue;
+                    }
+                }
             }
             if (!writeDataResult || writeDataResult.Code != 1) {
                 throw new Error('应用数据导入失败：表 ' + dataTableName + '，Id=' + targetRow.Id + '，' + ((writeDataResult && writeDataResult.Msg) || '未知错误'));

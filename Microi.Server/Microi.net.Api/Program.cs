@@ -1,6 +1,7 @@
 //【MacOS VS Code】折叠代码快捷键：【command + K + 0】
 
 #region using
+using System.Net;
 using System.Text;
 using System.Diagnostics;
 using Dos.Common;
@@ -17,6 +18,7 @@ using Senparc.Weixin.AspNet;
 using Senparc.Weixin.RegisterServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
@@ -99,6 +101,47 @@ builder.WebHost.UseKestrel((host, options) =>
 //USE IIS【发布到Windows IIS使用以下代码】
 //builder.WebHost.UseIISIntegration();
 var services = builder.Services;
+var forwardedHeaderKnownProxies = builder.Configuration
+    .GetSection("ForwardedHeaders:KnownProxies")
+    .GetChildren()
+    .Select(item => item.Value)
+    .Concat((builder.Configuration["ForwardedHeaders:KnownProxies"] ?? "")
+        .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+    .Where(item => !string.IsNullOrWhiteSpace(item))
+    .Select(item => item.Trim())
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToList();
+var forwardedHeaderKnownNetworks = builder.Configuration
+    .GetSection("ForwardedHeaders:KnownNetworks")
+    .GetChildren()
+    .Select(item => item.Value)
+    .Concat((builder.Configuration["ForwardedHeaders:KnownNetworks"] ?? "")
+        .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
+    .Where(item => !string.IsNullOrWhiteSpace(item))
+    .Select(item => item.Trim())
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToList();
+services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // 只接受离 Kestrel 最近的一跳。框架保留安全的 loopback 默认值；其它反向代理
+    // 必须在 KnownProxies/KnownNetworks 明确配置，公网请求自报 XFF 不会被采信。
+    options.ForwardLimit = 1;
+    foreach (var value in forwardedHeaderKnownProxies)
+    {
+        if (IPAddress.TryParse(value, out var proxy))
+        {
+            options.KnownProxies.Add(proxy);
+        }
+    }
+    foreach (var value in forwardedHeaderKnownNetworks)
+    {
+        if (System.Net.IPNetwork.TryParse(value, out var network))
+        {
+            options.KnownIPNetworks.Add(network);
+        }
+    }
+});
 services.Configure<FormOptions>(options =>
 {
     options.ValueLengthLimit = checked((int)Math.Min(maxFormValueBytes, int.MaxValue));
@@ -208,7 +251,7 @@ Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss
 
 #region SignalR、Redis
 var redisConn = RedisConnBuilder.BuildDefaultRedisConn();
-services.AddSignalR(options =>
+var signalRBuilder = services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = true;
     //客户端发保持连接请求到服务端最长间隔，默认30秒，改成4分钟，网页需跟着设置connection.keepAliveIntervalInMilliseconds = 12e4;即2分钟
@@ -227,6 +270,14 @@ services.AddSignalR(options =>
 .AddStackExchangeRedis(redisConn, options => //暂时还没找到方案在【builder.Build()】之后注册redis连接字符串，因此使用初始化redis配置
 {
     options.Configuration.ChannelPrefix = RedisChannel.Literal("MicroiSignalR");
+});
+signalRBuilder.AddHubOptions<GameRealtimeHub>(options =>
+{
+    // 游戏 Hub 只接收小型订阅命令，限制输入体并使用更短的断线检测周期；
+    // 权威牌局数据继续通过接口引擎 Snapshot 返回，不经过 SignalR。
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(45);
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.MaximumReceiveMessageSize = 16 * 1024;
 });
 services.AddStackExchangeRedisCache(options =>
 {
@@ -273,6 +324,10 @@ var app = builder.Build();
 #region .Net 系统默认
 //app.MapGrpcService<GreeterService>();
 
+// 必须先由框架验证直接对端是否为受信代理，再把 X-Forwarded-For 投影到
+// Connection.RemoteIpAddress。SecurityGuard 自身永远不直接解析客户端 Header。
+app.UseForwardedHeaders();
+
 // Production 内置异常页先注册为外层保险；吾码全局异常处理必须在其内层，
 // 否则 UseExceptionHandler 会先吞掉 Kestrel/Multipart 异常，无法返回标准 DosResult。
 if (!app.Environment.IsDevelopment())
@@ -316,9 +371,12 @@ app.Use(async (context, next) =>
     }
     await next();
 });
+app.UseRouting();
+// 安全防护可能在 Controller 前直接返回 DosResult。CORS 必须先执行，
+// 否则独立部署的前端无法读取 SecurityBlocked JSON，会误报成 API 不可用。
+app.UseCors("any");
 app.UseSecurityGuard();
 app.UseRequestPressureGuard();
-app.UseRouting();
 //-------注意以下两者的顺序-------
 app.UseAuthentication();
 app.UseAuthorization();
@@ -360,9 +418,13 @@ app.UseMicroi();      // 初始化 SaaS 引擎（同步加载 sys_osclients → 
 app.UseMicroiJob();   // 启用任务计划
 app.UseMicroiMQ();    // 启用消息队列
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
+app.MapHub<GameRealtimeHub>(GameRealtimeRuntime.HubPath).RequireCors("any");
 var realtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>();
 RealtimePushRuntime.Configure((connectionIds, eventName, payload) =>
     realtimeHubContext.Clients.Clients(connectionIds.ToList()).SendAsync(eventName, payload));
+var gameRealtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<GameRealtimeHub>>();
+RealtimePushRuntime.ConfigureGroups((groupName, eventName, payload) =>
+    gameRealtimeHubContext.Clients.Group(groupName).SendAsync(eventName, payload));
 
 // 解析主租户名称（统一使用 OsClient.GetConfigOsClient，避免在 Program.cs 里重复读取 env / appsettings）
 var osClientName = OsClient.GetConfigOsClient();
@@ -420,8 +482,14 @@ if (scheduleLicenseRestoreRetry)
     {
         _ = Task.Run(async () =>
         {
-            const int maxAttempts = 3;
-            const int retrySeconds = 10;
+            var maxAttempts = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",
+                "License:RestoreMaxAttempts",
+                3));
+            var retrySeconds = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
+                "MICROI_LICENSE_RESTORE_RETRY_SECONDS",
+                "License:RestoreRetrySeconds",
+                10));
 
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
@@ -539,7 +607,6 @@ if (app.Environment.IsDevelopment())
     Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】开发环境诊断模式已启用");
 }
 app.UseSession();
-app.UseCors("any");
 app.UseWebSockets(new WebSocketOptions
 {
     KeepAliveInterval = TimeSpan.FromMinutes(20)

@@ -305,6 +305,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { createOpenClawAuthBridge } from '../openclaw-auth-bridge'
 import { siteStyle } from '../site-style'
 import { buildSiteApiEngineUrl, resolveSiteApiBase } from '../utils/site-api-base.js'
+import { buildSiteSessionHeaders, getOrCreateSiteDid } from '../utils/site-session.js'
 
 const API_BASE = resolveSiteApiBase(import.meta.env.VITE_MICROI_API_BASE)
 const OS_CLIENT = 'iTdos'
@@ -465,7 +466,11 @@ function normalizeToken(raw) {
 }
 
 function authHeaders() {
-  return authToken.value ? { authorization: `Bearer ${authToken.value}`, Token: authToken.value } : {}
+  return buildSiteSessionHeaders({
+    token: authToken.value,
+    osClient: OS_CLIENT,
+    did: getOrCreateSiteDid(localStorage, window.crypto)
+  })
 }
 
 function apiEngineUrl(key) {
@@ -473,7 +478,13 @@ function apiEngineUrl(key) {
 }
 
 function apiEngineHeaders(extra = {}) {
-  return { osclient: OS_CLIENT, ...extra }
+  return {
+    ...buildSiteSessionHeaders({
+      osClient: OS_CLIENT,
+      did: getOrCreateSiteDid(localStorage, window.crypto)
+    }),
+    ...extra
+  }
 }
 
 function switchAuthTab(tab) {
