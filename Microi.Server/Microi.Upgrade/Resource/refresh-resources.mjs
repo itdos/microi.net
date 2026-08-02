@@ -12,15 +12,20 @@ import {
   verifyOfflineReleaseSafety,
 } from './resource-sync-core.mjs';
 import {
+  applicationStoreReplicaMappings,
   applicationStorePackageName,
   assertApplicationStoreEnginesSynchronized,
   choosePublishablePackageVersion,
   compareSemanticVersions,
+  getEmbeddedEngineSource,
   mergeApplicationStoreReplicas,
   publishedApplicationStoreReplicaMappings,
   synchronizeApplicationStoreEngines,
 } from './application-store-replica-sync.mjs';
-import { publishResourcesViaConfiguredMcp } from './mcp-resource-publisher.mjs';
+import {
+  publishResourcesViaConfiguredMcp,
+  readResourcesViaConfiguredMcp,
+} from './mcp-resource-publisher.mjs';
 
 const resourceNames = [
   'import-package.js',
@@ -185,29 +190,36 @@ function validateReleaseCandidate(name, content) {
   }
 }
 
-async function download(name) {
+function normalizeDownloadedResource(name, data, transportName) {
+  if (!data || data.ResourceName !== name || data.Content == null) {
+    throw new Error(`${name} ${transportName}响应格式或资源名不正确：${data?.Msg || ''}`);
+  }
+  const content = typeof data.Content === 'string'
+    ? data.Content
+    : `${JSON.stringify(data.Content, null, 2)}\n`;
+  validateReadableOfficialResource(name, content);
+  const downloadedSha256 = createHash('sha256').update(content, 'utf8').digest('hex');
+  const reportedSha256 = String(data.Sha256 || '').toLowerCase();
+  if (reportedSha256 && reportedSha256 !== downloadedSha256) {
+    throw new Error(`${name} ${transportName}返回内容与 Sha256 不一致`);
+  }
+  return {
+    content: canonicalizeResource(name, content),
+    sha256: reportedSha256 || downloadedSha256,
+    appVersion: String(data.AppVersion || ''),
+  };
+}
+
+async function downloadViaHttp(name) {
   const response = await fetch(`${endpoint}&Name=${encodeURIComponent(name)}`, {
     signal: AbortSignal.timeout(60_000),
   });
   if (!response.ok) throw new Error(`${name} HTTP ${response.status}`);
   const payload = await response.json();
-  if (payload?.Code !== 1 || payload?.Data?.ResourceName !== name || payload?.Data?.Content == null) {
+  if (payload?.Code !== 1) {
     throw new Error(`${name} 官方响应格式或资源名不正确：${payload?.Msg || ''}`);
   }
-  const content = typeof payload.Data.Content === 'string'
-    ? payload.Data.Content
-    : `${JSON.stringify(payload.Data.Content, null, 2)}\n`;
-  validateReadableOfficialResource(name, content);
-  const downloadedSha256 = createHash('sha256').update(content, 'utf8').digest('hex');
-  const reportedSha256 = String(payload.Data.Sha256 || '').toLowerCase();
-  if (reportedSha256 && reportedSha256 !== downloadedSha256) {
-    throw new Error(`${name} 官网返回内容与 Sha256 不一致`);
-  }
-  return {
-    content: canonicalizeResource(name, content),
-    sha256: reportedSha256 || downloadedSha256,
-    appVersion: String(payload.Data.AppVersion || ''),
-  };
+  return normalizeDownloadedResource(name, payload.Data, '官网 HTTP');
 }
 
 const readAttempts = Math.max(
@@ -219,11 +231,45 @@ const retryDelayMilliseconds = Math.max(
   Number.parseInt(process.env.MICROI_UPGRADE_RESOURCE_RETRY_DELAY_MS || '5000', 10) || 5000,
 );
 
+let mcpReadAnnouncementPrinted = false;
+
+async function downloadAllOnce() {
+  const configuredTransport = String(process.env.MICROI_UPGRADE_RESOURCE_TRANSPORT || 'auto')
+    .trim()
+    .toLowerCase();
+  if (!['auto', 'mcp', 'http'].includes(configuredTransport)) {
+    throw new Error('MICROI_UPGRADE_RESOURCE_TRANSPORT 只允许 auto、mcp 或 http');
+  }
+  const token = String(process.env.MICROI_UPGRADE_RESOURCE_TOKEN || '').trim();
+  if (configuredTransport !== 'http') {
+    try {
+      if (!mcpReadAnnouncementPrinted) {
+        process.stdout.write('使用已配置并登录的 microi_itdos MCP 读取官网升级资源并执行三方合并...\n');
+        mcpReadAnnouncementPrinted = true;
+      }
+      const readResult = await readResourcesViaConfiguredMcp(resourceNames, {
+        startDirectory: outputDirectory,
+      });
+      return new Map(resourceNames.map(name => [
+        name,
+        normalizeDownloadedResource(name, readResult.resources.get(name), 'microi_itdos MCP'),
+      ]));
+    } catch (error) {
+      const canUseCiTokenFallback = configuredTransport === 'auto'
+        && token
+        && /未找到 \.mcp\.json|已找到 MCP 配置，但其中没有 microi_itdos/.test(error.message);
+      if (!canUseCiTokenFallback) throw error;
+      process.stderr.write(`未找到 microi_itdos MCP，CI 令牌模式改用官网 HTTP 读取：${error.message}\n`);
+    }
+  }
+  return new Map(await Promise.all(resourceNames.map(async name => [name, await downloadViaHttp(name)])));
+}
+
 async function downloadAllWithRetry(stage) {
   let lastError;
   for (let attempt = 1; attempt <= readAttempts; attempt += 1) {
     try {
-      return new Map(await Promise.all(resourceNames.map(async name => [name, await download(name)])));
+      return await downloadAllOnce();
     } catch (error) {
       lastError = error;
       if (!isTemporaryOfficialResourceFailure(error) || attempt >= readAttempts) throw error;
@@ -337,6 +383,10 @@ if (process.argv.includes('--synchronize-local')) {
   const initializeBase = process.argv.includes('--initialize-base');
   const publish = process.argv.includes('--publish');
   const allowVerifiedOffline = process.argv.includes('--allow-verified-offline');
+  const repairBaseFromRemote = process.argv.includes('--repair-base-from-remote');
+  if (repairBaseFromRemote && (initializeBase || publish || allowVerifiedOffline)) {
+    throw new Error('--repair-base-from-remote 不能与 --initialize-base、--publish 或 --allow-verified-offline 同时使用');
+  }
   const localResources = new Map();
   const rawLocalResources = new Map();
   const baseResources = new Map();
@@ -382,6 +432,29 @@ if (process.argv.includes('--synchronize-local')) {
     );
     for (const name of resourceNames) {
       printResource(name, localResources.get(name), '已验证离线基线（未实时同步官网）');
+    }
+    process.exit(0);
+  }
+
+  if (repairBaseFromRemote) {
+    const remotePackageContent = remoteResources.get(applicationStorePackageName).content;
+    const remoteStandaloneContents = new Map(
+      applicationStoreReplicaMappings.map(mapping => [
+        mapping.resourceName,
+        mapping.publishedStandalone
+          ? remoteResources.get(mapping.resourceName).content
+          : getEmbeddedEngineSource(remotePackageContent, mapping.apiEngineKey),
+      ]),
+    );
+    assertApplicationStoreEnginesSynchronized(
+      remotePackageContent,
+      remoteStandaloneContents,
+    );
+    await mkdir(baseDirectory, { recursive: true });
+    for (const name of resourceNames) {
+      const content = remoteResources.get(name).content;
+      await writeFile(resolve(baseDirectory, name), content, 'utf8');
+      printResource(name, content, '按官网回读修复共同基线');
     }
     process.exit(0);
   }

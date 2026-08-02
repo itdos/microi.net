@@ -92,6 +92,74 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+export interface ApplicationStreamGateTransitionRequest {
+  OsClient: string;
+  OsClientType: string;
+  OsClientNetwork: string;
+  ExpectedMode: 'LegacyOpen' | 'Drain' | 'V3Only';
+  ExpectedMinProtocol: 2 | 3;
+  ExpectedGateEpoch: string;
+  TargetMode: 'LegacyOpen' | 'Drain' | 'V3Only';
+  TargetMinProtocol: 2 | 3;
+  TransitionId: string;
+  Reason: string;
+  DrainProofJson: string;
+  DrainProofHash: string;
+  ConfirmationSha256: string;
+  ConfirmExecution: true;
+}
+
+export interface ApplicationAssetStreamUploadRequest {
+  AppIdOrKey: string;
+  VersionNo: string;
+  RelativePath: string;
+  ExpectedSha256: string;
+  RequestId: string;
+  FilePath: string;
+  TimeoutMs?: number;
+  ProtocolVersion?: 3;
+  ExpectedGateEpoch?: string;
+  RequestFingerprint?: string;
+  DeliveryBatchId?: string;
+  SourceManifestHash?: string;
+  RuntimeManifestHash?: string;
+  RouteSnapshotJson?: string;
+  RouteSnapshotHash?: string;
+  ExpectedCurrentVersion?: number;
+  ExpectedAppVersion?: string | null;
+  ExpectedPublishFence?: string;
+  ExpectedPublishRowVersion?: string;
+  ExpectedVersionRowVersion?: string | null;
+  ExpectedActivePublishVersionId?: string | null;
+  ExpectedCommittedPublishVersionId?: string | null;
+}
+
+export interface ApplicationAssetStreamFinalizeRequest {
+  AppIdOrKey: string;
+  VersionNo: string;
+  EntryPath: string;
+  Assets: Array<{ Path: string; Sha256: string; Size: number }>;
+  PublishMode?: 'stage' | 'finalize';
+  ProtocolVersion?: 3;
+  ExpectedGateEpoch?: string;
+  RequestId: string;
+  RequestFingerprint?: string;
+  DeliveryBatchId: string;
+  SourceManifestHash?: string;
+  RuntimeManifestHash: string;
+  RouteSnapshotJson?: string;
+  RouteSnapshotHash?: string;
+  ExpectedCurrentVersion?: number;
+  ExpectedAppVersion?: string | null;
+  ExpectedPublishFence?: string;
+  ExpectedPublishRowVersion?: string;
+  ExpectedVersionRowVersion?: string | null;
+  ExpectedActivePublishVersionId?: string | null;
+  ExpectedCommittedPublishVersionId?: string | null;
+  Routes?: Array<Record<string, unknown>>;
+  ChangeSummary?: string;
+}
+
 export function isTenantConfigurationFailureResponse(result?: Partial<ApiResponse> | null): boolean {
   const reasonCode = String(result?.DataAppend?.ReasonCode || '').trim();
   if (/^(InvalidTenant|InvalidOsClient|TenantNotFound|TenantDisabled)$/i.test(reasonCode)) {
@@ -1114,6 +1182,15 @@ export class MicroiClient {
     return this.get(API.GET_STATUS);
   }
 
+  async transitionApplicationStreamGate(
+    data: ApplicationStreamGateTransitionRequest,
+  ): Promise<ApiResponse> {
+    return this.post(API.TRANSITION_APPLICATION_STREAM_GATE, data, {
+      timeoutMs: this.writeRequestTimeoutMs,
+      operationName: `transition application stream gate ${data.TransitionId}`,
+    });
+  }
+
   async listMyUserAccessKeys(): Promise<ApiResponse<UserAccessKeyRecord[]>> {
     // Deliberately omit TargetUserId: the backend binds the operation to the
     // authenticated user and prevents an access-key session from managing keys.
@@ -1484,14 +1561,7 @@ export class MicroiClient {
     });
   }
 
-  async uploadApplicationAssetStream(data: {
-    AppIdOrKey: string;
-    VersionNo: string;
-    RelativePath: string;
-    ExpectedSha256: string;
-    FilePath: string;
-    TimeoutMs?: number;
-  }): Promise<ApiResponse> {
+  async uploadApplicationAssetStream(data: ApplicationAssetStreamUploadRequest): Promise<ApiResponse> {
     const localPath = path.resolve(data.FilePath);
     const stat = fs.lstatSync(localPath);
     if (!stat.isFile() || stat.isSymbolicLink()) {
@@ -1501,6 +1571,28 @@ export class MicroiClient {
     if (!fileName || /[\r\n"]/u.test(fileName)) {
       throw new Error('RelativePath 的文件名不合法');
     }
+    const protocolFields: Record<string, string> = {};
+    if (data.ProtocolVersion === 3) {
+      const nullable = (value: string | null | undefined): string => value === null ? 'null' : String(value ?? '');
+      Object.assign(protocolFields, {
+        ProtocolVersion: '3',
+        PublishMode: 'stage',
+        ExpectedGateEpoch: String(data.ExpectedGateEpoch ?? ''),
+        RequestFingerprint: String(data.RequestFingerprint ?? ''),
+        DeliveryBatchId: String(data.DeliveryBatchId ?? ''),
+        SourceManifestHash: String(data.SourceManifestHash ?? ''),
+        RuntimeManifestHash: String(data.RuntimeManifestHash ?? ''),
+        RouteSnapshotJson: String(data.RouteSnapshotJson ?? ''),
+        RouteSnapshotHash: String(data.RouteSnapshotHash ?? ''),
+        ExpectedCurrentVersion: String(data.ExpectedCurrentVersion ?? ''),
+        ExpectedAppVersion: nullable(data.ExpectedAppVersion),
+        ExpectedPublishFence: String(data.ExpectedPublishFence ?? ''),
+        ExpectedPublishRowVersion: String(data.ExpectedPublishRowVersion ?? ''),
+        ExpectedVersionRowVersion: nullable(data.ExpectedVersionRowVersion),
+        ExpectedActivePublishVersionId: nullable(data.ExpectedActivePublishVersionId),
+        ExpectedCommittedPublishVersionId: nullable(data.ExpectedCommittedPublishVersionId),
+      });
+    }
     return this.requestMultipartFile(
       API.UPLOAD_APPLICATION_ASSET_STREAM,
       {
@@ -1509,6 +1601,8 @@ export class MicroiClient {
         VersionNo: data.VersionNo,
         RelativePath: data.RelativePath,
         ExpectedSha256: data.ExpectedSha256,
+        RequestId: data.RequestId,
+        ...protocolFields,
       },
       localPath,
       fileName,
@@ -1517,7 +1611,7 @@ export class MicroiClient {
     );
   }
 
-  async finalizeApplicationStreamPublish(data: Record<string, unknown>): Promise<ApiResponse> {
+  async finalizeApplicationStreamPublish(data: ApplicationAssetStreamFinalizeRequest): Promise<ApiResponse> {
     return this.post(API.FINALIZE_APPLICATION_STREAM_PUBLISH, {
       OsClient: this.config.osClient,
       ...data,

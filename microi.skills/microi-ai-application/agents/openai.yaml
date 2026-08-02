@@ -1,0 +1,4 @@
+interface:
+  display_name: "Microi AI 应用开发"
+  short_description: "以 Vue 3、Vite、TypeScript 构建可维护的吾码 AI 应用"
+  default_prompt: "使用 $microi-ai-application 创建一个可维护、可发布并通过多端验收的吾码 AI 应用。"

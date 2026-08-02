@@ -249,6 +249,11 @@ namespace Microi.net
             if (config is JObject jobj)
             {
                 var localModel = localClient.OsClientModel;
+                var localSigningKeyStatus = DiyToken.GetJwtSigningKeyStatus(
+                    localClient,
+                    includeFingerprint: false);
+                var localAuthSecret = localModel?["AuthSecret"]?.Val<string>();
+                var localAuthSecretRotateVersion = localModel?["AuthSecretRotateVersion"]?.Val<string>();
                 var localDbConn = localModel?["DbConn"]?.Val<string>();
                 var localDbReadConn = localModel?["DbReadConn"]?.Val<string>();
                 var localDbType = localModel?["DbType"]?.Val<string>();
@@ -259,6 +264,16 @@ namespace Microi.net
                 RestoreLocalDatabaseValue(localClient.OsClientModel, "DbReadConn", localDbReadConn);
                 RestoreLocalDatabaseValue(localClient.OsClientModel, "DbType", localDbType);
                 RestoreLocalDatabaseValue(localClient.OsClientModel, "DbReadType", localDbReadType);
+                if (localSigningKeyStatus.Ready)
+                {
+                    // 当前节点已经从宿主配置或数据库挂载到稳定密钥时，Redis 中的旧快照
+                    // 不能把它覆盖回发布前的临时值。显式轮换会先落数据库，再触发租户重载。
+                    RestoreLocalDatabaseValue(localClient.OsClientModel, "AuthSecret", localAuthSecret);
+                    RestoreLocalDatabaseValue(
+                        localClient.OsClientModel,
+                        "AuthSecretRotateVersion",
+                        localAuthSecretRotateVersion);
+                }
             }
 
             EnsureMainTenantDatabaseConfig(localClient.OsClient, localClient.OsClientModel);
@@ -525,6 +540,25 @@ namespace Microi.net
                 // 第二步：提取可序列化配置并缓存到L2（Redis）
                 try
                 {
+                    var signingKeyStatus = DiyToken.GetJwtSigningKeyStatus(
+                        client,
+                        includeFingerprint: false);
+                    if (!signingKeyStatus.Ready)
+                    {
+                        // 启动占位模型不再把进程临时/空密钥写进共享 Redis，避免新节点
+                        // 在数据库挂载完成前污染其它节点的稳定签名配置。
+                        MicroiEngine.QueueSystemLog(
+                            client.OsClient,
+                            "SaaS",
+                            "ConfigurationCacheSkipped",
+                            "租户配置暂未写入 Redis",
+                            signingKeyStatus.Message,
+                            2,
+                            false,
+                            client.OsClient);
+                        return client;
+                    }
+
                     var config = ExtractClientConfig(client);
                     var cacheKey = $"Microi:{OsClientExtend.GetConfigOsClient()}:saas-engine:{client.OsClient}";
                     var cache = GetCacheInstance();

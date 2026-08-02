@@ -63,8 +63,8 @@ export const zh = defineConfig({
 function nav(): DefaultTheme.NavItem[] {
 	return [
 		{ text: "首页", link: "/" },
-		{ text: "文档 🪧", link: "/doc/index" },
-		{ text: "AI应用", link: "/apps" },
+		{ text: "🤖 AI应用", link: "/apps" },
+    { text: "文档", link: "/doc/index" },//🪧
 		{ text: "成功案例", link: "/case/case-index" },
 		{
 			text: "相关链接 🔗",
@@ -94,7 +94,7 @@ function nav(): DefaultTheme.NavItem[] {
 					link: "https://lisaisai.blog.csdn.net/?type=blog",
 				},
 				{
-					text: "技术支持大牛 - 毛总",
+					text: "技术支持 - 毛总",
 					link: "https://gitee.com/mao_js ",
 				},
 				{

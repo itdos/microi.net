@@ -35,12 +35,27 @@ namespace Microi.net.Api
         public ActionResult<DosResult> HealthCheck()
         {
             var memory = _memoryPressure.GetSnapshot();
+            var jwtSigningKey = GetJwtSigningKeyStatus();
+            var isHealthy = !memory.RejectingRequests && jwtSigningKey.Ready;
+            var status = jwtSigningKey.Ready
+                ? (memory.RejectingRequests ? "Degraded" : "Healthy")
+                : "Unhealthy";
+            var message = !jwtSigningKey.Ready
+                ? "JWT 签名密钥尚未从稳定来源加载，节点已退出业务流量"
+                : (memory.RejectingRequests ? "当前节点处于内存压力保护状态" : "系统运行正常");
             var data = new
             {
-                Status = memory.RejectingRequests ? "Degraded" : "Healthy",
+                Status = status,
                 InstanceId = RuntimeInstanceId,
                 Timestamp = DateTime.Now,
-                Message = memory.RejectingRequests ? "当前节点处于内存压力保护状态" : "系统运行正常",
+                Message = message,
+                JwtSigningKey = new
+                {
+                    jwtSigningKey.Ready,
+                    jwtSigningKey.Durable,
+                    jwtSigningKey.Source,
+                    jwtSigningKey.Fingerprint
+                },
                 Memory = new
                 {
                     memory.RejectingRequests,
@@ -59,9 +74,34 @@ namespace Microi.net.Api
                     memory.SampledAt
                 }
             };
-            return memory.RejectingRequests
-                ? StatusCode(StatusCodes.Status503ServiceUnavailable, new DosResult(0, data, "当前节点处于内存压力保护状态。"))
+            return !isHealthy
+                ? StatusCode(StatusCodes.Status503ServiceUnavailable, new DosResult(0, data, message + "。"))
                 : Ok(new DosResult(1, data));
+        }
+
+        private static JwtSigningKeyStatus GetJwtSigningKeyStatus()
+        {
+            try
+            {
+                var osClient = OsClient.GetConfigOsClient();
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = OsClientDefault.OsClient;
+                }
+                OsClientExtend.ClientList.TryGetValue(osClient, out var clientModel);
+                return DiyToken.GetJwtSigningKeyStatus(clientModel);
+            }
+            catch (Exception ex)
+            {
+                return new JwtSigningKeyStatus
+                {
+                    Ready = false,
+                    Durable = false,
+                    Source = "Unavailable",
+                    Fingerprint = string.Empty,
+                    Message = "JWT 签名密钥状态读取失败：" + ex.Message
+                };
+            }
         }
 
         /// <summary>仅表示进程仍存活，不代表节点适合继续接收业务流量。</summary>

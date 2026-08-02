@@ -58,7 +58,9 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 ## 版本与回滚
 
 - 版本号单调递增，保存变更清单和前后哈希。
-- 公有发布必须同时保留两套入口：`/{OsClient}/ai-app-publish/{AppKey}/index.html` 永远指向最新版，`.../versions/{Version}/index.html` 永远保留该历史版本。先写入最新版的非入口资产，最后切换根 `index.html`，避免发布瞬间引用不存在的资源。
+- 公有发布必须同时保留两套入口：`/{OsClient}/ai-app-publish/{AppKey}/index.html` 永远指向最新版，`.../versions/{Version}/index.html` 永远保留该历史版本。先完整上传并逐字节验签不可变版本目录，再切换稳定入口。带 `data-microi-immutable-runtime` 的新入口通过版本目录解析全部资源，可先切换入口；旧入口仍在其它稳定资产之后切换。不能机械固定“入口永远最后”而破坏两种契约。
+- stage 前回读并冻结应用的 `CurrentVersion + AppVersion`；finalize 必须同时传 `ExpectedCurrentVersion + ExpectedAppVersion`，在以不可变 AppId 加锁后再次 compare-and-set。缺失前置条件、AppId/AppKey 漂移或旧请求晚到一律失败关闭；重新发布必须重新盘点，不能静默回退。
+- 新清单发布成功时，同应用 `dist/` 下不再出现的 active 文件元数据只能条件式改为可逆归档 scope，条件必须包含 AppId、路径、旧 scope 与版本；禁止删除 HDFS/数据库记录，也不得触碰 Private、非 `dist/` 或另一应用的行。
 - 官网、二维码和用户分享只使用无版本号根入口，不追加 `v/apiBase/OsClient`。目标租户的 `ApiBase/OsClient` 在发布或安装时写入入口 HTML 的 `window.__MICROI_APP_CONTEXT__ / MICROI_API_BASE / MICROI_OS_CLIENT`；安装包不得沿用发布端运行上下文。
 - 数据迁移通常只向前；回滚应用版本不能假设自动回滚业务数据。
 - 更新失败保留原版本可运行资源，记录失败阶段；不要清空客户 V8 后再尝试恢复。
@@ -92,4 +94,5 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 本地输入和三方合并后的最终候选必须继续执行最低版本、功能标记、内嵌逻辑副本一致性等严格校验；发布成功并按内容哈希回读一致后才能推进 `.resource-sync-base`，不能把放宽读取门误做成放宽发布门。
 - 应用包版本与平台发布版本分别单调递增。包正文需要写回而本地包版本、平台版本均未高于官网时，应基于官网包版本自动递增补丁号；内容无变化时不得递增，必须用连续两次同步验证第二次为零变更。
 - MCP 配置中的官方 API、`OsClient` 与 Token 文件是鉴权事实源，但编辑器可执行文件、插件版本目录和 `cwd` 都是易漂移的启动信息。发布器应保留鉴权配置、固定校验 `https://api.itdos.com + itdos`，并从已配置入口、同级最新已安装插件或当前工作区依次发现可信 `mcp-server.js`，使用正在运行发布脚本的 Node 启动；插件升级或旧目录清理不能再次阻塞后端发布。
+- 本地资源同步的官网读取、发布和发布后回读应使用同一个已校验的 `microi_itdos` MCP 链路；CI 无 MCP 时才允许凭显式 Token 使用 HTTP。V8 独立文件与应用包内嵌副本合并时，先把文件头说明和 `Version` 与可执行正文分离：两端独立升版不能算代码冲突，不同正文安全合成后应基于两端最高版本再升一版；只有同一段可执行逻辑出现不同实现才失败关闭。
 - 发布验收至少包含：定向合并测试、真实 `PublishBatch`、六项资源逐项 SHA-256 回读，以及立即执行第二次幂等重跑。任何一步失败都不得宣称官网已同步，也不得推进共同基线。

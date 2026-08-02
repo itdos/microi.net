@@ -240,6 +240,44 @@ function collectText(toolResult) {
     : '';
 }
 
+function parseCodexExecutionResult(toolResult, operation) {
+  const output = collectText(toolResult);
+  if (toolResult?.isError) {
+    throw new Error(`通过 microi_itdos MCP ${operation}失败：${output || '未知错误'}`);
+  }
+  const fencedJson = output.match(/```json\s*\n([\s\S]*?)\n```\s*$/);
+  if (!fencedJson) {
+    throw new Error(`通过 microi_itdos MCP ${operation}失败：返回格式不含完整 JSON`);
+  }
+  let envelope;
+  try {
+    envelope = JSON.parse(fencedJson[1]);
+  } catch (error) {
+    throw new Error(`通过 microi_itdos MCP ${operation}失败：返回 JSON 无法解析`, { cause: error });
+  }
+  const execution = envelope?.Result;
+  if (!execution || Number(execution.Code) !== 1) {
+    throw new Error(
+      `通过 microi_itdos MCP ${operation}失败：${String(execution?.Msg || '未知错误').slice(0, 800)}`,
+    );
+  }
+  return execution;
+}
+
+function validateReadResourceNames(resourceNames) {
+  if (!Array.isArray(resourceNames) || !resourceNames.length) {
+    throw new Error('没有需要读取的官网资源');
+  }
+  const seen = new Set();
+  for (const name of resourceNames) {
+    if (!officialResourceNames.has(name)) {
+      throw new Error(`MCP 读取资源不在固定白名单：${name || '(空)'}`);
+    }
+    if (seen.has(name)) throw new Error(`MCP 读取资源名称重复：${name}`);
+    seen.add(name);
+  }
+}
+
 function validatePublishChanges(changes) {
   if (!Array.isArray(changes) || !changes.length) throw new Error('没有需要发布的官网资源');
   for (const item of changes) {
@@ -351,8 +389,7 @@ function createLineJsonRpcClient(server, configPath) {
   return { request, notify, stop };
 }
 
-export async function publishResourcesViaConfiguredMcp(changes, options = {}) {
-  validatePublishChanges(changes);
+async function withConfiguredItDosMcp(options, callback) {
   const { path, server } = await findItDosMcpServer(
     options.startDirectory || process.cwd(),
     options.configPath || process.env.MICROI_UPGRADE_RESOURCE_MCP_CONFIG,
@@ -362,36 +399,65 @@ export async function publishResourcesViaConfiguredMcp(changes, options = {}) {
     await client.request('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'microi-upgrade-resource-sync', version: '1.0.0' },
+      clientInfo: { name: 'microi-upgrade-resource-sync', version: '1.1.0' },
     }, 30_000);
     client.notify('notifications/initialized');
-    const result = await client.request('tools/call', {
-      name: 'microi_codex',
-      arguments: {
-        action: 'microi_run_engine',
-        params: {
-          apiEngineKey: officialEngineKey,
-          params: {
-            Action: 'PublishBatch',
-            Resources: changes.map(item => ({
-              Name: item.name,
-              Content: item.content,
-              ExpectedRemoteSha256: item.expectedRemoteSha256,
-            })),
-          },
-          confirmExecution: officialEngineKey,
-        },
-      },
-    }, 180_000);
-    const text = collectText(result);
-    if (result?.isError || !/-\s*\*\*Code\*\*:\s*1(?:\s|$)/m.test(text)) {
-      const message = (text.match(/-\s*\*\*Message\*\*:\s*(.+)/)?.[1] || text || '未知错误')
-        .trim()
-        .slice(0, 800);
-      throw new Error(`通过 microi_itdos MCP 发布官网升级资源失败：${message}`);
+    const listed = await client.request('tools/list', {}, 30_000);
+    if (!Array.isArray(listed?.tools) || !listed.tools.some(item => item?.name === 'microi_codex')) {
+      throw new Error('microi_itdos MCP 未提供 microi_codex 单入口');
     }
-    return { configPath: path, resourceCount: changes.length };
+    return await callback(client, path);
   } finally {
     client.stop();
   }
+}
+
+async function callOfficialResourceEngine(client, params, operation, timeoutMilliseconds = 180_000) {
+  const result = await client.request('tools/call', {
+    name: 'microi_codex',
+    arguments: {
+      action: 'microi_run_engine',
+      params: {
+        apiEngineKey: officialEngineKey,
+        params,
+        confirmExecution: officialEngineKey,
+      },
+    },
+  }, timeoutMilliseconds);
+  return parseCodexExecutionResult(result, operation);
+}
+
+export async function readResourcesViaConfiguredMcp(resourceNames, options = {}) {
+  validateReadResourceNames(resourceNames);
+  return withConfiguredItDosMcp(options, async (client, configPath) => {
+    const resources = new Map();
+    for (const name of resourceNames) {
+      const execution = await callOfficialResourceEngine(
+        client,
+        { Name: name },
+        `读取官网升级资源 ${name}`,
+      );
+      const data = execution.Data;
+      if (!data || data.ResourceName !== name || data.Content == null) {
+        throw new Error(`通过 microi_itdos MCP 读取 ${name} 失败：资源名或内容不正确`);
+      }
+      resources.set(name, data);
+    }
+    return { configPath, resources };
+  });
+}
+
+export async function publishResourcesViaConfiguredMcp(changes, options = {}) {
+  validatePublishChanges(changes);
+  return withConfiguredItDosMcp(options, async (client, configPath) => {
+    await callOfficialResourceEngine(client, {
+      Action: 'PublishBatch',
+      Resources: changes.map(item => ({
+        Name: item.name,
+        Content: item.content,
+        ExpectedRemoteSha256: item.expectedRemoteSha256,
+      })),
+    }, '发布官网升级资源');
+    return { configPath, resourceCount: changes.length };
+  });
 }

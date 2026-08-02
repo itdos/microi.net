@@ -94,3 +94,4 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 - 不把 `docker ps` 的 Running 当作 readiness。
 - 不在没有备份和恢复演练时执行数据库升级或不可逆迁移。
 - 不修改 `microi.doc/docs/doc/about/update-log.md`，除非用户明确要求发版。
+- 撤回或重写版本日志前，必须遵循 `../workspace-conventions/SKILL.md` 的“多对话共享工作区变更归属保护”；当天提交、最新 `HEAD`、相同作者或相关提交信息都不能单独证明改动属于当前对话。

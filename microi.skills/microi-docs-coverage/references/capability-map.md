@@ -34,7 +34,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/databases.md` | dos-orm, v8-sql-query, microi-deployment | 扩展数据库与迁移 |
 | `system-engine/datasource-engine.md` | datasource-engine | 数据源定义、执行和供数 |
 | `system-engine/job.md` | job-engine | 调度、后台任务和分布式恢复 |
-| `system-engine/micro-app.md` | microi-microservice | 微服务/前端微应用交付 |
+| `system-engine/micro-app.md` | microi-microservice, microi-ai-application | 微服务/AI 前端应用的工程架构与交付 |
 | `system-engine/microi-ui.md` | microi-ui | Microi.UI 组件和主题 |
 | `system-engine/module-engine.md` | module-engine, v8-menu-buttons, v8-template-engine, microi-mobile-app-quality | 菜单统计、模块指标、复合列、移动卡片、按钮角标和页面入口 |
 | `system-engine/mq.md` | v8-mq-mqtt | RabbitMQ 生产与消费 |

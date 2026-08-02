@@ -41,6 +41,7 @@ namespace Microi.net
             var menuAppDisplaySnapshot = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var backgroundTaskRuntimeInvariantApplied = false;
             var databaseBackupRuntimeInvariantApplied = false;
+            var applicationStreamV3SchemaInvariantApplied = false;
 
             try
             {
@@ -757,6 +758,101 @@ namespace Microi.net
                     migrationFailed = true;
                     migrationErrors.Add("升级24失败：" + ex.Message);
                     Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级24 - 2026-08-01】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 应用发布v3租户门禁运行时不变量【必须】
+            if (!migrationFailed)
+            {
+                try
+                {
+                    var gateMsgs = await new Upgrade25()
+                        .EnsureTenantGateInvariant(osClientSecret.OsClient)
+                        .ConfigureAwait(false);
+                    if (gateMsgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(gateMsgs);
+                        foreach (var msg in gateMsgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【应用发布v3租户门禁检查】失败：{msg}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("应用发布v3租户门禁检查失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【应用发布v3租户门禁检查】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 应用发布v3完整结构运行时不变量【必须】
+            if (!migrationFailed)
+            {
+                try
+                {
+                    // ServerVersion 可能已是当前值，但商城资源随后才首次安装，或
+                    // 历史恢复只带回了列而漏掉唯一索引。每次启动先做轻量物理
+                    // readback，只有缺列/缺索引/SQL Server Unicode 路径形状不符
+                    // 时才执行完整 Upgrade25。
+                    var schemaMsgs = await new Upgrade25()
+                        .EnsureApplicationStreamV3SchemaInvariant(osClientSecret.OsClient)
+                        .ConfigureAwait(false);
+                    if (schemaMsgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(schemaMsgs);
+                        foreach (var msg in schemaMsgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【应用发布v3完整结构检查】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        applicationStreamV3SchemaInvariantApplied = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("应用发布v3完整结构检查失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【应用发布v3完整结构检查】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级25 --2026-08-02【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade25.Version))
+            {
+                try
+                {
+                    var msgs = applicationStreamV3SchemaInvariantApplied
+                        ? new List<string>()
+                        : await new Upgrade25().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级25 - 2026-08-02】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级25 - 2026-08-02】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade25.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级25失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级25 - 2026-08-02】失败：{ex.Message}");
                 }
             }
             #endregion
@@ -2092,10 +2188,18 @@ if (_microiLegacyMenuConfigChanged) {
                 EnsureStringColumnCapacity(osClientSecret, "sys_osclients", "AuthSecret", 100);
                 EnsureColumn(osClientSecret, "sys_osclients", "AuthSecretRotateVersion", "varchar(100)");
 
-                var rotateVersion = ConfigHelper
-                    .GetEnvOrConfiguration("MICROI_AUTH_SECRET_ROTATE_VERSION", "Security:AuthSecretRotateVersion")
-                    .DosIsNullOrWhiteSpace(DiyToken.CurrentAuthVersion)
-                    .Trim();
+                var rotateVersion = (Environment.GetEnvironmentVariable(
+                                         "MICROI_AUTH_SECRET_ROTATE_VERSION",
+                                         EnvironmentVariableTarget.Process)
+                                     ?? Environment.GetEnvironmentVariable("MICROI_AUTH_SECRET_ROTATE_VERSION")
+                                     ?? ConfigHelper.GetConfiguration("Security:AuthSecretRotateVersion"))
+                    .DosTrim();
+                if (rotateVersion.DosIsNullOrWhiteSpace())
+                {
+                    // 普通版本发布只补齐字段，不请求密钥轮换。只有运维显式配置新的
+                    // RotateVersion 时才标记本轮轮换，避免每次镜像更新让全部 Token 失效。
+                    return;
+                }
                 var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
                 var sql = dbType == "MySql"
                     ? @"UPDATE `sys_osclients`

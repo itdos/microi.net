@@ -467,15 +467,54 @@ namespace Microi.net
         /// </summary>
         public static object BuildStatusData(dynamic currentToken)
         {
+            string osClient = string.Empty;
+            object tokenObject = (object)currentToken;
+            if (tokenObject is CurrentToken typedToken)
+            {
+                osClient = typedToken.OsClient ?? string.Empty;
+            }
+            else if (tokenObject is JObject tokenJson)
+            {
+                osClient = SafeJString(tokenJson, "OsClient");
+            }
+            else if (tokenObject != null)
+            {
+                try { osClient = SafeJString(JObject.FromObject(tokenObject), "OsClient"); }
+                catch { osClient = string.Empty; }
+            }
+            if (string.IsNullOrWhiteSpace(osClient))
+                osClient = ConfigHelper.GetAppSettings("OsClient") ?? string.Empty;
+            var gateCoordinate = ResolveApplicationAssetStreamGateCoordinate(osClient);
+            var gateStatus = BuildApplicationAssetStreamGateStatusData(
+                osClient,
+                gateCoordinate.OsClientType,
+                gateCoordinate.OsClientNetwork);
             return new
             {
                 IsDebugMode = true,
                 Environment = System.Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"),
                 DebuggerAttached = Debugger.IsAttached,
                 LocalV8DebugPath = ConfigHelper.GetAppSettings("LocalV8DebugPath") ?? "",
-                OsClient = currentToken.OsClient ?? ConfigHelper.GetAppSettings("OsClient") ?? "",
-                OsClientType = ConfigHelper.GetAppSettings("OsClientType") ?? "Product",
-                OsClientNetwork = ConfigHelper.GetAppSettings("OsClientNetwork") ?? "Internal"
+                OsClient = osClient,
+                OsClientType = gateCoordinate.OsClientType,
+                OsClientNetwork = gateCoordinate.OsClientNetwork,
+                ApplicationAssetStreamProtocol = gateStatus.Value<string>("ApplicationAssetStreamProtocol"),
+                ProtocolVersion = gateStatus["ProtocolVersion"]?.DeepClone(),
+                ApplicationStreamPublishMode = gateStatus.Value<string>("ApplicationStreamPublishMode"),
+                ApplicationStreamMinProtocol = gateStatus.Value<int>("ApplicationStreamMinProtocol"),
+                ApplicationStreamGateEpoch = gateStatus.Value<string>("ApplicationStreamGateEpoch"),
+                GateEpoch = gateStatus.Value<string>("GateEpoch"),
+                ApplicationAssetStreamV3Only = gateStatus.Value<bool>("ApplicationAssetStreamV3Only"),
+                V3Only = gateStatus.Value<bool>("V3Only"),
+                ApplicationAssetStreamAllowedModes = gateStatus["ApplicationAssetStreamAllowedModes"]?.DeepClone(),
+                AllowedModes = gateStatus["AllowedModes"]?.DeepClone(),
+                TransportModes = gateStatus["TransportModes"]?.DeepClone(),
+                ApplicationAssetStreamGateReady = gateStatus.Value<bool>("ApplicationAssetStreamGateReady"),
+                ApplicationAssetStreamGateReadError = gateStatus.Value<string>("ApplicationAssetStreamGateReadError"),
+                ApplicationAssetStreamMaxFileBytes,
+                ApplicationAssetStreamMaxTotalBytes,
+                ApplicationAssetStreamIoConcurrency,
+                ApplicationAssetStreamReadBudgetBytes
             };
         }
 
@@ -2640,60 +2679,34 @@ namespace Microi.net
             return array != null && array.Count > 0 ? array.ToString(Newtonsoft.Json.Formatting.None) : "";
         }
 
-        private static async Task<McpMenuDefaults> BuildDefaultModuleMenuConfig(string osClient, string diyTableId, string diyTableName)
+        private static McpMenuDefaults BuildDefaultModuleMenuConfigFromRows(object rawRows, string diyTableId, string diyTableName)
         {
             var defaults = new McpMenuDefaults();
             if (diyTableId.DosIsNullOrWhiteSpace()) return defaults;
 
             var fields = new List<McpMenuFieldMeta>();
-            try
+            if (!(rawRows is System.Collections.IEnumerable rows))
             {
-                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
-                {
-                    OsClient = osClient,
-                    _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Type", "Sort" },
-                    _Where = new List<object>()
-                    {
-                        new List<object>() { "TableId", "=", diyTableId },
-                        new List<object>() { "AND", "IsDeleted", "<>", 1 },
-                    },
-                    _OrderBy = "Sort",
-                    _OrderByType = "ASC",
-                    _PageIndex = 1,
-                    _PageSize = 5000
-                });
-
-                if (result.Code == 1 && result.Data != null)
-                {
-                    foreach (var item in result.Data)
-                    {
-                        var row = JObject.FromObject(item);
-                        var name = SafeJString(row, "Name");
-                        if (name.DosIsNullOrWhiteSpace()) continue;
-                        fields.Add(new McpMenuFieldMeta
-                        {
-                            Id = SafeJString(row, "Id"),
-                            Name = name,
-                            Label = SafeJString(row, "Label", name),
-                            TableId = SafeJString(row, "TableId", diyTableId),
-                            TableName = diyTableName ?? "",
-                            TableDescription = diyTableName ?? "",
-                            Component = SafeJString(row, "Component"),
-                            Type = SafeJString(row, "Type"),
-                            Sort = SafeJInt(row, "Sort", 100)
-                        });
-                    }
-                }
-                else if (result.Code != 1)
-                {
-                    defaults.Warnings.Add("Auto sys_menu fields skipped: failed to read diy_field. " + SafeString(result.Msg));
-                    return defaults;
-                }
+                throw new InvalidOperationException("diy_field 查询结果不是可枚举集合");
             }
-            catch (Exception ex)
+            foreach (object item in rows)
             {
-                defaults.Warnings.Add("Auto sys_menu fields skipped: " + ex.Message);
-                return defaults;
+                if (item == null) continue;
+                var row = item as JObject ?? JObject.FromObject(item);
+                string name = SafeJString(row, "Name");
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                fields.Add(new McpMenuFieldMeta
+                {
+                    Id = SafeJString(row, "Id"),
+                    Name = name,
+                    Label = SafeJString(row, "Label", name),
+                    TableId = SafeJString(row, "TableId", diyTableId),
+                    TableName = diyTableName ?? "",
+                    TableDescription = diyTableName ?? "",
+                    Component = SafeJString(row, "Component"),
+                    Type = SafeJString(row, "Type"),
+                    Sort = SafeJInt(row, "Sort", 100)
+                });
             }
 
             if (!fields.Any()) return defaults;
@@ -2770,6 +2783,48 @@ namespace Microi.net
                         ["Sort"] = 0
                     }
                 }.ToString(Newtonsoft.Json.Formatting.None);
+            }
+
+            return defaults;
+        }
+
+        private static async Task<McpMenuDefaults> BuildDefaultModuleMenuConfig(string osClient, string diyTableId, string diyTableName)
+        {
+            var defaults = new McpMenuDefaults();
+            if (diyTableId.DosIsNullOrWhiteSpace()) return defaults;
+
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
+                {
+                    OsClient = osClient,
+                    _SelectFields = new[] { "Id", "TableId", "Name", "Label", "Component", "Type", "Sort" },
+                    _Where = new List<object>()
+                    {
+                        new List<object>() { "TableId", "=", diyTableId },
+                        new List<object>() { "AND", "IsDeleted", "<>", 1 },
+                    },
+                    _OrderBy = "Sort",
+                    _OrderByType = "ASC",
+                    _PageIndex = 1,
+                    _PageSize = 5000
+                });
+
+                if (result.Code == 1 && result.Data != null)
+                {
+                    // GetTableDataAsync<dynamic> keeps Data/items dynamic. Cross the boundary as
+                    // object before JObject conversion so all following string values stay statically
+                    // typed and extension-method dispatch cannot leak into the runtime binder.
+                    return BuildDefaultModuleMenuConfigFromRows((object)result.Data, diyTableId, diyTableName);
+                }
+                if (result.Code != 1)
+                {
+                    defaults.Warnings.Add("Auto sys_menu fields skipped: failed to read diy_field. " + SafeString(result.Msg));
+                }
+            }
+            catch (Exception ex)
+            {
+                defaults.Warnings.Add("Auto sys_menu fields skipped: " + ex.Message);
             }
 
             return defaults;

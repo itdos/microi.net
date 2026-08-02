@@ -20,6 +20,7 @@ import {
 } from './application-store-replica-sync.mjs';
 import {
   findItDosMcpServer,
+  readResourcesViaConfiguredMcp,
   resolveItDosMcpLaunch,
   validateItDosMcpServer,
 } from './mcp-resource-publisher.mjs';
@@ -314,12 +315,50 @@ test('应用商城逻辑副本自动合并独立文件和内嵌代码的不同�
   assert.equal(getEmbeddedEngineSource(merged.packageContent, 'ai_app_publish_store'), resolved);
 });
 
+test('应用商城逻辑副本忽略两端独立递增的版本头并为合成正文自动升版', async () => {
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.0.0', 'return { Code: 1 };');
+  const basePublisher = engineSource(
+    'ai_app_publish_store',
+    'v1.5.4',
+    'function localFeature() {\n  return 1;\n}\n\n// 两端保存时都会独立升版\n\nfunction remoteFeature() {\n  return 1;\n}',
+    '共同基线',
+  );
+  const localPublisher = engineSource(
+    'ai_app_publish_store',
+    'v1.5.5',
+    'function localFeature() {\n  return 2;\n}\n\n// 两端保存时都会独立升版\n\nfunction remoteFeature() {\n  return 1;\n}',
+    '本地功能',
+  );
+  const remotePublisher = engineSource(
+    'ai_app_publish_store',
+    'v1.5.6',
+    'function localFeature() {\n  return 1;\n}\n\n// 两端保存时都会独立升版\n\nfunction remoteFeature() {\n  return 3;\n}',
+    '官网功能',
+  );
+
+  const merged = await mergeReplicaFixture({
+    baseImporter: importer,
+    basePublisher,
+    baseBuilder: builder,
+    localPublisher,
+    localEmbeddedPublisher: basePublisher,
+    remotePublisher,
+    remoteEmbeddedPublisher: basePublisher,
+  });
+  const resolved = merged.standaloneContents.get('ai-app-publish-store.js');
+  assert.match(resolved, /Version: v1\.5\.7/);
+  assert.match(resolved, /function localFeature\(\) \{\n  return 2;/);
+  assert.match(resolved, /function remoteFeature\(\) \{\n  return 3;/);
+  assert.equal(getEmbeddedEngineSource(merged.packageContent, 'ai_app_publish_store'), resolved);
+});
+
 test('应用商城逻辑副本仍阻止同一代码行被本地和官网改成不同实现', async () => {
   const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
   const builder = engineSource('ai_app_build', 'v1.0.0', 'return { Code: 1 };');
   const basePublisher = engineSource('ai_app_publish_store', 'v1.5.3', 'var value = 1;\nreturn value;');
-  const localPublisher = basePublisher.replace('var value = 1;', 'var value = 2;');
-  const remotePublisher = basePublisher.replace('var value = 1;', 'var value = 3;');
+  const localPublisher = engineSource('ai_app_publish_store', 'v1.5.4', 'var value = 2;\nreturn value;');
+  const remotePublisher = engineSource('ai_app_publish_store', 'v1.5.5', 'var value = 3;\nreturn value;');
 
   await assert.rejects(
     mergeReplicaFixture({
@@ -397,11 +436,26 @@ test('后端发布前强制执行官网三方同步和发布后回读', () => {
   assert.match(refreshSource, /无法根据包版本[\s\S]*?生成更高的语义版本/);
   assert.match(refreshSource, /未写入官网、未修改本地资源、未推进共同基线/);
   assert.match(refreshSource, /publishResourcesViaConfiguredMcp/);
+  assert.match(refreshSource, /readResourcesViaConfiguredMcp/);
+  assert.match(refreshSource, /MICROI_UPGRADE_RESOURCE_TRANSPORT/);
   assert.match(refreshSource, /MICROI_UPGRADE_RESOURCE_TOKEN/);
   assert.match(refreshSource, /Authorization:\s*`Bearer \$\{token\}`/);
   assert.match(refreshSource, /Token:\s*token/);
   assert.match(refreshSource, /validateReadableOfficialResource\(name, content\)/);
   assert.match(refreshSource, /validateReleaseCandidate\(name, content\)/);
+});
+
+test('共同基线只能通过显式官网回读修复且不能伴随发布', () => {
+  assert.match(refreshSource, /--repair-base-from-remote/);
+  assert.match(
+    refreshSource,
+    /repairBaseFromRemote && \(initializeBase \|\| publish \|\| allowVerifiedOffline\)/,
+  );
+  assert.match(
+    refreshSource,
+    /assertApplicationStoreEnginesSynchronized\([\s\S]*?remotePackageContent/,
+  );
+  assert.match(refreshSource, /按官网回读修复共同基线/);
 });
 
 test('无显式 Token 时只允许复用绑定官方 iTdos 的 MCP', () => {
@@ -456,6 +510,58 @@ test('官网 MCP 发布器在插件升级后自动改用最新可用入口和当
   const found = await findItDosMcpServer(root, configPath);
   assert.equal(found.path, configPath);
   assert.equal(found.server.args[0], currentEntry);
+});
+
+test('官网资源通过 microi_itdos MCP 单入口读取完整内容', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'microi-mcp-read-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const extensionRoot = join(root, 'extensions', 'microi.v8-engine-1.0.0');
+  const entry = join(extensionRoot, 'dist', 'mcp-server.js');
+  await mkdir(dirname(entry), { recursive: true });
+  await writeFile(entry, [
+    "let buffer = '';",
+    "process.stdin.setEncoding('utf8');",
+    "function send(id, result) { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n'); }",
+    "process.stdin.on('data', chunk => {",
+    "  buffer += chunk;",
+    "  let index;",
+    "  while ((index = buffer.indexOf('\\n')) >= 0) {",
+    "    const line = buffer.slice(0, index).trim();",
+    "    buffer = buffer.slice(index + 1);",
+    "    if (!line) continue;",
+    "    const message = JSON.parse(line);",
+    "    if (message.id == null) continue;",
+    "    if (message.method === 'initialize') { send(message.id, { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'fake', version: '1' } }); continue; }",
+    "    if (message.method === 'tools/list') { send(message.id, { tools: [{ name: 'microi_codex' }] }); continue; }",
+    "    const name = message.params.arguments.params.params.Name;",
+    "    const execution = { Result: { Code: 1, Data: { ResourceName: name, Content: 'ApiEngineKey: ai_app_publish_store\\n', Sha256: 'a'.repeat(64) }, Msg: '' }, ConsoleOutput: [] };",
+    "    send(message.id, { content: [{ type: 'text', text: '## Execution Result\\n- **Code**: 1\\n```json\\n' + JSON.stringify(execution, null, 2) + '\\n```' }] });",
+    "  }",
+    "});",
+    '',
+  ].join('\n'), 'utf8');
+  const configPath = join(root, '.mcp.json');
+  await writeFile(configPath, JSON.stringify({
+    mcpServers: {
+      microi_itdos: {
+        type: 'stdio',
+        command: 'old-editor',
+        args: [entry],
+        cwd: extensionRoot,
+        env: { MICROI_API_URL: 'https://api.itdos.com', MICROI_OS_CLIENT: 'iTdos' },
+      },
+    },
+  }), 'utf8');
+
+  const readResult = await readResourcesViaConfiguredMcp(
+    ['ai-app-publish-store.js'],
+    { startDirectory: root, configPath },
+  );
+  assert.equal(readResult.configPath, configPath);
+  assert.equal(
+    readResult.resources.get('ai-app-publish-store.js').Content,
+    'ApiEngineKey: ai_app_publish_store\n',
+  );
 });
 
 test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async t => {

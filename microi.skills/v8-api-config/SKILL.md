@@ -34,6 +34,36 @@ description: Microi V8 接口引擎配置指南。用于设置 ApiEngineKey、Ap
 - `V8.Limits` 可读取本片有效预算和当前深度。异常优先检查 `DataAppend.V8Limit.Code`，不要看到“2GB”就判断服务器真实吃满 2GB。
 - 后台任务使用同一执行引擎。总任务可以运行数小时，但单片仍受 `Timeout/MaxStatements/LimitMemory` 约束；超过 10 分钟必须返回 `HasMore + Checkpoint` 分片续跑，不能只把 `Timeout` 调到 1800/3600。
 
+### 通用实时事件（SignalR）
+
+订单、协作、设备、审批或多人房间需要实时刷新时，业务写命令仍由接口引擎执行并提交事务；成功结果通过 `DataAppend.RealtimeEvent` 声明提交后事件。新业务统一使用通用 v2 Hub `/api-engine-realtime`，不要再新建业务专用 Hub 或把权威状态放进 C# 进程内字典。
+
+```javascript
+return {
+  Code: 1,
+  Data: snapshot,
+  DataAppend: { RealtimeEvent: {
+    EventId: requestId,
+    ChannelKey: 'order_updates',
+    SubjectId: order.Id,
+    Version: order.VersionNo,
+    EventType: 'StatusChanged',
+    Data: { Status: order.Status }
+  } }
+};
+```
+
+- Hub 方法固定为 `SubscribeChannel({ ChannelKey, SubjectId })` 与 `UnsubscribeChannel(...)`，客户端事件固定为 `RealtimeEvent`。订阅成功会返回 `ProtocolVersion/ChannelKey/SubjectId/Version/Latest/RenewAfterMilliseconds/LeaseExpiresAt`。
+- 连接只接受当前有效的普通登录 Token。现有 AccessKey 权限模型没有 `realtime:subscribe` scope，平台会直接拒绝；在平台正式增加并校验该 scope 前，不得用 AccessKey 建立实时订阅。
+- 对应订阅授权接口固定为 `realtime_{channel_key}_authorize`。它必须用 `V8.CurrentUser` 校验资源权限，并精确回显 `Authorized/ChannelKey/SubjectId/Version`；不能信任客户端传入的 UserId、OsClient 或 ApiEngineKey。
+- 订阅使用 30 秒时隙租约。客户端必须按服务端返回的 `RenewAfterMilliseconds` 再次调用同一个 `SubscribeChannel` 续租；每次续租都会重新验证登录 Token、经过共享 Redis 限流，并重新执行授权接口引擎。不要把一次订阅误当成连接全生命周期永久授权。
+- 当前共享 Redis 限流按 `OsClient + UserId` 聚合为 10 秒最多 96 次订阅授权，跨标签页、API 节点和滚动发布共同生效；Redis 不可用时实时订阅失败关闭，业务必须继续走 HTTP Snapshot。
+- `EventId` 在业务重试时保持稳定；平台先用 Redis 短 Claim 协调跨节点发布，只有真实广播成功后才写 24 小时完成标记，避免“先去重、后崩溃”永久漏发。客户端仍必须按 `EventId` 去重，因为故障恢复可能产生重复通知。
+- `Version` 按同一 `ChannelKey + SubjectId` 单调递增。低版本事件作为过期事件拒绝广播；同版本但内容指纹不同视为版本冲突并拒绝；重放相同事件不推进 latest。
+- 宿主只读取成功 DosResult 中固定大小写的 `DataAppend.RealtimeEvent`，并只广播 `EventId/ChannelKey/SubjectId/Version/EventType/Data/OccurredAt`。`Data` 最大 32KB，只能放该群组所有订阅者都可见的安全投影；个性化私有数据通过按当前用户裁剪的 Snapshot 获取。
+- 客户端按 `EventId` 去重、按 `Version` 检测乱序和缺口；连接失败、续租失败、重连或发现缺口时立即重新拉 HTTP Snapshot，并保留有界轮询兜底。共享存储/状态机才是事实源。
+- 旧 `/game-realtime` 只作兼容。新业务默认使用通用协议，完整契约见官方 `v8-server.md`。
+
 ## 1. 匿名调用（IsAnonymous）
 
 公开接口（登录、注册、忘记密码、验证码、扫码登录、第三方回调）必须开启：
