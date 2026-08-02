@@ -16,6 +16,15 @@ public class AiApplicationApiEngineSecurityTests
         return method!.Invoke(null, args);
     }
 
+    private static object? InvokeFormEngine(string methodName, params object?[] args)
+    {
+        var method = typeof(FormEngine).GetMethod(
+            methodName,
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return method!.Invoke(null, args);
+    }
+
     [Theory]
     [InlineData("app_bby_bootstrap_query", true)]
     [InlineData("APP_BBY_SAVE", true)]
@@ -35,6 +44,52 @@ public class AiApplicationApiEngineSecurityTests
     public void AiApplicationWriteCode_DetectsPersistenceButKeepsReadsAnonymous(string code, bool expected)
     {
         Assert.Equal(expected, (bool)Invoke("IsAiApplicationWriteCode", code)!);
+    }
+
+    [Theory]
+    [InlineData(
+        true,
+        "return V8.FormEngine.AddFormData('app_cg1_session', {});",
+        true)]
+    [InlineData(
+        true,
+        "V8.FormEngine.AddFormData('app_cg1_session', {}); return V8.FormEngine.UptFormData('app_cg1_request', { Id: 'x' });",
+        true)]
+    [InlineData(
+        false,
+        "return V8.FormEngine.AddFormData('app_cg1_session', {});",
+        false)]
+    [InlineData(
+        true,
+        "return V8.FormEngine.AddFormData('customer_order', {});",
+        false)]
+    [InlineData(
+        true,
+        "return V8.FormEngine.AddFormData(tableName, {});",
+        false)]
+    [InlineData(
+        true,
+        "V8.FormEngine.AddFormData('app_cg1_session', {}); V8.Db.FromSql('update app_cg1_session set Score=1').ExecuteNonQuery();",
+        false)]
+    [InlineData(
+        true,
+        "return V8.ApiEngine.Run('app_cg1_finish', V8.Param);",
+        false)]
+    [InlineData(
+        true,
+        "return V8.FormEngine.AddTableData([{ FormEngineKey: 'app_cg1_session' }]);",
+        false)]
+    public void AnonymousAiApplicationWrite_OnlyAllowsScopedLiteralAppTables(
+        bool allowAnonymous,
+        string code,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            (bool)Invoke(
+                "IsAnonymousAiApplicationWriteAllowed",
+                allowAnonymous,
+                code)!);
     }
 
     [Theory]
@@ -176,5 +231,65 @@ public class AiApplicationApiEngineSecurityTests
             .ToList();
         Assert.Single(ownerConditions);
         Assert.Equal("user-123", ownerConditions[0].Value?.ToString());
+    }
+
+    [Fact]
+    public async Task AnonymousAiApplicationV8_FormEngineCallIsTrustedAndOwnerScoped()
+    {
+        var engine = new FormEngine();
+
+        using (V8TenantContext.Enter(
+                   "iTdos",
+                   "app_cg1_start",
+                   "ApiEngine",
+                   null,
+                   "anon_device_scope"))
+        {
+            var param = await engine.DynamicToDiyTableRowParam(new JObject
+            {
+                ["FormEngineKey"] = "app_cg1_session",
+                ["_InvokeType"] = InvokeType.Client.ToString(),
+                ["_RowModel"] = new JObject
+                {
+                    ["UserId"] = "spoofed-user",
+                    ["SessionNo"] = "session-1"
+                }
+            });
+
+            Assert.True(param._TrustedServerInvocation);
+            Assert.Equal("anon_device_scope", param._RowModel?["UserId"]?.ToString());
+            var ownerConditions = WhereParser.ParseWhere(param._Where)
+                .Where(item => string.Equals(
+                    item.Name,
+                    "UserId",
+                    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            Assert.Single(ownerConditions);
+            Assert.Equal("anon_device_scope", ownerConditions[0].Value?.ToString());
+        }
+    }
+
+    [Fact]
+    public void AnonymousAiApplicationInsert_UsesSameServerOwnerAsScopedUpdates()
+    {
+        using (V8TenantContext.Enter(
+                   "iTdos",
+                   "app_cg1_start",
+                   "ApiEngine",
+                   null,
+                   "anon_device_scope"))
+        {
+            var anonymous = InvokeFormEngine(
+                "ResolveAiApplicationInsertUserId",
+                new DiyTableRowParam { FormEngineKey = "app_cg1_session" },
+                null);
+            Assert.Equal("anon_device_scope", anonymous);
+        }
+
+        var authenticated = InvokeFormEngine(
+            "ResolveAiApplicationInsertUserId",
+            new DiyTableRowParam { FormEngineKey = "app_cg1_session" },
+            "user-123");
+        Assert.Equal("user-123", authenticated);
     }
 }

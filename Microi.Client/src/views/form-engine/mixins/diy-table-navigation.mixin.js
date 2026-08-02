@@ -18,6 +18,16 @@ export default {
             var self = this;
             self.$refs.refDiyCustomDialog.CloseDialog();
         },
+        HandleMobileTableBack() {
+            if (this.PropsTableType === "OpenTable") {
+                this.$emit("closeOpenAnyTable");
+                return;
+            }
+            this.$router.back();
+        },
+        CloseOpenAnyTable() {
+            this.ShowAnyTable = false;
+        },
         OpenMenuForm() {
             var self = this;
             if (self.SysMenuModel.Id) {

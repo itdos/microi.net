@@ -761,13 +761,29 @@ namespace Microi.net
                 }
                 #endregion
 
+                var usePrivateAuditProxy = param.Limit != false
+                                           && !string.Equals(param.ReturnFileType, "Byte", StringComparison.OrdinalIgnoreCase)
+                                           && MicroiEngine.PrivateFileAuditLink != null;
+                var storageFilePath = ResolvePlatformStoragePath(param.OsClient, param.FilePathName);
+                var storageFilePaths = param.FilePathNames?
+                    .Select(path => ResolvePlatformStoragePath(param.OsClient, path))
+                    .ToList();
                 DosResult result = await _iMicroiHDFS.GetPrivateFileUrl(new HDFSParam()
                 {
                     ClientModel = clientModel,
                     Limit = param.Limit,
-                    FileFullPath = param.FilePathName,
-                    FileFullPaths = param.FilePathNames,
-                    ReturnFileType = param.ReturnFileType
+                    FileFullPath = storageFilePath,
+                    FileFullPaths = storageFilePaths,
+                    ReturnFileType = param.ReturnFileType,
+                    // The browser never receives this upstream URL when the audit
+                    // gateway is enabled. Generate it from the server-side/internal
+                    // object endpoint so a file written through the internal MinIO
+                    // endpoint cannot later appear missing through a different public
+                    // endpoint. OpenPrivateFile remains the only browser-facing URL.
+                    NetworkIsInternet = ResolvePrivateFileNetworkPreference(
+                        usePrivateAuditProxy,
+                        param.Limit,
+                        param.ReturnFileType)
                 });
                 #region 执行获取后事件
                 try
@@ -849,8 +865,7 @@ namespace Microi.net
 
                 }
                 #endregion
-                if (result?.Code == 1 && param.Limit != false && param.ReturnFileType != "Byte"
-                    && MicroiEngine.PrivateFileAuditLink != null)
+                if (result?.Code == 1 && usePrivateAuditProxy)
                 {
                     result = await MicroiEngine.PrivateFileAuditLink.WrapAsync(result, param);
                 }
@@ -865,6 +880,35 @@ namespace Microi.net
                 MicroiEngine.V8Engine.ReturnEngine(engineObj);
             }
 
+        }
+
+        private static bool? ResolvePrivateFileNetworkPreference(
+            bool auditProxyEnabled,
+            bool? limit,
+            string returnFileType)
+        {
+            return auditProxyEnabled
+                   && limit != false
+                   && !string.Equals(returnFileType, "Byte", StringComparison.OrdinalIgnoreCase)
+                ? false
+                : (bool?)null;
+        }
+
+        /// <summary>
+        /// V8.Method historically prefixes tenant-owned paths with /{OsClient}/.
+        /// Database backups are written by the platform's low-level HDFS client to
+        /// the reserved, server-owned /database-backups/ namespace instead. Remove
+        /// only that exact synthetic prefix before addressing the object store;
+        /// ordinary tenant files keep their original isolation prefix unchanged.
+        /// </summary>
+        private static string ResolvePlatformStoragePath(string osClient, string filePath)
+        {
+            if (filePath.DosIsNullOrWhiteSpace() || osClient.DosIsNullOrWhiteSpace()) return filePath;
+            var tenantSegment = osClient.Trim().Trim('/');
+            if (tenantSegment.DosIsNullOrWhiteSpace()) return filePath;
+            var prefixedBackupRoot = $"/{tenantSegment}/database-backups/";
+            if (!filePath.StartsWith(prefixedBackupRoot, StringComparison.OrdinalIgnoreCase)) return filePath;
+            return "/database-backups/" + filePath.Substring(prefixedBackupRoot.Length);
         }
 
         /// <summary>

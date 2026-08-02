@@ -89,7 +89,7 @@
                 <!-- 移动端顶部导航（小程序 webview 模式下隐藏，避免与小程序原生导航栏重复） -->
                 <div v-if="diyStore.IsPhoneView && !diyStore.IsMiniProgram && !PropsEmbedded && ShowAddByRoute" class="mobile-header">
                     <div class="mobile-header-left">
-                        <el-icon class="back-icon" @click="$router.back()">
+                        <el-icon class="back-icon" @click="HandleMobileTableBack">
                             <ArrowLeft />
                         </el-icon>
                     </div>
@@ -816,9 +816,8 @@
                             <span>{{ scope.row.UpdateTime }}</span>
                         </template>
                     </el-table-column>
-                    <!--之前是 MaxRowBtnsOut*115 按按钮数量来，现在按文字数量来-->
-                    <!-- 性能优化V3：简化DOM结构，移除不必要的包装div -->
-                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" :width="GetActionWidth + (IsSystemAccountTable() ? 94 : 0)">
+                    <!-- 操作列按每行真实可见按钮计算宽度，取最宽行并统一右对齐 -->
+                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" align="right" header-align="right" :width="GetActionWidth">
                         <template #default="scope">
                             <div class="diy-table-action-content">
                                 <el-button
@@ -847,7 +846,7 @@
                                 </template>
                                 <!--工作流-去处理 按钮（OpenType=='WorkFlow' 时显示，放在【详情】之前）-->
                                 <el-button
-                                    v-if="IsWorkFlowMenu() && scope.row._IsInTableAdd !== true"
+                                    v-if="ShouldShowRowWorkflowAction(scope.row)"
                                     type="primary"
                                     :icon="Tickets"
                                     :loading="BtnLoading"
@@ -856,14 +855,14 @@
                                     去处理
                                 </el-button>
                                 <el-button
-                                    v-if="IsPermission('NoDetail') && scope.row._IsInTableAdd !== true && scope.row.IsVisibleDetail == true"
+                                    v-if="ShouldShowRowDetailAction(scope.row)"
                                     :icon="Tickets"
                                     @click="OpenDetail(scope.row, 'View')"
                                 >
                                     {{ $t("Msg.Detail") }}
                                 </el-button>
                                 <el-button
-                                    v-if="IsTrashMode && scope.row._IsInTableAdd !== true"
+                                    v-if="ShouldShowRowRestoreAction(scope.row)"
                                     type="success"
                                     :icon="RefreshLeft"
                                     :loading="BtnLoading"
@@ -872,7 +871,7 @@
                                     恢复
                                 </el-button>
                                 <el-button
-                                    v-if="CanManageUserAccessKey(scope.row)"
+                                    v-if="ShouldShowRowAccessKeyAction(scope.row)"
                                     type="warning"
                                     plain
                                     @click.stop="OpenUserAccessKeys(scope.row)"
@@ -884,15 +883,7 @@
                                 <!-- 性能优化V3：使用原生按钮+全局共享菜单，避免每行实例化popover -->
                                 <!-- 流程引擎模式下：隐藏【编辑】项但保留【更多】按钮以提供删除/V8内部按钮 -->
                                 <el-button
-                                    v-if="!IsTrashMode && (
-                                        (!IsWorkFlowMenu() && TableChildFormMode != 'View' &&
-                                            !TableChildField.Readonly &&
-                                            _LimitEdit &&
-                                            scope.row._IsInTableAdd !== true &&
-                                            scope.row.IsVisibleEdit == true) ||
-                                        (scope.row._RowMoreBtnsIn && scope.row._RowMoreBtnsIn.some(btn => btn.IsVisible)) ||
-                                        (_LimitDel && scope.row.IsVisibleDel == true)
-                                    )"
+                                    v-if="ShouldShowRowMoreAction(scope.row)"
                                     class="more-action-btn"
                                     @click.stop="showMoreMenu($event, scope.row)"
                                 >
@@ -1624,7 +1615,7 @@
                         <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button :icon="Close" @click="ShowAnyTable = false">
+                        <el-button :icon="Close" @click="CloseOpenAnyTable">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
@@ -1643,6 +1634,7 @@
                             :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
                             :PropsTableType="'OpenTable'"
                             @getOpenAnyTableParam="getOpenAnyTableParam"
+                            @closeOpenAnyTable="CloseOpenAnyTable"
                             :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
                             :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
                             :PropsTableId="OpenAnyTableParam.TableId"
@@ -1683,7 +1675,7 @@
                         <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
-                        <el-button :icon="Close" @click="ShowAnyTable = false">
+                        <el-button :icon="Close" @click="CloseOpenAnyTable">
                             {{ $t("Msg.Close") }}
                         </el-button>
                     </div>
@@ -1701,6 +1693,7 @@
                             :key="'refOpenAnyTable_' + (OpenAnyTableParam.SysMenuId || OpenAnyTableParam.ModuleEngineKey)"
                             :PropsTableType="'OpenTable'"
                             @getOpenAnyTableParam="getOpenAnyTableParam"
+                            @closeOpenAnyTable="CloseOpenAnyTable"
                             :PropsSysMenuId="OpenAnyTableParam.SysMenuId"
                             :PropsModuleEngineKey="OpenAnyTableParam.ModuleEngineKey"
                             :PropsTableId="OpenAnyTableParam.TableId"

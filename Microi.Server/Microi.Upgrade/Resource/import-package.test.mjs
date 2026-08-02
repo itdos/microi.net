@@ -19,8 +19,12 @@ const microAppControllerSource = await readCanonicalText(new URL("../../Microi.n
 const apiProgramSource = await readCanonicalText(new URL("../../Microi.net.Api/Program.cs", import.meta.url));
 const tableActionsSource = await readCanonicalText(new URL("../../../Microi.Client/src/views/form-engine/mixins/diy-table-actions.mixin.js", import.meta.url));
 const functionSource = source.match(/var countPageTabs = function \(value\) \{[\s\S]*?\n\};/);
+const physicalNotNullBackfillSource = source.match(
+  /var prepareNotNullColumnData = function \(tableName, columnName, sourceColumn, targetColumn\) \{[\s\S]*?\n    \};/
+);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
+assert.ok(physicalNotNullBackfillSource, "NOT NULL physical-column backfill helper should exist");
 
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
@@ -30,6 +34,62 @@ const dataSetImportSource = source.match(
 );
 
 assert.ok(dataSetImportSource, "InsertIfMissing dataset importer should be extractable");
+
+function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
+  const calls = [];
+  const fixtureContext = {
+    isSafeIdentifier(value) {
+      return !!value && /^[A-Za-z0-9_]+$/.test(String(value));
+    },
+    normalizeSqlType(value) {
+      return String(value || "").toLowerCase().replace(/\s+/g, "");
+    },
+    getPhysicalValue(row, names) {
+      for (const name of names) {
+        if (row[name] !== undefined && row[name] !== null) return row[name];
+      }
+      return null;
+    },
+    getScalarCount(row, names) {
+      const name = names.find(candidate => row[candidate] !== undefined && row[candidate] !== null);
+      const value = name ? Number.parseInt(row[name], 10) : 0;
+      return Number.isNaN(value) ? 0 : value;
+    },
+    V8: {
+      Db: {
+        FromSql(sql) {
+          const call = { sql, parameters: [], executed: false };
+          calls.push(call);
+          const command = {
+            AddInParameter(name, value) {
+              call.parameters.push([name, value]);
+              return command;
+            },
+            ToArray() {
+              return [{ NullCount: options.nullCount ?? 3 }];
+            },
+            ExecuteNonQuery() {
+              call.executed = true;
+              return options.nullCount ?? 3;
+            },
+          };
+          return command;
+        },
+      },
+    },
+  };
+  vm.runInNewContext(
+    `${physicalNotNullBackfillSource[0]}\nresult = prepareNotNullColumnData;`,
+    fixtureContext
+  );
+  const count = fixtureContext.result(
+    "mci_ai_app_version",
+    sourceColumn.COLUMN_NAME,
+    sourceColumn,
+    { IS_NULLABLE: options.targetNullable || "YES" }
+  );
+  return { calls, count };
+}
 
 function runDataSetImportFixture(options = {}) {
   const noData = { Code: 2, Data: null, Msg: "NoExistData" };
@@ -113,6 +173,55 @@ test("PageTabs only preserves a real multi-tab target", () => {
     assert.equal(countPageTabs(value), expected, `unexpected count for ${JSON.stringify(value)}`);
   }
   assert.match(source, /existingPageTabsCount\s*>\s*1/);
+});
+
+test("physical schema sync backfills all legacy application publish NULLs before NOT NULL", () => {
+  const expectedDefaults = new Map([
+    ["PublishProtocolVersion", "2"],
+    ["PublishState", "LegacyUnverified"],
+    ["FencingToken", "0"],
+    ["RowVersion", "0"],
+    ["RecoveryEpoch", "0"],
+  ]);
+  const columns = packageModel.PhysicalColumns.filter(column => (
+    column.TABLE_NAME === "mci_ai_app_version" && expectedDefaults.has(column.COLUMN_NAME)
+  ));
+
+  assert.equal(columns.length, expectedDefaults.size);
+  for (const column of columns) {
+    assert.equal(column.IS_NULLABLE, "NO", column.COLUMN_NAME);
+    assert.equal(String(column.COLUMN_DEFAULT), expectedDefaults.get(column.COLUMN_NAME), column.COLUMN_NAME);
+    const result = runPhysicalNotNullBackfillFixture(column);
+    assert.equal(result.count, 3, column.COLUMN_NAME);
+    assert.equal(result.calls.length, 2, column.COLUMN_NAME);
+    assert.match(result.calls[0].sql, /SELECT COUNT\(1\).*IS NULL/);
+    assert.match(result.calls[1].sql, /UPDATE `mci_ai_app_version` SET `[A-Za-z0-9_]+` = @p0.*IS NULL/);
+    assert.deepEqual(result.calls[1].parameters, [["@p0", column.COLUMN_DEFAULT]]);
+    assert.equal(result.calls[1].executed, true);
+  }
+
+  assert.match(
+    source,
+    /prepareNumericColumnData\([\s\S]*?prepareNotNullColumnData\([\s\S]*?ALTER TABLE `[\s\S]*?` MODIFY COLUMN/
+  );
+});
+
+test("physical NOT NULL backfill is idempotent and fails closed without a declared default", () => {
+  const baseColumn = {
+    TABLE_NAME: "mci_ai_app_version",
+    COLUMN_NAME: "PublishState",
+    COLUMN_TYPE: "varchar(50)",
+    IS_NULLABLE: "NO",
+    COLUMN_DEFAULT: "LegacyUnverified",
+  };
+  const noNulls = runPhysicalNotNullBackfillFixture(baseColumn, { nullCount: 0 });
+  assert.equal(noNulls.count, 0);
+  assert.equal(noNulls.calls.length, 1, "repeat install should only verify that no NULL rows remain");
+
+  assert.throws(
+    () => runPhysicalNotNullBackfillFixture({ ...baseColumn, COLUMN_DEFAULT: null }),
+    /存在3条NULL数据.*未声明可回填的默认值/
+  );
 });
 
 test("InsertIfMissing never overwrites a configured row with the same Id", () => {

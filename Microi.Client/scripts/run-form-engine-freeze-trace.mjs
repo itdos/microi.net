@@ -20,6 +20,8 @@ const backendUrl = process.env.BACKEND || process.env.PW_API_BASE || 'https://lo
 const frontendUrl = process.env.FRONTEND || process.env.PW_BASE_URL || 'http://localhost:61500';
 const osClient = process.env.MICROI_OSCLIENT || process.env.PW_OS_CLIENT || appsettingsEnv;
 const launchProfile = process.env.PW_BACKEND_PROFILE || 'Microi.net.Api';
+const backendConfiguration = process.env.PW_BACKEND_CONFIGURATION || 'Debug';
+const releaseLockPath = path.join(repoRoot, '.tmp', 'microi-process-state', 'release.lock');
 
 function isTruthy(value) {
     return value === true || value === 1 || value === '1' || value === 'true' || value === 'yes' || value === 'on';
@@ -36,6 +38,19 @@ function shouldRun(value, defaultValue = true) {
 
 function resolveMaybeRelative(filePath) {
     return path.isAbsolute(filePath) ? filePath : path.resolve(repoRoot, filePath);
+}
+
+async function assertReleaseIsNotRunning() {
+    try {
+        await fs.access(releaseLockPath);
+        throw new Error(
+            `Workspace release lock exists: ${path.relative(repoRoot, releaseLockPath)}. ` +
+            'Wait for Microi一键编译发布.sh to finish before starting E2E services.'
+        );
+    } catch (error) {
+        if (error.code === 'ENOENT') return;
+        throw error;
+    }
 }
 
 async function readJson(filePath) {
@@ -129,13 +144,70 @@ function spawnManaged(command, args, options) {
         cwd: options.cwd,
         env: options.env,
         stdio: options.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'],
-        shell: useShell
+        shell: useShell,
+        detached: Boolean(options.detached)
     });
     if (!options.inherit) {
         child.stdout.on('data', (chunk) => process.stdout.write(`[${options.label}] ${chunk}`));
         child.stderr.on('data', (chunk) => process.stderr.write(`[${options.label}] ${chunk}`));
     }
     return child;
+}
+
+function waitForChildExit(child, timeoutMs) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (exited) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            child.off('exit', onExit);
+            resolve(exited);
+        };
+        const onExit = () => finish(true);
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        child.once('exit', onExit);
+    });
+}
+
+async function runIgnoringExit(command, args) {
+    await new Promise((resolve) => {
+        const child = spawn(command, args, { stdio: 'ignore', windowsHide: true });
+        child.once('error', () => resolve());
+        child.once('exit', () => resolve());
+    });
+}
+
+async function stopManagedProcessTree(child, label) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    console.log(`[microi-e2e] stopping ${label} process tree (PID ${child.pid})`);
+
+    if (process.platform === 'win32') {
+        await runIgnoringExit('taskkill.exe', ['/PID', String(child.pid), '/T']);
+        if (!(await waitForChildExit(child, 3000))) {
+            await runIgnoringExit('taskkill.exe', ['/PID', String(child.pid), '/T', '/F']);
+            await waitForChildExit(child, 5000);
+        }
+    } else {
+        try {
+            process.kill(-child.pid, 'SIGTERM');
+        } catch (error) {
+            if (error.code !== 'ESRCH') child.kill('SIGTERM');
+        }
+        if (!(await waitForChildExit(child, 3000))) {
+            try {
+                process.kill(-child.pid, 'SIGKILL');
+            } catch (error) {
+                if (error.code !== 'ESRCH') child.kill('SIGKILL');
+            }
+            await waitForChildExit(child, 5000);
+        }
+    }
+
+    if (child.exitCode === null && child.signalCode === null) {
+        throw new Error(`${label} process tree did not exit: PID ${child.pid}`);
+    }
 }
 
 async function runChild(command, args, options) {
@@ -160,19 +232,33 @@ async function startBackendIfNeeded() {
     const command = process.platform === 'win32' ? 'dotnet.exe' : 'dotnet';
     const resolvedApiProject = resolveMaybeRelative(apiProject);
     const backendCwd = path.dirname(resolvedApiProject);
-    const args = ['run', '--project', resolvedApiProject, '--launch-profile', launchProfile];
+    if (backendConfiguration.toLowerCase() === 'release') {
+        throw new Error('PW_BACKEND_CONFIGURATION=Release is forbidden for a long-lived E2E backend; use Debug.');
+    }
+    const args = [
+        'run',
+        '--configuration', backendConfiguration,
+        '--project', resolvedApiProject,
+        '--launch-profile', launchProfile
+    ];
     const env = {
         ...process.env,
         ASPNETCORE_ENVIRONMENT: aspnetcoreEnvironment,
         DOTNET_ENVIRONMENT: dotnetEnvironment
     };
     console.log(`[microi-e2e] starting backend ${path.relative(repoRoot, resolvedApiProject)} (${dotnetEnvironment})`);
-    const child = spawnManaged(command, args, { cwd: backendCwd, env, label: 'api' });
+    const child = spawnManaged(command, args, {
+        cwd: backendCwd,
+        env,
+        label: 'api',
+        detached: process.platform !== 'win32'
+    });
     await waitForUrl(backendUrl);
     return child;
 }
 
 async function main() {
+    await assertReleaseIsNotRunning();
     if (shouldRun(process.env.PW_CONFIG_BACKEND, true)) {
         await configureLaunchSettings();
     }
@@ -203,7 +289,7 @@ async function main() {
         });
     } finally {
         if (backendProcess) {
-            backendProcess.kill();
+            await stopManagedProcessTree(backendProcess, 'backend');
         }
     }
 }

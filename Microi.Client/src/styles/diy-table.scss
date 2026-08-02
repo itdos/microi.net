@@ -625,9 +625,9 @@
     box-sizing: border-box;
     width: 100%;
     align-items: center;
-    // 操作列宽度包含角标与极端文案的安全余量，按钮从左侧起排，
-    // 避免安全余量全部堆积到第一个按钮前面形成大块空白。
-    justify-content: flex-start;
+    // 操作列固定在表格右侧，按钮组始终靠右对齐；
+    // 列宽由每行真实可见按钮的最大宽度决定，不再用左对齐掩盖过量预留。
+    justify-content: flex-end;
     gap: 6px;
     // 行按钮数字角标会向右上方延伸；在固定操作列内部预留安全区，
     // 避免依赖跨越 el-table fixed 容器的 overflow 行为。

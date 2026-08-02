@@ -105,7 +105,7 @@ PW_HOME_PATH=/#/pages/index/index
 1. 编译后端。
 2. 停止旧的本地 `Microi.net.Api` 进程。
 3. 在 `Microi.Server/Microi.net.Api` 目录用 `dotnet run --launch-profile Microi.net.Api` 重新启动。
-4. 验证 `https://localhost:7266` 已监听并且进程未立即崩溃。
+4. 从 launch profile 回读实际地址（当前标准工作区为 `https://localhost:61501`），验证端口已监听并且进程未立即崩溃。
 
 不要只说“代码已编译”或“需要用户自己重启后端”；除非用户明确要求不要中断当前服务，否则 AI 要主动完成重启。
 
@@ -125,11 +125,11 @@ Playwright 登录助手（直接拿 Token，不走登录页）：
 ```js
 // helpers/microi-login.js
 export async function automationLogin(page, {
-  backend = process.env.BACKEND || 'https://localhost:7266',
+  backend = process.env.BACKEND || 'https://localhost:61501',
   osClient = process.env.MICROI_OSCLIENT || 'iTdos',
   account = process.env.PW_TEST_ACCOUNT || 'admin',
   password = process.env.PW_TEST_PASSWORD || '',
-  frontend = process.env.FRONTEND || 'http://localhost:1988',
+  frontend = process.env.FRONTEND || 'http://localhost:61500',
 } = {}) {
   const resp = await page.request.post(`${backend}/api/SysUser/Login`, {
     headers: { OsClient: osClient },
@@ -197,6 +197,21 @@ export async function automationLogin(page, {
 
 执行自动化测试、截图巡检、接口引擎回读、`/apiengine/{key}` 验收时，如果本地后端或前端不可达，不能把 `fetch failed`、`ECONNREFUSED`、`000 Failed to connect`、端口无人监听当作任务终点。必须先自动启动所需服务，再继续完整验证。
 
+同一工作区有多个 AI 对话时，服务自启动还必须遵守共享生命周期：
+
+- 先检查 `.tmp/microi-process-state/release.lock`。发布锁存在时禁止 Playwright `webServer`、
+  自愈脚本或 AI 重新抢占 `61500/61501`；等待发布结束后重新检查。
+- 端口健康且 PID/命令行属于当前工作区时直接复用，不得每个对话都无条件“先杀再启动”。
+  必须重载源码时才串行重启，并在状态播报中说明旧/新 PID。
+- 本地长期后端使用项目目录中的 `dotnet run --launch-profile Microi.net.Api`，禁止把
+  `bin/Release/net10.0` 或 `bin/Release/publish` 的 DLL 作为长期测试服务，否则会锁住
+  一键发布的 Release 输出。
+- 一次性测试要关闭自己创建的 browser/context 和临时 webServer。VS Code 持有的
+  `playwright test-server` 与用户 Edge/Chrome 不属于孤儿清理；禁止按进程名结束所有
+  `node/dotnet/chrome/msedge`。
+- 只读盘点或精确停止使用 `Microi.Server/tools/Microi.LocalProcessManager.ps1` 的
+  `Status`、`StopBackend`、`StopFrontend`，不能让用户在任务管理器里猜 PID。
+
 默认本地后端：
 
 ```powershell
@@ -211,7 +226,7 @@ Pop-Location
 
 ```powershell
 Push-Location Microi.Client
-npm run dev -- --host 0.0.0.0 --port 1988
+npm run dev -- --host 0.0.0.0 --port 61500
 Pop-Location
 ```
 
@@ -242,8 +257,8 @@ Pop-Location
 常用环境变量：
 
 ```powershell
-$env:FRONTEND='http://localhost:1988'
-$env:BACKEND='https://localhost:7266'
+$env:FRONTEND='http://localhost:61500'
+$env:BACKEND='https://localhost:61501'
 $env:PW_BACKEND_ENV='iTdos'
 $env:PW_ASPNETCORE_ENVIRONMENT='iTdos'
 $env:PW_DOTNET_ENVIRONMENT='iTdos'
@@ -301,7 +316,7 @@ uni-app H5、移动商城、分享海报、首页改版这类任务不能只跑�
 
 ```powershell
 Set-Location '<uniapp-project-root>'      # 替换为项目实际路径
-$env:PW_API_BASE='https://localhost:7266' # 替换为项目后端地址
+$env:PW_API_BASE='https://localhost:61501' # 替换为项目后端地址
 $env:PW_API_ENV='development'
 $env:PW_PORT='5192'                       # 替换为项目实际端口
 npm run build:h5:local
