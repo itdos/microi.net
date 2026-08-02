@@ -122,6 +122,8 @@ async function main(): Promise<void> {
     await client.login();
     const serverContext: McpServerContext = {
       osClient: config.osClient || '',
+      osClientType: config.osClientType || '',
+      osClientNetwork: config.osClientNetwork || '',
       apiBaseUrl: config.apiBaseUrl,
       label: resolveMcpLabel(process.env),
       codexMode: process.env.MICROI_CODEX_MODE === '1',
@@ -204,7 +206,13 @@ async function startSSE(port: number, defaultConfig: MicroiConfig): Promise<void
       });
       await client.login();
 
-      const sseContext: McpServerContext = { osClient: osClient || '', apiBaseUrl: defaultConfig.apiBaseUrl, label: '' };
+      const sseContext: McpServerContext = {
+        osClient: osClient || '',
+        osClientType: defaultConfig.osClientType || '',
+        osClientNetwork: defaultConfig.osClientNetwork || '',
+        apiBaseUrl: defaultConfig.apiBaseUrl,
+        label: '',
+      };
       const server = createMcpServer(client, sseContext);
       const sseTransport = new SSEServerTransport('/messages', res);
 

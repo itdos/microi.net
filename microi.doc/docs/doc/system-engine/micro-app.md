@@ -129,34 +129,54 @@ npm run dev
 ### 本地项目结构
 
 ```text
-Microi-MicroApp/
+Microi-V8-Engine/
   示例服务器 (api.example.com)/
     Demo.Product.Internal/
-      microi-official/
-        .microi-micro-app.json
-        microi.routes.json
-        package.json
-        vite.config.js
-        index.html
-        src/
-          App.vue
-          main.js
-          microi.js
-          utils/
-            microi.v8.js
-          pages/
+      AI应用/
+        microi-official/
+          .microi-micro-app.json
+          microi.routes.json
+          package.json
+          package-lock.json
+          tsconfig.json
+          vite.config.ts
+          index.html
+          src/
+            main.ts
+            App.vue
+            components/
+            pages/
+            composables/
+            domain/
+            services/
+            platform/
+              microi.ts
 ```
 
-目录隔离规则与 `Microi-V8-Engine` 完全一致：第一层为 `{系统名称} ({ApiBase域名})`，第二层为 `{OsClient}.{OsClientType}.{OsClientNetwork}`，第三层才是微服务 `appKey`。因此不同服务器或租户即使存在相同 `appKey`，也不会覆盖同一份本地源码。
+目录隔离规则为 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。因此不同服务器或租户即使存在相同 `appKey`，也不会覆盖同一份本地源码。
 
 同一个租户可以创建多个微服务，例如：
 
 ```text
-Microi-MicroApp/示例服务器 (api.example.com)/Demo.Product.Internal/demo-official
-Microi-MicroApp/示例服务器 (api.example.com)/Demo.Product.Internal/platform-service
+Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应用/demo-official
+Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应用/platform-service
 ```
 
-旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入隔离目录。拉取先从 `sys_microistore` 读取应用主数据，再从 `mci_ai_app_file` 读取私有 HDFS 源码，不是读取 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
+旧版直接平铺在 `Microi-MicroApp/` 下的项目仍会在资源树中以“旧目录”显示，但插件不会擅自移动；所有新建和拉取操作都写入 `Microi-V8-Engine/.../AI应用/{appKey}`。拉取先从 `sys_microistore` 读取应用主数据，再从 `mci_ai_app_file` 读取私有 HDFS 源码，不是读取 `sys_microiservice` 的公有编译产物。离线安装时若未包含源码，微服务仍可运行和预览，但必须回到原开发端或包含源码的服务器拉取。
+
+### AI 应用默认前端架构
+
+新建 Web、MicroService、H5，以及整体升级的存量 AI 应用，默认采用 Vue 3 单文件组件、Composition API、Vite 和 TypeScript。这里的 ESM 是浏览器模块标准，Vue 3 + Vite 本身仍以 ESM 组织源码，二者不是互斥选项。这个选择针对吾码生态：与 `Microi.Client`、Microi.UI 和团队既有 Vue 经验一致，方便升级、维护和二次开发；它不代表其它生态只能使用 Vue。
+
+- 使用 `<script setup lang="ts">`、严格类型检查和提交到源码库的 lockfile；`vite.config.ts` 必须设置 `base: './'`，以兼容 HDFS、CDN 和嵌入式相对路径。
+- 页面与组件放 `components/pages`，生命周期用例放 `composables`，纯业务规则放 `domain`，接口引擎、实时通信和音频适配放 `services`，Token、OsClient 与宿主桥接放 `platform`。
+- 只有多个可分享页面时才引入 Vue Router；只有跨页面或跨组件共享复杂状态时才引入 Pinia。不要为了“看起来主流”无条件增加大型依赖。
+- 页面不得散装拼接 `/apiengine`、Token 或文件地址，应通过统一的 Microi SDK/认证桥和薄服务层调用。生产配置不得写死 localhost、租户或密钥。
+- 默认质量门为 `vue-tsc --noEmit`、单元测试、生产构建、产物敏感信息扫描，以及 PC/移动真实浏览器验收。仅用 Vue 挂载旧 HTML、但仍由命令式 DOM 控制页面，不算完成架构迁移。
+- UniApp 继续使用 Vue 3 + TypeScript 的官方 Vite 工具链并遵守 UniApp 跨端规范；Canvas/WebGL 游戏的高频渲染循环保持独立，Vue 负责登录、大厅、房间、设置、HUD 和结算界面。
+- 正式流式发布采用两阶段协议：先回读并冻结应用的 `CurrentVersion`、`AppVersion`，stage 上传并验签不可变版本资产，finalize 同时提交 `ExpectedCurrentVersion`、`ExpectedAppVersion` 做条件切换。任何一项缺失或远端状态已变化都必须重新盘点，不能用旧任务覆盖新版本。
+
+原生 HTML/JavaScript 仅适用于用户明确要求、目标环境不能构建，或一次性且无状态的极小静态页；交付时必须记录例外原因与后续升级路径。
 
 `.microi-micro-app.json` 是插件识别项目的依据：
 
@@ -537,6 +557,7 @@ AI 应用工作台“发布应用商城”
 - 同一微服务的两个菜单连续切换不会出现 `app name conflict`。
 - 目标分辨率下没有横向溢出、遮挡或右侧内容看不全。
 - 应用商城安装后，使用的是目标租户自己的 HDFS 文件地址。
+- 发布后的 active 文件清单与本地构建完全一致；旧 `dist/` 元数据已可逆归档，Private、非 `dist/` 及其它应用文件未受影响。
 
 ## 常见问题
 

@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.5.4
+ * Version: v1.5.8
  * Function:
- * - 统一使用 sys_microistore 发布应用商城包；按 source/build 角色生成根目录正确的可编译源码 ZIP 与完整真实 dist ZIP；支持微服务仅发布商城而不预先写入 sys_microiservice，并保留可移植安装所需元数据。
+ * - 统一生成应用商城安装包；v3 发布仅在已提交指针证明仍精确匹配时原子写入包字段。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -103,6 +103,16 @@ function getLatestVersion(appId) {
     _OrderByType: 'DESC',
     _PageSize: 1
   });
+}
+function getCommittedVersion(appId, versionId) {
+  var result = V8.FormEngine.GetTableData('mci_ai_app_version', {
+    _Where: [['Id', '=', versionId], ['AND', 'AppId', '=', appId]],
+    _PageIndex: 1,
+    _PageSize: 2
+  });
+  var rows = result && result.Code === 1 ? toArray(result.Data) : [];
+  if (rows.length !== 1) throw new Error('CommittedProof.VersionId 必须精确命中 1 条所属应用版本，actual=' + rows.length);
+  return rows[0];
 }
 function readFileBase64(filePathName, isText, limit) {
   if (isBlank(filePathName)) return '';
@@ -257,6 +267,112 @@ function parseArray(value) {
   }
   return toArray(value);
 }
+function canonicalJson(value) {
+  if (value === null) return 'null';
+  if (value && typeof value.length === 'number' && typeof value !== 'string') {
+    var arrayParts = [];
+    for (var arrayIndex = 0; arrayIndex < value.length; arrayIndex++) {
+      arrayParts.push(canonicalJson(value[arrayIndex]));
+    }
+    return '[' + arrayParts.join(',') + ']';
+  }
+  if (typeof value === 'object') {
+    var objectKeys = Object.keys(value).sort();
+    var objectParts = [];
+    for (var objectIndex = 0; objectIndex < objectKeys.length; objectIndex++) {
+      var objectKey = objectKeys[objectIndex];
+      if (value[objectKey] === undefined || typeof value[objectKey] === 'function') {
+        throw new Error('RouteSnapshot 不能包含 undefined/function：' + objectKey);
+      }
+      objectParts.push(JSON.stringify(objectKey) + ':' + canonicalJson(value[objectKey]));
+    }
+    return '{' + objectParts.join(',') + '}';
+  }
+  if (typeof value === 'number'
+      && (!isFinite(value) || Math.floor(value) !== value || Math.abs(value) > 9007199254740991)) {
+    throw new Error('RouteSnapshot number 只允许 JavaScript safe integer');
+  }
+  var primitive = JSON.stringify(value);
+  if (primitive === undefined) throw new Error('RouteSnapshot 包含非 JSON 值');
+  return primitive;
+}
+function sha256Hex(value) {
+  if (!V8.EncryptHelper || !V8.EncryptHelper.Sha256Hex) throw new Error('V8.EncryptHelper.Sha256Hex 不可用');
+  return text(V8.EncryptHelper.Sha256Hex(text(value))).toLowerCase();
+}
+function readV3RouteSnapshot(routesValue, jsonValue, hashValue) {
+  if (routesValue === undefined || routesValue === null) throw new Error('ProtocolVersion=3 必须显式提供 Routes，无路由时传 []');
+  var routes = parseArray(routesValue);
+  var canonical = canonicalJson(JSON.parse(JSON.stringify(routes)));
+  var suppliedJson = text(jsonValue);
+  var suppliedHash = text(hashValue).toLowerCase();
+  if (suppliedJson !== canonical) throw new Error('RouteSnapshotJson 与 Routes canonical JSON 不一致');
+  var actualHash = sha256Hex(canonical);
+  if (!/^[a-f0-9]{64}$/.test(suppliedHash) || suppliedHash !== actualHash) {
+    throw new Error('RouteSnapshotHash 与 RouteSnapshotJson SHA-256 不一致');
+  }
+  return { Routes: routes, Json: canonical, Hash: actualHash };
+}
+function assertV3MicroServiceSnapshot(runtime, app, committedVersion, proof, routeSnapshot) {
+  if (!runtime || !runtime.Service) throw new Error('v3 MicroService 必须显式提供 MicroService snapshot，禁止回退 live runtime');
+  var service = runtime.Service;
+  var expected = [
+    ['MsKey', text(service.MsKey), text(app.AppKey)],
+    ['ApplicationType', text(service.ApplicationType).toLowerCase(), 'microservice'],
+    ['BuildVersion', text(service.BuildVersion), text(committedVersion.VersionNo)],
+    ['EntryPath', text(service.EntryPath), text(committedVersion.EntryPath)],
+    ['VersionId', text(service.VersionId), proof.VersionId],
+    ['SourceManifestHash', text(service.SourceManifestHash).toLowerCase(), text(committedVersion.SourceManifestHash).toLowerCase()],
+    ['RuntimeManifestHash', text(service.RuntimeManifestHash).toLowerCase(), proof.RuntimeManifestHash],
+    ['DeliveryBatchId', text(service.DeliveryBatchId), text(committedVersion.DeliveryBatchId)],
+    ['RequestId', text(service.RequestId), proof.RequestId],
+    ['RequestFingerprint', text(service.RequestFingerprint).toLowerCase(), proof.RequestFingerprint],
+    ['RouteSnapshotJson', text(service.RouteSnapshotJson), routeSnapshot.Json],
+    ['RouteSnapshotHash', text(service.RouteSnapshotHash).toLowerCase(), routeSnapshot.Hash],
+    ['RouteCount', text(service.RouteCount), text(routeSnapshot.Routes.length)]
+  ];
+  for (var expectedIndex = 0; expectedIndex < expected.length; expectedIndex++) {
+    if (expected[expectedIndex][1] !== expected[expectedIndex][2]) {
+      throw new Error('v3 MicroService snapshot.' + expected[expectedIndex][0] + ' 与 committed version 不一致');
+    }
+  }
+}
+function normalizeMenuContract(value, menuIds, exactMenuIds) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'string') {
+    try { value = JSON.parse(value); }
+    catch (error) { throw new Error('MenuContract 不是有效JSON：' + error.message); }
+  }
+  if (!value || typeof value !== 'object') throw new Error('MenuContract 必须是对象');
+  if (!exactMenuIds) throw new Error('MenuContract 只能与 ExactMenuIds=true 一起使用');
+  var expectedIds = selectionValues(menuIds, ['Id', 'MenuId', 'Value']);
+  var contractIds = selectionValues(value.MenuIds, ['Id', 'MenuId', 'Value']);
+  var contractMenus = toArray(value.Menus);
+  var menuRowIds = selectionValues(contractMenus, ['Id', 'MenuId', 'Value']);
+  var expectedMap = {};
+  var contractMap = {};
+  var menuRowMap = {};
+  for (var i = 0; i < expectedIds.length; i++) expectedMap[text(expectedIds[i]).toLowerCase()] = true;
+  for (var c = 0; c < contractIds.length; c++) contractMap[text(contractIds[c]).toLowerCase()] = true;
+  for (var m = 0; m < menuRowIds.length; m++) menuRowMap[text(menuRowIds[m]).toLowerCase()] = true;
+  if (expectedIds.length === 0
+      || contractIds.length !== expectedIds.length
+      || menuRowIds.length !== expectedIds.length
+      || parseInt(value.Count || 0, 10) !== expectedIds.length) {
+    throw new Error('MenuContract 数量与精确 MenuIds 不一致');
+  }
+  for (var e = 0; e < expectedIds.length; e++) {
+    var expectedKey = text(expectedIds[e]).toLowerCase();
+    if (!contractMap[expectedKey] || !menuRowMap[expectedKey]) {
+      throw new Error('MenuContract 菜单集合与精确 MenuIds 不一致：' + expectedIds[e]);
+    }
+  }
+  return value;
+}
+function selectionJson(value) {
+  if (value === null || value === undefined) return '';
+  return typeof value === 'string' ? value : JSON.stringify(value);
+}
 /* REUSE_FRESH_PREPARED_ASSETS_V1
  * 大型应用重新逐文件下载、压缩、上传 ZIP 可能耗时数分钟。仅当既有 ZIP
  * 晚于最近一次成功构建时复用，避免同步发布超过反向代理超时。
@@ -354,6 +470,63 @@ function upsertStore(row) {
   return V8.FormEngine.AddFormData('sys_microistore', row);
 }
 
+/* 解析 v3 finalize 回执中的提交证明；bigint 必须保持十进制字符串。 */
+function readV3CommittedProof(value) {
+  if (!value || typeof value !== 'object') throw new Error('ProtocolVersion=3 必须提供 CommittedProof');
+  var proof = {
+    VersionId: text(value.VersionId),
+    RuntimeManifestHash: text(value.RuntimeManifestHash || value.CommittedRuntimeManifestHash).toLowerCase(),
+    PublishFence: text(value.PublishFence),
+    PublishRowVersion: text(value.PublishRowVersion),
+    VersionRowVersion: text(value.VersionRowVersion),
+    PublishState: text(value.PublishState),
+    StableResolverPath: text(value.StableResolverPath),
+    RequestId: text(value.RequestId),
+    RequestFingerprint: text(value.RequestFingerprint).toLowerCase()
+  };
+  if (isBlank(proof.VersionId)) throw new Error('CommittedProof.VersionId 不能为空');
+  if (!/^[a-f0-9]{64}$/.test(proof.RuntimeManifestHash)) throw new Error('CommittedProof.RuntimeManifestHash 不合法');
+  if (!/^(0|[1-9]\d*)$/.test(proof.PublishFence)) throw new Error('CommittedProof.PublishFence 必须是规范十进制字符串');
+  if (!/^(0|[1-9]\d*)$/.test(proof.PublishRowVersion)) throw new Error('CommittedProof.PublishRowVersion 必须是规范十进制字符串');
+  if (!/^[1-9]\d*$/.test(proof.VersionRowVersion)) throw new Error('CommittedProof.VersionRowVersion 必须是正十进制字符串');
+  if (proof.PublishState !== 'Completed') throw new Error('CommittedProof.PublishState 必须是 Completed');
+  if (isBlank(proof.StableResolverPath) || proof.StableResolverPath.indexOf('/micro-app/v3/tenants/') < 0) {
+    throw new Error('CommittedProof.StableResolverPath 不是 v3 stable resolver');
+  }
+  if (isBlank(proof.RequestId) || !/^[a-f0-9]{64}$/.test(proof.RequestFingerprint)) {
+    throw new Error('CommittedProof 缺少 RequestId/RequestFingerprint');
+  }
+  return proof;
+}
+
+/* 在写包前后精确验证当前 store pointer；任何后续 release 前滚都会使 CAS 失败。 */
+function assertV3CommittedStore(row, proof, label) {
+  if (!row) throw new Error(label + ' sys_microistore 不存在');
+  if (text(row.CommittedPublishVersionId) !== proof.VersionId
+      || text(row.CommittedRuntimeManifestHash).toLowerCase() !== proof.RuntimeManifestHash
+      || text(row.PublishFence) !== proof.PublishFence
+      || text(row.PublishRowVersion) !== proof.PublishRowVersion
+      || text(row.PublishState) !== 'Completed') {
+    throw new Error(label + ' committed pointer 已漂移，禁止写入旧版本安装包');
+  }
+  if (text(row.PublicPublishPath) !== proof.StableResolverPath) {
+    throw new Error(label + ' PublicPublishPath 与 stable resolver 不一致');
+  }
+}
+
+/* 版本行证明同时绑定版本 Id、manifest、rowversion、请求指纹与完成态。 */
+function assertV3CommittedVersion(row, proof, label) {
+  if (!row
+      || text(row.Id) !== proof.VersionId
+      || text(row.RuntimeManifestHash).toLowerCase() !== proof.RuntimeManifestHash
+      || text(row.RowVersion) !== proof.VersionRowVersion
+      || text(row.PublishState || row.Status) !== 'Completed'
+      || text(row.RequestId) !== proof.RequestId
+      || text(row.RequestFingerprint).toLowerCase() !== proof.RequestFingerprint) {
+    throw new Error(label + ' mci_ai_app_version 提交证明不一致');
+  }
+}
+
 var currentUser = V8.CurrentUser || {};
 // V8.ApiEngine.Run 嵌套调用时 V8.CurrentUser 可能未随子引擎上下文复制，
 // 但当前 HTTP 请求的 Token 仍由服务器持有。只从服务端 Token 上下文恢复身份，
@@ -372,12 +545,22 @@ if (!appResult || appResult.Code !== 1 || !appResult.Data) return { Code: 2, Dat
 var app = appResult.Data;
 var appType = text(app.ApplicationType || app.AppType, 'Web');
 if (['Web', 'UniApp', 'MicroService'].indexOf(appType) < 0) return fail('不支持的应用类型：' + appType);
+var action = text(V8.Param.Action || 'Package');
+var protocolVersionText = text(V8.Param.ProtocolVersion);
+if (!isBlank(protocolVersionText) && protocolVersionText !== '3') return fail('ProtocolVersion 只支持显式 v3 或省略');
+var protocolV3 = protocolVersionText === '3';
+if (protocolV3 && action !== 'Publish') return fail('ProtocolVersion=3 只允许 Action=Publish');
 var versionsResult = getLatestVersion(app.Id);
 var latestVersion = versionsResult && versionsResult.Code === 1 && versionsResult.Data && versionsResult.Data.length ? versionsResult.Data[0] : null;
-var runtime = appType === 'MicroService' ? getMicroService(app.AppKey) : { Service: null, Pages: [] };
+var explicitRoutesSupplied = V8.Param.Routes !== undefined && V8.Param.Routes !== null;
+var runtime = appType === 'MicroService'
+  ? (protocolV3
+      ? { Service: V8.Param.MicroService || null, Pages: explicitRoutesSupplied ? parseArray(V8.Param.Routes) : null }
+      : getMicroService(app.AppKey))
+  : { Service: null, Pages: [] };
 // 商城发布与官方库运行态安装必须解耦。本地开发者可以直接提交构建 ZIP、
 // 微服务元数据和路由，而不必先向发布库写入 sys_microiservice。
-if (appType === 'MicroService' && (!runtime || !runtime.Service) && V8.Param.MicroService) {
+if (!protocolV3 && appType === 'MicroService' && (!runtime || !runtime.Service) && V8.Param.MicroService) {
   runtime = {
     Service: V8.Param.MicroService,
     Pages: parseArray(V8.Param.Routes || V8.Param.Pages)
@@ -385,7 +568,27 @@ if (appType === 'MicroService' && (!runtime || !runtime.Service) && V8.Param.Mic
 }
 var includeSource = V8.Param.IncludeSource === true || V8.Param.IncludeSource === 1 || text(V8.Param.IncludeSource).toLowerCase() === 'true';
 var returnPackageModel = V8.Param.ReturnPackageModel === true || V8.Param.ReturnPackageModel === 1 || text(V8.Param.ReturnPackageModel).toLowerCase() === 'true';
-var action = text(V8.Param.Action || 'Package');
+var committedProof = null;
+var committedVersion = null;
+var v3RouteSnapshot = null;
+if (protocolV3) {
+  try { committedProof = readV3CommittedProof(V8.Param.CommittedProof); }
+  catch (proofError) { return fail(proofError.message); }
+  try {
+    assertV3CommittedStore(app, committedProof, '写包前');
+    committedVersion = getCommittedVersion(app.Id, committedProof.VersionId);
+    assertV3CommittedVersion(committedVersion, committedProof, '写包前');
+    v3RouteSnapshot = readV3RouteSnapshot(V8.Param.Routes, V8.Param.RouteSnapshotJson, V8.Param.RouteSnapshotHash);
+    if (text(committedVersion.RouteSnapshotJson) !== v3RouteSnapshot.Json
+        || text(committedVersion.RouteSnapshotHash).toLowerCase() !== v3RouteSnapshot.Hash) {
+      throw new Error('写包前 mci_ai_app_version route snapshot 与显式冻结请求不一致');
+    }
+    if (isBlank(committedVersion.EntryPath)) throw new Error('写包前 committedVersion.EntryPath 不能为空');
+    if (appType === 'MicroService') {
+      assertV3MicroServiceSnapshot(runtime, app, committedVersion, committedProof, v3RouteSnapshot);
+    }
+  } catch (proofReadError) { return fail(proofReadError.message); }
+}
 var existingStore = getExistingStore(app.AppKey);
 // 应用商城“开始制作”历史上调用 PackageOnly，随后再下载 AppPakcet。
 // 这个动作同样必须生成完全自包含的离线 JSON，不能只保存发布端 ZIP 地址。
@@ -402,6 +605,7 @@ for (var preparedIndex = 0; preparedIndex < preparedList.length; preparedIndex++
 if (!packageAssets && V8.Param.PreparedAssets && !Array.isArray(V8.Param.PreparedAssets) && typeof V8.Param.PreparedAssets === 'object') {
   packageAssets = V8.Param.PreparedAssets;
 }
+if (protocolV3 && !packageAssets) return fail('ProtocolVersion=3 必须显式提供 finalize 前准备的不可变 PreparedAssets');
 var forcePrepareAssets = V8.Param.ForcePrepareAssets === true
   || V8.Param.ForcePrepareAssets === 1
   || text(V8.Param.ForcePrepareAssets).toLowerCase() === 'true';
@@ -429,22 +633,55 @@ var buildAssets = [];
 var infrastructure = getApplicationInfrastructure();
 // 微服务以真实运行态 BuildVersion 为准；其它应用比较最近构建版本与商城
 // 语义版本，既不接受旧调用参数降级，也不把 v3.0.0 降成构建流水号 v1.0.4。
-var versionNo = appType === 'MicroService' && runtime.Service && !isBlank(runtime.Service.BuildVersion)
-  ? normalizeVersion(runtime.Service.BuildVersion)
-  : highestVersion([
-      latestVersion ? latestVersion.VersionNo : '',
-      V8.Param.AppVersion,
-      existingStore ? existingStore.AppVersion : '',
-      app.AppVersion
-    ]);
-var entryPath = text((runtime.Service && runtime.Service.EntryPath) || 'index.html');
+// 发布编排器在“不可变版本已经 Published、仅安装包阶段中断”时可显式复用
+// 该最高不可变版本。门禁同时要求 PreparedAssets.PackageVersion 和最新
+// Published 版本一致，因此不能借此回退到旧资产或覆盖更高的不可变版本。
+var exactPublishedVersion = protocolV3
+  || V8.Param.ExactPublishedVersion === true
+  || V8.Param.ExactPublishedVersion === 1
+  || text(V8.Param.ExactPublishedVersion).toLowerCase() === 'true';
+var requestedPublishedVersion = normalizeVersion(V8.Param.AppVersion || '');
+if (exactPublishedVersion) {
+  var exactVersionRow = protocolV3 ? committedVersion : latestVersion;
+  var latestPublishedVersion = exactVersionRow ? normalizeVersion(exactVersionRow.VersionNo || exactVersionRow.VersionName || '') : '';
+  var preparedPublishedVersion = packageAssets ? normalizeVersion(packageAssets.PackageVersion || '') : '';
+  var latestRequiredState = protocolV3 ? 'completed' : 'published';
+  if (!exactVersionRow || text(exactVersionRow.PublishState || exactVersionRow.Status).toLowerCase() !== latestRequiredState) {
+    return fail('ExactPublishedVersion=true 时最新不可变版本必须为 ' + (protocolV3 ? 'Completed' : 'Published'));
+  }
+  if (isBlank(requestedPublishedVersion)
+      || requestedPublishedVersion !== latestPublishedVersion
+      || requestedPublishedVersion !== preparedPublishedVersion) {
+    return fail('ExactPublishedVersion 版本合同不一致：requested=' + requestedPublishedVersion
+      + ' latest=' + latestPublishedVersion + ' prepared=' + preparedPublishedVersion);
+  }
+}
+var versionNo = exactPublishedVersion
+  ? requestedPublishedVersion
+  : (appType === 'MicroService' && runtime.Service && !isBlank(runtime.Service.BuildVersion)
+      ? normalizeVersion(runtime.Service.BuildVersion)
+      : highestVersion([
+          latestVersion ? latestVersion.VersionNo : '',
+          V8.Param.AppVersion,
+          existingStore ? existingStore.AppVersion : '',
+          app.AppVersion
+        ]));
+var entryPath = protocolV3
+  ? text(committedVersion.EntryPath)
+  : text((runtime.Service && runtime.Service.EntryPath) || 'index.html');
 var dataSelections = parseArray(V8.Param.DataSelections || V8.Param.DataSets);
 var menuIds = parseArray(V8.Param.MenuIds);
+var exactMenuIds = V8.Param.ExactMenuIds === true
+  || V8.Param.ExactMenuIds === 1
+  || text(V8.Param.ExactMenuIds).toLowerCase() === 'true';
 var tableIds = parseArray(V8.Param.TableIds);
 var flowIds = parseArray(V8.Param.FlowIds);
 var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
   dataSelections = parseArray(existingStore.SelectData);
+}
+if (menuIds.length === 0 && existingStore && existingStore.SelectMenu) {
+  menuIds = selectionValues(existingStore.SelectMenu, ['Id', 'MenuId', 'Value']);
 }
 if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
   tableIds = selectionValues(existingStore.SelectTable, ['Id', 'TableId', 'Value']);
@@ -452,6 +689,15 @@ if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
 if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
   apiEngineKeys = selectionValues(existingStore.SelectApiEngine, ['ApiEngineKey', 'Key', 'Value']);
 }
+var menuContract = normalizeMenuContract(
+  V8.Param.MenuContract || (packageAssets && packageAssets.MenuContract),
+  menuIds,
+  exactMenuIds
+);
+if (exactMenuIds && menuIds.length > 0 && !menuContract) {
+  return fail('ExactMenuIds=true 时必须提供与菜单集合一致的 MenuContract');
+}
+if (menuContract && packageAssets) packageAssets.MenuContract = menuContract;
 
 var selectedExport = {
   DDLStatements: [],
@@ -463,6 +709,7 @@ var selectedExport = {
 if (dataSelections.length > 0 || menuIds.length > 0 || tableIds.length > 0 || flowIds.length > 0 || apiEngineKeys.length > 0) {
   var selectedExportResult = V8.ApiEngine.Run('export-microi-store-package', {
     MenuIds: menuIds,
+    ExactMenuIds: exactMenuIds,
     FlowIds: flowIds,
     ApiEngineKeys: apiEngineKeys,
     TableIds: tableIds,
@@ -621,12 +868,87 @@ if (action === 'Publish') {
     AppPublishTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppUpdateTime: nowText('yyyy-MM-dd HH:mm:ss'),
     AppPakcet: JSON.stringify(packageModel),
+    SelectMenu: V8.Param.SelectMenu !== undefined && V8.Param.SelectMenu !== null
+      ? selectionJson(V8.Param.SelectMenu)
+      : selectionJson(existingStore && existingStore.SelectMenu),
     SelectTable: existingStore && existingStore.SelectTable ? existingStore.SelectTable : '',
     SelectApiEngine: existingStore && existingStore.SelectApiEngine ? existingStore.SelectApiEngine : '',
     SelectAiApp: JSON.stringify([{ AppId: app.Id, AppKey: app.AppKey, AppName: app.Name, ApplicationType: appType, IncludeSource: !!packageAssets.SourceZip }]),
     AiAppZipFiles: JSON.stringify([packageAssets.BuildZip].concat(packageAssets.SourceZip ? [packageAssets.SourceZip] : [])),
     AiAppPackageManifest: JSON.stringify([packageAssets])
   };
+  if (protocolV3) {
+    // Core 已经提交并投影运行态字段；这里禁止普通 Upt/Add，只在同一
+    // committed pointer 上以单条条件更新写商城包与展示元数据。
+    var packageFields = {
+      AppName: storeRow.AppName,
+      Name: storeRow.Name,
+      AppId: storeRow.AppId,
+      AppKey: storeRow.AppKey,
+      AppType: storeRow.AppType,
+      ApplicationType: storeRow.ApplicationType,
+      Category: storeRow.Category,
+      PublisherType: storeRow.PublisherType,
+      AppAuthor: storeRow.AppAuthor,
+      OwnerUserId: storeRow.OwnerUserId,
+      OwnerName: storeRow.OwnerName,
+      AppDetail: storeRow.AppDetail,
+      Description: storeRow.Description,
+      AppPrice: storeRow.AppPrice,
+      AppOriPrice: storeRow.AppOriPrice,
+      AppRate: storeRow.AppRate,
+      AppPreview: storeRow.AppPreview,
+      IsApprove: storeRow.IsApprove,
+      AppUpdateTime: storeRow.AppUpdateTime,
+      AppPakcet: storeRow.AppPakcet,
+      SelectMenu: storeRow.SelectMenu,
+      SelectTable: storeRow.SelectTable,
+      SelectApiEngine: storeRow.SelectApiEngine,
+      SelectAiApp: storeRow.SelectAiApp,
+      AiAppZipFiles: storeRow.AiAppZipFiles,
+      AiAppPackageManifest: storeRow.AiAppPackageManifest,
+      _Where: [
+        ['Id', '=', app.Id],
+        ['AND', 'CommittedPublishVersionId', '=', committedProof.VersionId],
+        ['AND', 'CommittedRuntimeManifestHash', '=', committedProof.RuntimeManifestHash],
+        ['AND', 'PublishFence', '=', committedProof.PublishFence],
+        ['AND', 'PublishRowVersion', '=', committedProof.PublishRowVersion],
+        ['AND', 'PublishState', '=', 'Completed']
+      ]
+    };
+    var fencedPublishResult = V8.FormEngine.UptFormDataByWhere('sys_microistore', packageFields);
+    if (!fencedPublishResult || fencedPublishResult.Code !== 1) {
+      return fencedPublishResult || fail('v3 committed-proof CAS 写包失败');
+    }
+    var postPublishResult = getApp(app.Id);
+    var postPublishStore = postPublishResult && postPublishResult.Code === 1 ? postPublishResult.Data : null;
+    try { assertV3CommittedStore(postPublishStore, committedProof, '写包后'); }
+    catch (postProofError) { return fail(postProofError.message); }
+    try {
+      var postCommittedVersion = getCommittedVersion(app.Id, committedProof.VersionId);
+      assertV3CommittedVersion(postCommittedVersion, committedProof, '写包后');
+      if (text(postCommittedVersion.RouteSnapshotJson) !== v3RouteSnapshot.Json
+          || text(postCommittedVersion.RouteSnapshotHash).toLowerCase() !== v3RouteSnapshot.Hash) {
+        throw new Error('写包后 mci_ai_app_version route snapshot 已漂移');
+      }
+    } catch (postVersionProofError) { return fail(postVersionProofError.message); }
+    if (!postPublishStore
+        || text(postPublishStore.AppPakcet) !== text(packageFields.AppPakcet)
+        || text(postPublishStore.AiAppPackageManifest) !== text(packageFields.AiAppPackageManifest)
+        || text(postPublishStore.AiAppZipFiles) !== text(packageFields.AiAppZipFiles)) {
+      return fail('v3 committed-proof CAS 写包回读不一致');
+    }
+    return ok({
+      Store: postPublishStore,
+      Package: packageModel,
+      PreparedAssetsReused: false,
+      PreparedTime: packageAssets.PreparedTime || '',
+      AppVersion: text(postPublishStore.AppVersion),
+      CurrentVersion: postPublishStore.CurrentVersion,
+      CommittedProof: committedProof,
+      FencedCas: true
+    }, '应用安装包已绑定到当前 committed pointer');
+  }
   var publishResult = upsertStore(storeRow);
   if (!publishResult || publishResult.Code !== 1) return publishResult || fail('发布到应用商城失败');
   return ok({

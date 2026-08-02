@@ -226,16 +226,31 @@ export async function mergeJavascriptResource(name, baseContent, localContent, r
       writeFile(basePath, base, 'utf8'),
       writeFile(remotePath, remote, 'utf8'),
     ]);
-    const merge = spawnSync(
-      'git',
-      ['merge-file', '-p', localPath, basePath, remotePath],
-      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-    );
-    if (merge.status === 0) return canonicalizeResource(name, merge.stdout);
-    if (merge.status === 1) {
-      throw new Error(`${name} 存在 JS 三方合并冲突，请先人工合并后重新发布：\n${merge.stdout}`);
+    let firstConflict = '';
+    let lastToolError = '';
+    // 不同 Git diff 算法对长 V8 文件中的相邻函数/语句有不同的锚点选择。
+    // 任一算法得到无冲突结果即可接受；真正同一代码位置的不同实现会在所有
+    // 算法下继续失败关闭。
+    for (const algorithm of [null, 'histogram', 'patience', 'minimal']) {
+      const args = ['merge-file', '-p'];
+      if (algorithm) args.push('--diff-algorithm', algorithm);
+      args.push(localPath, basePath, remotePath);
+      const merge = spawnSync(
+        'git',
+        args,
+        { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+      );
+      if (merge.status === 0) return canonicalizeResource(name, merge.stdout);
+      if (merge.status === 1) {
+        firstConflict ||= merge.stdout;
+        continue;
+      }
+      lastToolError = merge.stderr || `退出码 ${merge.status}`;
     }
-    throw new Error(`${name} 执行 git merge-file 失败：${merge.stderr || `退出码 ${merge.status}`}`);
+    if (firstConflict) {
+      throw new Error(`${name} 存在 JS 三方合并冲突，请先人工合并后重新发布：\n${firstConflict}`);
+    }
+    throw new Error(`${name} 执行 git merge-file 失败：${lastToolError || '未知错误'}`);
   } finally {
     await rm(tempDirectory, { recursive: true, force: true });
   }

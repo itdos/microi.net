@@ -9,6 +9,7 @@ export declare const API: {
     readonly CREATE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Create";
     readonly REVOKE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Revoke";
     readonly GET_STATUS: "/api/V8Engine/GetStatus";
+    readonly TRANSITION_APPLICATION_STREAM_GATE: "/api/V8Engine/TransitionApplicationStreamGate";
     readonly REDIS_STATISTICS: "/api/Cache/redis/statistics";
     readonly REDIS_KEYS: "/api/Cache/redis/keys";
     readonly REDIS_KEY: "/api/Cache/redis/key";

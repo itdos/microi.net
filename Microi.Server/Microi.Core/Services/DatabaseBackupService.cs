@@ -607,51 +607,22 @@ ORDER BY ORDINAL_POSITION;";
                 : new HashSet<string>(
                     selectedOsClients.Where(item => !string.IsNullOrWhiteSpace(item)),
                     StringComparer.OrdinalIgnoreCase);
-            var runtimeType = OsClientDefault.OsClientType ?? "";
-            var runtimeNetwork = OsClientDefault.OsClientNetwork ?? "";
             var result = new Dictionary<string, TenantDatabase>(StringComparer.OrdinalIgnoreCase);
-            foreach (var pair in OsClientExtend.ClientList.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+            foreach (var tenant in DatabaseBackupControlService.SnapshotEligibleTenantConnections())
             {
-                var client = pair.Value;
-                var model = client?.OsClientModel;
-                if (model == null || IsFalse(model["IsEnable"]) || IsTrue(model["IsDeleted"])) continue;
-                if (requested != null && !requested.Contains(pair.Key)) continue;
-                if (!string.Equals(model["OsClientType"]?.ToString() ?? "", runtimeType, StringComparison.OrdinalIgnoreCase)
-                    || !string.Equals(model["OsClientNetwork"]?.ToString() ?? "", runtimeNetwork, StringComparison.OrdinalIgnoreCase))
-                {
-                    AppendLog($"跳过租户 {pair.Key}：不属于当前后端运行环境三元组。", null, null, false);
-                    continue;
-                }
-                var dbType = model["DbType"]?.ToString();
-                if (!string.Equals(dbType, "MySql", StringComparison.OrdinalIgnoreCase))
-                {
-                    AppendLog($"跳过非 MySQL 租户 {pair.Key}（DbType={dbType ?? "未配置"}）；当前备份引擎仅支持 MySQL。", null, null, false);
-                    continue;
-                }
-                var connectionString = model["DbReadConn"]?.ToString();
-                if (string.IsNullOrWhiteSpace(connectionString)) connectionString = model["DbConn"]?.ToString();
-                if (string.IsNullOrWhiteSpace(connectionString)
-                    && string.Equals(pair.Key, OsClientDefault.OsClient, StringComparison.OrdinalIgnoreCase))
-                    connectionString = OsClientDefault.OsClientDbConn;
-                if (string.IsNullOrWhiteSpace(connectionString))
-                {
-                    AppendLog($"跳过租户 {pair.Key}：未配置数据库连接。", null, null, false);
-                    continue;
-                }
+                if (requested != null && !requested.Contains(tenant.OsClient)) continue;
                 try
                 {
-                    var builder = new MySqlConnectionStringBuilder(
-                        ConnectionStringCompatibility.Normalize(
-                            DatabaseType.MySql, connectionString, 100, 120, 600));
+                    var builder = new MySqlConnectionStringBuilder(tenant.ConnectionString);
                     if (string.IsNullOrWhiteSpace(builder.Database))
                     {
-                        AppendLog($"跳过租户 {pair.Key}：连接未指定数据库名。", null, null, false);
+                        AppendLog($"跳过租户 {tenant.OsClient}：连接未指定数据库名。", null, null, false);
                         continue;
                     }
                     var key = $"{builder.Server}:{builder.Port}/{builder.Database}";
                     if (result.TryGetValue(key, out var existing))
                     {
-                        existing.OsClients.Add(pair.Key);
+                        existing.OsClients.Add(tenant.OsClient);
                     }
                     else
                     {
@@ -659,13 +630,13 @@ ORDER BY ORDINAL_POSITION;";
                         {
                             Database = builder.Database,
                             ConnectionString = builder.ConnectionString,
-                            OsClients = new List<string> { pair.Key }
+                            OsClients = new List<string> { tenant.OsClient }
                         };
                     }
                 }
                 catch (Exception ex)
                 {
-                    AppendLog($"跳过租户 {pair.Key}：数据库连接配置无效（{SafeError(ex)}）。", null, null, false);
+                    AppendLog($"跳过租户 {tenant.OsClient}：数据库连接配置无效（{SafeError(ex)}）。", null, null, false);
                 }
             }
             return result.Values.OrderBy(item => item.Database, StringComparer.OrdinalIgnoreCase).ToList();

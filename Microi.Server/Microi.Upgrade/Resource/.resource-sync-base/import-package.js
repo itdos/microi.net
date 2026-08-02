@@ -2159,15 +2159,26 @@ try {
         }
 
         var requiredIndexes = [
-            { Name: 'ux_mci_background_task_idempotency', Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'IdempotencyKey'], Unique: true },
-            { Name: 'ix_mci_background_task_claim', Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
+            { Name: 'ux_mci_bg_task_runtime_idem', Aliases: ['ux_mci_background_task_idempotency'], Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'IdempotencyKey'], Unique: true },
+            { Name: 'ix_mci_bg_task_runtime_claim', Aliases: ['ix_mci_background_task_claim'], Columns: ['OsClient', 'RuntimeOsClientType', 'RuntimeOsClientNetwork', 'Status', 'NextRunTime', 'LeaseExpiresAt', 'CreateTime'], Unique: false },
             { Name: 'ix_mci_background_task_user', Columns: ['OsClient', 'UserKey', 'IsDeleted', 'CreateTime'], Unique: false },
             { Name: 'ix_mci_background_task_concurrency', Columns: ['OsClient', 'ConcurrencyKey', 'Status', 'LeaseExpiresAt'], Unique: false }
         ];
         var invalidIndexes = [];
         for (var requiredIndexIndex = 0; requiredIndexIndex < requiredIndexes.length; requiredIndexIndex++) {
             var requiredIndex = requiredIndexes[requiredIndexIndex];
-            var actualIndex = actualIndexes[requiredIndex.Name.toLowerCase()];
+            var candidateNames = [requiredIndex.Name].concat(requiredIndex.Aliases || []);
+            var actualIndex = null;
+            for (var candidateNameIndex = 0; candidateNameIndex < candidateNames.length; candidateNameIndex++) {
+                var candidateIndex = actualIndexes[String(candidateNames[candidateNameIndex]).toLowerCase()];
+                if (!candidateIndex) continue;
+                var candidateColumns = candidateIndex.Columns.join(',').toLowerCase();
+                if (candidateColumns == requiredIndex.Columns.join(',').toLowerCase()
+                    && candidateIndex.Unique == requiredIndex.Unique) {
+                    actualIndex = candidateIndex;
+                    break;
+                }
+            }
             var actualColumns = actualIndex ? actualIndex.Columns.join(',').toLowerCase() : '';
             var requiredColumnText = requiredIndex.Columns.join(',').toLowerCase();
             if (!actualIndex || actualColumns != requiredColumnText || actualIndex.Unique != requiredIndex.Unique) {

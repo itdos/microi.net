@@ -16,8 +16,8 @@
 
 - 只有官网修改：自动合并到本地。
 - 只有本地修改：使用 `--publish` 写回官网。
-- 两端修改不同 JSON 节点或不同 JS 代码行：合并后同时保留。
-- 同一节点或代码行被改成不同内容：报告冲突并终止，不覆盖任意一端。
+- 两端修改不同 JSON 节点或不同 JS 可执行代码：合并后同时保留。V8 文件头的说明和 `Version` 作为发布元数据单独处理，不会再因两端正常独立升版而制造代码冲突；合成出第三份新正文时自动在两端最高版本上再升一版。
+- 同一 JSON 节点或同一段 JS 可执行逻辑被改成不同内容：报告真实冲突并终止，不覆盖任意一端。JS 正文会依次尝试 Git 默认、histogram、patience、minimal 锚点算法，只有全部无法安全合并才要求人工处理。
 - 发布官网时携带读取时的 SHA-256；若发布期间官网又被更新，服务端拒绝覆盖。发布完成后必须逐项回读一致，才推进共同基线。
 - 任一 JSON 应用包内容需要写回官网时，`PackageInfo.Version` 必须高于官网当前 `AppVersion`；服务端写入后会在同一事务内回读校验包内容哈希和商城版本，避免包内版本落后于商城元数据。
 
@@ -35,7 +35,7 @@ node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish
 Remove-Item Env:MICROI_UPGRADE_RESOURCE_TOKEN
 ```
 
-本地执行一键发布时，如果没有设置该环境变量，同步器会安全复用工作区中已配置并登录的 `microi_itdos` MCP。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，通过同一个官方接口引擎执行 `PublishBatch`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
+本地执行一键发布时，同步器默认安全复用工作区中已配置并登录的 `microi_itdos` MCP，通过同一个官方接口引擎完成六项资源读取、三方合并、`PublishBatch` 和发布后回读；不会出现“HTTP 读一份、MCP 写另一份”的事实源分叉。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`。CI 没有 MCP 配置但注入了 `MICROI_UPGRADE_RESOURCE_TOKEN` 时，`auto` 模式才回退到官网 HTTP；也可用 `MICROI_UPGRADE_RESOURCE_TRANSPORT=mcp|http|auto` 显式固定传输方式。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
 
 `Microi一键编译发布.sh` 的后端编译/发布模式会在 `dotnet build` 前自动执行同一条 `--publish` 命令。因此，本地资源或官网资源任一侧更新后，下一次后端发布都会先完成合并、官网写回（如有）、回读和基线更新；冲突、令牌缺失、并发哈希变化或回读不一致都会阻止后端发布。
 
@@ -60,7 +60,7 @@ https://api.itdos.com/apiengine/get-microi-upgrade-resource?OsClient=iTdos&Name=
 node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --initialize-base
 ```
 
-该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器、构建器与三个独立 JS 文件保持一致，不会访问或修改官网。正式同步会把这些独立源码和商城包内嵌代码视为同一组逻辑副本：说明文字、换行或不同代码段的修改可自动合并，只有同一代码位置被改成不同实现时才阻止发布。`ai-app-build.js` 仍是随服务器发布的本地事实源，不扩入官网六项资源白名单。
+该命令不会覆盖任何资源；任一项不一致都会拒绝建立基线。`--synchronize-local` 仅用于让 `app.microi.store.json` 内嵌的导入器、发布器、构建器与三个独立 JS 文件保持一致，不会访问或修改官网。正式同步会把这些独立源码和商城包内嵌代码视为同一组逻辑副本：说明文字、换行、独立升版或不同可执行代码段的修改可自动合并，只有同一段可执行逻辑被改成不同实现时才阻止发布。`ai-app-build.js` 仍是随服务器发布的本地事实源，不扩入官网六项资源白名单。
 
 刷新后必须构建 `Microi.Upgrade`，确认五个运行期升级资源及随服务器发布的 `ai-app-build.js` 均已作为 `EmbeddedResource` 写入程序集；`official-resource-api.js` 是仅供维护发布链路同步官网接口的源码，不写入运行程序集。发布包运行时不依赖这些源码文件存在。
 

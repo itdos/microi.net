@@ -37,6 +37,16 @@ const FORBIDDEN_APPLICATION_ASSET_FILES = [
     /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
     /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
 ];
+const APPLICATION_ASSET_MAX_FILE_BYTES = 128 * 1024 * 1024;
+const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
+export function validateLocalApplicationAssetSize(relativePath, fileSize, nextTotalSize, maxTotalBytes = APPLICATION_MANIFEST_MAX_TOTAL_BYTES) {
+    if (fileSize > APPLICATION_ASSET_MAX_FILE_BYTES) {
+        throw new Error(`发布单文件超过硬上限 ${APPLICATION_ASSET_MAX_FILE_BYTES} bytes：${relativePath}；已在上传前中止。`);
+    }
+    if (nextTotalSize > Math.min(maxTotalBytes, APPLICATION_MANIFEST_MAX_TOTAL_BYTES)) {
+        throw new Error(`发布总大小超过上限 ${Math.min(maxTotalBytes, APPLICATION_MANIFEST_MAX_TOTAL_BYTES)} bytes，已在上传前中止。`);
+    }
+}
 function normalizeLocalApplicationRelativePath(value) {
     const normalized = String(value || '').trim().replace(/\\/g, '/').replace(/^\.\//, '');
     const segments = normalized.split('/');
@@ -59,6 +69,554 @@ async function sha256LocalFile(filePath) {
         hash.update(chunk);
     return hash.digest('hex');
 }
+function deterministicApplicationPublishId(parts) {
+    return crypto.createHash('sha256')
+        .update(parts.map(value => String(value || '').trim()).join('\n'))
+        .digest('hex');
+}
+function normalizedApplicationVersion(value) {
+    const version = String(value || '').trim().toLowerCase();
+    return version.startsWith('v') ? version : `v${version}`;
+}
+export function buildApplicationAssetRequestId(input) {
+    return deterministicApplicationPublishId([
+        'microi-application-asset-upload-v1',
+        input.deliveryBatchId,
+        input.appIdOrKey,
+        normalizedApplicationVersion(input.versionNo),
+        normalizeLocalApplicationRelativePath(input.relativePath),
+        String(input.sha256 || '').toLowerCase(),
+    ]);
+}
+export function buildApplicationFinalizeRequestId(input) {
+    if (input.expectedCurrentVersion !== undefined || input.expectedAppVersion !== undefined) {
+        return deterministicApplicationPublishId([
+            'microi-application-finalize-v2',
+            input.deliveryBatchId,
+            input.appIdOrKey,
+            normalizedApplicationVersion(input.versionNo),
+            String(input.runtimeManifestHash || '').toLowerCase(),
+            input.expectedCurrentVersion === undefined ? '0:' : `1:${input.expectedCurrentVersion}`,
+            input.expectedAppVersion === undefined ? '0:' : `1:${JSON.stringify(input.expectedAppVersion)}`,
+        ]);
+    }
+    return deterministicApplicationPublishId([
+        'microi-application-finalize-v1',
+        input.deliveryBatchId,
+        input.appIdOrKey,
+        normalizedApplicationVersion(input.versionNo),
+        String(input.runtimeManifestHash || '').toLowerCase(),
+    ]);
+}
+function buildApplicationStageRequestId(input) {
+    return deterministicApplicationPublishId([
+        'microi-application-stage-v1',
+        input.deliveryBatchId,
+        input.appIdOrKey,
+        normalizedApplicationVersion(input.versionNo),
+        String(input.runtimeManifestHash || '').toLowerCase(),
+    ]);
+}
+const APPLICATION_ASSET_V3_SHA256 = /^[a-f0-9]{64}$/u;
+const APPLICATION_ASSET_V3_DECIMAL = /^(0|[1-9]\d*)$/u;
+const APPLICATION_ASSET_V3_REQUEST_ID = /^[A-Za-z0-9._:-]{8,100}$/u;
+const APPLICATION_ASSET_V3_DELIVERY_ID = /^[A-Za-z0-9._:-]{8,50}$/u;
+const APPLICATION_ASSET_V3_IDENTITY = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/u;
+const APPLICATION_ASSET_V3_PATH_MAX_LENGTH = 1000;
+const APPLICATION_ASSET_V3_PATH_SEGMENT_MAX_LENGTH = 255;
+function canonicalApplicationAssetStreamV3Json(value, label = 'Routes') {
+    if (value === null)
+        return 'null';
+    if (Array.isArray(value))
+        return `[${value.map(item => canonicalApplicationAssetStreamV3Json(item, label)).join(',')}]`;
+    if (typeof value === 'object') {
+        const record = value;
+        return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonicalApplicationAssetStreamV3Json(record[key], label)}`).join(',')}}`;
+    }
+    if (typeof value === 'string' || typeof value === 'boolean')
+        return JSON.stringify(value);
+    if (typeof value === 'number' && Number.isSafeInteger(value))
+        return JSON.stringify(value);
+    throw new Error(`${label} 只允许 JSON 值，number 必须是 JavaScript safe integer`);
+}
+const APPLICATION_STREAM_GATE_INT64_MAX = 9223372036854775807n;
+const APPLICATION_STREAM_GATE_TRANSITION_ID = /^[A-Za-z0-9._:-]{8,100}$/u;
+const APPLICATION_STREAM_GATE_OS_CLIENT = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9])?$/u;
+function requireExactGateText(value, label, { allowEmpty = false, maxLength = 1000 } = {}) {
+    if (typeof value !== 'string' || value !== value.trim()) {
+        throw new Error(`${label} 必须是无首尾空白的原始字符串`);
+    }
+    if ((!allowEmpty && !value) || value.length > maxLength || /[\u0000-\u001f\u007f]/u.test(value)) {
+        throw new Error(`${label} 长度或控制字符不合法`);
+    }
+    return value;
+}
+function canonicalApplicationStreamGateEpoch(value) {
+    if (typeof value !== 'string' || !APPLICATION_ASSET_V3_DECIMAL.test(value)) {
+        throw new Error('ExpectedGateEpoch 必须是规范非负十进制字符串');
+    }
+    if (BigInt(value) > APPLICATION_STREAM_GATE_INT64_MAX) {
+        throw new Error('ExpectedGateEpoch 超过 Int64 上限');
+    }
+    return value;
+}
+/**
+ * Validate and freeze an application-stream gate transition before any remote
+ * call is possible. The returned SHA-256 covers the exact tenant coordinate,
+ * compare-and-swap baseline, target state, reason, and canonical drain proof.
+ */
+export function buildApplicationStreamGateTransitionConfirmation(input, context) {
+    const osClient = requireExactGateText(input.osClient, 'OsClient', { maxLength: 100 });
+    if (!APPLICATION_STREAM_GATE_OS_CLIENT.test(osClient)) {
+        throw new Error('OsClient 只允许 1-100 位 ASCII 字母、数字、点、下划线或短横线');
+    }
+    const osClientType = requireExactGateText(input.osClientType, 'OsClientType', {
+        allowEmpty: true,
+        maxLength: 100,
+    });
+    const osClientNetwork = requireExactGateText(input.osClientNetwork, 'OsClientNetwork', {
+        allowEmpty: true,
+        maxLength: 100,
+    });
+    const boundCoordinate = {
+        osClient: context.osClient,
+        osClientType: context.osClientType ?? '',
+        osClientNetwork: context.osClientNetwork ?? '',
+    };
+    if (osClient !== boundCoordinate.osClient
+        || osClientType !== boundCoordinate.osClientType
+        || osClientNetwork !== boundCoordinate.osClientNetwork) {
+        throw new Error(`租户坐标不匹配：请求 ${osClient}|${osClientType}|${osClientNetwork}，`
+            + `MCP 绑定 ${boundCoordinate.osClient}|${boundCoordinate.osClientType}|${boundCoordinate.osClientNetwork}`);
+    }
+    const expectedGateEpoch = canonicalApplicationStreamGateEpoch(input.expectedGateEpoch);
+    if (BigInt(expectedGateEpoch) === APPLICATION_STREAM_GATE_INT64_MAX) {
+        throw new Error('ExpectedGateEpoch 已达 Int64 上限，无法安全递增门禁代次');
+    }
+    if (input.expectedMode === 'V3Only') {
+        if (input.expectedMinProtocol !== 3 || BigInt(expectedGateEpoch) < 1n) {
+            throw new Error('ExpectedMode=V3Only 要求 ExpectedMinProtocol=3 且 ExpectedGateEpoch>0');
+        }
+    }
+    else if (input.expectedMinProtocol !== 2) {
+        throw new Error(`ExpectedMode=${input.expectedMode} 要求 ExpectedMinProtocol=2`);
+    }
+    const targetMode = input.targetMode;
+    const transitionAllowed = (input.expectedMode === 'LegacyOpen' && targetMode === 'Drain')
+        || (input.expectedMode === 'Drain' && (targetMode === 'V3Only' || targetMode === 'LegacyOpen'));
+    if (!transitionAllowed) {
+        if (input.expectedMode === 'LegacyOpen' && targetMode === 'V3Only') {
+            throw new Error('禁止 LegacyOpen 直接切换到 V3Only；必须先进入 Drain');
+        }
+        if (input.expectedMode === 'V3Only') {
+            throw new Error('禁止从 V3Only 降级或再次转换');
+        }
+        throw new Error(`不允许门禁状态转换 ${input.expectedMode} -> ${targetMode}`);
+    }
+    const transitionId = requireExactGateText(input.transitionId, 'TransitionId', { maxLength: 100 });
+    if (!APPLICATION_STREAM_GATE_TRANSITION_ID.test(transitionId)) {
+        throw new Error('TransitionId 必须是 8-100 位 ASCII 字母、数字、点、下划线、冒号或短横线');
+    }
+    const reason = requireExactGateText(input.reason, 'Reason', { maxLength: 1000 });
+    const drainProofJson = requireExactGateText(input.drainProofJson, 'DrainProofJson', {
+        maxLength: 1024 * 1024,
+    });
+    if (Buffer.byteLength(drainProofJson, 'utf8') > 1024 * 1024) {
+        throw new Error('DrainProofJson 的 UTF-8 长度超过 1 MiB 安全上限');
+    }
+    let drainProof;
+    try {
+        drainProof = JSON.parse(drainProofJson);
+    }
+    catch {
+        throw new Error('DrainProofJson 必须是合法 JSON 对象');
+    }
+    if (!drainProof || typeof drainProof !== 'object' || Array.isArray(drainProof)) {
+        throw new Error('DrainProofJson 必须是 JSON 对象');
+    }
+    const canonicalDrainProofJson = canonicalApplicationAssetStreamV3Json(drainProof, 'DrainProofJson');
+    if (drainProofJson !== canonicalDrainProofJson) {
+        throw new Error('DrainProofJson 必须使用递归键排序、无多余空白的 canonical JSON');
+    }
+    if (!APPLICATION_ASSET_V3_SHA256.test(input.drainProofHash)) {
+        throw new Error('DrainProofHash 必须是 64 位小写 SHA-256');
+    }
+    const actualDrainProofHash = crypto.createHash('sha256').update(drainProofJson, 'utf8').digest('hex');
+    if (input.drainProofHash !== actualDrainProofHash) {
+        throw new Error('DrainProofHash 与 DrainProofJson 的 UTF-8 SHA-256 不一致');
+    }
+    const payload = {
+        OsClient: osClient,
+        OsClientType: osClientType,
+        OsClientNetwork: osClientNetwork,
+        ExpectedMode: input.expectedMode,
+        ExpectedMinProtocol: input.expectedMinProtocol,
+        ExpectedGateEpoch: expectedGateEpoch,
+        TargetMode: targetMode,
+        TargetMinProtocol: targetMode === 'V3Only' ? 3 : 2,
+        TransitionId: transitionId,
+        Reason: reason,
+        DrainProofJson: drainProofJson,
+        DrainProofHash: input.drainProofHash,
+    };
+    const confirmationCanonicalJson = canonicalApplicationAssetStreamV3Json(payload, 'ApplicationStreamGateTransition');
+    return {
+        payload,
+        confirmationCanonicalJson,
+        confirmationSha256: crypto.createHash('sha256')
+            .update(confirmationCanonicalJson, 'utf8')
+            .digest('hex'),
+    };
+}
+export function buildApplicationAssetStreamV3RouteSnapshot(routes = []) {
+    if (!Array.isArray(routes))
+        throw new Error('Routes 必须是数组，v3 缺省值为显式 []');
+    const routeSnapshotJson = canonicalApplicationAssetStreamV3Json(routes);
+    if (Buffer.byteLength(routeSnapshotJson, 'utf8') > 1024 * 1024) {
+        throw new Error('RouteSnapshotJson 的 UTF-8 长度超过 1 MiB 安全上限');
+    }
+    return {
+        routeSnapshotJson,
+        routeSnapshotHash: crypto.createHash('sha256').update(routeSnapshotJson, 'utf8').digest('hex'),
+    };
+}
+function canonicalV3Decimal(value, label, { positive = false } = {}) {
+    if (typeof value !== 'string' || !APPLICATION_ASSET_V3_DECIMAL.test(value)) {
+        throw new Error(`${label} 必须是规范十进制 bigint 字符串`);
+    }
+    if (positive && BigInt(value) < 1n)
+        throw new Error(`${label} 必须大于 0`);
+    return value;
+}
+function explicitV3Nullable(value, label) {
+    if (value === undefined)
+        throw new Error(`${label} 必须显式提供；空基线请传 null`);
+    if (value === null)
+        return null;
+    if (typeof value !== 'string' || !value.trim())
+        throw new Error(`${label} 必须是非空字符串或 null`);
+    const normalized = value.trim();
+    if (normalized.length > 64)
+        throw new Error(`${label} 长度不能超过 64`);
+    return normalized;
+}
+export function resolveApplicationAssetStreamV3Contract(input, runtimeManifestHash) {
+    if (input.protocolVersion === undefined)
+        return null;
+    if (input.protocolVersion !== 3)
+        throw new Error('ProtocolVersion 只支持显式 v3；v2 请省略该字段');
+    if (input.publishMode !== 'stage' && input.publishMode !== 'finalize') {
+        throw new Error('ProtocolVersion=3 只允许显式 publishMode=stage|finalize');
+    }
+    if (input.allowLegacyFallback === true)
+        throw new Error('ProtocolVersion=3 禁止 compatibility fallback');
+    const requestId = String(input.requestId || '').trim();
+    if (!APPLICATION_ASSET_V3_REQUEST_ID.test(requestId))
+        throw new Error('RequestId 必须是 8-100 位稳定 v3 请求标识');
+    const requestFingerprint = String(input.requestFingerprint || '').trim().toLowerCase();
+    if (!APPLICATION_ASSET_V3_SHA256.test(requestFingerprint))
+        throw new Error('RequestFingerprint 必须是 64 位小写 SHA-256');
+    const deliveryBatchId = String(input.deliveryBatchId || '').trim();
+    if (!APPLICATION_ASSET_V3_DELIVERY_ID.test(deliveryBatchId))
+        throw new Error('DeliveryBatchId 必须是 8-50 位稳定标识');
+    const sourceManifestHash = String(input.sourceManifestHash || '').trim().toLowerCase();
+    if (!APPLICATION_ASSET_V3_SHA256.test(sourceManifestHash))
+        throw new Error('SourceManifestHash 是 v3 必填的 64 位小写 SHA-256');
+    const suppliedRuntimeManifestHash = String(input.runtimeManifestHash || '').trim().toLowerCase();
+    if (!APPLICATION_ASSET_V3_SHA256.test(suppliedRuntimeManifestHash))
+        throw new Error('RuntimeManifestHash 是 v3 必填的 64 位小写 SHA-256');
+    if (suppliedRuntimeManifestHash !== runtimeManifestHash.toLowerCase()) {
+        throw new Error('RuntimeManifestHash 与 MCP 本地流式清单不一致');
+    }
+    const routeSnapshot = buildApplicationAssetStreamV3RouteSnapshot(input.routes ?? []);
+    if (typeof input.routeSnapshotJson !== 'string' || input.routeSnapshotJson !== routeSnapshot.routeSnapshotJson) {
+        throw new Error('RouteSnapshotJson 必须与 Routes 的递归键排序/UTF-8 canonical JSON 精确一致');
+    }
+    const suppliedRouteSnapshotHash = String(input.routeSnapshotHash || '').trim().toLowerCase();
+    if (!APPLICATION_ASSET_V3_SHA256.test(suppliedRouteSnapshotHash)
+        || suppliedRouteSnapshotHash !== routeSnapshot.routeSnapshotHash) {
+        throw new Error('RouteSnapshotHash 必须是 RouteSnapshotJson 的小写 SHA-256');
+    }
+    const expectedCurrentVersion = input.expectedCurrentVersion;
+    if (!Number.isSafeInteger(expectedCurrentVersion) || Number(expectedCurrentVersion) < 0) {
+        throw new Error('ExpectedCurrentVersion 是 v3 必填的非负安全整数');
+    }
+    if (input.expectedAppVersion === undefined)
+        throw new Error('ExpectedAppVersion 必须显式提供；空基线请传 null');
+    if (input.expectedAppVersion !== null
+        && (typeof input.expectedAppVersion !== 'string' || !input.expectedAppVersion.trim())) {
+        throw new Error('ExpectedAppVersion 必须是非空字符串或 null；空基线请传 null');
+    }
+    if (typeof input.expectedAppVersion === 'string' && input.expectedAppVersion.length > 64) {
+        throw new Error('ExpectedAppVersion 长度不能超过 64');
+    }
+    const expectedVersionRowVersion = input.expectedVersionRowVersion === null
+        ? null
+        : canonicalV3Decimal(input.expectedVersionRowVersion, 'ExpectedVersionRowVersion');
+    return {
+        protocolVersion: 3,
+        expectedGateEpoch: canonicalV3Decimal(input.expectedGateEpoch, 'ExpectedGateEpoch', { positive: true }),
+        requestId,
+        requestFingerprint,
+        deliveryBatchId,
+        sourceManifestHash,
+        runtimeManifestHash: suppliedRuntimeManifestHash,
+        routeSnapshotJson: routeSnapshot.routeSnapshotJson,
+        routeSnapshotHash: routeSnapshot.routeSnapshotHash,
+        expectedCurrentVersion: expectedCurrentVersion,
+        expectedAppVersion: input.expectedAppVersion,
+        expectedPublishFence: canonicalV3Decimal(input.expectedPublishFence, 'ExpectedPublishFence'),
+        expectedPublishRowVersion: canonicalV3Decimal(input.expectedPublishRowVersion, 'ExpectedPublishRowVersion'),
+        expectedVersionRowVersion,
+        expectedActivePublishVersionId: explicitV3Nullable(input.expectedActivePublishVersionId, 'ExpectedActivePublishVersionId'),
+        expectedCommittedPublishVersionId: explicitV3Nullable(input.expectedCommittedPublishVersionId, 'ExpectedCommittedPublishVersionId'),
+    };
+}
+function applicationAssetStreamV3PascalFields(contract) {
+    return {
+        ProtocolVersion: 3,
+        ExpectedGateEpoch: contract.expectedGateEpoch,
+        RequestId: contract.requestId,
+        RequestFingerprint: contract.requestFingerprint,
+        DeliveryBatchId: contract.deliveryBatchId,
+        SourceManifestHash: contract.sourceManifestHash,
+        RuntimeManifestHash: contract.runtimeManifestHash,
+        RouteSnapshotJson: contract.routeSnapshotJson,
+        RouteSnapshotHash: contract.routeSnapshotHash,
+        ExpectedCurrentVersion: contract.expectedCurrentVersion,
+        ExpectedAppVersion: contract.expectedAppVersion,
+        ExpectedPublishFence: contract.expectedPublishFence,
+        ExpectedPublishRowVersion: contract.expectedPublishRowVersion,
+        ExpectedVersionRowVersion: contract.expectedVersionRowVersion,
+        ExpectedActivePublishVersionId: contract.expectedActivePublishVersionId,
+        ExpectedCommittedPublishVersionId: contract.expectedCommittedPublishVersionId,
+    };
+}
+/**
+ * Mirror Core's protocol-v3 path contract without using the legacy path
+ * normalizer. v3 never trims, decodes, slash-rewrites, or silently normalizes a
+ * caller path: the bytes covered by the manifest must be the bytes uploaded.
+ */
+export function encodeApplicationAssetStreamV3RelativePath(value, label = 'v3 相对路径') {
+    if (typeof value !== 'string' || !value || !value.trim())
+        throw new Error(`${label} 不能为空`);
+    if (value.length > APPLICATION_ASSET_V3_PATH_MAX_LENGTH) {
+        throw new Error(`${label} 原始长度超过 varchar(1000) 边界`);
+    }
+    if (value !== value.trim())
+        throw new Error(`${label} 不能包含首尾空白`);
+    if (value.startsWith('/'))
+        throw new Error(`${label} 必须是相对路径`);
+    if (value.includes('\\'))
+        throw new Error(`${label} 禁止反斜杠`);
+    if (/[%?#]/u.test(value))
+        throw new Error(`${label} 禁止预编码、查询串或片段`);
+    const encodedSegments = [];
+    for (const segment of value.split('/')) {
+        if (!segment)
+            throw new Error(`${label} 包含空目录段`);
+        if (segment === '.' || segment === '..')
+            throw new Error(`${label} 禁止目录遍历`);
+        if (/^(?:root|latest)$/iu.test(segment))
+            throw new Error(`${label} 禁止 mutable root/latest 段`);
+        if (segment.length > APPLICATION_ASSET_V3_PATH_SEGMENT_MAX_LENGTH) {
+            throw new Error(`${label} 目录段长度超过 255`);
+        }
+        if (/[\u0000-\u001f\u007f-\u009f]/u.test(segment))
+            throw new Error(`${label} 禁止控制字符`);
+        const canonicalSegment = segment.normalize('NFC');
+        if (canonicalSegment !== segment)
+            throw new Error(`${label} 必须使用 Unicode NFC 规范形式`);
+        try {
+            encodedSegments.push(encodeURIComponent(canonicalSegment));
+        }
+        catch {
+            throw new Error(`${label} 包含无效 Unicode`);
+        }
+    }
+    const encodedPath = encodedSegments.join('/');
+    if (encodedPath.length > APPLICATION_ASSET_V3_PATH_MAX_LENGTH) {
+        throw new Error(`${label} 编码后长度超过 varchar(1000) 边界`);
+    }
+    return encodedPath;
+}
+export function buildConservativeApplicationAssetStreamV3ImmutablePath(input) {
+    const appKey = input.appIdOrKey;
+    const version = normalizedApplicationVersion(input.versionNo);
+    if (!APPLICATION_ASSET_V3_IDENTITY.test(appKey) || appKey.length > 128 || /^(?:root|latest)$/iu.test(appKey)) {
+        throw new Error('ProtocolVersion=3 的 AppIdOrKey 必须是 1-128 位 Core v3 identity；禁止 root/latest');
+    }
+    if (!APPLICATION_ASSET_V3_IDENTITY.test(version) || version.length > 64 || /^(?:root|latest)$/iu.test(version)) {
+        throw new Error('ProtocolVersion=3 的 VersionNo 必须是 1-64 位 Core v3 identity；禁止 root/latest');
+    }
+    if (!APPLICATION_ASSET_V3_SHA256.test(input.requestFingerprint)) {
+        throw new Error('ProtocolVersion=3 的 RequestFingerprint 必须是 64 位小写 SHA-256');
+    }
+    const encodedRelativePath = encodeApplicationAssetStreamV3RelativePath(input.relativePath);
+    // Tenant and application kind are resolved by Core, not supplied to this
+    // MCP tool. Use their Core maximum lengths so every accepted preflight is
+    // guaranteed to fit even before the server resolves those two identities.
+    const conservativeReleasePrefix = [
+        'microi',
+        'application-assets',
+        'v3',
+        'tenants',
+        't'.repeat(64),
+        'kinds',
+        'k'.repeat(32),
+        'apps',
+        appKey,
+        'releases',
+        version,
+        'requests',
+        input.requestFingerprint,
+    ].join('/');
+    const immutablePath = `${conservativeReleasePrefix}/assets/${encodedRelativePath}`;
+    if (immutablePath.length > APPLICATION_ASSET_V3_PATH_MAX_LENGTH) {
+        throw new Error(`v3 资产完整 immutable path 超过 varchar(1000) 边界：${input.relativePath}`);
+    }
+    return { encodedRelativePath, immutablePath };
+}
+function assertApplicationAssetStreamV3ManifestPaths(manifest, input, contract) {
+    const encodedByRelativePath = new Map();
+    for (const asset of manifest.assets) {
+        const filesystemRelativePath = path.relative(manifest.rootDirectory, asset.absolutePath).replace(/\\/gu, '/');
+        if (filesystemRelativePath !== asset.relativePath) {
+            throw new Error(`v3 清单路径被旧版规范化器改写，已在上传前拒绝：${filesystemRelativePath}`);
+        }
+        const { encodedRelativePath } = buildConservativeApplicationAssetStreamV3ImmutablePath({
+            appIdOrKey: input.appIdOrKey,
+            versionNo: input.versionNo,
+            requestFingerprint: contract.requestFingerprint,
+            relativePath: asset.relativePath,
+        });
+        encodedByRelativePath.set(asset.relativePath, encodedRelativePath);
+    }
+    encodeApplicationAssetStreamV3RelativePath(manifest.entryPath, 'v3 EntryPath');
+    return encodedByRelativePath;
+}
+function assertApplicationAssetV3Path(value, label) {
+    if (typeof value !== 'string' || !value || value !== value.trim() || value.includes('\\')
+        || value.length > APPLICATION_ASSET_V3_PATH_MAX_LENGTH
+        || /[\u0000-\u001f\u007f-\u009f]/u.test(value)
+        || value.split('/').some(segment => /^(root|latest)$/iu.test(segment))) {
+        throw new Error(`${label} 缺失或包含 v3 禁止的 root/latest mutable 段`);
+    }
+    return value;
+}
+function validateApplicationAssetV3UploadEvidence(result, expected) {
+    const evidence = asJsonRecord(result.Data);
+    const context = `v3 应用资产 ${expected.relativePath}`;
+    requireStreamEvidenceNumber(evidence, 'ProtocolVersion', 3, context);
+    requireStreamEvidenceString(evidence, 'PublishMode', 'stage', context);
+    requireStreamEvidenceString(evidence, 'GateEpoch', expected.expectedGateEpoch, context);
+    requireStreamEvidenceString(evidence, 'RequestId', expected.requestId, context);
+    requireStreamEvidenceString(evidence, 'RequestFingerprint', expected.requestFingerprint, context);
+    requireStreamEvidenceString(evidence, 'RouteSnapshotJson', expected.routeSnapshotJson, context);
+    requireStreamEvidenceString(evidence, 'RouteSnapshotHash', expected.routeSnapshotHash, context);
+    requireStreamEvidenceString(evidence, 'VersionNo', normalizedApplicationVersion(expected.versionNo), context);
+    requireStreamEvidenceString(evidence, 'Path', expected.relativePath, context);
+    requireStreamEvidenceString(evidence, 'Sha256', expected.sha256, context);
+    requireStreamEvidenceNumber(evidence, 'Size', expected.size, context);
+    if (String(evidence.PublishState || '') !== 'Prepared'
+        || String(evidence.PointerState || '') !== 'Uncommitted'
+        || evidence.Pending !== true) {
+        throw new Error(`${context} 必须返回 Prepared/Uncommitted/Pending=true`);
+    }
+    const fencingToken = requireApplicationAssetV3DecimalEvidence(evidence, 'FencingToken', context, { positive: true });
+    if (BigInt(fencingToken) <= BigInt(expected.expectedPublishFence)) {
+        throw new Error(`${context}.FencingToken 必须严格大于 ExpectedPublishFence`);
+    }
+    const releaseFilePath = assertApplicationAssetV3Path(evidence.ReleaseFilePath, `${context}.ReleaseFilePath`);
+    if (!releaseFilePath.includes(`/releases/${normalizedApplicationVersion(expected.versionNo)}/requests/${expected.requestFingerprint}/assets/`)
+        || !releaseFilePath.endsWith(`/${expected.encodedRelativePath}`)) {
+        throw new Error(`${context}.ReleaseFilePath 未绑定 immutable release/request/path`);
+    }
+    return evidence;
+}
+function validateApplicationAssetV3FinalizeEvidence(result, expected) {
+    const evidence = asJsonRecord(result.Data);
+    const context = `v3 ${expected.publishMode}`;
+    requireStreamEvidenceNumber(evidence, 'ProtocolVersion', 3, context);
+    requireStreamEvidenceString(evidence, 'PublishMode', expected.publishMode, context);
+    requireStreamEvidenceString(evidence, 'GateEpoch', expected.expectedGateEpoch, context);
+    requireStreamEvidenceString(evidence, 'AppKey', expected.appIdOrKey, context);
+    requireStreamEvidenceString(evidence, 'VersionNo', normalizedApplicationVersion(expected.versionNo), context);
+    requireStreamEvidenceString(evidence, 'RequestId', expected.requestId, context);
+    requireStreamEvidenceString(evidence, 'RequestFingerprint', expected.requestFingerprint, context);
+    requireStreamEvidenceString(evidence, 'DeliveryBatchId', expected.deliveryBatchId, context);
+    requireStreamEvidenceString(evidence, 'RuntimeManifestHash', expected.runtimeManifestHash, context);
+    requireStreamEvidenceString(evidence, 'SourceManifestHash', expected.sourceManifestHash, context);
+    requireStreamEvidenceString(evidence, 'RouteSnapshotJson', expected.routeSnapshotJson, context);
+    requireStreamEvidenceString(evidence, 'RouteSnapshotHash', expected.routeSnapshotHash, context);
+    const versionId = String(evidence.VersionId || '').trim();
+    if (!versionId)
+        throw new Error(`${context}.VersionId 不能为空`);
+    const publishFence = requireApplicationAssetV3DecimalEvidence(evidence, 'PublishFence', context);
+    const publishRowVersion = requireApplicationAssetV3DecimalEvidence(evidence, 'PublishRowVersion', context);
+    const versionRowVersion = requireApplicationAssetV3DecimalEvidence(evidence, 'VersionRowVersion', context, { positive: true });
+    if (evidence.V3Only !== true)
+        throw new Error(`${context}.V3Only 必须为 true`);
+    const allowedModes = Array.isArray(evidence.AllowedModes) ? evidence.AllowedModes.map(String) : [];
+    if (!allowedModes.includes('stage') || !allowedModes.includes('finalize')) {
+        throw new Error(`${context}.AllowedModes 必须包含 stage/finalize`);
+    }
+    const state = String(evidence.PublishState || '');
+    if (expected.publishMode === 'stage') {
+        requireStreamEvidenceString(evidence, 'PhaseState', 'ReleaseVerified', context);
+        if (state !== 'ReleaseVerified' || String(evidence.PointerState || '') !== 'Uncommitted' || evidence.Pending !== false) {
+            throw new Error('v3 stage 必须返回 ReleaseVerified/Uncommitted/Pending=false');
+        }
+        if (publishFence !== expected.expectedPublishFence
+            || publishRowVersion !== expected.expectedPublishRowVersion) {
+            throw new Error('v3 stage 不得前滚 sys_microistore pointer fence/rowversion');
+        }
+        const fencingToken = requireApplicationAssetV3DecimalEvidence(evidence, 'FencingToken', context, { positive: true });
+        if (BigInt(fencingToken) <= BigInt(expected.expectedPublishFence)) {
+            throw new Error('v3 stage.FencingToken 必须严格大于 ExpectedPublishFence');
+        }
+    }
+    else {
+        const appState = String(evidence.AppPublishState || '');
+        const rollForwardStates = new Set(['PointerCommitted', 'ProjectionPending', 'RepairRequired', 'Completed']);
+        const completed = state === 'Completed' && appState === 'Completed';
+        const pending = !completed && rollForwardStates.has(state) && rollForwardStates.has(appState);
+        if (String(evidence.PointerState || '') !== 'Committed'
+            || (pending && evidence.Pending !== true)
+            || (completed && evidence.Pending !== false)
+            || (!pending && !completed)
+            || evidence.Completed !== completed
+            || evidence.ProjectionPending !== !completed) {
+            throw new Error(`v3 finalize 返回非法状态 version=${state || '(empty)'}, app=${appState || '(empty)'}`);
+        }
+        requireStreamEvidenceString(evidence, 'CommittedPublishVersionId', versionId, context);
+        requireStreamEvidenceString(evidence, 'CommittedRuntimeManifestHash', expected.runtimeManifestHash, context);
+        if (BigInt(publishFence) <= BigInt(expected.expectedPublishFence)) {
+            throw new Error('v3 finalize.PublishFence 必须严格大于 ExpectedPublishFence');
+        }
+        if (BigInt(publishRowVersion) !== BigInt(expected.expectedPublishRowVersion) + 1n) {
+            throw new Error('v3 finalize.PublishRowVersion 必须精确前滚 1');
+        }
+        if (expected.expectedVersionRowVersion !== null
+            && BigInt(versionRowVersion) <= BigInt(expected.expectedVersionRowVersion)) {
+            throw new Error('v3 finalize.VersionRowVersion 必须严格前滚');
+        }
+    }
+    const releasePrefix = assertApplicationAssetV3Path(evidence.ReleasePrefix, `${context}.ReleasePrefix`);
+    const releaseEntryPath = assertApplicationAssetV3Path(evidence.ReleaseEntryPath, `${context}.ReleaseEntryPath`);
+    const stableResolverPath = assertApplicationAssetV3Path(evidence.StableResolverPath, `${context}.StableResolverPath`);
+    if (!releasePrefix.endsWith(`/releases/${normalizedApplicationVersion(expected.versionNo)}/requests/${expected.requestFingerprint}`)
+        || !releaseEntryPath.startsWith(`${releasePrefix}/assets/`)
+        || !releaseEntryPath.endsWith(`/${expected.encodedEntryPath}`)) {
+        throw new Error(`${context} immutable release 路径不一致`);
+    }
+    if (!/(^|\/)micro-app\/v3\/tenants\//u.test(stableResolverPath)
+        || stableResolverPath.includes('/releases/')
+        || stableResolverPath.includes('/requests/')) {
+        throw new Error(`${context}.StableResolverPath 不是 versionless v3 resolver`);
+    }
+    return evidence;
+}
 /**
  * Inspect and hash a built directory without loading any file wholly into RAM.
  * The hard caps also stop accidental node_modules/.git/trash-directory loops.
@@ -72,10 +630,11 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
     const rootRealPath = fs.realpathSync(root);
     const normalizedEntry = normalizeLocalApplicationRelativePath(entryPath);
     const maxFiles = Math.min(20_000, Math.max(1, options.maxFiles ?? 20_000));
-    const maxTotalBytes = Math.min(20 * 1024 * 1024 * 1024, Math.max(1, options.maxTotalBytes ?? 20 * 1024 * 1024 * 1024));
+    const maxTotalBytes = Math.min(APPLICATION_MANIFEST_MAX_TOTAL_BYTES, Math.max(1, options.maxTotalBytes ?? APPLICATION_MANIFEST_MAX_TOTAL_BYTES));
     const pending = [rootRealPath];
     const files = [];
     const skippedSourceMaps = [];
+    const skippedInternalEvidenceFiles = [];
     let totalSize = 0;
     while (pending.length > 0) {
         const current = pending.pop();
@@ -101,19 +660,25 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
             if (FORBIDDEN_APPLICATION_ASSET_FILES.some(pattern => pattern.test(item.name))) {
                 throw new Error(`发布目录疑似包含密钥或环境配置，已拒绝上传：${relativePath}`);
             }
+            if (relativePath.toLowerCase() === '.microi-build-evidence.json') {
+                skippedInternalEvidenceFiles.push(relativePath);
+                continue;
+            }
             if (!options.includeSourceMaps && relativePath.toLowerCase().endsWith('.map')) {
                 skippedSourceMaps.push(relativePath);
                 continue;
             }
+            validateLocalApplicationAssetSize(relativePath, itemStat.size, totalSize + itemStat.size, maxTotalBytes);
             files.push({ absolutePath, relativePath, size: itemStat.size });
             totalSize += itemStat.size;
             if (files.length > maxFiles)
                 throw new Error(`发布文件超过上限 ${maxFiles}，请检查是否误选项目根目录或产生垃圾文件。`);
-            if (totalSize > maxTotalBytes)
-                throw new Error(`发布总大小超过上限 ${maxTotalBytes} bytes，已在上传前中止。`);
         }
     }
-    files.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+    // Keep the manifest order byte-for-byte compatible with the API's
+    // StringComparer.Ordinal canonicalization. localeCompare is locale-sensitive
+    // and places names such as THIRD-PARTY-NOTICES.txt differently from .NET.
+    files.sort((left, right) => (left.relativePath < right.relativePath ? -1 : left.relativePath > right.relativePath ? 1 : 0));
     if (!files.some(file => file.relativePath.toLowerCase() === normalizedEntry.toLowerCase())) {
         throw new Error(`发布目录缺少入口文件：${normalizedEntry}`);
     }
@@ -128,7 +693,15 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
     const manifestHash = crypto.createHash('sha256')
         .update(assets.map(asset => `${asset.relativePath}\t${asset.sha256}\t${asset.size}`).join('\n'))
         .digest('hex');
-    return { rootDirectory: rootRealPath, entryPath: normalizedEntry, assets, totalSize, manifestHash, skippedSourceMaps };
+    return {
+        rootDirectory: rootRealPath,
+        entryPath: normalizedEntry,
+        assets,
+        totalSize,
+        manifestHash,
+        skippedSourceMaps,
+        skippedInternalEvidenceFiles,
+    };
 }
 const LEGACY_STREAM_COMPATIBILITY_MAX_FILES = 256;
 const LEGACY_STREAM_COMPATIBILITY_MAX_BYTES = 5 * 1024 * 1024;
@@ -156,6 +729,60 @@ function asJsonRecord(value) {
     return value && typeof value === 'object' && !Array.isArray(value)
         ? value
         : {};
+}
+function requireStreamEvidenceString(evidence, field, expected, context) {
+    if (String(evidence[field] ?? '') !== expected) {
+        throw new Error(`${context} 返回证据 ${field} 不一致`);
+    }
+}
+function requireStreamEvidenceNumber(evidence, field, expected, context) {
+    if (!Number.isFinite(Number(evidence[field])) || Number(evidence[field]) !== expected) {
+        throw new Error(`${context} 返回证据 ${field} 不一致`);
+    }
+}
+function requireApplicationAssetV3DecimalEvidence(evidence, field, context, { positive = false } = {}) {
+    const value = evidence[field];
+    if (typeof value !== 'string' || !APPLICATION_ASSET_V3_DECIMAL.test(value)
+        || (positive && BigInt(value) < 1n)) {
+        throw new Error(`${context}.${field} 必须是${positive ? '正' : '非负'}规范十进制 bigint 字符串`);
+    }
+    return value;
+}
+function validateApplicationAssetUploadEvidence(result, expected) {
+    const evidence = asJsonRecord(result.Data);
+    const context = `应用资产 ${expected.relativePath}`;
+    requireStreamEvidenceString(evidence, 'RequestId', expected.requestId, context);
+    requireStreamEvidenceString(evidence, 'VersionNo', normalizedApplicationVersion(expected.versionNo), context);
+    requireStreamEvidenceString(evidence, 'Path', expected.relativePath, context);
+    requireStreamEvidenceString(evidence, 'Sha256', expected.sha256, context);
+    requireStreamEvidenceNumber(evidence, 'Size', expected.size, context);
+    if (evidence.StablePromoted !== false)
+        throw new Error(`${context} 返回证据 StablePromoted 必须为 false`);
+    return evidence;
+}
+function validateApplicationFinalizeEvidence(result, expected) {
+    const evidence = asJsonRecord(result.Data);
+    const context = '应用清单确认';
+    requireStreamEvidenceString(evidence, 'RequestId', expected.requestId, context);
+    requireStreamEvidenceString(evidence, 'VersionNo', normalizedApplicationVersion(expected.versionNo), context);
+    requireStreamEvidenceString(evidence, 'EntryPath', expected.entryPath, context);
+    requireStreamEvidenceString(evidence, 'DeliveryBatchId', expected.deliveryBatchId, context);
+    requireStreamEvidenceString(evidence, 'RuntimeManifestHash', expected.runtimeManifestHash, context);
+    requireStreamEvidenceNumber(evidence, 'AssetCount', expected.assetCount, context);
+    requireStreamEvidenceNumber(evidence, 'TotalSize', expected.totalSize, context);
+    if (expected.expectedCurrentVersion !== undefined) {
+        requireStreamEvidenceNumber(evidence, 'ExpectedCurrentVersion', expected.expectedCurrentVersion, context);
+    }
+    if (expected.expectedAppVersion !== undefined) {
+        requireStreamEvidenceString(evidence, 'ExpectedAppVersion', expected.expectedAppVersion, context);
+    }
+    if (evidence.StablePromoted !== true)
+        throw new Error(`${context} 返回证据 StablePromoted 必须为 true`);
+    if (String(evidence.PublishStatus || '') !== 'Published')
+        throw new Error(`${context} 返回证据 PublishStatus 必须为 Published`);
+    if (String(evidence.VerificationStatus || '') !== 'Verified')
+        throw new Error(`${context} 返回证据 VerificationStatus 必须为 Verified`);
+    return evidence;
 }
 /**
  * Bridge a rolling-upgrade window without retrying the broken stream endpoint.
@@ -249,6 +876,403 @@ export async function tryLegacyMicroServiceStreamPublishFallback(client, manifes
         response,
     };
 }
+/**
+ * Execute the application-directory stream protocol independently of MCP tool
+ * registration so stage/finalize/retry semantics can be tested directly.
+ */
+export async function runApplicationDirectoryStreamPublish(client, input) {
+    const publishMode = input.publishMode || 'stage-and-finalize';
+    try {
+        if (input.confirmExecution && input.confirmExecution !== input.appIdOrKey) {
+            return {
+                content: [{ type: 'text', text: `Error: confirmExecution 必须精确等于 ${input.appIdOrKey}` }],
+                isError: true,
+            };
+        }
+        if (input.confirmExecution === input.appIdOrKey
+            && publishMode !== 'stage'
+            && (input.expectedCurrentVersion === undefined || input.expectedAppVersion === undefined)) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            error: 'finalize 必须同时传入 expectedCurrentVersion 与 expectedAppVersion；请先回读应用上下文并冻结发布基线。',
+                            publishMode,
+                            stablePromoted: false,
+                            retrySafe: true,
+                            expectedStateRequired: true,
+                        }, null, 2) }],
+                isError: true,
+            };
+        }
+        const manifest = await buildLocalApplicationAssetManifest(input.directory, input.entryPath || 'index.html', {
+            includeSourceMaps: input.includeSourceMaps,
+            maxFiles: input.maxFiles,
+            maxTotalBytes: input.maxTotalMegabytes
+                ? Math.floor(input.maxTotalMegabytes * 1024 * 1024)
+                : undefined,
+        });
+        const v3 = resolveApplicationAssetStreamV3Contract(input, manifest.manifestHash);
+        const v3EncodedRelativePaths = v3
+            ? assertApplicationAssetStreamV3ManifestPaths(manifest, input, v3)
+            : null;
+        const effectiveDeliveryBatchId = v3?.deliveryBatchId || input.deliveryBatchId || `mcp-${deterministicApplicationPublishId([
+            'microi-application-delivery-v1',
+            input.appIdOrKey,
+            normalizedApplicationVersion(input.versionNo),
+            manifest.manifestHash,
+        ]).slice(0, 40)}`;
+        const stageRequestId = v3?.requestId || buildApplicationStageRequestId({
+            deliveryBatchId: effectiveDeliveryBatchId,
+            appIdOrKey: input.appIdOrKey,
+            versionNo: input.versionNo,
+            runtimeManifestHash: manifest.manifestHash,
+        });
+        const finalizeRequestId = v3?.requestId || buildApplicationFinalizeRequestId({
+            deliveryBatchId: effectiveDeliveryBatchId,
+            appIdOrKey: input.appIdOrKey,
+            versionNo: input.versionNo,
+            runtimeManifestHash: manifest.manifestHash,
+            expectedCurrentVersion: input.expectedCurrentVersion,
+            expectedAppVersion: input.expectedAppVersion,
+        });
+        const assetRequests = manifest.assets.map(asset => ({
+            Path: asset.relativePath,
+            RequestId: v3?.requestId || buildApplicationAssetRequestId({
+                deliveryBatchId: effectiveDeliveryBatchId,
+                appIdOrKey: input.appIdOrKey,
+                versionNo: input.versionNo,
+                relativePath: asset.relativePath,
+                sha256: asset.sha256,
+            }),
+        }));
+        const assetRequestManifestHash = deterministicApplicationPublishId(assetRequests.flatMap(item => [item.Path, item.RequestId]));
+        if (input.confirmExecution !== input.appIdOrKey) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            dryRun: true,
+                            publishMode,
+                            confirmationRequired: input.appIdOrKey,
+                            rootDirectory: manifest.rootDirectory,
+                            entryPath: manifest.entryPath,
+                            assetCount: manifest.assets.length,
+                            totalSize: manifest.totalSize,
+                            runtimeManifestHash: manifest.manifestHash,
+                            deliveryBatchId: effectiveDeliveryBatchId,
+                            ...(input.expectedCurrentVersion !== undefined
+                                ? { expectedCurrentVersion: input.expectedCurrentVersion }
+                                : {}),
+                            ...(input.expectedAppVersion !== undefined
+                                ? { expectedAppVersion: input.expectedAppVersion }
+                                : {}),
+                            finalizePreconditionsRequired: publishMode !== 'stage',
+                            requestId: publishMode === 'stage' ? stageRequestId : finalizeRequestId,
+                            ...(v3 ? {
+                                protocolVersion: 3,
+                                expectedGateEpoch: v3.expectedGateEpoch,
+                                requestFingerprint: v3.requestFingerprint,
+                                routeSnapshotJson: v3.routeSnapshotJson,
+                                routeSnapshotHash: v3.routeSnapshotHash,
+                                expectedPublishFence: v3.expectedPublishFence,
+                                expectedPublishRowVersion: v3.expectedPublishRowVersion,
+                                expectedVersionRowVersion: v3.expectedVersionRowVersion,
+                                expectedActivePublishVersionId: v3.expectedActivePublishVersionId,
+                                expectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
+                            } : {}),
+                            assetRequestManifestHash,
+                            skippedSourceMaps: manifest.skippedSourceMaps,
+                            skippedInternalEvidenceFiles: manifest.skippedInternalEvidenceFiles,
+                            assetsPreview: manifest.assets.slice(0, 200).map((asset, index) => ({
+                                Path: asset.relativePath,
+                                Size: asset.size,
+                                Sha256: asset.sha256,
+                                RequestId: assetRequests[index].RequestId,
+                            })),
+                            previewTruncated: manifest.assets.length > 200,
+                        }, null, 2) }],
+            };
+        }
+        let uploadedCount = 0;
+        let idempotentCount = 0;
+        if (publishMode !== 'finalize') {
+            const requestIdByPath = new Map(assetRequests.map(item => [item.Path, item.RequestId]));
+            const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
+            for (const asset of uploadOrder) {
+                const requestId = requestIdByPath.get(asset.relativePath);
+                let result;
+                try {
+                    result = await client.uploadApplicationAssetStream({
+                        AppIdOrKey: input.appIdOrKey,
+                        VersionNo: input.versionNo,
+                        RelativePath: asset.relativePath,
+                        ExpectedSha256: asset.sha256,
+                        RequestId: requestId,
+                        FilePath: asset.absolutePath,
+                        TimeoutMs: input.timeoutMsPerFile,
+                        ...(v3 ? {
+                            ProtocolVersion: 3,
+                            ExpectedGateEpoch: v3.expectedGateEpoch,
+                            RequestFingerprint: v3.requestFingerprint,
+                            DeliveryBatchId: v3.deliveryBatchId,
+                            SourceManifestHash: v3.sourceManifestHash,
+                            RuntimeManifestHash: v3.runtimeManifestHash,
+                            RouteSnapshotJson: v3.routeSnapshotJson,
+                            RouteSnapshotHash: v3.routeSnapshotHash,
+                            ExpectedCurrentVersion: v3.expectedCurrentVersion,
+                            ExpectedAppVersion: v3.expectedAppVersion,
+                            ExpectedPublishFence: v3.expectedPublishFence,
+                            ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
+                            ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
+                            ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
+                            ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
+                        } : {}),
+                    });
+                }
+                catch (error) {
+                    return {
+                        content: [{ type: 'text', text: JSON.stringify({
+                                    error: error instanceof Error ? error.message : String(error),
+                                    failedPath: asset.relativePath,
+                                    requestId,
+                                    uploadedCount,
+                                    totalCount: manifest.assets.length,
+                                    publishMode,
+                                    retrySafe: true,
+                                }, null, 2) }],
+                        isError: true,
+                    };
+                }
+                if (result.Code !== 1) {
+                    const legacyDefect = isLegacyApplicationStreamJValueFailure(result);
+                    return {
+                        content: [{ type: 'text', text: JSON.stringify({
+                                    error: result.Msg,
+                                    failedPath: asset.relativePath,
+                                    requestId,
+                                    uploadedCount,
+                                    totalCount: manifest.assets.length,
+                                    publishMode,
+                                    retrySafe: true,
+                                    requiresRequestIdCapableApi: legacyDefect,
+                                    compatibilityFallbackAttempted: false,
+                                    compatibilityFallbackDisabled: input.allowLegacyFallback === true,
+                                }, null, 2) }],
+                        isError: true,
+                    };
+                }
+                let evidence;
+                try {
+                    evidence = v3
+                        ? validateApplicationAssetV3UploadEvidence(result, {
+                            ...v3,
+                            versionNo: input.versionNo,
+                            relativePath: asset.relativePath,
+                            encodedRelativePath: v3EncodedRelativePaths.get(asset.relativePath),
+                            sha256: asset.sha256,
+                            size: asset.size,
+                        })
+                        : validateApplicationAssetUploadEvidence(result, {
+                            requestId,
+                            versionNo: input.versionNo,
+                            relativePath: asset.relativePath,
+                            sha256: asset.sha256,
+                            size: asset.size,
+                        });
+                }
+                catch (error) {
+                    return {
+                        content: [{ type: 'text', text: JSON.stringify({
+                                    error: error instanceof Error ? error.message : String(error),
+                                    failedPath: asset.relativePath,
+                                    requestId,
+                                    uploadedCount,
+                                    totalCount: manifest.assets.length,
+                                    publishMode,
+                                    retrySafe: true,
+                                    evidenceMismatch: true,
+                                }, null, 2) }],
+                        isError: true,
+                    };
+                }
+                uploadedCount += 1;
+                if (evidence.Idempotent === true)
+                    idempotentCount += 1;
+                if (uploadedCount === 1 || uploadedCount % 25 === 0 || uploadedCount === manifest.assets.length) {
+                    console.error(`[microi-mcp] Stream stage ${input.appIdOrKey} ${input.versionNo}: ${uploadedCount}/${manifest.assets.length}`);
+                }
+            }
+        }
+        if (publishMode === 'stage' && !v3) {
+            const payload = {
+                appIdOrKey: input.appIdOrKey,
+                versionNo: normalizedApplicationVersion(input.versionNo),
+                deliveryBatchId: effectiveDeliveryBatchId,
+                runtimeManifestHash: manifest.manifestHash,
+                assetRequestManifestHash,
+                assetCount: manifest.assets.length,
+                stagedCount: manifest.assets.length,
+                uploadedCount: manifest.assets.length,
+                idempotentCount,
+                totalSize: manifest.totalSize,
+                transport: 'multipart-stream-to-hdfs-stage-only',
+                jintFileBytes: 0,
+                publishMode,
+                requestId: stageRequestId,
+                StablePromoted: false,
+            };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+        }
+        let finalizeResult;
+        try {
+            finalizeResult = await client.finalizeApplicationStreamPublish({
+                AppIdOrKey: input.appIdOrKey,
+                VersionNo: input.versionNo,
+                EntryPath: manifest.entryPath,
+                Assets: manifest.assets.map(asset => ({ Path: asset.relativePath, Sha256: asset.sha256, Size: asset.size })),
+                Routes: input.routes || [],
+                ChangeSummary: input.changeSummary || 'MCP 二进制流式发布',
+                DeliveryBatchId: effectiveDeliveryBatchId,
+                SourceManifestHash: input.sourceManifestHash || '',
+                RuntimeManifestHash: manifest.manifestHash,
+                RequestId: finalizeRequestId,
+                ...(v3 ? {
+                    PublishMode: publishMode,
+                    ...applicationAssetStreamV3PascalFields(v3),
+                } : {}),
+                ...(input.expectedCurrentVersion !== undefined
+                    ? { ExpectedCurrentVersion: input.expectedCurrentVersion }
+                    : {}),
+                ...(input.expectedAppVersion !== undefined
+                    ? { ExpectedAppVersion: input.expectedAppVersion }
+                    : {}),
+            });
+        }
+        catch (error) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            error: error instanceof Error ? error.message : String(error),
+                            requestId: finalizeRequestId,
+                            uploadedCount,
+                            stablePromoted: false,
+                            publishMode,
+                            retrySafe: true,
+                        }, null, 2) }],
+                isError: true,
+            };
+        }
+        if (finalizeResult.Code !== 1) {
+            const finalizeErrorData = finalizeResult.Data && typeof finalizeResult.Data === 'object'
+                ? finalizeResult.Data
+                : null;
+            const retrySafe = finalizeErrorData?.RetrySafe === true || finalizeErrorData?.retrySafe === true;
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            error: finalizeResult.Msg,
+                            requestId: finalizeRequestId,
+                            uploadedCount,
+                            stablePromoted: false,
+                            publishMode,
+                            retrySafe,
+                        }, null, 2) }],
+                isError: true,
+            };
+        }
+        let finalizeEvidence;
+        try {
+            finalizeEvidence = v3
+                ? validateApplicationAssetV3FinalizeEvidence(finalizeResult, {
+                    ...v3,
+                    appIdOrKey: input.appIdOrKey,
+                    versionNo: input.versionNo,
+                    publishMode: publishMode,
+                    entryPath: manifest.entryPath,
+                    encodedEntryPath: v3EncodedRelativePaths.get(manifest.entryPath)
+                        || encodeApplicationAssetStreamV3RelativePath(manifest.entryPath, 'v3 EntryPath'),
+                })
+                : validateApplicationFinalizeEvidence(finalizeResult, {
+                    requestId: finalizeRequestId,
+                    versionNo: input.versionNo,
+                    entryPath: manifest.entryPath,
+                    deliveryBatchId: effectiveDeliveryBatchId,
+                    runtimeManifestHash: manifest.manifestHash,
+                    assetCount: manifest.assets.length,
+                    totalSize: manifest.totalSize,
+                    expectedCurrentVersion: input.expectedCurrentVersion,
+                    expectedAppVersion: input.expectedAppVersion ?? undefined,
+                });
+        }
+        catch (error) {
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            error: error instanceof Error ? error.message : String(error),
+                            requestId: finalizeRequestId,
+                            uploadedCount,
+                            publishMode,
+                            retrySafe: false,
+                            evidenceMismatch: true,
+                        }, null, 2) }],
+                isError: true,
+            };
+        }
+        if (v3) {
+            const payload = {
+                ...finalizeEvidence,
+                deliveryBatchId: v3.deliveryBatchId,
+                sourceManifestHash: v3.sourceManifestHash,
+                runtimeManifestHash: v3.runtimeManifestHash,
+                assetRequestManifestHash,
+                assetCount: manifest.assets.length,
+                stagedCount: publishMode === 'stage' ? manifest.assets.length : 0,
+                uploadedCount: publishMode === 'stage' ? manifest.assets.length : 0,
+                idempotentCount,
+                totalSize: manifest.totalSize,
+                transport: publishMode === 'stage'
+                    ? 'v3-multipart-immutable-release-stage'
+                    : 'v3-immutable-pointer-finalize',
+                jintFileBytes: 0,
+                publishMode,
+                requestId: v3.requestId,
+                requestFingerprint: v3.requestFingerprint,
+            };
+            return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+        }
+        const publishedAppKey = String(finalizeEvidence.AppKey || input.appIdOrKey);
+        let runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
+        for (const delayMs of [250, 750, 1_500]) {
+            if (runtimeProbe.ok)
+                break;
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
+        }
+        const payload = {
+            ...finalizeEvidence,
+            deliveryBatchId: effectiveDeliveryBatchId,
+            sourceManifestHash: input.sourceManifestHash || '',
+            runtimeManifestHash: manifest.manifestHash,
+            assetRequestManifestHash,
+            assetCount: manifest.assets.length,
+            stagedCount: publishMode === 'stage-and-finalize' ? manifest.assets.length : 0,
+            uploadedCount: publishMode === 'stage-and-finalize' ? manifest.assets.length : 0,
+            idempotentCount,
+            totalSize: manifest.totalSize,
+            transport: publishMode === 'finalize' ? 'manifest-finalize-only' : 'multipart-stream-to-hdfs',
+            jintFileBytes: 0,
+            publishMode,
+            requestId: finalizeRequestId,
+            RuntimeProbe: runtimeProbe,
+            PublishedButUnavailable: !runtimeProbe.ok,
+            StablePromoted: true,
+        };
+        return {
+            content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+            ...(!runtimeProbe.ok ? { isError: true } : {}),
+        };
+    }
+    catch (error) {
+        return {
+            content: [{ type: 'text', text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true,
+        };
+    }
+}
 function normalizeAccessKeyStringList(values, lowerCase = false) {
     const normalized = (values || [])
         .map(value => String(value || '').trim())
@@ -319,6 +1343,7 @@ function buildRuntimeServerName(context) {
 const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_codex',
     'microi_get_status',
+    'microi_transition_application_stream_gate',
     'microi_redis_statistics',
     'microi_redis_list_keys',
     'microi_redis_get_key',
@@ -1135,6 +2160,107 @@ export function createMcpServer(client, context) {
         }
         catch (e) {
             return { content: [{ type: 'text', text: `❌ Connection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_transition_application_stream_gate', `Preview or execute one application-stream gate transition for the exact MCP-bound tenant coordinate. Allowed transitions are LegacyOpen -> Drain, Drain -> V3Only, and the safety rollback Drain -> LegacyOpen; every successful transition must advance the server epoch. V3Only never permits downgrade. The first call never reaches the server and returns ConfirmationSha256. A server call is possible only when confirmExecution=true and confirmationSha256 exactly matches that preview; the server must independently recompute the same hash.`, {
+        osClient: z.string().min(1).max(100).describe('Exact OsClient from the active MCP coordinate.'),
+        osClientType: z.string().max(100).describe('Exact OsClientType from the active MCP coordinate; pass an explicit empty string when unset.'),
+        osClientNetwork: z.string().max(100).describe('Exact OsClientNetwork from the active MCP coordinate; pass an explicit empty string when unset.'),
+        expectedMode: z.enum(['LegacyOpen', 'Drain', 'V3Only']).describe('Compare-and-swap source mode.'),
+        expectedMinProtocol: z.union([z.literal(2), z.literal(3)]).describe('Compare-and-swap source minimum protocol.'),
+        expectedGateEpoch: z.string().describe('Canonical non-negative Int64 decimal string; no leading zeroes.'),
+        targetMode: z.enum(['LegacyOpen', 'Drain', 'V3Only']).describe('Target mode. Drain -> LegacyOpen is the only rollback and still advances the gate epoch; V3Only cannot transition.'),
+        transitionId: z.string().min(8).max(100).describe('Stable idempotency/audit identifier.'),
+        reason: z.string().min(1).max(1000).describe('Auditable transition reason with no leading/trailing whitespace.'),
+        drainProofJson: z.string().min(2).max(1024 * 1024).describe('Canonical JSON object proving the drain observation.'),
+        drainProofHash: z.string().length(64).describe('Lowercase SHA-256 of the exact UTF-8 DrainProofJson bytes.'),
+        confirmExecution: z.boolean().optional().describe('Omit/false for preview. Only literal true can execute.'),
+        confirmationSha256: z.string().optional().describe('Exact lowercase ConfirmationSha256 returned by the preview of this unchanged payload.'),
+    }, async ({ osClient: requestedOsClient, osClientType, osClientNetwork, expectedMode, expectedMinProtocol, expectedGateEpoch, targetMode, transitionId, reason, drainProofJson, drainProofHash, confirmExecution, confirmationSha256, }) => {
+        let serverCallStarted = false;
+        try {
+            const confirmation = buildApplicationStreamGateTransitionConfirmation({
+                osClient: requestedOsClient,
+                osClientType,
+                osClientNetwork,
+                expectedMode,
+                expectedMinProtocol,
+                expectedGateEpoch,
+                targetMode,
+                transitionId,
+                reason,
+                drainProofJson,
+                drainProofHash,
+            }, context);
+            const preview = {
+                Preview: true,
+                RemoteWriteAttempted: false,
+                ConfirmationSha256: confirmation.confirmationSha256,
+                Transition: confirmation.payload,
+                Next: 'Repeat the unchanged payload with confirmExecution=true and confirmationSha256 exactly equal to ConfirmationSha256.',
+            };
+            if (confirmExecution !== true) {
+                return { content: [{ type: 'text', text: JSON.stringify(preview, null, 2) }] };
+            }
+            if (confirmationSha256 !== confirmation.confirmationSha256) {
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({
+                                ...preview,
+                                Error: 'confirmationSha256 与当前规范化转换载荷不完全一致；未调用服务器。',
+                            }, null, 2),
+                        }],
+                    isError: true,
+                };
+            }
+            serverCallStarted = true;
+            const result = await client.transitionApplicationStreamGate({
+                ...confirmation.payload,
+                ConfirmationSha256: confirmation.confirmationSha256,
+                ConfirmExecution: true,
+            });
+            if (result.Code !== 1) {
+                return {
+                    content: [{
+                            type: 'text',
+                            text: JSON.stringify({
+                                Preview: false,
+                                RemoteWriteAttempted: true,
+                                ConfirmationSha256: confirmation.confirmationSha256,
+                                Transition: confirmation.payload,
+                                Result: result,
+                            }, null, 2),
+                        }],
+                    isError: true,
+                };
+            }
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            Preview: false,
+                            RemoteWriteAttempted: true,
+                            ConfirmationSha256: confirmation.confirmationSha256,
+                            Transition: confirmation.payload,
+                            Result: result,
+                        }, null, 2),
+                    }],
+            };
+        }
+        catch (e) {
+            return {
+                content: [{
+                        type: 'text',
+                        text: JSON.stringify({
+                            Preview: !serverCallStarted,
+                            RemoteWriteAttempted: serverCallStarted,
+                            OutcomeUncertain: serverCallStarted,
+                            Error: e instanceof Error ? e.message : String(e),
+                        }, null, 2),
+                    }],
+                isError: true,
+            };
         }
     });
     server.tool('microi_list_my_access_keys', `List the current authenticated user's access keys for OsClient "${osClient}". The response contains only public metadata and never returns the credential or its hash. Access-key sessions cannot manage keys. Requires confirmExecution="LIST" because key prefixes and usage metadata are security-sensitive.`, {
@@ -3817,7 +4943,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 在本地 AI 应用目录创建 Vue 微服务脚手架
     // ========================
-    server.tool('microi_scaffold_vue_microservice', `Create a safe Vue 3 + Vite MicroService scaffold inside the local tenant AI应用 directory for OsClient "${osClient}". The tool writes .microi-micro-app.json, microi.routes.json and one Vue component per declared route. It only accepts a real absolute directory whose basename is AI应用, never overwrites a different existing project, and performs a dry run until confirmExecution exactly equals appKey. After scaffolding, use microi_create_microservice, microi_sync_microservice_source and microi_publish_application_directory_stream (or the legacy publisher for a tiny compatibility payload).`, {
+    server.tool('microi_scaffold_vue_microservice', `Create a safe, maintainable MicroService scaffold for OsClient "${osClient}" using the stable Vue 3.5.40 + Vite 7.3.6 + TypeScript 5.9.3 baseline, @vitejs/plugin-vue 6.0.8, vue-tsc 3.3.9, Composition API and <script setup lang="ts">. The minimal template keeps Microi SDK and host/internal-route integration but does not force Pinia or Vue Router; add either only when application complexity needs it. It writes .microi-micro-app.json, microi.routes.json and exactly one Vue component per declared route inside the local tenant AI应用 directory. It only accepts a real absolute directory whose basename is AI应用, never overwrites a different existing project, and performs a dry run until confirmExecution exactly equals appKey. After scaffolding, run npm install and npm run build, then use microi_create_microservice, microi_sync_microservice_source and microi_publish_application_directory_stream (or the legacy publisher for a tiny compatibility payload).`, {
         appKey: z.string().regex(/^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/u).describe('Stable lowercase application key and local directory name.'),
         name: z.string().min(1).max(120).describe('Human-readable MicroService name.'),
         description: z.string().optional().describe('Optional application description.'),
@@ -3963,7 +5089,20 @@ export function createMcpServer(client, context) {
             const actualSha256 = await sha256LocalFile(absolutePath);
             if (sha256 && sha256.toLowerCase() !== actualSha256)
                 throw new Error('本地文件 SHA-256 与传入值不一致');
-            const summary = { appIdOrKey, versionNo, relativePath: normalizedPath, size: stat.size, sha256: actualSha256 };
+            const deliveryBatchId = `mcp-low-${deterministicApplicationPublishId([
+                appIdOrKey,
+                normalizedApplicationVersion(versionNo),
+                normalizedPath,
+                actualSha256,
+            ]).slice(0, 48)}`;
+            const requestId = buildApplicationAssetRequestId({
+                deliveryBatchId,
+                appIdOrKey,
+                versionNo,
+                relativePath: normalizedPath,
+                sha256: actualSha256,
+            });
+            const summary = { appIdOrKey, versionNo, relativePath: normalizedPath, size: stat.size, sha256: actualSha256, requestId };
             if (confirmExecution !== appIdOrKey) {
                 return { content: [{ type: 'text', text: JSON.stringify({ dryRun: true, confirmationRequired: appIdOrKey, ...summary }, null, 2) }] };
             }
@@ -3972,12 +5111,20 @@ export function createMcpServer(client, context) {
                 VersionNo: versionNo,
                 RelativePath: normalizedPath,
                 ExpectedSha256: actualSha256,
+                RequestId: requestId,
                 FilePath: absolutePath,
                 TimeoutMs: timeoutMs,
             });
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
-            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+            const evidence = validateApplicationAssetUploadEvidence(result, {
+                requestId,
+                versionNo,
+                relativePath: normalizedPath,
+                sha256: actualSha256,
+                size: stat.size,
+            });
+            return { content: [{ type: 'text', text: JSON.stringify(evidence, null, 2) }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -3986,196 +5133,68 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 流式发布完整应用目录
     // ========================
-    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using constant-memory multipart streams. MCP hashes and uploads each file to an immutable semantic version, then sends a metadata-only manifest so HDFS performs server-side copies to short root/latest URLs. It rejects symlinks, secrets, node_modules/.git and runaway file counts before uploading. This is the preferred publisher for compiled applications; file bytes do not pass through JSON, Base64 or Jint. During a rolling upgrade only, an exact pre-write JValue.Val defect on an old API node may use the bounded legacy C# path for an existing MicroService of at most 256 files / 5MB; Web, UniApp and larger builds fail closed until the API node is upgraded.`, {
+    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using bounded multipart file streams and deterministic RequestId evidence. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Each file is capped at 128 MiB and the complete manifest at 1 GiB before upload. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without RequestId support fail closed.`, {
         appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
         versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
         directory: z.string().min(1).describe('Local compiled output directory such as dist or unpackage/dist/build/h5.'),
         entryPath: z.string().optional().default('index.html').describe('Entry file relative to directory. Default index.html.'),
-        routes: z.array(jsonRecordSchema).optional().describe('Optional MicroService page/route metadata.'),
+        routes: z.array(jsonRecordSchema).optional().default([]).describe('Canonical v3 route snapshot input; missing routes are frozen explicitly as [].'),
+        routeSnapshotJson: z.string().max(1024 * 1024).optional().describe('Protocol v3 requires the exact recursive-key-sorted, array-order-preserving UTF-8 canonical JSON for routes.'),
+        routeSnapshotHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the lowercase SHA-256 of RouteSnapshotJson.'),
         changeSummary: z.string().optional().describe('Version change summary stored in mci_ai_app_version.'),
         sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional source-manifest SHA-256 returned by microi_sync_microservice_source, tying source and runtime to one delivery.'),
-        deliveryBatchId: z.string().min(1).max(128).optional().describe('Optional stable delivery batch id. MCP generates one when omitted.'),
+        runtimeManifestHash: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 requires the exact lowercase runtime-manifest SHA-256 computed during the local dry run.'),
+        deliveryBatchId: z.string().min(8).max(50).optional().describe('Optional stable delivery batch id (8-50 characters, matching the API and LastBuildTaskId). When omitted MCP derives a deterministic id from app/version/manifest so retries remain stable.'),
+        publishMode: z.enum(['stage', 'finalize', 'stage-and-finalize']).optional().default('stage-and-finalize').describe('stage uploads immutable assets only; finalize submits the local manifest only; stage-and-finalize preserves the original one-call behavior.'),
+        protocolVersion: z.literal(3).optional().describe('Explicit protocol v3 gate. When set, publishMode must be explicit stage or finalize and every v3 precondition is required.'),
+        expectedGateEpoch: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 gate epoch as a canonical decimal bigint string.'),
+        requestId: z.string().regex(/^[A-Za-z0-9._:-]{8,100}$/u).optional().describe('Protocol v3 stable release RequestId; stage/finalize and all Pending replays must reuse it exactly.'),
+        requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u).optional().describe('Protocol v3 immutable release fingerprint.'),
+        expectedCurrentVersion: z.number().int().min(0).optional().describe('Required for finalize/stage-and-finalize and omitted only during stage. Must equal the application CurrentVersion read before staging.'),
+        expectedAppVersion: z.string().nullable().optional().describe('Application AppVersion baseline. Protocol v3 requires explicit string or null for both stage and finalize.'),
+        expectedPublishFence: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 sys_microistore.PublishFence canonical decimal bigint string.'),
+        expectedPublishRowVersion: z.string().regex(/^(0|[1-9]\d*)$/u).optional().describe('Protocol v3 sys_microistore.PublishRowVersion canonical decimal bigint string.'),
+        expectedVersionRowVersion: z.string().regex(/^(0|[1-9]\d*)$/u).nullable().optional().describe('Protocol v3 target mci_ai_app_version.RowVersion; explicit null means the row must not exist.'),
+        expectedActivePublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 active version id baseline; explicit null means empty.'),
+        expectedCommittedPublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 committed version id baseline; explicit null means empty.'),
         includeSourceMaps: z.boolean().optional().default(false).describe('Publish *.map source maps. Defaults to false to avoid source disclosure.'),
         maxFiles: z.number().int().min(1).max(20_000).optional().describe('Safety cap checked before upload. Default and hard maximum 20,000.'),
-        maxTotalMegabytes: z.number().positive().max(20_480).optional().describe('Safety cap checked before upload. Default and hard maximum 20GB.'),
+        maxTotalMegabytes: z.number().positive().max(1024).optional().default(1024).describe('Safety cap checked before upload. Default and hard maximum 1 GiB (1024 MiB).'),
         timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
-        allowLegacyFallback: z.boolean().optional().default(true).describe('Allow the bounded legacy Base64 C# fallback only for a small existing MicroService when an old API node hits the exact pre-write JValue.Val defect. Set false for deliveries that require multipart streaming end to end.'),
+        allowLegacyFallback: z.boolean().optional().default(false).describe('Deprecated compatibility flag. RequestId-capable two-phase publishing fails closed on old API nodes instead of publishing through the legacy payload.'),
         confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),
-    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, changeSummary, sourceManifestHash, deliveryBatchId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
-        try {
-            if (confirmExecution && confirmExecution !== appIdOrKey) {
-                return { content: [{ type: 'text', text: `Error: confirmExecution 必须精确等于 ${appIdOrKey}` }], isError: true };
-            }
-            const manifest = await buildLocalApplicationAssetManifest(directory, entryPath, {
-                includeSourceMaps,
-                maxFiles,
-                maxTotalBytes: maxTotalMegabytes ? Math.floor(maxTotalMegabytes * 1024 * 1024) : undefined,
-            });
-            if (confirmExecution !== appIdOrKey) {
-                return {
-                    content: [{ type: 'text', text: JSON.stringify({
-                                dryRun: true,
-                                confirmationRequired: appIdOrKey,
-                                rootDirectory: manifest.rootDirectory,
-                                entryPath: manifest.entryPath,
-                                assetCount: manifest.assets.length,
-                                totalSize: manifest.totalSize,
-                                runtimeManifestHash: manifest.manifestHash,
-                                skippedSourceMaps: manifest.skippedSourceMaps,
-                                assetsPreview: manifest.assets.slice(0, 200).map(asset => ({ Path: asset.relativePath, Size: asset.size, Sha256: asset.sha256 })),
-                                previewTruncated: manifest.assets.length > 200,
-                            }, null, 2) }],
-                };
-            }
-            const effectiveDeliveryBatchId = deliveryBatchId || crypto.randomUUID();
-            let uploadedCount = 0;
-            const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
-            for (const asset of uploadOrder) {
-                const result = await client.uploadApplicationAssetStream({
-                    AppIdOrKey: appIdOrKey,
-                    VersionNo: versionNo,
-                    RelativePath: asset.relativePath,
-                    ExpectedSha256: asset.sha256,
-                    FilePath: asset.absolutePath,
-                    TimeoutMs: timeoutMsPerFile,
-                });
-                if (result.Code !== 1) {
-                    const fallbackPolicy = resolveLegacyApplicationStreamFallbackPolicy(result, uploadedCount, allowLegacyFallback);
-                    if (fallbackPolicy.requireMultipartStream) {
-                        return {
-                            content: [{ type: 'text', text: JSON.stringify({
-                                        error: result.Msg,
-                                        failedPath: asset.relativePath,
-                                        uploadedCount,
-                                        totalCount: manifest.assets.length,
-                                        retrySafe: true,
-                                        allowLegacyFallback: false,
-                                        compatibilityFallbackAttempted: false,
-                                        requiresMultipartStream: true,
-                                        transport: 'multipart-stream-required',
-                                    }, null, 2) }],
-                            isError: true,
-                        };
-                    }
-                    if (fallbackPolicy.attemptFallback) {
-                        const fallback = await tryLegacyMicroServiceStreamPublishFallback(client, manifest, {
-                            appIdOrKey,
-                            versionNo,
-                            routes: routes || [],
-                            deliveryBatchId: effectiveDeliveryBatchId,
-                            sourceManifestHash: sourceManifestHash || '',
-                        });
-                        if (fallback.attempted && fallback.response?.Code === 1) {
-                            const fallbackData = asJsonRecord(fallback.response.Data);
-                            const publishedAppKey = getStringField(fallbackData, 'MsKey', 'AppKey')
-                                || fallback.appKey
-                                || appIdOrKey;
-                            let runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
-                            for (const delayMs of [250, 750, 1_500]) {
-                                if (runtimeProbe.ok)
-                                    break;
-                                await new Promise(resolve => setTimeout(resolve, delayMs));
-                                runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
-                            }
-                            const payload = {
-                                ...fallbackData,
-                                deliveryBatchId: effectiveDeliveryBatchId,
-                                sourceManifestHash: sourceManifestHash || '',
-                                runtimeManifestHash: getStringField(fallbackData, 'RuntimeManifestHash') || manifest.manifestHash,
-                                RuntimeProbe: runtimeProbe,
-                                PublishedButUnavailable: !runtimeProbe.ok,
-                                uploadedCount: 0,
-                                legacyUploadedCount: manifest.assets.length,
-                                totalSize: manifest.totalSize,
-                                skippedSourceMaps: manifest.skippedSourceMaps,
-                                transport: 'legacy-base64-csharp-compatibility',
-                                CompatibilityFallback: true,
-                                CompatibilityReason: fallback.reason,
-                                StreamFailure: result.Msg,
-                                StablePromoted: true,
-                                jintFileBytes: 0,
-                            };
-                            return {
-                                content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-                                ...(!runtimeProbe.ok ? { isError: true } : {}),
-                            };
-                        }
-                        return {
-                            content: [{ type: 'text', text: JSON.stringify({
-                                        error: fallback.attempted
-                                            ? fallback.response?.Msg || '旧节点兼容发布失败'
-                                            : result.Msg,
-                                        failedPath: asset.relativePath,
-                                        uploadedCount,
-                                        totalCount: manifest.assets.length,
-                                        retrySafe: !fallback.attempted,
-                                        compatibilityFallbackAttempted: fallback.attempted,
-                                        compatibilityFallbackReason: fallback.reason,
-                                        compatibilityFallbackRetryRequiresReadback: fallback.attempted,
-                                        streamFailure: result.Msg,
-                                    }, null, 2) }],
-                            isError: true,
-                        };
-                    }
-                    return {
-                        content: [{ type: 'text', text: JSON.stringify({
-                                    error: result.Msg,
-                                    failedPath: asset.relativePath,
-                                    uploadedCount,
-                                    totalCount: manifest.assets.length,
-                                    retrySafe: true,
-                                }, null, 2) }],
-                        isError: true,
-                    };
-                }
-                uploadedCount += 1;
-                if (uploadedCount === 1 || uploadedCount % 25 === 0 || uploadedCount === manifest.assets.length) {
-                    console.error(`[microi-mcp] Stream publish ${appIdOrKey} ${versionNo}: ${uploadedCount}/${manifest.assets.length}`);
-                }
-            }
-            const finalizeResult = await client.finalizeApplicationStreamPublish({
-                AppIdOrKey: appIdOrKey,
-                VersionNo: versionNo,
-                EntryPath: manifest.entryPath,
-                Assets: manifest.assets.map(asset => ({ Path: asset.relativePath, Sha256: asset.sha256, Size: asset.size })),
-                Routes: routes || [],
-                ChangeSummary: changeSummary || 'MCP 二进制流式发布',
-                DeliveryBatchId: effectiveDeliveryBatchId,
-                SourceManifestHash: sourceManifestHash || '',
-                RuntimeManifestHash: manifest.manifestHash,
-            });
-            if (finalizeResult.Code !== 1) {
-                return { content: [{ type: 'text', text: JSON.stringify({ error: finalizeResult.Msg, uploadedCount, stablePromoted: false, retrySafe: true }, null, 2) }], isError: true };
-            }
-            const publishedAppKey = String(finalizeResult.Data?.AppKey || appIdOrKey);
-            let runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
-            for (const delayMs of [250, 750, 1_500]) {
-                if (runtimeProbe.ok)
-                    break;
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-                runtimeProbe = await client.probeMicroAppEntry(publishedAppKey);
-            }
-            const payload = {
-                ...(finalizeResult.Data && typeof finalizeResult.Data === 'object' ? finalizeResult.Data : {}),
-                deliveryBatchId: effectiveDeliveryBatchId,
-                sourceManifestHash: sourceManifestHash || '',
-                runtimeManifestHash: manifest.manifestHash,
-                RuntimeProbe: runtimeProbe,
-                PublishedButUnavailable: !runtimeProbe.ok,
-                uploadedCount,
-                totalSize: manifest.totalSize,
-                skippedSourceMaps: manifest.skippedSourceMaps,
-                transport: 'multipart-stream-to-hdfs',
-                jintFileBytes: 0,
-            };
-            return {
-                content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
-                ...(!runtimeProbe.ok ? { isError: true } : {}),
-            };
-        }
-        catch (e) {
-            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
-        }
+    }, async ({ appIdOrKey, versionNo, directory, entryPath, routes, routeSnapshotJson, routeSnapshotHash, changeSummary, sourceManifestHash, runtimeManifestHash, deliveryBatchId, publishMode, protocolVersion, expectedGateEpoch, requestId, requestFingerprint, expectedCurrentVersion, expectedAppVersion, expectedPublishFence, expectedPublishRowVersion, expectedVersionRowVersion, expectedActivePublishVersionId, expectedCommittedPublishVersionId, includeSourceMaps, maxFiles, maxTotalMegabytes, timeoutMsPerFile, allowLegacyFallback, confirmExecution }) => {
+        return runApplicationDirectoryStreamPublish(client, {
+            appIdOrKey,
+            versionNo,
+            directory,
+            entryPath,
+            routes,
+            routeSnapshotJson,
+            routeSnapshotHash,
+            changeSummary,
+            sourceManifestHash,
+            runtimeManifestHash,
+            deliveryBatchId,
+            publishMode,
+            protocolVersion,
+            expectedGateEpoch,
+            requestId,
+            requestFingerprint,
+            expectedCurrentVersion,
+            expectedAppVersion,
+            expectedPublishFence,
+            expectedPublishRowVersion,
+            expectedVersionRowVersion,
+            expectedActivePublishVersionId,
+            expectedCommittedPublishVersionId,
+            includeSourceMaps,
+            maxFiles,
+            maxTotalMegabytes,
+            timeoutMsPerFile,
+            allowLegacyFallback,
+            confirmExecution,
+        });
     });
     // ========================
     // Tool: 发布微服务 / 微应用文件资产
@@ -4185,7 +5204,7 @@ export function createMcpServer(client, context) {
         assets: z.array(jsonRecordSchema).describe('Built asset files. Each item needs Path/RelativePath/FileName and FileByteBase64/ContentBase64. Mark the main HTML/JS entry with IsEntry=true or Entry=true.'),
         routes: z.array(jsonRecordSchema).optional().describe('Optional route/page records for sys_microiservice_page. Fields: PageKey, PageName, PageTitle, RoutePath, EntryPath, SourceDirName, SourceFile, RouteMetaJson, Sort, IsHome.'),
         sourceManifestHash: z.string().regex(/^[a-fA-F0-9]{64}$/u).optional().describe('Optional source-manifest SHA-256 returned by source sync.'),
-        deliveryBatchId: z.string().min(1).max(128).optional().describe('Optional stable delivery batch id. MCP generates one when omitted.'),
+        deliveryBatchId: z.string().min(8).max(50).optional().describe('Optional stable delivery batch id (8-50 characters, matching the API and LastBuildTaskId). MCP generates one when omitted.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
     }, async ({ microService, assets, routes, sourceManifestHash, deliveryBatchId, confirmExecution }) => {
         if (!confirmExecution) {

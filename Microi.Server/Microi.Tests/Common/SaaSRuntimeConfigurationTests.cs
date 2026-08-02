@@ -87,6 +87,21 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void BaseConfiguration_DoesNotRequestJwtSecretRotationOnRelease()
+    {
+        var root = FindRepositoryRoot();
+        var appSettings = JObject.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.net.Api",
+            "appsettings.json")));
+
+        Assert.Null(appSettings.SelectToken("Security.AuthSecretRotateVersion"));
+        Assert.True(string.IsNullOrWhiteSpace(
+            appSettings.SelectToken("Security.AuthSecret")?.Value<string>()));
+    }
+
+    [Fact]
     public void RuntimeSources_DoNotReadBusinessTuningEnvironmentVariables()
     {
         var root = FindRepositoryRoot();

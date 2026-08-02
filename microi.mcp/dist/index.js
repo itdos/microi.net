@@ -98,6 +98,8 @@ async function main() {
         await client.login();
         const serverContext = {
             osClient: config.osClient || '',
+            osClientType: config.osClientType || '',
+            osClientNetwork: config.osClientNetwork || '',
             apiBaseUrl: config.apiBaseUrl,
             label: resolveMcpLabel(process.env),
             codexMode: process.env.MICROI_CODEX_MODE === '1',
@@ -167,7 +169,13 @@ async function startSSE(port, defaultConfig) {
                 rsaPublicKey: defaultConfig.rsaPublicKey,
             });
             await client.login();
-            const sseContext = { osClient: osClient || '', apiBaseUrl: defaultConfig.apiBaseUrl, label: '' };
+            const sseContext = {
+                osClient: osClient || '',
+                osClientType: defaultConfig.osClientType || '',
+                osClientNetwork: defaultConfig.osClientNetwork || '',
+                apiBaseUrl: defaultConfig.apiBaseUrl,
+                label: '',
+            };
             const server = createMcpServer(client, sseContext);
             const sseTransport = new SSEServerTransport('/messages', res);
             sessions.set(sseTransport.sessionId, { transport: sseTransport, client });

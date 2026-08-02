@@ -382,22 +382,105 @@ ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
 
         private static List<EligibleTenant> SnapshotEligibleTenants()
         {
-            var result = new List<EligibleTenant>();
+            return SnapshotEligibleTenantConnections()
+                .Select(item => new EligibleTenant
+                {
+                    OsClient = item.OsClient,
+                    Name = item.Name
+                })
+                .ToList();
+        }
+
+        /// <summary>
+        /// Reads the authoritative SaaS catalog from the main database instead of
+        /// relying on ClientList, whose historical key is only OsClient. The same
+        /// OsClient can legitimately have one row per runtime type/network, so a
+        /// dictionary snapshot can otherwise let the last loaded row shadow the
+        /// row for the current server environment.
+        /// </summary>
+        internal static List<BackupTenantConnection> SnapshotEligibleTenantConnections()
+        {
             var runtimeType = OsClientDefault.OsClientType ?? "";
             var runtimeNetwork = OsClientDefault.OsClientNetwork ?? "";
-            foreach (var pair in OsClientExtend.ClientList.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase))
+            var mainOsClient = RuntimeMainOsClient();
+            try
             {
-                var model = pair.Value?.OsClientModel;
+                var db = string.IsNullOrWhiteSpace(OsClientDefault.OsClientDbConn)
+                    ? OsClientExtend.GetClient(mainOsClient)?.DbRead
+                      ?? OsClientExtend.GetClient(mainOsClient)?.Db
+                    : MicroiORMExtensions.CreateDbSession(
+                        OsClientDefault.OsClientDbConn,
+                        DatabaseType.MySql);
+                if (db != null)
+                {
+                    var rows = db.FromSql(@"SELECT `OsClient`,`ClientName`,`OsClientType`,`OsClientNetwork`,
+`DbType`,`DbConn`,`DbReadConn`,`IsEnable`,`IsDeleted`
+FROM `sys_osclients`
+WHERE (`IsDeleted` IS NULL OR `IsDeleted`<>1) AND `IsEnable`=1
+  AND LOWER(TRIM(COALESCE(`OsClientType`,'')))=LOWER(TRIM(@runtimeType))
+  AND LOWER(TRIM(COALESCE(`OsClientNetwork`,'')))=LOWER(TRIM(@runtimeNetwork))
+  AND LOWER(TRIM(COALESCE(`DbType`,'')))='mysql'
+ORDER BY `OsClient`,`Id`")
+                        .AddInParameter("@runtimeType", runtimeType)
+                        .AddInParameter("@runtimeNetwork", runtimeNetwork)
+                        .ToList<dynamic>() ?? new List<dynamic>();
+                    return BuildEligibleTenantConnections(
+                        rows.Select(item => JObject.FromObject((object)item)),
+                        runtimeType,
+                        runtimeNetwork,
+                        mainOsClient,
+                        OsClientDefault.OsClientDbConn);
+                }
+            }
+            catch
+            {
+                // A legacy deployment can briefly reach this path before its
+                // metadata table is ready. Keep the old in-process catalog as a
+                // fail-closed compatibility fallback; it is still filtered by
+                // the exact runtime triple below.
+            }
+
+            var legacyRows = OsClientExtend.ClientList
+                .OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
+                .Where(item => item.Value?.OsClientModel != null)
+                .Select(item =>
+                {
+                    var model = (JObject)item.Value.OsClientModel.DeepClone();
+                    model["OsClient"] = item.Key;
+                    return model;
+                });
+            return BuildEligibleTenantConnections(
+                legacyRows,
+                runtimeType,
+                runtimeNetwork,
+                mainOsClient,
+                OsClientDefault.OsClientDbConn);
+        }
+
+        internal static List<BackupTenantConnection> BuildEligibleTenantConnections(
+            IEnumerable<JObject> rows,
+            string runtimeType,
+            string runtimeNetwork,
+            string mainOsClient,
+            string mainConnectionString)
+        {
+            var result = new List<BackupTenantConnection>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var model in rows ?? Enumerable.Empty<JObject>())
+            {
                 if (model == null || IsFalse(model["IsEnable"]) || IsTrue(model["IsDeleted"])) continue;
                 if (!MatchesRuntimeEnvironment(model, runtimeType, runtimeNetwork)) continue;
-                if (!string.Equals(model["DbType"]?.ToString(), "MySql", StringComparison.OrdinalIgnoreCase)) continue;
-                var connectionString = model["DbReadConn"]?.ToString();
+                if (!string.Equals(model["DbType"]?.ToString()?.Trim(), "MySql", StringComparison.OrdinalIgnoreCase)) continue;
+                var tenantOsClient = model["OsClient"]?.ToString()?.Trim() ?? "";
+                if (!OsClientKeyRegex.IsMatch(tenantOsClient) || seen.Contains(tenantOsClient)) continue;
+
+                var connectionString = string.Equals(
+                    tenantOsClient,
+                    mainOsClient,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? mainConnectionString
+                    : model["DbReadConn"]?.ToString();
                 if (string.IsNullOrWhiteSpace(connectionString)) connectionString = model["DbConn"]?.ToString();
-                if (string.IsNullOrWhiteSpace(connectionString)
-                    && string.Equals(pair.Key, RuntimeMainOsClient(), StringComparison.OrdinalIgnoreCase))
-                {
-                    connectionString = OsClientDefault.OsClientDbConn;
-                }
                 if (string.IsNullOrWhiteSpace(connectionString)) continue;
                 try
                 {
@@ -405,20 +488,23 @@ ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
                         ConnectionStringCompatibility.Normalize(
                             DatabaseType.MySql, connectionString, 100, 120, 600));
                     if (string.IsNullOrWhiteSpace(builder.Database)) continue;
+                    result.Add(new BackupTenantConnection
+                    {
+                        OsClient = tenantOsClient,
+                        Name = string.IsNullOrWhiteSpace(model["ClientName"]?.ToString())
+                            ? tenantOsClient
+                            : model["ClientName"]?.ToString()?.Trim(),
+                        ConnectionString = builder.ConnectionString
+                    });
+                    seen.Add(tenantOsClient);
                 }
                 catch
                 {
-                    continue;
+                    // Invalid or incomplete connection settings are never
+                    // projected to the UI and are not eligible for backup.
                 }
-                result.Add(new EligibleTenant
-                {
-                    OsClient = pair.Key,
-                    Name = model["ClientName"]?.ToString()
-                           ?? model["SysTitle"]?.ToString()
-                           ?? pair.Key
-                });
             }
-            return result;
+            return result.OrderBy(item => item.OsClient, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         public static bool MatchesRuntimeEnvironment(JObject model, string osClientType, string osClientNetwork)
@@ -552,6 +638,13 @@ ORDER BY `Level` DESC,`CreateTime` ASC LIMIT 1").ToFirst<dynamic>();
         {
             public string OsClient { get; set; }
             public string Name { get; set; }
+        }
+
+        internal sealed class BackupTenantConnection
+        {
+            public string OsClient { get; set; }
+            public string Name { get; set; }
+            public string ConnectionString { get; set; }
         }
 
         private sealed class SelectionResult
