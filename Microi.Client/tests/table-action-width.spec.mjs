@@ -6,25 +6,62 @@ import tableUtilsMixin from "../src/views/form-engine/mixins/table-utils.mixin.j
 
 const methods = tableUtilsMixin.methods;
 
-test("row action width includes visible V8 button labels, chrome and gaps", function () {
+test("row action width includes visible V8 button labels, chrome and only real gaps", function () {
     const width = methods.GetRowActionButtonsWidth([
         { Name: "设计", IsVisible: true },
         { Name: "复制表", IsVisible: 1 },
         { Name: "不可见", IsVisible: false }
     ]);
 
-    assert.equal(width, 152);
+    assert.equal(width, 138);
     assert.equal(methods.GetRowActionButtonsWidth([
         { Name: "提料", IsVisible: true },
         { Name: "成品", IsVisible: true },
         { Name: "请购", IsVisible: true },
         { Name: "收款", IsVisible: true }
-    ]), 280);
+    ]), 258);
     assert.equal(methods.GetRowActionButtonsWidth([
         { Name: "充值Token", IsVisible: true },
         { Name: "清除登录信息", IsVisible: true }
-    ]), 223);
-    assert.equal(methods.GetActionCellReserveWidth(), 32);
+    ]), 209);
+    assert.equal(methods.GetActionCellReserveWidth(), 30);
+    assert.equal(methods.GetActionMinColumnWidth(), 56);
+});
+
+test("row action content width follows the buttons that the same row really renders", function () {
+    const context = {
+        ...methods,
+        IsTrashMode: false,
+        TableChildField: { Readonly: false },
+        TableChildFormMode: "Edit",
+        _LimitEdit: true,
+        _LimitDel: true,
+        IsWorkFlowMenu() { return false; },
+        IsPermission(name) { return name === "NoDetail"; },
+        CanManageUserAccessKey() { return false; },
+        $t(key) { return key === "Msg.Detail" ? "详情" : key === "Msg.More" ? "更多" : key; }
+    };
+    const regularRow = {
+        IsVisibleDetail: true,
+        IsVisibleEdit: true,
+        IsVisibleDel: false,
+        _RowMoreBtnsOut: [],
+        _RowMoreBtnsIn: []
+    };
+    const v8OnlyRow = {
+        IsVisibleDetail: false,
+        IsVisibleEdit: false,
+        IsVisibleDel: false,
+        _RowMoreBtnsOut: [{ Name: "长按钮文案", IsVisible: true }],
+        _RowMoreBtnsIn: []
+    };
+
+    assert.equal(methods.GetRowActionContentWidth.call(context, regularRow), 129);
+    assert.equal(methods.GetRowActionContentWidth.call(context, v8OnlyRow), 96);
+    assert.equal(Math.max(
+        methods.GetRowActionContentWidth.call(context, regularRow),
+        methods.GetRowActionContentWidth.call(context, v8OnlyRow)
+    ), 129);
 });
 
 test("switching from card to table refreshes the Element Plus layout after nextTick", function () {
@@ -58,20 +95,14 @@ test("switching from card to table refreshes the Element Plus layout after nextT
 test("configured action width is a safe minimum and cannot crop wider button content", function () {
     const context = {
         SysMenuModel: { TableActionFixedWidth: 500 },
-        IsWorkFlowMenu() { return false; },
-        IsPermission() { return true; },
-        IsTrashMode: false,
-        TableChildFormMode: "Edit",
-        _LimitEdit: false,
-        _LimitDel: true,
-        HasVisibleMoreBtnsIn: false,
-        MaxRowBtnsOut: 280,
-        GetActionCellReserveWidth() { return 32; }
+        MaxRowActionContentWidth: 258,
+        GetActionCellReserveWidth() { return 30; },
+        GetActionMinColumnWidth() { return 56; }
     };
 
     assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 500);
-    context.SysMenuModel.TableActionFixedWidth = 400;
-    assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 452);
+    context.SysMenuModel.TableActionFixedWidth = 200;
+    assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 288);
     context.SysMenuModel.TableActionFixedWidth = 600;
     assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 600);
 });
@@ -80,7 +111,7 @@ test("row action styles use compact gaps and keep statistic badges inside the fi
     const styles = readFileSync(new URL("../src/styles/diy-table.scss", import.meta.url), "utf8");
 
     assert.match(styles, /\.diy-table-action-content\s*\{[\s\S]*?gap:\s*6px;/);
-    assert.match(styles, /\.diy-table-action-content\s*\{[\s\S]*?justify-content:\s*flex-start;/);
+    assert.match(styles, /\.diy-table-action-content\s*\{[\s\S]*?justify-content:\s*flex-end;/);
     assert.match(styles, />\s*\.el-button\s*\{[\s\S]*?margin-left:\s*0\s*!important;[\s\S]*?padding-inline:\s*9px;/);
     assert.match(styles, /\.diy-table-action-content\s*\{[\s\S]*?\.button-stat-badge\s*\{[\s\S]*?top:\s*-5px;[\s\S]*?right:\s*-5px;[\s\S]*?min-width:\s*16px;/);
     assert.match(styles, /@media\s*\(max-width:\s*1440px\)[\s\S]*?gap:\s*4px;[\s\S]*?padding-inline:\s*7px;/);

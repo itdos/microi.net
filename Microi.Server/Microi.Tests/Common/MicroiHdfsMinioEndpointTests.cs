@@ -15,6 +15,34 @@ public class MicroiHdfsMinioEndpointTests
         return (bool)method!.Invoke(null, new object?[] { networkIsInternet, returnFileType })!;
     }
 
+    private static bool? ResolvePrivateFileNetworkPreference(
+        bool auditProxyEnabled,
+        bool? limit,
+        string returnFileType)
+    {
+        var method = typeof(MicroiHDFS).GetMethod(
+            "ResolvePrivateFileNetworkPreference",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        return (bool?)method!.Invoke(null, new object?[]
+        {
+            auditProxyEnabled,
+            limit,
+            returnFileType
+        });
+    }
+
+    private static string ResolvePlatformStoragePath(string osClient, string filePath)
+    {
+        var method = typeof(MicroiHDFS).GetMethod(
+            "ResolvePlatformStoragePath",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        return (string)method!.Invoke(null, new object?[] { osClient, filePath })!;
+    }
+
     [Theory]
     [InlineData(null, "Byte", false)]
     [InlineData(null, "Url", true)]
@@ -26,6 +54,38 @@ public class MicroiHdfsMinioEndpointTests
         bool expected)
     {
         Assert.Equal(expected, ShouldUseInternetEndpoint(networkIsInternet, returnFileType));
+    }
+
+    [Theory]
+    [InlineData(true, true, "Url", false)]
+    [InlineData(true, null, "Url", false)]
+    [InlineData(false, true, "Url", null)]
+    [InlineData(true, false, "Url", null)]
+    [InlineData(true, true, "Byte", null)]
+    public void PrivateAuditGatewayUsesInternalObjectEndpointOnlyForPrivateUrlResponses(
+        bool auditProxyEnabled,
+        bool? limit,
+        string returnFileType,
+        bool? expected)
+    {
+        Assert.Equal(expected, ResolvePrivateFileNetworkPreference(
+            auditProxyEnabled,
+            limit,
+            returnFileType));
+    }
+
+    [Theory]
+    [InlineData("iTdos", "/itdos/database-backups/tasks/a/attempt-1.zip", "/database-backups/tasks/a/attempt-1.zip")]
+    [InlineData("iTdos", "/ITDOS/database-backups/tasks/a/attempt-1.zip", "/database-backups/tasks/a/attempt-1.zip")]
+    [InlineData("iTdos", "/database-backups/tasks/a/attempt-1.zip", "/database-backups/tasks/a/attempt-1.zip")]
+    [InlineData("iTdos", "/itdos/user-files/a.zip", "/itdos/user-files/a.zip")]
+    [InlineData("iTdos", "/other/database-backups/a.zip", "/other/database-backups/a.zip")]
+    public void PlatformBackupPathRemovesOnlyTheSyntheticTenantPrefix(
+        string osClient,
+        string filePath,
+        string expected)
+    {
+        Assert.Equal(expected, ResolvePlatformStoragePath(osClient, filePath));
     }
 
     [Theory]

@@ -889,7 +889,8 @@ ORDER BY `FinishedAt` DESC, `CreateTime` DESC LIMIT 1000;";
             var client = OsClientExtend.GetClient(RuntimeMainOsClient())
                          ?? throw new InvalidOperationException("未读取到当前后端主租户 HDFS 配置。");
             using var stream = new FileStream(zipPath, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, FileOptions.SequentialScan);
-            var result = GetHdfs().PutObject(new HDFSParam
+            var hdfs = GetHdfs();
+            var result = hdfs.PutObject(new HDFSParam
             {
                 ClientModel = client,
                 Limit = true,
@@ -900,6 +901,26 @@ ORDER BY `FinishedAt` DESC, `CreateTime` DESC LIMIT 1000;";
             }).GetAwaiter().GetResult();
             if (result == null || result.Code != 1)
                 throw new InvalidOperationException("上传 HDFS 私有桶失败：" + (result?.Msg ?? "未知错误"));
+
+            DosResult<bool> existence = null;
+            for (var attempt = 1; attempt <= 5; attempt++)
+            {
+                existence = hdfs.ObjectExist(new HDFSParam
+                {
+                    ClientModel = client,
+                    Limit = true,
+                    FileFullPath = hdfsPath,
+                    // UploadPrivate is a server-side operation. Verify against the
+                    // same internal storage plane before committing the DB record.
+                    NetworkIsInternet = false
+                }).GetAwaiter().GetResult();
+                if (existence?.Code == 1 && existence.Data) return;
+                if (attempt < 5) Thread.Sleep(attempt * 250);
+            }
+
+            throw new InvalidOperationException(
+                "HDFS 私有桶上传返回成功，但对象回读校验失败，备份记录未提交："
+                + (existence?.Msg ?? "对象不存在"));
         }
 
         private void TryDeleteUncommittedAttemptObject()

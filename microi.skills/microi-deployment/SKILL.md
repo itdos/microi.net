@@ -57,6 +57,26 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 为 VS Code、Codex 和操作系统保留至少 `max(6GB, 物理内存 20%)`。资源不足时改做
 定向测试/构建，不并行启动多个全量任务；全机占用达到 95% 时终止本轮启动的重任务树。
 
+## Windows 多 AI 本地服务与 Release 文件锁
+
+多个 AI 对话共用同一工作区和固定 `61500/61501` 时，前后端是工作区级单例共享服务，
+不是每个对话各自拥有的后台进程。发布必须使用“工作区互斥 + 精确身份识别 + DLL 锁复核”：
+
+- 健康开发服务默认复用；需要重载源码时串行重启。长期后端只从项目目录执行
+  `dotnet run --launch-profile Microi.net.Api`，禁止直接运行 `bin/Release/net10.0`
+  或 `bin/Release/publish` 作为 E2E 服务。
+- 一键发布在改写输出目录前创建 `.tmp/microi-process-state/release.lock`；锁存在时其它 AI
+  不得启动、自愈或重启 `61500/61501`。
+- Windows 发布前调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease`。
+  只在端口、命令行和当前工作区路径同时匹配时停止 Microi API/Vite，并额外查找当前工作区
+  的 Release API；身份不匹配时失败关闭，禁止使用 `/IM dotnet.exe`、`/IM node.exe`、
+  `/IM chrome.exe` 或 `/IM msedge.exe` 全机清理。
+- 停止后必须确认 `61500/61501` 已释放，并以 `FileShare.None` 独占打开
+  `Microi.net.Api/bin/Release/net10.0` DLL。只结束 `VBCSCompiler` 不能解决正在运行的
+  `.NET Host` 对业务 DLL 的锁定。
+- Edge/Chrome 用户浏览器、VS Code 的 Playwright Test Server、MCP/语言服务 Node、
+  数据库和 Redis 不属于发布清理范围。人工查看使用进程管理器的 `-Action Status`。
+
 ## 一键发布产物边界与缓存
 
 - 需要完整解决方案构建和 NuGet 打包时，先完成一次 Release build；publish 阶段复用已验证产物，禁止先 clean 再重复编译同一项目引用链。

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.8.3
+ * Version: v1.8.4
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -1953,6 +1953,51 @@ try {
         return blankCount;
     };
 
+    // PHYSICAL_NOT_NULL_BACKFILL_V1：老租户可能已经创建了新字段，但历史行仍为
+    // NULL。MySQL 会在 MODIFY ... NOT NULL 之前校验既有数据，因此必须先使用包内
+    // 明确声明的默认值做参数化回填，再收紧列约束。没有默认值时失败关闭，不能猜值。
+    var prepareNotNullColumnData = function (tableName, columnName, sourceColumn, targetColumn) {
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) return 0;
+
+        var sourceNullable = String(getPhysicalValue(sourceColumn, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
+        var targetNullable = String(getPhysicalValue(targetColumn, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
+        if (sourceNullable != 'NO' || targetNullable == 'NO') return 0;
+
+        var nullRows = V8.Db.FromSql(
+            "SELECT COUNT(1) AS NullCount FROM `" + tableName + "` WHERE `" + columnName + "` IS NULL"
+        ).ToArray();
+        var nullCount = nullRows && nullRows.length > 0
+            ? getScalarCount(nullRows[0], ['NullCount', 'NULLCOUNT', 'nullcount'])
+            : 0;
+        if (nullCount == 0) return 0;
+
+        var sourceDefault = getPhysicalValue(sourceColumn, ['COLUMN_DEFAULT', 'ColumnDefault', 'Default']);
+        if (sourceDefault === null || sourceDefault === undefined) {
+            throw new Error(
+                '字段存在' + nullCount + '条NULL数据，但应用包要求NOT NULL且未声明可回填的默认值，已阻止修改'
+            );
+        }
+
+        var columnType = String(getPhysicalValue(sourceColumn, ['COLUMN_TYPE', 'ColumnType', 'Type']) || '');
+        var defaultText = String(sourceDefault);
+        var updateSql = "UPDATE `" + tableName + "` SET `" + columnName + "` = @p0 WHERE `" + columnName + "` IS NULL";
+        var isCurrentTimestamp = /^(?:CURRENT_TIMESTAMP)(?:\(\d*\))?$/i.test(defaultText)
+            && /^(?:datetime|timestamp)(?:\(|$)/i.test(normalizeSqlType(columnType));
+        var isBitLiteral = /^b'[01]+'$/i.test(defaultText)
+            && /^bit(?:\(|$)/i.test(normalizeSqlType(columnType));
+
+        if (isCurrentTimestamp || isBitLiteral) {
+            updateSql = "UPDATE `" + tableName + "` SET `" + columnName + "` = " + defaultText
+                + " WHERE `" + columnName + "` IS NULL";
+            V8.Db.FromSql(updateSql).ExecuteNonQuery();
+        } else {
+            V8.Db.FromSql(updateSql)
+                .AddInParameter('@p0', sourceDefault)
+                .ExecuteNonQuery();
+        }
+        return nullCount;
+    };
+
     var getTargetPhysicalColumns = function (tableName) {
         var map = {};
         if (!isSafeIdentifier(tableName)) return map;
@@ -2061,6 +2106,16 @@ try {
                         if (normalizedBlankCount > 0) {
                             debugLog['physical_schema_normalized_' + tableName + '_' + columnName] =
                                 '已将' + normalizedBlankCount + '条历史空字符串规范为NULL';
+                        }
+                        var backfilledNullCount = prepareNotNullColumnData(
+                            tableName,
+                            columnName,
+                            sourceColumn,
+                            targetColumn
+                        );
+                        if (backfilledNullCount > 0) {
+                            debugLog['physical_schema_backfilled_' + tableName + '_' + columnName] =
+                                '已按应用包默认值回填' + backfilledNullCount + '条历史NULL数据';
                         }
                         var definition = buildPhysicalColumnDefinition(sourceColumn, false, effectiveColumnType);
                         if (!definition) continue;

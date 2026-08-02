@@ -1,10 +1,11 @@
 /*
  * Microi AI Application authentication bridge.
  *
- * Anonymous users may browse an application's UI and read-only demo state.
- * A persistent app_* operation opens the shared Microi login dialog, then
- * retries the request with the authenticated token. Server-side ApiEngine
- * remains the authority for write detection and UserId isolation.
+ * Anonymous users may browse an application's UI and use explicitly anonymous,
+ * server-scoped app_* operations. Requests are sent to ApiEngine first; only an
+ * authoritative authentication response opens the shared login dialog and
+ * retries once. Server-side ApiEngine remains the authority for persistence and
+ * UserId isolation.
  */
 import V8 from './microi.v8.js';
 import JSEncrypt from '../Microi.Client/node_modules/jsencrypt/bin/jsencrypt.min.js';
@@ -38,6 +39,7 @@ let sysConfig = {};
 let captchaId = '';
 let captchaObjectUrl = '';
 let lastUserIntentAt = 0;
+let validatedSessionToken = '';
 const USER_INTENT_WINDOW_MS = 30000;
 
 function installUserIntentTracking() {
@@ -249,9 +251,10 @@ function applyIdentityToBody(body, headers) {
 
 function bodyAuthExpired(body, status) {
   if (Number(status) === 401 || AUTH_CODES.has(Number(body && body.Code))) return true;
-  if (V8.getToken()) return false;
   const message = String(body && (body.Msg || body.Message || body.message) || '');
-  return /(?:请先|需要|尚未|未)登录|登录后|没有权限|无权限|身份验证|Token.*(?:失效|缺失)/i.test(message);
+  if (/(?:请先|需要|尚未|未)登录|登录后|Token.*(?:失效|缺失|过期)/i.test(message)) return true;
+  if (V8.getToken()) return false;
+  return /没有权限|无权限|身份验证/i.test(message);
 }
 
 function bodyAction(body, headers) {
@@ -459,13 +462,50 @@ async function performLogin() {
   if (!token) throw new Error('登录成功但未收到 Token，请检查服务端登录响应');
   V8.setToken(token);
   V8.setUser(result.body.Data || {});
+  validatedSessionToken = token;
   localStorage.setItem('microi_last_login_account', account);
   window.dispatchEvent(new CustomEvent('microi:ai-app-login', { detail: result.body.Data || {} }));
   return result.body.Data || {};
 }
 
+async function validateCachedLogin() {
+  const token = normalizeToken(V8.getToken());
+  if (!token) return null;
+  const cachedUser = V8.getUser() || {};
+  if (validatedSessionToken === token && authenticatedIdentity()) return cachedUser;
+
+  const resolved = runtime();
+  const result = await jsonRequest('/api/SysUser/GetCurrentUser', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      osclient: resolved.osClient,
+      did: V8.getDid(),
+      Token: token,
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ OsClient: resolved.osClient, _ClientType: V8.config.clientType || 'PC' })
+  });
+  const refreshedToken = normalizeToken(
+    result.response.headers.get('authorization') || result.response.headers.get('token') || token
+  );
+  const user = result.body && Number(result.body.Code) === 1 ? (result.body.Data || {}) : {};
+  const userId = String(user.Id || user.id || user.UserId || '').trim();
+  if (result.response.ok && userId) {
+    if (refreshedToken) V8.setToken(refreshedToken);
+    V8.setUser(user);
+    validatedSessionToken = refreshedToken || token;
+    return user;
+  }
+
+  V8.clearToken();
+  validatedSessionToken = '';
+  return null;
+}
+
 async function showLogin() {
-  if (V8.getToken()) return V8.getUser();
+  const currentUser = await validateCachedLogin();
+  if (currentUser) return currentUser;
   if (loginPromise) return loginPromise;
   const view = ensureModal();
   document.documentElement.dataset.microiAiAuthState = 'prompt';
@@ -528,7 +568,6 @@ async function fetchWithAuth(input, init = {}, retried = false) {
   document.documentElement.dataset.microiLastEngine = appEngineKey(rawUrl) || '';
   document.documentElement.dataset.microiWriteDetected = writeRequest ? 'true' : 'false';
   document.documentElement.dataset.microiHasToken = V8.getToken() ? 'true' : 'false';
-  if (!retried && writeRequest && !V8.getToken() && promptAllowed) await showLogin();
   const headers = setRequestHeaders(init.headers || (input && input.headers));
   const target = typeof input === 'string' || input instanceof URL ? rewriteApiUrl(rawUrl) : input;
   const requestBody = applyIdentityToBody(init.body, headers);
@@ -586,10 +625,6 @@ function installXhrBridge() {
       const requestBody = applyIdentityToBody(body, { 'content-type': this.__microiContentType || '' });
       send.call(this, requestBody);
     };
-    if ((isLikelyWrite(this.__microiUrl) || bodyLikelyWrites(body, { 'content-type': this.__microiContentType || '' })) && !V8.getToken() && promptAllowed) {
-      void showLogin().then(execute).catch(() => {});
-      return;
-    }
     execute();
   };
   NativeXHR.prototype.setRequestHeader = function (name, value) {
@@ -608,8 +643,9 @@ installXhrBridge();
 window.MicroiV8 = window.MicroiV8 || V8;
 window.MicroiAiAppAuth = {
   login: showLogin,
-  logout() { V8.clearToken(); window.dispatchEvent(new Event('microi:ai-app-logout')); },
+  logout() { validatedSessionToken = ''; V8.clearToken(); window.dispatchEvent(new Event('microi:ai-app-logout')); },
   getUser: () => V8.getUser(),
   getToken: () => V8.getToken(),
+  getDid: () => V8.getDid(),
   runtime
 };

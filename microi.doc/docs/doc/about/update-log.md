@@ -1,5 +1,16 @@
 # 更新日志
 
+## v7.0.0 - (2026-08-02 21:42)
+
+- **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v7.0.0；Microi VS Code 插件及内置 Skills 升级至 v4.5.9。写入本日志前的非 `dist` 待提交基线为：根仓库 43 个已跟踪文件和 3 个未跟踪文件，Microi.net 5 个已跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 1 个已跟踪文件；四仓均无暂存内容，本轮没有 `dist` 待提交差异。Microi.AI 和 Microi.VSCode 除版本元数据外没有其它源码差异。
+- **表单引擎操作列精确布局**：PC 列表操作列改为按每一行真实可见的 V8 外部按钮、工作流处理、详情、回收站恢复、访问密钥和“更多”按钮分别计算内容宽度，再取最宽行作为统一列宽；文字、前后图标、按钮边框内边距和相邻按钮间隙采用同一估算链路，树形“加载更多”特殊行也参与统计。人工 `TableActionFixedWidth` 继续作为安全最小值，固定列统一右对齐并保留角标安全区，避免把不同记录才出现的按钮错误叠加后形成大块空白，也避免低分辨率下按钮或统计角标被裁切。
+- **移动端 OpenTable 关闭语义**：移动端普通模块继续使用路由返回；嵌入 Dialog／Drawer 的 OpenTable 点击顶部返回时改为向拥有者发送关闭事件，由两种 OpenAnyTable 容器统一收起当前弹层，不再错误执行全局 `$router.back()`。底部关闭按钮复用同一关闭入口，并新增独立回归用例覆盖弹层和独立路由两种路径。
+- **匿名 AI 应用最小持久化能力**：显式开启匿名访问的 `app_*` 接口引擎，现在只允许通过字面量 `app_*` 表名调用单表 `AddFormData/UptFormData/UptFormDataByWhere/DelFormData/DelFormDataByWhere`；FormEngine 以服务端生成的匿名设备作用域写入 `UserId`，并把同一归属条件注入查询和更新，匿名访问者不能读写其它访问者的数据。动态表名、批量 FormEngine、原生 SQL、MongoDB、上传和嵌套写接口继续要求登录并失败关闭。AI 应用认证桥改为先请求服务端、仅在权威认证响应后弹出登录，缓存 Token 会通过 `GetCurrentUser` 真实校验并接收续签 Token，避免把允许匿名保存的应用动作提前拦截或把失效本地登录态当作有效会话。
+- **私有文件与数据库备份对象回读**：私有文件审计代理统一从服务端内网对象存储端点生成上游地址，浏览器仍只接收后端短期审计票据，避免内网上传成功后又绕公网 MinIO 回源产生 404。数据库备份等平台保留对象仅对精确 `/{OsClient}/database-backups/` 合成前缀做白名单规范化，普通租户文件隔离前缀保持不变；备份 ZIP 的 `PutObject` 返回成功后最多五次从同一私有桶执行 `ObjectExist` 回读，未确认对象存在时不提交成功记录。Skills 同步补充 `Range: bytes=0-0` 下载验收及重要大文件写后回读规则。
+- **应用商城老租户 NOT NULL 升级修复**：商城导入器升级至 v1.8.4，内置应用商城包升级至 v6.9.12。物理列从可空收紧为 `NOT NULL` 前，先统计老租户历史 `NULL`，使用应用包明确声明的默认值参数化回填，再执行 `ALTER TABLE ... MODIFY COLUMN`；时间戳和 bit 字面量只在类型与安全格式匹配时原样使用。包未声明默认值时按影响行数失败关闭，不猜测业务值；零空值和重复安装保持幂等，独立源码、共同基线与应用包内嵌副本同步一致。
+- **多 AI 工作区发布互斥与进程安全**：一键编译发布新增 `.tmp/microi-process-state/release.lock` 工作区互斥锁，异常退出只在能够证明原持有进程已结束时回收；Windows 发布前调用新的 `Microi.LocalProcessManager.ps1`，按端口、进程类型、命令行和工作区路径精确识别 `61501` 后端、`61500` Vite 及额外 Release 后端，身份不符即停止，不按进程名批量结束 `dotnet/node/chrome/msedge`。清理后以独占文件句柄复核 Release DLL，编译禁用共享编译服务但不再全机结束 VBCSCompiler；浏览器、VS Code、Playwright Test Server、数据库和 Redis 明确保留。
+- **本地自动化生命周期与定向回归**：表单冻结追踪启动器在发布锁存在时拒绝抢占共享端口，长期后端固定使用 Debug `dotnet run`，退出时先温和再强制结束本次创建的完整进程树；本地端口规范统一为前端 `61500`、后端 `61501`。新增／扩展操作列、移动端 OpenTable、发布互斥、进程身份与 DLL 锁、匿名 AI 应用 owner scope、私有 HDFS 内网回源、数据库备份路径以及商城 NOT NULL 回填等定向测试；本日志不把尚未执行的后端 Full、真实业务生产发布或双节点故障验收描述为已通过。
+
 ## v6.9.8 - (2026-08-02 12:01)
 
 - **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v6.9.8；Microi VS Code 插件及内置 Skills 升级至 v4.5.7。写入本日志前的非 `dist` 待提交基线为：根仓库 78 个已跟踪文件和 20 个未跟踪文件，Microi.net 4 个已跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 3 个已跟踪文件；四仓均无暂存内容。根仓库另有 25 个 `dist` 生成文件只随最终提交交付，不纳入功能分析。

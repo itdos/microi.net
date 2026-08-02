@@ -11,6 +11,7 @@ if exist "%ProgramFiles%\Git\bin\bash.exe"           set "BASH_EXE=%ProgramFiles
 if exist "%ProgramFiles(x86)%\Git\bin\bash.exe"      if not defined BASH_EXE set "BASH_EXE=%ProgramFiles(x86)%\Git\bin\bash.exe"
 if exist "%LOCALAPPDATA%\Programs\Git\bin\bash.exe"  if not defined BASH_EXE set "BASH_EXE=%LOCALAPPDATA%\Programs\Git\bin\bash.exe"
 if exist "C:\Git\bin\bash.exe"                       if not defined BASH_EXE set "BASH_EXE=C:\Git\bin\bash.exe"
+if exist "D:\Program Files\Git\bin\bash.exe"       if not defined BASH_EXE set "BASH_EXE=D:\Program Files\Git\bin\bash.exe"
 if exist "C:\msys64\usr\bin\bash.exe"                if not defined BASH_EXE set "BASH_EXE=C:\msys64\usr\bin\bash.exe"
 if not defined BASH_EXE (
     for /f "delims=" %%i in ('where bash 2^>nul') do (
@@ -76,6 +77,8 @@ set -o pipefail
 MICROI_SKIP_EXIT_PAUSE=false
 MICROI_ACTIVE_BUILD_PID=""
 MICROI_ACTIVE_GUARD_PID_FILE=""
+MICROI_RELEASE_LOCK_HELD=false
+MICROI_RELEASE_LOCK_DIR=""
 
 is_windows_shell() {
     [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]
@@ -106,11 +109,93 @@ stop_active_client_build() {
     MICROI_ACTIVE_BUILD_PID=""
 }
 
+release_workspace_lock() {
+    [ "$MICROI_RELEASE_LOCK_HELD" != true ] && return 0
+    if [ -n "$MICROI_RELEASE_LOCK_DIR" ] && [ -d "$MICROI_RELEASE_LOCK_DIR" ]; then
+        rm -f "$MICROI_RELEASE_LOCK_DIR/owner.env"
+        rmdir "$MICROI_RELEASE_LOCK_DIR" 2>/dev/null || true
+    fi
+    MICROI_RELEASE_LOCK_HELD=false
+}
+
+acquire_workspace_lock() {
+    local _state_dir="$PWD/.tmp/microi-process-state"
+    local _lock_dir="$_state_dir/release.lock"
+    mkdir -p "$_state_dir"
+
+    if ! mkdir "$_lock_dir" 2>/dev/null; then
+        local _owner_pid=""
+        if [ -f "$_lock_dir/owner.env" ]; then
+            _owner_pid=$(sed -n 's/^pid=\([0-9][0-9]*\)$/\1/p' "$_lock_dir/owner.env" | head -1)
+        fi
+
+        # 只自动回收能证明持有进程已经退出的精确锁目录；无法证明时宁可阻止并发发布。
+        if [[ "$_owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$_owner_pid" 2>/dev/null; then
+            rm -f "$_lock_dir/owner.env"
+            rmdir "$_lock_dir" 2>/dev/null || true
+            mkdir "$_lock_dir" 2>/dev/null || print_fail "检测到无法安全回收的发布互斥锁: $_lock_dir"
+            print_warning "已回收上次异常退出留下的发布互斥锁（原 PID=$_owner_pid）"
+        else
+            local _owner_text="未知"
+            [ -n "$_owner_pid" ] && _owner_text="$_owner_pid"
+            print_fail "另一个吾码发布/编译流程正在使用当前工作区（PID=${_owner_text}）。
+请等待它结束；若确认上次异常退出，请先运行：
+powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status"
+        fi
+    fi
+
+    MICROI_RELEASE_LOCK_DIR="$_lock_dir"
+    MICROI_RELEASE_LOCK_HELD=true
+    {
+        echo "pid=${BASHPID:-$$}"
+        echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        echo "workspace=$PWD"
+    } > "$_lock_dir/owner.env"
+    print_info "已取得工作区发布互斥锁；其它 AI 不应在本次发布期间重启 61500/61501。"
+}
+
+prepare_release_workspace() {
+    if ! is_windows_shell; then
+        print_info "非 Windows 环境无需处理 DLL 文件锁；工作区发布互斥锁仍然生效。"
+        return 0
+    fi
+
+    local _powershell_cmd=""
+    if command -v powershell.exe >/dev/null 2>&1; then
+        _powershell_cmd="powershell.exe"
+    elif command -v pwsh.exe >/dev/null 2>&1; then
+        _powershell_cmd="pwsh.exe"
+    else
+        echo "未找到 PowerShell，无法安全识别并清理当前工作区的本地开发进程。" >&2
+        return 1
+    fi
+
+    local _manager_script="$PWD/Microi.Server/tools/Microi.LocalProcessManager.ps1"
+    if [ ! -f "$_manager_script" ]; then
+        echo "未找到进程管理器: $_manager_script" >&2
+        return 1
+    fi
+
+    local _manager_windows_path="$_manager_script"
+    local _workspace_windows_path="$PWD"
+    if command -v cygpath >/dev/null 2>&1; then
+        _manager_windows_path=$(cygpath -w "$_manager_script")
+        _workspace_windows_path=$(cygpath -w "$PWD")
+    fi
+
+    "$_powershell_cmd" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+        -File "$_manager_windows_path" \
+        -Action PrepareRelease \
+        -WorkspaceRoot "$_workspace_windows_path" \
+        -BackendPort 61501 \
+        -FrontendPort 61500 </dev/null
+}
+
 handle_session_interrupt() {
     local _signal="${1:-TERM}"
     MICROI_SKIP_EXIT_PAUSE=true
     stop_active_client_build
-    trap - EXIT INT TERM HUP
+    trap - INT TERM HUP
     [ "$_signal" = "INT" ] && exit 130
     exit 143
 }
@@ -118,7 +203,9 @@ handle_session_interrupt() {
 finish_windows_session() {
     local _exit_code=$?
     trap - EXIT
-    if [ "$MICROI_SKIP_EXIT_PAUSE" != true ] && [ -t 0 ]; then
+    stop_active_client_build
+    release_workspace_lock
+    if is_windows_shell && [ "$MICROI_SKIP_EXIT_PAUSE" != true ] && [ -t 0 ]; then
         echo ""
         read -r -p "  按回车键关闭窗口..." _w || true
     fi
@@ -139,6 +226,11 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
         "$LOCALAPPDATA/Yarn/bin"; do
         [ -d "$_np" ] && export PATH="$_np:$PATH"
     done
+else
+    trap finish_windows_session EXIT
+    trap 'handle_session_interrupt INT' INT
+    trap 'handle_session_interrupt TERM' TERM
+    trap 'handle_session_interrupt HUP' HUP
 fi
 
 # ════════════════════════════════════════════════════════════════
@@ -723,6 +815,22 @@ sleep 1
 # 开始执行
 # ══════════════════════════════════════════════════════════════
 
+# 编译/发布会改写共享输出目录，必须先取得工作区级互斥权。Windows 下随后只结束
+# 当前工作区的 61501 后端、61500 Vite 及额外 Release 后端；浏览器、VS Code、
+# Playwright Test Server、数据库和 Redis 一律不碰。这样多个 AI 共用服务时不会靠
+# “结束所有 node/dotnet/chrome”碰运气，也不会把 Release DLL 留在运行进程中。
+if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ] || [ "$PUBLISH_DOC" = true ]; then
+    print_phase "取得工作区发布独占权"
+    acquire_workspace_lock
+    if [ "$BUILD_BACKEND" = true ] || [ "$BUILD_CLIENT" = true ]; then
+        print_step "识别并停止当前工作区的共享开发服务，检查 Release DLL 文件锁..."
+        if ! prepare_release_workspace; then
+            print_fail "本地开发进程无法安全收尾；已阻止编译，避免误杀其它应用或再次遇到 DLL 文件锁。"
+        fi
+        print_success "共享开发服务已安全收尾，Release DLL 文件锁为 0"
+    fi
+fi
+
 # 前端资源预检必须发生在版本号、升级资源和其它源码变更之前。
 if [ "$BUILD_CLIENT" = true ]; then
     print_phase "发布前资源预检"
@@ -808,21 +916,7 @@ fi
 # Windows 并行编译时文件锁竞争问题，强制单线程（macOS/Linux 不需要）
 _BUILD_EXTRA_ARGS=""
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || -n "$WINDIR" ]]; then
-    _BUILD_EXTRA_ARGS="-m:1 -nodeReuse:false"
-    # 终止 Roslyn 编译服务器（VBCSCompiler）——它会在编译完 DLL 后仍持有文件句柄，
-    # 导致后续项目引用该 DLL 时报 "file is being used by another process"。
-    # VBCSCompiler 是纯后台缓存进程，终止后下次编译会自动重启，无副作用。
-    print_step "清理 Roslyn 编译服务进程（VBCSCompiler）..."
-    # 用 taskkill 而不是 powershell.exe：
-    #   1. PowerShell 启动要加载 .NET（1-2s），VBCSCompiler 进程多时线性变慢；
-    #   2. PowerShell 管道 "Get-Process | Stop-Process" 会一直等到进程真正退出，
-    #      VBCSCompiler 持有 DLL 文件句柄时强制终止会长时间挂起；
-    #   3. Git Bash 重定向 PowerShell 的 stdin 没显式关闭时，
-    #      powershell.exe 会等 stdin EOF 才退出，整个脚本就僵在那。
-    # taskkill 是原生 exe，无 .NET 依赖，配合 < /dev/null 关闭 stdin、timeout 10 兜底，
-    # 即便杀不掉也不会卡住后续流程（VBCSCompiler 下次 build 会自动重启）。
-    timeout 10 cmd.exe //c "taskkill /F /IM VBCSCompiler.exe /T 2>nul" </dev/null >/dev/null 2>&1 || true
-    print_info "Windows 环境：-m:1 -nodeReuse:false，已清理 VBCSCompiler"
+    _BUILD_EXTRA_ARGS="-m:1 -nodeReuse:false -p:UseSharedCompilation=false"
 fi
 
 # ─── 阶段（条件）: 编译后端解决方案 ──────────────────────
