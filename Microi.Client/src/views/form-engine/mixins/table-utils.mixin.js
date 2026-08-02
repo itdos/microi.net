@@ -1,8 +1,12 @@
 const ROW_ACTION_ASCII_LABEL_WIDTH = 7;
 const ROW_ACTION_WIDE_LABEL_WIDTH = 12;
-const ROW_ACTION_BUTTON_CHROME_WIDTH = 40;
+const ROW_ACTION_BUTTON_PADDING_AND_BORDER_WIDTH = 20;
+const ROW_ACTION_CUSTOM_LEADING_ICON_WIDTH = 16;
+const ROW_ACTION_ELEMENT_LEADING_ICON_WIDTH = 18;
+const ROW_ACTION_TRAILING_ICON_WIDTH = 17;
 const ROW_ACTION_BUTTON_GAP_WIDTH = 6;
-const ROW_ACTION_CELL_RESERVE_WIDTH = 32;
+const ROW_ACTION_CELL_RESERVE_WIDTH = 30;
+const ROW_ACTION_MIN_COLUMN_WIDTH = 56;
 
 function getRowActionLabelWidth(label) {
     return Array.from(String(label || "")).reduce(function (total, character) {
@@ -92,24 +96,134 @@ export default {
             }
         },
 
+        GetRowActionButtonWidth(label, options) {
+            options = options || {};
+            var iconWidth = 0;
+            if (options.customLeadingIcon) {
+                iconWidth += ROW_ACTION_CUSTOM_LEADING_ICON_WIDTH;
+            } else if (options.leadingIcon) {
+                iconWidth += ROW_ACTION_ELEMENT_LEADING_ICON_WIDTH;
+            }
+            if (options.trailingIcon) {
+                iconWidth += ROW_ACTION_TRAILING_ICON_WIDTH;
+            }
+            return getRowActionLabelWidth(label)
+                + ROW_ACTION_BUTTON_PADDING_AND_BORDER_WIDTH
+                + iconWidth;
+        },
+
+        GetRowActionWidthsTotal(widths) {
+            var validWidths = (Array.isArray(widths) ? widths : [])
+                .filter(function (width) { return Number(width) > 0; });
+            if (validWidths.length === 0) return 0;
+            return validWidths.reduce(function (total, width) {
+                return total + Number(width);
+            }, 0) + (validWidths.length - 1) * ROW_ACTION_BUTTON_GAP_WIDTH;
+        },
+
         /**
-         * 统一估算行外 V8 按钮占用宽度。
-         * 中文/宽字符与 ASCII 分别估算，除文字外还包含图标、紧凑内边距和
-         * flex gap，避免低分辨率下过度占宽，同时保留固定列安全余量。
+         * 统一估算行外 V8 按钮占用宽度。只在相邻按钮之间计算 gap，
+         * 避免把最后一个按钮后面不存在的间隔也算入操作列。
          */
         GetRowActionButtonsWidth(buttons) {
             var visibleButtons = (Array.isArray(buttons) ? buttons : [])
                 .filter(function (button) { return button && (button.IsVisible === true || button.IsVisible === 1); });
-            return visibleButtons.reduce(function (total, button) {
-                return total
-                    + getRowActionLabelWidth(button.Name)
-                    + ROW_ACTION_BUTTON_CHROME_WIDTH
-                    + ROW_ACTION_BUTTON_GAP_WIDTH;
-            }, 0);
+            var self = this;
+            return self.GetRowActionWidthsTotal(visibleButtons.map(function (button) {
+                return self.GetRowActionButtonWidth(button.Name, { customLeadingIcon: true });
+            }));
+        },
+
+        ShouldShowRowWorkflowAction(row) {
+            return !!row && this.IsWorkFlowMenu() && row._IsInTableAdd !== true;
+        },
+
+        ShouldShowRowDetailAction(row) {
+            return !!row
+                && this.IsPermission("NoDetail")
+                && row._IsInTableAdd !== true
+                && row.IsVisibleDetail == true;
+        },
+
+        ShouldShowRowRestoreAction(row) {
+            return !!row && this.IsTrashMode && row._IsInTableAdd !== true;
+        },
+
+        ShouldShowRowAccessKeyAction(row) {
+            return typeof this.CanManageUserAccessKey === "function"
+                && this.CanManageUserAccessKey(row);
+        },
+
+        ShouldShowRowMoreAction(row) {
+            if (!row || this.IsTrashMode) return false;
+            var isWorkflow = this.IsWorkFlowMenu();
+            var tableChildReadonly = !!(this.TableChildField && this.TableChildField.Readonly);
+            var canEdit = !isWorkflow
+                && this.TableChildFormMode != "View"
+                && !tableChildReadonly
+                && this._LimitEdit
+                && row._IsInTableAdd !== true
+                && row.IsVisibleEdit == true;
+            var hasVisibleInnerButton = Array.isArray(row._RowMoreBtnsIn)
+                && row._RowMoreBtnsIn.some(function (button) { return button && button.IsVisible; });
+            var canDelete = this._LimitDel && row.IsVisibleDel == true;
+            return canEdit || hasVisibleInnerButton || canDelete;
+        },
+
+        GetRowActionLabel(key, fallback) {
+            if (typeof this.$t !== "function") return fallback;
+            var translated = this.$t(key);
+            return translated && translated !== key ? translated : fallback;
+        },
+
+        /**
+         * 按每行真实渲染的按钮计算宽度，再由列宽取所有行的最大值。
+         * 这样不会把“某行最宽的 V8 按钮”与“另一行才可见的内置按钮”重复叠加。
+         */
+        GetRowActionContentWidth(row) {
+            if (!row) return 0;
+            if (row.__TreeLazyLoadMore) {
+                return this.GetRowActionButtonWidth(
+                    row.__TreeLazyLoadMoreText || this.GetRowActionLabel("Msg.LoadMore", "加载更多")
+                );
+            }
+
+            var widths = [];
+            var tableChildReadonly = !!(this.TableChildField && this.TableChildField.Readonly);
+            if (!this.IsTrashMode && !tableChildReadonly) {
+                var outsideButtonsWidth = this.GetRowActionButtonsWidth(row._RowMoreBtnsOut || []);
+                if (outsideButtonsWidth > 0) widths.push(outsideButtonsWidth);
+            }
+            if (this.ShouldShowRowWorkflowAction(row)) {
+                widths.push(this.GetRowActionButtonWidth("去处理", { leadingIcon: true }));
+            }
+            if (this.ShouldShowRowDetailAction(row)) {
+                widths.push(this.GetRowActionButtonWidth(
+                    this.GetRowActionLabel("Msg.Detail", "详情"),
+                    { leadingIcon: true }
+                ));
+            }
+            if (this.ShouldShowRowRestoreAction(row)) {
+                widths.push(this.GetRowActionButtonWidth("恢复", { leadingIcon: true }));
+            }
+            if (this.ShouldShowRowAccessKeyAction(row)) {
+                widths.push(this.GetRowActionButtonWidth("访问密钥", { customLeadingIcon: true }));
+            }
+            if (this.ShouldShowRowMoreAction(row)) {
+                widths.push(this.GetRowActionButtonWidth(
+                    this.GetRowActionLabel("Msg.More", "更多"),
+                    { trailingIcon: true }
+                ));
+            }
+            return this.GetRowActionWidthsTotal(widths);
         },
 
         GetActionCellReserveWidth() {
             return ROW_ACTION_CELL_RESERVE_WIDTH;
+        },
+
+        GetActionMinColumnWidth() {
+            return ROW_ACTION_MIN_COLUMN_WIDTH;
         },
 
         IsBusinessTranslateField(field) {

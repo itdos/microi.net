@@ -196,6 +196,14 @@ export default {
                 }
             });
             row.Key = row.Key || text;
+            // “加载更多”是追加到树节点的特殊行，不会再进入普通行的按钮处理循环。
+            // 在创建时同步纳入最大宽度，避免数量文案较长时被固定列裁切。
+            if (typeof this.GetRowActionContentWidth === "function") {
+                var actionWidth = this.GetRowActionContentWidth(row);
+                if (this.MaxRowActionContentWidth < actionWidth) {
+                    this.MaxRowActionContentWidth = actionWidth;
+                }
+            }
             return row;
         },
         AppendTreeLazyLoadMoreRow(rows, tree, pageIndex, pageSize, totalCount) {
@@ -1012,8 +1020,7 @@ export default {
                             var moreBtns = self.SysMenuModel.MoreBtns || [];
                             var moreBtnsOutTemplate = moreBtns.filter(item => item.ShowRow === true || item.ShowRow === 1) || [];
                             var moreBtnsInTemplate = moreBtns.filter(item => item.ShowRow === false || item.ShowRow === 0) || [];
-                            self.MaxRowBtnsOut = 0;
-                            self.HasVisibleMoreBtnsIn = false;
+                            self.MaxRowActionContentWidth = 0;
 
                             console.time(`Microi：【性能监控】[${self.SysMenuModel.Name}]按钮V8条件执行总耗时`);
 
@@ -1080,13 +1087,10 @@ export default {
                                 row._RowMoreBtnsOut = rowBtnsOut;
                                 row._RowMoreBtnsIn = rowBtnsIn;
 
-                                // 计算操作列宽度
-                                var newWidth = self.GetRowActionButtonsWidth(row._RowMoreBtnsOut);
-                                if (self.MaxRowBtnsOut < newWidth) self.MaxRowBtnsOut = newWidth;
-
-                                // 追踪是否有可见的内部按钮（用于动态计算操作列宽度）
-                                if (!self.HasVisibleMoreBtnsIn && rowBtnsIn.some(btn => btn.IsVisible)) {
-                                    self.HasVisibleMoreBtnsIn = true;
+                                // 逐行统计真实会渲染的所有操作，再取最大值作为列宽。
+                                var newWidth = self.GetRowActionContentWidth(row);
+                                if (self.MaxRowActionContentWidth < newWidth) {
+                                    self.MaxRowActionContentWidth = newWidth;
                                 }
                             }
 
@@ -1268,25 +1272,16 @@ export default {
                 self.HandlerBtns(_rowMoreBtnsOutCopy, row);
                 row._RowMoreBtnsOut = _rowMoreBtnsOutCopy;
 
-                //取列表数据中可能存在的最多按钮数量
-                // var maxLength = _rowMoreBtnsOutCopy.filter(item => item.IsVisible === true || item.IsVisible === 1).length;
-                // 普通列表与树形列表共用同一估算规则，避免相同按钮在两种数据模式下列宽不同。
-                var newWidth = self.GetRowActionButtonsWidth(_rowMoreBtnsOutCopy);
-                // if (self.MaxRowBtnsOut < maxLength) {
-                if (self.MaxRowBtnsOut < newWidth) {
-                    // self.MaxRowBtnsOut = maxLength;
-                    self.MaxRowBtnsOut = newWidth;
-                }
-
                 // 使用模板创建副本
                 let _rowMoreBtnsInCopy = moreBtnsInTemplate.map(element => ({ ...element }));
 
                 self.HandlerBtns(_rowMoreBtnsInCopy, row);
                 row._RowMoreBtnsIn = _rowMoreBtnsInCopy;
 
-                // 追踪是否有可见的内部按钮
-                if (!self.HasVisibleMoreBtnsIn && _rowMoreBtnsInCopy.some(btn => btn.IsVisible)) {
-                    self.HasVisibleMoreBtnsIn = true;
+                // 普通列表、非懒加载树与懒加载子节点共用同一条精确计算链路。
+                var newWidth = self.GetRowActionContentWidth(row);
+                if (self.MaxRowActionContentWidth < newWidth) {
+                    self.MaxRowActionContentWidth = newWidth;
                 }
 
                 //刘诚2025-6-29新增，判断默认的显示和删除按钮是否显示

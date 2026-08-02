@@ -296,9 +296,20 @@ Pop-Location
 
 必须先进入 `Microi.Server/Microi.net.Api` 再启动。`Program.cs` 会在 `WebApplication.CreateBuilder(args)` 之前读取当前目录下的 `.microi-local`，将其中的环境名写入 `ASPNETCORE_ENVIRONMENT` / `DOTNET_ENVIRONMENT`，随后加载 `appsettings.{环境名}.json`。如果从仓库根目录直接运行并导致配置读取异常，先改用上面的 `Push-Location` 方式。
 
-普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。访问地址通常是 `https://localhost:7266`，实际监听配置来自 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile。
+普通本地启动默认不要额外设置 `ASPNETCORE_ENVIRONMENT` 或 `DOTNET_ENVIRONMENT`；如果这些变量已由 `launchSettings.json`、`launch.json`、终端环境或测试脚本显式设置，`.microi-local` 不会覆盖它们。实际监听地址必须读取 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 的 `Microi.net.Api` profile；当前标准工作区是后端 `61501`、前端 `61500`，不能继续硬编码历史 `7266/1988`。
 
-**本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，AI 允许自动定位并停止占用 `7266` 的本项目 `Microi.net.Api`/`dotnet` 进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。若 `7266` 实在无法释放，允许临时启动 `7267`，并同步把本地 `Microi.Client/src/config.json` 的 API 地址改到 `https://localhost:7267`；任务结束前必须说明端口变更。不要误杀数据库、Redis、Node 前端或其它业务进程。
+**本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，先检查 `.tmp/microi-process-state/release.lock`；发布锁存在时禁止启动或重启。无发布时先回读标准端口和 `/api/Diagnostics/liveness`，健康服务默认复用；只有本任务修改了需重载的后端代码、服务不健康或用户明确要求重启时，才可精确停止当前工作区的后端进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。不要误杀数据库、Redis、Node 前端或其它业务进程。
+
+## 多 AI 对话共享本地服务与发布互斥（强制）
+
+同一工作区的 4、5 个 AI 对话共用同一份源码和固定端口时，`61500/61501` 是工作区级单例共享服务，不属于某个对话。端口相同意味着无法让每个对话拥有一套独立进程；正确模型是“复用健康服务 + 需要重载时串行重启 + 发布时独占”，不能让每个对话都无条件先杀再启动。
+
+- 启动前先检查端口、健康接口、PID、命令行和工作区路径。健康且代码无需重载时直接复用；不得仅为声明“本对话拥有服务”而重启。
+- 长期本地后端必须通过项目目录里的 `dotnet run --launch-profile Microi.net.Api` 使用开发输出。禁止把 `bin/Release/net10.0` 或 `bin/Release/publish` 的 `dotnet Microi.net.Api.dll` 当长期 E2E 服务；运行中的 Release DLL 会让后续 `dotnet build` 报 `MSB3021/MSB3027` 文件锁。
+- 一键编译发布会创建 `.tmp/microi-process-state/release.lock`，并调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease`。它只结束命令行和工作区均匹配的 `61501` 后端、`61500` Vite 以及额外 Release 后端，并验证 Release DLL 可独占打开；遇到身份不匹配的端口占用必须停止，不得按进程名全杀。
+- 发布锁存在期间，所有 AI 自动启动、服务自愈和 Playwright `webServer` 都必须等待或退出，禁止重新抢占 `61500/61501`。发布正常结束或中断时由脚本释放锁；无法证明锁持有者已退出时不得自行删除锁。
+- Edge/Chrome 主浏览器、VS Code 持有的 Playwright Test Server、语言服务和 MCP Node 进程不属于发布文件锁清理范围。浏览器自动化必须关闭本用例创建的 context/browser；不得通过 `taskkill /IM chrome.exe|msedge.exe|node.exe|dotnet.exe` 清空整机进程。
+- 人工盘点使用：`powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status`。需要单独停止当前工作区服务时使用 `-Action StopBackend` 或 `-Action StopFrontend`，不再让用户根据任务管理器猜进程。
 
 ## 本地租户与测试凭据读取约定
 
@@ -417,17 +428,17 @@ AI 只要修改了 `Microi.Server/**` 下会影响 `Microi.net.Api` 运行结果
 
 强制流程：
 
-1. 先执行后端编译验证。若 7266 正在运行导致 `bin/Debug/net10.0` DLL 被锁，可以先停止当前 `Microi.net.Api` 进程后重新编译；只有用户明确要求不中断正在运行服务时，才允许用临时输出目录作为补充验证，并必须说明运行服务尚未替换。
-2. 查找并停止占用 `https://localhost:7266` 或 `http://localhost:7266` 的本地 `Microi.net.Api` 进程。只停止 Microi 后端相关进程，不要误杀数据库、Redis、Node 前端或其它业务进程。
+1. 先执行后端编译验证。若 launch profile 当前端口上的开发服务导致 `bin/Debug/net10.0` DLL 被锁，可以先精确停止当前工作区的 `Microi.net.Api` 进程后重新编译；只有用户明确要求不中断正在运行服务时，才允许用临时输出目录作为补充验证，并必须说明运行服务尚未替换。
+2. 从 `launchSettings.json` 回读实际端口，查找并停止该端口上的本地 `Microi.net.Api` 进程。只停止命令行与当前工作区匹配的 Microi 后端，不要误杀数据库、Redis、Node 前端或其它业务进程。
 3. 必须进入 `Microi.Server/Microi.net.Api` 目录启动：
    ```powershell
    dotnet run --launch-profile Microi.net.Api
    ```
-   启动优先发生在用户能在 VS Code 中看到和停止的终端中，方便用户查看日志并手动停止；用户明确允许时，可以使用 VS Code 可追踪的隐藏终端/任务终端。当前工具环境没有 VS Code 终端能力时，允许使用本机可见的 `cmd`/PowerShell 窗口启动；禁止使用脱离用户可见窗口的后台服务或守护进程方式启动。若 `7266` 无法释放，允许临时使用 `7267`，并同步修改本地 `Microi.Client/src/config.json` 指向新端口。
-4. 启动后轮询验证 `https://localhost:7266` 或 launch profile 实际地址可访问；至少确认端口已监听、进程存在、最近日志没有立即崩溃。涉及新增 API 时，再调用新增/受影响接口做一次真实请求。
-5. 最终回复必须明确说明：后端已重新编译、旧进程 PID 是否停止、新进程 PID、7266 是否监听、验证的 URL 或接口。若因为用户明确要求不中断、端口被非 Microi 进程占用或配置缺失导致无法重启，必须把阻塞原因说具体。
+   启动优先发生在用户能在 VS Code 中看到和停止的终端中，方便用户查看日志并手动停止；用户明确允许时，可以使用 VS Code 可追踪的隐藏终端/任务终端。当前工具环境没有 VS Code 终端能力时，允许使用本机可见的 `cmd`/PowerShell 窗口启动；禁止使用脱离用户可见窗口的后台服务或守护进程方式启动。标准端口无法释放时，只有同步更新前端本地 `ApiBase` 和测试变量后才可使用明确的临时端口，并在任务结束时说明。
+4. 启动后轮询验证 launch profile 实际地址可访问；至少确认端口已监听、进程存在、最近日志没有立即崩溃。涉及新增 API 时，再调用新增/受影响接口做一次真实请求。
+5. 最终回复必须明确说明：后端已重新编译、旧进程 PID 是否停止、新进程 PID、实际端口是否监听、验证的 URL 或接口。若因为用户明确要求不中断、端口被非 Microi 进程占用或配置缺失导致无法重启，必须把阻塞原因说具体。
 
-这条规则优先于“避免打断正在运行服务”的默认谨慎策略；本地开发联调场景下，用户通常需要运行中的 7266 后端加载最新代码。
+这条规则优先于“避免打断正在运行服务”的默认谨慎策略；本地开发联调场景下，用户通常需要 launch profile 当前端口上的后端加载最新代码。
 
 ## MCP 可调用性诊断补充
 
