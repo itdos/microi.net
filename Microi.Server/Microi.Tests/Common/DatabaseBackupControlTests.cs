@@ -24,6 +24,48 @@ public sealed class DatabaseBackupControlTests
     }
 
     [Fact]
+    public void Eligible_backup_catalog_uses_the_exact_runtime_row_when_osclient_is_duplicated()
+    {
+        var rows = new[]
+        {
+            new JObject
+            {
+                ["OsClient"] = "iTdos",
+                ["ClientName"] = "外网主租户",
+                ["IsEnable"] = 1,
+                ["IsDeleted"] = 0,
+                ["OsClientType"] = "Product",
+                ["OsClientNetwork"] = "Internet",
+                ["DbType"] = "MySql",
+                ["DbConn"] = "Server=internet-db;Database=wrong;Uid=root;Pwd=test;SslMode=None;"
+            },
+            new JObject
+            {
+                ["OsClient"] = "iTdos",
+                ["ClientName"] = "内网主租户",
+                ["IsEnable"] = 1,
+                ["IsDeleted"] = 0,
+                ["OsClientType"] = "Product",
+                ["OsClientNetwork"] = "Internal",
+                ["DbType"] = "MySql"
+            }
+        };
+
+        var result = DatabaseBackupControlService.BuildEligibleTenantConnections(
+            rows,
+            "Product",
+            "Internal",
+            "iTdos",
+            "Server=internal-db;Database=microi;Uid=root;Pwd=test;SslMode=None;");
+
+        var tenant = Assert.Single(result);
+        Assert.Equal("iTdos", tenant.OsClient);
+        Assert.Equal("内网主租户", tenant.Name);
+        Assert.Contains("internal-db", tenant.ConnectionString, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("internet-db", tenant.ConnectionString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Historical_mysql_sslmode_none_is_normalized_before_provider_parsing()
     {
         var normalized = ConnectionStringCompatibility.Normalize(

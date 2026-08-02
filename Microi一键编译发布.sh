@@ -1208,7 +1208,13 @@ fi
 
 # 确保 Docker 已启动（Windows 启动 Docker Desktop，macOS 启动 Docker.app）
 ensure_docker_running() {
-    if docker info > /dev/null 2>&1; then
+    # docker.exe can itself hang while Docker Desktop/WSL is half-started. The
+    # outer 60-second loop is not a real bound unless every probe is bounded.
+    _docker_daemon_ready() {
+        timeout 5 docker info </dev/null > /dev/null 2>&1
+    }
+
+    if _docker_daemon_ready; then
         return 0
     fi
     print_step "Docker 未运行，尝试自动启动..."
@@ -1245,7 +1251,7 @@ ensure_docker_running() {
     # 等待 Docker daemon 就绪（最长 60 秒）
     print_step "等待 Docker 启动..."
     local _waited=0
-    while ! docker info > /dev/null 2>&1; do
+    while ! _docker_daemon_ready; do
         if [ $_waited -ge 60 ]; then
             print_fail "Docker 启动超时（60秒），请手动启动"
         fi

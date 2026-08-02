@@ -12,6 +12,7 @@ export const API = {
     REVOKE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Revoke',
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
+    TRANSITION_APPLICATION_STREAM_GATE: '/api/V8Engine/TransitionApplicationStreamGate',
     // Redis 管理器（默认当前租户连接，可指定已保存连接）
     REDIS_STATISTICS: '/api/Cache/redis/statistics',
     REDIS_KEYS: '/api/Cache/redis/keys',

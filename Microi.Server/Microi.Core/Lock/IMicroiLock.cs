@@ -21,10 +21,24 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Microi.net
 {
     /// <summary>
+    /// 已获取的分布式租约上下文。长任务可在每个外部副作用前后主动确认所有权，
+    /// 并携带单调递增 fencing token 供业务状态机审计或条件写入。
+    /// </summary>
+    public interface IMicroiLockLease
+    {
+        bool IsLost { get; }
+        string LossReason { get; }
+        long FencingToken { get; }
+        void ThrowIfLost();
+        Task EnsureHeldAsync();
+    }
+
+    /// <summary>
     /// 微信模板消息接口
     /// </summary>
     public interface IMicroiLock
     {
         Task<DosResult> ActionLockAsync(MicroiLockParam param, Func<Task> action);
+        Task<DosResult> ActionLockAsync(MicroiLockParam param, Func<IMicroiLockLease, Task> action);
     }
 }

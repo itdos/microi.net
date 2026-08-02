@@ -197,6 +197,7 @@ services.AddMicroiSearchEngine();//【可选】注入【搜索引擎】插件
 services.AddMicroiAI();//【可选】注入【AI引擎】插件
 services.AddMicroiMQTT();//【可选】注入【MQTT引擎】插件
 services.AddMicroiHDFS();//【可选】注入【分布式存储】插件
+services.AddHostedService<ApplicationAssetAliasReconciliationWorkerService>();
 services.AddMicroiCaptcha();//【可选】注入验证码插件
 services.AddMicroiJob(dbConn);//【可选】注入【任务调度引擎】插件
 services.TryAddSingleton(typeof(DiyFilter<>));
@@ -251,14 +252,14 @@ Console.WriteLine($"Microi：【✅成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss
 
 #region SignalR、Redis
 var redisConn = RedisConnBuilder.BuildDefaultRedisConn();
+var showSignalRDetailedErrors = builder.Environment.IsDevelopment();
 var signalRBuilder = services.AddSignalR(options =>
 {
-    options.EnableDetailedErrors = true;
+    options.EnableDetailedErrors = showSignalRDetailedErrors;
     //客户端发保持连接请求到服务端最长间隔，默认30秒，改成4分钟，网页需跟着设置connection.keepAliveIntervalInMilliseconds = 12e4;即2分钟
     options.ClientTimeoutInterval = TimeSpan.FromMinutes(20);
     //服务端发保持连接请求到客户端间隔，默认15秒，改成2分钟，网页需跟着设置connection.serverTimeoutInMilliseconds = 24e4;即4分钟
     options.KeepAliveInterval = TimeSpan.FromMinutes(20);
-    options.EnableDetailedErrors = true;
     options.MaximumReceiveMessageSize = 1024 * 1024 * 10;//10M
 })
 .AddNewtonsoftJsonProtocol(options =>
@@ -278,6 +279,16 @@ signalRBuilder.AddHubOptions<GameRealtimeHub>(options =>
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(45);
     options.KeepAliveInterval = TimeSpan.FromSeconds(15);
     options.MaximumReceiveMessageSize = 16 * 1024;
+    options.EnableDetailedErrors = showSignalRDetailedErrors;
+});
+signalRBuilder.AddHubOptions<ApiEngineRealtimeHub>(options =>
+{
+    // 通用 Hub 只接收 ChannelKey + SubjectId；服务端可推送小型安全事件投影，
+    // 业务事实仍由接口引擎与共享存储维护，版本缺口通过 HTTP Snapshot 收敛。
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(45);
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.MaximumReceiveMessageSize = 16 * 1024;
+    options.EnableDetailedErrors = showSignalRDetailedErrors;
 });
 services.AddStackExchangeRedisCache(options =>
 {
@@ -419,12 +430,18 @@ app.UseMicroiJob();   // 启用任务计划
 app.UseMicroiMQ();    // 启用消息队列
 app.MapHub<DiyWebSocket>("/diy-websocket").RequireCors("any");
 app.MapHub<GameRealtimeHub>(GameRealtimeRuntime.HubPath).RequireCors("any");
+app.MapHub<ApiEngineRealtimeHub>(ApiEngineRealtimeRuntime.HubPath).RequireCors("any");
 var realtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<DiyWebSocket>>();
 RealtimePushRuntime.Configure((connectionIds, eventName, payload) =>
     realtimeHubContext.Clients.Clients(connectionIds.ToList()).SendAsync(eventName, payload));
 var gameRealtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<GameRealtimeHub>>();
 RealtimePushRuntime.ConfigureGroups((groupName, eventName, payload) =>
     gameRealtimeHubContext.Clients.Group(groupName).SendAsync(eventName, payload));
+var apiEngineRealtimeHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<ApiEngineRealtimeHub>>();
+RealtimePushRuntime.ConfigureGroups(
+    ApiEngineRealtimeRuntime.TransportName,
+    (groupName, eventName, payload) =>
+        apiEngineRealtimeHubContext.Clients.Group(groupName).SendAsync(eventName, payload));
 
 // 解析主租户名称（统一使用 OsClient.GetConfigOsClient，避免在 Program.cs 里重复读取 env / appsettings）
 var osClientName = OsClient.GetConfigOsClient();
@@ -441,6 +458,12 @@ if (!OsClient.EnsureHydrated(osClientName))
     Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】主租户[{osClientName}]的 OsClientModel 未能从 sys_osclients 完整挂载，部分 DB 配置项将以默认值生效。");
 }
 var clientModel = OsClient.GetClient(osClientName);
+var jwtSigningKeyStatus = DiyToken.GetJwtSigningKeyStatus(clientModel);
+if (!jwtSigningKeyStatus.Ready)
+{
+    throw new InvalidOperationException(jwtSigningKeyStatus.Message);
+}
+Console.WriteLine($"Microi：【安全】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】JWT签名密钥发布门禁通过：Source={jwtSigningKeyStatus.Source}，Fingerprint={jwtSigningKeyStatus.Fingerprint}");
 // 自动升级必须在主租户完成 Hydrate 后启动。否则首次启动时 ClientList 仍为空，
 // 后台任务会静默遍历零个租户，导致本应执行的数据库迁移被跳过。
 app.UseMicroiUpgrade();// 启用平台自动升级

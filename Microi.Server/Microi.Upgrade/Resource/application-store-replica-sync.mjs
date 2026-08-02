@@ -83,9 +83,68 @@ export function choosePublishablePackageVersion(currentVersion, remoteVersion, r
   return `v${Number(remoteMatch[1])}.${Number(remoteMatch[2])}.${Number(remoteMatch[3]) + 1}`;
 }
 
-function executableBody(source) {
+function splitEngineSource(source) {
   const normalized = normalizeText(source);
-  return normalizeText(normalized.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, ''));
+  const match = normalized.match(/^(\s*\/\*[\s\S]*?\*\/)(?:[ \t]*\n)+([\s\S]*)$/);
+  if (!match) return { header: '', body: normalized };
+  return {
+    header: match[1].trimEnd(),
+    body: normalizeText(match[2]),
+  };
+}
+
+function normalizeEngineVersion(value) {
+  const match = String(value || '').trim().match(/^v?(\d+)\.(\d+)\.(\d+)$/i);
+  return match ? `v${Number(match[1])}.${Number(match[2])}.${Number(match[3])}` : '';
+}
+
+function bumpEngineVersion(value) {
+  const normalized = normalizeEngineVersion(value);
+  if (!normalized) return '';
+  let [major, minor, patch] = normalized.substring(1).split('.').map(Number);
+  patch += 1;
+  if (patch > 9) {
+    patch = 0;
+    minor += 1;
+  }
+  if (minor > 9) {
+    minor = 0;
+    major += 1;
+  }
+  return `v${major}.${minor}.${patch}`;
+}
+
+function highestEngineVersion(...sources) {
+  let selected = '';
+  for (const source of sources) {
+    const candidate = normalizeEngineVersion(engineVersion(source));
+    if (candidate && (!selected || compareSemanticVersions(candidate, selected) > 0)) {
+      selected = candidate;
+    }
+  }
+  return selected;
+}
+
+function replaceHeaderVersion(header, version) {
+  if (!header || !version) return header;
+  return header.replace(
+    /(Version\s*:\s*)v?\d+\.\d+\.\d+/i,
+    (_match, prefix) => `${prefix}${version}`,
+  );
+}
+
+function composeEngineSource(header, body, version) {
+  if (!header) return normalizeText(body);
+  return normalizeText(`${replaceHeaderVersion(header, version)}\n\n${normalizeText(body).trimEnd()}`);
+}
+
+function preferredEngineHeader(leftSource, rightSource, preferRight) {
+  const leftVersion = engineVersion(leftSource);
+  const rightVersion = engineVersion(rightSource);
+  const comparison = compareSemanticVersions(leftVersion, rightVersion);
+  if (comparison > 0) return splitEngineSource(leftSource).header;
+  if (comparison < 0) return splitEngineSource(rightSource).header;
+  return splitEngineSource(preferRight ? rightSource : leftSource).header;
 }
 
 async function mergeEngineSources(resourceName, baseSource, leftSource, rightSource, preferRight) {
@@ -96,16 +155,34 @@ async function mergeEngineSources(resourceName, baseSource, leftSource, rightSou
   if (left === base) return right;
   if (right === base) return left;
 
-  // V8 文件头只保存接口说明与版本。若可执行正文完全一致，不把说明文字差异
-  // 误判成业务代码冲突；优先更高版本，同版本按调用方指定的事实源取值。
-  if (executableBody(left) === executableBody(right)) {
-    const versionComparison = compareSemanticVersions(engineVersion(left), engineVersion(right));
-    if (versionComparison > 0) return left;
-    if (versionComparison < 0) return right;
-    return preferRight ? right : left;
+  const baseParts = splitEngineSource(base);
+  const leftParts = splitEngineSource(left);
+  const rightParts = splitEngineSource(right);
+  const selectedVersion = highestEngineVersion(base, left, right);
+  const selectedHeader = preferredEngineHeader(left, right, preferRight);
+
+  // 接口说明和 Version 都属于发布元数据。真实开发中本地与官网每次保存都会
+  // 独立递增 Version；若把文件头一起交给 git merge-file，即使正文修改完全
+  // 不重叠，也会只因 Version 行不同而产生永久性的伪冲突。
+  if (leftParts.body === rightParts.body) {
+    return composeEngineSource(selectedHeader, leftParts.body, selectedVersion);
+  }
+  if (leftParts.body === baseParts.body) {
+    return composeEngineSource(selectedHeader, rightParts.body, selectedVersion);
+  }
+  if (rightParts.body === baseParts.body) {
+    return composeEngineSource(selectedHeader, leftParts.body, selectedVersion);
   }
 
-  return mergeJavascriptResource(resourceName, base, left, right);
+  const mergedBody = await mergeJavascriptResource(
+    `${resourceName} 可执行正文`,
+    baseParts.body,
+    leftParts.body,
+    rightParts.body,
+  );
+  const synthesized = mergedBody !== leftParts.body && mergedBody !== rightParts.body;
+  const mergedVersion = synthesized ? bumpEngineVersion(selectedVersion) : selectedVersion;
+  return composeEngineSource(selectedHeader, mergedBody, mergedVersion);
 }
 
 async function reconcileReplicaPair(resourceName, sideName, baseSource, standaloneSource, embeddedSource) {

@@ -46,13 +46,17 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 
 ## 本地工程
 
+新建和整体升级项目的通用前端架构遵守 `microi-ai-application`：默认使用 Vue 3 单文件组件、Composition API、Vite 和严格 TypeScript。本 Skill 继续负责 MicroService 特有的 Manifest、页面路由、宿主上下文、菜单绑定与发布协议。
+
 项目至少有：
 
 ```text
 .microi-micro-app.json
 microi.routes.json
 package.json
-vite.config.js
+package-lock.json
+tsconfig.json
+vite.config.ts
 index.html
 src/
 ```
@@ -83,6 +87,8 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 `MicroServicePageId`、`MicroServiceRoutePath`、`MicroServiceKey`。
 复杂弹窗用 `V8.OpenAppDialog`，业务参数放 `Data`，回调放顶层。
 
+微服务内部禁止调用浏览器原生 `alert/confirm/prompt`。优先复用宿主 `Tips`/`V8.ConfirmTips`；需要由子应用自行承载时，使用 teleport 到 `body` 的品牌化可访问弹层，固定在当前视口正中央并高于宿主滚动内容。长列表只允许一次性加载后在前端内存搜索时，不得随着关键词重复请求服务器。
+
 Token 只通过宿主上下文传递，不硬编码、不放 URL、不写日志。子应用回传成功/取消/
 错误事件，宿主负责提示、关闭和刷新。
 
@@ -105,4 +111,5 @@ Token 只通过宿主上下文传递，不硬编码、不放 URL、不写日志�
 - Dialog/Drawer 成功、取消、错误和关闭协议正确。
 - 宿主 API 请求携带当前 Token/OsClient/菜单上下文，普通用户权限正确。
 - 至少验证桌面和窄屏；上传、表格、滚动、弹窗底部操作不被截断。
+- 长弹窗滚动到顶部/中部/底部后，错误提示和确认层仍位于当前视口中央；自动化监听到原生 JavaScript 对话框直接判失败。
 - 本地构建、MCP 发布和真实浏览器验收分别说明，未执行的层不宣称通过。

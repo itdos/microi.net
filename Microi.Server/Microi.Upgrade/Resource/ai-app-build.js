@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_build
- * Version: v1.5.4
+ * Version: v1.5.6
  * Function:
- * - AI应用编译发布、固定最新版发布与受控静态资源热修。
+ * - AI应用编译发布、固定最新版发布与受控静态资源热修；保留私有源码指针，并在发布前拒绝 HTTP 错误、Code=0、长度或哈希不一致的源文件。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || "成功" }; }
@@ -334,17 +334,41 @@ function getApp(appId) {
   });
 }
 function getFiles(appId) {
-  return V8.FormEngine.GetTableData("mci_ai_app_file", {
-    _Where: [["AppId", "=", appId]],
-    _SelectFields: ["Id", "AppId", "AppName", "VersionId", "FilePath", "FileName", "FileType", "HdfsPath", "PublishHdfsPath", "StorageScope", "ContentHash", "Size", "Version", "IsDirectory", "CreateTime", "UpdateTime"],
-    _OrderBy: "FilePath",
-    _OrderByType: "ASC",
-    _PageSize: 1000
-  });
+  var rows = [];
+  var seen = {};
+  var pageSize = 500;
+  var maxPages = 100;
+  for (var pageIndex = 1; pageIndex <= maxPages; pageIndex++) {
+    var page = V8.FormEngine.GetTableData("mci_ai_app_file", {
+      _Where: [["AppId", "=", appId]],
+      _SelectFields: ["Id", "AppId", "AppName", "VersionId", "FilePath", "FileName", "FileType", "HdfsPath", "PublishHdfsPath", "StorageScope", "ContentHash", "Size", "Version", "IsDirectory", "CreateTime", "UpdateTime"],
+      _OrderBy: "FilePath",
+      _OrderByType: "ASC",
+      _PageIndex: pageIndex,
+      _PageSize: pageSize
+    });
+    if (!page || page.Code !== 1) return page || fail("读取应用文件清单失败");
+    var pageRows = page.Data || [];
+    for (var rowIndex = 0; rowIndex < pageRows.length; rowIndex++) {
+      var normalized = normalizePath(pageRows[rowIndex].FilePath).toLowerCase();
+      if (seen[normalized]) return fail("应用文件路径重复，拒绝构建：" + normalized);
+      seen[normalized] = true;
+      rows.push(pageRows[rowIndex]);
+    }
+    if (pageRows.length < pageSize) return { Code: 1, Data: rows, DataCount: rows.length, Msg: "成功" };
+  }
+  return fail("应用文件超过50000条，拒绝使用不完整清单构建");
 }
 /* REAL_COMPILED_DIST_V1 */
 function readFileBase64(file) {
   if (!file || isBlank(file.HdfsPath)) return fail("源码文件地址为空");
+  var storageScope = text(file.StorageScope).toLowerCase();
+  var normalizedHdfsPath = normalizePath(file.HdfsPath).toLowerCase();
+  if (storageScope === "publicbuildstream" || storageScope === "publicbuildonly" || normalizedHdfsPath.indexOf("/ai-app-publish/") >= 0) {
+    var publicResult = readPublishedBase64(file.HdfsPath);
+    if (!publicResult || publicResult.Code !== 1) return publicResult || fail("读取公有编译源文件失败");
+    return validateSourceFileBase64(file, publicResult.Data);
+  }
   var urlResult = V8.Method.GetPrivateFileUrl({
     OsClient: V8.OsClient,
     FilePathName: file.HdfsPath,
@@ -356,7 +380,35 @@ function readFileBase64(file) {
   if (isBlank(url)) return fail("源码文件地址为空");
   var response = V8.Http.GetResponse({ Url: url, Timeout: 120 });
   if (!response || !response.RawBytes) return fail("下载源码文件失败：" + file.FilePath);
-  return ok(System.Convert.ToBase64String(response.RawBytes));
+  var statusCode = parseInt(response.StatusCode || 0);
+  if (statusCode && (statusCode < 200 || statusCode >= 300)) return fail("下载源码文件失败，HTTP " + statusCode + "：" + file.FilePath);
+  var responseContent = text(response.Content).replace(/^\s+|\s+$/g, "");
+  if (responseContent.charAt(0) === "{") {
+    try {
+      var storagePayload = JSON.parse(responseContent);
+      if (storagePayload && parseInt(storagePayload.Code) === 0) {
+        return fail("源码对象不可用：" + text(storagePayload.Msg, file.FilePath));
+      }
+    } catch (storagePayloadError) {}
+  }
+  return validateSourceFileBase64(file, System.Convert.ToBase64String(response.RawBytes));
+}
+function validateSourceFileBase64(file, base64) {
+  var bytes = System.Convert.FromBase64String(text(base64));
+  var expectedSize = parseInt(file && file.Size || 0);
+  if (expectedSize > 0 && bytes.Length !== expectedSize) {
+    return fail("源码文件长度不一致：" + text(file && file.FilePath) + "，expected=" + expectedSize + "，actual=" + bytes.Length);
+  }
+  var expectedHash = text(file && file.ContentHash).toLowerCase();
+  var scope = text(file && file.StorageScope).toLowerCase();
+  var base64WireHash = scope !== "publicbuildstream" && scope !== "publicbuildonly";
+  if (base64WireHash && !isBlank(expectedHash) && V8.EncryptHelper && V8.EncryptHelper.SHA256) {
+    var actualHash = text(V8.EncryptHelper.SHA256(text(base64))).toLowerCase();
+    if (actualHash !== expectedHash) {
+      return fail("源码文件哈希不一致：" + text(file && file.FilePath));
+    }
+  }
+  return ok(text(base64));
 }
 function readPublishedBase64(path) {
   if (isBlank(path)) return fail("公有编译文件地址为空");
@@ -526,22 +578,29 @@ function upsertPublishedBuildFile(app, relativePath, source, versionPath, latest
     _Where: [["AppId", "=", app.Id], ["AND", "FilePath", "=", filePath]],
     _PageSize: 1
   });
+  var existingRow = existing && existing.Code === 1 && existing.Data ? existing.Data : null;
+  var existingHdfsPath = text(existingRow && existingRow.HdfsPath);
+  var existingScope = text(existingRow && existingRow.StorageScope).toLowerCase();
+  var hasPrivateSource = !isBlank(existingHdfsPath)
+    && existingHdfsPath.toLowerCase().indexOf("/ai-app-source/") >= 0
+    && existingScope !== "publicbuildstream"
+    && existingScope !== "publicbuildonly";
   var row = {
     AppId: app.Id,
     AppName: app.Name || "",
     FilePath: filePath,
     FileName: fileNameOf(relativePath),
     FileType: fileNameOf(relativePath).indexOf(".") >= 0 ? fileNameOf(relativePath).split(".").pop().toLowerCase() : "bin",
-    HdfsPath: versionPath,
+    HdfsPath: hasPrivateSource ? existingHdfsPath : versionPath,
     PublishHdfsPath: latestPath,
-    StorageScope: "PrivateSource+PublicBuild",
+    StorageScope: hasPrivateSource ? "PrivateSource+PublicBuild" : "PublicBuildOnly",
     ContentHash: source.sha256 || source.Sha256 || source.hash || source.Hash || "",
     Size: parseInt(source.size || source.Size || 0),
     IsDirectory: 0,
     Version: 1
   };
-  if (existing && existing.Code === 1 && existing.Data && existing.Data.Id) {
-    row.Id = existing.Data.Id;
+  if (existingRow && existingRow.Id) {
+    row.Id = existingRow.Id;
     return V8.FormEngine.UptFormData("mci_ai_app_file", row);
   }
   return V8.FormEngine.AddFormData("mci_ai_app_file", row);

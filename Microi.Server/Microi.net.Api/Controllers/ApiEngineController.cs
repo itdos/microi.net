@@ -154,8 +154,106 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 只在 ApiEngine.RunAsync 已返回（其自有事务已经提交或回滚）后处理游戏失效通知。
-        /// 广播失败不能把已提交的出牌/结算伪装成业务失败，客户端以 Snapshot 轮询收敛。
+        /// 只在 ApiEngine.RunAsync 已返回（其自有事务已经提交或回滚）后处理通用实时通知。
+        /// 广播失败不能把已提交的业务伪装成失败，客户端必须用 Version + Snapshot 收敛。
+        /// </summary>
+        private static async Task PublishApiEngineRealtimeAfterCommitAsync(
+            object result,
+            JObject param)
+        {
+            try
+            {
+                var osClient = param?["OsClient"]?.ToString();
+                if (osClient.DosIsNullOrWhiteSpace())
+                {
+                    osClient = DiyToken.GetCurrentOsClient();
+                }
+                if (!ApiEngineRealtimeRuntime.TryReadEvent(
+                        result,
+                        osClient,
+                        out var realtimeEvent,
+                        out var contractError))
+                {
+                    if (!contractError.DosIsNullOrWhiteSpace())
+                    {
+                        MicroiEngine.QueueSystemLog(
+                            osClient,
+                            "ApiEngineRealtime",
+                            "EventContractRejected",
+                            "接口引擎实时通知契约不合法",
+                            contractError,
+                            2);
+                    }
+                    return;
+                }
+
+                var publishResult = await ApiEngineRealtimeRuntime
+                    .PublishAfterCommitWithinBudgetAsync(osClient, realtimeEvent)
+                    .ConfigureAwait(false);
+                if (publishResult.Conflict)
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "ApiEngineRealtime",
+                        "EventIdConflictRejected",
+                        "接口引擎实时 EventId 重放内容不一致，已拒绝广播",
+                        $"EventId={realtimeEvent.EventId}; ChannelKey={realtimeEvent.ChannelKey}; SubjectId={realtimeEvent.SubjectId}",
+                        3,
+                        false,
+                        realtimeEvent.EventId);
+                }
+                else if (publishResult.VersionConflict)
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "ApiEngineRealtime",
+                        "VersionConflictRejected",
+                        "接口引擎实时 Version 与已保存事件冲突，已拒绝广播",
+                        $"EventId={realtimeEvent.EventId}; ChannelKey={realtimeEvent.ChannelKey}; SubjectId={realtimeEvent.SubjectId}; Version={realtimeEvent.Version}",
+                        3,
+                        false,
+                        realtimeEvent.EventId);
+                }
+                else if (publishResult.Stale)
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "ApiEngineRealtime",
+                        "StaleVersionRejected",
+                        "接口引擎实时低版本事件已拒绝广播",
+                        $"EventId={realtimeEvent.EventId}; ChannelKey={realtimeEvent.ChannelKey}; SubjectId={realtimeEvent.SubjectId}; Version={realtimeEvent.Version}",
+                        2,
+                        false,
+                        realtimeEvent.EventId);
+                }
+                else if (!publishResult.RedisError.DosIsNullOrWhiteSpace()
+                         || !publishResult.BroadcastError.DosIsNullOrWhiteSpace())
+                {
+                    MicroiEngine.QueueSystemLog(
+                        osClient,
+                        "ApiEngineRealtime",
+                        "EventBroadcastDegraded",
+                        "接口引擎实时通知已降级为 Snapshot 轮询",
+                        $"Redis={publishResult.RedisError}; SignalR={publishResult.BroadcastError}",
+                        2,
+                        false,
+                        realtimeEvent.EventId);
+                }
+            }
+            catch (Exception ex)
+            {
+                MicroiEngine.QueueSystemLog(
+                    param?["OsClient"]?.ToString(),
+                    "ApiEngineRealtime",
+                    "EventBroadcastFailed",
+                    "接口引擎实时通知处理异常，已降级为 Snapshot 轮询",
+                    ex.ToString(),
+                    2);
+            }
+        }
+
+        /// <summary>
+        /// 旧游戏协议的向后兼容旁路。新业务应使用 DataAppend.RealtimeEvent。
         /// </summary>
         private static async Task PublishRealtimeInvalidationAfterCommitAsync(
             object result,
@@ -559,6 +657,7 @@ namespace Microi.net.Api
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             dynamic? result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
+            await PublishApiEngineRealtimeAfterCommitAsync(result, param);
             try
             {
                 //#region 接口引擎接收文件，将文件流转为byte[]，再转为string
@@ -637,6 +736,7 @@ namespace Microi.net.Api
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
+            await PublishApiEngineRealtimeAfterCommitAsync(result, param);
 
             if (result != null && result.GetType().Name == "String")
             {
@@ -693,6 +793,7 @@ namespace Microi.net.Api
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
+            await PublishApiEngineRealtimeAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -767,6 +868,7 @@ namespace Microi.net.Api
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
+            await PublishApiEngineRealtimeAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;
@@ -865,6 +967,7 @@ namespace Microi.net.Api
             if (accessKeyAuthorization.Code != 1) return Json(accessKeyAuthorization);
             var result = await MicroiEngine.ApiEngine.RunAsync(param);
             await PublishRealtimeInvalidationAfterCommitAsync(result, param);
+            await PublishApiEngineRealtimeAfterCommitAsync(result, param);
             try
             {
                 var redirectUrl = (string)result.RedirectUrl;

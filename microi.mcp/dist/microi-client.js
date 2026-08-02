@@ -742,6 +742,12 @@ export class MicroiClient {
     async getStatus() {
         return this.get(API.GET_STATUS);
     }
+    async transitionApplicationStreamGate(data) {
+        return this.post(API.TRANSITION_APPLICATION_STREAM_GATE, data, {
+            timeoutMs: this.writeRequestTimeoutMs,
+            operationName: `transition application stream gate ${data.TransitionId}`,
+        });
+    }
     async listMyUserAccessKeys() {
         // Deliberately omit TargetUserId: the backend binds the operation to the
         // authenticated user and prevents an access-key session from managing keys.
@@ -1059,12 +1065,36 @@ export class MicroiClient {
         if (!fileName || /[\r\n"]/u.test(fileName)) {
             throw new Error('RelativePath 的文件名不合法');
         }
+        const protocolFields = {};
+        if (data.ProtocolVersion === 3) {
+            const nullable = (value) => value === null ? 'null' : String(value ?? '');
+            Object.assign(protocolFields, {
+                ProtocolVersion: '3',
+                PublishMode: 'stage',
+                ExpectedGateEpoch: String(data.ExpectedGateEpoch ?? ''),
+                RequestFingerprint: String(data.RequestFingerprint ?? ''),
+                DeliveryBatchId: String(data.DeliveryBatchId ?? ''),
+                SourceManifestHash: String(data.SourceManifestHash ?? ''),
+                RuntimeManifestHash: String(data.RuntimeManifestHash ?? ''),
+                RouteSnapshotJson: String(data.RouteSnapshotJson ?? ''),
+                RouteSnapshotHash: String(data.RouteSnapshotHash ?? ''),
+                ExpectedCurrentVersion: String(data.ExpectedCurrentVersion ?? ''),
+                ExpectedAppVersion: nullable(data.ExpectedAppVersion),
+                ExpectedPublishFence: String(data.ExpectedPublishFence ?? ''),
+                ExpectedPublishRowVersion: String(data.ExpectedPublishRowVersion ?? ''),
+                ExpectedVersionRowVersion: nullable(data.ExpectedVersionRowVersion),
+                ExpectedActivePublishVersionId: nullable(data.ExpectedActivePublishVersionId),
+                ExpectedCommittedPublishVersionId: nullable(data.ExpectedCommittedPublishVersionId),
+            });
+        }
         return this.requestMultipartFile(API.UPLOAD_APPLICATION_ASSET_STREAM, {
             OsClient: this.config.osClient || '',
             AppIdOrKey: data.AppIdOrKey,
             VersionNo: data.VersionNo,
             RelativePath: data.RelativePath,
             ExpectedSha256: data.ExpectedSha256,
+            RequestId: data.RequestId,
+            ...protocolFields,
         }, localPath, fileName, 'initial', data.TimeoutMs);
     }
     async finalizeApplicationStreamPublish(data) {

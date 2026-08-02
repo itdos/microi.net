@@ -4,16 +4,20 @@ import test from "node:test";
 import vm from "node:vm";
 import { compareSemanticVersions } from "./application-store-replica-sync.mjs";
 
-const source = await readFile(new URL("./import-package.js", import.meta.url), "utf8");
-const publishSource = await readFile(new URL("./ai-app-publish-store.js", import.meta.url), "utf8");
+const readCanonicalText = async url => (
+  await readFile(url, "utf8")
+).replace(/\r\n/g, "\n");
+
+const source = await readCanonicalText(new URL("./import-package.js", import.meta.url));
+const publishSource = await readCanonicalText(new URL("./ai-app-publish-store.js", import.meta.url));
 const packageModel = JSON.parse(await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"));
-const refreshSource = await readFile(new URL("./refresh-resources.mjs", import.meta.url), "utf8");
-const upgradeSource = await readFile(new URL("../Upgrade.cs", import.meta.url), "utf8");
-const appStoreUpgradeSource = await readFile(new URL("../13-UpgradeAppStore.cs", import.meta.url), "utf8");
-const sysMenuLogicSource = await readFile(new URL("../../Microi.Core/Logic/SysMenuLogic.cs", import.meta.url), "utf8");
-const microAppControllerSource = await readFile(new URL("../../Microi.net.Api/Controllers/MicroAppController.cs", import.meta.url), "utf8");
-const apiProgramSource = await readFile(new URL("../../Microi.net.Api/Program.cs", import.meta.url), "utf8");
-const tableActionsSource = await readFile(new URL("../../../Microi.Client/src/views/form-engine/mixins/diy-table-actions.mixin.js", import.meta.url), "utf8");
+const refreshSource = await readCanonicalText(new URL("./refresh-resources.mjs", import.meta.url));
+const upgradeSource = await readCanonicalText(new URL("../Upgrade.cs", import.meta.url));
+const appStoreUpgradeSource = await readCanonicalText(new URL("../13-UpgradeAppStore.cs", import.meta.url));
+const sysMenuLogicSource = await readCanonicalText(new URL("../../Microi.Core/Logic/SysMenuLogic.cs", import.meta.url));
+const microAppControllerSource = await readCanonicalText(new URL("../../Microi.net.Api/Controllers/MicroAppController.cs", import.meta.url));
+const apiProgramSource = await readCanonicalText(new URL("../../Microi.net.Api/Program.cs", import.meta.url));
+const tableActionsSource = await readCanonicalText(new URL("../../../Microi.Client/src/views/form-engine/mixins/diy-table-actions.mixin.js", import.meta.url));
 const functionSource = source.match(/var countPageTabs = function \(value\) \{[\s\S]*?\n\};/);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
@@ -404,7 +408,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   );
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
   assert.equal(packageImporter.Version, importerSourceVersion);
-  assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical source byte-for-byte");
+  assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
   assert.ok(compareSemanticVersions(importerSourceVersion, "v1.8.3") >= 0);

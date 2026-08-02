@@ -42,6 +42,75 @@ export interface ApiResponse<T = unknown> {
         [key: string]: unknown;
     };
 }
+export interface ApplicationStreamGateTransitionRequest {
+    OsClient: string;
+    OsClientType: string;
+    OsClientNetwork: string;
+    ExpectedMode: 'LegacyOpen' | 'Drain' | 'V3Only';
+    ExpectedMinProtocol: 2 | 3;
+    ExpectedGateEpoch: string;
+    TargetMode: 'LegacyOpen' | 'Drain' | 'V3Only';
+    TargetMinProtocol: 2 | 3;
+    TransitionId: string;
+    Reason: string;
+    DrainProofJson: string;
+    DrainProofHash: string;
+    ConfirmationSha256: string;
+    ConfirmExecution: true;
+}
+export interface ApplicationAssetStreamUploadRequest {
+    AppIdOrKey: string;
+    VersionNo: string;
+    RelativePath: string;
+    ExpectedSha256: string;
+    RequestId: string;
+    FilePath: string;
+    TimeoutMs?: number;
+    ProtocolVersion?: 3;
+    ExpectedGateEpoch?: string;
+    RequestFingerprint?: string;
+    DeliveryBatchId?: string;
+    SourceManifestHash?: string;
+    RuntimeManifestHash?: string;
+    RouteSnapshotJson?: string;
+    RouteSnapshotHash?: string;
+    ExpectedCurrentVersion?: number;
+    ExpectedAppVersion?: string | null;
+    ExpectedPublishFence?: string;
+    ExpectedPublishRowVersion?: string;
+    ExpectedVersionRowVersion?: string | null;
+    ExpectedActivePublishVersionId?: string | null;
+    ExpectedCommittedPublishVersionId?: string | null;
+}
+export interface ApplicationAssetStreamFinalizeRequest {
+    AppIdOrKey: string;
+    VersionNo: string;
+    EntryPath: string;
+    Assets: Array<{
+        Path: string;
+        Sha256: string;
+        Size: number;
+    }>;
+    PublishMode?: 'stage' | 'finalize';
+    ProtocolVersion?: 3;
+    ExpectedGateEpoch?: string;
+    RequestId: string;
+    RequestFingerprint?: string;
+    DeliveryBatchId: string;
+    SourceManifestHash?: string;
+    RuntimeManifestHash: string;
+    RouteSnapshotJson?: string;
+    RouteSnapshotHash?: string;
+    ExpectedCurrentVersion?: number;
+    ExpectedAppVersion?: string | null;
+    ExpectedPublishFence?: string;
+    ExpectedPublishRowVersion?: string;
+    ExpectedVersionRowVersion?: string | null;
+    ExpectedActivePublishVersionId?: string | null;
+    ExpectedCommittedPublishVersionId?: string | null;
+    Routes?: Array<Record<string, unknown>>;
+    ChangeSummary?: string;
+}
 export declare function isTenantConfigurationFailureResponse(result?: Partial<ApiResponse> | null): boolean;
 export declare function isAuthenticationFailureResponse(result?: Partial<ApiResponse> | null): boolean;
 export interface ListEnvelope<T> {
@@ -311,6 +380,7 @@ export declare class MicroiClient {
     private recoveredWriteResult;
     private uncertainWriteFailure;
     getStatus(): Promise<ApiResponse>;
+    transitionApplicationStreamGate(data: ApplicationStreamGateTransitionRequest): Promise<ApiResponse>;
     listMyUserAccessKeys(): Promise<ApiResponse<UserAccessKeyRecord[]>>;
     createMyUserAccessKey(input: CreateUserAccessKeyInput): Promise<ApiResponse<CreateUserAccessKeyResult>>;
     revokeMyUserAccessKey(id: string): Promise<ApiResponse<UserAccessKeyRecord>>;
@@ -360,15 +430,8 @@ export declare class MicroiClient {
         TargetId?: string;
         TargetField?: string;
     }): Promise<ApiResponse>;
-    uploadApplicationAssetStream(data: {
-        AppIdOrKey: string;
-        VersionNo: string;
-        RelativePath: string;
-        ExpectedSha256: string;
-        FilePath: string;
-        TimeoutMs?: number;
-    }): Promise<ApiResponse>;
-    finalizeApplicationStreamPublish(data: Record<string, unknown>): Promise<ApiResponse>;
+    uploadApplicationAssetStream(data: ApplicationAssetStreamUploadRequest): Promise<ApiResponse>;
+    finalizeApplicationStreamPublish(data: ApplicationAssetStreamFinalizeRequest): Promise<ApiResponse>;
     getMicroService(msKey: string): Promise<ApiResponse>;
     listApplications(data?: Record<string, unknown>): Promise<ApiResponse>;
     getApplicationContext(data: Record<string, unknown>): Promise<ApiResponse>;

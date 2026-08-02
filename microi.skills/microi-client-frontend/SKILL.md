@@ -339,6 +339,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - `OpenAnyTable` 应传已授权的 `SysMenuId` / `ModuleEngineKey` 和 `SubmitEvent`，由目标模块按自身表、字段和权限初始化。不要先通过通用 FormEngine 读取 `sys_menu` 来发现任意模块，也不要只传物理 `TableName` 试图绕过菜单。
 - 表格/表单 V8 模板结果通过 `v-safe-html` / DOMPurify 渲染；`onclick`、`onerror`、`javascript:` 等危险内容会被移除。交互请使用平台按钮、插槽或安全链接，不要把内联事件写进模板字符串。
 - `V8.ConfirmTips` 内部使用 Element Plus 的 HTML 模式。只允许固定可信 HTML；数据库、URL、用户输入等动态值必须先进行 HTML/属性转义，路由参数还要 `encodeURIComponent`。它是回调式确认框，不能假定 `await V8.ConfirmTips()` 会直接返回用户选择。
+- 所有用户可见反馈禁止使用浏览器原生 `alert/confirm/prompt`。平台页面使用 `DiyCommon.Tips`、`V8.ConfirmTips`、`ElMessage` 或 `ElMessageBox`；需要 Promise 语义时在调用层封装平台组件，不能退回原生对话框。错误 Toast 与确认层必须 append/teleport 到 body 并固定在当前视口正中央，不能随 `.el-dialog__body`、Tabs 或表格滚动而离开视线。
 - 前端 `V8.Base64` 来自 `js-base64`，真实方法是 `encode`、`decode`、`isValid`，不要写成后端的 `StringToBase64/Base64ToString`。
 
 ### V8 文档与编辑器提示同步
@@ -411,6 +412,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 标题栏应保持清晰的拖动热区，可给 `.el-dialog__header` 设置 `cursor: move`，但不能遮挡关闭按钮。
 - 弹窗内部的表格、树、编辑区要设置稳定高度或最大高度，避免内容撑出视口导致默认居中失效。
 - 修改后验收默认打开态和拖动后状态：弹窗仍在可视区域内，标题/按钮/输入框不被导航、遮罩或浏览器边缘遮挡。
+- 对长内容弹窗还要分别滚到顶部、中部和底部触发一次错误反馈/二次确认，断言提示层仍以当前视口为基准居中；静态扫描同时禁止 `window.alert`、`window.confirm`、`window.prompt` 及对应全局别名。
 
 ## 7.1 登录验证码与 Sys_Config
 

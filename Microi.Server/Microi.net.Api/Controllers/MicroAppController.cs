@@ -23,6 +23,7 @@ namespace Microi.net.Api
     public class MicroAppController : Controller
     {
         private const string ServiceTable = "sys_microiservice";
+        private const string StoreTable = "sys_microistore";
         private const string DefaultVersion = "current";
         private static readonly HttpClient PublicFileHttpClient = new HttpClient
         {
@@ -39,6 +40,41 @@ namespace Microi.net.Api
             if (osClient.DosIsNullOrWhiteSpace() || appKey.DosIsNullOrWhiteSpace())
             {
                 return NotFound("MicroApp parameters are incomplete.");
+            }
+
+            // Protocol-v3 applications of every runtime type, including
+            // MicroService, resolve through the committed version snapshot.
+            // sys_microiservice and its pages are projections only and must
+            // never become an alternate authority after a v3 pointer exists.
+            var v3SnapshotResult = V8McpLogic.ReadApplicationAssetV3ResolverSnapshot(
+                osClient,
+                appKey,
+                null);
+            if (v3SnapshotResult.Code == 1 && v3SnapshotResult.Data != null)
+            {
+                Response.Headers["Cache-Control"] = "no-store";
+                Response.Headers["X-Microi-Application-Asset-Protocol"] = "3";
+                Response.Headers["X-Microi-Application-Publish-Fence"] =
+                    v3SnapshotResult.Data.PublishFence;
+                return Redirect(v3SnapshotResult.Data.StableResolverPath);
+            }
+
+            // Web/UniApp applications are published to the public AI application
+            // CDN. Older releases could leave a sys_microiservice row behind, so
+            // an existing /micro-app bookmark would otherwise keep serving that
+            // stale runtime forever. Resolve the unified application record first
+            // and preserve /micro-app exclusively for real MicroService runtimes.
+            var standaloneApplication = await GetStandaloneApplication(osClient, appKey);
+            if (standaloneApplication?["PublishProtocolVersion"].Val<int>() == 3)
+            {
+                // A v3 row whose authoritative snapshot fails validation must
+                // not fall back to PreviewUrl or mutable MicroService metadata.
+                return NotFound($"Application v3 pointer is incomplete or inconsistent: {appKey}");
+            }
+            var standaloneRedirect = ResolveStandaloneRedirect(standaloneApplication);
+            if (!standaloneRedirect.DosIsNullOrWhiteSpace())
+            {
+                return Redirect(standaloneRedirect);
             }
 
             var service = await GetService(osClient, appKey);
@@ -61,6 +97,56 @@ namespace Microi.net.Api
                 ResolveEntryPath(service),
                 service,
                 rewriteStableEntry: true);
+        }
+
+        /// <summary>
+        /// Resolves the protocol-v3 stable runtime URL through the committed
+        /// database pointer. The response always redirects to one immutable
+        /// release object; PreviewUrl and the legacy root/latest aliases are
+        /// deliberately not part of this decision.
+        /// </summary>
+        [HttpGet("~/micro-app/v3/tenants/{osClient}/kinds/{kind}/apps/{appKey}/assets/{*assetPath}")]
+        [HttpHead("~/micro-app/v3/tenants/{osClient}/kinds/{kind}/apps/{appKey}/assets/{*assetPath}")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CurrentV3(
+            [FromRoute] string osClient,
+            [FromRoute] string kind,
+            [FromRoute] string appKey,
+            [FromRoute] string assetPath = null)
+        {
+            if (osClient.DosIsNullOrWhiteSpace()
+                || kind.DosIsNullOrWhiteSpace()
+                || appKey.DosIsNullOrWhiteSpace())
+            {
+                return NotFound("Application asset v3 parameters are incomplete.");
+            }
+
+            if (!string.Equals(kind, "runtime", StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound($"Application v3 kind is unsupported: {kind}");
+            }
+
+            var snapshotResult = V8McpLogic.ReadApplicationAssetV3ResolverSnapshot(
+                osClient,
+                appKey,
+                assetPath);
+            var snapshot = snapshotResult.Code == 1 ? snapshotResult.Data : null;
+            if (snapshot == null || snapshot.ReleaseAssetPath.DosIsNullOrWhiteSpace())
+            {
+                return NotFound($"Application v3 pointer is incomplete or inconsistent: {appKey}");
+            }
+
+            var immutableUrl = await BuildPublicFileUrl(osClient, snapshot.ReleaseAssetPath);
+            if (immutableUrl.DosIsNullOrWhiteSpace())
+            {
+                return StatusCode(503, $"Application v3 storage is unavailable: {appKey}");
+            }
+
+            Response.Headers["Cache-Control"] = "no-store";
+            Response.Headers["X-Microi-Application-Asset-Protocol"] = "3";
+            Response.Headers["X-Microi-Application-Version"] = GetText(snapshot.Version, "VersionNo");
+            Response.Headers["X-Microi-Application-Publish-Fence"] = snapshot.PublishFence;
+            return Redirect(immutableUrl);
         }
 
         [HttpGet("~/micro-app/{osClient}/{appKey}/{version}/{*assetPath}")]
@@ -533,6 +619,154 @@ namespace Microi.net.Api
             // Older clients and already-saved menus may still use the service Id in
             // /micro-app/{appKey}. Keep those URLs working while new clients prefer MsKey.
             return await GetServiceByField(osClient, "Id", appKey, includeAssetPayloads);
+        }
+
+        private static string ResolveApplicationAssetV3CommittedPath(
+            JObject application,
+            JObject version,
+            string osClient,
+            string kind,
+            string appKey,
+            string assetPath)
+        {
+            if (application == null || version == null) return null;
+            if (!string.Equals(kind, "runtime", StringComparison.OrdinalIgnoreCase)) return null;
+            if (V8McpLogic.ValidateApplicationAssetV3StableResolverTarget(
+                    osClient,
+                    application,
+                    version) != null)
+            {
+                return null;
+            }
+            if (application["PublishProtocolVersion"].Val<int>() != 3
+                || version["PublishProtocolVersion"].Val<int>() != 3)
+            {
+                return null;
+            }
+            if (!IsApplicationAssetV3CommittedState(GetText(application, "PublishState"))
+                || !IsApplicationAssetV3CommittedState(GetText(version, "PublishState")))
+            {
+                return null;
+            }
+
+            var persistedAppKey = GetText(application, "AppKey");
+            var applicationId = GetText(application, "Id");
+            var committedVersionId = GetText(application, "CommittedPublishVersionId");
+            if (!string.Equals(persistedAppKey, appKey, StringComparison.Ordinal)
+                || applicationId.DosIsNullOrWhiteSpace()
+                || !string.Equals(GetText(version, "Id"), committedVersionId, StringComparison.Ordinal)
+                || !string.Equals(GetText(version, "AppId"), applicationId, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var runtimeManifestHash = GetText(version, "RuntimeManifestHash");
+            if (!IsCanonicalSha256(runtimeManifestHash)
+                || !string.Equals(
+                    GetText(application, "CommittedRuntimeManifestHash"),
+                    runtimeManifestHash,
+                    StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var identity = new V8McpLogic.ApplicationAssetV3ReleaseIdentity
+            {
+                Tenant = TenantConfigurationSecurity.NormalizeTenantId(osClient).ToLowerInvariant(),
+                Kind = "runtime",
+                AppKey = appKey,
+                Version = GetText(version, "VersionNo"),
+                RequestFingerprint = GetText(version, "RequestFingerprint")
+            };
+            if (V8McpLogic.ValidateApplicationAssetV3ReleaseIdentity(identity) != null) return null;
+
+            var releasePrefix = V8McpLogic.BuildApplicationAssetV3ReleasePrefix(identity);
+            if (!string.Equals(GetText(version, "ReleasePrefix"), releasePrefix, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var entryRelativePath = GetText(version, "EntryPath");
+            if (V8McpLogic.ValidateApplicationAssetV3RelativePath(entryRelativePath) != null) return null;
+
+            assetPath = assetPath.DosIsNullOrWhiteSpace() ? entryRelativePath : assetPath;
+            if (V8McpLogic.ValidateApplicationAssetV3RelativePath(assetPath) != null) return null;
+            return V8McpLogic.BuildApplicationAssetV3ReleaseEntryPath(identity, assetPath);
+        }
+
+        private static bool IsApplicationAssetV3CommittedState(string state)
+        {
+            return state.Equals("PointerCommitted", StringComparison.OrdinalIgnoreCase)
+                || state.Equals("ProjectionPending", StringComparison.OrdinalIgnoreCase)
+                || state.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+                || state.Equals("RepairRequired", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsCanonicalSha256(string value)
+        {
+            if (value == null || value.Length != 64) return false;
+            foreach (var character in value)
+            {
+                if ((character < '0' || character > '9')
+                    && (character < 'a' || character > 'f'))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static async Task<JObject> GetStandaloneApplication(string osClient, string appKey)
+        {
+            var param = new DiyTableRowParam
+            {
+                FormEngineKey = StoreTable,
+                OsClient = osClient,
+                _InvokeType = InvokeType.Server.ToString(),
+                _TrustedServerInvocation = true,
+                _Where = new List<DiyWhere>
+                {
+                    new DiyWhere
+                    {
+                        Name = "AppKey",
+                        Type = "=",
+                        Value = appKey
+                    }
+                },
+                _SelectFields = new List<string>
+                {
+                    "Id",
+                    "AppKey",
+                    "ApplicationType",
+                    "PublishProtocolVersion",
+                    "PreviewUrl"
+                }
+            };
+
+            dynamic result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
+            return result.Code == 1 ? ToJObject(result.Data) : null;
+        }
+
+        private static string ResolveStandaloneRedirect(JObject application)
+        {
+            if (application == null) return null;
+
+            var applicationType = (application["ApplicationType"].Val<string>() ?? "").Trim();
+            if (!applicationType.Equals("Web", StringComparison.OrdinalIgnoreCase)
+                && !applicationType.Equals("UniApp", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var previewUrl = (application["PreviewUrl"].Val<string>() ?? "").Trim();
+            if (!Uri.TryCreate(previewUrl, UriKind.Absolute, out var previewUri)
+                || (previewUri.Scheme != Uri.UriSchemeHttp && previewUri.Scheme != Uri.UriSchemeHttps)
+                || previewUri.AbsolutePath.StartsWith("/micro-app/", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            return previewUri.AbsoluteUri;
         }
 
         private static async Task<JObject> GetServiceByField(

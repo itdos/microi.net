@@ -60,7 +60,120 @@ var result2 = V8.ApiEngine.Run('ApiEngineKey', {
 - 嵌套调用传入外层事务时，最终提交或回滚由外层调用者决定。
 - `V8.DbTrans.Commit()`、`Rollback()`、`Close()` 会被安全代理忽略，不要在脚本中手动管理平台事务。
 
-### 多人游戏实时失效通知（SignalR）
+### 接口引擎通用实时事件（SignalR）
+
+接口引擎负责业务命令、权限、事务和权威状态，SignalR 负责把事务成功后的服务端事件低延迟推送给已授权订阅者。该能力不是游戏专用：订单进度、协同编辑、设备状态、审批提醒和多人房间都使用同一个通用 Hub。共享数据库、Redis 或业务状态机仍是事实源，不能把业务完成与否只保存在 Hub、进程内字典或 SignalR 消息中。
+
+写接口成功时返回固定大小写的 `DataAppend.RealtimeEvent`：
+
+```javascript
+return {
+  Code: 1,
+  Data: snapshot,
+  DataAppend: {
+    RealtimeEvent: {
+      EventId: requestId,          // 全局稳定；同一次重试保持不变
+      ChannelKey: 'order_updates', // 业务频道，小写字母/数字/下划线
+      SubjectId: order.Id,         // 频道内资源 Id
+      Version: order.VersionNo,    // 非负、单调递增
+      EventType: 'StatusChanged',
+      Data: { Status: order.Status } // 可选；只放该群组可见的安全投影，最大 32KB
+    }
+  }
+};
+```
+
+平台只在外部接口引擎请求执行完成且 `Code === 1` 后读取该对象；失败或回滚结果不会广播。宿主只读取固定大小写的 `DataAppend.RealtimeEvent`，重新生成 `OccurredAt`，并把事件收敛为 `EventId/ChannelKey/SubjectId/Version/EventType/Data/OccurredAt`。业务返回的其它 `DataAppend`、`Data`、私有手牌、用户信息和额外字段都不会进入通用 SignalR 事件。
+
+跨节点发布使用共享 Redis：同一个 `OsClient + EventId` 先取得短时 Claim，再按 `ChannelKey + SubjectId` 原子维护单调 latest。低于当前 `Version` 的事件作为过期事件拒绝广播；同版本但事件指纹不同会判为版本冲突并拒绝；完全相同的事件重放不会推进 latest。只有 SignalR 真实广播成功后，平台才写入 24 小时 EventId 完成标记。若节点在广播前退出，Claim 到期后可重试，不会形成“已经去重但从未广播”的永久窗口；故障恢复可能产生重复通知，所以客户端仍必须去重。Redis 或 SignalR 故障不能反写已经提交的业务结果，客户端通过 HTTP Snapshot 收敛。
+
+通用 Hub 固定契约：
+
+| 项目 | 值 |
+|---|---|
+| 协议版本 | `2` |
+| URL | `/api-engine-realtime` |
+| 订阅方法 | `SubscribeChannel` |
+| 取消订阅 | `UnsubscribeChannel` |
+| 客户端事件 | `RealtimeEvent` |
+| 订阅参数 | `{ ChannelKey, SubjectId }` |
+| 订阅结果 | `ProtocolVersion/ChannelKey/SubjectId/Version/Latest/RenewAfterMilliseconds/LeaseExpiresAt` |
+| 租约 | 30 秒时隙；客户端按返回值续租 |
+| 事件字段 | `EventId/ChannelKey/SubjectId/Version/EventType/Data/OccurredAt` |
+
+客户端不能指定任意接口 Key、用户或租户。连接必须使用当前有效的普通登录 Token；Hub 会检查 JWT 有效期、平台活跃 Token 缓存和租户配置的 Token 生命周期。现有 AccessKey 权限模型没有 `realtime:subscribe` scope，因此平台会直接拒绝 AccessKey 实时连接；在平台正式增加并校验该 scope 前，不得通过放宽 Hub 校验绕过此边界。
+
+Hub 从登录 Token 恢复 `OsClient` 与 `CurrentUser`，再按约定调用 `realtime_{channel_key}_authorize` 接口引擎。例如 `order_updates` 对应 `realtime_order_updates_authorize`：
+
+```javascript
+// ApiEngineKey: realtime_order_updates_authorize
+var order = V8.FormEngine.GetFormData('biz_order', {
+  Id: V8.Param.SubjectId,
+  _SelectFields: ['Id', 'OwnerUserId', 'VersionNo']
+});
+if (!order || order.Code !== 1 || order.Data.OwnerUserId !== V8.CurrentUser.Id) {
+  return { Code: 0, Msg: '您无权订阅该订单' };
+}
+return {
+  Code: 1,
+  Data: {
+    Authorized: true,
+    ChannelKey: V8.Param.ChannelKey,
+    SubjectId: order.Data.Id,
+    Version: order.Data.VersionNo
+  }
+};
+```
+
+`SubscribeChannel` 不是连接全生命周期的一次性授权，而是 30 秒时隙租约。每次调用都会重新校验 Token，通过共享 Redis 的 `OsClient + UserId` 限流，并重新执行授权接口引擎；当前限额是所有标签页和 API 节点合计 10 秒最多 96 次。服务端把通过授权的连接加入当前和下一时隙，只向当前时隙广播，并返回建议续租时间。客户端必须按本次响应的 `RenewAfterMilliseconds` 串行再次调用 `SubscribeChannel`，不要写死间隔；停止续租后，连接最迟在后续时隙自然停止收到事件。授权失败会移除该频道租约，Token 失效会清理全部租约并断开连接。Redis 限流不可用时订阅失败关闭，业务仍可使用 HTTP Snapshot。
+
+客户端按 `EventId` 去重、按 `Version` 忽略旧事件并检测缺口；发现版本跳跃、重连、续租失败或服务降级时，立即调用业务接口获取按当前用户裁剪的 Snapshot，并保留有界 HTTP 轮询兜底。一个频道群组中的所有订阅者都会收到同一份 `Data`，因此用户私有手牌、Token、密钥和按用户不同的字段不得放入群组事件。
+
+浏览器使用项目本地打包的 `@microsoft/signalr`，下面是续租与 Snapshot 降级的最小骨架：
+
+```javascript
+const subscription = { ChannelKey: 'order_updates', SubjectId: orderId };
+const connection = new signalR.HubConnectionBuilder()
+  .withUrl(apiBase + '/api-engine-realtime', {
+    accessTokenFactory: () => loginToken // 普通登录 Token，不是 AccessKey
+  })
+  .withAutomaticReconnect()
+  .build();
+
+const seenEventIds = new Set();
+let snapshotVersion = 0;
+let renewTimer;
+
+connection.on('RealtimeEvent', async event => {
+  if (seenEventIds.has(event.EventId) || event.Version <= snapshotVersion) return;
+  seenEventIds.add(event.EventId);
+  // 即使 Data 有公共增量，也要在缺口、重连和关键状态变化时回读权威 Snapshot。
+  const snapshot = await getOrderSnapshot(orderId);
+  snapshotVersion = snapshot.Version;
+  render(snapshot);
+});
+
+async function renewLease() {
+  clearTimeout(renewTimer);
+  try {
+    const lease = await connection.invoke('SubscribeChannel', subscription);
+    renewTimer = setTimeout(
+      () => void renewLease(),
+      Math.max(1000, lease.RenewAfterMilliseconds)
+    );
+  } catch (error) {
+    await refreshByHttpSnapshot();
+    renewTimer = setTimeout(() => void renewLease(), 3000);
+  }
+}
+
+await connection.start();
+await renewLease();
+```
+
+下面的 `/game-realtime` 是已有五款游戏的向后兼容协议；新业务和完成迁移后的游戏使用上面的通用协议。
+
+### 多人游戏实时失效通知（兼容协议）
 
 发牌、出牌、碰杠胡、结算、捕鱼命中等规则必须在接口引擎中执行，并用数据库事务、`RequestId`、`ExpectedVersion`、唯一索引和行锁维护权威状态。SignalR 不承载这些业务命令，也不发送手牌；它只在接口引擎成功提交后通知同房玩家“房间版本已变化”，客户端随后重新调用 gateway 的 `Snapshot`。
 

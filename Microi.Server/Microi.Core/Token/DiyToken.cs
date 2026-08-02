@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -11,6 +12,15 @@ using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
+    public sealed class JwtSigningKeyStatus
+    {
+        public bool Ready { get; set; }
+        public bool Durable { get; set; }
+        public string Source { get; set; }
+        public string Fingerprint { get; set; }
+        public string Message { get; set; }
+    }
+
     public partial class DiyToken
     {
         public const string AuthVersionClaimType = "MicroiAuthVersion";
@@ -37,14 +47,100 @@ namespace Microi.net
 
         public static string ResolveJwtSigningKey(OsClientSecret clientModel)
         {
-            var jwtKey = clientModel?.OsClientModel?["AuthSecret"]?.Val<string>();
-            if (IsWeakJwtSecret(jwtKey, clientModel?.OsClient))
+            var status = GetJwtSigningKeyStatus(clientModel, includeFingerprint: false);
+            if (!status.Ready)
             {
-                throw new Exception($"租户[{clientModel?.OsClient}]的JWT AuthSecret为空、过短或等于租户Key，请在SaaS引擎中配置强随机AuthSecret后重试。");
+                throw new InvalidOperationException(status.Message);
             }
 
+            return NormalizeJwtSigningKey(clientModel.OsClientModel["AuthSecret"].Val<string>());
+        }
+
+        public static JwtSigningKeyStatus GetJwtSigningKeyStatus(
+            OsClientSecret clientModel,
+            bool includeFingerprint = true)
+        {
+            var configuredRootSecret = GetConfiguredJwtRootSecret();
+            return EvaluateJwtSigningKeyStatus(clientModel, configuredRootSecret, includeFingerprint);
+        }
+
+        public static string GetConfiguredJwtRootSecret()
+        {
+            // AuthSecret 是启动基础设施密钥，不能从 SaaS runtime reader 回读。
+            // 否则 sys_osclients.AuthSecret 本身会被误判为宿主配置，进程占位值也可能
+            // 获得“Configuration”稳定来源身份。这里只接受真正的宿主环境/静态配置。
+            var value = Environment.GetEnvironmentVariable(
+                            "MICROI_AUTH_SECRET",
+                            EnvironmentVariableTarget.Process)
+                        ?? Environment.GetEnvironmentVariable("MICROI_AUTH_SECRET");
+            if (!value.DosIsNullOrWhiteSpace()) return value;
+            return ConfigHelper.GetConfiguration("Security:AuthSecret");
+        }
+
+        /// <summary>
+        /// 评估 JWT 签名密钥是否来自可跨进程、跨节点恢复的稳定来源。
+        /// 仅有一段强随机文本还不够：没有 sys_osclients 记录身份、也没有受控宿主配置时，
+        /// 它可能只是启动占位模型的进程临时值，发布后必然漂移。
+        /// </summary>
+        public static JwtSigningKeyStatus EvaluateJwtSigningKeyStatus(
+            OsClientSecret clientModel,
+            string configuredRootSecret,
+            bool includeFingerprint = true)
+        {
+            var osClient = clientModel?.OsClient ?? string.Empty;
+            var rawSecret = clientModel?.OsClientModel?["AuthSecret"]?.Val<string>();
+            if (IsWeakJwtSecret(rawSecret, osClient))
+            {
+                return new JwtSigningKeyStatus
+                {
+                    Ready = false,
+                    Durable = false,
+                    Source = "Unavailable",
+                    Fingerprint = string.Empty,
+                    Message = $"租户[{osClient}]的 JWT AuthSecret 为空、过短或等于租户 Key，节点拒绝接收登录流量。请检查 sys_osclients.AuthSecret 或 MICROI_AUTH_SECRET。"
+                };
+            }
+
+            var configuredMainTenant = OsClientDefault.OsClient;
+            var hasConfiguredRoot = !IsWeakJwtSecret(configuredRootSecret, configuredMainTenant);
+            var persistedId = clientModel?.OsClientModel?["Id"]?.Val<string>();
+            var hasPersistedTenantIdentity = !persistedId.DosIsNullOrWhiteSpace();
+            if (!hasConfiguredRoot && !hasPersistedTenantIdentity)
+            {
+                return new JwtSigningKeyStatus
+                {
+                    Ready = false,
+                    Durable = false,
+                    Source = "ProcessTemporary",
+                    Fingerprint = string.Empty,
+                    Message = $"租户[{osClient}]的 JWT AuthSecret 没有稳定来源；拒绝使用进程临时密钥签发或验证 Token。请确保主租户已从 sys_osclients 挂载，或配置稳定的 MICROI_AUTH_SECRET。"
+                };
+            }
+
+            var signingKey = NormalizeJwtSigningKey(rawSecret);
+            return new JwtSigningKeyStatus
+            {
+                Ready = true,
+                Durable = true,
+                Source = hasConfiguredRoot ? "Configuration" : "sys_osclients",
+                Fingerprint = includeFingerprint ? ComputeJwtSigningKeyFingerprint(signingKey) : string.Empty,
+                Message = "JWT 签名密钥已从稳定来源加载。"
+            };
+        }
+
+        private static string NormalizeJwtSigningKey(string jwtKey)
+        {
             jwtKey = jwtKey.Trim();
             return jwtKey.Length > 32 ? jwtKey.Substring(0, 32) : jwtKey.PadRight(32, '.');
+        }
+
+        private static string ComputeJwtSigningKeyFingerprint(string signingKey)
+        {
+            using (var sha256 = SHA256.Create())
+            {
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(signingKey));
+                return BitConverter.ToString(hash, 0, 8).Replace("-", string.Empty).ToLowerInvariant();
+            }
         }
 
         private static int ReadPositiveInt(OsClientSecret clientModel, params string[] keys)

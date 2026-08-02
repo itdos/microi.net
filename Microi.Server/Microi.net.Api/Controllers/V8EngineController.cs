@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using Dos.Common;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -217,15 +218,15 @@ namespace Microi.net.Api
 
         /// <summary>
         /// 将一个已编译应用资产以 multipart 二进制流直接写入 HDFS 历史版本目录。
-        /// 文件体不会进入 JSON、Base64 或 Jint；稳定入口由完整清单确认接口统一切换。
+        /// 文件体不会进入 JSON、Base64 或 Jint；RequestId 用于跨节点稳定重试，
+        /// 稳定入口由完整清单确认接口统一切换。
         /// </summary>
         [HttpPost]
         [Consumes("multipart/form-data")]
-        // One streamed asset may be very large. The business layer enforces the
-        // 20GB application-delivery cap; the slightly larger HTTP envelope leaves
-        // room for multipart metadata without imposing the old 1GB ceiling.
-        [RequestSizeLimit(22548578304L)]
-        [RequestFormLimits(MultipartBodyLengthLimit = 22548578304L)]
+        // The publisher performs strict byte[] readback, so one asset is bounded
+        // to 128MiB. The 130MiB HTTP envelope leaves room for multipart metadata.
+        [RequestSizeLimit(136314880L)]
+        [RequestFormLimits(MultipartBodyLengthLimit = 136314880L)]
         public async Task<IActionResult> UploadApplicationAssetStream()
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -245,17 +246,76 @@ namespace Microi.net.Api
                 if (lastSlash >= 0) normalizedFileName = normalizedFileName.Substring(lastSlash + 1);
 
                 await using var stream = file.OpenReadStream();
-                var result = await V8McpLogic.UploadApplicationAssetStream(
-                    osClient,
-                    form["AppIdOrKey"].ToString(),
-                    form["VersionNo"].ToString(),
-                    relativePath,
-                    form["ExpectedSha256"].ToString(),
-                    normalizedFileName,
-                    stream,
-                    file.Length,
-                    token,
-                    HttpContext.RequestAborted);
+                var protocolVersion = form["ProtocolVersion"].ToString().Trim();
+                DosResult<object> result;
+                if (protocolVersion == "3")
+                {
+                    var protocolParam = new JObject();
+                    var nullableFields = new HashSet<string>(StringComparer.Ordinal)
+                    {
+                        "ExpectedAppVersion",
+                        "ExpectedVersionRowVersion",
+                        "ExpectedActivePublishVersionId",
+                        "ExpectedCommittedPublishVersionId"
+                    };
+                    foreach (var fieldName in new[]
+                    {
+                        "ProtocolVersion",
+                        "PublishMode",
+                        "ExpectedGateEpoch",
+                        "ExpectedPublishRowVersion",
+                        "ExpectedVersionRowVersion",
+                        "ExpectedPublishFence",
+                        "ExpectedActivePublishVersionId",
+                        "ExpectedCommittedPublishVersionId",
+                        "ExpectedCurrentVersion",
+                        "ExpectedAppVersion",
+                        "RequestId",
+                        "RequestFingerprint",
+                        "DeliveryBatchId",
+                        "SourceManifestHash",
+                        "RuntimeManifestHash"
+                    })
+                    {
+                        if (!form.ContainsKey(fieldName)) continue;
+                        var rawValue = form[fieldName].ToString();
+                        protocolParam[fieldName] = nullableFields.Contains(fieldName)
+                                                   && string.Equals(rawValue, "null", StringComparison.Ordinal)
+                            ? JValue.CreateNull()
+                            : rawValue;
+                    }
+                    result = await V8McpLogic.UploadApplicationAssetStreamV3(
+                        osClient,
+                        form["AppIdOrKey"].ToString(),
+                        form["VersionNo"].ToString(),
+                        relativePath,
+                        form["ExpectedSha256"].ToString(),
+                        normalizedFileName,
+                        stream,
+                        file.Length,
+                        protocolParam,
+                        (object)token,
+                        HttpContext.RequestAborted);
+                }
+                else
+                {
+                    if (!string.IsNullOrEmpty(protocolVersion) && protocolVersion != "2")
+                    {
+                        return Ok(new DosResult(0, null, "ProtocolVersion 只允许 2 或 3"));
+                    }
+                    result = await V8McpLogic.UploadApplicationAssetStream(
+                        osClient,
+                        form["AppIdOrKey"].ToString(),
+                        form["VersionNo"].ToString(),
+                        relativePath,
+                        form["ExpectedSha256"].ToString(),
+                        normalizedFileName,
+                        stream,
+                        file.Length,
+                        form["RequestId"].ToString(),
+                        (object)token,
+                        HttpContext.RequestAborted);
+                }
                 return Ok(result);
             }
             catch (OperationCanceledException)
@@ -270,7 +330,7 @@ namespace Microi.net.Api
 
         /// <summary>
         /// 校验完整版本清单，并通过 HDFS 服务端复制切换 root/latest 稳定入口。
-        /// 请求只包含路径、大小、SHA-256 与路由元数据，不包含文件体。
+        /// 请求只包含路径、大小、SHA-256、RequestId 与路由元数据，不包含文件体。
         /// </summary>
         [HttpPost]
         public async Task<IActionResult> FinalizeApplicationStreamPublish([FromBody] JObject param)
@@ -285,13 +345,40 @@ namespace Microi.net.Api
                 var result = await V8McpLogic.FinalizeApplicationStreamPublish(
                     osClient,
                     param,
-                    token,
+                    (object)token,
                     HttpContext.RequestAborted);
                 return Ok(result);
             }
             catch (Exception ex)
             {
                 return Ok(new DosResult(0, null, "确认应用流式发布失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 以 ExpectedMode/MinProtocol/GateEpoch CAS 原子转换应用流式发布门禁。
+        /// 服务端会重算 MCP 规范载荷 SHA-256；只有 literal true 的
+        /// ConfirmExecution 与完全一致的 ConfirmationSha256 才允许写入。
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> TransitionApplicationStreamGate([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(
+                    param["OsClient"]?.Val<string>(),
+                    (object)token);
+                return Ok(V8McpLogic.TransitionApplicationStreamGate(
+                    osClient,
+                    param,
+                    (object)token));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "应用流式发布门禁转换请求失败：" + ex.Message));
             }
         }
 
