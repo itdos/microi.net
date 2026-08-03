@@ -50,6 +50,7 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 - 传入 `_InvokeType: 'Client'` → **触发**表单 V8 事件
 - Postman 等直接调用接口 → 前端事件**不执行**，后端事件**仍执行**
 - 服务器端提交前/后 V8 事件在**同一事务**中执行
+- `diy_table.V8Unlimited` 只控制该表的后端提交前、提交后和数据处理 V8；仅当事件链必须保持一个事务且无法安全分片时开启。它解除当前 Jint Engine 的超时、语句、函数递归和累计分配限制，但不解除进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护。
 
 ## ⚠️ 关键陷阱（必读）
 
@@ -374,6 +375,7 @@ if (V8.Form.Phone) {
 - `_InvokeType:'Server'` 只表达事件调用语义，不是客户端授权开关；浏览器伪造它不会获得受信任权限
 - `V8.FormSubmitAction` 的值是 `'Insert'`/`'Update'`/`'Delete'`（非 Add/Upt/Del）
 - 在 DataFilterV8 中使用 `V8.CacheData` 缓存查询结果，避免每行执行 N+1 查询
+- 表事件调用下游接口时，`diy_table.V8Unlimited` 不会自动放开下游接口；下游 `sys_apiengine.V8Unlimited` 必须独立配置，避免一次开关无边界扩散到整条调用链
 
 ### 复盘：提交后事件误把增量表单当作完整记录
 

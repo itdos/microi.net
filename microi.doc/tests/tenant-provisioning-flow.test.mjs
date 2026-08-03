@@ -57,6 +57,13 @@ test('both persistent and legacy creation paths preserve one-time Gitee Star pro
   assert.doesNotMatch(legacy, /AdminDefaultPassword\s*:\s*tenantKey/)
 })
 
+test('persistent wrapper clears terminal task locks and cleans up failed worker ownership', () => {
+  const legacy = read(legacyEntryPath)
+  assert.match(legacy, /FROM mci_background_task WHERE Id = @p0 AND OsClient = @p1/)
+  assert.match(legacy, /persistedStatus === 'succeeded'.*persistedStatus === 'failed'.*persistedStatus === 'canceled'/s)
+  assert.match(legacy, /if \(durableResult\.Code !== 1\) \{\s*removeOwnedLock\(tenantLockKey\);\s*removeOwnedLock\(userLockKey\);\s*cleanupGiteeWorkerProof\(\);/s)
+})
+
 test('all tenant V8 engines remain syntactically valid JavaScript functions', () => {
   for (const file of [workerPath, progressPath, centerPath, legacyEntryPath]) {
     assert.doesNotThrow(() => new Function(read(file)), path.basename(file))

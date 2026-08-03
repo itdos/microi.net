@@ -1,3 +1,4 @@
+import { getTableChildFieldRelations } from "@/utils/table-child-relations.js";
 
 export default {
     methods: {
@@ -295,18 +296,18 @@ export default {
 
                 //这句一直不需要
                 //var fatherFormModel = self.$refs.fieldForm.FormDiyTableModel;
-                if (!self.DiyCommon.IsNull(self.TableChildCallbackField) && !self.DiyCommon.IsNull(fatherFormModel)) {
-                    // if (!self.DiyCommon.IsNull(self.TableChildCallbackField) && !self.DiyCommon.IsNull(self.FatherFormModel.Id)) {
-                    try {
-                        var callBackJson = JSON.parse(self.TableChildCallbackField);
-                        callBackJson.forEach((callbackField) => {
-                            tempDefaultValues[callbackField.Child] = fatherFormModel[callbackField.Father];
-                            // tempDefaultValues[callbackField.Child] = self.FatherFormModel[callbackField.Father];
-                        });
-                    } catch (error) {
-                        self.DiyCommon.Tips("子表回写列配置错误，请检查：" + self.TableChildCallbackField, false);
-                        console.log(error);
+                if (!self.DiyCommon.IsNull(fatherFormModel)) {
+                    var relationConfig = {
+                        TableChild: self.TableChildConfig || {}
+                    };
+                    // 外部二开组件可能仍单独传入历史属性；只在读取时兼容，
+                    // 新版字段配置不会再写回这个旧键。
+                    if (!self.DiyCommon.IsNull(self.TableChildCallbackField)) {
+                        relationConfig.TableChildCallbackField = self.TableChildCallbackField;
                     }
+                    getTableChildFieldRelations(relationConfig).forEach((relation) => {
+                        tempDefaultValues[relation.ChildField] = fatherFormModel[relation.ParentField];
+                    });
                 }
             } catch (error) {
                 console.log("判断有没有主表要回写子表列的 error：");

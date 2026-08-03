@@ -22,6 +22,11 @@
                     <span>{{ $t("Msg.BackgroundTasks") }}</span>
                     <strong>{{ tasks.length }}</strong>
                 </div>
+                <div class="summary-card primary">
+                    <el-icon><Bell /></el-icon>
+                    <span>{{ $t("Msg.PlatformMessages") }}</span>
+                    <strong>{{ notificationUnreadCount }}</strong>
+                </div>
                 <div v-if="isAdmin" class="summary-card warning">
                     <el-icon><Monitor /></el-icon>
                     <span>{{ $t("Msg.OfficialApps") }}</span>
@@ -47,6 +52,73 @@
             </div>
 
             <el-tabs v-model="activeTab" class="notification-tabs">
+                <el-tab-pane name="platformMessages">
+                    <template #label>
+                        <span>{{ $t("Msg.PlatformMessages") }}</span>
+                        <span v-if="notificationUnreadCount > 0" class="tab-count warning">{{ notificationUnreadCount }}</span>
+                    </template>
+
+                    <div class="task-sub-actions">
+                        <el-button
+                            link
+                            size="small"
+                            :disabled="notificationUnreadCount === 0"
+                            @click="markAllNotificationsRead"
+                        >{{ $t("Msg.MarkAllRead") }}</el-button>
+                    </div>
+                    <el-empty
+                        v-if="!notificationLoading && platformNotifications.length === 0"
+                        :description="$t('Msg.NoPlatformMessages')"
+                    />
+                    <div v-else-if="notificationLoading" class="task-empty">{{ $t("Msg.Loading") }}</div>
+                    <el-table
+                        v-else
+                        :data="platformNotifications"
+                        size="small"
+                        row-key="Id"
+                        class="online-table notification-compact-table platform-message-table"
+                        max-height="420"
+                    >
+                        <el-table-column :label="$t('Msg.Name')" min-width="180" show-overflow-tooltip>
+                            <template #default="{ row }">
+                                <span :class="{ 'platform-message-title--unread': Number(row.IsRead || 0) !== 1 }">
+                                    {{ row.Title || $t("Msg.PlatformMessages") }}
+                                </span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="MsgContent" :label="$t('Msg.MessageContent')" min-width="320" show-overflow-tooltip>
+                            <template #default="{ row }">{{ row.MsgContent || row.Content || "-" }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.CreateTime')" width="168">
+                            <template #default="{ row }">{{ formatDateTime(row.CreateTime) }}</template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Status')" width="88">
+                            <template #default="{ row }">
+                                <el-tag size="small" :type="Number(row.IsRead || 0) === 1 ? 'info' : 'warning'">
+                                    {{ Number(row.IsRead || 0) === 1 ? $t("Msg.Read") : $t("Msg.Unread") }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column :label="$t('Msg.Operation')" width="150" fixed="right">
+                            <template #default="{ row }">
+                                <el-button
+                                    v-if="Number(row.IsRead || 0) !== 1"
+                                    link
+                                    size="small"
+                                    @click="markNotificationRead(row)"
+                                >{{ $t("Msg.MarkRead") }}</el-button>
+                                <el-button
+                                    v-if="row.LinkUrl"
+                                    link
+                                    type="primary"
+                                    size="small"
+                                    @click="openNotificationLink(row)"
+                                >{{ $t("Msg.Open") }}</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-tab-pane>
+
                 <el-tab-pane name="tasks">
                     <template #label>
                         <span>{{ $t("Msg.BackgroundTasks") }}</span>
@@ -250,7 +322,7 @@
 <script>
 import { DiyCommon } from "@/utils/diy.common";
 import { Bell, CircleClose, Delete, Download, Monitor, Refresh, SwitchButton, UserFilled } from "@element-plus/icons-vue";
-import { ElMessage, ElMessageBox } from "element-plus";
+import { ElMessage, ElMessageBox, ElNotification } from "element-plus";
 import { useDiyStore } from "@/pinia";
 import { useUserStore } from "@/pinia/modules/user";
 import {
@@ -260,6 +332,11 @@ import {
     isTerminalBackgroundTask,
     shouldPollBackgroundTasks
 } from "@/utils/background-task-display";
+import {
+    mergePlatformNotification,
+    normalizeNotificationLink,
+    normalizePlatformNotificationResult
+} from "@/utils/platform-notification";
 
 const STORE_CHECK_INTERVAL = 10 * 60 * 1000;
 const MASTER_STORE_LIST_URL = "https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos";
@@ -281,10 +358,13 @@ export default {
             visible: false,
             activeTab: "tasks",
             tasks: [],
+            platformNotifications: [],
+            notificationUnreadCount: 0,
             storeNotices: [],
             myTerminals: [],
             onlineUsers: [],
             loading: false,
+            notificationLoading: false,
             storeLoading: false,
             terminalLoading: false,
             taskPollTimer: null,
@@ -327,12 +407,13 @@ export default {
             return this.isAdmin ? this.storeNotices.length : 0;
         },
         badgeCount() {
-            return this.runningCount + this.failedCount + this.appNoticeCount;
+            return this.notificationUnreadCount + this.runningCount + this.failedCount + this.appNoticeCount;
         }
     },
     mounted() {
         this.bindWebsocket();
         this.refreshTasks();
+        this.loadPlatformNotifications();
         this.startOfficialAppChecker();
         window.addEventListener("microi-websocket-connected", this.handleWebSocketConnected);
         window.addEventListener("microi-background-task-started", this.handleBackgroundTaskStarted);
@@ -347,6 +428,7 @@ export default {
         const ws = this.getWebsocket();
         if (ws && typeof ws.off === "function") {
             ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
+            ws.off("ReceivePlatformNotification", this.handlePlatformNotification);
             ws.off("ReceiveOnlineTerminalChanged", this.handleOnlineTerminalChanged);
             ws.off("ReceiveForceLogout", this.handleForceLogout);
         }
@@ -385,16 +467,19 @@ export default {
             if (!ws || typeof ws.on !== "function") return;
             if (typeof ws.off === "function") {
                 ws.off("ReceiveBackgroundTaskList", this.handleTaskList);
+                ws.off("ReceivePlatformNotification", this.handlePlatformNotification);
                 ws.off("ReceiveOnlineTerminalChanged", this.handleOnlineTerminalChanged);
                 ws.off("ReceiveForceLogout", this.handleForceLogout);
             }
             ws.on("ReceiveBackgroundTaskList", this.handleTaskList);
+            ws.on("ReceivePlatformNotification", this.handlePlatformNotification);
             ws.on("ReceiveOnlineTerminalChanged", this.handleOnlineTerminalChanged);
             ws.on("ReceiveForceLogout", this.handleForceLogout);
         },
         handleWebSocketConnected() {
             this.bindWebsocket();
             this.loadTasks();
+            this.loadPlatformNotifications();
             if (this.visible) {
                 this.loadTerminals();
             }
@@ -407,6 +492,25 @@ export default {
         },
         handleTaskList(data) {
             this.tasks = Array.isArray(data) ? data : [];
+        },
+        handlePlatformNotification(data) {
+            const existed = this.platformNotifications.some((item) =>
+                String(item?.Id || item?.EventId || "") === String(data?.Id || data?.EventId || "")
+            );
+            this.platformNotifications = mergePlatformNotification(this.platformNotifications, data, 100);
+            if (!existed && Number(data?.IsRead || 0) !== 1) {
+                this.notificationUnreadCount++;
+                ElNotification({
+                    title: data?.Title || this.$t("Msg.PlatformMessages"),
+                    message: data?.Content || data?.MsgContent || "",
+                    type: "info",
+                    duration: 6000,
+                    onClick: () => {
+                        this.visible = true;
+                        this.activeTab = "platformMessages";
+                    }
+                });
+            }
         },
         handleTaskVisibilityChange() {
             if (!document.hidden && shouldPollBackgroundTasks(this.tasks)) {
@@ -426,6 +530,7 @@ export default {
         },
         refreshAll() {
             this.refreshTasks();
+            this.loadPlatformNotifications();
             this.loadTerminals();
             if (this.isAdmin) {
                 this.checkOfficialApps(true);
@@ -462,6 +567,55 @@ export default {
                 this.loading = false;
                 this.scheduleTaskPolling();
             }
+        },
+        async loadPlatformNotifications() {
+            if (this.notificationLoading || !DiyCommon.Notification) return;
+            this.notificationLoading = true;
+            try {
+                const result = await DiyCommon.Notification.List({ _PageIndex: 1, _PageSize: 100 });
+                if (result && result.Code === 1) {
+                    const normalized = normalizePlatformNotificationResult(result);
+                    this.platformNotifications = normalized.rows;
+                    this.notificationUnreadCount = normalized.unreadCount;
+                }
+            } catch (error) {
+                console.warn("[PlatformNotification] load failed", error);
+            } finally {
+                this.notificationLoading = false;
+            }
+        },
+        async markNotificationRead(row) {
+            if (!row?.Id || Number(row.IsRead || 0) === 1) return;
+            const result = await DiyCommon.Notification.MarkRead(row.Id);
+            if (result && result.Code === 1) {
+                row.IsRead = 1;
+                row.ReadTime = result.Data?.ReadTime || row.ReadTime;
+                this.notificationUnreadCount = Math.max(0, this.notificationUnreadCount - 1);
+            }
+        },
+        async markAllNotificationsRead() {
+            const result = await DiyCommon.Notification.MarkRead({ All: true });
+            if (result && result.Code === 1) {
+                this.platformNotifications.forEach((item) => {
+                    item.IsRead = 1;
+                    item.ReadTime = result.Data?.ReadTime || item.ReadTime;
+                });
+                this.notificationUnreadCount = 0;
+            }
+        },
+        async openNotificationLink(row) {
+            await this.markNotificationRead(row);
+            const link = normalizeNotificationLink(row?.LinkUrl, window.location.origin);
+            if (!link) return;
+            if (link.startsWith("#")) {
+                window.location.hash = link.replace(/^#/, "");
+                return;
+            }
+            if (link.startsWith("/") && !link.startsWith("//")) {
+                await this.$router.push(link);
+                return;
+            }
+            window.open(link, "_blank", "noopener,noreferrer");
         },
         scheduleTaskPolling() {
             this.stopTaskPolling();
@@ -715,6 +869,11 @@ export default {
     border: 1px solid #fff;
     padding: 0 4px;
     box-shadow: 0 2px 8px rgba(255, 74, 35, 0.28);
+}
+
+.platform-message-title--unread {
+    color: var(--mci-color-primary, #409eff);
+    font-weight: 700;
 }
 
 .task-icon {

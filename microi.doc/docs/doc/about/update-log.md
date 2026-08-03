@@ -1,5 +1,18 @@
 # 更新日志
 
+## v7.0.1 - (2026-08-03 15:49)
+
+- **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v7.0.1；Microi VS Code 插件、独立 CLI 及内置 Skills 统一升级至 v4.6.2。写入本日志前的非 `dist` 待提交基线为：根仓库 90 个已跟踪文件和 24 个未跟踪文件，Microi.net 10 个已跟踪文件和 1 个未跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 16 个已跟踪文件和 19 个未跟踪文件；四仓均无暂存内容，本轮没有 `dist` 待提交差异。Microi.AI 除版本元数据外没有其它源码差异。
+- **平台内部通知闭环**：后端 V8 新增 `V8.Notification.Send`，按当前租户校验接收人、稳定 `NotificationId/EventId`、标题、内容、Payload 与安全链接，在业务事务提交后才以 1.8 秒有界预算发送 SignalR 提示；通知事实、未读状态与重连补偿继续由持久化消息日志和 `msg_internal_list/msg_internal_mark_read` 接口负责，实时通道失败不会反写已提交业务。PC 通知中心新增平台消息列表、未读角标、单条／全部已读和安全跳转；平台 SignalR 不再因租户选择其它聊天实现而被关闭，并补齐简体、繁体和英文文案。
+- **登录历史帐号与头像体验**：PC 登录页新增按 `OsClient` 隔离的历史帐号选择、最多 8 条记录、单条删除／全部清空、密码显隐和当前帐号头像；勾选“记住密码”后只在当前浏览器本地保存，密码采用租户隔离的可逆 AES 包装以避免在 `localStorage` 中直接出现明文或 Base64，并明确提示公共设备不要启用。登录成功后缓存 64×64 头像快照，切换或编辑帐号会清空上一个帐号回填的密码，损坏、跨租户或不可解密记录失败关闭。
+- **TableChild 关系统一与导入兼容**：主子表字段映射统一为紧凑 `FieldRelations: [[主表字段, 子表字段, 是否参与导入匹配], ...]`；前后端在读取时合并旧版 `TableChildCallbackField`、`ImportRelations`、`ImportBackfillFields` 和单字段匹配配置，按字段对去重，新版设计器在后续正常保存时清理旧键。嵌入式 TableChild 新增默认值、左树右表新增子记录、固定父记录回填以及 Office 导入匹配复用同一关系事实源；服务端只为已经授权的菜单返回精确关系，避免多处配置漂移。
+- **受控 V8 无单次运行限制**：接口引擎和表后端 V8 事件新增显式高风险开关 `V8Unlimited`，Upgrade27 幂等补齐 `sys_apiengine/diy_table` 物理列、字段元数据与显隐事件，MCP、Manifest、VS Code 创建界面、同步状态和写后回读统一支持。开启后只取消当前接口或当前表后端事件的 Jint 单次超时、最大语句数、函数递归、累计分配预算和 Promise 固定等待；进程／容器常驻内存保护、请求与后台任务取消、执行并发、接口嵌套深度、权限沙箱和数据库保护仍生效，且不会自动传给嵌套接口。该能力仅用于业务明确要求整条链路共享同一事务且无法安全分片的场景，不能因数据量大自动开启。
+- **接口引擎授权、后台身份与返回值修复**：角色含 `OnlyGet` 时，只有接口引擎 `ApiRole` 明确包含该用户角色才允许作为受控例外；空角色配置继续拒绝写调用，畸形策略失败关闭，普通 HTTP 与持久化后台任务使用同一规则。后台任务提交时回源共享数据库读取权威接口模型，Worker 执行前再次校验，嵌套 `V8.ApiEngine.Run` 只继承服务端认证的用户快照，客户端不能伪造可信标记；同步 IIFE 仅设置 `V8.Result` 时不再被 Jint 的 `undefined` 完成值覆盖成空响应。
+- **系统账号访问密钥与路由稳定性**：系统账号“访问密钥”入口从 `diy-table.vue` 的表名／菜单特判迁移到 `sys_menu.MoreBtns` 动态行按钮，Upgrade26 以稳定按钮 Id、`ShowRow:true`、权限显隐 V8 和通用 `V8.OpenDialog + UserAccessKeyPanel` 幂等安装并清理菜单缓存，租户可在模块配置中统一控制。表单设计器路由改为启动时注册的常量受保护路由，避免动态菜单重载窗口内首次跳转只出现空壳、必须 F5 才能恢复；本地进程状态统计也修复无浏览器进程时的空值计算。
+- **独立 `@microi.net/cli` 与多入口并存**：Microi.VSCode 新增可独立安装的 `microi.net/cli`，在无 VS Code 场景提供服务器 Profile、登录／验证码、AI 与 MCP 初始化、V8 拉取、同步状态、显式推送和 Doctor 诊断；与插件共享工作区配置、Token、AI 规则、Skills、MCP 配置和同步基线。配置、Token 与同步元数据改为带超时／陈旧锁恢复的原子合并写入，保留未知字段；MCP 记录工具来源和三段版本，旧 CLI／插件不会覆盖较新提供者，Skills／AI 指令也记录逐文件版本，保护用户修改和较新生成内容。
+- **VS Code／CLI 联合发布安全**：扩展发布脚本新增 npm CLI、Visual Studio Marketplace 与 Open VSX 三目标预检、同版本打包校验、公开版本回读、严格模式、单目标补发和 npm 传播等待；默认隔离可选 npm 目标，CLI scope 未就绪不阻断已通过权限检查的两个扩展市场，同一不可变版本已被接收后不会重复上传。历史被 Git 跟踪的 `publish-tokens.json` 已停止读取并删除，发布凭据只允许环境变量或已忽略的 `publish-tokens.local.json`；官方 AI 开发文档同步 CLI 安装、命令、并存边界和补发流程。
+- **文档、Skills 与定向回归**：更新表单组件、数据库字典、AI 接口引擎、V8 客户端／服务端、VS Code 插件与平台消息通知文档，补齐 `V8.Notification`、`FieldRelations`、`V8Unlimited`、CLI 和单事务风险边界；新增登录历史帐号、平台消息、TableChild 兼容、动态访问密钥、接口角色授权、后台身份、V8.Result、V8Unlimited、MCP 写后回读、CLI 并发／打包与三端发布门禁等定向测试。本日志不把尚未执行的后端 Full、双节点故障验收、真实租户写入或官网线上 HTTP 回读描述为已通过。
+
 ## v7.0.0 - (2026-08-02 21:42)
 
 - **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v7.0.0；Microi VS Code 插件及内置 Skills 升级至 v4.5.9。写入本日志前的非 `dist` 待提交基线为：根仓库 43 个已跟踪文件和 3 个未跟踪文件，Microi.net 5 个已跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 1 个已跟踪文件；四仓均无暂存内容，本轮没有 `dist` 待提交差异。Microi.AI 和 Microi.VSCode 除版本元数据外没有其它源码差异。
