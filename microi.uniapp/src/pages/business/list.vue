@@ -104,7 +104,7 @@
           :lines="cardLines(row)"
           :summary="config.summaryField ? summaryValue(row) : ''"
           :actions="rowActions(row)"
-          :time="formatCreateTime(row.CreateTime || row.UpdateTime)"
+          :time="cardBottomText(row)"
           @open="openDetail"
           @phone="callPhone"
           @action="triggerRowAction"
@@ -219,7 +219,8 @@ import {
   loadModuleViewManifest
 } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
-import { parseJson } from '@/platform/native-form.js'
+import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
+import { loadModuleDefinition } from '@/platform/module-registry.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import {
   formatDateTime,
@@ -241,6 +242,10 @@ function createRelationshipId() {
     seed = Math.floor(seed / 16)
     return (token === 'x' ? value : (value & 0x3) | 0x8).toString(16)
   })
+}
+
+function cardFieldKey(field) {
+  return String(field || '').trim().toLowerCase()
 }
 
 export default {
@@ -376,6 +381,15 @@ export default {
     },
     async loadViewConfig(refresh = false) {
       try {
+        let merged = { ...this.baseConfig, menuId: this.menuId }
+        if (this.menuId) {
+          try {
+            const menuConfig = await loadModuleDefinition(this.menuId, refresh)
+            // 旧版菜单“卡片数据”没有摘要字段；移动显示列应完整进入内容行，
+            // 不应继续被租户本地的 summaryField 改造成无标签摘要。
+            merged = { ...merged, ...menuConfig, summaryField: '' }
+          } catch (error) {}
+        }
         let manifest = await loadModuleViewManifest(this.baseConfig, {
           scene: 'Card',
           device: 'Mobile',
@@ -391,10 +405,12 @@ export default {
           })
         }
         const dynamic = compileListConfig(manifest)
-        if (!dynamic) return
+        if (!dynamic) {
+          this.config = merged
+          return
+        }
         this.viewManifest = manifest
         if (manifest.Module && manifest.Module.Id) this.menuId = manifest.Module.Id
-        const merged = { ...this.baseConfig }
         merged.menuId = this.menuId
         const arrayFields = ['tagFields', 'lines', 'statusOptions']
         arrayFields.forEach((name) => {
@@ -630,8 +646,8 @@ export default {
       this.loadData(true, true)
     },
     getTitle(row) {
-      const configured = row[this.config.titleField]
-      if (configured) return formatFieldValue(configured, '', { empty: '' })
+      const configured = this.configuredFieldValue(row, this.config.titleField)
+      if (configured && configured !== '-') return configured
       const fallbackKeys = ['Name', 'Title', 'Biaoti', 'KehuMC', 'DingdanBH', 'ShouhouFWBH', 'Xingming']
       const key = fallbackKeys.find((field) => row[field])
       return key ? formatFieldValue(row[key], '', { empty: '' }) : `记录 ${String(row.Id || '').slice(-6)}`
@@ -646,14 +662,43 @@ export default {
       if (/待|处理中|跟进|预约/.test(statusText)) return 'is-warning'
       return 'is-info'
     },
+    field(name) {
+      return (this.config.definition?.fields || []).find((field) => field.Name === name)
+    },
+    configuredFieldValue(row, name, format = '') {
+      const field = this.field(name)
+      return field
+        ? fieldDisplayValue(field, row[name])
+        : formatFieldValue(row[name], format)
+    },
     getTags(row) {
-      return (this.config.tagFields || []).map((field) => formatFieldValue(row[field], '', { empty: '' })).filter(Boolean).slice(0, 3)
+      const usedFields = new Set([
+        cardFieldKey(this.config.titleField),
+        cardFieldKey(this.config.statusField)
+      ].filter(Boolean))
+      return (this.config.tagFields || []).filter((field) => {
+        const key = cardFieldKey(field)
+        if (!key || usedFields.has(key)) return false
+        usedFields.add(key)
+        return true
+      }).map((field) => this.configuredFieldValue(row, field)).filter((value) => value && value !== '-').slice(0, 3)
     },
     visibleLines(row) {
-      return (this.config.lines || []).filter((line) => row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== '').slice(0, 4)
+      const usedFields = new Set([
+        this.config.titleField,
+        this.config.statusField,
+        this.config.summaryField,
+        ...(this.config.tagFields || [])
+      ].map(cardFieldKey).filter(Boolean))
+      return (this.config.lines || []).filter((line) => {
+        const key = cardFieldKey(line.field)
+        if (!key || usedFields.has(key)) return false
+        usedFields.add(key)
+        return row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== ''
+      }).slice(0, 4)
     },
     displayValue(row, line) {
-      return formatFieldValue(row[line.field], line.format)
+      return this.configuredFieldValue(row, line.field, line.format)
     },
     cardLines(row) {
       return this.visibleLines(row).map((line) => ({
@@ -667,7 +712,24 @@ export default {
       if (this.period === item.value) return this.count
       return '·'
     },
-    summaryValue(row) { return formatFieldValue(row[this.config.summaryField], '', { empty: '' }) },
+    summaryValue(row) {
+      const summaryField = cardFieldKey(this.config.summaryField)
+      const usedFields = new Set([
+        this.config.titleField,
+        this.config.statusField,
+        ...(this.config.tagFields || [])
+      ].map(cardFieldKey).filter(Boolean))
+      if (!summaryField || usedFields.has(summaryField)) return ''
+      return formatFieldValue(row[this.config.summaryField], '', { empty: '' })
+    },
+    cardBottomText(row) {
+      const values = (this.config.bottomFields || [])
+        .map((field) => this.configuredFieldValue(row, field))
+        .filter((value) => value && value !== '-')
+      return values.length
+        ? values.join(' · ')
+        : this.formatCreateTime(row.CreateTime || row.UpdateTime)
+    },
     formatCreateTime(value) {
       return formatDateTime(value)
     },

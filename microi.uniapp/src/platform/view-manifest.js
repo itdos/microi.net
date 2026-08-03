@@ -22,7 +22,8 @@ export async function loadModuleViewManifest(moduleConfig, options = {}) {
     moduleConfig.menuAliases || [],
     moduleConfig.table,
     options.refresh === true,
-    moduleConfig.menuId || ''
+    moduleConfig.menuId || '',
+    moduleConfig.tableId || ''
   )
   if (!menu) return null
   const key = [
