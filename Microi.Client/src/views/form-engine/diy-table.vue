@@ -787,6 +787,17 @@
                         :prop="'CreateTime'"
                         width="150"
                     >
+                        <template #header>
+                            <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('CreateTime', $t('Msg.CreateTime')), $event)">
+                                <span>{{ $t('Msg.CreateTime') }}</span>
+                                <span class="col-header-sort-indicator" v-if="getColSortState(getSystemAuditField('CreateTime', $t('Msg.CreateTime'))) ">
+                                    <el-icon v-if="getColSortState(getSystemAuditField('CreateTime', $t('Msg.CreateTime'))) === 'asc'" :size="12"><SortUp /></el-icon>
+                                    <el-icon v-else :size="12"><SortDown /></el-icon>
+                                </span>
+                                <span class="col-header-menu-icon col-header-menu-icon--dots"><fa-icon icon="fas fa-ellipsis-v" style="font-size:14px;" /></span>
+                                <el-icon class="col-header-menu-icon col-header-menu-icon--search" :size="14"><Search /></el-icon>
+                            </div>
+                        </template>
                         <template #default="scope">
                             <!-- :title="scope.row.CreateTime" -->
                             <span>{{ scope.row.CreateTime }}</span>
@@ -799,6 +810,17 @@
                         :prop="'UserName'"
                         width="110"
                     >
+                        <template #header>
+                            <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('UserName', $t('Msg.Creator')), $event)">
+                                <span>{{ $t('Msg.Creator') }}</span>
+                                <span class="col-header-sort-indicator" v-if="getColSortState(getSystemAuditField('UserName', $t('Msg.Creator'))) ">
+                                    <el-icon v-if="getColSortState(getSystemAuditField('UserName', $t('Msg.Creator'))) === 'asc'" :size="12"><SortUp /></el-icon>
+                                    <el-icon v-else :size="12"><SortDown /></el-icon>
+                                </span>
+                                <span class="col-header-menu-icon col-header-menu-icon--dots"><fa-icon icon="fas fa-ellipsis-v" style="font-size:14px;" /></span>
+                                <el-icon class="col-header-menu-icon col-header-menu-icon--search" :size="14"><Search /></el-icon>
+                            </div>
+                        </template>
                         <template #default="scope">
                             <!-- :title="scope.row.UserName" -->
                             <span>{{ scope.row.UserName }}</span>
@@ -811,6 +833,17 @@
                         :prop="'UpdateTime'"
                         width="150"
                     >
+                        <template #header>
+                            <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime')), $event)">
+                                <span>{{ $t('Msg.UpdateTime') }}</span>
+                                <span class="col-header-sort-indicator" v-if="getColSortState(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime'))) ">
+                                    <el-icon v-if="getColSortState(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime'))) === 'asc'" :size="12"><SortUp /></el-icon>
+                                    <el-icon v-else :size="12"><SortDown /></el-icon>
+                                </span>
+                                <span class="col-header-menu-icon col-header-menu-icon--dots"><fa-icon icon="fas fa-ellipsis-v" style="font-size:14px;" /></span>
+                                <el-icon class="col-header-menu-icon col-header-menu-icon--search" :size="14"><Search /></el-icon>
+                            </div>
+                        </template>
                         <template #default="scope">
                             <!-- :title="scope.row.UpdateTime" -->
                             <span>{{ scope.row.UpdateTime }}</span>
@@ -901,7 +934,7 @@
                 <el-row
                     v-if="TableDisplayMode == 'Card'"
                     class="table-card-el-row"
-                    :gutter="10"
+                    :gutter="16"
                 >
                     <!-- 🔥 骨架屏：PC端loading时都显示，移动端仅首次加载显示 -->
                     <template v-if="tableLoading && (!diyStore.IsPhoneView || DiyTableRowList.length === 0)">
@@ -921,21 +954,28 @@
                                 IsCardFiveCol() ? 'card-col-five' : ''
                             ]"
                         >
-                            <el-card class="box-card card-data-animate no-padding">
+                            <el-card class="box-card card-data-animate no-padding card-redesign card-skeleton">
                                 <el-skeleton style="width: 100%" :loading="true" animated>
                                     <template #template>
                                         <el-skeleton-item
+                                            v-if="SysMenuModel.TableCardImgField"
                                             variant="image"
-                                            style="width: 100%; height: 100px"
+                                            class="card-skeleton-media"
                                         />
-                                        <div class="body">
-                                            <el-skeleton-item variant="text" style="width: 100%" />
+                                        <div class="card-skeleton-body">
+                                            <el-skeleton-item variant="circle" class="card-skeleton-avatar" />
+                                            <div class="card-skeleton-title">
+                                                <el-skeleton-item variant="text" style="width: 72%" />
+                                                <el-skeleton-item variant="text" style="width: 46%" />
+                                            </div>
                                         </div>
-                                        <div class="item">
+                                        <div class="card-skeleton-rows">
                                             <el-skeleton-item variant="text" style="width: 100%" />
+                                            <el-skeleton-item variant="text" style="width: 82%" />
                                         </div>
-                                        <div class="bottom">
-                                            <el-skeleton-item variant="text" style="width: 100%" />
+                                        <div class="card-skeleton-actions">
+                                            <el-skeleton-item variant="button" />
+                                            <el-skeleton-item variant="button" />
                                         </div>
                                     </template>
                                 </el-skeleton>
@@ -963,20 +1003,25 @@
                         v-for="(item, index) in DiyTableRowList"
                         v-show="!(!diyStore.IsPhoneView && tableLoading)"
                         :key="item.Id"
-                            :xs="24"
-                            :sm="12"
-                            :md="IsCardFiveCol() ? undefined : GetTableCardCol()"
-                            :lg="IsCardFiveCol() ? undefined : GetTableCardCol()"
-                            :xl="IsCardFiveCol() ? undefined : GetTableCardCol()"
-                            :class="[
-                                diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop',
-                                IsCardFiveCol() ? 'card-col-five' : ''
-                            ]"
+                        :xs="24"
+                        :sm="12"
+                        :md="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                        :lg="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                        :xl="IsCardFiveCol() ? undefined : GetTableCardCol()"
+                        :class="[
+                            diyStore.IsPhoneView ? 'card-wrapper-mobile' : 'card-wrapper-desktop',
+                            IsCardFiveCol() ? 'card-col-five' : ''
+                        ]"
                         >
                             <el-card
                                 class="box-card card-data-animate no-padding card-redesign"
                                 :class="{ 'card-selected': IsCardSelectActive(item) }"
+                                :aria-label="CardPrimaryField ? GetPresentationFieldValue(item, CardPrimaryField) : undefined"
+                                role="button"
+                                tabindex="0"
                                 @click="CardItemClick(item)"
+                                @keydown.enter.prevent="CardItemClick(item)"
+                                @keydown.space.prevent="CardItemClick(item)"
                             >
                                 <div
                                     :class="GetCardContentLayoutClass()"
@@ -996,25 +1041,13 @@
                                         "
                                         @error="$event.target.src = bodyBgSvg"
                                     />
-                                    <div
-                                        v-else-if="SysMenuModel.TableCardImgField"
-                                        class="preview card-image-fallback"
-                                        :style="
-                                            SysMenuModel.TableCardImgStyle ||
-                                            (SysMenuModel.TableCardImgPosition === 'Left'
-                                                ? 'width:120px;height:100%;flex-shrink:0;'
-                                                : 'height:100px;width:100%;')
-                                        "
-                                        aria-hidden="true"
-                                    >
-                                        <span>{{ GetCardImageFallbackText(item) }}</span>
-                                    </div>
                                     <!-- 卡片内容区域 -->
                                     <div class="card-body" style="flex: 1;">
                                         <!-- ====== 卡片头：头像/序号、顶部标签、标题、右侧多字段 ====== -->
                                         <div class="card-title-row" v-if="CardPrimaryField">
-                                            <template v-if="!SysMenuModel.TableCardImgField">
+                                            <template v-if="!SysMenuModel.TableCardImgField || !GetCardImageValue(item, SysMenuModel.TableCardImgField)">
                                                 <span v-if="CardAvatarField" class="card-avatar">{{ GetCardAvatarText(item) }}</span>
+                                                <span v-else-if="SysMenuModel.TableCardImgField" class="card-avatar card-avatar--fallback" aria-hidden="true">{{ GetCardImageFallbackText(item) }}</span>
                                                 <span v-else-if="!PresentationCardConfig || !PresentationCardConfig.HideIndex" class="card-index-badge">{{ getCardIndex(index) }}</span>
                                             </template>
                                             <div class="card-title-main">
@@ -1191,7 +1224,7 @@
                                         :loading="BtnV8Loading"
                                         @click.stop="RunMoreBtn(btn, item)"
                                         size="small"
-                                        round
+                                        plain
                                     >
                                          <fa-icon :icon="btn.Icon || 'fa-solid fa-file-code'" />
                                          {{ btn.Name }}
@@ -1202,7 +1235,6 @@
                                         class="card-action-btn"
                                         @click.stop="OpenDetail(item, 'Edit')"
                                         size="small"
-                                        round
                                         type="primary"
                                         plain
                                     >
@@ -1214,7 +1246,6 @@
                                         class="card-action-btn"
                                         @click.stop="RestoreTrashRow(item)"
                                         size="small"
-                                        round
                                         type="success"
                                         plain
                                     >
@@ -1228,7 +1259,6 @@
                                         :loading="BtnLoading"
                                         @click.stop="OpenWorkFlowProcess(item)"
                                         size="small"
-                                        round
                                         type="primary"
                                     >
                                         <fa-icon icon="far fa-clipboard-check" />
@@ -1243,9 +1273,9 @@
                                         trigger="click"
                                         @click.stop
                                     >
-                                        <el-button class="card-action-btn card-action-btn-more" size="small" round plain @click.stop>
+                                        <el-button class="card-action-btn card-action-btn-more" size="small" plain aria-label="更多" @click.stop>
                                             <el-icon><MoreFilled /></el-icon>
-                                            更多
+                                            <span class="card-action-more-label">更多</span>
                                         </el-button>
                                         <template #dropdown>
                                             <el-dropdown-menu>

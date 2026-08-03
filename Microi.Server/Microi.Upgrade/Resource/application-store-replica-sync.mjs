@@ -14,6 +14,11 @@ export const applicationStoreReplicaMappings = Object.freeze([
     publishedStandalone: true,
   }),
   Object.freeze({
+    resourceName: 'bulk-import-packages.js',
+    apiEngineKey: 'bulk-import-microi-store-packages',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
     resourceName: 'ai-app-publish-store.js',
     apiEngineKey: 'ai_app_publish_store',
     publishedStandalone: true,
@@ -38,6 +43,16 @@ function getEmbeddedEngine(packageModel, apiEngineKey) {
   const engine = engines.find(item => item.ApiEngineKey === apiEngineKey);
   if (!engine) throw new Error(`${applicationStorePackageName} 缺少接口引擎 ${apiEngineKey}`);
   return engine;
+}
+
+function findEmbeddedEngine(packageModel, apiEngineKey) {
+  const engines = Array.isArray(packageModel?.SysApiEngines) ? packageModel.SysApiEngines : [];
+  return engines.find(item => item.ApiEngineKey === apiEngineKey) || null;
+}
+
+function tryGetEmbeddedEngineSource(packageContent, apiEngineKey) {
+  const engine = findEmbeddedEngine(parsePackage(packageContent), apiEngineKey);
+  return engine ? normalizeText(engine.ApiV8Code || '') : null;
 }
 
 export function getEmbeddedEngineSource(packageContent, apiEngineKey) {
@@ -203,8 +218,12 @@ function maskReplicatedEngineFields(packageContent, basePackageContent) {
   const packageModel = parsePackage(packageContent);
   const basePackageModel = parsePackage(basePackageContent);
   for (const mapping of applicationStoreReplicaMappings) {
-    const engine = getEmbeddedEngine(packageModel, mapping.apiEngineKey);
-    const baseEngine = getEmbeddedEngine(basePackageModel, mapping.apiEngineKey);
+    const engine = findEmbeddedEngine(packageModel, mapping.apiEngineKey);
+    const baseEngine = findEmbeddedEngine(basePackageModel, mapping.apiEngineKey);
+    // A newly introduced embedded engine legitimately does not exist in the
+    // previous common baseline or on the remote package. Leave that local JSON
+    // array element unmasked so the normal three-way merge can add it.
+    if (!engine || !baseEngine) continue;
     engine.ApiV8Code = normalizeText(baseEngine.ApiV8Code || '');
     engine.Version = baseEngine.Version;
   }
@@ -229,8 +248,12 @@ export function synchronizeApplicationStoreEngines(packageContent, standaloneCon
   return canonicalizeResource(applicationStorePackageName, JSON.stringify(packageModel));
 }
 
-export function assertApplicationStoreEnginesSynchronized(packageContent, standaloneContents) {
-  for (const mapping of applicationStoreReplicaMappings) {
+export function assertApplicationStoreEnginesSynchronized(
+  packageContent,
+  standaloneContents,
+  mappings = applicationStoreReplicaMappings,
+) {
+  for (const mapping of mappings) {
     const standalone = standaloneContents.get(mapping.resourceName);
     if (standalone == null) throw new Error(`缺少应用商城接口引擎事实源 ${mapping.resourceName}`);
     const embedded = getEmbeddedEngineSource(packageContent, mapping.apiEngineKey);
@@ -253,7 +276,45 @@ export async function mergeApplicationStoreReplicas({
   const resolvedStandaloneContents = new Map();
 
   for (const mapping of applicationStoreReplicaMappings) {
-    const baseEmbedded = getEmbeddedEngineSource(basePackageContent, mapping.apiEngineKey);
+    const baseEmbedded = tryGetEmbeddedEngineSource(basePackageContent, mapping.apiEngineKey);
+    const localEmbedded = getEmbeddedEngineSource(localPackageContent, mapping.apiEngineKey);
+    const localStandalone = localStandaloneContents.get(mapping.resourceName);
+
+    // New replica mappings have no three-way baseline yet. They may be safely
+    // introduced only when the local standalone fact source and the package
+    // embedded source are identical, and the remote side has no conflicting
+    // pre-existing implementation. This keeps first publication automatic
+    // without weakening conflict protection for established replicas.
+    if (baseEmbedded == null) {
+      if (localStandalone == null) {
+        throw new Error(`${mapping.resourceName} 本地独立源码不存在，不能首次发布新副本`);
+      }
+      if (normalizeText(localStandalone) !== normalizeText(localEmbedded)) {
+        throw new Error(
+          `${mapping.resourceName} 首次发布前与应用商城内嵌 ${mapping.apiEngineKey} 不一致`,
+        );
+      }
+      const remoteEmbedded = tryGetEmbeddedEngineSource(remotePackageContent, mapping.apiEngineKey);
+      const remoteStandalone = mapping.publishedStandalone
+        ? remoteStandaloneContents.get(mapping.resourceName)
+        : null;
+      const remoteCandidate = remoteStandalone ?? remoteEmbedded;
+      if (remoteStandalone != null && remoteEmbedded != null
+        && normalizeText(remoteStandalone) !== normalizeText(remoteEmbedded)) {
+        throw new Error(
+          `${mapping.resourceName} 官网独立源码与商城内嵌 ${mapping.apiEngineKey} 不一致，不能首次建立基线`,
+        );
+      }
+      if (remoteCandidate != null
+        && normalizeText(remoteCandidate) !== normalizeText(localStandalone)) {
+        throw new Error(`${mapping.resourceName} 尚无共同基线且本地与官网实现不同`);
+      }
+      resolvedStandaloneContents.set(
+        mapping.resourceName,
+        canonicalizeResource(mapping.resourceName, localStandalone),
+      );
+      continue;
+    }
     const baseStandalone = mapping.publishedStandalone
       ? baseStandaloneContents.get(mapping.resourceName)
       : baseEmbedded;
@@ -266,7 +327,6 @@ export async function mergeApplicationStoreReplicas({
       );
     }
 
-    const localEmbedded = getEmbeddedEngineSource(localPackageContent, mapping.apiEngineKey);
     const localResolved = await reconcileReplicaPair(
       mapping.resourceName,
       '本地 ',

@@ -10,6 +10,7 @@ const workerPath = path.join(engineRoot, '[官网]创建SaaS租户后台执行(o
 const progressPath = path.join(engineRoot, '[官网]创建SaaS租户进度(official_create_tenant_progress).js')
 const centerPath = path.join(engineRoot, '[官网]租户个人中心(official_tenant_center).js')
 const legacyEntryPath = path.join(engineRoot, '[官网]创建SaaS租户(official_create_tenant).js')
+const sysUserLogicPath = path.join(workspace, 'Microi.Server/Microi.Core/Logic/SysUserLogic.cs')
 
 const read = file => fs.readFileSync(file, 'utf8')
 
@@ -20,6 +21,27 @@ test('profile submits tenant creation to the persistent background queue', () =>
   assert.doesNotMatch(source, /ApiEngineKey:\s*'official_create_tenant_worker'/)
   assert.match(source, /ConcurrencyKey:.*tenantKey\.value\.trim\(\)\.toLowerCase\(\)/)
   assert.doesNotMatch(source, /AdminDefaultPassword\s*\|\|\s*tenant\.OsClient/)
+})
+
+test('profile refreshes the authoritative identity before loading tenant actions', () => {
+  const source = read(profilePath)
+  assert.match(source, /\/api\/SysUser\/RefreshLoginUser/)
+  assert.match(source, /await refreshCurrentSessionIdentity\(\)[\s\S]*?const valid = await refreshCenter\(\)/)
+})
+
+test('login identity refresh reads roles through trusted logic and preserves cache on failure', () => {
+  const source = read(sysUserLogicPath)
+  const start = source.indexOf('public async Task<DosResult<dynamic>> RefreshLoginUser')
+  const end = source.indexOf('public async Task GetSysUserOtherInfo', start)
+  assert.ok(start >= 0 && end > start)
+  const refreshSource = source.slice(start, end)
+
+  assert.match(refreshSource, /new SysRoleLogic\(\)\.GetSysRole/)
+  assert.match(refreshSource, /new SysRoleLimitLogic\(\)\.GetSysRoleLimit/)
+  assert.doesNotMatch(refreshSource, /GetTableDataAsync<SysRole>/)
+  assert.doesNotMatch(refreshSource, /GetTableDataAsync<SysRoleLimit>/)
+  assert.ok(refreshSource.indexOf('new SysRoleLogic().GetSysRole') < refreshSource.indexOf('LoginTokenSysUser:{userId}', refreshSource.indexOf('SetAsync')))
+  assert.match(refreshSource, /刷新用户角色权限失败，原登录缓存未修改/)
 })
 
 test('bootstrap admin password is random, short-lived, and owner-scoped', () => {

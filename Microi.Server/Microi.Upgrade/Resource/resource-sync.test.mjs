@@ -49,7 +49,19 @@ function engineVersion(source) {
   return (source.match(/Version\s*:\s*(v?\d+\.\d+\.\d+)/i) || [])[1] || '';
 }
 
-function applicationStorePackage({ importer, publisher, builder, version = 'v6.6.1' }) {
+const defaultBulkImporter = engineSource(
+  'bulk-import-microi-store-packages',
+  'v1.1.1',
+  'return { Code: 1 };',
+);
+
+function applicationStorePackage({
+  importer,
+  publisher,
+  builder,
+  bulk = defaultBulkImporter,
+  version = 'v6.6.1',
+}) {
   return JSON.stringify({
     PackageInfo: { Name: '应用商城', Version: version },
     SysApiEngines: [
@@ -68,6 +80,13 @@ function applicationStorePackage({ importer, publisher, builder, version = 'v6.6
         StopHttp: 0,
       },
       {
+        Id: 'engine-bulk-importer',
+        ApiEngineKey: 'bulk-import-microi-store-packages',
+        Version: engineVersion(bulk),
+        ApiV8Code: bulk,
+        StopHttp: 0,
+      },
+      {
         Id: 'engine-builder',
         ApiEngineKey: 'ai_app_build',
         Version: engineVersion(builder),
@@ -78,9 +97,10 @@ function applicationStorePackage({ importer, publisher, builder, version = 'v6.6
   });
 }
 
-function replicaMaps({ importer, publisher, builder }) {
+function replicaMaps({ importer, publisher, builder, bulk = defaultBulkImporter }) {
   return new Map([
     ['import-package.js', importer],
+    ['bulk-import-packages.js', bulk],
     ['ai-app-publish-store.js', publisher],
     ['ai-app-build.js', builder],
   ]);
@@ -90,46 +110,55 @@ async function mergeReplicaFixture({
   baseImporter,
   basePublisher,
   baseBuilder,
+  baseBulk = defaultBulkImporter,
   localImporter = baseImporter,
   localPublisher = basePublisher,
   localBuilder = baseBuilder,
+  localBulk = baseBulk,
   localEmbeddedPublisher = localPublisher,
   localEmbeddedBuilder = localBuilder,
   remoteImporter = baseImporter,
   remotePublisher = basePublisher,
   remoteEmbeddedPublisher = remotePublisher,
   remoteEmbeddedBuilder = baseBuilder,
+  remoteBulk = baseBulk,
 }) {
   return mergeApplicationStoreReplicas({
     basePackageContent: applicationStorePackage({
       importer: baseImporter,
       publisher: basePublisher,
       builder: baseBuilder,
+      bulk: baseBulk,
     }),
     localPackageContent: applicationStorePackage({
       importer: localImporter,
       publisher: localEmbeddedPublisher,
       builder: localEmbeddedBuilder,
+      bulk: localBulk,
     }),
     remotePackageContent: applicationStorePackage({
       importer: remoteImporter,
       publisher: remoteEmbeddedPublisher,
       builder: remoteEmbeddedBuilder,
+      bulk: remoteBulk,
     }),
     baseStandaloneContents: replicaMaps({
       importer: baseImporter,
       publisher: basePublisher,
       builder: baseBuilder,
+      bulk: baseBulk,
     }),
     localStandaloneContents: replicaMaps({
       importer: localImporter,
       publisher: localPublisher,
       builder: localBuilder,
+      bulk: localBulk,
     }),
     remoteStandaloneContents: replicaMaps({
       importer: remoteImporter,
       publisher: remotePublisher,
       builder: remoteEmbeddedBuilder,
+      bulk: remoteBulk,
     }),
   });
 }
@@ -392,6 +421,47 @@ test('ai-app-build 保持本地事实源并同步写入官网商城包内嵌副�
   assert.equal(getEmbeddedEngineSource(merged.packageContent, 'ai_app_build'), localBuilder);
 });
 
+test('首次新增内嵌商城引擎时允许从一致的本地事实源建立副本基线', async () => {
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const publisher = engineSource('ai_app_publish_store', 'v1.5.3', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.3.0', 'return { Code: 1 };');
+  const bulk = engineSource(
+    'bulk-import-microi-store-packages',
+    'v1.0.0',
+    'return { Code: 1, Data: { BackgroundTask: { HasMore: false } } };',
+  );
+  const withoutBulk = content => {
+    const model = JSON.parse(content);
+    model.SysApiEngines = model.SysApiEngines.filter(
+      engine => engine.ApiEngineKey !== 'bulk-import-microi-store-packages',
+    );
+    return JSON.stringify(model);
+  };
+  const basePackage = withoutBulk(applicationStorePackage({ importer, publisher, builder, bulk }));
+  const localPackage = applicationStorePackage({ importer, publisher, builder, bulk });
+  const remotePackage = withoutBulk(applicationStorePackage({ importer, publisher, builder, bulk }));
+  const establishedReplicas = new Map([
+    ['import-package.js', importer],
+    ['ai-app-publish-store.js', publisher],
+    ['ai-app-build.js', builder],
+  ]);
+
+  const merged = await mergeApplicationStoreReplicas({
+    basePackageContent: basePackage,
+    localPackageContent: localPackage,
+    remotePackageContent: remotePackage,
+    baseStandaloneContents: establishedReplicas,
+    localStandaloneContents: replicaMaps({ importer, publisher, builder, bulk }),
+    remoteStandaloneContents: establishedReplicas,
+  });
+
+  assert.equal(
+    getEmbeddedEngineSource(merged.packageContent, 'bulk-import-microi-store-packages'),
+    bulk,
+  );
+  assert.equal(merged.standaloneContents.get('bulk-import-packages.js'), bulk);
+});
+
 test('商城包写回时优先使用更高正式版本，否则独立递增包补丁版本', () => {
   assert.equal(choosePublishablePackageVersion('v6.6.1', 'v6.6.1', '6.7.4'), 'v6.7.4');
   assert.equal(choosePublishablePackageVersion('v6.7.5', 'v6.6.1', '6.7.4'), 'v6.7.5');
@@ -455,6 +525,8 @@ test('共同基线只能通过显式官网回读修复且不能伴随发布', ()
     refreshSource,
     /assertApplicationStoreEnginesSynchronized\([\s\S]*?remotePackageContent/,
   );
+  assert.match(refreshSource, /remoteReplicaMappings/);
+  assert.match(refreshSource, /remoteEngineKeys\.has\(mapping\.apiEngineKey\)/);
   assert.match(refreshSource, /按官网回读修复共同基线/);
 });
 
@@ -510,6 +582,39 @@ test('官网 MCP 发布器在插件升级后自动改用最新可用入口和当
   const found = await findItDosMcpServer(root, configPath);
   assert.equal(found.path, configPath);
   assert.equal(found.server.args[0], currentEntry);
+});
+
+test('官网 MCP 发布器不会被仍存在的旧插件入口锁住', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'microi-mcp-stale-config-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const extensionsRoot = join(root, 'extensions');
+  const oldExtensionRoot = join(extensionsRoot, 'microi.v8-engine-4.6.2');
+  const oldEntry = join(oldExtensionRoot, 'dist', 'mcp-server.js');
+  const newExtensionRoot = join(extensionsRoot, 'microi.v8-engine-4.6.3');
+  const newEntry = join(newExtensionRoot, 'dist', 'mcp-server.js');
+  await mkdir(dirname(oldEntry), { recursive: true });
+  await mkdir(dirname(newEntry), { recursive: true });
+  await writeFile(oldEntry, '/* old MCP server */\n', 'utf8');
+  await writeFile(newEntry, '/* fixed MCP server */\n', 'utf8');
+
+  const server = {
+    type: 'stdio',
+    command: 'C:\\old-editor\\Code.exe',
+    args: [oldEntry],
+    cwd: oldExtensionRoot,
+    env: {
+      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_OS_CLIENT: 'itdos',
+      MICROI_TOKEN_FILE: join(root, 'token.json'),
+    },
+  };
+  const configPath = join(root, '.mcp.json');
+  const launch = await resolveItDosMcpLaunch(server, configPath);
+
+  assert.equal(launch.command, process.execPath);
+  assert.equal(launch.args[0], newEntry);
+  assert.equal(launch.cwd, newExtensionRoot);
+  assert.equal(launch.launchSource, 'newest-installed-extension');
 });
 
 test('官网资源通过 microi_itdos MCP 单入口读取完整内容', async t => {
