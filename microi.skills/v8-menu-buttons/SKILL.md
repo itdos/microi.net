@@ -266,6 +266,40 @@ window.microApp.dispatch({ type: 'app-dialog:error', data: { message: '校验失
 - 不要把 Token 拼接到 URL；使用宿主自动下发的 `token`。
 - `OpenAppDialog` 加载在线微服务；`OpenDialog` 加载 Microi.Client 内已注册的 Vue 组件，两者不要混用。
 
+### 4.2 业务面板复用通用弹窗宿主
+
+某个模块是否出现入口、入口名称、排序、图标和显隐规则属于 `sys_menu.MoreBtns` 配置，禁止在 `diy-table.vue`、卡片模板或通用 mixin 中按菜单 Id、Url、表名直接渲染业务按钮。主前端已有 Vue 面板时先全局注册组件，再用 `V8.OpenDialog`；独立发布、跨应用升级的页面用 `V8.OpenAppDialog`。禁止为单个业务面板扩展 `V8.Open<业务名>` 包装方法。
+
+系统账号的访问密钥入口示例：
+
+```js
+// V8CodeShow
+var currentUser = V8.CurrentUser || {};
+var currentUserId = String(currentUser.Id || "").toLowerCase();
+var targetUserId = String((V8.Form && V8.Form.Id) || "").toLowerCase();
+V8.Result = typeof V8.OpenDialog === "function"
+  && currentUser._AccessKeySession !== true
+  && !!targetUserId
+  && (currentUser._IsAdmin === true
+    || Number(currentUser.Level || 0) >= 9999
+    || currentUserId === targetUserId);
+```
+
+```js
+// V8Code
+var user = V8.Form || {};
+V8.OpenDialog({
+  ComponentName: "UserAccessKeyPanel",
+  Title: "访问密钥 - " + (user.Name || user.Account || ""),
+  TitleIcon: "fas fa-key",
+  Width: "min(980px, calc(100vw - 32px))",
+  OpenType: "Dialog",
+  DataAppend: { User: user }
+});
+```
+
+按钮应设置稳定 `Id`、`ShowRow:true`、`Icon:"fas fa-key"`。前端显隐只改善体验，创建、查询、吊销等接口仍必须在服务端重新校验普通登录会话以及本人/平台管理员权限。
+
 ## 5. 模式 C：状态机推进（无需弹窗）
 
 ```js
@@ -541,6 +575,9 @@ V8.OpenAppDialog({
 
 ❌ `MoreBtns` 不写 `ShowRow:true`，按钮看不见
 ✅ 行内必须 `ShowRow:true`
+
+❌ 在 `diy-table.vue` / 卡片模板 / action-width mixin 中按模块、Url 或表名硬编码业务行按钮，或为单个业务面板新增 `V8.Open<业务名>`
+✅ 入口完整保存在 `sys_menu.MoreBtns`；主前端组件用 `V8.OpenDialog`，在线微服务用 `V8.OpenAppDialog`；验收同时回读按钮 JSON、打开模块引擎设计器，并检查运行态
 
 ❌ 按钮 `Id` 重复或省略
 ✅ 用 ULID/GUID 保证唯一

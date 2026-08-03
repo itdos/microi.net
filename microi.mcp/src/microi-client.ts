@@ -388,6 +388,7 @@ export interface ApiEngine {
   Code?: string;
   ApiRemark?: string;
   Description?: string;
+  V8Unlimited?: number;
   Version?: string;
   ChangeHistory?: string;
   UpdateTime?: string;
@@ -1402,7 +1403,12 @@ export class MicroiClient {
     });
   }
 
-  async saveEngineCode(apiEngineKey: string, code: string, options?: { functionDescription?: string; changeSummary?: string; confirmLargeReduction?: boolean }): Promise<ApiResponse> {
+  async saveEngineCode(apiEngineKey: string, code: string, options?: {
+    functionDescription?: string;
+    changeSummary?: string;
+    confirmLargeReduction?: boolean;
+    v8Unlimited?: boolean;
+  }): Promise<ApiResponse> {
     assertSourceIntegrity(code, `保存接口引擎 ${apiEngineKey}`);
     let remote: ApiEngine | undefined;
     try {
@@ -1436,12 +1442,40 @@ export class MicroiClient {
       ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
       Version: prepared.version,
       ChangeHistory: prepared.changeHistory,
+      ...(options?.v8Unlimited === undefined ? {} : { V8Unlimited: options.v8Unlimited ? 1 : 0 }),
     };
+    const matchesReadback = (data: ApiEngine | undefined) =>
+      normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
+        === normalizeCodeForComparison(prepared.code)
+      && (options?.v8Unlimited === undefined
+        || Number(data?.V8Unlimited || 0) === (options.v8Unlimited ? 1 : 0));
     try {
-      return await this.post(API.UPDATE_ENGINE_CODE, payload, {
+      const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
         timeoutMs: this.writeRequestTimeoutMs,
         operationName: `保存接口引擎 ${apiEngineKey}`,
       });
+      if (result.Code !== 1 || options?.v8Unlimited === undefined) return result;
+      const verification = await this.pollReadback(
+        () => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Unlimited`)),
+        matchesReadback,
+      );
+      if (!verification.matched) {
+        return {
+          Code: 0,
+          Data: { ApiEngineKey: apiEngineKey, UpdateResponse: result.Data },
+          Msg: `保存接口引擎 ${apiEngineKey} 返回成功，但 V8Unlimited 写后回读不一致：${verification.lastError || '代码或配置不一致'}`,
+        };
+      }
+      return {
+        ...result,
+        Data: {
+          ...(result.Data && typeof result.Data === 'object' ? result.Data as Record<string, unknown> : {}),
+          ApiEngineKey: apiEngineKey,
+          V8Unlimited: options.v8Unlimited ? 1 : 0,
+          Verified: true,
+          Verification: 'readback',
+        },
+      };
     } catch (error) {
       if (!this.isUncertainWriteError(error)) throw error;
       const verification = await this.pollReadback(
@@ -1449,8 +1483,7 @@ export class MicroiClient {
           apiEngineKey,
           this.readbackOptions(`回读接口引擎 ${apiEngineKey}`),
         ),
-        (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
-          === normalizeCodeForComparison(prepared.code),
+        matchesReadback,
       );
       if (verification.matched) {
         return this.recoveredWriteResult(`保存接口引擎 ${apiEngineKey}`, error, {
@@ -1462,7 +1495,68 @@ export class MicroiClient {
     }
   }
 
-  async createEngine(data: { ApiEngineKey: string; ApiName: string; Category?: string; Code?: string; ApiAddress?: string; functionDescription?: string; changeSummary?: string }): Promise<ApiResponse> {
+  async updateEngineRuntimeConfig(apiEngineKey: string, v8Unlimited: boolean): Promise<ApiResponse> {
+    const payload = {
+      OsClient: this.config.osClient,
+      ApiEngineKey: apiEngineKey,
+      V8Unlimited: v8Unlimited ? 1 : 0,
+    };
+    const verify = () => this.pollReadback(
+      () => this.getEngineCode(
+        apiEngineKey,
+        this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Unlimited`),
+      ),
+      (remote) => Number(remote?.V8Unlimited || 0) === (v8Unlimited ? 1 : 0),
+    );
+    const operation = `更新接口引擎 ${apiEngineKey} V8Unlimited`;
+    try {
+      const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
+        timeoutMs: this.writeRequestTimeoutMs,
+        operationName: operation,
+      });
+      if (result.Code !== 1) return result;
+      const verification = await verify();
+      if (!verification.matched) {
+        return {
+          Code: 0,
+          Data: { ApiEngineKey: apiEngineKey, UpdateResponse: result.Data },
+          Msg: `${operation} 接口返回成功，但远端写后回读不一致：${verification.lastError || '配置不一致'}`,
+        };
+      }
+      return {
+        ...result,
+        Data: {
+          ...(result.Data && typeof result.Data === 'object' ? result.Data as Record<string, unknown> : {}),
+          ApiEngineKey: apiEngineKey,
+          V8Unlimited: v8Unlimited ? 1 : 0,
+          Verified: true,
+          Verification: 'readback',
+        },
+      };
+    } catch (error) {
+      if (!this.isUncertainWriteError(error)) throw error;
+      const verification = await verify();
+      if (verification.matched) {
+        return this.recoveredWriteResult(operation, error, {
+          ApiEngineKey: apiEngineKey,
+          V8Unlimited: v8Unlimited ? 1 : 0,
+          Verified: true,
+        });
+      }
+      throw this.uncertainWriteFailure(operation, error, verification.lastError);
+    }
+  }
+
+  async createEngine(data: {
+    ApiEngineKey: string;
+    ApiName: string;
+    Category?: string;
+    Code?: string;
+    ApiAddress?: string;
+    V8Unlimited?: number;
+    functionDescription?: string;
+    changeSummary?: string;
+  }): Promise<ApiResponse> {
     // 默认 ApiAddress 为 /apiengine/{key}，否则平台路由匹配会 404
     const payload: any = {
       OsClient: this.config.osClient,
@@ -1499,7 +1593,9 @@ export class MicroiClient {
       ),
       (remote) => String(remote?.ApiEngineKey || '') === data.ApiEngineKey
         && normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code)
-          === normalizeCodeForComparison(prepared.code),
+          === normalizeCodeForComparison(prepared.code)
+        && (data.V8Unlimited === undefined
+          || Number(remote?.V8Unlimited || 0) === (data.V8Unlimited === 1 ? 1 : 0)),
     );
 
     try {
@@ -1893,6 +1989,7 @@ export class MicroiClient {
   async createTable(name: string, description?: string, options?: {
     Tabs?: string; IsTree?: number; Column?: number;
     FormOpenType?: string; FormOpenWidth?: string;
+    V8Unlimited?: number;
   }): Promise<ApiResponse> {
     return this.post(API.CREATE_TABLE, {
       OsClient: this.config.osClient,

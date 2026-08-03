@@ -37,6 +37,33 @@ public class AdminTenantProvisioningAuthorizationTests
         Assert.Contains("超级管理员", result.Msg);
     }
 
+    [Fact]
+    public void NestedApiEngineCall_InheritsTrustedBackgroundUserSnapshot()
+    {
+        var trustedUser = new JObject
+        {
+            ["Id"] = "background-user",
+            ["Account"] = "user",
+            ["Level"] = 1
+        };
+
+        using var trustedScope = EnterTrustedExecutionContext(trustedUser);
+        var inherited = GetAmbientTrustedCurrentUser();
+
+        Assert.NotNull(inherited);
+        Assert.Equal("background-user", inherited!["Id"]?.ToString());
+        Assert.NotSame(trustedUser, inherited);
+
+        inherited["Id"] = "mutated";
+        Assert.Equal("background-user", trustedUser["Id"]?.ToString());
+    }
+
+    [Fact]
+    public void OrdinaryApiEngineCall_HasNoAmbientTrustedUser()
+    {
+        Assert.Null(GetAmbientTrustedCurrentUser());
+    }
+
     private static object? InvokeAuthorization(JObject trustedCurrentUser)
     {
         lock (MasterTenantLock)
@@ -75,5 +102,14 @@ public class AdminTenantProvisioningAuthorizationTests
         Assert.NotNull(enter);
         return Assert.IsAssignableFrom<IDisposable>(
             enter!.Invoke(null, new object?[] { currentUser }));
+    }
+
+    private static JObject? GetAmbientTrustedCurrentUser()
+    {
+        var method = typeof(ApiEngine).GetMethod(
+            "GetAmbientTrustedCurrentUser",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return method!.Invoke(null, null) as JObject;
     }
 }

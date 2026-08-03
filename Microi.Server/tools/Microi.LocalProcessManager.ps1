@@ -254,7 +254,13 @@ function Show-Status {
 
     $browserProcesses = @(Get-Process -ErrorAction SilentlyContinue |
         Where-Object { $_.ProcessName -match '^(chrome|msedge)$' })
-    $browserMemory = [math]::Round((($browserProcesses | Measure-Object WorkingSet64 -Sum).Sum) / 1MB, 1)
+    $browserMemoryBytes = if ($browserProcesses.Count -gt 0) {
+        ($browserProcesses | Measure-Object WorkingSet64 -Sum).Sum
+    }
+    else {
+        0
+    }
+    $browserMemory = [math]::Round($browserMemoryBytes / 1MB, 1)
     Write-Info "浏览器：$($browserProcesses.Count) 个进程，共约 ${browserMemory}MB；属于用户/浏览器会话，永不自动结束。"
 
     $playwrightServers = @($snapshot.Values | Where-Object {

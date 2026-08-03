@@ -1,18 +1,18 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v6.9.4",
+    "Version": "v6.9.5",
     "CreateTime": "2026-07-12T13:55:37.022Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "MenuCount": 4,
     "TableCount": 7,
-    "FieldCount": 130,
+    "FieldCount": 131,
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
     "DDLCount": 7,
-    "PhysicalColumnCount": 377,
+    "PhysicalColumnCount": 378,
     "ApiEngineCount": 1,
     "DataSetCount": 0,
     "DataRowCount": 0,
@@ -42,7 +42,7 @@
     {
       "TableName": "diy_table",
       "TableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
-      "DDL": "CREATE TABLE IF NOT EXISTS `diy_table` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `Remark` mediumtext NULL COMMENT '表说明/备注',\n  `EnableTrash` int NULL COMMENT '启用回收站',\n  `EnableDataVersion` int NULL COMMENT '启用数据版本',\n  `DataLogRole` mediumtext NULL COMMENT '数据日志权限',\n  `DisplayDefaultField` int NULL COMMENT '显示默认字段',\n  `EnableDataComment` int NULL COMMENT '启用数据评论',\n  `DataSourceId` varchar(36) NULL,\n  `ReportId` varchar(36) NULL COMMENT '报表引擎Id',\n  `ReportName` varchar(100) NULL COMMENT '报表引擎',\n  `EnableDataLog` int NULL COMMENT '启用数据日志',\n  `DataBaseName` varchar(100) NULL COMMENT '所属数据库',\n  `DataBaseId` varchar(36) NULL,\n  `SubmitAfterServerV8` mediumtext NULL COMMENT '后端表单提交后V8事件',\n  `SubmitBeforeServerV8` mediumtext NULL COMMENT '后端表单提交前V8事件',\n  `RowAction` mediumtext NULL,\n  `OutFormV8` mediumtext NULL COMMENT '前端表单提交后V8事件',\n  `Column` int(11) NULL COMMENT '电脑端布局',\n  `InputBorderStyle` varchar(255) NULL COMMENT '输入框样式',\n  `DataEncryptSave` int NULL COMMENT '数据加密存储',\n  `TableTabs` mediumtext NULL COMMENT '表单分组',\n  `ApiReplace` mediumtext NULL COMMENT '接口替换',\n  `IsAnonymousRead` int NULL COMMENT '允许匿名读取',\n  `FieldBorder` varchar(255) NULL,\n  `Description` mediumtext NULL COMMENT '表中文名',\n  `Tabs` mediumtext NULL COMMENT '表单分组',\n  `BindRole` mediumtext NULL COMMENT '访问权限',\n  `TableTabsPosition` varchar(255) NULL,\n  `TabsPosition` varchar(255) NULL COMMENT '分组标签位置',\n  `Name` varchar(255) NULL COMMENT '表名',\n  `TreeParentFields` mediumtext NULL COMMENT '完整父级列',\n  `TreeHasChildren` varchar(50) NULL COMMENT '是否有子级列',\n  `ServerDataV8` mediumtext NULL COMMENT '后端数据处理V8事件',\n  `IsTree` int NULL COMMENT '树形结构',\n  `FormOpenWidth` varchar(255) NULL COMMENT '弹窗/抽屉宽度',\n  `TableArticle` mediumtext NULL,\n  `DataEncryptTransfer` int NULL,\n  `InFormV8` mediumtext NULL COMMENT '前端表单进入V8事件',\n  `TreeParentField` varchar(50) NULL COMMENT '父级列',\n  `TreeLazy` int NULL COMMENT '树形懒加载',\n  `FormArticle` mediumtext NULL,\n  `EnableCache` int NULL,\n  `IsAnonymousAdd` int NULL COMMENT '允许匿名新增',\n  `CacheParentKey` varchar(255) NULL,\n  `FormOpenType` varchar(255) NULL COMMENT '表单打开方式',\n  `SubmitFormV8` mediumtext NULL COMMENT '前端表单提交前V8事件',\n  `FormLabelPosition` varchar(255) NULL COMMENT '标签对齐方式'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `diy_table` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `Remark` mediumtext NULL COMMENT '表说明/备注',\n  `EnableTrash` int NULL COMMENT '启用回收站',\n  `EnableDataVersion` int NULL COMMENT '启用数据版本',\n  `DataLogRole` mediumtext NULL COMMENT '数据日志权限',\n  `DisplayDefaultField` int NULL COMMENT '显示默认字段',\n  `EnableDataComment` int NULL COMMENT '启用数据评论',\n  `DataSourceId` varchar(36) NULL,\n  `ReportId` varchar(36) NULL COMMENT '报表引擎Id',\n  `ReportName` varchar(100) NULL COMMENT '报表引擎',\n  `EnableDataLog` int NULL COMMENT '启用数据日志',\n  `DataBaseName` varchar(100) NULL COMMENT '所属数据库',\n  `DataBaseId` varchar(36) NULL,\n  `SubmitAfterServerV8` mediumtext NULL COMMENT '后端表单提交后V8事件',\n  `SubmitBeforeServerV8` mediumtext NULL COMMENT '后端表单提交前V8事件',\n  `RowAction` mediumtext NULL,\n  `OutFormV8` mediumtext NULL COMMENT '前端表单提交后V8事件',\n  `Column` int(11) NULL COMMENT '电脑端布局',\n  `InputBorderStyle` varchar(255) NULL COMMENT '输入框样式',\n  `DataEncryptSave` int NULL COMMENT '数据加密存储',\n  `TableTabs` mediumtext NULL COMMENT '表单分组',\n  `ApiReplace` mediumtext NULL COMMENT '接口替换',\n  `IsAnonymousRead` int NULL COMMENT '允许匿名读取',\n  `FieldBorder` varchar(255) NULL,\n  `Description` mediumtext NULL COMMENT '表中文名',\n  `Tabs` mediumtext NULL COMMENT '表单分组',\n  `BindRole` mediumtext NULL COMMENT '访问权限',\n  `TableTabsPosition` varchar(255) NULL,\n  `TabsPosition` varchar(255) NULL COMMENT '分组标签位置',\n  `Name` varchar(255) NULL COMMENT '表名',\n  `TreeParentFields` mediumtext NULL COMMENT '完整父级列',\n  `TreeHasChildren` varchar(50) NULL COMMENT '是否有子级列',\n  `ServerDataV8` mediumtext NULL COMMENT '后端数据处理V8事件',\n  `IsTree` int NULL COMMENT '树形结构',\n  `FormOpenWidth` varchar(255) NULL COMMENT '弹窗/抽屉宽度',\n  `TableArticle` mediumtext NULL,\n  `DataEncryptTransfer` int NULL,\n  `InFormV8` mediumtext NULL COMMENT '前端表单进入V8事件',\n  `TreeParentField` varchar(50) NULL COMMENT '父级列',\n  `TreeLazy` int NULL COMMENT '树形懒加载',\n  `FormArticle` mediumtext NULL,\n  `EnableCache` int NULL,\n  `IsAnonymousAdd` int NULL COMMENT '允许匿名新增',\n  `CacheParentKey` varchar(255) NULL,\n  `FormOpenType` varchar(255) NULL COMMENT '表单打开方式',\n  `SubmitFormV8` mediumtext NULL COMMENT '前端表单提交前V8事件',\n  `FormLabelPosition` varchar(255) NULL COMMENT '标签对齐方式',\n  `V8Unlimited` int NULL DEFAULT 0 COMMENT 'V8无运行限制'\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
     },
     {
       "TableName": "diy_component",
@@ -1771,6 +1771,18 @@
       "COLUMN_KEY": "",
       "EXTRA": "",
       "ORDINAL_POSITION": 57
+    },
+    {
+      "TABLE_NAME": "diy_table",
+      "COLUMN_NAME": "V8Unlimited",
+      "COLUMN_TYPE": "int(11)",
+      "DATA_TYPE": "int",
+      "IS_NULLABLE": "YES",
+      "COLUMN_DEFAULT": "0",
+      "COLUMN_COMMENT": "V8无运行限制",
+      "COLUMN_KEY": "",
+      "EXTRA": "",
+      "ORDINAL_POSITION": 58
     },
     {
       "TABLE_NAME": "diy_component",
@@ -4842,6 +4854,7 @@
     },
     {
       "DataLogRole": "[]",
+      "V8Unlimited": 0,
       "SubmitAfterServerV8": "if(V8.FormSubmitAction == 'Insert' && !V8.Form.ReportId){\n  var addTableResult = V8.FormEngine.AddTable({\n    Name : V8.Form.Name,\n    Description: V8.Form.Description,\n    DataBaseId: V8.Form.DataBaseId,\n    DataBaseName: V8.Form.DataBaseName,\n    _OnlyCreateTable : true,\n  });\n  if(addTableResult.Code != 1){\n    V8.Result = addTableResult;\n  }\n}\nV8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${V8.Form.Id.toLowerCase()}`);\nif(V8.Form.Name){\n  V8.Cache.Remove(`Microi:${V8.OsClient}:FormData:diy_table:${V8.Form.Name.toLowerCase()}`);\n}",
       "RowAction": "[]",
       "Column": 2,
@@ -4904,6 +4917,33 @@
     }
   ],
   "DiyFields": [
+    {
+      "TableName": "diy_table",
+      "AppVisible": 1,
+      "Type": "int",
+      "Name": "V8Unlimited",
+      "InTableEdit": 0,
+      "Unique": 0,
+      "NameConfirm": 1,
+      "TableWidth": 130,
+      "Config": "",
+      "TableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
+      "Readonly": 0,
+      "Encrypt": 0,
+      "BindRole": "[]",
+      "Placeholder": "",
+      "DefaultValue": "0",
+      "Component": "Switch",
+      "Description": "高风险开关。开启后本表的提交前、提交后和服务器端数据处理V8事件不设置Jint执行超时、最大语句数、函数递归和累计分配预算；仍保留进程/容器常驻内存保护、请求及后台任务取消、执行并发、接口嵌套深度、权限沙箱和数据库保护。仅用于必须共享同一事务且无法安全分片的受控逻辑。",
+      "Visible": 1,
+      "IsLockField": 0,
+      "Data": "[]",
+      "Sort": 4250,
+      "NotEmpty": 0,
+      "Label": "V8无运行限制",
+      "Id": "01KZ2SYZJG63E54R1YYPHG4KGE",
+      "CreateTime": "2026-08-03 11:16:50"
+    },
     {
       "TableName": "diy_table",
       "AppVisible": 1,
