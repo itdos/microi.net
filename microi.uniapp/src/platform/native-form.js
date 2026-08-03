@@ -7,6 +7,11 @@ import {
 } from '@/platform/cache.js'
 import nativeControls from '@/config/mci-native-controls.json'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
+import {
+  filterFieldsByHiddenCollapseScope,
+  nativeFieldRoleVisibility,
+  nativeRoleCacheKey
+} from '@/platform/native-field-visibility.mjs'
 
 const LAYOUT_COMPONENTS = new Set(nativeControls.layout)
 const RELATED_COMPONENTS = new Set(nativeControls.related)
@@ -146,18 +151,20 @@ function inputMode(field, component) {
   return 'text'
 }
 
-export function normalizeField(field) {
+export function normalizeField(field, options = {}) {
   const component = inferNativeComponent(field)
-  const options = normalizeOptions(field)
+  const optionRows = normalizeOptions(field)
   const config = parseJson(field.Config, {}) || {}
   const selectable = OPTION_COMPONENTS.has(component)
   const relationLabel = relatedFieldLabel(field, component, config)
+  const roleVisibility = nativeFieldRoleVisibility(field, options.user || getUser() || {})
   return {
     ...field,
     Label: relationLabel || field.Label,
     component,
     config,
-    options,
+    options: optionRows,
+    bindRoleIds: roleVisibility.bindRoleIds,
     multiple: isNativeFieldMultiple({ ...field, component, config }),
     optionsRemote: isRemoteNativeFieldOptions({ ...field, component, config }),
     inputMode: inputMode(field, component),
@@ -168,7 +175,7 @@ export function normalizeField(field) {
       !GUARDED_COMPONENTS.has(component) &&
       !HIDDEN_NAMES.has(field.Name),
     required: Number(field.NotEmpty || 0) === 1,
-    visible: Number(field.AppVisible ?? field.Visible ?? 1) !== 0 && Number(field.IsVirtual || 0) !== 1 &&
+    visible: roleVisibility.visible && Number(field.AppVisible ?? field.Visible ?? 1) !== 0 && Number(field.IsVirtual || 0) !== 1 &&
       !SENSITIVE_FIELD_PATTERN.test(`${field.Name || ''} ${field.Label || ''}`),
     placeholder: field.Placeholder || `${selectable || ['DateTime', 'Address', 'Map', 'MapArea', 'ColorPicker'].includes(component) ? '请选择' : '请输入'}${field.Label || field.Name}`
   }
@@ -307,10 +314,16 @@ function buildDefinition(table, fields, layoutFields = fields) {
   const formTabs = normalizeTableTabs(table)
   assignFieldFormTabs(layoutFields, formTabs)
   if (layoutFields !== fields) assignFieldFormTabs(fields, formTabs)
-  const layoutGroups = groupFields(fields, table)
+  // A role-hidden CollapseGroup remains a logical boundary while its complete
+  // field range is removed, preventing child tables from leaking elsewhere.
+  const visibleFields = filterFieldsByHiddenCollapseScope(fields, {
+    layoutComponents: LAYOUT_COMPONENTS,
+    guardedComponents: GUARDED_COMPONENTS
+  })
+  const layoutGroups = groupFields(visibleFields, table)
   const uniqueRelated = (component) => {
     const seen = new Set()
-    return fields.filter((field) => {
+    return visibleFields.filter((field) => {
       if (field.component !== component) return false
       const config = field.config || {}
       const target = component === 'TableChild'
@@ -327,7 +340,7 @@ function buildDefinition(table, fields, layoutFields = fields) {
   }
   return {
     table,
-    fields,
+    fields: visibleFields,
     layoutFields,
     formTabs,
     groups: layoutGroups.filter((group) => group.fields.length),
@@ -339,13 +352,13 @@ function buildDefinition(table, fields, layoutFields = fields) {
   }
 }
 
-export function createNativeFormDefinition(table = {}, rawFields = []) {
-  const layoutFields = (Array.isArray(rawFields) ? rawFields : []).map(normalizeField)
-  const fields = layoutFields.filter((field) => field.visible)
-  return buildDefinition(table, fields, layoutFields)
+export function createNativeFormDefinition(table = {}, rawFields = [], options = {}) {
+  const user = options.user || getUser() || {}
+  const layoutFields = (Array.isArray(rawFields) ? rawFields : []).map((field) => normalizeField(field, { user }))
+  return buildDefinition(table, layoutFields, layoutFields)
 }
 
-export const NATIVE_FORM_SCHEMA_VERSION = 6
+export const NATIVE_FORM_SCHEMA_VERSION = 7
 const FORM_VERSION_MAX_AGE = 30 * 1000
 const FORM_DEFINITION_MAX_AGE = 30 * 24 * 60 * 60 * 1000
 
@@ -375,7 +388,8 @@ function definitionFingerprint(table, fields) {
       field.Sort,
       field.Visible,
       field.AppVisible,
-      field.Component
+      field.Component,
+      field.BindRole
     ])
   }
   return hashText(JSON.stringify(source))
@@ -393,14 +407,15 @@ function definitionAuthorizationScope(options = {}) {
 
 function definitionKeys(tableName, options = {}) {
   const normalized = String(tableName || '').trim().toLowerCase()
-  const user = getUser() || {}
+  const user = options.user || getUser() || {}
   const identity = String(user.Id || user.Account || 'guest').toLowerCase()
   const scope = hashText(definitionAuthorizationScope(options))
+  const roleScope = hashText(nativeRoleCacheKey(user))
   return {
-    version: `form-definition-version:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${scope}:${normalized}`,
+    version: `form-definition-version:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${roleScope}:${scope}:${normalized}`,
     definition: (fingerprint) =>
-      `form-definition:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${scope}:${normalized}:${fingerprint}`,
-    request: `form-definition-request:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${scope}:${normalized}`
+      `form-definition:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${roleScope}:${scope}:${normalized}:${fingerprint}`,
+    request: `form-definition-request:v${NATIVE_FORM_SCHEMA_VERSION}:${identity}:${roleScope}:${scope}:${normalized}`
   }
 }
 
@@ -443,7 +458,7 @@ async function requestFullDefinition(tableName, options = {}) {
     throw new Error((fieldResult && fieldResult.Msg) || '字段配置加载失败')
   }
   const rawFields = fieldResult.Data || []
-  const definition = createNativeFormDefinition(table, rawFields)
+  const definition = createNativeFormDefinition(table, rawFields, options)
   return {
     fingerprint: definitionFingerprint(table, rawFields),
     definition
