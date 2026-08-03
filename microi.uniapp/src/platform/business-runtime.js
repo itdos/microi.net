@@ -247,40 +247,26 @@ export async function resolveDiyTableId(tableName, refresh = false) {
   if (!tableName) return ''
   if (!tableIdCache) tableIdCache = readStorage(TABLE_CACHE_KEY, {})
   const cacheKey = String(tableName).toLowerCase()
-  if (!refresh && tableIdCache[cacheKey]) return tableIdCache[cacheKey]
+  const cachedTableId = tableIdCache[cacheKey]
+  if (!refresh && typeof cachedTableId === 'string' && cachedTableId) return cachedTableId
+  if (!refresh && cachedTableId && cachedTableId.missing &&
+    Date.now() - Number(cachedTableId.time || 0) < 30 * 1000) return ''
 
   const menus = flattenMenus(await loadMenuTree(refresh))
   const normalizedName = String(tableName).toLowerCase()
   const direct = menus.find((menu) =>
     String(menu.DiyTableName || menu.TableName || menu.DiyTable?.Name || menu._DiyTable?.Name || '').toLowerCase() === normalizedName
   )
-  let id = direct ? String(direct.DiyTableId || '') : ''
-  if (!id) {
-    let cursor = 0
-    const candidates = menus.filter((menu) => menu && menu.DiyTableId && menu.Id)
-    let matched = ''
-    const worker = async () => {
-      while (!matched && cursor < candidates.length) {
-        const menu = candidates[cursor++]
-        try {
-          const result = await V8.FormEngine.GetDiyTableModel({
-            Name: menu.DiyTableId,
-            _SysMenuId: menu.Id
-          })
-          const model = result && Number(result.Code) === 1 ? result.Data : null
-          if (model && String(model.Name || '').toLowerCase() === normalizedName) {
-            matched = String(model.Id || menu.DiyTableId || '')
-          }
-        } catch (error) {}
-      }
-    }
-    await Promise.all(Array.from({ length: Math.min(3, Math.max(1, candidates.length)) }, worker))
-    id = matched
-  }
+  // 菜单树没有携带表名时不能靠逐菜单 GetDiyTableModel 猜测。调用方应把已经
+  // 授权读取到的 tableId 传给 findMenu，既确定又不会越过真实菜单上下文。
+  const id = direct ? String(direct.DiyTableId || '') : ''
   if (id) {
     tableIdCache[cacheKey] = id
-    writeStorage(TABLE_CACHE_KEY, tableIdCache)
+  } else {
+    // 短负缓存避免同一批关联组件在菜单未配置时连续重试。
+    tableIdCache[cacheKey] = { missing: true, time: Date.now() }
   }
+  writeStorage(TABLE_CACHE_KEY, tableIdCache)
   return id
 }
 
@@ -317,12 +303,17 @@ export async function loadMenuTree(refresh = false) {
   return data
 }
 
-export async function findMenu(aliases = [], tableName = '', refresh = false, menuId = '') {
+export async function findMenu(aliases = [], tableName = '', refresh = false, menuId = '', tableId = '') {
   const menus = flattenMenus(await loadMenuTree(refresh))
   const names = aliases.map((item) => String(item).trim()).filter(Boolean)
   let result = menuId
     ? menus.find((menu) => String(menu.Id || '') === String(menuId))
     : null
+  // 显式菜单 Id 之后优先使用调用方已授权取得的表 Id；名称/别名可能重名，
+  // 只能作为兼容回退，不能覆盖确定的表关系。
+  if (!result && tableId) {
+    result = menus.find((menu) => String(menu.DiyTableId || '') === String(tableId))
+  }
   if (!result) result = menus.find((menu) => names.includes(String(menu.Name || '').trim()))
   if (!result && tableName) {
     const normalizedTableName = String(tableName).toLowerCase()
@@ -331,8 +322,8 @@ export async function findMenu(aliases = [], tableName = '', refresh = false, me
     )
   }
   if (!result && tableName) {
-    const tableId = await resolveDiyTableId(tableName)
-    result = menus.find((menu) => tableId && String(menu.DiyTableId || '') === tableId)
+    const resolvedTableId = await resolveDiyTableId(tableName)
+    result = menus.find((menu) => resolvedTableId && String(menu.DiyTableId || '') === resolvedTableId)
   }
   if (!result) {
     result = menus.find((menu) => names.some((name) => String(menu.Name || '').includes(name)))

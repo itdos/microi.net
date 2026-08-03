@@ -160,7 +160,8 @@
 						:field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-						parent-mode="View" :show-floating-add="false"
+						parent-mode="View" display-mode="preview" show-preview-header :preview-limit="2"
+						:show-floating-add="false"
 						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
 						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
 					<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"

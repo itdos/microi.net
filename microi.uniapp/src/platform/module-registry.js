@@ -51,7 +51,7 @@ function configuredFieldNames(value, fields) {
   }).filter(Boolean)
 }
 
-function preferredField(fields, patterns, excluded = new Set()) {
+function preferredField(fields, patterns, excluded = new Set(), fallback = true) {
   const visible = fields.filter((field) =>
     field.visible && !excluded.has(field.Name) && !HEAVY_COMPONENTS.has(field.component)
   )
@@ -61,7 +61,7 @@ function preferredField(fields, patterns, excluded = new Set()) {
     )
     if (matched) return matched
   }
-  return visible[0] || null
+  return fallback ? (visible[0] || null) : null
 }
 
 function moduleKey(menu) {
@@ -187,19 +187,21 @@ export async function loadModuleDefinition(menuId, refresh = false) {
   const configuredTags = configuredFieldNames(module.menu.CardTitleTagFields, fields)
   const configuredBottom = configuredFieldNames(module.menu.CardBottomTagFields, fields)
   const configuredStatistics = configuredFieldNames(module.menu.StatisticsFields, fields)
-  const preferredNames = [...configuredMobile, ...configuredList]
+  // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
+  // SelectFields 只在未配置移动端列时作为兼容回退，不能混入卡片造成展示漂移。
+  const preferredNames = configuredMobile.length ? configuredMobile : configuredList
   const preferred = preferredNames.map((name) => fields.find((field) => field.Name === name)).filter(Boolean)
   const titleField = preferredField(
     preferred.length ? preferred : fields,
     [/名称|标题|编号|姓名|name|title|code|no/i]
   )
   const excluded = new Set([titleField && titleField.Name].filter(Boolean))
-  const statusField = preferredField(fields, [/状态|status|stage/i], excluded)
+  const statusField = preferredField(fields, [/状态|status|stage/i], excluded, false)
   if (statusField) excluded.add(statusField.Name)
   let lines = preferred.filter((field) =>
     !excluded.has(field.Name) && !HEAVY_COMPONENTS.has(field.component)
   ).slice(0, 4)
-  if (lines.length < 3) {
+  if (!configuredMobile.length && lines.length < 3) {
     fields.forEach((field) => {
       if (lines.length >= 4 || excluded.has(field.Name) || HEAVY_COMPONENTS.has(field.component)) return
       if (!field.visible || lines.some((item) => item.Name === field.Name)) return
@@ -209,7 +211,7 @@ export async function loadModuleDefinition(menuId, refresh = false) {
   const statisticField = configuredStatistics
     .map((name) => fields.find((field) => field.Name === name))
     .find(Boolean)
-  const periodField = preferredField(fields, [/时间|日期|date|time/i]) ||
+  const periodField = preferredField(fields, [/时间|日期|date|time/i], new Set(), false) ||
     fields.find((field) => field.Name === 'CreateTime')
   return {
     ...module,

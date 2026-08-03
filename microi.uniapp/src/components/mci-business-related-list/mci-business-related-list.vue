@@ -1,5 +1,18 @@
 <template>
-  <view class="related-business-list" :class="{ 'related-business-list--preview': isPreview }">
+  <view class="related-business-list" :class="{
+    'related-business-list--preview': isPreview,
+    'related-business-list--section': isPreview && showPreviewHeader
+  }">
+    <view v-if="isPreview && showPreviewHeader" class="preview-section-header"
+      hover-class="preview-section-header--pressed" @tap="previewExpanded = !previewExpanded">
+      <view class="preview-section-header__main">
+        <text class="preview-section-header__bar"></text>
+        <text class="preview-section-header__title">{{ config.title || sectionTitle }}</text>
+        <text v-if="!loading" class="preview-section-header__count">{{ count }} 项</text>
+      </view>
+      <text class="preview-section-header__arrow">{{ previewExpanded ? '⌃' : '⌄' }}</text>
+    </view>
+
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
       <view class="search-input-wrap">
         <input v-model="keyword" class="search-input" type="text" confirm-type="search"
@@ -17,7 +30,7 @@
       <view class="search-button" @tap="resetSearch"><text>重置</text></view>
     </view>
 
-    <view v-if="loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
+    <view v-if="previewContentVisible && loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
       <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
         <view class="skeleton-line"></view>
@@ -25,7 +38,7 @@
       </view>
     </view>
 
-    <view v-else-if="rows.length" class="related-data-list">
+    <view v-else-if="previewContentVisible && rows.length" class="related-data-list">
       <template v-if="moduleKey === 'tasks'">
         <mci-task-card v-for="(row, index) in displayedRows" :key="row.Id || index"
           :item="taskCardRow(row)" :index="index" :state-class="taskStatusClass(row)"
@@ -45,12 +58,12 @@
       <view v-else-if="!isPreview" class="load-finished"><text>共 {{ count }} 条</text></view>
     </view>
 
-    <view v-else-if="error" class="related-empty">
+    <view v-else-if="previewContentVisible && error" class="related-empty">
       <text>{{ error }}</text>
       <view @tap="loadData(true, true)"><text>重新加载</text></view>
     </view>
 
-    <view v-else class="related-empty">
+    <view v-else-if="previewContentVisible" class="related-empty">
       <template v-if="waitingForParentSave">
         <text>保存当前表单后可新增{{ config.title || sectionTitle }}</text>
       </template>
@@ -63,7 +76,7 @@
     <view v-if="showFloatingAdd && canAdd && !isPreview" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
-    <view v-if="isPreview && !waitingForParentSave" class="preview-actions"
+    <view v-if="previewContentVisible && isPreview && !waitingForParentSave" class="preview-actions"
       :class="{ 'preview-actions--single': !canAdd }">
       <view class="preview-action preview-action--more" hover-class="preview-action--pressed" @tap="openMore">
         <text class="preview-action__icon">···</text><text>查看更多</text>
@@ -293,6 +306,7 @@ export default {
     parentMode: { type: String, default: 'View' },
     displayMode: { type: String, default: 'full' },
     previewLimit: { type: Number, default: 2 },
+    showPreviewHeader: { type: Boolean, default: false },
     relationValueOverride: { type: [String, Number], default: '' },
     showFloatingAdd: { type: Boolean, default: true },
     parentTableChildAuth: { type: Object, default: null }
@@ -326,6 +340,7 @@ export default {
       actionInput: '',
       approvalOpinions: [],
       actionSubmitting: false,
+      previewExpanded: true,
       searchTimer: null,
       loadRequestId: 0
     }
@@ -340,6 +355,7 @@ export default {
       return this.field.Label || this.fieldConfig.TableChildSysMenuName || this.table?.Description || this.field.Name || '关联数据'
     },
     isPreview() { return String(this.displayMode || '').toLowerCase() === 'preview' },
+    previewContentVisible() { return !this.isPreview || !this.showPreviewHeader || this.previewExpanded },
     displayedRows() { return this.isPreview ? this.rows.slice(0, Math.max(1, this.previewLimit)) : this.rows },
     relationValue() {
       if (this.relationValueOverride !== '' && this.relationValueOverride !== null && this.relationValueOverride !== undefined) {
@@ -395,7 +411,7 @@ export default {
     canAdd: {
       immediate: true,
       handler(value) {
-        this.$emit('floating-add-state', Boolean(value))
+        this.$emit('floating-add-state', Boolean(value && !this.isPreview))
       }
     },
     // zhy：将筛选遮罩开关同步给外层详情页，统一处理跨组件固定层级。
@@ -443,7 +459,8 @@ export default {
         })
         this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
           menuId: this.childMenuId,
-          tableChildAuth: this.tableChildAuth
+          tableChildAuth: this.tableChildAuth,
+          tableModel: this.table
         })
         const matched = this.resolveBusinessModule(this.table.Name)
         this.moduleKey = matched.key
@@ -451,13 +468,15 @@ export default {
           matched.config.menuAliases || [],
           this.table.Name,
           refresh,
-          this.childMenuId
+          this.childMenuId,
+          this.table.Id
         )
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
         this.config = {
           ...matched.config,
           table: this.table.Name,
+          tableId: this.table.Id,
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }
@@ -1091,6 +1110,18 @@ export default {
 <style scoped>
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
+.related-business-list--section { padding-top: 0; }
+.preview-section-header { min-height: 86rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 0 24rpx; border-top: 1rpx solid #e5edef; border-bottom: 1rpx solid #edf2f4; background: #fff; transition: background 150ms ease; }
+.preview-section-header--pressed { background: #f7fafb; }
+.preview-section-header__main { min-width: 0; display: flex; align-items: center; gap: 12rpx; }
+.preview-section-header__bar { flex: 0 0 auto; width: 6rpx; height: 28rpx; border-radius: 3rpx; background: var(--mci-color-primary, #e94b2c); }
+.preview-section-header__title { overflow: hidden; color: #17313b; font-size: 28rpx; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.preview-section-header__count { flex: 0 0 auto; color: #8aa0a9; font-size: 21rpx; font-weight: 500; }
+.preview-section-header__arrow { flex: 0 0 auto; color: #78919b; font-size: 25rpx; }
+.preview-section-header ~ .related-data-list,
+.preview-section-header ~ .related-skeleton,
+.preview-section-header ~ .related-empty,
+.preview-section-header ~ .preview-actions { margin-right: 22rpx; margin-left: 22rpx; }
 .search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
