@@ -109,7 +109,7 @@ if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
   !formRuntime.includes('active.group.relatedFields.push(field)') ||
   !formRuntime.includes('groups: layoutGroups.filter((group) => group.fields.length)') ||
   !formRuntime.includes('relatedGroups: layoutGroups') ||
-  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 6')) {
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 7')) {
   fail('related fields must preserve their platform CollapseGroup ownership')
 }
 if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
