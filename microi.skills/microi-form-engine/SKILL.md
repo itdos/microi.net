@@ -111,14 +111,12 @@ MCP 建模只使用：
   "TableChildSysMenuId": "<子表 sys_menu.Id>",
   "TableChildSysMenuName": "携带物品明细",
   "TableChildFkFieldName": "VisitId",
-  "TableChildCallbackField": "",
   "TableChild": {
     "PrimaryTableFieldName": "Id",
     "Data": [],
     "SearchAppend": {},
     "ImportAutoFillFk": true,
-    "ImportRelations": [],
-    "ImportBackfillFields": [],
+    "FieldRelations": [],
     "LastTableId": "",
     "LastSysMenuId": "",
     "LastSysMenuName": "",
@@ -127,6 +125,8 @@ MCP 建模只使用：
   }
 }
 ```
+
+`FieldRelations` 使用紧凑格式 `[["父表字段","子表字段",true?], ...]`。全部关系用于新增回写和导入回填；第三位 `true` 仅标记参与导入反查父表的关系。后端兼容旧三项配置，新版前端会合并去重并在字段下次保存时清除旧键。
 
 `OpenTable` 用于弹出列表选择数据，固定授权范围用 `V8.OpenTableSetWhere`；`JoinTable`
 用于展示关联集合，不能用前端拼接代替数据权限。

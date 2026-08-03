@@ -61,3 +61,37 @@ test("access-key exchange is isolated from stale bearer credentials", () => {
     assert.match(source, /suppressAuthFailure:\s*true/);
     assert.match(source, /scrubAccessKeyFromAddressBar\(\)/);
 });
+
+test("system-account access key entry is driven by MoreBtns instead of table templates", () => {
+    const tableSource = fs.readFileSync(
+        path.resolve(testDir, "../src/views/form-engine/diy-table.vue"),
+        "utf8"
+    );
+    const tableUtilsSource = fs.readFileSync(
+        path.resolve(testDir, "../src/views/form-engine/mixins/table-utils.mixin.js"),
+        "utf8"
+    );
+
+    assert.doesNotMatch(tableSource, /ShouldShowRowAccessKeyAction/);
+    assert.doesNotMatch(tableSource, /IsSystemAccountTable/);
+    assert.doesNotMatch(tableSource, />\s*访问密钥\s*</);
+    assert.doesNotMatch(tableUtilsSource, /访问密钥|ShouldShowRowAccessKeyAction/);
+    assert.doesNotMatch(tableSource, /OpenUserAccessKeys|UserAccessKeyDialog|UserAccessKeyPanel/);
+
+    const componentRegistry = fs.readFileSync(
+        path.resolve(testDir, "../src/utils/microi.net.import.js"),
+        "utf8"
+    );
+    const apiDefinitions = fs.readFileSync(
+        path.resolve(testDir, "../src/views/form-engine/diy-components/v8-api-definitions.js"),
+        "utf8"
+    );
+    const accessKeyPanel = fs.readFileSync(
+        path.resolve(testDir, "../src/views/system/components/user-access-key-panel.vue"),
+        "utf8"
+    );
+    assert.match(componentRegistry, /app\.component\("UserAccessKeyPanel", UserAccessKeyPanel\)/);
+    assert.doesNotMatch(apiDefinitions, /OpenUserAccessKeys/);
+    assert.match(accessKeyPanel, /DataAppend:\s*\{\s*type:\s*Object/);
+    assert.match(accessKeyPanel, /props\.DataAppend\?\.User/);
+});

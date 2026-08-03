@@ -38,6 +38,43 @@ namespace Microi.net.Api
     //IAuthorizationFilter|IAsyncAuthorizationFilter, ActionFilterAttribute,  Attribute,   DiyFilter<T> where T : 
     {
         private const string TimerKey = "__DiyFilter_Timer__";
+        private static readonly HashSet<string> ApiEngineExecutionActions =
+            new HashSet<string>(StringComparer.Ordinal)
+            {
+                "Run",
+                "Run_FormData",
+                "Run_Request_Get",
+                "Run_Response_File",
+                "Run_Response_Html"
+            };
+
+        /// <summary>
+        /// These actions perform their own exact API-engine role authorization.
+        /// Deferring only these routes avoids the coarse action-name OnlyGet check
+        /// while preserving it for every ordinary controller write operation.
+        /// </summary>
+        public static bool DefersOnlyGetToApiEngineRoleAuthorization(
+            ControllerActionDescriptor actionDescriptor)
+        {
+            if (actionDescriptor == null) return false;
+            if (string.Equals(
+                    actionDescriptor.ControllerName,
+                    "ApiEngine",
+                    StringComparison.Ordinal)
+                && ApiEngineExecutionActions.Contains(actionDescriptor.ActionName))
+            {
+                return true;
+            }
+
+            return string.Equals(
+                       actionDescriptor.ControllerName,
+                       "BackgroundTask",
+                       StringComparison.Ordinal)
+                   && string.Equals(
+                       actionDescriptor.ActionName,
+                       "RunApiEngine",
+                       StringComparison.Ordinal);
+        }
         /// <summary>
         /// 
         /// </summary>
@@ -1055,7 +1092,12 @@ namespace Microi.net.Api
                             {
                                 var tArr = context.HttpContext.Request.Path.ToString().DosSplit('/');
                                 var requestType = tArr[tArr.Length - 1].Substring(0, 3);
-                                if (requestType.ToUpper() != "GET" && baseLimit.Any(d => d == "OnlyGet"))
+                                var defersToApiEngineRoleAuthorization =
+                                    DefersOnlyGetToApiEngineRoleAuthorization(
+                                        context.ActionDescriptor as ControllerActionDescriptor);
+                                if (requestType.ToUpper() != "GET"
+                                    && baseLimit.Any(d => d == "OnlyGet")
+                                    && !defersToApiEngineRoleAuthorization)
                                 {
                                     context.Result = new JsonResult(new DosResult(0, null, "该账户角色拥有【仅查询】权限！"));
                                 }

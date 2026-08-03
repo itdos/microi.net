@@ -410,7 +410,7 @@ try {
 - FormEngine 的动态友好路由（如 `GetTableData-{table-key}`、`Get-TableData-{table-key}`、`GetFormData-{table-key}` 及写入别名）必须在 API capability 鉴权前归一化。动态路由转换器与访问密钥鉴权必须复用同一个别名解析器，禁止各维护一份前缀清单；归一化只决定所需 scope，URL 后缀还必须与模型绑定后的 `FormEngineKey/TableId/ModuleEngineKey/_SysMenuId` 之一规范化一致，并再次校验准确表或菜单引用。空 Key、前后缀不一致、额外路径段和相似前缀必须拒绝。
 - `ApiEngineController` 的 Run 系列即使标记了 `[AllowAnonymous]`，检测到访问密钥会话后也必须解析实际命中的引擎模型并校验准确 `ApiEngineKey`；数据源运行和后台接口任务同样校验准确 Key。禁止只在 MVC 授权过滤器中检查粗粒度路径，因为匿名兼容入口会跳过该过滤器。
 - 自动登录 URL 必须携带当前 `OsClient`；前端进入 `/access-login` 时先清除 Hash 中的密钥，再用 JSON Body 兑换，并设置有限超时。禁止等待与兑换无关的 SSO 初始化导致无限加载。
-- 管理操作只允许普通登录会话的本人或管理员；访问密钥会话不能创建或吊销密钥。
+- 管理操作只允许普通登录会话的本人或管理员；访问密钥会话不能创建或吊销密钥。系统账号中的管理入口必须由 `sys_menu.MoreBtns` 动态配置，并通过通用 `V8.OpenDialog` 打开预注册的 `UserAccessKeyPanel`；不得新增业务专用 `V8.OpenUserAccessKeys`，也不得在通用表格/卡片模板中按表名硬编码。按钮显隐不能代替后端逐次鉴权。
 - 多节点共享 Redis 只作为短 TTL 缓存和限流；数据库是事实源，吊销主动清除缓存。不得使用 `static` 字典、本机文件或本地定时器保存密钥状态。
 - 对外仍要求 HTTPS。固定终端使用独立只读帐号，不能用超级管理员帐号创建看板密钥。
 

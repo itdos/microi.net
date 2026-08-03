@@ -126,10 +126,10 @@ DIY tables created by the platform include fixed fields even when they are not p
 | `wx_mp` | 7 | 微信公众号配置 |
 | `wx_menu` | 3 | 微信公众号自定义菜单 |
 | `wx_mini_program` | 3 | 微信小程序 |
-| `wx_tpl_msg` | 10 | 公众号模板消息 |
+| `wx_tpl_msg` | 12 | 公众号/服务号模板消息，可选跳转小程序 |
 | `mic_email_server` | 7 | 邮件配置 |
-| `mic_msgset` | 10 | 消息通知设置 |
-| `mic_msg_event_log` | 5 | 消息通知事件日志 |
+| `mic_msgset` | 11 | 多通道消息通知设置 |
+| `mic_msg_event_log` | 13 | 按事件、渠道、接收人持久化的消息通知日志 |
 
 ### 内容、运营与平台功能
 

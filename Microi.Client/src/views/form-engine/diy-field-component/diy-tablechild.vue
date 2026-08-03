@@ -14,7 +14,6 @@
         :TableChildSysMenuId="field.Config.TableChildSysMenuId"
         :TableChildFkFieldName="field.Config.TableChildFkFieldName"
         :PrimaryTableFieldName="field.Config.TableChild.PrimaryTableFieldName"
-        :TableChildCallbackField="field.Config.TableChildCallbackField"
         :TableChildFormMode="FormMode"
         :FatherFormModel="fatherFormModelSnapshot"
         :ParentV8="ParentV8"
@@ -90,29 +89,13 @@
             <el-form-item label="关闭分页">
                 <el-switch v-model="configForm.DisablePagination" active-color="#ff6c04" inactive-color="#ccc" />
             </el-form-item>
-            <el-form-item label="回写子表列" :label-position="'top'"  style="display: block;">
+            <el-form-item label="主子表字段关系" :label-position="'top'"  style="display: block;">
                 <DiyCodeEditor
-                        v-model="configForm.TableChildCallbackField"
-                        :field="{ Id: 'TableChildCallbackField', Name: 'TableChildCallbackField' }"
+                        v-model="configForm.FieldRelations"
+                        :field="{ Id: 'TableChildFieldRelations', Name: 'TableChildFieldRelations' }"
                         :height="'300px'"
                     />
-                <div class="form-item-tip">格式：[{ "Father" : "FieldName1", "Child" : "FieldName2" }]</div>
-            </el-form-item>
-            <el-form-item label="导入匹配关系" :label-position="'top'"  style="display: block;">
-                <DiyCodeEditor
-                        v-model="configForm.ImportRelations"
-                        :field="{ Id: 'ImportRelations', Name: 'ImportRelations' }"
-                        :height="'220px'"
-                    />
-                <div class="form-item-tip">格式：[{ "Parent" : "Name", "Child" : "CustomerName" }]，导入子表时用 Child 列值反查主表 Parent 列，并自动写入关联子表列名。</div>
-            </el-form-item>
-            <el-form-item label="导入回填子表列" :label-position="'top'"  style="display: block;">
-                <DiyCodeEditor
-                        v-model="configForm.ImportBackfillFields"
-                        :field="{ Id: 'ImportBackfillFields', Name: 'ImportBackfillFields' }"
-                        :height="'220px'"
-                    />
-                <div class="form-item-tip">格式：[{ "Parent" : "XiangmuBH", "Child" : "XiangmuBH" }]。导入子表时根据已匹配到的主表行，把主表列值补写到子表列；兼容上方“回写子表列”的 Father/Child 配置。</div>
+                <div class="form-item-tip">格式：[["Code","XiangmuBM",true],["Name","XiangmuMC"]]。每项依次为“主表列、子表列、是否参与导入匹配”；只有用于反查父表的关系才在第三位填写 true，全部关系都会用于新增回写和导入回填。</div>
             </el-form-item>
         </el-form>
         <template #footer>
@@ -124,6 +107,11 @@
 
 <script setup>
 import { ref, computed, defineAsyncComponent, getCurrentInstance } from "vue";
+import {
+    getTableChildFieldRelations,
+    normalizeTableChildFieldRelations,
+    toCompactTableChildRelations
+} from "@/utils/table-child-relations.js";
 
 const DiyTableChildComponent = defineAsyncComponent(() => import("@/views/form-engine/diy-table"));
 
@@ -223,10 +211,8 @@ const configForm = ref({
     TableChildTableId: '',
     PrimaryTableFieldName: '',
     TableChildFkFieldName: '',
-    TableChildCallbackField: '',
     ImportAutoFillFk: true,
-    ImportRelations: '[]',
-    ImportBackfillFields: '[]',
+    FieldRelations: '[]',
     LastSysMenuId: '',
     LastSysMenuName: '',
     LastTableId: '',
@@ -305,7 +291,7 @@ const getTableChildTableRowId = () => {
     return props.TableRowId;
 };
 
-const stringifyImportRelations = (value) => {
+const stringifyRelations = (value) => {
     if (typeof value === 'string') {
         return value || '[]';
     }
@@ -341,18 +327,15 @@ const openConfig = () => {
     if (!props.field.Config.TableChild) {
         props.field.Config.TableChild = {};
     }
+    normalizeTableChildFieldRelations(props.field.Config);
     configForm.value = {
         TableChildSysMenuId: props.field.Config.TableChildSysMenuId || '',
         TableChildSysMenuName: props.field.Config.TableChildSysMenuName || '',
         TableChildTableId: props.field.Config.TableChildTableId || '',
         PrimaryTableFieldName: props.field.Config.TableChild.PrimaryTableFieldName || '',
         TableChildFkFieldName: props.field.Config.TableChildFkFieldName || '',
-        TableChildCallbackField: typeof props.field.Config.TableChildCallbackField === 'string' 
-            ? props.field.Config.TableChildCallbackField 
-            : JSON.stringify(props.field.Config.TableChildCallbackField || ''),
         ImportAutoFillFk: props.field.Config.TableChild.ImportAutoFillFk !== false,
-        ImportRelations: stringifyImportRelations(props.field.Config.TableChild.ImportRelations),
-        ImportBackfillFields: stringifyImportRelations(props.field.Config.TableChild.ImportBackfillFields),
+        FieldRelations: stringifyRelations(props.field.Config.TableChild.FieldRelations),
         LastSysMenuId: props.field.Config.TableChild.LastSysMenuId || '',
         LastSysMenuName: props.field.Config.TableChild.LastSysMenuName || '',
         LastTableId: props.field.Config.TableChild.LastTableId || '',
@@ -380,62 +363,25 @@ const saveConfig = () => {
     // 保存子表外键列名
     props.field.Config.TableChildFkFieldName = configForm.value.TableChildFkFieldName;
     
-    // 保存回写配置（验证 JSON 格式）
-    let callbackFieldValue = configForm.value.TableChildCallbackField;
-    if (!DiyCommon.IsNull(callbackFieldValue)) {
-        try {
-            // 验证是否为有效的 JSON
-            const parsed = JSON.parse(callbackFieldValue);
-            if (Array.isArray(parsed)) {
-                props.field.Config.TableChildCallbackField = callbackFieldValue;
-            } else {
-                DiyCommon.Tips('回写配置必须是数组格式', false);
-                return;
-            }
-        } catch (error) {
-            DiyCommon.Tips('回写配置 JSON 格式错误：' + error.message, false);
-            return;
-        }
-    } else {
-        props.field.Config.TableChildCallbackField = '';
-    }
-
     // 保存导入自动补齐外键配置
     props.field.Config.TableChild.ImportAutoFillFk = configForm.value.ImportAutoFillFk !== false;
-    let importRelationsValue = configForm.value.ImportRelations;
-    if (!DiyCommon.IsNull(importRelationsValue)) {
-        try {
-            const parsed = JSON.parse(importRelationsValue);
-            if (Array.isArray(parsed)) {
-                props.field.Config.TableChild.ImportRelations = parsed;
-            } else {
-                DiyCommon.Tips('导入匹配关系必须是数组格式', false);
-                return;
-            }
-        } catch (error) {
-            DiyCommon.Tips('导入匹配关系 JSON 格式错误：' + error.message, false);
+    let fieldRelationsValue = configForm.value.FieldRelations;
+    try {
+        const parsed = DiyCommon.IsNull(fieldRelationsValue) ? [] : JSON.parse(fieldRelationsValue);
+        if (!Array.isArray(parsed)) {
+            DiyCommon.Tips('主子表字段关系必须是数组格式', false);
             return;
         }
-    } else {
-        props.field.Config.TableChild.ImportRelations = [];
-    }
-
-    let importBackfillValue = configForm.value.ImportBackfillFields;
-    if (!DiyCommon.IsNull(importBackfillValue)) {
-        try {
-            const parsed = JSON.parse(importBackfillValue);
-            if (Array.isArray(parsed)) {
-                props.field.Config.TableChild.ImportBackfillFields = parsed;
-            } else {
-                DiyCommon.Tips('导入回填子表列必须是数组格式', false);
-                return;
-            }
-        } catch (error) {
-            DiyCommon.Tips('导入回填子表列 JSON 格式错误：' + error.message, false);
+        const relations = getTableChildFieldRelations({ FieldRelations: parsed });
+        if (relations.length !== parsed.length) {
+            DiyCommon.Tips('主子表字段关系存在空列、无效项或重复项，请检查', false);
             return;
         }
-    } else {
-        props.field.Config.TableChild.ImportBackfillFields = [];
+        props.field.Config.TableChild.FieldRelations = toCompactTableChildRelations(relations);
+        normalizeTableChildFieldRelations(props.field.Config);
+    } catch (error) {
+        DiyCommon.Tips('主子表字段关系 JSON 格式错误：' + error.message, false);
+        return;
     }
     
     // 保存上级模块信息
