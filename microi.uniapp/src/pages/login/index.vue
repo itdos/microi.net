@@ -196,6 +196,13 @@ function isEnabledFlag(value) {
 const LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v1'
 const REMEMBERED_PASSWORD_MASK = '••••••••'
 
+function normalizeAuthLoginUser(data) {
+  if (!data || typeof data !== 'object') return {}
+  return data.CurrentUser && typeof data.CurrentUser === 'object'
+    ? data.CurrentUser
+    : data
+}
+
 export default {
   mixins: [themeMixin],
   data() {
@@ -514,17 +521,18 @@ export default {
 
         if (result.Code === 1 && result.Data) {
           // 已绑定用户，直接登录成功
+          const currentUser = normalizeAuthLoginUser(result.Data)
           const token = getToken()
           if (token) {
-            setUser(result.Data)
-            this.showLoginSuccess(result.Data)
+            setUser(currentUser)
+            this.showLoginSuccess(currentUser)
             this.navigateAfterLogin()
           } else {
             const bodyToken = result.Data.Token || result.Data.token
             if (bodyToken) {
               setToken(bodyToken)
-              setUser(result.Data)
-              this.showLoginSuccess(result.Data)
+              setUser(currentUser)
+              this.showLoginSuccess(currentUser)
               this.navigateAfterLogin()
             } else {
               uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
@@ -593,17 +601,18 @@ export default {
         }, false)
 
         if (result.Code === 1 && result.Data) {
+          const currentUser = normalizeAuthLoginUser(result.Data)
           const token = getToken()
           if (token) {
-            setUser(result.Data)
-            this.showLoginSuccess(result.Data)
+            setUser(currentUser)
+            this.showLoginSuccess(currentUser)
             this.navigateAfterLogin()
           } else {
             const bodyToken = result.Data.Token || result.Data.token
             if (bodyToken) {
               setToken(bodyToken)
-              setUser(result.Data)
-              this.showLoginSuccess(result.Data)
+              setUser(currentUser)
+              this.showLoginSuccess(currentUser)
               this.navigateAfterLogin()
             } else {
               uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
