@@ -106,6 +106,31 @@ public class ApiEngineRoleAuthorizationTests
             DiyFilter<dynamic>.DefersOnlyGetToApiEngineRoleAuthorization(descriptor));
     }
 
+    [Theory]
+    [InlineData("SysUser", "RefreshLoginUser", true)]
+    [InlineData("Ai", "RelayTokenSummary", true)]
+    [InlineData("BackgroundTask", "List", true)]
+    [InlineData("BackgroundTask", "RunApiEngine", true)]
+    [InlineData("BackgroundTask", "ClearCompleted", false)]
+    [InlineData("BackgroundTask", "Remove", false)]
+    [InlineData("SysUser", "UptSysUser", false)]
+    [InlineData("Ai", "UpdateModel", false)]
+    public void OnlyGetActionAllowlist_IsExact(
+        string controller,
+        string action,
+        bool expected)
+    {
+        var descriptor = new ControllerActionDescriptor
+        {
+            ControllerName = controller,
+            ActionName = action
+        };
+
+        Assert.Equal(
+            expected,
+            DiyFilter<dynamic>.AllowsOnlyGetAction(descriptor));
+    }
+
     private static JObject NewUser(string roleId, bool onlyGet)
     {
         return new JObject

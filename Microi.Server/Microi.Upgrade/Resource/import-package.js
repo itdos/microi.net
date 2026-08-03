@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.8.4
+ * Version: v1.8.6
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -35,6 +35,9 @@ if (invokeType == 'client') {
 }
 
 var backgroundTaskId = V8.Param._BackgroundTaskId || V8.Param.BackgroundTaskId || V8.Param.TaskId || '';
+var installAction = String(V8.Param.InstallAction || V8.Param.Action || 'Install');
+var installOperationId = String(V8.Param.InstallOperationId || V8.Param.OperationId || backgroundTaskId || '');
+if (!installOperationId && V8.Method && V8.Method.NewGuid) installOperationId = String(V8.Method.NewGuid());
 var backgroundTaskEnvelope = V8.Param._BackgroundTask || {};
 var backgroundChunkingEnabled = !!backgroundTaskId && (
     V8.Param._TrustedServerInvocation === true
@@ -238,13 +241,24 @@ if ((!installUser || !installUser.Id) && V8.Method && V8.Method.GetCurrentToken)
 var reportProgress = function (progress, msg) {
     if (!backgroundTaskId || !V8.Method || !V8.Method.UpdateBackgroundTask) return;
     try {
+        var bulkIndex = parseInt(V8.Param.BulkCurrentIndex || 0, 10);
+        var bulkTotal = parseInt(V8.Param.BulkTotal || 0, 10);
+        var mappedProgress = progress;
+        var current = progress;
+        var total = 100;
+        if (!isNaN(bulkIndex) && !isNaN(bulkTotal) && bulkTotal > 0) {
+            mappedProgress = Math.max(0, Math.min(99, Math.floor(((bulkIndex + (progress / 100)) / bulkTotal) * 100)));
+            current = Math.max(0, Math.min(bulkTotal, bulkIndex + (progress / 100)));
+            total = bulkTotal;
+            msg = '[' + (bulkIndex + 1) + '/' + bulkTotal + '] ' + msg;
+        }
         V8.Method.UpdateBackgroundTask({
             _BackgroundTaskId: backgroundTaskId,
-            Progress: progress,
+            Progress: mappedProgress,
             Msg: msg,
             Message: msg,
-            Current: progress,
-            Total: 100
+            Current: current,
+            Total: total
         });
     } catch (progressError) {
         debugLog['background_progress_error_' + progress] = progressError.message;
@@ -1391,35 +1405,33 @@ try {
                 stats.VersionRecordUpdated++;
                 debugLog.version_record_result = '已写入应用安装版本：' + appName + ' ' + appVersion;
                 try {
-                    var statStoreId = firstTextParam([model.StoreId]);
-                    var statWhere = statStoreId ? [['Id', '=', statStoreId]] : [['AppId', '=', model.AppId]];
-                    var statStore = V8.FormEngine.GetFormData('sys_microistore', { _Where: statWhere });
-                    if (statStore && statStore.Code == 1 && statStore.Data) {
-                        V8.FormEngine.UptFormData('sys_microistore', {
-                            Id: statStore.Data.Id,
-                            InstallCount: parseInt(statStore.Data.InstallCount || 0, 10) + 1
-                        });
-                    }
                     var installationKey = V8.EncryptHelper.SHA256(
-                        firstTextParam([model.StoreId, model.AppId]) + '|' + V8.OsClient + '|' + appVersion
+                        firstTextParam([model.StoreId, model.AppId]) + '|' + V8.OsClient + '|' + installOperationId
                     );
                     var remoteStat = V8.Http.Post({
                         Url: storeApiBase + '/apiengine/official_marketplace_install_stat?OsClient=' + encodeURIComponent(storeOsClient),
                         PostParam: {
                             StoreId: model.StoreId,
                             AppId: model.AppId,
+                            AppName: model.AppName,
                             AppVersion: appVersion,
                             TargetOsClient: V8.OsClient,
+                            InstallAction: installAction,
+                            OperationId: installOperationId,
                             InstallationKey: installationKey
                         },
                         ParamType: 'json',
                         Timeout: 30
                     });
-                    debugLog.install_count_result = remoteStat && remoteStat.Code == 1
-                        ? '官方商城安装次数已累计'
-                        : '本地安装成功，官方商城统计稍后重试';
+                    if (remoteStat && remoteStat.Code == 1) {
+                        debugLog.install_count_result = '官方商城安装次数已累计，操作Id=' + installOperationId;
+                    } else {
+                        debugLog.install_count_error_remote = '官方商城安装次数累计失败：'
+                            + ((remoteStat && remoteStat.Msg) || '接口无返回') + '，操作Id=' + installOperationId;
+                    }
                 } catch (statError) {
-                    debugLog.install_count_error = statError.message || String(statError);
+                    debugLog.install_count_error_remote = (statError.message || String(statError))
+                        + '，操作Id=' + installOperationId;
                 }
             } else {
                 debugLog.version_record_error = saveResult ? saveResult.Msg : '未知错误';
@@ -4037,7 +4049,7 @@ try {
             }
         }
 
-        if (!latest) return;
+        if (!latest) return null;
         normalizeApiEngineModel(latest);
         // IV8Cache.Set 的 value 参数是 string。直接传 Jint/.NET 对象会被转换成
         // "System..." 类型名，污染 v3 与 v6 共用的 sys_apiengine JSON 缓存。
@@ -4051,6 +4063,7 @@ try {
         if (!isMissingValue(latest.ApiAddress)) {
             V8.Cache.Set(`Microi:${V8.OsClient}:FormData:sys_apiengine:${String(latest.ApiAddress).toLowerCase()}`, latestCacheJson);
         }
+        return latest;
     }
 
     function parseApiEngineVersion(model) {
@@ -4074,6 +4087,36 @@ try {
             if (left[versionIndex] < right[versionIndex]) return -1;
         }
         return 0;
+    }
+
+    // PACKAGE_API_ENGINE_READBACK_V1：菜单按钮与其依赖的接口引擎必须作为一个
+    // 原子应用能力交付。接口引擎写入失败、被元数据静默忽略或回读内容不一致时，
+    // 整个应用导入必须失败并回滚，禁止只留下一个运行时必然报“不存在”的按钮。
+    function assertPersistedApiEngine(expected, latest) {
+        var expectedKey = String((expected && expected.ApiEngineKey) || '').toLowerCase();
+        var actualKey = String((latest && latest.ApiEngineKey) || '').toLowerCase();
+        if (!latest || !expectedKey || actualKey !== expectedKey) {
+            throw new Error('接口引擎写入后回读失败：' + (expectedKey || (expected && expected.Id) || '未知接口'));
+        }
+        if (Number(latest.IsDeleted || 0) === 1) {
+            throw new Error('接口引擎写入后仍处于删除状态：' + expected.ApiEngineKey);
+        }
+        if (!isMissingValue(expected.IsEnable)
+            && Number(latest.IsEnable || 0) !== Number(expected.IsEnable || 0)) {
+            throw new Error('接口引擎写入后启用状态不一致：' + expected.ApiEngineKey);
+        }
+        if (!isMissingValue(expected.StopHttp)
+            && Number(latest.StopHttp || 0) !== Number(expected.StopHttp || 0)) {
+            throw new Error('接口引擎写入后HTTP状态不一致：' + expected.ApiEngineKey);
+        }
+        var expectedCode = String(expected.ApiV8Code || '');
+        var actualCode = String(latest.ApiV8Code || '');
+        if (expectedCode && actualCode !== expectedCode) {
+            throw new Error('接口引擎写入后源码回读不一致：' + expected.ApiEngineKey);
+        }
+        if (expected.Id && String(latest.Id || '') !== String(expected.Id)) {
+            throw new Error('接口引擎写入后Id回读不一致：' + expected.ApiEngineKey);
+        }
     }
 
     // ==================== 步骤7：处理sys_apiengine数据（可选） ====================
@@ -4140,9 +4183,11 @@ try {
                 });
                 existsByKey = checkByKeyResult.Code == 1 && checkByKeyResult.Data;
                 //如果存在ApiEngineKey，但不存在Id，将此ApiEngineKey的Id修改为应用商城的sys_apiengine的Id
-                if (existsByKey) {
+                if (existsByKey && apiEngine.Id) {
                     try {
-                        V8.Db.FromSql("UPDATE sys_apiengine SET Id = '" + apiEngine.Id + "' WHERE ApiEngineKey = '" + apiEngine.ApiEngineKey + "' and IsDeleted<>1")
+                        V8.Db.FromSql('UPDATE sys_apiengine SET Id = @p0 WHERE ApiEngineKey = @p1 AND (IsDeleted<>1 OR IsDeleted IS NULL)')
+                            .AddInParameter('@p0', apiEngine.Id)
+                            .AddInParameter('@p1', apiEngine.ApiEngineKey)
                             .ExecuteNonQuery();
                     } catch (error) {
 
@@ -4170,18 +4215,22 @@ try {
                 var uptResult = V8.FormEngine.UptFormData('sys_apiengine', modelCopy);
                 if (uptResult.Code == 1) {
                     stats.ApiEngineUpdated++;
-                    refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    var updatedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    assertPersistedApiEngine(apiEngine, updatedEngine);
                 } else {
                     debugLog['apiengine_upt_error_' + existingId] = uptResult.Msg;
+                    throw new Error('更新接口引擎失败：' + apiEngine.ApiEngineKey + '，' + (uptResult.Msg || '接口无返回'));
                 }
             } else {
                 // 不存在则新增
                 var addResult = V8.FormEngine.AddFormData('sys_apiengine', modelCopy);
                 if (addResult.Code == 1) {
                     stats.ApiEngineInserted++;
-                    refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    var insertedEngine = refreshApiEngineCache(apiEngine.ApiEngineKey, apiEngine.Id, apiEngine.ApiAddress);
+                    assertPersistedApiEngine(apiEngine, insertedEngine);
                 } else {
                     debugLog['apiengine_add_error_' + (apiEngine.Id || apiEngine.ApiEngineKey)] = addResult.Msg;
+                    throw new Error('新增接口引擎失败：' + apiEngine.ApiEngineKey + '，' + (addResult.Msg || '接口无返回'));
                 }
             }
         }

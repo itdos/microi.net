@@ -210,6 +210,42 @@ public class SecurityGuardAndSysUserRegressionTests
         Assert.False((bool)method.Invoke(null, new object?[] { null })!);
     }
 
+    [Theory]
+    [InlineData("/#/microi-store", "/microi-store")]
+    [InlineData("#/mic-sys-user", "/mic-sys-user")]
+    [InlineData("workflow/todo?state=waiting", "/workflow/todo?state=waiting")]
+    [InlineData("", "")]
+    public void DefaultIndexUrl_NormalizesSupportedInternalRouteForms(string input, string expected)
+    {
+        var method = typeof(SysUserController).GetMethod(
+            "TryNormalizeDefaultIndexUrl",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        object?[] args = { input, null, null };
+
+        Assert.True((bool)method!.Invoke(null, args)!);
+        Assert.Equal(expected, args[1]);
+        Assert.Null(args[2]);
+    }
+
+    [Theory]
+    [InlineData("https://evil.example/path")]
+    [InlineData("//evil.example/path")]
+    [InlineData("/login")]
+    [InlineData("#/access-login")]
+    [InlineData("/path\\child")]
+    public void DefaultIndexUrl_RejectsExternalAndAuthenticationRoutes(string input)
+    {
+        var method = typeof(SysUserController).GetMethod(
+            "TryNormalizeDefaultIndexUrl",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        object?[] args = { input, null, null };
+
+        Assert.False((bool)method!.Invoke(null, args)!);
+        Assert.False(string.IsNullOrWhiteSpace(args[2]?.ToString()));
+    }
+
     [Fact]
     public void UploadDisabledResult_ExplainsDefaultAndExactRecoveryField()
     {

@@ -330,6 +330,36 @@ public class CacheAndUpgradeRegressionTests
     }
 
     [Fact]
+    public void AppStoreBundle_DeliversBulkButtonRuntimeDependencyAsOneVerifiedCapability()
+    {
+        var loadResources = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(loadResources);
+
+        var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
+            loadResources!.Invoke(null, null));
+        var package = JObject.Parse(resources["app.microi.store.json"]);
+        Assert.Equal("v7.0.5", package["PackageInfo"]?["Version"]?.ToString());
+
+        var bulkEngine = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
+        Assert.Equal(1, bulkEngine["IsEnable"]?.Value<int>());
+        Assert.Equal(0, bulkEngine["StopHttp"]?.Value<int>());
+        Assert.Contains("Version: v1.1.1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
+        Assert.DoesNotContain("mci_marketplace_bulk_install_item", bulkEngine["ApiV8Code"]?.ToString());
+
+        var importer = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
+        Assert.Contains("Version: v1.8.6", importer["ApiV8Code"]?.ToString());
+        Assert.Contains("PACKAGE_API_ENGINE_READBACK_V1", importer["ApiV8Code"]?.ToString());
+    }
+
+    [Fact]
     public void OfficialBundles_DoNotPersistRecursionAboveRuntimeHardCeiling()
     {
         var loadResources = typeof(UpgradeAppStore).GetMethod(

@@ -38,6 +38,7 @@
 | `microi_get_event_code` | 获取 V8 事件源码 | 只读 |
 | `microi_save_event_code` | 保存 V8 事件代码 | 读写 |
 | `microi_create_table` | 创建/协调低代码自定义表（含后端事件 `V8Unlimited`） | 读写 |
+| `microi_repair_audit_fields` | 补齐已有表六个固定审计物理列对应的 `diy_field` 元数据并回读 | 读写 |
 | `microi_add_field` | 为自定义表添加字段和表单控件配置 | 读写 |
 | `microi_create_module` | 创建菜单模块并绑定表、按钮、Tab、列表配置 | 读写 |
 | `microi_set_role_permission` | 为角色授予菜单权限 | 读写 |
@@ -77,6 +78,10 @@
 | `microi_execute_external_database` | 对第三方数据库执行任意 SQL（DML/DDL/存储过程/多语句） | 读写（需确认，Level >= 9999） |
 | `microi_save_database_connection` | 测试后新增、更新或恢复数据库管理连接，不回显连接串 | 读写（需确认） |
 | `microi_import_external_attachment` | 从 HTTP/HTTPS、本机绝对路径或 UNC 路径流式上传附件 | 读写（需确认，Level >= 9999） |
+
+`microi_create_table` 会同时创建 `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted` 六个固定物理列和 `diy_field` 元数据。若旧表或外部创建流程只留下物理列，可直接要求 AI“修复某表的审计字段异常”，由 `microi_repair_audit_fields` 按表名或表 Id 幂等补齐；修复后字段不再出现在【异常字段修复】，默认是否显示仍由 `diy_table.DisplayDefaultField` 控制。
+
+`sys_user.DefaultIndexUrl` 是用户自己的登录后首页站内路由，支持 `/route`、`#/route`、`/#/route`；留空继承系统默认首页。更新账号时只保存当前用户有权限的站内模块，外部 URL 和登录路由无效。
 
 ### 外部数据库与附件迁移
 

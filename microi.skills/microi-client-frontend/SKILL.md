@@ -187,6 +187,13 @@ V8.Result = V8.Form.Status == '待审核';
 
 ## 5. 路由与打开方式
 
+登录首页支持“用户 > 系统 > 首个可访问菜单”的三级优先级：
+
+- 用户级首页保存到 `sys_user.DefaultIndexUrl`，系统级首页继续使用 `SysConfig.DefaultIndexUrl`；账号密码、Token 直达和 SSO 登录必须共用同一套跳转逻辑。
+- “个人设置”只能展示当前用户实际有权访问的动态路由，保存接口必须从 Token 绑定当前用户和 `OsClient`，不能接受前端传入任意用户 Id。
+- 路由保存前统一规范为站内绝对路由；拒绝外部 URL、协议相对 URL、反斜杠、登录页和控制字符。用户失权或菜单被删除后自动回退，不能造成登录循环或空白页。
+- `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted` 等审计列必须复用真实或合成的 `diy_field` 元数据，像普通列一样打开列头高级搜索；不要为审计列另写一套不可搜索的展示分支。
+
 `diy-form-full.vue` 支持三类形态：
 
 | 打开方式 | 特征 |

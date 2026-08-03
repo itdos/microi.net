@@ -138,11 +138,21 @@ export async function resolveItDosMcpLaunch(server, configPath) {
   let selectedEntry = await pathExists(configuredEntry) ? configuredEntry : '';
   let launchSource = selectedEntry ? 'configured' : '';
 
-  if (!selectedEntry) {
-    const configuredExtensionRoot = dirname(dirname(configuredEntry));
+  const configuredExtensionRoot = dirname(dirname(configuredEntry));
+  const configuredExtensionVersion = extensionVersion(basename(configuredExtensionRoot));
+  if (configuredExtensionVersion) {
     const siblingExtensionsRoot = dirname(configuredExtensionRoot);
-    selectedEntry = await newestMcpServerInExtensionRoot(siblingExtensionsRoot);
-    if (selectedEntry) launchSource = 'newest-installed-extension';
+    const newestSiblingEntry = await newestMcpServerInExtensionRoot(siblingExtensionsRoot);
+    if (newestSiblingEntry) {
+      const newestSiblingRoot = dirname(dirname(newestSiblingEntry));
+      const newestSiblingVersion = extensionVersion(basename(newestSiblingRoot));
+      const newerThanConfigured = newestSiblingVersion
+        && compareExtensionDirectories(newestSiblingRoot, configuredExtensionRoot) < 0;
+      if (!selectedEntry || newerThanConfigured) {
+        selectedEntry = newestSiblingEntry;
+        launchSource = 'newest-installed-extension';
+      }
+    }
   }
 
   if (!selectedEntry) {
@@ -380,11 +390,21 @@ function createLineJsonRpcClient(server, configPath) {
     }
   });
   const notify = (method, params = {}) => send({ jsonrpc: '2.0', method, params });
-  const stop = () => {
+  const stop = async () => {
     stopped = true;
     rejectPending(new Error('microi_itdos MCP 已关闭'));
     try { child.stdin.end(); } catch { /* 已关闭 */ }
+    if (child.exitCode !== null) return;
+    const waitForExit = timeoutMilliseconds => Promise.race([
+      new Promise(resolvePromise => child.once('exit', resolvePromise)),
+      new Promise(resolvePromise => setTimeout(resolvePromise, timeoutMilliseconds, 'timeout')),
+    ]);
     try { child.kill('SIGTERM'); } catch { /* 已退出 */ }
+    await waitForExit(2_000);
+    if (child.exitCode === null) {
+      try { child.kill('SIGKILL'); } catch { /* 已退出 */ }
+      await waitForExit(2_000);
+    }
   };
   return { request, notify, stop };
 }
@@ -408,7 +428,7 @@ async function withConfiguredItDosMcp(options, callback) {
     }
     return await callback(client, path);
   } finally {
-    client.stop();
+    await client.stop();
   }
 }
 

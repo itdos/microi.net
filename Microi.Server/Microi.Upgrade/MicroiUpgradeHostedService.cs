@@ -108,6 +108,18 @@ namespace Microi.net
                     {
                         throw new InvalidOperationException(string.Join("；", backgroundTaskMessages));
                     }
+                    // 用户个人首页、商城安装计数事件与批量任务明细都是当前
+                    // 运行时直接依赖的扩展型结构。历史租户可能因更早的无关迁移
+                    // 失败而停在旧 ServerVersion，因此像后台任务基础表一样在共享
+                    // 升级租约内独立、幂等地维持这一不变量。
+                    upgradeLease.ThrowIfLost();
+                    var userAndMarketplaceMessages = await new Upgrade28()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (userAndMarketplaceMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", userAndMarketplaceMessages));
+                    }
                     upgradeLease.ThrowIfLost();
                     var currentVersion = runtimeClient.Db
                         .FromSql("SELECT ServerVersion FROM sys_config WHERE IsEnable = @p0")

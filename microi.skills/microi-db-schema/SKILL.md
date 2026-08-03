@@ -17,6 +17,7 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 
 - `diy_table` 存储表单/表元数据和表级 V8 事件。
 - `diy_field` 存储每张 DIY 表的字段，包括组件类型、校验、可见性、数据源、字段事件和模板 V8。
+- DIY 表固定物理字段 `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted` 也必须有正常的 `diy_field` 元数据；设计器通过 `DisplayDefaultField` 默认隐藏，而不是把它们当异常字段。自然语言“修复审计字段/默认字段异常”应调用 `microi_repair_audit_fields`，由平台幂等补元数据，禁止直接用 SQL 临时修租户数据。
 - `sys_menu` 将 DIY 表转换为菜单/模块页面，并存储查询、按钮、导入导出、卡片/移动端、工作流和权限相关的模块配置。
 - `sys_apiengine` 存储接口引擎定义；通过 `V8.ApiEngine.Run(ApiEngineKey, params)` 调用。
 - `sys_datasource` 存储组件和页面可复用的数据源。
