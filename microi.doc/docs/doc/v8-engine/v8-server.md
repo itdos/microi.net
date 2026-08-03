@@ -265,7 +265,7 @@ Jint 的 `LimitMemory` 统计当前执行线程自约束重置后的**累计托�
 
 旧版中，父引擎执行子接口时，子接口初始化、查询、JSON 和业务对象分配还会被每一层父引擎重复计入，四层编排可能远早于预期触发父层 2GB。新版默认启用嵌套隔离：
 
-- 每个接口引擎拥有自己的单层累计分配预算，默认 2048MB、节点硬上限默认 4096MB；
+- 每个接口引擎拥有自己的单层累计分配预算，默认 2048MB、节点硬上限默认 8192MB；
 - 子接口分配不再重复计入每个父接口的单层预算；
 - 根调用树仍有独立累计分配总预算，默认 8192MB、节点硬上限默认 32768MB，防止通过无限嵌套绕过整体保护；
 - 嵌套调用不会重复占用全局和租户并发名额；同一调用树重入同一个 Key 也不会再次抢占自己的 Key 名额，循环调用最终由嵌套深度上限终止。
@@ -276,12 +276,51 @@ Jint 的 `LimitMemory` 统计当前执行线程自约束重置后的**累计托�
 console.log(JSON.stringify(V8.Limits));
 // TimeoutSeconds, MaxStatements, LimitMemoryMB,
 // CallTreeLimitMemoryMB, LimitRecursion, NestedApiDepthLimit,
-// CurrentDepth, IsBackgroundTask, IsolateNestedApiMemory, MemoryAccounting
+// CurrentDepth, IsBackgroundTask, IsolateNestedApiMemory,
+// ResidentMemoryGuardOnly, UnlimitedRuntime, MemoryAccounting
 ```
 
 资源异常会在 `DataAppend.V8Limit` 返回结构化分类，例如 `V8_MEMORY_LIMIT`、`V8_CALL_TREE_MEMORY_LIMIT`、`V8_STATEMENTS_LIMIT`、`V8_RECURSION_LIMIT`、`V8_TIMEOUT`、`V8_NESTED_DEPTH_LIMIT` 或 `V8_EXECUTION_QUEUE_TIMEOUT`，同时包含限制值、调用深度和调用路径。排查时应按分类处理，不要把所有异常都归为“服务器内存不足”。
 
 后台任务仍通过接口引擎执行，所以**一个未分片的 30 分钟脚本仍会受同一套单片超时、语句和累计分配预算约束**。后台任务的总时长可以是数小时，但每片应控制在默认 600 秒以内，在提交本片事务后返回 `HasMore + Checkpoint`，由 Worker 创建新的执行片段继续；新片会获得新的超时、语句和累计分配预算。
+
+### 必须保持单一事务时的受控例外
+
+如果每片可以独立提交并以幂等键恢复，仍应使用后台任务的 `HasMore + Checkpoint`。但有些业务链必须满足“上万条读写和全部下游调用要么一起提交、要么一起回滚”，任何中间提交都会破坏业务原子性；此时可以在接口引擎表单开启 `V8无运行限制`。若复杂逻辑位于表的 `SubmitBeforeServerV8`、`SubmitAfterServerV8` 或 `ServerDataV8`，则在对应 `diy_table` 表单开启同名开关。
+
+该开关只解除**当前 Jint Engine** 的执行超时、最大语句数、JavaScript 函数递归和累计分配预算，并同时取消 Promise 的固定等待时限。它不是“关闭平台安全”：进程/容器常驻内存保护、HTTP 断开与后台任务取消、节点停机取消、执行并发、接口嵌套深度、CLR 类型沙箱、租户权限、SQL/ORM/HTTP/文件限制仍然生效。接口调用的下游接口以及触发的表后端事件分别读取自己的开关，不会继承上游设置。
+
+开启后表单会隐藏 `Timeout / MaxStatements / LimitMemory / LimitRecursion`，已有值仍保留，关闭开关后重新显示并继续生效。建议同时满足以下条件：
+
+- 由后台任务承载，避免依赖长时间浏览器连接；
+- 已评估数据库长事务的锁等待、事务日志/Undo、回滚耗时和连接超时；
+- 任务具备稳定幂等键，节点故障导致数据库自动回滚后可安全重试；
+- 控制并发和查询字段，不把“48GB 内存”理解为单任务可以无界分配；常驻内存保护是全进程边界，接近阈值仍会拒绝新执行或有界停机。
+
+## V8.Notification
+
+`V8.Notification.Send` 向当前 `OsClient` 的指定用户发送“平台内部”SignalR 提示。它是低延迟提示原语，不负责创建权威日志；业务通知优先调用 `msg_event`，由接口引擎先在 `mic_msg_event_log` 原子 claim，再调用本方法。
+
+```js
+var result = V8.Notification.Send({
+  NotificationId: 'event-123-user-1',
+  EventId: 'event-123',
+  ReceiverUserIds: ['user-1'],
+  Title: '待办提醒',
+  Content: '您有一条新的待办',
+  LinkUrl: '/#/todo/123',
+  Payload: { TodoId: '123' }
+});
+```
+
+- `ReceiverUserId` 或 `ReceiverUserIds` 必传其一，去重后最多 200 个。
+- `Title` 最长 200 字符；`Content`、序列化后的 `Payload` 各最多 32 KiB。
+- `LinkUrl` 最长 500 字符，只允许站内路径、锚点或 HTTP/HTTPS。
+- 客户端事件固定为 `ReceivePlatformNotification`。
+- 存在当前事务时，推送只在事务提交后进行最多 1.8 秒的有界等待；回滚不推送。
+- 实时链路不可用时返回可降级结果，客户端应调用 `msg_internal_list` 回读持久通知。
+
+完整的策略表、公众号/服务号与小程序区别、幂等和多节点验收见[消息通知](../system-engine/message-notification)。
 
 ## 表单引擎 V8.FormEngine
 
@@ -1601,7 +1640,7 @@ WFNodeStart：流程节点开始V8事件
 
 常见上下文包括 `V8.Param`、`V8.Header`、`V8.CurrentUser`、`V8.OsClient`、`V8.Form`、`V8.OldForm`、`V8.TableModel`、`V8.TableData`、`V8.FormSubmitAction`、`V8.EventName`、`V8.InvokeType`、`V8.RowIndex`、`V8.CacheData`、`V8.NotSaveField`、`V8.LineValue`、`V8.NextNodeId`、`V8.FilesByteBase64` 和 `V8.WF`。`Engine`、`HttpContext`、执行租约等宿主对象属于内部实现，不要保存到静态变量、缓存或延迟回调。
 
-平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同限制单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；单个接口可用 `sys_apiengine.Timeout/MaxStatements/LimitMemory/LimitRecursion` 下调或在节点硬上限内覆盖。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
+平台的 `SecurityGuard`、`PressureGuard`、`V8Limits`、`OrmLimits`、`StartupLimits` 以及 V8 并发门共同限制单次脚本和单节点资源。V8 的默认/最大超时、语句数、单层累计分配、调用树累计分配、JavaScript 递归、接口嵌套深度和并发等待可在 `sys_config` 的开发配置中查看；单个接口可用 `sys_apiengine.Timeout/MaxStatements/LimitMemory/LimitRecursion` 下调或在节点硬上限内覆盖。只有确实不能分片且必须保持单一事务的受控逻辑才开启 `sys_apiengine.V8Unlimited`；表后端事件使用 `diy_table.V8Unlimited`。进程内并发门不是集群级配额或分布式锁；多节点副作用仍必须依赖 Redis/数据库租约、幂等键、唯一约束、状态机或 outbox/inbox。
 
 脚本应主动控制：
 

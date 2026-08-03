@@ -83,7 +83,13 @@ return {
   `V8_NESTED_DEPTH_LIMIT` 和 `V8_EXECUTION_QUEUE_TIMEOUT` 必须分别处理。
 - 后台任务总时长可以超过 10/30 分钟，但单片仍受上述预算；使用
   `HasMore + Checkpoint` 续跑，不要只提高单次超时或内存。
-- 唯一受信任特例是主租户中由服务端持久队列恢复的
+- 若业务链必须在一个共享数据库事务中全部提交或全部回滚，分片会改变业务
+  语义，可由管理员为对应 `sys_apiengine` 或 `diy_table` 开启
+  `V8Unlimited`。此时 `V8.Limits.UnlimitedRuntime=true`，只解除当前 Jint
+  的超时、语句、函数递归、累计分配和 Promise 等待限制；常驻内存保护、
+  外部取消、并发、接口嵌套深度、权限沙箱与数据库限制仍在。先排查数据库
+  长事务锁、日志和回滚风险，下游接口/表事件需分别开启，不能从请求参数启用。
+- 服务端另有一个内置受信任特例：主租户中由持久队列恢复的
   `import-microi-store-package`：必须同时具备可信用户快照、`Level >= 9999`
   和 TaskId，才允许 `V8.Limits.MemoryAccounting=ResidentMemoryGuardOnly`。
   此模式不是“无限内存”，而是改用容器优先的进程 RSS 防线：95% 拒绝新工作、

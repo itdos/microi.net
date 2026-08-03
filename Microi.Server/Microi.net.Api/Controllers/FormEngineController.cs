@@ -971,6 +971,95 @@ namespace Microi.net.Api
                     return Json(new DosResult(0, null,
                         DiyMessage.GetLang(param["OsClient"].Val<string>(), "NoAuth", param["_Lang"].Val<string>())));
                 }
+
+                // A left-tree/right-table page is another projection of a
+                // configured TableChild relation. Return only the relation for
+                // this already-authorized menu so the client can reuse the same
+                // add/import defaults as the embedded TableChild control.
+                var parentTableName = config["GuanlianBD"].Val<string>();
+                var configuredParentField = config["FubiaoGLZD"].Val<string>();
+                var configuredChildField = config["ZibiaoGLZD"].Val<string>();
+                if (!parentTableName.DosIsNullOrWhiteSpace())
+                {
+                    var db = OsClient.GetClient(param["OsClient"].Val<string>()).Db;
+                    var rightMenu = db.From<SysMenu>()
+                        .Where(d => d.Id == menuId && d.IsDeleted == 0)
+                        .First();
+                    var parentTable = db.From<DiyTable>()
+                        .Where(d => d.Name == parentTableName && d.IsDeleted == 0)
+                        .First();
+                    if (rightMenu != null && parentTable != null)
+                    {
+                        DiyFieldConfig matchedConfig = null;
+                        var matchedConfigScore = 0;
+                        var relationFields = db.From<DiyField>()
+                            .Where(d => d.TableId == parentTable.Id
+                                && d.Component == "TableChild"
+                                && d.IsDeleted == 0)
+                            .ToList();
+                        foreach (var relationField in relationFields)
+                        {
+                            DiyFieldConfig candidate;
+                            try
+                            {
+                                candidate = JsonHelper.Deserialize<DiyFieldConfig>(relationField.Config ?? "");
+                            }
+                            catch
+                            {
+                                continue;
+                            }
+                            if (candidate == null) continue;
+                            var menuMatches = string.Equals(
+                                candidate.TableChildSysMenuId,
+                                menuId,
+                                StringComparison.OrdinalIgnoreCase);
+                            var tableMatches = !rightMenu.DiyTableId.DosIsNullOrWhiteSpace()
+                                && string.Equals(
+                                    candidate.TableChildTableId,
+                                    rightMenu.DiyTableId,
+                                    StringComparison.OrdinalIgnoreCase);
+                            var fkMatches = configuredChildField.DosIsNullOrWhiteSpace()
+                                || string.Equals(
+                                    candidate.TableChildFkFieldName,
+                                    configuredChildField,
+                                    StringComparison.OrdinalIgnoreCase);
+                            var candidateScore = menuMatches ? 2 : tableMatches ? 1 : 0;
+                            if (candidateScore > matchedConfigScore && fkMatches)
+                            {
+                                matchedConfig = candidate;
+                                matchedConfigScore = candidateScore;
+                            }
+                        }
+
+                        if (matchedConfig != null)
+                        {
+                            var parentFieldName = matchedConfig.TableChild?.PrimaryTableFieldName;
+                            if (parentFieldName.DosIsNullOrWhiteSpace())
+                            {
+                                parentFieldName = configuredParentField.DosIsNullOrWhiteSpace()
+                                    ? "Id"
+                                    : configuredParentField;
+                            }
+                            var childFieldName = matchedConfig.TableChildFkFieldName
+                                .DosIsNullOrWhiteSpace(configuredChildField);
+                            var relations = DiyTableChildFieldRelationHelper.GetRelations(matchedConfig);
+                            config["TableChildRelation"] = new JObject
+                            {
+                                ["ParentTableId"] = parentTable.Id,
+                                ["ChildTableId"] = matchedConfig.TableChildTableId,
+                                ["ParentFieldName"] = parentFieldName,
+                                ["ChildFieldName"] = childFieldName,
+                                ["TableChildConfig"] = new JObject
+                                {
+                                    ["PrimaryTableFieldName"] = parentFieldName,
+                                    ["ImportAutoFillFk"] = matchedConfig.TableChild?.ImportAutoFillFk != false,
+                                    ["FieldRelations"] = DiyTableChildFieldRelationHelper.ToCompactArray(relations)
+                                }
+                            };
+                        }
+                    }
+                }
+                result.Data = config;
             }
             return Json(result);
         }

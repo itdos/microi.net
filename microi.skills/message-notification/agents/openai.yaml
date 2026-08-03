@@ -1,0 +1,5 @@
+interface:
+  display_name: "Microi 消息通知"
+  short_description: "设计、实现并验收租户安全的多通道与平台内部实时消息通知"
+  brand_color: "#409EFF"
+  default_prompt: "Use $message-notification to design and verify a tenant-safe Microi notification flow."

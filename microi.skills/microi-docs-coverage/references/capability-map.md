@@ -53,7 +53,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http | FormEngine API 与 HTTP |
 | `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, print-engine | 全部前端 V8、扫码和蓝牙打印 |
 | `v8-engine/v8-server.md` | v8-utilities, v8-api-config | 全部后端 V8 和专项路由 |
-| `v8-engine/vs-code-plugin.md` | v8-explorer-tree, microi-client-frontend | VS Code 插件、类型和资源树 |
+| `v8-engine/vs-code-plugin.md` | v8-explorer-tree, microi-client-frontend, workspace-conventions | VS Code 插件、Microi CLI、AI/MCP 初始化、类型、资源树和共享工作区 |
 | `v8-engine/where.md` | v8-crud-api, v8-sql-query | 参数化 `_Where` 条件 |
 
 ## 维护规则

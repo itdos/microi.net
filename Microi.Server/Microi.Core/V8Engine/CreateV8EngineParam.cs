@@ -74,11 +74,64 @@ namespace Microi.net
         /// </summary>
         public bool ResidentMemoryGuardOnly { get; set; }
 
+        /// <summary>
+        /// Disables the configurable per-execution Jint timeout, statement,
+        /// recursion and cumulative-allocation constraints. This capability is
+        /// read only from trusted server-side engine/table metadata; process RSS
+        /// protection, request/worker cancellation, concurrency and nested-call
+        /// depth protections remain active.
+        /// </summary>
+        public bool UnlimitedRuntime { get; set; }
+
         public static CreateV8EngineParam FromSysConfig(object sysConfig)
         {
             var param = new CreateV8EngineParam();
             param.ApplySysConfig(sysConfig);
             return param;
+        }
+
+        /// <summary>
+        /// Creates the effective limits for a backend table V8 event. The table
+        /// model must have been loaded by the server; callers must never pass a
+        /// request body as <paramref name="diyTableModel"/>.
+        /// </summary>
+        public static CreateV8EngineParam FromTrustedDiyTable(
+            object sysConfig,
+            object diyTableModel)
+        {
+            var param = FromSysConfig(sysConfig);
+            param.UnlimitedRuntime = DynamicHelper.GetDynamicBoolValue(
+                diyTableModel,
+                "V8Unlimited",
+                false);
+            return param;
+        }
+
+        public V8ExecutionLimitInfo ToExecutionLimitInfo(
+            bool isBackgroundTask = false,
+            int currentDepth = 0)
+        {
+            return new V8ExecutionLimitInfo
+            {
+                TimeoutSeconds = Timeout,
+                MaxStatements = MaxStatements,
+                LimitMemoryMB = LimitMemory,
+                CallTreeLimitMemoryMB = CallTreeLimitMemory,
+                LimitRecursion = LimitRecursion,
+                NestedApiDepthLimit = NestedApiDepth,
+                CurrentDepth = currentDepth,
+                IsBackgroundTask = isBackgroundTask,
+                IsolateNestedApiMemory = IsolateNestedApiMemory,
+                ResidentMemoryGuardOnly = ResidentMemoryGuardOnly,
+                UnlimitedRuntime = UnlimitedRuntime,
+                MemoryAccounting = UnlimitedRuntime
+                    ? "ProcessResidentMemoryGuardOnly"
+                    : ResidentMemoryGuardOnly
+                    ? "ResidentMemoryGuardOnly"
+                    : IsolateNestedApiMemory
+                        ? "PerEngineExclusivePlusRootCallTree"
+                        : "CumulativeAllocatedBytes"
+            };
         }
 
         public void ApplySysConfig(object sysConfig)

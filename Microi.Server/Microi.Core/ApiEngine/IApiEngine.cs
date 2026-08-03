@@ -16,5 +16,6 @@ namespace Microi.net
         Task<dynamic> RunAsync(string apiEngineKey, dynamic dynamicParam, DbTrans _trans = null);
         Task<dynamic> RunAsync(dynamic dynamicParam, DbTrans _trans = null);
         Task<DosResult<dynamic>> GetApiEngineModel(ApiEngineParam param);
+        Task<DosResult<dynamic>> GetAuthoritativeApiEngineModel(ApiEngineParam param);
     }
 }

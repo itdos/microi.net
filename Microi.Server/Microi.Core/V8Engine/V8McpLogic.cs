@@ -139,7 +139,7 @@ namespace Microi.net
             return $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {prefix}{summary}{Environment.NewLine}";
         }
 
-        private static bool SysApiEngineHasColumn(string osClient, string columnName)
+        private static bool HasPhysicalColumn(string osClient, string tableName, string columnName)
         {
             try
             {
@@ -149,7 +149,7 @@ namespace Microi.net
                     .GetColumns(new Dos.ORM.DbServiceParam
                     {
                         DbSession = client.Db,
-                        TableName = "sys_apiengine",
+                        TableName = tableName,
                         OsClient = osClient
                     });
                 return columns?.Data?.Any(column => string.Equals(
@@ -159,6 +159,16 @@ namespace Microi.net
             {
                 return false;
             }
+        }
+
+        private static bool SysApiEngineHasColumn(string osClient, string columnName)
+        {
+            return HasPhysicalColumn(osClient, "sys_apiengine", columnName);
+        }
+
+        private static bool DiyTableHasColumn(string osClient, string columnName)
+        {
+            return HasPhysicalColumn(osClient, "diy_table", columnName);
         }
 
         private static bool IsBlank(object value)
@@ -531,9 +541,11 @@ namespace Microi.net
             {
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime" };
                 if (hasVersionColumn) selectFields.Add("Version");
                 if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
+                if (hasV8UnlimitedColumn) selectFields.Add("V8Unlimited");
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -563,6 +575,7 @@ namespace Microi.net
                             ApiAddress = SafeJString(row, "ApiAddress"),
                             IsEnable = SafeJInt(row, "IsEnable", 1),
                             ApiRemark = SafeJString(row, "ApiRemark"),
+                            V8Unlimited = hasV8UnlimitedColumn ? SafeJInt(row, "V8Unlimited") : 0,
                             ApiV8Code = apiV8Code,
                             Version = hasVersionColumn ? SafeJString(row, "Version") : "",
                             ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
@@ -600,6 +613,7 @@ namespace Microi.net
             {
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -625,6 +639,7 @@ namespace Microi.net
                         ApiAddress = SafeJString(row, "ApiAddress"),
                         IsEnable = SafeJInt(row, "IsEnable", 1),
                         ApiRemark = SafeJString(row, "ApiRemark"),
+                        V8Unlimited = hasV8UnlimitedColumn ? SafeJInt(row, "V8Unlimited") : 0,
                         ApiV8Code = apiV8Code,
                         Version = hasVersionColumn ? SafeJString(row, "Version") : "",
                         ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
@@ -653,9 +668,11 @@ namespace Microi.net
             {
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
                 var selectFields = new List<string> { "ApiEngineKey", "ApiV8Code", "UpdateTime" };
                 if (hasVersionColumn) selectFields.Add("Version");
                 if (hasChangeHistoryColumn) selectFields.Add("ChangeHistory");
+                if (hasV8UnlimitedColumn) selectFields.Add("V8Unlimited");
                 var result = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
@@ -676,6 +693,7 @@ namespace Microi.net
                     return new DosResult<object>(1, new
                     {
                         ApiEngineKey = apiEngineKey,
+                        V8Unlimited = hasV8UnlimitedColumn ? SafeJInt(row, "V8Unlimited") : 0,
                         ApiV8Code = apiV8Code,
                         Version = hasVersionColumn ? SafeJString(row, "Version") : "",
                         ChangeHistory = hasChangeHistoryColumn ? SafeJString(row, "ChangeHistory") : "",
@@ -708,10 +726,13 @@ namespace Microi.net
 
             try
             {
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                var selectFields = new List<string> { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime", "IsDeleted" };
+                if (hasV8UnlimitedColumn) selectFields.Add("V8Unlimited");
                 var result = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
-                    _SelectFields = new[] { "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "IsEnable", "ApiRemark", "ApiV8Code", "UpdateTime", "IsDeleted" },
+                    _SelectFields = selectFields.ToArray(),
                     _Where = new List<object>()
                     {
                         new List<object>() { "UpdateTime", ">", syncTime.ToString("yyyy-MM-dd HH:mm:ss") }
@@ -738,6 +759,7 @@ namespace Microi.net
                             ApiAddress = SafeJString(row, "ApiAddress"),
                             IsEnable = SafeJInt(row, "IsEnable", 1),
                             ApiRemark = SafeJString(row, "ApiRemark"),
+                            V8Unlimited = hasV8UnlimitedColumn ? SafeJInt(row, "V8Unlimited") : 0,
                             ApiV8Code = apiV8Code,
                             UpdateTime = SafeJDateTime(row, "UpdateTime"),
                             IsDeleted = SafeJInt(row, "IsDeleted")
@@ -767,10 +789,21 @@ namespace Microi.net
         /// <summary>
         /// 更新接口引擎代码（本地 → 数据库）
         /// </summary>
-        public static async Task<DosResult<object>> UpdateApiEngineCode(string osClient, string apiEngineKey, string apiV8Code, string version = null, string changeHistory = null)
+        public static async Task<DosResult<object>> UpdateApiEngineCode(
+            string osClient,
+            string apiEngineKey,
+            string apiV8Code,
+            string version = null,
+            string changeHistory = null,
+            int? v8Unlimited = null,
+            bool updateCode = true)
         {
             try
             {
+                if (!updateCode && !v8Unlimited.HasValue)
+                {
+                    return new DosResult<object>(0, null, "没有需要更新的接口引擎代码或运行配置");
+                }
                 var client = OsClientExtend.GetClient(osClient);
                 if (client?.Db == null)
                 {
@@ -793,27 +826,40 @@ namespace Microi.net
                 var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                if (v8Unlimited.HasValue && !hasV8UnlimitedColumn)
+                {
+                    return new DosResult<object>(0, null,
+                        "当前平台尚未安装 sys_apiengine.V8Unlimited 字段，请先升级后端与接口引擎资源");
+                }
                 var updateParam = new JObject
                 {
                     ["Id"] = id,
                     ["OsClient"] = osClient,
-                    ["ApiV8Code"] = plainCode,
                     ["UpdateTime"] = now,
                     ["_InvokeType"] = "Server"
                 };
-                if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace())
+                if (updateCode)
                 {
-                    updateParam["Version"] = resolvedVersion;
-                }
-                if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace())
-                {
-                    var historyResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                    updateParam["ApiV8Code"] = plainCode;
+                    if (hasVersionColumn && !resolvedVersion.DosIsNullOrWhiteSpace())
                     {
-                        OsClient = osClient,
-                        Id = id,
-                        _SelectFields = new[] { "Id", "ChangeHistory" }
-                    });
-                    updateParam["ChangeHistory"] = changeHistoryEntry + (historyResult.Code == 1 ? SafeString(historyResult.Data?.ChangeHistory) : "");
+                        updateParam["Version"] = resolvedVersion;
+                    }
+                    if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace())
+                    {
+                        var historyResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                        {
+                            OsClient = osClient,
+                            Id = id,
+                            _SelectFields = new[] { "Id", "ChangeHistory" }
+                        });
+                        updateParam["ChangeHistory"] = changeHistoryEntry + (historyResult.Code == 1 ? SafeString(historyResult.Data?.ChangeHistory) : "");
+                    }
+                }
+                if (v8Unlimited.HasValue)
+                {
+                    updateParam["V8Unlimited"] = v8Unlimited.Value == 1 ? 1 : 0;
                 }
 
                 var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_apiengine", updateParam);
@@ -830,9 +876,12 @@ namespace Microi.net
 
                 return new DosResult<object>(1, new
                 {
-                    Message = $"接口引擎 [{apiEngineKey}] 代码已同步到数据库",
+                    Message = updateCode
+                        ? $"接口引擎 [{apiEngineKey}] 代码及运行配置已同步到数据库"
+                        : $"接口引擎 [{apiEngineKey}] 运行配置已同步到数据库",
                     UpdateTime = now,
-                    Version = resolvedVersion,
+                    Version = updateCode ? resolvedVersion : null,
+                    V8Unlimited = v8Unlimited.HasValue ? (v8Unlimited.Value == 1 ? 1 : 0) : (int?)null,
                     CacheRefresh = cacheRefreshStatus
                 });
             }
@@ -853,7 +902,7 @@ namespace Microi.net
             string osClient, string apiName, string apiEngineKey,
             string apiAddress, string apiRemark, int lockVal, int allowAnonymous,
             int isEnable, string category, string apiV8Code = null,
-            string version = null, string changeHistory = null)
+            string version = null, string changeHistory = null, int v8Unlimited = 0)
         {
             try
             {
@@ -876,6 +925,12 @@ namespace Microi.net
                 var changeHistoryEntry = BuildV8ChangeHistoryEntry(resolvedVersion, changeHistory);
                 var hasVersionColumn = SysApiEngineHasColumn(osClient, "Version");
                 var hasChangeHistoryColumn = SysApiEngineHasColumn(osClient, "ChangeHistory");
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                if (v8Unlimited == 1 && !hasV8UnlimitedColumn)
+                {
+                    return new DosResult<object>(0, null,
+                        "当前平台尚未安装 sys_apiengine.V8Unlimited 字段，请先升级后端与接口引擎资源");
+                }
                 // Keep MCP-created engines aligned with the tenant/runtime limits.  The old
                 // literal values (notably LimitRecursion=10000) could exceed the runtime hard
                 // ceiling and made a freshly-created engine's persisted configuration lie.
@@ -907,6 +962,7 @@ namespace Microi.net
                 };
                 if (hasVersionColumn) addParam["Version"] = resolvedVersion;
                 if (hasChangeHistoryColumn && !changeHistoryEntry.DosIsNullOrWhiteSpace()) addParam["ChangeHistory"] = changeHistoryEntry;
+                if (hasV8UnlimitedColumn) addParam["V8Unlimited"] = v8Unlimited == 1 ? 1 : 0;
 
                 var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("sys_apiengine", addParam);
 
@@ -920,6 +976,7 @@ namespace Microi.net
                         ApiEngineKey = apiEngineKey,
                         Version = resolvedVersion,
                         Category = category ?? "未分类",
+                        V8Unlimited = v8Unlimited == 1 ? 1 : 0,
                         CacheRefresh = cacheRefreshStatus
                     });
                 }
@@ -1930,13 +1987,17 @@ namespace Microi.net
             try
             {
                 var normalizedPageSize = Math.Min(Math.Max(pageSize <= 0 ? 5000 : pageSize, 100), 20000);
+                var hasV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                var engineSelectFields = new List<string>
+                {
+                    "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRemark",
+                    "AllowAnonymous", "StopHttp", "IsEnable", "UpdateTime"
+                };
+                if (hasV8UnlimitedColumn) engineSelectFields.Add("V8Unlimited");
                 var engineResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("sys_apiengine", new
                 {
                     OsClient = osClient,
-                    _SelectFields = new[] {
-                        "Id", "ApiName", "ApiEngineKey", "Category", "ApiAddress", "ApiRemark",
-                        "AllowAnonymous", "StopHttp", "IsEnable", "UpdateTime"
-                    },
+                    _SelectFields = engineSelectFields.ToArray(),
                     _Where = BuildKeywordWhere(keyword, "ApiName", "ApiEngineKey", "Category", "ApiRemark", "ApiAddress"),
                     _OrderBy = "Category",
                     _OrderByType = "ASC",
@@ -1972,6 +2033,7 @@ namespace Microi.net
                         AllowAnonymous = allowAnonymous,
                         StopHttp = stopHttp,
                         IsEnable = isEnable,
+                        V8Unlimited = hasV8UnlimitedColumn ? SafeJInt(row, "V8Unlimited") : 0,
                         UpdateTime = SafeJString(row, "UpdateTime")
                     });
                 }
@@ -2061,10 +2123,18 @@ namespace Microi.net
         /// 新增自定义表（diy_table）
         /// </summary>
         public static async Task<DosResult<object>> CreateTable(string osClient, string name, string description,
-            string tabs = null, int isTree = 0, int column = 1, string formOpenType = null, string formOpenWidth = null)
+            string tabs = null, int isTree = 0, int column = 1, string formOpenType = null,
+            string formOpenWidth = null, int? v8Unlimited = null)
         {
             try
             {
+                var hasV8UnlimitedColumn = DiyTableHasColumn(osClient, "V8Unlimited");
+                if (v8Unlimited.HasValue && !hasV8UnlimitedColumn)
+                {
+                    return new DosResult<object>(0, null,
+                        "当前平台尚未安装 diy_table.V8Unlimited 字段，请先升级后端与表单引擎资源");
+                }
+
                 // 检查表名是否已存在（幂等：已存在则直接返回该表）
                 var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new
                 {
@@ -2117,6 +2187,18 @@ namespace Microi.net
                         return fixedFieldResult;
                     }
 
+                    var v8UnlimitedUpdated = false;
+                    if (v8Unlimited.HasValue)
+                    {
+                        var updateResult = await UpdateTable(osClient, new JObject
+                        {
+                            ["Id"] = existingTableId,
+                            ["V8Unlimited"] = v8Unlimited.Value == 1 ? 1 : 0
+                        });
+                        if (updateResult.Code != 1) return updateResult;
+                        v8UnlimitedUpdated = true;
+                    }
+
                     return new DosResult<object>(1, new
                     {
                         Message = repairedPhysicalTable
@@ -2125,7 +2207,9 @@ namespace Microi.net
                         TableId = existingTableId,
                         Name = name,
                         Skipped = !repairedPhysicalTable,
-                        Repaired = repairedPhysicalTable
+                        Repaired = repairedPhysicalTable,
+                        V8Unlimited = v8Unlimited.HasValue ? (v8Unlimited.Value == 1 ? 1 : 0) : (int?)null,
+                        V8UnlimitedUpdated = v8UnlimitedUpdated
                     });
                 }
 
@@ -2144,6 +2228,7 @@ namespace Microi.net
                 if (column > 1) tableData["Column"] = column;
                 if (!string.IsNullOrWhiteSpace(formOpenType)) tableData["FormOpenType"] = formOpenType;
                 if (!string.IsNullOrWhiteSpace(formOpenWidth)) tableData["FormOpenWidth"] = formOpenWidth;
+                if (v8Unlimited.HasValue) tableData["V8Unlimited"] = v8Unlimited.Value == 1 ? 1 : 0;
 
                 var addResult = await MicroiEngine.FormEngine.AddTableAsync(tableData);
 
@@ -2153,7 +2238,8 @@ namespace Microi.net
                     {
                         Message = $"自定义表 [{name}] 创建成功",
                         TableId = id,
-                        Name = name
+                        Name = name,
+                        V8Unlimited = v8Unlimited.HasValue ? (v8Unlimited.Value == 1 ? 1 : 0) : 0
                     });
                 }
 
@@ -4279,11 +4365,15 @@ namespace Microi.net
             {
                 var errors = new List<string>();
                 var warnings = new List<string>();
+                var hasTableV8UnlimitedColumn = DiyTableHasColumn(osClient, "V8Unlimited");
+                var hasEngineV8UnlimitedColumn = SysApiEngineHasColumn(osClient, "V8Unlimited");
+                var tableSelectFields = new List<string> { "Id", "Name", "Description" };
+                if (hasTableV8UnlimitedColumn) tableSelectFields.Add("V8Unlimited");
 
                 var tableResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_table", new
                 {
                     OsClient = osClient,
-                    _SelectFields = new[] { "Id", "Name", "Description" },
+                    _SelectFields = tableSelectFields.ToArray(),
                     _PageSize = 10000
                 });
                 var fieldResult = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("diy_field", new
@@ -4307,6 +4397,21 @@ namespace Microi.net
                     {
                         errors.Add($"缺少表：{name}");
                         continue;
+                    }
+                    var expectedTableUnlimited = table["v8Unlimited"] ?? table["V8Unlimited"];
+                    if (expectedTableUnlimited != null && expectedTableUnlimited.Type != JTokenType.Null)
+                    {
+                        if (!hasTableV8UnlimitedColumn)
+                        {
+                            errors.Add($"表 {name} 无法验收 V8Unlimited：当前平台缺少 diy_table.V8Unlimited 字段");
+                        }
+                        else
+                        {
+                            var expected = expectedTableUnlimited.Val<bool>() ? 1 : 0;
+                            var actual = SafeJInt(JObject.FromObject(tableModel), "V8Unlimited");
+                            if (actual != expected) errors.Add($"表 {name} 的 V8Unlimited 期望 {expected}，实际 {actual}");
+                            if (expected == 1) warnings.Add($"表 {name} 已开启 V8Unlimited；仅该表后端 V8 事件取消 Jint 单次预算，进程常驻内存保护仍生效");
+                        }
                     }
                     var tableFields = fieldsByTable.ContainsKey((string)tableModel.Id) ? fieldsByTable[(string)tableModel.Id] : new List<dynamic>();
                     var fieldNames = new HashSet<string>(tableFields.Select(f => ((string)f.Name ?? "").ToLower()));
@@ -4368,7 +4473,32 @@ namespace Microi.net
                     }
                 }
 
-                await CheckByKey("sys_apiengine", "ApiEngineKey", manifest["engines"] as JArray ?? manifest["Engines"] as JArray ?? new JArray(), "接口引擎");
+                var manifestEngines = manifest["engines"] as JArray ?? manifest["Engines"] as JArray ?? new JArray();
+                await CheckByKey("sys_apiengine", "ApiEngineKey", manifestEngines, "接口引擎");
+                foreach (var token in manifestEngines)
+                {
+                    if (!(token is JObject engine)) continue;
+                    var expectedEngineUnlimited = engine["v8Unlimited"] ?? engine["V8Unlimited"];
+                    if (expectedEngineUnlimited == null || expectedEngineUnlimited.Type == JTokenType.Null) continue;
+                    var apiEngineKey = engine["apiEngineKey"].Val<string>() ?? engine["ApiEngineKey"].Val<string>();
+                    if (apiEngineKey.DosIsNullOrWhiteSpace()) continue;
+                    if (!hasEngineV8UnlimitedColumn)
+                    {
+                        errors.Add($"接口引擎 {apiEngineKey} 无法验收 V8Unlimited：当前平台缺少 sys_apiengine.V8Unlimited 字段");
+                        continue;
+                    }
+                    var engineResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("sys_apiengine", new
+                    {
+                        OsClient = osClient,
+                        _SelectFields = new[] { "ApiEngineKey", "V8Unlimited" },
+                        _Where = new List<object>() { new List<object>() { "ApiEngineKey", "=", apiEngineKey } }
+                    });
+                    if (engineResult.Code != 1 || engineResult.Data == null) continue;
+                    var expected = expectedEngineUnlimited.Val<bool>() ? 1 : 0;
+                    var actual = SafeJInt(JObject.FromObject(engineResult.Data), "V8Unlimited");
+                    if (actual != expected) errors.Add($"接口引擎 {apiEngineKey} 的 V8Unlimited 期望 {expected}，实际 {actual}");
+                    if (expected == 1) warnings.Add($"接口引擎 {apiEngineKey} 已开启 V8Unlimited；该开关不向嵌套接口继承，进程常驻内存保护仍生效");
+                }
                 await CheckByKey("sys_menu", "Name", manifest["modules"] as JArray ?? manifest["Modules"] as JArray ?? new JArray(), "菜单模块");
                 await CheckByKey("sys_datasource", "DataSourceKey", manifest["dataSources"] as JArray ?? manifest["DataSources"] as JArray ?? new JArray(), "数据源");
                 await CheckByKey("mic_print", "Title", manifest["printTemplates"] as JArray ?? manifest["PrintTemplates"] as JArray ?? new JArray(), "打印模板");

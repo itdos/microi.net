@@ -10,31 +10,81 @@
 
 ## 📌 推荐提示词
 
-::: tip AI开发推荐提示词
-你是一名资深企业架构师、业务产品经理、Microi吾码低代码专家、V8工程师、UI/UX设计师、数据工程师和自动化测试工程师。请直接使用指定 MCP 完成指定的需求，不要只给方案、示例代码或待办清单：
+::: tip 推荐工作流
+先通过 [Microi吾码 AI 开发工具：VS Code 插件 + CLI](./vs-code-plugin.md) 完成服务器登录、Skills 与 MCP 初始化。纯命令行用户运行 `microi init --pull` 后，应新开一个 AI 对话，让 Codex、Claude Code 或 Trae 加载新增 MCP。
 
-1、请根据mcp【microi_itdos】帮我开发一套非常完整、完善的【xx系统】，请认真仔细的深度分析需求文档【doc\xxx.doc】，生成一份非常完善、详细的md文档在同目录下，以便你后面可以随时读写这个md文档（如需求变更）
+提示词不需要重复粘贴全部 V8 API，也不要写真实密码。只需明确目标租户、需求事实源、交付范围、写入闸门和验收标准。
 
-2、请根据需求文档以及吾码skills相关规范，帮我创建相关的菜单、表、字段、V8按钮、V8事件等等，并且每一张表你至少帮我添加100条左右测试数据，但是不要显示测试相关的字眼，看上去像是真实正式运行的数据环境。数据的流程操作、流转都要合理，表与表之间的关系是正确的，一些带数据源的字段控件也请完善好Key-Value数据源源，该创建多个账号就创建。开始前先读取数据库 Schema、表、字段、索引、菜单、接口引擎、事件、工作流、页面、角色和数据；已有能力采用幂等更新，不得重复建表、重复建菜单或覆盖正确配置。建立满足成熟业务需要的表、字段、唯一约束、普通索引和组合索引。复杂业务按钮必须调用接口引擎，前端 V8 只负责确认、参数收集、提示和刷新。
+### 最短可用提示词
 
-3、对过程中的合理技术细节自行决策并继续执行，不要把可以通过 Schema、Skills、MCP 或浏览器发现的问题重新询问用户。先调用 microi_get_db_schema 和 microi_get_manifest_schema，再形成 Manifest；依次执行 microi_plan_system、dryRun 验证、确认后的真实生成和 microi_validate_system。
+```text
+使用当前工作区已经配置好的 Microi MCP 和 microi.skills，为【目标 OsClient】完成
+【具体需求】。先调用 microi_get_status 核对 API Server、OsClient 和登录用户，再读取
+现有业务蓝图、数据库结构、菜单、接口、事件、工作流和在线应用；不要猜字段或重复
+创建已有资源。
 
-4、所有表单宽度设置80%，子表打开设置为75%，子表的子表70%，如果还有子表就这样递减5%，并且开启数据日志，数据评论，数据版本，菜单不要汇总在一个总菜单里面；根据业务需求可以通过界面引擎多设计一些【看板报表】，界面要做的漂亮合理。普通短字段默认双列或合理栅格排列；长文本、富文本、上传、地图、代码、子表等整行控件使用 FormWidth=24。
+先给出业务蓝图、菜单树、数据关系、状态机和 Manifest dry-run，列明会新增/修改的资源；
+我确认后再真实写入。写入后逐项远端回读，运行 microi_validate_system、必要的接口与
+Playwright 验收，并报告本地未推送、远端较新和冲突数量。不要只给方案或示例代码。
+```
 
-5、一些Key-Value字段（如类似状态、分类）的模板引擎也请完善，使用不同样式来达到更好的用户视觉体验，所有 Select、Radio、Checkbox、MultipleSelect 必须有完整 KeyValue 数据源或其它数据源，保存 Key、展示中文 Label；禁止空下拉。
+### 完整系统交付提示词模板
 
-6、表单设计请尽量多的使用【折叠分组】来达到更好的表单视觉效果，而不是少量的字段都分配到了表单Tab分组中去（表单某个信息块字段比较多时[比如30个字段以上]、或子表比较多时仍然推荐使用表单Tab分组来达到更好的表单视觉效果），表单里的折叠组尽量默认展开（除非一些确实是非关键数据可以默认折叠）；同时模块引擎中的【页面多Tab】也请合理的使用，让用户可以方便快捷的查看类似不同类别/状态的数据
+把方括号内容替换成真实信息；没有的资料可删除对应行。
 
-7、根据实际情况，为了让用户有更好的视觉体验：【表格每一列的宽度、
-菜单动态统计角标（不要所有菜单都统计，不然会很丑，只挑那种比较重要的菜单进行统计角标）、
-数据表格【页面多Tab】角标统计、
-模块顶部标题/副标题及多个动态统计指标、
-更多V8按钮统计角标、表格主字段/多行副字段、
-表格右侧图标/状态字段（注意当配置了表格多行副字段、表格右侧图标/状态字段时，其它列就没必要重复显示了，并且注意这种复合列的宽度一定要给的合理，否则显示效果很差）、
-移动端卡片图片/标题/副标题/顶部标签/右侧金额/状态/内容/Meta/底部字段等动态区域】，
-这些元素都应该做的很完善、设计的很合理，不要什么都不做或漏做，特别是【模块顶部标题/副标题及多个动态统计指标】需要每个模块都做（根据每个模块对应的表进行分析设计动态业务数据统计指标，而不是毫无意义的单纯数据总数统计）
+```text
+你是资深企业架构师、业务产品经理、Microi吾码低代码/V8 工程师、UI/UX 设计师和
+自动化测试工程师。请使用当前工作区已注入的 Microi Skills，并只使用指定 MCP
+【MCP 名称】操作【API Server】【OsClient】。
 
-8、请随时通过本地访问【https://xxx.itdos.com（帐号admin密码xxxxxx）对应mcp【microi_itdos】】进行全自动化截图测试验收，页面有报错就修复错误。完成后关闭 AI 启动的浏览器和其它临时进程，不得遗留孤儿进程。
+目标：交付一套可实际运行的【系统名称】。
+需求事实源：【需求文档路径 / 现有系统说明 / 截图目录】。
+验收入口：【PC/H5 地址】；测试帐号从安全环境或已登录浏览器读取，不得写入文档、
+源码、命令行输出或提交记录。
+
+一、事实盘点
+1. 先调用 microi_get_status，明确回报当前 API Server、OsClient 和登录身份；不一致立即停止写入。
+2. 读取需求文档、业务蓝图、实时 Schema、索引、菜单、角色、接口引擎、V8 事件、
+   工作流、页面/打印和在线应用。已有能力采用幂等升级，不重复建表、菜单或接口。
+3. 关系基数、状态机、权限或资金/库存口径无法从事实源确定时，列为真正阻塞项；
+   其它可由 Schema、Skills、MCP 或浏览器发现的问题自行查明，不反复询问。
+
+二、规划与写入闸门
+4. 更新或生成可持续维护的业务蓝图，列出角色、两级菜单树、表关系、状态流转、
+   接口、按钮、任务、工作流、页面、打印和验收标准。
+5. 调用 microi_get_manifest_schema 形成 Manifest，依次执行 microi_plan_system 和
+   microi_generate_system(dryRun:true)。先展示新增、修改、跳过和风险清单。
+6. 未得到我对本轮写入的明确确认前，不执行 dryRun:false；确认后再真实生成，并立即
+   microi_validate_system 和逐资源回读。超时先回读，不盲目重复写入。
+
+三、建模与体验
+7. 建立符合业务语义的表、字段、唯一约束和查询索引。1:N 明细使用 TableChild；
+   N:1/1:1 才使用 JoinForm。复杂业务按钮调用后端接口引擎，前端 V8 只负责交互。
+8. Select、Radio、Checkbox、MultipleSelect 等选择控件必须有完整数据源，保存稳定 Key、
+   展示中文 Label；列表列、搜索列、隐藏列、统计列、默认排序、移动端卡片字段都要完整。
+9. 普通短字段采用合理栅格；长文本、富文本、上传、地图、代码和子表使用整行布局。
+   12 个以内字段不强行分组；中等表单优先折叠分组；只有大业务域或字段很多时使用 Tabs。
+10. 表格宽度、主副字段、状态样式、关键统计角标、模块标题/副标题和业务指标按真实场景设计；
+    不为每个菜单堆角标，不用无意义“总数”代替业务指标。
+
+四、数据、安全与验收
+11. 测试数据只写测试租户或明确测试资源；每个核心表准备 5～10 条可重复、可清理且关系正确
+    的数据。不得把测试数据伪装为生产数据，不修改真实资金、库存、积分或订单。
+12. 后端代码遵守参数化查询、租户隔离、权限、幂等和分布式部署规范；定时任务和消息消费
+    不能只依赖进程内锁或本机状态。
+13. 完成后验证真实 API、数据库/平台回读、核心业务闭环、网络 4xx/5xx、页面错误和截图；
+    涉及定时任务或消息时补充至少两节点的重复执行与故障恢复验证。
+14. 最终按“源码/配置、构建、远端写入回读、自动化测试、截图、同步状态、未覆盖风险”
+    分项报告。关闭本轮启动的浏览器和临时进程，不影响用户原有服务。
+```
+
+### 已有系统的局部优化提示词
+
+```text
+请只优化【模块/接口/页面】的【具体问题】。先读取远端当前配置与源码，说明根因和最小
+影响范围；先做 dry-run/diff，我确认后写入。保留其它正确配置和用户修改，写后回读
+目标资源并运行定向测试，最后报告远端是否生效以及同步状态。不要顺带重构无关模块。
+```
 :::
 
 ---
@@ -76,69 +126,60 @@
 - 接口引擎代码就是标准 JavaScript，AI 可以直接生成且正确率极高
 - 将数据库表结构、字段含义、菜单关系一键喂给 AI，AI 就能精准理解你的业务数据
 - **在线 AI 编程**：浏览器中用 DeepSeek / ChatGPT / Kimi 等工具写代码，复制粘贴到平台
-- **本地 AI 编程**：VS Code + GitHub Copilot / Claude Code / Cursor，知识库自动注入，写代码 → 执行 → 调试全在编辑器内完成，无需离开
+- **本地 AI 编程**：VS Code 插件或 `@microi.net/cli` 自动注入 Skills、Schema 与 MCP；可选择编辑器内调试，也可由 Codex/Claude/Trae 在纯终端完成交付
 - **从 V8 代码中调用 AI 大模型**：在接口引擎里直接请求 DeepSeek 等接口，实现 ReAct 模式
 
 > 博主某 MES 项目：500+ 张表，大量接口引擎均由 AI 生成。
 
 ---
 
-## 💻 本地 AI 编程（VS Code 插件）
+## 💻 本地 AI 编程（VS Code 插件 + microi.net/cli）
 
-这是本次更新带来的全新一体化开发模式：**在 VS Code 中直接用 GitHub Copilot / Claude Code / Cursor 编写接口引擎，知识库自动注入，无需离开编辑器。**
+Microi吾码提供同一套 AI 开发能力的两个入口：VS Code 插件负责资源树、Diff、远程执行和逐行调试；`@microi.net/cli` 负责无需 IDE 的连接、登录、AI/MCP 初始化、代码拉取、差异检查和显式推送。两者共用工作区配置、Token、Skills、MCP 和同步基线，完整功能与命令以 [AI 开发工具文档](./vs-code-plugin.md) 为准。
 
 ### 工作原理
 
-```
-安装 VS Code 插件「Microi吾码」
-        ↓
-  登录并点击「拉取」
-        ↓
-  插件自动完成：
-  ① 拉取所有接口引擎 .js 到本地
-  ② 拉取所有 V8 事件 .js 到本地
-  ③ 拉取数据库结构（表名 / 字段名 / 字段描述 / 菜单结构）
-        ↓
-  自动生成 AI 知识库文件（放在本地工作区）：
-  • .github/copilot-instructions.md  ← GitHub Copilot 读取
-  • CLAUDE.md                        ← Claude Code 读取
-  • .cursorrules                     ← Cursor 读取
-
-  知识库内容包含：
-  ✅ V8 引擎全部 API（FormEngine / Db / Cache / Http / ApiEngine 等）
-  ✅ _Where 查询条件语法
-  ✅ 你的数据库所有表结构（表名 / 字段名 / 类型 / 业务说明）
-  ✅ 菜单树结构（哪个菜单对应哪张表）
-        ↓
-  打开任意 .js 接口引擎文件
-        ↓
-  GitHub Copilot / Claude Code / Cursor 自动获得完整上下文
-  → 直接 AI 辅助编写接口引擎代码，无需额外的"喂文档"步骤
-        ↓
-  保存 → 自动推送到数据库（或手动 Ctrl+S）
-  远程执行 / 远程逐行调试，全在 VS Code 内完成
+```text
+安装 VS Code 插件                  npm install -g @microi.net/cli
+        ↓                                      ↓
+可视化添加服务器并登录               microi init --pull
+        └──────────────┬───────────────────────┘
+                       ↓
+          AI 指令 + Skills + V8 typings + MCP
+                       ↓
+    实时 Schema / 业务蓝图 / V8 源码 / 在线应用上下文
+                       ↓
+       AI 规划 → dry-run → 确认写入 → 远端回读 → 测试
+                       ↓
+       VS Code 可视化调试，或 CLI/Codex 纯终端交付
 ```
 
-### 安装插件
+初始化只建立知识与工具连接，不等于无条件修改远端。普通文件保存只标记本地变化；必须执行插件“推送当前文件”或 CLI `microi push <file>`，并通过冲突预检后才会写入数据库。
 
-在 VS Code 扩展市场搜索 **Microi吾码** 安装，或从 [OpenClaw](https://gitee.com/microi-net/microi.openclaw) 下载 `.vsix` 文件手动安装。
+### 安装一种入口
 
-### 一键拉取 + 自动建立知识库
+- **VS Code**：在扩展市场搜索 **Microi吾码**，适合可视化编辑、Diff 与调试。
+- **纯命令行**：执行 `npm install -g @microi.net/cli`，再进入工作区运行 `microi init --pull`。
 
-登录成功后，点击左侧 Microi 侧栏顶部的 **↓（拉取）** 按钮，或执行命令：
+首次生成 MCP 配置后应新开 AI 对话，已打开的 Codex/Claude/Trae 会话通常不会热加载新工具。
 
+### 初始化、拉取与知识注入
+
+插件用户执行 **`Microi: 初始化AI配置`**，需要本地源码时再点击服务器节点的“拉取此服务器代码”。CLI 用户执行：
+
+```bash
+microi init --pull
 ```
-Microi: 拉取V8引擎代码
-```
 
-插件会自动完成以下操作（支持多服务器并发）：
+两种入口都会完成以下工作：
 
 | 步骤 | 内容 |
 |---|---|
 | ① 拉取接口引擎 | 所有 `ApiEngineKey.js` 保存到本地目录 |
 | ② 拉取 V8 事件 | 所有表单 V8 事件 `.js` 保存到本地目录 |
 | ③ 拉取数据库结构 | 表名、字段名、类型、说明、菜单树一并拉取 |
-| ④ 自动生成知识库 | `copilot-instructions.md` / `CLAUDE.md` / `.cursorrules` |
+| ④ 自动生成知识库 | `AGENTS.md` / `CLAUDE.md` / Copilot/Cursor 指令 / `microi.skills/` / V8 typings |
+| ⑤ 配置 MCP | 幂等写入 VS Code、Cursor、Trae、Claude Code 与 Codex 配置，保留其它 MCP |
 
 知识库生成后，你在 VS Code 中打开任意 `.js` 文件，AI 助手已经了解：
 
@@ -153,7 +194,7 @@ Microi: 拉取V8引擎代码
 | AI 辅助写代码 | Copilot 自动补全，或在 Copilot Chat / Claude Code 输入需求 |
 | 远程执行 | 右键 → `Microi: 远程执行当前接口引擎`（弹出参数输入框） |
 | 逐行调试 | 右键 → `Microi: 远程逐行调试`，支持断点 / Step Over / 变量观察 |
-| 推送保存 | 文件保存时自动同步到数据库，无需编译发布 |
+| 推送保存 | 保存只更新本地状态；显式执行插件推送或 `microi push`，并先检查冲突 |
 
 所有右下角的信息、警告和错误通知都会同步保存在 VS Code 的【输出 → Microi 吾码】中，包括微服务构建/推送、代码拉取/同步、登录和远程执行结果。日志时间使用运行 VS Code 电脑的本地时区；带按钮的通知还会记录用户最终选择，通知消失后仍可继续追查。后台身份维护使用静默状态探测，服务器临时不可达不会反复产生无内容的 `GetStatus Error:`；用户主动操作失败时则会保留错误码、地址和端口等诊断明细。
 
@@ -168,7 +209,7 @@ Microi: 拉取V8引擎代码
 Microi: 拉取数据库结构到AI知识库
 ```
 
-即可更新三个知识库文件，让 AI 立即感知最新的表结构。
+CLI 用户可执行 `microi pull --scope schema`。两种方式都会更新当前 OsClient 的结构快照，让 AI 感知最新表结构。
 
 ### 效率对比
 
@@ -176,7 +217,8 @@ Microi: 拉取数据库结构到AI知识库
 |---|---|---|---|---|
 | 传统手写 | 无 | 手写 | 打开浏览器平台 | 浏览器平台 |
 | 在线 AI 编程 | 手动上传文档 + db.json | AI + 复制粘贴 | 浏览器平台 | 浏览器平台 |
-| **本地 AI 编程（推荐）** | **全自动，拉取时自动生成** | **AI 在 VS Code 实时辅助** | **VS Code 内执行/调试** | **保存自动推送** |
+| **VS Code 插件** | **自动注入 Skills/MCP，按需拉取** | **AI + 可视化编辑器** | **执行与逐行调试** | **显式推送并检查冲突** |
+| **microi.net/cli** | **`microi init --pull`** | **Codex/Claude/Trae/终端** | **AI 通过 MCP 执行并回读** | **`microi push` 显式推送** |
 
 ---
 
@@ -201,13 +243,13 @@ Microi Skills 是一组 **AI 编程最佳实践文件**，内置于平台源码�
 
 ### 平台内置 AI 的 Skill 镜像
 
-后端 `Microi.AI` 会把官方仓库全部 48 个 Skill 作为嵌入资源，供当前 `NL2V8EngineService` 建立检索知识库，覆盖 V8、前端事件、FormEngine HTTP、文件/租户安全、系统引擎、页面/打印、UniApp、MCP 交付与测试验收；普通 `Chat/ChatStream` 当前不会自动注入这套完整 corpus。嵌入资源必须从 `microi.skills/*/SKILL.md` 机械同步，禁止长期维护另一份手工简化版；新增、删除或修改 Skill 时，源码目录、嵌入资源、项目资源清单和向量文档清单必须一起校验。公共镜像不得包含客户名称、真实 `OsClient`、客户域名、项目路径或定制业务枚举。
+后端 `Microi.AI` 会把官方仓库中的完整 Skills 清单作为嵌入资源，供当前 `NL2V8EngineService` 建立检索知识库，覆盖 V8、前端事件、FormEngine HTTP、文件/租户安全、系统引擎、页面/打印、UniApp、MCP 交付与测试验收；普通 `Chat/ChatStream` 当前不会自动注入这套完整 corpus。嵌入资源必须从 `microi.skills/*/SKILL.md` 机械同步，禁止长期维护另一份手工简化版；新增、删除或修改 Skill 时，源码目录、嵌入资源、项目资源清单和向量文档清单必须一起校验。公共镜像不得包含客户名称、真实 `OsClient`、客户域名、项目路径或定制业务枚举。
 
 知识库 collection 名包含当前嵌入文档的 SHA-256 版本片段。新旧服务节点滚动发布时分别使用自己的版本化 collection，通过确定性 point id 幂等写入；初始化不会删除其它节点仍在使用的旧 collection。旧版本 collection 应在旧节点全部退出后由运维按保留策略清理，而不是在应用启动时抢占式删除。
 
 ### 完整 Skills 目录
 
-当前官方仓库包含 48 个 Skill，覆盖：
+当前官方 Skills 持续随平台版本增加，以 [`microi.skills/README.md`](https://gitee.com/ITdos/microi.net/blob/master/microi.skills/README.md) 的实时清单为准，主要覆盖：
 
 - 后端 V8：CRUD、SQL、表单事件、缓存、HTTP、MongoDB、MQ/MQTT、工作流、接口配置、SaaS、图片、文件、导入导出、调试、安全和爬虫；
 - 前端 V8：字段/表单/列表事件、模板、菜单按钮、FormEngine HTTP；
@@ -218,9 +260,9 @@ Microi Skills 是一组 **AI 编程最佳实践文件**，内置于平台源码�
 
 ### 快速集成
 
-#### 第 1 步：使用插件安装并生成 AI 指令（推荐）
+#### 第 1 步：使用 VS Code 插件或 CLI 生成 AI 指令（推荐）
 
-安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=microi.v8-engine)，在工作区执行初始化/拉取。插件会安装完整 Skills，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成对应项目指令。升级时按清单与哈希做差异更新，保留用户自行修改的 Skill。
+任选一种入口：安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=Microi.v8-engine) 并执行“初始化AI配置”，或安装 `@microi.net/cli` 后执行 `microi init --pull`。两者都会安装完整 Skills，并为 Codex、GitHub Copilot、Claude Code、Cursor、Trae 等生成对应项目指令。升级时按清单与哈希做差异更新，保留用户自行修改的 Skill。
 
 无法使用插件时，再从源码手工获取：
 
@@ -235,7 +277,7 @@ git sparse-checkout set microi.skills
 git checkout master
 ```
 
-将 `microi.skills` 文件夹放到工作区根目录。不要把 48 个 Skill 全文拼接成一个超长提示词；AI 应按任务类型读取相关 `SKILL.md`。
+将 `microi.skills` 文件夹放到工作区根目录。不要把全部 Skill 全文拼接成一个超长提示词；AI 应按任务类型读取相关 `SKILL.md`。
 
 #### 第 2 步：配置 AI 工具
 
@@ -244,7 +286,7 @@ git checkout master
 **GitHub Copilot（VS Code）**
 
 ::: tip 推荐方式
-安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=microi.v8-engine)，插件会自动生成 `.github/copilot-instructions.md` 并引用所有 Skills，**无需手动配置**。
+安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=Microi.v8-engine)，插件会自动生成 `.github/copilot-instructions.md` 并引用所有 Skills，**无需手动配置**。
 :::
 
 **手动配置方式：** 在项目根目录 `.github/copilot-instructions.md` 末尾追加：
@@ -292,14 +334,9 @@ globs: ["microi-v8-engine/**/*.js"]
 - @microi.skills/v8-security/SKILL.md
 ```
 
-**方式 B：合并到 `.cursorrules`**
+**方式 B：在 `.cursorrules` 中只写路由说明**
 
-```bash
-for f in microi.skills/*/SKILL.md; do
-  echo -e "\n---\n" >> .cursorrules
-  cat "$f" >> .cursorrules
-done
-```
+在规则中要求 AI 按任务类型读取对应 `microi.skills/*/SKILL.md`；不要把全部 Skills 拼接成一个巨型 `.cursorrules`，否则会增加上下文噪声，也无法可靠升级用户未修改的文件。
 
 ---
 
@@ -385,42 +422,42 @@ NL2SQL 当前由服务端生成不可被 JSON 伪造的授权上下文：白名�
 
 ### 什么是 Microi MCP
 
-Microi MCP Server 让 GitHub Copilot、Cursor、Claude Code 等 AI 工具**直接操作 Microi 平台**——不再需要手动复制粘贴表结构或 API 文档，AI 可以实时获取你的数据库结构和业务代码。
+Microi MCP Server 让 Codex、GitHub Copilot、Cursor、Trae、Claude Code 等外部 AI 客户端在明确权限和确认规则下**读取或操作 Microi 平台**——无需手工复制表结构和 V8 文档，AI 可以实时获取当前租户事实并在写后回读。
 
-### 提供的 AI 能力
+### 提供的 AI 能力（代表）
 
-| Tool | 功能 | 读/写 |
-|------|------|-------|
-| `microi_get_status` | 检查后端连接状态 | 只读 |
-| `microi_get_db_schema` | 获取数据库表结构（表名、字段、类型、描述） | 只读 |
-| `microi_list_engines` | 列出所有接口引擎 | 只读 |
-| `microi_get_engine_code` | 获取接口引擎 JavaScript 源码 | 只读 |
-| `microi_save_engine_code` | 保存接口引擎代码 | 读写 |
-| `microi_create_engine` | 创建新的接口引擎 | 读写 |
-| `microi_run_engine` | 远程执行接口引擎 | 读写 |
-| `microi_list_events` | 列出所有 V8 表单事件 | 只读 |
-| `microi_get_event_code` | 获取 V8 事件源码 | 只读 |
-| `microi_save_event_code` | 保存 V8 事件代码 | 读写 |
+| 领域 | 代表能力 | 写入保护 |
+|------|----------|----------|
+| 状态与事实发现 | 当前服务器/OsClient、实时 Schema、菜单、角色、接口、事件、应用和业务蓝图 | 只读 |
+| 全系统建模 | Manifest Schema、规划、dry-run、表/字段/菜单/权限/数据源/任务生成与系统验证 | 真实生成需确认 |
+| V8 与接口引擎 | 列表、源码读取、创建、保存、运行、表单/字段/模块/流程 V8 | 保存前校验，写后回读 |
+| 页面、打印与工作流 | Page Engine、打印模板、流程拓扑、条件路线和节点代码 | 先校验再保存 |
+| 在线 AI 应用 | 发现 Web/UniApp/MicroService、读取源码、创建、同步和发布 | 分阶段确认与版本回读 |
+| 测试与运维 | E2E 上下文、验收、文件、Redis、MongoDB 日志 | 高风险操作显式确认 |
+
+完整工具清单以当前 MCP 的 `tools/list` 为准；Codex 大工具集场景还可通过 `microi_codex` 的 `list_tools` / `describe_tool` 发现原始工具。
 
 ### 前置条件
 
 - 已部署 Microi 吾码后端服务
-- 已安装 AI 编程工具（GitHub Copilot / Cursor / Claude Code 任一）
+- 已安装支持 MCP 的 AI 客户端（Codex / GitHub Copilot / Cursor / Trae / Claude Code 任一）
 
-### 推荐方式：VS Code 插件（零配置）
+### 推荐方式：VS Code 插件或 CLI（无需手工部署 MCP）
 
 ::: tip 大多数用户无需手动配置 MCP
-安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=microi.v8-engine) 后，MCP 自动配置，开箱即用。
+安装 [Microi 吾码 VS Code 插件](https://marketplace.visualstudio.com/items?itemName=Microi.v8-engine)，或安装 `@microi.net/cli` 后运行 `microi init --pull`。VSIX 与 CLI npm 包都内置 MCP Server 和 Skills，普通用户无需克隆或构建 `microi.mcp`。
 :::
 
-安装插件后自动完成：
-- 生成 `.vscode/mcp.json`（GitHub Copilot）和 `.cursor/mcp.json`（Cursor）
-- Token 自动刷新，无需存储密码
-- 同时注入 AI 指令文件（`.github/copilot-instructions.md`、`CLAUDE.md`、`.cursorrules`）
+两种入口都会：
 
-**流程：** 安装插件 → 配置服务器连接 → 拉取代码 → MCP 立即可用。
+- 幂等生成 `.vscode/mcp.json`、`.cursor/mcp.json`、`.trae/mcp.json`、`.mcp.json` 和 Codex `config.toml`，保留用户已有 MCP；
+- 使用工作区 Token 文件，CLI 不落盘保存密码，插件密码保存在 VS Code `SecretStorage`；
+- 注入 `AGENTS.md`、`CLAUDE.md`、Copilot/Cursor 指令、V8 typings 和完整 Skills；
+- 提供真实诊断或 `microi doctor`，区分“配置存在”与“MCP 当前可调用”。
 
-> 以下内容适用于不使用 VS Code 插件或需要 SSE 远程部署的场景。
+**流程：** 安装一种入口 → 添加服务器并登录 → 初始化 AI/MCP → 新开 AI 对话 → 按需拉取代码。
+
+> 以下手工配置只适用于 MCP 源码开发者或需要自建远程 SSE 的团队；普通 CLI 用户不需要执行。
 
 ### 手动配置：本地 stdio 模式
 
@@ -608,49 +645,31 @@ AI：（调用 microi_run_engine）返回了 20 条订单数据...
 
 | 方案 | 提供的能力 | 适用场景 |
 |------|-----------|---------|
-| **VS Code 插件** | V8 全部 API 知识 + 数据库表结构 + 代码拉取/推送 + 断点调试 | 日常开发，自动化 |
+| **AI 开发工具（VS Code + CLI）** | 连接登录、Skills/typings、MCP、实时 Schema、V8 同步；插件补充资源树/Diff/断点调试，CLI 支持无 IDE 工作流 | 外部 AI 日常开发与完整交付 |
 | **MCP Server** | 为具备 MCP Host 的客户端提供实时查询、保存和执行工具 | AI 受控操作平台 |
 | **Skills** | 具体场景的编码最佳实践和代码模板 | 编码规范，深度指导 |
 | **平台在线 AI** | 普通会话上下文、NL2SQL Schema 双模式检索、NL2V8 Skill + Schema 双模式检索 | 默认关键词检索，可选向量融合；当前不自动调用 MCP |
 
 ::: tip 推荐组合
-外部开发场景由 VS Code 插件提供编辑体验，Skills 提供规范，MCP 提供最新事实和受控执行；平台在线 AI 在 NL2SQL/NL2V8 等明确入口默认使用大模型关键词扩展与权限感知 Schema/Skill 检索，只有管理员显式开启向量数据库后才增加向量召回。MCP 是工具协议，关键词/向量索引都是检索手段，三者不能互相替代。
+外部开发场景由 VS Code 插件或 CLI 建立工作区，Skills 提供规范，MCP 提供最新事实和受控执行；平台在线 AI 在 NL2SQL/NL2V8 等明确入口默认使用大模型关键词扩展与权限感知 Schema/Skill 检索，只有管理员显式开启向量数据库后才增加向量召回。MCP 是工具协议，关键词/向量索引都是检索手段，三者不能互相替代。
 
 平台源码（含 Skills、MCP）：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
 :::
 
-## 📌 Codex开通流程
+## 📌 Codex 接入 Microi 的要点
 
-> 1、准备一部苹果手机，设置-通用-语言与地区-地区-修改为美国
+Codex 的帐号、订阅、安装和网络要求应以其当前官方说明为准，本页不维护容易过期的注册、支付、地区或代理教程。Microi 侧只需要完成以下步骤：
 
-> 2、准备一个邮箱，优先Gmail，163也行
+1. 在准备作为项目工作区的目录安装并运行 `@microi.net/cli`：
 
-> 3、苹果手机-设置-App-邮件-邮件账户-添加账户-从列表中选取-iCloud-创建新Apple账户，填写姓名、邮箱，电话号码使用国内的即可，运气好直接就能注册成功，运气不好多试几次
+   ```bash
+   npm install -g @microi.net/cli
+   microi init --pull
+   ```
 
-> 4、IOS26.5 + 在设置-Apple账户、iCloud等-媒体与购买项目-退出旧的app store账户，然后打开App Store登录上面注册的账号，首次登录会提示需要验证Apple ID账户，去邮箱查看邮件通过AppleID帐号密码进行验证，然后再次尝试登录一般会成功
+2. 运行 `microi doctor`，确认 Profile、Token、Skills、工作区指令与 Codex MCP 配置均正常。
+3. 关闭当前 Codex 对话并新开一个对话；已打开的会话通常不会热加载新增 MCP。
+4. 先让 Codex 调用 `microi_get_status` 核对 API Server、OsClient 和登录身份，再使用本页推荐提示词。
+5. 代理地址属于用户本机环境，不要把固定端口、地区规则、帐号、密码或 Token 写进项目文档和仓库。
 
-> 5、支付宝搜索【PockyShop】,使用支付宝登录，首页-App Store & iTunes USA-购买对应礼品卡卡号
-
-> 6、app store 头像-兑换代码-手动输入兑换码，并搜索ChatGPT下载
-
-> 7、手机VPN翻墙，打开ChatGPT，使用上面的邮箱进行注册，然后订阅Plus $20，支付时会提示补充app store信息：街道【1234 SW Main Street】，城市【Portland】，州【俄勒冈州】，邮政编码【97205】，电话【212-5551234】，然后重新支付订阅（可能会提示【你的购买无法完成，请联系iTunes支持】，这一般是AppleID被风控，暂时无解）
-
-> 8、进入VS Code Codex插件，通过ChatGPT登录（在手机成功订阅之前，网页登录会需要验证手机号，手机订阅成功后再登录网页就不需要验证手机号了），OVER
-
-> 9、常见问题
-```
-# 1、创建一个.env文件
-# 修复Codex五次websocket连接失败、Codex的移动端无法连接的问题
-# 存放路径：~/.codex/.env 或 C:\Users\Administrator\.codex\.env
-# 注意：Clash Verge的默认端口是7897，而v2ray的默认端口是10808（设置-参数设置-本地混合监听端口）
-HTTP_PROXY=http://127.0.0.1:10808
-HTTPS_PROXY=http://127.0.0.1:10808
-ALL_PROXY=http://127.0.0.1:10808
-NO_PROXY=localhost,127.0.0.1,::1
-
-# 2、windows powershell需要执行以下2条命令，然后可通过【curl.exe -4 https://ipinfo.io/json】测试地区
-$env:HTTP_PROXY="http://127.0.0.1:10808"
-$env:HTTPS_PROXY="http://127.0.0.1:10808"
-
-# 3、不要使用新加坡、中国香港、中国台湾地区节点
-```
+如果 Codex 能看到 MCP 配置却不能调用工具，先运行 `microi doctor`；仍失败时，在 VS Code 插件中执行 **`Microi MCP: 诊断 MCP 可调用性`**，区分配置错误、Node 启动失败、Token 失效和服务器不可达。

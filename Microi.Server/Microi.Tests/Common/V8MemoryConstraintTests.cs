@@ -171,6 +171,67 @@ public class V8MemoryConstraintTests
     }
 
     [Fact]
+    public void TrustedTableMetadata_ControlsUnlimitedRuntimeWithoutReadingSysConfigOrRequestFields()
+    {
+        var ordinary = CreateV8EngineParam.FromSysConfig(new JObject
+        {
+            ["V8Unlimited"] = 1
+        });
+        var enabled = CreateV8EngineParam.FromTrustedDiyTable(
+            new JObject { ["V8Unlimited"] = 0 },
+            new JObject { ["V8Unlimited"] = 1 });
+        var disabled = CreateV8EngineParam.FromTrustedDiyTable(
+            null,
+            new JObject { ["V8Unlimited"] = 0 });
+
+        Assert.False(ordinary.UnlimitedRuntime);
+        Assert.True(enabled.UnlimitedRuntime);
+        Assert.False(disabled.UnlimitedRuntime);
+        Assert.True(enabled.ToExecutionLimitInfo().UnlimitedRuntime);
+        Assert.Equal(
+            "ProcessResidentMemoryGuardOnly",
+            enabled.ToExecutionLimitInfo().MemoryAccounting);
+    }
+
+    [Fact]
+    public void UnlimitedRuntime_RemovesConfigurableJintExecutionBudgets()
+    {
+        using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam
+        {
+            Timeout = 1,
+            MaxStatements = 1,
+            LimitMemory = 1,
+            LimitRecursion = 1,
+            UnlimitedRuntime = true
+        });
+
+        var value = engine.Evaluate(@"
+            var total = 0;
+            for (var i = 0; i < 1000; i++) total += i;
+            function recurse(depth) { return depth === 0 ? total : recurse(depth - 1); }
+            recurse(20);");
+
+        Assert.Equal(499500D, value.AsNumber());
+        Assert.Null(engine.Constraints.Find<MicroiV8MemoryConstraint>());
+    }
+
+    [Fact]
+    public void OrdinaryRuntime_StillEnforcesTheStatementBudget()
+    {
+        using var engine = new V8Engine().CreateEngine(new CreateV8EngineParam
+        {
+            Timeout = 5,
+            MaxStatements = 1,
+            LimitMemory = 64,
+            LimitRecursion = 10,
+            UnlimitedRuntime = false
+        });
+
+        Assert.ThrowsAny<Exception>(() => engine.Execute("var x = 0; x++; x++;"));
+        Assert.NotNull(engine.Constraints.Find<MicroiV8MemoryConstraint>());
+    }
+
+    [Fact]
     public void TrustedMarketplaceImporterPolicy_AllowsOnlyMasterTenantSuperAdminBackgroundExecution()
     {
         var trustedAdmin = new JObject

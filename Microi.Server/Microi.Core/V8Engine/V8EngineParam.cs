@@ -49,6 +49,7 @@ namespace Microi.net
         public bool IsBackgroundTask { get; set; }
         public bool IsolateNestedApiMemory { get; set; }
         public bool ResidentMemoryGuardOnly { get; set; }
+        public bool UnlimitedRuntime { get; set; }
         public string MemoryAccounting { get; set; } = "CumulativeAllocatedBytes";
     }
 
@@ -149,6 +150,12 @@ namespace Microi.net
 
         public IMicroiSpider Spider { get; set; }
         public IV8Method Method { get; set; }
+
+        /// <summary>
+        /// 平台内部通知。固定使用当前 V8 租户并在事务提交后发送 SignalR 提示；
+        /// 通知列表与未读状态仍以 mic_msg_event_log 为权威事实源。
+        /// </summary>
+        public IV8Notification Notification { get; set; }
 
         public IV8Cache Cache { get; set; }
 

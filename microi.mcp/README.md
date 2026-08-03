@@ -31,13 +31,13 @@
 | `microi_drop_table_index` | 删除非主键索引并回读 | 破坏性写入（需确认） |
 | `microi_list_engines` | 列出所有接口引擎 | 只读 |
 | `microi_get_engine_code` | 获取接口引擎 JavaScript 源码 | 只读 |
-| `microi_save_engine_code` | 保存接口引擎代码 | 读写 |
-| `microi_create_engine` | 创建新的接口引擎 | 读写 |
+| `microi_save_engine_code` | 保存接口引擎代码，可显式维护并回读 `V8Unlimited` | 读写 |
+| `microi_create_engine` | 创建新的接口引擎，可配置 `V8Unlimited` | 读写 |
 | `microi_run_engine` | 远程执行接口引擎（⚠️ 可能有副作用） | 读写 |
 | `microi_list_events` | 列出所有 V8 表单事件 | 只读 |
 | `microi_get_event_code` | 获取 V8 事件源码 | 只读 |
 | `microi_save_event_code` | 保存 V8 事件代码 | 读写 |
-| `microi_create_table` | 创建低代码自定义表（diy_table + 物理表） | 读写 |
+| `microi_create_table` | 创建/协调低代码自定义表（含后端事件 `V8Unlimited`） | 读写 |
 | `microi_add_field` | 为自定义表添加字段和表单控件配置 | 读写 |
 | `microi_create_module` | 创建菜单模块并绑定表、按钮、Tab、列表配置 | 读写 |
 | `microi_set_role_permission` | 为角色授予菜单权限 | 读写 |
@@ -53,7 +53,7 @@
 | `microi_validate_system` | 对生成后的系统做后置验收，检查表/字段/引擎/菜单/数据源/打印/工作流等是否存在 | 只读 |
 | `microi_validate_menu_buttons` | 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON | 只读 |
 | `microi_build_field_config` | 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段 Data/Config JSON | 只读 |
-| `microi_upsert_engine` | 接口引擎存在则更新，不存在则创建 | 读写（需确认） |
+| `microi_upsert_engine` | 接口引擎存在则按需更新代码/`V8Unlimited`，不存在则创建 | 读写（需确认） |
 | `microi_list_roles` | 列出角色 | 只读 |
 | `microi_save_role` | 创建或更新角色 | 读写（需确认） |
 | `microi_list_modules` | 列出菜单模块 | 只读 |
@@ -105,6 +105,8 @@ Manifest 的 `modules` 支持直接使用字段名配置列表和搜索，不需
 未显式配置时，MCP 会按字段语义自动补齐后台菜单体验：`NotShowFields` 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段，`SearchFieldIds` 默认选择名称、标题、编号、状态、分类、负责人、时间等常用筛选，`StatisticsFields` 默认选择金额、价格、数量、积分、余额等数值字段，`MobileListFields` 和卡片标签字段默认选择移动端可读的 3-4 个核心字段。字段较多的表单会优先使用 `diy_table.Tabs` 和字段 `Tab` 做基础信息、联系信息、业务信息、附件备注、扩展信息分组，必要时再使用 `CollapseGroup` / 字段级 `Tabs` 控件美化局部区域。
 
 Manifest 支持的顶层数组：`roles`、`tables`、`dataSources`、`engines`、`events`、`modules`、`permissions`、`pages`、`printTemplates`、`workflows`、`jobs`。每个 `tables[]` 可声明 `indexes: [{name?, columns: string[], unique?, purpose?}]`；生成器会在字段落地后通过标准索引 API 幂等创建，并由 `microi_validate_system` 回读验收。
+
+`tables[].v8Unlimited` 与 `engines[].v8Unlimited` 均为可选布尔值。省略时，Upsert 保留已有设置；显式 `false` 写入 `0`，显式 `true` 写入 `1` 并在计划阶段产生高风险提示。AI 不得只因数据量大就自动开启：它仅适用于明确要求整个业务链保持一个数据库事务且无法安全分片的场景。开启后仍保留进程常驻内存保护，并且接口设置不会向嵌套接口自动继承；生成后的 `microi_validate_system` 会回读真实值。
 
 数据库索引不能通过 V8 或临时 SQL 绕过 MCP。先用 `microi_get_table_indexes` 获取真实状态，再用 `microi_create_table_index` 创建，最后回读；DIY 表上的结果会直接出现在后台“开发设计 → 索引管理”。删除只允许 `microi_drop_table_index`，且主键索引受保护。
 
