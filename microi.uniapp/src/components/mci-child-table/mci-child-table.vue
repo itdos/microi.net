@@ -169,7 +169,8 @@ export default {
       })
       this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
         menuId: this.childMenuId,
-        tableChildAuth: this.tableChildAuth
+        tableChildAuth: this.tableChildAuth,
+        tableModel: this.table
       })
     },
     async loadRows(refresh = false) {
