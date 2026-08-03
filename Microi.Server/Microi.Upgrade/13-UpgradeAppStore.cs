@@ -91,7 +91,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 8, 3) ||
+                    importerVersion < new System.Version(1, 8, 6) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -119,9 +119,33 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("BACKGROUND_TASK_RUNTIME_SCOPE_V1") ||
                     !code.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
                     !code.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
-                    !code.Contains("DATASET_INSERT_IF_MISSING_V1"))
+                    !code.Contains("DATASET_INSERT_IF_MISSING_V1") ||
+                    !code.Contains("PACKAGE_API_ENGINE_READBACK_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
+                }
+
+                // 页面级按钮与依赖接口必须一起存在。历史包曾只更新 PageBtns，却没有
+                // 把 bulk-import-microi-store-packages 写入目标租户；ServerVersion 与
+                // sys_microistoreversion 都不能证明这个运行时依赖已经落库。
+                var bulkEngineRow = client.Db.FromSql(@"SELECT ApiV8Code, IsEnable, StopHttp FROM sys_apiengine
+WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
+                    .AddInParameter("p0", "bulk-import-microi-store-packages")
+                    .First<dynamic>();
+                var bulkEngine = bulkEngineRow == null ? null : JObject.FromObject(bulkEngineRow);
+                var bulkCode = bulkEngine?.Value<string>("ApiV8Code") ?? string.Empty;
+                var bulkVersionMatch = Regex.Match(bulkCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
+                var bulkVersion = new System.Version(0, 0, 0);
+                if (bulkEngine == null
+                    || !bulkVersionMatch.Success
+                    || !System.Version.TryParse(bulkVersionMatch.Groups[1].Value, out bulkVersion)
+                    || bulkVersion < new System.Version(1, 1, 1)
+                    || bulkEngine.Value<int?>("IsEnable") != 1
+                    || bulkEngine.Value<int?>("StopHttp") != 0
+                    || !bulkCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2")
+                    || !bulkCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1"))
+                {
+                    return RefreshRequired(osClient, "应用商城全部安装/更新接口缺失或版本过低");
                 }
 
                 var publisherCode = client.Db.FromSql(@"SELECT ApiV8Code FROM sys_apiengine
@@ -346,8 +370,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
         /// </summary>
         internal static bool IsOfficialSourceTenant(string osClient)
         {
-            return string.Equals(osClient, "iTdos", StringComparison.OrdinalIgnoreCase)
-                   && Microi.License.LicenseService.HasPrivateKey();
+            return Microi.License.LicenseService.IsOfficialPlatform(osClient);
         }
 
         private static readonly string[] CoreNullableTables =
@@ -480,7 +503,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 8, 3) ||
+                    importerVersion < new System.Version(1, 8, 6) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -502,7 +525,8 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("BACKGROUND_TASK_RUNTIME_SCOPE_V1") ||
                     !content.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
                     !content.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
-                    !content.Contains("DATASET_INSERT_IF_MISSING_V1"))
+                    !content.Contains("DATASET_INSERT_IF_MISSING_V1") ||
+                    !content.Contains("PACKAGE_API_ENGINE_READBACK_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
@@ -575,13 +599,22 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "import-microi-store-package", StringComparison.Ordinal));
                 var importerEngineCode = importerEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var importerEngineVersionText = importerEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
+                var bulkEngine = packageEngines?
+                    .FirstOrDefault(item => string.Equals(item?["ApiEngineKey"]?.ToString(), "bulk-import-microi-store-packages", StringComparison.Ordinal));
+                var bulkEngineCode = bulkEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
+                var bulkEngineVersionText = bulkEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(6, 5, 16) ||
+                    packageVersion < new System.Version(7, 0, 5) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 8, 3) ||
+                    embeddedImporterVersion < new System.Version(1, 8, 6) ||
+                    !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
+                    embeddedBulkVersion < new System.Version(1, 1, 1) ||
+                    bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
+                    bulkEngine?["StopHttp"]?.Value<int>() != 0 ||
                     !content.Contains("TargetSysMenuId") ||
                     !content.Contains("01KXFSG7MZ40CY8KCWCZZZJH2M") ||
                     !content.Contains("01KXFSG8153B3VZPZ45WNCCFHR") ||
+                    !content.Contains("RunBackground('bulk-import-microi-store-packages'") ||
                     !buildZipEngineCode.Contains("REAL_BUILD_ZIP_ASSETS_V1") ||
                     !sourceZipEngineCode.Contains("SOURCE_ONLY_ZIP_ROOT_V1") ||
                     !importerEngineCode.Contains("SKIP_MOVE_FOR_REUSED_BUILD_V1") ||
@@ -592,7 +625,10 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("BACKGROUND_TASK_RUNTIME_SCOPE_V1") ||
                     !importerEngineCode.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
                     !importerEngineCode.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
-                    !importerEngineCode.Contains("DATASET_INSERT_IF_MISSING_V1"))
+                    !importerEngineCode.Contains("DATASET_INSERT_IF_MISSING_V1") ||
+                    !importerEngineCode.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
+                    !bulkEngineCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2") ||
+                    !bulkEngineCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少页面Tab关联模块配置，拒绝覆盖客户数据库。");
                 }

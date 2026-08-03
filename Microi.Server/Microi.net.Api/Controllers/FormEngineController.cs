@@ -2338,6 +2338,22 @@ namespace Microi.net.Api
             return Json(result);
         }
 
+        [HttpPost("~/api/DiyField/RepairFixedDiyFieldMetadata")]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> RepairFixedDiyFieldMetadata(DiyFieldParam param)
+        {
+            await DefaultDiyFieldParam(param);
+            if (!(MicroiEngine.FormEngine is FormEngine formEngine))
+            {
+                return Json(new DosResult<object>(0, null, "当前表单引擎不支持固定审计字段修复。"));
+            }
+            var result = await formEngine.EnsureFixedDiyFieldMetadataAsync(
+                param.OsClient,
+                param.TableId,
+                param.TableName);
+            return Json(result);
+        }
+
         [HttpPost]
         [HttpPost("~/api/DiyField/AddDbField")]
         [PlatformAdminOnly]

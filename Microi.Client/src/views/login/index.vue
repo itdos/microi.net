@@ -1295,9 +1295,14 @@ export default {
             } else {
                 var url = "/";
                 var fallbackUrl = getFirstValidRoutePath(accessRoutes.length > 0 ? accessRoutes : self.permissionStore.addRoutes);
-                //这里需要跳转到sys_menu的第一个路由
-                //2022-07-05新增：以系统设置的默认首页路由为优先
-                if (self.SysConfig && self.SysConfig.DefaultIndexUrl) {
+                // 优先级：用户个人首页 > 系统默认首页 > 菜单首页 > 首个有权限菜单。
+                // 个人设置只接受内部路由，避免把普通用户字段变成外部跳转入口。
+                var userDefaultIndexUrl = self.LoginResult.Data && self.LoginResult.Data.DefaultIndexUrl
+                    ? String(self.LoginResult.Data.DefaultIndexUrl).trim()
+                    : "";
+                if (userDefaultIndexUrl && !/^(https?:)?\/\//i.test(userDefaultIndexUrl)) {
+                    url = userDefaultIndexUrl;
+                } else if (self.SysConfig && self.SysConfig.DefaultIndexUrl) {
                     url = String(self.SysConfig.DefaultIndexUrl || "");
                     url = url.replace("$V8.CurrentToken$", self.DiyCommon.getToken());
                     if (url.startsWith("/iframe/")) {

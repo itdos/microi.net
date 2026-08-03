@@ -919,6 +919,37 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级28 --2026-08-03【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade28.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade28().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级28 - 2026-08-03】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级28 - 2026-08-03】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade28.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级28失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级28 - 2026-08-03】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {

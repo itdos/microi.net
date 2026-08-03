@@ -145,6 +145,55 @@ namespace Microi.net.Api
             public string Avatar { get; set; }
         }
 
+        public class UpdateMyDefaultIndexUrlRequest
+        {
+            public string DefaultIndexUrl { get; set; }
+        }
+
+        private static bool TryNormalizeDefaultIndexUrl(
+            string value,
+            out string normalized,
+            out string error)
+        {
+            normalized = (value ?? string.Empty).Trim();
+            error = null;
+            if (normalized.Length == 0)
+            {
+                return true;
+            }
+            if (normalized.Length > 500 || normalized.Any(char.IsControl))
+            {
+                error = "登录后首页路由长度不能超过500个字符。";
+                return false;
+            }
+            if (normalized.StartsWith("/#/", StringComparison.Ordinal))
+            {
+                normalized = normalized.Substring(2);
+            }
+            else if (normalized.StartsWith("#/", StringComparison.Ordinal))
+            {
+                normalized = normalized.Substring(1);
+            }
+            if (!normalized.StartsWith("/", StringComparison.Ordinal))
+            {
+                normalized = "/" + normalized;
+            }
+            var routePath = normalized.Split('?', '#')[0];
+            if (normalized.StartsWith("//", StringComparison.Ordinal)
+                || normalized.Contains("\\", StringComparison.Ordinal)
+                || normalized.Contains("://", StringComparison.OrdinalIgnoreCase)
+                || routePath.Contains(":", StringComparison.Ordinal)
+                || routePath.Equals("/login", StringComparison.OrdinalIgnoreCase)
+                || routePath.StartsWith("/login/", StringComparison.OrdinalIgnoreCase)
+                || routePath.Equals("/access-login", StringComparison.OrdinalIgnoreCase)
+                || routePath.StartsWith("/access-login/", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "登录后首页只能使用当前系统内的业务路由。";
+                return false;
+            }
+            return true;
+        }
+
         private static async Task DefaultParam(SysUserParam param)
         {
             var currentTokenDynamic = await DiyToken.GetCurrentToken();
@@ -1575,6 +1624,47 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "SSO登录失败，请联系管理员检查服务配置。"));
             }
+        }
+
+        /// <summary>
+        /// 当前用户自助设置登录后首页。目标用户和租户只取登录 Token，且只允许
+        /// 保存站内路由；真正导航时客户端还会按当前动态菜单权限再次校验。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> UpdateMyDefaultIndexUrl([FromBody] UpdateMyDefaultIndexUrlRequest param)
+        {
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var currentUser = currentToken?.CurrentUser;
+            if (currentUser == null)
+            {
+                Response.StatusCode = 401;
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            }
+
+            if (!TryNormalizeDefaultIndexUrl(param?.DefaultIndexUrl, out var defaultIndexUrl, out var error))
+            {
+                return Json(new DosResult(0, null, error));
+            }
+
+            var userId = currentUser["Id"].Val<string>();
+            var osClient = currentToken.OsClient;
+            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+            {
+                Id = userId,
+                DefaultIndexUrl = defaultIndexUrl,
+                OsClient = osClient
+            });
+            if (updateResult.Code != 1)
+            {
+                return Json(new DosResult(0, null, updateResult.Msg ?? "登录后首页保存失败。"));
+            }
+
+            var refreshResult = await _sysUserLogic.RefreshLoginUser(userId, osClient);
+            if (refreshResult.Code != 1)
+            {
+                return Json(new DosResult(0, null, refreshResult.Msg ?? "设置已保存，但登录信息刷新失败。"));
+            }
+            return Json(new DosResult(1, refreshResult.Data, "登录后首页已保存。"));
         }
 
         /// <summary>
