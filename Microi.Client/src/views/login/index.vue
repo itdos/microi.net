@@ -22,11 +22,111 @@
                         type="text" 
                         size="large"
                         :placeholder="$t('Msg.InputAccount')"
+                        autocomplete="username"
+                        @input="HandleAccountInput"
                     >
                         <template #prefix>
-                            <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
-                                <el-icon color="white"><User /></el-icon>
+                            <div
+                                class="input-icon-wrapper account-avatar-wrapper"
+                                :class="{ 'has-avatar': CurrentAccountAvatarUrl }"
+                                :style="{ backgroundColor: CurrentAccountAvatarUrl ? 'rgba(255, 255, 255, 0.96)' : (SysConfig.ThemeColor || '#409EFF') }"
+                            >
+                                <img
+                                    v-if="CurrentAccountAvatarUrl"
+                                    :src="CurrentAccountAvatarUrl"
+                                    class="account-avatar-img"
+                                    alt=""
+                                    @error="HandleCurrentAccountAvatarError"
+                                />
+                                <el-icon v-else color="white"><User /></el-icon>
                             </div>
+                        </template>
+                        <template #suffix>
+                            <el-popover
+                                v-model:visible="AccountHistoryVisible"
+                                placement="bottom-end"
+                                trigger="click"
+                                :width="340"
+                                :teleported="true"
+                                popper-class="login-account-history-popper"
+                            >
+                                <template #reference>
+                                    <button
+                                        type="button"
+                                        class="input-suffix-action account-history-trigger"
+                                        :class="{ 'is-open': AccountHistoryVisible }"
+                                        :aria-expanded="AccountHistoryVisible ? 'true' : 'false'"
+                                        aria-label="选择历史登录帐号"
+                                        title="选择历史登录帐号"
+                                        @mousedown.prevent
+                                    >
+                                        <el-icon><ArrowDown /></el-icon>
+                                    </button>
+                                </template>
+                                <div class="account-history-panel">
+                                    <div class="account-history-header">
+                                        <div>
+                                            <strong>历史登录帐号</strong>
+                                            <span>选择后自动回填帐号和密码</span>
+                                        </div>
+                                        <button
+                                            v-if="RememberedAccounts.length > 0"
+                                            type="button"
+                                            class="account-history-clear"
+                                            @click="ClearRememberedAccounts"
+                                        >
+                                            清空
+                                        </button>
+                                    </div>
+                                    <div v-if="RememberedAccounts.length > 0" class="account-history-list">
+                                        <div
+                                            v-for="item in RememberedAccounts"
+                                            :key="item.Account"
+                                            class="account-history-item"
+                                            :class="{ 'is-current': IsCurrentRememberedAccount(item) }"
+                                        >
+                                            <button
+                                                type="button"
+                                                class="account-history-main"
+                                                @click="SelectRememberedAccount(item)"
+                                            >
+                                                <span class="account-history-avatar">
+                                                    <img
+                                                        v-if="GetRememberedAvatarSource(item)"
+                                                        :src="GetRememberedAvatarSource(item)"
+                                                        alt=""
+                                                        @error="HandleRememberedAvatarError(item)"
+                                                    />
+                                                    <el-icon v-else><User /></el-icon>
+                                                </span>
+                                                <span class="account-history-copy">
+                                                    <strong>{{ item.Account }}</strong>
+                                                    <span>{{ item.DisplayName || '已记住密码' }}</span>
+                                                </span>
+                                                <el-icon v-if="IsCurrentRememberedAccount(item)" class="account-history-check"><Check /></el-icon>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="account-history-delete"
+                                                :aria-label="'删除帐号 ' + item.Account"
+                                                :title="'删除帐号 ' + item.Account"
+                                                @click.stop="RemoveRememberedAccount(item)"
+                                            >
+                                                <el-icon><Delete /></el-icon>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div v-else class="account-history-empty">
+                                        <span class="account-history-avatar">
+                                            <el-icon><User /></el-icon>
+                                        </span>
+                                        <div>
+                                            <strong>暂无历史帐号</strong>
+                                            <span>勾选“记住密码”并登录成功后会显示在这里</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </el-popover>
                         </template>
                     </el-input>
                 </div>
@@ -38,6 +138,7 @@
                         :type="showPassword ? 'text' : 'password'" 
                         size="large"
                         :placeholder="$t('Msg.InputPwd')" 
+                        autocomplete="current-password"
                         @keyup.enter="Login"
                     >
                         <template #prefix>
@@ -46,15 +147,21 @@
                             </div>
                         </template>
                         <template #suffix>
-                            <span style="padding-left:10px;padding-right: 20px;">
+                            <button
+                                type="button"
+                                class="input-suffix-action"
+                                :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+                                :title="showPassword ? '隐藏密码' : '显示密码'"
+                                @mousedown.prevent
+                                @click="showPassword = !showPassword"
+                            >
                                 <el-icon
-                                    style="cursor: pointer; color: #909399;"
-                                    @click="showPassword = !showPassword"
+                                    class="password-visibility-icon"
                                 >
                                     <View v-if="showPassword" />
                                     <Hide v-else />
                                 </el-icon>
-                            </span>
+                            </button>
                         </template>
                     </el-input>
                 </div>
@@ -86,6 +193,13 @@
                             </div>
                         </template>
                     </el-input>
+                </div>
+
+                <div class="login-preferences-row">
+                    <el-checkbox v-model="RememberPassword" class="remember-password-checkbox">
+                        记住密码
+                    </el-checkbox>
+                    <span class="remember-password-hint">仅在此设备本地加密保存，请勿在公共设备勾选</span>
                 </div>
 
                 <!-- 界面风格选择 -->
@@ -285,13 +399,20 @@ import Cookies from "js-cookie";
 import { getLangs } from "@/utils/langs";
 import JSEncrypt from "jsencrypt"; // RSA加密库
 // Element Plus 图标
-import { User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from "@element-plus/icons-vue";
+import { ArrowDown, Check, Delete, User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from "@element-plus/icons-vue";
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import config from "@/config.json";
+import {
+    clearRememberedLoginAccounts,
+    readRememberedLoginAccounts,
+    removeRememberedLoginAccount,
+    updateRememberedLoginAccountProfile,
+    upsertRememberedLoginAccount
+} from "@/utils/login-credential-history.js";
 
 // 历史兼容公钥：仅用于避免登录密码在请求体中直接显示，不替代 HTTPS。
 // 显式部署配置仍然优先；未配置时保持旧版客户端与旧版服务端完全兼容。
@@ -313,6 +434,9 @@ const resolveLoginRsaPublicKey = (serverPublicKey = "") => {
 export default {
     name: "Login",
     components: {
+        ArrowDown,
+        Check,
+        Delete,
         User,
         Key,
         Lock,
@@ -411,6 +535,13 @@ export default {
             Account: "",
             Pwd: "",
             showPassword: false,
+            RememberPassword: false,
+            RememberedAccounts: [],
+            AccountHistoryVisible: false,
+            SelectedRememberedAccount: "",
+            CurrentAccountAvatarUrl: "",
+            AvatarResolveVersion: 0,
+            LoginComponentUnmounted: false,
             tipId: "",
             redirect: undefined,
             otherQuery: {},
@@ -435,6 +566,7 @@ export default {
     // Vue 3: beforeDestroy 改为 beforeUnmount
     beforeUnmount() {
         var self = this;
+        self.LoginComponentUnmounted = true;
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
             clearInterval(timer);
@@ -451,6 +583,14 @@ export default {
                 }
             },
             immediate: true
+        },
+        OsClient: function (value, previousValue) {
+            if (value === previousValue) return;
+            this.LoadRememberedAccounts();
+            this.RestoreRememberedAccount(this.Account || this.diyStore.getLastLoginAccount());
+        },
+        GetCurrentUser: function () {
+            this.RefreshCurrentAccountAvatar();
         }
     },
     mounted() {
@@ -479,9 +619,12 @@ export default {
         });
         // 已改用 CSS transform: translate(-50%, -50%) 实现居中，无需 jQuery 计算
 
+        self.LoadRememberedAccounts();
         var lastAccount = self.diyStore.getLastLoginAccount();
         if (!self.DiyCommon.IsNull(lastAccount)) {
-            self.Account = lastAccount;
+            self.RestoreRememberedAccount(lastAccount);
+        } else {
+            self.RefreshCurrentAccountAvatar();
         }
         self.$nextTick(function () {
             if (self.DiyCommon.ShowVideo()) {
@@ -537,6 +680,211 @@ export default {
                 return text === "1" || text === "true" || text === "yes" || text === "on";
             }
             return false;
+        },
+        NormalizeLoginAccount(value) {
+            return String(value == null ? "" : value).trim().toLowerCase();
+        },
+        GetCredentialStorageOptions() {
+            return {
+                storage: window.localStorage,
+                osClient: this.OsClient
+            };
+        },
+        FindRememberedAccount(account) {
+            var normalized = this.NormalizeLoginAccount(account);
+            return this.RememberedAccounts.find((item) => this.NormalizeLoginAccount(item.Account) === normalized) || null;
+        },
+        LoadRememberedAccounts() {
+            this.RememberedAccounts = readRememberedLoginAccounts(this.GetCredentialStorageOptions());
+        },
+        RestoreRememberedAccount(account) {
+            var value = String(account == null ? "" : account).trim();
+            this.Account = value;
+            var remembered = this.FindRememberedAccount(value);
+            if (remembered) {
+                this.Pwd = remembered.Password;
+                this.RememberPassword = true;
+                this.SelectedRememberedAccount = remembered.Account;
+            } else {
+                this.Pwd = "";
+                this.RememberPassword = false;
+                this.SelectedRememberedAccount = "";
+            }
+            this.RefreshCurrentAccountAvatar();
+        },
+        HandleAccountInput(value) {
+            if (
+                this.SelectedRememberedAccount
+                && this.NormalizeLoginAccount(value) !== this.NormalizeLoginAccount(this.SelectedRememberedAccount)
+            ) {
+                // 避免切换/编辑帐号后仍误用上一个帐号的已回填密码。
+                this.Pwd = "";
+                this.SelectedRememberedAccount = "";
+            }
+            this.RefreshCurrentAccountAvatar();
+        },
+        SelectRememberedAccount(item) {
+            if (!item) return;
+            this.Account = item.Account;
+            this.Pwd = item.Password;
+            this.RememberPassword = true;
+            this.SelectedRememberedAccount = item.Account;
+            this.AccountHistoryVisible = false;
+            this.RefreshCurrentAccountAvatar();
+        },
+        RemoveRememberedAccount(item) {
+            if (!item) return;
+            var isSelected = this.NormalizeLoginAccount(this.Account) === this.NormalizeLoginAccount(item.Account);
+            this.RememberedAccounts = removeRememberedLoginAccount({
+                ...this.GetCredentialStorageOptions(),
+                account: item.Account
+            });
+            if (isSelected) {
+                this.Pwd = "";
+                this.RememberPassword = false;
+                this.SelectedRememberedAccount = "";
+            }
+            this.RefreshCurrentAccountAvatar();
+        },
+        ClearRememberedAccounts() {
+            var self = this;
+            self.AccountHistoryVisible = false;
+            self.DiyCommon.OsConfirm("确认清空当前系统已记住的全部登录帐号？", function () {
+                clearRememberedLoginAccounts(self.GetCredentialStorageOptions());
+                self.RememberedAccounts = [];
+                self.Pwd = "";
+                self.RememberPassword = false;
+                self.SelectedRememberedAccount = "";
+                self.RefreshCurrentAccountAvatar();
+            });
+        },
+        IsCurrentRememberedAccount(item) {
+            return !!item && this.NormalizeLoginAccount(item.Account) === this.NormalizeLoginAccount(this.Account);
+        },
+        GetRememberedAvatarSource(item) {
+            if (!item) return "";
+            if (item.AvatarDataUrl) return item.AvatarDataUrl;
+            var avatar = String(item.Avatar || "").trim();
+            if (/^(?:https?:|data:)/i.test(avatar) || avatar.startsWith(".")) return avatar;
+            return "";
+        },
+        HandleCurrentAccountAvatarError() {
+            this.AvatarResolveVersion += 1;
+            this.CurrentAccountAvatarUrl = "";
+        },
+        HandleRememberedAvatarError(item) {
+            if (!item) return;
+            item.AvatarDataUrl = "";
+            item.Avatar = "";
+            if (this.IsCurrentRememberedAccount(item)) {
+                this.CurrentAccountAvatarUrl = "";
+            }
+        },
+        async RefreshCurrentAccountAvatar() {
+            var resolveVersion = ++this.AvatarResolveVersion;
+            var account = this.NormalizeLoginAccount(this.Account);
+            var remembered = this.FindRememberedAccount(account);
+            this.CurrentAccountAvatarUrl = this.GetRememberedAvatarSource(remembered);
+
+            var currentUser = this.GetCurrentUser || {};
+            if (!account || this.NormalizeLoginAccount(currentUser.Account) !== account) return;
+            var avatar = String(currentUser.Avatar || currentUser.HeadIcon || currentUser.HeadImg || "").trim();
+            if (!avatar) return;
+
+            var canResolveWithoutToken = /^(?:https?:|data:|blob:)/i.test(avatar) || avatar.startsWith(".");
+            if (!canResolveWithoutToken && !this.DiyCommon.getToken()) return;
+            var avatarUrl = await this.DiyCommon.GetUserAvatarUrl(avatar, currentUser.Id);
+            if (
+                resolveVersion === this.AvatarResolveVersion
+                && account === this.NormalizeLoginAccount(this.Account)
+                && avatarUrl
+            ) {
+                this.CurrentAccountAvatarUrl = avatarUrl;
+            }
+        },
+        PersistRememberedLogin(user) {
+            var account = String((user && user.Account) || this.Account || "").trim();
+            if (!account) return;
+            var options = {
+                ...this.GetCredentialStorageOptions(),
+                account: account
+            };
+            if (this.RememberPassword) {
+                this.RememberedAccounts = upsertRememberedLoginAccount({
+                    ...options,
+                    password: this.Pwd,
+                    user: user
+                });
+                var savedAccount = this.FindRememberedAccount(account);
+                if (!savedAccount || savedAccount.Password !== this.Pwd) {
+                    this.DiyCommon.Tips("当前浏览器无法保存记住密码记录，请检查本地存储权限。", false);
+                    return;
+                }
+                this.SelectedRememberedAccount = account;
+                this.CacheRememberedAccountAvatar(user);
+            } else {
+                this.RememberedAccounts = removeRememberedLoginAccount(options);
+                this.SelectedRememberedAccount = "";
+            }
+        },
+        async CacheRememberedAccountAvatar(user) {
+            var account = String((user && user.Account) || this.Account || "").trim();
+            var avatar = String((user && (user.Avatar || user.HeadIcon || user.HeadImg)) || "").trim();
+            if (!account || !avatar || !this.FindRememberedAccount(account)) return;
+            try {
+                var avatarUrl = await this.DiyCommon.GetUserAvatarUrl(avatar, user && user.Id);
+                var avatarDataUrl = await this.CreateAvatarThumbnailDataUrl(avatarUrl);
+                if (!avatarDataUrl) return;
+                updateRememberedLoginAccountProfile({
+                    ...this.GetCredentialStorageOptions(),
+                    account: account,
+                    user: user,
+                    avatarDataUrl: avatarDataUrl
+                });
+                if (!this.LoginComponentUnmounted) {
+                    this.LoadRememberedAccounts();
+                    this.RefreshCurrentAccountAvatar();
+                }
+            } catch (error) {
+                // 头像快照是体验增强；失败时保留帐号密码记录并回退到默认用户图标。
+            }
+        },
+        async CreateAvatarThumbnailDataUrl(source) {
+            var avatarUrl = String(source || "").trim();
+            if (!avatarUrl || typeof window.fetch !== "function") return "";
+            var objectUrl = "";
+            try {
+                var absoluteUrl = new URL(avatarUrl, window.location.href);
+                var response = await window.fetch(absoluteUrl.href, {
+                    credentials: absoluteUrl.origin === window.location.origin ? "include" : "omit",
+                    cache: "force-cache"
+                });
+                if (!response.ok) return "";
+                var blob = await response.blob();
+                if (!blob || blob.size > 4 * 1024 * 1024 || (blob.type && !blob.type.startsWith("image/"))) return "";
+                objectUrl = URL.createObjectURL(blob);
+                var image = await new Promise(function (resolve, reject) {
+                    var element = new Image();
+                    element.onload = function () { resolve(element); };
+                    element.onerror = reject;
+                    element.src = objectUrl;
+                });
+                var side = Math.min(image.naturalWidth || image.width, image.naturalHeight || image.height);
+                if (!side) return "";
+                var canvas = document.createElement("canvas");
+                canvas.width = 64;
+                canvas.height = 64;
+                var context = canvas.getContext("2d");
+                if (!context) return "";
+                var sourceX = ((image.naturalWidth || image.width) - side) / 2;
+                var sourceY = ((image.naturalHeight || image.height) - side) / 2;
+                context.drawImage(image, sourceX, sourceY, side, side, 0, 0, 64, 64);
+                return canvas.toDataURL("image/png");
+            } catch (error) {
+                return "";
+            } finally {
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+            }
         },
         normalizeIframeRouteUrl(url) {
             if (!url) return url;
@@ -852,6 +1200,7 @@ export default {
                 // }
                 if (self.DiyCommon.Result(result)) {
                     self.LoginResult = result;
+                    self.PersistRememberedLogin(result.Data || {});
                     if (false) {
                         //self.OsClient == 'Tdx' || self.OsClient == 'Nbgysh'
                         self.diyStore.setState("SystemStyle", "WebOS");
@@ -1090,12 +1439,303 @@ export default {
         .el-input__prefix {
             margin-right: 0;
         }
+
+        .el-input__suffix {
+            margin-left: 0;
+        }
         
         .el-input__inner {
             padding-left: 8px;
             height: 40px;
         }
     }
+}
+
+.account-avatar-wrapper.has-avatar {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55) inset;
+}
+
+.account-avatar-img {
+    width: 30px;
+    height: 30px;
+    display: block;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--el-fill-color-light, #f5f7fa);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.input-suffix-action {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--el-text-color-secondary, #909399);
+    background: transparent;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+
+    &:hover,
+    &:focus-visible {
+        color: var(--el-color-primary);
+        background: var(--el-fill-color-light, #f5f7fa);
+    }
+
+    &:active {
+        transform: scale(0.94);
+    }
+
+    .el-icon {
+        font-size: 18px;
+    }
+}
+
+.account-history-trigger .el-icon {
+    transition: transform 180ms ease;
+}
+
+.account-history-trigger.is-open .el-icon {
+    transform: rotate(180deg);
+}
+
+.login-preferences-row {
+    min-height: 40px;
+    margin: -8px 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+}
+
+.remember-password-checkbox {
+    min-height: 40px;
+    flex: 0 0 auto;
+
+    :deep(.el-checkbox__label) {
+        color: #fff;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    :deep(.el-checkbox__inner) {
+        border-color: rgba(255, 255, 255, 0.65);
+        background-color: rgba(255, 255, 255, 0.08);
+    }
+}
+
+.remember-password-hint {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    line-height: 1.45;
+    text-align: right;
+}
+
+:global(.login-account-history-popper.el-popper) {
+    max-width: calc(100vw - 24px);
+    padding: 0 !important;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid var(--el-border-color-light, #e4e7ed) !important;
+    border-radius: 14px !important;
+    background: var(--el-bg-color-overlay, #fff) !important;
+    box-shadow: 0 16px 42px rgba(31, 41, 55, 0.2), 0 3px 10px rgba(31, 41, 55, 0.08) !important;
+}
+
+:global(.login-account-history-popper .account-history-panel) {
+    color: var(--el-text-color-primary, #303133);
+}
+
+:global(.login-account-history-popper .account-history-header) {
+    min-height: 64px;
+    padding: 13px 14px 11px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--el-border-color-lighter, #ebeef5);
+    background: linear-gradient(135deg, var(--el-color-primary-light-9, #ecf5ff), var(--el-bg-color-overlay, #fff));
+}
+
+:global(.login-account-history-popper .account-history-header > div) {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+:global(.login-account-history-popper .account-history-header strong) {
+    font-size: 14px;
+    line-height: 1.35;
+}
+
+:global(.login-account-history-popper .account-history-header span) {
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+:global(.login-account-history-popper .account-history-clear) {
+    min-width: 44px;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 8px;
+    color: var(--el-color-danger, #f56c6c);
+    background: transparent;
+    cursor: pointer;
+}
+
+:global(.login-account-history-popper .account-history-clear:hover),
+:global(.login-account-history-popper .account-history-clear:focus-visible) {
+    background: var(--el-color-danger-light-9, #fef0f0);
+    outline: none;
+}
+
+:global(.login-account-history-popper .account-history-list) {
+    max-height: 304px;
+    padding: 8px;
+    overflow: auto;
+}
+
+:global(.login-account-history-popper .account-history-item) {
+    min-height: 58px;
+    display: flex;
+    align-items: stretch;
+    border-radius: 10px;
+    transition: background-color 180ms ease;
+}
+
+:global(.login-account-history-popper .account-history-item:hover),
+:global(.login-account-history-popper .account-history-item.is-current) {
+    background: var(--el-color-primary-light-9, #ecf5ff);
+}
+
+:global(.login-account-history-popper .account-history-main) {
+    min-width: 0;
+    min-height: 58px;
+    padding: 8px 6px 8px 8px;
+    border: 0;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+:global(.login-account-history-popper .account-history-main:focus-visible) {
+    outline: 2px solid var(--el-color-primary);
+    outline-offset: -2px;
+    border-radius: 10px;
+}
+
+:global(.login-account-history-popper .account-history-avatar) {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 50%;
+    color: #fff;
+    background: var(--el-color-primary);
+    box-shadow: 0 3px 10px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.22);
+}
+
+:global(.login-account-history-popper .account-history-avatar img) {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+}
+
+:global(.login-account-history-popper .account-history-copy) {
+    min-width: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+}
+
+:global(.login-account-history-popper .account-history-copy strong) {
+    overflow: hidden;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:global(.login-account-history-popper .account-history-copy span) {
+    overflow: hidden;
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 11px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:global(.login-account-history-popper .account-history-check) {
+    flex: 0 0 auto;
+    color: var(--el-color-primary);
+    font-size: 16px;
+}
+
+:global(.login-account-history-popper .account-history-delete) {
+    width: 40px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--el-text-color-placeholder, #a8abb2);
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+:global(.login-account-history-popper .account-history-delete:hover),
+:global(.login-account-history-popper .account-history-delete:focus-visible) {
+    color: var(--el-color-danger, #f56c6c);
+    background: var(--el-color-danger-light-9, #fef0f0);
+    outline: none;
+}
+
+:global(.login-account-history-popper .account-history-empty) {
+    min-height: 112px;
+    padding: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+:global(.login-account-history-popper .account-history-empty > div) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+:global(.login-account-history-popper .account-history-empty strong) {
+    font-size: 13px;
+}
+
+:global(.login-account-history-popper .account-history-empty span:not(.account-history-avatar)) {
+    max-width: 220px;
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 11px;
+    line-height: 1.5;
 }
 
 /* 图标容器样式 */
@@ -1422,33 +2062,52 @@ export default {
     }
 
     .divLoginCenter {
-        width: 420px;
-        max-width: 90%;
+        width: 500px;
+        max-width: calc(100vw - 32px);
         padding: 40px;
+        box-sizing: border-box;
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
         margin-top: 0 !important;
-        transition: all 0.7s ease;
+        transition: opacity 0.7s ease;
         border-radius: 12px;
         :deep(.el-checkbox__input.is-checked + .el-checkbox__label){
             color: #fff !important;
         }
     }
 
-    @media (min-width: 1365px) {
+    @media (min-width: 1200px) {
         .divLoginCenter {
-            width: 500px;
-            max-width: 90%;
+            // 固定外框为原宽屏实际视觉宽度，避免 1366px 下滚动条出现后跨断点导致退出登录时骤然变窄。
+            width: 620px;
             padding: 50px 60px;
         }
     }
     
     @media (max-width: 768px) {
         .divLoginCenter {
-            width: 95%;
+            width: calc(100vw - 24px);
+            max-width: 500px;
             padding: 30px 25px;
+        }
+
+        .login-preferences-row {
+            min-height: 44px;
+            align-items: flex-start;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0;
+        }
+
+        .remember-password-checkbox {
+            min-height: 32px;
+        }
+
+        .remember-password-hint {
+            padding-left: 24px;
+            text-align: left;
         }
         
         .login-title {

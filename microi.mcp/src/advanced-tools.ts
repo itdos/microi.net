@@ -518,6 +518,28 @@ function getBoolean(record: JsonRecord, ...keys: string[]): boolean | undefined 
   return undefined;
 }
 
+function validateV8Unlimited(
+  record: JsonRecord,
+  path: string,
+  errors: string[],
+  warnings: string[],
+): boolean | undefined {
+  const raw = getValue(record, 'v8Unlimited', 'V8Unlimited');
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const value = getBoolean(record, 'v8Unlimited', 'V8Unlimited');
+  if (value === undefined) {
+    errors.push(`${path}.v8Unlimited 必须是 boolean 或 0/1`);
+    return undefined;
+  }
+  if (value) {
+    warnings.push(
+      `${path}.v8Unlimited=true 会取消该接口或该表后端 V8 事件的单次 Jint 超时、语句、递归和累计分配预算；`
+      + '仅在业务明确要求单事务且已评估数据库锁、回滚、连接超时与进程内存风险时开启。进程常驻内存保护仍生效，且不会向嵌套接口继承。',
+    );
+  }
+  return value;
+}
+
 const VIEW_SCHEMA_SCENES = ['Detail', 'Edit', 'List', 'Card'];
 const VIEW_SCHEMA_DEVICES = ['PC', 'Mobile', 'All'];
 const VIEW_SCHEMA_ACTION_TYPES = [
@@ -1167,7 +1189,7 @@ function buildDefaultTableLayout(table: JsonRecord): TableLayoutDefaults {
   };
 }
 
-function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; warnings: string[] } {
+export function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; warnings: string[] } {
   const errors: string[] = [];
   const warnings: string[] = [];
   const plan: string[] = [];
@@ -1192,6 +1214,7 @@ function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; wa
   tables.forEach((table, tableIndex) => {
     const name = getString(table, 'name', 'Name');
     if (!name) errors.push(`tables[${tableIndex}].name 不能为空`);
+    validateV8Unlimited(table, `tables[${tableIndex}]`, errors, warnings);
     plan.push(`create_table ${name || `(index ${tableIndex})`}`);
     const layout = buildDefaultTableLayout(table);
     if (layout.tabs?.length) {
@@ -1231,7 +1254,12 @@ function buildPlan(manifest: JsonRecord): { plan: string[]; errors: string[]; wa
     });
   });
   dataSources.forEach((item) => plan.push(`save_data_source ${getString(item, 'dataSourceKey', 'DataSourceKey')}`));
-  engines.forEach((item) => plan.push(`upsert_engine ${getString(item, 'apiEngineKey', 'ApiEngineKey')}`));
+  engines.forEach((item, engineIndex) => {
+    const key = getString(item, 'apiEngineKey', 'ApiEngineKey');
+    if (!key) errors.push(`engines[${engineIndex}].apiEngineKey 不能为空`);
+    validateV8Unlimited(item, `engines[${engineIndex}]`, errors, warnings);
+    plan.push(`upsert_engine ${key}`);
+  });
   events.forEach((item) => plan.push(`save_event ${getString(item, 'formEngineKey', 'FormEngineKey')}/${getString(item, 'eventType', 'EventType')}`));
   modules.forEach((item) => {
     const normalized = normalizeAllMenuJson(item);
@@ -1508,12 +1536,41 @@ async function upsertEngine(client: MicroiClient, engine: JsonRecord): Promise<A
   const apiEngineKey = getString(engine, 'apiEngineKey', 'ApiEngineKey');
   const apiName = getString(engine, 'apiName', 'ApiName', 'name', 'Name') || apiEngineKey;
   const category = getString(engine, 'category', 'Category') || 'AI生成';
-  const code = getString(engine, 'code', 'Code', 'ApiV8Code');
+  const rawCode = getValue(engine, 'code', 'Code', 'ApiV8Code');
+  const codeProvided = typeof rawCode === 'string';
+  const code = codeProvided ? String(rawCode) : '';
+  const v8Unlimited = getBoolean(engine, 'v8Unlimited', 'V8Unlimited');
   const existing = await client.getEngineCode(apiEngineKey);
   if (existing.Code === 1) {
-    return client.saveEngineCode(apiEngineKey, code);
+    if (!codeProvided && v8Unlimited !== undefined) {
+      return client.updateEngineRuntimeConfig(apiEngineKey, v8Unlimited);
+    }
+    if (!codeProvided) {
+      return {
+        Code: 1,
+        Data: {
+          ApiEngineKey: apiEngineKey,
+          V8Unlimited: Number(existing.Data?.V8Unlimited || 0),
+          Skipped: true,
+        },
+        Msg: '接口引擎已存在，Manifest 未提供 code 或 V8Unlimited，保持原配置',
+      };
+    }
+    return client.saveEngineCode(apiEngineKey, code, {
+      functionDescription: getString(engine, 'functionDescription', 'FunctionDescription') || undefined,
+      changeSummary: getString(engine, 'changeSummary', 'ChangeSummary') || undefined,
+      v8Unlimited,
+    });
   }
-  return client.createEngine({ ApiEngineKey: apiEngineKey, ApiName: apiName, Category: category, Code: code });
+  return client.createEngine({
+    ApiEngineKey: apiEngineKey,
+    ApiName: apiName,
+    Category: category,
+    Code: code,
+    V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
+    functionDescription: getString(engine, 'functionDescription', 'FunctionDescription') || undefined,
+    changeSummary: getString(engine, 'changeSummary', 'ChangeSummary') || undefined,
+  });
 }
 
 function modulePayload(module: JsonRecord, tableIdByName: Map<string, string>, moduleIdByName?: Map<string, string>, fieldLookup?: FieldLookup): JsonRecord {
@@ -1625,7 +1682,7 @@ function jobPayload(job: JsonRecord): JsonRecord {
   });
 }
 
-function manifestGuide(osClient: string | undefined): JsonRecord {
+export function manifestGuide(osClient: string | undefined): JsonRecord {
   const confirmTarget = osClient || 'EXECUTE';
   return {
     osClient,
@@ -1643,6 +1700,7 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
       tables: [{
         name: 'Biz_Order',
         description: 'Order main table',
+        v8Unlimited: false,
         tabs: [{ Id: 'basic', Name: 'Basic Info', Sort: 10 }, { Id: 'business', Name: 'Business Info', Sort: 20 }],
         fields: [
           { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
@@ -1655,7 +1713,7 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
         ],
       }],
       engines: [
-        { apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', code: "return { Code: 1, Data: V8.Param };" },
+        { apiEngineKey: 'biz_order_submit', apiName: 'Submit order', category: 'Biz_Order', v8Unlimited: false, code: "return { Code: 1, Data: V8.Param };" },
         {
           apiEngineKey: 'biz_order_metrics',
           apiName: 'Order metrics',
@@ -1782,6 +1840,10 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
         tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
         column: 'Form column count. Omit to use 2 columns for generated systems unless the user asks for a single-column form.',
         indexes: 'Physical database indexes. Declare ordered columns and unique. Required indexes must be created by microi_create_table_index or manifest generation, never by ad-hoc SQL. Tenant tables should usually lead with OsClient.',
+        v8Unlimited: 'Default false. Set true only when this table\'s backend V8 events must keep one database transaction and the user explicitly accepts unbounded Jint per-execution budgets. Process resident-memory protection remains active.',
+      },
+      engines: {
+        v8Unlimited: 'Default false. Explicit high-risk opt-in for one API engine. It does not inherit to nested API engines; each child must opt in separately. Omit to preserve an existing engine setting during upsert.',
       },
       fields: {
         component: 'Use the real Microi component name. Available controls include Text, Textarea, NumberText, DateTime, Select, MultipleSelect, Radio, Checkbox, Switch, Rate, Progress, Slider, ColorPicker, AutoNumber, Divider, CollapseGroup, Tabs, Alert, StaticText, Html, RichText, CodeEditor, JsonTable, ImgUpload, FileUpload, Autocomplete, TagInput, Transfer, Cascader, Address, Department, SelectTree, TreeCheckbox, OpenTable, JoinTable, JoinForm, TableChild, Map, MapArea, Qrcode, FontAwesome, DevComponent.',
@@ -1810,6 +1872,7 @@ function manifestGuide(osClient: string | undefined): JsonRecord {
       'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
       'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
       'Use parameterized V8.Db SQL or V8.FormEngine CRUD in engine/event code.',
+      'Never infer v8Unlimited=true from data volume alone. Enable it only for an explicit single-transaction requirement after warning about database locks, rollback cost, connection timeout and process memory; the resident-memory guard remains active.',
       'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
       'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
       'Do not use diy_table.DiyConfig, diy_field.DiyConfig or sys_menu.DiyConfig for new configuration. Add dedicated physical columns and expose them through DIY metadata.',
@@ -1952,6 +2015,9 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
             Column: getNumber(table, 'column', 'Column') ?? tableLayout.column ?? 2,
             FormOpenType: getString(table, 'formOpenType', 'FormOpenType'),
             FormOpenWidth: getString(table, 'formOpenWidth', 'FormOpenWidth'),
+            V8Unlimited: getBoolean(table, 'v8Unlimited', 'V8Unlimited') === undefined
+              ? undefined
+              : (getBoolean(table, 'v8Unlimited', 'V8Unlimited') ? 1 : 0),
           });
           results.push({ step: 'createTable', tableName, response });
           if (response.Code !== 1) return textResult(JSON.stringify({ ok: false, failedAt: 'createTable', tableName, response, results }, null, 2), true);
@@ -2147,7 +2213,7 @@ export function registerAdvancedTools(server: McpServer, client: MicroiClient, c
     return apiText('Update Module', await client.updateModule(normalized.data));
   });
 
-  server.tool('microi_upsert_engine', `Create an API engine if missing, otherwise update its code. OsClient ${osClient}.`, { engine: jsonRecordSchema, confirmExecution: z.string().optional() }, async ({ engine, confirmExecution }) => {
+  server.tool('microi_upsert_engine', `Create an API engine if missing, otherwise update only the supplied code and/or v8Unlimited setting. Omitted v8Unlimited preserves the current value; omitted code never clears existing source. v8Unlimited is a high-risk explicit opt-in, keeps the resident-memory guard, and does not inherit to nested engines. OsClient ${osClient}.`, { engine: jsonRecordSchema.describe('Fields include apiEngineKey, apiName, category, code and optional boolean v8Unlimited'), confirmExecution: z.string().optional() }, async ({ engine, confirmExecution }) => {
     const key = getString(engine, 'apiEngineKey', 'ApiEngineKey');
     if (!key) return textResult('ApiEngineKey 不能为空', true);
     if (confirmExecution !== key && confirmExecution !== 'EXECUTE') return textResult(`写入已拦截：请传 confirmExecution="${key}" 或 "EXECUTE"。`, true);

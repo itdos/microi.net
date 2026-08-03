@@ -123,6 +123,10 @@ namespace Microi.net.Api
             var osClient = V8McpLogic.ResolveOsClient(param.Value<string>("OsClient"), (object)token);
             var apiEngineKey = param.Value<string>("ApiEngineKey");
             if (string.IsNullOrWhiteSpace(apiEngineKey)) return Ok(new DosResult(0, null, "ApiEngineKey 不能为空"));
+            var hasCodePayload = param["ApiV8CodeBase64"] != null
+                || param["CodeBase64"] != null
+                || param["ApiV8Code"] != null
+                || param["Code"] != null;
             // 兼容 MCP 客户端发送 Code 和 VSCode 扩展发送 ApiV8Code
             var codeBase64 = param.Value<string>("ApiV8CodeBase64") ?? param.Value<string>("CodeBase64");
             string code;
@@ -139,7 +143,9 @@ namespace Microi.net.Api
             var result = await V8McpLogic.UpdateApiEngineCode(
                 osClient, apiEngineKey, code,
                 param.Value<string>("Version"),
-                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"));
+                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"),
+                param["V8Unlimited"]?.Val<int?>(),
+                hasCodePayload);
             return Ok(result);
         }
 
@@ -171,7 +177,8 @@ namespace Microi.net.Api
                 param["Lock"].Val<int>(), param["AllowAnonymous"].Val<int>(),
                 param["IsEnable"]?.Val<int>() ?? 1, param["Category"].Val<string>(), code,
                 param.Value<string>("Version"),
-                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"));
+                param.Value<string>("ChangeHistory") ?? param.Value<string>("ChangeSummary"),
+                param["V8Unlimited"]?.Val<int?>() == 1 ? 1 : 0);
             return Ok(result);
         }
 
@@ -831,7 +838,7 @@ namespace Microi.net.Api
             var result = await V8McpLogic.CreateTable(osClient, name, param["Description"].Val<string>(),
                 param["Tabs"].Val<string>(), param["IsTree"]?.Val<int>() ?? 0,
                 param["Column"]?.Val<int>() ?? 1, param["FormOpenType"].Val<string>(),
-                param["FormOpenWidth"].Val<string>());
+                param["FormOpenWidth"].Val<string>(), param["V8Unlimited"]?.Val<int?>());
             return Ok(result);
         }
 

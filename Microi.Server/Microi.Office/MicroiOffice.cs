@@ -1500,41 +1500,24 @@ namespace Microi.net
             DiyFieldConfig relationConfig)
         {
             var result = new List<ImportChildParentMatch>();
-            var tableChildConfig = relationConfig?.TableChild;
-            if (tableChildConfig?.ImportRelations != null)
+            var relations = DiyTableChildFieldRelationHelper.GetRelations(relationConfig);
+            foreach (var relation in relations.Where(d => d.ImportMatch))
             {
-                foreach (var relation in tableChildConfig.ImportRelations)
-                {
-                    var parentKey = relation.ParentFieldName.DosIsNullOrWhiteSpace(relation.Parent);
-                    var childKey = relation.ChildFieldName.DosIsNullOrWhiteSpace(relation.Child);
-                    var parentField = ImportFindFieldByNameOrLabel(parentFields, parentKey, relation.ParentFieldLabel);
-                    var childField = ImportFindFieldByNameOrLabel(childFields, childKey, relation.ChildFieldLabel);
-                    if (parentField != null && childField != null)
-                    {
-                        result.Add(new ImportChildParentMatch()
-                        {
-                            ParentField = parentField,
-                            ChildField = childField,
-                            ParentAlias = $"Match{result.Count}"
-                        });
-                    }
-                }
-            }
-
-            if (!result.Any()
-                && tableChildConfig != null
-                && (!tableChildConfig.ImportParentMatchFieldName.DosIsNullOrWhiteSpace()
-                    || !tableChildConfig.ImportChildMatchFieldName.DosIsNullOrWhiteSpace()))
-            {
-                var parentField = ImportFindFieldByNameOrLabel(parentFields, tableChildConfig.ImportParentMatchFieldName);
-                var childField = ImportFindFieldByNameOrLabel(childFields, tableChildConfig.ImportChildMatchFieldName);
+                var parentField = ImportFindFieldByNameOrLabel(
+                    parentFields,
+                    relation.ParentField,
+                    relation.ParentFieldLabel);
+                var childField = ImportFindFieldByNameOrLabel(
+                    childFields,
+                    relation.ChildField,
+                    relation.ChildFieldLabel);
                 if (parentField != null && childField != null)
                 {
                     result.Add(new ImportChildParentMatch()
                     {
                         ParentField = parentField,
                         ChildField = childField,
-                        ParentAlias = "Match0"
+                        ParentAlias = $"Match{result.Count}"
                     });
                 }
             }
@@ -1606,33 +1589,11 @@ namespace Microi.net
             DiyFieldConfig relationConfig)
         {
             var result = new List<ImportChildParentBackfill>();
-            var mappings = new List<DiyFieldConfigTableChildImportBackfill>();
-            if (relationConfig?.TableChild?.ImportBackfillFields != null)
-            {
-                mappings.AddRange(relationConfig.TableChild.ImportBackfillFields);
-            }
-            if (relationConfig != null && !relationConfig.TableChildCallbackField.DosIsNullOrWhiteSpace())
-            {
-                try
-                {
-                    var legacyMappings = JsonHelper.Deserialize<List<DiyFieldConfigTableChildImportBackfill>>(relationConfig.TableChildCallbackField);
-                    if (legacyMappings != null)
-                    {
-                        mappings.AddRange(legacyMappings);
-                    }
-                }
-                catch { }
-            }
-            foreach (var mapping in mappings)
+            foreach (var mapping in DiyTableChildFieldRelationHelper.GetRelations(relationConfig))
             {
                 if (mapping == null) continue;
-                var parentKey = mapping.ParentFieldName
-                    .DosIsNullOrWhiteSpace(mapping.FatherFieldName)
-                    .DosIsNullOrWhiteSpace(mapping.Parent)
-                    .DosIsNullOrWhiteSpace(mapping.Father);
-                var childKey = mapping.ChildFieldName.DosIsNullOrWhiteSpace(mapping.Child);
-                var parentField = ImportFindFieldByNameOrLabel(parentFields, parentKey, mapping.ParentFieldLabel);
-                var childField = ImportFindFieldByNameOrLabel(childFields, childKey, mapping.ChildFieldLabel);
+                var parentField = ImportFindFieldByNameOrLabel(parentFields, mapping.ParentField, mapping.ParentFieldLabel);
+                var childField = ImportFindFieldByNameOrLabel(childFields, mapping.ChildField, mapping.ChildFieldLabel);
                 if (parentField == null || childField == null) continue;
                 if (result.Any(d => string.Equals(d.ChildField["Name"].Val<string>(), childField["Name"].Val<string>(), StringComparison.OrdinalIgnoreCase)))
                 {
@@ -1755,11 +1716,9 @@ namespace Microi.net
                         }
                     }
                 }
-                var importParentMatchFieldName = relationConfig.TableChild?.ImportParentMatchFieldName;
-                var importChildMatchFieldName = relationConfig.TableChild?.ImportChildMatchFieldName;
-                var hasExplicitImportRelation = relationConfig.TableChild?.ImportRelations?.Any() == true
-                    || !importParentMatchFieldName.DosIsNullOrWhiteSpace()
-                    || !importChildMatchFieldName.DosIsNullOrWhiteSpace();
+                var hasExplicitImportRelation = DiyTableChildFieldRelationHelper
+                    .GetRelations(relationConfig)
+                    .Any(d => d.ImportMatch);
                 var matches = ImportBuildChildParentMatches(currentFieldList, parentFields, relationConfig);
                 if (!matches.Any() && parentCodeField != null)
                 {

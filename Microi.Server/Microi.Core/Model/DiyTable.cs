@@ -66,6 +66,7 @@ namespace Microi.net
 		private string _UserName;
 		private string _SubmitBeforeServerV8;
 		private string _SubmitAfterServerV8;
+		private int _V8Unlimited;
 
 		/// <summary>
 		/// Id
@@ -652,6 +653,19 @@ namespace Microi.net
 				this._SubmitAfterServerV8 = value;
 			}
 		}
+		/// <summary>
+		/// 后端V8事件是否不启用单次Jint运行限制
+		/// </summary>
+		[Field("V8Unlimited")]
+		public int V8Unlimited
+		{
+			get{ return _V8Unlimited; }
+			set
+			{
+				this.OnPropertyValueChange("V8Unlimited");
+				this._V8Unlimited = value;
+			}
+		}
 		#endregion
 
 		#region Method
@@ -715,6 +729,7 @@ namespace Microi.net
 				_.UserName,
 				_.SubmitBeforeServerV8,
 				_.SubmitAfterServerV8,
+				_.V8Unlimited,
 			};
         }
         /// <summary>
@@ -768,6 +783,7 @@ namespace Microi.net
 				this._UserName,
 				this._SubmitBeforeServerV8,
 				this._SubmitAfterServerV8,
+				this._V8Unlimited,
 			};
         }
         /// <summary>
@@ -970,6 +986,10 @@ namespace Microi.net
 			/// 表单提交后事件
 			/// </summary>
 			public readonly static Field SubmitAfterServerV8 = new Field("SubmitAfterServerV8", "diy_table", "表单提交后事件");
+            /// <summary>
+			/// 后端V8事件是否不启用单次Jint运行限制
+			/// </summary>
+			public readonly static Field V8Unlimited = new Field("V8Unlimited", "diy_table", "V8无运行限制");
         }
         #endregion
 	}

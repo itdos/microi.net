@@ -550,7 +550,7 @@ Microi 的 AI 应用与应用商城只有一个主数据源：`sys_microistore`�
 
 - 固定看板免登录使用常量匿名路由 `/access-login`，密钥使用 `microi_ak_` 前缀，完整链接格式为 `{Microi.Client前端WebBase}/?OsClient={当前租户}#/access-login?access_key={密钥}&redirect={encodeURIComponent后的站内Hash路由}`。例如目标路由 `/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX` 必须生成 `redirect=%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX`。生成器只复制当前 `OsClient`，不能把其它页面查询参数带进凭据链接，也不能把 API Server 当成前端 WebBase。
 - 固定电视、看板和信息屏应保存完整 `/access-login` 链接作为开机主页或受控书签；兑换后的干净目标页不能作为唯一恢复入口。前端清除地址栏中的 `access_key` 后使用短期受限 Token 并接收响应头轮换；永久密钥不等于永久 JWT。浏览器会话丢失时重新打开启动链接即可免密码兑换，禁止在目标页面重复追加密钥或支持 `permanent=1/keep_login=1` 等 URL 参数。
-- 管理入口是【系统账号】（`/#/mic-sys-user`）：该路由当前由通用 `form-engine/diy-table.vue` 承载，不能只修改旧的专用用户组件。表格和默认卡片视图都必须把【访问密钥】作为帐号行/卡片的直接按钮显示，不能藏入【更多】，也不能要求用户先进入编辑表单。创建表单支持 90 天、自定义到期和永久三种有效期，永久记录以空 `ExpiresAt` 表示并显示为“永久”。
+- 管理入口是【系统账号】（`/#/mic-sys-user`）：该路由由通用 `form-engine/diy-table.vue` 承载。【访问密钥】必须保存为该模块 `sys_menu.MoreBtns` 的动态按钮，并设置 `ShowRow:true`，由表格和默认卡片视图的通用 MoreBtns 渲染链直接显示；禁止在表格模板、卡片模板、action-width mixin 中按 `sys_user`、菜单 Id 或 Url 写死按钮。面板作为预注册的 `UserAccessKeyPanel` 定制组件，由按钮调用通用 `V8.OpenDialog({ ComponentName:'UserAccessKeyPanel', DataAppend:{ User:V8.Form } })` 打开；禁止为单个业务面板扩展 `V8.OpenUserAccessKeys` 一类专用 V8 API。按钮名称、图标、排序和显隐均由模块配置维护。创建表单支持 90 天、自定义到期和永久三种有效期，永久记录以空 `ExpiresAt` 表示并显示为“永久”。
 - 页面必须先把密钥保存在局部变量，再立即从地址栏清除；不得写入 Cookie、localStorage、sessionStorage、Pinia 或控制台。
 - 兑换通过 `POST /api/SysUserAccessKey/Exchange` 的 JSON Body 完成。响应头中的短期 Token 继续交给平台统一请求层保存和轮换。
 - 创建界面默认按页面名称勾选，也支持粘贴完整页面网址自动解析；不能要求普通用户手写路由和物理表名。页面/数据均可选择“全部已授权”，内部值为 `*`，含义只是取消密钥层二次白名单，仍与目标帐号实时菜单、表单和行权限取交集。接口引擎与数据源引擎 Key 仍必须准确选择。

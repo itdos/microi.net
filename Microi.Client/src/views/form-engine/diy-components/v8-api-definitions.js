@@ -260,7 +260,6 @@ export const V8ApiDefinitions = {
                 snippet:
                     'OpenAnyTable({\n\tSysMenuId: "${1:menuId}",\n\tDialogType: "${2|Dialog,Drawer|}",\n\tWidth: "${3:80vw}",\n\tMultipleSelect: ${4:true},\n\tPropsWhere: [\n\t\t["${5:FkId}", "=", ${6:V8.Form.Id}]\n\t],\n\tSubmitEvent: async function(selectData, callback) {\n\t\t${7:// 处理提交}\n\t\tcallback({ Code: 1, Data: selectData });\n\t}\n})'
             },
-
             // ========== 表格操作方法 ==========
             RefreshTable: {
                 label: "RefreshTable",

@@ -92,13 +92,52 @@ namespace Microi.net.Api
                     "当前访问密钥未授权运行此接口引擎。"));
             }
 
+            // A background task executes after this request, possibly on another
+            // node. Authorize against the shared database now for an immediate
+            // response, then persist a marker so the worker repeats the check
+            // against the authoritative model immediately before execution.
+            var apiEngineModelResult = await MicroiEngine.ApiEngine
+                .GetAuthoritativeApiEngineModel(new ApiEngineParam
+                {
+                    OsClient = identity.OsClient,
+                    ApiEngineKey = apiEngineKey,
+                    _CurrentUser = identity.CurrentUser
+                })
+                .ConfigureAwait(false);
+            if (apiEngineModelResult.Code != 1 || apiEngineModelResult.Data == null)
+            {
+                return Json(new DosResult(
+                    0,
+                    null,
+                    apiEngineModelResult.Msg ?? "接口引擎不存在或已停用。"));
+            }
+
+            var apiRole = DynamicHelper.GetDynamicStringValue(
+                apiEngineModelResult.Data,
+                "ApiRole",
+                "");
+            var roleAuthorization = ApiEngineRoleAuthorization.Evaluate(
+                identity.CurrentUser,
+                apiRole);
+            if (!roleAuthorization.IsAllowed)
+            {
+                var deniedMessage = roleAuthorization.HasOnlyGet
+                                    && !roleAuthorization.HasExplicitRoles
+                                    && !roleAuthorization.HasMalformedPolicy
+                    ? ApiEngineRoleAuthorization.OnlyGetDeniedMessage
+                    : DiyMessage.GetLang(identity.OsClient, "NoAuth");
+                return Json(new DosResult(0, null, deniedMessage));
+            }
+
             // 客户端业务参数不允许决定执行身份。身份由服务端从当前登录令牌读取，
             // 并作为后台任务的可信快照单独传给执行器。
             var apiParam = param["Param"] as JObject ?? new JObject();
             apiParam = (JObject)apiParam.DeepClone();
             apiParam.Remove("_CurrentUser");
+            apiParam.Remove(ApiEngineRoleAuthorization.BackgroundAuthorizationMarker);
             apiParam["ApiEngineKey"] = apiEngineKey;
             apiParam["OsClient"] = identity.OsClient;
+            apiParam[ApiEngineRoleAuthorization.BackgroundAuthorizationMarker] = true;
 
             var title = param["Title"]?.ToString();
             var options = param["Options"] as JObject

@@ -386,6 +386,14 @@ namespace Microi.net
     {
         public string PrimaryTableFieldName { get; set; }
         public bool? ImportAutoFillFk { get; set; }
+        /// <summary>
+        /// Compact format: [[parentField, childField, importMatch?], ...].
+        /// The third value is true only when the pair participates in import
+        /// parent lookup; every pair participates in add/import backfill.
+        /// </summary>
+        public JArray FieldRelations { get; set; }
+        // Historical properties remain readable for rolling upgrades and old
+        // tenant data. New clients migrate them into FieldRelations on save.
         public string ImportParentMatchFieldName { get; set; }
         public string ImportChildMatchFieldName { get; set; }
         public List<DiyFieldConfigTableChildImportRelation> ImportRelations { get; set; }

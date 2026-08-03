@@ -42,8 +42,8 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `mic_day_word` | 2 | 每日一言 |
 | `mic_email_server` | 7 | 邮件配置 |
 | `mic_memo` | 3 | 备忘录 |
-| `mic_msg_event_log` | 5 | 消息通知事件日志 |
-| `mic_msgset` | 10 | 消息通知设置 |
+| `mic_msg_event_log` | 13 | 按事件、渠道、接收人持久化的消息通知日志 |
+| `mic_msgset` | 11 | 多通道消息通知设置 |
 | `mic_page` | 6 | 界面引擎 |
 | `mic_print` | 6 | 打印引擎 |
 | `microi_calendar` | 6 | 日历 |
@@ -80,7 +80,7 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `wx_menu` | 3 | 微信公众号自定义菜单 |
 | `wx_mini_program` | 3 | 微信小程序 |
 | `wx_mp` | 7 | 微信公众号配置 |
-| `wx_tpl_msg` | 10 | 公众号模板消息 |
+| `wx_tpl_msg` | 12 | 公众号/服务号模板消息，可选跳转小程序 |
 
 ## Fields
 
@@ -354,7 +354,7 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 
 ### `diy_qiwei_app` - 企业微信应用
 
-字段数：5
+字段数：13
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
@@ -691,12 +691,20 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `IsSuccess` | 是否成功 | `bit` | `Switch` | 是否成功 |
 | `MsgContent` | 消息内容 | `mediumtext` | `Textarea` | 消息内容 |
 | `Receivers` | 接收人 | `mediumtext` | `Textarea` | 接收人 |
-| `MsgEventId` | MsgEventId | `varchar(36)` | `Guid` | MsgEventId |
+| `MsgEventId` | 消息设置Id | `varchar(36)` | `Guid` | 关联 mic_msgset |
 | `MsgResult` | 消息结果 | `mediumtext` | `Textarea` | 消息结果 |
+| `EventId` | 事件Id | `varchar(100)` | `Text` | 调用方稳定幂等键 |
+| `ChannelType` | 通知方式 | `varchar(50)` | `Select` | 微信公众号模板消息、短信、邮件或平台内部 |
+| `ReceiverUserId` | 接收用户Id | `varchar(36)` | `Guid` | 单个接收用户，用于安全查询和唯一约束 |
+| `Title` | 通知标题 | `varchar(200)` | `Text` | 发送时标题快照 |
+| `LinkUrl` | 跳转链接 | `varchar(500)` | `Text` | 站内或 HTTP/HTTPS 安全链接 |
+| `Payload` | 扩展数据 | `mediumtext` | `Textarea` | 经过裁剪的 JSON 快照 |
+| `IsRead` | 是否已读 | `int` | `Switch` | 平台内部通知已读状态 |
+| `ReadTime` | 阅读时间 | `varchar(25)` | `DateTime` | 标记已读时间 |
 
 ### `mic_msgset` - 消息通知设置
 
-字段数：10
+字段数：11
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
@@ -710,6 +718,7 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `Type` | 通知方式 | `mediumtext` | `Checkbox` | 通知方式 |
 | `TableChild99` |  | `` | `TableChild` |  |
 | `ReceiversRoles` | 接收角色 | `mediumtext` | `MultipleSelect` | 接收角色 |
+| `ChannelApiEngineMap` | 渠道适配器映射 | `mediumtext` | `Textarea` | 短信、邮件或自定义渠道到接口引擎 Key 的 JSON 映射 |
 
 ### `mic_page` - 界面引擎
 
@@ -1578,9 +1587,9 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `AppSecret` | AppSecret | `varchar(255)` | `Text` | AppSecret |
 | `AppId` | AppId | `varchar(50)` | `Text` | AppId |
 
-### `wx_tpl_msg` - 公众号模板消息
+### `wx_tpl_msg` - 公众号/服务号模板消息
 
-字段数：10
+字段数：12
 
 | 字段 | 标签 | 类型 | 控件 | 说明 |
 |---|---|---|---|---|
@@ -1594,3 +1603,5 @@ Full generated catalog from `ai-helper/microi/db.json`. Load this only when a ta
 | `TemplateId` | 模板ID | `varchar(50)` | `Text` | 模板ID |
 | `MiniProgramPagePath` | 小程序页面 | `varchar(50)` | `Text` | 小程序页面 |
 | `MiniProgramId` | 小程序Id | `varchar(36)` | `Guid` | 小程序Id |
+| `WxMpName` | 公众号/服务号 | `varchar(100)` | `Select` | 发送模板消息的公众号或服务号 |
+| `WxMpId` | 公众号/服务号Id | `varchar(36)` | `Guid` | 关联 wx_mp；与小程序跳转配置分离 |
