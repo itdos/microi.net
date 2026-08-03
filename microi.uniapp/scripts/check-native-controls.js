@@ -378,6 +378,7 @@ for (const token of [
   if (!nativeForm.includes(token)) fail(`embedded related CollapseGroup rendering is missing: ${token}`)
 }
 for (const [source, name] of [
+  [nativeForm, 'native form detail'],
   [businessDetail, 'business detail'],
   [moduleDetail, 'module detail']
 ]) {
@@ -389,6 +390,17 @@ for (const [source, name] of [
   ]) {
     if (!source.includes(token)) fail(`${name} embedded child rendering is missing: ${token}`)
   }
+  if (!source.includes('show-preview-header')) {
+    fail(`${name} standalone TableChild must use the shared collapsible preview section`)
+  }
+}
+for (const token of [
+  'showPreviewHeader',
+  'previewContentVisible',
+  'preview-section-header',
+  "Boolean(value && !this.isPreview)"
+]) {
+  if (!relatedBusinessList.includes(token)) fail(`related TableChild preview section is missing: ${token}`)
 }
 if (!nativeForm.includes('v-show="tenantFieldPresentation(field).visible !== false"')) {
   fail('native form must support declarative tenant field visibility')
