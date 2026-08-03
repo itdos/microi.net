@@ -443,7 +443,8 @@ export default {
         })
         this.definition = await loadNativeFormDefinition(this.table.Name, refresh, {
           menuId: this.childMenuId,
-          tableChildAuth: this.tableChildAuth
+          tableChildAuth: this.tableChildAuth,
+          tableModel: this.table
         })
         const matched = this.resolveBusinessModule(this.table.Name)
         this.moduleKey = matched.key
@@ -451,13 +452,15 @@ export default {
           matched.config.menuAliases || [],
           this.table.Name,
           refresh,
-          this.childMenuId
+          this.childMenuId,
+          this.table.Id
         )
         this.menu = menu || null
         this.menuId = menu?.Id || this.childMenuId || ''
         this.config = {
           ...matched.config,
           table: this.table.Name,
+          tableId: this.table.Id,
           menuId: this.menuId,
           moduleEngineKey: menu?.ModuleEngineKey || ''
         }

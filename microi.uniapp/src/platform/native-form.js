@@ -425,7 +425,11 @@ export async function loadNativeTableModel(tableKey, options = {}) {
 
 async function requestFullDefinition(tableName, options = {}) {
   const authorization = metadataAuthorizationParams(options)
-  const table = await loadNativeTableModel(tableName, options)
+  // 关联组件通常已经按 TableChildTableId 读取过模型，直接复用，避免同一挂载
+  // 连续请求两次 GetDiyTableModel。
+  const table = options.tableModel && options.tableModel.Id
+    ? options.tableModel
+    : await loadNativeTableModel(tableName, options)
   const fieldResult = await V8.FormEngine.GetDiyFieldList({
     TableId: table.Id,
     TableName: table.Name || tableName,
