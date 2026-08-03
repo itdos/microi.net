@@ -37,6 +37,10 @@ const xjyProposalCalculation = fs.readFileSync(
 )
 const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
 const moduleDetail = fs.readFileSync(path.join(root, 'src/pages/module/detail.vue'), 'utf8')
+const tableSelector = fs.readFileSync(
+  path.join(root, 'src/components/mci-table-selector/mci-table-selector.vue'),
+  'utf8'
+)
 const formTabs = fs.readFileSync(path.join(root, 'src/components/mci-related-tabs/mci-related-tabs.vue'), 'utf8')
 const childTable = fs.readFileSync(path.join(root, 'src/components/mci-child-table/mci-child-table.vue'), 'utf8')
 const businessCard = fs.readFileSync(path.join(root, 'src/components/mci-business-card/mci-business-card.vue'), 'utf8')
@@ -109,7 +113,9 @@ if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
   !formRuntime.includes('active.group.relatedFields.push(field)') ||
   !formRuntime.includes('groups: layoutGroups.filter((group) => group.fields.length)') ||
   !formRuntime.includes('relatedGroups: layoutGroups') ||
-  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 7')) {
+  !formRuntime.includes("if (field.component === 'Tabs')") ||
+  !formRuntime.includes('Divider 只是组内分隔') ||
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 8')) {
   fail('related fields must preserve their platform CollapseGroup ownership')
 }
 if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
@@ -393,6 +399,28 @@ for (const [source, name] of [
   if (!source.includes('show-preview-header')) {
     fail(`${name} standalone TableChild must use the shared collapsible preview section`)
   }
+}
+for (const [source, name] of [
+  [nativeForm, 'native form detail'],
+  [businessDetail, 'business detail'],
+  [moduleDetail, 'module detail']
+]) {
+  for (const token of [
+    'isEmbeddedOpenTableRelated(item)',
+    "item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)",
+    'isEmbeddedRelated(item)',
+    '!this.isEmbeddedRelated(item)',
+    'compact'
+  ]) {
+    if (!source.includes(token)) fail(`${name} embedded OpenTable rendering is missing: ${token}`)
+  }
+}
+if (!nativeForm.includes('form-section__selector-grid') ||
+  !businessDetail.includes('section-selector-grid') ||
+  !moduleDetail.includes('detail-section__selector-grid') ||
+  !tableSelector.includes("'selector-field--compact': compact") ||
+  !tableSelector.includes('compact: { type: Boolean, default: false }')) {
+  fail('embedded OpenTable actions must use the shared compact two-column presentation')
 }
 for (const token of [
   'showPreviewHeader',

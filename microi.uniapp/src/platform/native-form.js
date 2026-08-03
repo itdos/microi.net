@@ -270,8 +270,21 @@ export function groupFields(fields, tableModel = {}) {
       return
     }
     if (LAYOUT_COMPONENTS.has(field.component)) {
-      activeGroups.delete(tabKey)
-      looseGroups.delete(tabKey)
+      // CollapseGroup 的范围与 PC 端保持一致：Divider 只是组内分隔，
+      // 只有 Tabs（CollapseGroup 已在上方处理）才会结束当前折叠范围。
+      if (field.component === 'Tabs') {
+        activeGroups.delete(tabKey)
+        looseGroups.delete(tabKey)
+        return
+      }
+      const active = activeGroups.get(tabKey)
+      if (active && Number.isFinite(active.remaining)) {
+        active.remaining -= 1
+        if (active.remaining <= 0) {
+          activeGroups.delete(tabKey)
+          looseGroups.delete(tabKey)
+        }
+      }
       return
     }
     if (RELATED_COMPONENTS.has(field.component)) {
@@ -358,7 +371,7 @@ export function createNativeFormDefinition(table = {}, rawFields = [], options =
   return buildDefinition(table, layoutFields, layoutFields)
 }
 
-export const NATIVE_FORM_SCHEMA_VERSION = 7
+export const NATIVE_FORM_SCHEMA_VERSION = 8
 const FORM_VERSION_MAX_AGE = 30 * 1000
 const FORM_DEFINITION_MAX_AGE = 30 * 24 * 60 * 60 * 1000
 

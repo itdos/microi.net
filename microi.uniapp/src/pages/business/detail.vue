@@ -99,6 +99,12 @@
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
 					</view>
 					<view v-if="isSectionExpanded(section, sectionIndex)" class="field-list section-body-enter">
+						<view v-if="section.selectorTabs.length" class="section-selector-grid">
+							<mci-table-selector v-for="relatedTab in section.selectorTabs" :key="relatedTab.key"
+								:field="relatedTab.field" :parent-table="moduleConfig.table"
+								:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
+								readonly compact />
+						</view>
 						<view class="field-row"
 							:class="{ 'field-row--map': tenantDetailFieldPresentation(field).type === 'map' }"
 							v-for="field in section.fields" :key="`${section.key}:${field.name}`">
@@ -1304,6 +1310,9 @@
 						relatedTabs: this.activeRelatedTabs.filter((item) =>
 							this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
 						),
+						selectorTabs: this.activeRelatedTabs.filter((item) =>
+							this.isEmbeddedOpenTableRelated(item) && item.field.layoutGroupKey === group.key
+						),
 						source: group.source,
 						description: group.description || '',
 						showFieldCount: group.showFieldCount,
@@ -1311,7 +1320,7 @@
 						key: group.key || `${group.name || 'ungrouped'}:${index}`
 					}
 				})
-				.filter((section) => section.fields.length || section.relatedTabs.length)
+				.filter((section) => section.fields.length || section.relatedTabs.length || section.selectorTabs.length)
 			},
 			formTabs() {
 				return (this.definition?.formTabs || []).map((tab) => ({
@@ -1339,7 +1348,7 @@
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
 			},
 			standaloneChildTab() {
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
@@ -1953,6 +1962,12 @@
 			},
 			isEmbeddedChildRelated(item) {
 				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
+			},
+			isEmbeddedOpenTableRelated(item) {
+				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
+			},
+			isEmbeddedRelated(item) {
+				return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
 			},
 			callPhone(phone) {
 				if (phone) uni.makePhoneCall({
@@ -2815,6 +2830,15 @@
 
 	.section-body-enter {
 		animation: sectionBodyEnter .2s ease both;
+	}
+
+	.section-selector-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 14rpx;
+		padding: 18rpx 0;
+		border-bottom: 1rpx solid #e5eef1;
+		background: linear-gradient(180deg, #f8fbfc, #fbfdfd);
 	}
 
 	.field-row {

@@ -96,7 +96,19 @@ export function filterFieldsByHiddenCollapseScope(fields = [], options = {}) {
       return
     }
     if (layoutComponents.has(field.component)) {
-      hiddenScopes.delete(tabKey)
+      if (field.component === 'Tabs') {
+        hiddenScopes.delete(tabKey)
+        if (field.visible) result.push(field)
+        return
+      }
+      const hiddenScope = hiddenScopes.get(tabKey)
+      if (hiddenScope) {
+        if (Number.isFinite(hiddenScope.remaining)) {
+          hiddenScope.remaining -= 1
+          if (hiddenScope.remaining <= 0) hiddenScopes.delete(tabKey)
+        }
+        return
+      }
       if (field.visible) result.push(field)
       return
     }
