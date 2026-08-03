@@ -121,6 +121,11 @@ namespace Microi.net
 
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string ServerDataV8 { get; set; }
+        /// <summary>
+        /// Whether backend table V8 events use process-resident-memory protection
+        /// instead of configurable per-execution Jint limits.
+        /// </summary>
+        public int? V8Unlimited { get; set; }
 
         public List<string> Ids { get; set; }
         /// <summary>

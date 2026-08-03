@@ -127,25 +127,21 @@ AI 或 MCP 生成低代码系统时，必须默认遵守此规则。发现已有
   "TableChildSysMenuId": "子表 sys_menu.Id",
   "TableChildSysMenuName": "项目成品清单",
   "TableChildFkFieldName": "XiangmuId",
-  "TableChildCallbackField": "",
   "TableChild": {
     "PrimaryTableFieldName": "Id",
     "ImportAutoFillFk": true,
-    "ImportRelations": [
-      { "Parent": "Code", "Child": "XiangmuBM" }
-    ],
-    "ImportBackfillFields": [
-      { "Parent": "Code", "Child": "XiangmuBM" },
-      { "Parent": "Name", "Child": "XiangmuMC" }
+    "FieldRelations": [
+      ["Code", "XiangmuBM", true],
+      ["Name", "XiangmuMC"]
     ],
     "DisablePagination": false
   }
 }
 ```
 
-`ImportRelations` 中 `Parent` 和 `Child` 可填字段名或字段标题；多组关系表示组合匹配。典型场景是 Excel 只有项目编号/客户名称，没有主表 Id，导入引擎通过 `Parent` 字段批量查主表 Id，再写入 Config 根节点指定的 `TableChildFkFieldName`。不要只依赖猜测字段名；业务关键子表必须显式配置 `ImportRelations`，并在修改后刷新结构缓存。
+`FieldRelations` 每项依次为 `[主表字段, 子表字段, 是否参与导入匹配]`。全部关系用于新增子表时回写父表值，也用于导入找到父表后回填空的子表字段；只有第三项为 `true` 的关系才用子表/Excel 值反查主表，多项为 `true` 时表示组合匹配。典型场景是 `Code -> XiangmuBM` 参与匹配，而 `Name -> XiangmuMC` 只回填，因此不能把全部关系无条件当作组合匹配。
 
-`ImportBackfillFields` 用于把已匹配到的主表字段回填到子表字段，例如项目主表的 `Code`、`Name` 回填到成品清单的 `XiangmuBM`、`XiangmuMC`。当 Excel 缺少这些展示冗余列，但导入发生在主表子表弹窗或可通过 `ImportRelations` 找到主表时，导入引擎会批量查询主表并补齐；Excel 已传值时不覆盖。旧版根节点 `Config.TableChildCallbackField` 保存的同类 JSON 数组也会被导入引擎兼容读取。
+后端继续读取旧版 `TableChildCallbackField`、`ImportRelations`、`ImportBackfillFields` 和单字段匹配配置。新版前端加载 TableChild 字段时按字段对去重合并为 `FieldRelations`，删除内存中的旧键，并在下一次正常保存字段配置时持久化新格式，避免重复合并。修改后按现有流程刷新结构缓存。
 
 更多表单组件配置项见 `references/form-component-options.md`。新增或修改 `Microi.Client/src/views/form-engine/diy-field-component/` 组件配置时，同步更新该参考文档和官方表单组件文档。
 

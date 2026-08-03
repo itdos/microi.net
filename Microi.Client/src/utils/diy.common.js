@@ -22,6 +22,8 @@ import { createV8Http } from "./v8-http.js";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
 import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
 import { prepareCodeEditorTransport } from "./code-editor-transport.js";
+import { normalizeTableChildFieldRelations } from "./table-child-relations.js";
+import { createPlatformNotificationApi } from "./platform-notification.js";
 import {
     hasAuthorizationIdentityChanged,
     normalizeAuthorizationToken
@@ -2854,7 +2856,6 @@ var DiyCommon = {
             TableChildSysMenuId: "",
             TableChildSysMenuName: "",
             TableChildFkFieldName: "",
-            TableChildCallbackField: "",
             TableChildRowClickV8: "",
             TableChild: {
                 Data: [],
@@ -2866,7 +2867,7 @@ var DiyCommon = {
                 LastSysMenuName: "",
                 PrimaryTableFieldName: "Id",
                 ImportAutoFillFk: true,
-                ImportRelations: [],
+                FieldRelations: [],
                 DisablePagination: false,
                 NoneDefaultHeight: false
             },
@@ -3036,6 +3037,9 @@ var DiyCommon = {
             tempConfigObj.ImgUpload.ShowFileList = false;
             tempConfigObj.FileUpload.ShowFileList = false;
             field.Config = tempConfigObj;
+        }
+        if (field.Component === "TableChild" && field.Config && typeof field.Config === "object") {
+            normalizeTableChildFieldRelations(field.Config);
         }
     },
     
@@ -5253,6 +5257,7 @@ var DiyCommon = {
                 WorkFlow : V8.WF,
                 // CurrentToken / SysConfig 同 CurrentUser 一样需要每次刷新，不进静态缓存
                 SendSystemMessage : DiyCommon.SendSystemMessage,
+                Notification : DiyCommon.Notification,
                 Base64 : Base64
             };
             // 注册 V8.Method（含 ScanCode 扫码功能）
@@ -5858,6 +5863,9 @@ DiyCommon.Http = createV8Http({
         });
         DiyCommon.ApplyAuthorizationToken(responseToken, requestToken);
     }
+});
+DiyCommon.Notification = createPlatformNotificationApi(function (engineKey, param) {
+    return DiyCommon.ApiEngine.Run(engineKey, param || {});
 });
 // DiyCommon.OsClientInit();
 export { DiyCommon };

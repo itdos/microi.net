@@ -857,6 +857,68 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级26 --2026-08-03【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade26.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade26().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级26 - 2026-08-03】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级26 - 2026-08-03】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade26.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级26失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级26 - 2026-08-03】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级27 --2026-08-03【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade27.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade27().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级27 - 2026-08-03】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级27 - 2026-08-03】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade27.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级27失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级27 - 2026-08-03】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {
@@ -1608,6 +1670,7 @@ if (_microiLegacyMenuConfigChanged) {
                 ["MaxStatements"] = "int",
                 ["LimitMemory"] = "int",
                 ["LimitRecursion"] = "int",
+                ["V8Unlimited"] = "int",
                 ["Lock"] = "int"
             };
 
@@ -1615,6 +1678,14 @@ if (_microiLegacyMenuConfigChanged) {
             {
                 UpgradeExecutionLeaseContext.ThrowIfLost();
                 EnsureColumn(osClientSecret, "sys_apiengine", column.Key, column.Value);
+            }
+
+            // DiyTable is materialized through a generated entity whose selected
+            // field list includes V8Unlimited. Add the physical column before any
+            // version-gated metadata migration can query that entity.
+            if (TableExists(osClientSecret, "diy_table"))
+            {
+                EnsureColumn(osClientSecret, "diy_table", "V8Unlimited", "int");
             }
         }
 

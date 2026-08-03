@@ -178,9 +178,9 @@
 | `OpenTable` | `varchar(50)` | `OpenTable.BtnName`、`ShowDialog`、`MultipleSelect`、`BeforeOpenV8`、`SubmitV8`、`SearchAppend`。 |
 | `JoinTable` | `varchar(50)` | `JoinTable.TableId`、`ModuleName`、`ModuleId`、`Where`。 |
 | `JoinForm` | `varchar(50)` | `JoinForm.TableId`、`TableName`、`JoinFieldName`、`Id`、`FormMode`、`_SearchEqual`。主表字段保存一个目标记录 Id。 |
-| `TableChild` | 控件字段通常不承担关系存储 | 根节点：`TableChildTableId`、`TableChildSysMenuId`、`TableChildSysMenuName`、`TableChildFkFieldName`、`TableChildCallbackField`、`TableChildRowClickV8`。真实关系列必须建在子表。 |
+| `TableChild` | 控件字段通常不承担关系存储 | 根节点：`TableChildTableId`、`TableChildSysMenuId`、`TableChildSysMenuName`、`TableChildFkFieldName`、`TableChildRowClickV8`。真实关系列必须建在子表。 |
 | `TableChild` | - | `TableChild.PrimaryTableFieldName`：主表关联字段，默认 `Id`；`DisablePagination`：子表是否禁用分页；`NoneDefaultHeight`：是否不使用默认高度；`Data`、`SearchAppend`、`LastTableId`、`LastSysMenuId`、`LastSysMenuName`。 |
-| `TableChild` | - | `TableChild.ImportAutoFillFk`：导入子表时自动补外键；`ImportRelations[{Parent,Child}]`：用主表字段和子表/Excel 字段批量匹配主表；`ImportBackfillFields[{Parent,Child}]`：匹配到主表后把主表值回填到子表字段。 |
+| `TableChild` | - | `TableChild.ImportAutoFillFk`：导入子表时自动补外键；`FieldRelations[[Parent,Child,ImportMatch?]]`：全部关系用于新增回写和导入回填，第三位 `true` 的关系用于导入反查主表。 |
 
 ### `JoinForm` / `TableChild` 选择门禁
 
@@ -224,18 +224,14 @@
   "TableChildSysMenuId": "01KNRM72C6KBG4S8CY341333XJ",
   "TableChildSysMenuName": "项目成品清单",
   "TableChildFkFieldName": "Guid",
-  "TableChildCallbackField": "[{\"Parent\":\"Code\",\"Child\":\"XiangmuBM\"},{\"Parent\":\"Name\",\"Child\":\"XiangmuMC\"}]",
   "TableChild": {
     "PrimaryTableFieldName": "Id",
     "Data": [],
     "SearchAppend": {},
     "ImportAutoFillFk": true,
-    "ImportRelations": [
-      { "Parent": "Code", "Child": "XiangmuBM" }
-    ],
-    "ImportBackfillFields": [
-      { "Parent": "Code", "Child": "XiangmuBM" },
-      { "Parent": "Name", "Child": "XiangmuMC" }
+    "FieldRelations": [
+      ["Code", "XiangmuBM", true],
+      ["Name", "XiangmuMC"]
     ],
     "LastTableId": "",
     "LastSysMenuId": "",
@@ -246,7 +242,7 @@
 }
 ```
 
-`Parent` 和 `Child` 都可以填字段名或字段标题。通过主表子表区域、或通过 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有 `XiangmuBM` / `XiangmuMC`，后端也应根据固定主表行回填外键和展示列。
+`FieldRelations` 每项依次为主表字段、子表字段、可选的导入匹配标记。上例只用编号反查主表，名称仅回填。通过主表子表区域、左右树形页面或 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有 `XiangmuBM` / `XiangmuMC`，后端也应根据固定主表行回填外键和展示列。旧三项配置仍由前后端兼容读取，并在字段下次保存时合并清理。
 
 ## 地图、二维码、图标、自定义
 

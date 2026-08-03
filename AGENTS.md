@@ -619,7 +619,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 
 ## Microi 项目技能规范
 
-处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 40 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
+处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 57 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -629,6 +629,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 - `microi.skills/v8-mq-mqtt/SKILL.md` — Microi V8 消息队列与 MQTT
 - `microi.skills/v8-workflow/SKILL.md` — Microi V8 工作流事件开发
 - `microi.skills/v8-api-config/SKILL.md` — Microi V8 接口引擎配置
+- `microi.skills/message-notification/SKILL.md` — Microi 多通道与平台内部消息通知
 - `microi.skills/v8-saas-multi-tenant/SKILL.md` — Microi V8 SaaS 多租户引擎
 - `microi.skills/v8-image-processing/SKILL.md` — Microi V8 图像处理
 - `microi.skills/v8-file-upload/SKILL.md` — Microi V8 文件上传下载

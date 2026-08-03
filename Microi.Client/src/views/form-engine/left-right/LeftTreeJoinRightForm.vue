@@ -22,6 +22,11 @@
                                 :PropsWhere="whereList"
                                 :ParentV8="clickData"
                                 :DataAppend="rightTableDataAppend"
+                                :TableChildConfig="tableChildRelation.TableChildConfig || null"
+                                :TableChildFkFieldName="tableChildRelation.ChildFieldName || LeftTreeData.ZibiaoGLZD || ''"
+                                :PrimaryTableFieldName="tableChildRelation.ParentFieldName || LeftTreeData.FubiaoGLZD || 'Id'"
+                                :TableChildTableRowId="selectedParentValue"
+                                :FatherFormModel="selectedParentRow"
                             ></DiyTableRowlist>
                         </div>
                     </div>
@@ -95,6 +100,9 @@ export default {
             WhereType: "",
             ShowRightView: true,
             rightTableDataAppend: {},
+            tableChildRelation: {},
+            selectedParentRow: {},
+            selectedParentValue: "",
             LastClickNode: {},
             MobileTreeDrawer: false,
             MobileTreeTitle: "全部项目"
@@ -156,6 +164,7 @@ export default {
                     // }
                 ];
                 this.RightViewType = res.Data.YoubianZSZJ;
+                this.tableChildRelation = res.Data.TableChildRelation || {};
                 this.LeftTreeData = {
                     ...res.Data
                 };
@@ -180,6 +189,8 @@ export default {
                     IsAllCategory: true
                 };
                 self.rightTableDataAppend = {};
+                self.selectedParentRow = {};
+                self.selectedParentValue = "";
                 self.MobileTreeTitle = "全部项目";
                 if (self.RightViewType === "表格" || self.RightViewType === "表单/表格") {
                     self.whereList = [];
@@ -249,6 +260,10 @@ export default {
                     ParentValue: data[this.LeftTreeData.FubiaoGLZD],
                     LeftTreeData: this.LeftTreeData
                 };
+                this.selectedParentRow = { ...data };
+                this.selectedParentValue = data[this.tableChildRelation.ParentFieldName || this.LeftTreeData.FubiaoGLZD || "Id"] == null
+                    ? ""
+                    : String(data[this.tableChildRelation.ParentFieldName || this.LeftTreeData.FubiaoGLZD || "Id"]);
 
                 this.whereList = [
                     {

@@ -579,7 +579,34 @@ V8.WF.StartWork({
 });
 ```
 
+## V8.Notification
+
+PC 前端 V8 提供统一通知方法：
+
+```js
+// 发送：调用 msg_event，由消息策略决定平台内部、公众号、短信或邮件渠道
+await V8.Notification.Send('order_wait_approve', {
+  EventId: 'order-wait-approve-' + V8.Form.Id,
+  ReceiverUserIds: [V8.Form.ApproverId],
+  Content: '订单等待审批',
+  LinkUrl: '/#/orders/detail?id=' + V8.Form.Id
+});
+
+// 当前登录用户的持久通知
+var result = await V8.Notification.List({ PageIndex: 1, PageSize: 20 });
+
+// 本人单条/全部已读
+await V8.Notification.MarkRead(result.Data[0].Id);
+await V8.Notification.MarkRead({ All: true });
+```
+
+`List`、`MarkRead` 分别调用 `msg_internal_list`、`msg_internal_mark_read`，服务端只信任 `V8.CurrentUser.Id`。SignalR 固定事件 `ReceivePlatformNotification` 只是低延迟刷新提示；启动、打开通知中心和重连后仍会回读列表，不能用实时事件替代数据库事实。
+
+完整配置、表结构、后端调用、幂等和多节点说明见[消息通知](../system-engine/message-notification)。
+
 ## V8.SendSystemMessage
+
+> 兼容聊天系统的旧方法。新业务通知使用 `V8.Notification`，才能获得多渠道策略、持久事件日志、幂等和已读状态。
 >* 发送系统消息、消息提醒
 ::: details 展开查看 JavaScript 代码（25 行）
 ```js
@@ -678,6 +705,30 @@ V8.OpenDialog({
     }
 });
 ```
+
+### 使用 V8.OpenDialog 打开预注册定制组件
+
+平台内置或二次开发的 Vue 组件先在主前端注册，再由模块按钮通过通用 `V8.OpenDialog` 打开。以下是【系统账号】访问密钥面板的配置示例：
+
+```js
+var user = V8.Form || {};
+if (!user.Id) {
+    V8.Tips("缺少用户Id，无法管理访问密钥。", false);
+    return;
+}
+V8.OpenDialog({
+    ComponentName: "UserAccessKeyPanel",
+    Title: "访问密钥 - " + (user.Name || user.Account || ""),
+    TitleIcon: "fas fa-key",
+    Width: "min(980px, calc(100vw - 32px))",
+    OpenType: "Dialog",
+    DataAppend: { User: user }
+});
+```
+
+入口仍配置在目标模块的 `sys_menu.MoreBtns` 中；组件用 `DataAppend` 接收业务数据。不要为单个业务面板再新增 `V8.OpenXxx` 方法，也不要在通用表格/卡片模板中按表名、菜单 Id 或路由写死按钮。若页面需要独立部署、跨应用升级或不应进入主前端，则改用 `V8.OpenAppDialog` 打开已发布微服务。
+
+按钮显隐只用于界面体验，访问密钥创建、查询和吊销仍由服务端逐次校验普通登录会话以及本人/平台管理员权限。
 
 ## V8.OpenAppDialog
 >* 在表格、表单、页面按钮等前端 V8 代码中，以标准 Dialog/Drawer 打开一个已经发布的在线微服务应用。适合复杂交互页面，可避免把大量 HTML、CSS、JavaScript 直接写进按钮 V8 代码。

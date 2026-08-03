@@ -149,11 +149,6 @@ export default {
             return !!row && this.IsTrashMode && row._IsInTableAdd !== true;
         },
 
-        ShouldShowRowAccessKeyAction(row) {
-            return typeof this.CanManageUserAccessKey === "function"
-                && this.CanManageUserAccessKey(row);
-        },
-
         ShouldShowRowMoreAction(row) {
             if (!row || this.IsTrashMode) return false;
             var isWorkflow = this.IsWorkFlowMenu();
@@ -205,9 +200,6 @@ export default {
             }
             if (this.ShouldShowRowRestoreAction(row)) {
                 widths.push(this.GetRowActionButtonWidth("恢复", { leadingIcon: true }));
-            }
-            if (this.ShouldShowRowAccessKeyAction(row)) {
-                widths.push(this.GetRowActionButtonWidth("访问密钥", { customLeadingIcon: true }));
             }
             if (this.ShouldShowRowMoreAction(row)) {
                 widths.push(this.GetRowActionButtonWidth(

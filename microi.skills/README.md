@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 56 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 57 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -57,6 +57,7 @@
 | **microi-left-right-layout** | 模块引擎“树形+表格/表单”左右布局与主外键过滤 | `microi-left-right-layout/SKILL.md` |
 | **datasource-engine** | SQL/V8/JSON 数据源设计、租户与权限、字段供数和验收 | `datasource-engine/SKILL.md` |
 | **job-engine** | 定时/后台任务、多节点租约、幂等、恢复和进度 | `job-engine/SKILL.md` |
+| **message-notification** | 公众号/服务号、短信、邮件、平台内部通知、SignalR、幂等与商城交付 | `message-notification/SKILL.md` |
 | **search-engine** | Elasticsearch 索引、同步、查询、租户/数据范围和重建 | `search-engine/SKILL.md` |
 | **report-engine** | Rpt_Report 虚拟报表、数据源、聚合、写接口和导出 | `report-engine/SKILL.md` |
 | **translate-engine** | 多语言词条、翻译供应商、租户隔离、缓存和批量翻译 | `translate-engine/SKILL.md` |

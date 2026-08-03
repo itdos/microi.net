@@ -241,13 +241,13 @@ window.tryConnectWebSocket = function(forceRetry = false) {
         return { success: false, reason: '设备类型未确定' };
     }
     
-    // 检查是否需要连接
-    const needConnect = !token ? false : 
-        !DiyCommon.IsNull(GetCurrentUser?.Id) && ChatType == "吾码IM";
+    // 平台内部通知、后台任务和在线终端始终依赖平台 SignalR；聊天类型
+    // 只决定聊天 UI 的实现，不得关闭系统级实时通道。
+    const needConnect = !!token && !DiyCommon.IsNull(GetCurrentUser?.Id);
     
     if (!needConnect) {
         console.log('[WebSocket] 不满足连接条件，跳过');
-        return { success: false, reason: '未登录或不支持聊天' };
+        return { success: false, reason: '未登录' };
     }
     
     // 检查已连接
@@ -309,7 +309,9 @@ function InitDiyWebcoket() {
         return { success: false, reason: '未登录' };
     }
 
-    if (!DiyCommon.IsNull(GetCurrentUser?.Id) && ChatType == "吾码IM") {
+    // 平台内部通知、后台任务和在线终端共用该鉴权 Hub；即使租户聊天
+    // 选择了腾讯 IM，也必须保持平台 SignalR 连接以接收系统级消息。
+    if (!DiyCommon.IsNull(GetCurrentUser?.Id)) {
         const currentWebsocket = app.config.globalProperties.$websocket;
         console.log('[WebSocket] 当前连接状态:', currentWebsocket?.state || 'null');
         

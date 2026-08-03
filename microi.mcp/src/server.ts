@@ -3449,11 +3449,11 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
 
         const lines = [
           `# API Engines (${engines.length})\n`,
-          '| # | Engine Key | Name | Category | Description |',
-          '|---|-----------|------|----------|-------------|',
+          '| # | Engine Key | Name | Category | V8 Unlimited | Description |',
+          '|---|-----------|------|----------|--------------|-------------|',
         ];
         engines.forEach((e, i) => {
-          lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${e.ApiRemark || e.Description || ''} |`);
+          lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${Number(e.V8Unlimited || 0) === 1 ? 'ON' : 'OFF'} | ${e.ApiRemark || e.Description || ''} |`);
         });
 
         return { content: [{ type: 'text', text: lines.join('\n') }] };
@@ -3495,6 +3495,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           engine?.Category ? `- **Category**: ${engine.Category}` : '',
           engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
           engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
+          `- **V8Unlimited**: ${Number(engine?.V8Unlimited || 0) === 1 ? 'true' : 'false'}`,
           `- **Source completeness**: ${hasMore || start > 0 ? 'PARTIAL CHUNK — do not save this chunk alone' : 'COMPLETE'}`,
           `- **Character range**: [${start}, ${end}) of ${code.length}`,
           `- **Full source SHA-256**: ${sha256}`,
@@ -3705,19 +3706,21 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_save_engine_code',
-    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`,
+    `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Unlimited is an explicit high-risk opt-in and is always verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`,
     {
       apiEngineKey: z.string().describe('The unique key of the API engine'),
       code: z.string().describe('The complete JavaScript source code to save'),
       functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
+      v8Unlimited: z.boolean().optional().describe('Explicit high-risk switch. true removes this engine\'s Jint timeout/statement/recursion/allocation budgets but keeps the process resident-memory guard. It does not inherit to nested engines. Omit to preserve the current value.'),
       confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
     },
-    async ({ apiEngineKey, code, functionDescription, changeSummary, confirmLargeReduction }) => {
+    async ({ apiEngineKey, code, functionDescription, changeSummary, v8Unlimited, confirmLargeReduction }) => {
       try {
         const result = await client.saveEngineCode(apiEngineKey, code, {
           functionDescription,
           changeSummary,
+          v8Unlimited,
           confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
         });
         if (result.Code !== 1) {
@@ -3740,7 +3743,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_engine',
-    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations.`,
+    `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations. v8Unlimited defaults to false and must never be inferred from data volume alone.`,
     {
       apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
       apiName: z.string().describe('Display name of the engine'),
@@ -3749,8 +3752,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
       changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
       apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
+      v8Unlimited: z.boolean().optional().describe('Default false. Set true only for an explicit single-transaction requirement after accepting DB lock/rollback/timeout and memory risks. Process resident-memory guard remains active.'),
     },
-    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress }) => {
+    async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, v8Unlimited }) => {
       try {
         const result = await client.createEngine({
           ApiEngineKey: apiEngineKey,
@@ -3760,6 +3764,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           functionDescription,
           changeSummary,
           ApiAddress: apiAddress,
+          V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -4038,7 +4043,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_table',
-    `Create a new custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name returns Skipped:true with the existing TableId. This is step 2 of system design.`,
+    `Create or reconcile a custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name reuses the existing TableId; an explicitly supplied v8Unlimited value is reconciled and read back by system validation. This is step 2 of system design.`,
     {
       name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
       description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
@@ -4047,12 +4052,14 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
       formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
       formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
+      v8Unlimited: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true removes Jint per-execution budgets only for this table\'s backend V8 events while retaining the process resident-memory guard.'),
     },
-    async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth }) => {
+    async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Unlimited }) => {
       try {
         const result = await client.createTable(name, description, {
           Tabs: tabs, IsTree: isTree, Column: column ?? 2,
           FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
+          V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -4808,7 +4815,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_update_table',
-    `Update a diy_table record for OsClient "${osClient}" (for example form layout, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`,
+    `Update a diy_table record for OsClient "${osClient}" (for example form layout, V8Unlimited, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`,
     {
       id: z.string().optional().describe('TableId (preferred locator)'),
       name: z.string().optional().describe('Table Name (alternative locator)'),
@@ -4821,6 +4828,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       enableDataLog: z.number().optional().describe('1 enables per-row data change logs; 0 disables.'),
       enableDataComment: z.number().optional().describe('1 enables per-row comments; 0 disables.'),
       enableDataVersion: z.number().optional().describe('1 enables data versions; 0 disables.'),
+      v8Unlimited: z.boolean().optional().describe('Explicit high-risk switch for this table\'s backend V8 events. Omit to preserve; false writes 0 and true writes 1.'),
     },
     async (args) => {
       try {
@@ -4836,6 +4844,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         if (args.enableDataLog !== undefined) patch.EnableDataLog = args.enableDataLog === 1 ? 1 : 0;
         if (args.enableDataComment !== undefined) patch.EnableDataComment = args.enableDataComment === 1 ? 1 : 0;
         if (args.enableDataVersion !== undefined) patch.EnableDataVersion = args.enableDataVersion === 1 ? 1 : 0;
+        if (args.v8Unlimited !== undefined) patch.V8Unlimited = args.v8Unlimited ? 1 : 0;
         const result = await client.updateTable(patch);
         if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         return { content: [{ type: 'text', text: `✅ Table updated. ${JSON.stringify(result.Data)}` }] };

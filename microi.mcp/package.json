@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && tsx --test src/token-utils.test.ts src/microi-client-recovery.test.ts src/mcp-label.test.ts src/mcp-did.test.ts src/server-codex-router.test.ts src/user-access-key-tools.test.ts src/view-schema.test.ts src/background-task.test.ts src/source-integrity.test.ts src/application-stream-publish.test.ts src/application-stream-gate-transition.test.ts src/microservice-scaffold.test.ts src/store-application-task.test.ts src/database-backup.test.ts",
+    "test": "npm run typecheck && tsx --test src/token-utils.test.ts src/microi-client-recovery.test.ts src/mcp-label.test.ts src/mcp-did.test.ts src/server-codex-router.test.ts src/user-access-key-tools.test.ts src/view-schema.test.ts src/background-task.test.ts src/source-integrity.test.ts src/application-stream-publish.test.ts src/application-stream-gate-transition.test.ts src/microservice-scaffold.test.ts src/store-application-task.test.ts src/database-backup.test.ts src/v8-unlimited.test.ts",
     "call:stdio": "node invoke-stdio-tool.mjs",
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",

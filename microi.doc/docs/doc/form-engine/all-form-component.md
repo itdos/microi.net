@@ -134,18 +134,14 @@ if(V8.Form.Phone.length != 11){
   "TableChildSysMenuId": "子表菜单 sys_menu.Id",
   "TableChildSysMenuName": "子表菜单名称",
   "TableChildFkFieldName": "XiangmuID",
-  "TableChildCallbackField": "[{\"Parent\":\"Code\",\"Child\":\"XiangmuBM\"}]",
   "TableChild": {
     "PrimaryTableFieldName": "Id",
     "DisablePagination": false,
     "NoneDefaultHeight": false,
     "ImportAutoFillFk": true,
-    "ImportRelations": [
-      { "Parent": "Code", "Child": "XiangmuBM" }
-    ],
-    "ImportBackfillFields": [
-      { "Parent": "Code", "Child": "XiangmuBM" },
-      { "Parent": "Name", "Child": "XiangmuMC" }
+    "FieldRelations": [
+      ["Code", "XiangmuBM", true],
+      ["Name", "XiangmuMC"]
     ]
   }
 }
@@ -153,10 +149,10 @@ if(V8.Form.Phone.length != 11){
 >* `TableChildFkFieldName`：子表保存主表关联值的字段。
 >* `TableChild.PrimaryTableFieldName`：主表被关联字段，默认 `Id`。
 >* `ImportAutoFillFk`：导入子表 Excel 时自动补齐子表外键。
->* `ImportRelations`：导入时用主表字段和子表/Excel 字段匹配主表，`Parent`、`Child` 可填字段名或字段标题。
->* `ImportBackfillFields`：匹配到主表后，把主表字段回填到子表字段。适用于 Excel 中没有项目编号、项目名称、客户名称等展示冗余列的场景。
->* `TableChildCallbackField`：旧版“回写子表列”配置，保存同类 JSON 字符串；导入逻辑会兼容读取。
->* 在主表详情的子表区域导入，或通过 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有主表关联列，也应由前端把固定主表关系传给 `/api/FormEngine/ImportDiyTableRow`，后端再补齐外键和 `ImportBackfillFields`。
+>* `FieldRelations`：每项格式为 `[主表字段, 子表字段, 是否参与导入匹配]`。全部关系用于新增回写和导入回填；第三位 `true` 表示用子表/Excel 值反查主表，多项 `true` 表示组合匹配。
+>* 上例只用 `Code -> XiangmuBM` 匹配主表，`Name -> XiangmuMC` 只负责回填，避免 Excel 缺少名称时组合匹配失败。
+>* 旧版 `TableChildCallbackField`、`ImportRelations`、`ImportBackfillFields` 和单字段匹配配置仍兼容读取；新版前端会合并去重，并在字段下次保存时清除旧键。
+>* 在主表详情子表区域、左右树形页面或通过 `V8.OpenAnyTable` 带主表条件打开子表后导入时，即使 Excel 没有主表关联列，也应由前端把固定主表关系传给 `/api/FormEngine/ImportDiyTableRow`，后端再补齐外键和 `FieldRelations` 回填列。
 
 ## 地图(点) Map
 >* 地图画点

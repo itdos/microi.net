@@ -140,6 +140,22 @@ export const constantRoutes = [
                 meta: { title: "我的", keepAlive: true }
             }
         ]
+    },
+    // 表单设计器不是租户菜单路由。它必须在应用启动时就存在，避免
+    // resetRouter/动态菜单重载的短窗口内 URL 已更新但组件没有匹配，
+    // 只能依赖 F5 重新注册路由。登录守卫仍会阻止未认证访问。
+    {
+        path: "/diy/diy-design/:Id",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "diy_field",
+                meta: { keepAlive: false },
+                component: () => import("@/views/form-engine/diy-design-page.vue")
+            }
+        ]
     }
 ];
 
@@ -158,22 +174,6 @@ function collectRouteNames(routes, names = new Set()) {
 const constantRouteNames = collectRouteNames(constantRoutes);
 
 export const asyncRoutes = [
-    {
-        path: "/diy/diy-design/:Id",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "/diy/diy-design/:Id",
-                name: "diy_field",
-                // 表单设计器持有大量字段/拖拽/ref 状态，不能与普通数据页一样
-                // 由 keep-alive 缓存半初始化实例。每次进入都按路由 Id 干净挂载，
-                // 避免首次从列表动态跳转时只显示空壳、必须 F5 才恢复。
-                meta: { keepAlive: false },
-                component: () => import("@/views/form-engine/diy-design-page.vue")
-            }
-        ]
-    },
     {
         path: "/diy/form-page",
         component: Layout,
