@@ -173,8 +173,15 @@ export function removeToken() {
   }
 }
 
+function normalizeCurrentUser(user) {
+  if (!user || typeof user !== 'object') return user;
+  return user.CurrentUser && typeof user.CurrentUser === 'object'
+    ? user.CurrentUser
+    : user;
+}
+
 export function setUser(user) {
-  V8.setUser(user);
+  V8.setUser(normalizeCurrentUser(user));
   const runtimeUni = getRuntimeUni();
   if (runtimeUni && typeof runtimeUni.$emit === 'function') {
     runtimeUni.$emit('mci:auth-changed');
@@ -183,7 +190,11 @@ export function setUser(user) {
 }
 
 export function getUser() {
-  return V8.getUser();
+  const user = V8.getUser();
+  const currentUser = normalizeCurrentUser(user);
+  // 兼容旧版授权登录已缓存的 { CurrentUser, Token, ... } 包装结构。
+  if (currentUser && currentUser !== user) V8.setUser(currentUser);
+  return currentUser;
 }
 
 export function request(options = {}) {
