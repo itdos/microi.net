@@ -1,5 +1,5 @@
 <template>
-  <view class="selector-field">
+  <view class="selector-field" :class="{ 'selector-field--compact': compact }">
     <view class="selector-field__button" :class="{ disabled: readonly }" hover-class="selector-field__pressed" @tap="openSelector">
       <view class="selector-field__icon"><text>＋</text></view>
       <view class="selector-field__copy">
@@ -83,7 +83,8 @@ export default {
     parentId: { type: [String, Number], default: '' },
     parentForm: { type: Object, default: () => ({}) },
     parentMenuId: { type: String, default: '' },
-    readonly: { type: Boolean, default: false }
+    readonly: { type: Boolean, default: false },
+    compact: { type: Boolean, default: false }
   },
   emits: ['change'],
   data() {
@@ -258,6 +259,12 @@ export default {
 .selector-field__hint { margin-top: 6rpx; color: #84979e; font-size: 21rpx; }
 .selector-field__arrow { color: #8399a1; font-size: 38rpx; }
 .selector-field__pressed { transform: scale(.986); opacity: .82; }
+.selector-field--compact { min-width: 0; margin: 0; }
+.selector-field--compact .selector-field__button { min-height: 90rpx; grid-template-columns: 46rpx minmax(0, 1fr) 18rpx; gap: 10rpx; padding: 12rpx 14rpx; border-color: #c9e1e7; background: linear-gradient(135deg, #f3fafc, #f8fcfc); box-shadow: 0 5rpx 14rpx rgba(18, 105, 131, .07); }
+.selector-field--compact .selector-field__icon { width: 46rpx; height: 46rpx; font-size: 27rpx; }
+.selector-field--compact .selector-field__title { font-size: 24rpx; line-height: 1.35; }
+.selector-field--compact .selector-field__hint { display: none; }
+.selector-field--compact .selector-field__arrow { font-size: 29rpx; }
 .selector-mask { position: fixed; z-index: 950; inset: 0; display: flex; align-items: flex-end; background: rgba(10, 31, 39, .44); }
 .selector-panel { box-sizing: border-box; width: 100%; height: 84vh; max-height: 1180rpx; display: flex; flex-direction: column; padding-bottom: var(--mci-safe-bottom, env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; background: #f7fafb; animation: mciSelectorUp .24s ease both; }
 .selector-panel__handle { width: 74rpx; height: 7rpx; flex: none; margin: 14rpx auto 4rpx; border-radius: 4rpx; background: #c8d4d8; }
