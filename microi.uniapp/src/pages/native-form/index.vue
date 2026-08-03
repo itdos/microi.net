@@ -89,6 +89,14 @@
 
 				<!-- zhy: 折叠后按需移除字段控件，已填写值仍保存在 form 中。 -->
 				<view v-if="isGroupExpanded(group, groupIndex)" class="form-section__content">
+					<view v-if="embeddedOpenTableRelatedForGroup(group).length"
+						class="form-section__selector-grid">
+						<mci-table-selector v-for="relatedTab in embeddedOpenTableRelatedForGroup(group)"
+							:key="relatedTab.key" :field="relatedTab.field" :parent-table="tableName"
+							:parent-id="relationParentId" :parent-form="form" :parent-menu-id="menuId"
+							:readonly="mode === 'View' || isConfiguredReadonly(relatedTab.field)" compact
+							@change="handleRelatedChange" />
+					</view>
 					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
 						v-show="tenantFieldPresentation(field).visible !== false"
 						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name }">
@@ -292,7 +300,7 @@
 			groups() {
 				const groups = this.definition ? this.definition.relatedGroups || this.definition.groups || [] : []
 				const visibleGroups = groups.filter((group) =>
-					(group.fields || []).length || this.embeddedChildRelatedForGroup(group).length
+					(group.fields || []).length || this.embeddedRelatedForGroup(group).length
 				)
 				if (!this.formTabs.length) return visibleGroups
 				return visibleGroups.filter((group) => group.tabKey === this.activeFormTabKey)
@@ -344,7 +352,7 @@
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
 			},
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
@@ -396,10 +404,22 @@
 			isEmbeddedChildRelated(item) {
 				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
-			embeddedChildRelatedForGroup(group) {
+			isEmbeddedOpenTableRelated(item) {
+				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
+			},
+			isEmbeddedRelated(item) {
+				return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
+			},
+			embeddedRelatedForGroup(group) {
 				return this.activeRelatedTabs.filter((item) =>
-					this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
+					this.isEmbeddedRelated(item) && item.field.layoutGroupKey === group.key
 				)
+			},
+			embeddedChildRelatedForGroup(group) {
+				return this.embeddedRelatedForGroup(group).filter((item) => item.type === 'child')
+			},
+			embeddedOpenTableRelatedForGroup(group) {
+				return this.embeddedRelatedForGroup(group).filter((item) => item.type === 'openTable')
 			},
 			async loadForm(refresh = false) {
 				// zhy: 每次加载分配递增编号，仅允许最后一次请求更新表单。
@@ -1008,6 +1028,15 @@
 	/* zhy: 展开字段分组时使用克制动效，保持与子表折叠交互一致。 */
 	.form-section__content {
 		animation: mciFormSectionExpand .18s ease both;
+	}
+
+	.form-section__selector-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 14rpx;
+		padding: 18rpx 22rpx;
+		border-bottom: 1px solid var(--mci-border, #e5eef1);
+		background: linear-gradient(180deg, #f8fbfc, #fbfdfd);
 	}
 
 	.form-section__related-preview {
