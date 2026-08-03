@@ -22,6 +22,8 @@ import {
 } from './customer-follow-scope.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
+// zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
+const ORDER_TABLE = 'diy_dingdan'
 const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
@@ -97,6 +99,19 @@ const CUSTOMER_PERSONNEL_LINKS = [
     idName: 'ShouhouRYID'
   }
 ]
+// zhy：集中维护订单客户、负责人、安装人及新增默认值字段，包含需要随表单提交的隐藏 Id。
+const ORDER_FIELDS = {
+  customerId: 'KehuID',
+  customerName: 'KehuMC',
+  owner: 'YewuY',
+  ownerId: 'YewuYID',
+  ownerPhone: 'YewuYDH',
+  orderType: 'XinLDD',
+  orderDate: 'XiadanRQ',
+  installer: 'AnzhuangR',
+  installerId: 'AnzhuangRID',
+  installerPhone: 'AnzhuangRDH'
+}
 const PERSON_ID_KEYS = ['Id', 'ID', 'id', 'UserId', 'UserID', 'userId', 'Value', 'value']
 const PERSON_PHONE_KEYS = [
   'Phone', 'phone', 'Mobile', 'mobile', 'MobilePhone', 'mobilePhone',
@@ -110,6 +125,15 @@ function isCustomerAdd(context) {
 
 function isCustomerForm(context) {
   return String(context.tableName || '').toLowerCase() === CUSTOMER_TABLE
+}
+
+// zhy：按表名识别订单表单；联动同时适用于新增和编辑，默认值仅适用于新增。
+function isOrderForm(context) {
+  return String(context.tableName || '').toLowerCase() === ORDER_TABLE
+}
+
+function isOrderAdd(context) {
+  return isOrderForm(context) && context.mode === 'Add' && !context.rowId
 }
 
 function isCustomerAddressForm(context) {
@@ -249,6 +273,78 @@ function selectedPersonId(payload, row) {
     return payload.value
   }
   return ''
+}
+
+function selectedRow(payload = {}) {
+  // zhy：兼容原生选择控件直接返回 raw，以及 option.raw 两种单选事件结构。
+  return payload.raw && typeof payload.raw === 'object'
+    ? payload.raw
+    : payload.option && payload.option.raw && typeof payload.option.raw === 'object'
+      ? payload.option.raw
+      : {}
+}
+
+function orderFieldName(context, key, label = '') {
+  return fieldName(context, ORDER_FIELDS[key], label)
+}
+
+function orderCustomerValues(context, row = {}, cleared = false) {
+  // zhy：客户表保存 FuzeR 系列字段，订单表保存 YewuY 系列字段，在此统一完成字段映射。
+  const values = {
+    [orderFieldName(context, 'customerId', '客户Id')]: cleared
+      ? ''
+      : personValue(row, ['Id', 'ID', 'id', 'KehuID', 'KehuId']),
+    [orderFieldName(context, 'owner', '负责人')]: cleared
+      ? ''
+      : personValue(row, ['FuzeR', 'YewuY']),
+    [orderFieldName(context, 'ownerId', '负责人ID')]: cleared
+      ? ''
+      : personValue(row, ['FuzeRID', 'YewuYID']),
+    [orderFieldName(context, 'ownerPhone', '负责人电话')]: cleared
+      ? ''
+      : personValue(row, ['FuzeRDH', 'YewuYDH'])
+  }
+  return values
+}
+
+function applyOrderValues(context, values = {}) {
+  // zhy：同时更新页面和提交态，确保不可见的负责人/安装人 Id 也能正常落库。
+  context.patchForm(values)
+  context.state.orderValues = {
+    ...(context.state.orderValues || {}),
+    ...values
+  }
+  return values
+}
+
+async function initializeOrder(context) {
+  // zhy：仅为空字段设置新增默认值，保留路由或业务侧已经传入的订单类型和下单日期。
+  const defaults = {
+    [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
+    [orderFieldName(context, 'orderDate', '下单日期')]: currentDate()
+  }
+  const emptyDefaults = Object.fromEntries(
+    Object.entries(defaults).filter(([name]) => isEmptyFormValue(context.form[name]))
+  )
+  applyOrderValues(context, emptyDefaults)
+
+  // 从客户/合作客户的订单 Tab 进入时只有客户 Id、名称，没有触发客户选择事件。
+  // 新增页仅在负责人信息仍为空时补查一次客户，避免覆盖路由明确传入的值。
+  const customerId = context.form[orderFieldName(context, 'customerId', '客户Id')]
+  const owner = context.form[orderFieldName(context, 'owner', '负责人')]
+  const ownerPhone = context.form[orderFieldName(context, 'ownerPhone', '负责人电话')]
+  if (!customerId || (!isEmptyFormValue(owner) && !isEmptyFormValue(ownerPhone))) return
+  try {
+    const result = await V8.FormEngine.GetFormData(CUSTOMER_TABLE, {
+      Id: customerId,
+      _SelectFields: ['Id', 'KehuMC', 'FuzeR', 'FuzeRID', 'FuzeRDH']
+    })
+    if (result && Number(result.Code) === 1 && result.Data) {
+      applyOrderValues(context, orderCustomerValues(context, result.Data))
+    }
+  } catch (error) {
+    // 客户联动属于便捷回填，读取失败不阻断订单新增，用户仍可手动选择客户或负责人。
+  }
 }
 
 function requestCurrentLocation() {
@@ -761,11 +857,18 @@ export function createState() {
     followupCustomerId: '',
     followupCustomerName: '',
     proposalInitialized: false,
-    customerFollowScopeValues: {}
+    customerFollowScopeValues: {},
+    orderInitialized: false,
+    orderValues: {}
   }
 }
 
 export async function initialize(context) {
+  // zhy：所有入口进入订单新增页时统一初始化，避免各页面分别维护相同逻辑。
+  if (isOrderAdd(context) && !context.state.orderInitialized) {
+    context.state.orderInitialized = true
+    await initializeOrder(context)
+  }
   if (isProposalAdd(context) &&
     isEmptyFormValue(context.form[fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')])) {
     context.patchForm({
@@ -984,6 +1087,47 @@ export async function runFieldAction(context, field, action) {
 }
 
 export async function handleFieldSelect(context, payload) {
+  // zhy：订单客户、负责人和安装人的选择联动统一在表单层处理，新增、编辑及不同入口均生效。
+  if (isOrderForm(context) && payload && !payload.multiple) {
+    const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    const row = selectedRow(payload)
+    if (selectedFieldName === ORDER_FIELDS.customerName.toLowerCase()) {
+      const updates = orderCustomerValues(context, row, payload.cleared)
+      updates[orderFieldName(context, 'customerName', '客户名称')] = payload.cleared
+        ? ''
+        : personValue(row, ['KehuMC', 'CustomerName', 'Name']) || payload.value || ''
+      applyOrderValues(context, updates)
+      return { handled: true }
+    }
+    const personnel = [
+      {
+        source: ORDER_FIELDS.owner,
+        id: 'ownerId',
+        phone: 'ownerPhone',
+        idLabel: '负责人ID',
+        phoneLabel: '负责人电话'
+      },
+      {
+        source: ORDER_FIELDS.installer,
+        id: 'installerId',
+        phone: 'installerPhone',
+        idLabel: '安装人Id',
+        phoneLabel: '安装人电话'
+      }
+    ].find((item) => selectedFieldName === item.source.toLowerCase())
+    if (personnel) {
+      // zhy：人员选择器返回 sys_user 原始行，从中提取 Id、Phone 并同步到订单关联字段。
+      applyOrderValues(context, {
+        [orderFieldName(context, personnel.id, personnel.idLabel)]: payload.cleared
+          ? ''
+          : selectedPersonId(payload, row),
+        [orderFieldName(context, personnel.phone, personnel.phoneLabel)]: payload.cleared
+          ? ''
+          : personValue(row, PERSON_PHONE_KEYS)
+      })
+      return { handled: true }
+    }
+  }
   if (isCustomerCareForm(context) && payload) {
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
     if (selectedFieldName === CUSTOMER_CARE_FIELDS.contact.toLowerCase()) {
@@ -1105,6 +1249,28 @@ export async function handleFieldSelect(context, payload) {
 }
 
 export function handleFieldChange(context, payload) {
+  // zhy：用户清空客户或人员时同步清空对应 Id、电话，避免提交残留的旧关联数据。
+  if (isOrderForm(context) && payload && isEmptyFormValue(payload.value)) {
+    const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    if (changedFieldName === ORDER_FIELDS.customerName.toLowerCase()) {
+      applyOrderValues(context, orderCustomerValues(context, {}, true))
+      return { handled: true }
+    }
+    if (changedFieldName === ORDER_FIELDS.owner.toLowerCase()) {
+      applyOrderValues(context, {
+        [orderFieldName(context, 'ownerId', '负责人ID')]: '',
+        [orderFieldName(context, 'ownerPhone', '负责人电话')]: ''
+      })
+      return { handled: true }
+    }
+    if (changedFieldName === ORDER_FIELDS.installer.toLowerCase()) {
+      applyOrderValues(context, {
+        [orderFieldName(context, 'installerId', '安装人Id')]: '',
+        [orderFieldName(context, 'installerPhone', '安装人电话')]: ''
+      })
+      return { handled: true }
+    }
+  }
   if (isCustomerCareForm(context) && payload) {
     const fieldNameValue = String(payload.field && payload.field.Name || '').toLowerCase()
     if ([
@@ -1148,6 +1314,20 @@ export function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  // zhy：提交前补入隐藏关联字段，并为新增订单兜底默认值；编辑订单不覆盖历史值。
+  if (isOrderForm(context)) {
+    const values = { ...(context.state.orderValues || {}) }
+    if (isOrderAdd(context)) {
+      const defaults = {
+        [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
+        [orderFieldName(context, 'orderDate', '下单日期')]: currentDate()
+      }
+      Object.entries(defaults).forEach(([name, value]) => {
+        if (isEmptyFormValue(context.form[name]) && isEmptyFormValue(values[name])) values[name] = value
+      })
+    }
+    return values
+  }
   if (context.state.locating) throw new Error('正在获取位置，请稍候')
   if (isCustomerForm(context)) {
     // zhy：隐藏状态字段也必须提交，最终负责人为空时写公海/2，否则写私有/1。
