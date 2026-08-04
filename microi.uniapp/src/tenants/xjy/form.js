@@ -24,6 +24,10 @@ import {
   calculateOrderProductCooperation,
   orderProductNumberValue
 } from './order-product-cooperation.mjs'
+import {
+  orderSummarySubmitValues,
+  orderSummaryValues
+} from './order-summary.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 // zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
@@ -475,6 +479,38 @@ async function updateOrderProductCooperation(context, payload) {
     }
   }
   return { handled: true }
+}
+
+async function loadOrderSummaryValues(orderId) {
+  const id = String(orderId || '').trim()
+  if (!id) return orderSummaryValues([], [])
+  const productResult = await V8.FormEngine.GetTableData(ORDER_PRODUCT_TABLE, {
+    _Where: [{ Name: 'DingdanID', Type: '=', Value: id }],
+    _OrderBy: 'CreateTime',
+    _OrderByType: 'ASC',
+    _PageIndex: 1,
+    _PageSize: 1000
+  })
+  if (!productResult || Number(productResult.Code) !== 1) {
+    throw new Error(productResult && productResult.Msg || '订单商品读取失败')
+  }
+  const products = Array.isArray(productResult.Data) ? productResult.Data : []
+  const productIds = products.map((item) => item && item.Id).filter(Boolean)
+  if (!productIds.length) return orderSummaryValues(products, [])
+  const positionResult = await V8.FormEngine.GetTableData(INSTALLATION_POSITION_TABLE, {
+    _Where: [{ Name: 'DingdanSPID', Type: 'In', Value: productIds }],
+    _OrderBy: 'Paixu',
+    _OrderByType: 'ASC',
+    _PageIndex: 1,
+    _PageSize: 5000
+  })
+  if (!positionResult || Number(positionResult.Code) !== 1) {
+    throw new Error(positionResult && positionResult.Msg || '设备安装位置读取失败')
+  }
+  return orderSummaryValues(
+    products,
+    Array.isArray(positionResult.Data) ? positionResult.Data : []
+  )
 }
 
 function proposalDefaults(context) {
@@ -1004,6 +1040,7 @@ export function createState() {
     customerFollowScopeValues: {},
     orderInitialized: false,
     orderValues: {},
+    orderSummaryValues: null,
     orderProductCooperationRequestId: 0,
     installationCodeInitialized: false,
     installationCodeInitializing: false,
@@ -1019,6 +1056,7 @@ export async function initialize(context) {
     context.state.orderInitialized = true
     await initializeOrder(context)
   }
+  if (isOrderForm(context)) await refreshDerivedValues(context)
   if (isProposalAdd(context) &&
     isEmptyFormValue(context.form[fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')])) {
     context.patchForm({
@@ -1479,6 +1517,9 @@ export async function beforeSubmit(context) {
   // zhy：提交前补入隐藏关联字段，并为新增订单兜底默认值；编辑订单不覆盖历史值。
   if (isOrderForm(context)) {
     const values = { ...(context.state.orderValues || {}) }
+    if (context.state.orderSummaryValues) {
+      Object.assign(values, orderSummarySubmitValues(context.state.orderSummaryValues))
+    }
     if (isOrderAdd(context)) {
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
@@ -1551,6 +1592,15 @@ export async function beforeSubmit(context) {
   return {}
 }
 
+export async function refreshDerivedValues(context) {
+  if (!isOrderForm(context)) return {}
+  const orderId = context.rowId || context.form.Id || context.defaultValues?.Id || ''
+  const values = await loadOrderSummaryValues(orderId)
+  context.state.orderSummaryValues = values
+  context.patchForm(values)
+  return values
+}
+
 export async function afterSubmit(context) {
   if (String(context.tableName || '').toLowerCase() === CHECKIN_TABLE && context.wasAdd) {
     dispose(context)
@@ -1577,6 +1627,7 @@ export default {
   handleFieldChange,
   handleFieldSelect,
   handleRelatedCount,
+  refreshDerivedValues,
   beforeSubmit,
   afterSubmit,
   getBusyMessage,
