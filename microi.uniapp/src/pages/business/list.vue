@@ -92,6 +92,7 @@
       </view>
 
       <view v-else-if="rows.length" class="data-list">
+        <!-- zhy：把租户配置的摘要最大行数传给卡片组件。 -->
         <mci-business-card
           v-for="(row, index) in rows"
           :key="row.Id || index"
@@ -103,6 +104,7 @@
           :tags="getTags(row)"
           :lines="cardLines(row)"
           :summary="config.summaryField ? summaryValue(row) : ''"
+          :summary-lines="config.summaryLines || 3"
           :actions="rowActions(row)"
           :time="cardBottomText(row)"
           @open="openDetail"
@@ -701,10 +703,14 @@ export default {
       return this.configuredFieldValue(row, line.field, line.format)
     },
     cardLines(row) {
+      // zhy：后台菜单会清空 config.summaryField 以保留字段标签，长文本识别必须回退到租户基础配置。
+      const multilineField = cardFieldKey(this.baseConfig.summaryField || this.config.summaryField)
+      const multilineLines = Number(this.baseConfig.summaryLines || this.config.summaryLines) || 3
       return this.visibleLines(row).map((line) => ({
         ...line,
         value: this.displayValue(row, line),
-        rawValue: row[line.field]
+        rawValue: row[line.field],
+        maxLines: cardFieldKey(line.field) === multilineField ? multilineLines : (Number(line.maxLines) || 1)
       }))
     },
     periodCount(item) {
