@@ -20,10 +20,20 @@ import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
 } from './customer-follow-scope.mjs'
+import {
+  calculateOrderProductCooperation,
+  orderProductNumberValue
+} from './order-product-cooperation.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 // zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
 const ORDER_TABLE = 'diy_dingdan'
+const ORDER_PRODUCT_TABLE = 'diy_dingdansp'
+const PRODUCT_TABLE = 'diy_shangpin'
+const ORDER_PRODUCT_CONSUMABLE_TABLE = 'diy_dingdansphc'
+const INSTALLATION_POSITION_TABLE = 'diy_shebeiwz'
+const INSTALLATION_POSITION_CODE_FIELD = 'ShangpinBH'
+const INSTALLATION_POSITION_CODE_ENGINE = 'create_unique_value'
 const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
@@ -134,6 +144,23 @@ function isOrderForm(context) {
 
 function isOrderAdd(context) {
   return isOrderForm(context) && context.mode === 'Add' && !context.rowId
+}
+
+function isOrderProductForm(context) {
+  return String(context.tableName || '').toLowerCase() === ORDER_PRODUCT_TABLE
+}
+
+function isInstallationPositionAdd(context) {
+  return String(context.tableName || '').toLowerCase() === INSTALLATION_POSITION_TABLE &&
+    context.mode === 'Add' && !context.rowId
+}
+
+function installationPositionCodeField(context) {
+  // 线上历史表可能使用 ShangpinBH 或 ShebeiBH，以当前元数据中“设备编号”的真实字段为准。
+  const labelledField = findField(context, '__device_number__', '设备编号')
+  return labelledField && labelledField.Name
+    ? labelledField.Name
+    : fieldName(context, INSTALLATION_POSITION_CODE_FIELD)
 }
 
 function isCustomerAddressForm(context) {
@@ -380,6 +407,74 @@ function isEmptyFormValue(value) {
   return value === undefined || value === null || value === '' ||
     (Array.isArray(value) && value.length === 0) ||
     (typeof value === 'string' && value.trim() === '[]')
+}
+
+function cooperationOptionKey(field, value) {
+  const option = Array.isArray(field && field.options)
+    ? field.options.find((item) => String(item && item.value) === String(value))
+    : null
+  const raw = option && option.raw && typeof option.raw === 'object' ? option.raw : {}
+  return raw.Key ?? raw.key ?? ''
+}
+
+async function orderProductFilterPrice(context, product) {
+  const orderProductId = context.rowId || context.form.Id
+  if (!orderProductId) return orderProductNumberValue(product.GenghuanLXJG)
+  const result = await V8.FormEngine.GetTableData(ORDER_PRODUCT_CONSUMABLE_TABLE, {
+    _Where: [['DingdanSPID', '=', orderProductId]],
+    _SelectFields: ['YouhuiHLXZJ'],
+    _PageIndex: 1,
+    _PageSize: 1000
+  })
+  // PC 字段事件查询成功时使用耗材明细合计，失败时才回退商品滤芯价。
+  if (!result || Number(result.Code) !== 1) return orderProductNumberValue(product.GenghuanLXJG)
+  return (Array.isArray(result.Data) ? result.Data : []).reduce(
+    (sum, item) => sum + orderProductNumberValue(item && item.YouhuiHLXZJ),
+    0
+  )
+}
+
+async function updateOrderProductCooperation(context, payload) {
+  const cooperation = String(payload.value || '')
+  const cooperationKey = cooperationOptionKey(payload.field, cooperation)
+  const productId = context.form.ShangpinID
+  const requestId = Number(context.state.orderProductCooperationRequestId || 0) + 1
+  context.state.orderProductCooperationRequestId = requestId
+
+  // 与 PC 一致先更新隐藏合作方式值，接口异常时也不残留上一方式。
+  context.patchForm({ HezuoFSZ: cooperationKey })
+  if (!cooperation || !productId) return { handled: true }
+
+  try {
+    const productResult = await V8.FormEngine.GetFormData(PRODUCT_TABLE, {
+      Id: productId,
+      _SelectFields: ['Id', 'Yuanjia', 'Xianjia', 'ZulinYJ', 'ZulinXJ', 'GenghuanLXJG']
+    })
+    if (!productResult || Number(productResult.Code) !== 1 || !productResult.Data) {
+      throw new Error(productResult && productResult.Msg || '商品价格读取失败')
+    }
+    const filterActualUnitPrice = await orderProductFilterPrice(context, productResult.Data)
+    // 快速连续切换时只允许最后一次请求更新价格。
+    if (context.state.orderProductCooperationRequestId !== requestId ||
+      String(context.form.HezuoFS || '') !== cooperation) {
+      return { handled: true }
+    }
+    context.patchForm(calculateOrderProductCooperation({
+      cooperation,
+      cooperationKey,
+      form: context.form,
+      product: productResult.Data,
+      filterActualUnitPrice
+    }))
+  } catch (error) {
+    if (context.state.orderProductCooperationRequestId === requestId) {
+      uni.showToast({
+        title: error.message || error.Msg || '合作方式价格联动失败',
+        icon: 'none'
+      })
+    }
+  }
+  return { handled: true }
 }
 
 function proposalDefaults(context) {
@@ -839,6 +934,55 @@ async function locateCheckin(context, chooseFromMap) {
   }
 }
 
+// 对齐 PC 端安装位置 InFormV8：设备编号统一由接口引擎生成，客户端不自行拼号。
+async function initializeInstallationPositionCode(context) {
+  if (!isInstallationPositionAdd(context) || context.state.installationCodeInitializing) return
+
+  const codeField = installationPositionCodeField(context)
+  context.state.installationCodeField = codeField
+  if (context.state.installationCodeInitialized) {
+    if (context.state.installationCodeValue) {
+      context.patchForm({ [codeField]: context.state.installationCodeValue })
+    }
+    return
+  }
+
+  context.state.installationCodeInitializing = true
+  try {
+    let result
+    try {
+      result = await V8.ApiEngine.Run(INSTALLATION_POSITION_CODE_ENGINE, { Batch: 1 })
+    } catch (error) {
+      result = await V8.ApiEngine.RunLegacy(INSTALLATION_POSITION_CODE_ENGINE, { Batch: 1 })
+    }
+    if (result && Number(result.Code) === 0) {
+      result = await V8.ApiEngine.RunLegacy(INSTALLATION_POSITION_CODE_ENGINE, { Batch: 1 })
+    }
+
+    const generatedCode = result && result.Data !== undefined && result.Data !== null
+      ? String(result.Data).trim()
+      : ''
+    if (!result || Number(result.Code) !== 1 || !generatedCode || generatedCode === '[object Object]') {
+      throw new Error(result && result.Msg || '设备编号生成失败请重试！')
+    }
+
+    context.state.installationCodeValue = generatedCode
+    context.state.installationCodeInitialized = true
+    context.patchForm({ [codeField]: generatedCode })
+    findFieldCopies(context, codeField).forEach((field) => {
+      field.editable = false
+      field.Readonly = true
+    })
+  } catch (error) {
+    uni.showToast({
+      title: error.message || error.Msg || '设备编号生成失败请重试！',
+      icon: 'none'
+    })
+  } finally {
+    context.state.installationCodeInitializing = false
+  }
+}
+
 export function createState() {
   return {
     locating: false,
@@ -859,11 +1003,17 @@ export function createState() {
     proposalInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
-    orderValues: {}
+    orderValues: {},
+    orderProductCooperationRequestId: 0,
+    installationCodeInitialized: false,
+    installationCodeInitializing: false,
+    installationCodeField: '',
+    installationCodeValue: ''
   }
 }
 
 export async function initialize(context) {
+  await initializeInstallationPositionCode(context)
   // zhy：所有入口进入订单新增页时统一初始化，避免各页面分别维护相同逻辑。
   if (isOrderAdd(context) && !context.state.orderInitialized) {
     context.state.orderInitialized = true
@@ -1248,7 +1398,11 @@ export async function handleFieldSelect(context, payload) {
   return { handled: true }
 }
 
-export function handleFieldChange(context, payload) {
+export async function handleFieldChange(context, payload) {
+  if (isOrderProductForm(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() === 'hezuofs') {
+    return updateOrderProductCooperation(context, payload)
+  }
   // zhy：用户清空客户或人员时同步清空对应 Id、电话，避免提交残留的旧关联数据。
   if (isOrderForm(context) && payload && isEmptyFormValue(payload.value)) {
     const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -1314,6 +1468,14 @@ export function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isInstallationPositionAdd(context)) {
+    const codeField = context.state.installationCodeField ||
+      installationPositionCodeField(context)
+    const codeValue = context.state.installationCodeValue || context.form[codeField]
+    if (isEmptyFormValue(codeValue)) throw new Error('设备编号尚未生成，请重新进入页面后重试')
+    // 只读字段不进入通用 editable 字段集合，必须作为受控额外值显式提交。
+    return { [codeField]: codeValue }
+  }
   // zhy：提交前补入隐藏关联字段，并为新增订单兜底默认值；编辑订单不覆盖历史值。
   if (isOrderForm(context)) {
     const values = { ...(context.state.orderValues || {}) }

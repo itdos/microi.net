@@ -77,6 +77,8 @@ export default {
         },
         basePermissions() {
             return [
+                // zhy：显式提供读取权限，便于已有角色单独补选 Read，而不必重置其它操作权限。
+                { value: "Read", label: this.permissionLabels.Read },
                 { value: "Add", label: this.permissionLabels.Add },
                 { value: "Edit", label: this.permissionLabels.Edit },
                 { value: "Del", label: this.permissionLabels.Del },

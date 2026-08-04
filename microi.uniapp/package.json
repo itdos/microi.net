@@ -28,6 +28,7 @@
     "check:share": "node scripts/check-share-policy.js",
     "check:view-schema": "node scripts/check-view-schema.mjs",
     "check:field-roles": "node scripts/check-native-field-role-visibility.mjs",
+    "check:xjy-order-product-cooperation": "node scripts/check-xjy-order-product-cooperation.mjs",
     "check:architecture": "node scripts/check-architecture.mjs",
     "check:profiles": "node scripts/check-profiles.cjs",
     "check:ui": "npm run check:architecture && npm run check:profiles && npm run check:view-schema && npm run check:field-roles && node scripts/check-mci-compliance.js && npm run check:controls && npm run check:file-urls && npm run check:upload-paths && npm run check:share",
