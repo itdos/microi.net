@@ -126,7 +126,9 @@
 						</view>
 
 						<!-- zhy: 接收下拉开关状态并同步外层层叠样式。 -->
+						<!-- zhy：详情模式下给租户配置的长文本字段传入最大可视行数。 -->
 						<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
+							:readonly-max-lines="readonlyMaxLines(field)"
 							:table-name="tableName" :form-data="form" :menu-id="menuId"
 							:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
 							@change="handleNativeFieldChange(field, $event)"
@@ -226,6 +228,9 @@
 		compileFormConfig,
 		loadModuleViewManifest
 	} from '@/platform/view-manifest.js'
+	import {
+		businessModules
+	} from '@/platform/business.js'
 	import {
 		createTenantFormState,
 		disposeTenantForm,
@@ -522,6 +527,15 @@
 			},
 			isReadonly(field) {
 				return this.mode === 'View' || !field.editable
+			},
+			readonlyMaxLines(field) {
+				// zhy：按当前物理表匹配租户业务模块，仅限制其 summaryField，普通字段保持原展示方式。
+				if (this.mode !== 'View') return 0
+				const module = Object.values(businessModules || {}).find((item) =>
+					String(item?.table || '').toLowerCase() === String(this.tableName || '').toLowerCase()
+				)
+				if (!module || String(field?.Name || '').toLowerCase() !== String(module.summaryField || '').toLowerCase()) return 0
+				return Math.min(20, Math.max(1, Number(module.detailSummaryLines) || 11))
 			},
 			isConfiguredReadonly(field) {
 				const value = field && (field.Readonly ?? field.ReadOnly)

@@ -109,7 +109,8 @@
 							:class="{ 'field-row--map': tenantDetailFieldPresentation(field).type === 'map' }"
 							v-for="field in section.fields" :key="`${section.key}:${field.name}`">
 							<text class="field-label">{{ field.label }}</text>
-							<view class="field-value-wrap">
+							<view class="field-value-wrap"
+								:class="{ 'field-value-wrap--scroll': isScrollableDetailField(field) }">
 								<view v-if="tenantDetailFieldPresentation(field).type === 'map'"
 									class="detail-field-map">
 									<map
@@ -179,15 +180,19 @@
 						:parent-form="detail" :parent-menu-id="menuId" />
 				</view>
 
-				<view v-if="summaryBlocks.length" class="info-band">
+				<!-- zhy：客户备注已在基本信息分组展示，客户详情不再重复渲染底部“补充说明”区。 -->
+				<view v-if="key !== 'customers' && summaryBlocks.length" class="info-band">
 					<view class="section-heading">
 						<view class="section-mark"></view>
 						<text>补充说明</text>
 					</view>
 					<view class="summary-block" v-for="block in summaryBlocks" :key="block.label">
 						<text class="summary-label">{{ block.label }}</text>
-						<rich-text v-if="block.rich" class="summary-text summary-text--rich" :nodes="block.html" />
-						<text v-else class="summary-text">{{ block.value }}</text>
+						<!-- zhy：详情长文本最多展示配置行数，超出后允许纵向滑动查看完整内容。 -->
+						<scroll-view class="summary-text-scroll" scroll-y :style="block.scrollStyle">
+							<rich-text v-if="block.rich" class="summary-text summary-text--rich" :nodes="block.html" />
+							<text v-else class="summary-text">{{ block.value }}</text>
+						</scroll-view>
 					</view>
 				</view>
 
@@ -1366,7 +1371,15 @@
 				}
 			},
 			summaryBlocks() {
-				return (this.preset.summaries || []).map((item) => {
+				// zhy：详情页默认最多显示 11 行，租户模块可通过 detailSummaryLines 调整。
+				const maxLines = Math.min(20, Math.max(1, Number(this.moduleConfig.detailSummaryLines) || 11))
+				return (this.preset.summaries || []).filter((item) => {
+					if (!this.formTabs.length) return true
+					// zhy：摘要字段只跟随其所属表单 Tab 展示；元数据缺失时归入首个基础信息 Tab，禁止串到联系人等其它 Tab。
+					const field = this.fieldDefinitionMap.get(String(item.field || '').toLowerCase())
+					const summaryTabKey = field?.formTabKey || this.formTabs[0]?.key || ''
+					return summaryTabKey === this.activeFormTabKey
+				}).map((item) => {
 					const raw = this.detail[item.field]
 					const rich = isHtmlValue(raw)
 					return {
@@ -1374,7 +1387,8 @@
 						raw,
 						rich,
 						html: rich ? normalizeRichTextHtml(raw) : '',
-						value: rich ? '' : formatFieldValue(raw, item.format)
+						value: rich ? '' : formatFieldValue(raw, item.format),
+						scrollStyle: { maxHeight: `${maxLines * 43}rpx` }
 					}
 				}).filter((item) => item.raw !== undefined && item.raw !== null && item.raw !== '')
 			},
@@ -1897,6 +1911,10 @@
 				return formatFieldValue(this.detail[field.name], field.format, {
 					empty: '-'
 				})
+			},
+			isScrollableDetailField(field) {
+				// zhy：字段同时出现在详情分组中时，也按摘要字段的 11 行上限处理。
+				return String(field?.name || '').toLowerCase() === String(this.moduleConfig.summaryField || '').toLowerCase()
 			},
 			usesNativeDisplay(field) {
 				return Boolean(field.nativeField && DETAIL_NATIVE_COMPONENTS.has(String(field.nativeField.component ||
@@ -2933,6 +2951,13 @@
 		gap: 14rpx;
 	}
 
+	/* zhy：跟进记录等长文本在详情字段区超过 11 行后可触摸滚动。 */
+	.field-value-wrap--scroll {
+		max-height: 396rpx;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
 	.field-value {
 		min-width: 0;
 		color: #203f4a;
@@ -2985,6 +3010,16 @@
 		font-size: 25rpx;
 		line-height: 1.7;
 		word-break: break-all;
+	}
+
+	/* zhy：scroll-view 使用 max-height，短内容保持自然高度，长内容才出现滚动。 */
+	.summary-text-scroll {
+		width: 100%;
+		margin-top: 10rpx;
+	}
+
+	.summary-text-scroll .summary-text {
+		margin-top: 0;
 	}
 
 	.summary-text--rich {
