@@ -29,13 +29,14 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/office.md` | v8-export-import, microi-microservice | Office 导入导出与在线编辑集成 |
 | `more/security.md` | v8-security | 平台安全和兼容基线 |
 | `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |
-| `system-engine/ai-engine.md` | ai-engine | 模型代理、AI 引擎和安全 |
+| `system-engine/ai-engine.md` | ai-engine, v8-http-integration, microi-ai-application | 模型代理、License、V8.AI、MCP 对话、跨端调用和安全 |
 | `system-engine/app-store.md` | app-store | 应用包、安装、升级和回滚 |
 | `system-engine/databases.md` | dos-orm, v8-sql-query, microi-deployment | 扩展数据库与迁移 |
 | `system-engine/datasource-engine.md` | datasource-engine | 数据源定义、执行和供数 |
 | `system-engine/job.md` | job-engine | 调度、后台任务和分布式恢复 |
 | `system-engine/micro-app.md` | microi-microservice, microi-ai-application | 微服务/AI 前端应用的工程架构与交付 |
 | `system-engine/microi-ui.md` | microi-ui | Microi.UI 组件和主题 |
+| `system-engine/message-notification.md` | message-notification | 平台内部消息、SignalR 与多通道通知 |
 | `system-engine/module-engine.md` | module-engine, v8-menu-buttons, v8-template-engine, microi-mobile-app-quality | 菜单统计、模块指标、复合列、移动卡片、按钮角标和页面入口 |
 | `system-engine/mq.md` | v8-mq-mqtt | RabbitMQ 生产与消费 |
 | `system-engine/mqtt-engine.md` | v8-mq-mqtt | MQTT 事件与 IoT |
@@ -51,8 +52,8 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置和调用 |
 | `v8-engine/apiengine-index.md` | v8-crud-api, v8-api-config | 接口引擎实战和规范 |
 | `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http | FormEngine API 与 HTTP |
-| `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, print-engine | 全部前端 V8、扫码和蓝牙打印 |
-| `v8-engine/v8-server.md` | v8-utilities, v8-api-config | 全部后端 V8 和专项路由 |
+| `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, v8-http-integration, ai-engine, print-engine | 全部前端 V8、平台 AI、扫码和蓝牙打印 |
+| `v8-engine/v8-server.md` | v8-utilities, v8-api-config, v8-http-integration, ai-engine | 全部后端 V8、平台 AI 和专项路由 |
 | `v8-engine/vs-code-plugin.md` | v8-explorer-tree, microi-client-frontend, workspace-conventions | VS Code 插件、Microi CLI、AI/MCP 初始化、类型、资源树和共享工作区 |
 | `v8-engine/where.md` | v8-crud-api, v8-sql-query | 参数化 `_Where` 条件 |
 

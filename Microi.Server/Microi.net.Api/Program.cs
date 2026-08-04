@@ -101,32 +101,24 @@ builder.WebHost.UseKestrel((host, options) =>
 //USE IIS【发布到Windows IIS使用以下代码】
 //builder.WebHost.UseIISIntegration();
 var services = builder.Services;
-var forwardedHeaderKnownProxies = builder.Configuration
-    .GetSection("ForwardedHeaders:KnownProxies")
-    .GetChildren()
-    .Select(item => item.Value)
-    .Concat((builder.Configuration["ForwardedHeaders:KnownProxies"] ?? "")
-        .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
-    .Where(item => !string.IsNullOrWhiteSpace(item))
-    .Select(item => item.Trim())
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToList();
-var forwardedHeaderKnownNetworks = builder.Configuration
-    .GetSection("ForwardedHeaders:KnownNetworks")
-    .GetChildren()
-    .Select(item => item.Value)
-    .Concat((builder.Configuration["ForwardedHeaders:KnownNetworks"] ?? "")
-        .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries))
-    .Where(item => !string.IsNullOrWhiteSpace(item))
-    .Select(item => item.Trim())
-    .Distinct(StringComparer.OrdinalIgnoreCase)
-    .ToList();
 services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     // 只接受离 Kestrel 最近的一跳。框架保留安全的 loopback 默认值；其它反向代理
     // 必须在 KnownProxies/KnownNetworks 明确配置，公网请求自报 XFF 不会被采信。
     options.ForwardLimit = 1;
+    var forwardedHeaderKnownProxies = (ConfigHelper.GetRuntimeConfigurationValue(
+            "ForwardedHeaders:KnownProxies") ?? "")
+        .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+        .Where(item => !string.IsNullOrWhiteSpace(item))
+        .Select(item => item.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase);
+    var forwardedHeaderKnownNetworks = (ConfigHelper.GetRuntimeConfigurationValue(
+            "ForwardedHeaders:KnownNetworks") ?? "")
+        .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+        .Where(item => !string.IsNullOrWhiteSpace(item))
+        .Select(item => item.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase);
     foreach (var value in forwardedHeaderKnownProxies)
     {
         if (IPAddress.TryParse(value, out var proxy))
@@ -192,6 +184,7 @@ services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
 services.AddMicroiWeChat();//【可选】注入【微信公众号平台】插件
 services.AddMicroiOffice();//【可选】注入【Office】插件
 services.AddMicroiSpider();//【可选】注入【采集引擎】插件
+services.AddMicroiOCR();//【可选】注入【OCR识别】插件
 services.AddMicroiMQ();//【可选】注入【MQ消息队列】插件
 services.AddMicroiSearchEngine();//【可选】注入【搜索引擎】插件
 services.AddMicroiAI();//【可选】注入【AI引擎】插件
@@ -505,14 +498,8 @@ if (scheduleLicenseRestoreRetry)
     {
         _ = Task.Run(async () =>
         {
-            var maxAttempts = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",
-                "License:RestoreMaxAttempts",
-                3));
-            var retrySeconds = Math.Max(1, ConfigHelper.GetEnvOrConfigurationInt(
-                "MICROI_LICENSE_RESTORE_RETRY_SECONDS",
-                "License:RestoreRetrySeconds",
-                10));
+            const int maxAttempts = 3;
+            const int retrySeconds = 10;
 
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {

@@ -50,23 +50,19 @@ V8.Result = typeof V8.OpenDialog === ""function""
             try
             {
                 UpgradeExecutionLeaseContext.ThrowIfLost();
-                var menuResult = await MicroiEngine.FormEngine.GetFormDataAsync(
-                    "sys_menu",
-                    new
-                    {
-                        OsClient = osClient,
-                        Id = SystemAccountMenuId,
-                        _SelectFields = new[] { "Id", "ModuleEngineKey", "MoreBtns" }
-                    });
-                if (menuResult.Code != 1 || menuResult.Data == null)
+                var menu = await GetSystemAccountMenuAsync(osClient).ConfigureAwait(false);
+                if (menu == null)
                 {
-                    messages.Add("系统账号模块不存在，无法安装访问密钥动态按钮。");
+                    // 老业务库可能没有平台内置【系统账号】模块。访问密钥按钮是可选
+                    // 菜单增强，不应阻止其它数据库升级；HostedService 会在以后每次
+                    // 启动时幂等重试，模块一旦安装即可自动补齐按钮。
+                    Console.WriteLine($"Microi：【基础应用升级】租户[{osClient}]未安装系统账号模块，跳过访问密钥动态按钮。");
                     return messages;
                 }
 
-                JObject menu = JsonHelper.ToJObject((object)menuResult.Data) ?? new JObject();
                 var moreButtons = ReconcileMoreButtons(menu["MoreBtns"].Val<string>(), out var changed);
                 if (!changed) return messages;
+                var menuId = menu["Id"].Val<string>();
 
                 UpgradeExecutionLeaseContext.ThrowIfLost();
                 var updateResult = await UpgradeTrustedFormEngine.UpdateAsync(
@@ -74,7 +70,7 @@ V8.Result = typeof V8.OpenDialog === ""function""
                     osClient,
                     new JObject
                     {
-                        ["Id"] = SystemAccountMenuId,
+                        ["Id"] = menuId,
                         ["OsClient"] = osClient,
                         ["MoreBtns"] = moreButtons
                     });
@@ -85,7 +81,7 @@ V8.Result = typeof V8.OpenDialog === ""function""
                 }
 
                 var cache = MicroiEngine.CacheTenant.Cache(osClient);
-                await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_menu:{SystemAccountMenuId.ToLowerInvariant()}");
+                await cache.RemoveAsync($"Microi:{osClient}:FormData:sys_menu:{menuId.ToLowerInvariant()}");
                 var moduleEngineKey = menu["ModuleEngineKey"].Val<string>();
                 if (!moduleEngineKey.DosIsNullOrWhiteSpace())
                 {
@@ -97,6 +93,41 @@ V8.Result = typeof V8.OpenDialog === ""function""
                 messages.Add("安装系统账号访问密钥动态按钮失败：" + ex.Message);
             }
             return messages;
+        }
+
+        private static async Task<JObject> GetSystemAccountMenuAsync(string osClient)
+        {
+            var canonical = await MicroiEngine.FormEngine.GetFormDataAsync(
+                "sys_menu",
+                new
+                {
+                    OsClient = osClient,
+                    Id = SystemAccountMenuId,
+                    _SelectFields = new[] { "Id", "Name", "ModuleEngineKey", "MoreBtns" }
+                }).ConfigureAwait(false);
+            if (canonical.Code == 1 && canonical.Data != null)
+                return JsonHelper.ToJObject((object)canonical.Data);
+
+            // 早期数据库使用不同菜单 Id，但 ModuleEngineKey=Sys_User 是稳定业务键。
+            // 仅接受唯一匹配；重复配置必须失败关闭，不能猜测并覆盖客户菜单。
+            var legacy = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>(
+                "sys_menu",
+                new
+                {
+                    OsClient = osClient,
+                    _Where = new List<object>
+                    {
+                        new List<object> { "ModuleEngineKey", "=", "Sys_User" }
+                    },
+                    _SelectFields = new[] { "Id", "Name", "ModuleEngineKey", "MoreBtns" },
+                    _PageIndex = 1,
+                    _PageSize = 2
+                }).ConfigureAwait(false);
+            if (legacy.Code != 1 || legacy.Data == null) return null;
+            var rows = JArray.FromObject((object)legacy.Data).OfType<JObject>().ToList();
+            if (rows.Count > 1)
+                throw new InvalidOperationException("存在多个 ModuleEngineKey=Sys_User 的系统账号模块，已停止自动写入。");
+            return rows.FirstOrDefault();
         }
 
         public static string ReconcileMoreButtons(string currentJson, out bool changed)

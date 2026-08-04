@@ -186,6 +186,14 @@ var extractResult = V8.Method.ExtractZip({
 - 安装脚本还必须同步当前有效 `sys_config`：`ApiBase` 使用对外可访问的 API 端口，`FileServer` 使用 `http://<访问IP>:<MinIO API端口>/mci-public`。`ApiBase` 不能误用 Web 前端端口，因为 V8 代码会直接在其后拼接 `/api/...` 或 `/apiengine/...`。
 - 安装验收必须使用真实登录 Token 分别执行一次 `Limit=false` 和 `Limit=true` 上传：公有文件匿名访问应返回 `200`，私有文件匿名访问应返回 `403`，私有文件通过签名 URL 访问应返回 `200`，并核对下载内容与上传内容一致。
 
+### 复盘：旧空库缺少可选字段导致 MinIO 初始化后中断
+
+- 触发场景：MinIO 容器、私有桶和公有桶均已成功创建，但安装器更新 `sys_osclients` 时因旧库缺少 `NetworkIsInternet` 返回 `Unknown column`，整套安装停在 API 部署之前。
+- 根因：安装器在 API/Upgrade 尚未启动时依赖了并非 MinIO 必需、且存量数据库不保证存在的旧可选字段；同时只按 `OsClient` 更新且没有写后回读。
+- 通用规则：MinIO 安装前先校验真正必需的物理字段，并按 `OsClient + OsClientType + OsClientNetwork + IsEnable + IsDeleted` 唯一定位运行租户。内外网端点由 API 允许的启动项 `OsClientNetwork` 选择，安装器不得再写 `NetworkIsInternet`；配置更新后逐字段回读一致才继续。
+- 恢复规则：桶初始化成功而配置写入失败不需要删除桶或数据卷。中断的新安装应先备份现有 Compose 并记录绑定数据目录，只对对应编排执行不带 `-v` 的 `docker compose down`，保留数据恢复点后再使用最新版脚本；禁止直接删除数据库或对象存储目录。
+- 自动化检查：用一个不含 `NetworkIsInternet`、但包含 MinIO 必需字段的临时 MySQL 表执行 schema、唯一租户、UPDATE 和回读闭环；再插入重复三参数租户，断言安装器失败关闭且不批量覆盖。
+
 ### 复盘：MinIO 已可上传但系统设置仍指向官方地址
 
 - 触发场景：一键安装和桶初始化均成功，用户手工上传也成功，但读取系统设置时发现 `ApiBase`、`FileServer` 仍是空库模板中的官方地址。

@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.ORM;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.net
 {
@@ -24,8 +27,9 @@ namespace Microi.net
                     "仅主租户有效。开启后V8.Http和采集引擎禁止访问回环、私网、链路本地及云元数据地址。"),
                 Text("SsrfAllowedHosts", "SSRF允许主机", "", 10030,
                     "仅主租户有效。严格SSRF模式下允许访问的精确主机/IP，多个值用英文逗号或分号分隔。"),
-                Number("StartupDynamicRouteMaxConcurrency", "启动路由初始化并发", "2", 10040,
-                    "仅主租户有效。API启动后并行初始化租户动态路由的最大租户数。"),
+                Number("StartupRouteMaxConcurrency", "启动路由初始化并发", "2", 10040,
+                    "仅主租户有效。API启动后并行初始化租户动态路由的最大租户数。",
+                    "StartupDynamicRouteMaxConcurrency"),
                 Number("ExtensionDatabaseCacheSeconds", "扩展库缓存秒数", "60", 10050,
                     "仅主租户有效。扩展数据库目录的本机缓存秒数；共享Redis版本变化仍会立即失效。"),
                 Number("BackgroundTaskMaxParallel", "后台任务并行数", "4", 10060,
@@ -34,10 +38,12 @@ namespace Microi.net
                     "仅主租户有效。重载diy_lang运行缓存时每页读取的行数，代码边界为100到2000。"),
                 Number("DiyLangRuntimeCacheMaxRows", "多语言缓存最大行数", "10000", 10080,
                     "仅主租户有效。单个租户多语言运行缓存允许加载的最大原始行数。"),
-                Number("DiyLangRuntimeCacheMaxCharacters", "多语言缓存最大字符", "5000000", 10090,
-                    "仅主租户有效。单个租户多语言运行缓存允许加载的最大字符数。"),
-                Number("DiyLangRuntimeCacheCommandTimeoutSeconds", "多语言缓存SQL超时秒", "30", 10099,
-                    "仅主租户有效。单次多语言缓存分页SQL允许执行的最长秒数，代码边界为5到120。"),
+                Number("DiyLangCacheMaxChars", "多语言缓存最大字符", "5000000", 10090,
+                    "仅主租户有效。单个租户多语言运行缓存允许加载的最大字符数。",
+                    "DiyLangRuntimeCacheMaxCharacters"),
+                Number("DiyLangCacheSqlTimeoutSec", "多语言缓存SQL超时秒", "30", 10099,
+                    "仅主租户有效。单次多语言缓存分页SQL允许执行的最长秒数，代码边界为5到120。",
+                    "DiyLangRuntimeCacheCommandTimeoutSeconds"),
                 Text("OAuthReturnUrlOrigins", "OAuth可信返回域名", "", 10091,
                     "仅主租户有效。允许OAuth回跳的精确HTTPS Origin，多个值用英文逗号或分号分隔。"),
                 Text("ChanjetOAuthState", "畅捷通OAuth State", "", 10092,
@@ -69,10 +75,12 @@ namespace Microi.net
                     "仅主租户有效。每个API节点保留的最近访问诊断记录数量。"),
                 Number("SecurityLogIntervalSeconds", "安全日志间隔秒", "60", 10160,
                     "仅主租户有效。同一IP同类安全事件写系统日志的最小间隔。"),
-                Number("SecurityAccessPersistIntervalSeconds", "访问落库间隔秒", "10", 10170,
-                    "仅主租户有效。同一IP、状态和路由的访问明细最小落库间隔。"),
-                Switch("SecurityRespectForwardedHeaders", "信任代理IP请求头", "1", 10180,
-                    "仅主租户有效。部署在可信Nginx/网关后开启；公网直连节点应关闭。"),
+                Number("SecurityAccessPersistSec", "访问落库间隔秒", "10", 10170,
+                    "仅主租户有效。同一IP、状态和路由的访问明细最小落库间隔。",
+                    "SecurityAccessPersistIntervalSeconds"),
+                Switch("SecurityTrustForwardedHeaders", "信任代理IP请求头", "1", 10180,
+                    "仅主租户有效。部署在可信Nginx/网关后开启；公网直连节点应关闭。",
+                    "SecurityRespectForwardedHeaders"),
                 Switch("SecurityLogBlockedToSysLog", "封禁写入系统日志", "1", 10190,
                     "仅主租户有效。是否把自动封禁事件写入系统日志。"),
                 Switch("SecurityPersistTables", "安全事件持久化", "1", 10200,
@@ -105,18 +113,23 @@ namespace Microi.net
                 Number("PressRetryAfter", "繁忙重试提示秒", "3", 10390,
                     "仅主租户有效。请求压力保护拒绝时返回给客户端的建议重试秒数。"),
 
-                Number("OrmMaxConcurrentConnectionOpens", "ORM开连接并发", "64", 10400,
-                    "仅主租户有效。单个API节点同时打开物理数据库连接的最大数量。"),
+                Number("OrmMaxConnectionOpens", "ORM开连接并发", "64", 10400,
+                    "仅主租户有效。单个API节点同时打开物理数据库连接的最大数量。",
+                    "OrmMaxConcurrentConnectionOpens"),
                 Number("OrmConnectionOpenWaitSeconds", "ORM开连接等待秒", "600", 10410,
                     "仅主租户有效。等待物理连接打开名额的最长时间。"),
-                Number("OrmConnectionPressureBackoffSeconds", "ORM连接退避秒", "120", 10420,
-                    "仅主租户有效。数据库连接压力异常后的临时退避时长。"),
-                Number("OrmDefaultCommandTimeoutSeconds", "ORM命令超时秒", "600", 10430,
-                    "仅主租户有效。默认SQL命令超时；单个重任务仍应使用后台任务分片。"),
-                Switch("OrmMySqlHostCacheAutoRepairEnabled", "MySQL主机缓存自动修复", "1", 10440,
-                    "仅主租户有效。遇到MySQL Host is blocked时尝试用当前业务连接清理host_cache。"),
-                Number("OrmMySqlHostCacheRepairCooldownSeconds", "MySQL主机修复冷却秒", "300", 10450,
-                    "仅主租户有效。同一数据库触发host_cache修复后的冷却时间。"),
+                Number("OrmConnPressureBackoffSec", "ORM连接退避秒", "120", 10420,
+                    "仅主租户有效。数据库连接压力异常后的临时退避时长。",
+                    "OrmConnectionPressureBackoffSeconds"),
+                Number("OrmCommandTimeoutSec", "ORM命令超时秒", "600", 10430,
+                    "仅主租户有效。默认SQL命令超时；单个重任务仍应使用后台任务分片。",
+                    "OrmDefaultCommandTimeoutSeconds"),
+                Switch("OrmMySqlHostCacheRepairOn", "MySQL主机缓存自动修复", "1", 10440,
+                    "仅主租户有效。遇到MySQL Host is blocked时尝试用当前业务连接清理host_cache。",
+                    "OrmMySqlHostCacheAutoRepairEnabled"),
+                Number("OrmMySqlHostCacheCooldownSec", "MySQL主机修复冷却秒", "300", 10450,
+                    "仅主租户有效。同一数据库触发host_cache修复后的冷却时间。",
+                    "OrmMySqlHostCacheRepairCooldownSeconds"),
                 Number("OrmDdlLockWaitSeconds", "DDL锁等待秒", "8", 10460,
                     "仅主租户有效。MySQL表结构变更等待元数据锁的时长。"),
                 Number("OrmDdlQueueWaitSeconds", "DDL队列等待秒", "600", 10470,
@@ -133,6 +146,9 @@ namespace Microi.net
                 Switch("SpiderTraceEnabled", "采集调试跟踪", "0", 10540,
                     "仅主租户有效。开启会产生较多诊断日志，生产环境通常关闭。")
             };
+
+        public static IReadOnlyList<string> RuntimeFieldNames =>
+            Fields.Select(field => field.Name).ToArray();
 
         public async Task<List<string>> Run(string osClient)
         {
@@ -159,6 +175,13 @@ namespace Microi.net
 
                 var tableId = Convert.ToString((object)tableResult.Data.Id);
                 var client = OsClientExtend.GetClient(osClient);
+                if (client?.Db == null)
+                {
+                    messages.Add("租户数据库连接不存在，无法增加 SaaS 运行配置。");
+                    return messages;
+                }
+
+                PromoteExistingMySqlTextColumns(client.Db);
                 foreach (var field in Fields)
                 {
                     UpgradeExecutionLeaseContext.ThrowIfLost();
@@ -172,33 +195,79 @@ namespace Microi.net
                                 new List<object> { "TableId", "=", tableId },
                                 new List<object> { "Name", "=", field.Name }
                             },
-                            _SelectFields = new[] { "Id", "Name" }
+                            _SelectFields = new[] { "Id", "Name", "Type" }
                         });
-                    if (existing.Code == 1 && existing.Data != null) continue;
+                    var existingField = existing.Code == 1 && existing.Data != null
+                        ? JObject.FromObject((object)existing.Data)
+                        : null;
 
-                    var physicalExists = client?.Db?.ColumnExists("sys_osclients", field.Name) == true;
-                    var addResult = await MicroiEngine.FormEngine.AddFieldAsync(new
+                    var physicalExists = client.Db.ColumnExists("sys_osclients", field.Name);
+                    if (existingField == null)
                     {
-                        OsClient = osClient,
-                        TableId = tableId,
-                        TableName = "sys_osclients",
-                        field.Name,
-                        field.Label,
-                        field.Type,
-                        field.Component,
-                        field.DefaultValue,
-                        field.Sort,
-                        field.Description,
-                        Tab = PlatformTab,
-                        Visible = 1,
-                        AppVisible = 1,
-                        TableWidth = 180,
-                        FormWidth = field.Component == "Textarea" ? 24 : 6,
-                        _NotAddDbField = physicalExists
-                    });
-                    if (addResult.Code != 1)
+                        var addResult = await UpgradeTrustedFormEngine.AddFieldAsync(
+                            osClient,
+                            new DiyFieldParam
+                            {
+                                TableId = tableId,
+                                TableName = "sys_osclients",
+                                Name = field.Name,
+                                Label = field.Label,
+                                Type = field.Type,
+                                Component = field.Component,
+                                DefaultValue = field.DefaultValue,
+                                Sort = field.Sort,
+                                Description = field.Description,
+                                Tab = PlatformTab,
+                                Visible = 1,
+                                AppVisible = 1,
+                                TableWidth = 180,
+                                FormWidth = field.Component == "Textarea" ? 24 : 6,
+                                _NotAddDbField = physicalExists
+                            });
+                        if (addResult.Code != 1)
+                        {
+                            messages.Add($"新增 sys_osclients.{field.Name} 失败：{addResult.Msg}");
+                            continue;
+                        }
+                    }
+                    else if (!string.Equals(
+                                 existingField.Value<string>("Type"),
+                                 field.Type,
+                                 StringComparison.OrdinalIgnoreCase))
                     {
-                        messages.Add($"新增 sys_osclients.{field.Name} 失败：{addResult.Msg}");
+                        var updateMetadata = await UpgradeTrustedFormEngine.UpdateAsync(
+                            "diy_field",
+                            osClient,
+                            new JObject
+                            {
+                                ["Id"] = existingField["Id"],
+                                ["TableId"] = tableId,
+                                ["TableName"] = "sys_osclients",
+                                ["Type"] = field.Type
+                            }).ConfigureAwait(false);
+                        if (updateMetadata.Code != 1)
+                        {
+                            messages.Add($"更新 sys_osclients.{field.Name} 字段类型失败：{updateMetadata.Msg}");
+                            continue;
+                        }
+                    }
+
+                    if (!client.Db.ColumnExists("sys_osclients", field.Name))
+                    {
+                        var addPhysical = await UpgradeTrustedFormEngine.AddDbFieldAsync(
+                            osClient,
+                            new DiyFieldParam
+                            {
+                                TableId = tableId,
+                                TableName = "sys_osclients",
+                                Name = field.Name,
+                                Type = field.Type
+                            }).ConfigureAwait(false);
+                        if (addPhysical.Code != 1
+                            && !client.Db.ColumnExists("sys_osclients", field.Name))
+                        {
+                            messages.Add($"新增 sys_osclients.{field.Name} 物理字段失败：{addPhysical.Msg}");
+                        }
                     }
                 }
             }
@@ -209,21 +278,66 @@ namespace Microi.net
             return messages;
         }
 
+        private static void PromoteExistingMySqlTextColumns(DbSession db)
+        {
+            if (db.Db.DbProvider.DatabaseType != DatabaseType.MySql) return;
+
+            foreach (var field in Fields.Where(item =>
+                         string.Equals(item.Type, "mediumtext", StringComparison.OrdinalIgnoreCase)))
+            {
+                UpgradeExecutionLeaseContext.ThrowIfLost();
+                if (!Regex.IsMatch(field.Name, "^[A-Za-z_][A-Za-z0-9_]{0,29}$"))
+                    throw new InvalidOperationException("SaaS 运行配置字段名不合法：" + field.Name);
+                if (!db.ColumnExists("sys_osclients", field.Name)) continue;
+
+                var dataType = db.FromSql(@"SELECT DATA_TYPE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@p0 AND COLUMN_NAME=@p1")
+                    .AddInParameter("p0", "sys_osclients")
+                    .AddInParameter("p1", field.Name)
+                    .ToScalar<string>();
+                if (string.Equals(dataType, "mediumtext", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(dataType, "longtext", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                if (!string.Equals(dataType, "varchar", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(dataType, "text", StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"sys_osclients.{field.Name} 当前物理类型 {dataType} 不能安全提升为 mediumtext。");
+                }
+
+                db.FromSql($"ALTER TABLE `sys_osclients` MODIFY COLUMN `{field.Name}` mediumtext NULL")
+                    .ExecuteNonQuery();
+                var readback = db.FromSql(@"SELECT DATA_TYPE
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=@p0 AND COLUMN_NAME=@p1")
+                    .AddInParameter("p0", "sys_osclients")
+                    .AddInParameter("p1", field.Name)
+                    .ToScalar<string>();
+                if (!string.Equals(readback, "mediumtext", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidOperationException($"sys_osclients.{field.Name} 提升为 mediumtext 后回读不一致。");
+            }
+        }
+
         private static RuntimeField Number(
             string name,
             string label,
             string defaultValue,
             int sort,
-            string description) =>
-            new RuntimeField(name, label, "int", "NumberText", defaultValue, sort, description);
+            string description,
+            string legacyName = null) =>
+            new RuntimeField(name, label, "int", "NumberText", defaultValue, sort, description, legacyName);
 
         private static RuntimeField Switch(
             string name,
             string label,
             string defaultValue,
             int sort,
-            string description) =>
-            new RuntimeField(name, label, "int", "Switch", defaultValue, sort, description);
+            string description,
+            string legacyName = null) =>
+            new RuntimeField(name, label, "int", "Switch", defaultValue, sort, description, legacyName);
 
         private static RuntimeField Text(
             string name,
@@ -231,7 +345,7 @@ namespace Microi.net
             string defaultValue,
             int sort,
             string description) =>
-            new RuntimeField(name, label, "varchar(2000)", "Textarea", defaultValue, sort, description);
+            new RuntimeField(name, label, "mediumtext", "Textarea", defaultValue, sort, description);
 
         private sealed class RuntimeField
         {
@@ -242,7 +356,8 @@ namespace Microi.net
                 string component,
                 string defaultValue,
                 int sort,
-                string description)
+                string description,
+                string legacyName = null)
             {
                 Name = name;
                 Label = label;
@@ -251,6 +366,7 @@ namespace Microi.net
                 DefaultValue = defaultValue;
                 Sort = sort;
                 Description = description;
+                LegacyName = legacyName;
             }
 
             public string Name { get; }
@@ -260,6 +376,7 @@ namespace Microi.net
             public string DefaultValue { get; }
             public int Sort { get; }
             public string Description { get; }
+            public string LegacyName { get; }
         }
     }
 }

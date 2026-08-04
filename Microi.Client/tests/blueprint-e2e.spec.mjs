@@ -3,7 +3,7 @@
 // 运行: cd Microi.Client && npx playwright test ../tests/blueprint-e2e.spec.mjs --headed --reporter=list
 //
 // 前置：
-//  1. 后端 https://localhost:61501 + iTdos 租户 + MICROI_DEV_TEST_KEY=itdos-smoketest-2026
+//  1. 后端 https://localhost:61501 + 目标租户开启 sys_config.AutoTestSkipCaptcha
 //  2. 前端 vite dev http://localhost:61500
 //  3. 已执行 microi-business-blueprint 三张表的建表 SQL
 
@@ -12,18 +12,18 @@ import { test, expect } from '@playwright/test';
 const FRONTEND = process.env.FRONTEND || 'http://localhost:61500';
 const BACKEND = process.env.BACKEND || 'https://localhost:61501';
 const ACCOUNT = process.env.PW_TEST_ACCOUNT || 'admin';
-const PASSWORD = process.env.PW_TEST_PASSWORD || '123456';
+const PASSWORD = process.env.PW_TEST_PASSWORD || '';
 const OS_CLIENT = process.env.MICROI_OSCLIENT || 'iTdos';
-const DEV_KEY = process.env.MICROI_DEV_KEY || 'itdos-smoketest-2026';
 
 test.use({ ignoreHTTPSErrors: true });
 
 test.describe('Blueprint E2E', () => {
     test.beforeEach(async ({ page }) => {
-        // 通过 dev bypass 直接登录获取 Token
+        expect(PASSWORD, 'PW_TEST_PASSWORD 必须由受保护的测试进程变量提供').toBeTruthy();
+        // 自动化标记只跳过验证码，账号密码仍走真实校验。
         const loginResp = await page.request.post(`${BACKEND}/api/SysUser/Login`, {
-            headers: { 'X-Microi-Dev-Key': DEV_KEY, 'OsClient': OS_CLIENT },
-            data: { Account: ACCOUNT, Pwd: '_DEV_BYPASS_' },
+            headers: { 'OsClient': OS_CLIENT },
+            data: { Account: ACCOUNT, Pwd: PASSWORD, OsClient: OS_CLIENT, _AutomationTestLogin: true },
             ignoreHTTPSErrors: true
         });
         const loginJson = await loginResp.json();
