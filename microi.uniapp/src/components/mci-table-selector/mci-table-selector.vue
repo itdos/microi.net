@@ -9,8 +9,9 @@
       <text class="selector-field__arrow">›</text>
     </view>
 
-    <view v-if="visible" class="selector-mask" @tap="closeSelector">
-      <view class="selector-panel" @tap.stop>
+    <root-portal v-if="visible">
+      <view class="selector-mask" @tap="closeSelector">
+        <view class="selector-panel" @tap.stop>
         <view class="selector-panel__handle"></view>
         <view class="selector-panel__header">
           <view class="selector-panel__heading">
@@ -22,7 +23,7 @@
 
         <view class="selector-search">
           <text class="selector-search__icon">⌕</text>
-          <input v-model="keyword" class="selector-search__input" placeholder="搜索名称、编号或关键词" confirm-type="search" @input="scheduleSearch" @confirm="search" />
+          <input v-model="keyword" class="selector-search__input" :placeholder="searchPlaceholder" confirm-type="search" @input="scheduleSearch" @confirm="search" />
           <text v-if="keyword" class="selector-search__clear" @tap="clearSearch">×</text>
         </view>
 
@@ -59,14 +60,16 @@
             <text>{{ submitting ? '正在处理' : `确认选择${selectedIds.length ? `（${selectedIds.length}）` : ''}` }}</text>
           </view>
         </view>
+        </view>
       </view>
-    </view>
+    </root-portal>
   </view>
 </template>
 
 <script>
 import { V8 } from '@/utils/request.js'
 import { fieldDisplayValue, loadNativeFormDefinition, loadNativeTableModel } from '@/platform/native-form.js'
+import { loadGrantedMenuDefinition } from '@/platform/module-registry.js'
 import {
   getOpenTableWhere,
   submitOpenTableSelection,
@@ -92,6 +95,7 @@ export default {
       visible: false,
       table: null,
       definition: null,
+      menuDefinition: null,
       rows: [],
       selectedIds: [],
       selectedRows: [],
@@ -115,13 +119,35 @@ export default {
     finished() { return this.rows.length >= this.total && this.total > 0 },
     columns() {
       if (!this.definition) return []
-      return this.definition.fields.filter((item) => item.visible && item.Name !== 'Id' && !HEAVY_COMPONENTS.has(item.component)).slice(0, 4)
+      const available = this.definition.fields.filter((item) =>
+        item.visible && item.Name !== 'Id' && !HEAVY_COMPONENTS.has(item.component)
+      )
+      const byName = new Map(available.map((item) => [String(item.Name || '').toLowerCase(), item]))
+      const configured = (this.menuDefinition && this.menuDefinition.cardFields || [])
+        .map((name) => byName.get(String(name || '').toLowerCase()))
+        .filter(Boolean)
+      return configured.length ? configured : available.slice(0, 4)
     },
     titleColumn() {
+      const configuredTitle = this.menuDefinition && this.menuDefinition.titleField
+      if (configuredTitle) {
+        const field = this.columns.find((item) =>
+          String(item.Name || '').toLowerCase() === String(configuredTitle).toLowerCase()
+        )
+        if (field) return field
+      }
       const preferred = /名称|标题|姓名|编号|型号|客户|商品|地址/
       return this.columns.find((item) => preferred.test(item.Label || '')) || this.columns[0] || null
     },
-    secondaryColumns() { return this.columns.filter((item) => item !== this.titleColumn).slice(0, 2) }
+    secondaryColumns() { return this.columns.filter((item) => item !== this.titleColumn) },
+    searchPlaceholder() {
+      const fields = this.menuDefinition && this.menuDefinition.searchFields || []
+      if (!fields.length || !this.definition) return '搜索名称、编号或关键词'
+      const byName = new Map(this.definition.fields.map((item) => [String(item.Name || '').toLowerCase(), item]))
+      const labels = fields.map((name) => byName.get(String(name || '').toLowerCase()))
+        .filter(Boolean).map((item) => item.Label || item.Name).slice(0, 3)
+      return labels.length ? `搜索${labels.join('、')}` : '搜索关键词'
+    }
   },
   beforeUnmount() {
     clearTimeout(this.searchTimer)
@@ -131,6 +157,17 @@ export default {
       if (this.table && this.definition) return
       const tableId = this.config.TableId
       if (!tableId && !this.config.TableName) throw new Error('选择组件未配置数据表')
+      if (this.targetMenuId) {
+        try {
+          this.menuDefinition = await loadGrantedMenuDefinition(this.targetMenuId)
+          this.definition = this.menuDefinition.definition
+          this.table = this.definition.table
+          return
+        } catch (error) {
+          // 兼容历史 OpenTable：菜单配置暂时不可用时仍可按表元数据选择。
+          this.menuDefinition = null
+        }
+      }
       this.table = await loadNativeTableModel(tableId || this.config.TableName, {
         menuId: this.targetMenuId
       })
@@ -265,7 +302,7 @@ export default {
 .selector-field--compact .selector-field__title { font-size: 24rpx; line-height: 1.35; }
 .selector-field--compact .selector-field__hint { display: none; }
 .selector-field--compact .selector-field__arrow { font-size: 29rpx; }
-.selector-mask { position: fixed; z-index: 950; inset: 0; display: flex; align-items: flex-end; background: rgba(10, 31, 39, .44); }
+.selector-mask { position: fixed; z-index: 9999; inset: 0; width: 100vw; height: 100vh; display: flex; align-items: flex-end; overflow: hidden; background: rgba(10, 31, 39, .44); }
 .selector-panel { box-sizing: border-box; width: 100%; height: 84vh; max-height: 1180rpx; display: flex; flex-direction: column; padding-bottom: var(--mci-safe-bottom, env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; background: #f7fafb; animation: mciSelectorUp .24s ease both; }
 .selector-panel__handle { width: 74rpx; height: 7rpx; flex: none; margin: 14rpx auto 4rpx; border-radius: 4rpx; background: #c8d4d8; }
 .selector-panel__header { min-height: 90rpx; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 24rpx; }
@@ -278,7 +315,7 @@ export default {
 .selector-search__icon { color: #6f8790; font-size: 34rpx; }
 .selector-search__input { min-width: 0; height: 76rpx; color: #25434d; font-size: 25rpx; }
 .selector-search__clear { display: flex; justify-content: center; color: #8ca0a7; font-size: 32rpx; }
-.selector-list { min-height: 0; flex: 1; }
+.selector-list { width: 100%; height: 0; min-height: 0; flex: 1; }
 .selector-rows { padding: 0 22rpx; }
 .selector-row { min-height: 126rpx; display: grid; grid-template-columns: 50rpx minmax(0, 1fr); align-items: start; gap: 16rpx; margin-bottom: 12rpx; padding: 20rpx; border: 1px solid #e1e9ec; border-radius: 8px; background: #fff; transition: transform .16s ease, opacity .16s ease; }
 .selector-row__check { width: 44rpx; height: 44rpx; display: flex; align-items: center; justify-content: center; border: 1px solid #b9cbd1; border-radius: 50%; color: #fff; font-size: 24rpx; }

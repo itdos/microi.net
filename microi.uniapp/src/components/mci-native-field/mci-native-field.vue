@@ -4,6 +4,12 @@
       <mci-media-uploader v-if="isImage && hasModelValue" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" :file-context="fileAccessContext" readonly />
       <mci-media-uploader v-else-if="isFile && hasModelValue" :model-value="modelValue" media-type="file" :file-context="fileAccessContext" readonly />
       <text v-else-if="isImage || isFile" class="native-control__value">-</text>
+      <!-- zhy：详情长文本超过配置行数后在字段内部纵向滑动，不再无限撑高页面。 -->
+      <scroll-view v-else-if="readonlyScrollable" class="native-control__readonly-scroll" scroll-y
+        :style="readonlyScrollStyle">
+        <rich-text v-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
+        <text v-else class="native-control__value">{{ displayText }}</text>
+      </scroll-view>
       <rich-text v-else-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
       <view v-else-if="component === 'Progress'" class="native-control__progress"><progress :percent="numberValue" activeColor="#087da8" /><text>{{ numberValue }}%</text></view>
       <view v-else-if="component === 'ColorPicker'" class="native-control__color-readonly"><view :style="{ backgroundColor: String(modelValue || '#ffffff') }"></view><text>{{ displayText }}</text></view>
@@ -213,7 +219,8 @@ export default {
     formData: { type: Object, default: () => ({}) },
     menuId: { type: String, default: '' },
     moduleEngineKey: { type: String, default: '' },
-    tableChildAuth: { type: Object, default: null }
+    tableChildAuth: { type: Object, default: null },
+    readonlyMaxLines: { type: Number, default: 0 }
   },
   // zhy: 通知表单页同步下拉框的打开状态，便于提升外层卡片层级。
   emits: ['update:modelValue', 'change', 'select', 'selector-toggle'],
@@ -256,6 +263,12 @@ export default {
     isDropdownOption() { return this.isOptionComponent && this.component !== 'Radio' },
     hasRemoteOptions() { return isRemoteNativeFieldOptions(this.field) },
     isRichDisplay() { return !!this.modelValue && (['RichText', 'Html'].includes(this.component) || isHtmlValue(this.modelValue)) },
+    readonlyScrollable() { return this.readonly && Number(this.readonlyMaxLines) > 0 },
+    readonlyScrollStyle() {
+      // zhy：只设置最大高度，未超过 11 行的短内容仍保持自然高度。
+      const lines = Math.min(20, Math.max(1, Number(this.readonlyMaxLines) || 11))
+      return { maxHeight: `${lines * 45}rpx` }
+    },
     richHtml() { return normalizeRichTextHtml(this.modelValue) },
     qrcodeUrl() { return this.component === 'Qrcode' ? V8.assetUrl(this.modelValue) : '' },
     displayText() { return fieldDisplayValue(this.field, this.modelValue) },
@@ -756,6 +769,8 @@ export default {
 .native-control__unavailable,.native-control__alert { padding: 17rpx 19rpx; border-left: 3px solid #d99b1f; color: #6f5b2d; background: #fff9e8; font-size: 22rpx; line-height: 1.6; }
 .native-control__value { display: block; color: #425b64; font-size: 27rpx; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
 .native-control__richtext { display: block; color: #425b64; font-size: 25rpx; line-height: 1.7; overflow-wrap: anywhere; }
+/* zhy：只读详情长文本使用 scroll-view 承载，超出最大高度后支持触摸滚动。 */
+.native-control__readonly-scroll { width: 100%; max-height: 495rpx; }
 .native-control__progress { display: grid; grid-template-columns: minmax(0,1fr) 70rpx; gap: 14rpx; align-items: center; }
 .native-control__progress text { color: #58727c; font-size: 22rpx; text-align: right; }
 .native-control__color-readonly { display: flex; align-items: center; gap: 14rpx; color: #425b64; font-size: 24rpx; }

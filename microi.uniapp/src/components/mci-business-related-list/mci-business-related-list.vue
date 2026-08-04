@@ -10,7 +10,8 @@
         <text class="preview-section-header__title">{{ config.title || sectionTitle }}</text>
         <text v-if="!loading" class="preview-section-header__count">{{ count }} 项</text>
       </view>
-      <text class="preview-section-header__arrow">{{ previewExpanded ? '⌃' : '⌄' }}</text>
+      <!-- zhy：关联区折叠图标与详情“基本信息”分组统一，避免使用字形不稳定的上下箭头。 -->
+      <text class="preview-section-header__arrow" :class="{ expanded: previewExpanded }">›</text>
     </view>
 
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
@@ -45,10 +46,12 @@
           @open="openDetail" @phone="callPhone" />
       </template>
       <template v-else>
+        <!-- zhy：关联列表中的跟进卡片同步使用摘要最大行数。 -->
         <mci-business-card v-for="(row, index) in displayedRows" :key="row.Id || index"
           :row="row" :index="index" :title="getTitle(row)" :status="getStatus(row)"
           :status-class="getStatusClass(row)" :tags="getTags(row)" :lines="cardLines(row)"
-          :summary="config.summaryField ? summaryValue(row) : ''" :actions="rowActions(row)"
+          :summary="config.summaryField ? summaryValue(row) : ''"
+          :summary-lines="config.summaryLines || 3" :actions="rowActions(row)"
           :time="formatCreateTime(row.CreateTime || row.UpdateTime)"
           @open="openDetail" @phone="callPhone" @action="triggerRowAction" />
       </template>
@@ -836,10 +839,19 @@ export default {
       return this.visibleLines(row).map((line) => ({
         ...line,
         value: formatFieldValue(row[line.field], line.format),
-        rawValue: row[line.field]
+        rawValue: row[line.field],
+        // zhy：动态清单把摘要字段作为普通行返回时，限制为配置的最大行数。
+        maxLines: String(line.field || '').toLowerCase() === String(this.config.summaryField || '').toLowerCase()
+          ? (Number(this.config.summaryLines) || 3)
+          : (Number(line.maxLines) || 1)
       }))
     },
-    summaryValue(row) { return formatFieldValue(row[this.config.summaryField], '', { empty: '' }) },
+    summaryValue(row) {
+      // zhy：摘要已经作为带标签字段行展示时，不在卡片底部重复输出。
+      const summaryField = String(this.config.summaryField || '').toLowerCase()
+      const renderedAsLine = this.visibleLines(row).some((line) => String(line.field || '').toLowerCase() === summaryField)
+      return renderedAsLine ? '' : formatFieldValue(row[this.config.summaryField], '', { empty: '' })
+    },
     formatCreateTime(value) { return formatDateTime(value) },
     taskCardRow(row) {
       return {
@@ -1111,16 +1123,18 @@ export default {
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .related-business-list--section { padding-top: 0; }
-.preview-section-header { min-height: 86rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 0 24rpx; border-top: 1rpx solid #e5edef; border-bottom: 1rpx solid #edf2f4; background: #fff; transition: background 150ms ease; }
+.preview-section-header { min-height: 82rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 0 28rpx; border-bottom: 1rpx solid #edf2f4; background: #fff; transition: background 150ms ease; }
 .preview-section-header--pressed { background: #f7fafb; }
 .preview-section-header__main { min-width: 0; display: flex; align-items: center; gap: 12rpx; }
 .preview-section-header__bar { flex: 0 0 auto; width: 6rpx; height: 28rpx; border-radius: 3rpx; background: var(--mci-color-primary, #e94b2c); }
 .preview-section-header__title { overflow: hidden; color: #17313b; font-size: 28rpx; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
 .preview-section-header__count { flex: 0 0 auto; color: #8aa0a9; font-size: 21rpx; font-weight: 500; }
-.preview-section-header__arrow { flex: 0 0 auto; color: #78919b; font-size: 25rpx; }
+.preview-section-header__arrow { flex: 0 0 auto; color: #81969e; font-size: 40rpx; line-height: 1; transform: rotate(90deg); transition: transform .18s ease; }
+.preview-section-header__arrow.expanded { transform: rotate(-90deg); }
+/* zhy：列表宽度不能在 100% 基础上再叠加左右 margin；首卡与标题之间保持和基础信息正文一致的呼吸感。 */
 .preview-section-header ~ .related-data-list,
 .preview-section-header ~ .related-skeleton,
-.preview-section-header ~ .related-empty,
+.preview-section-header ~ .related-empty { width: auto; margin: 18rpx 22rpx 0; }
 .preview-section-header ~ .preview-actions { margin-right: 22rpx; margin-left: 22rpx; }
 .search-row {
   display: grid;

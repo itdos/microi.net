@@ -13,9 +13,12 @@
     </view>
 
     <view v-if="lines.length" class="field-list">
-      <view v-for="line in lines" :key="line.field" class="field-row">
+      <view v-for="line in lines" :key="line.field" class="field-row"
+        :class="{ 'field-row--multiline': Number(line.maxLines) > 1 }">
         <text class="field-label">{{ line.label }}</text>
-        <text class="field-value">{{ line.value }}</text>
+        <!-- zhy：后台把摘要字段作为普通卡片行下发时，同样执行多行截断。 -->
+        <text class="field-value" :class="{ 'field-value--multiline': Number(line.maxLines) > 1 }"
+          :style="lineClampStyle(line)">{{ line.value }}</text>
         <view v-if="line.format === 'phone' && line.rawValue" class="phone-action"
           @tap.stop="$emit('phone', line.rawValue)">
           <image src="/static/xjy/UI-call.png" mode="aspectFit" />
@@ -23,7 +26,8 @@
       </view>
     </view>
 
-    <text v-if="summary" class="card-summary">{{ summary }}</text>
+    <!-- zhy：列表长文本按模块配置限制行数，超出部分显示省略号，避免撑高卡片。 -->
+    <text v-if="summary" class="card-summary" :style="summaryClampStyle">{{ summary }}</text>
 
     <view v-if="actions.length" class="card-actions" @tap.stop>
       <view v-for="action in actions" :key="action.key" class="card-action"
@@ -52,8 +56,23 @@ export default {
     tags: { type: Array, default: () => [] },
     lines: { type: Array, default: () => [] },
     summary: { type: String, default: '' },
+    summaryLines: { type: Number, default: 3 },
     actions: { type: Array, default: () => [] },
     time: { type: String, default: '' }
+  },
+  computed: {
+    summaryClampStyle() {
+      // zhy：限制在合理范围内，防止错误配置再次造成卡片高度异常。
+      const lines = Math.min(8, Math.max(1, Number(this.summaryLines) || 3))
+      return { '-webkit-line-clamp': String(lines) }
+    }
+  },
+  methods: {
+    lineClampStyle(line) {
+      if (Number(line?.maxLines) <= 1) return null
+      const lines = Math.min(8, Math.max(2, Number(line.maxLines) || 3))
+      return { '-webkit-line-clamp': String(lines) }
+    }
   },
   emits: ['open', 'phone', 'action']
 }
@@ -77,11 +96,14 @@ export default {
 .data-tag { padding: 5rpx 10rpx; color: #647c87; background: #f1f4f8; font-size: 20rpx; }
 .field-list { margin-top: 16rpx; padding-top: 12rpx; border-top: 1rpx solid #edf3f5; }
 .field-row { min-height: 48rpx; line-height: 34rpx; }
+.field-row--multiline { align-items: flex-start; }
 .field-label { flex: 0 0 138rpx; color: #8197a0; font-size: 23rpx; }
 .field-value { flex: 1; min-width: 0; overflow: hidden; color: #365663; font-size: 24rpx; text-overflow: ellipsis; white-space: nowrap; }
+/* zhy：微信小程序端使用静态三行规则兜底，避免动态 line-clamp 样式被编译器忽略。 */
+.field-value--multiline { display: -webkit-box; max-height: 102rpx; white-space: pre-wrap; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .phone-action { display: flex; align-items: center; justify-content: center; width: 52rpx; height: 44rpx; }
 .phone-action image { width: 28rpx; height: 28rpx; }
-.card-summary { display: -webkit-box; margin-top: 12rpx; overflow: hidden; color: #607b87; font-size: 23rpx; line-height: 36rpx; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.card-summary { display: -webkit-box; max-height: 108rpx; margin-top: 12rpx; overflow: hidden; color: #607b87; font-size: 23rpx; line-height: 36rpx; text-overflow: ellipsis; white-space: pre-wrap; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .card-actions { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 14rpx; padding-top: 14rpx; border-top: 1rpx solid #edf3f5; }
 .card-action { min-width: 90rpx; height: 50rpx; padding: 0 16rpx; border: 1rpx solid #dce8ed; border-radius: 8rpx; color: #58727d; background: #f8fbfc; font-size: 21rpx; line-height: 50rpx; text-align: center; transition: transform 140ms ease, background 140ms ease; }
 .card-action--primary { border-color: rgba(11, 134, 212, .3); color: #0b78ba; background: #eaf5fa; }

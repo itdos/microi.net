@@ -4745,6 +4745,11 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       config: z.string().optional(),
       description: z.string().optional(),
       inTableEdit: z.number().optional(),
+      // zhy: expose field V8 source properties so Config.V8Code and runtime V8Code can be updated together.
+      v8Code: z.string().optional().describe('Field value-change V8 JavaScript code.'),
+      keyupV8Code: z.string().optional().describe('Field keyup V8 JavaScript code.'),
+      v8TmpEngineTable: z.string().optional().describe('Table-cell template V8 JavaScript code.'),
+      v8TmpEngineForm: z.string().optional().describe('Form template V8 JavaScript code.'),
     },
     async (args) => {
       try {
@@ -4757,7 +4762,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           formWidth: 'FormWidth', tableWidth: 'TableWidth',
           placeholder: 'Placeholder', defaultValue: 'DefaultValue', tab: 'Tab',
           data: 'Data', config: 'Config', description: 'Description',
-          inTableEdit: 'InTableEdit',
+          // zhy: map MCP V8 arguments to the real diy_field runtime columns.
+          inTableEdit: 'InTableEdit', v8Code: 'V8Code', keyupV8Code: 'KeyupV8Code',
+          v8TmpEngineTable: 'V8TmpEngineTable', v8TmpEngineForm: 'V8TmpEngineForm',
         };
         for (const [k, v] of Object.entries(args)) {
           if (v !== undefined && map[k]) patch[map[k]] = v;
