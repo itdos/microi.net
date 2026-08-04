@@ -1660,6 +1660,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_update_field',
   'microi_refresh_schema_cache',
   'microi_create_table',
+  'microi_repair_audit_fields',
   'microi_create_module',
   'microi_scaffold_vue_microservice',
   'microi_get_event_code',
@@ -2118,7 +2119,7 @@ BOUNDARY RULES:
 
 ## 低代码系统设计工作流（按顺序执行）
 1. **microi_get_db_schema** — 先查看已有表结构，了解数据模型
-2. **microi_create_table** — 创建自定义表（写入 diy_table，自动创建 MySQL 表并添加 Id/CreateTime/UpdateTime/CreateUser/OsClient 基础字段）
+2. **microi_create_table** — 创建自定义表（写入 diy_table，并同步创建 Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted 六个固定审计字段的物理列与 diy_field 元数据）
 3. **microi_add_field** — 逐个添加业务字段（写入 diy_field，执行 ALTER TABLE），需指定 component 组件类型
 4. **microi_get_table_indexes / microi_create_table_index** — 按真实查询与业务唯一约束创建并回读物理索引
 5. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
@@ -2133,7 +2134,9 @@ BOUNDARY RULES:
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_get_field_list / microi_update_field / microi_refresh_schema_cache** — 修改已有 diy_field 字段属性、KeyValue 数据源、Config 后必须回读并刷新缓存，避免后台字段选项与前端/接口枚举不一致
+- **microi_repair_audit_fields** — 修复指定表已存在的六个固定审计物理列对应的 diy_field 元数据；修复后它们不再出现在“异常字段修复”，表单默认显隐继续由 diy_table.DisplayDefaultField 控制
 - **microi_get_table_data / microi_add_form_data / microi_update_form_data** — 维护租户业务表数据（如商品、示例数据、配置项）时使用，写入后必须回读验证关键字段
+- **sys_user.DefaultIndexUrl** — 当前用户登录后的首选站内路由，支持 /route、#/route、/#/route；留空时回退系统默认首页。客户端只采用存在且当前用户有权限的内部路由
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
@@ -4066,6 +4069,29 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         }
         const data = result.Data as { TableId?: string; Name?: string; Message?: string };
         return { content: [{ type: 'text', text: `✅ Table "${name}" created.\n- TableId: ${data?.TableId}\n- Use this TableId when adding fields via microi_add_field` }] };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_repair_audit_fields',
+    `Repair the fixed audit-field metadata for one existing table in OsClient "${osClient}". The backend reconciles Id, CreateTime, UpdateTime, UserId, UserName and IsDeleted only when the physical columns exist, restores soft-deleted diy_field rows, adds missing diy_field rows without repeating DDL, clears shared metadata caches, and reads the final state back. The fields remain hidden by default when diy_table.DisplayDefaultField is off.`,
+    {
+      tableId: z.string().optional().describe('Exact diy_table.Id. Provide tableId or tableName.'),
+      tableName: z.string().optional().describe('Exact physical table/diy_table.Name. Provide tableName or tableId.'),
+    },
+    async ({ tableId, tableName }) => {
+      if (!tableId && !tableName) {
+        return { content: [{ type: 'text', text: 'Error: tableId 和 tableName 至少传一个。' }], isError: true };
+      }
+      try {
+        const result = await client.repairFixedAuditFields({ tableId, tableName });
+        if (result.Code !== 1) {
+          return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result.Data || {}, null, 2) }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

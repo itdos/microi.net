@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import diyCommonMixin from "../src/views/form-engine/mixins/diy-common.mixin.js";
+import tableUtilsMixin from "../src/views/form-engine/mixins/table-utils.mixin.js";
 
 function createContext(overrides = {}) {
     const context = {
@@ -73,6 +74,19 @@ test("full-width legacy card images use a vertical layout and empty images use i
     assert.equal(context.GetCardContentLayoutClass(), "card-content-horizontal");
 });
 
+test("card grid defaults to four readable columns and preserves an explicit five-column layout", function () {
+    const context = { SysMenuModel: {} };
+    const getColumn = tableUtilsMixin.methods.GetTableCardCol.bind(context);
+    const isFiveColumns = tableUtilsMixin.methods.IsCardFiveCol.bind(context);
+
+    assert.equal(getColumn(), 6);
+    assert.equal(isFiveColumns(), false);
+
+    context.SysMenuModel.TableCardCol = "5";
+    assert.equal(getColumn(), "five");
+    assert.equal(isFiveColumns(), true);
+});
+
 test("card template and styles keep visible surfaces and no longer index rows by field Id", function () {
     const component = readFileSync(new URL("../src/views/form-engine/diy-table.vue", import.meta.url), "utf8");
     const presentation = readFileSync(new URL("../src/views/form-engine/mixins/diy-table-presentation.mixin.js", import.meta.url), "utf8");
@@ -80,12 +94,20 @@ test("card template and styles keep visible surfaces and no longer index rows by
 
     assert.match(component, /GetCardImageValue\(item, SysMenuModel\.TableCardImgField\)/);
     assert.doesNotMatch(component, /item\[SysMenuModel\.TableCardImgField\]/);
-    assert.match(component, /class="preview card-image-fallback"/);
-    assert.match(component, /v-if="!SysMenuModel\.TableCardImgField"/);
+    assert.doesNotMatch(component, /class="preview card-image-fallback"/);
+    assert.match(component, /class="card-avatar card-avatar--fallback"/);
+    assert.match(component, /!GetCardImageValue\(item, SysMenuModel\.TableCardImgField\)/);
+    assert.match(component, /@keydown\.enter\.prevent="CardItemClick\(item\)"/);
+    assert.match(component, /@keydown\.space\.prevent="CardItemClick\(item\)"/);
+    assert.match(component, /class="card-action-more-label">更多<\/span>/);
     assert.match(presentation, /device === "PC" \? "Mobile" : "PC"/);
     assert.match(presentation, /function withoutUsedFields\([\s\S]*?CardBottomFieldList\(\)[\s\S]*?withoutUsedFields/);
     assert.match(presentation, /const hasRawValue =[\s\S]*?return hasRawValue[\s\S]*?templateValue/);
-    assert.match(styles, /\.card-image-fallback\s*\{[\s\S]*?radial-gradient[\s\S]*?font-size:\s*27px;/);
-    assert.match(styles, /\.card-wrapper-desktop\s*\{[\s\S]*?&::before\s*\{[\s\S]*?linear-gradient/);
-    assert.match(styles, /\.card-wrapper-desktop\s*\{[\s\S]*?&::after\s*\{[\s\S]*?transition:\s*opacity/);
+    assert.doesNotMatch(styles, /\.card-image-fallback\s*\{/);
+    assert.match(styles, /\.card-avatar--fallback\s*\{/);
+    assert.match(styles, /\.card-action-btn-more\s*\{[\s\S]*?width:\s*34px;[\s\S]*?\.card-action-more-label/);
+    assert.match(styles, /\.card-actions\s+:deep\(\.card-action-btn\s*>\s*span\)[\s\S]*?color:\s*inherit\s*!important/);
+    assert.match(styles, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+    assert.match(styles, /\.box-card\.card-redesign\s*\{[\s\S]*?&:focus-visible/);
+    assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.box-card\.card-data-animate/);
 });

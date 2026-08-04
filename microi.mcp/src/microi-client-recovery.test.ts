@@ -107,8 +107,37 @@ test('token-file lookup prefers exact tenant identity and retains legacy fallbac
   );
   assert.deepEqual(
     buildTokenFileLookupKeys('https://microi.test/', 'demo'),
-    ['https://microi.test|demo', 'https://microi.test'],
+    ['https://microi.test|demo||', 'https://microi.test|demo', 'https://microi.test'],
   );
+  assert.deepEqual(
+    buildTokenFileLookupKeys('https://microi.test/', 'demo', 'Product'),
+    [
+      'https://microi.test|demo|Product|',
+      'https://microi.test|demo|Product',
+      'https://microi.test|demo',
+      'https://microi.test',
+    ],
+  );
+  assert.deepEqual(
+    buildTokenFileLookupKeys('https://microi.test/', 'demo', '', 'Internal'),
+    [
+      'https://microi.test|demo||Internal',
+      'https://microi.test|demo|Internal',
+      'https://microi.test|demo',
+      'https://microi.test',
+    ],
+  );
+});
+
+test('empty type/network still selects the canonical broker token before a stale legacy alias', () => {
+  const tokens: Record<string, string> = {
+    'https://microi.test|demo||': 'broker-refreshed-token',
+    'https://microi.test|demo': 'stale-legacy-token',
+  };
+  const selected = buildTokenFileLookupKeys('https://microi.test', 'demo')
+    .map(key => tokens[key])
+    .find(Boolean);
+  assert.equal(selected, 'broker-refreshed-token');
 });
 
 test('MCP requests credential-free VS Code recovery and reloads the rotated token file', async () => {

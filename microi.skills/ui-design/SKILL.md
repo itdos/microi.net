@@ -29,6 +29,15 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 - 设计前必须读取 [references/design-pattern-library.md](references/design-pattern-library.md)；涉及登录、订阅、支付、权限、搜索、设置等流程时再读 [references/product-flow-recipes.md](references/product-flow-recipes.md)；涉及滚动、3D、Canvas/WebGL 或动态 Hero 时再读 [references/motion-and-media.md](references/motion-and-media.md)；生成整站或交给 AI 延续设计时使用 [references/mci-design-contract.md](references/mci-design-contract.md)。
 - 可运行原创案例位于 [assets/pattern-showcase/index.html](assets/pattern-showcase/index.html)，用于理解结构和状态，不作为需要逐像素复制的模板。
 
+### 可执行设计契约（整站与长期项目强制）
+
+- `MCI-DESIGN.md` 必须同时维护机器可读层和人类可读层：前者保存精确 token、引用和组件状态，后者保存目标用户、情绪、具体视觉隐喻、选择理由和禁区。只有 token 会失去取舍依据，只有形容词无法稳定实现。
+- 设计意图按“用户任务 → 主情绪 → 具体视觉隐喻 → 应当/禁止 → token 与组件”收敛。具体隐喻必须能自然约束色彩、材质、密度、形状和动效；禁止只堆“高级、现代、极简、科技”等宽泛词。
+- 核心章节固定为：产品与用户、视觉性格、颜色、字体、布局与间距、层级与形状、组件与状态、页面模式、动效与媒体、响应式、安全与降级、应当与禁止。扩展章节放在末尾，未知扩展要保留，核心章节不得重复或用近似拼写另起一套。
+- token 使用语义命名并允许组件以 `{路径}` 复用；必须检查缺失/循环引用、错误类型、主色缺失、透明色叠加底、对比度、孤立 token、未覆盖状态和无理由省略。组件至少按适用场景定义 default/hover/focus/pressed/loading/empty/error/disabled/selected/success。
+- 契约与实现必须一起评审差异；意外删除、重命名、大范围 token 漂移或只改契约不改页面都视为未完成。运行时变量或其它主题格式只能从已校验的机器块派生，禁止维护第二份手工 token。
+- 契约格式必须锁定版本，升级时先检查语义差异再迁移；跨平台校验脚本提供稳定入口。完整结构、示例与验收见 [references/mci-design-contract.md](references/mci-design-contract.md)，新项目复制 [assets/templates/MCI-DESIGN.md](assets/templates/MCI-DESIGN.md)。
+
 ---
 
 ## 样式隔离与抗覆盖
@@ -73,6 +82,18 @@ description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus�
 - PC 卡片内边距不小于 14-18px，图标背景到卡片边缘不小于 16px；移动端内边距不小于 12px。不能出现图标、文字、统计贴边的效果。
 - 标题最多两行并截断或自然换行，长词必须 `overflow-wrap:anywhere`，不允许撑破卡片。图标按钮、标题、统计文本都要垂直和水平对齐。
 - 修改后必须截图验收 1366/1440/1920 桌面宽度和 390 左右移动宽度，检查每行数量、行列对齐、卡片内边距、标题与统计间距、文字溢出和横向滚动。
+
+## PC 后台数据卡片模式规范
+
+适用于 `diy-table` 卡片模式、任务/应用/客户/资产列表。它是高频数据操作容器，不是营销海报或入口宫格。
+
+- 信息顺序固定为“真实图片或紧凑身份标记 → 标题与状态 → 2—4 个关键字段 → 时间/辅助标签 → 操作区”。标题与状态在首屏可扫读，次要字段不能抢占标题层级。
+- 配置了图片但某行无图时，用 40—44px 首字或业务图标承接身份；禁止生成大面积渐变、发光字母、旋转方块等伪图片占据内容高度。真实图片按稳定比例使用 `cover/contain`。
+- 无显式配置时桌面默认四列，以最小可读宽度优先；显式 `TableCardCol` 配置必须保留。中等宽度降为三列/两列，移动端单列，禁止为“同屏更多”把标题和四个操作挤进过窄卡片。
+- 卡片依靠表面、细边框、轻阴影和 1—2px hover lift 建立层级；不要给每张卡加顶部霓虹线、径向光斑、彩虹渐变或重投影。选中态只改边框/焦点环，不能导致网格跳动。
+- 操作区优先一个主动作、一至两个次动作，其余进入“更多”；危险动作不得与主动作同权。按钮使用 8—10px 软圆角而非满屏胶囊，移动端高度不小于 44px。
+- 整卡可打开详情时提供可见 `focus-visible`、Enter/Space 触发；内部按钮和选择控件阻止冒泡。骨架屏要复刻图片（如有）、标题、字段和按钮的最终几何，不能先显示大图骨架再塌缩为空白。
+- 视觉验收至少覆盖：无图/有图、长标题、多个按钮、选中态、加载/空态、亮/暗主题、1366/1440/1920 桌面与 390 移动。
 
 ---
 

@@ -1056,16 +1056,12 @@
 .table-card-el-row {
     margin-left: 0 !important;
     margin-right: 0 !important;
-    margin-top: 10px;
-    margin-bottom: 10px !important;
-    background-color: var(--mci-bg-base, var(--el-bg-color-page, #f5f7fa)) !important;
-    background-image:
-        radial-gradient(circle at 12% 0%, rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.055), transparent 30%),
-        linear-gradient(180deg, rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.018), transparent 160px);
-    border-radius: var(--mci-radius-lg, 16px);
+    margin-top: 14px;
+    margin-bottom: 2px !important;
+    background: transparent !important;
     display: flex;
     flex-wrap: wrap;
-    gap: 0px;
+    gap: 0;
 
     // 卡片模式-空状态
     .card-empty-state {
@@ -1090,21 +1086,20 @@
 
     // 一行5个卡片的特殊布局（el-col 不支持 span=4.8）
     .card-col-five {
-        flex: 0 0 calc(20%) !important;
-        max-width: calc(20%) !important;
-        width: calc(20%) !important;
-        // padding: 0 !important;
+        flex: 0 0 20% !important;
+        max-width: 20% !important;
+        width: 20% !important;
 
-        @media screen and (max-width: 1200px) {
-            flex: 0 0 calc(25% - 12px) !important;
-            max-width: calc(25% - 12px) !important;
-            width: calc(25% - 12px) !important;
+        @media screen and (max-width: 1280px) {
+            flex-basis: 25% !important;
+            max-width: 25% !important;
+            width: 25% !important;
         }
 
-        @media screen and (max-width: 992px) {
-            flex: 0 0 calc(33.33% - 11px) !important;
-            max-width: calc(33.33% - 11px) !important;
-            width: calc(33.33% - 11px) !important;
+        @media screen and (max-width: 1024px) {
+            flex-basis: 33.3333% !important;
+            max-width: 33.3333% !important;
+            width: 33.3333% !important;
         }
 
         @media screen and (max-width: 768px) {
@@ -1117,13 +1112,13 @@
     // PC端卡片容器 - 默认样式
     .card-wrapper-desktop {
         box-sizing: border-box;
-        margin-bottom: 12px;
+        margin-bottom: 16px;
 
         .box-card {
             height: 100%;
-            border-radius: 12px;
+            border-radius: var(--mci-radius-lg, 16px);
             overflow: hidden;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            box-shadow: var(--mci-shadow-card, 0 3px 12px rgba(15, 23, 42, 0.06));
         }
     }
 
@@ -1237,20 +1232,24 @@
 // 卡片图片位置布局
 .card-content-vertical {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
+    min-height: 0;
 }
 
 .card-content-horizontal {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: row;
     align-items: stretch;
+    min-height: 0;
 
     .preview {
         height: auto;
         max-height: 100%;
         object-fit: cover;
         flex-shrink: 0;
-        border-radius: 12px;
+        border-radius: 0;
     }
 
     .card-body {
@@ -1283,46 +1282,101 @@
 
 /* 卡片选中状态 */
 .box-card.card-selected {
-    border: 2px solid var(--el-color-primary) !important;
-    box-shadow: 0 6px 20px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.35) !important;
-    transform: translateY(-3px);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-color: var(--mci-color-primary, var(--el-color-primary, #409eff)) !important;
+    box-shadow:
+        0 0 0 1px var(--mci-color-primary, var(--el-color-primary, #409eff)),
+        var(--mci-shadow-card, 0 4px 16px rgba(15, 23, 42, 0.08)) !important;
 }
 
 /* ========== 新版卡片样式 card-redesign ========== */
 .box-card.card-redesign {
-    border-radius: 12px;
+    position: relative;
+    border-radius: var(--mci-radius-lg, 16px);
     overflow: hidden;
-    border: 1px solid var(--mci-border-subtle, var(--el-border-color-lighter, rgba(0, 0, 0, 0.05)));
-    background:
-        linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--mci-bg-card, var(--el-bg-color, #fff)) 97%, var(--el-color-primary, #409eff) 3%) 0%,
-            var(--mci-bg-card, var(--el-bg-color, #fff)) 34%
-        );
-    box-shadow: none !important;
+    border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+    outline: none;
+    background: var(--mci-bg-card, var(--el-bg-color, #fff));
+    box-shadow: var(--mci-shadow-card, 0 3px 12px rgba(15, 23, 42, 0.06)) !important;
     cursor: pointer;
 
     :deep(.el-card__body) {
+        display: flex;
+        min-height: 100%;
+        flex-direction: column;
         padding: 0;
+    }
+
+    &:focus-visible {
+        border-color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+        box-shadow:
+            0 0 0 3px color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 22%, transparent),
+            var(--mci-shadow-card, 0 3px 12px rgba(15, 23, 42, 0.06)) !important;
     }
 }
 
 .box-card.card-data-animate {
     position: relative;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: visible;
+    overflow: hidden;
+    transition:
+        transform var(--mci-duration-fast, 160ms) ease,
+        border-color var(--mci-duration-fast, 160ms) ease,
+        box-shadow var(--mci-duration-fast, 160ms) ease;
 
     &:hover {
         transform: translateY(-2px);
-        border-color: rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.32);
-        box-shadow: var(--mci-shadow-card-hover, 0 8px 28px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.15)) !important;
+        border-color: var(--mci-border-color-hover, var(--el-border-color, #d1d5db));
+        box-shadow: var(--mci-shadow-card-hover, 0 10px 28px rgba(15, 23, 42, 0.11)) !important;
+    }
+}
+
+.card-skeleton-media {
+    width: 100%;
+    height: 120px;
+}
+
+.card-skeleton-body {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 16px 10px;
+}
+
+.card-skeleton-avatar {
+    width: 40px !important;
+    height: 40px !important;
+    flex: 0 0 40px;
+}
+
+.card-skeleton-title {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 8px;
+}
+
+.card-skeleton-rows {
+    display: grid;
+    gap: 8px;
+    padding: 2px 16px 16px;
+}
+
+.card-skeleton-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 11px 16px;
+    border-top: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+    background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f8fafc));
+
+    .el-skeleton__item {
+        width: 68px;
+        height: 32px;
+        border-radius: var(--mci-radius-sm, 8px);
     }
 }
 
 /* 卡片内容区域 */
 .card-body {
-    padding: 14px 16px 6px 16px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -1331,9 +1385,9 @@
 /* 第一行：序号 + 标题 + Tag */
 .card-title-row {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 10px;
+    align-items: flex-start;
+    gap: 10px;
+    padding-bottom: 12px;
     border-bottom: 0;
     margin-bottom: 0px;
 }
@@ -1345,21 +1399,22 @@
     min-width: 24px;
     height: 24px;
     padding: 0 6px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, var(--el-color-primary, #409eff) 0%, var(--el-color-primary-light-3, #79bbff) 100%);
-    color: var(--mci-text-on-primary, #fff);
+    border: 1px solid color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 20%, transparent);
+    border-radius: var(--mci-radius-sm, 8px);
+    background: color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 9%, var(--mci-bg-card, #fff));
+    color: var(--mci-color-primary, var(--el-color-primary, #409eff));
     font-size: 12px;
     font-weight: 700;
     flex-shrink: 0;
-    box-shadow: 0 2px 6px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.3);
+    box-shadow: none;
 }
 
 .card-title-text {
     flex: 1;
     font-size: 15px;
-    font-weight: 600;
-    color: var(--el-text-color-primary, #1a1a2e);
-    line-height: 1.4;
+    font-weight: 700;
+    color: var(--mci-text-primary, var(--el-text-color-primary, #1f2937));
+    line-height: 1.45;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1376,15 +1431,15 @@
 }
 
 .card-title-tag {
-    border-radius: 6px;
+    border-radius: var(--mci-radius-xs, 6px);
     font-size: 11px;
     height: 22px;
     line-height: 22px;
     padding: 0 8px;
-    border: none;
-    background: rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.1);
-    color: var(--el-color-primary, #409eff);
-    font-weight: 500;
+    border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+    background: var(--mci-bg-soft, var(--el-fill-color-light, #f5f7fa));
+    color: var(--mci-text-secondary, var(--el-text-color-regular, #606266));
+    font-weight: 600;
 }
 
 .card-tag-html {
@@ -1403,7 +1458,8 @@
 .card-field-row {
     display: flex;
     align-items: center;
-    padding: 4px 0;
+    min-height: 27px;
+    padding: 3px 0;
     font-size: 13px;
     line-height: 1.5;
     border-bottom: 0;
@@ -1414,7 +1470,7 @@
 }
 
 .card-field-label {
-    color: var(--el-text-color-secondary, #8c8c8c);
+    color: var(--mci-text-tertiary, var(--el-text-color-secondary, #909399));
     flex-shrink: 0;
     margin-right: 8px;
     font-size: 12px;
@@ -1425,7 +1481,7 @@
 }
 
 .card-field-value {
-    color: var(--el-text-color-primary, #333);
+    color: var(--mci-text-secondary, var(--el-text-color-regular, #4b5563));
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1444,10 +1500,10 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 3px 0;
-    margin-top: 0px;
-    border-top: none;
-    // min-height: 28px;
+    min-height: 28px;
+    padding: 10px 0 0;
+    margin-top: 10px;
+    border-top: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
 }
 
 .card-bottom-tags {
@@ -1488,27 +1544,35 @@
 .card-actions {
     display: flex;
     align-items: center;
-    justify-content: right;
+    justify-content: flex-end;
     flex-wrap: wrap;
     gap: 6px;
-    padding: 8px 14px 12px;
-    border-top: 0;
-    // background: linear-gradient(to bottom, #fafbfc 0%, #f5f6f8 100%);
+    padding: 11px 16px 12px;
+    border-top: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+    background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f8fafc));
+
+    :deep(.el-button + .el-button) {
+        margin-left: 0;
+    }
 }
 
 .card-action-btn {
-    height: 28px;
-    padding: 0 14px;
+    min-height: 34px;
+    height: 34px;
+    margin: 0;
+    padding: 0 6px;
     font-size: 12px;
-    font-weight: 500;
-    border-radius: 15px;
-    transition: all 0.2s ease;
-    border-color: transparent !important;
+    font-weight: 600;
+    line-height: 1;
+    border-radius: var(--mci-radius-sm, 8px);
+    transition:
+        transform var(--mci-duration-fast, 160ms) ease,
+        background-color var(--mci-duration-fast, 160ms) ease,
+        border-color var(--mci-duration-fast, 160ms) ease;
     box-shadow: none !important;
 
     &:hover {
         transform: translateY(-1px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18) !important;
     }
 
     &:active {
@@ -1522,11 +1586,50 @@
 }
 
 .card-action-btn-more {
-    padding: 0 8px;
-    min-width: 30px;
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+
     .el-icon {
         margin-right: 0;
     }
+
+    .card-action-more-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+}
+
+.card-actions .card-action-btn.el-button--primary.is-plain {
+    border-color: color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 28%, transparent) !important;
+    background: color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 8%, var(--mci-bg-elevated, #fff)) !important;
+    color: var(--mci-color-primary, var(--el-color-primary, #409eff)) !important;
+}
+
+.card-actions .card-action-btn.el-button--danger.is-plain {
+    border-color: color-mix(in srgb, var(--mci-color-danger, var(--el-color-danger, #f56c6c)) 26%, transparent) !important;
+    background: color-mix(in srgb, var(--mci-color-danger, var(--el-color-danger, #f56c6c)) 7%, var(--mci-bg-elevated, #fff)) !important;
+    color: var(--mci-color-danger, var(--el-color-danger, #f56c6c)) !important;
+}
+
+.card-actions .card-action-btn.el-button--success.is-plain {
+    border-color: color-mix(in srgb, var(--mci-color-success, var(--el-color-success, #67c23a)) 26%, transparent) !important;
+    background: color-mix(in srgb, var(--mci-color-success, var(--el-color-success, #67c23a)) 7%, var(--mci-bg-elevated, #fff)) !important;
+    color: var(--mci-color-success, var(--el-color-success, #67c23a)) !important;
+}
+
+/* 既有按钮主题会将子组件内部的 span/svg 固定为白色；浅色语义按钮应继承按钮本体颜色。 */
+.card-actions :deep(.card-action-btn > span),
+.card-actions :deep(.card-action-btn > span > span),
+.card-actions :deep(.card-action-btn .el-icon),
+.card-actions :deep(.card-action-btn svg) {
+    color: inherit !important;
 }
 
 .card-action-btn-danger {
@@ -1631,12 +1734,11 @@
 /* 移动端卡片适配 */
 @media screen and (max-width: 768px) {
     .card-body {
-        padding: 5px;
-        padding-bottom: 0;
+        padding: 14px;
     }
 
     .card-title-row {
-        padding-bottom: 5px;
+        padding-bottom: 10px;
     }
 
     .card-title-text {
@@ -1644,16 +1746,17 @@
     }
 
     .card-field-row {
-        padding: 2px 0;
+        padding: 4px 0;
     }
 
     .card-actions {
-        padding: 3px;
-        gap: 5px;
+        padding: 10px 12px 12px;
+        gap: 7px;
     }
 
     .card-action-btn {
-        height: 28px;
+        min-height: 44px;
+        height: 44px;
         padding: 0 10px;
         font-size: 12px;
     }
@@ -1668,63 +1771,13 @@
 /* PC端卡片样式 */
 .card-wrapper-desktop {
     .box-card.card-redesign {
-        isolation: isolate;
-        border-color: var(--mci-border-strong, var(--el-border-color, #cbd5e1));
-        border-color: color-mix(
-            in srgb,
-            var(--mci-border-strong, var(--el-border-color, #cbd5e1)) 84%,
-            var(--el-color-primary, #409eff) 16%
-        );
-        box-shadow: var(--mci-shadow-card, 0 4px 16px rgba(15, 18, 30, 0.08), 0 1px 3px rgba(15, 18, 30, 0.05)) !important;
-
-        &::before {
-            position: absolute;
-            z-index: 2;
-            top: -1px;
-            right: 14px;
-            left: 14px;
-            height: 3px;
-            border-radius: 0 0 999px 999px;
-            background: linear-gradient(
-                90deg,
-                transparent,
-                rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.72),
-                rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.28),
-                transparent
-            );
-            content: "";
-            pointer-events: none;
-        }
-
-        &::after {
-            position: absolute;
-            z-index: -1;
-            inset: 0;
-            border-radius: inherit;
-            box-shadow: var(--mci-shadow-card-hover, 0 18px 44px rgba(15, 23, 42, 0.14));
-            content: "";
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity var(--mci-duration-fast, 150ms) ease;
-        }
-
-        &:hover {
-            border-color: var(--mci-border-color-hover, var(--el-border-color, #dcdfe6));
-
-            &::after {
-                opacity: 1;
-            }
-        }
+        border-color: var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+        box-shadow: var(--mci-shadow-card, 0 3px 12px rgba(15, 23, 42, 0.06)) !important;
     }
 
     .card-actions {
-        border-top: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #ebeef5));
-        background:
-            linear-gradient(
-                180deg,
-                color-mix(in srgb, var(--mci-bg-soft, var(--el-fill-color-extra-light, #fafafa)) 92%, var(--el-color-primary, #409eff) 8%),
-                var(--mci-bg-soft, var(--el-fill-color-extra-light, #fafafa))
-            );
+        border-top-color: var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+        background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #f8fafc));
     }
 }
 
@@ -1741,48 +1794,40 @@
     border-bottom: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #ebeef5));
 }
 
-.card-image-fallback {
-    position: relative;
-    display: flex !important;
-    min-height: 112px;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    background:
-        radial-gradient(circle at 68% 24%, rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.22), transparent 34%),
-        linear-gradient(
-            145deg,
-            color-mix(in srgb, var(--mci-bg-soft, #f4f7fb) 86%, var(--el-color-primary, #409eff) 14%),
-            color-mix(in srgb, var(--mci-bg-card, #fff) 96%, var(--el-color-primary, #409eff) 4%)
-        ) !important;
+.card-avatar--fallback {
+    border-color: color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 18%, transparent);
+    border-radius: var(--mci-radius-md, 12px);
+    background: color-mix(in srgb, var(--mci-color-primary, var(--el-color-primary, #409eff)) 9%, var(--mci-bg-card, #fff));
+    color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+    font-weight: 800;
+}
 
-    &::before {
-        position: absolute;
-        width: 66px;
-        height: 66px;
-        border: 1px solid rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.18);
-        border-radius: 22px;
-        background: rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.10);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 24px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.12);
-        content: "";
-        transform: rotate(8deg);
-    }
+.card-skeleton {
+    cursor: default !important;
 
-    > span {
-        position: relative;
-        z-index: 1;
-        color: var(--el-color-primary, #409eff);
-        font-size: 27px;
-        font-weight: 800;
-        line-height: 1;
-        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
+    &:hover {
+        transform: none !important;
+        border-color: var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
+        box-shadow: var(--mci-shadow-card, 0 3px 12px rgba(15, 23, 42, 0.06)) !important;
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .card-wrapper-desktop .box-card.card-redesign::after {
-        transition: none;
+    .box-card.card-data-animate,
+    .card-action-btn,
+    .card-checkbox-wrapper {
+        transition-duration: 0.01ms !important;
     }
+}
+
+/* 卡片选中态不依赖位移，避免批量选择时整个网格跳动。 */
+.box-card.card-selected {
+    transform: none !important;
+}
+
+/* 媒体始终留在卡片边界内；缺图时由标题行中的紧凑标记承接身份信息。 */
+.box-card.card-redesign .preview {
+    display: block;
 }
 
 // ====== 统计面板 ======
@@ -2463,30 +2508,16 @@
 /* Rich card anatomy shared by PC Card mode and the mobile responsive list. */
 .box-card.card-redesign {
     position: relative;
-    border-color: var(--mci-border-strong, var(--el-border-color, #cbd5e1));
-    border-color: color-mix(
-        in srgb,
-        var(--mci-border-strong, var(--el-border-color, #cbd5e1)) 84%,
-        var(--el-color-primary, #409eff) 16%
-    );
+    border-color: var(--mci-border-color, var(--el-border-color-lighter, #e5e7eb));
     border-radius: var(--mci-radius-lg, 16px);
-    background:
-        linear-gradient(
-            180deg,
-            color-mix(in srgb, var(--mci-bg-card, var(--el-bg-color, #fff)) 96%, var(--el-color-primary, #409eff) 4%) 0%,
-            var(--mci-bg-card, var(--el-bg-color, #fff)) 38%
-        );
+    background: var(--mci-bg-card, var(--el-bg-color, #fff));
 }
 
 .box-card.card-data-animate {
     transition:
-        border-color var(--mci-duration-fast, 150ms) ease,
-        background-color var(--mci-duration-fast, 150ms) ease;
-
-    &:hover,
-    &:active {
-        transform: none;
-    }
+        transform var(--mci-duration-fast, 160ms) ease,
+        border-color var(--mci-duration-fast, 160ms) ease,
+        box-shadow var(--mci-duration-fast, 160ms) ease;
 }
 
 .box-card.card-selected {
@@ -2515,7 +2546,7 @@
     flex: 0 0 42px;
     overflow: hidden;
     border: 1px solid var(--mci-border-color, var(--el-border-color-lighter, #ebeef5));
-    border-radius: 50%;
+    border-radius: var(--mci-radius-md, 12px);
     background: var(--mci-bg-soft, var(--el-fill-color-light, #f5f7fa));
     color: var(--mci-text-primary, var(--el-text-color-primary, #303133));
     font-size: 16px;
@@ -2695,9 +2726,9 @@
 
 @media (hover: hover) and (pointer: fine) {
     .box-card.card-data-animate:hover {
-        transform: none;
+        transform: translateY(-2px);
         border-color: var(--mci-border-color-hover, var(--el-border-color, #dcdfe6));
-        box-shadow: var(--mci-shadow-card-hover, 0 8px 28px rgba(15, 23, 42, 0.12)) !important;
+        box-shadow: var(--mci-shadow-card-hover, 0 10px 28px rgba(15, 23, 42, 0.11)) !important;
     }
 
     .card-action-btn:hover,
@@ -3048,6 +3079,8 @@
     }
 
     .card-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         align-items: stretch;
         justify-content: flex-start;
         gap: 7px;
@@ -3056,12 +3089,16 @@
         background: var(--mci-bg-soft, var(--el-fill-color-extra-light, #fafafa));
 
         :deep(.el-button + .el-button) { margin-left: 0; }
+
+        .el-dropdown {
+            width: 100%;
+        }
     }
 
     .card-action-btn {
-        flex: 1 1 92px;
-        width: auto;
-        min-width: 76px;
+        flex: none;
+        width: 100%;
+        min-width: 0;
         min-height: 44px;
         height: 44px;
         margin: 0;
@@ -3077,7 +3114,21 @@
     }
 
     .card-action-btn-more {
-        min-width: 76px;
+        width: 100%;
+        min-width: 0;
+
+        .el-icon {
+            margin-right: 4px;
+        }
+
+        .card-action-more-label {
+            position: static;
+            width: auto;
+            height: auto;
+            overflow: visible;
+            clip: auto;
+            white-space: normal;
+        }
     }
 
     .card-checkbox-wrapper,

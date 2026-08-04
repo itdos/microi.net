@@ -149,6 +149,12 @@ MCP 建模只使用：
 - 不在组件内绕过 FormEngine 权限直接访问任意表。
 - 复杂但租户独有的页面优先使用 MicroService + `V8.OpenAppDialog`，避免把客户逻辑打进主前端。
 
+## 固定审计字段
+
+- `Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted` 是 DIY 表的正常固定字段。物理列存在时必须有对应 `diy_field` 元数据，不能长期出现在“异常字段修复”列表；`diy_table.DisplayDefaultField` 只控制设计器默认是否显示这些字段，不等于删除元数据。
+- 统一通过平台修复接口或 MCP `microi_repair_audit_fields` 补齐/恢复元数据。修复必须按 `OsClient` 使用共享租约锁，可重复执行，只处理已存在的固定物理列，不借机执行 DDL，并在成功后清理字段缓存。
+- 表格里的创建人、创建时间、修改时间等审计列应与普通字段共用列头高级搜索、权限和格式化逻辑。
+
 ## 验收
 
 - 物理列与 `diy_field` 一致，字段缓存已刷新。
