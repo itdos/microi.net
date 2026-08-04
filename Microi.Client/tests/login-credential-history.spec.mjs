@@ -10,6 +10,7 @@ import {
     updateRememberedLoginAccountProfile,
     upsertRememberedLoginAccount
 } from "../src/utils/login-credential-history.js";
+import { resolveLoginSystemLogoUrl } from "../src/utils/login-branding.js";
 
 function createStorage() {
     const values = new Map();
@@ -128,14 +129,51 @@ test("remove and clear affect only the requested account or tenant", () => {
     assert.equal(readRememberedLoginAccounts({ storage, osClient: "tenant-b" })[0].Account, "other");
 });
 
-test("login SFC wires remembered accounts, avatar fallback, and a stable desktop card width", () => {
+test("login system logo resolves Microi file objects, JSON strings, and URL variants", () => {
+    const getServerPath = (path) => `https://files.microi.test${path}`;
+
+    assert.equal(resolveLoginSystemLogoUrl({ Path: "/tenant/logo.png" }, getServerPath), "https://files.microi.test/tenant/logo.png");
+    assert.equal(resolveLoginSystemLogoUrl('{"Path":"/tenant/logo-json.png"}', getServerPath), "https://files.microi.test/tenant/logo-json.png");
+    assert.equal(resolveLoginSystemLogoUrl('[{"Path":"/tenant/logo-array.png"}]', getServerPath), "https://files.microi.test/tenant/logo-array.png");
+    assert.equal(resolveLoginSystemLogoUrl("tenant/logo-relative.png", getServerPath), "https://files.microi.test/tenant/logo-relative.png");
+    assert.equal(resolveLoginSystemLogoUrl("https://cdn.microi.test/logo.png", getServerPath), "https://cdn.microi.test/logo.png");
+    assert.equal(resolveLoginSystemLogoUrl("./static/img/logo.png", getServerPath), "./static/img/logo.png");
+    assert.equal(resolveLoginSystemLogoUrl(null, getServerPath), "");
+});
+
+test("login SFC wires branding, remembered accounts, classic default, and AI motion", () => {
     const component = readFileSync(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
 
     assert.match(component, /v-model="RememberPassword"/);
+    assert.match(component, /class="remember-password-label">记住密码/);
+    assert.doesNotMatch(component, /仅在此设备本地加密保存/);
     assert.match(component, /popper-class="login-account-history-popper"/);
     assert.match(component, /@click="SelectRememberedAccount\(item\)"/);
     assert.match(component, /v-if="CurrentAccountAvatarUrl"/);
+    assert.match(component, /this\.SysConfig\?\.SysLogo/);
+    assert.match(component, /resolveLoginSystemLogoUrl/);
+    assert.match(component, /class="login-system-logo"/);
+    assert.match(component, /class="login-brand" :class="\{ 'has-subtitle': !!SystemSubTitle \}"/);
+    assert.match(component, /<span v-if="SystemSubTitle">\{\{ SystemSubTitle \}\}<\/span>/);
+    assert.match(component, /--mci-login-brand-height:\s*40px/);
+    assert.match(component, /\.login-system-logo\s*\{[\s\S]*?width:\s*var\(--mci-login-brand-height\);[\s\S]*?height:\s*var\(--mci-login-brand-height\);[\s\S]*?flex:\s*0 0 var\(--mci-login-brand-height\);/);
+    assert.match(component, /\.login-brand[\s\S]*?\.login-title\s*\{[\s\S]*?height:\s*var\(--mci-login-brand-height\);[\s\S]*?justify-content:\s*center;/);
+    assert.doesNotMatch(component, /\.login-system-logo\s*\{[^}]*?(?:width|height|flex-basis):\s*(?:56|64)px/);
+    assert.doesNotMatch(component, /选择界面风格|style-selector-wrapper/);
+    assert.match(component, /self\.diyStore\.setState\("SystemStyle", "Classic"\)/);
     assert.match(component, /self\.PersistRememberedLogin\(result\.Data \|\| \{\}\)/);
+    assert.match(component, /class="login-button-energy"/);
+    assert.match(component, /class="login-button-energy-beam"/);
+    assert.match(component, /@keyframes mciLoginEnergySweep/);
+    assert.match(component, /@keyframes mciLoginCurrentTrace/);
+    assert.match(component, /@keyframes mciLoginCardBreath/);
+    assert.match(component, /@media \(prefers-reduced-motion: reduce\)/);
+    assert.match(component, /--mci-login-control-radius:\s*12px/);
+    assert.match(component, /\.remember-password-checkbox[\s\S]*?border-radius:\s*var\(--mci-login-control-radius\)/);
+    assert.match(component, /\.login-button[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*var\(--mci-login-control-radius\)/);
+    assert.match(component, /\.loginCenterBgCover[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*var\(--mci-login-card-shadow\)/);
+    assert.doesNotMatch(component, /login-button-energy-line|mci-login-button-circuit|mciLoginCircuitFlow/);
+    assert.doesNotMatch(component, /box-shadow:\s*0 0 0 1px rgba\(255,\s*255,\s*255[^;]*inset/);
     assert.match(component, /box-sizing:\s*border-box/);
     assert.match(component, /@media \(min-width: 1200px\)[\s\S]*?width:\s*620px/);
     assert.doesNotMatch(component, /@media \(min-width: 1365px\)/);

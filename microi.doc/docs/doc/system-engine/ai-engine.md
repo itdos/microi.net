@@ -17,6 +17,120 @@ AI 相关业务实现统一归属 `Microi.Server/Microi.AI`，`Microi.Server/Mic
 
 这一边界同时适用于 Controller、SignalR Hub、后台初始化和未来 Tool Gateway。新增 AI 入口时应先扩展 `IMicroiAI` 或 `Microi.AI` 内的专用服务，再由接口层做薄委托，不能把业务逻辑复制到 Controller。
 
+## 授权边界：服务器 License 与中转 ApiKey 是两套机制
+
+在未修改的吾码官方发布物中，内置在线 AI 的核心推理入口会统一读取服务器 License：`Chat`、`ChatStream`、`NL2SQL`、`NL2SQLStreaming`、`NL2V8Engine` 以及它们的可信聊天编排，只有本机存在有效的 `Personal` 或 `Enterprise` License 时才继续调用模型。自己在 `mic_ai` 中配置 DeepSeek、OpenAI 等供应商的 Endpoint/ApiKey，并不会绕过这层服务器授权。
+
+服务器 License 的真实信任链是：
+
+1. 吾码官方使用签发私钥生成 `microi.net.lic`；客户发布包和 NuGet 不包含该私钥。
+2. 客户节点使用程序集内嵌的官方公钥验证 RSA 签名，同时验证当前机器 HID 和有效期。显式配置的公钥也只能是同一官方公钥的副本，客户自建“私钥 + 公钥”不能替换信任根。
+3. 验签在本机完成，并非每次 AI 调用都访问 `api.itdos.com`。有效 License 启动后会延迟检查一次作废状态，之后每天检查一次；官网短时不可达或超时会跳过本次心跳，不会立即停用已经通过本地验签的 License。
+
+因此，准确说法是“核心在线 AI 需要**由吾码官方签发的有效服务器 License**”，而不是“每次调用都必须在线请求官网授权”。只下载源码或安装包、复制 `Microi.AI.dll`、把租户名改成 `iTdos`，都不能自行签发有效 License。
+
+官方中转站还要经过第二层账号授权：租户使用官网签发的 `sk-microi-*` ApiKey 请求 `https://api.itdos.com/v1`，官网按账号校验额度并计量。服务器 License 不能代替中转 ApiKey，中转 ApiKey 也不能把本地 `Chat/NL2SQL/NL2V8` 变成已授权状态。
+
+`ProxyChat`、`ProxyChatStream`、头像生成和 OpenAI 兼容 `/v1/chat/completions` 现在也在 `AiProxyService` 领域层读取同一服务器 License；不是只靠页面隐藏。`/v1/models`、套餐、订单和用量属于发现/账户管理接口，不触发模型推理，仍可用于配置与购买流程。中转调用在服务器 License 之外还会继续校验登录态或 `sk-microi-*` 及账号额度。
+
+`MicroiAI` 与 `AiProxyService` 只接受 `Microi.net` 中封闭的 `MicroiFeatureLicense` 实现；宿主仅重新注册另一个 `IMicroiFeatureLicense` 不会把 AI 变成已授权。签发客户端地址固定为 `https://api.itdos.com`，私钥目录从编译、NuGet 和发布内容中排除；签发服务还会核对私钥对应公钥必须与内嵌官方信任根一致。
+
+上述保证针对未被篡改的官方二进制与正常部署。拥有服务器管理员权限的人仍可以替换或修改程序集、改变机器指令，任何纯本地 DRM 都无法从理论上抵抗这种物理控制；但这不等于其能够“伪造 License”。没有官方私钥时，生成的文件不能通过未修改节点内嵌官方公钥的 RSA 验签，也不能拿去给其它正常吾码节点使用。
+
+## 跨界面、前后端 V8、MCP 与外部客户端调用
+
+平台已提供前后端第一等 `V8.AI` 和专用 `microi_chat` MCP Tool。调用边界如下：
+
+| 调用方 | 推荐入口 | 鉴权 | 普通返回 | 打字机 / 流式 |
+|---|---|---|---|---|
+| PC、H5、UniApp 或 MicroService 页面 | `POST /api/Ai/Chat` | 吾码登录 Token | 支持 | 改用 `POST /api/Ai/ChatStream` 并消费 SSE |
+| 前端 V8 | `await V8.AI.Chat(...)` / `ChatGet(...)` | 自动使用当前登录 Token、租户并接收轮换 Token | 支持 | `await V8.AI.ChatStream(..., onChunk)` |
+| 后端接口引擎 / 表单后端 V8 | `await V8.AI.Chat(...)` | 固定绑定当前 V8 租户与认证用户；匿名上下文拒绝 | 支持 | `await V8.AI.ChatStream(..., onChunk)` |
+| Microi MCP | `microi_chat` | MCP 当前登录 Token与绑定租户；不接受身份、密钥或 Endpoint 覆盖 | 支持最终 `DosResult` | MCP Tool 返回最终结果，不冒充逐 token 流 |
+| OpenAI 兼容客户端 | `POST /v1/chat/completions` | `Authorization: Bearer sk-microi-*` | `stream:false` | `stream:true` |
+
+### 参数与安全规则
+
+- `Chat` 和 `ChatStream` 同时声明了 GET/POST，但业务代码默认使用 POST。问题、系统提示、附件和会话信息不应放进 URL、代理日志或浏览器历史。
+- 常用请求字段为 `UserChatMsg`、`AiModel`、`AiModelId`、`RelayModel`、`ConversationId`、`Mode`、`ReasoningEffort` 和 `Attachments`。模型 Endpoint 与供应商 ApiKey 由服务端读取；Controller 和 `V8.AI` 会清除客户端提交的 `ApiKey/Endpoint`。HTTP 来源由 Controller 归一为 `http-ai`，后端 V8 来源固定为 `v8-ai`；不能通过伪造 `Source=ai-intent-router` 绕过中转计量。
+- 当前用户、用户名称和 `OsClient` 以服务端 Token 恢复结果为准。客户端提交同名字段不能切换租户或冒充用户。
+- `ChatStream` 使用标准 SSE 事件：`message` 是增量文本，`result` 是最终结果，`error` 是失败信息，`done` 的数据为 `[DONE]`。所谓“打字机效果”是前端收到 `message` 后逐块更新界面，不是把完整回答再用定时器假装成流式。
+- NL2SQL 不能通过通用包装把客户端表名当授权。必须继续调用受控的 `/api/Ai/NL2SQL`，由服务端根据当前用户生成不可伪造的表白名单。
+
+### 前端 V8：普通 POST / GET
+
+相对当前 `ApiBase` 的请求会自动携带吾码登录头，并接收服务端返回的新 Token：
+
+```javascript
+var result = await V8.AI.Chat({
+  UserChatMsg: '把这段工单内容归纳成三条结论',
+  AiModel: 'MiniMax-M3',
+  AiModelId: '当前租户 mic_ai 记录Id',
+  ConversationId: V8.NewGuid ? V8.NewGuid() : ''
+});
+if (result.Code != 1) {
+  V8.Tips(result.Msg || 'AI调用失败', false);
+  return;
+}
+V8.Result = result.Data;
+```
+
+`V8.AI.Chat` 默认 POST。只有纯标量、无附件、且确认问题允许进入 URL 日志时才使用 `V8.AI.ChatGet`；业务默认仍应使用 POST。
+
+`AiModelId` 应来自当前租户已经启用且当前用户可见的模型选择，不要在公共前端硬编码发布租户的主键。
+
+### 前端 V8：SSE 打字机输出
+
+`V8.AI.ChatStream` 已封装 SSE 分帧、认证头、Token 轮换与最终结果。`onChunk` 每次收到真实 `message` 增量块：
+
+```javascript
+var abortController = new AbortController();
+var answer = '';
+var result = await V8.AI.ChatStream({
+  UserChatMsg: '生成一段客户回访建议',
+  AiModel: 'MiniMax-M3',
+  AiModelId: '当前租户 mic_ai 记录Id'
+}, function (chunk) {
+  answer += chunk;
+  V8.Result = answer;
+}, {
+  Signal: abortController.signal
+});
+if (result.Code != 1) V8.Tips(result.Msg || 'AI调用失败', false);
+```
+
+复杂页面应把这段逻辑放进 MicroService 的 `services/ai.ts`，并用 `AbortController` 在页面关闭时取消浏览器读取；不要在多个按钮 V8 中复制完整 SSE 解析器。
+
+### 后端 V8：直接使用 V8.AI
+
+后端接口引擎与表单后端事件不再自请求 HTTP。`V8.AI` 会绑定当前执行租户与 `V8.CurrentUser`，并清除调用参数中的身份、Endpoint、ApiKey、`AllowedTables` 和服务端授权标记：
+
+```javascript
+var result = await V8.AI.Chat({
+  UserChatMsg: String(V8.Param.Question || ''),
+  AiModel: String(V8.Param.AiModel || ''),
+  AiModelId: String(V8.Param.AiModelId || '')
+});
+return result;
+```
+
+匿名接口没有可信用户上下文时 `V8.AI` 返回 `Code=1001`。`NL2SQL` 继续按当前用户生成表白名单；`NL2V8/NL2V8Stream` 仅平台管理员可调用。不要把完整 Token、问题和回答写入日志。
+
+### MCP 调用
+
+外部 Agent 直接调用专用 Tool：
+
+```text
+microi_chat({
+  question: "归纳当前工单",
+  aiModel: "MiniMax-M3",
+  aiModelId: "...",
+  reasoningEffort: "low"
+})
+```
+
+`microi_chat` 只暴露对话白名单参数，实际 `OsClient`、用户和 Token 来自当前 MCP 连接，HTTP 来源再由服务端归一；Tool 不接受 Endpoint、ApiKey、Authorization 或身份覆盖。它返回最终 `DosResult`，不冒充逐 token MCP 流。如果 Agent 本身需要模型协议流，使用 `/v1/chat/completions` 的 `stream:true`；平台事实写入仍调用对应 MCP 写工具并遵守确认与回读。
+
 ## 中转站配置
 
 `mic_ai` 中的 `Microi.AI中转站` 是官方 OpenAI 兼容入口：

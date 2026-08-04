@@ -66,8 +66,7 @@ namespace Microi.net.Api
             var publicProjection = source.Data == null
                 ? null
                 : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data);
-            var configuredLoginPublicKey = ConfigHelper.GetEnvOrConfiguration(
-                "MICROI_LOGIN_RSA_PUBLIC_KEY",
+            var configuredLoginPublicKey = ConfigHelper.GetRuntimeConfigurationValue(
                 "Security:LoginRsaPublicKey");
             if (publicProjection != null && !configuredLoginPublicKey.DosIsNullOrWhiteSpace())
             {

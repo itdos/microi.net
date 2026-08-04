@@ -218,6 +218,41 @@ if (patchResp.StatusCode >= 200 && patchResp.StatusCode < 300) {
 
 浏览器不支持后端的 `FilesStream`；使用 Base64、字符串或字节数组文件参数。更多示例见后端 `V8.Http` 文档及 `v8-http-integration` skill。
 
+### 从前端 V8 调用 Microi.AI
+
+平台提供第一等 `V8.AI`。它使用当前 `ApiBase`，自动携带登录 Token、`did`、语言头并接收响应 Token 轮换；调用参数不能覆盖当前用户、`OsClient`、Endpoint、ApiKey 或认证头：
+
+```javascript
+var result = await V8.AI.Chat({
+  UserChatMsg: '把当前表单内容归纳为三条结论',
+  AiModel: 'MiniMax-M3',
+  AiModelId: '当前租户启用的 mic_ai 记录Id'
+});
+if (result.Code != 1) V8.Tips(result.Msg || 'AI调用失败', false);
+else V8.Result = result.Data;
+```
+
+`V8.AI.Chat` 默认 POST；只有纯标量且确认问题适合进入 URL、代理日志和浏览器历史时才使用 `V8.AI.ChatGet`。其它普通方法包括 `RecognizeIntent`、`NL2SQL` 和管理员使用的 `NL2V8`，均返回标准 `DosResult`。
+
+打字机效果使用内置 SSE 适配，不需要在按钮事件中重复实现分帧、认证与 Token 轮换：
+
+```javascript
+var controller = new AbortController();
+var answer = '';
+var result = await V8.AI.ChatStream({
+  UserChatMsg: '生成一段客户回访建议',
+  AiModel: 'MiniMax-M3',
+  AiModelId: '当前租户启用的 mic_ai 记录Id'
+}, function (chunk) {
+  answer += chunk;
+  V8.Result = answer;
+}, {
+  Signal: controller.signal
+});
+```
+
+页面关闭时调用 `controller.abort()`。`ChatStream` 的回调收到真实 `message` 增量，最终 Promise 返回标准 `DosResult`；还提供管理员限定的 `NL2V8Stream`。完整授权矩阵、后端 V8 与 `microi_chat` MCP 示例见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
+
 ## V8.Post
 >* 历史兼容方法，继续保留。前端新代码应优先使用参数与后端基本一致的 `V8.Http`；`V8.Post/Get` 不再作为新功能首选，已有代码无需迁移。
 ```javascript
@@ -726,7 +761,7 @@ V8.OpenDialog({
 });
 ```
 
-入口仍配置在目标模块的 `sys_menu.MoreBtns` 中；组件用 `DataAppend` 接收业务数据。不要为单个业务面板再新增 `V8.OpenXxx` 方法，也不要在通用表格/卡片模板中按表名、菜单 Id 或路由写死按钮。若页面需要独立部署、跨应用升级或不应进入主前端，则改用 `V8.OpenAppDialog` 打开已发布微服务。
+入口仍配置在目标模块的 `sys_menu.MoreBtns` 中；组件用 `DataAppend` 接收业务数据。不要为单个业务面板再新增一个并不存在的 V8 打开方法，也不要在通用表格/卡片模板中按表名、菜单 Id 或路由写死按钮。若页面需要独立部署、跨应用升级或不应进入主前端，则改用 `V8.OpenAppDialog` 打开已发布微服务。
 
 按钮显隐只用于界面体验，访问密钥创建、查询和吊销仍由服务端逐次校验普通登录会话以及本人/平台管理员权限。
 
@@ -1105,14 +1140,20 @@ var rowResult = await V8.FormEngine.GetFormData({
 | `Microi.Client/src/views/form-engine/diy-table.vue` | 列表、菜单按钮、行按钮等表格 V8 |
 
 租户脚本无需直接导入 `utils/ble/tsc.js` 或 `esc.js`。后端接口引擎、后端表单
-V8 和微信小程序原生 BLE 不在这条挂载链中。多个前端 V8 上下文可能共享同一个
-`Print` 状态，因此所有打印任务都必须串行。
+V8 和微信小程序原生 BLE 不在这条挂载链中。三处挂载现在都会取得同一个应用级
+`Print` 实例；跨模块切换、不同按钮和不同前端 V8 上下文共享连接状态与发送队列，
+不会再各自创建一套蓝牙连接。
+
+PC 与平板端的顶部导航在 AI 助手后显示蓝牙图标：绿色圆点表示已连接，橙色表示连接或
+重连中，灰色表示未连接。移动端【我的】页显示“蓝牙连接”菜单、状态标签及当前或已记住
+的设备名称。两个入口都打开同一个 `OpenBluetoothPage()` 连接页，可以搜索、查看当前
+设备、测试打印、断开或重新选择设备；模块内 V8 打印与这些入口共享同一状态。
 
 ### 环境与连接判断
 
 | 环境 | 实现 | 注意事项 |
 |---|---|---|
-| 5+App APK/IPA | `plus.bluetooth` | 扫描并查找可写特征 |
+| 5+App APK/IPA | `plus.bluetooth` | 扫描并查找可写特征，监听连接状态变化 |
 | 支持 Web Bluetooth 的浏览器 | `navigator.bluetooth` | 通常要求 HTTPS/localhost 和用户点击手势 |
 | 其它 H5/浏览器 | 无可用引擎 | `V8.Print` 仍可能存在，但连接会失败并提示 |
 | 微信小程序 | 不属于此模块 | 使用小程序/UniApp 专用 BLE 实现 |
@@ -1125,7 +1166,11 @@ async function ensurePrinterConnected() {
   if (!V8.Print) throw new Error('当前前端未加载蓝牙打印能力');
   if (V8.Print.isConnected()) return;
 
-  // 必须由用户点击等手势触发；连接后关闭弹窗，此 Promise 才会结束。
+  // 先尝试恢复曾经连接的设备，不触发设备选择框。
+  var restored = await V8.Print.reconnect();
+  if (restored && V8.Print.isConnected()) return;
+
+  // 首次选择 Web Bluetooth 设备必须由用户点击等手势触发。
   var connected = await V8.Print.OpenBluetoothPage();
   if (!connected || !V8.Print.isConnected()) {
     throw new Error('未连接蓝牙打印机');
@@ -1133,12 +1178,16 @@ async function ensurePrinterConnected() {
 }
 ```
 
-`OpenBluetoothPage()` 返回 `Promise<boolean>`，在连接弹窗关闭时解析；重复打开
-同一个弹窗会返回 `false`。Web 端 `isConnected()` 会检查实时 GATT 和写特征，
-5+App 端当前只检查设备/写特征 ID，所以即使返回 `true` 也必须捕获写入失败。
+`OpenBluetoothPage()` 返回 `Promise<boolean>`，在连接弹窗关闭时解析；弹窗已打开时
+重复调用会取得同一个 Promise。Web 端 `isConnected()` 检查实时 GATT 和写特征，5+App
+端结合 `onBLEConnectionStateChange` 维护的在线标记与设备/写特征 ID 判断；写入期间仍可能
+物理断线，所以任何环境都要捕获发送异常。
 
-源码会把连接元数据写入 `sessionStorage`，但当前 `restoreBLEInfo()` 没有进入
-初始化调用链；页面刷新后不会自动恢复可发送的连接引用，应重新连接。
+设备元数据会同时写入 `localStorage` 和兼容用 `sessionStorage`。应用启动、页面恢复、重新
+获得焦点或意外断开时会尝试有限次数自动重连：5+App 使用已记住的 `deviceId`，Web 端只有
+在浏览器仍保留该设备授权且实现 `navigator.bluetooth.getDevices()` 时才能无弹窗取回设备。
+主动点击“断开连接”会停止自动重连并忘记设备。操作系统、浏览器权限、打印机关机或离开
+范围仍会终止物理连接，前端不能承诺永久不断线；此时入口会展示断开/重连状态并允许用户重选。
 
 ### 核心 API
 
@@ -1148,11 +1197,14 @@ async function ensurePrinterConnected() {
 | `V8.Print.createNewESC()` | ESC/POS 构建器 | 热敏小票 |
 | `V8.Print.OpenBluetoothPage()` | `Promise<boolean>` | 用户手势中打开并 `await` |
 | `V8.Print.isConnected()` | `boolean` | 推荐的连接判断 |
-| `V8.Print.prepareSend(bytes)` | `Promise<void>` | 自动检查连接、分包、串行写入；必须 `await` |
+| `V8.Print.reconnect()` | `Promise<boolean>` | 使用已记住的授权或设备 ID 重连，不弹设备选择框 |
+| `V8.Print.getConnectionState()` | 状态快照 | 展示引擎、连接/记忆状态、设备名、错误与时间 |
+| `V8.Print.subscribeConnection(listener)` | 取消订阅函数 | 注册后立即回调，并持续接收连接变化 |
+| `V8.Print.prepareSend(bytes)` | `Promise<void>` | 自动恢复连接，进入应用级队列后分包串行写入；必须 `await` |
 | `V8.Print.Send(bytes)` | 内部状态机入口 | 依赖 `prepareSend` 设置的共享游标，业务代码不要直接调用 |
-| `V8.Print.setOneTimeData(bytes)` | 设置 BLE 包长 | 默认 20；内置候选 20–190、步长 10；源码不校验 |
-| `V8.Print.setPrinterNum(num)` | 同一缓冲区重复发送 | 使用已验证的整数 1–9；源码不校验 |
-| `V8.Print.disconnect()` | 主动断开并清理状态 | 切换设备、注销或排障 |
+| `V8.Print.setOneTimeData(bytes)` | 设置 BLE 包长 | 只接受 1–512 整数；默认 20，连接页候选 20–190 |
+| `V8.Print.setPrinterNum(num)` | 同一缓冲区重复发送 | 只接受 1–99 整数；连接页候选 1–9 |
+| `V8.Print.disconnect()` | 主动断开并忘记设备 | 停止自动重连；下次需要重新选择设备 |
 | `V8.Print.BLEInformation` | 设备与特征元数据 | 只作诊断，不是连接状态或打印回执 |
 
 ### TSC/TSPL 标签示例
@@ -1275,7 +1327,8 @@ async function printBatch(rows, startIndex) {
 }
 ```
 
-- 不用固定 `setTimeout(3000)` 猜测上一张是否完成，也不用 `Promise.all` 并发。
+- 不用固定 `setTimeout(3000)` 猜测上一张是否完成，也不用 `Promise.all` 表达同一设备的并行打印；
+  运行时会把所有 V8 上下文的 `prepareSend` 放进同一队列，但业务仍应逐条 `await` 保持结果顺序。
 - 大批次分段保存 `NextIndex`；断连后从失败位置人工确认再恢复。
 - `setPrinterNum(n)` 只适合同一缓冲区重复发送，不适合每张内容不同的批次。
 - `prepareSend` 默认每包 20 字节、包间约 20ms，多份之间约 100ms；这些只是
@@ -1283,11 +1336,13 @@ async function printBatch(rows, startIndex) {
 
 ### 当前实现限制与安全边界
 
-- `prepareSend` 当前用 `floor(length / packetSize) + 1` 计算包数。数据长度恰好
-  整除包长时会尝试额外写一个 0 字节末包；目标 BLE 栈若拒绝空包，应修复适配器并
-  回归，不能并发发送或吞掉异常。
-- 包长必须是已实测的正整数，份数使用 1–9，空缓冲区不要发送；相关 setter 当前
-  不做入参校验。
+- `prepareSend` 使用 `Math.ceil(length / packetSize)` 分包，长度恰好整除时不会再发送
+  0 字节末包；空缓冲区、非法包长和非法份数会直接抛错。通过源码校验不等于目标打印机
+  支持该包长，仍须按型号实测。
+- 应用级发送队列能防止不同 V8 上下文覆盖分包游标，但不能把 BLE 写入变成打印机业务事务；
+  调用方仍要逐条等待、记录失败位置并处理用户取消。
+- 自动重连是有上限的最佳努力：Web Bluetooth 是否能恢复授权取决于浏览器实现和用户授权，
+  5+App 也会受系统蓝牙、距离、休眠与设备电源影响。重试结束后必须由用户点击入口重连。
 - 源码会发现 read/notify 特征，但尚未订阅或解析状态。`prepareSend` 成功只表示
   字节写入完成，不代表已走纸、无缺纸或物理打印成功。
 - 设备名称、ID、服务与特征是外部输入。展示时用文本方式转义，不拼 `innerHTML`；

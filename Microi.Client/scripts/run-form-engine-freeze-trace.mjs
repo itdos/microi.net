@@ -14,18 +14,12 @@ const launchSettingsPath = process.env.PW_LAUNCH_SETTINGS_PATH || path.join(apiD
 const backendEnv = process.env.PW_BACKEND_ENV || process.env.MICROI_BACKEND_ENV || process.env.PW_ASPNETCORE_ENVIRONMENT || process.env.DOTNET_ENVIRONMENT || 'iTdos';
 const aspnetcoreEnvironment = process.env.PW_ASPNETCORE_ENVIRONMENT || backendEnv;
 const dotnetEnvironment = process.env.PW_DOTNET_ENVIRONMENT || backendEnv;
-const appsettingsEnv = process.env.PW_APPSETTINGS_ENV || dotnetEnvironment;
-const appsettingsPath = process.env.PW_APPSETTINGS_PATH || path.join(apiDir, `appsettings.${appsettingsEnv}.json`);
 const backendUrl = process.env.BACKEND || process.env.PW_API_BASE || 'https://localhost:61501';
 const frontendUrl = process.env.FRONTEND || process.env.PW_BASE_URL || 'http://localhost:61500';
-const osClient = process.env.MICROI_OSCLIENT || process.env.PW_OS_CLIENT || appsettingsEnv;
+const osClient = process.env.MICROI_OSCLIENT || process.env.PW_OS_CLIENT || backendEnv;
 const launchProfile = process.env.PW_BACKEND_PROFILE || 'Microi.net.Api';
 const backendConfiguration = process.env.PW_BACKEND_CONFIGURATION || 'Debug';
 const releaseLockPath = path.join(repoRoot, '.tmp', 'microi-process-state', 'release.lock');
-
-function isTruthy(value) {
-    return value === true || value === 1 || value === '1' || value === 'true' || value === 'yes' || value === 'on';
-}
 
 function isExplicitFalse(value) {
     return value === false || value === 0 || value === '0' || value === 'false' || value === 'no' || value === 'off';
@@ -86,25 +80,6 @@ async function configureLaunchSettings() {
         profile.applicationUrl = process.env.PW_BACKEND_APPLICATION_URL;
     }
     await writeJsonIfChanged(resolveMaybeRelative(launchSettingsPath), json);
-}
-
-async function configureDevLoginBypass() {
-    const filePath = resolveMaybeRelative(appsettingsPath);
-    const json = await readJson(filePath);
-    const existing = json.DevLoginBypass || {};
-    const account = process.env.PW_TEST_ACCOUNT || process.env.PW_DEV_LOGIN_ACCOUNT || existing.DefaultAccount || 'admin';
-    const password = process.env.PW_TEST_PASSWORD || process.env.PW_DEV_LOGIN_PASSWORD || existing.DefaultPassword || 'microi#2026';
-
-    json.DevLoginBypass = {
-        '//': existing['//'] || 'Local development / E2E login bypass. Keep disabled in production.',
-        Enabled: shouldRun(process.env.PW_DEV_LOGIN_BYPASS, true),
-        SkipCaptcha: shouldRun(process.env.PW_DEV_SKIP_CAPTCHA, true),
-        OnlyLoopback: shouldRun(process.env.PW_DEV_ONLY_LOOPBACK, true),
-        DefaultAccount: account,
-        DefaultPassword: password
-    };
-    await writeJsonIfChanged(filePath, json);
-    return { account, password };
 }
 
 function isLocalUrl(url) {
@@ -262,12 +237,13 @@ async function main() {
     if (shouldRun(process.env.PW_CONFIG_BACKEND, true)) {
         await configureLaunchSettings();
     }
-    const login = shouldRun(process.env.PW_CONFIG_DEV_LOGIN, true)
-        ? await configureDevLoginBypass()
-        : {
-            account: process.env.PW_TEST_ACCOUNT || 'admin',
-            password: process.env.PW_TEST_PASSWORD || ''
-        };
+    const login = {
+        account: process.env.PW_TEST_ACCOUNT || 'admin',
+        password: process.env.PW_TEST_PASSWORD || ''
+    };
+    if (!login.password) {
+        throw new Error('PW_TEST_PASSWORD is required; credentials are never written to appsettings.');
+    }
 
     let backendProcess = null;
     try {

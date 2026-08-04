@@ -21,6 +21,16 @@ public class TenantConfigurationSecurityTests
             ["MQPassword"] = "mq-secret",
             ["MqttPwd"] = "mqtt-secret",
             ["SearchEngineApiKey"] = "search-secret",
+            ["OcrEnabled"] = 1,
+            ["OcrEndpoint"] = "http://ocr.internal:8080/ocr",
+            ["OcrApiKey"] = "ocr-secret",
+            ["OcrHeadersJson"] = "{\"Authorization\":\"Bearer secret\"}",
+            ["TranslateProvider"] = "LibreTranslate",
+            ["TranslateUrl"] = "http://translate.internal:5000",
+            ["TranslateApiKey"] = "translate-secret",
+            ["TranslateTimeout"] = 120,
+            ["BackendLoginRsaPrivateKey"] = "private-key",
+            ["BackendAutoUpgradeDisabled"] = 1,
             ["HDFS"] = "MinIO",
             ["AliOssPublicDomain"] = "https://static.example.com"
         };
@@ -39,6 +49,16 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["MQPassword"]);
         Assert.Null(projection["MqttPwd"]);
         Assert.Null(projection["SearchEngineApiKey"]);
+        Assert.Null(projection["OcrEnabled"]);
+        Assert.Null(projection["OcrEndpoint"]);
+        Assert.Null(projection["OcrApiKey"]);
+        Assert.Null(projection["OcrHeadersJson"]);
+        Assert.Null(projection["TranslateProvider"]);
+        Assert.Null(projection["TranslateUrl"]);
+        Assert.Null(projection["TranslateApiKey"]);
+        Assert.Null(projection["TranslateTimeout"]);
+        Assert.Null(projection["BackendLoginRsaPrivateKey"]);
+        Assert.Null(projection["BackendAutoUpgradeDisabled"]);
         Assert.NotNull(projection["InfrastructureIsolation"]);
 
         // 投影是深拷贝；脚本修改不能写穿运行时 SaaS 配置。
@@ -235,6 +255,15 @@ public class TenantConfigurationSecurityTests
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("MQPassword"));
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("MqttPwd"));
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("SearchEngineApiKey"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("OcrEnabled"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("OcrEndpoint"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("OcrApiKey"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TranslateProvider"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TranslateUrl"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TranslateApiKey"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TranslateTimeout"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("BackendLoginRsaPrivateKey"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("BackendAutoUpgradeDisabled"));
         Assert.True(TenantConfigurationSecurity.ShouldCopyFromMain("SysTitle"));
     }
 

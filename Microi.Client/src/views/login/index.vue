@@ -8,11 +8,28 @@
         >
             <div class="divLoginCenter" :style="{ opacity: '1' }">
                 <div class="loginCenterBgCover" />
-                <div class="login-title">
-                    <div>
-                        {{ WebTitle }}
+                <div class="login-brand" :class="{ 'has-subtitle': !!SystemSubTitle }">
+                    <div
+                        class="login-system-logo"
+                        :class="{ 'is-fallback': !SystemLogoUrl || SystemLogoLoadFailed }"
+                    >
+                        <img
+                            v-if="SystemLogoUrl && !SystemLogoLoadFailed"
+                            :src="SystemLogoUrl"
+                            :alt="(WebTitle || '吾码') + ' Logo'"
+                            @error="HandleSystemLogoError"
+                        />
+                        <span v-else class="login-system-logo-fallback" aria-hidden="true">
+                            {{ SystemLogoFallbackText }}
+                        </span>
+                        <span class="login-system-logo-ring" aria-hidden="true" />
                     </div>
-                    <span style="font-size: 18px">{{ SystemSubTitle }}</span>
+                    <div class="login-title">
+                        <div>
+                            {{ WebTitle }}
+                        </div>
+                        <span v-if="SystemSubTitle">{{ SystemSubTitle }}</span>
+                    </div>
                 </div>
 
                 <!-- 账号输入框 -->
@@ -196,65 +213,34 @@
                 </div>
 
                 <div class="login-preferences-row">
-                    <el-checkbox v-model="RememberPassword" class="remember-password-checkbox">
-                        记住密码
+                    <el-checkbox
+                        v-model="RememberPassword"
+                        class="remember-password-checkbox"
+                        :class="{ 'is-remembered': RememberPassword }"
+                    >
+                        <span class="remember-password-label">记住密码</span>
                     </el-checkbox>
-                    <span class="remember-password-hint">仅在此设备本地加密保存，请勿在公共设备勾选</span>
-                </div>
-
-                <!-- 界面风格选择 -->
-                <div class="style-selector-wrapper" v-if="hasWebOS && SysConfig.EnableSystemStyle">
-                    <div class="style-selector-label">选择界面风格</div>
-                    <div class="style-selector-options">
-                        <div 
-                            class="style-option" 
-                            :class="{ active: SystemStyle === 'Classic' }" 
-                            @click="SystemStyle = 'Classic'"
-                        >
-                            <div class="style-option-icon">
-                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 3h18v12H3V3zm0 14h18v2H3v-2zm4 3h10v1H7v-1z"/></svg>
-                            </div>
-                            <div class="style-option-text">经典传统</div>
-                            <div class="style-option-check" v-if="SystemStyle === 'Classic'">✓</div>
-                        </div>
-                        <div 
-                            class="style-option" 
-                            :class="{ active: SystemStyle === 'macOS' }" 
-                            @click="SystemStyle = 'macOS'"
-                        >
-                            <div class="style-option-icon">
-                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-                            </div>
-                            <div class="style-option-text">macOS 风格</div>
-                            <div class="style-option-check" v-if="SystemStyle === 'macOS'">✓</div>
-                        </div>
-                        <div 
-                            class="style-option" 
-                            :class="{ active: SystemStyle === 'Windows' }" 
-                            @click="SystemStyle = 'Windows'"
-                        >
-                            <div class="style-option-icon">
-                                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M3 12V6.75l6-1.32v6.48L3 12zm17-9v8.75l-10 .08V5.67L20 3zm-10 9.04l10-.08V21l-10-1.39V12.04zM3 12.5l6 .09v6.73l-6-1.07V12.5z"/></svg>
-                            </div>
-                            <div class="style-option-text">Windows 风格</div>
-                            <div class="style-option-check" v-if="SystemStyle === 'Windows'">✓</div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- 登录按钮 -->
                 <div v-if="PageType != 'BindWeChat'" class="login-button-wrapper">
-                    <el-button
-                        type="primary"
-                        size="large"
+                    <button
+                        type="button"
                         :disabled="LoginWaiting"
+                        :aria-busy="LoginWaiting ? 'true' : 'false'"
                         @click="Login"
                         class="login-button"
+                        :class="{ 'is-charging': LoginWaiting }"
                     >
-                        <el-icon v-if="LoginWaiting" class="is-loading"><Loading /></el-icon>
-                        <el-icon v-else><Unlock /></el-icon>
-                        <span>{{ LoginWaiting ? '登录中...' : '登 录' }}</span>
-                    </el-button>
+                        <span class="login-button-energy" aria-hidden="true">
+                            <span class="login-button-energy-beam" />
+                        </span>
+                        <span class="login-button-content">
+                            <el-icon v-if="LoginWaiting" class="is-loading"><Loading /></el-icon>
+                            <el-icon v-else><Unlock /></el-icon>
+                            <span>{{ LoginWaiting ? '正在安全接入...' : '登录' }}</span>
+                        </span>
+                    </button>
                 </div>
 
                 <!-- 隐私协议 -->
@@ -392,7 +378,6 @@ import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 // 使用 Pinia 替代 Vuex
 import { useDiyStore, useSettingsStore, useUserStore, usePermissionStore } from "@/pinia";
-import { hasWebOS } from "@/utils/webos-detect.js";
 import { storeToRefs } from "pinia";
 // 浏览器原生支持 setInterval，不需要导入 Node.js 的 timers 模块
 import Cookies from "js-cookie";
@@ -405,6 +390,7 @@ import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
+import { resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 import config from "@/config.json";
 import {
     clearRememberedLoginAccounts,
@@ -463,11 +449,7 @@ export default {
 
         const { title } = storeToRefs(settingsStore);
 
-        // SystemStyle 需要特殊处理（双向绑定）
-        const SystemStyle = computed({
-            get: () => diyStore.SystemStyle,
-            set: (val) => diyStore.setState("SystemStyle", val)
-        });
+        const SystemStyle = computed(() => diyStore.SystemStyle || "Classic");
 
         return {
             // Pinia store 实例
@@ -493,8 +475,7 @@ export default {
             SystemStyle,
             // 工具函数
             DiyCommon,
-            DiyApi,
-            hasWebOS
+            DiyApi
         };
     },
     computed: {
@@ -518,6 +499,16 @@ export default {
         },
         EnableCaptcha() {
             return this.isEnabledFlag(this.SysConfig?.EnableCaptcha);
+        },
+        SystemLogoUrl() {
+            return resolveLoginSystemLogoUrl(
+                this.SysConfig?.SysLogo,
+                (value, returnNoImg) => this.DiyCommon.GetServerPath(value, returnNoImg)
+            );
+        },
+        SystemLogoFallbackText() {
+            var title = String(this.SysConfig?.SysShortTitle || this.WebTitle || "M").trim();
+            return title ? title.charAt(0).toUpperCase() : "M";
         }
     },
     data() {
@@ -541,6 +532,7 @@ export default {
             SelectedRememberedAccount: "",
             CurrentAccountAvatarUrl: "",
             AvatarResolveVersion: 0,
+            SystemLogoLoadFailed: false,
             LoginComponentUnmounted: false,
             tipId: "",
             redirect: undefined,
@@ -591,6 +583,9 @@ export default {
         },
         GetCurrentUser: function () {
             this.RefreshCurrentAccountAvatar();
+        },
+        SystemLogoUrl: function () {
+            this.SystemLogoLoadFailed = false;
         }
     },
     mounted() {
@@ -610,10 +605,8 @@ export default {
             self.TokenLogin();
         }
 
-        // 默认选中经典传统界面
-        if (self.DiyCommon.IsNull(self.SystemStyle)) {
-            self.diyStore.setState("SystemStyle", "Classic");
-        }
+        // 登录页只负责身份验证，界面风格登录后再切换；每次进入默认使用经典传统界面。
+        self.diyStore.setState("SystemStyle", "Classic");
         $("#divLogin").css({
             opacity: 1
         });
@@ -680,6 +673,9 @@ export default {
                 return text === "1" || text === "true" || text === "yes" || text === "on";
             }
             return false;
+        },
+        HandleSystemLogoError() {
+            this.SystemLogoLoadFailed = true;
         },
         NormalizeLoginAccount(value) {
             return String(value == null ? "" : value).trim().toLowerCase();
@@ -1201,16 +1197,8 @@ export default {
                 if (self.DiyCommon.Result(result)) {
                     self.LoginResult = result;
                     self.PersistRememberedLogin(result.Data || {});
-                    if (false) {
-                        //self.OsClient == 'Tdx' || self.OsClient == 'Nbgysh'
-                        self.diyStore.setState("SystemStyle", "WebOS");
-                        self.GotoSystem();
-                    } else {
-                        if (self.DiyCommon.IsNull(self.SystemStyle)) {
-                            self.diyStore.setState("SystemStyle", "Classic");
-                        }
-                        self.GotoSystem();
-                    }
+                    self.diyStore.setState("SystemStyle", "Classic");
+                    self.GotoSystem();
                 } else {
                     if (self.EnableCaptcha) {
                         self.GetCaptcha();
@@ -1410,37 +1398,140 @@ export default {
     }
 }
 
-/* ==================== 登录输入框样式 ==================== */
-.login-input-param.captcha{
-    :deep(.el-input .el-input__wrapper){
-        border-radius: 6px 0 0 6px;
+/* ==================== 品牌标题与系统 Logo ==================== */
+.login-brand {
+    --mci-login-brand-height: 40px;
+    --mci-login-brand-subtitle-line-height: 20px;
+    --mci-login-brand-subtitle-gap: 2px;
+    position: relative;
+    z-index: 1;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    text-align: left;
+
+    &.has-subtitle {
+        --mci-login-brand-height: 58px;
+    }
+
+    .login-title {
+        width: auto;
+        height: var(--mci-login-brand-height);
+        min-width: 0;
+        max-width: calc(100% - var(--mci-login-brand-height) - 14px);
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+
+        > div {
+            overflow: hidden;
+            line-height: var(--mci-login-brand-height);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        > span {
+            overflow: hidden;
+            line-height: var(--mci-login-brand-subtitle-line-height);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    &.has-subtitle .login-title > div {
+        line-height: calc(
+            var(--mci-login-brand-height) - var(--mci-login-brand-subtitle-line-height) - var(--mci-login-brand-subtitle-gap)
+        );
     }
 }
+
+.login-system-logo {
+    width: var(--mci-login-brand-height);
+    height: var(--mci-login-brand-height);
+    padding: 3px;
+    box-sizing: border-box;
+    position: relative;
+    flex: 0 0 var(--mci-login-brand-height);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    background: var(--mci-login-logo-bg);
+    box-shadow: var(--mci-login-logo-shadow);
+
+    img {
+        width: 100%;
+        height: 100%;
+        display: block;
+        border-radius: 50%;
+        object-fit: contain;
+    }
+
+    &.is-fallback {
+        background: var(--mci-login-button-gradient);
+    }
+}
+
+.login-system-logo-fallback {
+    color: var(--mci-login-text-strong);
+    font-size: clamp(16px, 2vw, 21px);
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.login-system-logo-ring {
+    position: absolute;
+    inset: -4px;
+    z-index: -1;
+    border: 0;
+    border-radius: 50%;
+    background: var(--mci-login-logo-halo);
+    filter: blur(3px);
+    opacity: 0.5;
+    pointer-events: none;
+    transform: scale(0.94);
+    animation: mciLoginLogoPulse 5.2s ease-in-out infinite;
+}
+
+/* ==================== 登录输入框样式 ==================== */
 .login-input-param {
     margin-bottom: 20px;
-    
-    :deep(.el-input-group__append){
-        padding : 0px;
+
+    :deep(.el-input-group__append) {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none !important;
     }
+
     :deep(.el-input) {
         .el-input__wrapper {
-            border-radius: 6px;
-            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3) inset;
-            background-color: rgba(255, 255, 255, 0.95);
+            min-height: 48px;
+            box-sizing: border-box;
+            border: 1px solid transparent;
+            border-radius: var(--mci-login-control-radius);
+            background: var(--mci-login-input-bg);
+            box-shadow: var(--mci-login-input-shadow) !important;
             padding: 0;
-            transition: all 0.3s ease;
-            
+            transition: border-color 180ms ease, background-color 180ms ease;
+
             &:hover {
-                box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
-                background-color: rgba(255, 255, 255, 1);
+                border-color: var(--mci-login-input-border-hover);
+                background: var(--mci-login-input-bg-hover);
             }
-            
+
             &.is-focus {
-                box-shadow: 0 0 0 1px var(--el-color-primary) inset;
-                background-color: rgba(255, 255, 255, 1);
+                border-color: var(--mci-login-input-border-focus);
+                background: var(--mci-login-input-bg-hover);
+                box-shadow: var(--mci-login-input-focus-shadow) !important;
             }
         }
-        
+
         .el-input__prefix {
             margin-right: 0;
         }
@@ -1451,13 +1542,43 @@ export default {
         
         .el-input__inner {
             padding-left: 8px;
-            height: 40px;
+            height: 46px;
         }
     }
 }
 
+.login-input-param.captcha {
+    :deep(.el-input) {
+        border: 1px solid transparent;
+        border-radius: var(--mci-login-control-radius);
+        background: var(--mci-login-input-bg);
+        box-shadow: var(--mci-login-input-shadow);
+        overflow: hidden;
+        transition: border-color 180ms ease, background-color 180ms ease;
+
+        &:hover {
+            border-color: var(--mci-login-input-border-hover);
+            background: var(--mci-login-input-bg-hover);
+        }
+
+        &:focus-within {
+            border-color: var(--mci-login-input-border-focus);
+            background: var(--mci-login-input-bg-hover);
+            box-shadow: var(--mci-login-input-focus-shadow);
+        }
+    }
+
+    :deep(.el-input .el-input__wrapper) {
+        min-height: 46px;
+        border: 0;
+        border-radius: var(--mci-login-control-radius) 0 0 var(--mci-login-control-radius);
+        background: transparent;
+        box-shadow: none !important;
+    }
+}
+
 .account-avatar-wrapper.has-avatar {
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.55) inset;
+    box-shadow: none;
 }
 
 .account-avatar-img {
@@ -1471,8 +1592,8 @@ export default {
 }
 
 .input-suffix-action {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 46px;
     padding: 0;
     border: 0;
     outline: 0;
@@ -1509,36 +1630,87 @@ export default {
 }
 
 .login-preferences-row {
-    min-height: 40px;
-    margin: -8px 0 14px;
+    min-height: 44px;
+    margin: -4px 0 10px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: flex-start;
     text-align: left;
 }
 
 .remember-password-checkbox {
-    min-height: 40px;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 14px 0 10px;
+    box-sizing: border-box;
+    border: 0;
+    border-radius: var(--mci-login-control-radius);
     flex: 0 0 auto;
+    background: var(--mci-login-control-bg);
+    box-shadow: var(--mci-login-control-shadow);
+    transition: transform 180ms ease, background-color 180ms ease;
+
+    &:hover {
+        background: var(--mci-login-control-bg-hover);
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+
+    &.is-remembered {
+        background: var(--mci-login-control-active-bg);
+    }
+
+    :deep(.el-checkbox__input) {
+        display: inline-flex;
+        align-items: center;
+    }
 
     :deep(.el-checkbox__label) {
-        color: #fff;
-        font-size: 13px;
-        font-weight: 500;
+        padding-left: 9px;
+        color: var(--mci-login-text-strong);
     }
 
     :deep(.el-checkbox__inner) {
-        border-color: rgba(255, 255, 255, 0.65);
-        background-color: rgba(255, 255, 255, 0.08);
+        width: 18px;
+        height: 18px;
+        border: 1px solid var(--mci-login-checkbox-border);
+        border-radius: 5px;
+        background: var(--mci-login-checkbox-bg);
+        transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease;
+    }
+
+    :deep(.el-checkbox__inner::after) {
+        width: 4px;
+        height: 8px;
+        left: 8px;
+        top: 8px;
+        border-width: 0 2px 2px 0;
+    }
+
+    :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
+        border-color: transparent;
+        background: var(--mci-login-button-gradient);
+        box-shadow: none;
+        transform: scale(1.02);
+    }
+
+    :deep(.el-checkbox__input.is-focus .el-checkbox__inner) {
+        outline: none;
+    }
+
+    :deep(.el-checkbox__original:focus-visible + .el-checkbox__inner) {
+        outline: 2px solid var(--mci-login-electric);
+        outline-offset: 2px;
     }
 }
 
-.remember-password-hint {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 11px;
-    line-height: 1.45;
-    text-align: right;
+.remember-password-label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.35px;
 }
 
 :global(.login-account-history-popper.el-popper) {
@@ -1745,15 +1917,15 @@ export default {
 
 /* 图标容器样式 */
 .input-icon-wrapper {
-    width: 45px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-left: 0px;
     margin-right: 10px;
-    border-radius: 6px 0 0 6px;
-    transition: all 0.3s ease;
+    border-radius: var(--mci-login-control-radius) 0 0 var(--mci-login-control-radius);
+    transition: opacity 180ms ease;
     
     .el-icon {
         font-size: 20px;
@@ -1766,11 +1938,11 @@ export default {
     background: transparent;
     
     .captcha-img {
-        height: 40px;
+        height: 46px;
         width: 120px;
         cursor: pointer;
         display: block;
-        border-radius: 0 6px 6px 0;
+        border-radius: 0 var(--mci-login-control-radius) var(--mci-login-control-radius) 0;
         transition: opacity 0.3s ease;
         
         &:hover {
@@ -1779,119 +1951,124 @@ export default {
     }
 }
 
-/* ==================== 界面风格选择器样式 ==================== */
-.style-selector-wrapper {
-    margin-bottom: 8px;
-    margin-top: 4px;
+/* ==================== 登录按钮样式 ==================== */
+.login-button-wrapper {
+    margin-top: 18px;
+    margin-bottom: 20px;
+    text-align: center;
+}
 
-    .style-selector-label {
-        font-size: 13px;
-        color: rgba(255, 255, 255, 0.85);
-        margin-bottom: 5px;
-        text-align: left;
-        font-weight: 500;
-        letter-spacing: 0.5px;
+.login-button {
+    width: 100%;
+    min-height: 54px;
+    padding: 0 24px;
+    border: 0;
+    border-radius: var(--mci-login-control-radius);
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: var(--mci-login-text-strong);
+    background: var(--mci-login-button-gradient);
+    background-size: 180% 100%;
+    box-shadow: var(--mci-login-button-shadow);
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 1.6px;
+    cursor: pointer;
+    isolation: isolate;
+    animation: mciLoginButtonAura 6s ease-in-out infinite;
+    transition: transform 180ms ease, opacity 180ms ease;
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        border-radius: inherit;
+        background: var(--mci-login-button-depth);
+        opacity: 0.7;
+        pointer-events: none;
     }
 
-    .style-selector-options {
-        display: flex;
-        gap: 10px;
-        justify-content: center;
+    &:hover:not(:disabled),
+    &:focus-visible:not(:disabled) {
+        transform: translateY(-2px);
     }
 
-    .style-option {
-        flex: 1;
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 5px;
-        border-radius: 10px;
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        background: rgba(255, 255, 255, 0.08);
-        cursor: pointer;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        backdrop-filter: blur(4px);
-        -webkit-backdrop-filter: blur(4px);
-        color: rgba(255, 255, 255, 0.8);
+    &:focus-visible {
+        outline: 3px solid var(--mci-login-focus-ring);
+        outline-offset: 3px;
+    }
 
-        &:hover {
-            border-color: rgba(255, 255, 255, 0.45);
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateY(-2px);
-            color: #fff;
-        }
+    &:active:not(:disabled) {
+        transform: scale(0.985);
+    }
 
-        &.active {
-            border-color: var(--el-color-primary);
-            background: rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.2);
-            color: #fff;
-            box-shadow: 0 0 16px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.3);
+    &:disabled {
+        cursor: wait;
+        opacity: 0.9;
+    }
 
-            .style-option-icon {
-                color: var(--el-color-primary-light-3);
-            }
-        }
-
-        .style-option-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .style-option-text {
-            font-size: 12px;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .style-option-check {
-            position: absolute;
-            top: 4px;
-            right: 6px;
-            font-size: 11px;
-            color: var(--el-color-primary-light-3);
-            font-weight: bold;
-        }
+    &.is-charging .login-button-energy-beam,
+    &.is-charging .login-button-energy::after {
+        animation-duration: 880ms;
     }
 }
 
-/* ==================== 登录按钮样式 ==================== */
-.login-button-wrapper {
-    margin-top: 30px;
-    margin-bottom: 20px;
-    text-align: center;
-    
-    .login-button {
-        width: 60%;
-        min-width: 200px;
-        height: 45px;
-        font-size: 16px;
-        font-weight: 500;
-        border-radius: 6px;
-        transition: all 0.3s ease;
-        
-        .el-icon {
-            margin-right: 8px;
-            font-size: 18px;
-        }
-        
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        &:active {
-            transform: translateY(0);
-        }
+.login-button-content {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-shadow: 0 1px 8px var(--mci-login-text-shadow);
+
+    .el-icon {
+        font-size: 19px;
     }
+}
+
+.login-button-energy {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    border-radius: inherit;
+    opacity: 0.92;
+    pointer-events: none;
+
+    &::after {
+        content: "";
+        width: 58%;
+        height: 2px;
+        position: absolute;
+        top: 50%;
+        left: -62%;
+        border-radius: 999px;
+        background: var(--mci-login-energy-trace);
+        box-shadow: var(--mci-login-energy-trace-shadow);
+        opacity: 0;
+        transform: translateX(0) translateY(-50%);
+        animation: mciLoginCurrentTrace 3.4s ease-in-out infinite;
+    }
+}
+
+.login-button-energy-beam {
+    width: 44%;
+    height: 210%;
+    position: absolute;
+    top: -55%;
+    left: -54%;
+    border-radius: 50%;
+    background: var(--mci-login-energy-beam);
+    opacity: 0;
+    transform: translateX(0) skewX(-18deg);
+    animation: mciLoginEnergySweep 3.4s ease-in-out infinite;
 }
 
 /* ==================== 隐私协议样式 ==================== */
@@ -2034,6 +2211,39 @@ export default {
 
 /* ==================== 主登录容器样式 ==================== */
 #divLogin {
+    --mci-login-card-radius: 24px;
+    --mci-login-control-radius: 12px;
+    --mci-login-text-strong: #ffffff;
+    --mci-login-text-shadow: rgba(8, 20, 48, 0.42);
+    --mci-login-electric: #8cecff;
+    --mci-login-electric-soft: rgba(140, 236, 255, 0.72);
+    --mci-login-focus-ring: rgba(140, 236, 255, 0.42);
+    --mci-login-logo-bg: rgba(255, 255, 255, 0.96);
+    --mci-login-logo-shadow: 0 10px 28px rgba(8, 20, 48, 0.24), 0 0 22px rgba(140, 236, 255, 0.2);
+    --mci-login-logo-halo: radial-gradient(circle, rgba(140, 236, 255, 0.42) 0%, rgba(115, 87, 255, 0.18) 48%, transparent 72%);
+    --mci-login-input-bg: rgba(248, 250, 255, 0.96);
+    --mci-login-input-bg-hover: rgba(255, 255, 255, 0.99);
+    --mci-login-input-border-hover: rgba(140, 211, 255, 0.5);
+    --mci-login-input-border-focus: rgba(78, 168, 255, 0.92);
+    --mci-login-input-shadow: 0 10px 26px rgba(5, 16, 38, 0.18);
+    --mci-login-input-focus-shadow: 0 0 0 3px rgba(101, 201, 255, 0.2), 0 12px 28px rgba(5, 16, 38, 0.22);
+    --mci-login-control-bg: rgba(8, 24, 52, 0.4);
+    --mci-login-control-bg-hover: rgba(14, 39, 78, 0.56);
+    --mci-login-control-active-bg: rgba(37, 92, 165, 0.46);
+    --mci-login-control-shadow: 0 8px 22px rgba(4, 13, 34, 0.2);
+    --mci-login-checkbox-bg: rgba(255, 255, 255, 0.12);
+    --mci-login-checkbox-border: rgba(211, 232, 255, 0.72);
+    --mci-login-button-gradient: linear-gradient(105deg, #176ee8 0%, #386ff2 34%, #655cf2 68%, #7b4fe8 100%);
+    --mci-login-button-depth: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 48%, rgba(20, 30, 108, 0.16));
+    --mci-login-button-shadow: 0 15px 34px rgba(36, 91, 224, 0.38), 0 0 30px rgba(104, 100, 255, 0.25);
+    --mci-login-energy-beam: linear-gradient(90deg, transparent 0%, rgba(174, 242, 255, 0.08) 20%, rgba(229, 252, 255, 0.58) 50%, rgba(174, 242, 255, 0.1) 80%, transparent 100%);
+    --mci-login-energy-trace: linear-gradient(90deg, transparent 0%, rgba(150, 238, 255, 0.28) 24%, #ffffff 72%, transparent 100%);
+    --mci-login-energy-trace-shadow: 0 0 12px rgba(140, 236, 255, 0.82);
+    --mci-login-card-surface: linear-gradient(145deg, rgba(23, 55, 105, 0.68), rgba(12, 18, 52, 0.82) 58%, rgba(42, 20, 82, 0.76));
+    --mci-login-card-glow: linear-gradient(135deg, rgba(87, 215, 255, 0.72), rgba(78, 118, 255, 0.5) 46%, rgba(172, 78, 255, 0.62));
+    --mci-login-card-shadow: 0 28px 90px rgba(3, 9, 28, 0.5), 0 0 48px rgba(65, 172, 255, 0.34), 0 0 96px rgba(126, 78, 255, 0.24);
+    --mci-login-card-surface-mobile: linear-gradient(145deg, rgba(25, 62, 116, 0.88), rgba(10, 18, 47, 0.94) 62%, rgba(47, 22, 81, 0.9));
+    --mci-login-card-shadow-mobile: 0 18px 46px rgba(3, 9, 28, 0.46), 0 0 32px rgba(65, 172, 255, 0.24), 0 0 58px rgba(126, 78, 255, 0.18);
     font-size: 12px;
     position: fixed;
     background-color: var(--taskbar-color);
@@ -2052,14 +2262,14 @@ export default {
     background-position: center;
 
     .login-title {
-        margin-bottom: 25px;
         font-size: 28px;
         font-weight: bold;
+        line-height: 1.18;
         text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         
         span {
             display: block;
-            margin-top: 8px;
+            margin-top: var(--mci-login-brand-subtitle-gap);
             font-size: 16px !important;
             font-weight: normal;
             opacity: 0.9;
@@ -2074,10 +2284,28 @@ export default {
         position: absolute;
         top: 50%;
         left: 50%;
+        z-index: 1;
         transform: translate(-50%, -50%);
         margin-top: 0 !important;
         transition: opacity 0.7s ease;
-        border-radius: 12px;
+        border-radius: var(--mci-login-card-radius);
+        isolation: isolate;
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: -7px;
+            z-index: -2;
+            border: 0;
+            border-radius: calc(var(--mci-login-card-radius) + 7px);
+            background: var(--mci-login-card-glow);
+            filter: blur(18px);
+            opacity: 0.48;
+            pointer-events: none;
+            transform: scale(0.975);
+            animation: mciLoginCardBreath 4.8s ease-in-out infinite;
+        }
+
         :deep(.el-checkbox__input.is-checked + .el-checkbox__label){
             color: #fff !important;
         }
@@ -2100,21 +2328,31 @@ export default {
 
         .login-preferences-row {
             min-height: 44px;
-            align-items: flex-start;
-            flex-direction: column;
-            justify-content: center;
-            gap: 0;
+            align-items: center;
+            flex-direction: row;
+            justify-content: flex-start;
         }
 
         .remember-password-checkbox {
-            min-height: 32px;
+            height: 44px !important;
+            min-height: 44px !important;
         }
 
-        .remember-password-hint {
-            padding-left: 24px;
-            text-align: left;
+        .login-brand {
+            --mci-login-brand-height: 36px;
+            --mci-login-brand-subtitle-line-height: 18px;
+            margin-bottom: 24px;
+            gap: 12px;
+
+            &.has-subtitle {
+                --mci-login-brand-height: 50px;
+            }
+
+            .login-title {
+                max-width: calc(100% - var(--mci-login-brand-height) - 12px);
+            }
         }
-        
+
         .login-title {
             font-size: 24px;
             
@@ -2130,17 +2368,28 @@ export default {
     width: 100%;
     height: 100%;
     position: absolute;
-    background: linear-gradient(135deg, 
-        rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.1) 0%,
-        rgba(0, 0, 0, 0.4) 100%
-    );
+    background: var(--mci-login-card-surface);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     left: 0;
     top: 0;
     z-index: -1;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 0;
+    border-radius: var(--mci-login-card-radius);
+    box-shadow: var(--mci-login-card-shadow);
+}
+
+@media (max-width: 768px) {
+    .loginCenterBgCover {
+        background: var(--mci-login-card-surface-mobile);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        box-shadow: var(--mci-login-card-shadow-mobile);
+    }
+
+    #divLogin .divLoginCenter::before {
+        display: none;
+    }
 }
 
 /* ==================== 时间显示样式 ==================== */
@@ -2223,8 +2472,89 @@ export default {
     }
 }
 
+@keyframes mciLoginCardBreath {
+    0%, 100% {
+        opacity: 0.38;
+        transform: scale(0.975);
+    }
+    50% {
+        opacity: 0.78;
+        transform: scale(1.018);
+    }
+}
+
+@keyframes mciLoginLogoPulse {
+    0%, 100% {
+        opacity: 0.38;
+        transform: scale(0.94);
+    }
+    50% {
+        opacity: 0.72;
+        transform: scale(1.06);
+    }
+}
+
+@keyframes mciLoginButtonAura {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
+@keyframes mciLoginEnergySweep {
+    0%, 46% {
+        opacity: 0;
+        transform: translateX(0) skewX(-18deg);
+    }
+    58% {
+        opacity: 0.86;
+    }
+    78%, 100% {
+        opacity: 0;
+        transform: translateX(350%) skewX(-18deg);
+    }
+}
+
+@keyframes mciLoginCurrentTrace {
+    0%, 38% {
+        opacity: 0;
+        transform: translateX(0) translateY(-50%);
+    }
+    52%, 72% {
+        opacity: 0.88;
+    }
+    86%, 100% {
+        opacity: 0;
+        transform: translateX(285%) translateY(-50%);
+    }
+}
+
 .divLoginCenter {
     animation: fadeInUp 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .divLoginCenter,
+    .divLoginCenter::before,
+    .login-system-logo-ring,
+    .login-button,
+    .login-button-energy::after,
+    .login-button-energy-beam,
+    .is-loading {
+        animation: none !important;
+    }
+
+    .remember-password-checkbox {
+        transition: none !important;
+    }
+
+    .login-button:hover:not(:disabled),
+    .login-button:focus-visible:not(:disabled),
+    .remember-password-checkbox:hover {
+        transform: none;
+    }
 }
 
 /* ==================== 按钮统一样式 ==================== */

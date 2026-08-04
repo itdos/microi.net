@@ -8,8 +8,8 @@
  * - /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/form-engine.md
  * - /Users/Work/Microi.net/microi.doc/docs/doc/v8-engine/where.md
  *
- * @version 2.1.0
- * @date 2026-07-24
+ * @version 2.2.0
+ * @date 2026-08-04
  */
 
 // V8引擎后端完整API定义
@@ -317,6 +317,131 @@ export const V8ServerApiDefinitions = {
                         documentation: "GET请求，返回Response对象",
                         insertText: "GetResponse",
                         snippet: 'GetResponse({\n\tUrl: "${1:url}"\n})'
+                    }
+                }
+            },
+
+            // ========== Microi.AI ==========
+            AI: {
+                label: "AI",
+                kind: "Module",
+                documentation: "后端第一等 AI 能力。固定使用当前 V8 租户、认证用户、本机有效 License 和租户模型配置；脚本不能覆盖 Endpoint、ApiKey、OsClient 或用户。Task 会由 Jint 转为 Promise，请使用 await。",
+                insertText: "AI",
+                methods: {
+                    Chat: {
+                        label: "Chat",
+                        kind: "Method",
+                        documentation: "AI 对话。匿名 V8 上下文会被拒绝。",
+                        insertText: "Chat",
+                        snippet: 'Chat({\n\tUserChatMsg: "${1:问题}",\n\tAiModel: "${2:模型名称}"\n})'
+                    },
+                    ChatStream: {
+                        label: "ChatStream",
+                        kind: "Method",
+                        documentation: "流式 AI 对话，第二个参数接收增量文本。",
+                        insertText: "ChatStream",
+                        snippet: 'ChatStream({ UserChatMsg: "${1:问题}", AiModel: "${2:模型名称}" }, async function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    },
+                    RecognizeIntent: {
+                        label: "RecognizeIntent",
+                        kind: "Method",
+                        documentation: "识别 chat/data/builder/project/code 意图。",
+                        insertText: "RecognizeIntent",
+                        snippet: 'RecognizeIntent({ UserChatMsg: "${1:问题}", AiModel: "${2:模型名称}" })'
+                    },
+                    NL2SQL: {
+                        label: "NL2SQL",
+                        kind: "Method",
+                        documentation: "按当前登录用户授权范围执行 NL2SQL。脚本传入的 AllowedTables 或服务端授权标记会被清除。",
+                        insertText: "NL2SQL",
+                        snippet: 'NL2SQL({ Question: "${1:问题}", AiModel: "${2:模型名称}" })'
+                    },
+                    NL2SQLStream: {
+                        label: "NL2SQLStream",
+                        kind: "Method",
+                        documentation: "授权后的流式 NL2SQL，第二个参数接收增量文本。",
+                        insertText: "NL2SQLStream",
+                        snippet: 'NL2SQLStream({ Question: "${1:问题}", AiModel: "${2:模型名称}" }, async function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    },
+                    NL2V8: {
+                        label: "NL2V8",
+                        kind: "Method",
+                        documentation: "自然语言生成 V8 代码，仅平台管理员。",
+                        insertText: "NL2V8",
+                        snippet: 'NL2V8({ Question: "${1:需求}", AiModel: "${2:模型名称}" })'
+                    },
+                    NL2V8Stream: {
+                        label: "NL2V8Stream",
+                        kind: "Method",
+                        documentation: "流式生成 V8 代码，仅平台管理员。",
+                        insertText: "NL2V8Stream",
+                        snippet: 'NL2V8Stream({ Question: "${1:需求}", AiModel: "${2:模型名称}" }, async function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    }
+                }
+            },
+
+            // ========== TranslateEngine 翻译引擎 ==========
+            TranslateEngine: {
+                label: "TranslateEngine",
+                kind: "Module",
+                documentation: "当前租户翻译引擎。服务地址、密钥和 OsClient 由服务端 SaaS 配置绑定，V8 不能覆盖。完整支持 LibreTranslate 文本/批量、检测、语言列表、HTML、候选译文、文件、建议与健康状态；固定界面文案仍优先使用 diy_lang。",
+                insertText: "TranslateEngine",
+                methods: {
+                    Translate: {
+                        label: "Translate",
+                        kind: "Method",
+                        documentation: "兼容单条纯文本翻译，返回 DosResult，Data 为译文字符串。",
+                        insertText: "Translate",
+                        snippet: 'Translate("${1:你好}", "${2:en}", "${3:auto}")'
+                    },
+                    TranslateText: {
+                        label: "TranslateText",
+                        kind: "Method",
+                        documentation: "完整文本翻译：SourceText/SourceTexts 二选一，支持 auto、text/html 和 0~10 个候选译文。",
+                        insertText: "TranslateText",
+                        snippet: 'TranslateText({\n\tSourceTexts: ["${1:你好}", "${2:世界}"],\n\tFromLang: "${3:auto}",\n\tLang: "${4:en}",\n\tFormat: "${5:text}",\n\tAlternatives: ${6:0}\n})'
+                    },
+                    Detect: {
+                        label: "Detect",
+                        kind: "Method",
+                        documentation: "检测一段文本的语言，返回语言代码与置信度列表。",
+                        insertText: "Detect",
+                        snippet: 'Detect({ SourceText: "${1:Bonjour}" })'
+                    },
+                    GetLanguages: {
+                        label: "GetLanguages",
+                        kind: "Method",
+                        documentation: "读取当前租户服务已安装语言及每种语言可达的目标语言。",
+                        insertText: "GetLanguages",
+                        snippet: "GetLanguages()"
+                    },
+                    TranslateFile: {
+                        label: "TranslateFile",
+                        kind: "Method",
+                        documentation: "翻译 TXT/HTML/ODT/ODP/DOCX/PPTX/XLSX/EPUB/PDF，Data 返回译后文件名、类型、长度和 Base64。",
+                        insertText: "TranslateFile",
+                        snippet: 'TranslateFile({\n\tFileByteBase64: ${1:base64},\n\tFileName: "${2:document.docx}",\n\tFromLang: "${3:auto}",\n\tLang: "${4:en}"\n})'
+                    },
+                    Suggest: {
+                        label: "Suggest",
+                        kind: "Method",
+                        documentation: "向启用 suggestions 的 LibreTranslate 服务提交译文改进建议。",
+                        insertText: "Suggest",
+                        snippet: 'Suggest({ SourceText: "${1:Hello}", SuggestedText: "${2:你好}", FromLang: "${3:en}", Lang: "${4:zh}" })'
+                    },
+                    Health: {
+                        label: "Health",
+                        kind: "Method",
+                        documentation: "读取安全健康与能力摘要，不返回内部地址、密钥或运维设置。",
+                        insertText: "Health",
+                        snippet: "Health()"
+                    },
+                    GetLang: {
+                        label: "GetLang",
+                        kind: "Method",
+                        documentation: "从当前租户 diy_lang 缓存读取固定多语言词条。",
+                        insertText: "GetLang",
+                        snippet: 'GetLang("${1:NoAuth}", "${2:cn}")'
                     }
                 }
             },

@@ -41,6 +41,14 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 - 新业务使用平台通用 v2 `/api-engine-realtime`，以普通登录 Token 调用 `SubscribeChannel`。30 秒时隙租约必须按返回的 `RenewAfterMilliseconds` 重复订阅续租，每次续租由 `realtime_{channel_key}_authorize` 按 `V8.CurrentUser` 重新授权；现有 AccessKey 在没有 `realtime:subscribe` scope 时拒绝。不要为每个游戏或业务再新增专用 C# Hub；旧 `/game-realtime` 仅作兼容。
 - 环境配置从 `window.__MICROI_APP_CONTEXT__`、宿主上下文和模式文件解析。生产构建拒绝 localhost；开发地址只写 `.env.development.local`。
 
+## 调用平台 AI
+
+- 运行在吾码表单、表格、按钮或接口引擎上下文中的代码优先使用第一等 `V8.AI`：普通对话用 `await V8.AI.Chat(param)`，真实打字机输出用 `await V8.AI.ChatStream(param, onChunk, { Signal })`。前端实现会复用当前 ApiBase、登录 Token、设备/语言头和 Token 轮换；后端实现会固定绑定当前 `OsClient` 与认证用户。
+- 独立 Web、MicroService、UniApp 的工程代码在 `src/services/ai.ts` 建立薄适配，调用当前平台 `POST /api/Ai/Chat` 或 SSE `POST /api/Ai/ChatStream`；从标准 Microi SDK/宿主上下文取得认证，不在页面中拼 Token、Endpoint、供应商 ApiKey 或任意 Header。
+- 请求只传业务白名单字段，如 `UserChatMsg`、`AiModel`、`AiModelId`、`RelayModel`、`ConversationId`、`Mode`、`ReasoningEffort`、`Attachments`。服务端身份、租户、模型 Endpoint 和密钥不可由页面覆盖；NL2SQL 必须走专用受控入口，不能把页面提交的表名当授权。
+- 外部 Agent 使用 MCP 的 `microi_chat` 获取最终对话结果；它不提供逐 token MCP 流，也不等于平台在线模型已经获得其它 MCP Tool 的 Agent Loop。需要写平台数据时仍调用对应写 Tool，执行确认、幂等和远端回读。
+- 服务器 License 在本机通过官方公钥验签；有效 License 不要求每次 AI 调用访问官网。官方中转模型还会单独校验 `sk-microi-*` 和账号额度，这两套授权不能相互替代。
+
 ## Vue 实现规则
 
 - SFC 模板承担真实 DOM 结构；事件使用 Vue 绑定，状态使用 `ref/reactive/computed`，副作用在组合函数的生命周期内注册并清理。

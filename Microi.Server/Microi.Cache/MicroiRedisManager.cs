@@ -991,8 +991,6 @@ namespace Microi.Cache
 
         private static string ResolveEncryptionKey(string tenantOsClient)
         {
-            var explicitKey = ConfigHelper.GetEnvOrConfiguration("MICROI_REDIS_MANAGER_SECRET_KEY", "Security:RedisManagerSecretKey");
-            if (!string.IsNullOrWhiteSpace(explicitKey)) return explicitKey;
             var client = OsClient.GetClient(tenantOsClient);
             return "Microi.RedisManager:" + DiyToken.ResolveJwtSigningKey(client);
         }

@@ -108,6 +108,7 @@ MD5/SHA1 仅为兼容摘要；任何摘要都不能直接作为新密码存储�
 | HTTP | `V8.Http.Get/Post/Patch`、`GetResponse/PostResponse/PatchResponse` 及真实 `*Async` 版本 |
 | 图片 | `V8.Image.Create/Merge/Overlay/Watermark/Resize/Crop/Rotate/Flip/Draw/Convert/GetInfo/CreateQRCode` |
 | Office | `V8.Office.ExportExcel/ExcelToList/ExportWord/ExportPowerPoint/SendEmail` |
+| OCR | `await V8.OCR.Recognize({...})`；服务端租户配置与调用参数隔离，详见 `ocr-engine` |
 | 文件 | `V8.HDFS`、`V8.Method.Upload/GetPrivateFileUrl` |
 | MQ | `V8.MQ.SendMsg` |
 | 短信 | `V8.Sms.Send` |

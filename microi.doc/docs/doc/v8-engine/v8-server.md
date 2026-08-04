@@ -1086,6 +1086,23 @@ var uploadText = V8.Http.Post({
 
 后端 `V8.Http` 的严格 SSRF 防护默认关闭，未配置时完全保留历史行为：不限制协议、URL 内嵌凭据、`localhost`、私网、链路本地或云元数据地址，并继续自动处理重定向。只有在 SaaS 引擎主租户启用 `SsrfProtectionEnabled` 后，才只允许 HTTP(S)，拒绝 URL 内嵌凭据、回环、私网、链路本地、云元数据和其它特殊地址，同时禁止自动跟随 3xx；受控目标可通过 `SsrfAllowedHosts` 精确放行。白名单匹配主机，不匹配 URL 子串；严格模式下需要跳转时，先用 `GetResponse/PostResponse/PatchResponse` 检查状态码和 `Location`，再显式发起下一次请求。租户配置方法见 [平台安全总览](../more/security.md)。
 
+### 从后端 V8 调用 Microi.AI
+
+后端接口引擎和表单后端事件已注入第一等 `V8.AI`，无需再通过 HTTP 自请求当前服务器。对象创建时固定绑定当前 V8 执行的 `OsClient` 与 `V8.CurrentUser`；脚本传入的用户、租户、Endpoint、ApiKey、NL2SQL 表白名单和服务端授权标记都会被清除：
+
+```javascript
+var result = await V8.AI.Chat({
+  UserChatMsg: String(V8.Param.Question || ''),
+  AiModel: String(V8.Param.AiModel || ''),
+  AiModelId: String(V8.Param.AiModelId || '')
+});
+return result;
+```
+
+可用方法包括 `GetLicenseState`、`Chat`、`ChatStream`、`RecognizeIntent`、`NL2SQL`、`NL2SQLStream`、`NL2V8` 和 `NL2V8Stream`。匿名接口没有可信用户上下文时返回 `Code=1001`；`NL2SQL` 始终重新按当前用户授权，`NL2V8/NL2V8Stream` 仅平台管理员可调用。
+
+后端流式回调会占用本次 Jint 请求，只适合确实需要由同一脚本消费增量的场景；面向页面的打字机效果仍优先让浏览器使用前端 `V8.AI.ChatStream`。MCP 直接使用专用 `microi_chat` 获取最终结果，不再绕到 `microi_run_engine` 包装接口。不要把 Token、完整问题或回答写入日志。完整代码与授权矩阵见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
+
 ## V8.Header、V8.Param
 >* 目前两者均只支持在接口引擎中使用，用于获取客户端http post请求接口引擎地址发送的报文和Request Payload参数。
 
@@ -1102,6 +1119,100 @@ var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
 
 MD5、SHA1、SHA256 等摘要不能用于新密码存储；密码必须使用平台认证流程和带盐的专用密码哈希。DES/AES 的安全性取决于密钥管理，不要把密钥写进 V8 代码、日志或接口响应。
+
+## V8.TranslateEngine
+
+`V8.TranslateEngine` 绑定当前 V8 执行租户的 SaaS 翻译配置。兼容入口 `Translate(text, to, from?)` 的 `Data` 是单个译文字符串；新代码需要批量、HTML、自动检测、候选译文或完整返回信息时使用 `TranslateText`：
+
+```javascript
+var result = V8.TranslateEngine.TranslateText({
+  SourceTexts: ['你好', '世界'], // 与 SourceText 二选一
+  FromLang: 'auto',
+  Lang: 'en',
+  Format: 'text',               // text | html
+  Alternatives: 2
+});
+if (result.Code !== 1) return result;
+
+var detected = V8.TranslateEngine.Detect({ SourceText: 'Bonjour' });
+var languages = V8.TranslateEngine.GetLanguages();
+var health = V8.TranslateEngine.Health();
+```
+
+完整业务方法包括 `Translate/TranslateText`、`Detect`、`GetLanguages`、`TranslateFile`、`Suggest`、`Health`，以及不调用供应商的 `GetLang/GetLangData/GetLangCode` 词条方法。文件翻译支持 TXT、HTML、ODT、ODP、DOCX、PPTX、XLSX、EPUB、PDF，返回文件名、ContentType、长度和 Base64；接口引擎返回文件时需开启“响应文件”。
+
+脚本传入的 `OsClient` 会被当前 `V8TenantContext` 覆盖，且参数中不存在 Endpoint、API Key、Authorization 或 Header。普通租户不会隐式借用主租户翻译凭据。LibreTranslate 的前端设置、API Key 管理、指标和 Web UI 属于运维面，不开放给 V8。完整返回结构、MCP 工具和部署方式见[翻译引擎](../system-engine/translate-engine.md)。
+
+## V8.OCR
+
+`V8.OCR` 是图片/PDF 文字识别的统一租户网关。Microi API 负责鉴权、租户隔离、文件校验、大小/超时/页数限制和统一结果；OCR 模型由独立的 PaddleX 服务承载，避免在每个 .NET API 节点重复加载模型。
+
+```javascript
+var result = await V8.OCR.Recognize({
+  FileByteBase64: V8.FilesByteBase64.invoice,
+  FileName: 'invoice.png',
+  UseDocOrientationClassify: true,
+  UseDocUnwarping: true,
+  UseTextlineOrientation: true,
+  TextRecScoreThresh: 0.5,
+  ReturnWordBox: false
+});
+
+if (result.Code !== 1) {
+  return result;
+}
+
+return {
+  Code: 1,
+  Data: {
+    Text: result.Data.Text,
+    AverageConfidence: result.Data.AverageConfidence,
+    Pages: result.Data.Pages,
+    TraceId: result.Data.TraceId
+  }
+};
+```
+
+支持 PDF、PNG、JPEG、BMP、GIF、TIFF、WebP。平台会同时校验扩展名、Base64 和文件魔数；成功结果统一包含 `Provider`、`TraceId`、`FileType`、`Text`、`AverageConfidence`、`PageCount`、`ElapsedMilliseconds` 和 `Pages`。每页包含文本区域、置信度和多边形坐标。
+
+也可由已登录客户端调用 `POST /api/Ocr/Recognize`，请求体与上例参数相同。请求体中的 `OsClient` 会被忽略，以验证后的 Token 租户为准。接口不接受 endpoint、API key、任意 Header、代理地址或服务端文件路径。
+
+### SaaS 引擎配置
+
+管理员在 `SaaS引擎 → OCR识别` 独立 Tab 配置：
+
+| 字段 | 说明 | 默认值 |
+|---|---|---|
+| `OcrEnabled` | 当前租户总开关；未开启时失败关闭 | `0` |
+| `OcrProvider` | `PaddleX`（基础服务）或 `PaddleXHighStability`（KServe） | `PaddleX` |
+| `OcrEndpoint` | 服务完整接口地址 | 空 |
+| `OcrApiKey` | 可选 Bearer 密钥 | 空 |
+| `OcrHeadersJson` | 可选服务端固定 Header JSON | 空 |
+| `OcrTimeoutSeconds` | 单次超时，平台硬上限 300 秒 | `60` |
+| `OcrMaxFileMB` | 单文件上限，平台硬上限 100 MB | `20` |
+| `OcrMaxPages` | PDF 页数上限，平台硬上限 100 页 | `10` |
+| `OcrMinConfidence` | 统一结果最低置信度，范围 0-1 | `0` |
+
+`OcrEndpoint`、`OcrApiKey`、`OcrHeadersJson` 等 OCR 配置不会进入 `V8.OsClientModel`，业务脚本只能使用绑定当前租户的 `V8.OCR`。密码控件用于减少界面误显，但不等同于数据库静态加密；生产环境仍应限制 SaaS 配置表权限、数据库备份权限和审计日志内容。
+
+### 部署边界
+
+PaddleX 基础服务协议为 `POST /ocr`，高稳定服务协议为 `POST /v2/models/ocr/infer`。生产环境应固定 PaddleX、PaddlePaddle 和模型版本，并为 OCR 服务配置访问控制、readiness、请求体/并发限制与 CPU/GPU 资源上限。Microi API 节点保持无状态，可以共同调用同一服务池。
+
+仓库提供固定 `PaddleX 3.6.1 + PaddlePaddle 3.2.2` 的 `linux/amd64` CPU 基线。PaddlePaddle 3.3.0 当前存在 CPU oneDNN PIR 推理兼容问题，因此不要自行替换为 3.3.0。推荐直接拉取吾码杭州公开镜像；镜像发布阶段已经预置默认 OCR 产线模型：
+
+```bash
+cd Microi.Server/Microi.OCR/deploy/paddlex
+docker compose -f compose.cpu.yml pull
+docker compose -f compose.cpu.yml up -d --no-build
+docker compose -f compose.cpu.yml ps
+```
+
+默认只映射 `127.0.0.1:18080`，宿主机运行的 API 将 `OcrEndpoint` 配成 `http://127.0.0.1:18080/ocr`。若 API 也在 Docker 中，可将其加入名为 `microi-ocr` 的外部网络，并配置 `http://microi-ocr:8080/ocr`。全新的 named volume 会从镜像复制预置模型并在容器重启后复用；healthcheck 的 10 分钟启动宽限用于低配机器首次复制和加载模型，不代表单次识别可运行 10 分钟。本地修改 Dockerfile 后可显式执行 `docker compose -f compose.cpu.yml build`。
+
+Compose 的 CPU/内存限制是安全基线，应按真实图片尺寸、页数和并发压测后调整。GPU 环境必须按显卡驱动选择官方 CUDA 11.8/12.6 镜像与对应 PaddlePaddle wheel，不应直接复用 CPU Dockerfile 或使用浮动 `latest`。
+
+当前入口是请求内同步识别。批量、超大文件或长耗时 OCR 必须建立共享数据库/MQ/outbox 任务，以全局任务 Id、唯一约束和状态机保证幂等恢复；进程内队列、`static` 字典或本地文件不能作为任务完成事实源。
 
 ## V8.Office
 
@@ -1626,7 +1737,8 @@ WFNodeStart：流程节点开始V8事件
 | 数据源引擎 | `V8.DataSourceEngine.Run/RunAsync` | 只运行当前租户数据源；动态 SQL、远程连接和返回字段仍需按业务授权 |
 | 模块引擎 | `V8.ModuleEngine` | 读取当前用户可见模块模型；不能代替 FormEngine 的数据权限 |
 | 工作流引擎 | `V8.WFEngine`、事件中的 `V8.WF` | 启动、发送、撤回、取消等动作必须校验当前用户、当前租户、流程状态与表单范围 |
-| 翻译引擎 | `V8.TranslateEngine.Translate/GetLang...` | 使用当前租户的语言与供应商配置，不能传其它租户消耗其凭据或额度 |
+| 翻译引擎 | `V8.TranslateEngine.Translate/TranslateText/Detect/GetLanguages/TranslateFile/Suggest/Health/GetLang...` | 使用当前租户的语言与供应商配置，不能传其它租户、endpoint 或密钥；批量/文件受硬上限保护 |
+| OCR | `V8.OCR.Recognize` | 只使用当前租户服务端配置；调用方不能覆盖 endpoint、密钥、Header 或 OsClient；批量任务需要共享持久状态与幂等 |
 | 文件能力 | `V8.HDFS`、`V8.Method.Upload/GetPrivateFileUrl` | 普通业务优先使用受控上传和短期代理；列举、删除、读取私有字节属于可信管理能力 |
 | 消息能力 | `V8.MQ.SendMsg` | 队列名绑定当前租户；消费、关闭通道等属于 Worker 内部能力，消息必须有全局 `EventId` 和幂等消费 |
 | 短信 | `V8.Sms.Send` | 供应商配置必须脱敏，发送接口要有频率、金额/条数、模板和收件人限制 |

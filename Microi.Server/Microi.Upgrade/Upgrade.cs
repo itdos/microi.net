@@ -57,6 +57,23 @@ namespace Microi.net
                 await EnsureApiEngineFieldMetadataCompatibilityAsync(osClientSecret, "启动前");
                 await EnsureApiEngineCacheWriteCompatibilityAsync(osClientSecret, "启动前");
                 await EnsureOfficialWebsitePublicApiEngineContractAsync(osClientSecret);
+                var marketplaceVersionResult = OfficialMarketplaceInstalledVersionReconciler
+                    .Reconcile(osClientSecret);
+                if (marketplaceVersionResult.IsOfficialPlatform)
+                {
+                    if (!marketplaceVersionResult.Success)
+                    {
+                        Console.WriteLine($"Microi：【Error异常】【{osClientSecret.OsClient}】官网平台应用安装版本对齐失败：{marketplaceVersionResult.Message}");
+                    }
+                    else if (marketplaceVersionResult.Updated > 0)
+                    {
+                        Console.WriteLine($"Microi：【成功】【{osClientSecret.OsClient}】官网平台应用安装版本已对齐：计划{marketplaceVersionResult.Planned}条，更新{marketplaceVersionResult.Updated}条。");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【信息】【{osClientSecret.OsClient}】官网平台应用安装版本已是商城最新版。");
+                    }
+                }
                 await EnsureLegacyMenuDiyConfigCompatibilityAsync(osClientSecret);
                 // 持久后台任务是所有长任务的事实源。其运行环境路由字段必须在
                 // Worker 启动领取任务前存在，不能依赖可能已经错误推进的版本号。
@@ -950,6 +967,99 @@ namespace Microi.net
             }
             #endregion
 
+            #region 升级29 --2026-08-04【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade29.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade29().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级29 - 2026-08-04】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级29 - 2026-08-04】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade29.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级29失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级29 - 2026-08-04】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级30 --2026-08-04【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade30.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade30().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级30 - 2026-08-04】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级30 - 2026-08-04】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade30.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级30失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级30 - 2026-08-04】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
+            #region 升级31 --2026-08-04【必须】
+            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade31.Version))
+            {
+                try
+                {
+                    var msgs = await new Upgrade31().Run(osClientSecret.OsClient).ConfigureAwait(false);
+                    if (msgs.Count > 0)
+                    {
+                        migrationFailed = true;
+                        migrationErrors.AddRange(msgs);
+                        foreach (var msg in msgs)
+                        {
+                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级31 - 2026-08-04】失败：{msg}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级31 - 2026-08-04】成功！");
+                        needUptServerVersion = true;
+                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade31.Version);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    migrationFailed = true;
+                    migrationErrors.Add("升级31失败：" + ex.Message);
+                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级31 - 2026-08-04】失败：{ex.Message}");
+                }
+            }
+            #endregion
+
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {
@@ -1034,7 +1144,7 @@ namespace Microi.net
 
         private static bool IsOfficialWebsiteTenant(string osClient)
         {
-            return string.Equals(osClient, "iTdos", StringComparison.OrdinalIgnoreCase);
+            return Microi.License.LicenseService.IsOfficialPlatform(osClient);
         }
 
         /// <summary>
@@ -2289,36 +2399,8 @@ if (_microiLegacyMenuConfigChanged) {
 
                 EnsureStringColumnCapacity(osClientSecret, "sys_osclients", "AuthSecret", 100);
                 EnsureColumn(osClientSecret, "sys_osclients", "AuthSecretRotateVersion", "varchar(100)");
-
-                var rotateVersion = (Environment.GetEnvironmentVariable(
-                                         "MICROI_AUTH_SECRET_ROTATE_VERSION",
-                                         EnvironmentVariableTarget.Process)
-                                     ?? Environment.GetEnvironmentVariable("MICROI_AUTH_SECRET_ROTATE_VERSION")
-                                     ?? ConfigHelper.GetConfiguration("Security:AuthSecretRotateVersion"))
-                    .DosTrim();
-                if (rotateVersion.DosIsNullOrWhiteSpace())
-                {
-                    // 普通版本发布只补齐字段，不请求密钥轮换。只有运维显式配置新的
-                    // RotateVersion 时才标记本轮轮换，避免每次镜像更新让全部 Token 失效。
-                    return;
-                }
-                var dbType = osClientSecret.OsClientModel?["DbType"].Val<string>() ?? OsClientDefault.OsClientDbType;
-                var sql = dbType == "MySql"
-                    ? @"UPDATE `sys_osclients`
-                        SET `AuthSecretRotateVersion` = @p0
-                        WHERE (`AuthSecretRotateVersion` IS NULL OR `AuthSecretRotateVersion` = '')
-                          AND `AuthSecret` IS NOT NULL
-                          AND CHAR_LENGTH(`AuthSecret`) >= 32
-                          AND LOWER(`AuthSecret`) <> LOWER(`OsClient`)"
-                    : @"UPDATE [sys_osclients]
-                        SET [AuthSecretRotateVersion] = @p0
-                        WHERE ([AuthSecretRotateVersion] IS NULL OR [AuthSecretRotateVersion] = '')
-                          AND [AuthSecret] IS NOT NULL
-                          AND LEN([AuthSecret]) >= 32
-                          AND LOWER([AuthSecret]) <> LOWER([OsClient])";
-                osClientSecret.Db.FromSql(sql)
-                    .AddInParameter("p0", rotateVersion)
-                    .ExecuteNonQuery();
+                // 轮换请求读取 SaaS 引擎 BackendAuthSecretRotateVer；旧长字段名继续兼容。
+                // 此处只保证持久化列存在，不再从进程环境或 appsettings 注入轮换版本。
             }
             catch (Exception ex)
             {

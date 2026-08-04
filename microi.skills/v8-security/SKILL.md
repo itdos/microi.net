@@ -29,7 +29,7 @@ var openaiKey = 'sk-xxxxxxxxxx';
 
 子租户缺少 RabbitMQ/MQTT/Search 独立凭据时必须失败关闭，禁止回退主租户账号。新租户开通只有在外部 broker/search 中真实创建 user、vhost、ACL 或 API Key 后，才能标记对应服务可用。
 
-登录和管理端必须强制 HTTPS。登录 RSA 只用于避免密码在请求体、代理调试界面中直接显示，不能替代 HTTPS，也不能作为身份认证或密码存储密钥。平台为兼容已发布客户、旧前端和浏览器缓存，保留历史登录 RSA 密钥对作为缺省回退；安全修复不得直接删除该回退并造成全量客户无法登录。需要部署专属密钥时，服务端通过 `MICROI_LOGIN_RSA_PRIVATE_KEY` 或受限密钥文件注入私钥，同时通过 `MICROI_LOGIN_RSA_PUBLIC_KEY` / `Security:LoginRsaPublicKey` 向匿名 `GetSysConfig` 提供匹配公钥；两端必须成对切换。源码、V8、前端业务代码和日志中仍禁止新增或输出其它真正的业务私钥、JWT 密钥、支付密钥及对象存储凭据。
+登录和管理端必须强制 HTTPS。登录 RSA 只用于避免密码在请求体、代理调试界面中直接显示，不能替代 HTTPS，也不能作为身份认证或密码存储密钥。平台为兼容已发布客户、旧前端和浏览器缓存，保留历史登录 RSA 密钥对作为缺省回退；安全修复不得直接删除该回退并造成全量客户无法登录。需要部署专属密钥时，在主租户 SaaS 引擎【后端运行配置】中成对维护 `BackendLoginRsaPrivateKey` 与 `BackendLoginRsaPublicKey`；私钥只允许可信服务端读取，匿名 `GetSysConfig` 只返回匹配公钥。源码、环境变量、普通 V8、前端业务代码和日志中仍禁止新增或输出真正的业务私钥、JWT 密钥、支付密钥及对象存储凭据。
 
 吾码现有多端兼容约定是：主 SaaS 引擎 `sys_osclients.CorsAllowOrigins` 为空时默认允许全部跨域，便于本地开发、独立前端、H5 和不同租户域名访问；配置了来源后才按精确来源或通配符限制。安全修复不得把“未配置”改成默认拒绝，否则会造成所有存量部署和本地调试突然失效。CORS 不是鉴权边界，权限仍必须依赖 Token、租户隔离、菜单/表权限和服务端数据范围。
 
@@ -353,7 +353,7 @@ try {
 - 普通访问默认阈值为 10 秒 600 请求/120 异常。VS Code 多服务器源码拉取不能通过减少并发或请求量规避；符合条件的只读 V8Debug `Get/List` 使用独立桶，默认 10 秒 6000 请求/1200 异常。
 - 受信判断必须同时满足：服务端共享登录态确认 `Level >= 9999`、请求 Token 是活动 `ClientType=VSCode` Token、请求 `did` 与该 Token 保存的 Did 完全一致、路由为只读 `/api/V8Debug/Get*` 或 `/api/V8Debug/List*`。自报 `ClientType`、User-Agent、`X-User-Level`、单独伪造 did 都不可信；Update/Create/Execute/Upload/Finalize 和 FormEngine 写入不放宽。
 - 普通请求的计数 scope 固定为当前 API 主运行实例，不能使用请求方可控的 `OsClient` Query/Header 选择 Redis 桶；只有已通过上述联合校验的 VS Code profile 才能使用活动 Token 服务端绑定的租户 scope。测试必须覆盖轮换两个真实租户 Key 仍落入同一普通桶。
-- SecurityGuard 只读取 `Connection.RemoteIpAddress`，不得直接解析 `X-Forwarded-For`/`X-Real-IP`。宿主在 `UseForwardedHeaders` 中只信任 `ForwardedHeaders:KnownProxies` 的精确 IP 和 `KnownNetworks` 的受控 CIDR（环境变量可用 `ForwardedHeaders__KnownProxies__0` / `ForwardedHeaders__KnownNetworks__0`）；禁止 `0.0.0.0/0`、`::/0`。历史 `SecurityRespectForwardedHeaders` 字段不能建立 Header 信任。测试必须覆盖公网 Remote IP 携带伪造 `X-Forwarded-For: 127.0.0.1` 时仍识别公网 IP。
+- SecurityGuard 只读取 `Connection.RemoteIpAddress`，不得直接解析 `X-Forwarded-For`/`X-Real-IP`。宿主在 `UseForwardedHeaders` 中只信任主租户 SaaS 引擎【后端运行配置】的 `BackendForwardedKnownProxies` 精确 IP 和 `BackendForwardedKnownNetworks` 受控 CIDR；禁止使用环境变量、自定义 `appsettings` 节点、`0.0.0.0/0` 或 `::/0`。历史 `SecurityRespectForwardedHeaders` 字段不能建立 Header 信任。该宿主配置变更需滚动重启节点，测试必须覆盖公网 Remote IP 携带伪造 `X-Forwarded-For: 127.0.0.1` 时仍识别公网 IP。
 - 自动封禁按 `ExpiresAtUtc` 到期解除。立即解除只能从未被封禁的管理网络，以平台超级管理员进入【系统日志 → 安全防护】操作 `/api/SecurityGuard/UnblockIp`；同一被封出口不能给自己解封。
 - 固定可信出口才可精确加入当前服务器匹配 `sys_osclients.SecurityWhitelistIps`。禁止全网段、动态用户 IP 或请求参数自动入白名单，也不要关闭安全防护或全局放大普通阈值。
 - 多节点封禁、解封和到期状态必须进入共享 Redis/数据库；本机静态字典只能做缓存。Redis 可用且共享 block 不存在就是权威已解封，节点必须删除本机旧 block，禁止把旧状态回写复活；Redis 不可用时才允许本机降级。验收要让同一出口分别命中至少两个 API 节点，覆盖普通阈值、受信读取、伪造 Header、手动解除和自动到期。

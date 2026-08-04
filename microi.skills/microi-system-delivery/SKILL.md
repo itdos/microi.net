@@ -204,7 +204,7 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 
 ### 上传、私有文件与 SaaS
 
-- 上传业务默认值为 100 MB/文件、200 MB/次、10 文件、2 GB/帐号/日、20 GB/租户/日。有效值按当前租户 `sys_osclients` → 环境变量 → `appsettings` → 代码默认值解析，租户可以提高或降低业务默认值；最终仍受独立 `Absolute*`、HTTP/Multipart/Form 和反向代理上限约束。共享 Redis 原子预留，Redis 故障失败关闭。
+- 上传业务默认值为 100 MB/文件、200 MB/次、10 文件、2 GB/帐号/日、20 GB/租户/日。有效值只按当前租户 `sys_osclients` → 代码安全默认值解析，租户可以提高或降低业务默认值；不得为上传开关、额度或硬上限新增 API 环境变量或 `appsettings` 节点。最终仍受代码内不可突破的灾难保护、HTTP/Multipart/Form 和反向代理上限约束。共享 Redis 原子预留，Redis 故障失败关闭。
 - 普通交互式上传强制私有桶，一级目录只能是 `file`、`img`、`avatar`、`editor`。可信后端 V8 仍受全局文件大小硬上限。
 - 普通客户端私有文件签名必须提交 `FormEngineKey`、`FormDataId`、`FieldId`、`SysMenuId` 并验证记录字段真实引用；不能把后端 `V8.Method.GetPrivateFileUrl({FilePathName})` 的可信调用方式照搬到浏览器。
 - Upgrade16 六个上传字段全部可空，空值保持老租户兼容；升级后回读字段元数据、租户值并刷新 SaaS 缓存。
