@@ -332,7 +332,8 @@
 		loadNativeFormDefinition
 	} from '@/platform/native-form.js'
 	import {
-		getTenantFormFieldPresentation
+		getTenantFormFieldPresentation,
+		refreshTenantFormDerivedValues
 	} from '@/platform/form-extension.js'
 	import {
 		compileDetailPreset,
@@ -1190,6 +1191,7 @@
 				definition: null,
 				viewManifest: null,
 				metricValues: {},
+				tenantDerivedState: {},
 				expandedSections: {},
 				activeFormTabKey: '',
 				standaloneRelatedAddKey: '',
@@ -1771,6 +1773,20 @@
 			if (!this.loading && this.id) this.loadDetail(false)
 		},
 		methods: {
+			tenantDetailFormContext() {
+				return {
+					tableName: this.moduleConfig.table,
+					rowId: this.id,
+					mode: 'View',
+					definition: this.definition,
+					form: this.detail,
+					defaultValues: {},
+					state: this.tenantDerivedState,
+					patchForm: (updates = {}) => {
+						this.detail = { ...this.detail, ...updates }
+					}
+				}
+			},
 			async loadDetail(showLoading = true, refreshManifest = false) {
 				if (!this.id) {
 					this.error = '缺少业务数据编号'
@@ -1795,6 +1811,9 @@
 						this.definition = definitionResult
 						this.initializeFormTabs()
 					}
+					try {
+						await refreshTenantFormDerivedValues(this.tenantDetailFormContext())
+					} catch (error) {}
 					this.metricValues = await loadViewMetricValues(this.preset.metrics || [], {
 						form: this.detail,
 						user: this.currentUser,

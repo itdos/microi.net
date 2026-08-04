@@ -243,6 +243,7 @@
 		initializeTenantForm,
 		notifyTenantFormSaved,
 		prepareTenantFormSubmit,
+		refreshTenantFormDerivedValues,
 		runTenantFormFieldAction,
 		runTenantFormPresentationAction,
 		tenantFormBusyMessage
@@ -398,6 +399,10 @@
 			this.tableChildAuth = parseJson(decodeURIComponent(options.tableChildAuth || ''), null)
 			this.tenantFormState = createTenantFormState(this.tenantFormContext())
 			this.loadForm()
+		},
+		onShow() {
+			if (this.loading || !this.definition) return
+			refreshTenantFormDerivedValues(this.tenantFormContext()).catch(() => {})
 		},
 		onUnload() {
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
