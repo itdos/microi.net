@@ -96,6 +96,108 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+export interface OcrRecognizeRequest {
+  FileByteBase64: string;
+  FileName?: string;
+  UseDocOrientationClassify?: boolean;
+  UseDocUnwarping?: boolean;
+  UseTextlineOrientation?: boolean;
+  TextRecScoreThresh?: number;
+  ReturnWordBox?: boolean;
+}
+
+export interface OcrRegion {
+  Text?: string;
+  Confidence?: number;
+  Polygon?: number[][];
+}
+
+export interface OcrPage {
+  PageIndex?: number;
+  Text?: string;
+  AverageConfidence?: number;
+  Regions?: OcrRegion[];
+}
+
+export interface OcrRecognizeResult {
+  Provider?: string;
+  TraceId?: string;
+  FileName?: string;
+  FileType?: string;
+  Text?: string;
+  AverageConfidence?: number;
+  PageCount?: number;
+  ElapsedMilliseconds?: number;
+  Pages?: OcrPage[];
+  TextTruncated?: boolean;
+}
+
+export interface TranslateTextRequest {
+  SourceText?: string;
+  SourceTexts?: string[];
+  FromLang?: string;
+  Lang: string;
+  Format?: 'text' | 'html';
+  Alternatives?: number;
+}
+
+export interface TranslateDetection {
+  Language?: string;
+  Confidence?: number;
+}
+
+export interface TranslateTextResult {
+  Provider?: string;
+  IsBatch?: boolean;
+  SourceLanguage?: string;
+  TargetLanguage?: string;
+  Format?: string;
+  TranslatedText?: string;
+  TranslatedTexts?: string[];
+  DetectedLanguage?: TranslateDetection;
+  DetectedLanguages?: TranslateDetection[];
+  Alternatives?: string[];
+  AlternativeGroups?: string[][];
+}
+
+export interface TranslateLanguage {
+  Code?: string;
+  Name?: string;
+  Targets?: string[];
+}
+
+export interface TranslateFileRequest {
+  FileByteBase64: string;
+  FileName: string;
+  FromLang?: string;
+  Lang: string;
+}
+
+export interface TranslateFileResult {
+  Provider?: string;
+  FileName?: string;
+  ContentType?: string;
+  FileByteBase64?: string;
+  ByteLength?: number;
+}
+
+export interface TranslateSuggestionResult {
+  Provider?: string;
+  Success?: boolean;
+}
+
+export interface TranslateHealthResult {
+  Provider?: string;
+  Status?: string;
+  Healthy?: boolean;
+  SupportsBatch?: boolean;
+  SupportsHtml?: boolean;
+  SupportsAlternatives?: boolean;
+  SupportsDetection?: boolean;
+  SupportsFiles?: boolean;
+  SupportsSuggestions?: boolean;
+}
+
 export interface ApplicationStreamGateTransitionRequest {
   OsClient: string;
   OsClientType: string;
@@ -238,6 +340,8 @@ const DEFAULT_READBACK_REQUEST_TIMEOUT_MS = 5_000;
 const WRITE_READBACK_DELAYS_MS = [0, 300, 800, 1_500, 3_000];
 const DEFAULT_STREAM_UPLOAD_TIMEOUT_MS = 30 * 60_000;
 const MAX_STREAM_UPLOAD_TIMEOUT_MS = 2 * 60 * 60_000;
+const OCR_REQUEST_TIMEOUT_MS = 315_000;
+const TRANSLATE_REQUEST_TIMEOUT_MS = 315_000;
 const MENU_JSON_ARRAY_FIELDS = new Set([
   'MoreBtns',
   'FormBtns',
@@ -1404,6 +1508,91 @@ export class MicroiClient {
       OsClient: this.config.osClient,
       ApiEngineKey: apiEngineKey,
       Param: params || {},
+    });
+  }
+
+  async chat(input: {
+    question: string;
+    systemPrompt?: string;
+    aiModel: string;
+    aiModelId?: string;
+    relayModel?: string;
+    conversationId?: string;
+    reasoningEffort?: 'auto' | 'low' | 'medium' | 'high';
+    mode?: 'chat' | 'data' | 'code' | 'builder' | 'project';
+  }): Promise<ApiResponse> {
+    return this.post(API.AI_CHAT, {
+      UserChatMsg: input.question,
+      AiModel: input.aiModel,
+      ...(input.systemPrompt ? { SystemChatMsg: input.systemPrompt } : {}),
+      ...(input.aiModelId ? { AiModelId: input.aiModelId } : {}),
+      ...(input.relayModel ? { RelayModel: input.relayModel } : {}),
+      ...(input.conversationId ? { ConversationId: input.conversationId } : {}),
+      ...(input.reasoningEffort ? { ReasoningEffort: input.reasoningEffort } : {}),
+      ...(input.mode ? { Mode: input.mode } : {}),
+      OsClient: this.config.osClient,
+    }, {
+      timeoutMs: Math.max(this.config.requestTimeoutMs ?? 120_000, 330_000),
+      operationName: 'Microi AI chat',
+    });
+  }
+
+  /**
+   * 调用当前 MCP 身份和租户绑定的 OCR 网关。网络地址、Provider、认证头和
+   * OsClient 均不属于本方法参数，避免 MCP 把后端网关变成任意 HTTP 代理。
+   */
+  async recognizeOcr(input: OcrRecognizeRequest): Promise<ApiResponse<OcrRecognizeResult>> {
+    return this.post<OcrRecognizeResult>(API.OCR_RECOGNIZE, input, {
+      timeoutMs: OCR_REQUEST_TIMEOUT_MS,
+      operationName: `OCR recognize ${input.FileName || 'unnamed file'}`,
+    });
+  }
+
+  /** Calls the current authenticated tenant's server-side translation gateway. */
+  async translateText(input: TranslateTextRequest): Promise<ApiResponse<TranslateTextResult>> {
+    return this.post<TranslateTextResult>(API.TRANSLATE_TEXT, input, {
+      timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+      operationName: 'translate text',
+    });
+  }
+
+  async detectLanguage(sourceText: string): Promise<ApiResponse<TranslateDetection[]>> {
+    return this.post<TranslateDetection[]>(API.TRANSLATE_DETECT, { SourceText: sourceText }, {
+      timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+      operationName: 'detect language',
+    });
+  }
+
+  async listTranslateLanguages(): Promise<ApiResponse<TranslateLanguage[]>> {
+    return this.post<TranslateLanguage[]>(API.TRANSLATE_LANGUAGES, {}, {
+      timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+      operationName: 'list translation languages',
+    });
+  }
+
+  async translateFile(input: TranslateFileRequest): Promise<ApiResponse<TranslateFileResult>> {
+    return this.post<TranslateFileResult>(API.TRANSLATE_FILE, input, {
+      timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+      operationName: `translate file ${input.FileName}`,
+    });
+  }
+
+  async suggestTranslation(input: {
+    SourceText: string;
+    SuggestedText: string;
+    FromLang: string;
+    Lang: string;
+  }): Promise<ApiResponse<TranslateSuggestionResult>> {
+    return this.post<TranslateSuggestionResult>(API.TRANSLATE_SUGGEST, input, {
+      timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+      operationName: 'suggest translation',
+    });
+  }
+
+  async getTranslateHealth(): Promise<ApiResponse<TranslateHealthResult>> {
+    return this.post<TranslateHealthResult>(API.TRANSLATE_HEALTH, {}, {
+      timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+      operationName: 'translation health',
     });
   }
 

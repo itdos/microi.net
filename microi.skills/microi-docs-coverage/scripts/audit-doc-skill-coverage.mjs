@@ -410,8 +410,9 @@ function extractBuilderMethods(source) {
 }
 
 function extractPrintMembers(source) {
-  const start = source.indexOf("var Print = {");
-  const end = source.indexOf("// 初始化分包参数", start);
+  const startMatch = /\b(?:var|let|const)\s+Print\s*=\s*\{/.exec(source);
+  const start = startMatch ? startMatch.index : -1;
+  const end = source.indexOf("\n    return Print;", start);
   if (start === -1 || end === -1) return new Set();
 
   const block = source.slice(start, end);
@@ -425,7 +426,13 @@ function extractPrintMembers(source) {
   )) {
     members.add(match[1]);
   }
-  if (/^\s{8}BLEInformation:\s*\{/m.test(block)) {
+  for (const internalName of ["setTipHandler", "initializeConnection"]) {
+    members.delete(internalName);
+  }
+  for (const name of [...members]) {
+    if (name.startsWith("_")) members.delete(name);
+  }
+  if (/^\s{8}BLEInformation:\s*/m.test(block)) {
     members.add("BLEInformation");
   }
   return members;

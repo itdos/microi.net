@@ -13,6 +13,7 @@ import { ElConfigProvider } from "element-plus";
 import { useDiyStore, useSettingsStore, useAppStore } from "@/pinia";
 import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
+import { syncApkDesktopStatusbarInset } from "@/utils/apk-statusbar-safe-area.js";
 import { getQueryObject } from "@/utils/index.js";
 import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
 // import drag from '@/views/form-engine/utils/dos.common';
@@ -121,6 +122,7 @@ export default {
         } else {
             // 保存事件处理函数引用，以便销毁时移除
             self.plusreadyHandler = function () {
+                self.WindowResize(true);
                 self.PageInit();
             };
             document.addEventListener("plusready", self.plusreadyHandler, false);
@@ -131,6 +133,7 @@ export default {
 
         self.authResumeHandler = function () {
             if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+            self.WindowResize(true);
             self.RefreshTokenWithLock();
         };
         document.addEventListener("visibilitychange", self.authResumeHandler, false);
@@ -217,9 +220,13 @@ export default {
     },
     methods: {
         // 窗口大小变化处理
-        WindowResize() {
+        WindowResize(forceStatusbarInset) {
             var isPhoneView = window.innerWidth <= 768;
             this.diyStore.setIsPhoneView(isPhoneView);
+            syncApkDesktopStatusbarInset({
+                viewportWidth: window.innerWidth,
+                force: forceStatusbarInset === true
+            });
         },
         // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
         restoreMciMode() {

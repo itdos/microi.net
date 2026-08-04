@@ -149,6 +149,17 @@ namespace Microi.net
         public IMicroiHttp Http { get; set; }
 
         public IMicroiSpider Spider { get; set; }
+        /// <summary>
+        /// 当前租户绑定的通用 OCR 网关。Endpoint、ApiKey 和 Headers 仅由宿主读取，
+        /// V8 脚本只能提交待识别文件及安全的识别选项。
+        /// </summary>
+        public IV8Ocr OCR { get; set; }
+
+        /// <summary>
+        /// 当前 V8 执行租户和登录用户绑定的 AI 能力。脚本只能选择当前租户已启用的
+        /// 模型，不能覆盖 OsClient、CurrentUser、Endpoint 或 ApiKey。
+        /// </summary>
+        public IV8AI AI { get; set; }
         public IV8Method Method { get; set; }
 
         /// <summary>

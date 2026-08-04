@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "7.0.4",
+  "version": "7.0.7",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -20,6 +20,7 @@
     "format": "prettier --write \"**/*.{js,vue,json,md}\"",
     "test:blueprint": "playwright test tests/blueprint-e2e.spec.mjs --headed --reporter=list",
     "test:v8-http": "node --test tests/v8-http.spec.mjs",
+    "test:v8-ai": "node --test tests/v8-ai.spec.mjs",
     "test:api-service-status": "node --test tests/api-service-status.spec.mjs",
     "test:upload-error": "node --test tests/upload-error.spec.mjs",
     "test:background-task": "node --test tests/background-task-display.spec.mjs",

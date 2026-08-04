@@ -901,7 +901,7 @@ fi
 if [ "$BUILD_CLIENT" = true ]; then
     print_phase "编译前端 Microi.Client"
 
-    print_step "前端受保护构建（现代 Node 堆最高 6GB、legacy 2GB；全机 95% 自动暂停，恢复后继续）..."
+    print_step "前端受保护构建（现代 Vite 6GB、现代 JS 独立串行压缩 1.5GB、legacy 2GB；按实测峰值分阶段预检，全机 95% 自动暂停）..."
     echo ""
     cd Microi.Client
     if ! run_client_build; then

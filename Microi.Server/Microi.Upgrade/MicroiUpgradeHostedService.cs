@@ -22,12 +22,11 @@ namespace Microi.net
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var disabledText = ConfigHelper.GetEnvOrConfiguration(
-                "MICROI_DISABLE_AUTO_UPGRADE",
-                "MicroiUpgrade:Disabled");
-            if (bool.TryParse(disabledText, out var disabled) && disabled)
+            if (ConfigHelper.GetRuntimeConfigurationBool(
+                    "MicroiUpgrade:Disabled",
+                    false))
             {
-                Console.WriteLine("Microi：【信息】服务器端自动升级已通过配置禁用。");
+                Console.WriteLine("Microi：【信息】服务器端自动升级已通过 SaaS 引擎后端运行配置禁用。");
                 return;
             }
 
@@ -62,10 +61,15 @@ namespace Microi.net
                 return;
             }
 
-            var dbConn = runtimeClient.OsClientModel?["DbConn"]?.ToString();
-            if (string.IsNullOrWhiteSpace(dbConn))
+            // The bootstrap database connection is one of the ten API startup
+            // settings and deliberately does not have to be persisted back into
+            // sys_osclients.  A hydrated runtime tenant can therefore have an
+            // empty OsClientModel.DbConn while its DbSession is fully usable.
+            // Gate on the resolved session itself so first boot from an old
+            // database can still run the expand-only SaaS schema upgrades.
+            if (runtimeClient.Db == null)
             {
-                Console.WriteLine($"Microi：【⚠️警告】平台自动升级跳过租户【{runtimeClient.OsClient}】：数据库连接（DbConn）未配置。");
+                Console.WriteLine($"Microi：【⚠️警告】平台自动升级跳过租户【{runtimeClient.OsClient}】：运行时数据库会话尚未初始化。");
                 return;
             }
 
@@ -113,12 +117,54 @@ namespace Microi.net
                     // 失败而停在旧 ServerVersion，因此像后台任务基础表一样在共享
                     // 升级租约内独立、幂等地维持这一不变量。
                     upgradeLease.ThrowIfLost();
+                    var saasRuntimeMessages = await new Upgrade23()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (saasRuntimeMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", saasRuntimeMessages));
+                    }
+                    upgradeLease.ThrowIfLost();
+                    var userAccessKeyMenuMessages = await new Upgrade26()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (userAccessKeyMenuMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", userAccessKeyMenuMessages));
+                    }
+                    upgradeLease.ThrowIfLost();
                     var userAndMarketplaceMessages = await new Upgrade28()
                         .Run(runtimeClient.OsClient)
                         .ConfigureAwait(false);
                     if (userAndMarketplaceMessages.Count > 0)
                     {
                         throw new InvalidOperationException(string.Join("；", userAndMarketplaceMessages));
+                    }
+                    // SaaS 运行配置属于当前 API 的控制面。即使历史 ServerVersion 被错误
+                    // 推进，也要在共享升级租约内幂等补齐 OCR 与后端运行配置元数据。
+                    upgradeLease.ThrowIfLost();
+                    var ocrConfigurationMessages = await new Upgrade29()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (ocrConfigurationMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", ocrConfigurationMessages));
+                    }
+                    upgradeLease.ThrowIfLost();
+                    var backendConfigurationMessages = await new Upgrade30()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (backendConfigurationMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", backendConfigurationMessages));
+                    }
+                    upgradeLease.ThrowIfLost();
+                    var translateConfigurationMessages = await new Upgrade31()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (translateConfigurationMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", translateConfigurationMessages));
                     }
                     upgradeLease.ThrowIfLost();
                     var currentVersion = runtimeClient.Db

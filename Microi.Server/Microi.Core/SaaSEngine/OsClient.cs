@@ -20,8 +20,8 @@ namespace Microi.net
                 ["BackgroundTasks:MaxParallelTasks"] = new[] { "BackgroundTaskMaxParallel" },
                 ["DiyLang:RuntimeCachePageSize"] = new[] { "DiyLangRuntimeCachePageSize" },
                 ["DiyLang:RuntimeCacheMaxRows"] = new[] { "DiyLangRuntimeCacheMaxRows" },
-                ["DiyLang:RuntimeCacheMaxCharacters"] = new[] { "DiyLangRuntimeCacheMaxCharacters" },
-                ["DiyLang:RuntimeCacheCommandTimeoutSeconds"] = new[] { "DiyLangRuntimeCacheCommandTimeoutSeconds" },
+                ["DiyLang:RuntimeCacheMaxCharacters"] = new[] { "DiyLangCacheMaxChars", "DiyLangRuntimeCacheMaxCharacters" },
+                ["DiyLang:RuntimeCacheCommandTimeoutSeconds"] = new[] { "DiyLangCacheSqlTimeoutSec", "DiyLangRuntimeCacheCommandTimeoutSeconds" },
                 ["Security:OAuthReturnUrlOrigins"] = new[] { "OAuthReturnUrlOrigins" },
                 ["Integrations:Chanjet:OAuthState"] = new[] { "ChanjetOAuthState" },
                 ["Integrations:Chanjet:AesKey"] = new[] { "ChanjetAesKey" },
@@ -34,7 +34,7 @@ namespace Microi.net
                 ["Cors:AllowAnyWhenUnconfigured"] = new[] { "CorsAllowAnyWhenUnconfigured" },
                 ["SsrfProtection:Enabled"] = new[] { "SsrfProtectionEnabled" },
                 ["SsrfProtection:AllowedHosts"] = new[] { "SsrfAllowedHosts" },
-                ["StartupLimits:DynamicRouteInitMaxConcurrency"] = new[] { "StartupDynamicRouteMaxConcurrency" },
+                ["StartupLimits:DynamicRouteInitMaxConcurrency"] = new[] { "StartupRouteMaxConcurrency", "StartupDynamicRouteMaxConcurrency" },
                 ["SecurityGuard:Enabled"] = new[] { "SecurityGuardEnabled" },
                 ["SecurityGuard:WindowSeconds"] = new[] { "SecurityWindowSeconds" },
                 ["SecurityGuard:PerIpMaxRequests"] = new[] { "SecurityPerIpMaxRequests" },
@@ -44,8 +44,8 @@ namespace Microi.net
                 ["SecurityGuard:BlockMinutes"] = new[] { "SecurityBlockMinutes" },
                 ["SecurityGuard:RecentAccessMaxCount"] = new[] { "SecurityRecentAccessMaxCount" },
                 ["SecurityGuard:LogIntervalSeconds"] = new[] { "SecurityLogIntervalSeconds" },
-                ["SecurityGuard:AccessPersistIntervalSeconds"] = new[] { "SecurityAccessPersistIntervalSeconds" },
-                ["SecurityGuard:RespectForwardedHeaders"] = new[] { "SecurityRespectForwardedHeaders" },
+                ["SecurityGuard:AccessPersistIntervalSeconds"] = new[] { "SecurityAccessPersistSec", "SecurityAccessPersistIntervalSeconds" },
+                ["SecurityGuard:RespectForwardedHeaders"] = new[] { "SecurityTrustForwardedHeaders", "SecurityRespectForwardedHeaders" },
                 ["SecurityGuard:LogBlockedToSysLog"] = new[] { "SecurityLogBlockedToSysLog" },
                 ["SecurityGuard:PersistSecurityTables"] = new[] { "SecurityPersistTables" },
                 ["SecurityGuard:PersistAllAccess"] = new[] { "SecurityPersistAllAccess" },
@@ -61,19 +61,25 @@ namespace Microi.net
                 ["PressureGuard:WaitMilliseconds"] = new[] { "PressureWaitMilliseconds" },
                 ["PressureGuard:LongRunningWaitMilliseconds"] = new[] { "PressLongWaitMs", "PressureLongRunningWaitMilliseconds" },
                 ["PressureGuard:RetryAfterSeconds"] = new[] { "PressRetryAfter", "PressureRetryAfterSeconds" },
-                ["OrmLimits:MaxConcurrentConnectionOpens"] = new[] { "OrmMaxConcurrentConnectionOpens" },
+                ["OrmLimits:MaxConcurrentConnectionOpens"] = new[] { "OrmMaxConnectionOpens", "OrmMaxConcurrentConnectionOpens" },
                 ["OrmLimits:ConnectionOpenWaitSeconds"] = new[] { "OrmConnectionOpenWaitSeconds" },
-                ["OrmLimits:ConnectionPressureBackoffSeconds"] = new[] { "OrmConnectionPressureBackoffSeconds" },
-                ["OrmLimits:DefaultCommandTimeoutSeconds"] = new[] { "OrmDefaultCommandTimeoutSeconds" },
-                ["OrmLimits:MySqlHostCacheAutoRepairEnabled"] = new[] { "OrmMySqlHostCacheAutoRepairEnabled" },
-                ["OrmLimits:MySqlHostCacheRepairCooldownSeconds"] = new[] { "OrmMySqlHostCacheRepairCooldownSeconds" },
+                ["OrmLimits:ConnectionPressureBackoffSeconds"] = new[] { "OrmConnPressureBackoffSec", "OrmConnectionPressureBackoffSeconds" },
+                ["OrmLimits:DefaultCommandTimeoutSeconds"] = new[] { "OrmCommandTimeoutSec", "OrmDefaultCommandTimeoutSeconds" },
+                ["OrmLimits:MySqlHostCacheAutoRepairEnabled"] = new[] { "OrmMySqlHostCacheRepairOn", "OrmMySqlHostCacheAutoRepairEnabled" },
+                ["OrmLimits:MySqlHostCacheRepairCooldownSeconds"] = new[] { "OrmMySqlHostCacheCooldownSec", "OrmMySqlHostCacheRepairCooldownSeconds" },
                 ["OrmLimits:DdlLockWaitSeconds"] = new[] { "OrmDdlLockWaitSeconds" },
                 ["OrmLimits:DdlQueueWaitSeconds"] = new[] { "OrmDdlQueueWaitSeconds" },
                 ["Spider:MaxSessionsTotal"] = new[] { "SpiderMaxSessionsTotal" },
                 ["Spider:MaxSessionsPerScope"] = new[] { "SpiderMaxSessionsPerScope" },
                 ["Spider:SessionIdleMinutes"] = new[] { "SpiderSessionIdleMinutes" },
                 ["Spider:SessionMaxHours"] = new[] { "SpiderSessionMaxHours" },
-                ["Spider:TraceEnabled"] = new[] { "SpiderTraceEnabled" }
+                ["Spider:TraceEnabled"] = new[] { "SpiderTraceEnabled" },
+                ["MicroiUpgrade:Disabled"] = new[] { "BackendAutoUpgradeDisabled" },
+                ["Cad:FreeCadExecutablePath"] = new[] { "BackendFreeCadExecutablePath" },
+                ["ForwardedHeaders:KnownProxies"] = new[] { "BackendForwardedKnownProxies" },
+                ["ForwardedHeaders:KnownNetworks"] = new[] { "BackendForwardedKnownNetworks" },
+                ["Security:LoginRsaPrivateKey"] = new[] { "BackendLoginRsaPrivateKey" },
+                ["Security:LoginRsaPublicKey"] = new[] { "BackendLoginRsaPublicKey" }
             };
 
         static OsClientExtend()
@@ -297,7 +303,7 @@ namespace Microi.net
         {
             if (osClientModel == null || !IsConfiguredMainTenant(osClient)) return;
 
-            var dbConn = GetConfiguredValue("OsClientDbConn", OsClientDefault.OsClientDbConn);
+            var dbConn = GetConfiguredDbConnectionValue(OsClientDefault.OsClientDbConn);
             string currentDbConn = osClientModel["DbConn"]?.Val<string>() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(currentDbConn)
                 && !string.IsNullOrWhiteSpace(dbConn))
@@ -306,7 +312,7 @@ namespace Microi.net
                 currentDbConn = dbConn;
             }
 
-            var dbType = GetConfiguredValue("OsClientDbType", OsClientDefault.OsClientDbType);
+            var dbType = GetConfiguredDbTypeValue(OsClientDefault.OsClientDbType);
             string currentDbType = osClientModel["DbType"]?.Val<string>() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(currentDbType)
                 && !string.IsNullOrWhiteSpace(dbType))
@@ -332,16 +338,40 @@ namespace Microi.net
         private static bool IsConfiguredMainTenant(string osClient)
         {
             if (osClient.DosIsNullOrWhiteSpace()) return false;
-            var configuredOsClient = GetConfiguredValue("OsClient", OsClientDefault.OsClient);
+            var configuredOsClient = GetConfiguredOsClientValue(OsClientDefault.OsClient);
             return string.Equals(osClient, configuredOsClient, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string GetConfiguredValue(string key, string fallback)
+        private static string GetConfiguredOsClientValue(string fallback)
         {
-            var processValue = Environment.GetEnvironmentVariable(key, EnvironmentVariableTarget.Process);
+            var processValue = Environment.GetEnvironmentVariable(
+                "OsClient",
+                EnvironmentVariableTarget.Process);
             if (!processValue.DosIsNullOrWhiteSpace()) return processValue;
 
-            var appSettingsValue = ConfigHelper.GetAppSettings(key);
+            var appSettingsValue = ConfigHelper.GetAppSettings("OsClient");
+            return appSettingsValue.DosIsNullOrWhiteSpace() ? fallback : appSettingsValue;
+        }
+
+        private static string GetConfiguredDbConnectionValue(string fallback)
+        {
+            var processValue = Environment.GetEnvironmentVariable(
+                "OsClientDbConn",
+                EnvironmentVariableTarget.Process);
+            if (!processValue.DosIsNullOrWhiteSpace()) return processValue;
+
+            var appSettingsValue = ConfigHelper.GetAppSettings("OsClientDbConn");
+            return appSettingsValue.DosIsNullOrWhiteSpace() ? fallback : appSettingsValue;
+        }
+
+        private static string GetConfiguredDbTypeValue(string fallback)
+        {
+            var processValue = Environment.GetEnvironmentVariable(
+                "OsClientDbType",
+                EnvironmentVariableTarget.Process);
+            if (!processValue.DosIsNullOrWhiteSpace()) return processValue;
+
+            var appSettingsValue = ConfigHelper.GetAppSettings("OsClientDbType");
             return appSettingsValue.DosIsNullOrWhiteSpace() ? fallback : appSettingsValue;
         }
 

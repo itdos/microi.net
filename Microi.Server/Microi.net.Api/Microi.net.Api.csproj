@@ -131,6 +131,9 @@
     <ProjectReference Include="..\Microi.Spider\Microi.Spider.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>
+    <ProjectReference Include="..\Microi.OCR\Microi.OCR.csproj">
+      <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
+    </ProjectReference>
     <ProjectReference Include="..\Microi.WeChat\Microi.WeChat.csproj">
       <GlobalPropertiesToRemove></GlobalPropertiesToRemove>
     </ProjectReference>

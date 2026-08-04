@@ -58,6 +58,45 @@ namespace Microi.net
                 tableName,
                 BuildWriteParam(tableName, osClient, payload));
         }
+
+        internal static Task<DosResult> AddTableAsync(
+            string osClient,
+            string tableName,
+            string description,
+            bool onlyCreatePhysicalTable = false)
+        {
+            return MicroiEngine.FormEngine.AddTableAsync(new DiyTableParam
+            {
+                OsClient = osClient,
+                Name = tableName,
+                Description = description ?? "",
+                DataBaseId = "",
+                DataBaseName = "",
+                _OnlyCreateTable = onlyCreatePhysicalTable,
+                _InvokeType = InvokeType.Server.ToString(),
+                _TrustedServerInvocation = true
+            });
+        }
+
+        internal static Task<DosResult> AddFieldAsync(
+            string osClient,
+            DiyFieldParam param)
+        {
+            param.OsClient = osClient;
+            param._InvokeType = InvokeType.Server.ToString();
+            param._TrustedServerInvocation = true;
+            return MicroiEngine.FormEngine.AddFieldAsync(param);
+        }
+
+        internal static Task<DosResult> AddDbFieldAsync(
+            string osClient,
+            DiyFieldParam param)
+        {
+            param.OsClient = osClient;
+            param._InvokeType = InvokeType.Server.ToString();
+            param._TrustedServerInvocation = true;
+            return MicroiEngine.FormEngine.AddDbField(param);
+        }
     }
 
     /// <summary>

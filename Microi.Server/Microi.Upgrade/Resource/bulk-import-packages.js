@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.1.1
+ * Version: v1.1.3
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -12,6 +12,11 @@
 // BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1：旧版后端需要 StopHttp=0 才能进入本引擎，
 // 但 HTTP 控制器会剥离可信标记；这里再同时校验任务 Id、信封和 fencing token，
 // 普通 HTTP 即使伪造任务参数也不能执行批量安装。
+// BULK_PLATFORM_ONLY_PLAN_V1：页面上的“全部安装/更新”只面向 29 个官方平台
+// 应用。UniApp、Web、MicroService 等社区/AI 应用必须由用户逐个选择，禁止把
+// 整个商城的上千个应用和数千张业务表误装到租户。
+// BULK_ADAPTIVE_SINGLE_SLICE_V1：小型官方包按“一个应用一个事务”执行，外层
+// 任务仍在每个应用后持久化检查点；只有大型包继续使用导入器的内部安全分片。
 function text(value, fallback) {
     return value === null || value === undefined ? (fallback || '') : String(value);
 }
@@ -32,6 +37,26 @@ function parseJson(value, fallback) {
 function toInt(value, fallback) {
     var parsed = parseInt(value, 10);
     return isNaN(parsed) ? (fallback || 0) : parsed;
+}
+// BULK_CHILD_FAILURE_DETAIL_V1：子导入器会把字段级异常放在
+// Data['失败详情（共N条）'] 中。批量任务必须把首批详情带到任务中心，
+// 否则只能看到“请查看失败详情”，却没有任何可查看的内容。
+function childFailureDetail(result) {
+    var data = result && result.Data;
+    data = parseJson(data, data);
+    if (!data || typeof data != 'object') return '';
+    var details = [];
+    for (var key in data) {
+        if (!Object.prototype.hasOwnProperty.call(data, key)
+            || text(key).indexOf('失败详情') !== 0) continue;
+        var rows = toArray(data[key]);
+        for (var rowIndex = 0; rowIndex < rows.length && details.length < 3; rowIndex++) {
+            var row = rows[rowIndex] || {};
+            var detail = trim(row.详情 || row.Detail || row.Msg || row.Message || row);
+            if (detail) details.push(detail);
+        }
+    }
+    return details.join('；');
 }
 
 var currentUser = V8.CurrentUser || {};
@@ -58,6 +83,14 @@ if (!trustedBackground) {
 var checkpoint = parseJson(V8.Param._BackgroundTaskCheckpoint, {}) || {};
 if (checkpoint.TaskId && text(checkpoint.TaskId) != taskId) checkpoint = {};
 var phase = text(checkpoint.Phase, 'Discover');
+var checkpointVersion = toInt(checkpoint.Version, 0);
+if (phase == 'Install' && checkpointVersion > 0 && checkpointVersion < 3) {
+    // 旧版计划没有应用类型，曾把社区/AI 应用一并纳入。热更新后必须重新盘点，
+    // 已完成的平台应用会由 InstalledVersions 自动跳过，不能继续沿用错误计划。
+    checkpoint = {};
+    phase = 'Discover';
+}
+var bulkApplicationType = 'Platform';
 var sourceApiBase = trim(
     checkpoint.SourceApiBase
     || V8.Param.StoreApiBase
@@ -120,6 +153,7 @@ function normalizePlan(value) {
     var seen = {};
     for (var i = 0; i < source.length; i++) {
         var item = source[i] || {};
+        if (trim(item.ApplicationType || item.AppType) != bulkApplicationType) continue;
         var key = planItemKey(item);
         if (!key || seen[key]) continue;
         seen[key] = true;
@@ -128,6 +162,7 @@ function normalizePlan(value) {
             AppId: trim(item.AppId),
             AppName: trim(item.AppName || item.Name || item.AppId || item.StoreId),
             AppVersion: trim(item.AppVersion || item.Version),
+            ApplicationType: bulkApplicationType,
             InstallAction: text(item.InstallAction) == 'Update' ? 'Update' : 'Install'
         });
     }
@@ -138,6 +173,7 @@ function appendPlanRows(plan, rows) {
     for (var p = 0; p < plan.length; p++) seen[planItemKey(plan[p])] = true;
     for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
         var row = rows[rowIndex] || {};
+        if (trim(row.ApplicationType || row.AppType) != bulkApplicationType) continue;
         var status = text(row.StoreInstallStatus);
         if (status != 'Uninstalled' && status != 'Outdated') continue;
         var storeId = trim(row.StoreId || row.Id);
@@ -150,6 +186,7 @@ function appendPlanRows(plan, rows) {
             AppId: appId,
             AppName: trim(row.AppName || row.Name || appId),
             AppVersion: trim(row.AppVersion || row.Version),
+            ApplicationType: bulkApplicationType,
             InstallAction: status == 'Outdated' ? 'Update' : 'Install'
         });
     }
@@ -165,6 +202,7 @@ if (phase == 'Discover') {
         PostParam: {
             _PageIndex: pageIndex,
             _PageSize: pageSize,
+            ApplicationType: bulkApplicationType,
             InstalledVersions: installedVersions
         },
         ParamType: 'json',
@@ -180,11 +218,12 @@ if (phase == 'Discover') {
     var dataCount = toInt(listResult.DataCount, rows.length);
     if (pageIndex * pageSize < dataCount) {
         return continuation({
-            Version: 2,
+            Version: 3,
             TaskId: taskId,
             Phase: 'Discover',
             PageIndex: pageIndex + 1,
             Plan: plan,
+            ApplicationType: bulkApplicationType,
             SourceApiBase: sourceApiBase,
             SourceOsClient: sourceOsClient
         }, 2, pageIndex * pageSize, dataCount, '商城应用盘点已完成一页，将从后台任务检查点继续');
@@ -199,7 +238,7 @@ if (phase == 'Discover') {
         };
     }
     return continuation({
-        Version: 2,
+        Version: 3,
         TaskId: taskId,
         Phase: 'Install',
         CurrentIndex: 0,
@@ -207,6 +246,7 @@ if (phase == 'Discover') {
         Updated: 0,
         ChildCheckpoint: {},
         Plan: plan,
+        ApplicationType: bulkApplicationType,
         SourceApiBase: sourceApiBase,
         SourceOsClient: sourceOsClient
     }, 3, 0, plan.length, '批量安装计划已写入后台任务检查点，开始逐个安装/更新');
@@ -244,6 +284,7 @@ var childParam = {
     InstallOperationId: taskId + ':' + (item.StoreId || item.AppId),
     BulkCurrentIndex: currentIndex,
     BulkTotal: total,
+    BulkAdaptiveSingleSlice: true,
     _BackgroundTaskId: taskId,
     _BackgroundTask: taskEnvelope,
     _BackgroundTaskFencingToken: fencingToken,
@@ -253,10 +294,18 @@ var childParam = {
 report(Math.max(3, Math.floor((currentIndex / total) * 100)), currentIndex, total,
     '[' + (currentIndex + 1) + '/' + total + '] 正在' + (item.InstallAction == 'Update' ? '更新' : '安装') + item.AppName);
 var childResult = V8.ApiEngine.Run('import-microi-store-package', childParam);
+childResult = parseJson(childResult, childResult);
 if (!childResult || childResult.Code != 1) {
+    var childMsg = (childResult && childResult.Msg) || '子安装接口无返回';
+    var childDetail = childFailureDetail(childResult);
     return {
         Code: 0,
-        Msg: '应用【' + item.AppName + '】安装/更新失败：' + ((childResult && childResult.Msg) || '子安装接口无返回')
+        Data: {
+            FailedItem: item,
+            ChildData: childResult && childResult.Data ? childResult.Data : null
+        },
+        Msg: '应用【' + item.AppName + '】安装/更新失败：' + childMsg
+            + (childDetail ? '；失败详情：' + childDetail : '')
     };
 }
 
@@ -266,7 +315,7 @@ if (childBackground && childBackground.HasMore === true) {
     var overallProgress = Math.max(3, Math.min(99,
         Math.floor(((currentIndex + childProgress / 100) / total) * 100)));
     return continuation({
-        Version: 2,
+        Version: 3,
         TaskId: taskId,
         Phase: 'Install',
         CurrentIndex: currentIndex,
@@ -274,6 +323,7 @@ if (childBackground && childBackground.HasMore === true) {
         Updated: updatedCount,
         ChildCheckpoint: childBackground.Checkpoint || {},
         Plan: installPlan,
+        ApplicationType: bulkApplicationType,
         SourceApiBase: sourceApiBase,
         SourceOsClient: sourceOsClient
     }, overallProgress, currentIndex + childProgress / 100, total,
@@ -284,7 +334,7 @@ if (item.InstallAction == 'Update') updatedCount++;
 else installedCount++;
 currentIndex++;
 return continuation({
-    Version: 2,
+    Version: 3,
     TaskId: taskId,
     Phase: 'Install',
     CurrentIndex: currentIndex,
@@ -292,6 +342,7 @@ return continuation({
     Updated: updatedCount,
     ChildCheckpoint: {},
     Plan: installPlan,
+    ApplicationType: bulkApplicationType,
     SourceApiBase: sourceApiBase,
     SourceOsClient: sourceOsClient
 }, Math.min(99, Math.floor((currentIndex / total) * 100)), currentIndex, total,

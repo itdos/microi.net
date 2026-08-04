@@ -5,6 +5,10 @@ import { createSvgIconsPlugin } from 'vite-plugin-svg-icons';
 import { visualizer } from 'rollup-plugin-visualizer';
 import compression from 'vite-plugin-compression';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import {
+    createModernPostMinifyFingerprintPlugin,
+    modernBuildTargets
+} from './scripts/modern-build-pipeline.mjs';
 
 const isAnalyzeBuild = process.env.MICROI_BUILD_ANALYZE === 'true';
 const buildOutDir = process.env.MICROI_BUILD_OUT_DIR || 'bin/Release/dist';
@@ -69,6 +73,9 @@ export default defineConfig({
             iconDirs: [path.resolve(process.cwd(), 'src/icons/svg')],
             symbolId: 'icon-[name]'
         }),
+        // JS 压缩移到 Rollup 完全退出后的独立低堆子进程。这里只把压缩流水线版本
+        // 注入 chunk hash，确保压缩参数变化时 CDN 文件名也同步变化。
+        createModernPostMinifyFingerprintPlugin(),
         // 构建分析只在 npm run build:analyze 时启用，避免日常发布额外保留整份 bundle 元数据。
         isAnalyzeBuild && visualizer({
             open: false, // 构建后不自动打开
@@ -147,6 +154,10 @@ export default defineConfig({
     build: {
         outDir: buildOutDir,
         assetsDir: 'static',
+        // Rollup 阶段只负责生成现代 ESM；JS 在 Rollup 退出后逐文件串行压缩，
+        // 避免完整模块图、全部 chunk 字符串和压缩上下文同时驻留。
+        target: 'esnext',
+        cssTarget: modernBuildTargets,
         sourcemap: false,
         // 发布时不再额外计算 gzip 体积；压缩由 nginx 完成，可显著降低大包构建末段的内存峰值。
         reportCompressedSize: false,
@@ -158,10 +169,9 @@ export default defineConfig({
         cssMinify: 'esbuild',
         // 确保 CSS 导入顺序一致
         assetsInlineLimit: 4096,
-        // 🔥 压缩优化 - esbuild 比 terser 快 20-40 倍，体积差异仅 1-2%
-        // Chrome 49 产物由构建保护脚本基于现代 chunk 逐文件串行转换，
-        // 避免完整 Rollup 图与全部 Babel AST 同时驻留。
-        minify: 'esbuild',
+        // JS 会由 build-with-memory-guard 在 Vite 退出后逐文件串行压缩；
+        // Chrome 49 产物随后在另一个独立子进程中逐文件转换。
+        minify: false,
         rollupOptions: {
             // 🔥 确保依赖加载顺序：Vue -> Element Plus -> 其他
             output: {

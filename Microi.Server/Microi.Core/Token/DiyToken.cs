@@ -66,15 +66,10 @@ namespace Microi.net
 
         public static string GetConfiguredJwtRootSecret()
         {
-            // AuthSecret 是启动基础设施密钥，不能从 SaaS runtime reader 回读。
-            // 否则 sys_osclients.AuthSecret 本身会被误判为宿主配置，进程占位值也可能
-            // 获得“Configuration”稳定来源身份。这里只接受真正的宿主环境/静态配置。
-            var value = Environment.GetEnvironmentVariable(
-                            "MICROI_AUTH_SECRET",
-                            EnvironmentVariableTarget.Process)
-                        ?? Environment.GetEnvironmentVariable("MICROI_AUTH_SECRET");
-            if (!value.DosIsNullOrWhiteSpace()) return value;
-            return ConfigHelper.GetConfiguration("Security:AuthSecret");
+            // JWT 密钥唯一事实源是 sys_osclients.AuthSecret。安装环境不再接受额外
+            // AuthSecret 变量或 appsettings 覆盖，避免滚动发布时节点读取到不同密钥。
+            // 保留此方法只为兼容既有内部调用；返回空表示必须验证持久化租户身份。
+            return string.Empty;
         }
 
         /// <summary>
@@ -97,7 +92,7 @@ namespace Microi.net
                     Durable = false,
                     Source = "Unavailable",
                     Fingerprint = string.Empty,
-                    Message = $"租户[{osClient}]的 JWT AuthSecret 为空、过短或等于租户 Key，节点拒绝接收登录流量。请检查 sys_osclients.AuthSecret 或 MICROI_AUTH_SECRET。"
+                    Message = $"租户[{osClient}]的 JWT AuthSecret 为空、过短或等于租户 Key，节点拒绝接收登录流量。请检查 SaaS 引擎 sys_osclients.AuthSecret。"
                 };
             }
 
@@ -113,7 +108,7 @@ namespace Microi.net
                     Durable = false,
                     Source = "ProcessTemporary",
                     Fingerprint = string.Empty,
-                    Message = $"租户[{osClient}]的 JWT AuthSecret 没有稳定来源；拒绝使用进程临时密钥签发或验证 Token。请确保主租户已从 sys_osclients 挂载，或配置稳定的 MICROI_AUTH_SECRET。"
+                    Message = $"租户[{osClient}]的 JWT AuthSecret 没有稳定来源；拒绝使用进程临时密钥签发或验证 Token。请确保主租户已从 sys_osclients 挂载并持久化 AuthSecret。"
                 };
             }
 

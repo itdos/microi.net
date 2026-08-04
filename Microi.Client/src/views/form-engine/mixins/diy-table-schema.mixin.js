@@ -1,5 +1,6 @@
 import _u from "underscore";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
+import { getVisiblePageTabs, resolveInitialPageTab } from "./page-tab-runtime.js";
 
 export default {
     methods: {
@@ -679,7 +680,9 @@ export default {
             self.HandlerBtns(result.Data.PageBtns);
             //注意：表单按钮，一定要先打开表单后再进行判断IsVisible
             // self.HandlerBtns(result.Data.FormBtns);
-            result.Data.PageTabs = result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort);
+            result.Data.PageTabs = Array.isArray(result.Data.PageTabs)
+                ? result.Data.PageTabs.sort((a, b) => a.Sort - b.Sort)
+                : [];
             self.HandlerBtns(result.Data.PageTabs);
             self.HandlerBtns(result.Data.BatchSelectMoreBtns);
             self.TableEnableBatch = self.HasBatchSelectMoreBtns(result.Data) || self.EnableMultipleSelect === true;
@@ -694,40 +697,29 @@ export default {
                 if (self.IsTableChild()) {
                     queryTab = "";
                 }
-                if (!self.DiyCommon.IsNull(queryTab)) {
-                    await result.Data.PageTabs.forEach(async (element) => {
-                        if (element.Name == queryTab) {
-                            self.TableRowListActiveTab = element.Id;
-                            self.CurrentTableRowListActiveTab = element;
-                            //执行V8
-                            //注意：这里要设置搜索条件.V8.SetV8SearchModel([{FieldName : value}, {FieldName2 : value}]);
-                            if (!self.DiyCommon.IsNull(element.V8Code)) {
-                                await self.RunPageTabV8Code(element.V8Code);
-                            }
-                        }
-                    });
-                }
-                //TableRowListActiveTab 虽然给的默认是空'',但实际上是'0'，为啥 ？
-                if (self.DiyCommon.IsNull(self.TableRowListActiveTab) || self.TableRowListActiveTab == "none" || self.TableRowListActiveTab == "0") {
-                  // zhy只针对移动端tabs进行重新筛选出IsVisibale为true的tab,防止设置高亮值TableRowListActiveTab错误
-                    if (self.diyStore.IsPhoneView) {
-                        var activetabs = result.Data.PageTabs.filter(item => {
-                            return item.IsVisible == true
-                        })
-                        self.TableRowListActiveTab = activetabs[0].Id;
-                    } else {
-                      self.TableRowListActiveTab = result.Data.PageTabs[0].Id;
-                    }
-                    var tabModel = result.Data.PageTabs[0];
+                var visiblePageTabs = getVisiblePageTabs(result.Data.PageTabs);
+                var queryTabModel = self.DiyCommon.IsNull(queryTab)
+                    ? null
+                    : visiblePageTabs.find((element) => String(element.Name) === String(queryTab));
+                var currentTabModel = visiblePageTabs.find((element) => String(element.Id) === String(self.TableRowListActiveTab));
+                var tabModel = resolveInitialPageTab(result.Data.PageTabs, {
+                    queryTab: queryTab,
+                    currentTabId: self.TableRowListActiveTab
+                });
+
+                if (tabModel) {
+                    self.TableRowListActiveTab = tabModel.Id;
                     self.CurrentTableRowListActiveTab = tabModel;
-                    //执行V8
-                    //注意：这里要设置搜索条件.V8.SetV8SearchModel([{FieldName : value}, {FieldName2 : value}]);
-                    if (!self.DiyCommon.IsNull(tabModel.V8Code)) {
+                    // URL 指定了可见 Tab，或当前选中项已不可见时，执行实际选中 Tab 的 V8。
+                    // 隐藏 Tab 不得通过 URL 参数触发。
+                    if ((queryTabModel || !currentTabModel) && !self.DiyCommon.IsNull(tabModel.V8Code)) {
                         await self.RunPageTabV8Code(tabModel.V8Code);
                     }
-                    //2020-10-22新增，设置选中第一个Tab，查询一次数据
-                    //2022-05-14 这里不再查询数据，全部After处理好了再查询数据
-                    // self.GetDiyTableRow({_PageIndex : 1});
+                } else {
+                    // 普通角色可能没有任何 PageTab 按钮权限。此时保留列表基础查询，
+                    // 不执行隐藏 Tab 的 V8，也不访问不存在的 activetabs[0]。
+                    self.TableRowListActiveTab = "none";
+                    self.CurrentTableRowListActiveTab = {};
                 }
                 // return self.SysMenuModel.PageTabs;
             } else {
