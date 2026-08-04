@@ -1,4 +1,5 @@
-const DEFAULT_ROLE_PERMISSIONS = ["Add", "Edit", "Del", "Export", "Import"];
+// zhy：菜单被勾选即代表角色可读取该菜单绑定的数据，必须同步保存后端鉴权需要的 Read。
+const DEFAULT_ROLE_PERMISSIONS = ["Read", "Add", "Edit", "Del", "Export", "Import"];
 const ROLE_BUTTON_GROUPS = ["MoreBtns", "ExportMoreBtns", "BatchSelectMoreBtns", "PageBtns", "PageTabs", "FormBtns"];
 
 export function setRoleMenuChecked(row, checked) {
