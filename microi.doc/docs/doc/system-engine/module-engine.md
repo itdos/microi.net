@@ -5,6 +5,14 @@
 ![module-engine](https://static.itdos.com/upload/img/csdn/a1501c7cf43c402eb961952ec2619f43.png#pic_center)
 ## 模块配置
 
+### 用户级登录后首页
+
+每个系统账号都可在 PC 右上角头像菜单的【个人设置】中选择“登录后首页”。设置保存在 `sys_user.DefaultIndexUrl`，而系统级默认首页仍保存在 `sys_config.DefaultIndexUrl`。
+
+登录跳转优先级固定为：当前用户 `sys_user.DefaultIndexUrl` → 系统 `sys_config.DefaultIndexUrl` → 登录接口返回的菜单首页 → 当前用户第一个可访问模块。个人值支持 `/route`、`#/route`、`/#/route`，保存时统一规范为站内路由；外部网址、登录页和访问密钥兑换页不能保存。客户端会用当前动态菜单再次校验权限，菜单被撤权或删除时自动回退，不会停在 404 或空白页。
+
+管理员也可在【系统账号】表单的“个人设置”页签维护该字段。MCP 维护账号数据时使用同名字段 `DefaultIndexUrl`；留空表示继承系统默认值。
+
 ## 左侧菜单统计角标
 
 对库存预警、待审批、未读消息、待回款等需要用户持续关注的菜单，可在模块引擎配置：

@@ -35,7 +35,7 @@ node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --publish
 Remove-Item Env:MICROI_UPGRADE_RESOURCE_TOKEN
 ```
 
-本地执行一键发布时，同步器默认安全复用工作区中已配置并登录的 `microi_itdos` MCP，通过同一个官方接口引擎完成六项资源读取、三方合并、`PublishBatch` 和发布后回读；不会出现“HTTP 读一份、MCP 写另一份”的事实源分叉。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`。CI 没有 MCP 配置但注入了 `MICROI_UPGRADE_RESOURCE_TOKEN` 时，`auto` 模式才回退到官网 HTTP；也可用 `MICROI_UPGRADE_RESOURCE_TRANSPORT=mcp|http|auto` 显式固定传输方式。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
+本地执行一键发布时，同步器默认安全复用工作区中已配置并登录的 `microi_itdos` MCP，通过同一个官方接口引擎完成六项资源读取、三方合并、`PublishBatch` 和发布后回读；不会出现“HTTP 读一份、MCP 写另一份”的事实源分叉。它会严格校验 MCP 必须绑定 `https://api.itdos.com + iTdos`，并继续保留固定资源白名单、官网 SHA 乐观锁及发布后回读校验；同步器不会读取、打印或写入 MCP Token。Token 文件按 `ApiBase|OsClient|OsClientType|OsClientNetwork` 四段精确身份读取，即使后两段为空也保留分隔符，避免误用可能已过期的旧版兼容键；签名失效时由 VS Code SecretStorage 恢复代理重新登录并原子写回。恢复代理通过 `onStartupFinished` 确定性启动，避免大型工作区的递归 `workspaceContains` 扫描超时后无人处理恢复请求。可以用 `MICROI_UPGRADE_RESOURCE_MCP_CONFIG` 显式指定 MCP 配置文件，默认从当前工作区向上查找 `.mcp.json`、`.vscode/mcp.json` 或 `.cursor/mcp.json`；若配置仍指向已安装的旧插件目录，发布器会自动选择同目录下版本更高的已安装插件。CI 没有 MCP 配置但注入了 `MICROI_UPGRADE_RESOURCE_TOKEN` 时，`auto` 模式才回退到官网 HTTP；也可用 `MICROI_UPGRADE_RESOURCE_TRANSPORT=mcp|http|auto` 显式固定传输方式。如果本机既没有可用的官方 MCP 登录态，也没有环境变量令牌，发布仍会中止并给出明确提示。
 
 `Microi一键编译发布.sh` 的后端编译/发布模式会在 `dotnet build` 前自动执行同一条 `--publish` 命令。因此，本地资源或官网资源任一侧更新后，下一次后端发布都会先完成合并、官网写回（如有）、回读和基线更新；冲突、令牌缺失、并发哈希变化或回读不一致都会阻止后端发布。
 
@@ -64,4 +64,4 @@ node Microi.Server/Microi.Upgrade/Resource/refresh-resources.mjs --initialize-ba
 
 刷新后必须构建 `Microi.Upgrade`，确认五个运行期升级资源及随服务器发布的 `ai-app-build.js` 均已作为 `EmbeddedResource` 写入程序集；`official-resource-api.js` 是仅供维护发布链路同步官网接口的源码，不写入运行程序集。发布包运行时不依赖这些源码文件存在。
 
-刷新脚本会拒绝低于 v1.6.6、缺少统一应用商城、断点复用、微服务公有 HDFS 稳定路径、DB 运行产物兜底、Jint 安全清理、原生菜单保护、源码校验或安装统计能力的导入器；也会拒绝低于 v1.4.4 的发布器，以及低于 v6.5.14 或缺少严格 `SourceZip / BuildZip` 资产边界的商城基线，避免维护命令把已修复的本地资源降级。
+刷新脚本会拒绝低于 v1.8.6、缺少接口引擎写后回读、统一应用商城、断点复用、微服务公有 HDFS 稳定路径、DB 运行产物兜底、Jint 安全清理、原生菜单保护、源码校验或安装统计能力的导入器；也会拒绝低于 v1.4.4 的发布器，以及低于 v7.0.5、缺少批量安装后台检查点、可信后台自举保护或严格 `SourceZip / BuildZip` 资产边界的商城基线，避免维护命令把已修复的本地资源降级。批量引擎在兼容尚未部署后端可信调用修复的节点时使用 `StopHttp=0`，但必须同时校验由 HTTP 控制器剥离的 `_TrustedServerInvocation`、任务 Id、任务信封和正数 fencing token；普通 HTTP 仍然失败关闭。

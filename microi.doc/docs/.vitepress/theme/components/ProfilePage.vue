@@ -856,6 +856,34 @@ function restoreSession() {
   syncProfileDraft()
 }
 
+async function refreshCurrentSessionIdentity() {
+  if (!isAuthed.value) return false
+  try {
+    const response = await authenticatedFetch(`${API_BASE}/api/SysUser/RefreshLoginUser`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    })
+    const result = await response.json()
+    if (isSessionExpiredResult(result)) {
+      handleSessionExpired()
+      return false
+    }
+    if (result.Code !== 1 || !result.Data) return false
+
+    currentUser.value = { ...currentUser.value, ...result.Data }
+    localStorage.setItem('microi_doc_user', JSON.stringify(currentUser.value))
+    syncProfileDraft()
+    openClawAuthBridge?.notify()
+    return true
+  } catch {
+    // A refresh failure must not hide the personal center. The backend keeps
+    // the previous cache snapshot intact and normal API calls can still report
+    // an actionable error.
+    return false
+  }
+}
+
 function isSessionExpiredResult(result) {
   const code = Number(result?.Code ?? result?.code ?? 0)
   const message = String(result?.Msg || result?.msg || '')
@@ -1587,9 +1615,10 @@ function logout(goLogin = true) {
   if (goLogin) window.location.href = '/'
 }
 
-function onLoginSuccess() {
+async function onLoginSuccess() {
   restoreSession()
-  refreshCenter()
+  await refreshCurrentSessionIdentity()
+  await refreshCenter()
 }
 
 function onTenantUpdated() {
@@ -1644,6 +1673,8 @@ onMounted(async () => {
   window.addEventListener('hashchange', syncMenuFromHash)
   window.addEventListener('popstate', syncMenuFromHash)
   const returnedFromGitee = isGiteeStarReturn()
+  await refreshCurrentSessionIdentity()
+  if (!isAuthed.value) return
   const valid = await refreshCenter()
   if (valid && returnedFromGitee) {
     await handleGiteeStarReturn()

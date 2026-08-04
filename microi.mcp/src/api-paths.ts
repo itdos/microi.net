@@ -68,6 +68,7 @@ export const API = {
 
   // 低代码系统设计
   CREATE_TABLE: '/api/V8Engine/CreateTable',
+  REPAIR_FIXED_AUDIT_FIELDS: '/api/DiyField/RepairFixedDiyFieldMetadata',
   ADD_FIELD: '/api/V8Engine/AddField',
   DELETE_FIELD: '/api/DiyField/DelDiyField',
   GET_FIELD_LIST: '/api/V8Engine/GetFieldList',

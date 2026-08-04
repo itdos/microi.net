@@ -7,11 +7,19 @@ import { createMcpServer } from './server.js';
 import type { MicroiClient } from './microi-client.js';
 
 test('microi_codex discovers and invokes existing tools through one entry point', async () => {
+  let repairedAuditFieldsInput: { tableId?: string; tableName?: string } | undefined;
   const fakeClient = {
     getStatus: async () => ({
       Code: 1,
       Data: { OsClient: 'junchi', Online: true },
     }),
+    repairFixedAuditFields: async (input: { tableId?: string; tableName?: string }) => {
+      repairedAuditFieldsInput = input;
+      return {
+        Code: 1,
+        Data: { TableName: input.tableName, Repaired: 6 },
+      };
+    },
   } as unknown as MicroiClient;
   const server = createMcpServer(fakeClient, {
     osClient: 'junchi',
@@ -76,6 +84,30 @@ test('microi_codex discovers and invokes existing tools through one entry point'
     assert.match(indexCatalogText, /microi_get_table_indexes/);
     assert.match(indexCatalogText, /microi_create_table_index/);
     assert.match(indexCatalogText, /microi_drop_table_index/);
+
+    const auditCatalog = await client.callTool({
+      name: 'microi_codex',
+      arguments: { action: 'list_tools', params: { keyword: 'audit' } },
+    }) as CallToolResult;
+    const auditCatalogText = auditCatalog.content[0]?.type === 'text'
+      ? auditCatalog.content[0].text
+      : '';
+    assert.match(auditCatalogText, /microi_repair_audit_fields/);
+
+    const auditRepair = await client.callTool({
+      name: 'microi_codex',
+      arguments: {
+        action: 'microi_repair_audit_fields',
+        params: { tableName: 'biz_order' },
+      },
+    }) as CallToolResult;
+    const auditRepairText = auditRepair.content[0]?.type === 'text'
+      ? auditRepair.content[0].text
+      : '';
+    assert.equal(auditRepair.isError, undefined);
+    assert.equal(repairedAuditFieldsInput?.tableName, 'biz_order');
+    assert.equal(repairedAuditFieldsInput?.tableId, undefined);
+    assert.match(auditRepairText, /"Repaired": 6/);
 
     const blockedIndexCreate = await client.callTool({
       name: 'microi_codex',

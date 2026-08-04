@@ -675,6 +675,23 @@ LoadFabPosition() {
         // ========== 性能优化V3 END ==========
 
         // ========== 列头菜单方法 ==========
+        getSystemAuditField(fieldName, fallbackLabel) {
+            var self = this;
+            var metadata = (self.DiyFieldList || []).find(function (item) {
+                return item && String(item.Name || "").toLowerCase() === String(fieldName || "").toLowerCase();
+            });
+            var fallback = (self.DiyCommon.SysDefaultField || []).find(function (item) {
+                return item && String(item.Name || "").toLowerCase() === String(fieldName || "").toLowerCase();
+            }) || {};
+            return Object.assign({}, fallback, metadata || {}, {
+                Id: (metadata && metadata.Id) || fallback.Id || fieldName,
+                Name: fieldName,
+                Label: (metadata && metadata.Label) || fallbackLabel || fallback.Label || fieldName,
+                Component: (metadata && metadata.Component) || fallback.Component || (fieldName.indexOf("Time") > -1 ? "DateTime" : "Text"),
+                Type: (metadata && metadata.Type) || fallback.Type || "varchar(50)",
+                Config: (metadata && metadata.Config) || fallback.Config || {}
+            });
+        },
         showColHeaderMenu(field, event) {
             var self = this;
             event.stopPropagation();

@@ -34,10 +34,14 @@ export default {
         GetTableCardCol() {
             var self = this;
             if (!self.SysMenuModel || !self.SysMenuModel.TableCardCol) {
-                return 4; // 默认每行4个，span=6
+                return 6; // 默认每行4个，Element 栅格 span=6
             }
 
-            const cardsPerRow = self.SysMenuModel.TableCardCol;
+            const cardsPerRow = Number(self.SysMenuModel.TableCardCol);
+
+            if (!Number.isFinite(cardsPerRow) || cardsPerRow <= 0) {
+                return 6;
+            }
             
             // 特殊处理一行5个的情况
             if (cardsPerRow === 5) {
@@ -55,9 +59,9 @@ export default {
         IsCardFiveCol() {
             var self = this;
             if (!self.SysMenuModel || !self.SysMenuModel.TableCardCol) {
-                return true;
+                return false;
             }
-            return self.SysMenuModel && self.SysMenuModel.TableCardCol === 5;
+            return Number(self.SysMenuModel.TableCardCol) === 5;
         },
         
         /**
