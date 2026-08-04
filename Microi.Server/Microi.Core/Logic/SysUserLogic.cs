@@ -1535,7 +1535,6 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                     });
                     if (userModelResult.Code == 1)
                     {
-                        var errorMsg = "";
                         #region GetSysUserOtherInfo
                         JObject sysUser = JObject.FromObject(userModelResult.Data);
 
@@ -1545,14 +1544,19 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                         {
                             try
                             {
-                                roleIds = JsonHelper.Deserialize<List<string>>(sysUser["RoleIds"].Val<string>());
+                                roleIds = JsonHelper.Deserialize<List<string>>(sysUser["RoleIds"].Val<string>())
+                                    ?? new List<string>();
                             }
-                            catch (Exception ex)
+                            catch (Exception)
                             {
 
                                 var roles = JsonHelper.Deserialize<List<SysRole>>(sysUser["RoleIds"].Val<string>());
-                                roleIds = roles.Select(d => d.Id).ToList();
+                                roleIds = roles?.Select(d => d.Id).ToList() ?? new List<string>();
                             }
+                            roleIds = roleIds
+                                .Where(d => !d.DosIsNullOrWhiteSpace())
+                                .Distinct(StringComparer.OrdinalIgnoreCase)
+                                .ToList();
                             if (!roleIds.Any())
                             {
                                 sysUser["_IsAdmin"] = false;
@@ -1561,23 +1565,23 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                             }
                             else
                             {
-                                var roleList = await MicroiEngine.FormEngine.GetTableDataAsync<SysRole>(new
+                                // Identity refresh is an internal trusted operation. Reading protected
+                                // platform tables through FormEngine can be filtered by the caller's
+                                // role and must never turn a transient/authorization failure into an
+                                // empty role snapshot in the shared login cache.
+                                var roleList = await new SysRoleLogic().GetSysRole(new SysRoleParam
                                 {
-                                    FormEngineKey = "sys_role",
-                                    _Where = new List<DiyWhere>() {
-                                            new DiyWhere(){
-                                                Name = "Id",
-                                                Value = JsonHelper.Serialize(roleIds),
-                                                Type = "In"
-                                            }
-                                        },
-                                    //Ids = roleIds,
+                                    Ids = roleIds,
+                                    IsDeleted = 0,
                                     OsClient = osClient
                                 });
-
-                                sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
-
-
+                                if (roleList.Code != 1 || roleList.Data == null)
+                                {
+                                    return new DosResult<dynamic>(
+                                        0,
+                                        null,
+                                        roleList.Msg ?? "刷新用户角色失败，原登录缓存未修改。");
+                                }
 
                                 //var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam()
                                 //{
@@ -1585,37 +1589,30 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                                 //    OsClient = osClient
                                 //});
 
-                                var sysMenuLimits = await MicroiEngine.FormEngine.GetTableDataAsync<SysRoleLimit>(new
+                                var sysMenuLimits = await new SysRoleLimitLogic().GetSysRoleLimit(new SysRoleLimitParam
                                 {
-                                    FormEngineKey = "sys_rolelimit",
-                                    _Where = new List<DiyWhere>() {
-                                            new DiyWhere(){
-                                                Name = "RoleId",
-                                                Value = JsonHelper.Serialize(roleList.Data.Select(d => d.Id).ToList()),
-                                                Type = "In"
-                                            }
-                                        },
+                                    RoleIds = roleList.Data.Select(d => d.Id).ToList(),
                                     OsClient = osClient
                                 });
-                                if (sysMenuLimits.Code == 1)
+                                if (sysMenuLimits == null)
                                 {
-                                    sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits.Data);
+                                    return new DosResult<dynamic>(
+                                        0,
+                                        null,
+                                        "刷新用户角色权限失败，原登录缓存未修改。");
                                 }
-                                else
-                                {
-                                    sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
-                                    sysUser["_RoleLimitsError7"] = sysMenuLimits.Msg;
-                                }
+
+                                sysUser["_Roles"] = JTokenEx.FromObject(roleList.Data);
+                                sysUser["_RoleLimits"] = JTokenEx.FromObject(sysMenuLimits);
                                 sysUser["_IsAdmin"] = sysUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
                             }
                         }
                         catch (Exception ex)
                         {
-                            errorMsg = ex.Message;
-                            sysUser["_IsAdmin"] = false;
-                            sysUser["_Roles"] = JTokenEx.FromObject(new List<SysRole>());
-                            sysUser["_RoleLimits"] = JTokenEx.FromObject(new List<SysRoleLimit>());
-                            sysUser["_RoleLimitsError6"] = ex.Message;
+                            return new DosResult<dynamic>(
+                                0,
+                                null,
+                                $"刷新用户角色权限失败，原登录缓存未修改：{ex.Message}");
                         }
 
                         #endregion
@@ -1627,7 +1624,7 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
                         await DiyCacheBase.SetAsync($"Microi:{osClient}:LoginTokenSysUser:{userId}", currentToken);
                         return new DosResult<dynamic>(1, currentToken.CurrentUser, "", new
                         {
-                            ErrorMsg = errorMsg
+                            ErrorMsg = ""
                         });
                     }
                     else

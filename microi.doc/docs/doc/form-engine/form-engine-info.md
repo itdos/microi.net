@@ -34,6 +34,14 @@
 > 重头戏来了：表单引擎也由表单引擎驱动！即表单引擎列表、表单属性、字段属性也是由表单引擎驱动
 <img src="https://static.itdos.com/upload/img/csdn/f4ead7346e69b9d362e50d3aafb9dcfe.png">
 
+### 固定审计字段不是异常字段
+
+平台表固定包含 `Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted`。这些字段必须同时存在物理列和 `diy_field` 元数据；它们属于正常表单字段，不应出现在设计器【异常字段修复】列表。
+
+表单属性【显示默认字段】对应 `diy_table.DisplayDefaultField`，默认关闭时只是隐藏上述字段，并不删除元数据。打开后可以在设计器中查看和配置。进入异常字段页时，平台会在租户级分布式锁内为“物理列已存在、元数据缺失”的固定字段自动补齐或恢复元数据，并刷新共享缓存；不会重复执行 DDL。
+
+MCP 可用 `microi_repair_audit_fields` 按 `tableId` 或 `tableName` 修复任意已有表，适合直接说“修复某表的审计字段异常”。新建表时 `microi_create_table` 会一次创建六个固定物理列及其 `diy_field` 元数据。列表中的创建人、创建时间、修改时间也与普通字段一样支持点击列头打开高级搜索。
+
 ## 还有更多如任务调度、MQ等均由表单引擎驱动
 > 后期再补充
 

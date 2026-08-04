@@ -177,6 +177,8 @@ VS Code 插件必须让用户清楚知道本地和远端是否一致。
 3. 后端也缺通用 API：补 `V8EngineController` 或对应平台控制器的通用能力，再补 MCP。
 4. 只有租户私有业务逻辑才新建接口引擎。
 
+交付包含 DIY 表时，验收固定审计物理列与 `diy_field` 元数据一致；发现 `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted` 被列为异常字段时，调用通用修复接口或 MCP `microi_repair_audit_fields` 幂等修复并回读。交付用户个性化首页时，同时验收 Token 绑定保存、站内路由规范化、权限失效回退，以及账号密码、Token 与 SSO 三种登录入口的一致性。
+
 不要用租户接口引擎修平台设计器、全局上传限制、VS Code 插件同步、MCP 元数据写入等平台级问题。
 
 ## 平台安全与存量兼容验收（强制）

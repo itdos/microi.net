@@ -65,6 +65,37 @@ function normalizeIframeRouteUrl(url) {
     return "/iframe/" + encodeURIComponent(rawUrl);
 }
 
+function getUserDefaultIndexUrl(user) {
+    var value = user && user.DefaultIndexUrl ? String(user.DefaultIndexUrl).trim() : "";
+    if (!value || /^(https?:)?\/\//i.test(value)) return "";
+    var normalized = normalizeMenuRoutePath(value);
+    var routePath = normalized.split(/[?#]/)[0];
+    return routePath === "/login" || routePath === "/access-login" ? "" : normalized;
+}
+
+async function getAuthorizedUserDefaultIndexUrl(user) {
+    var candidate = getUserDefaultIndexUrl(user);
+    if (!candidate) return "";
+    try {
+        const userStore = useUserStore(pinia);
+        const permissionStore = usePermissionStore(pinia);
+        var accessRoutes = permissionStore.addRoutes || [];
+        if (accessRoutes.length === 0) {
+            const roles = userStore.roles && userStore.roles.length > 0 ? userStore.roles : ["admin"];
+            if (!userStore.roles || userStore.roles.length === 0) userStore.setRoles(roles);
+            accessRoutes = await permissionStore.generateRoutes(roles);
+            accessRoutes.forEach((route) => {
+                try { router.addRoute(route); } catch (_) { }
+            });
+        }
+        var candidatePath = candidate.split(/[?#]/)[0];
+        return hasAccessibleRoutePath(accessRoutes, candidatePath) ? candidate : "";
+    } catch (error) {
+        console.warn("[permission] 用户默认首页权限校验失败：", error && error.message);
+        return "";
+    }
+}
+
 function getPermissionFallbackPath(routes, targetPath) {
     const normalizedTarget = normalizeMenuRoutePath(targetPath || "/");
     if (hasAccessibleRoutePath(routes, normalizedTarget)) return "";
@@ -134,7 +165,7 @@ router.beforeEach(async (to, from, next) => {
             const diyStore = useDiyStore(pinia);
             diyStore.setState("SystemStyle", "Classic");
             diyStore.setCurrentUser(directLoginResult.Data);
-            // 优先级：to.path（当前目标路径） > to.query.redirect > SysConfig.DefaultIndexUrl > /
+            // 优先级：当前目标 > redirect > 用户个人首页 > 系统默认首页 > /
             // 1. 当前目标路径不是/login，说明用户要直接访问该页面
             if (to.path && to.path !== '/login' && to.path !== '/') {
                 next({ ...to, replace: true });
@@ -149,7 +180,13 @@ router.beforeEach(async (to, from, next) => {
                     return;
                 }
             }
-            // 3. 检查系统默认首页配置
+            // 3. 检查用户个人首页配置
+            var userDefaultIndexUrl = await getAuthorizedUserDefaultIndexUrl(directLoginResult.Data);
+            if (userDefaultIndexUrl) {
+                next({ path: userDefaultIndexUrl, replace: true });
+                return;
+            }
+            // 4. 检查系统默认首页配置
             var sysConfigResult = await DiyCommon.FormEngine.GetFormDataAnonymous({
                 FormEngineKey: "Sys_Config",
                 _Where: [["IsEnable", "=", 1]],
@@ -202,6 +239,12 @@ router.beforeEach(async (to, from, next) => {
                 const diyStore = useDiyStore(pinia);
                 diyStore.setState("SystemStyle", "Classic");
                 diyStore.setCurrentUser(ssoApiResult.Data);
+
+                var ssoUserDefaultIndexUrl = await getAuthorizedUserDefaultIndexUrl(ssoApiResult.Data);
+                if (ssoUserDefaultIndexUrl) {
+                    next({ path: ssoUserDefaultIndexUrl, replace: true });
+                    return;
+                }
 
                 //--- 2023-06-06新增此逻辑
                 //这里需要跳转到sys_menu的第一个路由

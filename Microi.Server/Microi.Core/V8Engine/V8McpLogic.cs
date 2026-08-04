@@ -3632,9 +3632,22 @@ namespace Microi.net
                 var url = item["Url"].Val<string>();
                 var targetSysMenuId = item["TargetSysMenuId"].Val<string>();
                 var hasRelatedModule = fieldName == "PageTabs" && !targetSysMenuId.DosIsNullOrWhiteSpace();
-                if (v8Code.DosIsNullOrWhiteSpace() && url.DosIsNullOrWhiteSpace() && !hasRelatedModule)
+                var runBackground = item["RunBackground"].Val<bool?>() == true
+                    || item["BackgroundTask"].Val<bool?>() == true
+                    || item["IsBackgroundTask"].Val<bool?>() == true;
+                var apiEngineKey = item["ApiEngineKey"].Val<string>();
+                if (apiEngineKey.DosIsNullOrWhiteSpace())
                 {
-                    return (false, rawValue, $"{fieldName}[{i}] 必须配置 V8Code、Url 或关联模块 TargetSysMenuId");
+                    apiEngineKey = item["BackgroundApiEngineKey"].Val<string>();
+                }
+                var hasBackgroundApiEngine = runBackground && !apiEngineKey.DosIsNullOrWhiteSpace();
+                if (v8Code.DosIsNullOrWhiteSpace()
+                    && url.DosIsNullOrWhiteSpace()
+                    && !hasRelatedModule
+                    && !hasBackgroundApiEngine)
+                {
+                    return (false, rawValue,
+                        $"{fieldName}[{i}] 必须配置 V8Code、Url、关联模块 TargetSysMenuId，或后台任务 ApiEngineKey");
                 }
 
                 var id = item["Id"].Val<string>();

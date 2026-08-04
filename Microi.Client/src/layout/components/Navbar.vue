@@ -77,6 +77,12 @@
                 </div>
                 <template #dropdown>
                     <el-dropdown-menu>
+                        <el-dropdown-item @click="OpenPersonalSettings">
+                            <span style="display: block">
+                                <el-icon><User /></el-icon>
+                                {{ "个人设置" }}</span
+                            >
+                        </el-dropdown-item>
                         <el-dropdown-item @click="OpenUptPwd">
                             <span style="display: block">
                                 <el-icon><Setting /></el-icon>
@@ -124,6 +130,39 @@
             </template>
         </el-dialog>
 
+        <el-dialog
+            draggable
+            align-center
+            title="个人设置"
+            v-model="dialogPersonalSettings"
+            :modal-append-to-body="false"
+            :close-on-click-modal="false"
+            width="520px">
+            <el-form label-width="110px">
+                <el-form-item label="登录后首页">
+                    <el-select
+                        v-model="FormPersonalSettings.DefaultIndexUrl"
+                        filterable
+                        clearable
+                        style="width: 100%"
+                        placeholder="留空则使用系统默认首页">
+                        <el-option
+                            v-for="item in DefaultRouteOptions"
+                            :key="item.path"
+                            :label="item.label"
+                            :value="item.path" />
+                    </el-select>
+                    <div class="personal-settings-help">仅列出当前账号有权限的站内页面；权限变化后若原页面不可访问，登录时会自动回退。</div>
+                </el-form-item>
+            </el-form>
+            <template #footer>
+                <div class="dialog-footer">
+                    <el-button :icon="Close" @click="dialogPersonalSettings = false">取 消</el-button>
+                    <el-button type="primary" :icon="Check" :loading="personalSettingsSaving" @click="SavePersonalSettings">保 存</el-button>
+                </div>
+            </template>
+        </el-dialog>
+
         <!-- 遮罩层 -->
         <div v-show="DiyChatShow" @click="SwitchDiyChatShow" class="chat_overlay"></div>
         <div class="diy-chat" v-show="DiyChatShow">
@@ -141,9 +180,10 @@ import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
 import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
 import DesktopAiAssistant from "@/components/DesktopAiAssistant/index.vue";
-import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
+import { useDiyStore, useAppStore, useUserStore, usePermissionStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
+import routePath from "@/utils/path";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
@@ -160,6 +200,7 @@ export default {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
         const userStore = useUserStore();
+        const permissionStore = usePermissionStore();
 
         const sidebar = computed(() => appStore.sidebar);
         const device = computed(() => appStore.device);
@@ -174,11 +215,13 @@ export default {
         const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
         const SysConfig = computed(() => diyStore.SysConfig);
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
+        const routes = computed(() => permissionStore.routes);
 
         return {
             diyStore,
             appStore,
             userStore,
+            permissionStore,
             hasWebOS,
             sidebar,
             device,
@@ -193,6 +236,7 @@ export default {
             ShowClassicTop,
             SysConfig,
             GetCurrentUser,
+            routes,
         };
     },
     data() {
@@ -205,6 +249,12 @@ export default {
             CurrentUserAvatarUrl: "./static/img/icon/personal.png",
             isBrowserFullScreen: !!document.fullscreenElement,
             dialogUptPwd: false,
+            dialogPersonalSettings: false,
+            personalSettingsSaving: false,
+            DefaultRouteOptions: [],
+            FormPersonalSettings: {
+                DefaultIndexUrl: ""
+            },
             FormUptPwd: {
                 Pwd: "",
                 NewPwd: "",
@@ -292,6 +342,60 @@ export default {
         }
     },
     methods: {
+        BuildDefaultRouteOptions(routes, basePath = "/", prefixTitle = []) {
+            var self = this;
+            var result = [];
+            var source = Array.isArray(routes) ? routes : [];
+            source.forEach(function (route) {
+                if (!route || route.hidden) return;
+                var currentPath = routePath.resolve(basePath, route.path || "");
+                var titles = prefixTitle.slice();
+                if (route.meta && route.meta.title) {
+                    titles.push(self.$t(route.meta.title));
+                    if (route.redirect !== "noRedirect" && currentPath !== "/") {
+                        result.push({ path: currentPath, label: titles.join(" > ") || currentPath });
+                    }
+                }
+                if (Array.isArray(route.children)) {
+                    result = result.concat(self.BuildDefaultRouteOptions(route.children, currentPath, titles));
+                }
+            });
+            var seen = {};
+            return result.filter(function (item) {
+                if (!item.path || seen[item.path]) return false;
+                seen[item.path] = true;
+                return true;
+            });
+        },
+        OpenPersonalSettings() {
+            this.DefaultRouteOptions = this.BuildDefaultRouteOptions(this.routes);
+            this.FormPersonalSettings.DefaultIndexUrl = this.GetCurrentUser?.DefaultIndexUrl || "";
+            this.dialogPersonalSettings = true;
+        },
+        async SavePersonalSettings() {
+            var self = this;
+            self.personalSettingsSaving = true;
+            try {
+                var result = await self.DiyCommon.PostAsync(
+                    "/api/SysUser/UpdateMyDefaultIndexUrl",
+                    { DefaultIndexUrl: self.FormPersonalSettings.DefaultIndexUrl || "" },
+                    null,
+                    null,
+                    "json"
+                );
+                if (!result || result.Code != 1) {
+                    self.DiyCommon.Tips((result && result.Msg) || "登录后首页保存失败。", false);
+                    return;
+                }
+                if (result.Data) self.diyStore.setCurrentUser(result.Data);
+                self.dialogPersonalSettings = false;
+                self.DiyCommon.Tips("登录后首页已保存，下次登录生效。", true);
+            } catch (error) {
+                self.DiyCommon.Tips("登录后首页保存失败：" + error.message, false);
+            } finally {
+                self.personalSettingsSaving = false;
+            }
+        },
         toggleBrowserFullScreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(() => {});
@@ -634,5 +738,12 @@ export default {
             }
         }
     }
+}
+
+.personal-settings-help {
+    margin-top: 8px;
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 12px;
+    line-height: 1.6;
 }
 </style>

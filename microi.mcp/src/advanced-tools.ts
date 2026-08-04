@@ -349,6 +349,8 @@ export function buildStoreApplicationBackgroundRequest(input: StoreApplicationTa
       StoreOsClient: storeOsClient,
       InstallParentSysMenuId: input.installParentSysMenuId,
       ResumeInstall: input.resumeInstall !== false,
+      InstallAction: input.operation === 'update' ? 'Update' : 'Install',
+      InstallOperationId: requestId,
     }),
     Options: {
       IdempotencyKey: `mcp:store:${input.operation}:${storeId}:${requestId}`,

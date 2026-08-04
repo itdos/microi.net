@@ -686,6 +686,14 @@ export default {
                     if (result.Code == 1) {
                         // self.CurrentErrorFieldModel = {};
                         self.ExceptionFieldList = result.Data;
+                        var repaired = result.DataAppend && Number(result.DataAppend.Repaired || 0) > 0;
+                        if (repaired) {
+                            self.$nextTick(function () {
+                                if (self.$refs.fieldForm && typeof self.$refs.fieldForm.GetDiyField === "function") {
+                                    self.$refs.fieldForm.GetDiyField(null, false);
+                                }
+                            });
+                        }
                     }
                 }
             );

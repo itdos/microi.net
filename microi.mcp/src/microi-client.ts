@@ -44,8 +44,10 @@ export interface MicroiConfig {
 
 /**
  * Return token-file keys from the most specific tenant identity to legacy keys.
- * New writers use api|os|type|network, while readers keep accepting the older
- * api|os|type, api|os and api layouts during migration.
+ * New writers use api|os|type|network even when type/network are empty, while
+ * readers keep accepting the older compact api|os|type, api|os and api layouts
+ * during migration. Keeping the empty segments is important: the VS Code
+ * broker may intentionally leave an ambiguous legacy alias untouched.
  */
 export function buildTokenFileLookupKeys(
   apiBaseUrl: string,
@@ -59,13 +61,15 @@ export function buildTokenFileLookupKeys(
   const tenantNetwork = String(osClientNetwork || '').trim();
   const keys: string[] = [];
 
-  if (tenant && (tenantType || tenantNetwork)) {
-    keys.push(`${apiUrl}|${tenant}|${tenantType}|${tenantNetwork}`);
-  }
-  if (tenant && tenantType) {
-    keys.push(`${apiUrl}|${tenant}|${tenantType}`);
-  }
   if (tenant) {
+    keys.push(`${apiUrl}|${tenant}|${tenantType}|${tenantNetwork}`);
+    const compactIdentity = [apiUrl, tenant, tenantType, tenantNetwork]
+      .filter(Boolean)
+      .join('|');
+    keys.push(compactIdentity);
+    if (tenantType) {
+      keys.push(`${apiUrl}|${tenant}|${tenantType}`);
+    }
     keys.push(`${apiUrl}|${tenant}`);
   }
   keys.push(apiUrl);
@@ -1996,6 +2000,14 @@ export class MicroiClient {
       Name: name,
       Description: description || '',
       ...options,
+    });
+  }
+
+  async repairFixedAuditFields(input: { tableId?: string; tableName?: string }): Promise<ApiResponse> {
+    return this.post(API.REPAIR_FIXED_AUDIT_FIELDS, {
+      OsClient: this.config.osClient,
+      TableId: input.tableId,
+      TableName: input.tableName,
     });
   }
 

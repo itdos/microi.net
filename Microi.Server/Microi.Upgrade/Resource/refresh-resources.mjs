@@ -52,7 +52,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_008_003
+    if (versionNumber < 1_008_006
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -74,8 +74,9 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('SCHEMA_BACKGROUND_CHUNKS_V1')
       || !content.includes('APPLICATION_ASSET_BACKGROUND_CHUNKS_V1')
       || !content.includes('ASSET_METADATA_WITHOUT_SECOND_DECODE_V1')
-      || !content.includes('DATASET_INSERT_IF_MISSING_V1')) {
-      throw new Error(`${name} 低于 v1.8.3 或缺少后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
+      || !content.includes('DATASET_INSERT_IF_MISSING_V1')
+      || !content.includes('PACKAGE_API_ENGINE_READBACK_V1')) {
+      throw new Error(`${name} 低于 v1.8.6 或缺少接口引擎写后回读、后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -129,10 +130,28 @@ function validateReleaseCandidate(name, content) {
       const menuTabsValid = menus.length === 3 && menus.every(menu => {
         try {
           const tabs = typeof menu.PageTabs === 'string' ? JSON.parse(menu.PageTabs) : menu.PageTabs;
-          return Array.isArray(tabs)
-            && tabs.map(tab => tab.Name).join('|') === expectedTabs.join('|');
+          const names = Array.isArray(tabs) ? tabs.map(tab => tab.Name) : [];
+          return names.length === expectedTabs.length
+            && names.every((tabName, index) => (
+              index === 1
+                ? ['我安装的应用', '已安装'].includes(tabName)
+                : tabName === expectedTabs[index]
+            ));
         } catch {
           return false;
+        }
+      });
+      const menuTabDiagnostics = menus.map(menu => {
+        try {
+          const tabs = typeof menu.PageTabs === 'string' ? JSON.parse(menu.PageTabs) : menu.PageTabs;
+          return {
+            id: menu.Id || '',
+            name: menu.Name || '',
+            pageTabsType: typeof menu.PageTabs,
+            names: Array.isArray(tabs) ? tabs.map(tab => tab.Name) : [],
+          };
+        } catch (error) {
+          return { id: menu.Id || '', name: menu.Name || '', error: error.message };
         }
       });
       const fields = Array.isArray(packageModel?.DiyFields) ? packageModel.DiyFields : [];
@@ -142,6 +161,7 @@ function validateReleaseCandidate(name, content) {
       const buildZipEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_download_build_zip');
       const sourceZipEngine = engines.find(engine => engine.ApiEngineKey === 'ai_app_download_source_zip');
       const importerEngine = engines.find(engine => engine.ApiEngineKey === 'import-microi-store-package');
+      const bulkEngine = engines.find(engine => engine.ApiEngineKey === 'bulk-import-microi-store-packages');
       const engineVersionNumber = engine => {
         const parts = String(engine?.Version || '')
           .replace(/^v/i, '')
@@ -157,7 +177,7 @@ function validateReleaseCandidate(name, content) {
         + (importerVersionParts[1] || 0) * 1_000
         + (importerVersionParts[2] || 0);
       const importerCode = String(importerEngine?.ApiV8Code || '');
-      if (versionNumber < 6_005_014
+      if (versionNumber < 7_000_005
         || !content.includes('TargetSysMenuId')
         || !content.includes('01KXFSG7MZ40CY8KCWCZZZJH2M')
         || !content.includes('01KXFSG8153B3VZPZ45WNCCFHR')
@@ -173,7 +193,13 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_008_003
+        || importerVersionNumber < 1_008_006
+        || engineVersionNumber(bulkEngine) < 1_001_001
+        || Number(bulkEngine?.IsEnable) !== 1
+        || Number(bulkEngine?.StopHttp) !== 0
+        || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1')
+        || !content.includes("RunBackground('bulk-import-microi-store-packages'")
         || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
         || !importerCode.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')
         || !importerCode.includes('DB_RUNTIME_BUILD_ASSETS_V1')
@@ -183,8 +209,47 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('SCHEMA_BACKGROUND_CHUNKS_V1')
       || !importerCode.includes('APPLICATION_ASSET_BACKGROUND_CHUNKS_V1')
       || !importerCode.includes('ASSET_METADATA_WITHOUT_SECOND_DECODE_V1')
-      || !importerCode.includes('DATASET_INSERT_IF_MISSING_V1')) {
-        throw new Error(`${name} 版本过旧，或缺少统一商城及严格 SourceZip/BuildZip 资产边界能力`);
+      || !importerCode.includes('DATASET_INSERT_IF_MISSING_V1')
+      || !importerCode.includes('PACKAGE_API_ENGINE_READBACK_V1')) {
+        throw new Error(
+          `${name} 版本过旧，或缺少统一商城及严格 SourceZip/BuildZip 资产边界能力：`
+          + JSON.stringify({
+            versionNumber,
+            menuCount: menus.length,
+            menuTabsValid,
+            menuTabDiagnostics,
+            applicationTypeComponent: applicationType?.Component || '',
+            applicationTypeOptions,
+            buildZipVersion: buildZipEngine?.Version || '',
+            buildZipMarker: String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1'),
+            sourceZipVersion: sourceZipEngine?.Version || '',
+            sourceZipMarker: String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1'),
+            importerVersion,
+            bulkVersion: bulkEngine?.Version || '',
+            bulkMarker: String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2'),
+            bulkTrustedBootstrap: String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1'),
+            missingPackageMarkers: [
+              'TargetSysMenuId',
+              '01KXFSG7MZ40CY8KCWCZZZJH2M',
+              '01KXFSG8153B3VZPZ45WNCCFHR',
+              'PublisherTypes',
+              'StoreInstallStatus',
+            ].filter(marker => !content.includes(marker)),
+            missingImporterMarkers: [
+              'SKIP_MOVE_FOR_REUSED_BUILD_V1',
+              'MICRO_APP_PUBLIC_HDFS_PATH_V1',
+              'DB_RUNTIME_BUILD_ASSETS_V1',
+              'PRUNE_ASSET_IDS_WITH_DELFORM_V1',
+              'BACKGROUND_TASK_BOOTSTRAP_READINESS_V1',
+              'BACKGROUND_TASK_RUNTIME_SCOPE_V1',
+              'SCHEMA_BACKGROUND_CHUNKS_V1',
+              'APPLICATION_ASSET_BACKGROUND_CHUNKS_V1',
+              'ASSET_METADATA_WITHOUT_SECOND_DECODE_V1',
+              'DATASET_INSERT_IF_MISSING_V1',
+              'PACKAGE_API_ENGINE_READBACK_V1',
+            ].filter(marker => !importerCode.includes(marker)),
+          }),
+        );
       }
     }
   }
@@ -365,16 +430,14 @@ async function readCurrentReleaseVersion() {
 
 await mkdir(outputDirectory, { recursive: true });
 if (process.argv.includes('--synchronize-local')) {
-  const importerSource = await readFile(resolve(outputDirectory, 'import-package.js'), 'utf8');
-  const publisherSource = await readFile(resolve(outputDirectory, 'ai-app-publish-store.js'), 'utf8');
-  const builderSource = await readFile(resolve(outputDirectory, 'ai-app-build.js'), 'utf8');
   const packagePath = resolve(outputDirectory, 'app.microi.store.json');
   const packageContent = await readFile(packagePath, 'utf8');
-  const standaloneContents = new Map([
-    ['import-package.js', importerSource],
-    ['ai-app-publish-store.js', publisherSource],
-    ['ai-app-build.js', builderSource],
-  ]);
+  const standaloneContents = new Map(await Promise.all(
+    applicationStoreReplicaMappings.map(async mapping => [
+      mapping.resourceName,
+      await readFile(resolve(outputDirectory, mapping.resourceName), 'utf8'),
+    ]),
+  ));
   const synchronized = synchronizeApplicationStoreEngines(packageContent, standaloneContents);
   validateReleaseCandidate('app.microi.store.json', synchronized);
   await writeFile(packagePath, synchronized, 'utf8');
@@ -401,15 +464,20 @@ if (process.argv.includes('--synchronize-local')) {
       baseResources.set(name, canonicalizeResource(name, baseContent));
     }
   }
-  const builderPath = resolve(outputDirectory, 'ai-app-build.js');
-  const rawBuilderSource = await readFile(builderPath, 'utf8');
-  const localStandaloneContents = new Map([
-    ...publishedApplicationStoreReplicaMappings.map(mapping => [
+  const rawLocalStandaloneContents = new Map();
+  const localStandaloneContents = new Map();
+  for (const mapping of applicationStoreReplicaMappings) {
+    if (mapping.publishedStandalone) {
+      localStandaloneContents.set(mapping.resourceName, localResources.get(mapping.resourceName));
+      continue;
+    }
+    const rawSource = await readFile(resolve(outputDirectory, mapping.resourceName), 'utf8');
+    rawLocalStandaloneContents.set(mapping.resourceName, rawSource);
+    localStandaloneContents.set(
       mapping.resourceName,
-      localResources.get(mapping.resourceName),
-    ]),
-    ['ai-app-build.js', canonicalizeResource('ai-app-build.js', rawBuilderSource)],
-  ]);
+      canonicalizeResource(mapping.resourceName, rawSource),
+    );
+  }
 
   let remoteResources;
   try {
@@ -438,8 +506,18 @@ if (process.argv.includes('--synchronize-local')) {
 
   if (repairBaseFromRemote) {
     const remotePackageContent = remoteResources.get(applicationStorePackageName).content;
+    const remotePackageModel = JSON.parse(remotePackageContent);
+    const remoteEngineKeys = new Set(
+      (Array.isArray(remotePackageModel.SysApiEngines) ? remotePackageModel.SysApiEngines : [])
+        .map(engine => engine.ApiEngineKey),
+    );
+    // 共同基线修复用于处理“本地已经新增副本映射、官网尚未首次发布该引擎”的状态。
+    // 只校验官网包中真实存在的副本；缺失的新映射必须留给后续三方合并按首次新增规则发布。
+    const remoteReplicaMappings = applicationStoreReplicaMappings.filter(
+      mapping => remoteEngineKeys.has(mapping.apiEngineKey),
+    );
     const remoteStandaloneContents = new Map(
-      applicationStoreReplicaMappings.map(mapping => [
+      remoteReplicaMappings.map(mapping => [
         mapping.resourceName,
         mapping.publishedStandalone
           ? remoteResources.get(mapping.resourceName).content
@@ -449,6 +527,7 @@ if (process.argv.includes('--synchronize-local')) {
     assertApplicationStoreEnginesSynchronized(
       remotePackageContent,
       remoteStandaloneContents,
+      remoteReplicaMappings,
     );
     await mkdir(baseDirectory, { recursive: true });
     for (const name of resourceNames) {
@@ -527,9 +606,16 @@ if (process.argv.includes('--synchronize-local')) {
       localStandaloneContents,
     );
   }
-  const resolvedBuilderSource = replicaMerge
-    ? replicaMerge.standaloneContents.get('ai-app-build.js')
-    : localStandaloneContents.get('ai-app-build.js');
+  const resolvedEmbeddedStandaloneContents = new Map(
+    applicationStoreReplicaMappings
+      .filter(mapping => !mapping.publishedStandalone)
+      .map(mapping => [
+        mapping.resourceName,
+        replicaMerge
+          ? replicaMerge.standaloneContents.get(mapping.resourceName)
+          : localStandaloneContents.get(mapping.resourceName),
+      ]),
+  );
   if (process.env.MICROI_UPGRADE_RESOURCE_DEBUG === '1') {
     const digest = value => createHash('sha256').update(value, 'utf8').digest('hex');
     process.stderr.write(`${JSON.stringify({
@@ -584,8 +670,10 @@ if (process.argv.includes('--synchronize-local')) {
       });
     }
   }
-  if (canonicalizeResource('ai-app-build.js', rawBuilderSource) !== resolvedBuilderSource) {
-    await writeFile(builderPath, resolvedBuilderSource, 'utf8');
+  for (const [name, resolvedSource] of resolvedEmbeddedStandaloneContents) {
+    if (canonicalizeResource(name, rawLocalStandaloneContents.get(name)) !== resolvedSource) {
+      await writeFile(resolve(outputDirectory, name), resolvedSource, 'utf8');
+    }
   }
 
   if (remoteChanges.length && !publish) {
@@ -614,9 +702,7 @@ if (process.argv.includes('--synchronize-local')) {
           : '两端一致';
     printResource(name, content, direction);
   }
-  printResource(
-    'ai-app-build.js',
-    resolvedBuilderSource,
-    '本地独立文件与官网商城包内嵌副本一致',
-  );
+  for (const [name, resolvedSource] of resolvedEmbeddedStandaloneContents) {
+    printResource(name, resolvedSource, '本地独立文件与官网商城包内嵌副本一致');
+  }
 }

@@ -321,21 +321,31 @@ namespace Microi.net
                     }
                     try
                     {
-                        //可能是扩展库。这里不能传入trans，因为trans是主库的，有可能这张表是要在扩展库中创建。
-                        var result = MicroiEngine.ORM(dbInfo.DbType).AddDiyTable(new DbServiceParam()
+                        // A create can be interrupted after the physical table is
+                        // committed but before diy_table/diy_field metadata is committed.
+                        // Re-running the idempotent create must reconcile that orphaned
+                        // physical table instead of failing forever with "already exists".
+                        // This also keeps multi-node startup migrations recoverable when
+                        // the lease transfers between the physical and metadata phases.
+                        var physicalTableAlreadyExists = dbSessionDataBase.TableExists(tableName);
+                        if (!physicalTableAlreadyExists)
                         {
-                            TableName = tableName,
-                            OsClientModel = osClientModel,
-                            DbInfo = dbInfo,
-                            DataBaseId = param["DataBaseId"].Val<string>(),
-                            OsClient = osClient,
-                            DbSession = dbSessionDataBase,
-                        });//, trans
-                        if (result.Code != 1)
-                        {
-                            if (_trans == null)
-                                trans.Rollback();
-                            return new DosResult(result.Code, result.Data, result.Msg, 0, result.DataAppend);
+                            //可能是扩展库。这里不能传入trans，因为trans是主库的，有可能这张表是要在扩展库中创建。
+                            var result = MicroiEngine.ORM(dbInfo.DbType).AddDiyTable(new DbServiceParam()
+                            {
+                                TableName = tableName,
+                                OsClientModel = osClientModel,
+                                DbInfo = dbInfo,
+                                DataBaseId = param["DataBaseId"].Val<string>(),
+                                OsClient = osClient,
+                                DbSession = dbSessionDataBase,
+                            });//, trans
+                            if (result.Code != 1)
+                            {
+                                if (_trans == null)
+                                    trans.Rollback();
+                                return new DosResult(result.Code, result.Data, result.Msg, 0, result.DataAppend);
+                            }
                         }
                         //如果只是创建实体表，则直接返回
                         if (onlyCreatePhysicalTable)

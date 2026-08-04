@@ -444,7 +444,13 @@ IsPermission(type) {
             var selected = await self.SelectMicroiStoreOfflinePackageFile();
             var packageInfo = selected.Package.PackageInfo || {};
             var packageName = packageInfo.Name || packageInfo.PackageName || selected.File.name;
-            var importParam = { Package: selected.Package, PackageFileName: selected.File.name };
+            var offlineOperationId = self.DiyCommon.NewGuid();
+            var importParam = {
+                Package: selected.Package,
+                PackageFileName: selected.File.name,
+                InstallAction: "Install",
+                InstallOperationId: offlineOperationId
+            };
 
             // 后台任务基础包必须先以前台方式完成安装，不能依赖它尚未补齐的任务表来自举。
             if (self.IsBackgroundTaskBootstrapPackage(packageInfo)) {
@@ -463,6 +469,12 @@ IsPermission(type) {
                 "import-microi-store-package",
                 importParam,
                 "安装离线包应用：" + packageName,
+                {
+                    IdempotencyKey: "microi-store-offline:" + offlineOperationId,
+                    ConcurrencyKey: "import-microi-store-package",
+                    MaxAttempts: 3,
+                    RetryOnFailure: true
+                },
                 function () { self.BtnV8Loading = false; }
             );
             if (!result || Number(result.Code) !== 1) {
@@ -480,6 +492,11 @@ IsPermission(type) {
         BuildMicroiStoreInstallParam(btn, row) {
             var self = this;
             row = row && typeof row === "object" ? row : {};
+            var actionName = String((btn && btn.Name) || row.StoreInstallActionName || "安装");
+            var installAction = actionName.indexOf("重新") > -1
+                ? "Reinstall"
+                : (actionName.indexOf("更新") > -1 ? "Update" : "Install");
+            var installOperationId = self.DiyCommon.NewGuid();
             var storeApiBase = row.StoreApiBase || row.AppStoreApiBase || self.DiyCommon.GetAppStoreSourceApiBase(row);
             var storeOsClient = row.StoreOsClient || row.AppStoreOsClient || row.SourceOsClient
                 || self.DiyCommon.GetAppStoreSourceOsClient(row);
@@ -501,7 +518,9 @@ IsPermission(type) {
                 StoreOsClient: storeOsClient,
                 AppStoreOsClient: storeOsClient,
                 InstallParentSysMenuId: row.InstallParentSysMenuId,
-                ResumeInstall: true
+                ResumeInstall: true,
+                InstallAction: installAction,
+                InstallOperationId: installOperationId
             };
         },
         IsBackgroundTaskBootstrapPackage(value) {
@@ -608,9 +627,18 @@ IsPermission(type) {
                 return;
             }
 
-            var result = await V8.ApiEngine.RunBackground("import-microi-store-package", backgroundParam, backgroundTitle, function () {
-                self.BtnV8Loading = false;
-            });
+            var result = await V8.ApiEngine.RunBackground(
+                "import-microi-store-package",
+                backgroundParam,
+                backgroundTitle,
+                {
+                    IdempotencyKey: "microi-store:" + backgroundParam.InstallOperationId,
+                    ConcurrencyKey: "import-microi-store-package",
+                    MaxAttempts: 3,
+                    RetryOnFailure: true
+                },
+                function () { self.BtnV8Loading = false; }
+            );
             if (!result || result.Code !== 1) {
                 self.DiyCommon.Tips((result && (result.Msg || result.Message)) || (actionName + "任务创建失败"), false);
                 self.BtnV8Loading = false;
