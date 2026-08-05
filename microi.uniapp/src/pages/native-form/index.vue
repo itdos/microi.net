@@ -143,7 +143,8 @@
 							:class="{ 'tenant-field-control-wrap--clearable': tenantFieldPresentation(field).clearable }">
 							<mci-native-field v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
 								:readonly-max-lines="readonlyMaxLines(field)"
-								:table-name="tableName" :form-data="form" :menu-id="menuId"
+								:table-name="tableName" :form-data="form" :form-data-id="rowId" :menu-id="menuId"
+								:file-access-menu-id="fileMenuId"
 								:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
 								@change="handleNativeFieldChange(field, $event)"
 								@select="handleNativeFieldSelect"
@@ -288,6 +289,7 @@
 			return {
 				tableName: '',
 				menuId: '',
+				fileMenuId: '',
 				rowId: '',
 				draftRowId: '',
 				mode: 'View',
@@ -406,6 +408,7 @@
 		onLoad(options) {
 			this.tableName = decodeURIComponent(options.table || '')
 			this.menuId = decodeURIComponent(options.menuId || '')
+			this.fileMenuId = decodeURIComponent(options.fileMenuId || '')
 			this.rowId = decodeURIComponent(options.id || '')
 			this.mode = options.mode || (this.rowId ? 'View' : 'Add')
 			this.title = decodeURIComponent(options.title || '')

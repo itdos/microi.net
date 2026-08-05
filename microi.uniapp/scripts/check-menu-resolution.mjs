@@ -59,4 +59,26 @@ assert.equal(
   '历史链接携带父目录 Id 时应重新解析为订单业务菜单'
 )
 
+const attendanceMenu = {
+  Id: 'attendance-card-menu',
+  Name: '打卡记录',
+  DiyTableId: 'location-table'
+}
+const locationMenu = {
+  Id: 'location-file-menu',
+  Name: '人员定位',
+  DiyTableId: 'location-table'
+}
+
+assert.equal(
+  selectAuthorizedMenu([attendanceMenu, locationMenu], {
+    aliases: ['人员定位'],
+    tableName: 'Diy_location',
+    tableId: 'location-table',
+    preferAliases: true
+  })?.Id,
+  locationMenu.Id,
+  '文件访问菜单应能在同表多个菜单中按指定别名精确选择'
+)
+
 console.log('菜单权限上下文解析检查通过')

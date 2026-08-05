@@ -222,7 +222,9 @@ export default {
     readonly: { type: Boolean, default: false },
     tableName: { type: String, default: '' },
     formData: { type: Object, default: () => ({}) },
+    formDataId: { type: String, default: '' },
     menuId: { type: String, default: '' },
+    fileAccessMenuId: { type: String, default: '' },
     moduleEngineKey: { type: String, default: '' },
     tableChildAuth: { type: Object, default: null },
     readonlyMaxLines: { type: Number, default: 0 }
@@ -297,9 +299,10 @@ export default {
     fileAccessContext() {
       return {
         formEngineKey: this.tableName,
-        formDataId: this.formData && (this.formData.Id || this.formData.id) || '',
+        // 详情页的 Id 可能未包含在可见字段返回值中，优先使用路由中已经完成权限校验的记录 Id。
+        formDataId: this.formDataId || (this.formData && (this.formData.Id || this.formData.id)) || '',
         fieldId: this.field.Id || this.field.id || '',
-        sysMenuId: this.menuId,
+        sysMenuId: this.fileAccessMenuId || this.menuId,
         tableChildAuth: this.tableChildAuth
       }
     },
