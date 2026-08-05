@@ -33,10 +33,10 @@
     hover-class="mci-ai-launcher--pressed"
     role="button"
     aria-label="打开AI助手"
-    @touchstart.stop="handleDragStart"
-    @touchmove.stop.prevent="handleDragMove"
-    @touchend.stop="handleDragEnd"
-    @touchcancel.stop="handleDragEnd"
+    @touchstart="handleDragStart"
+    @touchmove="handleDragMove"
+    @touchend="handleDragEnd"
+    @touchcancel="handleDragCancel"
     @tap="handleLauncherTap"
   >
     <view class="mci-ai-launcher__ring" />
@@ -338,6 +338,8 @@ export default {
       if (!this.dragState.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD) return
       this.dragState.moved = true
       this.dragging = true
+      if (event && typeof event.stopPropagation === 'function') event.stopPropagation()
+      if (event && typeof event.preventDefault === 'function') event.preventDefault()
       const position = this.clampLauncherPosition(
         this.dragState.originX + deltaX,
         this.dragState.originY + deltaY
@@ -346,10 +348,16 @@ export default {
       this.launcherY = position.y
     },
     handleDragEnd() {
+      const touched = Boolean(this.dragState)
       const moved = Boolean(this.dragState && this.dragState.moved)
       this.dragState = null
       this.dragging = false
-      if (!moved) return
+      if (!touched) return
+      this.suppressNextTap()
+      if (!moved) {
+        this.openAssistant()
+        return
+      }
       const bounds = this.launcherBounds()
       const sideX = this.launcherX + bounds.size / 2 <= this.windowWidth / 2
         ? bounds.minX
@@ -360,6 +368,13 @@ export default {
       this.launcherX = position.x
       this.launcherY = position.y
       this.persistLauncherPosition()
+    },
+    handleDragCancel() {
+      this.dragState = null
+      this.dragging = false
+      this.suppressNextTap()
+    },
+    suppressNextTap() {
       this.suppressTap = true
       setTimeout(() => { this.suppressTap = false }, 180)
     },
