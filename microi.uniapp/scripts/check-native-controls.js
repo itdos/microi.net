@@ -60,6 +60,14 @@ for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 
 if (!nativeForm.includes('<mci-native-field')) fail('native form must delegate fields to mci-native-field')
 if (!formRuntime.includes('inferNativeComponent')) fail('semantic control inference is missing')
 if (!formRuntime.includes("return 'ImgUpload'")) fail('avatar/image semantic fallback is missing')
+if (!formRuntime.includes('/手机|电话|座机|固话|phone|mobile|tel/i')) {
+  fail('phone field inference must cover mobile, telephone and landline labels')
+}
+if (!renderer.includes('v-if="callablePhone" class="native-control__phone-action"') ||
+  !renderer.includes('uni.makePhoneCall({ phoneNumber: this.callablePhone })') ||
+  !renderer.includes("!['-', '—'].includes(value)")) {
+  fail('readonly phone fields must provide a call action and hide it for empty values')
+}
 if (!formRuntime.includes('SENSITIVE_FIELD_PATTERN')) fail('sensitive field visibility guard is missing')
 if (!nativeForm.includes('hydrateNativeFormOptions(liveDefinition')) {
   fail('async field options must hydrate the live reactive form definition')
