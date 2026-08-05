@@ -101,37 +101,33 @@ public class FormEngineTenantBoundaryTests
 
     [Theory]
     [InlineData("sys_osclients")]
+    [InlineData("sys_config")]
     [InlineData("sys_apiengine")]
+    [InlineData("diy_table")]
+    [InlineData("diy_field")]
+    [InlineData("sys_menu")]
+    [InlineData("sys_role")]
+    [InlineData("sys_rolelimit")]
     [InlineData("sys_user")]
     [InlineData("sys_userfk")]
     [InlineData("sys_onlineuser")]
     [InlineData("sys_datasource")]
     [InlineData("diy_schedule_job")]
+    [InlineData("diy_schedule_job_log")]
     [InlineData("sys_mq")]
     [InlineData("sys_mqtt")]
-    [InlineData("mic_page")]
-    [InlineData("mic_print")]
-    [InlineData("wf_flowdesign")]
-    [InlineData("wf_node")]
-    [InlineData("wf_line")]
     [InlineData("microi_database")]
-    [InlineData("sys_microiservice")]
-    [InlineData("sys_microiservice_page")]
-    [InlineData("sys_microistore")]
-    [InlineData("sys_microistoreversion")]
-    [InlineData("sys_appinstalled")]
     [InlineData("sys_log")]
     [InlineData("sys_servernode")]
     [InlineData("mic_ai")]
     [InlineData("mic_email_server")]
     [InlineData("wx_mp")]
-    [InlineData("mic_micro_app")]
-    [InlineData("mic_micro_app_asset")]
-    [InlineData("mic_micro_app_version")]
     [InlineData("mci_database_backup")]
+    [InlineData("mci_background_task")]
     [InlineData("mci_file_remote_connection")]
     [InlineData("mci_redis_connection")]
     [InlineData("mci_license_server")]
+    [InlineData("mci_user_access_key")]
     [InlineData("mci_security_access_log")]
     [InlineData("mci_security_attack_event")]
     [InlineData("mci_security_ip_block")]
@@ -150,6 +146,73 @@ public class FormEngineTenantBoundaryTests
             tableName,
             PlatformResourceSecurity.ProtectedTableNames,
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("mic_page")]
+    [InlineData("mic_print")]
+    public void ClientFormEngine_RoleManagedRuntimeTablesUseExplicitRolePermissions(string tableName)
+    {
+        Assert.True(PlatformResourceSecurity.IsPlatformTable(tableName));
+        Assert.True(PlatformResourceSecurity.IsRoleManagedTable(tableName));
+        Assert.False(PlatformResourceSecurity.IsProtectedTable(tableName));
+        Assert.True(PlatformResourceSecurity.DeniesAnonymousAccess(tableName));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "Read"));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "Edit"));
+        Assert.All(
+            new[] { "Read", "Add", "Edit", "Del" },
+            permission => Assert.True(
+                PlatformResourceSecurity.CanGrantDirectTablePermission(
+                    tableName,
+                    permission,
+                    DiyCommon.MaxRoleLevel - 1)));
+    }
+
+    [Theory]
+    [InlineData("wf_flowdesign")]
+    [InlineData("wf_node")]
+    [InlineData("wf_line")]
+    [InlineData("sys_microiservice")]
+    [InlineData("sys_microiservice_page")]
+    [InlineData("sys_microistore")]
+    [InlineData("sys_microistoreversion")]
+    [InlineData("sys_appinstalled")]
+    [InlineData("sys_business_blueprint")]
+    [InlineData("sys_blueprint_relation")]
+    [InlineData("sys_blueprint_history")]
+    [InlineData("mic_micro_app")]
+    [InlineData("mic_micro_app_asset")]
+    [InlineData("mic_micro_app_version")]
+    public void ClientFormEngine_RuntimeMetadataCanOnlyBeDelegatedForRead(string tableName)
+    {
+        Assert.True(PlatformResourceSecurity.IsPlatformTable(tableName));
+        Assert.True(PlatformResourceSecurity.IsReadOnlyTable(tableName));
+        Assert.False(PlatformResourceSecurity.IsProtectedTable(tableName));
+        Assert.True(PlatformResourceSecurity.DeniesAnonymousAccess(tableName));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "Read"));
+        Assert.False(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "List"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "Add"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "Edit"));
+        Assert.True(PlatformResourceSecurity.RequiresPlatformAdministrator(tableName, "Delete"));
+        Assert.True(PlatformResourceSecurity.CanGrantDirectTablePermission(
+            tableName,
+            "Read",
+            DiyCommon.MaxRoleLevel - 1));
+        Assert.False(PlatformResourceSecurity.CanGrantDirectTablePermission(
+            tableName,
+            "Edit",
+            DiyCommon.MaxRoleLevel - 1));
+    }
+
+    [Fact]
+    public void ClientFormEngine_PlatformPolicyContainsExactDistinctTableSet()
+    {
+        Assert.Equal(55, PlatformResourceSecurity.PlatformTableNames.Count);
+        Assert.Equal(
+            PlatformResourceSecurity.PlatformTableNames.Count,
+            PlatformResourceSecurity.PlatformTableNames
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count());
     }
 
     [Fact]
@@ -208,6 +271,11 @@ public class FormEngineTenantBoundaryTests
             param,
             new JObject { ["Id"] = "protected-id", ["Name"] = "sys_osclients" },
             "Read"));
+        Assert.False(await InvokeClientAuthorization(
+            engine,
+            param,
+            new JObject { ["Id"] = "print-id", ["Name"] = "mic_print" },
+            "Read"));
         Assert.True(await InvokeClientAuthorization(
             engine,
             param,
@@ -240,6 +308,92 @@ public class FormEngineTenantBoundaryTests
             param,
             new JObject { ["Id"] = "protected-id", ["Name"] = "sys_apiengine" },
             "Read"));
+    }
+
+    [Fact]
+    public async Task PrintRuntime_UsesExplicitDirectTableGrantForOrdinaryUser()
+    {
+        var engine = new FormEngine();
+        var tableId = "print-table-id";
+        var param = new DiyTableRowParam
+        {
+            _InvokeType = InvokeType.Client.ToString(),
+            _CurrentUser = new JObject
+            {
+                ["Id"] = "print-user",
+                ["Level"] = 100
+            },
+            _AuthorizationSnapshot = new FormEngineAuthorizationSnapshot
+            {
+                UserId = "print-user",
+                UserLevel = 100,
+                IsActiveUser = true,
+                EffectiveRoleIds = new List<string> { "print-role" },
+                RoleLimits = new List<SysRoleLimit>
+                {
+                    new()
+                    {
+                        Type = "Table",
+                        FkId = tableId,
+                        Permission = "[\"Read\",\"Edit\"]"
+                    }
+                }
+            }
+        };
+
+        Assert.True(await InvokeClientAuthorization(
+            engine,
+            param,
+            new JObject { ["Id"] = tableId, ["Name"] = "mic_print" },
+            "Read"));
+        Assert.True(await InvokeClientAuthorization(
+            engine,
+            param,
+            new JObject { ["Id"] = tableId, ["Name"] = "mic_print" },
+            "Edit"));
+    }
+
+    [Fact]
+    public async Task ReadOnlyPlatformMetadata_RejectsWriteEvenWhenPayloadContainsEditGrant()
+    {
+        var engine = new FormEngine();
+        var tableId = "service-table-id";
+        var param = new DiyTableRowParam
+        {
+            _InvokeType = InvokeType.Client.ToString(),
+            _CurrentUser = new JObject
+            {
+                ["Id"] = "service-user",
+                ["Level"] = 100
+            },
+            _AuthorizationSnapshot = new FormEngineAuthorizationSnapshot
+            {
+                UserId = "service-user",
+                UserLevel = 100,
+                IsActiveUser = true,
+                EffectiveRoleIds = new List<string> { "service-role" },
+                RoleLimits = new List<SysRoleLimit>
+                {
+                    new()
+                    {
+                        Type = "Table",
+                        FkId = tableId,
+                        Permission = "[\"Read\",\"Edit\"]"
+                    }
+                }
+            }
+        };
+
+        Assert.True(await InvokeClientAuthorization(
+            engine,
+            param,
+            new JObject { ["Id"] = tableId, ["Name"] = "sys_microiservice" },
+            "Read"));
+        Assert.False(await InvokeClientAuthorization(
+            engine,
+            param,
+            new JObject { ["Id"] = tableId, ["Name"] = "sys_microiservice" },
+            "Edit"));
     }
 
     [Fact]

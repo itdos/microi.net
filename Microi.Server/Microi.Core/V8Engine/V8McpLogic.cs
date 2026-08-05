@@ -4835,6 +4835,22 @@ namespace Microi.net
             return result.Code == 1 && result.Data != null ? JArray.FromObject(result.Data) : new JArray();
         }
 
+        private static string NormalizeAiApplicationStoragePath(string value)
+        {
+            var normalized = SafeString(value).Trim().Replace('\\', '/').Trim('/');
+            return Regex.Replace(normalized, @"/+", "/");
+        }
+
+        internal static bool IsPublishedAiApplicationBuildFile(JObject file)
+        {
+            if (file == null) return false;
+            var hdfsPath = NormalizeAiApplicationStoragePath(SafeJString(file, "HdfsPath"));
+            var publishHdfsPath = NormalizeAiApplicationStoragePath(SafeJString(file, "PublishHdfsPath"));
+            return !IsBlank(hdfsPath)
+                && !IsBlank(publishHdfsPath)
+                && string.Equals(hdfsPath, publishHdfsPath, StringComparison.OrdinalIgnoreCase);
+        }
+
         private static async Task<JObject> ReadAiApplicationFile(string osClient, JObject file, bool includeContents, long maxFileBytes)
         {
             var item = (JObject)file.DeepClone();
@@ -4860,7 +4876,7 @@ namespace Microi.net
             {
                 OsClient = osClient,
                 FilePathName = hdfsPath,
-                Limit = true
+                Limit = !IsPublishedAiApplicationBuildFile(item)
             });
             if (fileResult.Code != 1)
             {

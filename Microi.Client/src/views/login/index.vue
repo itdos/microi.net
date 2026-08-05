@@ -2,9 +2,8 @@
     <div>
         <div
             id="divLogin"
-            :style="{
-                backgroundImage: 'url(' + (DiyCommon ? DiyCommon.GetServerPath(DesktopBg.LockImgUrl, false) : '') + ')'
-            }"
+            :style="LoginBackgroundStyle"
+            :data-login-wallpaper="ActiveLoginWallpaperName"
         >
             <div class="divLoginCenter" :style="{ opacity: '1' }">
                 <div class="loginCenterBgCover" />
@@ -46,7 +45,6 @@
                             <div
                                 class="input-icon-wrapper account-avatar-wrapper"
                                 :class="{ 'has-avatar': CurrentAccountAvatarUrl }"
-                                :style="{ backgroundColor: CurrentAccountAvatarUrl ? 'rgba(255, 255, 255, 0.96)' : (SysConfig.ThemeColor || '#409EFF') }"
                             >
                                 <img
                                     v-if="CurrentAccountAvatarUrl"
@@ -55,7 +53,7 @@
                                     alt=""
                                     @error="HandleCurrentAccountAvatarError"
                                 />
-                                <el-icon v-else color="white"><User /></el-icon>
+                                <el-icon v-else><User /></el-icon>
                             </div>
                         </template>
                         <template #suffix>
@@ -159,8 +157,8 @@
                         @keyup.enter="Login"
                     >
                         <template #prefix>
-                            <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
-                                <el-icon color="white"><Key /></el-icon>
+                            <div class="input-icon-wrapper">
+                                <el-icon><Key /></el-icon>
                             </div>
                         </template>
                         <template #suffix>
@@ -194,8 +192,8 @@
                         maxlength="6"
                     >
                         <template #prefix>
-                            <div class="input-icon-wrapper" :style="{ backgroundColor: SysConfig.ThemeColor || '#409EFF' }">
-                                <el-icon color="white"><Lock /></el-icon>
+                            <div class="input-icon-wrapper">
+                                <el-icon><Lock /></el-icon>
                             </div>
                         </template>
                         <template #append v-if="EnableCaptcha">
@@ -220,6 +218,33 @@
                     >
                         <span class="remember-password-label">记住密码</span>
                     </el-checkbox>
+                    <div class="login-appearance-actions" aria-label="登录页外观设置">
+                        <ThemeSelect :show-mode="false">
+                            <template #trigger>
+                                <button
+                                    type="button"
+                                    class="login-appearance-button login-theme-trigger"
+                                    aria-label="更改主题色"
+                                    title="更改主题色"
+                                >
+                                    <el-icon><Brush /></el-icon>
+                                    <span>主题色</span>
+                                </button>
+                            </template>
+                        </ThemeSelect>
+                        <button
+                            type="button"
+                            class="login-appearance-button login-wallpaper-trigger"
+                            :class="{ 'is-loading': WallpaperLoading }"
+                            :disabled="WallpaperLoading"
+                            aria-label="随机更换登录壁纸"
+                            title="随机更换登录壁纸"
+                            @click="ChangeLoginWallpaper"
+                        >
+                            <el-icon><RefreshRight /></el-icon>
+                            <span>换壁纸</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- 登录按钮 -->
@@ -384,13 +409,15 @@ import Cookies from "js-cookie";
 import { getLangs } from "@/utils/langs";
 import JSEncrypt from "jsencrypt"; // RSA加密库
 // Element Plus 图标
-import { ArrowDown, Check, Delete, User, Key, Lock, UserFilled, Loading, Right, Unlock, View, Hide } from "@element-plus/icons-vue";
+import { ArrowDown, Brush, Check, Delete, User, Key, Lock, UserFilled, Loading, RefreshRight, Right, Unlock, View, Hide } from "@element-plus/icons-vue";
 // 直接导入工具函数
 import { DiyCommon } from "@/utils/diy.common";
 import { DiyApi } from "@/utils/api.itdos";
 import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath } from "@/pinia/modules/permission";
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
-import { resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
+import { resolveLoginResourceUrl, resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
+import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "@/utils/login-wallpaper.js";
+import ThemeSelect from "@/layout/components/ThemeSelect.vue";
 import config from "@/config.json";
 import {
     clearRememberedLoginAccounts,
@@ -421,6 +448,7 @@ export default {
     name: "Login",
     components: {
         ArrowDown,
+        Brush,
         Check,
         Delete,
         User,
@@ -428,10 +456,12 @@ export default {
         Lock,
         UserFilled,
         Loading,
+        RefreshRight,
         Right,
         Unlock,
         View,
-        Hide
+        Hide,
+        ThemeSelect
     },
     beforeCreate() {},
     setup() {
@@ -509,6 +539,20 @@ export default {
         SystemLogoFallbackText() {
             var title = String(this.SysConfig?.SysShortTitle || this.WebTitle || "M").trim();
             return title ? title.charAt(0).toUpperCase() : "M";
+        },
+        LoginBackgroundUrl() {
+            if (this.ActiveLoginWallpaperUrl) return this.ActiveLoginWallpaperUrl;
+            return resolveLoginResourceUrl(
+                this.DesktopBg?.LockImgUrl || this.SysConfig?.LoginBgImg,
+                (value, returnNoImg) => this.DiyCommon.GetServerPath(value, returnNoImg)
+            );
+        },
+        LoginBackgroundStyle() {
+            return {
+                backgroundImage: this.LoginBackgroundUrl
+                    ? `url(${JSON.stringify(this.LoginBackgroundUrl)})`
+                    : "none"
+            };
         }
     },
     data() {
@@ -533,6 +577,11 @@ export default {
             CurrentAccountAvatarUrl: "",
             AvatarResolveVersion: 0,
             SystemLogoLoadFailed: false,
+            LoginWallpapers: [],
+            ActiveLoginWallpaperUrl: "",
+            ActiveLoginWallpaperName: "",
+            WallpaperLoading: false,
+            WallpaperLoadVersion: 0,
             LoginComponentUnmounted: false,
             tipId: "",
             redirect: undefined,
@@ -559,6 +608,7 @@ export default {
     beforeUnmount() {
         var self = this;
         self.LoginComponentUnmounted = true;
+        self.WallpaperLoadVersion += 1;
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
             clearInterval(timer);
@@ -634,7 +684,7 @@ export default {
                     },
                     OsClient: self.OsClient
                 },
-                function (sysConfigResult) {
+                async function (sysConfigResult) {
                     if (sysConfigResult.Code == 1) {
                         var sysConfig = sysConfigResult.Data;
                         // 服务端可以公开与部署私钥配对的公钥；本地显式配置仍优先。
@@ -644,6 +694,7 @@ export default {
                                 : ""
                         );
                         self.GetCaptcha(sysConfig);
+                        await self.LoadLoginWallpapers(sysConfig);
                     }
                 }
             );
@@ -676,6 +727,89 @@ export default {
         },
         HandleSystemLogoError() {
             this.SystemLogoLoadFailed = true;
+        },
+        async LoadLoginWallpapers(sysConfig, forceRandom = false) {
+            var loadVersion = ++this.WallpaperLoadVersion;
+            this.WallpaperLoading = true;
+            try {
+                var response = await this.$axios.get(
+                    this.DiyCommon.GetApiBase() + "/api/FormEngine/GetLoginWallpapers",
+                    {
+                        params: {
+                            OsClient: this.OsClient
+                        }
+                    }
+                );
+                var result = response && response.data;
+                if (loadVersion !== this.WallpaperLoadVersion || this.LoginComponentUnmounted) return;
+                this.LoginWallpapers = normalizeLoginWallpapers(
+                    result && result.Code === 1 ? result.Data : [],
+                    (value, returnNoImg) => this.DiyCommon.GetServerPath(value, returnNoImg)
+                );
+                if (forceRandom || this.isEnabledFlag(sysConfig?.LoginBgImgRandom)) {
+                    await this.ApplyRandomLoginWallpaper(forceRandom);
+                }
+            } catch (error) {
+                // 壁纸属于体验增强，失败时继续使用 SysConfig.LoginBgImg。
+                this.LoginWallpapers = [];
+            } finally {
+                if (loadVersion === this.WallpaperLoadVersion) this.WallpaperLoading = false;
+            }
+        },
+        PreloadLoginWallpaper(url) {
+            return new Promise((resolve) => {
+                if (!url || typeof Image === "undefined") {
+                    resolve(false);
+                    return;
+                }
+                var settled = false;
+                var image = new Image();
+                var finish = function (success) {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeoutId);
+                    image.onload = null;
+                    image.onerror = null;
+                    resolve(success);
+                };
+                var timeoutId = setTimeout(function () { finish(false); }, 8000);
+                image.onload = function () { finish((image.naturalWidth || image.width) > 0); };
+                image.onerror = function () { finish(false); };
+                image.src = url;
+            });
+        },
+        async ApplyRandomLoginWallpaper(showEmptyTip = false) {
+            var attemptedUrls = new Set();
+            while (true) {
+                var candidates = this.LoginWallpapers.filter((item) => !attemptedUrls.has(item.Url));
+                if (candidates.length === 0) break;
+                var wallpaper = pickNextLoginWallpaper(candidates, this.ActiveLoginWallpaperUrl);
+                if (!wallpaper) break;
+                attemptedUrls.add(wallpaper.Url);
+                if (await this.PreloadLoginWallpaper(wallpaper.Url)) {
+                    if (!this.LoginComponentUnmounted) {
+                        this.ActiveLoginWallpaperUrl = wallpaper.Url;
+                        this.ActiveLoginWallpaperName = wallpaper.Name;
+                    }
+                    return true;
+                }
+                this.LoginWallpapers = this.LoginWallpapers.filter((item) => item.Url !== wallpaper.Url);
+            }
+            if (showEmptyTip) this.DiyCommon.Tips("暂无可用壁纸，已保留系统默认登录背景。", false);
+            return false;
+        },
+        async ChangeLoginWallpaper() {
+            if (this.WallpaperLoading) return;
+            if (this.LoginWallpapers.length === 0) {
+                await this.LoadLoginWallpapers(this.SysConfig, true);
+                return;
+            }
+            this.WallpaperLoading = true;
+            try {
+                await this.ApplyRandomLoginWallpaper(true);
+            } finally {
+                this.WallpaperLoading = false;
+            }
         },
         NormalizeLoginAccount(value) {
             return String(value == null ? "" : value).trim().toLowerCase();
@@ -1477,7 +1611,7 @@ export default {
 }
 
 .login-system-logo-fallback {
-    color: var(--mci-login-text-strong);
+    color: var(--mci-login-on-primary);
     font-size: clamp(16px, 2vw, 21px);
     font-weight: 800;
     line-height: 1;
@@ -1513,27 +1647,29 @@ export default {
         .el-input__wrapper {
             min-height: 48px;
             box-sizing: border-box;
-            border: 1px solid transparent;
+            border: 0;
             border-radius: var(--mci-login-control-radius);
             background: var(--mci-login-input-bg);
-            box-shadow: var(--mci-login-input-shadow) !important;
+            box-shadow: inset 0 0 0 1px transparent, var(--mci-login-input-shadow) !important;
             padding: 0;
-            transition: border-color 180ms ease, background-color 180ms ease;
+            overflow: hidden;
+            transition: box-shadow 180ms ease, background 180ms ease;
 
             &:hover {
-                border-color: var(--mci-login-input-border-hover);
                 background: var(--mci-login-input-bg-hover);
+                box-shadow: inset 0 0 0 1px var(--mci-login-input-border-hover), var(--mci-login-input-shadow) !important;
             }
 
             &.is-focus {
-                border-color: var(--mci-login-input-border-focus);
                 background: var(--mci-login-input-bg-hover);
-                box-shadow: var(--mci-login-input-focus-shadow) !important;
+                box-shadow: inset 0 0 0 1px var(--mci-login-input-border-focus), var(--mci-login-input-focus-shadow) !important;
             }
         }
 
         .el-input__prefix {
             margin-right: 0;
+            overflow: hidden;
+            border-radius: var(--mci-login-control-radius) 0 0 var(--mci-login-control-radius);
         }
 
         .el-input__suffix {
@@ -1543,28 +1679,43 @@ export default {
         .el-input__inner {
             padding-left: 8px;
             height: 46px;
+            color: var(--mci-login-input-text) !important;
+            caret-color: var(--mci-login-primary);
+            -webkit-text-fill-color: var(--mci-login-input-text) !important;
+
+            &::placeholder {
+                color: var(--mci-login-input-placeholder) !important;
+                -webkit-text-fill-color: var(--mci-login-input-placeholder) !important;
+                opacity: 1;
+            }
+
+            &:-webkit-autofill,
+            &:-webkit-autofill:hover,
+            &:-webkit-autofill:focus {
+                -webkit-text-fill-color: var(--mci-login-input-text) !important;
+                caret-color: var(--mci-login-input-text);
+            }
         }
     }
 }
 
 .login-input-param.captcha {
     :deep(.el-input) {
-        border: 1px solid transparent;
+        border: 0;
         border-radius: var(--mci-login-control-radius);
         background: var(--mci-login-input-bg);
-        box-shadow: var(--mci-login-input-shadow);
+        box-shadow: inset 0 0 0 1px transparent, var(--mci-login-input-shadow);
         overflow: hidden;
-        transition: border-color 180ms ease, background-color 180ms ease;
+        transition: box-shadow 180ms ease, background 180ms ease;
 
         &:hover {
-            border-color: var(--mci-login-input-border-hover);
             background: var(--mci-login-input-bg-hover);
+            box-shadow: inset 0 0 0 1px var(--mci-login-input-border-hover), var(--mci-login-input-shadow);
         }
 
         &:focus-within {
-            border-color: var(--mci-login-input-border-focus);
             background: var(--mci-login-input-bg-hover);
-            box-shadow: var(--mci-login-input-focus-shadow);
+            box-shadow: inset 0 0 0 1px var(--mci-login-input-border-focus), var(--mci-login-input-focus-shadow);
         }
     }
 
@@ -1578,6 +1729,7 @@ export default {
 }
 
 .account-avatar-wrapper.has-avatar {
+    background: rgba(255, 255, 255, 0.96);
     box-shadow: none;
 }
 
@@ -1634,8 +1786,64 @@ export default {
     margin: -4px 0 10px;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
+    gap: 12px;
     text-align: left;
+}
+
+.login-appearance-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.login-appearance-button {
+    height: 44px;
+    min-width: 44px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: var(--mci-login-control-radius);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--mci-login-text-strong);
+    background: var(--mci-login-control-bg);
+    box-shadow: var(--mci-login-control-shadow);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 180ms ease, background-color 180ms ease, opacity 180ms ease;
+
+    &:hover,
+    &:focus-visible {
+        background: var(--mci-login-control-bg-hover);
+        transform: translateY(-1px);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--mci-login-electric);
+        outline-offset: 2px;
+    }
+
+    &:active {
+        transform: scale(0.97);
+    }
+
+    &:disabled {
+        cursor: wait;
+        opacity: 0.72;
+    }
+
+    .el-icon {
+        font-size: 16px;
+    }
+
+    &.is-loading .el-icon {
+        animation: rotating 1.4s linear infinite;
+    }
 }
 
 .remember-password-checkbox {
@@ -1823,7 +2031,7 @@ export default {
     justify-content: center;
     overflow: hidden;
     border-radius: 50%;
-    color: #fff;
+    color: var(--mci-text-on-primary, #fff);
     background: var(--el-color-primary);
     box-shadow: 0 3px 10px rgba(var(--el-color-primary-rgb, 64, 158, 255), 0.22);
 }
@@ -1925,6 +2133,8 @@ export default {
     margin-left: 0px;
     margin-right: 10px;
     border-radius: var(--mci-login-control-radius) 0 0 var(--mci-login-control-radius);
+    color: var(--mci-login-on-primary);
+    background: var(--mci-login-button-gradient);
     transition: opacity 180ms ease;
     
     .el-icon {
@@ -1969,7 +2179,7 @@ export default {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    color: var(--mci-login-text-strong);
+    color: var(--mci-login-on-primary);
     background: var(--mci-login-button-gradient);
     background-size: 180% 100%;
     box-shadow: var(--mci-login-button-shadow);
@@ -2213,44 +2423,52 @@ export default {
 #divLogin {
     --mci-login-card-radius: 24px;
     --mci-login-control-radius: 12px;
+    --mci-login-primary: var(--mci-color-primary, var(--el-color-primary, #409eff));
+    --mci-login-primary-rgb: var(--mci-color-primary-rgb, var(--el-color-primary-rgb, 64, 158, 255));
+    --mci-login-primary-light: var(--mci-color-primary-light, var(--el-color-primary-light-3, #79bbff));
+    --mci-login-primary-strong: var(--mci-color-primary-strong, var(--mci-color-primary-dark, var(--el-color-primary-dark-2, #337ecc)));
+    --mci-login-on-primary: var(--mci-text-on-primary, #ffffff);
+    --mci-login-primary-gradient: var(--mci-gradient-primary, linear-gradient(135deg, var(--mci-login-primary-strong), var(--mci-login-primary-light)));
     --mci-login-text-strong: #ffffff;
     --mci-login-text-shadow: rgba(8, 20, 48, 0.42);
-    --mci-login-electric: #8cecff;
-    --mci-login-electric-soft: rgba(140, 236, 255, 0.72);
-    --mci-login-focus-ring: rgba(140, 236, 255, 0.42);
+    --mci-login-electric: color-mix(in srgb, var(--mci-login-primary-light) 68%, #e7fdff);
+    --mci-login-electric-soft: rgba(var(--mci-login-primary-rgb), 0.72);
+    --mci-login-focus-ring: rgba(var(--mci-login-primary-rgb), 0.42);
     --mci-login-logo-bg: rgba(255, 255, 255, 0.96);
-    --mci-login-logo-shadow: 0 10px 28px rgba(8, 20, 48, 0.24), 0 0 22px rgba(140, 236, 255, 0.2);
-    --mci-login-logo-halo: radial-gradient(circle, rgba(140, 236, 255, 0.42) 0%, rgba(115, 87, 255, 0.18) 48%, transparent 72%);
-    --mci-login-input-bg: rgba(248, 250, 255, 0.96);
-    --mci-login-input-bg-hover: rgba(255, 255, 255, 0.99);
-    --mci-login-input-border-hover: rgba(140, 211, 255, 0.5);
-    --mci-login-input-border-focus: rgba(78, 168, 255, 0.92);
+    --mci-login-logo-shadow: 0 10px 28px rgba(8, 20, 48, 0.24), 0 0 22px rgba(var(--mci-login-primary-rgb), 0.28);
+    --mci-login-logo-halo: radial-gradient(circle, rgba(var(--mci-login-primary-rgb), 0.48) 0%, rgba(var(--mci-login-primary-rgb), 0.18) 50%, transparent 72%);
+    --mci-login-input-bg: linear-gradient(115deg, rgba(var(--mci-login-primary-rgb), 0.1), rgba(248, 250, 255, 0.97) 32%);
+    --mci-login-input-bg-hover: linear-gradient(115deg, rgba(var(--mci-login-primary-rgb), 0.16), rgba(255, 255, 255, 0.99) 38%);
+    --mci-login-input-border-hover: rgba(var(--mci-login-primary-rgb), 0.52);
+    --mci-login-input-border-focus: rgba(var(--mci-login-primary-rgb), 0.92);
+    --mci-login-input-text: #1f2937;
+    --mci-login-input-placeholder: #64748b;
     --mci-login-input-shadow: 0 10px 26px rgba(5, 16, 38, 0.18);
-    --mci-login-input-focus-shadow: 0 0 0 3px rgba(101, 201, 255, 0.2), 0 12px 28px rgba(5, 16, 38, 0.22);
-    --mci-login-control-bg: rgba(8, 24, 52, 0.4);
-    --mci-login-control-bg-hover: rgba(14, 39, 78, 0.56);
-    --mci-login-control-active-bg: rgba(37, 92, 165, 0.46);
+    --mci-login-input-focus-shadow: 0 0 0 3px rgba(var(--mci-login-primary-rgb), 0.2), 0 12px 28px rgba(5, 16, 38, 0.22);
+    --mci-login-control-bg: rgba(var(--mci-login-primary-rgb), 0.22);
+    --mci-login-control-bg-hover: rgba(var(--mci-login-primary-rgb), 0.32);
+    --mci-login-control-active-bg: rgba(var(--mci-login-primary-rgb), 0.44);
     --mci-login-control-shadow: 0 8px 22px rgba(4, 13, 34, 0.2);
     --mci-login-checkbox-bg: rgba(255, 255, 255, 0.12);
     --mci-login-checkbox-border: rgba(211, 232, 255, 0.72);
-    --mci-login-button-gradient: linear-gradient(105deg, #176ee8 0%, #386ff2 34%, #655cf2 68%, #7b4fe8 100%);
+    --mci-login-button-gradient: var(--mci-login-primary-gradient);
     --mci-login-button-depth: linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 48%, rgba(20, 30, 108, 0.16));
-    --mci-login-button-shadow: 0 15px 34px rgba(36, 91, 224, 0.38), 0 0 30px rgba(104, 100, 255, 0.25);
-    --mci-login-energy-beam: linear-gradient(90deg, transparent 0%, rgba(174, 242, 255, 0.08) 20%, rgba(229, 252, 255, 0.58) 50%, rgba(174, 242, 255, 0.1) 80%, transparent 100%);
-    --mci-login-energy-trace: linear-gradient(90deg, transparent 0%, rgba(150, 238, 255, 0.28) 24%, #ffffff 72%, transparent 100%);
-    --mci-login-energy-trace-shadow: 0 0 12px rgba(140, 236, 255, 0.82);
-    --mci-login-card-surface: linear-gradient(145deg, rgba(23, 55, 105, 0.68), rgba(12, 18, 52, 0.82) 58%, rgba(42, 20, 82, 0.76));
-    --mci-login-card-glow: linear-gradient(135deg, rgba(87, 215, 255, 0.72), rgba(78, 118, 255, 0.5) 46%, rgba(172, 78, 255, 0.62));
-    --mci-login-card-shadow: 0 28px 90px rgba(3, 9, 28, 0.5), 0 0 48px rgba(65, 172, 255, 0.34), 0 0 96px rgba(126, 78, 255, 0.24);
-    --mci-login-card-surface-mobile: linear-gradient(145deg, rgba(25, 62, 116, 0.88), rgba(10, 18, 47, 0.94) 62%, rgba(47, 22, 81, 0.9));
-    --mci-login-card-shadow-mobile: 0 18px 46px rgba(3, 9, 28, 0.46), 0 0 32px rgba(65, 172, 255, 0.24), 0 0 58px rgba(126, 78, 255, 0.18);
+    --mci-login-button-shadow: 0 15px 34px rgba(var(--mci-login-primary-rgb), 0.38), 0 0 30px rgba(var(--mci-login-primary-rgb), 0.25);
+    --mci-login-energy-beam: linear-gradient(90deg, transparent 0%, rgba(var(--mci-login-primary-rgb), 0.12) 20%, rgba(255, 255, 255, 0.64) 50%, rgba(var(--mci-login-primary-rgb), 0.14) 80%, transparent 100%);
+    --mci-login-energy-trace: linear-gradient(90deg, transparent 0%, rgba(var(--mci-login-primary-rgb), 0.36) 24%, #ffffff 72%, transparent 100%);
+    --mci-login-energy-trace-shadow: 0 0 12px rgba(var(--mci-login-primary-rgb), 0.82);
+    --mci-login-card-surface: linear-gradient(145deg, rgba(var(--mci-login-primary-rgb), 0.52), rgba(10, 18, 47, 0.88) 58%, rgba(var(--mci-login-primary-rgb), 0.34));
+    --mci-login-card-glow: linear-gradient(135deg, var(--mci-login-primary-light), var(--mci-login-primary) 46%, var(--mci-login-primary-strong));
+    --mci-login-card-shadow: 0 28px 90px rgba(3, 9, 28, 0.5), 0 0 48px rgba(var(--mci-login-primary-rgb), 0.36), 0 0 96px rgba(var(--mci-login-primary-rgb), 0.24);
+    --mci-login-card-surface-mobile: linear-gradient(145deg, rgba(var(--mci-login-primary-rgb), 0.68), rgba(10, 18, 47, 0.94) 62%, rgba(var(--mci-login-primary-rgb), 0.48));
+    --mci-login-card-shadow-mobile: 0 18px 46px rgba(3, 9, 28, 0.46), 0 0 32px rgba(var(--mci-login-primary-rgb), 0.28), 0 0 58px rgba(var(--mci-login-primary-rgb), 0.2);
     font-size: 12px;
     position: fixed;
     background-color: var(--taskbar-color);
     width: 100%;
     height: 100%;
     z-index: 99;
-    color: #fff;
+    color: var(--mci-login-text-strong);
     text-align: center;
     left: 0;
     top: 0;
@@ -2330,12 +2548,29 @@ export default {
             min-height: 44px;
             align-items: center;
             flex-direction: row;
-            justify-content: flex-start;
+            justify-content: space-between;
         }
 
         .remember-password-checkbox {
             height: 44px !important;
             min-height: 44px !important;
+        }
+
+        .login-appearance-button {
+            width: 44px;
+            padding: 0;
+
+            span {
+                position: absolute;
+                width: 1px;
+                height: 1px;
+                padding: 0;
+                margin: -1px;
+                overflow: hidden;
+                clip: rect(0, 0, 0, 0);
+                white-space: nowrap;
+                border: 0;
+            }
         }
 
         .login-brand {

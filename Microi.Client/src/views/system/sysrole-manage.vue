@@ -60,7 +60,7 @@
                         layout="total, sizes, prev, pager, next, jumper"
                         :total="SysRoleCount"
                         :page-size="PageSize"
-                        :page-sizes="[10, 15, 20, 50, 100]"
+                        :page-sizes="[15, 20, 30, 50, 100]"
                         :current-page="PageIndex"
                         @size-change="SizeChange"
                         @current-change="CurrentChange"

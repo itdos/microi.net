@@ -32,10 +32,20 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
+import { useTagsViewStore } from "@/pinia";
 import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
 import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import MicroAppRuntimeError from "./runtime-error.vue";
+import {
+    MICRO_APP_HOST_ACTION_RESULT_TYPE,
+    MICRO_APP_HOST_PROTOCOL,
+    createMicroAppHostCapabilities,
+    normalizeHostMessage,
+    normalizeHostRouteTarget,
+    normalizeHostTabTitle,
+    parseMicroAppHostAction
+} from "./host-bridge.js";
 import { applyMicroAppToken } from "./token-sync";
 
 function safeDecode(value) {
@@ -144,6 +154,9 @@ function joinUrl(baseUrl, path) {
 export default {
     name: "MicroAppHost",
     components: { MicroAppLoadingSkeleton, MicroAppRuntimeError },
+    setup() {
+        return { tagsViewStore: useTagsViewStore() };
+    },
     data() {
         return {
             loading: true,
@@ -184,6 +197,7 @@ export default {
                 menuName: this.$route?.meta?.title || "",
                 appKey: this.appKey,
                 version: this.appVersion,
+                hostCapabilities: createMicroAppHostCapabilities(),
                 hostViewport: this.hostViewport,
                 microRoute: this.microRoutePath,
                 route: {
@@ -215,9 +229,11 @@ export default {
     },
     mounted() {
         this.startViewportContract();
+        window.addEventListener("page-refresh", this.handleHostPageRefresh);
     },
     beforeUnmount() {
         this.stopViewportContract();
+        window.removeEventListener("page-refresh", this.handleHostPageRefresh);
     },
     watch: {
         "$route.fullPath"() {
@@ -225,9 +241,14 @@ export default {
         }
     },
     methods: {
-        handleDataChange(event) {
+        async handleDataChange(event) {
             const payload = event?.detail?.data ?? event?.detail ?? event ?? {};
             if (applyMicroAppToken(payload)) return;
+            const hostAction = parseMicroAppHostAction(payload);
+            if (hostAction) {
+                await this.handleHostAction(hostAction);
+                return;
+            }
             const type = String(payload?.type || payload?.Type || "").toLowerCase();
             const handled = payload?.handled === true || payload?.Handled === true;
             const errorType = String(payload?.errorType || payload?.ErrorType || "business").toLowerCase();
@@ -237,6 +258,148 @@ export default {
                     reasonCode: data?.reasonCode || data?.ReasonCode || "MICRO_APP_RUNTIME_ERROR"
                 });
             }
+        },
+        async handleHostAction(request) {
+            try {
+                let result = {};
+                switch (request.action) {
+                    case "closeTab":
+                        result = await this.closeCurrentHostTab();
+                        break;
+                    case "navigate":
+                        result = await this.navigateHostRoute(request.data, false);
+                        break;
+                    case "replaceTab":
+                        result = await this.navigateHostRoute(request.data, true);
+                        break;
+                    case "back":
+                        result = await this.goBackHostRoute();
+                        break;
+                    case "forward":
+                        result = await this.goForwardHostRoute();
+                        break;
+                    case "reloadTab":
+                        this.retry();
+                        result = { accepted: true };
+                        break;
+                    case "setTabTitle":
+                        result = this.setCurrentHostTabTitle(request.data);
+                        break;
+                    case "showMessage":
+                        result = this.showHostMessage(request.data);
+                        break;
+                    default:
+                        throw Object.assign(new Error("宿主不支持该微服务操作"), { code: "HOST_ACTION_UNSUPPORTED" });
+                }
+                this.sendHostActionResult(request, true, result);
+            } catch (error) {
+                const message = error?.message || String(error);
+                this.sendHostActionResult(request, false, null, {
+                    code: error?.code || "HOST_ACTION_FAILED",
+                    message
+                });
+                const silent = request.data?.silent === true || request.data?.Silent === true;
+                if (!silent) this.$message?.error?.(message);
+            }
+        },
+        sendHostActionResult(request, success, data = null, error = null) {
+            const app = this.$refs.microApp;
+            if (!app || typeof app.setData !== "function") return;
+            app.setData({
+                type: MICRO_APP_HOST_ACTION_RESULT_TYPE,
+                protocol: MICRO_APP_HOST_PROTOCOL,
+                requestId: request.requestId,
+                action: request.action,
+                success,
+                data,
+                error
+            });
+        },
+        getCurrentVisitedView() {
+            return this.tagsViewStore?.visitedViews?.find((view) => view.fullPath === this.$route?.fullPath) || null;
+        },
+        async closeCurrentHostTab() {
+            const visitedViews = this.tagsViewStore?.visitedViews || [];
+            const currentView = this.getCurrentVisitedView();
+            if (!currentView) {
+                throw Object.assign(new Error("当前页面不在系统 Tab 中"), { code: "HOST_TAB_NOT_FOUND" });
+            }
+            if (currentView.meta?.affix) {
+                throw Object.assign(new Error("固定 Tab 不能关闭"), { code: "HOST_TAB_AFFIXED" });
+            }
+            if (visitedViews.length <= 1) {
+                throw Object.assign(new Error("已经是最后一个 Tab，不能关闭"), { code: "HOST_TAB_LAST" });
+            }
+
+            const closedPath = currentView.fullPath;
+            const { visitedViews: remainingViews } = await this.tagsViewStore.delView(currentView);
+            const nextView = remainingViews.slice(-1)[0];
+            if (nextView?.fullPath) await this.$router.push(nextView.fullPath);
+            else await this.$router.push("/");
+            return { closedPath, nextPath: nextView?.fullPath || "/" };
+        },
+        resolveHostRoute(input) {
+            const target = normalizeHostRouteTarget(input);
+            const resolved = this.$router.resolve(target);
+            if (!resolved?.matched?.length || resolved.name === "page_404" || resolved.matched.some((record) => record.name === "page_404")) {
+                throw Object.assign(new Error("目标系统路由不存在或当前用户无权访问"), { code: "HOST_ROUTE_NOT_FOUND" });
+            }
+            return { target, resolved };
+        },
+        async navigateHostRoute(input, replaceCurrentTab) {
+            const currentView = this.getCurrentVisitedView();
+            const { target, resolved } = this.resolveHostRoute(input);
+            if (replaceCurrentTab) await this.$router.replace(target);
+            else await this.$router.push(target);
+
+            const activeRoute = this.$router?.currentRoute?.value || this.$route;
+            if (replaceCurrentTab && currentView && currentView.fullPath !== activeRoute?.fullPath) {
+                this.tagsViewStore.addView(activeRoute);
+                await this.tagsViewStore.delView(currentView);
+            }
+            return { fullPath: activeRoute?.fullPath || resolved.fullPath, replaced: replaceCurrentTab };
+        },
+        async goBackHostRoute() {
+            const backPath = this.$router?.options?.history?.state?.back;
+            if (typeof backPath === "string" && backPath.startsWith("/")) {
+                this.$router.back();
+                return { accepted: true };
+            }
+            await this.$router.push("/");
+            return { accepted: true, fullPath: "/" };
+        },
+        async goForwardHostRoute() {
+            const forwardPath = this.$router?.options?.history?.state?.forward;
+            if (typeof forwardPath === "string" && forwardPath.startsWith("/")) {
+                this.$router.forward();
+                return { accepted: true };
+            }
+            return { accepted: false, reason: "NO_FORWARD_ROUTE" };
+        },
+        setCurrentHostTabTitle(input) {
+            const title = normalizeHostTabTitle(input);
+            const currentView = this.getCurrentVisitedView();
+            if (!currentView) {
+                throw Object.assign(new Error("当前页面不在系统 Tab 中"), { code: "HOST_TAB_NOT_FOUND" });
+            }
+            this.tagsViewStore.updateVisitedView({
+                ...currentView,
+                title,
+                meta: { ...(currentView.meta || {}), title }
+            });
+            return { title };
+        },
+        showHostMessage(input) {
+            const result = normalizeHostMessage(input);
+            this.$message?.[result.messageType]?.(result.message);
+            return result;
+        },
+        handleHostPageRefresh(event) {
+            const detail = event?.detail || {};
+            if (detail.fullPath && detail.fullPath !== this.$route?.fullPath) return;
+            const menuId = this.$route?.meta?.Id || this.$route?.meta?.id || "";
+            if (detail.sysMenuId && menuId && detail.sysMenuId !== menuId) return;
+            this.retry();
         },
         handleMounted() {
             this.mountState = "mounted";

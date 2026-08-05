@@ -699,25 +699,88 @@
         }
 
         // ===== Android 平板 PC 布局顶部安全区 =====
-        // 手机（<= 768px）保持沉浸式；平板进入 PC 布局时只下移当前 WebView。
+        // 手机（<= 768px）保持沉浸式；平板即使遇到厂商 ROM 返回 false/0，
+        // 也通过安全区、Android 原生资源或 32px 保底下移当前 WebView。
+        var APK_DESKTOP_STATUSBAR_FALLBACK = 32;
         var _lastApkWebviewTop = null;
+        function readSafeNumber(reader) {
+            try {
+                var value = Number(reader());
+                return isFinite(value) ? value : 0;
+            } catch(e) {
+                return 0;
+            }
+        }
+        function normalizeStatusbarHeight(value) {
+            value = Number(value);
+            return isFinite(value) && value >= 12 && value <= 96 ? value : 0;
+        }
+        function getNativeAndroidStatusbarHeight() {
+            try {
+                if (!plus.android || typeof plus.android.invoke !== 'function') return 0;
+                var activity = plus.android.runtimeMainActivity();
+                var resources = activity
+                    ? plus.android.invoke(activity, 'getResources')
+                    : null;
+                var resourceId = resources
+                    ? readSafeNumber(function() {
+                        return plus.android.invoke(
+                            resources,
+                            'getIdentifier',
+                            'status_bar_height',
+                            'dimen',
+                            'android'
+                        );
+                    })
+                    : 0;
+                var resourcePixels = resourceId > 0
+                    ? readSafeNumber(function() {
+                        return plus.android.invoke(resources, 'getDimensionPixelSize', resourceId);
+                    })
+                    : 0;
+                var scale = readSafeNumber(function() { return plus.screen.scale; }) ||
+                    window.devicePixelRatio || 1;
+                return normalizeStatusbarHeight(resourcePixels / scale);
+            } catch(e) {
+                return 0;
+            }
+        }
         function syncDesktopStatusbarInset(force) {
             try {
                 if (!window.plus || !plus.navigator || !plus.webview || !plus.os ||
-                    String(plus.os.name || '').toLowerCase() !== 'android' ||
-                    typeof plus.navigator.isImmersedStatusbar !== 'function' ||
-                    plus.navigator.isImmersedStatusbar() !== true) {
+                    String(plus.os.name || '').toLowerCase() !== 'android') {
                     window.__microi_apkDesktopStatusbarInset = false;
                     return false;
                 }
 
                 var useDesktopInset = window.innerWidth > 768;
-                var statusbarHeight = useDesktopInset &&
-                    typeof plus.navigator.getStatusbarHeight === 'function'
-                    ? Number(plus.navigator.getStatusbarHeight())
+                var navigatorHeight = useDesktopInset
+                    ? normalizeStatusbarHeight(readSafeNumber(function() {
+                        return typeof plus.navigator.getStatusbarHeight === 'function'
+                            ? plus.navigator.getStatusbarHeight()
+                            : 0;
+                    }))
                     : 0;
-                var active = useDesktopInset && isFinite(statusbarHeight) && statusbarHeight > 0;
-                var top = active ? statusbarHeight : 0;
+                var safeAreaHeight = useDesktopInset
+                    ? normalizeStatusbarHeight(readSafeNumber(function() {
+                        var insets = typeof plus.navigator.getSafeAreaInsets === 'function'
+                            ? plus.navigator.getSafeAreaInsets()
+                            : null;
+                        return insets ? insets.top : 0;
+                    }))
+                    : 0;
+                var nativeHeight = useDesktopInset ? getNativeAndroidStatusbarHeight() : 0;
+                var detectedHeight = Math.max(
+                    navigatorHeight,
+                    safeAreaHeight,
+                    nativeHeight
+                );
+                var active = useDesktopInset;
+                var top = active
+                    ? (detectedHeight > 0
+                        ? detectedHeight
+                        : APK_DESKTOP_STATUSBAR_FALLBACK)
+                    : 0;
                 var currentWebview = plus.webview.currentWebview();
 
                 if (currentWebview && typeof currentWebview.setStyle === 'function' &&
@@ -727,6 +790,14 @@
                 }
 
                 window.__microi_apkDesktopStatusbarInset = active;
+                window.__microi_apkDesktopStatusbarDiagnostics = {
+                    active: active,
+                    top: top,
+                    navigatorHeight: navigatorHeight,
+                    safeAreaHeight: safeAreaHeight,
+                    nativeHeight: nativeHeight,
+                    fallback: APK_DESKTOP_STATUSBAR_FALLBACK
+                };
                 if (active) plus.navigator.setStatusBarStyle('dark');
                 return active;
             } catch(e) {

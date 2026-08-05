@@ -10,7 +10,8 @@ import {
     updateRememberedLoginAccountProfile,
     upsertRememberedLoginAccount
 } from "../src/utils/login-credential-history.js";
-import { resolveLoginSystemLogoUrl } from "../src/utils/login-branding.js";
+import { resolveLoginResourceUrl, resolveLoginSystemLogoUrl } from "../src/utils/login-branding.js";
+import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "../src/utils/login-wallpaper.js";
 
 function createStorage() {
     const values = new Map();
@@ -141,6 +142,26 @@ test("login system logo resolves Microi file objects, JSON strings, and URL vari
     assert.equal(resolveLoginSystemLogoUrl(null, getServerPath), "");
 });
 
+test("login wallpapers normalize Microi paths and avoid the current image when randomizing", () => {
+    const getServerPath = (path) => `https://files.microi.test${path}`;
+    const wallpapers = normalizeLoginWallpapers([
+        { Id: "json", Name: "JSON", ImgUrl: '{"Path":"/tenant/json.jpg"}' },
+        { Id: "object", Name: "对象", ImgUrl: { Path: "/tenant/object.jpg" } },
+        { Id: "absolute", Name: "绝对地址", ImgUrl: "https://cdn.microi.test/absolute.jpg" },
+        { Id: "duplicate", Name: "重复", ImgUrl: "/tenant/json.jpg" },
+        { Id: "empty", Name: "空", ImgUrl: "" }
+    ], getServerPath);
+
+    assert.deepEqual(wallpapers.map((item) => item.Url), [
+        "https://files.microi.test/tenant/json.jpg",
+        "https://files.microi.test/tenant/object.jpg",
+        "https://cdn.microi.test/absolute.jpg"
+    ]);
+    assert.equal(resolveLoginResourceUrl({ Path: "/tenant/background.jpg" }, getServerPath), "https://files.microi.test/tenant/background.jpg");
+    assert.equal(pickNextLoginWallpaper(wallpapers, wallpapers[0].Url, () => 0).Id, "object");
+    assert.equal(pickNextLoginWallpaper([wallpapers[0]], wallpapers[0].Url, () => 0).Id, "json");
+});
+
 test("login SFC wires branding, remembered accounts, classic default, and AI motion", () => {
     const component = readFileSync(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
 
@@ -169,6 +190,24 @@ test("login SFC wires branding, remembered accounts, classic default, and AI mot
     assert.match(component, /@keyframes mciLoginCardBreath/);
     assert.match(component, /@media \(prefers-reduced-motion: reduce\)/);
     assert.match(component, /--mci-login-control-radius:\s*12px/);
+    assert.match(component, /class="login-appearance-button login-theme-trigger"/);
+    assert.match(component, /class="login-appearance-button login-wallpaper-trigger"/);
+    assert.match(component, /\/api\/FormEngine\/GetLoginWallpapers/);
+    assert.match(component, /LoginBgImgRandom/);
+    assert.match(component, /--mci-login-input-text:\s*#1f2937/);
+    assert.match(component, /\.el-input__inner\s*\{[\s\S]*?color:\s*var\(--mci-login-input-text\) !important/);
+    assert.match(component, /\.el-input__wrapper\s*\{[\s\S]*?border:\s*0;[\s\S]*?overflow:\s*hidden;/);
+    assert.match(component, /--mci-login-primary:\s*var\(--mci-color-primary,\s*var\(--el-color-primary,/);
+    assert.match(component, /--mci-login-primary-rgb:\s*var\(--mci-color-primary-rgb,\s*var\(--el-color-primary-rgb,/);
+    assert.match(component, /--mci-login-primary-gradient:\s*var\(--mci-gradient-primary,/);
+    assert.match(component, /--mci-login-button-gradient:\s*var\(--mci-login-primary-gradient\)/);
+    assert.match(component, /--mci-login-card-glow:\s*linear-gradient\([^;]*var\(--mci-login-primary-light\)[^;]*var\(--mci-login-primary\)[^;]*var\(--mci-login-primary-strong\)/);
+    assert.match(component, /\.input-icon-wrapper\s*\{[\s\S]*?color:\s*var\(--mci-login-on-primary\);[\s\S]*?background:\s*var\(--mci-login-button-gradient\);/);
+    assert.match(component, /\.login-button\s*\{[\s\S]*?color:\s*var\(--mci-login-on-primary\);/);
+    assert.match(component, /\.login-system-logo-fallback\s*\{[\s\S]*?color:\s*var\(--mci-login-on-primary\);/);
+    assert.match(component, /\.login-account-history-popper \.account-history-avatar\)\s*\{[\s\S]*?color:\s*var\(--mci-text-on-primary, #fff\);/);
+    assert.doesNotMatch(component, /backgroundColor:\s*SysConfig\.ThemeColor|SysConfig\.ThemeColor\s*\|\|\s*['\"]#409EFF['\"]/);
+    assert.doesNotMatch(component, /--mci-login-button-gradient:\s*linear-gradient\([^;]*(?:#176ee8|#386ff2|#655cf2|#7b4fe8)/i);
     assert.match(component, /\.remember-password-checkbox[\s\S]*?border-radius:\s*var\(--mci-login-control-radius\)/);
     assert.match(component, /\.login-button[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*var\(--mci-login-control-radius\)/);
     assert.match(component, /\.loginCenterBgCover[\s\S]*?border:\s*0;[\s\S]*?box-shadow:\s*var\(--mci-login-card-shadow\)/);

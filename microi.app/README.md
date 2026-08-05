@@ -24,7 +24,11 @@ APK 启动后，通过 WebView 直接导航（`location.replace`）到远程服�
   将当前 WebView 动态下移，避免 Android 状态栏覆盖 PC 顶栏、头像和退出入口；
 - 横竖屏切换或应用从后台恢复时会重新判断，回到移动布局后恢复 `top: 0px`。
 
-不要写死 `24px` 等状态栏高度，也不要把 `immersed` 全局改为 `none`。底部手势区域继续由
+部分定制 Android ROM 会把 `isImmersedStatusbar()` 或 `getStatusbarHeight()` 错误返回为 `false/0`。
+PC/平板布局会依次读取 5+ 状态栏高度、安全区顶部、Android WindowInsets、系统
+`status_bar_height` 资源；全部不可用时才使用 32px 点击安全保底。诊断结果可在运行页面控制台读取
+`window.__microi_apkDesktopStatusbarDiagnostics`。该保底只用于宽度大于 768px 的 Android APK，
+不会应用到手机布局。不要把 `immersed` 全局改为 `none`；底部手势区域继续由
 `plus.safearea.bottom.offset = auto` 处理。
 
 修改状态栏配置后需要重新云打包并安装 APK；仅更新远程 Web 页面不会改变已安装 APK 的原生窗口配置。

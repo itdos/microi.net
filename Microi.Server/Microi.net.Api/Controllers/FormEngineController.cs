@@ -231,6 +231,50 @@ namespace Microi.net.Api
             return Json(CreatePublicSysConfigResult(result));
         }
 
+        /// <summary>
+        /// 获取登录页可用壁纸。该匿名接口只公开已启用壁纸的展示字段，
+        /// 避免为了登录页开放通用 FormEngine 匿名表查询权限。
+        /// </summary>
+        [HttpPost, HttpGet]
+        [AllowAnonymous]
+        public async Task<JsonResult> GetLoginWallpapers(
+            [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] JObject param = null)
+        {
+            param = await MergeRequestParam(param);
+            var osClient = param["OsClient"].Val<string>();
+            var lang = param["_Lang"].Val<string>();
+            if (lang.DosIsNullOrWhiteSpace()) lang = GetRequestLang();
+            if (osClient.DosIsNullOrWhiteSpace())
+            {
+                return Json(new DosResult(0, null, DiyMessage.GetLang(osClient, "ParamError", lang)));
+            }
+
+            var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(osClient, lang);
+            if (sysConfigResult == null)
+            {
+                return Json(new DosResult(0, null, "无效的租户标识。"));
+            }
+            if (sysConfigResult.Code != 1)
+            {
+                return Json(sysConfigResult);
+            }
+
+            try
+            {
+                var rows = OsClient.GetClient(osClient).DbRead
+                    .FromSql(@"SELECT Id, Name, Category, ImgUrl
+                               FROM diy_wallpaper
+                               WHERE IsEnable = 1 AND (IsDeleted <> 1 OR IsDeleted IS NULL)")
+                    .ToArray();
+                return Json(new DosResult(1, rows.Take(200).ToArray()));
+            }
+            catch
+            {
+                // 兼容尚未创建壁纸表的旧安装：登录页继续使用 SysConfig.LoginBgImg。
+                return Json(new DosResult(0, null, "读取登录壁纸失败，已使用系统默认登录背景。"));
+            }
+        }
+
         [HttpPost, HttpGet]
         [PlatformAdminOnly]
         public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
