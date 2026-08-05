@@ -4,6 +4,17 @@
       <mci-media-uploader v-if="isImage && hasModelValue" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" :file-context="fileAccessContext" readonly />
       <mci-media-uploader v-else-if="isFile && hasModelValue" :model-value="modelValue" media-type="file" :file-context="fileAccessContext" readonly />
       <text v-else-if="isImage || isFile" class="native-control__value">-</text>
+      <view v-else-if="isPhoneField" class="native-control__phone-row">
+        <text class="native-control__value">{{ displayText }}</text>
+        <view v-if="callablePhone" class="native-control__phone-action"
+          hover-class="native-control__phone-action--pressed" @tap.stop="callPhone">拨打</view>
+      </view>
+      <!-- zhy：详情长文本超过配置行数后在字段内部纵向滑动，不再无限撑高页面。 -->
+      <scroll-view v-else-if="readonlyScrollable" class="native-control__readonly-scroll" scroll-y
+        :style="readonlyScrollStyle">
+        <rich-text v-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
+        <text v-else class="native-control__value">{{ displayText }}</text>
+      </scroll-view>
       <rich-text v-else-if="isRichDisplay" class="native-control__richtext" :nodes="richHtml" />
       <view v-else-if="component === 'Progress'" class="native-control__progress"><progress :percent="numberValue" activeColor="#087da8" /><text>{{ numberValue }}%</text></view>
       <view v-else-if="component === 'ColorPicker'" class="native-control__color-readonly"><view :style="{ backgroundColor: String(modelValue || '#ffffff') }"></view><text>{{ displayText }}</text></view>
@@ -211,9 +222,12 @@ export default {
     readonly: { type: Boolean, default: false },
     tableName: { type: String, default: '' },
     formData: { type: Object, default: () => ({}) },
+    formDataId: { type: String, default: '' },
     menuId: { type: String, default: '' },
+    fileAccessMenuId: { type: String, default: '' },
     moduleEngineKey: { type: String, default: '' },
-    tableChildAuth: { type: Object, default: null }
+    tableChildAuth: { type: Object, default: null },
+    readonlyMaxLines: { type: Number, default: 0 }
   },
   // zhy: 通知表单页同步下拉框的打开状态，便于提升外层卡片层级。
   emits: ['update:modelValue', 'change', 'select', 'selector-toggle'],
@@ -252,10 +266,21 @@ export default {
     },
     isAvatar() { return /avatar|headimg|touxiang/i.test(String(this.field.Name || '')) || /头像/.test(String(this.field.Label || '')) },
     isMultiple() { return isNativeFieldMultiple(this.field) },
+    isPhoneField() { return this.field.inputMode === 'tel' },
+    callablePhone() {
+      const value = String(this.modelValue ?? '').trim()
+      return value && !['-', '—'].includes(value) ? value.replace(/\s+/g, '') : ''
+    },
     isOptionComponent() { return OPTION_COMPONENTS.has(this.component) },
     isDropdownOption() { return this.isOptionComponent && this.component !== 'Radio' },
     hasRemoteOptions() { return isRemoteNativeFieldOptions(this.field) },
     isRichDisplay() { return !!this.modelValue && (['RichText', 'Html'].includes(this.component) || isHtmlValue(this.modelValue)) },
+    readonlyScrollable() { return this.readonly && Number(this.readonlyMaxLines) > 0 },
+    readonlyScrollStyle() {
+      // zhy：只设置最大高度，未超过 11 行的短内容仍保持自然高度。
+      const lines = Math.min(20, Math.max(1, Number(this.readonlyMaxLines) || 11))
+      return { maxHeight: `${lines * 45}rpx` }
+    },
     richHtml() { return normalizeRichTextHtml(this.modelValue) },
     qrcodeUrl() { return this.component === 'Qrcode' ? V8.assetUrl(this.modelValue) : '' },
     displayText() { return fieldDisplayValue(this.field, this.modelValue) },
@@ -274,9 +299,10 @@ export default {
     fileAccessContext() {
       return {
         formEngineKey: this.tableName,
-        formDataId: this.formData && (this.formData.Id || this.formData.id) || '',
+        // 详情页的 Id 可能未包含在可见字段返回值中，优先使用路由中已经完成权限校验的记录 Id。
+        formDataId: this.formDataId || (this.formData && (this.formData.Id || this.formData.id)) || '',
         fieldId: this.field.Id || this.field.id || '',
-        sysMenuId: this.menuId,
+        sysMenuId: this.fileAccessMenuId || this.menuId,
         tableChildAuth: this.tableChildAuth
       }
     },
@@ -668,6 +694,10 @@ export default {
       this.tagDraft = ''
     },
     removeTag(index) { const values = [...this.tagValues]; values.splice(index, 1); this.emitValue(JSON.stringify(values)) },
+    callPhone() {
+      if (!this.callablePhone) return
+      uni.makePhoneCall({ phoneNumber: this.callablePhone })
+    },
     editorReady() {
       const query = uni.createSelectorQuery().in(this)
       query.select('.native-control__editor').context((result) => {
@@ -755,7 +785,13 @@ export default {
 .native-control__tags input { flex: 1; min-width: 210rpx; height: 58rpx; padding: 0 14rpx; border-bottom: 1px solid #dce7eb; font-size: 23rpx; }
 .native-control__unavailable,.native-control__alert { padding: 17rpx 19rpx; border-left: 3px solid #d99b1f; color: #6f5b2d; background: #fff9e8; font-size: 22rpx; line-height: 1.6; }
 .native-control__value { display: block; color: #425b64; font-size: 27rpx; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.native-control__phone-row { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; min-height: 48rpx; }
+.native-control__phone-row .native-control__value { flex: 1; min-width: 0; }
+.native-control__phone-action { flex: none; min-width: 70rpx; height: 44rpx; padding: 0 12rpx; border: 1px solid #64bce0; border-radius: 5px; color: #168bc1; background: #f7fcff; font-size: 21rpx; font-weight: 600; line-height: 42rpx; text-align: center; box-sizing: border-box; transition: transform .14s ease, background-color .14s ease; }
+.native-control__phone-action--pressed { background: #eaf7fc; transform: scale(.96); }
 .native-control__richtext { display: block; color: #425b64; font-size: 25rpx; line-height: 1.7; overflow-wrap: anywhere; }
+/* zhy：只读详情长文本使用 scroll-view 承载，超出最大高度后支持触摸滚动。 */
+.native-control__readonly-scroll { width: 100%; max-height: 495rpx; }
 .native-control__progress { display: grid; grid-template-columns: minmax(0,1fr) 70rpx; gap: 14rpx; align-items: center; }
 .native-control__progress text { color: #58727c; font-size: 22rpx; text-align: right; }
 .native-control__color-readonly { display: flex; align-items: center; gap: 14rpx; color: #425b64; font-size: 24rpx; }
@@ -765,7 +801,7 @@ export default {
 @keyframes nativeSelectIn { from { opacity: 0; transform: translateY(-8rpx); } to { opacity: 1; transform: translateY(0); } }
 @keyframes nativeSelectShimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .native-control__map,.native-select__trigger,.native-select__chevron { transition: none; }
+  .native-control__map,.native-select__trigger,.native-select__chevron,.native-control__phone-action { transition: none; }
   .native-select__popover,.native-select__loading view { animation: none; }
 }
 </style>
