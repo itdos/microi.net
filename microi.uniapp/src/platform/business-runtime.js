@@ -315,7 +315,18 @@ export async function findMenu(aliases = [], tableName = '', refresh = false, me
   })
 }
 
-export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null }) {
+export async function findPreferredMenu(aliases = [], tableName = '', refresh = false) {
+  const menus = flattenMenus(await loadMenuTree(refresh))
+  const resolvedTableId = tableName ? await resolveDiyTableId(tableName, refresh) : ''
+  return selectAuthorizedMenu(menus, {
+    aliases,
+    tableName,
+    tableId: resolvedTableId,
+    preferAliases: true
+  })
+}
+
+export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], fileMenuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null }) {
   if (!requireLogin()) return
   if (!table) {
     uni.showToast({ title: '未配置业务表单', icon: 'none' })
@@ -340,6 +351,12 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
     `stayAfterAdd=${stayAfterAdd === true ? '1' : '0'}`
   ]
   if (menu && menu.Id) params.push(`menuId=${encodeURIComponent(menu.Id)}`)
+  if (normalizedRecordAdapter === 'form-engine' && fileMenuAliases.length) {
+    try {
+      const fileMenu = await findPreferredMenu(fileMenuAliases, table)
+      if (fileMenu && fileMenu.Id) params.push(`fileMenuId=${encodeURIComponent(fileMenu.Id)}`)
+    } catch (error) {}
+  }
   if (moduleEngineKey) params.push(`moduleEngineKey=${encodeURIComponent(moduleEngineKey)}`)
   if (tableChildAuth) params.push(`tableChildAuth=${encodeURIComponent(JSON.stringify(tableChildAuth))}`)
   if (defaultValues && Object.keys(defaultValues).length) params.push(`defaults=${encodeURIComponent(JSON.stringify(defaultValues))}`)

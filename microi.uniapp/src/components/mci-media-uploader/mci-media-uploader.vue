@@ -50,6 +50,14 @@ export default {
         }
         this.syncItems()
       }
+    },
+    fileContext: {
+      deep: true,
+      handler(value, oldValue) {
+        const current = JSON.stringify(value || {})
+        const previous = JSON.stringify(oldValue || {})
+        if (current !== previous) this.syncItems()
+      }
     }
   },
   methods: {

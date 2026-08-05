@@ -912,7 +912,8 @@ export default {
         mode: 'View',
         title: `${this.config.title}详情`,
         menuId: this.menuId,
-        menuAliases: this.config.menuAliases || []
+        menuAliases: this.config.menuAliases || [],
+        fileMenuAliases: this.config.fileMenuAliases || []
       })
     },
     onMciListDetailReturned(scrollTop) {
@@ -957,6 +958,7 @@ export default {
         title: `新增${this.config.title}`,
         menuId: this.menuId,
         menuAliases: this.config.menuAliases || [],
+        fileMenuAliases: this.config.fileMenuAliases || [],
         defaultValues: Object.keys(defaultValues).length ? defaultValues : null
       })
     },
