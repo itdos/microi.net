@@ -355,7 +355,7 @@
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
 	const DETAIL_NATIVE_COMPONENTS = new Set([
 		'ImgUpload', 'FileUpload', 'RichText', 'Html', 'Address', 'Map', 'MapArea',
-		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Department', 'SelectTree',
+		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Switch', 'Department', 'SelectTree',
 		'TreeCheckbox', 'Cascader', 'ColorPicker', 'Progress', 'Rate', 'Qrcode', 'Alert'
 	])
 
