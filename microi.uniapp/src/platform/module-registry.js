@@ -1,6 +1,6 @@
 import { getUser, V8 } from '@/utils/request.js'
 import { cachedRequest } from '@/platform/cache.js'
-import { loadMenuTree } from '@/platform/business-runtime.js'
+import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
 
@@ -33,7 +33,7 @@ function collectMenus(items, parent = null, output = []) {
   return output
 }
 
-function configuredFieldNames(value, fields) {
+export function configuredFieldNames(value, fields) {
   const rows = parseJson(value, value)
   const list = Array.isArray(rows) ? rows : normalizeStringList(rows)
   const byId = new Map(fields.map((field) => [String(field.Id || '').toLowerCase(), field]))
@@ -49,6 +49,16 @@ function configuredFieldNames(value, fields) {
       byName.get(String(item || '').toLowerCase())
     return field && field.Name
   }).filter(Boolean)
+}
+
+function uniqueFieldNames(values = []) {
+  const seen = new Set()
+  return values.filter((value) => {
+    const key = String(value || '').toLowerCase()
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function preferredField(fields, patterns, excluded = new Set(), fallback = true) {
@@ -171,21 +181,13 @@ export async function loadAccessibleModuleGroups(refresh = false) {
   return [...groups.values()]
 }
 
-export async function loadModuleDefinition(menuId, refresh = false) {
-  const modules = await loadAccessibleModules(refresh)
-  const module = modules.find((item) =>
-    String(item.menuId) === String(menuId) || String(item.key) === String(menuId)
-  )
-  if (!module) throw new Error('模块不存在或当前账号无权访问')
-  const definition = await loadNativeFormDefinition(module.table, refresh, {
-    menuId: module.menuId,
-    moduleEngineKey: module.key
-  })
+function createModuleDefinition(module, definition) {
   const fields = definition.fields || []
   const configuredMobile = configuredFieldNames(module.menu.MobileListFields, fields)
   const configuredList = configuredFieldNames(module.menu.SelectFields, fields)
   const configuredTags = configuredFieldNames(module.menu.CardTitleTagFields, fields)
   const configuredBottom = configuredFieldNames(module.menu.CardBottomTagFields, fields)
+  const configuredSearch = configuredFieldNames(module.menu.SearchFieldIds, fields)
   const configuredStatistics = configuredFieldNames(module.menu.StatisticsFields, fields)
   // 后台已配置“移动端/卡片显示列”时必须严格使用该顺序；
   // SelectFields 只在未配置移动端列时作为兼容回退，不能混入卡片造成展示漂移。
@@ -221,6 +223,13 @@ export async function loadModuleDefinition(menuId, refresh = false) {
     statusOptions: statusField ? (statusField.options || []).map((item) => item.value) : [],
     tagFields: configuredTags.slice(0, 3),
     bottomFields: configuredBottom.slice(0, 3),
+    // 弹窗表格等通用卡片必须保留平台配置顺序，不再自行截取前 4 个可见字段。
+    cardFields: uniqueFieldNames([
+      ...preferredNames,
+      ...configuredTags,
+      ...configuredBottom
+    ]),
+    searchFields: configuredSearch,
     lines: lines.map((field) => ({
       field: field.Name,
       label: field.Label || field.Name,
@@ -232,8 +241,38 @@ export async function loadModuleDefinition(menuId, refresh = false) {
   }
 }
 
+export async function loadModuleDefinition(menuId, refresh = false) {
+  const modules = await loadAccessibleModules(refresh)
+  const module = modules.find((item) =>
+    String(item.menuId) === String(menuId) || String(item.key) === String(menuId)
+  )
+  if (!module) throw new Error('模块不存在或当前账号无权访问')
+  const definition = await loadNativeFormDefinition(module.table, refresh, {
+    menuId: module.menuId,
+    moduleEngineKey: module.key
+  })
+  return createModuleDefinition(module, definition)
+}
+
+// OpenTable 通常绑定不在工作台展示的隐藏 CRUD 菜单。它仍然必须从
+// 当前用户已授权的菜单树中精确查找，不能因 Display/AppDisplay=0 丢失字段配置。
+export async function loadGrantedMenuDefinition(menuId, refresh = false) {
+  const menu = await findMenu([], '', refresh, menuId)
+  if (!menu || !menu.DiyTableId) throw new Error('弹窗表格菜单不存在或当前账号无权访问')
+  const tableMap = await loadTableMap([{ menu }])
+  const table = tableMap.get(String(menu.DiyTableId || ''))
+  const module = baseModule(menu, null, table)
+  if (!module.table) throw new Error('弹窗表格未绑定有效数据表')
+  const definition = await loadNativeFormDefinition(module.table, refresh, {
+    menuId: module.menuId,
+    moduleEngineKey: module.key
+  })
+  return createModuleDefinition(module, definition)
+}
+
 export default {
   loadAccessibleModules,
   loadAccessibleModuleGroups,
-  loadModuleDefinition
+  loadModuleDefinition,
+  loadGrantedMenuDefinition
 }

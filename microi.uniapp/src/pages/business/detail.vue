@@ -99,11 +99,18 @@
 							:class="{ expanded: isSectionExpanded(section, sectionIndex) }">›</text>
 					</view>
 					<view v-if="isSectionExpanded(section, sectionIndex)" class="field-list section-body-enter">
+						<view v-if="section.selectorTabs.length" class="section-selector-grid">
+							<mci-table-selector v-for="relatedTab in section.selectorTabs" :key="relatedTab.key"
+								:field="relatedTab.field" :parent-table="moduleConfig.table"
+								:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
+								readonly compact />
+						</view>
 						<view class="field-row"
 							:class="{ 'field-row--map': tenantDetailFieldPresentation(field).type === 'map' }"
 							v-for="field in section.fields" :key="`${section.key}:${field.name}`">
 							<text class="field-label">{{ field.label }}</text>
-							<view class="field-value-wrap">
+							<view class="field-value-wrap"
+								:class="{ 'field-value-wrap--scroll': isScrollableDetailField(field) }">
 								<view v-if="tenantDetailFieldPresentation(field).type === 'map'"
 									class="detail-field-map">
 									<map
@@ -171,18 +178,6 @@
 						:parent-form="detail" :parent-menu-id="menuId" readonly />
 					<mci-related-table v-else-if="relatedTab.type === 'joinTable'" :field="relatedTab.field"
 						:parent-form="detail" :parent-menu-id="menuId" />
-				</view>
-
-				<view v-if="summaryBlocks.length" class="info-band">
-					<view class="section-heading">
-						<view class="section-mark"></view>
-						<text>补充说明</text>
-					</view>
-					<view class="summary-block" v-for="block in summaryBlocks" :key="block.label">
-						<text class="summary-label">{{ block.label }}</text>
-						<rich-text v-if="block.rich" class="summary-text summary-text--rich" :nodes="block.html" />
-						<text v-else class="summary-text">{{ block.value }}</text>
-					</view>
 				</view>
 
 				<view v-if="key === 'tasks' && showMerchantAcceptance" class="acceptance-band">
@@ -321,7 +316,8 @@
 		loadNativeFormDefinition
 	} from '@/platform/native-form.js'
 	import {
-		getTenantFormFieldPresentation
+		getTenantFormFieldPresentation,
+		refreshTenantFormDerivedValues
 	} from '@/platform/form-extension.js'
 	import {
 		compileDetailPreset,
@@ -343,7 +339,7 @@
 	const DETAIL_EXCLUDED_FIELDS = new Set(['Id', 'CreateUserId', 'UpdateUserId', 'OsClient'])
 	const DETAIL_NATIVE_COMPONENTS = new Set([
 		'ImgUpload', 'FileUpload', 'RichText', 'Html', 'Address', 'Map', 'MapArea',
-		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Department', 'SelectTree',
+		'Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Switch', 'Department', 'SelectTree',
 		'TreeCheckbox', 'Cascader', 'ColorPicker', 'Progress', 'Rate', 'Qrcode', 'Alert'
 	])
 
@@ -1179,6 +1175,7 @@
 				definition: null,
 				viewManifest: null,
 				metricValues: {},
+				tenantDerivedState: {},
 				expandedSections: {},
 				activeFormTabKey: '',
 				standaloneRelatedAddKey: '',
@@ -1297,12 +1294,18 @@
 						name: field.Name,
 						format: detailFieldFormat(field),
 						nativeField: field
-					})).filter((field) => !this.isTenantMapCoordinateHelper(field))
+					})).filter((field) =>
+						!this.isTenantMapCoordinateHelper(field) &&
+						this.tenantDetailFieldPresentation(field).visible !== false
+					)
 					return {
 						title: group.name || '',
 						fields: rows,
 						relatedTabs: this.activeRelatedTabs.filter((item) =>
 							this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
+						),
+						selectorTabs: this.activeRelatedTabs.filter((item) =>
+							this.isEmbeddedOpenTableRelated(item) && item.field.layoutGroupKey === group.key
 						),
 						source: group.source,
 						description: group.description || '',
@@ -1311,7 +1314,7 @@
 						key: group.key || `${group.name || 'ungrouped'}:${index}`
 					}
 				})
-				.filter((section) => section.fields.length || section.relatedTabs.length)
+				.filter((section) => section.fields.length || section.relatedTabs.length || section.selectorTabs.length)
 			},
 			formTabs() {
 				return (this.definition?.formTabs || []).map((tab) => ({
@@ -1339,7 +1342,7 @@
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
 			},
 			standaloneRelatedTabs() {
-				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
+				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
 			},
 			standaloneChildTab() {
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
@@ -1357,7 +1360,15 @@
 				}
 			},
 			summaryBlocks() {
-				return (this.preset.summaries || []).map((item) => {
+				// zhy：详情页默认最多显示 11 行，租户模块可通过 detailSummaryLines 调整。
+				const maxLines = Math.min(20, Math.max(1, Number(this.moduleConfig.detailSummaryLines) || 11))
+				return (this.preset.summaries || []).filter((item) => {
+					if (!this.formTabs.length) return true
+					// zhy：摘要字段只跟随其所属表单 Tab 展示；元数据缺失时归入首个基础信息 Tab，禁止串到联系人等其它 Tab。
+					const field = this.fieldDefinitionMap.get(String(item.field || '').toLowerCase())
+					const summaryTabKey = field?.formTabKey || this.formTabs[0]?.key || ''
+					return summaryTabKey === this.activeFormTabKey
+				}).map((item) => {
 					const raw = this.detail[item.field]
 					const rich = isHtmlValue(raw)
 					return {
@@ -1365,7 +1376,8 @@
 						raw,
 						rich,
 						html: rich ? normalizeRichTextHtml(raw) : '',
-						value: rich ? '' : formatFieldValue(raw, item.format)
+						value: rich ? '' : formatFieldValue(raw, item.format),
+						scrollStyle: { maxHeight: `${maxLines * 43}rpx` }
 					}
 				}).filter((item) => item.raw !== undefined && item.raw !== null && item.raw !== '')
 			},
@@ -1748,6 +1760,20 @@
 			if (!this.loading && this.id) this.loadDetail(false)
 		},
 		methods: {
+			tenantDetailFormContext() {
+				return {
+					tableName: this.moduleConfig.table,
+					rowId: this.id,
+					mode: 'View',
+					definition: this.definition,
+					form: this.detail,
+					defaultValues: {},
+					state: this.tenantDerivedState,
+					patchForm: (updates = {}) => {
+						this.detail = { ...this.detail, ...updates }
+					}
+				}
+			},
 			async loadDetail(showLoading = true, refreshManifest = false) {
 				if (!this.id) {
 					this.error = '缺少业务数据编号'
@@ -1772,6 +1798,9 @@
 						this.definition = definitionResult
 						this.initializeFormTabs()
 					}
+					try {
+						await refreshTenantFormDerivedValues(this.tenantDetailFormContext())
+					} catch (error) {}
 					this.metricValues = await loadViewMetricValues(this.preset.metrics || [], {
 						form: this.detail,
 						user: this.currentUser,
@@ -1889,6 +1918,10 @@
 					empty: '-'
 				})
 			},
+			isScrollableDetailField(field) {
+				// zhy：字段同时出现在详情分组中时，也按摘要字段的 11 行上限处理。
+				return String(field?.name || '').toLowerCase() === String(this.moduleConfig.summaryField || '').toLowerCase()
+			},
 			usesNativeDisplay(field) {
 				return Boolean(field.nativeField && DETAIL_NATIVE_COMPONENTS.has(String(field.nativeField.component ||
 					field.nativeField.Component || '')))
@@ -1953,6 +1986,12 @@
 			},
 			isEmbeddedChildRelated(item) {
 				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
+			},
+			isEmbeddedOpenTableRelated(item) {
+				return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
+			},
+			isEmbeddedRelated(item) {
+				return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
 			},
 			callPhone(phone) {
 				if (phone) uni.makePhoneCall({
@@ -2817,6 +2856,15 @@
 		animation: sectionBodyEnter .2s ease both;
 	}
 
+	.section-selector-grid {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 14rpx;
+		padding: 18rpx 0;
+		border-bottom: 1rpx solid #e5eef1;
+		background: linear-gradient(180deg, #f8fbfc, #fbfdfd);
+	}
+
 	.field-row {
 		display: grid;
 		grid-template-columns: 190rpx minmax(0, 1fr);
@@ -2909,6 +2957,13 @@
 		gap: 14rpx;
 	}
 
+	/* zhy：跟进记录等长文本在详情字段区超过 11 行后可触摸滚动。 */
+	.field-value-wrap--scroll {
+		max-height: 396rpx;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
 	.field-value {
 		min-width: 0;
 		color: #203f4a;
@@ -2961,6 +3016,16 @@
 		font-size: 25rpx;
 		line-height: 1.7;
 		word-break: break-all;
+	}
+
+	/* zhy：scroll-view 使用 max-height，短内容保持自然高度，长内容才出现滚动。 */
+	.summary-text-scroll {
+		width: 100%;
+		margin-top: 10rpx;
+	}
+
+	.summary-text-scroll .summary-text {
+		margin-top: 0;
 	}
 
 	.summary-text--rich {

@@ -176,7 +176,8 @@ export const businessModules = {
       { label: '跟进时间', field: 'GenjinSJ', format: 'datetime' },
       { label: '下次跟进', field: 'XiaciGJRQ', format: 'datetime' }
     ],
-    summaryField: 'GenjinJL', summaryLines: 3, periodField: 'GenjinSJ', filterFields: visitFilterFields
+    // zhy：列表最多 3 行并显示省略号，详情最多 11 行后纵向滚动。
+    summaryField: 'GenjinJL', summaryLines: 3, detailSummaryLines: 11, periodField: 'GenjinSJ', filterFields: visitFilterFields
   }),
   orders: native({
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
@@ -328,7 +329,8 @@ export const businessModules = {
       { label: '跟进时间', field: 'GenjinSJ', format: 'datetime' },
       { label: '下次跟进', field: 'XiaciGJRQ', format: 'datetime' }
     ],
-    summaryField: 'GenjinJL', summaryLines: 3, periodField: 'GenjinSJ',
+    // zhy：线索跟进沿用相同的长文本展示规则。
+    summaryField: 'GenjinJL', summaryLines: 3, detailSummaryLines: 11, periodField: 'GenjinSJ',
     filterFields: [
       { key: 'visitType', label: '跟进方式', field: 'GenjinFS', type: 'options', multiple: true, source: 'baseData', parentKey: 'GenjinFS', valueField: 'Value', labelField: 'Value' },
       { key: 'visitor', label: '跟进人', field: 'UserName', type: 'text' },
@@ -422,6 +424,7 @@ export const businessModules = {
   }),
   attendanceRecords: native({
     title: '打卡记录', table: 'Diy_location', menuAliases: ['打卡记录', '拜访打卡'],
+    fileMenuAliases: ['人员定位'],
     titleField: 'BaifangDX', tagFields: ['DakaR'],
     lines: [{ label: '打卡人', field: 'DakaR' }, { label: '打卡时间', field: 'DakaSJ', format: 'datetime' }, { label: '打卡地点', field: 'DakaDD' }],
     summaryField: 'Beizhu', periodField: 'DakaSJ'

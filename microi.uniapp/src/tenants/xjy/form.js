@@ -6,6 +6,7 @@ import {
   normalizeOptions,
   parseJson
 } from '@/platform/native-form.js'
+import { normalizeUploadItems } from '@/platform/display.js'
 import {
   V8,
   getUser
@@ -20,10 +21,25 @@ import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
 } from './customer-follow-scope.mjs'
+import {
+  calculateOrderProductCooperation,
+  orderProductNumberValue
+} from './order-product-cooperation.mjs'
+import {
+  orderSummarySubmitValues,
+  orderSummaryValues
+} from './order-summary.mjs'
 
 const CUSTOMER_TABLE = 'diy_kehu'
 // zhy：合同订单在所有移动端入口共用同一表单钩子，避免“我的订单”和客户订单 Tab 行为不一致。
 const ORDER_TABLE = 'diy_dingdan'
+const ORDER_PRODUCT_TABLE = 'diy_dingdansp'
+const PRODUCT_TABLE = 'diy_shangpin'
+const ORDER_PRODUCT_CONSUMABLE_TABLE = 'diy_dingdansphc'
+const ORDER_RENEWAL_TYPE = '老客户续签订单'
+const INSTALLATION_POSITION_TABLE = 'diy_shebeiwz'
+const INSTALLATION_POSITION_CODE_FIELD = 'ShangpinBH'
+const INSTALLATION_POSITION_CODE_ENGINE = 'create_unique_value'
 const CUSTOMER_ADDRESS_TABLE = 'diy_kehudz'
 const CHECKIN_TABLE = 'diy_location'
 // zhy：跟进记录及联系人表，用于新增跟进时按客户加载联系人。
@@ -55,6 +71,8 @@ const CUSTOMER_LOCATION_FIELDS = {
   longitude: 'KehuDT_Lng'
 }
 const CHECKIN_FIELDS = {
+  customerId: 'KehuID',
+  customerName: 'BaifangDX',
   address: 'DakaDD',
   time: 'DakaSJ',
   userName: 'DakaR'
@@ -108,6 +126,11 @@ const ORDER_FIELDS = {
   ownerPhone: 'YewuYDH',
   orderType: 'XinLDD',
   orderDate: 'XiadanRQ',
+  renewalOrderNumber: 'XQDingdanBH',
+  renewalState: 'DingdanSFXQ',
+  contractAttachment: 'HetongFJ',
+  contractUploadState: 'IsDingdanHT',
+  contractState: 'HetongZT',
   installer: 'AnzhuangR',
   installerId: 'AnzhuangRID',
   installerPhone: 'AnzhuangRDH'
@@ -136,6 +159,23 @@ function isOrderAdd(context) {
   return isOrderForm(context) && context.mode === 'Add' && !context.rowId
 }
 
+function isOrderProductForm(context) {
+  return String(context.tableName || '').toLowerCase() === ORDER_PRODUCT_TABLE
+}
+
+function isInstallationPositionAdd(context) {
+  return String(context.tableName || '').toLowerCase() === INSTALLATION_POSITION_TABLE &&
+    context.mode === 'Add' && !context.rowId
+}
+
+function installationPositionCodeField(context) {
+  // 线上历史表可能使用 ShangpinBH 或 ShebeiBH，以当前元数据中“设备编号”的真实字段为准。
+  const labelledField = findField(context, '__device_number__', '设备编号')
+  return labelledField && labelledField.Name
+    ? labelledField.Name
+    : fieldName(context, INSTALLATION_POSITION_CODE_FIELD)
+}
+
 function isCustomerAddressForm(context) {
   return String(context.tableName || '').toLowerCase() === CUSTOMER_ADDRESS_TABLE
 }
@@ -144,9 +184,17 @@ function isCustomerAddressAdd(context) {
   return isCustomerAddressForm(context) && context.mode === 'Add' && !context.rowId
 }
 
+function isCheckinForm(context) {
+  return String(context.tableName || '').toLowerCase() === CHECKIN_TABLE
+}
+
 function isCheckinAdd(context) {
-  return String(context.tableName || '').toLowerCase() === CHECKIN_TABLE &&
+  return isCheckinForm(context) &&
     context.mode === 'Add' && !context.rowId
+}
+
+function isCheckinEditable(context) {
+  return isCheckinForm(context) && ['Add', 'Edit'].includes(context.mode)
 }
 
 function isFollowupAdd(context) {
@@ -318,10 +366,12 @@ function applyOrderValues(context, values = {}) {
 }
 
 async function initializeOrder(context) {
-  // zhy：仅为空字段设置新增默认值，保留路由或业务侧已经传入的订单类型和下单日期。
+  // zhy：仅为空字段设置新增默认值，保留路由或业务侧已经传入的订单数据。
   const defaults = {
     [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
-    [orderFieldName(context, 'orderDate', '下单日期')]: currentDate()
+    [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
+    [orderFieldName(context, 'contractState', '合同状态')]: '未断约',
+    [orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'
   }
   const emptyDefaults = Object.fromEntries(
     Object.entries(defaults).filter(([name]) => isEmptyFormValue(context.form[name]))
@@ -380,6 +430,106 @@ function isEmptyFormValue(value) {
   return value === undefined || value === null || value === '' ||
     (Array.isArray(value) && value.length === 0) ||
     (typeof value === 'string' && value.trim() === '[]')
+}
+
+function cooperationOptionKey(field, value) {
+  const option = Array.isArray(field && field.options)
+    ? field.options.find((item) => String(item && item.value) === String(value))
+    : null
+  const raw = option && option.raw && typeof option.raw === 'object' ? option.raw : {}
+  return raw.Key ?? raw.key ?? ''
+}
+
+async function orderProductFilterPrice(context, product) {
+  const orderProductId = context.rowId || context.form.Id
+  if (!orderProductId) return orderProductNumberValue(product.GenghuanLXJG)
+  const result = await V8.FormEngine.GetTableData(ORDER_PRODUCT_CONSUMABLE_TABLE, {
+    _Where: [['DingdanSPID', '=', orderProductId]],
+    _SelectFields: ['YouhuiHLXZJ'],
+    _PageIndex: 1,
+    _PageSize: 1000
+  })
+  // PC 字段事件查询成功时使用耗材明细合计，失败时才回退商品滤芯价。
+  if (!result || Number(result.Code) !== 1) return orderProductNumberValue(product.GenghuanLXJG)
+  return (Array.isArray(result.Data) ? result.Data : []).reduce(
+    (sum, item) => sum + orderProductNumberValue(item && item.YouhuiHLXZJ),
+    0
+  )
+}
+
+async function updateOrderProductCooperation(context, payload) {
+  const cooperation = String(payload.value || '')
+  const cooperationKey = cooperationOptionKey(payload.field, cooperation)
+  const productId = context.form.ShangpinID
+  const requestId = Number(context.state.orderProductCooperationRequestId || 0) + 1
+  context.state.orderProductCooperationRequestId = requestId
+
+  // 与 PC 一致先更新隐藏合作方式值，接口异常时也不残留上一方式。
+  context.patchForm({ HezuoFSZ: cooperationKey })
+  if (!cooperation || !productId) return { handled: true }
+
+  try {
+    const productResult = await V8.FormEngine.GetFormData(PRODUCT_TABLE, {
+      Id: productId,
+      _SelectFields: ['Id', 'Yuanjia', 'Xianjia', 'ZulinYJ', 'ZulinXJ', 'GenghuanLXJG']
+    })
+    if (!productResult || Number(productResult.Code) !== 1 || !productResult.Data) {
+      throw new Error(productResult && productResult.Msg || '商品价格读取失败')
+    }
+    const filterActualUnitPrice = await orderProductFilterPrice(context, productResult.Data)
+    // 快速连续切换时只允许最后一次请求更新价格。
+    if (context.state.orderProductCooperationRequestId !== requestId ||
+      String(context.form.HezuoFS || '') !== cooperation) {
+      return { handled: true }
+    }
+    context.patchForm(calculateOrderProductCooperation({
+      cooperation,
+      cooperationKey,
+      form: context.form,
+      product: productResult.Data,
+      filterActualUnitPrice
+    }))
+  } catch (error) {
+    if (context.state.orderProductCooperationRequestId === requestId) {
+      uni.showToast({
+        title: error.message || error.Msg || '合作方式价格联动失败',
+        icon: 'none'
+      })
+    }
+  }
+  return { handled: true }
+}
+
+async function loadOrderSummaryValues(orderId) {
+  const id = String(orderId || '').trim()
+  if (!id) return orderSummaryValues([], [])
+  const productResult = await V8.FormEngine.GetTableData(ORDER_PRODUCT_TABLE, {
+    _Where: [{ Name: 'DingdanID', Type: '=', Value: id }],
+    _OrderBy: 'CreateTime',
+    _OrderByType: 'ASC',
+    _PageIndex: 1,
+    _PageSize: 1000
+  })
+  if (!productResult || Number(productResult.Code) !== 1) {
+    throw new Error(productResult && productResult.Msg || '订单商品读取失败')
+  }
+  const products = Array.isArray(productResult.Data) ? productResult.Data : []
+  const productIds = products.map((item) => item && item.Id).filter(Boolean)
+  if (!productIds.length) return orderSummaryValues(products, [])
+  const positionResult = await V8.FormEngine.GetTableData(INSTALLATION_POSITION_TABLE, {
+    _Where: [{ Name: 'DingdanSPID', Type: 'In', Value: productIds }],
+    _OrderBy: 'Paixu',
+    _OrderByType: 'ASC',
+    _PageIndex: 1,
+    _PageSize: 5000
+  })
+  if (!positionResult || Number(positionResult.Code) !== 1) {
+    throw new Error(positionResult && positionResult.Msg || '设备安装位置读取失败')
+  }
+  return orderSummaryValues(
+    products,
+    Array.isArray(positionResult.Data) ? positionResult.Data : []
+  )
 }
 
 function proposalDefaults(context) {
@@ -799,21 +949,41 @@ function applyCheckinTime(context) {
 
 function applyCheckinLocation(context, location) {
   const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
-  context.patchForm({ [addressName]: location.address })
-  context.state.checkinLocation = location
+  if (location.address) context.patchForm({ [addressName]: location.address })
+  context.state.checkinLocation = {
+    ...(context.state.checkinLocation || {}),
+    ...location,
+    address: location.address || context.state.checkinLocation?.address || context.form[addressName] || ''
+  }
   context.state.checkinValues = {
     ...(context.state.checkinValues || {}),
-    [addressName]: location.address
+    ...(location.address ? { [addressName]: location.address } : {})
   }
 }
 
+function scheduleCheckinMapMount(context) {
+  if (context.state.checkinMapReady || context.state.checkinMapTimer) return
+  context.state.checkinMapTimer = setTimeout(() => {
+    context.state.checkinMapReady = true
+    context.state.checkinMapTimer = null
+  }, 180)
+}
+
 async function locateCheckin(context, chooseFromMap) {
-  if (!isCheckinAdd(context) || context.state.locating) return
+  if (!isCheckinEditable(context) || context.state.locating) return
   context.state.locating = true
   try {
     const source = chooseFromMap
       ? await requestChosenLocation()
       : await requestCurrentLocation()
+    // 先提交坐标给页面并延迟挂载地图，地址解析不再阻塞地图和表单交互。
+    const immediate = normalizeChosenLocation(source, null)
+    applyCheckinLocation(context, immediate)
+    scheduleCheckinMapMount(context)
+    if (immediate.address) {
+      if (chooseFromMap) uni.showToast({ title: '签到地点已更新', icon: 'success' })
+      return
+    }
     let geocode = null
     try {
       geocode = await reverseGeocode(source.longitude, source.latitude, {
@@ -839,6 +1009,55 @@ async function locateCheckin(context, chooseFromMap) {
   }
 }
 
+// 对齐 PC 端安装位置 InFormV8：设备编号统一由接口引擎生成，客户端不自行拼号。
+async function initializeInstallationPositionCode(context) {
+  if (!isInstallationPositionAdd(context) || context.state.installationCodeInitializing) return
+
+  const codeField = installationPositionCodeField(context)
+  context.state.installationCodeField = codeField
+  if (context.state.installationCodeInitialized) {
+    if (context.state.installationCodeValue) {
+      context.patchForm({ [codeField]: context.state.installationCodeValue })
+    }
+    return
+  }
+
+  context.state.installationCodeInitializing = true
+  try {
+    let result
+    try {
+      result = await V8.ApiEngine.Run(INSTALLATION_POSITION_CODE_ENGINE, { Batch: 1 })
+    } catch (error) {
+      result = await V8.ApiEngine.RunLegacy(INSTALLATION_POSITION_CODE_ENGINE, { Batch: 1 })
+    }
+    if (result && Number(result.Code) === 0) {
+      result = await V8.ApiEngine.RunLegacy(INSTALLATION_POSITION_CODE_ENGINE, { Batch: 1 })
+    }
+
+    const generatedCode = result && result.Data !== undefined && result.Data !== null
+      ? String(result.Data).trim()
+      : ''
+    if (!result || Number(result.Code) !== 1 || !generatedCode || generatedCode === '[object Object]') {
+      throw new Error(result && result.Msg || '设备编号生成失败请重试！')
+    }
+
+    context.state.installationCodeValue = generatedCode
+    context.state.installationCodeInitialized = true
+    context.patchForm({ [codeField]: generatedCode })
+    findFieldCopies(context, codeField).forEach((field) => {
+      field.editable = false
+      field.Readonly = true
+    })
+  } catch (error) {
+    uni.showToast({
+      title: error.message || error.Msg || '设备编号生成失败请重试！',
+      icon: 'none'
+    })
+  } finally {
+    context.state.installationCodeInitializing = false
+  }
+}
+
 export function createState() {
   return {
     locating: false,
@@ -852,6 +1071,8 @@ export function createState() {
       longitude: 0,
       address: ''
     },
+    checkinMapReady: false,
+    checkinMapTimer: null,
     currentTime: '',
     followupInitialized: false,
     followupCustomerId: '',
@@ -859,16 +1080,24 @@ export function createState() {
     proposalInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
-    orderValues: {}
+    orderValues: {},
+    orderSummaryValues: null,
+    orderProductCooperationRequestId: 0,
+    installationCodeInitialized: false,
+    installationCodeInitializing: false,
+    installationCodeField: '',
+    installationCodeValue: ''
   }
 }
 
 export async function initialize(context) {
+  await initializeInstallationPositionCode(context)
   // zhy：所有入口进入订单新增页时统一初始化，避免各页面分别维护相同逻辑。
   if (isOrderAdd(context) && !context.state.orderInitialized) {
     context.state.orderInitialized = true
     await initializeOrder(context)
   }
+  if (isOrderForm(context)) await refreshDerivedValues(context)
   if (isProposalAdd(context) &&
     isEmptyFormValue(context.form[fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')])) {
     context.patchForm({
@@ -884,21 +1113,28 @@ export async function initialize(context) {
     context.state.locationInitialized = true
     setTimeout(() => locateCustomer(context, false), 0)
   }
-  if (isCheckinAdd(context) && !context.state.checkinInitialized) {
+  if (isCheckinEditable(context) && !context.state.checkinInitialized) {
     context.state.checkinInitialized = true
-    context.state.currentTime = currentTimestamp()
-    applyCheckinTime(context)
-    // zhy：新增打卡记录时自动将当前登录用户 Name 填入打卡人。
-    const user = currentUserOption()
-    if (user) {
-      const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
-      context.patchForm({ [userName]: user.Name })
-      context.state.checkinValues = {
-        ...(context.state.checkinValues || {}),
-        [userName]: user.Name
-      }
+    const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
+    context.state.checkinLocation = {
+      ...(context.state.checkinLocation || {}),
+      address: String(context.form[addressName] || '')
     }
-    setTimeout(() => locateCheckin(context, false), 0)
+    if (isCheckinAdd(context)) {
+      context.state.currentTime = currentTimestamp()
+      applyCheckinTime(context)
+      // zhy：新增打卡记录时自动将当前登录用户 Name 填入打卡人。
+      const user = currentUserOption()
+      if (user) {
+        const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
+        context.patchForm({ [userName]: user.Name })
+        context.state.checkinValues = {
+          ...(context.state.checkinValues || {}),
+          [userName]: user.Name
+        }
+      }
+      setTimeout(() => locateCheckin(context, false), 60)
+    }
   }
   if (isFollowupForm(context)) {
     // zhy：新增时初始化默认值；新增、编辑和详情都加载联系人选项，避免详情直接显示联系人 Id。
@@ -967,7 +1203,7 @@ export async function handleRelatedCount(context, payload = {}) {
 }
 
 export function getPresentation(context) {
-  if (isCheckinAdd(context)) {
+  if (isCheckinEditable(context)) {
     const location = context.state.checkinLocation || {}
     return {
       location: {
@@ -975,6 +1211,7 @@ export function getPresentation(context) {
         actionKey: 'xjy-checkin-location',
         actionLabel: context.state.locating ? '定位中…' : '重新定位',
         locating: Boolean(context.state.locating),
+        mapReady: Boolean(context.state.checkinMapReady),
         latitude: Number(location.latitude || 0),
         longitude: Number(location.longitude || 0),
         address: String(location.address || ''),
@@ -1016,6 +1253,19 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isCheckinEditable(context) && field &&
+    String(field.Name || '').toLowerCase() === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
+    return {
+      clearable: true,
+      clearFields: [fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')]
+    }
+  }
+  if (isOrderForm(context) && field &&
+    String(field.Name || '').toLowerCase() === ORDER_FIELDS.renewalOrderNumber.toLowerCase()) {
+    return {
+      visible: String(context.form[orderFieldName(context, 'orderType', '订单类型')] || '') === ORDER_RENEWAL_TYPE
+    }
+  }
   if (isProposalForm(context) && field &&
     String(field.Name || '').toLowerCase() === PROPOSAL_FIELDS.bottledWaterPrice.toLowerCase()) {
     return {
@@ -1066,6 +1316,15 @@ export function getFieldActions(context, field) {
   if (!field) return []
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
+  if (isCheckinEditable(context) &&
+    (name === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase() || label === '拜访对象')) {
+    return [{
+      key: 'xjy-checkin-customer',
+      label: '选择客户',
+      iconType: 'search',
+      position: 'label'
+    }]
+  }
   if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode) &&
     (name === CUSTOMER_LOCATION_FIELDS.address.toLowerCase() || label === '详细地址')) {
     return [{
@@ -1079,6 +1338,15 @@ export function getFieldActions(context, field) {
 }
 
 export async function runFieldAction(context, field, action) {
+  if (action && action.key === 'xjy-checkin-customer') {
+    return {
+      handled: true,
+      customerPicker: {
+        fieldName: fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象'),
+        idFieldName: fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
+      }
+    }
+  }
   if (action && action.key === 'xjy-customer-location') {
     await locateCustomer(context, true)
     return { handled: true }
@@ -1097,6 +1365,15 @@ export async function handleFieldSelect(context, payload) {
         ? ''
         : personValue(row, ['KehuMC', 'CustomerName', 'Name']) || payload.value || ''
       applyOrderValues(context, updates)
+      return { handled: true }
+    }
+    if (selectedFieldName === ORDER_FIELDS.renewalOrderNumber.toLowerCase()) {
+      // 平台保存订单编号文本而不是订单 Id，后续续签事件会按 DingdanBH 回查原订单。
+      applyOrderValues(context, {
+        [orderFieldName(context, 'renewalOrderNumber', '续签订单编号')]: payload.cleared
+          ? ''
+          : personValue(row, ['DingdanBH']) || payload.value || ''
+      })
       return { handled: true }
     }
     const personnel = [
@@ -1248,7 +1525,28 @@ export async function handleFieldSelect(context, payload) {
   return { handled: true }
 }
 
-export function handleFieldChange(context, payload) {
+export async function handleFieldChange(context, payload) {
+  if (isCheckinEditable(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() ===
+      fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
+    // 手动修改拜访对象后解除旧客户 Id；通过客户选择器回填时会同时写入新 Id。
+    context.patchForm({ [fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')]: '' })
+    return { handled: true }
+  }
+  if (isOrderProductForm(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() === 'hezuofs') {
+    return updateOrderProductCooperation(context, payload)
+  }
+  // 非续签订单必须清空历史续签编号，与平台订单类型字段事件保持一致。
+  if (isOrderForm(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() === ORDER_FIELDS.orderType.toLowerCase()) {
+    if (String(payload.value || '') !== ORDER_RENEWAL_TYPE) {
+      applyOrderValues(context, {
+        [orderFieldName(context, 'renewalOrderNumber', '续签订单编号')]: ''
+      })
+    }
+    return { handled: true }
+  }
   // zhy：用户清空客户或人员时同步清空对应 Id、电话，避免提交残留的旧关联数据。
   if (isOrderForm(context) && payload && isEmptyFormValue(payload.value)) {
     const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -1314,17 +1612,39 @@ export function handleFieldChange(context, payload) {
 }
 
 export async function beforeSubmit(context) {
+  if (isInstallationPositionAdd(context)) {
+    const codeField = context.state.installationCodeField ||
+      installationPositionCodeField(context)
+    const codeValue = context.state.installationCodeValue || context.form[codeField]
+    if (isEmptyFormValue(codeValue)) throw new Error('设备编号尚未生成，请重新进入页面后重试')
+    // 只读字段不进入通用 editable 字段集合，必须作为受控额外值显式提交。
+    return { [codeField]: codeValue }
+  }
   // zhy：提交前补入隐藏关联字段，并为新增订单兜底默认值；编辑订单不覆盖历史值。
   if (isOrderForm(context)) {
     const values = { ...(context.state.orderValues || {}) }
+    if (context.state.orderSummaryValues) {
+      Object.assign(values, orderSummarySubmitValues(context.state.orderSummaryValues))
+    }
+    // 合同附件的上传状态是派生数据；小程序不会执行 PC 字段 V8，保存时按最终附件值统一回写。
+    const attachmentName = orderFieldName(context, 'contractAttachment', '合同附件')
+    const uploadStateName = orderFieldName(context, 'contractUploadState', '合同是否上传')
+    values[uploadStateName] = normalizeUploadItems(context.form[attachmentName]).length
+      ? '已上传'
+      : '未上传'
     if (isOrderAdd(context)) {
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
-        [orderFieldName(context, 'orderDate', '下单日期')]: currentDate()
+        [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
+        [orderFieldName(context, 'contractState', '合同状态')]: '未断约',
+        [orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'
       }
       Object.entries(defaults).forEach(([name, value]) => {
         if (isEmptyFormValue(context.form[name]) && isEmptyFormValue(values[name])) values[name] = value
       })
+    }
+    if (String(context.form[orderFieldName(context, 'orderType', '订单类型')] || '') !== ORDER_RENEWAL_TYPE) {
+      values[orderFieldName(context, 'renewalOrderNumber', '续签订单编号')] = ''
     }
     return values
   }
@@ -1350,18 +1670,23 @@ export async function beforeSubmit(context) {
   if (isCustomerCareForm(context)) {
     return customerCareTotalValues(context)
   }
-  if (isCheckinAdd(context)) {
+  if (isCheckinEditable(context)) {
     // zhy：提交打卡记录时再次兜底打卡人，确保保存当前登录用户 Name。
     const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
     const timeName = fieldName(context, CHECKIN_FIELDS.time, '打卡时间')
     const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
-    const user = currentUserOption()
-    return {
+    const customerIdName = fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
+    const values = {
       ...context.state.checkinValues,
       [addressName]: context.form[addressName] || context.state.checkinLocation.address || '',
-      [timeName]: context.form[timeName] || context.state.currentTime || currentTimestamp(),
-      [userName]: context.form[userName] || (user && user.Name) || ''
+      [customerIdName]: context.form[customerIdName] || ''
     }
+    if (isCheckinAdd(context)) {
+      const user = currentUserOption()
+      values[timeName] = context.form[timeName] || context.state.currentTime || currentTimestamp()
+      values[userName] = context.form[userName] || (user && user.Name) || ''
+    }
+    return values
   }
   if (isFollowupForm(context)) {
     // zhy：KehuID 是隐藏字段，不会进入通用 visible fields 保存列表，提交前必须显式补入。
@@ -1389,6 +1714,15 @@ export async function beforeSubmit(context) {
   return {}
 }
 
+export async function refreshDerivedValues(context) {
+  if (!isOrderForm(context)) return {}
+  const orderId = context.rowId || context.form.Id || context.defaultValues?.Id || ''
+  const values = await loadOrderSummaryValues(orderId)
+  context.state.orderSummaryValues = values
+  context.patchForm(values)
+  return values
+}
+
 export async function afterSubmit(context) {
   if (String(context.tableName || '').toLowerCase() === CHECKIN_TABLE && context.wasAdd) {
     dispose(context)
@@ -1400,7 +1734,10 @@ export function getBusyMessage(context) {
 }
 
 export function dispose(context) {
-  // 当前租户表单扩展没有需要在页面卸载时清理的长驻任务。
+  if (context.state && context.state.checkinMapTimer) {
+    clearTimeout(context.state.checkinMapTimer)
+    context.state.checkinMapTimer = null
+  }
 }
 
 export default {
@@ -1415,6 +1752,7 @@ export default {
   handleFieldChange,
   handleFieldSelect,
   handleRelatedCount,
+  refreshDerivedValues,
   beforeSubmit,
   afterSubmit,
   getBusyMessage,

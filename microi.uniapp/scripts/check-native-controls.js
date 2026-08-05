@@ -37,6 +37,11 @@ const xjyProposalCalculation = fs.readFileSync(
 )
 const businessDetail = fs.readFileSync(path.join(root, 'src/pages/business/detail.vue'), 'utf8')
 const moduleDetail = fs.readFileSync(path.join(root, 'src/pages/module/detail.vue'), 'utf8')
+const tableSelector = fs.readFileSync(
+  path.join(root, 'src/components/mci-table-selector/mci-table-selector.vue'),
+  'utf8'
+)
+const moduleRegistry = fs.readFileSync(path.join(root, 'src/platform/module-registry.js'), 'utf8')
 const formTabs = fs.readFileSync(path.join(root, 'src/components/mci-related-tabs/mci-related-tabs.vue'), 'utf8')
 const childTable = fs.readFileSync(path.join(root, 'src/components/mci-child-table/mci-child-table.vue'), 'utf8')
 const businessCard = fs.readFileSync(path.join(root, 'src/components/mci-business-card/mci-business-card.vue'), 'utf8')
@@ -55,6 +60,14 @@ for (const control of ['ImgUpload', 'FileUpload', 'DateTime', 'Address', 'Map', 
 if (!nativeForm.includes('<mci-native-field')) fail('native form must delegate fields to mci-native-field')
 if (!formRuntime.includes('inferNativeComponent')) fail('semantic control inference is missing')
 if (!formRuntime.includes("return 'ImgUpload'")) fail('avatar/image semantic fallback is missing')
+if (!formRuntime.includes('/手机|电话|座机|固话|phone|mobile|tel/i')) {
+  fail('phone field inference must cover mobile, telephone and landline labels')
+}
+if (!renderer.includes('v-if="callablePhone" class="native-control__phone-action"') ||
+  !renderer.includes('uni.makePhoneCall({ phoneNumber: this.callablePhone })') ||
+  !renderer.includes("!['-', '—'].includes(value)")) {
+  fail('readonly phone fields must provide a call action and hide it for empty values')
+}
 if (!formRuntime.includes('SENSITIVE_FIELD_PATTERN')) fail('sensitive field visibility guard is missing')
 if (!nativeForm.includes('hydrateNativeFormOptions(liveDefinition')) {
   fail('async field options must hydrate the live reactive form definition')
@@ -109,7 +122,9 @@ if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
   !formRuntime.includes('active.group.relatedFields.push(field)') ||
   !formRuntime.includes('groups: layoutGroups.filter((group) => group.fields.length)') ||
   !formRuntime.includes('relatedGroups: layoutGroups') ||
-  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 7')) {
+  !formRuntime.includes("if (field.component === 'Tabs')") ||
+  !formRuntime.includes('Divider 只是组内分隔') ||
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 8')) {
   fail('related fields must preserve their platform CollapseGroup ownership')
 }
 if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
@@ -200,7 +215,37 @@ for (const page of [nativeForm, moduleDetail, businessDetail]) {
 if (!businessCard.includes('card-actions') || !businessCard.includes('查看详情')) {
   fail('shared business card must preserve list row actions and detail navigation')
 }
+// zhy：跟进记录列表必须从基础租户配置识别长文本，并在微信端保留静态三行截断兜底。
+if (!businessList.includes('this.baseConfig.summaryField || this.config.summaryField') ||
+  !businessCard.includes('.field-value--multiline') ||
+  !businessCard.includes('max-height: 102rpx') ||
+  !businessCard.includes('-webkit-line-clamp: 3')) {
+  fail('follow-up card long text must be clamped to three lines')
+}
+// zhy：原生详情页才是跟进记录实际入口，长文本必须限制为 11 行并支持滚动。
+if (!nativeForm.includes(':readonly-max-lines="readonlyMaxLines(field)"') ||
+  !nativeForm.includes('Number(module.detailSummaryLines) || 11') ||
+  !renderer.includes('class="native-control__readonly-scroll" scroll-y') ||
+  !renderer.includes('max-height: 495rpx')) {
+  fail('native follow-up detail long text must scroll after eleven lines')
+}
 // zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
+for (const token of [
+  "contractAttachment: 'HetongFJ'",
+  "contractUploadState: 'IsDingdanHT'",
+  "renewalOrderNumber: 'XQDingdanBH'",
+  "renewalState: 'DingdanSFXQ'",
+  "contractState: 'HetongZT'",
+  "const ORDER_RENEWAL_TYPE = '老客户续签订单'",
+  "[orderFieldName(context, 'contractState', '合同状态')]: '未断约'",
+  "[orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'",
+  "personValue(row, ['DingdanBH']) || payload.value || ''",
+  'normalizeUploadItems(context.form[attachmentName]).length',
+  "? '已上传'",
+  ": '未上传'"
+]) {
+  if (!xjyTenantForm.includes(token)) fail(`xjy order contract upload rule is missing: ${token}`)
+}
 for (const token of [
   'PROPOSAL_FIELDS',
   "['ShangpinMC']",
@@ -319,6 +364,20 @@ for (const token of [
   if (!businessDetail.includes(token)) fail(`page-level related-list floating action is missing: ${token}`)
 }
 for (const token of [
+  ':class="{ expanded: previewExpanded }">›</text>',
+  '.preview-section-header__arrow.expanded { transform: rotate(-90deg); }',
+  '.preview-section-header ~ .related-empty { width: auto; margin: 18rpx 22rpx 0; }'
+]) {
+  if (!relatedBusinessList.includes(token)) fail(`related preview spacing/toggle style is missing: ${token}`)
+}
+if (businessDetail.includes('<text>补充说明</text>')) {
+  fail('business detail must not render the duplicate supplementary summary section')
+}
+if (!nativeForm.includes('.filter((field) => this.tenantFieldPresentation(field).visible !== false)') ||
+  !businessDetail.includes('this.tenantDetailFieldPresentation(field).visible !== false')) {
+  fail('tenant conditional field visibility must apply to form validation and business details')
+}
+for (const token of [
   'CUSTOMER_CARE_FIELDS',
   'customerCareTotalValues(context',
   'loadCustomerCareContacts(context)',
@@ -393,6 +452,45 @@ for (const [source, name] of [
   if (!source.includes('show-preview-header')) {
     fail(`${name} standalone TableChild must use the shared collapsible preview section`)
   }
+}
+for (const [source, name] of [
+  [nativeForm, 'native form detail'],
+  [businessDetail, 'business detail'],
+  [moduleDetail, 'module detail']
+]) {
+  for (const token of [
+    'isEmbeddedOpenTableRelated(item)',
+    "item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)",
+    'isEmbeddedRelated(item)',
+    '!this.isEmbeddedRelated(item)',
+    'compact'
+  ]) {
+    if (!source.includes(token)) fail(`${name} embedded OpenTable rendering is missing: ${token}`)
+  }
+}
+if (!nativeForm.includes('form-section__selector-grid') ||
+  !businessDetail.includes('section-selector-grid') ||
+  !moduleDetail.includes('detail-section__selector-grid') ||
+  !tableSelector.includes("'selector-field--compact': compact") ||
+  !tableSelector.includes('compact: { type: Boolean, default: false }')) {
+  fail('embedded OpenTable actions must use the shared compact two-column presentation')
+}
+for (const token of [
+  '<root-portal v-if="visible">',
+  'height: 0; min-height: 0; flex: 1',
+  'loadGrantedMenuDefinition(this.targetMenuId)',
+  'this.menuDefinition.cardFields',
+  'this.menuDefinition.searchFields'
+]) {
+  if (!tableSelector.includes(token)) fail(`OpenTable mobile selector layout/configuration is missing: ${token}`)
+}
+for (const token of [
+  'export async function loadGrantedMenuDefinition',
+  "findMenu([], '', refresh, menuId)",
+  'cardFields: uniqueFieldNames',
+  'searchFields: configuredSearch'
+]) {
+  if (!moduleRegistry.includes(token)) fail(`OpenTable granted menu field configuration is missing: ${token}`)
 }
 for (const token of [
   'showPreviewHeader',

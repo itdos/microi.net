@@ -23,7 +23,7 @@
           </view>
           <view class="map-wrap" @tap="chooseLocation">
             <map
-              v-if="location.latitude && location.longitude"
+              v-if="mapReady && location.latitude && location.longitude"
               class="map-view"
               :latitude="location.latitude"
               :longitude="location.longitude"
@@ -41,13 +41,28 @@
 
         <view class="section form-section">
           <view class="field">
-            <text class="field-label">拜访对象</text>
-            <input v-model="form.name" class="field-input" placeholder="请输入客户或拜访对象" />
+            <view class="field-heading">
+              <text class="field-label">拜访对象</text>
+              <view class="customer-select-button" hover-class="customer-select-button--pressed" @tap="openCustomerPicker">
+                <view class="customer-select-icon"></view>
+                <text>选择客户</text>
+              </view>
+            </view>
+            <view class="field-input-wrap">
+              <input :value="form.name" class="field-input" placeholder="选择已有客户或手动输入" @input="handleTargetInput" />
+              <view v-if="form.name" class="field-clear-button" hover-class="field-clear-button--pressed" @tap="clearTargetInput">
+                <text>×</text>
+              </view>
+            </view>
           </view>
           <view class="field field--textarea">
-            <text class="field-label">现场备注</text>
-            <textarea v-model="form.remark" class="field-textarea" maxlength="500" placeholder="记录本次拜访或现场服务情况" />
-            <text class="field-count">{{ form.remark.length }}/500</text>
+            <view class="field-heading">
+              <text class="field-label">现场备注</text>
+            </view>
+            <view class="field-textarea-wrap">
+              <textarea v-model="form.remark" class="field-textarea" maxlength="500" placeholder="记录本次拜访或现场服务情况" />
+              <text class="field-count">{{ form.remark.length }}/500</text>
+            </view>
           </view>
         </view>
 
@@ -80,9 +95,16 @@
 
     <view v-if="!initialLoading" class="submit-bar">
       <button class="submit-button" :loading="submitting" :disabled="submitting" @tap="submit">
-        {{ submitting ? '正在提交' : '确认打卡' }}
+        <view v-if="!submitting" class="submit-check-icon"><text>✓</text></view>
+        <text>{{ submitting ? '正在提交' : '确认打卡' }}</text>
       </button>
     </view>
+    <mci-customer-picker
+      :visible="customerPickerVisible"
+      :selected-id="customerId"
+      @close="customerPickerVisible = false"
+      @select="selectCustomer"
+    />
     <mci-ai-launcher />
   </view>
 </template>
@@ -93,10 +115,12 @@ import { V8, getUser } from '@/utils/request.js'
 import { callApiEngine, openLowCodeMenu } from '@/platform/business-runtime.js'
 import { normalizeChosenLocation, reverseGeocode } from '@/platform/location.js'
 import { updateTask } from '@/utils/xjy-task.js'
+import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
 
 const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
 
 export default {
+  components: { MciCustomerPicker },
   mixins: [themeMixin],
   data() {
     return {
@@ -106,12 +130,16 @@ export default {
       todayCount: 0,
       initialLoading: true,
       locating: false,
+      mapReady: false,
+      mapMountTimer: null,
       submitting: false,
       location: { latitude: 0, longitude: 0, address: '' },
       photos: [],
       form: { name: '', remark: '' },
       taskId: '',
-      customerId: ''
+      customerId: '',
+      selectedCustomerName: '',
+      customerPickerVisible: false
     }
   },
   computed: {
@@ -131,17 +159,23 @@ export default {
     if (visitTarget) this.form.name = decodeURIComponent(visitTarget)
     this.taskId = decodeURIComponent(options.taskId || '')
     this.customerId = decodeURIComponent(options.customerId || '')
+    this.selectedCustomerName = this.customerId ? this.form.name : ''
     this.updateTime()
     this.timer = setInterval(this.updateTime, 1000)
     this.initializePage()
   },
   onUnload() {
     if (this.timer) clearInterval(this.timer)
+    if (this.mapMountTimer) clearTimeout(this.mapMountTimer)
   },
   methods: {
-    async initializePage() {
-      await Promise.allSettled([this.loadTodayCount(), this.chooseLocation(false)])
-      this.initialLoading = false
+    initializePage() {
+      // 首屏只等待一次视图刷新，统计、定位和地图均在内容可操作后异步加载。
+      this.$nextTick(() => {
+        this.initialLoading = false
+        this.loadTodayCount()
+        setTimeout(() => this.chooseLocation(false), 60)
+      })
     },
     updateTime() {
       const now = new Date()
@@ -174,6 +208,10 @@ export default {
       })
     },
     async resolveCheckinLocation(source) {
+      const immediate = normalizeChosenLocation(source, null)
+      this.location = { ...this.location, latitude: immediate.latitude, longitude: immediate.longitude, address: immediate.address || '' }
+      this.scheduleMapMount()
+      if (immediate.address) return
       let geocode = null
       try {
         geocode = await reverseGeocode(source.longitude, source.latitude, {
@@ -185,6 +223,13 @@ export default {
       const location = normalizeChosenLocation(source, geocode)
       if (!location.address) throw new Error('当前坐标的详细地址解析失败')
       this.location = location
+    },
+    scheduleMapMount() {
+      if (this.mapReady || this.mapMountTimer) return
+      this.mapMountTimer = setTimeout(() => {
+        this.mapReady = true
+        this.mapMountTimer = null
+      }, 180)
     },
     async chooseLocation(showPicker = true) {
       if (this.locating) return
@@ -212,6 +257,28 @@ export default {
       } finally {
         this.locating = false
       }
+    },
+    openCustomerPicker() {
+      this.customerPickerVisible = true
+    },
+    selectCustomer(payload) {
+      this.customerId = String(payload && payload.id || '')
+      this.selectedCustomerName = String(payload && payload.name || '')
+      this.form.name = this.selectedCustomerName
+      this.customerPickerVisible = false
+    },
+    clearSelectedCustomer() {
+      this.customerId = ''
+      this.selectedCustomerName = ''
+    },
+    clearTargetInput() {
+      this.form.name = ''
+      this.clearSelectedCustomer()
+    },
+    handleTargetInput(event) {
+      const value = String(event && event.detail && event.detail.value || '')
+      this.form.name = value
+      if (this.customerId && value.trim() !== this.selectedCustomerName.trim()) this.clearSelectedCustomer()
     },
     openWatermarkCamera() {
       if (this.photos.length >= 6) return
@@ -330,13 +397,22 @@ export default {
 .map-placeholder image { width: 92rpx; height: 92rpx; margin-bottom: 12rpx; opacity: 0.75; }
 .address-text { display: block; margin-top: 14rpx; color: #4d6975; font-size: 23rpx; line-height: 34rpx; }
 .form-section { padding-top: 8rpx; padding-bottom: 8rpx; }
-.field { display: grid; grid-template-columns: 138rpx minmax(0, 1fr); align-items: center; min-height: 92rpx; border-bottom: 1rpx solid #edf3f5; }
+.field { display: flex; flex-direction: column; align-items: stretch; min-height: 92rpx; padding: 18rpx 0; border-bottom: 1rpx solid #edf3f5; }
 .field:last-child { border-bottom: none; }
-.field--textarea { position: relative; align-items: start; padding: 24rpx 0; }
-.field-label { color: #536f7a; font-size: 25rpx; }
-.field-input { height: 72rpx; color: #233f4b; font-size: 25rpx; }
-.field-textarea { box-sizing: border-box; width: 100%; min-height: 150rpx; padding: 8rpx 0 34rpx; color: #233f4b; font-size: 25rpx; line-height: 38rpx; }
-.field-count { position: absolute; right: 0; bottom: 18rpx; color: #a0afb5; font-size: 20rpx; }
+.field--textarea { padding-bottom: 20rpx; }
+.field-heading { display: flex; align-items: center; justify-content: space-between; min-height: 48rpx; }
+.field-label { color: #536f7a; font-size: 25rpx; font-weight: 600; }
+.customer-select-button { display: flex; align-items: center; gap: 7rpx; min-height: 44rpx; margin-right: 16rpx; padding: 0 12rpx; border: 1rpx solid #b9dce8; border-radius: 10rpx; background: #edf8fb; color: #087fae; font-size: 21rpx; transition: transform .15s ease, opacity .15s ease; }
+.customer-select-button--pressed { transform: scale(.97); opacity: .76; }
+.customer-select-icon { position: relative; width: 18rpx; height: 18rpx; border: 2rpx solid #087fae; border-radius: 50%; }
+.customer-select-icon::after { position: absolute; right: -8rpx; bottom: -5rpx; width: 9rpx; height: 2rpx; border-radius: 1rpx; background: #087fae; transform: rotate(45deg); content: ''; }
+.field-input-wrap { position: relative; min-width: 0; padding-top: 4rpx; }
+.field-input { box-sizing: border-box; width: 100%; height: 64rpx; padding-right: 64rpx; color: #233f4b; font-size: 25rpx; }
+.field-clear-button { position: absolute; top: 10rpx; right: 0; display: flex; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; border-radius: 50%; color: #81959d; font-size: 32rpx; line-height: 1; transition: transform .15s ease, opacity .15s ease; }
+.field-clear-button--pressed { transform: scale(.9); opacity: .65; }
+.field-textarea-wrap { position: relative; width: 100%; }
+.field-textarea { box-sizing: border-box; width: 100%; min-height: 180rpx; padding: 10rpx 0 36rpx; color: #233f4b; font-size: 25rpx; line-height: 38rpx; }
+.field-count { position: absolute; right: 0; bottom: 4rpx; color: #a0afb5; font-size: 20rpx; }
 .photo-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14rpx; }
 .photo-item, .photo-add { position: relative; aspect-ratio: 1; border-radius: 12rpx; overflow: hidden; }
 .photo-item image { width: 100%; height: 100%; }
@@ -346,6 +422,7 @@ export default {
 .privacy-note { display: flex; align-items: flex-start; margin: 18rpx 8rpx 0; color: #8a9fa8; font-size: 21rpx; line-height: 32rpx; }
 .privacy-mark { flex: 0 0 auto; width: 8rpx; height: 8rpx; margin: 12rpx 12rpx 0 0; border-radius: 50%; background: #1f9d72; }
 .submit-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 5; padding: 16rpx 24rpx calc(16rpx + var(--mci-safe-bottom)); border-top: 1rpx solid #e1ebef; background: rgba(255, 255, 255, 0.96); }
-.submit-button { display: flex; align-items: center; justify-content: center; width: 100%; height: 84rpx; margin: 0; border: none; border-radius: 16rpx; background: #e94b2c; color: #fff; font-size: 28rpx; font-weight: 650; line-height: 84rpx; box-shadow: 0 9rpx 24rpx rgba(233, 75, 44, 0.22); }
+.submit-button { display: flex; align-items: center; justify-content: center; gap: 12rpx; width: 100%; height: 84rpx; margin: 0; border: none; border-radius: 16rpx; background: #e94b2c; color: #fff; font-size: 28rpx; font-weight: 650; line-height: 84rpx; box-shadow: 0 9rpx 24rpx rgba(233, 75, 44, 0.22); }
+.submit-check-icon { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; border: 3rpx solid rgba(255,255,255,.88); border-radius: 50%; font-size: 22rpx; line-height: 1; }
 .submit-button::after { border: none; }
 </style>

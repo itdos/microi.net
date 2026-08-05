@@ -115,6 +115,7 @@ check(nativeFormPageSource.includes('compileFormConfig'), '动态表单尚未消
 check(nativeFormPageSource.includes('applyNativeFormViewDefinition'), '动态表单缺少视图布局回退合并')
 
 const businessRuntimeSource = read('src/platform/business-runtime.js')
+const menuResolutionSource = read('src/platform/menu-resolution.mjs')
 const resolveTableIdSource = businessRuntimeSource.slice(
   businessRuntimeSource.indexOf('export async function resolveDiyTableId'),
   businessRuntimeSource.indexOf('function flattenMenus')
@@ -124,8 +125,13 @@ check(
   '表名解析禁止逐菜单调用 GetDiyTableModel，应由调用方传入已授权 tableId'
 )
 check(
-  businessRuntimeSource.includes("menu.DiyTableId || '') === String(tableId)"),
+  menuResolutionSource.includes('normalize(menu && menu.DiyTableId) === tableId'),
   '菜单解析缺少确定性 DiyTableId 匹配'
+)
+check(
+  menuResolutionSource.includes('不能把没有 DiyTableId 的父级目录当成表单授权菜单') &&
+    menuResolutionSource.includes('if (!tableName && !tableId)'),
+  '菜单解析必须拒绝把无表绑定的父目录作为 _SysMenuId'
 )
 const relatedListSource = read('src/components/mci-business-related-list/mci-business-related-list.vue')
 check(
