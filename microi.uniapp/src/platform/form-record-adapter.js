@@ -36,6 +36,22 @@ function normalizeValue(field, value) {
   return value
 }
 
+async function attachWeChatContentSecurityLoginCode(payload) {
+  let isWeChatMiniProgram = false
+  // #ifdef MP-WEIXIN
+  isWeChatMiniProgram = true
+  // #endif
+  if (!isWeChatMiniProgram) return
+  if (typeof uni === 'undefined' || typeof uni.login !== 'function') {
+    throw new Error('内容安全检测暂不可用，请稍后重试。')
+  }
+  const result = await new Promise((resolve, reject) => {
+    uni.login({ provider: 'weixin', success: resolve, fail: reject })
+  })
+  if (!result || !result.code) throw new Error('内容安全检测暂不可用，请稍后重试。')
+  payload.ContentSecurityLoginCode = result.code
+}
+
 async function loadFormEngineRecord(context) {
   if (!context.rowId) return null
   return V8.FormEngine.GetFormData(context.tableName, {
@@ -186,6 +202,7 @@ async function saveCurrentUserRecord(context) {
     if (!CURRENT_USER_EDITABLE_FIELDS.has(name.toLowerCase())) return
     payload[name] = normalizeValue(field, context.form[name])
   })
+  await attachWeChatContentSecurityLoginCode(payload)
 
   const updateResult = ensureSuccess(
     await post('/api/SysUser/UptSysUser', payload),

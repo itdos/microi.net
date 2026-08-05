@@ -21,6 +21,29 @@
 Token 只用于确认用户和租户。普通帐号不能因为持有 Token 就任意上传、列目录、读取私有桶裸路径或调用文件管理接口。
 :::
 
+### 微信小程序图片与资料内容安全
+
+微信小程序中的头像及其它用户图片统一通过 `V8.uploadFile` 上传。小程序运行时 SDK 会获取一次性 `wx.login` code，后端把图片保存在私有隔离区，并调用微信 `mediaCheckAsync`；只有异步回调明确返回 `pass` 后，SDK 才把文件值写入表单。`review`、`risky`、回调超时、配置缺失或 Redis 故障均失败关闭。用户侧只提示“你发布的内容含违规信息，请修改后重试”，不得显示命中标签、策略或概率。
+
+个人资料保存还会在服务端再次核对审核记录、图片路径和提交人，并用 `msgSecCheck` 检查姓名、实名和个人简介。因此不能通过跳过前端轮询或直接请求 `UptSysUser` 绕过检测。
+
+Upgrade32 会在当前租户的 SaaS 引擎“微信小程序”Tab 增加以下配置；这些值不得写入 `appsettings.json`、环境变量、UniApp 源码或日志：
+
+| SaaS 引擎字段 | 说明 |
+|---|---|
+| `WeChatMiniProgramAppId` | 当前小程序 AppId |
+| `WeChatMiniProgramAppSecret` | 当前小程序 AppSecret，仅后端读取 |
+| `WeChatMiniProgramMessageToken` | 微信消息推送签名 Token |
+| `WeChatMiniProgramEncodingAESKey` | 可选；兼容／安全模式回调解密密钥 |
+
+在微信公众平台配置小程序消息推送 URL：
+
+```text
+https://<API公网域名>/api/WeChatContentSecurity/Callback?o=<OsClient>
+```
+
+Token 必须与 `WeChatMiniProgramMessageToken` 完全一致；可先使用明文模式，启用兼容或安全模式时同时填写 EncodingAESKey。API 域名必须是微信可访问的 HTTPS 地址，负载均衡后的所有节点连接同一 Redis。接入依据见微信官方 [`mediaCheckAsync`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.mediaCheckAsync.html) 与 [`msgSecCheck`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.msgSecCheck.html) 文档。
+
 ### 租户动态限制、灾难保护上限与每日配额
 
 所有 HTTP、FormEngine、V8 和移动端上传入口共用服务端限制。上传限制分为三层：租户业务配置、平台独立灾难保护上限、HTTP 请求解析上限。前端 `FileUpload` / `ImgUpload` 字段配置只能进一步收紧最终结果。

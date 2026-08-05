@@ -218,6 +218,16 @@ namespace Microi.net
         /// 是否是预览图，如果是预览图则压缩
         /// </summary>
         public bool? Preview { get; set; }
+        // zhy：标识微信小程序用户图片上传，并传递微信内容安全检测场景。
+        /// <summary>
+        /// 客户端声明当前上传来自微信小程序内容发布场景。
+        /// 服务端仍会结合已签名登录令牌中的 ClientType 判断，不能把本字段当作鉴权依据。
+        /// </summary>
+        public bool? ContentSecurityRequired { get; set; }
+        /// <summary>
+        /// 微信内容安全场景：1 资料，2 评论，3 论坛，4 社交日志。头像默认使用 1。
+        /// </summary>
+        public int? ContentSecurityScene { get; set; }
         /// <summary>
         /// 注意：HttpContext不能做为参数 ，否则会报错：Could not create an instance of type 'Microsoft.AspNetCore.Http.HttpContext'. Model bound complex types must not be abstract or value types and must have a parameterless constructor. Alternatively, set the 'HttpContext' property to a non-null value in the 'Microi.net.Model.UploadParam' constructor.
         /// </summary>

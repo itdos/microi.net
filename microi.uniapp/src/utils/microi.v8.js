@@ -943,6 +943,61 @@ export function createMicroiV8(options = {}) {
     return (await requestPrivate('GetPrivateFileUrl')) || (await requestPrivate('MallFileUrl')) || assetUrl(path);
   }
 
+  function isWeChatMiniProgramRuntime() {
+    let matched = false;
+    // #ifdef MP-WEIXIN
+    matched = true;
+    // #endif
+    return matched || (typeof wx !== 'undefined' && wx && typeof wx.login === 'function');
+  }
+
+  async function getWeChatContentSecurityLoginCode() {
+    const runtimeUni = getUni();
+    if (!runtimeUni || typeof runtimeUni.login !== 'function') {
+      throw { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
+    }
+    const result = await new Promise((resolve, reject) => {
+      runtimeUni.login({ provider: 'weixin', success: resolve, fail: reject });
+    });
+    if (!result || !result.code) {
+      throw { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
+    }
+    return result.code;
+  }
+
+  async function waitForContentSecurity(reviewId, options = {}) {
+    const attempts = Math.max(1, Number(options.contentSecurityPollAttempts || 30));
+    const interval = Math.max(300, Number(options.contentSecurityPollInterval || 1000));
+    for (let index = 0; index < attempts; index += 1) {
+      if (index > 0) await new Promise((resolve) => setTimeout(resolve, interval));
+      const result = await post('/api/WeChatContentSecurity/Status', {
+        OsClient: config.osClient,
+        ReviewId: reviewId
+      }, { checkCode: false, silentError: true });
+      if (!result || Number(result.Code) !== 1) {
+        throw result || { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
+      }
+      const status = String((result.Data && result.Data.Status) || '');
+      if (status === 'Passed') return result.Data;
+      if (status === 'Rejected') {
+        throw { Code: 0, Msg: '你发布的内容含违规信息，请修改后重试。' };
+      }
+      if (status === 'Error') {
+        throw { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
+      }
+    }
+    throw { Code: 0, Msg: '内容正在进行安全检测，请稍后重试。' };
+  }
+
+  function isImageUpload(filePath, options = {}) {
+    if (options.preview === false) return false;
+    if (options.preview === true) return true;
+    const file = pickUploadFileLike(options.file);
+    if (file && /^image\//i.test(String(file.type || ''))) return true;
+    const name = String(options.fileName || (file && file.name) || filePath || '');
+    return /\.(?:jpe?g|png|gif|bmp|webp)(?:$|[?#])/i.test(name);
+  }
+
   // 文件上传同时支持 uni.uploadFile 与浏览器 fetch/FormData。
   async function uploadFile(filePath, options = {}) {
     const runtimeUni = getUni();
@@ -961,6 +1016,14 @@ export function createMicroiV8(options = {}) {
       action
     );
     delete uploadData.path;
+
+    const requiresContentSecurity = isWeChatMiniProgramRuntime() &&
+      options.contentSecurity !== false && isImageUpload(filePath, options);
+    if (requiresContentSecurity) {
+      uploadData.ContentSecurityRequired = 'true';
+      uploadData.ContentSecurityScene = String(options.contentSecurityScene || 1);
+      uploadData.ContentSecurityLoginCode = await getWeChatContentSecurityLoginCode();
+    }
 
     let body;
     const fetchSource = pickUploadFileSource(filePath, options);
@@ -1024,6 +1087,22 @@ export function createMicroiV8(options = {}) {
       const error = { Code: 0, Msg: '上传返回文件路径为空' };
       if (options.silentError !== true) toast(error.Msg);
       throw error;
+    }
+    if (requiresContentSecurity) {
+      if (!data.ContentSecurityReviewId || !['Pending', 'Passed'].includes(data.ContentSecurityStatus)) {
+        const error = { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
+        if (options.silentError !== true) toast(error.Msg);
+        throw error;
+      }
+      try {
+        if (data.ContentSecurityStatus !== 'Passed') {
+          const reviewed = await waitForContentSecurity(data.ContentSecurityReviewId, options);
+          data.ContentSecurityStatus = reviewed.Status;
+        }
+      } catch (error) {
+        if (options.silentError !== true) toast((error && (error.Msg || error.message)) || '内容安全检测失败');
+        throw error;
+      }
     }
     if (!data.Url && options.resolveUrl !== false) data.Url = await resolveFileUrl(data.Path);
     return { ...body, Data: data };
@@ -1449,6 +1528,7 @@ export function createMicroiV8(options = {}) {
     extractUploadPath,
     normalizeUploadValue,
     uploadFile,
+    waitForContentSecurity,
     getSafeArea,
     formatDate,
     toNumber,
