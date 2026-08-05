@@ -6,6 +6,7 @@ import {
   normalizeOptions,
   parseJson
 } from '@/platform/native-form.js'
+import { normalizeUploadItems } from '@/platform/display.js'
 import {
   V8,
   getUser
@@ -122,6 +123,8 @@ const ORDER_FIELDS = {
   ownerPhone: 'YewuYDH',
   orderType: 'XinLDD',
   orderDate: 'XiadanRQ',
+  contractAttachment: 'HetongFJ',
+  contractUploadState: 'IsDingdanHT',
   installer: 'AnzhuangR',
   installerId: 'AnzhuangRID',
   installerPhone: 'AnzhuangRDH'
@@ -1520,6 +1523,12 @@ export async function beforeSubmit(context) {
     if (context.state.orderSummaryValues) {
       Object.assign(values, orderSummarySubmitValues(context.state.orderSummaryValues))
     }
+    // 合同附件的上传状态是派生数据；小程序不会执行 PC 字段 V8，保存时按最终附件值统一回写。
+    const attachmentName = orderFieldName(context, 'contractAttachment', '合同附件')
+    const uploadStateName = orderFieldName(context, 'contractUploadState', '合同是否上传')
+    values[uploadStateName] = normalizeUploadItems(context.form[attachmentName]).length
+      ? '已上传'
+      : '未上传'
     if (isOrderAdd(context)) {
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',

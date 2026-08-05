@@ -68,7 +68,7 @@ for (const profileId of profileIds) {
   check(profile.config.profileId === profileId, `${profileId}: config.profileId 不一致`)
   check(profile.config.features && profile.config.routes, `${profileId}: 缺少 features/routes`)
   check(manifest.vueVersion === '3', `${profileId}: manifest 必须使用 Vue3`)
-  check(pages.tabBar && pages.tabBar.custom === true, `${profileId}: tabBar 必须启用 custom`)
+  check(pages.tabBar && pages.tabBar.custom === false, `${profileId}: tabBar 必须使用原生模式，避免自定义组件切换卡顿`)
   check((pages.tabBar && pages.tabBar.list || []).every((item) => pagePaths.has(item.pagePath)), `${profileId}: tabBar 存在未注册路由`)
   pagePaths.forEach((pagePath) => {
     const vuePath = path.join(projectRoot, 'src', `${pagePath}.vue`)

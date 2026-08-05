@@ -56,10 +56,6 @@ const pagesConfig = JSON.parse(read('src/pages.json'));
 const manifest = JSON.parse(read('src/manifest.json'));
 const aiPage = read('src/pages/ai/index.vue');
 const aiLauncher = read('src/components/mci-ai-launcher/mci-ai-launcher.vue');
-const customTabBarJs = read('src/custom-tab-bar/index.js');
-const customTabBarJson = JSON.parse(read('src/custom-tab-bar/index.json'));
-const customTabBarWxml = read('src/custom-tab-bar/index.wxml');
-const customTabBarWxss = read('src/custom-tab-bar/index.wxss');
 const activeTabBar = read('src/generated/active-tabbar.js');
 const profileManager = read('scripts/lib/profile-manager.cjs');
 const xjyPagesConfig = JSON.parse(read('profiles/xjy/pages.json'));
@@ -89,20 +85,15 @@ assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/
 assert(aiLauncher.includes('isFallbackLauncher') && aiLauncher.includes('getAiAssistantEnabled'), 'The floating AI launcher visibility must be controlled by the server-side system setting.');
 assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
 assert(sysConfig.includes('IsShowAiModel') && sysConfig.includes('getAiModelEnabled') && sysConfig.includes('aiModelFlagState'), 'AI model selectors must use the fail-closed IsShowAiModel platform flag.');
-assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === true, 'The active profile must use a custom tabBar for the navigation capsule.');
-assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === true, 'The xjy profile must enable the custom tabBar.');
-assert(standardPagesConfig.tabBar && standardPagesConfig.tabBar.custom === true, 'The standard profile must enable the custom tabBar.');
+assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === false, 'The active profile must use the native tabBar for smooth page switching.');
+assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === false, 'The xjy profile must use the native tabBar.');
+assert(standardPagesConfig.tabBar && standardPagesConfig.tabBar.custom === false, 'The standard profile must use the native tabBar.');
 assert((pagesConfig.subPackages || []).some((pkgEntry) => (pkgEntry.pages || []).some((page) => `${pkgEntry.root}/${page.path}`.replace(/\/+/g, '/') === 'pages/ai/index')), 'The dedicated AI assistant route must remain registered in pages.json.');
-assert(activeTabBar.includes('"custom": true') && activeTabBar.includes('"profileId": "xjy"'), 'The checked-in generated tabBar bridge must represent the default xjy profile.');
+assert(activeTabBar.includes('"custom": false') && activeTabBar.includes('"profileId": "xjy"'), 'The checked-in generated tabBar bridge must represent the native default xjy profile.');
 assert(profileManager.includes("'generated', 'active-tabbar.js'") && profileManager.includes('generatedActiveTabBarSource'), 'Profile switching must regenerate the active tabBar bridge.');
-assert(customTabBarJson.component === true, 'WeChat custom tabBar must be declared as a native component.');
-assert(customTabBarWxml.includes('class="mci-bottom-dock') && customTabBarWxml.includes('class="mci-bottom-dock__nav"'), 'WeChat custom tabBar must render the left navigation capsule.');
-assert(!customTabBarWxml.includes('mci-bottom-dock__ai-slot') && !customTabBarWxml.includes('bindtap="openAssistant"'), 'WeChat custom tabBar must leave AI rendering to the unified floating launcher.');
-assert(aiLauncher.includes('class="mci-bottom-dock mci-bottom-dock--without-ai"') && aiLauncher.includes('mci-bottom-dock__nav') && !aiLauncher.includes('mci-bottom-dock__ai-slot'), 'H5 navigation must leave AI rendering to the unified floating launcher.');
+assert(aiLauncher.includes('activeTabBar.custom === true') && aiLauncher.includes('class="mci-bottom-dock mci-bottom-dock--without-ai"') && aiLauncher.includes('mci-bottom-dock__nav') && !aiLauncher.includes('mci-bottom-dock__ai-slot'), 'The legacy H5 custom dock must stay disabled unless a profile explicitly opts in.');
 assert(aiLauncher.includes('mci-ai-launcher--fallback') && aiLauncher.includes('getSafeAreaMetrics') && aiLauncher.includes('safeRight') && aiLauncher.includes('safeBottom'), 'All pages must retain a safe-area-aware floating AI launcher.');
-assert(customTabBarJs.includes('safeAreaInsets') && customTabBarWxml.includes('{{safeBottom}}') && /position:\s*fixed[\s\S]*bottom:\s*0/.test(customTabBarWxss), 'The native bottom dock must consume the runtime safe area while staying fixed to the bottom.');
 assert(aiLauncher.includes('--mci-safe-bottom') && aiLauncher.includes('env(safe-area-inset-bottom'), 'The H5 bottom dock must consume the shared bottom safe-area variable with an env fallback.');
-assert(customTabBarWxml.includes('mci-bottom-dock--without-ai') && customTabBarWxss.includes('grid-template-columns: minmax(0, 1fr);'), 'The navigation capsule must use the full dock width after AI moves to the floating layer.');
 for (const dragToken of [
   'DRAG_THRESHOLD',
   'POSITION_STORAGE_VERSION',
@@ -122,7 +113,6 @@ for (const dragToken of [
 assert(!/@touch(?:start|move|end|cancel)\.(?:stop|prevent)/.test(aiLauncher), 'The draggable AI launcher must use bind-style touch events instead of catchtouch event modifiers.');
 assert(/handleDragEnd\(\)\s*\{[\s\S]*?if \(!moved\)\s*\{[\s\S]*?this\.openAssistant\(\)/.test(aiLauncher), 'A short touch must open the AI assistant directly from touchend.');
 assert(aiLauncher.includes("服务助手打开失败，请重试"), 'Assistant launcher navigation failures must give the user visible feedback.');
-assert(!customTabBarJs.includes("url: '/pages/ai/index'"), 'The native tabBar must not keep a second assistant navigation implementation.');
 assert(aiPage.includes('onBackPress') && aiPage.includes('assistant.handleBack'), 'AI page must consume internal back states before leaving the dedicated route.');
 assert(aiPage.includes('getAiAssistantEnabled({ refresh: true })') && aiPage.includes('message-fallback-page') && aiPage.includes('暂无新消息'), 'Direct assistant routes must enforce the server-side switch and render a complete normal message state while disabled.');
 assert(!aiPage.includes('功能暂未开放') && !aiPage.includes('敬请期待') && !aiPage.includes('根据平台配置'), 'Closed assistant state must not expose rollout, review, or incomplete-feature copy.');
