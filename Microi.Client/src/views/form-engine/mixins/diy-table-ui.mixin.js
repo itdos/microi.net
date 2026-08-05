@@ -1,4 +1,5 @@
 import _u from "underscore";
+import { hasFieldReference } from "./table-field-data-source.js";
 
 export default {
     methods: {
@@ -127,18 +128,7 @@ LoadFabPosition() {
          */
         IsInTableEditField(fieldId) {
             const fields = this.SysMenuModel?.InTableEditFields;
-            if (!fields) return false;
-            if (typeof fields === 'string') {
-                return fields.split(',').map(s => s.trim()).indexOf(fieldId) > -1;
-            }
-            if (Array.isArray(fields)) {
-                if (fields.length === 0) return false;
-                if (typeof fields[0] === 'object' && fields[0] !== null) {
-                    return fields.some(f => f.Id === fieldId);
-                }
-                return fields.indexOf(fieldId) > -1;
-            }
-            return false;
+            return hasFieldReference(fields, fieldId);
         },
         /**
          * ========== 表内编辑【SaveType】中央保存入口 ==========

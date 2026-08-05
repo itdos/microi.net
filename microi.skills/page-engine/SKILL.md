@@ -257,6 +257,8 @@ $ApiBase$/apiengine/{ApiEngineKey}
 
 界面引擎嵌套必须使用 `pageengine-widget.vue` 直接加载 `form-renderer` 组件，不得使用 iframe。每个嵌套页面由 `PAGE_ENGINE_STORE_KEY` 注入独立的 Pinia store，避免子页面覆盖父页面 `formData`；递归页面 Id 通过 `PAGE_ENGINE_RENDER_CONTEXT_KEY` 检测并阻止循环嵌套。父容器和组件高度设为 `0` 表示自动高度，由最外层页面统一滚动。
 
+`mic_page` 是按角色管理的运行资源：普通登录用户读取或嵌套页面时必须拥有菜单权限或高级表 `Read`，新增、修改、删除分别要求明确的 `Add`、`Edit`、`Del`；所有匿名 FormEngine 调用仍拒绝。角色页只展示服务端返回的分级策略，最终授权和当前操作者的平台管理员身份由后端主库复核。
+
 界面引擎渲染页会为 `_IsAdmin` 或 `Level >= 9999` 的用户提供“界面设计”入口，跳转 `/mic/autopage?Id={mic_page.Id}`。入口优先放入后台 TagsView 页签右键菜单，并在页面第一个容器标题栏右侧提供紧凑快捷入口，与 `moreOption` 等操作使用同一个 flex 操作区垂直居中、右对齐；不得额外占用页面高度、增加顶部空白或覆盖标题，非管理员不显示。嵌套 `pageengine` 也必须显示其自身页面的设计入口，并由父页面直接打开对应子页面设计器。
 
 首页编排可以组合 `aiengine`、`workcenter`、`diycalendar`、`diytable` 和一个占大区域的 `pageengine`。公告应优先通过绑定 `diy_notice` 的 `diytable` 渲染，使增删改权限继续由 `sys_menu + _RoleLimits` 控制；统计子页面由客户独立替换时，只需修改被嵌入的 `mic_page`，无需重做首页布局。

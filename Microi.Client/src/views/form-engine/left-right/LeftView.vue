@@ -255,7 +255,7 @@ export default {
             TreePage: {
                 PageIndex: 1,
                 PageSize: 20,
-                PageSizes: [10, 20, 50, 100],
+                PageSizes: [15, 20, 30, 50, 100],
                 DataCount: 0
             },
             TreeData: {

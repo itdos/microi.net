@@ -2,7 +2,7 @@
     <el-popover v-model="ShowThemes" placement="bottom" width="320" trigger="click" popper-class="mci-theme-popover">
         <div class="mci-theme-panel">
             <!-- 显示模式 -->
-            <div class="mci-theme-section">
+            <div v-if="showMode" class="mci-theme-section">
                 <div class="mci-theme-title">
                     <el-icon><Sunny v-if="themeMode === 'light'" /><Moon v-else /></el-icon>
                     <span>显示模式</span>
@@ -60,10 +60,12 @@
         </div>
 
         <template #reference>
-            <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
-                <!-- <el-icon class="theme-icon"><Brush /></el-icon> -->
-                <font-awesome-icon icon="fa-solid fa-shirt" style="font-size: 16px;" />
-            </button>
+            <slot name="trigger">
+                <button type="button" class="theme-select-trigger" aria-label="主题设置" title="主题设置">
+                    <!-- <el-icon class="theme-icon"><Brush /></el-icon> -->
+                    <font-awesome-icon icon="fa-solid fa-shirt" style="font-size: 16px;" />
+                </button>
+            </slot>
         </template>
     </el-popover>
 </template>
@@ -84,6 +86,12 @@ const DEFAULT_THEME_COLOR = "#409eff";
 export default {
     name: "ThemeSelect",
     components: { Brush, Sunny, Moon, Check, MagicStick },
+    props: {
+        showMode: {
+            type: Boolean,
+            default: true
+        }
+    },
     setup() {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
