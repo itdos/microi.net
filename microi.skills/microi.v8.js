@@ -1083,6 +1083,60 @@ export function createMicroiV8(options = {}) {
     return { data, callback };
   }
 
+  const formWriteOuterKeys = new Set([
+    'FormEngineKey', 'OsClient', 'Id', '_SysMenuId', '_TableChildAuth',
+    '_InvokeType', '_NotSaveField', '_NoLineForAdd', '_ForceUpt', '_DataLog', '_Lang'
+  ]);
+
+  function normalizeFormWriteOptions(options = {}) {
+    return {
+      ...options,
+      Header: options.Header || options.Headers || options.header || options.headers || {},
+      Auth: options.Auth !== undefined ? options.Auth : options.auth,
+      Timeout: options.Timeout || options.timeout,
+      SilentError: options.SilentError === true || options.silentError === true
+    };
+  }
+
+  function formEngineUpdate(first, second, third) {
+    if (typeof first !== 'string') {
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
+      return withCallback(legacyPost(legacyApi.UptFormData, data), callback);
+    }
+
+    const source = second && typeof second === 'object' ? { ...second } : {};
+    const callback = typeof third === 'function' ? third : null;
+    const options = normalizeFormWriteOptions(third && typeof third === 'object' ? third : {});
+    const rowId = source.Id;
+    const outer = { FormEngineKey: first, Id: rowId };
+    const patch = {};
+
+    Object.keys(source).forEach((key) => {
+      if (key === '_FormData' || key === '_RowModel') return;
+      if (formWriteOuterKeys.has(key)) outer[key] = source[key];
+      else patch[key] = source[key];
+    });
+    Object.assign(patch, source._RowModel || {}, source._FormData || {});
+    if (config.osClient && outer.OsClient === undefined) outer.OsClient = config.osClient;
+
+    const promise = (async () => {
+      if (rowId === undefined || rowId === null || rowId === '') {
+        return { Code: 0, Msg: 'UptFormData requires Id.' };
+      }
+      const readParam = {
+        FormEngineKey: first,
+        Id: rowId,
+        ...(outer._SysMenuId ? { _SysMenuId: outer._SysMenuId } : {}),
+        ...(outer._TableChildAuth ? { _TableChildAuth: outer._TableChildAuth } : {})
+      };
+      const current = await legacyPost(legacyApi.GetFormData, readParam, null, options);
+      if (!current || Number(current.Code) !== 1 || !current.Data) return current;
+      const formData = { ...current.Data, ...patch, Id: rowId };
+      return legacyPost(legacyApi.UptFormData, { ...outer, _FormData: formData }, null, options);
+    })();
+    return withCallback(promise, callback);
+  }
+
   async function legacyPost(url, data = {}, callback, option = {}) {
     const body = await request({
       url,
@@ -1709,8 +1763,7 @@ export function createMicroiV8(options = {}) {
       return withCallback(legacyPost(legacyApi.DelFormDataByWhere, param || {}), callback);
     },
     UptFormData(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, true);
-      return withCallback(legacyPost(legacyApi.UptFormData, data), callback);
+      return formEngineUpdate(first, second, third);
     },
     UptFormDataByWhere(param, callback) {
       return withCallback(legacyPost(legacyApi.UptFormDataByWhere, param || {}), callback);
@@ -1722,27 +1775,27 @@ export function createMicroiV8(options = {}) {
       return withCallback(legacyPost(legacyApi.UptFormDataBatch, param || {}), callback);
     },
     GetFormData(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(`${legacyApi.GetFormData}-${data.FormEngineKey || ''}`, data), callback);
     },
     GetFormDataAnonymous(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetFormDataAnonymous, data, null, { Auth: false }), callback);
     },
     GetTableData(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableData, data), callback);
     },
     GetTableDataAnonymous(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableDataAnonymous, data, null, { Auth: false }), callback);
     },
     GetTableDataTree(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableDataTree, data), callback);
     },
     GetTableDataTreeAnonymous(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableDataTreeAnonymous, data, null, { Auth: false }), callback);
     }
   });
