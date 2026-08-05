@@ -4,6 +4,11 @@
       <mci-media-uploader v-if="isImage && hasModelValue" :model-value="modelValue" :max-count="mediaMaxCount" :shape="isAvatar ? 'circle' : 'square'" :file-context="fileAccessContext" readonly />
       <mci-media-uploader v-else-if="isFile && hasModelValue" :model-value="modelValue" media-type="file" :file-context="fileAccessContext" readonly />
       <text v-else-if="isImage || isFile" class="native-control__value">-</text>
+      <view v-else-if="isPhoneField" class="native-control__phone-row">
+        <text class="native-control__value">{{ displayText }}</text>
+        <view v-if="callablePhone" class="native-control__phone-action"
+          hover-class="native-control__phone-action--pressed" @tap.stop="callPhone">拨打</view>
+      </view>
       <!-- zhy：详情长文本超过配置行数后在字段内部纵向滑动，不再无限撑高页面。 -->
       <scroll-view v-else-if="readonlyScrollable" class="native-control__readonly-scroll" scroll-y
         :style="readonlyScrollStyle">
@@ -259,6 +264,11 @@ export default {
     },
     isAvatar() { return /avatar|headimg|touxiang/i.test(String(this.field.Name || '')) || /头像/.test(String(this.field.Label || '')) },
     isMultiple() { return isNativeFieldMultiple(this.field) },
+    isPhoneField() { return this.field.inputMode === 'tel' },
+    callablePhone() {
+      const value = String(this.modelValue ?? '').trim()
+      return value && !['-', '—'].includes(value) ? value.replace(/\s+/g, '') : ''
+    },
     isOptionComponent() { return OPTION_COMPONENTS.has(this.component) },
     isDropdownOption() { return this.isOptionComponent && this.component !== 'Radio' },
     hasRemoteOptions() { return isRemoteNativeFieldOptions(this.field) },
@@ -681,6 +691,10 @@ export default {
       this.tagDraft = ''
     },
     removeTag(index) { const values = [...this.tagValues]; values.splice(index, 1); this.emitValue(JSON.stringify(values)) },
+    callPhone() {
+      if (!this.callablePhone) return
+      uni.makePhoneCall({ phoneNumber: this.callablePhone })
+    },
     editorReady() {
       const query = uni.createSelectorQuery().in(this)
       query.select('.native-control__editor').context((result) => {
@@ -768,6 +782,10 @@ export default {
 .native-control__tags input { flex: 1; min-width: 210rpx; height: 58rpx; padding: 0 14rpx; border-bottom: 1px solid #dce7eb; font-size: 23rpx; }
 .native-control__unavailable,.native-control__alert { padding: 17rpx 19rpx; border-left: 3px solid #d99b1f; color: #6f5b2d; background: #fff9e8; font-size: 22rpx; line-height: 1.6; }
 .native-control__value { display: block; color: #425b64; font-size: 27rpx; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+.native-control__phone-row { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; min-height: 48rpx; }
+.native-control__phone-row .native-control__value { flex: 1; min-width: 0; }
+.native-control__phone-action { flex: none; min-width: 70rpx; height: 44rpx; padding: 0 12rpx; border: 1px solid #64bce0; border-radius: 5px; color: #168bc1; background: #f7fcff; font-size: 21rpx; font-weight: 600; line-height: 42rpx; text-align: center; box-sizing: border-box; transition: transform .14s ease, background-color .14s ease; }
+.native-control__phone-action--pressed { background: #eaf7fc; transform: scale(.96); }
 .native-control__richtext { display: block; color: #425b64; font-size: 25rpx; line-height: 1.7; overflow-wrap: anywhere; }
 /* zhy：只读详情长文本使用 scroll-view 承载，超出最大高度后支持触摸滚动。 */
 .native-control__readonly-scroll { width: 100%; max-height: 495rpx; }
@@ -780,7 +798,7 @@ export default {
 @keyframes nativeSelectIn { from { opacity: 0; transform: translateY(-8rpx); } to { opacity: 1; transform: translateY(0); } }
 @keyframes nativeSelectShimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .native-control__map,.native-select__trigger,.native-select__chevron { transition: none; }
+  .native-control__map,.native-select__trigger,.native-select__chevron,.native-control__phone-action { transition: none; }
   .native-select__popover,.native-select__loading view { animation: none; }
 }
 </style>
