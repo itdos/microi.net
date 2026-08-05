@@ -4,8 +4,8 @@
     "name" : "宁波鸿地",
     "description" : "microi.net",
     "version" : {
-        "name" : "v1.0.0",
-        "code" : 100
+        "name" : "v7.0.7",
+        "code" : 707
     },
     "launch_path" : "index.html",
     "plus" : {
@@ -134,6 +134,9 @@
         "Barcode" : {},
         "Camera" : {},
         "Bluetooth" : {},
+        "Invocation" : {
+            "description" : "兼容厂商平板状态栏安全区探测"
+        },
         "FaceID" : {},
         "Record" : {},
         "VideoPlayer" : {}

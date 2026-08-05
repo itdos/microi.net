@@ -47,7 +47,7 @@ function unwrapFileReference(value, depth = 0) {
  * a Path object, JSON object/array string, absolute URL, app-relative asset,
  * or HDFS path relative to FileServer.
  */
-export function resolveLoginSystemLogoUrl(value, getServerPath) {
+export function resolveLoginResourceUrl(value, getServerPath) {
     const path = unwrapFileReference(value);
     if (!path) return "";
 
@@ -63,6 +63,10 @@ export function resolveLoginSystemLogoUrl(value, getServerPath) {
     } catch (error) {
         return storagePath;
     }
+}
+
+export function resolveLoginSystemLogoUrl(value, getServerPath) {
+    return resolveLoginResourceUrl(value, getServerPath);
 }
 
 export { unwrapFileReference };

@@ -28,6 +28,19 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// Returns the server-owned direct-table grant policy. The role editor must
+        /// not maintain a second hard-coded protection list that can drift from the
+        /// authorization boundary.
+        /// </summary>
+        [HttpGet, HttpPost]
+        public JsonResult GetDirectTableGrantPolicies()
+        {
+            return Json(new DosResult(
+                1,
+                PlatformResourceSecurity.DirectTableGrantPolicies));
+        }
+
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="param"></param>

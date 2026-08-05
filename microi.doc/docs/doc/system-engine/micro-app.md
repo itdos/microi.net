@@ -422,6 +422,7 @@ console.log(hostData.token);
 console.log(hostData.appKey);
 console.log(hostData.version);
 console.log(hostData.microRoute);
+console.log(hostData.hostCapabilities);
 console.log(hostData.dialog);
 console.log(hostData.dialogData);
 ```
@@ -434,6 +435,7 @@ console.log(hostData.dialogData);
 | `appKey` | 当前微服务 AppKey。 |
 | `version` | 实际构建版本。 |
 | `microRoute` | 当前内部路由。 |
+| `hostCapabilities` | 菜单型微服务可调用的吾码宿主协议、模式和动作清单；弹窗型微服务不提供 Tab 动作。 |
 | `dialog` | 由 `OpenAppDialog` 打开时为 `true`。 |
 | `dialogData` | 宿主传入的 `Data`。 |
 | `route` | 包含 `microRoute`、`microRoutePath` 的兼容对象。 |
@@ -451,6 +453,89 @@ const result = await V8.ApiEngine.Run('get-device-detail', {
 ```
 
 不要把 Token 拼接进 URL。SDK 会把运行时 Token 放入 `Authorization`，并携带当前 `osclient` 请求头。
+
+## 子应用调用吾码主框架 Tab 与路由
+
+通过后台菜单打开的微服务会收到 `hostCapabilities.protocol=microi.host.v1`。子应用不能直接访问主框架的 Pinia、Vue Router 或 DOM；应统一通过 micro-app 的 `dispatch` 发送宿主动作：
+
+```js
+function callMicroiHost(action, data = {}) {
+  const context = window.microApp?.getData?.() || {};
+  const capabilities = context.hostCapabilities;
+  if (!capabilities?.actions?.includes(action)) {
+    throw new Error(`当前宿主不支持 ${action}`);
+  }
+
+  const requestId = `host-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  window.microApp.dispatch({
+    type: capabilities.requestType || 'micro-app:host-action',
+    action,
+    requestId,
+    data
+  });
+  return requestId;
+}
+```
+
+截图中的【关闭】按钮可以直接这样实现：
+
+```js
+function closePage() {
+  callMicroiHost('closeTab');
+}
+```
+
+该动作与吾码顶部 Tab 的【关闭】使用同一份 `TagsView` 状态：移除当前页签并切换到最后一个可用页签。固定页签和系统中的最后一个页签不会被关闭，宿主会显示明确提示。
+
+### 支持的宿主动作
+
+| `action` | `data` 示例 | 行为 |
+|---|---|---|
+| `closeTab` | `{}` | 关闭当前吾码 Tab；不能关闭固定 Tab 或最后一个 Tab。 |
+| `navigate` | `{ path:'/mic-project', query:{ id:'01H...' } }` | 打开或激活一个当前用户可访问的站内路由，原 Tab 保留。 |
+| `replaceTab` | `{ path:'/mic-project' }` | 用目标站内路由替换当前 Tab，并移除旧 Tab。 |
+| `back` | `{}` | 返回吾码站内的上一个路由；没有站内历史时回到系统首页。 |
+| `forward` | `{}` | 前进到下一个吾码站内路由；没有可前进历史时不跳转。 |
+| `reloadTab` | `{}` | 重新解析入口并重载当前微服务；顶部 Tab 右键【刷新】也会重载微服务。 |
+| `setTabTitle` | `{ title:'成品打包完成' }` | 修改当前 Tab 标题，最长 80 个字符。 |
+| `showMessage` | `{ message:'保存成功', messageType:'success' }` | 使用吾码主框架消息提示；类型支持 `success / warning / error / info`，只接受纯文本。 |
+
+常用组合示例：
+
+```js
+// 打开另一个吾码菜单，当前微服务 Tab 继续保留
+callMicroiHost('navigate', {
+  path: '/mic-project-list',
+  query: { projectId: '01H...' }
+});
+
+// 把当前微服务 Tab 替换为订单详情
+callMicroiHost('replaceTab', {
+  path: '/diy/form-page/order-table/01H...',
+  query: { SysMenuId: 'order-menu-id' }
+});
+
+callMicroiHost('back');
+callMicroiHost('setTabTitle', { title: '成品打包 · HD26001' });
+callMicroiHost('showMessage', { message: '保存成功', messageType: 'success' });
+```
+
+路由动作只接受以 `/` 开头的吾码站内地址，也接受 `{ name, params, query, hash }` 路由对象；外部 URL、协议相对地址、反斜杠路径以及登录/访问密钥/内部重定向路由会被拒绝。目标路由仍须存在于当前登录用户加载后的路由表，并继续经过主框架路由守卫；该桥接不会扩大菜单或数据权限。
+
+若提供 `requestId`，宿主会尽力通过 data listener 返回结果：
+
+```js
+window.microApp?.addDataListener?.((payload) => {
+  if (payload?.type !== 'micro-app:host-action-result') return;
+  if (!payload.success) {
+    console.warn(payload.error?.code, payload.error?.message);
+  }
+});
+```
+
+`closeTab`、`navigate`、`replaceTab` 会卸载或切换当前子应用，结果事件只能视为尽力通知，业务流程不能依赖它持久化数据。应先等待业务接口成功，再发出关闭或跳转动作。
+
+> `hostCapabilities.mode=tab` 只出现在菜单型微服务宿主。通过 `V8.OpenAppDialog` 打开的页面应继续使用下节的 `app-dialog:success / app-dialog:cancel / app-dialog:error`；不要在弹窗中调用 `closeTab` 代替关闭弹窗。
 
 ## 子应用向弹窗返回结果
 

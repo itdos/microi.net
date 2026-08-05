@@ -517,7 +517,7 @@ CLI 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 A
 
 CLI 放在 `Microi.VSCode/cli/`，与插件使用同一版本号和一次发布流程。`npm run publish` 的三个目标是 **npm 的 `@microi.net/cli` + Visual Studio Marketplace + Open VSX**。`bump-version.js` 会同时更新 VSIX、CLI 与 bundled Skills 版本；打包前再校验插件与 CLI 版本相同。即使 npm 暂时没有 scope 或发布权限，本地 CLI tarball 仍与两个扩展市场使用同一版本号，便于后续原产物补发。
 
-三个 registry 不支持跨站点事务，因此无法做到“三端同一瞬间原子成功”。默认 `npm run publish` 将 Visual Studio Marketplace 和 Open VSX 作为独立主目标：npm 预检失败时只跳过 CLI，继续构建并发布两个扩展市场；扩展市场完成后才尝试 npm，npm 实际上传失败也不会撤销或阻断两个扩展市场。脚本会逐端公开回读并明确报告“扩展双端完成、CLI 待补发”，不会把部分完成冒充三端完成。若某次发布必须三端全部具备权限才允许递增版本，使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。插件 VSIX 不会重复包含 `cli/` 目录，CLI npm 包会包含自己的可执行文件、MCP Server、Codex adapter 和 Skills。
+三个 registry 不支持跨站点事务，因此无法做到“三端同一瞬间原子成功”。默认 `npm run publish` 会先处理 Visual Studio Marketplace 和 Open VSX：npm 已登录时在双市场之后直接发布 CLI；仅缺少 npm 登录时不跳过 CLI，而是在双市场之后启动交互式 `npm login`，浏览器授权成功后自动继续。registry/scope/权限错误、用户取消授权或 npm 上传失败仍不会撤销两个扩展市场，并会保留同版 CLI tarball 供补发。脚本会逐端公开回读，不会把部分完成冒充三端完成。若某次发布必须三端全部具备权限才允许递增版本，使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。插件 VSIX 不会重复包含 `cli/` 目录，CLI npm 包会包含自己的可执行文件、MCP Server、Codex adapter 和 Skills。
 
 ### 本地构建与安装验收
 
@@ -540,10 +540,10 @@ node publish.js --package-only --no-bump
 ### 首次发布到 npm
 
 1. 登录 npmjs.com，创建免费公开组织 **`microi.net`**；组织名会成为 `@microi.net` scope。若由个人 scope 发布，则 npm 用户名必须正好是 `microi.net`。
-2. 在 `Microi.VSCode/cli` 执行 `npm login --registry=https://registry.npmjs.org/`，再执行 `npm whoami --registry=https://registry.npmjs.org/`。
+2. 确认 npm 账号已加入 `@microi.net` 组织并拥有发布权限。本机未登录时，默认 `npm run publish` 会先发布 Visual Studio Marketplace 和 Open VSX，再自动执行 `npm login --registry=https://registry.npmjs.org/` 提示浏览器授权，授权成功后继续发布 CLI。CI、无人值守或严格预检模式仍应提前完成 npm 登录。
 3. 为两个插件市场准备 PAT。本机可设置环境变量 `VSCE_PAT` / `OVSX_PAT`，或把 `publish-tokens.example.json` 复制为已被 Git 忽略的 `publish-tokens.local.json`。不要再使用 `publish-tokens.json`。
 4. 如果仓库曾跟踪过 `publish-tokens.json`，应把其中的 PAT 视为已泄露：先在两个平台废弃并重新生成，把新 PAT 放入环境变量或 `publish-tokens.local.json`，再删除旧文件并执行 `git rm --cached publish-tokens.json`。发布脚本遇到该旧路径会主动停止。
-5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会检查 npm registry/登录/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；npm 不可用时会警告并继续验证两个扩展市场。要求三端全部通过才继续时执行 `npm run publish:preflight:all`。
+5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会检查 npm registry/登录/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；npm 仅缺少登录时会报告“发布阶段将交互授权”，不会阻断两个扩展市场。要求三端在版本递增前全部通过严格预检时，执行 `npm run publish:preflight:all`。
 6. 先运行 `npm run package` 检查本地产物；确认后执行 `npm run publish`。
 7. 脚本会自动回读本次实际发布的端；三端都发布后也可手工复核：
 
