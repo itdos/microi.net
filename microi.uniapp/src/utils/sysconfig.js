@@ -11,13 +11,20 @@ const AI_FLAG_EXPIRE = 60 * 1000
 
 let sysConfigRequest = null
 let aiFlagRequest = null
+let aiModelFlagRequest = null
 let aiFlagState = {
+  checkedAt: 0,
+  enabled: false
+}
+let aiModelFlagState = {
   checkedAt: 0,
   enabled: false
 }
 
 export function isEnabledFlag(value) {
-  return value === 1 || value === '1'
+  if (value === true || value === 1) return true
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return normalized === '1' || normalized === 'true'
 }
 
 /**
@@ -108,6 +115,33 @@ export async function getAiAssistantEnabled(options = {}) {
     return false
   } finally {
     aiFlagRequest = null
+  }
+}
+
+/**
+ * AI 模型选择采用失败关闭策略：只有服务端最新配置明确开启时，
+ * 才显示运行模型、模型通道及其关联的推理选项。
+ */
+export async function getAiModelEnabled(options = {}) {
+  const force = options === true || (options && options.refresh === true)
+  const fresh = aiModelFlagState.checkedAt && Date.now() - aiModelFlagState.checkedAt < AI_FLAG_EXPIRE
+  if (!force && fresh) return aiModelFlagState.enabled
+  if (aiModelFlagRequest) return aiModelFlagRequest
+
+  aiModelFlagRequest = (async () => {
+    const config = await getSysConfig({ refresh: true })
+    const enabled = isEnabledFlag(config && config.IsShowAiModel)
+    aiModelFlagState = { checkedAt: Date.now(), enabled }
+    return enabled
+  })()
+
+  try {
+    return await aiModelFlagRequest
+  } catch (error) {
+    aiModelFlagState = { checkedAt: Date.now(), enabled: false }
+    return false
+  } finally {
+    aiModelFlagRequest = null
   }
 }
 
