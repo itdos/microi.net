@@ -180,22 +180,6 @@
 						:parent-form="detail" :parent-menu-id="menuId" />
 				</view>
 
-				<!-- zhy：客户备注已在基本信息分组展示，客户详情不再重复渲染底部“补充说明”区。 -->
-				<view v-if="key !== 'customers' && summaryBlocks.length" class="info-band">
-					<view class="section-heading">
-						<view class="section-mark"></view>
-						<text>补充说明</text>
-					</view>
-					<view class="summary-block" v-for="block in summaryBlocks" :key="block.label">
-						<text class="summary-label">{{ block.label }}</text>
-						<!-- zhy：详情长文本最多展示配置行数，超出后允许纵向滑动查看完整内容。 -->
-						<scroll-view class="summary-text-scroll" scroll-y :style="block.scrollStyle">
-							<rich-text v-if="block.rich" class="summary-text summary-text--rich" :nodes="block.html" />
-							<text v-else class="summary-text">{{ block.value }}</text>
-						</scroll-view>
-					</view>
-				</view>
-
 				<view v-if="key === 'tasks' && showMerchantAcceptance" class="acceptance-band">
 					<view>
 						<text class="acceptance-title">商家验收</text>
