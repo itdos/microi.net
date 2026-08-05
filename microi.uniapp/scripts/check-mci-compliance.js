@@ -109,6 +109,7 @@ for (const dragToken of [
   'handleDragStart',
   'handleDragMove',
   'handleDragEnd',
+  'handleDragCancel',
   'avoidBottomAction',
   '@touchstart',
   '@touchmove',
@@ -117,6 +118,8 @@ for (const dragToken of [
 ]) {
   assert(aiLauncher.includes(dragToken), `The unified AI launcher must preserve draggable collision-safe behavior: ${dragToken}.`);
 }
+assert(!/@touch(?:start|move|end|cancel)\.(?:stop|prevent)/.test(aiLauncher), 'The draggable AI launcher must use bind-style touch events instead of catchtouch event modifiers.');
+assert(/handleDragEnd\(\)\s*\{[\s\S]*?if \(!moved\)\s*\{[\s\S]*?this\.openAssistant\(\)/.test(aiLauncher), 'A short touch must open the AI assistant directly from touchend.');
 assert(aiLauncher.includes("服务助手打开失败，请重试"), 'Assistant launcher navigation failures must give the user visible feedback.');
 assert(!customTabBarJs.includes("url: '/pages/ai/index'"), 'The native tabBar must not keep a second assistant navigation implementation.');
 assert(aiPage.includes('onBackPress') && aiPage.includes('assistant.handleBack'), 'AI page must consume internal back states before leaving the dedicated route.');
