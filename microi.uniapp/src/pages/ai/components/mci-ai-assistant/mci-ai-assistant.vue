@@ -58,8 +58,7 @@
           <text class="ai-assistant__generation-badge">AI</text>
           <text>内容由人工智能生成，请注意甄别</text>
         </view>
-		<!-- zhy先隐藏模型选择 -->
-        <view class="ai-assistant__toolbar">
+        <view v-if="showAiModel" class="ai-assistant__toolbar">
           <picker
             v-if="relayOptions.length"
             class="ai-assistant__picker ai-assistant__picker--runtime"
@@ -251,6 +250,7 @@
 
 <script>
 import { getToken, getUser } from '@/utils/request.js'
+import { getAiModelEnabled } from '@/utils/sysconfig.js'
 import { themeMixin } from '@/utils/theme.js'
 import appConfig from '@/config.js'
 import {
@@ -286,6 +286,7 @@ export default {
       appConfig,
       ready: false,
       enabled: false,
+      showAiModel: false,
       isAuthenticated: false,
       scopeLabel: '',
       roleText: '',
@@ -379,6 +380,7 @@ export default {
   },
   mounted() {
     if (uni.$on) uni.$on('mci:auth-changed', this.handleAuthChanged)
+    this.resolveModelVisibility()
     this.loadBootstrap()
   },
   beforeUnmount() {
@@ -386,6 +388,9 @@ export default {
     if (uni.$off) uni.$off('mci:auth-changed', this.handleAuthChanged)
   },
   methods: {
+    async resolveModelVisibility() {
+      this.showAiModel = await getAiModelEnabled({ refresh: true })
+    },
     restoreSelections() {
       let saved = {}
       try {

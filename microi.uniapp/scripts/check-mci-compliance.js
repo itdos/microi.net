@@ -88,6 +88,7 @@ assert(aiClient.includes("MCI_AI_ENGINE_KEY = 'mci_ai_data_assistant'"), 'AI cli
 assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/index'"), 'The enabled AI launcher must open the dedicated route without an auth request.');
 assert(aiLauncher.includes('isFallbackLauncher') && aiLauncher.includes('getAiAssistantEnabled'), 'The floating AI launcher visibility must be controlled by the server-side system setting.');
 assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
+assert(sysConfig.includes('IsShowAiModel') && sysConfig.includes('getAiModelEnabled') && sysConfig.includes('aiModelFlagState'), 'AI model selectors must use the fail-closed IsShowAiModel platform flag.');
 assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === true, 'The active profile must use a custom tabBar for the navigation capsule.');
 assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === true, 'The xjy profile must enable the custom tabBar.');
 assert(standardPagesConfig.tabBar && standardPagesConfig.tabBar.custom === true, 'The standard profile must enable the custom tabBar.');
@@ -130,6 +131,7 @@ assert(messageChat.includes('getAiAssistantEnabled({ refresh: true })') && messa
 assert(/loadAiModelList\(\)\s*\{[\s\S]*?if \(!this\.isAIChat\) return/.test(messageChat), 'Legacy chat must not request model data unless the assistant is enabled.');
 assert(aiAssistant.includes('if (!this.isAuthenticated)') && aiAssistant.includes('登录前不会读取、分析或展示任何业务数据'), 'AI assistant must render an anonymous login prompt without loading protected data.');
 assert(aiAssistant.includes('内容由人工智能生成，请注意甄别'), 'AI-generated content must carry a prominent artificial-intelligence disclosure.');
+assert(aiAssistant.includes('getAiModelEnabled') && aiAssistant.includes('v-if="showAiModel"') && aiAssistant.includes('resolveModelVisibility'), 'Runtime model and model channel controls must follow the IsShowAiModel platform flag.');
 assert(aiAssistant.includes('capsuleBottom') && aiAssistant.includes('aiHeaderStyle'), 'AI header actions must be laid out below the WeChat capsule when required.');
 assert(loginPage.includes("LOGIN_PREFERENCES_KEY = 'mci_login_preferences_v1'"), 'Account login must expose persistent remember-account preferences.');
 assert(loginPage.includes('rememberedPasswordCipher') && loginPage.includes('永不保存明文密码'), 'Remember-password must persist only the successful RSA ciphertext.');
