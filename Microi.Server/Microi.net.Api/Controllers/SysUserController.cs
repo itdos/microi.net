@@ -1160,6 +1160,35 @@ namespace Microi.net.Api
                 RestrictSelfServiceUpdate(param, currentUserId);
             }
 
+            // zhy：小程序保存个人资料前复核头像审核记录，并同步检测用户填写的文本内容。
+            if (WeChatContentSecurityService.IsWeChatMiniProgramRequest(HttpContext))
+            {
+                var contentSecurity = HttpContext.RequestServices
+                    .GetRequiredService<WeChatContentSecurityService>();
+                var actorUserId = currentUser["Id"].Val<string>();
+                if (param.Avatar != null)
+                {
+                    var avatarResult = await contentSecurity.ValidateAvatarAsync(
+                        param.OsClient,
+                        actorUserId,
+                        currentUser["Avatar"]?.ToString(),
+                        param.Avatar);
+                    if (avatarResult.Code != 1)
+                    {
+                        param.ContentSecurityLoginCode = null;
+                        return Json(avatarResult);
+                    }
+                }
+
+                var textResult = await contentSecurity.CheckProfileTextAsync(
+                    param.OsClient,
+                    param.ContentSecurityLoginCode,
+                    new[] { param.Name, param.RealName, param.Remark },
+                    HttpContext.RequestAborted);
+                param.ContentSecurityLoginCode = null;
+                if (textResult.Code != 1) return Json(textResult);
+            }
+
             //2022-06-27 新增密码提前加密，也可以不使用
             //if (!param.Pwd.DosIsNullOrWhiteSpace())
             //{
