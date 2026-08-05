@@ -47,6 +47,8 @@ namespace Microi.net
         public static IMicroiCacheTenant CacheTenant => GetService<IMicroiCacheTenant>();
         public static ITranslateEngine Translate => GetService<ITranslateEngine>();
         public static IMicroiSpider Spider => GetService<IMicroiSpider>();
+        public static IMicroiOcr OCR => GetService<IMicroiOcr>();
+        public static IMicroiAI AI => GetService<IMicroiAI>();
         public static IMicroiOffice Office => GetService<IMicroiOffice>();
         public static IMicroiMQ MQ => GetService<IMicroiMQ>();
         public static IWFEngine WFEngine => GetService<IWFEngine>();

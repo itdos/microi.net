@@ -6,14 +6,12 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-自动安装 **MySQL + Redis + MinIO + MongoDB + Watchtower + 低代码平台程序（API + Web）**，可选安装 **LibreTranslate** 开源翻译服务，以及 **Ollama + nomic-embed-text + Qdrant** 向量检索增强。全套服务基于 Docker Compose 编排部署，支持宝塔面板 Docker 编排模块可视化管理。
+默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。全套服务基于 Docker Compose 独立编排部署，支持宝塔面板 Docker 编排模块可视化管理；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
-:::: warning 默认无需安装 Ollama、nomic-embed-text 和 Qdrant
-Microi吾码平台 AI 引擎已内置“**大模型关键词扩展 + 权限感知 Schema 搜索 + 精确字段回读**”。不部署 Ollama、nomic-embed-text 和 Qdrant，也可使用在线 AI 数据分析和 AI 编程；轻量模式启动更快、资源占用更低，不会连接或同步向量数据库。
+:::: warning 不再推荐安装 Ollama、nomic-embed-text 和 Qdrant
+对于 Microi吾码默认的 **NL2SQL、NL2V8、在线 AI 数据分析与 AI 编程** 场景，平台内置的“**大模型关键词扩展 + 当前用户权限范围内的 Schema/Skill 搜索 + 精确表/字段回读**”已经完整替代原来的 **Ollama + `nomic-embed-text` + Qdrant** 方案。一键安装脚本已固定跳过这三项：安装更快、资源占用更低，也不会连接或同步向量数据库。
 
-向量模式只用于高度模糊语义召回的可选增强，不建议默认安装。一键安装脚本在此处**直接按 Enter 即跳过**。
-
-选择安装只会部署 Ollama、`nomic-embed-text` 与 Qdrant，并在安装结果中打印连接参数，**不会自动修改任何租户的 `mic_ai` 数据，也不会自动打开向量开关**。部署完成后，由租户管理员在 AI 引擎的“向量数据库（可选）”Tab 中设置 `EnableVectorDatabase=1`，并配置 `EmbeddingApiUrl`、`QdrantHost`、`QdrantPort`、`QdrantApiKey`；在此之前平台继续使用默认关键词检索，也不会连接或同步向量服务。
+页面末尾仍保留 Ollama 与 Qdrant 的手动编排，仅用于已有项目兼容、独立本地模型实验，或经过实际召回评测后确认必须使用向量库的特殊场景；它们不是新装环境的推荐依赖。
 ::::
 
 ### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
@@ -25,36 +23,37 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 
 | 序号 | 说明 |
 | :--: | ---- |
-| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）和 MySQL 版本（输入 `5` 安装 5.7，输入 `8` 安装 8.0） |
+| 1 | 执行脚本时会提示选择【公网 IP `g` / 内网 IP `n`】、主租户 `OsClient`（直接 Enter 默认为 `iTdos`）和主数据库类型/版本 |
 | 2 | Docker 环境不存在时脚本会**自动安装** Docker 及 Docker Compose V2 插件 |
 | 3 | MySQL 性能配置会**自动根据服务器内存**生成（支持 1G ~ 32G+ 多档位） |
 | 4 | 数据库还原后会自动同步 `sys_osclients.OsClient/ClientName` 和 API、Web 编排中的 `OsClient` |
 | 5 | MinIO 会自动创建私有桶 `mci-private`、公有桶 `mci-public`，为公有桶开放匿名下载权限，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
 | 6 | 根据安装模式选择的访问 IP 和实际分配端口，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为 `http://<访问IP>:<MinIO API端口>/mci-public` |
-| 7 | 端口从 **7000 开始顺序 +1 分配**；基础服务占用 7 个端口，向量检索增加 3 个端口，LibreTranslate 增加 1 个端口。安装前会自动检测占用，若有冲突则从 7100 开始重试 |
-| 8 | 安装前脚本会先开放数据库、缓存、对象存储、可选向量服务、API 和 Web 端口；LibreTranslate 只供平台内部调用，**不会默认开放其宿主机防火墙端口**（若使用云服务器，对外端口还需在云控制台安全组中开放） |
-| 9 | 重复执行脚本前会提示先删除已安装容器/编排，**这将导致所有数据丢失** |
-| 10 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
+| 7 | 端口从 **61600 开始顺序 +1 分配**；基础服务（含 OCR）占用 8 个连续端口，LibreTranslate 增加 1 个端口。候选端口段有冲突时起点每次 +1，最多尝试 100 次 |
+| 8 | 安装前脚本会开放 Web、API、数据库、缓存和对象存储端口；OCR 只绑定 `127.0.0.1` 并通过独立 Docker 内网供 API 调用，LibreTranslate 也不会默认开放宿主机防火墙端口（云服务器的其它对外端口仍需配置安全组） |
+| 9 | OCR 国内固定版本镜像会默认安装。服务健康且 API 完成 Upgrade29 后，脚本才把 `OcrEnabled`、服务地址与限额写入当前唯一的 SaaS 主租户，并以数据库回读确认；任一阶段失败都不会启用错误配置 |
+| 10 | API/Web 使用官方浮动标签时会在部署前强制回源拉取最新镜像，避免宿主机缓存的旧 `latest` 通过 liveness 后却缺少 Upgrade29/Upgrade31 |
+| 11 | 密码与端口生成后若任一后段门禁失败，脚本仍保持非零退出码，同时打印“安装未完成”恢复汇总，包含已分配端口、已生成凭据、数据/编排目录和当前容器状态；该汇总不代表服务可用 |
+| 12 | 检测到已有安装或中断编排时不要直接重跑、删卷或删除数据目录；先按失败汇总和 API 日志排查，确需停编排时使用对应目录的 `docker compose down`，禁止附加 `-v` |
+| 13 | 若脚本中文显示为乱码/问号，请先执行 `export LANG=en_US.UTF-8` 或 `export LANG=C.UTF-8` 后重新运行 |
 
-### 📋 端口分配表（默认从 7000 开始）
+### 📋 端口分配表（默认从 61600 开始）
 
 | 端口 | 服务 | 容器内部端口 |
 | :--: | ---- | :--: |
-| 7000 | MySQL 5.7 / 8.0 | 3306 |
-| 7001 | Redis 7.4 | 6379 |
-| 7002 | MongoDB | 27017 |
-| 7003 | MinIO API | 9000 |
-| 7004 | MinIO Console | 9001 |
-| 7005 | Ollama AI | 11434 |
-| 7006 | Qdrant HTTP | 6333 |
-| 7007 | Qdrant gRPC | 6334 |
-| 7008 | LibreTranslate（可选） | 5000 |
-| 7009 | API | 80 |
-| 7010 | Web 前端 | 80 |
+| 61600 | Web 前端 | 80 |
+| 61601 | API | 80 |
+| 61602 | 主数据库（实际内部端口随所选数据库变化） | - |
+| 61603 | Redis 7.4 | 6379 |
+| 61604 | MongoDB | 27017 |
+| 61605 | MinIO API | 9000 |
+| 61606 | MinIO Console | 9001 |
+| 61607 | PaddleX/PaddleOCR（仅 `127.0.0.1`） | 8080 |
+| 61608 | LibreTranslate（默认安装，套餐 1） | 5000 |
 
-> 上表是“向量检索 + LibreTranslate 全部安装”时的 11 端口示例。若端口段中有端口被占用，脚本会从下一组整百端口重新检测（例如从 7000 段切换到 7100 段）。
+> 上表是一直按 Enter 的吾码官方默认组合，共使用 9 个端口。只有明确输入 `0` 跳过 LibreTranslate 时才使用 `61600`～`61607`；若候选段冲突，脚本把起点从 `61600` 逐次加一后重新检查整段。
 
-> 仅安装基础服务时，API、Web 分别使用 7005、7006；仅增加 LibreTranslate 时，LibreTranslate、API、Web 分别使用 7005、7006、7007；仅增加向量检索时，端口仍为原来的 7000-7009。
+> OCR 的宿主机端口不会写入防火墙规则。API 与 OCR 均接入 external bridge 网络 `microi-ocr`，实际调用地址为 `http://microi-install-ocr:8080/ocr`，不经过公网或宿主机 LAN 地址。
 
 ### 🔄 一键更新 API 与 Web 前端
 
@@ -115,10 +114,10 @@ cd microi-offline
 bash install-microi-offline.sh
 ```
 
-::: tip 说明
-- 离线安装脚本与在线脚本功能**完全一致**（端口分配、MySQL 配置、防火墙开放等）
-- 唯一区别是镜像从本地 tar 文件加载，数据库文件从本地解压，不需要联网
-- 安装完成后 Watchtower 自动更新服务需要联网才能生效
+::: warning 离线脚本版本边界
+- 离线安装器独立维护，不能再假定与当前在线脚本功能完全一致；制作包前必须确认三个脚本版本相同。
+- 当前 OCR 默认安装、Upgrade29 字段等待和 SaaS 配置回读以本页在线安装脚本为准。完全离线环境需要额外把固定 OCR 镜像执行 `docker save`/`docker load`，再按下方 OCR 手动编排部署并在健康后配置 SaaS 引擎。
+- Watchtower 自动更新服务需要联网才能生效；完全离线环境不应把“容器已启动”当成已完成更新验证。
 :::
 
 ---
@@ -1097,6 +1096,7 @@ services:
 ::: tip 说明
 - 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像
 - `microi-web` 编排的 `OsClient` 可不指定，默认为空（SaaS 模式）
+- API 容器只允许下面十个启动引导配置：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。其它后端运行参数统一在主租户 SaaS 引擎中动态维护，不要再增加 `MICROI_*` 或自定义 `AppSettings` 环境变量。`ASPNETCORE_*` / `DOTNET_*` 仅属于 .NET 宿主配置。
 :::
 ::: details 展开查看 Shell 命令（70 行）
 ```shell
@@ -1112,11 +1112,13 @@ services:
       - OsClient=iTdos
       - OsClientType=Product
       - OsClientNetwork=Internal
+      - OsClientDbType=MySql
       - OsClientDbConn=Data Source=172.27.221.211;Database=microi_demo;User Id=microi_demo;Password=password123456;Port=1306;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;
       - OsClientRedisHost=172.27.221.211
       - OsClientRedisPort=1379
       - OsClientRedisPwd=password123456
       - OsClientRedisDataBase=5
+      - OsClientDbMongoConn=mongodb://root:password123456@172.27.221.211:17017/?authSource=admin
     ports:
       - "1000:80"
     logging:
@@ -1204,7 +1206,107 @@ server {
 
 ---
 
-### 7️⃣ LibreTranslate 开源翻译服务编排（可选）
+### 7️⃣ PaddleX / PaddleOCR 文字识别服务编排（默认安装）
+
+Microi API 内置统一 OCR 网关，模型推理由独立的 PaddleX 服务承载。一键安装使用吾码杭州镜像源中的固定版本 `PaddleX 3.6.1 + PaddlePaddle 3.2.2` CPU 镜像，并已在发布镜像阶段预置默认 OCR 产线模型。PaddlePaddle 3.3.0 当前存在 CPU oneDNN PIR 推理兼容问题，请勿自行替换为 3.3.0。因此服务器只需拉取一个经过固定版本验证的镜像，不再现场安装 Python 依赖或重新下载模型。
+
+:::: tip 一键安装会自动完成
+一键安装会创建 `microi-install-ocr` 独立编排和 `microi-ocr` 内部网络，等待容器进入 `healthy`，再由 API Upgrade29 创建 SaaS 引擎的“OCR识别”Tab。API/Web 的官方 `latest` 会强制回源拉取，API 存活后脚本立即回读 9 个物理字段，每秒一次、最多 15 秒；正常升级通常首轮通过，镜像过旧或迁移失败会快速报错，不再等待 5 分钟。只有数据库回读确认全部字段和唯一主租户后，才写入 `OcrEnabled=1` 与正确内网地址并重启 API 使配置生效，脚本不会绕过 Upgrade29 直接伪造元数据。若门禁失败，终端会继续打印已生成的端口、凭据、目录和容器状态，但标题明确为“安装未完成”且退出码仍非零。
+::::
+
+当前公开基线为 `linux/amd64`。建议整机至少 4 核 16 GB 内存，并根据真实图片尺寸、PDF 页数及并发压测调整；ARM64 或 GPU 服务器应使用仓库 Dockerfile/官方 Paddle 镜像构建对应架构版本，不要强行运行 amd64 CPU 镜像。
+
+手动部署可使用以下 Compose：
+
+:::: details 展开查看 OCR 编排
+```yaml
+name: microi-ocr
+
+services:
+  microi-ocr:
+    image: registry.cn-hangzhou.aliyuncs.com/microios/paddlex-ocr:3.6.1-paddle3.2.2-cpu
+    container_name: microi-ocr
+    init: true
+    restart: unless-stopped
+    ports:
+      # 仅允许宿主机访问；不要直接暴露到公网。
+      - "127.0.0.1:18080:8080"
+    shm_size: "4gb"
+    cpus: "4.0"
+    mem_limit: "8g"
+    stop_grace_period: 90s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - microi-ocr-models:/home/microi/.paddlex
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8080),3); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 10m
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+    networks:
+      - microi-ocr
+
+volumes:
+  microi-ocr-models:
+    name: microi-ocr-models
+
+networks:
+  microi-ocr:
+    name: microi-ocr
+    driver: bridge
+```
+::::
+
+启动并检查健康状态：
+
+```bash
+docker compose up -d
+docker compose ps
+docker inspect microi-ocr --format '{{.State.Health.Status}}'
+```
+
+如果 Microi API 也在 Docker 中，把 API 服务加入同一个 external 网络：
+
+```yaml
+services:
+  microi-api:
+    networks:
+      - microi-ocr
+
+networks:
+  microi-ocr:
+    external: true
+    name: microi-ocr
+```
+
+随后在 `SaaS引擎 → OCR识别` 设置：`OcrEnabled=1`、`OcrProvider=PaddleX`、`OcrEndpoint=http://microi-ocr:8080/ocr`、`OcrTimeoutSeconds=120`、`OcrMaxFileMB=20`、`OcrMaxPages=10`、`OcrMinConfidence=0`。若 API 运行在宿主机，则端点改为 `http://127.0.0.1:18080/ocr`。`OcrApiKey` 和 `OcrHeadersJson` 仅在接入自建鉴权代理时配置，不应写进 V8 脚本。
+
+V8 接口引擎通过租户绑定网关调用，不直接接触 OCR 地址或密钥：
+
+```javascript
+var result = await V8.OCR.Recognize({
+  FileByteBase64: V8.FilesByteBase64.invoice,
+  FileName: 'invoice.png',
+  TextRecScoreThresh: 0.5,
+  ReturnWordBox: false
+});
+return result;
+```
+
+完整参数、PDF/图片格式、统一返回结构与安全边界见 [V8.OCR 官方文档](/doc/v8-engine/v8-server.html#v8-ocr)。PaddleX 的基础服务接口为 `POST /ocr`，官方服务化方式及协议可参考 [PaddleX Serving 文档](https://www.paddleocr.ai/main/en/version3.x/inference_deployment/serving/serving.html)。
+
+---
+
+### 8️⃣ LibreTranslate 开源翻译服务编排（默认安装）
 
 LibreTranslate 用于动态内容翻译，不影响 `diy_lang` 固定界面词条。加载的语言越多，首次下载模型的时间和磁盘占用越大，因此建议从基础套餐开始：
 
@@ -1227,7 +1329,9 @@ LibreTranslate 用于动态内容翻译，不影响 `diy_lang` 固定界面词�
 | 意大利语 | `it` | 荷兰语 | `nl` | 土耳其语 | `tr` |
 | 波兰语 | `pl` | 乌克兰语 | `uk` |  |  |
 
-一键安装脚本默认不安装 LibreTranslate。选择安装后可选套餐 1/2/3，还可输入额外语言 Key；脚本会自动分配端口、生成随机 API Key，并把翻译服务地址与密钥写入 SaaS 引擎主租户配置后回读验证。
+一键安装脚本默认安装 LibreTranslate：安装选择直接按 Enter 等同于 `1`，语言套餐直接按 Enter 等同于基础套餐 `1`（简体中文、繁体中文、英语）。因此用户一路按 Enter 就会使用吾码官方推荐组合；明确不安装时在第一处提示输入 `0`。选择安装后仍可改选套餐 2/3 或输入额外语言 Key。脚本会自动分配只绑定 `127.0.0.1` 的诊断端口、生成并回读随机 API Key 数据库。平台 API 启动后，脚本立即回读 Upgrade31 的 4 个翻译物理字段，每秒一次、最多 15 秒；正常升级通常首轮通过，镜像过旧或迁移失败会快速报错。字段齐全后脚本才通过内部 Docker 地址写入主租户并回读验证，兼容没有 `TranslateProvider` 等新列的旧恢复库，且不会绕过 Upgrade31 直接伪造元数据。
+
+字段前置迁移完成不等于整条平台升级链成功。一键安装还会在重启 API 前等待并回读 `sys_config.ServerVersion` 至少达到脚本要求的版本；如果应用商城、SaaS 运行字段或其它中间迁移失败，脚本会明确停止，不会把“部分字段已创建”误报为安装完成，也不会用紧接着的重启打断尚未结束的升级事务。
 
 手动部署时可使用项目中的 `数据库、案例、文档、资料/docker-compose.libretranslate.yml`，并根据服务器修改宿主机目录、端口、`LT_LOAD_ONLY` 和 API Key。由于 Docker Compose 可能把全中文目录名归一化为空项目名，建议复制到 ASCII 目录，并始终显式指定项目名：
 
@@ -1238,7 +1342,7 @@ cd /microi/compose/libretranslate
 docker compose -p microi-libretranslate up -d
 ```
 
-如果直接在源码目录运行，也必须使用 `docker compose -p microi-libretranslate -f "数据库、案例、文档、资料/docker-compose.libretranslate.yml" up -d`。正式使用前请替换示例 API Key；不要把 LibreTranslate 端口直接暴露到公网。一键安装脚本会生成随机 Key、等待服务真正就绪并确认 Key 注册成功，且默认不会为 LibreTranslate 打开宿主机防火墙端口。
+如果直接在源码目录运行，也必须使用 `docker compose -p microi-libretranslate -f "数据库、案例、文档、资料/docker-compose.libretranslate.yml" up -d`。正式使用前请替换示例 API Key；不要把 LibreTranslate 端口直接暴露到公网。一键安装脚本会在容器启动前独立生成并回读 Key 数据库，让语言模型后台初始化，不会用 LibreTranslate 自带的“booting 即 healthy”检查冒充 HTTP 已就绪。
 
 下面是适用于 `/microi` 目录的等价编排：
 
@@ -1246,7 +1350,7 @@ docker compose -p microi-libretranslate up -d
 ```yaml
 services:
   microi-translate:
-    image: libretranslate/libretranslate:latest
+    image: registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1
     container_name: microi-translate
     user: "0:0"
     security_opt:
@@ -1295,10 +1399,10 @@ Microi API 不需要增加翻译环境变量。请在 SaaS 引擎主租户记录
 
 ---
 
-### 8️⃣ Ollama 编排（可选向量增强）
+### 9️⃣ Ollama 编排（不推荐，仅兼容特殊场景）
 
-:::: warning 仅在确有向量语义召回需求时安装
-在线 AI 的默认 Schema 搜索不依赖 Ollama。只有启用向量数据库后，才需要本节的 Ollama、下一节的 `nomic-embed-text` 和 Qdrant；三者配置必须配套。
+:::: warning 新装环境请跳过本节
+Microi 默认 NL2SQL/NL2V8/在线 AI 数据分析已经由内置的关键词扩展、权限感知 Schema/Skill 搜索和精确字段回读完整承接，不再推荐部署 Ollama、`nomic-embed-text` 与 Qdrant。仅当已有系统必须兼容旧向量链路，或独立召回评测证明内置能力无法满足特殊语义检索时，才同时部署本节和下一节。
 ::::
 
 >* Docker会自动创建所需的数据目录，无需手动创建
@@ -1370,7 +1474,7 @@ curl http://localhost:1434/v1/embeddings \
   -d '{"model": "nomic-embed-text", "input": "测试"}'
 ```
 
-### 9️⃣ Qdrant 向量数据库编排（可选向量增强）
+### 🔟 Qdrant 向量数据库编排（不推荐，仅兼容特殊场景）
 ::: details 展开查看 Shell 命令（93 行）
 ```shell
 version: '3.8'

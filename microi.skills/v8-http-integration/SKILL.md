@@ -64,6 +64,27 @@ if (resp.StatusCode < 200 || resp.StatusCode >= 300) {
 
 `GetResponse/PostResponse/PatchResponse` 返回 `Content`、`Headers`、`RawBytes`、`StatusCode`、`ErrorMessage`。后端 `RawBytes` 是 `.NET byte[]`，前端是 `Uint8Array`。
 
+## V8.AI 与底层 HTTP
+
+- 前端 V8 的平台 AI 普通调用优先 `await V8.AI.Chat(...)`。它自动使用当前 ApiBase 和平台登录头、接收响应 Token 轮换，并清除调用参数中的租户、身份、Endpoint、ApiKey 和认证头覆盖；只有确认问题适合进入 URL 日志时才用 `V8.AI.ChatGet(...)`。
+- 浏览器打字机效果使用 `await V8.AI.ChatStream(param, onChunk, { Signal })`。它解析 `message/result/error/done` SSE，`onChunk` 接收真实增量；页面关闭时通过 `AbortController` 取消读取。
+- 后端 V8 直接使用 `await V8.AI.Chat(...)`、`ChatStream(...)`、`NL2SQL(...)` 或管理员限定的 `NL2V8(...)`。对象在服务端绑定当前 `OsClient` 与认证用户，匿名上下文拒绝；禁止退回到自请求当前 API、转发 Token 或接受用户指定 Endpoint/ApiKey 的包装方式。
+- MCP 使用专用 `microi_chat`，由 MCP 连接提供 Token 与租户，只接受对话白名单参数并返回最终 `DosResult`。它不是逐 token MCP 流；其它平台写操作继续使用对应写 Tool 的确认与回读规则。
+- `Chat/ChatStream` 虽兼容 GET/POST，含问题、附件和会话上下文时一律优先 POST，避免敏感内容进入 URL、代理日志和浏览器历史。`V8.Http` 继续用于通用第三方 HTTP 集成，不要重复实现平台 AI 的认证或 SSE 解析器。
+
+```javascript
+// 前端或后端 V8：普通 AI 对话
+var result = await V8.AI.Chat({
+  UserChatMsg: '归纳当前工单',
+  AiModel: 'MiniMax-M3',
+  AiModelId: '当前租户启用的 mic_ai 记录Id'
+});
+if (result.Code != 1) V8.Tips(result.Msg || 'AI调用失败', false);
+else V8.Result = result.Data;
+```
+
+完整授权矩阵、SSE、后端安全边界与 MCP 示例维护在官网现有 `system-engine/ai-engine.md`，不要新建重复文档。
+
 ## POST 请求（对象参数格式）
 
 > V8 接口引擎中必须使用对象参数格式。尤其禁止 `V8.Http.Get(url)`：当前 .NET 同名重载包含 `Task<string> Get(string)`，Jint 可能把字符串调用解析为异步重载，脚本最终拿到 `[object Promise]`。GET 必须写成 `V8.Http.Get({ Url: url })`；第三方登录、微信 `jscode2session`、AccessToken 等链路保存后必须用无效 code 烟测，确认返回的是第三方明确错误而不是 Promise。

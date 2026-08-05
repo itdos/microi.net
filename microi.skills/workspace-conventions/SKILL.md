@@ -48,7 +48,7 @@ AI 在用户本机启动 Node.js、Vite、Webpack、dotnet build、Java、Docker
 
 - 启动前检查物理内存总量、当前占用率、可用内存，并检查是否已有同类 dev server/构建进程。已有可复用服务时禁止重复启动。
 - 默认只允许一个高资源任务运行；显式限制 Worker/并发数，优先按项目、包、模块、测试分组或文件分片执行，不得并行启动多个全量构建。
-- 启动重任务时仍以保留至少 `max(6 GB, 物理内存的 20%)` 给 VS Code、Codex 和操作系统为规划目标；低于该目标时应停止新增并发重任务、优先降级为定向验证，但不再把它作为强制终止已启动任务的硬门限。机器总内存占用达到 95% 时，立即终止 AI 启动的重任务及其子进程，不得等待 OOM。
+- 启动重任务前按“当前阶段进程树预算 + 系统安全余量”判断：阶段预算优先采用实测峰值；尚无实测时，用已限制的堆/容器上限加明确的原生进程、Worker 与缓冲开销。系统安全余量取 `max(1.5 GB, 物理内存的 5%)`，不得再按固定 20% 将大内存机器的启动门槛线性放大。顺序执行的阶段分别计算，禁止把不会并发的阶段峰值相加。机器总内存占用达到 95% 时，立即暂停或终止 AI 启动的重任务及其子进程，不得等待 OOM。
 - 禁止将 `--max-old-space-size`、JVM heap、Docker memory 或类似上限设为接近物理内存总量。除非用户明确授权独占构建窗口，单个 AI 启动的进程树不得持续占用超过物理内存的 25%。
 - 后台/长任务必须记录根 PID、子进程、启动时间和独立日志，每 15-30 秒监测一次进程树内存与全机可用内存。任务失败、中断或达阈值时必须停止整个子进程树，不得遗留孤儿 Node/dotnet/Java 进程。
 - 全量构建无法在上述阈值内完成时，先停止并改用定向 lint、类型检查、按模块构建或按测试文件验证。如仍必须进行全量验收，应明确报告资源瓶颈，交由 CI/专用构建机或经用户明确同意的独占时段执行，禁止在用户正在使用的 VS Code 会话里硬跑。
@@ -156,6 +156,14 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - 字段名、环境变量名、枚举值、路由、类名、方法名、包名、协议名等标识符保持原始英文，不要为了中文化而破坏程序读取。
 - 如果配置面向海外交付，才可以在中文说明后补充英文括注；不要整段只写英文。
 - 修改配置说明后，必须确认 JSON/YAML 仍可解析，不能因为中文标点或注释方式导致配置文件失效。
+
+## 后端 API 配置白名单与 SaaS 单一事实源（强制）
+
+- `Microi.net.Api` 的 `AppSettings` 与同名容器环境变量只允许：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。
+- 除上述十项外，任何业务开关、重试、超时、限额、安全策略、密钥或可执行文件路径通常都必须进入 SaaS 引擎 `sys_osclients` 的合适 Tab，并提供幂等升级、默认值、缓存刷新、敏感字段脱敏和子租户隔离。官方 License 信任链是固定例外：恢复重试次数/间隔使用代码常量，签发私钥固定只读挂载 `/app/microi_private.pem`，不得建立对应 SaaS 字段。禁止新增 `MICROI_*`、`DOS_ORM_*`、额外 `AppSettings` 节点或通用动态环境变量读取。
+- `ASPNETCORE_*`、`DOTNET_*` 是框架宿主配置；`PW_*`、MCP、构建、安装器和发布脚本变量只服务各自工具进程。它们不能成为生产 API 的业务配置入口。
+- 修改后必须用源码测试扫描生产 `.cs`、API `appsettings.json` 及在线/离线 Compose，精确断言十项白名单。不能用注释约定代替自动化守卫。
+- 一键安装恢复客户旧库时只允许定位精确主租户三元组；缺失则幂等创建，重复则停止，不能批量重写其它子租户。新主租户行不得持久化数据库、MongoDB 或 Redis 连接，安装器对 MinIO/OCR 等业务配置的后续更新也必须带同一三元组、活动状态条件并做唯一回读。
 
 ## 多语言优先约定
 
@@ -317,29 +325,13 @@ AI 在本地启动后端、跑 Playwright、做登录态页面截图或调用需
 
 1. 读取 `Microi.Server/Microi.net.Api/.microi-local`，得到当前环境名，例如 `<Environment>`。
 2. 读取 `Microi.Server/Microi.net.Api/appsettings.<Environment>.json`，或测试脚本传入的 `PW_APPSETTINGS_PATH`。
-3. 从 `DevLoginBypass.Accounts` 中按 `OsClient` 匹配账号密码；没有匹配时使用 `DevLoginBypass.DefaultAccount` / `DefaultPassword`。
-4. 如果环境变量 `MICROI_OSCLIENT`、`PW_OS_CLIENT`、`PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD` 已显式设置，以环境变量为准。
-5. `appsettings.*.json`、`.microi-local`、Token、数据库连接串、Redis 密码都视为本地敏感配置。可以读取并用于自动化，但最终回复、日志摘要和测试报告中不得输出真实值，只能写 `<redacted>`、`本地配置账号` 或 `本地配置凭据`。
+3. 测试账号密码只从用户本轮明确提供、受保护的测试进程变量 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD`、CI Secret 或既有安全登录态取得；不得把凭据写入 `appsettings.*.json`、源码或测试报告。
+4. `MICROI_OSCLIENT`、`PW_OS_CLIENT` 等只属于自动化工具进程，不是 API 生产环境变量；显式设置时可用于选择测试租户。
+5. `.microi-local`、Token、数据库连接串、Redis 密码和测试凭据都视为本地敏感配置。最终回复、日志摘要和测试报告中不得输出真实值，只能写 `<redacted>`、`本地配置账号` 或 `本地配置凭据`。
 
-## DevLoginBypass 多租户约定
+## 自动化登录约定
 
-当本地 E2E/API 自动化需要对多个租户免验证码登录时，在当前生效的 `appsettings.{Environment}.json` 中配置 `DevLoginBypass:Accounts`：
-
-```json
-"DevLoginBypass": {
-  "Enabled": true,
-  "SkipCaptcha": true,
-  "OnlyLoopback": true,
-  "DefaultAccount": "admin",
-  "DefaultPassword": "<default-password>",
-  "Accounts": [
-    { "OsClient": "<tenant-a>", "Account": "<account>", "Password": "<password>" },
-    { "OsClient": "<tenant-b>", "Account": "<account>", "Password": "<password>" }
-  ]
-}
-```
-
-本地旁路配置必须保留 `OnlyLoopback=true`，并且只允许在 `ASPNETCORE_ENVIRONMENT/DOTNET_ENVIRONMENT=Development` 且请求来自本机回环地址时生效。自动化脚本可传 `_AutomationTestLogin=true` 或本地 Dev Key 来跳过验证码，但任何方式都不能跳过密码校验；`Pwd="_DEV_BYPASS_"` 只能在本机 DevLoginBypass 下替换为本地配置密码后继续走真实密码校验。远端自动化若要免验证码，必须先在 `sys_config.AutoTestSkipCaptcha`（中文 Label：允许自动化测试登录时绕开验证码）开启开关，再传 `_AutomationTestLogin=true`，仍使用真实账号密码。不要把具体项目租户名或密码写进 skill；真实值只放环境配置文件。
+本地和远端 E2E 统一传真实 `Account` / `Pwd`。需要跳过图形验证码时，只能在目标租户 `sys_config.AutoTestSkipCaptcha=true` 后传 `_AutomationTestLogin=true`；它只跳过验证码，绝不能绕过密码校验。禁止恢复 `DevLoginBypass`、`X-Microi-Dev-Key`、`_DEV_BYPASS_` 或让脚本自动改写后端 `appsettings`。测试完成后不持久化账号密码。
 
 ## V8 远端/本地同步收尾约定
 

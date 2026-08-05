@@ -22,9 +22,13 @@ const functionSource = source.match(/var countPageTabs = function \(value\) \{[\
 const physicalNotNullBackfillSource = source.match(
   /var prepareNotNullColumnData = function \(tableName, columnName, sourceColumn, targetColumn\) \{[\s\S]*?\n    \};/
 );
+const mysqlOffpageHelpersSource = source.match(
+  /var isMysqlRowSizeTooLargeError = function \(error\) \{[\s\S]*?(?=\n    var applyPersistedMysqlOffpageOverrides)/
+);
 
 assert.ok(functionSource, "countPageTabs helper should exist");
 assert.ok(physicalNotNullBackfillSource, "NOT NULL physical-column backfill helper should exist");
+assert.ok(mysqlOffpageHelpersSource, "MySQL row-size fallback helpers should exist");
 
 const context = {};
 vm.runInNewContext(`${functionSource[0]}\nresult = countPageTabs;`, context);
@@ -89,6 +93,40 @@ function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
     { IS_NULLABLE: options.targetNullable || "YES" }
   );
   return { calls, count };
+}
+
+function runMysqlOffpageFallbackFixture() {
+  const packageFixture = {
+    DiyFields: [
+      { TableName: "sys_osclients", TableId: "table-1", Name: "LongSetting", Type: "varchar(2000)" },
+      { TableName: "sys_osclients", TableId: "table-1", Name: "IndexedSetting", Type: "varchar(500)" },
+    ],
+    PhysicalColumns: [],
+    DDLStatements: [{
+      TableName: "sys_osclients",
+      TableId: "table-1",
+      DDL: "CREATE TABLE `sys_osclients` (`Id` varchar(36) NOT NULL PRIMARY KEY, `LongSetting` varchar(2000) NULL, `IndexedSetting` varchar(500) NULL, KEY `ix_setting` (`IndexedSetting`))",
+    }],
+  };
+  const fixtureContext = {
+    Package: packageFixture,
+    debugLog: {},
+    mysqlOffpageTypeOverrides: {},
+    isSafeIdentifier(value) {
+      return !!value && /^[A-Za-z0-9_]+$/.test(String(value));
+    },
+    getPhysicalValue(row, names) {
+      for (const name of names) {
+        if (row[name] !== undefined && row[name] !== null) return row[name];
+      }
+      return null;
+    },
+  };
+  vm.runInNewContext(
+    `${mysqlOffpageHelpersSource[0]}\nresult = { isMysqlRowSizeTooLargeError, applyPackageColumnTypeOverride };`,
+    fixtureContext
+  );
+  return { fixtureContext, packageFixture, helpers: fixtureContext.result };
 }
 
 function runDataSetImportFixture(options = {}) {
@@ -183,9 +221,16 @@ test("physical schema sync backfills all legacy application publish NULLs before
     ["RowVersion", "0"],
     ["RecoveryEpoch", "0"],
   ]);
-  const columns = packageModel.PhysicalColumns.filter(column => (
-    column.TABLE_NAME === "mci_ai_app_version" && expectedDefaults.has(column.COLUMN_NAME)
-  ));
+  // These columns belong to the AI application package, not the application-store package.
+  // Keep the importer regression fixture local so resource ownership changes cannot silently
+  // remove the NOT NULL backfill coverage.
+  const columns = Array.from(expectedDefaults, ([COLUMN_NAME, COLUMN_DEFAULT]) => ({
+    TABLE_NAME: "mci_ai_app_version",
+    COLUMN_NAME,
+    COLUMN_TYPE: COLUMN_NAME === "PublishState" ? "varchar(50)" : "bigint",
+    IS_NULLABLE: "NO",
+    COLUMN_DEFAULT,
+  }));
 
   assert.equal(columns.length, expectedDefaults.size);
   for (const column of columns) {
@@ -222,6 +267,46 @@ test("physical NOT NULL backfill is idempotent and fails closed without a declar
     () => runPhysicalNotNullBackfillFixture({ ...baseColumn, COLUMN_DEFAULT: null }),
     /存在3条NULL数据.*未声明可回填的默认值/
   );
+});
+
+test("MySQL row-size fallback promotes only non-indexed varchar columns and persists the override", () => {
+  const { fixtureContext, packageFixture, helpers } = runMysqlOffpageFallbackFixture();
+  assert.equal(
+    helpers.isMysqlRowSizeTooLargeError(new Error("Row size too large. The maximum row size is 65535")),
+    true
+  );
+  assert.equal(helpers.isMysqlRowSizeTooLargeError(new Error("Duplicate column name")), false);
+
+  assert.equal(
+    helpers.applyPackageColumnTypeOverride(
+      "sys_osclients",
+      "table-1",
+      "LongSetting",
+      "mediumtext",
+      "test"
+    ),
+    true
+  );
+  assert.equal(packageFixture.DiyFields[0].Type, "mediumtext");
+  assert.match(packageFixture.DDLStatements[0].DDL, /`LongSetting` mediumtext NULL/);
+  assert.equal(
+    fixtureContext.mysqlOffpageTypeOverrides["sys_osclients.longsetting"],
+    "mediumtext"
+  );
+
+  assert.equal(
+    helpers.applyPackageColumnTypeOverride(
+      "sys_osclients",
+      "table-1",
+      "IndexedSetting",
+      "mediumtext",
+      "test"
+    ),
+    false
+  );
+  assert.equal(packageFixture.DiyFields[1].Type, "varchar(500)");
+  assert.match(packageFixture.DDLStatements[0].DDL, /KEY `ix_setting` \(`IndexedSetting`\)/);
+  assert.match(source, /checkpoint\.MySqlOffpageTypeOverrides = offpageSnapshot/);
 });
 
 test("InsertIfMissing never overwrites a configured row with the same Id", () => {
@@ -512,7 +597,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   );
   assert.ok(packageImporter, "application-store package should contain its importer");
   assert.ok(
-    compareSemanticVersions(packageModel.PackageInfo.Version, "v6.9.7") >= 0,
+    compareSemanticVersions(packageModel.PackageInfo.Version, "v7.0.10") >= 0,
     "application-store package version must not fall below the resumable importer baseline",
   );
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
@@ -520,11 +605,12 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.8.3") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.8.10") >= 0);
   assert.match(source, /SCHEMA_BACKGROUND_CHUNKS_V1/);
   assert.match(source, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(source, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(source, /DATASET_INSERT_IF_MISSING_V1/);
+  assert.match(source, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
   assert.match(source, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -558,9 +644,15 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 8, 3\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.8.3 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 8, 3\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 8, 10\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.8.10 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 8, 10\)/);
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 10\)/);
+  assert.equal(
+    (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
+    3,
+    "runtime, downloaded importer, and embedded package validation must all require the row-size fallback",
+  );
   assert.match(appStoreUpgradeSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(appStoreUpgradeSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(appStoreUpgradeSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -570,9 +662,8 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(appStoreUpgradeSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(appStoreUpgradeSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(6, 5, 16\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_008_003/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_008_010/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -583,7 +674,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_004_004/);
-  assert.match(refreshSource, /versionNumber\s*<\s*6_005_014/);
+  assert.match(refreshSource, /versionNumber\s*<\s*7_000_010/);
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {
@@ -664,8 +755,10 @@ test("legacy databases receive application-store bootstrap columns before upgrad
   }
   assert.match(upgradeSource, /EnsureColumn\(osClientSecret,\s*"diy_field",\s*"TableName",\s*"varchar\(50\)"\)/);
   assert.match(upgradeSource, /INNER JOIN `diy_table` dt ON dt\.`Id`=df\.`TableId`/);
-  assert.match(apiProgramSource, /"MICROI_LICENSE_RESTORE_MAX_ATTEMPTS",[\s\S]*?"License:RestoreMaxAttempts",[\s\S]*?\b3\)\)/);
-  assert.match(apiProgramSource, /"MICROI_LICENSE_RESTORE_RETRY_SECONDS",[\s\S]*?"License:RestoreRetrySeconds",[\s\S]*?\b10\)\)/);
+  assert.match(apiProgramSource, /const int maxAttempts = 3;/);
+  assert.match(apiProgramSource, /const int retrySeconds = 10;/);
+  assert.doesNotMatch(apiProgramSource, /License:RestoreMaxAttempts|License:RestoreRetrySeconds/);
+  assert.doesNotMatch(apiProgramSource, /MICROI_LICENSE_RESTORE_/);
 });
 
 test("database runtime mode embeds compiled files while retaining the HDFS manifest", () => {

@@ -475,6 +475,65 @@ export const V8ApiDefinitions = {
                 }
             },
 
+            // ========== Microi.AI ==========
+            AI: {
+                label: "AI",
+                kind: "Module",
+                documentation: "当前租户与登录用户绑定的 Microi.AI。浏览器自动携带并轮换 Token；调用参数不能覆盖 OsClient、用户、Endpoint、ApiKey 或 Authorization。所有方法返回 Promise。",
+                insertText: "AI",
+                methods: {
+                    Chat: {
+                        label: "Chat",
+                        kind: "Method",
+                        documentation: "AI 对话，默认 POST；参数可传 UserChatMsg、AiModel、AiModelId、SystemChatMsg、ConversationId、ReasoningEffort。",
+                        insertText: "Chat",
+                        snippet: 'Chat({\n\tUserChatMsg: "${1:问题}",\n\tAiModel: "${2:模型名称}"\n})'
+                    },
+                    ChatGet: {
+                        label: "ChatGet",
+                        kind: "Method",
+                        documentation: "使用 GET 调用 AI 对话，仅适合不含附件或复杂对象的标量参数。",
+                        insertText: "ChatGet",
+                        snippet: 'ChatGet({ UserChatMsg: "${1:问题}", AiModel: "${2:模型名称}" })'
+                    },
+                    ChatStream: {
+                        label: "ChatStream",
+                        kind: "Method",
+                        documentation: "SSE 打字机对话。第二个参数接收增量文本；Promise 返回最终 DosResult。第三个参数可传 Signal 取消请求。",
+                        insertText: "ChatStream",
+                        snippet: 'ChatStream({\n\tUserChatMsg: "${1:问题}",\n\tAiModel: "${2:模型名称}"\n}, function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    },
+                    RecognizeIntent: {
+                        label: "RecognizeIntent",
+                        kind: "Method",
+                        documentation: "识别 chat/data/builder/project/code 意图。",
+                        insertText: "RecognizeIntent",
+                        snippet: 'RecognizeIntent({ UserChatMsg: "${1:问题}", AiModel: "${2:模型名称}" })'
+                    },
+                    NL2SQL: {
+                        label: "NL2SQL",
+                        kind: "Method",
+                        documentation: "按当前登录用户菜单、角色和数据范围把自然语言转为只读查询并执行。",
+                        insertText: "NL2SQL",
+                        snippet: 'NL2SQL({ Question: "${1:问题}", AiModel: "${2:模型名称}" })'
+                    },
+                    NL2V8: {
+                        label: "NL2V8",
+                        kind: "Method",
+                        documentation: "自然语言生成 V8 代码，仅平台管理员。",
+                        insertText: "NL2V8",
+                        snippet: 'NL2V8({ Question: "${1:需求}", AiModel: "${2:模型名称}" })'
+                    },
+                    NL2V8Stream: {
+                        label: "NL2V8Stream",
+                        kind: "Method",
+                        documentation: "流式生成 V8 代码，仅平台管理员。",
+                        insertText: "NL2V8Stream",
+                        snippet: 'NL2V8Stream({ Question: "${1:需求}", AiModel: "${2:模型名称}" }, function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    }
+                }
+            },
+
             // ========== 旧版 HTTP 请求方法（兼容保留） ==========
             Post: {
                 label: "Post",
@@ -639,7 +698,7 @@ export const V8ApiDefinitions = {
             Print: {
                 label: "Print",
                 kind: "Module",
-                documentation: "蓝牙打印模块\n\n提供 TSC(TSPL) 标签和 ESC/POS 小票的 BLE 直连打印。5+App 使用 plus.bluetooth；存在 navigator.bluetooth.requestDevice 的 PC/H5 浏览器使用 Web Bluetooth。V8.Print 存在不等于当前环境可连接，必须调用 isConnected() 并处理连接页结果。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- await V8.Print.OpenBluetoothPage() — 打开连接页，关闭时返回是否已连接\n- await V8.Print.prepareSend(data) — 串行分包写入打印数据\n- V8.Print.Send(data) — 内部分包状态机，业务代码不要直接调用\n- V8.Print.isConnected() — 检测当前连接\n- V8.Print.disconnect() — 断开连接\n- V8.Print.BLEInformation — 仅作诊断的连接元数据\n\n不同前端 V8 上下文可能共享发送状态，禁止 Promise.all 或多个按钮并发打印。",
+                documentation: "蓝牙打印模块\n\n提供 TSC(TSPL) 标签和 ESC/POS 小票的 BLE 直连打印。5+App 使用 plus.bluetooth；存在 navigator.bluetooth.requestDevice 的 PC/H5 浏览器使用 Web Bluetooth。PC/平板右上角和移动端【我的】页共用同一连接状态与连接页。V8.Print 存在不等于当前环境可连接，必须调用 isConnected() 并处理连接页结果。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- await V8.Print.OpenBluetoothPage() — 打开连接页，关闭时返回是否已连接\n- await V8.Print.reconnect() — 使用已记住的授权或设备 ID 重连\n- V8.Print.getConnectionState() — 获取可展示的连接快照\n- V8.Print.subscribeConnection(listener) — 订阅连接状态\n- await V8.Print.prepareSend(data) — 进入应用级队列并串行分包写入\n- V8.Print.Send(data) — 内部分包状态机，业务代码不要直接调用\n- V8.Print.isConnected() — 检测当前连接\n- V8.Print.disconnect() — 主动断开并忘记设备\n- V8.Print.BLEInformation — 仅作诊断的连接元数据\n\n全部前端 V8 上下文共用一个 Print 实例和一条发送队列。业务代码仍应逐次 await，避免用 Promise.all 表达同一设备的并行打印。",
                 insertText: "Print",
                 methods: {
                     createNew: {
@@ -654,32 +713,47 @@ export const V8ApiDefinitions = {
                     },
                     OpenBluetoothPage: {
                         label: "OpenBluetoothPage()",
-                        documentation: '打开蓝牙连接页面\n\n返回 Promise<boolean>，在弹窗关闭时解析；boolean 表示关闭时是否已连接。必须由用户点击等手势触发。不要用 BLEInformation.deviceId 替代实时连接判断。\n\n示例:\nif (!V8.Print.isConnected()) {\n    var connected = await V8.Print.OpenBluetoothPage();\n    if (!connected || !V8.Print.isConnected()) return;\n}',
+                        documentation: '打开蓝牙连接页面\n\n返回 Promise<boolean>，在弹窗关闭时解析；boolean 表示关闭时是否已连接。弹窗已打开时，重复调用返回同一个 Promise。首次选择 Web Bluetooth 设备必须由用户点击等手势触发。不要用 BLEInformation.deviceId 替代实时连接判断。\n\n示例:\nif (!V8.Print.isConnected()) {\n    var connected = await V8.Print.OpenBluetoothPage();\n    if (!connected || !V8.Print.isConnected()) return;\n}',
                         snippet: 'OpenBluetoothPage()'
                     },
                     prepareSend: {
                         label: "prepareSend(data)",
-                        documentation: '发送打印数据到蓝牙打印机\n\n异步检查连接并串行分包写入；未连接时会打开连接页。必须 await，禁止 Promise.all 或多按钮并发。成功只表示 BLE 写入完成，不代表物理走纸或无缺纸故障。\n\n参数：data — 非空指令字节数组（由 createNew().getData() 或 createNewESC().getData() 返回）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
+                        documentation: '发送打印数据到蓝牙打印机\n\n异步检查或恢复连接，并进入应用级共享队列后串行分包写入；无法恢复时打开连接页。必须 await，不要用 Promise.all 表达同一设备的并行打印。成功只表示 BLE 写入完成，不代表物理走纸或无缺纸故障。\n\n参数：data — 非空指令字节数组（由 createNew().getData() 或 createNewESC().getData() 返回）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
                         snippet: 'prepareSend(${1:data})'
                     },
                     isConnected: {
                         label: "isConnected()",
-                        documentation: '检测蓝牙是否已连接\n\n返回 boolean。Web 端检查实时 GATT 和写特征；5+App 当前只检查已保存的设备/写特征 ID，发送时仍需捕获物理断线。\n\n示例:\nif (V8.Print.isConnected()) {\n    // 可以尝试发送，仍需捕获写入异常\n}',
+                        documentation: '检测蓝牙是否已连接\n\n返回 boolean。Web 端检查实时 GATT 和写特征；5+App 根据连接事件维护的在线标记以及设备/写特征 ID 判断。任何环境都仍需捕获写入期间的物理断线。\n\n示例:\nif (V8.Print.isConnected()) {\n    // 可以尝试发送，仍需捕获写入异常\n}',
                         snippet: 'isConnected()'
+                    },
+                    reconnect: {
+                        label: "reconnect(options)",
+                        documentation: '使用已记住的设备重连\n\n返回 Promise<boolean>，不会弹出浏览器设备选择框。5+App 使用已保存 deviceId；Web 端仅在浏览器仍保留授权且支持 navigator.bluetooth.getDevices() 时可自动取回设备。失败后可调用 OpenBluetoothPage() 让用户重新选择。\n\n示例:\nvar connected = await V8.Print.reconnect();\nif (!connected) await V8.Print.OpenBluetoothPage();',
+                        snippet: 'reconnect()'
+                    },
+                    getConnectionState: {
+                        label: "getConnectionState()",
+                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、autoReconnect、error、changedAt 等字段。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
+                        snippet: 'getConnectionState()'
+                    },
+                    subscribeConnection: {
+                        label: "subscribeConnection(listener)",
+                        documentation: '订阅连接状态变化\n\n注册后立即收到一次当前快照，并在连接、断开、重连或不支持时继续回调。返回取消订阅函数，组件销毁时必须调用。\n\n示例:\nvar unsubscribe = V8.Print.subscribeConnection(function (state) {\n    console.log(state.status, state.deviceName);\n});\n// 页面销毁时 unsubscribe();',
+                        snippet: 'subscribeConnection(${1:function (state) {\n\t$0\n}})'
                     },
                     disconnect: {
                         label: "disconnect()",
-                        documentation: '断开蓝牙连接\n\n示例:\nV8.Print.disconnect();',
+                        documentation: '主动断开蓝牙连接并忘记设备\n\n会停止自动重连并清除本地保存的设备信息；下次需要在连接页重新选择设备。\n\n示例:\nV8.Print.disconnect();',
                         snippet: 'disconnect()'
                     },
                     setOneTimeData: {
                         label: "setOneTimeData(bytes)",
-                        documentation: '设置每次发送的字节数\n\n参数：bytes — 已实机验证的正整数；默认20，内置候选20-190（步长10）。源码不做入参校验，错误值可能破坏分包状态。\n\n示例:\nV8.Print.setOneTimeData(100);',
+                        documentation: '设置每次发送的字节数\n\n参数：bytes — 1-512 的整数；默认20，连接页内置候选20-190（步长10）。目标打印机真正支持的包长仍需实机验证。非法值会抛出异常。\n\n示例:\nV8.Print.setOneTimeData(100);',
                         snippet: 'setOneTimeData(${1:100})'
                     },
                     setPrinterNum: {
                         label: "setPrinterNum(num)",
-                        documentation: '设置同一缓冲区的重复发送份数\n\n参数：num — 已验证的整数1-9，默认1；源码不做入参校验。不同内容的批次应逐条 await prepareSend，不使用此方法代替循环。\n\n示例:\nV8.Print.setPrinterNum(3); // 同一内容发送3份',
+                        documentation: '设置同一缓冲区的重复发送份数\n\n参数：num — 1-99 的整数，默认1；连接页内置候选1-9。非法值会抛出异常。不同内容的批次应逐条 await prepareSend，不使用此方法代替循环。\n\n示例:\nV8.Print.setPrinterNum(3); // 同一内容发送3份',
                         snippet: 'setPrinterNum(${1:1})'
                     }
                 }

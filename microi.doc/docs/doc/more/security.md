@@ -206,7 +206,7 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 }
 ```
 
-容器环境可等价使用 `ForwardedHeaders__KnownProxies__0=10.20.0.12`、`ForwardedHeaders__KnownNetworks__0=10.20.0.0/24`。只配置实际受控的代理地址，禁止填 `0.0.0.0/0`、`::/0` 或为了“拿到真实 IP”清空已知代理校验。每次只接受离 Kestrel 最近的一跳；多级代理应让最后一跳覆盖并清洗来自公网的转发头。历史租户字段 `SecurityRespectForwardedHeaders` 不再赋予原始 Header 信任，真实 IP 的信任根只在上述宿主级配置中维护。
+在主租户 SaaS 引擎【后端运行配置】中，用 `BackendForwardedKnownProxies` 配置受信代理精确 IP、用 `BackendForwardedKnownNetworks` 配置受控 CIDR；多个值用逗号或换行分隔，修改后滚动重启 API 节点。禁止改用容器环境变量或自定义 `appsettings` 节点，也禁止填 `0.0.0.0/0`、`::/0` 或为了“拿到真实 IP”清空已知代理校验。每次只接受离 Kestrel 最近的一跳；多级代理应让最后一跳覆盖并清洗来自公网的转发头。历史租户字段 `SecurityRespectForwardedHeaders` 不再赋予原始 Header 信任，真实 IP 的信任根只由上述 SaaS 字段维护。
 
 解除方式：
 
@@ -247,7 +247,7 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 登录 RSA 的用途只是避免密码在请求体和普通代理调试界面中直接显示，不能替代 HTTPS，也不是密码存储或身份认证密钥。
 
 - 平台保留历史登录 RSA 密钥对作为默认 fallback，兼容已发布客户、旧前端和浏览器缓存；安全升级不得直接删除 fallback。
-- 部署专属密钥时，私钥通过 `MICROI_LOGIN_RSA_PRIVATE_KEY` 或受限密钥文件注入，公钥通过 `MICROI_LOGIN_RSA_PUBLIC_KEY` / `Security:LoginRsaPublicKey` 提供给登录前端。
+- 部署专属登录 RSA 密钥时，在主租户 SaaS 引擎【后端运行配置】中成对维护 `BackendLoginRsaPrivateKey` 与 `BackendLoginRsaPublicKey`；私钥只供可信服务端使用，匿名系统配置只返回公钥。不得改用环境变量或额外 `appsettings` 节点。
 - 公钥和私钥必须成对切换；不匹配会导致所有用户无法登录。
 - 生产登录和管理端必须使用 HTTPS。
 

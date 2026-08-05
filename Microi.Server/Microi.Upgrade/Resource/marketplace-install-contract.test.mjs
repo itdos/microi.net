@@ -8,12 +8,16 @@ const bulkSource = await readFile(new URL("bulk-import-packages.js", resourceUrl
 const importerSource = await readFile(new URL("import-package.js", resourceUrl), "utf8");
 const statSource = await readFile(new URL("official-marketplace-install-stat.js", resourceUrl), "utf8");
 
+function normalizeSource(value) {
+  return `${String(value || "").replace(/\r\n?/g, "\n").replace(/\n*$/g, "")}\n`;
+}
+
 function parseButtons(value) {
   return value ? JSON.parse(value) : [];
 }
 
 test("application-store package hides every install mutation on the official platform", () => {
-  assert.equal(packageModel.PackageInfo.Version, "v7.0.5");
+  assert.equal(packageModel.PackageInfo.Version, "v7.0.10");
   const menu = packageModel.SysMenus.find((item) => item.Url === "/microi-store");
   assert.ok(menu, "application-store menu is missing");
 
@@ -35,6 +39,10 @@ test("application-store package hides every install mutation on the official pla
   assert.match(bulk.V8CodeShow, /Level/);
   assert.match(bulk.V8Code, /RunBackground\('bulk-import-microi-store-packages'/);
   assert.match(bulk.V8Code, /已是最新版的应用不会重新安装/);
+  assert.match(bulk.V8Code, /ApplicationType: 'Platform'/);
+  assert.match(bulk.V8Code, /官方平台应用/);
+  assert.equal(bulk.Workload.ExpectedItems, 29);
+  assert.equal(bulk.Workload.ExecutionMode, undefined);
 });
 
 test("bulk install persists its plan in the shared background-task checkpoint", () => {
@@ -50,6 +58,15 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /ChildCheckpoint/);
   assert.match(bulkSource, /UpdateBackgroundTask/);
   assert.match(bulkSource, /V8\.ApiEngine\.Run\('import-microi-store-package'/);
+  assert.match(bulkSource, /BULK_CHILD_FAILURE_DETAIL_V1/);
+  assert.match(bulkSource, /BULK_PLATFORM_ONLY_PLAN_V1/);
+  assert.match(bulkSource, /BULK_ADAPTIVE_SINGLE_SLICE_V1/);
+  assert.match(bulkSource, /ApplicationType: bulkApplicationType/);
+  assert.match(bulkSource, /trim\(row\.ApplicationType \|\| row\.AppType\) != bulkApplicationType/);
+  assert.match(bulkSource, /checkpointVersion[\s\S]*checkpointVersion < 3[\s\S]*phase = 'Discover'/);
+  assert.match(bulkSource, /BulkAdaptiveSingleSlice: true/);
+  assert.match(bulkSource, /childFailureDetail\(childResult\)/);
+  assert.match(bulkSource, /ChildData:/);
   assert.doesNotMatch(bulkSource, /localStorage|sessionStorage|static\s+/i);
 });
 
@@ -58,6 +75,10 @@ test("every install action reports one stable operation to the authoritative cou
   assert.match(importerSource, /InstallAction: installAction/);
   assert.match(importerSource, /OperationId: installOperationId/);
   assert.match(importerSource, /official_marketplace_install_stat/);
+  assert.match(importerSource, /MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1/);
+  assert.match(importerSource, /SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1/);
+  assert.match(importerSource, /if \(!marketplaceInstallIdentity\)[\s\S]*install_count_skipped_no_identity[\s\S]*return;/);
+  assert.match(importerSource, /typeof remoteStat == 'string'[\s\S]*JSON\.parse\(remoteStat\)[\s\S]*remoteStat\.Code == 1/);
   assert.doesNotMatch(importerSource, /UPDATE\s+`?sys_microistore`?\s+SET\s+`?InstallCount`?/i);
 
   assert.match(statSource, /mci_marketplace_install_event/);
@@ -73,15 +94,26 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.1.1");
+  assert.equal(engine.Version, "v1.1.3");
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
-  assert.equal(engine.ApiV8Code, bulkSource);
+  assert.equal(engine.ApiV8Code, normalizeSource(bulkSource));
   assert.equal(packageModel.PackageInfo.ApiEngineCount, packageModel.SysApiEngines.length);
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v1\.8\.6/);
+  assert.match(importerSource, /Version: v1\.8\.10/);
+  assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
+  assert.match(importerSource, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
+  assert.match(importerSource, /MySqlOffpageTypeOverrides/);
+  assert.match(importerSource, /isMysqlRowSizeTooLargeError/);
+  assert.match(importerSource, /applyPackageColumnTypeOverride/);
+  assert.match(importerSource, /ADD COLUMN触发MySQL 65535字节行宽上限/);
+  assert.match(importerSource, /CREATE TABLE触发MySQL 65535字节行宽上限/);
+  assert.match(importerSource, /isPackageColumnIndexed/);
+  assert.match(importerSource, /trustedBulkAdaptiveInvocation/);
+  assert.match(importerSource, /fieldCount <= 160/);
+  assert.match(importerSource, /assetContentChars <= 8 \* 1024 \* 1024/);
   assert.match(importerSource, /PACKAGE_API_ENGINE_READBACK_V1/);
   assert.match(importerSource, /assertPersistedApiEngine\(apiEngine, updatedEngine\)/);
   assert.match(importerSource, /assertPersistedApiEngine\(apiEngine, insertedEngine\)/);
@@ -93,6 +125,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v1.8.6");
-  assert.equal(embeddedImporter.ApiV8Code, importerSource);
+  assert.equal(embeddedImporter.Version, "v1.8.10");
+  assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

@@ -1,0 +1,59 @@
+FROM python:3.11-slim-bookworm@sha256:b18992999dbe963a45a8a4da40ac2b1975be1a776d939d098c647482bcad5cba
+
+ARG PADDLEPADDLE_VERSION=3.2.2
+ARG PADDLEX_VERSION=3.6.1
+ARG TARGETARCH
+
+LABEL org.opencontainers.image.title="Microi PaddleX OCR CPU" \
+      org.opencontainers.image.description="Pinned PaddleX OCR serving image with preloaded default OCR pipeline models" \
+      org.opencontainers.image.vendor="Microi" \
+      org.opencontainers.image.version="${PADDLEX_VERSION}-paddle${PADDLEPADDLE_VERSION}-cpu" \
+      org.opencontainers.image.source="https://github.com/ITdos/Microi.net"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    HOME=/home/microi
+
+RUN test "${TARGETARCH}" = "amd64"
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+        libgl1 \
+        libglib2.0-0 \
+        libgomp1 \
+        libsm6 \
+        libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# PaddleX 与 PaddlePaddle 分别固定版本；serving 插件由同版本 PaddleX CLI 安装。
+RUN python -m pip install --no-cache-dir \
+        "paddlepaddle==${PADDLEPADDLE_VERSION}" \
+        --index-url https://www.paddlepaddle.org.cn/packages/stable/cpu/ \
+    && python -m pip install --no-cache-dir \
+        "paddlex[ocr]==${PADDLEX_VERSION}" \
+        --index-url https://pypi.org/simple \
+    && paddlex --install serving \
+    && python -m pip check
+
+RUN groupadd --gid 10001 microi \
+    && useradd --uid 10001 --gid 10001 --create-home --shell /usr/sbin/nologin microi \
+    && mkdir -p /home/microi/.paddlex \
+    && chown -R microi:microi /home/microi
+
+USER microi
+WORKDIR /home/microi
+
+# 在发布镜像时把 OCR 默认产线模型一并下载。运行时挂载全新的 Docker named
+# volume 时，Docker 会把这里的已有内容复制到卷内，用户安装后无需再经过
+# Python 依赖安装或公网模型下载阶段。
+RUN python -c "from paddlex import create_pipeline; pipeline = create_pipeline(pipeline='OCR'); assert pipeline is not None"
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10m --retries=10 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"]
+
+ENTRYPOINT ["paddlex"]
+CMD ["--serve", "--pipeline", "OCR", "--device", "cpu", "--host", "0.0.0.0", "--port", "8080"]

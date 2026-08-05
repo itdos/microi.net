@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import type { ApiResponse, MicroiClient, DbTable, DbField, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo } from './microi-client.js';
+import type { ApiResponse, MicroiClient, DbTable, DbField, OcrRecognizeRequest, OcrRecognizeResult, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo, TranslateFileRequest, TranslateFileResult, TranslateTextResult } from './microi-client.js';
 import { normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
@@ -141,6 +141,268 @@ const FORBIDDEN_APPLICATION_ASSET_FILES = [
   /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
   /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
 ];
+
+const OCR_MAX_FILE_BYTES = 100 * 1024 * 1024;
+const OCR_MAX_BASE64_CHARACTERS = Math.ceil(OCR_MAX_FILE_BYTES / 3) * 4 + 512;
+const OCR_ALLOWED_EXTENSIONS = new Set([
+  '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tif', '.tiff', '.webp',
+]);
+
+export interface PreparedMcpOcrInput {
+  request: OcrRecognizeRequest;
+  byteLength: number;
+  sha256: string;
+  auditFileName: string;
+}
+
+function normalizeOcrFileName(value: unknown): string | undefined {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return undefined;
+  if (trimmed.includes('\0')) throw new Error('fileName 不能包含空字符。');
+  const fileName = path.basename(trimmed);
+  if (!fileName || fileName === '.' || fileName === '..') {
+    throw new Error('fileName 无效。');
+  }
+  if (fileName.length > 255) throw new Error('fileName 不能超过 255 个字符。');
+  const extension = path.extname(fileName).toLowerCase();
+  if (extension && !OCR_ALLOWED_EXTENSIONS.has(extension)) {
+    throw new Error('OCR 仅支持 PDF、PNG、JPEG、GIF、BMP、TIFF 或 WebP 文件。');
+  }
+  return fileName;
+}
+
+function decodeMcpOcrBase64(value: string): Buffer {
+  const trimmed = value.trim();
+  const commaIndex = /^data:[^;,]+;base64,/iu.test(trimmed) ? trimmed.indexOf(',') : -1;
+  const normalized = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed).replace(/\s/gu, '');
+  if (!normalized) throw new Error('fileByteBase64 不能为空。');
+  if (normalized.length > OCR_MAX_BASE64_CHARACTERS) {
+    throw new Error('OCR 文件超过 MCP 100 MB 硬上限。');
+  }
+  if (normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized)) {
+    throw new Error('fileByteBase64 不是有效的 Base64 内容。');
+  }
+  const bytes = Buffer.from(normalized, 'base64');
+  const canonicalInput = normalized.replace(/=+$/u, '');
+  const canonicalDecoded = bytes.toString('base64').replace(/=+$/u, '');
+  if (canonicalInput !== canonicalDecoded) {
+    throw new Error('fileByteBase64 不是规范的 Base64 内容。');
+  }
+  if (bytes.length === 0 || bytes.length > OCR_MAX_FILE_BYTES) {
+    throw new Error('OCR 文件必须大于 0 字节且不超过 MCP 100 MB 硬上限。');
+  }
+  return bytes;
+}
+
+/**
+ * Resolve one MCP OCR input without following symlinks or accepting caller-controlled
+ * tenant/network configuration. The backend repeats magic-byte and tenant-limit checks.
+ */
+export function prepareMcpOcrInput(input: {
+  filePath?: string;
+  fileByteBase64?: string;
+  fileName?: string;
+  useDocOrientationClassify?: boolean;
+  useDocUnwarping?: boolean;
+  useTextlineOrientation?: boolean;
+  textRecScoreThresh?: number;
+  returnWordBox?: boolean;
+}): PreparedMcpOcrInput {
+  const hasPath = Boolean(input.filePath?.trim());
+  const hasBase64 = Boolean(input.fileByteBase64?.trim());
+  if (hasPath === hasBase64) {
+    throw new Error('filePath 与 fileByteBase64 必须且只能提供一个。');
+  }
+
+  let bytes: Buffer;
+  let fileName = normalizeOcrFileName(input.fileName);
+  if (hasPath) {
+    const requestedPath = String(input.filePath).trim();
+    if (!path.isAbsolute(requestedPath)) throw new Error('filePath 必须是绝对路径。');
+    const stat = fs.lstatSync(requestedPath);
+    if (stat.isSymbolicLink()) throw new Error('filePath 不能是符号链接。');
+    if (!stat.isFile()) throw new Error('filePath 必须指向普通文件。');
+    if (stat.size <= 0 || stat.size > OCR_MAX_FILE_BYTES) {
+      throw new Error('OCR 文件必须大于 0 字节且不超过 MCP 100 MB 硬上限。');
+    }
+    const localFileName = normalizeOcrFileName(path.basename(requestedPath));
+    if (!localFileName || !path.extname(localFileName)) {
+      throw new Error('本地 OCR 文件必须使用受支持的扩展名。');
+    }
+    fileName = fileName || localFileName;
+    bytes = fs.readFileSync(requestedPath);
+    if (bytes.length !== stat.size) throw new Error('OCR 文件在读取期间发生变化，请重试。');
+  } else {
+    bytes = decodeMcpOcrBase64(String(input.fileByteBase64));
+  }
+
+  return {
+    request: {
+      FileByteBase64: bytes.toString('base64'),
+      FileName: fileName,
+      UseDocOrientationClassify: input.useDocOrientationClassify,
+      UseDocUnwarping: input.useDocUnwarping,
+      UseTextlineOrientation: input.useTextlineOrientation,
+      TextRecScoreThresh: input.textRecScoreThresh,
+      ReturnWordBox: input.returnWordBox,
+    },
+    byteLength: bytes.length,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+    auditFileName: fileName || '(unnamed OCR input)',
+  };
+}
+
+export function buildMcpOcrResult(
+  value: OcrRecognizeResult | null | undefined,
+  options: { includePages?: boolean; includeRegions?: boolean; maxTextChars?: number } = {},
+): OcrRecognizeResult | null {
+  if (!value) return null;
+  const maxTextChars = Math.max(1_000, Math.min(200_000, options.maxTextChars || 100_000));
+  const sourceText = String(value.Text || '');
+  const result: OcrRecognizeResult = {
+    Provider: value.Provider,
+    TraceId: value.TraceId,
+    FileName: value.FileName,
+    FileType: value.FileType,
+    Text: sourceText.slice(0, maxTextChars),
+    AverageConfidence: value.AverageConfidence,
+    PageCount: value.PageCount,
+    ElapsedMilliseconds: value.ElapsedMilliseconds,
+    TextTruncated: sourceText.length > maxTextChars,
+  };
+  if (!options.includePages) return result;
+
+  let remainingPageCharacters = maxTextChars;
+  result.Pages = (value.Pages || []).map(page => {
+    const pageText = String(page.Text || '');
+    const visibleText = pageText.slice(0, remainingPageCharacters);
+    remainingPageCharacters = Math.max(0, remainingPageCharacters - visibleText.length);
+    if (visibleText.length < pageText.length) result.TextTruncated = true;
+    return {
+      PageIndex: page.PageIndex,
+      Text: visibleText,
+      AverageConfidence: page.AverageConfidence,
+      ...(options.includeRegions ? { Regions: page.Regions || [] } : {}),
+    };
+  });
+  return result;
+}
+
+const TRANSLATE_MAX_FILE_BYTES = 20 * 1024 * 1024;
+const TRANSLATE_MAX_RESULT_BYTES = 25 * 1024 * 1024;
+const TRANSLATE_INLINE_RESULT_BYTES = 2 * 1024 * 1024;
+const TRANSLATE_MAX_BASE64_CHARACTERS = Math.ceil(TRANSLATE_MAX_FILE_BYTES / 3) * 4 + 512;
+const TRANSLATE_ALLOWED_EXTENSIONS = new Set([
+  '.txt', '.html', '.htm', '.odt', '.odp', '.docx', '.pptx', '.xlsx', '.epub', '.pdf',
+]);
+
+export interface PreparedMcpTranslateFileInput {
+  request: TranslateFileRequest;
+  byteLength: number;
+  sha256: string;
+  auditFileName: string;
+}
+
+function normalizeTranslateFileName(value: unknown): string {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed.includes('\0')) throw new Error('fileName 无效。');
+  const fileName = path.basename(trimmed);
+  if (!fileName || fileName === '.' || fileName === '..' || fileName.length > 255) {
+    throw new Error('fileName 无效或超过 255 个字符。');
+  }
+  if (!TRANSLATE_ALLOWED_EXTENSIONS.has(path.extname(fileName).toLowerCase())) {
+    throw new Error('文件翻译仅支持 TXT、HTML、ODT、ODP、DOCX、PPTX、XLSX、EPUB 或 PDF。');
+  }
+  return fileName;
+}
+
+function decodeTranslateBase64(value: string): Buffer {
+  const trimmed = value.trim();
+  const commaIndex = /^data:[^;,]+;base64,/iu.test(trimmed) ? trimmed.indexOf(',') : -1;
+  const normalized = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed).replace(/\s/gu, '');
+  if (!normalized || normalized.length > TRANSLATE_MAX_BASE64_CHARACTERS) {
+    throw new Error('翻译文件必须大于 0 字节且不超过 20 MB。');
+  }
+  if (normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized)) {
+    throw new Error('fileByteBase64 不是有效的 Base64 内容。');
+  }
+  const bytes = Buffer.from(normalized, 'base64');
+  if (bytes.length === 0 || bytes.length > TRANSLATE_MAX_FILE_BYTES
+      || bytes.toString('base64').replace(/=+$/u, '') !== normalized.replace(/=+$/u, '')) {
+    throw new Error('fileByteBase64 无效或超过 20 MB。');
+  }
+  return bytes;
+}
+
+export function prepareMcpTranslateFileInput(input: {
+  filePath?: string;
+  fileByteBase64?: string;
+  fileName?: string;
+  fromLang?: string;
+  targetLang: string;
+}): PreparedMcpTranslateFileInput {
+  const hasPath = Boolean(input.filePath?.trim());
+  const hasBase64 = Boolean(input.fileByteBase64?.trim());
+  if (hasPath === hasBase64) throw new Error('filePath 与 fileByteBase64 必须且只能提供一个。');
+  if (!String(input.targetLang || '').trim()) throw new Error('targetLang 不能为空。');
+
+  let bytes: Buffer;
+  let fileName: string;
+  if (hasPath) {
+    const requestedPath = String(input.filePath).trim();
+    if (!path.isAbsolute(requestedPath)) throw new Error('filePath 必须是绝对路径。');
+    const stat = fs.lstatSync(requestedPath);
+    if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('filePath 必须指向非符号链接的普通文件。');
+    if (stat.size <= 0 || stat.size > TRANSLATE_MAX_FILE_BYTES) {
+      throw new Error('翻译文件必须大于 0 字节且不超过 20 MB。');
+    }
+    fileName = normalizeTranslateFileName(input.fileName || path.basename(requestedPath));
+    bytes = fs.readFileSync(requestedPath);
+    if (bytes.length !== stat.size) throw new Error('翻译文件在读取期间发生变化，请重试。');
+  } else {
+    fileName = normalizeTranslateFileName(input.fileName);
+    bytes = decodeTranslateBase64(String(input.fileByteBase64));
+  }
+
+  return {
+    request: {
+      FileByteBase64: bytes.toString('base64'),
+      FileName: fileName,
+      FromLang: String(input.fromLang || 'auto').trim() || 'auto',
+      Lang: String(input.targetLang).trim(),
+    },
+    byteLength: bytes.length,
+    sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+    auditFileName: fileName,
+  };
+}
+
+export function decodeMcpTranslatedFile(result: TranslateFileResult | null | undefined): Buffer {
+  const value = String(result?.FileByteBase64 || '').trim();
+  if (!value) throw new Error('后端未返回翻译文件内容。');
+  const bytes = Buffer.from(value, 'base64');
+  if (bytes.length === 0 || bytes.length > TRANSLATE_MAX_RESULT_BYTES
+      || bytes.toString('base64').replace(/=+$/u, '') !== value.replace(/=+$/u, '')) {
+    throw new Error('后端返回的翻译文件无效或超过 25 MB。');
+  }
+  if (result?.ByteLength !== undefined && Number(result.ByteLength) !== bytes.length) {
+    throw new Error('后端翻译文件长度回读不一致。');
+  }
+  return bytes;
+}
+
+function saveMcpTranslatedFile(outputFilePath: string, bytes: Buffer): string {
+  const resolved = path.resolve(String(outputFilePath || '').trim());
+  if (!path.isAbsolute(String(outputFilePath || '').trim())) throw new Error('outputFilePath 必须是绝对路径。');
+  if (fs.existsSync(resolved)) throw new Error('outputFilePath 已存在；为避免覆盖，请使用新的文件名。');
+  const parent = path.dirname(resolved);
+  const parentStat = fs.lstatSync(parent);
+  if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) {
+    throw new Error('outputFilePath 的父目录必须是非符号链接目录。');
+  }
+  fs.writeFileSync(resolved, bytes, { flag: 'wx' });
+  return resolved;
+}
 const APPLICATION_ASSET_MAX_FILE_BYTES = 128 * 1024 * 1024;
 const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
 
@@ -1634,6 +1896,14 @@ function buildRuntimeServerName(context: McpServerContext): string {
 const CORE_TOOL_REGISTRATION_ORDER = [
   'microi_codex',
   'microi_get_status',
+  'microi_chat',
+  'microi_translate',
+  'microi_detect_language',
+  'microi_list_translate_languages',
+  'microi_translate_file',
+  'microi_suggest_translation',
+  'microi_get_translate_health',
+  'microi_ocr_recognize',
   'microi_transition_application_stream_gate',
   'microi_redis_statistics',
   'microi_redis_list_keys',
@@ -2142,8 +2412,14 @@ BOUNDARY RULES:
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
+- **microi_chat** — 使用当前 MCP 登录身份、绑定租户与服务器本机有效 License 调用 Microi.AI；工具不接受 OsClient、用户、Endpoint、ApiKey 或 Authorization 覆盖
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
 - **固定看板启动 URL 规范** — 使用 Microi.Client 前端 WebBase（不是 API Server）拼接 \`/?OsClient=${ctx.osClient}#/access-login?access_key=<密钥>&redirect=<encodeURIComponent后的站内Hash路由>\`。例如 redirect 原值为 \`/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX\` 时编码为 \`%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX\`。完整自动登录链接应保存为电视/看板的启动页；兑换成功后地址栏变为不含 \`access_key\` 的目标页是安全设计，禁止给目标页再次追加密钥，也禁止新增 \`permanent=1\` 一类由客户端决定有效期的参数
+
+## OCR 能力
+- 图片/PDF 文字识别统一调用后端 \`V8.OCR.Recognize({...})\` 或受认证的 \`POST /api/Ocr/Recognize\`；不要在接口引擎里自行读取密钥并调用 OCR endpoint。
+- 服务地址、API Key、固定 Header、超时和配额只从当前租户 \`sys_osclients\` 的“OCR识别”Tab 读取，调用参数不得覆盖 endpoint、密钥、Header 或 OsClient。
+- 相关实现与交付规范读取 \`microi.skills/ocr-engine/SKILL.md\`；批量或长耗时 OCR 必须使用数据库/MQ/outbox 的可恢复幂等任务，不能使用单节点内存队列。
 
 ## 数据库索引（强制通过 MCP）
 - 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
@@ -2529,6 +2805,361 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         return { content: [{ type: 'text', text: `⚠️ Server returned Code=${result.Code}: ${result.Msg}` }] };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `❌ Connection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: Microi.AI 对话
+  // ========================
+  server.tool(
+    'microi_chat',
+    `Chat with Microi.AI on the MCP-bound server and OsClient "${osClient}". Uses the current authenticated MCP user, tenant model configuration, local officially-signed Microi License and server-side provider credentials. The tool never accepts identity, OsClient, Endpoint, ApiKey or Authorization overrides. This is a non-streaming MCP result; UI typewriter output is available through V8.AI.ChatStream.` ,
+    {
+      question: z.string().min(1).max(32000).describe('User question or instruction.'),
+      systemPrompt: z.string().max(16000).optional().describe('Optional per-call system guidance; tenant model credentials and endpoint remain server-side.'),
+      aiModel: z.string().min(1).max(200).describe('Enabled model display name in the current tenant.'),
+      aiModelId: z.string().max(100).optional().describe('Optional mic_ai row Id; preferred when model names may repeat.'),
+      relayModel: z.string().max(200).optional().describe('Optional official relay runtime model.'),
+      conversationId: z.string().max(100).optional().describe('Optional existing conversation Id owned by the current authenticated user.'),
+      reasoningEffort: z.enum(['auto', 'low', 'medium', 'high']).optional().describe('Reasoning effort for supported models.'),
+      mode: z.enum(['chat', 'data', 'code', 'builder', 'project']).optional().describe('Conversation mode hint.'),
+    },
+    async ({
+      question,
+      systemPrompt,
+      aiModel,
+      aiModelId,
+      relayModel,
+      conversationId,
+      reasoningEffort,
+      mode,
+    }) => {
+      try {
+        const result = await client.chat({
+          question,
+          systemPrompt,
+          aiModel,
+          aiModelId,
+          relayModel,
+          conversationId,
+          reasoningEffort,
+          mode,
+        });
+        return {
+          content: [{
+            type: 'text',
+            text: typeof result.Data === 'string'
+              ? result.Data
+              : JSON.stringify(result, null, 2),
+          }],
+          structuredContent: {
+            Code: result.Code,
+            Data: result.Data,
+            Msg: result.Msg || '',
+          },
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return {
+          content: [{ type: 'text', text: `Microi.AI chat failed: ${e instanceof Error ? e.message : String(e)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ========================
+  // Tool: 当前租户 OCR 识别
+  // ========================
+  server.tool(
+    'microi_ocr_recognize',
+    `Recognize text in one image or PDF through the authenticated Microi OCR gateway for OsClient "${osClient}". Provide exactly one of filePath (absolute local regular file, symlinks rejected) or fileByteBase64. This transmits document bytes to the OCR provider configured by the tenant administrator, so confirmExecution="OCR" is mandatory. Endpoint, Provider, ApiKey, headers, Authorization and OsClient overrides are never accepted. Audit logs contain only safe filename, byte count, SHA-256 and option flags—not the local path, file bytes, recognized text or credentials.`,
+    {
+      filePath: z.string().max(32767).optional().describe('Absolute local path to one PDF/image. Mutually exclusive with fileByteBase64; symlinks and non-regular files are rejected.'),
+      fileByteBase64: z.string().max(OCR_MAX_BASE64_CHARACTERS).optional().describe('PDF/image Base64 or data URI. Mutually exclusive with filePath; backend validates file magic and tenant limits again.'),
+      fileName: z.string().max(255).optional().describe('Optional safe filename. For filePath, the basename is used when omitted.'),
+      useDocOrientationClassify: z.boolean().optional().describe('Enable document orientation classification when supported by the configured pipeline.'),
+      useDocUnwarping: z.boolean().optional().describe('Enable document unwarping when supported by the configured pipeline.'),
+      useTextlineOrientation: z.boolean().optional().describe('Enable text-line orientation classification when supported by the configured pipeline.'),
+      textRecScoreThresh: z.number().min(0).max(1).optional().describe('Per-call recognition threshold, 0..1. It can only raise the tenant minimum.'),
+      returnWordBox: z.boolean().optional().describe('Ask the provider for word-level boxes when supported.'),
+      includePages: z.boolean().optional().describe('Include bounded page texts. Default false to keep MCP output compact.'),
+      includeRegions: z.boolean().optional().describe('Include region polygons/confidence and implicitly include pages. Default false.'),
+      maxTextChars: z.number().int().min(1000).max(200000).optional().describe('Maximum characters for full text and cumulative page text; default 100000.'),
+      confirmExecution: z.string().optional().describe('Required because document bytes leave MCP for the tenant-configured OCR provider. Use exactly OCR.'),
+    },
+    async ({
+      filePath,
+      fileByteBase64,
+      fileName,
+      useDocOrientationClassify,
+      useDocUnwarping,
+      useTextlineOrientation,
+      textRecScoreThresh,
+      returnWordBox,
+      includePages,
+      includeRegions,
+      maxTextChars,
+      confirmExecution,
+    }) => {
+      try {
+        if (confirmExecution !== 'OCR') {
+          return {
+            content: [{
+              type: 'text',
+              text: '执行已拦截：microi_ocr_recognize 会把文档发送到当前租户管理员配置的 OCR 服务，请确认该文件允许处理后重新调用并传 confirmExecution="OCR"。',
+            }],
+            isError: true,
+          };
+        }
+        const prepared = prepareMcpOcrInput({
+          filePath,
+          fileByteBase64,
+          fileName,
+          useDocOrientationClassify,
+          useDocUnwarping,
+          useTextlineOrientation,
+          textRecScoreThresh,
+          returnWordBox,
+        });
+        await client.writeAuditLog(
+          'microi_ocr_recognize',
+          prepared.auditFileName,
+          JSON.stringify({
+            byteLength: prepared.byteLength,
+            sha256: prepared.sha256,
+            useDocOrientationClassify,
+            useDocUnwarping,
+            useTextlineOrientation,
+            textRecScoreThresh,
+            returnWordBox,
+            includePages: Boolean(includePages || includeRegions),
+            includeRegions: Boolean(includeRegions),
+          }),
+        );
+        const result = await client.recognizeOcr(prepared.request);
+        const publicData = buildMcpOcrResult(result.Data, {
+          includePages: Boolean(includePages || includeRegions),
+          includeRegions: Boolean(includeRegions),
+          maxTextChars,
+        });
+        const response = {
+          Code: result.Code,
+          Data: publicData,
+          Msg: result.Msg || '',
+        };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+          structuredContent: response,
+          isError: result.Code !== 1,
+        };
+      } catch (e: unknown) {
+        return {
+          content: [{ type: 'text', text: `OCR failed: ${e instanceof Error ? e.message : String(e)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ========================
+  // Tools: 当前租户翻译服务
+  // ========================
+  server.tool(
+    'microi_translate',
+    `Translate one text or a bounded batch through the authenticated Microi translation gateway for OsClient "${osClient}". Provide exactly one of sourceText/sourceTexts. Supports source auto-detection, text/HTML and up to 10 alternatives when the tenant uses LibreTranslate. Provider URL, API key, Authorization and OsClient are always server-side and cannot be overridden.`,
+    {
+      sourceText: z.string().max(50000).optional().describe('One source text. Mutually exclusive with sourceTexts.'),
+      sourceTexts: z.array(z.string().min(1).max(50000)).max(50).optional().describe('Up to 50 texts and 200000 total characters. Mutually exclusive with sourceText.'),
+      fromLang: z.string().max(32).optional().default('auto').describe('Source language code or auto.'),
+      targetLang: z.string().min(1).max(32).describe('Target language code.'),
+      format: z.enum(['text', 'html']).optional().default('text').describe('Source format.'),
+      alternatives: z.number().int().min(0).max(10).optional().default(0).describe('Preferred alternative translation count.'),
+    },
+    async ({ sourceText, sourceTexts, fromLang, targetLang, format, alternatives }) => {
+      try {
+        const hasSingle = Boolean(sourceText?.trim());
+        const hasBatch = Boolean(sourceTexts?.length);
+        if (hasSingle === hasBatch) throw new Error('sourceText 与 sourceTexts 必须且只能提供一个。');
+        if (sourceTexts && sourceTexts.reduce((sum, value) => sum + value.length, 0) > 200000) {
+          throw new Error('sourceTexts 总字符数不能超过 200000。');
+        }
+        const result = await client.translateText({
+          ...(hasSingle ? { SourceText: sourceText } : { SourceTexts: sourceTexts }),
+          FromLang: fromLang || 'auto',
+          Lang: targetLang,
+          Format: format || 'text',
+          Alternatives: alternatives || 0,
+        });
+        const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+          structuredContent: response,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Translate failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_detect_language',
+    `Detect the language of one text before a translate operation through the authenticated Microi translation gateway for OsClient "${osClient}". The text is sent only to the provider configured by the tenant administrator; caller-supplied endpoint, key and OsClient fields are ignored.`,
+    {
+      sourceText: z.string().min(1).max(50000).describe('Text whose language should be detected.'),
+    },
+    async ({ sourceText }) => {
+      try {
+        const result = await client.detectLanguage(sourceText);
+        const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+          structuredContent: response,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Language detection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_list_translate_languages',
+    `List the current tenant translation provider's installed source languages and exact reachable target codes for OsClient "${osClient}". No provider credentials or internal endpoint are returned.`,
+    {},
+    async () => {
+      try {
+        const result = await client.listTranslateLanguages();
+        const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+          structuredContent: response,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `List translation languages failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_translate_file',
+    `Translate one supported document through the authenticated Microi translation gateway for OsClient "${osClient}". Provide exactly one input (absolute non-symlink filePath or Base64+fileName) and exactly one output mode (new absolute outputFilePath or includeFileByteBase64=true for results up to 2 MB). Document bytes leave MCP for the tenant-configured provider, so confirmExecution="TRANSLATE_FILE" is mandatory. Endpoint, API key, Authorization and OsClient overrides are never accepted; audit logs contain hashes and sizes, never paths or document content.`,
+    {
+      filePath: z.string().max(32767).optional().describe('Absolute local source file path. Mutually exclusive with fileByteBase64.'),
+      fileByteBase64: z.string().max(TRANSLATE_MAX_BASE64_CHARACTERS).optional().describe('Source document Base64/data URI. Mutually exclusive with filePath.'),
+      fileName: z.string().max(255).optional().describe('Required for Base64; optional safe override for filePath.'),
+      fromLang: z.string().max(32).optional().default('auto').describe('Source language code or auto.'),
+      targetLang: z.string().min(1).max(32).describe('Target language code.'),
+      outputFilePath: z.string().max(32767).optional().describe('New absolute local file path. Existing files and symlink parent directories are rejected.'),
+      includeFileByteBase64: z.boolean().optional().default(false).describe('Return Base64 inline only for translated results up to 2 MB. Mutually exclusive with outputFilePath.'),
+      confirmExecution: z.string().optional().describe('Required exact value: TRANSLATE_FILE.'),
+    },
+    async ({ filePath, fileByteBase64, fileName, fromLang, targetLang, outputFilePath, includeFileByteBase64, confirmExecution }) => {
+      try {
+        if (confirmExecution !== 'TRANSLATE_FILE') {
+          return {
+            content: [{ type: 'text', text: '执行已拦截：文件会发送到当前租户配置的翻译服务；确认后请传 confirmExecution="TRANSLATE_FILE"。' }],
+            isError: true,
+          };
+        }
+        if (Boolean(outputFilePath?.trim()) === Boolean(includeFileByteBase64)) {
+          throw new Error('outputFilePath 与 includeFileByteBase64=true 必须且只能选择一种输出方式。');
+        }
+        const prepared = prepareMcpTranslateFileInput({ filePath, fileByteBase64, fileName, fromLang, targetLang });
+        if (includeFileByteBase64 && prepared.byteLength > TRANSLATE_INLINE_RESULT_BYTES) {
+          throw new Error('源文件超过 2 MB，请使用 outputFilePath，避免大 Base64 进入 MCP 上下文。');
+        }
+        await client.writeAuditLog('microi_translate_file', prepared.auditFileName, JSON.stringify({
+          byteLength: prepared.byteLength,
+          sha256: prepared.sha256,
+          fromLang: prepared.request.FromLang,
+          targetLang: prepared.request.Lang,
+          outputMode: outputFilePath ? 'local-file' : 'inline-base64',
+        }));
+        const result = await client.translateFile(prepared.request);
+        if (result.Code !== 1) {
+          const response = { Code: result.Code, Data: null, Msg: result.Msg || '' };
+          return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }], structuredContent: response, isError: true };
+        }
+        const translatedBytes = decodeMcpTranslatedFile(result.Data);
+        if (includeFileByteBase64 && translatedBytes.length > TRANSLATE_INLINE_RESULT_BYTES) {
+          throw new Error('译后文件超过 2 MB，请改用 outputFilePath。');
+        }
+        const sha256 = crypto.createHash('sha256').update(translatedBytes).digest('hex');
+        const publicData: Record<string, unknown> = {
+          Provider: result.Data?.Provider,
+          FileName: result.Data?.FileName,
+          ContentType: result.Data?.ContentType,
+          ByteLength: translatedBytes.length,
+          Sha256: sha256,
+        };
+        if (outputFilePath) publicData.SavedToPath = saveMcpTranslatedFile(outputFilePath, translatedBytes);
+        else publicData.FileByteBase64 = translatedBytes.toString('base64');
+        const response = { Code: 1, Data: publicData, Msg: result.Msg || '' };
+        return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }], structuredContent: response };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `File translation failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_suggest_translation',
+    `Submit a translation improvement suggestion to the current tenant's LibreTranslate-compatible provider. This mutates provider-side suggestion data and requires confirmExecution="TRANSLATE_SUGGEST". Audit logs contain only text lengths and SHA-256 values; source/suggestion text, endpoint, credentials and tenant secrets are never logged or caller-overridable.`,
+    {
+      sourceText: z.string().min(1).max(50000).describe('Original source text.'),
+      suggestedText: z.string().min(1).max(50000).describe('Proposed translated text.'),
+      fromLang: z.string().min(1).max(32).describe('Explicit source language; auto is not accepted.'),
+      targetLang: z.string().min(1).max(32).describe('Target language.'),
+      confirmExecution: z.string().optional().describe('Required exact value: TRANSLATE_SUGGEST.'),
+    },
+    async ({ sourceText, suggestedText, fromLang, targetLang, confirmExecution }) => {
+      try {
+        if (confirmExecution !== 'TRANSLATE_SUGGEST') {
+          return { content: [{ type: 'text', text: '执行已拦截：建议会写入翻译服务；确认后请传 confirmExecution="TRANSLATE_SUGGEST"。' }], isError: true };
+        }
+        await client.writeAuditLog('microi_suggest_translation', `${fromLang}->${targetLang}`, JSON.stringify({
+          sourceLength: sourceText.length,
+          sourceSha256: crypto.createHash('sha256').update(sourceText, 'utf8').digest('hex'),
+          suggestionLength: suggestedText.length,
+          suggestionSha256: crypto.createHash('sha256').update(suggestedText, 'utf8').digest('hex'),
+        }));
+        const result = await client.suggestTranslation({
+          SourceText: sourceText,
+          SuggestedText: suggestedText,
+          FromLang: fromLang,
+          Lang: targetLang,
+        });
+        const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+          structuredContent: response,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Translation suggestion failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    'microi_get_translate_health',
+    `Read a safe health/capability summary for the current tenant's translation gateway. It returns provider name, status and supported business operations, but never the internal URL, API key or frontend/metrics settings.`,
+    {},
+    async () => {
+      try {
+        const result = await client.getTranslateHealth();
+        const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+          structuredContent: response,
+          ...(result.Code !== 1 ? { isError: true } : {}),
+        };
+      } catch (e: unknown) {
+        return { content: [{ type: 'text', text: `Translation health failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }
     },
   );

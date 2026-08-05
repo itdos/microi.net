@@ -69,6 +69,7 @@
 
             <!-- 横向列表 -->
             <div class="mci-cell-group mci-stagger-item" :style="{ '--mci-index': 1 }">
+                <BluetoothPrinterEntry variant="profile" />
                 <div v-if="isApk" class="mci-cell" @click="openServerUrlDialog">
                     <div class="mci-cell__icon mci-cell__icon--cyan"><el-icon><Connection /></el-icon></div>
                     <div class="mci-cell__main">
@@ -267,6 +268,7 @@
 <script setup>
 import { DiyCommon } from "@/utils/diy.common.js";
 import { ref, computed, reactive, onMounted, watch } from 'vue';
+import BluetoothPrinterEntry from '@/components/BluetoothPrinterEntry/index.vue';
 import { useRouter } from 'vue-router';
 import { useDiyStore, useUserStore, useTagsViewStore, useAppStore } from '@/pinia';
 import {
