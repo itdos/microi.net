@@ -1083,6 +1083,66 @@ export function createMicroiV8(options = {}) {
     return { data, callback };
   }
 
+  // zhy：表单写入的权限、租户和执行控制参数必须保留在请求外层，不能混入业务表单字段。
+  const formWriteOuterKeys = new Set([
+    'FormEngineKey', 'OsClient', 'Id', '_SysMenuId', '_TableChildAuth',
+    '_InvokeType', '_NotSaveField', '_NoLineForAdd', '_ForceUpt', '_DataLog', '_Lang'
+  ]);
+
+  // zhy：同时兼容新版小写请求选项与旧 SDK 的首字母大写选项，避免切换标准接口后丢失请求头。
+  function normalizeFormWriteOptions(options = {}) {
+    return {
+      ...options,
+      Header: options.Header || options.Headers || options.header || options.headers || {},
+      Auth: options.Auth !== undefined ? options.Auth : options.auth,
+      Timeout: options.Timeout || options.timeout,
+      SilentError: options.SilentError === true || options.silentError === true
+    };
+  }
+
+  // zhy：字符串更新重载先读取服务端最新完整记录，再合并局部修改，满足客户端表单事件的完整数据契约。
+  function formEngineUpdate(first, second, third) {
+    if (typeof first !== 'string') {
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
+      return withCallback(legacyPost(legacyApi.UptFormData, data), callback);
+    }
+
+    const source = second && typeof second === 'object' ? { ...second } : {};
+    const callback = typeof third === 'function' ? third : null;
+    const options = normalizeFormWriteOptions(third && typeof third === 'object' ? third : {});
+    const rowId = source.Id;
+    const outer = { FormEngineKey: first, Id: rowId };
+    const patch = {};
+
+    // zhy：拆分外层控制参数与业务字段，并兼容调用方显式传入 _RowModel/_FormData。
+    Object.keys(source).forEach((key) => {
+      if (key === '_FormData' || key === '_RowModel') return;
+      if (formWriteOuterKeys.has(key)) outer[key] = source[key];
+      else patch[key] = source[key];
+    });
+    Object.assign(patch, source._RowModel || {}, source._FormData || {});
+    if (config.osClient && outer.OsClient === undefined) outer.OsClient = config.osClient;
+
+    const promise = (async () => {
+      if (rowId === undefined || rowId === null || rowId === '') {
+        return { Code: 0, Msg: 'UptFormData requires Id.' };
+      }
+      // zhy：携带相同菜单和子表授权上下文读取最新记录，防止绕过行级权限或使用页面旧快照覆盖新数据。
+      const readParam = {
+        FormEngineKey: first,
+        Id: rowId,
+        ...(outer._SysMenuId ? { _SysMenuId: outer._SysMenuId } : {}),
+        ...(outer._TableChildAuth ? { _TableChildAuth: outer._TableChildAuth } : {})
+      };
+      const current = await legacyPost(legacyApi.GetFormData, readParam, null, options);
+      if (!current || Number(current.Code) !== 1 || !current.Data) return current;
+      // zhy：以服务端最新记录为基准合并 patch，并按 PC 平台一致的完整 _FormData 契约提交。
+      const formData = { ...current.Data, ...patch, Id: rowId };
+      return legacyPost(legacyApi.UptFormData, { ...outer, _FormData: formData }, null, options);
+    })();
+    return withCallback(promise, callback);
+  }
+
   async function legacyPost(url, data = {}, callback, option = {}) {
     const body = await request({
       url,
@@ -1709,8 +1769,8 @@ export function createMicroiV8(options = {}) {
       return withCallback(legacyPost(legacyApi.DelFormDataByWhere, param || {}), callback);
     },
     UptFormData(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, true);
-      return withCallback(legacyPost(legacyApi.UptFormData, data), callback);
+      // zhy：统一委托公共更新适配器，保证 UniApp、H5 和其它独立前端使用同一写入契约。
+      return formEngineUpdate(first, second, third);
     },
     UptFormDataByWhere(param, callback) {
       return withCallback(legacyPost(legacyApi.UptFormDataByWhere, param || {}), callback);
@@ -1722,27 +1782,27 @@ export function createMicroiV8(options = {}) {
       return withCallback(legacyPost(legacyApi.UptFormDataBatch, param || {}), callback);
     },
     GetFormData(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(`${legacyApi.GetFormData}-${data.FormEngineKey || ''}`, data), callback);
     },
     GetFormDataAnonymous(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetFormDataAnonymous, data, null, { Auth: false }), callback);
     },
     GetTableData(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableData, data), callback);
     },
     GetTableDataAnonymous(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableDataAnonymous, data, null, { Auth: false }), callback);
     },
     GetTableDataTree(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableDataTree, data), callback);
     },
     GetTableDataTreeAnonymous(first, second, third) {
-      const { data, callback } = normalizeLegacyFormArgs(first, second, third, false);
+      const { data, callback } = normalizeLegacyFormArgs(first, second, third);
       return withCallback(legacyPost(legacyApi.GetTableDataTreeAnonymous, data, null, { Auth: false }), callback);
     }
   });

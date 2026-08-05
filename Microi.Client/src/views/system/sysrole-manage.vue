@@ -334,6 +334,8 @@ export default {
     computed: {
         permissionLabels() {
             return {
+                // zhy：Read 是 FormEngine 查询接口的真实权限标识，角色配置页统一显示为“读取”。
+                Read: "读取",
                 Add: this.$t("Msg.Add"),
                 Edit: this.$t("Msg.Edit"),
                 Del: this.$t("Msg.Del"),
@@ -766,7 +768,8 @@ export default {
         ForGetSysMenuListCheck(sysMenuList) {
             var self = this;
             var result = [];
-            var defaultRoleTypes = ["Add", "Edit", "Del", "Export", "Import", "NoDetail", "NoSearch"];
+            // zhy：保留 Read，避免界面已勾选读取权限但提交角色时被白名单过滤掉。
+            var defaultRoleTypes = ["Read", "Add", "Edit", "Del", "Export", "Import", "NoDetail", "NoSearch"];
             for (let index = 0; index < sysMenuList.length; index++) {
                 var sysMenu = sysMenuList[index];
                 if (sysMenu._Check == true) {

@@ -55,6 +55,11 @@
           <text>{{ expanded[index] ? '⌃' : '⌄' }}</text>
         </view>
         <view v-if="group.source === 'Ungrouped' || expanded[index]" class="detail-section__body">
+          <view v-if="group.selectorTabs.length" class="detail-section__selector-grid">
+            <mci-table-selector v-for="relatedTab in group.selectorTabs" :key="relatedTab.key"
+              :field="relatedTab.field" :parent-table="config.table" :parent-id="rowId"
+              :parent-form="row" :parent-menu-id="config.menuId" readonly compact />
+          </view>
           <view v-for="field in group.fields" :key="field.Id || field.Name" class="detail-field">
             <text class="detail-field__label">{{ field.Label || field.Name }}</text>
             <view class="detail-field__value">
@@ -168,8 +173,9 @@ export default {
         : groups
       return activeGroups.map((group) => ({
         ...group,
-        relatedTabs: this.embeddedChildRelatedForGroup(group)
-      })).filter((group) => (group.fields || []).length || group.relatedTabs.length)
+        relatedTabs: this.embeddedChildRelatedForGroup(group),
+        selectorTabs: this.embeddedOpenTableRelatedForGroup(group)
+      })).filter((group) => (group.fields || []).length || group.relatedTabs.length || group.selectorTabs.length)
     },
     formTabs() {
       return (this.config.definition?.formTabs || []).map((tab) => ({
@@ -205,7 +211,7 @@ export default {
       return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
     },
     standaloneRelatedTabs() {
-      return this.activeRelatedTabs.filter((item) => !this.isEmbeddedChildRelated(item))
+      return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
     }
   },
   onLoad(options) {
@@ -217,10 +223,22 @@ export default {
     isEmbeddedChildRelated(item) {
       return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
     },
-    embeddedChildRelatedForGroup(group) {
+    isEmbeddedOpenTableRelated(item) {
+      return item?.type === 'openTable' && Boolean(item.field?.layoutGroupKey)
+    },
+    isEmbeddedRelated(item) {
+      return this.isEmbeddedChildRelated(item) || this.isEmbeddedOpenTableRelated(item)
+    },
+    embeddedRelatedForGroup(group) {
       return this.activeRelatedTabs.filter((item) =>
-        this.isEmbeddedChildRelated(item) && item.field.layoutGroupKey === group.key
+        this.isEmbeddedRelated(item) && item.field.layoutGroupKey === group.key
       )
+    },
+    embeddedChildRelatedForGroup(group) {
+      return this.embeddedRelatedForGroup(group).filter((item) => item.type === 'child')
+    },
+    embeddedOpenTableRelatedForGroup(group) {
+      return this.embeddedRelatedForGroup(group).filter((item) => item.type === 'openTable')
     },
     async loadDetail(refresh = false) {
       this.loading = true
@@ -354,6 +372,7 @@ export default {
 .detail-section__header > view text:last-child { color: #94a3a8; font-size: 20rpx; font-weight: 500; }
 .detail-section__header > text { color: #81969d; font-size: 26rpx; }
 .detail-section__body { padding: 0 26rpx; }
+.detail-section__selector-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; padding: 18rpx 0; border-bottom: 1px solid #e5eef1; background: linear-gradient(180deg, #f8fbfc, #fbfdfd); }
 .detail-field { display: grid; grid-template-columns: 190rpx minmax(0, 1fr); gap: 20rpx; align-items: start; padding: 20rpx 0; border-top: 1px solid #edf2f4; }
 .detail-field__label { color: #82949b; font-size: 24rpx; line-height: 1.6; }
 .detail-field__value { min-width: 0; color: #294750; font-size: 25rpx; line-height: 1.6; overflow-wrap: anywhere; }

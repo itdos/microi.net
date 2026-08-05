@@ -36,4 +36,25 @@ const scopedFields = filterFieldsByHiddenCollapseScope([
 })
 assert.deepEqual(scopedFields.map((field) => field.Name), ['Before', 'After'])
 
+const dividerScopedFields = filterFieldsByHiddenCollapseScope([
+  { Name: 'Before', component: 'Text', visible: true },
+  {
+    Name: 'RestrictedGroup',
+    component: 'CollapseGroup',
+    visible: false,
+    config: { CollapseGroup: { ScopeMode: 'UntilNextGroup' } }
+  },
+  { Name: 'InnerDivider', component: 'Divider', visible: true },
+  { Name: 'RestrictedSelector', component: 'OpenTable', visible: true },
+  { Name: 'NextGroup', component: 'CollapseGroup', visible: true },
+  { Name: 'VisibleChild', component: 'Text', visible: true }
+], {
+  layoutComponents: ['CollapseGroup', 'Divider', 'Tabs'],
+  guardedComponents: []
+})
+assert.deepEqual(
+  dividerScopedFields.map((field) => field.Name),
+  ['Before', 'NextGroup', 'VisibleChild']
+)
+
 console.log('Native field BindRole visibility checks passed.')

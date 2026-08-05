@@ -312,8 +312,8 @@ const targets = [
   },
   {
     name: 'merchant-detail', route: '/#/pages/business/detail?key=stores&id=merchant-001', selector: '.detail-page',
-    required: ['.hero-band', '.info-band', '.summary-text--rich'],
-    forbiddenText: ['["浙江省"', '"HangyeMC"', '<p>']
+    required: ['.hero-band', '.info-band'],
+    forbiddenText: ['补充说明', '["浙江省"', '"HangyeMC"', '<p>']
   },
   {
     name: 'lead-detail', route: '/#/pages/business/detail?key=leads&id=lead-001', selector: '.detail-page',
