@@ -690,7 +690,10 @@
 			},
 			async submit() {
 				if (this.saving) return
-				const validationError = validateNativeForm(this.form, this.definition ? this.definition.fields : [])
+				// 租户声明式规则隐藏的字段不参与必填校验；显示字段仍按平台元数据校验并保存。
+				const submitFields = (this.definition ? this.definition.fields : [])
+					.filter((field) => this.tenantFieldPresentation(field).visible !== false)
+				const validationError = validateNativeForm(this.form, submitFields)
 				if (validationError) {
 					this.expandFirstInvalidGroup()
 					await this.$nextTick()
@@ -714,7 +717,7 @@
 						tableName: this.tableName,
 						rowId: this.rowId,
 						form: this.form,
-						fields: this.definition.fields,
+						fields: submitFields,
 						extraValues: {
 							...nativeFormDefaultSubmitValues(this.definition, this.defaultValues),
 							...tenantSubmitValues,

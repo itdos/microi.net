@@ -225,6 +225,13 @@ if (!nativeForm.includes(':readonly-max-lines="readonlyMaxLines(field)"') ||
 for (const token of [
   "contractAttachment: 'HetongFJ'",
   "contractUploadState: 'IsDingdanHT'",
+  "renewalOrderNumber: 'XQDingdanBH'",
+  "renewalState: 'DingdanSFXQ'",
+  "contractState: 'HetongZT'",
+  "const ORDER_RENEWAL_TYPE = '老客户续签订单'",
+  "[orderFieldName(context, 'contractState', '合同状态')]: '未断约'",
+  "[orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'",
+  "personValue(row, ['DingdanBH']) || payload.value || ''",
   'normalizeUploadItems(context.form[attachmentName]).length',
   "? '已上传'",
   ": '未上传'"
@@ -357,6 +364,10 @@ for (const token of [
 }
 if (businessDetail.includes('<text>补充说明</text>')) {
   fail('business detail must not render the duplicate supplementary summary section')
+}
+if (!nativeForm.includes('.filter((field) => this.tenantFieldPresentation(field).visible !== false)') ||
+  !businessDetail.includes('this.tenantDetailFieldPresentation(field).visible !== false')) {
+  fail('tenant conditional field visibility must apply to form validation and business details')
 }
 for (const token of [
   'CUSTOMER_CARE_FIELDS',
