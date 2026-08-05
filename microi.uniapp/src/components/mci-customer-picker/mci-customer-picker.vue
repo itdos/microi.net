@@ -129,6 +129,8 @@ export default {
         const menu = await findMenu(base.menuAliases || [], base.table)
         menuId = menu && menu.Id || ''
       } catch (error) {}
+      // 客户选择必须绑定当前账号真实授权菜单；找不到时关闭查询能力，保留手动输入。
+      if (!menuId) throw new Error('当前账号没有可用的客户查看权限，可直接手动输入拜访对象')
       this.moduleConfig = { ...base, menuId }
       return this.moduleConfig
     },

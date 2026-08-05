@@ -144,7 +144,7 @@ export function inferNativeComponent(field) {
 function inputMode(field, component) {
   const text = `${field.Name || ''} ${field.Label || ''}`
   if (/密码|password|pwd/i.test(text)) return 'password'
-  if (/手机|电话|phone|mobile|tel/i.test(text)) return 'tel'
+  if (/手机|电话|座机|固话|phone|mobile|tel/i.test(text)) return 'tel'
   if (/邮箱|email/i.test(text)) return 'email'
   if (/网址|链接|url|website/i.test(text)) return 'url'
   if (component === 'NumberText') return 'digit'

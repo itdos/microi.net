@@ -71,6 +71,8 @@ const CUSTOMER_LOCATION_FIELDS = {
   longitude: 'KehuDT_Lng'
 }
 const CHECKIN_FIELDS = {
+  customerId: 'KehuID',
+  customerName: 'BaifangDX',
   address: 'DakaDD',
   time: 'DakaSJ',
   userName: 'DakaR'
@@ -182,9 +184,17 @@ function isCustomerAddressAdd(context) {
   return isCustomerAddressForm(context) && context.mode === 'Add' && !context.rowId
 }
 
+function isCheckinForm(context) {
+  return String(context.tableName || '').toLowerCase() === CHECKIN_TABLE
+}
+
 function isCheckinAdd(context) {
-  return String(context.tableName || '').toLowerCase() === CHECKIN_TABLE &&
+  return isCheckinForm(context) &&
     context.mode === 'Add' && !context.rowId
+}
+
+function isCheckinEditable(context) {
+  return isCheckinForm(context) && ['Add', 'Edit'].includes(context.mode)
 }
 
 function isFollowupAdd(context) {
@@ -939,21 +949,41 @@ function applyCheckinTime(context) {
 
 function applyCheckinLocation(context, location) {
   const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
-  context.patchForm({ [addressName]: location.address })
-  context.state.checkinLocation = location
+  if (location.address) context.patchForm({ [addressName]: location.address })
+  context.state.checkinLocation = {
+    ...(context.state.checkinLocation || {}),
+    ...location,
+    address: location.address || context.state.checkinLocation?.address || context.form[addressName] || ''
+  }
   context.state.checkinValues = {
     ...(context.state.checkinValues || {}),
-    [addressName]: location.address
+    ...(location.address ? { [addressName]: location.address } : {})
   }
 }
 
+function scheduleCheckinMapMount(context) {
+  if (context.state.checkinMapReady || context.state.checkinMapTimer) return
+  context.state.checkinMapTimer = setTimeout(() => {
+    context.state.checkinMapReady = true
+    context.state.checkinMapTimer = null
+  }, 180)
+}
+
 async function locateCheckin(context, chooseFromMap) {
-  if (!isCheckinAdd(context) || context.state.locating) return
+  if (!isCheckinEditable(context) || context.state.locating) return
   context.state.locating = true
   try {
     const source = chooseFromMap
       ? await requestChosenLocation()
       : await requestCurrentLocation()
+    // 先提交坐标给页面并延迟挂载地图，地址解析不再阻塞地图和表单交互。
+    const immediate = normalizeChosenLocation(source, null)
+    applyCheckinLocation(context, immediate)
+    scheduleCheckinMapMount(context)
+    if (immediate.address) {
+      if (chooseFromMap) uni.showToast({ title: '签到地点已更新', icon: 'success' })
+      return
+    }
     let geocode = null
     try {
       geocode = await reverseGeocode(source.longitude, source.latitude, {
@@ -1041,6 +1071,8 @@ export function createState() {
       longitude: 0,
       address: ''
     },
+    checkinMapReady: false,
+    checkinMapTimer: null,
     currentTime: '',
     followupInitialized: false,
     followupCustomerId: '',
@@ -1081,21 +1113,28 @@ export async function initialize(context) {
     context.state.locationInitialized = true
     setTimeout(() => locateCustomer(context, false), 0)
   }
-  if (isCheckinAdd(context) && !context.state.checkinInitialized) {
+  if (isCheckinEditable(context) && !context.state.checkinInitialized) {
     context.state.checkinInitialized = true
-    context.state.currentTime = currentTimestamp()
-    applyCheckinTime(context)
-    // zhy：新增打卡记录时自动将当前登录用户 Name 填入打卡人。
-    const user = currentUserOption()
-    if (user) {
-      const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
-      context.patchForm({ [userName]: user.Name })
-      context.state.checkinValues = {
-        ...(context.state.checkinValues || {}),
-        [userName]: user.Name
-      }
+    const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
+    context.state.checkinLocation = {
+      ...(context.state.checkinLocation || {}),
+      address: String(context.form[addressName] || '')
     }
-    setTimeout(() => locateCheckin(context, false), 0)
+    if (isCheckinAdd(context)) {
+      context.state.currentTime = currentTimestamp()
+      applyCheckinTime(context)
+      // zhy：新增打卡记录时自动将当前登录用户 Name 填入打卡人。
+      const user = currentUserOption()
+      if (user) {
+        const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
+        context.patchForm({ [userName]: user.Name })
+        context.state.checkinValues = {
+          ...(context.state.checkinValues || {}),
+          [userName]: user.Name
+        }
+      }
+      setTimeout(() => locateCheckin(context, false), 60)
+    }
   }
   if (isFollowupForm(context)) {
     // zhy：新增时初始化默认值；新增、编辑和详情都加载联系人选项，避免详情直接显示联系人 Id。
@@ -1164,7 +1203,7 @@ export async function handleRelatedCount(context, payload = {}) {
 }
 
 export function getPresentation(context) {
-  if (isCheckinAdd(context)) {
+  if (isCheckinEditable(context)) {
     const location = context.state.checkinLocation || {}
     return {
       location: {
@@ -1172,6 +1211,7 @@ export function getPresentation(context) {
         actionKey: 'xjy-checkin-location',
         actionLabel: context.state.locating ? '定位中…' : '重新定位',
         locating: Boolean(context.state.locating),
+        mapReady: Boolean(context.state.checkinMapReady),
         latitude: Number(location.latitude || 0),
         longitude: Number(location.longitude || 0),
         address: String(location.address || ''),
@@ -1213,6 +1253,13 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isCheckinEditable(context) && field &&
+    String(field.Name || '').toLowerCase() === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
+    return {
+      clearable: true,
+      clearFields: [fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')]
+    }
+  }
   if (isOrderForm(context) && field &&
     String(field.Name || '').toLowerCase() === ORDER_FIELDS.renewalOrderNumber.toLowerCase()) {
     return {
@@ -1269,6 +1316,15 @@ export function getFieldActions(context, field) {
   if (!field) return []
   const name = String(field.Name || '').toLowerCase()
   const label = String(field.Label || '').trim()
+  if (isCheckinEditable(context) &&
+    (name === fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase() || label === '拜访对象')) {
+    return [{
+      key: 'xjy-checkin-customer',
+      label: '选择客户',
+      iconType: 'search',
+      position: 'label'
+    }]
+  }
   if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode) &&
     (name === CUSTOMER_LOCATION_FIELDS.address.toLowerCase() || label === '详细地址')) {
     return [{
@@ -1282,6 +1338,15 @@ export function getFieldActions(context, field) {
 }
 
 export async function runFieldAction(context, field, action) {
+  if (action && action.key === 'xjy-checkin-customer') {
+    return {
+      handled: true,
+      customerPicker: {
+        fieldName: fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象'),
+        idFieldName: fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
+      }
+    }
+  }
   if (action && action.key === 'xjy-customer-location') {
     await locateCustomer(context, true)
     return { handled: true }
@@ -1461,6 +1526,13 @@ export async function handleFieldSelect(context, payload) {
 }
 
 export async function handleFieldChange(context, payload) {
+  if (isCheckinEditable(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() ===
+      fieldName(context, CHECKIN_FIELDS.customerName, '拜访对象').toLowerCase()) {
+    // 手动修改拜访对象后解除旧客户 Id；通过客户选择器回填时会同时写入新 Id。
+    context.patchForm({ [fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')]: '' })
+    return { handled: true }
+  }
   if (isOrderProductForm(context) && payload &&
     String(payload.field && payload.field.Name || '').toLowerCase() === 'hezuofs') {
     return updateOrderProductCooperation(context, payload)
@@ -1598,18 +1670,23 @@ export async function beforeSubmit(context) {
   if (isCustomerCareForm(context)) {
     return customerCareTotalValues(context)
   }
-  if (isCheckinAdd(context)) {
+  if (isCheckinEditable(context)) {
     // zhy：提交打卡记录时再次兜底打卡人，确保保存当前登录用户 Name。
     const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
     const timeName = fieldName(context, CHECKIN_FIELDS.time, '打卡时间')
     const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
-    const user = currentUserOption()
-    return {
+    const customerIdName = fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
+    const values = {
       ...context.state.checkinValues,
       [addressName]: context.form[addressName] || context.state.checkinLocation.address || '',
-      [timeName]: context.form[timeName] || context.state.currentTime || currentTimestamp(),
-      [userName]: context.form[userName] || (user && user.Name) || ''
+      [customerIdName]: context.form[customerIdName] || ''
     }
+    if (isCheckinAdd(context)) {
+      const user = currentUserOption()
+      values[timeName] = context.form[timeName] || context.state.currentTime || currentTimestamp()
+      values[userName] = context.form[userName] || (user && user.Name) || ''
+    }
+    return values
   }
   if (isFollowupForm(context)) {
     // zhy：KehuID 是隐藏字段，不会进入通用 visible fields 保存列表，提交前必须显式补入。
@@ -1657,7 +1734,10 @@ export function getBusyMessage(context) {
 }
 
 export function dispose(context) {
-  // 当前租户表单扩展没有需要在页面卸载时清理的长驻任务。
+  if (context.state && context.state.checkinMapTimer) {
+    clearTimeout(context.state.checkinMapTimer)
+    context.state.checkinMapTimer = null
+  }
 }
 
 export default {

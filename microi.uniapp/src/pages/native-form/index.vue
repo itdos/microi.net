@@ -39,7 +39,7 @@
 					</view>
 					<view class="tenant-form-location__map-wrap"
 						@tap="runTenantPresentationAction(tenantFormPresentation.location.actionKey)">
-						<map v-if="tenantFormPresentation.location.latitude && tenantFormPresentation.location.longitude"
+						<map v-if="tenantFormPresentation.location.mapReady && tenantFormPresentation.location.latitude && tenantFormPresentation.location.longitude"
 							class="tenant-form-location__map"
 							:latitude="tenantFormPresentation.location.latitude"
 							:longitude="tenantFormPresentation.location.longitude"
@@ -101,8 +101,20 @@
 						v-show="tenantFieldPresentation(field).visible !== false"
 						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name }">
 						<view class="form-field__label">
-							<text>{{ field.Label || field.Name }}</text>
-							<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
+							<view class="form-field__label-copy">
+								<text>{{ field.Label || field.Name }}</text>
+								<text v-if="field.required && !isReadonly(field)" class="form-field__required">*</text>
+							</view>
+							<view v-if="tenantLabelFieldActions(field).length" class="tenant-field-label-actions">
+								<view v-for="action in tenantLabelFieldActions(field)" :key="action.key"
+									class="tenant-field-label-action"
+									:class="{ 'tenant-field-label-action--disabled': action.disabled }"
+									hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
+									<view v-if="action.iconType === 'search'" class="tenant-field-label-action__search"></view>
+									<text v-else-if="action.icon" class="tenant-field-action__icon">{{ action.icon }}</text>
+									<text>{{ action.label }}</text>
+								</view>
+							</view>
 						</view>
 
 						<view v-if="tenantFieldPresentation(field).type === 'map'" class="tenant-field-map">
@@ -127,16 +139,22 @@
 
 						<!-- zhy: 接收下拉开关状态并同步外层层叠样式。 -->
 						<!-- zhy：详情模式下给租户配置的长文本字段传入最大可视行数。 -->
-						<mci-native-field v-else v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
-							:readonly-max-lines="readonlyMaxLines(field)"
-							:table-name="tableName" :form-data="form" :menu-id="menuId"
-							:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
-							@change="handleNativeFieldChange(field, $event)"
-							@select="handleNativeFieldSelect"
-							@selector-toggle="handleSelectorToggle(field, $event)" />
+						<view v-else class="tenant-field-control-wrap"
+							:class="{ 'tenant-field-control-wrap--clearable': tenantFieldPresentation(field).clearable }">
+							<mci-native-field v-model="form[field.Name]" :field="field" :readonly="isReadonly(field)"
+								:readonly-max-lines="readonlyMaxLines(field)"
+								:table-name="tableName" :form-data="form" :menu-id="menuId"
+								:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
+								@change="handleNativeFieldChange(field, $event)"
+								@select="handleNativeFieldSelect"
+								@selector-toggle="handleSelectorToggle(field, $event)" />
+							<view v-if="tenantFieldPresentation(field).clearable && !isReadonly(field) && form[field.Name]"
+								class="tenant-field-clear" hover-class="tenant-field-clear--pressed"
+								@tap="clearTenantField(field)"><text>×</text></view>
+						</view>
 
-						<view v-if="tenantFieldActions(field).length" class="tenant-field-actions">
-							<view v-for="action in tenantFieldActions(field)" :key="action.key"
+						<view v-if="tenantBottomFieldActions(field).length" class="tenant-field-actions">
+							<view v-for="action in tenantBottomFieldActions(field)" :key="action.key"
 								class="tenant-field-action"
 								:class="{ 'tenant-field-action--disabled': action.disabled }"
 								hover-class="tenant-field-action--pressed" @tap="runTenantFieldAction(field, action)">
@@ -188,6 +206,9 @@
 
 			<view class="form-bottom-space"></view>
 		</view>
+
+		<mci-customer-picker :visible="customerPickerVisible" :selected-id="selectedCustomerPickerId"
+			@close="closeCustomerPicker" @select="selectCustomerFromPicker" />
 
 		<template #fixed>
 			<view v-if="!loading && !error && mode !== 'View'" class="form-actions">
@@ -249,6 +270,7 @@
 		tenantFormBusyMessage
 	} from '@/platform/form-extension.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
+	import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
 
 	function createDraftRowId() {
 		let seed = Date.now()
@@ -260,7 +282,7 @@
 	}
 
 	export default {
-		components: { MciBusinessRelatedList },
+		components: { MciBusinessRelatedList, MciCustomerPicker },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -289,6 +311,8 @@
 				viewManifest: null,
 				// zhy: 记录当前打开下拉框的字段名。
 				openSelectorField: '',
+				customerPickerVisible: false,
+				customerPickerConfig: null,
 				// zhy: 保存新增和编辑页已展开的字段分组。
 				expandedGroupKeys: [],
 				activeFormTabKey: '',
@@ -356,6 +380,10 @@
 			activeRelatedTabs() {
 				if (!this.formTabs.length) return this.relatedTabs
 				return this.relatedTabs.filter((item) => item.field.formTabKey === this.activeFormTabKey)
+			},
+			selectedCustomerPickerId() {
+				const fieldName = this.customerPickerConfig && this.customerPickerConfig.idFieldName
+				return fieldName ? this.form[fieldName] || '' : ''
 			},
 			standaloneRelatedTabs() {
 				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
@@ -642,6 +670,12 @@
 			tenantFieldActions(field) {
 				return getTenantFormFieldActions(this.tenantFormContext(), field)
 			},
+			tenantLabelFieldActions(field) {
+				return this.tenantFieldActions(field).filter((action) => action.position === 'label')
+			},
+			tenantBottomFieldActions(field) {
+				return this.tenantFieldActions(field).filter((action) => action.position !== 'label')
+			},
 			tenantFieldPresentation(field) {
 				return getTenantFormFieldPresentation(this.tenantFormContext(), field)
 			},
@@ -658,7 +692,31 @@
 			},
 			async runTenantFieldAction(field, action) {
 				if (!action || action.disabled) return
-				await runTenantFormFieldAction(this.tenantFormContext(), field, action)
+				const result = await runTenantFormFieldAction(this.tenantFormContext(), field, action)
+				if (result && result.customerPicker) {
+					this.customerPickerConfig = result.customerPicker
+					this.customerPickerVisible = true
+				}
+			},
+			closeCustomerPicker() {
+				this.customerPickerVisible = false
+			},
+			async selectCustomerFromPicker(payload) {
+				const config = this.customerPickerConfig || {}
+				if (!config.fieldName) return
+				this.form = {
+					...this.form,
+					[config.fieldName]: String(payload && payload.name || ''),
+					...(config.idFieldName ? { [config.idFieldName]: String(payload && payload.id || '') } : {})
+				}
+				this.customerPickerVisible = false
+			},
+			async clearTenantField(field) {
+				const presentation = this.tenantFieldPresentation(field)
+				const updates = { [field.Name]: '' }
+				;(presentation.clearFields || []).forEach((name) => { if (name) updates[name] = '' })
+				this.form = { ...this.form, ...updates }
+				await handleTenantFormFieldChange(this.tenantFormContext(), { field, value: '' })
 			},
 			async runTenantPresentationAction(actionKey) {
 				if (!actionKey) return
@@ -1091,15 +1149,97 @@
 	.form-field__label {
 		display: flex;
 		align-items: center;
-		gap: 5rpx;
+		justify-content: space-between;
 		margin-bottom: 14rpx;
 		color: var(--mci-text-primary, #17313b);
 		font-size: 26rpx;
 		font-weight: 600;
 	}
 
+	.form-field__label-copy {
+		display: flex;
+		align-items: center;
+		gap: 5rpx;
+		min-width: 0;
+	}
+
 	.form-field__required {
 		color: #e54625;
+	}
+
+	.tenant-field-label-actions {
+		display: flex;
+		align-items: center;
+		gap: 10rpx;
+		margin-right: 16rpx;
+	}
+
+	.tenant-field-label-action {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7rpx;
+		min-height: 44rpx;
+		padding: 0 12rpx;
+		border: 1px solid #b9dce8;
+		border-radius: 6px;
+		color: var(--mci-color-primary, #087fae);
+		background: #edf8fb;
+		font-size: 21rpx;
+		font-weight: 500;
+	}
+
+	.tenant-field-label-action__search {
+		position: relative;
+		width: 18rpx;
+		height: 18rpx;
+		border: 2rpx solid currentColor;
+		border-radius: 50%;
+	}
+
+	.tenant-field-label-action__search::after {
+		position: absolute;
+		right: -8rpx;
+		bottom: -5rpx;
+		width: 9rpx;
+		height: 2rpx;
+		border-radius: 1rpx;
+		background: currentColor;
+		transform: rotate(45deg);
+		content: '';
+	}
+
+	.tenant-field-label-action--disabled {
+		opacity: .58;
+	}
+
+	.tenant-field-control-wrap {
+		position: relative;
+	}
+
+	.tenant-field-control-wrap--clearable :deep(.native-control__input) {
+		padding-right: 70rpx;
+	}
+
+	.tenant-field-clear {
+		position: absolute;
+		top: 15rpx;
+		right: 8rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 52rpx;
+		height: 52rpx;
+		border-radius: 50%;
+		color: #81959d;
+		font-size: 32rpx;
+		line-height: 1;
+		transition: transform .15s ease, opacity .15s ease;
+	}
+
+	.tenant-field-clear--pressed {
+		transform: scale(.9);
+		opacity: .65;
 	}
 
 	.tenant-field-actions {
