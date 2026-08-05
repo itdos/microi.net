@@ -62,19 +62,11 @@ namespace Dos.Common
                 .SetBasePath(basePath)
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables()
                 .Build();
         }
 
         private static string ResolveConfigurationBasePath(string environment)
         {
-            var configured = Environment.GetEnvironmentVariable("MICROI_CONFIG_BASE_PATH");
-            if (!string.IsNullOrWhiteSpace(configured))
-            {
-                var configuredPath = Path.GetFullPath(configured);
-                if (Directory.Exists(configuredPath)) return configuredPath;
-            }
-
             var candidates = new[]
             {
                 Directory.GetCurrentDirectory(),
@@ -185,76 +177,6 @@ namespace Dos.Common
             return null;
         }
 #endif
-
-        public static string GetEnvOrConfiguration(string envKey, string configPath = null)
-        {
-            var value = Environment.GetEnvironmentVariable(envKey, EnvironmentVariableTarget.Process)
-                        ?? Environment.GetEnvironmentVariable(envKey);
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-
-            if (!string.IsNullOrWhiteSpace(configPath))
-            {
-                value = GetRuntimeConfiguration(configPath);
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    return value;
-                }
-            }
-
-            value = GetRuntimeConfiguration(envKey);
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                return value;
-            }
-
-            if (!string.IsNullOrWhiteSpace(configPath))
-            {
-                value = GetConfiguration(configPath);
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    return value;
-                }
-            }
-
-            return null;
-        }
-
-        public static int GetEnvOrConfigurationInt(string envKey, string configPath, int defaultValue)
-        {
-            var value = GetEnvOrConfiguration(envKey, configPath);
-            if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) && parsed > 0)
-            {
-                return parsed;
-            }
-
-            return defaultValue;
-        }
-
-        public static bool GetEnvOrConfigurationBool(string envKey, string configPath, bool defaultValue)
-        {
-            var value = GetEnvOrConfiguration(envKey, configPath);
-            if (bool.TryParse(value, out var parsed))
-            {
-                return parsed;
-            }
-            if (string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-            if (string.Equals(value, "0", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "no", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(value, "off", StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            return defaultValue;
-        }
 
         /// <summary>
         /// 只读取 SaaS 运行配置，不读取环境变量或 appsettings。

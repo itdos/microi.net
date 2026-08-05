@@ -19,6 +19,7 @@ import LocalStorageManager from "./localStorage-manager.js";
 import { initV8ScanCode } from "./v8-scan-code.js";
 import { initV8Print } from "./v8-print.js";
 import { createV8Http } from "./v8-http.js";
+import { createV8AI } from "./v8-ai.js";
 import { reportApiServiceFailure, reportApiServiceRecovered } from "./api-service-status.js";
 import { applyLegacySysMenuConfigFallback } from "./sys-menu-legacy-compat.js";
 import { prepareCodeEditorTransport } from "./code-editor-transport.js";
@@ -5230,6 +5231,7 @@ var DiyCommon = {
                 GetSync : DiyCommon.GetSync,
                 GetAsync : DiyCommon.GetAsync,
                 Http : DiyCommon.Http,
+                AI : DiyCommon.AI,
                 Tips : DiyCommon.Tips,
                 ConfirmTips : DiyCommon.OsConfirm,
                 // 注意：CurrentUser / CurrentToken / SysConfig 不放在静态缓存里，
@@ -5839,6 +5841,33 @@ var DiyCommon = {
     }
 };
 DiyCommon.Http = createV8Http({
+    getApiBase: function () {
+        return DiyCommon.GetApiBase();
+    },
+    getPlatformContext: function () {
+        var requestToken = DiyCommon.getToken();
+        var headers = {
+            did: DiyCommon.GetDid(),
+            macaddress: LocalStorageManager.get("MacAddress") || "",
+            lang: DiyCommon.GetCurrentLang()
+        };
+        if (!DiyCommon.IsNull(requestToken)) headers.authorization = "Bearer " + requestToken;
+        return { headers: headers, requestToken: requestToken };
+    },
+    onPlatformResponse: function (headers, requestToken) {
+        var responseToken = "";
+        Object.keys(headers || {}).some(function (name) {
+            if (String(name).toLowerCase() === "authorization" || String(name).toLowerCase() === "token") {
+                responseToken = headers[name];
+                return true;
+            }
+            return false;
+        });
+        DiyCommon.ApplyAuthorizationToken(responseToken, requestToken);
+    }
+});
+DiyCommon.AI = createV8AI({
+    http: DiyCommon.Http,
     getApiBase: function () {
         return DiyCommon.GetApiBase();
     },

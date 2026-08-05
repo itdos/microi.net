@@ -70,6 +70,8 @@ namespace Microi.net.Api
             // AI domain module, never from untrusted client input.
             param.ApiKey = null;
             param.Endpoint = null;
+            param.ServerInternalCall = false;
+            param.Source = "http-ai";
         }
 
         private async Task EnrichCurrentUserAsync(NL2SQLParam param)

@@ -1,0 +1,52 @@
+name: microi-ocr
+
+services:
+  microi-ocr:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+      args:
+        PADDLEPADDLE_VERSION: "3.2.2"
+        PADDLEX_VERSION: "3.6.1"
+    image: registry.cn-hangzhou.aliyuncs.com/microios/paddlex-ocr:3.6.1-paddle3.2.2-cpu
+    init: true
+    restart: unless-stopped
+    ports:
+      # 默认只允许宿主机上的 Microi API 访问，不直接暴露到公网。
+      - "127.0.0.1:${MICROI_OCR_HOST_PORT:-18080}:8080"
+    shm_size: "4gb"
+    cpus: "${MICROI_OCR_CPUS:-4.0}"
+    mem_limit: "${MICROI_OCR_MEMORY:-8g}"
+    stop_grace_period: 90s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      # 首次启动下载的官方模型在重启/升级后复用。
+      - microi_ocr_models:/home/microi/.paddlex
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).read()"
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 10m
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "3"
+
+volumes:
+  microi_ocr_models:
+    name: microi-ocr-models
+
+networks:
+  default:
+    # 其它 Compose 中的 Microi API 可把该网络声明为 external 后，通过
+    # http://microi-ocr:8080/ocr 访问；宿主机进程使用 127.0.0.1:18080。
+    name: microi-ocr

@@ -14,6 +14,29 @@ APK 启动后，通过 WebView 直接导航（`location.replace`）到远程服�
 - ✅ 支持所有 `plus` API（蓝牙、扫码、定位等）
 - ✅ 远程页面运行在 launcher webview 中，`window.plus` 及返回键事件完全可用
 
+### 手机与平板安全区
+
+`manifest.json` 中的 `plus.statusbar.immersed` 保持为 `supportedDevice`，手机端继续使用沉浸式状态栏。
+该 APK 会直接承载远程 Microi.Client，并与其响应式断点保持一致：
+
+- 宽度 `<= 768px`：进入移动布局，WebView `top` 为 `0px`，保留沉浸式视觉效果；
+- 宽度 `> 768px`：进入 PC/平板布局，通过 `plus.navigator.getStatusbarHeight()` 获取真实逻辑高度，
+  将当前 WebView 动态下移，避免 Android 状态栏覆盖 PC 顶栏、头像和退出入口；
+- 横竖屏切换或应用从后台恢复时会重新判断，回到移动布局后恢复 `top: 0px`。
+
+不要写死 `24px` 等状态栏高度，也不要把 `immersed` 全局改为 `none`。底部手势区域继续由
+`plus.safearea.bottom.offset = auto` 处理。
+
+修改状态栏配置后需要重新云打包并安装 APK；仅更新远程 Web 页面不会改变已安装 APK 的原生窗口配置。
+可先运行配置回归测试：
+
+```bash
+node --test tests/tablet-safe-area.spec.mjs
+```
+
+真机验收至少覆盖 Android 手机竖屏、平板横屏、平板竖屏以及运行中旋转：手机仍为沉浸式；平板
+PC 布局的系统状态栏与页面不重叠，顶部头像可点击、退出登录菜单可正常打开，底部手势区不遮挡操作。
+
 **配置方法**：编辑 `index.html` 顶部的 `MICROI_SERVER_URL`，修改为实际服务器地址：
 ```javascript
 <!-- 【配置项】请修改为你的实际服务器地址 -->

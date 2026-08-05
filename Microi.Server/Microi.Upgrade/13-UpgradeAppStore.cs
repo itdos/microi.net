@@ -91,7 +91,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 8, 6) ||
+                    importerVersion < new System.Version(1, 8, 10) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -120,7 +120,9 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
                     !code.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
                     !code.Contains("DATASET_INSERT_IF_MISSING_V1") ||
-                    !code.Contains("PACKAGE_API_ENGINE_READBACK_V1"))
+                    !code.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
+                    !code.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
+                    !code.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1"))
                 {
                     return RefreshRequired(osClient, "应用数据包导入器缺失或版本过低");
                 }
@@ -503,7 +505,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 8, 6) ||
+                    importerVersion < new System.Version(1, 8, 10) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -526,7 +528,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("APPLICATION_ASSET_BACKGROUND_CHUNKS_V1") ||
                     !content.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
                     !content.Contains("DATASET_INSERT_IF_MISSING_V1") ||
-                    !content.Contains("PACKAGE_API_ENGINE_READBACK_V1"))
+                    !content.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
+                    !content.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
+                    !content.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]版本过旧或缺少幂等安装保护，拒绝覆盖客户数据库。");
                 }
@@ -604,9 +608,9 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var bulkEngineCode = bulkEngine?["ApiV8Code"]?.ToString() ?? string.Empty;
                 var bulkEngineVersionText = bulkEngine?["Version"]?.ToString()?.TrimStart('v', 'V');
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
-                    packageVersion < new System.Version(7, 0, 5) ||
+                    packageVersion < new System.Version(7, 0, 10) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 8, 6) ||
+                    embeddedImporterVersion < new System.Version(1, 8, 10) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
                     embeddedBulkVersion < new System.Version(1, 1, 1) ||
                     bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
@@ -627,6 +631,8 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("ASSET_METADATA_WITHOUT_SECOND_DECODE_V1") ||
                     !importerEngineCode.Contains("DATASET_INSERT_IF_MISSING_V1") ||
                     !importerEngineCode.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
+                    !importerEngineCode.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
+                    !importerEngineCode.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1"))
                 {
@@ -646,11 +652,37 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
             });
             if (installResult.Code != 1)
             {
-                msgs.Add($"{packageName}导入失败：{installResult.Msg}");
+                msgs.Add($"{packageName}导入失败：{installResult.Msg}{FormatInstallFailureDetails(installResult.Data)}");
                 return;
             }
 
             Console.WriteLine($"Microi：【基础应用升级】{packageName}导入完成。");
+        }
+
+        private static string FormatInstallFailureDetails(object data)
+        {
+            try
+            {
+                if (data == null) return string.Empty;
+                var token = data as JToken ?? JToken.FromObject(data);
+                var detail = (token as JObject)?.Properties().FirstOrDefault(property =>
+                    property.Name.StartsWith("失败详情", StringComparison.Ordinal));
+                if (detail?.Value == null) return string.Empty;
+
+                // 只记录导入器明确返回的失败列表，不把整份应用包或其它统计信息写入日志。
+                var detailJson = detail.Value.ToString(Formatting.None);
+                const int maxLogLength = 4000;
+                if (detailJson.Length > maxLogLength)
+                {
+                    detailJson = detailJson.Substring(0, maxLogLength) + "...(已截断)";
+                }
+                return $"；{detail.Name}：{detailJson}";
+            }
+            catch
+            {
+                // 诊断信息不得覆盖原始失败，也不能让自动升级因序列化再次异常。
+                return string.Empty;
+            }
         }
 
         private static string NormalizePackageExecutionLimits(string packageContent)

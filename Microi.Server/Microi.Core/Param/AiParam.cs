@@ -57,6 +57,14 @@ namespace Microi.net
         /// </summary>
         public List<ChatHistoryItem>? ChatHistory { get; set; }
 
+        /// <summary>
+        /// 仅供 AI 领域层内部的二次模型调用使用。HTTP、MCP、V8 或其它 JSON
+        /// 调用方不能设置该标记，避免伪造内部来源绕过中转额度和审计。
+        /// </summary>
+        [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ServerInternalCall { get; set; }
+
     }
 
     /// <summary>

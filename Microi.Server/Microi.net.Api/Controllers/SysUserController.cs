@@ -28,18 +28,6 @@ namespace Microi.net.Api
             _captcha = captcha;
         }
 
-        private Microsoft.Extensions.Configuration.IConfiguration GetConfiguration()
-        {
-            return HttpContext.RequestServices.GetService(typeof(Microsoft.Extensions.Configuration.IConfiguration))
-                as Microsoft.Extensions.Configuration.IConfiguration;
-        }
-
-        private Microsoft.AspNetCore.Hosting.IWebHostEnvironment GetHostEnvironment()
-        {
-            return HttpContext.RequestServices.GetService(typeof(Microsoft.AspNetCore.Hosting.IWebHostEnvironment))
-                as Microsoft.AspNetCore.Hosting.IWebHostEnvironment;
-        }
-
         private static string ReadTokenClaim(string authorization, string claimType)
         {
             try
@@ -56,48 +44,6 @@ namespace Microi.net.Api
             {
                 return "";
             }
-        }
-
-        private bool IsDevTestKeyMatched()
-        {
-            var devKey = Environment.GetEnvironmentVariable("MICROI_DEV_TEST_KEY");
-            return !string.IsNullOrWhiteSpace(devKey)
-                && string.Equals(HttpContext.Request.Headers["X-Microi-Dev-Key"].ToString(), devKey, StringComparison.Ordinal);
-        }
-
-        private bool IsLoopbackRequest()
-        {
-            var remoteIp = HttpContext.Connection.RemoteIpAddress;
-            return remoteIp != null && System.Net.IPAddress.IsLoopback(remoteIp);
-        }
-
-        private bool IsLocalDevelopmentLoginBypassAllowed()
-        {
-            var cfg = GetConfiguration();
-            if (cfg == null || !cfg.GetValue<bool>("DevLoginBypass:Enabled"))
-            {
-                return false;
-            }
-
-            var env = GetHostEnvironment();
-            if (env == null || !env.IsDevelopment())
-            {
-                return false;
-            }
-
-            // 配置驱动旁路只允许本机回环，避免生产反代、容器网关、内网IP误判后开放默认账号密码。
-            return IsLoopbackRequest();
-        }
-
-        private bool IsDevLoginBypassEnabled(string configKey, bool defaultValue = false)
-        {
-            if (!IsLocalDevelopmentLoginBypassAllowed())
-            {
-                return false;
-            }
-
-            var cfg = GetConfiguration();
-            return cfg.GetValue<bool>(configKey, defaultValue);
         }
 
         private static bool IsAutomationCaptchaBypassRequested(SysUserParam param)
@@ -281,53 +227,12 @@ namespace Microi.net.Api
             try
             {
                 var enableCaptcha = DynamicHelper.GetDynamicBoolValue(sysConfigResult.Data, "EnableCaptcha");
-                // ===== 自动化测试旁路：只跳过验证码，账号密码永远走真实校验 =====
-                // 远端自动化：请求传 _AutomationTestLogin=true，且 sys_config.AutoTestSkipCaptcha=true。
-                // 本地/CI 兼容：MICROI_DEV_TEST_KEY + X-Microi-Dev-Key 仅用于跳验证码，不再跳过密码。
-                if ((IsAutomationCaptchaBypassRequested(param) && IsAutomationCaptchaBypassAllowed(sysConfigResult.Data))
-                    || IsDevTestKeyMatched())
+                // 自动化测试只能由当前租户 sys_config 显式授权，并且仅跳过图形验证码；
+                // 账号和密码仍走真实校验。API 进程不接受环境变量、Header 或本地配置旁路。
+                if (IsAutomationCaptchaBypassRequested(param)
+                    && IsAutomationCaptchaBypassAllowed(sysConfigResult.Data))
                 {
                     enableCaptcha = false;
-                }
-                // ===== 本地开发旁路（配置驱动）=====
-                // 仅本机 Development 环境允许配置驱动的开发登录旁路。
-                // 即使误把 DevLoginBypass.Enabled=true 发布到生产，非 Development 环境也不会生效。
-                if (IsLocalDevelopmentLoginBypassAllowed())
-                {
-                    var cfg = GetConfiguration();
-                    if (cfg != null)
-                    {
-                        if (cfg.GetValue<bool>("DevLoginBypass:SkipCaptcha", true))
-                        {
-                            enableCaptcha = false;
-                        }
-                        var defaultAccount = cfg.GetValue<string>("DevLoginBypass:DefaultAccount");
-                        var defaultPassword = cfg.GetValue<string>("DevLoginBypass:DefaultPassword");
-                        var accounts = cfg.GetSection("DevLoginBypass:Accounts").GetChildren();
-                        foreach (var accountCfg in accounts)
-                        {
-                            var osClient = accountCfg.GetValue<string>("OsClient");
-                            if (!osClient.DosIsNullOrWhiteSpace()
-                                && string.Equals(osClient, param.OsClient, StringComparison.OrdinalIgnoreCase))
-                            {
-                                defaultAccount = accountCfg.GetValue<string>("Account") ?? defaultAccount;
-                                defaultPassword = accountCfg.GetValue<string>("Password")
-                                    ?? accountCfg.GetValue<string>("Pwd")
-                                    ?? defaultPassword;
-                                break;
-                            }
-                        }
-                        // 自动填充缺省账号密码（仅当请求未带）；_DEV_BYPASS_ 会替换为配置密码，但仍走真实密码校验。
-                        if (param.Account.DosIsNullOrWhiteSpace())
-                        {
-                            param.Account = defaultAccount;
-                        }
-                        if (param.Pwd.DosIsNullOrWhiteSpace()
-                            || string.Equals(param.Pwd, "_DEV_BYPASS_", StringComparison.Ordinal))
-                        {
-                            param.Pwd = defaultPassword;
-                        }
-                    }
                 }
                 if (enableCaptcha)
                 {
@@ -494,8 +399,7 @@ namespace Microi.net.Api
                 {
                     return Json(new DosResult(0, null, "请输入正确的11位手机号！"));
                 }
-                var skipSmsCaptcha = IsDevLoginBypassEnabled("DevLoginBypass:SkipSmsCaptcha");
-                if (!skipSmsCaptcha && param._CaptchaValue.DosIsNullOrWhiteSpace())
+                if (param._CaptchaValue.DosIsNullOrWhiteSpace())
                 {
                     return Json(new DosResult(0, null, "请输入短信验证码！"));
                 }
@@ -505,18 +409,15 @@ namespace Microi.net.Api
                 #region 验证短信验证码（从Redis缓存中获取）
                 var cacheKey = $"Microi:{param.OsClient}:SmsCaptcha:{phone}";
                 var DiyCacheBase = MicroiEngine.CacheTenant.Cache(param.OsClient);
-                if (!skipSmsCaptcha)
-                {
-                    var cachedCode = await DiyCacheBase.GetAsync<string>(cacheKey);
+                var cachedCode = await DiyCacheBase.GetAsync<string>(cacheKey);
 
-                    if (cachedCode.DosIsNullOrWhiteSpace())
-                    {
-                        return Json(new DosResult(0, null, "未获取短信验证码或验证码已过期！"));
-                    }
-                    if (cachedCode != "Allow" && cachedCode != param._CaptchaValue)
-                    {
-                        return Json(new DosResult(0, null, "短信验证码错误！"));
-                    }
+                if (cachedCode.DosIsNullOrWhiteSpace())
+                {
+                    return Json(new DosResult(0, null, "未获取短信验证码或验证码已过期！"));
+                }
+                if (cachedCode != "Allow" && cachedCode != param._CaptchaValue)
+                {
+                    return Json(new DosResult(0, null, "短信验证码错误！"));
                 }
                 #endregion
 
@@ -657,10 +558,7 @@ namespace Microi.net.Api
                 }
 
                 #region 销毁验证码缓存
-                if (!skipSmsCaptcha)
-                {
-                    try { await DiyCacheBase.RemoveAsync(cacheKey); } catch { }
-                }
+                try { await DiyCacheBase.RemoveAsync(cacheKey); } catch { }
                 #endregion
 
                 #region 获取完整用户信息用于登录

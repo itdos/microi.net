@@ -1226,16 +1226,10 @@ o8uMyYMNp3PsWa7TODr7ofgxAM7ncAGmYWvjnsBxGT0=
 
         private static string GetLoginRsaPrivateKey()
         {
-            var privateKey = ConfigHelper.GetEnvOrConfiguration("MICROI_LOGIN_RSA_PRIVATE_KEY", "Security:LoginRsaPrivateKey");
+            var privateKey = ConfigHelper.GetRuntimeConfigurationValue("Security:LoginRsaPrivateKey");
             if (!privateKey.DosIsNullOrWhiteSpace())
             {
                 return privateKey.Replace("\\n", "\n").Trim();
-            }
-
-            var privateKeyPath = ConfigHelper.GetEnvOrConfiguration("MICROI_LOGIN_RSA_PRIVATE_KEY_PATH", "Security:LoginRsaPrivateKeyPath");
-            if (!privateKeyPath.DosIsNullOrWhiteSpace() && System.IO.File.Exists(privateKeyPath))
-            {
-                return System.IO.File.ReadAllText(privateKeyPath).Trim();
             }
 
             return DefaultLoginRsaPrivateKey;

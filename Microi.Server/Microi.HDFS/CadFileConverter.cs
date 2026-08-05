@@ -116,7 +116,7 @@ namespace Microi.net
         /// 将STEP/STP流转换为GLB字节数组。
         /// 使用FreeCAD命令行进行转换，如未安装FreeCAD则返回null。
         /// 部署时请确保服务器上安装了FreeCAD（apt install freecad 或 brew install freecad）。
-        /// 也可以通过环境变量 FREECAD_PATH 指定FreeCAD的可执行文件路径。
+        /// 自定义路径在 SaaS 引擎“后端运行配置”中维护。
         /// </summary>
         public static byte[] ConvertStepToGlbBytes(Stream stepStream)
         {
@@ -186,7 +186,7 @@ print('STEP_TO_STL_OK')
                 var freecadPath = FindFreecadExecutable();
                 if (freecadPath == null)
                 {
-                    WriteCadLog(OsClientDefault.OsClient, "FreeCadMissing", "未找到 FreeCAD，STEP/STP 文件无法转换", "可安装 FreeCAD 或配置 FREECAD_PATH。", 2);
+                    WriteCadLog(OsClientDefault.OsClient, "FreeCadMissing", "未找到 FreeCAD，STEP/STP 文件无法转换", "可安装 FreeCAD 或在 SaaS 引擎后端运行配置中填写 FreeCAD 可执行文件路径。", 2);
                     return null;
                 }
 
@@ -321,10 +321,11 @@ except ImportError:
         /// </summary>
         private static string FindFreecadExecutable()
         {
-            // 1. 优先使用环境变量
-            var envPath = Environment.GetEnvironmentVariable("FREECAD_PATH");
-            if (!string.IsNullOrWhiteSpace(envPath) && File.Exists(envPath))
-                return envPath;
+            // 1. 优先使用 SaaS 引擎动态配置
+            var configuredPath = ConfigHelper.GetRuntimeConfigurationValue(
+                "Cad:FreeCadExecutablePath");
+            if (!string.IsNullOrWhiteSpace(configuredPath) && File.Exists(configuredPath.Trim()))
+                return configuredPath.Trim();
 
             // 2. 常见路径
             var candidates = new[]

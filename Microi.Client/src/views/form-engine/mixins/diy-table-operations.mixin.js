@@ -1,4 +1,5 @@
 import { getTableChildFieldRelations } from "@/utils/table-child-relations.js";
+import { getVisiblePageTabs } from "./page-tab-runtime.js";
 
 export default {
     methods: {
@@ -49,7 +50,8 @@ export default {
         IsPageTabs() {
             var self = this;
             if (!self.DiyCommon.IsNull(self.SysMenuModel) && !self.DiyCommon.IsNull(self.SysMenuModel.PageTabs)) {
-                if (self.SysMenuModel.PageTabs.length > 1 || (self.SysMenuModel.PageTabs.length == 1 && self.SysMenuModel.PageTabs[0].Id != "none" && self.SysMenuModel.PageTabs[0].Name != "")) {
+                var visiblePageTabs = getVisiblePageTabs(self.SysMenuModel.PageTabs);
+                if (visiblePageTabs.length > 1 || (visiblePageTabs.length == 1 && visiblePageTabs[0].Id != "none" && visiblePageTabs[0].Name != "")) {
                     return true;
                 }
             }

@@ -199,6 +199,9 @@ V8.RefreshTable({ _PageIndex: 1 });
 | `V8.Method.ScanCode({...})` | 调用当前终端支持的扫码能力 |
 | `V8.Print.isConnected()` | 检查当前蓝牙写特征是否仍可用 |
 | `V8.Print.OpenBluetoothPage()` | 在用户手势中打开蓝牙连接页，返回 Promise |
+| `V8.Print.reconnect()` | 使用已记住的设备授权或设备 ID 尝试重连 |
+| `V8.Print.getConnectionState()` | 获取连接、设备、记忆和错误状态快照 |
+| `V8.Print.subscribeConnection(listener)` | 订阅应用级共享连接状态，返回取消订阅函数 |
 | `V8.Print.prepareSend(bytes)` | 串行分包发送 TSC 或 ESC/POS 字节，必须 `await` |
 
 `V8.OpenAnyForm` 只发起打开动作，不返回“用户关闭后的 Promise”。需要替换
@@ -234,7 +237,7 @@ try {
 }
 ```
 
-`prepareSend` 成功只证明字节已经写入蓝牙特征，不代表打印机已走纸、无缺纸或无硬件故障。批量打印必须逐条 `await`，不得用固定 `setTimeout` 猜测完成时间，也不得用 `Promise.all` 并发写同一设备。完整挂载范围、连接语义、批量恢复、安全与硬件验收见 `references/bluetooth-print.md`；源码级 TSC/ESC 方法表见 `references/bluetooth-print-api.md`。
+PC/平板顶部导航与移动端【我的】页共用同一个应用级 `V8.Print` 实例，用户可先在全局入口连接，再进入任意模块打印。`prepareSend` 内部会把不同 V8 上下文排入同一发送队列；成功只证明字节已经写入蓝牙特征，不代表打印机已走纸、无缺纸或无硬件故障。批量打印仍应逐条 `await`，不得用固定 `setTimeout` 猜测完成时间，也不要用 `Promise.all` 表达同一设备的并行打印。完整挂载范围、连接语义、批量恢复、安全与硬件验收见 `references/bluetooth-print.md`；源码级 TSC/ESC 方法表见 `references/bluetooth-print-api.md`。
 
 ### 常用上下文差异
 

@@ -549,10 +549,17 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 
 - 启动 Node.js、Vite、Webpack、dotnet build、Java、Docker build、浏览器自动化或压测等重任务前，先检查物理内存、当前占用、可用内存和已有同类进程；已有服务可复用时禁止重复启动。
 - 默认只运行一个高资源任务，显式限制 Worker/并发，优先按包、模块、测试分组或文件分片执行，禁止并行跑多个全量构建。
-- 启动重任务时仍以保留至少 `max(6 GB, 物理内存的 20%)` 给 VS Code、Codex 和操作系统为规划目标；低于该目标时停止新增并发重任务、优先降级为定向验证，但不作为强制终止已启动任务的硬门限。全机内存占用达到 95% 时，立即终止 AI 启动的重任务及子进程，不得等待 OOM。
+- 启动重任务前按“当前阶段进程树预算 + 系统安全余量”判断：阶段预算优先采用实测峰值；尚无实测时，用受控堆/容器上限加明确的原生进程、Worker 与缓冲开销。系统安全余量取 `max(1.5 GB, 物理内存的 5%)`，不得再按固定 20% 将大内存机器的启动门槛线性放大。顺序执行的阶段分别计算，禁止叠加不会并发的阶段峰值。全机内存占用达到 95% 时，立即暂停或终止 AI 启动的重任务及子进程，不得等待 OOM。
 - 禁止为强行通过构建而无限抬高 `--max-old-space-size`、JVM heap、Docker memory 或 Worker 数。未获用户明确授权时，单个 AI 启动的进程树不得持续占用超过物理内存的 25%。
 - 后台/长任务必须记录根 PID、子进程、启动时间和独立日志，每 15-30 秒监测进程树内存与全机可用内存；任务失败、中断或达阈值时必须停止整个子进程树。
 - 全量构建无法在阈值内完成时，改用定向 lint、类型检查、按模块构建或按测试文件验证；完整验收交由 CI/专用构建机或经用户明确同意的独占时段执行。
+
+## 后端 API 配置白名单与 SaaS 单一事实源（强制）
+
+- `Microi.net.Api` 的 `AppSettings` 与同名容器环境变量只允许：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。
+- 除上述十项外，业务开关、重试、超时、限额、安全策略、密钥和可执行文件路径必须进入 SaaS 引擎 `sys_osclients` 的合适 Tab；禁止新增 `MICROI_*`、`DOS_ORM_*`、额外 `AppSettings` 节点或动态环境变量读取。
+- `ASPNETCORE_*`、`DOTNET_*` 只属于 .NET 宿主；测试、构建、安装、MCP 和发布脚本可使用自身进程变量，但生产 API 不得读取它们控制业务行为。
+- 新配置必须配套幂等升级、默认值、缓存刷新、敏感字段脱敏、子租户隔离、文档和源码扫描测试；验收需扫描生产源码、API 配置及在线/离线 Compose。
 
 ## 版本更新日志保护规则（强制）
 
@@ -619,7 +626,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 
 ## Microi 项目技能规范
 
-处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 57 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
+处理 Microi 低代码系统、V8 引擎、PC 前端、UniApp/H5/小程序、Microi.UI、MCP 建模、自动化测试或交付复盘时，必须先按任务类型读取相关 skill 文件；不要只在编写 V8 代码时才参考 skills（共 58 个）。普通用户在空工作区安装插件后，只要通过插件执行初始化或拉取，AI 就应自动识别这些规则，不需要再手动要求“严格遵循 skills”：
 - `microi.skills/v8-crud-api/SKILL.md` — Microi V8 CRUD API 接口引擎开发
 - `microi.skills/v8-sql-query/SKILL.md` — Microi V8 安全 SQL 查询
 - `microi.skills/v8-table-event/SKILL.md` — Microi V8 表单事件开发
@@ -632,6 +639,7 @@ Microi 平台后端功能必须默认按多节点部署设计：多个 API/Worke
 - `microi.skills/message-notification/SKILL.md` — Microi 多通道与平台内部消息通知
 - `microi.skills/v8-saas-multi-tenant/SKILL.md` — Microi V8 SaaS 多租户引擎
 - `microi.skills/v8-image-processing/SKILL.md` — Microi V8 图像处理
+- `microi.skills/ocr-engine/SKILL.md` — Microi 通用 OCR 网关、SaaS 配置与服务部署
 - `microi.skills/v8-file-upload/SKILL.md` — Microi V8 文件上传下载
 - `microi.skills/v8-export-import/SKILL.md` — Microi V8 Excel 导入导出
 - `microi.skills/v8-debugging/SKILL.md` — Microi V8 调试与日志

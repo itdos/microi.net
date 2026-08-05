@@ -4,32 +4,219 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-07-25
+# 版本：v2026-08-04 20:26:02
+# 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
 #   microi-install-database   - 主数据库（安装前按编号选择）
 #   microi-install-redis      - Redis 7.4.2 缓存
 #   microi-install-mongodb    - MongoDB 数据库
 #   microi-install-minio      - MinIO 对象存储
+#   microi-install-ocr        - PaddleX/PaddleOCR CPU 文字识别服务（默认安装）
 #   microi-install-app        - 平台应用（API + Web）
 #   microi-install-watchtower - 自动更新服务
-#   microi-install-ollama     - Ollama Embedding 服务（可选：向量检索增强）
-#   microi-install-qdrant     - Qdrant 向量数据库（可选：向量检索增强）
-#   microi-install-libretranslate - LibreTranslate 翻译服务（可选）
+#   microi-install-libretranslate - LibreTranslate 翻译服务（默认安装基础套餐）
+#   microi-install-ollama     - Ollama Embedding 服务（不推荐，默认不安装）
+#   microi-install-qdrant     - Qdrant 向量数据库（不推荐，默认不安装）
 # ============================================================
 # 端口分配规则：
 #   默认从 61600 开始寻找连续端口块，候选起点冲突时每次 +1，最多递增 100 次
 #   61600 高于 Linux 默认临时端口上限 60999；实际临时端口范围仍以宿主机 ip_local_port_range 为准
-#   第 1 个端口分配给 Web，第 2 个分配给 API；基础组件占 5 个，向量检索增加 3 个，翻译服务增加 1 个
-#   基础端口顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console
-#   向量增强端口顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console,
-#                  Ollama, Qdrant-HTTP, Qdrant-gRPC
-#   同时安装翻译服务时，LibreTranslate 位于其它已选配件之后
+#   第 1 个端口分配给 Web，第 2 个分配给 API；基础组件（含 OCR）占 8 个端口
+#   基础端口顺序: Web, API, 主数据库, Redis, MongoDB, MinIO-API, MinIO-Console, OCR
+#   LibreTranslate（默认安装）排在 OCR 之后；已停用的 Ollama/Qdrant 端口保留在所有推荐组件之后
 # ============================================================
 
 set -e
 
-SCRIPT_VERSION="v2026-07-25"
+SCRIPT_VERSION="v2026-08-04 20:26:02"
+RUNTIME_OS_CLIENT_TYPE="Product"
+RUNTIME_OS_CLIENT_NETWORK="Internal"
+MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
+API_IMAGE="${MICROI_INSTALL_API_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest}"
+CLIENT_IMAGE="${MICROI_INSTALL_CLIENT_IMAGE_OVERRIDE:-registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest}"
+APP_API_PULL_POLICY="always"
+APP_CLIENT_PULL_POLICY="always"
+if [ -n "${MICROI_INSTALL_API_IMAGE_OVERRIDE:-}" ]; then
+  APP_API_PULL_POLICY="never"
+fi
+if [ -n "${MICROI_INSTALL_CLIENT_IMAGE_OVERRIDE:-}" ]; then
+  APP_CLIENT_PULL_POLICY="never"
+fi
+OCR_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/paddlex-ocr:3.6.1-paddle3.2.2-cpu"
+OCR_CONTAINER_NAME="microi-install-ocr"
+OCR_INTERNAL_PORT=8080
+OCR_RUNTIME_NETWORK="microi-ocr"
+OCR_SERVICE_ENDPOINT="http://${OCR_CONTAINER_NAME}:${OCR_INTERNAL_PORT}/ocr"
+LIBRETRANSLATE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6-microi1"
+LIBRETRANSLATE_CONTAINER_NAME="microi-install-libretranslate"
+LIBRETRANSLATE_INTERNAL_PORT=5000
+LIBRETRANSLATE_SERVICE_ENDPOINT="http://${LIBRETRANSLATE_CONTAINER_NAME}:${LIBRETRANSLATE_INTERNAL_PORT}"
+
+# 安装后半程的失败收尾状态。只有端口、密码和数据目录全部生成后才启用恢复汇总，
+# 既保留真正的非零退出码，也避免早期输入/环境错误输出尚未生成的敏感配置。
+INSTALL_RECOVERY_SUMMARY_ENABLED=0
+INSTALL_SUMMARY_PRINTED=0
+SQL_TMP_DIR=""
+SQL_ZIP_IS_TEMP=0
+SQL_ZIP_FILE=""
+API_LIVENESS_READY=0
+API_READINESS_READY=0
+OCR_SAAS_CONFIG_READY=0
+TRANSLATE_SAAS_CONFIG_READY=0
+
+cleanup_database_import_temp() {
+  if [[ "${SQL_TMP_DIR:-}" == /tmp/microi_database_* ]] && [ -d "${SQL_TMP_DIR}" ]; then
+    rm -rf -- "${SQL_TMP_DIR}"
+  fi
+  if [ "${SQL_ZIP_IS_TEMP:-0}" = "1" ] \
+    && [[ "${SQL_ZIP_FILE:-}" == /tmp/* ]] \
+    && [ -f "${SQL_ZIP_FILE}" ]; then
+    rm -f -- "${SQL_ZIP_FILE}"
+  fi
+  SQL_TMP_DIR=""
+  SQL_ZIP_IS_TEMP=0
+  SQL_ZIP_FILE=""
+}
+
+print_generated_install_configuration() {
+  local summary_mode="${1:-recovery}"
+  local address_title="预分配访问地址（相关容器可能尚未就绪）"
+  if [ "${summary_mode}" = "success" ]; then
+    address_title="访问地址"
+  fi
+
+  echo "脚本版本: ${SCRIPT_VERSION}"
+  echo "编排文件目录: ${COMPOSE_BASE_DIR:-尚未生成}"
+  echo '在宝塔面板 → Docker → 编排 中可查看和管理已经生成的编排项目'
+  echo ''
+  echo '------------------------------------------------------------------'
+  echo "${address_title}："
+  echo '------------------------------------------------------------------'
+  if [ -n "${ACCESS_IP:-}" ] && [ -n "${VUE_PORT:-}" ]; then
+    echo "前端传统界面:  http://${ACCESS_IP}:${VUE_PORT}/?OsClient=${OS_CLIENT:-iTdos}    账号: admin  密码: demo123456"
+  fi
+  echo "主租户:        OsClient=${OS_CLIENT:-未生成}, ClientName=${OS_CLIENT:-未生成}"
+  echo ''
+  echo '------------------------------------------------------------------'
+  echo "端口分配（从 ${PORT_BASE:-未生成} 开始顺序分配）："
+  echo '------------------------------------------------------------------'
+  [ -n "${VUE_PORT:-}" ] && printf '  %-18s %s\n' "Web:" "${VUE_PORT}"
+  [ -n "${API_PORT:-}" ] && printf '  %-18s %s\n' "API:" "${API_PORT}"
+  [ -n "${DATABASE_PORT:-}" ] && printf '  %-18s %s\n' "${DATABASE_PORT_NAME:-Database}:" "${DATABASE_PORT}"
+  [ -n "${REDIS_PORT:-}" ] && printf '  %-18s %s\n' "Redis:" "${REDIS_PORT}"
+  [ -n "${MONGO_PORT:-}" ] && printf '  %-18s %s\n' "MongoDB:" "${MONGO_PORT}"
+  [ -n "${MINIO_PORT:-}" ] && printf '  %-18s %s\n' "MinIO API:" "${MINIO_PORT}"
+  [ -n "${MINIO_CONSOLE_PORT:-}" ] && printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
+  [ -n "${OCR_PORT:-}" ] && printf '  %-18s %s\n' "OCR:" "${OCR_PORT}（仅绑定 127.0.0.1）"
+  if [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ] && [ -n "${LIBRETRANSLATE_PORT:-}" ]; then
+    printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}（仅绑定 127.0.0.1）"
+  fi
+  if [ "${INSTALL_ONLINE_AI:-0}" = "1" ]; then
+    [ -n "${OLLAMA_PORT:-}" ] && printf '  %-18s %s\n' "Ollama:" "${OLLAMA_PORT}"
+    [ -n "${QDRANT_HTTP_PORT:-}" ] && printf '  %-18s %s\n' "Qdrant HTTP:" "${QDRANT_HTTP_PORT}"
+    [ -n "${QDRANT_GRPC_PORT:-}" ] && printf '  %-18s %s\n' "Qdrant gRPC:" "${QDRANT_GRPC_PORT}"
+  fi
+  echo ''
+  echo '------------------------------------------------------------------'
+  echo '本次已生成的凭据与数据目录：'
+  echo '------------------------------------------------------------------'
+  if [ -n "${DATABASE_PASSWORD:-}" ]; then
+    echo "${DATABASE_DISPLAY_NAME:-主数据库}:  Dos.ORM类型 ${DATABASE_TYPE:-未生成}, 容器 ${DATABASE_CONTAINER_NAME:-未生成}, 端口 ${DATABASE_PORT:-未生成}, 管理员密码: ${DATABASE_PASSWORD}"
+    echo "             初始化包来源: ${SQL_SOURCE_DISPLAY:-未生成}"
+    echo "             数据目录: ${DATABASE_DATA_DIR:-未生成}"
+    echo "             编排目录: ${DATABASE_DIR:-${COMPOSE_BASE_DIR:-未生成}/microi-install-database}/"
+    echo ''
+  fi
+  if [ -n "${REDIS_PASSWORD:-}" ]; then
+    echo "Redis:       容器 microi-install-redis,      端口 ${REDIS_PORT:-未生成},  密码: ${REDIS_PASSWORD}"
+    echo "             数据目录: ${REDIS_DATA_DIR:-未生成}"
+    echo "             编排目录: ${COMPOSE_BASE_DIR:-未生成}/microi-install-redis/"
+    echo ''
+  fi
+  if [ -n "${MONGO_ROOT_PASSWORD:-}" ]; then
+    echo "MongoDB:     容器 microi-install-mongodb,    端口 ${MONGO_PORT:-未生成},  Root密码: ${MONGO_ROOT_PASSWORD}"
+    echo "             数据目录: ${MONGO_DATA_DIR:-未生成}"
+    echo "             编排目录: ${COMPOSE_BASE_DIR:-未生成}/microi-install-mongodb/"
+    echo ''
+  fi
+  if [ -n "${MINIO_ACCESS_KEY:-}" ] && [ -n "${MINIO_SECRET_KEY:-}" ]; then
+    echo "MinIO:       容器 microi-install-minio,      API端口 ${MINIO_PORT:-未生成},  控制台端口 ${MINIO_CONSOLE_PORT:-未生成}"
+    echo "             Access Key: ${MINIO_ACCESS_KEY},  Secret Key: ${MINIO_SECRET_KEY}"
+    echo "             私有桶: ${MINIO_PRIVATE_BUCKET:-mci-private}, 公有桶: ${MINIO_PUBLIC_BUCKET:-mci-public}（public 下载）"
+    echo "             数据目录: ${MINIO_DATA_DIR:-未生成}"
+    echo "             编排目录: ${COMPOSE_BASE_DIR:-未生成}/microi-install-minio/"
+    echo ''
+  fi
+  if [ "${summary_mode}" = "recovery" ] \
+    && [ "${INSTALL_ONLINE_AI:-0}" = "1" ] \
+    && [ -n "${QDRANT_API_KEY:-}" ]; then
+    echo "Qdrant API Key: ${QDRANT_API_KEY}"
+  fi
+  if [ "${summary_mode}" = "recovery" ] && [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ]; then
+    echo 'LibreTranslate API Key: 已随机生成；为避免密钥泄露，终端不输出明文。若初始化步骤已完成，密钥库位于 /microi/libretranslate/api-keys/api_keys.db。'
+  fi
+}
+
+print_install_recovery_summary() {
+  local exit_code="${1:-1}"
+  echo ''
+  echo '=================================================================='
+  echo "Microi：安装未完成（退出码 ${exit_code}）"
+  echo 'Microi：以下为本次已经生成的配置，便于排查和恢复；不代表所有服务均已安装或可用。'
+  echo 'Microi：原始失败原因位于本汇总上方，脚本仍以非零状态退出。'
+  echo '=================================================================='
+  echo ''
+  print_generated_install_configuration "recovery"
+  echo '------------------------------------------------------------------'
+  echo '后段门禁状态：'
+  echo '------------------------------------------------------------------'
+  echo "API liveness: $([ "${API_LIVENESS_READY:-0}" = "1" ] && echo '已通过' || echo '未确认')"
+  echo "API readiness: $([ "${API_READINESS_READY:-0}" = "1" ] && echo '已通过' || echo '未确认')"
+  if [ "${OCR_SAAS_CONFIG_READY:-0}" = "1" ]; then
+    echo 'OCR SaaS 配置: 已写入并回读；最终 API readiness 仍以上一行状态为准。'
+  else
+    echo 'OCR SaaS 配置: 未完成，安装器未把 OCR 视为已启用，也没有绕过 Upgrade29。'
+  fi
+  if [ "${INSTALL_LIBRETRANSLATE:-0}" = "1" ]; then
+    if [ "${TRANSLATE_SAAS_CONFIG_READY:-0}" = "1" ]; then
+      echo 'LibreTranslate SaaS 配置: 已写入并回读；最终 API readiness 仍以上一行状态为准。'
+    else
+      echo 'LibreTranslate SaaS 配置: 未完成，安装器没有绕过 Upgrade31。'
+    fi
+  fi
+  if command -v docker > /dev/null 2>&1; then
+    local api_image_id=""
+    local api_image_created=""
+    api_image_id=$(docker inspect microi-install-api --format '{{.Image}}' 2>/dev/null || true)
+    api_image_created=$(docker image inspect "${API_IMAGE:-}" --format '{{.Created}}' 2>/dev/null || true)
+    [ -n "${api_image_id}" ] && echo "当前 API 容器 ImageId: ${api_image_id}"
+    [ -n "${api_image_created}" ] && echo "当前 API 本地镜像创建时间: ${api_image_created}"
+  fi
+  echo ''
+  echo 'Microi：建议先查看 docker logs --tail 200 microi-install-api，并核对上方 API 镜像与 Upgrade29/Upgrade31 日志。'
+  echo 'Microi：不要删除数据库、MinIO、MongoDB、Redis 数据目录，也不要执行 docker compose down -v。'
+  echo ''
+  echo '------------------------------------------------------------------'
+  echo '当前容器状态（仅供排查，不等同 readiness）：'
+  echo '------------------------------------------------------------------'
+  docker ps --filter 'name=microi-install-' --format 'table {{.Names}}\t{{.Status}}' 2>/dev/null || true
+  echo '=================================================================='
+}
+
+on_install_exit() {
+  local exit_code="${1:-1}"
+  trap - EXIT
+  cleanup_database_import_temp || true
+  if [ "${exit_code}" -ne 0 ] \
+    && [ "${INSTALL_RECOVERY_SUMMARY_ENABLED:-0}" = "1" ] \
+    && [ "${INSTALL_SUMMARY_PRINTED:-0}" != "1" ]; then
+    print_install_recovery_summary "${exit_code}" || true
+  fi
+  exit "${exit_code}"
+}
+
+trap 'on_install_exit "$?"' EXIT
 
 # ============================================================
 # 数据库安装配置
@@ -507,6 +694,18 @@ if [ "${MICROI_INSTALL_PROFILE_ONLY:-0}" = "1" ]; then
   exit 0
 fi
 
+# OCR 安装计划的无副作用验收入口：不读取交互、不访问网络、不修改 Docker。
+if [ "${MICROI_INSTALL_OCR_PLAN_ONLY:-0}" = "1" ]; then
+  echo "OCR_IMAGE=${OCR_IMAGE}"
+  echo "OCR_CONTAINER_NAME=${OCR_CONTAINER_NAME}"
+  echo "OCR_INTERNAL_PORT=${OCR_INTERNAL_PORT}"
+  echo "OCR_RUNTIME_NETWORK=${OCR_RUNTIME_NETWORK}"
+  echo "OCR_SERVICE_ENDPOINT=${OCR_SERVICE_ENDPOINT}"
+  echo 'OCR_DEFAULT_INSTALL=1'
+  echo 'OCR_FIREWALL_EXPOSED=0'
+  exit 0
+fi
+
 # === 修复中文显示：确保终端使用 UTF-8 编码 ===
 export LANG=en_US.UTF-8 2>/dev/null || export LANG=C.UTF-8 2>/dev/null || true
 export LC_ALL=en_US.UTF-8 2>/dev/null || export LC_ALL=C.UTF-8 2>/dev/null || true
@@ -539,6 +738,19 @@ detect_os() {
   echo "Microi：检测到操作系统: ${OS_ID} ${OS_VERSION_ID}"
 }
 detect_os
+
+# 当前发布的 PaddlePaddle CPU 固定镜像只交付 linux/amd64。显式失败，避免在
+# ARM 主机拉到错误架构后才于安装中途报 exec format error。
+case "$(uname -m)" in
+  x86_64|amd64)
+    echo 'Microi：OCR 镜像架构检查通过（linux/amd64）✓'
+    ;;
+  *)
+    echo "Microi：错误：当前一键安装 OCR 镜像仅支持 linux/amd64，检测到 $(uname -m)。"
+    echo 'Microi：请使用 x86_64 服务器，或按官方文档单独构建与当前架构匹配的 OCR 镜像。'
+    exit 1
+    ;;
+esac
 
 # 判断包管理器类型
 is_debian_based() {
@@ -727,7 +939,9 @@ fi
 echo ''
 echo 'Microi：是否创建并让所有编排使用指定网段的 microi Docker 网络？'
 echo 'Microi：输入 1 配置，输入 0 使用 Docker Compose 默认网络：'
+echo 'Microi：默认是0（否），一般情况请直接按Enter跳过设置。'
 read -r install_microi_network
+install_microi_network="${install_microi_network:-0}"
 
 if [ "${install_microi_network}" == "1" ]; then
   INSTALL_MICROI_NETWORK=1
@@ -801,9 +1015,9 @@ MICROI_DISABLED_VECTOR_INSTALL_PROMPT
 # === LibreTranslate 翻译服务安装选择 ===
 echo ''
 echo 'Microi：是否安装开源 LibreTranslate 翻译服务？'
-echo 'Microi：直接按 Enter 或输入 0 跳过（默认）；输入 1 安装：'
+echo 'Microi：默认是 1（安装），一般情况请直接按 Enter 使用吾码官方推荐配置；输入 0 跳过：'
 read -r install_libretranslate
-install_libretranslate="${install_libretranslate:-0}"
+install_libretranslate="${install_libretranslate:-1}"
 
 LIBRETRANSLATE_SUPPORTED_LANGS="zh zt en ja ko vi th id ms tl hi ur ar ru de fr es pt it nl tr pl uk"
 LIBRETRANSLATE_LANGS=""
@@ -1080,21 +1294,53 @@ ensure_microi_network() {
   COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi:\n    external: true\n    name: microi'
 }
 
+# OCR、LibreTranslate 与 API 始终通过独立的内部 bridge 网络通信。服务的
+# 宿主机诊断端口仅绑定 127.0.0.1；API 不依赖宿主机 LAN 地址访问这些服务。
+ensure_ocr_runtime_network() {
+  local existing_driver
+  if docker network inspect "${OCR_RUNTIME_NETWORK}" > /dev/null 2>&1; then
+    existing_driver=$(docker network inspect "${OCR_RUNTIME_NETWORK}" --format '{{.Driver}}')
+    if [ "${existing_driver}" != "bridge" ]; then
+      echo "Microi：错误：已存在 ${OCR_RUNTIME_NETWORK} 网络，但驱动为 ${existing_driver}，不是 bridge。"
+      echo 'Microi：为避免影响现有容器，脚本不会自动删除或修改该网络。'
+      exit 1
+    fi
+    echo "Microi：已复用 OCR 内部网络 ${OCR_RUNTIME_NETWORK} ✓"
+  else
+    echo "Microi：正在创建 OCR 内部网络 ${OCR_RUNTIME_NETWORK}..."
+    if ! docker network create --driver bridge "${OCR_RUNTIME_NETWORK}" > /dev/null; then
+      echo "Microi：错误：OCR 内部网络 ${OCR_RUNTIME_NETWORK} 创建失败。"
+      exit 1
+    fi
+    echo "Microi：OCR 内部网络 ${OCR_RUNTIME_NETWORK} 创建成功 ✓"
+  fi
+
+  OCR_COMPOSE_SERVICE_NETWORK=$'    networks:\n      - microi-ocr'
+  OCR_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi-ocr:\n    external: true\n    name: microi-ocr'
+  if [ "${INSTALL_MICROI_NETWORK}" = "1" ]; then
+    APP_API_SERVICE_NETWORK=$'    networks:\n      - microi\n      - microi-ocr'
+    APP_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi:\n    external: true\n    name: microi\n  microi-ocr:\n    external: true\n    name: microi-ocr'
+  else
+    APP_API_SERVICE_NETWORK=$'    networks:\n      - microi-ocr'
+    APP_COMPOSE_EXTERNAL_NETWORKS="${OCR_COMPOSE_EXTERNAL_NETWORKS}"
+  fi
+}
+
 # === 检查已有容器/编排 ===
 EXISTING_MICROI_CONTAINERS=$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep '^microi-install-' || true)
 if [ -n "${EXISTING_MICROI_CONTAINERS}" ]; then
   echo ''
-  echo 'Microi：错误：检测到已有 microi-install 相关容器，请先清理后再运行此脚本。'
+  echo 'Microi：错误：检测到已有 microi-install 相关容器。为避免重复导入数据库，脚本已安全停止。'
   echo 'Microi：已检测到以下容器：'
   echo "${EXISTING_MICROI_CONTAINERS}"
-  echo 'Microi：清理方式一（推荐）：进入各编排目录执行 docker compose down'
-  echo 'Microi：清理方式二：执行以下命令强制删除所有相关容器：'
-  echo '  docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker rm -f'
-  echo 'Microi：注意此操作将会影响数据库、MinIO文件等数据，请谨慎操作！'
+  echo 'Microi：如果这是刚刚中断、尚未投入使用的新安装，请先备份 /microi/compose 下现有编排文件并记录其中的数据目录。'
+  echo 'Microi：然后只在对应 microi-install-* 编排目录执行 docker compose down（禁止使用 -v），再重新下载最新版脚本安装。'
+  echo 'Microi：不要删除数据库、MinIO、MongoDB、Redis 数据目录；新安装验收通过前保留原目录作为恢复点。'
   exit 1
 fi
 
 ensure_microi_network
+ensure_ocr_runtime_network
 
 # === 安装依赖工具（unzip/curl/openssl） ===
 install_deps() {
@@ -1169,6 +1415,20 @@ generate_random_password() {
   printf 'Aa1%s' "${random_hex:0:13}"
 }
 
+generate_random_auth_secret() {
+  # sys_osclients.AuthSecret 的历史列通常为 varchar(50)，48 个十六进制字符
+  # 同时满足 JWT 至少 32 字符与旧库列宽限制；不会写入 API 环境变量。
+  openssl rand -hex 24
+}
+
+generate_uuid() {
+  local random_hex
+  random_hex=$(openssl rand -hex 16)
+  printf '%s-%s-%s-%s-%s' \
+    "${random_hex:0:8}" "${random_hex:8:4}" "${random_hex:12:4}" \
+    "${random_hex:16:4}" "${random_hex:20:12}"
+}
+
 generate_random_data_dir() {
   local container_name="$1"
   local dir="/home/data-${container_name}-$(openssl rand -hex 4)"
@@ -1177,12 +1437,12 @@ generate_random_data_dir() {
 }
 
 # === 端口检测 ===
-PORT_LABELS=("Web(microi-install-client)" "API(microi-install-api)" "${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console")
-if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  PORT_LABELS+=("Ollama" "Qdrant-HTTP" "Qdrant-gRPC")
-fi
+PORT_LABELS=("Web(microi-install-client)" "API(microi-install-api)" "${DATABASE_PORT_NAME}" "Redis" "MongoDB" "MinIO-API" "MinIO-Console" "OCR")
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   PORT_LABELS+=("LibreTranslate")
+fi
+if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
+  PORT_LABELS+=("Ollama" "Qdrant-HTTP" "Qdrant-gRPC")
 fi
 PORT_COUNT=${#PORT_LABELS[@]}
 
@@ -1269,7 +1529,14 @@ REDIS_PORT=$((PORT_BASE + 3))
 MONGO_PORT=$((PORT_BASE + 4))
 MINIO_PORT=$((PORT_BASE + 5))
 MINIO_CONSOLE_PORT=$((PORT_BASE + 6))
-NEXT_PORT_OFFSET=7
+OCR_PORT=$((PORT_BASE + 7))
+NEXT_PORT_OFFSET=8
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  LIBRETRANSLATE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
+  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
+else
+  LIBRETRANSLATE_PORT=""
+fi
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   OLLAMA_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
   QDRANT_HTTP_PORT=$((PORT_BASE + NEXT_PORT_OFFSET + 1))
@@ -1279,12 +1546,6 @@ else
   OLLAMA_PORT=""
   QDRANT_HTTP_PORT=""
   QDRANT_GRPC_PORT=""
-fi
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  LIBRETRANSLATE_PORT=$((PORT_BASE + NEXT_PORT_OFFSET))
-  NEXT_PORT_OFFSET=$((NEXT_PORT_OFFSET + 1))
-else
-  LIBRETRANSLATE_PORT=""
 fi
 
 echo ''
@@ -1297,24 +1558,25 @@ printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
 printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
 printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
 printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
+printf '  %-18s %s\n' "OCR:"           "${OCR_PORT}（仅绑定 127.0.0.1）"
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  printf '  %-18s %s\n' "LibreTranslate:" "127.0.0.1:${LIBRETRANSLATE_PORT}（API 走 Docker 内网）"
+fi
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   printf '  %-18s %s\n' "Ollama:"        "${OLLAMA_PORT}"
   printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
   printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
 fi
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}"
-fi
 echo '------------------------------------------------------------------'
 
-ALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+ALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT} ${OCR_PORT}"
 FIREWALL_PORTS="${VUE_PORT} ${API_PORT} ${MYSQL_PORT} ${REDIS_PORT} ${MONGO_PORT} ${MINIO_PORT} ${MINIO_CONSOLE_PORT}"
+if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
+  ALL_PORTS="${ALL_PORTS} ${LIBRETRANSLATE_PORT}"
+fi
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   ALL_PORTS="${ALL_PORTS} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT}"
   FIREWALL_PORTS="${FIREWALL_PORTS} ${OLLAMA_PORT} ${QDRANT_HTTP_PORT} ${QDRANT_GRPC_PORT}"
-fi
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  ALL_PORTS="${ALL_PORTS} ${LIBRETRANSLATE_PORT}"
 fi
 echo ''
 echo '[步骤3/11] 端口分配完成 ✓'
@@ -1333,6 +1595,7 @@ REDIS_PASSWORD=$(generate_random_password)
 MONGO_ROOT_PASSWORD=$(generate_random_password)
 MINIO_ACCESS_KEY=$(generate_random_password)
 MINIO_SECRET_KEY=$(generate_random_password)
+AUTH_SECRET=$(generate_random_auth_secret)
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   QDRANT_API_KEY=$(generate_random_password)
 else
@@ -1345,7 +1608,7 @@ else
 fi
 
 # 验证密码是否生成成功（bash <4.4 下 set -e 不会传播到 $() 中）
-_REQUIRED_PW_VARS="DATABASE_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY"
+_REQUIRED_PW_VARS="DATABASE_PASSWORD REDIS_PASSWORD MONGO_ROOT_PASSWORD MINIO_ACCESS_KEY MINIO_SECRET_KEY AUTH_SECRET"
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   _REQUIRED_PW_VARS="${_REQUIRED_PW_VARS} QDRANT_API_KEY"
 fi
@@ -1370,6 +1633,10 @@ echo 'Microi：各服务数据目录已创建 ✓'
 
 echo ''
 echo '[步骤4/11] 密码与数据目录就绪 ✓'
+
+# 从这里开始，任何失败都必须在保持非零退出码的前提下输出已生成的端口、
+# 凭据和数据目录，避免后段迁移/健康门禁失败后用户丢失恢复信息。
+INSTALL_RECOVERY_SUMMARY_ENABLED=1
 
 
 # ============================================================
@@ -1456,6 +1723,7 @@ for port in ${FIREWALL_PORTS}; do
   firewall_open_port "${port}"
   echo "Microi：  端口 ${port}/tcp 已开放 ✓"
 done
+echo "Microi：  OCR ${OCR_PORT}/tcp 仅绑定 127.0.0.1，未自动开放到宿主机防火墙 ✓"
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo "Microi：  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 仅供平台内部调用，未自动开放到宿主机防火墙 ✓"
 fi
@@ -1520,7 +1788,6 @@ case "${DATABASE_CHOICE}" in
   1|2)
     generate_mysql_config > "${DATABASE_DIR}/my_microi.cnf"
     cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
@@ -1549,7 +1816,6 @@ EOF
     ;;
   3)
     cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
@@ -1575,7 +1841,6 @@ EOF
     ;;
   5)
     cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
@@ -1611,7 +1876,6 @@ EOF
     ;;
   6)
     cat > "${DATABASE_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
@@ -1670,7 +1934,7 @@ for i in $(seq 1 60); do
   fi
   case "${DATABASE_CHOICE}" in
     1|2)
-      docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
+      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
       ;;
     3)
       docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q 'SELECT 1' > /dev/null 2>&1 && DATABASE_READY=true
@@ -1700,7 +1964,7 @@ database_exec_sql() {
   local sql="$1"
   case "${DATABASE_CHOICE}" in
     1|2)
-      docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" microi_demo -e "${sql}"
+      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot microi_demo -e "${sql}"
       ;;
     3)
       docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d microi_demo -Q "${sql}"
@@ -1714,6 +1978,149 @@ database_exec_sql() {
   esac
 }
 
+version_at_least() {
+  local actual="$1"
+  local required="$2"
+  local -a actual_parts=()
+  local -a required_parts=()
+  local index actual_number required_number
+  IFS='.' read -r -a actual_parts <<< "${actual}"
+  IFS='.' read -r -a required_parts <<< "${required}"
+  if [ "${#actual_parts[@]}" -ne 4 ] || [ "${#required_parts[@]}" -ne 4 ]; then
+    return 1
+  fi
+  for index in 0 1 2 3; do
+    if ! [[ "${actual_parts[$index]}" =~ ^[0-9]+$ ]] \
+      || ! [[ "${required_parts[$index]}" =~ ^[0-9]+$ ]]; then
+      return 1
+    fi
+    actual_number=$((10#${actual_parts[$index]}))
+    required_number=$((10#${required_parts[$index]}))
+    if [ "${actual_number}" -gt "${required_number}" ]; then
+      return 0
+    fi
+    if [ "${actual_number}" -lt "${required_number}" ]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+# 只维护本次编排对应的精确主租户三元组。恢复包中的其它子租户、其它
+# Product/Dev 或 Internal/Internet 记录必须原样保留，禁止按 OsClient 批量覆盖。
+# 数据库、Redis、MongoDB 连接由 API 十项启动配置提供，不写回 sys_osclients。
+ensure_runtime_auth_secret_schema() {
+  local verify_sql=""
+  local add_sql=""
+  local readback=""
+  case "${DATABASE_CHOICE}" in
+    1|2)
+      verify_sql="SELECT 'MICROI_AUTH_SECRET_SCHEMA_OK' AS Marker FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='sys_osclients' AND column_name='AuthSecret';"
+      add_sql="ALTER TABLE sys_osclients ADD COLUMN AuthSecret varchar(100) NULL;"
+      ;;
+    3)
+      verify_sql="IF COL_LENGTH(N'dbo.sys_osclients',N'AuthSecret') IS NOT NULL SELECT N'MICROI_AUTH_SECRET_SCHEMA_OK' AS Marker;"
+      add_sql="IF COL_LENGTH(N'dbo.sys_osclients',N'AuthSecret') IS NULL ALTER TABLE [dbo].[sys_osclients] ADD [AuthSecret] nvarchar(100) NULL;"
+      ;;
+    5)
+      verify_sql="SELECT 'MICROI_AUTH_SECRET_SCHEMA_OK' AS Marker FROM USER_TAB_COLUMNS WHERE UPPER(TABLE_NAME)='SYS_OSCLIENTS' AND UPPER(COLUMN_NAME)='AUTHSECRET';"
+      add_sql="ALTER TABLE \"sys_osclients\" ADD \"AuthSecret\" VARCHAR(100);"
+      ;;
+    6)
+      verify_sql="SELECT 'MICROI_AUTH_SECRET_SCHEMA_OK' AS Marker FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='sys_osclients' AND column_name='AuthSecret';"
+      add_sql="ALTER TABLE \"sys_osclients\" ADD COLUMN IF NOT EXISTS \"AuthSecret\" varchar(100) NULL;"
+      ;;
+  esac
+
+  readback=$(database_exec_sql "${verify_sql}" 2>&1 || true)
+  if ! printf '%s\n' "${readback}" | grep -q 'MICROI_AUTH_SECRET_SCHEMA_OK'; then
+    echo 'Microi：旧恢复库缺少 sys_osclients.AuthSecret，正在补齐安全启动必需列...'
+    if ! database_exec_sql "${add_sql}" > /dev/null; then
+      echo 'Microi：错误：补齐 sys_osclients.AuthSecret 失败，API 不会以临时 JWT 密钥启动。'
+      return 1
+    fi
+    readback=$(database_exec_sql "${verify_sql}" 2>&1 || true)
+  fi
+  if ! printf '%s\n' "${readback}" | grep -q 'MICROI_AUTH_SECRET_SCHEMA_OK'; then
+    echo 'Microi：错误：sys_osclients.AuthSecret 建列后回读失败。'
+    return 1
+  fi
+}
+
+ensure_runtime_main_tenant() {
+  local state_sql=""
+  local insert_sql=""
+  local update_sql=""
+  local verify_sql=""
+  local state_readback=""
+  local tenant_id=""
+
+  ensure_runtime_auth_secret_schema || return 1
+
+  case "${DATABASE_CHOICE}" in
+    1|2)
+      state_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_MAIN_TENANT_MISSING' WHEN 1 THEN 'MICROI_MAIN_TENANT_UNIQUE' ELSE CONCAT('MICROI_MAIN_TENANT_DUPLICATE:', COUNT(*)) END AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+      update_sql="UPDATE sys_osclients SET ClientName='${OS_CLIENT}', AuthSecret=CASE WHEN AuthSecret IS NULL OR CHAR_LENGTH(TRIM(AuthSecret))<32 OR LOWER(TRIM(AuthSecret))=LOWER('${OS_CLIENT}') THEN '${AUTH_SECRET}' ELSE AuthSecret END WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+      verify_sql="SELECT 'MICROI_MAIN_TENANT_READY' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND ClientName='${OS_CLIENT}' AND CHAR_LENGTH(TRIM(AuthSecret))>=32 AND LOWER(TRIM(AuthSecret))<>LOWER('${OS_CLIENT}') AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,ClientName,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+      ;;
+    3)
+      state_sql="SELECT CASE COUNT(*) WHEN 0 THEN N'MICROI_MAIN_TENANT_MISSING' WHEN 1 THEN N'MICROI_MAIN_TENANT_UNIQUE' ELSE N'MICROI_MAIN_TENANT_DUPLICATE:' + CONVERT(nvarchar(20), COUNT(*)) END AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+      update_sql="UPDATE [dbo].[sys_osclients] SET [ClientName]=N'${OS_CLIENT}', [AuthSecret]=CASE WHEN [AuthSecret] IS NULL OR LEN(LTRIM(RTRIM([AuthSecret])))<32 OR LOWER(LTRIM(RTRIM([AuthSecret])))=LOWER(N'${OS_CLIENT}') THEN N'${AUTH_SECRET}' ELSE [AuthSecret] END WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+      verify_sql="SELECT N'MICROI_MAIN_TENANT_READY' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [ClientName]=N'${OS_CLIENT}' AND LEN(LTRIM(RTRIM([AuthSecret])))>=32 AND LOWER(LTRIM(RTRIM([AuthSecret])))<>LOWER(N'${OS_CLIENT}') AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[ClientName],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+      ;;
+    5|6)
+      state_sql="SELECT CASE COUNT(*) WHEN 0 THEN 'MICROI_MAIN_TENANT_MISSING' WHEN 1 THEN 'MICROI_MAIN_TENANT_UNIQUE' ELSE 'MICROI_MAIN_TENANT_DUPLICATE:' || CAST(COUNT(*) AS varchar(20)) END AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+      update_sql="UPDATE \"sys_osclients\" SET \"ClientName\"='${OS_CLIENT}', \"AuthSecret\"=CASE WHEN \"AuthSecret\" IS NULL OR LENGTH(TRIM(\"AuthSecret\"))<32 OR LOWER(TRIM(\"AuthSecret\"))=LOWER('${OS_CLIENT}') THEN '${AUTH_SECRET}' ELSE \"AuthSecret\" END WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+      verify_sql="SELECT 'MICROI_MAIN_TENANT_READY' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"ClientName\"='${OS_CLIENT}' AND LENGTH(TRIM(\"AuthSecret\"))>=32 AND LOWER(TRIM(\"AuthSecret\"))<>LOWER('${OS_CLIENT}') AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"ClientName\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+      ;;
+  esac
+
+  state_readback=$(database_exec_sql "${state_sql}" 2>&1 || true)
+  if printf '%s\n' "${state_readback}" | grep -q 'MICROI_MAIN_TENANT_DUPLICATE:'; then
+    echo "Microi：错误：活动主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 存在多条，无法安全选择。"
+    echo 'Microi：请先恢复原始数据库备份或人工合并重复主租户；安装器不会删除或覆盖不明确的数据。'
+    return 1
+  fi
+
+  if printf '%s\n' "${state_readback}" | grep -q 'MICROI_MAIN_TENANT_MISSING'; then
+    tenant_id=$(generate_uuid)
+    case "${DATABASE_CHOICE}" in
+      1|2)
+        insert_sql="INSERT INTO sys_osclients (Id,OsClient,ClientName,OsClientType,OsClientNetwork,IsEnable,IsDeleted) SELECT '${tenant_id}','${OS_CLIENT}','${OS_CLIENT}','${RUNTIME_OS_CLIENT_TYPE}','${RUNTIME_OS_CLIENT_NETWORK}',1,0 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0);"
+        ;;
+      3)
+        insert_sql="IF NOT EXISTS (SELECT 1 FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0) INSERT INTO [dbo].[sys_osclients] ([Id],[OsClient],[ClientName],[OsClientType],[OsClientNetwork],[IsEnable],[IsDeleted]) VALUES ('${tenant_id}',N'${OS_CLIENT}',N'${OS_CLIENT}',N'${RUNTIME_OS_CLIENT_TYPE}',N'${RUNTIME_OS_CLIENT_NETWORK}',1,0);"
+        ;;
+      5)
+        insert_sql="INSERT INTO \"sys_osclients\" (\"Id\",\"OsClient\",\"ClientName\",\"OsClientType\",\"OsClientNetwork\",\"IsEnable\",\"IsDeleted\") SELECT '${tenant_id}','${OS_CLIENT}','${OS_CLIENT}','${RUNTIME_OS_CLIENT_TYPE}','${RUNTIME_OS_CLIENT_NETWORK}',1,0 FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0);"
+        ;;
+      6)
+        insert_sql="INSERT INTO \"sys_osclients\" (\"Id\",\"OsClient\",\"ClientName\",\"OsClientType\",\"OsClientNetwork\",\"IsEnable\",\"IsDeleted\") SELECT '${tenant_id}','${OS_CLIENT}','${OS_CLIENT}','${RUNTIME_OS_CLIENT_TYPE}','${RUNTIME_OS_CLIENT_NETWORK}',1,0 WHERE NOT EXISTS (SELECT 1 FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0);"
+        ;;
+    esac
+    if ! database_exec_sql "${insert_sql}" > /dev/null; then
+      echo "Microi：错误：创建主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 失败。"
+      return 1
+    fi
+    echo "Microi：恢复库中不存在目标主租户，已创建 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK}；数据库与 Redis/MongoDB 连接继续由编排启动项提供 ✓"
+  elif ! printf '%s\n' "${state_readback}" | grep -q 'MICROI_MAIN_TENANT_UNIQUE'; then
+    echo 'Microi：错误：无法读取 sys_osclients 主租户状态，已停止以保护恢复库。'
+    printf '%s\n' "${state_readback}" | tail -20
+    return 1
+  fi
+
+  if ! database_exec_sql "${update_sql}" > /dev/null; then
+    echo 'Microi：错误：规范化目标主租户 ClientName/AuthSecret 失败。'
+    return 1
+  fi
+  state_readback=$(database_exec_sql "${verify_sql}" 2>&1 || true)
+  if ! printf '%s\n' "${state_readback}" | grep -q 'MICROI_MAIN_TENANT_READY'; then
+    echo 'Microi：错误：主租户创建/更新后回读不唯一，已停止后续安装。'
+    return 1
+  fi
+  echo "Microi：主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} 已唯一就绪，JWT AuthSecret 已持久化且原有子租户保持不变 ✓"
+}
+
 if [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; then
   echo 'Microi：配置 MySQL 远程访问权限...'
   if [ "${MYSQL_VERSION}" = "8.0" ]; then
@@ -1721,21 +2128,14 @@ if [ "${DATABASE_CHOICE}" = "1" ] || [ "${DATABASE_CHOICE}" = "2" ]; then
   else
     MYSQL_GRANT_SQL="USE mysql; GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '${DATABASE_PASSWORD}' WITH GRANT OPTION;"
   fi
-  docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e "${MYSQL_GRANT_SQL}"
-  docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
+  docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e "${MYSQL_GRANT_SQL}"
+  docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e 'FLUSH PRIVILEGES;' > /dev/null 2>&1 || true
 fi
 
 # 获取、复核并安全展开数据库包。自定义原文件只读使用，清理时绝不删除。
 SQL_ZIP_IS_TEMP=0
 SQL_TMP_DIR=$(mktemp -d "/tmp/microi_database_${DATABASE_ENGINE_KEY}.XXXXXX")
 SQL_FILE="${SQL_TMP_DIR}/microi-database-init.sql"
-cleanup_database_import_temp() {
-  rm -rf "${SQL_TMP_DIR:-/tmp/microi-no-such-dir}"
-  if [ "${SQL_ZIP_IS_TEMP:-0}" = '1' ] && [ -n "${SQL_ZIP_FILE:-}" ]; then
-    rm -f "${SQL_ZIP_FILE}"
-  fi
-}
-trap cleanup_database_import_temp EXIT
 
 if [ "${SQL_SOURCE_MODE}" = 'custom' ]; then
   SQL_ZIP_FILE="${SQL_CUSTOM_ZIP_PATH}"
@@ -1762,7 +2162,7 @@ fi
 echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 数据库（${SQL_ARCHIVE_ENTRY}，可能需要几分钟）..."
 case "${DATABASE_CHOICE}" in
   1|2)
-    docker exec -i "${DATABASE_CONTAINER_NAME}" mysql -uroot -p"${DATABASE_PASSWORD}" -e 'CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+    docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e 'CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
     # 仅本次恢复会话关闭 InnoDB 严格建表校验，兼容来源库中已存在的超宽 Dynamic 表；
     # 同时关闭本会话 binlog 并按事务批量提交，避免几十万条单行 INSERT 每条 fsync。
     # 不修改 global 配置，平台恢复完成后的所有新连接仍保持 MySQL 默认严格和安全落盘行为。
@@ -1770,7 +2170,7 @@ case "${DATABASE_CHOICE}" in
       printf "SET SESSION innodb_strict_mode=OFF; SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'; SET SESSION sql_log_bin=0; SET autocommit=0;\n"
     }
     run_mysql_import_stream() {
-      docker exec -i "${DATABASE_CONTAINER_NAME}" mysql --binary-mode=1 -uroot -p"${DATABASE_PASSWORD}" microi_demo
+      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --binary-mode=1 -uroot microi_demo
     }
     set +e
     if grep -q '^-- View structure' "${SQL_FILE}"; then
@@ -1787,7 +2187,7 @@ case "${DATABASE_CHOICE}" in
         emit_mysql_import_preamble
         sed -n '/^-- View structure/,$p' "${SQL_FILE}"
         printf '\nCOMMIT;\n'
-      } | docker exec -i "${DATABASE_CONTAINER_NAME}" mysql --force --binary-mode=1 -uroot -p"${DATABASE_PASSWORD}" microi_demo > "${SQL_TMP_DIR}/view-seed.log" 2>&1
+      } | docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --force --binary-mode=1 -uroot microi_demo > "${SQL_TMP_DIR}/view-seed.log" 2>&1
       MYSQL_VIEW_SEED_PIPE_STATUSES=("${PIPESTATUS[@]}")
 
       {
@@ -1855,25 +2255,35 @@ echo 'Microi：数据库还原完成 ✓'
 # 避免刚恢复就执行旧环境任务。执行失败时终止安装，不带病启动平台。
 echo 'Microi：暂停恢复库中的定时任务...'
 case "${DATABASE_CHOICE}" in
-  1|2) PAUSE_SCHEDULE_SQL="UPDATE diy_schedule_job SET Status='暂停'; UPDATE microi_job_triggers SET TRIGGER_STATE='PAUSED';" ;;
-  3) PAUSE_SCHEDULE_SQL="UPDATE [dbo].[diy_schedule_job] SET [Status]=N'暂停'; UPDATE [dbo].[microi_job_triggers] SET [TRIGGER_STATE]=N'PAUSED';" ;;
-  5|6) PAUSE_SCHEDULE_SQL="UPDATE \"diy_schedule_job\" SET \"Status\"='暂停'; UPDATE \"microi_job_triggers\" SET \"TRIGGER_STATE\"='PAUSED';" ;;
+  1|2)
+    PAUSE_SCHEDULE_SQL="UPDATE diy_schedule_job SET Status='暂停'; UPDATE microi_job_triggers SET TRIGGER_STATE='PAUSED';"
+    PAUSE_SCHEDULE_VERIFY_SQL="SELECT 'MICROI_SCHEDULES_PAUSED' AS Marker WHERE NOT EXISTS (SELECT 1 FROM diy_schedule_job WHERE IFNULL(Status,'')<>'暂停') AND NOT EXISTS (SELECT 1 FROM microi_job_triggers WHERE IFNULL(TRIGGER_STATE,'')<>'PAUSED');"
+    ;;
+  3)
+    PAUSE_SCHEDULE_SQL="UPDATE [dbo].[diy_schedule_job] SET [Status]=N'暂停'; UPDATE [dbo].[microi_job_triggers] SET [TRIGGER_STATE]=N'PAUSED';"
+    PAUSE_SCHEDULE_VERIFY_SQL="IF NOT EXISTS (SELECT 1 FROM [dbo].[diy_schedule_job] WHERE COALESCE([Status],N'')<>N'暂停') AND NOT EXISTS (SELECT 1 FROM [dbo].[microi_job_triggers] WHERE COALESCE([TRIGGER_STATE],N'')<>N'PAUSED') SELECT N'MICROI_SCHEDULES_PAUSED' AS Marker;"
+    ;;
+  5)
+    PAUSE_SCHEDULE_SQL="UPDATE \"diy_schedule_job\" SET \"Status\"='暂停'; UPDATE \"microi_job_triggers\" SET \"TRIGGER_STATE\"='PAUSED';"
+    PAUSE_SCHEDULE_VERIFY_SQL="SELECT 'MICROI_SCHEDULES_PAUSED' AS Marker FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM \"diy_schedule_job\" WHERE COALESCE(\"Status\",'')<>'暂停') AND NOT EXISTS (SELECT 1 FROM \"microi_job_triggers\" WHERE COALESCE(\"TRIGGER_STATE\",'')<>'PAUSED');"
+    ;;
+  6)
+    PAUSE_SCHEDULE_SQL="UPDATE \"diy_schedule_job\" SET \"Status\"='暂停'; UPDATE \"microi_job_triggers\" SET \"TRIGGER_STATE\"='PAUSED';"
+    PAUSE_SCHEDULE_VERIFY_SQL="SELECT 'MICROI_SCHEDULES_PAUSED' AS Marker WHERE NOT EXISTS (SELECT 1 FROM \"diy_schedule_job\" WHERE COALESCE(\"Status\",'')<>'暂停') AND NOT EXISTS (SELECT 1 FROM \"microi_job_triggers\" WHERE COALESCE(\"TRIGGER_STATE\",'')<>'PAUSED');"
+    ;;
 esac
 database_exec_sql "${PAUSE_SCHEDULE_SQL}"
-echo 'Microi：定时任务已全部暂停 ✓'
+PAUSE_SCHEDULE_READBACK=$(database_exec_sql "${PAUSE_SCHEDULE_VERIFY_SQL}" 2>&1 || true)
+if ! printf '%s\n' "${PAUSE_SCHEDULE_READBACK}" | grep -q 'MICROI_SCHEDULES_PAUSED'; then
+  echo 'Microi：错误：恢复库的定时任务暂停状态回读不一致，已在 API/Worker 启动前停止。'
+  exit 1
+fi
+echo 'Microi：定时任务已全部暂停并回读一致 ✓'
 
-echo "Microi：更新 SaaS 主租户为 ${OS_CLIENT}..."
-case "${DATABASE_CHOICE}" in
-  1|2) OS_CLIENT_SQL="UPDATE sys_osclients SET OsClient='${OS_CLIENT}', ClientName='${OS_CLIENT}' WHERE IFNULL(IsDeleted, 0) = 0;" ;;
-  3) OS_CLIENT_SQL="UPDATE [dbo].[sys_osclients] SET [OsClient]=N'${OS_CLIENT}', [ClientName]=N'${OS_CLIENT}' WHERE COALESCE([IsDeleted], 0) = 0;" ;;
-  5) OS_CLIENT_SQL="UPDATE \"sys_osclients\" SET \"OsClient\"='${OS_CLIENT}', \"ClientName\"='${OS_CLIENT}' WHERE COALESCE(\"IsDeleted\", 0) = 0;" ;;
-  6) OS_CLIENT_SQL="UPDATE \"sys_osclients\" SET \"OsClient\"='${OS_CLIENT}', \"ClientName\"='${OS_CLIENT}' WHERE COALESCE(\"IsDeleted\", 0) = 0;" ;;
-esac
-database_exec_sql "${OS_CLIENT_SQL}"
-echo 'Microi：SaaS 主租户 OsClient、ClientName 更新完成 ✓'
+echo "Microi：核对并初始化 SaaS 主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK}..."
+ensure_runtime_main_tenant
 
 cleanup_database_import_temp
-trap - EXIT
 echo 'Microi：临时文件已清理 ✓'
 
 echo ''
@@ -1911,7 +2321,6 @@ echo "Microi：Redis 端口: ${REDIS_PORT}, 密码: ${REDIS_PASSWORD}, maxmemory
 
 mkdir -p "${REDIS_DIR}"
 cat > "${REDIS_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-redis:
     image: registry.cn-hangzhou.aliyuncs.com/microios/redis:7.4.2
@@ -1986,7 +2395,6 @@ echo "Microi：MongoDB 端口: ${MONGO_PORT}, Root密码: ${MONGO_ROOT_PASSWORD}
 
 mkdir -p "${MONGO_DIR}"
 cat > "${MONGO_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-mongodb:
     image: registry.cn-hangzhou.aliyuncs.com/microios/mongo:latest
@@ -2026,13 +2434,48 @@ echo ''
 echo '[步骤9/11] 部署 MinIO'
 echo '------------------------------------------------------------------'
 
+# MinIO 配置写入发生在 API/Upgrade 启动前，只能依赖空库与存量库共同具备的
+# 必需字段。NetworkIsInternet 是旧版可选字段，当前运行时由允许的启动项
+# OsClientNetwork 决定内外网端点，安装器不再要求或写入该字段。
+case "${DATABASE_CHOICE}" in
+  1|2)
+    MINIO_SCHEMA_VERIFY_SQL="SELECT 'MICROI_MINIO_SCHEMA_OK' AS Marker FROM information_schema.columns WHERE table_schema=DATABASE() AND LOWER(table_name)='sys_osclients' AND LOWER(column_name) IN ('hdfs','minioaccesskey','miniosecretkey','minioendpoint','minioendpointinternet','minioendpointssl','minioprivateendpointssl','minioprivatebucketname','miniopublicbucketname','minioregion','osclient','osclienttype','osclientnetwork','isenable','isdeleted') HAVING COUNT(DISTINCT LOWER(column_name))=15;"
+    MINIO_TENANT_VERIFY_SQL="SELECT 'MICROI_MINIO_TENANT_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+    ;;
+  3)
+    MINIO_SCHEMA_VERIFY_SQL="IF (SELECT COUNT(DISTINCT LOWER(c.[name])) FROM sys.columns c INNER JOIN sys.objects o ON c.[object_id]=o.[object_id] WHERE LOWER(o.[name])=N'sys_osclients' AND SCHEMA_NAME(o.[schema_id])=N'dbo' AND LOWER(c.[name]) IN (N'hdfs',N'minioaccesskey',N'miniosecretkey',N'minioendpoint',N'minioendpointinternet',N'minioendpointssl',N'minioprivateendpointssl',N'minioprivatebucketname',N'miniopublicbucketname',N'minioregion',N'osclient',N'osclienttype',N'osclientnetwork',N'isenable',N'isdeleted'))=15 SELECT N'MICROI_MINIO_SCHEMA_OK' AS Marker;"
+    MINIO_TENANT_VERIFY_SQL="SELECT N'MICROI_MINIO_TENANT_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+    ;;
+  5)
+    MINIO_SCHEMA_VERIFY_SQL="SELECT 'MICROI_MINIO_SCHEMA_OK' AS Marker FROM USER_TAB_COLUMNS WHERE UPPER(TABLE_NAME)='SYS_OSCLIENTS' AND UPPER(COLUMN_NAME) IN ('HDFS','MINIOACCESSKEY','MINIOSECRETKEY','MINIOENDPOINT','MINIOENDPOINTINTERNET','MINIOENDPOINTSSL','MINIOPRIVATEENDPOINTSSL','MINIOPRIVATEBUCKETNAME','MINIOPUBLICBUCKETNAME','MINIOREGION','OSCLIENT','OSCLIENTTYPE','OSCLIENTNETWORK','ISENABLE','ISDELETED') HAVING COUNT(DISTINCT UPPER(COLUMN_NAME))=15;"
+    MINIO_TENANT_VERIFY_SQL="SELECT 'MICROI_MINIO_TENANT_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    ;;
+  6)
+    MINIO_SCHEMA_VERIFY_SQL="SELECT 'MICROI_MINIO_SCHEMA_OK' AS Marker WHERE (SELECT COUNT(DISTINCT LOWER(column_name)) FROM information_schema.columns WHERE table_schema=current_schema() AND LOWER(table_name)='sys_osclients' AND LOWER(column_name) IN ('hdfs','minioaccesskey','miniosecretkey','minioendpoint','minioendpointinternet','minioendpointssl','minioprivateendpointssl','minioprivatebucketname','miniopublicbucketname','minioregion','osclient','osclienttype','osclientnetwork','isenable','isdeleted'))=15;"
+    MINIO_TENANT_VERIFY_SQL="SELECT 'MICROI_MINIO_TENANT_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    ;;
+esac
+
+MINIO_SCHEMA_READBACK=$(database_exec_sql "${MINIO_SCHEMA_VERIFY_SQL}" 2>&1 || true)
+if ! printf '%s\n' "${MINIO_SCHEMA_READBACK}" | grep -q 'MICROI_MINIO_SCHEMA_OK'; then
+  echo 'Microi：错误：sys_osclients 缺少 MinIO 安装所需的必需字段，已在创建 MinIO 编排前停止。'
+  echo 'Microi：请使用当前官方空数据库包，或先通过正式平台升级补齐字段；脚本不会直接猜测并修改客户数据库结构。'
+  exit 1
+fi
+MINIO_TENANT_READBACK=$(database_exec_sql "${MINIO_TENANT_VERIFY_SQL}" 2>&1 || true)
+if ! printf '%s\n' "${MINIO_TENANT_READBACK}" | grep -q 'MICROI_MINIO_TENANT_OK'; then
+  echo "Microi：错误：主租户初始化后仍未唯一匹配 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK}，已在创建 MinIO 编排前停止。"
+  echo 'Microi：请检查恢复库是否存在重复目标三元组；脚本不会删除或批量覆盖其它租户。'
+  exit 1
+fi
+echo "Microi：MinIO 配置前置检查通过：唯一主租户 ${OS_CLIENT}/${RUNTIME_OS_CLIENT_TYPE}/${RUNTIME_OS_CLIENT_NETWORK} ✓"
+
 MINIO_DIR="${COMPOSE_BASE_DIR}/microi-install-minio"
 
 echo "Microi：MinIO API端口: ${MINIO_PORT}, Console端口: ${MINIO_CONSOLE_PORT}"
 
 mkdir -p "${MINIO_DIR}"
 cat > "${MINIO_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-minio:
     image: registry.cn-hangzhou.aliyuncs.com/microios/minio:latest
@@ -2123,27 +2566,30 @@ run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"
 rm -rf "${MINIO_MC_CONFIG_DIR}"
 echo "Microi：MinIO 桶已初始化：${MINIO_PRIVATE_BUCKET}（私有）、${MINIO_PUBLIC_BUCKET}（public）✓"
 
-if [ "${install_type}" == "g" ]; then
-  MINIO_NETWORK_IS_INTERNET=1
-else
-  MINIO_NETWORK_IS_INTERNET=0
-fi
 MINIO_INTERNAL_ENDPOINT="${LAN_IP}:${MINIO_PORT}"
 MINIO_INTERNET_ENDPOINT="${ACCESS_IP}:${MINIO_PORT}"
 case "${DATABASE_CHOICE}" in
   1|2)
-    MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY}', MinIOSecretKey='${MINIO_SECRET_KEY}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}', MinIOEndPointSSL=0, MinIOPrivateEndPointSSL=0, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}', MinIORegion='', NetworkIsInternet=${MINIO_NETWORK_IS_INTERNET} WHERE OsClient='${OS_CLIENT}' AND IFNULL(IsDeleted, 0) = 0;"
+    MINIO_CONFIG_SQL="UPDATE sys_osclients SET HDFS='MinIO', MinIOAccessKey='${MINIO_ACCESS_KEY}', MinIOSecretKey='${MINIO_SECRET_KEY}', MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}', MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}', MinIOEndPointSSL=0, MinIOPrivateEndPointSSL=0, MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}', MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}', MinIORegion='' WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+    MINIO_CONFIG_VERIFY_SQL="SELECT 'MICROI_MINIO_CONFIG_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 AND HDFS='MinIO' AND MinIOAccessKey='${MINIO_ACCESS_KEY}' AND MinIOSecretKey='${MINIO_SECRET_KEY}' AND MinIOEndPoint='${MINIO_INTERNAL_ENDPOINT}' AND MinIOEndPointInternet='${MINIO_INTERNET_ENDPOINT}' AND MinIOEndPointSSL=0 AND MinIOPrivateEndPointSSL=0 AND MinIOPrivateBucketName='${MINIO_PRIVATE_BUCKET}' AND MinIOPublicBucketName='${MINIO_PUBLIC_BUCKET}' AND IFNULL(MinIORegion,'')='' GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
     ;;
   3)
-    MINIO_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [HDFS]=N'MinIO', [MinIOAccessKey]=N'${MINIO_ACCESS_KEY}', [MinIOSecretKey]=N'${MINIO_SECRET_KEY}', [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT}', [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT}', [MinIOEndPointSSL]=0, [MinIOPrivateEndPointSSL]=0, [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET}', [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET}', [MinIORegion]=N'', [NetworkIsInternet]=${MINIO_NETWORK_IS_INTERNET} WHERE [OsClient]=N'${OS_CLIENT}' AND COALESCE([IsDeleted], 0) = 0;"
+    MINIO_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [HDFS]=N'MinIO', [MinIOAccessKey]=N'${MINIO_ACCESS_KEY}', [MinIOSecretKey]=N'${MINIO_SECRET_KEY}', [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT}', [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT}', [MinIOEndPointSSL]=0, [MinIOPrivateEndPointSSL]=0, [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET}', [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET}', [MinIORegion]=N'' WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+    MINIO_CONFIG_VERIFY_SQL="SELECT N'MICROI_MINIO_CONFIG_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 AND [HDFS]=N'MinIO' AND [MinIOAccessKey]=N'${MINIO_ACCESS_KEY}' AND [MinIOSecretKey]=N'${MINIO_SECRET_KEY}' AND [MinIOEndPoint]=N'${MINIO_INTERNAL_ENDPOINT}' AND [MinIOEndPointInternet]=N'${MINIO_INTERNET_ENDPOINT}' AND [MinIOEndPointSSL]=0 AND [MinIOPrivateEndPointSSL]=0 AND [MinIOPrivateBucketName]=N'${MINIO_PRIVATE_BUCKET}' AND [MinIOPublicBucketName]=N'${MINIO_PUBLIC_BUCKET}' AND COALESCE([MinIORegion],N'')=N'' GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
     ;;
   5|6)
-    MINIO_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"HDFS\"='MinIO', \"MinIOAccessKey\"='${MINIO_ACCESS_KEY}', \"MinIOSecretKey\"='${MINIO_SECRET_KEY}', \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT}', \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT}', \"MinIOEndPointSSL\"=0, \"MinIOPrivateEndPointSSL\"=0, \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET}', \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET}', \"MinIORegion\"='', \"NetworkIsInternet\"=${MINIO_NETWORK_IS_INTERNET} WHERE \"OsClient\"='${OS_CLIENT}' AND COALESCE(\"IsDeleted\", 0) = 0;"
+    MINIO_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"HDFS\"='MinIO', \"MinIOAccessKey\"='${MINIO_ACCESS_KEY}', \"MinIOSecretKey\"='${MINIO_SECRET_KEY}', \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT}', \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT}', \"MinIOEndPointSSL\"=0, \"MinIOPrivateEndPointSSL\"=0, \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET}', \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET}', \"MinIORegion\"='' WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+    MINIO_CONFIG_VERIFY_SQL="SELECT 'MICROI_MINIO_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 AND \"HDFS\"='MinIO' AND \"MinIOAccessKey\"='${MINIO_ACCESS_KEY}' AND \"MinIOSecretKey\"='${MINIO_SECRET_KEY}' AND \"MinIOEndPoint\"='${MINIO_INTERNAL_ENDPOINT}' AND \"MinIOEndPointInternet\"='${MINIO_INTERNET_ENDPOINT}' AND \"MinIOEndPointSSL\"=0 AND \"MinIOPrivateEndPointSSL\"=0 AND \"MinIOPrivateBucketName\"='${MINIO_PRIVATE_BUCKET}' AND \"MinIOPublicBucketName\"='${MINIO_PUBLIC_BUCKET}' AND COALESCE(\"MinIORegion\",'')='' GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
     ;;
 esac
 echo 'Microi：写入 SaaS 引擎 MinIO 配置...'
 if database_exec_sql "${MINIO_CONFIG_SQL}"; then
-  echo 'Microi：SaaS 引擎 MinIO 配置更新完成 ✓'
+  MINIO_CONFIG_READBACK=$(database_exec_sql "${MINIO_CONFIG_VERIFY_SQL}" 2>&1 || true)
+  if ! printf '%s\n' "${MINIO_CONFIG_READBACK}" | grep -q 'MICROI_MINIO_CONFIG_OK'; then
+    echo 'Microi：错误：SaaS 引擎 MinIO 配置写入后回读不一致。'
+    exit 1
+  fi
+  echo 'Microi：SaaS 引擎 MinIO 配置更新并回读一致 ✓'
 else
   echo 'Microi：错误：SaaS 引擎 MinIO 配置更新失败。'
   exit 1
@@ -2169,11 +2615,98 @@ echo '[步骤9/11] MinIO 部署完成 ✓'
 
 
 # ============================================================
-# 步骤10：部署可选服务与平台应用
+# 步骤10：部署 OCR、可选服务与平台应用
 # ============================================================
 echo ''
-echo '[步骤10/11] 部署可选服务与平台应用'
+echo '[步骤10/11] 部署 OCR、可选服务与平台应用'
 echo '------------------------------------------------------------------'
+
+# --- PaddleX / PaddleOCR ---
+echo ''
+echo 'Microi：部署 PaddleX/PaddleOCR CPU 文字识别服务（默认安装）'
+echo '------------------------------------------------------------------'
+
+OCR_DIR="${COMPOSE_BASE_DIR}/microi-install-ocr"
+echo "Microi：OCR 国内镜像: ${OCR_IMAGE}"
+echo "Microi：OCR 本机端口: 127.0.0.1:${OCR_PORT}，Docker 内网地址: ${OCR_SERVICE_ENDPOINT}"
+
+echo 'Microi：从吾码杭州镜像源拉取固定版本 OCR 镜像...'
+if ! docker pull "${OCR_IMAGE}"; then
+  echo 'Microi：错误：OCR 国内镜像拉取失败，安装已停止，SaaS 引擎不会启用 OCR。'
+  exit 1
+fi
+OCR_IMAGE_ARCH=$(docker image inspect "${OCR_IMAGE}" --format '{{.Architecture}}' 2>/dev/null || true)
+if [ "${OCR_IMAGE_ARCH}" != "amd64" ]; then
+  echo "Microi：错误：OCR 镜像架构应为 amd64，实际回读为 ${OCR_IMAGE_ARCH:-未知}。"
+  exit 1
+fi
+echo 'Microi：OCR 国内镜像已拉取并回读为 linux/amd64 ✓'
+
+mkdir -p "${OCR_DIR}"
+cat > "${OCR_DIR}/docker-compose.yml" <<EOF
+services:
+  microi-install-ocr:
+    image: ${OCR_IMAGE}
+    container_name: ${OCR_CONTAINER_NAME}
+${OCR_COMPOSE_SERVICE_NETWORK}
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${OCR_PORT}:${OCR_INTERNAL_PORT}"
+    shm_size: "4gb"
+    cpus: "4.0"
+    mem_limit: "8g"
+    stop_grace_period: 90s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    volumes:
+      - microi-ocr-models:/home/microi/.paddlex
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',${OCR_INTERNAL_PORT}),3); s.close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+      start_period: 10m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
+volumes:
+  microi-ocr-models:
+    name: microi-ocr-models
+${OCR_COMPOSE_EXTERNAL_NETWORKS}
+EOF
+echo 'Microi：OCR 编排文件已生成 ✓'
+
+compose_up "${OCR_DIR}"
+echo 'Microi：等待 OCR 服务完成模型加载并进入 healthy（最长 20 分钟）...'
+OCR_READY=0
+for _ocr_wait in $(seq 1 120); do
+  OCR_RUNNING=$(docker inspect "${OCR_CONTAINER_NAME}" --format '{{.State.Running}}' 2>/dev/null || true)
+  OCR_HEALTH=$(docker inspect "${OCR_CONTAINER_NAME}" --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || true)
+  if [ "${OCR_HEALTH}" = "healthy" ]; then
+    OCR_READY=1
+    break
+  fi
+  if [ "${OCR_RUNNING}" = "false" ]; then
+    echo 'Microi：错误：OCR 容器在初始化期间退出。'
+    docker logs "${OCR_CONTAINER_NAME}" 2>&1 | tail -100 || true
+    exit 1
+  fi
+  if [ $((_ocr_wait % 6)) -eq 0 ]; then
+    echo "Microi：OCR 模型加载中... ($((_ocr_wait * 10))/1200 秒，状态 ${OCR_HEALTH:-未知})"
+  fi
+  sleep 10
+done
+if [ "${OCR_READY}" != "1" ]; then
+  echo 'Microi：错误：OCR 服务在 20 分钟内未进入 healthy，SaaS 引擎不会启用 OCR。'
+  docker logs "${OCR_CONTAINER_NAME}" 2>&1 | tail -100 || true
+  exit 1
+fi
+echo 'Microi：OCR 服务健康检查通过 ✓'
 
 # 原 Ollama、nomic-embed-text、Qdrant 部署步骤完整保留，但固定注释，不参与一键安装。
 : <<'MICROI_DISABLED_VECTOR_DEPLOYMENT'
@@ -2189,7 +2722,6 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
 
   mkdir -p "${OLLAMA_DIR}"
   cat > "${OLLAMA_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-ollama:
     image: registry.cn-hangzhou.aliyuncs.com/microios/ollama:latest
@@ -2254,7 +2786,6 @@ EOF
 
   mkdir -p "${QDRANT_DIR}"
   cat > "${QDRANT_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-qdrant:
     image: registry.cn-hangzhou.aliyuncs.com/microios/qdrant:latest
@@ -2322,18 +2853,16 @@ if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
   echo '------------------------------------------------------------------'
 
   LIBRETRANSLATE_DIR="${COMPOSE_BASE_DIR}/microi-install-libretranslate"
-  LIBRETRANSLATE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:1.9.6"
   echo "Microi：LibreTranslate 端口: ${LIBRETRANSLATE_PORT}"
   echo "Microi：LibreTranslate 加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
 
   mkdir -p "${LIBRETRANSLATE_DIR}" /microi/libretranslate/models /microi/libretranslate/api-keys
   cat > "${LIBRETRANSLATE_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-translate:
     image: ${LIBRETRANSLATE_IMAGE}
-    container_name: microi-install-libretranslate
-${COMPOSE_SERVICE_NETWORK}
+    container_name: ${LIBRETRANSLATE_CONTAINER_NAME}
+${OCR_COMPOSE_SERVICE_NETWORK}
     user: "0:0"
     security_opt:
       - apparmor=unconfined
@@ -2348,7 +2877,7 @@ ${COMPOSE_SERVICE_NETWORK}
       - LT_WORKERS=1
       - LT_TIMEOUT=120
     ports:
-      - "${LIBRETRANSLATE_PORT}:5000"
+      - "127.0.0.1:${LIBRETRANSLATE_PORT}:${LIBRETRANSLATE_INTERNAL_PORT}"
     logging:
       driver: "json-file"
       options:
@@ -2357,7 +2886,7 @@ ${COMPOSE_SERVICE_NETWORK}
     restart: unless-stopped
     tty: true
     stdin_open: true
-${COMPOSE_EXTERNAL_NETWORKS}
+${OCR_COMPOSE_EXTERNAL_NETWORKS}
 EOF
   echo 'Microi：LibreTranslate 编排文件已生成 ✓'
 
@@ -2381,43 +2910,17 @@ EOF
   echo 'Microi：LibreTranslate 随机 API Key 初始化完成 ✓'
 
   compose_up "${LIBRETRANSLATE_DIR}"
-  if [ "$(docker inspect microi-install-libretranslate --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
+  if [ "$(docker inspect "${LIBRETRANSLATE_CONTAINER_NAME}" --format '{{.State.Running}}' 2>/dev/null)" != "true" ]; then
     echo 'Microi：错误：LibreTranslate 容器启动失败。'
-    docker logs microi-install-libretranslate 2>&1 | tail -100 || true
+    docker logs "${LIBRETRANSLATE_CONTAINER_NAME}" 2>&1 | tail -100 || true
     exit 1
   fi
 
   echo ''
   echo 'Microi：LibreTranslate 翻译服务已安装并启动 ✓'
 
-  TRANSLATE_SERVICE_URL="http://${LAN_IP}:${LIBRETRANSLATE_PORT}"
-  case "${DATABASE_CHOICE}" in
-    1|2)
-      TRANSLATE_CONFIG_SQL="UPDATE sys_osclients SET TranslateProvider='LibreTranslate', TranslateUrl='${TRANSLATE_SERVICE_URL}', TranslateApiKey='${LIBRETRANSLATE_API_KEY}', TranslateTimeout=120 WHERE OsClient='${OS_CLIENT}' AND IFNULL(IsDeleted, 0) = 0;"
-      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND TranslateProvider='LibreTranslate' AND TranslateUrl='${TRANSLATE_SERVICE_URL}' AND TranslateApiKey='${LIBRETRANSLATE_API_KEY}' AND TranslateTimeout=120 AND IFNULL(IsDeleted, 0) = 0;"
-      ;;
-    3)
-      TRANSLATE_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [TranslateProvider]=N'LibreTranslate', [TranslateUrl]=N'${TRANSLATE_SERVICE_URL}', [TranslateApiKey]=N'${LIBRETRANSLATE_API_KEY}', [TranslateTimeout]=120 WHERE [OsClient]=N'${OS_CLIENT}' AND COALESCE([IsDeleted], 0) = 0;"
-      TRANSLATE_CONFIG_VERIFY_SQL="SELECT N'MICROI_TRANSLATE_CONFIG_OK' FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [TranslateProvider]=N'LibreTranslate' AND [TranslateUrl]=N'${TRANSLATE_SERVICE_URL}' AND [TranslateApiKey]=N'${LIBRETRANSLATE_API_KEY}' AND [TranslateTimeout]=120 AND COALESCE([IsDeleted], 0) = 0;"
-      ;;
-    5|6)
-      TRANSLATE_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"TranslateProvider\"='LibreTranslate', \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}', \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}', \"TranslateTimeout\"=120 WHERE \"OsClient\"='${OS_CLIENT}' AND COALESCE(\"IsDeleted\", 0) = 0;"
-      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"TranslateProvider\"='LibreTranslate' AND \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}' AND \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}' AND \"TranslateTimeout\"=120 AND COALESCE(\"IsDeleted\", 0) = 0;"
-      ;;
-  esac
-
-  echo 'Microi：写入 SaaS 引擎 LibreTranslate 配置...'
-  if ! database_exec_sql "${TRANSLATE_CONFIG_SQL}" > /dev/null; then
-    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置更新失败。'
-    exit 1
-  fi
-  if TRANSLATE_CONFIG_READBACK=$(database_exec_sql "${TRANSLATE_CONFIG_VERIFY_SQL}" 2>&1) \
-    && printf '%s\n' "${TRANSLATE_CONFIG_READBACK}" | grep -q 'MICROI_TRANSLATE_CONFIG_OK'; then
-    echo "Microi：SaaS 引擎翻译配置更新完成：TranslateProvider=LibreTranslate, TranslateUrl=${TRANSLATE_SERVICE_URL} ✓"
-  else
-    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置写入后回读不一致。'
-    exit 1
-  fi
+  TRANSLATE_SERVICE_URL="${LIBRETRANSLATE_SERVICE_ENDPOINT}"
+  echo 'Microi：LibreTranslate 配置将在 API 完成 Upgrade31 后写入并回读，旧数据库不会提前访问不存在的字段 ✓'
 else
   echo 'Microi：已选择不安装 LibreTranslate，跳过翻译服务。'
 fi
@@ -2445,15 +2948,21 @@ case "${DATABASE_CHOICE}" in
 esac
 
 echo "Microi：Web端口: ${VUE_PORT}, API端口: ${API_PORT}"
+if [ "${APP_API_PULL_POLICY}" = "always" ] || [ "${APP_CLIENT_PULL_POLICY}" = "always" ]; then
+  echo 'Microi：API/Web 的官方浮动标签将强制回源拉取最新镜像，避免复用本机旧 latest。'
+fi
+if [ "${APP_API_PULL_POLICY}" = "never" ] || [ "${APP_CLIENT_PULL_POLICY}" = "never" ]; then
+  echo 'Microi：检测到安装验收镜像覆盖；被覆盖的镜像仅使用本机指定版本，不访问远端仓库。'
+fi
 
 mkdir -p "${APP_DIR}"
 cat > "${APP_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-api:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest
+    image: ${API_IMAGE}
+    pull_policy: ${APP_API_PULL_POLICY}
     container_name: microi-install-api
-${COMPOSE_SERVICE_NETWORK}
+${APP_API_SERVICE_NETWORK}
     restart: always
     tty: true
     stdin_open: true
@@ -2462,14 +2971,15 @@ ${COMPOSE_SERVICE_NETWORK}
       - "${API_PORT}:80"
     environment:
       - OsClient=${OS_CLIENT}
-      - OsClientType=Product
-      - OsClientNetwork=Internal
+      - OsClientType=${RUNTIME_OS_CLIENT_TYPE}
+      - OsClientNetwork=${RUNTIME_OS_CLIENT_NETWORK}
       - OsClientDbType=${DATABASE_TYPE}
       - OsClientDbConn=${OS_CLIENT_DB_CONN}
       - OsClientRedisHost=${LAN_IP}
       - OsClientRedisPort=${REDIS_PORT}
       - OsClientRedisPwd=${REDIS_PASSWORD}
-      - AuthServer=http://${LAN_IP}:${API_PORT}
+      - OsClientRedisDataBase=5
+      - OsClientDbMongoConn=mongodb://root:${MONGO_ROOT_PASSWORD}@${LAN_IP}:${MONGO_PORT}/?authSource=admin
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -2480,7 +2990,8 @@ ${COMPOSE_SERVICE_NETWORK}
         max-file: "10"
 
   microi-install-client:
-    image: registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest
+    image: ${CLIENT_IMAGE}
+    pull_policy: ${APP_CLIENT_PULL_POLICY}
     container_name: microi-install-client
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
@@ -2499,17 +3010,234 @@ ${COMPOSE_SERVICE_NETWORK}
       options:
         max-size: "10m"
         max-file: "10"
-${COMPOSE_EXTERNAL_NETWORKS}
+${APP_COMPOSE_EXTERNAL_NETWORKS}
 EOF
 echo "Microi：平台应用编排文件已生成 ✓"
 
 compose_up "${APP_DIR}"
 
+wait_for_microi_api() {
+  local probe_path="$1"
+  local probe_name="$2"
+  local max_attempts="$3"
+  local probe_url="http://127.0.0.1:${API_PORT}${probe_path}"
+  local _api_wait
+  for _api_wait in $(seq 1 "${max_attempts}"); do
+    if curl --fail --silent --show-error --max-time 5 "${probe_url}" > /dev/null 2>&1; then
+      echo "Microi：API ${probe_name}检查通过：${probe_url} ✓"
+      return 0
+    fi
+    if [ "$(docker inspect microi-install-api --format '{{.State.Running}}' 2>/dev/null || true)" = "false" ]; then
+      echo "Microi：错误：API 容器在等待 ${probe_name}期间退出。"
+      docker logs microi-install-api 2>&1 | tail -100 || true
+      return 1
+    fi
+    if [ $((_api_wait % 15)) -eq 0 ]; then
+      echo "Microi：等待 API ${probe_name}中... ($((_api_wait * 2)) 秒)"
+    fi
+    sleep 2
+  done
+  echo "Microi：错误：API ${probe_name}在 $((max_attempts * 2)) 秒内未通过。"
+  docker logs microi-install-api 2>&1 | tail -100 || true
+  return 1
+}
+
+# Upgrade29 由 API 启动升级租约幂等创建 SaaS 引擎 OCR Tab 与 9 个字段。
+# 先等进程存活，再从共享数据库回读物理字段，绝不依据日志文案猜测迁移成功。
+if ! wait_for_microi_api '/api/Diagnostics/liveness' '存活' 180; then
+  exit 1
+fi
+API_LIVENESS_READY=1
+
+case "${DATABASE_CHOICE}" in
+  1|2)
+    OCR_SCHEMA_VERIFY_SQL="SELECT 'MICROI_OCR_SCHEMA_OK' AS Marker FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='sys_osclients' AND column_name IN ('OcrEnabled','OcrProvider','OcrEndpoint','OcrApiKey','OcrHeadersJson','OcrTimeoutSeconds','OcrMaxFileMB','OcrMaxPages','OcrMinConfidence') HAVING COUNT(DISTINCT column_name)=9;"
+    OCR_TENANT_VERIFY_SQL="SELECT 'MICROI_OCR_TENANT_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+    OCR_CONFIG_SQL="UPDATE sys_osclients SET OcrEnabled=1, OcrProvider='PaddleX', OcrEndpoint='${OCR_SERVICE_ENDPOINT}', OcrApiKey='', OcrHeadersJson='{}', OcrTimeoutSeconds=120, OcrMaxFileMB=20, OcrMaxPages=10, OcrMinConfidence=0 WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+    OCR_CONFIG_VERIFY_SQL="SELECT 'MICROI_OCR_CONFIG_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND OcrEnabled=1 AND OcrProvider='PaddleX' AND OcrEndpoint='${OCR_SERVICE_ENDPOINT}' AND IFNULL(OcrApiKey,'')='' AND OcrHeadersJson='{}' AND OcrTimeoutSeconds=120 AND OcrMaxFileMB=20 AND OcrMaxPages=10 AND OcrMinConfidence=0 AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+    ;;
+  3)
+    OCR_SCHEMA_VERIFY_SQL="IF (SELECT COUNT(DISTINCT c.[name]) FROM sys.columns c INNER JOIN sys.objects o ON c.[object_id]=o.[object_id] WHERE o.[name]=N'sys_osclients' AND SCHEMA_NAME(o.[schema_id])=N'dbo' AND c.[name] IN (N'OcrEnabled',N'OcrProvider',N'OcrEndpoint',N'OcrApiKey',N'OcrHeadersJson',N'OcrTimeoutSeconds',N'OcrMaxFileMB',N'OcrMaxPages',N'OcrMinConfidence'))=9 SELECT N'MICROI_OCR_SCHEMA_OK' AS Marker;"
+    OCR_TENANT_VERIFY_SQL="SELECT N'MICROI_OCR_TENANT_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+    OCR_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [OcrEnabled]=1, [OcrProvider]=N'PaddleX', [OcrEndpoint]=N'${OCR_SERVICE_ENDPOINT}', [OcrApiKey]=N'', [OcrHeadersJson]=N'{}', [OcrTimeoutSeconds]=120, [OcrMaxFileMB]=20, [OcrMaxPages]=10, [OcrMinConfidence]=0 WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+    OCR_CONFIG_VERIFY_SQL="SELECT N'MICROI_OCR_CONFIG_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND [OcrEnabled]=1 AND [OcrProvider]=N'PaddleX' AND [OcrEndpoint]=N'${OCR_SERVICE_ENDPOINT}' AND COALESCE([OcrApiKey],N'')=N'' AND [OcrHeadersJson]=N'{}' AND [OcrTimeoutSeconds]=120 AND [OcrMaxFileMB]=20 AND [OcrMaxPages]=10 AND [OcrMinConfidence]=0 AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+    ;;
+  5)
+    OCR_SCHEMA_VERIFY_SQL="SELECT 'MICROI_OCR_SCHEMA_OK' AS Marker FROM USER_TAB_COLUMNS WHERE UPPER(TABLE_NAME)='SYS_OSCLIENTS' AND UPPER(COLUMN_NAME) IN ('OCRENABLED','OCRPROVIDER','OCRENDPOINT','OCRAPIKEY','OCRHEADERSJSON','OCRTIMEOUTSECONDS','OCRMAXFILEMB','OCRMAXPAGES','OCRMINCONFIDENCE') HAVING COUNT(DISTINCT UPPER(COLUMN_NAME))=9;"
+    OCR_TENANT_VERIFY_SQL="SELECT 'MICROI_OCR_TENANT_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    OCR_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"OcrEnabled\"=1, \"OcrProvider\"='PaddleX', \"OcrEndpoint\"='${OCR_SERVICE_ENDPOINT}', \"OcrApiKey\"='', \"OcrHeadersJson\"='{}', \"OcrTimeoutSeconds\"=120, \"OcrMaxFileMB\"=20, \"OcrMaxPages\"=10, \"OcrMinConfidence\"=0 WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+    OCR_CONFIG_VERIFY_SQL="SELECT 'MICROI_OCR_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND \"OcrEnabled\"=1 AND \"OcrProvider\"='PaddleX' AND \"OcrEndpoint\"='${OCR_SERVICE_ENDPOINT}' AND COALESCE(\"OcrApiKey\",'')='' AND \"OcrHeadersJson\"='{}' AND \"OcrTimeoutSeconds\"=120 AND \"OcrMaxFileMB\"=20 AND \"OcrMaxPages\"=10 AND \"OcrMinConfidence\"=0 AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    ;;
+  6)
+    OCR_SCHEMA_VERIFY_SQL="SELECT 'MICROI_OCR_SCHEMA_OK' AS Marker WHERE (SELECT COUNT(DISTINCT column_name) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='sys_osclients' AND column_name IN ('OcrEnabled','OcrProvider','OcrEndpoint','OcrApiKey','OcrHeadersJson','OcrTimeoutSeconds','OcrMaxFileMB','OcrMaxPages','OcrMinConfidence'))=9;"
+    OCR_TENANT_VERIFY_SQL="SELECT 'MICROI_OCR_TENANT_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    OCR_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"OcrEnabled\"=1, \"OcrProvider\"='PaddleX', \"OcrEndpoint\"='${OCR_SERVICE_ENDPOINT}', \"OcrApiKey\"='', \"OcrHeadersJson\"='{}', \"OcrTimeoutSeconds\"=120, \"OcrMaxFileMB\"=20, \"OcrMaxPages\"=10, \"OcrMinConfidence\"=0 WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+    OCR_CONFIG_VERIFY_SQL="SELECT 'MICROI_OCR_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND \"OcrEnabled\"=1 AND \"OcrProvider\"='PaddleX' AND \"OcrEndpoint\"='${OCR_SERVICE_ENDPOINT}' AND COALESCE(\"OcrApiKey\",'')='' AND \"OcrHeadersJson\"='{}' AND \"OcrTimeoutSeconds\"=120 AND \"OcrMaxFileMB\"=20 AND \"OcrMaxPages\"=10 AND \"OcrMinConfidence\"=0 AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+    ;;
+esac
+
+echo 'Microi：等待 Upgrade29 创建 SaaS 引擎 OCR 字段（最长 15 秒）...'
+OCR_SCHEMA_READY=0
+for _ocr_schema_wait in $(seq 1 15); do
+  OCR_SCHEMA_READBACK=$(database_exec_sql "${OCR_SCHEMA_VERIFY_SQL}" 2>&1 || true)
+  if printf '%s\n' "${OCR_SCHEMA_READBACK}" | grep -q 'MICROI_OCR_SCHEMA_OK'; then
+    OCR_SCHEMA_READY=1
+    break
+  fi
+  if [ "${_ocr_schema_wait}" -lt 15 ]; then
+    sleep 1
+  fi
+done
+if [ "${OCR_SCHEMA_READY}" != "1" ]; then
+  echo 'Microi：错误：API 已启动，但 15 秒内未能从数据库回读全部 9 个 OCR 字段。'
+  echo "Microi：请确认当前 API 镜像 ${API_IMAGE} 已包含 Upgrade29；脚本不会直接绕过平台迁移修改元数据，也不会启用 OCR。"
+  exit 1
+fi
+echo 'Microi：SaaS 引擎 OCR 物理字段回读通过 ✓'
+
+OCR_TENANT_READBACK=$(database_exec_sql "${OCR_TENANT_VERIFY_SQL}" 2>&1 || true)
+if ! printf '%s\n' "${OCR_TENANT_READBACK}" | grep -q 'MICROI_OCR_TENANT_OK'; then
+  echo "Microi：错误：活动 OsClient=${OS_CLIENT} 记录不是唯一一条，已停止 OCR 配置，避免误改多个租户。"
+  exit 1
+fi
+
+echo 'Microi：写入当前 SaaS 租户 OCR 配置...'
+if ! database_exec_sql "${OCR_CONFIG_SQL}" > /dev/null; then
+  echo 'Microi：错误：SaaS 引擎 OCR 配置更新失败。'
+  exit 1
+fi
+OCR_CONFIG_READBACK=$(database_exec_sql "${OCR_CONFIG_VERIFY_SQL}" 2>&1 || true)
+if ! printf '%s\n' "${OCR_CONFIG_READBACK}" | grep -q 'MICROI_OCR_CONFIG_OK'; then
+  echo 'Microi：错误：SaaS 引擎 OCR 配置写入后回读不一致。'
+  exit 1
+fi
+OCR_SAAS_CONFIG_READY=1
+echo "Microi：SaaS 引擎 OCR 配置回读一致：Provider=PaddleX, Endpoint=${OCR_SERVICE_ENDPOINT} ✓"
+
+if [ "${INSTALL_LIBRETRANSLATE}" = "1" ]; then
+  case "${DATABASE_CHOICE}" in
+    1|2)
+      TRANSLATE_SCHEMA_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_SCHEMA_OK' AS Marker FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='sys_osclients' AND column_name IN ('TranslateProvider','TranslateUrl','TranslateApiKey','TranslateTimeout') HAVING COUNT(DISTINCT column_name)=4;"
+      TRANSLATE_TENANT_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_TENANT_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+      TRANSLATE_CONFIG_SQL="UPDATE sys_osclients SET TranslateProvider='LibreTranslate', TranslateUrl='${TRANSLATE_SERVICE_URL}', TranslateApiKey='${LIBRETRANSLATE_API_KEY}', TranslateTimeout=120 WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' AS Marker FROM sys_osclients WHERE OsClient='${OS_CLIENT}' AND OsClientType='${RUNTIME_OS_CLIENT_TYPE}' AND OsClientNetwork='${RUNTIME_OS_CLIENT_NETWORK}' AND TranslateProvider='LibreTranslate' AND TranslateUrl='${TRANSLATE_SERVICE_URL}' AND TranslateApiKey='${LIBRETRANSLATE_API_KEY}' AND TranslateTimeout=120 AND IFNULL(IsEnable,0)=1 AND IFNULL(IsDeleted,0)=0 GROUP BY OsClient,OsClientType,OsClientNetwork HAVING COUNT(*)=1;"
+      ;;
+    3)
+      TRANSLATE_SCHEMA_VERIFY_SQL="IF (SELECT COUNT(DISTINCT c.[name]) FROM sys.columns c INNER JOIN sys.objects o ON c.[object_id]=o.[object_id] WHERE o.[name]=N'sys_osclients' AND SCHEMA_NAME(o.[schema_id])=N'dbo' AND c.[name] IN (N'TranslateProvider',N'TranslateUrl',N'TranslateApiKey',N'TranslateTimeout'))=4 SELECT N'MICROI_TRANSLATE_SCHEMA_OK' AS Marker;"
+      TRANSLATE_TENANT_VERIFY_SQL="SELECT N'MICROI_TRANSLATE_TENANT_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+      TRANSLATE_CONFIG_SQL="UPDATE [dbo].[sys_osclients] SET [TranslateProvider]=N'LibreTranslate', [TranslateUrl]=N'${TRANSLATE_SERVICE_URL}', [TranslateApiKey]=N'${LIBRETRANSLATE_API_KEY}', [TranslateTimeout]=120 WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT N'MICROI_TRANSLATE_CONFIG_OK' AS Marker FROM [dbo].[sys_osclients] WHERE [OsClient]=N'${OS_CLIENT}' AND [OsClientType]=N'${RUNTIME_OS_CLIENT_TYPE}' AND [OsClientNetwork]=N'${RUNTIME_OS_CLIENT_NETWORK}' AND [TranslateProvider]=N'LibreTranslate' AND [TranslateUrl]=N'${TRANSLATE_SERVICE_URL}' AND [TranslateApiKey]=N'${LIBRETRANSLATE_API_KEY}' AND [TranslateTimeout]=120 AND COALESCE([IsEnable],0)=1 AND COALESCE([IsDeleted],0)=0 GROUP BY [OsClient],[OsClientType],[OsClientNetwork] HAVING COUNT(*)=1;"
+      ;;
+    5)
+      TRANSLATE_SCHEMA_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_SCHEMA_OK' AS Marker FROM USER_TAB_COLUMNS WHERE UPPER(TABLE_NAME)='SYS_OSCLIENTS' AND UPPER(COLUMN_NAME) IN ('TRANSLATEPROVIDER','TRANSLATEURL','TRANSLATEAPIKEY','TRANSLATETIMEOUT') HAVING COUNT(DISTINCT UPPER(COLUMN_NAME))=4;"
+      TRANSLATE_TENANT_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_TENANT_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+      TRANSLATE_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"TranslateProvider\"='LibreTranslate', \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}', \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}', \"TranslateTimeout\"=120 WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND \"TranslateProvider\"='LibreTranslate' AND \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}' AND \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}' AND \"TranslateTimeout\"=120 AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+      ;;
+    6)
+      TRANSLATE_SCHEMA_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_SCHEMA_OK' AS Marker WHERE (SELECT COUNT(DISTINCT column_name) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='sys_osclients' AND column_name IN ('TranslateProvider','TranslateUrl','TranslateApiKey','TranslateTimeout'))=4;"
+      TRANSLATE_TENANT_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_TENANT_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+      TRANSLATE_CONFIG_SQL="UPDATE \"sys_osclients\" SET \"TranslateProvider\"='LibreTranslate', \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}', \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}', \"TranslateTimeout\"=120 WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0;"
+      TRANSLATE_CONFIG_VERIFY_SQL="SELECT 'MICROI_TRANSLATE_CONFIG_OK' AS Marker FROM \"sys_osclients\" WHERE \"OsClient\"='${OS_CLIENT}' AND \"OsClientType\"='${RUNTIME_OS_CLIENT_TYPE}' AND \"OsClientNetwork\"='${RUNTIME_OS_CLIENT_NETWORK}' AND \"TranslateProvider\"='LibreTranslate' AND \"TranslateUrl\"='${TRANSLATE_SERVICE_URL}' AND \"TranslateApiKey\"='${LIBRETRANSLATE_API_KEY}' AND \"TranslateTimeout\"=120 AND COALESCE(\"IsEnable\",0)=1 AND COALESCE(\"IsDeleted\",0)=0 GROUP BY \"OsClient\",\"OsClientType\",\"OsClientNetwork\" HAVING COUNT(*)=1;"
+      ;;
+  esac
+
+  echo 'Microi：等待 Upgrade31 创建 SaaS 引擎翻译字段（最长 15 秒）...'
+  TRANSLATE_SCHEMA_READY=0
+  for _translate_schema_wait in $(seq 1 15); do
+    TRANSLATE_SCHEMA_READBACK=$(database_exec_sql "${TRANSLATE_SCHEMA_VERIFY_SQL}" 2>&1 || true)
+    if printf '%s\n' "${TRANSLATE_SCHEMA_READBACK}" | grep -q 'MICROI_TRANSLATE_SCHEMA_OK'; then
+      TRANSLATE_SCHEMA_READY=1
+      break
+    fi
+    if [ "${_translate_schema_wait}" -lt 15 ]; then
+      sleep 1
+    fi
+  done
+  if [ "${TRANSLATE_SCHEMA_READY}" != "1" ]; then
+    echo 'Microi：错误：API 已启动，但 15 秒内未能从数据库回读全部 4 个 LibreTranslate 配置字段。'
+    echo 'Microi：请确认当前 microi-api 镜像已包含 Upgrade31；脚本不会绕过平台迁移直接伪造 diy_field 元数据。'
+    exit 1
+  fi
+
+  TRANSLATE_TENANT_READBACK=$(database_exec_sql "${TRANSLATE_TENANT_VERIFY_SQL}" 2>&1 || true)
+  if ! printf '%s\n' "${TRANSLATE_TENANT_READBACK}" | grep -q 'MICROI_TRANSLATE_TENANT_OK'; then
+    echo 'Microi：错误：当前活动主租户不唯一，已停止 LibreTranslate 配置写入。'
+    exit 1
+  fi
+  echo 'Microi：写入 SaaS 引擎 LibreTranslate 配置...'
+  if ! database_exec_sql "${TRANSLATE_CONFIG_SQL}" > /dev/null; then
+    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置更新失败。'
+    exit 1
+  fi
+  TRANSLATE_CONFIG_READBACK=$(database_exec_sql "${TRANSLATE_CONFIG_VERIFY_SQL}" 2>&1 || true)
+  if ! printf '%s\n' "${TRANSLATE_CONFIG_READBACK}" | grep -q 'MICROI_TRANSLATE_CONFIG_OK'; then
+    echo 'Microi：错误：SaaS 引擎 LibreTranslate 配置写入后回读不一致。'
+    exit 1
+  fi
+  TRANSLATE_SAAS_CONFIG_READY=1
+  echo "Microi：SaaS 引擎翻译配置回读一致：Provider=LibreTranslate, Url=${TRANSLATE_SERVICE_URL} ✓"
+fi
+
+# Upgrade29/31 是启动前置不变量，字段先出现并不代表完整平台升级链已经成功。
+# 必须等待 ServerVersion 推进到本脚本要求的最低版本，避免应用商城等中间迁移
+# 失败时仍把安装误报为成功，也避免紧接着重启 API 打断尚未完成的升级事务。
+case "${DATABASE_CHOICE}" in
+  1|2)
+    PLATFORM_VERSION_READ_SQL="SELECT ServerVersion FROM sys_config WHERE IsEnable=1 ORDER BY Id LIMIT 1;"
+    ;;
+  3)
+    PLATFORM_VERSION_READ_SQL="SELECT TOP 1 [ServerVersion] FROM [dbo].[sys_config] WHERE [IsEnable]=1 ORDER BY [Id];"
+    ;;
+  5)
+    PLATFORM_VERSION_READ_SQL='SELECT "ServerVersion" FROM "sys_config" WHERE "IsEnable"=1 ORDER BY "Id" FETCH FIRST 1 ROWS ONLY;'
+    ;;
+  6)
+    PLATFORM_VERSION_READ_SQL='SELECT "ServerVersion" FROM "sys_config" WHERE "IsEnable"=1 ORDER BY "Id" LIMIT 1;'
+    ;;
+esac
+
+echo "Microi：等待平台完整升级链推进到 ServerVersion>=${MINIMUM_PLATFORM_SERVER_VERSION}（最长 10 分钟）..."
+PLATFORM_UPGRADE_READY=0
+PLATFORM_SERVER_VERSION=''
+for _platform_upgrade_wait in $(seq 1 120); do
+  PLATFORM_VERSION_READBACK=$(database_exec_sql "${PLATFORM_VERSION_READ_SQL}" 2>&1 || true)
+  PLATFORM_SERVER_VERSION=$(printf '%s\n' "${PLATFORM_VERSION_READBACK}" \
+    | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' \
+    | tail -n 1 || true)
+  if version_at_least "${PLATFORM_SERVER_VERSION}" "${MINIMUM_PLATFORM_SERVER_VERSION}"; then
+    PLATFORM_UPGRADE_READY=1
+    break
+  fi
+  if [ $((_platform_upgrade_wait % 6)) -eq 0 ]; then
+    echo "Microi：平台升级仍在进行，当前 ServerVersion=${PLATFORM_SERVER_VERSION:-未回读}..."
+  fi
+  sleep 5
+done
+if [ "${PLATFORM_UPGRADE_READY}" != "1" ]; then
+  echo "Microi：错误：10 分钟内平台 ServerVersion 未达到 ${MINIMUM_PLATFORM_SERVER_VERSION}，当前=${PLATFORM_SERVER_VERSION:-未回读}。"
+  echo 'Microi：平台自动升级链可能在中间迁移失败；脚本已停止，禁止把部分完成状态误报为安装成功。请查看 API 容器日志及系统错误日志。'
+  exit 1
+fi
+echo "Microi：平台完整升级链回读通过：ServerVersion=${PLATFORM_SERVER_VERSION} ✓"
+
+# SaaS 租户配置在 API 启动时加载。安全重启单个新安装节点使 OCR/翻译设置立即生效，
+# 不影响 OCR 服务；多节点既有环境仍应按官方滚动发布流程逐节点刷新。
+echo 'Microi：重启新安装 API，使已回读的 OCR/翻译租户配置立即生效...'
+if ! docker restart microi-install-api > /dev/null; then
+  echo 'Microi：错误：API 重启失败。'
+  exit 1
+fi
+if ! wait_for_microi_api '/api/Diagnostics/health' '就绪' 180; then
+  exit 1
+fi
+API_READINESS_READY=1
+
 echo ''
 echo 'Microi：平台应用（API + Web）部署完成 ✓'
 
 echo ''
-echo '[步骤10/11] 可选服务与平台应用部署完成 ✓'
+echo '[步骤10/11] OCR、可选服务与平台应用部署完成 ✓'
 
 
 # ============================================================
@@ -2525,7 +3253,6 @@ echo "Microi：Watchtower 监控容器: microi-install-api, microi-install-clien
 
 mkdir -p "${WATCHTOWER_DIR}"
 cat > "${WATCHTOWER_DIR}/docker-compose.yml" <<EOF
-version: '3.8'
 services:
   microi-install-watchtower:
     image: registry.cn-hangzhou.aliyuncs.com/microios/watchtower:latest
@@ -2558,61 +3285,20 @@ echo '[步骤11/11] Watchtower 部署完成 ✓'
 # ============================================================
 # 输出所有服务信息
 # ============================================================
+INSTALL_SUMMARY_PRINTED=1
 echo ''
 echo ''
 echo '=================================================================='
 echo 'Microi：所有服务已成功安装！'
 echo '=================================================================='
 echo ''
-echo "编排文件目录: ${COMPOSE_BASE_DIR}"
-echo '在宝塔面板 → Docker → 编排 中可查看和管理所有编排项目'
-echo ''
-echo '------------------------------------------------------------------'
-echo '访问地址：'
-echo '------------------------------------------------------------------'
-echo "前端传统界面:  http://${ACCESS_IP}:${VUE_PORT}/?OsClient=${OS_CLIENT}    账号: admin  密码: demo123456"
-echo "主租户:        OsClient=${OS_CLIENT}, ClientName=${OS_CLIENT}"
-echo ''
-echo '------------------------------------------------------------------'
-echo "端口分配（从 ${PORT_BASE} 开始顺序分配）："
-echo '------------------------------------------------------------------'
-printf '  %-18s %s\n' "Web:"           "${VUE_PORT}"
-printf '  %-18s %s\n' "API:"           "${API_PORT}"
-printf '  %-18s %s\n' "${DATABASE_PORT_NAME}:" "${DATABASE_PORT}"
-printf '  %-18s %s\n' "Redis:"         "${REDIS_PORT}"
-printf '  %-18s %s\n' "MongoDB:"       "${MONGO_PORT}"
-printf '  %-18s %s\n' "MinIO API:"     "${MINIO_PORT}"
-printf '  %-18s %s\n' "MinIO Console:" "${MINIO_CONSOLE_PORT}"
-if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
-  printf '  %-18s %s\n' "Ollama:"        "${OLLAMA_PORT}"
-  printf '  %-18s %s\n' "Qdrant HTTP:"   "${QDRANT_HTTP_PORT}"
-  printf '  %-18s %s\n' "Qdrant gRPC:"   "${QDRANT_GRPC_PORT}"
-fi
-if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  printf '  %-18s %s\n' "LibreTranslate:" "${LIBRETRANSLATE_PORT}"
-fi
-echo ''
-echo '------------------------------------------------------------------'
-echo '服务信息：'
-echo '------------------------------------------------------------------'
-echo "${DATABASE_DISPLAY_NAME}:  Dos.ORM类型 ${DATABASE_TYPE}, 容器 ${DATABASE_CONTAINER_NAME}, 端口 ${DATABASE_PORT}, 管理员密码: ${DATABASE_PASSWORD}"
-echo "             初始化包来源: ${SQL_SOURCE_DISPLAY}"
-echo "             数据目录: ${DATABASE_DATA_DIR}"
-echo "             编排目录: ${DATABASE_DIR}/"
-echo ""
-echo "Redis:       容器 microi-install-redis,      端口 ${REDIS_PORT},  密码: ${REDIS_PASSWORD}"
-echo "             数据目录: ${REDIS_DATA_DIR}"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-redis/"
-echo ""
-echo "MongoDB:     容器 microi-install-mongodb,    端口 ${MONGO_PORT},  Root密码: ${MONGO_ROOT_PASSWORD}"
-echo "             数据目录: ${MONGO_DATA_DIR}"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-mongodb/"
-echo ""
-echo "MinIO:       容器 microi-install-minio,      API端口 ${MINIO_PORT},  控制台端口 ${MINIO_CONSOLE_PORT}"
-echo "             Access Key: ${MINIO_ACCESS_KEY},  Secret Key: ${MINIO_SECRET_KEY}"
-echo "             私有桶: ${MINIO_PRIVATE_BUCKET}, 公有桶: ${MINIO_PUBLIC_BUCKET}（public 下载）"
-echo "             数据目录: ${MINIO_DATA_DIR}"
-echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-minio/"
+print_generated_install_configuration "success"
+echo "OCR:         容器 ${OCR_CONTAINER_NAME}, 本机端口 127.0.0.1:${OCR_PORT}"
+echo "             国内镜像: ${OCR_IMAGE}"
+echo "             Docker内网: ${OCR_SERVICE_ENDPOINT}"
+echo "             模型卷: microi-ocr-models"
+echo "             SaaS配置: OsClient=${OS_CLIENT}, OcrEnabled=1, OcrProvider=PaddleX"
+echo "             编排目录: ${OCR_DIR}/"
 echo ""
 if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo "Ollama:      容器 microi-install-ollama,    端口 ${OLLAMA_PORT}"
@@ -2636,12 +3322,14 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo "             nomic-embed-text 当前 Microi Ollama HTTP 链路维度：768"
   echo ""
 else
-  echo 'AI Schema检索: 使用平台内置“大模型关键词扩展 + 权限感知 Schema 搜索”；已跳过 Ollama、nomic-embed-text 与 Qdrant。'
-  echo '             只有需要高度模糊语义召回时，才建议重新执行脚本并启用向量检索增强。'
+  echo '在线AI能力:  默认 NL2SQL/NL2V8 已由平台内置“大模型关键词扩展 + 权限感知 Schema/Skill 搜索 + 精确字段回读”完整承接。'
+  echo '             Ollama、nomic-embed-text 与 Qdrant 已固定跳过，不再推荐默认安装。'
   echo ""
 fi
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  echo "LibreTranslate: 容器 microi-install-libretranslate, 端口 ${LIBRETRANSLATE_PORT}"
+  echo "LibreTranslate: 容器 ${LIBRETRANSLATE_CONTAINER_NAME}, 本机端口 127.0.0.1:${LIBRETRANSLATE_PORT}"
+  echo "             国内镜像: ${LIBRETRANSLATE_IMAGE}"
+  echo "             Docker内网: ${LIBRETRANSLATE_SERVICE_ENDPOINT}"
   echo "             加载语言: ${LIBRETRANSLATE_LANGS_CSV}"
   echo "             API Key: 已随机生成并写入 SaaS 租户配置（终端不输出明文）"
   echo "             数据目录: /microi/libretranslate/"
@@ -2661,9 +3349,9 @@ echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-watchtower/"
 echo ''
 if [ "${INSTALL_MICROI_NETWORK}" == "1" ]; then
   echo "Docker网络:  microi（bridge，subnet ${MICROI_NETWORK_SUBNET}，gateway ${MICROI_NETWORK_GATEWAY}）"
-  echo '             所有本次生成的编排均通过 external: true 引用该网络'
+  echo "             API 同时接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
 else
-  echo 'Docker网络:  使用各 Docker Compose 项目的默认网络'
+  echo "Docker网络:  基础组件使用各 Compose 默认网络；API 接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
 fi
 echo ''
 echo '------------------------------------------------------------------'
@@ -2672,8 +3360,9 @@ echo '------------------------------------------------------------------'
 for port in ${FIREWALL_PORTS}; do
   echo "  ${port}/tcp"
 done
+echo "  OCR ${OCR_PORT}/tcp 未自动开放（仅绑定 127.0.0.1，API 走 ${OCR_RUNTIME_NETWORK} 内网）"
 if [ "${INSTALL_LIBRETRANSLATE}" == "1" ]; then
-  echo "  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 未自动开放（仅供平台内部调用）"
+  echo "  LibreTranslate ${LIBRETRANSLATE_PORT}/tcp 未自动开放（仅绑定 127.0.0.1，API 走 ${OCR_RUNTIME_NETWORK} 内网）"
 fi
 echo ''
 echo '------------------------------------------------------------------'

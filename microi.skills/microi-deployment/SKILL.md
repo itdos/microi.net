@@ -40,6 +40,31 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 - `/api/Diagnostics/health` readiness 与 `/api/Diagnostics/liveness`；
 - 当前运行中的 Node、dotnet、Docker build 等重任务。
 
+## 后端配置单一事实源（强制）
+
+Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下十个启动引导项：
+
+`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。
+
+- 除这十项外，业务开关、超时、重试次数、资源上限、代理信任、密钥路径和第三方密钥通常必须在 SaaS 引擎 `sys_osclients` 的合适 Tab 中动态配置，并提供代码安全默认值；影响整个 API 进程的字段只读取主租户记录。唯一固定例外是官方 License 信任链：恢复重试次数/间隔使用代码常量，签发私钥只读取固定只读挂载 `/app/microi_private.pem`，不得为这三项创建 SaaS 字段。
+- 不得新增 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或通用 `Environment.GetEnvironmentVariable(name)` 作为 API 运行配置；新增配置必须同步升级字段、表单 Tab、脱敏/子租户隔离、缓存刷新、文档和源码扫描测试。
+- `ASPNETCORE_*`、`DOTNET_*` 属于 .NET 宿主配置；构建、安装器、测试、MCP 和发布脚本自己的进程变量也不属于 API 业务配置，但生产 API 代码不得读取它们来控制业务行为。
+- `AuthSecret` 等已有 SaaS 敏感字段继续由受保护的主租户记录提供。普通业务私钥路径仍按相应 SaaS 配置管理；官方 License 签发私钥路径固定为 `/app/microi_private.pem`，只允许生产签发节点只读挂载。密钥明文不得写入镜像、Compose、日志或普通 V8 投影。
+- 验收必须扫描生产源码、`appsettings.json`、在线/离线安装编排，断言 API 容器仅出现上述十项；不能只检查某一个示例文件。
+
+## 一键安装脚本版本时间（强制）
+
+- 每次修改 `数据库、案例、文档、资料/install-microi.sh`，必须同时更新文件头版本和 `SCRIPT_VERSION`，两处完全一致。
+- 固定格式为 `vYYYY-MM-DD HH:mm:ss`，使用 `Asia/Shanghai` 时间并精确到秒；禁止只写日期或沿用上一次修改时间。
+- 验收同时断言两处版本一致、格式正确，并以脚本实际启动输出为准；官网静态地址尚未发布新文件时，不能把本地版本误报为客户已经可下载。
+- 恢复旧数据库时，OCR、翻译等启动不变量字段先出现不代表完整升级链已经成功。安装器必须在重启 API 和输出“安装完成”之前回读 `sys_config.ServerVersion` 达到本脚本最低版本；中间迁移失败或超时应失败关闭，禁止用部分字段就绪冒充整个平台升级成功，也禁止在升级事务仍执行时主动重启 API。
+- Compose v2 生成文件不再写顶层 `version`；所有模板直接以 `services:` 开始，避免 `the attribute version is obsolete` 告警。
+- LibreTranslate 属于一键安装默认组件：安装选择空输入按 `1` 处理，语言套餐空输入按基础套餐 `1` 处理；因此用户一路按 Enter 使用官方推荐组合。只有明确输入 `0` 才跳过，提示、端口预算、官网文档和静态回归测试必须一致。
+- OCR 的 Upgrade29 与 LibreTranslate 的 Upgrade31 字段门禁都在 API liveness 后立即回读，每秒一次、最多 15 秒；首轮成功就继续，超时快速失败并提示镜像/迁移版本，不得退回 5 分钟空等，也不得直接创建字段绕过平台升级。
+- 官方 API/Web 使用浮动 `latest` 时，生成的 Compose 必须设置 `pull_policy: always` 或在启动前显式拉取并核对，不能因宿主机已有同名镜像就复用旧版本；测试专用本机镜像覆盖必须明确使用 `never`，避免误访问或覆盖远端镜像。
+- 端口、密码和数据目录全部生成后，安装器必须注册统一的失败收尾：任何后段错误继续保留原始非零退出码，并在终端输出标题为“安装未完成”的恢复汇总，列出已生成端口、凭据、目录、迁移门禁和容器状态。失败汇总不得使用“安装完成”文案、不得把 `Running` 当 readiness，也不得因此绕过 OCR/翻译/完整升级链门禁。
+- 从客户/旧库恢复安装时，安装器只按 `OsClient + OsClientType + OsClientNetwork + IsEnable + IsDeleted` 处理目标主租户：0 条时幂等创建最小可运行记录，1 条时原位复用，超过 1 条失败关闭。禁止把所有活动 `sys_osclients` 批量改成输入的 OsClient；新记录不得落库 `DbConn/DbReadConn/DbMongoConnection` 或 Redis 主机、端口、密码，这些继续由十项编排启动配置提供。MinIO、OCR 等安装值随后只更新这个精确三元组并回读唯一性。
+
 ## 多节点与滚动发布
 
 后端默认按多个 API/Worker 节点设计：
@@ -53,9 +78,10 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 
 ## 构建资源保护
 
-启动 Node/Vite/dotnet/Docker build 前检查物理内存和同类进程。默认只运行一个重任务，
-为 VS Code、Codex 和操作系统保留至少 `max(6GB, 物理内存 20%)`。资源不足时改做
-定向测试/构建，不并行启动多个全量任务；全机占用达到 95% 时终止本轮启动的重任务树。
+启动 Node/Vite/dotnet/Docker build 前检查物理内存和同类进程。默认只运行一个重任务。
+启动门槛按“当前阶段进程树预算 + `max(1.5GB, 物理内存 5%)` 系统安全余量”计算，
+优先采用实测峰值；顺序阶段分别计算，不叠加峰值，也不得再用固定 20% 随机器容量放大门槛。
+资源不足时改做定向测试/构建，不并行启动多个全量任务；全机占用达到 95% 时暂停或终止本轮启动的重任务树。
 
 ## Windows 多 AI 本地服务与 Release 文件锁
 

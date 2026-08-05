@@ -434,6 +434,14 @@ router.afterEach((to) => {
         // 延迟检测，等待 Vue 组件渲染完成
         setTimeout(function() {
             try {
+                // Android 平板进入 PC 布局后，App.vue 已按真实状态栏高度下移
+                // 当前 WebView；状态栏区域露出白色原生背景，因此固定使用深色图标。
+                // 手机布局不进入此分支，继续按页面顶栏颜色保留沉浸式效果。
+                if (window.__microi_apkDesktopStatusbarInset === true) {
+                    plus.navigator.setStatusBarStyle('dark');
+                    return;
+                }
+
                 // 查找页面顶部 header 元素（fixed 定位的顶栏）
                 var headerEl = document.querySelector(
                     '.home-header, .workspace-header, .message-header, ' +

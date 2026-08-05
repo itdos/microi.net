@@ -129,6 +129,8 @@ Playwright 验收，并报告本地未推送、远端较新和冲突数量。不
 - **本地 AI 编程**：VS Code 插件或 `@microi.net/cli` 自动注入 Skills、Schema 与 MCP；可选择编辑器内调试，也可由 Codex/Claude/Trae 在纯终端完成交付
 - **从 V8 代码中调用 AI 大模型**：在接口引擎里直接请求 DeepSeek 等接口，实现 ReAct 模式
 
+如果要复用吾码已经封装的模型路由、会话、License、租户身份与中转计量，不要在每个页面重新保存供应商密钥。前端和后端 V8 均可直接使用第一等 `V8.AI.Chat/ChatStream/NL2SQL`，外部 Agent 使用专用 `microi_chat` MCP Tool；身份、租户、Endpoint 和 ApiKey 由可信宿主控制。GET/POST、Token 鉴权、SSE 打字机示例与服务器 License/中转 ApiKey 的区别见 [AI 引擎与 Microi.AI 中转站](../system-engine/ai-engine.md)。
+
 > 博主某 MES 项目：500+ 张表，大量接口引擎均由 AI 生成。
 
 ---

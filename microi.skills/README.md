@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 57 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 58 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -30,6 +30,7 @@
 | **v8-debugging** | 调试模式、异常捕获、系统日志 | `v8-debugging/SKILL.md` |
 | **v8-security** | 安全最佳实践（权限/输入验证/防注入） | `v8-security/SKILL.md` |
 | **v8-utilities** | 前后端 V8 上下文、通用函数、扫码、消息、Base64、加密和专项 API 索引 | `v8-utilities/SKILL.md` |
+| **ocr-engine** | 通用 OCR 网关、SaaS 配置、PaddleX 服务与多节点验收 | `ocr-engine/SKILL.md` |
 | **spider-engine** | 爬虫/浏览器采集 Worker、会话、目标地址、配额与交付边界 | `spider-engine/SKILL.md` |
 
 ### V8 引擎核心（前端）

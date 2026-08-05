@@ -230,6 +230,86 @@ function maskReplicatedEngineFields(packageContent, basePackageContent) {
   return canonicalizeResource(applicationStorePackageName, JSON.stringify(packageModel));
 }
 
+function restoreMissingReplicatedEngineSkeletons(
+  packageContent,
+  basePackageContent,
+  missingMappings,
+) {
+  if (!missingMappings.length) {
+    return canonicalizeResource(applicationStorePackageName, packageContent);
+  }
+
+  const packageModel = parsePackage(packageContent);
+  const basePackageModel = parsePackage(basePackageContent);
+  const engines = Array.isArray(packageModel.SysApiEngines) ? packageModel.SysApiEngines : [];
+  packageModel.SysApiEngines = engines;
+
+  for (const mapping of missingMappings) {
+    if (findEmbeddedEngine(packageModel, mapping.apiEngineKey)) continue;
+    const baseEngine = findEmbeddedEngine(basePackageModel, mapping.apiEngineKey);
+    if (!baseEngine) continue;
+
+    const idCollision = baseEngine.Id
+      ? engines.find(item => item.Id === baseEngine.Id && item.ApiEngineKey !== mapping.apiEngineKey)
+      : null;
+    if (idCollision) {
+      throw new Error(
+        `${applicationStorePackageName} 官网缺少接口引擎 ${mapping.apiEngineKey}，`
+        + `且共同基线 Id ${baseEngine.Id} 已被 ${idCollision.ApiEngineKey || '(空 Key)'} 占用，不能自动恢复`,
+      );
+    }
+
+    // The mapping is still part of the release contract, so a one-sided remote
+    // deletion is an incomplete logical replica rather than an accepted removal.
+    // Restore only the established structural skeleton; executable code is
+    // reconciled independently below and written back after the JSON merge.
+    engines.push(JSON.parse(JSON.stringify(baseEngine)));
+  }
+
+  return canonicalizeResource(applicationStorePackageName, JSON.stringify(packageModel));
+}
+
+function synchronizeBulkInstallButton(packageModel) {
+  const menu = (packageModel.SysMenus || []).find(item => item.Url === '/microi-store');
+  // 资源合并单元测试会使用只包含接口引擎的最小包；完整商城包仍由
+  // refresh-resources.mjs 的发布门强制校验菜单和按钮。
+  if (!menu) return;
+  const buttons = typeof menu.PageBtns === 'string' ? JSON.parse(menu.PageBtns) : menu.PageBtns;
+  const bulk = (buttons || []).find(item => item.Id === '01KMARKETPLACEBULKINSTALL1');
+  if (!bulk) return;
+  bulk.V8Code = `V8.ConfirmTips('将只安装未安装的官方平台应用，并更新存在新版本的官方平台应用；已是最新版的应用不会重新安装。任务进度可在右上角后台任务中心查看。', async function () {
+  try {
+    var selectApi = String((V8.SysMenuModel && V8.SysMenuModel.SelectApi) || 'https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos');
+    var parsed = new URL(selectApi, window.location.origin);
+    var sourceOsClient = parsed.searchParams.get('OsClient') || 'iTdos';
+    var operationId = Date.now() + '-' + Math.random().toString(36).substring(2);
+    var result = await V8.ApiEngine.RunBackground('bulk-import-microi-store-packages', {
+      StoreApiBase: parsed.origin,
+      StoreOsClient: sourceOsClient,
+      ApplicationType: 'Platform'
+    }, '应用商城全部安装/更新', {
+      IdempotencyKey: 'microi-store-bulk:' + operationId,
+      ConcurrencyKey: 'bulk-import-microi-store-packages',
+      MaxAttempts: 3,
+      RetryOnFailure: true
+    });
+    if (!result || result.Code != 1) {
+      V8.Tips('启动全部安装/更新失败：' + ((result && result.Msg) || '接口无返回'), false);
+      return;
+    }
+    V8.Tips('官方平台应用的全部安装/更新已进入后台任务，请在右上角后台任务中心查看进度。', true);
+  } catch (error) {
+    V8.Tips('启动全部安装/更新失败：' + error.message, false);
+  }
+}, null, { Title: '全部安装/更新', OkText: '开始执行', Icon: 'warning' });`;
+  bulk.Workload = {
+    ExpectedItems: 29,
+    FanOutOperations: 29,
+    ExpectedSeconds: 600,
+  };
+  menu.PageBtns = JSON.stringify(buttons);
+}
+
 export function synchronizeApplicationStoreEngines(packageContent, standaloneContents) {
   const packageModel = parsePackage(packageContent);
   for (const mapping of applicationStoreReplicaMappings) {
@@ -245,6 +325,12 @@ export function synchronizeApplicationStoreEngines(packageContent, standaloneCon
       engine.Version = versionMatch[1].startsWith('v') ? versionMatch[1] : `v${versionMatch[1]}`;
     }
   }
+  if (packageModel.PackageInfo) {
+    packageModel.PackageInfo.ApiEngineCount = Array.isArray(packageModel.SysApiEngines)
+      ? packageModel.SysApiEngines.length
+      : 0;
+  }
+  synchronizeBulkInstallButton(packageModel);
   return canonicalizeResource(applicationStorePackageName, JSON.stringify(packageModel));
 }
 
@@ -274,6 +360,7 @@ export async function mergeApplicationStoreReplicas({
   remoteStandaloneContents,
 }) {
   const resolvedStandaloneContents = new Map();
+  const missingRemoteEmbeddedMappings = [];
 
   for (const mapping of applicationStoreReplicaMappings) {
     const baseEmbedded = tryGetEmbeddedEngineSource(basePackageContent, mapping.apiEngineKey);
@@ -335,7 +422,12 @@ export async function mergeApplicationStoreReplicas({
       localEmbedded,
     );
 
-    const remoteEmbedded = getEmbeddedEngineSource(remotePackageContent, mapping.apiEngineKey);
+    const actualRemoteEmbedded = tryGetEmbeddedEngineSource(
+      remotePackageContent,
+      mapping.apiEngineKey,
+    );
+    if (actualRemoteEmbedded == null) missingRemoteEmbeddedMappings.push(mapping);
+    const remoteEmbedded = actualRemoteEmbedded ?? baseEmbedded;
     const remoteResolved = mapping.publishedStandalone
       ? await reconcileReplicaPair(
         mapping.resourceName,
@@ -366,7 +458,12 @@ export async function mergeApplicationStoreReplicas({
 
   const maskedBasePackage = maskReplicatedEngineFields(basePackageContent, basePackageContent);
   const maskedLocalPackage = maskReplicatedEngineFields(localPackageContent, basePackageContent);
-  const maskedRemotePackage = maskReplicatedEngineFields(remotePackageContent, basePackageContent);
+  const restoredRemotePackage = restoreMissingReplicatedEngineSkeletons(
+    remotePackageContent,
+    basePackageContent,
+    missingRemoteEmbeddedMappings,
+  );
+  const maskedRemotePackage = maskReplicatedEngineFields(restoredRemotePackage, basePackageContent);
   const mergedPackage = mergeJsonResource(
     applicationStorePackageName,
     maskedBasePackage,

@@ -30,6 +30,9 @@
             <!-- PC AI助手：与移动端、小程序复用同一机器人和同一接口能力 -->
             <DesktopAiAssistant />
 
+            <!-- 蓝牙打印机：PC 与平板共用全局连接状态 -->
+            <BluetoothPrinterEntry />
+
             <!-- 切换界面风格 -->
             <el-dropdown v-if="hasWebOS" trigger="hover">
                 <a class="wbtn right-menu-item hover-effect" title="切换界面风格" style="display:flex;align-items:center;cursor:pointer;">
@@ -180,6 +183,7 @@ import Search from "@/components/HeaderSearch";
 import ThemeSelect from "@/layout/components/ThemeSelect";
 import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
 import DesktopAiAssistant from "@/components/DesktopAiAssistant/index.vue";
+import BluetoothPrinterEntry from "@/components/BluetoothPrinterEntry/index.vue";
 import { useDiyStore, useAppStore, useUserStore, usePermissionStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
@@ -194,7 +198,8 @@ export default {
         Search,
         ThemeSelect,
         BackgroundTaskCenter,
-        DesktopAiAssistant
+        DesktopAiAssistant,
+        BluetoothPrinterEntry
     },
     setup() {
         const diyStore = useDiyStore();

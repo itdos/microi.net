@@ -13,6 +13,29 @@ description: Microi AI 引擎、模型代理、NL2SQL/NL2V8 与知识库规范�
 
 未来若给平台在线 AI 增加工具调用，优先在 `Microi.AI` 内建立受限 Tool Gateway，复用 FormEngine、V8McpLogic 等后端服务的授权入口；不要让后端使用超级管理员 Token 再请求自己的 MCP。每次工具调用必须继承当前用户、`OsClient`、Token/权限快照和审计上下文，模型只能提出调用建议，服务端仍负责参数白名单、写操作确认、幂等、步数/时长/结果大小上限和权威回读。工具返回的数据继续按不可信内容处理，不能反向覆盖系统规则。
 
+## 商业授权与调用入口
+
+内置在线 AI 有两套不能混淆的授权：
+
+- `Chat/ChatStream/NL2SQL/NL2SQLStreaming/NL2V8Engine` 统一读取宿主 `IMicroiFeatureLicense`。未修改的官方发布物只有本机通过官方 RSA 公钥、当前 HID 和有效期验证的 `Personal/Enterprise` License 才能继续推理；客户自建私钥/公钥不能替换内嵌官方信任根。验签在本机完成，`api.itdos.com` 只负责签发和周期性作废查询，不是每次调用的在线依赖。
+- `MicroiAI` 与 `AiProxyService` 会拒绝宿主替换的 `IMicroiFeatureLicense` 实现，统一回到 `Microi.net` 的封闭校验器；签发地址固定为 `https://api.itdos.com`，签发私钥目录不得进入构建、NuGet 或发布包。拥有服务器管理员权限的人仍可能篡改本地二进制或机器指令，纯本地 DRM 无法从理论上阻止这种物理控制；但没有官方私钥就不能生成可被未修改吾码节点接受、并可转发给其它正常节点使用的有效 License。
+- 官方中转站另用 `sk-microi-*` ApiKey 和账号 Token 额度鉴权。服务器 License 不能代替中转 ApiKey，中转 ApiKey 也不能把本地核心 AI 入口变成已授权。
+- `AiProxyService` 的 `ProxyChat/ProxyChatStream`、头像生成与 `/v1/chat/completions` 在领域层读取同一服务器 License，并继续执行登录态或平台 ApiKey/订阅链路。模型清单、套餐、订单和用量属于不触发模型推理的发现/账户接口，可以在未授权时用于配置与购买流程。
+
+跨端调用必须按现有事实描述：
+
+| 调用方 | 当前入口 | 关键边界 |
+|---|---|---|
+| 前端 V8 | `await V8.AI.Chat(...)` / `V8.AI.ChatGet(...)` | 自动使用当前 ApiBase、登录 Token 与租户；清除客户端身份、Endpoint、ApiKey；普通返回为 `DosResult` |
+| 浏览器流式 UI | `await V8.AI.ChatStream(..., onChunk, {Signal})` | 内置解析 `message/result/error/done` SSE、Token 轮换和取消；`onChunk` 接收真实增量 |
+| 后端 V8 | `await V8.AI.Chat(...)` / `ChatStream(...)` | 对象创建时绑定当前 `OsClient` 与认证用户；匿名上下文拒绝，不需要自请求 HTTP |
+| MCP | `microi_chat` | 使用 MCP 已登录 Token 和绑定租户；只接受对话白名单参数，返回最终 `DosResult`，不冒充逐 token 流 |
+| OpenAI 兼容客户端 | `POST /v1/chat/completions` | 使用 `Bearer sk-microi-*`，请求体 `stream` 控制普通/流式 |
+
+`Chat/ChatStream` 虽声明 GET/POST，含问题、附件和会话上下文的业务调用默认使用 POST，避免敏感内容进入 URL 日志。Controller 和 `V8.AI` 必须从可信执行上下文覆盖当前用户和 `OsClient`，并清除客户端提交的 `ApiKey/Endpoint`。所谓打字机效果必须来自真实 SSE 增量块；`microi_chat` 只返回最终结果，不能被描述成逐 token MCP 流。
+
+安全数据分析必须继续调用 `/api/Ai/NL2SQL`，由服务端从当前用户权限生成表白名单；通用 AI 包装接口不得接受客户端自报的表名作为授权。
+
 ## 代码分层
 
 AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.Api` 只是 HTTP、SSE 与 SignalR 传输层，可以做路由、请求绑定、读取认证中间件产生的可信用户/租户、传递取消信号和写响应，但不能承载模型选择、Schema/Skill 检索、NL2SQL 授权与执行、提示词编排、代理路由、供应商密钥、额度计量、订阅支付状态或 AI 工作流。
@@ -26,6 +49,8 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 - 模型 Provider、Endpoint、ApiKey、AuthPrefix 和上游模型 Id 只保存在服务端受保护配置。
 - 普通用户使用平台签发的受限 API Key/订阅身份，不能枚举或读取上游密钥。
+- 使用 Microi.AI 中转站时，租户侧 AI Bootstrap 通过官方 `official_ai_relay_models` 发现可用运行模型。该接口是跨租户只读公共契约，必须保持启用、允许匿名 HTTP 调用，并且只返回模型标识、展示名等公开白名单字段，绝不能返回中转密钥或上游 Endpoint。消费者不得把 `NoAuth` 静默伪装为“没有配置模型”；应返回可诊断错误，同时前端显示明确空态。
+- PC、UniApp 和其它客户端通过 `POST /apiengine/{key}` 发送的 JSON Body 必须完整进入 `V8.Param`；兼容入口 `/api/ApiEngine/Run` 的 JSON Body 还必须包含 `ApiEngineKey`。API 层只负责请求绑定和清除客户端伪造的可信字段，模型选择、权限策略与对话逻辑仍全部位于 `Microi.AI` 或受控 AI 接口引擎中。
 - 当前计量记录除问题摘要外还可能持久化完整 `Question`、`Answer`，部分诊断日志也会输出问题或摘要。处理现有版本时必须把这些字段视为敏感业务数据，限制查询权限和留存；不要声称已经全面脱敏。
 - 发布目标是日志只记录 trace id、模型、耗时、token 计数和状态，Prompt/Answer 按租户策略脱敏，密码、Token、连接串和完整业务数据不落日志。该目标必须用源码和真实数据回读证明。
 - OpenAI 代理流式接口会传递 HTTP 请求取消信号；普通 `ChatStream` 与 `NL2V8` 当前主要使用内部超时 Token。不要声称浏览器断开一定立即终止上游调用或计费。
@@ -119,6 +144,8 @@ MCP 提供实时事实和受控执行；关键词索引提供低依赖、确定�
 ## 验收清单
 
 - [ ] 模型密钥只在服务端，普通用户不可枚举
+- [ ] 官方中转模型清单可在无 Token 下返回非空公开白名单，且不含 ApiKey、Endpoint；Bootstrap 失败不会被静默降级为空列表
+- [ ] 直接动态路由与 `/api/ApiEngine/Run` 兼容入口的 JSON Body 均能到达 `V8.Param`，HTTP 伪造可信字段仍被清除
 - [ ] Schema/向量/对话/配额按 `OsClient` 隔离
 - [ ] `EnableVectorDatabase` 缺失、空值或 `0` 时不创建、连接、初始化、同步或搜索 Embedding/Ollama/Qdrant
 - [ ] 默认链路使用结构化大模型扩词；扩词失败时中文 2/3 字确定性回退仍能召回常见业务实体
@@ -134,7 +161,7 @@ MCP 提供实时事实和受控执行；关键词索引提供低依赖、确定�
 - [ ] 带行级范围或高风险查询失败关闭，并改走审核、参数化和审计的业务 ApiEngine
 - [ ] NL2V8 保存前有确认、语法、版本、回读和执行验证
 - [ ] Prompt injection 不能调用未授权工具
-- [ ] 未实现 MCP Tool/Agent Loop 时，界面和文档不会声称在线 AI 已执行 MCP
+- [ ] `microi_chat` 只调用对话入口、拒绝身份/密钥/Endpoint 覆盖并返回最终结果；在尚无模型 `tool_calls` Agent Loop 时，不会声称平台在线 AI 已执行其它 MCP 工具
 - [ ] 各流式入口分别验证断开取消或明确仅有超时，不做过度承诺
 - [ ] Prompt/Answer 当前留存范围已披露；全面脱敏只能在真实实现并回读后声明
 - [ ] 新旧节点知识库版本可共存
