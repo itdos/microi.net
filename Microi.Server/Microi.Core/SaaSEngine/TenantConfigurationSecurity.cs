@@ -224,6 +224,9 @@ namespace Microi.net
                    && !name.StartsWith("AliOss", StringComparison.OrdinalIgnoreCase)
                    && !name.StartsWith("CloudFront", StringComparison.OrdinalIgnoreCase)
                    && !name.StartsWith("SearchEngine", StringComparison.OrdinalIgnoreCase)
+                   && !name.StartsWith("Backend", StringComparison.OrdinalIgnoreCase)
+                   && !name.StartsWith("Ocr", StringComparison.OrdinalIgnoreCase)
+                   && !name.StartsWith("Translate", StringComparison.OrdinalIgnoreCase)
                    && !name.StartsWith("Mqtt", StringComparison.OrdinalIgnoreCase)
                    && !name.StartsWith("MQ", StringComparison.OrdinalIgnoreCase);
         }
@@ -296,6 +299,9 @@ namespace Microi.net
                     || property.Name.StartsWith("MinIO", StringComparison.OrdinalIgnoreCase)
                     || property.Name.StartsWith("CloudFront", StringComparison.OrdinalIgnoreCase)
                     || property.Name.StartsWith("SearchEngine", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.StartsWith("Backend", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.StartsWith("Ocr", StringComparison.OrdinalIgnoreCase)
+                    || property.Name.StartsWith("Translate", StringComparison.OrdinalIgnoreCase)
                     || property.Name.StartsWith("Mqtt", StringComparison.OrdinalIgnoreCase)
                     || property.Name.StartsWith("MQ", StringComparison.OrdinalIgnoreCase))
                 {

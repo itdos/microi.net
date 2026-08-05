@@ -51,7 +51,7 @@ function engineVersion(source) {
 
 const defaultBulkImporter = engineSource(
   'bulk-import-microi-store-packages',
-  'v1.1.1',
+  'v1.1.3',
   'return { Code: 1 };',
 );
 
@@ -104,6 +104,14 @@ function replicaMaps({ importer, publisher, builder, bulk = defaultBulkImporter 
     ['ai-app-publish-store.js', publisher],
     ['ai-app-build.js', builder],
   ]);
+}
+
+function withoutEmbeddedEngine(content, apiEngineKey) {
+  const model = JSON.parse(content);
+  model.SysApiEngines = model.SysApiEngines.filter(
+    engine => engine.ApiEngineKey !== apiEngineKey,
+  );
+  return JSON.stringify(model);
 }
 
 async function mergeReplicaFixture({
@@ -430,16 +438,15 @@ test('首次新增内嵌商城引擎时允许从一致的本地事实源建立�
     'v1.0.0',
     'return { Code: 1, Data: { BackgroundTask: { HasMore: false } } };',
   );
-  const withoutBulk = content => {
-    const model = JSON.parse(content);
-    model.SysApiEngines = model.SysApiEngines.filter(
-      engine => engine.ApiEngineKey !== 'bulk-import-microi-store-packages',
-    );
-    return JSON.stringify(model);
-  };
-  const basePackage = withoutBulk(applicationStorePackage({ importer, publisher, builder, bulk }));
+  const basePackage = withoutEmbeddedEngine(
+    applicationStorePackage({ importer, publisher, builder, bulk }),
+    'bulk-import-microi-store-packages',
+  );
   const localPackage = applicationStorePackage({ importer, publisher, builder, bulk });
-  const remotePackage = withoutBulk(applicationStorePackage({ importer, publisher, builder, bulk }));
+  const remotePackage = withoutEmbeddedEngine(
+    applicationStorePackage({ importer, publisher, builder, bulk }),
+    'bulk-import-microi-store-packages',
+  );
   const establishedReplicas = new Map([
     ['import-package.js', importer],
     ['ai-app-publish-store.js', publisher],
@@ -460,6 +467,104 @@ test('首次新增内嵌商城引擎时允许从一致的本地事实源建立�
     bulk,
   );
   assert.equal(merged.standaloneContents.get('bulk-import-packages.js'), bulk);
+});
+
+test('共同基线已有内嵌引擎但官网副本缺失时自动恢复且不丢本地升级', async () => {
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const publisher = engineSource('ai_app_publish_store', 'v1.5.3', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.3.0', 'return { Code: 1 };');
+  const baseBulk = engineSource(
+    'bulk-import-microi-store-packages',
+    'v1.1.2',
+    'return { Code: 1, Data: { Version: 2 } };',
+  );
+  const localBulk = engineSource(
+    'bulk-import-microi-store-packages',
+    'v1.1.3',
+    'return { Code: 1, Data: { Version: 3 } };',
+  );
+  const basePackage = applicationStorePackage({ importer, publisher, builder, bulk: baseBulk });
+  const localPackage = applicationStorePackage({ importer, publisher, builder, bulk: localBulk });
+  const remotePackage = withoutEmbeddedEngine(
+    basePackage,
+    'bulk-import-microi-store-packages',
+  );
+
+  const merged = await mergeApplicationStoreReplicas({
+    basePackageContent: basePackage,
+    localPackageContent: localPackage,
+    remotePackageContent: remotePackage,
+    baseStandaloneContents: replicaMaps({ importer, publisher, builder, bulk: baseBulk }),
+    localStandaloneContents: replicaMaps({ importer, publisher, builder, bulk: localBulk }),
+    remoteStandaloneContents: replicaMaps({ importer, publisher, builder, bulk: baseBulk }),
+  });
+
+  assert.equal(
+    getEmbeddedEngineSource(merged.packageContent, 'bulk-import-microi-store-packages'),
+    localBulk,
+  );
+  assert.equal(merged.standaloneContents.get('bulk-import-packages.js'), localBulk);
+  const mergedPackage = JSON.parse(merged.packageContent);
+  assert.equal(mergedPackage.PackageInfo.ApiEngineCount, mergedPackage.SysApiEngines.length);
+});
+
+test('官网缺少已建立的内嵌副本时保留官网独立源码更新并重建副本', async () => {
+  const baseImporter = engineSource(
+    'import-microi-store-package',
+    'v1.8.7',
+    'return { Code: 1, Data: { Version: 7 } };',
+  );
+  const remoteImporter = engineSource(
+    'import-microi-store-package',
+    'v1.8.8',
+    'return { Code: 1, Data: { Version: 8 } };',
+  );
+  const publisher = engineSource('ai_app_publish_store', 'v1.5.3', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.3.0', 'return { Code: 1 };');
+  const basePackage = applicationStorePackage({ importer: baseImporter, publisher, builder });
+  const remotePackage = withoutEmbeddedEngine(
+    basePackage,
+    'import-microi-store-package',
+  );
+
+  const merged = await mergeApplicationStoreReplicas({
+    basePackageContent: basePackage,
+    localPackageContent: basePackage,
+    remotePackageContent: remotePackage,
+    baseStandaloneContents: replicaMaps({ importer: baseImporter, publisher, builder }),
+    localStandaloneContents: replicaMaps({ importer: baseImporter, publisher, builder }),
+    remoteStandaloneContents: replicaMaps({ importer: remoteImporter, publisher, builder }),
+  });
+
+  assert.equal(
+    getEmbeddedEngineSource(merged.packageContent, 'import-microi-store-package'),
+    remoteImporter,
+  );
+  assert.equal(merged.standaloneContents.get('import-package.js'), remoteImporter);
+});
+
+test('官网缺失副本但共同基线引擎 Id 已被其它 Key 占用时阻止自动恢复', async () => {
+  const importer = engineSource('import-microi-store-package', 'v1.0.0', 'return { Code: 1 };');
+  const publisher = engineSource('ai_app_publish_store', 'v1.5.3', 'return { Code: 1 };');
+  const builder = engineSource('ai_app_build', 'v1.3.0', 'return { Code: 1 };');
+  const bulk = engineSource('bulk-import-microi-store-packages', 'v1.1.3', 'return { Code: 1 };');
+  const basePackage = applicationStorePackage({ importer, publisher, builder, bulk });
+  const remoteModel = JSON.parse(basePackage);
+  remoteModel.SysApiEngines.find(
+    engine => engine.ApiEngineKey === 'bulk-import-microi-store-packages',
+  ).ApiEngineKey = 'different-engine-using-the-same-id';
+
+  await assert.rejects(
+    mergeApplicationStoreReplicas({
+      basePackageContent: basePackage,
+      localPackageContent: basePackage,
+      remotePackageContent: JSON.stringify(remoteModel),
+      baseStandaloneContents: replicaMaps({ importer, publisher, builder, bulk }),
+      localStandaloneContents: replicaMaps({ importer, publisher, builder, bulk }),
+      remoteStandaloneContents: replicaMaps({ importer, publisher, builder, bulk }),
+    }),
+    /共同基线 Id engine-bulk-importer 已被 different-engine-using-the-same-id 占用/,
+  );
 });
 
 test('商城包写回时优先使用更高正式版本，否则独立递增包补丁版本', () => {

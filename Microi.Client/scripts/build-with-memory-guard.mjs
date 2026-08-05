@@ -12,12 +12,14 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
+import { calculateBuildMemoryPlan } from './build-memory-plan.mjs';
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const projectDir = path.resolve(scriptDir, '..');
 const viteBin = path.join(projectDir, 'node_modules', 'vite', 'bin', 'vite.js');
+const modernMinifier = path.join(scriptDir, 'minify-modern-output.mjs');
 const legacyBuilder = path.join(scriptDir, 'build-legacy-from-modern.mjs');
 const processTreeMemoryControl = path.join(scriptDir, 'process-tree-memory-control.ps1');
 const modernOutDir = path.join(projectDir, 'bin', 'Release', 'dist');
@@ -26,25 +28,52 @@ const logDir = path.join(projectDir, '.tmp', 'build-logs');
 const guardPidPath = path.join(logDir, 'guard.pid');
 const totalMemory = os.totalmem();
 const freeMemory = os.freemem();
-const reserveMemory = Math.max(6 * GB, totalMemory * 0.2);
-// 当前现代浏览器完整依赖图（含 go-view）需要超过 4 GB V8 堆。
-// 6 GB 在 32 GB 开发机上仍为物理内存的 20% 以内；Chrome 49 另用 2 GB 子进程逐 chunk 转换。
+const pauseMemoryUsageRatio = 0.95;
+const resumeMemoryUsageRatio = 0.9;
+const resumeStableSampleCount = 5;
+// 当前 14802 模块的现代浏览器完整依赖图（含 go-view）实测在 Rollup
+// 输出 757 个 chunk 时，5 GB 堆会 OOM，进程树峰值约 5.4 GB。
+// Vite 只生成未压缩现代 ESM；它退出后由独立 1.5 GB 子进程逐文件压缩，
+// Chrome 49 再由独立 2 GB 子进程逐 chunk 串行转换，三个阶段的峰值不会叠加。
 const defaultHeapMb = 6144;
-const maxHeapByHostMb = Math.max(1024, Math.floor(totalMemory / MB * 0.2));
+const measuredModernProcessTreePeakMb = 6144;
+const modernMinifyHeapMb = 1536;
+const legacyHeapMb = 2048;
+const maxHeapByHostMb = Math.max(1024, Math.floor(totalMemory / MB * 0.25));
 const requestedHeapMb = Number.parseInt(process.env.MICROI_BUILD_HEAP_MB || '', 10);
 const heapMb = Math.min(
     Number.isFinite(requestedHeapMb) && requestedHeapMb > 0 ? requestedHeapMb : defaultHeapMb,
     maxHeapByHostMb
 );
-const requiredStartMemory = reserveMemory + Math.min(2 * GB, heapMb * MB * 0.5);
+// Node 堆之外还要容纳 young generation、代码、Buffer 和 esbuild 原生进程。
+// 每个顺序阶段独立按“受控堆 + 原生开销 + 系统安全余量”计算启动目标，
+// 不使用物理内存 20% 的线性保留门槛，也不叠加不会并发的阶段峰值。
+const modernMemoryPlan = calculateBuildMemoryPlan({
+    totalMemory,
+    heapLimitMb: heapMb,
+    // 本机实测 5.4 GB 左右，按 6 GB 作为含约 10% 余量的阶段总预算。
+    processTreePeakMb: Math.min(measuredModernProcessTreePeakMb, maxHeapByHostMb),
+    pauseMemoryUsageRatio
+});
+const modernMinifyMemoryPlan = calculateBuildMemoryPlan({
+    totalMemory,
+    heapLimitMb: modernMinifyHeapMb,
+    pauseMemoryUsageRatio
+});
+const legacyMemoryPlan = calculateBuildMemoryPlan({
+    totalMemory,
+    heapLimitMb: legacyHeapMb,
+    pauseMemoryUsageRatio
+});
+const systemSafetyMemory = modernMemoryPlan.systemSafetyMemory;
+const requiredModernStartMemory = modernMemoryPlan.requiredStartMemory;
+const requiredModernMinifyStartMemory = modernMinifyMemoryPlan.requiredStartMemory;
+const requiredLegacyStartMemory = legacyMemoryPlan.requiredStartMemory;
 const esbuildParallelism = Math.max(
     1,
     Math.min(Number.parseInt(process.env.MICROI_ESBUILD_PROCS || '2', 10) || 2, os.cpus().length, 2)
 );
 const buildMemoryNoticeThreshold = totalMemory * 0.25;
-const pauseMemoryUsageRatio = 0.95;
-const resumeMemoryUsageRatio = 0.9;
-const resumeStableSampleCount = 5;
 const rawArgs = process.argv.slice(2);
 const dryRun = rawArgs.includes('--dry-run');
 const legacyOnly = rawArgs.includes('--legacy-only');
@@ -245,7 +274,7 @@ function closeMemoryWaitInput() {
     memoryWaitInput = null;
 }
 
-async function waitForStartMemory(context) {
+async function waitForStartMemory(context, requiredStartMemory) {
     if (memoryWaitBypassed) return;
 
     let available = os.freemem();
@@ -281,10 +310,15 @@ async function waitForStartMemory(context) {
 
 console.log(
     `[Microi build guard] 物理内存 ${formatGb(totalMemory)} GB，可用 ${formatGb(freeMemory)} GB，` +
-    `现代构建 Node 堆上限 ${heapMb} MB，esbuild 并行 ${esbuildParallelism}，legacy 子进程堆上限 2048 MB。`
+    `现代 Vite 堆上限 ${heapMb} MB，esbuild 并行 ${esbuildParallelism}，` +
+    `现代串行压缩 ${modernMinifyHeapMb} MB，legacy ${legacyHeapMb} MB。`
 );
 console.log(
-    `[Microi build guard] 启动前保留内存目标 ${formatGb(reserveMemory)} GB；` +
+    `[Microi build guard] 系统安全余量 ${formatGb(systemSafetyMemory)} GB，` +
+    `现代 Vite 实测峰值预算 ${formatGb(modernMemoryPlan.phaseBudgetMemory)} GB；` +
+    `各顺序阶段启动目标：现代 Vite ${formatGb(requiredModernStartMemory)} GB，` +
+    `现代串行压缩 ${formatGb(requiredModernMinifyStartMemory)} GB，` +
+    `legacy ${formatGb(requiredLegacyStartMemory)} GB（阶段峰值不叠加）；` +
     '全机占用达到 95% 时自动暂停整个构建进程树，降至 90% 并稳定 5 秒后继续。'
 );
 if (skipMemoryWaitFromEnv) {
@@ -297,16 +331,21 @@ if (!existsSync(viteBin)) {
     console.error('[Microi build guard] 未找到本地 Vite，请先执行 npm install。');
     process.exit(1);
 }
+if (!existsSync(modernMinifier)) {
+    console.error(`[Microi build guard] 未找到现代产物压缩器：${modernMinifier}`);
+    process.exit(1);
+}
 if (!existsSync(legacyBuilder)) {
     console.error(`[Microi build guard] 未找到 Chrome 49 转换器：${legacyBuilder}`);
     process.exit(1);
 }
 
 if (preflightOnly) {
-    if (!memoryWaitBypassed && freeMemory < requiredStartMemory) {
+    if (!memoryWaitBypassed && freeMemory < requiredModernStartMemory) {
         console.error(
             `[Microi build guard] 发布前资源预检未通过：当前可用 ${formatGb(freeMemory)} GB，` +
-            `需要至少 ${formatGb(requiredStartMemory)} GB。请先关闭不需要的 WSL、后端、浏览器或其它重任务后重试。`
+            `现代阶段需要至少 ${formatGb(requiredModernStartMemory)} GB。` +
+            '请先关闭不需要的 WSL、后端、浏览器或其它重任务后重试。'
         );
         process.exit(2);
     }
@@ -317,10 +356,10 @@ if (preflightOnly) {
 if (dryRun) {
     if (memoryWaitBypassed) {
         console.log('[Microi build guard] dry-run：实际构建将按配置跳过内存等待和自动暂停。');
-    } else if (freeMemory < requiredStartMemory) {
+    } else if (freeMemory < requiredModernStartMemory) {
         console.log(
             `[Microi build guard] dry-run：当前可用 ${formatGb(freeMemory)} GB；` +
-            `实际构建会等待到 ${formatGb(requiredStartMemory)} GB 后再启动。`
+            `实际构建会等待到 ${formatGb(requiredModernStartMemory)} GB 后再启动现代阶段。`
         );
     } else {
         console.log('[Microi build guard] 资源检查通过（dry-run，未启动 Vite）。');
@@ -440,7 +479,7 @@ process.once('SIGINT', () => handleSignal('SIGINT'));
 process.once('SIGTERM', () => handleSignal('SIGTERM'));
 
 async function runVitePhase(name, variant, outDir) {
-    await waitForStartMemory(`${name}构建`);
+    await waitForStartMemory(`${name}构建`, requiredModernStartMemory);
     return new Promise((resolve, reject) => {
         phaseStartFreeMemory = os.freemem();
         activePhaseName = name;
@@ -509,9 +548,8 @@ async function runVitePhase(name, variant, outDir) {
     });
 }
 
-async function runLegacyConversionPhase() {
-    const name = 'Chrome 49 legacy串行转换';
-    await waitForStartMemory(name);
+async function runNodeScriptPhase({ name, scriptPath, heapLimitMb, requiredStartMemory, logName }) {
+    await waitForStartMemory(name, requiredStartMemory);
     return new Promise((resolve, reject) => {
         phaseStartFreeMemory = os.freemem();
         activePhaseName = name;
@@ -522,7 +560,7 @@ async function runLegacyConversionPhase() {
         resumeStableSamples = 0;
 
         mkdirSync(logDir, { recursive: true });
-        const logPath = path.join(logDir, 'legacy.log');
+        const logPath = path.join(logDir, logName);
         const logFd = openSync(logPath, 'w');
         let logClosed = false;
         const closeLog = () => {
@@ -534,14 +572,14 @@ async function runLegacyConversionPhase() {
         console.log(`\n[Microi build guard] 开始${name}，详细日志：${logPath}`);
         activeChild = spawn(process.execPath, [
             '--expose-gc',
-            '--max-old-space-size=2048',
-            legacyBuilder
+            `--max-old-space-size=${heapLimitMb}`,
+            scriptPath
         ], {
             cwd: projectDir,
             detached: process.platform !== 'win32',
             env: {
                 ...process.env,
-                NODE_OPTIONS: nodeOptionsWithHeapLimit(process.env.NODE_OPTIONS, 2048),
+                NODE_OPTIONS: nodeOptionsWithHeapLimit(process.env.NODE_OPTIONS, heapLimitMb),
                 GOMAXPROCS: String(esbuildParallelism)
             },
             stdio: ['ignore', logFd, logFd],
@@ -582,6 +620,26 @@ async function runLegacyConversionPhase() {
     });
 }
 
+function runModernMinificationPhase() {
+    return runNodeScriptPhase({
+        name: '现代 JS 逐文件串行压缩',
+        scriptPath: modernMinifier,
+        heapLimitMb: modernMinifyHeapMb,
+        requiredStartMemory: requiredModernMinifyStartMemory,
+        logName: 'modern-minify.log'
+    });
+}
+
+function runLegacyConversionPhase() {
+    return runNodeScriptPhase({
+        name: 'Chrome 49 legacy串行转换',
+        scriptPath: legacyBuilder,
+        heapLimitMb: legacyHeapMb,
+        requiredStartMemory: requiredLegacyStartMemory,
+        logName: 'legacy.log'
+    });
+}
+
 try {
     assertSafeBuildPath(modernOutDir);
     assertSafeBuildPath(legacyOutDir);
@@ -589,6 +647,7 @@ try {
 
     if (!legacyOnly) {
         await runVitePhase('现代浏览器', 'modern', modernOutDir);
+        await runModernMinificationPhase();
     } else if (!existsSync(path.join(modernOutDir, 'index.html'))) {
         throw new Error('--legacy-only 需要已有的现代浏览器 index.html。');
     }

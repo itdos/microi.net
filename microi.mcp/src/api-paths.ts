@@ -14,6 +14,14 @@ export const API = {
 
   // 服务器状态
   GET_STATUS: '/api/V8Engine/GetStatus',
+  AI_CHAT: '/api/Ai/Chat',
+  OCR_RECOGNIZE: '/api/Ocr/Recognize',
+  TRANSLATE_TEXT: '/api/Translate/TranslateText',
+  TRANSLATE_DETECT: '/api/Translate/Detect',
+  TRANSLATE_LANGUAGES: '/api/Translate/Languages',
+  TRANSLATE_FILE: '/api/Translate/TranslateFile',
+  TRANSLATE_SUGGEST: '/api/Translate/Suggest',
+  TRANSLATE_HEALTH: '/api/Translate/Health',
   TRANSITION_APPLICATION_STREAM_GATE: '/api/V8Engine/TransitionApplicationStreamGate',
 
   // Redis 管理器（默认当前租户连接，可指定已保存连接）

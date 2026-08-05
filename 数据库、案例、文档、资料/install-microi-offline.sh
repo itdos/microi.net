@@ -1056,11 +1056,13 @@ services:
       - OsClient=iTdos
       - OsClientType=Product
       - OsClientNetwork=Internal
+      - OsClientDbType=MySql
       - OsClientDbConn=${OS_CLIENT_DB_CONN}
       - OsClientRedisHost=${LAN_IP}
       - OsClientRedisPort=${REDIS_PORT}
       - OsClientRedisPwd=${REDIS_PASSWORD}
-      - AuthServer=http://${LAN_IP}:${API_PORT}
+      - OsClientRedisDataBase=5
+      - OsClientDbMongoConn=mongodb://root:${MONGO_ROOT_PASSWORD}@${LAN_IP}:${MONGO_PORT}/?authSource=admin
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.8.6
+ * Version: v1.8.10
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  */
@@ -82,6 +82,18 @@ var supportedBackgroundCheckpointPhases = {
 if (!supportedBackgroundCheckpointPhases[backgroundCheckpointPhase]) backgroundCheckpointPhase = 'Ddl';
 var backgroundCheckpointIndex = parseInt(backgroundCheckpoint.Index || 0, 10);
 if (isNaN(backgroundCheckpointIndex) || backgroundCheckpointIndex < 0) backgroundCheckpointIndex = 0;
+// MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1：MySQL 宽表把失败的 varchar 配置列提升为
+// mediumtext 后，后续后台分片必须继续沿用同一物理类型。覆盖只保存表名、字段名和
+// 行外文本类型，不保存租户数据；节点切换或进程重启后仍能幂等恢复。
+var mysqlOffpageTypeOverrides = {};
+var storedMysqlOffpageTypeOverrides = backgroundCheckpoint.MySqlOffpageTypeOverrides || {};
+for (var storedOffpageKey in storedMysqlOffpageTypeOverrides) {
+    if (!Object.prototype.hasOwnProperty.call(storedMysqlOffpageTypeOverrides, storedOffpageKey)) continue;
+    var storedOffpageType = String(storedMysqlOffpageTypeOverrides[storedOffpageKey] || '').toLowerCase();
+    if (storedOffpageType == 'mediumtext' || storedOffpageType == 'longtext') {
+        mysqlOffpageTypeOverrides[String(storedOffpageKey).toLowerCase()] = storedOffpageType;
+    }
+}
 var schemaDdlChunkSize = parseInt(V8.Param.SchemaDdlChunkSize || 1, 10);
 if (isNaN(schemaDdlChunkSize)) schemaDdlChunkSize = 1;
 schemaDdlChunkSize = Math.max(1, Math.min(4, schemaDdlChunkSize));
@@ -157,6 +169,15 @@ var buildPersistentCheckpoint = function (phase, index, extra) {
     } catch (schemaStatsError) { schemaStats = null; }
     if (!schemaStats && backgroundCheckpoint.SchemaStats) schemaStats = backgroundCheckpoint.SchemaStats;
     if (schemaStats) checkpoint.SchemaStats = schemaStats;
+    if (Object.keys(mysqlOffpageTypeOverrides).length > 0) {
+        var offpageSnapshot = {};
+        for (var offpageSnapshotKey in mysqlOffpageTypeOverrides) {
+            if (Object.prototype.hasOwnProperty.call(mysqlOffpageTypeOverrides, offpageSnapshotKey)) {
+                offpageSnapshot[offpageSnapshotKey] = mysqlOffpageTypeOverrides[offpageSnapshotKey];
+            }
+        }
+        checkpoint.MySqlOffpageTypeOverrides = offpageSnapshot;
+    }
     extra = extra || {};
     for (var extraKey in extra) {
         if (Object.prototype.hasOwnProperty.call(extra, extraKey)) checkpoint[extraKey] = extra[extraKey];
@@ -369,6 +390,95 @@ if (!Package.PackageInfo) {
         Code: 0,
         Msg: '参数错误：Package.PackageInfo不能为空'
     };
+}
+
+// BULK_SMALL_PACKAGE_SINGLE_SLICE_V1：批量安装本身已经按“一个应用一个外层
+// checkpoint”持久化。对规模可控的官方平台包，再把同一个应用拆成几十个内部
+// Worker 片段只会反复下载和解析同一包体，调度成本远大于数据库写入。可信批量
+// 任务可让小包在一个事务中完成；大型 Schema、远程 ZIP 或大资产仍保留原有分片。
+var bulkAdaptiveSingleSliceRequested = V8.Param.BulkAdaptiveSingleSlice === true
+    || String(V8.Param.BulkAdaptiveSingleSlice || '').toLowerCase() == 'true';
+var trustedBulkAdaptiveInvocation = bulkAdaptiveSingleSliceRequested
+    && backgroundChunkingEnabled
+    && (V8.Param._TrustedServerInvocation === true
+        || String(V8.Param._TrustedServerInvocation || '').toLowerCase() == 'true')
+    && !!backgroundTaskId
+    && String(backgroundTaskEnvelope.Id || '') == String(backgroundTaskId)
+    && parseInt(V8.Param._BackgroundTaskFencingToken || 0, 10) > 0
+    && parseInt(V8.Param.BulkTotal || 0, 10) > 0;
+var listSize = function (value) {
+    return value && value.length !== undefined ? Number(value.length) || 0 : 0;
+};
+var bulkAdaptivePackageEligible = function (packageModel) {
+    packageModel = packageModel || {};
+    var fieldCount = listSize(packageModel.DiyFields);
+    var tableCount = listSize(packageModel.DiyTables);
+    var ddlCount = listSize(packageModel.DDLStatements);
+    var menuCount = listSize(packageModel.SysMenus);
+    var apiEngineCount = listSize(packageModel.SysApiEngines);
+    var workflowUnitCount = listSize(packageModel.WorkFlows || packageModel.Workflows)
+        + listSize(packageModel.WFNodes || packageModel.WorkFlowNodes)
+        + listSize(packageModel.WFLines || packageModel.WorkFlowLines);
+    var dataRowCount = 0;
+    var dataSets = packageModel.DataSets || [];
+    for (var dataSetIndex = 0; dataSetIndex < listSize(dataSets); dataSetIndex++) {
+        var dataSet = dataSets[dataSetIndex] || {};
+        dataRowCount += listSize(dataSet.Rows || dataSet.Data);
+    }
+
+    var bundles = [];
+    var packageBundles = packageModel.ApplicationBundles || [];
+    for (var bundleIndex = 0; bundleIndex < listSize(packageBundles); bundleIndex++) {
+        if (packageBundles[bundleIndex]) bundles.push(packageBundles[bundleIndex]);
+    }
+    var legacyBundle = packageModel.ApplicationBundle || packageModel.AiApplication || packageModel.FrontendApplication;
+    if (legacyBundle) bundles.push(legacyBundle);
+    var assetFileCount = 0;
+    var assetContentChars = 0;
+    var hasRemoteZipOnlyAssets = false;
+    for (var adaptiveBundleIndex = 0; adaptiveBundleIndex < bundles.length; adaptiveBundleIndex++) {
+        var adaptiveBundle = bundles[adaptiveBundleIndex] || {};
+        var sourceFiles = adaptiveBundle.SourceFiles || adaptiveBundle.Files || [];
+        var buildAssets = adaptiveBundle.BuildAssets || adaptiveBundle.Assets || [];
+        var embeddedCount = listSize(sourceFiles) + listSize(buildAssets);
+        var packageAssets = adaptiveBundle.PackageAssets || adaptiveBundle.ZipAssets || null;
+        if (typeof packageAssets == 'string') {
+            try { packageAssets = JSON.parse(packageAssets); } catch (adaptiveAssetParseError) { return false; }
+        }
+        if (packageAssets && packageAssets.length !== undefined && !packageAssets.BuildZip && !packageAssets.SourceZip) {
+            packageAssets = packageAssets.length ? packageAssets[0] : null;
+        }
+        if (embeddedCount == 0 && packageAssets && (packageAssets.BuildZip || packageAssets.SourceZip)) {
+            hasRemoteZipOnlyAssets = true;
+        }
+        var adaptiveFiles = [];
+        var sourceFileCount = listSize(sourceFiles);
+        var buildAssetCount = listSize(buildAssets);
+        for (var sourceFileIndex = 0; sourceFileIndex < sourceFileCount; sourceFileIndex++) adaptiveFiles.push(sourceFiles[sourceFileIndex]);
+        for (var buildAssetIndex = 0; buildAssetIndex < buildAssetCount; buildAssetIndex++) adaptiveFiles.push(buildAssets[buildAssetIndex]);
+        assetFileCount += adaptiveFiles.length;
+        for (var adaptiveFileIndex = 0; adaptiveFileIndex < adaptiveFiles.length; adaptiveFileIndex++) {
+            assetContentChars += applicationAssetContentLength(adaptiveFiles[adaptiveFileIndex]);
+        }
+    }
+
+    return fieldCount <= 160
+        && tableCount <= 12
+        && ddlCount <= 16
+        && menuCount <= 20
+        && apiEngineCount <= 40
+        && workflowUnitCount <= 200
+        && dataRowCount <= 500
+        && assetFileCount <= 20
+        && assetContentChars <= 8 * 1024 * 1024
+        && !hasRemoteZipOnlyAssets;
+};
+if (trustedBulkAdaptiveInvocation && bulkAdaptivePackageEligible(Package)) {
+    backgroundChunkingEnabled = false;
+    backgroundCheckpoint = {};
+    backgroundCheckpointPhase = 'Ddl';
+    backgroundCheckpointIndex = 0;
+    debugLog.bulk_small_package_single_slice = '可信批量任务使用单应用单事务快速路径';
 }
 
 // PACKAGE_REPLAY_VERSION_GUARD_V1：identifier-only 后台任务会在每片从商城源
@@ -1404,9 +1514,18 @@ try {
             if (saveResult && saveResult.Code == 1) {
                 stats.VersionRecordUpdated++;
                 debugLog.version_record_result = '已写入应用安装版本：' + appName + ' ' + appVersion;
+                // SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1：平台随版本内置的
+                // 基础应用包不是一次商城点击安装，不携带 StoreId/AppId。此时本地
+                // 版本记录仍然有效，但不得向官方计数接口发送空标识，更不能把统计
+                // 接口的参数校验失败升级为应用包事务失败。
+                var marketplaceInstallIdentity = firstTextParam([model.StoreId, model.AppId]);
+                if (!marketplaceInstallIdentity) {
+                    debugLog.install_count_skipped_no_identity = '安装包未携带官方商城 StoreId/AppId，已跳过安装次数累计';
+                    return;
+                }
                 try {
                     var installationKey = V8.EncryptHelper.SHA256(
-                        firstTextParam([model.StoreId, model.AppId]) + '|' + V8.OsClient + '|' + installOperationId
+                        marketplaceInstallIdentity + '|' + V8.OsClient + '|' + installOperationId
                     );
                     var remoteStat = V8.Http.Post({
                         Url: storeApiBase + '/apiengine/official_marketplace_install_stat?OsClient=' + encodeURIComponent(storeOsClient),
@@ -1423,6 +1542,12 @@ try {
                         ParamType: 'json',
                         Timeout: 30
                     });
+                    // MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1：V8.Http.Post 在不同
+                    // 运行版本中可能直接返回对象，也可能返回 JSON 字符串。官方接口已
+                    // 成功执行但未解析字符串时，不能把本地安装误判失败并反复回滚。
+                    if (typeof remoteStat == 'string') {
+                        remoteStat = JSON.parse(remoteStat);
+                    }
                     if (remoteStat && remoteStat.Code == 1) {
                         debugLog.install_count_result = '官方商城安装次数已累计，操作Id=' + installOperationId;
                     } else {
@@ -1874,6 +1999,157 @@ try {
         return definition;
     };
 
+    var buildDiyFieldAddColumnSql = function (tableName, field, overrideColumnType) {
+        field = field || {};
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(field.Name)) return '';
+        var columnType = overrideColumnType || mapToMySQLType(field.Type);
+        var sql = 'ALTER TABLE `' + tableName + '` ADD COLUMN `' + field.Name + '` ' + columnType;
+        sql += field.Name == 'Id' ? ' NOT NULL PRIMARY KEY' : ' NULL';
+        if (field.Label && String(field.Label) !== String(field.Name)) {
+            sql += " COMMENT '" + sqlString(field.Label) + "'";
+        }
+        return sql;
+    };
+
+    var isMysqlRowSizeTooLargeError = function (error) {
+        var message = String(error && error.message ? error.message : error || '');
+        return /row\s+size\s+too\s+large|maximum\s+row\s+size[^\n]*65535/i.test(message);
+    };
+
+    var mysqlOffpageOverrideKey = function (tableName, columnName) {
+        return String(tableName || '').toLowerCase() + '.' + String(columnName || '').toLowerCase();
+    };
+
+    var packageFieldBelongsToTable = function (field, tableName, tableId) {
+        field = field || {};
+        var fieldTableName = String(field.TableName || '').toLowerCase();
+        var expectedTableName = String(tableName || '').toLowerCase();
+        if (fieldTableName) return fieldTableName == expectedTableName;
+        return !!tableId && String(field.TableId || '') == String(tableId);
+    };
+
+    var isPackageColumnIndexed = function (tableName, columnName) {
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) return true;
+        var ddlList = Package.DDLStatements || [];
+        var columnPattern = new RegExp('(^|[^A-Za-z0-9_])' + columnName + '([^A-Za-z0-9_]|$)', 'i');
+        for (var ddlIndex = 0; ddlIndex < ddlList.length; ddlIndex++) {
+            var ddlRow = ddlList[ddlIndex] || {};
+            if (String(ddlRow.TableName || '').toLowerCase() != String(tableName).toLowerCase()) continue;
+            var ddlText = String(ddlRow.DDL || '');
+            var indexPattern = /(?:PRIMARY\s+KEY|UNIQUE\s+(?:KEY|INDEX)|(?:KEY|INDEX)\s+[`"A-Za-z0-9_]+)[\s\S]{0,240}?\(([^)]*)\)/ig;
+            var indexMatch = null;
+            while ((indexMatch = indexPattern.exec(ddlText)) !== null) {
+                if (columnPattern.test(String(indexMatch[1] || '').replace(/`/g, ''))) return true;
+            }
+        }
+        return false;
+    };
+
+    var rewritePackageDdlColumnType = function (tableName, columnName, targetType) {
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) return 0;
+        var ddlList = Package.DDLStatements || [];
+        var changed = 0;
+        var typePattern = new RegExp('(`?' + columnName + '`?\\s+)(?:var)?char\\s*\\(\\s*\\d+\\s*\\)', 'ig');
+        for (var ddlIndex = 0; ddlIndex < ddlList.length; ddlIndex++) {
+            var ddlRow = ddlList[ddlIndex] || {};
+            if (String(ddlRow.TableName || '').toLowerCase() != String(tableName).toLowerCase()) continue;
+            var sourceDdl = String(ddlRow.DDL || '');
+            var nextDdl = sourceDdl.replace(typePattern, '$1' + targetType);
+            if (nextDdl != sourceDdl) {
+                ddlRow.DDL = nextDdl;
+                changed++;
+            }
+        }
+        return changed;
+    };
+
+    var applyPackageColumnTypeOverride = function (tableName, tableId, columnName, targetType, reason) {
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) return false;
+        targetType = String(targetType || '').toLowerCase();
+        if (targetType != 'mediumtext' && targetType != 'longtext') return false;
+        if (isPackageColumnIndexed(tableName, columnName)) return false;
+
+        var matched = false;
+        var previousTypes = [];
+        var packageFields = Package.DiyFields || [];
+        for (var fieldIndex = 0; fieldIndex < packageFields.length; fieldIndex++) {
+            var packageField = packageFields[fieldIndex] || {};
+            if (!packageFieldBelongsToTable(packageField, tableName, tableId)
+                || String(packageField.Name || '').toLowerCase() != String(columnName).toLowerCase()) continue;
+            var currentFieldType = String(packageField.Type || '');
+            if (!/^(?:var)?char\s*\(\s*\d+\s*\)$/i.test(currentFieldType)
+                && !/^(?:medium|long)?text$/i.test(currentFieldType)) return false;
+            previousTypes.push(currentFieldType);
+            packageField.Type = targetType;
+            matched = true;
+        }
+
+        var physicalColumns = Package.PhysicalColumns || [];
+        for (var physicalIndex = 0; physicalIndex < physicalColumns.length; physicalIndex++) {
+            var physicalColumn = physicalColumns[physicalIndex] || {};
+            var physicalTableName = getPhysicalValue(physicalColumn, ['TABLE_NAME', 'TableName']);
+            var physicalColumnName = getPhysicalValue(physicalColumn, ['COLUMN_NAME', 'ColumnName', 'Name']);
+            if (String(physicalTableName || '').toLowerCase() != String(tableName).toLowerCase()
+                || String(physicalColumnName || '').toLowerCase() != String(columnName).toLowerCase()) continue;
+            previousTypes.push(String(getPhysicalValue(physicalColumn, ['COLUMN_TYPE', 'ColumnType', 'Type']) || ''));
+            physicalColumn.COLUMN_TYPE = targetType;
+            physicalColumn.DATA_TYPE = targetType;
+            if (physicalColumn.ColumnType !== undefined) physicalColumn.ColumnType = targetType;
+            if (physicalColumn.Type !== undefined) physicalColumn.Type = targetType;
+            matched = true;
+        }
+
+        if (!matched) return false;
+        rewritePackageDdlColumnType(tableName, columnName, targetType);
+        mysqlOffpageTypeOverrides[mysqlOffpageOverrideKey(tableName, columnName)] = targetType;
+        debugLog['mysql_row_offpage_fallback_' + tableName + '_' + columnName] =
+            (reason || 'MySQL宽表行内上限') + '：' + (previousTypes.join('/') || 'varchar') + ' -> ' + targetType;
+        return true;
+    };
+
+    var promoteWidePackageColumnsForTable = function (tableName, tableId, minimumLength, reason) {
+        var packageFields = Package.DiyFields || [];
+        var candidates = [];
+        for (var fieldIndex = 0; fieldIndex < packageFields.length; fieldIndex++) {
+            var packageField = packageFields[fieldIndex] || {};
+            if (!packageFieldBelongsToTable(packageField, tableName, tableId)) continue;
+            var varcharMatch = String(packageField.Type || '').toLowerCase().match(/^varchar\s*\(\s*(\d+)\s*\)$/);
+            if (!varcharMatch || parseInt(varcharMatch[1], 10) < minimumLength) continue;
+            if (!isSafeIdentifier(packageField.Name) || isPackageColumnIndexed(tableName, packageField.Name)) continue;
+            candidates.push(String(packageField.Name));
+        }
+        var promoted = 0;
+        for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+            if (applyPackageColumnTypeOverride(
+                tableName,
+                tableId,
+                candidates[candidateIndex],
+                'mediumtext',
+                reason
+            )) promoted++;
+        }
+        return promoted;
+    };
+
+    var applyPersistedMysqlOffpageOverrides = function () {
+        for (var overrideKey in mysqlOffpageTypeOverrides) {
+            if (!Object.prototype.hasOwnProperty.call(mysqlOffpageTypeOverrides, overrideKey)) continue;
+            var separatorIndex = String(overrideKey).indexOf('.');
+            if (separatorIndex <= 0 || separatorIndex >= String(overrideKey).length - 1) continue;
+            var tableName = String(overrideKey).substring(0, separatorIndex);
+            var columnName = String(overrideKey).substring(separatorIndex + 1);
+            applyPackageColumnTypeOverride(
+                tableName,
+                '',
+                columnName,
+                mysqlOffpageTypeOverrides[overrideKey],
+                '从后台任务检查点恢复行外文本类型'
+            );
+        }
+    };
+
+    applyPersistedMysqlOffpageOverrides();
+
     var getScalarCount = function (row, names) {
         var value = getPhysicalValue(row || {}, names);
         var numberValue = parseInt(value || 0, 10);
@@ -2084,9 +2360,24 @@ try {
                         var definition = buildPhysicalColumnDefinition(sourceColumn, false);
                         if (!definition) continue;
                         var addSql = 'ALTER TABLE `' + tableName + '` ADD COLUMN ' + definition;
-                        V8.Db.FromSql(addSql).ExecuteNonQuery();
+                        try {
+                            V8.Db.FromSql(addSql).ExecuteNonQuery();
+                        } catch (physicalAddError) {
+                            if (!isMysqlRowSizeTooLargeError(physicalAddError)
+                                || !applyPackageColumnTypeOverride(
+                                    tableName,
+                                    '',
+                                    columnName,
+                                    'mediumtext',
+                                    '物理列新增触发MySQL 65535字节行宽上限'
+                                )) throw physicalAddError;
+                            definition = buildPhysicalColumnDefinition(sourceColumn, false, 'mediumtext');
+                            addSql = 'ALTER TABLE `' + tableName + '` ADD COLUMN ' + definition;
+                            V8.Db.FromSql(addSql).ExecuteNonQuery();
+                        }
                         result.Added++;
-                        debugLog['physical_schema_added_' + tableName + '_' + columnName] = String(columnType);
+                        debugLog['physical_schema_added_' + tableName + '_' + columnName] =
+                            String(mysqlOffpageTypeOverrides[mysqlOffpageOverrideKey(tableName, columnName)] || columnType);
                         continue;
                     }
 
@@ -2282,17 +2573,43 @@ try {
                 ddlExecuted++;
                 debugLog['ddl_execute_' + ddlLogKey] = ddlInfo.Kind == 'index' ? '索引创建成功' : 'DDL执行成功';
             } catch (ddlError) {
-                // 多节点或重复请求可能在存在性检查之后抢先创建对象。
-                // 失败后再次回读；对象已存在即按幂等成功处理。
-                var existsAfterError = ddlInfo.Kind == 'table'
-                    ? ddlTableExists(ddlInfo.TableName)
-                    : (ddlInfo.Kind == 'index' ? ddlIndexExists(ddlInfo.TableName, ddlInfo.IndexName) : false);
-                if (existsAfterError) {
-                    ddlSkipped++;
-                    debugLog['ddl_race_skip_' + ddlLogKey] = '其它节点已创建，按幂等成功跳过';
-                } else {
-                    debugLog['ddl_execute_error_' + ddlLogKey] = ddlError.message;
-                    ddlSkipped++;
+                var finalDdlError = ddlError;
+                var recoveredFromRowSize = false;
+                if (ddlInfo.Kind == 'table' && isMysqlRowSizeTooLargeError(ddlError)) {
+                    var promotedWideColumns = promoteWidePackageColumnsForTable(
+                        ddlInfo.TableName,
+                        ddlItem.TableId,
+                        500,
+                        'CREATE TABLE触发MySQL 65535字节行宽上限'
+                    );
+                    if (promotedWideColumns > 0) {
+                        try {
+                            V8.Db.FromSql(ddlItem.DDL).ExecuteNonQuery();
+                            recoveredFromRowSize = true;
+                            ddlExecuted++;
+                            debugLog['ddl_row_size_recovered_' + ddlLogKey] =
+                                '已将' + promotedWideColumns + '个非索引长varchar列提升为mediumtext后创建成功';
+                        } catch (ddlRetryError) {
+                            finalDdlError = ddlRetryError;
+                        }
+                    }
+                }
+
+                if (!recoveredFromRowSize) {
+                    // 多节点或重复请求可能在存在性检查之后抢先创建对象。
+                    // 失败后再次回读；对象已存在即按幂等成功处理。
+                    var existsAfterError = ddlInfo.Kind == 'table'
+                        ? ddlTableExists(ddlInfo.TableName)
+                        : (ddlInfo.Kind == 'index' ? ddlIndexExists(ddlInfo.TableName, ddlInfo.IndexName) : false);
+                    if (existsAfterError) {
+                        ddlSkipped++;
+                        debugLog['ddl_race_skip_' + ddlLogKey] = '其它节点已创建，按幂等成功跳过';
+                    } else {
+                        debugLog['ddl_execute_error_' + ddlLogKey] = String(
+                            finalDdlError && finalDdlError.message ? finalDdlError.message : finalDdlError
+                        );
+                        ddlSkipped++;
+                    }
                 }
             }
         }
@@ -2305,7 +2622,7 @@ try {
         // 无论表是新创建还是已存在，都检查并补充缺失的字段。
         try {
             // 查询表的所有字段
-            var checkColumnsSQL = "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + ddlItem.TableName + "'";
+            var checkColumnsSQL = "SELECT COLUMN_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + ddlItem.TableName + "'";
             var columnsData = V8.Db.FromSql(checkColumnsSQL).ToArray();
 
             if (!columnsData || columnsData.length == 0) {
@@ -2314,6 +2631,7 @@ try {
             }
 
             var existingColumns = {};
+            var existingColumnTypes = {};
             for (var c = 0; c < columnsData.length; c++) {
                 try {
                     var colName = columnsData[c].COLUMN_NAME;
@@ -2321,6 +2639,7 @@ try {
                         // 使用String.prototype确保安全
                         var colNameStr = String.prototype.toLowerCase.call(String(colName));
                         existingColumns[colNameStr] = true;
+                        existingColumnTypes[colNameStr] = String(columnsData[c].COLUMN_TYPE || '');
                     }
                 } catch (e) {
                     debugLog['field_parse_error_' + ddlItem.TableName + '_' + c] = 'Column: ' + JSON.stringify(columnsData[c]) + ', Error: ' + e.message;
@@ -2384,7 +2703,19 @@ try {
 
                 // 字段已存在，跳过（忽略大小写）
                 try {
-                    if (existingColumns[fieldNameStr.toLowerCase()]) {
+                    var existingColumnKey = fieldNameStr.toLowerCase();
+                    if (existingColumns[existingColumnKey]) {
+                        var existingColumnType = String(existingColumnTypes[existingColumnKey] || '').toLowerCase();
+                        if ((existingColumnType == 'mediumtext' || existingColumnType == 'longtext')
+                            && getTextTypeCapacity(existingColumnType) > getTextTypeCapacity(field.Type)) {
+                            applyPackageColumnTypeOverride(
+                                ddlItem.TableName,
+                                ddlItem.TableId,
+                                fieldName,
+                                existingColumnType,
+                                '目标库已使用较宽的行外文本类型'
+                            );
+                        }
                         continue;
                     }
                 } catch (e) {
@@ -2393,32 +2724,49 @@ try {
                 }
 
                 var fieldType = mapToMySQLType(field.Type);
-                var alterSQL = 'ALTER TABLE `' + ddlItem.TableName + '` ADD COLUMN `' + fieldName + '` ' + fieldType;
-
-                // Id字段不允许NULL，其他字段允许NULL
-                if (fieldName == 'Id') {
-                    alterSQL += ' NOT NULL PRIMARY KEY';
-                } else {
-                    alterSQL += ' NULL';
-                }
-
-                // 添加字段说明（COMMENT）
-                if (field.Label && field.Label !== fieldName) {
-                    // 转义单引号
-                    var comment = field.Label.replace(/'/g, "''");
-                    alterSQL += " COMMENT '" + comment + "'";
-                }
+                var alterSQL = buildDiyFieldAddColumnSql(ddlItem.TableName, field, fieldType);
 
                 try {
                     V8.Db.FromSql(alterSQL).ExecuteNonQuery();
-                    existingColumns[fieldNameStr.toLowerCase()] = true;
+                    existingColumns[existingColumnKey] = true;
+                    existingColumnTypes[existingColumnKey] = fieldType;
                     fieldsAdded++;
                     fieldsAddedForTable++;
                     debugLog['field_added_' + ddlItem.TableName + '_' + fieldName] = '字段已添加';
                 } catch (alterError) {
                     var alterMessage = String(alterError && alterError.message ? alterError.message : alterError);
-                    if (/duplicate\s+column\s+name/i.test(alterMessage)) {
-                        existingColumns[fieldNameStr.toLowerCase()] = true;
+                    var recoveredFieldAdd = false;
+                    if (isMysqlRowSizeTooLargeError(alterError)
+                        && applyPackageColumnTypeOverride(
+                            ddlItem.TableName,
+                            ddlItem.TableId,
+                            fieldName,
+                            'mediumtext',
+                            'ADD COLUMN触发MySQL 65535字节行宽上限'
+                        )) {
+                        var offpageAlterSql = buildDiyFieldAddColumnSql(ddlItem.TableName, field, 'mediumtext');
+                        try {
+                            V8.Db.FromSql(offpageAlterSql).ExecuteNonQuery();
+                            existingColumns[existingColumnKey] = true;
+                            existingColumnTypes[existingColumnKey] = 'mediumtext';
+                            fieldsAdded++;
+                            fieldsAddedForTable++;
+                            recoveredFieldAdd = true;
+                            debugLog['field_add_row_size_recovered_' + ddlItem.TableName + '_' + fieldName] =
+                                'varchar新增失败后已安全改用mediumtext';
+                        } catch (offpageAlterError) {
+                            alterError = offpageAlterError;
+                            alterMessage = String(
+                                offpageAlterError && offpageAlterError.message
+                                    ? offpageAlterError.message
+                                    : offpageAlterError
+                            );
+                        }
+                    }
+                    if (recoveredFieldAdd) {
+                        continue;
+                    } else if (/duplicate\s+column\s+name/i.test(alterMessage)) {
+                        existingColumns[existingColumnKey] = true;
                         debugLog['field_add_skipped_' + ddlItem.TableName + '_' + fieldName] = '字段已存在，按幂等安装跳过';
                     } else {
                         debugLog['field_add_error_' + ddlItem.TableName + '_' + fieldName] = alterMessage;

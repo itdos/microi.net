@@ -136,14 +136,34 @@ namespace Microi.net
             string description,
             IEnumerable<FieldDefinition> fields)
         {
-            var create = await V8McpLogic.CreateTable(osClient, tableName, description)
-                .ConfigureAwait(false);
-            if (create.Code != 1)
-            {
-                messages.Add($"创建 {description} 表失败：{create.Msg}");
-                return;
-            }
+            var client = OsClientExtend.GetClient(osClient);
             var table = await GetTableAsync(osClient, tableName).ConfigureAwait(false);
+            if (table == null)
+            {
+                var create = await UpgradeTrustedFormEngine.AddTableAsync(
+                    osClient,
+                    tableName,
+                    description).ConfigureAwait(false);
+                table = await GetTableAsync(osClient, tableName).ConfigureAwait(false);
+                if (create.Code != 1 && table == null)
+                {
+                    messages.Add($"创建 {description} 表失败：{create.Msg}");
+                    return;
+                }
+            }
+            else if (client?.Db != null && !client.Db.TableExists(tableName))
+            {
+                var repair = await UpgradeTrustedFormEngine.AddTableAsync(
+                    osClient,
+                    tableName,
+                    description,
+                    true).ConfigureAwait(false);
+                if (repair.Code != 1 && !client.Db.TableExists(tableName))
+                {
+                    messages.Add($"修复 {description} 物理表失败：{repair.Msg}");
+                    return;
+                }
+            }
             if (table == null)
             {
                 messages.Add($"{description} 表创建后无法回读 diy_table 元数据。");
@@ -195,22 +215,23 @@ namespace Microi.net
             var physicalExists = client.Db.ColumnExists(tableName, definition.Name);
             if (existing == null)
             {
-                var add = await MicroiEngine.FormEngine.AddFieldAsync(new
+                var add = await UpgradeTrustedFormEngine.AddFieldAsync(
+                    osClient,
+                    new DiyFieldParam
                 {
-                    OsClient = osClient,
                     TableId = tableId,
                     TableName = tableName,
-                    definition.Name,
-                    definition.Label,
-                    definition.Type,
-                    definition.Component,
-                    definition.Sort,
-                    definition.Visible,
+                    Name = definition.Name,
+                    Label = definition.Label,
+                    Type = definition.Type,
+                    Component = definition.Component,
+                    Sort = definition.Sort,
+                    Visible = definition.Visible,
                     AppVisible = definition.Visible,
-                    definition.Readonly,
-                    definition.Description,
-                    definition.Tab,
-                    definition.TableWidth,
+                    Readonly = definition.Readonly,
+                    Description = definition.Description,
+                    Tab = definition.Tab,
+                    TableWidth = definition.TableWidth,
                     IsLockField = 0,
                     NameConfirm = 1,
                     Unique = 0,
@@ -235,9 +256,10 @@ namespace Microi.net
 
             if (!client.Db.ColumnExists(tableName, definition.Name))
             {
-                var addPhysical = await MicroiEngine.FormEngine.AddDbField(new DiyFieldParam
+                var addPhysical = await UpgradeTrustedFormEngine.AddDbFieldAsync(
+                    osClient,
+                    new DiyFieldParam
                 {
-                    OsClient = osClient,
                     TableId = tableId,
                     TableName = tableName,
                     Name = definition.Name,

@@ -259,7 +259,13 @@ namespace Microi.net
         /// <returns></returns>
         public async Task<DosResult> AddDiyTable(dynamic dynamicParam, DbTrans _trans = null)
         {
+            var sourceBaseParam = dynamicParam as BaseParam;
+            var sourceWasExternalJson = dynamicParam is JToken;
             JObject param = await DefaultParam(JsonHelper.ToJObject(dynamicParam));
+            var sourceInvokeType = sourceBaseParam?._InvokeType
+                                   ?? param["_InvokeType"].Val<string>();
+            var sourceCurrentUser = sourceBaseParam?._CurrentUser
+                                    ?? param["_CurrentUser"] as JObject;
             if (param["_Lang"] == null || param["_Lang"].Val<string>().DosIsNullOrWhiteSpace())
             {
                 param["_Lang"] = DiyMessage.Lang;
@@ -360,7 +366,24 @@ namespace Microi.net
 
                         //只可能是主数据库。这里不会触发后端V8事件中的创建实体表
                         param["_InvokeType"] = InvokeType.Server.ToString();
-                        var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(param, trans);
+                        var nestedTableAdd = new DiyTableRowParam
+                        {
+                            FormEngineKey = "diy_table",
+                            Id = tableId,
+                            OsClient = osClient,
+                            _CurrentUser = sourceCurrentUser,
+                            _InvokeType = sourceWasExternalJson
+                                ? InvokeType.Client.ToString()
+                                : (sourceInvokeType.DosIsNullOrWhiteSpace()
+                                    ? InvokeType.Server.ToString()
+                                    : sourceInvokeType),
+                            _TrustedServerInvocation =
+                                sourceBaseParam?._TrustedServerInvocation == true,
+                            _RowModel = (JObject)param.DeepClone()
+                        };
+                        var addResult = await MicroiEngine.FormEngine.AddFormDataAsync(
+                            nestedTableAdd,
+                            trans);
                         if (addResult.Code != 1)
                         {
                             if (_trans == null)
@@ -370,7 +393,7 @@ namespace Microi.net
                         //创建审计字段 --2025-09-18 by anderson
                         foreach (var item in DiyCommon.FixedDiyField)
                         {
-                            var addFixedFieldResult = await MicroiEngine.FormEngine.AddFormDataAsync("diy_field", new
+                            var fixedFieldModel = JObject.FromObject(new
                             {
                                 Label = item.Label,
                                 Name = item.Name,
@@ -384,7 +407,23 @@ namespace Microi.net
                                 NameConfirm = 1,
                                 TableWidth = item.TableWidth,
                                 Unique = 0
-                            }, trans);
+                            });
+                            var nestedFixedFieldAdd = new DiyTableRowParam
+                            {
+                                FormEngineKey = "diy_field",
+                                OsClient = osClient,
+                                _CurrentUser = sourceCurrentUser,
+                                _InvokeType = sourceWasExternalJson
+                                    ? InvokeType.Client.ToString()
+                                    : (sourceInvokeType.DosIsNullOrWhiteSpace()
+                                        ? InvokeType.Server.ToString()
+                                        : sourceInvokeType),
+                                _TrustedServerInvocation =
+                                    sourceBaseParam?._TrustedServerInvocation == true,
+                                _RowModel = fixedFieldModel
+                            };
+                            var addFixedFieldResult = await MicroiEngine.FormEngine
+                                .AddFormDataAsync(nestedFixedFieldAdd, trans);
                             if (addFixedFieldResult.Code != 1)
                             {
                                 if (_trans == null)

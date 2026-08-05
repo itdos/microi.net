@@ -1,0 +1,4 @@
+﻿interface:
+  display_name: "Microi OCR 引擎"
+  short_description: "集成、配置和验证 Microi 通用 OCR 能力"
+  default_prompt: "Use $ocr-engine to integrate and validate tenant-isolated OCR in Microi."

@@ -698,6 +698,43 @@
             }, 800);
         }
 
+        // ===== Android 平板 PC 布局顶部安全区 =====
+        // 手机（<= 768px）保持沉浸式；平板进入 PC 布局时只下移当前 WebView。
+        var _lastApkWebviewTop = null;
+        function syncDesktopStatusbarInset(force) {
+            try {
+                if (!window.plus || !plus.navigator || !plus.webview || !plus.os ||
+                    String(plus.os.name || '').toLowerCase() !== 'android' ||
+                    typeof plus.navigator.isImmersedStatusbar !== 'function' ||
+                    plus.navigator.isImmersedStatusbar() !== true) {
+                    window.__microi_apkDesktopStatusbarInset = false;
+                    return false;
+                }
+
+                var useDesktopInset = window.innerWidth > 768;
+                var statusbarHeight = useDesktopInset &&
+                    typeof plus.navigator.getStatusbarHeight === 'function'
+                    ? Number(plus.navigator.getStatusbarHeight())
+                    : 0;
+                var active = useDesktopInset && isFinite(statusbarHeight) && statusbarHeight > 0;
+                var top = active ? statusbarHeight : 0;
+                var currentWebview = plus.webview.currentWebview();
+
+                if (currentWebview && typeof currentWebview.setStyle === 'function' &&
+                    (force === true || _lastApkWebviewTop !== top)) {
+                    currentWebview.setStyle({ top: top + 'px', bottom: '0px' });
+                    _lastApkWebviewTop = top;
+                }
+
+                window.__microi_apkDesktopStatusbarInset = active;
+                if (active) plus.navigator.setStatusBarStyle('dark');
+                return active;
+            } catch(e) {
+                window.__microi_apkDesktopStatusbarInset = false;
+                return false;
+            }
+        }
+
         // ===== 初始化 5+App =====
         function initApp() {
             if (_state.plusReady) return;
@@ -707,8 +744,11 @@
 
             try { plus.navigator.closeSplashscreen(); } catch(e) {}
             try {
-                plus.navigator.setStatusBarStyle('light');
-                plus.navigator.setStatusBarBackground('#0A0A0F');
+                // 手机继续沿用深色启动页的沉浸式状态栏；仅平板 PC 布局避让。
+                if (!syncDesktopStatusbarInset(true)) {
+                    plus.navigator.setStatusBarStyle('light');
+                    plus.navigator.setStatusBarBackground('#0A0A0F');
+                }
             } catch(e) {}
 
             startLoad();

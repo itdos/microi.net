@@ -90,13 +90,12 @@ PW_HOME_PATH=/#/pages/index/index
 
 ## 本地测试账号自动发现
 
-当没有显式传入 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` / `MICROI_OSCLIENT` 时，AI 不要先说“未登录无法测试”。必须先尝试读取本地后端配置：
+当没有显式传入 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` / `MICROI_OSCLIENT` 时，AI 不要把账号密码写入后端配置来制造旁路：
 
 1. 读取 `Microi.Server/Microi.net.Api/.microi-local`，取得当前环境名。
-2. 读取 `Microi.Server/Microi.net.Api/appsettings.{环境名}.json`；若脚本显式传了 `PW_APPSETTINGS_PATH`，以该文件为准。
-3. 优先在 `DevLoginBypass.Accounts` 中按 `OsClient` 匹配当前租户，读取 `Account` / `Password`；没有匹配时再用 `DevLoginBypass.DefaultAccount` / `DefaultPassword`。
-4. 这些值只作为本地自动化登录输入或接口请求参数使用。日志、最终回复、截图说明、报告和异常消息中必须写成 `<redacted>` 或“本地配置凭据”，不要展开真实账号密码、Token、连接串或 Redis 密码。
-5. 如果配置不存在或登录失败，再报告具体阻塞点，例如“未找到 `DevLoginBypass`”“本地后端未启动”“登录接口返回 Code=0”，不要泛泛说无法测试。
+2. 账号密码只从用户本轮明确提供、`PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD`、CI Secret 或既有受保护登录态取得；`appsettings.*.json` 不再保存测试账号密码。
+3. 这些值只作为自动化进程的登录输入或接口请求参数使用。日志、最终回复、截图说明、报告和异常消息中必须写成 `<redacted>` 或“本地配置凭据”，不要展开真实账号密码、Token、连接串或 Redis 密码。
+4. 如果凭据不存在或登录失败，再报告具体阻塞点，例如“未提供受保护测试凭据”“本地后端未启动”“登录接口返回 Code=0”，不要泛泛说无法测试。
 
 ## 后端改动后的 E2E 前置动作
 
@@ -150,33 +149,11 @@ export async function automationLogin(page, {
 }
 ```
 
-### 方式 B：配置驱动旁路（本地 localhost 调试用）
-
-`appsettings.{Env}.json`（如 `appsettings.iTdos.json` / `appsettings.json`）中的 `DevLoginBypass` 块：
-
-```jsonc
-"DevLoginBypass": {
-  "//": "Local Development only / E2E login bypass. Keep disabled in production.",
-  "Enabled": true,
-  "SkipCaptcha": true,      // 跳过图形验证码
-  "OnlyLoopback": true,     // 必须保留 true；仅 Development + 127.0.0.1 / ::1 生效
-  "DefaultAccount": "<default-account>",
-  "DefaultPassword": "<default-password>"
-}
-```
-
-- 触发条件：`Enabled=true`，且后端环境为 `Development`，且请求来自本机回环地址。生产、容器反代、非回环来源均不得生效。
-- 效果：`SkipCaptcha=true` 时跳过验证码；请求未带账号/密码时自动填 `DefaultAccount`/`DefaultPassword`，仍会校验真实密码。
-- 与方式 A 区别：仅允许 Development + loopback。适合在本机用真实账号跑 UI 登录或直登；不要把它当成远端能力。
-- 生产环境务必保持 `Enabled=false` 或删除该块。
-
-`Microi.Client/scripts/run-form-engine-freeze-trace.mjs` 会在跑诊断前自动把 `DevLoginBypass` 写入 `appsettings.{Env}.json`；可用 `PW_CONFIG_DEV_LOGIN=0` 关闭该自动改写。
-
 ### 选型口诀
 
-- 容器/CI、无图形界面、要最稳 → **方式 A（`_AutomationTestLogin=true` + 真实密码）**，直接 request 拿 Token。
-- 本机调试、想顺带验真实密码或走真实 UI 登录 → **方式 B（DevLoginBypass）**。
-- 两者都失败时再退回 UI 兜底：填账号密码、点登录（参见 `tests/form-engine-freeze-trace.spec.mjs` 的 `loginThroughUiIfNeeded`）。
+- 容器、CI、本机接口自动化都使用 **`_AutomationTestLogin=true` + 真实密码**，直接 request 拿 Token。
+- 需要验证真实 UI 登录时，用同一真实账号密码填写页面；目标租户仍由 `sys_config.AutoTestSkipCaptcha` 决定是否允许自动化跳过验证码。
+- 失败时再退回 UI 兜底并保留原始错误；禁止新增 `DevLoginBypass`、Dev Key 或 `_DEV_BYPASS_`。
 - Token 可能在响应体 `Data.Token`，也可能在响应头 `Authorization`，两处都要兜底取。
 - 不要把 Token 明文写进最终报告/附件。
 
@@ -186,12 +163,12 @@ export async function automationLogin(page, {
 >
 > 在浏览器内做 E2E（点页面、拖拽、截图）时最稳的登录顺序：
 > 1. 跳到 `#/login`；
-> 2. 填从本地 `DevLoginBypass` 配置或环境变量读取到的账号密码；
-> 3. 验证码框随便填一个数字（`DevLoginBypass.SkipCaptcha=true` 时后端对 loopback 忽略验证码）；
+> 2. 填从受保护测试进程变量或用户本轮提供的真实账号密码；
+> 3. 目标租户开启 `AutoTestSkipCaptcha` 时传自动化标记跳过验证码，否则按真实页面流程填写验证码；
 > 4. 点「登 录」，落到首页；
 > 5. 再 `location.hash = '#/<目标路由>'` 进入目标页。
 >
-> 直连接口验收（不进页面）才用方式 A 拿 Token。历史 `_DEV_BYPASS_` 只能在本机 DevLoginBypass 下替换为配置密码后继续校验，不能作为免密码能力。
+> 直连接口验收（不进页面）使用自动化标记拿 Token；历史 `_DEV_BYPASS_`、Dev Key 和 `DevLoginBypass` 均不得继续使用。
 
 ## 服务自启动纪律（必做）
 
@@ -249,7 +226,7 @@ Pop-Location
 该入口会执行 `scripts/run-form-engine-freeze-trace.mjs`，完整流程如下：
 
 1. 自动配置 `Microi.Server/Microi.net.Api/Properties/launchSettings.json` 中指定 profile 的 `ASPNETCORE_ENVIRONMENT` 和 `DOTNET_ENVIRONMENT`。
-2. 自动配置 `Microi.Server/Microi.net.Api/appsettings.{Env}.json` 的 `DevLoginBypass`，用于本地测试账号、跳过验证码、只允许 loopback。
+2. 从 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` 读取真实测试凭据；脚本不得修改后端 `appsettings.*.json`。
 3. 本地后端未启动时，自动进入 `Microi.Server/Microi.net.Api` 后执行 `dotnet run --launch-profile Microi.net.Api`。
 4. 启动 Playwright，打开指定前端页面，开启 `MicroiFormTrace`，采集 `window.__MICROI_FORM_TRACE__`、console、pageerror、当前 URL 和 Playwright trace。
 5. 页面卡住或断言失败时，先看最后一批 `[MicroiFormTrace #n]`，定位是停在 `runtime:*`、`diy-select:*`、`inform-v8-*`、`field-v8-*` 还是业务 console。
@@ -274,11 +251,8 @@ npm run test:form-freeze:auto
 
 - `PW_START_BACKEND=0`：不自动启动后端，只跑测试。
 - `PW_CONFIG_BACKEND=0`：不修改 `launchSettings.json`。
-- `PW_CONFIG_DEV_LOGIN=0`：不修改 `DevLoginBypass`。
-- `PW_APPSETTINGS_PATH=Microi.Server/Microi.net.Api/appsettings.iTdos.json`：明确指定配置文件。
 - `PW_BACKEND_PROFILE=Microi.net.Api`：指定 launch profile。
-- `PW_DEV_LOGIN_BYPASS=1`、`PW_DEV_SKIP_CAPTCHA=1`、`PW_DEV_ONLY_LOOPBACK=1`：控制本地登录旁路。
-- `PW_DEV_LOGIN_ACCOUNT`、`PW_DEV_LOGIN_PASSWORD`：只配置后端旁路账号密码；`PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD` 同时作为 Playwright 登录账号密码。
+- `PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD`：仅注入当前自动化进程，必须使用真实账号密码且不得写回文件。
 - `PW_HEADED=0`：无头运行。
 
 诊断代码要遵守这些规则：

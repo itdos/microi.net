@@ -29,9 +29,12 @@
 Microi 浏览器/5+App 前端 V8 中可用，不属于后端接口引擎、后端表单事件或微信小程序
 原生 BLE API。
 
-基础 V8 对象会把同一个 `Print` 状态复制给多个前端 V8 上下文。分包游标、打印份数和
-连接引用均为可变状态，所以同一页面的所有打印任务必须共用一条串行队列，不能认为
-不同按钮或不同 V8 对象彼此隔离。
+三个入口都会取得同一个应用级 `Print` 单例。分包游标、打印份数和连接引用仍是可变状态，
+但 `prepareSend` 已把所有前端 V8 上下文排进同一条运行时发送队列。业务代码仍应逐次
+`await` 保持明确的结果顺序，不能认为不同按钮或不同 V8 对象彼此隔离。
+
+PC/平板顶部导航和移动端【我的】页的蓝牙入口也使用该单例：它们展示实时连接状态和设备名，
+点击后复用 `OpenBluetoothPage()`，因此用户可以先在全局入口连接，再进入任意模块执行 V8 打印。
 
 ## 运行环境与能力判断
 
@@ -55,22 +58,23 @@ ESC/POS 原生字节通过 BLE 写入才属于 `V8.Print`。
 |---|---|
 | `createNew()` | 新建 TSC/TSPL 标签指令构建器 |
 | `createNewESC()` | 新建 ESC/POS 小票指令构建器 |
-| `OpenBluetoothPage()` | 返回 `Promise<boolean>`；在连接弹窗关闭时解析，值表示关闭时是否有连接信息 |
-| `isConnected()` | Web 端检查实时 GATT 与写特征；5+App 端只检查已保存的设备/写特征 ID |
-| `prepareSend(bytes)` | 未连接时先打开连接页，然后按包串行写入；必须 `await` 并捕获失败 |
+| `OpenBluetoothPage()` | 返回 `Promise<boolean>`；在连接弹窗关闭时解析，重复打开复用同一个 Promise |
+| `isConnected()` | Web 端检查实时 GATT 与写特征；5+App 结合连接事件在线标记与设备/写特征 ID |
+| `reconnect()` | 使用已记住的设备 ID 或浏览器保留的设备授权重连，不弹选择框 |
+| `getConnectionState()` | 返回可展示的连接、记忆、设备、错误和重连状态快照 |
+| `subscribeConnection(listener)` | 立即回调当前快照并持续通知状态变化，返回取消订阅函数 |
+| `prepareSend(bytes)` | 先尝试恢复连接，再进入应用级队列按包串行写入；必须 `await` 并捕获失败 |
 | `Send(bytes)` | 依赖 `prepareSend` 已设置的内部游标，属于内部状态机入口，业务代码不要直接调用 |
-| `setOneTimeData(bytes)` | 设置 BLE 包长；源码不校验，内置候选为 20–190、步长 10，默认 20 |
-| `setPrinterNum(num)` | 重复发送同一缓冲区；源码不校验，内置候选为整数 1–9 |
-| `disconnect()` | 主动断开并清理当前设备、写特征和会话元数据 |
+| `setOneTimeData(bytes)` | 设置 BLE 包长；只接受 1–512 整数，连接页候选 20–190，默认 20 |
+| `setPrinterNum(num)` | 重复发送同一缓冲区；只接受 1–99 整数，连接页候选 1–9 |
+| `disconnect()` | 主动断开、停止自动重连并忘记当前设备 |
 | `BLEInformation` | 最近设备/服务/特征元数据，只用于诊断，不代表实时连接或打印回执 |
 
-`OpenBluetoothPage()` 已打开时再次调用会返回 `false`。它不是“连接成功事件”；用户连上
-设备后仍要关闭弹窗，调用方才能继续。`prepareSend` 虽会自动打开连接页，但业务按钮主动
-建立连接更容易给出清晰提示。
-
-连接元数据会写入 `sessionStorage`，但当前 `restoreBLEInfo()` 没有进入初始化调用链，页面
-刷新后不会自动恢复可发送的 GATT/特征引用。刷新、跨页面重建或断线后应重新连接。
-5+App 的 `isConnected()` 只验证 ID 是否存在，因此发送仍可能因物理断线失败。
+`OpenBluetoothPage()` 不是“连接成功事件”；用户连上设备后仍要关闭弹窗，调用方才能继续。
+设备元数据会写入 `localStorage` 与兼容用 `sessionStorage`。应用初始化、页面恢复、重新获得
+焦点和意外断线时会做有限次数自动重连：5+App 使用设备 ID；Web 端只有浏览器保留授权且
+支持 `navigator.bluetooth.getDevices()` 时才可无弹窗恢复。系统蓝牙、浏览器权限、设备电源、
+休眠、距离等仍会造成真实断线；重试结束后必须让用户从全局入口重新选择。
 
 ## 最小安全流程
 
@@ -85,7 +89,8 @@ async function ensurePrinterConnected() {
   if (!V8.Print) throw new Error('当前前端未加载蓝牙打印能力');
   if (V8.Print.isConnected()) return;
 
-  var connected = await V8.Print.OpenBluetoothPage();
+  var connected = await V8.Print.reconnect();
+  if (!connected) connected = await V8.Print.OpenBluetoothPage();
   if (!connected || !V8.Print.isConnected()) {
     throw new Error('未连接蓝牙打印机');
   }
@@ -141,7 +146,8 @@ async function printBatch(rows, startIndex) {
 ```
 
 - 不用固定 `setTimeout(3000)` 猜测上一张是否完成。
-- 不用 `Promise.all`，也不要让两个按钮同时调用 `prepareSend`。
+- 不用 `Promise.all` 表达同一设备的并行打印。运行时会把同时到达的调用排队，但业务仍应逐条
+  `await`，以便准确记录哪一条成功或失败。
 - 大批次分段并持久化 `NextIndex`；页面关闭、断连或写失败后从失败位置人工确认再恢复。
 - `setPrinterNum(n)` 只适合同一缓冲区重复发送，不适合每张内容不同的批次。
 - 业务落库与蓝牙打印不是原子事务。用稳定业务单号支持受控重打，不重复执行业务写入。
@@ -153,14 +159,14 @@ async function printBatch(rows, startIndex) {
   当前没有公开的自定义服务配置，并选择枚举到的第一个可写特征；其它型号可能需要扩展源码。
 - `prepareSend` 默认每包 20 字节、包间约 20ms；同一缓冲区多份打印间约 100ms。这只是
   BLE 写节奏，不是打印完成等待时间。包长必须是已实测的正整数，空缓冲区不得发送。
-- 当前分包公式是 `floor(length / packetSize) + 1`。长度恰好整除包长时会尝试额外写一个
-  0 字节末包；某些 BLE 栈会拒绝。实机出现此问题时应修复适配器并回归，不要靠并发或吞错绕过。
+- 当前分包公式使用 `Math.ceil(length / packetSize)`，长度恰好整除时不会产生 0 字节末包；
+  空数据、非法包长和非法份数会直接抛错。合法数值仍须按目标打印机实测。
 - TSC 与 ESC 文本使用仓库内置 `encoding.js` + `encoding-indexes.js` 转为 GB18030，运行时
   不请求网络。编码成功不等于打印机字体、代码页和固件支持全部字符；Emoji 等仍需实机验证。
 - `setBitmap` 接受 ImageData 风格 `{ width, height, data }` RGBA 数据。当前黑白转换较简单，
   大图可能产生大缓冲区；先缩放、二值化并用小图测试。
-- `V8.Print` 没有任务锁和队列。跨 V8 上下文并发会互相覆盖 `currentTime`、`looptime`、
-  `lastData` 等共享状态，必须由业务侧全局串行化。
+- `V8.Print` 使用应用级共享发送队列，跨 V8 上下文不会再并发覆盖 `currentTime`、`looptime`、
+  `lastData` 等共享状态。队列只保证写入顺序，不提供打印机 ACK、业务事务或自动重打语义。
 
 ## 安全边界
 

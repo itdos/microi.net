@@ -53,7 +53,8 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 
 - 所有可变业务逻辑默认必须由接口引擎编排，包括但不限于租户开通、开库、初始化、归属修复、官网个人中心、付费额度等 SaaS 业务流程。C# 后端只暴露原子 V8 能力，例如建库、导入空库模板、复制 `sys_config`、刷新 SaaS 缓存、补偿回滚、字段兜底等；不要把可变业务分支写死到 Controller 或 `TenantProvisioningService` 这类后端定制代码里。接口引擎缺少能力时，优先扩展 `V8.Method`/V8 引擎原子函数，再由接口引擎调用。
 - 主租户由运行环境决定：优先读取环境变量 `OsClient`，其次读取 `appsettings.json` 的 `AppSettings:OsClient`。只有这条主租户 `sys_osclients` 数据中的平台级字段会作为全局配置生效。
-- 普通业务与运行参数统一从主租户 `sys_osclients` 或 `sys_config` 读取，未配置时使用代码安全默认值；不要再为同一参数增加 `MICROI_*` 或 `DOS_ORM_*` 环境变量。数据库、Redis 和必要密钥属于启动基础设施，继续使用现有专用安全配置；节点身份由平台自动生成。
+- API 启动配置只有十项白名单：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。除这十项外，普通业务、运行参数、密钥路径、重试、限额和安全策略统一从主租户 `sys_osclients` 或按租户从 `sys_config` 读取，未配置时使用代码安全默认值；官方 License 恢复次数/间隔与固定私钥挂载 `/app/microi_private.pem` 是信任链例外，禁止创建对应 SaaS 字段。禁止再增加 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或动态名称的环境变量读取。节点身份由平台自动生成。
+- `ASPNETCORE_*`、`DOTNET_*` 仅用于 .NET 宿主；构建、安装、测试、MCP、发布脚本可使用自身进程变量，但 API 生产代码不得把它们当业务配置。新增 SaaS 运行字段必须配套独立或既有 Tab、幂等升级、缓存刷新、敏感字段脱敏、子租户不继承和源码扫描测试。
 - 文件上传的租户业务开关与额度按“当前租户 `sys_osclients` → 代码默认值”解析；平台固定灾难保护、HTTP/Multipart/Form 和反向代理上限不可由租户覆盖，也不要求安装者维护额外上传环境变量。
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
 - 修改 `sys_osclients` 的表、字段、数据源或配置值后，必须刷新 SaaS 引擎运行缓存，并回读验证字段 `Component`、`Data`、`Config`、实际数据值和前端真实消费结果。不要只看 MCP 写入成功。

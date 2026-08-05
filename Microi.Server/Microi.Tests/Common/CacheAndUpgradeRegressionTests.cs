@@ -303,7 +303,9 @@ public class CacheAndUpgradeRegressionTests
         var keys = Assert.IsType<string[]>(keysField!.GetValue(null));
         Assert.Equal(new[] { "send_sms_reg" }, keys);
         Assert.NotNull(tenantCheck);
-        Assert.True(Assert.IsType<bool>(tenantCheck!.Invoke(null, new object[] { "iTdos" })));
+        Assert.Equal(
+            Microi.License.LicenseService.IsOfficialPlatform("iTdos"),
+            Assert.IsType<bool>(tenantCheck!.Invoke(null, new object[] { "iTdos" })));
         Assert.False(Assert.IsType<bool>(tenantCheck.Invoke(null, new object[] { "customer" })));
         Assert.NotNull(repairMethod);
         Assert.Equal(typeof(Task), repairMethod!.ReturnType);
