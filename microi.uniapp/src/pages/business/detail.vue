@@ -1294,7 +1294,10 @@
 						name: field.Name,
 						format: detailFieldFormat(field),
 						nativeField: field
-					})).filter((field) => !this.isTenantMapCoordinateHelper(field))
+					})).filter((field) =>
+						!this.isTenantMapCoordinateHelper(field) &&
+						this.tenantDetailFieldPresentation(field).visible !== false
+					)
 					return {
 						title: group.name || '',
 						fields: rows,

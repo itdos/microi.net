@@ -36,6 +36,7 @@ const ORDER_TABLE = 'diy_dingdan'
 const ORDER_PRODUCT_TABLE = 'diy_dingdansp'
 const PRODUCT_TABLE = 'diy_shangpin'
 const ORDER_PRODUCT_CONSUMABLE_TABLE = 'diy_dingdansphc'
+const ORDER_RENEWAL_TYPE = '老客户续签订单'
 const INSTALLATION_POSITION_TABLE = 'diy_shebeiwz'
 const INSTALLATION_POSITION_CODE_FIELD = 'ShangpinBH'
 const INSTALLATION_POSITION_CODE_ENGINE = 'create_unique_value'
@@ -123,8 +124,11 @@ const ORDER_FIELDS = {
   ownerPhone: 'YewuYDH',
   orderType: 'XinLDD',
   orderDate: 'XiadanRQ',
+  renewalOrderNumber: 'XQDingdanBH',
+  renewalState: 'DingdanSFXQ',
   contractAttachment: 'HetongFJ',
   contractUploadState: 'IsDingdanHT',
+  contractState: 'HetongZT',
   installer: 'AnzhuangR',
   installerId: 'AnzhuangRID',
   installerPhone: 'AnzhuangRDH'
@@ -352,10 +356,12 @@ function applyOrderValues(context, values = {}) {
 }
 
 async function initializeOrder(context) {
-  // zhy：仅为空字段设置新增默认值，保留路由或业务侧已经传入的订单类型和下单日期。
+  // zhy：仅为空字段设置新增默认值，保留路由或业务侧已经传入的订单数据。
   const defaults = {
     [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
-    [orderFieldName(context, 'orderDate', '下单日期')]: currentDate()
+    [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
+    [orderFieldName(context, 'contractState', '合同状态')]: '未断约',
+    [orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'
   }
   const emptyDefaults = Object.fromEntries(
     Object.entries(defaults).filter(([name]) => isEmptyFormValue(context.form[name]))
@@ -1207,6 +1213,12 @@ export async function runPresentationAction(context, action) {
 }
 
 export function getFieldPresentation(context, field) {
+  if (isOrderForm(context) && field &&
+    String(field.Name || '').toLowerCase() === ORDER_FIELDS.renewalOrderNumber.toLowerCase()) {
+    return {
+      visible: String(context.form[orderFieldName(context, 'orderType', '订单类型')] || '') === ORDER_RENEWAL_TYPE
+    }
+  }
   if (isProposalForm(context) && field &&
     String(field.Name || '').toLowerCase() === PROPOSAL_FIELDS.bottledWaterPrice.toLowerCase()) {
     return {
@@ -1288,6 +1300,15 @@ export async function handleFieldSelect(context, payload) {
         ? ''
         : personValue(row, ['KehuMC', 'CustomerName', 'Name']) || payload.value || ''
       applyOrderValues(context, updates)
+      return { handled: true }
+    }
+    if (selectedFieldName === ORDER_FIELDS.renewalOrderNumber.toLowerCase()) {
+      // 平台保存订单编号文本而不是订单 Id，后续续签事件会按 DingdanBH 回查原订单。
+      applyOrderValues(context, {
+        [orderFieldName(context, 'renewalOrderNumber', '续签订单编号')]: payload.cleared
+          ? ''
+          : personValue(row, ['DingdanBH']) || payload.value || ''
+      })
       return { handled: true }
     }
     const personnel = [
@@ -1444,6 +1465,16 @@ export async function handleFieldChange(context, payload) {
     String(payload.field && payload.field.Name || '').toLowerCase() === 'hezuofs') {
     return updateOrderProductCooperation(context, payload)
   }
+  // 非续签订单必须清空历史续签编号，与平台订单类型字段事件保持一致。
+  if (isOrderForm(context) && payload &&
+    String(payload.field && payload.field.Name || '').toLowerCase() === ORDER_FIELDS.orderType.toLowerCase()) {
+    if (String(payload.value || '') !== ORDER_RENEWAL_TYPE) {
+      applyOrderValues(context, {
+        [orderFieldName(context, 'renewalOrderNumber', '续签订单编号')]: ''
+      })
+    }
+    return { handled: true }
+  }
   // zhy：用户清空客户或人员时同步清空对应 Id、电话，避免提交残留的旧关联数据。
   if (isOrderForm(context) && payload && isEmptyFormValue(payload.value)) {
     const changedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -1532,11 +1563,16 @@ export async function beforeSubmit(context) {
     if (isOrderAdd(context)) {
       const defaults = {
         [orderFieldName(context, 'orderType', '订单类型')]: '老客户新增订单',
-        [orderFieldName(context, 'orderDate', '下单日期')]: currentDate()
+        [orderFieldName(context, 'orderDate', '下单日期')]: currentDate(),
+        [orderFieldName(context, 'contractState', '合同状态')]: '未断约',
+        [orderFieldName(context, 'renewalState', '订单是否续签')]: '未续签'
       }
       Object.entries(defaults).forEach(([name, value]) => {
         if (isEmptyFormValue(context.form[name]) && isEmptyFormValue(values[name])) values[name] = value
       })
+    }
+    if (String(context.form[orderFieldName(context, 'orderType', '订单类型')] || '') !== ORDER_RENEWAL_TYPE) {
+      values[orderFieldName(context, 'renewalOrderNumber', '续签订单编号')] = ''
     }
     return values
   }
