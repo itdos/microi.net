@@ -223,6 +223,15 @@ if (!nativeForm.includes(':readonly-max-lines="readonlyMaxLines(field)"') ||
 }
 // zhy：确保客户方案设备联动和新增默认值不会在移动端回归中丢失。
 for (const token of [
+  "contractAttachment: 'HetongFJ'",
+  "contractUploadState: 'IsDingdanHT'",
+  'normalizeUploadItems(context.form[attachmentName]).length',
+  "? '已上传'",
+  ": '未上传'"
+]) {
+  if (!xjyTenantForm.includes(token)) fail(`xjy order contract upload rule is missing: ${token}`)
+}
+for (const token of [
   'PROPOSAL_FIELDS',
   "['ShangpinMC']",
   "['ZulinXJ']",
@@ -346,13 +355,8 @@ for (const token of [
 ]) {
   if (!relatedBusinessList.includes(token)) fail(`related preview spacing/toggle style is missing: ${token}`)
 }
-for (const token of [
-  "this.fieldDefinitionMap.get(String(item.field || '').toLowerCase())",
-  'const summaryTabKey = field?.formTabKey || this.formTabs[0]?.key',
-  'return summaryTabKey === this.activeFormTabKey',
-  `v-if="key !== 'customers' && summaryBlocks.length"`
-]) {
-  if (!businessDetail.includes(token)) fail(`detail summary must stay in its owning form tab: ${token}`)
+if (businessDetail.includes('<text>补充说明</text>')) {
+  fail('business detail must not render the duplicate supplementary summary section')
 }
 for (const token of [
   'CUSTOMER_CARE_FIELDS',

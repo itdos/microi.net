@@ -4,6 +4,7 @@ import { post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule, getRoleProfile } from '@/platform/business.js'
 import { cachedRequest } from '@/platform/cache.js'
 import { formatRegionValue, formatStructuredValue } from '@/platform/display.js'
+import { selectAuthorizedMenu } from '@/platform/menu-resolution.mjs'
 import tenantRuntime from '@/generated/tenant-runtime.js'
 
 const TABLE_CACHE_KEY = 'microi_diy_table_ids_v2'
@@ -305,30 +306,13 @@ export async function loadMenuTree(refresh = false) {
 
 export async function findMenu(aliases = [], tableName = '', refresh = false, menuId = '', tableId = '') {
   const menus = flattenMenus(await loadMenuTree(refresh))
-  const names = aliases.map((item) => String(item).trim()).filter(Boolean)
-  let result = menuId
-    ? menus.find((menu) => String(menu.Id || '') === String(menuId))
-    : null
-  // 显式菜单 Id 之后优先使用调用方已授权取得的表 Id；名称/别名可能重名，
-  // 只能作为兼容回退，不能覆盖确定的表关系。
-  if (!result && tableId) {
-    result = menus.find((menu) => String(menu.DiyTableId || '') === String(tableId))
-  }
-  if (!result) result = menus.find((menu) => names.includes(String(menu.Name || '').trim()))
-  if (!result && tableName) {
-    const normalizedTableName = String(tableName).toLowerCase()
-    result = menus.find((menu) =>
-      String(menu.DiyTableName || menu.TableName || menu.DiyTable?.Name || menu._DiyTable?.Name || '').toLowerCase() === normalizedTableName
-    )
-  }
-  if (!result && tableName) {
-    const resolvedTableId = await resolveDiyTableId(tableName)
-    result = menus.find((menu) => resolvedTableId && String(menu.DiyTableId || '') === resolvedTableId)
-  }
-  if (!result) {
-    result = menus.find((menu) => names.some((name) => String(menu.Name || '').includes(name)))
-  }
-  return result || null
+  const resolvedTableId = tableId || (tableName ? await resolveDiyTableId(tableName, refresh) : '')
+  return selectAuthorizedMenu(menus, {
+    aliases,
+    tableName,
+    tableId: resolvedTableId,
+    menuId
+  })
 }
 
 export async function openForm({ table, rowId = '', mode = 'View', title = '', menuId = '', moduleEngineKey = '', menuAliases = [], defaultValues = null, fieldNames = null, excludeFieldNames = null, readonlyFieldNames = null, includeRelated = true, stayAfterAdd = false, recordAdapter = 'form-engine', tableChildAuth = null }) {
@@ -338,11 +322,13 @@ export async function openForm({ table, rowId = '', mode = 'View', title = '', m
     return
   }
   const normalizedRecordAdapter = String(recordAdapter || 'form-engine').trim().toLowerCase()
-  let menu = menuId ? { Id: menuId } : null
-  if (!menu && normalizedRecordAdapter === 'form-engine') {
+  let menu = null
+  if (normalizedRecordAdapter === 'form-engine') {
     try {
-      menu = await findMenu(menuAliases, table)
+      menu = await findMenu(menuAliases, table, false, menuId)
     } catch (error) {}
+  } else if (menuId) {
+    menu = { Id: menuId }
   }
   const params = [
     `table=${encodeURIComponent(table)}`,

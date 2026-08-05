@@ -108,7 +108,7 @@ export default {
       return this.activeIndex >= 0
     },
     isH5Dock() {
-      return runtimeTarget === 'h5' && this.isTabBarPage
+      return activeTabBar.custom === true && runtimeTarget === 'h5' && this.isTabBarPage
     },
     isFallbackLauncher() {
       return this.aiAssistantEnabled
