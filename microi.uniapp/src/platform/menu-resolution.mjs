@@ -44,12 +44,21 @@ export function selectAuthorizedMenu(menus = [], options = {}) {
   const tableName = normalize(options.tableName)
   const tableId = normalize(options.tableId)
   const menuId = normalize(options.menuId)
+  const preferAliases = options.preferAliases === true
 
   if (menuId) {
     const explicitMenu = menus.find((menu) => normalize(menu && menu.Id) === menuId)
     if (explicitMenu && isBoundToRequestedTable(explicitMenu, tableName, tableId)) {
       return explicitMenu
     }
+  }
+
+  if (preferAliases) {
+    const preferredAlias = findByAliasOrder(menus, aliases, (menu, alias) =>
+      normalize(menu && menu.Name) === alias &&
+      isBoundToRequestedTable(menu, tableName, tableId)
+    )
+    if (preferredAlias) return preferredAlias
   }
 
   if (tableId) {
