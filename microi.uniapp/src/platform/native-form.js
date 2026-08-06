@@ -17,6 +17,9 @@ const LAYOUT_COMPONENTS = new Set(nativeControls.layout)
 const RELATED_COMPONENTS = new Set(nativeControls.related)
 const READONLY_COMPONENTS = new Set(nativeControls.readonly)
 const GUARDED_COMPONENTS = new Set(nativeControls.guarded)
+// 与 PC 表单引擎 DiyCommon.DefaultFieldNames 保持一致；是否展示由
+// diy_table.DisplayDefaultField 统一控制，不能只因 diy_field.Visible=1 就出现在移动表单中。
+const DEFAULT_FIELD_NAMES = new Set(['Id', 'CreateTime', 'UpdateTime', 'UserId', 'UserName', 'IsDeleted'])
 const HIDDEN_NAMES = new Set(['Id', 'CreateTime', 'UpdateTime', 'CreateUserId', 'UpdateUserId', 'OsClient'])
 const SENSITIVE_FIELD_PATTERN = /password|passwd|pwd|secret|token|openid|unionid|密码|密钥|令牌/i
 const OPTION_COMPONENTS = new Set([
@@ -175,7 +178,9 @@ export function normalizeField(field, options = {}) {
       !GUARDED_COMPONENTS.has(component) &&
       !HIDDEN_NAMES.has(field.Name),
     required: Number(field.NotEmpty || 0) === 1,
-    visible: roleVisibility.visible && Number(field.AppVisible ?? field.Visible ?? 1) !== 0 && Number(field.IsVirtual || 0) !== 1 &&
+    visible: roleVisibility.visible &&
+      (options.displayDefaultField || !DEFAULT_FIELD_NAMES.has(field.Name)) &&
+      Number(field.AppVisible ?? field.Visible ?? 1) !== 0 && Number(field.IsVirtual || 0) !== 1 &&
       !SENSITIVE_FIELD_PATTERN.test(`${field.Name || ''} ${field.Label || ''}`),
     placeholder: field.Placeholder || `${selectable || ['DateTime', 'Address', 'Map', 'MapArea', 'ColorPicker'].includes(component) ? '请选择' : '请输入'}${field.Label || field.Name}`
   }
@@ -367,11 +372,13 @@ function buildDefinition(table, fields, layoutFields = fields) {
 
 export function createNativeFormDefinition(table = {}, rawFields = [], options = {}) {
   const user = options.user || getUser() || {}
-  const layoutFields = (Array.isArray(rawFields) ? rawFields : []).map((field) => normalizeField(field, { user }))
+  const displayDefaultField = configBoolean(table.DisplayDefaultField, false)
+  const layoutFields = (Array.isArray(rawFields) ? rawFields : [])
+    .map((field) => normalizeField(field, { user, displayDefaultField }))
   return buildDefinition(table, layoutFields, layoutFields)
 }
 
-export const NATIVE_FORM_SCHEMA_VERSION = 8
+export const NATIVE_FORM_SCHEMA_VERSION = 9
 const FORM_VERSION_MAX_AGE = 30 * 1000
 const FORM_DEFINITION_MAX_AGE = 30 * 24 * 60 * 60 * 1000
 

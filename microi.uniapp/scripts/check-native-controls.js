@@ -124,8 +124,13 @@ if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
   !formRuntime.includes('relatedGroups: layoutGroups') ||
   !formRuntime.includes("if (field.component === 'Tabs')") ||
   !formRuntime.includes('Divider 只是组内分隔') ||
-  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 8')) {
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 9')) {
   fail('related fields must preserve their platform CollapseGroup ownership')
+}
+if (!formRuntime.includes("const DEFAULT_FIELD_NAMES = new Set(['Id', 'CreateTime', 'UpdateTime', 'UserId', 'UserName', 'IsDeleted'])") ||
+  !formRuntime.includes('configBoolean(table.DisplayDefaultField, false)') ||
+  !formRuntime.includes('(options.displayDefaultField || !DEFAULT_FIELD_NAMES.has(field.Name))')) {
+  fail('native forms must follow diy_table.DisplayDefaultField for platform audit fields')
 }
 if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
   fail('readonly platform fields must remain visible but non-editable')
