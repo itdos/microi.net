@@ -1,9 +1,10 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.5.8
+ * Version: v1.6.0
  * Function:
  * - 统一生成应用商城安装包；v3 发布仅在已提交指针证明仍精确匹配时原子写入包字段。
+ * - 为接口引擎生成 Managed/CreateIfMissing 所有权策略和上一版基线摘要。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -24,6 +25,12 @@ function toArray(value) {
   if (!value || value.length === undefined) return list;
   for (var i = 0; i < value.length; i++) list.push(value[i]);
   return list;
+}
+function parseObject(value, fallback) {
+  if (!value) return fallback || {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(text(value)); }
+  catch (error) { return fallback || {}; }
 }
 function normalizePath(value) {
   var path = text(value).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
@@ -299,6 +306,54 @@ function canonicalJson(value) {
 function sha256Hex(value) {
   if (!V8.EncryptHelper || !V8.EncryptHelper.Sha256Hex) throw new Error('V8.EncryptHelper.Sha256Hex 不可用');
   return text(V8.EncryptHelper.Sha256Hex(text(value))).toLowerCase();
+}
+function apiEngineMap(engines) {
+  var result = {};
+  var rows = toArray(engines);
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i] || {};
+    var key = text(row.ApiEngineKey).toLowerCase();
+    if (key) result[key] = row;
+  }
+  return result;
+}
+function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStore) {
+  var rows = toArray(engines);
+  if (rows.length === 0) return null;
+  var requestedRoot = parseObject(requestedPolicies, {});
+  var requested = parseObject(requestedRoot.ApiEngines || requestedRoot, {});
+  var previousPackage = parseObject(existingStore && existingStore.AppPakcet, {});
+  var previousEngines = apiEngineMap(previousPackage.SysApiEngines);
+  var previousRoot = parseObject(previousPackage.ResourcePolicies, {});
+  var previousPolicies = parseObject(previousRoot.ApiEngines, {});
+  var result = { SchemaVersion: 1, ApiEngines: {} };
+
+  for (var i = 0; i < rows.length; i++) {
+    var engine = rows[i] || {};
+    var originalKey = text(engine.ApiEngineKey);
+    var key = originalKey.toLowerCase();
+    if (!key) continue;
+    var source = requested[key] || requested[originalKey]
+      || previousPolicies[key] || previousPolicies[originalKey] || {};
+    if (typeof source === 'string') source = { UpgradePolicy: source };
+    var policy = text(source.UpgradePolicy || source.Policy || 'Managed');
+    if (policy !== 'Managed' && policy !== 'CreateIfMissing') {
+      throw new Error('接口引擎资源策略不受支持：' + originalKey + ' -> ' + policy);
+    }
+    var entry = {
+      Ownership: text(source.Ownership || (policy === 'CreateIfMissing' ? 'Tenant' : 'Application')),
+      UpgradePolicy: policy
+    };
+    if (policy === 'Managed') {
+      var previousEngine = previousEngines[key];
+      var baseHash = previousEngine
+        ? sha256Hex(text(previousEngine.ApiV8Code))
+        : text(source.BaseHash).toLowerCase();
+      if (baseHash) entry.BaseHash = baseHash;
+    }
+    result.ApiEngines[key] = entry;
+  }
+  return result;
 }
 function readV3RouteSnapshot(routesValue, jsonValue, hashValue) {
   if (routesValue === undefined || routesValue === null) throw new Error('ProtocolVersion=3 必须显式提供 Routes，无路由时传 []');
@@ -677,6 +732,7 @@ var exactMenuIds = V8.Param.ExactMenuIds === true
 var tableIds = parseArray(V8.Param.TableIds);
 var flowIds = parseArray(V8.Param.FlowIds);
 var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
+var requestedResourcePolicies = V8.Param.ResourcePolicies || V8.Param.ApiEnginePolicies || {};
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
   dataSelections = parseArray(existingStore.SelectData);
 }
@@ -782,6 +838,12 @@ var packageModel = {
   WfLines: toArray(selectedExport.WfLines),
   SysApiEngines: toArray(selectedExport.SysApiEngines)
 };
+var generatedResourcePolicies = buildApiEngineResourcePolicies(
+  packageModel.SysApiEngines,
+  requestedResourcePolicies,
+  existingStore
+);
+if (generatedResourcePolicies) packageModel.ResourcePolicies = generatedResourcePolicies;
 
 if (isOfflineAction) {
   // 离线包必须能在完全不通发布端/HDFS 的客户环境安装。

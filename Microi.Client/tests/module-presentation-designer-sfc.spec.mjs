@@ -77,6 +77,9 @@ test("module presentation designer compiles and exposes every standard list/card
     assert.match(source, /仅打开表单不应修改用户数据/);
     assert.match(source, /ensureStatisticsField\(metric\.Field\)/);
     assert.match(source, /onMetricSourceChange\(metric\)/);
+    assert.match(source, /metric\.Icon/);
+    assert.match(source, /metricVisualDefaults/);
+    assert.match(source, /每个指标应使用不同图标和语义色/);
     assert.match(source, /value: "DataCount"/);
     assert.match(source, /fieldRequestId/);
     assert.match(source, /cloneJson\(shared\)/);

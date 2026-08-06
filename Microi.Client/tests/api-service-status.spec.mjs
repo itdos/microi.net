@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 globalThis.window = {
@@ -110,13 +111,27 @@ test("SecurityBlocked keeps the exact backend diagnosis instead of showing API u
         }
     };
 
-    assert.equal(reportApiServiceResponse(payload, context), true);
+    const securityContext = {
+        apiBase: "https://api.example.com",
+        osClient: "example",
+        url: "/apiengine/get-data?OsClient=example&token=must-not-leak",
+        method: "post"
+    };
+
+    assert.equal(reportApiServiceResponse(payload, securityContext), true);
     assert.equal(apiServiceState.active, true);
     assert.equal(apiServiceState.mode, "security");
     assert.equal(apiServiceState.message, payload.Msg);
     assert.equal(apiServiceState.ip, "183.133.34.254");
     assert.equal(apiServiceState.reason, payload.DataAppend.Reason);
     assert.equal(apiServiceState.expiresAtUtc, expiresAtUtc);
+    assert.equal(apiServiceState.clientOrigin, "https://client.example.com");
+    assert.equal(apiServiceState.requestOrigin, "https://api.example.com");
+    assert.equal(
+        apiServiceState.requestUrl,
+        "https://api.example.com/apiengine/get-data?OsClient=example&token=REDACTED"
+    );
+    assert.equal(apiServiceState.requestMethod, "POST");
 
     // 并发中的普通成功响应不能覆盖明确的安全拦截事实。
     recover();
@@ -128,4 +143,56 @@ test("SecurityBlocked keeps the exact backend diagnosis instead of showing API u
     };
     assert.equal(await checkApiServiceNow(), true);
     assert.equal(apiServiceState.active, false);
+});
+
+test("an official external API block never covers the customer tenant system", function () {
+    const payload = {
+        Code: 0,
+        Msg: "当前IP访问过于频繁，已被安全防护临时拦截，请稍后再试或联系管理员。",
+        DataAppend: {
+            SecurityBlocked: true,
+            Ip: "172.30.0.1",
+            Reason: "IP在10秒内产生121次异常状态码，超过阈值120。"
+        }
+    };
+    const officialContext = {
+        apiBase: "https://api.customer.example.com",
+        osClient: "customer",
+        url: "https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos",
+        method: "post"
+    };
+
+    assert.equal(reportApiServiceResponse(payload, officialContext), false);
+    assert.equal(apiServiceState.active, false);
+
+    const error = new Error("Service Unavailable");
+    error.response = { status: 503, data: payload };
+    assert.equal(reportApiServiceFailure(error, officialContext), false);
+    assert.equal(apiServiceState.active, false);
+
+    const unavailable = new Error("Service Unavailable");
+    unavailable.response = { status: 503, data: null };
+    assert.equal(reportApiServiceFailure(unavailable, officialContext), false);
+    assert.equal(apiServiceState.active, false);
+});
+
+test("the security page renders complete diagnostics and current tenant branding", async function () {
+    const [component, backgroundTaskCenter] = await Promise.all([
+        readFile(new URL("../src/components/ApiServiceUnavailable/index.vue", import.meta.url), "utf8"),
+        readFile(new URL("../src/layout/components/BackgroundTaskCenter.vue", import.meta.url), "utf8")
+    ]);
+
+    assert.match(component, /实际请求目标（完整地址）/);
+    assert.match(component, /state\.requestUrl/);
+    assert.match(component, /state\.clientOrigin/);
+    assert.match(component, /state\.apiBase/);
+    assert.match(component, /state\.reasonKey/);
+    assert.match(component, /state\.securityScope/);
+    assert.match(component, /SysConfig\?\.SysLogo/);
+    assert.match(component, /SysConfig\?\.SysTitle/);
+    assert.match(component, /overflow-wrap:\s*anywhere/);
+    assert.doesNotMatch(component, /text-overflow:\s*ellipsis/);
+    assert.match(backgroundTaskCenter, /skipAuthorization:\s*true/);
+    assert.match(backgroundTaskCenter, /suppressAuthFailure:\s*true/);
+    assert.match(backgroundTaskCenter, /suppressErrorNotification:\s*true/);
 });

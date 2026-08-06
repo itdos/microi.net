@@ -216,7 +216,8 @@ Body: {"ApiEngineKey":"your_key","Action":"Bootstrap"}
 - HTTP 请求中的 `_CurrentUser`、`_InvokeType:'Server'`、`_TrustedServerInvocation` 都不能建立可信服务端身份；当前用户和调用类型必须由认证中间件与接口层重新写入。
 - `ApiAddress` 不能为空字符串；空字符串可能导致 404。
 - 响应不能是空 body、字符串 `null`、非 JSON；业务接口必须返回标准 DosResult。
-- 普通 `POST/PUT/PATCH/DELETE` 必须使用稳定路径 `/apiengine/{ApiEngineKey}`，租户放在唯一的 `osclient` Header，并可在 JSON/Form Body 中冗余传入；禁止无脑给路径追加 `--OsClient--...--`。普通 GET 优先 Header 或 `?OsClient=`。只有第三方回调、浏览器直接下载等确实无法设置 Header/Form/Query 的 GET/HEAD 场景，才使用 `--OsClient--{OsClient}--` 特殊路径。
+- 普通 `POST/PUT/PATCH/DELETE` 必须使用稳定路径 `/apiengine/{ApiEngineKey}`，租户放在唯一的 `osclient` Header，并可在 JSON/Form Body 中冗余传入；禁止无脑给路径追加 `--OsClient--...--`。普通 GET 优先 Header 或 `?OsClient=`。只有微信/支付等第三方回调（包括 POST）、浏览器直接下载等调用方确实无法设置 Header 或 Query 的场景，才使用 `--OsClient--{OsClient}--` 特殊路径；Query 参数名固定为 `OsClient`，禁止 `o` 等缩写。
+- 需要 C# 验签/AES 解密或隐藏 SaaS 密钥的回调，使用“最小协议网关 + `Managed` 核心接口 + `CreateIfMissing` 租户 Hook”。网关不得承载日志、写表、通知等业务逻辑；传给 V8 的事件必须脱敏，并包含稳定 `EventId` 供 Hook 幂等。
 - 更新接口代码时保留 HTTP 元数据，避免只覆盖 JS 代码却把匿名、启用、自定义地址等配置冲掉。
 
 ## 请求内异步与可靠后台任务

@@ -21,7 +21,7 @@ namespace Microi.net.Api
     {
         private async Task<DosResult> DefaultParam(DiyUploadParam param)
         {
-            dynamic currentTokenDynamic;
+            CurrentToken currentTokenDynamic;
             try
             {
                 currentTokenDynamic = await DiyToken.GetCurrentToken();
@@ -55,6 +55,9 @@ namespace Microi.net.Api
             param._CurrentUser = currentTokenDynamic.CurrentUser;
             param.OsClient = authenticatedOsClient;
             param._InvokeType = InvokeType.Client.ToString();
+            param._ClientType = DiyToken
+                .GetActiveCachedTokenEntry(currentTokenDynamic, currentTokenDynamic.Token)
+                ?.ClientType;
             return null;
         }
 
@@ -577,7 +580,7 @@ namespace Microi.net.Api
             return fieldValue.Children().Any(child => FieldValueReferencesPath(child, requestedPath));
         }
 
-        // zhy：上传成功后为当前上传请求补充短期预览地址，业务字段仍只持久化 Path。
+        // 上传成功后为当前上传请求补充短期预览地址，业务字段仍只持久化 Path。
         /// <summary>
         /// 上传成功后为本次响应补充可立即预览的地址。该地址只作为短期能力返回给
         /// 当前上传请求，业务字段仍只保存 Path；后续读取继续走记录级权限校验。
@@ -624,7 +627,7 @@ namespace Microi.net.Api
             return result;
         }
 
-        // zhy：为上传结果生成微信可访问的短期地址，并统一提交小程序图片内容安全检测。
+        // 为私有上传结果生成微信可访问的短期地址，并统一提交小程序图片内容安全检测。
         private async Task<DosResult> ApplyWeChatContentSecurityAsync(DosResult result, DiyUploadParam param)
         {
             var response = await AttachUploadedFileUrls(result, param);
@@ -632,7 +635,6 @@ namespace Microi.net.Api
             return await service.SubmitUploadedImagesAsync(
                 response,
                 param,
-                HttpContext,
                 HttpContext.RequestAborted);
         }
 
@@ -655,10 +657,13 @@ namespace Microi.net.Api
             var fileError = LoadFormFiles(param);
             if (fileError != null) return Json(fileError);
 
+            // 待审图片必须留在私有桶。ContentSecurityRequired 只能收紧存储范围，
+            // 不能由客户端通过 Limit=false 把尚未审核的图片暴露到公有桶。
+            if (RequiresWeChatContentSecurity(param)) param.Limit = true;
             //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
             //var result = await DiyCommon.Upload(param);//, HttpContext
             var result = await MicroiEngine.HDFS.Upload(param);//, HttpContext
-            // zhy：小程序图片先进入私有隔离区并提交检测，通过后才能写入业务字段。
+            // 小程序图片先进入私有存储并提交检测，通过后才能写入业务字段。
             return Json(await ApplyWeChatContentSecurityAsync(result, param));
         }
         /// <summary>
@@ -701,9 +706,16 @@ namespace Microi.net.Api
             var fileError = LoadFormFiles(param);
             if (fileError != null) return Json(fileError);
 
+            if (RequiresWeChatContentSecurity(param)) param.Limit = true;
             var result = await MicroiEngine.HDFS.Upload(param);
-            // zhy：UniApp 小程序图片同样统一提交检测，避免其它上传场景绕过安全校验。
+            // UniApp 小程序图片同样统一提交检测，避免其它上传场景绕过安全校验。
             return Json(await ApplyWeChatContentSecurityAsync(result, param));
+        }
+
+        private static bool RequiresWeChatContentSecurity(DiyUploadParam param)
+        {
+            return param?.ContentSecurityRequired == true
+                   || string.Equals(param?._ClientType, "WxMiniProgram", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>

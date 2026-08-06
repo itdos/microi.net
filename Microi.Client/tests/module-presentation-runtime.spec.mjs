@@ -137,9 +137,12 @@ test("module header, metric strip and compound search consume runtime theme toke
     const searchBlock = searchStart >= 0 ? styleSource.slice(searchStart, searchStart + 6500) : "";
 
     assert.match(headerBlock, /--mci-presentation-header-bg/);
-    assert.match(headerBlock, /--mci-presentation-metric-strip-bg/);
-    assert.match(headerBlock, /--mci-presentation-metric-bg/);
+    assert.match(headerBlock, /--metric-surface/);
+    assert.match(headerBlock, /--metric-icon-surface/);
     assert.match(headerBlock, /--mci-presentation-accent-gradient/);
+    assert.match(headerBlock, /grid-template-columns:\s*minmax\(250px,\s*0\.78fr\)\s*minmax\(0,\s*2\.22fr\)/);
+    assert.match(headerBlock, /\.module-presentation-header \.module-metric-strip[\s\S]*?border:\s*0/);
+    assert.match(headerBlock, /\.module-presentation-header \.module-metric-item[\s\S]*?background:\s*var\(--metric-surface\)/);
     assert.doesNotMatch(headerBlock, /background:\s*rgba\(248,\s*250,\s*252,\s*0\.68\)/);
     assert.match(searchBlock, /focus-within/);
     assert.match(searchBlock, /--mci-gradient-primary/);

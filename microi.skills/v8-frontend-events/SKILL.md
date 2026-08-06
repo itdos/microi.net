@@ -134,6 +134,12 @@ return V8.Form.Status === '待审核' && V8.CurrentUser.RoleName.indexOf('审批
 // V8.Result = V8.Form.Status === '待审核';
 ```
 
+`V8CodeShow` 与点击事件使用同一套前端 V8 能力，允许直接使用 `await`。平台所有
+按钮入口（列表按钮、表单顶部按钮、更多按钮和子表打开的嵌套表单按钮）都必须走
+异步执行器并等待结果后再决定显隐；不得在某一层退回同步 `new Function`，否则同一段
+代码在列表可用、进入嵌套表单后会报 `await is only valid in async functions`。回归测试
+至少覆盖“主表详情 → 定制子表 → 子记录详情”链路中的含 `await` 显隐代码。
+
 ## 列表事件
 
 ### TableRowClick — 行点击

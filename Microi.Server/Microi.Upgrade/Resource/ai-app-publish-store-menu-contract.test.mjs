@@ -12,14 +12,58 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.5.8 V3 source", () => {
+test("publisher package metadata matches the v1.6.0 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.5.8");
-  assert.match(String(packagedPublisher.ChangeHistory || ""), /v1\.5\.8[\s\S]*?committed-proof/u);
+  assert.equal(packagedPublisher.Version, "v1.6.0");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
   );
+});
+
+test("publisher emits managed baselines and tenant-owned create-if-missing policies", () => {
+  const context = {
+    V8: {
+      EncryptHelper: {
+        Sha256Hex(value) {
+          return crypto.createHash("sha256").update(String(value)).digest("hex");
+        },
+      },
+    },
+    JSON,
+    Object,
+    String,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "toArray")}
+    ${extractFunction(publisherSource, "parseObject")}
+    ${extractFunction(publisherSource, "sha256Hex")}
+    ${extractFunction(publisherSource, "apiEngineMap")}
+    ${extractFunction(publisherSource, "buildApiEngineResourcePolicies")}
+    result = buildApiEngineResourcePolicies;
+  `, context);
+  const policies = context.result(
+    [
+      { ApiEngineKey: "core", ApiV8Code: "new-core" },
+      { ApiEngineKey: "hook", ApiV8Code: "template" },
+    ],
+    { ApiEngines: { hook: { UpgradePolicy: "CreateIfMissing" } } },
+    {
+      AppPakcet: JSON.stringify({
+        SysApiEngines: [{ ApiEngineKey: "core", ApiV8Code: "old-core" }],
+      }),
+    },
+  );
+
+  assert.equal(policies.ApiEngines.core.UpgradePolicy, "Managed");
+  assert.equal(
+    policies.ApiEngines.core.BaseHash,
+    crypto.createHash("sha256").update("old-core").digest("hex"),
+  );
+  assert.equal(policies.ApiEngines.hook.Ownership, "Tenant");
+  assert.equal(policies.ApiEngines.hook.UpgradePolicy, "CreateIfMissing");
+  assert.equal(policies.ApiEngines.hook.BaseHash, undefined);
 });
 
 function extractFunction(source, name) {
@@ -237,7 +281,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.5\.8/);
+  assert.match(publisherSource, /Version: v1\.6\.0/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

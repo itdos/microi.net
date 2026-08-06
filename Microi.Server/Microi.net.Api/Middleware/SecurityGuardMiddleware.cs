@@ -26,6 +26,28 @@ namespace Microi.net.Api
                 return;
             }
 
+            // UseForwardedHeaders 已在本中间件之前执行。若 RemoteIp 仍是当前容器
+            // 精确发现的网桥网关，说明最后一跳没有提供可验证的客户端 IP；此时按
+            // 网关封禁会让任意一个用户拖垮全站。仅记录审计，不进入 IP 自动封禁，
+            // 后续请求压力与内存保护仍继续执行。
+            if (ForwardedProxyTrustPolicy.IsContainerGatewayPeer(context.Connection.RemoteIpAddress))
+            {
+                var unattributedWatch = Stopwatch.StartNew();
+                try
+                {
+                    await _next(context).ConfigureAwait(false);
+                }
+                finally
+                {
+                    unattributedWatch.Stop();
+                    SecurityGuardService.RecordAuditOnly(
+                        context,
+                        options,
+                        unattributedWatch.ElapsedMilliseconds);
+                }
+                return;
+            }
+
             var profile = await SecurityGuardTrustResolver.ResolveAsync(context).ConfigureAwait(false);
             var decision = SecurityGuardService.CheckBeforeRequest(context, options, profile);
             if (decision.IsBlocked)
@@ -42,6 +64,8 @@ namespace Microi.net.Api
             finally
             {
                 watch.Stop();
+                context.Items[SecurityGuardRuntimePolicy.MatchedEndpointItemKey] =
+                    context.GetEndpoint() != null;
                 SecurityGuardService.RecordAfterRequest(context, options, decision, watch.ElapsedMilliseconds);
             }
         }
