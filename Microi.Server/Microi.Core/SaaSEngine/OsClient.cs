@@ -30,6 +30,10 @@ namespace Microi.net
                 ["Integrations:WeChat:TemplateAppSecret"] = new[] { "WeChatTemplateAppSecret" },
                 ["Integrations:WeChat:TemplateId"] = new[] { "WeChatTemplateId" },
                 ["Integrations:WeChat:MiniProgramAppId"] = new[] { "WeChatMiniProgramAppId" },
+                // zhy：将当前租户的小程序内容安全凭据映射到统一运行配置键。
+                ["Integrations:WeChat:MiniProgramAppSecret"] = new[] { "WeChatMiniProgramAppSecret" },
+                ["Integrations:WeChat:MiniProgramMessageToken"] = new[] { "WeChatMiniProgramMessageToken" },
+                ["Integrations:WeChat:MiniProgramEncodingAESKey"] = new[] { "WeChatMiniProgramEncodingAESKey" },
                 ["Cors:AllowOrigins"] = new[] { "CorsAllowOrigins" },
                 ["Cors:AllowAnyWhenUnconfigured"] = new[] { "CorsAllowAnyWhenUnconfigured" },
                 ["SsrfProtection:Enabled"] = new[] { "SsrfProtectionEnabled" },

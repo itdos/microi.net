@@ -35,8 +35,9 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
 {
     private static readonly TimeSpan BatchWindow = TimeSpan.FromMilliseconds(150);
     private static readonly TimeSpan ReplayInterval = TimeSpan.FromSeconds(5);
+    // zhy：日志落盘前统一遮蔽微信一次性登录 code 与回调 AESKey。
     private static readonly Regex SensitiveJson = new(
-        "(?i)(\\\"?(?:password|pwd|token|authorization|apikey|secret|connectionstring)\\\"?\\s*[:=]\\s*\\\"?)[^\\\",}&\\s]+",
+        "(?i)(\\\"?(?:password|pwd|token|authorization|apikey|secret|logincode|encodingaeskey|connectionstring)\\\"?\\s*[:=]\\s*\\\"?)[^\\\",}&\\s]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly Channel<SysLogParam> _channel;

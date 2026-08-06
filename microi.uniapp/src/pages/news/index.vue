@@ -93,6 +93,7 @@
         <text v-if="loadingMore" class="load-more-text">{{ t('common.loading') }}</text>
         <text v-else-if="noMore" class="load-more-text">{{ t('common.noMore') }}</text>
       </view>
+      <view class="mci-tabbar-spacer" aria-hidden="true" />
     </scroll-view>
 
     <!-- 骨架屏 -->

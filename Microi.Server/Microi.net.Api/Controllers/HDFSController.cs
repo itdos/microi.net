@@ -624,6 +624,18 @@ namespace Microi.net.Api
             return result;
         }
 
+        // zhy：为上传结果生成微信可访问的短期地址，并统一提交小程序图片内容安全检测。
+        private async Task<DosResult> ApplyWeChatContentSecurityAsync(DosResult result, DiyUploadParam param)
+        {
+            var response = await AttachUploadedFileUrls(result, param);
+            var service = HttpContext.RequestServices.GetRequiredService<WeChatContentSecurityService>();
+            return await service.SubmitUploadedImagesAsync(
+                response,
+                param,
+                HttpContext,
+                HttpContext.RequestAborted);
+        }
+
         /// <summary>
         /// 上传文件、图片。返回/路径。支持单文件、多文件。
         /// Multiple：是否多文件
@@ -646,8 +658,8 @@ namespace Microi.net.Api
             //HttpContext为可选参数，在Controller层调用DiyCommon.Upload可以不用传入HttpContext，内部可以自动获取，也可以直接传入文件流。
             //var result = await DiyCommon.Upload(param);//, HttpContext
             var result = await MicroiEngine.HDFS.Upload(param);//, HttpContext
-            // zhy：普通上传接口同步返回本次上传文件的可预览地址。
-            return Json(await AttachUploadedFileUrls(result, param));
+            // zhy：小程序图片先进入私有隔离区并提交检测，通过后才能写入业务字段。
+            return Json(await ApplyWeChatContentSecurityAsync(result, param));
         }
         /// <summary>
         /// Uniapp上传，移除Consumes。
@@ -690,8 +702,8 @@ namespace Microi.net.Api
             if (fileError != null) return Json(fileError);
 
             var result = await MicroiEngine.HDFS.Upload(param);
-            // zhy：UniApp 上传接口同步返回本次上传文件的可预览地址。
-            return Json(await AttachUploadedFileUrls(result, param));
+            // zhy：UniApp 小程序图片同样统一提交检测，避免其它上传场景绕过安全校验。
+            return Json(await ApplyWeChatContentSecurityAsync(result, param));
         }
 
         /// <summary>
