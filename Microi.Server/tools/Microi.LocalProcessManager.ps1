@@ -25,6 +25,173 @@ $backendRoot = (Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api').Rep
 $frontendRoot = (Join-Path $resolvedWorkspace 'Microi.Client').Replace('/', '\').ToLowerInvariant()
 $releaseOutput = Join-Path $resolvedWorkspace 'Microi.Server\Microi.net.Api\bin\Release'
 $releaseLockDirectory = Join-Path $resolvedWorkspace '.tmp\microi-process-state\release.lock'
+$processCurrentDirectoryCache = @{}
+
+# Win32_Process 不公开进程当前目录。Vite 子进程由相对路径启动且父 npm/终端已经退出时，
+# CommandLine 只剩 node_modules/vite/bin/vite.js，无法证明它属于哪个工作区。这里通过只读
+# Windows 进程参数回读 CWD；读取失败时返回空，后续身份校验继续失败关闭。
+if ($null -eq ('Microi.ProcessTools.NativeProcessInspector' -as [type])) {
+    Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace Microi.ProcessTools
+{
+    public static class NativeProcessInspector
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ProcessBasicInformation
+        {
+            public IntPtr Reserved1;
+            public IntPtr PebBaseAddress;
+            public IntPtr Reserved2_0;
+            public IntPtr Reserved2_1;
+            public IntPtr UniqueProcessId;
+            public IntPtr Reserved3;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, int processId);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool ReadProcessMemory(
+            IntPtr processHandle,
+            IntPtr baseAddress,
+            [Out] byte[] buffer,
+            IntPtr size,
+            out IntPtr bytesRead);
+
+        [DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr handle);
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(
+            IntPtr processHandle,
+            int processInformationClass,
+            ref ProcessBasicInformation processInformation,
+            int processInformationLength,
+            out int returnLength);
+
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(
+            IntPtr processHandle,
+            int processInformationClass,
+            ref IntPtr processInformation,
+            int processInformationLength,
+            out int returnLength);
+
+        private static byte[] ReadBytes(IntPtr processHandle, long address, int count)
+        {
+            var buffer = new byte[count];
+            IntPtr bytesRead;
+            if (!ReadProcessMemory(
+                    processHandle,
+                    new IntPtr(address),
+                    buffer,
+                    new IntPtr(count),
+                    out bytesRead)
+                || bytesRead.ToInt64() != count)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+            return buffer;
+        }
+
+        private static long ReadPointer(IntPtr processHandle, long address, int pointerSize)
+        {
+            var bytes = ReadBytes(processHandle, address, pointerSize);
+            return pointerSize == 8
+                ? BitConverter.ToInt64(bytes, 0)
+                : BitConverter.ToUInt32(bytes, 0);
+        }
+
+        public static string GetCurrentDirectory(int processId)
+        {
+            const uint ProcessQueryInformation = 0x0400;
+            const uint ProcessVmRead = 0x0010;
+            var processHandle = OpenProcess(
+                ProcessQueryInformation | ProcessVmRead,
+                false,
+                processId);
+            if (processHandle == IntPtr.Zero)
+            {
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            }
+
+            try
+            {
+                var basicInformation = new ProcessBasicInformation();
+                int returnLength;
+                var status = NtQueryInformationProcess(
+                    processHandle,
+                    0,
+                    ref basicInformation,
+                    Marshal.SizeOf(typeof(ProcessBasicInformation)),
+                    out returnLength);
+                if (status != 0)
+                {
+                    throw new InvalidOperationException(
+                        "NtQueryInformationProcess(ProcessBasicInformation) failed: " + status);
+                }
+
+                var pointerSize = IntPtr.Size;
+                var pebAddress = basicInformation.PebBaseAddress.ToInt64();
+                if (IntPtr.Size == 8)
+                {
+                    var wow64PebAddress = IntPtr.Zero;
+                    status = NtQueryInformationProcess(
+                        processHandle,
+                        26,
+                        ref wow64PebAddress,
+                        IntPtr.Size,
+                        out returnLength);
+                    if (status == 0 && wow64PebAddress != IntPtr.Zero)
+                    {
+                        pointerSize = 4;
+                        pebAddress = wow64PebAddress.ToInt64();
+                    }
+                }
+
+                var processParametersOffset = pointerSize == 8 ? 0x20 : 0x10;
+                var processParametersAddress = ReadPointer(
+                    processHandle,
+                    pebAddress + processParametersOffset,
+                    pointerSize);
+                if (processParametersAddress == 0) return string.Empty;
+
+                var currentDirectoryOffset = pointerSize == 8 ? 0x38 : 0x24;
+                var unicodeStringHeader = ReadBytes(
+                    processHandle,
+                    processParametersAddress + currentDirectoryOffset,
+                    4);
+                var byteLength = BitConverter.ToUInt16(unicodeStringHeader, 0);
+                if (byteLength == 0 || byteLength > 32768 || byteLength % 2 != 0)
+                {
+                    return string.Empty;
+                }
+
+                var bufferOffset = pointerSize == 8 ? 8 : 4;
+                var bufferAddress = ReadPointer(
+                    processHandle,
+                    processParametersAddress + currentDirectoryOffset + bufferOffset,
+                    pointerSize);
+                if (bufferAddress == 0) return string.Empty;
+
+                return Encoding.Unicode
+                    .GetString(ReadBytes(processHandle, bufferAddress, byteLength))
+                    .TrimEnd('\0');
+            }
+            finally
+            {
+                CloseHandle(processHandle);
+            }
+        }
+    }
+}
+'@
+}
 
 function Write-Info([string]$Message) {
     Write-Host "[Microi process manager] $Message"
@@ -45,6 +212,27 @@ function Get-CommandText($ProcessInfo) {
     return (($commandLine + ' ' + $executablePath).Replace('/', '\').ToLowerInvariant())
 }
 
+function Get-ProcessCurrentDirectory($ProcessInfo) {
+    if ($null -eq $ProcessInfo) { return '' }
+    $processId = [int]$ProcessInfo.ProcessId
+    if ($processCurrentDirectoryCache.ContainsKey($processId)) {
+        return [string]$processCurrentDirectoryCache[$processId]
+    }
+
+    $currentDirectory = ''
+    try {
+        $rawDirectory = [Microi.ProcessTools.NativeProcessInspector]::GetCurrentDirectory($processId)
+        if (-not [string]::IsNullOrWhiteSpace($rawDirectory)) {
+            $currentDirectory = ([System.IO.Path]::GetFullPath($rawDirectory)).TrimEnd('\', '/').Replace('/', '\').ToLowerInvariant()
+        }
+    }
+    catch {
+        # 权限不足、位数不兼容或进程瞬时退出时保持空值；身份判断必须继续失败关闭。
+    }
+    $processCurrentDirectoryCache[$processId] = $currentDirectory
+    return $currentDirectory
+}
+
 function Test-IsWorkspaceBackend($ProcessInfo) {
     $processName = ([string]$ProcessInfo.Name).ToLowerInvariant()
     if ($processName -ne 'dotnet.exe' -and $processName -ne 'microi.net.api.exe') { return $false }
@@ -60,7 +248,15 @@ function Test-IsWorkspaceFrontend($ProcessInfo) {
     $processName = ([string]$ProcessInfo.Name).ToLowerInvariant()
     if ($processName -ne 'node.exe') { return $false }
     $text = Get-CommandText $ProcessInfo
-    return $text.Contains($frontendRoot) -and ($text.Contains('vite') -or $text.Contains('npm-cli.js'))
+    $isVite = $text.Contains('node_modules\vite\bin\vite')
+    if (-not $isVite -and -not $text.Contains('npm-cli.js')) { return $false }
+    if ($text.Contains($frontendRoot)) { return $true }
+
+    # npm/终端父进程退出后，Vite 的相对入口不会再携带工作区绝对路径。
+    # 只有精确 Vite 入口且进程 CWD 等于本工作区 Microi.Client 时才接受；
+    # “父进程不存在”本身永远不是归属证据。
+    if (-not $isVite) { return $false }
+    return (Get-ProcessCurrentDirectory $ProcessInfo) -eq $frontendRoot
 }
 
 function Get-ListeningProcessIds([int]$Port) {
@@ -93,11 +289,18 @@ function Get-ProcessSummary($ProcessInfo, [hashtable]$Snapshot) {
     $parentId = [int]$ProcessInfo.ParentProcessId
     $parentMissing = $parentId -gt 0 -and -not $Snapshot.ContainsKey($parentId)
     $orphanLabel = if ($parentMissing) { '，父进程已不存在' } else { '' }
+    $currentDirectory = Get-ProcessCurrentDirectory $ProcessInfo
+    $directoryLabel = if ([string]::IsNullOrWhiteSpace($currentDirectory)) {
+        ''
+    }
+    else {
+        "，工作目录=$currentDirectory"
+    }
     $commandLine = ([string]$ProcessInfo.CommandLine).Trim()
     if ($commandLine.Length -gt 260) {
         $commandLine = $commandLine.Substring(0, 260) + '...'
     }
-    return "PID=$processId，进程=$($ProcessInfo.Name)，内存=$(Get-WorkingSetMb $processId)MB$orphanLabel，命令=$commandLine"
+    return "PID=$processId，进程=$($ProcessInfo.Name)，内存=$(Get-WorkingSetMb $processId)MB$orphanLabel$directoryLabel，命令=$commandLine"
 }
 
 function Assert-ListenerIdentity(

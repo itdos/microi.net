@@ -192,13 +192,6 @@ export default {
                 // 使用公共方法初始化字段属性
                 self.DiyCommon.EnsureFieldProperties(field);
             });
-            var dataSourceFields = selectTableDataSourceFields(
-                result.Data,
-                self.TableId,
-                self.SysMenuModel
-            );
-            self.DiyCommon.SetFieldsData(dataSourceFields, null, self.TableChildAuth);
-
             result.Data.forEach((field) => {
                 // self.DiyFieldStrToJson(field, formData, isPostSql);
 
@@ -284,6 +277,15 @@ export default {
             }
 
             self.DiyFieldList = result.Data;
+            // Vue 3 只有通过响应式代理修改字段，异步数据源回填才会触发表格和
+            // 列头搜索立即重绘。先赋值 DiyFieldList，再从代理列表发起加载，
+            // 避免首屏显示保存值（例如部门 Id），直到拖动列宽后才显示文字。
+            var dataSourceFields = selectTableDataSourceFields(
+                self.DiyFieldList,
+                self.TableId,
+                self.SysMenuModel
+            );
+            self.DiyCommon.SetFieldsData(dataSourceFields, null, self.TableChildAuth);
             // self.$emit("CallbackGetDiyField", self.DiyFieldList)
         },
         GetDiyTableModel() {

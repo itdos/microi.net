@@ -315,6 +315,7 @@ Pop-Location
 - 启动前先检查端口、健康接口、PID、命令行和工作区路径。健康且代码无需重载时直接复用；不得仅为声明“本对话拥有服务”而重启。
 - 长期本地后端必须通过项目目录里的 `dotnet run --launch-profile Microi.net.Api` 使用开发输出。禁止把 `bin/Release/net10.0` 或 `bin/Release/publish` 的 `dotnet Microi.net.Api.dll` 当长期 E2E 服务；运行中的 Release DLL 会让后续 `dotnet build` 报 `MSB3021/MSB3027` 文件锁。
 - 一键编译发布会创建 `.tmp/microi-process-state/release.lock`，并调用 `Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action PrepareRelease`。它只结束命令行和工作区均匹配的 `61501` 后端、`61500` Vite 以及额外 Release 后端，并验证 Release DLL 可独占打开；遇到身份不匹配的端口占用必须停止，不得按进程名全杀。
+- Vite 子进程可能由相对 `node_modules/vite/bin/vite.js` 启动，父 npm/终端退出后命令行不再包含工作区绝对路径。Windows 进程管理器应先匹配命令行绝对路径；无法匹配时只读回读进程 CWD，只有 CWD 精确等于当前工作区 `Microi.Client` 且入口确为 Vite 才可结束。CWD 无法读取、属于其它目录或仅仅“父进程不存在”时必须失败关闭。
 - 发布锁存在期间，所有 AI 自动启动、服务自愈和 Playwright `webServer` 都必须等待或退出，禁止重新抢占 `61500/61501`。发布正常结束或中断时由脚本释放锁；无法证明锁持有者已退出时不得自行删除锁。
 - Edge/Chrome 主浏览器、VS Code 持有的 Playwright Test Server、语言服务和 MCP Node 进程不属于发布文件锁清理范围。浏览器自动化必须关闭本用例创建的 context/browser；不得通过 `taskkill /IM chrome.exe|msedge.exe|node.exe|dotnet.exe` 清空整机进程。
 - 人工盘点使用：`powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status`。需要单独停止当前工作区服务时使用 `-Action StopBackend` 或 `-Action StopFrontend`，不再让用户根据任务管理器猜进程。

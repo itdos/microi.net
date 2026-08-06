@@ -4,8 +4,8 @@
     "name" : "宁波鸿地",
     "description" : "microi.net",
     "version" : {
-        "name" : "v7.0.7",
-        "code" : 707
+        "name" : "v7.0.8",
+        "code" : 708
     },
     "launch_path" : "index.html",
     "plus" : {

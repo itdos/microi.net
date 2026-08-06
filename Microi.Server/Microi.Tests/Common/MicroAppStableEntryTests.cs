@@ -124,18 +124,26 @@ public class MicroAppStableEntryTests
     }
 
     [Fact]
-    public void StableEntry_RewritesRelativeAssetsToVersionedCacheBustingUrls()
+    public void StableEntry_RewritesRelativeAssetsWithoutDroppingReverseProxyPathBase()
     {
         var html = "<link href=\"./assets/app.css\"><script src='./assets/app.js'></script>";
 
         var rewritten = Encoding.UTF8.GetString(Rewrite(html));
 
         Assert.Contains(
-            "/micro-app/iTdos/microi-platform-service/v1.0.3/assets/app.css?v=v1.0.3",
+            "./v1.0.3/assets/app.css?v=v1.0.3",
             rewritten);
         Assert.Contains(
-            "/micro-app/iTdos/microi-platform-service/v1.0.3/assets/app.js?v=v1.0.3",
+            "./v1.0.3/assets/app.js?v=v1.0.3",
             rewritten);
+        Assert.DoesNotContain("href=\"/micro-app/", rewritten);
+        Assert.DoesNotContain("src='/micro-app/", rewritten);
+
+        var stableEntry = new Uri("https://lowcode.example.com/v2/micro-app/iTdos/microi-platform-service/index.html");
+        var resolvedAsset = new Uri(stableEntry, "./v1.0.3/assets/app.js?v=v1.0.3");
+        Assert.Equal(
+            "/v2/micro-app/iTdos/microi-platform-service/v1.0.3/assets/app.js",
+            resolvedAsset.AbsolutePath);
     }
 
     [Fact]

@@ -5,6 +5,27 @@
 /* 禁用状态文字颜色优化 - 使用 CSS 变量以兼容深色模式 */
 .itdos-diy-form {
 
+    /*
+     * 只读字段需要保留清晰的视觉语义。上面的规则只提升禁用文字可读性，
+     * 这里补回禁用背景和边框，避免只读控件看起来与可编辑控件完全相同。
+     */
+    :deep(.el-form-item.is-field-readonly) {
+        .el-form-item__label {
+            color: var(--el-text-color-secondary) !important;
+        }
+
+        .el-input__wrapper,
+        .el-select__wrapper,
+        .el-textarea__inner,
+        .el-date-editor,
+        .el-cascader .el-input__wrapper,
+        .el-input-number .el-input__wrapper {
+            background-color: var(--el-disabled-bg-color, var(--el-fill-color-light)) !important;
+            box-shadow: 0 0 0 1px var(--el-disabled-border-color, var(--el-border-color-light)) inset !important;
+            cursor: not-allowed !important;
+        }
+    }
+
     /* Element Plus Input 禁用状态 */
     :deep(.el-input.is-disabled .el-input__inner),
     :deep(.el-input.is-disabled .el-input__wrapper) {

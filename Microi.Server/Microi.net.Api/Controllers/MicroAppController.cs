@@ -530,7 +530,12 @@ namespace Microi.net.Api
             }
 
             var html = Encoding.UTF8.GetString(bytes);
-            var assetBase = $"/micro-app/{Uri.EscapeDataString(osClient)}/{Uri.EscapeDataString(appKey)}/{Uri.EscapeDataString(version)}/";
+            // Keep rewritten assets relative to the stable entry. Deployments commonly
+            // expose the API below a reverse-proxy prefix such as /v2. A root-relative
+            // /micro-app URL silently drops that prefix and turns valid published assets
+            // into nginx 404 responses. From .../{appKey}/index.html, ./vX/... resolves
+            // correctly both at the domain root and below any forwarded path base.
+            var assetBase = $"./{Uri.EscapeDataString(version)}/";
             var cacheVersion = Uri.EscapeDataString(version ?? DefaultVersion);
             var rewritten = Regex.Replace(
                 html,
