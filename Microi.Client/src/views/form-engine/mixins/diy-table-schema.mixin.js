@@ -1,6 +1,7 @@
 import _u from "underscore";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { getVisiblePageTabs, resolveInitialPageTab } from "./page-tab-runtime.js";
+import { selectTableDataSourceFields } from "./table-field-data-source.js";
 
 export default {
     methods: {
@@ -143,8 +144,14 @@ export default {
                             loadedFieldIds.add(field.Id);
                         }
                     });
-                    // 触发数据源加载
-                    self.DiyCommon.SetFieldsData(result.Data, null, self.TableChildAuth);
+                    // 只初始化菜单实际引用的跨表搜索字段。缺失表的完整字段列表中
+                    // 可能包含与当前模块无关的历史 SQL 数据源，不能让它们拖垮整批请求。
+                    var searchDataSourceFields = selectTableDataSourceFields(
+                        result.Data,
+                        self.TableId,
+                        self.SysMenuModel
+                    );
+                    self.DiyCommon.SetFieldsData(searchDataSourceFields, null, self.TableChildAuth);
                 }
             } catch (e) {
                 console.warn('[DiyTable] 补充加载搜索字段失败:', e);
@@ -185,7 +192,12 @@ export default {
                 // 使用公共方法初始化字段属性
                 self.DiyCommon.EnsureFieldProperties(field);
             });
-            self.DiyCommon.SetFieldsData(result.Data, null, self.TableChildAuth);
+            var dataSourceFields = selectTableDataSourceFields(
+                result.Data,
+                self.TableId,
+                self.SysMenuModel
+            );
+            self.DiyCommon.SetFieldsData(dataSourceFields, null, self.TableChildAuth);
 
             result.Data.forEach((field) => {
                 // self.DiyFieldStrToJson(field, formData, isPostSql);

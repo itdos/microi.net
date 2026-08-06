@@ -92,6 +92,30 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 Token 只通过宿主上下文传递，不硬编码、不放 URL、不写日志。子应用回传成功/取消/
 错误事件，宿主负责提示、关闭和刷新。
 
+菜单型微服务通过 `window.microApp.getData().hostCapabilities` 发现主框架能力，禁止直接操作
+父页面 DOM、Pinia 或 Vue Router。能力协议固定为 `microi.host.v1`，请求使用：
+
+```js
+window.microApp.dispatch({
+  type: 'micro-app:host-action',
+  action: 'closeTab',
+  requestId: 'optional-id',
+  data: {}
+});
+```
+
+AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data)`，先检查
+`hostCapabilities.actions`，再 dispatch。当前标准动作是：`closeTab`、`navigate`、
+`replaceTab`、`back`、`forward`、`reloadTab`、`setTabTitle`、`showMessage`。
+`navigate/replaceTab` 只传以 `/` 开头的站内 path 或 `{name,params,query,hash}`；禁止传
+外部 URL、登录页、访问密钥页或内部 redirect。目标仍要存在于当前用户动态路由并经过路由守卫，
+宿主桥接不授予菜单或数据权限。业务保存成功后才能关闭/跳转，不能把尽力返回的
+`micro-app:host-action-result` 当作业务持久化确认。
+
+`closeTab` 与 TagsView 当前页签关闭语义一致，固定页签和最后一个页签拒绝关闭；顶部 Tab
+右键刷新与 `reloadTab` 都应重载当前微服务。`OpenAppDialog` 页面不使用 Tab 动作，继续发送
+`app-dialog:success/cancel/error` 关闭弹窗并回传结果。
+
 `sys_microiservice_page` 是友好路由的页面事实源，`sys_menu` 只负责导航和角色权限。
 无需出现在导航中的按钮页/详情页应在页面元数据设置 `InternalOnly=true`，不创建伪隐藏菜单。
 

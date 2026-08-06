@@ -1,8 +1,8 @@
 <template>
     <section class="mci-table-permission">
         <el-alert
-            title="高级直连权限仅用于没有菜单上下文的集成或工具。常规业务表请通过上方菜单权限授权；平台敏感表始终仅限 Level ≥ 9999。"
-            type="warning"
+            :title="policyAlertTitle"
+            :type="policyLoadFailed ? 'error' : 'warning'"
             :closable="false"
             show-icon
             class="mci-table-permission__alert"
@@ -16,6 +16,7 @@
                 reserve-keyword
                 :remote-method="searchTables"
                 :loading="searchLoading"
+                :disabled="!policyReady"
                 placeholder="输入表名或说明，添加直连授权"
                 style="width: 100%"
                 @change="addTable"
@@ -25,11 +26,16 @@
                     :key="item.Id"
                     :label="`${item.Description || item.Name} (${item.Name})`"
                     :value="item.Id"
-                    :disabled="isProtectedTable(item.Name)"
+                    :disabled="!isTableSelectable(item.Name)"
                 >
                     <span>{{ item.Description || item.Name }}（{{ item.Name }}）</span>
-                    <el-tag v-if="isProtectedTable(item.Name)" type="danger" size="small" class="mci-table-permission__protected">
-                        平台保护
+                    <el-tag
+                        v-if="tablePolicyLabel(item.Name)"
+                        :type="tablePolicyTagType(item.Name)"
+                        size="small"
+                        class="mci-table-permission__policy"
+                    >
+                        {{ tablePolicyLabel(item.Name) }}
                     </el-tag>
                 </el-option>
             </el-select>
@@ -39,21 +45,29 @@
                 <template #default="{ row }">
                     <div class="mci-table-permission__name">{{ row.Description || row.Name || row.Id }}</div>
                     <div class="mci-table-permission__key">{{ row.Name || row.Id }}</div>
+                    <el-tag
+                        v-if="tablePolicyLabel(row.Name)"
+                        :type="tablePolicyTagType(row.Name)"
+                        size="small"
+                        class="mci-table-permission__row-policy"
+                    >
+                        {{ tablePolicyLabel(row.Name) }}
+                    </el-tag>
                 </template>
             </el-table-column>
             <el-table-column label="允许操作" min-width="330">
                 <template #default="{ row }">
                     <el-checkbox-group v-model="row.Permission" @change="emitValue">
-                        <el-checkbox value="Read">查</el-checkbox>
-                        <el-checkbox value="Add">增</el-checkbox>
-                        <el-checkbox value="Edit">改</el-checkbox>
-                        <el-checkbox value="Del">删</el-checkbox>
+                        <el-checkbox value="Read" :disabled="!isPermissionAllowed(row.Name, 'Read')">查</el-checkbox>
+                        <el-checkbox value="Add" :disabled="!isPermissionAllowed(row.Name, 'Add')">增</el-checkbox>
+                        <el-checkbox value="Edit" :disabled="!isPermissionAllowed(row.Name, 'Edit')">改</el-checkbox>
+                        <el-checkbox value="Del" :disabled="!isPermissionAllowed(row.Name, 'Del')">删</el-checkbox>
                     </el-checkbox-group>
                 </template>
             </el-table-column>
             <el-table-column label="操作" width="90" align="center">
                 <template #default="{ $index }">
-                    <el-button type="danger" link @click="removeTable($index)">移除</el-button>
+                    <el-button type="danger" link :disabled="!policyReady" @click="removeTable($index)">移除</el-button>
                 </template>
             </el-table-column>
         </el-table>
@@ -61,65 +75,10 @@
 </template>
 
 <script>
-// Keep this explicit bootstrap list in sync with
-// Microi.Core/Security/PlatformResourceSecurity.cs. Do not load it from
-// diy_table: diy_table is itself a protected resource and must not become the
-// authority for deciding which platform tables are protected.
-const PROTECTED_TABLES = new Set([
-    "sys_osclients",
-    "sys_config",
-    "sys_apiengine",
-    "diy_table",
-    "diy_field",
-    "sys_menu",
-    "sys_role",
-    "sys_rolelimit",
-    "sys_user",
-    "sys_userfk",
-    "sys_onlineuser",
-    "sys_datasource",
-    "diy_schedule_job",
-    "diy_schedule_job_log",
-    "sys_mq",
-    "sys_mqtt",
-    "mic_page",
-    "mic_print",
-    "wf_flowdesign",
-    "wf_node",
-    "wf_line",
-    "microi_database",
-    "sys_microiservice",
-    "sys_microiservice_page",
-    "sys_microistore",
-    "sys_microistoreversion",
-    "sys_appinstalled",
-    "sys_business_blueprint",
-    "sys_blueprint_relation",
-    "sys_blueprint_history",
-    "sys_log",
-    "sys_servernode",
-    "mic_ai",
-    "mic_email_server",
-    "wx_mp",
-    "mic_micro_app",
-    "mic_micro_app_asset",
-    "mic_micro_app_version",
-    "mci_database_backup",
-    "mci_file_remote_connection",
-    "mci_redis_connection",
-    "mci_license_server",
-    "mci_security_access_log",
-    "mci_security_attack_event",
-    "mci_security_ip_block",
-    "mci_spider_account",
-    "mci_spider_profile",
-    "mci_spider_rule",
-    "mci_ai_app",
-    "mci_ai_app_file",
-    "mci_ai_app_version",
-    "mci_ai_data_domain",
-    "mci_ai_role_policy"
-]);
+const ALL_PERMISSIONS = ["Read", "Add", "Edit", "Del"];
+const ADMINISTRATOR_ONLY_MODE = "AdministratorOnly";
+const READ_ONLY_MODE = "ReadOnly";
+const ROLE_MANAGED_MODE = "RoleManaged";
 
 export default {
     name: "SysroleTablePermission",
@@ -136,8 +95,19 @@ export default {
             tableOptions: [],
             pendingTableId: "",
             searchLoading: false,
-            loadingVersion: 0
+            loadingVersion: 0,
+            policyByTableName: Object.create(null),
+            policyReady: false,
+            policyLoadFailed: false
         };
+    },
+    computed: {
+        policyAlertTitle() {
+            if (this.policyLoadFailed) {
+                return "未能读取服务端授权策略，已停止编辑以避免误授权。请刷新页面后重试。";
+            }
+            return "高级直连权限仅用于没有菜单上下文的集成或工具。打印/页面表按角色授权；运行元数据仅可授予查询；账号、密钥、脚本及基础设施表仍由平台保护。";
+        }
     },
     watch: {
         modelValue: {
@@ -147,6 +117,9 @@ export default {
                 this.loadRows(value || []);
             }
         }
+    },
+    mounted() {
+        this.loadGrantPolicies();
     },
     methods: {
         parsePermission(value) {
@@ -159,8 +132,97 @@ export default {
                 return ["Read"];
             }
         },
-        isProtectedTable(name) {
-            return PROTECTED_TABLES.has(String(name || "").toLowerCase());
+        normalizePolicy(raw) {
+            const tableName = raw && (raw.TableName || raw.tableName);
+            const mode = raw && (raw.Mode || raw.mode);
+            const allowed = raw && (raw.AllowedPermissions || raw.allowedPermissions);
+            if (!tableName || !mode) return null;
+            return {
+                TableName: String(tableName),
+                Mode: String(mode),
+                AllowedPermissions: Array.isArray(allowed)
+                    ? allowed.filter((item) => ALL_PERMISSIONS.includes(item))
+                    : []
+            };
+        },
+        async loadGrantPolicies() {
+            this.policyReady = false;
+            this.policyLoadFailed = false;
+            try {
+                const result = await this.DiyCommon.PostAsync(
+                    "/api/SysRole/GetDirectTableGrantPolicies",
+                    {},
+                    null,
+                    null,
+                    "json"
+                );
+                if (!result || result.Code !== 1 || !Array.isArray(result.Data)) {
+                    throw new Error((result && result.Msg) || "授权策略返回格式不正确");
+                }
+                const policyByTableName = Object.create(null);
+                result.Data.forEach((raw) => {
+                    const policy = this.normalizePolicy(raw);
+                    if (policy) {
+                        policyByTableName[policy.TableName.toLowerCase()] = policy;
+                    }
+                });
+                this.policyByTableName = policyByTableName;
+                this.policyReady = true;
+                this.rows = this.rows.map((row) => this.applyPolicyToRow(row));
+            } catch (error) {
+                this.policyByTableName = Object.create(null);
+                this.policyLoadFailed = true;
+                this.tableOptions = [];
+                console.error("Microi：加载数据表直连授权策略失败", error);
+            }
+        },
+        getTablePolicy(name) {
+            if (!this.policyReady || !name) {
+                return {
+                    Mode: "Unavailable",
+                    AllowedPermissions: [],
+                    IsPlatformTable: false
+                };
+            }
+            const platformPolicy = this.policyByTableName[String(name).toLowerCase()];
+            if (platformPolicy) {
+                return { ...platformPolicy, IsPlatformTable: true };
+            }
+            return {
+                Mode: ROLE_MANAGED_MODE,
+                AllowedPermissions: ALL_PERMISSIONS,
+                IsPlatformTable: false
+            };
+        },
+        applyPolicyToRow(row) {
+            const policy = this.getTablePolicy(row.Name);
+            return {
+                ...row,
+                Permission: (row.Permission || []).filter((permission) =>
+                    policy.AllowedPermissions.includes(permission)
+                )
+            };
+        },
+        isTableSelectable(name) {
+            return this.policyReady
+                && this.getTablePolicy(name).Mode !== ADMINISTRATOR_ONLY_MODE;
+        },
+        isPermissionAllowed(name, permission) {
+            return this.policyReady
+                && this.getTablePolicy(name).AllowedPermissions.includes(permission);
+        },
+        tablePolicyLabel(name) {
+            const policy = this.getTablePolicy(name);
+            if (!policy.IsPlatformTable) return "";
+            if (policy.Mode === ADMINISTRATOR_ONLY_MODE) return "平台保护";
+            if (policy.Mode === READ_ONLY_MODE) return "仅可授权查询";
+            return "按角色授权";
+        },
+        tablePolicyTagType(name) {
+            const mode = this.getTablePolicy(name).Mode;
+            if (mode === ADMINISTRATOR_ONLY_MODE) return "danger";
+            if (mode === READ_ONLY_MODE) return "warning";
+            return "success";
         },
         async loadRows(limits) {
             const version = ++this.loadingVersion;
@@ -172,7 +234,9 @@ export default {
                     Description: item.Description || "",
                     Permission: this.parsePermission(item.Permission)
                 }));
-            this.rows = normalized;
+            this.rows = this.policyReady
+                ? normalized.map((item) => this.applyPolicyToRow(item))
+                : normalized;
             const ids = normalized.map((item) => item.Id);
             if (!ids.length) return;
             const result = await this.DiyCommon.FormEngine.GetTableData("diy_table", {
@@ -182,13 +246,15 @@ export default {
             });
             if (version !== this.loadingVersion || !result || result.Code !== 1) return;
             const byId = new Map((result.Data || []).map((item) => [item.Id, item]));
-            this.rows = normalized
-                .map((item) => ({ ...item, ...(byId.get(item.Id) || {}) }))
-                .filter((item) => !this.isProtectedTable(item.Name));
+            const hydrated = normalized
+                .map((item) => ({ ...item, ...(byId.get(item.Id) || {}) }));
+            this.rows = this.policyReady
+                ? hydrated.map((item) => this.applyPolicyToRow(item))
+                : hydrated;
         },
         async searchTables(keyword) {
             const text = String(keyword || "").trim();
-            if (!text) {
+            if (!this.policyReady || !text) {
                 this.tableOptions = [];
                 return;
             }
@@ -216,7 +282,7 @@ export default {
                 return;
             }
             const table = this.tableOptions.find((item) => item.Id === tableId);
-            if (!table || this.isProtectedTable(table.Name)) {
+            if (!table || !this.isTableSelectable(table.Name)) {
                 this.pendingTableId = "";
                 return;
             }
@@ -234,11 +300,16 @@ export default {
             this.emitValue();
         },
         emitValue() {
+            if (!this.policyReady) return;
             this.$emit(
                 "update:modelValue",
                 this.rows.map((row) => ({
                     Id: row.Id,
-                    Permission: JSON.stringify(row.Permission || [])
+                    Permission: JSON.stringify(
+                        (row.Permission || []).filter((permission) =>
+                            this.isPermissionAllowed(row.Name, permission)
+                        )
+                    )
                 }))
             );
         }
@@ -271,8 +342,12 @@ export default {
     font-size: 12px;
 }
 
-.mci-table-permission__protected {
+.mci-table-permission__policy {
     float: right;
     margin-left: var(--mci-space-2, 8px);
+}
+
+.mci-table-permission__row-policy {
+    margin-top: var(--mci-space-1, 4px);
 }
 </style>
