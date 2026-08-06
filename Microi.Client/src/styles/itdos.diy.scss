@@ -812,6 +812,8 @@ p {
         border-radius: 8px;
         margin-left: 8px;
         margin-right: 8px;
+        max-width: 100%;
+        object-fit: contain;
     }
     .navbar-microi {
         // height: 46px;

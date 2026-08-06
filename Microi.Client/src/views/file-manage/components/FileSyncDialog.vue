@@ -1608,7 +1608,7 @@ const addResult = (row, targetPath, status, message) => {
   })
 }
 
-const updateProgress = async (sourcePlatform, status = 'Running') => {
+const updateProgress = async (status = 'Running') => {
   const finished = task.successCount + task.failCount
   task.progress = task.totalCount ? Math.min(100, Math.round((finished / task.totalCount) * 100)) : 0
   task.statusText = status === 'Running' ? '同步中...' : status === 'Finished' ? '同步完成' : '同步失败'
@@ -1635,13 +1635,12 @@ const updateProgress = async (sourcePlatform, status = 'Running') => {
       EndTime: new Date().toISOString()
     }))
   }
-  try {
-    await fileSyncApi.runApiEngine('mci_file_sync_record', payload, sourcePlatform)
-    recordedResultCount = results.value.length
-  } catch (error) {
-    await fileSyncApi.runApiEngine('mci_file_sync_record', payload)
-    recordedResultCount = results.value.length
+  // 同步记录页始终读取当前租户，任务进度也必须写回同一平台。
+  const result = await fileManageApi.recordSyncTask(payload)
+  if (result?.Code !== 1) {
+    throw new Error(result?.Msg || '更新同步任务记录失败')
   }
+  recordedResultCount = results.value.length
 }
 
 const createTaskRecord = async (sourcePlatform, targetPlatform, selectedRows) => {
@@ -1669,13 +1668,12 @@ const createTaskRecord = async (sourcePlatform, targetPlatform, selectedRows) =>
       FileType: row.type
     }))
   }
-  try {
-    const result = await fileSyncApi.runApiEngine('mci_file_sync_record', payload, sourcePlatform)
-    if (result.Code === 1) return result.Data || {}
-  } catch (error) {}
-
-  const fallback = await fileSyncApi.runApiEngine('mci_file_sync_record', payload)
-  return fallback.Code === 1 ? (fallback.Data || {}) : {}
+  // 源平台仅提供文件，任务归属执行同步并展示记录的当前平台。
+  const result = await fileManageApi.recordSyncTask(payload)
+  if (result?.Code !== 1) {
+    throw new Error(result?.Msg || '创建同步任务记录失败')
+  }
+  return result.Data || {}
 }
 
 const syncFile = async (row, sourcePlatform, targetPlatform, targetFolder) => {
@@ -1762,7 +1760,7 @@ const syncFolder = async (row, sourcePlatform, targetPlatform, targetFolder) => 
 
   for (const child of row.children || []) {
     await syncEntry(child, sourcePlatform, targetPlatform, targetPath)
-    await updateProgress(sourcePlatform)
+    await updateProgress()
   }
 }
 
@@ -1812,10 +1810,10 @@ const startSync = async () => {
 
     for (const row of selectedRows) {
       await syncEntry(row, sourcePlatform, targetPlatform, selectedTargetPath.value)
-      await updateProgress(sourcePlatform)
+      await updateProgress()
     }
 
-    await updateProgress(sourcePlatform, task.failCount > 0 ? 'Failed' : 'Finished')
+    await updateProgress(task.failCount > 0 ? 'Failed' : 'Finished')
     ElMessage.success(task.failCount > 0 ? '同步完成，部分失败' : '同步完成')
     emit('finished')
     loadSyncLogs()
@@ -1871,6 +1869,7 @@ const formatFileSize = (bytes) => {
 const resultLabel = (status) => {
   if (status === 'Success') return '成功'
   if (status === 'Ignored') return '忽略'
+  if (status === 'Pending') return '待同步'
   return '失败'
 }
 
@@ -1878,6 +1877,7 @@ const statusTagType = (status) => {
   if (status === 'Finished' || status === 'Success') return 'success'
   if (status === 'Running') return 'primary'
   if (status === 'Ignored') return 'info'
+  if (status === 'Pending') return 'warning'
   return 'danger'
 }
 
