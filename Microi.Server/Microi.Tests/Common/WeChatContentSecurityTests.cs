@@ -1,12 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microi.net;
 using Microi.net.Api;
+using Microsoft.AspNetCore.Http;
 using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
-// zhy：覆盖微信内容安全签名、回调解密、租户密钥隔离及前后端失败关闭链路。
+// 覆盖微信内容安全签名、回调解密、租户密钥隔离及前后端失败关闭链路。
 public sealed class WeChatContentSecurityTests
 {
     [Fact]
@@ -37,20 +40,67 @@ public sealed class WeChatContentSecurityTests
     }
 
     [Fact]
-    public void WeChatConfigurationTab_IsIdempotentAndContainsRequiredFields()
+    public void MiniProgramDetection_RejectsUntrustedJwtPayload()
     {
-        var first = Upgrade32.ReconcileTabs("[]", out var firstChanged);
-        var second = Upgrade32.ReconcileTabs(first, out var secondChanged);
+        var context = new DefaultHttpContext();
+        var forged = new JwtSecurityToken(claims: new[] { new Claim("ClientType", "WxMiniProgram") });
+        context.Request.Headers.Authorization = "Bearer " + new JwtSecurityTokenHandler().WriteToken(forged);
 
-        Assert.True(firstChanged);
-        Assert.False(secondChanged);
-        var tab = Assert.Single(JArray.Parse(second).OfType<JObject>());
-        Assert.Equal(Upgrade32.TabId, tab.Value<string>("Id"));
-        Assert.Equal(Upgrade32.TabName, tab.Value<string>("Name"));
-        Assert.Equal(4, Upgrade32.FieldNames.Count);
-        Assert.Contains("WeChatMiniProgramAppSecret", Upgrade32.FieldNames);
-        Assert.Contains("WeChatMiniProgramMessageToken", Upgrade32.FieldNames);
-        Assert.Contains("WeChatMiniProgramEncodingAESKey", Upgrade32.FieldNames);
+        Assert.False(WeChatContentSecurityService.IsWeChatMiniProgramRequest(context));
+    }
+
+    [Theory]
+    [InlineData("xjy", "", "xjy")]
+    [InlineData("", "xjy", "xjy")]
+    [InlineData("xjy", "XJY", "xjy")]
+    public void CallbackTenant_SupportsSuffixAndOsClientQuery(
+        string routeOsClient,
+        string queryOsClient,
+        string expected)
+    {
+        Assert.True(WeChatContentSecurityService.TryResolveCallbackTenant(
+            routeOsClient,
+            queryOsClient,
+            out var actual));
+        Assert.Equal(expected, actual, ignoreCase: true);
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("xjy", "other")]
+    [InlineData("../xjy", "")]
+    public void CallbackTenant_RejectsMissingConflictingOrInvalidValues(
+        string routeOsClient,
+        string queryOsClient)
+    {
+        Assert.False(WeChatContentSecurityService.TryResolveCallbackTenant(
+            routeOsClient,
+            queryOsClient,
+            out _));
+    }
+
+    [Fact]
+    public void MiniProgramDetection_UsesExactActiveRedisSessionEntry()
+    {
+        const string token = "active-mini-program-token";
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Authorization = "Bearer " + token;
+        var currentToken = new CurrentToken
+        {
+            Token = token,
+            AuthVersion = DiyToken.CurrentAuthVersion,
+            Tokens = new List<TokensModel>
+            {
+                new()
+                {
+                    Token = token,
+                    AuthVersion = DiyToken.CurrentAuthVersion,
+                    ClientType = "WxMiniProgram"
+                }
+            }
+        };
+
+        Assert.True(WeChatContentSecurityService.IsWeChatMiniProgramRequest(context, currentToken));
     }
 
     [Fact]
@@ -61,7 +111,7 @@ public sealed class WeChatContentSecurityTests
             ["WeChatMiniProgramAppId"] = "wx-public-id",
             ["WeChatMiniProgramAppSecret"] = "secret-value",
             ["WeChatMiniProgramMessageToken"] = "token-value",
-            ["WeChatMiniProgramEncodingAESKey"] = "aes-value"
+            ["WeChatMiniProgramAESKey"] = "aes-value"
         };
 
         var projection = TenantConfigurationSecurity.CreateV8Projection(source);
@@ -69,11 +119,11 @@ public sealed class WeChatContentSecurityTests
         Assert.Equal("wx-public-id", projection.Value<string>("WeChatMiniProgramAppId"));
         Assert.Null(projection["WeChatMiniProgramAppSecret"]);
         Assert.Null(projection["WeChatMiniProgramMessageToken"]);
-        Assert.Null(projection["WeChatMiniProgramEncodingAESKey"]);
+        Assert.Null(projection["WeChatMiniProgramAESKey"]);
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("WeChatMiniProgramAppSecret"));
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("WeChatMiniProgramMessageToken"));
-        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("WeChatMiniProgramEncodingAESKey"));
-        Assert.True(UserBehaviorAudit.IsSensitiveField("WeChatMiniProgramEncodingAESKey"));
+        Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("WeChatMiniProgramAESKey"));
+        Assert.True(UserBehaviorAudit.IsSensitiveField("WeChatMiniProgramAESKey"));
     }
 
     [Fact]
@@ -93,6 +143,23 @@ public sealed class WeChatContentSecurityTests
         Assert.Contains("ContentSecurityReviewId", sdk, StringComparison.Ordinal);
         Assert.Contains("waitForContentSecurity", sdk, StringComparison.Ordinal);
         Assert.Contains(WeChatContentSecurityService.UnsafeContentMessage, sdk, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CallbackSource_DelegatesBusinessLogicToManagedApiEngine()
+    {
+        var root = FindRepositoryRoot();
+        var controller = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Controllers", "WeChatContentSecurityController.cs"));
+        var service = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Services", "WeChatContentSecurityService.cs"));
+
+        Assert.Contains("Callback--OsClient--{routeOsClient}--", controller, StringComparison.Ordinal);
+        Assert.Contains("FromQuery(Name = \"OsClient\")", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("?o=", controller, StringComparison.Ordinal);
+        Assert.Contains(WeChatContentSecurityService.CallbackCoreApiEngineKey, service, StringComparison.Ordinal);
+        Assert.Contains("MicroiEngine.ApiEngine.RunAsync", service, StringComparison.Ordinal);
+        Assert.DoesNotContain("CallbackLock", service, StringComparison.Ordinal);
     }
 
     private static string Signature(params string[] values)

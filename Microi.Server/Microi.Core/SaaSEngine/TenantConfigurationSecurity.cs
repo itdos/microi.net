@@ -78,8 +78,9 @@ namespace Microi.net
                 // 历史标准库字段中这两个名称不含 Secret/Password/AccessKey，
                 // 但仍是主租户第三方服务凭据，绝不能复制给子租户。
                 "TranslateKey", "AlidnsKeyId",
-                // zhy：小程序 AppSecret、消息 Token 和 AESKey 均由各租户独立维护，禁止从主租户复制。
+                // 小程序 AppSecret、消息 Token 和 AESKey 均由各租户独立维护，禁止从主租户复制。
                 "WeChatMiniProgramAppSecret", "WeChatMiniProgramMessageToken",
+                "WeChatMiniProgramAESKey",
                 "WeChatMiniProgramEncodingAESKey"
             };
 
@@ -89,8 +90,9 @@ namespace Microi.net
                 "AuthSecret", "AuthSecretRotateVersion", "ClientSecrets",
                 "DbConn", "DbReadConn", "DbMongoConnection",
                 "FileCabinetSecret",
-                // zhy：微信内容安全私密配置禁止注入 V8.OsClientModel 或返回前端。
+                // 微信内容安全私密配置禁止注入 V8.OsClientModel 或返回前端。
                 "WeChatMiniProgramAppSecret", "WeChatMiniProgramMessageToken",
+                "WeChatMiniProgramAESKey",
                 "WeChatMiniProgramEncodingAESKey"
             };
 

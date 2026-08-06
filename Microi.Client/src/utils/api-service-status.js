@@ -13,10 +13,13 @@ export const apiServiceState = reactive({
     active: false,
     checking: false,
     mode: "connection",
+    clientOrigin: "",
     apiBase: "",
     osClient: "",
     requestUrl: "",
+    requestOrigin: "",
     requestPath: "",
+    requestMethod: "",
     reason: "",
     errorCode: "",
     statusCode: 0,
@@ -48,16 +51,55 @@ function trimSlash(value) {
 }
 
 function getRequestUrl(context = {}) {
-    return String(context.url || context.requestUrl || "").trim();
+    return String(context.requestUrl || context.responseUrl || context.url || "").trim();
 }
 
-function getRequestPath(requestUrl, apiBase) {
+const SENSITIVE_QUERY_KEY = /^(?:authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|token|access[_-]?key|api[_-]?key|secret|client[_-]?secret|password|passwd|pwd|signature|sign|code)$/i;
+
+function sanitizeRequestUrl(requestUrl, apiBase) {
     try {
         const resolved = new URL(requestUrl, apiBase || window.location.origin);
+        resolved.username = "";
+        resolved.password = "";
+        resolved.hash = "";
+        for (const key of Array.from(resolved.searchParams.keys())) {
+            if (!SENSITIVE_QUERY_KEY.test(key)) continue;
+            resolved.searchParams.set(key, "REDACTED");
+        }
+        return resolved.toString();
+    } catch (error) {
+        return String(requestUrl || "/").replace(
+            /([?&](?:authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|token|access[_-]?key|api[_-]?key|secret|client[_-]?secret|password|passwd|pwd|signature|sign|code)=)[^&#]*/gi,
+            "$1REDACTED"
+        );
+    }
+}
+
+function getRequestPath(requestUrl) {
+    try {
+        const resolved = new URL(requestUrl);
         return `${resolved.pathname}${resolved.search || ""}`;
     } catch (error) {
         return requestUrl || "/";
     }
+}
+
+function getRequestOrigin(requestUrl) {
+    try {
+        return new URL(requestUrl).origin;
+    } catch (error) {
+        return "";
+    }
+}
+
+function updateRequestContext(context, apiBase) {
+    const requestUrl = sanitizeRequestUrl(getRequestUrl(context), apiBase);
+    apiServiceState.clientOrigin = trimSlash(window.location.origin);
+    apiServiceState.requestUrl = requestUrl;
+    apiServiceState.requestOrigin = getRequestOrigin(requestUrl);
+    apiServiceState.requestPath = getRequestPath(requestUrl);
+    apiServiceState.requestMethod = String(context.method || "").trim().toUpperCase() || "未识别";
+    return requestUrl;
 }
 
 function isPlatformRequest(requestUrl, apiBase) {
@@ -129,14 +171,12 @@ function scheduleSecurityExpiryCheck(expiresAtUtc) {
 function activateSecurityBlock(info, context = {}) {
     resetOutageEvidence({ hide: false });
     const apiBase = trimSlash(context.apiBase) || trimSlash(window.location.origin);
-    const requestUrl = getRequestUrl(context);
     apiServiceState.active = true;
     apiServiceState.checking = false;
     apiServiceState.mode = "security";
     apiServiceState.apiBase = apiBase;
     apiServiceState.osClient = String(context.osClient || "").trim() || apiServiceState.osClient || "未识别";
-    apiServiceState.requestUrl = requestUrl;
-    apiServiceState.requestPath = getRequestPath(requestUrl, apiBase);
+    updateRequestContext(context, apiBase);
     apiServiceState.message = info.message;
     apiServiceState.ip = info.ip;
     apiServiceState.reason = info.reason;
@@ -159,8 +199,7 @@ function activateSecurityBlock(info, context = {}) {
 function updateDiagnostic(error, context, apiBase, requestUrl, statusCode) {
     apiServiceState.apiBase = apiBase || trimSlash(window.location.origin);
     apiServiceState.osClient = String(context.osClient || "").trim() || "未识别";
-    apiServiceState.requestUrl = requestUrl;
-    apiServiceState.requestPath = getRequestPath(requestUrl, apiServiceState.apiBase);
+    updateRequestContext(Object.assign({}, context, { requestUrl }), apiServiceState.apiBase);
     apiServiceState.reason = resolveReason(error);
     apiServiceState.errorCode = String(error?.code || "");
     apiServiceState.statusCode = statusCode;
@@ -264,12 +303,17 @@ async function runHealthCheck(version) {
 export function reportApiServiceFailure(error, context = {}) {
     if (typeof window === "undefined" || !error || isCanceledRequest(error)) return false;
 
-    const securityInfo = readSecurityBlockedResult(error?.response?.data);
-    if (securityInfo) return activateSecurityBlock(securityInfo, context);
-    if (apiServiceState.active && apiServiceState.mode === "security") return true;
-
     const apiBase = trimSlash(context.apiBase);
     const requestUrl = getRequestUrl(context);
+    const securityInfo = readSecurityBlockedResult(error?.response?.data);
+    // 官网应用商城等绝对外部依赖即使被拦截，也不能升级成当前客户系统的全屏故障。
+    if (securityInfo) {
+        return isPlatformRequest(requestUrl, apiBase)
+            ? activateSecurityBlock(securityInfo, context)
+            : false;
+    }
+    if (apiServiceState.active && apiServiceState.mode === "security") return true;
+
     const statusCode = Number(error?.response?.status || 0);
     const isConnectionFailure = !error.response
         || NETWORK_STATUS_CODES.indexOf(statusCode) > -1
@@ -295,7 +339,12 @@ export function reportApiServiceFailure(error, context = {}) {
 export function reportApiServiceResponse(responseData, context = {}) {
     if (typeof window === "undefined") return false;
     const securityInfo = readSecurityBlockedResult(responseData);
-    return securityInfo ? activateSecurityBlock(securityInfo, context) : false;
+    if (!securityInfo) return false;
+    const apiBase = trimSlash(context.apiBase);
+    const requestUrl = getRequestUrl(context);
+    return isPlatformRequest(requestUrl, apiBase)
+        ? activateSecurityBlock(securityInfo, context)
+        : false;
 }
 
 export function reportApiServiceRecovered(context = {}) {
@@ -312,12 +361,16 @@ export function reportApiServiceRecovered(context = {}) {
 export async function checkApiServiceNow() {
     if (typeof window === "undefined") return false;
     apiServiceState.checking = true;
-    const probeResult = await probeApiService(apiServiceState.apiBase);
+    const probeBase = apiServiceState.mode === "security"
+        ? (apiServiceState.requestOrigin || apiServiceState.apiBase)
+        : apiServiceState.apiBase;
+    const probeResult = await probeApiService(probeBase);
     if (probeResult.securityInfo) {
         activateSecurityBlock(probeResult.securityInfo, {
             apiBase: apiServiceState.apiBase,
             osClient: apiServiceState.osClient,
-            url: HEALTH_CHECK_PATH
+            url: `${trimSlash(probeBase)}${HEALTH_CHECK_PATH}`,
+            method: "GET"
         });
         return false;
     }
@@ -332,13 +385,20 @@ export async function checkApiServiceNow() {
 export function getApiServiceDiagnostic() {
     return [
         apiServiceState.mode === "security" ? "Microi 安全防护拦截诊断" : "Microi 后端 API 服务诊断",
-        `ApiBase: ${apiServiceState.apiBase || "-"}`,
+        `当前站点: ${apiServiceState.clientOrigin || "-"}`,
+        `当前租户 ApiBase: ${apiServiceState.apiBase || "-"}`,
         `OsClient: ${apiServiceState.osClient || "-"}`,
-        `请求地址: ${apiServiceState.requestPath || "-"}`,
+        `请求方法: ${apiServiceState.requestMethod || "-"}`,
+        `实际请求目标: ${apiServiceState.requestUrl || "-"}`,
         `故障原因: ${apiServiceState.reason || "-"}`,
         `拦截IP: ${apiServiceState.ip || "-"}`,
+        `原因标识: ${apiServiceState.reasonKey || "-"}`,
+        `安全范围: ${apiServiceState.securityScope || "-"}`,
         `安全状态源: ${apiServiceState.stateBackend || "-"}`,
+        `拦截开始时间(UTC): ${apiServiceState.blockedAtUtc || "-"}`,
         `自动解除时间(UTC): ${apiServiceState.expiresAtUtc || "-"}`,
+        `剩余等待秒数: ${apiServiceState.retryAfterSeconds || "-"}`,
+        `自动解除: ${apiServiceState.autoUnblock ? "是" : "否"}`,
         `解除说明: ${apiServiceState.unblockAdvice || "-"}`,
         `HTTP 状态: ${apiServiceState.statusCode || "-"}`,
         `错误代码: ${apiServiceState.errorCode || "-"}`,

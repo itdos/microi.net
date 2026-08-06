@@ -1060,38 +1060,6 @@ namespace Microi.net
             }
             #endregion
 
-            #region 升级32 --2026-08-05【必须】
-            // zhy：按版本执行微信小程序内容安全 SaaS 配置升级，并仅在成功后推进服务端版本。
-            if (!migrationFailed && NeedUpgrade(CurrentVersion, Upgrade32.Version))
-            {
-                try
-                {
-                    var msgs = await new Upgrade32().Run(osClientSecret.OsClient).ConfigureAwait(false);
-                    if (msgs.Count > 0)
-                    {
-                        migrationFailed = true;
-                        migrationErrors.AddRange(msgs);
-                        foreach (var msg in msgs)
-                        {
-                            Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级32 - 2026-08-05】失败：{msg}");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Microi：【成功】平台自动升级【{osClientSecret.OsClient}】【升级32 - 2026-08-05】成功！");
-                        needUptServerVersion = true;
-                        AdvanceSuccessfulVersion(ref uptVersion, Upgrade32.Version);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    migrationFailed = true;
-                    migrationErrors.Add("升级32失败：" + ex.Message);
-                    Console.WriteLine($"Microi：【Error异常】平台自动升级【{osClientSecret.OsClient}】【升级32 - 2026-08-05】失败：{ex.Message}");
-                }
-            }
-            #endregion
-
             #region 保持新旧接口引擎字段元数据兼容【必须】
             try
             {

@@ -118,6 +118,14 @@
         display: none !important;
     }
 
+    // Button 字段本身使用字段 Label 作为按钮文字。顶部 Label 布局中仍需保留
+    // 与相邻字段一致的标题行高度，否则按钮会顶到标题位置而无法与输入控件对齐。
+    .el-form--label-top .is-button-field:not(.hide-label) :deep(.el-form-item__label) {
+        display: block !important;
+        min-height: 28px;
+        visibility: hidden;
+    }
+
     // .field_Text
     // ,.field_NumberText
     // ,.field_DateTime

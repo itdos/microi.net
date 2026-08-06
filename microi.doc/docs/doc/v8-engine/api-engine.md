@@ -19,6 +19,30 @@
 
 ![在这里插入图片描述](https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg)
 
+## 默认实现边界：业务逻辑优先接口引擎
+
+新增后端能力时，先判断表单引擎 CRUD/后端事件是否可以完成，其次使用接口引擎。只有接口引擎缺少通用底层原子能力时，才扩展 `V8.Method` 等 V8 函数；只有第三方协议验签、不可暴露密钥、可信鉴权、原始流/网络边界或运行时内核不能由 V8 安全表达时，才进入 C#。
+
+第三方回调推荐使用“协议网关 + 官方核心接口 + 租户扩展 Hook”三层结构：
+
+1. C# 协议网关只验签、解密、校验 AppId/租户并输出脱敏事件，不写业务表、不编排通知。
+2. 官方核心接口引擎负责幂等、状态、基础日志，并由应用商城以 `Managed` 资源交付。
+3. 租户 Hook 由应用商城首次创建，策略为 `CreateIfMissing`；之后客户可在线修改，应用更新永不覆盖。
+
+以微信小程序内容安全回调为例，微信后台推荐填写：
+
+```text
+https://你的API域名/api/WeChatContentSecurity/Callback--OsClient--你的OsClient--
+```
+
+普通 HTTP 调试也支持：
+
+```text
+https://你的API域名/api/WeChatContentSecurity/Callback?OsClient=你的OsClient
+```
+
+不使用 `?o=`。路径和查询参数同时出现时必须指向同一租户，否则服务端拒绝请求。Token 与 `EncodingAESKey` 保存在 SaaS 引擎当前租户的微信配置中，只由 C# 协议层读取，不进入 V8、日志或接口响应。业务扩展修改 `mci-wechat-content-callback-extension`，无需重新编译发布后端；涉及积分、库存、外部通知等副作用时必须以 `EventId` 建唯一约束或先写 outbox。
+
 ```js
 //获取一个数据列表
 var result = V8.FormEngine.GetTableData('tableName', {
