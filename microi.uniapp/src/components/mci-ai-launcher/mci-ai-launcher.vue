@@ -129,6 +129,7 @@ export default {
     }
   },
   mounted() {
+    this.routeSyncTimers = []
     this.activate()
     this.resizeHandler = () => this.refreshSafeArea()
     try {
@@ -142,6 +143,7 @@ export default {
     this.releaseH5Dock()
   },
   beforeUnmount() {
+    this.clearRouteSyncTimers()
     this.releaseH5Dock()
     try {
       if (this.resizeHandler && typeof uni.offWindowResize === 'function') {
@@ -152,6 +154,7 @@ export default {
   methods: {
     activate() {
       this.syncActiveRoute()
+      this.scheduleActiveRouteSync()
       this.refreshSafeArea()
       if (this.isH5Dock) this.activateH5Dock()
       else if (runtimeTarget === 'h5') this.releaseH5Dock()
@@ -181,6 +184,16 @@ export default {
     syncActiveRoute() {
       const route = this.currentRoute()
       this.activeIndex = this.tabItems.findIndex((item) => item.pagePath === route)
+    },
+    clearRouteSyncTimers() {
+      ;(this.routeSyncTimers || []).forEach((timer) => clearTimeout(timer))
+      this.routeSyncTimers = []
+    },
+    scheduleActiveRouteSync() {
+      this.clearRouteSyncTimers()
+      ;[0, 32, 120].forEach((delay) => {
+        this.routeSyncTimers.push(setTimeout(() => this.syncActiveRoute(), delay))
+      })
     },
     activateH5Dock() {
       try {
@@ -225,14 +238,15 @@ export default {
         const page = pages && pages.length ? pages[pages.length - 1] : null
         const tabBar = page && typeof page.getTabBar === 'function' ? page.getTabBar() : null
         if (!tabBar || typeof tabBar.setData !== 'function') return
-        tabBar.setData({
+        const state = {
           list: this.tabItems,
-          selected: this.activeIndex,
           color: activeTabBar.color,
           selectedColor: activeTabBar.selectedColor,
           backgroundColor: activeTabBar.backgroundColor,
           aiAssistantEnabled: this.aiAssistantEnabled
-        })
+        }
+        if (typeof tabBar.applyExternalState === 'function') tabBar.applyExternalState(state)
+        else tabBar.setData(state)
       } catch (error) {}
     },
     launcherStorageKey() {
@@ -384,18 +398,18 @@ export default {
     },
     switchTab(item, index) {
       if (this.switching || index === this.activeIndex) return
-      const previous = this.activeIndex
       this.switching = true
-      this.activeIndex = index
       uni.switchTab({
         url: `/${item.pagePath}`,
+        success: () => this.scheduleActiveRouteSync(),
         fail: (error) => {
-          this.activeIndex = previous
+          this.syncActiveRoute()
           console.error('[MciBottomDock] switchTab failed:', error)
           uni.showToast({ title: '页面切换失败，请重试', icon: 'none' })
         },
         complete: () => {
-          setTimeout(() => { this.switching = false }, 280)
+          this.switching = false
+          this.scheduleActiveRouteSync()
         }
       })
     },

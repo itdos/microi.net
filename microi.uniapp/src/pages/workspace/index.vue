@@ -107,6 +107,7 @@
           <text class="promise-title">{{ appConfig.promiseTitle }}</text>
           <text class="promise-text">{{ appConfig.promiseText }}</text>
         </view>
+        <view class="mci-tabbar-spacer" aria-hidden="true" />
       </view>
     </scroll-view>
     <mci-ai-launcher />
@@ -533,7 +534,7 @@ export default {
 }
 
 .home-content {
-  padding: 28rpx 24rpx calc(44rpx + var(--mci-safe-bottom));
+  padding: 28rpx 24rpx 24rpx;
 }
 
 .section-heading,

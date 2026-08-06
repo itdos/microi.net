@@ -71,6 +71,7 @@
           <text>{{ appConfig.platformName }} v{{ appConfig.versionName }}</text>
           <text>Power by {{ appConfig.poweredBy }}</text>
         </view>
+        <view class="mci-tabbar-spacer" aria-hidden="true" />
       </view>
     </scroll-view>
 
@@ -272,7 +273,7 @@ export default {
 .user-org { margin-top: 9rpx; overflow: hidden; color: rgba(255, 255, 255, 0.76); font-size: 22rpx; text-overflow: ellipsis; white-space: nowrap; }
 .user-arrow { color: rgba(255, 255, 255, 0.7); font-size: 40rpx; text-align: right; }
 .profile-scroll { height: calc(100vh - 306rpx - var(--mci-safe-top)); }
-.profile-content { padding: 0 24rpx calc(42rpx + var(--mci-safe-bottom)); }
+.profile-content { padding: 0 24rpx 24rpx; }
 .summary-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: -24rpx; border: 1rpx solid #e1ebef; border-radius: 16rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(18, 73, 98, 0.08); }
 .summary-item { position: relative; display: flex; flex-direction: column; align-items: center; padding: 24rpx 8rpx; }
 .summary-item + .summary-item::before { position: absolute; top: 24rpx; bottom: 24rpx; left: 0; width: 1rpx; background: #e8f0f3; content: ''; }
