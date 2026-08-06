@@ -236,6 +236,16 @@ function isProposalInstallationChild(field = {}) {
   return /安装点位|安装位置/.test(title)
 }
 
+function isOrderProductInstallationChild(field = {}) {
+  const config = field.config || {}
+  const tableName = String(config.TableChildTableName || config.TableChild?.TableName || '').toLowerCase()
+  if (tableName === INSTALLATION_POSITION_TABLE) return true
+  const title = [field.Label, field.Name, config.TableChildSysMenuName, config.TableChild?.Title]
+    .filter(Boolean)
+    .join(' ')
+  return /安装位置/.test(title)
+}
+
 function fieldName(context, expectedName, expectedLabel = '') {
   const definition = context.definition || {}
   const fields = definition.layoutFields || definition.fields || []
@@ -1183,10 +1193,30 @@ export async function initialize(context) {
 
 // zhy：客户方案的场所点位数量始终取安装点位子表接口返回的完整总数，空子表显示 0。
 export async function handleRelatedCount(context, payload = {}) {
-  if (!isProposalForm(context) || payload.filtered || !isProposalInstallationChild(payload.field)) return
+  if (payload.filtered) return
   const count = Number(payload.count)
-  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
   const value = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+
+  // 订单商品的设备数量以安装位置完整总数为唯一事实源。
+  if (isOrderProductForm(context) && isOrderProductInstallationChild(payload.field)) {
+    const field = fieldName(context, 'Shuliang', '设备数量')
+    if (Number(context.form[field] || 0) === value) return
+    if (context.rowId) {
+      const result = await V8.FormEngine.UptFormData(ORDER_PRODUCT_TABLE, {
+        Id: context.rowId,
+        [field]: value,
+        _InvokeType: 'Client'
+      })
+      if (!result || Number(result.Code) !== 1) {
+        throw new Error((result && result.Msg) || '设备数量同步失败')
+      }
+    }
+    context.patchForm({ [field]: value })
+    return
+  }
+
+  if (!isProposalForm(context) || !isProposalInstallationChild(payload.field)) return
+  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
   if (Number(context.form[field] || 0) === value) return
   // zhy：已保存方案的子表发生变化后直接持久化派生数量；写入固定值可安全重试且不会新增主表。
   if (context.rowId) {
