@@ -56,6 +56,9 @@ service.interceptors.response.use(
         reportApiServiceRecovered({
             apiBase: DiyCommon.GetApiBase(),
             url: response.config?.url,
+            requestUrl: response.request?.responseURL,
+            osClient: DiyCommon.GetOsClient(),
+            method: response.config?.method,
             responseData: response.data
         });
         const requestToken = response.config && response.config.__microiRequestToken;
@@ -118,6 +121,7 @@ service.interceptors.response.use(
             apiBase: DiyCommon.GetApiBase(),
             osClient: DiyCommon.GetOsClient(),
             url: error.config?.url,
+            requestUrl: error.request?.responseURL,
             method: error.config?.method
         });
         console.log("err" + error); // for debug

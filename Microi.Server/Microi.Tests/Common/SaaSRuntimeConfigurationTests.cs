@@ -367,6 +367,31 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void UpgradeHostedService_MaintainsApplicationStreamV3SchemaBeforeVersionChain()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+
+        var gateInvariantIndex = source.IndexOf("EnsureTenantGateInvariant", StringComparison.Ordinal);
+        var streamSchemaInvariantIndex = source.IndexOf("EnsureApplicationStreamV3SchemaInvariant", StringComparison.Ordinal);
+        var versionChainIndex = source.IndexOf("_upgrade.Upgrade", StringComparison.Ordinal);
+
+        Assert.True(gateInvariantIndex >= 0,
+            "The hosted prerequisite pass must maintain the tenant application gate schema.");
+        Assert.True(streamSchemaInvariantIndex > gateInvariantIndex,
+            "The V3 stream schema must be maintained after its tenant gate.");
+        Assert.True(versionChainIndex > streamSchemaInvariantIndex,
+            "Runtime application publish prerequisites must be ready before the versioned upgrade chain.");
+        Assert.Matches(
+            @"upgradeLease\.ThrowIfLost\(\);\s+var applicationGateMessages\s*=\s*await new Upgrade25",
+            source);
+        Assert.Matches(
+            @"upgradeLease\.ThrowIfLost\(\);\s+var applicationStreamSchemaMessages\s*=\s*await new Upgrade25",
+            source);
+    }
+
+    [Fact]
     public void UpgradeSchemaWrites_PreserveTrustedClrProvenanceWithoutTrustingExternalJson()
     {
         var root = FindRepositoryRoot();

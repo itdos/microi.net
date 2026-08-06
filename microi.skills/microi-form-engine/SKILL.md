@@ -148,6 +148,9 @@ MCP 建模只使用：
 - 支持 Add/Edit/View、只读、必填、清空、校验、移动端和暗色主题。
 - 不在组件内绕过 FormEngine 权限直接访问任意表。
 - 复杂但租户独有的页面优先使用 MicroService + `V8.OpenAppDialog`，避免把客户逻辑打进主前端。
+- `DevComponent` 配置了非空字段标题时必须正常渲染 Label；只有标题本身为空时才允许隐藏，
+  不能按组件类型全局吞掉业务标题。`el-form--label-top` 下的字段级 `Button` 仍保留与其它
+  控件等高的不可见 Label 占位，使按钮对齐控件区而不是对齐标题行。
 
 ## 固定审计字段
 

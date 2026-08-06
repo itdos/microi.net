@@ -28,6 +28,14 @@ function withoutUsedFields(fields, usedFields) {
     return uniqueFields(fields).filter((field) => !used.has(field.AsName || field.Name || field.Id));
 }
 
+const MODULE_METRIC_VISUALS = [
+    { Tone: "primary", Icon: "fas fa-chart-line" },
+    { Tone: "success", Icon: "fas fa-circle-check" },
+    { Tone: "warning", Icon: "fas fa-clock" },
+    { Tone: "danger", Icon: "fas fa-triangle-exclamation" },
+    { Tone: "info", Icon: "fas fa-layer-group" }
+];
+
 export default {
     data() {
         return {
@@ -96,6 +104,7 @@ export default {
         ModuleMetricItems() {
             const statistics = this.StatisticsFields || {};
             return (this.ModuleHero.Metrics || []).map((metric, index) => {
+                const visual = MODULE_METRIC_VISUALS[index % MODULE_METRIC_VISUALS.length];
                 let value = this.ModuleMetricValues[metric.Key];
                 if (value === undefined && metric.Field) value = statistics[metric.Field];
                 if (value === undefined && metric.Source === "DataCount") value = this.DiyTableRowCount;
@@ -112,9 +121,10 @@ export default {
                     Value: value,
                     Prefix: metric.Prefix,
                     Suffix: metric.Suffix,
-                    Icon: metric.Icon,
+                    // 旧配置未指定视觉语义时也提供可区分的图标和色调；新配置仍应显式保存。
+                    Icon: metric.Icon || visual.Icon,
                     Color: metric.Color,
-                    Tone: metric.Tone,
+                    Tone: metric.Tone || visual.Tone,
                     Format: metric.Format,
                     Source: "ViewSchema",
                     Loading: Boolean(metric.ApiEngineKey) && this.ModuleMetricLoading && value === undefined

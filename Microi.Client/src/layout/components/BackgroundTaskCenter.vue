@@ -716,11 +716,20 @@ export default {
             this.storeLoading = true;
             try {
                 await this.loadInstalledVersions(force);
-                const result = await DiyCommon.PostAsync(MASTER_STORE_LIST_URL, {
-                    _PageIndex: 1,
-                    _PageSize: 5000,
-                    ApplicationTypes: ["Platform"]
-                }, null, null, "json");
+                const result = await DiyCommon.PostAsync({
+                    url: MASTER_STORE_LIST_URL,
+                    data: {
+                        _PageIndex: 1,
+                        _PageSize: 5000,
+                        ApplicationTypes: ["Platform"]
+                    },
+                    dataType: "json",
+                    // 官网应用列表是匿名跨域资源，不能携带当前客户租户的登录 Token。
+                    skipAuthorization: true,
+                    // 官网不可用只影响应用商城提醒，不能弹全局错误或改动客户租户登录态。
+                    suppressAuthFailure: true,
+                    suppressErrorNotification: true
+                });
                 if (result && result.Code === 1) {
                     const rows = Array.isArray(result.Data) ? result.Data : [];
                     this.storeNotices = rows

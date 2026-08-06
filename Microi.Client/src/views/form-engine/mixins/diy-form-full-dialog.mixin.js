@@ -240,14 +240,14 @@ export default {
                         retryCount: retryCount,
                         source: source
                     });
-                    fieldForm.Init(true, function (callbackValue) {
+                    fieldForm.Init(true, async function (callbackValue) {
                         if (self._isDestroyed || token !== self._fieldFormOpenToken) {
                             return;
                         }
                         if (callbackValue && callbackValue.CurrentRowModel) {
                             self.CurrentRowModel = callbackValue.CurrentRowModel;
                             var V8 = callbackValue.V8;
-                            self.HandlerBtns(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
+                            await self.HandlerBtnsAsync(self.SysMenuModel.FormBtns, self.CurrentRowModel, V8);
                         }
                         self.BtnLoading = false;
                     });

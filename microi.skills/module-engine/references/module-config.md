@@ -99,7 +99,7 @@
 | 配置路径 | 用途 | 核心字段 |
 |---|---|---|
 | `Layout.Hero` | 模块眉题、标题、说明、统计条 | `Eyebrow/Title/Description/Metrics` |
-| `Hero.Metrics[]` | 内置、字段或接口引擎指标 | `Key/Label/Source/Field/ApiEngineKey/ValuePath/Prefix/Suffix/Tone/RefreshSeconds` |
+| `Hero.Metrics[]` | 内置、字段或接口引擎指标 | `Key/Label/Source/Field/ApiEngineKey/ValuePath/Prefix/Suffix/Icon/Tone/Color/RefreshSeconds` |
 | `Layout.List.Columns[]` | PC 复合列 | `Field/Lines/TrailingFields/RequiredFields/Align/MinWidth` |
 | `Layout.Card` | 移动端业务卡片 | `AvatarTextField/TitleField/TopFields/SubtitleFields/RightFields/Fields/MetaFields/BottomFields` |
 
@@ -108,8 +108,12 @@ FontWeight/DisplayStyle`。运行时会把引用字段并入 `_SelectFields`；�
 返回这些字段。多字段模板沿用对应 `diy_field.V8TmpEngineTable`，不在 ViewSchema 内保存
 可执行脚本。
 
-Hero 必须在 PageTabs 上方渲染。PC 无指标/含指标头部分别为 `44px / 58px`，连同间距的
-总纵向占用约 `50px / 64px`。只允许一次性入场与一次性轻量光效，禁止持续循环动画；
+Hero 必须在 PageTabs 上方渲染。PC 无指标/含指标头部分别为 `44px / 62px`，连同间距的
+总纵向占用约 `50px / 68px`。有指标时标题说明区占约 25%~30%，指标区弹性占满其余空间，
+两区只用弱化渐变分隔；指标容器不加外框，单指标使用轻量语义色背景和图标色块，禁止
+“外层框 + 指标条框 + 指标卡框”的多层线框。无指标时标题说明自动铺满。每个指标必须
+显式配置 `Icon`，同一 Hero 内使用不同 `Tone` 或 `Color` 与不同图标，不能只靠数字区分。
+只允许一次性入场与一次性轻量光效，禁止持续循环动画；
 `prefers-reduced-motion: reduce` 下关闭动画和过渡。
 
 `Hero.Metrics[].Source` 可直接配置 `DataCount`（当前筛选总记录数）或 `PageCount`（本页
