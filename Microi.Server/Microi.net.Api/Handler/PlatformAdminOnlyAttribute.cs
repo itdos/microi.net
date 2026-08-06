@@ -31,8 +31,12 @@ namespace Microi.net.Api
             var currentToken = await DiyToken.GetCurrentToken(false);
             var currentUser = currentToken?.CurrentUser;
 
-            var isAdmin = currentUser?["_IsAdmin"].Val<bool>() == true
+            var tokenClaimsAdmin = currentUser?["_IsAdmin"].Val<bool>() == true
                 || currentUser?["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+            var isAdmin = tokenClaimsAdmin
+                && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    currentToken?.OsClient,
+                    currentUser);
 
             if (!isAdmin)
             {
