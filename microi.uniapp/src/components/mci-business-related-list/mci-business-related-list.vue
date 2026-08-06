@@ -188,6 +188,7 @@ import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
 import {
+  canAddMenuRecord,
   executeBusinessRowAction,
   getBusinessRowActions,
   loadApprovalOpinions
@@ -387,7 +388,12 @@ export default {
       return result
     },
     canAdd() {
-      return Boolean(this.relationValue && this.childFkField && this.config.table)
+      return Boolean(
+        this.relationValue &&
+        this.childFkField &&
+        this.config.table &&
+        canAddMenuRecord(this.menuId || this.childMenuId, this.currentUser)
+      )
     },
     filterFields() { return this.config.filterFields || [] },
     activeFilterCount() {
@@ -1016,7 +1022,10 @@ export default {
       return result
     },
     openAdd() {
-      if (!this.canAdd) return
+      if (!this.canAdd) {
+        uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
+        return
+      }
       if (this.moduleKey === 'members') {
         uni.navigateTo({ url: '/pages/native/member-edit' })
         return
