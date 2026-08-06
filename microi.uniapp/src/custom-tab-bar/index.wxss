@@ -1,0 +1,72 @@
+.mci-bottom-dock {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112rpx;
+  gap: 16rpx;
+  align-items: center;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, rgba(245, 251, 255, 0), rgba(245, 251, 255, .92) 35%, #f5fbff 100%);
+  pointer-events: none;
+}
+
+.mci-bottom-dock--without-ai {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mci-bottom-dock__nav {
+  min-width: 0;
+  height: 112rpx;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1rpx solid rgba(15, 18, 30, .1);
+  border-radius: 58rpx;
+  box-shadow: 0 8rpx 30rpx rgba(15, 49, 66, .13);
+  pointer-events: auto;
+}
+
+.mci-bottom-dock__item {
+  flex: 1;
+  min-width: 0;
+  min-height: 88rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3rpx;
+  transition: transform 150ms ease, color 150ms ease, background-color 150ms ease;
+}
+
+.mci-bottom-dock__item--active {
+  font-weight: 700;
+}
+
+.mci-bottom-dock__item--pressed {
+  background: rgba(8, 125, 168, .06);
+  transform: scale(.92);
+}
+
+.mci-bottom-dock__icon {
+  width: 42rpx;
+  height: 42rpx;
+  flex: none;
+}
+
+.mci-bottom-dock__label {
+  max-width: 100%;
+  font-size: 20rpx;
+  line-height: 25rpx;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mci-bottom-dock__item {
+    transition: none;
+  }
+}

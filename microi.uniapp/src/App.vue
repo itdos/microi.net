@@ -79,6 +79,13 @@ page {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Tab 页滚动内容的统一尾部占位：底栏 128rpx + 16rpx 视觉间距 + 运行时安全区。 */
+.mci-tabbar-spacer {
+  width: 100%;
+  height: calc(144rpx + var(--mci-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  flex: none;
+}
+
 /* H5/自动化截图中的安全区位于 page 容器之外，必须有明确底色。 */
 html,
 body,
