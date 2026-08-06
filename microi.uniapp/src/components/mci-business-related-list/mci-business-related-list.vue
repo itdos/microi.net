@@ -191,6 +191,8 @@ import {
   canAddMenuRecord,
   executeBusinessRowAction,
   getBusinessRowActions,
+  hydrateInstallationPositionRows,
+  openInstallationPositionDevice,
   loadApprovalOpinions
 } from '@/pages/business/utils/xjy-row-actions.js'
 
@@ -628,7 +630,11 @@ export default {
           })
         }
         if (requestId !== this.loadRequestId) return
-        const incomingRows = Array.isArray(result.rows) ? result.rows : []
+        const rawIncomingRows = Array.isArray(result.rows) ? result.rows : []
+        const incomingRows = this.moduleKey === 'installationPositions'
+          ? await hydrateInstallationPositionRows(rawIncomingRows)
+          : rawIncomingRows
+        if (requestId !== this.loadRequestId) return
         const combinedRows = uniqueRowsById(reset ? incomingRows : [...this.rows, ...incomingRows])
         const combinedSourceCount = reset ? incomingRows.length : this.rows.length + incomingRows.length
         this.duplicateRowCount += Math.max(0, combinedSourceCount - combinedRows.length)
@@ -937,6 +943,19 @@ export default {
             LianxiR: row.LianxiR || ''
           }
         })
+        return
+      }
+      if (action.key === 'position-device') {
+        this.actionSubmitting = true
+        uni.showLoading({ title: '正在打开设备', mask: true })
+        try {
+          await openInstallationPositionDevice(row)
+        } catch (error) {
+          uni.showToast({ title: error.message || '设备详情打开失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+          this.actionSubmitting = false
+        }
         return
       }
       if (action.input) {
