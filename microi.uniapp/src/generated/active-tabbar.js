@@ -1,7 +1,7 @@
 // Generated from profiles/xjy/pages.json. Use npm profile commands to switch safely.
 export default {
   "profileId": "xjy",
-  "custom": false,
+  "custom": true,
   "color": "#999999",
   "selectedColor": "#E54625",
   "backgroundColor": "#ffffff",

@@ -33,6 +33,36 @@ function isCurrentTabBarPage() {
   }
 }
 
+function currentPageEntry() {
+  try {
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    return pages && pages.length ? pages[pages.length - 1] : null
+  } catch (e) {
+    return null
+  }
+}
+
+export function syncCustomTabBarSelection() {
+  const current = currentPageEntry()
+  const route = String(current && (current.route || current.$page?.route) || '').replace(/^\/+/, '').split('?')[0]
+  const selected = TAB_BAR_ROUTES.indexOf(route)
+  if (selected < 0) return
+
+  try {
+    const pageScope = current && (current.$vm?.$scope || current.$scope)
+    const tabBar = current && typeof current.getTabBar === 'function'
+      ? current.getTabBar()
+      : (pageScope && typeof pageScope.getTabBar === 'function' ? pageScope.getTabBar() : null)
+    if (tabBar && typeof tabBar.setData === 'function') tabBar.setData({ selected })
+  } catch (e) {}
+}
+
+function scheduleCustomTabBarSelectionSync() {
+  ;[0, 50, 200, 600].forEach((delay) => {
+    setTimeout(() => syncCustomTabBarSelection(), delay)
+  })
+}
+
 function rgba(hex, opacity) {
   const source = String(hex || WATER_PRIMARY).replace('#', '')
   const r = parseInt(source.slice(0, 2), 16)
@@ -196,6 +226,7 @@ export const themeMixin = {
     this._currentLang = getLang()
     this.refreshSafeArea()
     applyMciTheme()
+    scheduleCustomTabBarSelectionSync()
   }
 }
 
@@ -212,6 +243,7 @@ export default {
   applyTabBarTheme,
   applyMciTokensH5,
   applyMciTheme,
+  syncCustomTabBarSelection,
   initializeThemeSystem,
   themeMixin
 }
