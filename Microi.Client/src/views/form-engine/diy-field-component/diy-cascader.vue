@@ -13,6 +13,7 @@
         :props="GetCascaderProps(field)"
         :options="field.Data"
         :filterable="field.Config.Cascader.Filterable == true"
+        @visible-change="EnsureFieldDataLoaded"
         @change="CommonV8CodeChange"
         :collapse-tags="LoadType == 'Table' ? true : false"
     >
@@ -150,6 +151,8 @@
 
 <script>
 import _ from "underscore";
+import { normalizeCascaderModelValue } from "./diy-cascader-value.js";
+import { ensureFieldDataLoaded } from "./field-data-load-fallback.js";
 export default {
     name: "diy-autocomplete",
     inheritAttrs: false,
@@ -184,7 +187,8 @@ export default {
                 }
             },
             SysDataSourceList: [],
-            ApiEngineList: []
+            ApiEngineList: [],
+            _fieldDataFallbackTimer: null
         };
     },
     model: {
@@ -248,18 +252,20 @@ export default {
         modelValue: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = newVal;
+                var normalizedValue = self.normalizeExternalValue(newVal);
+                self.ModelValue = normalizedValue;
                 if (self.isMobile) {
-                    self.TreeInnerValue = self.cascaderValueToTreeValue(newVal);
+                    self.TreeInnerValue = self.cascaderValueToTreeValue(normalizedValue);
                 }
             }
         },
         ModelProps: function (newVal, oldVal) {
             var self = this;
             if (newVal != oldVal) {
-                self.ModelValue = self.ModelProps;
+                var normalizedValue = self.normalizeExternalValue(self.ModelProps);
+                self.ModelValue = normalizedValue;
                 if (self.isMobile) {
-                    self.TreeInnerValue = self.cascaderValueToTreeValue(self.ModelProps);
+                    self.TreeInnerValue = self.cascaderValueToTreeValue(normalizedValue);
                 }
             }
         }
@@ -285,15 +291,38 @@ export default {
     mounted() {
         var self = this;
         self.Init();
+        self._fieldDataFallbackTimer = setTimeout(function () {
+            self._fieldDataFallbackTimer = null;
+            self.EnsureFieldDataLoaded();
+        }, 800);
+    },
+
+    beforeUnmount() {
+        if (this._fieldDataFallbackTimer) {
+            clearTimeout(this._fieldDataFallbackTimer);
+            this._fieldDataFallbackTimer = null;
+        }
     },
 
     methods: {
+        EnsureFieldDataLoaded(visible) {
+            if (visible === false) return false;
+            return ensureFieldDataLoaded({
+                field: this.field,
+                formData: this.FormDiyTableModel,
+                tableChildAuth: this.field && this.field._TableChildAuth,
+                diyCommon: this.DiyCommon
+            });
+        },
+        normalizeExternalValue(value) {
+            return normalizeCascaderModelValue(value, {
+                multiple: this.field?.Config?.Cascader?.Multiple === true,
+                emitPath: this.field?.Config?.Cascader?.EmitPath !== false
+            });
+        },
         Init() {
             var self = this;
-            var modelValue = self.GetFieldValue(self.field, self.FormDiyTableModel);
-            if (typeof modelValue == "string" && !self.DiyCommon.IsNull(modelValue) && self.field.Config.Cascader.EmitPath !== false) {
-                modelValue = JSON.parse(modelValue);
-            }
+            var modelValue = self.normalizeExternalValue(self.GetFieldValue(self.field, self.FormDiyTableModel));
             self.ModelValue = modelValue;
             // 移动端同步 TreeInnerValue
             if (self.isMobile) {

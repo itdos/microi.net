@@ -92,6 +92,7 @@ import { ArrowDown } from "@element-plus/icons-vue";
 import { markRaw } from "vue";
 import DiyDataSourceConfig from "./shared/DiyDataSourceConfig.vue";
 import { mergeCurrentSelectOptions } from "@/utils/select-option-merge";
+import { ensureFieldDataLoaded } from "./field-data-load-fallback.js";
 
 export default {
     name: "diy-select",
@@ -108,6 +109,7 @@ export default {
             FieldAllData: [],
             NeedResetDataSourse: true,
             _selectDestroyed: false,
+            _fieldDataFallbackTimer: null,
             _ArrowDownIcon: markRaw(ArrowDown),
             // 配置弹窗相关
             configDialogVisible: false,
@@ -324,6 +326,10 @@ export default {
     beforeUnmount() {
         var self = this;
         self._selectDestroyed = true;
+        if (self._fieldDataFallbackTimer) {
+            clearTimeout(self._fieldDataFallbackTimer);
+            self._fieldDataFallbackTimer = null;
+        }
         if (self.field) {
             self.field._SelectRemoteRequestId = (self.field._SelectRemoteRequestId || 0) + 1;
             if (self.field.Config) {
@@ -439,9 +445,26 @@ export default {
 
             self.Initing = false;
         });
+        self.ScheduleFieldDataFallback();
     },
 
     methods: {
+        EnsureFieldDataLoaded() {
+            return ensureFieldDataLoaded({
+                field: this.field,
+                formData: this.FormDiyTableModel,
+                tableChildAuth: this.field && this.field._TableChildAuth,
+                diyCommon: this.DiyCommon
+            });
+        },
+        ScheduleFieldDataFallback() {
+            var self = this;
+            if (self._fieldDataFallbackTimer) clearTimeout(self._fieldDataFallbackTimer);
+            self._fieldDataFallbackTimer = setTimeout(function () {
+                self._fieldDataFallbackTimer = null;
+                if (!self._selectDestroyed) self.EnsureFieldDataLoaded();
+            }, 800);
+        },
         // ============ 模板渲染辅助 ============
         // el-option 的 :label —— 严格按数据源类型分流，不会因 SelectLabel 误配置导致 undefined
         GetOptionLabel(fieldData) {
@@ -847,6 +870,9 @@ export default {
         },
         VisibleChange(visible, field) {
             var self = this;
+            if (visible && (!Array.isArray(field.Data) || field.Data.length === 0)) {
+                self.EnsureFieldDataLoaded();
+            }
             if (field.Config.DataSourceSqlRemote) {
                 if (visible && (!Array.isArray(field.Data) || field.Data.length === 0)) {
                     self.SelectRemoteMethod("", field);
