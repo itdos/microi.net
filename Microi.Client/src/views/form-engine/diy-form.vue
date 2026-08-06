@@ -112,6 +112,7 @@
                                             :prop="field.Name"
                                             :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
                                                     + (shouldShowLabel(field) ? '' : ' hide-label ')
+                                                    + (field.Component === 'Button' ? ' is-button-field ' : '')
                                                     + (GetFieldReadOnly(field) ? ' is-field-readonly ' : '')"
                                         >
                                             <template #label>
@@ -191,6 +192,7 @@
                                             :class="'form-item'
                                                     + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
                                                     + (shouldShowLabel(field) ? '' : ' hide-label ')
+                                                    + (field.Component === 'Button' ? ' is-button-field ' : '')
                                                     + (GetFieldReadOnly(field) ? ' is-field-readonly ' : '')"
                                         >
                                             <!-- v-if="shouldShowLabel(field)" -->

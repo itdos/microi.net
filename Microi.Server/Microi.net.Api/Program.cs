@@ -133,6 +133,16 @@ services.Configure<ForwardedHeadersOptions>(options =>
             options.KnownIPNetworks.Add(network);
         }
     }
+    // Docker/容器内由宿主 Nginx 转发到发布端口时，Kestrel 的直接对端通常是
+    // 172.x/10.x 网桥网关。只自动加入当前容器路由表真实存在的私有网关精确 IP，
+    // 避免所有公网用户被聚合为 172.30.0.1，同时不信任公网自报的 XFF。
+    foreach (var proxy in ForwardedProxyTrustPolicy.DiscoverContainerGatewayProxies())
+    {
+        if (!options.KnownProxies.Contains(proxy))
+        {
+            options.KnownProxies.Add(proxy);
+        }
+    }
 });
 services.Configure<FormOptions>(options =>
 {
@@ -180,7 +190,7 @@ services.AddHostedService<ProcessMemoryGuardService>();
 services.AddHostedService<BackgroundTaskWorkerService>();
 services.AddSingleton<UserBehaviorSessionTracker>();
 services.AddSingleton<IPrivateFileAuditLinkService, PrivateFileAuditLinkService>();
-// zhy：注册无进程内业务状态的微信内容安全服务，审核事实统一存放共享 Redis。
+// 注册无进程内业务状态的微信内容安全服务，审核事实统一存放共享 Redis。
 services.AddSingleton<WeChatContentSecurityService>();
 services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
 services.AddMicroiWeChat();//【可选】注入【微信公众号平台】插件

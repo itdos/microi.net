@@ -34,13 +34,17 @@ export default {
         shouldShowLabel(field) {
             var self = this;
             // 不显示 label 的组件类型
-            var noLabelComponents = ['Divider', 'CollapseGroup', 'Tabs', 'Alert', 'StaticText', 'Html', 'HTML', 'DevComponent'];
+            var noLabelComponents = ['Divider', 'CollapseGroup', 'Tabs', 'Alert', 'StaticText', 'Html', 'HTML'];
             // 如果是子表，并且 Label 为空，也不显示
             if (field.Component === 'TableChild' && !field.Label) {
                 return false;
             }
-            return !noLabelComponents.includes(field.Component)
-                    && !field.Config?.DevComponentName;
+            // DevComponent 在旧版表单中保留字段 Label；只有 Label 为空时才按无标题
+            // 的整行组件处理，避免迁移后把“盘点明细”等业务标题静默隐藏。
+            if (field.Component === 'DevComponent' && !field.Label) {
+                return false;
+            }
+            return !noLabelComponents.includes(field.Component);
         },
         
         /**

@@ -1610,17 +1610,8 @@ export default {
         },
 
         // ========== 按钮处理（以diy-table.vue为准） ==========
-        HandlerBtns(btns, row, v8) {
-            var self = this;
-            if (btns) {
-                if (self.DiyCommon.IsNull(row)) {
-                    row = {};
-                }
-                btns.forEach((btn) => {
-                    var isVisible = self.LimitMoreBtn(btn, row, v8);
-                    btn.IsVisible = isVisible;
-                });
-            }
+        async HandlerBtns(btns, row, v8) {
+            return await this.HandlerBtnsAsync(btns, row, v8);
         },
         LimitMoreBtn(btn, row, v8) {
             var self = this;

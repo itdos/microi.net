@@ -46,6 +46,25 @@
 
 数据库、Redis、主租户标识等启动基础设施仍由安装编排中的少量基础参数提供；普通业务和运行参数统一由 SaaS 引擎主租户或系统设置管理，未填写时使用代码安全默认值。子租户只能在平台允许的字段上配置自身额度，不能抬高节点级硬边界。文件上传业务值按当前租户 `sys_osclients` → 代码默认值解析，最终仍受 API 固定接收硬顶和反向代理边界保护。配置保存后应走 SaaS 引擎的共享缓存刷新流程并回读验证，不依赖逐节点重启。
 
+### 微信小程序内容安全配置
+
+在 SaaS 引擎当前租户的【微信】Tab 配置以下字段：
+
+| 字段 | 用途 |
+|---|---|
+| `WeChatMiniProgramAppId` | 小程序 AppId |
+| `WeChatMiniProgramAppSecret` | 小程序 AppSecret |
+| `WeChatMiniProgramMessageToken` | 微信消息推送 Token（令牌） |
+| `WeChatMiniProgramAESKey` | 微信消息推送 EncodingAESKey（消息加密密钥，43 位） |
+
+Token 与 AESKey 必须和微信公众平台填写的值完全一致。推荐在微信后台使用不含 QueryString 的地址：
+
+```text
+https://你的API域名/api/WeChatContentSecurity/Callback--OsClient--你的OsClient--
+```
+
+服务端也支持 `/api/WeChatContentSecurity/Callback?OsClient=你的OsClient`，但不使用历史缩写 `?o=`。C# 只读取上述敏感配置完成协议验签/解密，解密后的脱敏事件交给应用商城“微信小程序内容安全”中的官方核心接口；租户业务写入和附加日志维护在 `mci-wechat-content-callback-extension`，保存即生效。
+
 ### CORS 兼容规则
 
 主租户 `sys_osclients.CorsAllowOrigins` 为空时，平台默认允许任意来源跨域，兼容本地开发、独立前端、H5 和存量租户；只有配置来源后才按精确来源或 `https://*.example.com` 这类通配符收紧。SaaS 引擎主租户字段 `CorsAllowAnyWhenUnconfigured` 可调整未配置时的兼容开关，默认值为允许。
