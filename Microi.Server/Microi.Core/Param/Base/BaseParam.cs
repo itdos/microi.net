@@ -64,7 +64,7 @@ namespace Microi.net
         public JObject _CodeEditorTransport { get; set; }
 
         public string _ClientType { get; set; }
-        // zhy：承载微信内容安全检测换取 openid 所需的一次性登录 code。
+        // 承载微信内容安全检测换取 openid 所需的一次性登录 code。
         /// <summary>
         /// 微信小程序内容安全检测使用的一次性 wx.login code。
         /// 仅由后端换取 openid，严禁把小程序 AppSecret 下发到客户端。

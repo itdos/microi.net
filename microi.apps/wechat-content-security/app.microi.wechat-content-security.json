@@ -1,0 +1,84 @@
+{
+  "PackageInfo": {
+    "Name": "微信小程序内容安全",
+    "Version": "v1.0.0",
+    "AppVersion": "v1.0.0",
+    "AppId": "microi-wechat-content-security",
+    "ApplicationType": "Platform",
+    "Description": "微信小程序内容安全回调核心接口与租户扩展 Hook。",
+    "CreateTime": "2026-08-06 00:00:00",
+    "CreateUser": "Microi吾码",
+    "OsClient": "iTdos",
+    "ApiEngineCount": 2
+  },
+  "DDLStatements": [],
+  "PhysicalColumns": [],
+  "DiyTables": [],
+  "DiyFields": [],
+  "DataSets": [],
+  "SysMenus": [],
+  "WfFlowDesigns": [],
+  "WfNodes": [],
+  "WfLines": [],
+  "SysApiEngines": [
+    {
+      "Id": "01KZZWECHATCONTENTCORE0000000",
+      "ApiName": "[微信内容安全]回调核心",
+      "ApiEngineKey": "mci-wechat-content-callback-core",
+      "ApiAddress": "",
+      "ApiRemark": "微信回调官方核心逻辑，由应用商城受管升级；检测到租户修改时停止覆盖。",
+      "ApiV8Code": "/*\n * V8 ApiEngine\n * ApiEngineKey: mci-wechat-content-callback-core\n * Version: v1.0.0\n * Ownership: Application / Managed\n *\n * C# 网关只完成微信签名、AES 解密和 AppId 校验；本接口负责业务状态、日志与租户 Hook。\n */\n\nfunction text(value) {\n    return value === null || value === undefined ? '' : String(value);\n}\nfunction parseObject(value) {\n    if (!value) return null;\n    if (typeof value == 'object') return value;\n    try { return JSON.parse(String(value)); } catch (error) { return null; }\n}\nfunction isHex(value, length) {\n    return text(value).length == length && new RegExp('^[a-fA-F0-9]{' + length + '}$').test(text(value));\n}\nfunction safeTraceId(value) {\n    var traceId = text(value);\n    return traceId.length > 0 && traceId.length <= 128 && /^[A-Za-z0-9_-]+$/.test(traceId);\n}\n\nvar tenant = text(V8.Param.OsClient);\nvar eventId = text(V8.Param.EventId).toLowerCase();\nvar traceId = text(V8.Param.TraceId);\nvar status = text(V8.Param.Status);\nvar suggest = text(V8.Param.Suggest);\nvar receivedAtUtc = text(V8.Param.ReceivedAtUtc);\nvar lifetimeSeconds = parseInt(V8.Param.ReviewLifetimeSeconds || 172800, 10);\nlifetimeSeconds = Math.max(3600, Math.min(172800, isNaN(lifetimeSeconds) ? 172800 : lifetimeSeconds));\n\nif (!tenant || tenant.toLowerCase() != text(V8.OsClient).toLowerCase()) {\n    return { Code: 0, Msg: '回调租户与接口引擎运行租户不一致。' };\n}\nif (!isHex(eventId, 64) || !safeTraceId(traceId)) {\n    return { Code: 0, Msg: '回调事件标识不合法。' };\n}\nif (status != 'Passed' && status != 'Rejected') {\n    return { Code: 0, Msg: '回调审核状态不受支持。' };\n}\nif ((status == 'Passed' && suggest != 'pass') || (status == 'Rejected' && suggest != 'blocked')) {\n    return { Code: 0, Msg: '回调审核建议与状态不一致。' };\n}\n\nvar prefix = 'Microi:' + tenant + ':WechatContentSecurity:';\nvar eventKey = prefix + 'CallbackEvent:' + eventId;\nif (V8.Cache.Get(eventKey)) {\n    return { Code: 1, Data: { EventId: eventId, Duplicate: true }, Msg: '重复回调已幂等忽略。' };\n}\n\nvar traceKey = prefix + 'Trace:' + traceId;\nvar reviewId = text(V8.Cache.Get(traceKey));\nvar isEarlyResult = !isHex(reviewId, 32);\nif (isEarlyResult) {\n    V8.Cache.Set(prefix + 'TraceResult:' + traceId, status, lifetimeSeconds);\n    reviewId = '';\n} else {\n    var reviewKey = prefix + 'Review:' + reviewId;\n    var review = parseObject(V8.Cache.Get(reviewKey));\n    if (review) {\n        var currentStatus = text(review.Status);\n        if (currentStatus != 'Passed' && currentStatus != 'Rejected') {\n            review.Status = status;\n            review.Suggest = suggest;\n            review.UpdatedAt = receivedAtUtc || DateNow('yyyy-MM-ddTHH:mm:ss.fffZ');\n            V8.Cache.Set(reviewKey, JSON.stringify(review), lifetimeSeconds);\n        }\n    }\n}\n\nvar hookPayload = {\n    OsClient: tenant,\n    EventId: eventId,\n    TraceId: traceId,\n    ReviewId: reviewId,\n    Status: status,\n    Suggest: suggest,\n    ReceivedAtUtc: receivedAtUtc,\n    IsEarlyResult: isEarlyResult\n};\nvar hookError = '';\ntry {\n    var hookModel = V8.FormEngine.GetFormData('sys_apiengine', {\n        _Where: [['ApiEngineKey', '=', 'mci-wechat-content-callback-extension']],\n        _SelectFields: ['Id', 'ApiEngineKey', 'IsEnable', 'IsDeleted'],\n        _PageSize: 1\n    });\n    if (hookModel && hookModel.Code == 1 && hookModel.Data\n        && Number(hookModel.Data.IsEnable || 0) == 1 && Number(hookModel.Data.IsDeleted || 0) != 1) {\n        var hookResult = V8.ApiEngine.Run('mci-wechat-content-callback-extension', hookPayload);\n        if (hookResult && hookResult.Code !== undefined && Number(hookResult.Code) != 1) {\n            hookError = text(hookResult.Msg || '租户扩展返回失败');\n        }\n    }\n} catch (hookException) {\n    hookError = text(hookException && hookException.message || hookException);\n}\n\nV8.Method.AddSysLog({\n    Type: 'ContentSecurity',\n    Title: hookError ? 'WeChatMediaReviewHookFailed' : 'WeChatMediaReviewCompleted',\n    Content: JSON.stringify({\n        EventId: eventId,\n        TraceId: traceId,\n        ReviewId: reviewId,\n        Status: status,\n        IsEarlyResult: isEarlyResult,\n        HookError: hookError ? hookError.substring(0, 500) : ''\n    }),\n    Level: hookError ? 2 : (status == 'Passed' ? 1 : 2)\n});\n\n// 只有核心状态与日志完成后才写幂等标记。Hook 失败已单独记录，不阻塞微信 ACK。\nV8.Cache.Set(eventKey, '1', lifetimeSeconds);\nreturn {\n    Code: 1,\n    Data: {\n        EventId: eventId,\n        ReviewId: reviewId,\n        Status: status,\n        IsEarlyResult: isEarlyResult,\n        HookSucceeded: !hookError\n    }\n};\n",
+      "Version": "v1.0.0",
+      "ChangeHistory": "2026-08-06 v1.0.0 微信协议网关与业务接口引擎分层；支持租户扩展 Hook。",
+      "Category": "微信内容安全",
+      "IsEnable": 1,
+      "IsDeleted": 0,
+      "StopHttp": 1,
+      "AllowAnonymous": 0,
+      "Lock": 1,
+      "ResponseFile": 0,
+      "EnableLog": 0,
+      "Timeout": 120,
+      "LimitMemory": 128,
+      "LimitRecursion": 64,
+      "V8Unlimited": 0,
+      "ApiRole": "[]"
+    },
+    {
+      "Id": "01KZZWECHATCONTENTHOOK0000000",
+      "ApiName": "[微信内容安全]租户回调扩展",
+      "ApiEngineKey": "mci-wechat-content-callback-extension",
+      "ApiAddress": "",
+      "ApiRemark": "微信回调租户扩展 Hook，首次安装后归租户维护，应用更新永不覆盖。",
+      "ApiV8Code": "/*\n * V8 ApiEngine\n * ApiEngineKey: mci-wechat-content-callback-extension\n * Version: v1.0.0\n * Ownership: Tenant / CreateIfMissing\n *\n * 此接口首次安装后归当前租户维护，应用更新永不覆盖。\n */\n\n// 可在这里增加业务表写入、系统日志、MQ/outbox 等逻辑。\n// 对外部通知、积分、库存等副作用，必须以 V8.Param.EventId 建唯一约束或幂等记录。\n// 示例：\n// V8.Method.AddSysLog({\n//   Type: 'ContentSecurity',\n//   Title: 'TenantWeChatContentCallback',\n//   Content: JSON.stringify(V8.Param),\n//   Level: 1\n// });\n\nreturn { Code: 1, Data: { EventId: V8.Param.EventId } };\n",
+      "Version": "v1.0.0",
+      "ChangeHistory": "2026-08-06 v1.0.0 微信协议网关与业务接口引擎分层；支持租户扩展 Hook。",
+      "Category": "微信内容安全",
+      "IsEnable": 1,
+      "IsDeleted": 0,
+      "StopHttp": 1,
+      "AllowAnonymous": 0,
+      "Lock": 1,
+      "ResponseFile": 0,
+      "EnableLog": 0,
+      "Timeout": 120,
+      "LimitMemory": 128,
+      "LimitRecursion": 64,
+      "V8Unlimited": 0,
+      "ApiRole": "[]"
+    }
+  ],
+  "ResourcePolicies": {
+    "SchemaVersion": 1,
+    "ApiEngines": {
+      "mci-wechat-content-callback-core": {
+        "Ownership": "Application",
+        "UpgradePolicy": "Managed"
+      },
+      "mci-wechat-content-callback-extension": {
+        "Ownership": "Tenant",
+        "UpgradePolicy": "CreateIfMissing"
+      }
+    }
+  }
+}

@@ -13,6 +13,13 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 
 客户已有的全局 V8、表单配置、菜单、字段和自定义代码必须保留。升级采用存在性检查、差异合并和包隔离，禁止整表覆盖或把发布方租户数据原样复制到目标租户。
 
+## 平台升级的应用商城边界（强制）
+
+- 表、字段、Tab、菜单、权限、接口引擎、事件、数据源、页面、打印、工作流、任务和可幂等种子数据都应通过应用包升级；不得为这些资源在 `Microi.Server/Microi.Upgrade/` 新增租户定制 .NET 代码。
+- 有官方 MCP 权限时，固定使用 `microi_itdos`（`https://api.itdos.com`、`OsClient=iTdos`）更新官方母版、制作并发布对应应用，按内容哈希/包版本回读后，再由目标租户 MCP 安装或更新。无官方权限时只通过当前用户自己的 MCP/Manifest 更新其数据库并回读，不得假借通用升级器越权发布官方应用。
+- `Microi.Upgrade` 只保留应用商城/安装器启动前必需的核心物理兼容或协议迁移，并要求持久化版本门、共享租约、幂等、失败不推进版本。禁止每次启动对每个租户重跑不断增长的历史迁移清单。
+- 平台通用缺陷的交付证据必须分开记录：源码修复、官方母版资源、商城包发布后回读、目标租户后台安装任务、目标租户资源回读和真实 UI/接口验收；其中任一步未完成都不能笼统称为“已发布并安装”。
+
 ## 包内容
 
 - Manifest：应用 Key、版本、兼容平台版本、依赖和资源清单。
@@ -20,6 +27,14 @@ description: Microi 应用商城开发、打包、安装和升级规范。用于
 - 源码与构建：私有源码包与可部署构建包分离，记录 SHA-256。
 - 安装/升级脚本：幂等、可恢复、可回读；不包含租户密钥、Token、连接串或 License keys。
 - 迁移采用“先扩展、后迁移、再收缩”，支持新旧节点短暂并存。
+
+## 接口引擎资源所有权（强制）
+
+- 新发布包必须声明 `ResourcePolicies.ApiEngines`，不得再依赖“同 Key 直接覆盖”。官方不可随租户修改的核心使用 `{ Ownership:'Application', UpgradePolicy:'Managed' }`；提供给租户改业务的 Hook 使用 `{ Ownership:'Tenant', UpgradePolicy:'CreateIfMissing' }`。
+- 发布器从上一版 `AppPakcet.SysApiEngines` 计算 `BaseHash`；导入成功后把本版摘要写入 `sys_microistoreversion.InstallResult.ResourceState.ApiEngines`。更新判定固定为 Base/Local/Incoming：`Local == Base` 才允许更新；`Local != Base && Local != Incoming` 必须回滚并报告冲突，禁止静默覆盖。
+- `CreateIfMissing` 只在目标 Key 不存在时创建，存在时不得对齐 Id、源码、启用状态或其它字段。扩展模板发布后即归租户维护；后续版本禁止把同一 Key 改回 `Managed` 接管，确需新的官方核心时发布新 Key 并显式迁移。
+- 官方功能采用“Managed 核心 + CreateIfMissing Hook”。核心只提供稳定协议和默认行为；客户日志、写表、通知和业务动作放 Hook，并以稳定 `EventId`、唯一约束或 outbox 幂等。安全核心冲突不自动三方合并代码。
+- 历史包未声明策略时只能按旧兼容流程安装；重新发布时发布器必须生成策略。验收至少覆盖首次安装、未修改核心升级、核心被改后冲突回滚、Hook 被改后保持原样、重复安装和两节点竞态。
 
 ## 安装流程
 

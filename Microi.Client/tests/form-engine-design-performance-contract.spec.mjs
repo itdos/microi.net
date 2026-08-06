@@ -7,6 +7,8 @@ const formStateFilename = new URL("../src/views/form-engine/mixins/diy-form-stat
 const formCleanupFilename = new URL("../src/views/form-engine/mixins/diy-form-cleanup.mixin.js", import.meta.url);
 const formFullFilename = new URL("../src/views/form-engine/diy-form-full.vue", import.meta.url);
 const formDialogFilename = new URL("../src/views/form-engine/mixins/diy-form-full-dialog.mixin.js", import.meta.url);
+const formUtilsFilename = new URL("../src/views/form-engine/mixins/form-utils.mixin.js", import.meta.url);
+const formStyleFilename = new URL("../src/styles/diy-form.scss", import.meta.url);
 const formSchemaFilename = new URL("../src/views/form-engine/mixins/diy-form-schema.mixin.js", import.meta.url);
 const jsonTableFilename = new URL("../src/views/form-engine/diy-field-component/diy-jsontable.vue", import.meta.url);
 const tableFilename = new URL("../src/views/form-engine/diy-table.vue", import.meta.url);
@@ -81,6 +83,29 @@ test("opening an existing form does not eagerly request log comment and version 
     assert.doesNotMatch(openDetailBody, /\bLoadDataLog\s*\(/);
     assert.doesNotMatch(openDetailBody, /\bLoadDataComment\s*\(/);
     assert.doesNotMatch(openDetailBody, /\bLoadDataVersion\s*\(/);
+});
+
+test("dialog form buttons evaluate async V8CodeShow through the async visibility runner", function () {
+    const fullSource = read(formFullFilename);
+    const dialogSource = read(formDialogFilename);
+    const handlerBody = extractBalancedBlock(fullSource, "\n        async HandlerBtns(btns, row, v8)");
+
+    assert.match(handlerBody, /HandlerBtnsAsync\(btns,\s*row,\s*v8\)/);
+    assert.match(fullSource, /runV8ButtonVisibilityCodeAsync/);
+    assert.match(dialogSource, /fieldForm\.Init\(true,\s*async function\s*\(callbackValue\)/);
+    assert.match(dialogSource, /await self\.HandlerBtnsAsync\(self\.SysMenuModel\.FormBtns/);
+});
+
+test("button controls keep the top-label spacer and titled DevComponents keep their business label", async function () {
+    const formSource = read(formFilename);
+    const styleSource = read(formStyleFilename);
+    const formUtilsMixin = (await import(formUtilsFilename)).default;
+
+    assert.ok((formSource.match(/is-button-field/g) || []).length >= 2);
+    assert.match(styleSource, /\.el-form--label-top \.is-button-field:not\(\.hide-label\)/);
+    assert.match(styleSource, /min-height:\s*28px/);
+    assert.equal(formUtilsMixin.methods.shouldShowLabel({ Component: "DevComponent", Label: "盘点明细", Config: { DevComponentName: "CountingDetails" } }), true);
+    assert.equal(formUtilsMixin.methods.shouldShowLabel({ Component: "DevComponent", Label: "", Config: { DevComponentName: "Dashboard" } }), false);
 });
 
 test("sys_menu module design uses mini code editors throughout DiyForm", function () {

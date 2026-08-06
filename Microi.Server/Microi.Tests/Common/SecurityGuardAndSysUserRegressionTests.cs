@@ -1,6 +1,10 @@
 using System.Net;
 using System.Reflection;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microi.net;
 using Microi.net.Api;
 using Newtonsoft.Json.Linq;
@@ -25,6 +29,120 @@ public class SecurityGuardAndSysUserRegressionTests
         Assert.Equal(
             "203.0.113.21",
             SecurityGuardRuntimePolicy.GetConnectionIp(context));
+    }
+
+    [Fact]
+    public void ContainerProxyTrust_UsesOnlyDiscoveredPrivateGatewayExactIps()
+    {
+        var gateways = new[]
+        {
+            IPAddress.Parse("172.30.0.1"),
+            IPAddress.Parse("10.20.0.1"),
+            IPAddress.Parse("203.0.113.1"),
+            IPAddress.Loopback
+        };
+
+        Assert.Empty(ForwardedProxyTrustPolicy.SelectContainerGatewayProxies(false, gateways));
+
+        var trusted = ForwardedProxyTrustPolicy.SelectContainerGatewayProxies(true, gateways);
+        Assert.Contains(IPAddress.Parse("172.30.0.1"), trusted);
+        Assert.Contains(IPAddress.Parse("10.20.0.1"), trusted);
+        Assert.DoesNotContain(IPAddress.Parse("203.0.113.1"), trusted);
+        Assert.DoesNotContain(IPAddress.Loopback, trusted);
+        Assert.True(ForwardedProxyTrustPolicy.IsContainerGatewayPeer(
+            IPAddress.Parse("172.30.0.1"),
+            trusted));
+        Assert.False(ForwardedProxyTrustPolicy.IsContainerGatewayPeer(
+            IPAddress.Parse("198.51.100.25"),
+            trusted));
+    }
+
+    [Fact]
+    public async Task TrustedContainerGateway_ProjectsForwardedIpButPublicPeerCannotForge()
+    {
+        var options = new ForwardedHeadersOptions
+        {
+            ForwardedHeaders = ForwardedHeaders.XForwardedFor,
+            ForwardLimit = 1
+        };
+        options.KnownIPNetworks.Clear();
+        options.KnownProxies.Clear();
+        options.KnownProxies.Add(IPAddress.Parse("172.30.0.1"));
+        var middleware = new ForwardedHeadersMiddleware(
+            _ => Task.CompletedTask,
+            NullLoggerFactory.Instance,
+            Options.Create(options));
+
+        var proxied = new DefaultHttpContext();
+        proxied.Connection.RemoteIpAddress = IPAddress.Parse("172.30.0.1");
+        proxied.Request.Headers["X-Forwarded-For"] = "198.51.100.25";
+        await middleware.Invoke(proxied);
+        Assert.Equal("198.51.100.25", proxied.Connection.RemoteIpAddress?.ToString());
+
+        var forged = new DefaultHttpContext();
+        forged.Connection.RemoteIpAddress = IPAddress.Parse("203.0.113.20");
+        forged.Request.Headers["X-Forwarded-For"] = "127.0.0.1";
+        await middleware.Invoke(forged);
+        Assert.Equal("203.0.113.20", forged.Connection.RemoteIpAddress?.ToString());
+    }
+
+    [Theory]
+    [InlineData(400, "/api/FormEngine/GetTableData", false)]
+    [InlineData(401, "/api/SysUser/GetCurrentUser", false)]
+    [InlineData(403, "/api/SecurityGuard/UnblockIp", false)]
+    [InlineData(404, "/apiengine/get-microi-store-list", false)]
+    [InlineData(429, "/api/FormEngine/GetTableData", false)]
+    [InlineData(500, "/apiengine/get-microi-upgrade-resource", false)]
+    [InlineData(404, "/wp-admin/install.php", true)]
+    [InlineData(405, "/.env", true)]
+    public void ErrorBurst_CountsOnlyUnmatchedRouteScanning(
+        int statusCode,
+        string path,
+        bool expected)
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = path;
+        context.Response.StatusCode = statusCode;
+
+        Assert.Equal(expected, SecurityGuardRuntimePolicy.ShouldCountAsAttackLikeResponse(context));
+    }
+
+    [Fact]
+    public void MatchedEndpoint404_IsAuditedButDoesNotCountTowardAutomaticBlock()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Path = "/known-controller/missing-item";
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        context.Items[SecurityGuardRuntimePolicy.MatchedEndpointItemKey] = true;
+
+        Assert.False(SecurityGuardRuntimePolicy.ShouldCountAsAttackLikeResponse(context));
+    }
+
+    [Fact]
+    public void LegacyBroadErrorBlock_IsRetiredWithoutWeakeningOtherBlockTypes()
+    {
+        Assert.True(SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(new BlockedIpState
+        {
+            ReasonKey = "HighError",
+            Reason = "IP在10秒内产生121次异常状态码，超过阈值120。"
+        }));
+        Assert.True(SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(new BlockedIpState
+        {
+            Reason = "IP在10秒内产生121次异常状态码，超过阈值120。"
+        }));
+        Assert.False(SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(new BlockedIpState
+        {
+            ReasonKey = "HighError",
+            Manual = true
+        }));
+        Assert.False(SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(new BlockedIpState
+        {
+            ReasonKey = "HighFrequency"
+        }));
+        Assert.False(SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(new BlockedIpState
+        {
+            ReasonKey = "RouteScan"
+        }));
     }
 
     [Fact]

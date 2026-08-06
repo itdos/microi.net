@@ -597,7 +597,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   );
   assert.ok(packageImporter, "application-store package should contain its importer");
   assert.ok(
-    compareSemanticVersions(packageModel.PackageInfo.Version, "v7.0.10") >= 0,
+    compareSemanticVersions(packageModel.PackageInfo.Version, "v7.0.13") >= 0,
     "application-store package version must not fall below the resumable importer baseline",
   );
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
@@ -605,7 +605,13 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.8.10") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.9.1") >= 0);
+  assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
+  assert.match(source, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
+  assert.match(source, /previousState\.UpgradePolicy[\s\S]*?CreateIfMissing/);
+  assert.match(source, /接口引擎稳定Id冲突/);
+  assert.match(source, /接口引擎稳定Key冲突/);
+  assert.match(source, /_OrderBy:\s*'InstallTime'[\s\S]*?_OrderByType:\s*'DESC'/);
   assert.match(source, /SCHEMA_BACKGROUND_CHUNKS_V1/);
   assert.match(source, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(source, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
@@ -644,10 +650,10 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 8, 10\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.8.10 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 8, 10\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 10\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 9, 1\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.9.1 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 9, 1\)/);
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 13\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
     3,
@@ -661,9 +667,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(appStoreUpgradeSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(appStoreUpgradeSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(appStoreUpgradeSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
+  assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 6, 0\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_008_010/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_009_001/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -673,8 +679,11 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(refreshSource, /versionNumber\s*<\s*1_004_004/);
-  assert.match(refreshSource, /versionNumber\s*<\s*7_000_010/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_006_000/);
+  assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_009_001/);
+  assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
+  assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {

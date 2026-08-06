@@ -146,6 +146,25 @@ namespace Microi.net
                 elapsedMilliseconds);
         }
 
+        public static void RecordAuditOnly(
+            HttpContext context,
+            SecurityGuardOptions options,
+            long elapsedMilliseconds)
+        {
+            var ip = GetRequestIp(context);
+            if (string.IsNullOrWhiteSpace(ip))
+            {
+                return;
+            }
+
+            AddRecentAccess(
+                context,
+                ip,
+                context.Response.StatusCode.ToString(),
+                elapsedMilliseconds,
+                options);
+        }
+
         public static void RecordAfterRequest(
             HttpContext context,
             SecurityGuardOptions options,
@@ -160,7 +179,7 @@ namespace Microi.net
 
             AddRecentAccess(context, ip, context.Response.StatusCode.ToString(), elapsedMilliseconds, options);
 
-            if (context.Response.StatusCode < 400)
+            if (!SecurityGuardRuntimePolicy.ShouldCountAsAttackLikeResponse(context))
             {
                 return;
             }
@@ -210,10 +229,10 @@ namespace Microi.net
             if (maxErrors > 0 && errorCount > maxErrors)
             {
                 var clientLabel = decision?.IsTrustedVsCode == true ? "受信 VS Code 只读拉取" : "IP";
-                var reason = $"{clientLabel}在{options.WindowSeconds}秒内产生{errorCount}次异常状态码，超过阈值{maxErrors}。";
+                var reason = $"{clientLabel}在{options.WindowSeconds}秒内产生{errorCount}次未匹配路由扫描，超过阈值{maxErrors}。";
                 var reasonKey = decision?.IsTrustedVsCode == true
-                    ? "TrustedVsCodeHighError"
-                    : "HighError";
+                    ? "TrustedVsCodeRouteScan"
+                    : "RouteScan";
                 BlockIp(ip, reason, options.BlockMinutes, false, requestCount, errorCount, securityScope, reasonKey);
                 TryLogSecurityEvent(context, options, ip, "恶意攻击自动封禁", reason, requestCount, errorCount);
             }
@@ -469,6 +488,36 @@ namespace Microi.net
                 ip,
                 out var sharedState,
                 out var sharedAvailable);
+
+            // v7.1.0 之前把所有 4xx/5xx 都当成攻击错误，可能把容器网关及整站用户
+            // 错误封禁。新节点首次读到该旧策略产生的自动封禁时立即退休共享/本机
+            // 状态；手动封禁、高频请求封禁与新版 RouteScan 封禁不受影响。
+            BlockedIpState retiredState = null;
+            if (SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(sharedState))
+            {
+                retiredState = sharedState;
+                TryDeleteSharedBlock(securityScope, ip);
+                sharedState = null;
+            }
+            if (SecurityGuardRuntimePolicy.IsLegacyBroadErrorBlock(localState))
+            {
+                retiredState ??= localState;
+                BlockedIps.TryRemove(localKey, out _);
+                localState = null;
+            }
+            if (retiredState != null)
+            {
+                EnqueueIpBlockRecord(
+                    retiredState,
+                    securityScope,
+                    "Auto",
+                    "LegacyErrorPolicyRetired",
+                    "Unblocked",
+                    "",
+                    "",
+                    "升级后自动解除旧版宽泛异常状态码策略造成的误封。");
+            }
+
             var source = SecurityGuardRuntimePolicy.ResolveActiveBlockSource(
                 sharedAvailable,
                 sharedState,
@@ -984,6 +1033,8 @@ namespace Microi.net
     /// </summary>
     public static class SecurityGuardRuntimePolicy
     {
+        public const string MatchedEndpointItemKey = "Microi.SecurityGuard.MatchedEndpoint";
+
         public static string GetConnectionIp(HttpContext context)
         {
             var address = context?.Connection?.RemoteIpAddress;
@@ -1014,6 +1065,56 @@ namespace Microi.net
             var value = (scope ?? "").Trim();
             if (value.Length == 0) value = "default";
             return value.Length <= 100 ? value : value.Substring(0, 100);
+        }
+
+        public static bool ShouldCountAsAttackLikeResponse(HttpContext context)
+        {
+            if (context == null)
+            {
+                return false;
+            }
+
+            var statusCode = context.Response.StatusCode;
+            if (statusCode != StatusCodes.Status404NotFound
+                && statusCode != StatusCodes.Status405MethodNotAllowed)
+            {
+                // 400/401/403/413/429 都可能是正常业务拒绝，5xx 更属于服务端故障；
+                // 这些响应可继续审计，但绝不能据此把客户端自动判成攻击者。
+                return false;
+            }
+
+            if (context.Items.TryGetValue(MatchedEndpointItemKey, out var matchedEndpoint)
+                && matchedEndpoint is true)
+            {
+                // 已匹配到平台 Controller/端点后的 404/405 是应用级结果，不是扫描。
+                return false;
+            }
+
+            var path = context.Request.Path.Value ?? "";
+            if (path.Equals("/api", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/api/", StringComparison.OrdinalIgnoreCase)
+                || path.Equals("/apiengine", StringComparison.OrdinalIgnoreCase)
+                || path.StartsWith("/apiengine/", StringComparison.OrdinalIgnoreCase))
+            {
+                // ApiEngine 是动态路由，接口不存在时可能没有 Endpoint；保留审计，
+                // 但客户端升级差异或应用轮询不能触发全站 IP 封禁。
+                return false;
+            }
+
+            return true;
+        }
+
+        public static bool IsLegacyBroadErrorBlock(BlockedIpState state)
+        {
+            if (state == null || state.Manual)
+            {
+                return false;
+            }
+
+            return string.Equals(state.ReasonKey, "HighError", StringComparison.Ordinal)
+                || string.Equals(state.ReasonKey, "TrustedVsCodeHighError", StringComparison.Ordinal)
+                || (string.IsNullOrWhiteSpace(state.ReasonKey)
+                    && (state.Reason ?? "").Contains("异常状态码", StringComparison.Ordinal));
         }
 
         public static SecurityGuardBlockSource ResolveActiveBlockSource(

@@ -1225,41 +1225,63 @@ export default {
 // ====== 主Tab样式 ======
 .main-tabs {
     background: var(--el-bg-color, #fff);
-    border-radius: 12px;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--el-border-color-lighter, #edf0f5);
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.05);
     min-height: 100%;
 
     :deep(.el-tabs__header) {
-        background: var(--mci-gradient-surface, linear-gradient(135deg, #f8faff 0%, #f0f5ff 100%));
+        position: relative;
+        z-index: 2;
+        overflow: visible;
+        background: var(--el-fill-color-extra-light, #f7f9fc);
         margin: 0;
-        padding: 0 20px;
+        padding: 9px 12px;
         border-bottom: 1px solid var(--el-border-color, #ebeef5);
-        border-radius: 12px 12px 0 0;
+        border-radius: 14px 14px 0 0;
     }
 
     :deep(.el-tabs__nav-wrap::after) {
         display: none;
     }
 
+    :deep(.el-tabs__nav-wrap),
+    :deep(.el-tabs__nav-scroll),
+    :deep(.el-tabs__nav),
     :deep(.el-tabs__item) {
-        height: 54px;
-        line-height: 54px;
-        font-size: 15px;
+        overflow: visible;
+    }
+
+    :deep(.el-tabs__item) {
+        height: 38px;
+        line-height: 38px;
+        padding: 0 4px;
+        margin-right: 4px;
+        font-size: 14px;
         color: var(--el-text-color-regular, #606266);
-        transition: all 0.3s;
+        transition: color 0.2s ease;
 
         &.is-active {
             color: var(--el-color-primary, #409eff);
             font-weight: 600;
+
+            .main-tab-label {
+                color: var(--el-color-primary, #409eff);
+                background: var(--el-color-primary-light-9, #ecf5ff);
+                box-shadow: inset 0 0 0 1px var(--el-color-primary-light-7, #c6e2ff), 0 3px 10px rgba(15, 23, 42, 0.06);
+            }
         }
         &:hover {
             color: var(--el-color-primary, #409eff);
+
+            .main-tab-label {
+                background: var(--el-fill-color-light, #f2f6fc);
+            }
         }
     }
 
     :deep(.el-tabs__active-bar) {
-        height: 3px;
-        border-radius: 3px;
+        display: none;
     }
 
     :deep(.el-tabs__content) {
@@ -1284,7 +1306,14 @@ export default {
 .main-tab-label {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    justify-content: center;
+    gap: 8px;
+    min-width: 92px;
+    height: 34px;
+    padding: 0 14px;
+    border-radius: 9px;
+    box-sizing: border-box;
+    transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 :deep(.workflow-form-engine-table .box-card-table-row-list) {
@@ -1452,8 +1481,16 @@ export default {
 }
 
 .notice-badge {
+    display: inline-flex;
+    overflow: visible;
+
     :deep(.el-badge__content) {
+        z-index: 3;
+        top: 1px;
+        right: 5px;
+        border: 2px solid var(--el-fill-color-extra-light, #f7f9fc);
         font-size: 11px;
+        transform: translate(55%, -45%);
     }
 }
 
@@ -1634,20 +1671,27 @@ export default {
         border-radius: 0;
 
         :deep(.el-tabs__header) {
-            padding: 0 10px;
+            padding: 7px 8px;
             border-radius: 0;
         }
 
         :deep(.el-tabs__item) {
-            height: 44px;
-            line-height: 44px;
+            height: 36px;
+            line-height: 36px;
             font-size: 13px;
-            padding: 0 10px;
+            padding: 0 2px;
         }
 
         :deep(.el-tabs__content) {
             padding: 12px;
         }
+    }
+
+    .main-tab-label {
+        min-width: 76px;
+        height: 32px;
+        padding: 0 10px;
+        gap: 6px;
     }
 
     .stats-cards {

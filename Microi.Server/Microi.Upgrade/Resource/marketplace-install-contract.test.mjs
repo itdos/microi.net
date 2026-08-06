@@ -17,7 +17,7 @@ function parseButtons(value) {
 }
 
 test("application-store package hides every install mutation on the official platform", () => {
-  assert.equal(packageModel.PackageInfo.Version, "v7.0.10");
+  assert.equal(packageModel.PackageInfo.Version, "v7.0.13");
   const menu = packageModel.SysMenus.find((item) => item.Url === "/microi-store");
   assert.ok(menu, "application-store menu is missing");
 
@@ -102,7 +102,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v1\.8\.10/);
+  assert.match(importerSource, /Version: v1\.9\.1/);
   assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
   assert.match(importerSource, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
   assert.match(importerSource, /MySqlOffpageTypeOverrides/);
@@ -120,11 +120,15 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /throw new Error\('更新接口引擎失败：'/);
   assert.match(importerSource, /throw new Error\('新增接口引擎失败：'/);
   assert.match(importerSource, /actualCode !== expectedCode/);
+  assert.match(importerSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
+  assert.match(importerSource, /UpgradePolicy == 'CreateIfMissing'/);
+  assert.match(importerSource, /localHash != incomingHash[\s\S]*localHash != baseHash/);
+  assert.match(importerSource, /接口引擎升级冲突/);
 
   const embeddedImporter = packageModel.SysApiEngines.find(
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v1.8.10");
+  assert.equal(embeddedImporter.Version, "v1.9.1");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

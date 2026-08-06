@@ -3,13 +3,23 @@
         <section v-if="state.active" class="api-service-unavailable" role="alert" aria-live="assertive">
             <div class="api-service-unavailable__mesh" aria-hidden="true"></div>
             <div class="api-service-unavailable__shell">
-                <div class="api-service-unavailable__visual" aria-hidden="true">
-                    <div class="api-service-unavailable__orbit api-service-unavailable__orbit--outer"></div>
-                    <div class="api-service-unavailable__orbit api-service-unavailable__orbit--inner"></div>
-                    <div class="api-service-unavailable__node api-service-unavailable__node--one"></div>
-                    <div class="api-service-unavailable__node api-service-unavailable__node--two"></div>
-                    <div class="api-service-unavailable__icon">
-                        <el-icon><Connection /></el-icon>
+                <div class="api-service-unavailable__visual">
+                    <div class="api-service-unavailable__orbit api-service-unavailable__orbit--outer" aria-hidden="true"></div>
+                    <div class="api-service-unavailable__orbit api-service-unavailable__orbit--inner" aria-hidden="true"></div>
+                    <div class="api-service-unavailable__node api-service-unavailable__node--one" aria-hidden="true"></div>
+                    <div class="api-service-unavailable__node api-service-unavailable__node--two" aria-hidden="true"></div>
+                    <div class="api-service-unavailable__brand">
+                        <div class="api-service-unavailable__icon">
+                            <img
+                                v-if="tenantLogoUrl && !logoLoadFailed"
+                                :src="tenantLogoUrl"
+                                :alt="`${tenantTitle} Logo`"
+                                @error="logoLoadFailed = true"
+                            />
+                            <el-icon v-else aria-hidden="true"><Connection /></el-icon>
+                        </div>
+                        <strong>{{ tenantTitle }}</strong>
+                        <span v-if="state.osClient">OsClient：{{ state.osClient }}</span>
                     </div>
                 </div>
 
@@ -29,26 +39,62 @@
                         </template>
                     </p>
 
-                    <dl v-if="isSecurity" class="api-service-unavailable__details">
+                    <dl v-if="isSecurity" class="api-service-unavailable__details is-security-details">
                         <div>
                             <dt>被拦截 IP</dt>
                             <dd>{{ state.ip || "-" }}</dd>
                         </div>
                         <div>
-                            <dt>自动解除时间</dt>
-                            <dd :title="state.expiresAtUtc">{{ formatUtc(state.expiresAtUtc) }}</dd>
-                        </div>
-                        <div>
-                            <dt>拦截原因</dt>
-                            <dd class="api-service-unavailable__details-long" :title="state.reason">{{ state.reason || "-" }}</dd>
-                        </div>
-                        <div>
                             <dt>保护状态</dt>
-                            <dd>{{ state.stateBackend === "SharedRedis" ? "共享 Redis（跨节点）" : "本节点安全降级" }}</dd>
+                            <dd>{{ formatStateBackend(state.stateBackend) }}</dd>
                         </div>
                         <div>
-                            <dt>请求位置</dt>
-                            <dd :title="state.requestPath">{{ state.requestPath || "-" }}</dd>
+                            <dt>请求方法</dt>
+                            <dd>{{ state.requestMethod || "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>当前租户</dt>
+                            <dd>{{ tenantTitle }}（OsClient：{{ state.osClient || "未识别" }}）</dd>
+                        </div>
+                        <div>
+                            <dt>当前站点</dt>
+                            <dd>{{ state.clientOrigin || "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>当前租户 ApiBase</dt>
+                            <dd>{{ state.apiBase || "-" }}</dd>
+                        </div>
+                        <div class="api-service-unavailable__details-wide api-service-unavailable__request-url">
+                            <dt>实际请求目标（完整地址）</dt>
+                            <dd>{{ state.requestUrl || "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>拦截开始时间</dt>
+                            <dd>{{ formatUtc(state.blockedAtUtc) }}</dd>
+                        </div>
+                        <div>
+                            <dt>自动解除时间</dt>
+                            <dd>{{ formatUtc(state.expiresAtUtc) }}</dd>
+                        </div>
+                        <div>
+                            <dt>剩余等待</dt>
+                            <dd>{{ formatRetryAfter(state.retryAfterSeconds) }}</dd>
+                        </div>
+                        <div>
+                            <dt>自动解除</dt>
+                            <dd>{{ state.autoUnblock ? "是" : "否" }}</dd>
+                        </div>
+                        <div>
+                            <dt>原因标识</dt>
+                            <dd>{{ state.reasonKey || "-" }}</dd>
+                        </div>
+                        <div>
+                            <dt>安全范围</dt>
+                            <dd>{{ state.securityScope || "-" }}</dd>
+                        </div>
+                        <div class="api-service-unavailable__details-wide">
+                            <dt>完整拦截原因</dt>
+                            <dd>{{ state.reason || "-" }}</dd>
                         </div>
                     </dl>
                     <dl v-else class="api-service-unavailable__details">
@@ -65,8 +111,12 @@
                             <dd>{{ state.reason || "连接失败" }}</dd>
                         </div>
                         <div>
-                            <dt>请求位置</dt>
-                            <dd :title="state.requestPath">{{ state.requestPath || "-" }}</dd>
+                            <dt>请求方法</dt>
+                            <dd>{{ state.requestMethod || "-" }}</dd>
+                        </div>
+                        <div class="api-service-unavailable__details-wide">
+                            <dt>实际请求目标（完整地址）</dt>
+                            <dd>{{ state.requestUrl || "-" }}</dd>
                         </div>
                     </dl>
 
@@ -103,23 +153,55 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { Connection, DocumentCopy, Monitor, RefreshRight } from "@element-plus/icons-vue";
 import { ElMessage } from "element-plus";
+import { useDiyStore } from "@/pinia";
+import { resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 import {
     apiServiceState as state,
     checkApiServiceNow,
     getApiServiceDiagnostic,
 } from "@/utils/api-service-status.js";
 
+const diyStore = useDiyStore();
+const logoLoadFailed = ref(false);
 const isSecurity = computed(function () {
     return state.mode === "security";
+});
+const tenantTitle = computed(function () {
+    return diyStore.SysConfig?.SysTitle || diyStore.WebTitle || "Microi 吾码";
+});
+const tenantLogoUrl = computed(function () {
+    return resolveLoginSystemLogoUrl(diyStore.SysConfig?.SysLogo, function (path) {
+        const fileServer = String(diyStore.FileServer || diyStore.SysConfig?.FileServer || "").replace(/\/+$/, "");
+        return fileServer ? `${fileServer}${path}` : path;
+    });
+});
+
+watch(tenantLogoUrl, function () {
+    logoLoadFailed.value = false;
 });
 
 function formatUtc(value) {
     if (!value) return "等待后端返回";
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatStateBackend(value) {
+    if (value === "SharedRedis") return "共享 Redis（跨节点）";
+    if (value === "ProcessFallback") return "本节点安全降级";
+    return value || "-";
+}
+
+function formatRetryAfter(value) {
+    const seconds = Number(value || 0);
+    if (!seconds) return "-";
+    if (seconds < 60) return `${seconds} 秒`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return remainingSeconds ? `${minutes} 分 ${remainingSeconds} 秒` : `${minutes} 分钟`;
 }
 
 async function retry() {
@@ -165,7 +247,7 @@ async function copyDiagnostic() {
     z-index: 32000;
     inset: 0;
     display: grid;
-    place-items: center;
+    place-items: start center;
     overflow: auto;
     padding: 40px;
     color: #162033;
@@ -186,9 +268,9 @@ async function copyDiagnostic() {
 .api-service-unavailable__shell {
     position: relative;
     display: grid;
-    grid-template-columns: 300px minmax(0, 640px);
-    width: min(1040px, 100%);
-    min-height: 520px;
+    grid-template-columns: 310px minmax(0, 850px);
+    width: min(1160px, 100%);
+    min-height: 600px;
     overflow: hidden;
     border: 1px solid rgba(30, 76, 92, 0.12);
     border-radius: 8px;
@@ -243,18 +325,51 @@ async function copyDiagnostic() {
     position: relative;
     z-index: 2;
     display: grid;
-    width: 92px;
-    height: 92px;
+    width: 116px;
+    height: 116px;
     place-items: center;
     border: 1px solid rgba(255, 255, 255, 0.28);
     border-radius: 50%;
     color: #fff;
-    background: #d95735;
+    background: #fff;
     box-shadow: 0 0 0 12px rgba(217, 87, 53, 0.12), 0 18px 40px rgba(0, 0, 0, 0.22);
 }
 
 .api-service-unavailable__icon .el-icon {
+    color: #d95735;
     font-size: 44px;
+}
+
+.api-service-unavailable__icon img {
+    display: block;
+    width: 82%;
+    height: 82%;
+    object-fit: contain;
+}
+
+.api-service-unavailable__brand {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    max-width: 250px;
+    align-items: center;
+    flex-direction: column;
+    color: #fff;
+    text-align: center;
+}
+
+.api-service-unavailable__brand strong {
+    margin-top: 28px;
+    font-size: 21px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.api-service-unavailable__brand span {
+    margin-top: 8px;
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 12px;
+    overflow-wrap: anywhere;
 }
 
 .api-service-unavailable__node {
@@ -284,7 +399,7 @@ async function copyDiagnostic() {
     min-width: 0;
     flex-direction: column;
     justify-content: center;
-    padding: 54px 58px;
+    padding: 42px 48px;
 }
 
 .api-service-unavailable__eyebrow {
@@ -329,6 +444,10 @@ async function copyDiagnostic() {
     border-left: 1px solid #e7edf2;
 }
 
+.api-service-unavailable__details.is-security-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .api-service-unavailable__details > div {
     min-width: 0;
     padding: 14px 16px;
@@ -343,20 +462,24 @@ async function copyDiagnostic() {
 }
 
 .api-service-unavailable__details dd {
-    overflow: hidden;
     margin: 0;
     color: #344054;
     font-size: 14px;
     font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
 }
 
-.api-service-unavailable__details dd.api-service-unavailable__details-long {
-    overflow: visible;
-    line-height: 1.45;
-    text-overflow: clip;
-    white-space: normal;
+.api-service-unavailable__details-wide {
+    grid-column: 1 / -1;
+}
+
+.api-service-unavailable__request-url dd {
+    color: #175f70;
+    font-family: Consolas, "SFMono-Regular", "Liberation Mono", monospace;
+    font-size: 13px;
 }
 
 .api-service-unavailable__content.is-security-blocked h1 {
@@ -385,6 +508,10 @@ async function copyDiagnostic() {
     margin-top: 20px;
     color: #98a2b3;
     font-size: 12px;
+}
+
+.api-service-unavailable__hint span {
+    overflow-wrap: anywhere;
 }
 
 .api-service-fade-enter-active,
@@ -447,8 +574,8 @@ async function copyDiagnostic() {
     }
 
     .api-service-unavailable__icon {
-        width: 70px;
-        height: 70px;
+        width: 82px;
+        height: 82px;
     }
 
     .api-service-unavailable__icon .el-icon {
@@ -459,11 +586,20 @@ async function copyDiagnostic() {
         padding: 30px 24px;
     }
 
+    .api-service-unavailable__brand strong {
+        margin-top: 18px;
+        font-size: 18px;
+    }
+
     .api-service-unavailable h1 {
         font-size: 24px;
     }
 
     .api-service-unavailable__details {
+        grid-template-columns: 1fr;
+    }
+
+    .api-service-unavailable__details.is-security-details {
         grid-template-columns: 1fr;
     }
 

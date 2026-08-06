@@ -124,6 +124,25 @@ namespace Microi.net
                     {
                         throw new InvalidOperationException(string.Join("；", saasRuntimeMessages));
                     }
+                    // 当前流式应用发布接口会直接读取 V3 发布闸门与协议字段。历史租户
+                    // 可能因更早的无关迁移失败或版本号漂移而跳过 Upgrade25，因此把
+                    // 这组扩展型物理结构作为运行时前置条件，在同一分布式租约内幂等维护。
+                    upgradeLease.ThrowIfLost();
+                    var applicationGateMessages = await new Upgrade25()
+                        .EnsureTenantGateInvariant(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (applicationGateMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", applicationGateMessages));
+                    }
+                    upgradeLease.ThrowIfLost();
+                    var applicationStreamSchemaMessages = await new Upgrade25()
+                        .EnsureApplicationStreamV3SchemaInvariant(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (applicationStreamSchemaMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("；", applicationStreamSchemaMessages));
+                    }
                     upgradeLease.ThrowIfLost();
                     var userAccessKeyMenuMessages = await new Upgrade26()
                         .Run(runtimeClient.OsClient)
@@ -165,15 +184,6 @@ namespace Microi.net
                     if (translateConfigurationMessages.Count > 0)
                     {
                         throw new InvalidOperationException(string.Join("；", translateConfigurationMessages));
-                    }
-                    upgradeLease.ThrowIfLost();
-                    // zhy：在共享升级租约内幂等补齐历史高版本租户缺失的微信内容安全配置。
-                    var weChatContentSecurityMessages = await new Upgrade32()
-                        .Run(runtimeClient.OsClient)
-                        .ConfigureAwait(false);
-                    if (weChatContentSecurityMessages.Count > 0)
-                    {
-                        throw new InvalidOperationException(string.Join("; ", weChatContentSecurityMessages));
                     }
                     upgradeLease.ThrowIfLost();
                     var currentVersion = runtimeClient.Db

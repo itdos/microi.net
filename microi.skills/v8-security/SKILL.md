@@ -354,7 +354,10 @@ try {
 - 普通访问默认阈值为 10 秒 600 请求/120 异常。VS Code 多服务器源码拉取不能通过减少并发或请求量规避；符合条件的只读 V8Debug `Get/List` 使用独立桶，默认 10 秒 6000 请求/1200 异常。
 - 受信判断必须同时满足：服务端共享登录态确认 `Level >= 9999`、请求 Token 是活动 `ClientType=VSCode` Token、请求 `did` 与该 Token 保存的 Did 完全一致、路由为只读 `/api/V8Debug/Get*` 或 `/api/V8Debug/List*`。自报 `ClientType`、User-Agent、`X-User-Level`、单独伪造 did 都不可信；Update/Create/Execute/Upload/Finalize 和 FormEngine 写入不放宽。
 - 普通请求的计数 scope 固定为当前 API 主运行实例，不能使用请求方可控的 `OsClient` Query/Header 选择 Redis 桶；只有已通过上述联合校验的 VS Code profile 才能使用活动 Token 服务端绑定的租户 scope。测试必须覆盖轮换两个真实租户 Key 仍落入同一普通桶。
-- SecurityGuard 只读取 `Connection.RemoteIpAddress`，不得直接解析 `X-Forwarded-For`/`X-Real-IP`。宿主在 `UseForwardedHeaders` 中只信任主租户 SaaS 引擎【后端运行配置】的 `BackendForwardedKnownProxies` 精确 IP 和 `BackendForwardedKnownNetworks` 受控 CIDR；禁止使用环境变量、自定义 `appsettings` 节点、`0.0.0.0/0` 或 `::/0`。历史 `SecurityRespectForwardedHeaders` 字段不能建立 Header 信任。该宿主配置变更需滚动重启节点，测试必须覆盖公网 Remote IP 携带伪造 `X-Forwarded-For: 127.0.0.1` 时仍识别公网 IP。
+- SecurityGuard 只读取 `Connection.RemoteIpAddress`，不得直接解析 `X-Forwarded-For`/`X-Real-IP`。容器运行时可自动信任当前容器路由表实际发现的 RFC1918/ULA 私有默认网关**精确 IP**，用于宿主 Nginx 经 Docker 发布端口转发的最后一跳；不得自动信任公网网关或任意私有网段。其它代理只信任主租户 SaaS 引擎【后端运行配置】的 `BackendForwardedKnownProxies` 精确 IP 和 `BackendForwardedKnownNetworks` 受控 CIDR；禁止使用环境变量、自定义 `appsettings` 节点、`0.0.0.0/0` 或 `::/0`。历史 `SecurityRespectForwardedHeaders` 字段不能建立 Header 信任。该宿主配置变更需滚动重启节点，测试必须覆盖容器网关把 XFF 投影为真实 IP，以及公网 Remote IP 携带伪造 `X-Forwarded-For: 127.0.0.1` 时仍识别公网 IP。
+- `UseForwardedHeaders` 后若 Remote IP 仍是自动发现的精确容器网关，表示代理未提供可验证的客户端地址；该请求不得进入按 IP 自动封禁，否则任一用户可导致全站误封。此降级不跳过后续全局请求压力、内存和业务鉴权，公网或普通私网地址也不适用；运维仍应补齐最后一跳转发头。
+- IP 错误窗口只把未匹配端点的 404/405 作为扫描计数；400/401/403/413/429、5xx、已匹配 Controller 以及 `/api`、`/apiengine` 动态路由的应用级 404/405 只能审计，不能触发自动封禁。请求总量窗口继续作为独立的高频攻击门禁，禁止用服务端故障或正常业务拒绝反向惩罚客户端。
+- 旧版 `HighError`／`TrustedVsCodeHighError` 宽泛错误策略产生的自动封禁属于可识别的失效状态；升级节点应从共享 Redis 和本机缓存幂等退休，不能要求所有租户等待旧 TTL，也不能解除手动、`HighFrequency` 或新版 `RouteScan` 封禁。
 - 自动封禁按 `ExpiresAtUtc` 到期解除。立即解除只能从未被封禁的管理网络，以平台超级管理员进入【系统日志 → 安全防护】操作 `/api/SecurityGuard/UnblockIp`；同一被封出口不能给自己解封。
 - 固定可信出口才可精确加入当前服务器匹配 `sys_osclients.SecurityWhitelistIps`。禁止全网段、动态用户 IP 或请求参数自动入白名单，也不要关闭安全防护或全局放大普通阈值。
 - 多节点封禁、解封和到期状态必须进入共享 Redis/数据库；本机静态字典只能做缓存。Redis 可用且共享 block 不存在就是权威已解封，节点必须删除本机旧 block，禁止把旧状态回写复活；Redis 不可用时才允许本机降级。验收要让同一出口分别命中至少两个 API 节点，覆盖普通阈值、受信读取、伪造 Header、手动解除和自动到期。
