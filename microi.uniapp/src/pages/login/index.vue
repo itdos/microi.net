@@ -203,6 +203,15 @@ function normalizeAuthLoginUser(data) {
     : data
 }
 
+function getLoginResultToken(data) {
+  if (!data || typeof data !== 'object') return ''
+  return String(data.Token || data.token || '')
+}
+
+function isValidLoginSession(user, token) {
+  return !!(token && user && user.Id)
+}
+
 export default {
   mixins: [themeMixin],
   data() {
@@ -522,23 +531,20 @@ export default {
         if (result.Code === 1 && result.Data) {
           // 已绑定用户，直接登录成功
           const currentUser = normalizeAuthLoginUser(result.Data)
-          const token = getToken()
-          if (token) {
-            setUser(currentUser)
-            this.showLoginSuccess(currentUser)
-            this.navigateAfterLogin()
-          } else {
-            const bodyToken = result.Data.Token || result.Data.token
-            if (bodyToken) {
-              setToken(bodyToken)
-              setUser(currentUser)
-              this.showLoginSuccess(currentUser)
-              this.navigateAfterLogin()
-            } else {
-              uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
-              this.showAccountLogin = true
-            }
+          let token = getToken()
+          if (!token) {
+            token = getLoginResultToken(result.Data)
+            if (token) setToken(token)
           }
+          if (!isValidLoginSession(currentUser, token)) {
+            removeToken()
+            uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
+            this.showAccountLogin = true
+            return
+          }
+          setUser(currentUser)
+          this.showLoginSuccess(currentUser)
+          this.navigateAfterLogin()
         } else {
           const msg = result.Msg || this.t('login.loginFailed')
           // 未绑定帐号，显示手机号授权按钮进行注册绑定
@@ -602,23 +608,20 @@ export default {
 
         if (result.Code === 1 && result.Data) {
           const currentUser = normalizeAuthLoginUser(result.Data)
-          const token = getToken()
-          if (token) {
-            setUser(currentUser)
-            this.showLoginSuccess(currentUser)
-            this.navigateAfterLogin()
-          } else {
-            const bodyToken = result.Data.Token || result.Data.token
-            if (bodyToken) {
-              setToken(bodyToken)
-              setUser(currentUser)
-              this.showLoginSuccess(currentUser)
-              this.navigateAfterLogin()
-            } else {
-              uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
-              this.showAccountLogin = true
-            }
+          let token = getToken()
+          if (!token) {
+            token = getLoginResultToken(result.Data)
+            if (token) setToken(token)
           }
+          if (!isValidLoginSession(currentUser, token)) {
+            removeToken()
+            uni.showToast({ title: this.t('login.pleaseUseAccount'), icon: 'none' })
+            this.showAccountLogin = true
+            return
+          }
+          setUser(currentUser)
+          this.showLoginSuccess(currentUser)
+          this.navigateAfterLogin()
           this.showPhoneAuth = false
         } else {
           const msg = result.Msg || this.t('login.loginFailedMsg')
@@ -684,19 +687,26 @@ export default {
 
         if (result.Code === 1 && result.Data) {
           // Token 已由 request.js 自动从响应头提取并保存
-          const token = getToken()
+          const currentUser = normalizeAuthLoginUser(result.Data)
+          let token = getToken()
           console.log('[Login] 登录成功，Token:', token ? ('已保存，长度=' + token.length) : '未获取到')
           if (!token) {
             // 兜底：尝试从响应体提取
-            const bodyToken = result.Data.Token || result.Data.token
+            const bodyToken = getLoginResultToken(result.Data)
             if (bodyToken) {
               setToken(bodyToken)
+              token = bodyToken
               console.log('[Login] 从响应体提取 Token，长度:', bodyToken.length)
             }
           }
-          setUser(result.Data)
+          if (!isValidLoginSession(currentUser, token)) {
+            removeToken()
+            uni.showToast({ title: '登录响应缺少有效身份，请重新登录', icon: 'none', duration: 2500 })
+            return
+          }
+          setUser(currentUser)
           this.persistLoginPreferences(encryptedPwd)
-          this.showLoginSuccess(result.Data)
+          this.showLoginSuccess(currentUser)
           this.navigateAfterLogin()
         } else {
           if (canReuseRememberedCipher) this.clearRememberedPassword()
