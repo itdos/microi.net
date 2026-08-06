@@ -111,7 +111,8 @@
                                             :label-position="GetLabelPosition(field)"
                                             :prop="field.Name"
                                             :class="'form-item' + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
-                                                    + (shouldShowLabel(field) ? '' : ' hide-label ')"
+                                                    + (shouldShowLabel(field) ? '' : ' hide-label ')
+                                                    + (GetFieldReadOnly(field) ? ' is-field-readonly ' : '')"
                                         >
                                             <template #label>
                                                 <span :title="GetFormItemLabel(field)" :style="getFieldLabelStyle(field)">
@@ -189,7 +190,8 @@
                                             :prop="field.Name"
                                             :class="'form-item'
                                                     + (field.NotEmpty && FormMode != 'View' ? ' is-required ' : '')
-                                                    + (shouldShowLabel(field) ? '' : ' hide-label ')"
+                                                    + (shouldShowLabel(field) ? '' : ' hide-label ')
+                                                    + (GetFieldReadOnly(field) ? ' is-field-readonly ' : '')"
                                         >
                                             <!-- v-if="shouldShowLabel(field)" -->
                                             <template #label>
@@ -1249,15 +1251,19 @@ export default {
                         self.LoadMap = true;
                         self.DiyFieldList = resultGetDiyField.Data;
 
-                        // 字段数据源新位置
-                        self.DiyCommon.SetFieldsData(self.DiyFieldList, formData, self.TableChildAuth);
-
                         // 初始化每个字段的属性（从计算属性移到这里，避免副作用）
                         self.DiyFieldList.forEach((field) => {
                             if (field) {
                                 self.DiyCommon.EnsureFieldProperties(field, self.FormDiyTableModel, null);
                             }
                         });
+
+                        // 先把接口返回的字段数组放进响应式列表，再立即从这批字段加载数据源。
+                        // 旧实现使用赋值前的 self.DiyFieldList（通常为空）；改为嵌套
+                        // nextTick 后，在复用的全屏表单里又可能错过本次初始化周期。
+                        // SetFieldsData 本身是异步的，组件随后挂载时会直接读取 field.Data，
+                        // 已挂载组件则由 field.Data watcher 接收回填。
+                        self.DiyCommon.SetFieldsData(self.DiyFieldList, formData, self.TableChildAuth);
 
                         self.RefreshDiyFieldRuntimeState();
                         formTrace("diy-form:runtime-refresh-after-fields", {

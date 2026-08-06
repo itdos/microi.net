@@ -97,6 +97,10 @@ Microi API 安装时，`AppSettings` 与同名容器环境变量只允许以下�
   只在端口、命令行和当前工作区路径同时匹配时停止 Microi API/Vite，并额外查找当前工作区
   的 Release API；身份不匹配时失败关闭，禁止使用 `/IM dotnet.exe`、`/IM node.exe`、
   `/IM chrome.exe` 或 `/IM msedge.exe` 全机清理。
+- Vite 以相对 `node_modules/vite/bin/vite.js` 启动且父进程退出时，命令行可能没有绝对工作区路径。
+  进程管理器只能把只读回读到的 CWD 精确等于当前 `Microi.Client` 作为补充证据；读取失败、
+  CWD 属于其它目录或仅检测到孤儿状态时仍须失败关闭。回归同时覆盖当前工作区可精确停止、
+  外部工作区同名相对 Vite 保持运行。
 - 停止后必须确认 `61500/61501` 已释放，并以 `FileShare.None` 独占打开
   `Microi.net.Api/bin/Release/net10.0` DLL。只结束 `VBCSCompiler` 不能解决正在运行的
   `.NET Host` 对业务 DLL 的锁定。
