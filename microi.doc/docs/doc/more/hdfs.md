@@ -27,22 +27,22 @@ Token 只用于确认用户和租户。普通帐号不能因为持有 Token 就�
 
 个人资料保存还会在服务端再次核对审核记录、图片路径和提交人，并用 `msgSecCheck` 检查姓名、实名和个人简介。因此不能通过跳过前端轮询或直接请求 `UptSysUser` 绕过检测。
 
-Upgrade32 会在当前租户的 SaaS 引擎“微信小程序”Tab 增加以下配置；这些值不得写入 `appsettings.json`、环境变量、UniApp 源码或日志：
+SaaS 引擎“微信小程序”Tab 提供以下租户配置；它们属于敏感配置，不得写入 `appsettings.json`、环境变量、UniApp 源码、接口引擎或日志。相关字段应随官方应用商城资源交付，不再为此新增 `Microi.Upgrade` 定制迁移：
 
 | SaaS 引擎字段 | 说明 |
 |---|---|
 | `WeChatMiniProgramAppId` | 当前小程序 AppId |
 | `WeChatMiniProgramAppSecret` | 当前小程序 AppSecret，仅后端读取 |
 | `WeChatMiniProgramMessageToken` | 微信消息推送签名 Token |
-| `WeChatMiniProgramEncodingAESKey` | 可选；兼容／安全模式回调解密密钥 |
+| `WeChatMiniProgramAESKey` | 可选；兼容／安全模式回调解密密钥（EncodingAESKey，43 位） |
 
 在微信公众平台配置小程序消息推送 URL：
 
 ```text
-https://<API公网域名>/api/WeChatContentSecurity/Callback?o=<OsClient>
+https://<API公网域名>/api/WeChatContentSecurity/Callback--OsClient--<OsClient>--
 ```
 
-Token 必须与 `WeChatMiniProgramMessageToken` 完全一致；可先使用明文模式，启用兼容或安全模式时同时填写 EncodingAESKey。API 域名必须是微信可访问的 HTTPS 地址，负载均衡后的所有节点连接同一 Redis。接入依据见微信官方 [`mediaCheckAsync`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.mediaCheckAsync.html) 与 [`msgSecCheck`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.msgSecCheck.html) 文档。
+如果第三方设置页确认支持查询参数，也可以使用 `/api/WeChatContentSecurity/Callback?OsClient=<OsClient>`；禁止使用 `?o=`。Token 必须与 `WeChatMiniProgramMessageToken` 完全一致；可先使用明文模式，启用兼容或安全模式时同时填写 EncodingAESKey。API 域名必须是微信可访问的 HTTPS 地址，负载均衡后的所有节点连接同一 Redis。接入依据见微信官方 [`mediaCheckAsync`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.mediaCheckAsync.html) 与 [`msgSecCheck`](https://developers.weixin.qq.com/miniprogram/dev/api-backend/open-api/sec-check/security.msgSecCheck.html) 文档。
 
 ### 租户动态限制、灾难保护上限与每日配额
 

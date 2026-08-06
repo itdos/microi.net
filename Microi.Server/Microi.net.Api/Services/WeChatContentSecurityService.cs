@@ -1,23 +1,21 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 using Dos.Common;
 using Microsoft.AspNetCore.Http;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 
 namespace Microi.net.Api;
 
-// zhy：集中实现微信图片/文本内容安全检测、可信回调及保存前复核，所有异常均失败关闭。
 /// <summary>
 /// 微信小程序用户发布内容安全服务。审核记录和 access_token 均存放在租户共享 Redis，
 /// 任意 API 节点都可以提交、接收回调和完成保存前复核。
 /// </summary>
 public sealed class WeChatContentSecurityService
 {
+    public const string CallbackCoreApiEngineKey = "mci-wechat-content-callback-core";
     public const string UnsafeContentMessage = "你发布的内容含违规信息，请修改后重试。";
     public const string CheckingContentMessage = "内容正在进行安全检测，请稍后重试。";
     public const string UnavailableContentMessage = "内容安全检测暂不可用，请稍后重试。";
@@ -36,35 +34,33 @@ public sealed class WeChatContentSecurityService
         _httpClientFactory = httpClientFactory;
     }
 
-    public static bool IsWeChatMiniProgramRequest(HttpContext context)
+    public static bool IsWeChatMiniProgramRequest(HttpContext context, CurrentToken currentToken = null)
     {
         if (context == null) return false;
-        var claim = context.User?.Claims?.FirstOrDefault(item => item.Type == "ClientType")?.Value;
-        if (string.Equals(claim, "WxMiniProgram", StringComparison.OrdinalIgnoreCase)) return true;
+        if (context.User?.Identity?.IsAuthenticated == true)
+        {
+            var authenticatedClaim = context.User.Claims
+                .FirstOrDefault(item => item.Type == "ClientType")?.Value;
+            if (string.Equals(authenticatedClaim, "WxMiniProgram", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
 
-        try
-        {
-            var authorization = context.Request.Headers["Authorization"].ToString();
-            var token = authorization.DosTrim().DosReplace("Bearer ", "");
-            if (token.DosIsNullOrWhiteSpace()) return false;
-            var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-            claim = jwt.Claims.FirstOrDefault(item => item.Type == "ClientType")?.Value;
-            return string.Equals(claim, "WxMiniProgram", StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
-        }
+        // ASP.NET JwtBearer 不是吾码登录态的唯一事实源。只有请求令牌仍精确存在于
+        // 当前租户共享 Redis 登录态中时，才信任缓存记录的终端类型；禁止只解码
+        // 未验证签名的 JWT payload 后把 ClientType 当成可信依据。
+        var authorization = context.Request.Headers["Authorization"].ToString();
+        var activeToken = DiyToken.GetActiveCachedTokenEntry(currentToken, authorization);
+        return string.Equals(activeToken?.ClientType, "WxMiniProgram", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<DosResult> SubmitUploadedImagesAsync(
         DosResult uploadResult,
         DiyUploadParam param,
-        HttpContext context,
         CancellationToken cancellationToken)
     {
         if (uploadResult?.Code != 1 || uploadResult.Data == null || param == null) return uploadResult;
-        var mustCheck = IsWeChatMiniProgramRequest(context) || param.ContentSecurityRequired == true;
+        var mustCheck = string.Equals(param._ClientType, "WxMiniProgram", StringComparison.OrdinalIgnoreCase)
+                        || param.ContentSecurityRequired == true;
         if (!mustCheck) return uploadResult;
 
         try
@@ -309,6 +305,38 @@ public sealed class WeChatContentSecurityService
         }
     }
 
+    /// <summary>
+    /// 微信后台可使用不带查询参数的 --OsClient--{tenant}-- 地址；普通 HTTP
+    /// 也可使用 ?OsClient={tenant}。同时提供时必须一致，且不接受旧的 o 别名。
+    /// </summary>
+    public static bool TryResolveCallbackTenant(
+        string routeOsClient,
+        string queryOsClient,
+        out string osClient)
+    {
+        osClient = null;
+        try
+        {
+            var routeTenant = routeOsClient.DosIsNullOrWhiteSpace()
+                ? null
+                : TenantConfigurationSecurity.NormalizeTenantId(routeOsClient);
+            var queryTenant = queryOsClient.DosIsNullOrWhiteSpace()
+                ? null
+                : TenantConfigurationSecurity.NormalizeTenantId(queryOsClient);
+            if (routeTenant.DosIsNullOrWhiteSpace() && queryTenant.DosIsNullOrWhiteSpace()) return false;
+            if (!routeTenant.DosIsNullOrWhiteSpace()
+                && !queryTenant.DosIsNullOrWhiteSpace()
+                && !string.Equals(routeTenant, queryTenant, StringComparison.OrdinalIgnoreCase))
+                return false;
+            osClient = routeTenant ?? queryTenant;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public async Task<bool> ProcessCallbackAsync(
         string osClient,
         string body,
@@ -349,52 +377,28 @@ public sealed class WeChatContentSecurityService
                 ? WeChatContentSecurityStatus.Passed
                 : WeChatContentSecurityStatus.Rejected;
 
-            var cache = MicroiEngine.CacheTenant.Cache(osClient);
-            var reviewId = await cache.GetAsync<string>(TraceKey(osClient, traceId)).ConfigureAwait(false);
-            if (!IsReviewId(reviewId))
-            {
-                await cache.SetAsync(
-                        TraceResultKey(osClient, traceId),
-                        completedStatus,
-                        ReviewLifetime)
-                    .ConfigureAwait(false);
-                return true;
-            }
-            var database = cache.GetIDatabase();
-            var owner = Guid.NewGuid().ToString("N");
-            var lockKey = $"Microi:{osClient}:WechatContentSecurity:CallbackLock:{reviewId}";
-            if (!await database.LockTakeAsync(lockKey, owner, TimeSpan.FromSeconds(10)).ConfigureAwait(false))
-            {
-                // 另一节点可能正在处理同一回调。只有确认它已把终态写入共享 Redis
-                // 才向微信确认成功；否则让微信重试，避免持锁节点中途退出时丢结果。
-                await Task.Delay(150).ConfigureAwait(false);
-                var concurrentReview = await GetReviewAsync(osClient, reviewId).ConfigureAwait(false);
-                return concurrentReview?.Status is WeChatContentSecurityStatus.Passed
-                    or WeChatContentSecurityStatus.Rejected;
-            }
-            try
-            {
-                var review = await GetReviewAsync(osClient, reviewId).ConfigureAwait(false);
-                if (review == null || review.Status is WeChatContentSecurityStatus.Passed or WeChatContentSecurityStatus.Rejected)
-                    return true;
-
-                review.Status = completedStatus;
-                review.Suggest = review.Status == WeChatContentSecurityStatus.Passed ? "pass" : "blocked";
-                review.UpdatedAt = DateTime.UtcNow;
-                await SaveReviewAsync(review).ConfigureAwait(false);
-                MicroiEngine.QueueSystemLog(
-                    osClient,
-                    "ContentSecurity",
-                    "WeChatMediaReviewCompleted",
-                    "微信图片内容安全检测完成",
-                    JsonConvert.SerializeObject(new { review.ReviewId, review.Status }),
-                    review.Status == WeChatContentSecurityStatus.Passed ? 1 : 2);
-                return true;
-            }
-            finally
-            {
-                await database.LockReleaseAsync(lockKey, owner).ConfigureAwait(false);
-            }
+            // C# 只承担微信协议验签、AES 解密、AppId 校验和安全字段归一化。
+            // 审核状态、系统日志和租户扩展逻辑全部由应用商城交付的接口引擎处理，
+            // 保存即生效，无需为了业务调整重新编译发布后端。
+            var eventId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                    $"{osClient}|{traceId}|{completedStatus}")))
+                .ToLowerInvariant();
+            var result = await MicroiEngine.ApiEngine.RunAsync(
+                    CallbackCoreApiEngineKey,
+                    new JObject
+                    {
+                        ["OsClient"] = osClient,
+                        ["EventId"] = eventId,
+                        ["TraceId"] = traceId,
+                        ["Status"] = completedStatus,
+                        ["Suggest"] = completedStatus == WeChatContentSecurityStatus.Passed ? "pass" : "blocked",
+                        ["Suggests"] = new JArray(suggests),
+                        ["ReceivedAtUtc"] = DateTime.UtcNow.ToString("O"),
+                        ["ReviewLifetimeSeconds"] = (long)ReviewLifetime.TotalSeconds,
+                        ["LockKey"] = $"WechatContentSecurity:Callback:{traceId}"
+                    })
+                .ConfigureAwait(false);
+            return IsSuccessfulApiEngineResult(result);
         }
         catch (Exception ex)
         {
@@ -414,6 +418,22 @@ public sealed class WeChatContentSecurityService
         var expected = Encoding.ASCII.GetBytes(digest);
         var supplied = Encoding.ASCII.GetBytes(signature.Trim().ToLowerInvariant());
         return expected.Length == supplied.Length && CryptographicOperations.FixedTimeEquals(expected, supplied);
+    }
+
+    internal static bool IsSuccessfulApiEngineResult(object result)
+    {
+        if (result == null) return false;
+        try
+        {
+            var token = result is string text
+                ? JToken.Parse(text)
+                : result as JToken ?? JToken.FromObject(result);
+            return token is JObject model && model.Value<int?>("Code") == 1;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     public static string DecryptMessage(string encrypted, string encodingAesKey, string expectedAppId)
@@ -463,7 +483,7 @@ public sealed class WeChatContentSecurityService
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(12));
             using var content = new StringContent(
-                payload.ToString(Formatting.None),
+                payload.ToString(Newtonsoft.Json.Formatting.None),
                 Encoding.UTF8,
                 "application/json");
             using var response = await client.PostAsync(
@@ -564,7 +584,9 @@ public sealed class WeChatContentSecurityService
             AppId = model?["WeChatMiniProgramAppId"]?.ToString()?.Trim(),
             AppSecret = model?["WeChatMiniProgramAppSecret"]?.ToString()?.Trim(),
             MessageToken = model?["WeChatMiniProgramMessageToken"]?.ToString()?.Trim(),
-            EncodingAesKey = model?["WeChatMiniProgramEncodingAESKey"]?.ToString()?.Trim()
+            EncodingAesKey = (model?["WeChatMiniProgramAESKey"]
+                              ?? model?["WeChatMiniProgramEncodingAESKey"])
+                ?.ToString()?.Trim()
         };
         if (settings.AppId.DosIsNullOrWhiteSpace() || settings.AppSecret.DosIsNullOrWhiteSpace())
             throw new WeChatContentSecurityException("MissingMiniProgramCredential");

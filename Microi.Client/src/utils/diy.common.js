@@ -2381,6 +2381,9 @@ var DiyCommon = {
                 reportApiServiceRecovered({
                     apiBase: DiyCommon.GetApiBase(),
                     url: url,
+                    requestUrl: req?.request?.responseURL,
+                    osClient: DiyCommon.GetOsClient(),
+                    method: method,
                     responseData: req.data
                 });
                 // 拿到token，存起来
@@ -2405,6 +2408,7 @@ var DiyCommon = {
                     apiBase: DiyCommon.GetApiBase(),
                     osClient: DiyCommon.GetOsClient(),
                     url: url,
+                    requestUrl: error?.request?.responseURL,
                     method: method
                 });
                 if (!DiyCommon.IsNull(errorCallback)) {
@@ -2516,6 +2520,9 @@ var DiyCommon = {
                     reportApiServiceRecovered({
                         apiBase: DiyCommon.GetApiBase(),
                         url: result.config?.url || firstRequestUrl,
+                        requestUrl: result?.request?.responseURL,
+                        osClient: DiyCommon.GetOsClient(),
+                        method: method,
                         responseData: result.data
                     });
                     // 批量请求中的任意一个响应都可能完成 Token 续签。必须逐个处理；
@@ -2546,6 +2553,7 @@ var DiyCommon = {
                     apiBase: DiyCommon.GetApiBase(),
                     osClient: DiyCommon.GetOsClient(),
                     url: failedRequestUrl,
+                    requestUrl: error?.request?.responseURL,
                     method: method
                 });
                 if (!DiyCommon.IsNull(errorCallback)) {

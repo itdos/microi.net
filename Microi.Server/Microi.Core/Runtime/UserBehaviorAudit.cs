@@ -15,8 +15,8 @@ namespace Microi.net
     {
         private static readonly string[] SensitiveNames =
         {
-            // zhy：内容安全登录 code 和回调 AESKey 必须按敏感字段从行为审计中脱敏。
-            "password", "pwd", "token", "authorization", "secret", "apikey", "logincode", "encodingaeskey", "connectionstring",
+            // 内容安全登录 code 和回调 AESKey 必须按敏感字段从行为审计中脱敏。
+            "password", "pwd", "token", "authorization", "secret", "apikey", "logincode", "aeskey", "connectionstring",
             "身份证", "idcard", "bankcard", "银行卡"
         };
         private static readonly HashSet<string> SystemFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

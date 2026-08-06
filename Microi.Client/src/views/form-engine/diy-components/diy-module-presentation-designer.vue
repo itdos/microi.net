@@ -55,7 +55,7 @@
                     <div class="card-head">
                         <div>
                             <div class="card-title">动态统计指标</div>
-                            <div class="form-tip">可直接汇总列表字段，也可调用接口引擎；接口返回值按 ValuePath 读取。</div>
+                            <div class="form-tip">可直接汇总列表字段，也可调用接口引擎；每个指标应使用不同图标和语义色，接口返回值按 ValuePath 读取。</div>
                         </div>
                         <el-button size="small" :icon="Plus" :disabled="readonly" @click="addMetric">添加指标</el-button>
                     </div>
@@ -92,6 +92,7 @@
                         <el-input v-model="metric.DefaultValue" :disabled="readonly" placeholder="失败兜底值" />
                         <el-input v-model="metric.Prefix" :disabled="readonly" placeholder="前缀" />
                         <el-input v-model="metric.Suffix" :disabled="readonly" placeholder="后缀" />
+                        <el-input v-model="metric.Icon" :disabled="readonly" placeholder="图标，如 fas fa-clock" title="Font Awesome 图标；不同指标应使用不同图标" />
                         <el-select v-model="metric.Tone" clearable :disabled="readonly" placeholder="色调">
                             <el-option v-for="item in toneOptions" :key="item.value" :label="item.label" :value="item.value" />
                         </el-select>
@@ -378,6 +379,13 @@ const toneOptions = [
     { label: "危险", value: "danger" },
     { label: "信息", value: "info" }
 ];
+const metricVisualDefaults = [
+    { Tone: "primary", Icon: "fas fa-chart-line" },
+    { Tone: "success", Icon: "fas fa-circle-check" },
+    { Tone: "warning", Icon: "fas fa-clock" },
+    { Tone: "danger", Icon: "fas fa-triangle-exclamation" },
+    { Tone: "info", Icon: "fas fa-layer-group" }
+];
 const metricSourceOptions = [
     { label: "总记录数", value: "DataCount" },
     { label: "本页加载", value: "PageCount" }
@@ -599,20 +607,23 @@ function ensureObjectArray(target, key, normalizer) {
     let values = [];
     if (Array.isArray(original)) values = original;
     else if (typeof original === "string" && original.trim()) values = original.split(/[,;|]/).map((item) => item.trim()).filter(Boolean);
-    const normalized = values.map(normalizer).filter(Boolean);
+    const normalized = values.map((value, index) => normalizer(value, index)).filter(Boolean);
     const changed = !Array.isArray(original) || normalized.some((item, index) => item !== values[index]);
     target[key] = normalized;
     return changed;
 }
 
-function normalizeMetricDraft(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return { Key: String(value || ""), Label: "", Source: "", Field: String(value || ""), ApiEngineKey: "", ValuePath: "", ParamMap: {}, DefaultValue: "", Prefix: "", Suffix: "", Tone: "", Color: "", Icon: "", RefreshSeconds: 0 };
+function normalizeMetricDraft(value, index = 0) {
+    const visual = metricVisualDefaults[index % metricVisualDefaults.length];
+    if (!value || typeof value !== "object" || Array.isArray(value)) return { Key: String(value || ""), Label: "", Source: "", Field: String(value || ""), ApiEngineKey: "", ValuePath: "", ParamMap: {}, DefaultValue: "", Prefix: "", Suffix: "", Tone: visual.Tone, Color: "", Icon: visual.Icon, RefreshSeconds: 0 };
     const item = { ...value };
     ["Key", "Label", "Source", "Field", "ApiEngineKey", "ValuePath", "DefaultValue", "Prefix", "Suffix", "Tone", "Color", "Icon"].forEach((key) => {
         if (item[key] === undefined) item[key] = "";
     });
     if (!item.ParamMap || typeof item.ParamMap !== "object" || Array.isArray(item.ParamMap)) item.ParamMap = {};
     if (item.RefreshSeconds === undefined) item.RefreshSeconds = 0;
+    if (!item.Tone) item.Tone = visual.Tone;
+    if (!item.Icon) item.Icon = visual.Icon;
     return item;
 }
 
@@ -703,7 +714,8 @@ function setFormValue(name, value, callbackField) {
 }
 
 function addMetric() {
-    listView.value.Layout.Hero.Metrics.push({ Key: "", Label: "", Source: "", Field: "", ApiEngineKey: "", ValuePath: "", ParamMap: {}, DefaultValue: "", Prefix: "", Suffix: "", Tone: "", Color: "", Icon: "", RefreshSeconds: 0 });
+    const visual = metricVisualDefaults[listView.value.Layout.Hero.Metrics.length % metricVisualDefaults.length];
+    listView.value.Layout.Hero.Metrics.push({ Key: "", Label: "", Source: "", Field: "", ApiEngineKey: "", ValuePath: "", ParamMap: {}, DefaultValue: "", Prefix: "", Suffix: "", Tone: visual.Tone, Color: "", Icon: visual.Icon, RefreshSeconds: 0 });
 }
 function removeMetric(index) { listView.value.Layout.Hero.Metrics.splice(index, 1); }
 function onMetricSourceChange(metric) {
