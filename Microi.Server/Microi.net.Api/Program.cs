@@ -180,6 +180,8 @@ services.AddHostedService<ProcessMemoryGuardService>();
 services.AddHostedService<BackgroundTaskWorkerService>();
 services.AddSingleton<UserBehaviorSessionTracker>();
 services.AddSingleton<IPrivateFileAuditLinkService, PrivateFileAuditLinkService>();
+// zhy：注册无进程内业务状态的微信内容安全服务，审核事实统一存放共享 Redis。
+services.AddSingleton<WeChatContentSecurityService>();
 services.AddMicroiUpgrade();//【可选】注入【平台自动更新】插件
 services.AddMicroiWeChat();//【可选】注入【微信公众号平台】插件
 services.AddMicroiOffice();//【可选】注入【Office】插件

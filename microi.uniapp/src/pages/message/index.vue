@@ -120,6 +120,7 @@
 					<text>{{ t('message.startChat') }}</text>
 				</view>
 			</view>
+			<view class="mci-tabbar-spacer" aria-hidden="true" />
 		</scroll-view>
 
 		<!-- 通讯录列表 -->
@@ -159,6 +160,7 @@
 				<image class="empty-icon" src="/static/xjy/repair/tongxunlu.png" mode="aspectFit" />
 				<text class="empty-text">{{ t('message.noContacts') }}</text>
 			</view>
+			<view class="mci-tabbar-spacer" aria-hidden="true" />
 		</scroll-view>
 
 		<!-- 新建聊天弹窗 -->
@@ -859,7 +861,8 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding-bottom: var(--mci-safe-bottom);
+		padding-bottom: calc(144rpx + var(--mci-safe-bottom));
+		box-sizing: border-box;
 	}
 
 	/* zhy筛选下拉样式 */

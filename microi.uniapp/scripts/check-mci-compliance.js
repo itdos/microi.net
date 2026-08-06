@@ -56,6 +56,10 @@ const pagesConfig = JSON.parse(read('src/pages.json'));
 const manifest = JSON.parse(read('src/manifest.json'));
 const aiPage = read('src/pages/ai/index.vue');
 const aiLauncher = read('src/components/mci-ai-launcher/mci-ai-launcher.vue');
+const customTabBarJs = read('src/custom-tab-bar/index.js');
+const customTabBarJson = JSON.parse(read('src/custom-tab-bar/index.json'));
+const customTabBarWxml = read('src/custom-tab-bar/index.wxml');
+const customTabBarWxss = read('src/custom-tab-bar/index.wxss');
 const activeTabBar = read('src/generated/active-tabbar.js');
 const profileManager = read('scripts/lib/profile-manager.cjs');
 const xjyPagesConfig = JSON.parse(read('profiles/xjy/pages.json'));
@@ -71,6 +75,7 @@ assert(request.includes('requestAdapter: uniRequestAdapter'), 'Configured Microi
 assert(sdk.includes("typeof uni !== 'undefined'"), 'microi.v8.js must detect the uni runtime directly, not only globalThis.uni.');
 assert(theme.includes('TAB_BAR_ROUTES'), 'theme.js must know tabBar routes before calling setTabBarStyle.');
 assert(theme.includes('isCurrentTabBarPage'), 'theme.js must guard setTabBarStyle to tabBar pages.');
+assert(theme.includes('syncCustomTabBarSelection') && theme.includes('scheduleCustomTabBarSelectionSync'), 'Every visible tab page must explicitly synchronize the custom tabBar selection from its route.');
 assert(theme.includes('task.catch'), 'theme.js must swallow setTabBarStyle Promise failures.');
 assert(!config.includes('/static/logo.png'), 'config.js must not point to missing /static/logo.png.');
 assert(!read('src/pages/login/index.vue').includes('/static/logo.png'), 'login page must not fall back to missing /static/logo.png.');
@@ -85,13 +90,25 @@ assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/
 assert(aiLauncher.includes('isFallbackLauncher') && aiLauncher.includes('getAiAssistantEnabled'), 'The floating AI launcher visibility must be controlled by the server-side system setting.');
 assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
 assert(sysConfig.includes('IsShowAiModel') && sysConfig.includes('getAiModelEnabled') && sysConfig.includes('aiModelFlagState'), 'AI model selectors must use the fail-closed IsShowAiModel platform flag.');
-assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === false, 'The active profile must use the native tabBar for smooth page switching.');
-assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === false, 'The xjy profile must use the native tabBar.');
-assert(standardPagesConfig.tabBar && standardPagesConfig.tabBar.custom === false, 'The standard profile must use the native tabBar.');
+assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === true, 'The active profile must use a custom tabBar for the navigation capsule.');
+assert(xjyPagesConfig.tabBar && xjyPagesConfig.tabBar.custom === true, 'The xjy profile must enable the custom tabBar.');
+assert(standardPagesConfig.tabBar && standardPagesConfig.tabBar.custom === true, 'The standard profile must enable the custom tabBar.');
 assert((pagesConfig.subPackages || []).some((pkgEntry) => (pkgEntry.pages || []).some((page) => `${pkgEntry.root}/${page.path}`.replace(/\/+/g, '/') === 'pages/ai/index')), 'The dedicated AI assistant route must remain registered in pages.json.');
-assert(activeTabBar.includes('"custom": false') && activeTabBar.includes('"profileId": "xjy"'), 'The checked-in generated tabBar bridge must represent the native default xjy profile.');
+assert(activeTabBar.includes('"custom": true') && activeTabBar.includes('"profileId": "xjy"'), 'The checked-in generated tabBar bridge must represent the custom default xjy profile.');
 assert(profileManager.includes("'generated', 'active-tabbar.js'") && profileManager.includes('generatedActiveTabBarSource'), 'Profile switching must regenerate the active tabBar bridge.');
+assert(customTabBarJson.component === true, 'WeChat custom tabBar must be declared as a native component.');
+assert(customTabBarWxml.includes('class="mci-bottom-dock') && customTabBarWxml.includes('class="mci-bottom-dock__nav"'), 'WeChat custom tabBar must render the navigation capsule.');
+assert(customTabBarJs.includes('pageLifetimes') && customTabBarJs.includes('scheduleRouteSync') && customTabBarJs.includes('selectedIndexForRoute'), 'WeChat custom tabBar must resync selection from the visible page route.');
+assert(!/setData\(\{\s*switching:\s*true,\s*selected:/.test(customTabBarJs), 'WeChat custom tabBar must not optimistically replace the route-derived selected state.');
+assert(!/Number\.isInteger\(state\.selected\)/.test(customTabBarJs), 'External component state must not override the route-derived selected state.');
+assert(customTabBarJs.includes('safeAreaInsets') && customTabBarWxml.includes('{{safeBottom}}') && /position:\s*fixed[\s\S]*bottom:\s*0/.test(customTabBarWxss), 'The custom tabBar must consume the runtime safe area while staying fixed to the bottom.');
 assert(aiLauncher.includes('activeTabBar.custom === true') && aiLauncher.includes('class="mci-bottom-dock mci-bottom-dock--without-ai"') && aiLauncher.includes('mci-bottom-dock__nav') && !aiLauncher.includes('mci-bottom-dock__ai-slot'), 'The legacy H5 custom dock must stay disabled unless a profile explicitly opts in.');
+assert(aiLauncher.includes('scheduleActiveRouteSync') && !aiLauncher.includes('this.activeIndex = index'), 'The H5 custom dock must also derive selection from the visible route instead of optimistic clicks.');
+assert(!aiLauncher.includes('setData({ ...state, selected:'), 'Async assistant state must never overwrite the custom tabBar selected index.');
+assert(app.includes('.mci-tabbar-spacer') && app.includes('144rpx + var(--mci-safe-bottom'), 'Tab page content must reserve the custom dock height and runtime bottom safe area.');
+for (const tabPage of [workspacePage, messagePage, read('src/pages/mall/index.vue'), read('src/pages/news/index.vue'), read('src/pages/profile/index.vue')]) {
+  assert(tabPage.includes('mci-tabbar-spacer'), 'Every tab page scroll area must include the shared bottom spacer.');
+}
 assert(aiLauncher.includes('mci-ai-launcher--fallback') && aiLauncher.includes('getSafeAreaMetrics') && aiLauncher.includes('safeRight') && aiLauncher.includes('safeBottom'), 'All pages must retain a safe-area-aware floating AI launcher.');
 assert(aiLauncher.includes('--mci-safe-bottom') && aiLauncher.includes('env(safe-area-inset-bottom'), 'The H5 bottom dock must consume the shared bottom safe-area variable with an env fallback.');
 for (const dragToken of [
