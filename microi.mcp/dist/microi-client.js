@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
+import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { createGzip } from 'node:zlib';
 import { API } from './api-paths.js';
 import { resolveMcpDid } from './mcp-did.js';
 import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
@@ -18,8 +21,10 @@ XaFX8UgCFE4d4pvK6IvQsWunm+WfYqgrSzBMS1LH1fstmZB0wnVUX1uGROaZTKGZ
 -----END PUBLIC KEY-----`;
 /**
  * Return token-file keys from the most specific tenant identity to legacy keys.
- * New writers use api|os|type|network, while readers keep accepting the older
- * api|os|type, api|os and api layouts during migration.
+ * New writers use api|os|type|network even when type/network are empty, while
+ * readers keep accepting the older compact api|os|type, api|os and api layouts
+ * during migration. Keeping the empty segments is important: the VS Code
+ * broker may intentionally leave an ambiguous legacy alias untouched.
  */
 export function buildTokenFileLookupKeys(apiBaseUrl, osClient = '', osClientType = '', osClientNetwork = '') {
     const apiUrl = String(apiBaseUrl || '').replace(/\/+$/, '');
@@ -27,13 +32,15 @@ export function buildTokenFileLookupKeys(apiBaseUrl, osClient = '', osClientType
     const tenantType = String(osClientType || '').trim();
     const tenantNetwork = String(osClientNetwork || '').trim();
     const keys = [];
-    if (tenant && (tenantType || tenantNetwork)) {
-        keys.push(`${apiUrl}|${tenant}|${tenantType}|${tenantNetwork}`);
-    }
-    if (tenant && tenantType) {
-        keys.push(`${apiUrl}|${tenant}|${tenantType}`);
-    }
     if (tenant) {
+        keys.push(`${apiUrl}|${tenant}|${tenantType}|${tenantNetwork}`);
+        const compactIdentity = [apiUrl, tenant, tenantType, tenantNetwork]
+            .filter(Boolean)
+            .join('|');
+        keys.push(compactIdentity);
+        if (tenantType) {
+            keys.push(`${apiUrl}|${tenant}|${tenantType}`);
+        }
         keys.push(`${apiUrl}|${tenant}`);
     }
     keys.push(apiUrl);
@@ -96,6 +103,8 @@ const DEFAULT_READBACK_REQUEST_TIMEOUT_MS = 5_000;
 const WRITE_READBACK_DELAYS_MS = [0, 300, 800, 1_500, 3_000];
 const DEFAULT_STREAM_UPLOAD_TIMEOUT_MS = 30 * 60_000;
 const MAX_STREAM_UPLOAD_TIMEOUT_MS = 2 * 60 * 60_000;
+const OCR_REQUEST_TIMEOUT_MS = 315_000;
+const TRANSLATE_REQUEST_TIMEOUT_MS = 315_000;
 const MENU_JSON_ARRAY_FIELDS = new Set([
     'MoreBtns',
     'FormBtns',
@@ -125,7 +134,7 @@ function resolveStreamUploadTimeoutMs(value) {
         return DEFAULT_STREAM_UPLOAD_TIMEOUT_MS;
     return Math.min(MAX_STREAM_UPLOAD_TIMEOUT_MS, Math.round(parsed));
 }
-function buildMultipartFileBody(fields, filePath, fileName, boundary) {
+function buildMultipartFileBody(fields, filePath, fileName, boundary, contentEncoding) {
     const chunks = [];
     for (const [name, value] of Object.entries(fields)) {
         chunks.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`, 'utf8'));
@@ -136,7 +145,11 @@ function buildMultipartFileBody(fields, filePath, fileName, boundary) {
     const fileSize = fs.statSync(filePath).size;
     async function* streamParts() {
         yield prefix;
-        for await (const chunk of fs.createReadStream(filePath)) {
+        const fileStream = fs.createReadStream(filePath);
+        const transportStream = contentEncoding === 'gzip'
+            ? fileStream.pipe(createGzip())
+            : fileStream;
+        for await (const chunk of transportStream) {
             yield Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         }
         yield suffix;
@@ -540,25 +553,47 @@ export class MicroiClient {
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         let res;
         let text;
+        const jsonBody = method === 'POST' ? JSON.stringify(body ?? {}) : undefined;
         try {
-            res = await fetch(url, {
+            const fetchResponse = await fetch(url, {
                 method,
                 headers,
                 signal: controller.signal,
-                ...(method === 'POST' ? { body: JSON.stringify(body ?? {}) } : {}),
+                ...(jsonBody !== undefined ? { body: jsonBody } : {}),
             });
-            text = await res.text();
+            res = fetchResponse;
+            text = await fetchResponse.text();
         }
         catch (error) {
             const isTimeout = controller.signal.aborted;
-            throw new MicroiTransportError(isTimeout
-                ? `${operationName} 请求超时（${timeoutMs}ms）`
-                : `${operationName} 网络请求失败：${error instanceof Error ? error.message : String(error)}`, {
-                kind: isTimeout ? 'timeout' : 'network',
-                requestPath: reqPath,
-                uncertainOutcome: method === 'POST',
-                cause: error,
-            });
+            if (isTimeout) {
+                throw new MicroiTransportError(`${operationName} 请求超时（${timeoutMs}ms）`, {
+                    kind: 'timeout',
+                    requestPath: reqPath,
+                    uncertainOutcome: method === 'POST',
+                    cause: error,
+                });
+            }
+            // Undici fetch can be reset by reverse proxies for otherwise valid JSON
+            // requests (notably the bounded MicroService compatibility publisher).
+            // Reuse the exact serialized body through node:http(s); callers retain
+            // their existing CAS/readback guards for uncertain POST outcomes.
+            try {
+                await new Promise(resolve => setTimeout(resolve, 250));
+                const nativeResponse = await this.requestJsonNative(method, url, headers, jsonBody, timeoutMs);
+                res = nativeResponse.res;
+                text = nativeResponse.text;
+            }
+            catch (nativeError) {
+                const fetchMessage = error instanceof Error ? error.message : String(error);
+                const nativeMessage = nativeError instanceof Error ? nativeError.message : String(nativeError);
+                throw new MicroiTransportError(`${operationName} 网络请求失败：fetch=${fetchMessage}；native=${nativeMessage}`, {
+                    kind: 'network',
+                    requestPath: reqPath,
+                    uncertainOutcome: method === 'POST',
+                    cause: nativeError,
+                });
+            }
         }
         finally {
             clearTimeout(timer);
@@ -612,42 +647,80 @@ export class MicroiClient {
      * whole-file Buffer. A retry constructs a fresh file stream, so auth recovery
      * remains safe for large immutable application assets.
      */
-    async requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage = 'initial', timeoutMs) {
+    async requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage = 'initial', timeoutMs, contentEncoding) {
         const requestToken = this.token;
+        const transportFields = contentEncoding === 'gzip'
+            ? { ...fields, ContentEncoding: 'gzip' }
+            : fields;
         const boundary = `----microi-mcp-${crypto.randomBytes(24).toString('hex')}`;
-        const multipart = buildMultipartFileBody(fields, filePath, fileName, boundary);
+        const multipart = buildMultipartFileBody(transportFields, filePath, fileName, boundary, contentEncoding);
         const controller = new AbortController();
         const effectiveTimeout = resolveStreamUploadTimeoutMs(timeoutMs);
         const timer = setTimeout(() => controller.abort(), effectiveTimeout);
         let res;
         let text;
         try {
-            res = await fetch(`${this.config.apiBaseUrl}${reqPath}`, {
+            const fetchResponse = await fetch(`${this.config.apiBaseUrl}${reqPath}`, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${requestToken}`,
                     did: this.did,
                     ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
                     'Content-Type': `multipart/form-data; boundary=${boundary}`,
-                    'Content-Length': String(multipart.contentLength),
                 },
                 body: multipart.body,
                 // Node.js fetch requires duplex for a streaming request body.
                 duplex: 'half',
                 signal: controller.signal,
             });
-            text = await res.text();
+            res = fetchResponse;
+            text = await fetchResponse.text();
         }
         catch (error) {
             const isTimeout = controller.signal.aborted;
-            throw new MicroiTransportError(isTimeout
-                ? `应用资产流式上传超时（${effectiveTimeout}ms）`
-                : `应用资产流式上传网络失败：${error instanceof Error ? error.message : String(error)}`, {
-                kind: isTimeout ? 'timeout' : 'network',
-                requestPath: reqPath,
-                uncertainOutcome: true,
-                cause: error,
-            });
+            if (isTimeout) {
+                throw new MicroiTransportError(`应用资产流式上传超时（${effectiveTimeout}ms）`, {
+                    kind: 'timeout',
+                    requestPath: reqPath,
+                    uncertainOutcome: true,
+                    cause: error,
+                });
+            }
+            // Undici/Node fetch occasionally aborts a streaming multipart request
+            // after a previous keep-alive upload, even though the same endpoint and
+            // payload are accepted by node:https. Application assets carry a stable
+            // RequestId and are immutable, so retrying the same request through the
+            // native transport is idempotent and avoids materialising the file.
+            try {
+                await new Promise(resolve => setTimeout(resolve, 250));
+                const nativeResponse = await this.requestMultipartFileNative(reqPath, transportFields, filePath, fileName, effectiveTimeout, contentEncoding);
+                res = nativeResponse.res;
+                text = nativeResponse.text;
+            }
+            catch (nativeError) {
+                const fetchMessage = error instanceof Error ? error.message : String(error);
+                const nativeMessage = nativeError instanceof Error ? nativeError.message : String(nativeError);
+                if (contentEncoding !== 'gzip') {
+                    try {
+                        return await this.requestMultipartFile(reqPath, fields, filePath, fileName, authRecoveryStage, timeoutMs, 'gzip');
+                    }
+                    catch (gzipError) {
+                        const gzipMessage = gzipError instanceof Error ? gzipError.message : String(gzipError);
+                        throw new MicroiTransportError(`应用资产流式上传网络失败：fetch=${fetchMessage}；native=${nativeMessage}；gzip=${gzipMessage}`, {
+                            kind: 'network',
+                            requestPath: reqPath,
+                            uncertainOutcome: true,
+                            cause: gzipError,
+                        });
+                    }
+                }
+                throw new MicroiTransportError(`应用资产 gzip 流式上传网络失败：fetch=${fetchMessage}；native=${nativeMessage}`, {
+                    kind: 'network',
+                    requestPath: reqPath,
+                    uncertainOutcome: true,
+                    cause: nativeError,
+                });
+            }
         }
         finally {
             clearTimeout(timer);
@@ -664,7 +737,7 @@ export class MicroiClient {
                 console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
             }
             if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
-                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs);
+                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding);
             }
             throw new Error(`HTTP 401 Unauthorized — token recovery failed: ${text.slice(0, 200)}`);
         }
@@ -685,10 +758,140 @@ export class MicroiClient {
                 console.error('[microi-mcp] Replacement token was rejected; escalating to credential recovery');
             }
             if (await this.tryRecoverFromAuthFailure(requestToken, credentialOnly)) {
-                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs);
+                return this.requestMultipartFile(reqPath, fields, filePath, fileName, nextAuthRecoveryStage(authRecoveryStage), timeoutMs, contentEncoding);
             }
         }
         return parsed;
+    }
+    async requestJsonNative(method, url, headers, body, timeoutMs) {
+        const endpoint = new URL(url);
+        const requestModule = endpoint.protocol === 'https:' ? https : http;
+        const bodyBuffer = body === undefined ? undefined : Buffer.from(body, 'utf8');
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const finishReject = (error) => {
+                if (settled)
+                    return;
+                settled = true;
+                reject(error);
+            };
+            const req = requestModule.request({
+                protocol: endpoint.protocol,
+                hostname: endpoint.hostname,
+                port: endpoint.port || undefined,
+                path: `${endpoint.pathname}${endpoint.search}`,
+                method,
+                timeout: timeoutMs,
+                headers: {
+                    ...headers,
+                    ...(bodyBuffer ? { 'Content-Length': String(bodyBuffer.length) } : {}),
+                },
+            }, response => {
+                const chunks = [];
+                response.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+                response.on('end', () => {
+                    if (settled)
+                        return;
+                    settled = true;
+                    const status = response.statusCode || 0;
+                    const responseHeaders = {
+                        get(name) {
+                            const value = response.headers[name.toLowerCase()];
+                            if (Array.isArray(value))
+                                return value.join(', ');
+                            return value === undefined ? null : String(value);
+                        },
+                    };
+                    resolve({
+                        res: {
+                            status,
+                            statusText: response.statusMessage || '',
+                            ok: status >= 200 && status < 300,
+                            headers: responseHeaders,
+                        },
+                        text: Buffer.concat(chunks).toString('utf8'),
+                    });
+                });
+            });
+            req.on('error', error => finishReject(new Error(error.message, { cause: error })));
+            req.on('timeout', () => {
+                req.destroy();
+                finishReject(new Error(`native request timeout (${timeoutMs}ms)`));
+            });
+            if (bodyBuffer)
+                req.write(bodyBuffer);
+            req.end();
+        });
+    }
+    async requestMultipartFileNative(reqPath, fields, filePath, fileName, timeoutMs, contentEncoding) {
+        const boundary = `----microi-mcp-native-${crypto.randomBytes(24).toString('hex')}`;
+        const multipart = buildMultipartFileBody(fields, filePath, fileName, boundary, contentEncoding);
+        const endpoint = new URL(`${this.config.apiBaseUrl}${reqPath}`);
+        const requestModule = endpoint.protocol === 'https:' ? https : http;
+        try {
+            return await new Promise((resolve, reject) => {
+                let settled = false;
+                const finishReject = (error) => {
+                    if (settled)
+                        return;
+                    settled = true;
+                    reject(error);
+                };
+                const req = requestModule.request({
+                    protocol: endpoint.protocol,
+                    hostname: endpoint.hostname,
+                    port: endpoint.port || undefined,
+                    path: `${endpoint.pathname}${endpoint.search}`,
+                    method: 'POST',
+                    timeout: timeoutMs,
+                    headers: {
+                        Authorization: `Bearer ${this.token}`,
+                        did: this.did,
+                        ...(this.config.osClient ? { OsClient: this.config.osClient } : {}),
+                        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+                    },
+                }, response => {
+                    const chunks = [];
+                    response.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+                    response.on('end', () => {
+                        if (settled)
+                            return;
+                        settled = true;
+                        const status = response.statusCode || 0;
+                        const headers = {
+                            get(name) {
+                                const value = response.headers[name.toLowerCase()];
+                                if (Array.isArray(value))
+                                    return value.join(', ');
+                                return value === undefined ? null : String(value);
+                            },
+                        };
+                        resolve({
+                            res: {
+                                status,
+                                statusText: response.statusMessage || '',
+                                ok: status >= 200 && status < 300,
+                                headers,
+                            },
+                            text: Buffer.concat(chunks).toString('utf8'),
+                        });
+                    });
+                });
+                req.on('error', error => finishReject(new Error(error.message, { cause: error })));
+                req.on('timeout', () => {
+                    req.destroy();
+                    finishReject(new Error(`native request timeout (${timeoutMs}ms)`));
+                });
+                multipart.body.on('error', error => {
+                    req.destroy();
+                    finishReject(new Error(`local asset stream failed: ${error.message}`, { cause: error }));
+                });
+                multipart.body.pipe(req);
+            });
+        }
+        finally {
+            multipart.body.destroy();
+        }
     }
     isUncertainWriteError(error) {
         return error instanceof MicroiTransportError && error.uncertainOutcome;
@@ -920,6 +1123,69 @@ export class MicroiClient {
             Param: params || {},
         });
     }
+    async chat(input) {
+        return this.post(API.AI_CHAT, {
+            UserChatMsg: input.question,
+            AiModel: input.aiModel,
+            ...(input.systemPrompt ? { SystemChatMsg: input.systemPrompt } : {}),
+            ...(input.aiModelId ? { AiModelId: input.aiModelId } : {}),
+            ...(input.relayModel ? { RelayModel: input.relayModel } : {}),
+            ...(input.conversationId ? { ConversationId: input.conversationId } : {}),
+            ...(input.reasoningEffort ? { ReasoningEffort: input.reasoningEffort } : {}),
+            ...(input.mode ? { Mode: input.mode } : {}),
+            OsClient: this.config.osClient,
+        }, {
+            timeoutMs: Math.max(this.config.requestTimeoutMs ?? 120_000, 330_000),
+            operationName: 'Microi AI chat',
+        });
+    }
+    /**
+     * 调用当前 MCP 身份和租户绑定的 OCR 网关。网络地址、Provider、认证头和
+     * OsClient 均不属于本方法参数，避免 MCP 把后端网关变成任意 HTTP 代理。
+     */
+    async recognizeOcr(input) {
+        return this.post(API.OCR_RECOGNIZE, input, {
+            timeoutMs: OCR_REQUEST_TIMEOUT_MS,
+            operationName: `OCR recognize ${input.FileName || 'unnamed file'}`,
+        });
+    }
+    /** Calls the current authenticated tenant's server-side translation gateway. */
+    async translateText(input) {
+        return this.post(API.TRANSLATE_TEXT, input, {
+            timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+            operationName: 'translate text',
+        });
+    }
+    async detectLanguage(sourceText) {
+        return this.post(API.TRANSLATE_DETECT, { SourceText: sourceText }, {
+            timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+            operationName: 'detect language',
+        });
+    }
+    async listTranslateLanguages() {
+        return this.post(API.TRANSLATE_LANGUAGES, {}, {
+            timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+            operationName: 'list translation languages',
+        });
+    }
+    async translateFile(input) {
+        return this.post(API.TRANSLATE_FILE, input, {
+            timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+            operationName: `translate file ${input.FileName}`,
+        });
+    }
+    async suggestTranslation(input) {
+        return this.post(API.TRANSLATE_SUGGEST, input, {
+            timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+            operationName: 'suggest translation',
+        });
+    }
+    async getTranslateHealth() {
+        return this.post(API.TRANSLATE_HEALTH, {}, {
+            timeoutMs: TRANSLATE_REQUEST_TIMEOUT_MS,
+            operationName: 'translation health',
+        });
+    }
     async saveEngineCode(apiEngineKey, code, options) {
         assertSourceIntegrity(code, `保存接口引擎 ${apiEngineKey}`);
         let remote;
@@ -953,18 +1219,42 @@ export class MicroiClient {
             ApiV8CodeBase64: Buffer.from(prepared.code, 'utf8').toString('base64'),
             Version: prepared.version,
             ChangeHistory: prepared.changeHistory,
+            ...(options?.v8Unlimited === undefined ? {} : { V8Unlimited: options.v8Unlimited ? 1 : 0 }),
         };
+        const matchesReadback = (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
+            === normalizeCodeForComparison(prepared.code)
+            && (options?.v8Unlimited === undefined
+                || Number(data?.V8Unlimited || 0) === (options.v8Unlimited ? 1 : 0));
         try {
-            return await this.post(API.UPDATE_ENGINE_CODE, payload, {
+            const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
                 timeoutMs: this.writeRequestTimeoutMs,
                 operationName: `保存接口引擎 ${apiEngineKey}`,
             });
+            if (result.Code !== 1 || options?.v8Unlimited === undefined)
+                return result;
+            const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Unlimited`)), matchesReadback);
+            if (!verification.matched) {
+                return {
+                    Code: 0,
+                    Data: { ApiEngineKey: apiEngineKey, UpdateResponse: result.Data },
+                    Msg: `保存接口引擎 ${apiEngineKey} 返回成功，但 V8Unlimited 写后回读不一致：${verification.lastError || '代码或配置不一致'}`,
+                };
+            }
+            return {
+                ...result,
+                Data: {
+                    ...(result.Data && typeof result.Data === 'object' ? result.Data : {}),
+                    ApiEngineKey: apiEngineKey,
+                    V8Unlimited: options.v8Unlimited ? 1 : 0,
+                    Verified: true,
+                    Verification: 'readback',
+                },
+            };
         }
         catch (error) {
             if (!this.isUncertainWriteError(error))
                 throw error;
-            const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey}`)), (data) => normalizeCodeForComparison(data?.ApiV8Code || data?.Code)
-                === normalizeCodeForComparison(prepared.code));
+            const verification = await this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey}`)), matchesReadback);
             if (verification.matched) {
                 return this.recoveredWriteResult(`保存接口引擎 ${apiEngineKey}`, error, {
                     ApiEngineKey: apiEngineKey,
@@ -972,6 +1262,54 @@ export class MicroiClient {
                 });
             }
             throw this.uncertainWriteFailure(`保存接口引擎 ${apiEngineKey}`, error, verification.lastError);
+        }
+    }
+    async updateEngineRuntimeConfig(apiEngineKey, v8Unlimited) {
+        const payload = {
+            OsClient: this.config.osClient,
+            ApiEngineKey: apiEngineKey,
+            V8Unlimited: v8Unlimited ? 1 : 0,
+        };
+        const verify = () => this.pollReadback(() => this.getEngineCode(apiEngineKey, this.readbackOptions(`回读接口引擎 ${apiEngineKey} V8Unlimited`)), (remote) => Number(remote?.V8Unlimited || 0) === (v8Unlimited ? 1 : 0));
+        const operation = `更新接口引擎 ${apiEngineKey} V8Unlimited`;
+        try {
+            const result = await this.post(API.UPDATE_ENGINE_CODE, payload, {
+                timeoutMs: this.writeRequestTimeoutMs,
+                operationName: operation,
+            });
+            if (result.Code !== 1)
+                return result;
+            const verification = await verify();
+            if (!verification.matched) {
+                return {
+                    Code: 0,
+                    Data: { ApiEngineKey: apiEngineKey, UpdateResponse: result.Data },
+                    Msg: `${operation} 接口返回成功，但远端写后回读不一致：${verification.lastError || '配置不一致'}`,
+                };
+            }
+            return {
+                ...result,
+                Data: {
+                    ...(result.Data && typeof result.Data === 'object' ? result.Data : {}),
+                    ApiEngineKey: apiEngineKey,
+                    V8Unlimited: v8Unlimited ? 1 : 0,
+                    Verified: true,
+                    Verification: 'readback',
+                },
+            };
+        }
+        catch (error) {
+            if (!this.isUncertainWriteError(error))
+                throw error;
+            const verification = await verify();
+            if (verification.matched) {
+                return this.recoveredWriteResult(operation, error, {
+                    ApiEngineKey: apiEngineKey,
+                    V8Unlimited: v8Unlimited ? 1 : 0,
+                    Verified: true,
+                });
+            }
+            throw this.uncertainWriteFailure(operation, error, verification.lastError);
         }
     }
     async createEngine(data) {
@@ -1006,7 +1344,9 @@ export class MicroiClient {
         const operation = `创建接口引擎 ${data.ApiEngineKey}`;
         const verifyCreated = () => this.pollReadback(() => this.getEngineCode(data.ApiEngineKey, this.readbackOptions(`回读新建接口引擎 ${data.ApiEngineKey}`)), (remote) => String(remote?.ApiEngineKey || '') === data.ApiEngineKey
             && normalizeCodeForComparison(remote?.ApiV8Code || remote?.Code)
-                === normalizeCodeForComparison(prepared.code));
+                === normalizeCodeForComparison(prepared.code)
+            && (data.V8Unlimited === undefined
+                || Number(remote?.V8Unlimited || 0) === (data.V8Unlimited === 1 ? 1 : 0)));
         try {
             const result = await this.post(API.CREATE_ENGINE, payload, {
                 timeoutMs: this.writeRequestTimeoutMs,
@@ -1061,10 +1401,15 @@ export class MicroiClient {
         if (!stat.isFile() || stat.isSymbolicLink()) {
             throw new Error(`应用资产必须是普通文件且不能是符号链接：${localPath}`);
         }
-        const fileName = path.posix.basename(String(data.RelativePath || '').replace(/\\/g, '/'));
-        if (!fileName || /[\r\n"]/u.test(fileName)) {
+        const relativeFileName = path.posix.basename(String(data.RelativePath || '').replace(/\\/g, '/'));
+        if (!relativeFileName || /[\r\n"]/u.test(relativeFileName)) {
             throw new Error('RelativePath 的文件名不合法');
         }
+        // The server derives and validates the canonical asset name from
+        // RelativePath, not from IFormFile.FileName. Keep the multipart transport
+        // filename extension-neutral so reverse proxies do not reject ordinary
+        // compiled .js/.css assets before ASP.NET Core receives the request.
+        const transportFileName = `microi-asset-${data.ExpectedSha256.slice(0, 16)}.bin`;
         const protocolFields = {};
         if (data.ProtocolVersion === 3) {
             const nullable = (value) => value === null ? 'null' : String(value ?? '');
@@ -1095,7 +1440,7 @@ export class MicroiClient {
             ExpectedSha256: data.ExpectedSha256,
             RequestId: data.RequestId,
             ...protocolFields,
-        }, localPath, fileName, 'initial', data.TimeoutMs);
+        }, localPath, transportFileName, 'initial', data.TimeoutMs);
     }
     async finalizeApplicationStreamPublish(data) {
         return this.post(API.FINALIZE_APPLICATION_STREAM_PUBLISH, {
@@ -1350,6 +1695,13 @@ export class MicroiClient {
             Name: name,
             Description: description || '',
             ...options,
+        });
+    }
+    async repairFixedAuditFields(input) {
+        return this.post(API.REPAIR_FIXED_AUDIT_FIELDS, {
+            OsClient: this.config.osClient,
+            TableId: input.tableId,
+            TableName: input.tableName,
         });
     }
     async addField(data) {

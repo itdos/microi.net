@@ -26,6 +26,6 @@ export const useSettingsStore = defineStore("settings", {
     persist: {
         key: "microi-settings",
         storage: localStorage,
-        paths: ["theme", "tagsView", "fixedHeader", "sidebarLogo"]
+        pick: ["theme", "tagsView", "fixedHeader", "sidebarLogo"]
     }
 });

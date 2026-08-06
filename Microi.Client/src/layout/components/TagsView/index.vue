@@ -302,7 +302,10 @@ export default {
         // ESC 退出全屏 + Alt+Enter 进入全屏
         this._keyHandler = (e) => {
             if (e.key === 'Escape' && this.diyStore.IsTabFullScreen) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
                 this.exitFullScreen();
+                return;
             }
             if (e.altKey && e.key === 'Enter') {
                 e.preventDefault();

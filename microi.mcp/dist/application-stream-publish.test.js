@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -164,7 +165,7 @@ test('uploadApplicationAssetStream sends raw multipart bytes without Base64 mate
             for await (const chunk of body)
                 pieces.push(Buffer.from(chunk));
             captured = Buffer.concat(pieces);
-            assert.equal(init?.headers && init.headers['Content-Length'], String(captured.length));
+            assert.equal(init?.headers && init.headers['Content-Length'], undefined);
             return new Response(JSON.stringify({ Code: 1, Data: { Streamed: true }, Msg: '' }), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },
@@ -193,6 +194,171 @@ test('uploadApplicationAssetStream sends raw multipart bytes without Base64 mate
     finally {
         globalThis.fetch = originalFetch;
         fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('uploadApplicationAssetStream falls back to native HTTP with the same raw multipart payload', async () => {
+    const root = createTempDirectory();
+    const filePath = path.join(root, 'asset.js');
+    const raw = Buffer.from('window.microiNativeFallback = true;', 'utf8');
+    fs.writeFileSync(filePath, raw);
+    const originalFetch = globalThis.fetch;
+    let captured = Buffer.alloc(0);
+    const server = http.createServer((request, response) => {
+        const chunks = [];
+        assert.equal(request.headers['content-length'], undefined);
+        assert.equal(request.headers['transfer-encoding'], 'chunked');
+        request.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        request.on('end', () => {
+            captured = Buffer.concat(chunks);
+            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ Code: 1, Data: { NativeFallback: true }, Msg: '' }));
+        });
+    });
+    try {
+        await new Promise((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', () => resolve());
+        });
+        const address = server.address();
+        assert.ok(address && typeof address === 'object');
+        globalThis.fetch = (async () => {
+            throw new TypeError('simulated undici stream reset');
+        });
+        const client = new MicroiClient({
+            apiBaseUrl: `http://127.0.0.1:${address.port}`,
+            username: '',
+            password: '',
+            osClient: 'iTdos',
+            token: 'unit-test-token',
+        });
+        const result = await client.uploadApplicationAssetStream({
+            AppIdOrKey: 'native-fallback-app',
+            VersionNo: 'v1.0.0',
+            RelativePath: 'assets/asset.js',
+            ExpectedSha256: crypto.createHash('sha256').update(raw).digest('hex'),
+            RequestId: 'request-native-fallback-unit-test',
+            FilePath: filePath,
+        });
+        assert.equal(result.Code, 1);
+        assert.ok(captured.includes(raw));
+        assert.equal(captured.includes(Buffer.from(raw.toString('base64'), 'utf8')), false);
+        assert.match(captured.toString('utf8'), /name="RequestId"\r\n\r\nrequest-native-fallback-unit-test/u);
+        assert.match(captured.toString('utf8'), new RegExp(`filename="microi-asset-${crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16)}\\.bin"`, 'u'));
+        assert.doesNotMatch(captured.toString('utf8'), /filename="asset\.js"/u);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+        await new Promise(resolve => server.close(() => resolve()));
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('uploadApplicationAssetStream retries through gzip multipart after raw proxy resets', async () => {
+    const root = createTempDirectory();
+    const filePath = path.join(root, 'asset.js');
+    const raw = Buffer.from('export default "microi gzip proxy fallback";'.repeat(2000), 'utf8');
+    fs.writeFileSync(filePath, raw);
+    const originalFetch = globalThis.fetch;
+    let requestCount = 0;
+    let captured = Buffer.alloc(0);
+    const server = http.createServer((request, response) => {
+        requestCount += 1;
+        if (requestCount === 1) {
+            request.socket.destroy();
+            return;
+        }
+        const chunks = [];
+        request.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        request.on('end', () => {
+            captured = Buffer.concat(chunks);
+            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ Code: 1, Data: { GzipFallback: true }, Msg: '' }));
+        });
+    });
+    try {
+        await new Promise((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', () => resolve());
+        });
+        const address = server.address();
+        assert.ok(address && typeof address === 'object');
+        globalThis.fetch = (async () => {
+            throw new TypeError('simulated proxy reset');
+        });
+        const client = new MicroiClient({
+            apiBaseUrl: `http://127.0.0.1:${address.port}`,
+            username: '',
+            password: '',
+            osClient: 'iTdos',
+            token: 'unit-test-token',
+        });
+        const result = await client.uploadApplicationAssetStream({
+            AppIdOrKey: 'gzip-fallback-app',
+            VersionNo: 'v1.0.0',
+            RelativePath: 'assets/asset.js',
+            ExpectedSha256: crypto.createHash('sha256').update(raw).digest('hex'),
+            RequestId: 'request-gzip-fallback-unit-test',
+            FilePath: filePath,
+        });
+        assert.equal(result.Code, 1);
+        assert.equal(requestCount, 2);
+        assert.match(captured.toString('latin1'), /name="ContentEncoding"\r\n\r\ngzip\r\n/u);
+        assert.equal(captured.includes(raw), false);
+        assert.notEqual(captured.indexOf(Buffer.from([0x1f, 0x8b, 0x08])), -1);
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+        await new Promise(resolve => server.close(() => resolve()));
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('publishMicroService falls back to native HTTP with the exact JSON body', async () => {
+    const originalFetch = globalThis.fetch;
+    let capturedPath = '';
+    let capturedBody = '';
+    const server = http.createServer((request, response) => {
+        const chunks = [];
+        capturedPath = request.url || '';
+        request.on('data', chunk => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+        request.on('end', () => {
+            capturedBody = Buffer.concat(chunks).toString('utf8');
+            response.writeHead(200, { 'Content-Type': 'application/json' });
+            response.end(JSON.stringify({ Code: 1, Data: { NativeJsonFallback: true }, Msg: '' }));
+        });
+    });
+    try {
+        await new Promise((resolve, reject) => {
+            server.once('error', reject);
+            server.listen(0, '127.0.0.1', () => resolve());
+        });
+        const address = server.address();
+        assert.ok(address && typeof address === 'object');
+        globalThis.fetch = (async () => {
+            throw new TypeError('simulated undici JSON reset');
+        });
+        const client = new MicroiClient({
+            apiBaseUrl: `http://127.0.0.1:${address.port}`,
+            username: '',
+            password: '',
+            osClient: 'iTdos',
+            token: 'unit-test-token',
+        });
+        const result = await client.publishMicroService({
+            AppId: 'existing-app',
+            AppVersion: 'v1.0.1',
+            FileList: [{ RelativePath: 'index.html', ContentBase64: 'PGh0bWw+' }],
+        });
+        assert.equal(result.Code, 1);
+        assert.match(capturedPath, /PublishMicroService/u);
+        assert.deepEqual(JSON.parse(capturedBody), {
+            OsClient: 'iTdos',
+            AppId: 'existing-app',
+            AppVersion: 'v1.0.1',
+            FileList: [{ RelativePath: 'index.html', ContentBase64: 'PGh0bWw+' }],
+        });
+    }
+    finally {
+        globalThis.fetch = originalFetch;
+        await new Promise(resolve => server.close(() => resolve()));
     }
 });
 test('protocol v3 multipart forwards canonical bigint strings and explicit null baselines as PascalCase fields', async () => {
@@ -900,7 +1066,7 @@ test('default stage-and-finalize mode validates request evidence and exposes the
         fs.rmSync(root, { recursive: true, force: true });
     }
 });
-test('a failed stage can be retried with the exact same asset request id', async () => {
+test('a transient failed asset upload is retried in-stage with the exact same request id', async () => {
     const root = createTempDirectory();
     try {
         fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html><html><head></head><body>retry</body></html>');
@@ -935,9 +1101,6 @@ test('a failed stage can be retried with the exact same asset request id', async
             publishMode: 'stage',
             confirmExecution: 'retry-app',
         };
-        const failed = await runApplicationDirectoryStreamPublish(fakeClient, input);
-        assert.equal(failed.isError, true);
-        assert.equal(parseToolJson(failed).retrySafe, true);
         const recovered = await runApplicationDirectoryStreamPublish(fakeClient, input);
         assert.equal(recovered.isError, undefined);
         assert.equal(requestIds.length, 2);
@@ -1095,6 +1258,8 @@ test('small existing MicroService can use bounded legacy CSharp publish compatib
                         AppKey: 'microi-platform-service',
                         AppName: '平台服务',
                         ApplicationType: 'MicroService',
+                        CurrentVersion: 3,
+                        AppVersion: 'v1.1.9',
                     },
                 },
                 Msg: '',
@@ -1114,6 +1279,8 @@ test('small existing MicroService can use bounded legacy CSharp publish compatib
             routes: [{ PageKey: 'home', RoutePath: '/' }],
             deliveryBatchId: 'delivery-1',
             sourceManifestHash: 'a'.repeat(64),
+            expectedCurrentVersion: 3,
+            expectedAppVersion: 'v1.1.9',
         });
         assert.equal(fallback.attempted, true);
         assert.equal(fallback.response?.Code, 1);
@@ -1126,6 +1293,58 @@ test('small existing MicroService can use bounded legacy CSharp publish compatib
         const entry = assets.find(asset => asset.Path === 'index.html');
         assert.equal(entry?.IsEntry, true);
         assert.match(Buffer.from(String(entry?.FileByteBase64), 'base64').toString('utf8'), /<!doctype html>/u);
+    }
+    finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+test('opt-in directory publish uses bounded MicroService compatibility after repeated stream resets', async () => {
+    const root = createTempDirectory();
+    let streamAttempts = 0;
+    let legacyPublishes = 0;
+    try {
+        fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html><body>compat fallback</body>');
+        const fakeClient = {
+            uploadApplicationAssetStream: async () => {
+                streamAttempts += 1;
+                throw new Error('read ECONNRESET');
+            },
+            getApplicationContext: async () => ({
+                Code: 1,
+                Data: {
+                    Application: {
+                        Id: 'compat-app-row',
+                        AppKey: 'compat-app',
+                        AppName: '兼容应用',
+                        ApplicationType: 'MicroService',
+                        CurrentVersion: 4,
+                        AppVersion: 'v1.0.4',
+                    },
+                },
+                Msg: '',
+            }),
+            publishMicroService: async () => {
+                legacyPublishes += 1;
+                return { Code: 1, Data: { MsKey: 'compat-app' }, Msg: '' };
+            },
+        };
+        const result = await runApplicationDirectoryStreamPublish(fakeClient, {
+            appIdOrKey: 'compat-app',
+            versionNo: 'v1.0.5',
+            directory: root,
+            publishMode: 'stage-and-finalize',
+            expectedCurrentVersion: 4,
+            expectedAppVersion: 'v1.0.4',
+            allowLegacyFallback: true,
+            confirmExecution: 'compat-app',
+        });
+        assert.equal(result.isError, undefined);
+        assert.equal(streamAttempts, 3);
+        assert.equal(legacyPublishes, 1);
+        const payload = parseToolJson(result);
+        assert.equal(payload.compatibilityFallback, true);
+        assert.equal(payload.transport, 'bounded-legacy-microservice-csharp');
+        assert.equal(payload.streamFailure, 'read ECONNRESET');
     }
     finally {
         fs.rmSync(root, { recursive: true, force: true });

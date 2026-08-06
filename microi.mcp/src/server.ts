@@ -1312,6 +1312,8 @@ export async function tryLegacyMicroServiceStreamPublishFallback(
     routes?: Array<Record<string, unknown>>;
     deliveryBatchId: string;
     sourceManifestHash?: string;
+    expectedCurrentVersion?: number;
+    expectedAppVersion?: string | null;
   },
 ): Promise<LegacyStreamPublishFallbackResult> {
   if (manifest.assets.length > LEGACY_STREAM_COMPATIBILITY_MAX_FILES) {
@@ -1351,6 +1353,20 @@ export async function tryLegacyMicroServiceStreamPublishFallback(
   const appKey = getStringField(application, 'AppKey', 'AppId');
   if (!appKey) {
     return { attempted: false, reason: '应用上下文缺少服务端确认的 AppKey' };
+  }
+  if (input.expectedCurrentVersion !== undefined
+    && Number(application.CurrentVersion) !== input.expectedCurrentVersion) {
+    return {
+      attempted: false,
+      reason: `兼容发布 CurrentVersion 基线已漂移：Expected=${input.expectedCurrentVersion}，Actual=${String(application.CurrentVersion ?? '')}`,
+    };
+  }
+  if (input.expectedAppVersion !== undefined
+    && (application.AppVersion == null ? null : String(application.AppVersion)) !== input.expectedAppVersion) {
+    return {
+      attempted: false,
+      reason: `兼容发布 AppVersion 基线已漂移：Expected=${input.expectedAppVersion}，Actual=${String(application.AppVersion ?? '')}`,
+    };
   }
 
   const assets: Array<Record<string, unknown>> = [];
@@ -1476,6 +1492,57 @@ export async function runApplicationDirectoryStreamPublish(
     }));
     const assetRequestManifestHash = deterministicApplicationPublishId(assetRequests.flatMap(item => [item.Path, item.RequestId]));
 
+    const tryOptInCompatibilityFallback = async (streamFailure: string): Promise<CallToolResult | null> => {
+      if (input.allowLegacyFallback !== true || v3 || publishMode !== 'stage-and-finalize') return null;
+      const fallback = await tryLegacyMicroServiceStreamPublishFallback(client, manifest, {
+        appIdOrKey: input.appIdOrKey,
+        versionNo: input.versionNo,
+        routes: input.routes,
+        deliveryBatchId: effectiveDeliveryBatchId,
+        sourceManifestHash: input.sourceManifestHash,
+        expectedCurrentVersion: input.expectedCurrentVersion,
+        expectedAppVersion: input.expectedAppVersion,
+      });
+      if (!fallback.attempted || !fallback.response) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            error: streamFailure,
+            compatibilityFallbackAttempted: false,
+            compatibilityFallbackReason: fallback.reason,
+            retrySafe: true,
+          }, null, 2) }],
+          isError: true,
+        };
+      }
+      if (fallback.response.Code !== 1) {
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            error: fallback.response.Msg || 'MicroService 兼容发布失败',
+            streamFailure,
+            compatibilityFallbackAttempted: true,
+            compatibilityFallbackReason: fallback.reason,
+            retrySafe: false,
+          }, null, 2) }],
+          isError: true,
+        };
+      }
+      return {
+        content: [{ type: 'text', text: JSON.stringify({
+          ...(asJsonRecord(fallback.response.Data)),
+          appIdOrKey: input.appIdOrKey,
+          versionNo: normalizedApplicationVersion(input.versionNo),
+          assetCount: manifest.assets.length,
+          totalSize: manifest.totalSize,
+          runtimeManifestHash: manifest.manifestHash,
+          deliveryBatchId: effectiveDeliveryBatchId,
+          compatibilityFallback: true,
+          compatibilityFallbackReason: fallback.reason,
+          streamFailure,
+          transport: 'bounded-legacy-microservice-csharp',
+        }, null, 2) }],
+      };
+    };
+
     if (input.confirmExecution !== input.appIdOrKey) {
       return {
         content: [{ type: 'text', text: JSON.stringify({
@@ -1529,47 +1596,58 @@ export async function runApplicationDirectoryStreamPublish(
       const uploadOrder = [...manifest.assets].sort((left, right) => Number(left.isEntry) - Number(right.isEntry));
       for (const asset of uploadOrder) {
         const requestId = requestIdByPath.get(asset.relativePath)!;
-        let result: ApiResponse;
-        try {
-          result = await client.uploadApplicationAssetStream({
-            AppIdOrKey: input.appIdOrKey,
-            VersionNo: input.versionNo,
-            RelativePath: asset.relativePath,
-            ExpectedSha256: asset.sha256,
-            RequestId: requestId,
-            FilePath: asset.absolutePath,
-            TimeoutMs: input.timeoutMsPerFile,
-            ...(v3 ? {
-              ProtocolVersion: 3 as const,
-              ExpectedGateEpoch: v3.expectedGateEpoch,
-              RequestFingerprint: v3.requestFingerprint,
-              DeliveryBatchId: v3.deliveryBatchId,
-              SourceManifestHash: v3.sourceManifestHash,
-              RuntimeManifestHash: v3.runtimeManifestHash,
-              RouteSnapshotJson: v3.routeSnapshotJson,
-              RouteSnapshotHash: v3.routeSnapshotHash,
-              ExpectedCurrentVersion: v3.expectedCurrentVersion,
-              ExpectedAppVersion: v3.expectedAppVersion,
-              ExpectedPublishFence: v3.expectedPublishFence,
-              ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
-              ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
-              ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
-              ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
-            } : {}),
-          });
-        } catch (error) {
-          return {
-            content: [{ type: 'text', text: JSON.stringify({
-              error: error instanceof Error ? error.message : String(error),
-              failedPath: asset.relativePath,
-              requestId,
-              uploadedCount,
-              totalCount: manifest.assets.length,
-              publishMode,
-              retrySafe: true,
-            }, null, 2) }],
-            isError: true,
-          };
+        let result!: ApiResponse;
+        for (let uploadAttempt = 0; uploadAttempt < 3; uploadAttempt += 1) {
+          try {
+            result = await client.uploadApplicationAssetStream({
+              AppIdOrKey: input.appIdOrKey,
+              VersionNo: input.versionNo,
+              RelativePath: asset.relativePath,
+              ExpectedSha256: asset.sha256,
+              RequestId: requestId,
+              FilePath: asset.absolutePath,
+              TimeoutMs: input.timeoutMsPerFile,
+              ...(v3 ? {
+                ProtocolVersion: 3 as const,
+                ExpectedGateEpoch: v3.expectedGateEpoch,
+                RequestFingerprint: v3.requestFingerprint,
+                DeliveryBatchId: v3.deliveryBatchId,
+                SourceManifestHash: v3.sourceManifestHash,
+                RuntimeManifestHash: v3.runtimeManifestHash,
+                RouteSnapshotJson: v3.routeSnapshotJson,
+                RouteSnapshotHash: v3.routeSnapshotHash,
+                ExpectedCurrentVersion: v3.expectedCurrentVersion,
+                ExpectedAppVersion: v3.expectedAppVersion,
+                ExpectedPublishFence: v3.expectedPublishFence,
+                ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
+                ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
+                ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
+                ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
+              } : {}),
+            });
+            break;
+          } catch (error) {
+            if (uploadAttempt < 2) {
+              await new Promise(resolve => setTimeout(resolve, uploadAttempt === 0 ? 500 : 1500));
+              continue;
+            }
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const fallbackResult = await tryOptInCompatibilityFallback(errorMessage);
+            if (fallbackResult) return fallbackResult;
+            return {
+              content: [{ type: 'text', text: JSON.stringify({
+                error: errorMessage,
+                failedPath: asset.relativePath,
+                requestId,
+                uploadedCount,
+                totalCount: manifest.assets.length,
+                publishMode,
+                retrySafe: true,
+                uploadAttempts: uploadAttempt + 1,
+              }, null, 2) }],
+              isError: true,
+            };
+          }
         }
         if (result.Code !== 1) {
           const legacyDefect = isLegacyApplicationStreamJValueFailure(result);
@@ -1626,6 +1704,9 @@ export async function runApplicationDirectoryStreamPublish(
         if (evidence.Idempotent === true) idempotentCount += 1;
         if (uploadedCount === 1 || uploadedCount % 25 === 0 || uploadedCount === manifest.assets.length) {
           console.error(`[microi-mcp] Stream stage ${input.appIdOrKey} ${input.versionNo}: ${uploadedCount}/${manifest.assets.length}`);
+        }
+        if (uploadedCount < manifest.assets.length) {
+          await new Promise(resolve => setTimeout(resolve, 150));
         }
       }
     }

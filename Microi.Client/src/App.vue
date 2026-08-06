@@ -15,6 +15,10 @@ import { getElementLocale, normalizeLocale } from "@/lang";
 import { setThemeMode as applyThemeMode } from "@/utils/theme-color.js";
 import { syncApkDesktopStatusbarInset } from "@/utils/apk-statusbar-safe-area.js";
 import { getQueryObject } from "@/utils/index.js";
+import {
+    exitClassicShellUrlMode,
+    syncClassicShellVisibilityFromUrl
+} from "@/utils/classic-shell-visibility.js";
 import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
@@ -76,10 +80,18 @@ export default {
             // 浏览器标签页从休眠/后台恢复时立即检查 Token 是否需要续签
             authResumeHandler: null,
             behaviorVisibilityHandler: null,
-            behaviorPageHideHandler: null
+            behaviorPageHideHandler: null,
+            classicShellKeyHandler: null
         };
     },
-    watch: {},
+    watch: {
+        "$route.fullPath": function () {
+            this.syncClassicShellVisibility();
+        },
+        "diyStore.IsTabFullScreen": function (isFullScreen) {
+            if (!isFullScreen) this.syncClassicShellVisibility();
+        }
+    },
 
     async mounted() {
         // console.log("-------> App.vue mounted");
@@ -95,6 +107,25 @@ export default {
            console.log('无法获取当前URL');
        }
         var self = this;
+
+        self.syncClassicShellVisibility();
+        self.classicShellKeyHandler = function (event) {
+            if (event.key !== "Escape" || event.defaultPrevented || self.diyStore.IsTabFullScreen) return;
+            const exited = exitClassicShellUrlMode(
+                self.diyStore,
+                window.location.href,
+                function (cleanUrl) {
+                    window.history.replaceState(window.history.state, "", cleanUrl);
+                    const hashIndex = cleanUrl.indexOf("#");
+                    const cleanRoute = hashIndex >= 0 ? cleanUrl.slice(hashIndex + 1) : "";
+                    if (cleanRoute.startsWith("/")) {
+                        self.$router.replace(cleanRoute).catch(function () {});
+                    }
+                }
+            );
+            if (exited) event.preventDefault();
+        };
+        document.addEventListener("keydown", self.classicShellKeyHandler);
 
         // 初始化窗口大小监听，用于响应式布局
         self.WindowResize();
@@ -215,10 +246,16 @@ export default {
         if (self.behaviorPageHideHandler) {
             window.removeEventListener("pagehide", self.behaviorPageHideHandler, false);
         }
+        if (self.classicShellKeyHandler) {
+            document.removeEventListener("keydown", self.classicShellKeyHandler);
+        }
         // 清理 Android 返回键处理
         window.__microi_handleBack = null;
     },
     methods: {
+        syncClassicShellVisibility() {
+            syncClassicShellVisibilityFromUrl(this.diyStore, window.location.href);
+        },
         // 窗口大小变化处理
         WindowResize(forceStatusbarInset) {
             var isPhoneView = window.innerWidth <= 768;
