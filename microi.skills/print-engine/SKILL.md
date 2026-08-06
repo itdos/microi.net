@@ -36,6 +36,12 @@ description: 生成和审查 Microi 打印引擎 Print Engine 模板 JSON。用�
 | PrintObj | 打印数据（运行时填充到模板中） |
 | DataApi | 关联的接口引擎 Id（动态数据） |
 
+### `mic_print` 权限边界
+
+- `mic_print` 是按角色管理的运行资源，不是只能由 `Level >= 9999` 读取的控制面表。打印渲染器通过 FormEngine 读取模板时，当前角色必须拥有菜单权限或高级表权限中的 `Read`；否则应明确返回 `NoAuth`，不能为兼容改成匿名读取。
+- 模板新增、修改、删除分别要求明确的 `Add`、`Edit`、`Del`。只需要打印的业务角色通常只授予 `Read`，不要顺带授予设计权限。
+- 角色授权界面只负责展示服务端策略。角色增删改接口必须从主库复核当前操作者确为活动平台管理员，不能相信 Postman 请求体中的 `_IsAdmin`、`Level`、`RoleIds` 或 `OsClient`。
+
 ## PageObj 模板结构
 
 ```json

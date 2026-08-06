@@ -42,6 +42,57 @@ namespace Microi.net
             "5DB47859-35A3-411A-A1F7-99482E057D24".ToLower()
         };
 
+        private static DosResult ValidateRoleMutationAdministrator(
+            DbSession dbSession,
+            SysRoleParam param)
+        {
+            if (param != null
+                && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    dbSession,
+                    param._CurrentUser))
+            {
+                return new DosResult(1);
+            }
+
+            return new DosResult(
+                0,
+                null,
+                DiyMessage.GetLang(param?.OsClient, "NoAuth", param?._Lang));
+        }
+
+        private static void SyncUserLevelsForRole(DbSession dbSession, string roleId)
+        {
+            if (dbSession == null || roleId.DosIsNullOrWhiteSpace())
+            {
+                return;
+            }
+
+            var allSysUser = dbSession.From<SysUser>()
+                .Select(new SysUser().GetFields())
+                .Where(d => d.RoleIds.Like(roleId) && d.IsDeleted != 1)
+                .ToList();
+            var allSysRole = dbSession.From<SysRole>()
+                .Select(new SysRole().GetFields())
+                .Where(d => d.IsDeleted != 1)
+                .ToList();
+            foreach (var sysUser in allSysUser)
+            {
+                var sysUserRoleIds = PlatformAdministratorSecurity.ParseRoleIds(sysUser.RoleIds);
+                var maxLevel = allSysRole
+                    .Where(role => sysUserRoleIds.Contains(
+                        role.Id,
+                        StringComparer.OrdinalIgnoreCase))
+                    .Select(role => role.Level)
+                    .DefaultIfEmpty(0)
+                    .Max();
+                if (sysUser.Level != maxLevel)
+                {
+                    sysUser.Level = maxLevel;
+                    dbSession.Update(sysUser);
+                }
+            }
+        }
+
         /// <summary>
         /// Direct table grants are an advanced escape hatch, so validate their full
         /// shape on the server. The UI is not an authority: callers may post arbitrary
@@ -110,12 +161,6 @@ namespace Microi.net
                         DiyMessage.GetLang(osClient, "NoExistData", lang));
                 }
 
-                if (targetRoleLevel < DiyCommon.MaxRoleLevel
-                    && PlatformResourceSecurity.IsProtectedTable(tableModel.Name))
-                {
-                    return new DosResult(0, null, "平台保护表不能授予普通角色直连权限。");
-                }
-
                 JArray permissionArray;
                 try
                 {
@@ -137,6 +182,28 @@ namespace Microi.net
                 if (permissions.Any(d => !AllowedDirectTablePermissions.Contains(d)))
                 {
                     return new DosResult(0, null, "数据表直连权限包含不支持的操作。");
+                }
+
+                var deniedPermissions = permissions
+                    .Where(permission => !PlatformResourceSecurity.CanGrantDirectTablePermission(
+                        tableModel.Name,
+                        permission,
+                        targetRoleLevel))
+                    .ToList();
+                if (deniedPermissions.Count > 0)
+                {
+                    if (PlatformResourceSecurity.IsProtectedTable(tableModel.Name))
+                    {
+                        return new DosResult(0, null, "平台核心保护表不能授予普通角色直连权限。");
+                    }
+                    if (PlatformResourceSecurity.IsReadOnlyTable(tableModel.Name))
+                    {
+                        return new DosResult(
+                            0,
+                            null,
+                            "平台运行元数据表仅允许向普通角色授予查询权限。");
+                    }
+                    return new DosResult(0, null, "该数据表包含不可授予的直连操作。");
                 }
 
                 // An empty permission array grants nothing. Do not persist a misleading
@@ -335,6 +402,12 @@ namespace Microi.net
 
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
+            var administratorValidation = ValidateRoleMutationAdministrator(dbSession, param);
+            if (administratorValidation.Code != 1)
+            {
+                return administratorValidation;
+            }
+
             model.CreateTime = DateTime.Now;
             model.UpdateTime = DateTime.Now;
             //var count = SysRoleRepository.Insert(model);
@@ -427,7 +500,11 @@ namespace Microi.net
             #endregion
 
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
-            DbSession dbRead = OsClientExtend.GetClient(param.OsClient).DbRead;
+            var administratorValidation = ValidateRoleMutationAdministrator(dbSession, param);
+            if (administratorValidation.Code != 1)
+            {
+                return administratorValidation;
+            }
             //var model = SysRoleRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -516,63 +593,13 @@ namespace Microi.net
             var count = dbSession.Update(model);
 
             //更新SysUser表的Level
-            if (isNeedSyncSysUserLevel)
+            if (count > 0 && isNeedSyncSysUserLevel)
             {
-                Task.Run(() =>
-                {
-                    //先修复RoleIds？暂时不修复，UptSysUser的时候修复
-                    var allSysUser = dbRead.From<SysUser>()
-                                            .Select(new SysUser().GetFields())
-                                            .Where(d => d.RoleIds.Like(model.Id.ToString()) && d.IsDeleted != 1)
-                                            .ToList();
-                    var allSysRole = dbRead.From<SysRole>()
-                                            .Select(new SysRole().GetFields())
-                                            .Where(d => d.IsDeleted != 1)
-                                            .ToList();
-                    foreach (var sysUser in allSysUser)
-                    {
-                        try
-                        {
-                            var sysUserRoleIds = JsonHelper.Deserialize<List<string>>(sysUser.RoleIds);
-                            //查询该用户所有角色
-                            var userRoles = allSysRole.Where(d => sysUserRoleIds.Contains(d.Id)).ToList();
-                            var maxLevel = 0;
-                            foreach (var roleModel in userRoles)
-                            {
-                                if (maxLevel < roleModel.Level)
-                                {
-                                    maxLevel = roleModel.Level;
-                                }
-                            }
-                            if (sysUser.Level != maxLevel)
-                            {
-                                sysUser.Level = maxLevel;
-                                //后期改成批量修改
-                                dbSession.Update(sysUser);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            var sysUserRoleIds = JsonHelper.Deserialize<List<SysRole>>(sysUser.RoleIds);
-                            //查询该用户所有角色
-                            var userRoles = allSysRole.Where(d => sysUserRoleIds.Any(o => o.Id == d.Id)).ToList();
-                            var maxLevel = 0;
-                            foreach (var roleModel in userRoles)
-                            {
-                                if (maxLevel < roleModel.Level)
-                                {
-                                    maxLevel = roleModel.Level;
-                                }
-                            }
-                            if (sysUser.Level != maxLevel)
-                            {
-                                sysUser.Level = maxLevel;
-                                //后期改成批量修改
-                                dbSession.Update(sysUser);
-                            }
-                        }
-                    }
-                });
+                // Role mutation is a control-plane write. Complete the denormalized
+                // user-level sync on the primary database before invalidating the
+                // shared authorization epoch and returning. A background Task.Run
+                // leaves a window where a demoted administrator can reuse stale Level.
+                SyncUserLevelsForRole(dbSession, model.Id);
             }
 
             //计算排序
@@ -667,6 +694,12 @@ namespace Microi.net
 
             DbSession dbSession = OsClientExtend.GetClient(param.OsClient).Db;
 
+            var administratorValidation = ValidateRoleMutationAdministrator(dbSession, param);
+            if (administratorValidation.Code != 1)
+            {
+                return administratorValidation;
+            }
+
             //var model = SysRoleRepository.First(d => d.Id == param.Id);
             var model = dbSession.From<SysRole>().Where(d => d.Id == param.Id).First();
             if (model == null)
@@ -679,6 +712,9 @@ namespace Microi.net
             var count = dbSession.Update(model);
             if (count > 0)
             {
+                // Deleting a role must close the same stale-Level window as lowering
+                // it. Recompute affected users before publishing the new auth epoch.
+                SyncUserLevelsForRole(dbSession, model.Id);
                 await FormEngineAuthorizationCache.InvalidateAsync(param.OsClient);
             }
             return new DosResult(1);

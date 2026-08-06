@@ -335,7 +335,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 当前菜单绑定表会自动补真实 `_SysMenuId`。
 - 跨表调用不能继承当前菜单 Id，否则会把无关菜单的数据范围错误套到目标表；未显式指定目标菜单时，由后端从当前用户的版本化授权缓存中推断其对目标表的菜单/表级权限。
 - 传入 `_SysMenuId`、历史 `SysMenuId` 或 `ModuleEngineKey` 表示调用方选择了明确菜单，后端必须按该菜单严格校验，失败时不能回退。
-- 受保护的平台表始终受敏感资源策略限制。`_InvokeType:'Client'` 只控制表单事件触发方式，不是授权绕过参数。
+- 平台表由服务端分级：管理员专用表全操作硬保护，只读委托表仅在真实菜单/Table `Read` 授权后查询，`mic_page/mic_print` 按角色 CRUD 权限管理；三类都拒绝匿名。前端角色页必须读取服务端授权策略并失败关闭，不维护第二份硬编码表名清单。`_InvokeType:'Client'` 只控制表单事件触发方式，不是授权绕过参数。
 - `TableChild` 使用运行时生成的不透明 `_TableChildAuth`；后端会重新验证父菜单、父记录、字段关系、外键和数据范围。业务代码不得手工伪造。
 - 导入、导出必须锚定真实菜单；通用 CRUD 的历史无菜单兼容不能扩展到批量数据传输。
 
@@ -460,6 +460,21 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 `sys_menu.OpenType=MicroService` 时，动态路由必须把 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath` 和真实入口 `MicroAppUrl` 写入 route meta；浏览器侧菜单路由使用 `/#/micro-app/{MsKey}/{RoutePath}`，不要再生成 `/micro-app-host/{menuId}`，否则地址过长且刷新或直接访问菜单路由容易加载空白页。
 
 同一个编译后的微服务可以绑定多个后台菜单和内部页面。`MicroAppHost` 的 `<micro-app name>` 必须包含菜单 Id、路由路径或其它实例维度，避免多个菜单共享同一个 appKey 时触发 `app name conflict`。入口 URL 中的 `microRoute/routePath` 只用于解析，最终应通过 `data.microRoute` 传给子应用，入口文件 URL 保持稳定。
+
+菜单型微服务的宿主操作集中维护在 `views/micro-app/host-bridge.js` 和 `host.vue`。
+`microAppData.hostCapabilities` 必须下发 `microi.host.v1` 协议、`tab` 模式、请求/结果事件名和动作清单；
+子应用只允许 dispatch `micro-app:host-action`，不能接收父页面函数或直接操作 TagsView/Router。
+标准动作包括 `closeTab/navigate/replaceTab/back/forward/reloadTab/setTabTitle/showMessage`：
+关闭当前 Tab 要复用 `useTagsViewStore` 的当前 `fullPath`，拒绝固定/最后一个 Tab；`navigate`
+保留当前 Tab，`replaceTab` 删除旧 Tab；返回/前进只使用站内 history；右键刷新和 `reloadTab`
+都重新解析并挂载当前微服务。路由输入必须拒绝外部 URL、协议相对地址、反斜杠、登录、访问密钥和
+内部 redirect，并在跳转前用当前 Router 解析，404/未注册动态路由失败关闭。宿主结果用
+`micro-app:host-action-result` 尽力回传，但关闭或跳转会卸载子应用，不能承诺结果事件必达。
+
+`OpenAppDialog` 不暴露 Tab 模式能力；弹窗成功/取消/失败继续使用
+`app-dialog:success/cancel/error`。修改桥接时至少运行
+`node --test tests/micro-app-host-bridge.spec.mjs tests/micro-app-runtime-contract.spec.mjs`，并同步
+`microi.doc/docs/doc/system-engine/micro-app.md` 与 `microi-microservice` Skill。
 
 后台配置必须配套维护 `sys_microiservice_page` 路由子表，并在 `sys_microiservice` 表单上用隐藏子模块 + `TableChild` 显示页面/路由。`sys_menu` 选择微服务时要由前端 V8 事件实时加载页面列表，不能完全依赖 SQL 下拉里的表单变量替换。
 

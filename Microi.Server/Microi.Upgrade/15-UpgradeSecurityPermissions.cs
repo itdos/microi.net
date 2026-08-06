@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Microi.net
 {
     /// <summary>
-    /// 移除历史上授予普通角色的平台敏感表直连权限。
+    /// 移除历史上授予普通角色的管理员专用平台表直连权限。
     /// 菜单权限由业务菜单继续维护，本迁移只处理 Type=Table 的直接授权。
     /// </summary>
     public class Upgrade15
@@ -42,7 +42,7 @@ namespace Microi.net
                 if (protectedTableIds.Count == 0)
                 {
                     Console.WriteLine(
-                        $"Microi：【信息】平台自动升级【{osClient}】【升级15】未发现敏感表元数据，无需清理表级直连权限。");
+                        $"Microi：【信息】平台自动升级【{osClient}】【升级15】未发现管理员专用表元数据，无需清理表级直连权限。");
                     return messages;
                 }
 
