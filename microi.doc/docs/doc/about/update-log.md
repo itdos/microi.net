@@ -1,5 +1,16 @@
 # 更新日志
 
+## v7.1.1 - (2026-08-07 00:00)
+
+- **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、OCR、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v7.1.1；Microi VS Code 插件、独立 CLI 与内置 Skills 升级至 v4.7.3。写入本日志前的非生成文件待提交基线为：根仓库 31 个已跟踪文件和 2 个未跟踪文件，Microi.net 1 个已跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 2 个已跟踪文件；`microi.mcp/dist`、`bin`、`obj` 等 38 个生成文件不纳入功能分析。Microi.net、Microi.AI 子仓库本轮除程序集、文件和 NuGet 版本升级至 v7.1.1 外没有其它源码差异；Microi.VSCode 子仓库本轮除插件与 CLI 版本升级至 v4.7.3 外没有其它源码差异。
+- **Classic 桌面壳层状态恢复**：`ShowClassicTop`、`ShowClassicLeft` 改为当前 URL 的一次性显示策略，初始化、路由切换和退出页签全屏后都会重新按地址同步；参数移除后自动恢复顶栏、侧栏，不再把某个隐藏壳层的业务链接状态残留到后续页面或刷新。非页签全屏状态下按 Esc 可退出 URL 隐藏模式，只清理外层及 Hash Query 中的壳层参数并保留 `OsClient`、`FormDataId` 等其它业务参数；页签全屏继续优先由 TagsView 自身退出，避免同一次按键触发两套恢复逻辑。
+- **Pinia 4 持久化兼容**：应用、租户运行态和界面设置三个 Store 的持久化白名单从已失效的 `paths` 迁移为 `pick`，继续只落盘语言、主题、登录租户与必要界面状态，避免升级 Pinia 后白名单失效导致临时壳层状态或其它运行态被意外持久化。
+- **MCP 应用资产发布抗代理重置**：MCP 的 JSON 请求和 multipart 流式上传在 Node `fetch`／Undici 被反向代理重置时，会用相同序列化内容切换原生 `http(s)` 传输；应用文件仍以流式、分块方式发送，不在内存中 Base64 化。上传传输文件名改为由资产摘要生成的扩展名中立 `.bin`，原始与原生传输都失败后可自动切换 gzip；服务端仍从受校验的 `RelativePath` 推导真实文件名，减少普通 JS／CSS 编译资产在到达 ASP.NET Core 前被代理规则误拦截的概率。
+- **稳定重试、节流与受限兼容回退**：每个应用资产最多执行 3 次上传，始终复用同一个稳定 RequestId，重试间隔为 500ms／1500ms，文件间增加 150ms 节流，降低连续上传触发瞬时网络故障或安全策略误判的概率。只有调用方显式允许、目标为小型既有 MicroService、使用 `stage-and-finalize` 且不属于 v3 发布时，连续流式失败才进入有界 C# 兼容发布；回退前必须再次核对 CurrentVersion／AppVersion 基线，Web 应用、版本漂移或超限资产继续失败关闭，不以兼容路径绕过并发控制。
+- **服务端 gzip 安全边界**：应用资产流式接口只接受空编码或 `gzip`，压缩内容解压到带 `DeleteOnClose` 的异步临时文件，按解压后的真实长度执行既有单文件上限与 SHA-256 校验，并在成功、校验失败、取消或异常路径统一释放；未知编码和解压膨胀超限立即拒绝，避免压缩传输把内存占用、文件大小或资产完整性边界放宽。
+- **定向回归与完整构建**：Classic 壳层 URL／Esc／Pinia 持久化 7 个用例、MCP 类型检查与完整测试 94 个、后端应用流式发布测试 74 个全部通过，合计 175 项定向检查成功。主发布完成现代前端、逐文件串行压缩、Chrome 49 legacy、后端 Release、19 个 NuGet 打包、Microi.net／Microi.AI 混淆和真实 API 启动探测，存活端点返回 HTTP 200；后端为 0 个编译错误，仅保留 5 个 xUnit 分析器警告，官网六项升级资源也已通过 `microi_itdos` 实时同步与 SHA-256 一致性检查。
+- **v7.1.1 公开发布回读**：一键发布以 `__MICROI_RELEASE_EXIT__=0` 完成，NuGet.org 已独立回读 19/19 个 v7.1.1；阿里云后端 `microi-api:latest`、`microi-api:v7.1.1`、`microi-api-dev:latest` 收敛至 `sha256:320f78de...a9c01840`，前端 `microi-web-dev`／`microi-client-dev` 的 `latest`、`v7.1.1` 四个标签收敛至 `sha256:84eea02d...0b80cbc6`。公共包与镜像已发布不等于客户或生产容器已经拉取重建，也不把尚未执行的真实客户网络、浏览器或业务页面验收描述为完成。
+
 ## v7.1.0 - (2026-08-06 20:19)
 
 - **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、OCR、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v7.1.0；Microi VS Code 插件与独立 CLI 升级至 v4.7.2。写入本日志前的非生成文件待提交基线为：根仓库 88 个已跟踪文件和 8 个未跟踪文件，Microi.net 1 个已跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 3 个已跟踪文件；四仓均无暂存内容，`dist`、`bin`、`obj` 等编译产物不纳入功能分析。Microi.net 与 Microi.AI 子仓库本轮除程序集、文件和 NuGet 版本升级至 v7.1.0 外没有其它源码差异。

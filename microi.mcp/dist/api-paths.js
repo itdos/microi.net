@@ -12,6 +12,14 @@ export const API = {
     REVOKE_USER_ACCESS_KEY: '/api/SysUserAccessKey/Revoke',
     // 服务器状态
     GET_STATUS: '/api/V8Engine/GetStatus',
+    AI_CHAT: '/api/Ai/Chat',
+    OCR_RECOGNIZE: '/api/Ocr/Recognize',
+    TRANSLATE_TEXT: '/api/Translate/TranslateText',
+    TRANSLATE_DETECT: '/api/Translate/Detect',
+    TRANSLATE_LANGUAGES: '/api/Translate/Languages',
+    TRANSLATE_FILE: '/api/Translate/TranslateFile',
+    TRANSLATE_SUGGEST: '/api/Translate/Suggest',
+    TRANSLATE_HEALTH: '/api/Translate/Health',
     TRANSITION_APPLICATION_STREAM_GATE: '/api/V8Engine/TransitionApplicationStreamGate',
     // Redis 管理器（默认当前租户连接，可指定已保存连接）
     REDIS_STATISTICS: '/api/Cache/redis/statistics',
@@ -60,6 +68,7 @@ export const API = {
     UPDATE_WORKFLOW_V8_EVENT_CODE: '/api/V8Engine/UpdateWorkflowV8EventCode',
     // 低代码系统设计
     CREATE_TABLE: '/api/V8Engine/CreateTable',
+    REPAIR_FIXED_AUDIT_FIELDS: '/api/DiyField/RepairFixedDiyFieldMetadata',
     ADD_FIELD: '/api/V8Engine/AddField',
     DELETE_FIELD: '/api/DiyField/DelDiyField',
     GET_FIELD_LIST: '/api/V8Engine/GetFieldList',

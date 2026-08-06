@@ -9,6 +9,14 @@ export declare const API: {
     readonly CREATE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Create";
     readonly REVOKE_USER_ACCESS_KEY: "/api/SysUserAccessKey/Revoke";
     readonly GET_STATUS: "/api/V8Engine/GetStatus";
+    readonly AI_CHAT: "/api/Ai/Chat";
+    readonly OCR_RECOGNIZE: "/api/Ocr/Recognize";
+    readonly TRANSLATE_TEXT: "/api/Translate/TranslateText";
+    readonly TRANSLATE_DETECT: "/api/Translate/Detect";
+    readonly TRANSLATE_LANGUAGES: "/api/Translate/Languages";
+    readonly TRANSLATE_FILE: "/api/Translate/TranslateFile";
+    readonly TRANSLATE_SUGGEST: "/api/Translate/Suggest";
+    readonly TRANSLATE_HEALTH: "/api/Translate/Health";
     readonly TRANSITION_APPLICATION_STREAM_GATE: "/api/V8Engine/TransitionApplicationStreamGate";
     readonly REDIS_STATISTICS: "/api/Cache/redis/statistics";
     readonly REDIS_KEYS: "/api/Cache/redis/keys";
@@ -51,6 +59,7 @@ export declare const API: {
     readonly GET_WORKFLOW_V8_EVENT_CODE: "/api/V8Engine/GetWorkflowV8EventCode";
     readonly UPDATE_WORKFLOW_V8_EVENT_CODE: "/api/V8Engine/UpdateWorkflowV8EventCode";
     readonly CREATE_TABLE: "/api/V8Engine/CreateTable";
+    readonly REPAIR_FIXED_AUDIT_FIELDS: "/api/DiyField/RepairFixedDiyFieldMetadata";
     readonly ADD_FIELD: "/api/V8Engine/AddField";
     readonly DELETE_FIELD: "/api/DiyField/DelDiyField";
     readonly GET_FIELD_LIST: "/api/V8Engine/GetFieldList";

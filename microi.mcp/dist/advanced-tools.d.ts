@@ -42,6 +42,12 @@ export declare function normalizeViewSchemaJson(raw: unknown): {
     errors: string[];
     warnings: string[];
 };
+export declare function buildPlan(manifest: JsonRecord): {
+    plan: string[];
+    errors: string[];
+    warnings: string[];
+};
+export declare function manifestGuide(osClient: string | undefined): JsonRecord;
 export declare function registerAdvancedTools(server: McpServer, client: MicroiClient, context: McpServerContext): void;
 export {};
 //# sourceMappingURL=advanced-tools.d.ts.map

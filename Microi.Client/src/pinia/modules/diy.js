@@ -333,6 +333,6 @@ export const useDiyStore = defineStore("diy", {
                 ctx.store.themeColor = "";
             }
         },
-        paths: ["Lang", "ThemeClass", "SystemStyle", "IsPhoneView", "CurrentUser", "SysConfig", "DesktopBg", "themeColor", "ApiBase", "OsClient", "Token", "TokenExpires", "LastLoginAccount", "DemoSelfLogout", "Did"]
+        pick: ["Lang", "ThemeClass", "SystemStyle", "IsPhoneView", "CurrentUser", "SysConfig", "DesktopBg", "themeColor", "ApiBase", "OsClient", "Token", "TokenExpires", "LastLoginAccount", "DemoSelfLogout", "Did"]
     }
 });

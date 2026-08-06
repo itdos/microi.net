@@ -17,6 +17,7 @@ using Dos.Common;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Text;
 
 namespace Microi.net.Api
@@ -252,76 +253,133 @@ namespace Microi.net.Api
                 var lastSlash = normalizedFileName.LastIndexOf('/');
                 if (lastSlash >= 0) normalizedFileName = normalizedFileName.Substring(lastSlash + 1);
 
-                await using var stream = file.OpenReadStream();
+                await using var transportStream = file.OpenReadStream();
+                Stream stream = transportStream;
+                FileStream decodedStream = null;
+                var contentEncoding = form["ContentEncoding"].ToString().Trim();
+                if (!string.IsNullOrEmpty(contentEncoding)
+                    && !string.Equals(contentEncoding, "gzip", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Ok(new DosResult(0, null, "ContentEncoding 仅支持 gzip"));
+                }
+                if (string.Equals(contentEncoding, "gzip", StringComparison.OrdinalIgnoreCase))
+                {
+                    var temporaryPath = Path.Combine(
+                        Path.GetTempPath(),
+                        "microi-application-asset-" + Guid.NewGuid().ToString("N") + ".tmp");
+                    decodedStream = new FileStream(
+                        temporaryPath,
+                        FileMode.CreateNew,
+                        FileAccess.ReadWrite,
+                        FileShare.None,
+                        81920,
+                        FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
+                    try
+                    {
+                        using var gzip = new GZipStream(transportStream, CompressionMode.Decompress, true);
+                        var buffer = new byte[81920];
+                        long decodedLength = 0;
+                        while (true)
+                        {
+                            var read = await gzip.ReadAsync(buffer, 0, buffer.Length, HttpContext.RequestAborted);
+                            if (read <= 0) break;
+                            decodedLength += read;
+                            if (decodedLength > V8McpLogic.ApplicationAssetStreamMaxFileBytes)
+                            {
+                                await decodedStream.DisposeAsync();
+                                decodedStream = null;
+                                return Ok(new DosResult(0, null,
+                                    $"gzip 解压后的应用资产不能超过 {V8McpLogic.ApplicationAssetStreamMaxFileBytes} bytes"));
+                            }
+                            await decodedStream.WriteAsync(buffer, 0, read, HttpContext.RequestAborted);
+                        }
+                        await decodedStream.FlushAsync(HttpContext.RequestAborted);
+                        decodedStream.Position = 0;
+                        stream = decodedStream;
+                    }
+                    catch
+                    {
+                        await decodedStream.DisposeAsync();
+                        decodedStream = null;
+                        throw;
+                    }
+                }
                 var protocolVersion = form["ProtocolVersion"].ToString().Trim();
                 DosResult<object> result;
-                if (protocolVersion == "3")
+                try
                 {
-                    var protocolParam = new JObject();
-                    var nullableFields = new HashSet<string>(StringComparer.Ordinal)
+                    if (protocolVersion == "3")
                     {
-                        "ExpectedAppVersion",
-                        "ExpectedVersionRowVersion",
-                        "ExpectedActivePublishVersionId",
-                        "ExpectedCommittedPublishVersionId"
-                    };
-                    foreach (var fieldName in new[]
-                    {
-                        "ProtocolVersion",
-                        "PublishMode",
-                        "ExpectedGateEpoch",
-                        "ExpectedPublishRowVersion",
-                        "ExpectedVersionRowVersion",
-                        "ExpectedPublishFence",
-                        "ExpectedActivePublishVersionId",
-                        "ExpectedCommittedPublishVersionId",
-                        "ExpectedCurrentVersion",
-                        "ExpectedAppVersion",
-                        "RequestId",
-                        "RequestFingerprint",
-                        "DeliveryBatchId",
-                        "SourceManifestHash",
-                        "RuntimeManifestHash"
-                    })
-                    {
-                        if (!form.ContainsKey(fieldName)) continue;
-                        var rawValue = form[fieldName].ToString();
-                        protocolParam[fieldName] = nullableFields.Contains(fieldName)
-                                                   && string.Equals(rawValue, "null", StringComparison.Ordinal)
-                            ? JValue.CreateNull()
-                            : rawValue;
+                        var protocolParam = new JObject();
+                        var nullableFields = new HashSet<string>(StringComparer.Ordinal)
+                        {
+                            "ExpectedAppVersion",
+                            "ExpectedVersionRowVersion",
+                            "ExpectedActivePublishVersionId",
+                            "ExpectedCommittedPublishVersionId"
+                        };
+                        foreach (var fieldName in new[]
+                        {
+                            "ProtocolVersion",
+                            "PublishMode",
+                            "ExpectedGateEpoch",
+                            "ExpectedPublishRowVersion",
+                            "ExpectedVersionRowVersion",
+                            "ExpectedPublishFence",
+                            "ExpectedActivePublishVersionId",
+                            "ExpectedCommittedPublishVersionId",
+                            "ExpectedCurrentVersion",
+                            "ExpectedAppVersion",
+                            "RequestId",
+                            "RequestFingerprint",
+                            "DeliveryBatchId",
+                            "SourceManifestHash",
+                            "RuntimeManifestHash"
+                        })
+                        {
+                            if (!form.ContainsKey(fieldName)) continue;
+                            var rawValue = form[fieldName].ToString();
+                            protocolParam[fieldName] = nullableFields.Contains(fieldName)
+                                                       && string.Equals(rawValue, "null", StringComparison.Ordinal)
+                                ? JValue.CreateNull()
+                                : rawValue;
+                        }
+                        result = await V8McpLogic.UploadApplicationAssetStreamV3(
+                            osClient,
+                            form["AppIdOrKey"].ToString(),
+                            form["VersionNo"].ToString(),
+                            relativePath,
+                            form["ExpectedSha256"].ToString(),
+                            normalizedFileName,
+                            stream,
+                            stream.Length,
+                            protocolParam,
+                            (object)token,
+                            HttpContext.RequestAborted);
                     }
-                    result = await V8McpLogic.UploadApplicationAssetStreamV3(
-                        osClient,
-                        form["AppIdOrKey"].ToString(),
-                        form["VersionNo"].ToString(),
-                        relativePath,
-                        form["ExpectedSha256"].ToString(),
-                        normalizedFileName,
-                        stream,
-                        file.Length,
-                        protocolParam,
-                        (object)token,
-                        HttpContext.RequestAborted);
+                    else
+                    {
+                        if (!string.IsNullOrEmpty(protocolVersion) && protocolVersion != "2")
+                        {
+                            return Ok(new DosResult(0, null, "ProtocolVersion 只允许 2 或 3"));
+                        }
+                        result = await V8McpLogic.UploadApplicationAssetStream(
+                            osClient,
+                            form["AppIdOrKey"].ToString(),
+                            form["VersionNo"].ToString(),
+                            relativePath,
+                            form["ExpectedSha256"].ToString(),
+                            normalizedFileName,
+                            stream,
+                            stream.Length,
+                            form["RequestId"].ToString(),
+                            (object)token,
+                            HttpContext.RequestAborted);
+                    }
                 }
-                else
+                finally
                 {
-                    if (!string.IsNullOrEmpty(protocolVersion) && protocolVersion != "2")
-                    {
-                        return Ok(new DosResult(0, null, "ProtocolVersion 只允许 2 或 3"));
-                    }
-                    result = await V8McpLogic.UploadApplicationAssetStream(
-                        osClient,
-                        form["AppIdOrKey"].ToString(),
-                        form["VersionNo"].ToString(),
-                        relativePath,
-                        form["ExpectedSha256"].ToString(),
-                        normalizedFileName,
-                        stream,
-                        file.Length,
-                        form["RequestId"].ToString(),
-                        (object)token,
-                        HttpContext.RequestAborted);
+                    if (decodedStream != null) await decodedStream.DisposeAsync();
                 }
                 return Ok(result);
             }

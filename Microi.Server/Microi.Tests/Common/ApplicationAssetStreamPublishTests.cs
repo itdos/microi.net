@@ -1738,6 +1738,11 @@ public class ApplicationAssetStreamPublishTests
             "V8EngineController.cs"));
         Assert.Contains("RequestSizeLimit(136314880L)", controllerSource);
         Assert.Contains("MultipartBodyLengthLimit = 136314880L", controllerSource);
+        Assert.Contains("form[\"ContentEncoding\"]", controllerSource);
+        Assert.Contains("new GZipStream(transportStream, CompressionMode.Decompress, true)", controllerSource);
+        Assert.Contains("decodedLength > V8McpLogic.ApplicationAssetStreamMaxFileBytes", controllerSource);
+        Assert.Contains("FileOptions.DeleteOnClose", controllerSource);
+        Assert.Contains("stream.Length", controllerSource);
     }
 
     [Fact]
