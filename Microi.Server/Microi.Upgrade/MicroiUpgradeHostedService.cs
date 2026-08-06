@@ -167,6 +167,15 @@ namespace Microi.net
                         throw new InvalidOperationException(string.Join("；", translateConfigurationMessages));
                     }
                     upgradeLease.ThrowIfLost();
+                    // zhy：在共享升级租约内幂等补齐历史高版本租户缺失的微信内容安全配置。
+                    var weChatContentSecurityMessages = await new Upgrade32()
+                        .Run(runtimeClient.OsClient)
+                        .ConfigureAwait(false);
+                    if (weChatContentSecurityMessages.Count > 0)
+                    {
+                        throw new InvalidOperationException(string.Join("; ", weChatContentSecurityMessages));
+                    }
+                    upgradeLease.ThrowIfLost();
                     var currentVersion = runtimeClient.Db
                         .FromSql("SELECT ServerVersion FROM sys_config WHERE IsEnable = @p0")
                         .AddInParameter("p0", 1)
