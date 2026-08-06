@@ -3698,6 +3698,7 @@ var DiyCommon = {
                         return;
                     }
                     field._DataLoading = true;
+                    field._DataLoadingStartedAt = Date.now();
                     var apiGetDiyFieldSqlData = DiyApi.GetDiyFieldSqlData;
                     if (!DiyCommon.IsNull(apiReplace) && !DiyCommon.IsNull(apiReplace.GetDiyFieldSqlData)) {
                         apiGetDiyFieldSqlData = apiReplace.GetDiyFieldSqlData;
@@ -3718,6 +3719,7 @@ var DiyCommon = {
                     // 查询数据库
                     DiyCommon.Post(apiGetDiyFieldSqlData, param, function (result) {
                         field._DataLoading = false;
+                        field._DataLoadingStartedAt = 0;
                         if (DiyCommon.Result(result)) {
                             try {
                                 if (DiyCommon.IsNull(result.Data)) {
@@ -3753,6 +3755,9 @@ var DiyCommon = {
                             } catch (error) {}
                             field.Data = result.Data;
                         }
+                    }, function () {
+                        field._DataLoading = false;
+                        field._DataLoadingStartedAt = 0;
                     });
                 }
             }
@@ -3933,10 +3938,17 @@ var DiyCommon = {
         //提前定义查询数据库的方法
         function GetFieldsData() {
             // 标记所有待加载字段为加载中，防止子组件并发请求
-            fieldList.forEach((f) => { f._DataLoading = true; });
+            var loadingStartedAt = Date.now();
+            fieldList.forEach((f) => {
+                f._DataLoading = true;
+                f._DataLoadingStartedAt = loadingStartedAt;
+            });
             // 查询数据库
             DiyCommon.Post(apiGetFieldsData, param, function (results) {
-                fieldList.forEach((f) => { f._DataLoading = false; });
+                fieldList.forEach((f) => {
+                    f._DataLoading = false;
+                    f._DataLoadingStartedAt = 0;
+                });
                 if (results.Code == 1) {
                     fieldList.forEach((field) => {
                         var resultModel = _.find(results.Data, function (item) {
@@ -3983,6 +3995,11 @@ var DiyCommon = {
                     } catch (error) {}
                     DiyCommon.Tips(results.Msg + "<br>相关字段：" + fieldsMsg, false);
                 }
+            }, function () {
+                fieldList.forEach((f) => {
+                    f._DataLoading = false;
+                    f._DataLoadingStartedAt = 0;
+                });
             });
         }
 
@@ -4012,6 +4029,7 @@ var DiyCommon = {
                     if (field.Config.DataSource == "Api" || field.Config.DataSource == "DataSource" || field.Config.DataSource == "ApiEngine") {
                         // 标记为加载中，防止子组件 SetFieldData 再次发起重复请求
                         field._DataLoading = true;
+                        field._DataLoadingStartedAt = Date.now();
                         var param = {
                             _FormData: formData,
                             _TableChildAuth: field._TableChildAuth || null
@@ -4029,6 +4047,7 @@ var DiyCommon = {
 
                         DiyCommon.Post(apiGetFieldsData, param, function (result) {
                             field._DataLoading = false;
+                            field._DataLoadingStartedAt = 0;
                             if (DiyCommon.Result(result)) {
                                 try {
                                     if (DiyCommon.IsNull(result.Data)) {
@@ -4060,6 +4079,9 @@ var DiyCommon = {
                                 } catch (error) {}
                                 field.Data = result.Data;
                             }
+                        }, function () {
+                            field._DataLoading = false;
+                            field._DataLoadingStartedAt = 0;
                         });
                     } else {
                         //先组装一次性查询数据库需要的参数

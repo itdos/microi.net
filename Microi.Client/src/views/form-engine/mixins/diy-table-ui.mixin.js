@@ -1,5 +1,6 @@
 import _u from "underscore";
 import { hasFieldReference } from "./table-field-data-source.js";
+import { buildIdBackedTreeFilterOptions, isIdBackedTreeFilterField } from "./column-filter-options.js";
 
 export default {
     methods: {
@@ -951,6 +952,7 @@ LoadFabPosition() {
             field = field || this._colMenuField;
             if (!field) return false;
             if (field.Component === 'Switch') return true;
+            if (isIdBackedTreeFilterField(field)) return true;
             return ['Select', 'MultipleSelect', 'Radio', 'Checkbox'].indexOf(field.Component) > -1 && Array.isArray(field.Data) && field.Data.length > 0;
         },
         getColFilterOptions() {
@@ -961,6 +963,9 @@ LoadFabPosition() {
                     { label: '打开', value: '1' },
                     { label: '关闭', value: '0' }
                 ];
+            }
+            if (isIdBackedTreeFilterField(field)) {
+                return buildIdBackedTreeFilterOptions(field);
             }
             var config = field.Config || {};
             var labelKey = config.SelectLabel || 'Name';
@@ -1018,10 +1023,15 @@ LoadFabPosition() {
                 var value = row ? row[fieldName] : null;
                 var key = self.getColPageFilterValueKey(value);
                 if (!map[key]) {
+                    var displayValue = self.GetColValue({ row: row }, field);
                     map[key] = {
                         key: key,
                         value: value,
-                        label: self.formatColPageFilterLabel(value),
+                        // 当页筛选仍保存原始值（例如部门 Id），只把列表已经使用的
+                        // 可读文本作为标签，确保筛选条件和值域都保持正确。
+                        label: self.DiyCommon.IsNull(displayValue)
+                            ? self.formatColPageFilterLabel(value)
+                            : String(displayValue),
                         count: 0
                     };
                     result.push(map[key]);
