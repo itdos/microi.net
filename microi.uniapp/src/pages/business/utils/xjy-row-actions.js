@@ -18,11 +18,42 @@ function roleLimits(user) {
 
 export function hasMenuPermission(menuId, name, user = getUser() || {}) {
   if (Number(user.Level || 0) >= 999) return true
-  const row = roleLimits(user).find((item) => String(item.FkId || '') === String(menuId || ''))
-  if (!row) return false
-  const permission = row.Permission
-  if (Array.isArray(permission)) return permission.some((item) => String(item.Name || item).includes(name))
-  return String(permission || '').includes(name)
+  return roleLimits(user)
+    .filter((item) => String(item.FkId || '') === String(menuId || ''))
+    .some((row) => {
+      const permission = row.Permission
+      if (Array.isArray(permission)) return permission.some((item) => String(item.Name || item).includes(name))
+      return String(permission || '').includes(name)
+    })
+}
+
+function permissionNames(permission) {
+  if (Array.isArray(permission)) return permission.map((item) => String(item && item.Name || item || '').trim())
+  if (typeof permission === 'string') {
+    try {
+      const parsed = JSON.parse(permission)
+      if (Array.isArray(parsed)) return permissionNames(parsed)
+    } catch (error) {}
+    return permission.split(',').map((item) => String(item || '').trim()).filter(Boolean)
+  }
+  return []
+}
+
+export function hasExactMenuPermission(menuId, names, user = getUser() || {}) {
+  if (Number(user.Level || 0) >= 999) return true
+  if (!menuId) return false
+  const expected = (Array.isArray(names) ? names : [names]).map((item) => String(item || '').trim())
+  return roleLimits(user)
+    .filter((item) => String(item.FkId || '') === String(menuId))
+    .some((row) => permissionNames(row.Permission).some((name) => expected.includes(name)))
+}
+
+export function canAddMenuRecord(menuId, user = getUser() || {}) {
+  return hasExactMenuPermission(menuId, ['Add', '新增'], user)
+}
+
+export function canEditMenuRecord(menuId, user = getUser() || {}) {
+  return hasExactMenuPermission(menuId, ['Edit', '编辑'], user)
 }
 
 function sameTenant(row, user) {
@@ -33,11 +64,18 @@ function sameTenant(row, user) {
   return !rowTenantName || !user.TenantName || String(rowTenantName) === String(user.TenantName)
 }
 
+export function canApproveOrder(row = {}, user = getUser() || {}) {
+  const state = String(row.DingdanZT || '').trim()
+  const stateCode = Number(row.DingdanZTZ)
+  const pendingApproval = state === '待审批' || stateCode === 1
+  return pendingApproval && sameTenant(row, user) && hasMenuPermission(MENU_IDS.orders, '审批', user)
+}
+
 export function getBusinessRowActions(key, row = {}, user = getUser() || {}) {
   const actions = []
   if (key === 'orders' && sameTenant(row, user)) {
     const state = String(row.DingdanZT || '')
-    if (/待审批/.test(state) && hasMenuPermission(MENU_IDS.orders, '审批', user)) {
+    if (canApproveOrder(row, user)) {
       actions.push({ key: 'order-approve', label: '审批', tone: 'primary', input: 'optional', inputTitle: '订单审批', inputPlaceholder: '审批意见（选填）' })
       actions.push({ key: 'order-reject', label: '驳回', tone: 'danger', input: 'required', inputTitle: '驳回订单', inputPlaceholder: '请输入驳回原因' })
     }
@@ -161,4 +199,13 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
   return { Code: 1, rowPatch }
 }
 
-export default { hasMenuPermission, getBusinessRowActions, executeBusinessRowAction, loadApprovalOpinions }
+export default {
+  hasMenuPermission,
+  hasExactMenuPermission,
+  canAddMenuRecord,
+  canEditMenuRecord,
+  canApproveOrder,
+  getBusinessRowActions,
+  executeBusinessRowAction,
+  loadApprovalOpinions
+}
