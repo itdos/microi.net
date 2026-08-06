@@ -219,6 +219,8 @@ import {
   canAddMenuRecord,
   executeBusinessRowAction,
   getBusinessRowActions,
+  hydrateInstallationPositionRows,
+  openInstallationPositionDevice,
   loadApprovalOpinions
 } from './utils/xjy-row-actions.js'
 import { listReturnMixin } from '@/platform/list-return.js'
@@ -471,10 +473,14 @@ export default {
       try {
         const result = await loadModuleRows(this.config, options)
         if (requestId !== this.loadRequestId) return
-        this.rows = reset ? result.rows : [...this.rows, ...result.rows]
+        const incomingRows = this.key === 'installationPositions'
+          ? await hydrateInstallationPositionRows(result.rows)
+          : result.rows
+        if (requestId !== this.loadRequestId) return
+        this.rows = reset ? incomingRows : [...this.rows, ...incomingRows]
         this.count = result.count
         this.dataAppend = result.append
-        this.finished = this.rows.length >= result.count || result.rows.length < (this.config.pageSize || 15)
+        this.finished = this.rows.length >= result.count || incomingRows.length < (this.config.pageSize || 15)
         if (!this.finished) this.pageIndex += 1
         this.loading = false
         if (reset) {
@@ -814,8 +820,17 @@ export default {
         })
         return
       }
-      if (action.key === 'position-product' && row.ShangpinID) {
-        this.mciNavigateToDetail(`/pages/mall/detail?id=${encodeURIComponent(row.ShangpinID)}`)
+      if (action.key === 'position-device') {
+        this.actionSubmitting = true
+        uni.showLoading({ title: '正在打开设备', mask: true })
+        try {
+          await openInstallationPositionDevice(row)
+        } catch (error) {
+          uni.showToast({ title: error.message || '设备详情打开失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+          this.actionSubmitting = false
+        }
         return
       }
       if (action.input) {
