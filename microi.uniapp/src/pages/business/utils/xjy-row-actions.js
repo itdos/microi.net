@@ -1,4 +1,4 @@
-import { callApiEngine } from '@/platform/business-runtime.js'
+import { callApiEngine, openForm } from '@/platform/business-runtime.js'
 import { V8, getUser } from '@/utils/request.js'
 import { removeCachePrefix } from '@/platform/cache.js'
 
@@ -18,11 +18,42 @@ function roleLimits(user) {
 
 export function hasMenuPermission(menuId, name, user = getUser() || {}) {
   if (Number(user.Level || 0) >= 999) return true
-  const row = roleLimits(user).find((item) => String(item.FkId || '') === String(menuId || ''))
-  if (!row) return false
-  const permission = row.Permission
-  if (Array.isArray(permission)) return permission.some((item) => String(item.Name || item).includes(name))
-  return String(permission || '').includes(name)
+  return roleLimits(user)
+    .filter((item) => String(item.FkId || '') === String(menuId || ''))
+    .some((row) => {
+      const permission = row.Permission
+      if (Array.isArray(permission)) return permission.some((item) => String(item.Name || item).includes(name))
+      return String(permission || '').includes(name)
+    })
+}
+
+function permissionNames(permission) {
+  if (Array.isArray(permission)) return permission.map((item) => String(item && item.Name || item || '').trim())
+  if (typeof permission === 'string') {
+    try {
+      const parsed = JSON.parse(permission)
+      if (Array.isArray(parsed)) return permissionNames(parsed)
+    } catch (error) {}
+    return permission.split(',').map((item) => String(item || '').trim()).filter(Boolean)
+  }
+  return []
+}
+
+export function hasExactMenuPermission(menuId, names, user = getUser() || {}) {
+  if (Number(user.Level || 0) >= 999) return true
+  if (!menuId) return false
+  const expected = (Array.isArray(names) ? names : [names]).map((item) => String(item || '').trim())
+  return roleLimits(user)
+    .filter((item) => String(item.FkId || '') === String(menuId))
+    .some((row) => permissionNames(row.Permission).some((name) => expected.includes(name)))
+}
+
+export function canAddMenuRecord(menuId, user = getUser() || {}) {
+  return hasExactMenuPermission(menuId, ['Add', '新增'], user)
+}
+
+export function canEditMenuRecord(menuId, user = getUser() || {}) {
+  return hasExactMenuPermission(menuId, ['Edit', '编辑'], user)
 }
 
 function sameTenant(row, user) {
@@ -33,11 +64,103 @@ function sameTenant(row, user) {
   return !rowTenantName || !user.TenantName || String(rowTenantName) === String(user.TenantName)
 }
 
+export function canApproveOrder(row = {}, user = getUser() || {}) {
+  const state = String(row.DingdanZT || '').trim()
+  const stateCode = Number(row.DingdanZTZ)
+  const pendingApproval = state === '待审批' || stateCode === 1
+  return pendingApproval && sameTenant(row, user) && hasMenuPermission(MENU_IDS.orders, '审批', user)
+}
+
+export function canViewOrderDevice(row = {}) {
+  const state = String(row.DingdanZT || '').trim()
+  const stateCode = Number(row.DingdanZTZ)
+  if (!state && !Number.isFinite(stateCode)) return false
+  const hiddenStates = ['待审批', '已驳回', '待审批作废', '待审批已作废']
+  return !hiddenStates.includes(state) && ![1, 5, 6].includes(stateCode)
+}
+
+// zhy：安装位置只保存订单商品 Id 与设备编号。先批量补齐订单、客户和审核状态，
+// 避免每张卡片单独请求；审核状态无法确认时按未审核处理，设备详情按钮保持隐藏。
+export async function hydrateInstallationPositionRows(rows = []) {
+  const sourceRows = Array.isArray(rows) ? rows : []
+  const productIds = [...new Set(sourceRows.map((row) => String(row.DingdanSPID || '').trim()).filter(Boolean))]
+  if (!productIds.length) return sourceRows.map((row) => ({ ...row, _DeviceDetailAvailable: false }))
+
+  try {
+    const productResult = await V8.FormEngine.GetTableData('Diy_DingdanSP', {
+      _Where: [{ Name: 'Id', Type: 'In', Value: productIds }],
+      _SelectFields: ['Id', 'DingdanID', 'KehuID'],
+      _PageIndex: 1,
+      _PageSize: Math.max(20, productIds.length)
+    })
+    ensure(productResult, '订单商品信息读取失败')
+    const products = Array.isArray(productResult.Data) ? productResult.Data : []
+    const productMap = new Map(products.map((item) => [String(item.Id || ''), item]))
+    const orderIds = [...new Set(products.map((item) => String(item.DingdanID || '').trim()).filter(Boolean))]
+    if (!orderIds.length) return sourceRows.map((row) => ({ ...row, _DeviceDetailAvailable: false }))
+
+    const orderResult = await V8.FormEngine.GetTableData('Diy_Dingdan', {
+      _Where: [{ Name: 'Id', Type: 'In', Value: orderIds }],
+      _SelectFields: ['Id', 'DingdanZT', 'DingdanZTZ', 'KehuID'],
+      _PageIndex: 1,
+      _PageSize: Math.max(20, orderIds.length)
+    })
+    ensure(orderResult, '订单审核状态读取失败')
+    const orders = Array.isArray(orderResult.Data) ? orderResult.Data : []
+    const orderMap = new Map(orders.map((item) => [String(item.Id || ''), item]))
+
+    return sourceRows.map((row) => {
+      const product = productMap.get(String(row.DingdanSPID || '')) || {}
+      const order = orderMap.get(String(product.DingdanID || '')) || {}
+      return {
+        ...row,
+        _DingdanID: product.DingdanID || '',
+        _KehuID: product.KehuID || order.KehuID || '',
+        _DeviceDetailAvailable: canViewOrderDevice(order),
+        _OrderStatus: order.DingdanZT || '',
+        _OrderStatusCode: order.DingdanZTZ
+      }
+    })
+  } catch (error) {
+    return sourceRows.map((row) => ({ ...row, _DeviceDetailAvailable: false }))
+  }
+}
+
+export async function openInstallationPositionDevice(row = {}) {
+  // 点击时重新读取订单状态，避免列表加载后订单状态发生变化仍可继续打开设备。
+  const hydrated = (await hydrateInstallationPositionRows([row]))[0] || row
+  if (!hydrated._DeviceDetailAvailable) throw new Error('当前订单状态不能查看设备详情')
+
+  const customerId = String(hydrated._KehuID || '').trim()
+  const deviceNumber = String(hydrated.ShangpinBH || hydrated.ShebeiBH || '').trim()
+  if (!customerId || !deviceNumber) throw new Error('缺少客户Id或设备编号，无法查询设备')
+
+  const deviceResult = await V8.FormEngine.GetFormData('Diy_KehuSB', {
+    _Where: [
+      { Name: 'KehuID', Type: '=', Value: customerId },
+      { Name: 'ShebeiBH', Type: '=', Value: deviceNumber }
+    ],
+    _SelectFields: ['Id', 'KehuID', 'ShebeiBH']
+  })
+  if (!deviceResult || Number(deviceResult.Code) !== 1 || !deviceResult.Data?.Id) {
+    throw new Error((deviceResult && deviceResult.Msg) || '未找到对应设备，请确认订单已完成审核')
+  }
+
+  openForm({
+    table: 'Diy_KehuSB',
+    rowId: deviceResult.Data.Id,
+    mode: 'View',
+    title: '设备详情',
+    menuAliases: ['客户设备', '我的设备', '设备管理']
+  })
+  return deviceResult.Data
+}
+
 export function getBusinessRowActions(key, row = {}, user = getUser() || {}) {
   const actions = []
   if (key === 'orders' && sameTenant(row, user)) {
     const state = String(row.DingdanZT || '')
-    if (/待审批/.test(state) && hasMenuPermission(MENU_IDS.orders, '审批', user)) {
+    if (canApproveOrder(row, user)) {
       actions.push({ key: 'order-approve', label: '审批', tone: 'primary', input: 'optional', inputTitle: '订单审批', inputPlaceholder: '审批意见（选填）' })
       actions.push({ key: 'order-reject', label: '驳回', tone: 'danger', input: 'required', inputTitle: '驳回订单', inputPlaceholder: '请输入驳回原因' })
     }
@@ -50,7 +173,7 @@ export function getBusinessRowActions(key, row = {}, user = getUser() || {}) {
     }
   }
   if (key === 'installationPositions') {
-    if (row.ShangpinID) actions.push({ key: 'position-product', label: '设备详情' })
+    if (row._DeviceDetailAvailable === true) actions.push({ key: 'position-device', label: '设备详情' })
     actions.push({ key: 'position-copy', label: '复制', confirm: '确认复制当前安装位置吗？' })
     actions.push({ key: 'position-delete', label: '删除', tone: 'danger', confirm: '确认删除当前安装位置吗？删除后无法恢复。' })
   }
@@ -117,7 +240,12 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
     ensure(await V8.FormEngine.UptFormData('Diy_Dingdan', { Id: id, DingdanZT: '待审批作废', DingdanZTZ: 5, _InvokeType: 'Client' }), '作废申请失败')
   }
   if (actionKey === 'order-void-approve') ensure(await callApiEngine('dingdan_zuofei', { Id: id }), '订单作废失败')
-  if (actionKey === 'position-copy') ensure(await callApiEngine('add_datacopy', { FormEngineKey: 'diy_shebeiwz', Id: id }), '安装位置复制失败')
+  if (actionKey === 'position-copy') {
+    ensure(await callApiEngine('position-copy', {
+      Id: id,
+      NewId: newCopyOperationId()
+    }), '安装位置复制失败')
+  }
   if (actionKey === 'position-delete') {
     ensure(await V8.FormEngine.DelFormData({ FormEngineKey: 'diy_shebeiwz', Id: id, _InvokeType: 'Client' }), '安装位置删除失败')
     if (row.DingdanSPID) {
@@ -161,4 +289,23 @@ export async function executeBusinessRowAction(actionKey, row = {}, input = '', 
   return { Code: 1, rowPatch }
 }
 
-export default { hasMenuPermission, getBusinessRowActions, executeBusinessRowAction, loadApprovalOpinions }
+function newCopyOperationId() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const value = Math.floor(Math.random() * 16)
+    return (char === 'x' ? value : (value & 0x3) | 0x8).toString(16)
+  })
+}
+
+export default {
+  hasMenuPermission,
+  hasExactMenuPermission,
+  canAddMenuRecord,
+  canEditMenuRecord,
+  canApproveOrder,
+  canViewOrderDevice,
+  hydrateInstallationPositionRows,
+  openInstallationPositionDevice,
+  getBusinessRowActions,
+  executeBusinessRowAction,
+  loadApprovalOpinions
+}

@@ -4,6 +4,7 @@ using System.Xml;
 using System.Xml.Linq;
 using Dos.Common;
 using Microsoft.AspNetCore.Http;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using StackExchange.Redis;
 
@@ -349,8 +350,9 @@ public sealed class WeChatContentSecurityService
         {
             var settings = LoadSettings(osClient, requireCallback: true);
             osClient = settings.OsClient;
-            var envelope = ParseXml(body);
-            var encrypted = FindElementValue(envelope, "Encrypt");
+            // zhy: 微信小程序消息推送当前可能使用 JSON，也保留历史 XML；外层先统一识别格式再读取 Encrypt。
+            var envelope = ParseCallbackDocument(body);
+            var encrypted = envelope.FindFirstValue("Encrypt");
             string payload;
             if (!encrypted.DosIsNullOrWhiteSpace())
             {
@@ -364,12 +366,11 @@ public sealed class WeChatContentSecurityService
                 payload = body;
             }
 
-            var document = ParseXml(payload);
-            var traceId = FindElementValue(document, "trace_id", "TraceId");
+            // zhy: 安全模式解密后的正文也可能是 JSON 或 XML，因此内层正文必须再次自动识别格式。
+            var document = ParseCallbackDocument(payload);
+            var traceId = document.FindFirstValue("trace_id", "TraceId");
             if (!IsTraceId(traceId)) return false;
-            var suggests = document.Descendants()
-                .Where(item => string.Equals(item.Name.LocalName, "suggest", StringComparison.OrdinalIgnoreCase))
-                .Select(item => item.Value?.Trim())
+            var suggests = document.FindValues("suggest")
                 .Where(item => !item.DosIsNullOrWhiteSpace())
                 .ToList();
             if (suggests.Count == 0) return false;
@@ -608,10 +609,78 @@ public sealed class WeChatContentSecurityService
         return XDocument.Load(reader, LoadOptions.None);
     }
 
-    private static string FindElementValue(XDocument document, params string[] names)
+    private static ParsedCallbackDocument ParseCallbackDocument(string content)
     {
-        var set = new HashSet<string>(names ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-        return document.Descendants().FirstOrDefault(item => set.Contains(item.Name.LocalName))?.Value?.Trim();
+        // zhy: 不依赖 Content-Type，按去除空白后的首字符识别 JSON/XML，兼容微信网关可能缺失或改写请求头。
+        var text = (content ?? "").Trim();
+        if (text.Length > 0 && text[0] == '\uFEFF') text = text[1..].TrimStart();
+        if (text.DosIsNullOrWhiteSpace())
+            throw new WeChatContentSecurityException("EmptyCallbackBody");
+        if (text[0] == '<') return new ParsedCallbackDocument(ParseXml(text), null);
+        if (text[0] is not ('{' or '['))
+            throw new WeChatContentSecurityException("UnsupportedCallbackFormat");
+
+        // zhy: JSON 限制最大嵌套深度并拒绝重复字段，避免歧义字段覆盖和恶意深层载荷。
+        using var stringReader = new StringReader(text);
+        using var jsonReader = new JsonTextReader(stringReader)
+        {
+            DateParseHandling = DateParseHandling.None,
+            MaxDepth = 64
+        };
+        var json = JToken.ReadFrom(jsonReader, new JsonLoadSettings
+        {
+            DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error
+        });
+        if (jsonReader.Read()) throw new WeChatContentSecurityException("TrailingCallbackContent");
+        return new ParsedCallbackDocument(null, json);
+    }
+
+    // zhy: 测试入口仅返回指定安全字段，不暴露完整微信回调正文或任何租户密钥。
+    private static IReadOnlyList<string> ReadCallbackValues(string content, params string[] names) =>
+        ParseCallbackDocument(content).FindValues(names);
+
+    private sealed class ParsedCallbackDocument
+    {
+        private readonly XDocument _xml;
+        private readonly JToken _json;
+
+        public ParsedCallbackDocument(XDocument xml, JToken json)
+        {
+            _xml = xml;
+            _json = json;
+        }
+
+        public string FindFirstValue(params string[] names) => FindValues(names).FirstOrDefault();
+
+        public IReadOnlyList<string> FindValues(params string[] names)
+        {
+            var set = new HashSet<string>(names ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+            if (_xml != null)
+                return _xml.Descendants()
+                    .Where(item => set.Contains(item.Name.LocalName))
+                    .Select(item => item.Value?.Trim())
+                    .Where(item => !item.DosIsNullOrWhiteSpace())
+                    .ToList();
+
+            return EnumerateJsonTokens(_json)
+                .OfType<JProperty>()
+                .Where(property => set.Contains(property.Name)
+                                   && property.Value is JValue
+                                   && property.Value.Type is not (JTokenType.Null or JTokenType.Undefined))
+                .Select(property => property.Value.ToString().Trim())
+                .Where(value => !value.DosIsNullOrWhiteSpace())
+                .ToList();
+        }
+
+        private static IEnumerable<JToken> EnumerateJsonTokens(JToken token)
+        {
+            if (token == null) yield break;
+            yield return token;
+            if (token is not JContainer container) yield break;
+            foreach (var child in container.Children())
+            foreach (var descendant in EnumerateJsonTokens(child))
+                yield return descendant;
+        }
     }
 
     private async Task SaveReviewAsync(WeChatContentSecurityReview review)

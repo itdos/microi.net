@@ -139,6 +139,7 @@ export default {
       taskId: '',
       customerId: '',
       selectedCustomerName: '',
+      returnToFollowup: false,
       customerPickerVisible: false
     }
   },
@@ -159,6 +160,7 @@ export default {
     if (visitTarget) this.form.name = decodeURIComponent(visitTarget)
     this.taskId = decodeURIComponent(options.taskId || '')
     this.customerId = decodeURIComponent(options.customerId || '')
+    this.returnToFollowup = String(options.returnToFollowup || '0') === '1'
     this.selectedCustomerName = this.customerId ? this.form.name : ''
     this.updateTime()
     this.timer = setInterval(this.updateTime, 1000)
@@ -355,8 +357,22 @@ export default {
         if (!result || result.Code !== 1) throw new Error((result && result.Msg) || '打卡提交失败')
         if (this.taskId) await updateTask(this.taskId, { ShangmenSJ: this.currentTime })
         this.todayCount += 1
+        if (this.returnToFollowup && typeof this.getOpenerEventChannel === 'function') {
+          // 回传仅用于通知来源页，不能让事件通道异常把已成功落库的打卡误报为失败。
+          try {
+            const eventChannel = this.getOpenerEventChannel()
+            if (eventChannel && typeof eventChannel.emit === 'function') {
+              eventChannel.emit('checkinSuccess', {
+                id: result.Data?.Id || (typeof result.Data === 'string' ? result.Data : ''),
+                customerId: this.customerId || '',
+                customerName: this.form.name.trim(),
+                time: this.currentTime
+              })
+            }
+          } catch (error) {}
+        }
         uni.showToast({ title: '打卡成功', icon: 'success' })
-        setTimeout(() => uni.navigateBack(), 700)
+        setTimeout(() => this.goBack(), 700)
       } catch (error) {
         uni.showToast({ title: error.message || error.Msg || '打卡提交失败', icon: 'none' })
       } finally {

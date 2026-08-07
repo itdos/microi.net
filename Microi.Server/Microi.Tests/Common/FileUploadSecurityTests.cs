@@ -105,6 +105,22 @@ public class FileUploadSecurityTests
         Assert.Equal(0, FileUploadSecurity.ValidatePayload(duplicate, SmallLimits).Code);
     }
 
+    //zhy：回归验证接口引擎 Base64 别名能阻止 HDFS 再次补入同名 multipart 流。
+    [Fact]
+    public void ContainsPayloadFileName_DetectsApiEngineBase64AliasCaseInsensitively()
+    {
+        var param = new DiyUploadParam
+        {
+            FilesByteBase64 = new Dictionary<string, string>
+            {
+                ["product-image.jpg"] = "AQ=="
+            }
+        };
+
+        Assert.True(FileUploadSecurity.ContainsPayloadFileName(param, "PRODUCT-IMAGE.JPG"));
+        Assert.False(FileUploadSecurity.ContainsPayloadFileName(param, "other-image.jpg"));
+    }
+
     [Fact]
     public void ValidatePayload_ReturnsExactBytesForAtomicQuotaReservation()
     {
