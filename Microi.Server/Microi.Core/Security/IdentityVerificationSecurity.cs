@@ -181,6 +181,48 @@ namespace Microi.net
             return value;
         }
 
+        /// <summary>
+        /// 校验 WebAuthn RP ID 与发起验证的前端 Origin 是否属于同一站点范围。
+        /// 浏览器要求 RP ID 等于当前域名，或是当前域名的可注册父域；在下发挑战前
+        /// 先做这一层可解释校验，避免把浏览器的英文 SecurityError 直接暴露给用户。
+        /// </summary>
+        public static string NormalizePasskeyRelyingPartyId(string configuredRpId, string origin)
+        {
+            if (!Uri.TryCreate((origin ?? "").Trim(), UriKind.Absolute, out var originUri)
+                || string.IsNullOrWhiteSpace(originUri.IdnHost))
+            {
+                throw new ArgumentException("Passkey 请求来源无效，请通过 HTTPS 站点重新访问。", nameof(origin));
+            }
+
+            var originHost = originUri.IdnHost.Trim().TrimEnd('.').ToLowerInvariant();
+            var rpId = string.IsNullOrWhiteSpace(configuredRpId)
+                ? originHost
+                : configuredRpId.Trim().TrimEnd('.').ToLowerInvariant();
+            if (rpId.Length < 1 || rpId.Length > 253
+                || rpId.Any(ch => !(char.IsLetterOrDigit(ch) || ch == '.' || ch == '-')))
+            {
+                throw new ArgumentException(
+                    "Passkey RP ID 配置无效：只能填写域名，不能包含协议、端口、路径或空格。",
+                    nameof(configuredRpId));
+            }
+
+            var isSameHost = string.Equals(originHost, rpId, StringComparison.OrdinalIgnoreCase);
+            var isParentDomain = originHost.EndsWith("." + rpId, StringComparison.OrdinalIgnoreCase);
+            if (!isSameHost && !isParentDomain)
+            {
+                var currentOrigin = originUri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
+                throw new ArgumentException(
+                    $"Passkey RP ID 与当前站点域名不匹配。当前站点：{currentOrigin}；"
+                    + $"当前域名：{originHost}；已配置 RP ID：{rpId}。"
+                    + "请由租户管理员进入“系统设置 → 登录与身份”，将 Passkey RP ID 设置为当前域名，"
+                    + "或设置为当前域名的可注册父域；同时把当前站点完整 Origin 加入 PasskeyOrigins，"
+                    + "保存后重新登记通行密钥。",
+                    nameof(configuredRpId));
+            }
+
+            return rpId;
+        }
+
         public static string ComputePasswordChangeActionHash(string userId, string encodedNewPassword)
         {
             using (var sha = SHA256.Create())
@@ -448,14 +490,15 @@ namespace Microi.net
         {
             var secret = Base32Decode(base32Secret);
             if (secret.Length < 16) throw new ArgumentException("Authenticator 密钥长度无效。", nameof(base32Secret));
-            var key = DeriveTotpEncryptionKey(osClient);
+            var tenantId = ResolveCanonicalTotpTenantId(osClient);
+            var key = DeriveTotpEncryptionKey(tenantId);
             var nonce = new byte[12];
             using (var random = RandomNumberGenerator.Create()) random.GetBytes(nonce);
             var ciphertext = new byte[secret.Length];
             var tag = new byte[16];
             using (var aes = new AesGcm(key))
             {
-                aes.Encrypt(nonce, secret, ciphertext, tag, Encoding.UTF8.GetBytes($"Microi:TOTP:{osClient}"));
+                aes.Encrypt(nonce, secret, ciphertext, tag, Encoding.UTF8.GetBytes($"Microi:TOTP:{tenantId}"));
             }
             CryptographicOperations.ZeroMemory(secret);
             return string.Join('.', TotpCipherPrefix,
@@ -470,21 +513,81 @@ namespace Microi.net
             var nonce = Base64UrlDecode(parts[1]);
             var ciphertext = Base64UrlDecode(parts[2]);
             var tag = Base64UrlDecode(parts[3]);
-            var plaintext = new byte[ciphertext.Length];
-            using (var aes = new AesGcm(DeriveTotpEncryptionKey(osClient)))
+            if (nonce.Length != 12 || tag.Length != 16 || ciphertext.Length < 16)
+                throw new CryptographicException("Authenticator 密钥密文结构无效，请重新登记 Authenticator。");
+
+            Exception lastError = null;
+            foreach (var tenantId in GetTotpTenantIdCandidates(osClient))
             {
-                aes.Decrypt(nonce, ciphertext, tag, plaintext, Encoding.UTF8.GetBytes($"Microi:TOTP:{osClient}"));
+                var plaintext = new byte[ciphertext.Length];
+                try
+                {
+                    using (var aes = new AesGcm(DeriveTotpEncryptionKey(tenantId)))
+                    {
+                        aes.Decrypt(nonce, ciphertext, tag, plaintext,
+                            Encoding.UTF8.GetBytes($"Microi:TOTP:{tenantId}"));
+                    }
+                    return plaintext;
+                }
+                catch (CryptographicException ex)
+                {
+                    lastError = ex;
+                    CryptographicOperations.ZeroMemory(plaintext);
+                }
             }
-            return plaintext;
+
+            throw new CryptographicException(
+                "Authenticator 密钥无法解密。系统已兼容租户标识大小写；若仍出现此提示，说明绑定后 AuthSecret 已变化或各节点配置不一致。"
+                + "请先使用账号密码登录，在“个人中心 → 验证器”移除并重新登记 Authenticator；管理员同时检查 SaaS 引擎 sys_osclients.AuthSecret 是否稳定且各节点一致。",
+                lastError);
         }
 
         private static byte[] DeriveTotpEncryptionKey(string osClient)
         {
             osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
-            var authSecret = OsClientExtend.GetClient(osClient)?.OsClientModel?["AuthSecret"]?.ToString();
+            var client = OsClientExtend.ClientList
+                .FirstOrDefault(item => string.Equals(item.Key, osClient, StringComparison.OrdinalIgnoreCase))
+                .Value;
+            if (client == null)
+            {
+                try { client = OsClientExtend.GetClient(osClient); }
+                catch { }
+            }
+            var authSecret = client?.OsClientModel?["AuthSecret"]?.ToString();
             if (authSecret.DosIsNullOrWhiteSpace()) throw new CryptographicException("租户认证密钥尚未就绪。");
             using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(authSecret));
             return hmac.ComputeHash(Encoding.UTF8.GetBytes($"Microi:Identity:TOTP:v1:{osClient}"));
+        }
+
+        private static string ResolveCanonicalTotpTenantId(string osClient)
+        {
+            var normalized = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var cached = OsClientExtend.ClientList
+                .FirstOrDefault(item => string.Equals(item.Key, normalized, StringComparison.OrdinalIgnoreCase))
+                .Value;
+            if (cached != null && !cached.OsClient.DosIsNullOrWhiteSpace())
+                return TenantConfigurationSecurity.NormalizeTenantId(cached.OsClient);
+            try
+            {
+                var loaded = OsClientExtend.GetClient(normalized);
+                if (loaded != null && !loaded.OsClient.DosIsNullOrWhiteSpace())
+                    return TenantConfigurationSecurity.NormalizeTenantId(loaded.OsClient);
+            }
+            catch { }
+            return normalized;
+        }
+
+        private static IEnumerable<string> GetTotpTenantIdCandidates(string osClient)
+        {
+            var normalized = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            return new[]
+                {
+                    ResolveCanonicalTotpTenantId(normalized),
+                    normalized,
+                    normalized.ToLowerInvariant()
+                }
+                .Where(value => !value.DosIsNullOrWhiteSpace())
+                .Distinct(StringComparer.Ordinal);
         }
 
         private static byte[] Base64UrlDecode(string value)

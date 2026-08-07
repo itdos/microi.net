@@ -10,7 +10,7 @@
                 {{ GetFormItemLabel(field) }}
             </span>
         </template>
-        <span v-safe-html="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
+        <span v-safe-html:template="FormDiyTableModel[field.Name + '_TmpEngineResult']"></span>
     </el-form-item>
 </template>
 

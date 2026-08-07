@@ -44,6 +44,10 @@ export const zh = defineConfig({
 				},
 				link: "https://gitee.com/ITdos/microi.net",
 			},
+			{
+				icon: "github",
+				link: "https://github.com/itdos/microi.net",
+			},
 		],
 		footer: {
 			message: "MIT License.",
@@ -72,6 +76,10 @@ function nav(): DefaultTheme.NavItem[] {
 				{
 					text: "Gitee 仓库",
 					link: "https://gitee.com/ITdos/microi.net",
+				},
+				{
+					text: "GitHub 仓库",
+					link: "https://github.com/itdos/microi.net",
 				},
 				{
 					text: "吾码UI",

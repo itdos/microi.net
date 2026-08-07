@@ -12,15 +12,18 @@
 	"homepage": "https://microi.net/",
 	"scripts": {
 		"check:links": "node scripts/check-dead-links.mjs",
+		"check:sidebar": "node scripts/check-sidebar-coverage.mjs",
+		"check:repositories": "node scripts/check-open-source-links.mjs",
+		"check:content": "npm run check:links && npm run check:sidebar && npm run check:repositories",
 		"check:seo": "node scripts/check-seo.mjs",
 		"check:theme": "node scripts/check-default-dark.mjs",
 		"test:app-preview": "node --test tests/uniapp-preview-mode.test.mjs",
 		"test:site-api": "node --test tests/site-api-base.test.mjs",
 		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
-		"docs:dev": "npm run check:links && vitepress dev docs --host",
-		"dev": "npm run check:links && vitepress dev docs --host",
-		"docs:build": "npm run check:links && vitepress build docs && npm run check:theme && npm run check:seo",
-		"build": "npm run check:links && vitepress build docs && npm run check:theme && npm run check:seo",
+		"docs:dev": "npm run check:content && vitepress dev docs --host",
+		"dev": "npm run check:content && vitepress dev docs --host",
+		"docs:build": "npm run check:content && vitepress build docs && npm run check:theme && npm run check:seo",
+		"build": "npm run check:content && vitepress build docs && npm run check:theme && npm run check:seo",
 		"docs:preview": "vitepress preview docs"
 	},
 	"devDependencies": {

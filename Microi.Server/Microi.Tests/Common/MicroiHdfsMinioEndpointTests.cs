@@ -52,6 +52,15 @@ public class MicroiHdfsMinioEndpointTests
         return (bool?)method!.Invoke(null, new object?[] { hasHttpContext });
     }
 
+    private static string BuildUploadReadbackDiagnostic(Exception exception, string bucket, string objectName)
+    {
+        var method = typeof(MicroiHDFSMinIO).GetMethod(
+            "BuildUploadReadbackDiagnostic",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (string)method!.Invoke(null, new object?[] { exception, bucket, objectName })!;
+    }
+
     [Theory]
     [InlineData(null, "Byte", false)]
     [InlineData(null, "Url", true)]
@@ -137,5 +146,20 @@ public class MicroiHdfsMinioEndpointTests
             MicroiHDFSMinIO.NormalizeEndpoint(endpoint, configuredSsl: false));
 
         Assert.Contains("MinIO Endpoint", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UploadReadbackAccessDenied_ReturnsChinesePolicyAndProxyResolution()
+    {
+        var message = BuildUploadReadbackDiagnostic(
+            new InvalidOperationException("Access denied on the resource: /public/"),
+            "public",
+            "tenant-a/avatar.png");
+
+        Assert.Contains("HEAD/Stat 回读被拒绝", message, StringComparison.Ordinal);
+        Assert.Contains("s3:GetObject", message, StringComparison.Ordinal);
+        Assert.Contains("s3:GetBucketLocation", message, StringComparison.Ordinal);
+        Assert.Contains("proxy_cache_convert_head off", message, StringComparison.Ordinal);
+        Assert.Contains("不会跳过上传后回读校验", message, StringComparison.Ordinal);
     }
 }

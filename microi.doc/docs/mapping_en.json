@@ -71,7 +71,7 @@
   "ai-skills-integrate.md": "AI Skills Integration Guide",
   "ai-mcp-integrate.md": "AI MCP Integration Guide",
 
-  "more": "Advanced Features",
+  "advanced": "Advanced Features",
   "sys-config.md": "System Settings",
   "copy-module.md": "Module Copy",
   "hdfs.md": "Distributed Storage",

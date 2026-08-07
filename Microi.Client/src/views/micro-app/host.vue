@@ -205,6 +205,8 @@ export default {
                 themeColor: this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
                 themeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
                 systemStyle: this.diyStore.SystemStyle || "Classic",
+                systemTitle: this.diyStore.SysConfig?.SysTitle || this.diyStore.SysConfig?.SysShortTitle || DiyCommon.GetOsClient(),
+                systemShortTitle: this.diyStore.SysConfig?.SysShortTitle || "",
                 hostCapabilities: createMicroAppHostCapabilities(),
                 hostViewport: this.hostViewport,
                 microRoute: this.microRoutePath,
@@ -288,6 +290,10 @@ export default {
                 return;
             }
             const type = String(payload?.type || payload?.Type || "").toLowerCase();
+            if (type === "micro-app:interaction") {
+                window.dispatchEvent(new CustomEvent("microi:close-global-overlays"));
+                return;
+            }
             const handled = payload?.handled === true || payload?.Handled === true;
             const errorType = String(payload?.errorType || payload?.ErrorType || "business").toLowerCase();
             if ((type === "error" || type === "app:error") && !handled && ["load", "protocol", "runtime"].includes(errorType)) {
