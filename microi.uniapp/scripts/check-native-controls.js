@@ -407,7 +407,9 @@ for (const token of [
   'PreviewURL,',
   'resolveFailures',
   'lastEmittedValue',
-  'preferProvidedUrl'
+  'preferProvidedUrl',
+  'mci-media-uploader__grid--circle',
+  'mci-media-uploader__item--circle .mci-media-uploader__remove'
 ]) {
   if (!mediaUploader.includes(token)) fail(`durable media preview handling is missing: ${token}`)
 }
