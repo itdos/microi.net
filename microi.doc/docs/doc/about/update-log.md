@@ -1,5 +1,11 @@
 # 更新日志
 
+## v7.1.11 - (2026-08-08 03:58)
+
+- **四仓历史与待提交差异完整审计**：本日志上一版本 v7.1.10 对应根仓 `5e446f912afc16b18bf3ded37204ce8d8c72d20f`、Microi.net `7bf402609e5b9cf9a331ee66a63206596deb7ef2`、Microi.AI `26bb0dd5b008d975bc880a094b26dc5913030d0b`、Microi.VSCode `31222f2ca78a94e5d2a1a93ec702fb8e3e475568`；逐仓 `fetch --prune` 后，这四个锚点到本地 `HEAD` 与远端 `origin/master` 的提交范围均为空，因此没有遗漏的英文提交说明、分支合并或自动 merge 重复变更需要再次归纳。主发布完成后，根仓仅有 20 个已跟踪版本文件待提交，Microi.net、Microi.AI 子仓各 1 个项目版本文件，Microi.VSCode 子仓 2 个插件／CLI 版本文件；四仓均无未跟踪或已暂存文件，`dist`、`bin`、`obj` 等生成目录未纳入功能分析。
+- **v7.1.11 统一版本发布**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务、消息队列、MQTT、MongoDB、OCR、Office、搜索、采集、V8、微信等公共组件由 v7.1.10 统一升级至 v7.1.11；Microi VS Code 插件、独立 CLI 与内置 Skills 由 v4.7.6 升级至 v4.7.7。本版本除版本号和 Skills 更新时间同步外没有新增业务源码差异，功能内容继续继承 v7.1.10，避免把上一版本已经总结的多登录方式、个人中心、SaaS 安全配置等变更重复计算。
+- **完整制品发布与权威回读**：第一次执行在版本已更新至 v7.1.11 后因本机 `microi_itdos` Token 过期被官网资源同步保护门禁中止；重新认证绑定 `https://api.itdos.com + OsClient=iTdos` 后继续同一版本并成功完成，未错误递增补丁号。第二次执行以 `__MICROI_RELEASE_EXIT__=0` 收尾，耗时 13 分 18 秒，完成官网升级资源同步、现代前端构建、逐文件串行压缩、Chrome 49 legacy、后端 Release（0 个编译错误）、Microi.net.Api 发布、受保护 DLL 替换、真实 liveness HTTP 200、19 个 NuGet 以及前后端正式／测试 Docker 推送；NuGet Flat Container v7.1.11 已 19/19 公网回读，后端三个标签统一为 `sha256:540e9dab877548ffa3fa6ac7872c9a98b420c7db98314a0a19aad2140278dd3e`，前端四个标签统一为 `sha256:36932dfcbba15c3f8282683a8a5f9386527e56ba70912aaf7641cc3e17ec2bd9`，发布锁和发布进程均已清理。写日志时 `api.itdos.com` 仍运行 v7.1.10，说明公共制品发布成功但生产节点自动拉取尚未完成；继续保留 `Microsoft.Bcl.Memory 9.0.0` 高严重性漏洞公告、xUnit 分析器及 NuGet License／Readme 等非阻断警告。
+
 ## v7.1.10 - (2026-08-08 03:28)
 
 - **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务、消息队列、MQTT、MongoDB、OCR、Office、搜索、采集、V8、微信等公共组件统一升级至 v7.1.10，Microi VS Code 插件、独立 CLI 与内置 Skills 升级至 v4.7.6。写日志前根仓库共有 76 个已跟踪文件和 13 个未跟踪源码／文档／测试文件待提交；Microi.net、Microi.AI 子仓库各 1 个版本文件，Microi.VSCode 子仓库 2 个版本文件，四仓均无已暂存内容。`dist`、`bin`、`obj` 等生成目录不纳入功能分析；三个子仓库本轮除版本升级外没有其它源码差异。
