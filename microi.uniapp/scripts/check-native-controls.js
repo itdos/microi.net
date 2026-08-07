@@ -396,6 +396,31 @@ for (const token of [
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`customer-care form linkage is missing: ${token}`)
 }
+for (const token of [
+  'tenantFormPresentation.floatingAction',
+  'tenant-form-floating-action--above-actions',
+  '@touchstart="handleTenantFloatingActionDragStart"',
+  'clampTenantFloatingActionPosition',
+  'persistTenantFloatingActionPosition',
+  'tenantFloatingActionSuppressTap',
+  'if (isPrimaryFollowupForm(context))',
+  "action.key === 'xjy-followup-checkin'",
+  '`returnToFollowup=1`',
+  'customerId=${encodeURIComponent(customerId)}',
+  'customer=${encodeURIComponent(customerName)}'
+]) {
+  if (!nativeForm.includes(token) && !xjyTenantForm.includes(token)) {
+    fail(`follow-up checkin floating action is missing: ${token}`)
+  }
+}
+const nativeCheckin = fs.readFileSync(path.join(root, 'src/pages/native/checkin.vue'), 'utf8')
+for (const token of [
+  "this.returnToFollowup = String(options.returnToFollowup || '0') === '1'",
+  "eventChannel.emit('checkinSuccess'",
+  'setTimeout(() => this.goBack(), 700)'
+]) {
+  if (!nativeCheckin.includes(token)) fail(`follow-up checkin return flow is missing: ${token}`)
+}
 const mediaUploader = fs.readFileSync(path.join(root, 'src/components/mci-media-uploader/mci-media-uploader.vue'), 'utf8')
 const microiV8 = fs.readFileSync(path.join(root, 'src/utils/microi.v8.js'), 'utf8')
 const hdfsController = fs.readFileSync(
