@@ -266,11 +266,7 @@
                             <span>{{ LoginWaiting ? '正在安全接入...' : '登录' }}</span>
                         </span>
                     </button>
-                    <div
-                        class="identity-login-entry"
-                        @mouseenter="OpenLoginMethods"
-                        @mouseleave="ScheduleLoginMethodsClose"
-                    >
+                    <div class="identity-login-entry">
                         <button
                             type="button"
                             class="identity-login-button"
@@ -278,27 +274,47 @@
                             :aria-busy="IdentityLoginWaiting ? 'true' : 'false'"
                             aria-haspopup="dialog"
                             :aria-expanded="LoginMethodsVisible ? 'true' : 'false'"
-                            @focus="OpenLoginMethods"
                             @click.stop="OpenLoginMethods"
                         >
-                            <el-icon v-if="IdentityLoginWaiting" class="is-loading"><Loading /></el-icon>
-                            <el-icon v-else><Key /></el-icon>
-                            <span>{{ IdentityLoginWaiting ? '验证中' : '登录方式' }}</span>
+                            <span class="identity-login-button__icon" aria-hidden="true">
+                                <el-icon v-if="IdentityLoginWaiting" class="is-loading"><Loading /></el-icon>
+                                <el-icon v-else><Key /></el-icon>
+                            </span>
+                            <span class="identity-login-button__copy">
+                                <strong>{{ IdentityLoginWaiting ? '验证中' : '登录方式' }}</strong>
+                                <small>{{ IdentityLoginWaiting ? '请完成验证' : '免密 · 扫码' }}</small>
+                            </span>
+                            <span class="identity-login-button__arrow" aria-hidden="true">↗</span>
                         </button>
-                        <transition name="login-methods-float">
+                    </div>
+                </div>
+
+                <Teleport to="body">
+                    <transition name="login-methods-modal">
+                        <div
+                            v-if="LoginMethodsVisible"
+                            class="login-methods-overlay"
+                            role="presentation"
+                            @click.self="CloseLoginMethods"
+                        >
                             <section
-                                v-if="LoginMethodsVisible"
-                                class="login-methods-popper login-methods-panel"
+                                ref="loginMethodsDialog"
+                                class="login-methods-panel"
                                 role="dialog"
-                                aria-label="可用登录方式"
-                                @mouseenter="CancelLoginMethodsClose"
+                                aria-modal="true"
+                                aria-labelledby="login-methods-title"
+                                aria-describedby="login-methods-description"
+                                tabindex="-1"
                             >
+                                <div class="login-methods-aurora" aria-hidden="true"><i /><i /><i /></div>
                                 <header class="login-methods-heading">
                                     <span class="login-methods-orbit" aria-hidden="true"><i /><i /><i /></span>
                                     <div>
-                                        <strong>选择登录方式</strong>
-                                        <p>所有方式验证成功后，都进入吾码 DiyToken 权限体系</p>
+                                        <span class="login-methods-kicker">SECURE ACCESS</span>
+                                        <strong id="login-methods-title">选择登录方式</strong>
+                                        <p id="login-methods-description">选择适合当前设备的验证方式，成功后安全进入当前系统</p>
                                     </div>
+                                    <button type="button" class="login-methods-close" aria-label="关闭登录方式" @click="CloseLoginMethods">×</button>
                                 </header>
                                 <div class="login-method-bubbles" role="list">
                                     <button
@@ -319,16 +335,17 @@
                                             <small>{{ method.description }}</small>
                                         </span>
                                         <span class="login-method-bubble-status">{{ method.status }}</span>
+                                        <span class="login-method-bubble-go" aria-hidden="true">→</span>
                                     </button>
                                 </div>
                                 <footer class="login-methods-footnote">
-                                    <el-icon><Lock /></el-icon>
-                                    <span>密钥与授权码仅由可信后端处理，浏览器不会得到 ClientSecret</span>
+                                    <span><el-icon><Lock /></el-icon> 敏感密钥只在可信后端处理</span>
+                                    <span>登录成功后仍遵循当前租户的角色、菜单和数据权限</span>
                                 </footer>
                             </section>
-                        </transition>
-                    </div>
-                </div>
+                        </div>
+                    </transition>
+                </Teleport>
 
                 <!-- 隐私协议 -->
                 <div v-if="SysConfig.EnablePrivacyPolicy" class="privacy-policy-wrapper">
@@ -744,7 +761,6 @@ export default {
             IdentityCapabilities: {},
             IdentityCapabilitiesLoaded: false,
             LoginMethodsVisible: false,
-            LoginMethodsCloseTimer: null,
             PasskeyAvailable: isPasskeySupported(),
             ShowTotpLogin: false,
             TotpLoginAccount: "",
@@ -770,7 +786,7 @@ export default {
         var self = this;
         self.LoginComponentUnmounted = true;
         window.removeEventListener("keydown", self.HandleLoginMethodsEscape);
-        if (self.LoginMethodsCloseTimer) clearTimeout(self.LoginMethodsCloseTimer);
+        document.body.classList.remove("mci-login-methods-open");
         self.WallpaperLoadVersion += 1;
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
@@ -894,27 +910,20 @@ export default {
             }
         },
         OpenLoginMethods() {
-            this.CancelLoginMethodsClose();
             this.LoginMethodsVisible = true;
+            document.body.classList.add("mci-login-methods-open");
+            this.$nextTick(() => this.$refs.loginMethodsDialog?.focus());
         },
-        ScheduleLoginMethodsClose() {
-            this.CancelLoginMethodsClose();
-            this.LoginMethodsCloseTimer = setTimeout(() => {
-                this.LoginMethodsVisible = false;
-                this.LoginMethodsCloseTimer = null;
-            }, 220);
-        },
-        CancelLoginMethodsClose() {
-            if (!this.LoginMethodsCloseTimer) return;
-            clearTimeout(this.LoginMethodsCloseTimer);
-            this.LoginMethodsCloseTimer = null;
+        CloseLoginMethods() {
+            this.LoginMethodsVisible = false;
+            document.body.classList.remove("mci-login-methods-open");
         },
         HandleLoginMethodsEscape(event) {
-            if (event?.key === "Escape" && this.LoginMethodsVisible) this.LoginMethodsVisible = false;
+            if (event?.key === "Escape" && this.LoginMethodsVisible) this.CloseLoginMethods();
         },
         StartLoginMethod(method) {
             if (!method?.available) return;
-            this.LoginMethodsVisible = false;
+            this.CloseLoginMethods();
             if (method.key === "Passkey") return this.LoginWithPasskey();
             if (method.key === "Totp") return this.OpenTotpLogin();
             if (method.key === "Face") return this.LoginWithFace();
@@ -2567,28 +2576,45 @@ export default {
 }
 
 .identity-login-button {
-    flex: 0 0 112px;
-    width: 112px;
+    flex: 0 0 132px;
+    width: 132px;
     min-height: 54px;
-    display: inline-flex;
+    position: relative;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 12px;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 0 14px;
-    border: 1px solid rgba(255, 255, 255, 0.38);
+    gap: 7px;
+    padding: 7px 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.46);
     border-radius: var(--mci-login-control-radius);
     color: #fff;
-    background: rgba(7, 18, 40, 0.32);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(12px);
+    background: linear-gradient(145deg, rgba(18, 39, 68, 0.76), rgba(7, 19, 39, 0.58));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 24px rgba(4, 13, 30, 0.18);
+    backdrop-filter: blur(18px) saturate(135%);
     cursor: pointer;
-    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+    transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+
+    &::before {
+        content: "";
+        width: 68px;
+        height: 68px;
+        position: absolute;
+        top: -46px;
+        right: -22px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--el-color-primary) 65%, #63e6ff);
+        filter: blur(15px);
+        opacity: 0.48;
+        pointer-events: none;
+    }
 
     &:hover:not(:disabled),
     &:focus-visible:not(:disabled) {
-        transform: translateY(-1px);
-        border-color: rgba(255, 255, 255, 0.75);
-        background: rgba(7, 18, 40, 0.48);
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.86);
+        background: linear-gradient(145deg, rgba(25, 55, 94, 0.86), rgba(7, 19, 39, 0.68));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 16px 32px rgba(4, 13, 30, 0.26);
     }
 
     &:focus-visible {
@@ -2602,10 +2628,57 @@ export default {
     }
 }
 
-.identity-login-entry {
-    width: 112px;
-    flex: 0 0 112px;
+.identity-login-button__icon {
+    width: 34px;
+    height: 34px;
     position: relative;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.32);
+    border-radius: 11px;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08));
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.28);
+    font-size: 17px;
+}
+
+.identity-login-button__copy {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+    text-align: left;
+}
+
+.identity-login-button__copy strong {
+    font-size: 12px;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.identity-login-button__copy small {
+    color: rgba(255, 255, 255, 0.68);
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.identity-login-button__arrow {
+    position: relative;
+    z-index: 1;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 12px;
+    transition: transform 180ms ease;
+}
+
+.identity-login-button:hover .identity-login-button__arrow {
+    transform: translate(2px, -2px);
+}
+
+.identity-login-entry {
+    width: 132px;
+    flex: 0 0 132px;
     display: flex;
 }
 
@@ -2620,81 +2693,131 @@ export default {
     }
 }
 
-.login-methods-popper {
-    width: min(660px, calc(100vw - 24px));
-    position: absolute;
-    right: 0;
-    bottom: calc(100% + 14px);
-    z-index: 120;
-    padding: 0;
-    border: 1px solid color-mix(in srgb, var(--el-color-primary) 24%, var(--el-border-color-light));
-    border-radius: 24px;
+.login-methods-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 4200;
+    display: grid;
+    place-items: center;
+    padding: 24px;
     overflow: hidden;
-    background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
-    box-shadow: 0 26px 80px rgba(4, 15, 35, 0.26);
-    backdrop-filter: blur(22px) saturate(145%);
+    background: rgba(2, 10, 24, 0.68);
+    backdrop-filter: blur(16px) saturate(125%);
 }
 
-.login-methods-float-enter-active,
-.login-methods-float-leave-active {
-    transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
-    transform-origin: 92% 100%;
-}
-
-.login-methods-float-enter-from,
-.login-methods-float-leave-to {
-    opacity: 0;
-    transform: translateY(12px) scale(0.96);
-}
-
-:global(.login-methods-panel) {
+.login-methods-panel {
+    width: min(940px, calc(100vw - 48px));
+    max-height: calc(100dvh - 48px);
+    box-sizing: border-box;
     position: relative;
-    padding: 20px;
-    overflow: hidden;
+    padding: 28px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid color-mix(in srgb, var(--el-color-primary) 30%, var(--el-border-color-light));
+    border-radius: 32px;
     color: var(--el-text-color-primary);
     background:
-        radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--el-color-primary) 18%, transparent), transparent 38%),
-        radial-gradient(circle at 10% 92%, color-mix(in srgb, var(--el-color-success) 12%, transparent), transparent 36%);
+        radial-gradient(circle at 96% 0, color-mix(in srgb, var(--el-color-primary) 22%, transparent), transparent 40%),
+        radial-gradient(circle at 0 100%, color-mix(in srgb, var(--el-color-success) 11%, transparent), transparent 34%),
+        color-mix(in srgb, var(--el-bg-color) 96%, transparent);
+    box-shadow: 0 38px 110px rgba(0, 8, 24, 0.48), inset 0 1px color-mix(in srgb, #fff 65%, transparent);
+    backdrop-filter: blur(26px) saturate(145%);
+    scrollbar-width: thin;
 }
 
-:global(.login-methods-heading) {
-    min-height: 54px;
-    display: flex;
+.login-methods-aurora {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.login-methods-aurora i {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(46px);
+    opacity: 0.22;
+}
+
+.login-methods-aurora i:nth-child(1) { width: 270px; height: 270px; top: -190px; left: 18%; background: #617bff; }
+.login-methods-aurora i:nth-child(2) { width: 220px; height: 220px; right: -130px; bottom: 3%; background: #28d4c2; }
+.login-methods-aurora i:nth-child(3) { width: 150px; height: 150px; left: -90px; bottom: -70px; background: #9b63e8; }
+
+.login-methods-modal-enter-active,
+.login-methods-modal-leave-active {
+    transition: opacity 220ms ease;
+}
+
+.login-methods-modal-enter-active .login-methods-panel,
+.login-methods-modal-leave-active .login-methods-panel {
+    transition: transform 360ms cubic-bezier(.16, 1, .3, 1), opacity 220ms ease;
+}
+
+.login-methods-modal-enter-from,
+.login-methods-modal-leave-to {
+    opacity: 0;
+}
+
+.login-methods-modal-enter-from .login-methods-panel,
+.login-methods-modal-leave-to .login-methods-panel {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+}
+
+:global(body.mci-login-methods-open) {
+    overflow: hidden;
+}
+
+.login-methods-heading {
+    min-height: 68px;
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr) 42px;
     align-items: center;
-    gap: 13px;
-    margin-bottom: 16px;
+    gap: 16px;
+    margin-bottom: 22px;
 }
 
-:global(.login-methods-heading > div) {
+.login-methods-heading > div {
     min-width: 0;
     display: grid;
-    gap: 4px;
+    gap: 5px;
 }
 
-:global(.login-methods-heading strong) {
-    font-size: 17px;
+.login-methods-heading strong {
+    font-size: clamp(22px, 2.7vw, 30px);
+    line-height: 1.12;
     letter-spacing: 0.4px;
 }
 
-:global(.login-methods-heading p) {
+.login-methods-heading p {
     margin: 0;
     color: var(--el-text-color-secondary);
-    font-size: 12px;
-    line-height: 1.45;
+    font-size: 13px;
+    line-height: 1.55;
 }
 
-:global(.login-methods-orbit) {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
+.login-methods-kicker {
+    color: color-mix(in srgb, var(--el-color-primary) 78%, var(--el-text-color-primary));
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2.4px;
+}
+
+.login-methods-orbit {
+    width: 58px;
+    height: 58px;
     position: relative;
     border: 1px solid color-mix(in srgb, var(--el-color-primary) 35%, transparent);
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--el-color-primary) 9%, var(--el-bg-color));
-    animation: mciLoginOrbit 8s linear infinite;
+    border-radius: 20px;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--el-color-primary) 18%, var(--el-bg-color)), color-mix(in srgb, var(--el-color-primary) 5%, var(--el-bg-color)));
+    box-shadow: 0 14px 34px color-mix(in srgb, var(--el-color-primary) 18%, transparent), inset 0 1px color-mix(in srgb, #fff 70%, transparent);
+    animation: mciLoginOrbitFloat 5s ease-in-out infinite;
 }
 
-:global(.login-methods-orbit i) {
+.login-methods-orbit i {
     width: 8px;
     height: 8px;
     position: absolute;
@@ -2705,44 +2828,69 @@ export default {
     box-shadow: 0 0 13px color-mix(in srgb, var(--el-color-primary) 70%, transparent);
 }
 
-:global(.login-methods-orbit i:nth-child(1)) { transform: translate(-50%, -50%); }
-:global(.login-methods-orbit i:nth-child(2)) { transform: translate(13px, -18px) scale(0.65); }
-:global(.login-methods-orbit i:nth-child(3)) { transform: translate(-20px, 9px) scale(0.45); }
+.login-methods-orbit i:nth-child(1) { transform: translate(-50%, -50%); }
+.login-methods-orbit i:nth-child(2) { transform: translate(15px, -20px) scale(0.65); }
+.login-methods-orbit i:nth-child(3) { transform: translate(-22px, 11px) scale(0.45); }
 
-:global(.login-method-bubbles) {
+.login-methods-close {
+    width: 42px;
+    height: 42px;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 11px;
+    place-items: center;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 14px;
+    color: var(--el-text-color-secondary);
+    background: color-mix(in srgb, var(--el-fill-color-light) 72%, transparent);
+    font-size: 25px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 180ms ease, color 180ms ease, border-color 180ms ease;
 }
 
-:global(.login-method-bubble) {
+.login-methods-close:hover,
+.login-methods-close:focus-visible {
+    transform: rotate(6deg) scale(1.05);
+    border-color: color-mix(in srgb, var(--el-color-primary) 46%, var(--el-border-color));
+    color: var(--el-color-primary);
+    outline: none;
+}
+
+.login-method-bubbles {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.login-method-bubble {
     --bubble-accent: var(--el-color-primary);
     min-width: 0;
-    min-height: 112px;
-    padding: 13px;
+    min-height: 148px;
+    padding: 18px;
     position: relative;
     display: grid;
-    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-columns: 48px minmax(0, 1fr) 24px;
     grid-template-rows: 1fr auto;
-    gap: 7px 10px;
+    gap: 11px 13px;
     overflow: hidden;
     text-align: left;
     color: var(--el-text-color-primary);
     border: 1px solid color-mix(in srgb, var(--bubble-accent) 28%, var(--el-border-color-light));
-    border-radius: 22px 22px 22px 9px;
+    border-radius: 24px 24px 24px 10px;
     background:
         radial-gradient(circle at 100% 0, color-mix(in srgb, var(--bubble-accent) 20%, transparent), transparent 45%),
         color-mix(in srgb, var(--el-fill-color-lighter) 78%, transparent);
     box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);
     cursor: pointer;
-    transform-origin: 80% 100%;
+    transform-origin: 50% 100%;
     animation: mciLoginBubbleIn 420ms cubic-bezier(.2,.8,.2,1) both;
     animation-delay: calc(var(--bubble-index) * 46ms);
     transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
 }
 
-:global(.login-method-bubble:hover:not(:disabled)),
-:global(.login-method-bubble:focus-visible:not(:disabled)) {
+.login-method-bubble:hover:not(:disabled),
+.login-method-bubble:focus-visible:not(:disabled) {
     z-index: 2;
     transform: translateY(-4px) scale(1.018);
     border-color: color-mix(in srgb, var(--bubble-accent) 58%, var(--el-border-color));
@@ -2750,22 +2898,22 @@ export default {
     outline: none;
 }
 
-:global(.login-method-bubble.is-passkey) { --bubble-accent: #5b8cff; }
-:global(.login-method-bubble.is-totp) { --bubble-accent: #9b63e8; }
-:global(.login-method-bubble.is-face) { --bubble-accent: #16a7a0; }
-:global(.login-method-bubble.is-gitee) { --bubble-accent: #c71d23; }
-:global(.login-method-bubble.is-wechat) { --bubble-accent: #07c160; }
-:global(.login-method-bubble.is-github) { --bubble-accent: #59636e; }
+.login-method-bubble.is-passkey { --bubble-accent: #5b8cff; }
+.login-method-bubble.is-totp { --bubble-accent: #9b63e8; }
+.login-method-bubble.is-face { --bubble-accent: #16a7a0; }
+.login-method-bubble.is-gitee { --bubble-accent: #c71d23; }
+.login-method-bubble.is-wechat { --bubble-accent: #07c160; }
+.login-method-bubble.is-github { --bubble-accent: #59636e; }
 
-:global(.login-method-bubble:disabled) {
+.login-method-bubble:disabled {
     opacity: 0.58;
     cursor: not-allowed;
     filter: saturate(0.55);
 }
 
-:global(.login-method-bubble-icon) {
-    width: 42px;
-    height: 42px;
+.login-method-bubble-icon {
+    width: 48px;
+    height: 48px;
     grid-row: 1 / 3;
     display: inline-flex;
     align-items: center;
@@ -2775,37 +2923,30 @@ export default {
     color: #fff;
     background: linear-gradient(145deg, color-mix(in srgb, var(--bubble-accent) 72%, #fff), var(--bubble-accent));
     box-shadow: 0 8px 20px color-mix(in srgb, var(--bubble-accent) 30%, transparent), inset 0 1px 1px #ffffff88;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 800;
     letter-spacing: -0.4px;
 }
 
-:global(.login-method-bubble-copy) {
+.login-method-bubble-copy {
     min-width: 0;
     display: grid;
     align-content: start;
     gap: 4px;
 }
 
-:global(.login-method-bubble-copy strong) {
-    overflow: hidden;
-    font-size: 13px;
+.login-method-bubble-copy strong {
+    font-size: 15px;
     line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-:global(.login-method-bubble-copy small) {
-    display: -webkit-box;
-    overflow: hidden;
+.login-method-bubble-copy small {
     color: var(--el-text-color-secondary);
-    font-size: 10px;
-    line-height: 1.45;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    font-size: 11px;
+    line-height: 1.55;
 }
 
-:global(.login-method-bubble-status) {
+.login-method-bubble-status {
     width: fit-content;
     grid-column: 2;
     padding: 2px 7px;
@@ -2813,22 +2954,50 @@ export default {
     border-radius: 999px;
     color: color-mix(in srgb, var(--bubble-accent) 78%, var(--el-text-color-primary));
     background: color-mix(in srgb, var(--bubble-accent) 8%, transparent);
-    font-size: 9px;
+    font-size: 10px;
     line-height: 1.5;
 }
 
-:global(.login-methods-footnote) {
+.login-method-bubble-go {
+    width: 24px;
+    height: 24px;
+    grid-column: 3;
+    grid-row: 1 / 3;
+    display: grid;
+    align-self: center;
+    place-items: center;
+    border-radius: 50%;
+    color: color-mix(in srgb, var(--bubble-accent) 82%, var(--el-text-color-primary));
+    background: color-mix(in srgb, var(--bubble-accent) 10%, transparent);
+    transition: transform 180ms ease;
+}
+
+.login-method-bubble:hover:not(:disabled) .login-method-bubble-go {
+    transform: translateX(3px);
+}
+
+.login-methods-footnote {
+    position: relative;
+    z-index: 1;
     display: flex;
-    align-items: flex-start;
-    gap: 7px;
-    margin-top: 14px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--el-border-color-lighter);
     color: var(--el-text-color-placeholder);
-    font-size: 10px;
+    font-size: 11px;
     line-height: 1.55;
 }
 
-:global(.login-methods-footnote .el-icon) {
-    margin-top: 2px;
+.login-methods-footnote span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.login-methods-footnote .el-icon {
     flex: 0 0 auto;
     color: var(--el-color-primary);
 }
@@ -2838,8 +3007,9 @@ export default {
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes mciLoginOrbit {
-    to { transform: rotate(360deg); }
+@keyframes mciLoginOrbitFloat {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    50% { transform: translateY(-4px) rotate(3deg); }
 }
 
 .login-button-energy {
@@ -3374,8 +3544,8 @@ export default {
     .divLoginCenter::before,
     .login-system-logo-ring,
     .login-button,
-    :global(.login-methods-orbit),
-    :global(.login-method-bubble),
+    .login-methods-orbit,
+    .login-method-bubble,
     .login-button-energy::after,
     .login-button-energy-beam,
     .is-loading {
@@ -3388,33 +3558,128 @@ export default {
 
     .login-button:hover:not(:disabled),
     .login-button:focus-visible:not(:disabled),
-    :global(.login-method-bubble:hover:not(:disabled)),
-    :global(.login-method-bubble:focus-visible:not(:disabled)),
+    .login-method-bubble:hover:not(:disabled),
+    .login-method-bubble:focus-visible:not(:disabled),
     .remember-password-checkbox:hover {
         transform: none;
     }
-}
 
-@media (max-width: 420px) {
-    :global(.login-methods-panel) {
-        padding: 16px;
-    }
-
-    :global(.login-method-bubbles) {
-        grid-template-columns: 1fr;
-        max-height: min(58vh, 430px);
-        overflow-y: auto;
-        padding-right: 2px;
-    }
-
-    :global(.login-method-bubble) {
-        min-height: 92px;
+    .login-methods-modal-enter-active,
+    .login-methods-modal-leave-active,
+    .login-methods-modal-enter-active .login-methods-panel,
+    .login-methods-modal-leave-active .login-methods-panel {
+        transition-duration: 1ms !important;
     }
 }
 
-@media (min-width: 421px) and (max-width: 760px) {
-    :global(.login-method-bubbles) {
+@media (max-width: 820px) {
+    .login-method-bubbles {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .login-methods-overlay {
+        place-items: end center;
+        padding: max(10px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+    }
+
+    .login-methods-panel {
+        width: 100%;
+        max-height: calc(100dvh - max(18px, env(safe-area-inset-top)));
+        padding: 20px 16px 18px;
+        border-radius: 27px 27px 18px 18px;
+    }
+
+    .login-methods-heading {
+        min-height: 54px;
+        grid-template-columns: 46px minmax(0, 1fr) 38px;
+        gap: 11px;
+        margin-bottom: 17px;
+    }
+
+    .login-methods-orbit {
+        width: 46px;
+        height: 46px;
+        border-radius: 15px;
+    }
+
+    .login-methods-orbit i:nth-child(2) { transform: translate(11px, -16px) scale(0.6); }
+    .login-methods-orbit i:nth-child(3) { transform: translate(-17px, 7px) scale(0.42); }
+
+    .login-methods-heading strong {
+        font-size: 20px;
+    }
+
+    .login-methods-heading p {
+        font-size: 11px;
+        line-height: 1.4;
+    }
+
+    .login-methods-kicker {
+        display: none;
+    }
+
+    .login-methods-close {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+    }
+
+    .login-method-bubbles {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .login-method-bubble {
+        min-height: 98px;
+        padding: 14px;
+        grid-template-columns: 44px minmax(0, 1fr) 24px;
+        gap: 7px 11px;
+        border-radius: 20px 20px 20px 9px;
+    }
+
+    .login-method-bubble-icon {
+        width: 44px;
+        height: 44px;
+    }
+
+    .login-method-bubble-copy strong {
+        font-size: 14px;
+    }
+
+    .login-method-bubble-copy small {
+        font-size: 10px;
+    }
+
+    .login-methods-footnote {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 14px;
+        padding-top: 13px;
+        font-size: 9px;
+    }
+
+    .identity-login-button,
+    .identity-login-entry {
+        width: 124px;
+        flex-basis: 124px;
+    }
+
+    .identity-login-button {
+        grid-template-columns: 32px minmax(0, 1fr) 10px;
+        gap: 6px;
+        padding-inline: 8px;
+    }
+
+    .identity-login-button__icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .identity-login-button__copy strong {
+        font-size: 11px;
     }
 }
 

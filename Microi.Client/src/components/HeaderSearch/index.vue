@@ -51,6 +51,9 @@ export default {
     computed: {},
     // routes, lang, supportPinyinSearch 已迁移到 setup() 中
     watch: {
+        "$route.fullPath"() {
+            this.close();
+        },
         lang() {
             this.searchPool = this.generateRoutes(this.routes);
         },
@@ -74,6 +77,11 @@ export default {
     },
     mounted() {
         this.searchPool = this.generateRoutes(this.routes);
+        window.addEventListener("microi:close-global-overlays", this.close);
+    },
+    beforeUnmount() {
+        document.body.removeEventListener("click", this.close);
+        window.removeEventListener("microi:close-global-overlays", this.close);
     },
     methods: {
         async addPinyinField(list) {

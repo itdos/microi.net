@@ -7,6 +7,27 @@ namespace Dos.Common.Tests;
 public class TenantConfigurationSecurityTests
 {
     [Fact]
+    public void ControlPlaneDetailUsesMainRuntimeWithoutInitializingTargetTenant()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !Directory.Exists(Path.Combine(directory.FullName, "Microi.net.Api")))
+        {
+            directory = directory.Parent;
+        }
+        Assert.NotNull(directory);
+
+        var source = File.ReadAllText(Path.Combine(
+            directory!.FullName,
+            "Microi.net.Api",
+            "Controllers",
+            "FormEngineController.cs"));
+
+        Assert.Contains("OsClient.GetClient(configOsClient)?.OsClientModel", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("OsClient.GetClient(targetOsClient)", source, StringComparison.Ordinal);
+        Assert.Contains("catch", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void CreateV8Projection_RemovesInfrastructureAndConnectionSecrets()
     {
         var source = new JObject
@@ -92,6 +113,48 @@ public class TenantConfigurationSecurityTests
         Assert.Null(tenant["MqttPwd"]);
         Assert.Null(tenant["SearchEngineApiKey"]);
         Assert.Null(tenant["DbConn"]);
+    }
+
+    [Fact]
+    public void ControlPlaneProjection_ShowsOnlyMissingEffectiveInfrastructureAndReturnsNoSaveFields()
+    {
+        var stored = new JObject
+        {
+            ["OsClient"] = "tenant_a",
+            ["MinIOEndPoint"] = "",
+            ["MinIOPublicBucketName"] = "tenant-owned-public",
+            ["DbConn"] = "tenant-db",
+            ["AuthSecret"] = "tenant-auth"
+        };
+        var effective = new JObject
+        {
+            ["MinIOEndPoint"] = "minio.internal:9000",
+            ["MinIOSecretKey"] = "shared-minio-secret",
+            ["MinIOPublicBucketName"] = "main-public",
+            ["RedisPwd"] = "shared-redis-secret",
+            ["DbConn"] = "main-db",
+            ["AuthSecret"] = "main-auth",
+            ["FaceApiKey"] = "tenant-only-secret"
+        };
+
+        var projection = TenantConfigurationSecurity.CreateControlPlaneSharedInfrastructureProjection(
+            stored,
+            effective,
+            out var inheritedFields);
+
+        Assert.Equal("minio.internal:9000", projection["MinIOEndPoint"]?.ToString());
+        Assert.Equal("shared-minio-secret", projection["MinIOSecretKey"]?.ToString());
+        Assert.Equal("shared-redis-secret", projection["RedisPwd"]?.ToString());
+        Assert.Equal("tenant-owned-public", projection["MinIOPublicBucketName"]?.ToString());
+        Assert.Equal("tenant-db", projection["DbConn"]?.ToString());
+        Assert.Equal("tenant-auth", projection["AuthSecret"]?.ToString());
+        Assert.Null(projection["FaceApiKey"]);
+        Assert.Contains("MinIOEndPoint", inheritedFields);
+        Assert.Contains("MinIOSecretKey", inheritedFields);
+        Assert.Contains("RedisPwd", inheritedFields);
+        Assert.DoesNotContain("MinIOPublicBucketName", inheritedFields);
+        Assert.DoesNotContain("DbConn", inheritedFields);
+        Assert.DoesNotContain("AuthSecret", inheritedFields);
     }
 
     [Fact]

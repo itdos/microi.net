@@ -15,7 +15,7 @@
 
 ### 📦 下载源码与 .NET 环境
 
-- 使用 Git 从开源地址拉取最新代码：[Gitee 仓库](https://gitee.com/ITdos/microi.net)
+- 使用 Git 从开源地址拉取最新代码：[GitHub 仓库](https://github.com/itdos/microi.net) / [Gitee 仓库](https://gitee.com/ITdos/microi.net)
 - 下载并安装 .NET 10 SDK：[.NET 下载页](https://dotnet.microsoft.com/zh-cn/download)
 
 ---
@@ -147,7 +147,7 @@ dotnet clean && dotnet publish -c Release -o ./bin/Release/publish
 
 ### 📦 下载源码与开发工具
 
-- 使用 Git 从开源地址拉取最新代码：[Gitee 仓库](https://gitee.com/ITdos/microi.net)
+- 使用 Git 从开源地址拉取最新代码：[GitHub 仓库](https://github.com/itdos/microi.net) / [Gitee 仓库](https://gitee.com/ITdos/microi.net)
 - 下载并安装 [VS Code](https://code.visualstudio.com/)
 - 下载并安装 nvm：[Windows 版](https://nvm.uihtm.com/) | [MacBook 版](https://blog.csdn.net/qq973702/article/details/143637128)
 ```shell

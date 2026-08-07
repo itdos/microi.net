@@ -11,7 +11,7 @@
 | Support storage | Alibaba Cloud OSS/CDN, MinIO, Amazon S3 |
 | Configuration-driven | Based on SaaS engine, different tenants can be configured independently |
 | Scalable | Driven by the form engine, it can freely expand Tencent Cloud, Huawei Cloud, etc. |
-| Source code location | [Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS) |
+| Source code location | [GitHub · Microi.HDFS](https://github.com/itdos/microi.net/tree/master/Microi.Server/Microi.HDFS) / [Gitee · Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.HDFS) |
 
 ---
 

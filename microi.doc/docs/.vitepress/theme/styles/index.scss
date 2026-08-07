@@ -1,4 +1,21 @@
 // 登录页面：保留顶部导航，隐藏文档侧栏与页脚。
+
+// 中等及以上宽度统一使用顶部独立主题按钮。VitePress 的“更多”菜单
+// 默认还会重复渲染一行 Appearance，这里只移除重复项；手机汉堡菜单中的
+// VPNavScreenAppearance 保留，确保窄屏仍能切换主题。
+@media (min-width: 768px) {
+  .VPNavBarExtra .group:has(> .item.appearance) {
+    display: none !important;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1279px) {
+  .VPNavBarAppearance {
+    display: flex !important;
+    align-items: center;
+  }
+}
+
 body:has(.ai-login-page) {
   overflow: hidden;
   background: #0a0a14 !important;

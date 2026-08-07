@@ -13,7 +13,7 @@
 
 ## 📦Download source code and development tools
 
-- Use Git to pull the latest code from an open source address:[Gitee repository](https://gitee.com/ITdos/microi.net)
+- Use Git to pull the latest code from an open source address: [GitHub repository](https://github.com/itdos/microi.net) / [Gitee repository](https://gitee.com/ITdos/microi.net)
 - Download and install [VS Code](https://code.visualstudio.com/)
 - Download and install nvm:[Windows version](https://nvm.uihtm.com/) | [MacBook version](https://blog.csdn.net/qq973702/article/details/143637128)
 ```shell

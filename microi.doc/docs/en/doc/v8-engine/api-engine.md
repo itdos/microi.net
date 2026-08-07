@@ -85,7 +85,7 @@ System.Threading.Tasks.Task.Run(function(){
 ```
 
 ## Extended Interface Engine
-> * See [`Microi.V8Engine`](https://gitee.com/ITdos/microi.net/tree/master/Microi. Server/Microi.V8Engine) class library, in [`V8EngineExtend`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8EngineExtend.cs) class
+> * Extensions are registered by `V8ExtensionRegistry` in `Microi.Server/Microi.V8Engine/V8Extend.cs` ([GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8Extend.cs) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8Extend.cs)).
 ::: details Expand to view JavaScript code (40 lines)
 ```js
 using System;

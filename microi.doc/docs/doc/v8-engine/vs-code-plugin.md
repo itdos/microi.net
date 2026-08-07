@@ -14,7 +14,7 @@
   <a href="https://microi.net/"><img src="https://img.shields.io/badge/官网-microi.net-2563eb" alt="Microi 官网"></a>
   <img src="https://img.shields.io/badge/VS%20Code-1.85%2B-007ACC" alt="VS Code 1.85+">
   <img src="https://img.shields.io/badge/CLI-Node.js%2018%2B-339933" alt="Microi CLI">
-  <img src="https://img.shields.io/badge/MCP-80%2B%20平台工具-8b5cf6" alt="80+ MCP 工具">
+  <img src="https://img.shields.io/badge/MCP-110%2B%20平台工具-8b5cf6" alt="110+ MCP 工具">
   <img src="https://img.shields.io/badge/AI-Copilot%20%7C%20Cursor%20%7C%20Trae%20%7C%20Claude%20%7C%20Codex-059669" alt="AI 客户端">
   <img src="https://img.shields.io/badge/License-MIT-f59e0b" alt="MIT License">
 </p>
@@ -89,7 +89,7 @@ Manifest 全系统规划 + dry-run 预演
 |---|---|
 | **自然语言生成完整系统** | 从需求直接生成业务蓝图、Manifest、表、字段、表单布局、菜单树、权限、接口、事件、数据源、页面、打印、工作流、任务和测试。 |
 | **内置 Microi MCP Server** | VSIX 与 CLI npm 包都打包 MCP Server，普通用户无需克隆 `microi.mcp`；一键配置后，AI 可直接读取和操作当前 Microi 租户。 |
-| **80+ 个平台工具** | 覆盖系统发现、低代码建模、V8、页面、打印、流程、微服务、测试、文件、Redis 和 MongoDB 日志等能力。 |
+| **110+ 个平台工具** | 当前源码已超过 110 个注册工具，覆盖系统发现、低代码建模、V8、页面、打印、流程、微服务、测试、文件、Redis 和 MongoDB 日志等能力；精确清单以运行时 `tools/list` 为准。 |
 | **AI 知识库与 Skills 自动注入** | 自动生成 `AGENTS.md`、`CLAUDE.md`、Copilot/Cursor 指令、V8 类型定义和 `microi.skills/`，AI 无需反复“喂文档”。 |
 | **实时数据库理解** | AI 可通过 MCP 查询实时表结构，也可按需读取每个 OsClient 的 `.microi-db-schema.md` 快照；大型数据库不会塞满公共指令文件。 |
 | **V8 全资源本地化** | 接口引擎、表单事件、字段事件、模块按钮/Tab、模块 Join/Where、工作流节点代码均可拉取为本地 `.js` 文件。 |
@@ -101,7 +101,7 @@ Manifest 全系统规划 + dry-run 预演
 | **性能压力测试** | 对接口引擎、V8 事件和表 CRUD 执行并发/升压测试，输出 RPS、平均耗时、P95/P99、错误率、趋势与错误 Top。 |
 | **多服务器 / 多租户** | 同一工作区可管理多个服务器和 OsClient，连接、Token、MCP 配置和本地目录彼此隔离；插件与 CLI 共用这些数据。 |
 
-## 80+ MCP 工具覆盖哪些平台能力
+## 110+ MCP 工具覆盖哪些平台能力
 
 插件内置 MCP 不是一个“万能写入接口”，而是一组按 Microi 业务对象设计、带参数校验与安全边界的专业工具。
 
@@ -243,7 +243,7 @@ microi init
 
 ## CLI 能力与插件边界
 
-CLI 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 AI 开发能力**，不是把编辑器 UI 生硬复制到终端。连接、登录、AI/MCP 初始化完成后，Codex 可通过同一套 80+ MCP 工具完成平台建模、V8、页面、打印、工作流、微服务和验收。
+CLI 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 AI 开发能力**，不是把编辑器 UI 生硬复制到终端。连接、登录、AI/MCP 初始化完成后，Codex 可通过同一套 110+ MCP 工具完成平台建模、V8、页面、打印、工作流、微服务和验收。
 
 | 能力 | VS Code 插件 | `@microi.net/cli` |
 |---|---|---|
@@ -251,7 +251,7 @@ CLI 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 A
 | AI 指令、Skills、typings、MCP 初始化 | 支持 | 支持 |
 | V8/字段/模块/流程/数据库结构拉取 | 资源树操作 | `microi pull` |
 | 远端差异检查、单文件显式推送 | Diff/同步结果视图 | `microi sync status` / `microi push` |
-| 80+ 平台能力 | AI 通过 MCP | Codex/Claude 通过同一 MCP |
+| 110+ 平台能力 | AI 通过 MCP | Codex/Claude 通过同一 MCP |
 | 接口引擎远程执行 | 编辑器按钮；AI MCP | AI MCP |
 | 断点、变量、Step Over/In/Out | 完整可视化调试 | 不提供调试 UI |
 | 前端微服务构建、发布 | 可视化命令 | 当前由 AI 通过 MCP；直接 CLI 子命令后续补齐 |
@@ -629,6 +629,8 @@ npm run publish:cli:resume
 
 - [Microi吾码官网与官方文档](https://microi.net/)
 - [AI 编程指南](https://microi.net/doc/v8-engine/ai-apiengine)
+- [MCP Server 完整指南](https://microi.net/doc/v8-engine/mcp-server)
+- [GitHub 源码](https://github.com/itdos/microi.net)
 - [Gitee 源码](https://gitee.com/ITdos/microi.net)
 - [版本更新日志](https://microi.net/doc/about/update-log.html)
 - [插件内部开发文档](https://git.itdos.net:88/anderson/microi.vscode/-/blob/master/DEVELOPMENT.md)

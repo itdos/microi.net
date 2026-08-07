@@ -1670,7 +1670,7 @@ var rows = V8.Office.ExcelToList({
 ```
 
 ### 发送邮件 SendEmail
->* 源码实现在[/Microi.Server/Microi.Office/MicroiOffice.cs](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs)
+>* 源码实现在 `Microi.Server/Microi.Office/MicroiOffice.cs`（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.Office/MicroiOffice.cs)）。
 ```js
 return V8.Office.SendEmail({
   SmtpServer : 'smtp.qq.com',

@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Microi.net.Api
@@ -86,6 +87,101 @@ namespace Microi.net.Api
             {
                 result.DynamicProperties[property.Key] = property.Value;
             }
+            return result;
+        }
+
+        private static bool IsSysOsClientsDetailRequest(JObject param)
+        {
+            var key = param?["FormEngineKey"].Val<string>()
+                      .DosIsNullOrWhiteSpace(param?["_TableName"].Val<string>())
+                      .DosIsNullOrWhiteSpace(param?["TableName"].Val<string>());
+            return string.Equals(
+                (key ?? string.Empty).Trim().Replace('-', '_'),
+                "sys_osclients",
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 主租户 9999 级管理员编辑 SaaS 引擎时，显示子租户实际继承生效的共享基础设施值。
+        /// 投影发生在 FormEngine/V8 DataFilter 完成之后，因此秘密不会进入 V8；继承字段同时
+        /// 写入 NotSaveField，避免普通表单提交把主租户值复制到子租户数据库行。
+        /// </summary>
+        private static DosResult<dynamic> ApplyControlPlaneSharedInfrastructureProjection(
+            JObject param,
+            DosResult<dynamic> result)
+        {
+            if (result?.Code != 1
+                || result.Data == null
+                || !IsSysOsClientsDetailRequest(param)
+                || (param?["_CurrentUser"]?["Level"].Val<int>() ?? 0) < DiyCommon.MaxRoleLevel)
+            {
+                return result;
+            }
+
+            var configOsClient = OsClient.GetConfigOsClient();
+            if (!string.Equals(param?["OsClient"].Val<string>(), configOsClient, StringComparison.OrdinalIgnoreCase))
+            {
+                return result;
+            }
+
+            JObject storedModel;
+            try
+            {
+                storedModel = result.Data as JObject ?? JObject.FromObject(result.Data);
+            }
+            catch
+            {
+                return result;
+            }
+
+            var targetOsClient = storedModel["OsClient"].Val<string>();
+            if (targetOsClient.DosIsNullOrWhiteSpace()) return result;
+
+            JObject projection;
+            IReadOnlyCollection<string> inheritedFields;
+            try
+            {
+                // 子租户继承的共享基础设施以主租户运行模型为事实源。这里绝不能调用
+                // GetClient(targetOsClient)：SaaS 列表可以包含尚未在当前节点加载的租户，
+                // 强行初始化目标租户数据库会让一个只读详情请求变成 500。
+                var controlPlaneRuntimeModel = OsClient.GetClient(configOsClient)?.OsClientModel;
+                projection = TenantConfigurationSecurity.CreateControlPlaneSharedInfrastructureProjection(
+                    storedModel,
+                    controlPlaneRuntimeModel,
+                    out inheritedFields);
+            }
+            catch
+            {
+                // 运行投影只负责补充显示，失败时保留 FormEngine 已成功读取的原始详情，
+                // 不能让可选的控制面展示逻辑破坏 SaaS 引擎详情页。
+                return result;
+            }
+            if (inheritedFields.Count == 0) return result;
+
+            JObject dataAppend;
+            try
+            {
+                dataAppend = result.DataAppend as JObject
+                             ?? (result.DataAppend == null ? new JObject() : JObject.FromObject(result.DataAppend));
+            }
+            catch
+            {
+                dataAppend = new JObject();
+            }
+
+            var notSaveFields = dataAppend["NotSaveField"] as JArray ?? new JArray();
+            foreach (var field in inheritedFields)
+            {
+                if (!notSaveFields.Any(item => string.Equals(item.Val<string>(), field, StringComparison.OrdinalIgnoreCase)))
+                {
+                    notSaveFields.Add(field);
+                }
+            }
+            dataAppend["NotSaveField"] = notSaveFields;
+            dataAppend["InheritedSharedInfrastructureFields"] = new JArray(inheritedFields);
+            dataAppend["SharedInfrastructureValueSource"] = "MainTenantRuntime";
+            result.Data = projection;
+            result.DataAppend = dataAppend;
             return result;
         }
 
@@ -390,6 +486,7 @@ namespace Microi.net.Api
         {
             param = await DefaultParam(param);
             var result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
+            result = ApplyControlPlaneSharedInfrastructureProjection(param, result);
             await TrackDetailOpened(param.ToObject<DiyTableRowParam>(), result).ConfigureAwait(false);
             return Json(result);
         }

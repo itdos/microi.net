@@ -328,7 +328,9 @@ export default {
             var self = this;
             // 匿名路由由页面组件自行做静默登录态校验。这里不能调用全局
             // GetCurrentUser，否则无 Token 的公有 OnlyOffice 预览会弹出“请重新登录”。
-            if (self.IsAnonymousRoute()) return;
+            // 首次打开根地址时 Hash 路由可能尚未完成匹配，因此无 Token 本身也必须
+            // 视为匿名启动状态；登录页会自行处理 URL Token、SSO 与账号登录。
+            if (self.IsAnonymousRoute() || !self.DiyCommon.getToken()) return;
             await self.RefreshTokenWithLock();
             self.GetCurrentUserApp();
             // 保存定时器引用，防止内存泄漏

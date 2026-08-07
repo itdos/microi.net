@@ -36,6 +36,10 @@ export const shared = defineConfig({
 				},
 				link: "https://gitee.com/ITdos/microi.net",
 			},
+			{
+				icon: "github",
+				link: "https://github.com/itdos/microi.net",
+			},
 		],
 
 		search: {

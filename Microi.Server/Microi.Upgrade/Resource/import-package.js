@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.9.2
+ * Version: v1.9.8
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
@@ -2001,7 +2001,9 @@ try {
 
     var isNumericSqlType = function (value) {
         var type = normalizeSqlType(value);
-        return /^(tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|double|float)(\(|$)/.test(type);
+        // MYSQL_BIT_NUMERIC_COMPAT_V1：MySQL BIT(1) 经 ORM 读取可能是原始
+        // 00/01 字节；它属于数值类型，不能按文本脏数据规则复核。
+        return /^(bit|tinyint|smallint|mediumint|int|integer|bigint|decimal|numeric|double|float)(\(|$)/.test(type);
     };
 
     var isIntegerSqlType = function (value) {
@@ -2093,6 +2095,57 @@ try {
         var expectedTableName = String(tableName || '').toLowerCase();
         if (fieldTableName) return fieldTableName == expectedTableName;
         return !!tableId && String(field.TableId || '') == String(tableId);
+    };
+
+    // LEGACY_SWITCH_BOOLEAN_TEXT_V1：只有应用包明确声明为 Switch 的字段，
+    // 才允许兼容早期数据库中由
+    // JSON/ORM 写入的 True/False 文本。普通数值字段继续失败关闭，避免
+    // 把真实脏数据静默转换成 0。
+    var isPackageSwitchColumn = function (tableName, columnName) {
+        if (!isSafeIdentifier(tableName) || !isSafeIdentifier(columnName)) return false;
+        var tableId = '';
+        var packageDeclaresSameNameSwitch = false;
+        var packageTables = Package.DiyTables || [];
+        for (var tableIndex = 0; tableIndex < packageTables.length; tableIndex++) {
+            var packageTable = packageTables[tableIndex] || {};
+            if (String(packageTable.Name || '').toLowerCase() == String(tableName).toLowerCase()) {
+                tableId = String(packageTable.Id || '');
+                break;
+            }
+        }
+        var packageFields = Package.DiyFields || [];
+        for (var fieldIndex = 0; fieldIndex < packageFields.length; fieldIndex++) {
+            var packageField = packageFields[fieldIndex] || {};
+            if (String(packageField.Name || '').toLowerCase() != String(columnName).toLowerCase()) continue;
+            if (String(packageField.Component || '').toLowerCase() != 'switch') continue;
+            packageDeclaresSameNameSwitch = true;
+            if (packageFieldBelongsToTable(packageField, tableName, tableId)) return true;
+        }
+        if (!packageDeclaresSameNameSwitch) return false;
+
+        // 后台分片恢复时，旧 Jint 会把 Package 中已经应用 IdMap 的 TableId 与
+        // 原始 DiyTables.Id 分开呈现；个别旧包对象还会丢失字段 TableName。
+        // 此时必须由“包内同名 Switch 声明 + 目标端同表同名 Switch 元数据”双重
+        // 证明，不能仅凭字段名放宽数值迁移。
+        var targetSwitchRows = V8.Db.FromSql(
+            'SELECT COUNT(1) AS SwitchCount FROM diy_field df ' +
+            'INNER JOIN diy_table dt ON dt.Id = df.TableId ' +
+            'WHERE LOWER(dt.Name) = LOWER(@p0) AND LOWER(df.Name) = LOWER(@p1) ' +
+            "AND LOWER(COALESCE(df.Component, '')) = 'switch' " +
+            'AND (df.IsDeleted <> 1 OR df.IsDeleted IS NULL) ' +
+            'AND (dt.IsDeleted <> 1 OR dt.IsDeleted IS NULL)'
+        ).AddInParameter('@p0', tableName)
+            .AddInParameter('@p1', columnName)
+            .ToArray();
+        var targetSwitchCount = targetSwitchRows && targetSwitchRows.length > 0
+            ? getScalarCount(targetSwitchRows[0], ['SwitchCount', 'SWITCHCOUNT', 'switchcount'])
+            : 0;
+        if (targetSwitchCount > 0) {
+            debugLog['physical_schema_switch_metadata_fallback_' + tableName + '_' + columnName] =
+                '包内与目标端均声明为Switch，已兼容分片Id映射后的字段关联';
+            return true;
+        }
+        return false;
     };
 
     var isPackageColumnIndexed = function (tableName, columnName) {
@@ -2267,24 +2320,94 @@ try {
     };
 
     // MySQL 严格模式不允许把历史 varchar 空字符串直接改成 int/decimal。
-    // 空字符串在平台旧数据中表示“未填写”，可安全规范为 NULL；其它非数字内容必须阻止迁移，不能静默转成 0。
+    // 空字符串在平台旧数据中表示“未填写”，可安全规范为 NULL；Switch 字段还兼容
+    // 老版本写入的 True/False 文本。其它非数字内容必须阻止迁移，不能静默转成 0。
     var prepareNumericColumnData = function (tableName, columnName, sourceColumn, sourceType, targetType) {
-        if (!isNumericSqlType(sourceType) || isNumericSqlType(targetType)) return 0;
+        var normalized = { BlankCount: 0, LegacyBooleanCount: 0, LegacySwitchNumericCount: 0 };
+        if (!isNumericSqlType(sourceType) || isNumericSqlType(targetType)) return normalized;
 
         var regexp = isIntegerSqlType(sourceType)
             ? '^[+-]?[0-9]+$'
             : '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$';
-        var invalidRows = V8.Db.FromSql(
-            "SELECT COUNT(1) AS InvalidCount FROM `" + tableName + "` " +
+        var isSwitchColumn = isPackageSwitchColumn(tableName, columnName);
+        var rawTextExpression = "TRIM(CAST(`" + columnName + "` AS CHAR))";
+        // JSON_SWITCH_LITERAL_UNQUOTE_V1：旧 ORM 可能把 bool/0/1 作为 JSON
+        // 字面量或 JSON 字符串写入 varchar。只对白名单 Switch 使用 MySQL JSON
+        // 校验和解包；无效 JSON 保持原文并继续走严格非数字拦截。
+        var normalizedTextExpression = isSwitchColumn
+            ? "LOWER(TRIM(CASE WHEN JSON_VALID(" + rawTextExpression + ") " +
+                "THEN JSON_UNQUOTE(" + rawTextExpression + ") ELSE " + rawTextExpression + " END))"
+            : rawTextExpression;
+        var invalidWhere =
             "WHERE `" + columnName + "` IS NOT NULL " +
             "AND TRIM(CAST(`" + columnName + "` AS CHAR)) <> '' " +
-            "AND TRIM(CAST(`" + columnName + "` AS CHAR)) NOT REGEXP @p0"
-        ).AddInParameter('@p0', regexp).ToArray();
+            "AND " + normalizedTextExpression + " NOT REGEXP @p0";
+        if (isSwitchColumn) {
+            // Dos.ORM/Jint 在部分旧运行时中会把 IN(@p1,@p2) 的字符串参数按
+            // 集合参数再次包装，导致数据库仍把 True/False 统计成非法值。
+            // 这里只有固定、不可由包或请求控制的布尔字面量，直接写入静态 SQL
+            // 可跨旧运行时稳定工作，同时继续只对白名单 Switch 字段生效。
+            invalidWhere +=
+                " AND " + normalizedTextExpression + " <> 'true'" +
+                " AND " + normalizedTextExpression + " <> 'false'";
+        }
+        var invalidSql =
+            "SELECT COUNT(1) AS InvalidCount FROM `" + tableName + "` " + invalidWhere;
+        var invalidRows = V8.Db.FromSql(
+            invalidSql
+        ).AddInParameter('@p0', regexp);
+        invalidRows = invalidRows.ToArray();
         var invalidCount = invalidRows && invalidRows.length > 0
             ? getScalarCount(invalidRows[0], ['InvalidCount', 'INVALIDCOUNT', 'invalidcount'])
             : 0;
         if (invalidCount > 0) {
-            throw new Error('字段存在' + invalidCount + '条非数字数据，已阻止转换为' + sourceType + '，请先清理数据');
+            var invalidHex = '';
+            if (isSwitchColumn) {
+                var invalidSampleRows = V8.Db.FromSql(
+                    "SELECT DISTINCT LEFT(HEX(CAST(`" + columnName + "` AS CHAR)), 64) AS InvalidHex " +
+                    "FROM `" + tableName + "` " + invalidWhere + " LIMIT 3"
+                ).AddInParameter('@p0', regexp).ToArray();
+                var invalidHexList = [];
+                for (var invalidSampleIndex = 0; invalidSampleIndex < invalidSampleRows.length; invalidSampleIndex++) {
+                    var invalidHexValue = String(getPhysicalValue(invalidSampleRows[invalidSampleIndex],
+                        ['InvalidHex', 'INVALIDHEX', 'invalidhex']) || '');
+                    if (invalidHexValue) invalidHexList.push(invalidHexValue);
+                }
+                if (invalidHexList.length > 0) invalidHex = '，样本HEX=' + invalidHexList.join(',');
+            }
+            throw new Error(
+                '字段存在' + invalidCount + '条非数字数据，已阻止转换为' + sourceType +
+                '，请先清理数据；导入器=v1.9.8，Switch双重声明=' +
+                (isSwitchColumn ? '已命中' : '未命中') + invalidHex
+            );
+        }
+
+        if (isSwitchColumn) {
+            var normalizeSwitchLiteral = function (literal, numericValue) {
+                if (literal != 'true' && literal != 'false' && literal != '1' && literal != '0') {
+                    throw new Error('不支持的Switch历史字面量');
+                }
+                var literalSql = "'" + literal + "'";
+                var countRows = V8.Db.FromSql(
+                    "SELECT COUNT(1) AS LegacyBooleanCount FROM `" + tableName + "` " +
+                    "WHERE " + normalizedTextExpression + " = " + literalSql
+                ).ToArray();
+                var count = countRows && countRows.length > 0
+                    ? getScalarCount(countRows[0], ['LegacyBooleanCount', 'LEGACYBOOLEANCOUNT', 'legacybooleancount'])
+                    : 0;
+                if (count > 0) {
+                    V8.Db.FromSql(
+                        "UPDATE `" + tableName + "` SET `" + columnName + "` = @p0 " +
+                        "WHERE " + normalizedTextExpression + " = " + literalSql
+                    ).AddInParameter('@p0', numericValue)
+                        .ExecuteNonQuery();
+                }
+                return count;
+            };
+            normalized.LegacyBooleanCount = normalizeSwitchLiteral('true', 1)
+                + normalizeSwitchLiteral('false', 0);
+            normalized.LegacySwitchNumericCount = normalizeSwitchLiteral('1', 1)
+                + normalizeSwitchLiteral('0', 0);
         }
 
         var blankRows = V8.Db.FromSql(
@@ -2294,7 +2417,7 @@ try {
         var blankCount = blankRows && blankRows.length > 0
             ? getScalarCount(blankRows[0], ['BlankCount', 'BLANKCOUNT', 'blankcount'])
             : 0;
-        if (blankCount == 0) return 0;
+        if (blankCount == 0) return normalized;
 
         var sourceNullable = String(getPhysicalValue(sourceColumn, ['IS_NULLABLE', 'IsNullable']) || '').toUpperCase();
         if (sourceNullable == 'NO') {
@@ -2305,7 +2428,8 @@ try {
             "UPDATE `" + tableName + "` SET `" + columnName + "` = NULL " +
             "WHERE `" + columnName + "` IS NOT NULL AND TRIM(CAST(`" + columnName + "` AS CHAR)) = ''"
         ).ExecuteNonQuery();
-        return blankCount;
+        normalized.BlankCount = blankCount;
+        return normalized;
     };
 
     // PHYSICAL_NOT_NULL_BACKFILL_V1：老租户可能已经创建了新字段，但历史行仍为
@@ -2466,16 +2590,20 @@ try {
                             debugLog['physical_schema_compat_' + tableName + '_' + columnName] =
                                 '保留目标库较宽类型：package=' + columnType + ', target=' + targetColumn.COLUMN_TYPE;
                         }
-                        var normalizedBlankCount = prepareNumericColumnData(
+                        var normalizedNumericData = prepareNumericColumnData(
                             tableName,
                             columnName,
                             sourceColumn,
                             effectiveColumnType,
                             targetColumn.COLUMN_TYPE
                         );
-                        if (normalizedBlankCount > 0) {
+                        if (normalizedNumericData.LegacyBooleanCount > 0) {
+                            debugLog['physical_schema_normalized_boolean_' + tableName + '_' + columnName] =
+                                '已将' + normalizedNumericData.LegacyBooleanCount + '条历史True/False开关值规范为1/0';
+                        }
+                        if (normalizedNumericData.BlankCount > 0) {
                             debugLog['physical_schema_normalized_' + tableName + '_' + columnName] =
-                                '已将' + normalizedBlankCount + '条历史空字符串规范为NULL';
+                                '已将' + normalizedNumericData.BlankCount + '条历史空字符串规范为NULL';
                         }
                         var backfilledNullCount = prepareNotNullColumnData(
                             tableName,

@@ -16,7 +16,7 @@
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
 .NET10 + Vue3 + 跨数据库 / 跨平台，分布式架构、高性能（L1/L2级缓存）、开源可控、多端统一
 
-[官网](https://microi.net/) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
+[官网](https://microi.net/) · [GitHub](https://github.com/itdos/microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [吾码UI](/doc/system-engine/microi-ui) · [OpenClaw 吾码小龙虾](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 
@@ -49,6 +49,7 @@
 | 🌐 官网 | [https://microi.net](https://microi.net) 【<span class="mci-doc-danger">支持在线注册免费使用</span>】 |
 | 🦞 OpenClaw 吾码小龙虾 | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
 | 📦 Gitee 源码 | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
+| 📦 GitHub 源码 | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
 | 📦 GitCode 源码 | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
 | 📝 官方 CSDN 博客 | [https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog) |
 | 📝 技术 CSDN 博客 | [https://lisaisai.blog.csdn.net](https://lisaisai.blog.csdn.net/?type=blog) |
@@ -112,6 +113,7 @@
 <tr><td>🤖 <strong><a href="/doc/v8-engine/ai-apiengine#模式二-本地-ai-编程vs-code-插件">AI 本地编程</a></strong></td><td><strong>业界首创。</strong> VS Code 插件一键拉取业务代码 + 数据库结构，自动生成 AI 知识库，GitHub Copilot / Claude Code / Cursor 零配置开箱即用，写代码 → 远程执行 → 逐行断点调试全在 VS Code 内闭环</td></tr>
 <tr><td>🤖 <strong><a href="/doc/v8-engine/ai-apiengine">AI 在线编程</a></strong></td><td>平台内置 DeepSeek 等 AI 模型，上传 V8 文档 + 数据库结构即可生成高质量接口代码，支持自然语言转 SQL、代码智能检查与优化</td></tr>
 <tr><td>📊 <strong>AI 数据分析</strong></td><td>自然语言提问，AI 自动分析业务数据并生成可视化图表；默认使用大模型关键词扩展、权限感知 Schema 搜索与准确字段回读，不依赖 Ollama/Qdrant，向量数据库仅作为可选语义召回增强；AI 训练、微调、提示词管理一站式管理</td></tr>
+<tr><td>🧠 <strong><a href="/doc/system-engine/ai-workflow-suite">AI 工作流与业务蓝图</a></strong></td><td>系统关系图、业务架构蓝图、状态机、自动化流和流程挖掘，覆盖设计、运行与治理</td></tr>
 <tr><td>📝 <strong><a href="/doc/form-engine/form-engine-info">表单引擎</a></strong></td><td>支持扩展组件、自定义 Vue 组件嵌入表单、V8 引擎事件，灵活实现复杂业务逻辑</td></tr>
 <tr><td>📦 <strong><a href="/doc/system-engine/module-engine">模块引擎</a></strong></td><td>多表关联、查询列、统计列、动态 V8 按钮、复杂 Where 条件、多种嵌入模式</td></tr>
 <tr><td>🔄 <strong><a href="/doc/system-engine/wf-engine">工作流引擎 v4</a></strong></td><td>完全自主研发，由表单引擎 + 接口引擎驱动</td></tr>
@@ -168,14 +170,14 @@
 <tr><td>🔐 <strong>细粒度权限</strong></td><td>精确到每张表、每个字段、每个菜单、每个按钮、每个接口</td></tr>
 <tr><td>🔑 <strong>单点登录</strong></td><td>支持第三方系统 ↔ 低代码平台双向单点登录</td></tr>
 <tr><td>💬 <strong>微信公众平台</strong></td><td>多公众号 / 多小程序配置、模板消息</td></tr>
-<tr><td>📱 <strong>移动端 (UniApp)</strong></td><td>100% 开源，支持小程序 / H5 / Android / iOS</td></tr>
-<tr><td>🧩 <strong>微服务</strong></td><td>Vue2 基于 Qiankun，Vue3 基于 MicroApp</td></tr>
+<tr><td>📱 <strong><a href="/doc/system-engine/multi-end-client">PC / WebOS / UniApp / App</a></strong></td><td>经典管理端、桌面式门户、移动 Web、原生动态小程序和 HBuilderX App 壳</td></tr>
+<tr><td>🧩 <strong><a href="/doc/system-engine/micro-app">前端微服务</a></strong></td><td>独立源码、宿主认证与路由桥、在线/本地编辑、应用商城交付</td></tr>
 <tr><td>⏱️ <strong><a href="/doc/system-engine/job">任务调度</a></strong></td><td>定时执行接口引擎或定制 DLL</td></tr>
 <tr><td>💬 <strong>聊天系统</strong></td><td>自研在线聊天 + 腾讯 IM 集成</td></tr>
 <tr><td>🕷️ <strong><a href="/doc/system-engine/spider-engine">采集引擎</a></strong></td><td>可重复规则采集、真实 Chrome Worker、验证码人工兜底、接口与 DOM 全覆盖</td></tr>
 <tr><td>🌍 <strong><a href="/doc/system-engine/translate-engine">多语言</a></strong></td><td>前后端多语言管理，在线配置</td></tr>
-<tr><td>📊 <strong>goView 数据大屏</strong></td><td><a href="https://lisaisai.blog.csdn.net/article/details/149858192?spm=1001.2014.3001.5502">集成 goView</a>，快速实现数据可视化</td></tr>
-<tr><td>🧊 <strong>WebGL 3D 渲染器</strong></td><td>基于 Three.js，支持 .gltf / .obj / .glb / .fbx / .stl 格式</td></tr>
+<tr><td>📊 <strong><a href="/doc/system-engine/visualization-engine">goView 数据大屏</a></strong></td><td>自由拖拽驾驶舱，设计 JSON 与 Microi 表单引擎数据统一管理</td></tr>
+<tr><td>🧊 <strong><a href="/doc/system-engine/visualization-engine">3D 与 CAD</a></strong></td><td>Three.js GLB/GLTF 场景设计，以及 DWG/DXF、STEP/STP、STL 转换与预览</td></tr>
 <tr><td>💬 <strong>腾讯 IM</strong></td><td>快速集成社交聊天、客服会话、直播弹幕</td></tr>
 </tbody>
 </table>
@@ -221,9 +223,9 @@ Microi.net/
 │   ├── Microi.net.Api/     #     Web API 层（ASP.NET Core 控制器）
 │   ├── Microi.Core/        #     核心基础设施库（接口定义/模型/抽象）
 │   ├── Microi.AI/          #     AI 领域实现（模型路由、Schema/NL2SQL、代理、计量、工作流）
+│   ├── Microi.net/         #     表单、接口、模块、工作流等核心运行时
 │   ├── Microi.V8Engine/    #     V8 引擎独立模块
 │   ├── Microi.Cache/       #     缓存模块（Redis + 内存）
-│   ├── Microi.ORM/         #     ORM 模块（多数据库适配）
 │   ├── Microi.MongoDB/     #     MongoDB 集成模块
 │   ├── Microi.MQ/          #     RabbitMQ 消息队列模块
 │   ├── Microi.MQTT/        #     MQTT 物联网服务模块
@@ -233,18 +235,22 @@ Microi.net/
 │   ├── Microi.Spider/      #     采集引擎模块
 │   ├── Microi.WeChat/      #     微信公众号/小程序集成
 │   ├── Microi.Captcha/     #     验证码模块
+│   ├── Microi.OCR/         #     OCR 租户网关
 │   ├── Microi.HDFS/        #     分布式文件存储（OSS/MinIO/S3）
 │   ├── Microi.Upgrade/     #     平台热更新模块
 │   ├── Dos.ORM/            #     自研 ORM 基础库
 │   └── Dos.Common/         #     通用工具类库
 ├── Microi.Client/          # 🖥️ PC 传统界面 100% 源码（Vue3 + Element-Plus + Vite + Pinia）
+├── Microi.UI/              # 🎨 Web / UniApp 统一设计系统
 ├── microi.uniapp/          # 📱 UniApp 移动端 100% 源码（小程序 / H5 / App）
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
 ├── microi.doc/             # 📝 官方文档（基于 VitePress）
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
-├── microi-v8-engine/       # ⚙️ V8 引擎开发工作区
+├── microi.apps/            # 🧩 官方 AI 应用与微服务源码
 └── microi.skills/          # 🧠 AI Skills 知识库
 ```
+
+各后端项目、前端入口、MCP、VS Code / CLI 与本地 `Microi-V8-Engine` 工作区的完整职责见 [源码架构与模块地图](/doc/getting-started/source-code-architecture)。
 
 ---
 

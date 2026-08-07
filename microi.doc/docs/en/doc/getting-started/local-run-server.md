@@ -13,7 +13,7 @@
 
 ## 📦Download the source code and. NET environment
 
-- Use Git to pull the latest code from an open source address:[Gitee repository](https://gitee.com/ITdos/microi.net)
+- Use Git to pull the latest code from an open source address: [GitHub repository](https://github.com/itdos/microi.net) / [Gitee repository](https://gitee.com/ITdos/microi.net)
 - Download and install. NET 10 SDK:[.NET Download Page](https://dotnet.microsoft.com/zh-cn/download)
 
 ---

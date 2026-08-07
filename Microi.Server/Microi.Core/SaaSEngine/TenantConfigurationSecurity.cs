@@ -261,6 +261,31 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// 为主租户控制面生成“存储值 + 运行时继承值”的独立投影。
+        /// 本方法只合并共享基础设施白名单，不会带入 DbConn、AuthSecret 或租户独立凭据；
+        /// 调用方必须在进入本方法前完成主租户与 Level >= 9999 的授权校验。
+        /// </summary>
+        public static JObject CreateControlPlaneSharedInfrastructureProjection(
+            JObject storedModel,
+            JObject effectiveRuntimeModel,
+            out IReadOnlyCollection<string> inheritedFields)
+        {
+            var projection = storedModel == null ? new JObject() : (JObject)storedModel.DeepClone();
+            var inherited = new List<string>();
+            if (effectiveRuntimeModel != null)
+            {
+                foreach (var field in SharedInfrastructureFieldSet.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+                {
+                    if (!IsMissing(projection[field]) || IsMissing(effectiveRuntimeModel[field])) continue;
+                    projection[field] = effectiveRuntimeModel[field].DeepClone();
+                    inherited.Add(field);
+                }
+            }
+            inheritedFields = inherited.ToArray();
+            return projection;
+        }
+
+        /// <summary>
         /// 历史版本曾把主租户第三方凭据复制进子租户行。仅当子租户值与主租户值完全一致时，
         /// 从运行时快照移除该值；子租户自行配置且不同的业务凭据继续可用。
         /// 共享 Redis/对象存储等服务字段由受控代理隔离，不在这里清除。
