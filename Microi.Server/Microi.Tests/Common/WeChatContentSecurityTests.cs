@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Reflection;
 using Microi.net;
 using Microi.net.Api;
 using Microsoft.AspNetCore.Http;
@@ -37,6 +38,52 @@ public sealed class WeChatContentSecurityTests
         Assert.Equal(xml, WeChatContentSecurityService.DecryptMessage(encrypted, aesKey, appId));
         Assert.Throws<WeChatContentSecurityException>(() =>
             WeChatContentSecurityService.DecryptMessage(encrypted, aesKey, "another-app"));
+    }
+
+    [Fact]
+    public void CallbackParser_KeepsXmlCompatibility()
+    {
+        // zhy: 双格式支持不能破坏已存在的 XML 回调处理。
+        const string xml = "<xml><trace_id>trace-xml-1</trace_id><detail><suggest>pass</suggest></detail></xml>";
+
+        Assert.Equal("trace-xml-1", Assert.Single(ReadCallbackValues(xml, "trace_id")));
+        Assert.Equal("pass", Assert.Single(ReadCallbackValues(xml, "suggest")));
+    }
+
+    [Fact]
+    public void JsonCallback_ReadsTraceIdAndNestedSuggestions()
+    {
+        // zhy: 微信明文 JSON 的 detail 数组必须归一化为与 XML 相同的安全字段。
+        const string json = """
+                            {
+                              "ToUserName": "gh_test",
+                              "trace_id": "trace-json-1",
+                              "detail": [
+                                { "strategy": "content_model", "suggest": "pass" },
+                                { "strategy": "risky_content", "suggest": "review" }
+                              ]
+                            }
+                            """;
+
+        Assert.Equal("trace-json-1", Assert.Single(ReadCallbackValues(json, "trace_id", "TraceId")));
+        Assert.Equal(new[] { "pass", "review" }, ReadCallbackValues(json, "suggest"));
+    }
+
+    [Fact]
+    public void SafeModeJsonEnvelope_DecryptsJsonPayload()
+    {
+        // zhy: 为以后切换安全模式保留 JSON 外层 Encrypt 与解密后 JSON 正文的兼容链路。
+        const string appId = "wx0e661a2fc4f52530";
+        const string payload = "{\"trace_id\":\"trace-safe-json-1\",\"detail\":[{\"suggest\":\"pass\"}]}";
+        var aesKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=');
+        var encrypted = Encrypt(payload, aesKey, appId);
+        var envelope = new JObject { ["Encrypt"] = encrypted }.ToString();
+
+        var extracted = Assert.Single(ReadCallbackValues(envelope, "Encrypt"));
+        var decrypted = WeChatContentSecurityService.DecryptMessage(extracted, aesKey, appId);
+
+        Assert.Equal("trace-safe-json-1", Assert.Single(ReadCallbackValues(decrypted, "trace_id")));
+        Assert.Equal("pass", Assert.Single(ReadCallbackValues(decrypted, "suggest")));
     }
 
     [Fact]
@@ -166,6 +213,16 @@ public sealed class WeChatContentSecurityTests
     {
         var text = string.Concat(values.OrderBy(value => value, StringComparer.Ordinal));
         return Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+    }
+
+    private static IReadOnlyList<string> ReadCallbackValues(string content, params string[] names)
+    {
+        var method = typeof(WeChatContentSecurityService).GetMethod(
+            "ReadCallbackValues",
+            BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return Assert.IsAssignableFrom<IReadOnlyList<string>>(
+            method.Invoke(null, new object[] { content, names }));
     }
 
     private static string Encrypt(string message, string encodingAesKey, string appId)

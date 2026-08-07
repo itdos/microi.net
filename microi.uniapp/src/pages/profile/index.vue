@@ -225,7 +225,7 @@ export default {
         title: '个人资料',
         recordAdapter: 'current-user',
         fieldNames: [
-          // 'Avatar', // 个人资料页暂时隐藏头像，保留配置便于后续恢复。
+          'Avatar', // 个人资料页暂时隐藏头像，保留配置便于后续恢复。
           'No', 'Account', 'Name', 'Email', 'Phone', 'Sex', 'Remark'
         ],
         readonlyFieldNames: ['No', 'Account', 'Phone'],
