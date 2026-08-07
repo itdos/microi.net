@@ -4,7 +4,8 @@
       <view class="nav-row mci-safe-nav-row">
         <view class="nav-icon" hover-class="nav-icon--pressed" @tap="goBack"><text>‹</text></view>
         <text class="nav-title">{{ config.title || '业务列表' }}</text>
-        <view class="nav-icon" hover-class="nav-icon--pressed" @tap="openAdd"><text>＋</text></view>
+        <view v-if="canAddRecord" class="nav-icon" hover-class="nav-icon--pressed" @tap="openAdd"><text>＋</text></view>
+        <view v-else class="nav-icon nav-icon--placeholder" aria-hidden="true"></view>
       </view>
 
       <view class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
@@ -122,11 +123,11 @@
       <view v-else class="empty-state">
         <image :src="entry.icon" mode="aspectFit" />
         <text class="empty-title">暂无{{ config.title }}数据</text>
-        <text class="empty-text">可调整搜索条件，或使用右上角新增</text>
+        <text class="empty-text">{{ canAddRecord ? '可调整搜索条件，或使用右上角新增' : '可调整搜索条件后重试' }}</text>
       </view>
     </scroll-view>
 
-    <view class="floating-add" hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
+    <view v-if="canAddRecord" class="floating-add" hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
 
     <view v-if="filterOpen" class="filter-mask" @tap="closeAdvancedFilters">
       <view class="filter-sheet" @tap.stop>
@@ -214,7 +215,14 @@
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import { getBusinessEntry, getBusinessModule } from '@/platform/business.js'
-import { executeBusinessRowAction, getBusinessRowActions, loadApprovalOpinions } from './utils/xjy-row-actions.js'
+import {
+  canAddMenuRecord,
+  executeBusinessRowAction,
+  getBusinessRowActions,
+  hydrateInstallationPositionRows,
+  openInstallationPositionDevice,
+  loadApprovalOpinions
+} from './utils/xjy-row-actions.js'
 import { listReturnMixin } from '@/platform/list-return.js'
 import {
   compileListConfig,
@@ -294,6 +302,9 @@ export default {
     }
   },
   computed: {
+    canAddRecord() {
+      return canAddMenuRecord(this.menuId, this.currentUser)
+    },
     periodLabel() {
       const item = this.periods.find((option) => option.value === this.period)
       return item ? item.label : '全部'
@@ -462,10 +473,14 @@ export default {
       try {
         const result = await loadModuleRows(this.config, options)
         if (requestId !== this.loadRequestId) return
-        this.rows = reset ? result.rows : [...this.rows, ...result.rows]
+        const incomingRows = this.key === 'installationPositions'
+          ? await hydrateInstallationPositionRows(result.rows)
+          : result.rows
+        if (requestId !== this.loadRequestId) return
+        this.rows = reset ? incomingRows : [...this.rows, ...incomingRows]
         this.count = result.count
         this.dataAppend = result.append
-        this.finished = this.rows.length >= result.count || result.rows.length < (this.config.pageSize || 15)
+        this.finished = this.rows.length >= result.count || incomingRows.length < (this.config.pageSize || 15)
         if (!this.finished) this.pageIndex += 1
         this.loading = false
         if (reset) {
@@ -805,8 +820,17 @@ export default {
         })
         return
       }
-      if (action.key === 'position-product' && row.ShangpinID) {
-        this.mciNavigateToDetail(`/pages/mall/detail?id=${encodeURIComponent(row.ShangpinID)}`)
+      if (action.key === 'position-device') {
+        this.actionSubmitting = true
+        uni.showLoading({ title: '正在打开设备', mask: true })
+        try {
+          await openInstallationPositionDevice(row)
+        } catch (error) {
+          uni.showToast({ title: error.message || '设备详情打开失败', icon: 'none' })
+        } finally {
+          uni.hideLoading()
+          this.actionSubmitting = false
+        }
         return
       }
       if (action.input) {
@@ -931,6 +955,10 @@ export default {
       await this.loadData(true, true)
     },
     openAdd() {
+      if (!this.canAddRecord) {
+        uni.showToast({ title: '当前账号没有新增权限', icon: 'none' })
+        return
+      }
       if (this.key === 'members') {
         uni.navigateTo({ url: '/pages/native/member-edit' })
         return
@@ -1013,6 +1041,11 @@ export default {
 
 .nav-icon--pressed {
   background: #edf5f8;
+}
+
+.nav-icon--placeholder {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .nav-title {

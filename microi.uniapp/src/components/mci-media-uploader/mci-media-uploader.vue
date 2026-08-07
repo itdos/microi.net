@@ -1,6 +1,6 @@
 <template>
   <view class="mci-media-uploader">
-    <view class="mci-media-uploader__grid">
+    <view class="mci-media-uploader__grid" :class="{ 'mci-media-uploader__grid--circle': shape === 'circle' }">
       <view v-for="(item, index) in items" :key="item.Path || item.localPath || index" class="mci-media-uploader__item" :class="{ 'mci-media-uploader__item--file': mediaType === 'file', 'mci-media-uploader__item--circle': shape === 'circle' }">
         <view v-if="mediaType === 'file'" class="mci-media-uploader__file" @tap="previewFile(item)"><text class="mci-media-uploader__file-icon">文</text><text class="mci-media-uploader__file-name">{{ item.Name || item.name || fileName(item.Path) }}</text></view>
         <video v-if="mediaType === 'video' && item.url" class="mci-media-uploader__media" :src="item.url" controls @error="handleMediaError(item)"></video>
@@ -210,10 +210,13 @@ export default {
 
 <style scoped>
 .mci-media-uploader__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14rpx; }
+.mci-media-uploader__grid--circle { grid-template-columns: minmax(0, 1fr); }
 .mci-media-uploader__item,
 .mci-media-uploader__add { position: relative; aspect-ratio: 1; min-width: 0; border-radius: 8px; overflow: hidden; }
 .mci-media-uploader__item { background: #eaf1f3; }
-.mci-media-uploader__item--circle,
+.mci-media-uploader__item--circle { overflow: visible; border-radius: 50%; }
+.mci-media-uploader__item--circle .mci-media-uploader__media,
+.mci-media-uploader__item--circle .mci-media-uploader__missing { overflow: hidden; border-radius: 50%; }
 .mci-media-uploader__add--circle { border-radius: 50%; }
 .mci-media-uploader__item--file { grid-column: span 3; aspect-ratio: auto; min-height: 86rpx; }
 .mci-media-uploader__file { height: 86rpx; display: grid; grid-template-columns: 48rpx minmax(0, 1fr); gap: 12rpx; align-items: center; padding: 0 58rpx 0 17rpx; box-sizing: border-box; }
@@ -222,6 +225,7 @@ export default {
 .mci-media-uploader__media { width: 100%; height: 100%; }
 .mci-media-uploader__missing { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 12rpx; box-sizing: border-box; color: #718890; background: #edf3f5; font-size: 20rpx; text-align: center; }
 .mci-media-uploader__remove { position: absolute; right: 6rpx; top: 6rpx; width: 42rpx; height: 42rpx; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: #fff; background: rgba(17,35,42,.72); font-size: 32rpx; line-height: 1; }
+.mci-media-uploader__item--circle .mci-media-uploader__remove { right: -10rpx; top: -10rpx; z-index: 2; width: 40rpx; height: 40rpx; border: 3rpx solid #fff; box-sizing: border-box; background: rgba(38, 56, 64, .88); font-size: 28rpx; box-shadow: 0 3rpx 10rpx rgba(17, 35, 42, .24); }
 .mci-media-uploader__add { min-height: 176rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8rpx; border: 1px dashed #9cb8c2; color: #607b85; background: #f7fafb; font-size: 23rpx; transition: transform .18s ease, background-color .18s ease; }
 .mci-media-uploader__add--pressed { transform: scale(.97); background: #edf6f8; }
 .mci-media-uploader__plus { color: var(--mci-color-primary, #0b86d4); font-size: 52rpx; line-height: 1; }

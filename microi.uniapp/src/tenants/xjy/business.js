@@ -398,7 +398,7 @@ export const businessModules = {
   installationPositions: native({
     title: '安装位置', table: 'diy_shebeiwz', menuAliases: ['安装位置', '订单商品安装位置'],
     titleField: 'AnzhuangWZ', statusField: 'Zhuangtai', tagFields: ['ShangpinXH'],
-    lines: [{ label: '商品编号', field: 'ShangpinBH' }, { label: '设备编号', field: 'ShebeiBH' }, { label: '人数', field: 'Renshu' }]
+    lines: [{ label: '设备编号', field: 'ShangpinBH' }, { label: '人数', field: 'Renshu' }]
   }),
   orderCommissions: native({
     title: '订单分佣', table: 'Diy_DingdanFY', menuAliases: ['订单分佣', '分佣配置', '分佣明细'],

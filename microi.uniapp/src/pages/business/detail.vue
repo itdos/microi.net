@@ -5,8 +5,9 @@
 			<view class="nav-row mci-safe-nav-row">
 				<view class="nav-button" hover-class="nav-button--pressed" @tap="goBack">‹</view>
 				<text class="nav-title">{{ pageTitle }}</text>
-				<view class="nav-button nav-button--edit" hover-class="nav-button--pressed" @tap="openFullForm">编辑
-				</view>
+				<view v-if="canEditRecord" class="nav-button nav-button--edit" hover-class="nav-button--pressed"
+					@tap="openFullForm">编辑</view>
+				<view v-else class="nav-button nav-button--placeholder" aria-hidden="true"></view>
 			</view>
 		</view>
 
@@ -250,7 +251,8 @@
 			</template>
 		</view>
 
-		<view v-if="showRejectDialog" class="dialog-mask" @tap.self="showRejectDialog = false">
+		<view v-if="showRejectDialog" class="dialog-mask">
+			<view class="dialog-backdrop" @tap="showRejectDialog = false"></view>
 			<view class="dialog-panel">
 				<text class="dialog-title">验收不通过</text>
 				<text class="dialog-desc">请填写明确原因，便于服务人员重新处理。</text>
@@ -263,12 +265,14 @@
 			</view>
 		</view>
 
-		<view v-if="showOrderApprovalDialog" class="dialog-mask" @tap.self="showOrderApprovalDialog = false">
+		<view v-if="showOrderApprovalDialog" class="dialog-mask">
+			<view class="dialog-backdrop" @tap="closeOrderApprovalDialog"></view>
 			<view class="dialog-panel">
 				<text class="dialog-title">{{ approvalMode === 'approve' ? '同意订单' : '驳回订单' }}</text>
 				<text
 					class="dialog-desc">{{ approvalMode === 'approve' ? '审批通过后订单将进入后续合同与服务流程。' : '请说明驳回原因，便于订单发起人调整。' }}</text>
-				<textarea v-model="approvalOpinion" class="dialog-textarea" maxlength="300"
+				<textarea v-model="approvalOpinion" class="dialog-textarea" maxlength="300" fixed
+					:adjust-position="true" :cursor-spacing="24"
 					:placeholder="approvalMode === 'approve' ? '可填写审批意见（选填）' : '请输入审批意见（必填）'" />
 				<scroll-view v-if="approvalOpinions.length" class="approval-opinions" scroll-x :show-scrollbar="false">
 					<view class="approval-opinions__row">
@@ -277,9 +281,9 @@
 					</view>
 				</scroll-view>
 				<view class="dialog-actions">
-					<button class="dialog-button" @tap="showOrderApprovalDialog = false">取消</button>
+					<button class="dialog-button" :disabled="submitting" @tap="closeOrderApprovalDialog">取消</button>
 					<button class="dialog-button dialog-button--confirm" :disabled="submitting"
-						@tap="submitOrderApproval">确认提交</button>
+						@tap="submitOrderApproval">{{ submitting ? '提交中...' : '确认提交' }}</button>
 				</view>
 			</view>
 		</view>
@@ -331,6 +335,8 @@
 		loadViewMetricValues
 	} from '@/platform/view-metrics.js'
 	import {
+		canApproveOrder as hasOrderApprovalPermission,
+		canEditMenuRecord,
 		loadApprovalOpinions
 	} from './utils/xjy-row-actions.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
@@ -1187,6 +1193,9 @@
 			}
 		},
 		computed: {
+			canEditRecord() {
+				return canEditMenuRecord(this.menuId, this.currentUser)
+			},
 			preset() {
 				const module = this.moduleConfig || {}
 				const entry = getBusinessEntry(this.key) || {}
@@ -1695,7 +1704,7 @@
 					this.detail.ShangjiaYSZT
 			},
 			canApproveOrder() {
-				return this.key === 'orders' && this.roleProfile.isInternal && /待审批/.test(String(this.statusText))
+				return this.key === 'orders' && hasOrderApprovalPermission(this.detail, this.currentUser)
 			},
 			customerFollowScope() {
 				const status = String(this.detail.KehuGJZT || '').trim()
@@ -1999,6 +2008,10 @@
 				})
 			},
 			openFullForm() {
+				if (!this.canEditRecord) {
+					uni.showToast({ title: '当前账号没有编辑权限', icon: 'none' })
+					return
+				}
 				openForm({
 					table: this.moduleConfig.table,
 					rowId: this.detail.Id || this.id,
@@ -2143,6 +2156,13 @@
 				}, '报修已取消')
 			},
 			openOrderApproval(mode) {
+				if (!this.canApproveOrder) {
+					uni.showToast({
+						title: '当前账号无订单审批权限或订单状态已变更',
+						icon: 'none'
+					})
+					return
+				}
 				this.approvalMode = mode
 				this.approvalOpinion = ''
 				this.showOrderApprovalDialog = true
@@ -2150,6 +2170,12 @@
 				loadApprovalOpinions().then((items) => {
 					if (this.showOrderApprovalDialog) this.approvalOpinions = items
 				})
+			},
+			closeOrderApprovalDialog() {
+				if (this.submitting) return
+				this.showOrderApprovalDialog = false
+				this.approvalOpinion = ''
+				this.approvalOpinions = []
 			},
 			confirm(content) {
 				return new Promise((resolve) => {
@@ -2416,6 +2442,11 @@
 
 	.nav-button--pressed {
 		background: #edf5f8;
+	}
+
+	.nav-button--placeholder {
+		visibility: hidden;
+		pointer-events: none;
 	}
 
 	.nav-title {
@@ -3164,7 +3195,14 @@
 		z-index: 20;
 	}
 
+	.dialog-backdrop {
+		position: absolute;
+		inset: 0;
+	}
+
 	.dialog-panel {
+		position: relative;
+		z-index: 1;
 		width: 100%;
 		max-width: 720rpx;
 		padding: 30rpx 28rpx calc(24rpx + var(--mci-safe-bottom));
