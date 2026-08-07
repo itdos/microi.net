@@ -171,6 +171,112 @@ const toolbarConfig = computed(() => {
     };
 });
 
+//zhy：富文本上传统一使用接口引擎地址，并在实际请求时读取当前 API 地址。
+const richTextUploadUrl = () => DiyCommon.GetApiBase() + '/apiengine/hdfs/upload';
+
+//zhy：自定义上传绕过 WangEditor 默认 Uppy 后，继续保留字段级类型和大小限制。
+const validateRichTextFile = (file, mediaType, maxFileSize) => {
+    if (!file || !file.name || file.size <= 0) throw new Error('不能上传空文件');
+    if (file.size > maxFileSize) {
+        throw new Error(`文件不能超过${Math.round(maxFileSize / 1024 / 1024)}MB`);
+    }
+    if (file.type && !file.type.toLowerCase().startsWith(mediaType + '/')) {
+        throw new Error(mediaType === 'image' ? '只能上传图片文件' : '只能上传视频文件');
+    }
+};
+
+//zhy：每个富文本文件使用独立 multipart 请求，避免并发操作产生同名文件批次。
+const uploadRichTextFile = async (file, options) => {
+    const { fieldName, timeout, mediaType, maxFileSize } = options;
+    validateRichTextFile(file, mediaType, maxFileSize);
+    const formData = new FormData();
+    formData.append('Path', 'editor');
+    //zhy：WangEditor 默认上传器会复用 Uppy 且以 bundle 模式发送文件。并发粘贴/选择时，
+    //zhy：未清理的文件可能再次进入后续请求。这里固定为一文件一请求，避免 multipart
+    //zhy：中出现同名文件，同时保留服务端的重复文件名安全校验。
+    formData.append(fieldName, file, file.name);
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), timeout);
+    const token = DiyCommon.getToken();
+    const headers = token ? { authorization: 'Bearer ' + token } : {};
+
+    try {
+        const response = await fetch(richTextUploadUrl(), {
+            method: 'POST',
+            headers,
+            body: formData,
+            signal: controller.signal
+        });
+        const responseText = await response.text();
+        let result = null;
+        try {
+            result = responseText ? JSON.parse(responseText) : null;
+        } catch (error) {
+            throw new Error('上传接口返回了无法识别的数据');
+        }
+
+        if (!response.ok || !result || Number(result.errno) !== 0) {
+            throw new Error(result?.message || result?.Msg || `上传失败（HTTP ${response.status}）`);
+        }
+        return result.data;
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            throw new Error('上传超时，请检查网络后重试');
+        }
+        throw error;
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
+};
+
+//zhy：向用户透传后端上传失败原因，便于区分文件限制、身份和存储错误。
+const showRichTextUploadError = (file, error) => {
+    const fileName = file?.name ? `“${file.name}”` : '文件';
+    const message = error?.message || '未知错误';
+    DiyCommon.Tips(`${fileName}上传失败：${message}`, false, 12);
+    console.error('[DiyRichText] 上传失败：', error);
+};
+
+//zhy：图片上传成功后兼容 WangEditor 新旧两种 data 返回结构。
+const uploadRichTextImage = async (file, insertFn) => {
+    try {
+        const data = await uploadRichTextFile(file, {
+            fieldName: 'wangeditor-uploaded-image',
+            timeout: 60 * 1000,
+            mediaType: 'image',
+            maxFileSize: 20 * 1024 * 1024
+        });
+        const items = Array.isArray(data) ? data : [data];
+        let inserted = false;
+        items.forEach((item) => {
+            if (!item?.url) return;
+            insertFn(item.url, item.alt || file.name, item.href || '');
+            inserted = true;
+        });
+        if (!inserted) throw new Error('上传成功但未返回图片地址');
+    } catch (error) {
+        showRichTextUploadError(file, error);
+    }
+};
+
+//zhy：视频同样采用单文件独立上传，并兼容数组形式的历史响应。
+const uploadRichTextVideo = async (file, insertFn) => {
+    try {
+        const result = await uploadRichTextFile(file, {
+            fieldName: 'wangeditor-uploaded-video',
+            timeout: 60 * 1000 * 100,
+            mediaType: 'video',
+            maxFileSize: 200 * 1024 * 1024
+        });
+        const data = Array.isArray(result) ? result[0] : result;
+        if (!data?.url) throw new Error('上传成功但未返回视频地址');
+        insertFn(data.url, data.poster || '');
+    } catch (error) {
+        showRichTextUploadError(file, error);
+    }
+};
+
 // 本地值（双向绑定）
 const localValue = computed({
     get() {
@@ -232,26 +338,14 @@ const editorConfig = computed(() => {
         placeholder: '请输入内容...',
         MENU_CONF: {
             uploadImage: {
-                server: DiyCommon.GetApiBase() + '/apiengine/hdfs/upload',
                 maxFileSize: 20 * 1024 * 1024, // 20M
-                meta: {
-                    Path: 'editor'
-                },
-                headers: {
-                    authorization: 'Bearer ' + DiyCommon.getToken()
-                },
-                timeout: 60 * 1000
+                //zhy：使用单文件自定义上传，避免 WangEditor bundle 重复打包。
+                customUpload: uploadRichTextImage
             },
             uploadVideo: {
-                server: DiyCommon.GetApiBase() + '/apiengine/hdfs/upload',
                 maxFileSize: 200 * 1024 * 1024, // 200M
-                meta: {
-                    Path: 'editor'
-                },
-                headers: {
-                    authorization: 'Bearer ' + DiyCommon.getToken()
-                },
-                timeout: 60 * 1000 * 100
+                //zhy：视频上传与图片保持相同的单文件请求策略。
+                customUpload: uploadRichTextVideo
             }
         }
     };
