@@ -520,6 +520,7 @@ namespace Dos.ORM.SeedConversion
         {
             switch (typeName)
             {
+                case "char":
                 case "varchar":
                     RequireArgumentCount(typeName, arguments, 1);
                     return;

@@ -13,6 +13,7 @@ public sealed class MySql57SeedConverterTests
         CREATE TABLE `seed_parent` (
           `Id` varchar(36) NOT NULL COMMENT 'identifier',
           `Message` mediumtext COMMENT 'message',
+          `ContentHash` char(64) DEFAULT NULL,
           `Enabled` bit(1) NOT NULL DEFAULT b'0',
           `UpdatedAt` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           `RowId` varchar(64) DEFAULT NULL,
@@ -20,10 +21,10 @@ public sealed class MySql57SeedConverterTests
           PRIMARY KEY (`Id`) USING BTREE,
           KEY `idx_seed_message` (`Message`(191)) USING BTREE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='seed table';
-        INSERT INTO `seed_parent` (`Id`,`Message`,`Enabled`,`UpdatedAt`,`RowId`,`Payload`) VALUES
-        ('one','semi; &quot; &name -- text\r\nV8.Result = false;\nquote\' and slash\\',0,NULL,'row-one',0x00FF),
-        ('two','',1,'2026-07-19 12:13:14','',NULL),
-        ('three',NULL,0,NULL,NULL,NULL);
+        INSERT INTO `seed_parent` (`Id`,`Message`,`ContentHash`,`Enabled`,`UpdatedAt`,`RowId`,`Payload`) VALUES
+        ('one','semi; &quot; &name -- text\r\nV8.Result = false;\nquote\' and slash\\','ABCDEF',0,NULL,'row-one',0x00FF),
+        ('two','','',1,'2026-07-19 12:13:14','',NULL),
+        ('three',NULL,NULL,0,NULL,NULL,NULL);
         SET FOREIGN_KEY_CHECKS=1;
         """;
 
@@ -53,6 +54,7 @@ public sealed class MySql57SeedConverterTests
         Assert.Contains(quotedTable, output.ToString());
         Assert.Contains(largeTextType, output.ToString());
         Assert.Contains(binaryLiteral, output.ToString());
+        Assert.Contains("ABCDEF", output.ToString());
         Assert.Contains("idx_seed_message", output.ToString());
         Assert.Contains("seed table", output.ToString());
         Assert.Contains("semi; &quot; &name -- text", output.ToString());

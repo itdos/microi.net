@@ -70,10 +70,11 @@ public class V8MemoryConstraintTests
     public void NestedAllocationExclusion_StillLeavesTheRootCallTreeGuardActive()
     {
         var individual = new MicroiV8MemoryConstraint(8 * 1024 * 1024);
+        var callTree = new MicroiV8CallTreeMemoryConstraint(1024 * 1024);
         using var engine = new Engine(options =>
         {
             options.Constraint(individual);
-            options.LimitMemory(1024 * 1024);
+            options.Constraint(callTree);
         });
         engine.Constraints.Reset();
 
@@ -85,9 +86,32 @@ public class V8MemoryConstraintTests
         }
 
         individual.Check();
-        var exception = Assert.ThrowsAny<Exception>(() => engine.Constraints.Check());
-        Assert.Contains("MemoryLimit", exception.GetType().Name, StringComparison.OrdinalIgnoreCase);
+        Assert.Throws<MicroiV8CallTreeMemoryLimitExceededException>(
+            () => engine.Constraints.Check());
         GC.KeepAlive(childAllocation);
+    }
+
+    [Fact]
+    public void TrustedHostExclusion_DoesNotChargeNativeWorkToScriptOrCallTreeBudgets()
+    {
+        var individual = new MicroiV8MemoryConstraint(1024 * 1024);
+        var callTree = new MicroiV8CallTreeMemoryConstraint(1024 * 1024);
+        individual.Reset();
+        callTree.Reset();
+
+        byte[] nativeAllocation;
+        using (individual.ExcludeNestedExecution())
+        using (callTree.ExcludeNestedExecution())
+        {
+            nativeAllocation = new byte[2 * 1024 * 1024];
+            nativeAllocation[0] = 1;
+        }
+
+        individual.Check();
+        callTree.Check();
+        Assert.True(individual.AllocatedBytes < individual.MemoryLimit);
+        Assert.True(callTree.AllocatedBytes < callTree.MemoryLimit);
+        GC.KeepAlive(nativeAllocation);
     }
 
     [Fact]
