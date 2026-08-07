@@ -1,5 +1,17 @@
 # 更新日志
 
+## v7.1.10 - (2026-08-08 03:28)
+
+- **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务、消息队列、MQTT、MongoDB、OCR、Office、搜索、采集、V8、微信等公共组件统一升级至 v7.1.10，Microi VS Code 插件、独立 CLI 与内置 Skills 升级至 v4.7.6。写日志前根仓库共有 76 个已跟踪文件和 13 个未跟踪源码／文档／测试文件待提交；Microi.net、Microi.AI 子仓库各 1 个版本文件，Microi.VSCode 子仓库 2 个版本文件，四仓均无已暂存内容。`dist`、`bin`、`obj` 等生成目录不纳入功能分析；三个子仓库本轮除版本升级外没有其它源码差异。
+- **多登录方式酷炫弹层与租户品牌适配**：登录页把原有大块“生物登录”入口重构为主登录按钮旁的“登录方式”，点击后以桌面／移动自适应弹层展示 Passkey 生物登录、Authenticator 动态口令、严格人脸以及租户已配置的 Gitee、微信、GitHub 等外部登录；可用性、状态和说明由匿名能力接口动态返回，点击可直接进入对应验证流程，Esc、遮罩和焦点行为完整。界面不再固定显示“吾码／Microi”，系统 Logo、标题和说明使用当前租户配置，并继续遵守隐私协议、主题与减少动效设置。
+- **Authenticator 解密兼容与 Passkey 中文诊断**：TOTP 新绑定统一使用缓存中的规范租户标识派生 AES-GCM 密钥，解密按规范标识、请求标识和历史小写标识有界兼容，修复 `iTdos/itdos` 大小写漂移导致的 `The computed authentication tag did not match...`；密文结构、AuthSecret 漂移或多节点配置不一致时返回可操作中文方案，前端也不再透传英文认证标签错误。Passkey 在下发挑战前校验 RP ID 必须等于当前域名或其父域，Origin 白名单、HTTPS、跨站 `/.well-known/webauthn`、重新登记等解决方法均以中文展示，不再暴露浏览器原始英文 SecurityError。
+- **个人中心、公开头像与微应用首开体验**：右上角“个人设置”升级为“个人中心”，移除重复的独立改密菜单；平台内置微服务 v1.5.4 使用租户系统标题而非固定 MICROI 品牌，安全与登录、验证器、外部账号、偏好与终端等区域跟随主题。`sys_user.Avatar` 继续保存私有头像，新增 `PublicAvatar varchar(2000) + ImgUpload(Limit=false)` 保存公有头像，后端分别限制在 `member/avatar` 与 `member/public-avatar` 目录；头像解析兼容对象、JSON、相对／绝对路径和历史公有／私有数据，Authenticator 可显示真实公开头像与科技 Banner。微应用交互会关闭框架全局搜索浮层，首次打开个人中心的路由、资源与宿主上下文完成线上白屏回归。
+- **SaaS 控制面敏感配置与 MinIO 可诊断上传**：只有主租户 Level=9999 控制面读取 `sys_osclients` 详情时，才把当前主租户运行模型中的共享基础设施白名单投影到子租户空字段；投影发生在 V8／DataFilter 之后，并写入 `NotSaveField`，既让最高管理员能看见实际继承的 MinIO 等配置，又不会向普通用户、子租户 V8 或表单保存泄露／复制主租户秘密，且不会为了只读详情强制初始化目标租户。MinIO 上传后仍强制 HEAD／Stat 回读，AccessDenied 会明确指出目标桶、对象、所需读取权限和 Nginx `proxy_cache_convert_head` 排查方向，不以跳过回读掩盖未落盘风险。
+- **应用商城布尔迁移、身份包与源码交付**：统一导入器升级至 v1.9.8，把 MySQL `BIT` 识别为数值类型；只有应用包与目标元数据双重声明为 `Switch` 时，才把历史 `True/False`、JSON 布尔和 `0/1` 规范成数值，其它非数字脏数据继续失败关闭，修复旧租户 `IsDeleted/IsEnable/MinIOEndPointSSL` 等字段阻断整包更新。官方“SaaS引擎”升级至 v6.4.7，完整包含身份验证表、动态系统设置、外部身份、`sys_user.PublicAvatar`、平台微服务 23 个源码文件、4 个构建资产及源码／构建 ZIP；`microi_xjy` 后台分片更新任务已 `Succeeded`，物理列、源码清单、个人中心路由和 Banner 均完成远端回读。
+- **表格特殊字段与模板样式安全渲染**：PC 表格和卡片统一使用 `DiyTableSpecialCell` 渲染公有／私有图片、附件、子表、地图、二维码、图标、颜色、评分、进度、开关、JSON、富文本、代码和关联字段，并复用签名 URL、预览、详情与子表授权入口。V8 模板允许 `<style>/<styles>` 但会提取并限定到当前单元格作用域，阻止全局选择器、`@import`、`url()` 和危险 CSS；`target=_blank` 自动补 `noopener noreferrer`，避免模板样式污染整页或新窗口劫持。
+- **官网内容地图与质量门禁**：新增源码架构与模块地图、AI 工作流／业务蓝图／状态机／流程挖掘、PC／WebOS／移动 Web／UniApp／App 壳、3D／CAD／数据大屏、Microi MCP Server 等专题；首页、侧栏、中英文映射、GitHub 开源入口与 HDFS、V8、VS Code、本地运行说明同步更新。文档构建新增侧栏覆盖和开源仓库链接检查，并与死链、主题、SEO 检查组成统一发布门禁。
+- **定向验证与 v7.1.10 公开发布回读**：身份／租户配置／MinIO 后端定向回归 91 项、v6.4.7 内嵌包 3 项、身份前端 11 项、商城导入 40 项以及表格模板／特殊字段／WebOS 13 项通过；PC 1440×900、移动 390×844 登录弹层与线上个人中心首次打开完成真实浏览器回归。完整一键发布以退出码 0 完成现代前端、串行压缩、Chrome 49 legacy、后端 Release、API HTTP 200 存活探测、19 个 NuGet、Microi.net／Microi.AI 受保护产物及前后端正式／测试 Docker 推送；NuGet.org Flat Container v7.1.10 已 19/19 回读，后端标签收敛至 `sha256:10ab2d42...d0bbf`，前端标签收敛至 `sha256:0c5d9f90...58f1d`，`api.itdos.com` 版本接口已返回 7.1.10，发布锁已清理。保留 `Microsoft.Bcl.Memory 9.0.0` 已知高严重性漏洞及少量分析器／Dockerfile 告警；有效手机 TOTP 与真实 Passkey／人脸硬件动作仍需用户当场确认，不能由无设备自动化替代。
+
 ## v7.1.4 - (2026-08-07 16:14)
 
 - **版本发布与四仓边界**：写入本日志前，根仓库共有 4 个已跟踪文件和 1 个未跟踪测试文件待提交，Microi.net、Microi.AI 子仓库各有 1 个版本文件待提交，Microi.VSCode 子仓库工作区干净；`dist`、`bin`、`obj` 等生成目录不纳入功能分析。Microi.net 与 Microi.AI 的程序集、文件和 NuGet 版本由 v7.1.3 升至 v7.1.4，VS Code 插件本轮没有源码或版本差异，因此不虚构插件更新内容。

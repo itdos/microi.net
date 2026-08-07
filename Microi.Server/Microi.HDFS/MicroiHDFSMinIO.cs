@@ -406,8 +406,36 @@ namespace Microi.net
             }
             catch (Exception verificationException)
             {
-                return (false, verificationException.Message);
+                return (false, BuildUploadReadbackDiagnostic(
+                    verificationException,
+                    bucketName,
+                    objectName));
             }
+        }
+
+        private static string BuildUploadReadbackDiagnostic(
+            Exception exception,
+            string bucketName,
+            string objectName)
+        {
+            var rawMessage = exception?.Message ?? "未知错误";
+            if (rawMessage.IndexOf("Access denied", StringComparison.OrdinalIgnoreCase) >= 0
+                || rawMessage.IndexOf("AccessDenied", StringComparison.OrdinalIgnoreCase) >= 0
+                || rawMessage.IndexOf("403", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return $"对象上传请求已返回成功，但同一 MinIO 凭据执行 HEAD/Stat 回读被拒绝"
+                       + $"（Bucket={bucketName}，Object={objectName}）。"
+                       + "请检查该凭据至少具有目标桶的 s3:GetObject 与 s3:GetBucketLocation 权限；"
+                       + "若权限已配置且 Endpoint 前存在 Nginx/缓存代理，请确认 HEAD 请求未被错误转换为 GET，"
+                       + "必要时对该代理位置设置 proxy_cache_convert_head off。"
+                       + "平台不会跳过上传后回读校验，以免把未落盘对象误报为成功。原始错误："
+                       + rawMessage;
+            }
+
+            return "对象上传请求已返回成功，但 HEAD/Stat 回读校验失败"
+                   + $"（Bucket={bucketName}，Object={objectName}）。"
+                   + "请检查 MinIO Endpoint、TLS、桶名、对象读取权限及反向代理配置。原始错误："
+                   + rawMessage;
         }
 
         private IMinioClient CreateMinioClient(OsClientSecret clientModel, bool isPrivate)

@@ -8,7 +8,9 @@ import {
     getIdentityCapabilities,
     isPasskeySupported,
     runExternalLogin,
-    sha256Hex
+    sha256Hex,
+    translateTotpFailure,
+    translateWebAuthnError
 } from "../src/utils/identity-verification.js";
 
 function bytes(...values) {
@@ -104,6 +106,48 @@ test("Passkey 只在安全上下文且浏览器认证器可用时启用", () => 
     }
 });
 
+test("WebAuthn RP ID 不匹配时返回详细中文配置方案", () => {
+    const oldWindow = globalThis.window;
+    try {
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                location: {
+                    origin: "https://os.jifulii.com",
+                    hostname: "os.jifulii.com"
+                }
+            }
+        });
+        const error = new DOMException(
+            "The relying party ID is not a registrable domain suffix of, nor equal to the current domain. Subsequently, an attempt to fetch the .well-known/webauthn resource of the claimed RP ID failed.",
+            "SecurityError"
+        );
+        const translated = translateWebAuthnError(error, { rpId: "api.itdos.com" });
+
+        assert.match(translated.message, /Passkey 域名配置与当前站点不匹配/);
+        assert.match(translated.message, /os\.jifulii\.com/);
+        assert.match(translated.message, /api\.itdos\.com/);
+        assert.match(translated.message, /系统设置 → 登录与身份/);
+        assert.match(translated.message, /PasskeyOrigins/);
+        assert.match(translated.message, /\.well-known\/webauthn/);
+        assert.doesNotMatch(translated.message, /registrable domain suffix/);
+    } finally {
+        Object.defineProperty(globalThis, "window", { configurable: true, value: oldWindow });
+    }
+});
+
+test("旧后端 TOTP 认证标签异常不会再向用户暴露英文底层错误", () => {
+    const translated = translateTotpFailure({
+        Code: 0,
+        Msg: "Authenticator 验证失败：The computed authentication tag did not match the input authentication tag."
+    });
+
+    assert.match(translated.Msg, /Authenticator 密钥无法解密/);
+    assert.match(translated.Msg, /个人中心 → 验证器/);
+    assert.match(translated.Msg, /sys_osclients\.AuthSecret/);
+    assert.doesNotMatch(translated.Msg, /computed authentication tag/i);
+});
+
 test("外部登录通过弹窗回传一次性票据并最终换取 DiyToken 登录结果", async () => {
     const oldWindow = globalThis.window;
     const oldScreen = globalThis.screen;
@@ -185,9 +229,13 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
     assert.match(login, /LoginWithPasskey/);
     assert.match(login, /生物登录/);
     assert.match(login, /登录方式/);
-    assert.match(login, /class="identity-login-entry"[\s\S]*?@mouseenter="OpenLoginMethods"/);
+    assert.match(login, /<Teleport to="body">/);
     assert.match(login, /@click\.stop="OpenLoginMethods"/);
-    assert.match(login, /v-if="LoginMethodsVisible"[\s\S]*?class="login-methods-popper login-methods-panel"/);
+    assert.match(login, /v-if="LoginMethodsVisible"[\s\S]*?class="login-methods-overlay"/);
+    assert.match(login, /class="login-methods-panel"[\s\S]*?aria-modal="true"/);
+    assert.match(login, /@click\.self="CloseLoginMethods"/);
+    assert.doesNotMatch(login, /@mouseenter="OpenLoginMethods"/);
+    assert.doesNotMatch(login, /进入吾码 DiyToken 权限体系/);
     assert.match(login, /LoginWithExternal/);
     assert.match(login, /LoginWithTotp/);
     assert.match(login, /LoginWithFace/);
@@ -202,6 +250,34 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
     assert.match(helper, /6 位 Code/);
     assert.match(router, /path: "\/login"[\s\S]*?anonymous: true/);
     assert.match(app, /anonymousHashPaths = \["#\/login", "#\/access-login", "#\/mci-redis-manager", "#\/online-office"\]/);
+    assert.match(app, /self\.IsAnonymousRoute\(\) \|\| !self\.DiyCommon\.getToken\(\)/);
+});
+
+test("登录方式弹层、宿主浮层收起和个人中心公开头像保持完整契约", async () => {
+    const microAppRoot = new URL("../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTDos.Product.Internal/AI应用/microi-platform-service/src/", import.meta.url);
+    const [login, headerSearch, host, microAppMain, personalSettings, profileController] = await Promise.all([
+        readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
+        readFile(new URL("../src/components/HeaderSearch/index.vue", import.meta.url), "utf8"),
+        readFile(new URL("../src/views/micro-app/host.vue", import.meta.url), "utf8"),
+        readFile(new URL("main.js", microAppRoot), "utf8"),
+        readFile(new URL("PersonalSettings.vue", microAppRoot), "utf8"),
+        readFile(new URL("../../Microi.Server/Microi.net.Api/Controllers/SysUserController.cs", import.meta.url), "utf8")
+    ]);
+
+    assert.match(login, /@media \(max-width: 600px\)[\s\S]*?\.login-method-bubbles\s*\{[\s\S]*?grid-template-columns: 1fr/);
+    assert.match(headerSearch, /microi:close-global-overlays/);
+    assert.match(host, /type === "micro-app:interaction"[\s\S]*?microi:close-global-overlays/);
+    assert.match(microAppMain, /pointerdown[\s\S]*?micro-app:interaction/);
+    assert.match(personalSettings, /profile\.PublicAvatar/);
+    assert.match(personalSettings, /path: 'member\/public-avatar'/);
+    assert.match(personalSettings, /limit: false/);
+    assert.match(personalSettings, /client\.resolveFileUrl\(user\.value\.Avatar\)/);
+    assert.match(personalSettings, /identity-tech-banner\.jpg/);
+    assert.doesNotMatch(personalSettings, /MICROI IDENTITY CENTER/);
+    assert.doesNotMatch(personalSettings, /window\.confirm/);
+    assert.match(profileController, /public string PublicAvatar/);
+    assert.match(profileController, /member\/public-avatar\//);
+    assert.match(profileController, /if \(param\?\.Avatar != null\)/);
 });
 
 test("改密票据客户端具备 Passkey 优先、TOTP 与严格人脸回退", async () => {

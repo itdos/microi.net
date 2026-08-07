@@ -106,10 +106,10 @@ return result;
 - MQ/outbox：适合可靠异步消息、重试和跨服务处理；事件使用稳定的全局 `EventId`，消费端幂等。
 - 前端 `setTimeout`：仅用于当前页面生命周期内的短时 UI 延迟或防抖，不承担可靠业务；页面关闭、卸载或租户切换时必须清理。
 
-详见：[V8 函数列表（后端）](https://microi.net/doc/v8-engine/v8-server.html) 与 [接口引擎配置 Skill](https://gitee.com/ITdos/microi.net/tree/master/microi.skills/v8-api-config)。
+详见：[V8 函数列表（后端）](https://microi.net/doc/v8-engine/v8-server.html) 与接口引擎配置 Skill（[GitHub](https://github.com/itdos/microi.net/tree/master/microi.skills/v8-api-config) / [Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.skills/v8-api-config)）。
 
 ## 扩展接口引擎
->* 当前扩展统一通过[`Microi.V8Engine/V8Extend.cs`](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8Extend.cs)中的 `V8ExtensionRegistry` 注册，不再修改旧 `V8EngineExtend` partial 属性。
+>* 当前扩展统一通过 `Microi.V8Engine/V8Extend.cs`（[GitHub](https://github.com/itdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8Extend.cs) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/Microi.Server/Microi.V8Engine/V8Extend.cs)）中的 `V8ExtensionRegistry` 注册，不再修改旧 `V8EngineExtend` partial 属性。
 >* 官方内置注册包括 `V8.Alipay`、`V8.AlipayV3`、`V8.WeChat`、`V8.Alidns`、`V8.System` 和 `V8.Image`；实际可用清单以当前部署源码为准。
 >* 支付、微信、DNS 等扩展会接触私钥和供应商凭据，只能从当前租户受控配置读取，不得写死在 V8、日志或响应中。
 ::: details 展开查看 C# 注册示例

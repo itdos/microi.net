@@ -29,10 +29,12 @@
   "docker-run.md" : "Docker部署（一键安装）",
   "win-install-microi.md" : "Windows部署",
   "local-run.md" : "源码本地运行",
+  "source-code-architecture.md" : "源码架构与模块地图",
 
   "v8-engine":"V8引擎",
   "ai-apiengine.md" : "AI 编程",
   "vs-code-plugin.md":"AI开发工具（VS Code + CLI）",
+  "mcp-server.md":"MCP Server 完整指南",
   "api-engine.md" : "API 接口引擎",
   "v8-server.md" : "V8函数-后端",
   "v8-client.md" : "V8函数-前端",
@@ -50,6 +52,7 @@
 
   "system-engine":"系统引擎",
   "ai-engine.md":"AI引擎与Microi.AI中转站",
+  "ai-workflow-suite.md":"AI工作流、蓝图与状态机",
   "app-store.md":"应用商城",
   "mqtt-engine.md":"MQTT引擎（IoT物联网）",
   "wf-engine.md" : "流程引擎",
@@ -57,7 +60,9 @@
   "module-engine.md" : "模块引擎",
   "micro-app.md" : "微服务",
   "page-engine.md" : "界面引擎",
+  "visualization-engine.md" : "3D、CAD与数据大屏",
   "microi-ui.md" : "吾码UI",
+  "multi-end-client.md" : "PC、WebOS与移动端",
   "print-engine.md" : "打印引擎",
   "spider-engine.md" : "采集引擎",
   "translate-engine.md" : "翻译引擎",
@@ -67,6 +72,7 @@
   "report-engine.md" : "报表引擎",
   "datasource-engine.md" : "数据源引擎",
   "databases.md" : "数据库扩展",
+  "message-notification.md" : "消息通知",
 
   "more" : "更多文档",
   "dos-orm.md" : "Dos.ORM",

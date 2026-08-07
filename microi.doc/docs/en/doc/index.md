@@ -16,7 +16,7 @@
 🔥 AI Local V8 Engine Programming (VS Code Copilot / Cursor / Claude + MCP + Skills), AI Online Programming, AI Data Analysis<br>
 .NET10 + Vue3 + Cross-Database / Cross-Platform, Distributed Architecture, High Performance (L1/L2 Cache), Open Source, Multi-Terminal Unified
 
-[Documentation](https://microi.net/) · [Try Online](https://web.microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [Microi UI](/en/doc/system-engine/microi-ui) · [OpenClaw](https://gitee.com/microi-net/microi.openclaw)
+[Documentation](https://microi.net/) · [Try Online](https://web.microi.net) · [GitHub](https://github.com/itdos/microi.net) · [Gitee](https://gitee.com/ITdos/microi.net) · [Microi UI](/en/doc/system-engine/microi-ui) · [OpenClaw](https://gitee.com/microi-net/microi.openclaw)
 
 </div>
 
@@ -33,6 +33,7 @@ The powerful [**API Engine**](/en/doc/v8-engine/api-engine) lets you write backe
 | 🌐 Official Documentation | [https://microi.net](https://microi.net) |
 | 🦞 OpenClaw | [https://gitee.com/microi-net/microi.openclaw](https://gitee.com/microi-net/microi.openclaw) |
 | 🖥️ Try Online | [https://web.microi.net](https://web.microi.net) |
+| 📦 GitHub Source Code | [https://github.com/itdos/microi.net](https://github.com/itdos/microi.net) |
 | 📦 Gitee Source Code | [https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net) |
 | 📦 GitCode Source Code | [https://gitcode.com/microi-net/microi.net/overview](https://gitcode.com/microi-net/microi.net/overview) |
 | 📝 Official CSDN Blog | [https://microi.blog.csdn.net](https://microi.blog.csdn.net/?type=blog) |

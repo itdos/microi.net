@@ -74,6 +74,64 @@ function resultData(result) {
     return result.Data || {};
 }
 
+function webAuthnPageContext(publicKey) {
+    const location = typeof window !== "undefined" ? window.location : null;
+    return {
+        origin: String(location?.origin || "未知"),
+        hostname: String(location?.hostname || "未知"),
+        rpId: String(publicKey?.rpId || publicKey?.rp?.id || "未返回")
+    };
+}
+
+export function translateWebAuthnError(error, publicKey = {}) {
+    const name = String(error?.name || "");
+    const rawMessage = String(error?.message || error || "");
+    const context = webAuthnPageContext(publicKey);
+    const relyingPartyMismatch = /relying party id|registrable domain suffix|\.well-known\/webauthn/i.test(rawMessage);
+
+    if (relyingPartyMismatch) {
+        return new Error(
+            `无法使用生物识别：Passkey 域名配置与当前站点不匹配。当前页面域名为“${context.hostname}”，`
+            + `后端下发的 RP ID 为“${context.rpId}”。请由租户管理员进入“系统设置 → 登录与身份”，`
+            + `将 Passkey RP ID 设置为当前页面域名（最稳妥），或设置为它的可注册父域；`
+            + `同时把完整 Origin“${context.origin}”加入 PasskeyOrigins，并确认页面使用 HTTPS。`
+            + `如确实需要跨站点 RP ID，还必须在 RP ID 站点正确发布可访问的 /.well-known/webauthn 关联声明。`
+            + "保存配置后，请重新登记通行密钥再登录。"
+        );
+    }
+    if (name === "AbortError") {
+        return new Error("设备验证等待超时，请确认系统验证窗口后重试。");
+    }
+    if (name === "NotAllowedError") {
+        return new Error("设备验证已取消、超时，或当前通行密钥不允许此用途。");
+    }
+    if (name === "InvalidStateError") {
+        return new Error("该通行密钥已在当前账号登记，无需重复添加；如需重建，请先在个人中心撤销旧通行密钥。");
+    }
+    if (name === "NotSupportedError") {
+        return new Error("当前浏览器、系统验证器或安全密钥不支持服务器要求的 Passkey 算法，请升级浏览器或改用另一台受支持设备。");
+    }
+    if (name === "SecurityError") {
+        return new Error(
+            `浏览器安全策略阻止了 Passkey。当前站点为“${context.origin}”，RP ID 为“${context.rpId}”。`
+            + "请确认使用 HTTPS，并检查“系统设置 → 登录与身份”中的 Passkey RP ID 与 PasskeyOrigins。"
+        );
+    }
+    return error instanceof Error ? error : new Error(rawMessage || "设备验证失败，请重试。");
+}
+
+export function translateTotpFailure(value) {
+    const rawMessage = String(value?.Msg || value?.message || value || "");
+    if (!/computed authentication tag|authentication tag did not match|tag mismatch/i.test(rawMessage)) {
+        return value;
+    }
+    const message = "Authenticator 密钥无法解密，通常是历史租户标识大小写不一致，或绑定后 AuthSecret 发生变化。"
+        + "请先使用账号密码登录，在“个人中心 → 验证器”移除并重新登记 Authenticator；"
+        + "管理员同时检查 SaaS 引擎 sys_osclients.AuthSecret 是否稳定且所有后端节点一致。";
+    if (value instanceof Error) return new Error(message);
+    return { ...(value || {}), Code: value?.Code ?? 0, Msg: message };
+}
+
 async function requestWebAuthnCredential(operation, publicKey, timeoutMilliseconds = 70000) {
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timeout = setTimeout(() => controller?.abort(), timeoutMilliseconds);
@@ -83,13 +141,7 @@ async function requestWebAuthnCredential(operation, publicKey, timeoutMillisecon
             ...(controller ? { signal: controller.signal } : {})
         });
     } catch (error) {
-        if (error?.name === "AbortError") {
-            throw new Error("设备验证等待超时，请确认系统验证窗口后重试。");
-        }
-        if (error?.name === "NotAllowedError") {
-            throw new Error("设备验证已取消、超时，或当前通行密钥不允许此用途。");
-        }
-        throw error;
+        throw translateWebAuthnError(error, publicKey);
     } finally {
         clearTimeout(timeout);
     }
@@ -245,15 +297,19 @@ export async function verifyWithTotp({
     clientType = "PC",
     did = ""
 }) {
-    return post(diyCommon, "VerifyTotp", {
-        OsClient: osClient,
-        Account: String(account || "").trim(),
-        Code: String(code || "").replace(/\D/g, "").slice(0, 6),
-        Purpose: purpose,
-        ActionHash: actionHash,
-        Did: did || diyCommon.GetDid?.() || "",
-        _ClientType: clientType
-    });
+    try {
+        return translateTotpFailure(await post(diyCommon, "VerifyTotp", {
+            OsClient: osClient,
+            Account: String(account || "").trim(),
+            Code: String(code || "").replace(/\D/g, "").slice(0, 6),
+            Purpose: purpose,
+            ActionHash: actionHash,
+            Did: did || diyCommon.GetDid?.() || "",
+            _ClientType: clientType
+        }));
+    } catch (error) {
+        throw translateTotpFailure(error);
+    }
 }
 
 export async function updateAuthenticatorPolicy(diyCommon, policy) {
@@ -408,7 +464,8 @@ export const IdentityVerification = {
     verifyWithFace,
     runExternalLogin,
     serializeCredential,
-    preparePublicKey
+    preparePublicKey,
+    translateWebAuthnError
 };
 
 export default IdentityVerification;

@@ -1,5 +1,6 @@
 using System.Text;
 using Microi.net;
+using Newtonsoft.Json.Linq;
 
 namespace Microi.Tests.Common;
 
@@ -46,6 +47,33 @@ public class IdentityVerificationSecurityTests
         Assert.NotEqual(baseline, IdentityVerificationSecurity.ComputePasswordChangeActionHash("user-a", "other-password"));
     }
 
+    [Theory]
+    [InlineData("", "https://os.jifulii.com", "os.jifulii.com")]
+    [InlineData("os.jifulii.com", "https://os.jifulii.com", "os.jifulii.com")]
+    [InlineData("jifulii.com", "https://os.jifulii.com", "jifulii.com")]
+    public void PasskeyRpId_AcceptsCurrentHostOrParentDomain(
+        string configuredRpId,
+        string origin,
+        string expected)
+    {
+        Assert.Equal(expected,
+            IdentityVerificationSecurity.NormalizePasskeyRelyingPartyId(configuredRpId, origin));
+    }
+
+    [Theory]
+    [InlineData("api.itdos.com", "https://os.jifulii.com")]
+    [InlineData("eviljifulii.com", "https://os.jifulii.com")]
+    public void PasskeyRpId_RejectsUnrelatedDomainWithChineseResolution(string configuredRpId, string origin)
+    {
+        var error = Assert.Throws<ArgumentException>(() =>
+            IdentityVerificationSecurity.NormalizePasskeyRelyingPartyId(configuredRpId, origin));
+
+        Assert.Contains("当前站点域名不匹配", error.Message, StringComparison.Ordinal);
+        Assert.Contains("系统设置 → 登录与身份", error.Message, StringComparison.Ordinal);
+        Assert.Contains("PasskeyOrigins", error.Message, StringComparison.Ordinal);
+        Assert.Contains("os.jifulii.com", error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void OpaqueChallenges_AreStrongUrlSafeAndUnique()
     {
@@ -88,5 +116,71 @@ public class IdentityVerificationSecurityTests
             DateTimeOffset.FromUnixTimeSeconds(59),
             window: 0,
             digits: 8));
+    }
+
+    [Fact]
+    public void TotpCipher_UsesCanonicalTenantCasingAcrossAnonymousLogin()
+    {
+        const string canonicalTenant = "TotpCaseFixture";
+        var client = new OsClientSecret
+        {
+            OsClient = canonicalTenant,
+            OsClientModel = new JObject
+            {
+                ["AuthSecret"] = "totp-case-fixture-auth-secret-0123456789abcdef"
+            }
+        };
+        OsClientExtend.ClientList[canonicalTenant] = client;
+        try
+        {
+            var expected = Encoding.ASCII.GetBytes("12345678901234567890");
+            var cipher = IdentityVerificationSecurity.ProtectTotpSecret(
+                canonicalTenant,
+                IdentityVerificationSecurity.Base32Encode(expected));
+
+            var actual = IdentityVerificationSecurity.UnprotectTotpSecret(
+                canonicalTenant.ToLowerInvariant(),
+                cipher);
+
+            Assert.Equal(expected, actual);
+        }
+        finally
+        {
+            OsClientExtend.ClientList.TryRemove(canonicalTenant, out _);
+        }
+    }
+
+    [Fact]
+    public void TotpCipher_ExplainsRecoveryWhenAuthSecretChanged()
+    {
+        const string tenant = "TotpSecretChangeFixture";
+        var client = new OsClientSecret
+        {
+            OsClient = tenant,
+            OsClientModel = new JObject
+            {
+                ["AuthSecret"] = "totp-before-change-auth-secret-0123456789abcdef"
+            }
+        };
+        OsClientExtend.ClientList[tenant] = client;
+        try
+        {
+            var cipher = IdentityVerificationSecurity.ProtectTotpSecret(
+                tenant,
+                IdentityVerificationSecurity.Base32Encode(
+                    Encoding.ASCII.GetBytes("12345678901234567890")));
+            client.OsClientModel["AuthSecret"] = "totp-after-change-auth-secret-abcdef0123456789";
+
+            var error = Assert.Throws<System.Security.Cryptography.CryptographicException>(() =>
+                IdentityVerificationSecurity.UnprotectTotpSecret(tenant, cipher));
+
+            Assert.Contains("重新登记 Authenticator", error.Message, StringComparison.Ordinal);
+            Assert.Contains("AuthSecret", error.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("authentication tag", error.Message, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            OsClientExtend.ClientList.TryRemove(tenant, out _);
+        }
     }
 }

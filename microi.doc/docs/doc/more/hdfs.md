@@ -11,7 +11,7 @@
 | 支持存储 | 阿里云 OSS/CDN、MinIO、亚马逊 S3 |
 | 配置驱动 | 基于 SaaS 引擎，不同租户可独立配置 |
 | 可扩展 | 由表单引擎驱动，可自由扩展腾讯云、华为云等 |
-| 源码位置 | [Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.HDFS) |
+| 源码位置 | [GitHub · Microi.HDFS](https://github.com/itdos/microi.net/tree/master/Microi.Server/Microi.HDFS) / [Gitee · Microi.HDFS](https://gitee.com/ITdos/microi.net/tree/master/Microi.Server/Microi.HDFS) |
 
 ---
 

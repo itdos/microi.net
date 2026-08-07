@@ -2,7 +2,7 @@
 
 > **在线 + 本地双模式 AI 编程，让 AI 充分了解你的 V8 API 与数据库结构**
 
-平台全部源码开源：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+平台全部源码开源：[GitHub](https://github.com/itdos/microi.net) / [Gitee](https://gitee.com/ITdos/microi.net)
 
 ::: tip 在线 AI 默认不需要向量数据库
 平台已内置“大模型关键词扩展 + 权限感知 Schema/Skill 搜索 + 准确字段回读”。未开启 `mic_ai.EnableVectorDatabase` 时，不安装 Ollama、`nomic-embed-text` 和 Qdrant 也可使用 NL2SQL、NL2V8 与在线 AI 数据分析；默认模式部署更轻、启动更快、Schema 更新更及时。只有确有高度模糊语义召回需求时，才建议把向量数据库作为增强通道启用。
@@ -232,8 +232,8 @@ CLI 用户可执行 `microi pull --scope schema`。两种方式都会更新当�
 
 Microi Skills 是一组 **AI 编程最佳实践文件**，内置于平台源码中，让 GitHub Copilot、Cursor、Claude Code 等 AI 工具在编写 Microi 平台代码时，自动遵循正确的 API 用法和安全规范。
 
-- **平台源码**：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
-- **Skills 目录**：[https://gitee.com/ITdos/microi.net/tree/master/microi.skills](https://gitee.com/ITdos/microi.net/tree/master/microi.skills)
+- **平台源码**：[GitHub](https://github.com/itdos/microi.net) / [Gitee](https://gitee.com/ITdos/microi.net)
+- **Skills 目录**：[GitHub](https://github.com/itdos/microi.net/tree/master/microi.skills) / [Gitee](https://gitee.com/ITdos/microi.net/tree/master/microi.skills)
 
 **没有 Skills 时：** AI 可能写出不规范的代码（拼接 SQL、缺少权限校验、参数未验证等）。
 
@@ -251,14 +251,14 @@ Microi Skills 是一组 **AI 编程最佳实践文件**，内置于平台源码�
 
 ### 完整 Skills 目录
 
-当前官方 Skills 持续随平台版本增加，以 [`microi.skills/README.md`](https://gitee.com/ITdos/microi.net/blob/master/microi.skills/README.md) 的实时清单为准，主要覆盖：
+当前官方 Skills 持续随平台版本增加，以 `microi.skills/README.md`（[GitHub](https://github.com/itdos/microi.net/blob/master/microi.skills/README.md) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/microi.skills/README.md)）的实时清单为准，主要覆盖：
 
 - 后端 V8：CRUD、SQL、表单事件、缓存、HTTP、MongoDB、MQ/MQTT、工作流、接口配置、SaaS、图片、文件、导入导出、调试、安全和爬虫；
 - 前端 V8：字段/表单/列表事件、模板、菜单按钮、FormEngine HTTP；
 - 平台引擎：界面、打印、数据源、任务、搜索、报表、翻译、AI、应用商城、数据库结构、表单布局、左右树表和 Microi.UI；
 - AI 零代码交付：业务蓝图、MCP 系统交付、前端 SDK、UniApp、移动质量、数据源映射、Playwright、性能测试、生产只读巡检和工作区规范。
 
-完整且随版本维护的清单以源码中的 [`microi.skills/README.md`](https://gitee.com/ITdos/microi.net/blob/master/microi.skills/README.md) 为准，不要在 AI 提示词里长期复制一份静态子集。
+完整且随版本维护的清单以源码中的 `microi.skills/README.md`（[GitHub](https://github.com/itdos/microi.net/blob/master/microi.skills/README.md) / [Gitee](https://gitee.com/ITdos/microi.net/blob/master/microi.skills/README.md)）为准，不要在 AI 提示词里长期复制一份静态子集。
 
 ### 快速集成
 
@@ -269,11 +269,13 @@ Microi Skills 是一组 **AI 编程最佳实践文件**，内置于平台源码�
 无法使用插件时，再从源码手工获取：
 
 ```bash
-# 方式一：克隆整个平台源码（含 Skills）
-git clone https://gitee.com/ITdos/microi.net.git
+# 方式一：从 GitHub 克隆整个平台源码（含 Skills）
+git clone https://github.com/itdos/microi.net.git
+# 国内网络也可使用 Gitee 镜像：git clone https://gitee.com/ITdos/microi.net.git
 
-# 方式二：仅克隆 Skills（通过 sparse-checkout）
-git clone --no-checkout https://gitee.com/ITdos/microi.net.git
+# 方式二：从 GitHub 仅克隆 Skills（通过 sparse-checkout）
+git clone --no-checkout https://github.com/itdos/microi.net.git
+# 国内网络也可使用 Gitee 镜像：git clone --no-checkout https://gitee.com/ITdos/microi.net.git
 cd microi.net
 git sparse-checkout set microi.skills
 git checkout master
@@ -410,7 +412,9 @@ AI：（参考 v8-crud-api Skill）
 
 ## 🔌 AI MCP 集成指南
 
-> MCP（Model Context Protocol）是 Anthropic 制定的开放协议，让 AI 工具以标准化方式连接外部系统。Microi MCP Server（[开源仓库](https://gitee.com/ITdos/microi.net)）让 AI 工具直接连接 Microi 吾码平台，实时查询数据库结构、读取引擎代码、远程执行引擎。
+> MCP（Model Context Protocol）是 Anthropic 制定的开放协议，让 AI 工具以标准化方式连接外部系统。Microi MCP Server（[GitHub](https://github.com/itdos/microi.net) / [Gitee](https://gitee.com/ITdos/microi.net)）让 AI 工具直接连接 Microi 吾码平台，实时查询数据库结构、读取引擎代码、远程执行引擎。
+
+完整工具分类、安装方式、写入确认与回读规则参见 [MCP Server 专题](/doc/v8-engine/mcp-server)。
 
 ::: warning 当前实现边界
 本节的“AI 可以调用 MCP”指 Codex、GitHub Copilot、Cursor、Claude Code 等已经实现 MCP Host/Agent Loop 的外部客户端。平台普通 `Chat/ChatStream` 使用服务端会话上下文和固定核心规范 Prompt，不检索完整知识库；`NL2SQL` 默认使用当前租户 Schema 关键词检索与准确字段回读；`NL2V8` 默认使用 Skill 镜像与当前租户 Schema 关键词检索。只有 `mic_ai.EnableVectorDatabase=1` 时，两条检索链路才增加 Ollama/Embedding/Qdrant 向量融合；向量服务异常会回退到关键词结果。当前 `Microi.Server/Microi.AI` 没有向模型注册 MCP Tools，也没有执行 `tool_calls` 循环，因此不会自动调用 MCP。仅在 Prompt 中写“使用 MCP”并不等于已经接入工具。
@@ -469,7 +473,8 @@ AI 工具在每次启动时自动拉起 MCP Server 进程。
 
 ```bash
 # MCP Server 源码内置于平台仓库 microi.mcp 目录
-git clone https://gitee.com/ITdos/microi.net.git
+git clone https://github.com/itdos/microi.net.git
+# 国内网络也可使用 Gitee 镜像：git clone https://gitee.com/ITdos/microi.net.git
 cd microi.net/microi.mcp
 npm install
 npm run build
@@ -655,7 +660,7 @@ AI：（调用 microi_run_engine）返回了 20 条订单数据...
 ::: tip 推荐组合
 外部开发场景由 VS Code 插件或 CLI 建立工作区，Skills 提供规范，MCP 提供最新事实和受控执行；平台在线 AI 在 NL2SQL/NL2V8 等明确入口默认使用大模型关键词扩展与权限感知 Schema/Skill 检索，只有管理员显式开启向量数据库后才增加向量召回。MCP 是工具协议，关键词/向量索引都是检索手段，三者不能互相替代。
 
-平台源码（含 Skills、MCP）：[https://gitee.com/ITdos/microi.net](https://gitee.com/ITdos/microi.net)
+平台源码（含 Skills、MCP）：[GitHub](https://github.com/itdos/microi.net) / [Gitee](https://gitee.com/ITdos/microi.net)
 :::
 
 ## 📌 Codex 接入 Microi 的要点

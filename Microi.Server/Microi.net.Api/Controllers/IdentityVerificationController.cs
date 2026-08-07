@@ -224,7 +224,7 @@ namespace Microi.net.Api
             try
             {
                 var origin = ResolveRequestOrigin(options);
-                var rpId = ResolveRelyingPartyId(options);
+                var rpId = ResolveRelyingPartyId(options, origin);
                 var userId = currentToken.CurrentUser["Id"]?.ToString();
                 var account = currentToken.CurrentUser["Account"]?.ToString() ?? userId;
                 var userName = currentToken.CurrentUser["Name"]?.ToString() ?? account;
@@ -372,7 +372,7 @@ namespace Microi.net.Api
                     .Where(item => PolicyEnabled(item, isLogin ? "AllowPasswordlessLogin" : "AllowStepUp"))
                     .ToList();
                 var origin = ResolveRequestOrigin(options);
-                var rpId = ResolveRelyingPartyId(options);
+                var rpId = ResolveRelyingPartyId(options, origin);
                 var fido = CreateFido(rpId, userName.DosIsNullOrWhiteSpace() ? "Microi" : userName, origin);
                 var publicKey = fido.GetAssertionOptions(new GetAssertionOptionsParams
                 {
@@ -1028,17 +1028,15 @@ namespace Microi.net.Api
             var origin = uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
             if (options.PasskeyOrigins.Count > 0
                 && !options.PasskeyOrigins.Any(item => string.Equals(item.TrimEnd('/'), origin, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidOperationException("当前站点不在租户 PasskeyOrigins 白名单中。 ");
+                throw new InvalidOperationException(
+                    $"当前站点 {origin} 不在租户 PasskeyOrigins 白名单中。"
+                    + "请由租户管理员进入“系统设置 → 登录与身份”，添加当前完整 Origin（含 https:// 和端口），保存后重试。 ");
             return origin;
         }
 
-        private string ResolveRelyingPartyId(IdentityVerificationOptions options)
+        private string ResolveRelyingPartyId(IdentityVerificationOptions options, string origin)
         {
-            var value = options.PasskeyRpId.DosIsNullOrWhiteSpace() ? Request.Host.Host : options.PasskeyRpId;
-            value = value?.Trim().TrimEnd('.') ?? "";
-            if (value.Length is < 1 or > 253 || value.Any(ch => !(char.IsLetterOrDigit(ch) || ch is '.' or '-')))
-                throw new InvalidOperationException("PasskeyRpId 配置无效。 ");
-            return value;
+            return IdentityVerificationSecurity.NormalizePasskeyRelyingPartyId(options.PasskeyRpId, origin);
         }
 
         private static Fido2 CreateFido(string rpId, string rpName, string origin)

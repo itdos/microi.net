@@ -36,6 +36,8 @@ public class IdentityUpgradePackageTests
         var resources = Assert.IsType<Dictionary<string, string>>(loader!.Invoke(null, null));
         var package = JObject.Parse(resources["app.microi.saas-engine.json"]);
         Assert.Equal("SaaS引擎", package["PackageInfo"]?["Name"]?.Value<string>());
+        Assert.Equal("v6.4.7", package["PackageInfo"]?["Version"]?.Value<string>());
+        Assert.True(package["PackageInfo"]?["IncludeSource"]?.Value<bool>());
 
         var tables = package["DiyTables"]?.Children<JObject>().ToList() ?? [];
         var fields = package["DiyFields"]?.Children<JObject>().ToList() ?? [];
@@ -83,6 +85,19 @@ public class IdentityUpgradePackageTests
         Assert.Single(tables,
             table => table["Name"]?.Value<string>() == "mci_user_external_identity");
 
+        var userTable = Assert.Single(tables,
+            table => table["Name"]?.Value<string>() == "sys_user");
+        var publicAvatar = Assert.Single(fields, field =>
+            field["TableId"]?.Value<string>() == userTable["Id"]?.Value<string>()
+            && field["Name"]?.Value<string>() == "PublicAvatar");
+        Assert.Equal("varchar(2000)", publicAvatar["Type"]?.Value<string>());
+        Assert.Equal("ImgUpload", publicAvatar["Component"]?.Value<string>());
+        Assert.Contains("\"Limit\":false", publicAvatar["Config"]?.Value<string>());
+        Assert.Contains(package["PhysicalColumns"]?.Children<JObject>() ?? [], column =>
+            column["TABLE_NAME"]?.Value<string>() == "sys_user"
+            && column["COLUMN_NAME"]?.Value<string>() == "PublicAvatar"
+            && column["COLUMN_TYPE"]?.Value<string>() == "varchar(2000)");
+
         var settingsDataSet = Assert.Single(package["DataSets"]?.Children<JObject>()
             .Where(item => item["TableName"]?.Value<string>() == "mci_system_setting") ?? []);
         Assert.Equal("InsertIfMissing", settingsDataSet["ConflictPolicy"]?.Value<string>());
@@ -90,7 +105,12 @@ public class IdentityUpgradePackageTests
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.5.0", bundle["VersionNo"]?.Value<string>());
+        Assert.Equal("v1.5.4", bundle["VersionNo"]?.Value<string>());
+        Assert.True(bundle["IncludeSource"]?.Value<bool>());
+        Assert.Equal("v1.5.4", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.NotNull(bundle["PackageAssets"]?["SourceZip"]);
+        Assert.False(string.IsNullOrWhiteSpace(
+            bundle["PackageAssets"]?["SourceZip"]?["Sha256"]?.Value<string>()));
         var routes = bundle["Routes"]?.Children<JObject>().ToList() ?? [];
         Assert.DoesNotContain(routes, route => route["RoutePath"]?.Value<string>() == "/");
         Assert.Contains(routes, route =>
@@ -99,7 +119,45 @@ public class IdentityUpgradePackageTests
         Assert.Contains(routes, route =>
             route["RoutePath"]?.Value<string>() == "/system-settings"
             && route["PageTitle"]?.Value<string>() == "租户系统设置");
-        Assert.NotEmpty(bundle["BuildAssets"]?.Children() ?? []);
+        var buildAssets = bundle["BuildAssets"]?.Children<JObject>().ToList() ?? [];
+        Assert.NotEmpty(buildAssets);
+        Assert.Contains(buildAssets, asset =>
+            asset["Path"]?.Value<string>()?.Contains("identity-tech-banner", StringComparison.Ordinal) == true);
+        var sourceFiles = bundle["SourceFiles"]?.Children<JObject>().ToList() ?? [];
+        Assert.Equal(23, sourceFiles.Count);
+        Assert.Contains(sourceFiles, file =>
+            file["Path"]?.Value<string>() == "src/PersonalSettings.vue"
+            && !string.IsNullOrWhiteSpace(file["FileByteBase64"]?.Value<string>()));
+        Assert.Contains(sourceFiles, file =>
+            file["Path"]?.Value<string>() == "src/identity-verification.js"
+            && !string.IsNullOrWhiteSpace(file["Sha256"]?.Value<string>()));
+    }
+
+    [Fact]
+    public void StoreImporterOnlyNormalizesLegacyBooleanTextForDeclaredSwitchFields()
+    {
+        var root = FindRepositoryRoot();
+        var importerPath = Path.Combine(root, "Microi.Server", "Microi.Upgrade", "Resource", "import-package.js");
+        var baseImporterPath = Path.Combine(root, "Microi.Server", "Microi.Upgrade", "Resource",
+            ".resource-sync-base", "import-package.js");
+        var importer = File.ReadAllText(importerPath);
+        var baseImporter = File.ReadAllText(baseImporterPath);
+
+        Assert.Equal(baseImporter, importer);
+        Assert.Contains("var isPackageSwitchColumn", importer, StringComparison.Ordinal);
+        Assert.Contains("String(packageField.Component || '').toLowerCase() != 'switch'", importer,
+            StringComparison.Ordinal);
+        Assert.Contains("packageDeclaresSameNameSwitch", importer, StringComparison.Ordinal);
+        Assert.Contains("INNER JOIN diy_table dt ON dt.Id = df.TableId", importer, StringComparison.Ordinal);
+        Assert.Contains("physical_schema_switch_metadata_fallback_", importer, StringComparison.Ordinal);
+        Assert.Contains("normalizeSwitchLiteral('true', 1)", importer, StringComparison.Ordinal);
+        Assert.Contains("normalizeSwitchLiteral('false', 0)", importer, StringComparison.Ordinal);
+        Assert.Contains("normalizedTextExpression + \" <> 'true'\"", importer, StringComparison.Ordinal);
+        Assert.Contains("normalizedTextExpression + \" <> 'false'\"", importer, StringComparison.Ordinal);
+        Assert.DoesNotContain("NOT IN (@p1, @p2)", importer, StringComparison.Ordinal);
+        Assert.Contains("其它非数字内容必须阻止迁移", importer, StringComparison.Ordinal);
+        Assert.Contains("'字段存在' + invalidCount + '条非数字数据", importer,
+            StringComparison.Ordinal);
     }
 
     private static string FindRepositoryRoot()

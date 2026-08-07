@@ -89,6 +89,7 @@ namespace Microi.net.Api
         {
             public string Name { get; set; }
             public string Avatar { get; set; }
+            public string PublicAvatar { get; set; }
         }
 
         public class UpdateMyDefaultIndexUrlRequest
@@ -1631,8 +1632,9 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 官网账户资料自助修改。字段白名单固定为显示名称和头像，目标用户、租户
-        /// 均来自登录 Token，头像只能保存到当前租户的 member/avatar 目录。
+        /// 账户资料自助修改。字段白名单固定为显示名称、私有头像和公开头像，目标用户、租户
+        /// 均来自登录 Token。私有头像只能来自 member/avatar，公开头像只能来自
+        /// member/public-avatar；未提交的头像字段保持原值，兼容尚未安装公开头像字段的租户。
         /// </summary>
         [HttpPost]
         public async Task<JsonResult> UpdateCurrentProfile([FromBody] UpdateCurrentProfileRequest param)
@@ -1653,33 +1655,62 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, "昵称需为 1 到 50 个字符。"));
             }
 
-            var avatar = (param?.Avatar ?? string.Empty).Trim();
-            var currentAvatar = currentUser["Avatar"]?.ToString()?.Trim() ?? string.Empty;
-            if (!avatar.DosIsNullOrWhiteSpace()
-                && !string.Equals(avatar, currentAvatar, StringComparison.Ordinal))
+            var updateModel = new JObject
             {
-                try
+                ["Id"] = userId,
+                ["Name"] = name,
+                ["OsClient"] = osClient
+            };
+
+            if (param?.Avatar != null)
+            {
+                var avatar = param.Avatar.Trim();
+                var currentAvatar = currentUser["Avatar"]?.ToString()?.Trim() ?? string.Empty;
+                if (!avatar.DosIsNullOrWhiteSpace()
+                    && !string.Equals(avatar, currentAvatar, StringComparison.Ordinal))
                 {
-                    avatar = TenantConfigurationSecurity.NormalizeStoragePath(osClient, avatar);
-                    var requiredPrefix = "/" + osClient.ToLowerInvariant() + "/member/avatar/";
-                    if (!avatar.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                    try
                     {
-                        return Json(new DosResult(0, null, "头像文件必须来自账户头像上传目录。"));
+                        avatar = TenantConfigurationSecurity.NormalizeStoragePath(osClient, avatar);
+                        var requiredPrefix = "/" + osClient.ToLowerInvariant() + "/member/avatar/";
+                        if (!avatar.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return Json(new DosResult(0, null, "私有头像文件必须来自账户头像上传目录。"));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return Json(new DosResult(0, null, "私有头像路径不合法：" + ex.Message));
                     }
                 }
-                catch (Exception ex)
-                {
-                    return Json(new DosResult(0, null, "头像路径不合法：" + ex.Message));
-                }
+                updateModel["Avatar"] = avatar;
             }
 
-            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
+            if (param?.PublicAvatar != null)
             {
-                Id = userId,
-                Name = name,
-                Avatar = avatar,
-                OsClient = osClient
-            });
+                var publicAvatar = param.PublicAvatar.Trim();
+                var currentPublicAvatar = currentUser["PublicAvatar"]?.ToString()?.Trim() ?? string.Empty;
+                if (!publicAvatar.DosIsNullOrWhiteSpace()
+                    && !string.Equals(publicAvatar, currentPublicAvatar, StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        publicAvatar = TenantConfigurationSecurity.NormalizeStoragePath(osClient, publicAvatar);
+                        var requiredPrefix = "/" + osClient.ToLowerInvariant() + "/member/public-avatar/";
+                        if (!publicAvatar.StartsWith(requiredPrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return Json(new DosResult(0, null, "公开头像文件必须来自公开头像上传目录。"));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return Json(new DosResult(0, null, "公开头像路径不合法：" + ex.Message));
+                    }
+                }
+                updateModel["PublicAvatar"] = publicAvatar;
+            }
+
+            var updateResult = await MicroiEngine.FormEngine.UptFormDataAsync("sys_user", updateModel);
             if (updateResult.Code != 1)
             {
                 return Json(new DosResult(0, null, updateResult.Msg ?? "账户资料保存失败。"));

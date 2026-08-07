@@ -1,8 +1,8 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v6.9.5",
-    "CreateTime": "2026-08-03T06:58:22.672Z",
+    "Version": "v6.9.7",
+    "CreateTime": "2026-08-07T18:20:33.275Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "MenuCount": 4,
@@ -4691,6 +4691,12 @@
   ],
   "SysMenus": [
     {
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-08-08 01:58:32",
+      "CreateTime": "2026-04-02 14:49:59",
+      "Id": "01KN6F83SQ87DQSJA878YKQW7Q",
       "MenuBadgeEnabled": 0,
       "ViewSchemaVersion": "1.0",
       "EnableViewSchema": 0,
@@ -4709,12 +4715,13 @@
       "DisplayMac": 0,
       "AppDisplay": 1,
       "OpenType": "SecondMenu",
+      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-012-78ykqw7q.webp",
       "NotShowFields": "[]",
       "IsMicroiService": 0,
       "MultRun": 0,
       "Sort": 10,
       "InTableEdit": 0,
-      "IconClass": "fas fa-file-waveform",
+      "IconClass": "Document",
       "Url": "/mic-form-engine-menu",
       "DiyConfig": "{\"HiddenIndex\":0,\"GeneralSeaarch\":0}",
       "SortFieldIds": "[]",
@@ -4723,11 +4730,15 @@
       "InTableEditFields": "[]",
       "Display": 1,
       "DisplayWin": 0,
-      "ParentId": "cdc0844b-7249-4d64-a9c3-563a15c9cd20",
-      "Id": "01KN6F83SQ87DQSJA878YKQW7Q",
-      "CreateTime": "2026-04-02 14:49:59"
+      "ParentId": "cdc0844b-7249-4d64-a9c3-563a15c9cd20"
     },
     {
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-08-08 01:58:35",
+      "CreateTime": "2026-02-05 18:24:08",
+      "Id": "01KGPN73HXRF9XNAEXWBE1H1QP",
       "MenuBadgeEnabled": 0,
       "ViewSchema": "{\"Views\":[{\"Key\":\"01KGPN73HXRF9XNAEXWBE1H1QP-list\",\"Scene\":\"List\",\"Device\":\"PC\",\"Enabled\":true,\"Priority\":20,\"Layout\":{\"Hero\":{\"Eyebrow\":\"SYSTEM ENGINE\",\"Title\":\"表单引擎字段\",\"Description\":\"配置字段控件、校验与展示行为\",\"Metrics\":[{\"Key\":\"DataCount\",\"Label\":\"总记录数\",\"Source\":\"DataCount\",\"Icon\":\"fas fa-layer-group\",\"Tone\":\"primary\"},{\"Key\":\"PageCount\",\"Label\":\"本页加载\",\"Source\":\"PageCount\",\"Icon\":\"fas fa-list\",\"Tone\":\"info\"}]},\"List\":{\"Density\":\"Compact\",\"Columns\":[{\"Key\":\"primary\",\"Field\":\"Name\",\"Lines\":[{\"Name\":\"TableName\",\"Label\":\"所属表名\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"Label\",\"Label\":\"显示名称\",\"Tone\":\"info\",\"ShowLabel\":true}],\"TrailingFields\":[{\"Name\":\"Component\",\"Label\":\"控件类型\",\"Icon\":\"fas fa-circle\",\"Tone\":\"primary\",\"DisplayStyle\":\"Tag\"},{\"Name\":\"NotEmpty\",\"Label\":\"是否必填\",\"Icon\":\"fas fa-circle\",\"Tone\":\"primary\",\"DisplayStyle\":\"Tag\"}],\"MinWidth\":240,\"Align\":\"Left\"}]}}},{\"Key\":\"01KGPN73HXRF9XNAEXWBE1H1QP-card\",\"Scene\":\"Card\",\"Device\":\"Mobile\",\"Enabled\":true,\"Priority\":20,\"Layout\":{\"Hero\":{\"Eyebrow\":\"SYSTEM ENGINE\",\"Title\":\"表单引擎字段\",\"Description\":\"配置字段控件、校验与展示行为\",\"Metrics\":[{\"Key\":\"DataCount\",\"Label\":\"总记录数\",\"Source\":\"DataCount\",\"Icon\":\"fas fa-layer-group\",\"Tone\":\"primary\"},{\"Key\":\"PageCount\",\"Label\":\"本页加载\",\"Source\":\"PageCount\",\"Icon\":\"fas fa-list\",\"Tone\":\"info\"}]},\"Card\":{\"Preset\":\"Business\",\"AvatarField\":\"\",\"AvatarTextField\":\"Name\",\"TitleField\":\"Name\",\"AccentField\":\"Component\",\"StatusFields\":[{\"Name\":\"Component\",\"Label\":\"控件类型\",\"DisplayStyle\":\"Tag\",\"Tone\":\"primary\"},{\"Name\":\"NotEmpty\",\"Label\":\"是否必填\",\"DisplayStyle\":\"Tag\",\"Tone\":\"primary\"}],\"TopFields\":[{\"Name\":\"Visible\",\"Label\":\"是否可见\",\"DisplayStyle\":\"Tag\",\"Tone\":\"info\"},{\"Name\":\"Unique\",\"Label\":\"是否唯一\",\"DisplayStyle\":\"Tag\",\"Tone\":\"info\"}],\"SubtitleFields\":[{\"Name\":\"TableName\",\"Label\":\"所属表名\",\"Tone\":\"info\"},{\"Name\":\"Label\",\"Label\":\"显示名称\",\"Tone\":\"info\"}],\"RightFields\":[],\"Fields\":[{\"Name\":\"Description\",\"Label\":\"字段说明\",\"ShowLabel\":true},{\"Name\":\"Type\",\"Label\":\"字段类型\",\"ShowLabel\":true}],\"MetaFields\":[{\"Name\":\"V8Code\",\"Label\":\"值变更V8事件\",\"Tone\":\"info\"},{\"Name\":\"KeyupV8Code\",\"Label\":\"键盘V8事件\",\"Tone\":\"info\"}],\"BottomFields\":[{\"Name\":\"NotEmpty\",\"Label\":\"是否必填\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"Visible\",\"Label\":\"是否可见\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"AppVisible\",\"Label\":\"移动端可见\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true}],\"HideIndex\":false,\"ShowCreateTime\":true,\"ShowUpdateTime\":false}}}]}",
       "ViewSchemaVersion": "1.0",
@@ -4747,6 +4758,7 @@
       "DisplayMac": 0,
       "AppDisplay": 0,
       "OpenType": "Diy",
+      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-014-wbe1h1qp.webp",
       "DiyTableId": "32c49fd3-54e9-4bb3-b9aa-cb9ea6032653",
       "NotShowFields": "[]",
       "StatisticsFields": "[]",
@@ -4767,11 +4779,15 @@
       "Display": 1,
       "SelectFields": "[{\"Id\":\"d6ab22e9-cf14-41e7-bd34-0e7c47cb25da\",\"Label\":\"字段名\",\"Name\":\"Name\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"01b2aec0-f750-43b8-8b54-c6dd3eaa0365\",\"Label\":\"显示名称\",\"Name\":\"Label\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"eb223b6b-8b67-4d48-8499-c0b59fa26660\",\"Label\":\"字段类型\",\"Name\":\"Type\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"47cd0d8e-b0d6-40c3-b261-d9b85f9423cf\",\"Label\":\"控件类型\",\"Name\":\"Component\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"01KFE71ZR5MAPSR5BMF6R92AEC\",\"Label\":\"所属表名\",\"Name\":\"TableName\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"7a920a20-2476-43ba-a64d-a6c8e55434bf\",\"Label\":\"所属表Id\",\"Name\":\"TableId\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"46f6d862-5582-4e72-89d6-d8970a639fa0\",\"Label\":\"字段说明\",\"Name\":\"Description\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"683bf34c-9d00-46b5-ba55-2853a712658a\",\"Label\":\"占位文字\",\"Name\":\"Placeholder\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"42af7476-612d-4e8d-a8e6-a58c4743e3db\",\"Label\":\"是否可见\",\"Name\":\"Visible\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"babac6c0-db43-4104-b939-ba86c37ed93c\",\"Label\":\"是否唯一\",\"Name\":\"Unique\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"fc8b963b-b2f0-4ce5-973a-76fe754c4de4\",\"Label\":\"备注\",\"Name\":\"Remark\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"13024274-ed7e-4a25-b7ec-14207be710ad\",\"Label\":\"排序\",\"Name\":\"Sort\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"},{\"Id\":\"ebcf24a8-f1e8-46e5-9ddb-0e7839bbb835\",\"Label\":\"所属表单分组\",\"Name\":\"Tab\",\"AsName\":\"\",\"TableDescription\":\"Diy_Field\",\"TableName\":\"diy_field\",\"TableId\":\"32c49fd3-54e9-4bb3-b9aa-cb9ea6032653\"}]",
       "DisplayWin": 0,
-      "ParentId": "01KN6F83SQ87DQSJA878YKQW7Q",
-      "Id": "01KGPN73HXRF9XNAEXWBE1H1QP",
-      "CreateTime": "2026-02-05 18:24:08"
+      "ParentId": "01KN6F83SQ87DQSJA878YKQW7Q"
     },
     {
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-08-08 01:58:34",
+      "CreateTime": "2023-09-08 12:24:50",
+      "Id": "914f07af-ee2c-4712-b990-a5b1c51f41d4",
       "MenuBadgeApiEngineKey": "mci-module-presentation-stats",
       "MenuBadgeEnabled": 1,
       "ViewSchema": "{\"Views\":[{\"Key\":\"914f07af-ee2c-4712-b990-a5b1c51f41d4-list\",\"Scene\":\"List\",\"Device\":\"PC\",\"Enabled\":true,\"Priority\":20,\"Layout\":{\"Hero\":{\"Eyebrow\":\"SYSTEM ENGINE\",\"Title\":\"表单管理\",\"Description\":\"管理数据模型、行为与运行能力\",\"Metrics\":[{\"Key\":\"DataCount\",\"Label\":\"总记录数\",\"Source\":\"DataCount\",\"Icon\":\"fas fa-layer-group\",\"Tone\":\"primary\"},{\"Key\":\"PageCount\",\"Label\":\"本页加载\",\"Source\":\"PageCount\",\"Icon\":\"fas fa-list\",\"Tone\":\"info\"}]},\"List\":{\"Density\":\"Compact\",\"Columns\":[{\"Key\":\"primary\",\"Field\":\"Name\",\"Lines\":[{\"Name\":\"Description\",\"Label\":\"表中文名\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"Remark\",\"Label\":\"表说明/备注\",\"Tone\":\"info\",\"ShowLabel\":true}],\"TrailingFields\":[{\"Name\":\"EnableDataComment\",\"Label\":\"启用数据评论\",\"Icon\":\"fas fa-circle\",\"Tone\":\"success\",\"DisplayStyle\":\"Tag\"},{\"Name\":\"EnableDataVersion\",\"Label\":\"启用数据版本\",\"Icon\":\"fas fa-circle\",\"Tone\":\"success\",\"DisplayStyle\":\"Tag\"}],\"MinWidth\":240,\"Align\":\"Left\"}]}}},{\"Key\":\"914f07af-ee2c-4712-b990-a5b1c51f41d4-card\",\"Scene\":\"Card\",\"Device\":\"Mobile\",\"Enabled\":true,\"Priority\":20,\"Layout\":{\"Hero\":{\"Eyebrow\":\"SYSTEM ENGINE\",\"Title\":\"表单管理\",\"Description\":\"管理数据模型、行为与运行能力\",\"Metrics\":[{\"Key\":\"DataCount\",\"Label\":\"总记录数\",\"Source\":\"DataCount\",\"Icon\":\"fas fa-layer-group\",\"Tone\":\"primary\"},{\"Key\":\"PageCount\",\"Label\":\"本页加载\",\"Source\":\"PageCount\",\"Icon\":\"fas fa-list\",\"Tone\":\"info\"}]},\"Card\":{\"Preset\":\"Business\",\"AvatarField\":\"\",\"AvatarTextField\":\"Name\",\"TitleField\":\"Name\",\"AccentField\":\"EnableDataComment\",\"StatusFields\":[{\"Name\":\"EnableDataComment\",\"Label\":\"启用数据评论\",\"DisplayStyle\":\"Tag\",\"Tone\":\"success\"},{\"Name\":\"EnableDataVersion\",\"Label\":\"启用数据版本\",\"DisplayStyle\":\"Tag\",\"Tone\":\"success\"}],\"TopFields\":[{\"Name\":\"EnableDataLog\",\"Label\":\"启用数据日志\",\"DisplayStyle\":\"Tag\",\"Tone\":\"info\"},{\"Name\":\"EnableTrash\",\"Label\":\"启用回收站\",\"DisplayStyle\":\"Tag\",\"Tone\":\"info\"}],\"SubtitleFields\":[{\"Name\":\"Description\",\"Label\":\"表中文名\",\"Tone\":\"info\"},{\"Name\":\"Remark\",\"Label\":\"表说明/备注\",\"Tone\":\"info\"}],\"RightFields\":[],\"Fields\":[{\"Name\":\"DataBaseName\",\"Label\":\"所属数据库\",\"ShowLabel\":true},{\"Name\":\"EnableDataLog\",\"Label\":\"启用数据日志\",\"ShowLabel\":true}],\"MetaFields\":[],\"BottomFields\":[{\"Name\":\"EnableDataComment\",\"Label\":\"启用数据评论\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"EnableDataVersion\",\"Label\":\"启用数据版本\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"EnableDataLog\",\"Label\":\"启用数据日志\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true}],\"HideIndex\":false,\"ShowCreateTime\":true,\"ShowUpdateTime\":false}}}]}",
@@ -4799,7 +4815,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "{\"Id\":\"legacy_1770830809812\",\"Name\":\"work_plan.png\",\"Size\":\"\",\"CreateTime\":\"\",\"Path\":\"/itdos/sysmenu/20241021/work_plan.png\",\"State\":1}",
+      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-013-c51f41d4.webp",
       "TableDiyFieldIds": "[\"784dcf4c-5486-4bec-8457-8e78f2db5206\",\"ae23394b-ebfa-45ea-879b-1f3391fb3a34\",\"14846112-81c9-4662-aa42-db99478fffc5\",\"d3174c97-91cb-4497-a163-54477d6b49d6\",\"f0348daa-dc9e-4dc3-a970-c02a084987d1\"]",
       "PageBtns": "[]",
       "DiyTableId": "39bc4abe-98ee-46a7-b9d1-a7d649691193",
@@ -4813,7 +4829,7 @@
       "SearchFieldIds": "[{\"Id\":\"784dcf4c-5486-4bec-8457-8e78f2db5206\",\"AsName\":\"\",\"Name\":\"Name\",\"Label\":\"表名\",\"TableId\":\"39bc4abe-98ee-46a7-b9d1-a7d649691193\",\"TableName\":\"Diy_Table\",\"TableDescription\":\"Diy_Table\",\"DisplayType\":\"Out\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"ae23394b-ebfa-45ea-879b-1f3391fb3a34\",\"AsName\":\"\",\"Name\":\"Description\",\"Label\":\"描述\",\"TableId\":\"39bc4abe-98ee-46a7-b9d1-a7d649691193\",\"TableName\":\"Diy_Table\",\"TableDescription\":\"Diy_Table\",\"DisplayType\":\"Out\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"d3174c97-91cb-4497-a163-54477d6b49d6\",\"AsName\":\"\",\"Name\":\"SuoshuSJK\",\"Label\":\"所属数据库\",\"TableId\":\"39bc4abe-98ee-46a7-b9d1-a7d649691193\",\"TableName\":\"Diy_Table\",\"TableDescription\":\"Diy_Table\",\"DisplayType\":\"Out\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true}]",
       "ComponentPath": "/diy/diy-table-rowlist",
       "ExportMoreBtns": "[]",
-      "IconClass": "fab fa-wpforms",
+      "IconClass": "Tickets",
       "Url": "/mic-form-engine",
       "DiyConfig": "{\"HiddenIndex\":0,\"GeneralSeaarch\":0,\"SelectApi\":\"\",\"AddBtnText\":\"\",\"SaveBtnText\":\"\",\"AddBtnType\":\"\",\"SaveType\":\"\",\"ImportApi\":\"\",\"ImportProgressApi\":\"\",\"ExportApi\":\"\"}",
       "SortFieldIds": "[\"CreateTime\",\"UpdateTime\",\"784dcf4c-5486-4bec-8457-8e78f2db5206\",\"ae23394b-ebfa-45ea-879b-1f3391fb3a34\",\"14846112-81c9-4662-aa42-db99478fffc5\",\"d3174c97-91cb-4497-a163-54477d6b49d6\"]",
@@ -4828,11 +4844,14 @@
       "FormBtns": "[]",
       "JoinTables": "[]",
       "DisplayWin": 1,
-      "ParentId": "01KN6F83SQ87DQSJA878YKQW7Q",
-      "Id": "914f07af-ee2c-4712-b990-a5b1c51f41d4",
-      "CreateTime": "2023-09-08 12:24:50"
+      "ParentId": "01KN6F83SQ87DQSJA878YKQW7Q"
     },
     {
+      "IsDeleted": 0,
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-08-08 01:58:37",
+      "CreateTime": "2021-09-17 14:31:51",
+      "Id": "d0c7a74a-2cfd-41c0-8902-440909f5f30c",
       "MenuBadgeEnabled": 0,
       "ViewSchema": "{\"Views\":[{\"Key\":\"d0c7a74a-2cfd-41c0-8902-440909f5f30c-list\",\"Scene\":\"List\",\"Device\":\"PC\",\"Enabled\":true,\"Priority\":20,\"Layout\":{\"Hero\":{\"Eyebrow\":\"SYSTEM ENGINE\",\"Title\":\"表单引擎组件\",\"Description\":\"管理基础与高级字段控件\",\"Metrics\":[{\"Key\":\"DataCount\",\"Label\":\"总记录数\",\"Source\":\"DataCount\",\"Icon\":\"fas fa-layer-group\",\"Tone\":\"primary\"},{\"Key\":\"PageCount\",\"Label\":\"本页加载\",\"Source\":\"PageCount\",\"Icon\":\"fas fa-list\",\"Tone\":\"info\"}]},\"List\":{\"Density\":\"Compact\",\"Columns\":[{\"Key\":\"primary\",\"Field\":\"Name\",\"Lines\":[{\"Name\":\"Control\",\"Label\":\"控件类型\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"FieldType\",\"Label\":\"字段类型\",\"Tone\":\"info\",\"ShowLabel\":true}],\"TrailingFields\":[{\"Name\":\"Disable\",\"Label\":\"是否禁用\",\"Icon\":\"fas fa-triangle-exclamation\",\"Tone\":\"danger\",\"DisplayStyle\":\"Tag\"}],\"MinWidth\":240,\"Align\":\"Left\"}]}}},{\"Key\":\"d0c7a74a-2cfd-41c0-8902-440909f5f30c-card\",\"Scene\":\"Card\",\"Device\":\"Mobile\",\"Enabled\":true,\"Priority\":20,\"Layout\":{\"Hero\":{\"Eyebrow\":\"SYSTEM ENGINE\",\"Title\":\"表单引擎组件\",\"Description\":\"管理基础与高级字段控件\",\"Metrics\":[{\"Key\":\"DataCount\",\"Label\":\"总记录数\",\"Source\":\"DataCount\",\"Icon\":\"fas fa-layer-group\",\"Tone\":\"primary\"},{\"Key\":\"PageCount\",\"Label\":\"本页加载\",\"Source\":\"PageCount\",\"Icon\":\"fas fa-list\",\"Tone\":\"info\"}]},\"Card\":{\"Preset\":\"Business\",\"AvatarField\":\"\",\"AvatarTextField\":\"Name\",\"TitleField\":\"Name\",\"AccentField\":\"Disable\",\"StatusFields\":[{\"Name\":\"Disable\",\"Label\":\"是否禁用\",\"DisplayStyle\":\"Tag\",\"Tone\":\"danger\"}],\"TopFields\":[],\"SubtitleFields\":[{\"Name\":\"Control\",\"Label\":\"控件类型\",\"Tone\":\"info\"},{\"Name\":\"FieldType\",\"Label\":\"字段类型\",\"Tone\":\"info\"}],\"RightFields\":[],\"Fields\":[{\"Name\":\"Icon\",\"Label\":\"组件图标\",\"ShowLabel\":true},{\"Name\":\"Path\",\"Label\":\"组件路径\",\"ShowLabel\":true}],\"MetaFields\":[],\"BottomFields\":[{\"Name\":\"Readonly\",\"Label\":\"默认只读\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true},{\"Name\":\"Disable\",\"Label\":\"是否禁用\",\"Icon\":\"fas fa-toggle-on\",\"Tone\":\"info\",\"ShowLabel\":true}],\"HideIndex\":false,\"ShowCreateTime\":true,\"ShowUpdateTime\":false}}}]}",
       "ViewSchemaVersion": "1.0",
@@ -4852,7 +4871,7 @@
       "DisplayMac": 1,
       "AppDisplay": 1,
       "OpenType": "Diy",
-      "Icon": "{\"Id\":\"legacy_1775112697323\",\"Name\":\"305cef94-cb99-49d9-90d7-0c7d22239993_preview.png\",\"Size\":\"\",\"CreateTime\":\"\",\"Path\":\"/upload/sysmenu/201906/305cef94-cb99-49d9-90d7-0c7d22239993_preview.png\",\"State\":1}",
+      "Icon": "/itdos/microi/menu-icons/20260808/202608/microi-menu-015-09f5f30c.webp",
       "TableDiyFieldIds": "[]",
       "PageBtns": "[]",
       "DiyTableId": "73a92e3d-8cd9-4a1f-bfc1-83fbc8e493d5",
@@ -4867,7 +4886,7 @@
       "SearchFieldIds": "[{\"Id\":\"7742568b-d3ab-4c88-ae79-d059b389e7de\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"8af89580-86b4-498e-9555-49d745a6652b\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"6ff6a0c0-9abd-4c9b-98fe-a96c9b2b57c9\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"505b98bf-d4ff-46da-935d-cc6e3040ace1\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"aabfa45e-ed93-42fb-afe2-a9c80b49d547\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"cf14a0f4-9083-4976-a09f-7f1ded2f1ea0\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"5277fd9a-d7c2-451f-98bf-290e242cfce7\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"96f0d85f-5aab-498d-908d-5d3191ca0e7e\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"90316535-f2ea-4782-bda6-417dc431960d\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"1323ce2b-ce3a-469f-be86-8e95244c4470\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true},{\"Id\":\"87ea6355-7f10-4c76-8833-05f2d7b4b717\",\"Name\":\"\",\"Label\":\"\",\"AsName\":\"\",\"TableId\":\"\",\"TableName\":\"\",\"TableDescription\":\"\",\"DisplayType\":\"In\",\"DisplaySelect\":false,\"Hide\":false,\"IsVisible\":true}]",
       "ComponentPath": "/diy/diy-table-rowlist",
       "ExportMoreBtns": "[]",
-      "IconClass": "fas fa-server",
+      "IconClass": "Grid",
       "Url": "/diy-component",
       "DiyConfig": "{\"HiddenIndex\":0,\"GeneralSeaarch\":0}",
       "SortFieldIds": "[\"96f0d85f-5aab-498d-908d-5d3191ca0e7e\",\"87ea6355-7f10-4c76-8833-05f2d7b4b717\",\"5277fd9a-d7c2-451f-98bf-290e242cfce7\",\"505b98bf-d4ff-46da-935d-cc6e3040ace1\",\"6ff6a0c0-9abd-4c9b-98fe-a96c9b2b57c9\",\"8af89580-86b4-498e-9555-49d745a6652b\"]",
@@ -4882,9 +4901,7 @@
       "FormBtns": "[]",
       "JoinTables": "[]",
       "DisplayWin": 1,
-      "ParentId": "01KN6F83SQ87DQSJA878YKQW7Q",
-      "Id": "d0c7a74a-2cfd-41c0-8902-440909f5f30c",
-      "CreateTime": "2021-09-17 14:31:51"
+      "ParentId": "01KN6F83SQ87DQSJA878YKQW7Q"
     }
   ],
   "DiyTables": [
@@ -8201,6 +8218,12 @@
   "DataSets": [],
   "SysApiEngines": [
     {
+      "IsDeleted": 0,
+      "UserName": "管理员",
+      "UserId": "c74d669c-a3d4-11e5-b60d-b870f43edd03",
+      "UpdateTime": "2026-07-14 03:10:59",
+      "CreateTime": "2024-11-25 11:32:55",
+      "Id": "005713be-69a1-4a0d-8663-601cd1e4c04a",
       "LimitRecursion": 10000,
       "LimitMemory": 2048,
       "MaxStatements": 100000000,
@@ -8218,9 +8241,7 @@
       "ApiRole": "[]",
       "IsEnable": 1,
       "ApiEngineKey": "copy_table",
-      "ApiName": "[系统]复制表",
-      "Id": "005713be-69a1-4a0d-8663-601cd1e4c04a",
-      "CreateTime": "2024-11-25 11:32:55"
+      "ApiName": "[系统]复制表"
     }
   ]
 }

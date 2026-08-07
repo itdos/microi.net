@@ -605,7 +605,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.9.2") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.9.8") >= 0);
+  assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
+  assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(source, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
   assert.match(source, /previousState\.UpgradePolicy[\s\S]*?CreateIfMissing/);
@@ -650,9 +652,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 9, 2\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.9.2 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 9, 2\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 9, 8\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.9.8 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 9, 8\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 13\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
@@ -669,7 +671,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(appStoreUpgradeSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 6, 0\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_009_002/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_009_008/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -681,7 +683,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_006_000/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_009_002/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_009_008/);
   assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
 });

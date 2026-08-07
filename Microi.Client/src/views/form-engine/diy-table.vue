@@ -605,7 +605,7 @@
                                     <div class="module-composite-cell">
                                         <div class="module-composite-content">
                                             <div class="module-composite-primary">
-                                                <span v-if="isMuban(field, scope)" v-safe-html="scope.row[field.Name + '_TmpEngineResult']"></span>
+                                                <span v-if="isMuban(field, scope)" v-safe-html:template="scope.row[field.Name + '_TmpEngineResult']"></span>
                                                 <span v-else>{{ GetColValue(scope, field) }}</span>
                                             </div>
                                             <div
@@ -617,7 +617,7 @@
                                             >
                                                 <fa-icon v-if="lineField.Icon" :icon="lineField.Icon" />
                                                 <span v-if="lineField.ShowLabel" class="module-composite-label">{{ lineField.Label }}：</span>
-                                                <span v-if="isMuban(lineField, scope)" v-safe-html="scope.row[lineField.Name + '_TmpEngineResult']"></span>
+                                                <span v-if="isMuban(lineField, scope)" v-safe-html:template="scope.row[lineField.Name + '_TmpEngineResult']"></span>
                                                 <span v-else>{{ GetPresentationFieldValue(scope.row, lineField) }}</span>
                                             </div>
                                         </div>
@@ -630,7 +630,7 @@
                                                 <span
                                                     v-if="isMuban(trailingField, scope)"
                                                     class="module-composite-template-result"
-                                                    v-safe-html="scope.row[trailingField.Name + '_TmpEngineResult']"
+                                                    v-safe-html:template="scope.row[trailingField.Name + '_TmpEngineResult']"
                                                 ></span>
                                                 <span
                                                     v-else
@@ -647,10 +647,10 @@
                                 </template>
                                 <!--如果使用了模板引擎-->
                                 <template v-else-if="isMuban(field, scope)">
-                                    <div style="line-height: 22px" v-safe-html="scope.row[field.Name + '_TmpEngineResult']"></div>
+                                    <div style="line-height: 22px" v-safe-html:template="scope.row[field.Name + '_TmpEngineResult']"></div>
                                 </template>
-                                <!--如果需要默认用模板的控件  此类控件不支持表内编辑-->
-                                <template v-else-if="NeedDiyTemplateFieldLst.indexOf(field.Component) > -1">
+                                <!--特殊字段使用统一列表渲染器，此类控件不支持表内编辑-->
+                                <template v-else-if="field.Component == 'DevComponent' || IsSpecialTableField(field)">
                                     <!--如果是定制开发组件-->
                                     <template v-if="field.Component == 'DevComponent'">
                                         <template v-if="!DiyCommon.IsNull(field.Config.DevComponentName)">
@@ -669,53 +669,16 @@
                                             </template>
                                         </template>
                                     </template>
-                                    <!--如果是子表-->
-                                    <template v-else-if="field.Component == 'TableChild'">
-                                        <el-tag type="info" class="hand">
-                                            <el-icon><Grid /></el-icon>
-                                            {{ $t('Msg.ViewData') }}
-                                        </el-tag>
-                                    </template>
-                                    <!--如果是地图-->
-                                    <template v-else-if="field.Component == 'Map'">
-                                        <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name + '_Lng'])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
-                                            <el-icon><LocationFilled /></el-icon>
-                                            {{ $t('Msg.NotMarked') }}
-                                        </el-tag>
-                                        <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
-                                            <el-icon><Location /></el-icon>
-                                            {{ $t('Msg.ViewMap') }}
-                                        </el-tag>
-                                    </template>
-                                    <template v-else-if="field.Component == 'MapArea'">
-                                        <el-tag v-if="DiyCommon.IsNull(scope.row[field.Name])" @click="OpenDetail(scope.row, 'Edit')" type="info" class="hand">
-                                            <el-icon><LocationFilled /></el-icon>
-                                            {{ $t('Msg.NotDrawn') }}
-                                        </el-tag>
-                                        <el-tag v-else @click="OpenDetail(scope.row, 'View')" type="success" class="hand">
-                                            <el-icon><Location /></el-icon>
-                                            {{ $t('Msg.ViewArea') }}
-                                        </el-tag>
-                                    </template>
-                                    <template v-else-if="field.Component == 'FontAwesome'">
-                                        <fa-icon :class="scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName]"></fa-icon>
-                                    </template>
-                                    <template v-else-if="field.Component == 'ImgUpload'">
-                                        <div style="display: flex; align-items: center; justify-content: center; height: 25px">
-                                            <el-image
-                                                v-if="!DiyCommon.IsNull(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
-                                                :src="getFirstImageUrl(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
-                                                :preview-src-list="getImagePreviewList(scope.row[DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName])"
-                                                :preview-teleported="true"
-                                                :z-index="50000"
-                                                style="width: 25px; height: 25px; border-radius: 2px; cursor: pointer; object-fit: cover"
-                                                fit="cover"
-                                                lazy
-                                                @error="handleImageError"
-                                            />
-                                            <span v-else style="color: #ccc; font-size: 10px">{{ $t('Msg.NoImage') }}</span>
-                                        </div>
-                                    </template>
+                                    <DiyTableSpecialCell
+                                        v-else
+                                        :field="field"
+                                        :row="scope.row"
+                                        :display-value="GetColValue(scope, field)"
+                                        :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                        :sys-menu-id="SysMenuId"
+                                        @open-table-child="OpenTableChildCell"
+                                        @open-detail="OpenSpecialCellDetail"
+                                    />
                                 </template>
                                 <!--如果没有使用模板引擎、也不是默认模板控件-->
                                 <template v-else>
@@ -1054,7 +1017,18 @@
                                                 <div class="card-title-tags" v-if="CardTopFieldList.length > 0">
                                                     <template v-for="tagField in CardTopFieldList" :key="'title-tag-' + tagField.Id">
                                                         <template v-if="HasPresentationFieldValue(item, tagField)">
-                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html:template="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <DiyTableSpecialCell
+                                                                v-else-if="IsSpecialTableField(tagField)"
+                                                                compact
+                                                                :field="tagField"
+                                                                :row="item"
+                                                                :display-value="GetPresentationFieldValue(item, tagField)"
+                                                                :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                                :sys-menu-id="SysMenuId"
+                                                                @open-table-child="OpenTableChildCell"
+                                                                @open-detail="OpenSpecialCellDetail"
+                                                            />
                                                             <span v-else class="card-title-tag" :class="'is-' + GetPresentationTone(tagField)" :style="GetPresentationFieldStyle(tagField)">
                                                                 <fa-icon v-if="tagField.Icon" :icon="tagField.Icon" />
                                                                 {{ GetPresentationFieldValue(item, tagField) }}
@@ -1063,7 +1037,7 @@
                                                     </template>
                                                 </div>
                                                 <div class="card-title-text">
-                                                    <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardPrimaryField.Id) && NeedDiyTemplateFieldLst.indexOf(CardPrimaryField.Component) === -1">
+                                                    <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(CardPrimaryField.Id) && CardPrimaryField.Component !== 'DevComponent' && !IsSpecialTableField(CardPrimaryField)">
                                                         <div class="card-inline-edit-item" @click.stop>
                                                             <div class="card-inline-edit-control">
                                                                 <component
@@ -1087,13 +1061,35 @@
                                                             </div>
                                                         </div>
                                                     </template>
-                                                    <span v-else-if="isMuban(CardPrimaryField, { row: item })" v-safe-html="item[CardPrimaryField.Name + '_TmpEngineResult']"></span>
+                                                    <span v-else-if="isMuban(CardPrimaryField, { row: item })" v-safe-html:template="item[CardPrimaryField.Name + '_TmpEngineResult']"></span>
+                                                    <DiyTableSpecialCell
+                                                        v-else-if="IsSpecialTableField(CardPrimaryField)"
+                                                        compact
+                                                        :field="CardPrimaryField"
+                                                        :row="item"
+                                                        :display-value="GetPresentationFieldValue(item, CardPrimaryField)"
+                                                        :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                        :sys-menu-id="SysMenuId"
+                                                        @open-table-child="OpenTableChildCell"
+                                                        @open-detail="OpenSpecialCellDetail"
+                                                    />
                                                     <span v-else>{{ GetPresentationFieldValue(item, CardPrimaryField) }}</span>
                                                 </div>
                                                 <div v-if="HasAnyPresentationFieldValue(item, CardSubtitleFieldList)" class="card-subtitle-row">
                                                     <template v-for="subtitleField in CardSubtitleFieldList" :key="'subtitle-' + subtitleField.Id">
                                                         <template v-if="HasPresentationFieldValue(item, subtitleField)">
-                                                            <span v-if="isMuban(subtitleField, { row: item })" v-safe-html="item[subtitleField.Name + '_TmpEngineResult']"></span>
+                                                            <span v-if="isMuban(subtitleField, { row: item })" v-safe-html:template="item[subtitleField.Name + '_TmpEngineResult']"></span>
+                                                            <DiyTableSpecialCell
+                                                                v-else-if="IsSpecialTableField(subtitleField)"
+                                                                compact
+                                                                :field="subtitleField"
+                                                                :row="item"
+                                                                :display-value="GetPresentationFieldValue(item, subtitleField)"
+                                                                :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                                :sys-menu-id="SysMenuId"
+                                                                @open-table-child="OpenTableChildCell"
+                                                                @open-detail="OpenSpecialCellDetail"
+                                                            />
                                                             <span v-else :style="GetPresentationFieldStyle(subtitleField)">{{ GetPresentationFieldValue(item, subtitleField) }}</span>
                                                         </template>
                                                     </template>
@@ -1109,7 +1105,18 @@
                                                     :style="GetPresentationFieldStyle(rightField)"
                                                 >
                                                     <span v-if="rightField.ShowLabel" class="card-right-label">{{ rightField.Label }}</span>
-                                                    <span v-if="isMuban(rightField, { row: item })" v-safe-html="item[rightField.Name + '_TmpEngineResult']"></span>
+                                                    <span v-if="isMuban(rightField, { row: item })" v-safe-html:template="item[rightField.Name + '_TmpEngineResult']"></span>
+                                                    <DiyTableSpecialCell
+                                                        v-else-if="IsSpecialTableField(rightField)"
+                                                        compact
+                                                        :field="rightField"
+                                                        :row="item"
+                                                        :display-value="GetPresentationDecoratedFieldValue(item, rightField)"
+                                                        :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                        :sys-menu-id="SysMenuId"
+                                                        @open-table-child="OpenTableChildCell"
+                                                        @open-detail="OpenSpecialCellDetail"
+                                                    />
                                                     <span v-else>{{ GetPresentationDecoratedFieldValue(item, rightField) }}</span>
                                                 </div>
                                             </div>
@@ -1122,7 +1129,7 @@
                                             class="card-field-row"
                                         >
                                             <!--如果是表内编辑（卡片模式）-->
-                                            <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(field.Id) && NeedDiyTemplateFieldLst.indexOf(field.Component) === -1">
+                                            <template v-if="SysMenuModel.InTableEdit && IsInTableEditField(field.Id) && field.Component !== 'DevComponent' && !IsSpecialTableField(field)">
                                                 <div class="card-inline-edit-item" @click.stop>
                                                     <span class="card-inline-edit-label">{{ field.Label }}：</span>
                                                     <div class="card-inline-edit-control">
@@ -1147,14 +1154,24 @@
                                                     </div>
                                                 </div>
                                             </template>
-                                            <template v-else-if="field.Component == 'Rate'">
-                                                <span class="card-field-label">{{ field.Label }}</span>
-                                                <el-rate v-model="item[field.AsName || field.Name]" :disabled="true" />
-                                            </template>
                                             <!-- V8TmpEngineTable 模板引擎 -->
                                             <template v-else-if="isMuban(field, { row: item })">
                                                 <span class="card-field-label">{{ field.Label }}</span>
-                                                <span class="card-field-value" :style="GetPresentationFieldStyle(field)" v-safe-html="item[field.Name + '_TmpEngineResult']"></span>
+                                                <span class="card-field-value" :style="GetPresentationFieldStyle(field)" v-safe-html:template="item[field.Name + '_TmpEngineResult']"></span>
+                                            </template>
+                                            <template v-else-if="IsSpecialTableField(field)">
+                                                <span class="card-field-label">{{ field.Label }}</span>
+                                                <DiyTableSpecialCell
+                                                    class="card-field-value"
+                                                    compact
+                                                    :field="field"
+                                                    :row="item"
+                                                    :display-value="GetColValue({ row: item }, field)"
+                                                    :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                    :sys-menu-id="SysMenuId"
+                                                    @open-table-child="OpenTableChildCell"
+                                                    @open-detail="OpenSpecialCellDetail"
+                                                />
                                             </template>
                                             <!--普通字段-->
                                             <template v-else>
@@ -1168,7 +1185,18 @@
                                                     <span class="card-meta-item" :class="'is-' + GetPresentationTone(metaField)" :style="GetPresentationFieldStyle(metaField)">
                                                         <fa-icon v-if="metaField.Icon" :icon="metaField.Icon" />
                                                         <span v-if="metaField.ShowLabel">{{ metaField.Label }} </span>
-                                                        <span v-if="isMuban(metaField, { row: item })" v-safe-html="item[metaField.Name + '_TmpEngineResult']"></span>
+                                                        <span v-if="isMuban(metaField, { row: item })" v-safe-html:template="item[metaField.Name + '_TmpEngineResult']"></span>
+                                                        <DiyTableSpecialCell
+                                                            v-else-if="IsSpecialTableField(metaField)"
+                                                            compact
+                                                            :field="metaField"
+                                                            :row="item"
+                                                            :display-value="GetPresentationFieldValue(item, metaField)"
+                                                            :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                            :sys-menu-id="SysMenuId"
+                                                            @open-table-child="OpenTableChildCell"
+                                                            @open-detail="OpenSpecialCellDetail"
+                                                        />
                                                         <span v-else>{{ GetPresentationFieldValue(item, metaField) }}</span>
                                                     </span>
                                                 </template>
@@ -1180,7 +1208,18 @@
                                                 <template v-if="CardBottomFieldList.length > 0">
                                                     <template v-for="tagField in CardBottomFieldList" :key="'bottom-tag-' + tagField.Id">
                                                         <template v-if="HasPresentationFieldValue(item, tagField)">
-                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <span v-if="isMuban(tagField, { row: item })" v-safe-html:template="item[tagField.Name + '_TmpEngineResult']" class="card-tag-html"></span>
+                                                            <DiyTableSpecialCell
+                                                                v-else-if="IsSpecialTableField(tagField)"
+                                                                compact
+                                                                :field="tagField"
+                                                                :row="item"
+                                                                :display-value="GetPresentationFieldValue(item, tagField)"
+                                                                :table-name="(CurrentDiyTableModel && CurrentDiyTableModel.Name) || TableName"
+                                                                :sys-menu-id="SysMenuId"
+                                                                @open-table-child="OpenTableChildCell"
+                                                                @open-detail="OpenSpecialCellDetail"
+                                                            />
                                                             <span v-else class="card-bottom-tag" :class="'is-' + GetPresentationTone(tagField)" :style="GetPresentationFieldStyle(tagField)">
                                                                 <fa-icon v-if="tagField.Icon" :icon="tagField.Icon" />
                                                                 <span v-if="tagField.ShowLabel">{{ tagField.Label }} </span>{{ GetPresentationFieldValue(item, tagField) }}
@@ -1621,7 +1660,7 @@
                         {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
                     </div>
                     <div class="pull-right">
-                        <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                        <el-button v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
                         <el-button :icon="Close" @click="CloseOpenAnyTable">
@@ -1681,7 +1720,7 @@
                         {{ $t('Msg.PopupTable') }}{{ OpenAnyTableParam.TableName ? "[" + OpenAnyTableParam.TableName + "]" : "" }}
                     </div>
                     <div class="pull-right">
-                        <el-button :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
+                        <el-button v-if="typeof OpenAnyTableParam.SubmitEvent === 'function'" :loading="BtnLoading" type="primary" :icon="BtnLoading ? undefined : CircleCheck" @click="RunOpenAnyTableSubmitEvent()">
                             {{ $t("Msg.Submit") }}
                         </el-button>
                         <el-button :icon="Close" @click="CloseOpenAnyTable">
@@ -1806,8 +1845,10 @@ import {
 import DiyImportDialog from "@/views/form-engine/diy-components/DiyImportDialog.vue";
 import DiyPermissionDialog from "@/views/form-engine/diy-components/DiyPermissionDialog.vue";
 import DiyIndexManager from "@/views/form-engine/diy-components/DiyIndexManager.vue";
+import DiyTableSpecialCell from "@/views/form-engine/diy-components/DiyTableSpecialCell.vue";
 import DiySearch from "@/views/form-engine/diy-search.vue";
 import DiyModleSearch from "@/views/form-engine/diy-mobile-search.vue";
+import { getFieldConfig, isSpecialTableField } from "@/views/form-engine/utils/table-special-field";
 export default {
     name: "DiyTableRowlist",
     directives: {},
@@ -1831,6 +1872,7 @@ export default {
         DiyImportDialog,
         DiyPermissionDialog,
         DiyIndexManager,
+        DiyTableSpecialCell,
         DiySearch,
         DiyModleSearch,
         // Vue 3: 使用 defineAsyncComponent 包装动态 import
@@ -1967,6 +2009,50 @@ export default {
         }
     },
     methods: {
+        IsSpecialTableField(field) {
+            return isSpecialTableField(field);
+        },
+        OpenSpecialCellDetail(payload) {
+            if (!payload || !payload.row) return;
+            this.OpenDetail(payload.row, payload.mode || "View");
+        },
+        OpenTableChildCell(payload) {
+            var self = this;
+            var field = payload && payload.field;
+            var row = payload && payload.row;
+            if (!field || !row) return;
+
+            var config = getFieldConfig(field);
+            var tableChildConfig = config.TableChild || {};
+            var sysMenuId = config.TableChildSysMenuId || tableChildConfig.LastSysMenuId || "";
+            if (!sysMenuId) {
+                self.DiyCommon.Tips("该子表尚未配置可打开的菜单。", false);
+                return;
+            }
+
+            var primaryFieldName = tableChildConfig.PrimaryTableFieldName || "Id";
+            var parentValue = row[primaryFieldName];
+            var fkFieldName = config.TableChildFkFieldName || tableChildConfig.TableChildFkFieldName || "";
+            var propsWhere = [];
+            if (fkFieldName && parentValue !== undefined && parentValue !== null && parentValue !== "") {
+                propsWhere.push([fkFieldName, "=", parentValue]);
+            }
+
+            self.OpenAnyTable({
+                SysMenuId: sysMenuId,
+                TableId: config.TableChildTableId || tableChildConfig.LastTableId || "",
+                TableName: config.TableChildSysMenuName || tableChildConfig.LastSysMenuName || field.Label || "子表",
+                DialogType: "Dialog",
+                Width: "92vw",
+                MultipleSelect: false,
+                PropsWhere: propsWhere,
+                TableChildFkFieldName: fkFieldName,
+                PrimaryTableFieldName: primaryFieldName,
+                TableChildTableRowId: parentValue,
+                FatherFormModel: row,
+                TableChildConfig: tableChildConfig
+            });
+        },
         ApplyTableChildAuthContext(param) {
             if (param && this.TableChildAuth) {
                 param._TableChildAuth = this.TableChildAuth;
