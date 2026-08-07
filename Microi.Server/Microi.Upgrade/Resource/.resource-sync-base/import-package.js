@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.9.1
+ * Version: v1.9.2
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
@@ -1458,31 +1458,56 @@ try {
         catch (error) { return fallback || {}; }
     };
 
-    var buildInstallVersionWhere = function () {
+    // LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1：历史安装记录可能只有
+    // AppName、没有 StoreId/AppId。按新标识优先、旧名称兜底读取，并在本次
+    // 安装成功后更新同一行，避免列表永久停留在“更新”。
+    var buildInstallVersionIdentity = function () {
         var pkgInfo = Package.PackageInfo || {};
         var storeId = firstText([V8.Param.StoreId, V8.Param.MicroiStoreId, V8.Param.Id]);
         var appId = firstText([V8.Param.AppId, V8.Param.AppKey, pkgInfo.AppId, storeId]);
         var appName = firstText([V8.Param.AppName, V8.Param.Name, pkgInfo.Name, appId]);
-        if (appId) return [['AppId', '=', appId]];
-        if (storeId) return [['StoreId', '=', storeId]];
-        if (appName) return [['AppName', '=', appName]];
-        return [];
+        return { StoreId: storeId, AppId: appId, AppName: appName };
+    };
+
+    var buildInstallVersionCandidates = function (identity) {
+        var candidates = [];
+        if (identity.AppId) candidates.push([['AppId', '=', identity.AppId]]);
+        if (identity.StoreId) candidates.push([['StoreId', '=', identity.StoreId]]);
+        if (identity.AppName) candidates.push([['AppName', '=', identity.AppName]]);
+        return candidates;
+    };
+
+    var findInstallVersionRecord = function (identity) {
+        var candidates = buildInstallVersionCandidates(identity);
+        for (var candidateIndex = 0; candidateIndex < candidates.length; candidateIndex++) {
+            var where = candidates[candidateIndex];
+            var result = V8.FormEngine.GetFormData('sys_microistoreversion', {
+                _Where: where,
+                _OrderBy: 'InstallTime',
+                _OrderByType: 'DESC',
+                _PageSize: 1
+            });
+            if (result && result.Code == 1 && result.Data && result.Data.Id) {
+                return { Where: where, Result: result, Data: result.Data };
+            }
+        }
+        return {
+            Where: candidates.length > 0 ? candidates[0] : [],
+            Result: null,
+            Data: null
+        };
     };
 
     // API_ENGINE_RESOURCE_BASELINE_V1：安装成功记录同时保存每个受管接口引擎
     // 的上游代码摘要。更新时只有 Local==Base 才允许替换为 Incoming；一旦租户
     // 修改了受管代码就明确冲突并回滚，绝不静默覆盖。CreateIfMissing 资源始终
     // 归租户维护，首次创建后后续应用更新只跳过。
-    var installedVersionWhere = buildInstallVersionWhere();
+    var installedVersionIdentity = buildInstallVersionIdentity();
+    var installedVersionLookup = findInstallVersionRecord(installedVersionIdentity);
     var previousApiEngineResourceState = {};
     var nextApiEngineResourceState = {};
-    if (installedVersionWhere.length > 0) {
-        var installedVersionResult = V8.FormEngine.GetFormData('sys_microistoreversion', {
-            _Where: installedVersionWhere,
-            _OrderBy: 'InstallTime',
-            _OrderByType: 'DESC',
-            _PageSize: 1
-        });
+    if (installedVersionLookup.Data) {
+        var installedVersionResult = installedVersionLookup.Result;
         if (installedVersionResult && installedVersionResult.Code == 1 && installedVersionResult.Data) {
             var previousInstallResult = parseJsonObject(installedVersionResult.Data.InstallResult, {});
             var previousResourceState = previousInstallResult.ResourceState || {};
@@ -1507,14 +1532,8 @@ try {
                 return;
             }
 
-            var where = [];
-            if (appId) {
-                where.push(['AppId', '=', appId]);
-            } else if (storeId) {
-                where.push(['StoreId', '=', storeId]);
-            } else {
-                where.push(['AppName', '=', appName]);
-            }
+            var versionIdentity = { StoreId: storeId, AppId: appId, AppName: appName };
+            var existingLookup = findInstallVersionRecord(versionIdentity);
 
             var now = nowText('yyyy-MM-dd HH:mm:ss');
             var model = {
@@ -1551,10 +1570,7 @@ try {
                 Remark: '应用商城安装完成'
             };
 
-            var existing = V8.FormEngine.GetFormData('sys_microistoreversion', {
-                _Where: where,
-                _PageSize: 1
-            });
+            var existing = existingLookup.Result;
             var saveResult;
             if (existing && existing.Code == 1 && existing.Data && existing.Data.Id) {
                 model.Id = existing.Data.Id;

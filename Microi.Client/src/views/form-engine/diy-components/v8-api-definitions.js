@@ -689,6 +689,42 @@ export const V8ApiDefinitions = {
                     }
                 }
             },
+            Identity: {
+                label: "Identity",
+                kind: "Module",
+                documentation: "登录后的强身份验证模块。前端只申请短期一次性票据；敏感业务接口必须在后端使用 V8.Method.ConsumeIdentityVerificationTicket 原子消费，不能仅相信前端成功结果。",
+                insertText: "Identity",
+                methods: {
+                    GetCapabilities: {
+                        label: "GetCapabilities",
+                        kind: "Method",
+                        documentation: "读取当前租户 Passkey、严格人脸及当前用户登记状态。",
+                        insertText: "GetCapabilities",
+                        snippet: "GetCapabilities()"
+                    },
+                    CreateActionHash: {
+                        label: "CreateActionHash",
+                        kind: "Method",
+                        documentation: "使用 SHA-256 对稳定业务载荷生成 ActionHash。后端必须按同样的规范重算，不能直接相信前端摘要。",
+                        insertText: "CreateActionHash",
+                        snippet: "CreateActionHash(${1:JSON.stringify({ Id: V8.Form.Id, Action: 'Approve' })})"
+                    },
+                    Verify: {
+                        label: "Verify",
+                        kind: "Method",
+                        documentation: "使用 Passkey 或严格人脸为自定义敏感操作申请一次性票据。Purpose 与 ActionHash 必填。返回 Data.Ticket；票据只能在后端消费一次。",
+                        insertText: "Verify",
+                        snippet: "Verify({\n\tPurpose: \"${1:ApproveSensitiveOperation}\",\n\tActionHash: ${2:actionHash},\n\tMethod: \"${3:Auto}\"\n})"
+                    },
+                    RegisterPasskey: {
+                        label: "RegisterPasskey",
+                        kind: "Method",
+                        documentation: "为当前登录用户登记 Passkey。通常优先引导用户进入个人设置统一管理。",
+                        insertText: "RegisterPasskey",
+                        snippet: "RegisterPasskey({ DeviceName: \"${1:我的设备}\" })"
+                    }
+                }
+            },
             ScanCodeRes: {
                 label: "ScanCodeRes",
                 kind: "Property",

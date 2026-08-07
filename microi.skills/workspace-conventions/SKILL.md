@@ -163,6 +163,15 @@ AI 新增或修改 Microi 配置文件时，凡是面向开发者、部署人员
 - 除上述十项外，任何业务开关、重试、超时、限额、安全策略、密钥或可执行文件路径通常都必须进入 SaaS 引擎 `sys_osclients` 的合适 Tab，并提供幂等升级、默认值、缓存刷新、敏感字段脱敏和子租户隔离。官方 License 信任链是固定例外：恢复重试次数/间隔使用代码常量，签发私钥固定只读挂载 `/app/microi_private.pem`，不得建立对应 SaaS 字段。禁止新增 `MICROI_*`、`DOS_ORM_*`、额外 `AppSettings` 节点或通用动态环境变量读取。
 - `ASPNETCORE_*`、`DOTNET_*` 是框架宿主配置；`PW_*`、MCP、构建、安装器和发布脚本变量只服务各自工具进程。它们不能成为生产 API 的业务配置入口。
 - 修改后必须用源码测试扫描生产 `.cs`、API `appsettings.json` 及在线/离线 Compose，精确断言十项白名单。不能用注释约定代替自动化守卫。
+
+## 身份、可逆业务秘密与敏感操作统一规范（强制）
+
+- DiyToken 是吾码多租户、多终端、V8 和低代码权限体系的唯一会话入口。新增密码、SSO、OAuth、Passkey、人脸或其它登录方式时，验证成功后必须继续签发 DiyToken，并复用现有角色、部门、菜单、表权限、数据范围、终端吊销和 Token 轮换；禁止整体替换为 ASP.NET Identity 或并行建立第二套用户/权限 Token。
+- 登录密码的新存储必须使用后端带盐、可调成本的专用密码哈希。存量 `PwdEncode=DES` 的管理员显示密码只是兼容能力，不得扩展给普通 V8、FormEngine、匿名或访问密钥会话。
+- 业务明确要求再次显示原文的设备口令、第三方业务账号密码等字段，允许使用吾码可逆加密兼容机制。保存只在可信后端加密；列表/导出默认掩码；显示明文走独立授权动作，校验 DiyToken、租户和业务权限，返回 `no-store`，记录不含明文的审计，失焦/超时后清除。
+- DES 是现有兼容格式，不得宣称能抵抗服务器所有者或代码执行者。新高价值秘密优先使用带版本的现代认证加密与集中密钥管理；基础设施密钥仍不得进入可编辑 V8。
+- 登录后的敏感操作优先用 `V8.Identity.Verify` 申请 Passkey/严格人脸一次性票据，接口引擎从权威数据重算 `ActionHash` 后调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能代替菜单/表/行权限、状态机、幂等、事务或审计。
+- Windows Hello、Touch ID、Face ID 和 Android 设备验证优先采用 WebAuthn/Passkey，不增加模型服务；只有服务端严格人脸与活体检测才接入独立 `Microi Face Gateway v1` 云服务或 Docker/集群。完整规范读取 `microi.skills/v8-security/SKILL.md` 与 `microi.doc/docs/doc/more/identity-verification.md`。
 - 一键安装恢复客户旧库时只允许定位精确主租户三元组；缺失则幂等创建，重复则停止，不能批量重写其它子租户。新主租户行不得持久化数据库、MongoDB 或 Redis 连接，安装器对 MinIO/OCR 等业务配置的后续更新也必须带同一三元组、活动状态条件并做唯一回读。
 
 ## 多语言优先约定

@@ -39,6 +39,8 @@ var code = V8.TranslateEngine.GetLangCode('NoAuth');
 
 LibreTranslate 的 `/frontend/settings`、API Key 管理、`/metrics` 和 Web UI 是运维控制面，不得从普通 V8/HTTP/MCP 代理。
 
+文件入口的完整名称是 `V8.TranslateEngine.TranslateFile({...})`，不要把叶子名误当全局函数。
+
 ## 租户与密钥
 
 - V8 调用统一绑定当前 `V8TenantContext`。普通租户传其它 `OsClient` 不会跨租户翻译或读取配置。
@@ -79,6 +81,8 @@ LibreTranslate 是动态翻译供应商，不是 `diy_lang` 的替代品。一�
 ## HTTP 与 MCP
 
 已登录 HTTP 入口固定为 `/api/Translate/TranslateText|Detect|Languages|TranslateFile|Suggest|Health`。Controller 必须用验证后的 Token 覆盖请求体 `OsClient`，不得接受 endpoint/key/header。
+
+覆盖审计所用的标准路由为 `/api/translate/detect`、`/api/translate/languages`、`/api/translate/translatefile`、`/api/translate/suggest` 和 `/api/translate/health`；它们都服从同一登录与租户绑定规则。
 
 MCP 固定工具：`microi_translate`、`microi_detect_language`、`microi_list_translate_languages`、`microi_translate_file`、`microi_suggest_translation`、`microi_get_translate_health`。文件翻译需要 `confirmExecution=TRANSLATE_FILE`，建议写入需要 `confirmExecution=TRANSLATE_SUGGEST`；审计只记录长度、SHA-256、语言和输出模式，不记录文本、文件内容、本机路径或凭据。大文件结果落到新的绝对路径，不允许覆盖已有文件。
 

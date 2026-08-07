@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-04 20:26:02
+# 版本：v2026-08-07 16:12:53
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-04 20:26:02"
+SCRIPT_VERSION="v2026-08-07 16:12:53"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -52,6 +52,563 @@ LIBRETRANSLATE_IMAGE="registry.cn-hangzhou.aliyuncs.com/microios/libretranslate:
 LIBRETRANSLATE_CONTAINER_NAME="microi-install-libretranslate"
 LIBRETRANSLATE_INTERNAL_PORT=5000
 LIBRETRANSLATE_SERVICE_ENDPOINT="http://${LIBRETRANSLATE_CONTAINER_NAME}:${LIBRETRANSLATE_INTERNAL_PORT}"
+
+# ============================================================
+# 已安装环境的 API + Web 原地更新/修复
+# ============================================================
+# 该模式只接管 microi-install-api / microi-install-client 两个无状态应用容器。
+# 它不会删除数据库、Redis、MongoDB、MinIO 容器、数据目录或 Docker volume。
+REPAIR_TEMP_DIR=""
+REPAIR_WATCHTOWER_WAS_RUNNING=0
+REPAIR_CANDIDATES=()
+REPAIR_LABEL_CANDIDATE_COUNT=0
+
+repair_add_candidate() {
+  local candidate="${1:-}"
+  local resolved=""
+  local existing=""
+  [ -n "${candidate}" ] || return 0
+  [ -f "${candidate}" ] || return 0
+  resolved=$(readlink -f "${candidate}" 2>/dev/null || printf '%s' "${candidate}")
+  for existing in "${REPAIR_CANDIDATES[@]:-}"; do
+    [ "${existing}" = "${resolved}" ] && return 0
+  done
+  REPAIR_CANDIDATES+=("${resolved}")
+}
+
+repair_add_container_compose_candidate() {
+  local container_name="$1"
+  local config_files=""
+  local working_dir=""
+  local first_config=""
+  local candidate_count_before=0
+  docker inspect "${container_name}" > /dev/null 2>&1 || return 0
+  config_files=$(docker inspect "${container_name}" \
+    --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' 2>/dev/null || true)
+  working_dir=$(docker inspect "${container_name}" \
+    --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' 2>/dev/null || true)
+  [ "${config_files}" != "<no value>" ] || config_files=""
+  [ "${working_dir}" != "<no value>" ] || working_dir=""
+  if [[ "${config_files}" == *,* ]]; then
+    echo "Microi：错误：容器 ${container_name} 使用了多层 Compose 文件：${config_files}"
+    echo 'Microi：为避免丢失现场覆盖配置，自动修复已在删除任何容器前停止。'
+    return 1
+  fi
+  first_config="${config_files}"
+  if [ -n "${first_config}" ] && [[ "${first_config}" != /* ]] && [ -n "${working_dir}" ]; then
+    first_config="${working_dir}/${first_config}"
+  fi
+  candidate_count_before=${#REPAIR_CANDIDATES[@]}
+  repair_add_candidate "${first_config}"
+  if [ "${#REPAIR_CANDIDATES[@]}" -gt "${candidate_count_before}" ]; then
+    REPAIR_LABEL_CANDIDATE_COUNT=$((REPAIR_LABEL_CANDIDATE_COUNT + 1))
+  fi
+}
+
+repair_config_has_app_services() {
+  local compose_file="$1"
+  local services=""
+  services=$(docker compose -f "${compose_file}" config --services 2>/dev/null) || return 1
+  printf '%s\n' "${services}" | grep -Fxq 'microi-install-api' \
+    && printf '%s\n' "${services}" | grep -Fxq 'microi-install-client'
+}
+
+repair_hash_file() {
+  local file_path="$1"
+  if command -v sha256sum > /dev/null 2>&1; then
+    sha256sum "${file_path}" | awk '{print $1}'
+  else
+    openssl dgst -sha256 "${file_path}" | awk '{print $NF}'
+  fi
+}
+
+repair_extract_api_block() {
+  local canonical_file="$1"
+  local output_file="$2"
+  awk '
+    /^  microi-install-api:$/ { in_service=1; print; next }
+    in_service && /^  [A-Za-z0-9_.-]+:$/ { exit }
+    in_service { print }
+  ' "${canonical_file}" > "${output_file}"
+}
+
+repair_validate_api_environment() {
+  local canonical_file="$1"
+  local api_block="${REPAIR_TEMP_DIR}/api-service.yml"
+  local required_key=""
+  local value=""
+  local actual_key=""
+  local required_keys=(
+    OsClient OsClientType OsClientNetwork OsClientDbType OsClientDbConn
+    OsClientRedisHost OsClientRedisPort OsClientRedisPwd
+    OsClientRedisDataBase OsClientDbMongoConn
+  )
+  repair_extract_api_block "${canonical_file}" "${api_block}"
+  for required_key in "${required_keys[@]}"; do
+    value=$(sed -n -E "s/^[[:space:]]{6}${required_key}:[[:space:]]*//p" "${api_block}" | head -1)
+    value=$(printf '%s' "${value}" | sed -E "s/^[[:space:]]+//;s/[[:space:]]+$//")
+    case "${value}" in
+      ''|'""'|"''"|null|'~')
+        echo "Microi：错误：应用编排中的 ${required_key} 缺失或为空。"
+        echo 'Microi：自动修复已在删除任何容器前停止，请先恢复原安装生成的完整应用编排。'
+        return 1
+        ;;
+    esac
+  done
+  while IFS= read -r actual_key; do
+    case "${actual_key}" in
+      OsClient|OsClientType|OsClientNetwork|OsClientDbType|OsClientDbConn|OsClientRedisHost|OsClientRedisPort|OsClientRedisPwd|OsClientRedisDataBase|OsClientDbMongoConn|ASPNETCORE_ENVIRONMENT|ASPNETCORE_URLS|DOTNET_ENVIRONMENT|DOTNET_RUNNING_IN_CONTAINER)
+        ;;
+      *)
+        echo "Microi：错误：应用编排包含不在后端启动白名单中的环境变量 ${actual_key}。"
+        echo 'Microi：为避免用旧配置覆盖 SaaS 引擎配置，自动修复已在删除任何容器前停止。'
+        return 1
+        ;;
+    esac
+  done < <(sed -n -E 's/^[[:space:]]{6}([A-Za-z][A-Za-z0-9_]*):.*/\1/p' "${api_block}")
+}
+
+repair_read_api_environment_value() {
+  local api_block="$1"
+  local key="$2"
+  local value=""
+  value=$(sed -n -E "s/^[[:space:]]{6}${key}:[[:space:]]*//p" "${api_block}" | head -1)
+  value=$(printf '%s' "${value}" | sed -E "s/^[[:space:]]+//;s/[[:space:]]+$//")
+  if [[ "${value}" == \"*\" ]] || [[ "${value}" == \'*\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "${value}"
+}
+
+repair_connect_container_to_microi_network() {
+  local container_name="$1"
+  local attached=""
+  docker inspect "${container_name}" > /dev/null 2>&1 || return 1
+  attached=$(docker inspect "${container_name}" \
+    --format '{{if index .NetworkSettings.Networks "microi"}}yes{{end}}' 2>/dev/null || true)
+  if [ "${attached}" != "yes" ]; then
+    docker network connect microi "${container_name}"
+    echo "Microi：已将 ${container_name} 接入 microi 内网 ✓"
+  fi
+}
+
+repair_migrate_app_to_internal_network() {
+  local compose_file="$1"
+  local canonical_file="$2"
+  local project_name="$3"
+  local api_block="${REPAIR_TEMP_DIR}/api-service-before-network.yml"
+  local db_type=""
+  local db_conn=""
+  local mongo_conn=""
+  local db_container=""
+  local db_internal_port=""
+  local db_candidates=()
+  local candidate=""
+  local existing_db_count=0
+  local network_driver=""
+  local override_file="${REPAIR_TEMP_DIR}/internal-network.override.yml"
+  local migrated_file="${REPAIR_TEMP_DIR}/internal-network.compose.yml"
+
+  if docker network inspect microi > /dev/null 2>&1; then
+    network_driver=$(docker network inspect microi --format '{{.Driver}}')
+    if [ "${network_driver}" != "bridge" ]; then
+      echo "Microi：错误：现有 microi 网络驱动为 ${network_driver}，不是 bridge。"
+      return 1
+    fi
+  else
+    docker network create --driver bridge microi > /dev/null
+    echo 'Microi：已创建由 Docker 自动分配网段的 microi 共享内网 ✓'
+  fi
+
+  repair_extract_api_block "${canonical_file}" "${api_block}"
+  db_type=$(repair_read_api_environment_value "${api_block}" OsClientDbType)
+  db_conn=$(repair_read_api_environment_value "${api_block}" OsClientDbConn)
+  mongo_conn=$(repair_read_api_environment_value "${api_block}" OsClientDbMongoConn)
+  case "${db_type}" in
+    MySql)
+      db_candidates=(microi-install-mysql57 microi-install-mysql80)
+      db_internal_port=3306
+      ;;
+    SqlServer)
+      db_candidates=(microi-install-sqlserver2022)
+      db_internal_port=1433
+      ;;
+    DaMeng)
+      db_candidates=(microi-install-dm8)
+      db_internal_port=5236
+      ;;
+    PostgreSql)
+      db_candidates=(microi-install-postgresql17)
+      db_internal_port=5432
+      ;;
+    *)
+      echo "Microi：错误：修复器暂不支持自动迁移数据库类型 ${db_type} 的容器内网连接。"
+      return 1
+      ;;
+  esac
+  for candidate in "${db_candidates[@]}"; do
+    if docker inspect "${candidate}" > /dev/null 2>&1; then
+      db_container="${candidate}"
+      existing_db_count=$((existing_db_count + 1))
+    fi
+  done
+  if [ "${existing_db_count}" -ne 1 ]; then
+    echo "Microi：错误：数据库类型 ${db_type} 应精确匹配一个安装器数据库容器，实际匹配 ${existing_db_count} 个。"
+    return 1
+  fi
+  repair_connect_container_to_microi_network "${db_container}" || return 1
+  repair_connect_container_to_microi_network microi-install-redis || return 1
+  repair_connect_container_to_microi_network microi-install-mongodb || return 1
+  repair_connect_container_to_microi_network microi-install-minio || return 1
+
+  case "${db_type}" in
+    MySql)
+      db_conn=$(printf '%s' "${db_conn}" | sed -E \
+        "s/(Data Source=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
+      ;;
+    SqlServer)
+      db_conn=$(printf '%s' "${db_conn}" | sed -E \
+        "s/(Data Source=)[^;]*/\\1${db_container},${db_internal_port}/I")
+      ;;
+    DaMeng)
+      db_conn=$(printf '%s' "${db_conn}" | sed -E \
+        "s/(Server=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
+      ;;
+    PostgreSql)
+      db_conn=$(printf '%s' "${db_conn}" | sed -E \
+        "s/(Host=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
+      ;;
+  esac
+  mongo_conn=$(printf '%s' "${mongo_conn}" | sed -E \
+    's#(mongodb://[^@]+@)[^/:]+:[0-9]+/#\1microi-install-mongodb:27017/#')
+
+  cat > "${override_file}" <<'EOF'
+services:
+  microi-install-api:
+    environment:
+      OsClientDbConn: ${MICROI_REPAIR_DB_CONN}
+      OsClientRedisHost: microi-install-redis
+      OsClientRedisPort: "6379"
+      OsClientDbMongoConn: ${MICROI_REPAIR_MONGO_CONN}
+    networks:
+      microi: null
+  microi-install-client:
+    networks:
+      microi: null
+networks:
+  microi:
+    external: true
+    name: microi
+EOF
+  chmod 600 "${override_file}"
+  if ! MICROI_REPAIR_DB_CONN="${db_conn}" MICROI_REPAIR_MONGO_CONN="${mongo_conn}" \
+    docker compose -p "${project_name}" -f "${compose_file}" -f "${override_file}" \
+    config > "${migrated_file}"; then
+    echo 'Microi：错误：无法生成容器内网版应用编排。'
+    return 1
+  fi
+  chmod 600 "${migrated_file}"
+  repair_validate_api_environment "${migrated_file}" || return 1
+  cp "${migrated_file}" "${compose_file}"
+  chmod 600 "${compose_file}"
+  REPAIR_INTERNAL_CANONICAL="${migrated_file}"
+  echo "Microi：API 启动连接已迁移为 Docker DNS：${db_container}:${db_internal_port}、microi-install-redis:6379、microi-install-mongodb:27017 ✓"
+}
+
+repair_validate_runtime_environment() {
+  local env_file="${REPAIR_TEMP_DIR}/api-runtime-env.txt"
+  local required_key=""
+  local required_keys=(
+    OsClient OsClientType OsClientNetwork OsClientDbType OsClientDbConn
+    OsClientRedisHost OsClientRedisPort OsClientRedisPwd
+    OsClientRedisDataBase OsClientDbMongoConn
+  )
+  docker inspect microi-install-api \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' > "${env_file}"
+  chmod 600 "${env_file}"
+  for required_key in "${required_keys[@]}"; do
+    if ! grep -Eq "^${required_key}=.+$" "${env_file}"; then
+      echo "Microi：错误：重建后的 API 容器仍缺少 ${required_key}。"
+      return 1
+    fi
+  done
+  if ! grep -Fxq 'OsClientRedisHost=microi-install-redis' "${env_file}" \
+    || ! grep -Fxq 'OsClientRedisPort=6379' "${env_file}" \
+    || ! grep -Eq '^OsClientDbConn=.*microi-install-' "${env_file}" \
+    || ! grep -Eq '^OsClientDbMongoConn=.*@microi-install-mongodb:27017/' "${env_file}"; then
+    echo 'Microi：错误：API 容器启动配置未完整切换到 Docker DNS/容器内部端口。'
+    return 1
+  fi
+  if [ "$(docker inspect microi-install-api --format '{{if index .NetworkSettings.Networks "microi"}}yes{{end}}' 2>/dev/null || true)" != "yes" ]; then
+    echo 'Microi：错误：API 容器未接入 microi 共享内网。'
+    return 1
+  fi
+  echo 'Microi：API 十项启动配置及 Docker DNS 内网连接已逐项回读通过 ✓'
+}
+
+repair_wait_for_api() {
+  local api_port="$1"
+  local probe_path="$2"
+  local probe_name="$3"
+  local max_seconds="$4"
+  local started_at="${SECONDS}"
+  local probe_url="http://127.0.0.1:${api_port}${probe_path}"
+  while [ $((SECONDS - started_at)) -lt "${max_seconds}" ]; do
+    if curl --fail --silent --show-error --max-time 5 "${probe_url}" > /dev/null 2>&1; then
+      echo "Microi：API ${probe_name}检查通过：${probe_url} ✓"
+      return 0
+    fi
+    sleep 2
+  done
+  echo "Microi：错误：API ${probe_name}检查在 ${max_seconds} 秒内未通过：${probe_url}"
+  return 1
+}
+
+repair_restore_previous_app_images() {
+  local compose_file="$1"
+  local project_name="$2"
+  local api_backup_image="$3"
+  local client_backup_image="$4"
+  local override_file="${REPAIR_TEMP_DIR}/rollback.override.yml"
+  if ! docker image inspect "${api_backup_image}" > /dev/null 2>&1 \
+    || ! docker image inspect "${client_backup_image}" > /dev/null 2>&1; then
+    echo 'Microi：警告：旧 API/Web 镜像不完整，无法自动恢复旧镜像；现场备份仍已保留。'
+    return 1
+  fi
+  cat > "${override_file}" <<EOF
+services:
+  microi-install-api:
+    image: ${api_backup_image}
+    pull_policy: never
+  microi-install-client:
+    image: ${client_backup_image}
+    pull_policy: never
+EOF
+  chmod 600 "${override_file}"
+  docker rm -f microi-install-api microi-install-client > /dev/null 2>&1 || true
+  if docker compose -p "${project_name}" -f "${compose_file}" -f "${override_file}" \
+    up -d --force-recreate --no-deps microi-install-api microi-install-client; then
+    echo 'Microi：已使用修复前的 API/Web 镜像和原编排配置完成自动恢复。'
+    return 0
+  fi
+  echo 'Microi：警告：自动恢复旧 API/Web 镜像失败，请使用备份目录中的现场信息人工恢复。'
+  return 1
+}
+
+repair_mode_cleanup() {
+  local exit_code="${1:-1}"
+  trap - EXIT
+  if [ "${REPAIR_WATCHTOWER_WAS_RUNNING:-0}" = "1" ]; then
+    docker start microi-install-watchtower > /dev/null 2>&1 || true
+  fi
+  if [[ "${REPAIR_TEMP_DIR:-}" == /tmp/microi_app_repair_* ]] && [ -d "${REPAIR_TEMP_DIR}" ]; then
+    rm -rf -- "${REPAIR_TEMP_DIR}"
+  fi
+  exit "${exit_code}"
+}
+
+repair_microi_app() {
+  local candidate=""
+  local canonical_file=""
+  local canonical_hash=""
+  local selected_file=""
+  local selected_hash=""
+  local selected_canonical=""
+  local candidate_index=0
+  local valid_count=0
+  local panel_base='/www/dk_project/dk_compose'
+  local default_base='/microi/compose'
+  local panel_file="${panel_base}/microi-install-app/docker-compose.yml"
+  local project_name='microi-install-app'
+  local api_project=""
+  local client_project=""
+  local backup_stamp=""
+  local backup_dir=""
+  local api_image_id=""
+  local client_image_id=""
+  local api_backup_image=""
+  local client_backup_image=""
+  local api_port=""
+  local repair_failed=0
+
+  echo '=================================================================='
+  echo "Microi：一键更新/修复 API 与 Web 前端（${SCRIPT_VERSION}）"
+  echo 'Microi：本模式不会删除或重建数据库、Redis、MongoDB、MinIO 及其数据卷。'
+  echo '=================================================================='
+  command -v docker > /dev/null 2>&1 || { echo 'Microi：错误：未安装 Docker。'; return 1; }
+  command -v curl > /dev/null 2>&1 || { echo 'Microi：错误：缺少 curl。'; return 1; }
+  command -v openssl > /dev/null 2>&1 || { echo 'Microi：错误：缺少 openssl。'; return 1; }
+  docker info > /dev/null 2>&1 || { echo 'Microi：错误：Docker daemon 当前不可访问。'; return 1; }
+  docker compose version > /dev/null 2>&1 || { echo 'Microi：错误：需要 Docker Compose V2。'; return 1; }
+
+  REPAIR_TEMP_DIR=$(mktemp -d /tmp/microi_app_repair_XXXXXX)
+  chmod 700 "${REPAIR_TEMP_DIR}"
+  trap 'repair_mode_cleanup "$?"' EXIT
+
+  repair_add_container_compose_candidate microi-install-api || return 1
+  repair_add_container_compose_candidate microi-install-client || return 1
+  if [ "${REPAIR_LABEL_CANDIDATE_COUNT}" -eq 0 ]; then
+    repair_add_candidate "${panel_file}"
+    repair_add_candidate "${panel_base}/microi-install-app/compose.yml"
+    repair_add_candidate "${default_base}/microi-install-app/docker-compose.yml"
+    repair_add_candidate "${default_base}/microi-install-app/compose.yml"
+  fi
+
+  for candidate in "${REPAIR_CANDIDATES[@]:-}"; do
+    [ -n "${candidate}" ] || continue
+    if repair_config_has_app_services "${candidate}"; then
+      candidate_index=$((candidate_index + 1))
+      canonical_file="${REPAIR_TEMP_DIR}/candidate-${candidate_index}.yml"
+      docker compose -f "${candidate}" config > "${canonical_file}"
+      chmod 600 "${canonical_file}"
+      canonical_hash=$(repair_hash_file "${canonical_file}")
+      if [ -z "${selected_file}" ]; then
+        selected_file="${candidate}"
+        selected_hash="${canonical_hash}"
+        selected_canonical="${canonical_file}"
+      elif [ "${selected_hash}" != "${canonical_hash}" ]; then
+        echo 'Microi：错误：发现多个内容不同的 API/Web 编排文件，无法安全猜测现场配置：'
+        printf '  - %s\n' "${selected_file}" "${candidate}"
+        echo 'Microi：未删除任何容器。请确认应保留的编排文件后再执行修复。'
+        return 1
+      elif [[ "${candidate}" == "${panel_base}/"* ]]; then
+        selected_file="${candidate}"
+        selected_canonical="${canonical_file}"
+      fi
+      valid_count=$((valid_count + 1))
+    fi
+  done
+  if [ "${valid_count}" -eq 0 ]; then
+    echo 'Microi：错误：没有找到同时包含 microi-install-api 和 microi-install-client 的有效 Compose 文件。'
+    echo 'Microi：未删除任何容器；请先从安装备份恢复 microi-install-app/docker-compose.yml。'
+    return 1
+  fi
+
+  api_project=$(docker inspect microi-install-api \
+    --format '{{ index .Config.Labels "com.docker.compose.project" }}' 2>/dev/null || true)
+  client_project=$(docker inspect microi-install-client \
+    --format '{{ index .Config.Labels "com.docker.compose.project" }}' 2>/dev/null || true)
+  [ "${api_project}" != "<no value>" ] || api_project=""
+  [ "${client_project}" != "<no value>" ] || client_project=""
+  if [ -n "${api_project}" ] && [ "${api_project}" = "${client_project}" ]; then
+    project_name="${api_project}"
+  else
+    project_name=$(sed -n -E 's/^name:[[:space:]]+//p' "${selected_canonical}" | head -1 | tr -d "'\"")
+    [ -n "${project_name}" ] || project_name='microi-install-app'
+  fi
+  if ! [[ "${project_name}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+    echo "Microi：错误：Compose project 名称不安全：${project_name}"
+    return 1
+  fi
+
+  # 宝塔标准编排目录存在但应用编排在默认目录时，将已经解析完整的现场配置
+  # 原样落入宝塔目录。解析结果包含所有环境值，不依赖源目录中的相对 .env。
+  if [ -d "${panel_base}" ] && [[ "${selected_file}" != "${panel_base}/"* ]]; then
+    if [ -f "${panel_file}" ]; then
+      echo "Microi：错误：宝塔应用编排 ${panel_file} 已存在但未通过一致性选择。"
+      return 1
+    fi
+    mkdir -p "$(dirname "${panel_file}")"
+    cp "${selected_canonical}" "${panel_file}"
+    chmod 600 "${panel_file}"
+    selected_file="${panel_file}"
+    selected_canonical="${REPAIR_TEMP_DIR}/panel-canonical.yml"
+    docker compose -p "${project_name}" -f "${selected_file}" config > "${selected_canonical}"
+    chmod 600 "${selected_canonical}"
+    echo "Microi：已将完整应用编排恢复到宝塔目录：${selected_file} ✓"
+  fi
+
+  repair_validate_api_environment "${selected_canonical}" || return 1
+  echo "Microi：已锁定应用编排：${selected_file}"
+  echo "Microi：Compose project：${project_name}"
+
+  if [ "$(docker inspect microi-install-watchtower --format '{{.State.Running}}' 2>/dev/null || true)" = "true" ]; then
+    docker stop microi-install-watchtower > /dev/null
+    REPAIR_WATCHTOWER_WAS_RUNNING=1
+    echo 'Microi：已临时停止 Watchtower，避免修复过程中并发替换应用容器。'
+  fi
+
+  backup_stamp=$(date '+%Y%m%d-%H%M%S')
+  backup_dir="$(dirname "${selected_file}")/.repair-backups/${backup_stamp}"
+  mkdir -p "${backup_dir}"
+  chmod 700 "$(dirname "${selected_file}")/.repair-backups" "${backup_dir}"
+  cp "${selected_file}" "${backup_dir}/docker-compose.before.yml"
+  chmod 600 "${backup_dir}/docker-compose.before.yml"
+  for candidate in microi-install-api microi-install-client; do
+    if docker inspect "${candidate}" > /dev/null 2>&1; then
+      docker inspect "${candidate}" > "${backup_dir}/${candidate}.inspect.json"
+      chmod 600 "${backup_dir}/${candidate}.inspect.json"
+    fi
+  done
+
+  if ! repair_migrate_app_to_internal_network \
+    "${selected_file}" "${selected_canonical}" "${project_name}"; then
+    echo 'Microi：错误：应用容器内网迁移失败，未删除任何应用容器。'
+    return 1
+  fi
+  selected_canonical="${REPAIR_INTERNAL_CANONICAL}"
+
+  api_image_id=$(docker inspect microi-install-api --format '{{.Image}}' 2>/dev/null || true)
+  client_image_id=$(docker inspect microi-install-client --format '{{.Image}}' 2>/dev/null || true)
+  api_backup_image="microi-local-backup/microi-install-api:${backup_stamp}"
+  client_backup_image="microi-local-backup/microi-install-client:${backup_stamp}"
+  [ -n "${api_image_id}" ] && docker image tag "${api_image_id}" "${api_backup_image}"
+  [ -n "${client_image_id}" ] && docker image tag "${client_image_id}" "${client_backup_image}"
+  echo "Microi：修复前配置、容器元数据和旧镜像恢复点已保存：${backup_dir} ✓"
+
+  echo 'Microi：正在按现场 Compose 配置拉取 API/Web 镜像...'
+  if ! docker compose -p "${project_name}" -f "${selected_file}" \
+    pull microi-install-api microi-install-client; then
+    echo 'Microi：错误：镜像拉取失败，未删除任何应用容器。'
+    return 1
+  fi
+
+  echo 'Microi：正在移除并重建两个无状态应用容器（不会操作任何数据容器/数据卷）...'
+  docker rm -f microi-install-api microi-install-client > /dev/null 2>&1 || true
+  if ! docker compose -p "${project_name}" -f "${selected_file}" \
+    up -d --force-recreate --no-deps microi-install-api microi-install-client; then
+    echo 'Microi：错误：新 API/Web 容器创建失败，正在自动恢复修复前镜像...'
+    repair_restore_previous_app_images "${selected_file}" "${project_name}" \
+      "${api_backup_image}" "${client_backup_image}" || true
+    return 1
+  fi
+
+  if ! repair_validate_runtime_environment; then
+    repair_failed=1
+  fi
+  api_port=$(docker port microi-install-api 80/tcp 2>/dev/null | head -1 | sed -E 's/.*:([0-9]+)$/\1/' || true)
+  if [ -z "${api_port}" ]; then
+    echo 'Microi：错误：无法回读 API 宿主机端口。'
+    repair_failed=1
+  fi
+  if [ "${repair_failed}" -eq 0 ] \
+    && ! repair_wait_for_api "${api_port}" '/api/Diagnostics/liveness' 'liveness' 180; then
+    repair_failed=1
+  fi
+  if [ "${repair_failed}" -eq 0 ] \
+    && ! repair_wait_for_api "${api_port}" '/api/Diagnostics/health' 'readiness' 180; then
+    repair_failed=1
+  fi
+  if [ "${repair_failed}" -ne 0 ]; then
+    docker logs --tail 100 microi-install-api 2>&1 || true
+    echo 'Microi：修复验收失败，正在自动恢复修复前镜像...'
+    repair_restore_previous_app_images "${selected_file}" "${project_name}" \
+      "${api_backup_image}" "${client_backup_image}" || true
+    return 1
+  fi
+
+  echo '=================================================================='
+  echo 'Microi：API 与 Web 前端更新/修复完成 ✓'
+  echo 'Microi：API 的 liveness、readiness 和十项启动配置均已回读通过。'
+  echo 'Microi：数据库、Redis、MongoDB、MinIO 容器及数据卷未被删除或重建。'
+  echo "Microi：现场恢复点：${backup_dir}"
+  echo '=================================================================='
+}
+
+if [ "${1:-}" = '--repair-app' ]; then
+  repair_microi_app
+  exit 0
+fi
 
 # 安装后半程的失败收尾状态。只有端口、密码和数据目录全部生成后才启用恢复汇总，
 # 既保留真正的非零退出码，也避免早期输入/环境错误输出尚未生成的敏感配置。
@@ -935,11 +1492,12 @@ else
   exit 1
 fi
 
-# === 可选的 Microi Docker 固定网段 ===
+# === Microi Docker 共享内网（可选固定网段）===
 echo ''
-echo 'Microi：是否创建并让所有编排使用指定网段的 microi Docker 网络？'
-echo 'Microi：输入 1 配置，输入 0 使用 Docker Compose 默认网络：'
-echo 'Microi：默认是0（否），一般情况请直接按Enter跳过设置。'
+echo 'Microi：所有编排都会接入共享的 microi Docker bridge 网络，并通过容器名访问内部依赖。'
+echo 'Microi：是否为该网络手工指定固定 subnet/gateway？'
+echo 'Microi：输入 1 手工指定，输入 0 由 Docker 自动分配网段：'
+echo 'Microi：默认是0（自动分配），一般情况请直接按Enter。'
 read -r install_microi_network
 install_microi_network="${install_microi_network:-0}"
 
@@ -1252,22 +1810,22 @@ else
   echo "Microi：Docker Compose 安装成功: $(docker compose version --short 2>/dev/null || docker compose version) ✓"
 fi
 
-# === 创建或校验可选的 Microi 固定网段 ===
+# === 创建或校验 Microi 共享内网；固定网段仅为可选项 ===
 ensure_microi_network() {
   local existing_driver existing_subnet existing_gateway
-
-  if [ "${INSTALL_MICROI_NETWORK}" != "1" ]; then
-    COMPOSE_SERVICE_NETWORK=""
-    COMPOSE_EXTERNAL_NETWORKS=""
-    return 0
-  fi
 
   if docker network inspect microi > /dev/null 2>&1; then
     existing_driver=$(docker network inspect microi --format '{{.Driver}}')
     existing_subnet=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' | head -1)
     existing_gateway=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' | head -1)
 
-    if [ "${existing_driver}" != "bridge" ] || [ "${existing_subnet}" != "${MICROI_NETWORK_SUBNET}" ] || [ "${existing_gateway}" != "${MICROI_NETWORK_GATEWAY}" ]; then
+    if [ "${existing_driver}" != "bridge" ]; then
+      echo "Microi：错误：已存在名为 microi 的 Docker 网络，但驱动为 ${existing_driver}，不是 bridge。"
+      echo 'Microi：为避免影响现有容器，脚本不会自动删除或修改该网络。'
+      exit 1
+    fi
+    if [ "${INSTALL_MICROI_NETWORK}" = "1" ] \
+      && { [ "${existing_subnet}" != "${MICROI_NETWORK_SUBNET}" ] || [ "${existing_gateway}" != "${MICROI_NETWORK_GATEWAY}" ]; }; then
       echo 'Microi：错误：已存在名为 microi 的 Docker 网络，但配置与本次输入不一致。'
       echo "Microi：现有配置: driver=${existing_driver}, subnet=${existing_subnet}, gateway=${existing_gateway}"
       echo "Microi：本次配置: driver=bridge, subnet=${MICROI_NETWORK_SUBNET}, gateway=${MICROI_NETWORK_GATEWAY}"
@@ -1277,15 +1835,24 @@ ensure_microi_network() {
     echo "Microi：已复用现有 microi 网络（${existing_subnet}, gateway ${existing_gateway}）✓"
   else
     echo 'Microi：正在创建 microi Docker 网络...'
-    if docker network create \
-      --driver bridge \
-      --subnet "${MICROI_NETWORK_SUBNET}" \
-      --gateway "${MICROI_NETWORK_GATEWAY}" \
-      microi > /dev/null; then
+    if [ "${INSTALL_MICROI_NETWORK}" = "1" ]; then
+      if ! docker network create \
+        --driver bridge \
+        --subnet "${MICROI_NETWORK_SUBNET}" \
+        --gateway "${MICROI_NETWORK_GATEWAY}" \
+        microi > /dev/null; then
+        echo 'Microi：错误：microi Docker 网络创建失败。请检查指定网段是否与现有网络重叠。'
+        exit 1
+      fi
       echo "Microi：microi 网络创建成功（${MICROI_NETWORK_SUBNET}, gateway ${MICROI_NETWORK_GATEWAY}）✓"
     else
-      echo 'Microi：错误：microi 网络创建失败。请检查该网段是否与现有 Docker 网络重叠。'
-      exit 1
+      if ! docker network create --driver bridge microi > /dev/null; then
+        echo 'Microi：错误：microi Docker 网络创建失败。'
+        exit 1
+      fi
+      existing_subnet=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' | head -1)
+      existing_gateway=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' | head -1)
+      echo "Microi：microi 网络创建成功，Docker 自动分配 ${existing_subnet}（gateway ${existing_gateway}）✓"
     fi
   fi
 
@@ -1317,13 +1884,8 @@ ensure_ocr_runtime_network() {
 
   OCR_COMPOSE_SERVICE_NETWORK=$'    networks:\n      - microi-ocr'
   OCR_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi-ocr:\n    external: true\n    name: microi-ocr'
-  if [ "${INSTALL_MICROI_NETWORK}" = "1" ]; then
-    APP_API_SERVICE_NETWORK=$'    networks:\n      - microi\n      - microi-ocr'
-    APP_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi:\n    external: true\n    name: microi\n  microi-ocr:\n    external: true\n    name: microi-ocr'
-  else
-    APP_API_SERVICE_NETWORK=$'    networks:\n      - microi-ocr'
-    APP_COMPOSE_EXTERNAL_NETWORKS="${OCR_COMPOSE_EXTERNAL_NETWORKS}"
-  fi
+  APP_API_SERVICE_NETWORK=$'    networks:\n      - microi\n      - microi-ocr'
+  APP_COMPOSE_EXTERNAL_NETWORKS=$'networks:\n  microi:\n    external: true\n    name: microi\n  microi-ocr:\n    external: true\n    name: microi-ocr'
 }
 
 # === 检查已有容器/编排 ===
@@ -2509,7 +3071,7 @@ compose_up "${MINIO_DIR}"
 echo 'Microi：等待 MinIO API 就绪...'
 MINIO_READY=false
 for _minio_wait in $(seq 1 60); do
-  if curl -fsS --connect-timeout 2 "http://${LAN_IP}:${MINIO_PORT}/minio/health/live" > /dev/null 2>&1; then
+  if curl -fsS --connect-timeout 2 "http://127.0.0.1:${MINIO_PORT}/minio/health/live" > /dev/null 2>&1; then
     MINIO_READY=true
     break
   fi
@@ -2535,6 +3097,7 @@ fi
 
 run_minio_mc() {
   docker run --rm \
+    --network microi \
     -v "${MINIO_MC_CONFIG_DIR}:/root/.mc" \
     "${MINIO_MC_IMAGE}" --config-dir /root/.mc "$@"
 }
@@ -2542,7 +3105,7 @@ run_minio_mc() {
 MINIO_MC_ALIAS="microi-local"
 MINIO_PRIVATE_BUCKET="mci-private"
 MINIO_PUBLIC_BUCKET="mci-public"
-if ! run_minio_mc alias set "${MINIO_MC_ALIAS}" "http://${LAN_IP}:${MINIO_PORT}" "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
+if ! run_minio_mc alias set "${MINIO_MC_ALIAS}" 'http://microi-install-minio:9000' "${MINIO_ACCESS_KEY}" "${MINIO_SECRET_KEY}"; then
   echo 'Microi：错误：MinIO mc 无法连接已安装的 MinIO 服务。'
   rm -rf "${MINIO_MC_CONFIG_DIR}"
   exit 1
@@ -2566,7 +3129,8 @@ run_minio_mc anonymous get "${MINIO_MC_ALIAS}/${MINIO_PUBLIC_BUCKET}"
 rm -rf "${MINIO_MC_CONFIG_DIR}"
 echo "Microi：MinIO 桶已初始化：${MINIO_PRIVATE_BUCKET}（私有）、${MINIO_PUBLIC_BUCKET}（public）✓"
 
-MINIO_INTERNAL_ENDPOINT="${LAN_IP}:${MINIO_PORT}"
+# 服务端内部流量使用 Docker DNS 与容器端口；浏览器/外部下载继续使用宿主机访问地址。
+MINIO_INTERNAL_ENDPOINT="microi-install-minio:9000"
 MINIO_INTERNET_ENDPOINT="${ACCESS_IP}:${MINIO_PORT}"
 case "${DATABASE_CHOICE}" in
   1|2)
@@ -2934,16 +3498,16 @@ APP_DIR="${COMPOSE_BASE_DIR}/microi-install-app"
 
 case "${DATABASE_CHOICE}" in
   1|2)
-    OS_CLIENT_DB_CONN="Data Source=${LAN_IP};Database=microi_demo;User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
+    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME};Database=microi_demo;User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_INTERNAL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
     ;;
   3)
-    OS_CLIENT_DB_CONN="Data Source=${LAN_IP},${DATABASE_PORT};Initial Catalog=microi_demo;User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
+    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME},${DATABASE_INTERNAL_PORT};Initial Catalog=microi_demo;User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
     ;;
   5)
-    OS_CLIENT_DB_CONN="Server=${LAN_IP};Port=${DATABASE_PORT};User Id=SYSDBA;Password=${DATABASE_PASSWORD};Schema=SYSDBA;"
+    OS_CLIENT_DB_CONN="Server=${DATABASE_CONTAINER_NAME};Port=${DATABASE_INTERNAL_PORT};User Id=SYSDBA;Password=${DATABASE_PASSWORD};Schema=SYSDBA;"
     ;;
   6)
-    OS_CLIENT_DB_CONN="Host=${LAN_IP};Port=${DATABASE_PORT};Database=microi_demo;Username=postgres;Password=${DATABASE_PASSWORD};Pooling=true;Maximum Pool Size=500;"
+    OS_CLIENT_DB_CONN="Host=${DATABASE_CONTAINER_NAME};Port=${DATABASE_INTERNAL_PORT};Database=microi_demo;Username=postgres;Password=${DATABASE_PASSWORD};Pooling=true;Maximum Pool Size=500;"
     ;;
 esac
 
@@ -2975,11 +3539,11 @@ ${APP_API_SERVICE_NETWORK}
       - OsClientNetwork=${RUNTIME_OS_CLIENT_NETWORK}
       - OsClientDbType=${DATABASE_TYPE}
       - OsClientDbConn=${OS_CLIENT_DB_CONN}
-      - OsClientRedisHost=${LAN_IP}
-      - OsClientRedisPort=${REDIS_PORT}
+      - OsClientRedisHost=microi-install-redis
+      - OsClientRedisPort=6379
       - OsClientRedisPwd=${REDIS_PASSWORD}
       - OsClientRedisDataBase=5
-      - OsClientDbMongoConn=mongodb://root:${MONGO_ROOT_PASSWORD}@${LAN_IP}:${MONGO_PORT}/?authSource=admin
+      - OsClientDbMongoConn=mongodb://root:${MONGO_ROOT_PASSWORD}@microi-install-mongodb:27017/?authSource=admin
     volumes:
       - /etc/localtime:/etc/localtime
       - /usr/share/fonts:/usr/share/fonts
@@ -3315,9 +3879,9 @@ if [ "${INSTALL_ONLINE_AI}" == "1" ]; then
   echo "向量开关:    安装程序不会自动修改任何租户的 mic_ai，当前仍保持默认关键词检索。"
   echo "             如需启用，请在 AI 引擎“向量数据库（可选）”Tab 设置："
   echo "             EnableVectorDatabase=1"
-  echo "             EmbeddingApiUrl=http://${LAN_IP}:${OLLAMA_PORT}/v1/embeddings"
-  echo "             QdrantHost=${LAN_IP}"
-  echo "             QdrantPort=${QDRANT_HTTP_PORT}"
+  echo '             EmbeddingApiUrl=http://microi-install-ollama:11434/v1/embeddings'
+  echo '             QdrantHost=microi-install-qdrant'
+  echo '             QdrantPort=6333'
   echo "             QdrantApiKey=${QDRANT_API_KEY}"
   echo "             nomic-embed-text 当前 Microi Ollama HTTP 链路维度：768"
   echo ""
@@ -3349,10 +3913,13 @@ echo "             编排目录: ${COMPOSE_BASE_DIR}/microi-install-watchtower/"
 echo ''
 if [ "${INSTALL_MICROI_NETWORK}" == "1" ]; then
   echo "Docker网络:  microi（bridge，subnet ${MICROI_NETWORK_SUBNET}，gateway ${MICROI_NETWORK_GATEWAY}）"
-  echo "             API 同时接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
 else
-  echo "Docker网络:  基础组件使用各 Compose 默认网络；API 接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
+  MICROI_ACTUAL_SUBNET=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Subnet}}{{end}}' 2>/dev/null | head -1 || true)
+  MICROI_ACTUAL_GATEWAY=$(docker network inspect microi --format '{{range .IPAM.Config}}{{println .Gateway}}{{end}}' 2>/dev/null | head -1 || true)
+  echo "Docker网络:  microi（bridge，Docker自动分配 subnet ${MICROI_ACTUAL_SUBNET:-未知}，gateway ${MICROI_ACTUAL_GATEWAY:-未知}）"
 fi
+echo '             数据库、Redis、MongoDB、MinIO 与 API 通过容器 DNS/内部端口通信'
+echo "             API 同时接入 OCR/翻译内部网络 ${OCR_RUNTIME_NETWORK}"
 echo ''
 echo '------------------------------------------------------------------'
 echo '已开放的防火墙端口（服务器内部防火墙）：'

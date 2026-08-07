@@ -775,23 +775,11 @@ namespace Microi.net.Api
                         
                         // 手动验证签名（可选，如果验证失败也不会中断）
                         var jwtKey = DiyToken.ResolveJwtSigningKey(defaultClientModel);
-                        
-                        // 验证签名（手动方式，不会抛出中断异常）
-                        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-                        var signingCredentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
-                        
-                        // 重新计算签名进行比对
-                        var header = jwtToken.Header.SerializeToJson();
-                        var payload = jwtToken.Payload.SerializeToJson();
-                        var headerBase64 = Base64UrlEncoder.Encode(header);
-                        var payloadBase64 = Base64UrlEncoder.Encode(payload);
-                        var signatureInput = $"{headerBase64}.{payloadBase64}";
-                        
-                        var hmac = new System.Security.Cryptography.HMACSHA256(Encoding.UTF8.GetBytes(jwtKey));
-                        var computedSignature = Base64UrlEncoder.Encode(hmac.ComputeHash(Encoding.UTF8.GetBytes(signatureInput)));
-                        
-                        // 比对签名
-                        if (jwtToken.RawSignature != computedSignature)
+
+                        // JWT 签名输入必须使用收到的原始 Base64Url Header/Payload 段。
+                        // 解析后重新 SerializeToJson 会改变属性顺序或 JSON 表示，导致刚由
+                        // 当前服务签发的合法 Token 也被误判为签名不匹配。
+                        if (!HasValidJwtSignature(tokenString, jwtKey))
                         {
                             MicroiEngine.MongoDB.AddSysLog(new SysLogParam()
                             {
@@ -1135,6 +1123,36 @@ namespace Microi.net.Api
                     {
                     }
                 }
+            }
+        }
+
+        public static bool HasValidJwtSignature(string tokenString, string jwtKey)
+        {
+            if (tokenString.DosIsNullOrWhiteSpace() || jwtKey.DosIsNullOrWhiteSpace())
+            {
+                return false;
+            }
+
+            var segments = tokenString.Split('.');
+            if (segments.Length != 3)
+            {
+                return false;
+            }
+
+            try
+            {
+                var signatureInput = segments[0] + "." + segments[1];
+                using var hmac = new System.Security.Cryptography.HMACSHA256(
+                    Encoding.UTF8.GetBytes(jwtKey));
+                var computedSignature = hmac.ComputeHash(Encoding.UTF8.GetBytes(signatureInput));
+                var suppliedSignature = Base64UrlEncoder.DecodeBytes(segments[2]);
+                return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                    computedSignature,
+                    suppliedSignature);
+            }
+            catch
+            {
+                return false;
             }
         }
     }

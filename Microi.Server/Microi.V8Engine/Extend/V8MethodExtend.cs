@@ -29,7 +29,10 @@ namespace Microi.net
             {
                 using var allocationScope = BeginTrustedHostAllocationScope();
                 var request = ParseEmptyDatabaseReleaseRequest(dynamicParam);
-                return request.Service.Prepare(request.CurrentUser, request.OsClient);
+                return request.Service.Prepare(
+                    request.CurrentUser,
+                    request.OsClient,
+                    request.Param["SanitizationSql"]?.ToString() ?? "");
             }
             catch (Exception ex)
             {
