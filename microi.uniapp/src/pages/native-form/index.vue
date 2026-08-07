@@ -212,6 +212,23 @@
 			@close="closeCustomerPicker" @select="selectCustomerFromPicker" />
 
 		<template #fixed>
+			<view v-if="!loading && !error && tenantFormPresentation.floatingAction"
+				class="tenant-form-floating-action"
+				:class="{ 'tenant-form-floating-action--above-actions': mode !== 'View', 'tenant-form-floating-action--dragging': tenantFloatingActionDragging }"
+				:style="tenantFloatingActionStyle"
+				hover-class="tenant-form-floating-action--pressed"
+				@touchstart="handleTenantFloatingActionDragStart"
+				@touchmove="handleTenantFloatingActionDragMove"
+				@touchend="handleTenantFloatingActionDragEnd"
+				@touchcancel="handleTenantFloatingActionDragCancel"
+				@tap="handleTenantFloatingActionTap">
+				<view class="tenant-form-floating-action__icon">
+					<view v-if="tenantFormPresentation.floatingAction.iconType === 'location'"
+						class="tenant-form-floating-action__pin"></view>
+					<text v-else>{{ tenantFormPresentation.floatingAction.icon || '＋' }}</text>
+				</view>
+				<text>{{ tenantFormPresentation.floatingAction.label }}</text>
+			</view>
 			<view v-if="!loading && !error && mode !== 'View'" class="form-actions">
 				<view class="form-actions__secondary" hover-class="form-actions__pressed" @tap="goBack"><text>取消</text>
 				</view>
@@ -230,6 +247,7 @@
 		getUser,
 		setUser
 	} from '@/utils/request.js'
+	import { getSafeAreaMetrics } from '@/utils/safe-area.js'
 	import {
 		defaultFormData,
 		applyNativeFormViewDefinition,
@@ -282,6 +300,10 @@
 		})
 	}
 
+	const TENANT_FLOATING_ACTION_DRAG_THRESHOLD = 8
+	const TENANT_FLOATING_ACTION_EDGE_MARGIN = 12
+	const TENANT_FLOATING_ACTION_POSITION_VERSION = 1
+
 	export default {
 		components: { MciBusinessRelatedList, MciCustomerPicker },
 		mixins: [themeMixin],
@@ -319,7 +341,13 @@
 				expandedGroupKeys: [],
 				activeFormTabKey: '',
 				// zhy: 标识最近一次表单加载，防止编辑或重试并发时旧响应覆盖新页面。
-				formLoadId: 0
+				formLoadId: 0,
+				tenantFloatingActionX: null,
+				tenantFloatingActionY: null,
+				tenantFloatingActionMetrics: null,
+				tenantFloatingActionDragState: null,
+				tenantFloatingActionDragging: false,
+				tenantFloatingActionSuppressTap: false
 			}
 		},
 		computed: {
@@ -393,6 +421,15 @@
 			tenantFormPresentation() {
 				return getTenantFormPresentation(this.tenantFormContext())
 			},
+			tenantFloatingActionStyle() {
+				if (!Number.isFinite(this.tenantFloatingActionX) || !Number.isFinite(this.tenantFloatingActionY)) return {}
+				return {
+					left: `${this.tenantFloatingActionX}px`,
+					top: `${this.tenantFloatingActionY}px`,
+					right: 'auto',
+					bottom: 'auto'
+				}
+			},
 			tenantFormPresentationMarkers() {
 				const location = this.tenantFormPresentation.location || {}
 				if (!location.latitude || !location.longitude) return []
@@ -429,11 +466,16 @@
 			this.moduleEngineKey = decodeURIComponent(options.moduleEngineKey || '')
 			this.tableChildAuth = parseJson(decodeURIComponent(options.tableChildAuth || ''), null)
 			this.tenantFormState = createTenantFormState(this.tenantFormContext())
+			this.refreshTenantFloatingActionMetrics()
 			this.loadForm()
 		},
 		onShow() {
 			if (this.loading || !this.definition) return
+			this.refreshTenantFloatingActionMetrics()
 			refreshTenantFormDerivedValues(this.tenantFormContext()).catch(() => {})
+		},
+		onResize() {
+			this.refreshTenantFloatingActionMetrics()
 		},
 		onUnload() {
 			// zhy: 页面销毁后作废仍在执行的异步加载，避免卸载后继续写入页面状态。
@@ -442,6 +484,137 @@
 			disposeTenantForm(this.tenantFormContext())
 		},
 		methods: {
+			tenantFloatingActionStorageKey() {
+				const actionKey = this.tenantFormPresentation.floatingAction?.key || 'default'
+				return `mci:form-floating-action:${String(this.tableName || '').toLowerCase()}:${actionKey}`
+			},
+			refreshTenantFloatingActionMetrics() {
+				const metrics = getSafeAreaMetrics()
+				this.tenantFloatingActionMetrics = {
+					top: Number(metrics?.top) || 0,
+					headerHeight: Number(metrics?.headerHeight) || (Number(metrics?.top) || 0) + 44,
+					left: Number(metrics?.left) || 0,
+					right: Number(metrics?.right) || 0,
+					bottom: Number(metrics?.bottom) || 0,
+					windowWidth: Number(metrics?.windowWidth) || 375,
+					windowHeight: Number(metrics?.windowHeight) || 667
+				}
+				this.ensureTenantFloatingActionPosition()
+			},
+			tenantFloatingActionBounds() {
+				const metrics = this.tenantFloatingActionMetrics || {
+					top: 0, headerHeight: 44, left: 0, right: 0, bottom: 0, windowWidth: 375, windowHeight: 667
+				}
+				const width = Math.max(82, metrics.windowWidth * 164 / 750)
+				const height = Math.max(38, metrics.windowWidth * 76 / 750)
+				const minX = metrics.left + TENANT_FLOATING_ACTION_EDGE_MARGIN
+				const maxX = Math.max(minX, metrics.windowWidth - metrics.right - width - TENANT_FLOATING_ACTION_EDGE_MARGIN)
+				const minY = Math.max(metrics.top, metrics.headerHeight) + TENANT_FLOATING_ACTION_EDGE_MARGIN
+				const bottomReserve = this.mode === 'View' ? 90 : 75
+				const maxY = Math.max(minY, metrics.windowHeight - metrics.bottom - height - bottomReserve)
+				return { width, height, minX, maxX, minY, maxY }
+			},
+			clampTenantFloatingActionPosition(x, y) {
+				const bounds = this.tenantFloatingActionBounds()
+				return {
+					x: Math.min(bounds.maxX, Math.max(bounds.minX, Number(x) || 0)),
+					y: Math.min(bounds.maxY, Math.max(bounds.minY, Number(y) || 0))
+				}
+			},
+			defaultTenantFloatingActionPosition() {
+				const bounds = this.tenantFloatingActionBounds()
+				return { x: bounds.maxX, y: bounds.maxY }
+			},
+			readTenantFloatingActionPosition() {
+				try {
+					const stored = uni.getStorageSync(this.tenantFloatingActionStorageKey())
+					if (!stored || Number(stored.version) !== TENANT_FLOATING_ACTION_POSITION_VERSION) return null
+					if (!Number.isFinite(Number(stored.x)) || !Number.isFinite(Number(stored.y))) return null
+					return this.clampTenantFloatingActionPosition(stored.x, stored.y)
+				} catch (error) {
+					return null
+				}
+			},
+			persistTenantFloatingActionPosition() {
+				try {
+					uni.setStorageSync(this.tenantFloatingActionStorageKey(), {
+						version: TENANT_FLOATING_ACTION_POSITION_VERSION,
+						x: this.tenantFloatingActionX,
+						y: this.tenantFloatingActionY
+					})
+				} catch (error) {}
+			},
+			ensureTenantFloatingActionPosition() {
+				if (!this.tenantFloatingActionMetrics) return
+				const current = Number.isFinite(this.tenantFloatingActionX) && Number.isFinite(this.tenantFloatingActionY)
+					? this.clampTenantFloatingActionPosition(this.tenantFloatingActionX, this.tenantFloatingActionY)
+					: (this.readTenantFloatingActionPosition() || this.defaultTenantFloatingActionPosition())
+				this.tenantFloatingActionX = current.x
+				this.tenantFloatingActionY = current.y
+			},
+			tenantFloatingActionTouchPoint(event) {
+				const touch = event?.touches?.[0] || event?.changedTouches?.[0]
+				if (!touch) return null
+				const x = Number(touch.clientX ?? touch.pageX)
+				const y = Number(touch.clientY ?? touch.pageY)
+				return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+			},
+			handleTenantFloatingActionDragStart(event) {
+				const point = this.tenantFloatingActionTouchPoint(event)
+				if (!point) return
+				this.ensureTenantFloatingActionPosition()
+				this.tenantFloatingActionDragState = {
+					startX: point.x,
+					startY: point.y,
+					originX: this.tenantFloatingActionX,
+					originY: this.tenantFloatingActionY,
+					moved: false
+				}
+				this.tenantFloatingActionDragging = false
+			},
+			handleTenantFloatingActionDragMove(event) {
+				const state = this.tenantFloatingActionDragState
+				const point = this.tenantFloatingActionTouchPoint(event)
+				if (!state || !point) return
+				const deltaX = point.x - state.startX
+				const deltaY = point.y - state.startY
+				if (!state.moved && Math.hypot(deltaX, deltaY) < TENANT_FLOATING_ACTION_DRAG_THRESHOLD) return
+				state.moved = true
+				this.tenantFloatingActionDragging = true
+				if (typeof event.stopPropagation === 'function') event.stopPropagation()
+				if (typeof event.preventDefault === 'function') event.preventDefault()
+				const position = this.clampTenantFloatingActionPosition(state.originX + deltaX, state.originY + deltaY)
+				this.tenantFloatingActionX = position.x
+				this.tenantFloatingActionY = position.y
+			},
+			handleTenantFloatingActionDragEnd() {
+				const moved = Boolean(this.tenantFloatingActionDragState?.moved)
+				this.tenantFloatingActionDragState = null
+				this.tenantFloatingActionDragging = false
+				if (!moved) return
+				const bounds = this.tenantFloatingActionBounds()
+				const metrics = this.tenantFloatingActionMetrics || { windowWidth: 375 }
+				const snapX = this.tenantFloatingActionX + bounds.width / 2 <= metrics.windowWidth / 2
+					? bounds.minX
+					: bounds.maxX
+				const position = this.clampTenantFloatingActionPosition(snapX, this.tenantFloatingActionY)
+				this.tenantFloatingActionX = position.x
+				this.tenantFloatingActionY = position.y
+				this.persistTenantFloatingActionPosition()
+				this.tenantFloatingActionSuppressTap = true
+				setTimeout(() => { this.tenantFloatingActionSuppressTap = false }, 180)
+			},
+			handleTenantFloatingActionDragCancel() {
+				this.tenantFloatingActionDragState = null
+				this.tenantFloatingActionDragging = false
+				this.tenantFloatingActionSuppressTap = true
+				setTimeout(() => { this.tenantFloatingActionSuppressTap = false }, 180)
+			},
+			handleTenantFloatingActionTap() {
+				if (this.tenantFloatingActionSuppressTap || this.tenantFloatingActionDragging) return
+				const actionKey = this.tenantFormPresentation.floatingAction?.key
+				if (actionKey) this.runTenantPresentationAction(actionKey)
+			},
 			isEmbeddedChildRelated(item) {
 				return item?.type === 'child' && Boolean(item.field?.layoutGroupKey)
 			},
@@ -648,6 +821,7 @@
 			},
 			async switchToEdit() {
 				this.mode = 'Edit'
+				this.ensureTenantFloatingActionPosition()
 				await this.loadForm()
 			},
 			tenantFormContext(extra = {}) {
@@ -1488,6 +1662,82 @@
 		height: calc(132rpx + var(--mci-safe-bottom));
 	}
 
+	.tenant-form-floating-action {
+		position: fixed;
+		box-sizing: border-box;
+		z-index: 39;
+		right: calc(var(--mci-safe-right) + 24rpx);
+		bottom: calc(var(--mci-safe-bottom) + 180rpx);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10rpx;
+		min-width: 164rpx;
+		height: 76rpx;
+		padding: 0 22rpx 0 14rpx;
+		border: 1rpx solid rgba(255, 255, 255, .42);
+		border-radius: 38rpx;
+		color: #fff;
+		background: linear-gradient(135deg, #078bc2, #11aaa4);
+		box-shadow: 0 10rpx 26rpx rgba(7, 139, 194, .24), 0 2rpx 8rpx rgba(19, 66, 82, .1);
+		font-size: 24rpx;
+		font-weight: 650;
+		letter-spacing: 1rpx;
+		transition: transform .16s ease, opacity .16s ease, box-shadow .16s ease;
+		touch-action: none;
+	}
+
+	.tenant-form-floating-action--above-actions {
+		bottom: calc(var(--mci-safe-bottom) + 150rpx);
+	}
+
+	.tenant-form-floating-action--pressed {
+		transform: translateY(2rpx) scale(.97);
+		opacity: .9;
+		box-shadow: 0 5rpx 14rpx rgba(7, 139, 194, .2);
+	}
+
+	.tenant-form-floating-action--dragging {
+		opacity: .9;
+		transition: none;
+	}
+
+	.tenant-form-floating-action__icon {
+		display: flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 46rpx;
+		height: 46rpx;
+		border: 1rpx solid rgba(255, 255, 255, .5);
+		border-radius: 50%;
+		color: #fff;
+		background: rgba(255, 255, 255, .16);
+		font-size: 30rpx;
+		line-height: 1;
+	}
+
+	.tenant-form-floating-action__pin {
+		position: relative;
+		box-sizing: border-box;
+		width: 19rpx;
+		height: 24rpx;
+		border: 3rpx solid #fff;
+		border-radius: 50% 50% 50% 0;
+		transform: rotate(-45deg);
+	}
+
+	.tenant-form-floating-action__pin::after {
+		position: absolute;
+		top: 4rpx;
+		left: 4rpx;
+		width: 5rpx;
+		height: 5rpx;
+		border-radius: 50%;
+		background: #fff;
+		content: '';
+	}
+
 	.form-actions {
 		position: fixed;
 		z-index: 40;
@@ -1601,6 +1851,7 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
+		.tenant-form-floating-action,
 		.form-section,
 		.form-section__header,
 		.form-section__toggle,

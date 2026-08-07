@@ -201,8 +201,12 @@ function isFollowupAdd(context) {
   return isFollowupForm(context) && context.mode === 'Add' && !context.rowId
 }
 
+function isPrimaryFollowupForm(context) {
+  return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE
+}
+
 function isFollowupForm(context) {
-  if (String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE) return true
+  if (isPrimaryFollowupForm(context)) return true
   // zhy：项目合伙人跟进记录与普通跟进记录使用同一组核心字段，
   // 不依赖租户动态表名，按字段结构复用当前用户、当天日期及客户联系人联动。
   return [
@@ -1087,6 +1091,7 @@ export function createState() {
     followupInitialized: false,
     followupCustomerId: '',
     followupCustomerName: '',
+    openingFollowupCheckin: false,
     proposalInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
@@ -1267,6 +1272,16 @@ export function getPresentation(context) {
       }
     }
   }
+  // 仅标准跟进记录提供拜访打卡；项目合伙人跟进记录只复用字段联动，不显示该入口。
+  if (isPrimaryFollowupForm(context)) {
+    return {
+      floatingAction: {
+        key: 'xjy-followup-checkin',
+        label: '拜访打卡',
+        iconType: 'location'
+      }
+    }
+  }
   return {}
 }
 
@@ -1277,6 +1292,28 @@ export async function runPresentationAction(context, action) {
   }
   if (action && action.key === 'xjy-customer-address-location') {
     await locateCustomer(context, true)
+    return { handled: true }
+  }
+  if (action && action.key === 'xjy-followup-checkin') {
+    if (context.state.openingFollowupCheckin) return { handled: true }
+    context.state.openingFollowupCheckin = true
+    const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
+    const customerNameName = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+    const customerId = String(context.form[customerIdName] || context.state.followupCustomerId || '')
+    const customerName = String(context.form[customerNameName] || context.state.followupCustomerName || '')
+    const params = [
+      `returnToFollowup=1`,
+      `customerId=${encodeURIComponent(customerId)}`,
+      `customer=${encodeURIComponent(customerName)}`
+    ]
+    uni.navigateTo({
+      url: `/pages/native/checkin?${params.join('&')}`,
+      success: () => setTimeout(() => { context.state.openingFollowupCheckin = false }, 600),
+      fail: () => {
+        context.state.openingFollowupCheckin = false
+        uni.showToast({ title: '拜访打卡页面打开失败', icon: 'none' })
+      }
+    })
     return { handled: true }
   }
   return { handled: false }
