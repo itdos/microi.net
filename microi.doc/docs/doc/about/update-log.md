@@ -1,5 +1,15 @@
 # 更新日志
 
+## v7.1.4 - (2026-08-07 16:14)
+
+- **版本发布与四仓边界**：写入本日志前，根仓库共有 4 个已跟踪文件和 1 个未跟踪测试文件待提交，Microi.net、Microi.AI 子仓库各有 1 个版本文件待提交，Microi.VSCode 子仓库工作区干净；`dist`、`bin`、`obj` 等生成目录不纳入功能分析。Microi.net 与 Microi.AI 的程序集、文件和 NuGet 版本由 v7.1.3 升至 v7.1.4，VS Code 插件本轮没有源码或版本差异，因此不虚构插件更新内容。
+- **个人设置微应用路由解析修复**：微应用页面解析不再把 `PagePath` 重复拼接为应用根路径，支持 `/personal-settings` 等由应用 Manifest 声明的页面路由；线上曾出现的 `MICRO_APP_PAGE_RESOLVE_FAILED` 已在源码中修复，正式生产站点仍以其自动拉取 v7.1.4 后端镜像、重建节点并完成登录点击回归为最终验收。
+- **身份验证应用商城正式交付**：遵循“表、字段、配置、微应用优先通过应用商城升级”的平台规范，将官方“吾码 SaaS 引擎”应用由 v6.3.5 升级至 v6.3.6；完整包纳入 `mci_identity_credential`、`mci_identity_device`、`mci_identity_face` 三张身份表、443 个字段资源中的相关身份字段、9 项 `sys_osclients` 身份配置，以及 `microi-platform-service` v1.3.0 的 `/personal-settings` 等 6 个路由和 4 个构建资产。原有 8 个核心接口引擎继续保留逐项 `Managed` 基线与资源策略，未新增重复 .NET 数据迁移或第二套 Token／权限体系。
+- **iTdos 身份能力在线开启**：通过绑定 `https://api.itdos.com + OsClient=iTdos + Product/Internal` 的官方 MCP，把设备身份验证、Passkey 和修改密码步进验证设为启用，RP ID 固定为 `os.itdos.com`、Origin 固定为 `https://os.itdos.com`；配置写后数据库精确回读一致，运行时 `GetCapabilities` 返回 `Enabled=true`、`PasskeyEnabled=true`、`PasswordChangeStepUp=true`、`SessionSystem=DiyToken`、`StoresBiometricImages=false`。严格人脸因尚未配置可信 `Microi Face Gateway v1` 地址和密钥而保持关闭，防止只开开关却形成不可用或不安全的登录入口。
+- **受保护平台表提交稳定性**：表单提交时优先使用表定义名称；当平台安全投影不向前端返回 `Name` 时，依次回退调用方 `TableName` 与后端支持的 `TableId`，同时传递 `_TableId`，若三者都无法解析则在前端失败关闭，避免发送空 `FormEngineKey` 导致修改个人资料、密码或其它受保护表单失败。新增静态回归用例锁定表身份回退、空值守卫和旧式直接取名路径已移除。
+- **一键安装器 Docker 内网与无损修复**：所有独立 Compose 编排默认接入共享 `microi` bridge 网络，API 通过容器 DNS 和内部端口访问数据库、Redis、MongoDB、MinIO，宿主机端口仅用于浏览器、运维和本机健康探测；MinIO 初始化与服务端端点同步改走内网。新增 `bash install-microi.sh --repair-app`，可从容器 Compose 标签和标准目录精确定位现场配置，先保存 Compose、容器元数据与旧镜像恢复点，再仅重建无状态 API/Web 容器；数据库、Redis、MongoDB、MinIO 容器、目录和 volume 均不删除，配置冲突或 liveness/readiness 失败时停止并尝试恢复旧镜像。官网 Docker 文档和 17 项 SaaS/安装器契约测试同步覆盖这一边界。
+- **定向测试与 v7.1.4 公开发布**：表单表身份回退 1 项、SaaS/安装器契约 17 项和安装脚本 Bash 语法检查全部通过。一键主发布以 `__MICROI_RELEASE_EXIT__=0` 完成现代前端、串行压缩、Chrome 49 legacy、后端 Release、API HTTP 200 存活探测、Microi.net／Microi.AI NuGet 推送及前后端正式／测试 Docker 发布；后端 0 个编译错误，保留 `Microsoft.Bcl.Memory 9.0.0` 已知高严重性漏洞和少量 xUnit／Dockerfile 分析告警。阿里云后端标签收敛至索引摘要 `sha256:04f4f872...d36782`，前端标签收敛至 `sha256:80c6e80a...fdcc0`；写日志时 NuGet.org Flat Container 尚在传播并返回 404，不能描述为公共下载回读已通过，公共制品发布也不等于所有生产节点已拉取重建或实体人脸／Passkey 设备验收完成。
+
 ## v7.1.3 - (2026-08-07 14:55)
 
 - **版本发布与四仓边界**：Microi.Client、Microi.net、Microi.AI、Dos.Common、Dos.ORM、Microi.Core、Microi.Upgrade 及缓存、验证码、HDFS、任务调度、消息队列、MQTT、MongoDB、OCR、Office、搜索、采集、V8、微信等服务器端公共组件统一升级至 v7.1.3；Microi VS Code 插件、独立 CLI 与内置 Skills 升级至 v4.7.5。写入本日志前共有：根仓库 28 个已跟踪文件，Microi.net 6 个已跟踪文件，Microi.AI 1 个已跟踪文件，Microi.VSCode 2 个已跟踪文件；四仓均无未跟踪或已暂存文件。Microi.AI 本轮只有程序集、文件和 NuGet 版本差异，Microi.VSCode 本轮只有插件与 CLI 版本差异。
