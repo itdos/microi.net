@@ -57,7 +57,7 @@
                     <div class="quick-grid__icon quick-grid__icon--cyan"><fa-icon icon="fas fa-globe" /></div>
                     <span class="quick-grid__label">语言</span>
                 </div>
-                <div class="quick-grid__item" @click="showPasswordDialog = true">
+                <div class="quick-grid__item" @click="openPersonalSettings('password')">
                     <div class="quick-grid__icon quick-grid__icon--gold"><el-icon><Lock /></el-icon></div>
                     <span class="quick-grid__label">修改密码</span>
                 </div>
@@ -130,29 +130,6 @@
                 </div>
             </div>
         </el-drawer>
-
-        <!-- 修改密码 -->
-        <el-dialog
-            v-model="showPasswordDialog" draggable align-center
-            title="修改密码" width="92%" class="mci-submenu-dialog"
-            :close-on-click-modal="false"
-        >
-            <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-position="top">
-                <el-form-item label="原密码" prop="oldPassword">
-                    <el-input v-model="passwordForm.oldPassword" type="password" placeholder="请输入原密码" show-password />
-                </el-form-item>
-                <el-form-item label="新密码" prop="newPassword">
-                    <el-input v-model="passwordForm.newPassword" type="password" placeholder="请输入新密码" show-password />
-                </el-form-item>
-                <el-form-item label="确认密码" prop="confirmPassword">
-                    <el-input v-model="passwordForm.confirmPassword" type="password" placeholder="请再次输入新密码" show-password />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <el-button @click="showPasswordDialog = false">取消</el-button>
-                <el-button type="primary" :loading="passwordLoading" @click="submitPassword">确定</el-button>
-            </template>
-        </el-dialog>
 
         <!-- 关于 -->
         <el-dialog v-model="showAbout" title="关于系统" width="92%" class="mci-submenu-dialog" draggable align-center>
@@ -361,7 +338,6 @@ const currentLang = computed(() => {
 });
 
 const showThemePanel = ref(false);
-const showPasswordDialog = ref(false);
 const showAbout = ref(false);
 const showLangSelect = ref(false);
 
@@ -434,26 +410,11 @@ const confirmServerUrl = () => {
     }).catch(() => { serverUrlLoading.value = false; });
 };
 
-// === 密码 ===
-const passwordFormRef = ref(null);
-const passwordLoading = ref(false);
-const passwordForm = reactive({ oldPassword: '', newPassword: '', confirmPassword: '' });
-
-const validateConfirmPassword = (rule, value, callback) => {
-    if (value !== passwordForm.newPassword) callback(new Error('两次输入的密码不一致'));
-    else callback();
-};
-
-const passwordRules = {
-    oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
-    newPassword: [
-        { required: true, message: '请输入新密码', trigger: 'blur' },
-        { min: 6, message: '密码长度不能小于6位', trigger: 'blur' }
-    ],
-    confirmPassword: [
-        { required: true, message: '请再次输入新密码', trigger: 'blur' },
-        { validator: validateConfirmPassword, trigger: 'blur' }
-    ]
+const openPersonalSettings = (action = '') => {
+    router.push({
+        path: '/micro-app/microi-platform-service/personal-settings',
+        query: { section: 'security', action }
+    }).catch(() => {});
 };
 
 const changeTheme = (color) => {
@@ -462,24 +423,6 @@ const changeTheme = (color) => {
     diyStore.setThemeColor(appliedColor || color);
     showThemePanel.value = false;
     ElMessage.success('主题已切换');
-};
-
-const submitPassword = async () => {
-    if (!passwordFormRef.value) return;
-    await passwordFormRef.value.validate((valid) => {
-        if (valid) {
-            passwordLoading.value = true;
-            setTimeout(() => {
-                passwordLoading.value = false;
-                showPasswordDialog.value = false;
-                passwordForm.oldPassword = '';
-                passwordForm.newPassword = '';
-                passwordForm.confirmPassword = '';
-                ElMessage.success('密码修改成功，请重新登录');
-                setTimeout(() => { handleLogout(false); }, 1500);
-            }, 1000);
-        }
-    });
 };
 
 const handleSetLanguage = (lang) => {

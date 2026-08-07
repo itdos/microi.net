@@ -46,7 +46,7 @@ return { Code: 1, Data: result.Data };
 
 ```js
 var fileResult = V8.TranslateEngine.TranslateFile({
-  FileByteBase64: V8.FilesByteBase64.contract,
+  FileByteBase64: V8.FilesByteBase64['contract.docx'],
   FileName: 'contract.docx',
   FromLang: 'auto',
   Lang: 'en'

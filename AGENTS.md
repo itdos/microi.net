@@ -519,6 +519,14 @@ console.log('调试信息')                                  // 控制台输出�
 
 ## 接口引擎与应用商城优先规范（强制）
 
+### 身份、可逆业务秘密与强身份验证（强制）
+
+- DiyToken 继续作为吾码多租户、多终端、V8、角色/部门、菜单、表权限和数据范围的唯一会话入口。新增密码、SSO、OAuth、Passkey 或人脸登录时，验证成功后签发 DiyToken；禁止整体替换为 ASP.NET Identity 或并行创建第二套用户/权限 Token。
+- 登录密码的新存储使用后端带盐、可调成本的专用密码哈希；存量 `PwdEncode=DES` 的管理员显示密码仅作兼容，不开放给普通 V8、FormEngine、匿名或访问密钥会话。
+- 业务明确要求再次显示原文的设备口令、第三方业务账号密码等字段允许可逆加密：只在可信后端加解密，列表/导出默认掩码，显示明文使用独立授权动作、`no-store`、不含明文的审计和前端超时清除。DES 是兼容格式，新高价值秘密优先使用带版本的现代认证加密与集中密钥管理。
+- 敏感操作前端用 `V8.Identity.Verify` 申请 Passkey/严格人脸一次性票据；接口引擎必须从权威数据重算 `ActionHash` 后调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能代替菜单/表/行权限、状态机、幂等、事务或审计。
+- Windows Hello、Touch ID、Face ID 和 Android 设备验证优先采用 WebAuthn/Passkey，不增加模型 Docker；只有服务端严格人脸与活体检测才接入独立 `Microi Face Gateway v1` 云服务或 Docker/集群。详细规则读取 `microi.skills/v8-security/SKILL.md`。
+
 - 新增业务逻辑先判断现有低代码 CRUD/表单事件能否完成；其次使用接口引擎。只有缺少可复用底层原子能力时才扩展 V8，并继续由接口引擎编排；平台协议、可信鉴权、密钥隔离、存储/网络边界和运行时内核才允许直接写 C# Controller/Service。
 - 修改 `Microi.Server` 前必须说明为什么不能使用接口引擎。第三方 HTTP 集成默认使用 `V8.Http`；密钥不能暴露给可编辑 V8 时，只在 C# 提供最小、租户隔离且不可覆盖密钥的安全原子方法。第三方回调采用“C# 最小协议网关 + `Managed` 核心接口引擎 + `CreateIfMissing` 租户 Hook”，C# 不承载日志、写表、通知等业务。
 - 第三方不支持 QueryString 时使用 `/path--OsClient--{OsClient}--`；支持 Query 时固定使用 `?OsClient=`，禁止 `?o=`。路径与 Query 同时出现时必须一致。

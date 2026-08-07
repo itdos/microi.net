@@ -1118,7 +1118,25 @@ var digest = V8.EncryptHelper.MD5Encrypt('123456');//兼容用不可逆摘要，
 var pwd = V8.EncryptHelper.Sha256Hex('123456');
 ```
 
-MD5、SHA1、SHA256 等摘要不能用于新密码存储；密码必须使用平台认证流程和带盐的专用密码哈希。DES/AES 的安全性取决于密钥管理，不要把密钥写进 V8 代码、日志或接口响应。
+MD5、SHA1、SHA256 等摘要不能用于新密码存储；登录密码必须使用平台认证流程和带盐的专用密码哈希。
+
+`DESEncode/DESDecode` 可用于业务明确要求“加密保存且授权后显示明文”的兼容字段，但只能在后端接口引擎/表单事件中处理：列表默认掩码，显示明文使用独立受权动作并审计，响应禁止缓存，不向匿名、访问密钥会话或普通 FormEngine 暴露批量解密。DES 是现有兼容格式；新高价值秘密优先使用带版本的现代认证加密和集中密钥管理。完整分级见[平台安全与兼容基线](../more/security)。
+
+## 强身份验证票据 V8.Method.ConsumeIdentityVerificationTicket
+
+登录后的前端 V8 可通过 `V8.Identity.Verify` 完成 Passkey 或严格人脸验证，取得两分钟有效的一次性票据。后端接口引擎必须从数据库重读业务事实、重新计算 `ActionHash`，再原子消费：
+
+```javascript
+var actionHash = V8.EncryptHelper.Sha256Hex(canonicalBusinessCommand);
+var verified = V8.Method.ConsumeIdentityVerificationTicket({
+  Ticket: V8.Param.IdentityVerificationTicket,
+  Purpose: 'ApproveSensitiveOperation',
+  ActionHash: actionHash
+});
+if (verified.Code !== 1) return verified;
+```
+
+票据绑定当前 DiyToken 用户、`OsClient`、用途和操作摘要，只能成功消费一次；访问密钥会话不能使用。它不代替菜单/表权限、业务状态机、事务和幂等。完整配置与前端示例见 [Passkey、设备生物识别与严格人脸验证](../more/identity-verification)。
 
 ## V8.TranslateEngine
 

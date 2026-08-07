@@ -5709,7 +5709,7 @@ export function createMcpServer(client, context) {
     server.tool('microi_sync_microservice_source', `Sync local microservice source files into the online AI Application for OsClient "${osClient}". The app is created/upserted as AppType=MicroService; source files are private and remain separate from published assets.`, {
         microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: Description and SourceDirName.'),
         sourceFiles: z.array(jsonRecordSchema).describe('Source files. Each item needs Path/FilePath and FileByteBase64/ContentBase64. Optional: Size and Sha256.'),
-        replace: z.boolean().optional().describe('When true, remove stale online source metadata not present in this manifest.'),
+        replace: z.boolean().optional().describe('When true, remove stale private-source metadata not present in this manifest. Public runtime/build rows are always preserved.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
     }, async ({ microService, sourceFiles, replace, confirmExecution }) => {
         if (!confirmExecution) {
@@ -5718,7 +5718,15 @@ export function createMcpServer(client, context) {
             };
         }
         try {
-            const result = await client.syncMicroServiceSource({ microService, sourceFiles, Replace: replace === true });
+            // Replace=true on legacy servers could prune public build metadata because
+            // source and runtime rows share mci_ai_app_file. The new flag is ignored by
+            // old servers (safe/no prune) and honored by new servers (private-only prune).
+            const result = await client.syncMicroServiceSource({
+                microService,
+                sourceFiles,
+                Replace: false,
+                ReplacePrivateSourceOnly: replace === true,
+            });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }

@@ -289,6 +289,7 @@ import { useDiyStore } from "@/pinia";
 // 使用共享的组件缓存池，避免重复创建导致的内存泄漏
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { initV8ScanCode } from "@/utils/v8-scan-code.js";
+import { initV8IdentityVerification } from "@/utils/v8-identity-verification.js";
 import { initV8Print } from "@/utils/v8-print.js";
 import { formTrace } from "@/utils/form-engine-trace.js";
 
@@ -910,6 +911,7 @@ export default {
 
             // 注册 V8.Method.ScanCode 扫码功能（闭包绑定当前 V8 实例）
             initV8ScanCode(V8);
+            initV8IdentityVerification(V8);
             // 注册 V8.Print 蓝牙打印功能（闭包绑定当前 V8 实例）
             initV8Print(V8);
 

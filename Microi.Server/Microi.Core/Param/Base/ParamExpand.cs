@@ -998,6 +998,14 @@ namespace Microi.net
         public string _EncodePwd { get; set; }
         public string _EncodeNewPwd { get; set; }
         /// <summary>
+        /// 修改本人密码时可携带的 Passkey/人脸二次认证一次性票据。
+        /// </summary>
+        public string _IdentityVerificationTicket { get; set; }
+        /// <summary>
+        /// 票据绑定的操作摘要；服务端会按实际 NewPwd 重新计算并比对。
+        /// </summary>
+        public string _IdentityVerificationActionHash { get; set; }
+        /// <summary>
         /// 历史兼容字段：登录逻辑不再允许通过任何自动化参数跳过密码校验。
         /// </summary>
         public bool _DevBypassPwd { get; set; }

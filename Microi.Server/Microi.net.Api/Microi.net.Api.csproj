@@ -76,6 +76,8 @@
     <Folder Include="Handler\" />
   </ItemGroup>
   <ItemGroup>
+    <!-- DiyToken 保持为平台会话体系；Fido2 只负责标准 WebAuthn/Passkey 验签，不引入 ASP.NET Identity。 -->
+    <PackageReference Include="Fido2" Version="4.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="10.0.10" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.21.0" />

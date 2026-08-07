@@ -268,6 +268,33 @@
                     </button>
                 </div>
 
+                <div
+                    v-if="PageType != 'BindWeChat' && (IdentityCapabilities.PasskeyEnabled || IdentityCapabilities.FaceEnabled)"
+                    class="identity-login-actions"
+                    aria-label="免密码安全登录"
+                >
+                    <button
+                        v-if="IdentityCapabilities.PasskeyEnabled && PasskeyAvailable"
+                        type="button"
+                        class="identity-login-button"
+                        :disabled="IdentityLoginWaiting"
+                        @click="LoginWithPasskey"
+                    >
+                        <el-icon><Key /></el-icon>
+                        <span>{{ IdentityLoginWaiting === 'Passkey' ? '正在验证…' : '使用设备生物识别 / Passkey' }}</span>
+                    </button>
+                    <button
+                        v-if="IdentityCapabilities.FaceEnabled"
+                        type="button"
+                        class="identity-login-button"
+                        :disabled="IdentityLoginWaiting"
+                        @click="LoginWithFace"
+                    >
+                        <el-icon><View /></el-icon>
+                        <span>{{ IdentityLoginWaiting === 'Face' ? '正在核验…' : '使用严格人脸识别' }}</span>
+                    </button>
+                </div>
+
                 <!-- 隐私协议 -->
                 <div v-if="SysConfig.EnablePrivacyPolicy" class="privacy-policy-wrapper">
                     <el-checkbox v-model="CheckPrivacyPolicy" class="privacy-checkbox">
@@ -417,6 +444,12 @@ import { getFirstValidRoutePath, hasAccessibleRoutePath, normalizeMenuRoutePath 
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
 import { resolveLoginResourceUrl, resolveLoginSystemLogoUrl } from "@/utils/login-branding.js";
 import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "@/utils/login-wallpaper.js";
+import {
+    getIdentityCapabilities,
+    isPasskeySupported,
+    verifyWithFace,
+    verifyWithPasskey
+} from "@/utils/identity-verification.js";
 import ThemeSelect from "@/layout/components/ThemeSelect.vue";
 import config from "@/config.json";
 import {
@@ -588,6 +621,9 @@ export default {
             otherQuery: {},
             LoginResult: {},
             LoginWaiting: false,
+            IdentityLoginWaiting: "",
+            IdentityCapabilities: {},
+            PasskeyAvailable: isPasskeySupported(),
             CaptchaId: "",
             RegCaptchaId: "",
             CaptchaValue: "",
@@ -630,6 +666,7 @@ export default {
             if (value === previousValue) return;
             this.LoadRememberedAccounts();
             this.RestoreRememberedAccount(this.Account || this.diyStore.getLastLoginAccount());
+            this.LoadIdentityCapabilities();
         },
         GetCurrentUser: function () {
             this.RefreshCurrentAccountAvatar();
@@ -653,6 +690,7 @@ export default {
 
         if (self.DiyCommon && self.DiyApi) {
             self.TokenLogin();
+            self.LoadIdentityCapabilities();
         }
 
         // 登录页只负责身份验证，界面风格登录后再切换；每次进入默认使用经典传统界面。
@@ -717,6 +755,67 @@ export default {
     },
 
     methods: {
+        async LoadIdentityCapabilities() {
+            try {
+                this.IdentityCapabilities = await getIdentityCapabilities(this.DiyCommon, this.OsClient);
+            } catch (_) {
+                this.IdentityCapabilities = {};
+            }
+        },
+        ValidateIdentityLoginPolicy() {
+            if (this.SysConfig.EnablePrivacyPolicy && !this.CheckPrivacyPolicy) {
+                this.DiyCommon.Tips(`请先勾选[${this.SysConfig.PrivacyPolicyName || "同意隐私协议"}]！`, false);
+                return false;
+            }
+            return true;
+        },
+        CompleteIdentityLogin(result) {
+            if (!result || result.Code !== 1) throw new Error(result?.Msg || "身份验证登录失败。");
+            this.LoginResult = result;
+            this.PersistRememberedLogin(result.Data || {});
+            this.diyStore.setState("SystemStyle", "Classic");
+            return this.GotoSystem();
+        },
+        async LoginWithPasskey() {
+            if (this.IdentityLoginWaiting || !this.ValidateIdentityLoginPolicy()) return;
+            this.IdentityLoginWaiting = "Passkey";
+            try {
+                const result = await verifyWithPasskey({
+                    diyCommon: this.DiyCommon,
+                    osClient: this.OsClient,
+                    account: this.Account,
+                    purpose: "Login",
+                    clientType: this.diyStore.IsPhoneView ? "Mobile" : "PC"
+                });
+                await this.CompleteIdentityLogin(result);
+            } catch (error) {
+                this.DiyCommon.Tips(error?.message || "设备生物识别登录失败。", false);
+            } finally {
+                this.IdentityLoginWaiting = "";
+            }
+        },
+        async LoginWithFace() {
+            if (this.IdentityLoginWaiting || !this.ValidateIdentityLoginPolicy()) return;
+            if (this.DiyCommon.IsNull(this.Account)) {
+                this.DiyCommon.Tips("严格人脸登录需要先输入账号。", false);
+                return;
+            }
+            this.IdentityLoginWaiting = "Face";
+            try {
+                const result = await verifyWithFace({
+                    diyCommon: this.DiyCommon,
+                    osClient: this.OsClient,
+                    account: this.Account,
+                    purpose: "Login",
+                    clientType: this.diyStore.IsPhoneView ? "Mobile" : "PC"
+                });
+                await this.CompleteIdentityLogin(result);
+            } catch (error) {
+                this.DiyCommon.Tips(error?.message || "严格人脸登录失败。", false);
+            } finally {
+                this.IdentityLoginWaiting = "";
+            }
+        },
         isEnabledFlag(value) {
             if (value === true || value === 1) return true;
             if (typeof value === "string") {
@@ -2240,6 +2339,47 @@ export default {
 
     .el-icon {
         font-size: 19px;
+    }
+}
+
+.identity-login-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+    margin: 12px 0 18px;
+}
+
+.identity-login-button {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 14px;
+    border: 1px solid rgba(255, 255, 255, 0.38);
+    border-radius: 12px;
+    color: #fff;
+    background: rgba(7, 18, 40, 0.32);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+    transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+
+    &:hover:not(:disabled),
+    &:focus-visible:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: rgba(255, 255, 255, 0.75);
+        background: rgba(7, 18, 40, 0.48);
+    }
+
+    &:focus-visible {
+        outline: 3px solid var(--mci-login-focus-ring);
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        opacity: 0.64;
+        cursor: wait;
     }
 }
 

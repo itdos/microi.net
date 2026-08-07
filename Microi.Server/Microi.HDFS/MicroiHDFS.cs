@@ -59,6 +59,13 @@ namespace Microi.net
             return FileUploadSecurityOptions.Load(tenantConfig);
         }
 
+        private static bool? ResolveUploadNetworkPreference(bool hasHttpContext)
+        {
+            // 后台任务没有浏览器网络边界，必须直接使用租户配置的内部对象存储
+            // Endpoint。HTTP 交互上传继续保留现有的部署网络自动选择行为。
+            return hasHttpContext ? (bool?)null : false;
+        }
+
         /// <summary>
         /// 上传文件或不压缩的图片。返回/路径。
         /// 必传：OsClient、
@@ -85,6 +92,7 @@ namespace Microi.net
             }
 
             var httpContext = DiyHttpContext.Current ?? _httpContext;
+            var uploadNetworkPreference = ResolveUploadNetworkPreference(httpContext != null);
             param.Files ??= new Dictionary<string, Stream>();
             if (httpContext?.Request?.HasFormContentType == true)
             {
@@ -236,6 +244,7 @@ namespace Microi.net
                 var objectExistResult = await _iMicroiHDFS.ObjectExist(new HDFSParam()
                 {
                     ClientModel = clientModel,
+                    NetworkIsInternet = uploadNetworkPreference,
                     Limit = param.Limit,
                     FileFullPath = (fielPah + "/" + realFileName + fileSuffix).DosTrimStart('/')
                 });
@@ -289,6 +298,7 @@ namespace Microi.net
                         var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                         {
                             ClientModel = clientModel,
+                            NetworkIsInternet = uploadNetworkPreference,
                             Limit = true,//param.Limit,
                             FileFullPath = pathOrigin,
                             FileStream = file.Value
@@ -365,6 +375,7 @@ namespace Microi.net
                             var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
+                                NetworkIsInternet = uploadNetworkPreference,
                                 Limit = param.Limit,
                                 FileFullPath = resultPath,
                                 FileStream = file.Value
@@ -387,6 +398,7 @@ namespace Microi.net
                             var putCaijianResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
+                                NetworkIsInternet = uploadNetworkPreference,
                                 Limit = param.Limit,
                                 FileFullPathOrigin = pathOrigin,
                                 FileFullPath = resultPath,
@@ -434,6 +446,7 @@ namespace Microi.net
                             var putYasuoResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                             {
                                 ClientModel = clientModel,
+                                NetworkIsInternet = uploadNetworkPreference,
                                 Limit = param.Limit,
                                 FileFullPath = resultPath,
                                 FileStream = newImgStream
@@ -457,6 +470,7 @@ namespace Microi.net
                         var putFallbackResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                         {
                             ClientModel = clientModel,
+                            NetworkIsInternet = uploadNetworkPreference,
                             Limit = param.Limit,
                             FileFullPath = resultPath,
                             FileStream = file.Value
@@ -476,6 +490,7 @@ namespace Microi.net
                         var putFallbackResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                         {
                             ClientModel = clientModel,
+                            NetworkIsInternet = uploadNetworkPreference,
                             Limit = param.Limit,
                             FileFullPath = resultPath,
                             FileStream = file.Value
@@ -499,6 +514,7 @@ namespace Microi.net
                     var putResult = await _iMicroiHDFS.PutObject(new HDFSParam()
                     {
                         ClientModel = clientModel,
+                        NetworkIsInternet = uploadNetworkPreference,
                         Limit = param.Limit,
                         FileFullPath = resultPath,
                         FileStream = file.Value

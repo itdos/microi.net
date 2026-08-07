@@ -108,64 +108,6 @@
                 </template>
             </el-dropdown>
         </div>
-        <el-dialog 
-            draggable
-            align-center
-            title="修改密码" v-model="dialogUptPwd" :modal-append-to-body="false" :close-on-click-modal="false" width="450px">
-            <el-form ref="FormUptPwd" :model="FormUptPwd" :rules="FormUptPwdRules" label-width="100px">
-                <el-form-item label="旧密码" prop="Pwd">
-                    <el-input v-show="false" type="text" />
-                    <el-input v-show="false" type="password" />
-                    <el-input v-model="FormUptPwd.Pwd" type="password" />
-                </el-form-item>
-                <el-form-item label="新密码" prop="NewPwd">
-                    <el-input v-model="FormUptPwd.NewPwd" type="password" />
-                </el-form-item>
-                <el-form-item label="重复新密码" prop="NewPwd2">
-                    <el-input v-model="FormUptPwd.NewPwd2" type="password" />
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button :icon="Close" @click="dialogUptPwd = false">取 消</el-button>
-                    <el-button type="primary" :icon="Check" @click="UptSysUser">确 定</el-button>
-                </div>
-            </template>
-        </el-dialog>
-
-        <el-dialog
-            draggable
-            align-center
-            title="个人设置"
-            v-model="dialogPersonalSettings"
-            :modal-append-to-body="false"
-            :close-on-click-modal="false"
-            width="520px">
-            <el-form label-width="110px">
-                <el-form-item label="登录后首页">
-                    <el-select
-                        v-model="FormPersonalSettings.DefaultIndexUrl"
-                        filterable
-                        clearable
-                        style="width: 100%"
-                        placeholder="留空则使用系统默认首页">
-                        <el-option
-                            v-for="item in DefaultRouteOptions"
-                            :key="item.path"
-                            :label="item.label"
-                            :value="item.path" />
-                    </el-select>
-                    <div class="personal-settings-help">仅列出当前账号有权限的站内页面；权限变化后若原页面不可访问，登录时会自动回退。</div>
-                </el-form-item>
-            </el-form>
-            <template #footer>
-                <div class="dialog-footer">
-                    <el-button :icon="Close" @click="dialogPersonalSettings = false">取 消</el-button>
-                    <el-button type="primary" :icon="Check" :loading="personalSettingsSaving" @click="SavePersonalSettings">保 存</el-button>
-                </div>
-            </template>
-        </el-dialog>
-
         <!-- 遮罩层 -->
         <div v-show="DiyChatShow" @click="SwitchDiyChatShow" class="chat_overlay"></div>
         <div class="diy-chat" v-show="DiyChatShow">
@@ -184,10 +126,9 @@ import ThemeSelect from "@/layout/components/ThemeSelect";
 import BackgroundTaskCenter from "@/layout/components/BackgroundTaskCenter.vue";
 import DesktopAiAssistant from "@/components/DesktopAiAssistant/index.vue";
 import BluetoothPrinterEntry from "@/components/BluetoothPrinterEntry/index.vue";
-import { useDiyStore, useAppStore, useUserStore, usePermissionStore } from "@/pinia";
+import { useDiyStore, useAppStore, useUserStore } from "@/pinia";
 import { computed } from "vue";
 import { hasWebOS } from "@/utils/webos-detect.js";
-import routePath from "@/utils/path";
 // import { aw } from 'public/three/static/js/DRACOLoader-DSa8Sn_h';
 
 export default {
@@ -205,7 +146,6 @@ export default {
         const diyStore = useDiyStore();
         const appStore = useAppStore();
         const userStore = useUserStore();
-        const permissionStore = usePermissionStore();
 
         const sidebar = computed(() => appStore.sidebar);
         const device = computed(() => appStore.device);
@@ -220,13 +160,11 @@ export default {
         const ShowClassicTop = computed(() => diyStore.ShowClassicTop);
         const SysConfig = computed(() => diyStore.SysConfig);
         const GetCurrentUser = computed(() => diyStore.GetCurrentUser);
-        const routes = computed(() => permissionStore.routes);
 
         return {
             diyStore,
             appStore,
             userStore,
-            permissionStore,
             hasWebOS,
             sidebar,
             device,
@@ -241,7 +179,6 @@ export default {
             ShowClassicTop,
             SysConfig,
             GetCurrentUser,
-            routes,
         };
     },
     data() {
@@ -252,42 +189,7 @@ export default {
             ChatType: "",
             ShowUnreadCount: true,
             CurrentUserAvatarUrl: "./static/img/icon/personal.png",
-            isBrowserFullScreen: !!document.fullscreenElement,
-            dialogUptPwd: false,
-            dialogPersonalSettings: false,
-            personalSettingsSaving: false,
-            DefaultRouteOptions: [],
-            FormPersonalSettings: {
-                DefaultIndexUrl: ""
-            },
-            FormUptPwd: {
-                Pwd: "",
-                NewPwd: "",
-                NewPwd2: ""
-            },
-            FormUptPwdRules: {
-                Pwd: [
-                    {
-                        required: true,
-                        message: "旧密码不能为空",
-                        trigger: "blur"
-                    }
-                ],
-                NewPwd: [
-                    {
-                        required: true,
-                        message: "新密码不能为空",
-                        trigger: "blur"
-                    }
-                ],
-                NewPwd2: [
-                    {
-                        required: true,
-                        message: "重复密码不能为空",
-                        trigger: "blur"
-                    }
-                ]
-            }
+            isBrowserFullScreen: !!document.fullscreenElement
         };
     },
     computed: {
@@ -347,59 +249,8 @@ export default {
         }
     },
     methods: {
-        BuildDefaultRouteOptions(routes, basePath = "/", prefixTitle = []) {
-            var self = this;
-            var result = [];
-            var source = Array.isArray(routes) ? routes : [];
-            source.forEach(function (route) {
-                if (!route || route.hidden) return;
-                var currentPath = routePath.resolve(basePath, route.path || "");
-                var titles = prefixTitle.slice();
-                if (route.meta && route.meta.title) {
-                    titles.push(self.$t(route.meta.title));
-                    if (route.redirect !== "noRedirect" && currentPath !== "/") {
-                        result.push({ path: currentPath, label: titles.join(" > ") || currentPath });
-                    }
-                }
-                if (Array.isArray(route.children)) {
-                    result = result.concat(self.BuildDefaultRouteOptions(route.children, currentPath, titles));
-                }
-            });
-            var seen = {};
-            return result.filter(function (item) {
-                if (!item.path || seen[item.path]) return false;
-                seen[item.path] = true;
-                return true;
-            });
-        },
         OpenPersonalSettings() {
-            this.DefaultRouteOptions = this.BuildDefaultRouteOptions(this.routes);
-            this.FormPersonalSettings.DefaultIndexUrl = this.GetCurrentUser?.DefaultIndexUrl || "";
-            this.dialogPersonalSettings = true;
-        },
-        async SavePersonalSettings() {
-            var self = this;
-            self.personalSettingsSaving = true;
-            try {
-                var result = await self.DiyCommon.PostAsync(
-                    "/api/SysUser/UpdateMyDefaultIndexUrl",
-                    { DefaultIndexUrl: self.FormPersonalSettings.DefaultIndexUrl || "" },
-                    null,
-                    null,
-                    "json"
-                );
-                if (!result || result.Code != 1) {
-                    self.DiyCommon.Tips((result && result.Msg) || "登录后首页保存失败。", false);
-                    return;
-                }
-                if (result.Data) self.diyStore.setCurrentUser(result.Data);
-                self.dialogPersonalSettings = false;
-                self.DiyCommon.Tips("登录后首页已保存，下次登录生效。", true);
-            } catch (error) {
-                self.DiyCommon.Tips("登录后首页保存失败：" + error.message, false);
-            } finally {
-                self.personalSettingsSaving = false;
-            }
+            this.$router.push("/micro-app/microi-platform-service/personal-settings").catch(() => {});
         },
         toggleBrowserFullScreen() {
             if (!document.fullscreenElement) {
@@ -530,36 +381,10 @@ export default {
         },
         // 修改密码
         OpenUptPwd() {
-            var self = this;
-            self.dialogUptPwd = true;
-        },
-        UptSysUser() {
-            var self = this;
-            self.$refs.FormUptPwd.validate((valid) => {
-                if (valid) {
-                    if (self.FormUptPwd.NewPwd != self.FormUptPwd.NewPwd2) {
-                        self.DiyCommon.OsAlert("再次密码输入不一致！", {
-                            Icon: error
-                        });
-                        return;
-                    }
-                    var url = "/api/SysUser/uptsysuser";
-                    var param = {};
-                    param.Id = self.GetCurrentUser.Id;
-                    ((param.Pwd = self.Base64.encode(self.FormUptPwd.Pwd)),
-                        (param.NewPwd = self.Base64.encode(self.FormUptPwd.NewPwd)),
-                        // self.LoadingCount++;
-                        self.DiyCommon.Post(url, param, function (result) {
-                            // self.LoadingCount--;
-                            if (self.DiyCommon.Result(result)) {
-                                self.DiyCommon.OsAlert(self.$t("Msg.Success"));
-                                self.dialogUptPwd = false;
-                            }
-                        }));
-                } else {
-                    return false;
-                }
-            });
+            this.$router.push({
+                path: "/micro-app/microi-platform-service/personal-settings",
+                query: { section: "security", action: "password" }
+            }).catch(() => {});
         },
         GetCurrentUserAvatar() {
             return this.CurrentUserAvatarUrl || "./static/img/icon/personal.png";
