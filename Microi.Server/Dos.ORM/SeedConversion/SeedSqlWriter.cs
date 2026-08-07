@@ -298,10 +298,15 @@ namespace Dos.ORM.SeedConversion
             var physical = UsesTextEnvelope
                 ? LogicalTextEnvelopeCodec.Encode(value)
                 : value;
-            var isLarge = !string.Equals(
-                column.Type.Name,
-                "varchar",
-                StringComparison.OrdinalIgnoreCase)
+            var isBoundedText = string.Equals(
+                    column.Type.Name,
+                    "varchar",
+                    StringComparison.OrdinalIgnoreCase)
+                || string.Equals(
+                    column.Type.Name,
+                    "char",
+                    StringComparison.OrdinalIgnoreCase);
+            var isLarge = !isBoundedText
                 || (column.Type.Arguments.Count > 0
                     && column.Type.Arguments[0] > 2000);
             WriteStringLiteral(physical, isLarge);
@@ -622,6 +627,7 @@ namespace Dos.ORM.SeedConversion
         {
             switch (type.Name)
             {
+                case "char":
                 case "varchar":
                     return type.Arguments[0] <= 4000
                         ? "NVARCHAR(" + type.Arguments[0] + ")"
@@ -932,6 +938,7 @@ namespace Dos.ORM.SeedConversion
         {
             switch (type.Name)
             {
+                case "char":
                 case "varchar": return "VARCHAR(" + type.Arguments[0] + ")";
                 case "mediumtext":
                 case "longtext": return "TEXT";
@@ -1180,6 +1187,7 @@ namespace Dos.ORM.SeedConversion
         {
             switch (type.Name)
             {
+                case "char":
                 case "varchar":
                     var physicalLength = _dm
                         ? type.Arguments[0]

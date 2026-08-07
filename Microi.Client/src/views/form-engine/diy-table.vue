@@ -1779,6 +1779,7 @@ import { Base64 } from "js-base64";
 import PanThumb from "@/components/PanThumb";
 import DiyCardSelect from "@/views/form-engine/diy-card-select.vue";
 import { initV8ScanCode } from "@/utils/v8-scan-code.js";
+import { initV8IdentityVerification } from "@/utils/v8-identity-verification.js";
 import { initV8Print } from "@/utils/v8-print.js";
 import {
     resolveV8ButtonVisibility,
@@ -2533,6 +2534,7 @@ export default {
             );
             // 注册 V8.Method.ScanCode 扫码功能
             initV8ScanCode(V8);
+            initV8IdentityVerification(V8);
             // 注册 V8.Print 蓝牙打印功能
             initV8Print(V8);
             return V8;

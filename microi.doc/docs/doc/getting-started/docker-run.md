@@ -6,7 +6,7 @@
 
 针对不想本地编译代码、打包镜像、安装环境等繁琐操作的用户，提供**一键安装脚本**。
 
-默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。全套服务基于 Docker Compose 独立编排部署，支持宝塔面板 Docker 编排模块可视化管理；明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
+默认安装 **主数据库 + Redis + MinIO + MongoDB + PaddleX/PaddleOCR + LibreTranslate（基础语言套餐）+ Watchtower + 低代码平台程序（API + Web）**。全套服务基于 Docker Compose 独立编排部署，支持宝塔面板 Docker 编排模块可视化管理；各独立编排统一接入 `microi` Docker bridge 网络，API 通过容器 DNS 和内部端口访问数据库、Redis、MongoDB、MinIO。明确不需要动态翻译时可在提示中输入 `0` 跳过 LibreTranslate。
 
 :::: warning 不再推荐安装 Ollama、nomic-embed-text 和 Qdrant
 对于 Microi吾码默认的 **NL2SQL、NL2V8、在线 AI 数据分析与 AI 编程** 场景，平台内置的“**大模型关键词扩展 + 当前用户权限范围内的 Schema/Skill 搜索 + 精确表/字段回读**”已经完整替代原来的 **Ollama + `nomic-embed-text` + Qdrant** 方案。一键安装脚本已固定跳过这三项：安装更快、资源占用更低，也不会连接或同步向量数据库。
@@ -30,7 +30,7 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 | 5 | MinIO 会自动创建私有桶 `mci-private`、公有桶 `mci-public`，为公有桶开放匿名下载权限，并把端点、密钥、桶名、SSL 等配置写回 `sys_osclients` |
 | 6 | 根据安装模式选择的访问 IP 和实际分配端口，自动把 `sys_config.ApiBase` 写为 API 地址，把 `sys_config.FileServer` 写为 `http://<访问IP>:<MinIO API端口>/mci-public` |
 | 7 | 端口从 **61600 开始顺序 +1 分配**；基础服务（含 OCR）占用 8 个连续端口，LibreTranslate 增加 1 个端口。候选端口段有冲突时起点每次 +1，最多尝试 100 次 |
-| 8 | 安装前脚本会开放 Web、API、数据库、缓存和对象存储端口；OCR 只绑定 `127.0.0.1` 并通过独立 Docker 内网供 API 调用，LibreTranslate 也不会默认开放宿主机防火墙端口（云服务器的其它对外端口仍需配置安全组） |
+| 8 | 安装器始终创建/复用 `microi` 共享 Docker bridge 网络；API 使用容器名和容器内部端口访问数据库、Redis、MongoDB、MinIO，不绕宿主机局域网 IP。宿主机映射端口仍保留给运维/外部访问；OCR 与 LibreTranslate 的诊断端口只绑定 `127.0.0.1` |
 | 9 | OCR 国内固定版本镜像会默认安装。服务健康且 API 完成 Upgrade29 后，脚本才把 `OcrEnabled`、服务地址与限额写入当前唯一的 SaaS 主租户，并以数据库回读确认；任一阶段失败都不会启用错误配置 |
 | 10 | API/Web 使用官方浮动标签时会在部署前强制回源拉取最新镜像，避免宿主机缓存的旧 `latest` 通过 liveness 后却缺少 Upgrade29/Upgrade31 |
 | 11 | 密码与端口生成后若任一后段门禁失败，脚本仍保持非零退出码，同时打印“安装未完成”恢复汇总，包含已分配端口、已生成凭据、数据/编排目录和当前容器状态；该汇总不代表服务可用 |
@@ -53,17 +53,26 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 
 > 上表是一直按 Enter 的吾码官方默认组合，共使用 9 个端口。只有明确输入 `0` 跳过 LibreTranslate 时才使用 `61600`～`61607`；若候选段冲突，脚本把起点从 `61600` 逐次加一后重新检查整段。
 
+> 容器内的 `127.0.0.1` / `localhost` 只代表该容器自身，不能作为 API 连接其它容器的地址；宿主机局域网 IP 虽然可通过端口映射访问，但会额外经过宿主机网络、防火墙和 NAT。安装器因此固定采用 Docker DNS：Redis 为 `microi-install-redis:6379`，MongoDB 为 `microi-install-mongodb:27017`，数据库使用实际数据库容器名及内部端口，MinIO 服务端地址为 `microi-install-minio:9000`。只有宿主机本地健康探测才使用 `127.0.0.1:<映射端口>`，浏览器需要访问的 `ApiBase`、`FileServer` 和 MinIO 外网端点仍使用实际公网/局域网访问地址。
+
 > OCR 的宿主机端口不会写入防火墙规则。API 与 OCR 均接入 external bridge 网络 `microi-ocr`，实际调用地址为 `http://microi-install-ocr:8080/ocr`，不经过公网或宿主机 LAN 地址。
 
-### 🔄 一键更新 API 与 Web 前端
+### 🔄 一键更新/修复 **API 与 Web 前端**
 
-适用于通过上述一键安装脚本部署的环境。以下命令会拉取最新的 `microi-api`、`microi-client-dev` 镜像，并只重新创建 `microi-install-api`、`microi-install-client` 两个容器：
+适用于通过上述一键安装脚本部署的环境，也适用于以下故障：API 报“未检测到 `OsClientRedisHost`”、更新时报同名容器冲突、API/Web 编排在宝塔面板中消失。修复器会从现有容器 Compose 标签及两个标准目录中定位现场编排；多个配置不一致时会在删除容器前停止，不会猜测或覆盖。
 
 ```bash
-APP_DIR=/microi/compose/microi-install-app;if [ -d /www/dk_project/dk_compose/microi-install-app ];then APP_DIR=/www/dk_project/dk_compose/microi-install-app;fi;docker pull registry.cn-hangzhou.aliyuncs.com/microios/microi-api:latest && docker pull registry.cn-hangzhou.aliyuncs.com/microios/microi-client-dev:latest && cd "$APP_DIR" && docker compose up -d --force-recreate --no-deps microi-install-api microi-install-client
+url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh --repair-app
 ```
 
-> 命令同时兼容默认编排目录和宝塔面板编排目录。更新过程不会删除数据库或数据卷，但 API、Web 前端容器重新创建时会有短暂中断。
+修复流程如下：
+
+1. 回读现有 API/Web 容器的 Compose project、配置文件和镜像，静态校验 API 十项启动配置；先把 Compose、容器元数据和旧镜像恢复点保存到应用编排目录的 `.repair-backups/<时间>/`。
+2. 创建/复用 `microi` 共享 bridge 网络，将现有数据库、Redis、MongoDB、MinIO 容器接入该网络；把 API 的数据库、Redis、MongoDB 启动连接迁移为容器 DNS 与内部端口。
+3. 按现场 Compose 拉取镜像，临时停止 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
+4. 重建后回读十项启动配置和 `microi` 网络，依次验证 API liveness、readiness；失败时自动尝试用修复前镜像恢复。最后恢复原本正在运行的 Watchtower。
+
+> 该命令不会删除或重建主数据库、Redis、MongoDB、MinIO 容器，不会删除它们的数据目录或 Docker volume，也不会执行 `docker compose down -v`。API、Web 前端重建时会有短暂中断。宝塔标准编排目录存在而应用编排仅位于 `/microi/compose` 时，修复器会把已经完整解析的应用配置恢复到宝塔目录后再重建，使编排重新可管理。
 
 ### 🗑️ 删除所有已安装容器/编排
 
@@ -1097,6 +1106,7 @@ services:
 - 请将所有参数修改为实际参数，以下镜像均为公开开源版镜像
 - `microi-web` 编排的 `OsClient` 可不指定，默认为空（SaaS 模式）
 - API 容器只允许下面十个启动引导配置：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。其它后端运行参数统一在主租户 SaaS 引擎中动态维护，不要再增加 `MICROI_*` 或自定义 `AppSettings` 环境变量。`ASPNETCORE_*` / `DOTNET_*` 仅属于 .NET 宿主配置。
+- 下方旧式手工示例中的 `172.27.221.211` 表示 API 容器确实可达的外部数据库/缓存宿主机，并不表示推荐让同机 Docker 依赖绕宿主机端口；同机容器部署应建立共享 bridge 网络，改用对应容器 DNS 与内部端口。无论哪种方式，都不要把 API 容器中的 `127.0.0.1` / `localhost` 当成其它容器。
 :::
 ::: details 展开查看 Shell 命令（70 行）
 ```shell

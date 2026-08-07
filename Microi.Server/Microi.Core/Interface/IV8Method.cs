@@ -57,6 +57,12 @@ namespace Microi.net
         DosResult ClearUserLoginInfo(string userId, string osClient = null);
 
         /// <summary>
+        /// 一次性消费由 Passkey、设备生物识别或严格人脸验证签发的二次认证票据。
+        /// 票据与当前用户、租户、Purpose 和 ActionHash 绑定，不能重复使用。
+        /// </summary>
+        DosResult ConsumeIdentityVerificationTicket(dynamic dynamicParam);
+
+        /// <summary>
         /// 获取当前token
         /// </summary>
         CurrentToken GetCurrentToken(string token = null, string osClient = null);

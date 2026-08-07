@@ -457,9 +457,19 @@ namespace Microi.net.Api
             };
             dynamic result = await MicroiEngine.FormEngine.GetFormDataAsync(param);
             if (result.Code != 1) return null;
-            var page = ToJObject(result.Data);
-            var isEnable = page?["IsEnable"];
-            return isEnable != null && isEnable.Type != JTokenType.Null && isEnable.Val<int>() == 0 ? null : page;
+            // result.Data is dynamic. Without the explicit object boundary the
+            // local page/isEnable variables also become dynamic, so Val<int>()
+            // is incorrectly dispatched as a JValue instance method at runtime.
+            return ToEnabledPage((object)result.Data);
+        }
+
+        private static JObject ToEnabledPage(object data)
+        {
+            JObject page = ToJObject(data);
+            JToken isEnable = page?["IsEnable"];
+            return isEnable != null && isEnable.Type != JTokenType.Null && isEnable.Val<int>() == 0
+                ? null
+                : page;
         }
 
         private static List<string> GetPageSelectFields()

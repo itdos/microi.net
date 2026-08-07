@@ -32,7 +32,7 @@
 
 <script>
 import { DiyCommon } from "@/utils/diy.common";
-import { useTagsViewStore } from "@/pinia";
+import { useDiyStore, useTagsViewStore } from "@/pinia";
 import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils/microAppEntryUrl.js";
 import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
@@ -155,7 +155,7 @@ export default {
     name: "MicroAppHost",
     components: { MicroAppLoadingSkeleton, MicroAppRuntimeError },
     setup() {
-        return { tagsViewStore: useTagsViewStore() };
+        return { diyStore: useDiyStore(), tagsViewStore: useTagsViewStore() };
     },
     data() {
         return {
@@ -197,6 +197,9 @@ export default {
                 menuName: this.$route?.meta?.title || "",
                 appKey: this.appKey,
                 version: this.appVersion,
+                themeColor: this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",
+                themeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
+                systemStyle: this.diyStore.SystemStyle || "Classic",
                 hostCapabilities: createMicroAppHostCapabilities(),
                 hostViewport: this.hostViewport,
                 microRoute: this.microRoutePath,

@@ -176,7 +176,8 @@ namespace Dos.ORM.SeedConversion
         {
             get
             {
-                return string.Equals(Name, "varchar", StringComparison.OrdinalIgnoreCase)
+                return string.Equals(Name, "char", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(Name, "varchar", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(Name, "mediumtext", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(Name, "longtext", StringComparison.OrdinalIgnoreCase);
             }
