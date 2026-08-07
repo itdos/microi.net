@@ -78,6 +78,45 @@ public sealed class EmptyDatabaseReleaseServiceTests
     }
 
     [Fact]
+    public void GetUnconditionallyClearedTables_OnlyReturnsWholeTableDeletes()
+    {
+        const string sql = """
+            -- DELETE FROM ignored_comment;
+            TRUNCATE TABLE `mic_data_version`;
+            DELETE FROM sys_log;
+            DELETE FROM sys_user WHERE Account <> 'admin';
+            UPDATE sys_config SET Remark='DELETE FROM ignored_literal;';
+            """;
+
+        var result = Assert.IsType<HashSet<string>>(InvokePrivateStatic(
+            "GetUnconditionallyClearedTables",
+            sql));
+
+        Assert.Equal(
+            new[] { "mic_data_version", "sys_log" },
+            result.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+        Assert.DoesNotContain("sys_user", result, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("Succeeded", true)]
+    [InlineData("Failed", true)]
+    [InlineData("Canceled", true)]
+    [InlineData("Running", false)]
+    [InlineData("Pending", false)]
+    [InlineData("", false)]
+    public void IsTerminalBackgroundTaskStatus_OnlyAcceptsFinishedStates(
+        string status,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            Assert.IsType<bool>(InvokePrivateStatic(
+                "IsTerminalBackgroundTaskStatus",
+                status)));
+    }
+
+    [Fact]
     public void ReleaseTargets_AreFixedAndCannotComeFromRuntimeInput()
     {
         Assert.Equal("admin_build_sanitized_empty_database", EmptyDatabaseReleaseService.WorkerApiEngineKey);

@@ -47,7 +47,10 @@ namespace Microi.net
             _backgroundTaskId = backgroundTaskId ?? "";
         }
 
-        public DosResult Prepare(JObject currentUser, string osClient)
+        public DosResult Prepare(
+            JObject currentUser,
+            string osClient,
+            string sanitizationSql = "")
         {
             var permissionResult = ValidatePermission(currentUser, osClient);
             if (permissionResult.Code != 1)
@@ -61,6 +64,12 @@ namespace Microi.net
                 EnsureReleaseLease();
                 Report(1, 8, "正在检查主库配置");
                 sourceBuilder = BuildAndValidateSourceConnection();
+                var tablesWithoutSeedData = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!string.IsNullOrWhiteSpace(sanitizationSql))
+                {
+                    ValidateSanitizationSql(sanitizationSql);
+                    tablesWithoutSeedData = GetUnconditionallyClearedTables(sanitizationSql);
+                }
                 Report(2, 8, "正在重建临时空数据库");
                 ExecuteInfrastructureOperationWithRetry(
                     "重建临时数据库",
@@ -77,11 +86,15 @@ namespace Microi.net
                 }
 
                 Report(4, 8, "正在复制主库全部表数据");
-                var copiedRows = CopyTableData(sourceBuilder, sourceTables);
+                var copiedRows = CopyTableData(
+                    sourceBuilder,
+                    sourceTables,
+                    tablesWithoutSeedData);
                 return new DosResult(1, new
                 {
                     SourceTableCount = sourceTables.Count,
-                    CopiedRowCount = copiedRows
+                    CopiedRowCount = copiedRows,
+                    SkippedDataTableCount = tablesWithoutSeedData.Count
                 }, "主库结构和数据已复制到 microi_empty_temp。");
             }
             catch (Exception ex)
@@ -354,6 +367,29 @@ namespace Microi.net
                     throw new InvalidOperationException("脱敏 SQL 只能操作固定目标库，检测到禁止语句。");
                 }
             }
+        }
+
+        private static HashSet<string> GetUnconditionallyClearedTables(string sql)
+        {
+            var normalized = StripSqlLiteralsAndComments(sql ?? "");
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var patterns = new[]
+            {
+                @"\bTRUNCATE\s+(?:TABLE\s+)?`?([A-Za-z0-9_]+)`?\s*;",
+                @"\bDELETE\s+FROM\s+`?([A-Za-z0-9_]+)`?\s*;"
+            };
+            foreach (var pattern in patterns)
+            {
+                foreach (Match match in Regex.Matches(
+                             normalized,
+                             pattern,
+                             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+                {
+                    var table = match.Groups[1].Value;
+                    if (!string.IsNullOrWhiteSpace(table)) result.Add(table);
+                }
+            }
+            return result;
         }
 
         private static string StripSqlLiteralsAndComments(string sql)
@@ -659,21 +695,32 @@ WHERE TABLE_SCHEMA=@database ORDER BY TABLE_TYPE DESC, TABLE_NAME;";
             }
         }
 
-        private long CopyTableData(MySqlConnectionStringBuilder sourceBuilder, IReadOnlyCollection<string> tables)
+        private long CopyTableData(
+            MySqlConnectionStringBuilder sourceBuilder,
+            IReadOnlyCollection<string> tables,
+            ISet<string> tablesWithoutSeedData)
         {
             long copiedRows = 0;
             var index = 0;
             foreach (var table in tables)
             {
                 index++;
-                copiedRows += ExecuteTableOperationWithRetry(
-                    "复制表数据",
-                    table,
-                    () => CopySingleTableData(sourceBuilder, table));
+                if (tablesWithoutSeedData == null || !tablesWithoutSeedData.Contains(table))
+                {
+                    copiedRows += ExecuteTableOperationWithRetry(
+                        "复制表数据",
+                        table,
+                        () => CopySingleTableData(sourceBuilder, table));
+                }
                 if (index == tables.Count || index % 20 == 0)
                 {
                     var percent = 38 + Convert.ToInt32(Math.Floor(index * 10m / Math.Max(1, tables.Count)));
-                    BackgroundTaskRuntime.TryUpdateProgress(_backgroundTaskId, percent, $"正在复制表数据（{index}/{tables.Count}）", index, tables.Count);
+                    BackgroundTaskRuntime.TryUpdateProgress(
+                        _backgroundTaskId,
+                        percent,
+                        $"正在复制表数据（{index}/{tables.Count}，已跳过{tablesWithoutSeedData?.Count ?? 0}张脱敏后必为空的表）",
+                        index,
+                        tables.Count);
                 }
             }
             return copiedRows;
@@ -1657,8 +1704,51 @@ return 0";
                 new RedisValue[] { _backgroundTaskId, ReleaseLeaseMilliseconds });
             if (acquired != 1)
             {
+                var previousOwner = database.StringGet(ReleaseLeaseKey).ToString();
+                if (IsCompletedBackgroundTask(previousOwner))
+                {
+                    const string reclaimScript = @"
+if redis.call('get', KEYS[1]) == ARGV[1] then
+  redis.call('psetex', KEYS[1], ARGV[3], ARGV[2])
+  return 1
+end
+return 0";
+                    acquired = (long)database.ScriptEvaluate(
+                        reclaimScript,
+                        new RedisKey[] { ReleaseLeaseKey },
+                        new RedisValue[]
+                        {
+                            previousOwner,
+                            _backgroundTaskId,
+                            ReleaseLeaseMilliseconds
+                        });
+                }
+            }
+            if (acquired != 1)
+            {
                 throw new InvalidOperationException("另一项主库空数据库发布任务仍在执行，当前任务未修改临时数据库。");
             }
+        }
+
+        private static bool IsCompletedBackgroundTask(string taskId)
+        {
+            if (string.IsNullOrWhiteSpace(taskId)) return false;
+            try
+            {
+                var task = BackgroundTaskStore.Get(RequiredOsClient, taskId);
+                return task != null && IsTerminalBackgroundTaskStatus(task.Status);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool IsTerminalBackgroundTaskStatus(string status)
+        {
+            return string.Equals(status, "Succeeded", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(status, "Failed", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(status, "Canceled", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsReleaseLeaseOwner()
