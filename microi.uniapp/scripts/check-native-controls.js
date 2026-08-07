@@ -211,9 +211,10 @@ if (!taskList.includes('<mci-task-card') ||
   fail('standalone and related task lists must share the task card presentation')
 }
 for (const page of [nativeForm, moduleDetail, businessDetail]) {
+  // zhy：页面可以同时注册其它原生表单组件，只要求组件清单中确实包含 MciBusinessRelatedList。
   if (!page.includes('<mci-business-related-list v-if="relatedTab.type === \'child\'"') ||
     page.includes('<mci-child-table v-if="relatedTab.type === \'child\'"') ||
-    !page.includes('components: { MciBusinessRelatedList }')) {
+    !/components:\s*\{[^}]*\bMciBusinessRelatedList\b[^}]*\}/.test(page)) {
     fail('form tab child tables must use the same business list presentation as standalone entries')
   }
 }
