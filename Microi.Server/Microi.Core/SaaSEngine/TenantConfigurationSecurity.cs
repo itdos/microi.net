@@ -355,7 +355,7 @@ namespace Microi.net
         /// 创建匿名 GetSysConfig API 的公开快照。GlobalV8Code 与 PwdV8 是既有前端协议，
         /// 可继续返回；服务器端代码、ClientSecrets 及其它疑似凭据必须隐藏。
         /// </summary>
-        public static JObject CreatePublicSysConfigProjection(object source)
+        public static JObject CreatePublicSysConfigProjection(object source, string osClient = null)
         {
             var projection = ToIndependentJObject(source);
             foreach (var property in projection.Properties().ToList())
@@ -370,6 +370,12 @@ namespace Microi.net
                 {
                     property.Remove();
                 }
+            }
+            if (!string.IsNullOrWhiteSpace(osClient))
+            {
+                // 未来新增业务设置不再依赖硬编码字段白名单。每个租户可在
+                // mci_system_setting 中逐项决定是否公开；Secret 与敏感 Key 永远拒绝下发。
+                projection["PublicSettings"] = TenantSystemSettingsSecurity.LoadPublicProjection(osClient);
             }
             return projection;
         }

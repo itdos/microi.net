@@ -20,7 +20,8 @@ export const constantRoutes = [
     {
         path: "/login",
         component: () => import("@/views/login/index.vue"),
-        hidden: true
+        hidden: true,
+        meta: { title: "登录", anonymous: true, keepAlive: false }
     },
     {
         path: "/access-login",
@@ -516,7 +517,10 @@ export const asyncRoutes = [
                 path: "",
                 name: "micro_app_friendly",
                 component: () => import("@/views/micro-app/host.vue"),
-                meta: { title: "微服务", microAppFriendlyRoute: true }
+                // The micro-app runtime already owns its keep-alive lifecycle.
+                // Caching the Vue host as well leaves a detached vnode that can
+                // win a tab-switch race and render the newly active host empty.
+                meta: { title: "微服务", microAppFriendlyRoute: true, keepAlive: false }
             }
         ]
     },

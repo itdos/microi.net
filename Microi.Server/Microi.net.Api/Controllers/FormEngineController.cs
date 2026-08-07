@@ -59,13 +59,13 @@ namespace Microi.net.Api
             }
         }
 
-        private static DosResult<dynamic> CreatePublicSysConfigResult(DosResult<dynamic> source)
+        private static DosResult<dynamic> CreatePublicSysConfigResult(DosResult<dynamic> source, string osClient)
         {
             if (source == null) return null;
 
             var publicProjection = source.Data == null
                 ? null
-                : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data);
+                : TenantConfigurationSecurity.CreatePublicSysConfigProjection(source.Data, osClient);
             var configuredLoginPublicKey = ConfigHelper.GetRuntimeConfigurationValue(
                 "Security:LoginRsaPublicKey");
             if (publicProjection != null && !configuredLoginPublicKey.DosIsNullOrWhiteSpace())
@@ -228,7 +228,7 @@ namespace Microi.net.Api
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             }
             var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
-            return Json(CreatePublicSysConfigResult(result));
+            return Json(CreatePublicSysConfigResult(result, param.OsClient));
         }
 
         /// <summary>
@@ -1477,7 +1477,7 @@ namespace Microi.net.Api
             if (param.OsClient.DosIsNullOrWhiteSpace())
                 return Json(new DosResult(0, null, DiyMessage.GetLang(param.OsClient, "ParamError", param._Lang)));
             var result = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient);
-            return Json(CreatePublicSysConfigResult(result));
+            return Json(CreatePublicSysConfigResult(result, param.OsClient));
         }
 
         /// <summary>

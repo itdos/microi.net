@@ -28,9 +28,10 @@ V8.OsClientNetwork     // 'Intranet' / 'Outernet'
 V8.OsClientModel       // 当前租户 SaaS 配置的脱敏副本
 V8.ClientModel         // OsClientModel 的兼容别名，同样是脱敏副本
 V8.SysConfig           // 当前租户 sys_config 的独立脱敏副本
+V8.SysConfig.PublicSettings // 当前租户 mci_system_setting 的动态公开投影
 ```
 
-`V8.SysConfig` 与 `V8.FormEngine.GetSysConfig(...)` 不暴露 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 或疑似凭据字段；子租户显式传其它 `OsClient` 也会被强制改回当前租户。
+`V8.SysConfig` 与 `V8.FormEngine.GetSysConfig(...)` 不暴露 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 或疑似凭据字段；子租户显式传其它 `OsClient` 也会被强制改回当前租户。`PublicSettings` 由每条设置的 `IsPublic` 动态决定，但 Secret 及固定敏感 Key 规则永远优先。
 
 ### V8.OsClientModel 常用字段
 
@@ -39,7 +40,7 @@ V8.OsClientModel.SysTitle              // 租户系统标题
 V8.OsClientModel.DbType                // 非敏感数据库类型
 V8.OsClientModel.HDFS                  // 'Aliyun' / 'MinIO' / 'S3'
 V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
-// 当前租户自行扩展的业务集成字段仍可读取
+// 当前租户自行扩展的业务字段只作存量兼容；新增配置使用 mci_system_setting
 
 // 以下基础设施字段不会注入 V8：
 // DbConn / DbReadConn / AuthSecret
@@ -49,11 +50,11 @@ V8.OsClientModel.AliOssPublicDomain    // 可公开的文件域名
 
 ## 平台级配置与主租户规则
 
-`sys_osclients` 既保存每个租户自己的数据库、Redis、第三方密钥等配置，也可以承载影响整个 API 进程的平台级配置。平台级配置必须遵守“主租户为准、子租户只能降额隔离”的规则：
+主库 `sys_osclients` 保存租户数据库/Redis/存储路由及影响整个 API 进程的平台级配置；目标租户建立上下文后，`sys_config` 和 `mci_system_setting` 从该租户自己的数据库读取。平台级配置必须遵守“主租户为准、子租户只能降额隔离”的规则：
 
 - 所有可变业务逻辑默认必须由接口引擎编排，包括但不限于租户开通、开库、初始化、归属修复、官网个人中心、付费额度等 SaaS 业务流程。C# 后端只暴露原子 V8 能力，例如建库、导入空库模板、复制 `sys_config`、刷新 SaaS 缓存、补偿回滚、字段兜底等；不要把可变业务分支写死到 Controller 或 `TenantProvisioningService` 这类后端定制代码里。接口引擎缺少能力时，优先扩展 `V8.Method`/V8 引擎原子函数，再由接口引擎调用。
 - 主租户由运行环境决定：优先读取环境变量 `OsClient`，其次读取 `appsettings.json` 的 `AppSettings:OsClient`。只有这条主租户 `sys_osclients` 数据中的平台级字段会作为全局配置生效。
-- API 启动配置只有十项白名单：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。除这十项外，普通业务、运行参数、密钥路径、重试、限额和安全策略统一从主租户 `sys_osclients` 或按租户从 `sys_config` 读取，未配置时使用代码安全默认值；官方 License 恢复次数/间隔与固定私钥挂载 `/app/microi_private.pem` 是信任链例外，禁止创建对应 SaaS 字段。禁止再增加 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或动态名称的环境变量读取。节点身份由平台自动生成。
+- API 启动配置只有十项白名单：`OsClient`、`OsClientType`、`OsClientNetwork`、`OsClientDbType`、`OsClientDbConn`、`OsClientRedisHost`、`OsClientRedisPort`、`OsClientRedisPwd`、`OsClientRedisDataBase`、`OsClientDbMongoConn`。除这十项外，部署/节点级运行参数与基础设施秘密从主控 `sys_osclients` 读取；允许子租户自行维护的业务开关、OAuth/第三方集成和展示设置从该租户 `sys_config` / `mci_system_setting` 读取，未配置时使用代码安全默认值。官方 License 恢复次数/间隔与固定私钥挂载 `/app/microi_private.pem` 是信任链例外。禁止再增加 `MICROI_*`、`DOS_ORM_*`、自定义 `AppSettings` 节点或动态名称的环境变量读取。节点身份由平台自动生成。
 - `ASPNETCORE_*`、`DOTNET_*` 仅用于 .NET 宿主；构建、安装、测试、MCP、发布脚本可使用自身进程变量，但 API 生产代码不得把它们当业务配置。新增 SaaS 运行字段必须配套独立或既有 Tab、幂等升级、缓存刷新、敏感字段脱敏、子租户不继承和源码扫描测试。
 - 文件上传的租户业务开关与额度按“当前租户 `sys_osclients` → 代码默认值”解析；平台固定灾难保护、HTTP/Multipart/Form 和反向代理上限不可由租户覆盖，也不要求安装者维护额外上传环境变量。
 - 类似 MQTT 端口、PressureGuard、V8Limits、OrmLimits、StartupLimits、SecurityGuard 这类影响整进程资源的配置，不能让每个子租户各自抬高全局上限。子租户同名隔离字段只能降低自己的并发、等待时间或资源额度，用于隔离弱租户、试用租户或异常租户。
@@ -139,18 +140,20 @@ var erpUrl = (V8.OsClientNetwork === 'Intranet')
   : 'https://erp.public.com/api';
 ```
 
-## 第三方密钥放 OsClientModel（不要硬编码）
+## 第三方密钥放租户动态设置（不要硬编码）
 
 ```javascript
 // ❌ 危险：密钥写在代码里，所有租户共用，无法独立轮换
 var ak = 'AKIDxxxxxxxx';
 
-// ✅ 正确：每个租户在 sys_osclients 表中配置自己的业务集成密钥
-var ak = V8.OsClientModel.WxPayMchKey;
-var secret = V8.OsClientModel.WxPaySecret;
+// ✅ 普通可公开业务值：每个租户在 mci_system_setting 动态维护
+var loginName = V8.SysConfig.PublicSettings['Login.Gitee.Name'];
+
+// ✅ Secret：由固定协议的可信后端能力读取并直接调用供应商
+// V8 只传业务参数，不获得 ak/secret 原文。
 ```
 
-> 在表单引擎中给 `sys_osclients` 添加租户自有业务字段（如 `WxPayMchKey`），可通过 `V8.OsClientModel.字段名` 访问。共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
+> `mci_system_setting` 位于每个租户自己的数据库。普通设置可以逐条动态公开到 `V8.SysConfig.PublicSettings`；Secret 保存认证密文，普通 V8/FormEngine/匿名/访问密钥会话不能读取 `SecretCipher` 或调用通用解密器。`sys_osclients` 自定义业务字段只保留存量兼容；共享基础设施字段由服务端强制移除，不能用自定义同义字段绕过安全代理。
 
 ## 用户扩展字段访问（同理）
 
@@ -169,6 +172,7 @@ SELECT * FROM Contact WHERE OwnerId = $CurrentUser.Id$ AND Spouse = $CurrentUser
 ❌ 绕开 `V8.Cache` 使用底层 Redis → 租户数据串号（V8 已不再暴露底层句柄）
 ❌ MongoDB DbName 不带 OsClient → 数据混淆  
 ❌ 把 OsClientModel 字段直接返回给前端 → 密钥泄漏  
+❌ 查询 `mci_system_setting.SecretCipher` 或给 V8 暴露通用解密器 → 密钥边界失效  
 ❌ 在前端硬编码 OsClient → 一改全改，应通过 token/URL 自动识别  
 ❌ 跨租户操作不验证当前用户权限 → 越权风险  
 ❌ 子租户缺少 MQ/MQTT/Search 独立凭据时回退主账号 → 全平台越权

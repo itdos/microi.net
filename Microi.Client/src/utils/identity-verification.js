@@ -1,4 +1,5 @@
 const API_ROOT = "/api/IdentityVerification";
+const EXTERNAL_LOGIN_API_ROOT = "/api/ExternalLogin";
 
 function toBase64Url(value) {
     const bytes = value instanceof ArrayBuffer
@@ -63,9 +64,35 @@ async function post(diyCommon, action, payload) {
     return diyCommon.PostAsync(`${API_ROOT}/${action}`, payload || {}, null, null, "json");
 }
 
+async function postExternalLogin(diyCommon, action, payload) {
+    if (!diyCommon?.PostAsync) throw new Error("DiyCommon.PostAsync 不可用。");
+    return diyCommon.PostAsync(`${EXTERNAL_LOGIN_API_ROOT}/${action}`, payload || {}, null, null, "json");
+}
+
 function resultData(result) {
     if (!result || result.Code !== 1) throw new Error(result?.Msg || "身份验证请求失败。");
     return result.Data || {};
+}
+
+async function requestWebAuthnCredential(operation, publicKey, timeoutMilliseconds = 70000) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout = setTimeout(() => controller?.abort(), timeoutMilliseconds);
+    try {
+        return await navigator.credentials[operation]({
+            publicKey: preparePublicKey(publicKey),
+            ...(controller ? { signal: controller.signal } : {})
+        });
+    } catch (error) {
+        if (error?.name === "AbortError") {
+            throw new Error("设备验证等待超时，请确认系统验证窗口后重试。");
+        }
+        if (error?.name === "NotAllowedError") {
+            throw new Error("设备验证已取消、超时，或当前通行密钥不允许此用途。");
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeout);
+    }
 }
 
 export function isPasskeySupported() {
@@ -81,12 +108,97 @@ export async function getIdentityCapabilities(diyCommon, osClient) {
     return resultData(result);
 }
 
+function popupFeatures(width, height) {
+    const safeWidth = Math.max(480, Math.min(920, Number(width) || 720));
+    const safeHeight = Math.max(620, Math.min(900, Number(height) || 760));
+    const left = Math.max(0, Math.round((window.screenX || 0) + ((window.outerWidth || screen.width) - safeWidth) / 2));
+    const top = Math.max(0, Math.round((window.screenY || 0) + ((window.outerHeight || screen.height) - safeHeight) / 2));
+    return `popup=yes,width=${safeWidth},height=${safeHeight},left=${left},top=${top},resizable=yes,scrollbars=yes`;
+}
+
+function waitForExternalLoginPopup(popup, provider, expectedOrigin, timeoutMilliseconds = 5 * 60 * 1000) {
+    return new Promise((resolve, reject) => {
+        let finished = false;
+        const cleanup = () => {
+            window.removeEventListener("message", onMessage);
+            clearInterval(closeWatcher);
+            clearTimeout(timeout);
+        };
+        const complete = (callback) => {
+            if (finished) return;
+            finished = true;
+            cleanup();
+            callback();
+        };
+        const onMessage = (event) => {
+            if (event.source !== popup || event.origin !== expectedOrigin) return;
+            const data = event.data || {};
+            if (data.type !== "microi-external-login"
+                || String(data.provider || "").toLowerCase() !== String(provider || "").toLowerCase()) return;
+            complete(() => data.success
+                ? resolve(data)
+                : reject(new Error(data.message || "外部身份验证未完成。")));
+        };
+        window.addEventListener("message", onMessage);
+        const closeWatcher = setInterval(() => {
+            if (popup.closed) complete(() => reject(new Error("外部登录窗口已关闭。")));
+        }, 500);
+        const timeout = setTimeout(() => {
+            try { popup.close(); } catch (_) {}
+            complete(() => reject(new Error("外部登录等待超时，请重新发起。")));
+        }, timeoutMilliseconds);
+    });
+}
+
+/**
+ * 发起固定供应商 OAuth/扫码流程。授权码与 ClientSecret 始终只在后端交换，前端仅接收
+ * 90 秒一次性票据；登录成功后仍由 DiyToken 返回统一会话。
+ */
+export async function runExternalLogin({
+    diyCommon,
+    osClient,
+    provider,
+    mode = "Login",
+    clientType = "PC",
+    did = ""
+}) {
+    if (typeof window === "undefined") throw new Error("当前环境无法打开外部登录窗口。");
+    const providerKey = String(provider || "").trim();
+    if (!providerKey) throw new Error("登录方式不能为空。");
+    const popupName = `microi-external-login-${providerKey.toLowerCase()}`;
+    const popup = window.open("about:blank", popupName, popupFeatures(720, 760));
+    if (!popup) throw new Error("浏览器阻止了登录窗口，请允许本站弹出窗口后重试。");
+    try {
+        popup.document.title = "正在创建安全登录会话…";
+        const begin = resultData(await postExternalLogin(diyCommon, "Begin", {
+            OsClient: osClient,
+            Provider: providerKey,
+            Mode: String(mode).toLowerCase() === "bind" ? "Bind" : "Login",
+            ReturnOrigin: window.location.origin
+        }));
+        const callbackOrigin = new URL(begin.CallbackUrl, window.location.href).origin;
+        popup.resizeTo?.(Number(begin.Popup?.Width) || 720, Number(begin.Popup?.Height) || 760);
+        popup.location.replace(begin.AuthorizeUrl);
+        const callback = await waitForExternalLoginPopup(popup, providerKey, callbackOrigin);
+        if (String(mode).toLowerCase() === "bind") return { Code: 1, Data: callback, Msg: callback.message || "绑定成功。" };
+        return postExternalLogin(diyCommon, "CompleteLogin", {
+            OsClient: osClient,
+            Ticket: callback.ticket,
+            Did: did || diyCommon.GetDid?.() || "",
+            _ClientType: clientType
+        });
+    } catch (error) {
+        try { popup.close(); } catch (_) {}
+        throw error;
+    }
+}
+
 export async function registerPasskey({ diyCommon, deviceName, did }) {
     if (!isPasskeySupported() || typeof navigator.credentials.create !== "function") {
         throw new Error("当前浏览器或访问方式不支持 Passkey，请使用 HTTPS、Windows Hello、Face ID、Touch ID 或安全密钥。");
     }
     const begin = resultData(await post(diyCommon, "BeginPasskeyRegistration", { DeviceName: deviceName }));
-    const credential = await navigator.credentials.create({ publicKey: preparePublicKey(begin.PublicKey) });
+    const credential = await requestWebAuthnCredential("create", begin.PublicKey);
     return post(diyCommon, "CompletePasskeyRegistration", {
         ChallengeId: begin.ChallengeId,
         Response: serializeCredential(credential),
@@ -113,7 +225,7 @@ export async function verifyWithPasskey({
         Purpose: purpose,
         ActionHash: actionHash
     }));
-    const credential = await navigator.credentials.get({ publicKey: preparePublicKey(begin.PublicKey) });
+    const credential = await requestWebAuthnCredential("get", begin.PublicKey);
     return post(diyCommon, "CompletePasskeyAuthentication", {
         OsClient: osClient,
         ChallengeId: begin.ChallengeId,
@@ -121,6 +233,47 @@ export async function verifyWithPasskey({
         Did: did || diyCommon.GetDid?.() || "",
         _ClientType: clientType
     });
+}
+
+export async function verifyWithTotp({
+    diyCommon,
+    osClient,
+    account = "",
+    code,
+    purpose = "Login",
+    actionHash = "",
+    clientType = "PC",
+    did = ""
+}) {
+    return post(diyCommon, "VerifyTotp", {
+        OsClient: osClient,
+        Account: String(account || "").trim(),
+        Code: String(code || "").replace(/\D/g, "").slice(0, 6),
+        Purpose: purpose,
+        ActionHash: actionHash,
+        Did: did || diyCommon.GetDid?.() || "",
+        _ClientType: clientType
+    });
+}
+
+export async function updateAuthenticatorPolicy(diyCommon, policy) {
+    return post(diyCommon, "UpdateAuthenticatorPolicy", policy || {});
+}
+
+export async function beginTotpEnrollment(diyCommon) {
+    return resultData(await post(diyCommon, "BeginTotpEnrollment", {}));
+}
+
+export async function completeTotpEnrollment(diyCommon, payload) {
+    return post(diyCommon, "CompleteTotpEnrollment", payload || {});
+}
+
+export async function listTotpAuthenticators(diyCommon) {
+    return resultData(await post(diyCommon, "ListTotpAuthenticators", {}));
+}
+
+export async function revokeTotpAuthenticator(diyCommon, id) {
+    return post(diyCommon, "RevokeTotpAuthenticator", { Id: id });
 }
 
 export async function sha256Hex(value) {
@@ -134,7 +287,7 @@ export async function createPasswordChangeActionHash(userId, encodedNewPassword)
     return sha256Hex(`Microi:ChangePassword:v1:${userId || ""}:${encodedNewPassword || ""}`);
 }
 
-export async function requestPasswordChangeTicket({ diyCommon, osClient, account, userId, encodedNewPassword, clientType }) {
+export async function requestPasswordChangeTicket({ diyCommon, osClient, account, userId, encodedNewPassword, clientType, totpCode = "" }) {
     const capabilities = await getIdentityCapabilities(diyCommon, osClient);
     if (!capabilities.Enabled || !capabilities.PasswordChangeStepUp) return "";
     const actionHash = await createPasswordChangeActionHash(userId, encodedNewPassword);
@@ -144,6 +297,16 @@ export async function requestPasswordChangeTicket({ diyCommon, osClient, account
             diyCommon,
             osClient,
             account,
+            purpose: "ChangePassword",
+            actionHash,
+            clientType
+        });
+    } else if (capabilities.TotpEnabled && capabilities.HasStepUpTotp && totpCode) {
+        result = await verifyWithTotp({
+            diyCommon,
+            osClient,
+            account,
+            code: totpCode,
             purpose: "ChangePassword",
             actionHash,
             clientType
@@ -236,7 +399,14 @@ export const IdentityVerification = {
     listAuthenticators,
     renameAuthenticator,
     revokeAuthenticator,
+    updateAuthenticatorPolicy,
+    beginTotpEnrollment,
+    completeTotpEnrollment,
+    listTotpAuthenticators,
+    revokeTotpAuthenticator,
+    verifyWithTotp,
     verifyWithFace,
+    runExternalLogin,
     serializeCredential,
     preparePublicKey
 };

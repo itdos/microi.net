@@ -588,7 +588,7 @@ test('官网临时故障识别只放行网络、限流和服务端错误', () =>
   assert.equal(isTemporaryOfficialResourceFailure(new Error('资源名不正确')), false);
 });
 
-test('离线发布仅允许六项本地资源与共同基线完全一致', () => {
+test('离线发布仅允许七项本地资源与共同基线完全一致', () => {
   const names = ['a.js', 'b.json'];
   const local = new Map([['a.js', 'a\n'], ['b.json', '{}\n']]);
   const base = new Map(local);

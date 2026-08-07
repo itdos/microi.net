@@ -33,6 +33,7 @@ const resourceNames = [
   'official-resource-api.js',
   'app.microi.form-engine.json',
   'app.microi.module-engine.json',
+  'app.microi.saas-engine.json',
   'app.microi.store.json',
 ];
 const endpoint = process.env.MICROI_UPGRADE_RESOURCE_API
@@ -122,6 +123,7 @@ function validateReleaseCandidate(name, content) {
     const expectedNames = {
       'app.microi.form-engine.json': '表单引擎',
       'app.microi.module-engine.json': '模块引擎',
+      'app.microi.saas-engine.json': 'SaaS引擎',
       'app.microi.store.json': '应用商城',
     };
     if (packageModel?.PackageInfo?.Name !== expectedNames[name]) {
@@ -472,8 +474,21 @@ if (process.argv.includes('--synchronize-local')) {
   const publish = process.argv.includes('--publish');
   const allowVerifiedOffline = process.argv.includes('--allow-verified-offline');
   const repairBaseFromRemote = process.argv.includes('--repair-base-from-remote');
+  const bootstrapMissing = process.argv.includes('--bootstrap-missing');
   if (repairBaseFromRemote && (initializeBase || publish || allowVerifiedOffline)) {
     throw new Error('--repair-base-from-remote 不能与 --initialize-base、--publish 或 --allow-verified-offline 同时使用');
+  }
+  if (bootstrapMissing) {
+    const bootstrapRemoteResources = await downloadAllWithRetry('初始化缺失资源');
+    await mkdir(baseDirectory, { recursive: true });
+    for (const name of resourceNames) {
+      if (await readOptional(resolve(outputDirectory, name)) !== null) continue;
+      const content = canonicalizeResource(name, bootstrapRemoteResources.get(name).content);
+      validateReleaseCandidate(name, content);
+      await writeFile(resolve(outputDirectory, name), content, 'utf8');
+      await writeFile(resolve(baseDirectory, name), content, 'utf8');
+      printResource(name, content, '从官网初始化新增资源');
+    }
   }
   const localResources = new Map();
   const rawLocalResources = new Map();
@@ -519,7 +534,7 @@ if (process.argv.includes('--synchronize-local')) {
       localStandaloneContents,
     );
     process.stderr.write(
-      '\n⚠ 官网升级资源接口在重试后仍暂时不可用；6 项本地资源与上次官网成功回读的共同基线完全一致。\n'
+      '\n⚠ 官网升级资源接口在重试后仍暂时不可用；7 项本地资源与上次官网成功回读的共同基线完全一致。\n'
       + '  本次仅允许继续后端编译发布：未写入官网、未修改本地资源、未推进共同基线。\n'
       + `  故障原因：${error.message}\n\n`,
     );

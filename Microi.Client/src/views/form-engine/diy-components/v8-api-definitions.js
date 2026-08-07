@@ -698,7 +698,7 @@ export const V8ApiDefinitions = {
                     GetCapabilities: {
                         label: "GetCapabilities",
                         kind: "Method",
-                        documentation: "读取当前租户 Passkey、严格人脸及当前用户登记状态。",
+                        documentation: "读取当前租户 Passkey、Authenticator TOTP、严格人脸及当前用户登记状态。",
                         insertText: "GetCapabilities",
                         snippet: "GetCapabilities()"
                     },
@@ -712,7 +712,7 @@ export const V8ApiDefinitions = {
                     Verify: {
                         label: "Verify",
                         kind: "Method",
-                        documentation: "使用 Passkey 或严格人脸为自定义敏感操作申请一次性票据。Purpose 与 ActionHash 必填。返回 Data.Ticket；票据只能在后端消费一次。",
+                        documentation: "使用 Passkey、Authenticator TOTP 或严格人脸为自定义敏感操作申请一次性票据。Purpose 与 ActionHash 必填；Method=Totp 时同时传 6 位 Code。返回 Data.Ticket；票据只能在后端消费一次。",
                         insertText: "Verify",
                         snippet: "Verify({\n\tPurpose: \"${1:ApproveSensitiveOperation}\",\n\tActionHash: ${2:actionHash},\n\tMethod: \"${3:Auto}\"\n})"
                     },

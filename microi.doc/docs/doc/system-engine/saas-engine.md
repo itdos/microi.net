@@ -12,7 +12,7 @@
 >* 一套程序驱动N个租户数据库，而不必每个租户再部署一套docker程序
 >* 本地二次开发`一键切换租户数据库`、`环境`
 >* `主库`即部署平台时`环境变量`或`appsettings.json`中配置的`数据库连接字符串[OsClientDbConn]`
->* 所有的`Saas引擎配置`以`主库`为准， 租户库的`Saas引擎配置`表清空数据即可
+>* 所有的 **SaaS 路由与部署控制面配置** 以主库 `sys_osclients` 为准，租户库不维护第二份 `sys_osclients` 数据；当前租户自己的业务设置则保存在其租户库的 `sys_config` / `mci_system_setting`，不要与控制面混为一谈
 
 ## `OsClient`
 >* OsClient 值即为 `SaaS引擎Key`，用于确定租户，值可自定义，建议使用全小写字母，例如 `tenant_a`、`tenant_demo`、`demo01`。
@@ -40,11 +40,25 @@
 
 - `V8.OsClientModel` / `V8.ClientModel` 是当前租户的独立脱敏副本，不包含数据库连接、`AuthSecret`、Redis、对象存储、MQ/MQTT、搜索凭据。
 - `V8.SysConfig` 同样是脱敏副本，不包含 `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 和疑似 Password/Secret/Token/Key/Connection 字段。
-- 租户自行扩展的微信、支付、ERP 等业务密钥仍可能存在，V8 只能在服务端使用，禁止把整个配置对象或具体密钥返回前端。
+- 存量项目可能在 `sys_osclients` 扩展微信、支付、ERP 等业务密钥；新增配置应迁移到当前租户库的 `mci_system_setting`，由受控后端使用，禁止把整个配置对象或具体密钥返回前端。
 - 普通帐号即使拥有 Token 或错误配置了菜单/高级表权限，也不能通过通用 FormEngine 访问 SaaS 配置、接口引擎、菜单角色、任务、数据源等管理员专用平台表。相关控制面管理接口会用当前租户主库复核活动用户及有效管理员角色，要求 `Level >= 9999`；请求体自报管理员身份无效。
 - 主租户由运行环境中的 `OsClient` 或 `AppSettings:OsClient` 决定，不应在业务代码中写死为 `master`、`iTdos` 或其它固定值。
 
 数据库、Redis、主租户标识等启动基础设施仍由安装编排中的少量基础参数提供；普通业务和运行参数统一由 SaaS 引擎主租户或系统设置管理，未填写时使用代码安全默认值。子租户只能在平台允许的字段上配置自身额度，不能抬高节点级硬边界。文件上传业务值按当前租户 `sys_osclients` → 代码默认值解析，最终仍受 API 固定接收硬顶和反向代理边界保护。配置保存后应走 SaaS 引擎的共享缓存刷新流程并回读验证，不依赖逐节点重启。
+
+### 主库控制面与租户业务设置的分工
+
+子租户运行时不是“所有配置都从主租户数据库读取”。平台先用主库 `sys_osclients` 找到目标租户的数据库、Redis、MongoDB、MinIO、MQ 等部署路由；建立租户上下文以后，`sys_config` 与 `mci_system_setting` 都从目标租户自己的数据库读取。
+
+| 配置类型 | 事实源 | 子租户能否自行维护 |
+|---|---|---|
+| 数据库连接、Redis、MongoDB、MinIO、MQ/MQTT、搜索、签名与部署信任链 | 主库 `sys_osclients` | 否，只能由平台控制面维护 |
+| 系统标题、主题、公开地址等传统系统配置 | 子租户库 `sys_config` | 按系统设置权限维护 |
+| OAuth ClientId/ClientSecret、租户业务开关、第三方业务参数 | 子租户库 `mci_system_setting` | 是，仅租户超级管理员维护 |
+
+`mci_system_setting` 的公开性是每条记录动态配置的：普通设置可选择进入 `V8.SysConfig.PublicSettings`；Secret 只保存租户绑定的认证密文。平台不是固定指定“哪些字段可以公开”，而是固定一组永远不能公开的敏感 Key 规则——Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等名称即使勾选公开也会被后端拒绝。这样既允许租户和低代码开发者随时增加公开/私有业务设置，又不会让一个错误开关泄露基础设施或第三方密钥。
+
+Secret 的列表接口只返回“已配置”状态；显示原文需要租户超级管理员先完成 Passkey、Authenticator 或严格人脸二次验证，原文响应禁止缓存并在前端 30 秒后清除，审计只记录 Key/记录 Id/结果，不记录明文。登录方式的完整配置见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
 
 ### 微信小程序内容安全配置
 

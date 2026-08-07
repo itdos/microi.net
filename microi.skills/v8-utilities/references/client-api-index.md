@@ -118,7 +118,7 @@
 | `V8.Identity.GetCapabilities()` | 读取当前租户强身份能力和本人登记状态 |
 | `V8.Identity.CreateActionHash(value)` | 为稳定业务命令生成 SHA-256 摘要 |
 | `V8.Identity.RegisterPasskey(options?)` | 登记当前用户 Passkey |
-| `V8.Identity.Verify({Purpose,ActionHash,Method})` | 完成 Passkey/严格人脸验证并取得一次性后端票据 |
+| `V8.Identity.Verify({Purpose,ActionHash,Method,Code?})` | 完成 Passkey、Authenticator TOTP 或严格人脸验证并取得一次性后端票据；Totp 需 6 位 Code |
 
 扫码应优先接收 Promise 返回值；兼容代码可在调用后读取 `V8.ScanCodeRes`。
 `V8.Identity` 是强身份验证模块。`V8.Identity.Verify` 的成功结果不能直接授权业务；后端必须重读权威数据、重算摘要并调用 `V8.Method.ConsumeIdentityVerificationTicket`。

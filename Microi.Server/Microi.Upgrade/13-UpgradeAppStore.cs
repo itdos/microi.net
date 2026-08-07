@@ -20,7 +20,7 @@ namespace Microi.net
         /// <summary>
         /// 
         /// </summary>
-        public static string Version = "6.4.3.0";
+        public static string Version = "6.4.4.0";
         private static readonly HttpClient ResourceHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(8)
@@ -31,6 +31,7 @@ namespace Microi.net
         private const string BuildAiAppResourceName = "ai-app-build.js";
         private const string FormEnginePackageResourceName = "app.microi.form-engine.json";
         private const string ModuleEnginePackageResourceName = "app.microi.module-engine.json";
+        private const string SaaSEnginePackageResourceName = "app.microi.saas-engine.json";
         private const string AppStorePackageResourceName = "app.microi.store.json";
         private const string AppStoreMenuId = "61b7faee-35b2-4571-add2-5231a355f368";
         // Jint 4.14 的 MemoryLimitConstraint 统计一次执行的累计分配量，而非实时存活堆。
@@ -45,6 +46,7 @@ namespace Microi.net
             BuildAiAppResourceName,
             FormEnginePackageResourceName,
             ModuleEnginePackageResourceName,
+            SaaSEnginePackageResourceName,
             AppStorePackageResourceName
         };
 
@@ -52,6 +54,7 @@ namespace Microi.net
         {
             { FormEnginePackageResourceName, "表单引擎" },
             { ModuleEnginePackageResourceName, "模块引擎" },
+            { SaaSEnginePackageResourceName, "SaaS引擎" },
             { AppStorePackageResourceName, "应用商城" }
         };
 
@@ -1081,6 +1084,14 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL) LIMIT 1";
 
             #region 模块引擎 数据包
             await InstallUpgradePackage(osClient, msgs, ModuleEnginePackageResourceName, "模块引擎数据包", resources);
+            if (msgs.Count > 0) return msgs;
+            #endregion
+
+            #region SaaS引擎与强身份验证基础包
+            // SaaS 引擎包是官方平台资源，随升级自动安装。它通过统一应用商城导入器
+            // 幂等补齐 Passkey/TOTP/严格人脸表、sys_osclients 配置字段和个人中心微服务；
+            // 不在 .NET 中复制表/字段迁移逻辑，并保留租户后来显式关闭的 0 值。
+            await InstallUpgradePackage(osClient, msgs, SaaSEnginePackageResourceName, "SaaS引擎与身份验证数据包", resources);
             if (msgs.Count > 0) return msgs;
             #endregion
 

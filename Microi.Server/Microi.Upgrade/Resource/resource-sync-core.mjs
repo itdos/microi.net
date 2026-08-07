@@ -25,6 +25,7 @@ const readableResourceIdentities = {
 const readablePackageNames = {
   'app.microi.form-engine.json': '表单引擎',
   'app.microi.module-engine.json': '模块引擎',
+  'app.microi.saas-engine.json': 'SaaS引擎',
   'app.microi.store.json': '应用商城',
 };
 

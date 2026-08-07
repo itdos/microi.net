@@ -5812,7 +5812,7 @@ namespace Microi.net
             for (var i = 0; i < routes.Count; i++)
             {
                 if (!(routes[i] is JObject route)) continue;
-                var routePath = route["RoutePath"]?.Val<string>() ?? route["Path"]?.Val<string>() ?? "/";
+                var routePath = ReadMicroServiceRouteString(route, "RoutePath", "routePath", "Path", "path") ?? "/";
                 if (routePath.DosIsNullOrWhiteSpace()) routePath = "/";
                 var routeMetaToken = route["RouteMetaJson"];
                 var routeMetaJson = routeMetaToken?.Type == JTokenType.String
@@ -5847,16 +5847,16 @@ namespace Microi.net
                     ["OsClient"] = osClient,
                     ["MicroServiceId"] = serviceId,
                     ["MicroServiceKey"] = msKey,
-                    ["PageKey"] = route["PageKey"]?.Val<string>() ?? route["Key"]?.Val<string>() ?? $"page-{i + 1}",
-                    ["PageName"] = route["PageName"]?.Val<string>() ?? route["Name"]?.Val<string>() ?? route["PageTitle"]?.Val<string>() ?? $"页面{i + 1}",
-                    ["PageTitle"] = route["PageTitle"]?.Val<string>() ?? route["Title"]?.Val<string>() ?? route["PageName"]?.Val<string>() ?? $"页面{i + 1}",
+                    ["PageKey"] = ReadMicroServiceRouteString(route, "PageKey", "pageKey", "Key", "key", "Name", "name") ?? $"page-{i + 1}",
+                    ["PageName"] = ReadMicroServiceRouteString(route, "PageName", "pageName", "Name", "name", "PageTitle", "pageTitle", "Title", "title") ?? $"页面{i + 1}",
+                    ["PageTitle"] = ReadMicroServiceRouteString(route, "PageTitle", "pageTitle", "Title", "title", "PageName", "pageName", "Name", "name") ?? $"页面{i + 1}",
                     ["RoutePath"] = routePath,
-                    ["EntryPath"] = route["EntryPath"]?.Val<string>() ?? entryPath,
-                    ["SourceDirName"] = route["SourceDirName"]?.Val<string>() ?? route["sourceDirName"]?.Val<string>() ?? msKey,
-                    ["MenuUrl"] = route["MenuUrl"]?.Val<string>() ?? $"/micro-app/{msKey}{routePath}",
-                    ["Sort"] = route["Sort"]?.Val<int?>() ?? i,
-                    ["IsHome"] = route["IsHome"]?.Val<int?>() ?? (i == 0 ? 1 : 0),
-                    ["IsEnable"] = route["IsEnable"]?.Val<int?>() ?? 1,
+                    ["EntryPath"] = ReadMicroServiceRouteString(route, "EntryPath", "entryPath") ?? entryPath,
+                    ["SourceDirName"] = ReadMicroServiceRouteString(route, "SourceDirName", "sourceDirName") ?? msKey,
+                    ["MenuUrl"] = ReadMicroServiceRouteString(route, "MenuUrl", "menuUrl") ?? $"/micro-app/{msKey}{routePath}",
+                    ["Sort"] = ReadMicroServiceRouteInt(route, i, "Sort", "sort"),
+                    ["IsHome"] = ReadMicroServiceRouteInt(route, i == 0 ? 1 : 0, "IsHome", "isHome"),
+                    ["IsEnable"] = ReadMicroServiceRouteInt(route, 1, "IsEnable", "isEnable"),
                     ["BuildVersion"] = buildVersion,
                     ["RouteMetaJson"] = routeMetaJson
                 };
@@ -5890,6 +5890,33 @@ namespace Microi.net
             }
 
             return new DosResult<object>(1, new { Warnings = warnings, SyncedCount = routes.Count });
+        }
+
+        internal static string ReadMicroServiceRouteString(JObject route, params string[] names)
+        {
+            if (route == null || names == null) return null;
+            foreach (var name in names)
+            {
+                var token = route[name];
+                if (token == null || token.Type == JTokenType.Null) continue;
+                var value = token.Val<string>();
+                if (!value.DosIsNullOrWhiteSpace()) return value;
+            }
+            return null;
+        }
+
+        internal static int ReadMicroServiceRouteInt(JObject route, int fallback, params string[] names)
+        {
+            if (route == null || names == null) return fallback;
+            foreach (var name in names)
+            {
+                var token = route[name];
+                if (token == null || token.Type == JTokenType.Null) continue;
+                if (token.Type == JTokenType.Boolean) return token.Val<bool>() ? 1 : 0;
+                var value = token.Val<int?>();
+                if (value.HasValue) return value.Value;
+            }
+            return fallback;
         }
 
         #endregion

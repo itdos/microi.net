@@ -1053,9 +1053,10 @@ var clientType = V8.ClientType;
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
 var apiBase = V8.SysConfig.ApiBase;
+var loginLabel = V8.SysConfig.PublicSettings?.['Login.Gitee.Name'];
 ```
 
-`V8.SysConfig` 不是 `sys_config`/SaaS 配置整行。数据库、Redis、对象存储、MQ、搜索、密码、Secret、Token、Key、Connection、`ClientSecrets`、`GlobalServerV8Code` 等敏感字段不会注入浏览器。需要业务密钥的逻辑必须放到后端接口引擎或受控服务中，禁止尝试从前端读取。
+`V8.SysConfig` 不是 `sys_config`/SaaS 配置整行。`PublicSettings` 来自当前租户 `mci_system_setting`：管理员可以逐条动态勾选公开，不需要修改前端代码；但是 Secret 以及名称包含 Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等敏感片段的设置始终不会公开。数据库、对象存储、MQ、搜索凭据、`ClientSecrets`、`GlobalServerV8Code` 等同样不会注入浏览器。需要业务密钥的逻辑必须放到后端接口引擎或受控服务中，禁止尝试从前端读取。
 
 ## V8.FormEngine
 >* 前端表单引擎 facade，用于受权限约束的单表 CRUD。完整查询参数见：[FormEngine用法](https://microi.net/doc/v8-engine/form-engine.html)
@@ -1123,14 +1124,14 @@ var rowResult = await V8.FormEngine.GetFormData({
 
 ## 强身份验证（`V8.Identity`）
 
-`V8.Identity` 在登录后的表单/列表 V8 中提供受控的 Passkey、设备生物识别和严格人脸交互：
+`V8.Identity` 在登录后的表单/列表 V8 中提供受控的 Passkey、Authenticator TOTP、设备生物识别和严格人脸交互：
 
 | 方法 | 说明 |
 |---|---|
-| `GetCapabilities(callback?)` | 读取当前租户开关，以及本人是否已登记 Passkey/人脸 |
+| `GetCapabilities(callback?)` | 读取当前租户开关，以及本人是否已登记可用于二次授权的 Passkey/TOTP/人脸 |
 | `CreateActionHash(value, callback?)` | 对稳定字符串或 JSON 计算 SHA-256 操作摘要 |
 | `RegisterPasskey(options?, callback?)` | 为当前登录用户登记 Passkey |
-| `Verify(options, callback?)` | 完成敏感操作验证并返回一次性 Ticket |
+| `Verify(options, callback?)` | 完成敏感操作验证并返回一次性 Ticket；`Method=Totp` 时传当前 6 位 `Code` |
 
 ```javascript
 var actionHash = await V8.Identity.CreateActionHash({
@@ -1146,7 +1147,7 @@ var result = await V8.Identity.Verify({
 if (result.Code !== 1) return V8.Tips(result.Msg, false);
 ```
 
-前端成功不等于业务已授权。必须把 `result.Data.Ticket` 交给后端接口引擎，由后端重读权威业务数据、重新计算摘要，并调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能复用，也不能代替菜单/表权限和业务状态校验。完整方案见 [Passkey、设备生物识别与严格人脸验证](../more/identity-verification)。
+前端成功不等于业务已授权。必须把 `result.Data.Ticket` 交给后端接口引擎，由后端重读权威业务数据、重新计算摘要，并调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能复用，也不能代替菜单/表权限和业务状态校验。完整方案见 [登录方式、Passkey、Authenticator、第三方登录与严格人脸验证](../more/identity-verification)。
 
 ## 蓝牙打印（`V8.Print`）
 

@@ -11,6 +11,24 @@ assert.equal(createEngines.length, 1, "ai_app_create must exist exactly once");
 const engine = createEngines[0];
 const source = engine.ApiV8Code;
 
+function compareSemver(actual, minimum) {
+  const parse = (value) => String(value || "")
+    .replace(/^v/i, "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10));
+  const left = parse(actual);
+  const right = parse(minimum);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const delta = (left[index] || 0) - (right[index] || 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function extractFunction(name) {
   const start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `missing function ${name}`);
@@ -125,10 +143,10 @@ function assertStableVueBaseline(files, applicationType) {
 }
 
 test("ai_app_create keeps one versioned and syntactically valid engine", () => {
-  assert.equal(engine.Version, "v1.1.4");
-  assert.match(engine.ChangeHistory, /^2026-08-02 v1\.1\.4 /);
+  assert.ok(compareSemver(engine.Version, "v1.1.5") >= 0);
+  assert.match(engine.ChangeHistory, new RegExp(`^\\d{4}-\\d{2}-\\d{2}(?: \\d{2}:\\d{2}:\\d{2})? ${escapeRegExp(engine.Version)} `));
   assert.match(source, /ApiEngineKey: ai_app_create/);
-  assert.match(source, /Version: v1\.1\.4/);
+  assert.match(source, new RegExp(`Version: ${escapeRegExp(engine.Version)}`));
   assert.doesNotThrow(() => new Function(source));
 });
 

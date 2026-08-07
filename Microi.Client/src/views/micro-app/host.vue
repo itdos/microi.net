@@ -21,7 +21,6 @@
             :default-page="microRoutePath || '/'"
             router-mode="pure"
             iframe
-            keep-alive
             @datachange="handleDataChange"
             @mounted="handleMounted"
             @unmount="handleUnmount"
@@ -172,9 +171,15 @@ export default {
             reasonCode: "",
             mountState: "idle",
             retryKey: 0,
+            resolveGeneration: 0,
+            mountWatchdog: null,
+            autoMountRetryCount: 0,
             hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
             resizeObserver: null,
-            visualViewportHandler: null
+            visualViewportHandler: null,
+            isHostActive: true,
+            ownedRoutePath: this.$route?.path || "",
+            ownedRouteFullPath: this.$route?.fullPath || ""
         };
     },
     computed: {
@@ -234,12 +239,42 @@ export default {
         this.startViewportContract();
         window.addEventListener("page-refresh", this.handleHostPageRefresh);
     },
+    activated() {
+        this.isHostActive = true;
+        this.startViewportContract();
+        if (this.$route?.path !== this.ownedRoutePath) return;
+        if (this.$route?.fullPath !== this.ownedRouteFullPath) {
+            this.ownedRouteFullPath = this.$route?.fullPath || "";
+            this.autoMountRetryCount = 0;
+            this.resolveEntryUrl();
+            return;
+        }
+        this.$nextTick(() => {
+            this.updateViewportContract();
+            this.pushViewportContract();
+        });
+    },
+    deactivated() {
+        this.isHostActive = false;
+        this.clearMountWatchdog();
+        this.resolveGeneration += 1;
+        this.stopViewportContract();
+    },
     beforeUnmount() {
+        this.isHostActive = false;
+        this.clearMountWatchdog();
+        this.resolveGeneration += 1;
         this.stopViewportContract();
         window.removeEventListener("page-refresh", this.handleHostPageRefresh);
     },
     watch: {
-        "$route.fullPath"() {
+        "$route.fullPath"(fullPath) {
+            // Every friendly microservice route owns one KeepAlive instance.
+            // Cached hosts still observe the global route; updating a detached
+            // vnode races Vue's DOM insert and can leave the first mount white.
+            if (!this.isHostActive || this.$route?.path !== this.ownedRoutePath) return;
+            this.ownedRouteFullPath = fullPath || "";
+            this.autoMountRetryCount = 0;
             this.resolveEntryUrl();
         }
     },
@@ -405,23 +440,63 @@ export default {
             this.retry();
         },
         handleMounted() {
+            this.clearMountWatchdog();
             this.mountState = "mounted";
             this.pushViewportContract();
         },
         handleUnmount() {
+            this.clearMountWatchdog();
             if (!this.error) this.mountState = "unmounted";
         },
         handleMicroAppError(event) {
             const detail = event?.detail ?? event ?? {};
-            this.setRuntimeError(detail?.message || detail?.error?.message || "微服务挂载失败", {
-                reasonCode: "MICRO_APP_MOUNT_FAILED"
-            });
+            this.recoverMountFailure(
+                detail?.message || detail?.error?.message || "微服务挂载失败",
+                "MICRO_APP_MOUNT_FAILED"
+            );
         },
         setRuntimeError(message, extra = {}) {
+            this.clearMountWatchdog();
             this.error = String(message || "微服务运行异常");
             this.mountState = "error";
             if (extra.httpStatus !== undefined) this.httpStatus = String(extra.httpStatus || "");
             if (extra.reasonCode !== undefined) this.reasonCode = String(extra.reasonCode || "");
+        },
+        clearMountWatchdog() {
+            if (this.mountWatchdog) clearTimeout(this.mountWatchdog);
+            this.mountWatchdog = null;
+        },
+        startMountWatchdog(generation) {
+            this.clearMountWatchdog();
+            this.mountWatchdog = setTimeout(() => {
+                if (generation !== this.resolveGeneration || this.mountState !== "mounting") return;
+                this.recoverMountFailure("微服务首次挂载超时，宿主已尝试自动恢复。", "MICRO_APP_MOUNT_TIMEOUT");
+            }, 12000);
+        },
+        async destroyStuckMicroApp() {
+            try {
+                if (typeof window.microApp?.unmountApp === "function") {
+                    await window.microApp.unmountApp(this.microAppName, { destroy: true, clearData: true });
+                }
+            } catch (_) {
+                // 挂载失败实例可能尚未完成注册，继续使用 key 强制创建新实例。
+            }
+        },
+        async recoverMountFailure(message, reasonCode) {
+            this.clearMountWatchdog();
+            if (this.autoMountRetryCount < 1 && this.entryUrl) {
+                this.autoMountRetryCount += 1;
+                const generation = this.resolveGeneration;
+                this.mountState = "recovering";
+                await this.destroyStuckMicroApp();
+                if (generation !== this.resolveGeneration) return;
+                this.retryKey += 1;
+                this.mountState = "mounting";
+                await this.$nextTick();
+                this.startMountWatchdog(generation);
+                return;
+            }
+            this.setRuntimeError(message, { reasonCode });
         },
         async resolveManagedRuntime(config) {
             const requirePage = this.$route?.meta?.microAppFriendlyRoute === true;
@@ -488,7 +563,10 @@ export default {
                 throw error;
             }
         },
-        retry() {
+        async retry() {
+            this.clearMountWatchdog();
+            this.autoMountRetryCount = 0;
+            await this.destroyStuckMicroApp();
             this.retryKey += 1;
             this.resolveEntryUrl();
         },
@@ -514,6 +592,7 @@ export default {
             }
         },
         startViewportContract() {
+            this.stopViewportContract();
             this.updateViewportContract();
             if (typeof ResizeObserver !== "undefined" && this.$refs.host) {
                 this.resizeObserver = new ResizeObserver(() => this.updateViewportContract());
@@ -525,10 +604,12 @@ export default {
         },
         stopViewportContract() {
             this.resizeObserver?.disconnect?.();
+            this.resizeObserver = null;
             if (this.visualViewportHandler) {
                 window.visualViewport?.removeEventListener("resize", this.visualViewportHandler);
                 window.removeEventListener("resize", this.visualViewportHandler);
             }
+            this.visualViewportHandler = null;
         },
         updateViewportContract() {
             const host = this.$refs.host;
@@ -614,6 +695,8 @@ export default {
             };
         },
         async resolveEntryUrl() {
+            const generation = ++this.resolveGeneration;
+            this.clearMountWatchdog();
             this.loading = true;
             this.error = "";
             this.entryUrl = "";
@@ -634,6 +717,7 @@ export default {
                         AppKey: config.appKey,
                         Version: config.version
                     });
+                    if (generation !== this.resolveGeneration) return;
                     if (result.Code !== 1) {
                         throw new Error(result.Msg || "接口引擎未返回前端微服务地址");
                     }
@@ -642,6 +726,7 @@ export default {
 
                 if (!url && config.appKey) {
                     url = await this.resolveManagedRuntime(config);
+                    if (generation !== this.resolveGeneration) return;
                     if (!url) {
                         url = buildMicroAppEntryUrl({
                             osClient: DiyCommon.GetOsClient(),
@@ -666,15 +751,18 @@ export default {
                 }
 
                 await this.probeEntry(url);
+                if (generation !== this.resolveGeneration) return;
                 this.entryUrl = url;
                 this.mountState = "mounting";
+                this.startMountWatchdog(generation);
             } catch (error) {
+                if (generation !== this.resolveGeneration) return;
                 this.setRuntimeError(error?.message || String(error), {
                     httpStatus: error?.httpStatus,
                     reasonCode: error?.reasonCode || "MICRO_APP_LOAD_FAILED"
                 });
             } finally {
-                this.loading = false;
+                if (generation === this.resolveGeneration) this.loading = false;
             }
         }
     }

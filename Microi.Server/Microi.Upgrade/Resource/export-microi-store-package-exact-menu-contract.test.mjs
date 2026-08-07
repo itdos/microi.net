@@ -7,12 +7,19 @@ const exporter = (packageModel.SysApiEngines || [])
   .find(item => item.ApiEngineKey === 'export-microi-store-package')
 const source = String(exporter?.ApiV8Code || '')
 
-test('application-store package preserves its release version while the exporter is v1.1.4', () => {
+test('application-store package preserves its release version while the exporter is v1.1.5', () => {
   assert.match(String(packageModel.PackageInfo?.Version || ''), /^v\d+\.\d+\.\d+$/)
-  assert.equal(exporter.Version, 'v1.1.4')
-  assert.match(String(exporter.ChangeHistory || ''), /v1\.1\.4[\s\S]*?ExactMenuIds/)
+  assert.equal(exporter.Version, 'v1.1.5')
+  assert.match(String(exporter.ChangeHistory || ''), /v1\.1\.5[\s\S]*?InsertIfMissing/)
   assert.match(source, /ApiEngineKey: export-microi-store-package/)
-  assert.match(source, /Version: v1\.1\.4/)
+  assert.match(source, /Version: v1\.1\.5/)
+})
+
+test('dataset export preserves and validates InsertIfMissing conflict fields', () => {
+  assert.match(source, /var conflictPolicy = String\(selection\.ConflictPolicy \|\| 'UpsertById'\)/)
+  assert.match(source, /conflictPolicy != 'UpsertById' && conflictPolicy != 'InsertIfMissing'/)
+  assert.match(source, /使用 InsertIfMissing 时必须声明 ConflictFields/)
+  assert.match(source, /ConflictPolicy: conflictPolicy,\s*ConflictFields: conflictFields,/)
 })
 
 test('ExactMenuIds is opt-in and normal exports keep recursive descendants', () => {

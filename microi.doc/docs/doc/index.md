@@ -148,7 +148,7 @@
 <tr><td>💾 <strong>分布式缓存</strong></td><td>Redis 哨兵模式</td></tr>
 <tr><td>📂 <strong><a href="/doc/more/hdfs">分布式存储</a></strong></td><td>阿里云 OSS / MinIO / 亚马逊 S3，可扩展更多存储介质</td></tr>
 <tr><td>🔐 <strong><a href="/doc/more/security">平台安全与兼容基线</a></strong></td><td>FormEngine 混合授权、保护表、TableChild、上传与私有文件、CORS/SSRF、RSA、Token 和多节点缓存</td></tr>
-<tr><td>🛡️ <strong><a href="/doc/more/identity-verification">Passkey、设备生物识别与严格人脸验证</a></strong></td><td>DiyToken 无密码登录、改密步进验证、V8 敏感操作票据和可选人脸网关</td></tr>
+<tr><td>🛡️ <strong><a href="/doc/more/identity-verification">登录方式与强身份验证</a></strong></td><td>DiyToken、Passkey、Authenticator、Gitee/微信/GitHub 登录、改密步进票据与可选严格人脸网关</td></tr>
 <tr><td>📨 <strong><a href="/doc/system-engine/mq">消息队列</a></strong></td><td>RabbitMQ 集成</td></tr>
 <tr><td>🔔 <strong><a href="/doc/system-engine/message-notification">消息通知</a></strong></td><td>公众号/服务号、短信、邮件与平台内部实时通知，持久日志和多节点幂等</td></tr>
 <tr><td>📡 <strong><a href="/doc/system-engine/mqtt-engine">IoT 物联网 MQTT</a></strong></td><td>集成 MQTT 服务器，支持 485 / ZigBee / 蓝牙 / Modbus 网关</td></tr>

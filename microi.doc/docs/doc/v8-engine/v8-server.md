@@ -1124,7 +1124,7 @@ MD5、SHA1、SHA256 等摘要不能用于新密码存储；登录密码必须使
 
 ## 强身份验证票据 V8.Method.ConsumeIdentityVerificationTicket
 
-登录后的前端 V8 可通过 `V8.Identity.Verify` 完成 Passkey 或严格人脸验证，取得两分钟有效的一次性票据。后端接口引擎必须从数据库重读业务事实、重新计算 `ActionHash`，再原子消费：
+登录后的前端 V8 可通过 `V8.Identity.Verify` 完成 Passkey、Authenticator TOTP 或严格人脸验证，取得两分钟有效的一次性票据。后端接口引擎必须从数据库重读业务事实、重新计算 `ActionHash`，再原子消费：
 
 ```javascript
 var actionHash = V8.EncryptHelper.Sha256Hex(canonicalBusinessCommand);
@@ -1136,7 +1136,7 @@ var verified = V8.Method.ConsumeIdentityVerificationTicket({
 if (verified.Code !== 1) return verified;
 ```
 
-票据绑定当前 DiyToken 用户、`OsClient`、用途和操作摘要，只能成功消费一次；访问密钥会话不能使用。它不代替菜单/表权限、业务状态机、事务和幂等。完整配置与前端示例见 [Passkey、设备生物识别与严格人脸验证](../more/identity-verification)。
+票据绑定当前 DiyToken 用户、`OsClient`、用途和操作摘要，只能成功消费一次；访问密钥会话不能使用。它不代替菜单/表权限、业务状态机、事务和幂等。完整配置与前端示例见 [Passkey、Authenticator、设备生物识别与严格人脸验证](../more/identity-verification)。
 
 ## V8.TranslateEngine
 
@@ -1689,13 +1689,16 @@ return V8.Office.SendEmail({
 >* `ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 以及 Password/Secret/Token/Key/Connection 等疑似凭据字段不会注入 V8。`V8.FormEngine.GetSysConfig(...)` 同样强制绑定当前租户并应用此安全边界。
 ```js
 var sysTitle = V8.SysConfig.SysTitle;
+var publicLoginName = V8.SysConfig.PublicSettings?.['Login.Gitee.Name'];
 // V8.SysConfig.ClientSecrets / GlobalServerV8Code 为 undefined
 ```
+
+`V8.SysConfig.PublicSettings` 是当前租户 `mci_system_setting` 的动态公开投影。租户管理员逐条控制 `IsPublic`，但 Secret 和固定敏感 Key 规则永远优先，不能通过勾选公开绕过。后端 V8 若需要第三方 Secret，应调用封装好租户隔离与固定协议的受控原子能力；不要查询 `mci_system_setting.SecretCipher`、自行解密或把原文写入日志/返回值。
 
 ## SaaS引擎信息 V8.OsClientModel / V8.ClientModel
 >* 两者是当前租户 SaaS 配置的独立脱敏副本，脚本修改不会写回服务端运行配置。
 >* 数据库连接、鉴权密钥以及共享 Redis、对象存储、RabbitMQ、MQTT、Search 的地址、账号和密码不会注入 V8；即使接口错误地 `return V8.ClientModel`，也不会泄露主库基础设施凭据。
->* 当前租户自行扩展的业务集成字段（例如微信支付 Key）仍可供后端 V8 使用，但不得把整个配置对象或单个密钥返回前端。
+>* `sys_osclients` 自定义业务字段只作为存量兼容；新增租户业务设置使用当前租户库的 `mci_system_setting`。普通值按需进入 `V8.SysConfig.PublicSettings`，Secret 只能由封装好的后端协议能力使用，不通过 `V8.OsClientModel` 暴露。
 >* 存储类型 `HDFS` 与公开文件域名可以读取；访问缓存、文件、MQ、MQTT 和 Search 必须使用对应的 `V8.*` 受控能力，服务端自动添加当前租户命名空间。
 ```js
 var title = V8.OsClientModel.SysTitle;

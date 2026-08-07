@@ -16,9 +16,11 @@ namespace Microi.net
     /// </summary>
     public sealed class IdentityVerificationOptions
     {
-        // 缺少应用包字段或身份表时必须保持关闭，避免旧租户升级后出现不可用的登录入口。
-        public bool Enabled { get; set; }
+        // 身份能力随官方平台应用默认开启；租户明确写入 0 后仍保持关闭。
+        public bool Enabled { get; set; } = true;
         public bool PasskeyEnabled { get; set; } = true;
+        public bool TotpEnabled { get; set; } = true;
+        public string TotpIssuer { get; set; } = "Microi";
         public bool FaceEnabled { get; set; }
         public bool RequirePasswordChangeStepUp { get; set; } = true;
         public string PasskeyRpId { get; set; } = "";
@@ -31,18 +33,59 @@ namespace Microi.net
         {
             var client = OsClientExtend.GetClient(osClient);
             var model = client?.OsClientModel ?? new JObject();
+            var settings = TenantSystemSettingsSecurity.LoadSnapshot(osClient);
+            var legacyFaceApiKey = model["FaceApiKey"]?.ToString() ?? "";
             return new IdentityVerificationOptions
             {
-                Enabled = ReadBool(model, "IdentityVerificationEnabled", false),
-                PasskeyEnabled = ReadBool(model, "PasskeyEnabled", true),
-                FaceEnabled = ReadBool(model, "FaceVerificationEnabled", false),
-                RequirePasswordChangeStepUp = ReadBool(model, "RequirePasswordChangeStepUp", true),
-                PasskeyRpId = model["PasskeyRpId"]?.ToString()?.Trim() ?? "",
-                PasskeyOrigins = ParseList(model["PasskeyOrigins"]),
-                FaceProvider = model["FaceProvider"]?.ToString()?.Trim() ?? "MicroiFaceGatewayV1",
-                FaceApiBase = model["FaceApiBase"]?.ToString()?.Trim().TrimEnd('/') ?? "",
-                FaceApiKey = model["FaceApiKey"]?.ToString() ?? ""
+                Enabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Identity.Enabled",
+                    ReadBool(model, "IdentityVerificationEnabled", true), true),
+                PasskeyEnabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Passkey.Enabled",
+                    ReadBool(model, "PasskeyEnabled", true), true),
+                TotpEnabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Authenticator.Enabled",
+                    ReadBool(model, "AuthenticatorTotpEnabled", true), true),
+                TotpIssuer = NormalizeIssuer(ReadSettingText(settings, "Login.Authenticator.Issuer",
+                    model["AuthenticatorIssuer"]?.ToString())),
+                FaceEnabled = TenantSystemSettingsSecurity.GetBool(settings, "Login.Face.Enabled",
+                    ReadBool(model, "FaceVerificationEnabled", false), true),
+                RequirePasswordChangeStepUp = TenantSystemSettingsSecurity.GetBool(settings,
+                    "Security.PasswordChange.RequireStepUp",
+                    ReadBool(model, "RequirePasswordChangeStepUp", true), true),
+                PasskeyRpId = ReadSettingText(settings, "Login.Passkey.RpId",
+                    model["PasskeyRpId"]?.ToString()).Trim(),
+                PasskeyOrigins = ParseList(new JValue(ReadSettingText(settings, "Login.Passkey.Origins",
+                    model["PasskeyOrigins"]?.ToString()))),
+                FaceProvider = ReadSettingText(settings, "Login.Face.Provider",
+                    model["FaceProvider"]?.ToString() ?? "MicroiFaceGatewayV1").Trim(),
+                FaceApiBase = ReadSettingText(settings, "Login.Face.ApiBase",
+                    model["FaceApiBase"]?.ToString()).Trim().TrimEnd('/'),
+                FaceApiKey = ReadSettingSecret(settings, "Login.Face.ApiKey", legacyFaceApiKey)
             };
+        }
+
+        private static string ReadSettingText(
+            IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
+            string key,
+            string fallback)
+        {
+            if (settings != null && settings.TryGetValue(key, out var item) && item.IsEnabled && !item.IsSecret)
+                return item.Value ?? string.Empty;
+            return fallback ?? string.Empty;
+        }
+
+        private static string ReadSettingSecret(
+            IReadOnlyDictionary<string, TenantSystemSettingValue> settings,
+            string key,
+            string fallback)
+        {
+            try
+            {
+                return TenantSystemSettingsSecurity.GetText(settings, key, fallback ?? string.Empty, true);
+            }
+            catch
+            {
+                // 密文损坏时失败关闭，不让人脸网关使用错误或泄露的凭据。
+                return string.Empty;
+            }
         }
 
         private static bool ReadBool(JObject model, string name, bool defaultValue)
@@ -54,6 +97,14 @@ namespace Microi.net
             if (value.Length == 0) return defaultValue;
             return value == "1" || value == "true" || value == "yes" || value == "on"
                 || value == "开启" || value == "启用";
+        }
+
+        private static string NormalizeIssuer(string value)
+        {
+            var issuer = (value ?? "").Trim();
+            if (issuer.Length == 0) issuer = "Microi";
+            if (issuer.Length > 50) issuer = issuer.Substring(0, 50);
+            return new string(issuer.Where(ch => !char.IsControl(ch) && ch != ':' && ch != '\r' && ch != '\n').ToArray());
         }
 
         private static IReadOnlyList<string> ParseList(JToken token)
@@ -102,6 +153,8 @@ namespace Microi.net
     {
         private static readonly TimeSpan TicketLifetime = TimeSpan.FromMinutes(2);
         private const string TicketPrefix = "Microi:{0}:IdentityVerification:Ticket:{1}";
+        private const string TotpCipherPrefix = "totp-v1";
+        private const string Base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
         public static string NormalizePurpose(string purpose)
         {
@@ -235,6 +288,7 @@ namespace Microi.net
             string osClient,
             string userId,
             bool allowPasskey = true,
+            bool allowTotp = true,
             bool allowFace = true)
         {
             if (osClient.DosIsNullOrWhiteSpace() || userId.DosIsNullOrWhiteSpace()) return false;
@@ -248,9 +302,38 @@ namespace Microi.net
             {
                 var credential = await MicroiEngine.FormEngine.GetTableDataAsync(
                     "mci_identity_credential",
-                    new { OsClient = osClient, _Where = commonWhere, _PageIndex = 1, _PageSize = 1, _SelectFields = new[] { "Id" } })
+                    new
+                    {
+                        OsClient = osClient,
+                        _Where = commonWhere.Concat(new[]
+                        {
+                            new DiyWhere { Name = "AllowStepUp", Type = "=", Value = 1 }
+                        }).ToList(),
+                        _PageIndex = 1,
+                        _PageSize = 1,
+                        _SelectFields = new[] { "Id" }
+                    })
                     .ConfigureAwait(false);
                 if (credential.Code == 1 && credential.Data != null && JArray.FromObject(credential.Data).Count > 0) return true;
+            }
+            catch { }
+            if (allowTotp) try
+            {
+                var totp = await MicroiEngine.FormEngine.GetTableDataAsync(
+                    "mci_identity_totp",
+                    new
+                    {
+                        OsClient = osClient,
+                        _Where = commonWhere.Concat(new[]
+                        {
+                            new DiyWhere { Name = "AllowStepUp", Type = "=", Value = 1 }
+                        }).ToList(),
+                        _PageIndex = 1,
+                        _PageSize = 1,
+                        _SelectFields = new[] { "Id" }
+                    })
+                    .ConfigureAwait(false);
+                if (totp.Code == 1 && totp.Data != null && JArray.FromObject(totp.Data).Count > 0) return true;
             }
             catch { }
             if (allowFace) try
@@ -263,6 +346,152 @@ namespace Microi.net
             }
             catch { }
             return false;
+        }
+
+        public static string GenerateTotpSecret(int byteLength = 20)
+        {
+            if (byteLength < 16 || byteLength > 64) throw new ArgumentOutOfRangeException(nameof(byteLength));
+            var bytes = new byte[byteLength];
+            RandomNumberGenerator.Fill(bytes);
+            return Base32Encode(bytes);
+        }
+
+        public static string Base32Encode(byte[] value)
+        {
+            if (value == null || value.Length == 0) return "";
+            var builder = new StringBuilder((value.Length * 8 + 4) / 5);
+            var buffer = 0;
+            var bitsLeft = 0;
+            foreach (var item in value)
+            {
+                buffer = (buffer << 8) | item;
+                bitsLeft += 8;
+                while (bitsLeft >= 5)
+                {
+                    bitsLeft -= 5;
+                    builder.Append(Base32Alphabet[(buffer >> bitsLeft) & 31]);
+                }
+            }
+            if (bitsLeft > 0) builder.Append(Base32Alphabet[(buffer << (5 - bitsLeft)) & 31]);
+            return builder.ToString();
+        }
+
+        public static byte[] Base32Decode(string value)
+        {
+            var normalized = new string((value ?? "")
+                .ToUpperInvariant()
+                .Where(ch => !char.IsWhiteSpace(ch) && ch != '-' && ch != '=')
+                .ToArray());
+            if (normalized.Length == 0) return Array.Empty<byte>();
+            var result = new List<byte>(normalized.Length * 5 / 8);
+            var buffer = 0;
+            var bitsLeft = 0;
+            foreach (var character in normalized)
+            {
+                var index = Base32Alphabet.IndexOf(character);
+                if (index < 0) throw new FormatException("Authenticator 密钥格式无效。");
+                buffer = (buffer << 5) | index;
+                bitsLeft += 5;
+                if (bitsLeft >= 8)
+                {
+                    bitsLeft -= 8;
+                    result.Add((byte)((buffer >> bitsLeft) & 0xff));
+                }
+            }
+            return result.ToArray();
+        }
+
+        public static string ComputeTotpCode(byte[] secret, long counter, int digits = 6)
+        {
+            if (secret == null || secret.Length < 16) throw new ArgumentException("Authenticator 密钥长度无效。", nameof(secret));
+            if (digits < 6 || digits > 8) throw new ArgumentOutOfRangeException(nameof(digits));
+            var counterBytes = new byte[8];
+            for (var index = counterBytes.Length - 1; index >= 0; index--)
+            {
+                counterBytes[index] = (byte)(counter & 0xff);
+                counter >>= 8;
+            }
+            using var hmac = new HMACSHA1(secret);
+            var hash = hmac.ComputeHash(counterBytes);
+            var offset = hash[^1] & 0x0f;
+            var binary = ((hash[offset] & 0x7f) << 24)
+                | ((hash[offset + 1] & 0xff) << 16)
+                | ((hash[offset + 2] & 0xff) << 8)
+                | (hash[offset + 3] & 0xff);
+            var modulo = digits == 8 ? 100_000_000 : digits == 7 ? 10_000_000 : 1_000_000;
+            return (binary % modulo).ToString(new string('0', digits));
+        }
+
+        public static long FindMatchingTotpCounter(
+            byte[] secret,
+            string code,
+            DateTimeOffset now,
+            int window = 1,
+            int periodSeconds = 30,
+            int digits = 6)
+        {
+            code = new string((code ?? "").Where(char.IsDigit).ToArray());
+            if (code.Length != digits || window < 0 || window > 5 || periodSeconds < 15) return -1;
+            var currentCounter = now.ToUnixTimeSeconds() / periodSeconds;
+            var supplied = Encoding.ASCII.GetBytes(code);
+            for (var delta = -window; delta <= window; delta++)
+            {
+                var counter = currentCounter + delta;
+                if (counter < 0) continue;
+                var expected = Encoding.ASCII.GetBytes(ComputeTotpCode(secret, counter, digits));
+                if (CryptographicOperations.FixedTimeEquals(expected, supplied)) return counter;
+            }
+            return -1;
+        }
+
+        public static string ProtectTotpSecret(string osClient, string base32Secret)
+        {
+            var secret = Base32Decode(base32Secret);
+            if (secret.Length < 16) throw new ArgumentException("Authenticator 密钥长度无效。", nameof(base32Secret));
+            var key = DeriveTotpEncryptionKey(osClient);
+            var nonce = new byte[12];
+            using (var random = RandomNumberGenerator.Create()) random.GetBytes(nonce);
+            var ciphertext = new byte[secret.Length];
+            var tag = new byte[16];
+            using (var aes = new AesGcm(key))
+            {
+                aes.Encrypt(nonce, secret, ciphertext, tag, Encoding.UTF8.GetBytes($"Microi:TOTP:{osClient}"));
+            }
+            CryptographicOperations.ZeroMemory(secret);
+            return string.Join('.', TotpCipherPrefix,
+                Base64UrlEncode(nonce), Base64UrlEncode(ciphertext), Base64UrlEncode(tag));
+        }
+
+        public static byte[] UnprotectTotpSecret(string osClient, string protectedValue)
+        {
+            var parts = (protectedValue ?? "").Split('.');
+            if (parts.Length != 4 || !string.Equals(parts[0], TotpCipherPrefix, StringComparison.Ordinal))
+                throw new CryptographicException("Authenticator 密钥密文版本无效。");
+            var nonce = Base64UrlDecode(parts[1]);
+            var ciphertext = Base64UrlDecode(parts[2]);
+            var tag = Base64UrlDecode(parts[3]);
+            var plaintext = new byte[ciphertext.Length];
+            using (var aes = new AesGcm(DeriveTotpEncryptionKey(osClient)))
+            {
+                aes.Decrypt(nonce, ciphertext, tag, plaintext, Encoding.UTF8.GetBytes($"Microi:TOTP:{osClient}"));
+            }
+            return plaintext;
+        }
+
+        private static byte[] DeriveTotpEncryptionKey(string osClient)
+        {
+            osClient = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var authSecret = OsClientExtend.GetClient(osClient)?.OsClientModel?["AuthSecret"]?.ToString();
+            if (authSecret.DosIsNullOrWhiteSpace()) throw new CryptographicException("租户认证密钥尚未就绪。");
+            using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(authSecret));
+            return hmac.ComputeHash(Encoding.UTF8.GetBytes($"Microi:Identity:TOTP:v1:{osClient}"));
+        }
+
+        private static byte[] Base64UrlDecode(string value)
+        {
+            var text = (value ?? "").Replace('-', '+').Replace('_', '/');
+            text = text.PadRight(text.Length + ((4 - text.Length % 4) % 4), '=');
+            return Convert.FromBase64String(text);
         }
 
         public static string NewOpaqueValue()

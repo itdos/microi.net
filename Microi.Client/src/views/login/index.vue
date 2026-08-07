@@ -247,7 +247,7 @@
                     </div>
                 </div>
 
-                <!-- 登录按钮 -->
+                <!-- 登录按钮与紧凑免密入口 -->
                 <div v-if="PageType != 'BindWeChat'" class="login-button-wrapper">
                     <button
                         type="button"
@@ -266,33 +266,68 @@
                             <span>{{ LoginWaiting ? '正在安全接入...' : '登录' }}</span>
                         </span>
                     </button>
-                </div>
-
-                <div
-                    v-if="PageType != 'BindWeChat' && (IdentityCapabilities.PasskeyEnabled || IdentityCapabilities.FaceEnabled)"
-                    class="identity-login-actions"
-                    aria-label="免密码安全登录"
-                >
-                    <button
-                        v-if="IdentityCapabilities.PasskeyEnabled && PasskeyAvailable"
-                        type="button"
-                        class="identity-login-button"
-                        :disabled="IdentityLoginWaiting"
-                        @click="LoginWithPasskey"
+                    <div
+                        class="identity-login-entry"
+                        @mouseenter="OpenLoginMethods"
+                        @mouseleave="ScheduleLoginMethodsClose"
                     >
-                        <el-icon><Key /></el-icon>
-                        <span>{{ IdentityLoginWaiting === 'Passkey' ? '正在验证…' : '使用设备生物识别 / Passkey' }}</span>
-                    </button>
-                    <button
-                        v-if="IdentityCapabilities.FaceEnabled"
-                        type="button"
-                        class="identity-login-button"
-                        :disabled="IdentityLoginWaiting"
-                        @click="LoginWithFace"
-                    >
-                        <el-icon><View /></el-icon>
-                        <span>{{ IdentityLoginWaiting === 'Face' ? '正在核验…' : '使用严格人脸识别' }}</span>
-                    </button>
+                        <button
+                            type="button"
+                            class="identity-login-button"
+                            :disabled="!!IdentityLoginWaiting || LoginWaiting"
+                            :aria-busy="IdentityLoginWaiting ? 'true' : 'false'"
+                            aria-haspopup="dialog"
+                            :aria-expanded="LoginMethodsVisible ? 'true' : 'false'"
+                            @focus="OpenLoginMethods"
+                            @click.stop="OpenLoginMethods"
+                        >
+                            <el-icon v-if="IdentityLoginWaiting" class="is-loading"><Loading /></el-icon>
+                            <el-icon v-else><Key /></el-icon>
+                            <span>{{ IdentityLoginWaiting ? '验证中' : '登录方式' }}</span>
+                        </button>
+                        <transition name="login-methods-float">
+                            <section
+                                v-if="LoginMethodsVisible"
+                                class="login-methods-popper login-methods-panel"
+                                role="dialog"
+                                aria-label="可用登录方式"
+                                @mouseenter="CancelLoginMethodsClose"
+                            >
+                                <header class="login-methods-heading">
+                                    <span class="login-methods-orbit" aria-hidden="true"><i /><i /><i /></span>
+                                    <div>
+                                        <strong>选择登录方式</strong>
+                                        <p>所有方式验证成功后，都进入吾码 DiyToken 权限体系</p>
+                                    </div>
+                                </header>
+                                <div class="login-method-bubbles" role="list">
+                                    <button
+                                        v-for="(method, methodIndex) in LoginMethodItems"
+                                        :key="method.key"
+                                        type="button"
+                                        role="listitem"
+                                        class="login-method-bubble"
+                                        :class="[`is-${method.tone}`, { 'is-unavailable': !method.available }]"
+                                        :style="{ '--bubble-index': methodIndex }"
+                                        :disabled="!!IdentityLoginWaiting || LoginWaiting || !method.available"
+                                        :aria-label="`${method.name}：${method.description}`"
+                                        @click.stop="StartLoginMethod(method)"
+                                    >
+                                        <span class="login-method-bubble-icon" aria-hidden="true">{{ method.glyph }}</span>
+                                        <span class="login-method-bubble-copy">
+                                            <strong>{{ method.name }}</strong>
+                                            <small>{{ method.description }}</small>
+                                        </span>
+                                        <span class="login-method-bubble-status">{{ method.status }}</span>
+                                    </button>
+                                </div>
+                                <footer class="login-methods-footnote">
+                                    <el-icon><Lock /></el-icon>
+                                    <span>密钥与授权码仅由可信后端处理，浏览器不会得到 ClientSecret</span>
+                                </footer>
+                            </section>
+                        </transition>
+                    </div>
                 </div>
 
                 <!-- 隐私协议 -->
@@ -338,6 +373,33 @@
                 draggable
                 align-center>
                 <div v-safe-html="SysConfig.PrivacyPolicy" style="width: 100%; text-align: left"></div>
+            </el-dialog>
+
+            <el-dialog
+                v-model="ShowTotpLogin"
+                width="420px"
+                :append-to-body="true"
+                title="Authenticator 免密码登录"
+                :close-on-click-modal="false"
+                align-center
+            >
+                <div class="totp-login-dialog">
+                    <p>输入账号与 Authenticator 中当前的 6 位动态口令，不需要输入密码。</p>
+                    <el-input v-model="TotpLoginAccount" autocomplete="username" placeholder="账号" clearable />
+                    <el-input
+                        v-model="TotpLoginCode"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        placeholder="6 位动态口令"
+                        clearable
+                        @keyup.enter="LoginWithTotp"
+                    />
+                </div>
+                <template #footer>
+                    <el-button @click="ShowTotpLogin = false">取消</el-button>
+                    <el-button type="primary" :loading="IdentityLoginWaiting === 'Totp'" @click="LoginWithTotp">安全登录</el-button>
+                </template>
             </el-dialog>
 
             <!-- 用户注册对话框 -->
@@ -447,8 +509,10 @@ import { normalizeLoginWallpapers, pickNextLoginWallpaper } from "@/utils/login-
 import {
     getIdentityCapabilities,
     isPasskeySupported,
+    runExternalLogin,
     verifyWithFace,
-    verifyWithPasskey
+    verifyWithPasskey,
+    verifyWithTotp
 } from "@/utils/identity-verification.js";
 import ThemeSelect from "@/layout/components/ThemeSelect.vue";
 import config from "@/config.json";
@@ -586,6 +650,61 @@ export default {
                     ? `url(${JSON.stringify(this.LoginBackgroundUrl)})`
                     : "none"
             };
+        },
+        LoginMethodItems() {
+            const capabilities = this.IdentityCapabilities || {};
+            const methods = [];
+            if (capabilities.PasskeyEnabled || !this.IdentityCapabilitiesLoaded) {
+                methods.push({
+                    key: "Passkey",
+                    name: "生物登录",
+                    description: "Windows Hello、Face ID、Touch ID 或安全密钥",
+                    glyph: "⌁",
+                    tone: "passkey",
+                    available: !!capabilities.PasskeyEnabled && this.PasskeyAvailable,
+                    status: !this.IdentityCapabilitiesLoaded
+                        ? "读取中"
+                        : (!this.PasskeyAvailable ? "需 HTTPS" : "免账号密码")
+                });
+            }
+            if (capabilities.TotpEnabled || !this.IdentityCapabilitiesLoaded) {
+                methods.push({
+                    key: "Totp",
+                    name: "Authenticator",
+                    description: "使用 Microsoft Authenticator 等应用的 6 位动态口令",
+                    glyph: "6",
+                    tone: "totp",
+                    available: !!capabilities.TotpEnabled,
+                    status: this.IdentityCapabilitiesLoaded ? "动态口令" : "读取中"
+                });
+            }
+            if (capabilities.FaceEnabled) {
+                methods.push({
+                    key: "Face",
+                    name: "严格人脸核验",
+                    description: "服务端活体检测，适合高风险登录与特殊业务场景",
+                    glyph: "◎",
+                    tone: "face",
+                    available: true,
+                    status: "活体核验"
+                });
+            }
+            const providerTone = { gitee: "gitee", wechat: "wechat", github: "github" };
+            const providerGlyph = { gitee: "G", wechat: "微", github: "GH" };
+            (capabilities.ExternalProviders || []).forEach((provider) => {
+                const normalized = String(provider.Key || "").toLowerCase();
+                methods.push({
+                    key: `External:${provider.Key}`,
+                    provider: provider.Key,
+                    name: provider.Name,
+                    description: provider.Description,
+                    glyph: providerGlyph[normalized] || String(provider.Name || "外").slice(0, 2),
+                    tone: providerTone[normalized] || "external",
+                    available: !!provider.Available,
+                    status: provider.Available ? (provider.Kind === "qr" ? "扫码登录" : "授权登录") : (provider.Enabled ? "待配置" : "未开启")
+                });
+            });
+            return methods;
         }
     },
     data() {
@@ -623,7 +742,13 @@ export default {
             LoginWaiting: false,
             IdentityLoginWaiting: "",
             IdentityCapabilities: {},
+            IdentityCapabilitiesLoaded: false,
+            LoginMethodsVisible: false,
+            LoginMethodsCloseTimer: null,
             PasskeyAvailable: isPasskeySupported(),
+            ShowTotpLogin: false,
+            TotpLoginAccount: "",
+            TotpLoginCode: "",
             CaptchaId: "",
             RegCaptchaId: "",
             CaptchaValue: "",
@@ -644,6 +769,8 @@ export default {
     beforeUnmount() {
         var self = this;
         self.LoginComponentUnmounted = true;
+        window.removeEventListener("keydown", self.HandleLoginMethodsEscape);
+        if (self.LoginMethodsCloseTimer) clearTimeout(self.LoginMethodsCloseTimer);
         self.WallpaperLoadVersion += 1;
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
@@ -666,6 +793,7 @@ export default {
             if (value === previousValue) return;
             this.LoadRememberedAccounts();
             this.RestoreRememberedAccount(this.Account || this.diyStore.getLastLoginAccount());
+            this.IdentityCapabilitiesLoaded = false;
             this.LoadIdentityCapabilities();
         },
         GetCurrentUser: function () {
@@ -692,6 +820,7 @@ export default {
             self.TokenLogin();
             self.LoadIdentityCapabilities();
         }
+        window.addEventListener("keydown", self.HandleLoginMethodsEscape);
 
         // 登录页只负责身份验证，界面风格登录后再切换；每次进入默认使用经典传统界面。
         self.diyStore.setState("SystemStyle", "Classic");
@@ -760,7 +889,36 @@ export default {
                 this.IdentityCapabilities = await getIdentityCapabilities(this.DiyCommon, this.OsClient);
             } catch (_) {
                 this.IdentityCapabilities = {};
+            } finally {
+                this.IdentityCapabilitiesLoaded = true;
             }
+        },
+        OpenLoginMethods() {
+            this.CancelLoginMethodsClose();
+            this.LoginMethodsVisible = true;
+        },
+        ScheduleLoginMethodsClose() {
+            this.CancelLoginMethodsClose();
+            this.LoginMethodsCloseTimer = setTimeout(() => {
+                this.LoginMethodsVisible = false;
+                this.LoginMethodsCloseTimer = null;
+            }, 220);
+        },
+        CancelLoginMethodsClose() {
+            if (!this.LoginMethodsCloseTimer) return;
+            clearTimeout(this.LoginMethodsCloseTimer);
+            this.LoginMethodsCloseTimer = null;
+        },
+        HandleLoginMethodsEscape(event) {
+            if (event?.key === "Escape" && this.LoginMethodsVisible) this.LoginMethodsVisible = false;
+        },
+        StartLoginMethod(method) {
+            if (!method?.available) return;
+            this.LoginMethodsVisible = false;
+            if (method.key === "Passkey") return this.LoginWithPasskey();
+            if (method.key === "Totp") return this.OpenTotpLogin();
+            if (method.key === "Face") return this.LoginWithFace();
+            if (method.provider) return this.LoginWithExternal(method.provider);
         },
         ValidateIdentityLoginPolicy() {
             if (this.SysConfig.EnablePrivacyPolicy && !this.CheckPrivacyPolicy) {
@@ -783,13 +941,58 @@ export default {
                 const result = await verifyWithPasskey({
                     diyCommon: this.DiyCommon,
                     osClient: this.OsClient,
-                    account: this.Account,
+                    account: "",
                     purpose: "Login",
                     clientType: this.diyStore.IsPhoneView ? "Mobile" : "PC"
                 });
+                this.IdentityLoginWaiting = "";
                 await this.CompleteIdentityLogin(result);
             } catch (error) {
                 this.DiyCommon.Tips(error?.message || "设备生物识别登录失败。", false);
+            } finally {
+                this.IdentityLoginWaiting = "";
+            }
+        },
+        LoginWithPreferredIdentity() {
+            if (this.IdentityCapabilities.PasskeyEnabled && this.PasskeyAvailable) {
+                return this.LoginWithPasskey();
+            }
+            if (this.IdentityCapabilities.TotpEnabled) {
+                this.OpenTotpLogin();
+                return;
+            }
+            return this.LoginWithFace();
+        },
+        OpenTotpLogin() {
+            if (!this.ValidateIdentityLoginPolicy()) return;
+            this.TotpLoginAccount = this.Account || this.diyStore.getLastLoginAccount() || "";
+            this.TotpLoginCode = "";
+            this.ShowTotpLogin = true;
+        },
+        async LoginWithTotp() {
+            if (this.IdentityLoginWaiting || !this.ValidateIdentityLoginPolicy()) return;
+            const account = String(this.TotpLoginAccount || "").trim();
+            const code = String(this.TotpLoginCode || "").replace(/\D/g, "");
+            if (!account || code.length !== 6) {
+                this.DiyCommon.Tips("请输入账号和 6 位 Authenticator 动态口令。", false);
+                return;
+            }
+            this.IdentityLoginWaiting = "Totp";
+            try {
+                const result = await verifyWithTotp({
+                    diyCommon: this.DiyCommon,
+                    osClient: this.OsClient,
+                    account,
+                    code,
+                    purpose: "Login",
+                    clientType: this.diyStore.IsPhoneView ? "Mobile" : "PC"
+                });
+                this.Account = account;
+                this.ShowTotpLogin = false;
+                this.IdentityLoginWaiting = "";
+                await this.CompleteIdentityLogin(result);
+            } catch (error) {
+                this.DiyCommon.Tips(error?.message || "Authenticator 登录失败。", false);
             } finally {
                 this.IdentityLoginWaiting = "";
             }
@@ -812,6 +1015,24 @@ export default {
                 await this.CompleteIdentityLogin(result);
             } catch (error) {
                 this.DiyCommon.Tips(error?.message || "严格人脸登录失败。", false);
+            } finally {
+                this.IdentityLoginWaiting = "";
+            }
+        },
+        async LoginWithExternal(provider) {
+            if (this.IdentityLoginWaiting || !this.ValidateIdentityLoginPolicy()) return;
+            this.IdentityLoginWaiting = provider || "External";
+            try {
+                const result = await runExternalLogin({
+                    diyCommon: this.DiyCommon,
+                    osClient: this.OsClient,
+                    provider,
+                    mode: "Login",
+                    clientType: this.diyStore.IsPhoneView ? "Mobile" : "PC"
+                });
+                await this.CompleteIdentityLogin(result);
+            } catch (error) {
+                this.DiyCommon.Tips(error?.message || "外部登录失败。", false);
             } finally {
                 this.IdentityLoginWaiting = "";
             }
@@ -1517,7 +1738,7 @@ export default {
                 var url = "/";
                 var fallbackUrl = getFirstValidRoutePath(accessRoutes.length > 0 ? accessRoutes : self.permissionStore.addRoutes);
                 // 优先级：用户个人首页 > 系统默认首页 > 菜单首页 > 首个有权限菜单。
-                // 个人设置只接受内部路由，避免把普通用户字段变成外部跳转入口。
+                // 个人中心只接受内部路由，避免把普通用户字段变成外部跳转入口。
                 var userDefaultIndexUrl = self.LoginResult.Data && self.LoginResult.Data.DefaultIndexUrl
                     ? String(self.LoginResult.Data.DefaultIndexUrl).trim()
                     : "";
@@ -2264,11 +2485,14 @@ export default {
 .login-button-wrapper {
     margin-top: 18px;
     margin-bottom: 20px;
-    text-align: center;
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
 }
 
 .login-button {
-    width: 100%;
+    width: auto;
+    flex: 1 1 auto;
     min-height: 54px;
     padding: 0 24px;
     border: 0;
@@ -2342,22 +2566,17 @@ export default {
     }
 }
 
-.identity-login-actions {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 10px;
-    margin: 12px 0 18px;
-}
-
 .identity-login-button {
-    min-height: 42px;
+    flex: 0 0 112px;
+    width: 112px;
+    min-height: 54px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     padding: 0 14px;
     border: 1px solid rgba(255, 255, 255, 0.38);
-    border-radius: 12px;
+    border-radius: var(--mci-login-control-radius);
     color: #fff;
     background: rgba(7, 18, 40, 0.32);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -2379,8 +2598,248 @@ export default {
 
     &:disabled {
         opacity: 0.64;
-        cursor: wait;
+        cursor: progress;
     }
+}
+
+.identity-login-entry {
+    width: 112px;
+    flex: 0 0 112px;
+    position: relative;
+    display: flex;
+}
+
+.totp-login-dialog {
+    display: grid;
+    gap: 14px;
+
+    p {
+        margin: 0 0 2px;
+        color: var(--el-text-color-secondary);
+        line-height: 1.7;
+    }
+}
+
+.login-methods-popper {
+    width: min(660px, calc(100vw - 24px));
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 14px);
+    z-index: 120;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--el-color-primary) 24%, var(--el-border-color-light));
+    border-radius: 24px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--el-bg-color) 92%, transparent);
+    box-shadow: 0 26px 80px rgba(4, 15, 35, 0.26);
+    backdrop-filter: blur(22px) saturate(145%);
+}
+
+.login-methods-float-enter-active,
+.login-methods-float-leave-active {
+    transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+    transform-origin: 92% 100%;
+}
+
+.login-methods-float-enter-from,
+.login-methods-float-leave-to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+}
+
+:global(.login-methods-panel) {
+    position: relative;
+    padding: 20px;
+    overflow: hidden;
+    color: var(--el-text-color-primary);
+    background:
+        radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--el-color-primary) 18%, transparent), transparent 38%),
+        radial-gradient(circle at 10% 92%, color-mix(in srgb, var(--el-color-success) 12%, transparent), transparent 36%);
+}
+
+:global(.login-methods-heading) {
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-bottom: 16px;
+}
+
+:global(.login-methods-heading > div) {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+:global(.login-methods-heading strong) {
+    font-size: 17px;
+    letter-spacing: 0.4px;
+}
+
+:global(.login-methods-heading p) {
+    margin: 0;
+    color: var(--el-text-color-secondary);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+:global(.login-methods-orbit) {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    position: relative;
+    border: 1px solid color-mix(in srgb, var(--el-color-primary) 35%, transparent);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--el-color-primary) 9%, var(--el-bg-color));
+    animation: mciLoginOrbit 8s linear infinite;
+}
+
+:global(.login-methods-orbit i) {
+    width: 8px;
+    height: 8px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 50%;
+    background: var(--el-color-primary);
+    box-shadow: 0 0 13px color-mix(in srgb, var(--el-color-primary) 70%, transparent);
+}
+
+:global(.login-methods-orbit i:nth-child(1)) { transform: translate(-50%, -50%); }
+:global(.login-methods-orbit i:nth-child(2)) { transform: translate(13px, -18px) scale(0.65); }
+:global(.login-methods-orbit i:nth-child(3)) { transform: translate(-20px, 9px) scale(0.45); }
+
+:global(.login-method-bubbles) {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 11px;
+}
+
+:global(.login-method-bubble) {
+    --bubble-accent: var(--el-color-primary);
+    min-width: 0;
+    min-height: 112px;
+    padding: 13px;
+    position: relative;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    gap: 7px 10px;
+    overflow: hidden;
+    text-align: left;
+    color: var(--el-text-color-primary);
+    border: 1px solid color-mix(in srgb, var(--bubble-accent) 28%, var(--el-border-color-light));
+    border-radius: 22px 22px 22px 9px;
+    background:
+        radial-gradient(circle at 100% 0, color-mix(in srgb, var(--bubble-accent) 20%, transparent), transparent 45%),
+        color-mix(in srgb, var(--el-fill-color-lighter) 78%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 55%, transparent);
+    cursor: pointer;
+    transform-origin: 80% 100%;
+    animation: mciLoginBubbleIn 420ms cubic-bezier(.2,.8,.2,1) both;
+    animation-delay: calc(var(--bubble-index) * 46ms);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+}
+
+:global(.login-method-bubble:hover:not(:disabled)),
+:global(.login-method-bubble:focus-visible:not(:disabled)) {
+    z-index: 2;
+    transform: translateY(-4px) scale(1.018);
+    border-color: color-mix(in srgb, var(--bubble-accent) 58%, var(--el-border-color));
+    box-shadow: 0 15px 34px color-mix(in srgb, var(--bubble-accent) 18%, transparent);
+    outline: none;
+}
+
+:global(.login-method-bubble.is-passkey) { --bubble-accent: #5b8cff; }
+:global(.login-method-bubble.is-totp) { --bubble-accent: #9b63e8; }
+:global(.login-method-bubble.is-face) { --bubble-accent: #16a7a0; }
+:global(.login-method-bubble.is-gitee) { --bubble-accent: #c71d23; }
+:global(.login-method-bubble.is-wechat) { --bubble-accent: #07c160; }
+:global(.login-method-bubble.is-github) { --bubble-accent: #59636e; }
+
+:global(.login-method-bubble:disabled) {
+    opacity: 0.58;
+    cursor: not-allowed;
+    filter: saturate(0.55);
+}
+
+:global(.login-method-bubble-icon) {
+    width: 42px;
+    height: 42px;
+    grid-row: 1 / 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    align-self: start;
+    border-radius: 50%;
+    color: #fff;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--bubble-accent) 72%, #fff), var(--bubble-accent));
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--bubble-accent) 30%, transparent), inset 0 1px 1px #ffffff88;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+}
+
+:global(.login-method-bubble-copy) {
+    min-width: 0;
+    display: grid;
+    align-content: start;
+    gap: 4px;
+}
+
+:global(.login-method-bubble-copy strong) {
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:global(.login-method-bubble-copy small) {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--el-text-color-secondary);
+    font-size: 10px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+:global(.login-method-bubble-status) {
+    width: fit-content;
+    grid-column: 2;
+    padding: 2px 7px;
+    border: 1px solid color-mix(in srgb, var(--bubble-accent) 22%, transparent);
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--bubble-accent) 78%, var(--el-text-color-primary));
+    background: color-mix(in srgb, var(--bubble-accent) 8%, transparent);
+    font-size: 9px;
+    line-height: 1.5;
+}
+
+:global(.login-methods-footnote) {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    margin-top: 14px;
+    color: var(--el-text-color-placeholder);
+    font-size: 10px;
+    line-height: 1.55;
+}
+
+:global(.login-methods-footnote .el-icon) {
+    margin-top: 2px;
+    flex: 0 0 auto;
+    color: var(--el-color-primary);
+}
+
+@keyframes mciLoginBubbleIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.86); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mciLoginOrbit {
+    to { transform: rotate(360deg); }
 }
 
 .login-button-energy {
@@ -2915,6 +3374,8 @@ export default {
     .divLoginCenter::before,
     .login-system-logo-ring,
     .login-button,
+    :global(.login-methods-orbit),
+    :global(.login-method-bubble),
     .login-button-energy::after,
     .login-button-energy-beam,
     .is-loading {
@@ -2927,8 +3388,33 @@ export default {
 
     .login-button:hover:not(:disabled),
     .login-button:focus-visible:not(:disabled),
+    :global(.login-method-bubble:hover:not(:disabled)),
+    :global(.login-method-bubble:focus-visible:not(:disabled)),
     .remember-password-checkbox:hover {
         transform: none;
+    }
+}
+
+@media (max-width: 420px) {
+    :global(.login-methods-panel) {
+        padding: 16px;
+    }
+
+    :global(.login-method-bubbles) {
+        grid-template-columns: 1fr;
+        max-height: min(58vh, 430px);
+        overflow-y: auto;
+        padding-right: 2px;
+    }
+
+    :global(.login-method-bubble) {
+        min-height: 92px;
+    }
+}
+
+@media (min-width: 421px) and (max-width: 760px) {
+    :global(.login-method-bubbles) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

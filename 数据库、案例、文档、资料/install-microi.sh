@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-07 16:12:53
+# 版本：v2026-08-07 17:04:38
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-07 16:12:53"
+SCRIPT_VERSION="v2026-08-07 17:04:38"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -132,9 +132,20 @@ repair_extract_api_block() {
   ' "${canonical_file}" > "${output_file}"
 }
 
+repair_extract_api_environment_block() {
+  local api_block="$1"
+  local output_file="$2"
+  awk '
+    /^    environment:$/ { in_environment=1; next }
+    in_environment && /^    [A-Za-z0-9_.-]+:/ { exit }
+    in_environment { print }
+  ' "${api_block}" > "${output_file}"
+}
+
 repair_validate_api_environment() {
   local canonical_file="$1"
   local api_block="${REPAIR_TEMP_DIR}/api-service.yml"
+  local environment_block="${REPAIR_TEMP_DIR}/api-environment.yml"
   local required_key=""
   local value=""
   local actual_key=""
@@ -144,8 +155,9 @@ repair_validate_api_environment() {
     OsClientRedisDataBase OsClientDbMongoConn
   )
   repair_extract_api_block "${canonical_file}" "${api_block}"
+  repair_extract_api_environment_block "${api_block}" "${environment_block}"
   for required_key in "${required_keys[@]}"; do
-    value=$(sed -n -E "s/^[[:space:]]{6}${required_key}:[[:space:]]*//p" "${api_block}" | head -1)
+    value=$(sed -n -E "s/^[[:space:]]{6}${required_key}:[[:space:]]*//p" "${environment_block}" | head -1)
     value=$(printf '%s' "${value}" | sed -E "s/^[[:space:]]+//;s/[[:space:]]+$//")
     case "${value}" in
       ''|'""'|"''"|null|'~')
@@ -165,7 +177,7 @@ repair_validate_api_environment() {
         return 1
         ;;
     esac
-  done < <(sed -n -E 's/^[[:space:]]{6}([A-Za-z][A-Za-z0-9_]*):.*/\1/p' "${api_block}")
+  done < <(sed -n -E 's/^[[:space:]]{6}([A-Za-z][A-Za-z0-9_]*):.*/\1/p' "${environment_block}")
 }
 
 repair_read_api_environment_value() {
@@ -197,6 +209,7 @@ repair_migrate_app_to_internal_network() {
   local canonical_file="$2"
   local project_name="$3"
   local api_block="${REPAIR_TEMP_DIR}/api-service-before-network.yml"
+  local environment_block="${REPAIR_TEMP_DIR}/api-environment-before-network.yml"
   local db_type=""
   local db_conn=""
   local mongo_conn=""
@@ -221,9 +234,10 @@ repair_migrate_app_to_internal_network() {
   fi
 
   repair_extract_api_block "${canonical_file}" "${api_block}"
-  db_type=$(repair_read_api_environment_value "${api_block}" OsClientDbType)
-  db_conn=$(repair_read_api_environment_value "${api_block}" OsClientDbConn)
-  mongo_conn=$(repair_read_api_environment_value "${api_block}" OsClientDbMongoConn)
+  repair_extract_api_environment_block "${api_block}" "${environment_block}"
+  db_type=$(repair_read_api_environment_value "${environment_block}" OsClientDbType)
+  db_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbConn)
+  mongo_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbMongoConn)
   case "${db_type}" in
     MySql)
       db_candidates=(microi-install-mysql57 microi-install-mysql80)

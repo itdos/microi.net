@@ -28,6 +28,7 @@ namespace Microi.net.Api
     public sealed class IdentityVerificationController : Controller
     {
         private const string CredentialTable = "mci_identity_credential";
+        private const string TotpTable = "mci_identity_totp";
         private const string DeviceTable = "mci_identity_device";
         private const string FaceTable = "mci_identity_face";
         private static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(5);
@@ -74,6 +75,34 @@ namespace Microi.net.Api
             public string DeviceName { get; set; }
         }
 
+        public sealed class AuthenticatorPolicyRequest
+        {
+            public string Id { get; set; }
+            public string Type { get; set; }
+            public bool AllowPasswordlessLogin { get; set; }
+            public bool AllowStepUp { get; set; }
+        }
+
+        public sealed class CompleteTotpEnrollmentRequest
+        {
+            public string ChallengeId { get; set; }
+            public string Code { get; set; }
+            public string DeviceName { get; set; }
+            public bool AllowPasswordlessLogin { get; set; } = true;
+            public bool AllowStepUp { get; set; } = true;
+        }
+
+        public sealed class VerifyTotpRequest
+        {
+            public string OsClient { get; set; }
+            public string Account { get; set; }
+            public string Code { get; set; }
+            public string Purpose { get; set; } = "Login";
+            public string ActionHash { get; set; }
+            public string Did { get; set; }
+            public string _ClientType { get; set; }
+        }
+
         public sealed class BeginFaceRequest
         {
             public string OsClient { get; set; }
@@ -108,6 +137,7 @@ namespace Microi.net.Api
             public string FaceMode { get; set; }
             public string ProviderSessionId { get; set; }
             public string ProviderSubjectReference { get; set; }
+            public string TotpSecretCipher { get; set; }
             public string CreatedAt { get; set; }
         }
 
@@ -120,6 +150,11 @@ namespace Microi.net.Api
             var osClient = osClientResult.Data;
             var options = IdentityVerificationOptions.Resolve(osClient);
             var hasPasskey = false;
+            var hasPasswordlessPasskey = false;
+            var hasStepUpPasskey = false;
+            var hasTotp = false;
+            var hasPasswordlessTotp = false;
+            var hasStepUpTotp = false;
             var hasFace = false;
             try
             {
@@ -129,22 +164,50 @@ namespace Microi.net.Api
                     && !UserAccessKeySecurity.IsSession(currentToken.CurrentUser))
                 {
                     var userId = currentToken.CurrentUser["Id"]?.ToString();
-                    hasPasskey = (await ListCredentialsByUserAsync(osClient, userId).ConfigureAwait(false)).Count > 0;
+                    var credentials = await ListCredentialsByUserAsync(osClient, userId).ConfigureAwait(false);
+                    hasPasskey = credentials.Count > 0;
+                    hasPasswordlessPasskey = credentials.Any(item => PolicyEnabled(item, "AllowPasswordlessLogin"));
+                    hasStepUpPasskey = credentials.Any(item => PolicyEnabled(item, "AllowStepUp"));
+                    var totp = await FindTotpByUserAsync(osClient, userId).ConfigureAwait(false);
+                    hasTotp = totp != null;
+                    hasPasswordlessTotp = totp != null && PolicyEnabled(totp, "AllowPasswordlessLogin");
+                    hasStepUpTotp = totp != null && PolicyEnabled(totp, "AllowStepUp");
                     hasFace = await FindFaceBindingAsync(osClient, userId).ConfigureAwait(false) != null;
                 }
             }
             catch { }
+            var externalProviders = ExternalLoginProviderCatalog.Resolve(osClient)
+                .OrderBy(item => item.Sort)
+                .Select(item => new
+                {
+                    item.Key,
+                    item.Name,
+                    item.Description,
+                    item.Kind,
+                    item.Icon,
+                    item.Enabled,
+                    Configured = item.Configured,
+                    Available = item.Configured
+                })
+                .ToArray();
             return Json(new DosResult(1, new
             {
                 Enabled = options.Enabled,
                 PasskeyEnabled = options.Enabled && options.PasskeyEnabled,
+                TotpEnabled = options.Enabled && options.TotpEnabled,
                 FaceEnabled = options.Enabled && options.FaceEnabled && !options.FaceApiBase.DosIsNullOrWhiteSpace(),
                 PasswordChangeStepUp = options.RequirePasswordChangeStepUp,
                 PasskeyRequiresSecureContext = true,
                 SessionSystem = "DiyToken",
                 StoresBiometricImages = false,
                 HasPasskey = hasPasskey,
-                HasFace = hasFace
+                HasPasswordlessPasskey = hasPasswordlessPasskey,
+                HasStepUpPasskey = hasStepUpPasskey,
+                HasTotp = hasTotp,
+                HasPasswordlessTotp = hasPasswordlessTotp,
+                HasStepUpTotp = hasStepUpTotp,
+                HasFace = hasFace,
+                ExternalProviders = externalProviders
             }));
         }
 
@@ -305,6 +368,9 @@ namespace Microi.net.Api
                 var credentials = userId.DosIsNullOrWhiteSpace()
                     ? new List<JObject>()
                     : await ListCredentialsByUserAsync(osClient, userId).ConfigureAwait(false);
+                credentials = credentials
+                    .Where(item => PolicyEnabled(item, isLogin ? "AllowPasswordlessLogin" : "AllowStepUp"))
+                    .ToList();
                 var origin = ResolveRequestOrigin(options);
                 var rpId = ResolveRelyingPartyId(options);
                 var fido = CreateFido(rpId, userName.DosIsNullOrWhiteSpace() ? "Microi" : userName, origin);
@@ -360,6 +426,11 @@ namespace Microi.net.Api
                 var response = DeserializeFido<AuthenticatorAssertionRawResponse>(request.Response);
                 var stored = await FindCredentialByIdAsync(state.OsClient, response.RawId).ConfigureAwait(false);
                 if (stored == null) return Json(new DosResult(0, null, "Passkey 不存在或已被撤销。"));
+                var isLogin = string.Equals(state.Purpose, "Login", StringComparison.Ordinal);
+                if (!PolicyEnabled(stored, isLogin ? "AllowPasswordlessLogin" : "AllowStepUp"))
+                    return Json(new DosResult(0, null, isLogin
+                        ? "该 Passkey 未开启免密码登录。"
+                        : "该 Passkey 未开启二次授权验证。"));
                 var credentialUserId = stored["UserId"]?.ToString();
                 if (!state.UserId.DosIsNullOrWhiteSpace()
                     && !string.Equals(state.UserId, credentialUserId, StringComparison.Ordinal))
@@ -388,13 +459,14 @@ namespace Microi.net.Api
                 if (user == null) return Json(new DosResult(0, null, "系统用户不存在或已停用。"));
                 QueueAudit(state.OsClient, user, "PasskeyVerified", true, stored["Id"]?.ToString());
 
-                if (string.Equals(state.Purpose, "Login", StringComparison.Ordinal))
+                if (isLogin)
                 {
                     return await CreateDiyTokenLoginResultAsync(
                         state.OsClient,
                         user,
                         request?._ClientType,
-                        request?.Did).ConfigureAwait(false);
+                        request?.Did,
+                        "PasskeyOrBiometric").ConfigureAwait(false);
                 }
 
                 var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
@@ -441,6 +513,8 @@ namespace Microi.net.Api
                 BackedUp = item["BackedUp"]?.Value<int>() == 1,
                 CreateTime = item["CreateTime"]?.ToString(),
                 LastUsedTime = item["LastUsedTime"]?.ToString(),
+                AllowPasswordlessLogin = PolicyEnabled(item, "AllowPasswordlessLogin"),
+                AllowStepUp = PolicyEnabled(item, "AllowStepUp"),
                 State = item["State"]?.Value<int>() ?? 0
             }).ToList();
             return Json(new DosResult(1, data));
@@ -475,6 +549,264 @@ namespace Microi.net.Api
             }).ConfigureAwait(false);
             QueueAudit(token.Data.OsClient, token.Data.CurrentUser, "RevokePasskey", result.Code == 1, credential["Id"]?.ToString());
             return Json(result);
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> UpdateAuthenticatorPolicy([FromBody] AuthenticatorPolicyRequest request)
+        {
+            var token = await RequireUserTokenAsync().ConfigureAwait(false);
+            if (token.Code != 1) return Json(token);
+            var type = (request?.Type ?? "").Trim();
+            JObject authenticator;
+            string table;
+            if (string.Equals(type, "Passkey", StringComparison.OrdinalIgnoreCase))
+            {
+                authenticator = await FindOwnedCredentialAsync(token.Data, request?.Id).ConfigureAwait(false);
+                table = CredentialTable;
+            }
+            else if (string.Equals(type, "Totp", StringComparison.OrdinalIgnoreCase))
+            {
+                authenticator = await FindOwnedTotpAsync(token.Data, request?.Id).ConfigureAwait(false);
+                table = TotpTable;
+            }
+            else
+            {
+                return Json(new DosResult(0, null, "身份验证器类型无效。"));
+            }
+            if (authenticator == null) return Json(new DosResult(0, null, "身份验证器不存在或已撤销。"));
+            var result = await MicroiEngine.FormEngine.UptFormDataAsync(table, new
+            {
+                Id = authenticator["Id"]?.ToString(),
+                AllowPasswordlessLogin = request.AllowPasswordlessLogin ? 1 : 0,
+                AllowStepUp = request.AllowStepUp ? 1 : 0,
+                OsClient = token.Data.OsClient
+            }).ConfigureAwait(false);
+            QueueAudit(token.Data.OsClient, token.Data.CurrentUser, "UpdateAuthenticatorPolicy", result.Code == 1,
+                $"{type}:{authenticator["Id"]}");
+            return Json(result.Code == 1
+                ? new DosResult(1, new
+                {
+                    Id = authenticator["Id"]?.ToString(),
+                    Type = type,
+                    request.AllowPasswordlessLogin,
+                    request.AllowStepUp
+                }, "身份验证用途已更新。")
+                : result);
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> BeginTotpEnrollment()
+        {
+            var token = await RequireUserTokenAsync().ConfigureAwait(false);
+            if (token.Code != 1) return Json(token);
+            var options = IdentityVerificationOptions.Resolve(token.Data.OsClient);
+            if (!options.Enabled || !options.TotpEnabled)
+                return Json(new DosResult(0, null, "当前租户未启用 Authenticator 动态验证码。"));
+            var userId = token.Data.CurrentUser["Id"]?.ToString();
+            var account = token.Data.CurrentUser["Account"]?.ToString() ?? userId;
+            var secret = IdentityVerificationSecurity.GenerateTotpSecret();
+            var challengeId = await StoreChallengeAsync(new ChallengeState
+            {
+                Type = "TotpEnrollment",
+                OsClient = token.Data.OsClient,
+                UserId = userId,
+                Account = account,
+                UserName = token.Data.CurrentUser["Name"]?.ToString() ?? account,
+                Purpose = "RegisterTotp",
+                TotpSecretCipher = IdentityVerificationSecurity.ProtectTotpSecret(token.Data.OsClient, secret),
+                CreatedAt = DateTimeOffset.UtcNow.ToString("O")
+            }).ConfigureAwait(false);
+            var issuer = options.TotpIssuer;
+            var label = Uri.EscapeDataString($"{issuer}:{account}");
+            var uri = $"otpauth://totp/{label}?secret={Uri.EscapeDataString(secret)}"
+                + $"&issuer={Uri.EscapeDataString(issuer)}&algorithm=SHA1&digits=6&period=30";
+            QueueAudit(token.Data.OsClient, token.Data.CurrentUser, "BeginTotpEnrollment", true, null);
+            return Json(new DosResult(1, new
+            {
+                ChallengeId = challengeId,
+                Secret = secret,
+                OtpAuthUri = uri,
+                Issuer = issuer,
+                Account = account,
+                ExpiresInSeconds = (int)ChallengeLifetime.TotalSeconds
+            }));
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> CompleteTotpEnrollment([FromBody] CompleteTotpEnrollmentRequest request)
+        {
+            var token = await RequireUserTokenAsync().ConfigureAwait(false);
+            if (token.Code != 1) return Json(token);
+            var stateResult = await ConsumeChallengeAsync(token.Data.OsClient, request?.ChallengeId).ConfigureAwait(false);
+            if (stateResult.Code != 1) return Json(stateResult);
+            var state = stateResult.Data;
+            if (state.Type != "TotpEnrollment"
+                || !string.Equals(state.UserId, token.Data.CurrentUser["Id"]?.ToString(), StringComparison.Ordinal))
+                return Json(new DosResult(0, null, "Authenticator 登记请求与当前用户不匹配。"));
+            byte[] secret = null;
+            try
+            {
+                secret = IdentityVerificationSecurity.UnprotectTotpSecret(state.OsClient, state.TotpSecretCipher);
+                var counter = IdentityVerificationSecurity.FindMatchingTotpCounter(
+                    secret, request?.Code, DateTimeOffset.UtcNow);
+                if (counter < 0) return Json(new DosResult(0, null, "动态验证码不正确，请重新扫码登记。"));
+                var existing = await FindTotpByUserAsync(state.OsClient, state.UserId).ConfigureAwait(false);
+                var name = NormalizeDeviceName(request?.DeviceName);
+                if (name.Length == 0) name = "Microsoft Authenticator";
+                var model = new
+                {
+                    Id = existing?["Id"]?.ToString() ?? Guid.NewGuid().ToString(),
+                    UserId = state.UserId,
+                    UserName = state.UserName,
+                    DeviceName = name,
+                    SecretCipher = state.TotpSecretCipher,
+                    SecretVersion = "totp-v1",
+                    Issuer = IdentityVerificationOptions.Resolve(state.OsClient).TotpIssuer,
+                    EnrolledTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    LastAcceptedCounter = counter,
+                    AllowPasswordlessLogin = request?.AllowPasswordlessLogin == false ? 0 : 1,
+                    AllowStepUp = request?.AllowStepUp == false ? 0 : 1,
+                    State = 1,
+                    IsDeleted = 0,
+                    OsClient = state.OsClient
+                };
+                var result = existing == null
+                    ? await MicroiEngine.FormEngine.AddFormDataAsync(TotpTable, model).ConfigureAwait(false)
+                    : await MicroiEngine.FormEngine.UptFormDataAsync(TotpTable, model).ConfigureAwait(false);
+                QueueAudit(state.OsClient, token.Data.CurrentUser, "RegisterTotp", result.Code == 1, model.Id);
+                return Json(result.Code == 1
+                    ? new DosResult(1, new
+                    {
+                        model.Id,
+                        model.DeviceName,
+                        AllowPasswordlessLogin = model.AllowPasswordlessLogin == 1,
+                        AllowStepUp = model.AllowStepUp == 1
+                    }, "Authenticator 登记成功。")
+                    : result);
+            }
+            catch (Exception ex)
+            {
+                QueueAudit(state.OsClient, token.Data.CurrentUser, "RegisterTotp", false, ex.Message);
+                return Json(new DosResult(0, null, "Authenticator 登记失败：" + SafeMessage(ex)));
+            }
+            finally
+            {
+                if (secret != null) CryptographicOperations.ZeroMemory(secret);
+            }
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> ListTotpAuthenticators()
+        {
+            var token = await RequireUserTokenAsync().ConfigureAwait(false);
+            if (token.Code != 1) return Json(token);
+            var item = await FindTotpByUserAsync(token.Data.OsClient, token.Data.CurrentUser["Id"]?.ToString()).ConfigureAwait(false);
+            return Json(new DosResult(1, item == null ? Array.Empty<object>() : new object[]
+            {
+                new
+                {
+                    Id = item["Id"]?.ToString(),
+                    DeviceName = item["DeviceName"]?.ToString(),
+                    Issuer = item["Issuer"]?.ToString(),
+                    EnrolledTime = item["EnrolledTime"]?.ToString(),
+                    LastUsedTime = item["LastUsedTime"]?.ToString(),
+                    AllowPasswordlessLogin = PolicyEnabled(item, "AllowPasswordlessLogin"),
+                    AllowStepUp = PolicyEnabled(item, "AllowStepUp"),
+                    State = item["State"]?.Value<int>() ?? 0
+                }
+            }));
+        }
+
+        [HttpPost]
+        public async Task<JsonResult> RevokeTotpAuthenticator([FromBody] AuthenticatorMutationRequest request)
+        {
+            var token = await RequireUserTokenAsync().ConfigureAwait(false);
+            if (token.Code != 1) return Json(token);
+            var item = await FindOwnedTotpAsync(token.Data, request?.Id).ConfigureAwait(false);
+            if (item == null) return Json(new DosResult(0, null, "Authenticator 不存在。"));
+            var result = await MicroiEngine.FormEngine.UptFormDataAsync(TotpTable, new
+            {
+                Id = item["Id"]?.ToString(), State = 0, IsDeleted = 1, SecretCipher = "", OsClient = token.Data.OsClient
+            }).ConfigureAwait(false);
+            QueueAudit(token.Data.OsClient, token.Data.CurrentUser, "RevokeTotp", result.Code == 1, item["Id"]?.ToString());
+            return Json(result);
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<JsonResult> VerifyTotp([FromBody] VerifyTotpRequest request)
+        {
+            var purpose = IdentityVerificationSecurity.NormalizePurpose(request?.Purpose ?? "Login");
+            var isLogin = string.Equals(purpose, "Login", StringComparison.Ordinal);
+            var osClientResult = await ResolveOsClientAsync(request?.OsClient, allowAnonymous: isLogin).ConfigureAwait(false);
+            if (osClientResult.Code != 1) return Json(osClientResult);
+            var osClient = osClientResult.Data;
+            var options = IdentityVerificationOptions.Resolve(osClient);
+            if (!options.Enabled || !options.TotpEnabled)
+                return Json(new DosResult(0, null, "当前租户未启用 Authenticator 动态验证码。"));
+            if (!await AllowTotpAttemptAsync(osClient, request?.Account).ConfigureAwait(false))
+                return Json(new DosResult(0, null, "验证尝试过于频繁，请稍后再试。"));
+
+            CurrentToken currentToken = null;
+            JObject user;
+            if (isLogin)
+            {
+                user = await FindEnabledUserByAccountAsync(osClient, request?.Account).ConfigureAwait(false);
+            }
+            else
+            {
+                var token = await RequireUserTokenAsync().ConfigureAwait(false);
+                if (token.Code != 1) return Json(token);
+                currentToken = token.Data;
+                if (!string.Equals(currentToken.OsClient, osClient, StringComparison.OrdinalIgnoreCase))
+                    return Json(new DosResult(0, null, "禁止跨租户发起身份验证。"));
+                user = currentToken.CurrentUser;
+            }
+            var userId = user?["Id"]?.ToString();
+            var item = await FindTotpByUserAsync(osClient, userId).ConfigureAwait(false);
+            if (user == null || item == null || !PolicyEnabled(item, isLogin ? "AllowPasswordlessLogin" : "AllowStepUp"))
+                return Json(new DosResult(0, null, "账号或动态验证码不正确，或该用途未启用。"));
+
+            byte[] secret = null;
+            try
+            {
+                secret = IdentityVerificationSecurity.UnprotectTotpSecret(osClient, item["SecretCipher"]?.ToString());
+                var counter = IdentityVerificationSecurity.FindMatchingTotpCounter(
+                    secret, request?.Code, DateTimeOffset.UtcNow);
+                if (counter < 0) return Json(new DosResult(0, null, "账号或动态验证码不正确，或该用途未启用。"));
+                var replayKey = $"Microi:{osClient}:IdentityVerification:TOTP:Replay:{item["Id"]}:{counter}";
+                var accepted = await MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase()
+                    .StringSetAsync(replayKey, "1", TimeSpan.FromSeconds(90), When.NotExists)
+                    .ConfigureAwait(false);
+                if (!accepted) return Json(new DosResult(0, null, "该动态验证码已使用，请等待下一组验证码。"));
+                await MicroiEngine.FormEngine.UptFormDataAsync(TotpTable, new
+                {
+                    Id = item["Id"]?.ToString(),
+                    LastAcceptedCounter = counter,
+                    LastUsedTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    LastUsedIP = IPHelper.GetClientIP(HttpContext).Data,
+                    OsClient = osClient
+                }).ConfigureAwait(false);
+                var tokenUser = await GetEnabledUserForTokenAsync(osClient, userId).ConfigureAwait(false);
+                if (tokenUser == null) return Json(new DosResult(0, null, "系统用户不存在或已停用。"));
+                QueueAudit(osClient, tokenUser, "TotpVerified", true, item["Id"]?.ToString());
+                if (isLogin)
+                    return await CreateDiyTokenLoginResultAsync(
+                        osClient, tokenUser, request?._ClientType, request?.Did, "AuthenticatorTOTP").ConfigureAwait(false);
+                var actionHash = IdentityVerificationSecurity.NormalizeActionHash(request?.ActionHash, true);
+                return Json(await IdentityVerificationSecurity.IssueTicketAsync(
+                    osClient, userId, purpose, actionHash, "AuthenticatorTOTP", item["Id"]?.ToString(), request?.Did)
+                    .ConfigureAwait(false));
+            }
+            catch (Exception ex)
+            {
+                QueueAudit(osClient, user, "TotpVerified", false, ex.Message);
+                return Json(new DosResult(0, null, "Authenticator 验证失败：" + SafeMessage(ex)));
+            }
+            finally
+            {
+                if (secret != null) CryptographicOperations.ZeroMemory(secret);
+            }
         }
 
         /// <summary>
@@ -628,7 +960,8 @@ namespace Microi.net.Api
                         state.OsClient,
                         user,
                         request?._ClientType,
-                        request?.Did).ConfigureAwait(false);
+                        request?.Did,
+                        "StrictFace").ConfigureAwait(false);
                 }
                 var token = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
                 if (token?.CurrentUser == null
@@ -885,6 +1218,71 @@ namespace Microi.net.Api
             catch { return null; }
         }
 
+        private static bool PolicyEnabled(JObject item, string fieldName)
+        {
+            var value = item?[fieldName];
+            if (value == null || value.Type == JTokenType.Null || value.Type == JTokenType.Undefined)
+                return true;
+            if (value.Type == JTokenType.Boolean) return value.Value<bool>();
+            if (value.Type == JTokenType.Integer) return value.Value<long>() != 0;
+            var text = value.ToString().Trim();
+            if (bool.TryParse(text, out var boolean)) return boolean;
+            return !long.TryParse(text, out var number) || number != 0;
+        }
+
+        private static async Task<JObject> FindTotpByUserAsync(string osClient, string userId)
+        {
+            if (userId.DosIsNullOrWhiteSpace()) return null;
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync(TotpTable, new
+                {
+                    OsClient = osClient,
+                    _Where = new List<DiyWhere>
+                    {
+                        new DiyWhere { Name = "UserId", Type = "=", Value = userId },
+                        new DiyWhere { Name = "State", Type = "=", Value = 1 },
+                        new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 }
+                    }
+                }).ConfigureAwait(false);
+                return result.Code == 1 && result.Data != null ? JObject.FromObject(result.Data) : null;
+            }
+            catch { return null; }
+        }
+
+        private static async Task<JObject> FindOwnedTotpAsync(CurrentToken token, string id)
+        {
+            if (id.DosIsNullOrWhiteSpace()) return null;
+            try
+            {
+                var result = await MicroiEngine.FormEngine.GetFormDataAsync(TotpTable, new
+                {
+                    Id = id,
+                    OsClient = token.OsClient,
+                    _Where = new List<DiyWhere>
+                    {
+                        new DiyWhere { Name = "UserId", Type = "=", Value = token.CurrentUser["Id"]?.ToString() },
+                        new DiyWhere { Name = "State", Type = "=", Value = 1 },
+                        new DiyWhere { Name = "IsDeleted", Type = "=", Value = 0 }
+                    }
+                }).ConfigureAwait(false);
+                return result.Code == 1 && result.Data != null ? JObject.FromObject(result.Data) : null;
+            }
+            catch { return null; }
+        }
+
+        private async Task<bool> AllowTotpAttemptAsync(string osClient, string account)
+        {
+            var ip = IPHelper.GetClientIP(HttpContext).Data?.ToString() ?? "unknown";
+            var identity = $"{(account ?? "").Trim().ToLowerInvariant()}|{ip}";
+            var hash = IdentityVerificationSecurity.HashIdentifier(Encoding.UTF8.GetBytes(identity));
+            var key = $"Microi:{osClient}:IdentityVerification:TOTP:Rate:{hash}";
+            var database = MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase();
+            var count = await database.StringIncrementAsync(key).ConfigureAwait(false);
+            if (count == 1) await database.KeyExpireAsync(key, TimeSpan.FromMinutes(1)).ConfigureAwait(false);
+            return count <= 8;
+        }
+
         private async Task<DosResult> SaveCredentialAsync(
             ChallengeState state,
             RegisteredPublicKeyCredential credential,
@@ -926,6 +1324,8 @@ namespace Microi.net.Api
                     BackupEligible = credential.IsBackupEligible ? 1 : 0,
                     BackedUp = credential.IsBackedUp ? 1 : 0,
                     DeviceName = deviceName,
+                    AllowPasswordlessLogin = 1,
+                    AllowStepUp = 1,
                     State = 1,
                     IsDeleted = 0,
                     OsClient = state.OsClient
@@ -1006,7 +1406,12 @@ namespace Microi.net.Api
             return Convert.FromBase64String(text);
         }
 
-        private async Task<JsonResult> CreateDiyTokenLoginResultAsync(string osClient, JObject user, string clientType, string did)
+        private async Task<JsonResult> CreateDiyTokenLoginResultAsync(
+            string osClient,
+            JObject user,
+            string clientType,
+            string did,
+            string loginMethod)
         {
             var token = await new DiyToken().GetAccessToken(new DiyTokenParam
             {
@@ -1026,9 +1431,9 @@ namespace Microi.net.Api
                 {
                     SysMenuHomePage = homePage,
                     SysConfig = sysConfigResult.Code == 1
-                        ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data)
+                        ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data, osClient)
                         : null,
-                    LoginMethod = "PasskeyOrBiometric"
+                    LoginMethod = loginMethod
                 }
             };
             _ = MicroiEngine.FormEngine.UptFormDataAsync("sys_user", new
