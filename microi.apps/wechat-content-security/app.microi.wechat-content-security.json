@@ -1,15 +1,15 @@
 {
   "PackageInfo": {
     "Name": "微信小程序内容安全",
-    "Version": "v1.0.0",
-    "AppVersion": "v1.0.0",
+    "Version": "v1.0.1",
+    "AppVersion": "v1.0.1",
     "AppId": "microi-wechat-content-security",
     "ApplicationType": "Platform",
-    "Description": "微信小程序内容安全回调核心接口与租户扩展 Hook。",
+    "Description": "微信小程序内容安全回调核心接口、批量状态查询与租户扩展 Hook。",
     "CreateTime": "2026-08-06 00:00:00",
     "CreateUser": "Microi吾码",
     "OsClient": "iTdos",
-    "ApiEngineCount": 2
+    "ApiEngineCount": 3
   },
   "DDLStatements": [],
   "PhysicalColumns": [],
@@ -66,6 +66,29 @@
       "LimitRecursion": 64,
       "V8Unlimited": 0,
       "ApiRole": "[]"
+    },
+    {
+      "Id": "01KZZWECHATSTATUSBATCH0000000",
+      "ApiName": "[微信内容安全]批量状态查询",
+      "ApiEngineKey": "mci-wechat-content-status-batch",
+      "ApiAddress": "",
+      "ApiRemark": "登录用户批量查询本人微信图片审核状态，使用租户共享 Redis，供小程序合并轮询。",
+      "ApiV8Code": "/*\n * V8 ApiEngine\n * ApiEngineKey: mci-wechat-content-status-batch\n * Version: v1.0.0\n * Ownership: Application / Managed\n *\n * 批量读取当前登录用户自己的微信图片审核状态，减少 UniApp 多图场景的轮询请求。\n */\n\nfunction text(value) {\n    return value === null || value === undefined ? '' : String(value);\n}\nfunction parseObject(value) {\n    if (!value) return null;\n    if (typeof value == 'object') return value;\n    try { return JSON.parse(String(value)); } catch (error) { return null; }\n}\nfunction isReviewId(value) {\n    return /^[a-fA-F0-9]{32}$/.test(text(value));\n}\n\n// zhy: 状态查询必须依赖接口引擎建立的 DiyToken 当前用户，不能相信客户端传入 UserId。\nvar currentUserId = text(V8.CurrentUser && V8.CurrentUser.Id);\nif (!currentUserId) {\n    return { Code: 1001, Msg: '登录身份已过期，请重新登录。' };\n}\n\nvar source = V8.Param && V8.Param.ReviewIds;\nif (!source || typeof source.length != 'number' || source.length < 1 || source.length > 20) {\n    return { Code: 0, Msg: '审核记录数量不合法。' };\n}\n\nvar reviewIds = [];\nvar seen = {};\nfor (var i = 0; i < source.length; i++) {\n    var reviewId = text(source[i]);\n    if (!isReviewId(reviewId)) {\n        return { Code: 0, Msg: '审核记录标识不合法。' };\n    }\n    if (!seen[reviewId]) {\n        seen[reviewId] = true;\n        reviewIds.push(reviewId);\n    }\n}\n\nvar tenant = text(V8.OsClient);\nvar prefix = 'Microi:' + tenant + ':WechatContentSecurity:Review:';\nvar items = [];\nvar pendingCount = 0;\n\n// zhy: 审核记录保存在按 OsClient 隔离的共享 Redis；逐条校验 UserId，支持回调与查询落在不同 API 节点。\nfor (var index = 0; index < reviewIds.length; index++) {\n    var id = reviewIds[index];\n    var review = parseObject(V8.Cache.Get(prefix + id));\n    var status = 'Error';\n    if (review && text(review.UserId) == currentUserId && text(review.ReviewId) == id) {\n        var storedStatus = text(review.Status);\n        if (storedStatus == 'Pending' || storedStatus == 'Passed'\n            || storedStatus == 'Rejected' || storedStatus == 'Error') {\n            status = storedStatus;\n        }\n    }\n    if (status == 'Pending') pendingCount++;\n    items.push({ ReviewId: id, Status: status });\n}\n\n// zhy: 只返回审核 Id 与归一化状态，不向客户端暴露 OpenId、文件路径、命中标签或微信回调正文。\nreturn {\n    Code: 1,\n    Data: {\n        Items: items,\n        PendingCount: pendingCount,\n        NextPollAfterMs: pendingCount > 0 ? 1200 : 0\n    }\n};\n",
+      "Version": "v1.0.0",
+      "ChangeHistory": "2026-08-07 v1.0.0 多图审核批量状态查询；按当前用户和租户校验记录归属。",
+      "Category": "微信内容安全",
+      "IsEnable": 1,
+      "IsDeleted": 0,
+      "StopHttp": 0,
+      "AllowAnonymous": 0,
+      "Lock": 0,
+      "ResponseFile": 0,
+      "EnableLog": 0,
+      "Timeout": 120,
+      "LimitMemory": 128,
+      "LimitRecursion": 64,
+      "V8Unlimited": 0,
+      "ApiRole": "[]"
     }
   ],
   "ResourcePolicies": {
@@ -78,6 +101,10 @@
       "mci-wechat-content-callback-extension": {
         "Ownership": "Tenant",
         "UpgradePolicy": "CreateIfMissing"
+      },
+      "mci-wechat-content-status-batch": {
+        "Ownership": "Application",
+        "UpgradePolicy": "Managed"
       }
     }
   }
