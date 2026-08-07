@@ -2214,21 +2214,28 @@ namespace Microi.net
                 }
 
                 var id = Ulid.NewUlid().ToString();
-                var tableData = new JObject
+                // MCP 是受认证的控制面调用。这里必须使用强类型 BaseParam 将可信来源
+                // 传入 AddDiyTable；若传 JObject，AddDiyTable 会按外部 Client 调用处理并
+                // 触发 diy_table 的租户前端事件，事件在事务提交前回查新 Id 会得到
+                // NoExistData，导致标准建表工具稳定回滚。
+                var tableData = new DiyTableParam
                 {
-                    ["OsClient"] = osClient,
-                    ["Id"] = id,
-                    ["Name"] = name,
-                    ["Description"] = description ?? "",
-                    ["IsDeleted"] = 0,
-                    ["_InvokeType"] = "Server"
+                    OsClient = osClient,
+                    Id = id,
+                    Name = name,
+                    Description = description ?? "",
+                    IsDeleted = 0,
+                    DataBaseId = "",
+                    DataBaseName = "",
+                    _InvokeType = InvokeType.Server.ToString(),
+                    _TrustedServerInvocation = true
                 };
-                if (!string.IsNullOrWhiteSpace(tabs)) tableData["Tabs"] = tabs;
-                if (isTree > 0) tableData["IsTree"] = isTree;
-                if (column > 1) tableData["Column"] = column;
-                if (!string.IsNullOrWhiteSpace(formOpenType)) tableData["FormOpenType"] = formOpenType;
-                if (!string.IsNullOrWhiteSpace(formOpenWidth)) tableData["FormOpenWidth"] = formOpenWidth;
-                if (v8Unlimited.HasValue) tableData["V8Unlimited"] = v8Unlimited.Value == 1 ? 1 : 0;
+                if (!string.IsNullOrWhiteSpace(tabs)) tableData.Tabs = tabs;
+                if (isTree > 0) tableData.IsTree = isTree;
+                if (column > 1) tableData.Column = column;
+                if (!string.IsNullOrWhiteSpace(formOpenType)) tableData.FormOpenType = formOpenType;
+                if (!string.IsNullOrWhiteSpace(formOpenWidth)) tableData.FormOpenWidth = formOpenWidth;
+                if (v8Unlimited.HasValue) tableData.V8Unlimited = v8Unlimited.Value == 1 ? 1 : 0;
 
                 var addResult = await MicroiEngine.FormEngine.AddTableAsync(tableData);
 
@@ -4832,7 +4839,14 @@ namespace Microi.net
                 _OrderByType = "ASC",
                 _PageSize = 5000
             });
-            return result.Code == 1 && result.Data != null ? JArray.FromObject(result.Data) : new JArray();
+            if (result.Code != 1 || result.Data == null) return new JArray();
+
+            // mci_ai_app_file 既保存私有源码，也保存公有运行产物元数据。
+            // 在线应用上下文和源码拉取只能返回私有源码；运行产物由 Runtime/版本清单读取。
+            // 否则客户端会拿公有桶路径调用私有桶读取接口，既产生假故障，也泄露错误的工程结构。
+            return new JArray(JArray.FromObject(result.Data)
+                .OfType<JObject>()
+                .Where(file => !IsPublishedAiApplicationBuildFile(file)));
         }
 
         private static string NormalizeAiApplicationStoragePath(string value)
@@ -4844,11 +4858,26 @@ namespace Microi.net
         internal static bool IsPublishedAiApplicationBuildFile(JObject file)
         {
             if (file == null) return false;
+            var storageScope = SafeJString(file, "StorageScope").Trim();
+            if (string.Equals(storageScope, "PublicBuildStream", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(storageScope, "PublicBuildStreamArchived", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(storageScope, "PublicBuildOnly", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
             var hdfsPath = NormalizeAiApplicationStoragePath(SafeJString(file, "HdfsPath"));
             var publishHdfsPath = NormalizeAiApplicationStoragePath(SafeJString(file, "PublishHdfsPath"));
             return !IsBlank(hdfsPath)
                 && !IsBlank(publishHdfsPath)
                 && string.Equals(hdfsPath, publishHdfsPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static bool ShouldRemoveAiApplicationSourceFile(JObject file, ISet<string> syncedPaths)
+        {
+            if (file == null || IsPublishedAiApplicationBuildFile(file)) return false;
+            var filePath = SafeJString(file, "FilePath");
+            return !IsBlank(filePath) && (syncedPaths == null || !syncedPaths.Contains(filePath));
         }
 
         private static async Task<JObject> ReadAiApplicationFile(string osClient, JObject file, bool includeContents, long maxFileBytes)
@@ -5034,17 +5063,11 @@ namespace Microi.net
                 if (IsBlank(filePath)) return new DosResult<object>(0, null, "FilePath 不合法");
                 var app = await FindAiApplication(osClient, appIdOrKey);
                 if (app == null) return new DosResult<object>(2, null, "在线应用不存在");
-                var fileResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("mci_ai_app_file", new
-                {
-                    OsClient = osClient,
-                    _Where = new List<object>
-                    {
-                        new List<object> { "AppId", "=", SafeJString(app, "Id") },
-                        new List<object> { "AND", "FilePath", "=", filePath }
-                    }
-                });
-                if (fileResult.Code != 1 || fileResult.Data == null) return new DosResult<object>(2, null, "应用文件不存在");
-                var file = await ReadAiApplicationFile(osClient, JObject.FromObject(fileResult.Data), includeContents, maxFileBytes);
+                var files = await GetAiApplicationFiles(osClient, SafeJString(app, "Id"));
+                var sourceFile = files.OfType<JObject>().FirstOrDefault(item =>
+                    string.Equals(SafeJString(item, "FilePath"), filePath, StringComparison.OrdinalIgnoreCase));
+                if (sourceFile == null) return new DosResult<object>(2, null, "应用源码文件不存在");
+                var file = await ReadAiApplicationFile(osClient, sourceFile, includeContents, maxFileBytes);
                 return new DosResult<object>(1, new { Application = app, File = file }, "已获取应用文件");
             }
             catch (Exception ex)
@@ -5457,7 +5480,10 @@ namespace Microi.net
                 }
 
                 var removed = 0;
-                if (param?["Replace"]?.Val<bool?>() == true)
+                // ReplacePrivateSourceOnly 是新版安全协议：旧服务器会忽略它而不误删运行产物，
+                // 新服务器只清理私有源码。保留 Replace 兼容已有调用，但两种模式都必须保护公有产物。
+                if (param?["Replace"]?.Val<bool?>() == true
+                    || param?["ReplacePrivateSourceOnly"]?.Val<bool?>() == true)
                 {
                     var oldFiles = await MicroiEngine.FormEngine.GetTableDataAsync<dynamic>("mci_ai_app_file", new
                     {
@@ -5469,9 +5495,9 @@ namespace Microi.net
                     {
                         foreach (var old in oldFiles.Data)
                         {
-                            var oldPath = Convert.ToString(old.FilePath);
-                            if (syncedPaths.Contains(oldPath)) continue;
-                            var deleteResult = await MicroiEngine.FormEngine.DelFormDataAsync("mci_ai_app_file", new JObject { ["OsClient"] = osClient, ["Id"] = Convert.ToString(old.Id) });
+                            var oldFile = JObject.FromObject(old);
+                            if (!ShouldRemoveAiApplicationSourceFile(oldFile, syncedPaths)) continue;
+                            var deleteResult = await MicroiEngine.FormEngine.DelFormDataAsync("mci_ai_app_file", new JObject { ["OsClient"] = osClient, ["Id"] = SafeJString(oldFile, "Id") });
                             if (deleteResult.Code == 1) removed++;
                         }
                     }

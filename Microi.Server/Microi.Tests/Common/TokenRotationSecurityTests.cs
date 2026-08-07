@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.IdentityModel.Tokens;
 using Microi.net;
+using Microi.net.Api;
 using Newtonsoft.Json.Linq;
 
 namespace Dos.Common.Tests;
@@ -104,6 +105,17 @@ public class TokenRotationSecurityTests
             DiyToken.ResolveJwtSigningKey(afterRestart));
 
         Assert.Equal("restart-user", principal.FindFirst("UserId")?.Value);
+    }
+
+    [Fact]
+    public void DiyFilterSignatureValidation_UsesOriginalJwtSegments()
+    {
+        var token = CreateSignedToken(StableSigningSecret);
+
+        Assert.True(DiyFilter<dynamic>.HasValidJwtSignature(token, StableSigningSecret));
+        Assert.False(DiyFilter<dynamic>.HasValidJwtSignature(
+            token,
+            StableSigningSecret + "_different"));
     }
 
     [Fact]

@@ -1121,6 +1121,33 @@ var rowResult = await V8.FormEngine.GetFormData({
 
 业务 V8 不得手工构造、缓存、跨父记录复用或向其它表传播 `_TableChildAuth`。存量项目也不需要给每个隐藏子表菜单逐角色补权限，合法子表访问由上述父记录范围内的委托授权完成。
 
+## 强身份验证（`V8.Identity`）
+
+`V8.Identity` 在登录后的表单/列表 V8 中提供受控的 Passkey、设备生物识别和严格人脸交互：
+
+| 方法 | 说明 |
+|---|---|
+| `GetCapabilities(callback?)` | 读取当前租户开关，以及本人是否已登记 Passkey/人脸 |
+| `CreateActionHash(value, callback?)` | 对稳定字符串或 JSON 计算 SHA-256 操作摘要 |
+| `RegisterPasskey(options?, callback?)` | 为当前登录用户登记 Passkey |
+| `Verify(options, callback?)` | 完成敏感操作验证并返回一次性 Ticket |
+
+```javascript
+var actionHash = await V8.Identity.CreateActionHash({
+  Version: 1,
+  Action: 'ApproveContract',
+  Id: V8.Form.Id
+});
+var result = await V8.Identity.Verify({
+  Purpose: 'ApproveContract',
+  ActionHash: actionHash,
+  Method: 'Auto'
+});
+if (result.Code !== 1) return V8.Tips(result.Msg, false);
+```
+
+前端成功不等于业务已授权。必须把 `result.Data.Ticket` 交给后端接口引擎，由后端重读权威业务数据、重新计算摘要，并调用 `V8.Method.ConsumeIdentityVerificationTicket` 原子消费。票据不能复用，也不能代替菜单/表权限和业务状态校验。完整方案见 [Passkey、设备生物识别与严格人脸验证](../more/identity-verification)。
+
 ## 蓝牙打印（`V8.Print`）
 
 `V8.Print` 是前端 BLE 直连打印能力，支持 TSC/TSPL 标签指令和 ESC/POS

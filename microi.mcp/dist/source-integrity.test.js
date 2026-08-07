@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import { assertPayloadSourceIntegrity, assertSourceIntegrity, findSourceIntegrityIssues } from './source-integrity.js';
 test('detects AI and terminal output contamination markers', () => {
@@ -30,5 +31,12 @@ test('scans nested module button payloads', () => {
         ModuleId: 'module-1',
         MoreBtns: JSON.stringify([{ Id: 'button-1', V8Code: 'var a = 1;\nExit code: 0' }]),
     }, '更新菜单模块'));
+});
+test('microservice source replacement never sends legacy full-table Replace=true', () => {
+    const serverSource = fs.readFileSync(new URL('../src/server.ts', import.meta.url), 'utf8');
+    const syncTool = serverSource.match(/'microi_sync_microservice_source'[\s\S]*?\/\/ Tool: 流式上传单个应用资产/)?.[0] || '';
+    assert.match(syncTool, /Replace:\s*false/u);
+    assert.match(syncTool, /ReplacePrivateSourceOnly:\s*replace === true/u);
+    assert.doesNotMatch(syncTool, /Replace:\s*replace === true/u);
 });
 //# sourceMappingURL=source-integrity.test.js.map

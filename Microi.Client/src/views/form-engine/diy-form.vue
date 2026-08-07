@@ -289,6 +289,7 @@ import { useDiyStore } from "@/pinia";
 // 使用共享的组件缓存池，避免重复创建导致的内存泄漏
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { initV8ScanCode } from "@/utils/v8-scan-code.js";
+import { initV8IdentityVerification } from "@/utils/v8-identity-verification.js";
 import { initV8Print } from "@/utils/v8-print.js";
 import { formTrace } from "@/utils/form-engine-trace.js";
 
@@ -910,6 +911,7 @@ export default {
 
             // 注册 V8.Method.ScanCode 扫码功能（闭包绑定当前 V8 实例）
             initV8ScanCode(V8);
+            initV8IdentityVerification(V8);
             // 注册 V8.Print 蓝牙打印功能（闭包绑定当前 V8 实例）
             initV8Print(V8);
 
@@ -1936,12 +1938,23 @@ export default {
                     param.Id = formParam.TableRowId;
                 }
 
-                //2022-04-09 改为表名和Id都传
-                //2023-05-19 改为不要都传，不好看
-                // param.TableId = self.TableId
-                // param.TableName = self.TableName
-                // param.TableName = self.DiyTableModel.Name;
-                param.FormEngineKey = self.DiyTableModel.Name;
+                // 优先使用表定义名称；受保护平台表的元数据可能不会向前端返回 Name，
+                // 此时使用调用方传入的 TableName，最后回退到后端同样支持的 TableId。
+                // 不能发送空 FormEngineKey，否则 UptFormData 会失去目标表上下文。
+                param.FormEngineKey = [
+                    self.DiyTableModel && self.DiyTableModel.Name,
+                    self.TableName,
+                    self.TableId
+                ].find(function (value) {
+                    return !self.DiyCommon.IsNull(value);
+                });
+                if (self.DiyCommon.IsNull(param.FormEngineKey)) {
+                    formParam.SaveLoading = false;
+                    self.DiyCommon.Tips("表单提交失败：未能解析目标表，请刷新页面后重试", false);
+                    callback(false);
+                    return;
+                }
+                param._TableId = self.TableId;
                  param._SysMenuId = self.SysMenuId;
                  param._TableChildAuth = self.TableChildAuth;
 

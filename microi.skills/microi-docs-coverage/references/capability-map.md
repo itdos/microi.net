@@ -26,6 +26,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/dos-orm.md` | dos-orm, v8-sql-query | ORM 查询、参数和事务 |
 | `more/dos-result.md` | v8-utilities, v8-crud-api | DosResult/DosResultList 返回协议 |
 | `more/hdfs.md` | v8-file-upload | 分布式文件存储和 URL |
+| `more/identity-verification.md` | v8-security, v8-utilities, microi-microservice | DiyToken、Passkey、严格人脸、一次性步进票据和个人设置 |
 | `more/office.md` | v8-export-import, microi-microservice | Office 导入导出与在线编辑集成 |
 | `more/security.md` | v8-security | 平台安全和兼容基线 |
 | `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |
@@ -52,8 +53,8 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `v8-engine/api-engine.md` | v8-api-config, v8-utilities | 接口上下文、配置和调用 |
 | `v8-engine/apiengine-index.md` | v8-crud-api, v8-api-config | 接口引擎实战和规范 |
 | `v8-engine/form-engine.md` | v8-crud-api, v8-formengine-http | FormEngine API 与 HTTP |
-| `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, v8-http-integration, ai-engine, print-engine | 全部前端 V8、平台 AI、扫码和蓝牙打印 |
-| `v8-engine/v8-server.md` | v8-utilities, v8-api-config, v8-http-integration, ai-engine | 全部后端 V8、平台 AI 和专项路由 |
+| `v8-engine/v8-client.md` | v8-utilities, v8-frontend-events, v8-http-integration, v8-security, ai-engine, print-engine | 全部前端 V8、平台 AI、强身份验证、扫码和蓝牙打印 |
+| `v8-engine/v8-server.md` | v8-utilities, v8-api-config, v8-http-integration, v8-security, ai-engine | 全部后端 V8、强身份票据、平台 AI 和专项路由 |
 | `v8-engine/vs-code-plugin.md` | v8-explorer-tree, microi-client-frontend, workspace-conventions | VS Code 插件、Microi CLI、AI/MCP 初始化、类型、资源树和共享工作区 |
 | `v8-engine/where.md` | v8-crud-api, v8-sql-query | 参数化 `_Where` 条件 |
 

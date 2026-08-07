@@ -17,7 +17,7 @@ function parseButtons(value) {
 }
 
 test("application-store package hides every install mutation on the official platform", () => {
-  assert.equal(packageModel.PackageInfo.Version, "v7.0.13");
+  assert.equal(packageModel.PackageInfo.Version, "v7.1.2");
   const menu = packageModel.SysMenus.find((item) => item.Url === "/microi-store");
   assert.ok(menu, "application-store menu is missing");
 
@@ -77,6 +77,9 @@ test("every install action reports one stable operation to the authoritative cou
   assert.match(importerSource, /official_marketplace_install_stat/);
   assert.match(importerSource, /MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1/);
   assert.match(importerSource, /SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1/);
+  assert.match(importerSource, /LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1/);
+  assert.match(importerSource, /findInstallVersionRecord/);
+  assert.match(importerSource, /\['AppName', '=', identity\.AppName\]/);
   assert.match(importerSource, /if \(!marketplaceInstallIdentity\)[\s\S]*install_count_skipped_no_identity[\s\S]*return;/);
   assert.match(importerSource, /typeof remoteStat == 'string'[\s\S]*JSON\.parse\(remoteStat\)[\s\S]*remoteStat\.Code == 1/);
   assert.doesNotMatch(importerSource, /UPDATE\s+`?sys_microistore`?\s+SET\s+`?InstallCount`?/i);
@@ -102,7 +105,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v1\.9\.1/);
+  assert.match(importerSource, /Version: v1\.9\.2/);
   assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
   assert.match(importerSource, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
   assert.match(importerSource, /MySqlOffpageTypeOverrides/);
@@ -129,6 +132,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v1.9.1");
+  assert.equal(embeddedImporter.Version, "v1.9.2");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

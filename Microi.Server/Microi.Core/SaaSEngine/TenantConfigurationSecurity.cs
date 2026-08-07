@@ -81,7 +81,9 @@ namespace Microi.net
                 // 小程序 AppSecret、消息 Token 和 AESKey 均由各租户独立维护，禁止从主租户复制。
                 "WeChatMiniProgramAppSecret", "WeChatMiniProgramMessageToken",
                 "WeChatMiniProgramAESKey",
-                "WeChatMiniProgramEncodingAESKey"
+                "WeChatMiniProgramEncodingAESKey",
+                // 严格人脸网关凭据由各租户独立维护，只允许核心后端读取。
+                "FaceApiKey"
             };
 
         private static readonly HashSet<string> V8AlwaysHiddenFieldSet =
@@ -93,7 +95,8 @@ namespace Microi.net
                 // 微信内容安全私密配置禁止注入 V8.OsClientModel 或返回前端。
                 "WeChatMiniProgramAppSecret", "WeChatMiniProgramMessageToken",
                 "WeChatMiniProgramAESKey",
-                "WeChatMiniProgramEncodingAESKey"
+                "WeChatMiniProgramEncodingAESKey",
+                "FaceApiKey"
             };
 
         private static readonly HashSet<string> V8SafePublicInfrastructureFieldSet =

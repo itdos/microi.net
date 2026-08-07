@@ -50,6 +50,7 @@
 | `V8.Method.GetCurrentToken(token,osClient)` | 读取当前 Token 对象；不透传前端 |
 | `V8.Method.RefreshLoginUser(userId,osClient)` | 刷新用户登录缓存 |
 | `V8.Method.ClearUserLoginInfo(userId,osClient)` | 管理员吊销用户全部终端 Token |
+| `V8.Method.ConsumeIdentityVerificationTicket({Ticket,Purpose,ActionHash})` | 按当前 DiyToken 用户、租户、用途和操作摘要原子消费一次性 Passkey/人脸票据 |
 | `V8.Method.GetPrivateFileUrl({FilePathName})` | 签发当前租户短期私有文件代理地址 |
 | `V8.Method.Upload(options)` | 受配额限制的上传 |
 | `V8.Method.AddSysLog(options)` | 结构化系统日志 |
@@ -81,6 +82,8 @@ var signature = V8.EncryptHelper.HmacSha256(secretFromConfig, payload);
 `V8.EncryptHelper.Sha256Hex`、`V8.EncryptHelper.HmacSha256`、
 `V8.EncryptHelper.AESEncrypt`、`V8.EncryptHelper.AESDecrypt`、
 `V8.EncryptHelper.DESEncode`、`V8.EncryptHelper.DESDecode`。
+
+DES 只用于明确要求取回原文的兼容业务秘密；保存和显示都在可信后端完成，列表掩码、独立授权、`no-store` 且审计不含明文。登录密码不使用摘要或可逆加密的新设计，完整分级见 `v8-security/SKILL.md`。
 
 MD5/SHA1 仅为兼容摘要；任何摘要都不能直接作为新密码存储方案。AES/DES/HMAC
 密钥从受控配置读取，不硬编码、不写日志、不返回客户端。

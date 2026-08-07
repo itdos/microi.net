@@ -319,6 +319,8 @@ namespace Microi.net
             }
 
             var fileSuffix = Path.GetExtension(param.FileFullPath).ToLower();
+            var objectName = param.FileFullPath.DosTrimStart('/');
+            var expectedSize = param.FileStream.Length;
             //很重要，否则直接访问图片路径会直接下载，而不是直接预览
             var contentType = "application/octet-stream";
             if (fileSuffix == ".pdf")
@@ -342,22 +344,69 @@ namespace Microi.net
                 }
                 // 上传文件。注意：objectName不能以/开头，并且objectName区分大小写
                 var putObjParam = new PutObjectArgs()
-                                .WithObject(param.FileFullPath.DosTrimStart('/'))
+                                .WithObject(objectName)
                                 .WithStreamData(param.FileStream)
-                                .WithObjectSize(param.FileStream.Length)
+                                .WithObjectSize(expectedSize)
                                 .WithContentType(contentType)
                                 ;
                 putObjParam = putObjParam.WithBucket(bucketName);
                 var result = await minIOClient.PutObjectAsync(putObjParam);
                 if (result.ResponseStatusCode == HttpStatusCode.OK)
                 {
-                    return new DosResult(1);
+                    var verification = await VerifyUploadedObjectAsync(
+                        minIOClient,
+                        bucketName,
+                        objectName,
+                        expectedSize);
+                    return verification.Verified
+                        ? new DosResult(1)
+                        : new DosResult(0, null, "MinIO 上传后回读校验失败：" + verification.Error);
                 }
                 return new DosResult(0, result, result.ResponseContent);
             }
             catch (Exception ex)
             {
-                return new DosResult(0, null, "MinIO Upload Error5:" + ex.Message);
+                // 部分反向代理会在对象已落盘后返回空或非 XML 响应，MinIO SDK
+                // 因解析响应失败而抛异常。以同 Endpoint 的 StatObject 大小回读作为
+                // 最终事实源，避免把已成功的后台应用资源写入误判成失败并回滚。
+                var verification = await VerifyUploadedObjectAsync(
+                    minIOClient,
+                    bucketName,
+                    objectName,
+                    expectedSize);
+                if (verification.Verified)
+                {
+                    return new DosResult(1, null, "MinIO 响应解析异常，但对象已通过回读校验。");
+                }
+                return new DosResult(
+                    0,
+                    null,
+                    "MinIO Upload Error5:" + ex.Message + "；回读校验：" + verification.Error);
+            }
+        }
+
+        private static async Task<(bool Verified, string Error)> VerifyUploadedObjectAsync(
+            IMinioClient minioClient,
+            string bucketName,
+            string objectName,
+            long expectedSize)
+        {
+            try
+            {
+                var stat = await minioClient.StatObjectAsync(
+                    new StatObjectArgs()
+                        .WithBucket(bucketName)
+                        .WithObject(objectName));
+                var actualSize = Convert.ToInt64(stat.Size);
+                if (actualSize != expectedSize)
+                {
+                    return (false, $"对象大小不一致，期望{expectedSize}，实际{actualSize}。");
+                }
+                return (true, string.Empty);
+            }
+            catch (Exception verificationException)
+            {
+                return (false, verificationException.Message);
             }
         }
 
