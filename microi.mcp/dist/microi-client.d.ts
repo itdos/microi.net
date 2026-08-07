@@ -23,8 +23,10 @@ export interface MicroiConfig {
 }
 /**
  * Return token-file keys from the most specific tenant identity to legacy keys.
- * New writers use api|os|type|network, while readers keep accepting the older
- * api|os|type, api|os and api layouts during migration.
+ * New writers use api|os|type|network even when type/network are empty, while
+ * readers keep accepting the older compact api|os|type, api|os and api layouts
+ * during migration. Keeping the empty segments is important: the VS Code
+ * broker may intentionally leave an ambiguous legacy alias untouched.
  */
 export declare function buildTokenFileLookupKeys(apiBaseUrl: string, osClient?: string, osClientType?: string, osClientNetwork?: string): string[];
 export declare function buildMicroAppEntryUrl(apiBaseUrl: string, osClient: string, msKey: string): string;
@@ -41,6 +43,96 @@ export interface ApiResponse<T = unknown> {
         AppendMsg?: string;
         [key: string]: unknown;
     };
+}
+export interface OcrRecognizeRequest {
+    FileByteBase64: string;
+    FileName?: string;
+    UseDocOrientationClassify?: boolean;
+    UseDocUnwarping?: boolean;
+    UseTextlineOrientation?: boolean;
+    TextRecScoreThresh?: number;
+    ReturnWordBox?: boolean;
+}
+export interface OcrRegion {
+    Text?: string;
+    Confidence?: number;
+    Polygon?: number[][];
+}
+export interface OcrPage {
+    PageIndex?: number;
+    Text?: string;
+    AverageConfidence?: number;
+    Regions?: OcrRegion[];
+}
+export interface OcrRecognizeResult {
+    Provider?: string;
+    TraceId?: string;
+    FileName?: string;
+    FileType?: string;
+    Text?: string;
+    AverageConfidence?: number;
+    PageCount?: number;
+    ElapsedMilliseconds?: number;
+    Pages?: OcrPage[];
+    TextTruncated?: boolean;
+}
+export interface TranslateTextRequest {
+    SourceText?: string;
+    SourceTexts?: string[];
+    FromLang?: string;
+    Lang: string;
+    Format?: 'text' | 'html';
+    Alternatives?: number;
+}
+export interface TranslateDetection {
+    Language?: string;
+    Confidence?: number;
+}
+export interface TranslateTextResult {
+    Provider?: string;
+    IsBatch?: boolean;
+    SourceLanguage?: string;
+    TargetLanguage?: string;
+    Format?: string;
+    TranslatedText?: string;
+    TranslatedTexts?: string[];
+    DetectedLanguage?: TranslateDetection;
+    DetectedLanguages?: TranslateDetection[];
+    Alternatives?: string[];
+    AlternativeGroups?: string[][];
+}
+export interface TranslateLanguage {
+    Code?: string;
+    Name?: string;
+    Targets?: string[];
+}
+export interface TranslateFileRequest {
+    FileByteBase64: string;
+    FileName: string;
+    FromLang?: string;
+    Lang: string;
+}
+export interface TranslateFileResult {
+    Provider?: string;
+    FileName?: string;
+    ContentType?: string;
+    FileByteBase64?: string;
+    ByteLength?: number;
+}
+export interface TranslateSuggestionResult {
+    Provider?: string;
+    Success?: boolean;
+}
+export interface TranslateHealthResult {
+    Provider?: string;
+    Status?: string;
+    Healthy?: boolean;
+    SupportsBatch?: boolean;
+    SupportsHtml?: boolean;
+    SupportsAlternatives?: boolean;
+    SupportsDetection?: boolean;
+    SupportsFiles?: boolean;
+    SupportsSuggestions?: boolean;
 }
 export interface ApplicationStreamGateTransitionRequest {
     OsClient: string;
@@ -173,6 +265,7 @@ export interface ApiEngine {
     Code?: string;
     ApiRemark?: string;
     Description?: string;
+    V8Unlimited?: number;
     Version?: string;
     ChangeHistory?: string;
     UpdateTime?: string;
@@ -374,6 +467,8 @@ export declare class MicroiClient {
      * remains safe for large immutable application assets.
      */
     private requestMultipartFile;
+    private requestJsonNative;
+    private requestMultipartFileNative;
     private isUncertainWriteError;
     private readbackOptions;
     private pollReadback;
@@ -405,17 +500,47 @@ export declare class MicroiClient {
     getEngineList(keyword?: string): Promise<ApiResponse<ApiEngine[] | ListEnvelope<ApiEngine>>>;
     getEngineCode(apiEngineKey: string, options?: RequestOptions): Promise<ApiResponse<ApiEngine>>;
     executeEngine(apiEngineKey: string, params?: Record<string, unknown>): Promise<ApiResponse>;
+    chat(input: {
+        question: string;
+        systemPrompt?: string;
+        aiModel: string;
+        aiModelId?: string;
+        relayModel?: string;
+        conversationId?: string;
+        reasoningEffort?: 'auto' | 'low' | 'medium' | 'high';
+        mode?: 'chat' | 'data' | 'code' | 'builder' | 'project';
+    }): Promise<ApiResponse>;
+    /**
+     * 调用当前 MCP 身份和租户绑定的 OCR 网关。网络地址、Provider、认证头和
+     * OsClient 均不属于本方法参数，避免 MCP 把后端网关变成任意 HTTP 代理。
+     */
+    recognizeOcr(input: OcrRecognizeRequest): Promise<ApiResponse<OcrRecognizeResult>>;
+    /** Calls the current authenticated tenant's server-side translation gateway. */
+    translateText(input: TranslateTextRequest): Promise<ApiResponse<TranslateTextResult>>;
+    detectLanguage(sourceText: string): Promise<ApiResponse<TranslateDetection[]>>;
+    listTranslateLanguages(): Promise<ApiResponse<TranslateLanguage[]>>;
+    translateFile(input: TranslateFileRequest): Promise<ApiResponse<TranslateFileResult>>;
+    suggestTranslation(input: {
+        SourceText: string;
+        SuggestedText: string;
+        FromLang: string;
+        Lang: string;
+    }): Promise<ApiResponse<TranslateSuggestionResult>>;
+    getTranslateHealth(): Promise<ApiResponse<TranslateHealthResult>>;
     saveEngineCode(apiEngineKey: string, code: string, options?: {
         functionDescription?: string;
         changeSummary?: string;
         confirmLargeReduction?: boolean;
+        v8Unlimited?: boolean;
     }): Promise<ApiResponse>;
+    updateEngineRuntimeConfig(apiEngineKey: string, v8Unlimited: boolean): Promise<ApiResponse>;
     createEngine(data: {
         ApiEngineKey: string;
         ApiName: string;
         Category?: string;
         Code?: string;
         ApiAddress?: string;
+        V8Unlimited?: number;
         functionDescription?: string;
         changeSummary?: string;
     }): Promise<ApiResponse>;
@@ -471,6 +596,11 @@ export declare class MicroiClient {
         Column?: number;
         FormOpenType?: string;
         FormOpenWidth?: string;
+        V8Unlimited?: number;
+    }): Promise<ApiResponse>;
+    repairFixedAuditFields(input: {
+        tableId?: string;
+        tableName?: string;
     }): Promise<ApiResponse>;
     addField(data: {
         TableId: string;
