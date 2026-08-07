@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.6.4 V3 source", () => {
+test("publisher package metadata matches the v1.6.5 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.6.4");
+  assert.equal(packagedPublisher.Version, "v1.6.5");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -232,14 +232,90 @@ test("storeRow saves explicit SelectMenu metadata and otherwise preserves the st
   assert.equal(resolve({ SelectMenu: [] }, { SelectMenu: stored }), "[]", "an explicit empty selection clears the stored selection");
 });
 
-test("interrupted package repair may reuse only the exact latest Published version and prepared assets", () => {
+function exactPublishedVersionValidator() {
+  const context = {};
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "ok")}
+    ${extractFunction(publisherSource, "fail")}
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeExactVersion")}
+    ${extractFunction(publisherSource, "validateExactPublishedVersion")}
+    result = validateExactPublishedVersion;
+  `, context);
+  return context.result;
+}
+
+test("legacy exact package repair accepts only latest successful immutable states with an exact asset contract", () => {
+  const validate = exactPublishedVersionValidator();
+  const assets = { PackageVersion: "v1.5.5" };
+
+  for (const state of ["Published", "Completed"]) {
+    const result = validate(
+      { VersionNo: "v1.5.5", PublishState: state },
+      assets,
+      "v1.5.5",
+      false,
+    );
+    assert.equal(result.Code, 1, `legacy exact should accept ${state}`);
+    assert.equal(result.Data.AppVersion, "v1.5.5");
+  }
+
+  for (const state of ["Failed", "Preparing", "Publishing", "Pending", "Cancelled", ""]) {
+    const result = validate(
+      { VersionNo: "v1.5.5", PublishState: state },
+      assets,
+      "v1.5.5",
+      false,
+    );
+    assert.equal(result.Code, 0, `legacy exact must reject ${state || "empty"}`);
+    assert.match(result.Msg, /必须为 Published 或 Completed/);
+  }
+
+  assert.equal(
+    validate({ VersionNo: "v1.5.4", PublishState: "Completed" }, assets, "v1.5.5", false).Code,
+    0,
+    "an older version row must not satisfy the exact contract",
+  );
+  assert.equal(
+    validate(
+      { VersionNo: "v1.5.5", PublishState: "Completed" },
+      { PackageVersion: "v1.5.4" },
+      "v1.5.5",
+      false,
+    ).Code,
+    0,
+    "stale prepared assets must not satisfy the exact contract",
+  );
+  assert.equal(
+    validate({ VersionNo: "v1.5.5", PublishState: "Completed" }, {}, "v1.5.5", false).Code,
+    0,
+    "PreparedAssets.PackageVersion is mandatory",
+  );
+  assert.equal(
+    validate({ VersionNo: "v1.5.5", PublishState: "Completed" }, assets, "", false).Code,
+    0,
+    "AppVersion is mandatory instead of silently defaulting to v1.0.0",
+  );
+  assert.equal(
+    validate({ VersionNo: "v1.5.5", PublishState: "Published" }, assets, "v1.5.5", true).Code,
+    0,
+    "protocol v3 remains Completed-only",
+  );
+});
+
+test("interrupted package repair resolves legacy exact against the single newest version row", () => {
   assert.match(
     publisherSource,
-    /var exactPublishedVersion = protocolV3[\s\S]*?V8\.Param\.ExactPublishedVersion === true[\s\S]*?requestedPublishedVersion !== latestPublishedVersion[\s\S]*?requestedPublishedVersion !== preparedPublishedVersion/,
+    /var exactPublishedVersion = protocolV3[\s\S]*?V8\.Param\.ExactPublishedVersion === true[\s\S]*?validateExactPublishedVersion\([\s\S]*?exactVersionRow,[\s\S]*?packageAssets,[\s\S]*?V8\.Param\.AppVersion/,
   );
   assert.match(
     publisherSource,
-    /var latestRequiredState = protocolV3 \? 'completed' : 'published';/,
+    /function getLatestVersion\(appId\)[\s\S]*?_OrderBy: 'CreateTime',[\s\S]*?_OrderByType: 'DESC',[\s\S]*?_PageSize: 1/,
+  );
+  assert.match(
+    publisherSource,
+    /var exactVersionRow = protocolV3 \? committedVersion : latestVersion;/,
   );
   assert.match(
     publisherSource,
@@ -286,7 +362,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.6\.4/);
+  assert.match(publisherSource, /Version: v1\.6\.5/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

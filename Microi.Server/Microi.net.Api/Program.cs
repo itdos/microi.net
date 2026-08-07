@@ -682,9 +682,9 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
             }
 
             // 多语言元数据延迟修复
-            try
+            _ = Task.Run(async () =>
             {
-                _ = Task.Run(async () =>
+                try
                 {
                     await Task.Delay(TimeSpan.FromMinutes(2));
                     var startupOsClients = OsClientExtend.ClientList.Keys
@@ -699,17 +699,22 @@ if (clientModel.OsClientModel["EnableSwagger"].Val<int>() == 1)
                             startupOsClients.Add(configOsClient);
                         }
                     }
+                    var queuedCount = 0;
+                    var failedCount = 0;
                     foreach (var item in startupOsClients)
                     {
-                        await MicroiEngine.FormEngine.RepairMissingDiyLangTranslationsAsync(item, "startup");
+                        var queueResult = DiyLangBackgroundTaskService.QueueStartupRepair(item);
+                        if (queueResult.Code == 1) queuedCount++;
+                        else failedCount++;
                     }
-                    Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 已排队同步 diy_lang 元数据与前端固定文案。");
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 排队同步 diy_lang 失败：{ex.Message}");
-            }
+                    Console.WriteLine(
+                        $"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 启动修复已投递持久后台任务；成功/复用={queuedCount}，失败={failedCount}。");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Microi：【多语言】{DateTime.Now:yyyy-MM-dd HH:mm:ss} 投递启动修复任务失败：{ex.Message}");
+                }
+            });
 
         });
     });

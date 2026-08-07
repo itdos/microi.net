@@ -1,7 +1,8 @@
 <template>
     <el-dropdown trigger="hover" class="international" @command="handleSetLanguage">
-        <div>
-            <span style="font-size: 13px;">{{ currentLabel }}</span>
+        <div class="international-trigger" :class="{ compact }">
+            <font-awesome-icon v-if="compact" icon="fa-solid fa-language" aria-hidden="true" />
+            <span v-else style="font-size: 13px;">{{ currentLabel }}</span>
         </div>
         <template #dropdown>
             <el-dropdown-menu style="max-height: 500px; overflow: auto">
@@ -31,6 +32,12 @@ import {
 
 export default {
     name: "LangSelect",
+    props: {
+        compact: {
+            type: Boolean,
+            default: false
+        }
+    },
     setup() {
         const appStore = useAppStore();
         const diyStore = useDiyStore();
@@ -133,6 +140,19 @@ export default {
 
     .language-icon {
         font-size: 20px;
+    }
+}
+.international-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    white-space: nowrap;
+
+    &.compact {
+        width: 30px;
+        height: 30px;
+        font-size: 17px;
     }
 }
 </style>

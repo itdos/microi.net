@@ -69,6 +69,18 @@ namespace Microi.net
             BackgroundTaskRuntime.IsCancellationRequestedHandler = IsCancellationRequested;
         }
 
+        public static bool IsReservedNativeWorkerKey(string apiEngineKey)
+        {
+            return string.Equals(
+                       apiEngineKey,
+                       DiyLangBackgroundTaskService.WorkerApiEngineKey,
+                       StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(
+                       apiEngineKey,
+                       DatabaseBackupService.WorkerApiEngineKey,
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
         public static BackgroundTaskItem StartApiEngine(
             string osClient,
             string userKey,
@@ -125,6 +137,7 @@ namespace Microi.net
             if (concurrencyKey.DosIsNullOrWhiteSpace()
                 && (string.Equals(apiEngineKey, "import-microi-store-package", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(apiEngineKey, DatabaseBackupService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(apiEngineKey, DiyLangBackgroundTaskService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)
                     || string.Equals(apiEngineKey, EmptyDatabaseReleaseService.WorkerApiEngineKey, StringComparison.OrdinalIgnoreCase)))
             {
                 concurrencyKey = apiEngineKey;
@@ -318,6 +331,23 @@ namespace Microi.net
             }
         }
 
+        internal static bool IsCurrentExecutionOwner(string taskId, long fencingToken)
+        {
+            if (taskId.DosIsNullOrWhiteSpace()
+                || !ActiveExecutions.TryGetValue(taskId, out var active)
+                || active.Cancellation.IsCancellationRequested
+                || active.LeaseLost
+                || active.Record.FencingToken != fencingToken)
+            {
+                return false;
+            }
+            return BackgroundTaskStore.IsLeaseCurrent(
+                active.Record.OsClient,
+                taskId,
+                active.Record.LeaseOwner,
+                fencingToken);
+        }
+
         public static async Task RunWorkerLoopAsync(CancellationToken stoppingToken)
         {
             var parallelism = Clamp(
@@ -480,7 +510,21 @@ namespace Microi.net
                     });
 
                     dynamic rawResult;
-                    if (string.Equals(item.ApiEngineKey, DatabaseBackupService.WorkerApiEngineKey,
+                    if (string.Equals(item.ApiEngineKey, DiyLangBackgroundTaskService.WorkerApiEngineKey,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        // diy_lang synchronization is platform-native work. The
+                        // durable envelope owns leases, fencing, retries and recovery;
+                        // FormEngine remains the synchronization implementation.
+                        rawResult = await DiyLangBackgroundTaskService.RunAsync(
+                                item.Id,
+                                item.FencingToken,
+                                param,
+                                trustedUser,
+                                cancellation.Token)
+                            .ConfigureAwait(false);
+                    }
+                    else if (string.Equals(item.ApiEngineKey, DatabaseBackupService.WorkerApiEngineKey,
                             StringComparison.OrdinalIgnoreCase))
                     {
                         // Database backup is a platform capability, not tenant V8

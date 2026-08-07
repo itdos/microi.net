@@ -253,6 +253,25 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
     assert.match(app, /self\.IsAnonymousRoute\(\) \|\| !self\.DiyCommon\.getToken\(\)/);
 });
 
+test("Authenticator 免密码登录使用独立安全弹层并兼顾移动端与无障碍", async () => {
+    const login = await readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8");
+
+    assert.match(login, /class="totp-login-shell"/);
+    assert.match(login, /modal-class="totp-login-modal"/);
+    assert.match(login, /class="totp-security-orb"/);
+    assert.match(login, /无密码安全验证/);
+    assert.match(login, /:global\(\.totp-login-shell\.el-dialog\)[\s\S]*?margin:\s*auto/);
+    assert.match(login, /autocomplete="username"/);
+    assert.match(login, /autocomplete="one-time-code"/);
+    assert.match(login, /inputmode="numeric"/);
+    assert.match(login, /@input="NormalizeTotpLoginCode"/);
+    assert.match(login, /验证码不留存/);
+    assert.match(login, /aria-busy="IdentityLoginWaiting === 'Totp' \? 'true' : 'false'"/);
+    assert.match(login, /this\.\$refs\.totpCodeInput/);
+    assert.match(login, /@media \(max-width: 520px\)[\s\S]*?\.totp-login-actions/);
+    assert.match(login, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.totp-security-orb i/);
+});
+
 test("登录方式弹层、宿主浮层收起和个人中心公开头像保持完整契约", async () => {
     const microAppRoot = new URL("../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTDos.Product.Internal/AI应用/microi-platform-service/src/", import.meta.url);
     const [login, headerSearch, host, microAppMain, personalSettings, profileController] = await Promise.all([
@@ -266,13 +285,18 @@ test("登录方式弹层、宿主浮层收起和个人中心公开头像保持�
 
     assert.match(login, /@media \(max-width: 600px\)[\s\S]*?\.login-method-bubbles\s*\{[\s\S]*?grid-template-columns: 1fr/);
     assert.match(headerSearch, /microi:close-global-overlays/);
+    assert.match(headerSearch, /handleClickOutside/);
+    assert.match(headerSearch, /@visible-change="handleVisibleChange"/);
     assert.match(host, /type === "micro-app:interaction"[\s\S]*?microi:close-global-overlays/);
-    assert.match(microAppMain, /pointerdown[\s\S]*?micro-app:interaction/);
+    assert.match(microAppMain, /pointerdown[\s\S]*?micro-app:interaction[\s\S]*?force:\s*true/);
+    assert.match(microAppMain, /micro-app:ready[\s\S]*?hostGeneration[\s\S]*?hostMountAttempt/);
     assert.match(personalSettings, /profile\.PublicAvatar/);
     assert.match(personalSettings, /path: 'member\/public-avatar'/);
     assert.match(personalSettings, /limit: false/);
     assert.match(personalSettings, /client\.resolveFileUrl\(user\.value\.Avatar\)/);
     assert.match(personalSettings, /identity-tech-banner\.jpg/);
+    assert.match(personalSettings, /terminalData\?\.Terminals/);
+    assert.match(personalSettings, /item\.ConnectionId\s*\|\|\s*item\.DeviceClientId/);
     assert.doesNotMatch(personalSettings, /MICROI IDENTITY CENTER/);
     assert.doesNotMatch(personalSettings, /window\.confirm/);
     assert.match(profileController, /public string PublicAvatar/);

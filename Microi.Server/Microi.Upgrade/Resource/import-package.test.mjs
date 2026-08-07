@@ -793,6 +793,25 @@ test("application-store package embeds the canonical publisher", () => {
   assert.match(publishSource, /Path: 'index\.html'/);
 });
 
+test("application-store import resource carries the strict legacy Completed compatibility gate", () => {
+  const packagePublisher = packageModel.SysApiEngines.find(
+    engine => engine.ApiEngineKey === "ai_app_publish_store"
+  );
+  assert.ok(packagePublisher);
+  assert.match(
+    packagePublisher.ApiV8Code,
+    /protocolV3\s*\? state === 'completed'\s*:\s*\(state === 'published' \|\| state === 'completed'\)/,
+  );
+  assert.match(
+    packagePublisher.ApiV8Code,
+    /requestedVersion !== latestVersion[\s\S]*?requestedVersion !== preparedVersion/,
+  );
+  assert.match(
+    packagePublisher.ApiV8Code,
+    /normalizeExactVersion\(packageAssets && packageAssets\.PackageVersion\)/,
+  );
+});
+
 test("stale application files use the Jint-safe DelFormData Ids contract", () => {
   const functionSource = source.match(
     /var pruneApplicationAssets = function \(appId, expectedPaths\) \{[\s\S]*?\n    \};/

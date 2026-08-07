@@ -2,9 +2,24 @@
     <div>
         <div
             id="divLogin"
-            :style="LoginBackgroundStyle"
+            :class="{
+                'is-wallpaper-transitioning': WallpaperTransitioning,
+                'is-theme-transitioning': ThemeTransitioning
+            }"
             :data-login-wallpaper="ActiveLoginWallpaperName"
         >
+            <div class="login-wallpaper-stage" aria-hidden="true">
+                <div
+                    v-if="PreviousLoginWallpaperUrl"
+                    class="login-wallpaper-layer login-wallpaper-layer--previous"
+                    :style="PreviousLoginBackgroundStyle"
+                />
+                <div
+                    class="login-wallpaper-layer login-wallpaper-layer--current"
+                    :style="LoginBackgroundStyle"
+                />
+                <span class="login-wallpaper-vignette" />
+            </div>
             <div class="divLoginCenter" :style="{ opacity: '1' }">
                 <div class="loginCenterBgCover" />
                 <div class="login-brand" :class="{ 'has-subtitle': !!SystemSubTitle }">
@@ -235,8 +250,8 @@
                         <button
                             type="button"
                             class="login-appearance-button login-wallpaper-trigger"
-                            :class="{ 'is-loading': WallpaperLoading }"
-                            :disabled="WallpaperLoading"
+                            :class="{ 'is-loading': WallpaperLoading || !!PreviousLoginWallpaperUrl }"
+                            :disabled="WallpaperLoading || !!PreviousLoginWallpaperUrl"
                             aria-label="随机更换登录壁纸"
                             title="随机更换登录壁纸"
                             @click="ChangeLoginWallpaper"
@@ -394,29 +409,97 @@
 
             <el-dialog
                 v-model="ShowTotpLogin"
-                width="420px"
+                width="470px"
                 :append-to-body="true"
                 title="Authenticator 免密码登录"
                 :close-on-click-modal="false"
+                :show-close="false"
                 align-center
+                class="totp-login-shell"
+                modal-class="totp-login-modal"
             >
-                <div class="totp-login-dialog">
-                    <p>输入账号与 Authenticator 中当前的 6 位动态口令，不需要输入密码。</p>
-                    <el-input v-model="TotpLoginAccount" autocomplete="username" placeholder="账号" clearable />
-                    <el-input
-                        v-model="TotpLoginCode"
-                        inputmode="numeric"
-                        autocomplete="one-time-code"
-                        maxlength="6"
-                        placeholder="6 位动态口令"
-                        clearable
-                        @keyup.enter="LoginWithTotp"
-                    />
-                </div>
-                <template #footer>
-                    <el-button @click="ShowTotpLogin = false">取消</el-button>
-                    <el-button type="primary" :loading="IdentityLoginWaiting === 'Totp'" @click="LoginWithTotp">安全登录</el-button>
+                <template #header>
+                    <div class="totp-login-header">
+                        <div class="totp-security-orb" aria-hidden="true">
+                            <span>6</span>
+                            <i />
+                        </div>
+                        <div class="totp-login-heading">
+                            <span>无密码安全验证</span>
+                            <h2>Authenticator 登录</h2>
+                            <p>输入当前动态口令，即可安全进入系统</p>
+                        </div>
+                        <button
+                            type="button"
+                            class="totp-login-close"
+                            aria-label="关闭 Authenticator 登录"
+                            title="关闭"
+                            @click="ShowTotpLogin = false"
+                        >
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    </div>
                 </template>
+                <div class="totp-login-dialog">
+                    <div class="totp-login-aurora" aria-hidden="true">
+                        <i /><i /><i />
+                    </div>
+                    <div class="totp-field">
+                        <label for="totp-login-account">登录账号</label>
+                        <el-input
+                            id="totp-login-account"
+                            ref="totpAccountInput"
+                            v-model="TotpLoginAccount"
+                            size="large"
+                            autocomplete="username"
+                            placeholder="请输入已绑定验证器的账号"
+                            clearable
+                        >
+                            <template #prefix><el-icon><User /></el-icon></template>
+                        </el-input>
+                    </div>
+                    <div class="totp-field totp-code-field">
+                        <div class="totp-field-label">
+                            <label for="totp-login-code">一次性动态口令</label>
+                            <span>每 30 秒更新</span>
+                        </div>
+                        <el-input
+                            id="totp-login-code"
+                            ref="totpCodeInput"
+                            v-model="TotpLoginCode"
+                            size="large"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength="6"
+                            placeholder="000 000"
+                            clearable
+                            @input="NormalizeTotpLoginCode"
+                            @keyup.enter="LoginWithTotp"
+                        >
+                            <template #prefix><el-icon><Lock /></el-icon></template>
+                        </el-input>
+                    </div>
+                    <div class="totp-security-notes" aria-label="安全说明">
+                        <span><el-icon><Check /></el-icon>免输密码</span>
+                        <span><el-icon><Check /></el-icon>动态口令</span>
+                        <span><el-icon><Check /></el-icon>验证码不留存</span>
+                    </div>
+                    <div class="totp-login-actions">
+                        <button type="button" class="totp-cancel-button" @click="ShowTotpLogin = false">取消</button>
+                        <button
+                            type="button"
+                            class="totp-submit-button"
+                            :disabled="IdentityLoginWaiting === 'Totp'"
+                            :aria-busy="IdentityLoginWaiting === 'Totp' ? 'true' : 'false'"
+                            @click="LoginWithTotp"
+                        >
+                            <span class="totp-submit-shine" aria-hidden="true" />
+                            <el-icon v-if="IdentityLoginWaiting === 'Totp'" class="is-loading"><Loading /></el-icon>
+                            <el-icon v-else><Unlock /></el-icon>
+                            <span>{{ IdentityLoginWaiting === 'Totp' ? '正在验证...' : '安全登录' }}</span>
+                        </button>
+                    </div>
+                </div>
             </el-dialog>
 
             <!-- 用户注册对话框 -->
@@ -668,6 +751,16 @@ export default {
                     : "none"
             };
         },
+        PreviousLoginBackgroundStyle() {
+            return {
+                backgroundImage: this.PreviousLoginWallpaperUrl
+                    ? `url(${JSON.stringify(this.PreviousLoginWallpaperUrl)})`
+                    : "none"
+            };
+        },
+        LoginThemeSignature() {
+            return String(this.diyStore?.themeColor || this.SysConfig?.ThemeColor || "#409eff").trim().toLowerCase();
+        },
         LoginMethodItems() {
             const capabilities = this.IdentityCapabilities || {};
             const methods = [];
@@ -749,8 +842,16 @@ export default {
             LoginWallpapers: [],
             ActiveLoginWallpaperUrl: "",
             ActiveLoginWallpaperName: "",
+            PreviousLoginWallpaperUrl: "",
+            WallpaperTransitioning: false,
+            WallpaperTransitionFrame: 0,
+            WallpaperTransitionTimer: 0,
             WallpaperLoading: false,
             WallpaperLoadVersion: 0,
+            ThemeTransitioning: false,
+            ThemeTransitionFrame: 0,
+            ThemeTransitionTimer: 0,
+            LoginVisualReady: false,
             LoginComponentUnmounted: false,
             tipId: "",
             redirect: undefined,
@@ -788,6 +889,10 @@ export default {
         window.removeEventListener("keydown", self.HandleLoginMethodsEscape);
         document.body.classList.remove("mci-login-methods-open");
         self.WallpaperLoadVersion += 1;
+        if (self.WallpaperTransitionFrame) cancelAnimationFrame(self.WallpaperTransitionFrame);
+        if (self.ThemeTransitionFrame) cancelAnimationFrame(self.ThemeTransitionFrame);
+        clearTimeout(self.WallpaperTransitionTimer);
+        clearTimeout(self.ThemeTransitionTimer);
         // 清理所有定时器，防止内存泄漏
         self.timers.forEach(function (timer) {
             clearInterval(timer);
@@ -817,6 +922,10 @@ export default {
         },
         SystemLogoUrl: function () {
             this.SystemLogoLoadFailed = false;
+        },
+        LoginThemeSignature: function (value, previousValue) {
+            if (!this.LoginVisualReady || !previousValue || value === previousValue) return;
+            this.PlayLoginThemeTransition();
         }
     },
     mounted() {
@@ -853,6 +962,7 @@ export default {
             self.RefreshCurrentAccountAvatar();
         }
         self.$nextTick(function () {
+            self.LoginVisualReady = true;
             if (self.DiyCommon.ShowVideo()) {
                 self.DiyCommon.LoadVideoLogin();
             }
@@ -977,6 +1087,13 @@ export default {
             this.TotpLoginAccount = this.Account || this.diyStore.getLastLoginAccount() || "";
             this.TotpLoginCode = "";
             this.ShowTotpLogin = true;
+            this.$nextTick(() => {
+                const target = this.TotpLoginAccount ? this.$refs.totpCodeInput : this.$refs.totpAccountInput;
+                target?.focus?.();
+            });
+        },
+        NormalizeTotpLoginCode(value) {
+            this.TotpLoginCode = String(value || "").replace(/\D/g, "").slice(0, 6);
         },
         async LoginWithTotp() {
             if (this.IdentityLoginWaiting || !this.ValidateIdentityLoginPolicy()) return;
@@ -1107,6 +1224,57 @@ export default {
                 image.src = url;
             });
         },
+        PrefersReducedLoginMotion() {
+            return typeof window !== "undefined"
+                && typeof window.matchMedia === "function"
+                && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        },
+        PlayLoginThemeTransition() {
+            if (this.PrefersReducedLoginMotion() || this.LoginComponentUnmounted) return;
+            if (this.ThemeTransitionFrame) cancelAnimationFrame(this.ThemeTransitionFrame);
+            clearTimeout(this.ThemeTransitionTimer);
+            this.ThemeTransitioning = false;
+            this.$nextTick(() => {
+                this.ThemeTransitionFrame = requestAnimationFrame(() => {
+                    this.ThemeTransitionFrame = 0;
+                    if (this.LoginComponentUnmounted) return;
+                    this.ThemeTransitioning = true;
+                    this.ThemeTransitionTimer = setTimeout(() => {
+                        this.ThemeTransitioning = false;
+                        this.ThemeTransitionTimer = 0;
+                    }, 720);
+                });
+            });
+        },
+        SetActiveLoginWallpaper(wallpaper) {
+            const nextUrl = String(wallpaper?.Url || "").trim();
+            if (!nextUrl) return false;
+            const previousUrl = this.LoginBackgroundUrl;
+            const shouldAnimate = !!previousUrl
+                && previousUrl !== nextUrl
+                && !this.PrefersReducedLoginMotion();
+
+            if (this.WallpaperTransitionFrame) cancelAnimationFrame(this.WallpaperTransitionFrame);
+            clearTimeout(this.WallpaperTransitionTimer);
+            this.PreviousLoginWallpaperUrl = shouldAnimate ? previousUrl : "";
+            this.WallpaperTransitioning = shouldAnimate;
+            this.ActiveLoginWallpaperUrl = nextUrl;
+            this.ActiveLoginWallpaperName = wallpaper?.Name || "";
+
+            if (!shouldAnimate) return true;
+            this.$nextTick(() => {
+                this.WallpaperTransitionFrame = requestAnimationFrame(() => {
+                    this.WallpaperTransitionFrame = 0;
+                    if (this.LoginComponentUnmounted) return;
+                    this.WallpaperTransitioning = false;
+                    this.WallpaperTransitionTimer = setTimeout(() => {
+                        this.PreviousLoginWallpaperUrl = "";
+                        this.WallpaperTransitionTimer = 0;
+                    }, 1040);
+                });
+            });
+            return true;
+        },
         async ApplyRandomLoginWallpaper(showEmptyTip = false) {
             var attemptedUrls = new Set();
             while (true) {
@@ -1117,8 +1285,7 @@ export default {
                 attemptedUrls.add(wallpaper.Url);
                 if (await this.PreloadLoginWallpaper(wallpaper.Url)) {
                     if (!this.LoginComponentUnmounted) {
-                        this.ActiveLoginWallpaperUrl = wallpaper.Url;
-                        this.ActiveLoginWallpaperName = wallpaper.Name;
+                        this.SetActiveLoginWallpaper(wallpaper);
                     }
                     return true;
                 }
@@ -1128,7 +1295,7 @@ export default {
             return false;
         },
         async ChangeLoginWallpaper() {
-            if (this.WallpaperLoading) return;
+            if (this.WallpaperLoading || this.PreviousLoginWallpaperUrl) return;
             if (this.LoginWallpapers.length === 0) {
                 await this.LoadLoginWallpapers(this.SysConfig, true);
                 return;
@@ -2682,14 +2849,371 @@ export default {
     display: flex;
 }
 
-.totp-login-dialog {
+:global(.totp-login-modal) {
+    background: rgba(2, 8, 23, 0.68) !important;
+    backdrop-filter: blur(15px) saturate(128%);
+    -webkit-backdrop-filter: blur(15px) saturate(128%);
+}
+
+:global(.totp-login-shell.el-dialog) {
+    width: 470px;
+    max-width: calc(100vw - 28px);
+    margin: auto;
+    overflow: hidden;
+    border: 1px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.3);
+    border-radius: 28px;
+    color: var(--el-text-color-primary, #172033);
+    background: rgba(255, 255, 255, 0.96);
+    background:
+        radial-gradient(circle at 95% -8%, rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.18), transparent 42%),
+        color-mix(in srgb, var(--el-bg-color, #fff) 96%, transparent);
+    box-shadow:
+        0 36px 100px rgba(2, 8, 23, 0.48),
+        0 0 48px rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.2),
+        inset 0 1px rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(28px) saturate(145%);
+    -webkit-backdrop-filter: blur(28px) saturate(145%);
+}
+
+:global(.totp-login-shell .el-dialog__header) {
+    margin: 0;
+    padding: 26px 28px 19px;
+    border-bottom: 1px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.12);
+}
+
+:global(.totp-login-shell .el-dialog__body) {
+    padding: 0;
+}
+
+:global(html[data-theme="dark"] .totp-login-shell.el-dialog) {
+    background:
+        radial-gradient(circle at 95% -8%, rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.2), transparent 42%),
+        rgba(13, 20, 35, 0.97);
+}
+
+.totp-login-header {
     display: grid;
-    gap: 14px;
+    grid-template-columns: 66px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 16px;
+    text-align: left;
+}
+
+.totp-security-orb {
+    width: 66px;
+    height: 66px;
+    position: relative;
+    display: grid;
+    place-items: center;
+    border-radius: 22px;
+    color: var(--mci-text-on-primary, #fff);
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.3), transparent 42%),
+        var(--mci-gradient-primary, linear-gradient(135deg, #6c2bd9, #2196f3));
+    box-shadow:
+        0 16px 34px rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.34),
+        inset 0 1px rgba(255, 255, 255, 0.5);
+
+    span {
+        position: relative;
+        z-index: 1;
+        font-size: 27px;
+        font-weight: 900;
+        line-height: 1;
+        text-shadow: 0 2px 8px rgba(3, 8, 28, 0.28);
+    }
+
+    i {
+        position: absolute;
+        inset: -7px;
+        border: 1px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.3);
+        border-radius: 26px;
+        opacity: 0.8;
+        animation: mciTotpOrbPulse 2.8s ease-in-out infinite;
+    }
+}
+
+.totp-login-heading {
+    min-width: 0;
+
+    > span {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+    }
+
+    h2 {
+        margin: 0;
+        color: var(--el-text-color-primary, #172033);
+        font-size: 23px;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+    }
 
     p {
-        margin: 0 0 2px;
-        color: var(--el-text-color-secondary);
-        line-height: 1.7;
+        margin: 5px 0 0;
+        color: var(--el-text-color-secondary, #64748b);
+        font-size: 12px;
+        line-height: 1.5;
+    }
+}
+
+.totp-login-close {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--el-border-color-lighter, #e8ecf3);
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    align-self: start;
+    color: var(--el-text-color-secondary, #64748b);
+    background: var(--el-fill-color-light, rgba(241, 245, 249, 0.76));
+    cursor: pointer;
+    transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+
+    span {
+        font-size: 24px;
+        font-weight: 300;
+        line-height: 1;
+        transform: translateY(-1px);
+    }
+
+    &:hover,
+    &:focus-visible {
+        color: var(--el-color-primary, #409eff);
+        background: rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.1);
+        transform: rotate(5deg);
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.42);
+        outline-offset: 2px;
+    }
+}
+
+.totp-login-dialog {
+    position: relative;
+    display: grid;
+    gap: 18px;
+    padding: 24px 28px 28px;
+    overflow: hidden;
+    text-align: left;
+
+    > :not(.totp-login-aurora) {
+        position: relative;
+        z-index: 1;
+    }
+}
+
+.totp-login-aurora {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+
+    i {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(34px);
+        opacity: 0.14;
+    }
+
+    i:nth-child(1) { width: 130px; height: 130px; top: -70px; right: 4%; background: var(--mci-color-primary, #409eff); }
+    i:nth-child(2) { width: 90px; height: 90px; bottom: 4%; left: -40px; background: #9b63e8; }
+    i:nth-child(3) { width: 72px; height: 72px; right: 12%; bottom: -42px; background: #24c7af; }
+}
+
+.totp-field {
+    display: grid;
+    gap: 8px;
+
+    label {
+        color: var(--el-text-color-regular, #334155);
+        font-size: 13px;
+        font-weight: 750;
+    }
+
+    :deep(.el-input__wrapper) {
+        min-height: 50px;
+        padding: 1px 15px;
+        border: 1px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.15);
+        border-radius: 15px;
+        background: var(--el-fill-color-blank, rgba(255, 255, 255, 0.9));
+        box-shadow: 0 8px 22px rgba(13, 24, 50, 0.07);
+        transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+
+    :deep(.el-input__wrapper:hover) {
+        border-color: rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.42);
+    }
+
+    :deep(.el-input__wrapper.is-focus) {
+        border-color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+        box-shadow:
+            0 0 0 4px rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.12),
+            0 10px 26px rgba(13, 24, 50, 0.1);
+        transform: translateY(-1px);
+    }
+
+    :deep(.el-input__prefix) {
+        color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+        font-size: 18px;
+    }
+}
+
+.totp-field-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+
+    span {
+        color: var(--el-text-color-placeholder, #94a3b8);
+        font-size: 11px;
+    }
+}
+
+.totp-code-field :deep(.el-input__inner) {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.32em;
+    font-variant-numeric: tabular-nums;
+}
+
+.totp-security-notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    span {
+        min-height: 28px;
+        padding: 0 10px;
+        border: 1px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.13);
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: var(--el-text-color-secondary, #64748b);
+        background: rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.06);
+        font-size: 11px;
+        font-weight: 650;
+    }
+
+    .el-icon {
+        color: var(--el-color-success, #22a06b);
+        font-size: 13px;
+    }
+}
+
+.totp-login-actions {
+    display: grid;
+    grid-template-columns: 106px minmax(0, 1fr);
+    gap: 12px;
+    margin-top: 2px;
+
+    button {
+        min-height: 48px;
+        border-radius: 15px;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 800;
+        cursor: pointer;
+    }
+}
+
+.totp-cancel-button {
+    border: 1px solid var(--el-border-color, #d8dee9);
+    color: var(--el-text-color-regular, #334155);
+    background: var(--el-fill-color-blank, rgba(255, 255, 255, 0.86));
+    transition: border-color 180ms ease, color 180ms ease, transform 180ms ease;
+
+    &:hover,
+    &:focus-visible {
+        border-color: rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.48);
+        color: var(--mci-color-primary, var(--el-color-primary, #409eff));
+        transform: translateY(-1px);
+    }
+}
+
+.totp-submit-button {
+    position: relative;
+    overflow: hidden;
+    border: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--mci-text-on-primary, #fff);
+    background: var(--mci-gradient-primary, linear-gradient(135deg, #6c2bd9, #2196f3));
+    box-shadow: 0 14px 30px rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.3);
+    transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+
+    > :not(.totp-submit-shine) {
+        position: relative;
+        z-index: 1;
+    }
+
+    &:hover:not(:disabled),
+    &:focus-visible:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 38px rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.4);
+    }
+
+    &:focus-visible {
+        outline: 2px solid rgba(var(--mci-color-primary-rgb, 64, 158, 255), 0.52);
+        outline-offset: 3px;
+    }
+
+    &:disabled {
+        cursor: wait;
+        opacity: 0.72;
+    }
+}
+
+.totp-submit-shine {
+    width: 42%;
+    height: 180%;
+    position: absolute;
+    top: -40%;
+    left: -55%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.46), transparent);
+    transform: skewX(-18deg);
+    animation: mciTotpSubmitShine 2.8s ease-in-out infinite;
+}
+
+@media (max-width: 520px) {
+    :global(.totp-login-shell .el-dialog__header) {
+        padding: 22px 20px 17px;
+    }
+
+    .totp-login-header {
+        grid-template-columns: 54px minmax(0, 1fr) 44px;
+        gap: 12px;
+    }
+
+    .totp-security-orb {
+        width: 54px;
+        height: 54px;
+        border-radius: 18px;
+
+        i { border-radius: 22px; }
+    }
+
+    .totp-login-heading h2 { font-size: 19px; }
+    .totp-login-heading p { font-size: 11px; }
+
+    .totp-login-dialog {
+        gap: 16px;
+        padding: 21px 20px 22px;
+    }
+
+    .totp-login-actions {
+        grid-template-columns: 88px minmax(0, 1fr);
     }
 }
 
@@ -3233,6 +3757,7 @@ export default {
     --mci-login-card-shadow-mobile: 0 18px 46px rgba(3, 9, 28, 0.46), 0 0 32px rgba(var(--mci-login-primary-rgb), 0.28), 0 0 58px rgba(var(--mci-login-primary-rgb), 0.2);
     font-size: 12px;
     position: fixed;
+    isolation: isolate;
     background-color: var(--taskbar-color);
     width: 100%;
     height: 100%;
@@ -3244,9 +3769,23 @@ export default {
     transition: opacity 0.7s ease;
     overflow: hidden;
     display: block !important;
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center;
+
+    &::after {
+        content: "";
+        position: absolute;
+        inset: -18%;
+        z-index: 1;
+        pointer-events: none;
+        opacity: 0;
+        background:
+            radial-gradient(circle at 18% 78%, rgba(var(--mci-login-primary-rgb), 0.3), transparent 31%),
+            radial-gradient(circle at 82% 18%, rgba(var(--mci-login-primary-rgb), 0.38), transparent 34%);
+        transform: scale(0.82) rotate(-4deg);
+    }
+
+    &.is-theme-transitioning::after {
+        animation: mciLoginThemeWash 720ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+    }
 
     .login-title {
         font-size: 28px;
@@ -3271,7 +3810,7 @@ export default {
         position: absolute;
         top: 50%;
         left: 50%;
-        z-index: 1;
+        z-index: 3;
         transform: translate(-50%, -50%);
         margin-top: 0 !important;
         transition: opacity 0.7s ease;
@@ -3403,6 +3942,7 @@ export default {
     width: 400px;
     height: auto;
     position: fixed;
+    z-index: 2;
     transition: all 0.7s ease;
     
     p {
@@ -3535,6 +4075,45 @@ export default {
     }
 }
 
+@keyframes mciLoginThemeWash {
+    0% {
+        opacity: 0;
+        transform: scale(0.82) rotate(-4deg);
+    }
+    42% {
+        opacity: 0.7;
+    }
+    100% {
+        opacity: 0;
+        transform: scale(1.16) rotate(3deg);
+    }
+}
+
+@keyframes mciTotpOrbPulse {
+    0%, 100% {
+        opacity: 0.34;
+        transform: scale(0.92);
+    }
+    50% {
+        opacity: 0.86;
+        transform: scale(1.04);
+    }
+}
+
+@keyframes mciTotpSubmitShine {
+    0%, 34% {
+        opacity: 0;
+        transform: translateX(0) skewX(-18deg);
+    }
+    48% {
+        opacity: 0.9;
+    }
+    72%, 100% {
+        opacity: 0;
+        transform: translateX(420%) skewX(-18deg);
+    }
+}
+
 .divLoginCenter {
     animation: fadeInUp 0.6s ease-out;
 }
@@ -3548,12 +4127,20 @@ export default {
     .login-method-bubble,
     .login-button-energy::after,
     .login-button-energy-beam,
+    .totp-security-orb i,
+    .totp-submit-shine,
     .is-loading {
         animation: none !important;
     }
 
-    .remember-password-checkbox {
+    .remember-password-checkbox,
+    .login-wallpaper-layer--current {
         transition: none !important;
+    }
+
+    #divLogin.is-theme-transitioning::after {
+        animation: none !important;
+        opacity: 0 !important;
     }
 
     .login-button:hover:not(:disabled),
@@ -3570,6 +4157,55 @@ export default {
     .login-methods-modal-leave-active .login-methods-panel {
         transition-duration: 1ms !important;
     }
+}
+
+.login-wallpaper-stage {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: var(--taskbar-color);
+    pointer-events: none;
+}
+
+.login-wallpaper-layer {
+    position: absolute;
+    inset: -2%;
+    background-color: var(--taskbar-color);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    will-change: opacity, transform;
+}
+
+.login-wallpaper-layer--previous {
+    z-index: 0;
+    opacity: 1;
+    transform: scale(1.018);
+}
+
+.login-wallpaper-layer--current {
+    z-index: 1;
+    opacity: 1;
+    transform: scale(1.018);
+    transition:
+        opacity 760ms cubic-bezier(0.22, 0.72, 0.24, 1),
+        transform 980ms cubic-bezier(0.22, 0.72, 0.24, 1);
+}
+
+#divLogin.is-wallpaper-transitioning .login-wallpaper-layer--current {
+    opacity: 0;
+    transform: scale(1.065);
+    transition: none;
+}
+
+.login-wallpaper-vignette {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background:
+        linear-gradient(120deg, rgba(1, 7, 20, 0.12), transparent 42%),
+        radial-gradient(circle at center, transparent 56%, rgba(1, 7, 20, 0.18) 100%);
 }
 
 @media (max-width: 820px) {

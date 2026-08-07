@@ -194,6 +194,16 @@ test("login SFC wires branding, remembered accounts, classic default, and AI mot
     assert.match(component, /class="login-appearance-button login-wallpaper-trigger"/);
     assert.match(component, /\/api\/FormEngine\/GetLoginWallpapers/);
     assert.match(component, /LoginBgImgRandom/);
+    assert.match(component, /class="login-wallpaper-stage"/);
+    assert.match(component, /class="login-wallpaper-layer login-wallpaper-layer--previous"/);
+    assert.match(component, /class="login-wallpaper-layer login-wallpaper-layer--current"/);
+    assert.match(component, /SetActiveLoginWallpaper\(wallpaper\)/);
+    assert.match(component, /PreviousLoginWallpaperUrl = shouldAnimate \? previousUrl : ""/);
+    assert.match(component, /PrefersReducedLoginMotion\(\)/);
+    assert.match(component, /#divLogin\.is-wallpaper-transitioning \.login-wallpaper-layer--current/);
+    assert.match(component, /mciLoginThemeWash/);
+    assert.match(component, /LoginThemeSignature\(\)[\s\S]*?ThemeColor \|\| "#409eff"/);
+    assert.match(component, /LoginThemeSignature:[\s\S]*?PlayLoginThemeTransition\(\)/);
     assert.match(component, /--mci-login-input-text:\s*#1f2937/);
     assert.match(component, /\.el-input__inner\s*\{[\s\S]*?color:\s*var\(--mci-login-input-text\) !important/);
     assert.match(component, /\.el-input__wrapper\s*\{[\s\S]*?border:\s*0;[\s\S]*?overflow:\s*hidden;/);
