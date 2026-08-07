@@ -423,7 +423,7 @@ export const businessModules = {
     lines: [{ label: '级数', field: 'Paixu' }, { label: '更换周期', field: 'GenghuanZQ' }, { label: '单价', field: 'LvxinDJ', format: 'money' }]
   }),
   attendanceRecords: native({
-    title: '打卡记录', table: 'Diy_location', menuAliases: ['打卡记录', '拜访打卡'],
+    title: '打卡记录', table: 'Diy_location', menuAliases: ['打卡记录', '拜访打卡', '人员定位'],
     fileMenuAliases: ['人员定位'],
     titleField: 'BaifangDX', tagFields: ['DakaR'],
     lines: [{ label: '打卡人', field: 'DakaR' }, { label: '打卡时间', field: 'DakaSJ', format: 'datetime' }, { label: '打卡地点', field: 'DakaDD' }],
