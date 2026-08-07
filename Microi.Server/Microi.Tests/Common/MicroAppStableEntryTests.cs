@@ -181,6 +181,22 @@ public class MicroAppStableEntryTests
     }
 
     [Fact]
+    public void RuntimePageProjection_HandlesJValueEnableFlagWithoutDynamicDispatch()
+    {
+        var method = typeof(MicroAppController).GetMethod(
+            "ToEnabledPage",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var enabled = JObject.FromObject(new { PageKey = "personal-settings", IsEnable = 1 });
+        var disabled = JObject.FromObject(new { PageKey = "disabled-page", IsEnable = 0 });
+
+        var enabledResult = Assert.IsType<JObject>(method!.Invoke(null, new object[] { enabled }));
+        Assert.Equal("personal-settings", enabledResult["PageKey"]?.Value<string>());
+        Assert.Null(method.Invoke(null, new object[] { disabled }));
+    }
+
+    [Fact]
     public void RuntimeResolve_DoesNotLoadCompiledAssetPayloads()
     {
         var method = typeof(MicroAppController).GetMethod(
