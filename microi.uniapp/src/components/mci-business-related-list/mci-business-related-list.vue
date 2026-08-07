@@ -184,6 +184,7 @@ import {
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { loadNativeFormDefinition, loadNativeTableModel, parseJson } from '@/platform/native-form.js'
+import { buildTableChildDefaultValues } from '@/platform/table-child-defaults.js'
 import { V8, getUser, post } from '@/utils/request.js'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import MciTaskCard from '@/components/mci-task-card/mci-task-card.vue'
@@ -1017,12 +1018,12 @@ export default {
       }
     },
     callbackDefaults() {
-      const result = { [this.childFkField]: this.relationValue }
-      const callbacks = parseJson(this.fieldConfig.TableChildCallbackField, [])
-      ;(Array.isArray(callbacks) ? callbacks : []).forEach((item) => {
-        const father = item.Father || item.father
-        const child = item.Child || item.child
-        if (father && child && this.parentForm[father] !== undefined) result[child] = this.parentForm[father]
+      // zhy：同时读取新版 FieldRelations 和旧版 TableChildCallbackField，避免配置升级后客户名称默认值丢失。
+      const result = buildTableChildDefaultValues({
+        fieldConfig: this.fieldConfig,
+        parentForm: this.parentForm,
+        childFkField: this.childFkField,
+        relationValue: this.relationValue
       })
       if (this.moduleKey === 'customerCare') {
         const rawContacts = parseJson(this.parentForm.BeibaiFR, this.parentForm.BeibaiFR)
