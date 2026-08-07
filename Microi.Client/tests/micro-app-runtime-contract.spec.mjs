@@ -101,6 +101,13 @@ test("page host automatically heals one stuck first mount and then exposes a sta
     assert.match(host, /autoMountRetryCount\s*<\s*1/);
     assert.match(host, /unmountApp\(this\.microAppName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
     assert.match(host, /MICRO_APP_MOUNT_TIMEOUT/);
+    assert.match(host, /micro-app:ready/);
+    assert.match(host, /startContentWatchdog/);
+    assert.match(host, /hasRenderableMicroAppContent/);
+    assert.match(host, /MICRO_APP_CONTENT_EMPTY/);
+    assert.match(host, /hostGeneration:\s*this\.resolveGeneration/);
+    assert.match(host, /hostMountAttempt:\s*this\.retryKey/);
+    assert.match(host, /readyAttempt\s*!==\s*this\.retryKey/);
     assert.match(host, /resolveGeneration/);
 });
 

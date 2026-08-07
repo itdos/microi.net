@@ -375,7 +375,6 @@ namespace Microi.net.Api
         [PlatformAdminOnly]
         public async Task<JsonResult> SyncLangMetadata([FromBody] JObject param = null)
         {
-            var requestedOsClient = param?["OsClient"].Val<string>();
             var requestedSource = param?["Source"].Val<string>();
             var requestedForce = param?["Force"].Val<string>();
             var requestedOnlyFillMissing = param?["OnlyFillMissing"].Val<string>();
@@ -404,10 +403,6 @@ namespace Microi.net.Api
                 requestedOnlyFillMissing = Request.Query["OnlyFillMissing"].ToString();
             }
             param = await DefaultParam(param);
-            if (!requestedOsClient.DosIsNullOrWhiteSpace())
-            {
-                param["OsClient"] = requestedOsClient;
-            }
             if (!requestedSource.DosIsNullOrWhiteSpace())
             {
                 param["Source"] = requestedSource;
@@ -439,21 +434,25 @@ namespace Microi.net.Api
                 source = "api";
             }
             var osClient = param["OsClient"].Val<string>();
-            if (force)
+            var queuedResult = DiyLangBackgroundTaskService.QueueManualSync(
+                param["_CurrentUser"] as JObject,
+                osClient,
+                includeClientText,
+                source,
+                force,
+                onlyFillMissing);
+            if (!wait || queuedResult.Code != 1)
             {
-                MicroiEngine.FormEngine.ResetDiyLangFullSync(osClient, source);
+                return Json(queuedResult);
             }
-            var reloadResult = MicroiEngine.FormEngine.ReloadDiyLangRuntimeConfig(osClient);
-            if (reloadResult.Code != 1)
-            {
-                return Json(reloadResult);
-            }
-            var result = onlyFillMissing
-                ? await MicroiEngine.FormEngine.RepairMissingDiyLangTranslationsAsync(osClient, source)
-                : wait
-                ? await MicroiEngine.FormEngine.SyncDiyLangFullAsync(osClient, includeClientText, source)
-                : MicroiEngine.FormEngine.QueueDiyLangFullSync(osClient, includeClientText, source);
-            return Json(result);
+            var queuedData = queuedResult.Data == null
+                ? new JObject()
+                : JObject.FromObject(queuedResult.Data);
+            return Json(await DiyLangBackgroundTaskService.WaitForCompletionAsync(
+                osClient,
+                queuedData["TaskId"]?.ToString(),
+                TimeSpan.FromSeconds(30),
+                HttpContext.RequestAborted));
         }
 
         [HttpPost, HttpGet]

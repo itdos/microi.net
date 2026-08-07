@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.6.4
+ * Version: v1.6.5
  * Function:
  * - 统一生成应用商城安装包；v3 发布以已提交指针证明做原子绑定，并生成接口引擎资源所有权策略。
  */
@@ -65,6 +65,41 @@ function normalizeVersion(value) {
   var match = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/i.exec(version);
   if (!match) return 'v1.0.0';
   return 'v' + parseInt(match[1] || '1', 10) + '.' + parseInt(match[2] || '0', 10) + '.' + parseInt(match[3] || '0', 10);
+}
+function normalizeExactVersion(value) {
+  var version = text(value).replace(/^\s+|\s+$/g, '');
+  var match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  if (!match) return '';
+  return 'v' + parseInt(match[1], 10) + '.' + parseInt(match[2], 10) + '.' + parseInt(match[3], 10);
+}
+/*
+ * 旧发布器曾把不可变版本终态写为 Published；v3 finalize 写为 Completed。
+ * legacy ExactPublishedVersion 只兼容这两个成功终态，且调用方仍须同时命中
+ * 最新版本行和 PreparedAssets.PackageVersion，不能复用失败、处理中或旧版本资产。
+ */
+function validateExactPublishedVersion(versionRow, packageAssets, requestedVersionValue, protocolV3) {
+  var state = text(versionRow && (versionRow.PublishState || versionRow.Status))
+    .replace(/^\s+|\s+$/g, '')
+    .toLowerCase();
+  var acceptedState = protocolV3
+    ? state === 'completed'
+    : (state === 'published' || state === 'completed');
+  if (!versionRow || !acceptedState) {
+    return fail('ExactPublishedVersion=true 时最新不可变版本必须为 '
+      + (protocolV3 ? 'Completed' : 'Published 或 Completed')
+      + '，actual=' + (state || '(empty)'));
+  }
+
+  var requestedVersion = normalizeExactVersion(requestedVersionValue);
+  var latestVersion = normalizeExactVersion(versionRow.VersionNo || versionRow.VersionName || '');
+  var preparedVersion = normalizeExactVersion(packageAssets && packageAssets.PackageVersion);
+  if (isBlank(requestedVersion)
+      || requestedVersion !== latestVersion
+      || requestedVersion !== preparedVersion) {
+    return fail('ExactPublishedVersion 版本合同不一致：requested=' + requestedVersion
+      + ' latest=' + latestVersion + ' prepared=' + preparedVersion);
+  }
+  return ok({ AppVersion: requestedVersion }, 'ExactPublishedVersion 版本合同验证通过');
 }
 function highestVersion(values) {
   var selected = 'v1.0.0';
@@ -691,28 +726,24 @@ var buildAssets = [];
 var infrastructure = getApplicationInfrastructure();
 // 微服务以真实运行态 BuildVersion 为准；其它应用比较最近构建版本与商城
 // 语义版本，既不接受旧调用参数降级，也不把 v3.0.0 降成构建流水号 v1.0.4。
-// 发布编排器在“不可变版本已经 Published、仅安装包阶段中断”时可显式复用
-// 该最高不可变版本。门禁同时要求 PreparedAssets.PackageVersion 和最新
-// Published 版本一致，因此不能借此回退到旧资产或覆盖更高的不可变版本。
+// 发布编排器在“最新不可变版本已成功完成、仅安装包阶段中断”时可显式复用。
+// legacy 同时兼容历史 Published 与 v3 Completed 终态；门禁仍要求
+// PreparedAssets.PackageVersion、调用 AppVersion 和最新版本完全一致。
 var exactPublishedVersion = protocolV3
   || V8.Param.ExactPublishedVersion === true
   || V8.Param.ExactPublishedVersion === 1
   || text(V8.Param.ExactPublishedVersion).toLowerCase() === 'true';
-var requestedPublishedVersion = normalizeVersion(V8.Param.AppVersion || '');
+var requestedPublishedVersion = '';
 if (exactPublishedVersion) {
   var exactVersionRow = protocolV3 ? committedVersion : latestVersion;
-  var latestPublishedVersion = exactVersionRow ? normalizeVersion(exactVersionRow.VersionNo || exactVersionRow.VersionName || '') : '';
-  var preparedPublishedVersion = packageAssets ? normalizeVersion(packageAssets.PackageVersion || '') : '';
-  var latestRequiredState = protocolV3 ? 'completed' : 'published';
-  if (!exactVersionRow || text(exactVersionRow.PublishState || exactVersionRow.Status).toLowerCase() !== latestRequiredState) {
-    return fail('ExactPublishedVersion=true 时最新不可变版本必须为 ' + (protocolV3 ? 'Completed' : 'Published'));
-  }
-  if (isBlank(requestedPublishedVersion)
-      || requestedPublishedVersion !== latestPublishedVersion
-      || requestedPublishedVersion !== preparedPublishedVersion) {
-    return fail('ExactPublishedVersion 版本合同不一致：requested=' + requestedPublishedVersion
-      + ' latest=' + latestPublishedVersion + ' prepared=' + preparedPublishedVersion);
-  }
+  var exactVersionValidation = validateExactPublishedVersion(
+    exactVersionRow,
+    packageAssets,
+    V8.Param.AppVersion,
+    protocolV3
+  );
+  if (!exactVersionValidation || exactVersionValidation.Code !== 1) return exactVersionValidation;
+  requestedPublishedVersion = exactVersionValidation.Data.AppVersion;
 }
 var versionNo = exactPublishedVersion
   ? requestedPublishedVersion
