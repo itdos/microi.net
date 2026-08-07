@@ -239,7 +239,7 @@ public class SaaSRuntimeConfigurationTests
         var source = File.ReadAllText(Path.Combine(root,
             relativePath.Replace('/', Path.DirectorySeparatorChar)));
         var block = Regex.Match(source,
-            @"microi-install-api:\s*[\s\S]*?\n\s+environment:\s*(?<environment>[\s\S]*?)\n\s+volumes:");
+            @"cat > ""\$\{APP_DIR\}/docker-compose\.yml"" <<EOF[\s\S]*?microi-install-api:\s*[\s\S]*?\n\s+environment:\s*(?<environment>[\s\S]*?)\n\s+volumes:");
         Assert.True(block.Success, "未找到 microi-install-api.environment 编排块。");
 
         var keys = Regex.Matches(block.Groups["environment"].Value,
@@ -352,6 +352,46 @@ public class SaaSRuntimeConfigurationTests
         Assert.Equal(
             headerVersion.Groups["version"].Value,
             runtimeVersion.Groups["version"].Value);
+    }
+
+    [Fact]
+    public void OfficialInstaller_AppRepairPreservesDataAndUsesDockerDns()
+    {
+        var root = FindRepositoryRoot();
+        var installer = File.ReadAllText(Path.Combine(
+            root, "数据库、案例、文档、资料", "install-microi.sh"));
+        var dockerDocument = File.ReadAllText(Path.Combine(
+            root, "microi.doc", "docs", "doc", "getting-started", "docker-run.md"));
+
+        Assert.Contains("if [ \"${1:-}\" = '--repair-app' ]", installer);
+        Assert.Contains("repair_migrate_app_to_internal_network", installer);
+        Assert.Contains("repair_validate_runtime_environment", installer);
+        Assert.Contains("repair_restore_previous_app_images", installer);
+        Assert.Contains(".repair-backups", installer);
+        Assert.Contains(
+            "docker rm -f microi-install-api microi-install-client",
+            installer);
+        Assert.DoesNotContain("docker rm -f microi-install-redis", installer);
+        Assert.DoesNotContain("docker rm -f microi-install-mongodb", installer);
+        Assert.DoesNotContain("docker rm -f microi-install-minio", installer);
+        Assert.Contains("'/api/Diagnostics/liveness' 'liveness' 180", installer);
+        Assert.Contains("'/api/Diagnostics/health' 'readiness' 180", installer);
+
+        Assert.Contains("OsClientRedisHost=microi-install-redis", installer);
+        Assert.Contains("OsClientRedisPort=6379", installer);
+        Assert.Contains("@microi-install-mongodb:27017/", installer);
+        Assert.Contains("MINIO_INTERNAL_ENDPOINT=\"microi-install-minio:9000\"", installer);
+        Assert.Contains("Data Source=${DATABASE_CONTAINER_NAME}", installer);
+        Assert.Contains("Port=${DATABASE_INTERNAL_PORT}", installer);
+        Assert.DoesNotContain("OsClientRedisHost=${LAN_IP}", installer);
+        Assert.DoesNotContain("@${LAN_IP}:${MONGO_PORT}/", installer);
+        Assert.DoesNotContain("Data Source=${LAN_IP}", installer);
+
+        Assert.Contains("一键更新/修复 **API 与 Web 前端**", dockerDocument);
+        Assert.Contains("bash install-microi.sh --repair-app", dockerDocument);
+        Assert.Contains("microi-install-redis:6379", dockerDocument);
+        Assert.Contains("容器内的 `127.0.0.1` / `localhost`", dockerDocument);
+        Assert.DoesNotContain("APP_DIR=/microi/compose/microi-install-app", dockerDocument);
     }
 
     [Fact]
