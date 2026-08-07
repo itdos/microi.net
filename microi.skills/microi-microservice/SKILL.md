@@ -79,6 +79,9 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 创建/更新元数据：`microi_create_microservice`。
 - 同步私有源码：`microi_sync_microservice_source`。
 - 真实编译目录优先 `microi_publish_application_directory_stream` 流式发布。
+- 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。
+- 私有源码同步使用 `ReplacePrivateSourceOnly` 精确清理过期源码；兼容调用可以继续接受 `replace`，但实现不得用旧式全表 `Replace=true` 删除同一应用的公有运行产物元数据。
+- `mci_ai_app_file` 同时存在私有源码和公有编译产物。源码拉取/差异比较必须优先按 `StorageScope=PublicBuildStream|PublicBuildStreamArchived|PublicBuildOnly` 排除公有产物，并保留旧数据中 `HdfsPath == PublishHdfsPath` 的兼容判断；不能仅靠两个路径相等识别，否则版本路径与稳定别名不同的流式产物会被误读成私有源码。
 - 只有服务器不支持流式端点且产物很小时，才兼容 `microi_publish_microservice`。
 - 正常发布支持最多 20,000 个文件、总计 20GB；逐文件从磁盘流入 HDFS，不生成整包 Buffer/Base64。几百 MB、1GB 级项目不得自动降级到旧 Base64 发布器。
 - `StorageMode=db` 仅是显式的小型应急恢复模式，不是正常发布容量；当前最多 256 文件/5MB。超过该边界必须修复租户 HDFS/网关并恢复流式文件模式，不能调大数据库内联上限来承载大项目。
@@ -138,6 +141,7 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 ## 验收
 
 - 源码、构建文件、运行时、页面路由和菜单五层分别回读。
+- 组合发布成功前，私有源码回读必须与本地源码在路径集合、文件数、字节数、逐文件 SHA-256 和规范化清单哈希上完全一致；任何缺失、多余或读取错误都要阻止运行版本切换。
 - 直接刷新友好路由与连续切换多个微应用不 404、白屏或实例名冲突。
 - Dialog/Drawer 成功、取消、错误和关闭协议正确。
 - 宿主 API 请求携带当前 Token/OsClient/菜单上下文，普通用户权限正确。

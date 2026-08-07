@@ -8,6 +8,7 @@ using Dos.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Microi.net
 {
@@ -1493,8 +1494,9 @@ namespace Microi.net
                             // 先用旧行补齐客户端未传字段，再合并显式 null，保持历史的
                             // “只改传入字段”语义，最后在同一事务中批量更新。
                             var oldFieldObject = JObject.FromObject(oldModel);
+                            var mergePatch = NormalizeDiyFieldPatchForMerge(newField);
                             oldFieldObject.Merge(
-                                newField,
+                                mergePatch,
                                 new JsonMergeSettings
                                 {
                                     MergeArrayHandling = MergeArrayHandling.Replace,
@@ -1600,6 +1602,41 @@ namespace Microi.net
                     StackTrace = ex.StackTrace
                 });
             }
+        }
+
+        internal static JObject NormalizeDiyFieldPatchForMerge(JObject source)
+        {
+            var patch = source == null
+                ? new JObject()
+                : (JObject)source.DeepClone();
+
+            foreach (var property in patch.Properties().ToList())
+            {
+                if (property.Value.Type != JTokenType.Null
+                    && property.Value.Type != JTokenType.Undefined)
+                {
+                    continue;
+                }
+
+                var modelProperty = typeof(DiyField).GetProperty(
+                    property.Name,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (modelProperty == null)
+                {
+                    continue;
+                }
+
+                var propertyType = modelProperty.PropertyType;
+                if (propertyType.IsValueType && Nullable.GetUnderlyingType(propertyType) == null)
+                {
+                    // Vue 表单会把未设置的整数、布尔兼容字段序列化为 null。
+                    // 对非 nullable 值类型忽略该 null 并保留数据库旧值；字符串和
+                    // Nullable<T> 仍允许显式清空，维持设计器的历史更新语义。
+                    property.Remove();
+                }
+            }
+
+            return patch;
         }
         /// <summary>
         /// 删除菜单，必传：Id

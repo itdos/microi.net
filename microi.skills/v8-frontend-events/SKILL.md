@@ -17,6 +17,7 @@ description: Microi 前端 V8 事件与客户端能力指南。用于编写浏�
 - 需求包含“蓝牙打印、标签打印、TSC/TSPL、ESC/POS、小票打印、佳博打印机”时，必须先读取 `references/bluetooth-print.md`；需要完整指令签名、编码或位图参数时，再读取 `references/bluetooth-print-api.md`。
 - 浏览器模板打印、PDF/纸张模板、`mic_print`、`PageObj`、`PrintObj` 使用 `print-engine/SKILL.md`，不要与直接蓝牙指令混为一套 API。
 - 扫码使用 `V8.Method.ScanCode`，结果从 Promise/回调取得；`V8.ScanCodeRes` 只作兼容结果槽，详见客户端 API 索引。
+- 登录后的敏感操作使用 `V8.Identity.Verify` 完成 Passkey/严格人脸交互；前端只取得一次性 Ticket，后端接口引擎必须重算 `ActionHash` 并原子消费，不能把前端成功当作授权。
 
 ## 字段事件（在【字段属性】中配置）
 

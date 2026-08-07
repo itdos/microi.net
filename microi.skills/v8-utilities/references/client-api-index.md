@@ -115,8 +115,13 @@
 | `V8.SendSystemMessage(...)` | 发送站内系统消息 |
 | `await V8.Method.ScanCode()` | 扫码；成功值同时写入 `V8.ScanCodeRes` |
 | `V8.Print.*` | BLE 标签/小票打印，见蓝牙打印参考 |
+| `V8.Identity.GetCapabilities()` | 读取当前租户强身份能力和本人登记状态 |
+| `V8.Identity.CreateActionHash(value)` | 为稳定业务命令生成 SHA-256 摘要 |
+| `V8.Identity.RegisterPasskey(options?)` | 登记当前用户 Passkey |
+| `V8.Identity.Verify({Purpose,ActionHash,Method})` | 完成 Passkey/严格人脸验证并取得一次性后端票据 |
 
 扫码应优先接收 Promise 返回值；兼容代码可在调用后读取 `V8.ScanCodeRes`。
+`V8.Identity` 是强身份验证模块。`V8.Identity.Verify` 的成功结果不能直接授权业务；后端必须重读权威数据、重算摘要并调用 `V8.Method.ConsumeIdentityVerificationTicket`。
 蓝牙打印完整 API 包含 `V8.Print.createNew`、`V8.Print.createNewESC`、
 `V8.Print.OpenBluetoothPage`、`V8.Print.isConnected`、
 `V8.Print.prepareSend`、`V8.Print.Send`、`V8.Print.setOneTimeData`、

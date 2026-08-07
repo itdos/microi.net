@@ -66,6 +66,19 @@ public class ApiEngineRoleAuthorizationTests
     }
 
     [Fact]
+    public void PlatformAdministrator_BypassesStaleApiRoleIds()
+    {
+        var user = NewUser("current-admin-role", onlyGet: false);
+        user["Level"] = DiyCommon.MaxRoleLevel;
+
+        var result = ApiEngineRoleAuthorization.Evaluate(
+            user,
+            new JArray("retired-admin-role").ToString());
+
+        Assert.True(result.IsAllowed);
+    }
+
+    [Fact]
     public void MalformedRolePolicies_FailClosed()
     {
         var user = NewUser(PersonalRoleId, onlyGet: true);

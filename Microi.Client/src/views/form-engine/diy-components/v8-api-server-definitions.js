@@ -527,6 +527,13 @@ export const V8ServerApiDefinitions = {
                         insertText: "ClearUserLoginInfo",
                         snippet: 'ClearUserLoginInfo("${1:userId}", "${2:osClient}")'
                     },
+                    ConsumeIdentityVerificationTicket: {
+                        label: "ConsumeIdentityVerificationTicket",
+                        kind: "Method",
+                        documentation: "原子消费当前用户的一次性身份验证票据。票据必须由 Passkey 或严格人脸验证产生，并与当前 OsClient、用户、Purpose、ActionHash 完全匹配；重复使用、过期和访问密钥会话均失败。\n\n自定义敏感场景应先在前端取得票据，再把 Ticket、Purpose、ActionHash 传给受认证接口引擎。",
+                        insertText: "ConsumeIdentityVerificationTicket",
+                        snippet: 'ConsumeIdentityVerificationTicket({\n\tTicket: V8.Param.IdentityVerificationTicket,\n\tPurpose: "${1:ApproveSensitiveOperation}",\n\tActionHash: "${2:业务操作摘要}"\n})'
+                    },
                     GetPrivateFileUrl: {
                         label: "GetPrivateFileUrl",
                         kind: "Method",

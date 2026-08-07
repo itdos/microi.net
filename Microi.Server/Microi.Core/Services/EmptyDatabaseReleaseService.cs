@@ -35,6 +35,8 @@ namespace Microi.net
         internal const string PublicObjectDirectory = "/install/";
         internal const string PublicDownloadBaseUrl = DatabaseSeedConverter.PublicReleaseBaseUrl;
         internal const int TableOperationMaxAttempts = 3;
+        internal const int DatabaseCleanupBatchSize = 40;
+        internal const int DatabaseCleanupCommandTimeoutSeconds = 120;
         private const int ReleaseLeaseMilliseconds = 15 * 60 * 1000;
         private const string ReleaseLeaseKey = "Microi:iTdos:EmptyDatabaseRelease:Lease";
 
@@ -60,7 +62,13 @@ namespace Microi.net
                 Report(1, 8, "正在检查主库配置");
                 sourceBuilder = BuildAndValidateSourceConnection();
                 Report(2, 8, "正在重建临时空数据库");
-                RecreateTargetDatabase(sourceBuilder);
+                ExecuteInfrastructureOperationWithRetry(
+                    "重建临时数据库",
+                    () =>
+                    {
+                        RecreateTargetDatabase(sourceBuilder);
+                        return true;
+                    });
                 Report(3, 8, "正在复制主库全部表结构");
                 var sourceTables = CopyTableStructures(sourceBuilder);
                 if (sourceTables.Count == 0)
@@ -453,21 +461,156 @@ namespace Microi.net
             BlockComment
         }
 
-        private static void RecreateTargetDatabase(MySqlConnectionStringBuilder sourceBuilder)
+        private void RecreateTargetDatabase(MySqlConnectionStringBuilder sourceBuilder)
         {
             var masterBuilder = new MySqlConnectionStringBuilder(sourceBuilder.ConnectionString)
             {
                 Database = "",
                 AllowUserVariables = true
             };
-            using var connection = OpenConnection(masterBuilder);
-            ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS `{TargetDatabase}`;");
-            ExecuteNonQuery(connection, $"CREATE DATABASE `{TargetDatabase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;");
+            DropTargetDatabaseContents(masterBuilder, true);
+            ExecuteInfrastructureOperationWithRetry(
+                "删除已清空的临时数据库",
+                () =>
+                {
+                    using var connection = OpenConnection(masterBuilder);
+                    ExecuteNonQuery(
+                        connection,
+                        $"DROP DATABASE IF EXISTS `{TargetDatabase}`;",
+                        DatabaseCleanupCommandTimeoutSeconds);
+                    return true;
+                });
+            ExecuteInfrastructureOperationWithRetry(
+                "创建临时数据库",
+                () =>
+                {
+                    using var connection = OpenConnection(masterBuilder);
+                    ExecuteNonQuery(
+                        connection,
+                        $"CREATE DATABASE `{TargetDatabase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;",
+                        DatabaseCleanupCommandTimeoutSeconds);
+                    return true;
+                });
+        }
+
+        private void DropTargetDatabaseContents(
+            MySqlConnectionStringBuilder masterBuilder,
+            bool reportProgress)
+        {
+            var objects = ExecuteInfrastructureOperationWithRetry(
+                "读取临时数据库对象清单",
+                () => GetDatabaseObjects(masterBuilder, TargetDatabase));
+            if (objects.Count == 0) return;
+
+            // Views must be removed before their backing tables. Each finite batch
+            // uses a fresh connection so a broken MySQL result stream cannot pin the
+            // release forever or poison the next batch after a node restart.
+            var ordered = objects
+                .OrderBy(item => string.Equals(item.ObjectType, "VIEW", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var completed = 0;
+            foreach (var typeGroup in ordered.GroupBy(item =>
+                         string.Equals(item.ObjectType, "VIEW", StringComparison.OrdinalIgnoreCase)
+                             ? "VIEW"
+                             : "TABLE"))
+            {
+                var groupItems = typeGroup.ToList();
+                for (var offset = 0; offset < groupItems.Count; offset += DatabaseCleanupBatchSize)
+                {
+                    EnsureReleaseLease();
+                    var batch = groupItems
+                        .Skip(offset)
+                        .Take(DatabaseCleanupBatchSize)
+                        .Select(item => item.Name)
+                        .ToList();
+                    var sql = BuildDropBatchSql(typeGroup.Key, TargetDatabase, batch);
+                    ExecuteInfrastructureOperationWithRetry(
+                        $"清理临时数据库{typeGroup.Key}分片",
+                        () =>
+                        {
+                            using var connection = OpenConnection(masterBuilder);
+                            ExecuteNonQuery(
+                                connection,
+                                "SET FOREIGN_KEY_CHECKS=0;",
+                                DatabaseCleanupCommandTimeoutSeconds);
+                            try
+                            {
+                                ExecuteNonQuery(connection, sql, DatabaseCleanupCommandTimeoutSeconds);
+                            }
+                            finally
+                            {
+                                if (connection.State == ConnectionState.Open)
+                                {
+                                    try
+                                    {
+                                        ExecuteNonQuery(
+                                            connection,
+                                            "SET FOREIGN_KEY_CHECKS=1;",
+                                            DatabaseCleanupCommandTimeoutSeconds);
+                                    }
+                                    catch { }
+                                }
+                            }
+                            return true;
+                        });
+                    completed += batch.Count;
+                    if (reportProgress)
+                    {
+                        BackgroundTaskRuntime.TryUpdateProgress(
+                            _backgroundTaskId,
+                            2,
+                            $"正在清理上次中断的临时数据库（{completed}/{ordered.Count}）",
+                            completed,
+                            ordered.Count);
+                    }
+                }
+            }
+        }
+
+        private static string BuildDropBatchSql(
+            string objectType,
+            string database,
+            IReadOnlyCollection<string> objectNames)
+        {
+            if (objectNames == null || objectNames.Count == 0)
+                throw new ArgumentException("待清理数据库对象不能为空。", nameof(objectNames));
+            var keyword = string.Equals(objectType, "VIEW", StringComparison.OrdinalIgnoreCase)
+                ? "VIEW"
+                : "TABLE";
+            var qualified = objectNames.Select(name =>
+                QuoteIdentifier(database) + "." + QuoteIdentifier(name));
+            return $"DROP {keyword} IF EXISTS {string.Join(",", qualified)};";
+        }
+
+        private static List<DatabaseObject> GetDatabaseObjects(
+            MySqlConnectionStringBuilder builder,
+            string database)
+        {
+            var result = new List<DatabaseObject>();
+            using var connection = OpenConnection(builder);
+            using var command = connection.CreateCommand();
+            command.CommandText = @"SELECT TABLE_NAME, TABLE_TYPE FROM information_schema.TABLES
+WHERE TABLE_SCHEMA=@database ORDER BY TABLE_TYPE DESC, TABLE_NAME;";
+            command.Parameters.AddWithValue("@database", database);
+            command.CommandTimeout = DatabaseCleanupCommandTimeoutSeconds;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new DatabaseObject
+                {
+                    Name = reader.GetString(0),
+                    ObjectType = reader.GetString(1)
+                });
+            }
+            return result;
         }
 
         private List<string> CopyTableStructures(MySqlConnectionStringBuilder sourceBuilder)
         {
-            var tables = GetBaseTables(sourceBuilder, RequiredSourceDatabase);
+            var tables = ExecuteInfrastructureOperationWithRetry(
+                "读取主库表清单",
+                () => GetBaseTables(sourceBuilder, RequiredSourceDatabase));
             var index = 0;
             foreach (var table in tables)
             {
@@ -1201,6 +1344,7 @@ FROM `sys_microistore`;";
             var result = hdfsClient.PutObject(new HDFSParam
             {
                 ClientModel = clientModel,
+                NetworkIsInternet = false,
                 Limit = false,
                 Preview = false,
                 FileFullPath = objectPath,
@@ -1209,6 +1353,20 @@ FROM `sys_microistore`;";
             if (result == null || result.Code != 1)
             {
                 throw new InvalidOperationException("上传空数据库发布包失败：" + (result?.Msg ?? "未知错误"));
+            }
+
+
+            var readback = hdfsClient.ObjectExist(new HDFSParam
+            {
+                ClientModel = clientModel,
+                NetworkIsInternet = false,
+                Limit = false,
+                FileFullPath = objectPath
+            }).GetAwaiter().GetResult();
+            if (readback == null || readback.Code != 1 || !readback.Data)
+            {
+                throw new InvalidOperationException(
+                    "空数据库发布包上传后回读失败：" + (readback?.Msg ?? "对象不存在"));
             }
         }
 
@@ -1311,6 +1469,17 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
 
         private static int ExecuteNonQuery(
             MySqlConnection connection,
+            string sql,
+            int commandTimeoutSeconds)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandTimeout = Math.Max(1, commandTimeoutSeconds);
+            return command.ExecuteNonQuery();
+        }
+
+        private static int ExecuteNonQuery(
+            MySqlConnection connection,
             MySqlTransaction transaction,
             string sql)
         {
@@ -1358,6 +1527,44 @@ WHERE TABLE_SCHEMA=@database AND TABLE_NAME=@table;";
                 table,
                 TableOperationMaxAttempts,
                 lastException ?? new InvalidOperationException("未知数据库异常。"));
+        }
+
+        private T ExecuteInfrastructureOperationWithRetry<T>(
+            string stage,
+            Func<T> operation)
+        {
+            Exception lastException = null;
+            for (var attempt = 1; attempt <= TableOperationMaxAttempts; attempt++)
+            {
+                try
+                {
+                    EnsureReleaseLease();
+                    return operation();
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+                    if (attempt >= TableOperationMaxAttempts || !IsTransientDatabaseFailure(ex))
+                    {
+                        throw new InvalidOperationException(
+                            $"{stage}失败：尝试={attempt}/{TableOperationMaxAttempts}，详情={DescribeExceptionChain(ex)}",
+                            ex);
+                    }
+
+                    MicroiEngine.QueueSystemLog(
+                        RequiredOsClient,
+                        "DatabaseRelease",
+                        "TransientMySqlInfrastructureRetry",
+                        $"{stage}遇到瞬时 MySQL 异常，准备重试",
+                        $"Attempt={attempt}/{TableOperationMaxAttempts}; Detail={DescribeExceptionChain(ex)}",
+                        2);
+                    Thread.Sleep(500 * attempt);
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"{stage}失败：尝试={TableOperationMaxAttempts}/{TableOperationMaxAttempts}，详情={DescribeExceptionChain(lastException)}",
+                lastException);
         }
 
         private static InvalidOperationException CreateTableOperationException(
@@ -1513,13 +1720,23 @@ return 0";
             return BitConverter.ToString(sha256.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
         }
 
-        private static void TryDropTargetDatabase(MySqlConnectionStringBuilder sourceBuilder)
+        private void TryDropTargetDatabase(MySqlConnectionStringBuilder sourceBuilder)
         {
             try
             {
                 var master = new MySqlConnectionStringBuilder(sourceBuilder.ConnectionString) { Database = "" };
-                using var connection = OpenConnection(master);
-                ExecuteNonQuery(connection, $"DROP DATABASE IF EXISTS `{TargetDatabase}`;");
+                DropTargetDatabaseContents(master, false);
+                ExecuteInfrastructureOperationWithRetry(
+                    "清理未完成的临时数据库",
+                    () =>
+                    {
+                        using var connection = OpenConnection(master);
+                        ExecuteNonQuery(
+                            connection,
+                            $"DROP DATABASE IF EXISTS `{TargetDatabase}`;",
+                            DatabaseCleanupCommandTimeoutSeconds);
+                        return true;
+                    });
             }
             catch (Exception cleanupEx)
             {
@@ -1552,6 +1769,12 @@ return 0";
             public long RowCount { get; set; }
             public IReadOnlyDictionary<string, long> TableRowCounts { get; set; }
                 = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private sealed class DatabaseObject
+        {
+            public string Name { get; set; }
+            public string ObjectType { get; set; }
         }
 
         private sealed class ReleasePackageArtifact

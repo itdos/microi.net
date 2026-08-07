@@ -52,7 +52,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_009_001
+    if (versionNumber < 1_009_002
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -80,9 +80,10 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
       || !content.includes('MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1')
       || !content.includes('SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1')
+      || !content.includes('LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1')
       || !content.includes('BULK_SMALL_PACKAGE_SINGLE_SLICE_V1')
       || !content.includes('MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1')) {
-      throw new Error(`${name} 低于 v1.9.1 或缺少租户接口引擎所有权不可逆保护、接口引擎资源基线、无商城标识时跳过计数、MySQL宽表行外文本回退、可信批量小包单事务、安装统计响应解析、接口引擎写后回读、后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v1.9.2 或缺少历史安装记录身份修复、租户接口引擎所有权不可逆保护、接口引擎资源基线、无商城标识时跳过计数、MySQL宽表行外文本回退、可信批量小包单事务、安装统计响应解析、接口引擎写后回读、后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -201,7 +202,7 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_009_001
+        || importerVersionNumber < 1_009_002
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || engineVersionNumber(publisherEngine) < 1_006_000
@@ -229,6 +230,7 @@ function validateReleaseCandidate(name, content) {
       || !importerCode.includes('PACKAGE_API_ENGINE_READBACK_V1')
       || !importerCode.includes('MARKETPLACE_INSTALL_STAT_STRING_RESPONSE_V1')
       || !importerCode.includes('SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1')
+      || !importerCode.includes('LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1')
       || !importerCode.includes('BULK_SMALL_PACKAGE_SINGLE_SLICE_V1')
       || !importerCode.includes('MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1')) {
         throw new Error(

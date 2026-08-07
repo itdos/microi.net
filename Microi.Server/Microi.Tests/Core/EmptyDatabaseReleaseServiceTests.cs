@@ -88,6 +88,30 @@ public sealed class EmptyDatabaseReleaseServiceTests
         Assert.Equal("/install/", ReadPrivateConstant("PublicObjectDirectory"));
         Assert.Equal("https://static.itdos.com/install/", ReadPrivateConstant("PublicDownloadBaseUrl"));
         Assert.Equal(3, ReadPrivateIntConstant("TableOperationMaxAttempts"));
+        Assert.Equal(40, ReadPrivateIntConstant("DatabaseCleanupBatchSize"));
+        Assert.Equal(120, ReadPrivateIntConstant("DatabaseCleanupCommandTimeoutSeconds"));
+    }
+
+    [Fact]
+    public void BuildDropBatchSql_QuotesEveryDatabaseObjectAndKeepsObjectKind()
+    {
+        var tableSql = Assert.IsType<string>(InvokePrivateStatic(
+            "BuildDropBatchSql",
+            "TABLE",
+            "microi_empty_temp",
+            new[] { "sys_user", "name`with`ticks" }));
+        var viewSql = Assert.IsType<string>(InvokePrivateStatic(
+            "BuildDropBatchSql",
+            "VIEW",
+            "microi_empty_temp",
+            new[] { "v_summary" }));
+
+        Assert.Equal(
+            "DROP TABLE IF EXISTS `microi_empty_temp`.`sys_user`,`microi_empty_temp`.`name``with``ticks`;",
+            tableSql);
+        Assert.Equal(
+            "DROP VIEW IF EXISTS `microi_empty_temp`.`v_summary`;",
+            viewSql);
     }
 
     [Fact]

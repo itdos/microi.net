@@ -43,6 +43,15 @@ public class MicroiHdfsMinioEndpointTests
         return (string)method!.Invoke(null, new object?[] { osClient, filePath })!;
     }
 
+    private static bool? ResolveUploadNetworkPreference(bool hasHttpContext)
+    {
+        var method = typeof(MicroiHDFS).GetMethod(
+            "ResolveUploadNetworkPreference",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool?)method!.Invoke(null, new object?[] { hasHttpContext });
+    }
+
     [Theory]
     [InlineData(null, "Byte", false)]
     [InlineData(null, "Url", true)]
@@ -54,6 +63,16 @@ public class MicroiHdfsMinioEndpointTests
         bool expected)
     {
         Assert.Equal(expected, ShouldUseInternetEndpoint(networkIsInternet, returnFileType));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, null)]
+    public void BackgroundUploadsForceInternalEndpointWhileHttpKeepsDeploymentSelection(
+        bool hasHttpContext,
+        bool? expected)
+    {
+        Assert.Equal(expected, ResolveUploadNetworkPreference(hasHttpContext));
     }
 
     [Theory]

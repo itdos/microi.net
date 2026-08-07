@@ -1,6 +1,6 @@
 ---
 name: v8-security
-description: Microi V8 安全指南。用于审查接口引擎安全、密钥管理、SQL 注入、权限检查、匿名端点、文件上传安全和租户隔离。
+description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆业务秘密、Passkey/人脸步进验证、接口引擎安全、密钥管理、SQL 注入、匿名端点、文件上传和租户隔离。
 ---
 
 # Microi V8 安全最佳实践
@@ -30,6 +30,8 @@ var openaiKey = 'sk-xxxxxxxxxx';
 子租户缺少 RabbitMQ/MQTT/Search 独立凭据时必须失败关闭，禁止回退主租户账号。新租户开通只有在外部 broker/search 中真实创建 user、vhost、ACL 或 API Key 后，才能标记对应服务可用。
 
 登录和管理端必须强制 HTTPS。登录 RSA 只用于避免密码在请求体、代理调试界面中直接显示，不能替代 HTTPS，也不能作为身份认证或密码存储密钥。平台为兼容已发布客户、旧前端和浏览器缓存，保留历史登录 RSA 密钥对作为缺省回退；安全修复不得直接删除该回退并造成全量客户无法登录。需要部署专属密钥时，在主租户 SaaS 引擎【后端运行配置】中成对维护 `BackendLoginRsaPrivateKey` 与 `BackendLoginRsaPublicKey`；私钥只允许可信服务端读取，匿名 `GetSysConfig` 只返回匹配公钥。源码、环境变量、普通 V8、前端业务代码和日志中仍禁止新增或输出真正的业务私钥、JWT 密钥、支付密钥及对象存储凭据。
+
+微信内容安全回调固定使用 `/api/wechatcontentsecurity/callback` 或第三方不支持 QueryString 时以 `/api/wechatcontentsecurity/callback--osclient--` 为路径前缀并追加 `{OsClient}--`；回调只能由服务端按签名和租户规则建立信任。
 
 吾码现有多端兼容约定是：主 SaaS 引擎 `sys_osclients.CorsAllowOrigins` 为空时默认允许全部跨域，便于本地开发、独立前端、H5 和不同租户域名访问；配置了来源后才按精确来源或通配符限制。安全修复不得把“未配置”改成默认拒绝，否则会造成所有存量部署和本地调试突然失效。CORS 不是鉴权边界，权限仍必须依赖 Token、租户隔离、菜单/表权限和服务端数据范围。
 
@@ -84,6 +86,17 @@ V8.Db.FromSql("SELECT * FROM " + V8.Param.table).ToArray();
 ```
 
 ## 2. 权限校验
+
+### DiyToken 是平台会话与权限入口，不替换为 ASP.NET Identity
+
+DiyToken 与 `sys_user`、`OsClient`、终端 `did`、共享 Redis 登录态、角色/部门、菜单动作、表权限、数据范围和接口引擎共同构成吾码认证授权体系。它不是“只有一个 Token 字符串”的简化登录：
+
+- 登录、SSO、OAuth、Passkey、人脸或访问密钥验证成功后，统一签发/兑换 DiyToken。
+- Token 认证只证明用户和租户；服务端仍按资源、动作和数据范围授权，前端按钮不可代替。
+- 用户停用、角色变化、单终端/全部终端吊销和 Token 轮换都依赖共享会话事实，不依赖单机内存。
+- ASP.NET Identity 可以作为外部身份源的适配参考，但不能整体替换吾码的租户、低代码权限、V8 和在线终端协议。
+
+开发新登录入口时只实现“验证身份 -> 获取仍启用的 `sys_user` -> 签发 DiyToken”，禁止并行创建第二套用户、角色、权限 Token 或会话有效期规则。
 
 ### 平台 FormEngine 授权边界
 
@@ -261,6 +274,45 @@ if (old.Code === 1 && old.Data) {
 
 存量 `PwdEncode=DES` 的兼容例外只能位于 `[PlatformAdminOnly]` 的 `GetSysUserPassword`：还要拒绝访问密钥会话、按当前 `OsClient` 和准确用户 Id 查询、用“解密后重新加密等于原密文”验证结果、返回 `no-store` 并写不含明文的安全审计。`PwdEncode=V8` 不假定可逆。不得把该能力暴露给 FormEngine、V8、普通角色或匿名端点。
 
+### 可逆业务秘密：允许加密存储和授权显示
+
+设备口令、第三方业务账号密码、客户明确要求再次显示的字段可以使用 `V8.EncryptHelper.DESEncode/DESDecode` 兼容机制，但必须与登录密码、支付私钥、`AuthSecret` 和基础设施密钥分开：
+
+```javascript
+// 保存：只在可信后端执行
+V8.Form.SecretCipher = V8.EncryptHelper.DESEncode(String(V8.Form.SecretPlain || ''));
+V8.NotSaveField.push('SecretPlain');
+```
+
+显示明文必须设计为独立后端动作，并同时做到：
+
+- 校验当前 DiyToken、准确 `OsClient`、当前用户真实角色/菜单/业务权限；高风险场景再要求下面的一次性强身份票据。
+- 只解密一条明确记录，不向列表、批量导出、通用 FormEngine、匿名或访问密钥会话提供解密器。
+- 只记录操作者、目标 Id、用途、结果和时间，禁止日志/审计/通知/缓存保存明文；HTTP 响应设置 `no-store`。
+- 页面默认掩码，点击显示需二次确认，失焦/超时/路由离开后清除；禁止复制到 URL、LocalStorage 或前端日志。
+- DES 是存量兼容格式。新高价值秘密优先由可信 C# 原子能力使用带版本的现代认证加密和集中密钥管理，V8 仍只编排授权显示，不能获取主密钥。
+
+### Passkey、人脸与敏感操作票据
+
+前端 V8 使用 `V8.Identity.Verify({Purpose,ActionHash,Method})` 完成人机交互，后端必须从数据库重读权威业务字段、按稳定版本/顺序重算 `ActionHash`，再消费票据：
+
+```javascript
+var actionHash = V8.EncryptHelper.Sha256Hex(canonicalCommand);
+var verified = V8.Method.ConsumeIdentityVerificationTicket({
+  Ticket: V8.Param.IdentityVerificationTicket,
+  Purpose: 'RevealBusinessSecret',
+  ActionHash: actionHash
+});
+if (verified.Code !== 1) return verified;
+```
+
+- Ticket 绑定 `OsClient + UserId + Purpose + ActionHash`，共享 Redis 保存两分钟并使用原子 `GETDEL`，只能消费一次。
+- 前端提交的摘要、`Verified=true`、认证器名称或方法不能作为授权事实；访问密钥会话不能使用。
+- 票据只证明近期强身份，不代替菜单/表/行权限、业务状态机、事务、幂等或审计。
+- 设备指纹/Face ID/Windows Hello 优先走 WebAuthn/Passkey，不需要模型 Docker；只有严格服务端人脸/活体检测才通过 `Microi Face Gateway v1` 接入独立服务。
+- 完整表、SaaS 字段、API 和启用顺序见 `microi.doc/docs/doc/more/identity-verification.md`。
+- 身份验证 HTTP 控制面统一位于 `/api/identityverification/`，业务页面优先使用 `V8.Identity`，不要自行复制 WebAuthn 序列化代码。
+
 ### 脱敏返回
 
 ```javascript
@@ -384,6 +436,9 @@ try {
 - [ ] 涉及数据修改的接口校验请求参数合法性
 - [ ] 敏感数据（手机号、身份证等）脱敏返回
 - [ ] 密码只走平台认证/重置流程；禁止MD5/SHA直接存储，后端使用带盐自适应密码哈希
+- [ ] 可逆业务秘密只在后端加解密；列表掩码、独立授权显示、no-store 且审计不含明文
+- [ ] 新登录/SSO/Passkey/人脸入口最终签发 DiyToken，不并行创建第二套权限体系
+- [ ] 敏感操作票据由后端重算 ActionHash 后原子消费，不能相信前端验证成功布尔值
 - [ ] 写操作有防重复提交机制
 - [ ] 关键操作写审计日志
 - [ ] catch 块不暴露内部错误给前端
