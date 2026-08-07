@@ -358,6 +358,34 @@ WHERE Id=@p0 AND OsClient=@p1")
             return true;
         }
 
+        internal static bool IsLeaseCurrent(
+            string osClient,
+            string taskId,
+            string leaseOwner,
+            long fencingToken)
+        {
+            try
+            {
+                var client = GetClient(osClient);
+                if (client?.Db == null
+                    || taskId.DosIsNullOrWhiteSpace()
+                    || leaseOwner.DosIsNullOrWhiteSpace()) return false;
+                return client.Db.FromSql($@"SELECT COUNT(1) FROM {TableName}
+WHERE Id=@p0 AND OsClient=@p1 AND Status='Running' AND CancelRequested=0
+  AND LeaseOwner=@p2 AND FencingToken=@p3 AND LeaseExpiresAt>@p4")
+                    .AddInParameter("p0", taskId)
+                    .AddInParameter("p1", osClient)
+                    .AddInParameter("p2", leaseOwner)
+                    .AddInParameter("p3", fencingToken)
+                    .AddInParameter("p4", DbTime(DateTime.Now))
+                    .ToScalar<int>() == 1;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static bool UpdateProgress(BackgroundTaskRecord item)
         {
             var client = GetRequiredClient(item.OsClient);

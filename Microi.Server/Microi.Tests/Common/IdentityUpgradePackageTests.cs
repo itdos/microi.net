@@ -36,7 +36,7 @@ public class IdentityUpgradePackageTests
         var resources = Assert.IsType<Dictionary<string, string>>(loader!.Invoke(null, null));
         var package = JObject.Parse(resources["app.microi.saas-engine.json"]);
         Assert.Equal("SaaS引擎", package["PackageInfo"]?["Name"]?.Value<string>());
-        Assert.Equal("v6.4.7", package["PackageInfo"]?["Version"]?.Value<string>());
+        Assert.Equal("v6.4.8", package["PackageInfo"]?["Version"]?.Value<string>());
         Assert.True(package["PackageInfo"]?["IncludeSource"]?.Value<bool>());
 
         var tables = package["DiyTables"]?.Children<JObject>().ToList() ?? [];
@@ -105,9 +105,13 @@ public class IdentityUpgradePackageTests
 
         var bundle = Assert.Single(package["ApplicationBundles"]?.Children<JObject>()
             .Where(item => item["Application"]?["AppKey"]?.Value<string>() == "microi-platform-service") ?? []);
-        Assert.Equal("v1.5.4", bundle["VersionNo"]?.Value<string>());
+        Assert.Equal("v1.5.5", bundle["VersionNo"]?.Value<string>());
         Assert.True(bundle["IncludeSource"]?.Value<bool>());
-        Assert.Equal("v1.5.4", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal(12, bundle["Application"]?["CurrentVersion"]?.Value<int>());
+        Assert.Equal("v1.5.5", bundle["Application"]?["BuildVersion"]?.Value<string>());
+        Assert.Equal("v1.5.5", bundle["MicroService"]?["BuildVersion"]?.Value<string>());
+        Assert.All(bundle["Routes"]?.Children<JObject>() ?? [], route =>
+            Assert.Equal("v1.5.5", route["BuildVersion"]?.Value<string>()));
         Assert.NotNull(bundle["PackageAssets"]?["SourceZip"]);
         Assert.False(string.IsNullOrWhiteSpace(
             bundle["PackageAssets"]?["SourceZip"]?["Sha256"]?.Value<string>()));

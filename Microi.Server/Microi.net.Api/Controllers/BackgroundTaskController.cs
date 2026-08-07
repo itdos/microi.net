@@ -76,6 +76,13 @@ namespace Microi.net.Api
             {
                 return Json(new DosResult(0, null, "ApiEngineKey不能为空"));
             }
+            if (BackgroundTaskService.IsReservedNativeWorkerKey(apiEngineKey))
+            {
+                return Json(new DosResult(
+                    0,
+                    null,
+                    "该任务标识属于平台保留的原生 Worker，不能通过通用接口引擎入口提交。"));
+            }
 
             var identity = await GetIdentity(param).ConfigureAwait(false);
             if (identity.CurrentUser == null || identity.CurrentUser["Id"]?.ToString().DosIsNullOrWhiteSpace() != false)

@@ -138,6 +138,13 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 加载/协议/运行时异常只由宿主兜底显示；子应用业务错误标记 `handled=true` 后宿主不得重复提示。
 加载失败页至少显示 AppKey、PageKey、路由、版本、入口、HTTP 状态、发布状态、资产来源、挂载状态和安全原因码，并提供重试、返回与复制诊断。
 
+### 首次挂载、iframe 交互与接口契约
+
+- `micro-app` 的 `mounted` 生命周期只表示容器和脚本执行流程完成，不能单独证明子框架已经在 `#app` 渲染出可见内容。宿主给每次解析和重挂载分别下发 `hostGeneration`、`hostMountAttempt`；子应用在 Vue/React 根节点挂载后的下一帧用 `forceDispatch` 回传 `micro-app:ready`。宿主只接受与当前解析世代、挂载尝试都一致的就绪事件，并在可检查 DOM 时复核根节点非空；超时只自动销毁重建一次，第二次失败显示稳定诊断，禁止让白屏永久停留在 `mounted` 状态。
+- iframe 内的 pointer/click 不会冒泡到宿主 document。子应用应在捕获阶段发送 `micro-app:interaction`，宿主再广播统一的“关闭全局浮层”事件。`@micro-zoe/micro-app` EventCenter 会去重内容相同的普通 dispatch，连续交互事件必须使用 `forceDispatch`；否则只能收到第一次点击。宿主的 Select/Popover 等浮层若 teleport 到 `body`，收到通知后还要显式执行组件的 click-outside/close 路径并清理搜索值和焦点，不能只依赖 `blur`。
+- 调接口时以真实 `DosResult.Data` DTO 为准，不能仅凭界面名称猜成数组。例如在线终端接口返回的是用户视图对象 `{ Terminals: [...] }`，前端应读取 `Data.Terminals`，只把 `Data` 直接数组作为旧版兼容；列表 key 优先使用 `ConnectionId`、`DeviceClientId` 等稳定标识。修复前先沿 Controller → Service → 序列化对象 → 子应用解析完整核对契约，避免为正确的后端响应另写一个平行接口。
+- 发布前统一更新 `package.json`、`package-lock.json` 根包版本、`.microi-micro-app.json`、应用 `CurrentVersion/BuildVersion`、微服务与页面 `BuildVersion`。应用商城候选包可以先嵌入待发布源码和构建产物，但 `.resource-sync-base` 只能在官方远端发布完成、逐文件内容哈希回读一致后由资源同步器推进，禁止把本地候选提前写成共同基线。
+
 ## 验收
 
 - 源码、构建文件、运行时、页面路由和菜单五层分别回读。

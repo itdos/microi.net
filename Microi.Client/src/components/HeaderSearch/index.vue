@@ -10,6 +10,7 @@
             remote 
             :placeholder="$t('Msg.Search')" 
             class="header-search-select" 
+            @visible-change="handleVisibleChange"
             @change="change">
             <el-option v-for="item in options" :key="item.path" :value="item" :label="item.title && Array.isArray(item.title) ? item.title.join(' > ') : item.title || item.path" />
         </el-select>
@@ -108,9 +109,20 @@ export default {
             }
         },
         close() {
-            this.$refs.headerSearchSelect && this.$refs.headerSearchSelect.blur();
-            this.options = [];
             this.show = false;
+            this.search = "";
+            this.options = [];
+            const select = this.$refs.headerSearchSelect;
+            // iframe 内点击不会触发 Element Plus 的 click-outside。只调 blur
+            // 在部分浏览器中会遗留 teleport 到 body 的下拉层，因此显式走
+            // Select 的外部点击收起路径，再用 blur 清理焦点。
+            select?.handleClickOutside?.(new Event("pointerdown"));
+            select?.blur?.();
+        },
+        handleVisibleChange(visible) {
+            // 关闭期间若 Select 因延迟 focus 再次弹出，立即收起，
+            // 避免宿主搜索列表覆盖微应用内容。
+            if (visible && !this.show) this.$nextTick(() => this.close());
         },
         change(val) {
             // 添加安全检查

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
@@ -38,6 +41,13 @@ namespace Microi.net
         private static readonly SemaphoreSlim DiyLangGlobalDbSemaphore = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim DiyLangFullSyncSemaphore = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim DiyLangTranslateSemaphore = new SemaphoreSlim(2, 2);
+        private static readonly AsyncLocal<Func<bool>> DiyLangSyncOwnershipGuard = new AsyncLocal<Func<bool>>();
+        private static readonly Regex DiyLangUrlDiagnosticRegex = new Regex(
+            @"https?://[^\s""'<>]+",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+        private static readonly Regex DiyLangCredentialDiagnosticRegex = new Regex(
+            @"\b(api[-_ ]?key|access[-_ ]?key|secret|token|authorization)\b\s*[:=]\s*[^\s,;]+",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
         private static int DiyLangAllClientSyncRunning = 0;
         private static readonly object DiyLangCacheLock = new object();
         private const int DiyLangTranslateTimeoutSeconds = 8;
@@ -189,6 +199,7 @@ namespace Microi.net
 
         private static async Task<T> RunDiyLangDbOperationAsync<T>(string osClient, Func<Task<T>> action)
         {
+            ThrowIfDiyLangSyncOwnershipLost();
             if (IsDiyLangDbBackoffActive(osClient, out var backoffMessage))
             {
                 throw new Exception(backoffMessage);
@@ -198,7 +209,10 @@ namespace Microi.net
             await tenantSemaphore.WaitAsync();
             try
             {
-                return await action();
+                ThrowIfDiyLangSyncOwnershipLost();
+                var result = await action();
+                ThrowIfDiyLangSyncOwnershipLost();
+                return result;
             }
             catch (Exception ex)
             {
@@ -216,6 +230,41 @@ namespace Microi.net
                 {
                     await Task.Delay(DiyLangDbOperationDelayMs);
                 }
+            }
+        }
+
+        internal static IDisposable EnterDiyLangSyncOwnershipGuard(Func<bool> ownershipGuard)
+        {
+            var previous = DiyLangSyncOwnershipGuard.Value;
+            DiyLangSyncOwnershipGuard.Value = ownershipGuard;
+            return new DiyLangOwnershipGuardScope(previous);
+        }
+
+        private static void ThrowIfDiyLangSyncOwnershipLost()
+        {
+            var ownershipGuard = DiyLangSyncOwnershipGuard.Value;
+            if (ownershipGuard != null && !ownershipGuard())
+            {
+                throw new OperationCanceledException(
+                    "多语言持久任务已失去执行租约，已在下一个数据库批次前停止写入。");
+            }
+        }
+
+        private sealed class DiyLangOwnershipGuardScope : IDisposable
+        {
+            private readonly Func<bool> _previous;
+            private bool _disposed;
+
+            public DiyLangOwnershipGuardScope(Func<bool> previous)
+            {
+                _previous = previous;
+            }
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                DiyLangSyncOwnershipGuard.Value = _previous;
             }
         }
 
@@ -1132,7 +1181,7 @@ namespace Microi.net
         {
             return "V8.ConfirmTips('\\u786e\\u8ba4\\u6839\\u636e\\u5f53\\u524d\\u7cfb\\u7edf\\u8bbe\\u7f6e\\u7684\\u591a\\u8bed\\u8a00\\u914d\\u7f6e\\u521d\\u59cb\\u5316\\u5e76\\u540c\\u6b65\\u5417\\uff1f', function(){\n"
                 + "  V8.Post('/api/FormEngine/SyncLangMetadata?Source=sys_config', { OsClient: V8.OsClient, Wait: false, IncludeClientText: true }, function(r){\n"
-                + "    if(r && r.Code == 1){ V8.Tips('\\u5df2\\u5f00\\u59cb\\u521d\\u59cb\\u5316\\u591a\\u8bed\\u8a00\\uff0c\\u53ef\\u5728\\u3010\\u591a\\u8bed\\u8a00\\u65e5\\u5fd7\\u3011\\u67e5\\u770b\\u8fdb\\u5ea6\\u3002', true); }\n"
+                + "    if(r && r.Code == 1){ var taskId = r.Data && r.Data.TaskId ? '\\uff08\\u4efb\\u52a1 ' + r.Data.TaskId + '\\uff09' : ''; V8.Tips(((r && r.Msg) || '\\u591a\\u8bed\\u8a00\\u521d\\u59cb\\u5316\\u5df2\\u8fdb\\u5165\\u6301\\u4e45\\u540e\\u53f0\\u4efb\\u52a1\\u961f\\u5217\\u3002') + taskId, true); }\n"
                 + "    else { V8.Tips((r && r.Msg) || '\\u521d\\u59cb\\u5316\\u5931\\u8d25', false); }\n"
                 + "  });\n"
                 + "});";
@@ -1524,12 +1573,100 @@ namespace Microi.net
 
         private static string LimitDiyLangFailureText(string value, int maxLength = 500)
         {
-            value = (value ?? "").Trim();
+            value = SanitizeDiyLangDiagnosticText(value, null, maxLength);
             if (value.Length <= maxLength)
             {
                 return value;
             }
             return value.Substring(0, maxLength);
+        }
+
+        private static string SafeDiyLangProviderIdentity(string providerKey)
+        {
+            providerKey = (providerKey ?? "").Trim();
+            if (IsBlank(providerKey)) return "not-configured";
+            var safeDescriptor = string.Join("|", providerKey
+                .Split('|')
+                .Select(BuildSafeDiyLangProviderDescriptor)
+                .Where(item => !IsBlank(item))
+                .OrderBy(item => item, StringComparer.OrdinalIgnoreCase));
+            if (IsBlank(safeDescriptor)) return "configured";
+            using (var sha256 = SHA256.Create())
+            {
+                // Persistent diagnostics fingerprint only provider type + endpoint.
+                // Credentials remain usable by the internal backoff cache but never
+                // become an offline verifier in mci_lang_init_log.
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(safeDescriptor));
+                return "configured:" + BitConverter.ToString(hash, 0, 6)
+                    .Replace("-", "")
+                    .ToLowerInvariant();
+            }
+        }
+
+        private static string BuildSafeDiyLangProviderDescriptor(string providerIdentity)
+        {
+            providerIdentity = (providerIdentity ?? "").Trim();
+            if (IsBlank(providerIdentity)) return "";
+            var credentialSeparator = providerIdentity.LastIndexOf(':');
+            var descriptor = credentialSeparator >= 0
+                ? providerIdentity.Substring(0, credentialSeparator)
+                : providerIdentity;
+            var endpointSeparator = descriptor.IndexOf(':');
+            if (endpointSeparator < 0) return descriptor.ToLowerInvariant();
+            var provider = descriptor.Substring(0, endpointSeparator).Trim().ToLowerInvariant();
+            var endpoint = descriptor.Substring(endpointSeparator + 1).Trim();
+            if (Uri.TryCreate(endpoint, UriKind.Absolute, out var endpointUri))
+            {
+                var builder = new UriBuilder(endpointUri)
+                {
+                    UserName = "",
+                    Password = "",
+                    Query = "",
+                    Fragment = ""
+                };
+                endpoint = builder.Uri.GetLeftPart(UriPartial.Path).TrimEnd('/');
+            }
+            else
+            {
+                var queryIndex = endpoint.IndexOfAny(new[] { '?', '#' });
+                if (queryIndex >= 0) endpoint = endpoint.Substring(0, queryIndex);
+            }
+            return $"{provider}:{endpoint.ToLowerInvariant()}";
+        }
+
+        private static string SanitizeDiyLangDiagnosticText(
+            string value,
+            string providerKey = null,
+            int maxLength = 500,
+            IEnumerable<string> sensitiveTokens = null)
+        {
+            var text = (value ?? "").Trim();
+            if (!IsBlank(providerKey))
+            {
+                var safeIdentity = SafeDiyLangProviderIdentity(providerKey);
+                text = text.Replace(providerKey, safeIdentity, StringComparison.OrdinalIgnoreCase);
+                foreach (var provider in providerKey.Split('|'))
+                {
+                    var separator = provider.LastIndexOf(':');
+                    var possibleCredential = separator >= 0 && separator + 1 < provider.Length
+                        ? provider.Substring(separator + 1)
+                        : "";
+                    if (possibleCredential.Length >= 6)
+                    {
+                        text = text.Replace(possibleCredential, "[redacted]", StringComparison.Ordinal);
+                    }
+                }
+            }
+            foreach (var sensitiveToken in sensitiveTokens ?? Enumerable.Empty<string>())
+            {
+                if (!IsBlank(sensitiveToken) && sensitiveToken.Length >= 6)
+                {
+                    text = text.Replace(sensitiveToken, "[redacted]", StringComparison.Ordinal);
+                }
+            }
+            text = DiyLangUrlDiagnosticRegex.Replace(text, "[redacted-url]");
+            text = DiyLangCredentialDiagnosticRegex.Replace(text, "$1=[redacted]");
+            return text.Length <= maxLength ? text : text.Substring(0, maxLength);
         }
 
         private static void AddDiyLangFailureReason(JObject stats, string reasonKey, string reasonText, string sampleKey = "", int count = 1)
@@ -1846,7 +1983,9 @@ namespace Microi.net
         private static void PreflightDiyLangTranslateTargets(string osClient, List<DiyLangFieldConfig> langConfigs, JObject stats)
         {
             var providerKey = GetTranslateProviderKey(osClient);
-            stats["TranslateProvider"] = providerKey;
+            var safeProviderIdentity = SafeDiyLangProviderIdentity(providerKey);
+            var sensitiveTokens = GetDiyLangTranslateSensitiveTokens(osClient);
+            stats["TranslateProvider"] = safeProviderIdentity;
             var targets = new JArray();
             var unsupportedCount = 0;
             foreach (var lang in langConfigs ?? new List<DiyLangFieldConfig>())
@@ -1882,7 +2021,7 @@ namespace Microi.net
                 if (DiyLangTranslateUnsupportedTarget.ContainsKey(unsupportedTargetKey))
                 {
                     item["Status"] = "UnsupportedCached";
-                    AddDiyLangFailureReason(stats, $"TranslateTargetUnsupported:{targetLang}", $"翻译服务[{providerKey}]缓存标记不支持目标语言[{targetLang}]。", lang.Locale);
+                    AddDiyLangFailureReason(stats, $"TranslateTargetUnsupported:{targetLang}", $"翻译服务[{safeProviderIdentity}]缓存标记不支持目标语言[{targetLang}]。", lang.Locale);
                     unsupportedCount++;
                     targets.Add(item);
                     continue;
@@ -1897,7 +2036,7 @@ namespace Microi.net
                         OsClient = osClient
                     });
                     item["Code"] = result.Code;
-                    item["Message"] = result.Msg ?? "";
+                    item["Message"] = SanitizeDiyLangDiagnosticText(result.Msg, providerKey, 500, sensitiveTokens);
                     if (result.Code == 1)
                     {
                         item["Status"] = "Supported";
@@ -1906,23 +2045,23 @@ namespace Microi.net
                     {
                         item["Status"] = "Unsupported";
                         DiyLangTranslateUnsupportedTarget[unsupportedTargetKey] = DateTime.UtcNow;
-                        AddDiyLangFailureReason(stats, $"TranslateTargetUnsupported:{targetLang}", result.Msg, lang.Locale);
+                        AddDiyLangFailureReason(stats, $"TranslateTargetUnsupported:{targetLang}", SanitizeDiyLangDiagnosticText(result.Msg, providerKey, 500, sensitiveTokens), lang.Locale);
                         unsupportedCount++;
                     }
                     else
                     {
                         item["Status"] = "Unavailable";
                         MarkTranslateUnavailable(osClient, providerKey, result.Msg);
-                        AddDiyLangFailureReason(stats, $"TranslateProviderUnavailable:{providerKey}", result.Msg, lang.Locale);
+                        AddDiyLangFailureReason(stats, $"TranslateProviderUnavailable:{safeProviderIdentity}", SanitizeDiyLangDiagnosticText(result.Msg, providerKey, 500, sensitiveTokens), lang.Locale);
                         unsupportedCount++;
                     }
                 }
                 catch (Exception ex)
                 {
                     item["Status"] = "Unavailable";
-                    item["Message"] = ex.Message;
+                    item["Message"] = SanitizeDiyLangDiagnosticText(ex.Message, providerKey, 500, sensitiveTokens);
                     MarkTranslateUnavailable(osClient, providerKey, ex.Message);
-                    AddDiyLangFailureReason(stats, $"TranslateProviderException:{providerKey}", ex.Message, lang.Locale);
+                    AddDiyLangFailureReason(stats, $"TranslateProviderException:{safeProviderIdentity}", SanitizeDiyLangDiagnosticText(ex.Message, providerKey, 500, sensitiveTokens), lang.Locale);
                     unsupportedCount++;
                 }
                 targets.Add(item);
@@ -3175,7 +3314,10 @@ namespace Microi.net
                 var now = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 if (isNew && IsBlank(TokenString(row, "Id")))
                 {
-                    row["Id"] = Guid.NewGuid().ToString();
+                    // A deterministic primary key turns the cross-node read-then-insert race into
+                    // a recoverable duplicate-key conflict, even if an old worker resumes after
+                    // losing its lease between the ownership check and the INSERT statement.
+                    row["Id"] = BuildDeterministicDiyLangRowId(osClient, TokenString(row, "Key"));
                 }
                 row["OsClient"] = osClient;
                 row["UpdateTime"] = now;
@@ -3184,10 +3326,17 @@ namespace Microi.net
                     row["CreateTime"] = now;
                 }
 
+                var physicalColumns = GetPhysicalColumnNames(db, osClient, "diy_lang");
+                var hasKeyHashColumn = ApplyDiyLangKeyHashForPhysicalColumns(row, physicalColumns);
+
                 var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
                     "Id", "Key", "Code", "Name", "ParentId", "OsClient", "CreateTime", "UpdateTime", "ZhCN"
                 };
+                if (hasKeyHashColumn)
+                {
+                    allowed.Add("KeyHash");
+                }
                 foreach (var lang in langConfigs ?? new List<DiyLangFieldConfig>())
                 {
                     if (IsSafeSqlIdentifier(lang.Field))
@@ -3195,7 +3344,6 @@ namespace Microi.net
                         allowed.Add(lang.Field);
                     }
                 }
-                var physicalColumns = GetPhysicalColumnNames(db, osClient, "diy_lang");
 
                 var values = row.Properties()
                     .Where(prop => allowed.Contains(prop.Name)
@@ -3206,6 +3354,32 @@ namespace Microi.net
                 {
                     return Task.FromResult(new DosResult(0, row, "No writable diy_lang columns were found."));
                 }
+
+                var updateValues = values
+                    .Where(prop => !string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase)
+                                   && !string.Equals(prop.Name, "CreateTime", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                Func<string, int> updateById = id =>
+                {
+                    if (IsBlank(id))
+                    {
+                        throw new InvalidOperationException("diy_lang row Id is required for update.");
+                    }
+                    if (updateValues.Count == 0)
+                    {
+                        return 0;
+                    }
+                    ThrowIfDiyLangSyncOwnershipLost();
+                    var setters = updateValues.Select((prop, index) => $"`{prop.Name}` = @p{index}").ToList();
+                    var updateCommand = db.FromSql($"UPDATE diy_lang SET {string.Join(",", setters)} WHERE Id = @p{updateValues.Count}");
+                    for (var i = 0; i < updateValues.Count; i++)
+                    {
+                        updateCommand.AddInParameter($"p{i}", TokenString(updateValues[i].Value));
+                    }
+                    updateCommand.AddInParameter($"p{updateValues.Count}", id);
+                    return updateCommand.ExecuteNonQuery();
+                };
+
                 if (isNew)
                 {
                     var columns = values.Select(prop => $"`{prop.Name}`").ToList();
@@ -3215,7 +3389,52 @@ namespace Microi.net
                     {
                         cmd.AddInParameter($"p{i}", TokenString(values[i].Value));
                     }
-                    cmd.ExecuteNonQuery();
+                    try
+                    {
+                        ThrowIfDiyLangSyncOwnershipLost();
+                        cmd.ExecuteNonQuery();
+                    }
+                    catch (Exception ex) when (IsDiyLangDuplicateKeyException(ex))
+                    {
+                        // Another node already materialized the same tenant/key. Re-read the
+                        // authoritative row (including legacy random Id rows protected by a Key
+                        // unique index) and converge by update instead of creating a duplicate.
+                        ThrowIfDiyLangSyncOwnershipLost();
+                        var existingSql = hasKeyHashColumn
+                            ? @"SELECT Id
+                                FROM diy_lang
+                                WHERE Id = @p0 OR KeyHash = @p1 OR `Key` = @p2
+                                ORDER BY CASE WHEN Id = @p0 THEN 0 WHEN KeyHash = @p1 THEN 1 ELSE 2 END
+                                LIMIT 1"
+                            : @"SELECT Id
+                                FROM diy_lang
+                                WHERE Id = @p0 OR `Key` = @p1
+                                ORDER BY CASE WHEN Id = @p0 THEN 0 ELSE 1 END
+                                LIMIT 1";
+                        var existingCommand = db.FromSql(existingSql)
+                            .AddInParameter("p0", TokenString(row, "Id"));
+                        if (hasKeyHashColumn)
+                        {
+                            existingCommand
+                                .AddInParameter("p1", TokenString(row, "KeyHash"))
+                                .AddInParameter("p2", TokenString(row, "Key"));
+                        }
+                        else
+                        {
+                            existingCommand.AddInParameter("p1", TokenString(row, "Key"));
+                        }
+                        var existing = existingCommand
+                            .ToList<dynamic>()
+                            .Select(ToJObjectSafe)
+                            .FirstOrDefault();
+                        var existingId = TokenString(existing, "Id");
+                        if (IsBlank(existingId))
+                        {
+                            throw;
+                        }
+                        row["Id"] = existingId;
+                        updateById(existingId);
+                    }
                 }
                 else
                 {
@@ -3224,21 +3443,87 @@ namespace Microi.net
                     {
                         return Task.FromResult(new DosResult(0, row, "diy_lang row Id is required for update."));
                     }
-                    var updateValues = values
-                        .Where(prop => !string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase)
-                                       && !string.Equals(prop.Name, "CreateTime", StringComparison.OrdinalIgnoreCase))
-                        .ToList();
-                    var setters = updateValues.Select((prop, index) => $"`{prop.Name}` = @p{index}").ToList();
-                    var cmd = db.FromSql($"UPDATE diy_lang SET {string.Join(",", setters)} WHERE Id = @p{updateValues.Count}");
-                    for (var i = 0; i < updateValues.Count; i++)
-                    {
-                        cmd.AddInParameter($"p{i}", TokenString(updateValues[i].Value));
-                    }
-                    cmd.AddInParameter($"p{updateValues.Count}", id);
-                    cmd.ExecuteNonQuery();
+                    updateById(id);
                 }
                 return Task.FromResult(new DosResult(1, row, isNew ? "Added." : "Updated."));
             });
+        }
+
+        internal static string BuildDeterministicDiyLangRowId(string osClient, string key)
+        {
+            var identity = string.Join("\n", new[]
+            {
+                "microi:diy_lang:v1",
+                (osClient ?? "").Trim().ToLowerInvariant(),
+                (key ?? "").Trim().ToLowerInvariant()
+            });
+            using (var sha256 = SHA256.Create())
+            {
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(identity));
+                var guidBytes = new byte[16];
+                Buffer.BlockCopy(hash, 0, guidBytes, 0, guidBytes.Length);
+                return new Guid(guidBytes).ToString();
+            }
+        }
+
+        internal static string BuildDiyLangKeyHash(string key)
+        {
+            var normalizedKey = (key ?? "").Trim().ToLowerInvariant();
+            using (var sha256 = SHA256.Create())
+            {
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(normalizedKey));
+                var result = new StringBuilder(hash.Length * 2);
+                foreach (var value in hash)
+                {
+                    result.Append(value.ToString("x2"));
+                }
+                return result.ToString();
+            }
+        }
+
+        internal static bool ApplyDiyLangKeyHashForPhysicalColumns(JObject row, ISet<string> physicalColumns)
+        {
+            if (row == null
+                || physicalColumns == null
+                || !physicalColumns.Contains("KeyHash"))
+            {
+                return false;
+            }
+
+            var key = TokenString(row, "Key");
+            if (IsBlank(key))
+            {
+                return false;
+            }
+
+            row["KeyHash"] = BuildDiyLangKeyHash(key);
+            return true;
+        }
+
+        private static bool IsDiyLangDuplicateKeyException(Exception exception)
+        {
+            for (var current = exception; current != null; current = current.InnerException)
+            {
+                var message = current.Message ?? "";
+                if (message.IndexOf("Duplicate entry", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("duplicate key", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("unique constraint", StringComparison.OrdinalIgnoreCase) >= 0
+                    || message.IndexOf("ORA-00001", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+
+                var numberProperty = current.GetType().GetProperty("Number");
+                if (numberProperty != null)
+                {
+                    var numberText = Convert.ToString(numberProperty.GetValue(current));
+                    if (numberText == "1062" || numberText == "2601" || numberText == "2627")
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         private static string GetExistingMetadataTranslation(string osClient, string sourceText, string langField)
@@ -3446,6 +3731,37 @@ namespace Microi.net
             }
         }
 
+        private static List<string> GetDiyLangTranslateSensitiveTokens(string osClient)
+        {
+            var result = new HashSet<string>(StringComparer.Ordinal);
+            AddDiyLangTranslateSensitiveTokens(result, osClient);
+            var configOsClient = OsClientExtend.GetConfigOsClient();
+            if (!IsBlank(configOsClient)
+                && !string.Equals(configOsClient, osClient, StringComparison.OrdinalIgnoreCase))
+            {
+                AddDiyLangTranslateSensitiveTokens(result, configOsClient);
+            }
+            return result.ToList();
+        }
+
+        private static void AddDiyLangTranslateSensitiveTokens(HashSet<string> target, string osClient)
+        {
+            if (target == null || IsBlank(osClient)) return;
+            try
+            {
+                var config = OsClientExtend.GetClient(osClient)?.OsClientModel;
+                foreach (var field in new[] { "TranslateKey", "TranslateSecret", "TranslateApiKey" })
+                {
+                    var value = TokenString(config?[field]);
+                    if (!IsBlank(value)) target.Add(value);
+                }
+            }
+            catch
+            {
+                // Diagnostics must fail closed even while tenant configuration reloads.
+            }
+        }
+
         private static string GetTranslateProviderKeyFromConfig(JObject config)
         {
             if (config == null)
@@ -3514,7 +3830,12 @@ namespace Microi.net
             DiyLangTranslateUnavailable[unavailableCacheKey] = DateTime.UtcNow;
             if (isFirstMark)
             {
-                WriteDiyLangLog(osClient, "TranslationBackoff", "多语言自动翻译暂不可用，已降级为仅同步词条", $"10 分钟内暂停自动翻译。{message}", 2);
+                WriteDiyLangLog(
+                    osClient,
+                    "TranslationBackoff",
+                    "多语言自动翻译暂不可用，已降级为仅同步词条",
+                    $"10 分钟内暂停自动翻译。{SanitizeDiyLangDiagnosticText(message, providerKey, 500, GetDiyLangTranslateSensitiveTokens(osClient))}",
+                    2);
             }
         }
 

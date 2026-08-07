@@ -174,6 +174,8 @@ export default {
             resolveGeneration: 0,
             mountWatchdog: null,
             autoMountRetryCount: 0,
+            mountReadyGeneration: 0,
+            mountReadyAttempt: -1,
             hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
             resizeObserver: null,
             visualViewportHandler: null,
@@ -208,6 +210,8 @@ export default {
                 systemTitle: this.diyStore.SysConfig?.SysTitle || this.diyStore.SysConfig?.SysShortTitle || DiyCommon.GetOsClient(),
                 systemShortTitle: this.diyStore.SysConfig?.SysShortTitle || "",
                 hostCapabilities: createMicroAppHostCapabilities(),
+                hostGeneration: this.resolveGeneration,
+                hostMountAttempt: this.retryKey,
                 hostViewport: this.hostViewport,
                 microRoute: this.microRoutePath,
                 route: {
@@ -290,6 +294,15 @@ export default {
                 return;
             }
             const type = String(payload?.type || payload?.Type || "").toLowerCase();
+            if (type === "micro-app:ready") {
+                const data = payload?.data ?? payload?.Data ?? {};
+                const readyGeneration = Number(data?.hostGeneration || data?.HostGeneration || 0);
+                const readyAttempt = Number(data?.hostMountAttempt ?? data?.HostMountAttempt ?? -1);
+                if (readyGeneration && readyGeneration !== this.resolveGeneration) return;
+                if (readyAttempt >= 0 && readyAttempt !== this.retryKey) return;
+                this.markMicroAppReady();
+                return;
+            }
             if (type === "micro-app:interaction") {
                 window.dispatchEvent(new CustomEvent("microi:close-global-overlays"));
                 return;
@@ -446,9 +459,13 @@ export default {
             this.retry();
         },
         handleMounted() {
-            this.clearMountWatchdog();
-            this.mountState = "mounted";
             this.pushViewportContract();
+            if (this.mountReadyGeneration === this.resolveGeneration && this.mountReadyAttempt === this.retryKey) {
+                this.markMicroAppReady();
+                return;
+            }
+            this.mountState = "settling";
+            this.startContentWatchdog(this.resolveGeneration, this.retryKey);
         },
         handleUnmount() {
             this.clearMountWatchdog();
@@ -479,6 +496,51 @@ export default {
                 this.recoverMountFailure("微服务首次挂载超时，宿主已尝试自动恢复。", "MICRO_APP_MOUNT_TIMEOUT");
             }, 12000);
         },
+        markMicroAppReady() {
+            this.clearMountWatchdog();
+            this.mountReadyGeneration = this.resolveGeneration;
+            this.mountReadyAttempt = this.retryKey;
+            this.mountState = "mounted";
+            this.pushViewportContract();
+        },
+        hasRenderableMicroAppContent() {
+            const app = this.$refs.microApp;
+            if (!app || typeof app.querySelector !== "function") return null;
+            const body = app.querySelector("micro-app-body");
+            // 旧微应用或其它隔离模式可能无法从宿主查看 body，
+            // 返回 null 表示保留 mounted 兼容语义，不误判为白屏。
+            if (!body) return null;
+            const appRoot = body.querySelector("#app");
+            if (appRoot) {
+                return appRoot.childElementCount > 0 || String(appRoot.textContent || "").trim().length > 0;
+            }
+            return Array.from(body.children || []).some((element) =>
+                !["SCRIPT", "STYLE", "LINK"].includes(String(element.tagName || "").toUpperCase())
+                && (element.childElementCount > 0 || String(element.textContent || "").trim().length > 0)
+            );
+        },
+        startContentWatchdog(generation, attempt) {
+            this.clearMountWatchdog();
+            const deadline = Date.now() + 4000;
+            const inspect = () => {
+                if (generation !== this.resolveGeneration || attempt !== this.retryKey || this.error) return;
+                if (this.mountReadyGeneration === generation && this.mountReadyAttempt === attempt) {
+                    this.markMicroAppReady();
+                    return;
+                }
+                const hasContent = this.hasRenderableMicroAppContent();
+                if (hasContent === true || hasContent === null) {
+                    this.markMicroAppReady();
+                    return;
+                }
+                if (Date.now() < deadline) {
+                    this.mountWatchdog = setTimeout(inspect, 250);
+                    return;
+                }
+                this.recoverMountFailure("微服务容器已挂载，但子应用未渲染任何内容，宿主已尝试自动恢复。", "MICRO_APP_CONTENT_EMPTY");
+            };
+            this.mountWatchdog = setTimeout(inspect, 250);
+        },
         async destroyStuckMicroApp() {
             try {
                 if (typeof window.microApp?.unmountApp === "function") {
@@ -497,6 +559,8 @@ export default {
                 await this.destroyStuckMicroApp();
                 if (generation !== this.resolveGeneration) return;
                 this.retryKey += 1;
+                this.mountReadyGeneration = 0;
+                this.mountReadyAttempt = -1;
                 this.mountState = "mounting";
                 await this.$nextTick();
                 this.startMountWatchdog(generation);
@@ -703,6 +767,8 @@ export default {
         async resolveEntryUrl() {
             const generation = ++this.resolveGeneration;
             this.clearMountWatchdog();
+            this.mountReadyGeneration = 0;
+            this.mountReadyAttempt = -1;
             this.loading = true;
             this.error = "";
             this.entryUrl = "";
