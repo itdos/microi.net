@@ -248,7 +248,11 @@ function Test-IsWorkspaceFrontend($ProcessInfo) {
     $processName = ([string]$ProcessInfo.Name).ToLowerInvariant()
     if ($processName -ne 'node.exe') { return $false }
     $text = Get-CommandText $ProcessInfo
-    $isVite = $text.Contains('node_modules\vite\bin\vite')
+    # npm on Windows may launch Vite through the `.bin\\..` shim, leaving a
+    # command such as `node_modules\.bin\\..\vite\bin\vite.js`. Recognize the
+    # stable node_modules + Vite entry suffix; ownership still requires either
+    # the absolute frontend root in the command or an exact process CWD match.
+    $isVite = $text.Contains('node_modules\') -and $text.Contains('\vite\bin\vite')
     if (-not $isVite -and -not $text.Contains('npm-cli.js')) { return $false }
     if ($text.Contains($frontendRoot)) { return $true }
 

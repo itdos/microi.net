@@ -1158,6 +1158,41 @@ namespace Microi.net.Api
                     return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
                 }
                 RestrictSelfServiceUpdate(param, currentUserId);
+
+            }
+
+            // 已登记 Passkey/严格人脸因子的用户修改自己的密码时必须进行二次认证。
+            // 该规则同样适用于平台管理员自助改密；管理员重置他人密码属于独立授权场景。
+            // 未登记任何因子的历史用户继续使用旧密码校验，避免升级后自锁。
+            var passwordActorUserId = currentUser["Id"].Val<string>();
+            var isSelfPasswordChange = !param.NewPwd.DosIsNullOrWhiteSpace()
+                && (param.Id.DosIsNullOrWhiteSpace() || string.Equals(param.Id, passwordActorUserId, StringComparison.Ordinal));
+            if (isSelfPasswordChange)
+            {
+                var identityOptions = IdentityVerificationOptions.Resolve(currentToken.OsClient);
+                if (identityOptions.Enabled
+                    && identityOptions.RequirePasswordChangeStepUp
+                    && await IdentityVerificationSecurity.UserHasStepUpFactorAsync(
+                        currentToken.OsClient,
+                        passwordActorUserId,
+                        identityOptions.PasskeyEnabled,
+                        identityOptions.FaceEnabled && !identityOptions.FaceApiBase.DosIsNullOrWhiteSpace()).ConfigureAwait(false))
+                {
+                    var expectedActionHash = IdentityVerificationSecurity.ComputePasswordChangeActionHash(
+                        passwordActorUserId,
+                        param.NewPwd);
+                    var ticketResult = await IdentityVerificationSecurity.ConsumeTicketAsync(
+                        currentToken.OsClient,
+                        passwordActorUserId,
+                        param._IdentityVerificationTicket,
+                        "ChangePassword",
+                        expectedActionHash).ConfigureAwait(false);
+                    if (ticketResult.Code != 1)
+                    {
+                        Response.StatusCode = 403;
+                        return Json(new DosResult(0, null, ticketResult.Msg));
+                    }
+                }
             }
 
             // 小程序保存个人资料前复核头像审核记录，并同步检测用户填写的文本内容。

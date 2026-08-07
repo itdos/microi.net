@@ -74,6 +74,7 @@
   "copy-module.md" : "模块复制",
   "hdfs.md" : "分布式存储",
   "security.md" : "平台安全与兼容基线",
+  "identity-verification.md" : "Passkey与人脸验证",
   "office.md" : "Office在线编辑",
   "dos-result.md" : "DosResult说明",
   "db-dictionary.md" : "平台数据库表说明",

@@ -23,6 +23,15 @@ namespace Microi.net
                 return ApiEngineRoleAuthorizationResult.Allow();
             }
 
+            // 平台超级管理员已经通过登录身份、租户边界和访问密钥白名单校验。
+            // 历史接口引擎 ApiRole 可能只保存旧角色 Id，不能反过来阻止 Level=999
+            // 的平台管理员执行受信任后台任务。
+            if (int.TryParse(currentUser["Level"]?.ToString(), out var level)
+                && level >= DiyCommon.MaxRoleLevel)
+            {
+                return ApiEngineRoleAuthorizationResult.Allow();
+            }
+
             if (!TryReadOnlyGet(currentUser, out var hasOnlyGet))
             {
                 return ApiEngineRoleAuthorizationResult.Deny(false, false, true);
