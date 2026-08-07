@@ -108,7 +108,7 @@ test("build ZIP reads every real compiled file and strips only its build root", 
 });
 
 test("upgrade rejects stale publisher and stale source/build ZIP engines", () => {
-  assert.match(upgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 4, 4\)/);
+  assert.match(upgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 6, 0\)/);
   assert.match(upgradeSource, /SOURCE_BUILD_ARCHIVE_ROOTS_V1/);
   assert.match(upgradeSource, /ai_app_download_build_zip[\s\S]*?REAL_BUILD_ZIP_ASSETS_V1/);
   assert.match(upgradeSource, /ai_app_download_source_zip[\s\S]*?SOURCE_ONLY_ZIP_ROOT_V1/);

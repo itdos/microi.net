@@ -1,29 +1,32 @@
 ---
 name: v8-security
-description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆业务秘密、Passkey/人脸步进验证、接口引擎安全、密钥管理、SQL 注入、匿名端点、文件上传和租户隔离。
+description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆业务秘密、Passkey/TOTP/人脸步进验证、接口引擎安全、密钥管理、SQL 注入、匿名端点、文件上传和租户隔离。
 ---
 
 # Microi V8 安全最佳实践
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。
 
-## 0. 租户业务密钥放 OsClientModel（基础设施密钥由服务端托管）
+## 0. 租户动态系统设置与密钥边界
 
-第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。受保护的 `sys_osclients` 表可扩展租户自有业务集成字段；只有可信控制面能维护，普通角色不能通过 FormEngine 直接读写：
+第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。新增租户业务配置使用当前租户数据库的 `mci_system_setting`；数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。
 
 ```javascript
-// ✅ 正确
-var openaiKey = V8.OsClientModel.OpenAIKey;
-var wxSecret  = V8.OsClientModel.WxPaySecret;
-var smtpPwd   = V8.OsClientModel.SmtpPassword;
+// ✅ 浏览器/前端 V8 只能读取管理员明确公开的普通设置
+var loginName = V8.SysConfig.PublicSettings['Login.Gitee.Name'];
+
+// ✅ Secret 由固定协议的可信后端原子能力读取和使用
+//    V8 只传业务参数，不能拿到 ClientSecret 原文。
 
 // ❌ 危险：密钥泄漏 / 跨租户串号
 var openaiKey = 'sk-xxxxxxxxxx';
 ```
 
-> `V8.OsClientModel` 与兼容别名 `V8.ClientModel` 均为独立脱敏副本：数据库连接、AuthSecret、Redis、对象存储、MQ、MQTT、Search 的地址与凭据不会注入脚本。当前租户自有的微信、支付、ERP 等业务密钥仍可能存在，因此仍严禁把整个对象或单个密钥返回前端。
+`V8.OsClientModel` 与兼容别名 `V8.ClientModel` 均为独立脱敏副本：数据库连接、AuthSecret、Redis、对象存储、MQ、MQTT、Search 的地址与凭据不会注入脚本。存量租户业务字段只作兼容，新增 Secret 不得继续依赖 `V8.OsClientModel`。
 
-`V8.SysConfig` 也是独立脱敏副本，`ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段不会注入脚本。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时服务端会强制使用当前 `OsClient`，不能借缓存命中读取主租户配置。
+`V8.SysConfig` 也是独立脱敏副本，`ClientSecrets`、`PwdV8`、`GlobalServerV8Code` 及疑似 Password/Secret/Token/Key/Connection 字段不会注入脚本。`V8.SysConfig.PublicSettings` 来自当前租户 `mci_system_setting`：每条记录可以动态设置 `IsPublic`，但 `IsSecret=1` 或 Key 命中 Password、Secret、Token、Credential、PrivateKey、AccessKey、ApiKey、ConnectionString、DbConn、Redis、MinIO、ClientSecret 等固定敏感片段时永远失败关闭。子租户调用 `V8.FormEngine.GetSysConfig(...)` 时服务端会强制使用当前 `OsClient`，不能借缓存命中读取主租户配置。
+
+Secret 只通过租户管理员专用端点写入租户绑定的认证密文。列表不返回密文或原文；临时显示必须消费 Passkey/TOTP/严格人脸一次性票据，设置 `no-store`，30 秒清除，审计不含原文。普通 FormEngine、可编辑 V8、匿名请求和访问密钥会话不得读取 `SecretCipher` 或获得通用解密器。
 
 共享基础设施只能通过受控能力访问：`V8.Cache` 自动绑定 `Microi:{OsClient}:*`，文件路径绑定 `/{OsClient}/...`，RabbitMQ 队列绑定 `microi.{OsClient}.*`，MQTT Topic 绑定 `tenant/{OsClient}/...`，Search 索引绑定 `{OsClient}_*`。V8 不得获得 Redis `IDatabase`、HDFS `ClientModel` 或原始基础设施配置。
 
@@ -292,9 +295,9 @@ V8.NotSaveField.push('SecretPlain');
 - 页面默认掩码，点击显示需二次确认，失焦/超时/路由离开后清除；禁止复制到 URL、LocalStorage 或前端日志。
 - DES 是存量兼容格式。新高价值秘密优先由可信 C# 原子能力使用带版本的现代认证加密和集中密钥管理，V8 仍只编排授权显示，不能获取主密钥。
 
-### Passkey、人脸与敏感操作票据
+### Passkey、Authenticator、人脸与敏感操作票据
 
-前端 V8 使用 `V8.Identity.Verify({Purpose,ActionHash,Method})` 完成人机交互，后端必须从数据库重读权威业务字段、按稳定版本/顺序重算 `ActionHash`，再消费票据：
+前端 V8 使用 `V8.Identity.Verify({Purpose,ActionHash,Method,Code})` 完成人机交互；`Method=Totp` 时 `Code` 是用户当前看到的 6 位动态口令。后端必须从数据库重读权威业务字段、按稳定版本/顺序重算 `ActionHash`，再消费票据：
 
 ```javascript
 var actionHash = V8.EncryptHelper.Sha256Hex(canonicalCommand);
@@ -310,8 +313,12 @@ if (verified.Code !== 1) return verified;
 - 前端提交的摘要、`Verified=true`、认证器名称或方法不能作为授权事实；访问密钥会话不能使用。
 - 票据只证明近期强身份，不代替菜单/表/行权限、业务状态机、事务、幂等或审计。
 - 设备指纹/Face ID/Windows Hello 优先走 WebAuthn/Passkey，不需要模型 Docker；只有严格服务端人脸/活体检测才通过 `Microi Face Gateway v1` 接入独立服务。
+- 标准 TOTP Authenticator 不需要 Docker，但 6 位码不能单独标识账号：登录时仍需账号；密钥只以租户绑定的认证密文保存，并用共享限流和已接受计数器阻止暴力尝试与重放。
+- 每个 Passkey/TOTP 分别保存 `AllowPasswordlessLogin` 与 `AllowStepUp`；登录和票据签发都必须服务端重新读取策略，不能只依赖个人中心开关的前端状态。
+- Gitee、微信、GitHub 等外部身份只允许登录已绑定的吾码用户；禁止按邮箱/昵称自动合并账号。OAuth state 与登录票据保存在共享 Redis、单次消费并绑定 `OsClient`/Provider/Origin；固定端点白名单，ClientSecret 只由可信后端读取，最终仍签发 DiyToken。
+- 官方升级通过 `app.microi.saas-engine` 应用包幂等安装身份表、`mci_system_setting`、`mci_user_external_identity`、默认设置、个人中心和系统设置微服务。默认设置按 `ConfigKey + InsertIfMissing` 补齐，不覆盖 `ValueSource=Tenant` 的租户值；Passkey、TOTP、总开关和改密步进验证默认开启，严格人脸及各外部 Provider 默认关闭。
 - 完整表、SaaS 字段、API 和启用顺序见 `microi.doc/docs/doc/more/identity-verification.md`。
-- 身份验证 HTTP 控制面统一位于 `/api/identityverification/`，业务页面优先使用 `V8.Identity`，不要自行复制 WebAuthn 序列化代码。
+- 身份验证 HTTP 控制面位于 `/api/identityverification/`，外部登录位于 `/api/externallogin/`，动态设置位于 `/api/tenantsystemsettings/`；业务页面优先使用 `V8.Identity` 或官方个人中心，不要自行复制 WebAuthn/OAuth 协议代码。
 
 ### 脱敏返回
 

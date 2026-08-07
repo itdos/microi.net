@@ -26,7 +26,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `more/dos-orm.md` | dos-orm, v8-sql-query | ORM 查询、参数和事务 |
 | `more/dos-result.md` | v8-utilities, v8-crud-api | DosResult/DosResultList 返回协议 |
 | `more/hdfs.md` | v8-file-upload | 分布式文件存储和 URL |
-| `more/identity-verification.md` | v8-security, v8-utilities, microi-microservice | DiyToken、Passkey、严格人脸、一次性步进票据和个人设置 |
+| `more/identity-verification.md` | v8-security, v8-utilities, microi-microservice, app-store, v8-saas-multi-tenant | DiyToken、登录方式气泡、Passkey、Authenticator TOTP、Gitee/微信/GitHub、动态租户设置、严格人脸、一次性步进票据、个人中心和自动升级包 |
 | `more/office.md` | v8-export-import, microi-microservice | Office 导入导出与在线编辑集成 |
 | `more/security.md` | v8-security | 平台安全和兼容基线 |
 | `more/sys-config.md` | v8-utilities, microi-deployment | 系统/租户配置和敏感边界 |

@@ -83,13 +83,7 @@
                         <el-dropdown-item @click="OpenPersonalSettings">
                             <span style="display: block">
                                 <el-icon><User /></el-icon>
-                                {{ "个人设置" }}</span
-                            >
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="OpenUptPwd">
-                            <span style="display: block">
-                                <el-icon><Setting /></el-icon>
-                                {{ "修改密码" }}</span
+                                {{ "个人中心" }}</span
                             >
                         </el-dropdown-item>
                         <!-- <el-dropdown-item v-if="hasWebOS" @click="GotoWebOSDesktop">
@@ -378,13 +372,6 @@ export default {
                     console.warn('[聊天图标] WebSocket未就绪，稍后再试...');
                 }
             }
-        },
-        // 修改密码
-        OpenUptPwd() {
-            this.$router.push({
-                path: "/micro-app/microi-platform-service/personal-settings",
-                query: { section: "security", action: "password" }
-            }).catch(() => {});
         },
         GetCurrentUserAvatar() {
             return this.CurrentUserAvatarUrl || "./static/img/icon/personal.png";

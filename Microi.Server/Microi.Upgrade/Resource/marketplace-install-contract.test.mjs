@@ -16,8 +16,25 @@ function parseButtons(value) {
   return value ? JSON.parse(value) : [];
 }
 
+function compareSemver(actual, minimum) {
+  const parse = (value) => String(value || "")
+    .replace(/^v/i, "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10));
+  const left = parse(actual);
+  const right = parse(minimum);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const delta = (left[index] || 0) - (right[index] || 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
 test("application-store package hides every install mutation on the official platform", () => {
-  assert.equal(packageModel.PackageInfo.Version, "v7.1.2");
+  assert.ok(
+    compareSemver(packageModel.PackageInfo.Version, "v7.1.3") >= 0,
+    `application-store package must be at least v7.1.3, got ${packageModel.PackageInfo.Version}`
+  );
   const menu = packageModel.SysMenus.find((item) => item.Url === "/microi-store");
   assert.ok(menu, "application-store menu is missing");
 

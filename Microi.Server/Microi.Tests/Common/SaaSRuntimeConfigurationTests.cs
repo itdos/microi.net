@@ -365,6 +365,13 @@ public class SaaSRuntimeConfigurationTests
 
         Assert.Contains("if [ \"${1:-}\" = '--repair-app' ]", installer);
         Assert.Contains("repair_migrate_app_to_internal_network", installer);
+        Assert.Contains("repair_extract_api_environment_block", installer);
+        Assert.Contains(
+            "in_environment && /^    [A-Za-z0-9_.-]+:/ { exit }",
+            installer);
+        Assert.Contains(
+            "done < <(sed -n -E 's/^[[:space:]]{6}([A-Za-z][A-Za-z0-9_]*):.*/\\1/p' \"${environment_block}\")",
+            installer);
         Assert.Contains("repair_validate_runtime_environment", installer);
         Assert.Contains("repair_restore_previous_app_images", installer);
         Assert.Contains(".repair-backups", installer);

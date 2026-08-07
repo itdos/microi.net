@@ -50,7 +50,7 @@
 | `V8.Method.GetCurrentToken(token,osClient)` | 读取当前 Token 对象；不透传前端 |
 | `V8.Method.RefreshLoginUser(userId,osClient)` | 刷新用户登录缓存 |
 | `V8.Method.ClearUserLoginInfo(userId,osClient)` | 管理员吊销用户全部终端 Token |
-| `V8.Method.ConsumeIdentityVerificationTicket({Ticket,Purpose,ActionHash})` | 按当前 DiyToken 用户、租户、用途和操作摘要原子消费一次性 Passkey/人脸票据 |
+| `V8.Method.ConsumeIdentityVerificationTicket({Ticket,Purpose,ActionHash})` | 按当前 DiyToken 用户、租户、用途和操作摘要原子消费一次性 Passkey/TOTP/人脸票据 |
 | `V8.Method.GetPrivateFileUrl({FilePathName})` | 签发当前租户短期私有文件代理地址 |
 | `V8.Method.Upload(options)` | 受配额限制的上传 |
 | `V8.Method.AddSysLog(options)` | 结构化系统日志 |

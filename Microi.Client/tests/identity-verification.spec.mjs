@@ -7,6 +7,7 @@ import {
     createPasswordChangeActionHash,
     getIdentityCapabilities,
     isPasskeySupported,
+    runExternalLogin,
     sha256Hex
 } from "../src/utils/identity-verification.js";
 
@@ -103,17 +104,92 @@ test("Passkey 只在安全上下文且浏览器认证器可用时启用", () => 
     }
 });
 
+test("外部登录通过弹窗回传一次性票据并最终换取 DiyToken 登录结果", async () => {
+    const oldWindow = globalThis.window;
+    const oldScreen = globalThis.screen;
+    const oldNavigator = globalThis.navigator;
+    const listeners = new Map();
+    const popup = {
+        closed: false,
+        document: { title: "" },
+        location: { replace() {} },
+        resizeTo() {},
+        close() { this.closed = true; }
+    };
+    const calls = [];
+    try {
+        Object.defineProperty(globalThis, "screen", { configurable: true, value: { width: 1440, height: 900 } });
+        Object.defineProperty(globalThis, "navigator", { configurable: true, value: {} });
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                location: { origin: "https://os.example.com", href: "https://os.example.com/#/login" },
+                screenX: 0,
+                screenY: 0,
+                outerWidth: 1440,
+                outerHeight: 900,
+                open: () => popup,
+                addEventListener: (name, handler) => listeners.set(name, handler),
+                removeEventListener: (name, handler) => {
+                    if (listeners.get(name) === handler) listeners.delete(name);
+                }
+            }
+        });
+        const diyCommon = {
+            GetDid: () => "did-1",
+            PostAsync: async (url, payload) => {
+                calls.push({ url, payload });
+                if (url.endsWith("/Begin")) {
+                    setTimeout(() => listeners.get("message")?.({
+                        source: popup,
+                        origin: "https://api.example.com",
+                        data: { type: "microi-external-login", provider: "Gitee", success: true, ticket: "opaque-ticket" }
+                    }), 0);
+                    return { Code: 1, Data: {
+                        AuthorizeUrl: "https://gitee.com/oauth/authorize?state=opaque",
+                        CallbackUrl: "https://api.example.com/api/ExternalLogin/Callback",
+                        Popup: { Width: 720, Height: 760 }
+                    } };
+                }
+                return { Code: 1, Data: { Id: "user-1" }, DataAppend: { LoginMethod: "External:Gitee" } };
+            }
+        };
+
+        const result = await runExternalLogin({ diyCommon, osClient: "iTdos", provider: "Gitee" });
+
+        assert.equal(result.Code, 1);
+        assert.equal(calls[0].url, "/api/ExternalLogin/Begin");
+        assert.equal(calls[0].payload.ReturnOrigin, "https://os.example.com");
+        assert.equal(calls[1].url, "/api/ExternalLogin/CompleteLogin");
+        assert.equal(calls[1].payload.Ticket, "opaque-ticket");
+        assert.equal(calls[1].payload.Did, "did-1");
+    } finally {
+        Object.defineProperty(globalThis, "window", { configurable: true, value: oldWindow });
+        Object.defineProperty(globalThis, "screen", { configurable: true, value: oldScreen });
+        Object.defineProperty(globalThis, "navigator", { configurable: true, value: oldNavigator });
+    }
+});
+
 test("客户端入口、V8 挂载和个人设置路由保持同一契约", async () => {
-    const [login, navbar, mobileProfile, form, table, helper] = await Promise.all([
+    const [login, navbar, mobileProfile, form, table, helper, app, router] = await Promise.all([
         readFile(new URL("../src/views/login/index.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/layout/components/Navbar.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/mobile/profile.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/form-engine/diy-form.vue", import.meta.url), "utf8"),
         readFile(new URL("../src/views/form-engine/diy-table.vue", import.meta.url), "utf8"),
-        readFile(new URL("../src/utils/v8-identity-verification.js", import.meta.url), "utf8")
+        readFile(new URL("../src/utils/v8-identity-verification.js", import.meta.url), "utf8"),
+        readFile(new URL("../src/App.vue", import.meta.url), "utf8"),
+        readFile(new URL("../src/router/index.js", import.meta.url), "utf8")
     ]);
 
     assert.match(login, /LoginWithPasskey/);
+    assert.match(login, /生物登录/);
+    assert.match(login, /登录方式/);
+    assert.match(login, /class="identity-login-entry"[\s\S]*?@mouseenter="OpenLoginMethods"/);
+    assert.match(login, /@click\.stop="OpenLoginMethods"/);
+    assert.match(login, /v-if="LoginMethodsVisible"[\s\S]*?class="login-methods-popper login-methods-panel"/);
+    assert.match(login, /LoginWithExternal/);
+    assert.match(login, /LoginWithTotp/);
     assert.match(login, /LoginWithFace/);
     assert.match(navbar, /microi-platform-service\/personal-settings/);
     assert.match(mobileProfile, /microi-platform-service\/personal-settings/);
@@ -121,11 +197,17 @@ test("客户端入口、V8 挂载和个人设置路由保持同一契约", async
     assert.match(table, /initV8IdentityVerification/);
     assert.match(helper, /ConsumeIdentityVerificationTicket/);
     assert.match(helper, /ActionHash/);
+    assert.match(helper, /verifyWithTotp/);
+    assert.match(helper, /HasStepUpTotp/);
+    assert.match(helper, /6 位 Code/);
+    assert.match(router, /path: "\/login"[\s\S]*?anonymous: true/);
+    assert.match(app, /anonymousHashPaths = \["#\/login", "#\/access-login", "#\/mci-redis-manager", "#\/online-office"\]/);
 });
 
-test("改密票据客户端具备 Passkey 优先与严格人脸回退", async () => {
+test("改密票据客户端具备 Passkey 优先、TOTP 与严格人脸回退", async () => {
     const source = await readFile(new URL("../src/utils/identity-verification.js", import.meta.url), "utf8");
     assert.match(source, /capabilities\.PasskeyEnabled && capabilities\.HasPasskey/);
+    assert.match(source, /capabilities\.TotpEnabled && capabilities\.HasStepUpTotp/);
     assert.match(source, /capabilities\.FaceEnabled && capabilities\.HasFace/);
     assert.match(source, /purpose: "ChangePassword"/);
 });
