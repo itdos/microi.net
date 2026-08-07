@@ -37,6 +37,242 @@ const FORBIDDEN_APPLICATION_ASSET_FILES = [
     /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
     /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
 ];
+const OCR_MAX_FILE_BYTES = 100 * 1024 * 1024;
+const OCR_MAX_BASE64_CHARACTERS = Math.ceil(OCR_MAX_FILE_BYTES / 3) * 4 + 512;
+const OCR_ALLOWED_EXTENSIONS = new Set([
+    '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tif', '.tiff', '.webp',
+]);
+function normalizeOcrFileName(value) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed)
+        return undefined;
+    if (trimmed.includes('\0'))
+        throw new Error('fileName 不能包含空字符。');
+    const fileName = path.basename(trimmed);
+    if (!fileName || fileName === '.' || fileName === '..') {
+        throw new Error('fileName 无效。');
+    }
+    if (fileName.length > 255)
+        throw new Error('fileName 不能超过 255 个字符。');
+    const extension = path.extname(fileName).toLowerCase();
+    if (extension && !OCR_ALLOWED_EXTENSIONS.has(extension)) {
+        throw new Error('OCR 仅支持 PDF、PNG、JPEG、GIF、BMP、TIFF 或 WebP 文件。');
+    }
+    return fileName;
+}
+function decodeMcpOcrBase64(value) {
+    const trimmed = value.trim();
+    const commaIndex = /^data:[^;,]+;base64,/iu.test(trimmed) ? trimmed.indexOf(',') : -1;
+    const normalized = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed).replace(/\s/gu, '');
+    if (!normalized)
+        throw new Error('fileByteBase64 不能为空。');
+    if (normalized.length > OCR_MAX_BASE64_CHARACTERS) {
+        throw new Error('OCR 文件超过 MCP 100 MB 硬上限。');
+    }
+    if (normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized)) {
+        throw new Error('fileByteBase64 不是有效的 Base64 内容。');
+    }
+    const bytes = Buffer.from(normalized, 'base64');
+    const canonicalInput = normalized.replace(/=+$/u, '');
+    const canonicalDecoded = bytes.toString('base64').replace(/=+$/u, '');
+    if (canonicalInput !== canonicalDecoded) {
+        throw new Error('fileByteBase64 不是规范的 Base64 内容。');
+    }
+    if (bytes.length === 0 || bytes.length > OCR_MAX_FILE_BYTES) {
+        throw new Error('OCR 文件必须大于 0 字节且不超过 MCP 100 MB 硬上限。');
+    }
+    return bytes;
+}
+/**
+ * Resolve one MCP OCR input without following symlinks or accepting caller-controlled
+ * tenant/network configuration. The backend repeats magic-byte and tenant-limit checks.
+ */
+export function prepareMcpOcrInput(input) {
+    const hasPath = Boolean(input.filePath?.trim());
+    const hasBase64 = Boolean(input.fileByteBase64?.trim());
+    if (hasPath === hasBase64) {
+        throw new Error('filePath 与 fileByteBase64 必须且只能提供一个。');
+    }
+    let bytes;
+    let fileName = normalizeOcrFileName(input.fileName);
+    if (hasPath) {
+        const requestedPath = String(input.filePath).trim();
+        if (!path.isAbsolute(requestedPath))
+            throw new Error('filePath 必须是绝对路径。');
+        const stat = fs.lstatSync(requestedPath);
+        if (stat.isSymbolicLink())
+            throw new Error('filePath 不能是符号链接。');
+        if (!stat.isFile())
+            throw new Error('filePath 必须指向普通文件。');
+        if (stat.size <= 0 || stat.size > OCR_MAX_FILE_BYTES) {
+            throw new Error('OCR 文件必须大于 0 字节且不超过 MCP 100 MB 硬上限。');
+        }
+        const localFileName = normalizeOcrFileName(path.basename(requestedPath));
+        if (!localFileName || !path.extname(localFileName)) {
+            throw new Error('本地 OCR 文件必须使用受支持的扩展名。');
+        }
+        fileName = fileName || localFileName;
+        bytes = fs.readFileSync(requestedPath);
+        if (bytes.length !== stat.size)
+            throw new Error('OCR 文件在读取期间发生变化，请重试。');
+    }
+    else {
+        bytes = decodeMcpOcrBase64(String(input.fileByteBase64));
+    }
+    return {
+        request: {
+            FileByteBase64: bytes.toString('base64'),
+            FileName: fileName,
+            UseDocOrientationClassify: input.useDocOrientationClassify,
+            UseDocUnwarping: input.useDocUnwarping,
+            UseTextlineOrientation: input.useTextlineOrientation,
+            TextRecScoreThresh: input.textRecScoreThresh,
+            ReturnWordBox: input.returnWordBox,
+        },
+        byteLength: bytes.length,
+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        auditFileName: fileName || '(unnamed OCR input)',
+    };
+}
+export function buildMcpOcrResult(value, options = {}) {
+    if (!value)
+        return null;
+    const maxTextChars = Math.max(1_000, Math.min(200_000, options.maxTextChars || 100_000));
+    const sourceText = String(value.Text || '');
+    const result = {
+        Provider: value.Provider,
+        TraceId: value.TraceId,
+        FileName: value.FileName,
+        FileType: value.FileType,
+        Text: sourceText.slice(0, maxTextChars),
+        AverageConfidence: value.AverageConfidence,
+        PageCount: value.PageCount,
+        ElapsedMilliseconds: value.ElapsedMilliseconds,
+        TextTruncated: sourceText.length > maxTextChars,
+    };
+    if (!options.includePages)
+        return result;
+    let remainingPageCharacters = maxTextChars;
+    result.Pages = (value.Pages || []).map(page => {
+        const pageText = String(page.Text || '');
+        const visibleText = pageText.slice(0, remainingPageCharacters);
+        remainingPageCharacters = Math.max(0, remainingPageCharacters - visibleText.length);
+        if (visibleText.length < pageText.length)
+            result.TextTruncated = true;
+        return {
+            PageIndex: page.PageIndex,
+            Text: visibleText,
+            AverageConfidence: page.AverageConfidence,
+            ...(options.includeRegions ? { Regions: page.Regions || [] } : {}),
+        };
+    });
+    return result;
+}
+const TRANSLATE_MAX_FILE_BYTES = 20 * 1024 * 1024;
+const TRANSLATE_MAX_RESULT_BYTES = 25 * 1024 * 1024;
+const TRANSLATE_INLINE_RESULT_BYTES = 2 * 1024 * 1024;
+const TRANSLATE_MAX_BASE64_CHARACTERS = Math.ceil(TRANSLATE_MAX_FILE_BYTES / 3) * 4 + 512;
+const TRANSLATE_ALLOWED_EXTENSIONS = new Set([
+    '.txt', '.html', '.htm', '.odt', '.odp', '.docx', '.pptx', '.xlsx', '.epub', '.pdf',
+]);
+function normalizeTranslateFileName(value) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed || trimmed.includes('\0'))
+        throw new Error('fileName 无效。');
+    const fileName = path.basename(trimmed);
+    if (!fileName || fileName === '.' || fileName === '..' || fileName.length > 255) {
+        throw new Error('fileName 无效或超过 255 个字符。');
+    }
+    if (!TRANSLATE_ALLOWED_EXTENSIONS.has(path.extname(fileName).toLowerCase())) {
+        throw new Error('文件翻译仅支持 TXT、HTML、ODT、ODP、DOCX、PPTX、XLSX、EPUB 或 PDF。');
+    }
+    return fileName;
+}
+function decodeTranslateBase64(value) {
+    const trimmed = value.trim();
+    const commaIndex = /^data:[^;,]+;base64,/iu.test(trimmed) ? trimmed.indexOf(',') : -1;
+    const normalized = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed).replace(/\s/gu, '');
+    if (!normalized || normalized.length > TRANSLATE_MAX_BASE64_CHARACTERS) {
+        throw new Error('翻译文件必须大于 0 字节且不超过 20 MB。');
+    }
+    if (normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized)) {
+        throw new Error('fileByteBase64 不是有效的 Base64 内容。');
+    }
+    const bytes = Buffer.from(normalized, 'base64');
+    if (bytes.length === 0 || bytes.length > TRANSLATE_MAX_FILE_BYTES
+        || bytes.toString('base64').replace(/=+$/u, '') !== normalized.replace(/=+$/u, '')) {
+        throw new Error('fileByteBase64 无效或超过 20 MB。');
+    }
+    return bytes;
+}
+export function prepareMcpTranslateFileInput(input) {
+    const hasPath = Boolean(input.filePath?.trim());
+    const hasBase64 = Boolean(input.fileByteBase64?.trim());
+    if (hasPath === hasBase64)
+        throw new Error('filePath 与 fileByteBase64 必须且只能提供一个。');
+    if (!String(input.targetLang || '').trim())
+        throw new Error('targetLang 不能为空。');
+    let bytes;
+    let fileName;
+    if (hasPath) {
+        const requestedPath = String(input.filePath).trim();
+        if (!path.isAbsolute(requestedPath))
+            throw new Error('filePath 必须是绝对路径。');
+        const stat = fs.lstatSync(requestedPath);
+        if (stat.isSymbolicLink() || !stat.isFile())
+            throw new Error('filePath 必须指向非符号链接的普通文件。');
+        if (stat.size <= 0 || stat.size > TRANSLATE_MAX_FILE_BYTES) {
+            throw new Error('翻译文件必须大于 0 字节且不超过 20 MB。');
+        }
+        fileName = normalizeTranslateFileName(input.fileName || path.basename(requestedPath));
+        bytes = fs.readFileSync(requestedPath);
+        if (bytes.length !== stat.size)
+            throw new Error('翻译文件在读取期间发生变化，请重试。');
+    }
+    else {
+        fileName = normalizeTranslateFileName(input.fileName);
+        bytes = decodeTranslateBase64(String(input.fileByteBase64));
+    }
+    return {
+        request: {
+            FileByteBase64: bytes.toString('base64'),
+            FileName: fileName,
+            FromLang: String(input.fromLang || 'auto').trim() || 'auto',
+            Lang: String(input.targetLang).trim(),
+        },
+        byteLength: bytes.length,
+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        auditFileName: fileName,
+    };
+}
+export function decodeMcpTranslatedFile(result) {
+    const value = String(result?.FileByteBase64 || '').trim();
+    if (!value)
+        throw new Error('后端未返回翻译文件内容。');
+    const bytes = Buffer.from(value, 'base64');
+    if (bytes.length === 0 || bytes.length > TRANSLATE_MAX_RESULT_BYTES
+        || bytes.toString('base64').replace(/=+$/u, '') !== value.replace(/=+$/u, '')) {
+        throw new Error('后端返回的翻译文件无效或超过 25 MB。');
+    }
+    if (result?.ByteLength !== undefined && Number(result.ByteLength) !== bytes.length) {
+        throw new Error('后端翻译文件长度回读不一致。');
+    }
+    return bytes;
+}
+function saveMcpTranslatedFile(outputFilePath, bytes) {
+    const resolved = path.resolve(String(outputFilePath || '').trim());
+    if (!path.isAbsolute(String(outputFilePath || '').trim()))
+        throw new Error('outputFilePath 必须是绝对路径。');
+    if (fs.existsSync(resolved))
+        throw new Error('outputFilePath 已存在；为避免覆盖，请使用新的文件名。');
+    const parent = path.dirname(resolved);
+    const parentStat = fs.lstatSync(parent);
+    if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) {
+        throw new Error('outputFilePath 的父目录必须是非符号链接目录。');
+    }
+    fs.writeFileSync(resolved, bytes, { flag: 'wx' });
+    return resolved;
+}
 const APPLICATION_ASSET_MAX_FILE_BYTES = 128 * 1024 * 1024;
 const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
 export function validateLocalApplicationAssetSize(relativePath, fileSize, nextTotalSize, maxTotalBytes = APPLICATION_MANIFEST_MAX_TOTAL_BYTES) {
@@ -828,6 +1064,20 @@ export async function tryLegacyMicroServiceStreamPublishFallback(client, manifes
     if (!appKey) {
         return { attempted: false, reason: '应用上下文缺少服务端确认的 AppKey' };
     }
+    if (input.expectedCurrentVersion !== undefined
+        && Number(application.CurrentVersion) !== input.expectedCurrentVersion) {
+        return {
+            attempted: false,
+            reason: `兼容发布 CurrentVersion 基线已漂移：Expected=${input.expectedCurrentVersion}，Actual=${String(application.CurrentVersion ?? '')}`,
+        };
+    }
+    if (input.expectedAppVersion !== undefined
+        && (application.AppVersion == null ? null : String(application.AppVersion)) !== input.expectedAppVersion) {
+        return {
+            attempted: false,
+            reason: `兼容发布 AppVersion 基线已漂移：Expected=${input.expectedAppVersion}，Actual=${String(application.AppVersion ?? '')}`,
+        };
+    }
     const assets = [];
     for (const asset of manifest.assets) {
         const bytes = await fs.promises.readFile(asset.absolutePath);
@@ -945,6 +1195,57 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
             }),
         }));
         const assetRequestManifestHash = deterministicApplicationPublishId(assetRequests.flatMap(item => [item.Path, item.RequestId]));
+        const tryOptInCompatibilityFallback = async (streamFailure) => {
+            if (input.allowLegacyFallback !== true || v3 || publishMode !== 'stage-and-finalize')
+                return null;
+            const fallback = await tryLegacyMicroServiceStreamPublishFallback(client, manifest, {
+                appIdOrKey: input.appIdOrKey,
+                versionNo: input.versionNo,
+                routes: input.routes,
+                deliveryBatchId: effectiveDeliveryBatchId,
+                sourceManifestHash: input.sourceManifestHash,
+                expectedCurrentVersion: input.expectedCurrentVersion,
+                expectedAppVersion: input.expectedAppVersion,
+            });
+            if (!fallback.attempted || !fallback.response) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({
+                                error: streamFailure,
+                                compatibilityFallbackAttempted: false,
+                                compatibilityFallbackReason: fallback.reason,
+                                retrySafe: true,
+                            }, null, 2) }],
+                    isError: true,
+                };
+            }
+            if (fallback.response.Code !== 1) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({
+                                error: fallback.response.Msg || 'MicroService 兼容发布失败',
+                                streamFailure,
+                                compatibilityFallbackAttempted: true,
+                                compatibilityFallbackReason: fallback.reason,
+                                retrySafe: false,
+                            }, null, 2) }],
+                    isError: true,
+                };
+            }
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            ...(asJsonRecord(fallback.response.Data)),
+                            appIdOrKey: input.appIdOrKey,
+                            versionNo: normalizedApplicationVersion(input.versionNo),
+                            assetCount: manifest.assets.length,
+                            totalSize: manifest.totalSize,
+                            runtimeManifestHash: manifest.manifestHash,
+                            deliveryBatchId: effectiveDeliveryBatchId,
+                            compatibilityFallback: true,
+                            compatibilityFallbackReason: fallback.reason,
+                            streamFailure,
+                            transport: 'bounded-legacy-microservice-csharp',
+                        }, null, 2) }],
+            };
+        };
         if (input.confirmExecution !== input.appIdOrKey) {
             return {
                 content: [{ type: 'text', text: JSON.stringify({
@@ -998,47 +1299,59 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
             for (const asset of uploadOrder) {
                 const requestId = requestIdByPath.get(asset.relativePath);
                 let result;
-                try {
-                    result = await client.uploadApplicationAssetStream({
-                        AppIdOrKey: input.appIdOrKey,
-                        VersionNo: input.versionNo,
-                        RelativePath: asset.relativePath,
-                        ExpectedSha256: asset.sha256,
-                        RequestId: requestId,
-                        FilePath: asset.absolutePath,
-                        TimeoutMs: input.timeoutMsPerFile,
-                        ...(v3 ? {
-                            ProtocolVersion: 3,
-                            ExpectedGateEpoch: v3.expectedGateEpoch,
-                            RequestFingerprint: v3.requestFingerprint,
-                            DeliveryBatchId: v3.deliveryBatchId,
-                            SourceManifestHash: v3.sourceManifestHash,
-                            RuntimeManifestHash: v3.runtimeManifestHash,
-                            RouteSnapshotJson: v3.routeSnapshotJson,
-                            RouteSnapshotHash: v3.routeSnapshotHash,
-                            ExpectedCurrentVersion: v3.expectedCurrentVersion,
-                            ExpectedAppVersion: v3.expectedAppVersion,
-                            ExpectedPublishFence: v3.expectedPublishFence,
-                            ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
-                            ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
-                            ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
-                            ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
-                        } : {}),
-                    });
-                }
-                catch (error) {
-                    return {
-                        content: [{ type: 'text', text: JSON.stringify({
-                                    error: error instanceof Error ? error.message : String(error),
-                                    failedPath: asset.relativePath,
-                                    requestId,
-                                    uploadedCount,
-                                    totalCount: manifest.assets.length,
-                                    publishMode,
-                                    retrySafe: true,
-                                }, null, 2) }],
-                        isError: true,
-                    };
+                for (let uploadAttempt = 0; uploadAttempt < 3; uploadAttempt += 1) {
+                    try {
+                        result = await client.uploadApplicationAssetStream({
+                            AppIdOrKey: input.appIdOrKey,
+                            VersionNo: input.versionNo,
+                            RelativePath: asset.relativePath,
+                            ExpectedSha256: asset.sha256,
+                            RequestId: requestId,
+                            FilePath: asset.absolutePath,
+                            TimeoutMs: input.timeoutMsPerFile,
+                            ...(v3 ? {
+                                ProtocolVersion: 3,
+                                ExpectedGateEpoch: v3.expectedGateEpoch,
+                                RequestFingerprint: v3.requestFingerprint,
+                                DeliveryBatchId: v3.deliveryBatchId,
+                                SourceManifestHash: v3.sourceManifestHash,
+                                RuntimeManifestHash: v3.runtimeManifestHash,
+                                RouteSnapshotJson: v3.routeSnapshotJson,
+                                RouteSnapshotHash: v3.routeSnapshotHash,
+                                ExpectedCurrentVersion: v3.expectedCurrentVersion,
+                                ExpectedAppVersion: v3.expectedAppVersion,
+                                ExpectedPublishFence: v3.expectedPublishFence,
+                                ExpectedPublishRowVersion: v3.expectedPublishRowVersion,
+                                ExpectedVersionRowVersion: v3.expectedVersionRowVersion,
+                                ExpectedActivePublishVersionId: v3.expectedActivePublishVersionId,
+                                ExpectedCommittedPublishVersionId: v3.expectedCommittedPublishVersionId,
+                            } : {}),
+                        });
+                        break;
+                    }
+                    catch (error) {
+                        if (uploadAttempt < 2) {
+                            await new Promise(resolve => setTimeout(resolve, uploadAttempt === 0 ? 500 : 1500));
+                            continue;
+                        }
+                        const errorMessage = error instanceof Error ? error.message : String(error);
+                        const fallbackResult = await tryOptInCompatibilityFallback(errorMessage);
+                        if (fallbackResult)
+                            return fallbackResult;
+                        return {
+                            content: [{ type: 'text', text: JSON.stringify({
+                                        error: errorMessage,
+                                        failedPath: asset.relativePath,
+                                        requestId,
+                                        uploadedCount,
+                                        totalCount: manifest.assets.length,
+                                        publishMode,
+                                        retrySafe: true,
+                                        uploadAttempts: uploadAttempt + 1,
+                                    }, null, 2) }],
+                            isError: true,
+                        };
+                    }
                 }
                 if (result.Code !== 1) {
                     const legacyDefect = isLegacyApplicationStreamJValueFailure(result);
@@ -1097,6 +1410,9 @@ export async function runApplicationDirectoryStreamPublish(client, input) {
                     idempotentCount += 1;
                 if (uploadedCount === 1 || uploadedCount % 25 === 0 || uploadedCount === manifest.assets.length) {
                     console.error(`[microi-mcp] Stream stage ${input.appIdOrKey} ${input.versionNo}: ${uploadedCount}/${manifest.assets.length}`);
+                }
+                if (uploadedCount < manifest.assets.length) {
+                    await new Promise(resolve => setTimeout(resolve, 150));
                 }
             }
         }
@@ -1343,6 +1659,14 @@ function buildRuntimeServerName(context) {
 const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_codex',
     'microi_get_status',
+    'microi_chat',
+    'microi_translate',
+    'microi_detect_language',
+    'microi_list_translate_languages',
+    'microi_translate_file',
+    'microi_suggest_translation',
+    'microi_get_translate_health',
+    'microi_ocr_recognize',
     'microi_transition_application_stream_gate',
     'microi_redis_statistics',
     'microi_redis_list_keys',
@@ -1369,6 +1693,7 @@ const CORE_TOOL_REGISTRATION_ORDER = [
     'microi_update_field',
     'microi_refresh_schema_cache',
     'microi_create_table',
+    'microi_repair_audit_fields',
     'microi_create_module',
     'microi_scaffold_vue_microservice',
     'microi_get_event_code',
@@ -1782,7 +2107,7 @@ BOUNDARY RULES:
 
 ## 低代码系统设计工作流（按顺序执行）
 1. **microi_get_db_schema** — 先查看已有表结构，了解数据模型
-2. **microi_create_table** — 创建自定义表（写入 diy_table，自动创建 MySQL 表并添加 Id/CreateTime/UpdateTime/CreateUser/OsClient 基础字段）
+2. **microi_create_table** — 创建自定义表（写入 diy_table，并同步创建 Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted 六个固定审计字段的物理列与 diy_field 元数据）
 3. **microi_add_field** — 逐个添加业务字段（写入 diy_field，执行 ALTER TABLE），需指定 component 组件类型
 4. **microi_get_table_indexes / microi_create_table_index** — 按真实查询与业务唯一约束创建并回读物理索引
 5. **microi_create_module** — 创建菜单模块（写入 sys_menu），绑定 diyTableId 后即可在导航栏看到并使用 CRUD。**复杂业务系统请同时传入 moreBtns/formBtns/pageTabs/batchSelectMoreBtns** 一次性配齐按钮
@@ -1797,14 +2122,22 @@ BOUNDARY RULES:
 - **microi_validate_menu_buttons** — 校验并规范化 MoreBtns/FormBtns/PageTabs 等按钮 JSON，自动补 Id/Sort/默认显隐
 - **microi_build_field_config** — 生成 Select/Radio/Checkbox/JoinForm/AutoNumber/DateTime 等字段的 Data/Config JSON
 - **microi_get_field_list / microi_update_field / microi_refresh_schema_cache** — 修改已有 diy_field 字段属性、KeyValue 数据源、Config 后必须回读并刷新缓存，避免后台字段选项与前端/接口枚举不一致
+- **microi_repair_audit_fields** — 修复指定表已存在的六个固定审计物理列对应的 diy_field 元数据；修复后它们不再出现在“异常字段修复”，表单默认显隐继续由 diy_table.DisplayDefaultField 控制
 - **microi_get_table_data / microi_add_form_data / microi_update_form_data** — 维护租户业务表数据（如商品、示例数据、配置项）时使用，写入后必须回读验证关键字段
+- **sys_user.DefaultIndexUrl** — 当前用户登录后的首选站内路由，支持 /route、#/route、/#/route；留空时回退系统默认首页。客户端只采用存在且当前用户有权限的内部路由
 - **microi_upsert_engine** — 接口引擎存在则更新，不存在则创建；真实写入必须确认
 - **microi_save_engine_code** — 递增代码头语义版本并保存 ApiV8Code；如 sys_apiengine 存在 Version/ChangeHistory 字段则同步写入；不修改 AllowAnonymous/StopHttp/IsEnable/ApiAddress 等接口配置
 - **microi_check_workflow_package / microi_test_workflow_condition** — 保存工作流前检查拓扑，并用样例表单数据测试图形条件路线
 - **microi_save_data_source / microi_save_print_template / microi_save_workflow_package / microi_save_job** — 覆盖数据源、打印、工作流、定时任务的系统级建模
 - **microi_get_playwright_context / microi_plan_playwright_e2e** — 为 Playwright E2E 自动化测试提供当前租户的菜单路由、接口引擎和冒烟计划
+- **microi_chat** — 使用当前 MCP 登录身份、绑定租户与服务器本机有效 License 调用 Microi.AI；工具不接受 OsClient、用户、Endpoint、ApiKey 或 Authorization 覆盖
 - **microi_list_my_access_keys / microi_create_my_access_key / microi_revoke_my_access_key** — 管理当前登录用户自己的限期访问密钥。列表、创建和吊销都必须显式确认；创建先返回规范化授权载荷的 SHA-256，再以该 SHA-256 确认；MCP 暂只开放 page:open、form:read、api-engine:run、data-source:run、file:read，永久密钥不通过 MCP 创建，明文只在创建结果中返回一次
 - **固定看板启动 URL 规范** — 使用 Microi.Client 前端 WebBase（不是 API Server）拼接 \`/?OsClient=${ctx.osClient}#/access-login?access_key=<密钥>&redirect=<encodeURIComponent后的站内Hash路由>\`。例如 redirect 原值为 \`/mic/data-dashboard/preview/01KK988A0YPHKAM8SF216917HX\` 时编码为 \`%2Fmic%2Fdata-dashboard%2Fpreview%2F01KK988A0YPHKAM8SF216917HX\`。完整自动登录链接应保存为电视/看板的启动页；兑换成功后地址栏变为不含 \`access_key\` 的目标页是安全设计，禁止给目标页再次追加密钥，也禁止新增 \`permanent=1\` 一类由客户端决定有效期的参数
+
+## OCR 能力
+- 图片/PDF 文字识别统一调用后端 \`V8.OCR.Recognize({...})\` 或受认证的 \`POST /api/Ocr/Recognize\`；不要在接口引擎里自行读取密钥并调用 OCR endpoint。
+- 服务地址、API Key、固定 Header、超时和配额只从当前租户 \`sys_osclients\` 的“OCR识别”Tab 读取，调用参数不得覆盖 endpoint、密钥、Header 或 OsClient。
+- 相关实现与交付规范读取 \`microi.skills/ocr-engine/SKILL.md\`；批量或长耗时 OCR 必须使用数据库/MQ/outbox 的可恢复幂等任务，不能使用单节点内存队列。
 
 ## 数据库索引（强制通过 MCP）
 - 需求、蓝图、接口、Job 或评审一旦明确某表字段需要索引，必须声明 Manifest \`tables[].indexes\`，并通过 \`microi_create_table_index\` 创建；禁止在 V8、接口引擎、FormEngine 或临时 SQL 中执行 CREATE/DROP INDEX。
@@ -2160,6 +2493,298 @@ export function createMcpServer(client, context) {
         }
         catch (e) {
             return { content: [{ type: 'text', text: `❌ Connection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    // ========================
+    // Tool: Microi.AI 对话
+    // ========================
+    server.tool('microi_chat', `Chat with Microi.AI on the MCP-bound server and OsClient "${osClient}". Uses the current authenticated MCP user, tenant model configuration, local officially-signed Microi License and server-side provider credentials. The tool never accepts identity, OsClient, Endpoint, ApiKey or Authorization overrides. This is a non-streaming MCP result; UI typewriter output is available through V8.AI.ChatStream.`, {
+        question: z.string().min(1).max(32000).describe('User question or instruction.'),
+        systemPrompt: z.string().max(16000).optional().describe('Optional per-call system guidance; tenant model credentials and endpoint remain server-side.'),
+        aiModel: z.string().min(1).max(200).describe('Enabled model display name in the current tenant.'),
+        aiModelId: z.string().max(100).optional().describe('Optional mic_ai row Id; preferred when model names may repeat.'),
+        relayModel: z.string().max(200).optional().describe('Optional official relay runtime model.'),
+        conversationId: z.string().max(100).optional().describe('Optional existing conversation Id owned by the current authenticated user.'),
+        reasoningEffort: z.enum(['auto', 'low', 'medium', 'high']).optional().describe('Reasoning effort for supported models.'),
+        mode: z.enum(['chat', 'data', 'code', 'builder', 'project']).optional().describe('Conversation mode hint.'),
+    }, async ({ question, systemPrompt, aiModel, aiModelId, relayModel, conversationId, reasoningEffort, mode, }) => {
+        try {
+            const result = await client.chat({
+                question,
+                systemPrompt,
+                aiModel,
+                aiModelId,
+                relayModel,
+                conversationId,
+                reasoningEffort,
+                mode,
+            });
+            return {
+                content: [{
+                        type: 'text',
+                        text: typeof result.Data === 'string'
+                            ? result.Data
+                            : JSON.stringify(result, null, 2),
+                    }],
+                structuredContent: {
+                    Code: result.Code,
+                    Data: result.Data,
+                    Msg: result.Msg || '',
+                },
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return {
+                content: [{ type: 'text', text: `Microi.AI chat failed: ${e instanceof Error ? e.message : String(e)}` }],
+                isError: true,
+            };
+        }
+    });
+    // ========================
+    // Tool: 当前租户 OCR 识别
+    // ========================
+    server.tool('microi_ocr_recognize', `Recognize text in one image or PDF through the authenticated Microi OCR gateway for OsClient "${osClient}". Provide exactly one of filePath (absolute local regular file, symlinks rejected) or fileByteBase64. This transmits document bytes to the OCR provider configured by the tenant administrator, so confirmExecution="OCR" is mandatory. Endpoint, Provider, ApiKey, headers, Authorization and OsClient overrides are never accepted. Audit logs contain only safe filename, byte count, SHA-256 and option flags—not the local path, file bytes, recognized text or credentials.`, {
+        filePath: z.string().max(32767).optional().describe('Absolute local path to one PDF/image. Mutually exclusive with fileByteBase64; symlinks and non-regular files are rejected.'),
+        fileByteBase64: z.string().max(OCR_MAX_BASE64_CHARACTERS).optional().describe('PDF/image Base64 or data URI. Mutually exclusive with filePath; backend validates file magic and tenant limits again.'),
+        fileName: z.string().max(255).optional().describe('Optional safe filename. For filePath, the basename is used when omitted.'),
+        useDocOrientationClassify: z.boolean().optional().describe('Enable document orientation classification when supported by the configured pipeline.'),
+        useDocUnwarping: z.boolean().optional().describe('Enable document unwarping when supported by the configured pipeline.'),
+        useTextlineOrientation: z.boolean().optional().describe('Enable text-line orientation classification when supported by the configured pipeline.'),
+        textRecScoreThresh: z.number().min(0).max(1).optional().describe('Per-call recognition threshold, 0..1. It can only raise the tenant minimum.'),
+        returnWordBox: z.boolean().optional().describe('Ask the provider for word-level boxes when supported.'),
+        includePages: z.boolean().optional().describe('Include bounded page texts. Default false to keep MCP output compact.'),
+        includeRegions: z.boolean().optional().describe('Include region polygons/confidence and implicitly include pages. Default false.'),
+        maxTextChars: z.number().int().min(1000).max(200000).optional().describe('Maximum characters for full text and cumulative page text; default 100000.'),
+        confirmExecution: z.string().optional().describe('Required because document bytes leave MCP for the tenant-configured OCR provider. Use exactly OCR.'),
+    }, async ({ filePath, fileByteBase64, fileName, useDocOrientationClassify, useDocUnwarping, useTextlineOrientation, textRecScoreThresh, returnWordBox, includePages, includeRegions, maxTextChars, confirmExecution, }) => {
+        try {
+            if (confirmExecution !== 'OCR') {
+                return {
+                    content: [{
+                            type: 'text',
+                            text: '执行已拦截：microi_ocr_recognize 会把文档发送到当前租户管理员配置的 OCR 服务，请确认该文件允许处理后重新调用并传 confirmExecution="OCR"。',
+                        }],
+                    isError: true,
+                };
+            }
+            const prepared = prepareMcpOcrInput({
+                filePath,
+                fileByteBase64,
+                fileName,
+                useDocOrientationClassify,
+                useDocUnwarping,
+                useTextlineOrientation,
+                textRecScoreThresh,
+                returnWordBox,
+            });
+            await client.writeAuditLog('microi_ocr_recognize', prepared.auditFileName, JSON.stringify({
+                byteLength: prepared.byteLength,
+                sha256: prepared.sha256,
+                useDocOrientationClassify,
+                useDocUnwarping,
+                useTextlineOrientation,
+                textRecScoreThresh,
+                returnWordBox,
+                includePages: Boolean(includePages || includeRegions),
+                includeRegions: Boolean(includeRegions),
+            }));
+            const result = await client.recognizeOcr(prepared.request);
+            const publicData = buildMcpOcrResult(result.Data, {
+                includePages: Boolean(includePages || includeRegions),
+                includeRegions: Boolean(includeRegions),
+                maxTextChars,
+            });
+            const response = {
+                Code: result.Code,
+                Data: publicData,
+                Msg: result.Msg || '',
+            };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+                structuredContent: response,
+                isError: result.Code !== 1,
+            };
+        }
+        catch (e) {
+            return {
+                content: [{ type: 'text', text: `OCR failed: ${e instanceof Error ? e.message : String(e)}` }],
+                isError: true,
+            };
+        }
+    });
+    // ========================
+    // Tools: 当前租户翻译服务
+    // ========================
+    server.tool('microi_translate', `Translate one text or a bounded batch through the authenticated Microi translation gateway for OsClient "${osClient}". Provide exactly one of sourceText/sourceTexts. Supports source auto-detection, text/HTML and up to 10 alternatives when the tenant uses LibreTranslate. Provider URL, API key, Authorization and OsClient are always server-side and cannot be overridden.`, {
+        sourceText: z.string().max(50000).optional().describe('One source text. Mutually exclusive with sourceTexts.'),
+        sourceTexts: z.array(z.string().min(1).max(50000)).max(50).optional().describe('Up to 50 texts and 200000 total characters. Mutually exclusive with sourceText.'),
+        fromLang: z.string().max(32).optional().default('auto').describe('Source language code or auto.'),
+        targetLang: z.string().min(1).max(32).describe('Target language code.'),
+        format: z.enum(['text', 'html']).optional().default('text').describe('Source format.'),
+        alternatives: z.number().int().min(0).max(10).optional().default(0).describe('Preferred alternative translation count.'),
+    }, async ({ sourceText, sourceTexts, fromLang, targetLang, format, alternatives }) => {
+        try {
+            const hasSingle = Boolean(sourceText?.trim());
+            const hasBatch = Boolean(sourceTexts?.length);
+            if (hasSingle === hasBatch)
+                throw new Error('sourceText 与 sourceTexts 必须且只能提供一个。');
+            if (sourceTexts && sourceTexts.reduce((sum, value) => sum + value.length, 0) > 200000) {
+                throw new Error('sourceTexts 总字符数不能超过 200000。');
+            }
+            const result = await client.translateText({
+                ...(hasSingle ? { SourceText: sourceText } : { SourceTexts: sourceTexts }),
+                FromLang: fromLang || 'auto',
+                Lang: targetLang,
+                Format: format || 'text',
+                Alternatives: alternatives || 0,
+            });
+            const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+                structuredContent: response,
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Translate failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_detect_language', `Detect the language of one text before a translate operation through the authenticated Microi translation gateway for OsClient "${osClient}". The text is sent only to the provider configured by the tenant administrator; caller-supplied endpoint, key and OsClient fields are ignored.`, {
+        sourceText: z.string().min(1).max(50000).describe('Text whose language should be detected.'),
+    }, async ({ sourceText }) => {
+        try {
+            const result = await client.detectLanguage(sourceText);
+            const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+                structuredContent: response,
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Language detection failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_list_translate_languages', `List the current tenant translation provider's installed source languages and exact reachable target codes for OsClient "${osClient}". No provider credentials or internal endpoint are returned.`, {}, async () => {
+        try {
+            const result = await client.listTranslateLanguages();
+            const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+                structuredContent: response,
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `List translation languages failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_translate_file', `Translate one supported document through the authenticated Microi translation gateway for OsClient "${osClient}". Provide exactly one input (absolute non-symlink filePath or Base64+fileName) and exactly one output mode (new absolute outputFilePath or includeFileByteBase64=true for results up to 2 MB). Document bytes leave MCP for the tenant-configured provider, so confirmExecution="TRANSLATE_FILE" is mandatory. Endpoint, API key, Authorization and OsClient overrides are never accepted; audit logs contain hashes and sizes, never paths or document content.`, {
+        filePath: z.string().max(32767).optional().describe('Absolute local source file path. Mutually exclusive with fileByteBase64.'),
+        fileByteBase64: z.string().max(TRANSLATE_MAX_BASE64_CHARACTERS).optional().describe('Source document Base64/data URI. Mutually exclusive with filePath.'),
+        fileName: z.string().max(255).optional().describe('Required for Base64; optional safe override for filePath.'),
+        fromLang: z.string().max(32).optional().default('auto').describe('Source language code or auto.'),
+        targetLang: z.string().min(1).max(32).describe('Target language code.'),
+        outputFilePath: z.string().max(32767).optional().describe('New absolute local file path. Existing files and symlink parent directories are rejected.'),
+        includeFileByteBase64: z.boolean().optional().default(false).describe('Return Base64 inline only for translated results up to 2 MB. Mutually exclusive with outputFilePath.'),
+        confirmExecution: z.string().optional().describe('Required exact value: TRANSLATE_FILE.'),
+    }, async ({ filePath, fileByteBase64, fileName, fromLang, targetLang, outputFilePath, includeFileByteBase64, confirmExecution }) => {
+        try {
+            if (confirmExecution !== 'TRANSLATE_FILE') {
+                return {
+                    content: [{ type: 'text', text: '执行已拦截：文件会发送到当前租户配置的翻译服务；确认后请传 confirmExecution="TRANSLATE_FILE"。' }],
+                    isError: true,
+                };
+            }
+            if (Boolean(outputFilePath?.trim()) === Boolean(includeFileByteBase64)) {
+                throw new Error('outputFilePath 与 includeFileByteBase64=true 必须且只能选择一种输出方式。');
+            }
+            const prepared = prepareMcpTranslateFileInput({ filePath, fileByteBase64, fileName, fromLang, targetLang });
+            if (includeFileByteBase64 && prepared.byteLength > TRANSLATE_INLINE_RESULT_BYTES) {
+                throw new Error('源文件超过 2 MB，请使用 outputFilePath，避免大 Base64 进入 MCP 上下文。');
+            }
+            await client.writeAuditLog('microi_translate_file', prepared.auditFileName, JSON.stringify({
+                byteLength: prepared.byteLength,
+                sha256: prepared.sha256,
+                fromLang: prepared.request.FromLang,
+                targetLang: prepared.request.Lang,
+                outputMode: outputFilePath ? 'local-file' : 'inline-base64',
+            }));
+            const result = await client.translateFile(prepared.request);
+            if (result.Code !== 1) {
+                const response = { Code: result.Code, Data: null, Msg: result.Msg || '' };
+                return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }], structuredContent: response, isError: true };
+            }
+            const translatedBytes = decodeMcpTranslatedFile(result.Data);
+            if (includeFileByteBase64 && translatedBytes.length > TRANSLATE_INLINE_RESULT_BYTES) {
+                throw new Error('译后文件超过 2 MB，请改用 outputFilePath。');
+            }
+            const sha256 = crypto.createHash('sha256').update(translatedBytes).digest('hex');
+            const publicData = {
+                Provider: result.Data?.Provider,
+                FileName: result.Data?.FileName,
+                ContentType: result.Data?.ContentType,
+                ByteLength: translatedBytes.length,
+                Sha256: sha256,
+            };
+            if (outputFilePath)
+                publicData.SavedToPath = saveMcpTranslatedFile(outputFilePath, translatedBytes);
+            else
+                publicData.FileByteBase64 = translatedBytes.toString('base64');
+            const response = { Code: 1, Data: publicData, Msg: result.Msg || '' };
+            return { content: [{ type: 'text', text: JSON.stringify(response, null, 2) }], structuredContent: response };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `File translation failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_suggest_translation', `Submit a translation improvement suggestion to the current tenant's LibreTranslate-compatible provider. This mutates provider-side suggestion data and requires confirmExecution="TRANSLATE_SUGGEST". Audit logs contain only text lengths and SHA-256 values; source/suggestion text, endpoint, credentials and tenant secrets are never logged or caller-overridable.`, {
+        sourceText: z.string().min(1).max(50000).describe('Original source text.'),
+        suggestedText: z.string().min(1).max(50000).describe('Proposed translated text.'),
+        fromLang: z.string().min(1).max(32).describe('Explicit source language; auto is not accepted.'),
+        targetLang: z.string().min(1).max(32).describe('Target language.'),
+        confirmExecution: z.string().optional().describe('Required exact value: TRANSLATE_SUGGEST.'),
+    }, async ({ sourceText, suggestedText, fromLang, targetLang, confirmExecution }) => {
+        try {
+            if (confirmExecution !== 'TRANSLATE_SUGGEST') {
+                return { content: [{ type: 'text', text: '执行已拦截：建议会写入翻译服务；确认后请传 confirmExecution="TRANSLATE_SUGGEST"。' }], isError: true };
+            }
+            await client.writeAuditLog('microi_suggest_translation', `${fromLang}->${targetLang}`, JSON.stringify({
+                sourceLength: sourceText.length,
+                sourceSha256: crypto.createHash('sha256').update(sourceText, 'utf8').digest('hex'),
+                suggestionLength: suggestedText.length,
+                suggestionSha256: crypto.createHash('sha256').update(suggestedText, 'utf8').digest('hex'),
+            }));
+            const result = await client.suggestTranslation({
+                SourceText: sourceText,
+                SuggestedText: suggestedText,
+                FromLang: fromLang,
+                Lang: targetLang,
+            });
+            const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+                structuredContent: response,
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Translation suggestion failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_get_translate_health', `Read a safe health/capability summary for the current tenant's translation gateway. It returns provider name, status and supported business operations, but never the internal URL, API key or frontend/metrics settings.`, {}, async () => {
+        try {
+            const result = await client.getTranslateHealth();
+            const response = { Code: result.Code, Data: result.Data, Msg: result.Msg || '' };
+            return {
+                content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+                structuredContent: response,
+                ...(result.Code !== 1 ? { isError: true } : {}),
+            };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Translation health failed: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
         }
     });
     server.tool('microi_transition_application_stream_gate', `Preview or execute one application-stream gate transition for the exact MCP-bound tenant coordinate. Allowed transitions are LegacyOpen -> Drain, Drain -> V3Only, and the safety rollback Drain -> LegacyOpen; every successful transition must advance the server epoch. V3Only never permits downgrade. The first call never reaches the server and returns ConfirmationSha256. A server call is possible only when confirmExecution=true and confirmationSha256 exactly matches that preview; the server must independently recompute the same hash.`, {
@@ -2950,11 +3575,11 @@ export function createMcpServer(client, context) {
             }
             const lines = [
                 `# API Engines (${engines.length})\n`,
-                '| # | Engine Key | Name | Category | Description |',
-                '|---|-----------|------|----------|-------------|',
+                '| # | Engine Key | Name | Category | V8 Unlimited | Description |',
+                '|---|-----------|------|----------|--------------|-------------|',
             ];
             engines.forEach((e, i) => {
-                lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${e.ApiRemark || e.Description || ''} |`);
+                lines.push(`| ${i + 1} | ${e.ApiEngineKey || ''} | ${e.ApiName || ''} | ${e.Category || ''} | ${Number(e.V8Unlimited || 0) === 1 ? 'ON' : 'OFF'} | ${e.ApiRemark || e.Description || ''} |`);
             });
             return { content: [{ type: 'text', text: lines.join('\n') }] };
         }
@@ -2989,6 +3614,7 @@ export function createMcpServer(client, context) {
                 engine?.Category ? `- **Category**: ${engine.Category}` : '',
                 engine?.ApiAddress ? `- **Address**: ${engine.ApiAddress}` : '',
                 engine?.ApiRemark ? `- **Remark**: ${engine.ApiRemark}` : '',
+                `- **V8Unlimited**: ${Number(engine?.V8Unlimited || 0) === 1 ? 'true' : 'false'}`,
                 `- **Source completeness**: ${hasMore || start > 0 ? 'PARTIAL CHUNK — do not save this chunk alone' : 'COMPLETE'}`,
                 `- **Character range**: [${start}, ${end}) of ${code.length}`,
                 `- **Full source SHA-256**: ${sha256}`,
@@ -3159,17 +3785,19 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 保存接口引擎代码
     // ========================
-    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
+    server.tool('microi_save_engine_code', `Save (update) API engine JavaScript code on Microi server (OsClient: ${osClient}). Increments semantic Version (v1.0.0 -> v1.0.1, patch/minor max 9), writes a header with function description only, syncs sys_apiengine.Version/ChangeHistory when those fields exist, and preserves AllowAnonymous, StopHttp, IsEnable, ApiAddress and other HTTP/security metadata. Optional v8Unlimited is an explicit high-risk opt-in and is always verified by remote readback. Transport timeouts are automatically verified by remote readback. Do not bypass this tool with raw HTTP, FormEngine, SQL, or a temporary maintenance engine.`, {
         apiEngineKey: z.string().describe('The unique key of the API engine'),
         code: z.string().describe('The complete JavaScript source code to save'),
         functionDescription: z.string().optional().describe('Complete function description to keep in the code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
+        v8Unlimited: z.boolean().optional().describe('Explicit high-risk switch. true removes this engine\'s Jint timeout/statement/recursion/allocation budgets but keeps the process resident-memory guard. It does not inherit to nested engines. Omit to preserve the current value.'),
         confirmLargeReduction: z.string().optional().describe('Required only when replacing source >=8000 chars with code shorter by more than 15%. Use apiEngineKey or EXECUTE.'),
-    }, async ({ apiEngineKey, code, functionDescription, changeSummary, confirmLargeReduction }) => {
+    }, async ({ apiEngineKey, code, functionDescription, changeSummary, v8Unlimited, confirmLargeReduction }) => {
         try {
             const result = await client.saveEngineCode(apiEngineKey, code, {
                 functionDescription,
                 changeSummary,
+                v8Unlimited,
                 confirmLargeReduction: confirmLargeReduction === apiEngineKey || confirmLargeReduction === 'EXECUTE',
             });
             if (result.Code !== 1) {
@@ -3189,7 +3817,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建接口引擎
     // ========================
-    server.tool('microi_create_engine', `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations.`, {
+    server.tool('microi_create_engine', `Create a new API engine (接口引擎) for OsClient "${osClient}". Stored in sys_apiengine table. WARNING: Do NOT create API engines for basic CRUD operations — the low-code platform handles CRUD automatically when a menu module is bound to a diy_table. Only create engines for complex business logic, third-party integrations, scheduled tasks, or custom calculations. v8Unlimited defaults to false and must never be inferred from data volume alone.`, {
         apiEngineKey: z.string().describe('Unique key for the new engine (lowercase, hyphens allowed, e.g. "my-new-api")'),
         apiName: z.string().describe('Display name of the engine'),
         category: z.string().optional().describe('Category to organize engines'),
@@ -3197,7 +3825,8 @@ export function createMcpServer(client, context) {
         functionDescription: z.string().optional().describe('Complete function description to keep in the initial code header. No change history here.'),
         changeSummary: z.string().optional().describe('One-line change summary stored in sys_apiengine.ChangeHistory when the field exists.'),
         apiAddress: z.string().optional().describe('Custom URL path. Default: /apiengine/{apiEngineKey}. ⚠️ Empty string causes 404 — MCP auto-fills this; only override when you need a custom alias.'),
-    }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress }) => {
+        v8Unlimited: z.boolean().optional().describe('Default false. Set true only for an explicit single-transaction requirement after accepting DB lock/rollback/timeout and memory risks. Process resident-memory guard remains active.'),
+    }, async ({ apiEngineKey, apiName, category, code, functionDescription, changeSummary, apiAddress, v8Unlimited }) => {
         try {
             const result = await client.createEngine({
                 ApiEngineKey: apiEngineKey,
@@ -3207,6 +3836,7 @@ export function createMcpServer(client, context) {
                 functionDescription,
                 changeSummary,
                 ApiAddress: apiAddress,
+                V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
@@ -3438,7 +4068,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建自定义表（低代码系统设计）
     // ========================
-    server.tool('microi_create_table', `Create a new custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name returns Skipped:true with the existing TableId. This is step 2 of system design.`, {
+    server.tool('microi_create_table', `Create or reconcile a custom table for OsClient "${osClient}". Inserts a record into diy_table. IDEMPOTENT — calling again with the same name reuses the existing TableId; an explicitly supplied v8Unlimited value is reconciled and read back by system validation. This is step 2 of system design.`, {
         name: z.string().describe('Table name in English (e.g. "Crm_Customer", "Order_Main"). Convention: Module_Entity format. Will be a real MySQL table.'),
         description: z.string().optional().describe('Chinese description of the table (e.g. "客户信息", "订单主表")'),
         tabs: z.string().optional().describe('Form tab layout JSON (e.g. \'[{"Id":"basic","Name":"基本信息","Sort":10},{"Id":"business","Name":"业务信息","Sort":20}]\'). Groups fields into diy_table.Tabs. When using microi_generate_system, many-field tables can be auto-tabbed.'),
@@ -3446,17 +4076,37 @@ export function createMcpServer(client, context) {
         column: z.number().optional().describe('Number of form columns (1, 2, or 3). Controls form layout. Default: 2 (双列，更紧凑现代)'),
         formOpenType: z.string().optional().describe('How to open form: "Dialog" (弹窗), "Drawer" (抽屉), "Page" (新页面). Default: Dialog'),
         formOpenWidth: z.string().optional().describe('Form dialog/drawer width (e.g. "800px", "60%"). Default: auto'),
-    }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth }) => {
+        v8Unlimited: z.boolean().optional().describe('Default false for new tables; omit to preserve an existing table. true removes Jint per-execution budgets only for this table\'s backend V8 events while retaining the process resident-memory guard.'),
+    }, async ({ name, description, tabs, isTree, column, formOpenType, formOpenWidth, v8Unlimited }) => {
         try {
             const result = await client.createTable(name, description, {
                 Tabs: tabs, IsTree: isTree, Column: column ?? 2,
                 FormOpenType: formOpenType, FormOpenWidth: formOpenWidth,
+                V8Unlimited: v8Unlimited === undefined ? undefined : (v8Unlimited ? 1 : 0),
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
             const data = result.Data;
             return { content: [{ type: 'text', text: `✅ Table "${name}" created.\n- TableId: ${data?.TableId}\n- Use this TableId when adding fields via microi_add_field` }] };
+        }
+        catch (e) {
+            return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
+        }
+    });
+    server.tool('microi_repair_audit_fields', `Repair the fixed audit-field metadata for one existing table in OsClient "${osClient}". The backend reconciles Id, CreateTime, UpdateTime, UserId, UserName and IsDeleted only when the physical columns exist, restores soft-deleted diy_field rows, adds missing diy_field rows without repeating DDL, clears shared metadata caches, and reads the final state back. The fields remain hidden by default when diy_table.DisplayDefaultField is off.`, {
+        tableId: z.string().optional().describe('Exact diy_table.Id. Provide tableId or tableName.'),
+        tableName: z.string().optional().describe('Exact physical table/diy_table.Name. Provide tableName or tableId.'),
+    }, async ({ tableId, tableName }) => {
+        if (!tableId && !tableName) {
+            return { content: [{ type: 'text', text: 'Error: tableId 和 tableName 至少传一个。' }], isError: true };
+        }
+        try {
+            const result = await client.repairFixedAuditFields({ tableId, tableName });
+            if (result.Code !== 1) {
+                return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(result.Data || {}, null, 2) }] };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -4090,6 +4740,11 @@ export function createMcpServer(client, context) {
         config: z.string().optional(),
         description: z.string().optional(),
         inTableEdit: z.number().optional(),
+        // zhy: expose field V8 source properties so Config.V8Code and runtime V8Code can be updated together.
+        v8Code: z.string().optional().describe('Field value-change V8 JavaScript code.'),
+        keyupV8Code: z.string().optional().describe('Field keyup V8 JavaScript code.'),
+        v8TmpEngineTable: z.string().optional().describe('Table-cell template V8 JavaScript code.'),
+        v8TmpEngineForm: z.string().optional().describe('Form template V8 JavaScript code.'),
     }, async (args) => {
         try {
             const patch = {};
@@ -4101,7 +4756,9 @@ export function createMcpServer(client, context) {
                 formWidth: 'FormWidth', tableWidth: 'TableWidth',
                 placeholder: 'Placeholder', defaultValue: 'DefaultValue', tab: 'Tab',
                 data: 'Data', config: 'Config', description: 'Description',
-                inTableEdit: 'InTableEdit',
+                // zhy: map MCP V8 arguments to the real diy_field runtime columns.
+                inTableEdit: 'InTableEdit', v8Code: 'V8Code', keyupV8Code: 'KeyupV8Code',
+                v8TmpEngineTable: 'V8TmpEngineTable', v8TmpEngineForm: 'V8TmpEngineForm',
             };
             for (const [k, v] of Object.entries(args)) {
                 if (v !== undefined && map[k])
@@ -4198,7 +4855,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 修改 diy_table 属性（如表单列数 Column）
     // ========================
-    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (for example form layout, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`, {
+    server.tool('microi_update_table', `Update a diy_table record for OsClient "${osClient}" (for example form layout, V8Unlimited, data log/comment/version switches, Description or IsTree). Only provided fields are patched. Automatically clears diy_table + diy_table_field_list Redis caches.`, {
         id: z.string().optional().describe('TableId (preferred locator)'),
         name: z.string().optional().describe('Table Name (alternative locator)'),
         column: z.number().optional().describe('Form columns: 1, 2 or 3'),
@@ -4210,6 +4867,7 @@ export function createMcpServer(client, context) {
         enableDataLog: z.number().optional().describe('1 enables per-row data change logs; 0 disables.'),
         enableDataComment: z.number().optional().describe('1 enables per-row comments; 0 disables.'),
         enableDataVersion: z.number().optional().describe('1 enables data versions; 0 disables.'),
+        v8Unlimited: z.boolean().optional().describe('Explicit high-risk switch for this table\'s backend V8 events. Omit to preserve; false writes 0 and true writes 1.'),
     }, async (args) => {
         try {
             const patch = {};
@@ -4235,6 +4893,8 @@ export function createMcpServer(client, context) {
                 patch.EnableDataComment = args.enableDataComment === 1 ? 1 : 0;
             if (args.enableDataVersion !== undefined)
                 patch.EnableDataVersion = args.enableDataVersion === 1 ? 1 : 0;
+            if (args.v8Unlimited !== undefined)
+                patch.V8Unlimited = args.v8Unlimited ? 1 : 0;
             const result = await client.updateTable(patch);
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };

@@ -37,6 +37,7 @@ import "./styles/mci-design.scss";
 import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
 import { reportApiServiceFailure } from "./utils/api-service-status.js";
+import { syncClassicShellVisibilityFromUrl } from "./utils/classic-shell-visibility.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
 import $ from "jquery";
@@ -165,14 +166,8 @@ async function initApp() {
         diyStore.setState("SystemStyle", systemStyle);
         document.body.classList.add(systemStyle);
     }
-    var showClassicTop = decodeURIComponent((new RegExp("[?|&|%3F]" + "ShowClassicTop=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
-    if (!DiyCommon.IsNull(showClassicTop) && (showClassicTop == "false" || showClassicTop == 0)) {
-        diyStore.setState("ShowClassicTop", 0);
-    }
-    var showClassicLeft = decodeURIComponent((new RegExp("[?|&|%3F]" + "ShowClassicLeft=" + "([^&;]+?)(&|#|;|$)").exec(location.href) || [, ""])[1].replace(/\+/g, "%20")) || null;
-    if (!DiyCommon.IsNull(showClassicLeft) && (showClassicLeft == "false" || showClassicLeft == 0)) {
-        diyStore.setState("ShowClassicLeft", 0);
-    }
+    // URL 参数是当前地址的一次性框架显示策略，不得残留为后续路由或刷新状态。
+    syncClassicShellVisibilityFromUrl(diyStore, location.href);
     var osClient = DiyCommon.GetOsClient();
     await DiyOsClient.OsClientInit(true);
 
