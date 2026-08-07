@@ -94,16 +94,16 @@ function currentUserDefinition() {
     Description: '员工信息'
   }, [
     // 个人资料页暂时隐藏头像；保留字段定义，后续需要时可直接恢复。
-    // {
-    //   Id: 'current-user-avatar',
-    //   Name: 'Avatar',
-    //   Label: '头像',
-    //   Component: 'ImgUpload',
-    //   Visible: 1,
-    //   AppVisible: 1,
-    //   Sort: 10,
-    //   Config: JSON.stringify({ ImgUpload: { Multiple: false, Limit: 1 } })
-    // },
+    {
+      Id: 'current-user-avatar',
+      Name: 'Avatar',
+      Label: '头像',
+      Component: 'ImgUpload',
+      Visible: 1,
+      AppVisible: 1,
+      Sort: 10,
+      Config: JSON.stringify({ ImgUpload: { Multiple: false, Limit: 1 } })
+    },
     {
       Id: 'current-user-no',
       Name: 'No',
