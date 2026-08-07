@@ -26,7 +26,7 @@
     "check:file-urls": "node scripts/check-file-url-resolution.mjs",
     "check:formengine-writes": "node scripts/check-formengine-write-contract.mjs",
     "check:upload-paths": "node scripts/check-upload-path-policy.mjs",
-    "check:content-security": "node scripts/check-content-security.mjs",
+    "check:content-security": "node scripts/check-content-security.mjs && node --test scripts/test-content-security-batch.mjs",
     "check:auth-session": "node scripts/check-auth-session-race.mjs",
     "check:share": "node scripts/check-share-policy.js",
     "check:view-schema": "node scripts/check-view-schema.mjs",
