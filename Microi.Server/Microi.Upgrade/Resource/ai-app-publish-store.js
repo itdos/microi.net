@@ -1,10 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.6.0
+ * Version: v1.6.4
  * Function:
- * - 统一生成应用商城安装包；v3 发布仅在已提交指针证明仍精确匹配时原子写入包字段。
- * - 为接口引擎生成 Managed/CreateIfMissing 所有权策略和上一版基线摘要。
+ * - 统一生成应用商城安装包；v3 发布以已提交指针证明做原子绑定，并生成接口引擎资源所有权策略。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -161,7 +160,11 @@ function getMicroService(appKey) {
   });
   if (!service || service.Code !== 1 || !service.Data) return { Service: null, Pages: [] };
   var pages = V8.FormEngine.GetTableData('sys_microiservice_page', {
-    _Where: [['MicroServiceId', '=', service.Data.Id]],
+    _Where: [
+      ['MicroServiceId', '=', service.Data.Id],
+      ['AND', 'IsDeleted', '<>', 1],
+      ['AND', 'IsEnable', '<>', 0]
+    ],
     _OrderBy: 'Sort',
     _OrderByType: 'ASC',
     _PageSize: 500

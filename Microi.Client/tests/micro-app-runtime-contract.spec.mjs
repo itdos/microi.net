@@ -14,6 +14,7 @@ test("friendly micro-app route exists before the catch-all and requires a page f
     assert.ok(friendly >= 0);
     assert.ok(catchAll > friendly);
     assert.match(router, /microAppFriendlyRoute:\s*true/);
+    assert.match(router, /microAppFriendlyRoute:\s*true,\s*keepAlive:\s*false/);
 
     const host = read("src/views/micro-app/host.vue");
     assert.match(host, /MicroApp\/Resolve/);
@@ -91,4 +92,26 @@ test("page host derives height from the visible viewport instead of its collapse
     assert.match(host, /host\.style\.minHeight/);
     assert.doesNotMatch(host, /Math\.min\(rect\.height/);
     assert.match(host, /overflow:\s*auto/);
+});
+
+test("page host automatically heals one stuck first mount and then exposes a stable diagnostic", () => {
+    const host = read("src/views/micro-app/host.vue");
+
+    assert.match(host, /startMountWatchdog/);
+    assert.match(host, /autoMountRetryCount\s*<\s*1/);
+    assert.match(host, /unmountApp\(this\.microAppName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
+    assert.match(host, /MICRO_APP_MOUNT_TIMEOUT/);
+    assert.match(host, /resolveGeneration/);
+});
+
+test("cached micro-app hosts only react while their own route is active", () => {
+    const host = read("src/views/micro-app/host.vue");
+
+    assert.match(host, /isHostActive:\s*true/);
+    assert.match(host, /ownedRoutePath:\s*this\.\$route\?\.path/);
+    assert.match(host, /activated\(\)\s*\{[\s\S]*?this\.isHostActive\s*=\s*true/);
+    assert.match(host, /deactivated\(\)\s*\{[\s\S]*?this\.isHostActive\s*=\s*false/);
+    assert.match(host, /if\s*\(!this\.isHostActive\s*\|\|\s*this\.\$route\?\.path\s*!==\s*this\.ownedRoutePath\)\s*return/);
+    assert.match(host, /startViewportContract\(\)\s*\{\s*this\.stopViewportContract\(\)/);
+    assert.doesNotMatch(host, /<micro-app[\s\S]*?\n\s+keep-alive\b/);
 });

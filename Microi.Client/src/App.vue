@@ -342,7 +342,10 @@ export default {
             })) return true;
             // App mounted 可能早于 Hash 路由完成首次匹配，使用当前 hash 做启动期兜底。
             var hashPath = typeof window !== "undefined" ? String(window.location.hash || "").split("?")[0] : "";
-            return hashPath === "#/online-office" || hashPath === "#/online-office/";
+            var anonymousHashPaths = ["#/login", "#/access-login", "#/mci-redis-manager", "#/online-office"];
+            return anonymousHashPaths.some(function (path) {
+                return hashPath === path || hashPath === path + "/" || hashPath.indexOf(path + "/") === 0;
+            });
         },
         GetCurrentUserApp() {
             var self = this;

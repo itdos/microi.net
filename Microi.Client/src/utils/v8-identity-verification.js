@@ -3,7 +3,8 @@ import {
     registerPasskey,
     sha256Hex,
     verifyWithFace,
-    verifyWithPasskey
+    verifyWithPasskey,
+    verifyWithTotp
 } from "@/utils/identity-verification.js";
 
 function withCallback(promise, callback) {
@@ -44,7 +45,21 @@ export function initV8IdentityVerification(V8) {
                 if (!actionHash) throw new Error("ActionHash 不能为空，必须绑定本次业务操作。");
                 const capabilities = await getIdentityCapabilities(diyCommon, osClient);
                 const method = String(options.Method || options.method || "Auto").toLowerCase();
-                if (method === "face" || (method === "auto" && !capabilities.HasPasskey && capabilities.HasFace)) {
+                const totpCode = String(options.Code || options.code || "").replace(/\D/g, "").slice(0, 6);
+                if (method === "totp" || (method === "auto" && !capabilities.HasStepUpPasskey && capabilities.HasStepUpTotp)) {
+                    if (!capabilities.TotpEnabled || !capabilities.HasStepUpTotp) throw new Error("当前用户没有可用于二次授权的 Authenticator。");
+                    if (totpCode.length !== 6) throw new Error("使用 Authenticator 验证时必须传入 6 位 Code。");
+                    return verifyWithTotp({
+                        diyCommon,
+                        osClient,
+                        account: V8.CurrentUser?.Account || "",
+                        code: totpCode,
+                        purpose,
+                        actionHash,
+                        clientType: V8.ClientType || "PC"
+                    });
+                }
+                if (method === "face" || (method === "auto" && !capabilities.HasStepUpPasskey && !capabilities.HasStepUpTotp && capabilities.HasFace)) {
                     if (!capabilities.FaceEnabled) throw new Error("当前租户未启用严格人脸验证。");
                     return verifyWithFace({
                         diyCommon,
@@ -55,7 +70,7 @@ export function initV8IdentityVerification(V8) {
                         clientType: V8.ClientType || "PC"
                     });
                 }
-                if (!capabilities.PasskeyEnabled) throw new Error("当前租户未启用 Passkey。");
+                if (!capabilities.PasskeyEnabled || !capabilities.HasStepUpPasskey) throw new Error("当前用户没有可用于二次授权的 Passkey。");
                 return verifyWithPasskey({
                     diyCommon,
                     osClient,

@@ -8,6 +8,20 @@ const packageModel = JSON.parse(await readFile(new URL("./app.microi.store.json"
 const upgradeSource = await readFile(new URL("../13-UpgradeAppStore.cs", import.meta.url), "utf8");
 const projectSource = await readFile(new URL("../Microi.Upgrade.csproj", import.meta.url), "utf8");
 
+function compareSemver(actual, minimum) {
+  const parse = (value) => String(value || "")
+    .replace(/^v/i, "")
+    .split(".")
+    .map((part) => Number.parseInt(part, 10));
+  const left = parse(actual);
+  const right = parse(minimum);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const delta = (left[index] || 0) - (right[index] || 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
 function extractFunction(name) {
   const start = source.indexOf(`function ${name}(`);
   assert.notEqual(start, -1, `missing function ${name}`);
@@ -183,7 +197,10 @@ test("application-store package and server upgrade both carry the fixed builder"
   assert.ok(packaged);
   assert.equal(packaged.Version, "v1.5.6");
   assert.equal(packaged.ApiV8Code.replace(/\r\n/g, "\n"), source.replace(/\r\n/g, "\n"));
-  assert.match(String(packageModel.PackageInfo.Version), /^v6\.5\.(?:[4-9]|\d{2,})$|^v6\.[6-9]\./);
+  assert.ok(
+    compareSemver(packageModel.PackageInfo.Version, "v6.5.4") >= 0,
+    `application-store package must be at least v6.5.4, got ${packageModel.PackageInfo.Version}`
+  );
   assert.match(upgradeSource, /BuildAiAppResourceName\s*=\s*"ai-app-build\.js"/);
   assert.match(upgradeSource, /EnsureAiAppBuilderAsync\(osClient, msgs, resources\)/);
   assert.match(upgradeSource, /TENANT_RUNTIME_CONTEXT_V1/);

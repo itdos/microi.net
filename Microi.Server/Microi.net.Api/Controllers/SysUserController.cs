@@ -285,7 +285,7 @@ namespace Microi.net.Api
                 // executable server code and the cached raw model are never
                 // returned or mutated for tenant-specific branding.
                 sysConfig = sysConfigResult.Code == 1
-                    ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data)
+                    ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data, param.OsClient)
                     : null;
                 if (sysConfigResult.Code == 1 && !sysUser["TenantId"].Val<string>().DosIsNullOrWhiteSpace())
                 {
@@ -619,7 +619,7 @@ namespace Microi.net.Api
                 #region 获取系统配置
                 var sysConfigResult = await MicroiEngine.FormEngine.GetSysConfig(param.OsClient, param._Lang);
                 dynamic sysConfig = sysConfigResult.Code == 1
-                    ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data)
+                    ? TenantConfigurationSecurity.CreatePublicSysConfigProjection(sysConfigResult.Data, param.OsClient)
                     : null;
 
                 dynamic SysMenuHomePage = null;
@@ -1176,6 +1176,7 @@ namespace Microi.net.Api
                         currentToken.OsClient,
                         passwordActorUserId,
                         identityOptions.PasskeyEnabled,
+                        identityOptions.TotpEnabled,
                         identityOptions.FaceEnabled && !identityOptions.FaceApiBase.DosIsNullOrWhiteSpace()).ConfigureAwait(false))
                 {
                     var expectedActionHash = IdentityVerificationSecurity.ComputePasswordChangeActionHash(

@@ -12,13 +12,18 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.6.0 V3 source", () => {
+test("publisher package metadata matches the v1.6.4 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.6.0");
+  assert.equal(packagedPublisher.Version, "v1.6.4");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
   );
+});
+
+test("microservice packages exclude deleted and disabled historical routes", () => {
+  assert.match(publisherSource, /\['AND', 'IsDeleted', '<>', 1\]/);
+  assert.match(publisherSource, /\['AND', 'IsEnable', '<>', 0\]/);
 });
 
 test("publisher emits managed baselines and tenant-owned create-if-missing policies", () => {
@@ -281,7 +286,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.6\.0/);
+  assert.match(publisherSource, /Version: v1\.6\.4/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

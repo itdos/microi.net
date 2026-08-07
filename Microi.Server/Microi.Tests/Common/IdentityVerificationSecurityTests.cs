@@ -73,4 +73,20 @@ public class IdentityVerificationSecurityTests
         Assert.Null(projection["FaceApiKey"]);
         Assert.Equal("https://face.example.test", projection["FaceApiBase"]?.ToString());
     }
+
+    [Fact]
+    public void Totp_Rfc6238VectorAndBase32RoundTrip_AreStable()
+    {
+        var secret = Encoding.ASCII.GetBytes("12345678901234567890");
+        var encoded = IdentityVerificationSecurity.Base32Encode(secret);
+
+        Assert.Equal(secret, IdentityVerificationSecurity.Base32Decode(encoded));
+        Assert.Equal("94287082", IdentityVerificationSecurity.ComputeTotpCode(secret, 1, digits: 8));
+        Assert.Equal(1, IdentityVerificationSecurity.FindMatchingTotpCounter(
+            secret,
+            "94287082",
+            DateTimeOffset.FromUnixTimeSeconds(59),
+            window: 0,
+            digits: 8));
+    }
 }
