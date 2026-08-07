@@ -319,6 +319,29 @@ return {1, userNext, tenantNext}";
             return ValidatePayload(param, out _, options);
         }
 
+        /// <summary>
+        ///zhy：判断上传参数中是否已经包含指定文件名。HDFS 从当前 HTTP multipart 补充文件流前
+        ///zhy：使用此方法，避免接口引擎已经把同一文件注入 FilesByteBase64 后，又把原始请求流
+        ///zhy：作为第二份上传载荷加入。这里只用于传输表示去重；ValidatePayload 仍会拒绝调用方
+        ///zhy：在 Files / FilesByte / FilesByteBase64 之间显式提交的重复文件名。
+        /// </summary>
+        public static bool ContainsPayloadFileName(DiyUploadParam param, string fileName)
+        {
+            if (param == null || string.IsNullOrWhiteSpace(fileName)) return false;
+
+            bool Contains<T>(IDictionary<string, T> files)
+            {
+                return files?.Keys.Any(name => string.Equals(
+                    name,
+                    fileName,
+                    StringComparison.OrdinalIgnoreCase)) == true;
+            }
+
+            return Contains(param.Files)
+                || Contains(param.FilesByte)
+                || Contains(param.FilesByteBase64);
+        }
+
         public static DosResult ValidatePayload(
             DiyUploadParam param,
             out long totalBytes,

@@ -93,6 +93,7 @@ function currentUserDefinition() {
     Name: 'Sys_User',
     Description: '员工信息'
   }, [
+    // 个人资料页暂时隐藏头像；保留字段定义，后续需要时可直接恢复。
     {
       Id: 'current-user-avatar',
       Name: 'Avatar',

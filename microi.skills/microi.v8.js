@@ -672,17 +672,27 @@ export function createMicroiV8(options = {}) {
     return expiresAt - now <= lead;
   }
 
-  function handleReturnedToken(headers) {
-    const auth = getHeaderValue(headers, 'authorization') || getHeaderValue(headers, 'token');
-    const token = normalizeBearer(auth);
-    if (token) setToken(token);
+  function isSameToken(left, right) {
+    return normalizeBearer(left) === normalizeBearer(right);
   }
 
-  function handleAuthExpired(body) {
+  function handleReturnedToken(headers, requestToken, authEnabled) {
+    const auth = getHeaderValue(headers, 'authorization') || getHeaderValue(headers, 'token');
+    const token = normalizeBearer(auth);
+    if (!token) return;
+    // 登录等匿名请求允许建立新会话；受保护请求只能续签自己发起时的会话。
+    // 否则登录前的慢响应可能把刚登录得到的新 Token 覆盖回旧 Token。
+    if (!authEnabled || isSameToken(getToken(), requestToken)) setToken(token);
+  }
+
+  function handleAuthExpired(body, requestToken) {
+    // 该响应属于已经被替换的旧会话时，不得清理当前的新登录态。
+    if (!isSameToken(getToken(), requestToken)) return false;
     clearToken();
     if (typeof config.onAuthExpired === 'function') {
       config.onAuthExpired(body, client);
     }
+    return true;
   }
 
   // 所有相对地址默认走 apiBase，必要时自动追加 OsClient。
@@ -725,6 +735,8 @@ export function createMicroiV8(options = {}) {
   async function request(options = {}) {
     const method = String(options.method || 'POST').toUpperCase();
     let fullUrl = buildUrl(options.url || options.path || '');
+    const authEnabled = options.auth !== false;
+    const requestToken = authEnabled ? getToken() : '';
     const headers = buildHeaders(options);
     const data = options.data === undefined ? {} : options.data;
     const timeout = options.timeout || config.timeout;
@@ -776,13 +788,16 @@ export function createMicroiV8(options = {}) {
       const statusCode = response.statusCode || response.status || 200;
       const body = response.data === undefined ? response.body : response.data;
       const headersReturned = response.header || response.headers || {};
-      handleReturnedToken(headersReturned);
 
-      if (options.auth !== false && isAuthExpired(body, statusCode)) {
-        handleAuthExpired(body);
+      if (authEnabled && isAuthExpired(body, statusCode)) {
+        const expiredCurrentSession = handleAuthExpired(body, requestToken);
+        // 登录前发出的旧请求可以正常失败，但不能弹过期框、跳登录或清理新 Token。
+        if (!expiredCurrentSession) throw body || new Error('旧登录会话已失效');
         if (options.silentError !== true) toast((body && body.Msg) || '登录已过期');
         throw body || new Error('登录已过期');
       }
+
+      handleReturnedToken(headersReturned, requestToken, authEnabled);
 
       if (statusCode >= 400) {
         const error = body || new Error(`请求失败: ${statusCode}`);
@@ -852,7 +867,7 @@ export function createMicroiV8(options = {}) {
       }
     }).then((result) => {
       if (result && result.Code !== 1 && isAuthExpired(result)) {
-        handleAuthExpired(result);
+        handleAuthExpired(result, oldToken);
       }
       return result;
     }).finally(() => {

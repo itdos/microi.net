@@ -201,8 +201,12 @@ function isFollowupAdd(context) {
   return isFollowupForm(context) && context.mode === 'Add' && !context.rowId
 }
 
+function isPrimaryFollowupForm(context) {
+  return String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE
+}
+
 function isFollowupForm(context) {
-  if (String(context.tableName || '').toLowerCase() === FOLLOWUP_TABLE) return true
+  if (isPrimaryFollowupForm(context)) return true
   // zhy：项目合伙人跟进记录与普通跟进记录使用同一组核心字段，
   // 不依赖租户动态表名，按字段结构复用当前用户、当天日期及客户联系人联动。
   return [
@@ -234,6 +238,16 @@ function isProposalInstallationChild(field = {}) {
     config.TableChild?.Title
   ].filter(Boolean).join(' ')
   return /安装点位|安装位置/.test(title)
+}
+
+function isOrderProductInstallationChild(field = {}) {
+  const config = field.config || {}
+  const tableName = String(config.TableChildTableName || config.TableChild?.TableName || '').toLowerCase()
+  if (tableName === INSTALLATION_POSITION_TABLE) return true
+  const title = [field.Label, field.Name, config.TableChildSysMenuName, config.TableChild?.Title]
+    .filter(Boolean)
+    .join(' ')
+  return /安装位置/.test(title)
 }
 
 function fieldName(context, expectedName, expectedLabel = '') {
@@ -1077,6 +1091,7 @@ export function createState() {
     followupInitialized: false,
     followupCustomerId: '',
     followupCustomerName: '',
+    openingFollowupCheckin: false,
     proposalInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
@@ -1183,10 +1198,30 @@ export async function initialize(context) {
 
 // zhy：客户方案的场所点位数量始终取安装点位子表接口返回的完整总数，空子表显示 0。
 export async function handleRelatedCount(context, payload = {}) {
-  if (!isProposalForm(context) || payload.filtered || !isProposalInstallationChild(payload.field)) return
+  if (payload.filtered) return
   const count = Number(payload.count)
-  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
   const value = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+
+  // 订单商品的设备数量以安装位置完整总数为唯一事实源。
+  if (isOrderProductForm(context) && isOrderProductInstallationChild(payload.field)) {
+    const field = fieldName(context, 'Shuliang', '设备数量')
+    if (Number(context.form[field] || 0) === value) return
+    if (context.rowId) {
+      const result = await V8.FormEngine.UptFormData(ORDER_PRODUCT_TABLE, {
+        Id: context.rowId,
+        [field]: value,
+        _InvokeType: 'Client'
+      })
+      if (!result || Number(result.Code) !== 1) {
+        throw new Error((result && result.Msg) || '设备数量同步失败')
+      }
+    }
+    context.patchForm({ [field]: value })
+    return
+  }
+
+  if (!isProposalForm(context) || !isProposalInstallationChild(payload.field)) return
+  const field = fieldName(context, PROPOSAL_FIELDS.installationPositionCount, '场所点位数量')
   if (Number(context.form[field] || 0) === value) return
   // zhy：已保存方案的子表发生变化后直接持久化派生数量；写入固定值可安全重试且不会新增主表。
   if (context.rowId) {
@@ -1237,6 +1272,16 @@ export function getPresentation(context) {
       }
     }
   }
+  // 仅标准跟进记录提供拜访打卡；项目合伙人跟进记录只复用字段联动，不显示该入口。
+  if (isPrimaryFollowupForm(context)) {
+    return {
+      floatingAction: {
+        key: 'xjy-followup-checkin',
+        label: '拜访打卡',
+        iconType: 'location'
+      }
+    }
+  }
   return {}
 }
 
@@ -1247,6 +1292,28 @@ export async function runPresentationAction(context, action) {
   }
   if (action && action.key === 'xjy-customer-address-location') {
     await locateCustomer(context, true)
+    return { handled: true }
+  }
+  if (action && action.key === 'xjy-followup-checkin') {
+    if (context.state.openingFollowupCheckin) return { handled: true }
+    context.state.openingFollowupCheckin = true
+    const customerIdName = fieldName(context, FOLLOWUP_FIELDS.customerId, '客户Id')
+    const customerNameName = fieldName(context, FOLLOWUP_FIELDS.customerName, '客户名称')
+    const customerId = String(context.form[customerIdName] || context.state.followupCustomerId || '')
+    const customerName = String(context.form[customerNameName] || context.state.followupCustomerName || '')
+    const params = [
+      `returnToFollowup=1`,
+      `customerId=${encodeURIComponent(customerId)}`,
+      `customer=${encodeURIComponent(customerName)}`
+    ]
+    uni.navigateTo({
+      url: `/pages/native/checkin?${params.join('&')}`,
+      success: () => setTimeout(() => { context.state.openingFollowupCheckin = false }, 600),
+      fail: () => {
+        context.state.openingFollowupCheckin = false
+        uni.showToast({ title: '拜访打卡页面打开失败', icon: 'none' })
+      }
+    })
     return { handled: true }
   }
   return { handled: false }

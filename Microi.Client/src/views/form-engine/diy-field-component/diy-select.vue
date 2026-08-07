@@ -317,9 +317,8 @@ export default {
         SelectOptionList() {
             var self = this;
             var data = self.field && Array.isArray(self.field.Data) ? self.field.Data : [];
-            return data.filter(function (item) {
-                return !self._isEmptyOptionItem(item);
-            });
+            // zhy：对象数据源可能被旧事件写成嵌套数组或 JSON 字符串；渲染前统一展开，避免把整段数组当成下拉项显示。
+            return self._normalizeSelectOptionList(data);
         }
     },
 
@@ -586,6 +585,46 @@ export default {
                 return oldList === newList;
             }
         },
+        _normalizeSelectOptionList(data) {
+            var self = this;
+            var result = [];
+            var seen = {};
+            var cfg = (self.field && self.field.Config) || {};
+            var isObjectSource = self._isObjectDataSource();
+
+            function append(item) {
+                if (Array.isArray(item)) {
+                    item.forEach(append);
+                    return;
+                }
+                if (isObjectSource && typeof item === "string") {
+                    var text = item.trim();
+                    if ((text.charAt(0) === "[" && text.charAt(text.length - 1) === "]") ||
+                        (text.charAt(0) === "{" && text.charAt(text.length - 1) === "}")) {
+                        try {
+                            append(JSON.parse(text));
+                            return;
+                        } catch (error) { /* zhy：非 JSON 字符串继续交给空值规则处理。 */ }
+                    }
+                }
+                if (self._isEmptyOptionItem(item)) return;
+
+                var identity = item;
+                if (item && typeof item === "object") {
+                    var identityField = cfg.SelectSaveField ||
+                        (!self.DiyCommon.IsNull(item.Id) ? "Id" :
+                            (!self.DiyCommon.IsNull(item.id) ? "id" : cfg.SelectLabel));
+                    identity = identityField ? item[identityField] : JSON.stringify(item);
+                }
+                var key = typeof item + ":" + String(identity);
+                if (seen[key]) return;
+                seen[key] = true;
+                result.push(item);
+            }
+
+            append(data);
+            return result;
+        },
         _normalizeMultipleSaveFieldValue(value) {
             var self = this;
             var cfg = (self.field && self.field.Config) || {};
@@ -831,16 +870,16 @@ export default {
 
             // 多选模式
             if (isMultiple) {
-                // 已经是数组
+                // zhy：兼容历史嵌套数组和数组内 JSON 字符串，防止异常值继续进入 el-select。
                 if (Array.isArray(value)) {
-                    return value.filter(item => !this._isEmptySelectValue(item));
+                    return this._normalizeSelectOptionList(value);
                 }
                 // 字符串尝试 JSON 解析
                 if (typeof value === 'string') {
                     try {
                         const parsed = JSON.parse(value);
                         if (Array.isArray(parsed)) {
-                            return parsed;
+                            return this._normalizeSelectOptionList(parsed);
                         }
                     } catch (e) {
                         // 解析失败，可能是逗号分隔
@@ -1042,6 +1081,20 @@ export default {
             }
             if (field.Component === "MultipleSelect" && !self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
                 return undefined;
+            }
+            // zhy：对象选项优先使用稳定 Id 比较，联系人改名后仍能匹配同一条记录，不再把可变姓名当唯一键。
+            if (self._isObjectDataSource && self._isObjectDataSource()) {
+                var objectOptions = self._normalizeSelectOptionList(field.Data || []);
+                if (objectOptions.some(function (item) {
+                    return item && typeof item === "object" && !self.DiyCommon.IsNull(item.Id);
+                })) {
+                    return "Id";
+                }
+                if (objectOptions.some(function (item) {
+                    return item && typeof item === "object" && !self.DiyCommon.IsNull(item.id);
+                })) {
+                    return "id";
+                }
             }
             if (self.DiyCommon.IsNull(field.Config.SelectLabel) && self.DiyCommon.IsNull(field.Config.SelectSaveField)) {
                 return "";

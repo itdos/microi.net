@@ -98,7 +98,10 @@ namespace Microi.net
             {
                 foreach (var file in httpContext.Request.Form.Files)
                 {
-                    if (file != null && !param.Files.ContainsKey(file.FileName))
+                    //zhy：接口引擎会先把 multipart 文件注入 FilesByteBase64。V8.Method.Upload
+                    //zhy：仍处于同一个 HttpContext 时，不能再把原始请求流补成第二份同名载荷。
+                    if (file != null
+                        && !FileUploadSecurity.ContainsPayloadFileName(param, file.FileName))
                     {
                         param.Files.Add(file.FileName, file.OpenReadStream());
                     }

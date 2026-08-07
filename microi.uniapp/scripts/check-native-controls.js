@@ -124,8 +124,13 @@ if (!formRuntime.includes('field.layoutGroupKey = active.group.key') ||
   !formRuntime.includes('relatedGroups: layoutGroups') ||
   !formRuntime.includes("if (field.component === 'Tabs')") ||
   !formRuntime.includes('Divider 只是组内分隔') ||
-  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 8')) {
+  !formRuntime.includes('NATIVE_FORM_SCHEMA_VERSION = 9')) {
   fail('related fields must preserve their platform CollapseGroup ownership')
+}
+if (!formRuntime.includes("const DEFAULT_FIELD_NAMES = new Set(['Id', 'CreateTime', 'UpdateTime', 'UserId', 'UserName', 'IsDeleted'])") ||
+  !formRuntime.includes('configBoolean(table.DisplayDefaultField, false)') ||
+  !formRuntime.includes('(options.displayDefaultField || !DEFAULT_FIELD_NAMES.has(field.Name))')) {
+  fail('native forms must follow diy_table.DisplayDefaultField for platform audit fields')
 }
 if (!formRuntime.includes('field.Readonly ?? field.ReadOnly')) {
   fail('readonly platform fields must remain visible but non-editable')
@@ -206,9 +211,10 @@ if (!taskList.includes('<mci-task-card') ||
   fail('standalone and related task lists must share the task card presentation')
 }
 for (const page of [nativeForm, moduleDetail, businessDetail]) {
+  // zhy：页面可以同时注册其它原生表单组件，只要求组件清单中确实包含 MciBusinessRelatedList。
   if (!page.includes('<mci-business-related-list v-if="relatedTab.type === \'child\'"') ||
     page.includes('<mci-child-table v-if="relatedTab.type === \'child\'"') ||
-    !page.includes('components: { MciBusinessRelatedList }')) {
+    !/components:\s*\{[^}]*\bMciBusinessRelatedList\b[^}]*\}/.test(page)) {
     fail('form tab child tables must use the same business list presentation as standalone entries')
   }
 }
@@ -390,6 +396,31 @@ for (const token of [
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`customer-care form linkage is missing: ${token}`)
 }
+for (const token of [
+  'tenantFormPresentation.floatingAction',
+  'tenant-form-floating-action--above-actions',
+  '@touchstart="handleTenantFloatingActionDragStart"',
+  'clampTenantFloatingActionPosition',
+  'persistTenantFloatingActionPosition',
+  'tenantFloatingActionSuppressTap',
+  'if (isPrimaryFollowupForm(context))',
+  "action.key === 'xjy-followup-checkin'",
+  '`returnToFollowup=1`',
+  'customerId=${encodeURIComponent(customerId)}',
+  'customer=${encodeURIComponent(customerName)}'
+]) {
+  if (!nativeForm.includes(token) && !xjyTenantForm.includes(token)) {
+    fail(`follow-up checkin floating action is missing: ${token}`)
+  }
+}
+const nativeCheckin = fs.readFileSync(path.join(root, 'src/pages/native/checkin.vue'), 'utf8')
+for (const token of [
+  "this.returnToFollowup = String(options.returnToFollowup || '0') === '1'",
+  "eventChannel.emit('checkinSuccess'",
+  'setTimeout(() => this.goBack(), 700)'
+]) {
+  if (!nativeCheckin.includes(token)) fail(`follow-up checkin return flow is missing: ${token}`)
+}
 const mediaUploader = fs.readFileSync(path.join(root, 'src/components/mci-media-uploader/mci-media-uploader.vue'), 'utf8')
 const microiV8 = fs.readFileSync(path.join(root, 'src/utils/microi.v8.js'), 'utf8')
 const hdfsController = fs.readFileSync(
@@ -402,7 +433,9 @@ for (const token of [
   'PreviewURL,',
   'resolveFailures',
   'lastEmittedValue',
-  'preferProvidedUrl'
+  'preferProvidedUrl',
+  'mci-media-uploader__grid--circle',
+  'mci-media-uploader__item--circle .mci-media-uploader__remove'
 ]) {
   if (!mediaUploader.includes(token)) fail(`durable media preview handling is missing: ${token}`)
 }
