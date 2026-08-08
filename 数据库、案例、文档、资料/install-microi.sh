@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-08 17:41:18
+# 版本：v2026-08-08 18:18:36
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-08 17:41:18"
+SCRIPT_VERSION="v2026-08-08 18:18:36"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -226,6 +226,46 @@ repair_read_container_environment_value() {
       '
 }
 
+microi_database_name_is_safe() {
+  local database_name="${1:-}"
+  [[ "${database_name}" =~ ^[A-Za-z0-9][A-Za-z0-9_\$-]{0,62}$ ]]
+}
+
+repair_read_container_database_label() {
+  local container_name="$1"
+  local database_name=""
+  database_name=$(docker inspect "${container_name}" \
+    --format '{{ index .Config.Labels "com.microi.database.name" }}' 2>/dev/null || true)
+  [ "${database_name}" != '<no value>' ] || database_name=""
+  printf '%s' "${database_name}"
+}
+
+repair_read_connection_database_name() {
+  local db_conn="$1"
+  printf '%s' "${db_conn}" | awk -F';' '
+    {
+      for (field_index = 1; field_index <= NF; field_index++) {
+        segment = $field_index
+        separator = index(segment, "=")
+        if (separator <= 1) continue
+        key = substr(segment, 1, separator - 1)
+        value = substr(segment, separator + 1)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        normalized_key = tolower(key)
+        if (normalized_key == "database" || normalized_key == "initial catalog") {
+          if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") \
+            || (substr(value, 1, 1) == "'" && substr(value, length(value), 1) == "'")) {
+            value = substr(value, 2, length(value) - 2)
+          }
+          print value
+          exit
+        }
+      }
+    }
+  '
+}
+
 repair_db_connection_has_value() {
   local db_conn="$1"
   local key_pattern="$2"
@@ -291,6 +331,7 @@ repair_build_installer_db_connection() {
   local db_type="$1"
   local db_container="$2"
   local db_internal_port="$3"
+  local database_name="$4"
   local password_key=""
   local password=""
   local encoded_password=""
@@ -306,20 +347,20 @@ repair_build_installer_db_connection() {
   encoded_password=$(repair_encode_connection_value "${password}") || return 1
   case "${db_type}" in
     MySql)
-      printf 'Data Source=%s;Database=microi_demo;User Id=root;Password=%s;Port=%s;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;' \
-        "${db_container}" "${encoded_password}" "${db_internal_port}"
+      printf 'Data Source=%s;Database=%s;User Id=root;Password=%s;Port=%s;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;' \
+        "${db_container}" "${database_name}" "${encoded_password}" "${db_internal_port}"
       ;;
     SqlServer)
-      printf 'Data Source=%s,%s;Initial Catalog=microi_demo;User ID=sa;Password=%s;Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;' \
-        "${db_container}" "${db_internal_port}" "${encoded_password}"
+      printf 'Data Source=%s,%s;Initial Catalog=%s;User ID=sa;Password=%s;Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;' \
+        "${db_container}" "${db_internal_port}" "${database_name}" "${encoded_password}"
       ;;
     DaMeng)
       printf 'Server=%s;Port=%s;User Id=SYSDBA;Password=%s;Schema=SYSDBA;' \
         "${db_container}" "${db_internal_port}" "${encoded_password}"
       ;;
     PostgreSql)
-      printf 'Host=%s;Port=%s;Database=microi_demo;Username=postgres;Password=%s;Pooling=true;Maximum Pool Size=500;' \
-        "${db_container}" "${db_internal_port}" "${encoded_password}"
+      printf 'Host=%s;Port=%s;Database=%s;Username=postgres;Password=%s;Pooling=true;Maximum Pool Size=500;' \
+        "${db_container}" "${db_internal_port}" "${database_name}" "${encoded_password}"
       ;;
   esac
 }
@@ -359,8 +400,10 @@ repair_migrate_app_to_internal_network() {
   local project_name="$3"
   local api_block="${REPAIR_TEMP_DIR}/api-service-before-network.yml"
   local environment_block="${REPAIR_TEMP_DIR}/api-environment-before-network.yml"
+  local os_client=""
   local db_type=""
   local db_conn=""
+  local database_name=""
   local mongo_conn=""
   local db_container=""
   local db_internal_port=""
@@ -385,6 +428,7 @@ repair_migrate_app_to_internal_network() {
 
   repair_extract_api_block "${canonical_file}" "${api_block}"
   repair_extract_api_environment_block "${api_block}" "${environment_block}"
+  os_client=$(repair_read_api_environment_value "${environment_block}" OsClient)
   db_type=$(repair_read_api_environment_value "${environment_block}" OsClientDbType)
   db_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbConn)
   mongo_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbMongoConn)
@@ -421,8 +465,22 @@ repair_migrate_app_to_internal_network() {
     return 1
   fi
   if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+    database_name=$(repair_read_container_database_label "${db_container}")
+    if [ -z "${database_name}" ]; then
+      case "${db_type}" in
+        MySql) database_name=$(repair_read_container_environment_value "${db_container}" MYSQL_DATABASE) ;;
+        PostgreSql) database_name=$(repair_read_container_environment_value "${db_container}" POSTGRES_DB) ;;
+      esac
+    fi
+    [ -n "${database_name}" ] || database_name=$(repair_read_connection_database_name "${db_conn}")
+    [ -n "${database_name}" ] || database_name="${os_client}"
+    if [ "${db_type}" != 'DaMeng' ] && ! microi_database_name_is_safe "${database_name}"; then
+      echo "Microi：错误：无法从数据库容器标签、原连接串或 OsClient 安全确定 ${db_type} 数据库名。"
+      echo 'Microi：未输出任何密码，未删除任何容器；请先恢复合法数据库名后重试。'
+      return 1
+    fi
     if ! db_conn=$(repair_build_installer_db_connection \
-      "${db_type}" "${db_container}" "${db_internal_port}"); then
+      "${db_type}" "${db_container}" "${db_internal_port}" "${database_name}"); then
       echo "Microi：错误：现有 ${db_type} 启动连接串已损坏，且无法从 ${db_container} 的安装环境恢复数据库凭据。"
       echo 'Microi：未输出任何密码，未删除任何容器；请从安装备份恢复完整连接串后重试。'
       return 1
@@ -870,6 +928,7 @@ print_generated_install_configuration() {
   echo '------------------------------------------------------------------'
   if [ -n "${DATABASE_PASSWORD:-}" ]; then
     echo "${DATABASE_DISPLAY_NAME:-主数据库}:  Dos.ORM类型 ${DATABASE_TYPE:-未生成}, 容器 ${DATABASE_CONTAINER_NAME:-未生成}, 端口 ${DATABASE_PORT:-未生成}, 管理员密码: ${DATABASE_PASSWORD}"
+    echo "             业务数据库: ${DATABASE_NAME:-未生成}（来源：${DATABASE_NAME_SOURCE:-未生成}）"
     echo "             初始化包来源: ${SQL_SOURCE_DISPLAY:-未生成}"
     echo "             数据目录: ${DATABASE_DATA_DIR:-未生成}"
     echo "             编排目录: ${DATABASE_DIR:-${COMPOSE_BASE_DIR:-未生成}/microi-install-database}/"
@@ -1094,7 +1153,7 @@ configure_database_profile() {
 
 print_database_profile() {
   echo "DATABASE_CHOICE=${DATABASE_CHOICE}"
-  echo "DATABASE_NAME=${DATABASE_DISPLAY_NAME}"
+  echo "DATABASE_DISPLAY_NAME=${DATABASE_DISPLAY_NAME}"
   echo "DATABASE_TYPE=${DATABASE_TYPE}"
   echo "DATABASE_ENGINE_KEY=${DATABASE_ENGINE_KEY}"
   echo "SQL_ZIP_FILE_NAME=${SQL_ZIP_FILE_NAME}"
@@ -1200,6 +1259,98 @@ validate_sql_zip_archive() {
   SQL_UNCOMPRESSED_BYTES=$(unzip -Z -l "${archive_path}" | awk 'NR > 2 && $1 ~ /^-/ {print $4; exit}')
   if [[ ! "${SQL_UNCOMPRESSED_BYTES:-}" =~ ^[0-9]+$ ]] || [ "${SQL_UNCOMPRESSED_BYTES}" -le 0 ]; then
     echo 'Microi：错误：无法读取 SQL 解压后大小，或 SQL 文件为空。' >&2
+    return 1
+  fi
+}
+
+# 从成熟库 SQL 的显式切库/建库语句或常见导出头识别原数据库名。
+# 仅接受各数据库共同可安全引用的短标识符；没有任何可靠候选时由调用方回退 OsClient，
+# 多个不同候选则失败关闭，避免把同一包静默导入错误数据库。
+detect_sql_database_name_from_archive() {
+  local archive_path="$1"
+  local archive_entry="$2"
+  local database_type="$3"
+  local candidates=""
+  local candidate=""
+  local candidate_count=0
+  SQL_DETECTED_DATABASE_NAME=""
+
+  case "${database_type}" in
+    MySql)
+      if ! candidates=$(set -o pipefail; unzip -p "${archive_path}" "${archive_entry}" \
+          | tr -d '\r`"[]' \
+          | sed -nE \
+            -e 's/^[[:space:]]*USE[[:space:]]+([A-Za-z0-9_$-]+)[[:space:]]*;.*$/\1/Ip' \
+            -e 's/^[[:space:]]*CREATE[[:space:]]+DATABASE([[:space:]]+IF[[:space:]]+NOT[[:space:]]+EXISTS)?[[:space:]]+([A-Za-z0-9_$-]+)([[:space:];].*)?$/\2/Ip' \
+            -e 's/^[[:space:]]*(--|#|\/\*)?[[:space:]]*Source[[:space:]]+(Database|Schema)[[:space:]]*:[[:space:]]*([A-Za-z0-9_$-]+).*$/\3/Ip' \
+            -e 's/^[[:space:]]*--.*Database[[:space:]]*:[[:space:]]*([A-Za-z0-9_$-]+).*$/\1/Ip' \
+            -e 's/^[[:space:]]*--[[:space:]]*Dumping[[:space:]]+database[[:space:]]+structure[[:space:]]+for[[:space:]]+([A-Za-z0-9_$-]+).*$/\1/Ip'); then
+        echo 'Microi：错误：无法读取 ZIP 内 SQL 以识别数据库名。' >&2
+        return 1
+      fi
+      ;;
+    SqlServer)
+      if ! candidates=$(set -o pipefail; unzip -p "${archive_path}" "${archive_entry}" \
+          | tr -d '\r`"[]' \
+          | sed -nE \
+            -e 's/^[[:space:]]*USE[[:space:]]+([A-Za-z0-9_$-]+)[[:space:]]*;?[[:space:]]*$/\1/Ip' \
+            -e 's/^[[:space:]]*CREATE[[:space:]]+DATABASE[[:space:]]+([A-Za-z0-9_$-]+)([[:space:];].*)?$/\1/Ip' \
+            -e 's/^[[:space:]]*--.*Database[[:space:]]*:[[:space:]]*([A-Za-z0-9_$-]+).*$/\1/Ip'); then
+        echo 'Microi：错误：无法读取 ZIP 内 SQL 以识别数据库名。' >&2
+        return 1
+      fi
+      ;;
+    PostgreSql)
+      if ! candidates=$(set -o pipefail; unzip -p "${archive_path}" "${archive_entry}" \
+          | tr -d '\r`"[]' \
+          | sed -nE \
+            -e 's/^[[:space:]]*\\(connect|c)[[:space:]]+(-reuse-previous=on[[:space:]]+)?([A-Za-z0-9_$-]+).*$/\3/Ip' \
+            -e 's/^[[:space:]]*CREATE[[:space:]]+DATABASE[[:space:]]+([A-Za-z0-9_$-]+)([[:space:];].*)?$/\1/Ip' \
+            -e 's/^[[:space:]]*--.*Database[[:space:]]*:[[:space:]]*([A-Za-z0-9_$-]+).*$/\1/Ip'); then
+        echo 'Microi：错误：无法读取 ZIP 内 SQL 以识别数据库名。' >&2
+        return 1
+      fi
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  candidates=$(printf '%s\n' "${candidates}" | awk -v database_type="${database_type}" '
+    {
+      name=$0
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", name)
+      if (name == "") next
+      normalized=tolower(name)
+      if (database_type == "MySql" \
+        && (normalized == "mysql" || normalized == "information_schema" \
+          || normalized == "performance_schema" || normalized == "sys")) next
+      if (database_type == "SqlServer" \
+        && (normalized == "master" || normalized == "tempdb" \
+          || normalized == "model" || normalized == "msdb")) next
+      if (database_type == "PostgreSql" \
+        && (normalized == "postgres" || normalized == "template0" \
+          || normalized == "template1")) next
+      if (!seen[normalized]++) print name
+    }
+  ')
+
+  while IFS= read -r candidate; do
+    [ -n "${candidate}" ] || continue
+    if ! microi_database_name_is_safe "${candidate}"; then
+      echo "Microi：错误：SQL 中识别到不安全的数据库名，无法自动还原。" >&2
+      return 1
+    fi
+    SQL_DETECTED_DATABASE_NAME="${candidate}"
+    candidate_count=$((candidate_count + 1))
+  done <<< "${candidates}"
+
+  if [ "${candidate_count}" -gt 1 ]; then
+    echo "Microi：错误：SQL 中识别到多个不同的业务数据库名，无法安全确定唯一还原目标：" >&2
+    while IFS= read -r candidate; do
+      [ -n "${candidate}" ] && printf '  - %s\n' "${candidate}" >&2
+    done <<< "${candidates}"
+    SQL_DETECTED_DATABASE_NAME=""
     return 1
   fi
 }
@@ -1425,6 +1576,11 @@ if [ "${MICROI_INSTALL_VALIDATE_SQL_ZIP_ONLY:-0}" = "1" ]; then
   validate_sql_zip_archive "${MICROI_SQL_ZIP_PATH:?MICROI_SQL_ZIP_PATH is required}"
   echo "SQL_ARCHIVE_ENTRY=${SQL_ARCHIVE_ENTRY}"
   echo "SQL_UNCOMPRESSED_BYTES=${SQL_UNCOMPRESSED_BYTES}"
+  if [ -n "${MICROI_SQL_DATABASE_TYPE:-}" ]; then
+    detect_sql_database_name_from_archive \
+      "${MICROI_SQL_ZIP_PATH}" "${SQL_ARCHIVE_ENTRY}" "${MICROI_SQL_DATABASE_TYPE}"
+    echo "SQL_DETECTED_DATABASE_NAME=${SQL_DETECTED_DATABASE_NAME}"
+  fi
   exit 0
 fi
 if [ "${MICROI_INSTALL_MYSQL_CONFIG_ONLY:-0}" = "1" ]; then
@@ -2124,12 +2280,29 @@ install_deps
 
 # 在开始拉取镜像和创建数据库前完成自定义包的完整安全校验。
 SQL_REQUIRED_FREE_MB=2048
+DATABASE_NAME="${OS_CLIENT}"
+DATABASE_NAME_SOURCE='OsClient 回退'
+if [ "${DATABASE_TYPE}" = 'DaMeng' ]; then
+  DATABASE_NAME='SYSDBA'
+  DATABASE_NAME_SOURCE='达梦固定 Schema'
+fi
 if [ "${SQL_SOURCE_MODE}" = 'custom' ]; then
   validate_sql_zip_archive "${SQL_CUSTOM_ZIP_PATH}"
+  detect_sql_database_name_from_archive \
+    "${SQL_CUSTOM_ZIP_PATH}" "${SQL_ARCHIVE_ENTRY}" "${DATABASE_TYPE}"
+  if [ -n "${SQL_DETECTED_DATABASE_NAME}" ]; then
+    DATABASE_NAME="${SQL_DETECTED_DATABASE_NAME}"
+    DATABASE_NAME_SOURCE='SQL 显式建库/切库信息'
+  fi
   SQL_REQUIRED_FREE_MB=$(((SQL_UNCOMPRESSED_BYTES * 3 + 1048575) / 1048576 + 1024))
   [ "${SQL_REQUIRED_FREE_MB}" -lt 2048 ] && SQL_REQUIRED_FREE_MB=2048
   echo "Microi：数据库包校验通过：${SQL_ARCHIVE_ENTRY}，解压后约 $(((SQL_UNCOMPRESSED_BYTES + 1048575) / 1048576))MB ✓"
 fi
+if ! microi_database_name_is_safe "${DATABASE_NAME}"; then
+  echo "Microi：错误：最终数据库名不安全：${DATABASE_NAME}"
+  exit 1
+fi
+echo "Microi：本次还原目标数据库：${DATABASE_NAME}（来源：${DATABASE_NAME_SOURCE}）✓"
 
 echo ''
 echo '[步骤2/11] Docker 环境就绪 ✓'
@@ -2544,6 +2717,8 @@ services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
     container_name: ${DATABASE_CONTAINER_NAME}
+    labels:
+      com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
     tty: true
@@ -2553,6 +2728,7 @@ ${COMPOSE_SERVICE_NETWORK}
       - "${DATABASE_PORT}:${DATABASE_INTERNAL_PORT}"
     environment:
       - MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD}
+      - MYSQL_DATABASE=${DATABASE_NAME}
       - MYSQL_ROOT_HOST=%
       - MYSQL_TIME_ZONE=Asia/Shanghai
     volumes:
@@ -2572,6 +2748,8 @@ services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
     container_name: ${DATABASE_CONTAINER_NAME}
+    labels:
+      com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
     ports:
@@ -2597,6 +2775,8 @@ services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
     container_name: ${DATABASE_CONTAINER_NAME}
+    labels:
+      com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
     privileged: true
@@ -2632,6 +2812,8 @@ services:
   ${DATABASE_CONTAINER_NAME}:
     image: ${DATABASE_IMAGE}
     container_name: ${DATABASE_CONTAINER_NAME}
+    labels:
+      com.microi.database.name: ${DATABASE_NAME}
 ${COMPOSE_SERVICE_NETWORK}
     restart: always
     ports:
@@ -2639,7 +2821,7 @@ ${COMPOSE_SERVICE_NETWORK}
     environment:
       - POSTGRES_USER=${DATABASE_USER}
       - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
-      - POSTGRES_DB=microi_demo
+      - POSTGRES_DB=${DATABASE_NAME}
       - POSTGRES_INITDB_ARGS=--encoding=UTF8 --locale=C.UTF-8
     volumes:
       - ${DATABASE_DATA_DIR}:/var/lib/postgresql/data
@@ -2695,7 +2877,7 @@ for i in $(seq 1 60); do
       printf 'SELECT 1 OK FROM DUAL;\nEXIT;\n' | docker exec -e LD_LIBRARY_PATH=/opt/dmdbms/bin -i "${DATABASE_CONTAINER_NAME}" /opt/dmdbms/bin/disql "${DATABASE_USER}/${DATABASE_PASSWORD}@127.0.0.1:${DATABASE_INTERNAL_PORT}" > /dev/null 2>&1 && DATABASE_READY=true
       ;;
     6)
-      docker exec -i "${DATABASE_CONTAINER_NAME}" pg_isready -U "${DATABASE_USER}" -d microi_demo > /dev/null 2>&1 && DATABASE_READY=true
+      docker exec -i "${DATABASE_CONTAINER_NAME}" pg_isready -U "${DATABASE_USER}" -d "${DATABASE_NAME}" > /dev/null 2>&1 && DATABASE_READY=true
       ;;
   esac
   if [ "${DATABASE_READY}" = true ]; then
@@ -2716,16 +2898,16 @@ database_exec_sql() {
   local sql="$1"
   case "${DATABASE_CHOICE}" in
     1|2)
-      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot microi_demo -e "${sql}"
+      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot "${DATABASE_NAME}" -e "${sql}"
       ;;
     3)
-      docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d microi_demo -Q "${sql}"
+      docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d "${DATABASE_NAME}" -Q "${sql}"
       ;;
     5)
       printf 'WHENEVER SQLERROR EXIT SQL.SQLCODE;\n%s\nCOMMIT;\nEXIT;\n' "${sql}" | docker exec -e LD_LIBRARY_PATH=/opt/dmdbms/bin -i "${DATABASE_CONTAINER_NAME}" /opt/dmdbms/bin/disql "${DATABASE_USER}/${DATABASE_PASSWORD}@127.0.0.1:${DATABASE_INTERNAL_PORT}"
       ;;
     6)
-      docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d microi_demo -c "${sql}"
+      docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d "${DATABASE_NAME}" -c "${sql}"
       ;;
   esac
 }
@@ -2901,6 +3083,18 @@ fi
 
 # 二次校验可防止预检后文件被替换；unzip -p 输出到固定文件名，不信任 ZIP 内路径。
 validate_sql_zip_archive "${SQL_ZIP_FILE}"
+if [ "${SQL_SOURCE_MODE}" = 'custom' ]; then
+  detect_sql_database_name_from_archive \
+    "${SQL_ZIP_FILE}" "${SQL_ARCHIVE_ENTRY}" "${DATABASE_TYPE}"
+  SQL_RECHECK_DATABASE_NAME="${SQL_DETECTED_DATABASE_NAME:-${OS_CLIENT}}"
+  if [ "${DATABASE_TYPE}" = 'DaMeng' ]; then
+    SQL_RECHECK_DATABASE_NAME='SYSDBA'
+  fi
+  if [ "${SQL_RECHECK_DATABASE_NAME}" != "${DATABASE_NAME}" ]; then
+    echo 'Microi：错误：数据库包在预检后发生变化，二次识别的数据库名不一致。'
+    exit 1
+  fi
+fi
 if ! unzip -p "${SQL_ZIP_FILE}" "${SQL_ARCHIVE_ENTRY}" > "${SQL_FILE}"; then
   echo 'Microi：错误：数据库 SQL 解压失败。'
   exit 1
@@ -2914,7 +3108,7 @@ fi
 echo "Microi：还原 ${DATABASE_DISPLAY_NAME} 数据库（${SQL_ARCHIVE_ENTRY}，可能需要几分钟）..."
 case "${DATABASE_CHOICE}" in
   1|2)
-    docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e 'CREATE DATABASE IF NOT EXISTS microi_demo CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;'
+    docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 -uroot -e "CREATE DATABASE IF NOT EXISTS \`${DATABASE_NAME}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
     # 仅本次恢复会话关闭 InnoDB 严格建表校验，兼容来源库中已存在的超宽 Dynamic 表；
     # 同时关闭本会话 binlog 并按事务批量提交，避免几十万条单行 INSERT 每条 fsync。
     # 不修改 global 配置，平台恢复完成后的所有新连接仍保持 MySQL 默认严格和安全落盘行为。
@@ -2922,7 +3116,7 @@ case "${DATABASE_CHOICE}" in
       printf "SET SESSION innodb_strict_mode=OFF; SET SESSION sql_mode='NO_ENGINE_SUBSTITUTION'; SET SESSION sql_log_bin=0; SET autocommit=0;\n"
     }
     run_mysql_import_stream() {
-      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --binary-mode=1 -uroot microi_demo
+      docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --binary-mode=1 -uroot "${DATABASE_NAME}"
     }
     set +e
     if grep -q '^-- View structure' "${SQL_FILE}"; then
@@ -2939,7 +3133,7 @@ case "${DATABASE_CHOICE}" in
         emit_mysql_import_preamble
         sed -n '/^-- View structure/,$p' "${SQL_FILE}"
         printf '\nCOMMIT;\n'
-      } | docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --force --binary-mode=1 -uroot microi_demo > "${SQL_TMP_DIR}/view-seed.log" 2>&1
+      } | docker exec -e MYSQL_PWD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" mysql --default-character-set=utf8mb4 --force --binary-mode=1 -uroot "${DATABASE_NAME}" > "${SQL_TMP_DIR}/view-seed.log" 2>&1
       MYSQL_VIEW_SEED_PIPE_STATUSES=("${PIPESTATUS[@]}")
 
       {
@@ -2974,8 +3168,8 @@ case "${DATABASE_CHOICE}" in
     fi
     ;;
   3)
-    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q "IF DB_ID(N'microi_demo') IS NULL CREATE DATABASE [microi_demo] COLLATE Chinese_PRC_CI_AS; ALTER DATABASE [microi_demo] SET COMPATIBILITY_LEVEL = 160;"
-    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d microi_demo < "${SQL_FILE}"
+    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -Q "IF DB_ID(N'${DATABASE_NAME}') IS NULL CREATE DATABASE [${DATABASE_NAME}] COLLATE Chinese_PRC_CI_AS; ALTER DATABASE [${DATABASE_NAME}] SET COMPATIBILITY_LEVEL = 160;"
+    docker exec -i "${DATABASE_CONTAINER_NAME}" "${SQLCMD_PATH}" -S localhost -U sa -P "${DATABASE_PASSWORD}" -C -b -d "${DATABASE_NAME}" < "${SQL_FILE}"
     ;;
   5)
     DM8_IMPORT_LOG="/tmp/microi_dm8_import.log"
@@ -2998,7 +3192,7 @@ case "${DATABASE_CHOICE}" in
     rm -f "${DM8_IMPORT_LOG}"
     ;;
   6)
-    docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d microi_demo < "${SQL_FILE}"
+    docker exec -e PGPASSWORD="${DATABASE_PASSWORD}" -i "${DATABASE_CONTAINER_NAME}" psql -v ON_ERROR_STOP=1 -U "${DATABASE_USER}" -d "${DATABASE_NAME}" < "${SQL_FILE}"
     ;;
 esac
 echo 'Microi：数据库还原完成 ✓'
@@ -3688,16 +3882,16 @@ APP_DIR="${COMPOSE_BASE_DIR}/microi-install-app"
 
 case "${DATABASE_CHOICE}" in
   1|2)
-    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME};Database=microi_demo;User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_INTERNAL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
+    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME};Database=${DATABASE_NAME};User Id=root;Password=${DATABASE_PASSWORD};Port=${DATABASE_INTERNAL_PORT};Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;"
     ;;
   3)
-    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME},${DATABASE_INTERNAL_PORT};Initial Catalog=microi_demo;User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
+    OS_CLIENT_DB_CONN="Data Source=${DATABASE_CONTAINER_NAME},${DATABASE_INTERNAL_PORT};Initial Catalog=${DATABASE_NAME};User ID=sa;Password=${DATABASE_PASSWORD};Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;"
     ;;
   5)
     OS_CLIENT_DB_CONN="Server=${DATABASE_CONTAINER_NAME};Port=${DATABASE_INTERNAL_PORT};User Id=SYSDBA;Password=${DATABASE_PASSWORD};Schema=SYSDBA;"
     ;;
   6)
-    OS_CLIENT_DB_CONN="Host=${DATABASE_CONTAINER_NAME};Port=${DATABASE_INTERNAL_PORT};Database=microi_demo;Username=postgres;Password=${DATABASE_PASSWORD};Pooling=true;Maximum Pool Size=500;"
+    OS_CLIENT_DB_CONN="Host=${DATABASE_CONTAINER_NAME};Port=${DATABASE_INTERNAL_PORT};Database=${DATABASE_NAME};Username=postgres;Password=${DATABASE_PASSWORD};Pooling=true;Maximum Pool Size=500;"
     ;;
 esac
 
