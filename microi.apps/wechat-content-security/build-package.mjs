@@ -4,28 +4,29 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const normalize = value => `${String(value).replace(/\r\n?/g, "\n").replace(/\n*$/g, "")}\n`;
-const [core, extension] = await Promise.all([
+const [core, extension, statusBatch] = await Promise.all([
   readFile(resolve(root, "core.js"), "utf8"),
   readFile(resolve(root, "extension.js"), "utf8"),
+  readFile(resolve(root, "status-batch.js"), "utf8"),
 ]);
 
-const engine = (id, key, name, code, policy) => ({
+const engine = (id, key, name, code, policy, options = {}) => ({
   Id: id,
   ApiName: name,
   ApiEngineKey: key,
   ApiAddress: "",
-  ApiRemark: policy === "Managed"
+  ApiRemark: options.remark || (policy === "Managed"
     ? "微信回调官方核心逻辑，由应用商城受管升级；检测到租户修改时停止覆盖。"
-    : "微信回调租户扩展 Hook，首次安装后归租户维护，应用更新永不覆盖。",
+    : "微信回调租户扩展 Hook，首次安装后归租户维护，应用更新永不覆盖。"),
   ApiV8Code: normalize(code),
-  Version: "v1.0.0",
-  ChangeHistory: "2026-08-06 v1.0.0 微信协议网关与业务接口引擎分层；支持租户扩展 Hook。",
+  Version: options.version || "v1.0.0",
+  ChangeHistory: options.changeHistory || "2026-08-06 v1.0.0 微信协议网关与业务接口引擎分层；支持租户扩展 Hook。",
   Category: "微信内容安全",
   IsEnable: 1,
   IsDeleted: 0,
-  StopHttp: 1,
+  StopHttp: options.stopHttp === undefined ? 1 : options.stopHttp,
   AllowAnonymous: 0,
-  Lock: 1,
+  Lock: options.lock === undefined ? 1 : options.lock,
   ResponseFile: 0,
   EnableLog: 0,
   Timeout: 120,
@@ -38,15 +39,15 @@ const engine = (id, key, name, code, policy) => ({
 const packageModel = {
   PackageInfo: {
     Name: "微信小程序内容安全",
-    Version: "v1.0.0",
-    AppVersion: "v1.0.0",
+    Version: "v1.0.1",
+    AppVersion: "v1.0.1",
     AppId: "microi-wechat-content-security",
     ApplicationType: "Platform",
-    Description: "微信小程序内容安全回调核心接口与租户扩展 Hook。",
+    Description: "微信小程序内容安全回调核心接口、批量状态查询与租户扩展 Hook。",
     CreateTime: "2026-08-06 00:00:00",
     CreateUser: "Microi吾码",
     OsClient: "iTdos",
-    ApiEngineCount: 2,
+    ApiEngineCount: 3,
   },
   DDLStatements: [],
   PhysicalColumns: [],
@@ -72,6 +73,19 @@ const packageModel = {
       extension,
       "CreateIfMissing",
     ),
+    engine(
+      "01KZZWECHATSTATUSBATCH0000000",
+      "mci-wechat-content-status-batch",
+      "[微信内容安全]批量状态查询",
+      statusBatch,
+      "Managed",
+      {
+        stopHttp: 0,
+        lock: 0,
+        remark: "登录用户批量查询本人微信图片审核状态，使用租户共享 Redis，供小程序合并轮询。",
+        changeHistory: "2026-08-07 v1.0.0 多图审核批量状态查询；按当前用户和租户校验记录归属。",
+      },
+    ),
   ],
   ResourcePolicies: {
     SchemaVersion: 1,
@@ -83,6 +97,10 @@ const packageModel = {
       "mci-wechat-content-callback-extension": {
         Ownership: "Tenant",
         UpgradePolicy: "CreateIfMissing",
+      },
+      "mci-wechat-content-status-batch": {
+        Ownership: "Application",
+        UpgradePolicy: "Managed",
       },
     },
   },

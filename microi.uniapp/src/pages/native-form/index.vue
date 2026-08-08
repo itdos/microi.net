@@ -148,6 +148,7 @@
 								:module-engine-key="moduleEngineKey" :table-child-auth="tableChildAuth"
 								@change="handleNativeFieldChange(field, $event)"
 								@select="handleNativeFieldSelect"
+								@upload-state="handleUploadState(field, $event)"
 								@selector-toggle="handleSelectorToggle(field, $event)" />
 							<view v-if="tenantFieldPresentation(field).clearable && !isReadonly(field) && form[field.Name]"
 								class="tenant-field-clear" hover-class="tenant-field-clear--pressed"
@@ -335,6 +336,7 @@
 				viewManifest: null,
 				// zhy: 记录当前打开下拉框的字段名。
 				openSelectorField: '',
+				uploadStates: {},
 				customerPickerVisible: false,
 				customerPickerConfig: null,
 				// zhy: 保存新增和编辑页已展开的字段分组。
@@ -919,12 +921,37 @@
 					this.openSelectorField = ''
 				}
 			},
+			handleUploadState(field, state) {
+				const fieldName = String(field && (field.Name || field.Id) || '')
+				if (!fieldName) return
+				const normalized = {
+					pendingCount: Math.max(0, Number(state && state.pendingCount || 0)),
+					failedCount: Math.max(0, Number(state && state.failedCount || 0))
+				}
+				if (normalized.pendingCount > 0 || normalized.failedCount > 0) {
+					this.uploadStates[fieldName] = normalized
+				} else {
+					delete this.uploadStates[fieldName]
+				}
+			},
 			isSelectorGroupOpen(group) {
 				if (!this.openSelectorField || !group || !Array.isArray(group.fields)) return false
 				return group.fields.some((field) => field.Name === this.openSelectorField)
 			},
 			async submit() {
 				if (this.saving) return
+				const uploadStateList = Object.values(this.uploadStates || {})
+				const pendingUploadCount = uploadStateList.reduce((total, item) => total + Number(item.pendingCount || 0), 0)
+				const failedUploadCount = uploadStateList.reduce((total, item) => total + Number(item.failedCount || 0), 0)
+				if (pendingUploadCount > 0 || failedUploadCount > 0) {
+					uni.showToast({
+						title: pendingUploadCount > 0
+							? `还有 ${pendingUploadCount} 张图片正在处理`
+							: `请删除 ${failedUploadCount} 张失败图片后重试`,
+						icon: 'none'
+					})
+					return
+				}
 				// 租户声明式规则隐藏的字段不参与必填校验；显示字段仍按平台元数据校验并保存。
 				const submitFields = (this.definition ? this.definition.fields : [])
 					.filter((field) => this.tenantFieldPresentation(field).visible !== false)
