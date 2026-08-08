@@ -29,7 +29,14 @@ namespace Dos.ORM.MySql
         /// </summary>
         /// <param name="connectionString">数据库连接字符串</param>
         public MySqlProvider(string connectionString)
-            : base(connectionString, MySqlClientFactory.Instance, '`', '`', '?')
+            : base(
+                ConnectionStringCompatibility.NormalizeProviderSyntax(
+                    DatabaseType.MySql,
+                    connectionString),
+                MySqlClientFactory.Instance,
+                '`',
+                '`',
+                '?')
         {
         }
 

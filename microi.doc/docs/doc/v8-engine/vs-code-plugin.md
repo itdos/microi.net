@@ -4,7 +4,7 @@
   <img src="https://static.itdos.com/upload/img/microi-red-256.png" width="112" alt="Microi吾码">
 </p>
 
-<h1 align="center">Microi吾码 AI 开发工具：VS Code 插件 + CLI</h1>
+<h1 align="center">Microi吾码 AI 开发工具：VS Code 插件 + CLI + Codex Plugin</h1>
 
 <p align="center">
   <strong>用自然语言开发完整的复杂业务系统，让低代码从“拖拉拽”进入“AI 直接交付”。</strong>
@@ -14,6 +14,7 @@
   <a href="https://microi.net/"><img src="https://img.shields.io/badge/官网-microi.net-2563eb" alt="Microi 官网"></a>
   <img src="https://img.shields.io/badge/VS%20Code-1.85%2B-007ACC" alt="VS Code 1.85+">
   <img src="https://img.shields.io/badge/CLI-Node.js%2018%2B-339933" alt="Microi CLI">
+  <img src="https://img.shields.io/badge/Codex-Plugin-111827" alt="Microi Codex Plugin">
   <img src="https://img.shields.io/badge/MCP-110%2B%20平台工具-8b5cf6" alt="110+ MCP 工具">
   <img src="https://img.shields.io/badge/AI-Copilot%20%7C%20Cursor%20%7C%20Trae%20%7C%20Claude%20%7C%20Codex-059669" alt="AI 客户端">
   <img src="https://img.shields.io/badge/License-MIT-f59e0b" alt="MIT License">
@@ -21,14 +22,15 @@
 
 ---
 
-## 同一套 AI 能力，两种使用入口
+## 同一套 AI 能力，三种使用入口
 
-传统低代码把开发从“写大量代码”变成了“手动建表、逐个添加字段、拖拽控件、配置菜单、拼界面 JSON、设计打印模板和工作流”。Microi吾码进一步把这些操作变成自然语言，并提供两个互补入口：
+传统低代码把开发从“写大量代码”变成了“手动建表、逐个添加字段、拖拽控件、配置菜单、拼界面 JSON、设计打印模板和工作流”。Microi吾码进一步把这些操作变成自然语言，并提供三个互补入口：
 
 - **VS Code 插件**：适合需要资源树、编辑器按钮、Diff、可视化状态、远程执行和逐行调试的用户。
 - **`@microi.net/cli`**：产品展示名为 `microi.net/cli`，适合只使用 Codex CLI、Claude Code、Trae 或普通终端、不想安装 IDE 的用户；可在命令行完成连接、登录、AI/MCP 初始化和 V8 资源同步。
+- **`@microi.net/codex-plugin`**：Codex 原生 Plugin，直接打包同源 MCP、CLI 和全套 Microi Skills，适合以 Codex 对话为主要开发入口的用户。
 
-两者不是两套产品。CLI 源码与插件位于同一个 `Microi.VSCode` 仓库，复用相同的连接、认证、同步和 AI 知识注入代码，并共用工作区配置与同步基线。可以只安装一种，也可以同时使用。
+三者不是三套实现。它们位于同一个 `Microi.VSCode` 仓库，复用相同的连接、认证、同步、MCP 和 AI 知识注入代码，并共用工作区配置、Token 与同步基线。可以只安装一种，也可以同时使用。
 
 > 你描述业务目标，AI 通过插件内置的 Microi MCP、平台知识库和 Skills，完成业务蓝图、数据模型、表单字段、菜单权限、接口引擎、V8 事件、数据源、界面引擎、打印引擎、工作流、定时任务、前端微服务以及自动化测试。
 
@@ -88,20 +90,20 @@ Manifest 全系统规划 + dry-run 预演
 | 能力 | 说明 |
 |---|---|
 | **自然语言生成完整系统** | 从需求直接生成业务蓝图、Manifest、表、字段、表单布局、菜单树、权限、接口、事件、数据源、页面、打印、工作流、任务和测试。 |
-| **内置 Microi MCP Server** | VSIX 与 CLI npm 包都打包 MCP Server，普通用户无需克隆 `microi.mcp`；一键配置后，AI 可直接读取和操作当前 Microi 租户。 |
+| **内置 Microi MCP Server** | VSIX、CLI npm 包与 Codex Plugin 都打包同一 MCP Server，普通用户无需克隆 `microi.mcp`；一键配置后，AI 可直接读取和操作当前 Microi 租户。 |
 | **110+ 个平台工具** | 当前源码已超过 110 个注册工具，覆盖系统发现、低代码建模、V8、页面、打印、流程、微服务、测试、文件、Redis 和 MongoDB 日志等能力；精确清单以运行时 `tools/list` 为准。 |
 | **AI 知识库与 Skills 自动注入** | 自动生成 `AGENTS.md`、`CLAUDE.md`、Copilot/Cursor 指令、V8 类型定义和 `microi.skills/`，AI 无需反复“喂文档”。 |
 | **实时数据库理解** | AI 可通过 MCP 查询实时表结构，也可按需读取每个 OsClient 的 `.microi-db-schema.md` 快照；大型数据库不会塞满公共指令文件。 |
 | **V8 全资源本地化** | 接口引擎、表单事件、字段事件、模块按钮/Tab、模块 Join/Where、工作流节点代码均可拉取为本地 `.js` 文件。 |
-| **远程执行与逐行调试** | VS Code 插件提供完整调试界面；CLI 用户可让 AI 通过 MCP 执行接口引擎并回读结果，逐行调试 UI 仍由插件提供。 |
+| **远程执行与调试** | VS Code 提供 DAP 可视化调试；CLI 与 Codex Plugin 通过同源 MCP/Skill 完成远程执行、堆栈诊断、最小补丁和复测，UI 形态不同但不复制远端实现。 |
 | **安全同步与冲突检测** | 支持单文件推送、服务器一键同步、远端 Diff、同步结果下钻和双端修改冲突拦截。 |
 | **前端微服务全生命周期** | 创建、拉取、构建、发布、同步私有源码、维护路由清单并检查源码冲突。 |
 | **AI 模型统一配置** | 在插件中维护模型库，并分别同步到 Claude Code、Codex 和 GitHub Copilot；内置 DeepSeek、通义千问、MiniMax、腾讯混元、OpenRouter 等快捷预设。 |
 | **Playwright E2E** | 生成 Microi 专用测试工程、登录与接口辅助方法、冒烟测试、契约测试、网络守卫、视觉与资源检查，并打开 HTML 报告。 |
 | **性能压力测试** | 对接口引擎、V8 事件和表 CRUD 执行并发/升压测试，输出 RPS、平均耗时、P95/P99、错误率、趋势与错误 Top。 |
-| **多服务器 / 多租户** | 同一工作区可管理多个服务器和 OsClient，连接、Token、MCP 配置和本地目录彼此隔离；插件与 CLI 共用这些数据。 |
+| **多服务器 / 多租户** | 同一工作区可管理多个服务器和 OsClient，连接、Token、MCP 配置和本地目录彼此隔离；VS Code、CLI 与 Codex Plugin 共用这些数据。 |
 
-## 110+ MCP 工具覆盖哪些平台能力
+## MCP 工具覆盖哪些平台能力
 
 插件内置 MCP 不是一个“万能写入接口”，而是一组按 Microi 业务对象设计、带参数校验与安全边界的专业工具。
 
@@ -230,6 +232,22 @@ microi init
 
 首次写入 Codex MCP 后必须新开 Codex 对话；已经打开的对话通常不会热加载新增工具。
 
+### 方案 C：Codex Plugin
+
+Codex Plugin 以 `@microi.net/codex-plugin` 打包，marketplace 固定名为 `microi-net`，选择器为 `microi@microi-net`。普通用户明确同意安装后，可直接让 AI 执行：
+
+```bash
+npx --yes @microi.net/cli@latest codex install --yes
+```
+
+已安装 CLI 时也可运行 `microi codex status --json` 检测、运行 `microi codex install --yes` 安装。`--yes` 表示用户已经授权修改 Codex 全局 marketplace、插件配置和缓存；普通 Microi 对话不得静默补上该参数。
+
+开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.VSCode` 验收本地 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm marketplace 模板见 `codex/marketplace.npm.json`。
+
+安装后在新 Codex 任务中先调用 `microi_codex` 的 `profiles` 动作。它会读取 `Microi-V8-Engine/.microi-config.json`；未初始化时，使用插件内置 `scripts/microi-cli.js init --workspace <工作区>`。多连接时把 `profiles` 返回的稳定 `name` 传给后续工具调用。
+
+> npm 包用于 repo/npm marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；通用目录仍需按 OpenAI 官方 Plugin 提交流程审核。
+
 ### 开始自然语言开发
 
 在 Copilot、Cursor、Trae、Claude Code 或 Codex 中描述系统需求即可。插件和 CLI 都建议让 AI 明确执行以下流程：
@@ -241,23 +259,21 @@ microi init
 写入后回读验证、生成 E2E 测试，并检查同步状态。
 ```
 
-## CLI 能力与插件边界
+## 三端能力与交互边界
 
-CLI 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 AI 开发能力**，不是把编辑器 UI 生硬复制到终端。连接、登录、AI/MCP 初始化完成后，Codex 可通过同一套 110+ MCP 工具完成平台建模、V8、页面、打印、工作流、微服务和验收。
+CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 AI 开发能力**，不是把编辑器 UI 生硬复制到终端或对话。三端连接后均通过同一套 MCP 与 Skills 完成平台建模、V8、页面、打印、工作流、微服务和验收。
 
-| 能力 | VS Code 插件 | `@microi.net/cli` |
-|---|---|---|
-| 多服务器连接、帐号/密码/验证码登录 | 可视化表单 | 交互式命令行 |
-| AI 指令、Skills、typings、MCP 初始化 | 支持 | 支持 |
-| V8/字段/模块/流程/数据库结构拉取 | 资源树操作 | `microi pull` |
-| 远端差异检查、单文件显式推送 | Diff/同步结果视图 | `microi sync status` / `microi push` |
-| 110+ 平台能力 | AI 通过 MCP | Codex/Claude 通过同一 MCP |
-| 接口引擎远程执行 | 编辑器按钮；AI MCP | AI MCP |
-| 断点、变量、Step Over/In/Out | 完整可视化调试 | 不提供调试 UI |
-| 前端微服务构建、发布 | 可视化命令 | 当前由 AI 通过 MCP；直接 CLI 子命令后续补齐 |
-| MCP 进程启停与输出面板 | 可视化管理 | 由 AI 客户端管理；`microi doctor` 检查配置 |
-
-因此，不使用 IDE 的用户只需安装 `@microi.net/cli`；喜欢编辑器体验的用户继续安装插件；需要两种方式的用户可以同时安装。
+| 能力 | VS Code 插件 | `@microi.net/cli` | `@microi.net/codex-plugin` |
+|---|---|---|---|
+| 多服务器连接、帐号/密码/验证码登录 | 可视化表单 | 交互式命令行 | 内置 CLI + `profiles` 路由 |
+| AI 指令、Skills、typings、MCP 初始化 | 支持 | 支持 | 自带全套 Skills/MCP，也可注入工作区 |
+| V8/字段/模块/流程/数据库结构拉取 | 资源树操作 | `microi pull` | 内置 CLI 或 MCP |
+| 远端差异检查、单文件显式推送 | Diff/同步结果视图 | `microi sync status` / `microi push` | CLI + Codex 原生 diff/patch |
+| 平台建模与写入 | AI 通过 MCP | AI 通过同一 MCP | `microi_codex` 路由同一原工具 |
+| 接口引擎远程执行 | 编辑器按钮；AI MCP | AI MCP | MCP + `v8-debugging` Skill |
+| 调试交互 | DAP 断点/变量/Step | 结构化执行与诊断 | 结构化执行、补丁、复测；不复制 DAP UI |
+| 前端微服务构建、发布 | 可视化命令 | AI 通过 MCP/终端 | `microi-microservice` Skill + MCP/终端 |
+| MCP 进程启停与输出 | 可视化管理 | AI 客户端管理；`doctor` 诊断 | Codex Plugin 宿主管理；路由器报告连接状态 |
 
 ## CLI 常用命令
 
@@ -511,13 +527,13 @@ CLI 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 A
 | `Microi: 运行端到端自动化测试（Playwright E2E）` |
 | `Microi: 打开端到端测试报告（Playwright Report）` |
 
-## CLI 命名、打包与发布
+## CLI 与 Codex Plugin 命名、打包与发布
 
-产品名称和文档入口可以写 **`microi.net/cli`**。npm 中带 `/` 的 registry 包必须使用 `@scope/package` 形式，所以正式安装名采用合法且保留完整品牌的 **`@microi.net/cli`**，安装后暴露简短命令 **`microi`**。发布者必须先拥有 npm 用户或组织 scope `@microi.net`。
+CLI 正式包名为 **`@microi.net/cli`**，安装后暴露命令 **`microi`**；Codex Plugin 正式包名为 **`@microi.net/codex-plugin`**。两个 npm 产品共用 `@microi.net` scope 和版本号。
 
-CLI 放在 `Microi.VSCode/cli/`，与插件使用同一版本号和一次发布流程。`npm run publish` 的三个目标是 **npm 的 `@microi.net/cli` + Visual Studio Marketplace + Open VSX**。`bump-version.js` 会同时更新 VSIX、CLI 与 bundled Skills 版本；打包前再校验插件与 CLI 版本相同。即使 npm 暂时没有 scope 或发布权限，本地 CLI tarball 仍与两个扩展市场使用同一版本号，便于后续原产物补发。
+一套 `Microi.VSCode` 输出三个产品、四个分发目标：VS Code 扩展发布到 Visual Studio Marketplace 与 Open VSX，CLI 和 Codex Plugin 分别发布到 npm。`bump-version.js` 同时更新扩展、CLI、Codex npm 包、Codex manifest、npm marketplace 示例和 bundled Skills；任一版本不一致都会在外部写入前停止。
 
-三个 registry 不支持跨站点事务，因此无法做到“三端同一瞬间原子成功”。默认 `npm run publish` 会先处理 Visual Studio Marketplace 和 Open VSX：npm 已登录时在双市场之后直接发布 CLI；仅缺少 npm 登录时不跳过 CLI，而是在双市场之后启动交互式 `npm login`，浏览器授权成功后自动继续。registry/scope/权限错误、用户取消授权或 npm 上传失败仍不会撤销两个扩展市场，并会保留同版 CLI tarball 供补发。脚本会逐端公开回读，不会把部分完成冒充三端完成。若某次发布必须三端全部具备权限才允许递增版本，使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。插件 VSIX 不会重复包含 `cli/` 目录，CLI npm 包会包含自己的可执行文件、MCP Server、Codex adapter 和 Skills。
+四个分发目标不支持跨站事务。默认 `npm run publish` 先处理两个扩展市场，再只执行一次 npm 登录/权限检查，随后先发布 Codex Plugin；只有目标 Codex npm 包已公开或本次发布成功，才发布内含一键安装器的 CLI，避免安装器引用 404 版本。任一目标失败不会撤销已完成目标，两个 tarball 都会保留供同源码补发，脚本逐目标公开回读，不把部分完成冒充三端完成。严格发布使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。
 
 ### 本地构建与安装验收
 
@@ -527,11 +543,16 @@ npm install
 npm run cli:typecheck
 npm run build
 npm run cli:test
+npm run codex:test
+python %USERPROFILE%/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py plugins/microi
+npm run package
+node scripts/test-cli-package.js
+node scripts/test-codex-plugin-package.js
 npm install -g ./cli
 microi --help
 ```
 
-只生成并校验 VSIX 与 npm tarball、不改版本也不上传：
+只生成并校验 VSIX、CLI tarball 与 Codex Plugin tarball，不改版本也不上传：
 
 ```bash
 node publish.js --package-only --no-bump
@@ -540,36 +561,40 @@ node publish.js --package-only --no-bump
 ### 首次发布到 npm
 
 1. 登录 npmjs.com，创建免费公开组织 **`microi.net`**；组织名会成为 `@microi.net` scope。若由个人 scope 发布，则 npm 用户名必须正好是 `microi.net`。
-2. 确认 npm 账号已加入 `@microi.net` 组织并拥有发布权限。本机未登录时，默认 `npm run publish` 会先发布 Visual Studio Marketplace 和 Open VSX，再自动执行 `npm login --registry=https://registry.npmjs.org/` 提示浏览器授权，授权成功后继续发布 CLI。CI、无人值守或严格预检模式仍应提前完成 npm 登录。
+2. 确认 npm 账号已加入 `@microi.net` 组织并拥有发布权限。本机未登录时，默认流程会先发布两个扩展市场，再执行一次 `npm login --registry=https://registry.npmjs.org/`，随后先发布 Codex Plugin、再发布 CLI。CI、无人值守或严格预检模式仍应提前登录。
 3. 为两个插件市场准备 PAT。本机可设置环境变量 `VSCE_PAT` / `OVSX_PAT`，或把 `publish-tokens.example.json` 复制为已被 Git 忽略的 `publish-tokens.local.json`。不要再使用 `publish-tokens.json`。
 4. 如果仓库曾跟踪过 `publish-tokens.json`，应把其中的 PAT 视为已泄露：先在两个平台废弃并重新生成，把新 PAT 放入环境变量或 `publish-tokens.local.json`，再删除旧文件并执行 `git rm --cached publish-tokens.json`。发布脚本遇到该旧路径会主动停止。
-5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会检查 npm registry/登录/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；npm 仅缺少登录时会报告“发布阶段将交互授权”，不会阻断两个扩展市场。要求三端在版本递增前全部通过严格预检时，执行 `npm run publish:preflight:all`。
+5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会同时检查两个 npm 包的 registry/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；仅缺 npm 登录时不会阻断两个扩展市场。要求全部目标在版本递增前通过时，执行 `npm run publish:preflight:all`。
 6. 先运行 `npm run package` 检查本地产物；确认后执行 `npm run publish`。
-7. 脚本会自动回读本次实际发布的端；三端都发布后也可手工复核：
+7. 脚本会自动回读本次实际发布的目标；也可手工复核：
 
 ```bash
 npm view @microi.net/cli version
+npm view @microi.net/codex-plugin version
 npx vsce show Microi.v8-engine --json
 npx ovsx get Microi.v8-engine --metadata
 npm install -g @microi.net/cli
 microi --help
 ```
 
-npm 新 scope 或新版本刚发布后，npmjs.com 页面与公共 registry 可能短时间不同步。脚本会使用 `--prefer-online` 最长等待约 2 分钟；如果 `npm publish` 已成功返回但公共回读仍是临时 E404，只报告 `pending-propagation`，不会把已经成功的发布误判为失败。此时**不要重复发布或补发同一版本**，稍后执行下面的只读命令确认三端：
+npm 新 scope 或新版本刚发布后，公共 registry 可能短时间不同步。脚本会使用 `--prefer-online` 最长等待约 2 分钟；如果 `npm publish` 已成功返回但回读仍是临时 E404，只报告 `pending-propagation`。此时**不要重复发布或补发同一版本**，稍后执行只读验证：
 
 ```bash
 npm run publish:verify
 ```
 
-如果 npm 因未登录、scope 不存在、权限不足或上传错误而不可发布，默认流程仍会先完成两个扩展市场，并在项目根保留同版本 CLI tarball。**不要再次执行 `npm run publish`**，否则会继续递增版本。创建好 scope 后，在源码和本次 tarball 未改变的前提下执行：
+如果 npm 因未登录、scope、权限或上传错误而不可发布，默认流程仍先完成两个扩展市场，并在项目根保留两个同版本 tarball。**不要再次执行 `npm run publish`**。在源码和对应原始 tarball 未改变时先补发 Codex Plugin，再补发 CLI：
 
 ```bash
+npm run publish:codex:resume
 npm run publish:cli:resume
 ```
 
-反过来，如果 CLI 已发布、两个扩展市场都未完成，执行 `npm run publish:extensions:resume`。只补 Visual Studio Marketplace 用 `npm run publish:vsce:resume`，只补 Open VSX 用 `npm run publish:ovsx:resume`。所有补发命令都不递增版本，但最后仍会回读三端并校验同版。
+如果两个 npm 产品已发布、扩展市场未完成，执行 `npm run publish:extensions:resume`。只补一个扩展市场使用 `publish:vsce:resume` 或 `publish:ovsx:resume`。补发不递增版本，并回读全部三端产品的当前版本。
 
 > 补发只适用于“同一份源码和产物的当次发布被中断”。如果失败后又修改了代码，必须重新完整发布下一版，不能用相同版本号发布不同产物。
+
+> 发布 `@microi.net/codex-plugin` 只完成 npm/marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；公开目录需另按 OpenAI 官方 Plugin 提交流程审核。
 
 正式发布是外部不可逆操作。不要把 npm Token、服务器 Token 或任何登录密码写入仓库。CI 后续可改用 npm Trusted Publishing，避免长期保存发布 Token。
 

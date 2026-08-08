@@ -5,6 +5,10 @@ import { DiyCommon } from "@/utils/diy.common";
 import { hasWebOS, loadDesktop } from "@/utils/webos-detect.js";
 /* Layout */
 import Layout from "@/layout";
+// 友好路由是登录后可直接落地的核心入口，必须随主包同步可用。
+// 若这里使用动态 import，发布切换或首次冷启动时一旦路由 chunk 加载失败，
+// RouterView 只会留下空容器，连微服务宿主自己的诊断/自愈都无法运行。
+import MicroAppHost from "@/views/micro-app/host.vue";
 export const constantRoutes = [
     {
         path: "/redirect",
@@ -155,6 +159,26 @@ export const constantRoutes = [
                 name: "diy_field",
                 meta: { keepAlive: false },
                 component: () => import("@/views/form-engine/diy-design-page.vue")
+            }
+        ]
+    },
+    // MicroService 友好路由和表单设计器一样，属于平台协议入口而不是租户菜单。
+    // 必须在首次解析 URL 时就存在；若等 GetSysMenuStep 后才动态注入，冷启动会先
+    // 得到一个没有匹配组件的路由，菜单或网络稍有抖动就只剩空 RouterView。
+    // 登录守卫仍会拦截匿名用户，宿主 Resolve(RequirePage=true) 继续复核页面事实。
+    {
+        path: "/micro-app/:appKey/:microPath(.*)*",
+        component: Layout,
+        hidden: true,
+        children: [
+            {
+                path: "",
+                name: "micro_app_friendly",
+                component: MicroAppHost,
+                // The micro-app runtime already owns its keep-alive lifecycle.
+                // Caching the Vue host as well leaves a detached vnode that can
+                // win a tab-switch race and render the newly active host empty.
+                meta: { title: "微服务", microAppFriendlyRoute: true, keepAlive: false }
             }
         ]
     }
@@ -504,24 +528,6 @@ export const asyncRoutes = [
             { path: "nodes", name: "openclaw_nodes", component: () => import("@/views/openclaw/nodes/index.vue"), meta: { title: "节点管理" } },
             { path: "llm", name: "openclaw_llm", component: () => import("@/views/openclaw/llm/index.vue"), meta: { title: "AI模型配置" } },
             { path: "settings", name: "openclaw_settings", component: () => import("@/views/openclaw/settings/index.vue"), meta: { title: "系统设置" } }
-        ]
-    },
-    // MicroService 友好路由由 sys_microiservice_page 作为页面事实源。
-    // sys_menu 只负责导航与角色权限展示；内部按钮页无需伪造可见菜单。
-    {
-        path: "/micro-app/:appKey/:microPath(.*)*",
-        component: Layout,
-        hidden: true,
-        children: [
-            {
-                path: "",
-                name: "micro_app_friendly",
-                component: () => import("@/views/micro-app/host.vue"),
-                // The micro-app runtime already owns its keep-alive lifecycle.
-                // Caching the Vue host as well leaves a detached vnode that can
-                // win a tab-switch race and render the newly active host empty.
-                meta: { title: "微服务", microAppFriendlyRoute: true, keepAlive: false }
-            }
         ]
     },
     // Vue Router 4: 使用 pathMatch 替代 * ，此路由放到最后

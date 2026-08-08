@@ -7,6 +7,19 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = relativePath => fs.readFileSync(path.join(root, relativePath), "utf8");
 
+function mockElement({ text = "", children = 0, width = 0, height = 0, tagName = "DIV" } = {}) {
+    return {
+        tagName,
+        textContent: text,
+        childElementCount: children,
+        scrollWidth: width,
+        scrollHeight: height,
+        clientWidth: width,
+        clientHeight: height,
+        getBoundingClientRect: () => ({ width, height })
+    };
+}
+
 test("friendly micro-app route exists before the catch-all and requires a page fact", () => {
     const router = read("src/router/index.js");
     const friendly = router.indexOf('path: "/micro-app/:appKey/:microPath(.*)*"');
@@ -15,11 +28,44 @@ test("friendly micro-app route exists before the catch-all and requires a page f
     assert.ok(catchAll > friendly);
     assert.match(router, /microAppFriendlyRoute:\s*true/);
     assert.match(router, /microAppFriendlyRoute:\s*true,\s*keepAlive:\s*false/);
+    assert.match(router, /import MicroAppHost from ["']@\/views\/micro-app\/host\.vue["']/);
+    assert.match(router, /name:\s*["']micro_app_friendly["'][\s\S]*?component:\s*MicroAppHost/);
+    assert.doesNotMatch(router, /name:\s*["']micro_app_friendly["'][\s\S]{0,240}?component:\s*\(\)\s*=>\s*import/);
+    const constantsFrozen = router.indexOf("const constantRouteNames = collectRouteNames(constantRoutes)");
+    assert.ok(constantsFrozen > friendly, "friendly route must be registered before the router freezes constant route names");
+    assert.ok(router.indexOf("export const asyncRoutes") > friendly, "friendly route must not wait for authenticated menu injection");
 
     const host = read("src/views/micro-app/host.vue");
     assert.match(host, /MicroApp\/Resolve/);
     assert.match(host, /const requirePage\s*=\s*this\.\$route\?\.meta\?\.microAppFriendlyRoute\s*===\s*true/);
     assert.match(host, /RequirePage:\s*requirePage/);
+});
+
+test("render health requires real visible child content and permits only one automatic rebuild", async () => {
+    const source = read("src/views/micro-app/render-health.js");
+    const health = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+    const visibleStyle = () => ({ display: "block", visibility: "visible" });
+
+    assert.equal(health.hasRenderableMicroAppContent(null, visibleStyle), false);
+    assert.equal(health.hasRenderableMicroAppContent({ querySelector: () => null }, visibleStyle), false);
+
+    const emptyRoot = mockElement({ width: 800, height: 600 });
+    const zeroHeightRoot = mockElement({ text: "个人资料", width: 800, height: 0 });
+    const visibleRoot = mockElement({ text: "个人资料", width: 800, height: 600 });
+    const appWithRoot = rootElement => ({
+        querySelector: selector => selector === "micro-app-body"
+            ? { querySelector: inner => inner === "#app" ? rootElement : null, children: [] }
+            : null
+    });
+
+    assert.equal(health.hasRenderableMicroAppContent(appWithRoot(emptyRoot), visibleStyle), false);
+    assert.equal(health.hasRenderableMicroAppContent(appWithRoot(zeroHeightRoot), visibleStyle), false);
+    assert.equal(health.hasRenderableMicroAppContent(appWithRoot(visibleRoot), visibleStyle), true);
+    assert.equal(health.hasRenderableMicroAppContent(appWithRoot(visibleRoot), () => ({ display: "none" })), false);
+
+    assert.equal(health.shouldAutoRecoverMicroApp(0, "https://api.example/micro-app/index.html"), true);
+    assert.equal(health.shouldAutoRecoverMicroApp(1, "https://api.example/micro-app/index.html"), false);
+    assert.equal(health.shouldAutoRecoverMicroApp(0, ""), false);
 });
 
 test("hosts use authenticated resolve and one diagnostic error component", () => {
@@ -96,14 +142,20 @@ test("page host derives height from the visible viewport instead of its collapse
 
 test("page host automatically heals one stuck first mount and then exposes a stable diagnostic", () => {
     const host = read("src/views/micro-app/host.vue");
+    const health = read("src/views/micro-app/render-health.js");
 
     assert.match(host, /startMountWatchdog/);
-    assert.match(host, /autoMountRetryCount\s*<\s*1/);
+    assert.match(host, /shouldAutoRecoverMicroApp\(this\.autoMountRetryCount,\s*this\.entryUrl\)/);
+    assert.match(health, /Number\(retryCount\s*\|\|\s*0\)\s*<\s*1/);
     assert.match(host, /unmountApp\(this\.microAppName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
     assert.match(host, /MICRO_APP_MOUNT_TIMEOUT/);
     assert.match(host, /micro-app:ready/);
     assert.match(host, /startContentWatchdog/);
     assert.match(host, /hasRenderableMicroAppContent/);
+    assert.match(health, /app\.querySelector\("micro-app-body"\)[\s\S]{0,120}?app\.shadowRoot/);
+    assert.match(health, /if\s*\(!body\)\s*return false/);
+    assert.doesNotMatch(host, /hasContent\s*===\s*null/);
+    assert.doesNotMatch(host, /if\s*\(this\.mountReadyGeneration\s*===\s*generation[\s\S]{0,180}?this\.markMicroAppReady/);
     assert.match(host, /MICRO_APP_CONTENT_EMPTY/);
     assert.match(host, /hostGeneration:\s*this\.resolveGeneration/);
     assert.match(host, /hostMountAttempt:\s*this\.retryKey/);

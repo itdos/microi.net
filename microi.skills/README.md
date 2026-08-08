@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 58 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 59 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -83,6 +83,7 @@
 | **v8-formengine-http** | 移动端/外部系统直接调用 FormEngine HTTP 路由的约定 | `v8-formengine-http/SKILL.md` |
 | **v8-explorer-tree** | VS Code 插件 V8 资源管理器目录规范和本地文件归档 | `v8-explorer-tree/SKILL.md` |
 | **workspace-conventions** | 工作区文件放置、临时产物、项目专属目录和根目录污染防护 | `workspace-conventions/SKILL.md` |
+| **microi-codex-installer** | Codex 插件立即检测、授权安装、旧 marketplace 迁移与验收 | `microi-codex-installer/SKILL.md` |
 | **production-readonly-audit** | 正式环境只读巡检，不改动线上数据的业务核对流程 | `production-readonly-audit/SKILL.md` |
 | **uniapp-mall-assets** | UniApp/H5/商城上传资源、FileServer、私有临时 URL 与富文本安全 | `uniapp-mall-assets/SKILL.md` |
 
@@ -99,7 +100,7 @@
 
 ### 推荐：VS Code 插件零配置安装
 
-安装 Microi 吾码 VS Code 插件后，在工作区执行初始化/拉取。插件会安装当前版本的完整 `microi.skills`，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成 `AGENTS.md`、`.github/copilot-instructions.md`、`CLAUDE.md` 和 Cursor rules；不需要手工维护 56 条 Skill 引用。
+安装 Microi 吾码 VS Code 插件后，在工作区执行初始化/拉取。插件会安装当前版本的完整 `microi.skills`，并为 Codex、GitHub Copilot、Claude Code、Cursor 等生成 `AGENTS.md`、`.github/copilot-instructions.md`、`CLAUDE.md` 和 Cursor rules；不需要手工维护 59 条 Skill 引用。
 
 插件升级采用清单和内容哈希做差异更新：未被用户修改的官方 Skill 自动升级，用户已经修改的文件不被整文件覆盖，新增 Skill 自动补齐。发布插件时必须比对源 Skills、插件 `dist`、VSIX 和空工作区初始化产物的相对路径与 SHA-256，不能只检查文件数量。
 

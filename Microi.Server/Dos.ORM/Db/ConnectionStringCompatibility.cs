@@ -39,8 +39,7 @@ namespace Dos.ORM
             if (string.IsNullOrWhiteSpace(connectionString)) return connectionString;
             if (databaseType != DatabaseType.MySql) return connectionString;
 
-            var normalized = RepairUnquotedMySqlCredentialSemicolons(connectionString);
-            normalized = NormalizeMySqlSslMode(normalized);
+            var normalized = NormalizeProviderSyntax(databaseType, connectionString);
             if (!ContainsOption(normalized, "sslmode"))
                 normalized = Append(normalized, "SslMode=Disabled");
             if (!ContainsOption(normalized, "maxpoolsize", "maximumpoolsize"))
@@ -56,6 +55,22 @@ namespace Dos.ORM
             if (!ContainsOption(normalized, "useaffectedrows"))
                 normalized = Append(normalized, "Use Affected Rows=False");
             return normalized;
+        }
+
+        /// <summary>
+        /// 只修复数据库驱动解析前必需的历史语法，不补充连接池等平台默认值。
+        /// MySqlProvider 会在通用连接串构建器解析前调用此方法，因此直接 new DbSession、
+        /// 旧插件或其它绕过上层工厂的入口也不会把旧连接串原样交给驱动。
+        /// </summary>
+        public static string NormalizeProviderSyntax(
+            DatabaseType databaseType,
+            string connectionString)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString)) return connectionString;
+            if (databaseType != DatabaseType.MySql) return connectionString;
+
+            var normalized = RepairUnquotedMySqlCredentialSemicolons(connectionString);
+            return NormalizeMySqlSslMode(normalized);
         }
 
         /// <summary>

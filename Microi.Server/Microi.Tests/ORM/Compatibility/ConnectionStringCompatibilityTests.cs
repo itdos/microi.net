@@ -73,6 +73,21 @@ public sealed class ConnectionStringCompatibilityTests
     }
 
     [Fact]
+    public void DbSession_CreateConnection_RepairsUnquotedCredentialSemicolonAtProviderBoundary()
+    {
+        const string original =
+            "Server=localhost;Database=microi;User Id=root;Password=secret;User;SslMode=None;";
+        var session = new DbSession(DatabaseType.MySql, original);
+
+        using var connection = session.Db.CreateConnection();
+        var builder = new MySqlConnectionStringBuilder(connection.ConnectionString);
+
+        Assert.Equal("root", builder.UserID);
+        Assert.Equal("secret;User", builder.Password);
+        Assert.Equal(MySqlSslMode.Disabled, builder.SslMode);
+    }
+
+    [Fact]
     public void Normalize_RepairsUnquotedSemicolonInMySqlUserId()
     {
         const string original =

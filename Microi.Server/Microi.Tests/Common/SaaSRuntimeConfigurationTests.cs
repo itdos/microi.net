@@ -373,6 +373,14 @@ public class SaaSRuntimeConfigurationTests
             "done < <(sed -n -E 's/^[[:space:]]{6}([A-Za-z][A-Za-z0-9_]*):.*/\\1/p' \"${environment_block}\")",
             installer);
         Assert.Contains("repair_validate_runtime_environment", installer);
+        Assert.Contains("repair_db_connection_has_required_shape", installer);
+        Assert.Contains("repair_build_installer_db_connection", installer);
+        Assert.Contains("repair_validate_api_db_connection", installer);
+        Assert.Contains("MYSQL_ROOT_PASSWORD", installer);
+        Assert.Contains("检测到原 API 数据库连接串被截断", installer);
+        Assert.Contains(
+            "User Id=root;Password=%s;Port=%s;Convert Zero Datetime=True",
+            installer);
         Assert.Contains("repair_restore_previous_app_images", installer);
         Assert.Contains(".repair-backups", installer);
         Assert.Contains(
@@ -398,6 +406,7 @@ public class SaaSRuntimeConfigurationTests
         Assert.Contains("bash install-microi.sh --repair-app", dockerDocument);
         Assert.Contains("microi-install-redis:6379", dockerDocument);
         Assert.Contains("容器内的 `127.0.0.1` / `localhost`", dockerDocument);
+        Assert.Contains("数据库连接串被截断", dockerDocument);
         Assert.DoesNotContain("APP_DIR=/microi/compose/microi-install-app", dockerDocument);
     }
 

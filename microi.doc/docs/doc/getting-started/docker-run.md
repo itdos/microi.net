@@ -59,7 +59,7 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 
 ### 🔄 一键更新/修复 **API 与 Web 前端**
 
-适用于通过上述一键安装脚本部署的环境，也适用于以下故障：API 报“未检测到 `OsClientRedisHost`”、更新时报同名容器冲突、API/Web 编排在宝塔面板中消失。修复器会从现有容器 Compose 标签及两个标准目录中定位现场编排；多个配置不一致时会在删除容器前停止，不会猜测或覆盖。
+适用于通过上述一键安装脚本部署的环境，也适用于以下故障：API 报“未检测到 `OsClientRedisHost`”、`OsClientDbConn` 数据库连接串被截断、更新时报同名容器冲突、API/Web 编排在宝塔面板中消失。修复器会从现有容器 Compose 标签及两个标准目录中定位现场编排；多个配置不一致时会在删除容器前停止，不会猜测或覆盖。
 
 ```bash
 url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh --repair-app
@@ -67,8 +67,8 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 
 修复流程如下：
 
-1. 回读现有 API/Web 容器的 Compose project、配置文件和镜像，静态校验 API 十项启动配置；先把 Compose、容器元数据和旧镜像恢复点保存到应用编排目录的 `.repair-backups/<时间>/`。
-2. 创建/复用 `microi` 共享 bridge 网络，将现有数据库、Redis、MongoDB、MinIO 容器接入该网络；把 API 的数据库、Redis、MongoDB 启动连接迁移为容器 DNS 与内部端口。
+1. 回读现有 API/Web 容器的 Compose project、配置文件和镜像，静态校验 API 十项启动配置及数据库连接串结构；先把 Compose、容器元数据和旧镜像恢复点保存到应用编排目录的 `.repair-backups/<时间>/`。
+2. 创建/复用 `microi` 共享 bridge 网络，将现有数据库、Redis、MongoDB、MinIO 容器接入该网络；把 API 的数据库、Redis、MongoDB 启动连接迁移为容器 DNS 与内部端口。如果一键安装环境中的数据库连接串缺少用户、密码或端口，修复器会从唯一匹配的现有数据库容器安装环境中恢复完整连接串，全程不输出密码；无法精确匹配容器或凭据时会在删除应用容器前停止。
 3. 按现场 Compose 拉取镜像，临时停止 Watchtower，只删除并重建 `microi-install-api`、`microi-install-client` 两个无状态应用容器，从而接管丢失标签或归属漂移造成的同名容器冲突。
 4. 重建后回读十项启动配置和 `microi` 网络，依次验证 API liveness、readiness；失败时自动尝试用修复前镜像恢复。最后恢复原本正在运行的 Watchtower。
 
