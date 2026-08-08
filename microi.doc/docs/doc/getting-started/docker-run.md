@@ -16,7 +16,8 @@
 
 ### 📦 CentOS 7/8/9 / Ubuntu 20/22/24 / Debian 10/11/12 一键安装
 ```bash
-url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
+# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
+url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh
 ```
 
 ### ⚠️ 注意事项
@@ -62,7 +63,8 @@ url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/
 适用于通过上述一键安装脚本部署的环境，也适用于以下故障：API 报“未检测到 `OsClientRedisHost`”、`OsClientDbConn` 数据库连接串被截断、更新时报同名容器冲突、API/Web 编排在宝塔面板中消失。修复器会从现有容器 Compose 标签及两个标准目录中定位现场编排；多个配置不一致时会在删除容器前停止，不会猜测或覆盖。
 
 ```bash
-url=https://static.itdos.com/install/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh --repair-app
+# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
+url=https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh;if command -v curl >/dev/null 2>&1;then curl -fsSL -o install-microi.sh "$url";else wget -O install-microi.sh "$url";fi;sed -i 's/\r$//' install-microi.sh;bash install-microi.sh --repair-app
 ```
 
 修复流程如下：
@@ -98,9 +100,10 @@ docker ps -a --format "{{.Names}}" | grep "^microi-install-" | xargs -r docker r
 
 ```bash
 # 下载制作脚本和离线安装脚本
+# 官方 GitHub 镜像（源码浏览）：https://github.com/itdos/microi.net
 curl -sSO https://static.itdos.com/install/microi-offline-prepare.sh
 curl -sSO https://static.itdos.com/install/install-microi-offline.sh
-curl -sSO https://static.itdos.com/install/install-microi.sh
+curl -sSO https://gitee.com/ITdos/microi.net/raw/master/%E6%95%B0%E6%8D%AE%E5%BA%93%E3%80%81%E6%A1%88%E4%BE%8B%E3%80%81%E6%96%87%E6%A1%A3%E3%80%81%E8%B5%84%E6%96%99/install-microi.sh
 sed -i 's/\r$//' microi-offline-prepare.sh install-microi-offline.sh install-microi.sh
 
 # 执行制作脚本（会拉取 Docker 镜像并打包，约需 10-30 分钟）
