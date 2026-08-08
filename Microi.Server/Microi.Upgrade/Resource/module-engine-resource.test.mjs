@@ -41,6 +41,8 @@ test("module presentation is exposed through a visual DevComponent", () => {
 
     assert.equal(field("EnableViewSchema").Label, "启用自定义表单视图");
     assert.match(field("EnableViewSchema").Description, /仅控制.*Detail\/Edit/);
+    assert.match(field("EnableViewSchema").V8TmpEngineTable, /自定义表单视图/);
+    assert.doesNotMatch(field("EnableViewSchema").V8TmpEngineTable, /传统视图|跨端视图/);
     assert.equal(field("ViewSchemaVersion").NotEmpty, 0);
     assert.match(field("ViewSchemaVersion").Placeholder, /默认 1\.0/);
     assert.equal(field("ViewConfigVersion").NotEmpty, 0);
