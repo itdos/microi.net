@@ -342,14 +342,21 @@ public class CacheAndUpgradeRegressionTests
         var resources = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(
             loadResources!.Invoke(null, null));
         var package = JObject.Parse(resources["app.microi.store.json"]);
-        Assert.Equal("v7.0.5", package["PackageInfo"]?["Version"]?.ToString());
+        var packageVersionText = package["PackageInfo"]?["Version"]?.ToString();
+        Assert.NotNull(packageVersionText);
+        Assert.True(
+            System.Version.TryParse(packageVersionText!.TrimStart('v', 'V'), out var packageVersion),
+            $"应用商城包版本格式无效：{packageVersionText}");
+        Assert.True(
+            packageVersion!.CompareTo(new System.Version(7, 0, 5)) >= 0,
+            $"批量安装能力要求应用商城包版本不低于 v7.0.5，当前为 {packageVersionText}");
 
         var bulkEngine = Assert.Single(
             package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "bulk-import-microi-store-packages");
         Assert.Equal(1, bulkEngine["IsEnable"]?.Value<int>());
         Assert.Equal(0, bulkEngine["StopHttp"]?.Value<int>());
-        Assert.Contains("Version: v1.1.1", bulkEngine["ApiV8Code"]?.ToString());
+        AssertEngineVersionAtLeast(bulkEngine, new System.Version(1, 1, 1));
         Assert.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2", bulkEngine["ApiV8Code"]?.ToString());
         Assert.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1", bulkEngine["ApiV8Code"]?.ToString());
         Assert.DoesNotContain("mci_marketplace_bulk_install_item", bulkEngine["ApiV8Code"]?.ToString());
@@ -357,7 +364,7 @@ public class CacheAndUpgradeRegressionTests
         var importer = Assert.Single(
             package["SysApiEngines"]!.Children<JObject>(),
             item => item["ApiEngineKey"]?.ToString() == "import-microi-store-package");
-        Assert.Contains("Version: v1.8.6", importer["ApiV8Code"]?.ToString());
+        AssertEngineVersionAtLeast(importer, new System.Version(1, 8, 6));
         Assert.Contains("PACKAGE_API_ENGINE_READBACK_V1", importer["ApiV8Code"]?.ToString());
     }
 
@@ -465,6 +472,19 @@ public class CacheAndUpgradeRegressionTests
             new object[] { "app.microi.store.json", package.ToString() }));
 
         Assert.Null(exception);
+    }
+
+    private static void AssertEngineVersionAtLeast(JObject engine, System.Version minimum)
+    {
+        var versionText = engine["Version"]?.ToString();
+        Assert.NotNull(versionText);
+        Assert.True(
+            System.Version.TryParse(versionText!.TrimStart('v', 'V'), out var version),
+            $"接口引擎版本格式无效：{versionText}");
+        Assert.True(
+            version!.CompareTo(minimum) >= 0,
+            $"接口引擎版本不得低于 v{minimum}，当前为 {versionText}");
+        Assert.Contains($"Version: {versionText}", engine["ApiV8Code"]?.ToString());
     }
 }
 

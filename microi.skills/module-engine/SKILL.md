@@ -76,13 +76,13 @@ Iframe 不把长期 Token、密码或连接串放 URL。第三方单点登录使
 
 ## 跨端 ViewSchema
 
-顶层 PC 数据列表默认使用紧凑的新模块标题样式；即使未启用 ViewSchema，也不能退回无标题的旧外观。无指标头部固定 `44px`、含指标头部固定 `62px`，连同间距总纵向占用约 `50px / 68px`。子表、关联表、嵌入表不重复显示，移动端由固定导航栏承载标题。`ViewSchema` 只负责个性化标题、指标、复合列和卡片，不改变 Detail/Edit 的显式启用语义。
+顶层 PC 数据列表默认使用紧凑的新模块标题样式；即使未启用自定义表单视图，也不能退回无标题的旧外观。无指标头部固定 `44px`、含指标头部固定 `62px`，连同间距总纵向占用约 `50px / 68px`。子表、关联表、嵌入表不重复显示，移动端由固定导航栏承载标题。`Scene=List/Card` 的个性化标题、指标、复合列和卡片配置存在时必须直接生效；`EnableViewSchema` 只控制 Detail/Edit 自定义表单视图。
 
 PC 列表的固定结构顺序是“模块 Hero（标题/副标题/动态指标）→ PageTabs → 查询与表格”，Hero 必须渲染在页面多 Tab 上方。头部只使用一次性入场和一次性轻量光效，禁止持续循环动画；`prefers-reduced-motion: reduce` 必须关闭动画和过渡。
 
-`ViewSchema` 是模块级视图，不写入已废弃的通用 `DiyConfig`。优先通过 sys_menu“跨端视图”的 `DiyModulePresentationDesigner` 配置；需要角色视图或 Detail/Edit 高级布局时再使用设计器的高级 JSON。启用后仍须：
+`ViewSchema` 是模块级视图，不写入已废弃的通用 `DiyConfig`。优先通过 sys_menu“跨端视图”的 `DiyModulePresentationDesigner` 配置；Detail/Edit 使用独立的“自定义表单视图 JSON”，需要完整协议、角色优先级或未知扩展字段时再使用高级 JSON。启用自定义表单视图后仍须：
 
-- 配置 `EnableViewSchema`、语义版本和递增配置版本。
+- 配置 `EnableViewSchema=1`；`ViewSchemaVersion/ViewConfigVersion` 可为空，分别按 `1.0/1` 处理并在后续变更时递增配置版本。
 - 按 Scene、Device、RoleIds、Priority 选择视图。
 - 配置损坏或客户端不支持时回退标准 `sys_menu + diy_table + diy_field`，不能白屏。
 - 小程序只消费声明式动作，不执行 PC 的任意 `V8Code`。
