@@ -1,7 +1,7 @@
 interface:
-  display_name: "Microi吾码 Codex 插件安装"
-  short_description: "检测并安装或升级 Microi吾码 Codex 插件"
-  default_prompt: "Use $microi-codex-installer to detect and install the Microi吾码 Codex plugin with user authorization."
+  display_name: "Microi吾码 AI 插件安装"
+  short_description: "初始化吾码 CLI、Skills、MCP 与多宿主插件"
+  default_prompt: "使用 $microi-codex-installer 安装或初始化 @microi.net/cli，配置指定吾码服务器与 MCP，并按需拉取全部 V8 代码。"
 
 policy:
   allow_implicit_invocation: true

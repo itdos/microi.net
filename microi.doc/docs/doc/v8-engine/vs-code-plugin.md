@@ -4,7 +4,7 @@
   <img src="https://static.itdos.com/upload/img/microi-red-256.png" width="112" alt="Microi吾码">
 </p>
 
-<h1 align="center">Microi吾码 AI 开发工具：VS Code 插件 + CLI + Codex Plugin</h1>
+<h1 align="center">Microi吾码 AI 开发工具：VS Code + CLI + 多宿主 AI Plugin</h1>
 
 <p align="center">
   <strong>用自然语言开发完整的复杂业务系统，让低代码从“拖拉拽”进入“AI 直接交付”。</strong>
@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/CLI-Node.js%2018%2B-339933" alt="Microi CLI">
   <img src="https://img.shields.io/badge/Codex-Plugin-111827" alt="Microi Codex Plugin">
   <img src="https://img.shields.io/badge/MCP-110%2B%20平台工具-8b5cf6" alt="110+ MCP 工具">
-  <img src="https://img.shields.io/badge/AI-Copilot%20%7C%20Cursor%20%7C%20Trae%20%7C%20Claude%20%7C%20Codex-059669" alt="AI 客户端">
+  <img src="https://img.shields.io/badge/AI-Codex%20%7C%20WorkBuddy%20%7C%20CodeBuddy%20%7C%20Qoder%20%7C%20Comate-059669" alt="AI 客户端">
   <img src="https://img.shields.io/badge/License-MIT-f59e0b" alt="MIT License">
 </p>
 
@@ -27,8 +27,8 @@
 传统低代码把开发从“写大量代码”变成了“手动建表、逐个添加字段、拖拽控件、配置菜单、拼界面 JSON、设计打印模板和工作流”。Microi吾码进一步把这些操作变成自然语言，并提供三个互补入口：
 
 - **VS Code 插件**：适合需要资源树、编辑器按钮、Diff、可视化状态、远程执行和逐行调试的用户。
-- **`@microi.net/cli`**：产品展示名为 `microi.net/cli`，适合只使用 Codex CLI、Claude Code、Trae 或普通终端、不想安装 IDE 的用户；可在命令行完成连接、登录、AI/MCP 初始化和 V8 资源同步。
-- **`@microi.net/codex-plugin`**：Codex 原生 Plugin，直接打包同源 MCP、CLI 和全套 Microi Skills，适合以 Codex 对话为主要开发入口的用户。
+- **`@microi.net/cli`**：产品展示名为 `microi.net/cli`，适合 Codex、WorkBuddy、CodeBuddy、Qoder、Comate、Claude Code、Trae 或普通终端用户。
+- **AI Plugin `microi@microi-net`**：同样来自 `@microi.net/cli`，包根同时携带 Codex、WorkBuddy、CodeBuddy 兼容清单、同源 MCP、CLI 和全套 Microi Skills。
 
 三者不是三套实现。它们位于同一个 `Microi.VSCode` 仓库，复用相同的连接、认证、同步、MCP 和 AI 知识注入代码，并共用工作区配置、Token 与同步基线。可以只安装一种，也可以同时使用。
 
@@ -127,7 +127,7 @@ Manifest 全系统规划 + dry-run 预演
 
 部分 Codex 版本不会稳定注入超大 MCP 工具集。插件会为 Codex 配置 `microi_codex` 单入口：AI 可先用 `list_tools` / `describe_tool` 发现全部原始工具，再通过同一入口调用；参数校验、写入确认、审计和远端回读不会被绕过。
 
-如果当前 Codex 仍未注入工具，MCP 还提供 `microi://codex/status`、`microi://codex/tools` 和通用 action 资源模板作为兼容通道。VS Code/Copilot、Cursor、Trae 与 Claude Code 继续使用完整 MCP 工具集。
+如果当前 Codex 仍未注入工具，MCP 还提供 `microi://codex/status`、`microi://codex/tools` 和通用 action 资源模板作为兼容通道。其它兼容客户端继续使用完整 MCP 工具集。
 
 ## 支持的 AI 客户端
 
@@ -140,6 +140,17 @@ Manifest 全系统规划 + dry-run 预演
 | Trae | `AGENTS.md`、Skills、V8 typings | `.trae/mcp.json` | 首次使用需开启项目级 MCP |
 | Claude Code | `CLAUDE.md`、Skills | 工作区根 `.mcp.json` | 支持检测/安装 Claude Code，并同步模型库 |
 | Codex | `AGENTS.md`、Skills | `~/.codex/config.toml` | 支持同步 Provider、模型目录与环境配置 |
+| WorkBuddy | `AGENTS.md`；npm 包内含 WorkBuddy Plugin 与全套 Skills | `.workbuddy/mcp.json` | 保存/重载后可用自然语言自动调用 MCP |
+| CodeBuddy | `.codebuddy/skills/microi/SKILL.md`、`.codebuddy/rules/microi.md` | 工作区根 `.mcp.json` | 也可安装包内 `microi@microi-net` 原生插件 |
+| Qoder | `.qoder/skills/microi/SKILL.md`、`AGENTS.md` | 工作区根 `.mcp.json` | 当前会话可用 `/skills reload` 刷新 |
+| 百度 Comate | `.agents/skills/microi/SKILL.md`、`.comate/skills/microi/SKILL.md` | `.comate/mcp.json` | 自动发现项目 Skills |
+
+各宿主路径依据其官方协议实现：
+
+- [WorkBuddy MCP](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/MCP-Guide)、[Skills](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Skills-Market) 与 [插件系统](https://www.codebuddy.cn/docs/workbuddy/Plugins)
+- [CodeBuddy Skills](https://www.codebuddy.cn/docs/cli/skills)、[MCP](https://www.codebuddy.cn/docs/cli/mcp) 与 [插件规范](https://www.codebuddy.cn/docs/cli/plugins-reference)
+- [Qoder Skills](https://docs.qoder.com/en/cli/Skills)、[MCP](https://docs.qoder.com/en/cli/mcp-servers) 与 [AGENTS.md 规则兼容](https://docs.qoder.com/user-guide/rules)
+- [百度 Comate Skills](https://cloud.baidu.com/doc/COMATE/s/Nmma28iqe) 与 [MCP.json](https://cloud.baidu.com/doc/COMATE/s/Ymir0x2ye)
 
 VS Code 插件和 CLI 都支持本地 stdio MCP；远程 SSE 与可视化生命周期管理当前由插件提供：
 
@@ -149,6 +160,8 @@ VS Code 插件和 CLI 都支持本地 stdio MCP；远程 SSE 与可视化生命�
 - **生命周期管理**：在 Microi 侧栏启动、停止、重启、查看输出、查看配置、启用/禁用或移除 MCP Server。
 
 > Codex 已打开的会话通常不会热加载新增 MCP。首次生成配置后，请新开 Codex 对话或重载 Codex；其他客户端也可能要求首次批准新 MCP Server。
+>
+> WorkBuddy 官方项目 MCP 路径是 `.workbuddy/mcp.json`；CodeBuddy 与 Qoder 使用根 `.mcp.json`；Comate 使用 `.comate/mcp.json`。CLI 和 VS Code 插件会一次性幂等生成这些文件，但不能绕过各宿主的工作区信任、插件授权或重载机制。
 
 ## 零配置知识库：AI 自动理解 Microi
 
@@ -202,7 +215,7 @@ MCP 配置、Token 文件、数据库快照和运行态元数据会加入本地 
 5. 如需复查，执行 **`Microi MCP: 诊断 MCP 可调用性`**。
 6. 需要人工编辑、Git 管理或远程调试时，在服务器节点执行 **“拉取此服务器代码”**。
 
-### 方案 B：Codex CLI / 纯命令行
+### 方案 B：任意 AI 编程软件 / 纯命令行
 
 要求 Node.js `18.18.0` 或更高版本。npm 首次公开发布后安装：
 
@@ -213,7 +226,7 @@ npm install -g @microi.net/cli
 CLI 首次发布前，从 `Microi.VSCode` 源码目录本地安装也能完成同样验证：
 
 ```bash
-npm install -g ./Microi.VSCode/cli
+npm install -g ./Microi.VSCode/plugins/microi
 ```
 
 进入准备作为 AI 工作区的目录并运行：
@@ -232,9 +245,19 @@ microi init
 
 首次写入 Codex MCP 后必须新开 Codex 对话；已经打开的对话通常不会热加载新增工具。
 
+在一个完全空白的工作区，可以直接对 WorkBuddy、CodeBuddy、Qoder、Comate、Trae、Cursor、Claude Code 或 Codex 说：
+
+```text
+安装 @microi.net/cli@latest，在当前工作区初始化 Microi吾码插件；
+添加 API 地址为 <地址>、OsClient 为 <租户> 的服务器连接并配置 MCP；
+登录后拉取该连接的所有 V8 代码和数据库结构，最后运行 doctor 验证。
+```
+
+因为第一句话已经明确给出可信 npm 包名，具备终端权限的 Agent 可以直接执行 `npx --yes @microi.net/cli@latest init --workspace <工作区> --pull`。账号、密码和验证码仍通过交互输入，不得写进对话或命令参数。初始化后生成的宿主路由 Skill 会识别更短的“帮我初始化 Microi吾码插件”“拉取某服务器/MCP 的所有 V8 代码”等说法。
+
 ### 方案 C：Codex Plugin
 
-Codex Plugin 以 `@microi.net/codex-plugin` 打包，marketplace 固定名为 `microi-net`，选择器为 `microi@microi-net`。普通用户明确同意安装后，可直接让 AI 执行：
+Codex Plugin 已合并在 `@microi.net/cli` 中，marketplace 固定名为 `microi-net`，选择器为 `microi@microi-net`。普通用户明确同意安装后，可直接让 AI 执行：
 
 ```bash
 npx --yes @microi.net/cli@latest codex install --yes
@@ -248,9 +271,13 @@ npx --yes @microi.net/cli@latest codex install --yes
 
 > npm 包用于 repo/npm marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；通用目录仍需按 OpenAI 官方 Plugin 提交流程审核。
 
+### 方案 D：WorkBuddy / CodeBuddy 原生 Plugin（可选）
+
+`@microi.net/cli` 包根包含 `.workbuddy-plugin/plugin.json`、`.codebuddy-plugin/plugin.json`、两个 marketplace 清单、根 `.mcp.json` 和全套 `skills/`。先运行 `microi plugin path --json` 获取真实 `packageRoot`。CodeBuddy CLI 可把该目录添加为本地 marketplace 并安装 `microi@microi-net`；WorkBuddy 可在插件页添加可信 marketplace，或导入本地 Skill。宿主级插件用于跨项目自动发现；单个项目只执行 `microi init` 也能获得原生 MCP、规则和项目 Skills。
+
 ### 开始自然语言开发
 
-在 Copilot、Cursor、Trae、Claude Code 或 Codex 中描述系统需求即可。插件和 CLI 都建议让 AI 明确执行以下流程：
+在 Copilot、Cursor、Trae、Claude Code、Codex、WorkBuddy、CodeBuddy、Qoder 或 Comate 中描述系统需求即可。插件和 CLI 都建议让 AI 明确执行以下流程：
 
 ```text
 先读取当前租户状态、业务蓝图、数据库结构和已有在线应用；
@@ -263,7 +290,7 @@ npx --yes @microi.net/cli@latest codex install --yes
 
 CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整启用 Microi 的 AI 开发能力**，不是把编辑器 UI 生硬复制到终端或对话。三端连接后均通过同一套 MCP 与 Skills 完成平台建模、V8、页面、打印、工作流、微服务和验收。
 
-| 能力 | VS Code 插件 | `@microi.net/cli` | `@microi.net/codex-plugin` |
+| 能力 | VS Code 插件 | `@microi.net/cli` 命令行 | Codex Plugin（同一 `@microi.net/cli`） |
 |---|---|---|---|
 | 多服务器连接、帐号/密码/验证码登录 | 可视化表单 | 交互式命令行 | 内置 CLI + `profiles` 路由 |
 | AI 指令、Skills、typings、MCP 初始化 | 支持 | 支持 | 自带全套 Skills/MCP，也可注入工作区 |
@@ -280,17 +307,18 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 | 命令 | 作用 |
 |---|---|
 | `microi init [--pull]` | 一次完成连接、登录、AI/MCP 初始化；可选全量拉取 |
-| `microi profile list` | 查看连接及登录状态 |
+| `microi profile list` | 查看连接、稳定 `mcpName` 及登录状态 |
 | `microi profile add` / `remove` | 添加或删除服务器连接 |
 | `microi auth login` / `status` / `logout` | 管理工作区登录 Token |
 | `microi ai init` | 生成或更新 AI 指令、Skills、typings 与 MCP |
 | `microi mcp init` | 幂等更新各 AI 客户端 MCP 配置 |
-| `microi pull --scope all` | 拉取全部资源；也可选 `api/form/module/workflow/schema` |
+| `microi pull --profile <连接/OsClient/mcpName> --scope all` | 按连接拉取全部资源；也可选 `api/form/module/workflow/schema` |
+| `microi plugin path --json` | 查看 npm 包根和 WorkBuddy/CodeBuddy 原生插件/市场清单 |
 | `microi sync status --scope all` | 读取本地与远端差异 |
 | `microi push <file>` | 显式推送一个已拉取的 V8 文件 |
 | `microi doctor` | 检查 Node、工作区、Profile、Token、AI 与 MCP 文件 |
 
-通用选项包括 `--workspace <目录>`、`--profile <序号/OsClient/名称>` 和 `--json`。远端写入仍遵循显式策略；保存本地文件不会自动推送。
+通用选项包括 `--workspace <目录>`、`--profile <序号/OsClient/名称/mcpName>` 和 `--json`。`profile list --json` 会返回可直接用于选择服务器的稳定 `mcpName`。远端写入仍遵循显式策略；保存本地文件不会自动推送。
 
 ## CLI 与 VS Code 插件同时使用
 
@@ -529,11 +557,11 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 
 ## CLI 与 Codex Plugin 命名、打包与发布
 
-CLI 正式包名为 **`@microi.net/cli`**，安装后暴露命令 **`microi`**；Codex Plugin 正式包名为 **`@microi.net/codex-plugin`**。两个 npm 产品共用 `@microi.net` scope 和版本号。
+唯一 AI/npm 包名为 **`@microi.net/cli`**，安装后暴露命令 **`microi`**，包根同时包含 `.codex-plugin/plugin.json`、`.codebuddy-plugin/plugin.json`、`.workbuddy-plugin/plugin.json`、对应 marketplace、MCP、路由器与全套 Skills。现有未带 scope 的 **`microi.net`** 是另一项已发布的前端库，继续保持原用途，不能在兼容版本中改造成 CLI。
 
-一套 `Microi.VSCode` 输出三个产品、四个分发目标：VS Code 扩展发布到 Visual Studio Marketplace 与 Open VSX，CLI 和 Codex Plugin 分别发布到 npm。`bump-version.js` 同时更新扩展、CLI、Codex npm 包、Codex manifest、npm marketplace 示例和 bundled Skills；任一版本不一致都会在外部写入前停止。
+一套 `Microi.VSCode` 输出两个发布产品、多个使用端、三个分发目标：VS Code 扩展发布到 Visual Studio Marketplace 与 Open VSX；`@microi.net/cli` 只向 npm 发布一次，同时服务 CLI、Codex、WorkBuddy、CodeBuddy、Qoder、Comate 等宿主。`bump-version.js` 同时更新扩展、单一 npm 包、各宿主 manifest/marketplace 和 bundled Skills；任一版本不一致都会在外部写入前停止。
 
-四个分发目标不支持跨站事务。默认 `npm run publish` 先处理两个扩展市场，再只执行一次 npm 登录/权限检查，随后先发布 Codex Plugin；只有目标 Codex npm 包已公开或本次发布成功，才发布内含一键安装器的 CLI，避免安装器引用 404 版本。任一目标失败不会撤销已完成目标，两个 tarball 都会保留供同源码补发，脚本逐目标公开回读，不把部分完成冒充三端完成。严格发布使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。
+三个分发目标不支持跨站事务。默认 `npm run publish` 先处理两个扩展市场，再只执行一次 npm 登录/权限检查并发布一次 `@microi.net/cli`。任一目标失败不会撤销已完成目标，单一 npm tarball 会保留供同源码补发；脚本逐目标公开回读，不把部分完成冒充三端完成。严格发布使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。
 
 ### 本地构建与安装验收
 
@@ -548,11 +576,11 @@ python %USERPROFILE%/.codex/skills/.system/plugin-creator/scripts/validate_plugi
 npm run package
 node scripts/test-cli-package.js
 node scripts/test-codex-plugin-package.js
-npm install -g ./cli
+npm install -g ./plugins/microi
 microi --help
 ```
 
-只生成并校验 VSIX、CLI tarball 与 Codex Plugin tarball，不改版本也不上传：
+只生成并校验 VSIX 与同时包含 CLI/Codex Plugin 的单一 npm tarball，不改版本也不上传：
 
 ```bash
 node publish.js --package-only --no-bump
@@ -561,16 +589,15 @@ node publish.js --package-only --no-bump
 ### 首次发布到 npm
 
 1. 登录 npmjs.com，创建免费公开组织 **`microi.net`**；组织名会成为 `@microi.net` scope。若由个人 scope 发布，则 npm 用户名必须正好是 `microi.net`。
-2. 确认 npm 账号已加入 `@microi.net` 组织并拥有发布权限。本机未登录时，默认流程会先发布两个扩展市场，再执行一次 `npm login --registry=https://registry.npmjs.org/`，随后先发布 Codex Plugin、再发布 CLI。CI、无人值守或严格预检模式仍应提前登录。
+2. 确认 npm 账号已加入 `@microi.net` 组织并拥有发布权限。本机未登录时，默认流程会先发布两个扩展市场，再执行一次 `npm login --registry=https://registry.npmjs.org/`，随后发布一次 `@microi.net/cli`。CI、无人值守或严格预检模式仍应提前登录。
 3. 为两个插件市场准备 PAT。本机可设置环境变量 `VSCE_PAT` / `OVSX_PAT`，或把 `publish-tokens.example.json` 复制为已被 Git 忽略的 `publish-tokens.local.json`。不要再使用 `publish-tokens.json`。
 4. 如果仓库曾跟踪过 `publish-tokens.json`，应把其中的 PAT 视为已泄露：先在两个平台废弃并重新生成，把新 PAT 放入环境变量或 `publish-tokens.local.json`，再删除旧文件并执行 `git rm --cached publish-tokens.json`。发布脚本遇到该旧路径会主动停止。
-5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会同时检查两个 npm 包的 registry/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；仅缺 npm 登录时不会阻断两个扩展市场。要求全部目标在版本递增前通过时，执行 `npm run publish:preflight:all`。
+5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会检查 `@microi.net/cli` 的 registry/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；仅缺 npm 登录时不会阻断两个扩展市场。要求全部目标在版本递增前通过时，执行 `npm run publish:preflight:all`。
 6. 先运行 `npm run package` 检查本地产物；确认后执行 `npm run publish`。
 7. 脚本会自动回读本次实际发布的目标；也可手工复核：
 
 ```bash
 npm view @microi.net/cli version
-npm view @microi.net/codex-plugin version
 npx vsce show Microi.v8-engine --json
 npx ovsx get Microi.v8-engine --metadata
 npm install -g @microi.net/cli
@@ -583,18 +610,17 @@ npm 新 scope 或新版本刚发布后，公共 registry 可能短时间不同�
 npm run publish:verify
 ```
 
-如果 npm 因未登录、scope、权限或上传错误而不可发布，默认流程仍先完成两个扩展市场，并在项目根保留两个同版本 tarball。**不要再次执行 `npm run publish`**。在源码和对应原始 tarball 未改变时先补发 Codex Plugin，再补发 CLI：
+如果 npm 因未登录、scope、权限或上传错误而不可发布，默认流程仍先完成两个扩展市场，并在项目根保留一个同版本 tarball。**不要再次执行 `npm run publish`**。在源码和原始 tarball 未改变时补发唯一 npm 包：
 
 ```bash
-npm run publish:codex:resume
 npm run publish:cli:resume
 ```
 
-如果两个 npm 产品已发布、扩展市场未完成，执行 `npm run publish:extensions:resume`。只补一个扩展市场使用 `publish:vsce:resume` 或 `publish:ovsx:resume`。补发不递增版本，并回读全部三端产品的当前版本。
+如果 npm 单包已发布、扩展市场未完成，执行 `npm run publish:extensions:resume`。只补一个扩展市场使用 `publish:vsce:resume` 或 `publish:ovsx:resume`。补发不递增版本，并回读全部三端的当前版本。
 
 > 补发只适用于“同一份源码和产物的当次发布被中断”。如果失败后又修改了代码，必须重新完整发布下一版，不能用相同版本号发布不同产物。
 
-> 发布 `@microi.net/codex-plugin` 只完成 npm/marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；公开目录需另按 OpenAI 官方 Plugin 提交流程审核。
+> 发布 `@microi.net/cli` 只完成 CLI/npm marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；公开目录需另按 OpenAI 官方 Plugin 提交流程审核。
 
 正式发布是外部不可逆操作。不要把 npm Token、服务器 Token 或任何登录密码写入仓库。CI 后续可改用 npm Trusted Publishing，避免长期保存发布 Token。
 
@@ -627,7 +653,7 @@ npm run publish:cli:resume
 
 ### 不安装 VS Code，能否完整使用吾码 AI 开发能力
 
-可以。安装 `@microi.net/cli` 后运行 `microi init --pull`，再新开 Codex、Claude Code 或 Trae 对话即可使用同一套 MCP 与 Skills。所谓“完整 AI 开发能力”指自然语言建模、V8、页面、打印、流程、微服务、测试和回读验收；资源树、编辑器 Diff 和断点调试是 IDE 交互能力，只在 VS Code 插件中提供。
+可以。安装 `@microi.net/cli` 后运行 `microi init --pull`，再新开或重载 Codex、WorkBuddy、CodeBuddy、Qoder、Comate、Claude Code 或 Trae 对话即可使用同一套 MCP 与 Skills。所谓“完整 AI 开发能力”指自然语言建模、V8、页面、打印、流程、微服务、测试和回读验收；资源树、编辑器 Diff 和断点调试是 IDE 交互能力，只在 VS Code 插件中提供。
 
 ### CLI 和 VS Code 插件会不会冲突
 
@@ -637,7 +663,7 @@ npm run publish:cli:resume
 
 ### `npm install -g @microi.net/cli` 提示包不存在
 
-说明 npm 首次公开发布尚未完成，或当前 registry 不是 npm 官方源。开发阶段可在源码根目录执行 `npm install -g ./Microi.VSCode/cli`；发布后用 `npm view @microi.net/cli version` 回读确认。
+说明 npm 首次公开发布尚未完成，或当前 registry 不是 npm 官方源。开发阶段可在仓库根目录执行 `npm install -g ./Microi.VSCode/plugins/microi`；发布后用 `npm view @microi.net/cli version` 回读确认。
 
 ### 远程执行与调试不可用
 
