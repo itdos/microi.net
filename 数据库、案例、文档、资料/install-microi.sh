@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-08 16:26:29
+# 版本：v2026-08-08 17:41:18
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-08 16:26:29"
+SCRIPT_VERSION="v2026-08-08 17:41:18"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -184,7 +184,28 @@ repair_read_api_environment_value() {
   local api_block="$1"
   local key="$2"
   local value=""
-  value=$(sed -n -E "s/^[[:space:]]{6}${key}:[[:space:]]*//p" "${api_block}" | head -1)
+  # 较旧的 Docker Compose 会把长 plain scalar 折成多行 YAML，例如将
+  # `...;User Id=root;...` 在 User 与 Id 之间换行。续行属于同一个值，
+  # 必须先按 YAML 的折叠语义用空格拼回；否则完整连接串会被误判成以 User
+  # 结尾的裸片段。这里只读取 docker compose config 生成的规范 environment
+  # mapping，下一项固定恢复为 6 空格缩进，续行至少为 8 空格缩进。
+  value=$(awk -v wanted_key="${key}" '
+    index($0, "      " wanted_key ":") == 1 {
+      line = substr($0, length("      " wanted_key ":") + 1)
+      sub(/^[[:space:]]+/, "", line)
+      value = line
+      found = 1
+      next
+    }
+    found && index($0, "        ") == 1 {
+      line = $0
+      sub(/^[[:space:]]+/, "", line)
+      value = value " " line
+      next
+    }
+    found { exit }
+    END { if (found) print value }
+  ' "${api_block}")
   value=$(printf '%s' "${value}" | sed -E "s/^[[:space:]]+//;s/[[:space:]]+$//")
   if [[ "${value}" == \"*\" ]] || [[ "${value}" == \'*\' ]]; then
     value="${value:1:${#value}-2}"
