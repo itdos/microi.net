@@ -37,6 +37,7 @@ import ResizeMixin from "./mixin/ResizeHandler";
 import { useDiyStore, useAppStore, useSettingsStore, usePermissionStore } from "@/pinia";
 import { computed, shallowRef, markRaw } from "vue";
 import { loadAppContainer, getAppContainerSync } from "@/utils/webos-detect.js";
+import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
 
 export default {
     name: "Layout",
@@ -60,7 +61,8 @@ export default {
         // 优先使用同步缓存（后续导航无延迟），首次加载走异步
         const cachedMod = getAppContainerSync();
         const WebOSAppContainer = shallowRef(cachedMod ? markRaw(cachedMod.default) : null);
-        const isWebOS = computed(() => ['macOS', 'Windows'].includes(diyStore.SystemStyle));
+        const isEmbeddedWebosWindow = isEmbeddedWebosWindowRuntime();
+        const isWebOS = computed(() => isEmbeddedWebosWindow || ['macOS', 'Windows'].includes(diyStore.SystemStyle));
         if (loadAppContainer && !WebOSAppContainer.value) {
             loadAppContainer().then(m => {
                 WebOSAppContainer.value = markRaw(m.default);

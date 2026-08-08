@@ -38,12 +38,15 @@ import axios from "axios";
 import { DiyOsClient } from "./utils/itdos.osclient";
 import { reportApiServiceFailure } from "./utils/api-service-status.js";
 import { syncClassicShellVisibilityFromUrl } from "./utils/classic-shell-visibility.js";
+import { isEmbeddedWebosWindowRuntime } from "./utils/webos-embedded-runtime.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
 import $ from "jquery";
 window.$ = window.jQuery = window.jquery = $;
 import * as websocket from "@microsoft/signalr";
 import microApp from "@micro-zoe/micro-app";
+const isWebosEmbeddedRuntime = isEmbeddedWebosWindowRuntime();
+window.__MICROI_WEBOS_EMBEDDED_RUNTIME__ = isWebosEmbeddedRuntime;
 
 // 初始化主题色系统（必须在样式加载后执行）
 initThemeColor();
@@ -74,9 +77,27 @@ import chatComponents from "@/views/chat/components.js";
 app.use(chatComponents);
 // 【重要】在 Pinia 初始化之前先迁移旧的 localStorage 数据
 // 这样 Pinia persist 插件才能正确读取已迁移的数据
-LocalStorageManager.init();
+if (!isWebosEmbeddedRuntime) LocalStorageManager.init();
 // 使用 Pinia
 app.use(pinia);
+if (isWebosEmbeddedRuntime) {
+    // Router 首次导航前从父页共享存储做一次只读白名单引导；之后只接受父页
+    // postMessage 更新内存态，嵌入 Pinia 不安装持久化插件。
+    const snapshot = LocalStorageManager.getAll() || {};
+    const embeddedDiyStore = useDiyStore(pinia);
+    embeddedDiyStore.$patch({
+        ApiBase: snapshot.ApiBase || snapshot.SysConfig?.ApiBase || '',
+        OsClient: snapshot.OsClient || DiyCommon.GetOsClient() || '',
+        FileServer: snapshot.FileServer || snapshot.SysConfig?.FileServer || '',
+        MediaServer: snapshot.MediaServer || snapshot.SysConfig?.MediaServer || '',
+        Token: snapshot.Token || '',
+        TokenExpires: snapshot.TokenExpires || '',
+        CurrentUser: snapshot.CurrentUser || {},
+        SysConfig: snapshot.SysConfig || {},
+        SystemStyle: snapshot.SystemStyle || '',
+        themeColor: snapshot.themeColor || '',
+    });
+}
 // 使用 Element Plus
 app.use(ElementPlus, {
     locale: zhCn,
@@ -158,7 +179,7 @@ const appTimers = [];
 // 初始化逻辑
 async function initApp() {
     // 初始化 LocalStorage 管理器（迁移旧数据）
-    LocalStorageManager.init();
+    if (!isWebosEmbeddedRuntime) LocalStorageManager.init();
     
     const diyStore = useDiyStore();
     var systemStyle = LocalStorageManager.get("SystemStyle") || diyStore.SystemStyle;
@@ -169,7 +190,12 @@ async function initApp() {
     // URL 参数是当前地址的一次性框架显示策略，不得残留为后续路由或刷新状态。
     syncClassicShellVisibilityFromUrl(diyStore, location.href);
     var osClient = DiyCommon.GetOsClient();
-    await DiyOsClient.OsClientInit(true);
+    if (isWebosEmbeddedRuntime) {
+        // 子窗口使用父桌面同一租户的只读启动快照，禁止重复租户初始化和持久化写入。
+        diyStore.setOsClient(osClient);
+    } else {
+        await DiyOsClient.OsClientInit(true);
+    }
 
     // 初始化主题色（兼容生产环境 CSS 顺序差异）
     const themeColor = diyStore.themeColor || diyStore.SysConfig?.ThemeColor || "#409eff";
@@ -192,28 +218,30 @@ function onAppMounted() {
     });
     const diyStore = useDiyStore();
     // 初始化 LocalStorage 管理器（启动时清理）
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && !isWebosEmbeddedRuntime) {
         LocalStorageManager.init();
     }
-    diyStore.setCurrentTime(new Date());
-    // 保存定时器引用，用于应用销毁时清理
-    var currentTimeTimer = setInterval(function () {
-        diyStore.setCurrentTime(new Date().AddTime("s", 1));
-    }, 1000);
-    appTimers.push(currentTimeTimer);
+    if (!isWebosEmbeddedRuntime) {
+        diyStore.setCurrentTime(new Date());
+        // 保存定时器引用，用于应用销毁时清理
+        var currentTimeTimer = setInterval(function () {
+            diyStore.setCurrentTime(new Date().AddTime("s", 1));
+        }, 1000);
+        appTimers.push(currentTimeTimer);
+    }
     // 内存监控（开发环境）
-    if (import.meta.env.DEV) {
+    if (import.meta.env.DEV && !isWebosEmbeddedRuntime) {
         setupMemoryMonitor();
     }
     
     // 清理聊天事件注册标志（页面刷新时重置）
-    if (window._chatEventsRegistered) {
+    if (!isWebosEmbeddedRuntime && window._chatEventsRegistered) {
         console.log('[启动] 清理遗留的聊天事件标志');
         window._chatEventsRegistered = false;
     }
     
     // 尝试连接WebSocket（如果已登录）
-    tryConnectWebSocket();
+    if (!isWebosEmbeddedRuntime) tryConnectWebSocket();
 }
 
 // WebSocket连接管理
@@ -223,6 +251,9 @@ let lastConnectAttempt = 0;   // 上次尝试连接时间
 
 // 导出全局方法供外部调用（登录后、点击聊天图标时）
 window.tryConnectWebSocket = function(forceRetry = false) {
+    if (isWebosEmbeddedRuntime) {
+        return { success: false, reason: 'WebOS嵌入窗口复用父页面实时通道' };
+    }
     const diyStore = useDiyStore();
     const GetCurrentUser = diyStore.GetCurrentUser;
     const ChatType = diyStore.ChatType || "吾码IM";

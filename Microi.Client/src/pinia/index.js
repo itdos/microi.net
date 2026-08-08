@@ -1,10 +1,13 @@
 // Pinia Store 入口
 import { createPinia } from "pinia";
 import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
+import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
 
 // 创建 Pinia 实例
 const pinia = createPinia();
-pinia.use(piniaPluginPersistedstate);
+// WebOS 业务窗口与父桌面同源。子 SPA 若安装持久化插件，会把启动时的旧
+// Token/CurrentUser 整包写回父页；嵌入窗口只保留内存态，由父页广播更新。
+if (!isEmbeddedWebosWindowRuntime()) pinia.use(piniaPluginPersistedstate);
 
 export default pinia;
 

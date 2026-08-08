@@ -1,6 +1,7 @@
 // Vue I18n v9 for Vue 3
 // 前端只内置简体中文 / 繁体中文 / 英语。其它语言从后端 diy_lang 缓存词条包加载。
 import { createI18n } from "vue-i18n";
+import { isEmbeddedWebosWindowRuntime } from "../utils/webos-embedded-runtime.js";
 
 // Element Plus 語言包
 import elementEnLocale from "element-plus/dist/locale/en.mjs";
@@ -249,14 +250,16 @@ export function setI18nLocale(locale) {
     } else {
         i18n.global.locale = n;
     }
-    try { localStorage.setItem(LANG_STORAGE_KEY, n); } catch {}
-    try { localStorage.setItem("language", n); } catch {}
-    try { localStorage.setItem("lang", n); } catch {}
-    try {
-        const storage = JSON.parse(localStorage.getItem("microi.net") || "{}");
-        storage.Lang = n;
-        localStorage.setItem("microi.net", JSON.stringify(storage));
-    } catch {}
+    if (!isEmbeddedWebosWindowRuntime()) {
+        try { localStorage.setItem(LANG_STORAGE_KEY, n); } catch {}
+        try { localStorage.setItem("language", n); } catch {}
+        try { localStorage.setItem("lang", n); } catch {}
+        try {
+            const storage = JSON.parse(localStorage.getItem("microi.net") || "{}");
+            storage.Lang = n;
+            localStorage.setItem("microi.net", JSON.stringify(storage));
+        } catch {}
+    }
     try { document.documentElement.setAttribute("lang", n); } catch {}
     try { window.dispatchEvent(new CustomEvent("microi:lang-change", { detail: { locale: n } })); } catch {}
     return n;

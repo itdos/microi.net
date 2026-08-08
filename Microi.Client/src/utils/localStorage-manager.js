@@ -2,8 +2,10 @@
  * LocalStorage 管理工具
  * 统一使用 microi.net 作为主 key 存储所有数据
  */
+import { isEmbeddedWebosWindowRuntime } from './webos-embedded-runtime.js';
 
 const STORAGE_KEY = 'microi.net';
+const isReadOnlyEmbeddedRuntime = isEmbeddedWebosWindowRuntime();
 
 // 初始化存储结构
 const initStorage = () => {
@@ -30,11 +32,14 @@ const getStorage = () => {
 
 // 保存整个存储对象
 const saveStorage = (data) => {
+    if (isReadOnlyEmbeddedRuntime) return false;
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        return true;
     } catch (e) {
         console.error('Microi：[LocalStorage] 保存失败:', e);
     }
+    return false;
 };
 
 const LocalStorageManager = {

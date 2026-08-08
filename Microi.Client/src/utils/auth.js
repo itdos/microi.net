@@ -1,5 +1,6 @@
 import Cookies from "js-cookie";
 import LocalStorageManager from "./localStorage-manager.js";
+import { isEmbeddedWebosWindowRuntime } from "./webos-embedded-runtime.js";
 
 const TokenKey = "authorization";
 
@@ -8,10 +9,12 @@ export function getToken() {
 }
 
 export function setToken(token) {
+    if (isEmbeddedWebosWindowRuntime()) return token;
     return Cookies.set(TokenKey, token);
 }
 
 export function removeToken() {
+    if (isEmbeddedWebosWindowRuntime()) return;
     return Cookies.remove(TokenKey);
 }
 
