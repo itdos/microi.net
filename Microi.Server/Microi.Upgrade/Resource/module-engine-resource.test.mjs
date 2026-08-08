@@ -8,7 +8,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v6.9.3");
+    assert.equal(resource.PackageInfo.Version, "v6.9.5");
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema"]) {
         assert.ok(physicalNames.has(name), `missing physical sys_menu column ${name}`);
@@ -38,6 +38,13 @@ test("module presentation is exposed through a visual DevComponent", () => {
     for (const name of ["EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "MenuBadgeEnabled", "MenuBadgeApiEngineKey"]) {
         assert.equal(field(name).Visible, 1, `${name} must be visible in sys_menu form design`);
     }
+
+    assert.equal(field("EnableViewSchema").Label, "启用自定义表单视图");
+    assert.match(field("EnableViewSchema").Description, /仅控制.*Detail\/Edit/);
+    assert.equal(field("ViewSchemaVersion").NotEmpty, 0);
+    assert.match(field("ViewSchemaVersion").Placeholder, /默认 1\.0/);
+    assert.equal(field("ViewConfigVersion").NotEmpty, 0);
+    assert.match(field("ViewConfigVersion").Placeholder, /默认 1/);
 });
 
 test("menu badge engine selector uses bounded remote keyword search", () => {
