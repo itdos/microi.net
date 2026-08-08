@@ -36,6 +36,7 @@ import { buildMicroAppEntryUrl, shouldUseMicroAppResolveFallback } from "@/utils
 import { resolveMicroAppHostViewport } from "@/utils/microAppViewport.js";
 import MicroAppLoadingSkeleton from "./loading-skeleton.vue";
 import MicroAppRuntimeError from "./runtime-error.vue";
+import { hasRenderableMicroAppContent, shouldAutoRecoverMicroApp } from "./render-health.js";
 import {
     MICRO_APP_HOST_ACTION_RESULT_TYPE,
     MICRO_APP_HOST_PROTOCOL,
@@ -176,6 +177,7 @@ export default {
             autoMountRetryCount: 0,
             mountReadyGeneration: 0,
             mountReadyAttempt: -1,
+            childReadyRendered: false,
             hostViewport: { width: 0, height: 0, safeAreaBottom: 0 },
             resizeObserver: null,
             visualViewportHandler: null,
@@ -234,6 +236,7 @@ export default {
                 publishStatus: this.publishStatus,
                 assetSource: this.assetSource,
                 mountState: this.mountState,
+                childReadyRendered: this.childReadyRendered,
                 reasonCode: this.reasonCode
             };
         }
@@ -300,7 +303,14 @@ export default {
                 const readyAttempt = Number(data?.hostMountAttempt ?? data?.HostMountAttempt ?? -1);
                 if (readyGeneration && readyGeneration !== this.resolveGeneration) return;
                 if (readyAttempt >= 0 && readyAttempt !== this.retryKey) return;
-                this.markMicroAppReady();
+                // 子应用信号只表示它执行到了渲染确认点。最终成功仍由宿主对
+                // micro-app-body/#app 的真实 DOM 与几何尺寸复核，避免 iframe
+                // 初始化竞态把“已执行脚本”误判成“用户已经看见内容”。
+                this.mountReadyGeneration = readyGeneration || this.resolveGeneration;
+                this.mountReadyAttempt = readyAttempt >= 0 ? readyAttempt : this.retryKey;
+                this.childReadyRendered = data?.rendered === true || data?.Rendered === true;
+                this.mountState = "verifying";
+                this.startContentWatchdog(this.resolveGeneration, this.retryKey);
                 return;
             }
             if (type === "micro-app:interaction") {
@@ -460,10 +470,6 @@ export default {
         },
         handleMounted() {
             this.pushViewportContract();
-            if (this.mountReadyGeneration === this.resolveGeneration && this.mountReadyAttempt === this.retryKey) {
-                this.markMicroAppReady();
-                return;
-            }
             this.mountState = "settling";
             this.startContentWatchdog(this.resolveGeneration, this.retryKey);
         },
@@ -504,32 +510,15 @@ export default {
             this.pushViewportContract();
         },
         hasRenderableMicroAppContent() {
-            const app = this.$refs.microApp;
-            if (!app || typeof app.querySelector !== "function") return null;
-            const body = app.querySelector("micro-app-body");
-            // 旧微应用或其它隔离模式可能无法从宿主查看 body，
-            // 返回 null 表示保留 mounted 兼容语义，不误判为白屏。
-            if (!body) return null;
-            const appRoot = body.querySelector("#app");
-            if (appRoot) {
-                return appRoot.childElementCount > 0 || String(appRoot.textContent || "").trim().length > 0;
-            }
-            return Array.from(body.children || []).some((element) =>
-                !["SCRIPT", "STYLE", "LINK"].includes(String(element.tagName || "").toUpperCase())
-                && (element.childElementCount > 0 || String(element.textContent || "").trim().length > 0)
-            );
+            return hasRenderableMicroAppContent(this.$refs.microApp, window.getComputedStyle?.bind(window));
         },
         startContentWatchdog(generation, attempt) {
             this.clearMountWatchdog();
             const deadline = Date.now() + 4000;
             const inspect = () => {
                 if (generation !== this.resolveGeneration || attempt !== this.retryKey || this.error) return;
-                if (this.mountReadyGeneration === generation && this.mountReadyAttempt === attempt) {
-                    this.markMicroAppReady();
-                    return;
-                }
                 const hasContent = this.hasRenderableMicroAppContent();
-                if (hasContent === true || hasContent === null) {
+                if (hasContent === true) {
                     this.markMicroAppReady();
                     return;
                 }
@@ -552,7 +541,7 @@ export default {
         },
         async recoverMountFailure(message, reasonCode) {
             this.clearMountWatchdog();
-            if (this.autoMountRetryCount < 1 && this.entryUrl) {
+            if (shouldAutoRecoverMicroApp(this.autoMountRetryCount, this.entryUrl)) {
                 this.autoMountRetryCount += 1;
                 const generation = this.resolveGeneration;
                 this.mountState = "recovering";
@@ -561,6 +550,7 @@ export default {
                 this.retryKey += 1;
                 this.mountReadyGeneration = 0;
                 this.mountReadyAttempt = -1;
+                this.childReadyRendered = false;
                 this.mountState = "mounting";
                 await this.$nextTick();
                 this.startMountWatchdog(generation);
@@ -769,6 +759,7 @@ export default {
             this.clearMountWatchdog();
             this.mountReadyGeneration = 0;
             this.mountReadyAttempt = -1;
+            this.childReadyRendered = false;
             this.loading = true;
             this.error = "";
             this.entryUrl = "";
