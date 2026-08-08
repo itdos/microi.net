@@ -41,8 +41,8 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 
 ### 模块级跨端视图
 
-- Detail/Edit/List/Card 视图属于 `sys_menu`，使用物理字段 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion`、`ViewSchema`。
-- 顶层 PC `diy-table` 即使未启用 ViewSchema，也默认显示约 40 至 52px 的紧凑模块标题；只在列表 mixin 生成该 fallback，禁止放宽全局 `selectModuleView()`，否则会误接管 Detail。
+- Detail/Edit/List/Card 视图属于 `sys_menu`，使用物理字段 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion`、`ViewSchema`。其中 `EnableViewSchema` 只控制 Detail/Edit 自定义表单视图，List/Card 有有效配置时始终生效；两个版本字段可空，默认按 `1.0/1` 处理。
+- 顶层 PC `diy-table` 即使没有 List ViewSchema，也默认显示约 40 至 52px 的紧凑模块标题。`selectModuleView()` 只能对 List/Card 绕过 `EnableViewSchema`；Detail/Edit 必须继续显式启用，不能被列表 fallback 误接管。
 - `diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均为废弃兼容字段；禁止向其中写入任何新功能配置。
 - Text、Select、ImgUpload、Map 等数据控件继续放在 `diy-field-component`。
 - EntityHero、MetricStrip、ActionGrid、ResponsiveSection 是独立展示区块，放在 `form-view-blocks`，禁止用虚拟字段或 DevComponent 模拟。
@@ -372,7 +372,7 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 - 官方文档：`microi.doc/docs/doc/v8-engine/v8-client.md`。
 - Skills：`v8-frontend-events`、`v8-table-event`、`v8-menu-buttons`、`v8-template-engine`、`v8-formengine-http` 和本 Skill。
 
-`sys_menu.ViewSchema` 使用 `DiyModulePresentationDesigner` 作为配置入口，聚合 `EnableViewSchema / ViewSchemaVersion / ViewConfigVersion / ViewSchema`。设计器可视化编辑默认 List-PC 与 Card-Mobile 视图，保留其它 Detail/Edit、角色视图和未知 JSON 字段；运行时的 EntityHero/MetricStrip 等仍是独立展示区块，不由 DevComponent 参与渲染。
+`sys_menu.ViewSchema` 使用 `DiyModulePresentationDesigner` 作为配置入口，聚合 `EnableViewSchema / ViewSchemaVersion / ViewConfigVersion / ViewSchema`。设计器可视化编辑默认 List-PC 与 Card-Mobile 视图，以独立的自定义表单视图 JSON 编辑 Detail/Edit，并由高级 JSON 保留完整协议、角色视图和未知字段；运行时的 EntityHero/MetricStrip 等仍是独立展示区块，不由 DevComponent 参与渲染。
 
 固定高度的 `diy-form-full` 弹窗只能有一个纵向滚动容器：由弹窗直属 `.el-dialog__body` 承载滚动，Element Plus 的 overlay 和表单顶层 `.el-tabs__content` 必须禁用独立滚动。禁止同时保留 overlay、dialog body、tabs content 三层纵向滚动条；切换表单 Tab 时弹窗外框高度不得变化。
 

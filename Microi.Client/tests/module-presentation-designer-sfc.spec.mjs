@@ -84,6 +84,12 @@ test("module presentation designer compiles and exposes every standard list/card
     assert.match(source, /fieldRequestId/);
     assert.match(source, /cloneJson\(shared\)/);
     assert.match(source, /跨端视图负责字段编排，字段模板负责复杂渲染，两者可以叠加使用/);
+    assert.match(source, /自定义表单视图 JSON/);
+    assert.match(source, /function applyCustomFormJson\s*\(/);
+    assert.match(source, /currentViews\.filter\(\(view\) => !isCustomFormView\(view\)\)/);
+    assert.match(source, /DEFAULT_VIEW_SCHEMA_VERSION\s*=\s*"1\.0"/);
+    assert.match(source, /DEFAULT_VIEW_CONFIG_VERSION\s*=\s*1/);
+    assert.match(source, /只要配置就始终生效/);
     assert.doesNotMatch(source, /\beval\s*\(|new Function\s*\(/);
 });
 
@@ -93,7 +99,7 @@ test("module presentation designer defers every internal pane and remote-pages a
     assert.deepEqual(parsed.errors, []);
     const template = parsed.descriptor.template.content;
 
-    for (const paneName of ["hero", "list", "card", "json"]) {
+    for (const paneName of ["hero", "list", "card", "form-json", "json"]) {
         assert.match(openingTagForNamedPane(template, paneName), /\blazy\b/i);
     }
 

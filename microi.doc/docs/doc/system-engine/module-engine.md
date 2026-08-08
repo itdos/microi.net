@@ -45,16 +45,16 @@ return {
 
 | 物理字段 | 说明 |
 | --- | --- |
-| `EnableViewSchema` | `1` 启用跨端视图；未启用时继续使用现有表单和模块配置。 |
-| `ViewSchemaVersion` | 协议语义版本，例如 `1.0`。 |
-| `ViewConfigVersion` | 配置递增版本；每次发布视图时递增，用于客户端缓存失效。 |
+| `EnableViewSchema` | `1` 启用 Detail/Edit 自定义表单视图；不控制 List/Card 展示配置。 |
+| `ViewSchemaVersion` | 可选的协议语义版本；为空时默认 `1.0`。 |
+| `ViewConfigVersion` | 可选的配置递增版本；为空时默认 `1`，后续变更自动递增。 |
 | `ViewSchema` | Detail、Edit、List、Card 的版本化 JSON。 |
 
-所有顶层 PC 数据模块默认使用紧凑的新列表外观，即使 `EnableViewSchema=0`，也会显示以模块名称为标题的模块头部；子表、关联表和嵌入表不会重复显示。模块头部在**页面多 Tab（PageTabs）上方**渲染，固定信息层级为“模块标题/副标题/动态指标 → 页面多 Tab → 查询与表格”。无指标时头部高度为 `44px`，含指标时为 `58px`，连同区块间距的总纵向占用约为 `50px / 64px`，不能为了视觉效果挤占低分辨率电脑的表格首屏。`EnableViewSchema` 只控制个性化内容，例如标题文案、动态指标、复合列和移动卡片，不再决定是否采用平台默认新样式。移动端继续由固定导航栏显示模块名，只有配置了动态指标时才追加指标区，避免重复标题和空白占位。
+所有顶层 PC 数据模块默认使用紧凑的新列表外观，即使 `EnableViewSchema=0`，也会显示以模块名称为标题的模块头部；子表、关联表和嵌入表不会重复显示。模块头部在**页面多 Tab（PageTabs）上方**渲染，固定信息层级为“模块标题/副标题/动态指标 → 页面多 Tab → 查询与表格”。无指标时头部高度为 `44px`，含指标时为 `58px`，连同区块间距的总纵向占用约为 `50px / 64px`，不能为了视觉效果挤占低分辨率电脑的表格首屏。`Scene=List/Card` 的标题与统计、PC 复合列和移动端卡片只要存在有效配置就直接生效；`EnableViewSchema` 仅控制 `Scene=Detail/Edit` 的自定义表单视图。移动端继续由固定导航栏显示模块名，只有配置了动态指标时才追加指标区，避免重复标题和空白占位。
 
 模块头部只允许一次性入场和一次性轻量光效，不得使用持续循环的位移、呼吸、渐变或阴影动画。所有动效必须支持 `prefers-reduced-motion: reduce`：命中时关闭动画与过渡，保证低性能终端、无障碍用户和长时间停留页面不会卡顿。
 
-模块引擎表单的“跨端视图”页签提供“模块展示设计器”，可视化配置标题与指标、PC 复合列、移动卡片和高级 JSON。普通用户无需手写 `ViewSchema`；高级 JSON 用于 Detail/Edit、角色优先级等完整协议能力。设计器保存时会同步 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion` 和 `ViewSchema`。
+模块引擎表单的“跨端视图”页签提供“模块展示设计器”，可视化配置标题与指标、PC 复合列和移动卡片，并提供独立的“自定义表单视图 JSON”编辑 Detail/Edit。高级 JSON 保留完整协议、角色优先级和未知扩展字段。设计器保存时会同步 `EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion` 和 `ViewSchema`；两个版本字段允许为空，读取时使用上述默认值。
 
 `diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均已废弃。旧字段只保留历史读取兼容，新功能必须增加专用物理列，并通过 `diy_field` 元数据提供设计控件。
 

@@ -55,7 +55,7 @@ test("selectModuleView chooses the role-specific PC detail view", () => {
     assert.equal(selected.Layout.Hero.Title, "管理视图");
 });
 
-test("selectModuleView falls back to All and rejects disabled protocol", () => {
+test("selectModuleView falls back to All and rejects disabled custom form views", () => {
     const selected = selectModuleView(menu, {
         scene: "Detail",
         device: "PC",
@@ -63,6 +63,7 @@ test("selectModuleView falls back to All and rejects disabled protocol", () => {
     });
     assert.equal(selected.Key, "default-detail");
     assert.equal(hasModuleDetailView({ ...menu, EnableViewSchema: 0 }, {}), false);
+    assert.equal(selectModuleView({ ...menu, EnableViewSchema: 0 }, { scene: "Edit", device: "PC" }), null);
 });
 
 test("malformed ViewSchema never enables the renderer", () => {
@@ -90,7 +91,7 @@ test("retired DiyConfig cannot enable the unified view renderer", () => {
 
 test("List and Card layouts preserve composite presentation fields", () => {
     const presentationMenu = {
-        EnableViewSchema: 1,
+        EnableViewSchema: 0,
         ViewSchema: {
             Views: [
                 {
@@ -144,7 +145,7 @@ test("List and Card layouts preserve composite presentation fields", () => {
 
 test("List hero accepts safe built-in total and current-page metrics", () => {
     const builtInMenu = {
-        EnableViewSchema: 1,
+        EnableViewSchema: 0,
         ViewSchema: {
             Views: [{
                 Key: "built-in-metrics",

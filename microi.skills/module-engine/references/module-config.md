@@ -77,12 +77,12 @@
 
 | 字段 | 说明 |
 |---|---|
-| `EnableViewSchema` | 1 启用 |
-| `ViewSchemaVersion` | 协议语义版本 |
-| `ViewConfigVersion` | 每次发布递增，驱动缓存失效 |
+| `EnableViewSchema` | 1 启用 Detail/Edit 自定义表单视图；不控制 List/Card |
+| `ViewSchemaVersion` | 可选；为空默认 `1.0` |
+| `ViewConfigVersion` | 可选；为空默认 `1`，后续发布递增并驱动缓存失效 |
 | `ViewSchema` | Detail/Edit/List/Card JSON |
 
-顶层 PC 列表不依赖 `EnableViewSchema` 才采用新样式：平台始终显示紧凑模块标题。模块表单中的 `DiyModulePresentationDesigner` 负责可视化编辑默认 List-PC 与 Card-Mobile 视图，并保留 Detail/Edit、角色视图及未知 JSON 字段。
+顶层 PC 列表不依赖 `EnableViewSchema` 才采用新样式：平台始终显示紧凑模块标题；ViewSchema 中有效的 List-PC 与 Card-Mobile 配置也不受该开关限制。模块表单中的 `DiyModulePresentationDesigner` 负责可视化编辑这些展示配置，以独立 JSON 编辑 Detail/Edit，并通过高级 JSON 保留角色视图及未知字段。
 
 视图项常用字段：`Key`、`Scene`、`Device`、`RoleIds`、`Priority`、`Layout`。
 标准区块包括 `EntityHero`、`MetricStrip`、`ActionGrid`、

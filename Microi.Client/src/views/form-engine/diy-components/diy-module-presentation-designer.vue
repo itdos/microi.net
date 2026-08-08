@@ -12,7 +12,7 @@
             </div>
             <div class="head-actions">
                 <div class="enable-control">
-                    <span>启用自定义展示</span>
+                    <span>启用自定义表单视图</span>
                     <el-switch v-model="enabled" :disabled="readonly" />
                 </div>
                 <el-tag :type="syncStateType" effect="plain">{{ syncStateText }}</el-tag>
@@ -224,12 +224,36 @@
                 </div>
             </el-tab-pane>
 
+            <el-tab-pane label="自定义表单视图 JSON" name="form-json" lazy>
+                <section class="designer-card json-card">
+                    <div class="card-head">
+                        <div>
+                            <div class="card-title">Detail / Edit 自定义表单视图</div>
+                            <div class="form-tip">此处只编辑 Detail/Edit 场景，并合并回完整 ViewSchema；“启用自定义表单视图”仅控制这部分。标题与统计、PC 复合列和移动端卡片只要配置就始终生效。</div>
+                        </div>
+                        <div class="inline-actions">
+                            <el-button size="small" :disabled="readonly" @click="refreshCustomFormJson">从完整配置刷新</el-button>
+                            <el-button size="small" type="primary" :disabled="readonly" @click="applyCustomFormJson">校验并应用</el-button>
+                        </div>
+                    </div>
+                    <el-alert
+                        class="designer-alert"
+                        type="info"
+                        show-icon
+                        :closable="false"
+                        title="JSON 根节点使用 Views 数组，只允许 Scene=Detail 或 Scene=Edit；为空表示继续使用标准表单。"
+                    />
+                    <el-input v-model="customFormJson" type="textarea" :rows="22" resize="vertical" :disabled="readonly" spellcheck="false" @input="onCustomFormJsonInput" />
+                    <el-alert v-if="customFormJsonError" class="json-error" type="error" :closable="false" show-icon :title="customFormJsonError" />
+                </section>
+            </el-tab-pane>
+
             <el-tab-pane label="高级 JSON" name="json" lazy>
                 <section class="designer-card json-card">
                     <div class="card-head">
                         <div>
                             <div class="card-title">完整 ViewSchema</div>
-                            <div class="form-tip">保留 Detail、Edit、角色专属视图及未知扩展字段。这里只解析 JSON，不会执行 eval 或任意脚本。</div>
+                            <div class="form-tip">保留全部 List/Card/Detail/Edit、角色专属视图及未知扩展字段。List/Card 不受启用开关影响，Detail/Edit 由“启用自定义表单视图”控制；这里只解析 JSON，不会执行 eval 或任意脚本。</div>
                         </div>
                         <div class="inline-actions">
                             <el-button size="small" :disabled="readonly" @click="refreshAdvancedJson">从设计器刷新</el-button>
@@ -243,7 +267,7 @@
         </el-tabs>
 
         <footer class="designer-footer">
-            <span :class="{ 'dirty-text': dirty || advancedJsonDirty || syncError }">{{ syncStateText }}；完成后保存模块即可。</span>
+            <span :class="{ 'dirty-text': dirty || customFormJsonDirty || advancedJsonDirty || syncError }">{{ syncStateText }}；完成后保存模块即可。</span>
             <span>协议 {{ viewSchemaVersion }} · 配置版本 {{ viewConfigVersion }}</span>
         </footer>
     </div>
@@ -354,9 +378,14 @@ const parseError = ref("");
 const jsonError = ref("");
 const advancedJson = ref("");
 const advancedJsonDirty = ref(false);
+const customFormJson = ref("");
+const customFormJsonDirty = ref(false);
+const customFormJsonError = ref("");
 const enabled = ref(false);
-const viewSchemaVersion = ref("1.0");
-const viewConfigVersion = ref(0);
+const DEFAULT_VIEW_SCHEMA_VERSION = "1.0";
+const DEFAULT_VIEW_CONFIG_VERSION = 1;
+const viewSchemaVersion = ref(DEFAULT_VIEW_SCHEMA_VERSION);
+const viewConfigVersion = ref(DEFAULT_VIEW_CONFIG_VERSION);
 const schema = ref({ Views: [] });
 const listView = ref(null);
 const cardView = ref(null);
@@ -415,11 +444,12 @@ const metricFieldOptions = computed(() => fields.value
     .map((item) => ({ value: item.Name, label: item.Label ? `${item.Label}（${item.Name}）` : item.Name })));
 const syncStateText = computed(() => {
     if (syncError.value) return syncError.value;
+    if (customFormJsonDirty.value) return "自定义表单视图 JSON 待校验";
     if (advancedJsonDirty.value) return "高级 JSON 待校验";
     if (dirty.value) return "正在自动同步";
     return "已自动同步到表单";
 });
-const syncStateType = computed(() => syncError.value ? "danger" : (dirty.value || advancedJsonDirty.value ? "warning" : "success"));
+const syncStateType = computed(() => syncError.value ? "danger" : (dirty.value || customFormJsonDirty.value || advancedJsonDirty.value ? "warning" : "success"));
 
 onMounted(reload);
 onBeforeUnmount(() => {
@@ -454,8 +484,8 @@ async function reload() {
         enabled.value = configuredEnabled === undefined || configuredEnabled === null || configuredEnabled === ""
             ? false
             : toBoolean(configuredEnabled);
-        viewSchemaVersion.value = String(readFormField("ViewSchemaVersion") || "1.0");
-        viewConfigVersion.value = Math.max(0, Number(readFormField("ViewConfigVersion") || 0));
+        viewSchemaVersion.value = String(readFormField("ViewSchemaVersion") || "").trim() || DEFAULT_VIEW_SCHEMA_VERSION;
+        viewConfigVersion.value = normalizeConfigVersion(readFormField("ViewConfigVersion")) || DEFAULT_VIEW_CONFIG_VERSION;
         hydrateSchema(source, true);
         lastSyncedSchema = stringifyInput(source);
         lastSyncedEnabled = enabled.value;
@@ -491,6 +521,9 @@ function hydrateSchema(value, initial = false) {
     cardView.value = ensured.card;
     advancedJson.value = parsed.error && typeof value === "string" ? value : JSON.stringify(nextSchema, null, 2);
     advancedJsonDirty.value = false;
+    customFormJson.value = stringifyCustomFormViews(nextSchema);
+    customFormJsonDirty.value = false;
+    customFormJsonError.value = "";
     jsonError.value = "";
     hydrating.value = false;
     if (!initial && ensured.changed && !readonly.value) {
@@ -677,8 +710,12 @@ async function syncToForm(requestId = ++syncRequestId) {
         if (requestId !== syncRequestId) return false;
         const enableValue = enabled.value ? 1 : 0;
         const changed = text !== lastSyncedSchema || enableValue !== lastSyncedEnabled;
-        if (changed) viewConfigVersion.value = Math.max(viewConfigVersion.value, Number(readFormField("ViewConfigVersion") || 0)) + 1;
-        viewSchemaVersion.value = "1.0";
+        if (changed) {
+            const persistedVersion = normalizeConfigVersion(readFormField("ViewConfigVersion"));
+            const versionBase = persistedVersion || (lastSyncedSchema ? DEFAULT_VIEW_CONFIG_VERSION : 0);
+            viewConfigVersion.value = versionBase + 1;
+        }
+        viewSchemaVersion.value = String(readFormField("ViewSchemaVersion") || "").trim() || DEFAULT_VIEW_SCHEMA_VERSION;
         lastSyncedSchema = text;
         lastSyncedEnabled = enableValue;
         setFormValue("ViewSchema", text, props.field);
@@ -686,8 +723,11 @@ async function syncToForm(requestId = ++syncRequestId) {
         setFormValue("ViewSchemaVersion", viewSchemaVersion.value);
         setFormValue("ViewConfigVersion", viewConfigVersion.value);
         emit("update:modelValue", text);
-        advancedJson.value = text;
-        advancedJsonDirty.value = false;
+        if (!advancedJsonDirty.value) advancedJson.value = text;
+        if (!customFormJsonDirty.value) {
+            customFormJson.value = stringifyCustomFormViews(schema.value);
+            customFormJsonError.value = "";
+        }
         parseError.value = "";
         jsonError.value = "";
         dirty.value = false;
@@ -701,6 +741,11 @@ async function syncToForm(requestId = ++syncRequestId) {
 
 async function flushPendingSync() {
     if (readonly.value) return true;
+    if (customFormJsonDirty.value && advancedJsonDirty.value) {
+        syncError.value = "自定义表单视图 JSON 与高级 JSON 均有未应用修改，请先选择一处校验并应用。";
+        return false;
+    }
+    if (customFormJsonDirty.value && !applyCustomFormJson({ silent: true, schedule: false })) return false;
     if (advancedJsonDirty.value && !applyAdvancedJson({ silent: true, schedule: false })) return false;
     if (!dirty.value && !syncError.value) return true;
     clearTimeout(syncTimer);
@@ -748,6 +793,67 @@ function removeColumn(index) { listView.value.Layout.List.Columns.splice(index, 
 function addDescriptor(target) { target.push({ Name: "", Icon: "", Tone: "", Color: "", ShowLabel: false }); }
 function removeDescriptor(target, index) { target.splice(index, 1); }
 
+function isCustomFormView(view) {
+    return ["detail", "edit"].includes(canonical(view?.Scene || view?.scene));
+}
+
+function stringifyCustomFormViews(root) {
+    const views = Array.isArray(root?.Views) ? root.Views : (Array.isArray(root?.views) ? root.views : []);
+    return JSON.stringify({ Views: views.filter(isCustomFormView).map(cloneJson) }, null, 2);
+}
+
+function refreshCustomFormJson() {
+    customFormJson.value = stringifyCustomFormViews(schema.value);
+    customFormJsonDirty.value = false;
+    customFormJsonError.value = "";
+}
+
+function onCustomFormJsonInput() {
+    if (hydrating.value || readonly.value) return;
+    customFormJsonDirty.value = true;
+    customFormJsonError.value = "";
+}
+
+function applyCustomFormJson(options = {}) {
+    try {
+        if (parseError.value) throw new Error("原 ViewSchema 尚未修复，请先在高级 JSON 中校验并应用");
+        if (advancedJsonDirty.value) throw new Error("高级 JSON 尚有未应用修改，请先校验并应用或从完整配置刷新");
+        const text = String(customFormJson.value || "").trim();
+        const parsed = text ? JSON.parse(text) : { Views: [] };
+        const formViews = Array.isArray(parsed)
+            ? parsed
+            : (Array.isArray(parsed?.Views) ? parsed.Views : (Array.isArray(parsed?.views) ? parsed.views : null));
+        if (!formViews) throw new Error("根节点必须是包含 Views 数组的 JSON 对象，也可以直接使用数组");
+        const invalidView = formViews.find((view) => !view || typeof view !== "object" || Array.isArray(view) || !isCustomFormView(view));
+        if (invalidView) throw new Error("Views 只允许包含 Scene=Detail 或 Scene=Edit 的对象");
+
+        const next = cloneJson(schema.value);
+        const currentViews = Array.isArray(next.Views) ? next.Views : [];
+        next.Views = currentViews.filter((view) => !isCustomFormView(view)).concat(formViews.map(cloneJson));
+        const ensured = ensureEditorViews(next);
+        hydrating.value = true;
+        schema.value = next;
+        listView.value = ensured.list;
+        cardView.value = ensured.card;
+        hydrating.value = false;
+        customFormJson.value = stringifyCustomFormViews(next);
+        customFormJsonDirty.value = false;
+        customFormJsonError.value = "";
+        advancedJson.value = JSON.stringify(next, null, 2);
+        advancedJsonDirty.value = false;
+        jsonError.value = "";
+        dirty.value = true;
+        if (options.schedule !== false) scheduleSync();
+        if (!options.silent) DiyCommon.Tips("自定义表单视图 JSON 已校验并应用。", true);
+        return true;
+    } catch (error) {
+        hydrating.value = false;
+        customFormJsonError.value = `JSON 校验失败：${error.message}`;
+        if (!options.silent) DiyCommon.Tips(customFormJsonError.value, false);
+        return false;
+    }
+}
+
 function refreshAdvancedJson() {
     advancedJson.value = JSON.stringify(schema.value, null, 2);
     advancedJsonDirty.value = false;
@@ -762,6 +868,7 @@ function onAdvancedJsonInput() {
 
 function applyAdvancedJson(options = {}) {
     try {
+        if (customFormJsonDirty.value) throw new Error("自定义表单视图 JSON 尚有未应用修改，请先校验并应用或从完整配置刷新");
         const parsed = JSON.parse(String(advancedJson.value || ""));
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("根节点必须是 JSON 对象");
         const next = cloneJson(parsed);
@@ -773,6 +880,9 @@ function applyAdvancedJson(options = {}) {
         hydrating.value = false;
         advancedJson.value = JSON.stringify(next, null, 2);
         advancedJsonDirty.value = false;
+        customFormJson.value = stringifyCustomFormViews(next);
+        customFormJsonDirty.value = false;
+        customFormJsonError.value = "";
         parseError.value = "";
         jsonError.value = "";
         dirty.value = true;
@@ -959,6 +1069,10 @@ function isRoleless(view) {
     });
 }
 function toBoolean(value) { return [true, 1, "1", "true"].includes(value); }
+function normalizeConfigVersion(value) {
+    const number = Number(value);
+    return Number.isInteger(number) && number > 0 ? number : 0;
+}
 function cloneJson(value) { return JSON.parse(JSON.stringify(value || {})); }
 function stringifyInput(value) {
     if (typeof value === "string") return value.trim();
