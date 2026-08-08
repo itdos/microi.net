@@ -587,10 +587,15 @@ export function createMicroiV8(options = {}) {
   let refreshTokenPromise = null;
   let tokenMaintenanceTimer = null;
   let stopBrowserResumeListeners = null;
+  let contentSecurityBatchAvailable = null;
 
   // 更新配置后立即刷新并发队列，保证 maxConcurrent 热更新生效。
   function configure(next = {}) {
+    const contentSecurityContextChanged =
+      (Object.prototype.hasOwnProperty.call(next, 'osClient') && next.osClient !== config.osClient)
+      || (Object.prototype.hasOwnProperty.call(next, 'apiBase') && next.apiBase !== config.apiBase);
     config = { ...config, ...next };
+    if (contentSecurityContextChanged) contentSecurityBatchAvailable = null;
     if (Object.prototype.hasOwnProperty.call(next, 'maxConcurrent')) {
       runQueued = createQueue(config.maxConcurrent);
     }
@@ -980,28 +985,201 @@ export function createMicroiV8(options = {}) {
     return result.code;
   }
 
-  async function waitForContentSecurity(reviewId, options = {}) {
-    const attempts = Math.max(1, Number(options.contentSecurityPollAttempts || 30));
-    const interval = Math.max(300, Number(options.contentSecurityPollInterval || 1000));
-    for (let index = 0; index < attempts; index += 1) {
-      if (index > 0) await new Promise((resolve) => setTimeout(resolve, interval));
+  const CONTENT_SECURITY_BATCH_ENGINE = 'mci-wechat-content-status-batch';
+  const CONTENT_SECURITY_TERMINAL = new Set(['Passed', 'Rejected', 'Error', 'Timeout', 'Cancelled']);
+
+  function contentSecurityError(status) {
+    if (status === 'Rejected') {
+      return { Code: 0, Status: status, Msg: '你发布的内容含违规信息，请修改后重试。' };
+    }
+    if (status === 'Timeout') {
+      return { Code: 0, Status: status, Msg: '内容安全检测超时，请删除后重试。' };
+    }
+    if (status === 'Cancelled') {
+      return { Code: 0, Status: status, Cancelled: true, Msg: '内容安全检测已取消。' };
+    }
+    return { Code: 0, Status: status || 'Error', Msg: '内容安全检测暂不可用，请稍后重试。' };
+  }
+
+  function contentSecurityCancelled(options = {}) {
+    try {
+      return typeof options.isCancelled === 'function' && options.isCancelled() === true;
+    } catch (error) {
+      return true;
+    }
+  }
+
+  function waitMilliseconds(milliseconds) {
+    const delay = Math.max(0, Number(milliseconds || 0));
+    return delay > 0 ? new Promise((resolve) => setTimeout(resolve, delay)) : Promise.resolve();
+  }
+
+  function normalizeContentSecurityStatusItems(items, reviewIds) {
+    const allowed = new Set(reviewIds);
+    const normalized = [];
+    const source = items && typeof items.length === 'number' ? items : [];
+    for (let index = 0; index < source.length; index += 1) {
+      const item = source[index] || {};
+      const reviewId = String(item.ReviewId || '');
+      if (!allowed.has(reviewId)) continue;
+      const status = String(item.Status || 'Error');
+      normalized.push({ ReviewId: reviewId, Status: status });
+    }
+    return normalized;
+  }
+
+  async function getContentSecurityStatuses(reviewIds) {
+    if (contentSecurityBatchAvailable !== false) {
+      try {
+        const items = [];
+        let nextPollAfterMs = 0;
+        for (let offset = 0; offset < reviewIds.length; offset += 20) {
+          const chunk = reviewIds.slice(offset, offset + 20);
+          const batch = await apiEngineRun(CONTENT_SECURITY_BATCH_ENGINE, {
+            ReviewIds: chunk
+          }, { checkCode: false, silentError: true });
+          if (!batch || Number(batch.Code) !== 1 || !batch.Data || !batch.Data.Items) {
+            throw {
+              Code: batch && batch.Code,
+              Msg: (batch && batch.Msg) || '批量审核状态接口不可用',
+              ContentSecurityBatchUnavailable: true
+            };
+          }
+          items.push(...normalizeContentSecurityStatusItems(batch.Data.Items, chunk));
+          nextPollAfterMs = Math.max(nextPollAfterMs, Number(batch.Data.NextPollAfterMs || 0));
+        }
+        contentSecurityBatchAvailable = true;
+        return { Items: items, NextPollAfterMs: nextPollAfterMs };
+      } catch (error) {
+        // Authentication failures must stop immediately instead of causing another request to the legacy endpoint.
+        if (isAuthExpired(error)) throw error;
+        // 网络错误由有限重试策略处理，避免一次失败就扇出为 N 个旧状态请求。
+        if (!error || error.ContentSecurityBatchUnavailable !== true) throw error;
+        // 兼容应用包尚未升级的租户。本会话后续直接使用旧状态端点，避免每轮重复探测不存在的引擎。
+        contentSecurityBatchAvailable = false;
+      }
+    }
+
+    const legacyItems = await Promise.all(reviewIds.map(async (reviewId) => {
       const result = await post('/api/WeChatContentSecurity/Status', {
         OsClient: config.osClient,
         ReviewId: reviewId
       }, { checkCode: false, silentError: true });
-      if (!result || Number(result.Code) !== 1) {
-        throw result || { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
-      }
-      const status = String((result.Data && result.Data.Status) || '');
-      if (status === 'Passed') return result.Data;
-      if (status === 'Rejected') {
-        throw { Code: 0, Msg: '你发布的内容含违规信息，请修改后重试。' };
-      }
-      if (status === 'Error') {
-        throw { Code: 0, Msg: '内容安全检测暂不可用，请稍后重试。' };
-      }
+      if (!result || Number(result.Code) !== 1) throw result || contentSecurityError('Error');
+      return {
+        ReviewId: reviewId,
+        Status: String((result.Data && result.Data.Status) || 'Error')
+      };
+    }));
+    return { Items: legacyItems, NextPollAfterMs: 0 };
+  }
+
+  async function waitForContentSecurityBatch(reviewIds, options = {}) {
+    const uniqueIds = [];
+    const seen = new Set();
+    const source = reviewIds && typeof reviewIds.length === 'number' ? reviewIds : [];
+    for (let index = 0; index < source.length; index += 1) {
+      const reviewId = String(source[index] || '');
+      if (!reviewId || seen.has(reviewId)) continue;
+      seen.add(reviewId);
+      uniqueIds.push(reviewId);
     }
-    throw { Code: 0, Msg: '内容正在进行安全检测，请稍后重试。' };
+    if (!uniqueIds.length) return { Items: [], PendingCount: 0 };
+
+    const configuredAttempts = Number(options.contentSecurityPollAttempts || 8);
+    const attempts = Math.min(12, Math.max(1, Number.isFinite(configuredAttempts) ? configuredAttempts : 8));
+    const configuredTimeout = Number(options.contentSecurityTimeout || 25000);
+    const timeout = Math.min(60000, Math.max(3000, Number.isFinite(configuredTimeout) ? configuredTimeout : 25000));
+    const configuredInterval = Number(options.contentSecurityPollInterval || 0);
+    const fixedInterval = Number.isFinite(configuredInterval) && configuredInterval > 0
+      ? Math.min(5000, Math.max(300, configuredInterval))
+      : 0;
+    const backoff = [700, 1000, 1500, 2000, 3000, 5000];
+    const startedAt = Date.now();
+    const pending = new Set(uniqueIds);
+    const completed = {};
+    let consecutiveFailures = 0;
+    let nextPollAfterMs = 0;
+
+    const removeCancelledReviews = () => {
+      for (const reviewId of Array.from(pending)) {
+        let cancelled = false;
+        try {
+          cancelled = typeof options.isReviewCancelled === 'function'
+            && options.isReviewCancelled(reviewId) === true;
+        } catch (error) {
+          cancelled = true;
+        }
+        if (cancelled) {
+          completed[reviewId] = { ReviewId: reviewId, Status: 'Cancelled' };
+          pending.delete(reviewId);
+        }
+      }
+    };
+
+    for (let attempt = 0; attempt < attempts && pending.size > 0; attempt += 1) {
+      if (contentSecurityCancelled(options)) throw contentSecurityError('Cancelled');
+      removeCancelledReviews();
+      if (!pending.size) break;
+
+      const clientBackoff = backoff[Math.min(attempt, backoff.length - 1)];
+      const delay = fixedInterval || Math.max(clientBackoff, nextPollAfterMs || 0);
+      if (Date.now() - startedAt + delay >= timeout) break;
+      await waitMilliseconds(delay);
+      if (contentSecurityCancelled(options)) throw contentSecurityError('Cancelled');
+      removeCancelledReviews();
+      if (!pending.size) break;
+
+      let response;
+      try {
+        response = await getContentSecurityStatuses(Array.from(pending));
+        consecutiveFailures = 0;
+      } catch (error) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 2) throw error || contentSecurityError('Error');
+        continue;
+      }
+
+      const returned = new Set();
+      const items = response.Items || [];
+      for (let index = 0; index < items.length; index += 1) {
+        const item = items[index] || {};
+        const reviewId = String(item.ReviewId || '');
+        if (!pending.has(reviewId)) continue;
+        returned.add(reviewId);
+        const status = String(item.Status || 'Error');
+        if (CONTENT_SECURITY_TERMINAL.has(status)) {
+          completed[reviewId] = { ReviewId: reviewId, Status: status };
+          pending.delete(reviewId);
+        }
+      }
+      // 接口对已请求 Id 缺少返回值时失败关闭，不能让异常数据永久停在 Pending。
+      for (const reviewId of Array.from(pending)) {
+        if (!returned.has(reviewId)) {
+          completed[reviewId] = { ReviewId: reviewId, Status: 'Error' };
+          pending.delete(reviewId);
+        }
+      }
+      const suggestedDelay = Number(response.NextPollAfterMs || 0);
+      nextPollAfterMs = Number.isFinite(suggestedDelay) && suggestedDelay > 0
+        ? Math.min(5000, Math.max(300, suggestedDelay))
+        : 0;
+    }
+
+    for (const reviewId of Array.from(pending)) {
+      completed[reviewId] = { ReviewId: reviewId, Status: 'Timeout' };
+    }
+    return {
+      Items: uniqueIds.map((reviewId) => completed[reviewId] || { ReviewId: reviewId, Status: 'Error' }),
+      PendingCount: 0
+    };
+  }
+
+  async function waitForContentSecurity(reviewId, options = {}) {
+    const result = await waitForContentSecurityBatch([reviewId], options);
+    const reviewed = result.Items[0] || { ReviewId: reviewId, Status: 'Error' };
+    if (reviewed.Status === 'Passed') return reviewed;
+    throw contentSecurityError(reviewed.Status);
   }
 
   function isImageUpload(filePath, options = {}) {
@@ -1014,7 +1192,7 @@ export function createMicroiV8(options = {}) {
   }
 
   // 文件上传同时支持 uni.uploadFile 与浏览器 fetch/FormData。
-  async function uploadFile(filePath, options = {}) {
+  async function uploadFileInternal(filePath, options = {}, deferContentSecurity = false) {
     const runtimeUni = getUni();
     const action = options.action || (options.anonymous ? 'UniappUploadAnonymous' : 'UniappUpload');
     const rawFormData = options.formData || {};
@@ -1110,7 +1288,7 @@ export function createMicroiV8(options = {}) {
         throw error;
       }
       try {
-        if (data.ContentSecurityStatus !== 'Passed') {
+        if (!deferContentSecurity && data.ContentSecurityStatus !== 'Passed') {
           const reviewed = await waitForContentSecurity(data.ContentSecurityReviewId, options);
           data.ContentSecurityStatus = reviewed.Status;
         }
@@ -1121,6 +1299,142 @@ export function createMicroiV8(options = {}) {
     }
     if (!data.Url && options.resolveUrl !== false) data.Url = await resolveFileUrl(data.Path);
     return { ...body, Data: data };
+  }
+
+  function uploadFile(filePath, options = {}) {
+    return uploadFileInternal(filePath, options, false);
+  }
+
+  function notifyUploadItem(options, payload) {
+    try {
+      if (typeof options.onItemChange === 'function') options.onItemChange(payload);
+    } catch (error) {}
+  }
+
+  async function uploadFiles(files, options = {}) {
+    const source = files && typeof files.length === 'number' ? files : [];
+    const entries = [];
+    for (let index = 0; index < source.length; index += 1) {
+      const item = source[index];
+      const filePath = typeof item === 'string'
+        ? item
+        : String((item && (item.filePath || item.tempFilePath || item.path)) || '');
+      entries.push({
+        index,
+        filePath,
+        file: typeof item === 'object' ? (item.file || item) : null,
+        fileName: typeof item === 'object' ? (item.fileName || item.name || '') : ''
+      });
+    }
+    if (!entries.length) return [];
+
+    const requestedConcurrency = Number(options.concurrency || 3);
+    const concurrency = Math.min(3, Math.max(1,
+      Number.isFinite(requestedConcurrency) ? Math.floor(requestedConcurrency) : 3));
+    const outcomes = new Array(entries.length);
+    const pending = [];
+    const reviewIndexes = {};
+    let cursor = 0;
+
+    const isItemCancelled = (index) => {
+      if (contentSecurityCancelled(options)) return true;
+      try {
+        return typeof options.isItemCancelled === 'function' && options.isItemCancelled(index) === true;
+      } catch (error) {
+        return true;
+      }
+    };
+
+    const worker = async () => {
+      while (cursor < entries.length) {
+        const entry = entries[cursor];
+        cursor += 1;
+        if (isItemCancelled(entry.index)) {
+          outcomes[entry.index] = { Code: 0, Error: contentSecurityError('Cancelled') };
+          continue;
+        }
+        notifyUploadItem(options, { Index: entry.index, Status: 'uploading' });
+        try {
+          const result = await uploadFileInternal(entry.filePath, {
+            ...options,
+            file: entry.file,
+            fileName: entry.fileName || options.fileName,
+            silentError: true
+          }, true);
+          if (isItemCancelled(entry.index)) {
+            outcomes[entry.index] = { Code: 0, Error: contentSecurityError('Cancelled') };
+            continue;
+          }
+          const data = result.Data || {};
+          if (data.ContentSecurityReviewId && data.ContentSecurityStatus === 'Pending') {
+            const reviewId = String(data.ContentSecurityReviewId);
+            pending.push({ entry, result, reviewId });
+            reviewIndexes[reviewId] = entry.index;
+            notifyUploadItem(options, { Index: entry.index, Status: 'checking' });
+          } else {
+            outcomes[entry.index] = { Code: 1, Data: data, Result: result };
+            notifyUploadItem(options, { Index: entry.index, Status: 'passed', Result: result });
+          }
+        } catch (error) {
+          const normalized = error || { Code: 0, Msg: '上传失败' };
+          outcomes[entry.index] = { Code: 0, Error: normalized };
+          notifyUploadItem(options, {
+            Index: entry.index,
+            Status: normalized.Cancelled ? 'cancelled' : 'error',
+            Error: normalized
+          });
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, () => worker()));
+
+    const activePending = pending.filter((item) => !isItemCancelled(item.entry.index));
+    for (const item of pending) {
+      if (activePending.indexOf(item) >= 0) continue;
+      outcomes[item.entry.index] = { Code: 0, Error: contentSecurityError('Cancelled') };
+    }
+    if (activePending.length) {
+      try {
+        const reviewed = await waitForContentSecurityBatch(
+          activePending.map((item) => item.reviewId),
+          {
+            ...options,
+            isReviewCancelled: (reviewId) => isItemCancelled(reviewIndexes[reviewId])
+          }
+        );
+        const statuses = {};
+        reviewed.Items.forEach((item) => { statuses[item.ReviewId] = item.Status; });
+        activePending.forEach((item) => {
+          const status = statuses[item.reviewId] || 'Error';
+          if (status === 'Passed' && !isItemCancelled(item.entry.index)) {
+            item.result.Data.ContentSecurityStatus = 'Passed';
+            outcomes[item.entry.index] = { Code: 1, Data: item.result.Data, Result: item.result };
+            notifyUploadItem(options, { Index: item.entry.index, Status: 'passed', Result: item.result });
+            return;
+          }
+          const error = contentSecurityError(status);
+          outcomes[item.entry.index] = { Code: 0, Error: error };
+          notifyUploadItem(options, {
+            Index: item.entry.index,
+            Status: String(status || 'error').toLowerCase(),
+            Error: error
+          });
+        });
+      } catch (error) {
+        activePending.forEach((item) => {
+          const normalized = error || contentSecurityError('Error');
+          outcomes[item.entry.index] = { Code: 0, Error: normalized };
+          notifyUploadItem(options, {
+            Index: item.entry.index,
+            Status: normalized.Cancelled ? 'cancelled' : 'error',
+            Error: normalized
+          });
+        });
+      }
+    }
+
+    return outcomes;
   }
 
   function apiEngineRun(key, data = {}, options = {}) {
@@ -1543,7 +1857,9 @@ export function createMicroiV8(options = {}) {
     extractUploadPath,
     normalizeUploadValue,
     uploadFile,
+    uploadFiles,
     waitForContentSecurity,
+    waitForContentSecurityBatch,
     getSafeArea,
     formatDate,
     toNumber,

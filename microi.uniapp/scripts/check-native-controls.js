@@ -305,6 +305,16 @@ for (const token of [
 ]) {
   if (!xjyTenantForm.includes(token)) fail(`xjy follow-up form rule is missing: ${token}`)
 }
+// 联系人选择所属客户时必须同步客户 Id，并在提交前显式补入可能被隐藏的 KehuID。
+for (const token of [
+  "const CONTACT_FIELDS = {\n  customerId: 'KehuID',\n  customerName: 'SuoshuKH'",
+  'isContactForm(context)',
+  'selectedContactCustomer(context, payload)',
+  'applyContactCustomerValues(context, customer)',
+  'resolveContactCustomer(context, true)'
+]) {
+  if (!xjyTenantForm.includes(token)) fail(`xjy contact customer link rule is missing: ${token}`)
+}
 for (const token of [
   "ShuizhiYQ: '纳滤'",
   "DashuiFS: '[\"4\"]'",

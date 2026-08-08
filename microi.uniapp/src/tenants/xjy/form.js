@@ -86,6 +86,10 @@ const FOLLOWUP_FIELDS = {
   time: 'GenjinSJ',
   effective: 'GuanjianJCR'
 }
+const CONTACT_FIELDS = {
+  customerId: 'KehuID',
+  customerName: 'SuoshuKH'
+}
 const CUSTOMER_CARE_FIELDS = {
   customerId: 'KehuID',
   customerName: 'KehuMC',
@@ -215,6 +219,10 @@ function isFollowupForm(context) {
     FOLLOWUP_FIELDS.user,
     FOLLOWUP_FIELDS.time
   ].every((name) => Boolean(findField(context, name)))
+}
+
+function isContactForm(context) {
+  return String(context.tableName || '').toLowerCase() === CONTACT_TABLE.toLowerCase()
 }
 
 function isCustomerCareForm(context) {
@@ -795,6 +803,70 @@ async function resolveFollowupCustomer(context, requireUnique = false) {
   return {
     id: String(personValue(rows[0], ['Id', 'ID', 'id']) || '').trim(),
     name: String(personValue(rows[0], ['KehuMC', 'Name', 'name']) || normalizedName).trim()
+  }
+}
+
+function selectedContactCustomer(context, payload = {}) {
+  if (payload.cleared) return { id: '', name: '' }
+  const row = selectedRow(payload)
+  const fromSelection = Boolean(payload.field)
+  const customerIdName = fieldName(context, CONTACT_FIELDS.customerId, '客户Id')
+  const customerNameField = fieldName(context, CONTACT_FIELDS.customerName, '所属客户')
+  const stateValues = context.state.contactCustomerValues || {}
+  return {
+    id: personValue(row, ['Id', 'ID', 'id', 'KehuID', 'KehuId', 'CustomerId', 'CustomerID']) ||
+      (fromSelection ? '' : context.form[customerIdName] || stateValues[customerIdName] || ''),
+    name: personValue(row, ['KehuMC', 'CustomerName', 'Name', 'name']) ||
+      payload.value || (fromSelection ? '' : context.form[customerNameField] || stateValues[customerNameField] || '')
+  }
+}
+
+function applyContactCustomerValues(context, customer = {}) {
+  // 联系人所属客户保存名称，同时用隐藏 KehuID 建立客户详情页可查询的真实关联。
+  const customerIdName = fieldName(context, CONTACT_FIELDS.customerId, '客户Id')
+  const customerNameField = fieldName(context, CONTACT_FIELDS.customerName, '所属客户')
+  const values = {
+    [customerIdName]: String(customer.id || '').trim(),
+    [customerNameField]: String(customer.name || '').trim()
+  }
+  context.patchForm(values)
+  context.state.contactCustomerValues = values
+  return values
+}
+
+async function resolveContactCustomer(context, requireUnique = false) {
+  const current = selectedContactCustomer(context)
+  const normalizedId = String(current.id || '').trim()
+  const normalizedName = String(current.name || '').trim()
+  if (normalizedId && normalizedName) return { id: normalizedId, name: normalizedName }
+  if (!normalizedId && !normalizedName) {
+    if (requireUnique) throw new Error('请选择所属客户')
+    return { id: '', name: '' }
+  }
+
+  const where = normalizedId
+    ? [['Id', '=', normalizedId]]
+    : [['KehuMC', '=', normalizedName]]
+  const result = await V8.FormEngine.GetTableData(CUSTOMER_TABLE, {
+    _Where: where,
+    _SelectFields: ['Id', 'KehuMC'],
+    _PageIndex: 1,
+    _PageSize: 2
+  })
+  if (!result || Number(result.Code) !== 1) {
+    if (requireUnique) throw new Error((result && result.Msg) || '所属客户关联信息加载失败')
+    return { id: normalizedId, name: normalizedName }
+  }
+  const rows = Array.isArray(result.Data) ? result.Data : []
+  if (rows.length !== 1) {
+    if (requireUnique) {
+      throw new Error(rows.length > 1 ? '存在同名客户，请重新选择所属客户' : '未找到所选客户，请重新选择')
+    }
+    return { id: normalizedId, name: normalizedName }
+  }
+  return {
+    id: String(personValue(rows[0], ['Id', 'ID', 'id']) || normalizedId).trim(),
+    name: String(personValue(rows[0], ['KehuMC', 'CustomerName', 'Name', 'name']) || normalizedName).trim()
   }
 }
 
@@ -1519,6 +1591,19 @@ export async function handleFieldSelect(context, payload) {
       return { handled: true }
     }
   }
+  if (isContactForm(context) && payload && !payload.multiple) {
+    const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
+    const customerNameField = fieldName(context, CONTACT_FIELDS.customerName, '所属客户')
+    if (selectedFieldName === customerNameField.toLowerCase()) {
+      let customer = selectedContactCustomer(context, payload)
+      applyContactCustomerValues(context, customer)
+      if (!customer.id && customer.name) {
+        customer = await resolveContactCustomer(context)
+        applyContactCustomerValues(context, customer)
+      }
+      return { handled: true }
+    }
+  }
   if (isFollowupForm(context) && payload && !payload.multiple) {
     // zhy：用户切换客户后同步客户 Id，清空旧联系人并重新加载该客户的联系人。
     const selectedFieldName = String(payload.field && payload.field.Name || '').toLowerCase()
@@ -1733,6 +1818,16 @@ export async function beforeSubmit(context) {
     return {
       ...(context.state.locationValues || {})
     }
+  }
+  if (isContactForm(context)) {
+    const current = selectedContactCustomer(context)
+    if (!String(current.id || '').trim() && !String(current.name || '').trim()) {
+      // 编辑时清空所属客户也要显式清空隐藏 KehuID，避免遗留旧关联。
+      return applyContactCustomerValues(context, current)
+    }
+    // KehuID 可能是隐藏字段，提交前显式补入，确保首页新增与客户详情新增的关联行为一致。
+    const customer = await resolveContactCustomer(context, true)
+    return applyContactCustomerValues(context, customer)
   }
   if (isCustomerCareForm(context)) {
     return customerCareTotalValues(context)
