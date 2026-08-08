@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-07 17:04:38
+# 版本：v2026-08-08 16:26:29
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-07 17:04:38"
+SCRIPT_VERSION="v2026-08-08 16:26:29"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -192,6 +192,134 @@ repair_read_api_environment_value() {
   printf '%s' "${value}"
 }
 
+repair_read_container_environment_value() {
+  local container_name="$1"
+  local key="$2"
+  docker inspect "${container_name}" \
+    --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+    | awk -v prefix="${key}=" '
+        index($0, prefix) == 1 {
+          print substr($0, length(prefix) + 1)
+          exit
+        }
+      '
+}
+
+repair_db_connection_has_value() {
+  local db_conn="$1"
+  local key_pattern="$2"
+  printf '%s' "${db_conn}" \
+    | grep -Eiq "(^|;)[[:space:]]*(${key_pattern})[[:space:]]*=[[:space:]]*[^;[:space:]][^;]*"
+}
+
+repair_db_connection_has_required_shape() {
+  local db_type="$1"
+  local db_conn="$2"
+  case "${db_type}" in
+    MySql)
+      repair_db_connection_has_value "${db_conn}" 'Data[[:space:]]+Source|Server|Host' \
+        && repair_db_connection_has_value "${db_conn}" 'Database' \
+        && repair_db_connection_has_value "${db_conn}" 'User([[:space:]]+Id)?|Uid|Username' \
+        && repair_db_connection_has_value "${db_conn}" 'Password|Pwd' \
+        && repair_db_connection_has_value "${db_conn}" 'Port'
+      ;;
+    SqlServer)
+      repair_db_connection_has_value "${db_conn}" 'Data[[:space:]]+Source|Server' \
+        && repair_db_connection_has_value "${db_conn}" 'Initial[[:space:]]+Catalog|Database' \
+        && repair_db_connection_has_value "${db_conn}" 'User([[:space:]]+Id)?|Uid' \
+        && repair_db_connection_has_value "${db_conn}" 'Password|Pwd'
+      ;;
+    DaMeng)
+      repair_db_connection_has_value "${db_conn}" 'Server' \
+        && repair_db_connection_has_value "${db_conn}" 'Port' \
+        && repair_db_connection_has_value "${db_conn}" 'User([[:space:]]+Id)?|Uid' \
+        && repair_db_connection_has_value "${db_conn}" 'Password|Pwd' \
+        && repair_db_connection_has_value "${db_conn}" 'Schema'
+      ;;
+    PostgreSql)
+      repair_db_connection_has_value "${db_conn}" 'Host|Server' \
+        && repair_db_connection_has_value "${db_conn}" 'Port' \
+        && repair_db_connection_has_value "${db_conn}" 'Database' \
+        && repair_db_connection_has_value "${db_conn}" 'Username|User[[:space:]]+Id|User' \
+        && repair_db_connection_has_value "${db_conn}" 'Password|Pwd'
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+repair_encode_connection_value() {
+  local value="$1"
+  local escaped=""
+  case "${value}" in
+    *$'\r'*|*$'\n'*)
+      return 1
+      ;;
+  esac
+  if [[ "${value}" == *';'* || "${value}" == *'"'* || "${value}" == *"'"* ]] \
+    || printf '%s' "${value}" | grep -Eq '(^[[:space:]]|[[:space:]]$)'; then
+    escaped=${value//\"/\"\"}
+    printf '"%s"' "${escaped}"
+  else
+    printf '%s' "${value}"
+  fi
+}
+
+repair_build_installer_db_connection() {
+  local db_type="$1"
+  local db_container="$2"
+  local db_internal_port="$3"
+  local password_key=""
+  local password=""
+  local encoded_password=""
+  case "${db_type}" in
+    MySql) password_key='MYSQL_ROOT_PASSWORD' ;;
+    SqlServer) password_key='MSSQL_SA_PASSWORD' ;;
+    DaMeng) password_key='SYSDBA_PWD' ;;
+    PostgreSql) password_key='POSTGRES_PASSWORD' ;;
+    *) return 1 ;;
+  esac
+  password=$(repair_read_container_environment_value "${db_container}" "${password_key}")
+  [ -n "${password}" ] || return 1
+  encoded_password=$(repair_encode_connection_value "${password}") || return 1
+  case "${db_type}" in
+    MySql)
+      printf 'Data Source=%s;Database=microi_demo;User Id=root;Password=%s;Port=%s;Convert Zero Datetime=True;Allow Zero Datetime=True;Charset=utf8mb4;Max Pool Size=500;sslmode=None;' \
+        "${db_container}" "${encoded_password}" "${db_internal_port}"
+      ;;
+    SqlServer)
+      printf 'Data Source=%s,%s;Initial Catalog=microi_demo;User ID=sa;Password=%s;Encrypt=False;TrustServerCertificate=True;Max Pool Size=500;' \
+        "${db_container}" "${db_internal_port}" "${encoded_password}"
+      ;;
+    DaMeng)
+      printf 'Server=%s;Port=%s;User Id=SYSDBA;Password=%s;Schema=SYSDBA;' \
+        "${db_container}" "${db_internal_port}" "${encoded_password}"
+      ;;
+    PostgreSql)
+      printf 'Host=%s;Port=%s;Database=microi_demo;Username=postgres;Password=%s;Pooling=true;Maximum Pool Size=500;' \
+        "${db_container}" "${db_internal_port}" "${encoded_password}"
+      ;;
+  esac
+}
+
+repair_validate_api_db_connection() {
+  local canonical_file="$1"
+  local api_block="${REPAIR_TEMP_DIR}/api-service-db-connection.yml"
+  local environment_block="${REPAIR_TEMP_DIR}/api-environment-db-connection.yml"
+  local db_type=""
+  local db_conn=""
+  repair_extract_api_block "${canonical_file}" "${api_block}"
+  repair_extract_api_environment_block "${api_block}" "${environment_block}"
+  db_type=$(repair_read_api_environment_value "${environment_block}" OsClientDbType)
+  db_conn=$(repair_read_api_environment_value "${environment_block}" OsClientDbConn)
+  if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+    echo "Microi：错误：${db_type} 启动连接串结构不完整，必须包含服务器、数据库、用户、密码及端口等完整键值。"
+    echo 'Microi：连接串和密码不会输出；自动修复已在删除应用容器前停止。'
+    return 1
+  fi
+}
+
 repair_connect_container_to_microi_network() {
   local container_name="$1"
   local attached=""
@@ -218,6 +346,7 @@ repair_migrate_app_to_internal_network() {
   local db_candidates=()
   local candidate=""
   local existing_db_count=0
+  local db_conn_recovered=0
   local network_driver=""
   local override_file="${REPAIR_TEMP_DIR}/internal-network.override.yml"
   local migrated_file="${REPAIR_TEMP_DIR}/internal-network.compose.yml"
@@ -270,6 +399,15 @@ repair_migrate_app_to_internal_network() {
     echo "Microi：错误：数据库类型 ${db_type} 应精确匹配一个安装器数据库容器，实际匹配 ${existing_db_count} 个。"
     return 1
   fi
+  if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+    if ! db_conn=$(repair_build_installer_db_connection \
+      "${db_type}" "${db_container}" "${db_internal_port}"); then
+      echo "Microi：错误：现有 ${db_type} 启动连接串已损坏，且无法从 ${db_container} 的安装环境恢复数据库凭据。"
+      echo 'Microi：未输出任何密码，未删除任何容器；请从安装备份恢复完整连接串后重试。'
+      return 1
+    fi
+    db_conn_recovered=1
+  fi
   repair_connect_container_to_microi_network "${db_container}" || return 1
   repair_connect_container_to_microi_network microi-install-redis || return 1
   repair_connect_container_to_microi_network microi-install-mongodb || return 1
@@ -278,7 +416,7 @@ repair_migrate_app_to_internal_network() {
   case "${db_type}" in
     MySql)
       db_conn=$(printf '%s' "${db_conn}" | sed -E \
-        "s/(Data Source=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
+        "s/((Data Source|Server|Host)=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
       ;;
     SqlServer)
       db_conn=$(printf '%s' "${db_conn}" | sed -E \
@@ -293,6 +431,11 @@ repair_migrate_app_to_internal_network() {
         "s/(Host=)[^;]*/\\1${db_container}/I;s/(Port=)[0-9]+/\\1${db_internal_port}/I")
       ;;
   esac
+  if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+    echo "Microi：错误：${db_type} 启动连接串在迁移 Docker DNS 后仍不完整。"
+    echo 'Microi：未输出任何连接串或密码，未删除任何应用容器。'
+    return 1
+  fi
   mongo_conn=$(printf '%s' "${mongo_conn}" | sed -E \
     's#(mongodb://[^@]+@)[^/:]+:[0-9]+/#\1microi-install-mongodb:27017/#')
 
@@ -323,15 +466,21 @@ EOF
   fi
   chmod 600 "${migrated_file}"
   repair_validate_api_environment "${migrated_file}" || return 1
+  repair_validate_api_db_connection "${migrated_file}" || return 1
   cp "${migrated_file}" "${compose_file}"
   chmod 600 "${compose_file}"
   REPAIR_INTERNAL_CANONICAL="${migrated_file}"
+  if [ "${db_conn_recovered}" -eq 1 ]; then
+    echo "Microi：检测到原 API 数据库连接串被截断，已从 ${db_container} 的安装环境无明文输出地恢复完整凭据 ✓"
+  fi
   echo "Microi：API 启动连接已迁移为 Docker DNS：${db_container}:${db_internal_port}、microi-install-redis:6379、microi-install-mongodb:27017 ✓"
 }
 
 repair_validate_runtime_environment() {
   local env_file="${REPAIR_TEMP_DIR}/api-runtime-env.txt"
   local required_key=""
+  local db_type=""
+  local db_conn=""
   local required_keys=(
     OsClient OsClientType OsClientNetwork OsClientDbType OsClientDbConn
     OsClientRedisHost OsClientRedisPort OsClientRedisPwd
@@ -346,6 +495,12 @@ repair_validate_runtime_environment() {
       return 1
     fi
   done
+  db_type=$(sed -n -E 's/^OsClientDbType=//p' "${env_file}" | head -1)
+  db_conn=$(sed -n -E 's/^OsClientDbConn=//p' "${env_file}" | head -1)
+  if ! repair_db_connection_has_required_shape "${db_type}" "${db_conn}"; then
+    echo 'Microi：错误：重建后的 API 容器数据库启动连接串结构仍不完整。'
+    return 1
+  fi
   if ! grep -Fxq 'OsClientRedisHost=microi-install-redis' "${env_file}" \
     || ! grep -Fxq 'OsClientRedisPort=6379' "${env_file}" \
     || ! grep -Eq '^OsClientDbConn=.*microi-install-' "${env_file}" \

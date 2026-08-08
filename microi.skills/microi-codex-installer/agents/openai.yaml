@@ -1,0 +1,7 @@
+interface:
+  display_name: "Microi吾码 Codex 插件安装"
+  short_description: "检测并安装或升级 Microi吾码 Codex 插件"
+  default_prompt: "Use $microi-codex-installer to detect and install the Microi吾码 Codex plugin with user authorization."
+
+policy:
+  allow_implicit_invocation: true
