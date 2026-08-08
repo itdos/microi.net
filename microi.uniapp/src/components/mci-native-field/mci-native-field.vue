@@ -173,6 +173,7 @@
       :upload-path="uploadPath"
       :file-context="fileAccessContext"
       @update:model-value="emitValue"
+      @upload-state="$emit('upload-state', $event)"
     />
 
     <mci-media-uploader
@@ -183,6 +184,7 @@
       :upload-path="uploadPath"
       :file-context="fileAccessContext"
       @update:model-value="emitValue"
+      @upload-state="$emit('upload-state', $event)"
     />
 
     <rich-text v-else-if="component === 'Html' && modelValue" class="native-control__richtext" :nodes="richHtml" />
@@ -230,7 +232,7 @@ export default {
     readonlyMaxLines: { type: Number, default: 0 }
   },
   // zhy: 通知表单页同步下拉框的打开状态，便于提升外层卡片层级。
-  emits: ['update:modelValue', 'change', 'select', 'selector-toggle'],
+  emits: ['update:modelValue', 'change', 'select', 'selector-toggle', 'upload-state'],
   data() {
     return {
       tagDraft: '',
