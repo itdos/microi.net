@@ -216,6 +216,9 @@ test('desktop styles use per-style persisted menus and safe external links', () 
     const winDesk = read('src/views/webos/components/win/desk.vue');
     assert.match(store, /ModuleListByDesktopType/);
     assert.match(store, /pick:\s*\['SwiperIndex',\s*'ModuleListByDesktopType'/);
-    assert.match(macDesk, /'_blank',\s*'noopener,noreferrer'/);
-    assert.match(winDesk, /'_blank',\s*'noopener,noreferrer'/);
+    assert.match(macDesk, /openSafeExternalUrl\(item\.Url\)/);
+    assert.match(winDesk, /openSafeExternalUrl\(item\.Url\)/);
+    const navigation = read('src/views/webos/utils/navigation.js');
+    assert.match(navigation, /\['http:', 'https:'\]/);
+    assert.match(navigation, /'_blank', 'noopener,noreferrer'/);
 });

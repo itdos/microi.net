@@ -29,6 +29,7 @@ import {
     hasAuthorizationIdentityChanged,
     normalizeAuthorizationToken
 } from "./auth-transition.js";
+import { isEmbeddedWebosWindowRuntime } from "./webos-embedded-runtime.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -1978,6 +1979,8 @@ var DiyCommon = {
         return new Date(Math.max(nowSeconds, expiresAtSeconds - refreshLeadSeconds) * 1000);
     },
     ApplyAuthorizationToken: function (responseToken, requestToken) {
+        // WebOS 子窗口只消费父桌面广播的认证内存态，不能轮换或覆盖共享凭据。
+        if (isEmbeddedWebosWindowRuntime()) return false;
         var response = DiyCommon.NormalizeAuthorizationToken(responseToken);
         if (DiyCommon.IsNull(response)) return false;
 
@@ -2110,6 +2113,14 @@ var DiyCommon = {
     },
     OpenLogin: function () {
         if (DiyCommon.IsRedisManagerRoute()) return Promise.resolve(false);
+        if (isEmbeddedWebosWindowRuntime()) {
+            var embeddedNonce = String(window.name || '').replace(/^microi-webos-window:/, '');
+            window.parent.postMessage({
+                type: 'microi:webos-window-auth-required',
+                nonce: embeddedNonce
+            }, window.location.origin);
+            return Promise.resolve(true);
+        }
         if (DiyCommon._AuthRedirecting) return Promise.resolve(false);
         DiyCommon._AuthRedirecting = true;
         store.commit("DiyStore/SetCurrentUser", {});

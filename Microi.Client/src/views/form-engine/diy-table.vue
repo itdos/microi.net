@@ -588,7 +588,7 @@
                         >
                             <template #header>
                                 <div class="col-header-cell" @click.stop="showColHeaderMenu(field, $event)">
-                                    <span>{{ field.Label }}</span>
+                                    <span class="col-header-label">{{ field.Label }}</span>
                                     <span class="col-header-sort-indicator" v-if="getColSortState(field)">
                                         <el-icon v-if="getColSortState(field) === 'asc'" :size="12"><SortUp /></el-icon>
                                         <el-icon v-else :size="12"><SortDown /></el-icon>
@@ -752,7 +752,7 @@
                     >
                         <template #header>
                             <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('CreateTime', $t('Msg.CreateTime')), $event)">
-                                <span>{{ $t('Msg.CreateTime') }}</span>
+                                <span class="col-header-label">{{ $t('Msg.CreateTime') }}</span>
                                 <span class="col-header-sort-indicator" v-if="getColSortState(getSystemAuditField('CreateTime', $t('Msg.CreateTime'))) ">
                                     <el-icon v-if="getColSortState(getSystemAuditField('CreateTime', $t('Msg.CreateTime'))) === 'asc'" :size="12"><SortUp /></el-icon>
                                     <el-icon v-else :size="12"><SortDown /></el-icon>
@@ -775,7 +775,7 @@
                     >
                         <template #header>
                             <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('UserName', $t('Msg.Creator')), $event)">
-                                <span>{{ $t('Msg.Creator') }}</span>
+                                <span class="col-header-label">{{ $t('Msg.Creator') }}</span>
                                 <span class="col-header-sort-indicator" v-if="getColSortState(getSystemAuditField('UserName', $t('Msg.Creator'))) ">
                                     <el-icon v-if="getColSortState(getSystemAuditField('UserName', $t('Msg.Creator'))) === 'asc'" :size="12"><SortUp /></el-icon>
                                     <el-icon v-else :size="12"><SortDown /></el-icon>
@@ -798,7 +798,7 @@
                     >
                         <template #header>
                             <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime')), $event)">
-                                <span>{{ $t('Msg.UpdateTime') }}</span>
+                                <span class="col-header-label">{{ $t('Msg.UpdateTime') }}</span>
                                 <span class="col-header-sort-indicator" v-if="getColSortState(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime'))) ">
                                     <el-icon v-if="getColSortState(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime'))) === 'asc'" :size="12"><SortUp /></el-icon>
                                     <el-icon v-else :size="12"><SortDown /></el-icon>

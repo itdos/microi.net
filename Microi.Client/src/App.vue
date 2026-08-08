@@ -20,6 +20,7 @@ import {
     syncClassicShellVisibilityFromUrl
 } from "@/utils/classic-shell-visibility.js";
 import ApiServiceUnavailable from "@/components/ApiServiceUnavailable/index.vue";
+import { isEmbeddedWebosWindowRuntime } from "@/utils/webos-embedded-runtime.js";
 // import drag from '@/views/form-engine/utils/dos.common';
 // import { DiyFormDialog, DiyChat } from "@/utils/microi.net.import";
 export default {
@@ -95,7 +96,8 @@ export default {
 
     async mounted() {
         // console.log("-------> App.vue mounted");
-       if(window && window.location && window.location.href) {
+       const isWebosEmbeddedRuntime = isEmbeddedWebosWindowRuntime();
+       if(!isWebosEmbeddedRuntime && window && window.location && window.location.href) {
          //zhy存储小程序端传过来的经纬度，用于定位和地图，小程序获取的比浏览器准确
            let query = getQueryObject(window.location.href);
            if(query && query.appAddress_lat && query.appAddress_lng) {
@@ -107,7 +109,6 @@ export default {
            console.log('无法获取当前URL');
        }
         var self = this;
-
         self.syncClassicShellVisibility();
         self.classicShellKeyHandler = function (event) {
             if (event.key !== "Escape" || event.defaultPrevented || self.diyStore.IsTabFullScreen) return;
@@ -125,7 +126,7 @@ export default {
             );
             if (exited) event.preventDefault();
         };
-        document.addEventListener("keydown", self.classicShellKeyHandler);
+        if (!isWebosEmbeddedRuntime) document.addEventListener("keydown", self.classicShellKeyHandler);
 
         // 初始化窗口大小监听，用于响应式布局
         self.WindowResize();
@@ -135,10 +136,10 @@ export default {
         self.diyStore.detectMiniProgram();
 
         // 恢复 MCI 亮/暗模式（localStorage 'mci-theme'）
-        this.restoreMciMode();
+        if (!isWebosEmbeddedRuntime) this.restoreMciMode();
 
         // 清除遗留的 OpenClaw 风格主题状态（一次性迁移）
-        try {
+        if (!isWebosEmbeddedRuntime) try {
             localStorage.removeItem('microi_oc_theme');
             var _appEl = document.getElementById('app-microi');
             if (_appEl && (_appEl.getAttribute('data-theme') || '').indexOf('openclaw') === 0) {
@@ -148,38 +149,40 @@ export default {
             document.documentElement.classList.remove('oc-theme-dark', 'oc-theme-light');
         } catch (e) {}
 
-        if (window.plus) {
-            self.PageInit();
-        } else {
-            // 保存事件处理函数引用，以便销毁时移除
-            self.plusreadyHandler = function () {
-                self.WindowResize(true);
+        if (!isWebosEmbeddedRuntime) {
+            if (window.plus) {
                 self.PageInit();
-            };
-            document.addEventListener("plusready", self.plusreadyHandler, false);
-        }
-        if (!self.DiyCommon.isClientApp) {
-            self.PageInit();
-        }
+            } else {
+                // 保存事件处理函数引用，以便销毁时移除
+                self.plusreadyHandler = function () {
+                    self.WindowResize(true);
+                    self.PageInit();
+                };
+                document.addEventListener("plusready", self.plusreadyHandler, false);
+            }
+            if (!self.DiyCommon.isClientApp) self.PageInit();
 
-        self.authResumeHandler = function () {
-            if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-            self.WindowResize(true);
-            self.RefreshTokenWithLock();
-        };
-        document.addEventListener("visibilitychange", self.authResumeHandler, false);
-        window.addEventListener("focus", self.authResumeHandler, false);
-        window.addEventListener("pageshow", self.authResumeHandler, false);
-        self.behaviorVisibilityHandler = function () {
-            self.DiyCommon.UserBehaviorSignal({
-                Action: document.visibilityState === "hidden" ? "PageHidden" : "PageVisible"
-            }, document.visibilityState === "hidden");
-        };
-        self.behaviorPageHideHandler = function () {
-            self.DiyCommon.UserBehaviorSignal({ Action: "PageClosed" }, true);
-        };
-        document.addEventListener("visibilitychange", self.behaviorVisibilityHandler, false);
-        window.addEventListener("pagehide", self.behaviorPageHideHandler, false);
+            self.authResumeHandler = function () {
+                if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+                self.WindowResize(true);
+                self.RefreshTokenWithLock();
+            };
+            document.addEventListener("visibilitychange", self.authResumeHandler, false);
+            window.addEventListener("focus", self.authResumeHandler, false);
+            window.addEventListener("pageshow", self.authResumeHandler, false);
+        }
+        if (!isWebosEmbeddedRuntime) {
+            self.behaviorVisibilityHandler = function () {
+                self.DiyCommon.UserBehaviorSignal({
+                    Action: document.visibilityState === "hidden" ? "PageHidden" : "PageVisible"
+                }, document.visibilityState === "hidden");
+            };
+            self.behaviorPageHideHandler = function () {
+                self.DiyCommon.UserBehaviorSignal({ Action: "PageClosed" }, true);
+            };
+            document.addEventListener("visibilitychange", self.behaviorVisibilityHandler, false);
+            window.addEventListener("pagehide", self.behaviorPageHideHandler, false);
+        }
 
         // ===== 5+App 返回键：Vue Router 路由感知处理 =====
         // permission.js 的 router.afterEach 在每次路由完成后设置 window.__microi_isRootPage
@@ -212,7 +215,7 @@ export default {
             };
         })();
 
-        self.$nextTick(function () {
+        if (!isWebosEmbeddedRuntime) self.$nextTick(function () {
             var timer = setInterval(function () {
                 try {
                     self.$refs.refDiyChat.InitSignalROnEvent(timer);
@@ -287,6 +290,7 @@ export default {
             return result;
         },
         async RefreshTokenWithLock() {
+            if (isEmbeddedWebosWindowRuntime()) return false;
             var self = this;
             var refresh = async function () {
                 // 获得锁后必须重读共享存储；另一个标签页可能已经完成续签。
@@ -326,6 +330,7 @@ export default {
         },
         async PageInit() {
             var self = this;
+            if (isEmbeddedWebosWindowRuntime()) return;
             // 匿名路由由页面组件自行做静默登录态校验。这里不能调用全局
             // GetCurrentUser，否则无 Token 的公有 OnlyOffice 预览会弹出“请重新登录”。
             // 首次打开根地址时 Hash 路由可能尚未完成匹配，因此无 Token 本身也必须
@@ -369,6 +374,7 @@ export default {
         },
         TryConnectWebSocketAfterCurrentUser() {
             var self = this;
+            if (isEmbeddedWebosWindowRuntime()) return;
             self.$nextTick(function () {
                 if (typeof window.tryConnectWebSocket !== "function") {
                     return;
