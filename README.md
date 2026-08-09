@@ -7,10 +7,10 @@
 ## 用 AI 快速开发并交付企业应用
 
 <p>
-  <img src="https://static.itdos.com/upload/img/NET-10.svg" alt=".NET 10" />
-  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" alt="Vue 2 / Vue 3" />
-  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" alt="MIT License" />
-  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" /></a>
+  <img src="./microi.doc/docs/public/images/readme/dotnet-10.png" alt=".NET 10" width="87" height="20" />
+  <img src="./microi.doc/docs/public/images/readme/vue-2-3.png" alt="Vue 2 / Vue 3" width="77" height="20" />
+  <img src="./microi.doc/docs/public/images/readme/license-mit.png" alt="MIT License" width="78" height="20" />
+  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="./microi.doc/docs/public/images/readme/qq-group-51050055.png" alt="QQ 交流群 51050055" width="126" height="20" /></a>
 </p>
 
 开源 AI 低代码平台：`.NET 10 + Vue 3 + Redis`，以 V8 引擎连接 AI 编程、可视化建模与企业级交付。<br>
@@ -27,9 +27,9 @@
 
 ## Microi吾码 AI平台 架构图
 
-[![Microi吾码 AI平台 架构图](./microi.doc/docs/public/images/microi-ai-platform-architecture.svg)](./microi.doc/docs/public/images/microi-ai-platform-architecture.svg)
+[![Microi吾码 AI平台 架构图](./microi.doc/docs/public/images/microi-ai-platform-architecture-3840x2160.png)](./microi.doc/docs/public/images/microi-ai-platform-architecture-3840x2160.png)
 
-> 点击图片查看可无限缩放的 SVG 原图。架构覆盖 AI 智能、低代码引擎、平台治理、集成自动化、SaaS 安全、多节点运行、全端入口、数据底座和应用交付闭环。
+> 点击图片查看 3840 × 2160 PNG 高清原图。架构覆盖 AI 智能、低代码引擎、平台治理、集成自动化、SaaS 安全、多节点运行、全端入口、数据底座和应用交付闭环。
 
 ## 30 秒了解 Microi吾码
 
@@ -289,7 +289,7 @@ Microi.net/
 
 <p align="center">
   <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank">
-    <img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="点击加入 QQ 交流群" />
+    <img src="./microi.doc/docs/public/images/readme/qq-group-51050055.png" alt="点击加入 QQ 交流群" width="126" height="20" />
   </a>
 </p>
 
