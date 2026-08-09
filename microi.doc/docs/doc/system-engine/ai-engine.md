@@ -131,6 +131,66 @@ microi_chat({
 
 `microi_chat` 只暴露对话白名单参数，实际 `OsClient`、用户和 Token 来自当前 MCP 连接，HTTP 来源再由服务端归一；Tool 不接受 Endpoint、ApiKey、Authorization 或身份覆盖。它返回最终 `DosResult`，不冒充逐 token MCP 流。如果 Agent 本身需要模型协议流，使用 `/v1/chat/completions` 的 `stream:true`；平台事实写入仍调用对应 MCP 写工具并遵守确认与回读。
 
+## MiniMax 视频生成
+
+吾码把 MiniMax 视频接入放在 `Microi.AI`，而不是让每个接口引擎各自保存 Key、拼接异步任务协议。这里复用的是供应商级底层能力：服务端密钥隔离、MiniMax 创建/查询/下载三段协议、当前用户绑定、订阅额度保护和跨节点幂等；文章主题、业务提示词、定时触发和内容平台分发仍由接口引擎、Job 或 Agent 编排。
+
+MiniMax 当前采用异步流程：创建任务返回 `task_id`，查询成功后得到 `file_id`，最后再取得临时 `download_url`。吾码不会把两个原始 Id 下发给浏览器，而是返回绑定当前用户、用途和供应商 Key 的 `TaskHandle` / `FileHandle`。
+
+### 配置边界
+
+- MiniMax Token Plan Key 与按量 API Key 是两套独立凭据。把实际使用的 Key 配置到现有服务器端 AI Provider/ApiKey 受保护数据中，不要放进前端、V8 源码、Compose 环境变量或 API `AppSettings`。
+- Provider 的官方 API Base 必须是 `https://api.minimaxi.com`。系统拒绝把视频请求转发到其它 Host。
+- 套餐价格和每天可生成条数可能变化，应以购买页和 Token Plan 控制台为准；服务端不硬编码“每天 2 条”或“每天 3 条”。
+- 当前官方模型边界：`MiniMax-Hailuo-2.3` 支持文生/图生；`MiniMax-Hailuo-2.3-Fast` 只支持图生并要求首帧；首尾帧使用 `MiniMax-Hailuo-02`。默认 6 秒、768P；10 秒不能使用 1080P。
+
+### 登录态 API
+
+创建任务：
+
+```http
+POST /api/Ai/CreateMiniMaxVideo
+Content-Type: application/json
+Authorization: <当前吾码登录 Token>
+
+{
+  "RequestId": "article:2026-08-09:pm:douyin:v1",
+  "Prompt": "Two adult engineers naturally discuss a release checklist in a modern office [固定].",
+  "Model": "MiniMax-Hailuo-2.3-Fast",
+  "Duration": 6,
+  "Resolution": "768P",
+  "FirstFrameImage": "https://example.com/inspected-office-first-frame.png"
+}
+```
+
+`RequestId` 是业务幂等键，不是随机重试号。创建前，服务端会在当前租户共享 Redis 中按 `OsClient + 当前用户 + RequestId` 原子占位：相同参数回放返回同一 `TaskHandle`，同一 Id 改参数会被拒绝；Redis 不可用或上游结果不确定时失败关闭，防止多节点/网络重试重复消耗日额度。
+
+查询任务：
+
+```http
+POST /api/Ai/GetMiniMaxVideoTask
+Content-Type: application/json
+
+{ "TaskHandle": "<创建接口返回的签名句柄>" }
+```
+
+终态 `Status=Success` 时会返回 `FileHandle`。再获取临时下载地址：
+
+```http
+POST /api/Ai/GetMiniMaxVideoFile
+Content-Type: application/json
+
+{ "FileHandle": "<任务查询返回的签名句柄>" }
+```
+
+下载地址只代表视频生成完成，不代表已经发布到抖音、快手或其它平台。分发端仍要执行目标平台的上传、字段校验、dry-run、一次正式发布、任务详情和公开页面回读，并按平台规则如实标记 AI 生成内容。
+
+### 内容质量边界
+
+用于技术内容分发时，推荐先生成并检查办公室首帧，再做 6 秒 768P 图生视频。画面可表现 25 岁以上、职业着装的成年人自然讨论设计、调试、发版、数据或 AI 工作流；不要性感化人物、模仿名人或冒充真实员工。若需要低调品牌露出，只把准确的 `Microi吾码` 作为背景墙上一处小型静态环境文字，禁止口播推荐、价格、二维码、促销按钮、Logo 动画或反复叠加品牌。
+
+生成后必须验片。墙面文字错误、人脸/手部明显畸变、广告感强或内容不安全时不得进入发布流程。
+
 ## 中转站配置
 
 `mic_ai` 中的 `Microi.AI中转站` 是官方 OpenAI 兼容入口：

@@ -1,6 +1,6 @@
 import { getCurrentInstance, inject } from 'vue'
 import { createPinia, defineStore } from 'pinia'
-import { generateId, deepClone, } from '../utils/util'
+import { generateId, deepClone, } from '../utils/util.js'
 
 export const PAGE_ENGINE_STORE_KEY = Symbol('microi-page-engine-store')
 export const PAGE_ENGINE_RENDER_CONTEXT_KEY = Symbol('microi-page-engine-render-context')
@@ -22,6 +22,16 @@ const useDefaultPageEngineStore = defineStore('pageEngine', {
     token: localStorage.getItem('page_token') || '',  // 初始化时从 localStorage 读取 token
     //是否开启暗黑模式
     dark: localStorage.getItem('page_dark') || false, // 初始化时从 localStorage 读取 isDark
+    // 当前服务端内容哈希与历史能力状态，用于多人协作的乐观并发保护。
+    currentHash: '',
+    historyAvailable: false,
+    // 设计期本地撤销/重做只保存有界 JSON 快照，不进入服务器版本历史。
+    undoStack: [],
+    redoStack: [],
+    currentDesignSnapshot: '',
+    historyApplying: false,
+    historyLimitCount: 50,
+    historyLimitBytes: 20 * 1024 * 1024,
     components: {},//注册组件
     widgetList: []//组件列表
   }),
@@ -36,6 +46,83 @@ const useDefaultPageEngineStore = defineStore('pageEngine', {
     //修改页面数据
     updateFormData(newFormData) {
       this.formData = newFormData
+      this.resetDesignHistory()
+    },
+    setVersionState(currentHash, historyAvailable) {
+      this.currentHash = currentHash || ''
+      this.historyAvailable = historyAvailable === true
+    },
+    serializeDesignSnapshot() {
+      try {
+        return JSON.stringify(this.formData?.JsonObj || {})
+      } catch (error) {
+        return ''
+      }
+    },
+    resetDesignHistory() {
+      this.undoStack = []
+      this.redoStack = []
+      this.currentDesignSnapshot = this.serializeDesignSnapshot()
+      this.historyApplying = false
+    },
+    trimDesignHistory() {
+      while (this.undoStack.length > this.historyLimitCount) this.undoStack.shift()
+      let totalBytes = this.currentDesignSnapshot.length
+        + this.undoStack.reduce((sum, item) => sum + item.length, 0)
+        + this.redoStack.reduce((sum, item) => sum + item.length, 0)
+      while (totalBytes > this.historyLimitBytes && this.undoStack.length) {
+        totalBytes -= this.undoStack[0].length
+        this.undoStack.shift()
+      }
+      while (totalBytes > this.historyLimitBytes && this.redoStack.length) {
+        totalBytes -= this.redoStack[0].length
+        this.redoStack.shift()
+      }
+    },
+    captureDesignHistory() {
+      if (this.historyApplying) return false
+      const next = this.serializeDesignSnapshot()
+      if (!next || next === this.currentDesignSnapshot) return false
+      if (!this.currentDesignSnapshot) {
+        this.currentDesignSnapshot = next
+        return false
+      }
+      this.undoStack.push(this.currentDesignSnapshot)
+      this.currentDesignSnapshot = next
+      this.redoStack = []
+      this.trimDesignHistory()
+      return true
+    },
+    applyDesignSnapshot(snapshot) {
+      if (!snapshot) return false
+      let parsed
+      try { parsed = JSON.parse(snapshot) } catch (error) { return false }
+      this.historyApplying = true
+      this.formData.JsonObj = parsed
+      this.currentDesignSnapshot = snapshot
+      this.curWrapperIdx = -1
+      this.curWidgetIdx = -1
+      this.curWrapper = {}
+      this.curWidget = {}
+      return true
+    },
+    undoDesign() {
+      this.captureDesignHistory()
+      const target = this.undoStack.pop()
+      if (!target) return false
+      if (this.currentDesignSnapshot) this.redoStack.push(this.currentDesignSnapshot)
+      this.trimDesignHistory()
+      return this.applyDesignSnapshot(target)
+    },
+    redoDesign() {
+      const target = this.redoStack.pop()
+      if (!target) return false
+      if (this.currentDesignSnapshot) this.undoStack.push(this.currentDesignSnapshot)
+      this.trimDesignHistory()
+      return this.applyDesignSnapshot(target)
+    },
+    finishDesignHistoryApply() {
+      this.historyApplying = false
     },
     //设置当前选中容器索引
     setCurWrapperIdx(curWrapperIdx) {

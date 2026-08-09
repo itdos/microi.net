@@ -207,6 +207,27 @@ export const V8ServerApiDefinitions = {
                         documentation: "删除缓存\n\n返回: bool",
                         insertText: "Remove",
                         snippet: 'Remove("${1:key}")'
+                    },
+                    Expire: {
+                        label: "Expire",
+                        kind: "Method",
+                        documentation: "为当前租户逻辑Key设置过期秒数。适合给Hash计数窗口设置有界生命周期；返回bool。",
+                        insertText: "Expire",
+                        snippet: 'Expire("${1:key}", ${2:600})'
+                    },
+                    SetIfNotExists: {
+                        label: "SetIfNotExists",
+                        kind: "Method",
+                        documentation: "在当前租户命名空间内执行带过期时间的原子NX写入；适用于幂等占位、租约或一次性副作用标记。",
+                        insertText: "SetIfNotExists",
+                        snippet: 'SetIfNotExists("${1:key}", "${2:value}", ${3:600})'
+                    },
+                    HashIncrement: {
+                        label: "HashIncrement",
+                        kind: "Method",
+                        documentation: "原子递增当前租户Hash字段。计数窗口必须配合Expire设置有界生命周期。",
+                        insertText: "HashIncrement",
+                        snippet: 'HashIncrement("${1:key}", "${2:field}", ${3:1})'
                     }
                 }
             },
@@ -376,6 +397,27 @@ export const V8ServerApiDefinitions = {
                         documentation: "流式生成 V8 代码，仅平台管理员。",
                         insertText: "NL2V8Stream",
                         snippet: 'NL2V8Stream({ Question: "${1:需求}", AiModel: "${2:模型名称}" }, async function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    },
+                    CreateMiniMaxVideo: {
+                        label: "CreateMiniMaxVideo",
+                        kind: "Method",
+                        documentation: "创建 MiniMax 异步视频任务。供应商密钥与租户身份由服务端绑定，返回签名 TaskHandle。",
+                        insertText: "CreateMiniMaxVideo",
+                        snippet: 'CreateMiniMaxVideo({ Prompt: "${1:办公室工作场景}", Model: "${2:MiniMax-Hailuo-2.3}", Duration: ${3:6}, Resolution: "${4:1080P}" })'
+                    },
+                    GetMiniMaxVideoTask: {
+                        label: "GetMiniMaxVideoTask",
+                        kind: "Method",
+                        documentation: "使用签名 TaskHandle 查询异步视频状态；完成后返回签名 FileHandle。",
+                        insertText: "GetMiniMaxVideoTask",
+                        snippet: 'GetMiniMaxVideoTask({ TaskHandle: "${1:taskHandle}" })'
+                    },
+                    GetMiniMaxVideoFile: {
+                        label: "GetMiniMaxVideoFile",
+                        kind: "Method",
+                        documentation: "使用签名 FileHandle 获取短时有效下载地址，不暴露供应商 file_id。",
+                        insertText: "GetMiniMaxVideoFile",
+                        snippet: 'GetMiniMaxVideoFile({ FileHandle: "${1:fileHandle}" })'
                     }
                 }
             },

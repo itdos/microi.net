@@ -5,6 +5,8 @@ description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。用�
 
 # Microi 界面引擎（Page Engine）页面 JSON 生成
 
+MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_page_design`；版本治理入口见下文。保存工具写入后仍需回读 `mic_page`，不能把生成成功当作持久化成功。
+
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
 ## 设计器源码事件
@@ -378,6 +380,36 @@ return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
 - `html` 组件承载长文本、失败原因、来源清单、备注说明、交付结论时，必须设置 `white-space:normal`、`overflow-wrap:anywhere` 或使用逐条列表/卡片渲染；禁止把多条内容用 `；`、`,` 拼成一整行导致底部说明挤在一起。写入后必须检查长文本在 1366/1440 宽度下能自然换行且不横向溢出。
 - 交付类首页如果使用一个远程 `html` 组件承载整页驾驶舱，运行态应由外层框架滚动，不要给容器和组件写死 1000px 这类固定高度。页面 JSON 可将 `wrapperOption.height` 与 `widgetOption.height` 设为 `0`（或运行态支持的 `auto`），前端运行态必须按内容自适应高度；设计器模式再使用可编辑的默认高度。
 - 首页写入口径说明时，必须区分“用户口头期望数量”“原始资料条目数量”“按业务主体合并后的数量”“后台项目/规则/别名数量”。不要只显示一个“未交付 N 个”，应同时列出部分交付、待执行、阻塞/需业务人员配合的清单和原因。
+
+## 版本历史、并发保存与回滚
+
+修改现有页面时必须先读取页面详情中的 `CurrentHash`，保存时把它作为 `expectedHash` 传入，并填写简短 `changeSummary`。不要仅凭本地旧 JSON 覆盖远端页面。
+
+| MCP 工具 | 用途 |
+|---|---|
+| `microi_list_page_history` | 获取历史元数据与当前哈希 |
+| `microi_get_page_history` | 获取指定不可变快照 |
+| `microi_compare_page_versions` | 结构化比较两个版本；右侧省略时比较当前页面 |
+| `microi_export_page_design` | 导出 `microi.page.v1` 设计包 |
+| `microi_rollback_page_design` | 使用 `expectedCurrentHash` 回滚并新增审计版本 |
+
+- 内容规范化后哈希未变化时，不应新增空历史。
+- 遇到哈希冲突先重新读取、比较，再决定合并或重做；禁止去掉 `expectedHash` 强行覆盖。
+- 回滚不是删除：目标快照成为新当前版本，回滚前内容仍保留。
+- 写后必须再次读取页面详情和历史，确认 `CurrentHash`、版本号、变更摘要和 JSON 一致。
+- 页面历史属于当前租户数据库；不要假定业务表有物理 `OsClient` 列。
+
+## 本地撤销、Vue 源码桥与资产包
+
+- 设计器本地历史最多 50 步、总计最多 20MB；连续编辑允许合并，但保存前必须刷新当前 `CurrentHash`。
+- `Ctrl/Cmd+Z`、`Ctrl/Cmd+Shift+Z`、`Ctrl/Cmd+Y` 不能抢占输入框、textarea、contenteditable 或代码编辑器自己的撤销行为。
+- 本地 Undo/Redo 不是审计版本；跨会话恢复仍使用服务端历史与 CAS。
+- Page JSON → Vue SFC 只使用确定性 `microi.page.sfc.v1` 模板；禁止 eval、动态执行用户 JSON 或注入任意 import。
+- Vue SFC → Page JSON 只接受平台生成标记、完整元数据和匹配 Hash；任意手写 Vue、第三方 SFC 或未知 script 必须拒绝。
+- 导入源码后先规范化、显示 Diff，再由用户确认写入；不得因为“解析成功”直接覆盖当前页面。
+- 可复用组件/区块使用治理中心 `microi.asset.v1`，声明 Props、Setters、DataAdapters、Platforms 和 DependencyPackages；调用 `mci-asset-publish` DryRun 后再发布。
+- 资产依赖必须检查缺失、语义版本范围、循环和最大深度；运行时使用 `mci-asset-resolve` 返回的 `LoadOrder`。
+- 复杂页面需要完整工程能力时提升为前端微服务；不要承诺任意 Vue 源码无损反编译回界面引擎。
 
 ## 生成 JSON 注意事项
 

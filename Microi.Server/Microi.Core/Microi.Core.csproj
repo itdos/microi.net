@@ -11,11 +11,11 @@
     <Copyright>Copyright 2009-2026 microi.net</Copyright>
     <PackageProjectUrl>https://microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
+    <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageReleaseNotes>开源低代码平台-Microi吾码，核心库。此类库开源，官网：https://microi.net</PackageReleaseNotes>
-    <Version>7.2.4</Version>
-    <AssemblyVersion>7.2.4</AssemblyVersion>
-    <FileVersion>7.2.4</FileVersion>
+    <Version>7.2.5</Version>
+    <AssemblyVersion>7.2.5</AssemblyVersion>
+    <FileVersion>7.2.5</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>
@@ -34,6 +34,7 @@
   <ItemGroup>
     <PackageReference Include="Jint" Version="4.14.0" />
     <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.21.0" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="10.0.10" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.21.0" />
     <PackageReference Include="MongoDB.Bson" Version="3.10.0" />
     <!-- Pin the fixed XML signature implementation for legacy ASP.NET Core 2.x transitive dependencies. -->

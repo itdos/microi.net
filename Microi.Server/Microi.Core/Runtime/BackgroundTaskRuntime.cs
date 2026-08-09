@@ -40,5 +40,13 @@ namespace Microi.net
                    && !string.IsNullOrWhiteSpace(message)
                    && handler(taskId, message);
         }
+
+        /// <summary>
+        /// 可信宿主原子能力在产生不可逆副作用前校验后台任务当前租约与栅栏令牌。
+        /// </summary>
+        public static bool IsLeaseCurrent(string osClient, string taskId, string leaseOwner, long fencingToken)
+        {
+            return BackgroundTaskStore.IsLeaseCurrent(osClient, taskId, leaseOwner, fencingToken);
+        }
     }
 }

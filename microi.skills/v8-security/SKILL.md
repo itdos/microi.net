@@ -7,6 +7,8 @@ description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆�
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。
 
+访问密钥由 `microi_list_my_access_keys`、`microi_create_my_access_key`、`microi_revoke_my_access_key` 管理，只允许当前用户、限期、最小 scope，明文仅创建时返回一次。外部身份回调固定为 `/api/ExternalLogin/Callback`，服务端校验租户、Provider、state、redirect 和回调域名，验证成功后仍签发 DiyToken。
+
 ## 0. 租户动态系统设置与密钥边界
 
 第三方密钥（微信、支付宝、OpenAI、阿里云、ERP、SMTP）**禁止**硬编码在 V8 代码或前端。新增租户业务配置使用当前租户数据库的 `mci_system_setting`；数据库、Redis、MongoDB、MinIO、MQ 等部署控制面仍由主库 `sys_osclients` 托管，子租户不能修改。

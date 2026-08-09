@@ -23,6 +23,10 @@ namespace Microi.net
         /// </summary>
         public string OsClient { get; set; }
 
+        /// <summary>W3C调用链上下文；仅用于诊断，不参与消息身份校验。</summary>
+        public string TraceParent { get; set; }
+        public string TraceState { get; set; }
+
         /// <summary>
         /// 暂时无用
         /// </summary>

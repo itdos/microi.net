@@ -1,0 +1,1088 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
+  <title id="architecture-title">Microi吾码 AI平台 架构图</title>
+  <desc id="architecture-desc">以 V8引擎为运行核心，连接 AI、低代码、治理、服务观测、多端入口、安全、多租户和数据存储的 Microi吾码 AI 平台全景架构。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
+    <linearGradient id="header-line" x1="0" x2="1"><stop stop-color="#4de8ff"/><stop offset=".5" stop-color="#b995ff"/><stop offset="1" stop-color="#48e7a6"/></linearGradient>
+    <linearGradient id="reactor" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0d3352"/><stop offset=".48" stop-color="#162b5a"/><stop offset="1" stop-color="#0b3f3a"/></linearGradient>
+    <radialGradient id="reactor-halo"><stop stop-color="#4de8ff" stop-opacity=".22"/><stop offset=".48" stop-color="#8d65ff" stop-opacity=".1"/><stop offset="1" stop-color="#020713" stop-opacity="0"/></radialGradient>
+    <pattern id="micro-grid" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="#7ddfff" stroke-opacity=".045"/></pattern>
+    <pattern id="dot-grid" width="56" height="56" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" fill="#8fdfff" opacity=".16"/></pattern>
+    <filter id="halo" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="13"/></filter>
+    <filter id="line-glow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      text { font-family:"Microsoft YaHei UI","Microsoft YaHei","PingFang SC","Noto Sans CJK SC",Arial,sans-serif; }
+      .title { fill:#f5fbff; font-size:31px; font-weight:800; letter-spacing:1.8px; }
+      .subtitle { fill:#9eb8d8; font-size:12px; font-weight:600; letter-spacing:.8px; }
+      .value-shell { fill:#071a31; stroke:#7bdcff; stroke-opacity:.34; }
+      .value-main { fill:#f4fbff; font-size:23px; font-weight:900; }
+      .value-sub { fill:#b9cee6; font-size:11.5px; font-weight:700; }
+      .channel-shell { fill:#08192f; stroke:#8edfff; stroke-opacity:.28; }
+      .channel-title { fill:#eef8ff; font-size:12.2px; font-weight:800; }
+      .channel-sub { fill:#93adca; font-size:9.8px; font-weight:600; }
+      .bus { fill:#07182d; stroke:#65ddf2; stroke-opacity:.32; }
+      .bus-text { fill:#cbeeff; font-size:10px; font-weight:700; letter-spacing:1.2px; }
+      .panel-shell { fill:#061326; fill-opacity:.96; stroke-width:1; stroke-opacity:.54; }
+      .panel-code { font-family:Consolas,"Microsoft YaHei UI",sans-serif; font-size:19px; font-weight:900; }
+      .panel-title { fill:#f3f8ff; font-size:17px; font-weight:800; }
+      .panel-sub { fill:#91a9c7; font-size:9.8px; font-weight:600; }
+      .feature-shell { fill:#0b1c33; fill-opacity:.92; stroke-width:.75; stroke-opacity:.35; }
+      .feature-text { fill:#dce8f6; font-size:10.9px; font-weight:650; }
+      .feature-text--compact { font-size:9.9px; }
+      .flow-text { fill:#e7f8ff; font-size:10px; font-weight:750; }
+      .flow-arrow { fill:none; stroke:#73e6f7; stroke-width:1; stroke-opacity:.72; }
+      .reactor-link { fill:none; stroke:#55dbed; stroke-width:.8; stroke-opacity:.36; }
+      .satellite-shell { fill:#091a31; stroke:#79e9f7; stroke-width:.8; stroke-opacity:.45; }
+      .satellite-title { fill:#edfaff; font-size:10.6px; font-weight:800; }
+      .satellite-sub { fill:#8faac8; font-size:8.7px; font-weight:600; }
+      .reactor-label { fill:#8befff; font-size:10px; font-weight:800; letter-spacing:2.2px; }
+      .reactor-title { fill:#ffffff; font-size:35px; font-weight:900; letter-spacing:2px; }
+      .reactor-sub { fill:#b9e9f4; font-size:11px; font-weight:700; letter-spacing:.8px; }
+      .reactor-tag { fill:#e5f6ff; font-size:9.8px; font-weight:700; }
+      .loop-title { fill:#f2f8ff; font-size:15px; font-weight:850; }
+      .loop-sub { fill:#8fa8c6; font-size:9.8px; font-weight:650; }
+      .loop-text { fill:#e3f1fb; font-size:9.8px; font-weight:750; }
+      .foundation-shell { fill:#061326; stroke-width:1; stroke-opacity:.48; }
+      .foundation-title { font-size:13.2px; font-weight:850; letter-spacing:.4px; }
+      .foundation-chip { fill:#d8e7f5; font-size:9.2px; font-weight:700; }
+      .footer { fill:#7894b6; font-size:9.3px; font-weight:600; letter-spacing:.25px; }
+      .circuit { fill:none; stroke:#63ddf3; stroke-width:1; stroke-opacity:.18; }
+    </style>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#micro-grid)"/>
+  <rect width="1920" height="1080" fill="url(#dot-grid)"/>
+  <ellipse cx="960" cy="520" rx="450" ry="390" fill="url(#reactor-halo)"/>
+  <g><path d="M0 204H355V214H585" class="circuit"/><path d="M1920 204H1565V214H1335" class="circuit"/><path d="M585 388H604" class="circuit"/><path d="M1316 388H1335" class="circuit"/><path d="M585 720H604" class="circuit"/><path d="M1316 720H1335" class="circuit"/><path d="M960 166V232" class="circuit"/><path d="M960 880V910" class="circuit"/><path d="M60 895V886H585" class="circuit"/><path d="M1860 895V886H1335" class="circuit"/><path d="M600 1048H1320" class="circuit"/></g>
+  <g opacity=".35"><circle cx="355" cy="204" r="3" fill="#4de8ff"/><circle cx="1565" cy="204" r="3" fill="#48e7a6"/><circle cx="960" cy="204" r="3" fill="#b995ff"/><circle cx="585" cy="720" r="3" fill="#4de8ff"/><circle cx="1335" cy="720" r="3" fill="#ffbd59"/></g>
+
+  <path d="M22 16H718L734 32H898" fill="none" stroke="url(#header-line)" stroke-width="2"/>
+  <text x="40" y="55" class="title">Microi吾码 AI平台 架构图</text>
+  <text x="40" y="82" class="subtitle">AI-NATIVE LOW-CODE · DESIGN → BUILD → GOVERN → DELIVER → OBSERVE → RECOVER</text>
+  <g transform="translate(930 20)">
+    <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
+    <path d="M12 62H210" stroke="#4de8ff" stroke-width="2"/>
+    <text x="16" y="31" class="value-main">10×+</text>
+    <text x="16" y="53" class="value-sub">更省 Token</text>
+  </g><g transform="translate(1168 20)">
+    <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
+    <path d="M12 62H210" stroke="#b995ff" stroke-width="2"/>
+    <text x="16" y="31" class="value-main">10×+</text>
+    <text x="16" y="53" class="value-sub">更快开发</text>
+  </g><g transform="translate(1406 20)">
+    <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
+    <path d="M12 62H210" stroke="#48e7a6" stroke-width="2"/>
+    <text x="16" y="31" class="value-main">几十+</text>
+    <text x="16" y="53" class="value-sub">成熟引擎 · 更稳定</text>
+  </g><g transform="translate(1644 20)">
+    <path d="M10 0H212L222 10V60L212 70H10L0 60V10Z" class="value-shell"/>
+    <path d="M12 62H210" stroke="#ffbd59" stroke-width="2"/>
+    <text x="16" y="31" class="value-main">开箱即用</text>
+    <text x="16" y="53" class="value-sub">更快交付</text>
+  </g>
+
+  <g transform="translate(40 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#4de8ff"/>
+    <text x="15" y="23" class="channel-title">PC 管理端</text>
+    <text x="15" y="41" class="channel-sub">Vue 3</text>
+  </g><g transform="translate(224 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
+    <text x="15" y="23" class="channel-title">WebOS</text>
+    <text x="15" y="41" class="channel-sub">桌面多任务</text>
+  </g><g transform="translate(408 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#4de8ff"/>
+    <text x="15" y="23" class="channel-title">移动自适应</text>
+    <text x="15" y="41" class="channel-sub">H5 / 触控</text>
+  </g><g transform="translate(592 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
+    <text x="15" y="23" class="channel-title">UniApp / App</text>
+    <text x="15" y="41" class="channel-sub">Android / iOS</text>
+  </g><g transform="translate(776 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#4de8ff"/>
+    <text x="15" y="23" class="channel-title">微信小程序</text>
+    <text x="15" y="41" class="channel-sub">多端复用</text>
+  </g><g transform="translate(960 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
+    <text x="15" y="23" class="channel-title">AI 应用</text>
+    <text x="15" y="41" class="channel-sub">Web / UniApp</text>
+  </g><g transform="translate(1144 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#4de8ff"/>
+    <text x="15" y="23" class="channel-title">前端微服务</text>
+    <text x="15" y="41" class="channel-sub">多页路由</text>
+  </g><g transform="translate(1328 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
+    <text x="15" y="23" class="channel-title">Microi.VSCode</text>
+    <text x="15" y="41" class="channel-sub">资源树 / 调试</text>
+  </g><g transform="translate(1512 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#4de8ff"/>
+    <text x="15" y="23" class="channel-title">MCP / Codex</text>
+    <text x="15" y="41" class="channel-sub">AI 原生交付</text>
+  </g><g transform="translate(1696 112)">
+    <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
+    <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
+    <text x="15" y="23" class="channel-title">OpenAPI / SDK</text>
+    <text x="15" y="41" class="channel-sub">HTTP / JS</text>
+  </g>
+  <g transform="translate(40 178)"><path d="M9 0H1831L1840 9V25L1831 34H9L0 25V9Z" class="bus"/><path d="M18 17H1822" stroke="url(#header-line)" stroke-opacity=".55" stroke-dasharray="5 7"/><text x="920" y="21" text-anchor="middle" class="bus-text">MICROI HOST CONTEXT BUS · API BASE · OSCLIENT · DIYTOKEN · ROUTE · THEME · TRACE · AUDIT</text></g>
+
+  <g>
+    <path d="M56 232H569L585 248V530L569 546H56L40 530V248Z" class="panel-shell" stroke="#4de8ff"/>
+    <path d="M41 283H584" stroke="#4de8ff" stroke-opacity=".52"/>
+    <path d="M55 233H228" stroke="#4de8ff" stroke-width="3"/>
+    <text x="56" y="263" class="panel-code" fill="#4de8ff">01</text>
+    <text x="101" y="262" class="panel-title">AI 智能与设计控制面</text>
+    <text x="569" y="261" text-anchor="end" class="panel-sub">自然语言 → 可审计系统变更</text>
+    <g data-feature="多模型网关">
+    <path d="M58 290H171L176 295V311L171 316H58L53 311V295Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="303" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="307" text-anchor="middle" class="feature-text">多模型网关</text>
+  </g><g data-feature="智能模型路由">
+    <path d="M188 290H301L306 295V311L301 316H188L183 311V295Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="303" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="307" text-anchor="middle" class="feature-text">智能模型路由</text>
+  </g><g data-feature="密钥隔离">
+    <path d="M318 290H431L436 295V311L431 316H318L313 311V295Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="303" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="307" text-anchor="middle" class="feature-text">密钥隔离</text>
+  </g><g data-feature="Token 统计">
+    <path d="M448 290H561L566 295V311L561 316H448L443 311V295Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="303" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="307" text-anchor="middle" class="feature-text">Token 统计</text>
+  </g><g data-feature="流式对话">
+    <path d="M58 321H171L176 326V342L171 347H58L53 342V326Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="334" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="338" text-anchor="middle" class="feature-text">流式对话</text>
+  </g><g data-feature="多模态输入">
+    <path d="M188 321H301L306 326V342L301 347H188L183 342V326Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="334" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="338" text-anchor="middle" class="feature-text">多模态输入</text>
+  </g><g data-feature="知识库 RAG">
+    <path d="M318 321H431L436 326V342L431 347H318L313 342V326Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="334" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="338" text-anchor="middle" class="feature-text">知识库 RAG</text>
+  </g><g data-feature="向量检索">
+    <path d="M448 321H561L566 326V342L561 347H448L443 342V326Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="334" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="338" text-anchor="middle" class="feature-text">向量检索</text>
+  </g><g data-feature="NL2SQL">
+    <path d="M58 352H171L176 357V373L171 378H58L53 373V357Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="365" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="369" text-anchor="middle" class="feature-text">NL2SQL</text>
+  </g><g data-feature="NL2V8">
+    <path d="M188 352H301L306 357V373L301 378H188L183 373V357Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="365" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="369" text-anchor="middle" class="feature-text">NL2V8</text>
+  </g><g data-feature="Agent">
+    <path d="M318 352H431L436 357V373L431 378H318L313 373V357Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="365" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="369" text-anchor="middle" class="feature-text">Agent</text>
+  </g><g data-feature="Tool Calling">
+    <path d="M448 352H561L566 357V373L561 378H448L443 373V357Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="365" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="369" text-anchor="middle" class="feature-text">Tool Calling</text>
+  </g><g data-feature="MCP 编排">
+    <path d="M58 383H171L176 388V404L171 409H58L53 404V388Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="396" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="400" text-anchor="middle" class="feature-text">MCP 编排</text>
+  </g><g data-feature="Skills">
+    <path d="M188 383H301L306 388V404L301 409H188L183 404V388Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="396" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="400" text-anchor="middle" class="feature-text">Skills</text>
+  </g><g data-feature="Prompt 模板">
+    <path d="M318 383H431L436 388V404L431 409H318L313 404V388Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="396" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="400" text-anchor="middle" class="feature-text">Prompt 模板</text>
+  </g><g data-feature="上下文记忆">
+    <path d="M448 383H561L566 388V404L561 409H448L443 404V388Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="396" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="400" text-anchor="middle" class="feature-text">上下文记忆</text>
+  </g><g data-feature="AI 应用工作台">
+    <path d="M58 414H171L176 419V435L171 440H58L53 435V419Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="427" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="431" text-anchor="middle" class="feature-text">AI 应用工作台</text>
+  </g><g data-feature="在线源码">
+    <path d="M188 414H301L306 419V435L301 440H188L183 435V419Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="427" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="431" text-anchor="middle" class="feature-text">在线源码</text>
+  </g><g data-feature="业务架构蓝图">
+    <path d="M318 414H431L436 419V435L431 440H318L313 435V419Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="427" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="431" text-anchor="middle" class="feature-text">业务架构蓝图</text>
+  </g><g data-feature="系统关系图谱">
+    <path d="M448 414H561L566 419V435L561 440H448L443 435V419Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="427" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="431" text-anchor="middle" class="feature-text">系统关系图谱</text>
+  </g><g data-feature="AI Workflow">
+    <path d="M58 445H171L176 450V466L171 471H58L53 466V450Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="458" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="462" text-anchor="middle" class="feature-text">AI Workflow</text>
+  </g><g data-feature="状态机">
+    <path d="M188 445H301L306 450V466L301 471H188L183 466V450Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="458" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="462" text-anchor="middle" class="feature-text">状态机</text>
+  </g><g data-feature="Automation Flow">
+    <path d="M318 445H431L436 450V466L431 471H318L313 466V450Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="458" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="462" text-anchor="middle" class="feature-text feature-text--compact">Automation Flow</text>
+  </g><g data-feature="流程挖掘">
+    <path d="M448 445H561L566 450V466L561 471H448L443 466V450Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="458" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="462" text-anchor="middle" class="feature-text">流程挖掘</text>
+  </g><g data-feature="Manifest 建模">
+    <path d="M58 476H171L176 481V497L171 502H58L53 497V481Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="489" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="493" text-anchor="middle" class="feature-text">Manifest 建模</text>
+  </g><g data-feature="解决方案规划">
+    <path d="M188 476H301L306 481V497L301 502H188L183 497V481Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="489" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="493" text-anchor="middle" class="feature-text">解决方案规划</text>
+  </g><g data-feature="影响面分析">
+    <path d="M318 476H431L436 481V497L431 502H318L313 497V481Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="489" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="493" text-anchor="middle" class="feature-text">影响面分析</text>
+  </g><g data-feature="代码生成">
+    <path d="M448 476H561L566 481V497L561 502H448L443 497V481Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="489" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="493" text-anchor="middle" class="feature-text">代码生成</text>
+  </g><g data-feature="测试计划生成">
+    <path d="M58 507H171L176 512V528L171 533H58L53 528V512Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="62" cy="520" r="2" fill="#4de8ff"/>
+    <text x="118.5" y="524" text-anchor="middle" class="feature-text">测试计划生成</text>
+  </g><g data-feature="AI 辅助调试">
+    <path d="M188 507H301L306 512V528L301 533H188L183 528V512Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="192" cy="520" r="2" fill="#4de8ff"/>
+    <text x="248.5" y="524" text-anchor="middle" class="feature-text">AI 辅助调试</text>
+  </g><g data-feature="根因诊断">
+    <path d="M318 507H431L436 512V528L431 533H318L313 528V512Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="322" cy="520" r="2" fill="#4de8ff"/>
+    <text x="378.5" y="524" text-anchor="middle" class="feature-text">根因诊断</text>
+  </g><g data-feature="Preview / Diff">
+    <path d="M448 507H561L566 512V528L561 533H448L443 528V512Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="452" cy="520" r="2" fill="#4de8ff"/>
+    <text x="508.5" y="524" text-anchor="middle" class="feature-text feature-text--compact">Preview / Diff</text>
+  </g>
+  </g><g>
+    <path d="M56 566H569L585 582V864L569 880H56L40 864V582Z" class="panel-shell" stroke="#b995ff"/>
+    <path d="M41 617H584" stroke="#b995ff" stroke-opacity=".52"/>
+    <path d="M55 567H228" stroke="#b995ff" stroke-width="3"/>
+    <text x="56" y="597" class="panel-code" fill="#b995ff">02</text>
+    <text x="101" y="596" class="panel-title">低代码与多端体验引擎</text>
+    <text x="569" y="595" text-anchor="end" class="panel-sub">表单、页面、流程、报表与微应用</text>
+    <g data-feature="表单引擎">
+    <path d="M58 624H171L176 629V645L171 650H58L53 645V629Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="637" r="2" fill="#b995ff"/>
+    <text x="118.5" y="641" text-anchor="middle" class="feature-text">表单引擎</text>
+  </g><g data-feature="40+ 控件">
+    <path d="M188 624H301L306 629V645L301 650H188L183 645V629Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="637" r="2" fill="#b995ff"/>
+    <text x="248.5" y="641" text-anchor="middle" class="feature-text">40+ 控件</text>
+  </g><g data-feature="Tabs / 分组">
+    <path d="M318 624H431L436 629V645L431 650H318L313 645V629Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="637" r="2" fill="#b995ff"/>
+    <text x="378.5" y="641" text-anchor="middle" class="feature-text">Tabs / 分组</text>
+  </g><g data-feature="栅格布局">
+    <path d="M448 624H561L566 629V645L561 650H448L443 645V629Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="637" r="2" fill="#b995ff"/>
+    <text x="508.5" y="641" text-anchor="middle" class="feature-text">栅格布局</text>
+  </g><g data-feature="主子表">
+    <path d="M58 655H171L176 660V676L171 681H58L53 676V660Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="668" r="2" fill="#b995ff"/>
+    <text x="118.5" y="672" text-anchor="middle" class="feature-text">主子表</text>
+  </g><g data-feature="关联表单">
+    <path d="M188 655H301L306 660V676L301 681H188L183 676V660Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="668" r="2" fill="#b995ff"/>
+    <text x="248.5" y="672" text-anchor="middle" class="feature-text">关联表单</text>
+  </g><g data-feature="字段 V8 事件">
+    <path d="M318 655H431L436 660V676L431 681H318L313 676V660Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="668" r="2" fill="#b995ff"/>
+    <text x="378.5" y="672" text-anchor="middle" class="feature-text">字段 V8 事件</text>
+  </g><g data-feature="表单 V8 事件">
+    <path d="M448 655H561L566 660V676L561 681H448L443 676V660Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="668" r="2" fill="#b995ff"/>
+    <text x="508.5" y="672" text-anchor="middle" class="feature-text">表单 V8 事件</text>
+  </g><g data-feature="数据过滤">
+    <path d="M58 686H171L176 691V707L171 712H58L53 707V691Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="699" r="2" fill="#b995ff"/>
+    <text x="118.5" y="703" text-anchor="middle" class="feature-text">数据过滤</text>
+  </g><g data-feature="模块引擎">
+    <path d="M188 686H301L306 691V707L301 712H188L183 707V691Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="699" r="2" fill="#b995ff"/>
+    <text x="248.5" y="703" text-anchor="middle" class="feature-text">模块引擎</text>
+  </g><g data-feature="列表 / 搜索">
+    <path d="M318 686H431L436 691V707L431 712H318L313 707V691Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="699" r="2" fill="#b995ff"/>
+    <text x="378.5" y="703" text-anchor="middle" class="feature-text">列表 / 搜索</text>
+  </g><g data-feature="统计 / 角标">
+    <path d="M448 686H561L566 691V707L561 712H448L443 707V691Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="699" r="2" fill="#b995ff"/>
+    <text x="508.5" y="703" text-anchor="middle" class="feature-text">统计 / 角标</text>
+  </g><g data-feature="PC 复合列">
+    <path d="M58 717H171L176 722V738L171 743H58L53 738V722Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="730" r="2" fill="#b995ff"/>
+    <text x="118.5" y="734" text-anchor="middle" class="feature-text">PC 复合列</text>
+  </g><g data-feature="移动卡片">
+    <path d="M188 717H301L306 722V738L301 743H188L183 738V722Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="730" r="2" fill="#b995ff"/>
+    <text x="248.5" y="734" text-anchor="middle" class="feature-text">移动卡片</text>
+  </g><g data-feature="左右树表">
+    <path d="M318 717H431L436 722V738L431 743H318L313 738V722Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="730" r="2" fill="#b995ff"/>
+    <text x="378.5" y="734" text-anchor="middle" class="feature-text">左右树表</text>
+  </g><g data-feature="界面引擎">
+    <path d="M448 717H561L566 722V738L561 743H448L443 738V722Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="730" r="2" fill="#b995ff"/>
+    <text x="508.5" y="734" text-anchor="middle" class="feature-text">界面引擎</text>
+  </g><g data-feature="JSON ↔ Vue">
+    <path d="M58 748H171L176 753V769L171 774H58L53 769V753Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="761" r="2" fill="#b995ff"/>
+    <text x="118.5" y="765" text-anchor="middle" class="feature-text">JSON ↔ Vue</text>
+  </g><g data-feature="源码预览">
+    <path d="M188 748H301L306 753V769L301 774H188L183 769V753Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="761" r="2" fill="#b995ff"/>
+    <text x="248.5" y="765" text-anchor="middle" class="feature-text">源码预览</text>
+  </g><g data-feature="Undo / Redo">
+    <path d="M318 748H431L436 753V769L431 774H318L313 769V753Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="761" r="2" fill="#b995ff"/>
+    <text x="378.5" y="765" text-anchor="middle" class="feature-text">Undo / Redo</text>
+  </g><g data-feature="页面版本">
+    <path d="M448 748H561L566 753V769L561 774H448L443 769V753Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="761" r="2" fill="#b995ff"/>
+    <text x="508.5" y="765" text-anchor="middle" class="feature-text">页面版本</text>
+  </g><g data-feature="语义 Diff">
+    <path d="M58 779H171L176 784V800L171 805H58L53 800V784Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="792" r="2" fill="#b995ff"/>
+    <text x="118.5" y="796" text-anchor="middle" class="feature-text">语义 Diff</text>
+  </g><g data-feature="区块 / 物料">
+    <path d="M188 779H301L306 784V800L301 805H188L183 800V784Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="792" r="2" fill="#b995ff"/>
+    <text x="248.5" y="796" text-anchor="middle" class="feature-text">区块 / 物料</text>
+  </g><g data-feature="资产依赖">
+    <path d="M318 779H431L436 784V800L431 805H318L313 800V784Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="792" r="2" fill="#b995ff"/>
+    <text x="378.5" y="796" text-anchor="middle" class="feature-text">资产依赖</text>
+  </g><g data-feature="打印引擎">
+    <path d="M448 779H561L566 784V800L561 805H448L443 800V784Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="792" r="2" fill="#b995ff"/>
+    <text x="508.5" y="796" text-anchor="middle" class="feature-text">打印引擎</text>
+  </g><g data-feature="报表引擎">
+    <path d="M58 810H171L176 815V831L171 836H58L53 831V815Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="823" r="2" fill="#b995ff"/>
+    <text x="118.5" y="827" text-anchor="middle" class="feature-text">报表引擎</text>
+  </g><g data-feature="审批流 v4">
+    <path d="M188 810H301L306 815V831L301 836H188L183 831V815Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="823" r="2" fill="#b995ff"/>
+    <text x="248.5" y="827" text-anchor="middle" class="feature-text">审批流 v4</text>
+  </g><g data-feature="模板引擎">
+    <path d="M318 810H431L436 815V831L431 836H318L313 831V815Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="823" r="2" fill="#b995ff"/>
+    <text x="378.5" y="827" text-anchor="middle" class="feature-text">模板引擎</text>
+  </g><g data-feature="Office 导出">
+    <path d="M448 810H561L566 815V831L561 836H448L443 831V815Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="823" r="2" fill="#b995ff"/>
+    <text x="508.5" y="827" text-anchor="middle" class="feature-text">Office 导出</text>
+  </g><g data-feature="图表 / 地图">
+    <path d="M58 841H171L176 846V862L171 867H58L53 862V846Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="62" cy="854" r="2" fill="#b995ff"/>
+    <text x="118.5" y="858" text-anchor="middle" class="feature-text">图表 / 地图</text>
+  </g><g data-feature="甘特图">
+    <path d="M188 841H301L306 846V862L301 867H188L183 862V846Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="192" cy="854" r="2" fill="#b995ff"/>
+    <text x="248.5" y="858" text-anchor="middle" class="feature-text">甘特图</text>
+  </g><g data-feature="3D / CAD / 大屏">
+    <path d="M318 841H431L436 846V862L431 867H318L313 862V846Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="322" cy="854" r="2" fill="#b995ff"/>
+    <text x="378.5" y="858" text-anchor="middle" class="feature-text">3D / CAD / 大屏</text>
+  </g><g data-feature="前端微服务">
+    <path d="M448 841H561L566 846V862L561 867H448L443 862V846Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="452" cy="854" r="2" fill="#b995ff"/>
+    <text x="508.5" y="858" text-anchor="middle" class="feature-text">前端微服务</text>
+  </g>
+  </g><g>
+    <path d="M1351 232H1864L1880 248V530L1864 546H1351L1335 530V248Z" class="panel-shell" stroke="#48e7a6"/>
+    <path d="M1336 283H1879" stroke="#48e7a6" stroke-opacity=".52"/>
+    <path d="M1350 233H1523" stroke="#48e7a6" stroke-width="3"/>
+    <text x="1351" y="263" class="panel-code" fill="#48e7a6">03</text>
+    <text x="1396" y="262" class="panel-title">AI 平台治理中心</text>
+    <text x="1864" y="261" text-anchor="end" class="panel-sub">门户、身份、配置、发布全链路治理</text>
+    <g data-feature="门户项目">
+    <path d="M1353 290H1466L1471 295V311L1466 316H1353L1348 311V295Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="303" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="307" text-anchor="middle" class="feature-text">门户项目</text>
+  </g><g data-feature="命名插槽">
+    <path d="M1483 290H1596L1601 295V311L1596 316H1483L1478 311V295Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="303" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="307" text-anchor="middle" class="feature-text">命名插槽</text>
+  </g><g data-feature="统一资产">
+    <path d="M1613 290H1726L1731 295V311L1726 316H1613L1608 311V295Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="303" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="307" text-anchor="middle" class="feature-text">统一资产</text>
+  </g><g data-feature="不可变快照">
+    <path d="M1743 290H1856L1861 295V311L1856 316H1743L1738 311V295Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="303" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="307" text-anchor="middle" class="feature-text">不可变快照</text>
+  </g><g data-feature="原子发布">
+    <path d="M1353 321H1466L1471 326V342L1466 347H1353L1348 342V326Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="334" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="338" text-anchor="middle" class="feature-text">原子发布</text>
+  </g><g data-feature="运行解析">
+    <path d="M1483 321H1596L1601 326V342L1596 347H1483L1478 342V326Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="334" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="338" text-anchor="middle" class="feature-text">运行解析</text>
+  </g><g data-feature="身份连接器">
+    <path d="M1613 321H1726L1731 326V342L1726 347H1613L1608 342V326Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="334" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="338" text-anchor="middle" class="feature-text">身份连接器</text>
+  </g><g data-feature="SCIM 同步">
+    <path d="M1743 321H1856L1861 326V342L1856 347H1743L1738 342V326Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="334" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="338" text-anchor="middle" class="feature-text">SCIM 同步</text>
+  </g><g data-feature="增量游标">
+    <path d="M1353 352H1466L1471 357V373L1466 378H1353L1348 373V357Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="365" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="369" text-anchor="middle" class="feature-text">增量游标</text>
+  </g><g data-feature="冲突重放">
+    <path d="M1483 352H1596L1601 357V373L1596 378H1483L1478 373V357Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="365" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="369" text-anchor="middle" class="feature-text">冲突重放</text>
+  </g><g data-feature="动态用户组">
+    <path d="M1613 352H1726L1731 357V373L1726 378H1613L1608 373V357Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="365" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="369" text-anchor="middle" class="feature-text">动态用户组</text>
+  </g><g data-feature="用户标签">
+    <path d="M1743 352H1856L1861 357V373L1856 378H1743L1738 373V357Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="365" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="369" text-anchor="middle" class="feature-text">用户标签</text>
+  </g><g data-feature="人群圈选">
+    <path d="M1353 383H1466L1471 388V404L1466 409H1353L1348 404V388Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="396" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="400" text-anchor="middle" class="feature-text">人群圈选</text>
+  </g><g data-feature="批量授权">
+    <path d="M1483 383H1596L1601 388V404L1596 409H1483L1478 404V388Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="396" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="400" text-anchor="middle" class="feature-text">批量授权</text>
+  </g><g data-feature="权限解释">
+    <path d="M1613 383H1726L1731 388V404L1726 409H1613L1608 404V388Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="396" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="400" text-anchor="middle" class="feature-text">权限解释</text>
+  </g><g data-feature="临时权限">
+    <path d="M1743 383H1856L1861 388V404L1856 409H1743L1738 404V388Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="396" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="400" text-anchor="middle" class="feature-text">临时权限</text>
+  </g><g data-feature="组织快照">
+    <path d="M1353 414H1466L1471 419V435L1466 440H1353L1348 435V419Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="427" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="431" text-anchor="middle" class="feature-text">组织快照</text>
+  </g><g data-feature="配置模板">
+    <path d="M1483 414H1596L1601 419V435L1596 440H1483L1478 435V419Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="427" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="431" text-anchor="middle" class="feature-text">配置模板</text>
+  </g><g data-feature="配置继承">
+    <path d="M1613 414H1726L1731 419V435L1726 440H1613L1608 435V419Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="427" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="431" text-anchor="middle" class="feature-text">配置继承</text>
+  </g><g data-feature="Secret 引用">
+    <path d="M1743 414H1856L1861 419V435L1856 440H1743L1738 435V419Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="427" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="431" text-anchor="middle" class="feature-text">Secret 引用</text>
+  </g><g data-feature="配置漂移">
+    <path d="M1353 445H1466L1471 450V466L1466 471H1353L1348 466V450Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="458" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="462" text-anchor="middle" class="feature-text">配置漂移</text>
+  </g><g data-feature="Feature Flag">
+    <path d="M1483 445H1596L1601 450V466L1596 471H1483L1478 466V450Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="458" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="462" text-anchor="middle" class="feature-text">Feature Flag</text>
+  </g><g data-feature="稳定灰度">
+    <path d="M1613 445H1726L1731 450V466L1726 471H1613L1608 466V450Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="458" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="462" text-anchor="middle" class="feature-text">稳定灰度</text>
+  </g><g data-feature="发布时间窗">
+    <path d="M1743 445H1856L1861 450V466L1856 471H1743L1738 466V450Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="458" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="462" text-anchor="middle" class="feature-text">发布时间窗</text>
+  </g><g data-feature="发布计划">
+    <path d="M1353 476H1466L1471 481V497L1466 502H1353L1348 497V481Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="489" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="493" text-anchor="middle" class="feature-text">发布计划</text>
+  </g><g data-feature="计划哈希">
+    <path d="M1483 476H1596L1601 481V497L1596 502H1483L1478 497V481Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="489" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="493" text-anchor="middle" class="feature-text">计划哈希</text>
+  </g><g data-feature="不可变审批">
+    <path d="M1613 476H1726L1731 481V497L1726 502H1613L1608 497V481Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="489" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="493" text-anchor="middle" class="feature-text">不可变审批</text>
+  </g><g data-feature="职责分离">
+    <path d="M1743 476H1856L1861 481V497L1856 502H1743L1738 497V481Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="489" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="493" text-anchor="middle" class="feature-text">职责分离</text>
+  </g><g data-feature="自动门禁">
+    <path d="M1353 507H1466L1471 512V528L1466 533H1353L1348 528V512Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1357" cy="520" r="2" fill="#48e7a6"/>
+    <text x="1413.5" y="524" text-anchor="middle" class="feature-text">自动门禁</text>
+  </g><g data-feature="断点续发">
+    <path d="M1483 507H1596L1601 512V528L1596 533H1483L1478 528V512Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1487" cy="520" r="2" fill="#48e7a6"/>
+    <text x="1543.5" y="524" text-anchor="middle" class="feature-text">断点续发</text>
+  </g><g data-feature="条件回滚">
+    <path d="M1613 507H1726L1731 512V528L1726 533H1613L1608 528V512Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1617" cy="520" r="2" fill="#48e7a6"/>
+    <text x="1673.5" y="524" text-anchor="middle" class="feature-text">条件回滚</text>
+  </g><g data-feature="跨资源变更集">
+    <path d="M1743 507H1856L1861 512V528L1856 533H1743L1738 528V512Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1747" cy="520" r="2" fill="#48e7a6"/>
+    <text x="1803.5" y="524" text-anchor="middle" class="feature-text">跨资源变更集</text>
+  </g>
+  </g><g>
+    <path d="M1351 566H1864L1880 582V864L1864 880H1351L1335 864V582Z" class="panel-shell" stroke="#ffbd59"/>
+    <path d="M1336 617H1879" stroke="#ffbd59" stroke-opacity=".52"/>
+    <path d="M1350 567H1523" stroke="#ffbd59" stroke-width="3"/>
+    <text x="1351" y="597" class="panel-code" fill="#ffbd59">04</text>
+    <text x="1396" y="596" class="panel-title">服务、观测与可靠运行</text>
+    <text x="1864" y="595" text-anchor="end" class="panel-sub">多节点事实源、告警闭环与可恢复任务</text>
+    <g data-feature="服务注册">
+    <path d="M1353 624H1466L1471 629V645L1466 650H1353L1348 645V629Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="637" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="641" text-anchor="middle" class="feature-text">服务注册</text>
+  </g><g data-feature="实例心跳">
+    <path d="M1483 624H1596L1601 629V645L1596 650H1483L1478 645V629Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="637" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="641" text-anchor="middle" class="feature-text">实例心跳</text>
+  </g><g data-feature="共享租约">
+    <path d="M1613 624H1726L1731 629V645L1726 650H1613L1608 645V629Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="637" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="641" text-anchor="middle" class="feature-text">共享租约</text>
+  </g><g data-feature="优雅排空">
+    <path d="M1743 624H1856L1861 629V645L1856 650H1743L1738 645V629Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="637" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="641" text-anchor="middle" class="feature-text">优雅排空</text>
+  </g><g data-feature="版本 / 区域">
+    <path d="M1353 655H1466L1471 660V676L1466 681H1353L1348 676V660Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="668" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="672" text-anchor="middle" class="feature-text">版本 / 区域</text>
+  </g><g data-feature="标签 / 权重">
+    <path d="M1483 655H1596L1601 660V676L1596 681H1483L1478 676V660Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="668" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="672" text-anchor="middle" class="feature-text">标签 / 权重</text>
+  </g><g data-feature="稳定路由">
+    <path d="M1613 655H1726L1731 660V676L1726 681H1613L1608 676V660Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="668" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="672" text-anchor="middle" class="feature-text">稳定路由</text>
+  </g><g data-feature="限流许可">
+    <path d="M1743 655H1856L1861 660V676L1856 681H1743L1738 676V660Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="668" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="672" text-anchor="middle" class="feature-text">限流许可</text>
+  </g><g data-feature="熔断反馈">
+    <path d="M1353 686H1466L1471 691V707L1466 712H1353L1348 707V691Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="699" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="703" text-anchor="middle" class="feature-text">熔断反馈</text>
+  </g><g data-feature="重试 / 降级">
+    <path d="M1483 686H1596L1601 691V707L1596 712H1483L1478 707V691Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="699" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="703" text-anchor="middle" class="feature-text">重试 / 降级</text>
+  </g><g data-feature="服务拓扑">
+    <path d="M1613 686H1726L1731 691V707L1726 712H1613L1608 707V691Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="699" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="703" text-anchor="middle" class="feature-text">服务拓扑</text>
+  </g><g data-feature="W3C Trace">
+    <path d="M1743 686H1856L1861 691V707L1856 712H1743L1738 707V691Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="699" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="703" text-anchor="middle" class="feature-text">W3C Trace</text>
+  </g><g data-feature="Span 时间线">
+    <path d="M1353 717H1466L1471 722V738L1466 743H1353L1348 738V722Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="730" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="734" text-anchor="middle" class="feature-text">Span 时间线</text>
+  </g><g data-feature="日志信号">
+    <path d="M1483 717H1596L1601 722V738L1596 743H1483L1478 738V722Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="730" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="734" text-anchor="middle" class="feature-text">日志信号</text>
+  </g><g data-feature="告警规则">
+    <path d="M1613 717H1726L1731 722V738L1726 743H1613L1608 738V722Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="730" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="734" text-anchor="middle" class="feature-text">告警规则</text>
+  </g><g data-feature="窗口评估">
+    <path d="M1743 717H1856L1861 722V738L1856 743H1743L1738 738V722Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="730" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="734" text-anchor="middle" class="feature-text">窗口评估</text>
+  </g><g data-feature="去重 / 抑制">
+    <path d="M1353 748H1466L1471 753V769L1466 774H1353L1348 769V753Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="761" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="765" text-anchor="middle" class="feature-text">去重 / 抑制</text>
+  </g><g data-feature="自动恢复">
+    <path d="M1483 748H1596L1601 753V769L1596 774H1483L1478 769V753Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="761" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="765" text-anchor="middle" class="feature-text">自动恢复</text>
+  </g><g data-feature="值班排班">
+    <path d="M1613 748H1726L1731 753V769L1726 774H1613L1608 769V753Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="761" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="765" text-anchor="middle" class="feature-text">值班排班</text>
+  </g><g data-feature="升级链">
+    <path d="M1743 748H1856L1861 753V769L1856 774H1743L1738 769V753Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="761" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="765" text-anchor="middle" class="feature-text">升级链</text>
+  </g><g data-feature="Outbox 送达">
+    <path d="M1353 779H1466L1471 784V800L1466 805H1353L1348 800V784Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="792" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="796" text-anchor="middle" class="feature-text">Outbox 送达</text>
+  </g><g data-feature="热 / 温 / 冷">
+    <path d="M1483 779H1596L1601 784V800L1596 805H1483L1478 800V784Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="792" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="796" text-anchor="middle" class="feature-text">热 / 温 / 冷</text>
+  </g><g data-feature="留存 / 配额">
+    <path d="M1613 779H1726L1731 784V800L1726 805H1613L1608 800V784Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="792" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="796" text-anchor="middle" class="feature-text">留存 / 配额</text>
+  </g><g data-feature="脱敏规则">
+    <path d="M1743 779H1856L1861 784V800L1856 805H1743L1738 800V784Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="792" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="796" text-anchor="middle" class="feature-text">脱敏规则</text>
+  </g><g data-feature="法律保留">
+    <path d="M1353 810H1466L1471 815V831L1466 836H1353L1348 831V815Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="823" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="827" text-anchor="middle" class="feature-text">法律保留</text>
+  </g><g data-feature="归档证明">
+    <path d="M1483 810H1596L1601 815V831L1596 836H1483L1478 831V815Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="823" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="827" text-anchor="middle" class="feature-text">归档证明</text>
+  </g><g data-feature="导入预检">
+    <path d="M1613 810H1726L1731 815V831L1726 836H1613L1608 831V815Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="823" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="827" text-anchor="middle" class="feature-text">导入预检</text>
+  </g><g data-feature="暂存行修正">
+    <path d="M1743 810H1856L1861 815V831L1856 836H1743L1738 831V815Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="823" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="827" text-anchor="middle" class="feature-text">暂存行修正</text>
+  </g><g data-feature="检查点 / 栅栏">
+    <path d="M1353 841H1466L1471 846V862L1466 867H1353L1348 862V846Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1357" cy="854" r="2" fill="#ffbd59"/>
+    <text x="1413.5" y="858" text-anchor="middle" class="feature-text">检查点 / 栅栏</text>
+  </g><g data-feature="暂停 / 恢复">
+    <path d="M1483 841H1596L1601 846V862L1596 867H1483L1478 862V846Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1487" cy="854" r="2" fill="#ffbd59"/>
+    <text x="1543.5" y="858" text-anchor="middle" class="feature-text">暂停 / 恢复</text>
+  </g><g data-feature="条件回滚">
+    <path d="M1613 841H1726L1731 846V862L1726 867H1613L1608 862V846Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1617" cy="854" r="2" fill="#ffbd59"/>
+    <text x="1673.5" y="858" text-anchor="middle" class="feature-text">条件回滚</text>
+  </g><g data-feature="协作租约">
+    <path d="M1743 841H1856L1861 846V862L1856 867H1743L1738 862V846Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1747" cy="854" r="2" fill="#ffbd59"/>
+    <text x="1803.5" y="858" text-anchor="middle" class="feature-text">协作租约</text>
+  </g>
+  </g>
+
+  <g>
+    <path d="M617 232H1303L1315 244V275L1303 287H617L605 275V244Z" class="panel-shell" stroke="#5de9ff"/>
+    <text x="624" y="244" class="panel-sub">AI DELIVERY PIPELINE</text>
+    <g data-feature="自然语言">
+    <path d="M627 247H687L692 252V272L687 277H627L622 272V252Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="631" cy="262" r="2" fill="#4de8ff"/>
+    <text x="661" y="266" text-anchor="middle" class="flow-text">自然语言</text>
+  </g><path d="M692 262H702" class="flow-arrow"/><path d="M698 258L702 262L698 266" class="flow-arrow"/><g data-feature="业务蓝图">
+    <path d="M711 247H771L776 252V272L771 277H711L706 272V252Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="715" cy="262" r="2" fill="#4de8ff"/>
+    <text x="745" y="266" text-anchor="middle" class="flow-text">业务蓝图</text>
+  </g><path d="M776 262H786" class="flow-arrow"/><path d="M782 258L786 262L782 266" class="flow-arrow"/><g data-feature="Manifest">
+    <path d="M795 247H855L860 252V272L855 277H795L790 272V252Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="799" cy="262" r="2" fill="#4de8ff"/>
+    <text x="829" y="266" text-anchor="middle" class="flow-text">Manifest</text>
+  </g><path d="M860 262H870" class="flow-arrow"/><path d="M866 258L870 262L866 266" class="flow-arrow"/><g data-feature="DryRun">
+    <path d="M879 247H939L944 252V272L939 277H879L874 272V252Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="883" cy="262" r="2" fill="#4de8ff"/>
+    <text x="913" y="266" text-anchor="middle" class="flow-text">DryRun</text>
+  </g><path d="M944 262H954" class="flow-arrow"/><path d="M950 258L954 262L950 266" class="flow-arrow"/><g data-feature="确认执行">
+    <path d="M963 247H1023L1028 252V272L1023 277H963L958 272V252Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="967" cy="262" r="2" fill="#48e7a6"/>
+    <text x="997" y="266" text-anchor="middle" class="flow-text">确认执行</text>
+  </g><path d="M1028 262H1038" class="flow-arrow"/><path d="M1034 258L1038 262L1034 266" class="flow-arrow"/><g data-feature="自动校验">
+    <path d="M1047 247H1107L1112 252V272L1107 277H1047L1042 272V252Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1051" cy="262" r="2" fill="#48e7a6"/>
+    <text x="1081" y="266" text-anchor="middle" class="flow-text">自动校验</text>
+  </g><path d="M1112 262H1122" class="flow-arrow"/><path d="M1118 258L1122 262L1118 266" class="flow-arrow"/><g data-feature="真实回读">
+    <path d="M1131 247H1191L1196 252V272L1191 277H1131L1126 272V252Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1135" cy="262" r="2" fill="#48e7a6"/>
+    <text x="1165" y="266" text-anchor="middle" class="flow-text">真实回读</text>
+  </g><path d="M1196 262H1206" class="flow-arrow"/><path d="M1202 258L1206 262L1202 266" class="flow-arrow"/><g data-feature="安全回滚">
+    <path d="M1215 247H1275L1280 252V272L1275 277H1215L1210 272V252Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1219" cy="262" r="2" fill="#48e7a6"/>
+    <text x="1249" y="266" text-anchor="middle" class="flow-text">安全回滚</text>
+  </g>
+  </g>
+
+  <g aria-label="V8引擎核心">
+    <circle cx="960" cy="510" r="184" fill="#4de8ff" opacity=".06" filter="url(#halo)"/>
+    <circle cx="960" cy="510" r="178" fill="none" stroke="#60e8f5" stroke-opacity=".27" stroke-width="1.2"/>
+    <circle cx="960" cy="510" r="151" fill="none" stroke="#b995ff" stroke-opacity=".30" stroke-width="1" stroke-dasharray="4 7"/>
+    <circle cx="960" cy="510" r="132" fill="none" stroke="#48e7a6" stroke-opacity=".22"/>
+    <path d="M960 319L1126 414V606L960 701L794 606V414Z" fill="#09172e" fill-opacity=".8" stroke="#6ceafa" stroke-opacity=".2"/>
+    <g>
+    <path d="M734 332L759 332L835 430.5" class="reactor-link"/>
+    <path d="M625 315H727L734 322V342L727 349H625L618 342V322Z" class="satellite-shell"/>
+    <text x="676" y="329" text-anchor="middle" class="satellite-title">接口引擎</text>
+    <text x="676" y="342" text-anchor="middle" class="satellite-sub">保存即生效</text>
+  </g><g>
+    <path d="M734 371L759 371L835 441.5" class="reactor-link"/>
+    <path d="M625 354H727L734 361V381L727 388H625L618 381V361Z" class="satellite-shell"/>
+    <text x="676" y="368" text-anchor="middle" class="satellite-title">FormEngine</text>
+    <text x="676" y="381" text-anchor="middle" class="satellite-sub">CRUD / _Where</text>
+  </g><g>
+    <path d="M734 410L759 410L835 452.5" class="reactor-link"/>
+    <path d="M625 393H727L734 400V420L727 427H625L618 420V400Z" class="satellite-shell"/>
+    <text x="676" y="407" text-anchor="middle" class="satellite-title">DataSource</text>
+    <text x="676" y="420" text-anchor="middle" class="satellite-sub">SQL / API / JSON</text>
+  </g><g>
+    <path d="M734 449L759 449L835 463.5" class="reactor-link"/>
+    <path d="M625 432H727L734 439V459L727 466H625L618 459V439Z" class="satellite-shell"/>
+    <text x="676" y="446" text-anchor="middle" class="satellite-title">Db / Dos.ORM</text>
+    <text x="676" y="459" text-anchor="middle" class="satellite-sub">多数据库</text>
+  </g><g>
+    <path d="M734 488L759 488L835 474.5" class="reactor-link"/>
+    <path d="M625 471H727L734 478V498L727 505H625L618 498V478Z" class="satellite-shell"/>
+    <text x="676" y="485" text-anchor="middle" class="satellite-title">HTTP</text>
+    <text x="676" y="498" text-anchor="middle" class="satellite-sub">GET / POST / PATCH</text>
+  </g><g>
+    <path d="M734 527L759 527L835 485.5" class="reactor-link"/>
+    <path d="M625 510H727L734 517V537L727 544H625L618 537V517Z" class="satellite-shell"/>
+    <text x="676" y="524" text-anchor="middle" class="satellite-title">Redis Cache</text>
+    <text x="676" y="537" text-anchor="middle" class="satellite-sub">TTL / Hash</text>
+  </g><g>
+    <path d="M734 566L759 566L835 496.5" class="reactor-link"/>
+    <path d="M625 549H727L734 556V576L727 583H625L618 576V556Z" class="satellite-shell"/>
+    <text x="676" y="563" text-anchor="middle" class="satellite-title">MongoDB</text>
+    <text x="676" y="576" text-anchor="middle" class="satellite-sub">文档数据</text>
+  </g><g>
+    <path d="M734 605L759 605L835 507.5" class="reactor-link"/>
+    <path d="M625 588H727L734 595V615L727 622H625L618 615V595Z" class="satellite-shell"/>
+    <text x="676" y="602" text-anchor="middle" class="satellite-title">Search Engine</text>
+    <text x="676" y="615" text-anchor="middle" class="satellite-sub">索引 / 检索</text>
+  </g><g>
+    <path d="M734 644L759 644L835 518.5" class="reactor-link"/>
+    <path d="M625 627H727L734 634V654L727 661H625L618 654V634Z" class="satellite-shell"/>
+    <text x="676" y="641" text-anchor="middle" class="satellite-title">Job / Quartz</text>
+    <text x="676" y="654" text-anchor="middle" class="satellite-sub">可靠后台任务</text>
+  </g><g>
+    <path d="M734 683L759 683L835 529.5" class="reactor-link"/>
+    <path d="M625 666H727L734 673V693L727 700H625L618 693V673Z" class="satellite-shell"/>
+    <text x="676" y="680" text-anchor="middle" class="satellite-title">Spider Engine</text>
+    <text x="676" y="693" text-anchor="middle" class="satellite-sub">采集 / 浏览器</text>
+  </g><g>
+    <path d="M1187 332L1162 332L1085 430.5" class="reactor-link"/>
+    <path d="M1194 315H1296L1303 322V342L1296 349H1194L1187 342V322Z" class="satellite-shell"/>
+    <text x="1245" y="329" text-anchor="middle" class="satellite-title">MQ / RabbitMQ</text>
+    <text x="1245" y="342" text-anchor="middle" class="satellite-sub">Outbox / Inbox</text>
+  </g><g>
+    <path d="M1187 371L1162 371L1085 441.5" class="reactor-link"/>
+    <path d="M1194 354H1296L1303 361V381L1296 388H1194L1187 381V361Z" class="satellite-shell"/>
+    <text x="1245" y="368" text-anchor="middle" class="satellite-title">MQTT / IoT</text>
+    <text x="1245" y="381" text-anchor="middle" class="satellite-sub">设备事件</text>
+  </g><g>
+    <path d="M1187 410L1162 410L1085 452.5" class="reactor-link"/>
+    <path d="M1194 393H1296L1303 400V420L1296 427H1194L1187 420V400Z" class="satellite-shell"/>
+    <text x="1245" y="407" text-anchor="middle" class="satellite-title">Files / HDFS</text>
+    <text x="1245" y="420" text-anchor="middle" class="satellite-sub">流式资产</text>
+  </g><g>
+    <path d="M1187 449L1162 449L1085 463.5" class="reactor-link"/>
+    <path d="M1194 432H1296L1303 439V459L1296 466H1194L1187 459V439Z" class="satellite-shell"/>
+    <text x="1245" y="446" text-anchor="middle" class="satellite-title">Office</text>
+    <text x="1245" y="459" text-anchor="middle" class="satellite-sub">Excel / Word / PPT</text>
+  </g><g>
+    <path d="M1187 488L1162 488L1085 474.5" class="reactor-link"/>
+    <path d="M1194 471H1296L1303 478V498L1296 505H1194L1187 498V478Z" class="satellite-shell"/>
+    <text x="1245" y="485" text-anchor="middle" class="satellite-title">OCR / Image</text>
+    <text x="1245" y="498" text-anchor="middle" class="satellite-sub">识别 / 图像处理</text>
+  </g><g>
+    <path d="M1187 527L1162 527L1085 485.5" class="reactor-link"/>
+    <path d="M1194 510H1296L1303 517V537L1296 544H1194L1187 537V517Z" class="satellite-shell"/>
+    <text x="1245" y="524" text-anchor="middle" class="satellite-title">Translate</text>
+    <text x="1245" y="537" text-anchor="middle" class="satellite-sub">翻译 / 多语言</text>
+  </g><g>
+    <path d="M1187 566L1162 566L1085 496.5" class="reactor-link"/>
+    <path d="M1194 549H1296L1303 556V576L1296 583H1194L1187 576V556Z" class="satellite-shell"/>
+    <text x="1245" y="563" text-anchor="middle" class="satellite-title">Message Engine</text>
+    <text x="1245" y="576" text-anchor="middle" class="satellite-sub">站内 / 多通道</text>
+  </g><g>
+    <path d="M1187 605L1162 605L1085 507.5" class="reactor-link"/>
+    <path d="M1194 588H1296L1303 595V615L1296 622H1194L1187 615V595Z" class="satellite-shell"/>
+    <text x="1245" y="602" text-anchor="middle" class="satellite-title">AI / Agent</text>
+    <text x="1245" y="615" text-anchor="middle" class="satellite-sub">模型 / 工具</text>
+  </g><g>
+    <path d="M1187 644L1162 644L1085 518.5" class="reactor-link"/>
+    <path d="M1194 627H1296L1303 634V654L1296 661H1194L1187 654V634Z" class="satellite-shell"/>
+    <text x="1245" y="641" text-anchor="middle" class="satellite-title">Template</text>
+    <text x="1245" y="654" text-anchor="middle" class="satellite-sub">HTML / 文档</text>
+  </g><g>
+    <path d="M1187 683L1162 683L1085 529.5" class="reactor-link"/>
+    <path d="M1194 666H1296L1303 673V693L1296 700H1194L1187 693V673Z" class="satellite-shell"/>
+    <text x="1245" y="680" text-anchor="middle" class="satellite-title">Webhook / SignalR</text>
+    <text x="1245" y="693" text-anchor="middle" class="satellite-sub">实时集成</text>
+  </g>
+    <path d="M960 381L1072 445V575L960 639L848 575V445Z" fill="url(#reactor)" stroke="#89eff8" stroke-width="1.8" filter="url(#line-glow)"/>
+    <path d="M960 399L1055 453V567L960 621L865 567V453Z" fill="#07162b" stroke="#b995ff" stroke-opacity=".48"/>
+    <text x="960" y="438" text-anchor="middle" class="reactor-label">AI-NATIVE RUNTIME CORE</text>
+    <text x="960" y="493" text-anchor="middle" class="reactor-title">V8引擎</text>
+    <text x="960" y="521" text-anchor="middle" class="reactor-sub">可信服务端脚本 · 在线保存即生效</text>
+    <g>
+      <path d="M890 543H949L954 548V563L949 568H890L885 563V548Z" class="feature-shell" stroke="#4de8ff"/><text x="919.5" y="560" text-anchor="middle" class="reactor-tag">事务</text>
+      <path d="M971 543H1030L1035 548V563L1030 568H971L966 563V548Z" class="feature-shell" stroke="#b995ff"/><text x="1000.5" y="560" text-anchor="middle" class="reactor-tag">权限</text>
+      <path d="M890 576H949L954 581V596L949 601H890L885 596V581Z" class="feature-shell" stroke="#48e7a6"/><text x="919.5" y="593" text-anchor="middle" class="reactor-tag">多租户</text>
+      <path d="M971 576H1030L1035 581V596L1030 601H971L966 596V581Z" class="feature-shell" stroke="#ffbd59"/><text x="1000.5" y="593" text-anchor="middle" class="reactor-tag">多节点</text>
+    </g>
+  </g>
+
+  <g>
+    <path d="M619 752H1301L1315 766V866L1301 880H619L605 866V766Z" class="panel-shell" stroke="#68e5f4"/>
+    <path d="M606 780H1314" stroke="#68e5f4" stroke-opacity=".35"/>
+    <text x="622" y="773" class="loop-title">统一治理与交付闭环</text>
+    <text x="1298" y="773" text-anchor="end" class="loop-sub">可预检 · 可执行 · 可回读 · 可恢复</text>
+    <g data-feature="Plan / DryRun">
+    <path d="M627 790H722L727 795V814L722 819H627L622 814V795Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="631" cy="804.5" r="2" fill="#4de8ff"/>
+    <text x="678.5" y="808.5" text-anchor="middle" class="loop-text">Plan / DryRun</text>
+  </g><g data-feature="Confirm / Apply">
+    <path d="M739 790H834L839 795V814L834 819H739L734 814V795Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="743" cy="804.5" r="2" fill="#4de8ff"/>
+    <text x="790.5" y="808.5" text-anchor="middle" class="loop-text feature-text--compact">Confirm / Apply</text>
+  </g><g data-feature="Validate / Readback">
+    <path d="M851 790H946L951 795V814L946 819H851L846 814V795Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="855" cy="804.5" r="2" fill="#4de8ff"/>
+    <text x="902.5" y="808.5" text-anchor="middle" class="loop-text feature-text--compact">Validate / Readback</text>
+  </g><g data-feature="Version / Hash">
+    <path d="M963 790H1058L1063 795V814L1058 819H963L958 814V795Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="967" cy="804.5" r="2" fill="#4de8ff"/>
+    <text x="1014.5" y="808.5" text-anchor="middle" class="loop-text feature-text--compact">Version / Hash</text>
+  </g><g data-feature="Audit / Trace">
+    <path d="M1075 790H1170L1175 795V814L1170 819H1075L1070 814V795Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="1079" cy="804.5" r="2" fill="#4de8ff"/>
+    <text x="1126.5" y="808.5" text-anchor="middle" class="loop-text">Audit / Trace</text>
+  </g><g data-feature="Rollback / Recover">
+    <path d="M1187 790H1282L1287 795V814L1282 819H1187L1182 814V795Z" class="feature-shell" stroke="#4de8ff"/>
+    <circle cx="1191" cy="804.5" r="2" fill="#4de8ff"/>
+    <text x="1238.5" y="808.5" text-anchor="middle" class="loop-text feature-text--compact">Rollback / Recover</text>
+  </g><g data-feature="Managed Core">
+    <path d="M627 825H722L727 830V849L722 854H627L622 849V830Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="631" cy="839.5" r="2" fill="#48e7a6"/>
+    <text x="678.5" y="843.5" text-anchor="middle" class="loop-text">Managed Core</text>
+  </g><g data-feature="Tenant Hook">
+    <path d="M739 825H834L839 830V849L834 854H739L734 849V830Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="743" cy="839.5" r="2" fill="#48e7a6"/>
+    <text x="790.5" y="843.5" text-anchor="middle" class="loop-text">Tenant Hook</text>
+  </g><g data-feature="OsClient 隔离">
+    <path d="M851 825H946L951 830V849L946 854H851L846 849V830Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="855" cy="839.5" r="2" fill="#48e7a6"/>
+    <text x="902.5" y="843.5" text-anchor="middle" class="loop-text">OsClient 隔离</text>
+  </g><g data-feature="共享状态">
+    <path d="M963 825H1058L1063 830V849L1058 854H963L958 849V830Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="967" cy="839.5" r="2" fill="#48e7a6"/>
+    <text x="1014.5" y="843.5" text-anchor="middle" class="loop-text">共享状态</text>
+  </g><g data-feature="稳定幂等">
+    <path d="M1075 825H1170L1175 830V849L1170 854H1075L1070 849V830Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1079" cy="839.5" r="2" fill="#48e7a6"/>
+    <text x="1126.5" y="843.5" text-anchor="middle" class="loop-text">稳定幂等</text>
+  </g><g data-feature="失败关闭">
+    <path d="M1187 825H1282L1287 830V849L1282 854H1187L1182 849V830Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1191" cy="839.5" r="2" fill="#48e7a6"/>
+    <text x="1238.5" y="843.5" text-anchor="middle" class="loop-text">失败关闭</text>
+  </g>
+  </g>
+
+  <g>
+    <path d="M53 910H467L480 923V1021L467 1034H53L40 1021V923Z" class="foundation-shell" stroke="#57c9ff"/>
+    <path d="M41 946H479" stroke="#57c9ff" stroke-opacity=".42"/>
+    <path d="M53 911H158" stroke="#57c9ff" stroke-width="3"/>
+    <text x="54" y="935" class="foundation-title" fill="#57c9ff">数据与存储底座</text>
+    <g data-feature="MySQL">
+    <path d="M58 958H128L133 963V978L128 983H58L53 978V963Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="62" cy="970.5" r="2" fill="#57c9ff"/>
+    <text x="97" y="974.5" text-anchor="middle" class="foundation-chip">MySQL</text>
+  </g><g data-feature="SQL Server">
+    <path d="M144 958H214L219 963V978L214 983H144L139 978V963Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="148" cy="970.5" r="2" fill="#57c9ff"/>
+    <text x="183" y="974.5" text-anchor="middle" class="foundation-chip">SQL Server</text>
+  </g><g data-feature="Oracle">
+    <path d="M230 958H300L305 963V978L300 983H230L225 978V963Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="234" cy="970.5" r="2" fill="#57c9ff"/>
+    <text x="269" y="974.5" text-anchor="middle" class="foundation-chip">Oracle</text>
+  </g><g data-feature="PostgreSQL">
+    <path d="M316 958H386L391 963V978L386 983H316L311 978V963Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="320" cy="970.5" r="2" fill="#57c9ff"/>
+    <text x="355" y="974.5" text-anchor="middle" class="foundation-chip">PostgreSQL</text>
+  </g><g data-feature="达梦">
+    <path d="M402 958H472L477 963V978L472 983H402L397 978V963Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="406" cy="970.5" r="2" fill="#57c9ff"/>
+    <text x="441" y="974.5" text-anchor="middle" class="foundation-chip">达梦</text>
+  </g><g data-feature="金仓">
+    <path d="M58 988H128L133 993V1008L128 1013H58L53 1008V993Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="62" cy="1000.5" r="2" fill="#57c9ff"/>
+    <text x="97" y="1004.5" text-anchor="middle" class="foundation-chip">金仓</text>
+  </g><g data-feature="Redis">
+    <path d="M144 988H214L219 993V1008L214 1013H144L139 1008V993Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="148" cy="1000.5" r="2" fill="#57c9ff"/>
+    <text x="183" y="1004.5" text-anchor="middle" class="foundation-chip">Redis</text>
+  </g><g data-feature="MongoDB">
+    <path d="M230 988H300L305 993V1008L300 1013H230L225 1008V993Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="234" cy="1000.5" r="2" fill="#57c9ff"/>
+    <text x="269" y="1004.5" text-anchor="middle" class="foundation-chip">MongoDB</text>
+  </g><g data-feature="Elasticsearch">
+    <path d="M316 988H386L391 993V1008L386 1013H316L311 1008V993Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="320" cy="1000.5" r="2" fill="#57c9ff"/>
+    <text x="355" y="1004.5" text-anchor="middle" class="foundation-chip">Elasticsearch</text>
+  </g><g data-feature="MinIO / HDFS">
+    <path d="M402 988H472L477 993V1008L472 1013H402L397 1008V993Z" class="feature-shell" stroke="#57c9ff"/>
+    <circle cx="406" cy="1000.5" r="2" fill="#57c9ff"/>
+    <text x="441" y="1004.5" text-anchor="middle" class="foundation-chip">MinIO / HDFS</text>
+  </g>
+  </g><g>
+    <path d="M513 910H927L940 923V1021L927 1034H513L500 1021V923Z" class="foundation-shell" stroke="#b995ff"/>
+    <path d="M501 946H939" stroke="#b995ff" stroke-opacity=".42"/>
+    <path d="M513 911H618" stroke="#b995ff" stroke-width="3"/>
+    <text x="514" y="935" class="foundation-title" fill="#b995ff">身份、安全与多租户</text>
+    <g data-feature="SaaS / OsClient">
+    <path d="M518 958H588L593 963V978L588 983H518L513 978V963Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="522" cy="970.5" r="2" fill="#b995ff"/>
+    <text x="557" y="974.5" text-anchor="middle" class="foundation-chip feature-text--compact">SaaS / OsClient</text>
+  </g><g data-feature="DiyToken">
+    <path d="M604 958H674L679 963V978L674 983H604L599 978V963Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="608" cy="970.5" r="2" fill="#b995ff"/>
+    <text x="643" y="974.5" text-anchor="middle" class="foundation-chip">DiyToken</text>
+  </g><g data-feature="角色 / 部门">
+    <path d="M690 958H760L765 963V978L760 983H690L685 978V963Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="694" cy="970.5" r="2" fill="#b995ff"/>
+    <text x="729" y="974.5" text-anchor="middle" class="foundation-chip">角色 / 部门</text>
+  </g><g data-feature="菜单 / 表权限">
+    <path d="M776 958H846L851 963V978L846 983H776L771 978V963Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="780" cy="970.5" r="2" fill="#b995ff"/>
+    <text x="815" y="974.5" text-anchor="middle" class="foundation-chip">菜单 / 表权限</text>
+  </g><g data-feature="行 / 字段权限">
+    <path d="M862 958H932L937 963V978L932 983H862L857 978V963Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="866" cy="970.5" r="2" fill="#b995ff"/>
+    <text x="901" y="974.5" text-anchor="middle" class="foundation-chip">行 / 字段权限</text>
+  </g><g data-feature="Access Key">
+    <path d="M518 988H588L593 993V1008L588 1013H518L513 1008V993Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="522" cy="1000.5" r="2" fill="#b995ff"/>
+    <text x="557" y="1004.5" text-anchor="middle" class="foundation-chip">Access Key</text>
+  </g><g data-feature="Passkey / TOTP">
+    <path d="M604 988H674L679 993V1008L674 1013H604L599 1008V993Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="608" cy="1000.5" r="2" fill="#b995ff"/>
+    <text x="643" y="1004.5" text-anchor="middle" class="foundation-chip feature-text--compact">Passkey / TOTP</text>
+  </g><g data-feature="SSO / OAuth">
+    <path d="M690 988H760L765 993V1008L760 1013H690L685 1008V993Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="694" cy="1000.5" r="2" fill="#b995ff"/>
+    <text x="729" y="1004.5" text-anchor="middle" class="foundation-chip">SSO / OAuth</text>
+  </g><g data-feature="强身份票据">
+    <path d="M776 988H846L851 993V1008L846 1013H776L771 1008V993Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="780" cy="1000.5" r="2" fill="#b995ff"/>
+    <text x="815" y="1004.5" text-anchor="middle" class="foundation-chip">强身份票据</text>
+  </g><g data-feature="认证加密">
+    <path d="M862 988H932L937 993V1008L932 1013H862L857 1008V993Z" class="feature-shell" stroke="#b995ff"/>
+    <circle cx="866" cy="1000.5" r="2" fill="#b995ff"/>
+    <text x="901" y="1004.5" text-anchor="middle" class="foundation-chip">认证加密</text>
+  </g>
+  </g><g>
+    <path d="M973 910H1387L1400 923V1021L1387 1034H973L960 1021V923Z" class="foundation-shell" stroke="#48e7a6"/>
+    <path d="M961 946H1399" stroke="#48e7a6" stroke-opacity=".42"/>
+    <path d="M973 911H1078" stroke="#48e7a6" stroke-width="3"/>
+    <text x="974" y="935" class="foundation-title" fill="#48e7a6">分布式运行底座</text>
+    <g data-feature="多节点 API">
+    <path d="M978 958H1048L1053 963V978L1048 983H978L973 978V963Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="982" cy="970.5" r="2" fill="#48e7a6"/>
+    <text x="1017" y="974.5" text-anchor="middle" class="foundation-chip">多节点 API</text>
+  </g><g data-feature="Worker 集群">
+    <path d="M1064 958H1134L1139 963V978L1134 983H1064L1059 978V963Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1068" cy="970.5" r="2" fill="#48e7a6"/>
+    <text x="1103" y="974.5" text-anchor="middle" class="foundation-chip">Worker 集群</text>
+  </g><g data-feature="分布式租约">
+    <path d="M1150 958H1220L1225 963V978L1220 983H1150L1145 978V963Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1154" cy="970.5" r="2" fill="#48e7a6"/>
+    <text x="1189" y="974.5" text-anchor="middle" class="foundation-chip">分布式租约</text>
+  </g><g data-feature="Fencing Token">
+    <path d="M1236 958H1306L1311 963V978L1306 983H1236L1231 978V963Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1240" cy="970.5" r="2" fill="#48e7a6"/>
+    <text x="1275" y="974.5" text-anchor="middle" class="foundation-chip">Fencing Token</text>
+  </g><g data-feature="幂等 / 唯一约束">
+    <path d="M1322 958H1392L1397 963V978L1392 983H1322L1317 978V963Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1326" cy="970.5" r="2" fill="#48e7a6"/>
+    <text x="1361" y="974.5" text-anchor="middle" class="foundation-chip">幂等 / 唯一约束</text>
+  </g><g data-feature="Outbox / Inbox">
+    <path d="M978 988H1048L1053 993V1008L1048 1013H978L973 1008V993Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="982" cy="1000.5" r="2" fill="#48e7a6"/>
+    <text x="1017" y="1004.5" text-anchor="middle" class="foundation-chip feature-text--compact">Outbox / Inbox</text>
+  </g><g data-feature="WAL / Spool">
+    <path d="M1064 988H1134L1139 993V1008L1134 1013H1064L1059 1008V993Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1068" cy="1000.5" r="2" fill="#48e7a6"/>
+    <text x="1103" y="1004.5" text-anchor="middle" class="foundation-chip">WAL / Spool</text>
+  </g><g data-feature="重启恢复">
+    <path d="M1150 988H1220L1225 993V1008L1220 1013H1150L1145 1008V993Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1154" cy="1000.5" r="2" fill="#48e7a6"/>
+    <text x="1189" y="1004.5" text-anchor="middle" class="foundation-chip">重启恢复</text>
+  </g><g data-feature="健康检查">
+    <path d="M1236 988H1306L1311 993V1008L1306 1013H1236L1231 1008V993Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1240" cy="1000.5" r="2" fill="#48e7a6"/>
+    <text x="1275" y="1004.5" text-anchor="middle" class="foundation-chip">健康检查</text>
+  </g><g data-feature="Docker / K8s">
+    <path d="M1322 988H1392L1397 993V1008L1392 1013H1322L1317 1008V993Z" class="feature-shell" stroke="#48e7a6"/>
+    <circle cx="1326" cy="1000.5" r="2" fill="#48e7a6"/>
+    <text x="1361" y="1004.5" text-anchor="middle" class="foundation-chip">Docker / K8s</text>
+  </g>
+  </g><g>
+    <path d="M1433 910H1847L1860 923V1021L1847 1034H1433L1420 1021V923Z" class="foundation-shell" stroke="#ffbd59"/>
+    <path d="M1421 946H1859" stroke="#ffbd59" stroke-opacity=".42"/>
+    <path d="M1433 911H1538" stroke="#ffbd59" stroke-width="3"/>
+    <text x="1434" y="935" class="foundation-title" fill="#ffbd59">工程、生态与交付</text>
+    <g data-feature="应用商城">
+    <path d="M1438 958H1508L1513 963V978L1508 983H1438L1433 978V963Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1442" cy="970.5" r="2" fill="#ffbd59"/>
+    <text x="1477" y="974.5" text-anchor="middle" class="foundation-chip">应用商城</text>
+  </g><g data-feature="Managed">
+    <path d="M1524 958H1594L1599 963V978L1594 983H1524L1519 978V963Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1528" cy="970.5" r="2" fill="#ffbd59"/>
+    <text x="1563" y="974.5" text-anchor="middle" class="foundation-chip">Managed</text>
+  </g><g data-feature="CreateIfMissing">
+    <path d="M1610 958H1680L1685 963V978L1680 983H1610L1605 978V963Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1614" cy="970.5" r="2" fill="#ffbd59"/>
+    <text x="1649" y="974.5" text-anchor="middle" class="foundation-chip feature-text--compact">CreateIfMissing</text>
+  </g><g data-feature="MCP">
+    <path d="M1696 958H1766L1771 963V978L1766 983H1696L1691 978V963Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1700" cy="970.5" r="2" fill="#ffbd59"/>
+    <text x="1735" y="974.5" text-anchor="middle" class="foundation-chip">MCP</text>
+  </g><g data-feature="Microi.VSCode">
+    <path d="M1782 958H1852L1857 963V978L1852 983H1782L1777 978V963Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1786" cy="970.5" r="2" fill="#ffbd59"/>
+    <text x="1821" y="974.5" text-anchor="middle" class="foundation-chip">Microi.VSCode</text>
+  </g><g data-feature="CLI / Plugins">
+    <path d="M1438 988H1508L1513 993V1008L1508 1013H1438L1433 1008V993Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1442" cy="1000.5" r="2" fill="#ffbd59"/>
+    <text x="1477" y="1004.5" text-anchor="middle" class="foundation-chip">CLI / Plugins</text>
+  </g><g data-feature="Skills">
+    <path d="M1524 988H1594L1599 993V1008L1594 1013H1524L1519 1008V993Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1528" cy="1000.5" r="2" fill="#ffbd59"/>
+    <text x="1563" y="1004.5" text-anchor="middle" class="foundation-chip">Skills</text>
+  </g><g data-feature="官方文档">
+    <path d="M1610 988H1680L1685 993V1008L1680 1013H1610L1605 1008V993Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1614" cy="1000.5" r="2" fill="#ffbd59"/>
+    <text x="1649" y="1004.5" text-anchor="middle" class="foundation-chip">官方文档</text>
+  </g><g data-feature="自动化测试">
+    <path d="M1696 988H1766L1771 993V1008L1766 1013H1696L1691 1008V993Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1700" cy="1000.5" r="2" fill="#ffbd59"/>
+    <text x="1735" y="1004.5" text-anchor="middle" class="foundation-chip">自动化测试</text>
+  </g><g data-feature="浏览器回读">
+    <path d="M1782 988H1852L1857 993V1008L1852 1013H1782L1777 1008V993Z" class="feature-shell" stroke="#ffbd59"/>
+    <circle cx="1786" cy="1000.5" r="2" fill="#ffbd59"/>
+    <text x="1821" y="1004.5" text-anchor="middle" class="foundation-chip">浏览器回读</text>
+  </g>
+  </g>
+
+  <path d="M40 1052H1880" stroke="url(#header-line)" stroke-opacity=".35"/>
+  <text x="40" y="1069" class="footer">核心原则：后端权威鉴权 · OsClient 隔离 · 共享状态 · 幂等副作用 · 不可变版本 · 失败关闭 · 应用商城统一交付 · 真实回读验收</text>
+  <text x="1880" y="1069" text-anchor="end" class="footer">microi.net</text>
+</svg>

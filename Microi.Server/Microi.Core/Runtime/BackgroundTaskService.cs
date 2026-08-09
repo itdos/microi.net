@@ -111,6 +111,12 @@ namespace Microi.net
             }
 
             var param = apiParam == null ? new JObject() : (JObject)apiParam.DeepClone();
+            if (param["_TraceParent"] == null && !MicroiTraceContext.CurrentTraceParent.DosIsNullOrWhiteSpace())
+            {
+                param["_TraceParent"] = MicroiTraceContext.CurrentTraceParent;
+                if (!MicroiTraceContext.CurrentTraceState.DosIsNullOrWhiteSpace())
+                    param["_TraceState"] = MicroiTraceContext.CurrentTraceState;
+            }
             var apiEngineKey = param["ApiEngineKey"]?.ToString() ?? "";
             if (apiEngineKey.DosIsNullOrWhiteSpace())
                 throw new InvalidOperationException("ApiEngineKey不能为空。");
@@ -475,6 +481,18 @@ namespace Microi.net
             using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken))
             {
                 var active = new ActiveExecution(item, cancellation);
+                var traceParam = ParseObject(item.ParamJson);
+                var activity = MicroiTraceContext.StartActivity(
+                    "Microi.BackgroundTask " + (item.ApiEngineKey ?? "Worker"),
+                    traceParam["_TraceParent"]?.ToString(),
+                    traceParam["_TraceState"]?.ToString(),
+                    new Dictionary<string, object>
+                    {
+                        ["microi.os_client"] = item.OsClient ?? "",
+                        ["microi.background_task_id"] = item.Id ?? "",
+                        ["microi.api_engine_key"] = item.ApiEngineKey ?? "",
+                        ["microi.fencing_token"] = item.FencingToken
+                    });
                 ActiveExecutions[item.Id] = active;
                 CacheProjection(item);
                 QueueNotification(item);
@@ -506,7 +524,8 @@ namespace Microi.net
                         item.BusinessStatusField,
                         item.BusinessTaskIdField,
                         item.BusinessProgressField,
-                        item.BusinessEtaField
+                        item.BusinessEtaField,
+                        item.LeaseOwner
                     });
 
                     dynamic rawResult;
@@ -631,6 +650,7 @@ namespace Microi.net
                         CacheProjection(current);
                         QueueNotification(current);
                     }
+                    activity?.Stop();
                 }
             }
         }

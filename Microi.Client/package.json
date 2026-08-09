@@ -1,6 +1,6 @@
 {
   "name": "microi.net",
-  "version": "7.2.4",
+  "version": "7.2.5",
   "description": "开源低代码平台 - Microi吾码",
   "author": "iTdos",
   "type": "module",
@@ -19,6 +19,8 @@
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml",
     "format": "prettier --write \"**/*.{js,vue,json,md}\"",
     "test:blueprint": "playwright test tests/blueprint-e2e.spec.mjs --headed --reporter=list",
+    "test:blueprint-versioning": "node --test tests/blueprint-versioning-sfc.spec.mjs",
+    "test:page-versioning": "node --test tests/page-engine-versioning-sfc.spec.mjs",
     "test:v8-http": "node --test tests/v8-http.spec.mjs",
     "test:v8-ai": "node --test tests/v8-ai.spec.mjs",
     "test:api-service-status": "node --test tests/api-service-status.spec.mjs",

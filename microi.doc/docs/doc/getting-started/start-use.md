@@ -2,6 +2,8 @@
 
 > **使用 Microi吾码低代码平台快速创建业务模块**
 
+<MciNugetStats variant="feature" />
+
 ---
 
 ## 🎥 视频教程

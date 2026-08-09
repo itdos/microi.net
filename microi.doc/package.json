@@ -11,6 +11,7 @@
 	"license": "MIT",
 	"homepage": "https://microi.net/",
 	"scripts": {
+		"generate:architecture": "node scripts/generate-ai-platform-architecture.mjs",
 		"check:links": "node scripts/check-dead-links.mjs",
 		"check:sidebar": "node scripts/check-sidebar-coverage.mjs",
 		"check:repositories": "node scripts/check-open-source-links.mjs",
@@ -19,6 +20,8 @@
 		"check:theme": "node scripts/check-default-dark.mjs",
 		"test:app-preview": "node --test tests/uniapp-preview-mode.test.mjs",
 		"test:site-api": "node --test tests/site-api-base.test.mjs",
+		"test:nuget": "node --test tests/nuget-downloads.test.mjs",
+		"test:architecture": "node --test tests/ai-platform-architecture.test.mjs",
 		"test:marketplace": "node --test tests/marketplace-query-state.test.mjs tests/site-session.test.mjs",
 		"docs:dev": "npm run check:content && vitepress dev docs --host",
 		"dev": "npm run check:content && vitepress dev docs --host",

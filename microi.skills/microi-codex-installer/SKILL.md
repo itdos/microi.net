@@ -7,7 +7,7 @@ description: 当用户在 Codex、WorkBuddy、CodeBuddy、Qoder、Comate、Trae�
 
 本技能负责发现、安装、初始化、升级和诊断 Microi吾码 AI 开发能力。唯一 npm 包为 `@microi.net/cli`；该包同时提供 `microi` CLI、Codex Plugin、WorkBuddy/CodeBuddy 兼容插件清单、完整 Skills 与同源 MCP。正式 marketplace 名称固定为 `microi-net`，插件选择器固定为 `microi@microi-net`，禁止新建 `microi-official` 或第二个 npm 包。
 
-只要本技能已经由 Microi.VSCode、工作区 `microi.skills` 或已安装插件提供，用户说“帮我初始化 Microi吾码插件”时就必须识别该意图，用户不需要再次说出 npm 包名。绝对空白且任何宿主都尚未提供本技能的 AI 会话无法依靠尚未加载的 Skill 自我发现包名；因此冷启动入口统一固化在 VS Code 初始化产物、`@microi.net/cli` 与 Codex Plugin 三处，而不是要求用户记忆第二个包。
+只要本技能已经由 Microi.VSCode、工作区 `microi.skills` 或已安装插件提供，用户说“帮我初始化 Microi吾码插件”时就必须识别该意图，用户不需要再次说出 npm 包名。全新 Codex 与空目录尚未加载任何吾码 Skill 时，用户只需在首次请求中明确 `@microi.net/cli`，例如“通过 `@microi.net/cli` 安装吾码 Codex 插件”；具备终端与网络权限的 AI 必须直接执行本技能中的确定性安装命令。安装完成后，更短的“初始化吾码”“添加服务器/MCP”“拉取全部 V8”均由插件 Skill 自动识别。
 
 ## 自然语言入口规则
 
@@ -37,6 +37,7 @@ codex plugin list
 - marketplace 为 `microi-net`；
 - `microi@microi-net` 显示 `installed, enabled`；
 - 已安装版本等于 CLI 内置 marketplace 的目标版本。
+- 插件路径位于 `microi-net-marketplace/plugins/microi`，且 `.codex-plugin/plugin.json` 的显示名为 `Microi吾码`。
 
 `microi-official` 和 `microi@microi-official` 仅是旧标识，不得写入新文档或新配置；安装器会在新版安装成功后迁移并清理旧标识。
 
@@ -52,6 +53,14 @@ microi codex install --yes
 
 ```bash
 npx --yes @microi.net/cli@latest codex install --yes
+```
+
+这条命令把 npm 仅作为下载通道：安装器会将包内完整 Codex Plugin 安全复制到当前用户的 `${CODEX_HOME:-~/.codex}/microi-net-marketplace/plugins/microi`，生成 Codex 官方支持的本地 marketplace，注册 `microi-net`，再安装并启用 `microi@microi-net`。完成并重载后，Codex 的“插件”页面必须显示 **Microi吾码**，来源为 **microi-net**。禁止重新写入 Codex 不支持的 `source: npm` marketplace 条目。
+
+在全新 Codex 的空目录中，以下自然语言属于明确安装授权，必须等价执行上述命令，不得仅生成项目 Skill 后就声称 Codex Plugin 已安装：
+
+```text
+通过 @microi.net/cli@latest 安装吾码 Codex 插件。
 ```
 
 `--yes` 只表示当前用户已经授权这次全局修改，不得由 AI 在普通 Microi 对话中自行补上。只有版本不一致且普通安装不能升级、并确认目标 npm 包已经公开可读时，才使用：
@@ -135,6 +144,6 @@ CodeBuddy CLI 可把该 `packageRoot` 作为本地 marketplace 添加，再安�
 microi codex status --json
 ```
 
-只有返回 `ok: true` 且选择器、状态和版本全部正确，才报告安装完成。随后明确提示用户新建 Codex 任务或重载 Codex；当前已经打开的任务通常不会热加载新增 Skills/MCP。
+只有返回 `ok: true` 且选择器、状态和版本全部正确，才报告安装完成；必要时再用 `codex plugin list` 核对路径。随后明确提示用户新建 Codex 任务或重载 Codex；当前已经打开的任务通常不会热加载新增 Skills/MCP，桌面端插件页面也可能需要重载后刷新。
 
 若 npm 返回 `E404`，说明 `@microi.net/cli` 的目标版本尚未公开或仍在传播。不得删除仍可用的旧插件、不得重复发布同一不可变版本，也不得声称安装成功。

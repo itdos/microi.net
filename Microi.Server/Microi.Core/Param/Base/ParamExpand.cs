@@ -55,6 +55,20 @@ namespace Microi.net
         public long? DurationSeconds { get; set; }
         public bool? Success { get; set; }
         public string TraceId { get; set; }
+        /// <summary>W3C SpanId（16位十六进制）。</summary>
+        public string SpanId { get; set; }
+        /// <summary>父级 W3C SpanId；根 Span 为空。</summary>
+        public string ParentSpanId { get; set; }
+        /// <summary>W3C TraceFlags，例如 01 表示 sampled。</summary>
+        public string TraceFlags { get; set; }
+        /// <summary>产生该日志的逻辑服务名。</summary>
+        public string ServiceName { get; set; }
+        public string ServiceVersion { get; set; }
+        /// <summary>运行节点标识，只用于诊断，不能作为全局事实源。</summary>
+        public string NodeId { get; set; }
+        public string Environment { get; set; }
+        public double? DurationMs { get; set; }
+        public int? HttpStatusCode { get; set; }
         /// <summary>行为实际发生时间。异步重试时不得改成重试时间。</summary>
         public DateTime? OccurredAt { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
@@ -85,6 +99,114 @@ namespace Microi.net
         public int? Timer { get; set; }
         [DisplayFormat(ConvertEmptyStringToNull = false)]
         public string Result { get; set; }
+    }
+
+    /// <summary>按 W3C TraceId 查询跨月系统日志时间线。</summary>
+    public sealed class SysLogTraceQueryParam
+    {
+        public string OsClient { get; set; }
+        public string TraceId { get; set; }
+        public string SearchMonth { get; set; }
+        public int PageSize { get; set; } = 200;
+    }
+
+    /// <summary>受限的系统日志窗口信号查询，只返回聚合值和少量净化样例。</summary>
+    public sealed class SysLogSignalQueryParam
+    {
+        public string OsClient { get; set; }
+        public DateTime WindowStart { get; set; }
+        public DateTime WindowEnd { get; set; }
+        public string Keyword { get; set; }
+        public string Type { get; set; }
+        public string Category { get; set; }
+        public string Source { get; set; }
+        public string ServiceName { get; set; }
+        public int? LevelMin { get; set; }
+        public int MaxDurationSamples { get; set; } = 10000;
+        public int MaxEventSamples { get; set; } = 5;
+    }
+
+    public sealed class SysLogSignalSample
+    {
+        public string EventId { get; set; }
+        public string TraceId { get; set; }
+        public string ServiceName { get; set; }
+        public string Type { get; set; }
+        public string Title { get; set; }
+        public int? Level { get; set; }
+        public bool? Success { get; set; }
+        public int? HttpStatusCode { get; set; }
+        public DateTime CreateTime { get; set; }
+    }
+
+    public sealed class SysLogSignalResult
+    {
+        public long TotalCount { get; set; }
+        public long ErrorCount { get; set; }
+        public double ErrorRate { get; set; }
+        public double P95DurationMs { get; set; }
+        public int DurationSampleCount { get; set; }
+        public bool DurationSampled { get; set; }
+        public DateTime? LastSeenTime { get; set; }
+        public List<string> MonthsScanned { get; set; } = new List<string>();
+        public List<SysLogSignalSample> Samples { get; set; } = new List<SysLogSignalSample>();
+    }
+
+    /// <summary>系统日志生命周期的可信物理执行参数。</summary>
+    public class SysLogLifecycleParam
+    {
+        public string OsClient { get; set; }
+        public DateTime CutoffTime { get; set; }
+        public string Type { get; set; }
+        public string Category { get; set; }
+        public string Source { get; set; }
+        public int MaxCollections { get; set; } = 120;
+        public int BatchSize { get; set; } = 200;
+        public string SearchMonth { get; set; }
+        public string PolicyKey { get; set; }
+        public string RunKey { get; set; }
+        public string ArchiveMode { get; set; }
+        public string BackgroundTaskId { get; set; }
+        public long FencingToken { get; set; }
+    }
+
+    public sealed class SysLogLifecycleCollectionPlan
+    {
+        public string SearchMonth { get; set; }
+        public long EstimatedCount { get; set; }
+    }
+
+    public sealed class SysLogLifecyclePlan
+    {
+        public DateTime CutoffTime { get; set; }
+        public long EstimatedCount { get; set; }
+        public List<SysLogLifecycleCollectionPlan> Collections { get; set; } = new List<SysLogLifecycleCollectionPlan>();
+    }
+
+    public sealed class SysLogLifecycleBatch
+    {
+        public string SearchMonth { get; set; }
+        public string NextSearchMonth { get; set; }
+        public bool HasMore { get; set; }
+        public List<SysLog> Items { get; set; } = new List<SysLog>();
+    }
+
+    public sealed class SysLogLifecycleCommitParam : SysLogLifecycleParam
+    {
+        public List<string> EventIds { get; set; } = new List<string>();
+        public string ArchivePath { get; set; }
+        public string ArchiveProofHash { get; set; }
+        public long ScannedCount { get; set; }
+        public long ArchivedCount { get; set; }
+    }
+
+    public sealed class SysLogLifecycleRunState
+    {
+        public long Scanned { get; set; }
+        public long Archived { get; set; }
+        public long Deleted { get; set; }
+        public string LastArchivePath { get; set; }
+        public string LastArchiveProofHash { get; set; }
     }
     /// <summary>
     /// 接口引擎调用次数统计参数

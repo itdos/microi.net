@@ -9,6 +9,10 @@
             <el-input v-model="form.Name" placeholder="蓝图名称" style="width: 220px;" size="default" />
             <el-input v-model="form.Code" placeholder="编码（可选）" style="width: 160px; margin-left: 6px;"
                 size="default" />
+            <el-input v-model="form.Version" placeholder="版本" style="width: 92px; margin-left: 6px;" maxlength="20"
+                size="default" />
+            <el-input v-model="form.ChangeSummary" placeholder="本次变更说明" style="width: 180px; margin-left: 6px;"
+                maxlength="2000" size="default" />
             <el-divider direction="vertical" />
             <el-button-group>
                 <el-button :type="layer === 'domain' ? 'primary' : ''" @click="switchLayer('domain')"
@@ -43,6 +47,7 @@
             <el-divider direction="vertical" />
             <el-button type="success" @click="onSave" :icon="Check">保存</el-button>
             <el-button type="warning" @click="onValidate" :disabled="!form.Id" :icon="WarningFilled">验证</el-button>
+            <el-button type="primary" plain @click="openHistory" :disabled="!form.Id" :icon="Clock">历史</el-button>
             <el-button type="info" @click="showJsonDialog = true" :icon="DataLine">JSON</el-button>
             <span class="zoom-tip">缩放：{{ Math.round(zoom * 100) }}%</span>
         </div>
@@ -191,6 +196,81 @@
             </template>
         </el-dialog>
 
+        <!-- 不可变历史、差异与回滚 -->
+        <el-dialog v-model="historyVisible" title="蓝图版本历史" width="min(1080px, calc(100vw - 48px))"
+            align-center draggable append-to-body>
+            <div class="history-summary">
+                <div>
+                    <span class="history-label">当前版本</span>
+                    <strong>{{ form.Version || '1.0' }}</strong>
+                </div>
+                <div>
+                    <span class="history-label">当前内容 Hash</span>
+                    <code>{{ shortHash(currentHash) }}</code>
+                </div>
+                <el-button size="small" @click="loadHistoryPage(historyPage)" :loading="historyLoading">刷新</el-button>
+            </div>
+            <el-table v-loading="historyLoading" :data="historyItems" stripe max-height="520">
+                <el-table-column prop="Version" label="版本" width="110" />
+                <el-table-column prop="ChangeSummary" label="变更说明" min-width="220" show-overflow-tooltip />
+                <el-table-column prop="CreateUserName" label="保存人" width="120" />
+                <el-table-column prop="CreateTime" label="保存时间" width="168" />
+                <el-table-column label="内容" width="150">
+                    <template #default="scope">
+                        <code :title="scope.row.ContentHash">{{ shortHash(scope.row.ContentHash) }}</code>
+                        <div class="history-bytes">{{ formatBytes(scope.row.ContentLength) }}</div>
+                    </template>
+                </el-table-column>
+                <el-table-column label="操作" width="244" fixed="right">
+                    <template #default="scope">
+                        <el-button link type="primary" @click="compareHistory(scope.row)">比较当前</el-button>
+                        <el-button link @click="viewHistory(scope.row)">查看</el-button>
+                        <el-button link type="danger" :loading="rollbackLoadingId === scope.row.Id"
+                            @click="confirmRollback(scope.row)">回滚</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+            <div class="history-pagination" v-if="historyTotal > historyPageSize">
+                <el-pagination background layout="prev, pager, next, total" :total="historyTotal"
+                    :page-size="historyPageSize" :current-page="historyPage"
+                    @current-change="loadHistoryPage" />
+            </div>
+        </el-dialog>
+
+        <el-dialog v-model="diffVisible" title="蓝图语义差异" width="min(1180px, calc(100vw - 48px))"
+            align-center draggable append-to-body>
+            <div v-if="diffResult" class="diff-panel">
+                <div class="diff-summary">
+                    <el-tag type="success">新增 {{ diffResult.Added || 0 }}</el-tag>
+                    <el-tag type="danger">删除 {{ diffResult.Removed || 0 }}</el-tag>
+                    <el-tag type="warning">修改 {{ diffResult.Changed || 0 }}</el-tag>
+                    <span>{{ diffResult.Left?.Version || '-' }} → {{ diffResult.Right?.Version || '-' }}</span>
+                    <span v-if="diffResult.Truncated" class="diff-truncated">结果过多，仅展示前 {{ diffResult.ReturnedChanges }} 项</span>
+                </div>
+                <el-empty v-if="diffResult.Equal" description="两个版本的业务内容一致" />
+                <el-table v-else :data="diffResult.Changes || []" stripe max-height="560">
+                    <el-table-column prop="Type" label="类型" width="88">
+                        <template #default="scope">
+                            <el-tag :type="diffTagType(scope.row.Type)" size="small">{{ diffTypeLabel(scope.row.Type) }}</el-tag>
+                        </template>
+                    </el-table-column>
+                    <el-table-column prop="Path" label="语义路径" min-width="280" show-overflow-tooltip />
+                    <el-table-column label="变更前" min-width="300">
+                        <template #default="scope"><pre class="diff-value">{{ formatDiffValue(scope.row.Before) }}</pre></template>
+                    </el-table-column>
+                    <el-table-column label="变更后" min-width="300">
+                        <template #default="scope"><pre class="diff-value">{{ formatDiffValue(scope.row.After) }}</pre></template>
+                    </el-table-column>
+                </el-table>
+            </div>
+        </el-dialog>
+
+        <el-dialog v-model="historyDetailVisible" title="历史快照 JSON"
+            width="min(920px, calc(100vw - 48px))" align-center draggable append-to-body>
+            <el-input type="textarea" :rows="24" v-model="historyDetailText" readonly
+                style="font-family: Consolas, monospace;" />
+        </el-dialog>
+
         <!-- 节点重命名（双击） -->
         <el-dialog v-model="renameVisible" title="重命名节点" width="360px">
             <el-input v-model="renameText" @keyup.enter="confirmRename" autofocus />
@@ -213,7 +293,7 @@ import { Transform } from "@antv/x6-plugin-transform";
 import {
     ArrowLeft, Check, WarningFilled, Grid, Connection, Lightning, Coin, Cpu, Operation,
     EditPen, RefreshLeft, RefreshRight, ZoomIn, ZoomOut, FullScreen, MagicStick,
-    Delete, DocumentCopy, DocumentAdd, DataLine, InfoFilled
+    Delete, DocumentCopy, DocumentAdd, DataLine, InfoFilled, Clock
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { BlueprintApi } from "./api.js";
@@ -257,18 +337,18 @@ export default {
     components: {
         ArrowLeft, Check, WarningFilled, Grid, Connection, Lightning, Coin, Cpu, Operation,
         EditPen, RefreshLeft, RefreshRight, ZoomIn, ZoomOut, FullScreen, MagicStick,
-        Delete, DocumentCopy, DocumentAdd, DataLine, InfoFilled
+        Delete, DocumentCopy, DocumentAdd, DataLine, InfoFilled, Clock
     },
     data() {
         return {
             ArrowLeft, Check, WarningFilled, Grid, Connection, Lightning, Coin, Cpu, Operation,
             EditPen, RefreshLeft, RefreshRight, ZoomIn, ZoomOut, FullScreen, MagicStick,
-            Delete, DocumentCopy, DocumentAdd, DataLine, InfoFilled,
+            Delete, DocumentCopy, DocumentAdd, DataLine, InfoFilled, Clock,
             SHAPE_STYLE,
             LAYER_CONFIG,
             graph: null,
             layer: "domain",
-            form: { Id: "", Name: "", Code: "", Description: "", Version: "1.0", Status: 1 },
+            form: { Id: "", Name: "", Code: "", Description: "", Version: "1.0", Status: 1, ChangeSummary: "" },
             // 三层图：仅保存"序列化"的 nodes/edges，画布以 x6 内部状态为准
             diagrams: {
                 domain: { nodes: [], edges: [] },
@@ -288,7 +368,19 @@ export default {
             renameText: "",
             renameTargetId: "",
             zoom: 1,
-            resourceCache: { tables: [], engines: [], menus: [] }
+            resourceCache: { tables: [], engines: [], menus: [] },
+            historyVisible: false,
+            historyLoading: false,
+            historyItems: [],
+            historyPage: 1,
+            historyPageSize: 50,
+            historyTotal: 0,
+            currentHash: "",
+            rollbackLoadingId: "",
+            diffVisible: false,
+            diffResult: null,
+            historyDetailVisible: false,
+            historyDetailText: ""
         };
     },
     computed: {
@@ -312,6 +404,27 @@ export default {
         kindLabel(k) { return KIND_LABEL[k] || k; },
         kindTagType(k) {
             return { table: "primary", engine: "warning", process: "success", note: "info" }[k] || "";
+        },
+        shortHash(value) {
+            const text = String(value || "");
+            return text ? `${text.slice(0, 10)}…${text.slice(-6)}` : "-";
+        },
+        formatBytes(value) {
+            const size = Number(value || 0);
+            if (size < 1024) return `${size} B`;
+            if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+            return `${(size / 1024 / 1024).toFixed(1)} MB`;
+        },
+        diffTagType(type) {
+            return { Added: "success", Removed: "danger", Changed: "warning" }[type] || "info";
+        },
+        diffTypeLabel(type) {
+            return { Added: "新增", Removed: "删除", Changed: "修改" }[type] || type;
+        },
+        formatDiffValue(value) {
+            if (value === null || value === undefined) return "—";
+            if (typeof value === "string") return value;
+            try { return JSON.stringify(value, null, 2); } catch (e) { return String(value); }
         },
 
         initGraph() {
@@ -738,7 +851,12 @@ export default {
             this.form = {
                 Id: res.Data.Id, Name: res.Data.Name, Code: res.Data.Code || "",
                 Description: res.Data.Description || "", Version: res.Data.Version || "1.0",
-                Status: res.Data.Status ?? 1
+                Status: res.Data.Status ?? 1, ChangeSummary: ""
+            };
+            this.diagrams = {
+                domain: { nodes: [], edges: [] },
+                process: { nodes: [], edges: [] },
+                behavior: { nodes: [], edges: [] }
             };
             try {
                 const bd = res.Data.BlueprintData ? JSON.parse(res.Data.BlueprintData) : null;
@@ -776,6 +894,7 @@ export default {
             const res = await BlueprintApi.save(payload);
             if (res.Code === 1) {
                 this.form.Id = res.Data?.Id || this.form.Id;
+                this.form.ChangeSummary = "";
                 ElMessage.success("保存成功");
             } else {
                 ElMessage.error(res.Msg || "保存失败");
@@ -790,6 +909,106 @@ export default {
                 this.validateVisible = true;
             } else {
                 ElMessage.error(res.Msg || "验证失败");
+            }
+        },
+
+        async openHistory() {
+            if (!this.form.Id) { ElMessage.warning("请先保存蓝图"); return; }
+            this.historyVisible = true;
+            await this.loadHistoryPage(1);
+        },
+
+        async loadHistoryPage(page = 1) {
+            if (!this.form.Id) return;
+            this.historyLoading = true;
+            try {
+                const res = await BlueprintApi.listHistory(this.form.Id, page, this.historyPageSize);
+                if (res.Code !== 1) {
+                    ElMessage.error(res.Msg || "读取历史失败");
+                    return;
+                }
+                this.historyItems = res.Data?.Items || [];
+                this.historyTotal = Number(res.Data?.DataCount || 0);
+                this.historyPage = Number(res.Data?.PageIndex || page);
+                this.currentHash = res.Data?.CurrentHash || "";
+            } catch (e) {
+                ElMessage.error("读取历史失败：" + e.message);
+            } finally {
+                this.historyLoading = false;
+            }
+        },
+
+        async compareHistory(row) {
+            const res = await BlueprintApi.compare(this.form.Id, row.Id);
+            if (res.Code !== 1) {
+                ElMessage.error(res.Msg || "比较失败");
+                return;
+            }
+            this.diffResult = res.Data;
+            this.diffVisible = true;
+        },
+
+        async viewHistory(row) {
+            const res = await BlueprintApi.getHistory(this.form.Id, row.Id);
+            if (res.Code !== 1) {
+                ElMessage.error(res.Msg || "读取历史快照失败");
+                return;
+            }
+            try {
+                const data = res.Data || {};
+                const blueprintData = data.BlueprintData ? JSON.parse(data.BlueprintData) : null;
+                this.historyDetailText = JSON.stringify({
+                    Id: data.Id,
+                    Version: data.Version,
+                    ChangeSummary: data.ChangeSummary,
+                    CreateTime: data.CreateTime,
+                    CreateUserName: data.CreateUserName,
+                    ContentHash: data.ContentHash,
+                    BlueprintData: blueprintData
+                }, null, 2);
+            } catch (e) {
+                this.historyDetailText = String(res.Data?.BlueprintData || "");
+            }
+            this.historyDetailVisible = true;
+        },
+
+        async confirmRollback(row) {
+            if (!this.currentHash) {
+                await this.loadHistoryPage(this.historyPage);
+                if (!this.currentHash) return;
+            }
+            try {
+                await ElMessageBox.confirm(
+                    `将当前蓝图回滚到版本 ${row.Version || "-"}。系统会先保存当前快照，历史记录不会被修改。`,
+                    "确认回滚蓝图",
+                    {
+                        type: "warning",
+                        confirmButtonText: "回滚并保留当前快照",
+                        cancelButtonText: "取消",
+                        autofocus: false
+                    }
+                );
+            } catch (e) {
+                return;
+            }
+            this.rollbackLoadingId = row.Id;
+            try {
+                const res = await BlueprintApi.rollback(this.form.Id, row.Id, this.currentHash, {
+                    newVersion: row.Version || this.form.Version || "1.0",
+                    changeSummary: `设计器回滚到历史版本 ${row.Version || "-"}`
+                });
+                if (res.Code !== 1) {
+                    ElMessage.error(res.Msg || "回滚失败");
+                    await this.loadHistoryPage(this.historyPage);
+                    return;
+                }
+                ElMessage.success("回滚成功，回滚前内容已自动保存为历史快照");
+                await this.loadBlueprint(this.form.Id);
+                await this.loadHistoryPage(1);
+            } catch (e) {
+                ElMessage.error("回滚失败：" + e.message);
+            } finally {
+                this.rollbackLoadingId = "";
             }
         },
 
@@ -822,14 +1041,34 @@ export default {
             try {
                 const { DiyCommon } = await import("@/utils/diy.common");
                 const wrap = (url, params) => new Promise(r => { try { DiyCommon.Post(url, params || {}, r); } catch (e) { r({ Code: 0 }); } });
-                // 试探多个常见端点，错误静默
-                const tableRes = await wrap("/api/DiyTable/GetTableData", { _PageSize: 500 });
+                const [tableRes, menuRes, engineRes] = await Promise.all([
+                    DiyCommon.FormEngine.GetTableData("diy_table", {
+                        _SelectFields: ["Id", "Name", "Description"],
+                        _Where: [["IsDeleted", "<>", 1]],
+                        _OrderBy: "Name",
+                        _OrderByType: "ASC",
+                        _PageSize: 500
+                    }),
+                    DiyCommon.FormEngine.GetTableData("sys_menu", {
+                        _SelectFields: ["Id", "Name"],
+                        _Where: [["IsDeleted", "<>", 1]],
+                        _OrderBy: "Name",
+                        _OrderByType: "ASC",
+                        _PageSize: 500
+                    }),
+                    wrap("/api/V8Engine/GetApiEngineList", {})
+                ]);
                 if (tableRes?.Code === 1 && Array.isArray(tableRes.Data)) {
                     this.resourceCache.tables = tableRes.Data.map(t => t.Name || t.name).filter(Boolean);
                 }
-                const engineRes = await wrap("/api/V8Engine/ListApiEngine", { _PageSize: 500 });
-                if (engineRes?.Code === 1 && Array.isArray(engineRes.Data)) {
-                    this.resourceCache.engines = engineRes.Data.map(e => e.ApiEngineKey || e.apiEngineKey).filter(Boolean);
+                if (menuRes?.Code === 1 && Array.isArray(menuRes.Data)) {
+                    this.resourceCache.menus = menuRes.Data.map(m => m.Name || m.name || m.Id || m.id).filter(Boolean);
+                }
+                const engineRows = Array.isArray(engineRes?.Data)
+                    ? engineRes.Data
+                    : (Array.isArray(engineRes?.Data?.List) ? engineRes.Data.List : []);
+                if (engineRes?.Code === 1) {
+                    this.resourceCache.engines = engineRows.map(e => e.ApiEngineKey || e.apiEngineKey).filter(Boolean);
                 }
             } catch (e) { /* 静默 */ }
         }
@@ -1023,4 +1262,64 @@ export default {
 
 .result-error { color: #f56c6c; margin: 4px 0; }
 .result-warn { color: #e6a23c; margin: 4px 0; }
+
+.history-summary,
+.diff-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.history-summary > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.history-label,
+.history-bytes {
+    color: #909399;
+    font-size: 12px;
+}
+
+.history-pagination {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.diff-panel {
+    min-height: 180px;
+}
+
+.diff-summary > span {
+    color: #606266;
+    font-size: 13px;
+}
+
+.diff-summary .diff-truncated {
+    color: #e6a23c;
+}
+
+.diff-value {
+    margin: 0;
+    max-height: 140px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: 12px/1.5 Consolas, "Microsoft YaHei", monospace;
+    color: #303133;
+}
+
+@media (max-width: 900px) {
+    .toolbar .el-input {
+        max-width: calc(50vw - 20px);
+    }
+    .history-summary {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
 </style>

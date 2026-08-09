@@ -32,5 +32,21 @@ namespace Microi.net
         Task<DosResult> NL2V8Stream(
             NL2V8Param param,
             Func<string, Task> onChunkReceived);
+
+        /// <summary>
+        /// 创建绑定当前 V8 租户和用户的 MiniMax 视频任务。
+        /// 脚本不得传入供应商密钥、Endpoint、用户或租户。
+        /// </summary>
+        Task<DosResult> CreateMiniMaxVideo(MiniMaxVideoCreateParam param);
+
+        /// <summary>
+        /// 使用服务器签名的 TaskHandle 查询当前用户的视频任务。
+        /// </summary>
+        Task<DosResult> GetMiniMaxVideoTask(MiniMaxVideoTaskParam param);
+
+        /// <summary>
+        /// 使用服务器签名的 FileHandle 获取临时下载地址。
+        /// </summary>
+        Task<DosResult> GetMiniMaxVideoFile(MiniMaxVideoFileParam param);
     }
 }

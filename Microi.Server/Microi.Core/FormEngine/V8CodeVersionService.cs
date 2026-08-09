@@ -17,6 +17,32 @@ namespace Microi.net
     /// </summary>
     public static class V8CodeVersionService
     {
+        internal sealed class CodeFieldChange
+        {
+            public CodeFieldChange(string fieldName, string fieldLabel, string code)
+            {
+                FieldName = fieldName;
+                FieldLabel = fieldLabel;
+                Code = code;
+            }
+
+            public string FieldName { get; }
+            public string FieldLabel { get; }
+            public string Code { get; }
+        }
+
+        internal sealed class CodeRowChange
+        {
+            public CodeRowChange(string rowId, IReadOnlyList<CodeFieldChange> fields)
+            {
+                RowId = rowId;
+                Fields = fields;
+            }
+
+            public string RowId { get; }
+            public IReadOnlyList<CodeFieldChange> Fields { get; }
+        }
+
         private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> CodeFields
             = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
             {
@@ -108,19 +134,13 @@ namespace Microi.net
                 return new DosResult(1, new { Count = 0 });
             }
 
-            var newRowList = (newRows ?? Enumerable.Empty<JObject>())
-                .Where(row => row != null)
-                .Select(row => (JObject)row.DeepClone())
-                .ToList();
-            if (newRowList.Count == 0)
+            // 先在内存中比较代码字段。表单设计器批量保存通常只改布局、标签或排序，
+            // 这种请求不应再查询 diy_table，更不能对每个字段逐条扫描版本表。
+            var changedRows = CollectChangedCodeRows(tableName, oldRows, newRows);
+            if (changedRows.Count == 0)
             {
                 return new DosResult(1, new { Count = 0 });
             }
-
-            var oldRowMap = (oldRows ?? Enumerable.Empty<JObject>())
-                .Where(row => row != null && !SafeString(row, "Id").DosIsNullOrWhiteSpace())
-                .GroupBy(row => SafeString(row, "Id"), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
             var tableModelResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_table", new
             {
@@ -141,7 +161,68 @@ namespace Microi.net
             var canonicalTableName = SafeString(tableModel, "Name", tableName);
             var createdCount = 0;
 
-            foreach (var newRow in newRowList)
+            foreach (var changedRow in changedRows)
+            {
+                var latestVersion = await GetLatestVersionAsync(osClient, tableId, changedRow.RowId);
+                foreach (var field in changedRow.Fields)
+                {
+                    var version = ResolveNextVersion(latestVersion, ExtractVersion(field.Code));
+                    var snapshot = new JObject
+                    {
+                        ["Id"] = changedRow.RowId,
+                        [field.FieldName] = field.Code,
+                        ["__CodeEditorCode"] = field.Code,
+                        ["__CodeEditorFieldName"] = field.FieldName,
+                        ["__CodeEditorFieldLabel"] = field.FieldLabel,
+                        ["__CodeEditorLanguage"] = "javascript"
+                    };
+                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("mic_data_version", new
+                    {
+                        OsClient = osClient,
+                        _CurrentUser = currentUser,
+                        TableId = tableId,
+                        TableName = canonicalTableName,
+                        TableRowId = changedRow.RowId,
+                        Version = version,
+                        Action = action,
+                        Data = snapshot.ToString(Formatting.None),
+                        Remark = $"{field.FieldLabel}代码变更"
+                    });
+                    if (addResult.Code != 1)
+                    {
+                        return new DosResult(addResult.Code, new
+                        {
+                            Count = createdCount,
+                            TableName = canonicalTableName,
+                            TableRowId = changedRow.RowId,
+                            FieldName = field.FieldName
+                        }, addResult.Msg);
+                    }
+                    createdCount++;
+                    latestVersion = version;
+                }
+            }
+
+            return new DosResult(1, new { Count = createdCount });
+        }
+
+        internal static IReadOnlyList<CodeRowChange> CollectChangedCodeRows(
+            string tableName,
+            IEnumerable<JObject> oldRows,
+            IEnumerable<JObject> newRows)
+        {
+            if (!IsSupportedTable(tableName))
+            {
+                return Array.Empty<CodeRowChange>();
+            }
+
+            var oldRowMap = (oldRows ?? Enumerable.Empty<JObject>())
+                .Where(row => row != null && !SafeString(row, "Id").DosIsNullOrWhiteSpace())
+                .GroupBy(row => SafeString(row, "Id"), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+            var changedRows = new List<CodeRowChange>();
+
+            foreach (var newRow in newRows ?? Enumerable.Empty<JObject>())
             {
                 var rowId = SafeString(newRow, "Id");
                 if (rowId.DosIsNullOrWhiteSpace())
@@ -150,10 +231,16 @@ namespace Microi.net
                 }
 
                 oldRowMap.TryGetValue(rowId, out var oldRow);
-                var latestVersion = await GetLatestVersionAsync(osClient, tableId, rowId);
+                var changedFields = new List<CodeFieldChange>();
                 foreach (var field in CodeFields[tableName])
                 {
-                    var newCode = DecodeCode(SafeString(newRow, field.Key));
+                    // 未提交的代码字段表示“保持原值”；显式 null/空串才表示清空代码。
+                    if (!newRow.TryGetValue(field.Key, StringComparison.OrdinalIgnoreCase, out var newCodeToken))
+                    {
+                        continue;
+                    }
+
+                    var newCode = DecodeCode(SafeString(newCodeToken));
                     var oldCode = oldRow == null ? "" : DecodeCode(SafeString(oldRow, field.Key));
                     if (NormalizeCode(oldCode) == NormalizeCode(newCode))
                     {
@@ -165,44 +252,16 @@ namespace Microi.net
                         continue;
                     }
 
-                    var version = ResolveNextVersion(latestVersion, ExtractVersion(newCode));
-                    var snapshot = new JObject
-                    {
-                        ["Id"] = rowId,
-                        [field.Key] = newCode,
-                        ["__CodeEditorCode"] = newCode,
-                        ["__CodeEditorFieldName"] = field.Key,
-                        ["__CodeEditorFieldLabel"] = field.Value,
-                        ["__CodeEditorLanguage"] = "javascript"
-                    };
-                    var addResult = await MicroiEngine.FormEngine.AddFormDataAsync("mic_data_version", new
-                    {
-                        OsClient = osClient,
-                        _CurrentUser = currentUser,
-                        TableId = tableId,
-                        TableName = canonicalTableName,
-                        TableRowId = rowId,
-                        Version = version,
-                        Action = action,
-                        Data = snapshot.ToString(Formatting.None),
-                        Remark = $"{field.Value}代码变更"
-                    });
-                    if (addResult.Code != 1)
-                    {
-                        return new DosResult(addResult.Code, new
-                        {
-                            Count = createdCount,
-                            TableName = canonicalTableName,
-                            TableRowId = rowId,
-                            FieldName = field.Key
-                        }, addResult.Msg);
-                    }
-                    createdCount++;
-                    latestVersion = version;
+                    changedFields.Add(new CodeFieldChange(field.Key, field.Value, newCode));
+                }
+
+                if (changedFields.Count > 0)
+                {
+                    changedRows.Add(new CodeRowChange(rowId, changedFields));
                 }
             }
 
-            return new DosResult(1, new { Count = createdCount });
+            return changedRows;
         }
 
         private static async Task<string> GetLatestVersionAsync(
@@ -320,7 +379,16 @@ namespace Microi.net
 
         private static string SafeString(JObject row, string fieldName, string fallback = "")
         {
-            var token = row?[fieldName];
+            if (row == null
+                || !row.TryGetValue(fieldName, StringComparison.OrdinalIgnoreCase, out var token))
+            {
+                return fallback;
+            }
+            return SafeString(token, fallback);
+        }
+
+        private static string SafeString(JToken token, string fallback = "")
+        {
             if (token == null || token.Type == JTokenType.Null || token.Type == JTokenType.Undefined)
             {
                 return fallback;

@@ -144,6 +144,57 @@ export function registerBlueprintTools(server: McpServer, client: MicroiClient, 
   );
 
   server.tool(
+    'microi_list_blueprint_history',
+    `List immutable history snapshots for a blueprint. Returns metadata, stable SHA-256 hashes and the current draft hash without returning snapshot bodies. OsClient: ${osClient}`,
+    {
+      blueprintId: z.string().describe('Blueprint Id or Name'),
+      pageIndex: z.number().int().min(1).optional().describe('1-based page index, default 1'),
+      pageSize: z.number().int().min(1).max(100).optional().describe('Page size, default 50, max 100'),
+    },
+    async ({ blueprintId, pageIndex, pageSize }) => apiText(
+      'Blueprint History',
+      await client.listBlueprintHistory(blueprintId, pageIndex ?? 1, pageSize ?? 50),
+    ),
+  );
+
+  server.tool(
+    'microi_get_blueprint_history',
+    `Read one immutable blueprint history snapshot including BlueprintData. The history row must belong to the requested blueprint and current tenant. OsClient: ${osClient}`,
+    {
+      blueprintId: z.string().describe('Blueprint Id or Name'),
+      historyId: z.string().describe('History snapshot Id'),
+    },
+    async ({ blueprintId, historyId }) => apiText(
+      'Blueprint History Detail',
+      await client.getBlueprintHistory(blueprintId, historyId),
+    ),
+  );
+
+  server.tool(
+    'microi_compare_blueprint_versions',
+    `Compare blueprint JSON semantically. Arrays with stable id/key values are matched by identity, so pure ordering changes do not create noisy diffs. Omit rightHistoryId to compare with the current draft; omit leftHistoryId to use the latest snapshot. OsClient: ${osClient}`,
+    {
+      blueprintId: z.string().describe('Blueprint Id or Name'),
+      leftHistoryId: z.string().optional().describe('Left snapshot Id; latest snapshot when omitted'),
+      rightHistoryId: z.string().optional().describe('Right snapshot Id; current draft when omitted'),
+    },
+    async ({ blueprintId, leftHistoryId, rightHistoryId }) => apiText(
+      'Blueprint Version Diff',
+      await client.compareBlueprintVersions(blueprintId, leftHistoryId, rightHistoryId),
+    ),
+  );
+
+  server.tool(
+    'microi_export_blueprint',
+    `Export the current blueprint as a portable microi.blueprint.v1 JSON snapshot with a stable SHA-256 content hash. Read-only. OsClient: ${osClient}`,
+    { blueprintId: z.string().describe('Blueprint Id or Name') },
+    async ({ blueprintId }) => apiText(
+      'Export Blueprint',
+      await client.exportBlueprint(blueprintId),
+    ),
+  );
+
+  server.tool(
     'microi_save_blueprint',
     `Create or update a system blueprint. Auto-saves a history snapshot (sys_blueprint_history) and rebuilds the reverse-reference index (sys_blueprint_relation). Pass the blueprint per microi_get_blueprint_schema. OsClient: ${osClient}`,
     {
@@ -174,6 +225,38 @@ export function registerBlueprintTools(server: McpServer, client: MicroiClient, 
       }
       await audit(client, 'microi_delete_blueprint', blueprintId, { BlueprintId: blueprintId });
       return apiText('Delete Blueprint', await client.deleteBlueprint(blueprintId));
+    },
+  );
+
+  server.tool(
+    'microi_rollback_blueprint',
+    `Restore a blueprint from an immutable history snapshot. Rollback creates a pre-rollback snapshot, rebuilds reverse references in the same database transaction and requires ExpectedCurrentHash to reject concurrent overwrites. OsClient: ${osClient}`,
+    {
+      blueprintId: z.string().describe('Blueprint Id or Name'),
+      historyId: z.string().describe('Target history snapshot Id'),
+      expectedCurrentHash: z.string().regex(/^[a-f0-9]{64}$/i).describe('CurrentHash from microi_list_blueprint_history or compare result'),
+      newVersion: z.string().max(20).optional().describe('Optional version label; defaults to target snapshot version'),
+      changeSummary: z.string().max(2000).optional().describe('Rollback reason recorded in history and audit'),
+      confirmExecution: z.string().describe('Must equal blueprintId or "EXECUTE"'),
+    },
+    async ({ blueprintId, historyId, expectedCurrentHash, newVersion, changeSummary, confirmExecution }) => {
+      if (confirmExecution !== blueprintId && confirmExecution !== 'EXECUTE') {
+        return textResult(`回滚已拦截：请传 confirmExecution="${blueprintId}" 或 "EXECUTE"。`, true);
+      }
+      const payload = {
+        BlueprintId: blueprintId,
+        HistoryId: historyId,
+        ExpectedCurrentHash: expectedCurrentHash,
+        ...(newVersion ? { NewVersion: newVersion } : {}),
+        ...(changeSummary ? { ChangeSummary: changeSummary } : {}),
+      };
+      await audit(client, 'microi_rollback_blueprint', blueprintId, {
+        HistoryId: historyId,
+        ExpectedCurrentHash: expectedCurrentHash,
+        NewVersion: newVersion,
+        ChangeSummary: changeSummary,
+      });
+      return apiText('Rollback Blueprint', await client.rollbackBlueprint(payload));
     },
   );
 

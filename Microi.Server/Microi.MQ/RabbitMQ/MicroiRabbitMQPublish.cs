@@ -3,6 +3,8 @@ using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -91,6 +93,7 @@ namespace Microi.net
             string tenant = null;
             string physicalQueue = null;
             string eventId = null;
+            Activity activity = MicroiTraceContext.StartActivity("Microi.MQ.Publish");
 
             try
             {
@@ -105,6 +108,8 @@ namespace Microi.net
                 sendInfo.OsClient = tenant;
                 sendInfo.QueueName = physicalQueue;
                 sendInfo.EventId = eventId;
+                sendInfo.TraceParent = MicroiTraceContext.CurrentTraceParent;
+                sendInfo.TraceState = MicroiTraceContext.CurrentTraceState;
 
                 var connection = await _mqConnection
                     .GetPublishConnectionAsync(tenant)
@@ -123,6 +128,8 @@ namespace Microi.net
                     EventId = eventId,
                     Id = eventId,
                     OsClient = tenant,
+                    TraceParent = sendInfo.TraceParent,
+                    TraceState = sendInfo.TraceState,
                     Message = sendInfo.Message,
                     CurrentUserId = sendInfo.CurrentToken?.CurrentUser?.GetValue("Id")?.ToString()
                 };
@@ -132,8 +139,13 @@ namespace Microi.net
                     Persistent = true,
                     ContentType = "application/json",
                     Type = "microi.tenant-message.v1",
-                    MessageId = eventId
+                    MessageId = eventId,
+                    Headers = new Dictionary<string, object>()
                 };
+                if (!sendInfo.TraceParent.DosIsNullOrWhiteSpace())
+                    properties.Headers["traceparent"] = Encoding.UTF8.GetBytes(sendInfo.TraceParent);
+                if (!sendInfo.TraceState.DosIsNullOrWhiteSpace())
+                    properties.Headers["tracestate"] = Encoding.UTF8.GetBytes(sendInfo.TraceState);
 
                 // RabbitMQ transaction makes broker acceptance explicit. Every async operation is awaited;
                 // omitting TxCommitAsync would silently lose messages when the channel is disposed.
@@ -156,6 +168,7 @@ namespace Microi.net
             finally
             {
                 TryWriteSendLog(sendInfo, tenant, physicalQueue, eventId, status, statusInfo);
+                activity?.Stop();
             }
 
             return result;

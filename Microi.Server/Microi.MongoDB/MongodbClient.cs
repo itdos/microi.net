@@ -24,9 +24,19 @@ namespace Microi.net
         /// <returns></returns>
         public static IMongoCollection<T> MongodbInfoClient(MongodbHost host)
         {
-            var client = _clientCache.GetOrAdd(host.Connection, CreateClient);
-            var dataBase = client.GetDatabase(host.DataBase);
+            var dataBase = MongodbDatabase(host);
             return dataBase.GetCollection<T>(host.Table);
+        }
+
+        /// <summary>
+        /// 获取复用连接池的数据库实例。生命周期治理需要先读取集合目录，
+        /// 避免为了探测不存在的月份逐个创建集合句柄并触发大量网络往返。
+        /// </summary>
+        public static IMongoDatabase MongodbDatabase(MongodbHost host)
+        {
+            if (host == null) throw new ArgumentNullException(nameof(host));
+            var client = _clientCache.GetOrAdd(host.Connection, CreateClient);
+            return client.GetDatabase(host.DataBase);
         }
 
         private static MongoClient CreateClient(string connection)

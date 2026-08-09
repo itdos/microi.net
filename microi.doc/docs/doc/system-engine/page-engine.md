@@ -145,6 +145,39 @@ methods: {
   }
  }
 ```
+## 页面版本、比较与回滚
+
+界面引擎保存不再只是覆盖 `mic_page.JsonObj`。每次内容真实变化时，服务端会生成规范化 JSON 的 SHA-256，并在同一数据库事务中写入历史快照；内容未变化时不会制造空历史。
+
+设计器标题栏提供历史、版本差异、导入、导出和回滚。保存与回滚都携带当前 `CurrentHash`：若页面已被另一位管理员或 AI 修改，服务端返回冲突并要求重新加载，禁止最后写入者静默覆盖。
+
+| MCP 工具 | 作用 |
+|---|---|
+| `microi_list_page_history` | 分页列出历史元数据和当前哈希 |
+| `microi_get_page_history` | 读取一个不可变页面快照 |
+| `microi_compare_page_versions` | 比较两个快照，或比较历史与当前页面 |
+| `microi_export_page_design` | 导出 `microi.page.v1` 设计包、页面元数据和哈希 |
+| `microi_rollback_page_design` | 带预期哈希回滚，并创建新的审计版本 |
+
+回滚不会删除历史。目标快照会成为新的当前内容，回滚前状态仍留在版本链中，便于再次审计或恢复。AI 修改页面时应遵循“读取详情及当前哈希 → 保存 → 回读新哈希与历史”的顺序。
+
+## 撤销重做、Vue 源码桥与物料资产
+
+设计器本地历史与服务端版本承担不同职责：
+
+- 本地 Undo/Redo 保存最近 50 步且总计不超过 20MB，用于当前编辑会话快速撤销；连续小修改会合并，避免每次键入制造一个快照。
+- `Ctrl/Cmd+Z`、`Ctrl/Cmd+Shift+Z` 和 `Ctrl/Cmd+Y` 只在画布上下文生效；输入框、代码编辑器或浏览器原生编辑区域保持自己的撤销栈。
+- 服务端不可变历史跨会话、跨设备和跨节点保留，最终保存仍使用 `ExpectedHash`；本地撤销不能绕过并发保护。
+
+界面引擎提供确定性的 Page JSON ↔ Vue SFC 桥接，用于源码预览和有限往返：
+
+1. Page JSON 先规范化，再生成带 `microi.page.sfc.v1` 标记的 Vue 单文件组件；
+2. template、script 和 style 都来自平台白名单模板，不执行页面 JSON 中的任意代码；
+3. 反向导入只接受平台生成且 Hash/标记完整的 SFC，拒绝任意 Vue 工程或未知脚本；
+4. 导入后再次规范化并比较页面 Hash，确认后才写入设计器状态。
+
+可复用区块和组件应发布为治理中心的 `microi.asset.v1` 资产包，声明 Props、Setters、DataAdapters、目标平台和依赖版本。发布前执行 DryRun、依赖循环/版本范围检查，运行端按确定性加载顺序解析。复杂页面仍可提升为独立前端微服务；源码桥不承诺把任意手写 Vue 无损反编译为低代码 JSON。
+
 ## 界面引擎由吾码团队成员lisaisai开发
 > 更多完整说明见博文：[https://lisaisai.blog.csdn.net/article/details/143928130](https://lisaisai.blog.csdn.net/article/details/143928130)
 

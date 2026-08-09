@@ -2116,6 +2116,41 @@ export class MicroiClient {
             ...data,
         });
     }
+    async listPageEngineHistory(pageId, pageIndex = 1, pageSize = 50) {
+        return this.post(API.LIST_PAGE_ENGINE_HISTORY, {
+            OsClient: this.config.osClient,
+            PageId: pageId,
+            PageIndex: pageIndex,
+            PageSize: pageSize,
+        });
+    }
+    async getPageEngineHistory(pageId, historyId) {
+        return this.post(API.GET_PAGE_ENGINE_HISTORY, {
+            OsClient: this.config.osClient,
+            PageId: pageId,
+            HistoryId: historyId,
+        });
+    }
+    async comparePageEngineVersions(pageId, leftHistoryId, rightHistoryId) {
+        return this.post(API.COMPARE_PAGE_ENGINE_VERSIONS, {
+            OsClient: this.config.osClient,
+            PageId: pageId,
+            ...(leftHistoryId ? { LeftHistoryId: leftHistoryId } : {}),
+            ...(rightHistoryId ? { RightHistoryId: rightHistoryId } : {}),
+        });
+    }
+    async exportPageEngine(pageId) {
+        return this.post(API.EXPORT_PAGE_ENGINE, {
+            OsClient: this.config.osClient,
+            PageId: pageId,
+        });
+    }
+    async rollbackPageEngine(data) {
+        return this.post(API.ROLLBACK_PAGE_ENGINE, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
     // ---------- 业务架构蓝图（System Blueprint） ----------
     async listBlueprints(keyword) {
         return this.post(API.LIST_BLUEPRINTS, {
@@ -2129,8 +2164,43 @@ export class MicroiClient {
             BlueprintId: blueprintId,
         });
     }
+    async listBlueprintHistory(blueprintId, pageIndex = 1, pageSize = 50) {
+        return this.post(API.LIST_BLUEPRINT_HISTORY, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+            PageIndex: pageIndex,
+            PageSize: pageSize,
+        });
+    }
+    async getBlueprintHistory(blueprintId, historyId) {
+        return this.post(API.GET_BLUEPRINT_HISTORY, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+            HistoryId: historyId,
+        });
+    }
+    async compareBlueprintVersions(blueprintId, leftHistoryId, rightHistoryId) {
+        return this.post(API.COMPARE_BLUEPRINT_VERSIONS, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+            ...(leftHistoryId ? { LeftHistoryId: leftHistoryId } : {}),
+            ...(rightHistoryId ? { RightHistoryId: rightHistoryId } : {}),
+        });
+    }
+    async exportBlueprint(blueprintId) {
+        return this.post(API.EXPORT_BLUEPRINT, {
+            OsClient: this.config.osClient,
+            BlueprintId: blueprintId,
+        });
+    }
     async saveBlueprint(data) {
         return this.post(API.SAVE_BLUEPRINT, {
+            OsClient: this.config.osClient,
+            ...data,
+        });
+    }
+    async rollbackBlueprint(data) {
+        return this.post(API.ROLLBACK_BLUEPRINT, {
             OsClient: this.config.osClient,
             ...data,
         });

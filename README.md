@@ -18,9 +18,18 @@
 
 [在线体验](https://microi.net/) · [快速开始](https://microi.net/doc/getting-started/start-use.html) · [完整文档](https://microi.net/doc/index.html) · [Docker 部署](https://microi.net/doc/getting-started/docker-run.html) · [Gitee](https://gitee.com/ITdos/microi.net) · [GitHub](https://github.com/itdos/microi.net)
 
+**[NuGet 官方数据：ITdos 名下 NuGet 包累计下载量已超过 892 万 →](https://www.nuget.org/profiles/ITdos)**<br>
+按 NuGet 官方公开数据与可检索的同类平台口径，Microi吾码目前在 .NET AI 低代码平台中总下载量位居首位；官网文档通过 NuGet V3 官方 API 实时汇总展示。
+
 </div>
 
 ---
+
+## Microi吾码 AI平台 架构图
+
+[![Microi吾码 AI平台 架构图](./microi.doc/docs/public/images/microi-ai-platform-architecture.svg)](./microi.doc/docs/public/images/microi-ai-platform-architecture.svg)
+
+> 点击图片查看可无限缩放的 SVG 原图。架构覆盖 AI 智能、低代码引擎、平台治理、集成自动化、SaaS 安全、多节点运行、全端入口、数据底座和应用交付闭环。
 
 ## 30 秒了解 Microi吾码
 
@@ -29,6 +38,19 @@
 | AI 理解 V8 API 与真实数据库结构，可在 VS Code 本地编程，也可在平台在线编程 | 表单、模块、工作流、界面、打印、报表等 20+ 引擎覆盖应用全生命周期 | 跨数据库、RabbitMQ、MQTT、Redis、MongoDB、ElasticSearch、Office 与第三方 API | Docker / K8S / CI/CD，多节点分布式部署；PC、UniApp、多端源码开放 |
 
 > Microi吾码不是“只生成页面”的工具。它把业务数据模型、后端接口、权限、流程、前端交互和部署交付放进同一条可持续维护的工程链路。
+
+### 🚀 为什么 Microi吾码 + AI 更快、更省 Token
+
+| 对比维度 | 传统定制代码 + AI | Microi吾码 + AI |
+|---|---|---|
+| AI 需要生成的内容 | 从数据库访问、权限、CRUD、流程、页面到部署胶水代码都要反复生成 | 复用几十+成熟引擎，AI 主要生成业务模型、配置和少量 V8 / 前端扩展 |
+| 上下文与 Token | 每轮都可能重复解释框架、表结构、接口约定和历史代码 | Skills、V8 类型提示、实时 Schema、业务蓝图与 MCP 自动提供准确上下文 |
+| 开发与验证 | 生成大段代码后再编译、联调、补权限和部署脚本 | 建模、生成、远程执行、调试、回读与验收形成闭环，开箱即可进入业务开发 |
+| 稳定性与维护 | 项目自建的通用能力多，代码面大，后续升级和回归成本高 | 平台自 2014 年持续演进，权限、表单、工作流、SaaS、缓存和分布式能力由统一底座承载 |
+
+在表单、CRUD、权限、流程、报表、SaaS 等平台能力高度复用的典型企业应用中，相比从零生成整套定制代码，**AI Token 消耗与开发周期都有机会获得 10 倍以上的改善**。实际结果取决于需求与平台的匹配度、模型、上下文质量、团队熟练度和验收范围，不作为对所有项目的无条件工期或费用承诺。
+
+> [→ 了解 AI + 低代码为什么更快、更稳定](https://microi.net/doc/v8-engine/ai-apiengine.html#ai-efficiency)
 
 ### 推荐阅读路径
 
@@ -184,10 +206,14 @@
 <thead><tr><th width="80">版本</th><th width="140">价格</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td><strong>开源版</strong></td><td>免费</td><td>PC 传统界面 100% 源码、移动端 100% 源码、后端 99% 源码；可商用、随意修改、无限分发部署。<strong>开源版仅无法使用在线 AI 相关功能，本地 AI 不受影响</strong></td></tr>
-<tr><td><strong>个人版</strong></td><td>￥999</td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong></td></tr>
-<tr><td><strong>企业版</strong></td><td>￥2.5w</td><td>提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong></td></tr>
+<tr><td><strong>个人版</strong></td><td><strong>￥999 买断</strong></td><td>额外包含 <strong>WebOS 100% 完整源码</strong>，功能、开源程度与企业版完全一致，<strong>无任何限制、无限分发部署、无限商用、永久有效</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
+<tr><td><strong>企业版</strong></td><td><strong>￥2.5w 买断</strong></td><td><strong>永久有效</strong>，并提供更多培训、咨询等售后服务，<strong>优先响应平台升级需求</strong>。不购买后续技术支持也可永久正常使用已获得授权的版本，只是购买满一年后新增的部分功能可能无法使用</td></tr>
 </tbody>
 </table>
+
+> 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续技术支持可按对应买断价的半价/年自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
+
+> [→ 查看开源版、个人版、企业版的详细区别与选择建议](https://microi.net/doc/edition-comparison.html)
 
 ---
 

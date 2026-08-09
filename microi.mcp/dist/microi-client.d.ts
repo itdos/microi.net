@@ -728,10 +728,33 @@ export declare class MicroiClient {
         JsonStr: string;
         RoutePath?: string;
         ComponentPath?: string;
+        ExpectedCurrentHash?: string;
+        ChangeSummary?: string;
+    }): Promise<ApiResponse>;
+    listPageEngineHistory(pageId: string, pageIndex?: number, pageSize?: number): Promise<ApiResponse>;
+    getPageEngineHistory(pageId: string, historyId: string): Promise<ApiResponse>;
+    comparePageEngineVersions(pageId: string, leftHistoryId?: string, rightHistoryId?: string): Promise<ApiResponse>;
+    exportPageEngine(pageId: string): Promise<ApiResponse>;
+    rollbackPageEngine(data: {
+        PageId: string;
+        HistoryId: string;
+        ExpectedCurrentHash: string;
+        ChangeSummary?: string;
     }): Promise<ApiResponse>;
     listBlueprints(keyword?: string): Promise<ApiResponse>;
     getBlueprint(blueprintId: string): Promise<ApiResponse>;
+    listBlueprintHistory(blueprintId: string, pageIndex?: number, pageSize?: number): Promise<ApiResponse>;
+    getBlueprintHistory(blueprintId: string, historyId: string): Promise<ApiResponse>;
+    compareBlueprintVersions(blueprintId: string, leftHistoryId?: string, rightHistoryId?: string): Promise<ApiResponse>;
+    exportBlueprint(blueprintId: string): Promise<ApiResponse>;
     saveBlueprint(data: Record<string, unknown>): Promise<ApiResponse>;
+    rollbackBlueprint(data: {
+        BlueprintId: string;
+        HistoryId: string;
+        ExpectedCurrentHash: string;
+        NewVersion?: string;
+        ChangeSummary?: string;
+    }): Promise<ApiResponse>;
     deleteBlueprint(blueprintId: string): Promise<ApiResponse>;
     validateBlueprint(blueprintId: string): Promise<ApiResponse>;
     destroy(): void;
