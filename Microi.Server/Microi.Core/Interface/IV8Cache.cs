@@ -26,11 +26,15 @@ namespace Microi.net
         bool Set<T>(string key, T value, string expiresIn);
         bool Set(string key, string value, string expiresIn);
         bool Set(string key, string value, double expiresInSeconds);
+        /// <summary>仅当当前租户逻辑Key不存在时写入，并设置有界过期时间。</summary>
+        bool SetIfNotExists(string key, string value, double expiresInSeconds);
 
         T Get<T>(string key);
         object Get(string key);
         bool KeyExist(string key);
         bool Exists(string key);
+        /// <summary>为当前租户逻辑Key设置过期时间；不暴露底层Redis连接。</summary>
+        bool Expire(string key, double expiresInSeconds);
 
         Task<bool> SetAsync<T>(string key, T value);
         Task<bool> SetAsync(string key, string value);

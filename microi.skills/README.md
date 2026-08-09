@@ -63,6 +63,7 @@
 | **report-engine** | Rpt_Report 虚拟报表、数据源、聚合、写接口和导出 | `report-engine/SKILL.md` |
 | **translate-engine** | 多语言词条、翻译供应商、租户隔离、缓存和批量翻译 | `translate-engine/SKILL.md` |
 | **ai-engine** | 模型代理、NL2SQL/NL2V8、Schema/Skill 关键词检索与可选向量融合 | `ai-engine/SKILL.md` |
+| **ai-platform-governance** | 门户/身份/配置/发布、服务韧性、Trace/日志、资产协作与可恢复导入 | `ai-platform-governance/SKILL.md` |
 | **app-store** | 应用包、Manifest、后台安装、差异升级、回滚和验收 | `app-store/SKILL.md` |
 
 ### 项目交付、前端与移动端

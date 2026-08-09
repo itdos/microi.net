@@ -12,7 +12,7 @@ namespace Microi.net
 
         Task<MicroiJobResult> GetAllJob(MicroiSearchJobModel jobModel);
 
-        Task<MicroiJobResult> GetJobByName(List<string> jobNameArr);
+        Task<MicroiJobResult> GetJobByName(List<string> jobNameArr, string osClient = null);
 
         Task<MicroiJobResult> AddJob(MicroiAddJobModel addJobModel);
 

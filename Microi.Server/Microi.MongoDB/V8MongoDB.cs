@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
 using System.Dynamic;
+using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -427,6 +429,10 @@ namespace Microi.net
             {
                 list.Add(Builders<SysLog>.Filter.Where(d => d.Type == param.Type));
             }
+            if (!param.TraceId.DosIsNullOrWhiteSpace())
+            {
+                list.Add(Builders<SysLog>.Filter.Eq(d => d.TraceId, param.TraceId.Trim().ToLowerInvariant()));
+            }
             //DbSession dbSession = DiyDatabase.GetDbSession(param.OsClient);
             //DbSession dbSession = OsClient.GetClient(param.OsClient).DbRead;
             //var fs = dbSession.From<SysLog>()
@@ -522,6 +528,363 @@ namespace Microi.net
             //fs.OrderBy(orderBy);
             //var list = fs.ToList();
             return new DosResultList<SysLog>(1, result, "", int.Parse(dataCount.ToString()));
+        }
+
+        public async Task<DosResultList<SysLog>> GetTraceTimeline(SysLogTraceQueryParam param)
+        {
+            try
+            {
+                if (param == null || param.OsClient.DosIsNullOrWhiteSpace())
+                    return new DosResultList<SysLog>(0, null, "OsClient不能为空。");
+                var traceId = (param.TraceId ?? "").Trim().ToLowerInvariant();
+                if (!Regex.IsMatch(traceId, "^[0-9a-f]{32}$"))
+                    return new DosResultList<SysLog>(0, null, "TraceId必须是32位十六进制W3C TraceId。");
+
+                var client = Microi.net.OsClient.GetClient(param.OsClient);
+                if (client?.OsClientModel == null)
+                    return new DosResultList<SysLog>(0, null, "当前租户MongoDB配置不可用。");
+                var host = new MongodbHost
+                {
+                    Connection = client.OsClientModel["DbMongoConnection"].Val<string>(),
+                    DataBase = "sys_log_" + param.OsClient.ToLowerInvariant(),
+                    Table = ""
+                };
+                var database = MongodbClient<SysLog>.MongodbDatabase(host);
+                var existingMonths = await GetSystemLogMonthsAsync(database).ConfigureAwait(false);
+                var requestedMonth = NormalizeMonth(param.SearchMonth);
+                var months = requestedMonth != null
+                    ? existingMonths.Where(month => string.Equals(month, requestedMonth, StringComparison.Ordinal)).ToList()
+                    : existingMonths.OrderByDescending(month => month).Take(3).ToList();
+                var max = Math.Max(1, Math.Min(500, param.PageSize));
+                var rows = new List<SysLog>();
+                foreach (var month in months)
+                {
+                    host.Table = "log_" + month;
+                    await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                    var remaining = max - rows.Count;
+                    if (remaining <= 0) break;
+                    var monthRows = await collection
+                        .Find(Builders<SysLog>.Filter.Eq(d => d.TraceId, traceId))
+                        .Sort(Builders<SysLog>.Sort.Ascending(d => d.CreateTime).Ascending(d => d.Id))
+                        .Limit(remaining)
+                        .ToListAsync()
+                        .ConfigureAwait(false);
+                    rows.AddRange(monthRows);
+                }
+                rows = rows.OrderBy(row => row.CreateTime).ThenBy(row => row.Id, StringComparer.Ordinal).Take(max).ToList();
+                return new DosResultList<SysLog>(1, rows, "", rows.Count);
+            }
+            catch (Exception ex)
+            {
+                return new DosResultList<SysLog>(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResult<SysLogSignalResult>> QuerySystemLogSignal(SysLogSignalQueryParam param)
+        {
+            try
+            {
+                if (param == null || param.OsClient.DosIsNullOrWhiteSpace())
+                    return new DosResult<SysLogSignalResult>(0, null, "OsClient不能为空。");
+                // SysLog.CreateTime follows the historical server-local OccurredAt contract.
+                // Convert explicit UTC input to local time; keep Local/Unspecified values unchanged.
+                var start = param.WindowStart.Kind == DateTimeKind.Utc
+                    ? param.WindowStart.ToLocalTime()
+                    : param.WindowStart;
+                var end = param.WindowEnd.Kind == DateTimeKind.Utc
+                    ? param.WindowEnd.ToLocalTime()
+                    : param.WindowEnd;
+                if (end <= start || end - start > TimeSpan.FromDays(1))
+                    return new DosResult<SysLogSignalResult>(0, null, "日志信号窗口必须大于0且不超过24小时。");
+                if ((param.Keyword ?? string.Empty).Length > 100)
+                    return new DosResult<SysLogSignalResult>(0, null, "日志关键字最长100个字符。");
+                var host = CreateSystemLogHost(param.OsClient, null);
+                if (host.Connection.DosIsNullOrWhiteSpace())
+                    return new DosResult<SysLogSignalResult>(0, null, "当前租户MongoDB配置不可用。");
+                var database = MongodbClient<SysLog>.MongodbDatabase(host);
+                var existingMonths = await GetSystemLogMonthsAsync(database).ConfigureAwait(false);
+                var startMonth = start.ToString("yyyyMM", CultureInfo.InvariantCulture);
+                var endMonth = end.ToString("yyyyMM", CultureInfo.InvariantCulture);
+                var months = existingMonths
+                    .Where(month => string.CompareOrdinal(month, startMonth) >= 0
+                                    && string.CompareOrdinal(month, endMonth) <= 0)
+                    .OrderBy(month => month, StringComparer.Ordinal)
+                    .Take(2)
+                    .ToList();
+                var result = new SysLogSignalResult { MonthsScanned = months };
+                var durations = new List<double>();
+                var maxDurationSamples = Math.Max(100, Math.Min(10000, param.MaxDurationSamples));
+                var maxEventSamples = Math.Max(0, Math.Min(10, param.MaxEventSamples));
+                foreach (var month in months)
+                {
+                    host = CreateSystemLogHost(param.OsClient, month);
+                    await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                    var filters = new List<FilterDefinition<SysLog>>
+                    {
+                        Builders<SysLog>.Filter.Gte(row => row.CreateTime, start),
+                        Builders<SysLog>.Filter.Lt(row => row.CreateTime, end)
+                    };
+                    if (!param.Keyword.DosIsNullOrWhiteSpace())
+                    {
+                        var expression = new BsonRegularExpression(Regex.Escape(param.Keyword.Trim()), "i");
+                        filters.Add(Builders<SysLog>.Filter.Or(
+                            Builders<SysLog>.Filter.Regex(row => row.Title, expression),
+                            Builders<SysLog>.Filter.Regex(row => row.Content, expression)));
+                    }
+                    if (!param.Type.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Type, param.Type.Trim()));
+                    if (!param.Category.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Category, param.Category.Trim()));
+                    if (!param.Source.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.Source, param.Source.Trim()));
+                    if (!param.ServiceName.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(row => row.ServiceName, param.ServiceName.Trim()));
+                    if (param.LevelMin.HasValue) filters.Add(Builders<SysLog>.Filter.Gte(row => row.Level, param.LevelMin.Value));
+                    var filter = Builders<SysLog>.Filter.And(filters);
+                    var errorFilter = Builders<SysLog>.Filter.And(filter, Builders<SysLog>.Filter.Or(
+                        Builders<SysLog>.Filter.Gte(row => row.Level, 2),
+                        Builders<SysLog>.Filter.Eq(row => row.Success, false),
+                        Builders<SysLog>.Filter.Gte(row => row.HttpStatusCode, 500)));
+                    var totalTask = collection.CountDocumentsAsync(filter);
+                    var errorTask = collection.CountDocumentsAsync(errorFilter);
+                    var durationBudget = Math.Max(0, maxDurationSamples - durations.Count);
+                    var durationTask = durationBudget == 0
+                        ? Task.FromResult(new List<double?>())
+                        : collection.Find(Builders<SysLog>.Filter.And(
+                                filter,
+                                Builders<SysLog>.Filter.Ne(row => row.DurationMs, null)))
+                            .Sort(Builders<SysLog>.Sort.Descending(row => row.CreateTime))
+                            .Limit(durationBudget)
+                            .Project(row => row.DurationMs)
+                            .ToListAsync();
+                    var sampleBudget = Math.Max(0, maxEventSamples - result.Samples.Count);
+                    var sampleTask = sampleBudget == 0
+                        ? Task.FromResult(new List<SysLog>())
+                        : collection.Find(filter)
+                            .Sort(Builders<SysLog>.Sort.Descending(row => row.CreateTime).Descending(row => row.Id))
+                            .Limit(sampleBudget)
+                            .ToListAsync();
+                    await Task.WhenAll(totalTask, errorTask, durationTask, sampleTask).ConfigureAwait(false);
+                    result.TotalCount += totalTask.Result;
+                    result.ErrorCount += errorTask.Result;
+                    durations.AddRange(durationTask.Result.Where(value => value.HasValue).Select(value => value.GetValueOrDefault()));
+                    foreach (var row in sampleTask.Result)
+                    {
+                        result.Samples.Add(new SysLogSignalSample
+                        {
+                            EventId = row.EventId ?? row.Id,
+                            TraceId = row.TraceId,
+                            ServiceName = row.ServiceName,
+                            Type = row.Type,
+                            Title = row.Title,
+                            Level = row.Level,
+                            Success = row.Success,
+                            HttpStatusCode = row.HttpStatusCode,
+                            CreateTime = row.CreateTime
+                        });
+                    }
+                }
+                result.Samples = result.Samples
+                    .OrderByDescending(row => row.CreateTime)
+                    .Take(maxEventSamples)
+                    .ToList();
+                result.LastSeenTime = result.Samples.FirstOrDefault()?.CreateTime;
+                result.ErrorRate = result.TotalCount == 0
+                    ? 0
+                    : Math.Round((double)result.ErrorCount / result.TotalCount, 6);
+                durations.Sort();
+                result.DurationSampleCount = durations.Count;
+                result.DurationSampled = result.TotalCount > durations.Count;
+                if (durations.Count > 0)
+                {
+                    var index = Math.Max(0, (int)Math.Ceiling(durations.Count * 0.95) - 1);
+                    result.P95DurationMs = Math.Round(durations[index], 4);
+                }
+                return new DosResult<SysLogSignalResult>(1, result);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<SysLogSignalResult>(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResult<SysLogLifecyclePlan>> PlanSystemLogLifecycle(SysLogLifecycleParam param)
+        {
+            try
+            {
+                var validation = ValidateLifecycleParam(param, requireRun: false);
+                if (validation != null) return new DosResult<SysLogLifecyclePlan>(0, null, validation);
+                var host = CreateSystemLogHost(param.OsClient, null);
+                var database = MongodbClient<SysLog>.MongodbDatabase(host);
+                var months = await GetLifecycleMonthsAsync(database, param.CutoffTime, param.MaxCollections).ConfigureAwait(false);
+                var result = new SysLogLifecyclePlan { CutoffTime = param.CutoffTime };
+                foreach (var month in months)
+                {
+                    host.Table = "log_" + month;
+                    await EnsureSysLogIndexesAsync(host).ConfigureAwait(false);
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                    var count = await collection.CountDocumentsAsync(BuildLifecycleFilter(param)).ConfigureAwait(false);
+                    if (count <= 0) continue;
+                    result.Collections.Add(new SysLogLifecycleCollectionPlan { SearchMonth = month, EstimatedCount = count });
+                    result.EstimatedCount += count;
+                }
+                return new DosResult<SysLogLifecyclePlan>(1, result);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<SysLogLifecyclePlan>(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResult<SysLogLifecycleBatch>> ReadSystemLogLifecycleBatch(SysLogLifecycleParam param)
+        {
+            try
+            {
+                var validation = ValidateLifecycleParam(param, requireRun: true);
+                if (validation != null) return new DosResult<SysLogLifecycleBatch>(0, null, validation);
+                var host = CreateSystemLogHost(param.OsClient, null);
+                var database = MongodbClient<SysLog>.MongodbDatabase(host);
+                var months = await GetLifecycleMonthsAsync(database, param.CutoffTime, param.MaxCollections).ConfigureAwait(false);
+                var startMonth = NormalizeMonth(param.SearchMonth);
+                if (startMonth != null) months = months.Where(month => string.CompareOrdinal(month, startMonth) >= 0).ToList();
+                var batchSize = Math.Max(1, Math.Min(500, param.BatchSize));
+                for (var index = 0; index < months.Count; index++)
+                {
+                    var month = months[index];
+                    host.Table = "log_" + month;
+                    var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                    var items = await collection.Find(BuildLifecycleFilter(param))
+                        .Sort(Builders<SysLog>.Sort.Ascending(d => d.CreateTime).Ascending(d => d.Id))
+                        .Limit(batchSize)
+                        .ToListAsync()
+                        .ConfigureAwait(false);
+                    if (items.Count == 0) continue;
+                    var sameMonthHasMore = items.Count >= batchSize;
+                    var nextMonth = sameMonthHasMore
+                        ? month
+                        : (index + 1 < months.Count ? months[index + 1] : null);
+                    return new DosResult<SysLogLifecycleBatch>(1, new SysLogLifecycleBatch
+                    {
+                        SearchMonth = month,
+                        NextSearchMonth = nextMonth,
+                        HasMore = sameMonthHasMore || index + 1 < months.Count,
+                        Items = items
+                    });
+                }
+                return new DosResult<SysLogLifecycleBatch>(1, new SysLogLifecycleBatch
+                {
+                    SearchMonth = startMonth,
+                    NextSearchMonth = null,
+                    HasMore = false,
+                    Items = new List<SysLog>()
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<SysLogLifecycleBatch>(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResult<SysLogLifecycleRunState>> CommitSystemLogLifecycleBatch(SysLogLifecycleCommitParam param)
+        {
+            try
+            {
+                var validation = ValidateLifecycleParam(param, requireRun: true);
+                if (validation != null) return new DosResult<SysLogLifecycleRunState>(0, null, validation);
+                var month = NormalizeMonth(param.SearchMonth);
+                var eventIds = (param.EventIds ?? new List<string>())
+                    .Where(id => !id.DosIsNullOrWhiteSpace()).Select(id => id.Trim())
+                    .Distinct(StringComparer.Ordinal).Take(501).ToList();
+                if (month == null || eventIds.Count == 0 || eventIds.Count > 500)
+                    return new DosResult<SysLogLifecycleRunState>(0, null, "SearchMonth和1至500个EventId不能为空。");
+                if (param.ArchiveProofHash.DosIsNullOrWhiteSpace()
+                    || !Regex.IsMatch(param.ArchiveProofHash, "^[0-9a-f]{64}$", RegexOptions.IgnoreCase))
+                    return new DosResult<SysLogLifecycleRunState>(0, null, "ArchiveProofHash必须是64位十六进制摘要。");
+                var deleteOnly = string.Equals(param.ArchiveMode, "DeleteOnly", StringComparison.OrdinalIgnoreCase);
+                if (!deleteOnly && param.ArchivePath.DosIsNullOrWhiteSpace())
+                    return new DosResult<SysLogLifecycleRunState>(0, null, "归档模式必须提供已回读的ArchivePath。");
+
+                var host = CreateSystemLogHost(param.OsClient, month);
+                var database = MongodbClient<SysLog>.MongodbDatabase(host);
+                var receipts = database.GetCollection<BsonDocument>("_log_lifecycle_receipts");
+                var receiptId = param.RunKey + ":" + param.ArchiveProofHash.ToLowerInvariant();
+                var receiptFilter = Builders<BsonDocument>.Filter.Eq("_id", receiptId);
+                var existing = await receipts.Find(receiptFilter).FirstOrDefaultAsync().ConfigureAwait(false);
+                if (existing != null && existing.GetValue("Status", "").AsString == "Committed")
+                    return await GetSystemLogLifecycleRunState(param).ConfigureAwait(false);
+
+                var now = DateTime.UtcNow;
+                var receiptUpdate = Builders<BsonDocument>.Update
+                    .SetOnInsert("_id", receiptId)
+                    .SetOnInsert("OsClient", param.OsClient)
+                    .SetOnInsert("RunKey", param.RunKey)
+                    .SetOnInsert("PolicyKey", param.PolicyKey ?? "")
+                    .SetOnInsert("SearchMonth", month)
+                    .SetOnInsert("EventIds", new BsonArray(eventIds))
+                    .SetOnInsert("ScannedCount", Math.Max(param.ScannedCount, eventIds.Count))
+                    .SetOnInsert("ArchivedCount", deleteOnly ? 0 : Math.Max(param.ArchivedCount, eventIds.Count))
+                    .SetOnInsert("ArchivePath", param.ArchivePath ?? "")
+                    .SetOnInsert("ArchiveProofHash", param.ArchiveProofHash.ToLowerInvariant())
+                    .SetOnInsert("BackgroundTaskId", param.BackgroundTaskId ?? "")
+                    .SetOnInsert("FencingToken", param.FencingToken)
+                    .SetOnInsert("CreateTime", now)
+                    .Set("Status", "ArchiveVerified")
+                    .Set("UpdateTime", now);
+                await receipts.UpdateOneAsync(receiptFilter, receiptUpdate, new UpdateOptions { IsUpsert = true }).ConfigureAwait(false);
+
+                var collection = MongodbClient<SysLog>.MongodbInfoClient(host);
+                var deleteFilter = Builders<SysLog>.Filter.And(
+                    BuildLifecycleFilter(param),
+                    Builders<SysLog>.Filter.In(d => d.Id, eventIds));
+                await collection.DeleteManyAsync(deleteFilter).ConfigureAwait(false);
+                var remaining = await collection.CountDocumentsAsync(Builders<SysLog>.Filter.In(d => d.Id, eventIds)).ConfigureAwait(false);
+                if (remaining != 0)
+                    return new DosResult<SysLogLifecycleRunState>(0, null, "归档后日志条件删除回读失败，保留ArchiveVerified收据供重试。");
+
+                await receipts.UpdateOneAsync(receiptFilter, Builders<BsonDocument>.Update
+                    .Set("Status", "Committed")
+                    .Set("DeletedCount", eventIds.Count)
+                    .Set("CommitTime", DateTime.UtcNow)
+                    .Set("UpdateTime", DateTime.UtcNow)).ConfigureAwait(false);
+                return await GetSystemLogLifecycleRunState(param).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<SysLogLifecycleRunState>(0, null, ex.Message);
+            }
+        }
+
+        public async Task<DosResult<SysLogLifecycleRunState>> GetSystemLogLifecycleRunState(SysLogLifecycleParam param)
+        {
+            try
+            {
+                if (param == null || param.OsClient.DosIsNullOrWhiteSpace() || param.RunKey.DosIsNullOrWhiteSpace())
+                    return new DosResult<SysLogLifecycleRunState>(0, null, "OsClient和RunKey不能为空。");
+                var host = CreateSystemLogHost(param.OsClient, null);
+                var receipts = MongodbClient<SysLog>.MongodbDatabase(host).GetCollection<BsonDocument>("_log_lifecycle_receipts");
+                var rows = await receipts.Find(Builders<BsonDocument>.Filter.And(
+                        Builders<BsonDocument>.Filter.Eq("OsClient", param.OsClient),
+                        Builders<BsonDocument>.Filter.Eq("RunKey", param.RunKey),
+                        Builders<BsonDocument>.Filter.Eq("Status", "Committed")))
+                    .Sort(Builders<BsonDocument>.Sort.Descending("CommitTime"))
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+                var state = new SysLogLifecycleRunState();
+                foreach (var row in rows)
+                {
+                    state.Scanned += ReadInt64(row, "ScannedCount");
+                    state.Archived += ReadInt64(row, "ArchivedCount");
+                    state.Deleted += ReadInt64(row, "DeletedCount");
+                }
+                if (rows.Count > 0)
+                {
+                    state.LastArchivePath = rows[0].GetValue("ArchivePath", "").AsString;
+                    state.LastArchiveProofHash = rows[0].GetValue("ArchiveProofHash", "").AsString;
+                }
+                return new DosResult<SysLogLifecycleRunState>(1, state);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<SysLogLifecycleRunState>(0, null, ex.Message);
+            }
         }
 
         public async Task<DosResult> GetSysLogTypes(SysLogParam param)
@@ -686,6 +1049,85 @@ namespace Microi.net
             return await collection.CountAsync(filter, new CountOptions { Limit = maxCount });
         }
 
+        private static MongodbHost CreateSystemLogHost(string osClient, string month)
+        {
+            var client = Microi.net.OsClient.GetClient(osClient);
+            if (client?.OsClientModel == null) throw new InvalidOperationException("当前租户MongoDB配置不可用。");
+            return new MongodbHost
+            {
+                Connection = client.OsClientModel["DbMongoConnection"].Val<string>(),
+                DataBase = "sys_log_" + osClient.ToLowerInvariant(),
+                Table = month.DosIsNullOrWhiteSpace() ? "log_" : "log_" + month
+            };
+        }
+
+        private static string ValidateLifecycleParam(SysLogLifecycleParam param, bool requireRun)
+        {
+            if (param == null) return "日志生命周期参数不能为空。";
+            if (param.OsClient.DosIsNullOrWhiteSpace()) return "OsClient不能为空。";
+            if (param.CutoffTime == default(DateTime)) return "CutoffTime不能为空。";
+            if (param.CutoffTime > DateTime.UtcNow.AddMinutes(5)) return "CutoffTime不能晚于当前时间。";
+            if (param.MaxCollections < 1 || param.MaxCollections > 120) return "MaxCollections必须在1到120之间。";
+            if (param.BatchSize < 1 || param.BatchSize > 500) return "BatchSize必须在1到500之间。";
+            if (requireRun)
+            {
+                if (param.RunKey.DosIsNullOrWhiteSpace() || param.RunKey.Length > 160) return "RunKey不能为空且不能超过160字符。";
+                if (param.BackgroundTaskId.DosIsNullOrWhiteSpace() || param.FencingToken <= 0) return "缺少可信后台任务与栅栏令牌。";
+            }
+            return null;
+        }
+
+        private static FilterDefinition<SysLog> BuildLifecycleFilter(SysLogLifecycleParam param)
+        {
+            var filters = new List<FilterDefinition<SysLog>>
+            {
+                Builders<SysLog>.Filter.Lt(d => d.CreateTime, param.CutoffTime)
+            };
+            if (!param.Type.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(d => d.Type, param.Type));
+            if (!param.Category.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(d => d.Category, param.Category));
+            if (!param.Source.DosIsNullOrWhiteSpace()) filters.Add(Builders<SysLog>.Filter.Eq(d => d.Source, param.Source));
+            return Builders<SysLog>.Filter.And(filters);
+        }
+
+        private static string NormalizeMonth(string month)
+        {
+            month = (month ?? "").Trim();
+            if (!Regex.IsMatch(month, "^[0-9]{6}$")) return null;
+            return DateTime.TryParseExact(month, "yyyyMM", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out _) ? month : null;
+        }
+
+        private static async Task<List<string>> GetSystemLogMonthsAsync(IMongoDatabase database)
+        {
+            using var cursor = await database.ListCollectionNamesAsync().ConfigureAwait(false);
+            var names = await cursor.ToListAsync().ConfigureAwait(false);
+            return names.Where(name => name != null && name.StartsWith("log_", StringComparison.Ordinal)
+                                               && NormalizeMonth(name.Substring(4)) != null)
+                .Select(name => name.Substring(4))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static async Task<List<string>> GetLifecycleMonthsAsync(IMongoDatabase database, DateTime cutoff, int maxCollections)
+        {
+            var cutoffMonth = cutoff.ToString("yyyyMM", CultureInfo.InvariantCulture);
+            var lowerMonth = new DateTime(cutoff.Year, cutoff.Month, 1)
+                .AddMonths(-(Math.Max(1, Math.Min(120, maxCollections)) - 1))
+                .ToString("yyyyMM", CultureInfo.InvariantCulture);
+            var months = await GetSystemLogMonthsAsync(database).ConfigureAwait(false);
+            return months.Where(month => string.CompareOrdinal(month, lowerMonth) >= 0
+                                         && string.CompareOrdinal(month, cutoffMonth) <= 0)
+                .OrderBy(month => month, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static long ReadInt64(BsonDocument document, string name)
+        {
+            if (document == null || !document.TryGetValue(name, out var value) || value == null || value.IsBsonNull) return 0;
+            try { return value.ToInt64(); } catch { return 0; }
+        }
+
         // 范围索引是否已确认（DataBase.Table → true）
         private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _indexEnsured
             = new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
@@ -733,6 +1175,14 @@ namespace Microi.net
                     toCreate.Add(new CreateIndexModel<SysLog>(
                         Builders<SysLog>.IndexKeys.Ascending(d => d.UserId).Descending(d => d.CreateTime),
                         new CreateIndexOptions { Name = "idx_UserId_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_TraceId_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.TraceId).Ascending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_TraceId_CreateTime" }));
+                if (!existingIndexNames.Contains("idx_ServiceName_CreateTime"))
+                    toCreate.Add(new CreateIndexModel<SysLog>(
+                        Builders<SysLog>.IndexKeys.Ascending(d => d.ServiceName).Descending(d => d.CreateTime),
+                        new CreateIndexOptions { Name = "idx_ServiceName_CreateTime" }));
 
                 if (toCreate.Count > 0)
                     await collection.Indexes.CreateManyAsync(toCreate);

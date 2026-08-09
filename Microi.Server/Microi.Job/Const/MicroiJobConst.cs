@@ -25,6 +25,8 @@ namespace Microi.net
 
         // Job参数
         public const string JobParam = "JobParam";
+        // Quartz Cron 时区；新任务显式设置，旧任务为空时继续使用宿主机本地时区。
+        public const string TimeZoneId = "TimeZoneId";
         // SaaS租户标识
         public const string OsClient = "OsClient";
         //log表

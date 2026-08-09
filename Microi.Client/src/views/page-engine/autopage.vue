@@ -8,6 +8,7 @@
 import { DiyCommon } from "@/utils/diy.common";
 import { formDesigner, EventBus, usePageEngineStore } from "./index.js";
 import { newComponents, newWidgets } from "@/utils/extendedWidget";
+import PageVersionApi from "./version-api.js";
 
 export default {
     components: {
@@ -53,10 +54,7 @@ export default {
         async loadFormData() {
             if (!this.pageid) return;
 
-            var res = await DiyCommon.FormEngine.GetFormData({
-                FormEngineKey: "mic_page",
-                Id: this.pageid
-            });
+            var res = await PageVersionApi.detail(this.pageid);
 
             if (res.Code === 1 && res.Data) {
                 var JsonObj = {};
@@ -70,26 +68,10 @@ export default {
                     Desc: res.Data.Desc || "",
                     JsonObj: JsonObj
                 };
+                this.pageEngineStore.setVersionState(res.Data.CurrentHash, res.Data.HistoryAvailable);
             }
         },
         registerEventListeners() {
-            //监听保存页面JSON事件
-            EventBus.on("saveFormJson", async (saveFormJson) => {
-                console.log("监听saveFormJson", saveFormJson);
-                if (saveFormJson.Id == this.pageid) {
-                    var model = {
-                        Title: saveFormJson.Title,
-                        Desc: saveFormJson.Desc,
-                        JsonObj: JSON.stringify(saveFormJson.JsonObj)
-                    };
-                    await DiyCommon.FormEngine.UptFormData({
-                        FormEngineKey: "mic_page",
-                        Id: this.pageid,
-                        _RowModel: model
-                    });
-                }
-            });
-
             //监听日历选择日期事件
             EventBus.on("calendarSelDate", (data) => {
                 console.log("监听calendarSelDate", data);
@@ -143,7 +125,6 @@ export default {
             });
         },
         removeEventListeners() {
-            EventBus.off("saveFormJson");
             EventBus.off("calendarSelDate");
             EventBus.off("cartMoreLink");
             EventBus.off("linkWidget");

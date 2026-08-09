@@ -15,6 +15,7 @@
 #endregion
 using System;
 using Dos.Common;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -193,5 +194,32 @@ namespace Microi.net
         /// <param name="param">请求参数</param>
         /// <returns></returns>
         Task<DosResult> NL2V8Engine(NL2V8Param param);
+
+        /// <summary>
+        /// 使用可信服务端身份创建 MiniMax 视频异步任务。
+        /// </summary>
+        Task<DosResult> CreateMiniMaxVideoAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            MiniMaxVideoCreateParam param,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 使用可信服务端身份和签名句柄查询 MiniMax 视频任务。
+        /// </summary>
+        Task<DosResult> GetMiniMaxVideoTaskAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            MiniMaxVideoTaskParam param,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 使用可信服务端身份和签名句柄获取 MiniMax 临时下载地址。
+        /// </summary>
+        Task<DosResult> GetMiniMaxVideoFileAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            MiniMaxVideoFileParam param,
+            CancellationToken cancellationToken = default);
     }
 }

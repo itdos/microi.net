@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { defineComponent, h, Fragment, nextTick, provide } from 'vue'
-import { useData } from 'vitepress'
+import { useData, useRoute } from 'vitepress'
 import DefaultTheme from "vitepress/theme";
 import ContactCard from "./components/ContactCard.vue";
 import ProductShowcase from "./components/ProductShowcase.vue";
@@ -10,11 +10,14 @@ import UserBar from "./components/UserBar.vue";
 import LoginPage from "./components/LoginPage.vue";
 import ProfilePage from "./components/ProfilePage.vue";
 import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
+import MciNugetStats from "./components/MciNugetStats.vue";
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
 import "./styles/mci-site.scss";
 import "./styles/mainstream.scss";
 import "./styles/ai-studio-home.scss";
+import "./styles/edition-comparison.scss";
+import "./styles/nuget-downloads.scss";
 
 const APPEARANCE_KEY = 'vitepress-theme-appearance'
 
@@ -40,6 +43,7 @@ const MicroiLayout = defineComponent({
     name: 'MicroiLayout',
     setup() {
         const { isDark } = useData()
+        const route = useRoute()
 
         // VitePress/VueUse otherwise stores `auto` when the chosen appearance
         // happens to match the operating system. The site exposes only two
@@ -51,7 +55,10 @@ const MicroiLayout = defineComponent({
         })
 
         return () => h(DefaultTheme.Layout, null, {
-            'nav-bar-content-after': () => h(Fragment, null, [h(ProfileLocaleSwitch), h(UserBar)])
+            'nav-bar-content-after': () => h(Fragment, null, [h(ProfileLocaleSwitch), h(UserBar)]),
+            'sidebar-nav-after': () => /^(?:\/en)?\/doc\//.test(route.path || '')
+                ? h(MciNugetStats, { variant: 'sidebar' })
+                : null
         })
     }
 })
@@ -67,5 +74,6 @@ export default {
         ctx.app.component('AiStudioHome', AiStudioHome);
         ctx.app.component('ProductShowcase', ProductShowcase);
         ctx.app.component('AppDetail', AppDetail);
+        ctx.app.component('MciNugetStats', MciNugetStats);
     }
 };

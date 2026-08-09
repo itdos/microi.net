@@ -53,6 +53,12 @@ namespace Microi.net
         /// <summary>批量、幂等写入系统日志；仅供后台审计队列消费。</summary>
         Task<DosResult> AddSysLogs(IReadOnlyCollection<SysLogParam> parameters);
         Task<DosResultList<SysLog>> GetSysLog(SysLogParam param);
+        Task<DosResultList<SysLog>> GetTraceTimeline(SysLogTraceQueryParam param);
+        Task<DosResult<SysLogSignalResult>> QuerySystemLogSignal(SysLogSignalQueryParam param);
+        Task<DosResult<SysLogLifecyclePlan>> PlanSystemLogLifecycle(SysLogLifecycleParam param);
+        Task<DosResult<SysLogLifecycleBatch>> ReadSystemLogLifecycleBatch(SysLogLifecycleParam param);
+        Task<DosResult<SysLogLifecycleRunState>> CommitSystemLogLifecycleBatch(SysLogLifecycleCommitParam param);
+        Task<DosResult<SysLogLifecycleRunState>> GetSystemLogLifecycleRunState(SysLogLifecycleParam param);
         Task<DosResult> GetSysLogTypes(SysLogParam param);
         /// <summary>
         /// 一次性返回当前月 5 类日志的并行数量统计（Error/Warn/SlowSQL/SlowExec/Exception）

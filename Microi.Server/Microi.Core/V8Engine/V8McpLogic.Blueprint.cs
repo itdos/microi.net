@@ -16,6 +16,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -39,6 +41,8 @@ namespace Microi.net
             "Status", "LockedBy", "LockedAt", "LastSyncedSchemaHash",
             "Sort", "CreateTime", "UpdateTime", "CreateUserName", "UpdateUserName"
         };
+        private const int BlueprintDiffMaxJsonChars = 8 * 1024 * 1024;
+        private const int BlueprintDiffMaxChanges = 1000;
 
         private static DbSession BpDbWrite(string osClient) => OsClientExtend.GetClient(osClient).Db;
         private static DbSession BpDbRead(string osClient) => OsClientExtend.GetClient(osClient).DbRead;
@@ -88,6 +92,360 @@ namespace Microi.net
             catch (Exception ex)
             {
                 return Task.FromResult(new DosResult<object>(0, null, "获取蓝图详情失败：" + ex.Message));
+            }
+        }
+
+        public static async Task<DosResult<object>> ListBlueprintHistory(
+            string osClient,
+            string blueprintIdOrName,
+            int pageIndex = 1,
+            int pageSize = 50)
+        {
+            try
+            {
+                var blueprintResult = await GetBlueprint(osClient, blueprintIdOrName).ConfigureAwait(false);
+                if (blueprintResult.Code != 1 || !(blueprintResult.Data is JObject blueprint))
+                    return new DosResult<object>(blueprintResult.Code, null, blueprintResult.Msg);
+
+                var blueprintId = blueprint["Id"].Val<string>();
+                pageIndex = Math.Max(1, pageIndex);
+                pageSize = Math.Max(1, Math.Min(100, pageSize));
+                var offset = (pageIndex - 1) * pageSize;
+                var total = BpDbRead(osClient).FromSql(
+                        "SELECT COUNT(1) FROM `sys_blueprint_history` " +
+                        "WHERE `OsClient`=?os AND `BlueprintId`=?bpid AND (`IsDeleted` IS NULL OR `IsDeleted`=0)")
+                    .AddInParameter("?os", osClient)
+                    .AddInParameter("?bpid", blueprintId)
+                    .ToScalar<int>();
+
+                var rows = ReadRowsAsJArray(BpDbRead(osClient).FromSql(
+                        "SELECT `Id`,`BlueprintId`,`Version`,`BlueprintData`,`ChangeSummary`,`CreateTime`," +
+                        "`CreateUserId`,`CreateUserName` FROM `sys_blueprint_history` " +
+                        "WHERE `OsClient`=?os AND `BlueprintId`=?bpid AND (`IsDeleted` IS NULL OR `IsDeleted`=0) " +
+                        "ORDER BY `CreateTime` DESC,`Id` DESC " + BuildSafePaginationClause(offset, pageSize))
+                    .AddInParameter("?os", osClient)
+                    .AddInParameter("?bpid", blueprintId));
+
+                foreach (var token in rows.OfType<JObject>())
+                {
+                    var json = token["BlueprintData"].Val<string>() ?? "";
+                    token["ContentHash"] = ComputeBlueprintContentHash(json);
+                    token["ContentLength"] = Encoding.UTF8.GetByteCount(json);
+                    token.Remove("BlueprintData");
+                }
+
+                var currentJson = blueprint["BlueprintData"].Val<string>() ?? "";
+                return new DosResult<object>(1, new
+                {
+                    Items = rows,
+                    DataCount = total,
+                    PageIndex = pageIndex,
+                    PageSize = pageSize,
+                    BlueprintId = blueprintId,
+                    BlueprintName = blueprint["Name"].Val<string>(),
+                    CurrentVersion = blueprint["Version"].Val<string>(),
+                    CurrentHash = ComputeBlueprintContentHash(currentJson)
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取蓝图历史失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> GetBlueprintHistory(
+            string osClient,
+            string blueprintIdOrName,
+            string historyId)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(historyId))
+                    return new DosResult<object>(0, null, "HistoryId 不能为空");
+
+                var blueprintResult = await GetBlueprint(osClient, blueprintIdOrName).ConfigureAwait(false);
+                if (blueprintResult.Code != 1 || !(blueprintResult.Data is JObject blueprint))
+                    return new DosResult<object>(blueprintResult.Code, null, blueprintResult.Msg);
+                var blueprintId = blueprint["Id"].Val<string>();
+
+                var rows = ReadRowsAsJArray(BpDbRead(osClient).FromSql(
+                        "SELECT `Id`,`BlueprintId`,`Version`,`BlueprintData`,`ChangeSummary`,`CreateTime`," +
+                        "`CreateUserId`,`CreateUserName` FROM `sys_blueprint_history` " +
+                        "WHERE `OsClient`=?os AND `BlueprintId`=?bpid AND `Id`=?hid " +
+                        "AND (`IsDeleted` IS NULL OR `IsDeleted`=0) LIMIT 1")
+                    .AddInParameter("?os", osClient)
+                    .AddInParameter("?bpid", blueprintId)
+                    .AddInParameter("?hid", historyId));
+                if (rows.Count == 0)
+                    return new DosResult<object>(2, null, "蓝图历史不存在或不属于当前蓝图");
+
+                var history = (JObject)rows[0];
+                history["ContentHash"] = ComputeBlueprintContentHash(history["BlueprintData"].Val<string>() ?? "");
+                return new DosResult<object>(1, history);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "获取蓝图历史详情失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> CompareBlueprintVersions(
+            string osClient,
+            string blueprintIdOrName,
+            string leftHistoryId,
+            string rightHistoryId = null)
+        {
+            try
+            {
+                var blueprintResult = await GetBlueprint(osClient, blueprintIdOrName).ConfigureAwait(false);
+                if (blueprintResult.Code != 1 || !(blueprintResult.Data is JObject blueprint))
+                    return new DosResult<object>(blueprintResult.Code, null, blueprintResult.Msg);
+                var blueprintId = blueprint["Id"].Val<string>();
+
+                JObject left;
+                if (string.IsNullOrWhiteSpace(leftHistoryId))
+                {
+                    var latestRows = ReadRowsAsJArray(BpDbRead(osClient).FromSql(
+                            "SELECT `Id`,`Version`,`BlueprintData`,`ChangeSummary`,`CreateTime`,`CreateUserName` " +
+                            "FROM `sys_blueprint_history` WHERE `OsClient`=?os AND `BlueprintId`=?bpid " +
+                            "AND (`IsDeleted` IS NULL OR `IsDeleted`=0) ORDER BY `CreateTime` DESC,`Id` DESC LIMIT 1")
+                        .AddInParameter("?os", osClient)
+                        .AddInParameter("?bpid", blueprintId));
+                    if (latestRows.Count == 0)
+                        return new DosResult<object>(2, null, "蓝图尚无历史快照");
+                    left = (JObject)latestRows[0];
+                }
+                else
+                {
+                    left = LoadBlueprintHistoryRaw(osClient, blueprintId, leftHistoryId);
+                    if (left == null)
+                        return new DosResult<object>(2, null, "左侧蓝图历史不存在或不属于当前蓝图");
+                }
+
+                JObject right;
+                var rightIsCurrent = string.IsNullOrWhiteSpace(rightHistoryId);
+                if (rightIsCurrent)
+                {
+                    right = new JObject
+                    {
+                        ["Id"] = "current",
+                        ["Version"] = blueprint["Version"],
+                        ["BlueprintData"] = blueprint["BlueprintData"],
+                        ["ChangeSummary"] = "当前草稿",
+                        ["CreateTime"] = blueprint["UpdateTime"],
+                        ["CreateUserName"] = blueprint["UpdateUserName"]
+                    };
+                }
+                else
+                {
+                    right = LoadBlueprintHistoryRaw(osClient, blueprintId, rightHistoryId);
+                    if (right == null)
+                        return new DosResult<object>(2, null, "右侧蓝图历史不存在或不属于当前蓝图");
+                }
+
+                var leftJson = left["BlueprintData"].Val<string>() ?? "";
+                var rightJson = right["BlueprintData"].Val<string>() ?? "";
+                if (leftJson.Length > BlueprintDiffMaxJsonChars || rightJson.Length > BlueprintDiffMaxJsonChars)
+                    return new DosResult<object>(0, null, "蓝图内容超过在线差异比较上限，请先导出后离线比较");
+
+                var diff = BuildBlueprintJsonDiff(leftJson, rightJson, BlueprintDiffMaxChanges);
+                diff["BlueprintId"] = blueprintId;
+                diff["BlueprintName"] = blueprint["Name"];
+                diff["Left"] = BuildBlueprintVersionDescriptor(left, false);
+                diff["Right"] = BuildBlueprintVersionDescriptor(right, rightIsCurrent);
+                return new DosResult<object>(1, diff);
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "比较蓝图版本失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> ExportBlueprint(
+            string osClient,
+            string blueprintIdOrName)
+        {
+            try
+            {
+                var blueprintResult = await GetBlueprint(osClient, blueprintIdOrName).ConfigureAwait(false);
+                if (blueprintResult.Code != 1 || !(blueprintResult.Data is JObject blueprint))
+                    return new DosResult<object>(blueprintResult.Code, null, blueprintResult.Msg);
+
+                var blueprintJson = blueprint["BlueprintData"].Val<string>() ?? "";
+                JToken blueprintData;
+                try { blueprintData = JToken.Parse(blueprintJson); }
+                catch (Exception parseEx)
+                {
+                    return new DosResult<object>(0, null, "蓝图内容不是有效 JSON：" + parseEx.Message);
+                }
+
+                var contentHash = ComputeBlueprintContentHash(blueprintJson);
+                var export = new JObject
+                {
+                    ["Schema"] = "microi.blueprint.v1",
+                    ["ExportedAt"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    ["ContentHash"] = contentHash,
+                    ["Blueprint"] = new JObject
+                    {
+                        ["Id"] = blueprint["Id"],
+                        ["Name"] = blueprint["Name"],
+                        ["Code"] = blueprint["Code"],
+                        ["Description"] = blueprint["Description"],
+                        ["Version"] = blueprint["Version"],
+                        ["RootDiagramId"] = blueprint["RootDiagramId"],
+                        ["Status"] = blueprint["Status"],
+                        ["BlueprintData"] = blueprintData
+                    }
+                };
+                var fileStem = SafeBlueprintFileName(
+                    blueprint["Code"].Val<string>() ?? blueprint["Name"].Val<string>() ?? blueprint["Id"].Val<string>());
+                return new DosResult<object>(1, new
+                {
+                    FileName = fileStem + ".microi-blueprint.json",
+                    ContentType = "application/json;charset=utf-8",
+                    ContentHash = contentHash,
+                    Snapshot = export
+                });
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "导出蓝图失败：" + ex.Message);
+            }
+        }
+
+        public static async Task<DosResult<object>> RollbackBlueprint(
+            string osClient,
+            JObject param,
+            dynamic currentToken = null)
+        {
+            try
+            {
+                var blueprintKey = param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+                var historyId = param?["HistoryId"].Val<string>();
+                var expectedHash = param?["ExpectedCurrentHash"].Val<string>();
+                if (string.IsNullOrWhiteSpace(blueprintKey))
+                    return new DosResult<object>(0, null, "BlueprintId 不能为空");
+                if (string.IsNullOrWhiteSpace(historyId))
+                    return new DosResult<object>(0, null, "HistoryId 不能为空");
+                if (string.IsNullOrWhiteSpace(expectedHash))
+                    return new DosResult<object>(0, null, "ExpectedCurrentHash 不能为空，请先重新读取蓝图历史");
+
+                var blueprintResult = await GetBlueprint(osClient, blueprintKey).ConfigureAwait(false);
+                if (blueprintResult.Code != 1 || !(blueprintResult.Data is JObject blueprint))
+                    return new DosResult<object>(blueprintResult.Code, null, blueprintResult.Msg);
+                var blueprintId = blueprint["Id"].Val<string>();
+                var currentJson = blueprint["BlueprintData"].Val<string>() ?? "";
+                var currentHash = ComputeBlueprintContentHash(currentJson);
+                if (!string.Equals(currentHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new DosResult<object>(0, new
+                    {
+                        Conflict = true,
+                        ExpectedCurrentHash = expectedHash,
+                        ActualCurrentHash = currentHash,
+                        BlueprintId = blueprintId
+                    }, "蓝图已被其他用户或节点修改，请重新比较后再回滚");
+                }
+
+                var target = LoadBlueprintHistoryRaw(osClient, blueprintId, historyId);
+                if (target == null)
+                    return new DosResult<object>(2, null, "目标蓝图历史不存在或不属于当前蓝图");
+                var targetJson = target["BlueprintData"].Val<string>() ?? "";
+                try { JToken.Parse(targetJson); }
+                catch (Exception parseEx)
+                {
+                    return new DosResult<object>(0, null, "目标历史快照不是合法 JSON：" + parseEx.Message);
+                }
+
+                var newVersion = param?["NewVersion"].Val<string>() ?? target["Version"].Val<string>() ?? "1.0";
+                if (newVersion.Length > 20)
+                    return new DosResult<object>(0, null, "NewVersion 最多 20 个字符");
+                if (IsBlueprintRollbackNoOp(
+                        currentJson,
+                        targetJson,
+                        blueprint["Version"].Val<string>(),
+                        newVersion))
+                {
+                    return new DosResult<object>(1, new
+                    {
+                        BlueprintId = blueprintId,
+                        HistoryId = historyId,
+                        CurrentHash = currentHash,
+                        Version = blueprint["Version"].Val<string>() ?? "1.0",
+                        Reused = true
+                    }, "目标版本已是当前版本");
+                }
+                var changeSummary = param?["ChangeSummary"].Val<string>() ??
+                                    $"回滚到历史 {historyId}（版本 {target["Version"].Val<string>() ?? ""}）";
+                if (changeSummary.Length > 2000)
+                    return new DosResult<object>(0, null, "ChangeSummary 最多 2000 个字符");
+
+                var (userId, userName) = ExtractBlueprintUser((object)currentToken);
+                var preRollbackHistoryId = Ulid.NewUlid().ToString();
+                using (var trans = BpDbWrite(osClient).BeginTransaction())
+                {
+                    try
+                    {
+                        trans.FromSql("INSERT INTO `sys_blueprint_history` " +
+                                "(`Id`,`OsClient`,`BlueprintId`,`Version`,`BlueprintData`,`ChangeSummary`," +
+                                "`CreateTime`,`CreateUserId`,`CreateUserName`,`IsDeleted`) " +
+                                "VALUES(?id,?os,?bpid,?ver,?bd,?cs,NOW(),?uid,?unm,0)")
+                            .AddInParameter("?id", preRollbackHistoryId)
+                            .AddInParameter("?os", osClient)
+                            .AddInParameter("?bpid", blueprintId)
+                            .AddInParameter("?ver", blueprint["Version"].Val<string>() ?? "1.0")
+                            .AddInParameter("?bd", currentJson)
+                            .AddInParameter("?cs", "回滚前自动快照：" + changeSummary)
+                            .AddInParameter("?uid", userId)
+                            .AddInParameter("?unm", userName)
+                            .ExecuteNonQuery();
+
+                        var affected = trans.FromSql("UPDATE `sys_business_blueprint` SET " +
+                                "`BlueprintData`=?target,`Version`=?ver,`UpdateTime`=NOW()," +
+                                "`UpdateUserId`=?uid,`UpdateUserName`=?unm,`Remark`=?remark " +
+                                "WHERE `Id`=?id AND `OsClient`=?os AND " +
+                                "((`BlueprintData`=?expected) OR (`BlueprintData` IS NULL AND ?expected=''))")
+                            .AddInParameter("?target", targetJson)
+                            .AddInParameter("?ver", newVersion)
+                            .AddInParameter("?uid", userId)
+                            .AddInParameter("?unm", userName)
+                            .AddInParameter("?remark", changeSummary)
+                            .AddInParameter("?id", blueprintId)
+                            .AddInParameter("?os", osClient)
+                            .AddInParameter("?expected", currentJson)
+                            .ExecuteNonQuery();
+                        if (affected != 1)
+                            throw new BlueprintConcurrencyException();
+
+                        RebuildBlueprintRelationsInTransaction(trans, osClient, blueprintId, targetJson);
+                        trans.Commit();
+                    }
+                    catch
+                    {
+                        try { trans.Rollback(); } catch { /* ignore */ }
+                        throw;
+                    }
+                }
+
+                var restoredHash = ComputeBlueprintContentHash(targetJson);
+                return new DosResult<object>(1, new
+                {
+                    BlueprintId = blueprintId,
+                    HistoryId = historyId,
+                    PreRollbackHistoryId = preRollbackHistoryId,
+                    PreviousHash = currentHash,
+                    CurrentHash = restoredHash,
+                    Version = newVersion,
+                    RolledBack = true
+                }, "蓝图已按历史快照回滚，并保留回滚前快照");
+            }
+            catch (BlueprintConcurrencyException)
+            {
+                return new DosResult<object>(0, new { Conflict = true }, "蓝图在回滚过程中已发生变化，请重新读取后再操作");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult<object>(0, null, "回滚蓝图失败：" + ex.Message);
             }
         }
 
@@ -287,6 +645,93 @@ namespace Microi.net
             }
             catch { /* swallow */ }
             return Task.CompletedTask;
+        }
+
+        private static void RebuildBlueprintRelationsInTransaction(
+            DbTrans trans,
+            string osClient,
+            string blueprintId,
+            string blueprintData)
+        {
+            trans.FromSql("DELETE FROM `sys_blueprint_relation` WHERE `OsClient`=?os AND `BlueprintId`=?bpid")
+                .AddInParameter("?os", osClient)
+                .AddInParameter("?bpid", blueprintId)
+                .ExecuteNonQuery();
+
+            var root = JObject.Parse(blueprintData);
+            var diagrams = root["diagrams"] as JArray ?? root["Diagrams"] as JArray;
+            if (diagrams == null) return;
+
+            foreach (var diagram in diagrams.OfType<JObject>())
+            {
+                var diagramId = diagram["id"].Val<string>() ?? diagram["Id"].Val<string>() ?? "";
+                var nodes = diagram["nodes"] as JArray ?? diagram["Nodes"] as JArray;
+                if (nodes == null) continue;
+                foreach (var node in nodes.OfType<JObject>())
+                {
+                    var nodeId = node["id"].Val<string>() ?? node["Id"].Val<string>() ?? "";
+                    var refs = node["refs"] as JObject ?? node["Refs"] as JObject;
+                    if (refs == null) continue;
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "table", refs["tables"] ?? refs["Tables"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "field", refs["fields"] ?? refs["Fields"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "menu", refs["menus"] ?? refs["Menus"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "engine", refs["engines"] ?? refs["Engines"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "v8event", refs["v8Events"] ?? refs["V8Events"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "dataSource", refs["dataSources"] ?? refs["DataSources"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "printTemplate", refs["printTemplates"] ?? refs["PrintTemplates"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "workflow", refs["workflows"] ?? refs["Workflows"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "page", refs["pages"] ?? refs["Pages"]);
+                    InsertRelationsRaw(trans, osClient, blueprintId, diagramId, nodeId, "job", refs["jobs"] ?? refs["Jobs"]);
+                }
+            }
+        }
+
+        private static void InsertRelationsRaw(
+            DbTrans trans,
+            string osClient,
+            string blueprintId,
+            string diagramId,
+            string nodeId,
+            string relationType,
+            JToken arr)
+        {
+            if (!(arr is JArray values)) return;
+            var sort = 0;
+            foreach (var item in values)
+            {
+                string key;
+                string name;
+                if (item.Type == JTokenType.String)
+                {
+                    key = item.Val<string>();
+                    name = key;
+                }
+                else if (item is JObject obj)
+                {
+                    key = obj["key"].Val<string>() ?? obj["Key"].Val<string>() ??
+                          obj["id"].Val<string>() ?? obj["Id"].Val<string>() ?? "";
+                    name = obj["name"].Val<string>() ?? obj["Name"].Val<string>() ?? key;
+                }
+                else
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(key)) continue;
+                trans.FromSql("INSERT INTO `sys_blueprint_relation` " +
+                        "(`Id`,`OsClient`,`BlueprintId`,`DiagramId`,`NodeId`,`RelationType`,`RelationKey`,`RelationName`,`Sort`,`CreateTime`,`IsDeleted`) " +
+                        "VALUES(?id,?os,?bpid,?did,?nid,?rt,?rk,?rn,?st,NOW(),0)")
+                    .AddInParameter("?id", Ulid.NewUlid().ToString())
+                    .AddInParameter("?os", osClient)
+                    .AddInParameter("?bpid", blueprintId)
+                    .AddInParameter("?did", diagramId ?? "")
+                    .AddInParameter("?nid", nodeId ?? "")
+                    .AddInParameter("?rt", relationType)
+                    .AddInParameter("?rk", key)
+                    .AddInParameter("?rn", name ?? key)
+                    .AddInParameter("?st", sort++)
+                    .ExecuteNonQuery();
+            }
         }
 
         private static void InsertRelationsRaw(string osClient, string blueprintId, string diagramId, string nodeId,
@@ -530,6 +975,308 @@ namespace Microi.net
         #endregion
 
         #region helpers
+
+        internal static string ComputeBlueprintContentHash(string json)
+        {
+            var normalized = NormalizeBlueprintJson(json);
+            using var sha = SHA256.Create();
+            var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(normalized));
+            var builder = new StringBuilder(bytes.Length * 2);
+            foreach (var value in bytes) builder.Append(value.ToString("x2"));
+            return builder.ToString();
+        }
+
+        // Dos.ORM's MySQL provider serializes LIMIT/OFFSET parameters as quoted
+        // strings (for example LIMIT '20' OFFSET '0'), which MySQL rejects.
+        // Only validated integers reach this helper, so emitting numeric literals
+        // is both injection-safe and portable across the supported MySQL versions.
+        internal static string BuildSafePaginationClause(int offset, int pageSize)
+        {
+            offset = Math.Max(0, offset);
+            pageSize = Math.Max(1, Math.Min(100, pageSize));
+            return $"LIMIT {pageSize} OFFSET {offset}";
+        }
+
+        internal static bool IsBlueprintRollbackNoOp(
+            string currentJson,
+            string targetJson,
+            string currentVersion,
+            string targetVersion)
+        {
+            return string.Equals(
+                       ComputeBlueprintContentHash(currentJson ?? ""),
+                       ComputeBlueprintContentHash(targetJson ?? ""),
+                       StringComparison.OrdinalIgnoreCase)
+                   && string.Equals(
+                       (currentVersion ?? "1.0").Trim(),
+                       (targetVersion ?? "1.0").Trim(),
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string SafeBlueprintFileName(string value)
+        {
+            var source = string.IsNullOrWhiteSpace(value) ? "microi-blueprint" : value.Trim();
+            var invalid = new HashSet<char>(System.IO.Path.GetInvalidFileNameChars());
+            var safe = new string(source.Select(ch => invalid.Contains(ch) || char.IsControl(ch) ? '_' : ch).ToArray());
+            safe = safe.Trim().Trim('.');
+            if (string.IsNullOrWhiteSpace(safe)) safe = "microi-blueprint";
+            return safe.Length > 100 ? safe.Substring(0, 100) : safe;
+        }
+
+        internal static JObject BuildBlueprintJsonDiff(string leftJson, string rightJson, int maxChanges = BlueprintDiffMaxChanges)
+        {
+            var left = string.IsNullOrWhiteSpace(leftJson) ? JValue.CreateNull() : JToken.Parse(leftJson);
+            var right = string.IsNullOrWhiteSpace(rightJson) ? JValue.CreateNull() : JToken.Parse(rightJson);
+            var changes = new JArray();
+            var added = 0;
+            var removed = 0;
+            var changed = 0;
+            var total = 0;
+            maxChanges = Math.Max(1, Math.Min(BlueprintDiffMaxChanges, maxChanges));
+            CompareBlueprintTokens(left, right, "", changes, ref added, ref removed, ref changed, ref total, maxChanges);
+            return new JObject
+            {
+                ["Equal"] = total == 0,
+                ["LeftHash"] = ComputeBlueprintContentHash(leftJson),
+                ["RightHash"] = ComputeBlueprintContentHash(rightJson),
+                ["Added"] = added,
+                ["Removed"] = removed,
+                ["Changed"] = changed,
+                ["TotalChanges"] = total,
+                ["ReturnedChanges"] = changes.Count,
+                ["Truncated"] = total > changes.Count,
+                ["Changes"] = changes
+            };
+        }
+
+        private static void CompareBlueprintTokens(
+            JToken left,
+            JToken right,
+            string path,
+            JArray changes,
+            ref int added,
+            ref int removed,
+            ref int changed,
+            ref int total,
+            int maxChanges)
+        {
+            if (JToken.DeepEquals(left, right)) return;
+            if (left == null || left.Type == JTokenType.Null)
+            {
+                added++;
+                total++;
+                AppendBlueprintChange(changes, maxChanges, "Added", path, null, right);
+                return;
+            }
+            if (right == null || right.Type == JTokenType.Null)
+            {
+                removed++;
+                total++;
+                AppendBlueprintChange(changes, maxChanges, "Removed", path, left, null);
+                return;
+            }
+
+            if (left is JObject leftObject && right is JObject rightObject)
+            {
+                var names = leftObject.Properties().Select(p => p.Name)
+                    .Union(rightObject.Properties().Select(p => p.Name), StringComparer.Ordinal)
+                    .OrderBy(name => name, StringComparer.Ordinal);
+                foreach (var name in names)
+                {
+                    CompareBlueprintTokens(
+                        leftObject[name],
+                        rightObject[name],
+                        path + "/" + EscapeBlueprintPath(name),
+                        changes,
+                        ref added,
+                        ref removed,
+                        ref changed,
+                        ref total,
+                        maxChanges);
+                }
+                return;
+            }
+
+            if (left is JArray leftArray && right is JArray rightArray)
+            {
+                if (TryBuildBlueprintIdentityMap(leftArray, out var leftMap, out var leftOrder) &&
+                    TryBuildBlueprintIdentityMap(rightArray, out var rightMap, out var rightOrder))
+                {
+                    var ids = leftOrder.Concat(rightOrder.Where(id => !leftMap.ContainsKey(id)));
+                    foreach (var id in ids)
+                    {
+                        leftMap.TryGetValue(id, out var leftItem);
+                        rightMap.TryGetValue(id, out var rightItem);
+                        CompareBlueprintTokens(
+                            leftItem,
+                            rightItem,
+                            path + "[id=" + EscapeBlueprintPath(id) + "]",
+                            changes,
+                            ref added,
+                            ref removed,
+                            ref changed,
+                            ref total,
+                            maxChanges);
+                    }
+                    return;
+                }
+
+                var length = Math.Max(leftArray.Count, rightArray.Count);
+                for (var index = 0; index < length; index++)
+                {
+                    CompareBlueprintTokens(
+                        index < leftArray.Count ? leftArray[index] : null,
+                        index < rightArray.Count ? rightArray[index] : null,
+                        path + "/" + index,
+                        changes,
+                        ref added,
+                        ref removed,
+                        ref changed,
+                        ref total,
+                        maxChanges);
+                }
+                return;
+            }
+
+            changed++;
+            total++;
+            AppendBlueprintChange(changes, maxChanges, "Changed", path, left, right);
+        }
+
+        private static bool TryBuildBlueprintIdentityMap(
+            JArray values,
+            out Dictionary<string, JToken> map,
+            out List<string> order)
+        {
+            map = new Dictionary<string, JToken>(StringComparer.Ordinal);
+            order = new List<string>();
+            if (values.Count == 0) return false;
+            foreach (var item in values)
+            {
+                if (!(item is JObject obj)) return false;
+                var identity = obj["id"].Val<string>() ?? obj["Id"].Val<string>() ??
+                               obj["key"].Val<string>() ?? obj["Key"].Val<string>();
+                if (string.IsNullOrWhiteSpace(identity) || map.ContainsKey(identity)) return false;
+                map[identity] = item;
+                order.Add(identity);
+            }
+            return true;
+        }
+
+        private static void AppendBlueprintChange(
+            JArray changes,
+            int maxChanges,
+            string type,
+            string path,
+            JToken before,
+            JToken after)
+        {
+            if (changes.Count >= maxChanges) return;
+            changes.Add(new JObject
+            {
+                ["Type"] = type,
+                ["Path"] = string.IsNullOrWhiteSpace(path) ? "/" : path,
+                ["Before"] = SummarizeBlueprintDiffValue(before),
+                ["After"] = SummarizeBlueprintDiffValue(after)
+            });
+        }
+
+        private static JToken SummarizeBlueprintDiffValue(JToken value)
+        {
+            if (value == null) return JValue.CreateNull();
+            var text = value.ToString(Newtonsoft.Json.Formatting.None);
+            if (text.Length <= 2048) return value.DeepClone();
+            return new JObject
+            {
+                ["Truncated"] = true,
+                ["Length"] = text.Length,
+                ["Hash"] = ComputeBlueprintContentHash(text),
+                ["Preview"] = text.Substring(0, 512)
+            };
+        }
+
+        private static string NormalizeBlueprintJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return "null";
+            return SortBlueprintToken(JToken.Parse(json)).ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private static JToken SortBlueprintToken(JToken token)
+        {
+            if (token is JObject obj)
+            {
+                var sorted = new JObject();
+                foreach (var property in obj.Properties().OrderBy(p => p.Name, StringComparer.Ordinal))
+                    sorted.Add(property.Name, SortBlueprintToken(property.Value));
+                return sorted;
+            }
+            if (token is JArray array)
+                return new JArray(array.Select(SortBlueprintToken));
+            return token.DeepClone();
+        }
+
+        private static string EscapeBlueprintPath(string value)
+        {
+            return (value ?? "").Replace("~", "~0").Replace("/", "~1").Replace("]", "\\]");
+        }
+
+        private static JObject LoadBlueprintHistoryRaw(string osClient, string blueprintId, string historyId)
+        {
+            var rows = ReadRowsAsJArray(BpDbRead(osClient).FromSql(
+                    "SELECT `Id`,`BlueprintId`,`Version`,`BlueprintData`,`ChangeSummary`,`CreateTime`," +
+                    "`CreateUserId`,`CreateUserName` FROM `sys_blueprint_history` " +
+                    "WHERE `OsClient`=?os AND `BlueprintId`=?bpid AND `Id`=?hid " +
+                    "AND (`IsDeleted` IS NULL OR `IsDeleted`=0) LIMIT 1")
+                .AddInParameter("?os", osClient)
+                .AddInParameter("?bpid", blueprintId)
+                .AddInParameter("?hid", historyId));
+            return rows.Count == 0 ? null : rows[0] as JObject;
+        }
+
+        private static JObject BuildBlueprintVersionDescriptor(JObject source, bool isCurrent)
+        {
+            var json = source?["BlueprintData"].Val<string>() ?? "";
+            return new JObject
+            {
+                ["Id"] = source?["Id"],
+                ["Version"] = source?["Version"],
+                ["ChangeSummary"] = source?["ChangeSummary"],
+                ["CreateTime"] = source?["CreateTime"],
+                ["CreateUserName"] = source?["CreateUserName"],
+                ["ContentHash"] = ComputeBlueprintContentHash(json),
+                ["IsCurrent"] = isCurrent
+            };
+        }
+
+        private static (string userId, string userName) ExtractBlueprintUser(object currentToken)
+        {
+            try
+            {
+                object currentUser = null;
+                if (currentToken is CurrentToken typedToken)
+                    currentUser = typedToken.CurrentUser;
+                else if (currentToken is JObject tokenJson)
+                    currentUser = tokenJson["CurrentUser"];
+                else if (currentToken != null)
+                {
+                    var property = currentToken.GetType().GetProperty("CurrentUser");
+                    currentUser = property?.GetValue(currentToken);
+                }
+                if (currentUser == null) return ("", "");
+                var user = currentUser as JObject ?? JObject.FromObject(currentUser);
+                return (
+                    user["Id"].Val<string>() ?? "",
+                    user["Name"].Val<string>() ?? user["Account"].Val<string>() ?? "");
+            }
+            catch
+            {
+                return ("", "");
+            }
+        }
+
+        private sealed class BlueprintConcurrencyException : Exception
+        {
+        }
 
         /// <summary>
         /// 把 SqlSection 的查询结果读为 JArray（每行一个 JObject，按列名展开）。

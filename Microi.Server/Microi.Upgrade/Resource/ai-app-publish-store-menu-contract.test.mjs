@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.6.5 V3 source", () => {
+test("publisher package metadata matches the v1.7.4 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.6.5");
+  assert.equal(packagedPublisher.Version, "v1.7.4");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -232,6 +232,21 @@ test("storeRow saves explicit SelectMenu metadata and otherwise preserves the st
   assert.equal(resolve({ SelectMenu: [] }, { SelectMenu: stored }), "[]", "an explicit empty selection clears the stored selection");
 });
 
+test("storeRow persists resolved resource ids when explicit package selections are supplied", () => {
+  assert.match(
+    publisherSource,
+    /V8\.Param\.MenuIds !== undefined && V8\.Param\.MenuIds !== null\s*\? selectionJson\(menuIds\)/,
+  );
+  assert.match(
+    publisherSource,
+    /SelectTable:[\s\S]*?V8\.Param\.TableIds !== undefined && V8\.Param\.TableIds !== null\s*\? selectionJson\(tableIds\)/,
+  );
+  assert.match(
+    publisherSource,
+    /SelectApiEngine:[\s\S]*?V8\.Param\.ApiEngineKeys !== undefined && V8\.Param\.ApiEngineKeys !== null\s*\? selectionJson\(apiEngineKeys\)/,
+  );
+});
+
 function exactPublishedVersionValidator() {
   const context = {};
   vm.runInNewContext(`
@@ -260,6 +275,24 @@ test("legacy exact package repair accepts only latest successful immutable state
     assert.equal(result.Code, 1, `legacy exact should accept ${state}`);
     assert.equal(result.Data.AppVersion, "v1.5.5");
   }
+
+  const legacyV2Result = validate(
+    { VersionNo: "v1.5.5", Status: "Published", PublishState: "LegacyUnverified" },
+    assets,
+    "v1.5.5",
+    false,
+  );
+  assert.equal(legacyV2Result.Code, 1, "legacy v2 must use its verified historical Status field");
+  assert.equal(
+    validate(
+      { VersionNo: "v1.5.5", Status: "Published", PublishState: "LegacyUnverified" },
+      assets,
+      "v1.5.5",
+      true,
+    ).Code,
+    0,
+    "protocol v3 must never accept a legacy-unverified pointer",
+  );
 
   for (const state of ["Failed", "Preparing", "Publishing", "Pending", "Cancelled", ""]) {
     const result = validate(
@@ -362,7 +395,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.6\.5/);
+  assert.match(publisherSource, /Version: v1\.7\.4/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

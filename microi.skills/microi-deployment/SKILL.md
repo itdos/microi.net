@@ -9,6 +9,8 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 版本、端口和命令可能变化，执行前必须回读当前中文官网、仓库 compose/配置和目标
 主机状态，不能把旧示例当作当前生产事实。
 
+数据库备份 MCP 使用 `microi_list_database_backup_tenants` 盘点可备份租户，使用 `microi_run_database_backup` 提交带稳定幂等键的持久化任务。备份必须进入共享存储并回读文件大小、哈希和任务终态；本机进程返回成功不等于备份可恢复。
+
 ## 必读参考
 
 - 部署方式、依赖、配置和验收矩阵：`references/deployment-matrix.md`

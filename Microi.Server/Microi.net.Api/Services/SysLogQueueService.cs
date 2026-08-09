@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
@@ -47,6 +49,9 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
     private readonly ILogger<SysLogQueueService> _logger;
     private readonly string _spoolDirectory;
     private readonly string _nodeId;
+    private readonly string _serviceName;
+    private readonly string _serviceVersion;
+    private readonly string _environmentName;
     private long _enqueued;
     private long _persisted;
     private long _retried;
@@ -98,6 +103,9 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             _logger.LogError(ex, "配置的日志spool目录不可用，已降级到临时目录 {Spool}", _spoolDirectory);
         }
         _nodeId = NormalizeNodeId(Environment.MachineName);
+        _serviceName = Limit(environment.ApplicationName, 128) ?? "Microi.net.Api";
+        _serviceVersion = Limit(Assembly.GetEntryAssembly()?.GetName().Version?.ToString(), 64);
+        _environmentName = Limit(environment.EnvironmentName, 64);
         RecoverTempSpools();
     }
 
@@ -429,9 +437,10 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
         Interlocked.Exchange(ref _lastPersistedTicks, DateTime.Now.Ticks);
     }
 
-    private static SysLogParam Snapshot(SysLogParam source)
+    private SysLogParam Snapshot(SysLogParam source)
     {
         var now = source.OccurredAt ?? DateTime.Now;
+        var activity = Activity.Current;
         Microsoft.AspNetCore.Http.HttpContext? context = null;
         try { context = DiyHttpContext.Current; } catch { /* 非Web宿主或极早期启动阶段没有HttpContextAccessor。 */ }
         var osClient = source.OsClient;
@@ -468,7 +477,34 @@ public sealed class SysLogQueueService : BackgroundService, ISysLogQueue
             TargetId = Limit(source.TargetId, 256),
             DurationSeconds = source.DurationSeconds,
             Success = source.Success,
-            TraceId = Limit(source.TraceId ?? context?.TraceIdentifier, 128),
+            TraceId = Limit(source.TraceId
+                            ?? (activity != null && activity.IdFormat == ActivityIdFormat.W3C
+                                ? activity.TraceId.ToHexString()
+                                : null)
+                            ?? context?.TraceIdentifier, 128),
+            SpanId = Limit(source.SpanId
+                           ?? (activity != null && activity.IdFormat == ActivityIdFormat.W3C
+                               ? activity.SpanId.ToHexString()
+                               : null), 32),
+            ParentSpanId = Limit(source.ParentSpanId
+                                 ?? (activity != null && activity.IdFormat == ActivityIdFormat.W3C
+                                     && activity.ParentSpanId != default
+                                     ? activity.ParentSpanId.ToHexString()
+                                     : null), 32),
+            TraceFlags = Limit(source.TraceFlags
+                               ?? (activity != null && activity.IdFormat == ActivityIdFormat.W3C
+                                   ? ((byte)activity.ActivityTraceFlags).ToString("x2")
+                                   : null), 8),
+            ServiceName = Limit(!string.IsNullOrWhiteSpace(source.ServiceName)
+                ? source.ServiceName
+                : (!string.IsNullOrWhiteSpace(activity?.Source.Name) ? activity.Source.Name : _serviceName), 128),
+            ServiceVersion = Limit(source.ServiceVersion ?? _serviceVersion, 64),
+            NodeId = Limit(source.NodeId ?? _nodeId, 128),
+            Environment = Limit(source.Environment ?? _environmentName, 64),
+            DurationMs = source.DurationMs ?? (activity != null && activity.Duration > TimeSpan.Zero
+                ? activity.Duration.TotalMilliseconds
+                : null),
+            HttpStatusCode = source.HttpStatusCode ?? context?.Response?.StatusCode,
             OccurredAt = now,
             OsClient = Limit(osClient, 128),
             AppId = Limit(source.AppId, 256),

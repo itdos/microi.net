@@ -55,11 +55,18 @@ const defaultBulkImporter = engineSource(
   'return { Code: 1 };',
 );
 
+const defaultAssetPreparer = engineSource(
+  'ai_app_prepare_store_assets',
+  'v1.0.0',
+  'return { Code: 1 };',
+);
+
 function applicationStorePackage({
   importer,
   publisher,
   builder,
   bulk = defaultBulkImporter,
+  preparer = defaultAssetPreparer,
   version = 'v6.6.1',
 }) {
   return JSON.stringify({
@@ -93,15 +100,29 @@ function applicationStorePackage({
         ApiV8Code: builder,
         StopHttp: 0,
       },
+      {
+        Id: 'engine-asset-preparer',
+        ApiEngineKey: 'ai_app_prepare_store_assets',
+        Version: engineVersion(preparer),
+        ApiV8Code: preparer,
+        StopHttp: 1,
+      },
     ],
   });
 }
 
-function replicaMaps({ importer, publisher, builder, bulk = defaultBulkImporter }) {
+function replicaMaps({
+  importer,
+  publisher,
+  builder,
+  bulk = defaultBulkImporter,
+  preparer = defaultAssetPreparer,
+}) {
   return new Map([
     ['import-package.js', importer],
     ['bulk-import-packages.js', bulk],
     ['ai-app-publish-store.js', publisher],
+    ['ai-app-prepare-store-assets.js', preparer],
     ['ai-app-build.js', builder],
   ]);
 }
@@ -450,6 +471,7 @@ test('首次新增内嵌商城引擎时允许从一致的本地事实源建立�
   const establishedReplicas = new Map([
     ['import-package.js', importer],
     ['ai-app-publish-store.js', publisher],
+    ['ai-app-prepare-store-assets.js', defaultAssetPreparer],
     ['ai-app-build.js', builder],
   ]);
 
@@ -731,7 +753,13 @@ test('官网资源通过 microi_itdos MCP 单入口读取完整内容', async t 
   await writeFile(entry, [
     "let buffer = '';",
     "process.stdin.setEncoding('utf8');",
-    "function send(id, result) { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n'); }",
+    "function send(id, result) {",
+    "  const payload = Buffer.from(JSON.stringify({ jsonrpc: '2.0', id, result }) + '\\n', 'utf8');",
+    "  const marker = payload.indexOf(Buffer.from('🧠', 'utf8'));",
+    "  if (marker < 0) { process.stdout.write(payload); return; }",
+    "  process.stdout.write(payload.subarray(0, marker + 1));",
+    "  setTimeout(() => process.stdout.write(payload.subarray(marker + 1)), 1);",
+    "}",
     "process.stdin.on('data', chunk => {",
     "  buffer += chunk;",
     "  let index;",
@@ -744,7 +772,7 @@ test('官网资源通过 microi_itdos MCP 单入口读取完整内容', async t 
     "    if (message.method === 'initialize') { send(message.id, { protocolVersion: '2024-11-05', capabilities: {}, serverInfo: { name: 'fake', version: '1' } }); continue; }",
     "    if (message.method === 'tools/list') { send(message.id, { tools: [{ name: 'microi_codex' }] }); continue; }",
     "    const name = message.params.arguments.params.params.Name;",
-    "    const execution = { Result: { Code: 1, Data: { ResourceName: name, Content: 'ApiEngineKey: ai_app_publish_store\\n', Sha256: 'a'.repeat(64) }, Msg: '' }, ConsoleOutput: [] };",
+    "    const execution = { Result: { Code: 1, Data: { ResourceName: name, Content: 'ApiEngineKey: ai_app_publish_store | 🧠\\n', Sha256: 'a'.repeat(64) }, Msg: '' }, ConsoleOutput: [] };",
     "    send(message.id, { content: [{ type: 'text', text: '## Execution Result\\n- **Code**: 1\\n```json\\n' + JSON.stringify(execution, null, 2) + '\\n```' }] });",
     "  }",
     "});",
@@ -770,7 +798,7 @@ test('官网资源通过 microi_itdos MCP 单入口读取完整内容', async t 
   assert.equal(readResult.configPath, configPath);
   assert.equal(
     readResult.resources.get('ai-app-publish-store.js').Content,
-    'ApiEngineKey: ai_app_publish_store\n',
+    'ApiEngineKey: ai_app_publish_store | 🧠\n',
   );
 });
 

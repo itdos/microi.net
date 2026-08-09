@@ -3381,7 +3381,11 @@ namespace Microi.net
                     return new DosResult<object>(result.Code == 1 ? 2 : result.Code, null, result.Code == 1 ? "页面不存在" : result.Msg);
                 }
 
-                return new DosResult<object>(1, result.Data);
+                var page = result.Data as JObject ?? JObject.FromObject(result.Data);
+                var snapshot = BuildPageEngineSnapshotForTest(page);
+                page["CurrentHash"] = ComputeBlueprintContentHash(snapshot.ToString(Newtonsoft.Json.Formatting.None));
+                page["HistoryAvailable"] = PageVersionStoreAvailable(osClient);
+                return new DosResult<object>(1, page);
             }
             catch (Exception ex)
             {
@@ -4362,16 +4366,96 @@ namespace Microi.net
                     JobParam = param["JobParam"].Val<string>() ?? "",
                     CronDesc = param["CronDesc"].Val<string>() ?? "",
                     CronExpression = cronExpression,
+                    TimeZoneId = param["TimeZoneId"].Val<string>() ?? "",
                     JobType = jobType,
                     ApiEngineKey = param["ApiEngineKey"].Val<string>() ?? "",
                     OsClient = osClient
                 };
 
-                var result = existing.Code == 1 && existing.Data != null
+                var quartzExisting = await MicroiEngine.Job.GetJobDetail(
+                    new MicroiSearchJobModel
+                    {
+                        Name = jobName,
+                        OsClient = osClient
+                    });
+                var result = quartzExisting.Code == 1
                     ? await MicroiEngine.Job.UpdateJob(model)
                     : await MicroiEngine.Job.AddJob(model);
+                // 两个管理节点可能同时判断任务不存在。共享 Quartz JobStore 会
+                // 保证只有一个 Add 成功；另一个节点在看到“已存在”后转为更新，
+                // 让 MCP 创建/更新保持幂等而不是把竞态暴露为失败。
+                if (result.Code != 1
+                    && ((result.Msg ?? "").IndexOf("已存在", StringComparison.OrdinalIgnoreCase) >= 0
+                        || (result.Msg ?? "").IndexOf("already exists", StringComparison.OrdinalIgnoreCase) >= 0))
+                {
+                    result = await MicroiEngine.Job.UpdateJob(model);
+                }
                 if (result.Code != 1) return new DosResult<object>(result.Code, result.Data, result.Msg);
-                return new DosResult<object>(1, new { JobId = id, JobName = jobName, Message = "定时任务已保存" });
+
+                var quartzReadback = await MicroiEngine.Job.GetJobDetail(
+                    new MicroiSearchJobModel
+                    {
+                        Name = jobName,
+                        OsClient = osClient
+                    });
+                if (quartzReadback.Code != 1 || quartzReadback.Data == null)
+                {
+                    return new DosResult<object>(
+                        0,
+                        new { JobId = id, JobName = jobName, QuartzSaved = true },
+                        "Quartz 已保存任务，但运行态回读失败；请先回读后再决定是否重试。");
+                }
+
+                var runtime = JObject.FromObject(quartzReadback.Data);
+                var jobData = new JObject
+                {
+                    ["Id"] = id,
+                    ["OsClient"] = osClient,
+                    ["_InvokeType"] = "Server",
+                    ["JobName"] = jobName,
+                    ["DllName"] = model.DllName ?? "",
+                    ["JobPath"] = model.JobPath ?? "",
+                    ["JobDesc"] = model.JobDesc ?? "",
+                    ["Description"] = model.JobDesc ?? "",
+                    ["JobParam"] = model.JobParam ?? "",
+                    ["CronDesc"] = model.CronDesc ?? "",
+                    ["CronExpression"] = model.CronExpression ?? "",
+                    ["JobType"] = model.JobType ?? "1",
+                    ["ApiEngineKey"] = model.ApiEngineKey ?? "",
+                    ["Status"] = runtime["Status"]?.DeepClone() ?? "正常",
+                    ["LastTime"] = runtime["LastTime"]?.DeepClone() ?? "",
+                    ["NextTime"] = runtime["NextTime"]?.DeepClone() ?? ""
+                };
+                var persistResult = await UpsertRecordByIdOrKey(
+                    osClient,
+                    "diy_schedule_job",
+                    jobData,
+                    "JobName",
+                    "定时任务");
+                if (persistResult.Code != 1)
+                {
+                    return new DosResult<object>(
+                        0,
+                        new
+                        {
+                            JobId = id,
+                            JobName = jobName,
+                            QuartzSaved = true,
+                            MetadataSaved = false
+                        },
+                        "Quartz 已保存任务，但 diy_schedule_job 持久化失败：" + persistResult.Msg);
+                }
+                return new DosResult<object>(1, new
+                {
+                    JobId = id,
+                    JobName = jobName,
+                    QuartzSaved = true,
+                    MetadataSaved = true,
+                    Status = jobData["Status"]?.ToString(),
+                    LastTime = jobData["LastTime"]?.ToString(),
+                    NextTime = jobData["NextTime"]?.ToString(),
+                    Message = "定时任务已保存并完成 Quartz/数据库双回读"
+                });
             }
             catch (Exception ex)
             {
@@ -4523,6 +4607,26 @@ namespace Microi.net
                 await CheckByKey("sys_datasource", "DataSourceKey", manifest["dataSources"] as JArray ?? manifest["DataSources"] as JArray ?? new JArray(), "数据源");
                 await CheckByKey("mic_print", "Title", manifest["printTemplates"] as JArray ?? manifest["PrintTemplates"] as JArray ?? new JArray(), "打印模板");
                 await CheckByKey("wf_flowdesign", "FlowName", manifest["workflows"] as JArray ?? manifest["Workflows"] as JArray ?? new JArray(), "工作流");
+
+                var manifestJobs = manifest["jobs"] as JArray ?? manifest["Jobs"] as JArray ?? new JArray();
+                await CheckByKey("diy_schedule_job", "JobName", manifestJobs, "定时任务元数据");
+                foreach (var token in manifestJobs)
+                {
+                    if (!(token is JObject job)) continue;
+                    var jobName = job["JobName"].Val<string>() ?? job["jobName"].Val<string>()
+                        ?? job["name"].Val<string>() ?? job["Name"].Val<string>();
+                    if (jobName.DosIsNullOrWhiteSpace()) continue;
+                    var runtime = await MicroiEngine.Job.GetJobDetail(
+                        new MicroiSearchJobModel
+                        {
+                            Name = jobName,
+                            OsClient = osClient
+                        });
+                    if (runtime.Code != 1 || runtime.Data == null)
+                    {
+                        errors.Add($"缺少 Quartz 运行态定时任务：{jobName}");
+                    }
+                }
 
                 var events = manifest["events"] as JArray ?? manifest["Events"] as JArray ?? new JArray();
                 foreach (var token in events)

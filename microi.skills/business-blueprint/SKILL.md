@@ -38,9 +38,16 @@ description: Microi 业务架构蓝图（System Blueprint）— 设计期系统�
 | `microi_get_blueprint_schema` | 读取蓝图协议指南 | 否 |
 | `microi_list_blueprints` | 列出当前 OsClient 所有蓝图 | 否 |
 | `microi_get_blueprint` | 读取单个蓝图（含 BlueprintData） | 否 |
+| `microi_list_blueprint_history` | 分页读取不可变历史元数据与当前哈希 | 否 |
+| `microi_get_blueprint_history` | 读取指定历史快照 | 否 |
+| `microi_compare_blueprint_versions` | 结构化比较两个快照或历史与当前草稿 | 否 |
+| `microi_export_blueprint` | 导出 `microi.blueprint.v1` 设计包与稳定哈希 | 否 |
 | `microi_save_blueprint` | 创建或更新蓝图 + 自动写历史 + 重建反向索引 | 是（需 confirmExecution） |
+| `microi_rollback_blueprint` | 带 `ExpectedCurrentHash` 回滚并重建反向索引 | 是（需 confirmExecution） |
 | `microi_delete_blueprint` | 软删除蓝图 | 是 |
 | `microi_validate_blueprint` | 漂移检测：所有 refs 是否仍存在 | 否 |
+
+保存前必须从详情或历史列表取得当前哈希，并把它作为蓝图对象的 `ExpectedCurrentHash`。哈希冲突时先比较版本再合并，不得移除并发保护强行覆盖。回滚会先保存回滚前快照，再在同一事务中恢复目标内容并重建反向索引；历史不会被删除。
 
 ## AI 工作流（强制约定）
 

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.9.8
+ * Version: v1.10.0
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
@@ -78,7 +78,8 @@ var supportedBackgroundCheckpointPhases = {
     Fields: true,
     Physical: true,
     ApplicationAssets: true,
-    PostSchema: true
+    PostSchema: true,
+    ScheduleJobs: true
 };
 if (!supportedBackgroundCheckpointPhases[backgroundCheckpointPhase]) backgroundCheckpointPhase = 'Ddl';
 var backgroundCheckpointIndex = parseInt(backgroundCheckpoint.Index || 0, 10);
@@ -153,7 +154,8 @@ var buildPersistentCheckpoint = function (phase, index, extra) {
         || phase == 'Fields'
         || phase == 'Physical'
         || phase == 'ApplicationAssets'
-        || phase == 'PostSchema') {
+        || phase == 'PostSchema'
+        || phase == 'ScheduleJobs') {
         checkpoint.IdMapsPlanned = true;
     }
     var maps = null;
@@ -417,6 +419,7 @@ var bulkAdaptivePackageEligible = function (packageModel) {
     var ddlCount = listSize(packageModel.DDLStatements);
     var menuCount = listSize(packageModel.SysMenus);
     var apiEngineCount = listSize(packageModel.SysApiEngines);
+    var scheduleJobCount = listSize(packageModel.ScheduleJobs);
     var workflowUnitCount = listSize(packageModel.WorkFlows || packageModel.Workflows)
         + listSize(packageModel.WFNodes || packageModel.WorkFlowNodes)
         + listSize(packageModel.WFLines || packageModel.WorkFlowLines);
@@ -468,6 +471,7 @@ var bulkAdaptivePackageEligible = function (packageModel) {
         && ddlCount <= 16
         && menuCount <= 20
         && apiEngineCount <= 40
+        && scheduleJobCount == 0
         && workflowUnitCount <= 200
         && dataRowCount <= 500
         && assetFileCount <= 20
@@ -511,9 +515,75 @@ if (backgroundChunkingEnabled) {
     }
 }
 
+var validateScheduleJobPackage = function (packageModel) {
+    packageModel = packageModel || {};
+    var errors = [];
+    var rawJobs = packageModel.ScheduleJobs || [];
+    if (typeof rawJobs == 'string') {
+        try { rawJobs = JSON.parse(rawJobs || '[]'); }
+        catch (parseJobsError) {
+            return { Jobs: [], Errors: ['ScheduleJobs 不是有效 JSON：' + parseJobsError.message] };
+        }
+    }
+    if (!rawJobs || rawJobs.length === undefined) {
+        return { Jobs: [], Errors: ['ScheduleJobs 必须是数组'] };
+    }
+    if (rawJobs.length > 50) errors.push('单个应用包最多包含 50 个定时任务');
+
+    var packageEngineMap = {};
+    var packageEngines = packageModel.SysApiEngines || [];
+    for (var packageEngineIndex = 0; packageEngineIndex < listSize(packageEngines); packageEngineIndex++) {
+        var packageEngine = packageEngines[packageEngineIndex] || {};
+        var packageEngineKey = String(packageEngine.ApiEngineKey || '').toLowerCase();
+        if (packageEngineKey) packageEngineMap[packageEngineKey] = true;
+    }
+
+    var names = {};
+    var jobs = [];
+    for (var packageJobIndex = 0; packageJobIndex < Math.min(rawJobs.length, 51); packageJobIndex++) {
+        var sourceJob = rawJobs[packageJobIndex] || {};
+        var jobName = String(sourceJob.JobName || '').trim();
+        var apiEngineKey = String(sourceJob.ApiEngineKey || '').trim();
+        var cronExpression = String(sourceJob.CronExpression || '').trim();
+        var jobType = String(sourceJob.JobType || '1');
+        var prefix = '第' + (packageJobIndex + 1) + '个定时任务';
+        if (!/^[A-Za-z][A-Za-z0-9_.-]{0,99}$/.test(jobName)) errors.push(prefix + ' JobName 不合法');
+        if (jobName && names[jobName.toLowerCase()]) errors.push(prefix + ' JobName 重复：' + jobName);
+        if (jobName) names[jobName.toLowerCase()] = true;
+        if (!/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(apiEngineKey)) errors.push(prefix + ' ApiEngineKey 不合法');
+        if (apiEngineKey && !packageEngineMap[apiEngineKey.toLowerCase()]) {
+            errors.push(prefix + ' 引用的接口引擎未包含在当前应用包：' + apiEngineKey);
+        }
+        if (jobType != '1') errors.push(prefix + ' 只允许 JobType=1 的接口引擎任务');
+        if (!cronExpression || cronExpression.length > 200) errors.push(prefix + ' CronExpression 不合法');
+        if (String(sourceJob.JobParam || '').length > 16384
+            || String(sourceJob.JobDesc || sourceJob.Description || '').length > 500
+            || String(sourceJob.CronDesc || '').length > 500
+            || String(sourceJob.TimeZoneId || '').length > 100) {
+            errors.push(prefix + ' 参数或说明超过安全长度限制');
+        }
+        if (sourceJob.DllName || sourceJob.JobPath) errors.push(prefix + ' 不允许携带 DLL 或类型路径');
+        jobs.push({
+            JobName: jobName,
+            JobDesc: String(sourceJob.JobDesc || sourceJob.Description || ''),
+            JobParam: String(sourceJob.JobParam || ''),
+            CronDesc: String(sourceJob.CronDesc || ''),
+            CronExpression: cronExpression,
+            TimeZoneId: String(sourceJob.TimeZoneId || ''),
+            JobType: '1',
+            ApiEngineKey: apiEngineKey
+        });
+    }
+    return { Jobs: jobs, Errors: errors };
+};
+var scheduleJobContract = validateScheduleJobPackage(Package);
+
 // 仅检查包体结构，不写数据库、不上传文件。用于发布前及跨平台安装前的安全验收。
 if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase() == 'validate') {
     var validationErrors = [];
+    for (var validationJobErrorIndex = 0; validationJobErrorIndex < scheduleJobContract.Errors.length; validationJobErrorIndex++) {
+        validationErrors.push(scheduleJobContract.Errors[validationJobErrorIndex]);
+    }
     var validationBundles = [];
     var rawBundles = Package.ApplicationBundles;
     if (rawBundles && rawBundles.length !== undefined) {
@@ -588,13 +658,20 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
             Applications: validationSummary,
             MenuCount: Package.SysMenus && Package.SysMenus.length !== undefined ? Package.SysMenus.length : 0,
             TableCount: Package.DiyTables && Package.DiyTables.length !== undefined ? Package.DiyTables.length : 0,
-            DataSetCount: Package.DataSets && Package.DataSets.length !== undefined ? Package.DataSets.length : 0
+            DataSetCount: Package.DataSets && Package.DataSets.length !== undefined ? Package.DataSets.length : 0,
+            JobCount: scheduleJobContract.Jobs.length
         },
         Msg: '应用数据包结构校验通过，未执行写入'
     };
 }
 
 try {
+    if (scheduleJobContract.Errors.length > 0) {
+        throw new Error('定时任务资源校验失败：' + scheduleJobContract.Errors.join('；'));
+    }
+    if (scheduleJobContract.Jobs.length > 0 && !backgroundChunkingEnabled) {
+        throw new Error('包含定时任务的应用必须通过持久后台任务安装，以便在资源事务提交后幂等调度。');
+    }
     debugLog.startTime = new Date().toISOString();
     debugLog.packageInfo = Package.PackageInfo;
     reportProgress(5, '开始导入应用数据包');
@@ -709,7 +786,24 @@ try {
         DataSetCount: 0,
         DataInserted: 0,
         DataUpdated: 0,
-        DataSkipped: 0
+        DataSkipped: 0,
+        ScheduleJobSaved: 0
+    };
+
+    var savePackageScheduleJobs = function () {
+        if (scheduleJobContract.Jobs.length === 0) return;
+        if (!V8.Method || !V8.Method.SaveScheduleJob) {
+            throw new Error('当前平台版本不支持应用定时任务安装，请先升级 Microi吾码平台。');
+        }
+        for (var scheduleJobIndex = 0; scheduleJobIndex < scheduleJobContract.Jobs.length; scheduleJobIndex++) {
+            var scheduleJob = scheduleJobContract.Jobs[scheduleJobIndex];
+            var scheduleResult = V8.Method.SaveScheduleJob(scheduleJob);
+            if (!scheduleResult || scheduleResult.Code != 1) {
+                throw new Error('保存定时任务失败：' + scheduleJob.JobName + '，'
+                    + ((scheduleResult && scheduleResult.Msg) || '接口无返回'));
+            }
+            stats.ScheduleJobSaved++;
+        }
     };
 
     var persistentSchemaStatNames = [
@@ -4009,6 +4103,26 @@ try {
         );
     }
 
+    if (backgroundChunkingEnabled && backgroundCheckpointPhase == 'ScheduleJobs') {
+        reportProgress(98, '正在幂等安装定时任务');
+        savePackageScheduleJobs();
+        upsertMicroiStoreVersionRecord();
+        return {
+            Code: 1,
+            Data: {
+                应用包信息: {
+                    名称: Package.PackageInfo.Name || '未命名',
+                    版本: Package.PackageInfo.Version || Package.PackageInfo.AppVersion || ''
+                },
+                执行概览: {
+                    定时任务: '保存' + stats.ScheduleJobSaved + '个',
+                    应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
+                }
+            },
+            Msg: '导入成功'
+        };
+    }
+
     reportProgress(70, '正在导入菜单和按钮配置');
     debugLog.step3 = '开始处理sys_menu数据';
 
@@ -5099,6 +5213,18 @@ try {
     }
     debugLog.step8Result = '随包数据处理完成：数据集' + stats.DataSetCount + '，新增' + stats.DataInserted + '，修改' + stats.DataUpdated;
 
+    if (backgroundChunkingEnabled
+        && backgroundCheckpointPhase == 'PostSchema'
+        && scheduleJobContract.Jobs.length > 0) {
+        assertSchemaChunkSucceeded('任务前置资源');
+        return buildSchemaContinuation(
+            'ScheduleJobs',
+            0,
+            97,
+            '表、菜单、引擎和随包数据已提交，将在独立执行片中幂等安装定时任务'
+        );
+    }
+
     var hasInstallErrorsBeforeVersion = false;
     for (var debugKeyBeforeVersion in debugLog) {
         if (debugKeyBeforeVersion.indexOf('_error_') > -1) {
@@ -5159,6 +5285,7 @@ try {
             接口引擎: '新增' + stats.ApiEngineInserted + '条，修改' + stats.ApiEngineUpdated
                 + '条，保留租户扩展' + stats.ApiEngineSkipped + '条',
             选择数据: '数据集' + stats.DataSetCount + '个，新增' + stats.DataInserted + '条，修改' + stats.DataUpdated + '条，跳过' + stats.DataSkipped + '条',
+            定时任务: '保存' + stats.ScheduleJobSaved + '个',
             在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
             应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }

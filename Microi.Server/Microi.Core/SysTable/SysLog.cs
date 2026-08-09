@@ -33,6 +33,15 @@ namespace Microi.net
 		public long? DurationSeconds { get; set; }
 		public bool? Success { get; set; }
 		public string TraceId { get; set; }
+		public string SpanId { get; set; }
+		public string ParentSpanId { get; set; }
+		public string TraceFlags { get; set; }
+		public string ServiceName { get; set; }
+		public string ServiceVersion { get; set; }
+		public string NodeId { get; set; }
+		public string Environment { get; set; }
+		public double? DurationMs { get; set; }
+		public int? HttpStatusCode { get; set; }
 		public DateTime? OccurredAt { get; set; }
 		public string AppId { get; set; }
 		public string Api { get; set; }

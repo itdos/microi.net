@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { access, readFile, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, parse, resolve } from 'node:path';
+import { StringDecoder } from 'node:string_decoder';
 
 const officialApiBaseUrl = 'https://api.itdos.com';
 const officialOsClient = 'itdos';
@@ -323,6 +324,11 @@ function createLineJsonRpcClient(server, configPath) {
   let nextId = 1;
   let outputBuffer = '';
   let errorOutput = '';
+  // stdio data events may split one UTF-8 code point across Buffer chunks.
+  // Calling chunk.toString('utf8') independently replaces the split bytes with
+  // U+FFFD, corrupting large JSON resources and invalidating their SHA-256.
+  const outputDecoder = new StringDecoder('utf8');
+  const errorDecoder = new StringDecoder('utf8');
   let stopped = false;
   const pending = new Map();
 
@@ -335,10 +341,10 @@ function createLineJsonRpcClient(server, configPath) {
   };
 
   child.stderr.on('data', chunk => {
-    errorOutput = (errorOutput + chunk.toString('utf8')).slice(-4000);
+    errorOutput = (errorOutput + errorDecoder.write(chunk)).slice(-4000);
   });
   child.stdout.on('data', chunk => {
-    outputBuffer += chunk.toString('utf8');
+    outputBuffer += outputDecoder.write(chunk);
     let newlineIndex;
     while ((newlineIndex = outputBuffer.indexOf('\n')) >= 0) {
       const line = outputBuffer.slice(0, newlineIndex).trim();
@@ -364,6 +370,8 @@ function createLineJsonRpcClient(server, configPath) {
   });
   child.on('error', error => rejectPending(new Error(`无法启动 microi_itdos MCP：${error.message}`)));
   child.on('exit', code => {
+    outputBuffer += outputDecoder.end();
+    errorOutput = (errorOutput + errorDecoder.end()).slice(-4000);
     if (!stopped && pending.size) {
       const detail = errorOutput.trim().split(/\r?\n/).slice(-2).join('；');
       rejectPending(new Error(`microi_itdos MCP 提前退出（${code ?? 'unknown'}）${detail ? `：${detail}` : ''}`));

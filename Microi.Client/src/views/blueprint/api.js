@@ -21,11 +21,40 @@ export const BlueprintApi = {
     get(idOrName) {
         return call("/api/V8Engine/GetBlueprint", { BlueprintId: idOrName });
     },
+    listHistory(idOrName, pageIndex = 1, pageSize = 50) {
+        return call("/api/V8Engine/ListBlueprintHistory", {
+            BlueprintId: idOrName,
+            PageIndex: pageIndex,
+            PageSize: pageSize
+        });
+    },
+    getHistory(idOrName, historyId) {
+        return call("/api/V8Engine/GetBlueprintHistory", {
+            BlueprintId: idOrName,
+            HistoryId: historyId
+        });
+    },
+    compare(idOrName, leftHistoryId, rightHistoryId) {
+        return call("/api/V8Engine/CompareBlueprintVersions", {
+            BlueprintId: idOrName,
+            LeftHistoryId: leftHistoryId || undefined,
+            RightHistoryId: rightHistoryId || undefined
+        });
+    },
     save(blueprint) {
         return call("/api/V8Engine/SaveBlueprint", blueprint);
     },
     delete(id) {
         return call("/api/V8Engine/DeleteBlueprint", { BlueprintId: id });
+    },
+    rollback(idOrName, historyId, expectedCurrentHash, options = {}) {
+        return call("/api/V8Engine/RollbackBlueprint", {
+            BlueprintId: idOrName,
+            HistoryId: historyId,
+            ExpectedCurrentHash: expectedCurrentHash,
+            NewVersion: options.newVersion || undefined,
+            ChangeSummary: options.changeSummary || undefined
+        });
     },
     validate(id) {
         return call("/api/V8Engine/ValidateBlueprint", { BlueprintId: id });

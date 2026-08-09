@@ -122,7 +122,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v1\.9\.8/);
+  assert.match(importerSource, /Version: v1\.10\.0/);
   assert.match(importerSource, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
   assert.match(importerSource, /MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/);
@@ -150,6 +150,6 @@ test("package importer fails closed when an API engine is not durably persisted"
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v1.9.8");
+  assert.equal(embeddedImporter.Version, "v1.10.0");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

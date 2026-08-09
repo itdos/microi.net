@@ -664,6 +664,49 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 创建 MiniMax 视频异步任务。RequestId 必须由调用方按业务槽位稳定生成；
+        /// 同一租户、用户和 RequestId 不会重复调用上游。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> CreateMiniMaxVideo([FromBody] MiniMaxVideoCreateParam param)
+        {
+            var context = await GetCurrentUserContextAsync();
+            return Json(await _proxyService.CreateAuthenticatedVideoAsync(
+                context.UserId,
+                context.OsClient,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
+        /// 查询当前用户的 MiniMax 视频任务；仅接收服务器签发的 TaskHandle。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetMiniMaxVideoTask([FromBody] MiniMaxVideoTaskParam param)
+        {
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
+            return Json(await _proxyService.GetAuthenticatedVideoTaskAsync(
+                userId,
+                osClient,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
+        /// 获取当前用户视频文件的临时下载地址；仅接收服务器签发的 FileHandle。
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetMiniMaxVideoFile([FromBody] MiniMaxVideoFileParam param)
+        {
+            var (userId, _, osClient) = await GetCurrentUserContextAsync();
+            return Json(await _proxyService.GetAuthenticatedVideoFileAsync(
+                userId,
+                osClient,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
         /// 查询当前用户的额度和订阅状态（给 OpenClaw 客户端用）
         /// </summary>
         [HttpGet, HttpPost]

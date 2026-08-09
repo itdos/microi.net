@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using System;
+using System.Diagnostics;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -265,6 +266,7 @@ namespace Microi.net
             var status = "失败";
             var statusInfo = "未处理";
             MicroiMQMessageModel envelope = null;
+            Activity activity = null;
 
             try
             {
@@ -280,7 +282,7 @@ namespace Microi.net
                     return;
                 }
 
-                var validationError = ValidateEnvelope(item, envelope, eventArgs.BasicProperties?.MessageId);
+                var validationError = ValidateEnvelope(item, envelope, eventArgs.BasicProperties);
                 if (validationError != null)
                 {
                     statusInfo = validationError;
@@ -288,6 +290,18 @@ namespace Microi.net
                     await channel.BasicRejectAsync(eventArgs.DeliveryTag, requeue: false).ConfigureAwait(false);
                     return;
                 }
+
+                activity = MicroiTraceContext.StartActivity(
+                    "Microi.MQ.Consume " + item.QueueName,
+                    envelope.TraceParent,
+                    envelope.TraceState,
+                    new Dictionary<string, object>
+                    {
+                        ["microi.os_client"] = item.OsClient ?? "",
+                        ["messaging.system"] = "rabbitmq",
+                        ["messaging.destination"] = item.QueueName ?? "",
+                        ["messaging.message_id"] = envelope.StableEventId ?? ""
+                    });
 
                 var success = await ExecuteHandlerAsync(item, envelope).ConfigureAwait(false);
                 if (success)
@@ -340,13 +354,14 @@ namespace Microi.net
             finally
             {
                 TryWriteReceiveLog(item, envelope, receiveTime, status, statusInfo);
+                activity?.Stop();
             }
         }
 
         private static string ValidateEnvelope(
             MicroiMQReceiveInfo item,
             MicroiMQMessageModel envelope,
-            string brokerMessageId)
+            IReadOnlyBasicProperties brokerProperties)
         {
             if (envelope == null) return "消息 envelope 为空";
             if (string.IsNullOrWhiteSpace(envelope.OsClient)) return "消息 envelope 未携带 OsClient";
@@ -361,12 +376,27 @@ namespace Microi.net
             {
                 return "消息 envelope 的 EventId 与兼容字段 Id 不一致";
             }
+            var brokerMessageId = brokerProperties?.MessageId;
             if (!string.IsNullOrWhiteSpace(brokerMessageId)
                 && !string.Equals(brokerMessageId, envelope.StableEventId, StringComparison.Ordinal))
             {
                 return "RabbitMQ MessageId 与 envelope EventId 不一致";
             }
+            if (!string.IsNullOrWhiteSpace(envelope.TraceParent)
+                && !MicroiTraceContext.IsValidTraceParent(envelope.TraceParent, envelope.TraceState))
+                return "消息 envelope 的W3C traceparent无效";
+            var brokerTraceParent = ReadHeader(brokerProperties, "traceparent");
+            if (!string.IsNullOrWhiteSpace(brokerTraceParent)
+                && !string.Equals(brokerTraceParent, envelope.TraceParent, StringComparison.Ordinal))
+                return "RabbitMQ traceparent 与 envelope 不一致";
             return null;
+        }
+
+        private static string ReadHeader(IReadOnlyBasicProperties properties, string name)
+        {
+            if (properties?.Headers == null || !properties.Headers.TryGetValue(name, out var value) || value == null) return null;
+            if (value is byte[] bytes) return Encoding.UTF8.GetString(bytes);
+            return Convert.ToString(value);
         }
 
         private static async Task<bool> ExecuteHandlerAsync(

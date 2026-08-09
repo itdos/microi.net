@@ -1266,11 +1266,78 @@ namespace Microi.net.Api
             if (string.IsNullOrWhiteSpace(title)) return Ok(new DosResult(0, null, "Title 不能为空"));
             var jsonStr = param["JsonStr"].Val<string>();
             if (string.IsNullOrWhiteSpace(jsonStr)) return Ok(new DosResult(0, null, "JsonStr 不能为空"));
-            var result = await V8McpLogic.SavePageEngine(
+            var result = await V8McpLogic.SavePageEngineVersioned(
                 osClient, param["PageId"].Val<string>(), title,
                 param["Number"].Val<string>(), param["Desc"].Val<string>(), jsonStr,
-                param["RoutePath"].Val<string>(), param["ComponentPath"].Val<string>());
+                param["RoutePath"].Val<string>(), param["ComponentPath"].Val<string>(),
+                param["ExpectedCurrentHash"].Val<string>(), param["ChangeSummary"].Val<string>(),
+                (object)token);
             return Ok(result);
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListPageEngineHistory(
+            string osClient, string pageId, int pageIndex = 1, int pageSize = 50,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            pageId = pageId ?? param?["PageId"].Val<string>();
+            pageIndex = param?["PageIndex"].Val<int?>() ?? pageIndex;
+            pageSize = param?["PageSize"].Val<int?>() ?? pageSize;
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            return Ok(await V8McpLogic.ListPageEngineHistory(osClient, pageId, pageIndex, pageSize));
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetPageEngineHistory(
+            string osClient, string pageId, string historyId,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            pageId = pageId ?? param?["PageId"].Val<string>();
+            historyId = historyId ?? param?["HistoryId"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            return Ok(await V8McpLogic.GetPageEngineHistory(osClient, pageId, historyId));
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ComparePageEngineVersions(
+            string osClient, string pageId, string leftHistoryId, string rightHistoryId,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            pageId = pageId ?? param?["PageId"].Val<string>();
+            leftHistoryId = leftHistoryId ?? param?["LeftHistoryId"].Val<string>();
+            rightHistoryId = rightHistoryId ?? param?["RightHistoryId"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            return Ok(await V8McpLogic.ComparePageEngineVersions(osClient, pageId, leftHistoryId, rightHistoryId));
+        }
+
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ExportPageEngine(
+            string osClient, string pageId, [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = osClient ?? param?["OsClient"].Val<string>();
+            pageId = pageId ?? param?["PageId"].Val<string>();
+            osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+            return Ok(await V8McpLogic.ExportPageEngine(osClient, pageId));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RollbackPageEngine([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            return Ok(await V8McpLogic.RollbackPageEngine(osClient, param, (object)token));
         }
 
         #endregion
@@ -1388,6 +1455,86 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 分页读取蓝图历史元数据。列表不返回 BlueprintData 全文，只返回内容长度和稳定 Hash。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ListBlueprintHistory(
+            string osClient,
+            string blueprintId,
+            int pageIndex = 1,
+            int pageSize = 50,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+            pageIndex = param?["PageIndex"]?.Val<int>() ?? pageIndex;
+            pageSize = param?["PageSize"]?.Val<int>() ?? pageSize;
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            return Ok(await V8McpLogic.ListBlueprintHistory(osClient, blueprintId, pageIndex, pageSize));
+        }
+
+        /// <summary>
+        /// 读取一条蓝图历史快照全文。HistoryId 必须属于指定蓝图和当前租户。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> GetBlueprintHistory(
+            string osClient,
+            string blueprintId,
+            string historyId,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+            historyId = historyId ?? param?["HistoryId"].Val<string>();
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            if (string.IsNullOrWhiteSpace(historyId)) return Ok(new DosResult(0, null, "HistoryId 不能为空"));
+            return Ok(await V8McpLogic.GetBlueprintHistory(osClient, blueprintId, historyId));
+        }
+
+        /// <summary>
+        /// 对蓝图历史做语义 JSON 差异比较。RightHistoryId 为空时与当前草稿比较；
+        /// LeftHistoryId 为空时自动使用最近一条历史。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> CompareBlueprintVersions(
+            string osClient,
+            string blueprintId,
+            string leftHistoryId,
+            string rightHistoryId,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+            leftHistoryId = leftHistoryId ?? param?["LeftHistoryId"].Val<string>();
+            rightHistoryId = rightHistoryId ?? param?["RightHistoryId"].Val<string>();
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            return Ok(await V8McpLogic.CompareBlueprintVersions(osClient, blueprintId, leftHistoryId, rightHistoryId));
+        }
+
+        /// <summary>
+        /// 导出当前蓝图为带 Schema 与稳定内容哈希的可移植 JSON 设计包。
+        /// </summary>
+        [HttpGet, HttpPost]
+        public async Task<IActionResult> ExportBlueprint(
+            string osClient,
+            string blueprintId,
+            [FromBody] JObject param = null)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            osClient = V8McpLogic.ResolveOsClient(osClient ?? param?["OsClient"].Val<string>(), (object)token);
+            blueprintId = blueprintId ?? param?["BlueprintId"].Val<string>() ?? param?["Id"].Val<string>();
+            if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
+            return Ok(await V8McpLogic.ExportBlueprint(osClient, blueprintId));
+        }
+
+        /// <summary>
         /// 创建或更新蓝图。规则：
         ///   - 传 Id 命中 → Update；否则按 Name 命中 → Update；否则 Create
         ///   - 自动写入历史快照（sys_blueprint_history）
@@ -1417,6 +1564,20 @@ namespace Microi.net.Api
             if (string.IsNullOrWhiteSpace(blueprintId)) return Ok(new DosResult(0, null, "BlueprintId 不能为空"));
             var result = await V8McpLogic.DeleteBlueprint(osClient, blueprintId);
             return Ok(result);
+        }
+
+        /// <summary>
+        /// 按历史快照回滚蓝图。历史本身不可修改；回滚前自动保存当前快照。
+        /// ExpectedCurrentHash 用于阻止多节点或多人并发覆盖。
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> RollbackBlueprint([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            var osClient = V8McpLogic.ResolveOsClient(param?["OsClient"].Val<string>(), (object)token);
+            if (string.IsNullOrWhiteSpace(osClient)) return Ok(new DosResult(0, null, "OsClient 不能为空"));
+            return Ok(await V8McpLogic.RollbackBlueprint(osClient, param, token));
         }
 
         /// <summary>

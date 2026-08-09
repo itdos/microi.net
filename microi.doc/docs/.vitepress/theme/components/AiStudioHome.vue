@@ -54,6 +54,7 @@
       <p v-if="chatError" class="ai-studio-error" role="alert">{{ chatError }}</p>
     </section>
 
+    <MciNugetStats variant="home" :locale="locale" />
     <ProductShowcase :locale="locale" />
   </main>
 </template>
@@ -62,6 +63,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vitepress'
 import ProductShowcase from './ProductShowcase.vue'
+import MciNugetStats from './MciNugetStats.vue'
 
 const route = useRoute()
 const inputText = ref('')

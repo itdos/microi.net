@@ -110,13 +110,14 @@ Manifest 全系统规划 + dry-run 预演
 | 领域 | 代表能力 / 工具 |
 |---|---|
 | 系统与结构发现 | `microi_get_status`、`microi_get_db_schema`、字段、模块、角色、接口、事件和应用清单读取 |
-| 业务架构蓝图 | `microi_get_blueprint_schema`、`microi_list_blueprints`、`microi_get_blueprint`、保存、校验与历史追踪 |
+| 业务架构蓝图 | `microi_get_blueprint_schema`、列表/详情、历史读取、结构化比较、CAS 保存、校验与审计回滚 |
 | 全系统 Manifest | `microi_get_manifest_schema`、`microi_plan_system`、`microi_generate_system`、`microi_validate_system` |
 | 表单与数据模型 | 创建表、添加/批量更新字段、关联字段修复、字段控件配置、表属性更新、结构缓存刷新 |
 | 菜单与权限 | 创建菜单模块、维护列表/搜索/统计/移动端字段、按钮与 Tab、角色和菜单权限 |
 | V8 与接口引擎 | 创建/读取/保存/执行接口引擎，表单与字段事件，模块按钮代码，工作流节点 V8，匿名访问配置 |
 | 数据源与业务数据 | SQL/V8/JSON 数据源，表数据查询/新增/修改/种子数据，文件上传 |
-| 界面引擎 | 从自然语言生成、校验和保存 Page Engine 页面与运营驾驶舱 |
+| 界面引擎 | 从自然语言生成、校验和保存 Page Engine 页面；支持当前哈希、历史、比较、导出与审计回滚 |
+| AI 平台治理 | 门户、身份与权限、配置、功能开关、发布审批/执行/回滚、服务流量、Trace、日志生命周期、可观测告警、组件资产、页面源码桥接、协作和可恢复导入 |
 | 打印引擎 | 从自然语言生成、校验和保存 hiprint 打印模板与运行数据结构 |
 | 工作流与任务 | 工作流包、拓扑检查、条件路线测试、节点 V8、定时任务 |
 | 在线 AI 应用 | 发现 Web / UniApp / MicroService，读取完整源码上下文，创建、同步和发布前端微服务 |
@@ -263,13 +264,15 @@ Codex Plugin 已合并在 `@microi.net/cli` 中，marketplace 固定名为 `micr
 npx --yes @microi.net/cli@latest codex install --yes
 ```
 
+因此在全新 Codex 的空目录里，用户可以直接说“**通过 `@microi.net/cli@latest` 安装吾码 Codex 插件**”。具备终端和网络权限的 Codex 会执行上面的确定性命令：npm 仅负责下载，CLI 将包内完整插件复制到当前用户的 `~/.codex/microi-net-marketplace/plugins/microi`（设置 `CODEX_HOME` 时使用对应目录），注册 Codex 官方支持的本地 marketplace，再安装、启用 `microi@microi-net`。重载后，“插件”页面显示 **Microi吾码**，来源为 **microi-net**。
+
 已安装 CLI 时也可运行 `microi codex status --json` 检测、运行 `microi codex install --yes` 安装。`--yes` 表示用户已经授权修改 Codex 全局 marketplace、插件配置和缓存；普通 Microi 对话不得静默补上该参数。
 
-开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.VSCode` 验收本地 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm marketplace 模板见 `codex/marketplace.npm.json`。
+开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.VSCode` 验收仓库 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm 安装器生成用户本地 marketplace 所使用的模板见 `codex/marketplace.npm.json`。
 
 安装后在新 Codex 任务中先调用 `microi_codex` 的 `profiles` 动作。它会读取 `Microi-V8-Engine/.microi-config.json`；未初始化时，使用插件内置 `scripts/microi-cli.js init --workspace <工作区>`。多连接时把 `profiles` 返回的稳定 `name` 传给后续工具调用。
 
-> npm 包用于 repo/npm marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；通用目录仍需按 OpenAI 官方 Plugin 提交流程审核。
+> npm 包完成 CLI 下载与用户本地 marketplace 安装，不会自动进入 ChatGPT/Codex 通用公开插件目录；通用目录仍需按 OpenAI 官方 Plugin 提交流程审核。
 
 ### 方案 D：WorkBuddy / CodeBuddy 原生 Plugin（可选）
 
@@ -620,7 +623,7 @@ npm run publish:cli:resume
 
 > 补发只适用于“同一份源码和产物的当次发布被中断”。如果失败后又修改了代码，必须重新完整发布下一版，不能用相同版本号发布不同产物。
 
-> 发布 `@microi.net/cli` 只完成 CLI/npm marketplace 分发，不会自动进入 ChatGPT/Codex 通用公开插件目录；公开目录需另按 OpenAI 官方 Plugin 提交流程审核。
+> 发布 `@microi.net/cli` 只完成 CLI 下载与用户本地 marketplace 安装能力，不会自动进入 ChatGPT/Codex 通用公开插件目录；公开目录需另按 OpenAI 官方 Plugin 提交流程审核。
 
 正式发布是外部不可逆操作。不要把 npm Token、服务器 Token 或任何登录密码写入仓库。CI 后续可改用 npm Trusted Publishing，避免长期保存发布 Token。
 

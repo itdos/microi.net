@@ -61,7 +61,7 @@ namespace Microi.net.Api
                     {
                         jobNameList.Add(item.JobName);
                     }
-                    var jobResult = await MicroiEngine.Job.GetJobByName(jobNameList);
+                    var jobResult = await MicroiEngine.Job.GetJobByName(jobNameList, osClient);
                     if (jobResult.Code == 1 && jobResult.Data != null)
                     {
                         var jobs = jobResult.Data as List<MicroiJobModel>;
@@ -168,7 +168,8 @@ namespace Microi.net.Api
                 // 更新上次执行时间以及下次执行时间到数据库
                 MicroiSearchJobModel jobModel = new MicroiSearchJobModel()
                 {
-                    Name = addJobModel.JobName
+                    Name = addJobModel.JobName,
+                    OsClient = osClient
                 };
                 var jobDeatilResult = await MicroiEngine.Job.GetJobDetail(jobModel);
                 if (jobDeatilResult.Code == 1)
@@ -238,7 +239,8 @@ namespace Microi.net.Api
                 // 更新上次执行时间以及下次执行时间到数据库
                 MicroiSearchJobModel jobModel = new MicroiSearchJobModel()
                 {
-                    Name = addJobModel.JobName
+                    Name = addJobModel.JobName,
+                    OsClient = osClient
                 };
                 var jobDeatilResult = await MicroiEngine.Job.GetJobDetail(jobModel);
                 if (jobDeatilResult.Code == 1)
@@ -283,6 +285,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> PauseJob([FromForm] MicroiJobModel job)
         {
             var osClient = job.OsClient.IsNullOrWhiteSpace() ? GetCurrentOsClient() : job.OsClient;
+            job.OsClient = osClient;
             var result = await MicroiEngine.Job.PauseJob(job);
             if (result.Code == 1)
             {
@@ -309,6 +312,7 @@ namespace Microi.net.Api
         public async Task<JsonResult> ResumeJob([FromForm] MicroiJobModel job)
         {
             var osClient = job.OsClient.IsNullOrWhiteSpace() ? GetCurrentOsClient() : job.OsClient;
+            job.OsClient = osClient;
             var result = await MicroiEngine.Job.ResumeJob(job);
             if (result.Code == 1)
             {
@@ -334,6 +338,7 @@ namespace Microi.net.Api
         [HttpPost]
         public async Task<JsonResult> DeleteJob([FromForm] MicroiJobModel job)
         {
+            if (job.OsClient.IsNullOrWhiteSpace()) job.OsClient = GetCurrentOsClient();
             return Json(await MicroiEngine.Job.DeleteJob(job));
         }
     }

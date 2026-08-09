@@ -33,6 +33,8 @@ namespace Microi.net
         // cron表达式
         [Required(ErrorMessage = "cron表达式不能为空")]
         public string CronExpression { get; set; }
+        // Quartz 触发时区；为空时保持历史行为，使用宿主机本地时区。
+        public string TimeZoneId { get; set; }
         // job类型（1、接口引擎  2、定制开发）
         [Required(ErrorMessage = "任务类型不能为空")]
         public string JobType { get; set; }

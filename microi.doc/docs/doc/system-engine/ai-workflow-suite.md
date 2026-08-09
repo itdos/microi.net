@@ -30,8 +30,12 @@ AI 工作流会读取当前租户的表、菜单、接口引擎、V8 调用与�
 
 1. `microi_list_blueprints` 查找现有蓝图。
 2. `microi_get_blueprint` 读取当前架构事实。
-3. 完成系统变更后调用 `microi_validate_blueprint`。
-4. 只有蓝图内容确实变化时才用 `microi_save_blueprint` 更新，并保留历史。
+3. `microi_list_blueprint_history` 读取当前哈希；需要审计时用 `microi_get_blueprint_history`、`microi_compare_blueprint_versions` 或 `microi_export_blueprint`。
+4. 完成系统变更后调用 `microi_validate_blueprint`。
+5. 只有蓝图内容确实变化时才用 `microi_save_blueprint` 更新，并保留历史。
+6. 恢复旧设计时用 `microi_rollback_blueprint`，同时传 `ExpectedCurrentHash`；回滚会创建新版本而不是删除历史。
+
+历史快照使用稳定 JSON 哈希。保存和回滚在同一数据库事务中更新当前蓝图、历史和反向引用；并发哈希不一致时失败关闭，避免多人或多个 AI 静默覆盖。
 
 蓝图不会代替数据库权限、菜单权限或应用商城版本。它描述架构关系，真实资源仍由各引擎与数据库负责。
 

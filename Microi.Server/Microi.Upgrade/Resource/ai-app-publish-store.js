@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.6.5
+ * Version: v1.7.4
  * Function:
- * - 统一生成应用商城安装包；v3 发布以已提交指针证明做原子绑定，并生成接口引擎资源所有权策略。
+ * - 统一生成应用商城安装包；绑定精确版本、完整资源选择、任务定义与接口引擎所有权策略。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -78,7 +78,12 @@ function normalizeExactVersion(value) {
  * 最新版本行和 PreparedAssets.PackageVersion，不能复用失败、处理中或旧版本资产。
  */
 function validateExactPublishedVersion(versionRow, packageAssets, requestedVersionValue, protocolV3) {
-  var state = text(versionRow && (versionRow.PublishState || versionRow.Status))
+  // v2 历史版本会在新增字段中标记 LegacyUnverified，但其原始 Status 仍由
+  // 完整的资产哈希、稳定别名与运行探针校验后写为 Published。legacy 精确
+  // 补包必须读取历史事实字段；v3 则继续只认可 committed PublishState。
+  var state = text(versionRow && (protocolV3
+    ? versionRow.PublishState
+    : (versionRow.Status || versionRow.PublishState)))
     .replace(/^\s+|\s+$/g, '')
     .toLowerCase();
   var acceptedState = protocolV3
@@ -545,6 +550,60 @@ function mergeUniqueRows(left, right, keyFields) {
   return result;
 }
 
+function exportScheduleJobs(jobNames, apiEngines) {
+  var names = selectionValues(jobNames, ['JobName', 'Name', 'Value']);
+  if (names.length === 0) return [];
+  if (names.length > 50) throw new Error('单个应用最多发布 50 个定时任务');
+
+  var engineMap = apiEngineMap(apiEngines);
+  var query = V8.FormEngine.GetTableData('diy_schedule_job', {
+    _Where: [['JobName', 'In', names]],
+    _PageIndex: 1,
+    _PageSize: 51
+  });
+  if (!query || query.Code !== 1) {
+    throw new Error('读取定时任务失败：' + ((query && query.Msg) || '接口无返回'));
+  }
+  var rows = toArray(query.Data);
+  var rowMap = {};
+  for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+    var row = rows[rowIndex] || {};
+    var rowName = text(row.JobName).replace(/^\s+|\s+$/g, '');
+    if (rowName) rowMap[rowName.toLowerCase()] = row;
+  }
+
+  var result = [];
+  for (var nameIndex = 0; nameIndex < names.length; nameIndex++) {
+    var jobName = text(names[nameIndex]).replace(/^\s+|\s+$/g, '');
+    if (!/^[A-Za-z][A-Za-z0-9_.-]{0,99}$/.test(jobName)) {
+      throw new Error('定时任务名称不合法：' + jobName);
+    }
+    var source = rowMap[jobName.toLowerCase()];
+    if (!source) throw new Error('所选定时任务不存在：' + jobName);
+    var jobType = text(source.JobType || '1');
+    var apiEngineKey = text(source.ApiEngineKey).replace(/^\s+|\s+$/g, '');
+    if (jobType !== '1') throw new Error('应用包只允许发布接口引擎任务：' + jobName);
+    if (!apiEngineKey || !engineMap[apiEngineKey.toLowerCase()]) {
+      throw new Error('定时任务引用的接口引擎未包含在当前应用包：' + jobName + ' -> ' + apiEngineKey);
+    }
+    var cronExpression = text(source.CronExpression).replace(/^\s+|\s+$/g, '');
+    if (!cronExpression || cronExpression.length > 200) {
+      throw new Error('定时任务 CronExpression 不合法：' + jobName);
+    }
+    result.push({
+      JobName: jobName,
+      JobDesc: text(source.JobDesc || source.Description).substring(0, 500),
+      JobParam: text(source.JobParam).substring(0, 16384),
+      CronDesc: text(source.CronDesc).substring(0, 500),
+      CronExpression: cronExpression,
+      TimeZoneId: text(source.TimeZoneId).substring(0, 100),
+      JobType: '1',
+      ApiEngineKey: apiEngineKey
+    });
+  }
+  return result;
+}
+
 function upsertStore(row) {
   var existing = V8.FormEngine.GetFormData('sys_microistore', {
     _Where: [['AppKey', '=', row.AppKey || row.AppId]],
@@ -712,7 +771,8 @@ if (!packageAssets && !isOfflineAction && !forcePrepareAssets) {
 if (!packageAssets && !isOfflineAction) {
   var prepareResult = V8.ApiEngine.Run('ai_app_prepare_store_assets', {
     Action: 'Prepare',
-    Apps: [{ AppId: app.Id, IncludeSource: includeSource }]
+    PackageVersion: text(V8.Param.AppVersion),
+    Apps: [{ AppId: app.Id, IncludeSource: includeSource, PackageVersion: text(V8.Param.AppVersion) }]
   });
   if (!prepareResult || prepareResult.Code !== 1 || !prepareResult.Data) {
     return fail('生成AI应用ZIP失败：' + ((prepareResult && prepareResult.Msg) || '接口无返回'));
@@ -766,6 +826,7 @@ var exactMenuIds = V8.Param.ExactMenuIds === true
 var tableIds = parseArray(V8.Param.TableIds);
 var flowIds = parseArray(V8.Param.FlowIds);
 var apiEngineKeys = parseArray(V8.Param.ApiEngineKeys);
+var scheduleJobNames = parseArray(V8.Param.ScheduleJobNames || V8.Param.JobNames);
 var requestedResourcePolicies = V8.Param.ResourcePolicies || V8.Param.ApiEnginePolicies || {};
 if (dataSelections.length === 0 && existingStore && existingStore.SelectData) {
   dataSelections = parseArray(existingStore.SelectData);
@@ -778,6 +839,15 @@ if (tableIds.length === 0 && existingStore && existingStore.SelectTable) {
 }
 if (apiEngineKeys.length === 0 && existingStore && existingStore.SelectApiEngine) {
   apiEngineKeys = selectionValues(existingStore.SelectApiEngine, ['ApiEngineKey', 'Key', 'Value']);
+}
+if (scheduleJobNames.length === 0 && existingStore && existingStore.AppPakcet) {
+  var previousPackageWithJobs = parseObject(existingStore.AppPakcet, {});
+  var previousJobs = toArray(previousPackageWithJobs.ScheduleJobs);
+  for (var previousJobIndex = 0; previousJobIndex < previousJobs.length; previousJobIndex++) {
+    if (previousJobs[previousJobIndex] && previousJobs[previousJobIndex].JobName) {
+      scheduleJobNames.push(previousJobs[previousJobIndex].JobName);
+    }
+  }
 }
 var menuContract = normalizeMenuContract(
   V8.Param.MenuContract || (packageAssets && packageAssets.MenuContract),
@@ -820,6 +890,7 @@ var selectedDataRowCount = 0;
 for (var selectedDataSetIndex = 0; selectedDataSetIndex < selectedDataSets.length; selectedDataSetIndex++) {
   selectedDataRowCount += toArray(selectedDataSets[selectedDataSetIndex] && selectedDataSets[selectedDataSetIndex].Rows).length;
 }
+var selectedScheduleJobs = exportScheduleJobs(scheduleJobNames, selectedExport.SysApiEngines);
 
 var packageModel = {
   PackageInfo: {
@@ -834,6 +905,7 @@ var packageModel = {
     OsClient: V8.OsClient,
     DataSetCount: selectedDataSets.length,
     DataRowCount: selectedDataRowCount,
+    JobCount: selectedScheduleJobs.length,
     IncludeSource: includeSource
   },
   ApplicationBundle: {
@@ -870,7 +942,8 @@ var packageModel = {
   WfFlowDesigns: toArray(selectedExport.WfFlowDesigns),
   WfNodes: toArray(selectedExport.WfNodes),
   WfLines: toArray(selectedExport.WfLines),
-  SysApiEngines: toArray(selectedExport.SysApiEngines)
+  SysApiEngines: toArray(selectedExport.SysApiEngines),
+  ScheduleJobs: selectedScheduleJobs
 };
 var generatedResourcePolicies = buildApiEngineResourcePolicies(
   packageModel.SysApiEngines,
@@ -917,7 +990,8 @@ if (isOfflineAction) {
       OfflineSelfContained: true,
       BuildAssetCount: buildAssets.length,
       SourceFileCount: sourceFiles.length,
-      RouteCount: packageModel.ApplicationBundle.Routes.length
+      RouteCount: packageModel.ApplicationBundle.Routes.length,
+      JobCount: selectedScheduleJobs.length
     }
   };
   // 大型源码包的 Package 对象和 FileByteBase64 内容完全重复。默认只返回下载内容，
@@ -966,9 +1040,19 @@ if (action === 'Publish') {
     AppPakcet: JSON.stringify(packageModel),
     SelectMenu: V8.Param.SelectMenu !== undefined && V8.Param.SelectMenu !== null
       ? selectionJson(V8.Param.SelectMenu)
-      : selectionJson(existingStore && existingStore.SelectMenu),
-    SelectTable: existingStore && existingStore.SelectTable ? existingStore.SelectTable : '',
-    SelectApiEngine: existingStore && existingStore.SelectApiEngine ? existingStore.SelectApiEngine : '',
+      : (V8.Param.MenuIds !== undefined && V8.Param.MenuIds !== null
+          ? selectionJson(menuIds)
+          : selectionJson(existingStore && existingStore.SelectMenu)),
+    SelectTable: V8.Param.SelectTable !== undefined && V8.Param.SelectTable !== null
+      ? selectionJson(V8.Param.SelectTable)
+      : (V8.Param.TableIds !== undefined && V8.Param.TableIds !== null
+          ? selectionJson(tableIds)
+          : selectionJson(existingStore && existingStore.SelectTable)),
+    SelectApiEngine: V8.Param.SelectApiEngine !== undefined && V8.Param.SelectApiEngine !== null
+      ? selectionJson(V8.Param.SelectApiEngine)
+      : (V8.Param.ApiEngineKeys !== undefined && V8.Param.ApiEngineKeys !== null
+          ? selectionJson(apiEngineKeys)
+          : selectionJson(existingStore && existingStore.SelectApiEngine)),
     SelectAiApp: JSON.stringify([{ AppId: app.Id, AppKey: app.AppKey, AppName: app.Name, ApplicationType: appType, IncludeSource: !!packageAssets.SourceZip }]),
     AiAppZipFiles: JSON.stringify([packageAssets.BuildZip].concat(packageAssets.SourceZip ? [packageAssets.SourceZip] : [])),
     AiAppPackageManifest: JSON.stringify([packageAssets])

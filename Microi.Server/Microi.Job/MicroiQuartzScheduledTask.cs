@@ -14,6 +14,7 @@ using Newtonsoft.Json;
 using System.Text.RegularExpressions;
 using static System.Collections.Specialized.BitVector32;
 using System.IO;
+using System.Security.Cryptography;
 using EnumsNET;
 using System.Threading;
 using Dos.Common;
@@ -35,7 +36,57 @@ namespace Microi.net
         // 用于优雅关闭后台任务
         private CancellationTokenSource _cts = new CancellationTokenSource();
 
-        private const string group = "default_group";
+        private const string LegacyGroup = "default_group";
+
+        private static string NormalizeJobTenant(string osClient)
+        {
+            return (osClient.IsNullOrWhiteSpace() ? OsClientDefault.OsClient : osClient).Trim().ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Quartz 的 Name + Group 是全平台唯一键。历史实现把全部租户放进
+        /// default_group，导致不同租户安装同名应用任务时互相覆盖。新组名同时
+        /// 包含可读租户片段与稳定摘要，既隔离租户，也避免超长或特殊字符。
+        /// </summary>
+        private static string GetTenantGroup(string osClient)
+        {
+            var tenant = NormalizeJobTenant(osClient);
+            var readable = Regex.Replace(tenant, "[^a-z0-9_-]", "_");
+            if (readable.Length > 32) readable = readable.Substring(0, 32);
+            if (readable.IsNullOrWhiteSpace()) readable = "tenant";
+            using var sha256 = SHA256.Create();
+            var hash = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(tenant)))
+                .Replace("-", "")
+                .Substring(0, 16)
+                .ToLowerInvariant();
+            return $"{LegacyGroup}.{readable}.{hash}";
+        }
+
+        private static bool JobBelongsToTenant(IJobDetail job, string osClient)
+        {
+            if (job == null) return false;
+            var actual = job.JobDataMap.ContainsKey(MicroiJobConst.OsClient)
+                ? job.JobDataMap.GetString(MicroiJobConst.OsClient)
+                : OsClientDefault.OsClient;
+            return string.Equals(
+                NormalizeJobTenant(actual),
+                NormalizeJobTenant(osClient),
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// 优先读取新租户组；仅当历史 default_group 中的 JobDataMap.OsClient
+        /// 与当前租户一致时才兼容旧任务，杜绝跨租户同名误命中。
+        /// </summary>
+        private async Task<JobKey> ResolveJobKey(string jobName, string osClient)
+        {
+            var tenantKey = new JobKey(jobName, GetTenantGroup(osClient));
+            if (await _scheduler.CheckExists(tenantKey)) return tenantKey;
+
+            var legacyKey = new JobKey(jobName, LegacyGroup);
+            var legacyJob = await _scheduler.GetJobDetail(legacyKey);
+            return JobBelongsToTenant(legacyJob, osClient) ? legacyKey : tenantKey;
+        }
         private static void WriteJobLog(string osClient, string action, string title, string content, int level = 2, string targetId = null, bool? success = false)
         {
             MicroiEngine.QueueSystemLog(osClient, "Job", action, title, content, level, success, targetId);
@@ -152,17 +203,20 @@ namespace Microi.net
                         allJobList.Add((JobDetailImpl)jobDetail);
                     }
                 }
+                var tenantJobs = allJobList
+                    .Where(x => JobBelongsToTenant(x, jobModel?.OsClient))
+                    .ToList();
                 List<JobDetailImpl> jobList = null;
                 if (!string.IsNullOrEmpty(jobModel._Key))
                 {
-                    jobList = allJobList.Where(x => x.Name.Contains(jobModel._Key))
+                    jobList = tenantJobs.Where(x => x.Name.Contains(jobModel._Key))
                                         .OrderBy(c => c.Group)
                                         .Skip((jobModel._PageIndex - 1) * jobModel._PageSize)
                                         .Take(jobModel._PageSize).ToList();
                 }
                 else
                 {
-                    jobList = allJobList.OrderBy(c => c.Group).Skip((jobModel._PageIndex - 1) * jobModel._PageSize).Take(jobModel._PageSize).ToList();
+                    jobList = tenantJobs.OrderBy(c => c.Group).Skip((jobModel._PageIndex - 1) * jobModel._PageSize).Take(jobModel._PageSize).ToList();
                 }
                 foreach (JobDetailImpl job in jobList)
                 {
@@ -174,7 +228,7 @@ namespace Microi.net
                 {
                     Code = 1,
                     Data = jobs,
-                    DataCount = allJobList.Count
+                    DataCount = tenantJobs.Count
                 };
             }
             catch (Exception ex)
@@ -188,48 +242,30 @@ namespace Microi.net
             }
         }
 
-        public async Task<MicroiJobResult> GetJobByName(List<string> jobNameArr)
+        public async Task<MicroiJobResult> GetJobByName(List<string> jobNameArr, string osClient = null)
         {
             try
             {
-                List<JobDetailImpl> allJobList = new List<JobDetailImpl>();
                 List<MicroiJobModel> jobs = new List<MicroiJobModel>();
-
-                //第一步：获取所有的job信息
-                var jobKeySet = await _scheduler.GetJobKeys(GroupMatcher<JobKey>.AnyGroup());
-                foreach (var jobKey in jobKeySet)
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var jobName in jobNameArr ?? new List<string>())
                 {
-                    var jobDetail = await _scheduler.GetJobDetail(jobKey);
-                    if (jobDetail != null)
-                    {
-                        allJobList.Add((JobDetailImpl)jobDetail);
-                    }
+                    if (jobName.IsNullOrWhiteSpace() || !seen.Add(jobName)) continue;
+                    var jobKey = await ResolveJobKey(jobName, osClient);
+                    var job = await _scheduler.GetJobDetail(jobKey);
+                    if (job != null && JobBelongsToTenant(job, osClient))
+                        jobs.Add(await PackageJob((JobDetailImpl)job));
                 }
-                List<JobDetailImpl> jobList = new List<JobDetailImpl>();
-                foreach (var jobName in jobNameArr)
-                {
-                    var job = allJobList.Where(x => x.Name.Equals(jobName, StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
-                    if (job != null)
-                    {
-                        jobList.Add(job);
-                    }
-                }
-                foreach (JobDetailImpl job in jobList)
-                {
-                    var model = await PackageJob(job);
-                    jobs.Add(model);
-                }
-                ;
                 return new MicroiJobResult()
                 {
                     Code = 1,
                     Data = jobs,
-                    DataCount = allJobList.Count
+                    DataCount = jobs.Count
                 };
             }
             catch (Exception ex)
             {
-                WriteJobLog(OsClientDefault.OsClient, "QueryJobsByNamesFailed", "按名称获取定时任务失败", ex.ToString(), 2);
+                WriteJobLog(osClient, "QueryJobsByNamesFailed", "按名称获取定时任务失败", ex.ToString(), 2);
                 return new MicroiJobResult()
                 {
                     Code = 0,
@@ -242,7 +278,8 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await _scheduler.GetJobDetail(new JobKey(jobModel.Name, group));
+                var jobKey = await ResolveJobKey(jobModel.Name, jobModel?.OsClient);
+                var jobDetail = await _scheduler.GetJobDetail(jobKey);
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在：" + jobModel.Name);
@@ -300,7 +337,8 @@ namespace Microi.net
                 {
                     return new MicroiJobResult(0, "无效的cron表达式");
                 }
-                if (await _scheduler.CheckExists(new JobKey(addJobModel.JobName)))
+                var jobKey = await ResolveJobKey(addJobModel.JobName, addJobModel.OsClient);
+                if (await _scheduler.CheckExists(jobKey))
                 {
                     return new MicroiJobResult(0, "job已存在");
                 }
@@ -317,6 +355,10 @@ namespace Microi.net
                 if (!String.IsNullOrEmpty(addJobModel.JobParam))
                 {
                     dic.Add(MicroiJobConst.JobParam, addJobModel.JobParam);
+                }
+                if (!String.IsNullOrWhiteSpace(addJobModel.TimeZoneId))
+                {
+                    dic.Add(MicroiJobConst.TimeZoneId, addJobModel.TimeZoneId);
                 }
                 if (addJobModel.JobType.Equals(MicroiJobConst.JobTypeApiEngineKey))
                 {
@@ -337,24 +379,24 @@ namespace Microi.net
                 var saveFilePath = Path.Combine(AppContext.BaseDirectory, dllName);
 
                 Assembly assembly = Assembly.LoadFrom(saveFilePath);
+                var tenantGroup = GetTenantGroup(addJobModel.OsClient);
+                var tenantJobKey = new JobKey(addJobModel.JobName, tenantGroup);
                 var job = JobBuilder.Create(assembly.GetType(jobPath))
                                   .StoreDurably(true)
-                                  .WithIdentity(addJobModel.JobName, group)
+                                  .WithIdentity(tenantJobKey)
                                   .WithDescription(addJobModel.JobDesc)
                                   .UsingJobData(jobDataMap)
                                   .Build();
-                await _scheduler.AddJob(job, true);
-
-                #endregion 新增job
-
-                #region 新增触发器
-
                 ITrigger trigger = TriggerBuilder.Create().ForJob(job)
-                                            .WithIdentity(addJobModel.JobName, group)
-                                            .WithCronSchedule(addJobModel.CronExpression)
+                                            .WithIdentity(addJobModel.JobName, tenantGroup)
+                                            .WithCronSchedule(
+                                                addJobModel.CronExpression,
+                                                schedule => schedule.InTimeZone(ResolveTimeZone(addJobModel.TimeZoneId)))
                                             .WithDescription(addJobModel.CronDesc)
                                             .Build();
-                await _scheduler.ScheduleJob(trigger);
+                // 单次 Quartz Store 事务同时写 Job 与 Trigger，避免第二步冲突后
+                // 留下“Job 已存在但 Trigger 缺失”的半完成运行态。
+                await _scheduler.ScheduleJob(job, trigger);
 
                 #endregion 新增触发器
 
@@ -376,13 +418,14 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                var resolvedKey = await ResolveJobKey(job.JobName, job.OsClient);
+                var jobDetail = await _scheduler.GetJobDetail(resolvedKey);
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
-                JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
+                JobKey jobKey = jobDetailImpl.Key;
                 await _scheduler.PauseJob(jobKey);
                 return new MicroiJobResult(1, "成功");
             }
@@ -401,13 +444,14 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                var resolvedKey = await ResolveJobKey(job.JobName, job.OsClient);
+                var jobDetail = await _scheduler.GetJobDetail(resolvedKey);
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
-                JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
+                JobKey jobKey = jobDetailImpl.Key;
                 await _scheduler.ResumeJob(jobKey);
                 return new MicroiJobResult(1, "成功");
             }
@@ -426,13 +470,14 @@ namespace Microi.net
         {
             try
             {
-                var jobDetail = await _scheduler.GetJobDetail(new JobKey(job.JobName, group));
+                var resolvedKey = await ResolveJobKey(job.JobName, job.OsClient);
+                var jobDetail = await _scheduler.GetJobDetail(resolvedKey);
                 if (jobDetail == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
                 }
                 JobDetailImpl jobDetailImpl = (JobDetailImpl)jobDetail;
-                JobKey jobKey = new JobKey(jobDetailImpl.Name, group);
+                JobKey jobKey = jobDetailImpl.Key;
                 await _scheduler.DeleteJob(jobKey);
                 return new MicroiJobResult(1, "成功");
             }
@@ -535,7 +580,8 @@ namespace Microi.net
                 {
                     return new MicroiJobResult(0, "无效的cron表达式");
                 }
-                var job = await _scheduler.GetJobDetail(new JobKey(addJobModel.JobName, group));
+                var resolvedKey = await ResolveJobKey(addJobModel.JobName, addJobModel.OsClient);
+                var job = await _scheduler.GetJobDetail(resolvedKey);
                 if (job == null)
                 {
                     return new MicroiJobResult(0, "job不存在");
@@ -552,6 +598,13 @@ namespace Microi.net
                     ? OsClientDefault.OsClient
                     : addJobModel.OsClient;
                 job.JobDataMap[MicroiJobConst.JobParam] = addJobModel.JobParam ?? "";
+                var timeZoneId = addJobModel.TimeZoneId;
+                if (timeZoneId.IsNullOrWhiteSpace()
+                    && job.JobDataMap.ContainsKey(MicroiJobConst.TimeZoneId))
+                {
+                    timeZoneId = job.JobDataMap.GetString(MicroiJobConst.TimeZoneId);
+                }
+                job.JobDataMap[MicroiJobConst.TimeZoneId] = timeZoneId ?? "";
                 if (addJobModel.JobType == MicroiJobConst.JobTypeApiEngineKey)
                 {
                     job.JobDataMap[MicroiJobConst.ApiEngineKey] = addJobModel.ApiEngineKey ?? "";
@@ -559,7 +612,7 @@ namespace Microi.net
                 await _scheduler.AddJob(job, true);
 
                 // 获取任务的当前状态
-                var jobKey = new JobKey(addJobModel.JobName, group);
+                var jobKey = job.Key;
                 var triggers = await _scheduler.GetTriggersOfJob(jobKey);
 
                 // 检查是否有触发器处于暂停状态
@@ -569,13 +622,21 @@ namespace Microi.net
                     return triggerState == TriggerState.Paused;
                 });
 
+                var existingTrigger = triggers.FirstOrDefault();
+                var triggerKey = existingTrigger?.Key
+                    ?? new TriggerKey(addJobModel.JobName, jobKey.Group);
                 ITrigger trigger = TriggerBuilder.Create().ForJob(job)
-                                              .WithIdentity(addJobModel.JobName, group)
-                                              .WithCronSchedule(addJobModel.CronExpression)
+                                              .WithIdentity(triggerKey)
+                                              .WithCronSchedule(
+                                                  addJobModel.CronExpression,
+                                                  schedule => schedule.InTimeZone(ResolveTimeZone(timeZoneId)))
                                               .WithDescription(addJobModel.CronDesc)
                                               .Build();
 
-                await _scheduler.RescheduleJob(new TriggerKey(addJobModel.JobName, group), trigger);
+                if (existingTrigger == null)
+                    await _scheduler.ScheduleJob(trigger);
+                else
+                    await _scheduler.RescheduleJob(triggerKey, trigger);
 
                 // 如果任务原本是暂停状态，则手动暂停
                 if (isPaused)
@@ -644,6 +705,9 @@ namespace Microi.net
                 JobParam = jobParamStr,
                 Status = "未调度",
                 JobType = job.JobDataMap.GetString(MicroiJobConst.JobType),
+                TimeZoneId = job.JobDataMap.ContainsKey(MicroiJobConst.TimeZoneId)
+                    ? job.JobDataMap.GetString(MicroiJobConst.TimeZoneId)
+                    : null,
                 OsClient = job.JobDataMap.ContainsKey(MicroiJobConst.OsClient) ? job.JobDataMap.GetString(MicroiJobConst.OsClient) : OsClientDefault.OsClient,
             };
             var triggerModelCollection = await _scheduler.GetTriggersOfJob(new JobKey(job.Name, job.Group));
@@ -652,6 +716,7 @@ namespace Microi.net
                 var triggerModel = triggerModelCollection.FirstOrDefault();
                 TriggerState state = await _scheduler.GetTriggerState(triggerModel.Key);
                 Quartz.Impl.Triggers.CronTriggerImpl cronTriggerModel = triggerModel as Quartz.Impl.Triggers.CronTriggerImpl;
+                model.TimeZoneId = cronTriggerModel?.TimeZone?.Id ?? model.TimeZoneId;
                 model.Status = GetTriggerState(state);
                 model.LastTime = triggerModel.GetPreviousFireTimeUtc() == null ? "" : triggerModel.GetPreviousFireTimeUtc().Value.AddHours(8).ToString("yyyy-MM-dd HH:mm:ss");
                 model.NextTime = triggerModel.GetNextFireTimeUtc() == null ? "" : triggerModel.GetNextFireTimeUtc().Value.AddHours(8).ToString("yyyy-MM-dd HH:mm:ss");
@@ -659,6 +724,27 @@ namespace Microi.net
                 model.CronExpression = cronTriggerModel?.CronExpressionString;
             }
             return model;
+        }
+
+        private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+        {
+            if (timeZoneId.IsNullOrWhiteSpace()) return TimeZoneInfo.Local;
+            var candidates = new List<string> { timeZoneId.Trim() };
+            if (string.Equals(timeZoneId, "Asia/Shanghai", StringComparison.OrdinalIgnoreCase))
+            {
+                candidates.Add("China Standard Time");
+            }
+            else if (string.Equals(timeZoneId, "China Standard Time", StringComparison.OrdinalIgnoreCase))
+            {
+                candidates.Add("Asia/Shanghai");
+            }
+            foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                try { return TimeZoneInfo.FindSystemTimeZoneById(candidate); }
+                catch (TimeZoneNotFoundException) { }
+                catch (InvalidTimeZoneException) { }
+            }
+            throw new ArgumentException($"找不到 Quartz 时区：{timeZoneId}");
         }
 
         public void SyncTaskTime()

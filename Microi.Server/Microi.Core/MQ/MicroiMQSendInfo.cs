@@ -18,6 +18,10 @@ namespace Microi.net
         /// </summary>
         public string EventId { get; set; }
 
+        /// <summary>只读诊断投影；发布器始终从当前可信Activity覆盖，不能用于鉴权。</summary>
+        public string TraceParent { get; set; }
+        public string TraceState { get; set; }
+
         /// <summary>
         /// 队列名称
         /// </summary>

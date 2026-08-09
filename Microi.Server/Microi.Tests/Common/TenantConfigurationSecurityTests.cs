@@ -284,6 +284,9 @@ public class TenantConfigurationSecurityTests
         Assert.DoesNotContain("GetIDatabase", cacheMethods);
         Assert.DoesNotContain("Db", cacheMethods);
         Assert.DoesNotContain("AddConnection", cacheMethods);
+        Assert.Contains("Expire", cacheMethods);
+        Assert.Contains("SetIfNotExists", cacheMethods);
+        Assert.Contains("HashIncrement", cacheMethods);
 
         var hdfsMethods = typeof(IV8HDFS).GetMethods();
         Assert.DoesNotContain(hdfsMethods, method =>

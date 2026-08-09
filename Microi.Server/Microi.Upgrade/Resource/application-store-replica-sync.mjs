@@ -24,6 +24,11 @@ export const applicationStoreReplicaMappings = Object.freeze([
     publishedStandalone: true,
   }),
   Object.freeze({
+    resourceName: 'ai-app-prepare-store-assets.js',
+    apiEngineKey: 'ai_app_prepare_store_assets',
+    publishedStandalone: false,
+  }),
+  Object.freeze({
     resourceName: 'ai-app-build.js',
     apiEngineKey: 'ai_app_build',
     publishedStandalone: false,

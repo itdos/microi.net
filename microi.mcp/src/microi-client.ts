@@ -2950,8 +2950,54 @@ export class MicroiClient {
   async savePageEngine(data: {
     PageId?: string; Title: string; Number?: string;
     Desc?: string; JsonStr: string; RoutePath?: string; ComponentPath?: string;
+    ExpectedCurrentHash?: string; ChangeSummary?: string;
   }): Promise<ApiResponse> {
     return this.post(API.SAVE_PAGE_ENGINE, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async listPageEngineHistory(pageId: string, pageIndex = 1, pageSize = 50): Promise<ApiResponse> {
+    return this.post(API.LIST_PAGE_ENGINE_HISTORY, {
+      OsClient: this.config.osClient,
+      PageId: pageId,
+      PageIndex: pageIndex,
+      PageSize: pageSize,
+    });
+  }
+
+  async getPageEngineHistory(pageId: string, historyId: string): Promise<ApiResponse> {
+    return this.post(API.GET_PAGE_ENGINE_HISTORY, {
+      OsClient: this.config.osClient,
+      PageId: pageId,
+      HistoryId: historyId,
+    });
+  }
+
+  async comparePageEngineVersions(pageId: string, leftHistoryId?: string, rightHistoryId?: string): Promise<ApiResponse> {
+    return this.post(API.COMPARE_PAGE_ENGINE_VERSIONS, {
+      OsClient: this.config.osClient,
+      PageId: pageId,
+      ...(leftHistoryId ? { LeftHistoryId: leftHistoryId } : {}),
+      ...(rightHistoryId ? { RightHistoryId: rightHistoryId } : {}),
+    });
+  }
+
+  async exportPageEngine(pageId: string): Promise<ApiResponse> {
+    return this.post(API.EXPORT_PAGE_ENGINE, {
+      OsClient: this.config.osClient,
+      PageId: pageId,
+    });
+  }
+
+  async rollbackPageEngine(data: {
+    PageId: string;
+    HistoryId: string;
+    ExpectedCurrentHash: string;
+    ChangeSummary?: string;
+  }): Promise<ApiResponse> {
+    return this.post(API.ROLLBACK_PAGE_ENGINE, {
       OsClient: this.config.osClient,
       ...data,
     });
@@ -2973,8 +3019,58 @@ export class MicroiClient {
     });
   }
 
+  async listBlueprintHistory(blueprintId: string, pageIndex = 1, pageSize = 50): Promise<ApiResponse> {
+    return this.post(API.LIST_BLUEPRINT_HISTORY, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
+      PageIndex: pageIndex,
+      PageSize: pageSize,
+    });
+  }
+
+  async getBlueprintHistory(blueprintId: string, historyId: string): Promise<ApiResponse> {
+    return this.post(API.GET_BLUEPRINT_HISTORY, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
+      HistoryId: historyId,
+    });
+  }
+
+  async compareBlueprintVersions(
+    blueprintId: string,
+    leftHistoryId?: string,
+    rightHistoryId?: string,
+  ): Promise<ApiResponse> {
+    return this.post(API.COMPARE_BLUEPRINT_VERSIONS, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
+      ...(leftHistoryId ? { LeftHistoryId: leftHistoryId } : {}),
+      ...(rightHistoryId ? { RightHistoryId: rightHistoryId } : {}),
+    });
+  }
+
+  async exportBlueprint(blueprintId: string): Promise<ApiResponse> {
+    return this.post(API.EXPORT_BLUEPRINT, {
+      OsClient: this.config.osClient,
+      BlueprintId: blueprintId,
+    });
+  }
+
   async saveBlueprint(data: Record<string, unknown>): Promise<ApiResponse> {
     return this.post(API.SAVE_BLUEPRINT, {
+      OsClient: this.config.osClient,
+      ...data,
+    });
+  }
+
+  async rollbackBlueprint(data: {
+    BlueprintId: string;
+    HistoryId: string;
+    ExpectedCurrentHash: string;
+    NewVersion?: string;
+    ChangeSummary?: string;
+  }): Promise<ApiResponse> {
+    return this.post(API.ROLLBACK_BLUEPRINT, {
       OsClient: this.config.osClient,
       ...data,
     });

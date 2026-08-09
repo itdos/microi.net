@@ -530,6 +530,27 @@ export const V8ApiDefinitions = {
                         documentation: "流式生成 V8 代码，仅平台管理员。",
                         insertText: "NL2V8Stream",
                         snippet: 'NL2V8Stream({ Question: "${1:需求}", AiModel: "${2:模型名称}" }, function(chunk) {\n\t${3:console.log(chunk);}\n})'
+                    },
+                    CreateMiniMaxVideo: {
+                        label: "CreateMiniMaxVideo",
+                        kind: "Method",
+                        documentation: "创建 MiniMax 异步视频任务。浏览器不接触供应商密钥，返回签名 TaskHandle。",
+                        insertText: "CreateMiniMaxVideo",
+                        snippet: 'CreateMiniMaxVideo({ Prompt: "${1:办公室工作场景}", Model: "${2:MiniMax-Hailuo-2.3}", Duration: ${3:6}, Resolution: "${4:1080P}" })'
+                    },
+                    GetMiniMaxVideoTask: {
+                        label: "GetMiniMaxVideoTask",
+                        kind: "Method",
+                        documentation: "使用签名 TaskHandle 查询视频任务；完成后返回签名 FileHandle。",
+                        insertText: "GetMiniMaxVideoTask",
+                        snippet: 'GetMiniMaxVideoTask({ TaskHandle: "${1:taskHandle}" })'
+                    },
+                    GetMiniMaxVideoFile: {
+                        label: "GetMiniMaxVideoFile",
+                        kind: "Method",
+                        documentation: "使用签名 FileHandle 获取短时有效下载地址。",
+                        insertText: "GetMiniMaxVideoFile",
+                        snippet: 'GetMiniMaxVideoFile({ FileHandle: "${1:fileHandle}" })'
                     }
                 }
             },

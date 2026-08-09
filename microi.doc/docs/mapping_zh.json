@@ -1,5 +1,6 @@
 ﻿{
   "index.md" : "平台介绍",
+  "edition-comparison.md" : "版本选择（开源/个人/企业）",
 
   "case-index.md" : "成功案例",
   
@@ -53,6 +54,7 @@
   "system-engine":"系统引擎",
   "ai-engine.md":"AI引擎与Microi.AI中转站",
   "ai-workflow-suite.md":"AI工作流、蓝图与状态机",
+  "ai-platform-governance.md":"AI平台治理中心",
   "app-store.md":"应用商城",
   "mqtt-engine.md":"MQTT引擎（IoT物联网）",
   "wf-engine.md" : "流程引擎",

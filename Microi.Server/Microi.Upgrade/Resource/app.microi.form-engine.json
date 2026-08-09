@@ -1,8 +1,8 @@
 {
   "PackageInfo": {
     "Name": "表单引擎",
-    "Version": "v6.9.8",
-    "CreateTime": "2026-08-08T05:58:33.317Z",
+    "Version": "v6.9.9",
+    "CreateTime": "2026-08-08T18:11:58.929Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
     "MenuCount": 4,
@@ -11,7 +11,7 @@
     "FlowCount": 0,
     "NodeCount": 0,
     "LineCount": 0,
-    "DDLCount": 7,
+    "DDLCount": 8,
     "PhysicalColumnCount": 386,
     "ApiEngineCount": 1,
     "DataSetCount": 0,
@@ -27,7 +27,12 @@
     {
       "TableName": "mic_data_version",
       "TableId": "1a897952-1761-4379-87d4-897f58bb6c41",
-      "DDL": "CREATE TABLE IF NOT EXISTS `mic_data_version` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `Remark` varchar(500) NULL COMMENT '备注',\n  `Action` varchar(50) NULL COMMENT '操作类型',\n  `TableRowId` varchar(36) NULL COMMENT '数据Id',\n  `Data` mediumtext NULL,\n  `Version` varchar(50) NULL,\n  `TableName` varchar(50) NULL,\n  `TableId` varchar(36) NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+      "DDL": "CREATE TABLE IF NOT EXISTS `mic_data_version` (\n  `Id` varchar(36) NOT NULL PRIMARY KEY,\n  `CreateTime` datetime NULL COMMENT '创建时间',\n  `UpdateTime` datetime NULL COMMENT '修改时间',\n  `UserId` varchar(36) NULL COMMENT '创建人Id',\n  `UserName` varchar(255) NULL COMMENT '创建人',\n  `IsDeleted` int NULL COMMENT '是否已删除',\n  `Remark` varchar(500) NULL COMMENT '备注',\n  `Action` varchar(50) NULL COMMENT '操作类型',\n  `TableRowId` varchar(36) NULL COMMENT '数据Id',\n  `Data` mediumtext NULL,\n  `Version` varchar(50) NULL,\n  `TableName` varchar(50) NULL,\n  `TableId` varchar(36) NULL,\n  KEY `ix_mic_data_version_table_row_time` (`TableId`,`TableRowId`,`CreateTime`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "TableName": "mic_data_version",
+      "TableId": "1a897952-1761-4379-87d4-897f58bb6c41",
+      "DDL": "CREATE INDEX `ix_mic_data_version_table_row_time` ON `mic_data_version` (`TableId`,`TableRowId`,`CreateTime`);"
     },
     {
       "TableName": "microi_datalog",
