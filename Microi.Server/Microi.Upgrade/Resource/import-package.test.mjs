@@ -184,6 +184,9 @@ function runDataSetImportFixture(options = {}) {
     stats: { DataSetCount: 0, DataInserted: 0, DataUpdated: 0, DataSkipped: 0 },
     debugLog: {},
     reportProgress() {},
+    backgroundChunkingEnabled: false,
+    backgroundCheckpointPhase: "PostSchema",
+    scheduleJobContract: { Jobs: [] },
     JSON,
     Object,
     String,
@@ -1187,4 +1190,25 @@ test("legacy sys_menu partial updates preserve omitted visibility fields", () =>
   assert.match(sysMenuLogicSource, /MapNotNull<object, SysMenu>\(param, model\)/);
   assert.match(sysMenuLogicSource, /model\.AppDisplay\s*=\s*param\.AppDisplay\s*\?\?\s*1/);
   assert.doesNotMatch(sysMenuLogicSource, /model\s*=\s*MapperHelper\.MapNotNull<object, SysMenu>\(param\);/);
+});
+
+test("application packages deliver schedule jobs only after transactional resources commit", () => {
+  assert.match(publishSource, /function exportScheduleJobs\(jobNames, apiEngines\)/);
+  assert.match(publishSource, /ScheduleJobs:\s*selectedScheduleJobs/);
+  assert.match(publishSource, /JobCount:\s*selectedScheduleJobs\.length/);
+  assert.match(source, /PostSchema:\s*true,[\s\S]*ScheduleJobs:\s*true/);
+  assert.match(source, /backgroundCheckpointPhase == 'PostSchema'[\s\S]*scheduleJobContract\.Jobs\.length > 0/);
+  assert.match(source, /buildSchemaContinuation\([\s\S]*'ScheduleJobs'/);
+  assert.match(source, /backgroundCheckpointPhase == 'ScheduleJobs'[\s\S]*savePackageScheduleJobs\(\)[\s\S]*upsertMicroiStoreVersionRecord\(\)/);
+  assert.match(source, /V8\.Method\.SaveScheduleJob\(scheduleJob\)/);
+});
+
+test("schedule job package contract is bounded and excludes custom runtime types", () => {
+  assert.match(source, /单个应用包最多包含 50 个定时任务/);
+  assert.match(source, /只允许 JobType=1 的接口引擎任务/);
+  assert.match(source, /引用的接口引擎未包含在当前应用包/);
+  assert.match(source, /不允许携带 DLL 或类型路径/);
+  assert.match(source, /包含定时任务的应用必须通过持久后台任务安装/);
+  assert.match(publishSource, /应用包只允许发布接口引擎任务/);
+  assert.match(publishSource, /定时任务引用的接口引擎未包含在当前应用包/);
 });

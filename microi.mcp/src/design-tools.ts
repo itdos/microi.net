@@ -34,6 +34,14 @@ function apiText(title: string, response: ApiResponse, append?: JsonRecord): Too
   return textResult(lines.join('\n'), response.Code !== 1);
 }
 
+async function audit(client: MicroiClient, action: string, target: string, payload: unknown): Promise<void> {
+  try {
+    await client.writeAuditLog(action, target, JSON.stringify(payload).slice(0, 6000));
+  } catch (error) {
+    console.error('[microi-mcp] page design audit log failed:', error instanceof Error ? error.message : String(error));
+  }
+}
+
 export function registerDesignTools(server: McpServer, client: MicroiClient, context: McpServerContext): void {
   const osClient = context.osClient;
 
@@ -185,9 +193,11 @@ export function registerDesignTools(server: McpServer, client: MicroiClient, con
       json: z.unknown().describe('Raw JsonObj, {JsonObj}, {JsonStr}, mic_page row, or {formData:{JsonObj}}.'),
       routePath: z.string().optional(),
       componentPath: z.string().optional(),
+      expectedCurrentHash: z.string().regex(/^[a-f0-9]{64}$/i).optional().describe('CurrentHash returned by page history; rejects concurrent overwrites.'),
+      changeSummary: z.string().max(2000).optional().describe('Reason recorded in immutable page history.'),
       confirmExecution: z.string().optional(),
     },
-    async ({ pageId, title, number, desc, json, routePath, componentPath, confirmExecution }) => {
+    async ({ pageId, title, number, desc, json, routePath, componentPath, expectedCurrentHash, changeSummary, confirmExecution }) => {
       if (confirmExecution !== title && confirmExecution !== 'EXECUTE') {
         return textResult(`Write blocked. Pass confirmExecution="${title}" or "EXECUTE".`, true);
       }
@@ -201,8 +211,83 @@ export function registerDesignTools(server: McpServer, client: MicroiClient, con
         JsonStr: normalized.json,
         RoutePath: routePath,
         ComponentPath: componentPath,
+        ExpectedCurrentHash: expectedCurrentHash,
+        ChangeSummary: changeSummary,
       });
       return apiText('Save Page Design', response, { warnings: normalized.warnings });
+    },
+  );
+
+  server.tool(
+    'microi_list_page_history',
+    `List immutable history for one Page Engine design, including the current SHA-256 hash used for optimistic concurrency. Snapshot bodies are omitted. OsClient ${osClient}.`,
+    {
+      pageId: z.string().describe('mic_page.Id'),
+      pageIndex: z.number().int().min(1).optional(),
+      pageSize: z.number().int().min(1).max(100).optional(),
+    },
+    async ({ pageId, pageIndex, pageSize }) => apiText(
+      'Page Design History',
+      await client.listPageEngineHistory(pageId, pageIndex ?? 1, pageSize ?? 50),
+    ),
+  );
+
+  server.tool(
+    'microi_get_page_history',
+    `Read one immutable Page Engine history snapshot. The history row must belong to the requested page and tenant. OsClient ${osClient}.`,
+    {
+      pageId: z.string().describe('mic_page.Id'),
+      historyId: z.string().describe('mci_resource_version.Id'),
+    },
+    async ({ pageId, historyId }) => apiText(
+      'Page Design History Detail',
+      await client.getPageEngineHistory(pageId, historyId),
+    ),
+  );
+
+  server.tool(
+    'microi_compare_page_versions',
+    `Compare two Page Engine snapshots semantically. Stable widget ids are matched by identity so pure reordering is ignored. Omit rightHistoryId to compare with the current design; omit leftHistoryId for the latest snapshot. OsClient ${osClient}.`,
+    {
+      pageId: z.string().describe('mic_page.Id'),
+      leftHistoryId: z.string().optional(),
+      rightHistoryId: z.string().optional(),
+    },
+    async ({ pageId, leftHistoryId, rightHistoryId }) => apiText(
+      'Page Design Version Diff',
+      await client.comparePageEngineVersions(pageId, leftHistoryId, rightHistoryId),
+    ),
+  );
+
+  server.tool(
+    'microi_export_page_design',
+    `Export a canonical, portable Microi Page Engine snapshot with schema version and content hash. Read-only. OsClient ${osClient}.`,
+    { pageId: z.string().describe('mic_page.Id') },
+    async ({ pageId }) => apiText('Export Page Design', await client.exportPageEngine(pageId)),
+  );
+
+  server.tool(
+    'microi_rollback_page_design',
+    `Restore Page Engine design from an immutable snapshot. Requires the current hash to reject concurrent overwrites and creates a new audit version instead of deleting history. OsClient ${osClient}.`,
+    {
+      pageId: z.string().describe('mic_page.Id'),
+      historyId: z.string().describe('Target mci_resource_version.Id'),
+      expectedCurrentHash: z.string().regex(/^[a-f0-9]{64}$/i).describe('CurrentHash from microi_list_page_history'),
+      changeSummary: z.string().max(2000).optional(),
+      confirmExecution: z.string().describe('Must equal pageId or "EXECUTE".'),
+    },
+    async ({ pageId, historyId, expectedCurrentHash, changeSummary, confirmExecution }) => {
+      if (confirmExecution !== pageId && confirmExecution !== 'EXECUTE') {
+        return textResult(`Rollback blocked. Pass confirmExecution="${pageId}" or "EXECUTE".`, true);
+      }
+      const payload = {
+        PageId: pageId,
+        HistoryId: historyId,
+        ExpectedCurrentHash: expectedCurrentHash,
+        ...(changeSummary ? { ChangeSummary: changeSummary } : {}),
+      };
+      await audit(client, 'microi_rollback_page_design', pageId, payload);
+      return apiText('Rollback Page Design', await client.rollbackPageEngine(payload));
     },
   );
 

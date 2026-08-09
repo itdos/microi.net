@@ -24,6 +24,7 @@ namespace Microi.net
         public string CronDesc { get; set; }
         // 触发器
         public string CronExpression { get; set; }
+        public string TimeZoneId { get; set; }
         // job运行需要的参数
         public string JobParam { get; set; }
         // job id

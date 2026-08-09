@@ -1,0 +1,379 @@
+.mci-nuget-stats {
+  --mci-nuget-accent: #0b6bd3;
+  --mci-nuget-accent-strong: #004880;
+  --mci-nuget-surface: rgba(255, 255, 255, .9);
+  --mci-nuget-text: var(--mci-site-ink, #171923);
+  --mci-nuget-muted: var(--mci-site-muted, #64748b);
+  width: 100%;
+  margin: 28px 0 36px;
+}
+.mci-nuget-stats__card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 132px;
+  overflow: hidden;
+  padding: 24px 26px;
+  border: 1px solid color-mix(in srgb, var(--mci-nuget-accent) 22%, transparent);
+  border-radius: var(--mci-site-radius-panel, 18px);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--mci-nuget-accent) 9%, transparent), transparent 42%),
+    linear-gradient(180deg, var(--mci-nuget-surface), color-mix(in srgb, var(--mci-nuget-surface) 88%, transparent));
+  box-shadow: 0 18px 42px rgba(24, 32, 48, .11);
+  color: var(--mci-nuget-text) !important;
+  text-decoration: none !important;
+  transition: transform .2s ease, border-color .2s ease;
+}
+
+.mci-nuget-stats__card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, #20a4f3, var(--mci-nuget-accent-strong));
+}
+
+.mci-nuget-stats__card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.34) 48%, transparent 66%);
+  opacity: 0;
+  transform: translateX(-55%);
+  transition: opacity .2s ease, transform .45s ease;
+}
+
+.mci-nuget-stats__card:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--mci-nuget-accent) 40%, transparent);
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .mci-nuget-stats__card:hover {
+    border-color: color-mix(in srgb, var(--mci-nuget-accent) 42%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .mci-nuget-stats__card:hover::after {
+    opacity: .7;
+    transform: translateX(55%);
+  }
+}
+
+.mci-nuget-stats__icon {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #0b79d0, #004880);
+  box-shadow: 0 12px 28px rgba(0, 72, 128, .22), inset 0 1px 0 rgba(255,255,255,.25);
+  color: #fff;
+}
+
+.mci-nuget-stats__icon svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.65;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mci-nuget-stats__body,
+.mci-nuget-stats__metric,
+.mci-nuget-stats__arrow {
+  position: relative;
+  z-index: 1;
+}
+
+.mci-nuget-stats__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.mci-nuget-stats__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--mci-nuget-accent-strong);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.mci-nuget-stats__eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #18a957;
+  box-shadow: 0 0 0 4px rgba(24, 169, 87, .12);
+}
+
+.mci-nuget-stats[data-state="loading"] .mci-nuget-stats__eyebrow i {
+  animation: mciNugetPulse 1.15s ease-in-out infinite alternate;
+}
+
+.mci-nuget-stats[data-state="fallback"] .mci-nuget-stats__eyebrow i {
+  background: #d9a23a;
+  box-shadow: 0 0 0 4px rgba(217, 162, 58, .13);
+}
+
+.mci-nuget-stats__title {
+  color: var(--mci-nuget-text);
+  font-size: clamp(17px, 2vw, 21px);
+  line-height: 1.35;
+}
+
+.mci-nuget-stats__description {
+  max-width: 680px;
+  color: var(--mci-nuget-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.mci-nuget-stats__metric {
+  display: flex;
+  min-width: 132px;
+  flex-direction: column;
+  align-items: flex-end;
+  white-space: nowrap;
+}
+
+.mci-nuget-stats__metric strong {
+  color: var(--mci-nuget-accent-strong);
+  font-size: clamp(28px, 4vw, 40px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  line-height: 1;
+  letter-spacing: -.035em;
+}
+
+.mci-nuget-stats__metric span,
+.mci-nuget-stats__metric small {
+  color: var(--mci-nuget-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mci-nuget-stats__metric small {
+  margin-top: 3px;
+  opacity: .78;
+}
+
+.mci-nuget-stats__arrow {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid color-mix(in srgb, var(--mci-nuget-accent) 22%, transparent);
+  border-radius: 12px;
+  color: var(--mci-nuget-accent-strong);
+}
+
+.mci-nuget-stats__arrow svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mci-nuget-stats__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 9px 6px 0 !important;
+  color: var(--mci-nuget-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.dark .mci-nuget-stats {
+  --mci-nuget-accent: #38a8ff;
+  --mci-nuget-accent-strong: #8bcaff;
+  --mci-nuget-surface: rgba(15, 23, 42, .88);
+}
+
+.mci-nuget-stats--home {
+  --mci-nuget-accent: #55b9ff;
+  --mci-nuget-accent-strong: #a8d8ff;
+  --mci-nuget-surface: rgba(31, 31, 31, .94);
+  --mci-nuget-text: #f7f7f7;
+  --mci-nuget-muted: #a7a7a7;
+  width: min(1120px, calc(100% - 40px));
+  margin: 0 auto 58px;
+}
+
+.mci-nuget-stats--home .mci-nuget-stats__card {
+  border-color: rgba(85, 185, 255, .24);
+  background:
+    linear-gradient(90deg, rgba(11, 107, 211, .18), transparent 46%),
+    linear-gradient(180deg, rgba(38,38,38,.98), rgba(27,27,27,.96));
+  box-shadow: 0 22px 48px rgba(0, 0, 0, .24);
+}
+
+.mci-nuget-stats--home .mci-nuget-stats__eyebrow,
+.mci-nuget-stats--home .mci-nuget-stats__metric strong,
+.mci-nuget-stats--home .mci-nuget-stats__arrow {
+  color: #a8d8ff;
+}
+
+.mci-nuget-stats--sidebar {
+  margin: 26px 0 0;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__card {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 12px;
+  min-height: 0;
+  padding: 14px;
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(24, 32, 48, .09);
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__eyebrow {
+  font-size: 9px;
+  letter-spacing: .06em;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__title {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__metric {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  min-width: 0;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--mci-nuget-accent) 13%, transparent);
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__metric strong {
+  font-size: 25px;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__metric span {
+  margin-left: 6px;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__metric small,
+.mci-nuget-stats--sidebar .mci-nuget-stats__arrow {
+  display: none;
+}
+
+@keyframes mciNugetPulse {
+  to { opacity: .42; transform: scale(.78); }
+}
+
+@media (max-width: 767px) {
+  .mci-nuget-stats {
+    margin: 22px 0 30px;
+  }
+
+  .mci-nuget-stats--home {
+    width: min(100% - 28px, 1120px);
+    margin-bottom: 42px;
+  }
+
+  .mci-nuget-stats__card {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 13px;
+    min-height: 0;
+    padding: 18px 17px;
+  }
+
+  .mci-nuget-stats__icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+  }
+
+  .mci-nuget-stats__icon svg {
+    width: 25px;
+    height: 25px;
+  }
+
+  .mci-nuget-stats__description,
+  .mci-nuget-stats__arrow {
+    display: none;
+  }
+
+  .mci-nuget-stats__title {
+    font-size: 14px;
+  }
+
+  .mci-nuget-stats__metric {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: baseline;
+    justify-content: start;
+    min-width: 0;
+    padding-top: 10px;
+    border-top: 1px solid color-mix(in srgb, var(--mci-nuget-accent) 16%, transparent);
+  }
+
+  .mci-nuget-stats__metric strong {
+    font-size: 30px;
+  }
+
+  .mci-nuget-stats__metric span,
+  .mci-nuget-stats__metric small {
+    margin-left: 7px;
+  }
+
+  .mci-nuget-stats__meta {
+    display: block;
+  }
+
+  .mci-nuget-stats__meta span:nth-child(2) {
+    display: none;
+  }
+
+  .mci-nuget-stats__meta span:last-child {
+    display: block;
+    margin-top: 3px;
+  }
+
+  .mci-nuget-stats--sidebar {
+    margin-top: 24px;
+  }
+
+  .mci-nuget-stats--sidebar .mci-nuget-stats__card {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mci-nuget-stats__card,
+  .mci-nuget-stats__card::after,
+  .mci-nuget-stats__eyebrow i {
+    animation: none !important;
+    transition: none !important;
+  }
+}

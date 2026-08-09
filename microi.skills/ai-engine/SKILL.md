@@ -5,6 +5,8 @@ description: Microi AI 引擎、模型代理、NL2SQL/NL2V8 与知识库规范�
 
 # Microi AI Engine
 
+平台视频生成的受控 HTTP 入口为 `/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。
+
 ## 能力
 
 平台 AI 包含聊天/流式聊天、模型代理、模型路由、订阅配额、NL2SQL、NL2V8、数据库 Schema 关键词检索、可选向量融合和 V8 Skill 文档检索。AI 输出是建议，不是授权；执行 SQL、V8 或 MCP 写入前仍走平台权限与确认。
@@ -49,6 +51,11 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 - 模型 Provider、Endpoint、ApiKey、AuthPrefix 和上游模型 Id 只保存在服务端受保护配置。
 - 普通用户使用平台签发的受限 API Key/订阅身份，不能枚举或读取上游密钥。
+- MiniMax 视频生成属于可复用供应商原子能力，应实现在 `Microi.AI`，Controller 只读取可信用户/`OsClient`、绑定参数并传递取消信号。理由是上游密钥隔离、异步 `task_id → file_id → download_url` 协议、订阅额度和跨节点幂等都不是某个可编辑接口引擎应复制的业务逻辑；具体文章、提示词和分发编排仍可留在 Job/接口引擎/发布 Skill。
+- MiniMax Token Plan Key 与按量 API Key 是相互独立的凭据，必须复用现有服务器端 Provider/ApiKey 受保护配置，不新增 API `AppSettings`、`MICROI_*` 环境变量或浏览器可见 Key。视频创建、查询和下载仅允许官方 HTTPS Host `api.minimaxi.com`。
+- 视频创建必须要求调用方稳定 `RequestId`，先在当前租户共享 Redis 以 `OsClient + 用户 + RequestId` 原子 `NX` 占位；Redis 不可用时失败关闭。相同 RequestId/参数回放返回原任务，不同参数冲突拒绝；上游 POST 超时或结果不确定时禁止自动换 RequestId 重试。查询不再次扣生成额度。
+- 原始 MiniMax `task_id`/`file_id` 不下发。服务端返回由供应商 Key 签名、绑定当前用户和用途的短句柄；查询/下载验签后才还原。Key 轮换会使旧句柄失效，应先完成或重新登记在途任务。
+- 当前官方模型边界必须实时校准：`MiniMax-Hailuo-2.3` 支持文生/图生，`MiniMax-Hailuo-2.3-Fast` 仅图生且必须有首帧，首尾帧使用 `MiniMax-Hailuo-02`；默认 6 秒 768P，10 秒不允许 1080P。套餐每日条数会变化，禁止在代码中硬编码价格或日额度。
 - 使用 Microi.AI 中转站时，租户侧 AI Bootstrap 通过官方 `official_ai_relay_models` 发现可用运行模型。该接口是跨租户只读公共契约，必须保持启用、允许匿名 HTTP 调用，并且只返回模型标识、展示名等公开白名单字段，绝不能返回中转密钥或上游 Endpoint。消费者不得把 `NoAuth` 静默伪装为“没有配置模型”；应返回可诊断错误，同时前端显示明确空态。
 - PC、UniApp 和其它客户端通过 `POST /apiengine/{key}` 发送的 JSON Body 必须完整进入 `V8.Param`；兼容入口 `/api/ApiEngine/Run` 的 JSON Body 还必须包含 `ApiEngineKey`。API 层只负责请求绑定和清除客户端伪造的可信字段，模型选择、权限策略与对话逻辑仍全部位于 `Microi.AI` 或受控 AI 接口引擎中。
 - 当前计量记录除问题摘要外还可能持久化完整 `Question`、`Answer`，部分诊断日志也会输出问题或摘要。处理现有版本时必须把这些字段视为敏感业务数据，限制查询权限和留存；不要声称已经全面脱敏。
@@ -59,6 +66,9 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 
 - PC 与移动端复用 `mci_ai_data_assistant`。`Bootstrap` 返回的 `Enabled`、`Models`、`AllowedDomains` 和 `Prompts` 是跨端共同事实源；快捷问题来自启用的 `mci_ai_data_domain.PromptExamples`，前端不能维护另一套固定文案。
 - 普通角色必须匹配启用的 `mci_ai_role_policy`。只有后端可信的 `V8.CurrentUser.Level >= 9999` 可以在新安装租户缺少角色策略时获得安全兜底：从目标租户动态读取已启用业务域和模型，范围为 `All`，仍保持 `AllowRawSql=false`、敏感字段默认关闭。不得相信客户端提交的 Level、角色名或账号名。
+- 当租户要求“所有角色均可使用 AI 助手”时，必须为 `sys_role` 中每个目标角色建立显式启用策略；受限角色使用 `Self`/`Department` 与最小业务域，管理角色才可使用经确认的 `All`。禁止把“人人可打开助手”实现成普通角色默认全库可读。
+- 开启 `Sys_Config.IsShowAiAssistant` 前后都要做策略覆盖验收：回读 `sys_role` 与 `mci_ai_role_policy`，断言每个目标角色都有唯一启用策略，`AllowedDomains`、`AllowedModels` 均非空且模型仍处于启用状态；再至少用超级管理员、普通员工和客户身份分别调用 `Bootstrap`，确认 `Enabled=true` 且返回范围符合角色。仅看到入口图标不算可用。
+- 角色策略存在但 `AllowedModels` 为空时，客户端最终仍会得到无可用模型；不得把它误判为前端角色拦截。应补齐当前租户启用模型白名单并回读，而不是删除 `mci_ai_role_policy` 校验或在客户端强制把 `Enabled` 改成 `true`。
 - 商城包不能携带发布租户的角色 Id、模型 Id 或密钥；应携带业务域定义和接口引擎，由安装后的目标租户动态发现自己的启用模型。发布后回读 `sys_microistore.AppVersion/AppPakcet`，并真实执行 `Bootstrap` 验证超级管理员可用、模型非空、快捷问题存在。
 
 ## Schema 检索双模式

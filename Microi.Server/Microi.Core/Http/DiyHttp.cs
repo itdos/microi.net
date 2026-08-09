@@ -418,6 +418,15 @@ namespace Microi.net
                     request.AddHeader(item.Key, item.Value?.ToString());
                 }
             }
+            // 当前请求、后台任务或MQ消费者存在W3C上下文时，覆盖用户自带的同名头，
+            // 让下游服务继续同一条Trace；traceparent从不参与鉴权。
+            var traceParent = MicroiTraceContext.CurrentTraceParent;
+            if (!traceParent.DosIsNullOrWhiteSpace())
+            {
+                request.AddOrUpdateHeader("traceparent", traceParent);
+                var traceState = MicroiTraceContext.CurrentTraceState;
+                if (!traceState.DosIsNullOrWhiteSpace()) request.AddOrUpdateHeader("tracestate", traceState);
+            }
             #endregion
 
             if (param.GetParam != null)

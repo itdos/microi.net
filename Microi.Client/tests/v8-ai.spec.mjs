@@ -53,6 +53,32 @@ test("V8.AI.ChatGet 支持 GET 且仍由宿主注入鉴权", async () => {
     assert.equal(captured.GetParam.UserChatMsg, "你好");
 });
 
+test("V8.AI MiniMax 视频方法固定走平台接口并清除伪造密钥", async () => {
+    const calls = [];
+    const ai = createV8AI({
+        http: {
+            Post: async (param) => {
+                calls.push(param);
+                return JSON.stringify({ Code: 1, Data: {}, Msg: "" });
+            }
+        }
+    });
+
+    await ai.CreateMiniMaxVideo({ Prompt: "办公室协作", ApiKey: "forged", OsClient: "forged" });
+    await ai.GetMiniMaxVideoTask({ TaskHandle: "signed-task" });
+    await ai.GetMiniMaxVideoFile({ FileHandle: "signed-file" });
+
+    assert.deepEqual(calls.map((item) => item.Url), [
+        "/api/Ai/CreateMiniMaxVideo",
+        "/api/Ai/GetMiniMaxVideoTask",
+        "/api/Ai/GetMiniMaxVideoFile"
+    ]);
+    assert.deepEqual(calls[0].PostParam, { Prompt: "办公室协作" });
+    assert.equal(ai.CreateMiniMaxVideoAsync, ai.CreateMiniMaxVideo);
+    assert.equal(ai.GetMiniMaxVideoTaskAsync, ai.GetMiniMaxVideoTask);
+    assert.equal(ai.GetMiniMaxVideoFileAsync, ai.GetMiniMaxVideoFile);
+});
+
 test("V8.AI.ChatStream 解析 SSE 打字机分片、最终结果并回收新 Token", async () => {
     const encoder = new TextEncoder();
     const chunks = [

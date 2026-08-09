@@ -1,0 +1,21 @@
+{
+  "name": "microi-ai-platform-studio",
+  "version": "2.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "vue-tsc --noEmit",
+    "test": "node --test tests/studio-contract.test.mjs",
+    "build": "npm run typecheck && npm test && vite build"
+  },
+  "dependencies": {
+    "vue": "3.5.40"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@vitejs/plugin-vue": "6.0.8",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vue-tsc": "3.3.9"
+  }
+}

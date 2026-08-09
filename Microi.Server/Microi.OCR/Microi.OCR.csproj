@@ -8,11 +8,11 @@
     <Copyright>Copyright 2009-2026 microi.net</Copyright>
     <PackageProjectUrl>https://microi.net</PackageProjectUrl>
     <PackageIcon>microi-blue-256.png</PackageIcon>
-    <PackageTags>低代码,LowCode,OCR,PaddleOCR,PaddleX,Microi吾码,Microi</PackageTags>
+    <PackageTags>低代码,LowCode,AI,OCR,PaddleOCR,PaddleX,Microi吾码,Microi</PackageTags>
     <PackageReleaseNotes>Microi吾码通用 OCR 网关。</PackageReleaseNotes>
-    <Version>7.2.4</Version>
-    <AssemblyVersion>7.2.4</AssemblyVersion>
-    <FileVersion>7.2.4</FileVersion>
+    <Version>7.2.5</Version>
+    <AssemblyVersion>7.2.5</AssemblyVersion>
+    <FileVersion>7.2.5</FileVersion>
     <RestorePackages>true</RestorePackages>
     <IsPackable>true</IsPackable>
     <Configurations>Release;Debug</Configurations>

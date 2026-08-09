@@ -4,9 +4,9 @@
     <!-- dotnet build -c Release -->
     <!-- 若升级此类库版本号，必须同时升级Microi.net版本号 -->
     <TargetFramework>netstandard2.1</TargetFramework>
-    <Version>7.2.4</Version>
-    <AssemblyVersion>7.2.4</AssemblyVersion>
-    <FileVersion>7.2.4</FileVersion>
+    <Version>7.2.5</Version>
+    <AssemblyVersion>7.2.5</AssemblyVersion>
+    <FileVersion>7.2.5</FileVersion>
     <Authors>iTdos</Authors>
     <Company>www.itdos.com</Company>
     <Product>Dos.Common</Product>
@@ -16,7 +16,7 @@
     <PackageProjectUrl>http://www.itdos.com/dos/common/index.html</PackageProjectUrl>
     <PackageIconUrl></PackageIconUrl>
     <PackageReleaseNotes>开源iTdos C#常用开发类库，集成了大量通用方法。开源低代码平台 - Microi吾码：https://microi.net</PackageReleaseNotes>
-    <PackageTags>低代码,LowCode,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
+    <PackageTags>低代码,LowCode,AI,V8,V8引擎,JavaScript,Microi吾码,Microi,Microi.net,iTdos,MicroiOS,Dos,Dos.ORM</PackageTags>
     <PackageIcon>itdos-red-256.png</PackageIcon>
     <!-- 禁用NuGet包警告 -->
     <NoWarn>$(NoWarn);NU5128</NoWarn>

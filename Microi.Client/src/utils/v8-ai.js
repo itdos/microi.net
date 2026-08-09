@@ -184,12 +184,18 @@ export function createV8AI(options = {}) {
         NL2V8: function (param) { return request("/api/Ai/NL2V8EngineSync", param); },
         NL2V8Stream: function (param, onChunk, callOptions) {
             return stream("/api/Ai/NL2V8Engine", param, onChunk, callOptions);
-        }
+        },
+        CreateMiniMaxVideo: function (param) { return request("/api/Ai/CreateMiniMaxVideo", param); },
+        GetMiniMaxVideoTask: function (param) { return request("/api/Ai/GetMiniMaxVideoTask", param); },
+        GetMiniMaxVideoFile: function (param) { return request("/api/Ai/GetMiniMaxVideoFile", param); }
     };
     api.ChatAsync = api.Chat;
     api.RecognizeIntentAsync = api.RecognizeIntent;
     api.NL2SQLAsync = api.NL2SQL;
     api.NL2V8Async = api.NL2V8;
+    api.CreateMiniMaxVideoAsync = api.CreateMiniMaxVideo;
+    api.GetMiniMaxVideoTaskAsync = api.GetMiniMaxVideoTask;
+    api.GetMiniMaxVideoFileAsync = api.GetMiniMaxVideoFile;
     return api;
 }
 
