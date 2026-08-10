@@ -31,12 +31,17 @@ function cssToken(scope, name) {
   return match[0];
 }
 
-test('MicroService guide explains all three runtime entries with real case images', () => {
+test('MicroService guide explains all four runtime entries with real case images', () => {
   const guide = read('microi.doc/docs/doc/system-engine/micro-app.md');
   for (const phrase of [
     '独立运行',
     '平台菜单直开',
     'V8.OpenAppDialog',
+    '在表单引擎中引用',
+    'DevComponentPath',
+    'LegacyComponentPaths',
+    'componentMode',
+    'dev-component:resize',
     'https://microi.net/apps.html',
     '/micro-app/{AppKey}/{RoutePath}',
     'EnableCaptcha',
@@ -61,6 +66,26 @@ test('MicroService guide explains all three runtime entries with real case image
   }
 });
 
+test('FormEngine MicroService entry matches the implemented component fallback contract', () => {
+  const guide = read('microi.doc/docs/doc/system-engine/micro-app.md');
+  const formGuide = read('microi.doc/docs/doc/form-engine/form-custom-control.md');
+  const cache = read('Microi.Client/src/utils/dynamicComponentCache.js');
+  const resolver = read('Microi.Client/src/utils/microAppDevComponentResolver.js');
+  const host = read('Microi.Client/src/views/micro-app/dev-component.vue');
+
+  for (const token of ['DevComponent', 'DevComponentPath', 'LegacyComponentPaths', 'RoutePath', 'componentData', 'permissionContext']) {
+    assert.ok(guide.includes(token), `MicroService guide is missing ${token}`);
+    assert.ok(formGuide.includes(token), `custom component guide is missing ${token}`);
+  }
+  assert.match(cache, /本地源码不存在时[\s\S]*?MicroAppDevComponent/);
+  assert.match(cache, /legacyComponentPath:\s*path/);
+  assert.match(resolver, /findLegacyMicroAppPage/);
+  assert.match(resolver, /normalizeLegacyComponentPath/);
+  for (const token of ['componentMode', 'componentData', 'dev-component:resize', 'dev-component:event', 'permissionContext']) {
+    assert.ok(host.includes(token), `component host is missing ${token}`);
+  }
+});
+
 test('documentation theme has global and MicroService-specific readable layouts', () => {
   const themeEntry = read('microi.doc/docs/.vitepress/theme/index.ts');
   const visualProfiles = read('microi.doc/docs/.vitepress/theme/doc-visual-profiles.js');
@@ -74,7 +99,7 @@ test('documentation theme has global and MicroService-specific readable layouts'
   for (const token of ['--mci-doc-reading-width', '.mci-doc-profile--reference', '&.dark', '.vp-doc details', '.mci-doc-grid', 'prefers-reduced-motion']) {
     assert.ok(globalTheme.includes(token));
   }
-  for (const token of ['--micro-app-hero-surface', '--micro-app-hero-ink', '.micro-app-hero', '.micro-app-mode-grid', '.micro-app-case-grid', '.micro-app-auth-flow', '@media (max-width: 680px)', '&.dark .micro-app-hero']) {
+  for (const token of ['--micro-app-hero-surface', '--micro-app-hero-ink', '.micro-app-hero', '.micro-app-mode-grid', '.micro-app-case-grid', '.micro-app-auth-flow', '.micro-app-component-flow', '@media (max-width: 680px)', '&.dark .micro-app-hero']) {
     assert.ok(microAppTheme.includes(token));
   }
 
@@ -114,7 +139,7 @@ test('future AI delivery rules prohibit manual chunks and require standalone aut
   const scaffold = read('microi.mcp/src/microservice-scaffold.ts');
   const host = read('Microi.Client/src/views/micro-app/host.vue');
 
-  for (const token of ['directory', '.sync-seg-*', '独立运行的认证门', 'permissionContext']) assert.ok(sourceSkill.includes(token));
+  for (const token of ['directory', '.sync-seg-*', '独立运行的认证门', 'permissionContext', '表单嵌入四种入口', 'dev-component:resize']) assert.ok(sourceSkill.includes(token));
   for (const token of ['中文文档视觉与可读性契约', 'doc-visual-profiles.js', 'npm run audit:visual', '&.dark', 'WCAG AA']) assert.ok(docsSkill.includes(token));
   for (const token of ['MicroService 独立运行认证', 'EnableCaptcha', 'captchaid']) assert.ok(sdkSkill.includes(token));
   for (const token of ['VitePress 中文文档布局规范', '86ch', 'prefers-reduced-motion', 'html:lang(zh).dark', '全站扫描']) assert.ok(uiSkill.includes(token));
@@ -128,6 +153,7 @@ test('workspace Skills and the packaged Codex plugin carry the same rules', () =
   const files = [
     'microi-microservice/SKILL.md',
     'microi-microservice/references/runtime-delivery.md',
+    'microi-form-engine/SKILL.md',
     'microi-docs-coverage/SKILL.md',
     'microi-frontend-sdk/SKILL.md',
     'ui-design/SKILL.md',

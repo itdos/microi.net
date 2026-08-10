@@ -916,7 +916,7 @@ namespace Microi.net.Api
                 osClient, tableId, name, label,
                 param["Type"].Val<string>(), param["Component"].Val<string>(),
                 IntOrDefault(param, "Visible", 1), IntOrDefault(param, "AppVisible", 1),
-                param["Tab"].Val<string>(), param["TableWidth"]?.Val<int>() ?? 120,
+                param["Tab"].Val<string>(), param["TableWidth"]?.Val<int>() ?? 0,
                 param["Sort"]?.Val<int>() ?? 100, param["NameConfirm"]?.Val<int>() ?? 0,
                 param["Readonly"]?.Val<int>() ?? 0,
                 param["NotEmpty"]?.Val<int>() ?? 0, param["Unique"]?.Val<int>() ?? 0,

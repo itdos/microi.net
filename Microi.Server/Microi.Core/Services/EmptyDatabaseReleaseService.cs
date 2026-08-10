@@ -163,6 +163,11 @@ namespace Microi.net
                 validation.RemainingApplicationPhysicalTables,
                 validation.RemainingApplicationTableDefinitions,
                 validation.RemainingApplicationFieldDefinitions,
+                validation.RemainingApplicationApiEngines,
+                validation.RemainingApplicationScheduleJobs,
+                validation.RemainingApplicationMicroservices,
+                validation.RemainingApplicationMicroservicePages,
+                validation.RemainingMciDemoMenus,
                 validation.RemainingAppApiEngines,
                 validation.RemainingAppTableDefinitions,
                 validation.RemainingAppFieldDefinitions,
@@ -794,7 +799,8 @@ WHERE TABLE_SCHEMA=@database ORDER BY TABLE_TYPE DESC, TABLE_NAME;";
         {
             using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
             var tables = GetBaseTables(connection, TargetDatabase);
-            var removableApplicationTables = GetRemovableApplicationTableNames(sourceBuilder);
+            var removableApplicationResources = GetRemovableApplicationResources(sourceBuilder);
+            var removableApplicationTables = removableApplicationResources.TableNames;
             var requiredTables = new[]
             {
                 "sys_user", "sys_menu", "sys_apiengine", "diy_table", "diy_field", "sys_microistore"
@@ -823,6 +829,33 @@ WHERE TABLE_SCHEMA = DATABASE()
                     connection,
                     "SELECT DISTINCT `TableName` FROM `diy_field` WHERE COALESCE(`TableName`, '') <> '';",
                     removableApplicationTables),
+                RemainingApplicationApiEngines = CountMatchingTableNames(
+                    connection,
+                    "SELECT `ApiEngineKey` FROM `sys_apiengine` WHERE COALESCE(`ApiEngineKey`, '') <> '';",
+                    removableApplicationResources.ApiEngineKeys),
+                RemainingApplicationScheduleJobs = tables.Contains("diy_schedule_job", StringComparer.OrdinalIgnoreCase)
+                    ? CountMatchingTableNames(
+                        connection,
+                        "SELECT `ApiEngineKey` FROM `diy_schedule_job` WHERE COALESCE(`ApiEngineKey`, '') <> '';",
+                        removableApplicationResources.ApiEngineKeys)
+                    : 0,
+                RemainingApplicationMicroservices = tables.Contains("sys_microiservice", StringComparer.OrdinalIgnoreCase)
+                    ? CountMatchingTableNames(
+                        connection,
+                        "SELECT `MsKey` FROM `sys_microiservice` WHERE COALESCE(`MsKey`, '') <> '';",
+                        removableApplicationResources.AppKeys)
+                    : 0,
+                RemainingApplicationMicroservicePages = tables.Contains("sys_microiservice_page", StringComparer.OrdinalIgnoreCase)
+                    ? CountMatchingTableNames(
+                        connection,
+                        "SELECT `MicroServiceKey` FROM `sys_microiservice_page` WHERE COALESCE(`MicroServiceKey`, '') <> '';",
+                        removableApplicationResources.AppKeys)
+                    : 0,
+                RemainingMciDemoMenus = ExecuteScalarCount(connection, @"
+SELECT COUNT(*) FROM `sys_menu`
+WHERE LOWER(COALESCE(`ModuleEngineKey`, '')) = 'mci_demo'
+   OR LOWER(COALESCE(`Url`, '')) LIKE '%/mci_demo/%'
+   OR `Name` = '文章关联微服务';"),
                 RemainingAppApiEngines = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_apiengine`
 WHERE LEFT(LOWER(COALESCE(`ApiEngineKey`, '')), 4) = 'app_'
@@ -836,7 +869,13 @@ WHERE LEFT(LOWER(COALESCE(`TableName`, '')), 4) = 'app_';"),
                 RemainingAiStoreApps = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
 WHERE LOWER(COALESCE(`AppKey`, '')) <> 'microi-platform-service'
-  AND UPPER(COALESCE(NULLIF(TRIM(`ApplicationType`), ''), NULLIF(TRIM(`AppType`), ''), '')) <> 'PLATFORM';"),
+  AND NOT (
+    UPPER(COALESCE(NULLIF(TRIM(`ApplicationType`), ''), NULLIF(TRIM(`AppType`), ''), '')) = 'PLATFORM'
+    AND (
+      LOWER(COALESCE(`AppKey`, '')) LIKE 'app.microi.%'
+      OR LOWER(COALESCE(`AppKey`, '')) = 'microi-wechat-content-security'
+    )
+  );"),
                 PlatformServiceCount = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
 WHERE `AppKey` = 'microi-platform-service';")
@@ -906,6 +945,26 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             if (validation.RemainingApplicationFieldDefinitions > 0)
             {
                 violations.Add($"应用包业务字段定义={validation.RemainingApplicationFieldDefinitions}");
+            }
+            if (validation.RemainingApplicationApiEngines > 0)
+            {
+                violations.Add($"应用包业务接口={validation.RemainingApplicationApiEngines}");
+            }
+            if (validation.RemainingApplicationScheduleJobs > 0)
+            {
+                violations.Add($"应用包业务任务={validation.RemainingApplicationScheduleJobs}");
+            }
+            if (validation.RemainingApplicationMicroservices > 0)
+            {
+                violations.Add($"应用微服务运行时={validation.RemainingApplicationMicroservices}");
+            }
+            if (validation.RemainingApplicationMicroservicePages > 0)
+            {
+                violations.Add($"应用微服务页面={validation.RemainingApplicationMicroservicePages}");
+            }
+            if (validation.RemainingMciDemoMenus > 0)
+            {
+                violations.Add($"mci_demo 发文实测菜单={validation.RemainingMciDemoMenus}");
             }
             if (validation.RemainingAppApiEngines > 0)
             {
@@ -984,13 +1043,17 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             return count;
         }
 
-        private static HashSet<string> GetRemovableApplicationTableNames(
+        private static RemovableApplicationResources GetRemovableApplicationResources(
             MySqlConnectionStringBuilder sourceBuilder)
         {
             using var connection = OpenConnection(sourceBuilder);
             var packageTablesByStoreId = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var packageEnginesByStoreId = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var platformTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var applicationTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var platformEngines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var applicationEngines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var applicationKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             using (var command = connection.CreateCommand())
             {
@@ -1007,11 +1070,14 @@ FROM `sys_microistore`;";
                     var appType = reader.IsDBNull(3) ? "" : reader.GetString(3);
                     var packageText = reader.IsDBNull(4) ? "" : reader.GetString(4);
                     var tables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var engines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     if (!string.IsNullOrWhiteSpace(packageText))
                     {
                         try
                         {
-                            CollectPackageTableNames(JToken.Parse(packageText), tables);
+                            var package = JToken.Parse(packageText);
+                            CollectPackageTableNames(package, tables);
+                            CollectPackageApiEngineKeys(package, engines);
                         }
                         catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is FormatException)
                         {
@@ -1020,11 +1086,20 @@ FROM `sys_microistore`;";
                                 ex);
                         }
                     }
-                    if (!string.IsNullOrWhiteSpace(storeId)) packageTablesByStoreId[storeId] = tables;
-                    var isPlatform = string.Equals(appKey, "microi-platform-service", StringComparison.OrdinalIgnoreCase)
-                                     || string.Equals(applicationType, "Platform", StringComparison.OrdinalIgnoreCase)
-                                     || string.Equals(appType, "Platform", StringComparison.OrdinalIgnoreCase);
+                    if (!string.IsNullOrWhiteSpace(storeId))
+                    {
+                        packageTablesByStoreId[storeId] = tables;
+                        packageEnginesByStoreId[storeId] = engines;
+                    }
+                    if (!string.IsNullOrWhiteSpace(appKey))
+                    {
+                        packageTablesByStoreId[appKey] = tables;
+                        packageEnginesByStoreId[appKey] = engines;
+                    }
+                    var isPlatform = IsCorePlatformApplication(appKey, applicationType, appType);
                     (isPlatform ? platformTables : applicationTables).UnionWith(tables);
+                    (isPlatform ? platformEngines : applicationEngines).UnionWith(engines);
+                    if (!isPlatform && !string.IsNullOrWhiteSpace(appKey)) applicationKeys.Add(appKey);
                 }
             }
 
@@ -1060,18 +1135,63 @@ FROM `sys_microistore`;";
                 {
                     var storeId = reader.IsDBNull(0) ? "" : reader.GetString(0);
                     if (!packageTablesByStoreId.TryGetValue(storeId, out var tables)) continue;
+                    packageEnginesByStoreId.TryGetValue(storeId, out var engines);
                     var appKey = reader.IsDBNull(1) ? "" : reader.GetString(1);
                     var applicationType = reader.IsDBNull(2) ? "" : reader.GetString(2);
                     var appType = reader.IsDBNull(3) ? "" : reader.GetString(3);
-                    var isPlatform = string.Equals(appKey, "microi-platform-service", StringComparison.OrdinalIgnoreCase)
-                                     || string.Equals(applicationType, "Platform", StringComparison.OrdinalIgnoreCase)
-                                     || string.Equals(appType, "Platform", StringComparison.OrdinalIgnoreCase);
+                    var isPlatform = IsCorePlatformApplication(appKey, applicationType, appType);
                     (isPlatform ? platformTables : applicationTables).UnionWith(tables);
+                    if (engines != null) (isPlatform ? platformEngines : applicationEngines).UnionWith(engines);
                 }
             }
 
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT `ApiEngineKey` FROM `sys_apiengine`
+WHERE LEFT(LOWER(COALESCE(`ApiEngineKey`, '')), 9) = 'mci_demo_';";
+                command.CommandTimeout = 0;
+                using var reader = command.ExecuteReader();
+                while (reader.Read())
+                {
+                    AddSafeEngineKey(applicationEngines, reader.IsDBNull(0) ? "" : reader.GetString(0));
+                }
+            }
+
+            // mci_demo 是文章发布的固定实测微服务，即使旧数据缺少商城归属也必须清理。
+            applicationKeys.Add("mci_demo");
             applicationTables.ExceptWith(platformTables);
-            return applicationTables;
+            applicationEngines.ExceptWith(platformEngines);
+            return new RemovableApplicationResources
+            {
+                TableNames = applicationTables,
+                ApiEngineKeys = applicationEngines,
+                AppKeys = applicationKeys
+            };
+        }
+
+        private static bool IsCorePlatformApplication(
+            string appKey,
+            string applicationType,
+            string appType)
+        {
+            var normalizedKey = (appKey ?? "").Trim();
+            if (string.Equals(normalizedKey, "microi-platform-service", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var runtimeType = string.IsNullOrWhiteSpace(applicationType) ? appType : applicationType;
+            if (!string.Equals((runtimeType ?? "").Trim(), "Platform", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return normalizedKey.StartsWith("app.microi.", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(
+                       normalizedKey,
+                       "microi-wechat-content-security",
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         private static void CollectPackageTableNames(JToken token, ISet<string> tables)
@@ -1114,12 +1234,54 @@ FROM `sys_microistore`;";
             }
         }
 
+        private static void CollectPackageApiEngineKeys(JToken token, ISet<string> engineKeys)
+        {
+            if (token is JObject obj)
+            {
+                foreach (var property in obj.Properties())
+                {
+                    if (string.Equals(property.Name, "SysApiEngines", StringComparison.OrdinalIgnoreCase)
+                        && property.Value is JArray engines)
+                    {
+                        foreach (var engine in engines.OfType<JObject>())
+                        {
+                            AddSafeEngineKey(engineKeys, engine["ApiEngineKey"]?.ToString());
+                        }
+                    }
+                    if (string.Equals(property.Name, "ResourcePolicies", StringComparison.OrdinalIgnoreCase)
+                        && property.Value is JObject policies
+                        && policies["ApiEngines"] is JArray enginePolicies)
+                    {
+                        foreach (var policy in enginePolicies.OfType<JObject>())
+                        {
+                            AddSafeEngineKey(engineKeys, policy["ApiEngineKey"]?.ToString());
+                        }
+                    }
+                    CollectPackageApiEngineKeys(property.Value, engineKeys);
+                }
+                return;
+            }
+            if (token is JArray array)
+            {
+                foreach (var item in array) CollectPackageApiEngineKeys(item, engineKeys);
+            }
+        }
+
         private static void AddSafeTableName(ISet<string> tables, string value)
         {
             var tableName = (value ?? "").Trim().Trim('`', '"');
             if (Regex.IsMatch(tableName, @"^[A-Za-z0-9_]+$", RegexOptions.CultureInvariant))
             {
                 tables.Add(tableName);
+            }
+        }
+
+        private static void AddSafeEngineKey(ISet<string> engineKeys, string value)
+        {
+            var engineKey = (value ?? "").Trim();
+            if (Regex.IsMatch(engineKey, @"^[A-Za-z0-9_.:-]+$", RegexOptions.CultureInvariant))
+            {
+                engineKeys.Add(engineKey);
             }
         }
 
@@ -1888,6 +2050,11 @@ return 0";
             public long RemainingApplicationPhysicalTables { get; set; }
             public long RemainingApplicationTableDefinitions { get; set; }
             public long RemainingApplicationFieldDefinitions { get; set; }
+            public long RemainingApplicationApiEngines { get; set; }
+            public long RemainingApplicationScheduleJobs { get; set; }
+            public long RemainingApplicationMicroservices { get; set; }
+            public long RemainingApplicationMicroservicePages { get; set; }
+            public long RemainingMciDemoMenus { get; set; }
             public long RemainingAppApiEngines { get; set; }
             public long RemainingAppTableDefinitions { get; set; }
             public long RemainingAppFieldDefinitions { get; set; }
@@ -1899,11 +2066,23 @@ return 0";
 
             public long RemainingAppArtifacts =>
                 RemainingApplicationPhysicalTables
-                + RemainingAppApiEngines
                 + RemainingApplicationTableDefinitions
                 + RemainingApplicationFieldDefinitions
+                + RemainingApplicationApiEngines
+                + RemainingApplicationScheduleJobs
+                + RemainingApplicationMicroservices
+                + RemainingApplicationMicroservicePages
+                + RemainingMciDemoMenus
+                + RemainingAppApiEngines
                 + RemainingAiStoreApps
                 + RemainingLegacyAiRows;
+        }
+
+        private sealed class RemovableApplicationResources
+        {
+            public HashSet<string> TableNames { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public HashSet<string> ApiEngineKeys { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            public HashSet<string> AppKeys { get; set; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
     }
 }

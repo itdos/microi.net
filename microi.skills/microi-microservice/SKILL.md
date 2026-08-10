@@ -19,6 +19,7 @@ description: Microi 前端微服务 MicroService 开发与交付指南。用于�
 | 标准单表新增/编辑/查看 | FormEngine / `V8.OpenAnyForm` |
 | 主前端已注册组件 | `V8.OpenDialog` |
 | 3 个以上字段、联动、上传、表格、Tab、步骤条、代码编辑 | MicroService + `V8.OpenAppDialog` |
+| 复杂区域需要固定嵌入表单、独立发布且不进入主前端 | `DevComponent` + MicroService 路由 |
 | 独立菜单、多页面、AI 在线编辑、本地 Vite、独立发布 | MicroService |
 
 ## 默认发现顺序
@@ -101,22 +102,24 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 - 服务器暂未部署修复且产物很小时，可把 `StorageMode=db` 与内联 `ContentBase64` 作为短期恢复手段；必须明确记录为临时方案。修复部署后重新流式发布到公有 HDFS，并恢复 `StorageMode=file`，禁止长期把大 JS/CSS 放在数据库 JSON。
 - 子租户发布时，源码、版本资产、回读验签、页面与缓存全部绑定当前 Token 的 `OsClient`；禁止回退到主租户或宿主服务器默认租户。切换前必须由当前 API 节点通过该子租户 HDFS 配置读回每个版本文件并校验大小/SHA-256。
 
-## 菜单与弹窗
+## 菜单、弹窗与表单嵌入
 
 菜单 `OpenType=MicroService` 时一次绑定 `MicroServiceId`、
 `MicroServicePageId`、`MicroServiceRoutePath`、`MicroServiceKey`。
 完整系统 Manifest 不得固化不同租户会变化的两个 Id；模块声明 `openType=MicroService`、`microServiceKey` 和 `microServiceRoutePath` 即可，由 `microi_generate_system` 在任何写入前回读 `sys_microiservice/sys_microiservice_page`，解析并校验当前租户的 `MicroServiceId/MicroServicePageId`。微服务或页面不存在时必须在首个写操作前失败，不能留下半套系统。
 复杂弹窗用 `V8.OpenAppDialog`，业务参数放 `Data`，回调放顶层。
 
-### 独立、菜单与弹层三种入口
+### 独立、菜单、弹层与表单嵌入四种入口
 
-- 同一发布物必须支持：直接打开独立运行、`sys_menu` 使用 `/micro-app/{AppKey}/{RoutePath}` 打开指定路由、`V8.OpenAppDialog` 按 AppKey/RoutePath 以 Dialog 或 Drawer 打开。
-- 菜单路由必须同时回读并传入 `SysMenuId`、`ModuleEngineKey`、`DiyTableId`；弹层默认继承调用菜单，也允许跨模块时显式传真实授权模块。宿主统一下发 `{ sysMenuId, moduleEngineKey, diyTableId }` 的 `permissionContext`。
+- 同一发布物必须支持：直接打开独立运行、`sys_menu` 使用 `/micro-app/{AppKey}/{RoutePath}` 打开指定路由、`V8.OpenAppDialog` 按 AppKey/RoutePath 以 Dialog 或 Drawer 打开、表单 `DevComponent` 按组件路径别名嵌入指定 RoutePath。
+- 表单嵌入时，在 `microi.routes.json` 的目标页面声明稳定、唯一的 `LegacyComponentPaths`；字段 `Config.DevComponentPath` 与其归一化后匹配。主前端存在同路径 Vue 文件时本地组件优先；不存在时 `DynamicComponentCache` 才交给 MicroService 组件宿主。新项目使用不与 `/src/views` 真实文件冲突的虚拟路径，历史字段无需逐租户改配置。
+- 组件宿主必须下发 `componentMode=true`、可序列化的 `componentData`、当前路由和权限上下文；子应用用 `dev-component:resize` 同步 80～1600px 高度，用 `dev-component:event` 回传 `update:modelValue`、`CallbackFormValueChange`、`FormSet` 或 `ParentFormSet`。禁止依赖父页面 DOM、Vue 实例、函数或 `ParentV8` 跨 iframe 传递。
+- 菜单路由必须同时回读并传入 `SysMenuId`、`ModuleEngineKey`、`DiyTableId`；弹层与表单组件默认继承调用菜单，也允许跨模块时显式传真实授权模块。宿主统一下发 `{ sysMenuId, moduleEngineKey, diyTableId }` 的 `permissionContext`。
 - `permissionContext` 只是选择正确 API 调用上下文，不是授权凭证。后端仍依据 DiyToken、OsClient、角色、菜单、表、按钮和数据范围校验；禁止删除权限参数、改成匿名接口或写死管理员 Token 来消除“没权限”。
 
 ### 独立运行的认证门
 
-- 嵌入菜单或 `V8.OpenAppDialog` 时直接复用宿主 Token，不显示第二套登录页；同一个 V8 SDK 实例继续处理 Token 轮换。
+- 嵌入菜单、表单定制组件或 `V8.OpenAppDialog` 时直接复用宿主 Token，不显示第二套登录页；同一个 V8 SDK 实例继续处理 Token 轮换。
 - 独立访问时先配置当前 `apiBase/osClient` 并复用本地有效 Token；没有有效 Token 才显示吾码帐号密码登录。
 - 页面启动时调用 `V8.GetSysConfig(true)`，用统一 `isEnabledFlag` 解析 `EnableCaptcha`。开启时请求 `GET /api/Captcha/GetCaptcha?OsClient=...`、读取响应头 `captchaid`，登录提交 `_CaptchaId/_CaptchaValue`；关闭时不渲染、不提交验证码字段。
 - 登录使用统一 `V8.Login` 与 DiyToken，不创建第二套用户体系。Token 失效后回到认证门；禁止在 URL、日志、源码、`.env` 或业务数据中保存 Token。
@@ -177,6 +180,7 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 - 组合发布成功前，私有源码回读必须与本地源码在路径集合、文件数、字节数、逐文件 SHA-256 和规范化清单哈希上完全一致；任何缺失、多余或读取错误都要阻止运行版本切换。
 - 直接刷新友好路由与连续切换多个微应用不 404、白屏或实例名冲突。
 - Dialog/Drawer 成功、取消、错误和关闭协议正确。
+- 表单 `DevComponentPath` 能匹配页面 `LegacyComponentPaths`，指定路由正常加载；Add/Edit/View/只读、字段值回写和自动高度均通过。
 - 独立地址覆盖“已有 Token 自动进入”和“无 Token 显示帐号密码”；`EnableCaptcha` 开/关各验一次，验证码响应头和登录参数正确。
 - 宿主 API 请求携带当前 Token/OsClient/`permissionContext`，普通用户用真实授权模块成功、未授权模块仍明确拒绝。
 - 至少验证桌面和窄屏；上传、表格、滚动、弹窗底部操作不被截断。

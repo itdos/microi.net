@@ -86,6 +86,15 @@ export default {
                 menu: this.SysMenuModel,
                 table: this.CurrentDiyTableModel,
                 view: this.ActiveModulePresentationView,
+                fields: uniqueFields([
+                    ...(this.DiyFieldList || []),
+                    ...(this._allFieldList || []),
+                    ...(this.ShowDiyFieldList || []),
+                    ...(this.SysMenuModel?.SelectFields || [])
+                ]),
+                statistics: this.StatisticsFields,
+                rows: this.DiyTableRowList || this._modulePresentationLastRows,
+                rowCount: this.DiyTableRowCount,
                 isPhoneView: this.diyStore.IsPhoneView,
                 embedded: this.PropsEmbedded,
                 isTableChild: this._IsTableChild,
@@ -113,6 +122,7 @@ export default {
                         ? this.DiyTableRowList.length
                         : (this._modulePresentationLastRows || []).length;
                 }
+                if (value === undefined && metric.Value !== undefined) value = metric.Value;
                 if (value === undefined) value = metric.DefaultValue;
                 return {
                     Id: `ViewMetric_${metric.Key || index}`,

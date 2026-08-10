@@ -2493,6 +2493,19 @@ namespace Microi.net
         /// <summary>
         /// 为自定义表添加字段
         /// </summary>
+        private static int GetDefaultMcpTableWidth(string name, string label, string type, string component)
+        {
+            var text = $"{name} {label} {type} {component}".ToLowerInvariant();
+            bool HasAny(params string[] keywords) => keywords.Any(keyword => text.Contains(keyword.ToLowerInvariant()));
+            if (HasAny("richtext", "textarea", "address", "map", "fileupload", "imgupload", "地址", "备注", "说明", "内容", "附件", "图片")) return 240;
+            if (HasAny("name", "title", "subject", "customer", "company", "名称", "标题", "主题", "客户", "企业")) return 200;
+            if (HasAny("datetime", " date", "time", "日期", "时间")) return 170;
+            if (HasAny("numbertext", "decimal", "numeric", "bigint", " int", "amount", "money", "price", "金额", "价格", "数量")) return 140;
+            if (HasAny("phone", "mobile", "email", "autonumber", "code", "编号", "单号", "电话", "手机", "邮箱")) return 160;
+            if (HasAny("select", "radio", "switch", "status", "state", "type", "category", "状态", "类型", "分类")) return 130;
+            return 150;
+        }
+
         public static async Task<DosResult<object>> AddField(
             string osClient, string tableId, string name, string label,
             string type, string component, int visible, int appVisible,
@@ -2565,7 +2578,7 @@ namespace Microi.net
                     Visible = visible,
                     AppVisible = appVisible,
                     Tab = tab ?? "",
-                    TableWidth = tableWidth > 0 ? tableWidth : 120,
+                    TableWidth = tableWidth > 0 ? tableWidth : GetDefaultMcpTableWidth(name, label, type, componentName),
                     Sort = sort > 0 ? sort : 100,
                     NameConfirm = nameConfirm,
                     Readonly = readonlyVal,
@@ -2649,6 +2662,7 @@ namespace Microi.net
             public string CardTitleTagFields { get; set; } = "";
             public string CardBottomTagFields { get; set; } = "";
             public string DefaultOrderBy { get; set; } = "";
+            public string ViewSchema { get; set; } = "";
             public List<string> Warnings { get; } = new List<string>();
         }
 
@@ -2777,7 +2791,242 @@ namespace Microi.net
             return array != null && array.Count > 0 ? array.ToString(Newtonsoft.Json.Formatting.None) : "";
         }
 
-        private static McpMenuDefaults BuildDefaultModuleMenuConfigFromRows(object rawRows, string diyTableId, string diyTableName)
+        private static int McpPresentationTitleScore(McpMenuFieldMeta field)
+        {
+            if (McpHasKeyword(field, "title", "subject", "标题", "主题")) return 150;
+            if (McpHasKeyword(field, "name", "名称")) return 130;
+            if (string.Equals(field.Component, "AutoNumber", StringComparison.OrdinalIgnoreCase)
+                || McpHasKeyword(field, "no", "code", "number", "编号", "单号", "编码")) return 110;
+            return McpListScore(field);
+        }
+
+        private static JObject McpPresentationDescriptor(
+            McpMenuFieldMeta field,
+            string icon = null,
+            string tone = null,
+            string displayStyle = null,
+            string fontWeight = null)
+        {
+            var result = new JObject
+            {
+                ["Name"] = field.Name,
+                ["Label"] = field.Label.DosIsNullOrWhiteSpace() ? field.Name : field.Label
+            };
+            if (!icon.DosIsNullOrWhiteSpace()) result["Icon"] = icon;
+            if (!tone.DosIsNullOrWhiteSpace()) result["Tone"] = tone;
+            if (!displayStyle.DosIsNullOrWhiteSpace()) result["DisplayStyle"] = displayStyle;
+            if (!fontWeight.DosIsNullOrWhiteSpace()) result["FontWeight"] = fontWeight;
+            return result;
+        }
+
+        private static List<McpMenuFieldMeta> McpTakeUnusedPresentationFields(
+            IEnumerable<McpMenuFieldMeta> candidates,
+            int count,
+            HashSet<string> used)
+        {
+            var result = new List<McpMenuFieldMeta>();
+            foreach (var field in candidates ?? Enumerable.Empty<McpMenuFieldMeta>())
+            {
+                if (field == null || field.Name.DosIsNullOrWhiteSpace() || !used.Add(field.Name)) continue;
+                result.Add(field);
+                if (result.Count >= count) break;
+            }
+            return result;
+        }
+
+        private static JObject McpBuildPresentationHero(string title, string description, JArray metrics)
+        {
+            return new JObject
+            {
+                ["Title"] = title,
+                ["Description"] = description,
+                ["Metrics"] = new JArray((metrics ?? new JArray()).Select(item => item.DeepClone()))
+            };
+        }
+
+        private static string BuildDefaultModuleViewSchema(
+            string moduleName,
+            string diyTableName,
+            List<McpMenuFieldMeta> rankedVisible,
+            List<McpMenuFieldMeta> statisticsFields)
+        {
+            rankedVisible = rankedVisible ?? new List<McpMenuFieldMeta>();
+            statisticsFields = statisticsFields ?? new List<McpMenuFieldMeta>();
+            var title = moduleName.DosIsNullOrWhiteSpace()
+                ? (diyTableName.DosIsNullOrWhiteSpace() ? "业务模块" : diyTableName)
+                : moduleName.Trim();
+            var description = $"{title}的业务数据、进度与关键指标";
+            var primary = rankedVisible
+                .OrderByDescending(McpPresentationTitleScore)
+                .ThenBy(field => field.Sort)
+                .FirstOrDefault();
+            var statusFields = rankedVisible
+                .Where(field => field != primary && McpHasKeyword(field,
+                    "status", "state", "type", "category", "stage", "状态", "类型", "分类", "阶段"))
+                .OrderByDescending(McpListScore)
+                .ThenBy(field => field.Sort)
+                .ToList();
+            var numericFields = statisticsFields.Where(field => field != primary).Take(2).ToList();
+            var dateFields = rankedVisible.Where(McpIsDateField).OrderBy(field => field.Sort).ToList();
+            if (!dateFields.Any())
+            {
+                dateFields.Add(new McpMenuFieldMeta
+                {
+                    Id = "CreateTime",
+                    Name = "CreateTime",
+                    Label = "创建时间",
+                    TableName = diyTableName ?? "",
+                    Component = "DateTime",
+                    Type = "varchar(25)",
+                    IsSystem = true
+                });
+            }
+            var lineFields = rankedVisible
+                .Where(field => field != primary && !statusFields.Contains(field) && !numericFields.Contains(field))
+                .OrderByDescending(field => McpHasKeyword(field,
+                    "customer", "member", "user", "owner", "contact", "客户", "会员", "用户", "负责人", "联系人") ? 100 : McpListScore(field))
+                .ThenBy(field => field.Sort)
+                .Take(2)
+                .ToList();
+            var trailingFields = statusFields.Take(1).Concat(numericFields.Take(1))
+                .GroupBy(field => field.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+
+            var metrics = new JArray();
+            var metricVisuals = new[]
+            {
+                new { Icon = "fas fa-chart-column", Tone = "primary" },
+                new { Icon = "fas fa-calculator", Tone = "success" }
+            };
+            for (var index = 0; index < numericFields.Count; index++)
+            {
+                var field = numericFields[index];
+                metrics.Add(new JObject
+                {
+                    ["Key"] = "Aggregate:" + field.Name,
+                    ["Label"] = (field.Label.DosIsNullOrWhiteSpace() ? field.Name : field.Label) + "合计",
+                    ["Source"] = "Field",
+                    ["Field"] = field.Name,
+                    ["Icon"] = metricVisuals[index].Icon,
+                    ["Tone"] = metricVisuals[index].Tone
+                });
+            }
+            metrics.Add(new JObject
+            {
+                ["Key"] = "DataCount",
+                ["Label"] = "筛选结果",
+                ["Source"] = "DataCount",
+                ["Icon"] = "fas fa-layer-group",
+                ["Tone"] = "info"
+            });
+            if (metrics.Count < 3)
+            {
+                metrics.Add(new JObject
+                {
+                    ["Key"] = "PageCount",
+                    ["Label"] = "本页展示",
+                    ["Source"] = "PageCount",
+                    ["Icon"] = "fas fa-list-check",
+                    ["Tone"] = "warning"
+                });
+            }
+
+            var requiredFields = new JArray(new[] { primary }
+                .Where(field => field != null)
+                .Concat(lineFields)
+                .Concat(trailingFields)
+                .GroupBy(field => field.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First().Name));
+            var columns = new JArray();
+            if (primary != null)
+            {
+                var minWidth = Math.Min(520, Math.Max(340,
+                    GetDefaultMcpTableWidth(primary.Name, primary.Label, primary.Type, primary.Component)
+                    + lineFields.Count * 28 + trailingFields.Count * 70));
+                columns.Add(new JObject
+                {
+                    ["Key"] = "composite:" + primary.Name,
+                    ["Field"] = primary.Name,
+                    ["Lines"] = new JArray(lineFields.Select(field => McpPresentationDescriptor(
+                        field, McpIsDateField(field) ? "fas fa-clock" : "fas fa-circle-info", "info"))),
+                    ["TrailingFields"] = new JArray(trailingFields.Select(field => McpPresentationDescriptor(
+                        field,
+                        statusFields.Contains(field) ? "fas fa-circle-check" : "fas fa-coins",
+                        statusFields.Contains(field) ? "success" : "warning",
+                        statusFields.Contains(field) ? "Tag" : "Text"))),
+                    ["RequiredFields"] = requiredFields,
+                    ["Align"] = "Left",
+                    ["MinWidth"] = minWidth
+                });
+            }
+
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (primary != null) used.Add(primary.Name);
+            var cardSubtitle = McpTakeUnusedPresentationFields(lineFields, 1, used);
+            var cardStatus = McpTakeUnusedPresentationFields(statusFields, 1, used);
+            var cardTop = McpTakeUnusedPresentationFields(statusFields, 1, used);
+            var cardRight = McpTakeUnusedPresentationFields(numericFields, 1, used);
+            var cardMeta = McpTakeUnusedPresentationFields(dateFields, 2, used);
+            var cardContent = McpTakeUnusedPresentationFields(rankedVisible, 2, used);
+            var cardBottom = McpTakeUnusedPresentationFields(numericFields.Concat(dateFields), 2, used);
+            var card = new JObject
+            {
+                ["Preset"] = "Business",
+                ["AvatarTextField"] = primary?.Name ?? "",
+                ["TitleField"] = primary?.Name ?? "",
+                ["SubtitleFields"] = new JArray(cardSubtitle.Select(field => McpPresentationDescriptor(field, "fas fa-circle-info", "info"))),
+                ["StatusFields"] = new JArray(cardStatus.Select(field => McpPresentationDescriptor(field, "fas fa-circle-check", "success", "Tag"))),
+                ["TopFields"] = new JArray(cardTop.Select(field => McpPresentationDescriptor(field, "fas fa-tag", "primary", "Tag"))),
+                ["RightFields"] = new JArray(cardRight.Select(field => McpPresentationDescriptor(field, "fas fa-coins", "danger", null, "700"))),
+                ["Fields"] = new JArray(cardContent.Select(field => McpPresentationDescriptor(field))),
+                ["MetaFields"] = new JArray(cardMeta.Select(field => McpPresentationDescriptor(field, "fas fa-clock", "info"))),
+                ["BottomFields"] = new JArray(cardBottom.Select(field => McpPresentationDescriptor(field,
+                    McpIsDateField(field) ? "fas fa-calendar" : "fas fa-chart-simple", "warning"))),
+                ["HideIndex"] = true,
+                ["ShowCreateTime"] = cardMeta.Count == 0,
+                ["ShowUpdateTime"] = false
+            };
+
+            var views = new JArray
+            {
+                new JObject
+                {
+                    ["Key"] = "auto-list-pc",
+                    ["Scene"] = "List",
+                    ["Device"] = "PC",
+                    ["Priority"] = 100,
+                    ["Layout"] = new JObject
+                    {
+                        ["Hero"] = McpBuildPresentationHero(title, description, metrics),
+                        ["List"] = new JObject
+                        {
+                            ["Density"] = "Compact",
+                            ["Columns"] = columns
+                        }
+                    }
+                },
+                new JObject
+                {
+                    ["Key"] = "auto-card-mobile",
+                    ["Scene"] = "Card",
+                    ["Device"] = "Mobile",
+                    ["Priority"] = 100,
+                    ["Layout"] = new JObject
+                    {
+                        ["Hero"] = McpBuildPresentationHero(title, description, metrics),
+                        ["Card"] = card
+                    }
+                }
+            };
+            return new JObject { ["Views"] = views }.ToString(Newtonsoft.Json.Formatting.None);
+        }
+
+        private static McpMenuDefaults BuildDefaultModuleMenuConfigFromRows(
+            object rawRows,
+            string diyTableId,
+            string diyTableName,
+            string moduleName = null)
         {
             var defaults = new McpMenuDefaults();
             if (diyTableId.DosIsNullOrWhiteSpace()) return defaults;
@@ -2869,6 +3118,11 @@ namespace Microi.net
             defaults.MobileListFields = McpJson(new JArray(mobileFields.Select(f => McpToMenuFieldObject(f))));
             defaults.CardTitleTagFields = McpJson(new JArray(cardTitleFields.Select(f => McpToMenuFieldObject(f))));
             defaults.CardBottomTagFields = McpJson(new JArray(cardBottomFields.Select(f => McpToMenuFieldObject(f))));
+            defaults.ViewSchema = BuildDefaultModuleViewSchema(
+                moduleName,
+                diyTableName,
+                rankedVisible,
+                statisticsFields);
             if (defaultOrder != null)
             {
                 defaults.DefaultOrderBy = new JArray
@@ -2886,7 +3140,11 @@ namespace Microi.net
             return defaults;
         }
 
-        private static async Task<McpMenuDefaults> BuildDefaultModuleMenuConfig(string osClient, string diyTableId, string diyTableName)
+        private static async Task<McpMenuDefaults> BuildDefaultModuleMenuConfig(
+            string osClient,
+            string diyTableId,
+            string diyTableName,
+            string moduleName)
         {
             var defaults = new McpMenuDefaults();
             if (diyTableId.DosIsNullOrWhiteSpace()) return defaults;
@@ -2913,7 +3171,7 @@ namespace Microi.net
                     // GetTableDataAsync<dynamic> keeps Data/items dynamic. Cross the boundary as
                     // object before JObject conversion so all following string values stay statically
                     // typed and extension-method dispatch cannot leak into the runtime binder.
-                    return BuildDefaultModuleMenuConfigFromRows((object)result.Data, diyTableId, diyTableName);
+                    return BuildDefaultModuleMenuConfigFromRows((object)result.Data, diyTableId, diyTableName, moduleName);
                 }
                 if (result.Code != 1)
                 {
@@ -3142,7 +3400,7 @@ namespace Microi.net
 
                 if (!diyTableId.DosIsNullOrWhiteSpace())
                 {
-                    var menuDefaults = await BuildDefaultModuleMenuConfig(osClient, diyTableId, diyTableName);
+                    var menuDefaults = await BuildDefaultModuleMenuConfig(osClient, diyTableId, diyTableName, name);
                     if (searchFieldIds.DosIsNullOrWhiteSpace()) searchFieldIds = menuDefaults.SearchFieldIds;
                     if (tableDiyFieldIds.DosIsNullOrWhiteSpace()) tableDiyFieldIds = menuDefaults.TableDiyFieldIds;
                     if (selectFields.DosIsNullOrWhiteSpace()) selectFields = menuDefaults.SelectFields;
@@ -3153,6 +3411,15 @@ namespace Microi.net
                     if (cardTitleTagFields.DosIsNullOrWhiteSpace()) cardTitleTagFields = menuDefaults.CardTitleTagFields;
                     if (cardBottomTagFields.DosIsNullOrWhiteSpace()) cardBottomTagFields = menuDefaults.CardBottomTagFields;
                     if (defaultOrderBy.DosIsNullOrWhiteSpace()) defaultOrderBy = menuDefaults.DefaultOrderBy;
+                    var visibleDiyModule = (display == 1 || appDisplay == 1)
+                        && !isMicroServiceMenu
+                        && (openType.DosIsNullOrWhiteSpace() || string.Equals(openType, "Diy", StringComparison.OrdinalIgnoreCase));
+                    if (viewSchema.DosIsNullOrWhiteSpace() && visibleDiyModule)
+                    {
+                        viewSchema = menuDefaults.ViewSchema;
+                        viewSchemaNormalized = NormalizeViewSchemaJson(viewSchema);
+                        if (!viewSchemaNormalized.Ok) return new DosResult<object>(0, null, viewSchemaNormalized.Msg);
+                    }
                     if (menuDefaults.Warnings.Any()) buttonWarnings.AddRange(menuDefaults.Warnings);
                 }
 

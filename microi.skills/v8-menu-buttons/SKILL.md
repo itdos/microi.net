@@ -80,6 +80,17 @@ return {
 生命周期里单独查数量；后端应按 `Ids` 批量 `GROUP BY`，并继续应用租户、菜单和数据权限。
 统计失败只隐藏角标，不能阻断按钮本身或 PageTab 切换。
 
+### JsonTable 内嵌选择器的数据源代理
+
+`PageTabs/MoreBtns/PageBtns/BatchSelectMoreBtns/ExportMoreBtns/FormBtns` 都是 `JsonTable` 字段，
+其中的列对象不是独立 `diy_field`。内嵌 `Select/Radio/Checkbox/Autocomplete/Cascader/SelectTree`
+一旦使用 `Sql/DataSource/ApiEngine` 服务端数据源，必须在列的 `Config.DataSourceFieldId` 中填写
+同租户、同表内一个真实且权限等价的 `diy_field.Id`。禁止把内嵌列的 `Key` 或列 `Id` 当成
+字段 Id，否则打开“模块设计-按钮”时会触发“DiyField 数据不存在”，并使同批字段数据加载失败。
+
+远程 SQL 搜索还应同时设置 `DataSourceSqlRemote=true`，使用 `$Keyword$` 参数并限制返回条数；
+应用包回归测试必须逐个校验所有按钮集合的代理字段真实存在、保存字段/显示字段一致。
+
 ### PageTabs 关联模块
 
 - 列表页固定顺序为“模块 Hero（标题/副标题/动态指标）→ PageTabs → 查询与表格”；PageTabs 不能渲染到 Hero 上方，也不能重复承担模块标题。

@@ -33,6 +33,9 @@ function projectStoreRows(storeRows) {
       PackageIsValid: packageIsValid,
       DiyTableNamesJson: packageModel?.DiyTables
         ? JSON.stringify(packageModel.DiyTables.map((table) => table.Name))
+        : null,
+      ApiEngineKeysJson: packageModel?.SysApiEngines
+        ? JSON.stringify(packageModel.SysApiEngines.map((engine) => engine.ApiEngineKey))
         : null
     }
   })
@@ -53,12 +56,19 @@ function run(storeRows, options = {}) {
     Db: {
       FromSql(sql) {
         queries.push(sql)
+        if (/FROM\s+sys_apiengine/i.test(sql)) {
+          return { ToArray: () => options.evidenceEngineRows || [] }
+        }
         return { ToArray: () => projectStoreRows(storeRows) }
       }
     },
     FormEngine: {
       GetTableData(key, query) {
         const pageIndex = Number(query._PageIndex || 1) - 1
+        if (key === 'diy_table' && Array.isArray(query.Ids)) {
+          const requested = new Set(query.Ids)
+          return { Code: 1, Data: tablePages.flat().filter((row) => requested.has(row.Id)) }
+        }
         if (key === 'diy_table') return { Code: 1, Data: tablePages[pageIndex] || [] }
         if (key === 'sys_menu') return { Code: 1, Data: menuPages[pageIndex] || [] }
         return { Code: 0, Msg: `unexpected table ${key}` }
@@ -91,10 +101,52 @@ test('non-platform package tables and StoreId menu tables enter the cleanup SQL'
   assert.match(result.Data.Sql, /\('BusinessLegacy'\)/)
   assert.match(result.Data.Sql, /\('ExtraLegacy'\)/)
   assert.doesNotMatch(result.Data.Sql, /temp_app_owned_tables \(Name\) VALUES[^;]*\('sys_menu'\)/)
-  assert.match(result.Data.Sql, /<> 'PLATFORM'/)
+  assert.match(result.Data.Sql, /LIKE 'app\.microi\.%'/)
   assert.equal(result.Data.StoreCount, 2)
   assert.equal(result.Data.ApplicationOwnedTableCount, 2)
   assert.deepEqual(result.Data.ApplicationOwnedTables, ['BusinessLegacy', 'ExtraLegacy'])
+})
+
+test('misclassified business Platform app, package engines, jobs and mci_demo evidence are removed', () => {
+  const { result } = run([
+    {
+      Id: 'platform-app',
+      AppKey: 'app.microi.module-engine',
+      ApplicationType: 'Platform',
+      AppPakcet: JSON.stringify({
+        DiyTables: [{ Name: 'sys_menu' }],
+        SysApiEngines: [{ ApiEngineKey: 'app_platform_core' }]
+      })
+    },
+    {
+      Id: 'content-app',
+      AppKey: 'ai-content-operations',
+      ApplicationType: 'Platform',
+      AppPakcet: JSON.stringify({
+        DiyTables: [{ Name: 'mci_ai_content_plan' }, { Name: 'mci_ai_publish_task' }],
+        SysApiEngines: [
+          { ApiEngineKey: 'mci-ai-content-dispatch' },
+          { ApiEngineKey: 'mci-ai-content-recover' }
+        ]
+      })
+    }
+  ], {
+    evidenceEngineRows: [{ ApiEngineKey: 'mci_demo_ai_output_contract_lab' }]
+  })
+
+  assert.equal(result.Code, 1)
+  assert.deepEqual(result.Data.ApplicationOwnedTables, ['mci_ai_content_plan', 'mci_ai_publish_task'])
+  assert.deepEqual(result.Data.ApplicationOwnedEngineKeys, [
+    'mci-ai-content-dispatch',
+    'mci-ai-content-recover',
+    'mci_demo_ai_output_contract_lab'
+  ])
+  assert.doesNotMatch(result.Data.Sql, /temp_app_owned_tables \(Name\) VALUES[^;]*\('sys_menu'\)/)
+  assert.doesNotMatch(result.Data.Sql, /temp_app_owned_engines \(KeyName\) VALUES[^;]*\('app_platform_core'\)/)
+  assert.match(result.Data.Sql, /DELETE c FROM microi_job_cron_triggers c/)
+  assert.match(result.Data.Sql, /DELETE d FROM microi_job_job_details d/)
+  assert.match(result.Data.Sql, /LEFT\(LOWER\(COALESCE\(ApiEngineKey, ''\)\), 9\) = 'mci_demo_'/)
+  assert.match(result.Data.Sql, /m\.Name = '文章关联微服务'/)
 })
 
 test('invalid non-empty AppPakcet stops release before SQL execution', () => {
@@ -105,7 +157,7 @@ test('invalid non-empty AppPakcet stops release before SQL execution', () => {
   assert.match(result.Msg, /AppPakcet.*合法 JSON/)
 })
 
-test('large metadata lists are read through every page', () => {
+test('menu-owned table lookup reads only the referenced diy_table ids', () => {
   const firstPage = Array.from({ length: 5000 }, (_, index) => ({
     Id: `table-${index}`,
     Name: `PlatformTable${index}`
@@ -126,10 +178,14 @@ test('store packages use compact MySQL JSON projection instead of loading packag
   const { result, queries } = run([])
 
   assert.equal(result.Code, 1)
-  assert.equal(queries.length, 1)
+  assert.equal(queries.length, 2)
   assert.match(queries[0], /JSON_VALID\(AppPakcet\)/)
+  assert.match(queries[0], /JSON_EXTRACT\(SelectTable, '\$\[\*\]\.Name'\)/)
   assert.match(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.DiyTables\[\*\]\.Name'\)/)
+  assert.match(queries[0], /JSON_EXTRACT\(SelectApiEngine, '\$\[\*\]\.ApiEngineKey'\)/)
+  assert.match(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.SysApiEngines\[\*\]\.ApiEngineKey'\)/)
   assert.doesNotMatch(queries[0].split(/\bCASE\b/i, 1)[0], /\bAppPakcet\b/i)
+  assert.match(queries[1], /FROM sys_apiengine/)
 })
 
 test('empty database SQL clears credentials and operational residue but keeps core table structures', () => {

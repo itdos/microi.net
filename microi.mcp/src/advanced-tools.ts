@@ -1009,6 +1009,199 @@ function defaultCardBottomFields(fields: FieldMeta[]): FieldMeta[] {
   }).slice(0, 3);
 }
 
+function presentationFieldMeta(value: unknown, index = 0): FieldMeta | null {
+  const field = asRecord(value);
+  const name = getString(field, 'name', 'Name');
+  if (!name) return null;
+  return {
+    id: getString(field, 'id', 'Id') || name,
+    name,
+    label: getString(field, 'label', 'Label') || name,
+    tableId: getString(field, 'tableId', 'TableId'),
+    tableName: getString(field, 'tableName', 'TableName'),
+    tableDescription: getString(field, 'tableDescription', 'TableDescription'),
+    component: getString(field, 'component', 'Component') || 'Text',
+    type: getString(field, 'type', 'Type') || 'varchar(500)',
+  };
+}
+
+/** Stable semantic list width used when AI/Manifest callers omit TableWidth. */
+export function inferTableColumnWidth(value: unknown): number {
+  const field = presentationFieldMeta(value);
+  if (!field) return 150;
+  const text = fieldText(field);
+  const component = componentKey(field);
+  if (['richtext', 'textarea', 'address', 'map', 'maparea', 'fileupload', 'imgupload'].includes(component)
+    || hasKeyword(text, ['address', 'remark', 'description', 'content', '地址', '备注', '说明', '内容', '附件', '图片'])) return 240;
+  if (hasKeyword(text, ['name', 'title', 'subject', 'customer', 'company', '名称', '标题', '主题', '客户', '企业'])) return 200;
+  if (isDateField(field)) return 170;
+  if (isNumericField(field)) return 140;
+  if (component === 'autonumber' || hasKeyword(text, ['phone', 'mobile', 'email', 'code', 'number', '编号', '单号', '电话', '手机', '邮箱'])) return 160;
+  if (EXACT_SEARCH_COMPONENTS.has(component) || hasKeyword(text, ['status', 'state', 'type', 'category', '状态', '类型', '分类'])) return 130;
+  return 150;
+}
+
+function presentationDescriptor(field: FieldMeta, extras: JsonRecord = {}): JsonRecord {
+  return {
+    Name: field.name,
+    Label: field.label || field.name,
+    ...extras,
+  };
+}
+
+function takeUnusedPresentationFields(candidates: FieldMeta[], count: number, used: Set<string>): FieldMeta[] {
+  const result: FieldMeta[] = [];
+  for (const field of candidates) {
+    if (!field?.name || used.has(lower(field.name))) continue;
+    used.add(lower(field.name));
+    result.push(field);
+    if (result.length >= count) break;
+  }
+  return result;
+}
+
+/**
+ * Minimum production-ready List/Card presentation for every visible bound module.
+ * It intentionally contains no Detail/Edit views, so EnableViewSchema remains a
+ * custom-form switch only. Metrics are real field aggregates/list counts; never random.
+ */
+export function buildDefaultModulePresentation(
+  moduleName: string,
+  rawFields: unknown[],
+  tableDescription = '',
+): JsonRecord {
+  const fields = rawFields.map(presentationFieldMeta).filter(Boolean) as FieldMeta[];
+  const visible = defaultListFields(fields);
+  const title = String(moduleName || tableDescription || fields[0]?.tableDescription || fields[0]?.tableName || '业务模块').trim();
+  const descriptionSource = String(tableDescription || fields[0]?.tableDescription || '').trim();
+  const description = descriptionSource && descriptionSource !== title
+    ? descriptionSource
+    : `${title}的业务数据、进度与关键指标`;
+  const primary = rankedFields(visible, (field) => {
+    const text = fieldText(field);
+    if (hasKeyword(text, ['title', 'subject', '标题', '主题'])) return 150;
+    if (hasKeyword(text, ['name', '名称'])) return 130;
+    if (componentKey(field) === 'autonumber' || hasKeyword(text, ['no', 'code', 'number', '编号', '单号', '编码'])) return 110;
+    return listFieldScore(field);
+  })[0] || visible[0];
+  const statusCandidates = rankedFields(visible.filter((field) => field !== primary), (field) => (
+    hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'stage', '状态', '类型', '分类', '阶段']) ? 100 : 0
+  )).filter((field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'stage', '状态', '类型', '分类', '阶段']));
+  const numericCandidates = defaultStatisticsFields(fields).filter((field) => field !== primary);
+  const dateCandidates = rankedFields(fields.filter(isDateField), (field) => hasKeyword(fieldText(field), ['create', '创建']) ? 100 : 50);
+
+  const lineCandidates = rankedFields(visible.filter((field) => field !== primary
+    && !statusCandidates.includes(field)
+    && !numericCandidates.includes(field)), (field) => {
+    const text = fieldText(field);
+    if (hasKeyword(text, ['customer', 'member', 'user', 'owner', 'contact', '客户', '会员', '用户', '负责人', '联系人'])) return 90;
+    if (isDateField(field)) return 70;
+    return listFieldScore(field);
+  }).slice(0, 2);
+  const trailingFields = uniqueFields([...statusCandidates.slice(0, 1), ...numericCandidates.slice(0, 1)]);
+  const requiredFields = uniqueFields([primary, ...lineCandidates, ...trailingFields].filter(Boolean) as FieldMeta[])
+    .map((field) => field.name);
+  const compositeWidth = primary
+    ? Math.min(520, Math.max(340, inferTableColumnWidth(primary) + (lineCandidates.length * 28) + (trailingFields.length * 70)))
+    : 0;
+
+  const metricVisuals = [
+    { Icon: 'fas fa-chart-column', Tone: 'primary' },
+    { Icon: 'fas fa-calculator', Tone: 'success' },
+  ];
+  const metrics: JsonRecord[] = numericCandidates.slice(0, 2).map((field, index) => ({
+    Key: `Aggregate:${field.name}`,
+    Label: `${field.label || field.name}合计`,
+    Source: 'Field',
+    Field: field.name,
+    ...metricVisuals[index],
+  }));
+  metrics.push({
+    Key: 'DataCount',
+    Label: '筛选结果',
+    Source: 'DataCount',
+    Icon: 'fas fa-layer-group',
+    Tone: 'info',
+  });
+  if (metrics.length < 3) {
+    metrics.push({
+      Key: 'PageCount',
+      Label: '本页展示',
+      Source: 'PageCount',
+      Icon: 'fas fa-list-check',
+      Tone: 'warning',
+    });
+  }
+
+  const used = new Set<string>(primary ? [lower(primary.name)] : []);
+  const cardSubtitle = takeUnusedPresentationFields(lineCandidates, 1, used);
+  const cardStatus = takeUnusedPresentationFields(statusCandidates, 1, used);
+  const cardTop = takeUnusedPresentationFields(statusCandidates, 1, used);
+  const cardRight = takeUnusedPresentationFields(numericCandidates, 1, used);
+  const cardMeta = takeUnusedPresentationFields(dateCandidates, 2, used);
+  const cardContent = takeUnusedPresentationFields(visible, 2, used);
+  const cardBottom = takeUnusedPresentationFields([...numericCandidates, ...dateCandidates], 2, used);
+
+  const hero = {
+    Title: title,
+    Description: description,
+    Metrics: metrics,
+  };
+  return {
+    Views: [
+      {
+        Key: 'auto-list-pc',
+        Scene: 'List',
+        Device: 'PC',
+        Priority: 100,
+        Layout: {
+          Hero: hero,
+          List: {
+            Density: 'Compact',
+            Columns: primary ? [{
+              Key: `composite:${primary.name}`,
+              Field: primary.name,
+              Lines: lineCandidates.map((field) => presentationDescriptor(field, { Icon: isDateField(field) ? 'fas fa-clock' : 'fas fa-circle-info', Tone: 'info' })),
+              TrailingFields: trailingFields.map((field) => presentationDescriptor(field, {
+                Icon: statusCandidates.includes(field) ? 'fas fa-circle-check' : 'fas fa-coins',
+                Tone: statusCandidates.includes(field) ? 'success' : 'warning',
+                DisplayStyle: statusCandidates.includes(field) ? 'Tag' : 'Text',
+              })),
+              RequiredFields: requiredFields,
+              Align: 'Left',
+              MinWidth: compositeWidth,
+            }] : [],
+          },
+        },
+      },
+      {
+        Key: 'auto-card-mobile',
+        Scene: 'Card',
+        Device: 'Mobile',
+        Priority: 100,
+        Layout: {
+          Hero: { ...hero, Metrics: metrics.map((metric) => ({ ...metric })) },
+          Card: {
+            Preset: 'Business',
+            AvatarTextField: primary?.name || '',
+            TitleField: primary?.name || '',
+            SubtitleFields: cardSubtitle.map((field) => presentationDescriptor(field, { Icon: 'fas fa-circle-info', Tone: 'info' })),
+            StatusFields: cardStatus.map((field) => presentationDescriptor(field, { DisplayStyle: 'Tag', Icon: 'fas fa-circle-check', Tone: 'success' })),
+            TopFields: cardTop.map((field) => presentationDescriptor(field, { DisplayStyle: 'Tag', Icon: 'fas fa-tag', Tone: 'primary' })),
+            RightFields: cardRight.map((field) => presentationDescriptor(field, { Icon: 'fas fa-coins', Tone: 'danger', FontWeight: '700' })),
+            Fields: cardContent.map((field) => presentationDescriptor(field)),
+            MetaFields: cardMeta.map((field) => presentationDescriptor(field, { Icon: 'fas fa-clock', Tone: 'info' })),
+            BottomFields: cardBottom.map((field) => presentationDescriptor(field, { Icon: isDateField(field) ? 'fas fa-calendar' : 'fas fa-chart-simple', Tone: 'warning' })),
+            HideIndex: true,
+            ShowCreateTime: cardMeta.length === 0,
+            ShowUpdateTime: false,
+          },
+        },
+      },
+    ],
+  };
+}
+
 function defaultOrderByFromFields(fields: FieldMeta[], tableId: string, tableName: string): string | undefined {
   const candidates = fields.length ? fields : [systemFieldMeta(tableId, tableName, 'CreateTime')];
   const field = candidates.find((item) => lower(item.name) === 'createtime')
@@ -1622,6 +1815,29 @@ function modulePayload(module: JsonRecord, tableIdByName: Map<string, string>, m
   const diyTableId = getString(module, 'diyTableId', 'DiyTableId') || (tableRef ? tableIdByName.get(tableRef.toLowerCase()) : '');
   const tableName = tableRef || getString(module, 'DiyTableName', 'diyTableName');
   const resolvedFields = fieldLookup ? resolveModuleFields(module, fieldLookup, diyTableId || '', tableName) : {};
+  const display = getNumber(module, 'display', 'Display') ?? 1;
+  const appDisplay = getNumber(module, 'appDisplay', 'AppDisplay') ?? 1;
+  const openType = getString(module, 'openType', 'OpenType') || 'Diy';
+  let effectiveViewSchema = normalized.data.ViewSchema;
+  if (!effectiveViewSchema
+    && fieldLookup
+    && diyTableId
+    && (display === 1 || appDisplay === 1)
+    && lower(openType) === 'diy') {
+    const tableFields = getFieldsForTable(fieldLookup, diyTableId).length
+      ? getFieldsForTable(fieldLookup, diyTableId)
+      : getFieldsForTable(fieldLookup, tableName);
+    if (tableFields.length) {
+      const generated = buildDefaultModulePresentation(
+        getString(module, 'name', 'Name'),
+        tableFields,
+        tableFields[0]?.tableDescription || tableName,
+      );
+      const normalizedGenerated = normalizeViewSchemaJson(generated);
+      if (!normalizedGenerated.ok) throw new Error(normalizedGenerated.errors.join('\n'));
+      effectiveViewSchema = normalizedGenerated.value;
+    }
+  }
   const payload = compactObject({
     ...normalized.data,
     ...resolvedFields,
@@ -1630,10 +1846,10 @@ function modulePayload(module: JsonRecord, tableIdByName: Map<string, string>, m
     ParentId: getString(module, 'parentId', 'ParentId') || (moduleIdByName ? moduleIdByName.get(getString(module, 'parentName', 'ParentName').toLowerCase()) : undefined),
     ComponentName: getString(module, 'componentName', 'ComponentName'),
     ComponentPath: getString(module, 'componentPath', 'ComponentPath'),
-    Display: getNumber(module, 'display', 'Display') ?? 1,
-    AppDisplay: getNumber(module, 'appDisplay', 'AppDisplay') ?? 1,
+    Display: display,
+    AppDisplay: appDisplay,
     HasChild: getNumber(module, 'hasChild', 'HasChild'),
-    OpenType: getString(module, 'openType', 'OpenType'),
+    OpenType: openType,
     Url: getString(module, 'url', 'Url'),
     Sort: getNumber(module, 'sort', 'Sort'),
     Icon: getString(module, 'icon', 'Icon'),
@@ -1654,10 +1870,10 @@ function modulePayload(module: JsonRecord, tableIdByName: Map<string, string>, m
     CardBottomTagFields: getExplicitJsonString(module, 'cardBottomTagFields', 'CardBottomTagFields') || resolvedFields.CardBottomTagFields,
     MenuBadgeEnabled: getNumber(module, 'menuBadgeEnabled', 'MenuBadgeEnabled'),
     MenuBadgeApiEngineKey: getString(module, 'menuBadgeApiEngineKey', 'MenuBadgeApiEngineKey'),
-    EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema'),
-    ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion'),
-    ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion'),
-    ViewSchema: normalized.data.ViewSchema,
+    EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema') ?? 0,
+    ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion') || (effectiveViewSchema ? '1.0' : undefined),
+    ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion') ?? (effectiveViewSchema ? 1 : undefined),
+    ViewSchema: effectiveViewSchema,
     IsMicroiService: getNumber(module, 'isMicroiService', 'IsMicroiService'),
     MicroServiceId: getString(module, 'microServiceId', 'MicroServiceId'),
     MicroServicePageId: getString(module, 'microServicePageId', 'MicroServicePageId'),
@@ -2022,7 +2238,7 @@ function manifestFieldPayload(
     Visible: getNumber(field, 'visible', 'Visible') ?? 1,
     AppVisible: getNumber(field, 'appVisible', 'AppVisible') ?? 1,
     Tab: getString(field, 'tab', 'Tab') || tableLayout.fieldTabs.get(getString(field, 'name', 'Name')),
-    TableWidth: getNumber(field, 'tableWidth', 'TableWidth'),
+    TableWidth: getNumber(field, 'tableWidth', 'TableWidth') ?? inferTableColumnWidth(field),
     Sort: getNumber(field, 'sort', 'Sort'),
     Readonly: getNumber(field, 'readonly', 'Readonly'),
     NotEmpty: getNumber(field, 'notEmpty', 'NotEmpty'),
@@ -2063,7 +2279,9 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         fields: [
           { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
           { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', tab: 'basic', notEmpty: 1, tableWidth: 160, sort: 20 },
-          { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, sort: 30 },
+          { name: 'OwnerName', label: 'Owner', type: 'varchar(100)', component: 'Text', tab: 'basic', tableWidth: 150, sort: 30 },
+          { name: 'Amount', label: 'Order Amount', type: 'decimal(18,2)', component: 'NumberText', tab: 'business', tableWidth: 140, sort: 40 },
+          { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, tableWidth: 130, sort: 50 },
         ],
         indexes: [
           { name: 'uk_biz_order_osclient_orderno', columns: ['OsClient', 'OrderNo'], unique: true, purpose: 'Tenant-scoped order number invariant' },
@@ -2094,7 +2312,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         name: 'Orders',
         table: 'Biz_Order',
         icon: 'Document',
-        listFields: ['OrderNo', 'CustomerName', 'Status', 'CreateTime'],
+        listFields: ['OrderNo', 'CustomerName', 'OwnerName', 'Amount', 'Status', 'CreateTime'],
         searchFields: ['OrderNo', 'CustomerName', 'Status'],
         sortFields: ['CreateTime'],
         defaultOrderBy: [{ field: 'CreateTime', type: 'DESC' }],
@@ -2112,15 +2330,21 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
               Layout: {
                 Hero: {
                   Title: 'Orders',
-                  Metrics: [{ Key: 'pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', Tone: 'warning' }],
+                  Description: 'Track order value, pending work and current filtered results',
+                  Metrics: [
+                    { Key: 'pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', Icon: 'fas fa-clock', Tone: 'warning' },
+                    { Key: 'amount', Label: 'Order Amount', Source: 'Field', Field: 'Amount', Icon: 'fas fa-coins', Tone: 'success' },
+                    { Key: 'records', Label: 'Filtered Results', Source: 'DataCount', Icon: 'fas fa-layer-group', Tone: 'info' },
+                  ],
                 },
                 List: {
                   Density: 'Comfortable',
                   Columns: [{
                     Field: 'OrderNo',
                     Lines: [{ Name: 'CustomerName', Label: 'Customer', ShowLabel: true, Tone: 'info' }],
-                    TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
-                    RequiredFields: ['CustomerName', 'Status'],
+                    TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }, { Name: 'Amount', Icon: 'fas fa-coins', Tone: 'warning' }],
+                    RequiredFields: ['CustomerName', 'Status', 'Amount'],
+                    MinWidth: 380,
                   }],
                 },
               },
@@ -2143,12 +2367,12 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
                   AvatarTextField: 'CustomerName',
                   TitleField: 'OrderNo',
                   SubtitleFields: ['CustomerName'],
-                  StatusField: 'Status',
-                  TopFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                  StatusFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                  TopFields: [],
                   RightFields: [{ Name: 'Amount', Format: 'currency', Tone: 'danger' }],
-                  Fields: [{ Name: 'CustomerName', Label: 'Customer' }, { Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
+                  Fields: [{ Name: 'OwnerName', Label: 'Owner' }],
                   MetaFields: [{ Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
-                  BottomFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                  BottomFields: [],
                 },
               },
             },
@@ -2245,7 +2469,7 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
         enableViewSchema: 'Set to 1 only when Detail/Edit should use custom form views. Configured List/Card presentation is always applied and does not depend on this switch.',
         viewSchemaVersion: 'Optional protocol version. Blank or omitted values resolve to 1.0.',
         viewConfigVersion: 'Optional monotonic configuration version. Omitted values resolve to 1 and later changes increment it.',
-        viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Layout.List supports multi-line columns and trailing fields; Layout.Card supports top/right/body/meta/bottom field groups. The full declarative object is preserved. Use ActionSchema only; never place arbitrary client V8Code in mobile actions.',
+        viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Every visible bound module gets generated List/Card defaults when omitted, but AI must still business-tune Hero metrics, composite columns and mobile regions. Layout.List supports multi-line columns and trailing fields; Layout.Card supports top/right/body/meta/bottom field groups. The full declarative object is preserved. Use ActionSchema only; never place arbitrary client V8Code in mobile actions.',
       },
     },
     rules: [
@@ -2258,6 +2482,10 @@ export function manifestGuide(osClient: string | undefined): JsonRecord {
       'Never infer v8Unlimited=true from data volume alone. Enable it only for an explicit single-transaction requirement after warning about database locks, rollback cost, connection timeout and process memory; the resident-memory guard remains active.',
       'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
       'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
+      'Every visible bound business module must have a compact Hero title, a real business subtitle and 2-4 meaningful dynamic metrics. Prefer pending/overdue/amount/capacity/risk aggregates; DataCount/PageCount are truthful fallback only. Never generate random or fabricated statistics.',
+      'Give every list field a semantic TableWidth. Build at least one PC composite column with a reasonable MinWidth, remove its Lines/TrailingFields from standalone columns, and configure mobile title/subtitle/top/status/right/body/meta/bottom regions without repeating the same field.',
+      'Use sidebar menu badges only for a small set of actionable important menus. Add PageTabs and More/Page/Form/Batch/Export button badges when their counts help the workflow; batch one statistics API and never issue N+1 requests.',
+      'EnableViewSchema controls Detail/Edit custom forms only. List/Card presentation and generated Hero/metrics remain active when it is 0.',
       'Do not use diy_table.DiyConfig, diy_field.DiyConfig or sys_menu.DiyConfig for new configuration. Add dedicated physical columns and expose them through DIY metadata.',
       'For forms with many fields, use diy_table.Tabs first. Use CollapseGroup for optional/secondary sections and field component Tabs for nested in-page grouping.',
       'Use dryRun=true until the user explicitly asks to write.',

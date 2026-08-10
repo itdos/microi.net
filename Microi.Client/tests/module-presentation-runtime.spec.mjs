@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import {
+    buildAutomaticPresentationMetrics,
     collectBadgeApiGroups,
     formatBadgeValue,
     getValueByPath,
@@ -15,20 +16,50 @@ import {
 test("top-level desktop lists receive a compact default header without enabling ViewSchema", () => {
     const header = resolveListPresentationHeader({
         menu: { Name: "全量测试(勿删)", EnableViewSchema: 0 },
-        table: { Description: "测试模块" }
+        table: { Description: "测试模块" },
+        fields: [
+            { Name: "TotalAmount", Label: "总金额", Component: "NumberText", Type: "decimal(18,2)" },
+            { Name: "Status", Label: "状态", Component: "Select", Type: "varchar(25)" }
+        ],
+        statistics: { TotalAmount: 320.5 },
+        rows: [{ Status: "待处理" }, { Status: "已完成" }],
+        rowCount: 18
     });
     assert.equal(header.Visible, true);
     assert.equal(header.IsDefault, true);
     assert.equal(header.Title, "全量测试(勿删)");
-    assert.deepEqual(header.Metrics, []);
+    assert.equal(header.Description, "测试模块");
+    assert.deepEqual(header.Metrics.map((metric) => metric.Label), ["总金额合计", "筛选结果", "本页待处理"]);
 
     assert.equal(resolveListPresentationHeader({ menu: { Name: "子表" }, isTableChild: true }).Visible, false);
     assert.equal(resolveListPresentationHeader({ menu: { Name: "嵌入表" }, embedded: true }).Visible, false);
     assert.equal(resolveListPresentationHeader({ menu: { Name: "关联表" }, isJoinTable: true }).Visible, false);
-    assert.equal(resolveListPresentationHeader({ menu: { Name: "移动端" }, isPhoneView: true }).Visible, false);
+    assert.equal(resolveListPresentationHeader({ menu: { Name: "移动端" }, isPhoneView: true }).Visible, true);
 });
 
-test("configured list presentation overrides the default title and mobile only renders metrics", () => {
+test("legacy metric fallback uses real aggregates or labelled current-page values and never fabricates random data", () => {
+    const fields = [
+        { Name: "Amount", Label: "金额", Component: "NumberText", Type: "decimal(18,2)" },
+        { Name: "Status", Label: "状态", Component: "Select", Type: "varchar(25)" }
+    ];
+    const aggregated = buildAutomaticPresentationMetrics({
+        fields,
+        statistics: { Amount: 99.5 },
+        rows: [{ Amount: 10, Status: "待审核" }, { Amount: 20, Status: "待审核" }]
+    });
+    assert.equal(aggregated[0].DefaultValue, 99.5);
+    assert.equal(aggregated[0].Label, "金额合计");
+
+    const currentPage = buildAutomaticPresentationMetrics({ fields, rows: [{ Amount: 10 }, { Amount: "20.5" }] });
+    assert.equal(currentPage[0].DefaultValue, 30.5);
+    assert.equal(currentPage[0].Label, "本页金额");
+    assert.doesNotMatch(JSON.stringify(currentPage), /random|随机/i);
+
+    const generic = buildAutomaticPresentationMetrics({ fields: [{ Name: "Name", Label: "名称", Type: "varchar(200)" }], rows: [] });
+    assert.deepEqual(generic.map((metric) => metric.Source), ["DataCount", "PageCount"]);
+});
+
+test("configured list presentation overrides the default title and mobile receives truthful fallback metrics", () => {
     const view = {
         Layout: {
             Hero: {
@@ -46,11 +77,13 @@ test("configured list presentation overrides the default title and mobile only r
     const mobile = resolveListPresentationHeader({ menu: { Name: "合同" }, view, isPhoneView: true });
     assert.equal(mobile.Visible, true);
     assert.equal(mobile.Metrics.length, 1);
-    assert.equal(resolveListPresentationHeader({
+    const titleOnlyMobile = resolveListPresentationHeader({
         menu: { Name: "合同" },
         view: { Layout: { Hero: { Title: "仅标题", Metrics: [] } } },
         isPhoneView: true
-    }).Visible, false);
+    });
+    assert.equal(titleOnlyMobile.Visible, true);
+    assert.deepEqual(titleOnlyMobile.Metrics.map((metric) => metric.Source), ["DataCount", "PageCount"]);
 });
 
 test("menu badge configuration is disabled unless both switch and ApiEngine are configured", () => {
@@ -148,4 +181,15 @@ test("module header, metric strip and compound search consume runtime theme toke
     assert.match(searchBlock, /--mci-gradient-primary/);
     assert.match(searchBlock, /overflow:\s*hidden/);
     assert.match(buttonSource, /height:\s*100%[\s\S]*?border-radius:\s*inherit/);
+});
+
+test("composite MinWidth wins over last-column auto sizing and unconfigured fields receive semantic widths", () => {
+    const source = fs.readFileSync(new URL("../src/views/form-engine/mixins/diy-table-ui.mixin.js", import.meta.url), "utf8");
+    const start = source.indexOf("GetColWidth(field, fieldIndex)");
+    const block = start >= 0 ? source.slice(start, start + 2600) : "";
+    assert.match(block, /presentationColumn\.MinWidth/);
+    assert.ok(block.indexOf("presentationColumn.MinWidth") < block.indexOf("fieldIndex == visibleFields.length - 1"));
+    assert.match(block, /return 200/);
+    assert.match(block, /return 170/);
+    assert.match(block, /return 140/);
 });

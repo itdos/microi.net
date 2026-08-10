@@ -72,7 +72,7 @@ public class V8McpMenuBadgeTokenTests
             }
         };
 
-        var defaults = method!.Invoke(null, [rows, "table-orders", "订单"]);
+        var defaults = method!.Invoke(null, [rows, "table-orders", "订单", "订单管理"]);
         Assert.NotNull(defaults);
         var result = JObject.FromObject(defaults!);
 
@@ -118,7 +118,69 @@ public class V8McpMenuBadgeTokenTests
         Assert.Equal("CreateTime", defaultOrder["Id"]?.ToString());
         Assert.Equal("CreateTime", defaultOrder["Name"]?.ToString());
         Assert.Equal("DESC", defaultOrder["Type"]?.ToString());
+
+        var viewSchema = JObject.Parse(result["ViewSchema"]?.ToString() ?? "{}");
+        var views = Assert.IsType<JArray>(viewSchema["Views"]);
+        Assert.Equal(new[] { "List", "Card" }, views.Select(view => view["Scene"]?.ToString()));
+        Assert.DoesNotContain(views, view => new[] { "Detail", "Edit" }.Contains(view["Scene"]?.ToString()));
+        var listView = Assert.IsType<JObject>(views[0]);
+        var listLayout = Assert.IsType<JObject>(listView["Layout"]);
+        var list = Assert.IsType<JObject>(listLayout["List"]);
+        var columns = Assert.IsType<JArray>(list["Columns"]);
+        Assert.True(columns[0]?["MinWidth"]?.Val<int>() >= 340);
+        var metrics = Assert.IsType<JArray>(listLayout["Hero"]?["Metrics"]);
+        Assert.Equal(new[] { "Field", "DataCount", "PageCount" }, metrics.Select(metric => metric["Source"]?.ToString()));
         Assert.Empty(result["Warnings"] as JArray ?? new JArray());
+    }
+
+    [Fact]
+    public void BuildDefaultModuleMenuConfigFromRows_UsesTruthfulCountMetricsWhenNoNumericFieldExists()
+    {
+        var method = typeof(V8McpLogic).GetMethod(
+            "BuildDefaultModuleMenuConfigFromRows",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var rows = new List<dynamic>
+        {
+            new JObject
+            {
+                ["Id"] = "field-name",
+                ["TableId"] = "table-customers",
+                ["Name"] = "CustomerName",
+                ["Label"] = "客户名称",
+                ["Component"] = "Text",
+                ["Type"] = "varchar(200)",
+                ["Sort"] = 10
+            }
+        };
+
+        var defaults = method!.Invoke(null, [rows, "table-customers", "客户", "客户管理"]);
+        var result = JObject.FromObject(defaults!);
+        var schemaText = result["ViewSchema"]?.ToString() ?? "";
+        Assert.DoesNotContain("random", schemaText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("随机", schemaText, StringComparison.OrdinalIgnoreCase);
+        var schema = JObject.Parse(schemaText);
+        var metrics = Assert.IsType<JArray>(schema["Views"]?[0]?["Layout"]?["Hero"]?["Metrics"]);
+        Assert.Equal(new[] { "DataCount", "PageCount" }, metrics.Select(metric => metric["Source"]?.ToString()));
+    }
+
+    [Theory]
+    [InlineData("CustomerName", "客户名称", "varchar(200)", "Text", 200)]
+    [InlineData("CreateTime", "创建时间", "varchar(25)", "DateTime", 170)]
+    [InlineData("Amount", "金额", "decimal(18,2)", "NumberText", 140)]
+    [InlineData("Status", "状态", "varchar(25)", "Select", 130)]
+    public void GetDefaultMcpTableWidth_UsesFieldSemantics(
+        string name,
+        string label,
+        string type,
+        string component,
+        int expected)
+    {
+        var method = typeof(V8McpLogic).GetMethod(
+            "GetDefaultMcpTableWidth",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        Assert.Equal(expected, method!.Invoke(null, [name, label, type, component]));
     }
 
     [Theory]
