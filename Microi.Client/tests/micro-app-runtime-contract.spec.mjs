@@ -88,6 +88,26 @@ test("hosts use authenticated resolve and one diagnostic error component", () =>
     assert.match(diagnostic, /复制诊断/);
 });
 
+test("menu, dialog and component hosts pass authenticated permission context without URL tokens", () => {
+    const permission = read("src/pinia/modules/permission.js");
+    assert.match(permission, /"DiyTableId",\s*"ModuleEngineKey",\s*"MicroServiceId"/);
+    assert.match(permission, /meta\.ModuleEngineKey\s*=\s*item\.ModuleEngineKey/);
+
+    for (const file of ["host.vue", "dialog.vue", "dev-component.vue"]) {
+        const source = read(`src/views/micro-app/${file}`);
+        assert.match(source, /permissionContext/);
+        assert.match(source, /moduleEngineKey/);
+        assert.match(source, /diyTableId/);
+        assert.doesNotMatch(source, /[?&](?:token|authorization)=/i);
+    }
+
+    for (const file of ["diy-table-navigation.mixin.js", "diy-form-navigation.mixin.js"]) {
+        const source = read(`src/views/form-engine/mixins/${file}`);
+        assert.match(source, /OpenAppDialog\(param\)[\s\S]*?PermissionContext:\s*\{/);
+        assert.match(source, /PermissionContext:[\s\S]*?sysMenuId:[\s\S]*?moduleEngineKey:[\s\S]*?diyTableId:/);
+    }
+});
+
 test("managed menu routes can use the stable entry only for safe compatibility failures", async () => {
     const utilitySource = read("src/utils/microAppEntryUrl.js");
     const utility = await import(`data:text/javascript;base64,${Buffer.from(utilitySource).toString("base64")}`);

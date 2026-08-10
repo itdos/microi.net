@@ -101,6 +101,16 @@ export async function login(account, pwd, captcha = {}) {
 }
 ```
 
+### MicroService 独立运行认证（强制）
+
+AI 生成的前端微服务不能假定永远在主平台 iframe/micro-app 宿主中运行：
+
+- `window.microApp` 存在且宿主下发 Token 时，直接配置同一个 SDK 实例并进入业务页，不重复显示登录。
+- 独立访问时从 `.microi-micro-app.json`/构建配置取得 `apiBase` 与 `osClient`，先复用 SDK 已保存的有效 Token；无 Token 时显示平台帐号密码登录。
+- 初始化必须调用 `V8.GetSysConfig(true)` 并按 `EnableCaptcha` 动态决定验证码。验证码接口固定为 `GET /api/Captcha/GetCaptcha`，响应头读取 `captchaid`；只有启用时才向 `V8.Login` 追加 `_CaptchaId/_CaptchaValue`。
+- 登录仍签发平台 DiyToken，不创建平行 Token、平行用户表或微服务自有密码体系。失效事件回到登录态，Token 续签仍按本 Skill 的单实例规则处理。
+- 宿主额外传入 `permissionContext={sysMenuId,moduleEngineKey,diyTableId}`。SDK/服务层需要访问 FormEngine 时使用真实授权 `moduleEngineKey`；该对象不能代替后端权限，也不能成为放宽匿名接口的理由。
+
 ## 请求头规则
 
 SDK 的 `buildHeaders` 必须集中处理所有请求头，不能让页面、业务 wrapper 或上传逻辑各自拼接租户和鉴权头。

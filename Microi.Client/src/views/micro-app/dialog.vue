@@ -85,10 +85,20 @@ export default {
             return `${this.microAppName}@${this.entryUrl}@${this.retryKey}`;
         },
         microAppData() {
+            const suppliedPermission = this.DataAppend?.PermissionContext || {};
+            const permissionContext = {
+                sysMenuId: suppliedPermission.sysMenuId || suppliedPermission.SysMenuId || this.DataAppend?.SysMenuId || "",
+                moduleEngineKey: suppliedPermission.moduleEngineKey || suppliedPermission.ModuleEngineKey || this.DataAppend?.ModuleEngineKey || "",
+                diyTableId: suppliedPermission.diyTableId || suppliedPermission.DiyTableId || this.DataAppend?.DiyTableId || ""
+            };
             return {
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
                 token: DiyCommon.getToken(),
+                menuId: permissionContext.sysMenuId,
+                moduleEngineKey: permissionContext.moduleEngineKey,
+                diyTableId: permissionContext.diyTableId,
+                permissionContext,
                 appKey: this.appKey,
                 version: this.appVersion,
                 hostViewport: this.hostViewport,

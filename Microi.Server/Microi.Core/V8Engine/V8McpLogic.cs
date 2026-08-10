@@ -2505,7 +2505,28 @@ namespace Microi.net
             {
                 var componentName = component ?? "Text";
 
-                // 幂等：先检查同 TableId + Name 的字段是否已存在，存在则视为成功（避免 AI 并发/重试报错）
+                // 选项类组件（Select/MultipleSelect/Radio/Checkbox）：自动构建 Data + Config JSON
+                var effectiveData = data ?? "";
+                var effectiveConfig = config ?? "";
+                if (IsOptionComponent(componentName))
+                {
+                    var (dataJson, configJson) = BuildOptionDataAndConfig(componentName, data, config);
+                    effectiveData = dataJson;
+                    effectiveConfig = configJson;
+                }
+
+                if (!string.IsNullOrWhiteSpace(effectiveConfig))
+                {
+                    var configCheck = ValidateJsonIfPresent("Config", effectiveConfig);
+                    if (!configCheck.Ok) return new DosResult<object>(0, null, configCheck.Msg);
+                }
+
+                var relationCheck = await ValidateMcpFieldRelationAsync(
+                    osClient, tableId, name, componentName, effectiveConfig);
+                if (!relationCheck.Ok) return new DosResult<object>(0, null, relationCheck.Msg);
+
+                // 幂等检查必须在关系校验之后。否则同名的坏 JoinForm/TableChild
+                // 会被 Skipped:true 掩盖，完整系统重跑也无法发现或修复。
                 if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(tableId))
                 {
                     var existResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
@@ -2528,22 +2549,6 @@ namespace Microi.net
                             Skipped = true
                         });
                     }
-                }
-
-                // 选项类组件（Select/MultipleSelect/Radio/Checkbox）：自动构建 Data + Config JSON
-                var effectiveData = data ?? "";
-                var effectiveConfig = config ?? "";
-                if (IsOptionComponent(componentName))
-                {
-                    var (dataJson, configJson) = BuildOptionDataAndConfig(componentName, data, config);
-                    effectiveData = dataJson;
-                    effectiveConfig = configJson;
-                }
-
-                if (!string.IsNullOrWhiteSpace(effectiveConfig))
-                {
-                    var configCheck = ValidateJsonIfPresent("Config", effectiveConfig);
-                    if (!configCheck.Ok) return new DosResult<object>(0, null, configCheck.Msg);
                 }
 
                 var fieldParam = new DiyFieldParam
@@ -2943,7 +2948,7 @@ namespace Microi.net
         public static async Task<DosResult<object>> CreateModule(
             string osClient, string name, string diyTableId,
             string componentName, string componentPath,
-            int display, int appDisplay, string openType, string url,
+            int display, int appDisplay, int hasChild, string openType, string url,
             string parentId = null, int sort = 100,
             string icon = null, string searchFieldIds = null,
             string tableDiyFieldIds = null, string defaultOrderBy = null,
@@ -3164,6 +3169,7 @@ namespace Microi.net
                     ["ComponentPath"] = componentPath ?? "/diy/diy-table-rowlist",
                     ["Display"] = display,
                     ["AppDisplay"] = appDisplay,
+                    ["HasChild"] = hasChild == 1 ? 1 : 0,
                     ["OpenType"] = openType ?? "Diy",
                     ["Url"] = effectiveUrl ?? "",
                     ["MenuBadgeEnabled"] = menuBadgeEnabled == 1 ? 1 : 0,
@@ -4525,7 +4531,36 @@ namespace Microi.net
                         if (!(fieldToken is JObject field)) continue;
                         var fieldName = field["name"].Val<string>() ?? field["Name"].Val<string>();
                         if (fieldName.DosIsNullOrWhiteSpace()) { errors.Add($"表 {name} 中存在无 name 字段定义"); continue; }
-                        if (!fieldNames.Contains(fieldName.ToLower())) errors.Add($"表 {name} 缺少字段：{fieldName}");
+                        if (!fieldNames.Contains(fieldName.ToLower()))
+                        {
+                            errors.Add($"表 {name} 缺少字段：{fieldName}");
+                            continue;
+                        }
+                        var expectedComponent = field["component"].Val<string>() ?? field["Component"].Val<string>();
+                        var savedField = tableFields.FirstOrDefault(item =>
+                            string.Equals((string)item.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+                        var actualComponent = savedField == null ? "" : (string)savedField.Component ?? "";
+                        if (!expectedComponent.DosIsNullOrWhiteSpace()
+                            && !string.Equals(expectedComponent, actualComponent, StringComparison.OrdinalIgnoreCase))
+                        {
+                            errors.Add($"表 {name} 字段 {fieldName} 的组件期望 {expectedComponent}，实际 {actualComponent}");
+                        }
+                    }
+
+                    foreach (var relationFieldModel in tableFields)
+                    {
+                        var relationField = JObject.FromObject(relationFieldModel);
+                        var component = relationField["Component"].Val<string>();
+                        if (!string.Equals(component, "JoinForm", StringComparison.OrdinalIgnoreCase)
+                            && !string.Equals(component, "TableChild", StringComparison.OrdinalIgnoreCase)) continue;
+                        var relationCheck = await ValidateMcpFieldRelationAsync(
+                            osClient,
+                            (string)tableModel.Id,
+                            relationField["Name"].Val<string>(),
+                            component,
+                            relationField["Config"].Val<string>());
+                        if (!relationCheck.Ok)
+                            errors.Add($"表 {name} 字段 {relationField["Name"].Val<string>()}：{relationCheck.Msg}");
                     }
 
                     var manifestIndexes = table["indexes"] as JArray ?? table["Indexes"] as JArray ?? new JArray();
@@ -6256,6 +6291,28 @@ namespace Microi.net
                 {
                     var fieldId = await ResolveFieldIdAsync();
                     if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "未找到字段，无法更新字段属性");
+                    var relationFieldResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
+                    {
+                        OsClient = osClient,
+                        Id = fieldId,
+                        _SelectFields = new[] { "Id", "TableId", "Name", "Component", "Config" }
+                    });
+                    if (relationFieldResult.Code != 1 || relationFieldResult.Data == null)
+                        return new DosResult<object>(0, null, "未找到字段，无法校验关系组件配置");
+                    var relationField = JObject.FromObject(relationFieldResult.Data);
+                    var effectiveComponent = patch["Component"] != null
+                        ? patch["Component"].Val<string>()
+                        : relationField["Component"].Val<string>();
+                    var effectiveConfig = patch["Config"] != null
+                        ? patch["Config"].Val<string>()
+                        : relationField["Config"].Val<string>();
+                    var relationCheck = await ValidateMcpFieldRelationAsync(
+                        osClient,
+                        relationField["TableId"].Val<string>(),
+                        relationField["Name"].Val<string>(),
+                        effectiveComponent,
+                        effectiveConfig);
+                    if (!relationCheck.Ok) return new DosResult<object>(0, null, relationCheck.Msg);
                     var directPatch = new JObject { ["OsClient"] = osClient, ["Id"] = fieldId };
                     foreach (var prop in patch.Properties())
                     {
@@ -6305,6 +6362,10 @@ namespace Microi.net
                 p.Config = patch["Config"] != null ? p.Config : existingField["Config"].Val<string>();
                 p.Description = patch["Description"] != null ? p.Description : existingField["Description"].Val<string>();
                 p.InTableEdit = patch["InTableEdit"] != null ? p.InTableEdit : existingField["InTableEdit"]?.Val<int>();
+
+                var relationUpdateCheck = await ValidateMcpFieldRelationAsync(
+                    osClient, p.TableId, p.Name, p.Component, p.Config);
+                if (!relationUpdateCheck.Ok) return new DosResult<object>(0, null, relationUpdateCheck.Msg);
 
                 var r = await MicroiEngine.FormEngine.UptDiyField(p);
                 if (r.Code != 1) return new DosResult<object>(r.Code, r.Data, r.Msg);
@@ -6383,6 +6444,38 @@ namespace Microi.net
                 var fullRowFields = new[] { "Name", "Label", "Type", "Component", "Sort" };
                 var isSparsePatch = fieldList.Any(item =>
                     fullRowFields.Any(name => item[name] == null && item[ToLocalCamelCase(name)] == null));
+
+                foreach (var item in fieldList)
+                {
+                    var componentToken = item["Component"] ?? item["component"];
+                    var configToken = item["Config"] ?? item["config"];
+                    if (componentToken == null && configToken == null) continue;
+                    var fieldId = item["Id"].Val<string>() ?? item["id"].Val<string>();
+                    if (fieldId.DosIsNullOrWhiteSpace()) return new DosResult<object>(0, null, "FieldList 每项必须包含 Id");
+                    var existingRelationFieldResult = await MicroiEngine.FormEngine.GetFormDataAsync<dynamic>("diy_field", new
+                    {
+                        OsClient = osClient,
+                        Id = fieldId,
+                        _SelectFields = new[] { "Id", "TableId", "Name", "Component", "Config" }
+                    });
+                    if (existingRelationFieldResult.Code != 1 || existingRelationFieldResult.Data == null)
+                        return new DosResult<object>(0, null, $"未找到字段 {fieldId}，无法校验关系组件配置");
+                    var existingRelationField = JObject.FromObject(existingRelationFieldResult.Data);
+                    var effectiveComponent = componentToken != null
+                        ? componentToken.Val<string>()
+                        : existingRelationField["Component"].Val<string>();
+                    var effectiveConfig = configToken != null
+                        ? configToken.Val<string>()
+                        : existingRelationField["Config"].Val<string>();
+                    var relationCheck = await ValidateMcpFieldRelationAsync(
+                        osClient,
+                        existingRelationField["TableId"].Val<string>(),
+                        existingRelationField["Name"].Val<string>(),
+                        effectiveComponent,
+                        effectiveConfig);
+                    if (!relationCheck.Ok) return new DosResult<object>(0, null, relationCheck.Msg);
+                }
+
                 if (isSparsePatch)
                 {
                     var fieldMappings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

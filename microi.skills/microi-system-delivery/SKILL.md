@@ -53,6 +53,7 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 - 写入菜单时，业务按钮一次性配齐 `MoreBtns`、`FormBtns`、`PageBtns`、`BatchSelectMoreBtns`、`PageTabs`，按钮前端只负责交互，后端逻辑放接口引擎。
 - 写入后台菜单时必须至少规划两级菜单树：先创建业务域父菜单，再把 CRUD、报表、日志、设置模块挂到对应父菜单。不要把客户、设备、工单、报告、日志、配置等所有模块直接创建为一级菜单。Manifest dry-run 和最终交付说明都必须列出菜单树。
 - 新建前端 MicroService 时，必须先 `microi_list_applications` 盘点，再用 `microi_scaffold_vue_microservice` 在当前租户 `AI应用/{appKey}` 做预演和确认创建；构建后依次同步私有源码、发布公有产物、回读页面 Id。每个菜单通过 `microi_create_module` 一次绑定 `MicroServiceId/MicroServicePageId/MicroServiceRoutePath/MicroServiceKey`，写后用 `microi_get_module` 回读，不得把普通 URL 菜单的创建成功误报成微服务菜单已交付。
+- 完整系统 Manifest 中的 MicroService 菜单使用 `microServiceKey + microServiceRoutePath` 作为跨租户可移植引用；`microi_generate_system` 必须在任何写入前回读并解析当前租户的服务/页面 Id。直接调用 `microi_create_module` 时仍须一次提供全部四个绑定字段。
 - Windows 上脚手架从临时目录原子改名时，杀毒软件或索引器可能短暂返回 `EPERM/EACCES/EBUSY`；MCP 应做有上限的短重试并保持原子改名，重试仍失败才清理临时目录并报错，禁止改成逐文件覆盖目标目录。
 - 编译产物优先调用 `microi_publish_application_directory_stream`。流式端点失败时必须检查 `uploadedCount/retrySafe`：只有 `uploadedCount=0` 且 `retrySafe=true`、并且产物较小时，才可临时回退 `microi_publish_microservice`；已上传部分文件时先按版本和哈希回读，禁止无判断重复发布。回退与远端版本缺口必须写进交付结论。
 - `microi_get_application_context` 返回文件清单不等于源码可读；必须检查 `ContentsComplete/ContentErrorCount` 以及逐文件 `ContentReadError`。MinIO 服务端读取私有源码应走内网端点，不能因公网代理拒绝私有桶而把 `IncludedContents=true` 误判为完整上下文。
@@ -105,11 +106,29 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 - `JoinForm` 只用于主表保存一个目标 Id、并嵌入一条独立目标记录完整表单的 N:1/1:1
   场景；目标表不能是当前表。需要列表、多行增删改或可能有多条记录时禁止使用。
 - `TableChild` 的 `TableChildTableId`、`TableChildSysMenuId`、`TableChildFkFieldName`
-  必须引用回读后的真实资源。资源尚未创建时分两阶段写入，禁止猜 Id，禁止退化成
+  必须引用回读后的真实资源。完整系统 Manifest 使用
+  `relation:{cardinality:"1:N",targetTable,childForeignKey,childModule}`，生成器按“全部表与
+  普通字段 → 隐藏子表菜单 → 关系字段”分阶段解析当前租户 Id；禁止猜 Id，禁止退化成
   `JoinForm`。
 - 基数不清楚时必须在远端写入前询问用户。调用 `microi_plan_system` / `dryRun` 前先做
-  关系语义审查；即使工具没有报错，AI 发现“1:N + JoinForm”、缺子表外键、缺隐藏
-  子菜单或缺回查索引时仍必须阻断。
+  关系语义审查。MCP 会硬性拒绝“1:N + JoinForm”、自关联 JoinForm、缺主/子外键、缺
+  `Display=0/AppDisplay=0/HasChild=0` 隐藏子菜单或缺 `(OsClient, FK)` 回查索引；AI
+  不得改用直接单字段工具绕过。
+
+`JoinForm` 的可移植 Manifest 只写名称，不写租户 Id：
+
+```json
+{
+  "name": "CustomerProfile",
+  "label": "客户资料",
+  "component": "JoinForm",
+  "relation": {
+    "cardinality": "N:1",
+    "targetTable": "Biz_Customer",
+    "joinFieldName": "CustomerId"
+  }
+}
+```
 
 `JoinForm` / `OpenTable` 等单记录关联仍需兼顾可读字段，不能只生成一个裸 `XxxId`。
 

@@ -188,6 +188,14 @@ var extractResult = V8.Method.ExtractZip({
 - 安装脚本还必须同步当前有效 `sys_config`：`ApiBase` 使用对外可访问的 API 端口，`FileServer` 使用 `http://<访问IP>:<MinIO API端口>/mci-public`。`ApiBase` 不能误用 Web 前端端口，因为 V8 代码会直接在其后拼接 `/api/...` 或 `/apiengine/...`。
 - 安装验收必须使用真实登录 Token 分别执行一次 `Limit=false` 和 `Limit=true` 上传：公有文件匿名访问应返回 `200`，私有文件匿名访问应返回 `403`，私有文件通过签名 URL 访问应返回 `200`，并核对下载内容与上传内容一致。
 
+### 复盘：签名 HEAD 被代理转换为 GET 导致上传后回读误报
+
+- 触发场景：`PutObject` 已返回成功、对象可通过 GET 下载，但公有桶和私有桶的上传后 `StatObject` 均对桶根路径返回 `AccessDenied`；常见于启用严格回读校验后，MinIO Endpoint 前的 Nginx 同时启用了缓存与默认的 `proxy_cache_convert_head on`。
+- 根因判断：S3 SigV4 的签名包含 HTTP 方法；代理把客户端签名的 HEAD 转为上游 GET 后会造成签名不一致。另一个可能原因是对象级凭据缺少桶级 `ListBucket` / `GetBucketLocation` 权限，因此不能只凭 `AccessDenied /bucket/` 推断对象未落盘，也不能把空 Region 当作唯一原因。
+- 通用规则：优先在 MinIO 代理位置设置 `proxy_cache_convert_head off`；若仍使用缓存，缓存键需区分 `$request_method`。平台不得跳过上传后回读：当 HEAD/Stat 失败时，使用同一凭据生成签名 GET，并以 `Range: bytes=0-0` 回读；禁用重定向，非空对象必须同时验证期望总长度与首字节，空对象验证长度为零，`404` 判不存在，`403`、网络错误和证据不足继续失败关闭。禁止记录或返回带签名查询参数的 URL。
+- 配置边界：只有实时回读证明 Endpoint、桶名、Region 或凭据确实错误时才修改 SaaS 配置；对象 GET 正常而仅 HEAD 失败时应修复代理或兼容回读路径，不能猜测内网地址、降低校验强度或轮换正常凭据。
+- 自动化检查：覆盖签名 GET 的单字节 Range、期望总长度、首字节实际读取、空对象、长度不符、重定向、`403` 和 `404`；真实环境同时验证公有桶与私有桶的 `Put -> Range GET -> 内容一致`，并对比相同签名在 GET 与 HEAD 方法下的响应。
+
 ### 复盘：旧空库缺少可选字段导致 MinIO 初始化后中断
 
 - 触发场景：MinIO 容器、私有桶和公有桶均已成功创建，但安装器更新 `sys_osclients` 时因旧库缺少 `NetworkIsInternet` 返回 `Unknown column`，整套安装停在 API 部署之前。

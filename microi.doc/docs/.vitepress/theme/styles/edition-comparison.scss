@@ -5,7 +5,7 @@
 
 .mci-edition-page {
   --mci-edition-text: #182033;
-  --mci-edition-muted: #5f6b7c;
+  --mci-edition-muted: #526176;
   --mci-edition-subtle: #7a8493;
   --mci-edition-surface: rgba(255, 255, 255, .94);
   --mci-edition-surface-soft: rgba(255, 252, 247, .86);
@@ -937,7 +937,7 @@ html.dark .mci-edition-page {
 
 .mci-edition-page .vp-doc .mci-edition-button--primary {
   border-color: transparent;
-  color: #fff;
+  color: #fff !important;
   background: linear-gradient(135deg, #9f0d1a, #d93643);
   box-shadow: 0 12px 28px rgba(181, 18, 32, .24);
 }
@@ -956,7 +956,7 @@ html.dark .mci-edition-page {
 
   .mci-edition-page .vp-doc .mci-edition-button--primary:hover {
     border-color: transparent;
-    color: #fff;
+    color: #fff !important;
   }
 }
 

@@ -1,84 +1,150 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 
 import {
-  fetchNugetOwnerStats,
+  NUGET_FALLBACK_STATS,
+  NUGET_STATS_ENDPOINT,
+  __resetNugetStatsRequestForTests,
   formatCompactDownloads,
-  getSearchServiceEndpoints
+  loadCachedNugetStats,
+  loadNugetOwnerStats,
+  normalizeNugetStatsPayload
 } from '../docs/.vitepress/theme/utils/nuget-downloads.js'
 
-test('discovers and deduplicates official NuGet search endpoints', () => {
-  const endpoints = getSearchServiceEndpoints({
-    resources: [
-      { '@id': 'https://azuresearch-usnc.nuget.org/query', '@type': 'SearchQueryService' },
-      { '@id': 'https://azuresearch-usnc.nuget.org/query', '@type': 'SearchQueryService/3.5.0' },
-      { '@id': 'https://azuresearch-ussc.nuget.org/query', '@type': 'SearchQueryService/3.5.0' },
-      { '@id': 'https://example.com/query', '@type': 'SearchQueryService/3.5.0' }
-    ]
+const STATS = Object.freeze({
+  owner: 'ITdos',
+  packageCount: 38,
+  totalDownloads: 8942864,
+  profileUrl: 'https://www.nuget.org/profiles/ITdos',
+  queriedAt: '2026-08-10T12:21:40.281Z',
+  cachedAt: '2026-08-10T12:21:40.281Z',
+  successfulEndpoints: 2,
+  ageSeconds: 12,
+  didRefresh: false,
+  refreshFailed: false
+})
+
+test('uses the official iTdos API Engine endpoint instead of querying NuGet from every browser', async () => {
+  assert.equal(
+    NUGET_STATS_ENDPOINT,
+    'https://api.itdos.com/apiengine/official_nuget_stats?OsClient=iTdos'
+  )
+
+  const source = await readFile(new URL('../docs/.vitepress/theme/utils/nuget-downloads.js', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /api\.nuget\.org|azuresearch-[a-z]+\.nuget\.org/i)
+
+  const component = await readFile(new URL('../docs/.vitepress/theme/components/MciNugetStats.vue', import.meta.url), 'utf8')
+  assert.match(component, /正在更新/)
+  assert.match(component, /当前 API 实时汇总/)
+  assert.match(component, /Redis 最近一次成功汇总/)
+})
+
+test('normalizes only valid ITdos server payloads and keeps the official profile URL', () => {
+  const result = normalizeNugetStatsPayload({
+    ...STATS,
+    profileUrl: 'https://example.com/untrusted',
+    stage: 'current',
+    cacheState: 'fresh'
   })
 
-  assert.deepEqual(endpoints, [
-    'https://azuresearch-usnc.nuget.org/query',
-    'https://azuresearch-ussc.nuget.org/query'
-  ])
-})
-
-test('aggregates exact-owner packages and selects the freshest official node', async () => {
-  const fetchImpl = async url => {
-    if (url === 'https://api.nuget.org/v3/index.json') {
-      return response({
-        resources: [
-          { '@id': 'https://azuresearch-usnc.nuget.org/query', '@type': 'SearchQueryService/3.5.0' },
-          { '@id': 'https://azuresearch-ussc.nuget.org/query', '@type': 'SearchQueryService/3.5.0' }
-        ]
-      })
-    }
-
-    const isSecondary = url.startsWith('https://azuresearch-ussc.nuget.org/query')
-    return response({
-      totalHits: 3,
-      data: [
-        { id: 'Microi.net', owners: ['ITdos'], totalDownloads: isSecondary ? 140 : 120 },
-        { id: 'Microi.Core', owners: 'ITdos', totalDownloads: isSecondary ? 90 : 80 },
-        { id: 'Unrelated', owners: ['AnotherOwner'], totalDownloads: 999999 }
-      ]
-    })
-  }
-
-  const result = await fetchNugetOwnerStats({ fetchImpl })
-  assert.equal(result.totalDownloads, 230)
-  assert.equal(result.packageCount, 2)
-  assert.equal(result.successfulEndpoints, 2)
+  assert.equal(result.owner, 'ITdos')
+  assert.equal(result.totalDownloads, STATS.totalDownloads)
+  assert.equal(result.profileUrl, 'https://www.nuget.org/profiles/ITdos')
   assert.equal(result.isLive, true)
+  assert.throws(() => normalizeNugetStatsPayload({ ...STATS, owner: 'another-owner' }), /owner/i)
+  assert.throws(() => normalizeNugetStatsPayload({ ...STATS, totalDownloads: 0 }), /invalid/i)
 })
 
-test('formats Chinese and English compact download totals without rounding upward', () => {
-  assert.equal(formatCompactDownloads(8923506, 'zh-CN'), '892万+')
-  assert.equal(formatCompactDownloads(8923506, 'en-US'), '8.9M+')
-  assert.equal(formatCompactDownloads(999, 'zh-CN'), '999')
+test('loads the Redis last-success snapshot before the refresh request', async () => {
+  __resetNugetStatsRequestForTests()
+  const requests = []
+  const fetchImpl = async (url, options) => {
+    requests.push({ url, options })
+    return response({ Code: 1, Data: { ...STATS, stage: 'cache', cacheState: 'hit' } })
+  }
+
+  const result = await loadCachedNugetStats({ fetchImpl })
+  assert.equal(result.stage, 'cache')
+  assert.equal(result.isLive, false)
+  assert.equal(requests.length, 1)
+  assert.equal(requests[0].url, NUGET_STATS_ENDPOINT)
+  assert.equal(requests[0].options.method, 'POST')
+  assert.equal(requests[0].options.headers.osclient, 'iTdos')
+  assert.deepEqual(JSON.parse(requests[0].options.body), {
+    Action: 'Cache',
+    LockScope: 'NuGetCacheRead'
+  })
 })
 
-test('falls back to the official NuGet search nodes when service discovery fails', async () => {
-  const requested = []
-  const fetchImpl = async url => {
-    requested.push(url)
-    if (url === 'https://api.nuget.org/v3/index.json') throw new Error('service index unavailable')
+test('deduplicates refreshes across every NuGet stats component on the same page', async () => {
+  __resetNugetStatsRequestForTests()
+  let calls = 0
+  const fetchImpl = async (_url, options) => {
+    calls++
+    assert.deepEqual(JSON.parse(options.body), {
+      Action: 'Refresh',
+      LockScope: 'NuGetOfficialRefresh'
+    })
+    await new Promise(resolve => setTimeout(resolve, 5))
     return response({
-      totalHits: 1,
-      data: [{ id: 'Microi.net', owners: ['ITdos'], totalDownloads: 8923506 }]
+      Code: 1,
+      Data: { ...STATS, stage: 'current', cacheState: 'updated', didRefresh: true }
     })
   }
 
-  const result = await fetchNugetOwnerStats({ fetchImpl })
-  assert.equal(result.totalDownloads, 8923506)
-  assert.equal(result.successfulEndpoints, 2)
-  assert.ok(requested.some(url => url.startsWith('https://azuresearch-usnc.nuget.org/query')))
-  assert.ok(requested.some(url => url.startsWith('https://azuresearch-ussc.nuget.org/query')))
+  const [first, second, third] = await Promise.all([
+    loadNugetOwnerStats({ fetchImpl }),
+    loadNugetOwnerStats({ fetchImpl }),
+    loadNugetOwnerStats({ fetchImpl })
+  ])
+
+  assert.equal(calls, 1)
+  assert.equal(first.isLive, true)
+  assert.deepEqual(second, first)
+  assert.deepEqual(third, first)
+})
+
+test('keeps cached data when the server reports an upstream refresh failure', async () => {
+  __resetNugetStatsRequestForTests()
+  const result = await loadNugetOwnerStats({
+    fetchImpl: async () => response({
+      Code: 1,
+      Data: { ...STATS, stage: 'cache', cacheState: 'stale', refreshFailed: true }
+    })
+  })
+
+  assert.equal(result.totalDownloads, STATS.totalDownloads)
+  assert.equal(result.refreshFailed, true)
+  assert.equal(result.isLive, false)
+})
+
+test('clears a failed shared request so a later component can retry', async () => {
+  __resetNugetStatsRequestForTests()
+  let calls = 0
+  const fetchImpl = async () => {
+    calls++
+    if (calls === 1) return response({ Code: 0, Msg: 'temporary failure' })
+    return response({ Code: 1, Data: { ...STATS, stage: 'current', cacheState: 'fresh' } })
+  }
+
+  await assert.rejects(loadNugetOwnerStats({ fetchImpl }), /temporary failure/)
+  const recovered = await loadNugetOwnerStats({ fetchImpl })
+  assert.equal(recovered.isLive, true)
+  assert.equal(calls, 2)
+})
+
+test('formats Chinese and English compact totals without rounding upward', () => {
+  assert.equal(formatCompactDownloads(8942864, 'zh-CN'), '894万+')
+  assert.equal(formatCompactDownloads(8942864, 'en-US'), '8.9M+')
+  assert.equal(formatCompactDownloads(999, 'zh-CN'), '999')
+  assert.equal(NUGET_FALLBACK_STATS.profileUrl, 'https://www.nuget.org/profiles/ITdos')
 })
 
 function response(payload) {
   return {
     ok: true,
+    status: 200,
     async json() { return payload }
   }
 }

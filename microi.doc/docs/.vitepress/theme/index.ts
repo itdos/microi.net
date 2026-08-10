@@ -11,13 +11,16 @@ import LoginPage from "./components/LoginPage.vue";
 import ProfilePage from "./components/ProfilePage.vue";
 import ProfileLocaleSwitch from "./components/ProfileLocaleSwitch.vue";
 import MciNugetStats from "./components/MciNugetStats.vue";
+import { getDocVisualProfile } from './doc-visual-profiles.js';
 import "./styles/index.scss";
 import "./styles/home-glow.scss";
 import "./styles/mci-site.scss";
+import "./styles/doc-readable.scss";
 import "./styles/mainstream.scss";
 import "./styles/ai-studio-home.scss";
 import "./styles/edition-comparison.scss";
 import "./styles/nuget-downloads.scss";
+import "./styles/micro-app.scss";
 
 const APPEARANCE_KEY = 'vitepress-theme-appearance'
 
@@ -54,12 +57,19 @@ const MicroiLayout = defineComponent({
             nextTick(() => persistExplicitAppearance(nextIsDark))
         })
 
-        return () => h(DefaultTheme.Layout, null, {
-            'nav-bar-content-after': () => h(Fragment, null, [h(ProfileLocaleSwitch), h(UserBar)]),
-            'sidebar-nav-after': () => /^(?:\/en)?\/doc\//.test(route.path || '')
-                ? h(MciNugetStats, { variant: 'sidebar' })
-                : null
-        })
+        return () => {
+            const visualProfile = getDocVisualProfile(route.path || '')
+            const layoutClass = visualProfile
+                ? `mci-doc-profile mci-doc-profile--${visualProfile}`
+                : undefined
+
+            return h(DefaultTheme.Layout, { class: layoutClass }, {
+                'nav-bar-content-after': () => h(Fragment, null, [h(ProfileLocaleSwitch), h(UserBar)]),
+                'sidebar-nav-after': () => /^(?:\/en)?\/doc\//.test(route.path || '')
+                    ? h(MciNugetStats, { variant: 'sidebar' })
+                    : null
+            })
+        }
     }
 })
 

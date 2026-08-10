@@ -945,6 +945,7 @@ namespace Microi.net.Api
                 param["DiyTableId"].Val<string>(),
                 param["ComponentName"].Val<string>(), param["ComponentPath"].Val<string>(),
                 IntOrDefault(param, "Display", 1), IntOrDefault(param, "AppDisplay", 1),
+                IntOrDefault(param, "HasChild", 0),
                 param["OpenType"].Val<string>(), param["Url"].Val<string>(),
                 param["ParentId"].Val<string>(), param["Sort"]?.Val<int>() ?? 100,
                 param["Icon"].Val<string>(), param["SearchFieldIds"].Val<string>(),
