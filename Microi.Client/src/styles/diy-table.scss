@@ -2063,7 +2063,7 @@
     }
 }
 
-.module-presentation-header.is-default .module-presentation-copy {
+.module-presentation-header.is-default:not(.has-metrics) .module-presentation-copy {
     display: flex;
     align-items: center;
 }
@@ -2159,7 +2159,7 @@
 .module-metric-label,
 .metric-strip__label {
     overflow: hidden;
-    color: var(--mci-text-tertiary, var(--el-text-color-secondary, #909399));
+    color: var(--mci-text-secondary, var(--el-text-color-regular, #606266));
     font-size: 11px;
     font-weight: 500;
     line-height: 1.35;

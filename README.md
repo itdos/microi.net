@@ -27,9 +27,9 @@
 
 ## Microi吾码 AI平台 架构图
 
-[![Microi吾码 AI平台 架构图](./microi.doc/docs/public/images/microi-ai-platform-architecture-3840x2160.png)](./microi.doc/docs/public/images/microi-ai-platform-architecture-3840x2160.png)
+![Microi吾码 AI平台 架构图](./microi.doc/docs/public/images/microi-ai-platform-architecture-3840x2160.png)
 
-> 点击图片查看 3840 × 2160 PNG 高清原图。架构覆盖 AI 智能、低代码引擎、平台治理、集成自动化、SaaS 安全、多节点运行、全端入口、数据底座和应用交付闭环。
+> 图片为 3840 × 2160 PNG 高清版；在 Gitee 中点击图片可直接放大查看。架构覆盖 AI 智能、低代码引擎、平台治理、集成自动化、SaaS 安全、多节点运行、全端入口、数据底座和应用交付闭环。
 
 ## 30 秒了解 Microi吾码
 

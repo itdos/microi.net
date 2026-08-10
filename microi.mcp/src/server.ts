@@ -5,7 +5,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import type { ApiResponse, MicroiClient, DbTable, DbField, OcrRecognizeRequest, OcrRecognizeResult, PlaywrightContextData, PlaywrightEngineInfo, PlaywrightModuleInfo, TranslateFileRequest, TranslateFileResult, TranslateTextResult } from './microi-client.js';
-import { normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
+import {
+  buildDefaultModulePresentation,
+  inferTableColumnWidth,
+  normalizeAllMenuJson,
+  normalizeViewSchemaJson,
+  registerAdvancedTools,
+} from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
@@ -2668,7 +2674,12 @@ BOUNDARY RULES:
 ## sys_menu 自动增强默认值（创建后端菜单必须关注）
 - 绑定 diyTableId 创建菜单时，不要只写 Name/DiyTableId。应配置或允许 MCP/后端自动推断：TableDiyFieldIds、SelectFields、SearchFieldIds、SortFieldIds、NotShowFields、StatisticsFields、MobileListFields、CardTitleTagFields、CardBottomTagFields、DefaultOrderBy。
 - NotShowFields 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段；SearchFieldIds 默认选择标题、名称、编号、状态、类型、分类、负责人、时间等常用筛选；StatisticsFields 默认选择金额、价格、数量、积分、余额等数值字段；MobileListFields 默认选择 3-4 个卡片可读字段。
-- 如果用户显式指定上述字段，以用户配置为准；否则 microi_generate_system 和后端 CreateModule 会按真实 diy_field 元数据补齐。
+- 每个可见且绑定表的 Diy 模块必须有：紧凑 Hero 标题、业务副标题、2-4 个真实动态指标、合理列宽、至少一个有合理 MinWidth 的 PC 复合列，以及不重复字段的移动端标题/副标题/顶部标签/状态/右侧金额/正文/Meta/底部区域。用户未配置 ViewSchema 时，microi_generate_system、microi_create_module 和后端 CreateModule 会按真实 diy_field 元数据补齐 List/Card 最低默认值。
+- 自动默认值不是 AI 省略设计的理由。应按当前表和状态流把指标改为待处理、逾期、金额、容量、风险等有业务含义的真实聚合；DataCount/PageCount 只是无可推断指标时的真实兜底。禁止随机数、伪统计和无来源数字。
+- 复合列 Lines/TrailingFields 使用的字段不再作为普通列重复展示；复合列必须给足 MinWidth。每个 diy_field 未显式设置 TableWidth 时按标题/地址、日期/编码、数值、状态等语义自动推断。
+- MenuBadge 只挑少量有行动意义的重要菜单；PageTabs、MoreBtns、PageBtns、FormBtns、BatchSelectMoreBtns、ExportMoreBtns 在数量有助于决策时配置角标。相同页面的统计必须批量返回，禁止逐行或逐指标 N+1。
+- EnableViewSchema 只控制 Detail/Edit 自定义表单。它为 0 时，Hero、动态指标、列表密度、PC 复合列和移动端卡片仍然生效。
+- 如果用户显式指定上述字段，以用户配置为准；否则平台按真实 diy_field 元数据补齐。
 
 ## ✅ 工具支持并发调用（请尽量并发以提高效率）
 主要低代码建模写入工具（microi_create_table / microi_add_field / microi_create_module）已做幂等保护；microi_create_engine 的 ApiEngineKey 必须唯一，重复创建会返回错误：
@@ -2825,7 +2836,7 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
 - openType: Diy（低代码页面）, Url（外部链接）, Page（自定义前端页面）
 - 绑定 diyTableId 后，平台自动提供完整 CRUD 功能（列表、搜索、新增、编辑、删除、导入、导出）
 - 重要菜单可配置 menuBadgeEnabled=1 和 menuBadgeApiEngineKey，在侧栏显示接口引擎统计值；接口应返回 {Code:1,Data:{Value:number}}，并保持轻量、租户隔离。
-- ViewSchema 可直接传 JSON 对象或字符串；Layout.List 的多行列/尾随字段与 Layout.Card 的顶部、右侧、正文、元数据、底部字段组会完整保存。
+- ViewSchema 可直接传 JSON 对象或字符串；省略时，可见且绑定表的 Diy 模块会自动生成仅含 List/Card 的真实数据展示默认值，EnableViewSchema 仍为 0。Layout.List 的多行列/尾随字段与 Layout.Card 的顶部、右侧、正文、元数据、底部字段组会完整保存。
 
 ## V8 事件类型（microi_get_event_code / microi_save_event_code 的 eventType）
 | eventType | 运行端 | 触发时机 |
@@ -4969,7 +4980,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       visible: z.number().optional().describe('Is visible in form (1=yes, 0=no). Default: 1'),
       appVisible: z.number().optional().describe('Is visible in mobile app (1=yes, 0=no). Default: 1'),
       tab: z.string().optional().describe('Form tab group name (for organizing fields into tabs)'),
-      tableWidth: z.number().optional().describe('Column width in list view (pixels). Default: 120'),
+      tableWidth: z.number().optional().describe('Column width in list view (pixels). When omitted, MCP infers a stable width from field semantics: titles/addresses are wider, dates/codes medium, numbers/statuses compact.'),
       sort: z.number().optional().describe('Field display order (smaller = front). If omitted, MCP auto-increments per table starting at 100, step 10 — so adding fields in business-meaningful order produces correct list/form ordering automatically. Override only when you need a specific position.'),
       readonly: z.number().optional().describe('Is readonly (1=yes, 0=no). Default: 0'),
       notEmpty: z.number().optional().describe('Required field validation (1=required, 0=optional). Default: 0'),
@@ -4996,7 +5007,9 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           TableId: tableId, Name: name, Label: label,
           Type: normalizedType, Component: component,
           Visible: visible ?? 1, AppVisible: appVisible ?? 1,
-          Tab: tab, TableWidth: tableWidth, Sort: sort ?? nextSortFor(tableId),
+          Tab: tab,
+          TableWidth: tableWidth ?? inferTableColumnWidth({ Name: name, Label: label, Type: normalizedType, Component: component }),
+          Sort: sort ?? nextSortFor(tableId),
           Readonly: readonlyVal,
           NotEmpty: notEmpty, Unique: unique,
           DefaultValue: defaultValue, Placeholder: placeholder,
@@ -6115,7 +6128,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_create_module',
-    `Create a menu module for OsClient "${osClient}". Inserts a record into sys_menu table (NOT sys_module, NOT Sys_Module). Links a diy_table to the navigation sidebar. IDEMPOTENT — calling again with the same Name+ParentId returns Skipped:true with the existing ModuleId. URL collisions are auto-resolved with random suffixes (concurrency-safe). Step 4 of system design. ⚠️ For business systems, also pass moreBtns/formBtns/pageTabs/batchSelectMoreBtns JSON to wire up business buttons in one call — see skill doc microi.skills/v8-menu-buttons.`,
+    `Create a menu module for OsClient "${osClient}". Inserts a record into sys_menu table (NOT sys_module, NOT Sys_Module). Links a diy_table to the navigation sidebar. IDEMPOTENT — calling again with the same Name+ParentId returns Skipped:true with the existing ModuleId. URL collisions are auto-resolved with random suffixes (concurrency-safe). Every visible bound Diy module receives a real-data compact Hero, meaningful metrics, a sensible PC composite column and a complete mobile card when viewSchema is omitted; EnableViewSchema remains 0 because it controls Detail/Edit custom forms only. Step 4 of system design. ⚠️ For business systems, also pass moreBtns/formBtns/pageTabs/batchSelectMoreBtns JSON to wire up business buttons in one call — see skill doc microi.skills/v8-menu-buttons.`,
     {
       name: z.string().describe('Module display name (Chinese, e.g. "客户管理", "订单列表")'),
       diyTableId: z.string().optional().describe('The TableId to bind this module to (from microi_create_table)'),
@@ -6138,7 +6151,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       enableViewSchema: z.number().optional().describe('Enable custom Detail/Edit form views (1=yes, 0=no). List/Card presentation in ViewSchema is applied whenever configured and is not gated by this switch. Default: 0.'),
       viewSchemaVersion: z.string().optional().describe('Optional ViewSchema protocol version stored in sys_menu.ViewSchemaVersion. Blank or omitted defaults to "1.0".'),
       viewConfigVersion: z.number().optional().describe('Optional monotonic configuration version stored in sys_menu.ViewConfigVersion. Omitted defaults to 1.'),
-      viewSchema: z.union([z.string(), jsonRecordSchema]).optional().describe('Versioned cross-client view JSON object/string stored in sys_menu.ViewSchema. Supports Detail/Edit/List/Card and PC/Mobile/All. Layout.List keeps multi-line Columns[].Lines, TrailingFields and RequiredFields; Layout.Card keeps AvatarTextField, TitleField, SubtitleFields, StatusFields, TopFields, RightFields, Fields, MetaFields and BottomFields.'),
+      viewSchema: z.union([z.string(), jsonRecordSchema]).optional().describe('Versioned cross-client view JSON object/string stored in sys_menu.ViewSchema. When omitted for a visible bound Diy module, MCP generates List/Card presentation only. Supports Detail/Edit/List/Card and PC/Mobile/All. Layout.List keeps multi-line Columns[].Lines, TrailingFields and RequiredFields; Layout.Card keeps AvatarTextField, TitleField, SubtitleFields, StatusFields, TopFields, RightFields, Fields, MetaFields and BottomFields.'),
       moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
       formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required. Buttons may configure BadgeEnabled, BadgeApiEngineKey, BadgeValuePath, BadgeTone, BadgeMax, BadgeShowZero and BadgeRefreshSeconds.'),
       batchSelectMoreBtns: z.string().optional().describe('Batch action buttons JSON ARRAY (string). Same item and optional Badge* fields as moreBtns. Use V8.TableRowSelected to access selected rows; badge APIs must batch current-page Ids instead of calling once per row.'),
@@ -6200,6 +6213,32 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
             : '/' + routePath.slice(1).split('/').map(segment => encodeURIComponent(segment)).join('/');
           effectiveUrl = url || `/micro-app/${encodeURIComponent(String(microServiceKey))}${encodedRoute}`;
         }
+        let effectiveViewSchema = viewSchema;
+        const autoPresentationEligible = Boolean(diyTableId)
+          && !isMicroService
+          && String(effectiveOpenType || 'Diy').toLowerCase() === 'diy'
+          && ((display ?? 1) === 1 || (appDisplay ?? 1) === 1);
+        if (!effectiveViewSchema && autoPresentationEligible && diyTableId) {
+          const fieldResult = await client.getFieldList(undefined, diyTableId);
+          if (fieldResult.Code !== 1) {
+            return {
+              content: [{ type: 'text', text: `Error: 无法读取模块字段并生成默认展示配置：${fieldResult.Msg}` }],
+              isError: true,
+            };
+          }
+          effectiveViewSchema = buildDefaultModulePresentation(
+            name,
+            unwrapList<Record<string, unknown>>(fieldResult.Data),
+            name,
+          );
+        }
+        const normalizedViewSchema = normalizeViewSchemaJson(effectiveViewSchema);
+        if (!normalizedViewSchema.ok) {
+          return {
+            content: [{ type: 'text', text: `Error: ${normalizedViewSchema.errors.join('\n')}` }],
+            isError: true,
+          };
+        }
         if (confirmExecution !== name && confirmExecution !== 'EXECUTE') {
           return {
             content: [{ type: 'text', text: JSON.stringify({
@@ -6216,7 +6255,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
                 MenuBadgeEnabled: menuBadgeEnabled ?? 0,
                 MenuBadgeApiEngineKey: menuBadgeApiEngineKey,
                 EnableViewSchema: enableViewSchema ?? 0,
-                ViewSchema: viewSchema,
+                ViewSchema: normalizedViewSchema.value ? JSON.parse(normalizedViewSchema.value) : undefined,
                 IsMicroiService: isMicroService ? 1 : 0,
                 MicroServiceId: microServiceId,
                 MicroServicePageId: microServicePageId,
@@ -6224,13 +6263,6 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
                 MicroServiceKey: microServiceKey,
               },
             }, null, 2) }],
-          };
-        }
-        const normalizedViewSchema = normalizeViewSchemaJson(viewSchema);
-        if (!normalizedViewSchema.ok) {
-          return {
-            content: [{ type: 'text', text: `Error: ${normalizedViewSchema.errors.join('\n')}` }],
-            isError: true,
           };
         }
         const result = await client.createModule({

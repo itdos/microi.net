@@ -28,7 +28,7 @@
 
 [![Microi吾码 AI平台 架构图](/images/microi-ai-platform-architecture.svg)](/images/microi-ai-platform-architecture.svg)
 
-> 点击图片可全屏查看和无限缩放。图中治理控制面覆盖门户、身份权限、配置、功能开关、发布审批与执行、服务流量、Trace、日志生命周期、可观测告警、组件资产、页面源码桥接、协作与可恢复导入，详见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
+> 点击图片可在弹层中放大、缩小和拖动查看。图中治理控制面覆盖门户、身份权限、配置、功能开关、发布审批与执行、服务流量、Trace、日志生命周期、可观测告警、组件资产、页面源码桥接、协作与可恢复导入，详见 [AI 平台治理中心](/doc/system-engine/ai-platform-governance)。
 
 ## 📖 平台简介
 
@@ -80,45 +80,45 @@
 
 ## 📸 预览图
 
-<table>
+<table class="mci-doc-preview-gallery">
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" style="width:100%" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="Microi 接口引擎在线开发界面" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="Microi 接口引擎在线开发界面" style="width:100%" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城"/></td>
-    <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="接口引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="接口引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" alt="表单引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" alt="界面引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" alt="表单引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" alt="界面引擎" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png" alt="数据大屏"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png" alt="打印引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png" alt="AI 数据分析"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png" alt="数据大屏" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png" alt="打印引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png" alt="AI 数据分析" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" alt="报表引擎"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" alt="SaaS 引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" alt="报表引擎" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" alt="SaaS 引擎" data-fancybox="platform-preview"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg" alt="移动端蓝牙打印结果"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接" data-fancybox="platform-preview"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg" alt="移动端蓝牙打印结果" data-fancybox="platform-preview"/></td>
   </tr>
 </table>
 

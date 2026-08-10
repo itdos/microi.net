@@ -31,6 +31,16 @@
 默认搜索优先名称、标题、编号、状态、类型、分类、负责人和时间；统计优先金额、
 数量、价格、积分和余额。用户明确配置优先。
 
+每个可见且绑定表的 Diy 模块还必须有 List/Card 展示设计：所有普通列给合理
+`TableWidth`，至少一个 PC 复合列给 `MinWidth`，Hero 有业务标题、副标题和 2~4 个
+真实指标，移动卡片覆盖可用的标题/副标题/顶部/状态/右侧/正文/Meta/底部区域。
+复合列和卡片区域使用过的字段不得继续机械显示为普通列或在多个区域重复。
+
+菜单角标只用于少量待办、未读、逾期、预警等重要入口；PageTabs 与按钮角标按业务价值
+选择。相同页面的一组指标/角标使用一个批量接口，不逐指标、逐按钮、逐行请求。
+自动默认值只保证旧库和漏配模块不出现空白标题，不替代业务设计；严禁用随机数或静态演示
+数字伪造统计。没有可推断业务指标时只使用真实 `DataCount/PageCount` 兜底。
+
 ## 打开方式细节
 
 ### Diy
@@ -85,6 +95,9 @@
 | `ViewSchema` | Detail/Edit/List/Card JSON |
 
 顶层 PC 列表不依赖 `EnableViewSchema` 才采用新样式：平台始终显示紧凑模块标题；ViewSchema 中有效的 List-PC 与 Card-Mobile 配置也不受该开关限制。模块表单中的 `DiyModulePresentationDesigner` 负责可视化编辑这些展示配置，以独立 JSON 编辑 Detail/Edit，并通过高级 JSON 保留角色视图及未知字段。
+
+设计器固定提供“模块标题与统计 / PC 复合列 / 移动端卡片 / 自定义表单 / 高级 JSON”五个
+Tab；开关标签是“启用自定义表单视图”，只影响第四个 Tab 中的 Detail/Edit。
 
 视图项常用字段：`Key`、`Scene`、`Device`、`RoleIds`、`Priority`、`Layout`。
 标准区块包括 `EntityHero`、`MetricStrip`、`ActionGrid`、
