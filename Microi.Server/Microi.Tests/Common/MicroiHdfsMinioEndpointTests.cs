@@ -1,5 +1,8 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Reflection;
 using Microi.net;
+using Minio;
 
 namespace Microi.Tests.Common;
 
@@ -59,6 +62,66 @@ public class MicroiHdfsMinioEndpointTests
             BindingFlags.NonPublic | BindingFlags.Static);
         Assert.NotNull(method);
         return (string)method!.Invoke(null, new object?[] { exception, bucket, objectName })!;
+    }
+
+    private static bool IsRangeReadbackObjectPresent(
+        int statusCode,
+        long? contentLength,
+        long? contentRangeLength,
+        int bytesRead)
+    {
+        var method = typeof(MicroiHDFSMinIO).GetMethod(
+            "IsRangeReadbackObjectPresent",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool)method!.Invoke(null, new object?[]
+        {
+            statusCode,
+            contentLength,
+            contentRangeLength,
+            bytesRead
+        })!;
+    }
+
+    private static bool IsRangeReadbackVerified(
+        int statusCode,
+        long? contentLength,
+        long? contentRangeLength,
+        int bytesRead,
+        long expectedSize)
+    {
+        var method = typeof(MicroiHDFSMinIO).GetMethod(
+            "IsRangeReadbackVerified",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (bool)method!.Invoke(null, new object?[]
+        {
+            statusCode,
+            contentLength,
+            contentRangeLength,
+            bytesRead,
+            expectedSize
+        })!;
+    }
+
+    private sealed class RecordingRangeHandler : HttpMessageHandler
+    {
+        public HttpMethod? RequestMethod { get; private set; }
+        public RangeHeaderValue? Range { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestMethod = request.Method;
+            Range = request.Headers.Range;
+            var content = new ByteArrayContent(new byte[] { 0x2A });
+            content.Headers.ContentRange = new ContentRangeHeaderValue(0, 0, 123);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.PartialContent)
+            {
+                Content = content
+            });
+        }
     }
 
     [Theory]
@@ -158,8 +221,93 @@ public class MicroiHdfsMinioEndpointTests
 
         Assert.Contains("HEAD/Stat 回读被拒绝", message, StringComparison.Ordinal);
         Assert.Contains("s3:GetObject", message, StringComparison.Ordinal);
+        Assert.Contains("s3:ListBucket", message, StringComparison.Ordinal);
         Assert.Contains("s3:GetBucketLocation", message, StringComparison.Ordinal);
         Assert.Contains("proxy_cache_convert_head off", message, StringComparison.Ordinal);
+        Assert.Contains("签名 Range GET", message, StringComparison.Ordinal);
         Assert.Contains("不会跳过上传后回读校验", message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(206, 1L, 123L, 1, 123L, true)]
+    [InlineData(206, null, 123L, 1, 123L, true)]
+    [InlineData(206, 1L, 122L, 1, 123L, false)]
+    [InlineData(206, 1L, 123L, 0, 123L, false)]
+    [InlineData(200, 123L, null, 1, 123L, true)]
+    [InlineData(200, null, null, 1, 123L, false)]
+    [InlineData(200, 0L, null, 0, 0L, true)]
+    [InlineData(416, null, 0L, 0, 0L, true)]
+    public void SignedRangeReadbackRequiresExactSizeAndOneContentByte(
+        int statusCode,
+        long? contentLength,
+        long? contentRangeLength,
+        int bytesRead,
+        long expectedSize,
+        bool expected)
+    {
+        Assert.Equal(expected, IsRangeReadbackVerified(
+            statusCode,
+            contentLength,
+            contentRangeLength,
+            bytesRead,
+            expectedSize));
+    }
+
+    [Theory]
+    [InlineData(206, 1L, 123L, 1, true)]
+    [InlineData(200, 0L, null, 0, true)]
+    [InlineData(416, null, 0L, 0, true)]
+    [InlineData(404, null, null, 0, false)]
+    [InlineData(403, null, null, 0, false)]
+    public void SignedRangeExistenceProbeDistinguishesMissingAndUnreadableObjects(
+        int statusCode,
+        long? contentLength,
+        long? contentRangeLength,
+        int bytesRead,
+        bool expected)
+    {
+        Assert.Equal(expected, IsRangeReadbackObjectPresent(
+            statusCode,
+            contentLength,
+            contentRangeLength,
+            bytesRead));
+    }
+
+    [Fact]
+    public async Task SignedRangeReadbackUsesGetWithOneByteRangeWithoutStatPreflight()
+    {
+        var handler = new RecordingRangeHandler();
+        using var httpClient = new HttpClient(handler);
+        var minioClient = new MinioClient()
+            .WithEndpoint("minio.test", 9000)
+            .WithCredentials("test-access", "test-secret")
+            .WithRegion("us-east-1")
+            .Build();
+        var method = typeof(MicroiHDFSMinIO).GetMethods(
+                BindingFlags.NonPublic | BindingFlags.Static)
+            .Single(candidate => candidate.Name == "ReadObjectRangeAsync"
+                                 && candidate.GetParameters().Length == 4);
+
+        var task = (Task)method.Invoke(null, new object?[]
+        {
+            minioClient,
+            "public",
+            "qiqiang/test.bin",
+            httpClient
+        })!;
+        await task;
+        var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
+        var resultType = result.GetType();
+
+        Assert.Equal(HttpMethod.Get, handler.RequestMethod);
+        var range = Assert.Single(handler.Range!.Ranges);
+        Assert.Equal(0, range.From);
+        Assert.Equal(0, range.To);
+        Assert.Equal(HttpStatusCode.PartialContent,
+            resultType.GetProperty("StatusCode")!.GetValue(result));
+        Assert.Equal(123L,
+            resultType.GetProperty("ContentRangeLength")!.GetValue(result));
+        Assert.Equal(1,
+            resultType.GetProperty("BytesRead")!.GetValue(result));
     }
 }

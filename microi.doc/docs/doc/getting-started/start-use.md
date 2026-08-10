@@ -28,7 +28,7 @@ Microi吾码面向开发者，采用传统开发思维流程来创建模块，�
 - 一张物理表可被多个【报表引擎】关联设计报表
 :::
 
-<img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/9ae60bcfddfb3ed574297e510c4d358b.jpeg" alt="Microi吾码快速开始界面" style="margin: 5px;">
 
 ---
 

@@ -184,7 +184,13 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 
 ### IP 访问频率保护、VS Code 拉取与解封
 
-平台普通访问默认按“同一真实 IP 10 秒 600 次请求、120 次未匹配路由扫描”保护，超过后默认临时封禁 30 分钟。错误计数只统计没有命中平台端点的 404/405 扫描；业务校验 400、登录或权限拒绝 401/403、上传超限 413、服务压力 429、后端故障 5xx，以及已匹配 Controller 或 `/api`、`/apiengine` 动态路由产生的应用级 404/405 都只记审计，不得据此自动封禁客户端。升级后的 API 节点读到旧版 `HighError`／`TrustedVsCodeHighError` 宽泛状态码策略产生的自动封禁时，会从共享 Redis 和本机缓存中自动退休该状态；手动封禁、高频请求封禁与新版 `RouteScan` 扫描封禁不会被解除。被拦截时后端仍返回 HTTP 200 的标准 `DosResult`，其中 `Code=0`、`DataAppend.SecurityBlocked=true`，并保留 `Ip`、`Reason`、`ReasonKey`、`BlockedAtUtc`、`ExpiresAtUtc`、`RetryAfterSeconds`、解除建议和本文档地址。PC 前端必须显示这些原始信息，不能把它改写成“后端 API 服务暂时不可用”。安全中间件必须位于 CORS 之后，使独立域名部署的浏览器也能读取该 JSON。
+平台普通访问按真实 IP 建立两类保护，并把“业务失败”与“恶意扫描”分开处理：
+
+- **请求频率**：同一真实 IP 默认 10 秒最多 600 次请求，超过后临时封禁 30 分钟。
+- **路由扫描**：默认累计 120 次未命中平台端点的 404/405 后触发保护。业务校验 400、登录或权限拒绝 401/403、上传超限 413、服务压力 429、后端故障 5xx，以及已匹配 Controller 或 `/api`、`/apiengine` 动态路由产生的应用级 404/405，只记审计，不得据此自动封禁客户端。
+- **旧状态退休**：升级后的 API 节点若读到旧版 `HighError`／`TrustedVsCodeHighError` 宽泛状态码策略产生的自动封禁，会从共享 Redis 和本机缓存中自动退休该状态；手动封禁、高频请求封禁与新版 `RouteScan` 扫描封禁不会被解除。
+
+被拦截时后端仍返回 HTTP 200 的标准 `DosResult`，其中 `Code=0`、`DataAppend.SecurityBlocked=true`，并保留 `Ip`、`Reason`、`ReasonKey`、`BlockedAtUtc`、`ExpiresAtUtc`、`RetryAfterSeconds`、解除建议和本文档地址。PC 前端必须显示这些原始信息，不能改写成“后端 API 服务暂时不可用”。安全中间件必须位于 CORS 之后，使独立域名部署的浏览器也能读取该 JSON。
 
 吾码 VS Code 插件一次拉取多个服务器的 V8 源码时不降低并发或请求量。只读的 `/api/V8Debug/Get*`、`/api/V8Debug/List*` 请求在同时满足下列全部条件后使用独立计数桶，默认阈值为 10 秒 6000 次请求、1200 次异常状态码：
 
@@ -197,7 +203,14 @@ Redis 管理器只允许 `Level >= 9999` 使用当前租户连接或后端保存
 
 #### 反向代理后的真实 IP
 
-安全防护只读取 ASP.NET Core 已验证后的 `HttpContext.Connection.RemoteIpAddress`，不会直接解析客户端发送的 `X-Forwarded-For`、`X-Real-IP`。因此伪造 `X-Forwarded-For: 127.0.0.1` 不能命中本机白名单。容器内运行时会自动发现当前容器路由表中的 RFC1918/ULA 私有默认网关，并只把这些**精确网关 IP**加入可信最后一跳；这覆盖宿主 Nginx 经 Docker 发布端口访问时 Kestrel 看到 `172.30.0.1` 等网桥地址的常见部署，避免把全站用户聚合进同一个 IP 桶。若可信代理没有提供可验证的转发头、处理后 `RemoteIpAddress` 仍是该精确容器网关，平台会跳过这一请求的 IP 自动封禁，继续执行全局请求压力与内存保护；无法区分真实来源时宁可保留审计，也不能让一个用户触发整站误封。公网网关、宽泛网段和客户端自报地址不会被自动信任。框架同时保留安全的 loopback 直连代理默认值；Nginx、Ingress、SLB、CDN 或其它 API 节点若不是 loopback 或容器自动发现的私有网关，必须在后端配置其**直接连接 Kestrel 的最后一跳** IP 或 CIDR：
+安全防护以 ASP.NET Core 已验证后的 `HttpContext.Connection.RemoteIpAddress` 为事实源，不直接信任客户端发送的 `X-Forwarded-For`、`X-Real-IP`：
+
+- 伪造 `X-Forwarded-For: 127.0.0.1` 不能命中本机白名单。
+- 容器运行时自动发现路由表中的 RFC1918/ULA 私有默认网关，并只把这些**精确网关 IP**作为可信最后一跳。这覆盖宿主 Nginx 经 Docker 发布端口访问、Kestrel 看到 `172.30.0.1` 等网桥地址的常见部署，避免把全站用户聚合进同一个 IP 桶。
+- 若可信代理没有提供可验证的转发头，处理后的 `RemoteIpAddress` 仍是该精确容器网关，平台会跳过这一请求的 IP 自动封禁，但继续执行全局请求压力与内存保护。无法区分真实来源时宁可保留审计，也不能让一个用户触发整站误封。
+- 公网网关、宽泛网段和客户端自报地址不会被自动信任；框架仅额外保留安全的 loopback 直连代理默认值。
+
+Nginx、Ingress、SLB、CDN 或其它 API 节点若不是 loopback 或容器自动发现的私有网关，必须在后端配置其**直接连接 Kestrel 的最后一跳** IP 或 CIDR：
 
 ```json
 {

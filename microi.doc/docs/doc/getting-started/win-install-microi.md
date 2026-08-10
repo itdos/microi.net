@@ -13,7 +13,7 @@
 ::: tip 下载地址
 https://dotnet.microsoft.com/en-us/download/dotnet/9.0
 :::
-![在这里插入图片描述](https://static.itdos.com/upload/editor/image/202211/6380477367466977006970663.png#pic_center)
+![Windows 安装 .NET SDK](https://static.itdos.com/upload/editor/image/202211/6380477367466977006970663.png#pic_center)
 
 ---
 
@@ -215,4 +215,4 @@ sc create microi-api binPath="C:\Microi\Microi.net.Auth\net10.0\Microi.net.Api.e
 ::: warning 注意
 图中仅为参考，请按真实的 client 名字和 api 地址填写。
 :::
-![在这里插入图片描述](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383124964739859058076187_origin.png/20230925/os-html.png#pic_center)
+![IIS 网站 API 地址配置](https://static.itdos.com/itdos/itdos/upload/editor/image/202309/6383124964739859058076187_origin.png/20230925/os-html.png#pic_center)

@@ -1,0 +1,514 @@
+/*
+ * Chinese documentation visual contract.
+ *
+ * The five route profiles are assigned in doc-visual-profiles.js. Shared
+ * Markdown primitives live here so that all Chinese pages improve together;
+ * product showcases may still add a narrowly scoped stylesheet of their own.
+ */
+html:lang(zh) {
+  --mci-doc-reading-width: 86ch;
+  --mci-doc-wide-reading-width: 94ch;
+  --mci-doc-text: #1e293b;
+  --mci-doc-muted: #526176;
+  --mci-doc-surface: rgba(255, 255, 255, .92);
+  --mci-doc-surface-soft: rgba(248, 250, 252, .90);
+  --mci-doc-surface-raised: #ffffff;
+  --mci-doc-table-head: #eef4ff;
+  --mci-doc-table-head-text: #172033;
+  --mci-doc-row-alt: rgba(37, 99, 235, .035);
+  --mci-doc-row-hover: rgba(37, 99, 235, .075);
+  --mci-doc-accent: #b51220;
+  --mci-doc-accent-soft: rgba(181, 18, 32, .075);
+  --mci-doc-accent-border: rgba(181, 18, 32, .20);
+  --mci-doc-success: #047857;
+  --mci-doc-warning: #b45309;
+  --mci-doc-danger: #b91c1c;
+
+  &.dark {
+    --mci-doc-text: #f1f5f9;
+    --mci-doc-muted: #c3cfdd;
+    --mci-doc-surface: rgba(17, 24, 39, .90);
+    --mci-doc-surface-soft: rgba(15, 23, 42, .82);
+    --mci-doc-surface-raised: #172033;
+    --mci-doc-table-head: #1d2a3d;
+    --mci-doc-table-head-text: #f8fafc;
+    --mci-doc-row-alt: rgba(96, 165, 250, .055);
+    --mci-doc-row-hover: rgba(96, 165, 250, .11);
+    --mci-doc-accent: #fb7185;
+    --mci-doc-accent-soft: rgba(251, 113, 133, .10);
+    --mci-doc-accent-border: rgba(251, 113, 133, .26);
+    --mci-doc-success: #6ee7b7;
+    --mci-doc-warning: #fcd34d;
+    --mci-doc-danger: #fca5a5;
+  }
+
+  .mci-doc-profile--overview {
+    --mci-doc-accent: #087e9b;
+    --mci-doc-accent-soft: rgba(8, 145, 178, .085);
+    --mci-doc-accent-border: rgba(8, 145, 178, .22);
+  }
+
+  .mci-doc-profile--guide {
+    --mci-doc-accent: #245fd1;
+    --mci-doc-accent-soft: rgba(37, 99, 235, .085);
+    --mci-doc-accent-border: rgba(37, 99, 235, .22);
+  }
+
+  .mci-doc-profile--policy {
+    --mci-doc-accent: #a85a08;
+    --mci-doc-accent-soft: rgba(217, 119, 6, .09);
+    --mci-doc-accent-border: rgba(217, 119, 6, .24);
+  }
+
+  .mci-doc-profile--reference {
+    --mci-doc-reading-width: var(--mci-doc-wide-reading-width);
+    --mci-doc-accent: #5b4bc4;
+    --mci-doc-accent-soft: rgba(91, 75, 196, .075);
+    --mci-doc-accent-border: rgba(91, 75, 196, .20);
+  }
+
+  .mci-doc-profile--showcase {
+    --mci-doc-accent: #b51220;
+    --mci-doc-accent-soft: rgba(181, 18, 32, .075);
+    --mci-doc-accent-border: rgba(181, 18, 32, .20);
+  }
+
+  &.dark .mci-doc-profile--overview {
+    --mci-doc-accent: #67e8f9;
+    --mci-doc-accent-soft: rgba(34, 211, 238, .10);
+    --mci-doc-accent-border: rgba(34, 211, 238, .25);
+  }
+
+  &.dark .mci-doc-profile--guide {
+    --mci-doc-accent: #93c5fd;
+    --mci-doc-accent-soft: rgba(96, 165, 250, .11);
+    --mci-doc-accent-border: rgba(96, 165, 250, .27);
+  }
+
+  &.dark .mci-doc-profile--policy {
+    --mci-doc-accent: #fcd34d;
+    --mci-doc-accent-soft: rgba(251, 191, 36, .10);
+    --mci-doc-accent-border: rgba(251, 191, 36, .27);
+  }
+
+  &.dark .mci-doc-profile--reference {
+    --mci-doc-accent: #c4b5fd;
+    --mci-doc-accent-soft: rgba(167, 139, 250, .10);
+    --mci-doc-accent-border: rgba(167, 139, 250, .26);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc {
+    counter-reset: mci-doc-section;
+    color: var(--mci-doc-text);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > :is(p, ul, ol, blockquote) {
+    max-width: min(100%, var(--mci-doc-reading-width));
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > p {
+    margin-block: 16px;
+    color: var(--mci-doc-muted);
+    font-size: 16px;
+    line-height: 1.86;
+    text-wrap: pretty;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h1 + p {
+    position: relative;
+    margin: -6px 0 30px;
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 17px;
+    padding: 17px 20px 17px 50px;
+    background:
+      linear-gradient(135deg, var(--mci-doc-accent-soft), transparent 58%),
+      var(--mci-doc-surface-soft);
+    color: var(--mci-doc-text);
+    font-size: clamp(16px, 1.6vw, 18px);
+    font-weight: 560;
+    line-height: 1.78;
+    box-shadow: 0 12px 30px rgba(24, 32, 48, .07);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h1 + p::before {
+    content: "✦";
+    position: absolute;
+    top: 17px;
+    left: 19px;
+    color: var(--mci-doc-accent);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .mci-doc-home-subtitle {
+    margin: 8px auto 18px;
+    color: var(--mci-doc-text);
+    font-size: clamp(20px, 3vw, 32px);
+    font-weight: 820;
+    line-height: 1.3;
+    text-wrap: balance;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h2 {
+    counter-increment: mci-doc-section;
+    margin-top: 50px;
+    padding-top: 2px;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h2::before {
+    content: counter(mci-doc-section, decimal-leading-zero);
+    display: inline-grid;
+    place-items: center;
+    width: 33px;
+    height: 27px;
+    margin-right: 11px;
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 9px;
+    background: var(--mci-doc-accent-soft);
+    color: var(--mci-doc-accent);
+    font-size: 11px;
+    font-weight: 850;
+    line-height: 1;
+    vertical-align: 4px;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h3 {
+    margin-top: 34px;
+    padding-top: 3px;
+    color: var(--mci-doc-text);
+    font-size: clamp(19px, 2.2vw, 24px);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h3::before {
+    content: "◆";
+    margin-right: 9px;
+    color: var(--mci-doc-accent);
+    font-size: .55em;
+    vertical-align: .16em;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h4 {
+    margin-top: 26px;
+    color: var(--mci-doc-text);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > :is(ul, ol) {
+    margin-block: 18px 28px;
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 16px;
+    padding: 16px 20px 16px 44px;
+    background:
+      linear-gradient(135deg, var(--mci-doc-accent-soft), transparent 50%),
+      var(--mci-doc-surface-soft);
+    box-shadow: 0 10px 26px rgba(24, 32, 48, .055);
+  }
+
+  .mci-doc-profile--reference .VPDoc .vp-doc > :is(ul, ol) {
+    border-width: 0 0 0 3px;
+    border-radius: 0 13px 13px 0;
+    padding-block: 10px;
+    background: linear-gradient(90deg, var(--mci-doc-accent-soft), transparent 72%);
+    box-shadow: none;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > :is(ul, ol) > li + li {
+    margin-top: 8px;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc li::marker {
+    color: var(--mci-doc-accent);
+    font-weight: 850;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc > hr {
+    height: 1px;
+    margin: 44px 0;
+    border: 0;
+    background: linear-gradient(90deg, transparent, var(--mci-doc-accent-border), transparent);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc details {
+    max-width: 100%;
+    margin: 19px 0;
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 16px;
+    padding: 0 18px;
+    background:
+      linear-gradient(135deg, var(--mci-doc-accent-soft), transparent 52%),
+      var(--mci-doc-surface-soft);
+    box-shadow: 0 10px 28px rgba(24, 32, 48, .06);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc details > summary {
+    margin: 0 -18px;
+    padding: 15px 18px;
+    color: var(--mci-doc-text);
+    font-weight: 780;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc details > summary::before {
+    content: "＋";
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin-right: 9px;
+    border-radius: 8px;
+    background: var(--mci-doc-accent-soft);
+    color: var(--mci-doc-accent);
+    font-size: 14px;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc details[open] > summary {
+    margin-bottom: 13px;
+    border-bottom: 1px solid var(--mci-doc-accent-border);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc details[open] > summary::before {
+    content: "－";
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .custom-block-title::before {
+    display: inline-grid;
+    place-items: center;
+    width: 23px;
+    height: 23px;
+    margin-right: 8px;
+    border-radius: 7px;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .custom-block.tip .custom-block-title::before {
+    content: "✓";
+    background: rgba(5, 150, 105, .13);
+    color: var(--mci-doc-success);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .custom-block.warning .custom-block-title::before {
+    content: "!";
+    background: rgba(217, 119, 6, .14);
+    color: var(--mci-doc-warning);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .custom-block.danger .custom-block-title::before {
+    content: "×";
+    background: rgba(220, 38, 38, .13);
+    color: var(--mci-doc-danger);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc .custom-block.info .custom-block-title::before {
+    content: "i";
+    background: var(--mci-doc-accent-soft);
+    color: var(--mci-doc-accent);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc table {
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    border: 1px solid var(--mci-site-border);
+    border-radius: 16px;
+    background: var(--mci-doc-surface);
+    color: var(--mci-doc-text);
+    box-shadow: 0 14px 34px rgba(24, 32, 48, .08);
+    scrollbar-color: var(--mci-doc-accent-border) transparent;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc thead th {
+    background: var(--mci-doc-table-head) !important;
+    color: var(--mci-doc-table-head-text) !important;
+    font-weight: 800;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc :is(th, td) {
+    border-color: var(--mci-site-border) !important;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc tbody tr:nth-child(even) {
+    background: var(--mci-doc-row-alt);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc tbody tr:hover {
+    background: var(--mci-doc-row-hover);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc figure {
+    overflow: hidden;
+    margin: 25px 0;
+    border: 1px solid var(--mci-site-border);
+    border-radius: 17px;
+    background: var(--mci-doc-surface);
+    box-shadow: 0 16px 38px rgba(24, 32, 48, .09);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc figure img {
+    display: block;
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc figcaption {
+    margin: 0;
+    border-top: 1px solid var(--mci-site-border);
+    padding: 12px 16px 14px;
+    color: var(--mci-doc-muted);
+    font-size: 13px;
+    line-height: 1.65;
+    text-align: center;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc img:not(.VPImage):not(.VPNavBarTitle .logo) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc [class*="language-"] > span.lang {
+    color: #cbd5e1;
+  }
+
+  /* The legacy highlighter emits fixed inline colors. Its SQL comment gray
+     and VitePress line-number gray fall just below AA on the dark code slab. */
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc [class*="language-"] span[style*="color:#6A737D" i] {
+    color: #aeb8c4 !important;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc [class*="language-"] .line-numbers-wrapper {
+    color: #a3adba !important;
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc kbd {
+    border: 1px solid var(--mci-site-border-strong);
+    border-bottom-width: 2px;
+    border-radius: 6px;
+    padding: 2px 6px;
+    background: var(--mci-doc-surface-raised);
+    color: var(--mci-doc-text);
+    font-size: .86em;
+    box-shadow: 0 2px 4px rgba(24, 32, 48, .08);
+  }
+
+  body:not(:has(.ai-login-page)) .VPDoc .vp-doc :is(a, summary, button):focus-visible {
+    outline: 3px solid var(--mci-doc-accent-border);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  /* Reusable visual vocabulary for hand-authored Chinese Markdown pages. */
+  .vp-doc .mci-doc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+    gap: 14px;
+    margin: 22px 0;
+  }
+
+  .vp-doc .mci-doc-card {
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 16px;
+    padding: 18px;
+    background:
+      linear-gradient(135deg, var(--mci-doc-accent-soft), transparent 56%),
+      var(--mci-doc-surface);
+    box-shadow: 0 12px 30px rgba(24, 32, 48, .07);
+  }
+
+  .vp-doc .mci-doc-card > :first-child { margin-top: 0; }
+  .vp-doc .mci-doc-card > :last-child { margin-bottom: 0; }
+
+  .vp-doc .mci-doc-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    margin: 2px 5px 2px 0;
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    background: var(--mci-doc-accent-soft);
+    color: var(--mci-doc-text);
+    font-size: 12px;
+    font-weight: 750;
+  }
+
+  /* The case directory is valuable evidence, but 214 names should not occupy
+     the first reading screen. Keep it collapsed and render entries as chips. */
+  .vp-doc .mci-case-directory > blockquote {
+    max-height: min(52vh, 430px);
+    overflow: auto;
+    margin: 0 0 18px;
+    border: 0;
+    padding: 4px 3px 12px;
+    background: transparent;
+    scrollbar-color: var(--mci-doc-accent-border) transparent;
+  }
+
+  .vp-doc .mci-case-directory > blockquote > p {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .vp-doc .mci-case-directory > blockquote :is(strong, em) {
+    display: contents;
+  }
+
+  .vp-doc .mci-case-directory > blockquote code {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    border: 1px solid var(--mci-doc-accent-border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: var(--mci-doc-surface-raised);
+    color: var(--mci-doc-text);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 640px) {
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc > p {
+      font-size: 15.5px;
+      line-height: 1.82;
+    }
+
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h1 + p {
+      padding: 15px 16px 15px 43px;
+    }
+
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h1 + p::before {
+      top: 16px;
+      left: 16px;
+    }
+
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc > h2::before {
+      width: 30px;
+      height: 25px;
+      margin-right: 8px;
+    }
+
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc > :is(ul, ol) {
+      padding: 13px 14px 13px 35px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body:not(:has(.ai-login-page)) .VPDoc .content-container,
+    body:not(:has(.ai-login-page)) .VPDoc .vp-doc * {
+      scroll-behavior: auto !important;
+      animation-duration: .01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: .01ms !important;
+    }
+  }
+}

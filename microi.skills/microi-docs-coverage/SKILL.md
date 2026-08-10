@@ -1,6 +1,6 @@
 ---
 name: microi-docs-coverage
-description: Microi 中文官网文档与 Skills 能力覆盖审计。用于全面分析 microi.doc/docs/doc、核对官方能力和 V8 函数是否已进入 microi.skills、补充或重构 Skills、维护文档到 Skill 的责任映射，以及防止后续新增中文文档造成 AI 知识漏项。
+description: Microi 中文官网文档与 Skills 能力覆盖审计。用于全面分析 microi.doc/docs/doc 与 docs/case、核对官方能力和 V8 函数是否已进入 microi.skills、补充或重构 Skills、维护文档到 Skill 的责任映射，以及防止后续新增中文文档造成 AI 知识漏项。
 ---
 
 # Microi 中文官网文档与 Skills 覆盖审计
@@ -10,8 +10,12 @@ V8 函数”或新增、调整官方中文文档时，使用本 Skill。
 
 ## 范围与事实源
 
-- 扫描 `microi.doc/docs/doc/**/*.md`，但排除
-  `microi.doc/docs/doc/about/update-log.md`。
+- 能力映射扫描 `microi.doc/docs/doc/**/*.md`，但排除受发版规则保护的
+  `microi.doc/docs/doc/about/update-log.md`；视觉与可读性审计还必须包含
+  `microi.doc/docs/case/**/*.md`。
+- `index.md`、`apps.md`、`app-detail.md`、`profile.md`、`login.md` 与
+  `contact/index.md` 是由专用 Vue 组件承载的站点交互页，必须单独登记并按各自
+  页面契约验收，不能静默漏扫，也不能机械套用正文档排版。
 - 不扫描、不手工维护 `microi.doc/docs/en/`；英文站由中文站统一翻译。
 - `references/capability-map.md` 维护每篇中文文档的责任 Skill。
 - 文档描述能力边界，当前源码、接口定义、组件清单和 MCP Schema 决定真实签名。
@@ -38,6 +42,32 @@ V8 函数”或新增、调整官方中文文档时，使用本 Skill。
 5. 更新 `references/capability-map.md`，重新运行审计，直到严格检查通过。
 6. 对每个新增或改动的 Skill 运行 `skill-creator` 的 `quick_validate.py`，
    再执行 `git diff --check` 和相对链接检查。
+
+## 中文文档视觉与可读性契约（强制）
+
+文档正确但密密麻麻仍属于未完成。修改 `microi.doc/docs/doc/**/*.md` 或
+`microi.doc/docs/case/**/*.md` 时同时遵守：
+
+- 正文使用清晰的 H1/H2/H3 层级和 80–90 字符左右的阅读宽度；连续长段落拆为短段、列表、对比表、步骤、流程或有语义的卡片。不要为了“丰富”把每句话都做成卡片。
+- 首屏先回答“这是什么、有什么价值、怎么选择”，再展开原理和完整参数；长篇高级细节可使用可访问的 `details/summary` 渐进披露。
+- 三个以上可比较能力优先使用表格或网格卡片；三步以上的依赖流程优先使用流程图/步骤带。图标必须帮助辨识，不能只作装饰噪声。
+- 颜色至少区分主能力、成功、警告、风险，但正文对比度必须满足易读要求；不能只靠颜色表达状态。亮色、暗色、窄屏和 `prefers-reduced-motion` 都要有样式。
+- 真实案例截图进入 `docs/public/images/...`，使用稳定英文文件名、有效 `alt` 和简短图注；图片不得代替关键文字说明，移动端不得横向撑破页面。
+- 整站共同规则优先落在 VitePress 主题层 `mci-site.scss` / `doc-readable.scss`，页面独有展示放独立 SCSS；禁止为几十篇 Markdown 机械复制内联 `<style>`。
+- 新页面可复用 `.mci-doc-grid`、`.mci-doc-card`、`.mci-doc-chip`；产品页需要独立视觉时使用页面 marker + `body:has(...)` 限定作用域，不能污染登录页、首页或英文生成页。
+- 改动后运行 `npm run check:readability` 与 `npm run check:content`，再在真实浏览器至少检查一个桌面宽度和一个移动宽度，覆盖亮/暗主题、代码块、表格、图片、侧栏与锚点。
+- `microi.doc/docs/en/` 由脚本生成，不手工同步样式化内容；日常文档工作继续禁止修改 `about/update-log.md`。
+
+自动可读性检查只能阻止缺少 H1、超长连续文字块或整站主题契约丢失，不能证明页面真正好看。最终仍要查看渲染结果，不能用构建成功替代视觉验收。
+
+全站任务必须进一步执行以下闭环，禁止把“扫描到若干 `/doc` 文件”等同于
+“全部中文阅读页已完善”：
+
+1. 在 `docs/.vitepress/theme/doc-visual-profiles.js` 为每个 `/doc` 与 `/case` 中文阅读页明确选择 `overview`、`guide`、`reference`、`policy` 或 `showcase`。新增、删除、移动文档时，页面清单与视觉档案必须同步闭环；专用站点交互页需显式登记为独立范围，英文路由不得进入该表。
+2. 运行 `npm run audit:visual` 查看逐页报告。强制检查应覆盖唯一 H1、首屏引导、章节密度、连续正文、页面类型对应的表格/列表/代码/图片/提示/自定义布局、图片 `alt` 和主题契约；交付前应达到 0 条阻断和 0 条密度建议。
+3. 中文样式若用 `html:lang(zh) { ... }` 包裹，根暗色选择器必须写成 `&.dark`，使 Sass 编译为 `html:lang(zh).dark`；写 `.dark` 会错误编译为后代选择器并导致暗色覆盖失效。所有自定义浅/暗背景都必须与前景、次要文字、边框成对切换，并用测试验证正文至少达到 WCAG AA 4.5:1。
+4. 在浏览器遍历全部中文阅读路由（包括 `/doc` 与 `/case`），检查页面类型类、唯一 H1、页面级横向溢出和明显低对比文字；再从五种视觉类型各选代表页，覆盖桌面/移动与亮色/暗色截图。专用站点交互页按自身组件测试与代表截图验收。只有已登记范围全部通过，才可描述为“全站视觉验收完成”。
+5. 静态脚本、Sass 编译、单元测试、VitePress 构建和浏览器截图是不同证据层。任何一层因资源保护或环境问题跳过，最终必须明确写出，不能用其它层替代。
 
 ## 自动审计能证明什么
 

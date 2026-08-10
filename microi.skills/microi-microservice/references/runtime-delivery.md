@@ -62,12 +62,16 @@
 | `microi_get_application_file` | 读取单文件 |
 | `microi_get_microservice` | 回读已发布运行时 |
 | `microi_create_microservice` | dry-run/创建运行元数据 |
-| `microi_sync_microservice_source` | 同步私有源码 |
+| `microi_sync_microservice_source` | 同步私有源码；本地工程首选绝对路径 `directory` |
 | `microi_publish_application_directory_stream` | 流式发布真实构建目录 |
 | `microi_publish_microservice` | 小产物兼容发布 |
 
 `replace=true` 会清理源码清单外的旧元数据，属于覆盖性写入；必须先展示文件差异并
 获得明确确认。超时先回读，不重复发布。
+
+本地源码目录由 MCP 进程直接扫描和读取，AI 只看路径、大小、哈希与清单；禁止生成
+`.sync-seg-*`、`sync-source-files.json` 或手工 Base64 分段。单个源码超过模型读取上限时仍保持
+一个真实文件。`sourceFiles` 只保留没有本地目录时的旧调用兼容。
 
 真实构建目录一律使用逐文件 multipart 流：默认/硬上限为 20,000 文件、总计 20GB，
 文件体不进入 JSON、Base64 或 Jint。`StorageMode=db` 的 256 文件/5MB 仅用于小型
@@ -90,6 +94,7 @@
 - `MicroServiceRoutePath`
 - `MicroServiceKey`
 - `ComponentPath=/micro-app/host`
+- `ModuleEngineKey`（宿主权限上下文）
 
 无需导航的内部页面直接在 `sys_microiservice_page.RouteMetaJson` 设置
 `InternalOnly=true`；不再依赖伪造的隐藏 `sys_menu` 才能刷新友好路由。真正需要菜单
@@ -105,6 +110,7 @@ V8.OpenAppDialog({
   Width: 'min(960px, calc(100vw - 32px))',
   OpenType: 'Drawer',
   Data: { Id: V8.Form.Id },
+  ModuleEngineKey: 'authorized-module-key',
   OnSuccess: function (data) {
     V8.RefreshTable({ _PageIndex: -1 });
   },
@@ -124,8 +130,16 @@ V8.OpenAppDialog({
 const host = window.microApp?.getData?.() || {};
 ```
 
-常见字段：`apiBase`、`osClient`、`token`、`appKey`、`version`、
-`microRoute`、`dialog`、`dialogData`。只在内存中使用 Token。
+常见字段：`apiBase`、`osClient`、`token`、`menuId`、`moduleEngineKey`、`diyTableId`、
+`permissionContext`、`appKey`、`version`、`microRoute`、`dialog`、`dialogData`。只在内存中使用 Token。
+
+独立访问时没有宿主 Token：先配置清单中的 `apiBase/osClient`，读取 `V8.GetSysConfig(true)`，
+没有有效本地 Token 才显示吾码帐号密码登录；按 `EnableCaptcha` 动态请求验证码并向 `V8.Login`
+提交 `_CaptchaId/_CaptchaValue`。嵌入菜单或弹层时复用宿主身份，不显示第二套登录。
+
+`permissionContext={sysMenuId,moduleEngineKey,diyTableId}` 只帮助子应用选择正确的 FormEngine
+模块上下文，不能授予权限。无权限时依次核对 Token/OsClient、模块 Key、宿主上下文和角色授权；
+禁止去掉权限参数、改匿名接口或硬编码管理员 Token。
 
 页面根容器使用 `min-height: var(--micro-app-available-height, 100vh)`，让后台菜单、弹窗和
 移动端共享宿主实测高度；不要在嵌入模式直接固定 `100vh`。宿主高度变化时还会通过

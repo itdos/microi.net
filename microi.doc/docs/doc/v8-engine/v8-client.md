@@ -466,8 +466,8 @@ V8.ShowFormTab('tabName（在表单属性中配置的Tab名称）')
 >* 自定义 HTML 仅用于简单、一次性的可信展示，如下图所示：
 <table>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips-2.png"/></td>
+    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips.png" alt="V8 确认提示框默认样式"/></td>
+    <td><img src="https://static.itdos.com/upload/img/v8-confirm-tips-2.png" alt="V8 确认提示框自定义样式"/></td>
   </tr>
 </table>
 
@@ -780,6 +780,8 @@ V8.OpenAppDialog({
         source: 'osclients',
         osClientNetwork: 'Internal'
     },
+    // 可省略：默认继承当前菜单。跨模块操作时传入真实、已授权的模块 Key。
+    ModuleEngineKey: 'authorized-module-key',
     OnSuccess: function (data) {
         V8.Tips('创建任务已提交', true);
         V8.RefreshTable({ _PageIndex: -1 });
@@ -806,6 +808,9 @@ V8.OpenAppDialog({
 | `Width` | `string` | 否 | `min(920px, calc(100vw - 32px))` | 弹窗/抽屉宽度，支持 `px`、`%`、`vw`、`min(...)` 等 CSS 宽度值。 |
 | `OpenType` | `string` | 否 | `Dialog` | 打开方式：`Dialog` 或 `Drawer`。 |
 | `Data` | `object` | 否 | `{}` | 传给子应用的业务数据。应使用可序列化的普通对象，不要在其中放回调函数。 |
+| `SysMenuId` | `string` | 否 | 当前调用菜单 | 菜单权限上下文；一般无需手工传入。 |
+| `ModuleEngineKey` | `string` | 否 | 当前调用模块 | 目标模块引擎 Key。跨模块调用时应显式使用真实、已授权的 Key，不能用表名代替。 |
+| `DiyTableId` | `string` | 否 | 当前调用表 | 目标表 Id，仅作上下文，不能代替后端权限校验。 |
 | `OnSuccess` | `function(data)` | 否 | - | 子应用提交成功时执行；执行后宿主会自动关闭弹窗。 |
 | `OnCancel` | `function(data)` | 否 | - | 子应用主动取消时执行；执行后宿主会自动关闭弹窗。 |
 | `OnError` | `function(error)` | 否 | - | 应用加载失败或子应用上报错误时执行；错误不会自动关闭弹窗。 |
@@ -821,6 +826,7 @@ var hostData = window.microApp.getData();
 console.log(hostData.apiBase);
 console.log(hostData.osClient);
 console.log(hostData.token);
+console.log(hostData.permissionContext);
 
 // OpenAppDialog 参数
 console.log(hostData.appKey);
@@ -835,6 +841,10 @@ console.log(hostData.dialogData);   // 即宿主传入的 Data
 | `apiBase` | 当前吾码后端地址。 |
 | `osClient` | 当前租户标识。 |
 | `token` | 当前登录 Token，供子应用请求吾码接口时使用。 |
+| `menuId` | 当前调用菜单 Id。 |
+| `moduleEngineKey` | 当前或显式指定的模块引擎 Key。 |
+| `diyTableId` | 当前或显式指定的表 Id。 |
+| `permissionContext` | `{ sysMenuId, moduleEngineKey, diyTableId }`；用于选择正确的模块调用上下文，不是授权凭证。 |
 | `appKey` | 当前微服务 AppKey。 |
 | `version` | 实际加载的构建版本。 |
 | `microRoute` | 实际打开的微服务内部路由。 |
@@ -875,7 +885,7 @@ window.microApp.dispatch({
 | `V8.OpenAppDialog` | 按 `AppKey` 动态加载在线 AI 应用/微服务；应用可以独立维护、AI 生成、编译和发布。 |
 | `V8.OpenDialog` | 打开 Microi.Client 源码中已经注册的 Vue 组件，需要前端二次开发和重新发布主站。 |
 
-复杂定制界面优先使用 `V8.OpenAppDialog`；按钮 V8 代码只负责传参、接收结果和刷新页面，数据校验及业务事务仍应放在接口引擎或后端服务中。
+复杂定制界面优先使用 `V8.OpenAppDialog`；按钮 V8 代码只负责传参、接收结果和刷新页面，数据校验及业务事务仍应放在接口引擎或后端服务中。子应用提示“没权限”时，应先核对登录 Token、OsClient、`ModuleEngineKey` 和角色授权，禁止删除权限参数、改成匿名接口或把管理员 Token 写入前端。
 
 ## V8.NewGuid
 >* 生成一个前端Guid值

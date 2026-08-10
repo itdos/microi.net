@@ -198,12 +198,20 @@ export default {
             return this.$route?.path || "/";
         },
         microAppData() {
+            const permissionContext = {
+                sysMenuId: this.$route?.meta?.Id || "",
+                moduleEngineKey: this.$route?.meta?.ModuleEngineKey || "",
+                diyTableId: this.$route?.meta?.DiyTableId || ""
+            };
             return {
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
                 token: DiyCommon.getToken(),
-                menuId: this.$route?.meta?.Id || "",
+                menuId: permissionContext.sysMenuId,
                 menuName: this.$route?.meta?.title || "",
+                moduleEngineKey: permissionContext.moduleEngineKey,
+                diyTableId: permissionContext.diyTableId,
+                permissionContext,
                 appKey: this.appKey,
                 version: this.appVersion,
                 themeColor: this.diyStore.themeColor || this.diyStore.SysConfig?.ThemeColor || "#409eff",

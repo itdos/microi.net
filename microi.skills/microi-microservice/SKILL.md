@@ -64,8 +64,10 @@ src/
 AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，删除/新增路由后由
 发布流程同步 `sys_microiservice_page`，不要从 Vue 源码猜路由。
 
-构建前遵守本地 OOM 保护；已有 dev server 可复用时不重复启动。独立 Vite 预览缺少
-完整宿主 Token/OsClient/菜单/弹窗上下文，不能替代宿主验收。
+本地项目必须位于当前连接对应的 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。`microi.apps/` 是官方应用商城发行包工程目录，不是 MicroService 源码目录；发行包只能引用、构建或快照当前租户的唯一源码，不得在包内嵌套第二份可编辑 `microservice/` 工程。
+
+构建前遵守本地 OOM 保护；已有 dev server 可复用时不重复启动。新脚手架必须支持独立
+访问时的平台帐号登录，但独立 Vite 预览仍没有菜单/弹窗等完整宿主上下文，不能替代宿主验收。
 
 迁移 Vue2 定制页到独立 Vite 微服务时，不得假设宿主会提供 Tailwind/UnoCSS 等原子类；
 页面依赖的宽高、颜色、间距、响应式和打印/下载样式必须由组件自身的语义 class 明确声明，
@@ -74,10 +76,18 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 筛选、确认、导入参数或状态同步。验收需用旧版截图逐项核对标题、工具栏、选项、按钮、表格
 和分页，而不只确认组件已挂载。
 
+### 本地源码同步禁止人工分段
+
+- 已有本地工程时，`microi_sync_microservice_source` 首选只传项目绝对路径 `directory`；先 dry-run 审阅文件数、总大小、逐文件哈希和清单哈希，再传 `confirmExecution`。
+- 源码扫描、读取、哈希和上传内容组装必须在 MCP 进程内完成，模型上下文只接触清单。禁止让 AI 读取整个源码为 Base64，禁止生成 `.sync-seg-*`、`sync-source-files.json`，禁止把一个真实源码文件拆成多个临时文件反复调用工具。
+- 目录扫描必须排除 `node_modules`、`dist`、`build`、`coverage`、缓存、版本库和 UniApp 构建目录；发现 `.env`、证书、私钥、符号链接或越过根目录时失败关闭。
+- AI 工具单次读取上限不是 MicroService 源码文件上限。即使 `microi.v8.js` 等文件超过 50KB，也应保持一个完整文件，由 MCP 直接从磁盘读取。
+- `sourceFiles` 仅用于调用方本来就持有内存文件的旧版兼容场景；不得把它作为本地工程默认路径，也不得用人工切片规避上下文限制。
+
 ## 发布
 
 - 创建/更新元数据：`microi_create_microservice`。
-- 同步私有源码：`microi_sync_microservice_source`。
+- 同步私有源码：`microi_sync_microservice_source`；本地工程必须优先传 `directory`，不构造 Base64 文件数组。
 - 真实编译目录优先 `microi_publish_application_directory_stream` 流式发布。
 - 发布动作必须明确区分两种模式：默认“源码+编译产物”先把完整工程同步到私有桶并逐文件回读 SHA-256，再把 `dist` 流式发布到公有桶；显式“仅编译产物”只更新公有桶，必须在界面中告知其他用户仍会拉取上一次私有源码，禁止暗示源码已同步。
 - 私有源码同步使用 `ReplacePrivateSourceOnly` 精确清理过期源码；兼容调用可以继续接受 `replace`，但实现不得用旧式全表 `Replace=true` 删除同一应用的公有运行产物元数据。
@@ -95,7 +105,22 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 
 菜单 `OpenType=MicroService` 时一次绑定 `MicroServiceId`、
 `MicroServicePageId`、`MicroServiceRoutePath`、`MicroServiceKey`。
+完整系统 Manifest 不得固化不同租户会变化的两个 Id；模块声明 `openType=MicroService`、`microServiceKey` 和 `microServiceRoutePath` 即可，由 `microi_generate_system` 在任何写入前回读 `sys_microiservice/sys_microiservice_page`，解析并校验当前租户的 `MicroServiceId/MicroServicePageId`。微服务或页面不存在时必须在首个写操作前失败，不能留下半套系统。
 复杂弹窗用 `V8.OpenAppDialog`，业务参数放 `Data`，回调放顶层。
+
+### 独立、菜单与弹层三种入口
+
+- 同一发布物必须支持：直接打开独立运行、`sys_menu` 使用 `/micro-app/{AppKey}/{RoutePath}` 打开指定路由、`V8.OpenAppDialog` 按 AppKey/RoutePath 以 Dialog 或 Drawer 打开。
+- 菜单路由必须同时回读并传入 `SysMenuId`、`ModuleEngineKey`、`DiyTableId`；弹层默认继承调用菜单，也允许跨模块时显式传真实授权模块。宿主统一下发 `{ sysMenuId, moduleEngineKey, diyTableId }` 的 `permissionContext`。
+- `permissionContext` 只是选择正确 API 调用上下文，不是授权凭证。后端仍依据 DiyToken、OsClient、角色、菜单、表、按钮和数据范围校验；禁止删除权限参数、改成匿名接口或写死管理员 Token 来消除“没权限”。
+
+### 独立运行的认证门
+
+- 嵌入菜单或 `V8.OpenAppDialog` 时直接复用宿主 Token，不显示第二套登录页；同一个 V8 SDK 实例继续处理 Token 轮换。
+- 独立访问时先配置当前 `apiBase/osClient` 并复用本地有效 Token；没有有效 Token 才显示吾码帐号密码登录。
+- 页面启动时调用 `V8.GetSysConfig(true)`，用统一 `isEnabledFlag` 解析 `EnableCaptcha`。开启时请求 `GET /api/Captcha/GetCaptcha?OsClient=...`、读取响应头 `captchaid`，登录提交 `_CaptchaId/_CaptchaValue`；关闭时不渲染、不提交验证码字段。
+- 登录使用统一 `V8.Login` 与 DiyToken，不创建第二套用户体系。Token 失效后回到认证门；禁止在 URL、日志、源码、`.env` 或业务数据中保存 Token。
+- “无权限”排查顺序固定为：Token/OsClient → 目标 `ModuleEngineKey` → 宿主 `permissionContext` → 当前角色的菜单/表/按钮/数据范围。登录成功不等于拥有全部模块权限。
 
 微服务内部禁止调用浏览器原生 `alert/confirm/prompt`。优先复用宿主 `Tips`/`V8.ConfirmTips`；需要由子应用自行承载时，使用 teleport 到 `body` 的品牌化可访问弹层，固定在当前视口正中央并高于宿主滚动内容。长列表只允许一次性加载后在前端内存搜索时，不得随着关键词重复请求服务器。
 
@@ -152,7 +177,8 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 - 组合发布成功前，私有源码回读必须与本地源码在路径集合、文件数、字节数、逐文件 SHA-256 和规范化清单哈希上完全一致；任何缺失、多余或读取错误都要阻止运行版本切换。
 - 直接刷新友好路由与连续切换多个微应用不 404、白屏或实例名冲突。
 - Dialog/Drawer 成功、取消、错误和关闭协议正确。
-- 宿主 API 请求携带当前 Token/OsClient/菜单上下文，普通用户权限正确。
+- 独立地址覆盖“已有 Token 自动进入”和“无 Token 显示帐号密码”；`EnableCaptcha` 开/关各验一次，验证码响应头和登录参数正确。
+- 宿主 API 请求携带当前 Token/OsClient/`permissionContext`，普通用户用真实授权模块成功、未授权模块仍明确拒绝。
 - 至少验证桌面和窄屏；上传、表格、滚动、弹窗底部操作不被截断。
 - 长弹窗滚动到顶部/中部/底部后，错误提示和确认层仍位于当前视口中央；自动化监听到原生 JavaScript 对话框直接判失败。
 - 本地构建、MCP 发布和真实浏览器验收分别说明，未执行的层不宣称通过。

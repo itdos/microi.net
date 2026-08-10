@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
@@ -17,6 +19,8 @@ namespace Microi.net
     /// </summary>
 	public class MicroiHDFSMinIO : MicroiHDFS, IMicroiHDFS
     {
+        private static readonly HttpClient UploadReadbackHttpClient = CreateUploadReadbackHttpClient();
+
         public sealed class MinioEndpointConfiguration
         {
             public string Host { get; set; }
@@ -78,6 +82,19 @@ namespace Microi.net
             if (normalized.UseSsl) builder = builder.WithSSL();
             if (!region.DosIsNullOrWhiteSpace()) builder = builder.WithRegion(region);
             return builder.Build();
+        }
+
+        private static HttpClient CreateUploadReadbackHttpClient()
+        {
+            return new HttpClient(new HttpClientHandler
+            {
+                // Pre-signed URLs contain temporary credentials in the query.
+                // Never forward them to a redirect target during readback.
+                AllowAutoRedirect = false
+            })
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
         }
 
         private static bool ShouldUseInternetEndpoint(bool? networkIsInternet, string returnFileType)
@@ -250,9 +267,36 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-
-
-                objectExist = false;
+                // Minio SDK 7 performs a signed HEAD /{bucket}/ before the
+                // object request. A cache proxy can change that signed HEAD
+                // into GET, while object-scoped credentials may intentionally
+                // lack bucket-list permission. A signed one-byte GET remains
+                // an exact, fail-closed existence proof in both cases.
+                var rangeReadback = await ReadObjectRangeAsync(
+                    minIOClient,
+                    bucketName,
+                    param.FileFullPath.DosTrimStart('/'));
+                if (IsRangeReadbackObjectPresent(
+                    (int)rangeReadback.StatusCode,
+                    rangeReadback.ContentLength,
+                    rangeReadback.ContentRangeLength,
+                    rangeReadback.BytesRead))
+                {
+                    return new DosResult<bool>(1, true);
+                }
+                if (rangeReadback.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return new DosResult<bool>(1, false);
+                }
+                return new DosResult<bool>(
+                    0,
+                    false,
+                    "MinIO 对象存在性回读失败：HEAD/Stat 未通过，签名 Range GET 也未能确认对象。"
+                    + $"Bucket={bucketName}，Object={param.FileFullPath.DosTrimStart('/')}。"
+                    + "请检查 s3:GetObject、s3:ListBucket/GetBucketLocation 以及 Nginx "
+                    + "proxy_cache_convert_head off。Stat原始错误："
+                    + (ex?.Message ?? "未知错误")
+                    + "；Range回读：" + rangeReadback.Error);
             }
             return new DosResult<bool>(1, objectExist);
         }
@@ -406,11 +450,149 @@ namespace Microi.net
             }
             catch (Exception verificationException)
             {
+                var rangeReadback = await ReadObjectRangeAsync(
+                    minioClient,
+                    bucketName,
+                    objectName);
+                if (IsRangeReadbackVerified(
+                    (int)rangeReadback.StatusCode,
+                    rangeReadback.ContentLength,
+                    rangeReadback.ContentRangeLength,
+                    rangeReadback.BytesRead,
+                    expectedSize))
+                {
+                    return (true, string.Empty);
+                }
                 return (false, BuildUploadReadbackDiagnostic(
                     verificationException,
                     bucketName,
-                    objectName));
+                    objectName)
+                    + "；签名 Range GET 兼容回读也未通过："
+                    + rangeReadback.Error);
             }
+        }
+
+        private sealed class ObjectRangeReadback
+        {
+            public HttpStatusCode StatusCode { get; set; }
+            public long? ContentLength { get; set; }
+            public long? ContentRangeLength { get; set; }
+            public int BytesRead { get; set; }
+            public string Error { get; set; }
+        }
+
+        private static Task<ObjectRangeReadback> ReadObjectRangeAsync(
+            IMinioClient minioClient,
+            string bucketName,
+            string objectName)
+        {
+            return ReadObjectRangeAsync(
+                minioClient,
+                bucketName,
+                objectName,
+                UploadReadbackHttpClient);
+        }
+
+        private static async Task<ObjectRangeReadback> ReadObjectRangeAsync(
+            IMinioClient minioClient,
+            string bucketName,
+            string objectName,
+            HttpClient httpClient)
+        {
+            try
+            {
+                var signedUrl = await minioClient.PresignedGetObjectAsync(
+                    new PresignedGetObjectArgs()
+                        .WithBucket(bucketName)
+                        .WithObject(objectName)
+                        .WithExpiry(60));
+                using (var request = new HttpRequestMessage(HttpMethod.Get, signedUrl))
+                {
+                    request.Headers.Range = new RangeHeaderValue(0, 0);
+                    using (var response = await httpClient.SendAsync(
+                        request,
+                        HttpCompletionOption.ResponseHeadersRead))
+                    {
+                        var bytesRead = 0;
+                        if (response.StatusCode == HttpStatusCode.OK
+                            || response.StatusCode == HttpStatusCode.PartialContent)
+                        {
+                            using (var stream = await response.Content.ReadAsStreamAsync())
+                            {
+                                var firstByte = new byte[1];
+                                bytesRead = await stream.ReadAsync(firstByte, 0, firstByte.Length);
+                            }
+                        }
+                        return new ObjectRangeReadback
+                        {
+                            StatusCode = response.StatusCode,
+                            ContentLength = response.Content.Headers.ContentLength,
+                            ContentRangeLength = response.Content.Headers.ContentRange?.Length,
+                            BytesRead = bytesRead,
+                            Error = $"HTTP {(int)response.StatusCode}，Content-Length="
+                                    + (response.Content.Headers.ContentLength?.ToString() ?? "null")
+                                    + "，Content-Range-Length="
+                                    + (response.Content.Headers.ContentRange?.Length?.ToString() ?? "null")
+                                    + $"，BytesRead={bytesRead}"
+                        };
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                // Never include the pre-signed URL or its query in diagnostics.
+                return new ObjectRangeReadback
+                {
+                    StatusCode = 0,
+                    Error = "签名 Range GET 回读异常（ExceptionType="
+                            + exception.GetType().Name + "）"
+                };
+            }
+        }
+
+        private static bool IsRangeReadbackObjectPresent(
+            int statusCode,
+            long? contentLength,
+            long? contentRangeLength,
+            int bytesRead)
+        {
+            if (statusCode == (int)HttpStatusCode.PartialContent)
+            {
+                return bytesRead == 1;
+            }
+            if (statusCode == (int)HttpStatusCode.OK)
+            {
+                return bytesRead == 1 || (bytesRead == 0 && contentLength == 0);
+            }
+            return statusCode == (int)HttpStatusCode.RequestedRangeNotSatisfiable
+                   && contentRangeLength == 0;
+        }
+
+        private static bool IsRangeReadbackVerified(
+            int statusCode,
+            long? contentLength,
+            long? contentRangeLength,
+            int bytesRead,
+            long expectedSize)
+        {
+            if (expectedSize < 0) return false;
+            if (expectedSize == 0)
+            {
+                return (statusCode == (int)HttpStatusCode.OK
+                        && contentLength == 0
+                        && bytesRead == 0)
+                       || (statusCode == (int)HttpStatusCode.RequestedRangeNotSatisfiable
+                           && contentRangeLength == 0);
+            }
+            if (statusCode == (int)HttpStatusCode.PartialContent)
+            {
+                return contentRangeLength == expectedSize
+                       && (contentLength == null || contentLength == 1)
+                       && bytesRead == 1;
+            }
+            return statusCode == (int)HttpStatusCode.OK
+                   && contentLength == expectedSize
+                   && bytesRead == 1;
         }
 
         private static string BuildUploadReadbackDiagnostic(
@@ -425,10 +607,12 @@ namespace Microi.net
             {
                 return $"对象上传请求已返回成功，但同一 MinIO 凭据执行 HEAD/Stat 回读被拒绝"
                        + $"（Bucket={bucketName}，Object={objectName}）。"
-                       + "请检查该凭据至少具有目标桶的 s3:GetObject 与 s3:GetBucketLocation 权限；"
+                       + "MinIO SDK 可能先执行 HEAD Bucket，请检查该凭据至少具有目标对象的 s3:GetObject，"
+                       + "并按部署需要配置 s3:ListBucket / s3:GetBucketLocation；"
                        + "若权限已配置且 Endpoint 前存在 Nginx/缓存代理，请确认 HEAD 请求未被错误转换为 GET，"
                        + "必要时对该代理位置设置 proxy_cache_convert_head off。"
-                       + "平台不会跳过上传后回读校验，以免把未落盘对象误报为成功。原始错误："
+                       + "平台还会使用同凭据的签名 Range GET 校验对象大小并读取首字节，"
+                       + "不会跳过上传后回读校验。原始错误："
                        + rawMessage;
             }
 

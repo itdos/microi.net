@@ -588,6 +588,14 @@ export const V8ApiDefinitions = {
                 insertText: "ConfirmTips",
                 snippet: 'ConfirmTips("${1:message}", function() {\n\t${2:// 确认后的操作}\n})'
             },
+            OpenAppDialog: {
+                label: "OpenAppDialog",
+                kind: "Method",
+                documentation:
+                    '按 AppKey 和 RoutePath 以 Dialog/Drawer 打开已发布的 MicroService 指定路由。菜单与弹层会复用当前 DiyToken、OsClient，并传入 sysMenuId/moduleEngineKey/diyTableId 权限上下文。\n\n参数:\n  - AppKey: 微服务 Key（必传）\n  - RoutePath: 内部路由，默认 /\n  - OpenType: Dialog 或 Drawer\n  - Data: 可序列化业务数据\n  - SysMenuId/ModuleEngineKey/DiyTableId: 可选；默认继承调用菜单，跨模块时显式传真实授权模块\n  - OnSuccess/OnCancel/OnError: 回调\n\n不要把 Token 拼进 URL；无权限时核对身份、租户、ModuleEngineKey 与角色授权，禁止改成匿名接口。',
+                insertText: "OpenAppDialog",
+                snippet: 'OpenAppDialog({\n\tAppKey: "${1:app-key}",\n\tRoutePath: "${2:/route}",\n\tTitle: "${3:应用}",\n\tOpenType: "${4:Dialog}",\n\tData: { ${5} },\n\tOnSuccess: function(data) {\n\t\t${6:// 成功处理}\n\t}\n})'
+            },
 
             // ========== 工具方法 ==========
             IsNull: {

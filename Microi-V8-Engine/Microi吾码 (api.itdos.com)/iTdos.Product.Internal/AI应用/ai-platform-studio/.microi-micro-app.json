@@ -4,10 +4,10 @@
   "appKey": "ai-platform-studio",
   "name": "Microi吾码 AI 平台治理中心",
   "osClient": "iTdos",
-  "apiBaseUrl": "http://localhost:61501",
+  "apiBaseUrl": "https://api.itdos.com",
   "entry": "index.html",
   "distDir": "dist",
   "routeManifest": "microi.routes.json",
-  "version": "v2.0.0",
+  "version": "v2.0.3",
   "createdAt": "2026-08-09 00:00:00"
 }

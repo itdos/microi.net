@@ -1,7 +1,272 @@
 {
   "name": "Microi吾码 AI 平台治理中心",
-  "version": "v2.0.1",
+  "version": "v2.0.3",
   "description": "门户、身份目录、标签人群、访问申请、临时权限、灰度发布、服务实例、Trace、日志生命周期、告警升级、资产包、协作租约与可恢复导入的一体化平台治理能力。",
+  "menuCatalog": [
+    {
+      "key": "portal",
+      "name": "门户装配",
+      "purpose": "管理可组合门户及其不可变发布版本。",
+      "menus": [
+        {
+          "name": "门户项目",
+          "kind": "配置",
+          "purpose": "定义一个门户及其当前发布状态。"
+        },
+        {
+          "name": "门户插槽",
+          "kind": "配置",
+          "purpose": "定义门户页面中可装配内容的位置。"
+        },
+        {
+          "name": "门户资源",
+          "kind": "配置",
+          "purpose": "维护装入插槽的页面、组件和资源。"
+        },
+        {
+          "name": "资源版本",
+          "kind": "台账",
+          "purpose": "保存资源不可变版本，用于比较、审计和回滚。"
+        }
+      ]
+    },
+    {
+      "key": "identity",
+      "name": "身份目录",
+      "purpose": "把外部组织与账号同步到吾码身份体系并保留冲突证据。",
+      "menus": [
+        {
+          "name": "身份连接器",
+          "kind": "配置",
+          "purpose": "配置企业微信、钉钉、LDAP 等身份来源。"
+        },
+        {
+          "name": "身份同步",
+          "kind": "运行",
+          "purpose": "查看每次组织和账号同步的执行结果。"
+        },
+        {
+          "name": "身份冲突",
+          "kind": "处置",
+          "purpose": "处理重名、账号碰撞和归属不一致。"
+        },
+        {
+          "name": "组织快照",
+          "kind": "台账",
+          "purpose": "保存部门树与用户归属的不可变快照。"
+        }
+      ]
+    },
+    {
+      "key": "access",
+      "name": "人群与授权",
+      "purpose": "用动态人群、标签和审批式变更治理访问权限。",
+      "menus": [
+        {
+          "name": "动态用户组",
+          "kind": "配置",
+          "purpose": "按规则生成可重复计算的用户人群。"
+        },
+        {
+          "name": "用户组成员",
+          "kind": "台账",
+          "purpose": "查看某次计算得到的实际成员。"
+        },
+        {
+          "name": "用户标签",
+          "kind": "配置",
+          "purpose": "定义用户分类、范围和标签类型。"
+        },
+        {
+          "name": "标签分配",
+          "kind": "台账",
+          "purpose": "记录标签分配来源、有效期和状态。"
+        },
+        {
+          "name": "授权变更集",
+          "kind": "运行",
+          "purpose": "批量授权或回收前生成可校验的变更计划。"
+        },
+        {
+          "name": "授权变更明细",
+          "kind": "台账",
+          "purpose": "记录每个账号的授权执行结果与错误。"
+        },
+        {
+          "name": "访问申请",
+          "kind": "审批",
+          "purpose": "提交、审批和跟踪访问权限申请。"
+        },
+        {
+          "name": "临时授权",
+          "kind": "运行",
+          "purpose": "管理带到期时间且可自动回收的权限。"
+        }
+      ]
+    },
+    {
+      "key": "configuration",
+      "name": "配置与灰度",
+      "purpose": "统一配置基线、环境差异和功能灰度。",
+      "menus": [
+        {
+          "name": "配置模板",
+          "kind": "配置",
+          "purpose": "维护不同环境可继承、可版本化的配置基线。"
+        },
+        {
+          "name": "配置漂移",
+          "kind": "处置",
+          "purpose": "发现并处理目标环境偏离配置基线的问题。"
+        },
+        {
+          "name": "功能开关",
+          "kind": "配置",
+          "purpose": "按用户、角色、部门或比例控制功能灰度。"
+        }
+      ]
+    },
+    {
+      "key": "release",
+      "name": "发布治理",
+      "purpose": "让发布经过计划、审批、门禁、执行和审计。",
+      "menus": [
+        {
+          "name": "发布计划",
+          "kind": "配置",
+          "purpose": "固定发布内容、门禁、步骤和回滚方案。"
+        },
+        {
+          "name": "发布审批",
+          "kind": "审批",
+          "purpose": "保存不可变审批结论并落实职责分离。"
+        },
+        {
+          "name": "发布运行",
+          "kind": "运行",
+          "purpose": "查看发布或回滚的断点、租约和执行状态。"
+        },
+        {
+          "name": "变更台账",
+          "kind": "台账",
+          "purpose": "汇总跨资源变更及其应用、验证证据。"
+        }
+      ]
+    },
+    {
+      "key": "service",
+      "name": "服务治理",
+      "purpose": "管理服务目录、实例、路由策略和调用拓扑。",
+      "menus": [
+        {
+          "name": "服务目录",
+          "kind": "配置",
+          "purpose": "登记服务身份、负责人和健康状态。"
+        },
+        {
+          "name": "服务实例",
+          "kind": "运行",
+          "purpose": "查看实例版本、区域、租约和排空状态。"
+        },
+        {
+          "name": "流量策略",
+          "kind": "配置",
+          "purpose": "配置版本路由、重试、限流、熔断和降级。"
+        },
+        {
+          "name": "调用结果",
+          "kind": "台账",
+          "purpose": "记录策略许可对应的真实调用结果。"
+        },
+        {
+          "name": "服务拓扑",
+          "kind": "台账",
+          "purpose": "聚合服务间调用量、错误量和延迟。"
+        }
+      ]
+    },
+    {
+      "key": "observability",
+      "name": "可观测与日志",
+      "purpose": "把监控规则、告警处置、送达和日志生命周期连成闭环。",
+      "menus": [
+        {
+          "name": "可观测策略",
+          "kind": "配置",
+          "purpose": "定义可信指标、阈值、窗口和严重级别。"
+        },
+        {
+          "name": "规则评估台账",
+          "kind": "台账",
+          "purpose": "记录每个时间窗口的规则评估证据。"
+        },
+        {
+          "name": "告警事件",
+          "kind": "处置",
+          "purpose": "查看、确认、恢复和关闭平台告警。"
+        },
+        {
+          "name": "告警路由",
+          "kind": "配置",
+          "purpose": "配置告警接收人、优先级和处理时限。"
+        },
+        {
+          "name": "告警送达",
+          "kind": "台账",
+          "purpose": "跟踪每次通知尝试、重试和送达结果。"
+        },
+        {
+          "name": "日志策略",
+          "kind": "配置",
+          "purpose": "设置日志热、温、冷阶段和归档方式。"
+        },
+        {
+          "name": "日志生命周期",
+          "kind": "运行",
+          "purpose": "查看日志扫描、归档和清理任务结果。"
+        }
+      ]
+    },
+    {
+      "key": "asset",
+      "name": "资产与协作",
+      "purpose": "沉淀可复用资产并避免多人同时覆盖同一资源。",
+      "menus": [
+        {
+          "name": "资产包",
+          "kind": "配置",
+          "purpose": "定义可复用、可安装的页面或配置资产集合。"
+        },
+        {
+          "name": "资产版本",
+          "kind": "台账",
+          "purpose": "保存资产不可变版本、内容哈希和兼容范围。"
+        },
+        {
+          "name": "协作租约",
+          "kind": "运行",
+          "purpose": "显示谁正在编辑资源并提供过期与防并发令牌。"
+        }
+      ]
+    },
+    {
+      "key": "import",
+      "name": "数据迁移",
+      "purpose": "对大批量导入进行预检、分片执行、恢复和回滚。",
+      "menus": [
+        {
+          "name": "导入批次",
+          "kind": "运行",
+          "purpose": "查看导入计划、进度、成功失败数和检查点。"
+        },
+        {
+          "name": "导入暂存行",
+          "kind": "台账",
+          "purpose": "查看每一行的计划动作、结果和错误原因。"
+        }
+      ]
+    }
+  ],
   "tables": [
     {
       "name": "mci_portal_project",
@@ -8183,7 +8448,7 @@
       "v8Unlimited": false,
       "stopHttp": 0,
       "allowAnonymous": 1,
-      "code": "/*\n * 按 ProjectKey/ProjectId 解析当前已发布门户快照。\n */\nvar projectKey = String((V8.Param && (V8.Param.ProjectKey || V8.Param.ProjectId)) || '');\nif (!projectKey) return { Code: 0, Msg: 'ProjectKey不能为空。' };\nvar projectResult = V8.FormEngine.GetFormData('mci_portal_project', {\n  _Where: [\n    ['ProjectKey', '=', projectKey],\n    ['OR', 'Id', '=', projectKey]\n  ]\n});\nif (!projectResult || projectResult.Code !== 1 || !projectResult.Data) return { Code: 2, Msg: '门户项目不存在。' };\nvar project = projectResult.Data;\nif (!project.ActiveVersionId) return { Code: 2, Msg: '门户项目尚未发布。' };\nvar versionResult = V8.FormEngine.GetFormData('mci_resource_version', { Id: project.ActiveVersionId });\nif (!versionResult || versionResult.Code !== 1 || !versionResult.Data) return { Code: 2, Msg: '当前发布版本不存在。' };\nvar version = versionResult.Data;\nvar snapshot = {};\ntry { snapshot = JSON.parse(String(version.SnapshotJson || '{}')); }\ncatch (error) { return { Code: 0, Msg: '门户快照损坏。' }; }\nreturn {\n  Code: 1,\n  Data: {\n    ProjectId: project.Id,\n    ProjectKey: project.ProjectKey,\n    VersionId: version.Id,\n    VersionNo: version.VersionNo,\n    ETag: version.ContentHash,\n    Snapshot: snapshot,\n    PublishedTime: version.PublishedTime\n  }\n};\n\n"
+      "code": "/*\n * 按 ProjectKey/ProjectId 解析当前已发布门户快照。\n */\nvar projectKey = String((V8.Param && (V8.Param.ProjectKey || V8.Param.ProjectId)) || '');\nif (!projectKey) return { Code: 0, Msg: 'ProjectKey不能为空。' };\nvar projectResult = V8.FormEngine.GetFormData('mci_portal_project', {\n  _Where: [\n    ['ProjectKey', '=', projectKey],\n    ['OR', 'Id', '=', projectKey]\n  ]\n});\nif (!projectResult || projectResult.Code !== 1 || !projectResult.Data) return { Code: 2, Msg: '门户项目不存在。' };\nvar project = projectResult.Data;\nif (!project.ActiveVersionId) return { Code: 2, Msg: '门户项目尚未发布。' };\nvar versionResult = V8.FormEngine.GetFormData('mci_resource_version', { Id: project.ActiveVersionId });\nif (!versionResult || versionResult.Code !== 1 || !versionResult.Data) return { Code: 2, Msg: '当前发布版本不存在。' };\nvar version = versionResult.Data;\nvar snapshot = {};\ntry { snapshot = JSON.parse(String(version.SnapshotJson || '{}')); }\ncatch (error) { return { Code: 0, Msg: '门户快照损坏。' }; }\nreturn {\n  Code: 1,\n  Data: {\n    ProjectId: project.Id,\n    ProjectKey: project.ProjectKey,\n    VersionId: version.Id,\n    VersionNo: version.VersionNo,\n    ETag: version.ContentHash,\n    Snapshot: snapshot,\n    PublishedTime: version.PublishedTime\n  }\n};\n"
     },
     {
       "apiEngineKey": "mci-resource-compare",
@@ -8669,7 +8934,7 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     },
     {
       "apiEngineKey": "mci-identity-source-extension",
@@ -8678,7 +8943,7 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     },
     {
       "apiEngineKey": "mci-release-gate-extension",
@@ -8687,7 +8952,7 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     },
     {
       "apiEngineKey": "mci-alert-notify-extension",
@@ -8696,7 +8961,7 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     },
     {
       "apiEngineKey": "mci-asset-validate-extension",
@@ -8705,7 +8970,7 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     },
     {
       "apiEngineKey": "mci-log-archive-extension",
@@ -8714,7 +8979,7 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     },
     {
       "apiEngineKey": "mci-release-execute-extension",
@@ -8723,11 +8988,37 @@
       "v8Unlimited": false,
       "stopHttp": 1,
       "allowAnonymous": 0,
-      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n\n"
+      "code": "/*\n * Microi吾码租户扩展 Hook。\n * 由应用包以 CreateIfMissing 发布，首次安装后归租户维护，官方升级永不覆盖。\n */\nreturn {\n  Code: 1,\n  Data: {\n    Accepted: true,\n    HookKey: V8.Param && V8.Param.HookKey ? String(V8.Param.HookKey) : '',\n    Records: [],\n    Gates: [],\n    Notifications: []\n  },\n  Msg: '未配置租户扩展，已按平台默认策略继续。'\n};\n"
     }
   ],
   "events": [],
   "modules": [
+    {
+      "name": "AI平台治理",
+      "Description": "集中管理门户、身份、授权、配置、发布、服务、可观测、资产与数据迁移治理。",
+      "parentId": "cdc0844b-7249-4d64-a9c3-563a15c9cd20",
+      "icon": "fas fa-shield-alt",
+      "display": 1,
+      "appDisplay": 1,
+      "openType": "SecondMenu",
+      "sort": 9
+    },
+    {
+      "name": "AI平台治理工作台",
+      "Description": "AI平台治理统一操作入口。",
+      "parentName": "AI平台治理",
+      "icon": "fas fa-tachometer-alt",
+      "display": 1,
+      "appDisplay": 1,
+      "openType": "MicroService",
+      "componentName": "MicroService",
+      "componentPath": "/micro-app/host",
+      "url": "/micro-app/ai-platform-studio/overview",
+      "isMicroiService": 1,
+      "microServiceKey": "ai-platform-studio",
+      "microServiceRoutePath": "/overview",
+      "sort": 1
+    },
     {
       "name": "AI平台治理·门户项目",
       "table": "mci_portal_project",
@@ -8768,7 +9059,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 10
     },
     {
       "name": "AI平台治理·门户插槽",
@@ -8810,7 +9103,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 20
     },
     {
       "name": "AI平台治理·门户资源",
@@ -8853,7 +9148,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 30
     },
     {
       "name": "AI平台治理·资源版本",
@@ -8898,7 +9195,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 40
     },
     {
       "name": "AI平台治理·身份连接器",
@@ -8942,7 +9241,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 50
     },
     {
       "name": "AI平台治理·身份同步",
@@ -8987,7 +9288,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 60
     },
     {
       "name": "AI平台治理·身份冲突",
@@ -9031,7 +9334,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 70
     },
     {
       "name": "AI平台治理·配置模板",
@@ -9079,7 +9384,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 170
     },
     {
       "name": "AI平台治理·配置漂移",
@@ -9125,7 +9432,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 180
     },
     {
       "name": "AI平台治理·功能开关",
@@ -9168,7 +9477,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 190
     },
     {
       "name": "AI平台治理·发布计划",
@@ -9215,7 +9526,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 200
     },
     {
       "name": "AI平台治理·发布审批",
@@ -9256,7 +9569,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 210
     },
     {
       "name": "AI平台治理·发布运行",
@@ -9303,7 +9618,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 220
     },
     {
       "name": "AI平台治理·服务目录",
@@ -9348,7 +9665,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 240
     },
     {
       "name": "AI平台治理·可观测策略",
@@ -9393,7 +9712,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 290
     },
     {
       "name": "AI平台治理·告警事件",
@@ -9439,7 +9760,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 310
     },
     {
       "name": "AI平台治理·规则评估台账",
@@ -9486,7 +9809,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 300
     },
     {
       "name": "AI平台治理·导入批次",
@@ -9533,7 +9858,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 390
     },
     {
       "name": "AI平台治理·导入暂存行",
@@ -9576,7 +9903,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 400
     },
     {
       "name": "AI平台治理·动态用户组",
@@ -9623,7 +9952,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 90
     },
     {
       "name": "AI平台治理·用户组成员",
@@ -9666,7 +9997,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 100
     },
     {
       "name": "AI平台治理·用户标签",
@@ -9711,7 +10044,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 110
     },
     {
       "name": "AI平台治理·标签分配",
@@ -9755,7 +10090,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 120
     },
     {
       "name": "AI平台治理·授权变更集",
@@ -9803,7 +10140,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 130
     },
     {
       "name": "AI平台治理·授权变更明细",
@@ -9847,7 +10186,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 140
     },
     {
       "name": "AI平台治理·访问申请",
@@ -9894,7 +10235,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 150
     },
     {
       "name": "AI平台治理·临时授权",
@@ -9939,7 +10282,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 160
     },
     {
       "name": "AI平台治理·组织快照",
@@ -9982,7 +10327,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 80
     },
     {
       "name": "AI平台治理·服务实例",
@@ -10028,7 +10375,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 250
     },
     {
       "name": "AI平台治理·流量策略",
@@ -10074,7 +10423,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 260
     },
     {
       "name": "AI平台治理·调用结果",
@@ -10123,7 +10474,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 270
     },
     {
       "name": "AI平台治理·服务拓扑",
@@ -10167,7 +10520,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 280
     },
     {
       "name": "AI平台治理·日志策略",
@@ -10214,7 +10569,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 340
     },
     {
       "name": "AI平台治理·日志生命周期",
@@ -10260,7 +10617,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 350
     },
     {
       "name": "AI平台治理·告警路由",
@@ -10304,7 +10663,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 320
     },
     {
       "name": "AI平台治理·告警送达",
@@ -10353,7 +10714,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 330
     },
     {
       "name": "AI平台治理·资产包",
@@ -10398,7 +10761,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 360
     },
     {
       "name": "AI平台治理·资产版本",
@@ -10445,7 +10810,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 370
     },
     {
       "name": "AI平台治理·变更台账",
@@ -10493,7 +10860,9 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 230
     },
     {
       "name": "AI平台治理·协作租约",
@@ -10537,13 +10906,17 @@
       ],
       "enableViewSchema": 1,
       "viewSchemaVersion": "1.0",
-      "viewConfigVersion": 1
+      "viewConfigVersion": 1,
+      "parentName": "AI平台治理",
+      "sort": 380
     }
   ],
   "permissions": [
     {
       "roleId": "admin",
       "moduleNames": [
+        "AI平台治理",
+        "AI平台治理工作台",
         "AI平台治理·门户项目",
         "AI平台治理·门户插槽",
         "AI平台治理·门户资源",

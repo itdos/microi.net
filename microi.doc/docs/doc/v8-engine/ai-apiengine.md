@@ -231,8 +231,8 @@ microi init --pull
 
 所有右下角的信息、警告和错误通知都会同步保存在 VS Code 的【输出 → Microi 吾码】中，包括微服务构建/推送、代码拉取/同步、登录和远程执行结果。日志时间使用运行 VS Code 电脑的本地时区；带按钮的通知还会记录用户最终选择，通知消失后仍可继续追查。后台身份维护使用静默状态探测，服务器临时不可达不会反复产生无内容的 `GetStatus Error:`；用户主动操作失败时则会保留错误码、地址和端口等诊断明细。
 
-<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试" style="margin: 5px;">
 
 ### 单独更新 AI 知识库
 

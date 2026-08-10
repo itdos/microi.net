@@ -22,7 +22,7 @@
 ---
 
 ## 📸 平台预览图
-<img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台预览" style="margin: 5px;">
 
 ```js
 这里插入文章正文

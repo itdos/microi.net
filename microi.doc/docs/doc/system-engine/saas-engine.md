@@ -103,12 +103,12 @@ Upgrade16 会在 `sys_osclients` 增加以下可空字段：
 ## 基础配置
 >* 支持数据库读写分离，支持指定存储介质
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
+![SaaS 引擎基础配置](https://static.itdos.com/upload/img/csdn/de7982df51cc41afa7e0dbc2c5389c89.png#pic_center)
 
 ## 阿里云配置
 >* 如果未使用MinIO，即可使用阿里云的OSS+CDN
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
+![SaaS 引擎阿里云 OSS 配置](https://static.itdos.com/upload/img/csdn/0e4da43b35394de7867cfa5425697476.png#pic_center)
 
 ## MinIO配置
 >* 如果未使用阿里云OSS，则可以使用MinIO
@@ -208,12 +208,12 @@ server {
 :::
 
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
+![SaaS 引擎 MinIO 配置](https://static.itdos.com/upload/img/csdn/1efac36d0af04dd58b79723e2c850070.png#pic_center)
 
 ## Redis配置
 >* 支持哨兵模式
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
+![SaaS 引擎 Redis 配置](https://static.itdos.com/upload/img/csdn/d67c8649dc444e508238410c36b746ee.png#pic_center)
 
 ### SaaS 运行缓存刷新与扩展库加载
 
@@ -241,12 +241,12 @@ Microi MCP 同步提供 `microi_redis_statistics`、`microi_redis_list_keys`、`
 ## MQ消息队列配置
 >* 支持集群模式
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
+![SaaS 引擎 MQ 集群配置](https://static.itdos.com/upload/img/csdn/c171c8510a2b452980c3f020048b9d53.png#pic_center)
 
 ## 搜索引擎配置
 >* 目前仅支持ES搜索引擎，支持分词搜索，将来可能扩展其它搜索引擎
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
+![SaaS 引擎 Elasticsearch 配置](https://static.itdos.com/upload/img/csdn/637ce005054d43c2b6177f3b00693fc3.png#pic_center)
 
 ## 接口引擎区分saas租户
 >* 用户访问一个接口引擎的自定义接口地址，如：(https://api.itdos.com/apiengine/test1)[https://api.itdos.com/apiengine/test1]，默认是走主库的接口引擎

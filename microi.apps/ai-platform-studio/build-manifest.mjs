@@ -863,6 +863,10 @@ const engines = await Promise.all(engineSpecs.map(async ([apiEngineKey, apiName,
   code: await readFile(resolve(root, 'engines', file), 'utf8')
 })))
 
+const SYSTEM_ENGINE_MENU_ID = 'cdc0844b-7249-4d64-a9c3-563a15c9cd20'
+const GOVERNANCE_ROOT_NAME = 'AI平台治理'
+const GOVERNANCE_WORKBENCH_NAME = 'AI平台治理工作台'
+
 const module = (name, tableName, listFields, searchFields, mobileFields) => ({
   name,
   table: tableName,
@@ -881,7 +885,7 @@ const module = (name, tableName, listFields, searchFields, mobileFields) => ({
   viewConfigVersion: 1
 })
 
-const modules = [
+const dataModules = [
   module('AI平台治理·门户项目', 'mci_portal_project', ['ProjectKey', 'Name', 'Status', 'PublishedTime'], ['ProjectKey', 'Name', 'Status'], ['Name', 'Status', 'PublishedTime']),
   module('AI平台治理·门户插槽', 'mci_portal_slot', ['ProjectId', 'SlotKey', 'Name', 'LayoutType', 'Enabled'], ['ProjectId', 'SlotKey', 'Name'], ['Name', 'LayoutType', 'Enabled']),
   module('AI平台治理·门户资源', 'mci_portal_asset', ['ProjectId', 'AssetKey', 'Name', 'AssetType', 'Enabled'], ['ProjectId', 'AssetKey', 'Name', 'AssetType'], ['Name', 'AssetType', 'Enabled']),
@@ -924,6 +928,149 @@ const modules = [
   module('AI平台治理·协作租约', 'mci_collaboration_session', ['ResourceType', 'ResourceId', 'HolderName', 'State', 'FencingToken', 'LeaseExpiresAt'], ['ResourceType', 'ResourceId', 'HolderName', 'State'], ['HolderName', 'State', 'LeaseExpiresAt'])
 ]
 
+const governanceAreas = [
+  {
+    key: 'portal',
+    name: '门户装配',
+    purpose: '管理可组合门户及其不可变发布版本。',
+    menus: [
+      { name: '门户项目', kind: '配置', purpose: '定义一个门户及其当前发布状态。' },
+      { name: '门户插槽', kind: '配置', purpose: '定义门户页面中可装配内容的位置。' },
+      { name: '门户资源', kind: '配置', purpose: '维护装入插槽的页面、组件和资源。' },
+      { name: '资源版本', kind: '台账', purpose: '保存资源不可变版本，用于比较、审计和回滚。' }
+    ]
+  },
+  {
+    key: 'identity',
+    name: '身份目录',
+    purpose: '把外部组织与账号同步到吾码身份体系并保留冲突证据。',
+    menus: [
+      { name: '身份连接器', kind: '配置', purpose: '配置企业微信、钉钉、LDAP 等身份来源。' },
+      { name: '身份同步', kind: '运行', purpose: '查看每次组织和账号同步的执行结果。' },
+      { name: '身份冲突', kind: '处置', purpose: '处理重名、账号碰撞和归属不一致。' },
+      { name: '组织快照', kind: '台账', purpose: '保存部门树与用户归属的不可变快照。' }
+    ]
+  },
+  {
+    key: 'access',
+    name: '人群与授权',
+    purpose: '用动态人群、标签和审批式变更治理访问权限。',
+    menus: [
+      { name: '动态用户组', kind: '配置', purpose: '按规则生成可重复计算的用户人群。' },
+      { name: '用户组成员', kind: '台账', purpose: '查看某次计算得到的实际成员。' },
+      { name: '用户标签', kind: '配置', purpose: '定义用户分类、范围和标签类型。' },
+      { name: '标签分配', kind: '台账', purpose: '记录标签分配来源、有效期和状态。' },
+      { name: '授权变更集', kind: '运行', purpose: '批量授权或回收前生成可校验的变更计划。' },
+      { name: '授权变更明细', kind: '台账', purpose: '记录每个账号的授权执行结果与错误。' },
+      { name: '访问申请', kind: '审批', purpose: '提交、审批和跟踪访问权限申请。' },
+      { name: '临时授权', kind: '运行', purpose: '管理带到期时间且可自动回收的权限。' }
+    ]
+  },
+  {
+    key: 'configuration',
+    name: '配置与灰度',
+    purpose: '统一配置基线、环境差异和功能灰度。',
+    menus: [
+      { name: '配置模板', kind: '配置', purpose: '维护不同环境可继承、可版本化的配置基线。' },
+      { name: '配置漂移', kind: '处置', purpose: '发现并处理目标环境偏离配置基线的问题。' },
+      { name: '功能开关', kind: '配置', purpose: '按用户、角色、部门或比例控制功能灰度。' }
+    ]
+  },
+  {
+    key: 'release',
+    name: '发布治理',
+    purpose: '让发布经过计划、审批、门禁、执行和审计。',
+    menus: [
+      { name: '发布计划', kind: '配置', purpose: '固定发布内容、门禁、步骤和回滚方案。' },
+      { name: '发布审批', kind: '审批', purpose: '保存不可变审批结论并落实职责分离。' },
+      { name: '发布运行', kind: '运行', purpose: '查看发布或回滚的断点、租约和执行状态。' },
+      { name: '变更台账', kind: '台账', purpose: '汇总跨资源变更及其应用、验证证据。' }
+    ]
+  },
+  {
+    key: 'service',
+    name: '服务治理',
+    purpose: '管理服务目录、实例、路由策略和调用拓扑。',
+    menus: [
+      { name: '服务目录', kind: '配置', purpose: '登记服务身份、负责人和健康状态。' },
+      { name: '服务实例', kind: '运行', purpose: '查看实例版本、区域、租约和排空状态。' },
+      { name: '流量策略', kind: '配置', purpose: '配置版本路由、重试、限流、熔断和降级。' },
+      { name: '调用结果', kind: '台账', purpose: '记录策略许可对应的真实调用结果。' },
+      { name: '服务拓扑', kind: '台账', purpose: '聚合服务间调用量、错误量和延迟。' }
+    ]
+  },
+  {
+    key: 'observability',
+    name: '可观测与日志',
+    purpose: '把监控规则、告警处置、送达和日志生命周期连成闭环。',
+    menus: [
+      { name: '可观测策略', kind: '配置', purpose: '定义可信指标、阈值、窗口和严重级别。' },
+      { name: '规则评估台账', kind: '台账', purpose: '记录每个时间窗口的规则评估证据。' },
+      { name: '告警事件', kind: '处置', purpose: '查看、确认、恢复和关闭平台告警。' },
+      { name: '告警路由', kind: '配置', purpose: '配置告警接收人、优先级和处理时限。' },
+      { name: '告警送达', kind: '台账', purpose: '跟踪每次通知尝试、重试和送达结果。' },
+      { name: '日志策略', kind: '配置', purpose: '设置日志热、温、冷阶段和归档方式。' },
+      { name: '日志生命周期', kind: '运行', purpose: '查看日志扫描、归档和清理任务结果。' }
+    ]
+  },
+  {
+    key: 'asset',
+    name: '资产与协作',
+    purpose: '沉淀可复用资产并避免多人同时覆盖同一资源。',
+    menus: [
+      { name: '资产包', kind: '配置', purpose: '定义可复用、可安装的页面或配置资产集合。' },
+      { name: '资产版本', kind: '台账', purpose: '保存资产不可变版本、内容哈希和兼容范围。' },
+      { name: '协作租约', kind: '运行', purpose: '显示谁正在编辑资源并提供过期与防并发令牌。' }
+    ]
+  },
+  {
+    key: 'import',
+    name: '数据迁移',
+    purpose: '对大批量导入进行预检、分片执行、恢复和回滚。',
+    menus: [
+      { name: '导入批次', kind: '运行', purpose: '查看导入计划、进度、成功失败数和检查点。' },
+      { name: '导入暂存行', kind: '台账', purpose: '查看每一行的计划动作、结果和错误原因。' }
+    ]
+  }
+]
+
+const governanceMenuOrder = governanceAreas.flatMap((area) => area.menus.map((item) => `AI平台治理·${item.name}`))
+const governanceSortByName = new Map(governanceMenuOrder.map((name, index) => [name, (index + 1) * 10]))
+const governanceModules = dataModules.map((item) => ({
+  ...item,
+  parentName: GOVERNANCE_ROOT_NAME,
+  sort: governanceSortByName.get(item.name)
+}))
+const modules = [
+  {
+    name: GOVERNANCE_ROOT_NAME,
+    Description: '集中管理门户、身份、授权、配置、发布、服务、可观测、资产与数据迁移治理。',
+    parentId: SYSTEM_ENGINE_MENU_ID,
+    icon: 'fas fa-shield-alt',
+    display: 1,
+    appDisplay: 1,
+    openType: 'SecondMenu',
+    sort: 9
+  },
+  {
+    name: GOVERNANCE_WORKBENCH_NAME,
+    Description: 'AI平台治理统一操作入口。',
+    parentName: GOVERNANCE_ROOT_NAME,
+    icon: 'fas fa-tachometer-alt',
+    display: 1,
+    appDisplay: 1,
+    openType: 'MicroService',
+    componentName: 'MicroService',
+    componentPath: '/micro-app/host',
+    url: '/micro-app/ai-platform-studio/overview',
+    isMicroiService: 1,
+    microServiceKey: 'ai-platform-studio',
+    microServiceRoutePath: '/overview',
+    sort: 1
+  },
+  ...governanceModules
+]
+
 const jobs = [
   {
     JobName: 'MciAiPlatformMinuteSweep',
@@ -938,8 +1085,9 @@ const jobs = [
 
 const manifest = {
   name: 'Microi吾码 AI 平台治理中心',
-  version: 'v2.0.1',
+  version: 'v2.0.3',
   description: '门户、身份目录、标签人群、访问申请、临时权限、灰度发布、服务实例、Trace、日志生命周期、告警升级、资产包、协作租约与可恢复导入的一体化平台治理能力。',
+  menuCatalog: governanceAreas,
   tables,
   engines,
   events: [],
@@ -963,7 +1111,7 @@ const resourcePolicies = {
 await Promise.all([
   writeFile(resolve(root, 'system.manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8'),
   writeFile(resolve(root, 'resource-policies.json'), `${JSON.stringify(resourcePolicies, null, 2)}\n`, 'utf8'),
-  writeFile(resolve(root, 'manifest-build.json'), `${JSON.stringify({ SchemaVersion: 1, Version: manifest.version, BuiltAt: now, TableCount: tables.length, ModuleCount: modules.length, EngineCount: engines.length }, null, 2)}\n`, 'utf8')
+  writeFile(resolve(root, 'manifest-build.json'), `${JSON.stringify({ SchemaVersion: 1, Version: manifest.version, BuiltAt: now, TableCount: tables.length, ModuleCount: modules.length, WorkbenchModuleCount: 1, DataModuleCount: governanceModules.length, EngineCount: engines.length }, null, 2)}\n`, 'utf8')
 ])
 
-console.log(`Microi AI平台治理 Manifest 已生成：${tables.length} 张表，${modules.length} 个模块，${engines.length} 个接口引擎。`)
+console.log(`Microi AI平台治理 Manifest 已生成：${tables.length} 张表，${modules.length} 个菜单（1 个父菜单 + 1 个治理工作台 + ${governanceModules.length} 个数据菜单），${engines.length} 个接口引擎。`)

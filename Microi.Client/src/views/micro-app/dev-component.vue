@@ -109,11 +109,20 @@ export default {
             return serializeMicroAppComponentData(this.$attrs);
         },
         microAppData() {
+            const permissionContext = {
+                sysMenuId: this.$attrs.SysMenuId || this.$attrs.sysMenuId || this.$route?.meta?.Id || "",
+                moduleEngineKey: this.$attrs.ModuleEngineKey || this.$attrs.moduleEngineKey || this.$route?.meta?.ModuleEngineKey || "",
+                diyTableId: this.$attrs.DiyTableId || this.$attrs.diyTableId || this.$route?.meta?.DiyTableId || ""
+            };
             return {
                 apiBase: DiyCommon.GetApiBase(),
                 osClient: DiyCommon.GetOsClient(),
                 token: DiyCommon.getToken(),
                 currentUser: DiyCommon.GetCurrentUser?.() || {},
+                menuId: permissionContext.sysMenuId,
+                moduleEngineKey: permissionContext.moduleEngineKey,
+                diyTableId: permissionContext.diyTableId,
+                permissionContext,
                 appKey: this.page?.MicroServiceKey || "",
                 version: this.page?.BuildVersion || "",
                 microRoute: this.routePath,

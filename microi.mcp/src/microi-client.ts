@@ -2523,7 +2523,7 @@ export class MicroiClient {
   async createModule(data: {
     Name: string; DiyTableId?: string; ParentId?: string;
     ComponentName?: string; ComponentPath?: string;
-    Display?: number; AppDisplay?: number;
+    Display?: number; AppDisplay?: number; HasChild?: number;
     OpenType?: string; Url?: string; Sort?: number;
     Icon?: string; SearchFieldIds?: string; TableDiyFieldIds?: string;
     DefaultOrderBy?: string; SqlWhere?: string;

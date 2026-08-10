@@ -433,13 +433,19 @@ var uploadResult = V8.Method.Upload({
 });
 ```
 
+#### 私有文件访问与审计
+
 普通 HTTP 上传只允许平台规定的目录并默认按私有文件处理；可信后端 V8 可进行租户内受控文件操作，但不能把 `GetPrivateFileByte`、对象列举或删除等管理能力直接暴露给普通用户。浏览器访问私有文件时还必须证明菜单、记录、字段与附件绑定关系，详见 [文件上传与私有文件](../more/hdfs.md)。
 
 `GetPrivateFileUrl` 返回的是后端短期票据代理地址，而不是可泄露的对象存储真实签名地址。后端会分别记录链接签发和实际 `GET/HEAD` 打开/下载行为；登录用户记录为 `Name(Account)`，转发链接被无身份访问时记录为匿名访问。代理支持 `Range` 流式响应并对分片请求短时去重，失败时不会退回未经审计的真实签名地址。`Limit:false` 的公有文件仍可直接走 CDN/公有桶，不记录此类行为日志。
 
+#### 系统日志队列与持久化
+
 系统日志调用会先进入后端真正有界的内存队列，由单一后台消费者按批次写入 MongoDB；请求线程通常不等待 MongoDB。平台固定使用主队列 4096 条、内存重试区 512 条、每批 250 条，安装者无需维护队列容量环境变量。两级内存都满时会同步写持久化 spool 形成回压，禁止用无界内存队列继续堆积；健康信息会公开 `Capacity`、`OverflowPending`、`EmergencySpooled` 和 `Dropped`，其中 `Dropped` 必须保持为 0。
 
 每批日志在写 MongoDB 前先写入固定目录 `logs/syslog-spool`，MongoDB 暂时不可用或服务正常重启时会自动幂等重放。容器部署时应直接把该目录挂载到持久卷，节点标识由平台自动生成，不需要额外环境变量。所有节点共享 MongoDB/Redis，日志按全局 `EventId` 幂等 upsert，详情停留状态和私有附件票据可跨节点继续读取。
+
+#### 用户行为日志
 
 平台内置用户行为日志还会记录 `Category`、`Action`、`Source`、`TargetType`、`TargetId`、`SessionId`、`DurationSeconds`、`Success`、`OccurredAt` 等结构化字段。用户显示统一采用 `Name(Account)`；密码、Token、Authorization、Secret、ApiKey、连接字符串等敏感内容会在进入队列时脱敏和限长。
 :::
@@ -448,11 +454,15 @@ var uploadResult = V8.Method.Upload({
 
 API 默认启用进程级内存保护。达到软阈值后节点会停止接收普通请求并返回 HTTP 503；连续达到硬阈值后先请求宿主有界停机，宽限期结束仍未释放时以退出码 137 强制结束，由 Docker/Kubernetes/服务管理器重启，避免单个节点耗尽整台宿主机内存。`GET /api/Diagnostics/health` 同时承担 readiness：内存保护期间返回 503；`GET /api/Diagnostics/liveness` 只表示进程仍存活。
 
+#### 阈值与度量口径
+
 保护阈值统一依据进程实际驻留内存（Windows Working Set / Linux RSS），不能依据 Linux 下的 `PrivateMemorySize64`。后者可能包含 .NET GC 预留但尚未占用物理内存的巨大虚拟地址空间，数值甚至会超过宿主机物理内存数倍，只能作为诊断值。健康接口会同时返回 `PressureMetric=ResidentSet`、`WorkingSetMB`、`PrivateAddressSpaceMB` 与 `ManagedHeapMB`，其中只有驻留内存参与熔断判断。
 
 默认先识别 Linux cgroup v2/v1 容器内存上限；容器未限额时使用宿主机物理内存，其他平台回退到 .NET GC 可用内存。软阈值固定为该有效内存额度的 95%，硬阈值固定为 98%，不再固定封顶为 4096 MB。例如 48 GiB 单节点默认约为 Soft=46694 MB、Hard=48168 MB，RSS 3.94 GB 不会触发保护。平台仍采用安全轮询、连续样本和有界退出策略。
 
 内存保护不增加任何专用环境变量，也不要求在 `appsettings.json` 中维护一组节点参数。95%/98% 属于平台自动安全边界；后续确需面向用户开放调整时，应进入 SaaS 引擎或系统设置统一管理。
+
+#### 多节点部署与缓存预热
 
 阈值按单个 API 节点的有效内存额度计算。单节点独占宿主机时直接使用默认 95%/98%；多个 API/Worker 或数据库共用同一宿主机时，必须由容器编排层给每个容器设置独立 memory limit，避免所有节点都按整机额度计算造成超卖。生产环境必须配置自动重启和 readiness 摘除；多节点滚动发布时，一个节点进入内存保护不能影响其它节点继续服务。
 

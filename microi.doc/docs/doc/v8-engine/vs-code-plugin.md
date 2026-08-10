@@ -264,7 +264,11 @@ Codex Plugin 已合并在 `@microi.net/cli` 中，marketplace 固定名为 `micr
 npx --yes @microi.net/cli@latest codex install --yes
 ```
 
+#### 自动安装流程
+
 因此在全新 Codex 的空目录里，用户可以直接说“**通过 `@microi.net/cli@latest` 安装吾码 Codex 插件**”。具备终端和网络权限的 Codex 会执行上面的确定性命令：npm 仅负责下载，CLI 将包内完整插件复制到当前用户的 `~/.codex/microi-net-marketplace/plugins/microi`（设置 `CODEX_HOME` 时使用对应目录），注册 Codex 官方支持的本地 marketplace，再安装、启用 `microi@microi-net`。重载后，“插件”页面显示 **Microi吾码**，来源为 **microi-net**。
+
+#### 安装后验收
 
 已安装 CLI 时也可运行 `microi codex status --json` 检测、运行 `microi codex install --yes` 安装。`--yes` 表示用户已经授权修改 Codex 全局 marketplace、插件配置和缓存；普通 Microi 对话不得静默补上该参数。
 
@@ -560,11 +564,21 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 
 ## CLI 与 Codex Plugin 命名、打包与发布
 
+### 包名与产物边界
+
 唯一 AI/npm 包名为 **`@microi.net/cli`**，安装后暴露命令 **`microi`**，包根同时包含 `.codex-plugin/plugin.json`、`.codebuddy-plugin/plugin.json`、`.workbuddy-plugin/plugin.json`、对应 marketplace、MCP、路由器与全套 Skills。现有未带 scope 的 **`microi.net`** 是另一项已发布的前端库，继续保持原用途，不能在兼容版本中改造成 CLI。
 
 一套 `Microi.VSCode` 输出两个发布产品、多个使用端、三个分发目标：VS Code 扩展发布到 Visual Studio Marketplace 与 Open VSX；`@microi.net/cli` 只向 npm 发布一次，同时服务 CLI、Codex、WorkBuddy、CodeBuddy、Qoder、Comate 等宿主。`bump-version.js` 同时更新扩展、单一 npm 包、各宿主 manifest/marketplace 和 bundled Skills；任一版本不一致都会在外部写入前停止。
 
-三个分发目标不支持跨站事务。默认 `npm run publish` 先处理两个扩展市场，再只执行一次 npm 登录/权限检查并发布一次 `@microi.net/cli`。任一目标失败不会撤销已完成目标，单一 npm tarball 会保留供同源码补发；脚本逐目标公开回读，不把部分完成冒充三端完成。严格发布使用 `npm run publish:preflight:all` 和 `npm run publish:strict`。
+### 发布顺序与失败边界
+
+三个分发目标不支持跨站事务，发布按以下边界执行：
+
+1. **身份校验**：`npm run publish` 优先使用 `NPM_TOKEN`，其次读取 `publish-tokens.local.json` 中的 npm Granular Access Token；都不可用时，在版本递增和构建前执行一次交互式 `npm login`。
+2. **固定顺序**：授权完成后自动构建，先发布 `@microi.net/cli`，再发布 Visual Studio Marketplace 与 Open VSX。
+3. **失败可补发**：任一目标失败不会撤销已完成目标；原始 npm tarball 与 VSIX 会保留，可用同一版本补发。
+4. **精准回读**：上传命令成功即结束该目标。只有上传报错或执行补发时，才短时回读对应目标，排除“服务端已写入、客户端收到 5xx 或断线”的不确定状态。
+5. **主动验收**：诊断全部公开状态时运行 `npm run publish:verify`；严格发布使用 `npm run publish:preflight:all` 与 `npm run publish:strict`。
 
 ### 本地构建与安装验收
 
@@ -592,12 +606,12 @@ node publish.js --package-only --no-bump
 ### 首次发布到 npm
 
 1. 登录 npmjs.com，创建免费公开组织 **`microi.net`**；组织名会成为 `@microi.net` scope。若由个人 scope 发布，则 npm 用户名必须正好是 `microi.net`。
-2. 确认 npm 账号已加入 `@microi.net` 组织并拥有发布权限。本机未登录时，默认流程会先发布两个扩展市场，再执行一次 `npm login --registry=https://registry.npmjs.org/`，随后发布一次 `@microi.net/cli`。CI、无人值守或严格预检模式仍应提前登录。
-3. 为两个插件市场准备 PAT。本机可设置环境变量 `VSCE_PAT` / `OVSX_PAT`，或把 `publish-tokens.example.json` 复制为已被 Git 忽略的 `publish-tokens.local.json`。不要再使用 `publish-tokens.json`。
+2. 推荐在 npmjs.com 的 **Access Tokens** 中生成 Granular Access Token：Packages and scopes 只选择 `@microi.net/cli`（或最小必要的 `@microi.net` scope）、权限设为 **Read and write**，开启 **Bypass 2FA** 并设置有效期。包的 Publishing access 必须允许“2FA 或启用 Bypass 2FA 的 Granular Token”；若设为 disallow tokens，则只能交互发布。把 Token 放入环境变量 `NPM_TOKEN`，或填写到已忽略的 `publish-tokens.local.json` 的 `npm` 字段，禁止写入被 Git 跟踪的文件。脚本只把 Token 传给 npm 子进程，临时 npmrc 只保存 `${NPM_TOKEN}` 占位符，不落盘明文。
+3. 为两个插件市场准备 PAT。本机可设置环境变量 `VSCE_PAT` / `OVSX_PAT`，或把 `publish-tokens.example.json` 复制为已被 Git 忽略的 `publish-tokens.local.json`。没有可用 npm Token 或登录会话时，默认发布会在流程最前面执行一次 `npm login --registry=https://registry.npmjs.org/`，完成后全自动继续。不要再使用 `publish-tokens.json`。
 4. 如果仓库曾跟踪过 `publish-tokens.json`，应把其中的 PAT 视为已泄露：先在两个平台废弃并重新生成，把新 PAT 放入环境变量或 `publish-tokens.local.json`，再删除旧文件并执行 `git rm --cached publish-tokens.json`。发布脚本遇到该旧路径会主动停止。
 5. 回到 `Microi.VSCode` 执行 `npm run publish:preflight`。脚本会检查 `@microi.net/cli` 的 registry/scope 权限，并调用 `vsce verify-pat` 与 `ovsx verify-pat`；仅缺 npm 登录时不会阻断两个扩展市场。要求全部目标在版本递增前通过时，执行 `npm run publish:preflight:all`。
 6. 先运行 `npm run package` 检查本地产物；确认后执行 `npm run publish`。
-7. 脚本会自动回读本次实际发布的目标；也可手工复核：
+7. 正常上传命令成功返回后不做公开 registry/市场回读。看到 `npm 发布完成`、`Visual Studio Marketplace 发布完成` 或 `Open VSX Registry 发布完成` 即结束对应目标；只有上传命令报错或执行补发时才精确确认该版本是否已存在。如需主动诊断全部公开状态，执行 `npm run publish:verify`，或手工复核：
 
 ```bash
 npm view @microi.net/cli version
@@ -607,25 +621,23 @@ npm install -g @microi.net/cli
 microi --help
 ```
 
-npm 新 scope 或新版本刚发布后，公共 registry 可能短时间不同步。脚本会使用 `--prefer-online` 最长等待约 2 分钟；如果 `npm publish` 已成功返回但回读仍是临时 E404，只报告 `pending-propagation`。此时**不要重复发布或补发同一版本**，稍后执行只读验证：
+npm 新 scope 或新版本刚发布后，公共 registry 可能短时间不同步。只有显式执行 `npm run publish:verify` 时，诊断命令才会使用 `--prefer-online` 做有限重试；这不会触发重复上传，也不影响已成功返回的发布结果。
 
-```bash
-npm run publish:verify
-```
+Open VSX 等市场偶尔会在已经接收 VSIX 后向客户端返回 `503 Service Unavailable`。脚本遇到这类上传错误会短时回读当前精确版本：若已找到该版本，就显示“异常后回读确认”并按成功继续，不会重复上传；若仍无法确认，则干净地报告部分完成并给出补发命令，不再输出未捕获的 Node.js 调用栈。
 
-如果 npm 因未登录、scope、权限或上传错误而不可发布，默认流程仍先完成两个扩展市场，并在项目根保留一个同版本 tarball。**不要再次执行 `npm run publish`**。在源码和原始 tarball 未改变时补发唯一 npm 包：
+如果 npm 因登录取消、scope、权限或上传错误而不可发布，默认流程仍继续处理两个扩展市场，并在项目根保留一个同版本 tarball。**不要再次执行 `npm run publish`**。在源码和原始 tarball 未改变时补发唯一 npm 包：
 
 ```bash
 npm run publish:cli:resume
 ```
 
-如果 npm 单包已发布、扩展市场未完成，执行 `npm run publish:extensions:resume`。只补一个扩展市场使用 `publish:vsce:resume` 或 `publish:ovsx:resume`。补发不递增版本，并回读全部三端的当前版本。
+如果 npm 单包已发布、扩展市场未完成，执行 `npm run publish:extensions:resume`。只补一个扩展市场使用 `publish:vsce:resume` 或 `publish:ovsx:resume`。补发不递增版本、不重新构建，而是复用当次保留的原始 VSIX；上传前只确认所选市场的精确版本，若已公开则直接跳过重复上传，不回读其它目标。
 
 > 补发只适用于“同一份源码和产物的当次发布被中断”。如果失败后又修改了代码，必须重新完整发布下一版，不能用相同版本号发布不同产物。
 
 > 发布 `@microi.net/cli` 只完成 CLI 下载与用户本地 marketplace 安装能力，不会自动进入 ChatGPT/Codex 通用公开插件目录；公开目录需另按 OpenAI 官方 Plugin 提交流程审核。
 
-正式发布是外部不可逆操作。不要把 npm Token、服务器 Token 或任何登录密码写入仓库。CI 后续可改用 npm Trusted Publishing，避免长期保存发布 Token。
+正式发布是外部不可逆操作。不要把 npm Token、服务器 Token 或任何登录密码写入被 Git 跟踪的文件；本机 Token 应限制到单包、最小权限并定期轮换。CI 优先使用 npm Trusted Publishing（OIDC），避免长期保存发布 Token。
 
 ## 使用截图
 

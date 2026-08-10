@@ -31,6 +31,8 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 4. 读取 `microi-frontend-sdk`、`ui-design`；MicroService 再读取 `microi-microservice`，UniApp 再读取 `microi-uniapp-frontend`，游戏或复杂媒体再读取 `ui-design/references/motion-and-media.md`。
 5. 在项目根目录维护 `.microi-micro-app.json`；源码必须位于当前租户的 `Microi-V8-Engine/.../AI应用/{appKey}`，不得跨租户复用目录。
 
+`microi.apps/` 只用于可审计的官方应用商城发行包工程，例如 Manifest、接口引擎、资源策略、安装测试和离线包生成；它不是 Web、UniApp 或 MicroService 的本地源码根。发行包需要包含前端产物或可选源码时，必须从上述当前服务器、当前租户的 `AI应用/{appKey}` 唯一源码构建或打包，禁止在 `microi.apps/{package}/microservice` 再维护一份可编辑副本。
+
 ## 工程边界
 
 - `src/components` 保存可复用展示组件，`src/pages` 保存页面，`src/composables` 保存 UI 用例，`src/domain` 保存纯 TypeScript 业务规则，`src/services` 保存 API/实时通信适配，`src/platform` 保存 Microi 桥接。

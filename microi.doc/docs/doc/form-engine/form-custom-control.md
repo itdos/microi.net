@@ -15,7 +15,7 @@
 
 客户需求：在客户详情顶部显示数据统计，点击每个统计后自动滚动到对应子表位置：
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
+![客户详情顶部统计定制组件](https://static.itdos.com/upload/img/csdn/a1db402363594f9bb04a65a196aa9fd4.png#pic_center)
 ---
 
 ## 📸 示例二（定制组件）
@@ -24,7 +24,7 @@
 1. 选择几室几厅几卫
 2. 选择小区后获取楼栋 → 选择楼栋后获取单元 → 选择单元后获取房号
 
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
+![房源户型与楼栋联动定制组件](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
 ## 实现步骤
 ## 1、到Microi吾码框架源码中创建一个定制vue组件
@@ -194,5 +194,5 @@ export default {
 ```
 :::
 ## 2、表单设计拖入一个【定制组件】并填写组件路径
-![在这里插入图片描述](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
+![表单设计器中的定制组件路径](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
 ## 3、发布前端项目即可
