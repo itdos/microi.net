@@ -1273,14 +1273,28 @@ LoadFabPosition() {
 
         GetColWidth(field, fieldIndex) {
             var self = this;
+            var presentationColumn = typeof self.GetListColumnConfig === 'function'
+                ? self.GetListColumnConfig(field)
+                : null;
+            if (presentationColumn && Number(presentationColumn.MinWidth) > 0) {
+                return Number(presentationColumn.MinWidth);
+            }
+            if (field.TableWidth && Number(field.TableWidth) > 0) {
+                return Number(field.TableWidth);
+            }
             var visibleFields = self.PresentationTableFieldList || self.ShowDiyFieldList || [];
             if (fieldIndex == visibleFields.length - 1) {
                 return "";
             }
-            if (!field.TableWidth) {
-                return 150;
-            }
-            return field.TableWidth;
+            var fieldText = [field.Name, field.Label, field.Component, field.Type].filter(Boolean).join(' ').toLowerCase();
+            var component = String(field.Component || '').toLowerCase();
+            if (/richtext|textarea|address|map|fileupload|imgupload/.test(component) || /地址|说明|备注|内容|附件|图片/.test(fieldText)) return 240;
+            if (/name|title|subject|customer|company|名称|标题|主题|客户|企业/.test(fieldText)) return 200;
+            if (/datetime|date|time|日期|时间/.test(fieldText)) return 170;
+            if (/phone|mobile|email|autonumber|code|编号|单号|电话|手机|邮箱/.test(fieldText)) return 160;
+            if (/numbertext|decimal|numeric|int|amount|money|price|金额|价格|数量/.test(fieldText)) return 140;
+            if (/select|radio|switch|status|state|type|category|状态|类型|分类/.test(fieldText)) return 130;
+            return 150;
         },
         isMuban(field, scope) {
             // 把 !DiyCommon.IsNull(field.V8TmpEngineTable) && scope.row[field.Name + '_TmpEngineResult'] !== undefined 做成计算属性

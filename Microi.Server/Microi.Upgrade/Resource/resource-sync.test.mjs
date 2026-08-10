@@ -711,6 +711,34 @@ test('官网 MCP 发布器在插件升级后自动改用最新可用入口和当
   assert.equal(found.server.args[0], currentEntry);
 });
 
+test('官网 MCP 发布器兼容带 API 主机后缀的稳定服务器名称', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'microi-mcp-host-suffix-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const entry = join(root, 'plugin', 'dist', 'mcp-server.js');
+  await mkdir(dirname(entry), { recursive: true });
+  await writeFile(entry, '/* test MCP server */\n', 'utf8');
+
+  const server = {
+    type: 'stdio',
+    command: 'node',
+    args: [entry],
+    env: {
+      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_OS_CLIENT: 'iTdos',
+      MICROI_TOKEN_FILE: join(root, 'token.json'),
+    },
+  };
+  const configPath = join(root, '.mcp.json');
+  await writeFile(configPath, JSON.stringify({
+    mcpServers: { microi_itdos_api_itdos_com: server },
+  }), 'utf8');
+
+  const found = await findItDosMcpServer(root, configPath);
+  assert.equal(found.path, configPath);
+  assert.equal(found.server.args[0], entry);
+  assert.equal(found.server.env.MICROI_TOKEN_FILE, server.env.MICROI_TOKEN_FILE);
+});
+
 test('官网 MCP 发布器不会被仍存在的旧插件入口锁住', async t => {
   const root = await mkdtemp(join(tmpdir(), 'microi-mcp-stale-config-'));
   t.after(() => rm(root, { recursive: true, force: true }));

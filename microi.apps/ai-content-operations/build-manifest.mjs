@@ -313,7 +313,7 @@ const jobs = [
 
 const manifest = {
   name: 'Microi吾码 AI 内容创作与发布',
-  version: 'v1.0.4',
+  version: 'v1.0.8',
   description: '在线AI文章生成、MiniMax视频、短视频平台质量门禁、持久发布队列与本机多平台连接器协同。',
   tables,
   engines,

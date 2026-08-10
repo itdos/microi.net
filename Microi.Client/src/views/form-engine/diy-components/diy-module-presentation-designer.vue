@@ -224,7 +224,7 @@
                 </div>
             </el-tab-pane>
 
-            <el-tab-pane label="自定义表单视图 JSON" name="form-json" lazy>
+            <el-tab-pane label="自定义表单" name="form-json" lazy>
                 <section class="designer-card json-card">
                     <div class="card-head">
                         <div>
@@ -1137,6 +1137,10 @@ defineExpose({ flushPendingSync });
 .enable-control { gap: 8px; font-size: 13px; }
 .designer-alert { margin-top: 10px; }
 .designer-tabs { margin-top: 8px; }
+.module-presentation-designer :deep(.designer-tabs .el-tabs__item.is-active) {
+    color: var(--mci-presentation-primary-text, #1d4ed8) !important;
+    font-weight: 700;
+}
 .module-presentation-designer :deep(.designer-tabs > .el-tabs__content) { max-height: none !important; overflow: visible !important; }
 .designer-card {
     min-width: 0;

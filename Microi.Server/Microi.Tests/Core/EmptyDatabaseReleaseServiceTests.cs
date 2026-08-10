@@ -38,6 +38,59 @@ public sealed class EmptyDatabaseReleaseServiceTests
         Assert.DoesNotContain(tables, value => value.Contains(';'));
     }
 
+    [Fact]
+    public void CollectPackageApiEngineKeys_UsesOwnedDefinitionsAndPoliciesOnly()
+    {
+        var package = JToken.Parse("""
+        {
+          "SysApiEngines": [
+            { "ApiEngineKey": "mci-ai-content-dispatch" },
+            { "ApiEngineKey": "bad key;DROP TABLE sys_user" }
+          ],
+          "ApplicationBundles": [
+            {
+              "ResourcePolicies": {
+                "ApiEngines": [
+                  { "ApiEngineKey": "mci_demo_ai_output_contract_lab", "Policy": "CreateIfMissing" }
+                ]
+              },
+              "References": { "ApiEngineKey": "shared-core-engine" }
+            }
+          ]
+        }
+        """);
+        var engines = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        InvokePrivateStatic("CollectPackageApiEngineKeys", package, engines);
+
+        Assert.Equal(
+            new[] { "mci-ai-content-dispatch", "mci_demo_ai_output_contract_lab" },
+            engines.OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+        Assert.DoesNotContain("shared-core-engine", engines);
+    }
+
+    [Theory]
+    [InlineData("microi-platform-service", "", "", true)]
+    [InlineData("app.microi.saas-engine", "Platform", "", true)]
+    [InlineData("microi-wechat-content-security", "", "Platform", true)]
+    [InlineData("ai-content-operations", "Platform", "Platform", false)]
+    [InlineData("mci_demo", "MicroService", "MicroService", false)]
+    [InlineData("app.microi.saas-engine", "Web", "Platform", false)]
+    public void IsCorePlatformApplication_UsesExactOfficialAllowlist(
+        string appKey,
+        string applicationType,
+        string appType,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            Assert.IsType<bool>(InvokePrivateStatic(
+                "IsCorePlatformApplication",
+                appKey,
+                applicationType,
+                appType)));
+    }
+
     [Theory]
     [InlineData("USE itdos; DELETE FROM sys_log;")]
     [InlineData("DROP DATABASE microi_empty_temp;")]

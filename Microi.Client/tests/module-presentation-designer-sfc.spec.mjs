@@ -84,7 +84,7 @@ test("module presentation designer compiles and exposes every standard list/card
     assert.match(source, /fieldRequestId/);
     assert.match(source, /cloneJson\(shared\)/);
     assert.match(source, /跨端视图负责字段编排，字段模板负责复杂渲染，两者可以叠加使用/);
-    assert.match(source, /自定义表单视图 JSON/);
+    assert.match(source, /label="自定义表单" name="form-json"/);
     assert.match(source, /function applyCustomFormJson\s*\(/);
     assert.match(source, /currentViews\.filter\(\(view\) => !isCustomFormView\(view\)\)/);
     assert.match(source, /DEFAULT_VIEW_SCHEMA_VERSION\s*=\s*"1\.0"/);

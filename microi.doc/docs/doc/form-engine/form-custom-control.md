@@ -1,13 +1,26 @@
 # 🎨 定制组件
 
-> **当平台组件库无法满足需求时，通过定制组件或扩展组件库解决**
+> **当平台组件库无法满足需求时，可加载主前端 Vue 组件，也可把 MicroService 指定路由嵌入表单。**
 
 ---
 
 ## 📌 前言
 
-- 在实际表单开发中，低代码平台的组件库并不能满足所有需求
-- Microi吾码提供两种方式：**定制组件** 和 **扩展组件库**
+- 在实际表单开发中，低代码组件库无法覆盖全部复杂交互。
+- Microi吾码的 `DevComponent` 同时支持**主前端本地 Vue 组件**和**已发布 MicroService 路由**。
+- 通用、平台级组件可以进入 `Microi.Client`；租户专属或需要独立迭代的复杂区域优先使用 MicroService，避免每次修改都重新发布主前端。
+
+## 🧭 先选择交付方式
+
+| 场景 | 推荐方式 | 发布边界 |
+|---|---|---|
+| 多租户共用、与主框架强耦合的基础控件 | 本地 Vue 定制组件 | 随 `Microi.Client` 编译发布 |
+| 租户专属看板、联动工作区、复杂选择器 | `DevComponent` + MicroService 路由 | 微服务独立构建、发布与回滚 |
+| 需要临时弹出而非固定占据表单位置 | `V8.OpenAppDialog` | 微服务以 Dialog / Drawer 打开 |
+
+::: tip 表单嵌入不是手写 iframe
+平台会复用当前登录态、租户以及菜单/模块/表权限上下文，并把可序列化表单数据传给子应用。完整配置、自动高度和字段值回写协议参见[微服务：在表单引擎中引用](/doc/system-engine/micro-app.html#在表单引擎中引用)。
+:::
 
 ---
 
@@ -26,8 +39,9 @@
 
 ![房源户型与楼栋联动定制组件](https://static.itdos.com/upload/img/csdn/16f0262046f24b529b681eae924c8c53.png#pic_center)
 
-## 实现步骤
-## 1、到Microi吾码框架源码中创建一个定制vue组件
+## 方式一：加载主前端 Vue 组件
+
+### 1、到 Microi吾码框架源码中创建定制 Vue 组件
 >如：`/src/views/custom/demo/components/customer-childtable.vue`
 ::: details 展开查看 JavaScript 代码（160 行）
 ```javascript
@@ -193,6 +207,29 @@ export default {
 </style>
 ```
 :::
-## 2、表单设计拖入一个【定制组件】并填写组件路径
+### 2、表单设计拖入一个【定制组件】并填写组件路径
 ![表单设计器中的定制组件路径](https://static.itdos.com/upload/img/csdn/8e853444d60145ae8a182324320c8cb5.png#pic_center)
-## 3、发布前端项目即可
+
+### 3、发布前端项目
+
+本地 Vue 文件会随 `Microi.Client` 主包发布。同一路径存在本地组件时，本地组件优先加载。
+
+## 方式二：加载 MicroService 指定路由
+
+1. 在 `microi.routes.json` 的目标页面声明唯一的 `LegacyComponentPaths` 别名。
+2. 构建并发布微服务，确认对应 `sys_microiservice_page` 已启用。
+3. 在表单设计器拖入“定制组件”，让 `DevComponentPath` 与该别名一致。
+4. 子应用通过 `window.microApp.getData()` 获取 `componentData` 与 `permissionContext`，通过 `dev-component:resize` 同步高度、通过 `dev-component:event` 回写字段值。
+
+```json
+{
+  "Component": "DevComponent",
+  "FormWidth": 24,
+  "Config": {
+    "DevComponentName": "QualityInspectionMicroApp",
+    "DevComponentPath": "/micro-app-components/quality-inspection-board"
+  }
+}
+```
+
+当主前端找不到该路径的本地 Vue 文件时，平台会用 `LegacyComponentPaths` 找到已发布微服务页面，并加载它的 `RoutePath`。详细路由清单与通信示例见[微服务（前端微应用）](/doc/system-engine/micro-app.html#在表单引擎中引用)。

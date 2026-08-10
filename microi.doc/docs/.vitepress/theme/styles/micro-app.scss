@@ -127,6 +127,7 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-hero h2::before {
 .micro-app-mode-grid article,
 .micro-app-flow article,
 .micro-app-auth-flow article,
+.micro-app-component-flow article,
 .micro-app-guard-grid article {
   border: 1px solid rgba(37, 99, 235, .12);
   border-radius: 17px;
@@ -171,7 +172,7 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-hero h2::before {
 
 .micro-app-mode-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin: 22px 0 30px;
 }
@@ -197,6 +198,7 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-hero h2::before {
 
 .micro-app-mode-grid article.is-independent::after { background: var(--micro-app-green); }
 .micro-app-mode-grid article.is-dialog::after { background: var(--micro-app-amber); }
+.micro-app-mode-grid article.is-component::after { background: var(--micro-app-cyan); }
 
 .micro-app-mode-icon {
   display: inline-grid;
@@ -232,8 +234,8 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-hero h2::before {
 
 .micro-app-case-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
   margin: 24px 0 34px;
 }
 
@@ -284,7 +286,8 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
 }
 
 .micro-app-flow,
-.micro-app-auth-flow {
+.micro-app-auth-flow,
+.micro-app-component-flow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: stretch;
@@ -293,13 +296,15 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
 }
 
 .micro-app-flow article,
-.micro-app-auth-flow article {
+.micro-app-auth-flow article,
+.micro-app-component-flow article {
   padding: 16px;
   background: linear-gradient(145deg, rgba(8, 145, 178, .075), transparent), var(--mci-site-surface);
 }
 
 .micro-app-flow > i,
-.micro-app-auth-flow > i {
+.micro-app-auth-flow > i,
+.micro-app-component-flow > i {
   align-self: center;
   color: var(--micro-app-blue);
   font-style: normal;
@@ -308,15 +313,19 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
 
 .micro-app-flow article > span,
 .micro-app-auth-flow article > span,
+.micro-app-component-flow article > span,
 .micro-app-flow article > strong,
 .micro-app-flow article > small,
 .micro-app-auth-flow article > strong,
-.micro-app-auth-flow article > small {
+.micro-app-auth-flow article > small,
+.micro-app-component-flow article > strong,
+.micro-app-component-flow article > small {
   display: block;
 }
 
 .micro-app-flow article > span,
-.micro-app-auth-flow article > span {
+.micro-app-auth-flow article > span,
+.micro-app-component-flow article > span {
   margin-bottom: 10px;
   color: var(--micro-app-blue);
   font-size: 11px;
@@ -325,13 +334,15 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
 }
 
 .micro-app-flow article > strong,
-.micro-app-auth-flow article > strong {
+.micro-app-auth-flow article > strong,
+.micro-app-component-flow article > strong {
   color: var(--mci-site-ink);
   font-size: 14px;
 }
 
 .micro-app-flow article > small,
-.micro-app-auth-flow article > small {
+.micro-app-auth-flow article > small,
+.micro-app-component-flow article > small {
   margin-top: 6px;
   color: var(--mci-site-muted);
   line-height: 1.5;
@@ -400,9 +411,11 @@ body:has(.mci-micro-app-page) .VPDoc .micro-app-case img {
   .micro-app-mode-grid { grid-template-columns: 1fr; }
   .micro-app-mode-grid article { min-height: 0; }
   .micro-app-flow,
-  .micro-app-auth-flow { grid-template-columns: 1fr; }
+  .micro-app-auth-flow,
+  .micro-app-component-flow { grid-template-columns: 1fr; }
   .micro-app-flow > i,
-  .micro-app-auth-flow > i { transform: rotate(90deg); justify-self: center; }
+  .micro-app-auth-flow > i,
+  .micro-app-component-flow > i { transform: rotate(90deg); justify-self: center; }
 }
 
 @media (max-width: 680px) {

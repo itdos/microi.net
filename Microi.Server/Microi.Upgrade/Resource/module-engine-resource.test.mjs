@@ -8,7 +8,7 @@ const resourceDir = path.dirname(fileURLToPath(import.meta.url));
 const resource = JSON.parse(fs.readFileSync(path.join(resourceDir, "app.microi.module-engine.json"), "utf8"));
 
 test("module engine package version and physical menu badge columns are current", () => {
-    assert.equal(resource.PackageInfo.Version, "v6.9.5");
+    assert.equal(resource.PackageInfo.Version, "v6.9.6");
     const physicalNames = new Set((resource.PhysicalColumns || []).map((item) => item.COLUMN_NAME));
     for (const name of ["MenuBadgeEnabled", "MenuBadgeApiEngineKey", "EnableViewSchema", "ViewSchemaVersion", "ViewConfigVersion", "ViewSchema"]) {
         assert.ok(physicalNames.has(name), `missing physical sys_menu column ${name}`);
@@ -59,6 +59,8 @@ test("menu badge engine selector uses bounded remote keyword search", () => {
 });
 
 test("all button collections and PageTabs expose the complete badge contract", () => {
+    const menuBadgeApiEngineField = field("MenuBadgeApiEngineKey");
+    const menuBadgeApiEngineConfig = configOf(menuBadgeApiEngineField);
     const expected = [
         "BadgeEnabled",
         "BadgeApiEngineKey",
@@ -89,6 +91,18 @@ test("all button collections and PageTabs expose the complete badge contract", (
         assert.equal(new Set(badgeColumns.map((item) => item.Id)).size, expected.length, `${name} badge Ids must be unique`);
         assert.deepEqual(badgeColumns.map((item) => Number(item.Sort)), [...badgeColumns.map((item) => Number(item.Sort))].sort((left, right) => left - right));
         badgeColumns.forEach((item) => assert.equal(item.Component, expectedComponents[item.Key], `${name}.${item.Key} component`));
+
+        const badgeApiEngineColumn = columns.find((item) => item.Key === "BadgeApiEngineKey");
+        assert.equal(badgeApiEngineColumn.Config.DataSource, "Sql", `${name}.BadgeApiEngineKey data source`);
+        assert.equal(
+            badgeApiEngineColumn.Config.DataSourceFieldId,
+            menuBadgeApiEngineField.Id,
+            `${name}.BadgeApiEngineKey must proxy a real diy_field`
+        );
+        assert.equal(badgeApiEngineColumn.Config.DataSourceSqlRemote, true, `${name}.BadgeApiEngineKey remote search`);
+        assert.equal(badgeApiEngineColumn.Config.SelectSaveField, menuBadgeApiEngineConfig.SelectSaveField);
+        assert.equal(badgeApiEngineColumn.Config.SelectLabel, menuBadgeApiEngineConfig.SelectLabel);
+        assert.equal(badgeApiEngineColumn.Config.Sql, menuBadgeApiEngineConfig.Sql, `${name}.BadgeApiEngineKey SQL contract`);
     }
 });
 

@@ -164,10 +164,13 @@ MCP 建模只使用：
 优先使用现有 44 类标准控件。只有标准控件无法表达交互、且该交互会长期复用时，
 才使用 `DevComponent`：
 
-- Vue 组件路径必须稳定并纳入 `Microi.Client` 源码/构建。
+- 多租户共用且与主框架强耦合的 Vue 组件，路径必须稳定并纳入 `Microi.Client` 源码/构建。
 - 支持 Add/Edit/View、只读、必填、清空、校验、移动端和暗色主题。
 - 不在组件内绕过 FormEngine 权限直接访问任意表。
-- 复杂但租户独有的页面优先使用 MicroService + `V8.OpenAppDialog`，避免把客户逻辑打进主前端。
+- 复杂但租户独有、需要固定嵌入表单的区域，优先使用 `DevComponent` + MicroService 路由；临时打开的复杂页面使用 `V8.OpenAppDialog`，都避免把客户逻辑打进主前端。
+- MicroService 表单嵌入使用 `microi.routes.json` 页面级 `LegacyComponentPaths` 作为稳定别名，字段 `Config.DevComponentPath` 与其匹配。主前端存在同路径 Vue 文件时本地优先；不存在时平台自动加载对应 `sys_microiservice_page.RoutePath`。新别名不得与 `/src/views` 真实文件冲突。
+- 组件宿主下发 `componentMode=true`、可序列化 `componentData` 与 `permissionContext`；子应用用 `dev-component:resize` 同步高度，用 `dev-component:event` 回传 `update:modelValue`、`CallbackFormValueChange`、`FormSet` 或 `ParentFormSet`。不传 Vue 实例、函数、循环引用或 `ParentV8`，不直接操作父页面 DOM。
+- 表单嵌入验收必须覆盖 Add/Edit/View/只读、初始值与回写、自动高度、窄屏、暗色主题，以及当前菜单 `ModuleEngineKey` 下的有权/无权账号。
 - `DevComponent` 配置了非空字段标题时必须正常渲染 Label；只有标题本身为空时才允许隐藏，
   不能按组件类型全局吞掉业务标题。`el-form--label-top` 下的字段级 `Button` 仍保留与其它
   控件等高的不可见 Label 占位，使按钮对齐控件区而不是对齐标题行。

@@ -32,11 +32,12 @@ test('PNG 精确为 1920×1080 且保持轻量', async () => {
   assert.ok(info.size < 2 * 1024 * 1024)
 })
 
-test('官网首页和根 README 默认展示矢量图', async () => {
+test('官网文档展示矢量图，根 README 使用可原生放大的高清 PNG', async () => {
   const [index, readme] = await Promise.all([
     readFile(resolve(docsRoot, 'docs/doc/index.md'), 'utf8'),
     readFile(resolve(workspaceRoot, 'README.md'), 'utf8')
   ])
   assert.match(index, /!\[[^\]]*架构图[^\]]*\]\(\/images\/microi-ai-platform-architecture\.svg\)/)
-  assert.match(readme, /!\[[^\]]*架构图[^\]]*\]\(\.\/microi\.doc\/docs\/public\/images\/microi-ai-platform-architecture\.svg\)/)
+  assert.match(readme, /!\[[^\]]*架构图[^\]]*\]\(\.\/microi\.doc\/docs\/public\/images\/microi-ai-platform-architecture-3840x2160\.png\)/)
+  assert.doesNotMatch(readme, /\[!\[[^\]]*架构图[^\]]*\]\([^\n]+\)\]\([^\n]+\)/)
 })

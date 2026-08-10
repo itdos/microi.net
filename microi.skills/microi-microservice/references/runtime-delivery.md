@@ -8,7 +8,7 @@
   ├─ 私有源码 -> mci_ai_app_file -> 私有 HDFS
   └─ 构建发布 -> sys_microiservice + sys_microiservice_page
                                       └-> 公有构建产物
-后台菜单 / V8.OpenAppDialog -> 微应用宿主
+后台菜单 / 表单 DevComponent / V8.OpenAppDialog -> 微应用宿主
 ```
 
 `ApplicationType=MicroService` 表示运行类型；官方/社区来源是独立字段，不能混用。
@@ -51,7 +51,8 @@
 ```
 
 路径必须稳定并以 `/` 开头。迁移历史内置页面时可维护
-`LegacyMenuUrls/LegacyComponentPaths`，让新旧书签在过渡期共存。
+`LegacyMenuUrls/LegacyComponentPaths`，让新旧书签在过渡期共存；
+`LegacyComponentPaths` 也作为表单 `DevComponentPath` 到微服务页面 RoutePath 的稳定别名。
 
 ## MCP 读取/写入
 
@@ -124,6 +125,30 @@ V8.OpenAppDialog({
 回调函数必须在顶层，不放 `Data`。`OpenAppDialog` 只加载已发布 MicroService；
 `OpenDialog` 加载主前端注册组件。
 
+## 表单引擎定制组件
+
+需要把复杂区域固定嵌入表单时，字段使用 `Component=DevComponent`，并让
+`Config.DevComponentPath` 匹配目标页面 `RouteMetaJson.LegacyComponentPaths`。主前端能找到
+同路径 Vue 文件时仍加载本地组件；找不到时才查询启用的 `sys_microiservice_page` 并由
+`micro-app/dev-component.vue` 加载该页面 `RoutePath`。新项目应使用不会与 `/src/views` 真实文件
+冲突的虚拟路径。
+
+组件宿主下发 `componentMode=true`、`componentData`、`microRoute`、当前 Token/OsClient 和
+`permissionContext`。`componentData` 仅包含可序列化表单上下文，不传函数、Vue 实例、循环引用或
+`ParentV8`。子应用使用：
+
+```javascript
+window.microApp.dispatch({ type: 'dev-component:resize', height: 520 });
+window.microApp.dispatch({
+  type: 'dev-component:event',
+  event: 'update:modelValue',
+  args: [{ status: 'passed' }]
+});
+```
+
+高度限制为 80～1600px；表单联动还可上报 `CallbackFormValueChange`、`FormSet`、
+`ParentFormSet`。验收覆盖 Add/Edit/View/只读、字段值回写、窄屏/暗色以及有权/无权账号。
+
 ## 子应用宿主数据
 
 ```javascript
@@ -131,11 +156,12 @@ const host = window.microApp?.getData?.() || {};
 ```
 
 常见字段：`apiBase`、`osClient`、`token`、`menuId`、`moduleEngineKey`、`diyTableId`、
-`permissionContext`、`appKey`、`version`、`microRoute`、`dialog`、`dialogData`。只在内存中使用 Token。
+`permissionContext`、`appKey`、`version`、`microRoute`、`dialog`、`dialogData`、
+`componentMode`、`componentData`。只在内存中使用 Token。
 
 独立访问时没有宿主 Token：先配置清单中的 `apiBase/osClient`，读取 `V8.GetSysConfig(true)`，
 没有有效本地 Token 才显示吾码帐号密码登录；按 `EnableCaptcha` 动态请求验证码并向 `V8.Login`
-提交 `_CaptchaId/_CaptchaValue`。嵌入菜单或弹层时复用宿主身份，不显示第二套登录。
+提交 `_CaptchaId/_CaptchaValue`。嵌入菜单、表单定制组件或弹层时复用宿主身份，不显示第二套登录。
 
 `permissionContext={sysMenuId,moduleEngineKey,diyTableId}` 只帮助子应用选择正确的 FormEngine
 模块上下文，不能授予权限。无权限时依次核对 Token/OsClient、模块 Key、宿主上下文和角色授权；

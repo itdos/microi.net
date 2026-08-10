@@ -5,10 +5,10 @@
 <section class="micro-app-hero">
   <div class="micro-app-hero__copy">
     <p class="micro-app-eyebrow">MICROI · VUE 3 · AI DELIVERY</p>
-    <h2>一个工程，三种打开方式</h2>
-    <p>吾码 MicroService 是面向定制业务界面的前端微应用体系。它可以脱离吾码主界面独立运行，也可以作为后台菜单中的完整页面，还可以由 <code>V8.OpenAppDialog</code> 打开某个指定路由。</p>
+    <h2>一个工程，四种运行方式</h2>
+    <p>吾码 MicroService 是面向定制业务界面的前端微应用体系。同一份发布物既能独立运行，也能作为后台菜单完整页面、表单引擎定制组件，或由 <code>V8.OpenAppDialog</code> 打开指定路由。</p>
     <div class="micro-app-hero__actions">
-      <a href="#三种运行方式">查看运行方式</a>
+      <a href="#四种运行方式">查看运行方式</a>
       <a class="is-secondary" href="https://microi.net/apps.html" target="_blank" rel="noreferrer">浏览 AI 应用案例 ↗</a>
     </div>
   </div>
@@ -16,7 +16,7 @@
     <article><span>01</span><strong>独立运行</strong><small>同一套帐号、租户与动态验证码</small></article>
     <article><span>02</span><strong>菜单直开</strong><small>一个应用可按路由绑定多个菜单</small></article>
     <article><span>03</span><strong>弹层打开</strong><small>Dialog / Drawer 与业务回调</small></article>
-    <article><span>AI</span><strong>独立交付</strong><small>源码、构建、版本与商城发布</small></article>
+    <article><span>04</span><strong>表单嵌入</strong><small>定制组件加载指定业务路由</small></article>
   </div>
 </section>
 
@@ -24,9 +24,9 @@
 本文的 `MicroService` 是可独立构建和发布的前端微应用，不等同于 .NET、Java 后端微服务。页面和交互放在 MicroService；事务、权限校验与可信数据写入继续放在接口引擎或后端原子能力中。
 :::
 
-吾码官网 [AI 应用广场](https://microi.net/apps.html) 中的大部分 AI 应用均采用 MicroService 实现。这样既能独立展示和访问，也能无缝嵌入吾码菜单与业务弹层，而不必把每个定制页面都打进 `Microi.Client` 主包。
+吾码官网 [AI 应用广场](https://microi.net/apps.html) 中的大部分 AI 应用均采用 MicroService 实现。这样既能独立展示和访问，也能无缝嵌入吾码菜单、表单与业务弹层，而不必把每个定制页面都打进 `Microi.Client` 主包。
 
-## 三种运行方式
+## 四种运行方式
 
 <div class="micro-app-mode-grid">
   <article class="is-independent">
@@ -50,6 +50,13 @@
     <p>在前端 V8 事件中调用 <code>V8.OpenAppDialog</code>，按 AppKey 和 RoutePath 打开 Dialog 或 Drawer，并通过回调返回结果。</p>
     <strong>适合：</strong><span>复杂配置、分步操作、跨表选择、详情工作台。</span>
   </article>
+  <article class="is-component">
+    <span class="micro-app-mode-icon" aria-hidden="true">▤</span>
+    <p class="micro-app-eyebrow">FORM COMPONENT</p>
+    <h3>表单引擎中引用</h3>
+    <p>表单字段使用 <code>DevComponent</code>，通过稳定的 <code>DevComponentPath</code> 别名匹配微服务页面，并在表单当前位置加载该页面的 <code>RoutePath</code>。</p>
+    <strong>适合：</strong><span>表单内嵌看板、联动工作区、复杂选择器、租户专属业务区域。</span>
+  </article>
 </div>
 
 ### 一句话选择
@@ -59,23 +66,24 @@
 | 只是“是否继续” | `V8.ConfirmTips` | 无需引入完整页面。 |
 | 普通新增、编辑、详情 | 表单引擎 / `V8.OpenAnyForm` | 权限、字段与校验已经标准化。 |
 | 已内置在主前端的组件 | `V8.OpenDialog` | 直接复用 `Microi.Client` 组件。 |
+| 表单中固定嵌入复杂业务区域 | `DevComponent` + MicroService 路由 | 与表单同屏，复用登录态、表单数据和权限上下文，又能独立发布。 |
 | 复杂弹层，有联动、表格、上传或分步操作 | MicroService + `V8.OpenAppDialog` | 独立组件化开发，仍保留平台上下文。 |
 | 完整工作台或同一应用多个业务页面 | MicroService + 菜单路由 | 可让多个菜单分别打开不同内部路由。 |
-| 需要独立访问、独立版本、AI 维护与商城交付 | MicroService | 一个工程覆盖独立、嵌入和发布。 |
+| 需要独立访问、独立版本、AI 维护与商城交付 | MicroService | 一个工程覆盖四种入口和独立发布。 |
 
 ## 真实案例：同一能力融入不同业务位置
 
 <div class="micro-app-case-grid">
   <figure class="micro-app-case is-wide">
-    <img src="/images/microservice-cases/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开">
+    <img src="/images/microservice-cases/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开" data-fancybox="micro-app-cases">
     <figcaption><span>案例 1 · 弹层</span><strong>数据库定时备份</strong><small>在 SaaS 引擎列表上方打开指定微服务路由；背景页面、菜单和登录态均保留。</small></figcaption>
   </figure>
   <figure class="micro-app-case">
-    <img src="/images/microservice-cases/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开">
+    <img src="/images/microservice-cases/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开" data-fancybox="micro-app-cases">
     <figcaption><span>案例 2 · 菜单路由</span><strong>生产计数报工工作台</strong><small>深色大屏式工作台直接占据菜单内容区，宿主导航仍可正常使用。</small></figcaption>
   </figure>
   <figure class="micro-app-case">
-    <img src="/images/microservice-cases/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开">
+    <img src="/images/microservice-cases/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开" data-fancybox="micro-app-cases">
     <figcaption><span>案例 3 · 菜单路由</span><strong>成品打包工作台</strong><small>一个 MicroService 可以维护多个页面，并让不同菜单直达各自 RoutePath。</small></figcaption>
   </figure>
 </div>
@@ -89,7 +97,7 @@
   <i aria-hidden="true">→</i>
   <article><span>3</span><strong>构建与发布</strong><small>不可变版本资产和路由清单</small></article>
   <i aria-hidden="true">→</i>
-  <article><span>4</span><strong>独立 / 菜单 / 弹层</strong><small>三种入口复用同一发布物</small></article>
+  <article><span>4</span><strong>独立 / 菜单 / 弹层 / 表单</strong><small>四种入口复用同一发布物</small></article>
 </div>
 
 ### 核心数据边界
@@ -100,7 +108,7 @@
 | 私有源码 `mci_ai_app_file` | 保存源码文件清单；实际内容进入当前租户私有 HDFS。 |
 | 版本 `mci_ai_app_version` | 保存构建版本、状态、预览地址和变更说明。 |
 | 运行时 `sys_microiservice` | 保存 `MsKey`、版本、入口、构建清单、文件列表和发布时间。 |
-| 页面路由 `sys_microiservice_page` | 一个微服务可包含多个页面，是菜单与弹层 RoutePath 的事实源。 |
+| 页面路由 `sys_microiservice_page` | 一个微服务可包含多个页面，是菜单、弹层与表单定制组件 RoutePath 的事实源。 |
 | 菜单 `sys_menu` | `OpenType=MicroService` 时绑定微服务及其具体页面。 |
 
 源码与构建产物必须分开：源码默认进入私有存储；编译后的 HTML、JS、CSS、图片和字体进入公有发布存储供浏览器加载。不要把大体积 JS/CSS 作为内联 JSON 长期保存在数据库字段里。
@@ -446,6 +454,94 @@ http://localhost:1988/?OsClient=iTdos#/micro-app/microi-official/saas-tenant/cre
 
 `sys_microiservice_page` 作为隐藏子表菜单时，应设置 `Display=0`、`AppDisplay=0`、`HasChild=0`。若错误开启“是否有子集”，上级微服务菜单可能被识别成只能展开的父菜单。
 
+## 在表单引擎中引用
+
+吾码支持把已发布 MicroService 的某个路由，作为表单引擎的“定制组件”（`DevComponent`）直接嵌入新增、编辑或详情表单。它使用平台内置的微应用宿主，不需要手写 iframe，也不需要把租户定制页面编译进 `Microi.Client` 主包。
+
+<div class="micro-app-component-flow" aria-label="表单引擎加载微服务路由的流程">
+  <article><span>表单字段</span><strong>选择定制组件</strong><small><code>Component=DevComponent</code></small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>稳定别名</span><strong>配置组件路径</strong><small><code>DevComponentPath</code></small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>页面清单</span><strong>匹配微服务路由</strong><small><code>LegacyComponentPaths</code></small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>表单宿主</span><strong>加载 RoutePath</strong><small>继承登录态与权限上下文</small></article>
+</div>
+
+### 1. 在路由清单声明组件路径别名
+
+为需要嵌入表单的页面设置稳定、唯一的 `LegacyComponentPaths`。名称用于兼容历史定制组件，也可作为新微服务页面的表单组件别名：
+
+```json
+[
+  {
+    "path": "/quality/inspection-board",
+    "name": "quality-inspection-board",
+    "title": "质量检验看板",
+    "LegacyComponentPaths": [
+      "/micro-app-components/quality-inspection-board"
+    ]
+  }
+]
+```
+
+发布后，插件会把该声明写入 `sys_microiservice_page.RouteMetaJson`。页面必须处于启用状态，`path` 才是最终加载的微服务 `RoutePath`。
+
+### 2. 在表单设计器配置定制组件
+
+拖入“定制组件”，填写组件名称和同一个路径别名。等价字段配置如下：
+
+```json
+{
+  "Component": "DevComponent",
+  "FormWidth": 24,
+  "Config": {
+    "DevComponentName": "QualityInspectionMicroApp",
+    "DevComponentPath": "/micro-app-components/quality-inspection-board"
+  }
+}
+```
+
+`DevComponentName` 只需在当前页面保持稳定；`DevComponentPath` 必须与微服务页面的 `LegacyComponentPaths` 匹配。路径会统一忽略 `@/views`、`/src/views`、`.vue`、`/index` 和大小写差异，但新项目仍建议按示例使用不与真实 Vue 文件冲突的虚拟路径。
+
+::: tip 本地组件优先，微服务自动接管
+如果 `Microi.Client/src/views` 中存在该路径的 Vue 组件，表单继续加载本地组件；只有本地源码不存在时，平台才查询已发布页面并切换到 MicroService 宿主。因此历史字段无需逐租户改配置，新项目也能用独立发布的微服务承载复杂组件。
+:::
+
+### 3. 接收表单上下文并回传结果
+
+子应用通过宿主数据读取当前表单的可序列化上下文：
+
+```js
+const hostData = window.microApp?.getData?.() || {};
+
+console.log(hostData.componentMode);       // true
+console.log(hostData.componentData);       // FormData、字段、行 Id、只读状态等
+console.log(hostData.microRoute);          // 当前微服务 RoutePath
+console.log(hostData.permissionContext);   // 当前菜单、模块与表权限上下文
+```
+
+Vue 实例、函数、循环引用和 `ParentV8` 不会跨 iframe 传递；业务交互应使用可序列化数据与事件协议。内容高度或字段值变化时，由子应用主动通知宿主：
+
+```js
+// 内容渲染完成后同步实际高度，宿主会限制在 80～1600px。
+window.microApp?.dispatch?.({
+  type: 'dev-component:resize',
+  height: 520
+});
+
+// 回写当前定制字段的值。
+window.microApp?.dispatch?.({
+  type: 'dev-component:event',
+  event: 'update:modelValue',
+  args: [{ inspectionStatus: 'passed' }]
+});
+```
+
+需要联动父表单时，也可通过 `dev-component:event` 上报 `CallbackFormValueChange`、`FormSet` 或 `ParentFormSet`，参数放在 `args` 数组中。应先在 Add、Edit、View、只读和窄屏模式分别验证，不要依赖父页面 DOM、Vue 实例或未序列化的回调函数。
+
+<div class="micro-app-note-strip"><strong>权限边界</strong><span>组件入口会复用当前 DiyToken、OsClient，并传入 <code>permissionContext</code>；这只帮助微服务选择正确的模块调用上下文，不会额外授予权限。出现“没权限”时应核对当前菜单的 <code>ModuleEngineKey</code> 与角色授权，不能改成匿名接口。</span></div>
+
 ## 在 V8 中弹出复杂页面
 
 页面按钮、行按钮或表单按钮可以调用 `V8.OpenAppDialog`：
@@ -754,6 +850,7 @@ AI 应用工作台“发布应用商城”
 - `BuildVersion`、`EntryPath`、`AssetManifestJson` 和构建文件清单完整。
 - `microi.routes.json` 与 `sys_microiservice_page` 一致。
 - 菜单绑定了正确的 `MicroServiceId`、`MicroServicePageId` 和路由。
+- 表单嵌入场景中，字段 `DevComponentPath` 能匹配页面 `LegacyComponentPaths`；指定路由、自动高度、字段值回写以及 Add/Edit/View/只读模式均已验证。
 - 目标端需要迁移的 `LegacyMenuUrls/LegacyComponentPaths` 菜单已绑定 `/micro-app/host`，且旧菜单 URL、稳定 `MsKey` 路由和历史服务 `Id` 路由均能打开同一页面；原开发服务器仍可运行的原生组件菜单保持不变。
 - 真实主站 URL 不携带 Token，页面仍能调用需要登录的接口。
 - Dialog 的成功、取消、失败回调都已测试。
@@ -789,6 +886,10 @@ AI 应用工作台“发布应用商城”
 ### 后台选择微服务页面没有数据
 
 检查 `sys_microiservice_page` 是否已有当前微服务的路由数据；重新推送项目可以按 `microi.routes.json` 同步页面。
+
+### 表单定制组件提示“组件未找到”
+
+依次检查：微服务及页面是否已发布并启用、字段 `DevComponentPath` 是否能与页面 `LegacyComponentPaths` 归一化后匹配、当前主前端是否存在同路径本地 Vue 组件，以及当前账号是否能读取目标微服务页面。若组件能打开但接口提示无权限，再核对宿主菜单的 `ModuleEngineKey`、`DiyTableId` 和角色授权。
 
 ### MCP 查询不到应用
 

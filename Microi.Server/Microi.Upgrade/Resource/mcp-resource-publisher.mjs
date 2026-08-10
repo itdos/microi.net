@@ -21,6 +21,47 @@ function normalizeApiBaseUrl(value) {
   return String(value || '').trim().replace(/\/+$/, '').toLowerCase();
 }
 
+function isCompatibleItDosMcpName(value) {
+  return /^microi_itdos(?:_[a-z0-9_]+)?$/i.test(String(value || '').trim());
+}
+
+function selectConfiguredItDosMcpServer(servers, source) {
+  if (!servers || typeof servers !== 'object') return null;
+  const namedCandidates = Object.entries(servers)
+    .filter(([name]) => isCompatibleItDosMcpName(name));
+  if (!namedCandidates.length) return null;
+
+  const officialCandidates = namedCandidates.filter(([, server]) => {
+    const env = server?.env && typeof server.env === 'object' ? server.env : {};
+    return normalizeApiBaseUrl(env.MICROI_API_URL) === officialApiBaseUrl
+      && String(env.MICROI_OS_CLIENT || '').trim().toLowerCase() === officialOsClient;
+  });
+  if (officialCandidates.length === 1) {
+    const [name, server] = officialCandidates[0];
+    return { name, server };
+  }
+  if (officialCandidates.length > 1) {
+    const exact = officialCandidates.find(([name]) => name.toLowerCase() === 'microi_itdos');
+    if (exact) {
+      const [name, server] = exact;
+      return { name, server };
+    }
+    throw new Error(
+      `${source} 中存在多个绑定吾码官方 API 与 iTdos 租户的 MCP，无法唯一选择：${officialCandidates.map(([name]) => name).join(', ')}`,
+    );
+  }
+
+  // Preserve the detailed fail-closed validation error when one compatible
+  // name exists but its official API or tenant binding is incorrect.
+  if (namedCandidates.length === 1) {
+    const [name, server] = namedCandidates[0];
+    return { name, server };
+  }
+  throw new Error(
+    `${source} 中存在多个名称兼容但均未正确绑定官方 iTdos 的 MCP：${namedCandidates.map(([name]) => name).join(', ')}`,
+  );
+}
+
 export function validateItDosMcpServer(server, source = 'MCP 配置') {
   if (!server || typeof server !== 'object') {
     throw new Error(`${source} 中缺少 microi_itdos`);
@@ -224,11 +265,12 @@ export async function findItDosMcpServer(startDirectory, explicitConfigPath = ''
     if (!config) continue;
     foundConfig = true;
     const servers = config.mcpServers || config.servers;
-    if (!servers?.microi_itdos) {
-      if (explicit) throw new Error(`${path} 中缺少 microi_itdos`);
+    const selected = selectConfiguredItDosMcpServer(servers, path);
+    if (!selected) {
+      if (explicit) throw new Error(`${path} 中缺少 microi_itdos 或兼容的 microi_itdos_<host>`);
       continue;
     }
-    const validated = validateItDosMcpServer(servers.microi_itdos, path);
+    const validated = validateItDosMcpServer(selected.server, `${path} 的 ${selected.name}`);
     try {
       const server = await resolveItDosMcpLaunch(validated, path);
       return { path, server };
@@ -241,7 +283,7 @@ export async function findItDosMcpServer(startDirectory, explicitConfigPath = ''
     launchErrors.length
       ? `已找到 microi_itdos，但无法解析可运行的 MCP：${launchErrors.join('；')}`
       : foundConfig
-      ? '已找到 MCP 配置，但其中没有 microi_itdos'
+      ? '已找到 MCP 配置，但其中没有 microi_itdos 或兼容的 microi_itdos_<host>'
       : '未找到 .mcp.json、.vscode/mcp.json 或 .cursor/mcp.json',
   );
 }
