@@ -4,6 +4,10 @@
   --mci-nuget-surface: rgba(255, 255, 255, .9);
   --mci-nuget-text: var(--mci-site-ink, #171923);
   --mci-nuget-muted: var(--mci-site-muted, #64748b);
+  --mci-nuget-success: #087a45;
+  --mci-nuget-success-soft: rgba(8, 122, 69, .09);
+  --mci-nuget-warning: #956000;
+  --mci-nuget-warning-soft: rgba(217, 162, 58, .12);
   width: 100%;
   margin: 28px 0 36px;
 }
@@ -76,6 +80,17 @@
   color: #fff;
 }
 
+.mci-nuget-stats__icon::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border: 1px solid color-mix(in srgb, var(--mci-nuget-accent) 44%, transparent);
+  border-radius: 21px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(.88);
+}
+
 .mci-nuget-stats__icon svg {
   width: 30px;
   height: 30px;
@@ -118,10 +133,12 @@
   box-shadow: 0 0 0 4px rgba(24, 169, 87, .12);
 }
 
-.mci-nuget-stats[data-state="loading"] .mci-nuget-stats__eyebrow i {
+.mci-nuget-stats[data-state="cache-loading"] .mci-nuget-stats__eyebrow i,
+.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__eyebrow i {
   animation: mciNugetPulse 1.15s ease-in-out infinite alternate;
 }
 
+.mci-nuget-stats[data-state="cached"] .mci-nuget-stats__eyebrow i,
 .mci-nuget-stats[data-state="fallback"] .mci-nuget-stats__eyebrow i {
   background: #d9a23a;
   box-shadow: 0 0 0 4px rgba(217, 162, 58, .13);
@@ -142,7 +159,7 @@
 
 .mci-nuget-stats__metric {
   display: flex;
-  min-width: 132px;
+  min-width: 190px;
   flex-direction: column;
   align-items: flex-end;
   white-space: nowrap;
@@ -157,8 +174,8 @@
   letter-spacing: -.035em;
 }
 
-.mci-nuget-stats__metric span,
-.mci-nuget-stats__metric small {
+.mci-nuget-stats__metric > span:not(.mci-nuget-stats__status),
+.mci-nuget-stats__metric > small {
   color: var(--mci-nuget-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -167,6 +184,111 @@
 .mci-nuget-stats__metric small {
   margin-top: 3px;
   opacity: .78;
+}
+
+.mci-nuget-stats__status {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 26px;
+  margin-top: 9px;
+  overflow: hidden;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--mci-nuget-accent) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mci-nuget-accent) 7%, transparent);
+  color: var(--mci-nuget-accent-strong);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: .025em;
+  line-height: 1;
+  isolation: isolate;
+}
+
+.mci-nuget-stats__status::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .48) 48%, transparent 76%);
+  opacity: 0;
+  transform: translateX(-125%) skewX(-16deg);
+}
+
+.mci-nuget-stats__status-orbit {
+  position: relative;
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: .9;
+}
+
+.mci-nuget-stats__status-orbit i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.mci-nuget-stats__status-orbit i:nth-child(1) {
+  inset: 4px;
+}
+
+.mci-nuget-stats__status-orbit i:nth-child(2) {
+  top: -2px;
+  left: 5px;
+  width: 3px;
+  height: 3px;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.mci-nuget-stats__status-orbit i:nth-child(3) {
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  height: 2px;
+}
+
+.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__card::after {
+  opacity: .58;
+  animation: mciNugetSyncSweep 1.75s var(--mci-ease-smooth, ease-in-out) infinite;
+}
+
+.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__icon::after {
+  animation: mciNugetIconSignal 1.35s ease-out infinite;
+}
+
+.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__status {
+  border-color: color-mix(in srgb, var(--mci-nuget-accent) 48%, transparent);
+  background: color-mix(in srgb, var(--mci-nuget-accent) 13%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mci-nuget-accent) 7%, transparent);
+}
+
+.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__status::before {
+  opacity: .7;
+  animation: mciNugetStatusSweep 1.25s ease-in-out infinite;
+}
+
+.mci-nuget-stats[data-state="refreshing"] .mci-nuget-stats__status-orbit {
+  animation: mciNugetOrbit 1.05s linear infinite;
+}
+
+.mci-nuget-stats[data-state="live"] .mci-nuget-stats__status {
+  border-color: color-mix(in srgb, var(--mci-nuget-success) 32%, transparent);
+  background: var(--mci-nuget-success-soft);
+  color: var(--mci-nuget-success);
+}
+
+.mci-nuget-stats[data-state="cached"] .mci-nuget-stats__status,
+.mci-nuget-stats[data-state="fallback"] .mci-nuget-stats__status {
+  border-color: color-mix(in srgb, var(--mci-nuget-warning) 28%, transparent);
+  background: var(--mci-nuget-warning-soft);
+  color: var(--mci-nuget-warning);
 }
 
 .mci-nuget-stats__arrow {
@@ -203,6 +325,10 @@
   --mci-nuget-accent: #38a8ff;
   --mci-nuget-accent-strong: #8bcaff;
   --mci-nuget-surface: rgba(15, 23, 42, .88);
+  --mci-nuget-success: #58d695;
+  --mci-nuget-success-soft: rgba(88, 214, 149, .11);
+  --mci-nuget-warning: #f2c96d;
+  --mci-nuget-warning-soft: rgba(242, 201, 109, .1);
 }
 
 .mci-nuget-stats--home {
@@ -277,8 +403,17 @@
   font-size: 25px;
 }
 
-.mci-nuget-stats--sidebar .mci-nuget-stats__metric span {
+.mci-nuget-stats--sidebar .mci-nuget-stats__metric > span:not(.mci-nuget-stats__status) {
   margin-left: 6px;
+}
+
+.mci-nuget-stats--sidebar .mci-nuget-stats__status {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-height: 23px;
+  margin-top: 7px;
+  padding: 0 8px;
+  font-size: 9px;
 }
 
 .mci-nuget-stats--sidebar .mci-nuget-stats__metric small,
@@ -288,6 +423,26 @@
 
 @keyframes mciNugetPulse {
   to { opacity: .42; transform: scale(.78); }
+}
+
+@keyframes mciNugetSyncSweep {
+  0% { transform: translateX(-65%); opacity: 0; }
+  20% { opacity: .48; }
+  75%, 100% { transform: translateX(65%); opacity: 0; }
+}
+
+@keyframes mciNugetStatusSweep {
+  0% { transform: translateX(-125%) skewX(-16deg); }
+  70%, 100% { transform: translateX(125%) skewX(-16deg); }
+}
+
+@keyframes mciNugetOrbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes mciNugetIconSignal {
+  0% { opacity: .62; transform: scale(.88); }
+  75%, 100% { opacity: 0; transform: scale(1.16); }
 }
 
 @media (max-width: 767px) {
@@ -342,9 +497,15 @@
     font-size: 30px;
   }
 
-  .mci-nuget-stats__metric span,
-  .mci-nuget-stats__metric small {
+  .mci-nuget-stats__metric > span:not(.mci-nuget-stats__status),
+  .mci-nuget-stats__metric > small {
     margin-left: 7px;
+  }
+
+  .mci-nuget-stats__status {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-left: 0;
   }
 
   .mci-nuget-stats__meta {
@@ -372,7 +533,10 @@
 @media (prefers-reduced-motion: reduce) {
   .mci-nuget-stats__card,
   .mci-nuget-stats__card::after,
-  .mci-nuget-stats__eyebrow i {
+  .mci-nuget-stats__eyebrow i,
+  .mci-nuget-stats__icon::after,
+  .mci-nuget-stats__status::before,
+  .mci-nuget-stats__status-orbit {
     animation: none !important;
     transition: none !important;
   }

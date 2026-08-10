@@ -764,8 +764,19 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   --mci-doc-gold: #d9a23a;
   --mci-doc-blue: #2563eb;
   --mci-doc-cyan: #0891b2;
+  --mci-doc-red-fill-start: #b51220;
+  --mci-doc-red-fill-end: #c02635;
+  --mci-doc-blue-fill-start: #1d4ed8;
+  --mci-doc-blue-fill-end: #0e7490;
   --mci-doc-ink: #171923;
-  --mci-doc-muted: #64748b;
+  --mci-doc-muted: #475569;
+}
+
+html.dark .vp-doc._doc_system-engine_microi-ui {
+  --mci-doc-red: #fb7185;
+  --mci-doc-red-dark: #fda4af;
+  --mci-doc-ink: #f8fafc;
+  --mci-doc-muted: #cbd5e1;
 }
 
 .mci-ui-doc {
@@ -863,7 +874,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   min-height: 42px;
   padding: 0 18px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   color: #fff;
   font-weight: 800;
   text-decoration: none;
@@ -878,7 +889,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 }
 
 .mci-ui-hero__actions a:nth-child(3) {
-  background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan));
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end));
   box-shadow: 0 14px 30px rgba(37, 99, 235, .20);
 }
 
@@ -1181,7 +1192,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 
 .mci-ui-structure__tree span:first-child {
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   font-weight: 900;
 }
 
@@ -1271,7 +1282,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   padding: 16px;
   border-radius: 18px;
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 16px 32px rgba(181,18,32,.18);
 }
 
@@ -1525,7 +1536,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   height: 92px;
   margin-top: 18px;
   border-radius: 22px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 18px 42px rgba(181,18,32,.24);
 }
 
@@ -1579,7 +1590,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 
 .mci-recipe-tabs b {
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
 }
 
 .mci-recipe-products {
@@ -1613,7 +1624,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   color: #fff;
   background:
     linear-gradient(115deg, rgba(255,255,255,.22), transparent 36%),
-    linear-gradient(135deg, var(--mci-doc-red), #f04438);
+    linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 22px 48px rgba(181,18,32,.24);
 }
 
@@ -1645,7 +1656,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   border: 0;
   border-radius: 999px;
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 12px 26px rgba(181,18,32,.20);
   font-weight: 900;
 }
@@ -1782,12 +1793,12 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   display: block;
   margin-bottom: 16px;
   border-radius: 14px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 14px 30px rgba(181,18,32,.20);
 }
 
 .mci-ui-scenario-grid article:nth-child(2n) i {
-  background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan));
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end));
   box-shadow: 0 14px 30px rgba(37,99,235,.16);
 }
 
@@ -1891,7 +1902,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   margin-bottom: 14px;
   border-radius: 14px;
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 14px 30px rgba(181,18,32,.20);
   font-size: 14px;
   font-weight: 950;
@@ -2028,14 +2039,14 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   width: 18px;
   height: 18px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
 }
 
 .mci-shot-page__hero {
   height: 74px;
   margin-top: 18px;
   border-radius: 20px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 18px 36px rgba(181,18,32,.24);
 }
 
@@ -2089,7 +2100,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   border-radius: 999px;
   color: #fff;
   font-weight: 900;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 12px 26px rgba(181, 18, 32, .20);
 }
 
@@ -2106,7 +2117,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 }
 
 .mci-shot-buttons button:nth-child(4) {
-  background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan));
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end));
   box-shadow: 0 12px 26px rgba(37,99,235,.18);
 }
 
@@ -2183,7 +2194,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   width: 34px;
   height: 34px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
 }
 
 .mci-shot-cell span {
@@ -2233,7 +2244,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 
 .mci-shot-tabs .is-active {
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 12px 24px rgba(181,18,32,.20);
 }
 
@@ -2244,7 +2255,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   color: #fff;
   background:
     linear-gradient(115deg, rgba(255,255,255,.24), transparent 35%),
-    linear-gradient(135deg, var(--mci-doc-red), #f04438);
+    linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
 }
 
 .mci-shot-metric small,
@@ -2304,14 +2315,14 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   border: 2px solid rgba(255,255,255,.76);
   border-radius: 999px;
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 14px 28px rgba(181,18,32,.20);
   font-weight: 950;
 }
 
 .mci-shot-avatar span:nth-child(2) { background: linear-gradient(135deg, var(--mci-doc-gold), #f7c65d); color: #3a2500; }
-.mci-shot-avatar span:nth-child(3) { background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan)); }
-.mci-shot-avatar span:nth-child(4) { background: linear-gradient(135deg, #7c3aed, #a78bfa); }
+.mci-shot-avatar span:nth-child(3) { background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end)); }
+.mci-shot-avatar span:nth-child(4) { background: linear-gradient(135deg, #6d28d9, #7e22ce); }
 
 .mci-shot-product {
   display: grid;
@@ -2409,7 +2420,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 .mci-shot-richtext div {
   height: 92px;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan));
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end));
 }
 
 .mci-shot-richtext h4,
@@ -2440,7 +2451,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   box-shadow: 0 8px 18px rgba(24,32,48,.12);
 }
 
-.mci-shot-theme div span:nth-child(1) { background: linear-gradient(135deg, var(--mci-doc-red), #f04438); }
+.mci-shot-theme div span:nth-child(1) { background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end)); }
 .mci-shot-theme div span:nth-child(2) { background: linear-gradient(135deg, var(--mci-doc-gold), #f7c65d); }
 .mci-shot-theme div span:nth-child(3) { background: linear-gradient(135deg, #16a34a, #34d399); }
 .mci-shot-theme div span:nth-child(4) { background: linear-gradient(135deg, var(--mci-doc-blue), #60a5fa); }
@@ -2450,7 +2461,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 .mci-ui-shot.mci-shot-asset {
   background:
     linear-gradient(115deg, rgba(255,255,255,.24), transparent 35%),
-    linear-gradient(135deg, var(--mci-doc-red), #f04438) !important;
+    linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end)) !important;
 }
 
 .mci-ui-shot.mci-shot-metric *,
@@ -2477,7 +2488,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   border: 1px solid rgba(31,41,55,.10);
   border-radius: 12px;
   background: rgba(255,255,255,.88);
-  color: #94a3b8;
+  color: #475569;
   font-size: 14px;
 }
 
@@ -2520,7 +2531,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   min-height: 38px;
   border: 0;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   color: #fff;
   font-weight: 900;
   box-shadow: 0 12px 26px rgba(181,18,32,.20);
@@ -2571,7 +2582,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   padding: 4px 8px;
   border-radius: 999px;
   background: rgba(15,159,110,.12);
-  color: #0f9f6e;
+  color: #047857;
   font-style: normal;
 }
 
@@ -2586,7 +2597,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan));
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end));
 }
 
 .mci-shot-order p {
@@ -2662,7 +2673,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   width: 62px;
   height: 62px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 14px 30px rgba(181,18,32,.22);
   position: relative;
 }
@@ -2776,12 +2787,12 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 .mci-shot-steps .is-done,
 .mci-shot-steps .is-active {
   color: #fff;
-  background: linear-gradient(135deg, var(--mci-doc-red), #f04438);
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end));
   box-shadow: 0 14px 30px rgba(181,18,32,.20);
 }
 
 .mci-shot-steps .is-active {
-  background: linear-gradient(135deg, var(--mci-doc-blue), var(--mci-doc-cyan));
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end));
 }
 
 .mci-ui-value-grid article::before,
@@ -3054,7 +3065,7 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
 
 .mci-ui-mode-grid small {
   margin-top: 11px;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 10px;
 }
 
@@ -3245,5 +3256,130 @@ AI 或开发者接手页面时，先完整读取契约和三条禁区再实现�
   .mci-ui-recipe-card__visual {
     min-height: 260px;
   }
+}
+
+/* Filled controls keep one accessible palette in both themes. */
+.mci-ui-hero__actions a {
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end)) !important;
+}
+
+.mci-ui-hero__actions a:nth-child(2) {
+  color: #3a2500 !important;
+  background: linear-gradient(135deg, #d9a23a, #f7c65d) !important;
+}
+
+.mci-ui-hero__actions a:nth-child(3) {
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end)) !important;
+}
+
+.mci-ui-shot.mci-shot-metric,
+.mci-ui-shot.mci-shot-asset {
+  background:
+    linear-gradient(115deg, rgba(255,255,255,.20), transparent 35%),
+    linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end)) !important;
+}
+
+.mci-shot-timeline small {
+  color: #475569;
+}
+
+.dark .mci-shot-timeline small {
+  color: #cbd5e1;
+}
+
+.mci-ui-third-steps span,
+.mci-ui-structure__tree span:first-child,
+.mci-recipe-tabs b,
+.mci-shot-tabs .is-active,
+.mci-shot-buttons button:first-child,
+.mci-shot-action__bar button:last-child,
+.mci-shot-theme button {
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end)) !important;
+}
+
+.mci-shot-buttons button:nth-child(2) {
+  color: #3a2500 !important;
+  background: linear-gradient(135deg, #f7c65d, #d9a23a) !important;
+}
+
+.mci-shot-buttons button:nth-child(3),
+.mci-shot-action__bar button:first-child {
+  color: #8e0613 !important;
+  background: #fff !important;
+}
+
+.mci-shot-buttons button:nth-child(4) {
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--mci-doc-blue-fill-start), var(--mci-doc-blue-fill-end)) !important;
+}
+
+.mci-shot-cell em {
+  color: #475569;
+}
+
+.mci-ui-value-grid > article > span {
+  color: #9f1239;
+}
+
+.dark .mci-ui-value-grid > article > span {
+  color: #fda4af;
+}
+
+.mci-recipe-metric small,
+.mci-recipe-metric span {
+  color: #fff !important;
+}
+
+.dark .mci-ui-kicker {
+  border-color: rgba(251, 113, 133, .28);
+  background: rgba(136, 19, 55, .34);
+  color: #fecdd3;
+}
+
+.dark .mci-ui-console__bar,
+.dark .mci-ui-console__bar span,
+.dark .mci-shot-cell em {
+  color: #cbd5e1;
+}
+
+.dark .mci-ui-shot.mci-shot-metric,
+.dark .mci-ui-shot.mci-shot-asset {
+  background:
+    linear-gradient(115deg, rgba(255,255,255,.16), transparent 35%),
+    linear-gradient(135deg, var(--mci-doc-red-fill-start), var(--mci-doc-red-fill-end)) !important;
+}
+
+.dark .mci-shot-order em {
+  background: rgba(16, 185, 129, .16);
+  color: #6ee7b7;
+}
+
+.dark .mci-shot-modal button:first-child {
+  border-color: rgba(251, 113, 133, .34);
+  background: #1e293b;
+  color: #fecdd3;
+}
+
+.dark .mci-recipe-action button:first-child {
+  border-color: rgba(251, 113, 133, .34);
+  background: #1e293b;
+  color: #fecdd3;
+}
+
+.dark .mci-recipe-filter span {
+  border-color: rgba(255,255,255,.12);
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+.dark .mci-ui-mode-grid article > span {
+  color: #cbd5e1;
+}
+
+.dark .mci-ui-state-matrix article > b {
+  color: #93c5fd;
 }
 </style>

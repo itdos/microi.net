@@ -1,12 +1,12 @@
 {
   "name": "@microi/ai-platform-studio-package",
-  "version": "2.0.1",
+  "version": "2.0.3",
   "private": true,
   "type": "module",
   "scripts": {
     "build:manifest": "node build-manifest.mjs",
     "test": "node --test tests/manifest.test.mjs",
-    "build:microservice": "npm --prefix microservice run build",
+    "build:microservice": "node build-microservice.mjs",
     "build": "npm run build:manifest && npm test && npm run build:microservice"
   }
 }

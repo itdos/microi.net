@@ -183,8 +183,8 @@ var result = V8.FormEngine.GetTableData('Sys_User', {
 >* 导出的ExportExcel()方法源码公开在【Microi.Office】插件源码中
 
 ### 效果图
-<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" style="margin: 5px;">
-<img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/d6ed3d2de178154a778f4084e486872f.png" alt="接口引擎配置示例" style="margin: 5px;">
+<img src="https://static.itdos.com/upload/img/csdn/ef8a3fa4c7d2332134e85b55bb49b741.jpeg" alt="接口引擎运行结果" style="margin: 5px;">
 
 ### 使用接口引擎替换导出接口
 ::: details 展开查看 JavaScript 代码（49 行）

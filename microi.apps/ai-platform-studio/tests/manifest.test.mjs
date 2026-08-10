@@ -4,19 +4,79 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 
 const root = resolve(import.meta.dirname, '..')
+const microserviceRoot = resolve(
+  root,
+  '../../Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-platform-studio'
+)
 const manifest = JSON.parse(await readFile(resolve(root, 'system.manifest.json'), 'utf8'))
 const policies = JSON.parse(await readFile(resolve(root, 'resource-policies.json'), 'utf8'))
 const byKey = Object.fromEntries(manifest.engines.map((item) => [item.apiEngineKey, item]))
 
+test('前端微应用源码归档到当前服务器与租户的 AI应用 目录', async () => {
+  const appManifest = JSON.parse(
+    await readFile(resolve(microserviceRoot, '.microi-micro-app.json'), 'utf8')
+  )
+  const packageJson = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
+
+  assert.equal(appManifest.appKey, 'ai-platform-studio')
+  assert.equal(appManifest.osClient, 'iTdos')
+  assert.equal(new URL(appManifest.apiBaseUrl).hostname, 'api.itdos.com')
+  assert.equal(packageJson.scripts['build:microservice'], 'node build-microservice.mjs')
+})
+
 test('治理中心资源数量和业务键稳定', () => {
-  assert.equal(manifest.version, 'v2.0.1')
+  assert.equal(manifest.version, 'v2.0.3')
   assert.equal(manifest.tables.length, 40)
-  assert.equal(manifest.modules.length, 40)
+  assert.equal(manifest.modules.length, 42)
   assert.equal(manifest.engines.length, 64)
   assert.equal(manifest.jobs.length, 1)
   assert.equal(new Set(manifest.tables.map((item) => item.name)).size, 40)
   assert.equal(new Set(manifest.engines.map((item) => item.apiEngineKey)).size, 64)
-  assert.equal(new Set(manifest.modules.map((item) => item.table)).size, 40)
+  const dataModules = manifest.modules.filter((item) => item.table)
+  assert.equal(dataModules.length, 40)
+  assert.equal(new Set(dataModules.map((item) => item.table)).size, 40)
+})
+
+test('治理菜单固定归入系统引擎下的 AI平台治理父菜单', () => {
+  const rootModule = manifest.modules[0]
+  const workbenchModule = manifest.modules[1]
+  const dataModules = manifest.modules.filter((item) => item.table)
+  const catalogMenus = manifest.menuCatalog.flatMap((area) => area.menus.map((item) => `AI平台治理·${item.name}`))
+
+  assert.deepEqual(rootModule, {
+    name: 'AI平台治理',
+    Description: '集中管理门户、身份、授权、配置、发布、服务、可观测、资产与数据迁移治理。',
+    parentId: 'cdc0844b-7249-4d64-a9c3-563a15c9cd20',
+    icon: 'fas fa-shield-alt',
+    display: 1,
+    appDisplay: 1,
+    openType: 'SecondMenu',
+    sort: 9
+  })
+  assert.deepEqual(workbenchModule, {
+    name: 'AI平台治理工作台',
+    Description: 'AI平台治理统一操作入口。',
+    parentName: 'AI平台治理',
+    icon: 'fas fa-tachometer-alt',
+    display: 1,
+    appDisplay: 1,
+    openType: 'MicroService',
+    componentName: 'MicroService',
+    componentPath: '/micro-app/host',
+    url: '/micro-app/ai-platform-studio/overview',
+    isMicroiService: 1,
+    microServiceKey: 'ai-platform-studio',
+    microServiceRoutePath: '/overview',
+    sort: 1
+  })
+  assert.equal(manifest.menuCatalog.length, 9)
+  assert.equal(catalogMenus.length, 40)
+  assert.equal(new Set(catalogMenus).size, 40)
+  assert.deepEqual(new Set(dataModules.map((item) => item.name)), new Set(catalogMenus))
+  assert.ok(dataModules.every((item) => item.parentName === rootModule.name))
+  assert.equal(workbenchModule.parentName, rootModule.name)
+  assert.deepEqual(dataModules.map((item) => item.sort).sort((a, b) => a - b), Array.from({ length: 40 }, (_, index) => (index + 1) * 10))
+  assert.deepEqual(manifest.permissions[0].moduleNames, manifest.modules.map((item) => item.name))
 })
 
 test('所有接口都有显式所有权策略', () => {

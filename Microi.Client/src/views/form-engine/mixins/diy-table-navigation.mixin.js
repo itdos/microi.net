@@ -309,6 +309,11 @@ export default {
                     Version: param.Version || "",
                     RoutePath: param.RoutePath || param.MicroRoute || "/",
                     Data: param.Data || {},
+                    PermissionContext: {
+                        sysMenuId: param.SysMenuId || (param.PermissionContext && (param.PermissionContext.sysMenuId || param.PermissionContext.SysMenuId)) || (self.SysMenuModel && self.SysMenuModel.Id) || self.SysMenuId || "",
+                        moduleEngineKey: param.ModuleEngineKey || (param.PermissionContext && (param.PermissionContext.moduleEngineKey || param.PermissionContext.ModuleEngineKey)) || (self.SysMenuModel && self.SysMenuModel.ModuleEngineKey) || "",
+                        diyTableId: param.DiyTableId || (param.PermissionContext && (param.PermissionContext.diyTableId || param.PermissionContext.DiyTableId)) || (self.SysMenuModel && self.SysMenuModel.DiyTableId) || self.DiyTableId || ""
+                    },
                     OnSuccess: param.OnSuccess,
                     OnCancel: param.OnCancel,
                     OnError: param.OnError

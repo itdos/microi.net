@@ -83,8 +83,10 @@ MCP 建模只使用：
 - 语义仍不明确时必须在任何 MCP 写入前询问基数；禁止静默退化为 `JoinForm`。
 - 禁止把“明细”设计为主表 `XxxId + JoinForm`；禁止让 `JoinForm.TableId/TableName`
   指向当前表；禁止把 1:N 外键放在主表。
-- MCP 的组件枚举、Manifest 结构检查或 `dryRun` 即使通过，也不代表关系基数正确；AI 必须
-  单独执行本节语义门禁。
+- 完整系统 Manifest 中，`JoinForm` / `TableChild` 字段必须声明 `relation.cardinality`；
+  `microi_plan_system` 与 `microi_generate_system` 会在任何写入前执行本节门禁。直接调用
+  `microi_add_field` / `microi_update_field` 时，后端仍会校验目标表、主/子外键、隐藏菜单
+  和子表索引，不能靠绕过 Manifest 写入未初始化配置。
 
 示例：
 
@@ -100,9 +102,27 @@ MCP 建模只使用：
    `tables[].indexes`，并以 `microi_get_table_indexes` 回读。
 3. 为子表创建绑定其 `diyTableId` 的隐藏 CRUD 菜单：`Display=0`、`AppDisplay=0`、
    `HasChild=0`。
-4. 回读真实的子表 `diy_table.Id`、子菜单 `sys_menu.Id` 与子表外键名后，再在主表
-   新增/更新 `Component=TableChild`、`FormWidth=24` 的配置字段。工具还不能在一次
-   Manifest 中解析这些新建 Id 时，必须分两阶段执行；禁止编造 Id 或改用 `JoinForm`。
+4. 在完整系统 Manifest 的主表字段声明：
+
+   ```json
+   {
+     "name": "Items",
+     "label": "明细",
+     "component": "TableChild",
+     "formWidth": 24,
+     "relation": {
+       "cardinality": "1:N",
+       "targetTable": "Biz_OrderItem",
+       "childForeignKey": "OrderId",
+       "childModule": "订单明细（隐藏）",
+       "primaryTableFieldName": "Id"
+     }
+   }
+   ```
+
+   `microi_generate_system` 会先创建全部表与普通字段，再创建隐藏菜单，最后回读并写入
+   当前租户真实的 `diy_table.Id` / `sys_menu.Id`。禁止在 Manifest 中编造这些 Id，禁止
+   因依赖尚未创建而退化成 `JoinForm`。
 5. `TableChild` 控件字段通常只是表单配置位，关系事实存放在子表外键。至少保存：
 
 ```json

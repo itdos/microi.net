@@ -1,54 +1,109 @@
 # 微服务（前端微应用）
 
-吾码微服务是一套面向 Vue3 定制页面的开发、托管和交付体系。一个微服务可以包含多个页面，既能绑定后台菜单作为完整业务页面，也能通过 `V8.OpenAppDialog` 作为 Dialog 或 Drawer 弹出，还能由在线 AI、MCP 和 VS Code 共同维护。
+<div class="mci-micro-app-page" aria-hidden="true"></div>
 
-> 本文中的 `MicroService` 指运行在吾码主站中的前端微应用，不等同于独立部署的 .NET、Java 后端服务。复杂业务事务、权限校验和数据写入仍建议放在接口引擎或后端服务中，微服务主要负责页面与交互。
+<section class="micro-app-hero">
+  <div class="micro-app-hero__copy">
+    <p class="micro-app-eyebrow">MICROI · VUE 3 · AI DELIVERY</p>
+    <h2>一个工程，三种打开方式</h2>
+    <p>吾码 MicroService 是面向定制业务界面的前端微应用体系。它可以脱离吾码主界面独立运行，也可以作为后台菜单中的完整页面，还可以由 <code>V8.OpenAppDialog</code> 打开某个指定路由。</p>
+    <div class="micro-app-hero__actions">
+      <a href="#三种运行方式">查看运行方式</a>
+      <a class="is-secondary" href="https://microi.net/apps.html" target="_blank" rel="noreferrer">浏览 AI 应用案例 ↗</a>
+    </div>
+  </div>
+  <div class="micro-app-hero__facts" aria-label="微服务核心能力">
+    <article><span>01</span><strong>独立运行</strong><small>同一套帐号、租户与动态验证码</small></article>
+    <article><span>02</span><strong>菜单直开</strong><small>一个应用可按路由绑定多个菜单</small></article>
+    <article><span>03</span><strong>弹层打开</strong><small>Dialog / Drawer 与业务回调</small></article>
+    <article><span>AI</span><strong>独立交付</strong><small>源码、构建、版本与商城发布</small></article>
+  </div>
+</section>
 
-## 什么时候应该使用微服务
+::: tip 先理解这里的“微服务”
+本文的 `MicroService` 是可独立构建和发布的前端微应用，不等同于 .NET、Java 后端微服务。页面和交互放在 MicroService；事务、权限校验与可信数据写入继续放在接口引擎或后端原子能力中。
+:::
 
-| 需求 | 推荐方案 |
-|---|---|
-| 确认、删除、是否继续 | `V8.ConfirmTips` |
-| 简单表单新增、修改、查看 | 表单引擎 / `V8.OpenAnyForm` |
-| 已写在 `Microi.Client` 源码中的组件 | `V8.OpenDialog` |
-| 3 个以上输入项、联动校验、分步操作、上传、表格、代码编辑器 | 微服务 + `V8.OpenAppDialog` |
-| 独立菜单页面、同一应用包含多个业务页面 | 微服务 + 后台菜单绑定 |
-| 需要 AI 生成、在线编辑、本地工程化构建、独立版本和商城交付 | 微服务 |
+吾码官网 [AI 应用广场](https://microi.net/apps.html) 中的大部分 AI 应用均采用 MicroService 实现。这样既能独立展示和访问，也能无缝嵌入吾码菜单与业务弹层，而不必把每个定制页面都打进 `Microi.Client` 主包。
 
-典型场景包括：
+## 三种运行方式
 
-- 不同 SaaS 租户需要不同的 Vue3 定制页面，但不希望全部打进 `Microi.Client` 主包。
-- 一个官方应用需要持续增加页面，并独立于吾码主前端发布。
-- 页面需要在线 AI 生成和修改，同时允许开发者拉回本地继续工程化开发。
-- 表格按钮需要打开一个有完整布局、校验和交互的复杂弹窗，而不是在 V8 代码中拼接 HTML。
+<div class="micro-app-mode-grid">
+  <article class="is-independent">
+    <span class="micro-app-mode-icon" aria-hidden="true">↗</span>
+    <p class="micro-app-eyebrow">STANDALONE</p>
+    <h3>独立运行</h3>
+    <p>直接打开微服务地址。若浏览器已有有效登录态则自动进入；否则显示吾码帐号密码登录。验证码是否出现由当前租户 <code>EnableCaptcha</code> 动态决定。</p>
+    <strong>适合：</strong><span>官网 AI 应用、外部入口、专用工作台、独立演示。</span>
+  </article>
+  <article class="is-menu">
+    <span class="micro-app-mode-icon" aria-hidden="true">▦</span>
+    <p class="micro-app-eyebrow">MENU ROUTE</p>
+    <h3>平台菜单直开</h3>
+    <p>后台菜单使用 <code>OpenType=MicroService</code>，URL 指向 <code>/micro-app/{AppKey}/{RoutePath}</code>，直接打开应用内的指定路由。</p>
+    <strong>适合：</strong><span>生产工作台、驾驶舱、复杂双栏页面、全屏业务操作。</span>
+  </article>
+  <article class="is-dialog">
+    <span class="micro-app-mode-icon" aria-hidden="true">◫</span>
+    <p class="micro-app-eyebrow">OPEN APP DIALOG</p>
+    <h3>弹层打开</h3>
+    <p>在前端 V8 事件中调用 <code>V8.OpenAppDialog</code>，按 AppKey 和 RoutePath 打开 Dialog 或 Drawer，并通过回调返回结果。</p>
+    <strong>适合：</strong><span>复杂配置、分步操作、跨表选择、详情工作台。</span>
+  </article>
+</div>
+
+### 一句话选择
+
+| 你的需求 | 首选能力 | 原因 |
+|---|---|---|
+| 只是“是否继续” | `V8.ConfirmTips` | 无需引入完整页面。 |
+| 普通新增、编辑、详情 | 表单引擎 / `V8.OpenAnyForm` | 权限、字段与校验已经标准化。 |
+| 已内置在主前端的组件 | `V8.OpenDialog` | 直接复用 `Microi.Client` 组件。 |
+| 复杂弹层，有联动、表格、上传或分步操作 | MicroService + `V8.OpenAppDialog` | 独立组件化开发，仍保留平台上下文。 |
+| 完整工作台或同一应用多个业务页面 | MicroService + 菜单路由 | 可让多个菜单分别打开不同内部路由。 |
+| 需要独立访问、独立版本、AI 维护与商城交付 | MicroService | 一个工程覆盖独立、嵌入和发布。 |
+
+## 真实案例：同一能力融入不同业务位置
+
+<div class="micro-app-case-grid">
+  <figure class="micro-app-case is-wide">
+    <img src="/images/microservice-cases/open-app-dialog.png" alt="数据库定时备份微服务通过 V8.OpenAppDialog 在吾码 SaaS 引擎中弹层打开">
+    <figcaption><span>案例 1 · 弹层</span><strong>数据库定时备份</strong><small>在 SaaS 引擎列表上方打开指定微服务路由；背景页面、菜单和登录态均保留。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="/images/microservice-cases/menu-production-counter.jpg" alt="生产计数报工工作台作为吾码平台菜单中的微服务路由打开">
+    <figcaption><span>案例 2 · 菜单路由</span><strong>生产计数报工工作台</strong><small>深色大屏式工作台直接占据菜单内容区，宿主导航仍可正常使用。</small></figcaption>
+  </figure>
+  <figure class="micro-app-case">
+    <img src="/images/microservice-cases/menu-packing-workbench.jpg" alt="成品打包工作台作为吾码平台菜单中的另一个微服务路由打开">
+    <figcaption><span>案例 3 · 菜单路由</span><strong>成品打包工作台</strong><small>一个 MicroService 可以维护多个页面，并让不同菜单直达各自 RoutePath。</small></figcaption>
+  </figure>
+</div>
 
 ## 整体架构
 
-```text
-在线 AI / MCP / VS Code
-          │
-          ├─ 应用主数据 ──> sys_microistore
-          ├─ 私有源码 ──> mci_ai_app_file ──> 私有 HDFS
-          │
-          └─ 构建发布 ──> sys_microiservice + sys_microiservice_page
-                                      │
-                                      └─ 公有构建产物 ──> 公有 HDFS
-                                                               │
-                               后台菜单 / OpenAppDialog <──────┘
-```
+<div class="micro-app-flow" aria-label="微服务从开发到运行的流程">
+  <article><span>1</span><strong>在线 AI / MCP / VS Code</strong><small>创建或维护 Vue 3 源码</small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>2</span><strong>私有源码与版本</strong><small>租户隔离、文件清单与哈希</small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>3</span><strong>构建与发布</strong><small>不可变版本资产和路由清单</small></article>
+  <i aria-hidden="true">→</i>
+  <article><span>4</span><strong>独立 / 菜单 / 弹层</strong><small>三种入口复用同一发布物</small></article>
+</div>
 
-### 核心数据表
+### 核心数据边界
 
-| 表 | 作用 |
+| 数据 | 存储与职责 |
 |---|---|
-| `sys_microistore` | 应用商城唯一主表，统一保存平台应用、Web、UniApp、MicroService 的名称、类型、分类、发布、预览和统计。 |
-| `mci_ai_app_file` | 应用源码文件清单，文件内容存储在当前租户的私有 HDFS。 |
-| `mci_ai_app_version` | 构建版本、状态、预览地址和变更说明。 |
-| `sys_microiservice` | 微服务运行时主表，保存 `MsKey`、版本、入口、构建清单、文件列表和发布时间。 |
-| `sys_microiservice_page` | 微服务页面/路由表，一个微服务可以包含多个页面。 |
-| `sys_menu` | 后台菜单；`OpenType=MicroService` 时绑定微服务及其页面。 |
+| 应用主数据 `sys_microistore` | 统一保存平台应用、Web、UniApp、MicroService 的名称、类型、分类、发布、预览和统计。 |
+| 私有源码 `mci_ai_app_file` | 保存源码文件清单；实际内容进入当前租户私有 HDFS。 |
+| 版本 `mci_ai_app_version` | 保存构建版本、状态、预览地址和变更说明。 |
+| 运行时 `sys_microiservice` | 保存 `MsKey`、版本、入口、构建清单、文件列表和发布时间。 |
+| 页面路由 `sys_microiservice_page` | 一个微服务可包含多个页面，是菜单与弹层 RoutePath 的事实源。 |
+| 菜单 `sys_menu` | `OpenType=MicroService` 时绑定微服务及其具体页面。 |
 
-源码与构建产物必须分开：源码默认存入私有桶，只有有权限的当前租户可以读取；编译后的 HTML、JS、CSS、图片和字体存入公有桶，由浏览器加载。不要把大体积 JS/CSS 以内联 JSON 长期保存在数据库字段中。
+源码与构建产物必须分开：源码默认进入私有存储；编译后的 HTML、JS、CSS、图片和字体进入公有发布存储供浏览器加载。不要把大体积 JS/CSS 作为内联 JSON 长期保存在数据库字段里。
 
 ## 在线使用：AI 应用工作台
 
@@ -247,15 +302,15 @@ Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应�
 
 ```text
 1. microi_list_applications：先盘点现有应用和文件清单
-2. microi_get_application_context：读取目标应用完整上下文
-3. microi_get_application_file：按需补读单个大文件
+2. microi_get_application_context：先读元数据与必要的小文件
+3. 已有本地工程时直接修改文件，不把整个目录塞进 AI 上下文
 4. 优先在合适的现有微服务中增加页面
 5. 没有合适应用时才创建新的微服务
-6. 先 dry-run 审核写入内容，再确认执行
-7. 发布后检查运行时、路由和真实页面
+6. microi_sync_microservice_source 只传本地 directory，先 dry-run 清单
+7. 构建产物使用目录流式发布，发布后检查运行时、路由和真实页面
 ```
 
-这一步非常重要。若不先盘点应用，AI 容易重复创建范围过小的微服务，或在 V8 按钮中继续拼接大量 HTML。
+这一步非常重要。若不先盘点应用，AI 容易重复创建范围过小的微服务，或在 V8 按钮中继续拼接大量 HTML；若让 AI 自己读取、编码和分段整个源码目录，又会浪费大量时间与上下文。
 
 ### 应用发现工具
 
@@ -271,12 +326,36 @@ Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应�
 | MCP 工具 | 关键参数 | 说明 |
 |---|---|---|
 | `microi_create_microservice` | `microService`、`confirmExecution?` | 创建或更新 `sys_microiservice` 元数据，不上传源码或构建文件。 |
-| `microi_sync_microservice_source` | `microService`、`sourceFiles`、`replace?`、`confirmExecution?` | 把源码写入在线 AI 应用的私有 HDFS；`replace=true` 时清理清单外的旧源码元数据。 |
+| `microi_sync_microservice_source` | `microService`、`directory?`、`sourceFiles?`、`replace?`、`confirmExecution?` | **本地工程首选 `directory`**。MCP 在进程内扫描、哈希和读取源码，模型不接触文件字节；`sourceFiles` 仅保留旧调用兼容。 |
 | `microi_publish_microservice` | `microService`、`assets`、`routes?`、`confirmExecution?` | 上传构建产物，更新运行时并同步 `sys_microiservice_page`。 |
 
 三个写入工具在未传 `confirmExecution` 时只返回 dry-run，不会真正写入。AI 应先展示将要创建的 AppKey、文件数、路由和版本，确认无误后再传入任意非空确认文本执行。
 
-`sourceFiles` 中每个文件需要 `Path` 或 `FilePath`，以及 `FileByteBase64` 或 `ContentBase64`；`assets` 中每个构建文件需要相对路径和 Base64 内容，并将入口文件标记为 `IsEntry=true` 或 `Entry=true`。
+### 源码同步不要再手工拆文件
+
+<div class="micro-app-guard-grid">
+  <article class="is-danger"><span>不要这样做</span><strong>读取 Base64 → 切成 48KB → 反复上传</strong><p>不要创建 <code>.sync-seg-*</code>、<code>sync-source-files.json</code>，也不要因为单个源码超过 AI 工具读取上限就拆坏真实工程。</p></article>
+  <article class="is-success"><span>正确做法</span><strong>把本地项目绝对目录交给 MCP</strong><p>MCP 自己排除依赖与构建目录、计算清单和哈希、读取普通文件；例如 93KB 的 <code>microi.v8.js</code> 仍然是一个完整源码文件。</p></article>
+</div>
+
+先 dry-run 查看文件清单：
+
+```json
+{
+  "microService": {
+    "MsKey": "demo-device-ops",
+    "MsName": "设备运维微服务"
+  },
+  "directory": "D:\\Microi-V8-Engine\\Demo\\AI应用\\demo-device-ops",
+  "replace": true
+}
+```
+
+确认清单后再补 `confirmExecution`。目录模式会自动排除 `node_modules`、`dist`、`build`、`coverage`、缓存与版本库目录，并在上传前拒绝 `.env`、证书和密钥文件。dry-run 会返回文件数、总字节数、文件哈希、清单哈希以及 `aiContextFileBytes=0`。
+
+::: warning 旧版兼容边界
+只有调用方手里本来就只有内存文件时才使用 `sourceFiles`。这条兼容路径仍要求每个文件提供相对路径和内容；它不是本地工程的推荐方式，也不能用人工切片来规避上下文限制。
+:::
 
 ### 怎样向 AI 描述需求
 
@@ -363,6 +442,8 @@ http://localhost:1988/?OsClient=iTdos#/micro-app/microi-official/saas-tenant/cre
 
 同一微服务可以绑定多个菜单。宿主会为每个运行实例生成独立名称，避免切换页面时出现 `app name conflict`。
 
+菜单加载时还会把当前 `SysMenuId`、`ModuleEngineKey`、`DiyTableId` 作为 `permissionContext` 传给子应用。微服务调用表单引擎时应使用被授权的模块 Key；不能把表名当成模块 Key，也不能删除权限参数来“解决”无权限提示。
+
 `sys_microiservice_page` 作为隐藏子表菜单时，应设置 `Display=0`、`AppDisplay=0`、`HasChild=0`。若错误开启“是否有子集”，上级微服务菜单可能被识别成只能展开的父菜单。
 
 ## 在 V8 中弹出复杂页面
@@ -380,6 +461,8 @@ V8.OpenAppDialog({
     Data: {
         source: 'osclients'
     },
+    // 可省略；默认继承当前调用菜单。跨模块操作时应显式传目标授权模块。
+    ModuleEngineKey: 'authorized-module-key',
     OnSuccess: function (data) {
         V8.Tips('创建任务已提交', true);
         V8.RefreshTable({ _PageIndex: -1 });
@@ -403,11 +486,41 @@ V8.OpenAppDialog({
 | `Width` | 否 | `min(920px, calc(100vw - 32px))` | 支持 px、%、vw、`min(...)`。 |
 | `OpenType` | 否 | `Dialog` | `Dialog` 或 `Drawer`。 |
 | `Data` | 否 | `{}` | 传给子应用的可序列化业务数据。 |
+| `SysMenuId` | 否 | 当前调用菜单 | 传给子应用的菜单权限上下文。 |
+| `ModuleEngineKey` | 否 | 当前调用模块 | 目标模块引擎 Key；跨模块调用时建议显式传入。 |
+| `DiyTableId` | 否 | 当前调用表 | 目标表 Id，仅作上下文；后端仍按 Token 与模块权限校验。 |
 | `OnSuccess` | 否 | - | 成功回调，执行后自动关闭。 |
 | `OnCancel` | 否 | - | 取消回调，执行后自动关闭。 |
 | `OnError` | 否 | - | 加载失败或子应用上报错误时执行，不自动关闭。 |
 
 回调函数应放在顶层，不要放进 `Data`。完整 API 文档参见 [V8.OpenAppDialog](/doc/v8-engine/v8-client.html#v8-openappdialog)。
+
+## 独立运行：平台登录、动态验证码与权限
+
+新生成的 MicroService 默认具备独立访问认证门，不再假定所有页面都只会嵌入吾码后台。
+
+<div class="micro-app-auth-flow">
+  <article><span>已有宿主</span><strong>复用吾码 Token</strong><small>菜单与弹层入口不重复登录</small></article>
+  <i>或</i>
+  <article><span>独立访问</span><strong>读取租户配置</strong><small><code>V8.GetSysConfig(true)</code></small></article>
+  <i>→</i>
+  <article><span>按需显示</span><strong>帐号、密码、验证码</strong><small><code>EnableCaptcha</code> 动态控制</small></article>
+  <i>→</i>
+  <article><span>登录成功</span><strong>进入业务路由</strong><small>Token 由统一 SDK 保存与轮换</small></article>
+</div>
+
+验证码开启时，页面请求 `/api/Captcha/GetCaptcha?OsClient={当前租户}`，读取响应头 `captchaid`，并在 `V8.Login` 中提交 `_CaptchaId` 与 `_CaptchaValue`。`EnableCaptcha` 兼容布尔值、数字 `1` 和字符串 `true/1/yes/on`；关闭时不渲染验证码控件，也不提交验证码字段。
+
+### 为什么仍然会提示“没权限”
+
+登录成功只说明身份有效，不代表用户自动拥有所有模块权限。按下面顺序排查，禁止通过移除权限校验、改用匿名接口或硬编码管理员 Token 处理：
+
+1. **先看身份**：独立访问是否已经登录，接口请求是否携带当前租户 `osclient` 与最新 `Authorization`。
+2. **再看目标模块**：FormEngine 调用是否传入真实、已授权的 `ModuleEngineKey`，而不是表名或空字符串。
+3. **再看宿主上下文**：菜单、弹层或组件入口是否收到 `permissionContext.sysMenuId/moduleEngineKey/diyTableId`。
+4. **最后看角色授权**：当前用户角色是否拥有目标菜单、表权限、按钮权限与数据范围。
+
+<div class="micro-app-note-strip"><strong>安全边界</strong><span><code>permissionContext</code> 用于让子应用选择正确的模块调用上下文，不是授权凭证。真正的权限仍由后端依据 DiyToken、租户、角色、菜单、表和数据范围校验。</span></div>
 
 ## 子应用接收宿主上下文
 
@@ -419,6 +532,7 @@ const hostData = window.microApp?.getData?.() || {};
 console.log(hostData.apiBase);
 console.log(hostData.osClient);
 console.log(hostData.token);
+console.log(hostData.permissionContext);
 console.log(hostData.appKey);
 console.log(hostData.version);
 console.log(hostData.microRoute);
@@ -432,6 +546,10 @@ console.log(hostData.dialogData);
 | `apiBase` | 当前吾码后端地址。 |
 | `osClient` | 当前租户。 |
 | `token` | 当前登录 Token。 |
+| `menuId` | 当前菜单 Id；弹层默认继承调用菜单。 |
+| `moduleEngineKey` | 当前或显式指定的模块引擎 Key。 |
+| `diyTableId` | 当前或显式指定的表 Id。 |
+| `permissionContext` | `{ sysMenuId, moduleEngineKey, diyTableId }` 的规范对象。 |
 | `appKey` | 当前微服务 AppKey。 |
 | `version` | 实际构建版本。 |
 | `microRoute` | 当前内部路由。 |

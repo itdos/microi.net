@@ -66,6 +66,22 @@ export interface LocalApplicationAssetManifest {
   skippedInternalEvidenceFiles: string[];
 }
 
+export interface LocalMicroServiceSourceFile {
+  absolutePath: string;
+  relativePath: string;
+  size: number;
+  sha256: string;
+}
+
+export interface LocalMicroServiceSourceManifest {
+  rootDirectory: string;
+  files: LocalMicroServiceSourceFile[];
+  totalSize: number;
+  manifestHash: string;
+  skippedDirectories: string[];
+  skippedFiles: string[];
+}
+
 export type ApplicationStreamPublishMode = 'stage' | 'finalize' | 'stage-and-finalize';
 
 export interface ApplicationDirectoryStreamPublishInput {
@@ -141,6 +157,18 @@ const FORBIDDEN_APPLICATION_ASSET_FILES = [
   /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
   /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
 ];
+
+const MICRO_SERVICE_SOURCE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+const MICRO_SERVICE_SOURCE_MAX_FILES = 1_000;
+const MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES = new Set([
+  '.git', '.hg', '.svn', '.cache', '.next', '.nuxt', '.output', '.turbo', '.vite',
+  'coverage', 'dist', 'build', 'node_modules',
+]);
+const MICRO_SERVICE_SOURCE_EXCLUDED_FILES = new Set([
+  '.ds_store', 'thumbs.db', '.microi-micro-app-sync.json', '.microi-build-evidence.json',
+]);
+const MICRO_SERVICE_SOURCE_CHUNK_ARTIFACT = /^(?:\.sync-seg-.*|sync-source-files\.json)$/iu;
 
 const OCR_MAX_FILE_BYTES = 100 * 1024 * 1024;
 const OCR_MAX_BASE64_CHARACTERS = Math.ceil(OCR_MAX_FILE_BYTES / 3) * 4 + 512;
@@ -1157,6 +1185,117 @@ export async function buildLocalApplicationAssetManifest(
     manifestHash,
     skippedSourceMaps,
     skippedInternalEvidenceFiles,
+  };
+}
+
+/**
+ * Build the private-source manifest inside the MCP process. Source bytes never
+ * enter the model context: callers pass one local directory and the server
+ * reads each ordinary file directly after a bounded preflight.
+ */
+export async function buildLocalMicroServiceSourceManifest(
+  rootDirectory: string,
+  options: { maxFiles?: number; maxTotalBytes?: number } = {},
+): Promise<LocalMicroServiceSourceManifest> {
+  const root = path.resolve(String(rootDirectory || '').trim());
+  if (!path.isAbsolute(String(rootDirectory || '').trim())) {
+    throw new Error('directory 必须是微服务项目的绝对路径。');
+  }
+  const rootStat = fs.lstatSync(root);
+  if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+    throw new Error(`源码根目录必须是真实目录且不能是符号链接：${root}`);
+  }
+  const rootRealPath = fs.realpathSync(root);
+  const maxFiles = Math.min(
+    MICRO_SERVICE_SOURCE_MAX_FILES,
+    Math.max(1, options.maxFiles ?? MICRO_SERVICE_SOURCE_MAX_FILES),
+  );
+  const maxTotalBytes = Math.min(
+    MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES,
+    Math.max(1, options.maxTotalBytes ?? MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES),
+  );
+  const pending = [rootRealPath];
+  const sourceFiles: Array<{ absolutePath: string; relativePath: string; size: number }> = [];
+  const skippedDirectories: string[] = [];
+  const skippedFiles: string[] = [];
+  let totalSize = 0;
+
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    for (const item of fs.readdirSync(current, { withFileTypes: true })) {
+      const absolutePath = path.join(current, item.name);
+      const itemStat = fs.lstatSync(absolutePath);
+      if (itemStat.isSymbolicLink()) throw new Error(`源码目录不允许符号链接：${absolutePath}`);
+      const relativePath = normalizeLocalApplicationRelativePath(path.relative(rootRealPath, absolutePath));
+      const resolvedRealPath = fs.realpathSync(absolutePath);
+      if (resolvedRealPath !== rootRealPath && !resolvedRealPath.startsWith(rootRealPath + path.sep)) {
+        throw new Error(`源码文件越过了根目录：${absolutePath}`);
+      }
+
+      if (itemStat.isDirectory()) {
+        const normalizedDirectory = relativePath.toLowerCase();
+        const excluded = MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES.has(item.name.toLowerCase())
+          || normalizedDirectory === 'unpackage/dist'
+          || normalizedDirectory.startsWith('unpackage/dist/');
+        if (excluded) {
+          skippedDirectories.push(relativePath);
+          continue;
+        }
+        pending.push(absolutePath);
+        continue;
+      }
+      if (!itemStat.isFile()) throw new Error(`源码目录包含非普通文件：${absolutePath}`);
+
+      const normalizedName = item.name.toLowerCase();
+      if (MICRO_SERVICE_SOURCE_CHUNK_ARTIFACT.test(item.name)) {
+        throw new Error(
+          `发现废弃的手工切片文件 ${relativePath}。请删除 .sync-seg-* / sync-source-files.json，`
+          + '然后直接把项目 directory 传给 microi_sync_microservice_source；不要再分段或拼接 Base64。',
+        );
+      }
+      if (MICRO_SERVICE_SOURCE_EXCLUDED_FILES.has(normalizedName)) {
+        skippedFiles.push(relativePath);
+        continue;
+      }
+      if (/^\.env(?:\.|$)/iu.test(item.name) && !/^\.env\.example$/iu.test(item.name)) {
+        throw new Error(`源码目录疑似包含环境密钥文件，已拒绝同步：${relativePath}`);
+      }
+      if (FORBIDDEN_APPLICATION_ASSET_FILES.slice(1).some(pattern => pattern.test(item.name))) {
+        throw new Error(`源码目录疑似包含密钥文件，已拒绝同步：${relativePath}`);
+      }
+      if (itemStat.size > MICRO_SERVICE_SOURCE_MAX_FILE_BYTES) {
+        throw new Error(`源码单文件超过 ${MICRO_SERVICE_SOURCE_MAX_FILE_BYTES} bytes：${relativePath}`);
+      }
+      totalSize += itemStat.size;
+      if (totalSize > maxTotalBytes) {
+        throw new Error(`源码总大小超过 ${maxTotalBytes} bytes；请检查是否误包含缓存或构建目录。`);
+      }
+      sourceFiles.push({ absolutePath, relativePath, size: itemStat.size });
+      if (sourceFiles.length > maxFiles) {
+        throw new Error(`源码文件超过上限 ${maxFiles}；请检查是否误包含依赖、缓存或构建目录。`);
+      }
+    }
+  }
+
+  sourceFiles.sort((left, right) => (
+    left.relativePath < right.relativePath ? -1 : left.relativePath > right.relativePath ? 1 : 0
+  ));
+  if (sourceFiles.length === 0) throw new Error(`源码目录没有可同步文件：${rootRealPath}`);
+
+  const files: LocalMicroServiceSourceFile[] = [];
+  for (const file of sourceFiles) {
+    files.push({ ...file, sha256: await sha256LocalFile(file.absolutePath) });
+  }
+  const manifestHash = crypto.createHash('sha256')
+    .update(files.map(file => `${file.relativePath}\t${file.sha256}\t${file.size}`).join('\n'))
+    .digest('hex');
+  return {
+    rootDirectory: rootRealPath,
+    files,
+    totalSize,
+    manifestHash,
+    skippedDirectories: skippedDirectories.sort(),
+    skippedFiles: skippedFiles.sort(),
   };
 }
 
@@ -2536,7 +2675,7 @@ BOUNDARY RULES:
 - 后端使用 Ulid 随机段（非时间戳）生成唯一 URL 后缀，碰撞自动重试最多 5 次
 - 重复 Name/字段会幂等返回 Skipped:true 而非报错
 - "已存在唯一值" 错误会自动重试并追加随机后缀
-**鼓励**：为同一张表批量添加 N 个字段时，可一次性发起 N 个并发 microi_add_field 调用以缩短总耗时；
+**鼓励**：普通独立字段可批量并发添加；JoinForm/TableChild 必须等目标表、外键、索引和隐藏子表模块就绪后顺序创建，完整系统优先使用 Manifest 生成器；
 不同表的 microi_create_table 也可并发；菜单模块同理。接口引擎请先 list/get 再 create，避免重复 ApiEngineKey。
 
 ## ⚖️ 何时创建接口引擎（microi_create_engine）
@@ -2653,6 +2792,11 @@ microi_add_field 的 component 决定该字段在表单中的 UI 控件：
 | TableChild | 子表/明细表 | — (关联表) |
 | JoinForm | 关联表单（外键） | varchar(50) |
 | OpenTable | 弹窗选择关联数据 | varchar(50) |
+
+### JoinForm / TableChild 关系组件硬规则
+- \`JoinForm\` 仅表示 1:1 或 N:1：目标表必须与当前表不同，\`Config.JoinForm.JoinFieldName\` 必须是当前主表里已存在、实际保存目标记录 Id 的字段；禁止默认写成 \`Name\`，禁止目标表/字段未解析时落库。
+- \`TableChild\` 仅表示 1:N：必须先创建独立子表与真实外键字段，再创建以 \`(OsClient, 外键)\` 开头的组合索引，以及 \`Display=0、AppDisplay=0、HasChild=0\` 且绑定子表的隐藏菜单；最后才能写入 \`TableChildTableId/TableChildSysMenuId/TableChildFkFieldName\`。
+- 自然语言生成完整系统时必须使用 Manifest \`fields[].relation\`，让 \`microi_generate_system\` 分阶段解析当前租户真实 Id。不要直接拼租户 Id 或把 1:N 明细伪装成 JoinForm。
 
 ## 选项类组件（Select/MultipleSelect/Radio/Checkbox）数据源（重要！）
 为这四种组件添加字段时，**必须**通过 \`data\` 参数传入选项，否则表单下拉框为空。
@@ -4834,7 +4978,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       placeholder: z.string().optional().describe('Placeholder text shown in form input'),
       formWidth: z.number().nullable().optional().describe('Field width in form grid columns (1-24). Default: null/omitted for normal fields. Use 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.'),
       data: z.string().optional().describe('Options data source for Select/MultipleSelect/Radio/Checkbox components. REQUIRED for these four components. Format: "key1|label1,key2|label2" (KeyValue, recommended — e.g. "1|启用,0|禁用", "male|男,female|女") — backend stores key, displays label. Or simple "v1,v2,v3" (same value for both). Backend auto-builds the Config JSON. For SQL/ApiEngine/DataSource sources, use the config parameter instead.'),
-      config: z.string().optional().describe('Component config JSON string. Auto-generated for Select/Radio/Checkbox when "data" is provided. Use this only for advanced cases:\n - SQL source: \'{"DataSource":"Sql","Sql":"select Id,Name from t where Name like \\\'%$Keyword$%\\\' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\'\n - ApiEngine: \'{"DataSource":"ApiEngine","DataSourceApiEngineKey":"key","SelectLabel":"name","SelectSaveField":"id"}\'\n - AutoNumber: \'{"AutoNumberFixed":"ORD","AutoNumberLength":4}\'\n - DateTime: \'{"DateTimeType":"datetime"}\' (datetime|date|month|year|HH:mm)\n - JoinForm: \'{"JoinForm":{"TableId":"xxx","TableName":"xxx","JoinFieldName":"yyy"}}\''),
+      config: z.string().optional().describe('Component config JSON string. Auto-generated for Select/Radio/Checkbox when "data" is provided. Use this only for advanced cases:\n - SQL source: \'{"DataSource":"Sql","Sql":"select Id,Name from t where Name like \\\'%$Keyword$%\\\' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\'\n - ApiEngine: \'{"DataSource":"ApiEngine","DataSourceApiEngineKey":"key","SelectLabel":"name","SelectSaveField":"id"}\'\n - AutoNumber: \'{"AutoNumberFixed":"ORD","AutoNumberLength":4}\'\n - DateTime: \'{"DateTimeType":"datetime"}\' (datetime|date|month|year|HH:mm)\n - JoinForm direct writes require a different, existing target TableId/TableName and an existing parent JoinFieldName that stores the target Id. For 1:N use Manifest relation + TableChild instead. Backend rejects unresolved/self-referencing relation config.'),
       description: z.string().optional().describe('Field description / help text'),
       encrypt: z.number().optional().describe('Enable encryption storage (1=encrypt, 0=plain). Default: 0. For sensitive data like phone/ID number.'),
       inTableEdit: z.number().optional().describe('Enable inline editing in table list view (1=yes, 0=no). Default: 0'),
@@ -5980,6 +6124,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       componentPath: z.string().optional().describe('Component path. Default: "/diy/diy-table-rowlist"'),
       display: z.number().optional().describe('Show in PC menu (1=yes, 0=no). Default: 1'),
       appDisplay: z.number().optional().describe('Show in mobile menu (1=yes, 0=no). Default: 1'),
+      hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
       openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService"'),
       url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
       sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
@@ -6017,7 +6162,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
       confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
     },
-    async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort,
+    async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, hasChild, openType, url, sort,
       icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere,
       enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema,
       moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns,
@@ -6063,6 +6208,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
               module: {
                 Name: name,
                 ParentId: parentId,
+                HasChild: hasChild,
                 OpenType: effectiveOpenType || 'Diy',
                 ComponentName: effectiveComponentName,
                 ComponentPath: effectiveComponentPath,
@@ -6090,7 +6236,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         const result = await client.createModule({
           Name: name, DiyTableId: diyTableId, ParentId: parentId,
           ComponentName: effectiveComponentName, ComponentPath: effectiveComponentPath,
-          Display: display ?? 1, AppDisplay: appDisplay ?? 1,
+          Display: display ?? 1, AppDisplay: appDisplay ?? 1, HasChild: hasChild,
           OpenType: effectiveOpenType, Url: effectiveUrl, Sort: sort,
           Icon: icon,
           MenuBadgeEnabled: menuBadgeEnabled ?? 0,
@@ -6477,33 +6623,94 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_sync_microservice_source',
-    `Sync local microservice source files into the online AI Application for OsClient "${osClient}". The app is created/upserted as AppType=MicroService; source files are private and remain separate from published assets.`,
+    `Sync a local Web, UniApp or MicroService source directory into the online AI Application for OsClient "${osClient}". Prefer directory: MCP scans, hashes and reads the local files internally, so AI agents must never read large files into Base64, create .sync-seg-* files, create sync-source-files.json, or split one source file across tool calls. The legacy sourceFiles array remains available only for compatibility. Source files stay private and separate from published assets.`,
     {
       microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: Description and SourceDirName.'),
-      sourceFiles: z.array(jsonRecordSchema).describe('Source files. Each item needs Path/FilePath and FileByteBase64/ContentBase64. Optional: Size and Sha256.'),
+      directory: z.string().optional().describe('Preferred. Absolute local project directory; MCP reads it directly and excludes node_modules, dist, build, coverage, caches and VCS data.'),
+      sourceFiles: z.array(jsonRecordSchema).optional().describe('Legacy compatibility only. Do not construct this array from manually split files when a local directory is available.'),
       replace: z.boolean().optional().describe('When true, remove stale private-source metadata not present in this manifest. Public runtime/build rows are always preserved.'),
       confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
     },
-    async ({ microService, sourceFiles, replace, confirmExecution }) => {
-      if (!confirmExecution) {
-        return {
-          content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, sourceFileCount: sourceFiles.length, replace: replace === true }, null, 2) }],
-        };
-      }
+    async ({ microService, directory, sourceFiles, replace, confirmExecution }) => {
       try {
+        const explicitFiles = sourceFiles || [];
+        if (directory && explicitFiles.length > 0) {
+          throw new Error('directory 与 sourceFiles 不能同时传入；本地工程必须只传 directory。');
+        }
+        if (!directory && explicitFiles.length === 0) {
+          throw new Error('请传入 directory；仅兼容旧调用时才传 sourceFiles。');
+        }
+
+        const localManifest = directory
+          ? await buildLocalMicroServiceSourceManifest(directory)
+          : null;
+        const summary = localManifest
+          ? {
+              sourceMode: 'local-directory',
+              sourceDirectory: localManifest.rootDirectory,
+              sourceFileCount: localManifest.files.length,
+              totalSize: localManifest.totalSize,
+              sourceManifestHash: localManifest.manifestHash,
+              files: localManifest.files.map(file => ({ Path: file.relativePath, Size: file.size, Sha256: file.sha256 })),
+              skippedDirectories: localManifest.skippedDirectories,
+              skippedFiles: localManifest.skippedFiles,
+              aiContextFileBytes: 0,
+              manualChunking: false,
+            }
+          : {
+              sourceMode: 'legacy-inline-array',
+              sourceFileCount: explicitFiles.length,
+              manualChunking: false,
+            };
+        if (!confirmExecution) {
+          return {
+            content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, replace: replace === true, ...summary }, null, 2) }],
+          };
+        }
+
+        const uploadFiles = localManifest
+          ? await Promise.all(localManifest.files.map(async file => {
+              const bytes = await fs.promises.readFile(file.absolutePath);
+              const actualSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+              if (bytes.byteLength !== file.size || actualSha256 !== file.sha256) {
+                throw new Error(`源码在 dry-run/清单生成后发生变化：${file.relativePath}`);
+              }
+              return {
+                Path: file.relativePath,
+                FileName: path.posix.basename(file.relativePath),
+                FileByteBase64: bytes.toString('base64'),
+                Size: file.size,
+                Sha256: file.sha256,
+              };
+            }))
+          : explicitFiles;
         // Replace=true on legacy servers could prune public build metadata because
         // source and runtime rows share mci_ai_app_file. The new flag is ignored by
         // old servers (safe/no prune) and honored by new servers (private-only prune).
         const result = await client.syncMicroServiceSource({
           microService,
-          sourceFiles,
+          sourceFiles: uploadFiles,
           Replace: false,
           ReplacePrivateSourceOnly: replace === true,
         });
         if (result.Code !== 1) {
           return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         }
-        return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+        const evidence = asJsonRecord(result.Data);
+        if (localManifest) {
+          requireStreamEvidenceNumber(evidence, 'FileCount', localManifest.files.length, '源码目录同步');
+          requireStreamEvidenceNumber(evidence, 'TotalSize', localManifest.totalSize, '源码目录同步');
+          requireStreamEvidenceString(evidence, 'SourceManifestHash', localManifest.manifestHash, '源码目录同步');
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify({
+            ...evidence,
+            sourceMode: localManifest ? 'local-directory' : 'legacy-inline-array',
+            sourceDirectory: localManifest?.rootDirectory,
+            aiContextFileBytes: 0,
+            manualChunking: false,
+          }, null, 2) }],
+        };
       } catch (e: unknown) {
         return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
       }

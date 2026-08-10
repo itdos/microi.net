@@ -37,6 +37,11 @@ export default {
                     Version: param.Version || "",
                     RoutePath: param.RoutePath || param.MicroRoute || "/",
                     Data: param.Data || {},
+                    PermissionContext: {
+                        sysMenuId: param.SysMenuId || (param.PermissionContext && (param.PermissionContext.sysMenuId || param.PermissionContext.SysMenuId)) || self.SysMenuId || (self.SysMenuModel && self.SysMenuModel.Id) || "",
+                        moduleEngineKey: param.ModuleEngineKey || (param.PermissionContext && (param.PermissionContext.moduleEngineKey || param.PermissionContext.ModuleEngineKey)) || (self.SysMenuModel && self.SysMenuModel.ModuleEngineKey) || "",
+                        diyTableId: param.DiyTableId || (param.PermissionContext && (param.PermissionContext.diyTableId || param.PermissionContext.DiyTableId)) || self.DiyTableId || self.TableId || (self.FormDiyTableModel && self.FormDiyTableModel.Id) || ""
+                    },
                     OnSuccess: param.OnSuccess,
                     OnCancel: param.OnCancel,
                     OnError: param.OnError

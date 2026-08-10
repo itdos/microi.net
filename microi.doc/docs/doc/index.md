@@ -4,13 +4,13 @@
 
 # Microi 吾码
 
-# AI 深度融合 V8引擎 的开源低代码平台
+<p class="mci-doc-home-subtitle">AI 深度融合 V8 引擎的开源低代码平台</p>
 
 <p style="display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px;">
-  <img src="https://static.itdos.com/upload/img/NET-10.svg" />
-  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" />
-  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" />
-  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" /></a>
+  <img src="https://static.itdos.com/upload/img/NET-10.svg" alt=".NET 10" />
+  <img src="https://static.itdos.com/upload/img/Vue-2_3-4FC08D.svg" alt="Vue 2 与 Vue 3" />
+  <img src="https://static.itdos.com/openclaw/preview/license-MIT-orange.svg" alt="MIT 开源协议" />
+  <a href="https://qun.qq.com/universal-share/share?ac=1&authKey=kV1duuyq6mvmOdBZHXuwrOAXxmYjdg4ga33HKNefIfjCv4dsPRpi7BbDeS8rPCCd&busi_data=eyJncm91cENvZGUiOiI1MTA1MDA1NSIsInRva2VuIjoiMk52UzB6aWNYdnhJb3pVODdDbmVFQWZLeFhCSEltbkcrcWczcVBSVEFKTjJONlVQcXZvbDQzakhrR01IUEFEZiIsInVpbiI6Ijk3MzcwMiJ9&data=gr7BMtLgNqPpYNpN7ChH4JwREChPjZHlxLGlGm81aCsONvAFCIM3K60QG2l1WZtJQEZghRjFYRlCDHPSUPzkDQ&svctype=4&tempid=h5_group_info" target="_blank"><img src="https://static.itdos.com/openclaw/preview/QQ交流群-51050055-12B7F5.svg" alt="加入吾码 QQ 交流群" /></a>
 </p>
 
 🔥 AI 本地 V8引擎 编程（VS Code Copilot / Cursor / Claude + MCP + Skills）、AI 在线编程、AI 数据分析<br>
@@ -82,43 +82,43 @@
 
 <table>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/csdn/ee76765ec943d4da0b6f6097c494d8bc.jpeg" alt="Microi吾码平台主界面" style="width:100%"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/ScreenShot_2026-07-08_231038_158.jpg" alt="Microi吾码 AI 平台界面" style="width:100%"/></td>
   </tr>
   <tr>
-    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" style="width:100%"/></td>
+    <td colspan="3" align="center"><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="Microi 接口引擎在线开发界面" style="width:100%"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/应用商城.png" alt="应用商城"/></td>
+    <td><img src="https://static.itdos.com/upload/img/microi-apiengine-20260208.jpg" alt="接口引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/9989ec6bfdcd6c0fead567bd79012bc4.jpeg" alt="AI 应用开发"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程连接配置.png" alt="V8 引擎本地 AI 编程连接配置"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程运行调试.png" alt="V8 引擎本地 AI 编程运行调试"/></td>
+    <td><img src="https://static.itdos.com/upload/img/V8引擎本地AI编程VSCode插件.png" alt="Microi VS Code 插件"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/13c2c7a5e0329f6821eddd3f12c8536f.jpeg" alt="模块引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/表单引擎.png" alt="表单引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/界面引擎.png" alt="界面引擎"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/数据大屏.png" alt="数据大屏"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/打印引擎.png" alt="打印引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/AI数据分析.png" alt="AI 数据分析"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/ede3b036e9ebbf6de2772bcb3b062790.jpeg" alt="工作流引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/23ca5070e927a7a7cc3687221fe483dd.jpeg" alt="报表引擎"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/6cf3c31ba0e8da4a124cb1bf8c755b74.jpeg" alt="SaaS 引擎"/></td>
   </tr>
   <tr>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg"/></td>
-    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-扫一扫.jpg" alt="移动端扫一扫"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印1.jpg" alt="移动端蓝牙打印连接"/></td>
+    <td><img src="https://static.itdos.com/upload/img/csdn/移动端-蓝牙打印2.jpg" alt="移动端蓝牙打印结果"/></td>
   </tr>
 </table>
 
@@ -217,7 +217,7 @@
 </tbody>
 </table>
 
-> 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续技术支持可按对应买断价的半价/年自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
+> 个人版 ￥999、企业版 ￥2.5w 均为一次买断价格，授权永久有效。后续可选技术支持为个人版 ¥499/年、企业版 ¥1.5w/年，由用户自愿购买；不购买也不影响已有授权永久正常使用。吾码坚持“做一单生意、交一个朋友”，实际服务通常不会机械地卡得很严格，遇到具体情况可以先友好沟通。
 
 > [→ 查看开源版、个人版、企业版的详细区别与选择建议](/doc/edition-comparison)
 
@@ -272,7 +272,7 @@ Microi.net/
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
 ├── microi.doc/             # 📝 官方文档（基于 VitePress）
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
-├── microi.apps/            # 🧩 官方 AI 应用与微服务源码
+├── microi.apps/            # 🧩 官方应用商城发行包源码（非租户微应用源码根）
 └── microi.skills/          # 🧠 AI Skills 知识库
 ```
 

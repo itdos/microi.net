@@ -102,6 +102,8 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 App 源码 | `microi.app/` |
 | 吾码 UniApp 源码 | `microi.uniapp/` |
 | 吾码官方网站 / 文档源码 | `microi.doc/` |
+| 吾码 AI 应用源码 | `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/` |
+| 吾码官方应用商城发行包源码 | `microi.apps/{packageKey}/` |
 
 以上路径只作为通用工作区相对路径规范，不写入具体本机盘符。跨仓库、空工作区或普通用户项目中，如果路径不存在，以插件生成的 `AGENTS.md`、MCP 配置和实际文件树为准。
 

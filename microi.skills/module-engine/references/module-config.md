@@ -71,6 +71,8 @@
 
 路由优先 `/micro-app/{MsKey}/{RoutePath}`，并兼容历史 Id 路由。
 
+完整系统 Manifest 使用可移植引用：模块写 `openType=MicroService`、`microServiceKey`、`microServiceRoutePath`，不把某个租户的 `MicroServiceId/MicroServicePageId` 固化进发行包。`microi_generate_system` 会在首个写操作前回读运行元数据并补齐两个 Id；解析失败必须停止整次生成。直接调用 `microi_create_module` 时仍须一次提供全部四个绑定字段。
+
 ## 跨端 ViewSchema
 
 专用物理字段：

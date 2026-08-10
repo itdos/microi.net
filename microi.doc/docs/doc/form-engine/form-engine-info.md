@@ -11,28 +11,28 @@
 > 模块引擎即常规理解的“系统菜单配置”，包括了菜单基础配置、数据源配置、更多按钮配置、替换配置
 > 优点：可以使用表单引擎去设计模块引擎，自由新增配置项
 > 比如说前段时间刘老师需要给“菜单配置”新增一个“App是否显示”的配置项，10秒解决
-<img src="https://static.itdos.com/upload/img/csdn/012ef3417a0edefe280ed22972b4bc32.png" />
-<img src="https://static.itdos.com/upload/img/csdn/7197b448e310da3e0945937664f0047f.png" />
+<img src="https://static.itdos.com/upload/img/csdn/012ef3417a0edefe280ed22972b4bc32.png" alt="模块引擎菜单配置" />
+<img src="https://static.itdos.com/upload/img/csdn/7197b448e310da3e0945937664f0047f.png" alt="菜单 App 是否显示配置" />
 
 ## “流程引擎”由表单引擎驱动
 > 流程引擎的流程属性、节点属性也由表单引擎驱动
 > 这带来的好处是开发者可自由新增流程、节点的可配置项
 > 比如说我们想给节点属性新增一个自定义配置“”，仅需10秒
-<img src="https://static.itdos.com/upload/img/csdn/812c3691ce7b2c7e9965accfc605891e.png">
+<img src="https://static.itdos.com/upload/img/csdn/812c3691ce7b2c7e9965accfc605891e.png" alt="流程节点属性扩展">
 
 ## “接口引擎”由表单引擎驱动
 >* 接口引擎是Microi吾码平台的特色之一，在线使用javascript语法编写任何复杂的业务逻辑，适用于大型ERP、互联网等项目
 >* 开发者可自由给接口引擎添加可配置项，如：接口调用频率限制？
-<img src="https://static.itdos.com/upload/img/csdn/0fccb24ace37b9b36f8f9de801fb7d90.png">
+<img src="https://static.itdos.com/upload/img/csdn/0fccb24ace37b9b36f8f9de801fb7d90.png" alt="接口引擎配置扩展">
 
 ## “SaaS引擎”由表单引擎驱动
 > SaaS引擎包含了租户的数据库、阿里云、MinIO、Redis、MQ、搜索引擎等独立配置
 > 开发者可自由新增配置，如：租户允许登录？
-<img src="https://static.itdos.com/upload/img/csdn/a16ab7aabec6834dff731d4db4b457d2.png">
+<img src="https://static.itdos.com/upload/img/csdn/a16ab7aabec6834dff731d4db4b457d2.png" alt="SaaS 引擎租户配置">
 
 ## “表单引擎”也由表单引擎驱动
 > 重头戏来了：表单引擎也由表单引擎驱动！即表单引擎列表、表单属性、字段属性也是由表单引擎驱动
-<img src="https://static.itdos.com/upload/img/csdn/f4ead7346e69b9d362e50d3aafb9dcfe.png">
+<img src="https://static.itdos.com/upload/img/csdn/f4ead7346e69b9d362e50d3aafb9dcfe.png" alt="表单引擎自驱配置">
 
 ### 固定审计字段不是异常字段
 
@@ -48,15 +48,15 @@ MCP 可用 `microi_repair_audit_fields` 按 `tableId` 或 `tableName` 修复任�
 ## 黑科技
 ## 拓展表单组件
 > 表单引擎组件库支持二次开发自由扩展，比如说我想增加一个“显示天气”组件
-<img src="https://static.itdos.com/upload/img/csdn/9a37d32ab119cf8d9a8eee9230d916c2.png">
+<img src="https://static.itdos.com/upload/img/csdn/9a37d32ab119cf8d9a8eee9230d916c2.png" alt="扩展天气表单组件">
 ## 定制表单组件
 > 表单设计里面可以任意嵌入自己开发的vue组件
 > 嵌入的vue组件也能通过一句代码&lt;DiyForm TableId="1" /&gt;来调用表单引擎
-<img src="https://static.itdos.com/upload/img/csdn/e67595311cdb3119244fc6ed0edb3a93.png">
+<img src="https://static.itdos.com/upload/img/csdn/e67595311cdb3119244fc6ed0edb3a93.png" alt="定制 Vue 表单组件">
 
 ## 二次开发引用表单组件
 > 如图：定制开发一个比较复杂的页面，均可以通过一句代码来调用表单引擎设计好的表单进行编辑或新增
-<img src="https://static.itdos.com/upload/img/csdn/caa80acf3b86e28ff78cd74514982a36.png">
+<img src="https://static.itdos.com/upload/img/csdn/caa80acf3b86e28ff78cd74514982a36.png" alt="二次开发引用表单组件">
 
 ## 强大的V8.FormEngine
 * 见CSDN文章：[https://microi.blog.csdn.net/article/details/143623519](https://microi.blog.csdn.net/article/details/143623519)
@@ -72,5 +72,5 @@ MCP 可用 `microi_repair_audit_fields` 按 `tableId` 或 `tableName` 修复任�
 > 而饮水机我需要填写出水模式、出水龙头、制水能力等信息
 > 而电脑我需要填写CPU、内存、显卡等信息
 > 此时就可以用到动态关联表单，为商品分类设计多张表单引擎，然后动态调用
-<img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png">
+<img src="https://static.itdos.com/upload/img/csdn/a405352e6078d8868a6e42d7a12aca31.png" alt="动态关联表单示例">
 

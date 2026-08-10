@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import test from 'node:test'
 
 const root = resolve(import.meta.dirname, '..')
+const workspaceRoot = resolve(root, '..', '..', '..', '..', '..')
 const read = (file) => readFile(resolve(root, file), 'utf8')
 
 test('十个治理路由都有页面实现且导入中心使用后台任务', async () => {
@@ -22,6 +23,13 @@ test('十个治理路由都有页面实现且导入中心使用后台任务', as
   assert.match(importer, /mci-import-execute/)
   assert.match(importer, /mci-import-rollback/)
   assert.match(client, /BackgroundTask\/RunApiEngine/)
+})
+
+test('治理总览声明应用商城菜单迁移入口', async () => {
+  const routes = JSON.parse(await read('microi.routes.json'))
+  const overview = routes.find((item) => item.path === '/overview')
+  assert.ok(overview)
+  assert.deepEqual(overview.legacyMenuUrls, ['/micro-app/ai-platform-studio/overview'])
 })
 
 test('微服务遵循宿主协议且不使用原生阻塞弹窗', async () => {
@@ -70,7 +78,7 @@ test('新增治理控制面使用计划哈希、条件回滚、租约和资产�
 test('共享 Microi V8 helper 与源文件规范化一致', async () => {
   const [copy, source] = await Promise.all([
     read('src/utils/microi.v8.js'),
-    readFile(resolve(root, '..', '..', '..', 'microi.skills', 'microi.v8.js'), 'utf8')
+    readFile(resolve(workspaceRoot, 'microi.skills', 'microi.v8.js'), 'utf8')
   ])
   const normalize = (value) => value.replace(/\r\n/g, '\n').trimEnd()
   assert.equal(normalize(copy), normalize(source))
