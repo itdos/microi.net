@@ -13,6 +13,8 @@ module.exports = {
     servicePlatformName: '集福鲤服务平台',
     poweredBy: '集福鲤',
     versionName: '2.0.0',
+    // zhy：关于小程序未配置 SaaS 发布说明时使用该构建版本说明。
+    releaseNotes: ['新增小程序版本查看与更新能力', '优化版本切换后的配置缓存刷新'],
     appSubTitle: '让每一次服务都有迹可循',
     workspaceSubTitle: '客户与服务工作台',
     guestWelcomeText: '欢迎使用集福鲤',
@@ -60,6 +62,8 @@ module.exports = {
       serviceTasks: true
     },
     routes: {
+      // zhy：关于小程序是无需登录即可访问的公共版本入口。
+      about: '/pages/about/index',
       catalog: '/pages/business/catalog',
       login: '/pages/login/index',
       messages: '/pages/message/index',

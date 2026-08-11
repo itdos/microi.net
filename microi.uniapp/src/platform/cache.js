@@ -51,6 +51,18 @@ export function removeCachePrefix(prefix) {
   } catch (error) {}
 }
 
+// zhy：小程序代码包版本变化时只清理平台派生缓存，保留 Token、did、主题和业务草稿。
+export function clearPlatformCache() {
+  memory.clear()
+  inflight.clear()
+  try {
+    const info = uni.getStorageInfoSync()
+    ;(info.keys || []).forEach((key) => {
+      if (key.startsWith(PREFIX)) uni.removeStorageSync(key)
+    })
+  } catch (error) {}
+}
+
 export function dedupeRequest(key, loader) {
   if (inflight.has(key)) return inflight.get(key)
   const task = Promise.resolve()
@@ -88,6 +100,7 @@ export default {
   writeCache,
   removeCache,
   removeCachePrefix,
+  clearPlatformCache,
   dedupeRequest,
   cachedRequest,
   readPageState,
