@@ -35,7 +35,8 @@ Component({
     safeRight: 0,
     safeBottom: 0,
     safeLeft: 0,
-    switching: false
+    switching: false,
+    openingAssistant: false
   },
 
   lifetimes: {
@@ -169,6 +170,21 @@ Component({
         complete: () => {
           this.setData({ switching: false })
           this.scheduleRouteSync()
+        }
+      })
+    },
+
+    openAssistant() {
+      if (!this.data.aiAssistantEnabled || this.data.openingAssistant) return
+      this.setData({ openingAssistant: true })
+      wx.navigateTo({
+        url: '/pages/ai/index',
+        fail: (error) => {
+          console.error('[MciBottomDock] open assistant failed:', error)
+          wx.showToast({ title: '服务助手打开失败，请重试', icon: 'none' })
+        },
+        complete: () => {
+          setTimeout(() => this.setData({ openingAssistant: false }), 280)
         }
       })
     }
