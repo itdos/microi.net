@@ -701,6 +701,43 @@ function closePage() {
 
 该动作与吾码顶部 Tab 的【关闭】使用同一份 `TagsView` 状态：移除当前页签并切换到最后一个可用页签。固定页签和系统中的最后一个页签不会被关闭，宿主会显示明确提示。
 
+### 微服务内部菜单只切内容区
+
+`navigate`、`replaceTab` 是**吾码主框架级**导航，用于离开当前微服务、打开另一个后台菜单或替换当前顶部 Tab；不能拿它们实现微服务自己左侧菜单的 `/overview`、`/portal` 等内部页面切换。吾码顶部 Tab 以主框架的 `$route.fullPath` 标识页面，内部菜单若调用 `replaceTab('/micro-app/{AppKey}/{RoutePath}')`，会改变主框架路由并卸载、重挂整个微服务，因此微服务左侧栏、顶部栏和已加载状态都会重新初始化。
+
+内部页面应由子应用自己的 Vue Router、状态机或 iframe 内 Hash 管理，保持主框架 Tab 路由不变。页面较多时用异步组件，并把 `Suspense`/骨架屏放在右侧内容容器内；这样导航栏持续可用，只替换内容区：
+
+```vue
+<main class="micro-content">
+  <Suspense :timeout="0">
+    <template #default>
+      <component :is="activeComponent" :key="currentRoute" />
+    </template>
+    <template #fallback><ContentSkeleton /></template>
+  </Suspense>
+</main>
+
+<script setup>
+import { computed, defineAsyncComponent, ref } from 'vue';
+
+const currentRoute = ref('/overview');
+const pages = {
+  '/overview': defineAsyncComponent(() => import('./pages/OverviewPage.vue')),
+  '/portal': defineAsyncComponent(() => import('./pages/PortalPage.vue'))
+};
+const activeComponent = computed(() => pages[currentRoute.value] || pages['/overview']);
+
+function navigateMicroRoute(path) {
+  currentRoute.value = path;
+  history.pushState({}, '', `#${path}`); // 只改变子应用自身地址
+}
+</script>
+```
+
+微服务 CSS 即使当前使用 iframe，也必须能在非 iframe/sandbox 策略变化时安全运行：主题变量和通用控件规则挂在 AppKey 唯一根容器（例如 `[data-mci-ui-root="your-app-key"]`）下，不能只用会被宿主或其它应用共同命中的裸 `[data-mci-ui-root]`；禁止用 `:root`、`html`、`body`、裸 `*`、裸 `button` 改写宿主。背景网格等装饰层使用根容器内的 `position:absolute`，禁止 `position:fixed; inset:0` 覆盖吾码左侧菜单。宿主容器同时使用 paint containment 作为第二道边界，但不能替代子应用样式命名空间。
+
+自动化验收至少断言：点击微服务内部菜单时主框架 URL/Tab 不变、微服务左栏 DOM 不重建、骨架屏只出现在内容区；吾码左上角 Logo 可见，主菜单不出现来自子应用的网格线、按钮或主题样式；浏览器前进/后退能恢复子应用内部页面。
+
 ### 支持的宿主动作
 
 | `action` | `data` 示例 | 行为 |

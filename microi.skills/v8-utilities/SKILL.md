@@ -3,6 +3,8 @@ name: v8-utilities
 description: Microi V8 全局对象、上下文变量和通用函数索引。用于查询某个 V8 函数是否存在、区分前端与后端 API，或使用 V8.Method、Base64、EncryptHelper、Action、CurrentUser、SysConfig、OsClient、扫码和客户端导航工具。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 通用能力与函数索引
 
 本 Skill 是 V8 能力的路由入口，不替代 CRUD、HTTP、缓存、文件、图片、Office、

@@ -3,6 +3,8 @@ name: v8-security
 description: Microi V8 安全指南。用于审查 DiyToken 与权限、可逆业务秘密、Passkey/TOTP/人脸步进验证、接口引擎安全、密钥管理、SQL 注入、匿名端点、文件上传和租户隔离。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 安全最佳实践
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，必须遵守以下安全规范。

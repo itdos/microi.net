@@ -3,6 +3,8 @@ name: search-engine
 description: Microi 搜索引擎索引、同步、查询与安全规范。用于 Elasticsearch 表索引、增量同步、字段映射、SearchAfter 分页、租户与菜单数据范围、重建和多节点验收。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi SearchEngine
 
 ## 能力与事实源

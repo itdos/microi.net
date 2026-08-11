@@ -3,6 +3,8 @@ name: microi-microservice
 description: Microi 前端微服务 MicroService 开发与交付指南。用于创建、读取、修改、构建、发布或修复 Vue3 微应用，维护 microi.routes.json，绑定 sys_menu，使用 V8.OpenAppDialog，或通过 MCP 管理 Web、UniApp、MicroService 应用源码和运行时。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 前端微服务
 
 这里的 MicroService 是运行在吾码主站中的前端微应用，不是 .NET/Java 后端微服务。
@@ -65,7 +67,7 @@ src/
 AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，删除/新增路由后由
 发布流程同步 `sys_microiservice_page`，不要从 Vue 源码猜路由。
 
-本地项目必须位于当前连接对应的 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。`microi.apps/` 是官方应用商城发行包工程目录，不是 MicroService 源码目录；发行包只能引用、构建或快照当前租户的唯一源码，不得在包内嵌套第二份可编辑 `microservice/` 工程。
+本地项目必须位于当前连接对应的 `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}`。该应用目录同时承载 MicroService 源码、Manifest、接口引擎、资源策略、测试和应用商城上传素材，是唯一事实源；禁止创建平行的 `microi.apps/` 发行根，也不得在应用内嵌套第二份可编辑 `microservice/` 工程。
 
 构建前遵守本地 OOM 保护；已有 dev server 可复用时不重复启动。新脚手架必须支持独立
 访问时的平台帐号登录，但独立 Vite 预览仍没有菜单/弹窗等完整宿主上下文，不能替代宿主验收。
@@ -149,6 +151,21 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 外部 URL、登录页、访问密钥页或内部 redirect。目标仍要存在于当前用户动态路由并经过路由守卫，
 宿主桥接不授予菜单或数据权限。业务保存成功后才能关闭/跳转，不能把尽力返回的
 `micro-app:host-action-result` 当作业务持久化确认。
+
+微服务自己的左侧菜单、页签和详情层级属于**子应用内部路由**，必须由子应用 Vue Router、
+状态机或 iframe 内 Hash 管理；禁止为 `/overview`、`/portal` 等同一 AppKey 页面调用宿主
+`navigate/replaceTab`。吾码 TagsView 以主框架 `$route.fullPath` 作为组件 key，修改宿主路由会
+卸载并重新挂载整个微服务。内部页面较多时使用 `defineAsyncComponent`，并把 `Suspense` 骨架屏
+放在右侧内容容器内，使微服务导航栏和顶部栏保持挂载；浏览器 `popstate/hashchange` 要能恢复
+内部路由。只有确实要离开当前微服务、打开另一个吾码后台菜单或替换顶部 Tab 时才调用宿主路由动作。
+
+微服务所有主题变量、reset、通用元素规则必须限定在 AppKey 唯一根容器（推荐
+`[data-mci-ui-root="{AppKey}"]`）下，不能只用宿主也会命中的裸 `[data-mci-ui-root]`；禁止用
+`:root/html/body/#app`、裸 `*`、裸 `button/input` 污染宿主。
+背景网格、光晕等全屏装饰在微服务根节点内使用 `position:absolute`，禁止
+`position:fixed; inset:0` 越界覆盖吾码 Logo 与主菜单。宿主使用 `contain: layout paint` 和
+`isolation:isolate` 作为第二道边界，但不能代替子应用命名空间。验收需检查宿主 Logo/菜单样式、
+内部导航不重挂微服务、内容区局部骨架屏，以及前进/后退恢复。
 
 `closeTab` 与 TagsView 当前页签关闭语义一致，固定页签和最后一个页签拒绝关闭；顶部 Tab
 右键刷新与 `reloadTab` 都应重载当前微服务。`OpenAppDialog` 页面不使用 Tab 动作，继续发送

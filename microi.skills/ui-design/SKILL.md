@@ -3,6 +3,8 @@ name: ui-design
 description: Microi UI 设计系统指南。用于设计 PC Vue、Element Plus、uni-app H5、仪表盘、表单、卡片、渐变、响应式布局、骨架屏、移动安全区和视觉打磨。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi吾码设计规范
 
 你正在为 Microi 吾码平台创建界面。所有页面、组件、弹窗必须遵循本规范，打造高级、克制、具有科技感和品牌识别度的视觉体验。

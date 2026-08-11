@@ -3,6 +3,8 @@ name: v8-explorer-tree
 description: Microi.VSCode 插件 V8 资源管理器目录规范（表单引擎 / 字段V8事件 / 模块引擎按钮）。覆盖 diy_table V8 事件、diy_field V8 事件、sys_menu 按钮 JSON 拆分回写，含 7 条安全不变量。用于实现 VSCode V8 事件树、重构目录布局或处理 sys_menu 按钮 JSON 序列化。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # v8-explorer-tree — V8 资源管理器目录规范 v2（2026-05）
 
 > 涉及文件：[Microi.VSCode/src/explorer/engineTreeProvider.ts](Microi.VSCode/src/explorer/engineTreeProvider.ts)、[Microi.VSCode/src/sync/syncManager.ts](Microi.VSCode/src/sync/syncManager.ts)、[Microi.VSCode/src/constants.ts](Microi.VSCode/src/constants.ts)、[Microi.VSCode/src/utils.ts](Microi.VSCode/src/utils.ts)、[Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs](Microi.Server/Microi.net.Api/Controllers/V8EngineController.cs)

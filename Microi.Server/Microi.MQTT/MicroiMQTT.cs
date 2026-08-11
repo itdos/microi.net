@@ -443,12 +443,12 @@ namespace Microi.net
                 }
                 osClient = normalizedTenant;
 
-                // 优先取设备级 ApiEngineId（mci_mqtt_client.ApiEngineId），缺失时回退到租户默认 OsClientModel.MqttApiEngine
-                var mqttApiEngine = ResolveClientApiEngineId(mqttParam?.ClientId, clientModel);
-                if (mqttApiEngine.DosIsNullOrWhiteSpace()) return null;
-
-                var dbs = OsClient.GetAllClientDataBase(clientModel);
-                var resultSysConfig = await MicroiEngine.FormEngine.GetSysConfig(osClient);
+                // 设备级 ApiEngineId 与 SaaS 配置里的 MqttApiEngine 历史上都由 JoinForm
+                // 保存 sys_apiengine.Id；新配置也允许直接保存 ApiEngineKey。执行入口只接受
+                // Key，因此先把历史 Id 规范化，不能把合法记录 Id 当成 Key 查询。
+                var mqttApiEngineReference = ResolveClientApiEngineId(mqttParam?.ClientId, clientModel);
+                if (mqttApiEngineReference.DosIsNullOrWhiteSpace()) return null;
+                var mqttApiEngine = await ResolveMqttApiEngineKeyAsync(osClient, mqttApiEngineReference);
                 if (mqttParam != null && mqttParam.OsClient.DosIsNullOrWhiteSpace())
                 {
                     mqttParam.OsClient = osClient;
@@ -502,6 +502,56 @@ namespace Microi.net
                 // 已配置 V8 策略时执行异常必须 fail-closed，避免脚本故障反而放行消息。
                 return new DosResult(0, null, $"MQTT V8事件执行失败：{ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 将 MQTT 配置中的历史 sys_apiengine.Id 解析为 ApiEngineKey。
+        /// 对已经保存 Key 的配置保持零额外查询的快速路径。
+        /// </summary>
+        private static async Task<string> ResolveMqttApiEngineKeyAsync(
+            string osClient,
+            string apiEngineReference)
+        {
+            if (!IsApiEngineRecordIdReference(apiEngineReference))
+            {
+                return apiEngineReference;
+            }
+
+            var apiEngineResult = await MicroiEngine.ApiEngine.GetApiEngineModel(new ApiEngineParam
+            {
+                OsClient = osClient,
+                Id = apiEngineReference
+            });
+            if (apiEngineResult?.Code != 1 || apiEngineResult.Data == null)
+            {
+                // 保留原引用，让统一 RunAsync 入口返回原有的“不存在的数据”诊断。
+                return apiEngineReference;
+            }
+
+            var model = apiEngineResult.Data is JObject json
+                ? json
+                : JObject.FromObject(apiEngineResult.Data);
+            var apiEngineKey = model["ApiEngineKey"]?.Val<string>();
+            return apiEngineKey.DosIsNullOrWhiteSpace()
+                ? apiEngineReference
+                : apiEngineKey;
+        }
+
+        /// <summary>
+        /// Microi 历史接口引擎 Id 使用 GUID，新记录也可能使用 ULID。
+        /// </summary>
+        private static bool IsApiEngineRecordIdReference(string value)
+        {
+            if (value.DosIsNullOrWhiteSpace()) return false;
+            if (Guid.TryParse(value, out _)) return true;
+            if (value.Length != 26) return false;
+
+            const string crockfordBase32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+            foreach (var character in value.ToUpperInvariant())
+            {
+                if (crockfordBase32.IndexOf(character) < 0) return false;
+            }
+            return true;
         }
 
         /// <summary>

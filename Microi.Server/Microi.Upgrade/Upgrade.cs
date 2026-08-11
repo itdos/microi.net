@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Dos.ORM;
@@ -18,6 +19,71 @@ namespace Microi.net
         {
             "send_sms_reg"
         };
+
+        /// <summary>
+        /// Repairs the small expand-only schema surface that generated runtime
+        /// entities select during startup. This must finish before License and
+        /// login are allowed to touch FormEngine; the normal hosted upgrade runs
+        /// too late for a database downloaded from an older source release.
+        /// </summary>
+        public async Task<DosResult> EnsureRuntimePhysicalPrerequisitesAsync(
+            OsClientSecret osClientSecret,
+            CancellationToken cancellationToken = default)
+        {
+            if (osClientSecret?.Db == null)
+            {
+                return new DosResult(0, null, "租户数据库连接不存在，无法检查启动所需物理字段。");
+            }
+
+            const int maxLeaseAttempts = 30;
+            string leaseReason = null;
+            for (var attempt = 1; attempt <= maxLeaseAttempts; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (RuntimePhysicalPrerequisitesReady(osClientSecret))
+                {
+                    return new DosResult(1, null, "启动所需物理字段已就绪。");
+                }
+
+                var upgradeLease = UpgradeDistributedLease.TryAcquire(
+                    osClientSecret.OsClient,
+                    out leaseReason);
+                if (upgradeLease != null)
+                {
+                    using (upgradeLease)
+                    using (UpgradeExecutionLeaseContext.Enter(upgradeLease))
+                    {
+                        upgradeLease.ThrowIfLost();
+                        EnsureApiEngineRuntimeColumns(osClientSecret);
+                        upgradeLease.ThrowIfLost();
+                        if (!RuntimePhysicalPrerequisitesReady(osClientSecret))
+                        {
+                            return new DosResult(
+                                0,
+                                null,
+                                "启动所需物理字段自愈执行后仍不完整，节点拒绝接收流量。");
+                        }
+                    }
+
+                    return new DosResult(1, null, "启动所需物理字段已完成幂等自愈。");
+                }
+
+                // Another node may already hold the full upgrade lease. Poll the
+                // physical invariant so this node can proceed as soon as the
+                // expand-only columns are visible, without waiting for every
+                // historical migration on the elected node to finish.
+                if (attempt < maxLeaseAttempts)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+
+            return new DosResult(
+                0,
+                null,
+                $"启动所需物理字段尚未就绪，且未能取得共享升级租约：{leaseReason ?? "未知原因"}");
+        }
 
         /// <summary>
         /// 
@@ -1796,10 +1862,6 @@ if (_microiLegacyMenuConfigChanged) {
         {
             UpgradeExecutionLeaseContext.ThrowIfLost();
             if (osClientSecret?.Db == null) throw new InvalidOperationException("租户数据库连接不存在。");
-            if (!TableExists(osClientSecret, "sys_apiengine"))
-            {
-                return;
-            }
 
             // 升级13会先读取并调整这些运行限额，再安装应用商城包。很老的数据库
             // 可能已有对应 diy_field 元数据但物理列尚未创建，FormEngine 会因此在
@@ -1815,10 +1877,13 @@ if (_microiLegacyMenuConfigChanged) {
                 ["Lock"] = "int"
             };
 
-            foreach (var column in columns)
+            if (TableExists(osClientSecret, "sys_apiengine"))
             {
-                UpgradeExecutionLeaseContext.ThrowIfLost();
-                EnsureColumn(osClientSecret, "sys_apiengine", column.Key, column.Value);
+                foreach (var column in columns)
+                {
+                    UpgradeExecutionLeaseContext.ThrowIfLost();
+                    EnsureColumn(osClientSecret, "sys_apiengine", column.Key, column.Value);
+                }
             }
 
             // DiyTable is materialized through a generated entity whose selected
@@ -1828,6 +1893,28 @@ if (_microiLegacyMenuConfigChanged) {
             {
                 EnsureColumn(osClientSecret, "diy_table", "V8Unlimited", "int");
             }
+        }
+
+        private bool RuntimePhysicalPrerequisitesReady(OsClientSecret osClientSecret)
+        {
+            if (osClientSecret?.Db == null) return false;
+
+            if (TableExists(osClientSecret, "diy_table")
+                && !ColumnExists(osClientSecret, "diy_table", "V8Unlimited"))
+            {
+                return false;
+            }
+
+            if (!TableExists(osClientSecret, "sys_apiengine"))
+            {
+                return true;
+            }
+
+            return new[]
+            {
+                "StopHttp", "Timeout", "MaxStatements", "LimitMemory",
+                "LimitRecursion", "V8Unlimited", "Lock"
+            }.All(column => ColumnExists(osClientSecret, "sys_apiengine", column));
         }
 
         private void EnsureLegacyFieldMetadataColumns(OsClientSecret osClientSecret)

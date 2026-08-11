@@ -3,6 +3,8 @@ name: microi-system-delivery
 description: Microi 吾码从自然语言交付完整系统的总控规范。用于通过 MCP、VS Code 插件、V8 引擎、低代码元数据、UniApp/H5、PC 后台和 Playwright E2E 设计、生成、升级、测试、同步或交付完整 Microi 系统。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 全系统交付复盘与总控规范
 
 本 Skill 来自一次完整业务系统交付复盘。目标是让下一套 OA、ERP、MES、CRM、商城、预约、互联网项目等 Microi 系统少走返工路：先固定事实源，再用 MCP 正确建模，最后用可视化和业务闭环测试证明可交付。

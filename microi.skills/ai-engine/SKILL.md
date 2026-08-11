@@ -3,6 +3,8 @@ name: ai-engine
 description: Microi AI 引擎、模型代理、NL2SQL/NL2V8 与知识库规范。用于模型路由、密钥和订阅配额、Schema/Skill 关键词检索与可选向量融合、提示词安全、流式响应、租户隔离和验收。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi AI Engine
 
 平台视频生成的受控 HTTP 入口为 `/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。

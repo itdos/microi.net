@@ -5,6 +5,7 @@ import express from 'express';
 import { buildTokenFileLookupKeys, MicroiClient, type MicroiConfig } from './microi-client.js';
 import { createMcpServer, type McpServerContext } from './server.js';
 import { resolveMcpLabel } from './mcp-label.js';
+import { selectPreferredAuthorizationTokenFromCandidates } from './token-utils.js';
 
 interface SseSession {
   transport: SSEServerTransport;
@@ -21,9 +22,20 @@ function readTokenFromFile(
 ): string | undefined {
   try {
     const tokens: Record<string, string> = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return buildTokenFileLookupKeys(apiUrl, osClient, osClientType, osClientNetwork)
-      .map(key => tokens[key])
-      .find(Boolean);
+    const apiKey = String(apiUrl || '').replace(/\/+$/, '');
+    const lookupKeys = buildTokenFileLookupKeys(
+      apiUrl,
+      osClient,
+      osClientType,
+      osClientNetwork,
+    );
+    const tenantKeys = osClient ? lookupKeys.filter(key => key !== apiKey) : lookupKeys;
+    const tenantToken = selectPreferredAuthorizationTokenFromCandidates(
+      tenantKeys.map(key => tokens[key]),
+    );
+    // The API-wide legacy token can belong to another tenant. Keep it only as
+    // a last-resort fallback when no tenant-scoped alias exists.
+    return tenantToken || tokens[apiKey];
   } catch {
     return undefined;
   }

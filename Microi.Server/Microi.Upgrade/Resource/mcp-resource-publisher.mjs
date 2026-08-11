@@ -166,11 +166,12 @@ function workspaceMcpCandidates(configPath) {
 export async function resolveItDosMcpLaunch(server, configPath) {
   const validated = validateItDosMcpServer(server, configPath);
   const configDirectory = dirname(configPath);
+  const supportedEntrypoints = new Set(['mcp-server.js', 'microi-cli-mcp.js']);
   const configuredEntryIndex = validated.args.findIndex(value => (
-    basename(String(value || '')).toLowerCase() === 'mcp-server.js'
+    supportedEntrypoints.has(basename(String(value || '')).toLowerCase())
   ));
   if (configuredEntryIndex < 0) {
-    throw new Error(`${configPath} 的 microi_itdos args 中缺少 mcp-server.js`);
+    throw new Error(`${configPath} 的 microi_itdos args 中缺少 mcp-server.js 或 microi-cli-mcp.js`);
   }
 
   const configuredEntry = resolveServerPath(

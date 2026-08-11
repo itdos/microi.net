@@ -3,6 +3,8 @@ name: print-engine
 description: 生成和审查 Microi 打印引擎 Print Engine 模板 JSON。用于创建 mic_print 模板、PageObj 布局、PrintObj 数据绑定、可打印报告、标签或合同。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 打印引擎（Print Engine）模板 JSON 生成
 
 你正在为 Microi 吾码平台生成打印引擎模板的 JSON 数据。打印模板包含 PageObj（模板定义）和 PrintObj（打印数据）。

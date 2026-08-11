@@ -3,6 +3,8 @@ name: microi-form-layout
 description: Microi 吾码低代码表单布局分组规范。用于通过 MCP、Manifest、VS Code 插件或 V8 引擎创建/优化 `diy_table` 和 `diy_field` 时，决定使用 `diy_table.Tabs` 表单全局 Tab、字段级 `Tabs` 控件、字段级 `CollapseGroup` 折叠分组，还是直接平铺字段。覆盖"何时分 Tab、何时分折叠分组、有效表单行判断阈值、JSON 配置示例、回读验收与回滚"。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 表单布局分组规范（Tabs vs CollapseGroup）
 
 Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明确的使用场景。**AI 必须先按本规范评估，再决定如何分组**，禁止盲目创建 Tab。

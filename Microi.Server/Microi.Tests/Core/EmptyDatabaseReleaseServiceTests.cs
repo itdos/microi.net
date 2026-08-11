@@ -185,6 +185,109 @@ public sealed class EmptyDatabaseReleaseServiceTests
     }
 
     [Fact]
+    public void BundledSanitizationEngine_ProtectsCoreTablesFromApplicationOwnership()
+    {
+        var loader = typeof(UpgradeAppStore).GetMethod(
+            "LoadBundledResources",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(loader);
+
+        var resources = Assert.IsType<Dictionary<string, string>>(loader!.Invoke(null, null));
+        var package = JObject.Parse(resources["app.microi.saas-engine.json"]);
+        var engine = Assert.Single(
+            package["SysApiEngines"]!.Children<JObject>(),
+            item => item["ApiEngineKey"]?.Value<string>() == "admin_get_empty_database_sanitization_sql");
+        var code = engine["ApiV8Code"]?.Value<string>() ?? "";
+
+        Assert.Equal("v1.2.8", engine["Version"]?.Value<string>());
+        Assert.Contains("protectedPlatformTableNames", code, StringComparison.Ordinal);
+        Assert.Contains("operationalResidueTableNames", code, StringComparison.Ordinal);
+        Assert.Contains("cleanupOperationalResidueSql", code, StringComparison.Ordinal);
+        Assert.Contains("DELETE l FROM diy_lang l", code, StringComparison.Ordinal);
+        Assert.Contains("SUBSTRING_INDEX(COALESCE(l.\\`Key\\`, '')", code, StringComparison.Ordinal);
+        Assert.Contains("':', 2)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("LIKE CONCAT('diy_field:', LOWER(x.Name)", code, StringComparison.Ordinal);
+        Assert.Contains("PackageDiyTableNamesJson", code, StringComparison.Ordinal);
+        Assert.Contains("$.DiyTables[*].Name", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON_EXTRACT(AppPakcet, '$**.TableName')", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON_EXTRACT(AppPakcet, '$**", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON_EXTRACT(AppPakcet, '$.DiyFields", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON_EXTRACT(AppPakcet, '$.ApplicationBundles", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("JSON_EXTRACT(AppPakcet, '$.DDLStatements", code, StringComparison.Ordinal);
+        Assert.Contains("PackageApiEngineKeysJson", code, StringComparison.Ordinal);
+        Assert.Contains("PackagePolicyEngineKeysJson", code, StringComparison.Ordinal);
+        Assert.Contains("$.SysApiEngines[*].ApiEngineKey", code, StringComparison.Ordinal);
+        Assert.Contains("$.ResourcePolicies.ApiEngines[*].ApiEngineKey", code, StringComparison.Ordinal);
+        Assert.Contains(
+            "AND LOWER(table_name) NOT IN (${protectedPlatformTableNotInSql})",
+            code,
+            StringComparison.Ordinal);
+        foreach (var table in new[]
+                 {
+                     "sys_microistore",
+                     "sys_microistoreversion",
+                     "sys_appinstalled",
+                     "sys_microiservice",
+                     "sys_microiservice_page",
+                     "mci_ai_app",
+                     "mci_ai_project",
+                     "microi_job_triggers"
+                 })
+        {
+            Assert.Contains($"\"{table}\"", code, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void BackendSanitization_ReconcilesFullPackageOwnershipAndReportsResidualNames()
+    {
+        var reconcile = typeof(EmptyDatabaseReleaseService).GetMethod(
+            "ReconcileApplicationOwnedTables",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        var clearOperationalResidue = typeof(EmptyDatabaseReleaseService).GetMethod(
+            "ClearOperationalResidue",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        var protectedTablesField = typeof(EmptyDatabaseReleaseService).GetField(
+            "ProtectedPlatformTableNames",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        var operationalTablesField = typeof(EmptyDatabaseReleaseService).GetField(
+            "EmptyDatabaseOperationalTables",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(reconcile);
+        Assert.NotNull(clearOperationalResidue);
+        Assert.NotNull(protectedTablesField);
+        Assert.NotNull(operationalTablesField);
+        var protectedTables = Assert.IsAssignableFrom<ISet<string>>(protectedTablesField!.GetValue(null));
+        var operationalTables = Assert.IsType<string[]>(operationalTablesField!.GetValue(null));
+        Assert.Contains("sys_microistore", protectedTables);
+        Assert.Contains("sys_microiservice", protectedTables);
+        foreach (var table in new[]
+                 {
+                     "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
+                     "mci_identity_credential", "mci_identity_device", "mci_identity_totp",
+                     "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
+                     "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
+                 })
+        {
+            Assert.Contains(table, protectedTables);
+            Assert.Contains(table, operationalTables);
+        }
+        Assert.Equal("[app_order,app_order_item]", Assert.IsType<string>(InvokePrivateStatic(
+            "FormatNameSample",
+            new List<string> { "app_order", "app_order_item" })));
+        Assert.Equal("mci_ai_content_plan", Assert.IsType<string>(InvokePrivateStatic(
+            "ExtractApplicationLanguageTableName",
+            "diy_field:mci_ai_content_plan:name:Label")));
+        Assert.Equal("mci_ai_publish_task", Assert.IsType<string>(InvokePrivateStatic(
+            "ExtractApplicationLanguageTableName",
+            "diy_table:mci_ai_publish_task:tabs:runtime:Name")));
+        Assert.Equal("", Assert.IsType<string>(InvokePrivateStatic(
+            "ExtractApplicationLanguageTableName",
+            "sys_menu:content-operations:Name")));
+    }
+
+    [Fact]
     public void BuildDropBatchSql_QuotesEveryDatabaseObjectAndKeepsObjectKind()
     {
         var tableSql = Assert.IsType<string>(InvokePrivateStatic(

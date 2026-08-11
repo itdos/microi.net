@@ -1,12 +1,17 @@
 {
   "name": "microi-ai-platform-studio",
-  "version": "2.0.3",
+  "version": "2.0.6",
   "private": true,
   "type": "module",
   "scripts": {
     "typecheck": "vue-tsc --noEmit",
-    "test": "node --test tests/studio-contract.test.mjs",
-    "build": "npm run typecheck && npm test && vite build"
+    "test:ui": "node --test tests/studio-contract.test.mjs",
+    "test:manifest": "node --test tests/manifest.test.mjs",
+    "test": "npm run test:ui && npm run test:manifest",
+    "build:manifest": "node build-manifest.mjs",
+    "build:ui": "npm run typecheck && npm run test:ui && vite build",
+    "build:microservice": "node build-microservice.mjs",
+    "build": "npm run build:manifest && npm run test:manifest && npm run build:microservice"
   },
   "dependencies": {
     "vue": "3.5.40"

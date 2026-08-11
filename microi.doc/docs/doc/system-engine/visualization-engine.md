@@ -10,6 +10,7 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 | 常规统计表、ECharts 报表 | [报表引擎](/doc/system-engine/report-engine) | 模块、SQL/接口数据源 |
 | 驾驶舱、监控大屏、自由拖拽图表 | go-view 数据大屏 | `mic_data_dashboard.ContentData` |
 | 产品/设备模型、灯光、材质与镜头 | 3D 引擎 | `.glb` / `.gltf` 或场景 JSON |
+| 可操控游戏、沉浸展厅、复杂数字孪生 | [Unity WebGL](/doc/system-engine/unity-integration) | Unity 场景 + V8 接口引擎 |
 | DWG、DXF、STEP/STP、STL 文件预览 | CAD 预览与 HDFS 转换 | 原文件与 `_preview` 转换文件 |
 
 ## go-view 数据大屏
@@ -31,6 +32,8 @@ Microi吾码提供多条可视化路线。界面引擎、报表引擎、go-view 
 - `/3d-engine/renderer`：运行时渲染，可从查询参数或配置读取模型。
 
 当前公开设计器的上传控件接受 `.glb` 与 `.gltf`，加载器基于 `GLTFLoader` 并支持 Draco。场景配置可以保存模型位置、旋转、缩放、材质、灯光、环境、后处理和镜头路径。若业务需要 OBJ/FBX 等格式，应先确认当前分支是否已有对应 Loader，不要仅根据旧宣传文字判断已支持。
+
+需要 Unity 物理、角色控制、复杂交互或现有 Unity 工程时，使用独立的 [Unity 3D 与 WebGL 集成](/doc/system-engine/unity-integration)。Unity 客户端通过 UPM SDK 与宿主桥接，业务通讯继续进入 V8 接口引擎，不需要为每个项目新增专用 Server Controller。
 
 3D 页面应限制模型大小、贴图分辨率和同时加载数量；移动设备还需要测试 GPU 内存、弱网加载、页面离开后的资源释放与低性能降级。
 

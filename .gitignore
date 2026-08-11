@@ -100,6 +100,8 @@ unpackage/release/
 /Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/*
 !/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-platform-studio/
 !/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-platform-studio/package-lock.json
+!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-content-operations/
+!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/wechat-content-security/
 
 /microi.mcp/publish.sh
 
@@ -136,6 +138,12 @@ microi_private.pem
 switch-env.ps1
 .tmp
 .microi-performance
+
+# Unity 本地生成缓存；保留 Packages、ProjectSettings 与 Microi.Unity 源码。
+/Library/
+/Temp/
+/Logs/
+/UserSettings/
 AI-Project/
 new-water-source-h5/
 Microi-MicroApp/

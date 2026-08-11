@@ -158,6 +158,8 @@ test("page host derives height from the visible viewport instead of its collapse
     assert.match(host, /host\.style\.minHeight/);
     assert.doesNotMatch(host, /Math\.min\(rect\.height/);
     assert.match(host, /overflow:\s*auto/);
+    assert.match(host, /contain:\s*layout paint/);
+    assert.match(host, /isolation:\s*isolate/);
 });
 
 test("page host automatically heals one stuck first mount and then exposes a stable diagnostic", () => {

@@ -3,6 +3,8 @@ name: ai-platform-governance
 description: Microi吾码 AI 平台治理中心设计、调用、扩展、应用商城升级与验收规范。用于门户与资源版本、身份目录/用户组/权限解释、配置模板与漂移、功能开关、发布审批/门禁/断点回滚、服务注册路由与韧性、Trace/告警/日志生命周期、资产物料、协作租约和可恢复导入。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi吾码 AI 平台治理中心
 
 ## 何时使用
@@ -31,13 +33,14 @@ description: Microi吾码 AI 平台治理中心设计、调用、扩展、应用
 
 ## 官方应用事实
 
-应用 Key：`ai-platform-studio`，当前资源合同版本：`v2.0.3`。
+应用 Key：`ai-platform-studio`，当前资源合同版本：`v2.0.4`。
 
 - 40 张 `mci_` 治理表和 5 张运行基础表，应用包共 45 张表、873 个字段；
 - 42 个后台菜单：1 个 `AI平台治理` 父菜单、1 个 `AI平台治理工作台` 微服务菜单和 40 个数据菜单；
 - 64 个接口引擎：57 个 `Managed`，7 个 `CreateIfMissing`；
 - 1 个 `MciAiPlatformMinuteSweep` 维护任务；
 - 10 个微服务路由：`overview`、`portal`、`identity`、`access`、`configuration`、`release`、`services`、`observability`、`assets`、`import`。
+- v2.0.4 保持数据资源合同不变；内部菜单只切换异步内容区并显示局部骨架屏，主题/reset/装饰样式限定在 `[data-mci-ui-root="ai-platform-studio"]`，不得重挂宿主 Tab 或污染吾码 Logo 与主菜单。
 
 租户 Hook：
 

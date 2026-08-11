@@ -39,6 +39,28 @@ namespace Microi.net
         internal const int DatabaseCleanupCommandTimeoutSeconds = 120;
         private const int ReleaseLeaseMilliseconds = 15 * 60 * 1000;
         private const string ReleaseLeaseKey = "Microi:iTdos:EmptyDatabaseRelease:Lease";
+        private static readonly HashSet<string> ProtectedPlatformTableNames = new HashSet<string>(
+            new[]
+            {
+                "diy_table", "diy_field", "diy_schedule_job",
+                "sys_menu", "sys_rolelimit", "sys_apiengine", "sys_user", "sys_osclients", "sys_config",
+                "sys_microistore", "sys_microistoreversion", "sys_appinstalled",
+                "sys_microiservice", "sys_microiservice_page",
+                "mci_ai_app", "mci_ai_project", "mci_ai_app_file", "mci_ai_app_version",
+                "microi_job_triggers", "microi_job_cron_triggers", "microi_job_job_details", "microi_job_calendars",
+                "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
+                "mci_identity_credential", "mci_identity_device", "mci_identity_totp",
+                "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
+                "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
+            },
+            StringComparer.OrdinalIgnoreCase);
+        private static readonly string[] EmptyDatabaseOperationalTables =
+        {
+            "mci_background_task", "mci_database_backup", "mci_gitee_star_audit",
+            "mci_identity_credential", "mci_identity_device", "mci_identity_totp",
+            "mci_marketplace_install_event", "mci_tenant_quota_log", "mic_msg_event_log",
+            "microi_job_locks", "wx_mini_program", "wx_tpl_msg", "mic_msgset"
+        };
 
         private readonly string _backgroundTaskId;
 
@@ -137,6 +159,8 @@ namespace Microi.net
                 ValidateSanitizationSql(sanitizationSql);
                 Report(5, 8, "正在执行线上脱敏 SQL 接口引擎脚本");
                 ExecuteSanitizationScript(sourceBuilder, sanitizationSql);
+                ReconcileApplicationOwnedTables(sourceBuilder);
+                ClearOperationalResidue(sourceBuilder);
                 var validation = ValidateSanitizedDatabase(sourceBuilder);
                 return CreateSanitizationSuccess(validation, false);
             }
@@ -163,6 +187,8 @@ namespace Microi.net
                 validation.RemainingApplicationPhysicalTables,
                 validation.RemainingApplicationTableDefinitions,
                 validation.RemainingApplicationFieldDefinitions,
+                validation.RemainingApplicationLanguageEntries,
+                validation.RemainingApplicationLanguageKeys,
                 validation.RemainingApplicationApiEngines,
                 validation.RemainingApplicationScheduleJobs,
                 validation.RemainingApplicationMicroservices,
@@ -173,6 +199,8 @@ namespace Microi.net
                 validation.RemainingAppFieldDefinitions,
                 validation.RemainingAiStoreApps,
                 validation.RemainingLegacyAiRows,
+                validation.RemainingOperationalResidueRows,
+                validation.RemainingOperationalResidue,
                 validation.PlatformServiceCount,
                 validation.PlatformServiceRuntimeCount,
                 validation.PlatformServiceSourceFileCount,
@@ -243,6 +271,8 @@ namespace Microi.net
                         .ToList(),
                     RemainingNonTemplateUsers = validation.RemainingNonTemplateUsers,
                     RemainingAppArtifacts = validation.RemainingAppArtifacts,
+                    RemainingOperationalResidueRows = validation.RemainingOperationalResidueRows,
+                    RemainingOperationalResidue = validation.RemainingOperationalResidue,
                     PlatformServiceCount = validation.PlatformServiceCount,
                     PackageCount = packages.Count,
                     Packages = packages.Select(package => new
@@ -795,6 +825,157 @@ WHERE TABLE_SCHEMA=@database ORDER BY TABLE_TYPE DESC, TABLE_NAME;";
             script.Execute();
         }
 
+        /// <summary>
+        /// V8 脱敏脚本使用紧凑 JSON 投影，避免把应用源码和大体量业务种子数据送入 Jint。
+        /// 这里再以服务端对完整 AppPakcet 的递归解析结果为准做一次幂等对账，保证未来应用包
+        /// 新增嵌套资源节点时，业务物理表和元数据仍不会进入官方空数据库。
+        /// </summary>
+        private static void ReconcileApplicationOwnedTables(MySqlConnectionStringBuilder sourceBuilder)
+        {
+            var resources = GetRemovableApplicationResources(sourceBuilder);
+            var applicationTableNameSet = new HashSet<string>(
+                resources.TableNames.Where(name => !ProtectedPlatformTableNames.Contains(name)),
+                StringComparer.OrdinalIgnoreCase);
+            var applicationTableNames = applicationTableNameSet
+                .Where(name => !ProtectedPlatformTableNames.Contains(name))
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (applicationTableNames.Count == 0) return;
+
+            using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
+            var physicalTables = GetBaseTables(connection, TargetDatabase)
+                .Where(applicationTableNameSet.Contains)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=0;");
+            try
+            {
+                ExecuteNonQuery(connection, @"
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_backend_app_owned_tables (
+  Name VARCHAR(128) PRIMARY KEY
+);
+TRUNCATE TABLE temp_backend_app_owned_tables;");
+                for (var offset = 0; offset < applicationTableNames.Count; offset += DatabaseCleanupBatchSize)
+                {
+                    var values = applicationTableNames
+                        .Skip(offset)
+                        .Take(DatabaseCleanupBatchSize)
+                        .Select(name => "(" + FormatSqlValue(name) + ")");
+                    ExecuteNonQuery(
+                        connection,
+                        "INSERT IGNORE INTO temp_backend_app_owned_tables (Name) VALUES "
+                        + string.Join(",", values) + ";");
+                }
+
+                ExecuteNonQuery(connection, @"
+DELETE l FROM diy_lang l
+JOIN temp_backend_app_owned_tables x
+  ON x.Name = SUBSTRING_INDEX(
+    SUBSTRING_INDEX(COALESCE(l.`Key`, ''), ':', 2),
+    ':',
+    -1
+  )
+WHERE l.`Key` LIKE 'diy_field:%'
+   OR l.`Key` LIKE 'diy_table:%';
+
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_backend_app_diy_table_ids (
+  Id VARCHAR(64) PRIMARY KEY
+);
+TRUNCATE TABLE temp_backend_app_diy_table_ids;
+INSERT IGNORE INTO temp_backend_app_diy_table_ids (Id)
+SELECT t.Id FROM diy_table t
+WHERE EXISTS (
+  SELECT 1 FROM temp_backend_app_owned_tables x
+  WHERE LOWER(x.Name) = LOWER(t.Name)
+);
+
+CREATE TEMPORARY TABLE IF NOT EXISTS temp_backend_app_menu_ids (
+  Id VARCHAR(64) PRIMARY KEY
+);
+TRUNCATE TABLE temp_backend_app_menu_ids;
+INSERT IGNORE INTO temp_backend_app_menu_ids (Id)
+SELECT DISTINCT m.Id
+FROM sys_menu m
+LEFT JOIN temp_backend_app_diy_table_ids t ON m.DiyTableId = t.Id
+WHERE t.Id IS NOT NULL
+   OR EXISTS (
+     SELECT 1 FROM temp_backend_app_owned_tables x
+     WHERE LOWER(x.Name) = LOWER(COALESCE(m.DiyTableName, ''))
+   );
+
+DELETE rl FROM sys_rolelimit rl
+JOIN temp_backend_app_menu_ids m ON rl.FkId = m.Id;
+DELETE m FROM sys_menu m
+JOIN temp_backend_app_menu_ids x ON m.Id = x.Id;
+DELETE f FROM diy_field f
+LEFT JOIN temp_backend_app_diy_table_ids t ON f.TableId = t.Id
+WHERE t.Id IS NOT NULL
+   OR EXISTS (
+     SELECT 1 FROM temp_backend_app_owned_tables x
+     WHERE LOWER(x.Name) = LOWER(COALESCE(f.TableName, ''))
+   );
+DELETE t FROM diy_table t
+JOIN temp_backend_app_diy_table_ids x ON t.Id = x.Id;");
+
+                for (var offset = 0; offset < physicalTables.Count; offset += DatabaseCleanupBatchSize)
+                {
+                    var batch = physicalTables
+                        .Skip(offset)
+                        .Take(DatabaseCleanupBatchSize)
+                        .ToList();
+                    ExecuteNonQuery(connection, BuildDropBatchSql("TABLE", TargetDatabase, batch));
+                }
+
+                ExecuteNonQuery(connection, @"
+DROP TEMPORARY TABLE IF EXISTS temp_backend_app_menu_ids;
+DROP TEMPORARY TABLE IF EXISTS temp_backend_app_diy_table_ids;
+DROP TEMPORARY TABLE IF EXISTS temp_backend_app_owned_tables;");
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    try { ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=1;"); } catch { }
+                }
+            }
+        }
+
+        /// <summary>
+        /// 空数据库只保留平台运行所需结构，不携带主库的任务、备份、审计、身份凭据、
+        /// 安装事件、配额流水、消息配置或第三方小程序账号数据。该后端门禁独立于 V8
+        /// 脱敏脚本执行，防止线上脚本被旧版本覆盖或遗漏后再次发布隐私数据。
+        /// </summary>
+        private static void ClearOperationalResidue(MySqlConnectionStringBuilder sourceBuilder)
+        {
+            using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
+            var existingTables = new HashSet<string>(
+                GetBaseTables(connection, TargetDatabase),
+                StringComparer.OrdinalIgnoreCase);
+            var tablesToClear = EmptyDatabaseOperationalTables
+                .Where(existingTables.Contains)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (tablesToClear.Count == 0) return;
+
+            ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=0;");
+            try
+            {
+                foreach (var table in tablesToClear)
+                {
+                    ExecuteNonQuery(connection, $"DELETE FROM {QuoteIdentifier(table)};");
+                }
+            }
+            finally
+            {
+                if (connection.State == ConnectionState.Open)
+                {
+                    try { ExecuteNonQuery(connection, "SET FOREIGN_KEY_CHECKS=1;"); } catch { }
+                }
+            }
+        }
+
         private static SanitizationValidation ValidateSanitizedDatabase(MySqlConnectionStringBuilder sourceBuilder)
         {
             using var connection = OpenConnection(WithDatabase(sourceBuilder, TargetDatabase));
@@ -811,6 +992,25 @@ WHERE TABLE_SCHEMA=@database ORDER BY TABLE_TYPE DESC, TABLE_NAME;";
                 throw new InvalidOperationException("脱敏后缺少核心表：" + string.Join(",", missing));
             }
 
+            var remainingApplicationPhysicalTableNames = tables
+                .Where(removableApplicationTables.Contains)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var remainingApplicationTableDefinitionNames = GetMatchingNames(
+                connection,
+                "SELECT `Name` FROM `diy_table`;",
+                removableApplicationTables);
+            var remainingApplicationFieldDefinitionTableNames = GetMatchingNames(
+                connection,
+                "SELECT DISTINCT `TableName` FROM `diy_field` WHERE COALESCE(`TableName`, '') <> '';",
+                removableApplicationTables);
+            var remainingApplicationLanguageKeys = GetRemainingApplicationLanguageKeys(
+                connection,
+                tables,
+                removableApplicationTables);
+            var remainingOperationalResidue = GetOperationalResidueRowCounts(connection, tables);
+
             var validation = new SanitizationValidation
             {
                 RemainingNonTemplateUsers = ExecuteScalarCount(connection,
@@ -820,15 +1020,14 @@ SELECT COUNT(*) FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = DATABASE()
   AND TABLE_TYPE = 'BASE TABLE'
   AND LEFT(LOWER(TABLE_NAME), 4) = 'app_';"),
-                RemainingApplicationPhysicalTables = tables.LongCount(removableApplicationTables.Contains),
-                RemainingApplicationTableDefinitions = CountMatchingTableNames(
-                    connection,
-                    "SELECT `Name` FROM `diy_table`;",
-                    removableApplicationTables),
-                RemainingApplicationFieldDefinitions = CountMatchingTableNames(
-                    connection,
-                    "SELECT DISTINCT `TableName` FROM `diy_field` WHERE COALESCE(`TableName`, '') <> '';",
-                    removableApplicationTables),
+                RemainingApplicationPhysicalTables = remainingApplicationPhysicalTableNames.Count,
+                RemainingApplicationPhysicalTableNames = remainingApplicationPhysicalTableNames,
+                RemainingApplicationTableDefinitions = remainingApplicationTableDefinitionNames.Count,
+                RemainingApplicationTableDefinitionNames = remainingApplicationTableDefinitionNames,
+                RemainingApplicationFieldDefinitions = remainingApplicationFieldDefinitionTableNames.Count,
+                RemainingApplicationFieldDefinitionTableNames = remainingApplicationFieldDefinitionTableNames,
+                RemainingApplicationLanguageEntries = remainingApplicationLanguageKeys.Count,
+                RemainingApplicationLanguageKeys = remainingApplicationLanguageKeys,
                 RemainingApplicationApiEngines = CountMatchingTableNames(
                     connection,
                     "SELECT `ApiEngineKey` FROM `sys_apiengine` WHERE COALESCE(`ApiEngineKey`, '') <> '';",
@@ -876,6 +1075,8 @@ WHERE LOWER(COALESCE(`AppKey`, '')) <> 'microi-platform-service'
       OR LOWER(COALESCE(`AppKey`, '')) = 'microi-wechat-content-security'
     )
   );"),
+                RemainingOperationalResidueRows = remainingOperationalResidue.Values.Sum(),
+                RemainingOperationalResidue = remainingOperationalResidue,
                 PlatformServiceCount = ExecuteScalarCount(connection, @"
 SELECT COUNT(*) FROM `sys_microistore`
 WHERE `AppKey` = 'microi-platform-service';")
@@ -936,15 +1137,27 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             }
             if (validation.RemainingApplicationPhysicalTables > 0)
             {
-                violations.Add($"应用包业务物理表={validation.RemainingApplicationPhysicalTables}");
+                violations.Add(
+                    $"应用包业务物理表={validation.RemainingApplicationPhysicalTables}"
+                    + FormatNameSample(validation.RemainingApplicationPhysicalTableNames));
             }
             if (validation.RemainingApplicationTableDefinitions > 0)
             {
-                violations.Add($"应用包业务表定义={validation.RemainingApplicationTableDefinitions}");
+                violations.Add(
+                    $"应用包业务表定义={validation.RemainingApplicationTableDefinitions}"
+                    + FormatNameSample(validation.RemainingApplicationTableDefinitionNames));
             }
             if (validation.RemainingApplicationFieldDefinitions > 0)
             {
-                violations.Add($"应用包业务字段定义={validation.RemainingApplicationFieldDefinitions}");
+                violations.Add(
+                    $"应用包业务字段定义={validation.RemainingApplicationFieldDefinitions}"
+                    + FormatNameSample(validation.RemainingApplicationFieldDefinitionTableNames));
+            }
+            if (validation.RemainingApplicationLanguageEntries > 0)
+            {
+                violations.Add(
+                    $"应用包语言词条={validation.RemainingApplicationLanguageEntries}"
+                    + FormatNameSample(validation.RemainingApplicationLanguageKeys));
             }
             if (validation.RemainingApplicationApiEngines > 0)
             {
@@ -986,6 +1199,13 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             {
                 violations.Add($"旧 AI 应用表记录={validation.RemainingLegacyAiRows}");
             }
+            if (validation.RemainingOperationalResidueRows > 0)
+            {
+                var residueSummary = string.Join(",", validation.RemainingOperationalResidue
+                    .Where(item => item.Value > 0)
+                    .Select(item => $"{item.Key}={item.Value}"));
+                violations.Add($"运行/凭据/审计残留={validation.RemainingOperationalResidueRows}[{residueSummary}]");
+            }
             if (validation.PlatformServiceCount == 0)
             {
                 violations.Add("官方 microi-platform-service 已被误删");
@@ -1004,6 +1224,71 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
                     "脱敏发布门禁未通过：" + string.Join("；", violations) + "。");
             }
             return validation;
+        }
+
+        private static List<string> GetRemainingApplicationLanguageKeys(
+            MySqlConnection connection,
+            IReadOnlyCollection<string> existingTables,
+            ISet<string> applicationTables)
+        {
+            var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (applicationTables == null
+                || applicationTables.Count == 0
+                || !existingTables.Contains("diy_lang", StringComparer.OrdinalIgnoreCase))
+            {
+                return result.ToList();
+            }
+
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+SELECT `Key` FROM `diy_lang`
+WHERE LOWER(COALESCE(`Key`, '')) LIKE 'diy_field:%'
+   OR LOWER(COALESCE(`Key`, '')) LIKE 'diy_table:%';";
+            command.CommandTimeout = 0;
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0)) continue;
+                var key = reader.GetString(0);
+                var tableName = ExtractApplicationLanguageTableName(key);
+                if (!string.IsNullOrWhiteSpace(tableName) && applicationTables.Contains(tableName))
+                {
+                    result.Add(key);
+                }
+            }
+            return result.OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private static string ExtractApplicationLanguageTableName(string languageKey)
+        {
+            var value = (languageKey ?? "").Trim();
+            var prefixes = new[] { "diy_field:", "diy_table:" };
+            var prefix = prefixes.FirstOrDefault(item =>
+                value.StartsWith(item, StringComparison.OrdinalIgnoreCase));
+            if (prefix == null) return "";
+
+            var remainder = value.Substring(prefix.Length);
+            var separatorIndex = remainder.IndexOf(':');
+            if (separatorIndex <= 0) return "";
+            var tableName = remainder.Substring(0, separatorIndex);
+            return Regex.IsMatch(tableName, @"^[A-Za-z0-9_]+$", RegexOptions.CultureInvariant)
+                ? tableName
+                : "";
+        }
+
+        private static Dictionary<string, long> GetOperationalResidueRowCounts(
+            MySqlConnection connection,
+            IReadOnlyCollection<string> existingTables)
+        {
+            var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var table in EmptyDatabaseOperationalTables)
+            {
+                if (!existingTables.Contains(table, StringComparer.OrdinalIgnoreCase)) continue;
+                result[table] = ExecuteScalarCount(
+                    connection,
+                    $"SELECT COUNT(*) FROM {QuoteIdentifier(table)};");
+            }
+            return result;
         }
 
         private static long ExecuteScalarCount(MySqlConnection connection, string sql)
@@ -1026,21 +1311,40 @@ WHERE LOWER(COALESCE(p.`AppKey`, '')) = 'microi-platform-service';")
             return Convert.ToInt64(command.ExecuteScalar(), CultureInfo.InvariantCulture);
         }
 
-        private static long CountMatchingTableNames(
+        private static List<string> GetMatchingNames(
             MySqlConnection connection,
             string sql,
             ISet<string> expectedNames)
         {
-            long count = 0;
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             using var command = connection.CreateCommand();
             command.CommandText = sql;
             command.CommandTimeout = 0;
             using var reader = command.ExecuteReader();
             while (reader.Read())
             {
-                if (!reader.IsDBNull(0) && expectedNames.Contains(reader.GetString(0))) count++;
+                if (!reader.IsDBNull(0) && expectedNames.Contains(reader.GetString(0)))
+                {
+                    names.Add(reader.GetString(0));
+                }
             }
-            return count;
+            return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        private static long CountMatchingTableNames(
+            MySqlConnection connection,
+            string sql,
+            ISet<string> expectedNames)
+        {
+            return GetMatchingNames(connection, sql, expectedNames).Count;
+        }
+
+        private static string FormatNameSample(IReadOnlyCollection<string> names)
+        {
+            if (names == null || names.Count == 0) return "";
+            const int limit = 20;
+            var sample = string.Join(",", names.Take(limit));
+            return "[" + sample + (names.Count > limit ? ",..." : "") + "]";
         }
 
         private static RemovableApplicationResources GetRemovableApplicationResources(
@@ -2048,8 +2352,13 @@ return 0";
             public long RemainingNonTemplateUsers { get; set; }
             public long RemainingAppPhysicalTables { get; set; }
             public long RemainingApplicationPhysicalTables { get; set; }
+            public List<string> RemainingApplicationPhysicalTableNames { get; set; } = new List<string>();
             public long RemainingApplicationTableDefinitions { get; set; }
+            public List<string> RemainingApplicationTableDefinitionNames { get; set; } = new List<string>();
             public long RemainingApplicationFieldDefinitions { get; set; }
+            public List<string> RemainingApplicationFieldDefinitionTableNames { get; set; } = new List<string>();
+            public long RemainingApplicationLanguageEntries { get; set; }
+            public List<string> RemainingApplicationLanguageKeys { get; set; } = new List<string>();
             public long RemainingApplicationApiEngines { get; set; }
             public long RemainingApplicationScheduleJobs { get; set; }
             public long RemainingApplicationMicroservices { get; set; }
@@ -2060,6 +2369,9 @@ return 0";
             public long RemainingAppFieldDefinitions { get; set; }
             public long RemainingAiStoreApps { get; set; }
             public long RemainingLegacyAiRows { get; set; }
+            public long RemainingOperationalResidueRows { get; set; }
+            public Dictionary<string, long> RemainingOperationalResidue { get; set; }
+                = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             public long PlatformServiceCount { get; set; }
             public long PlatformServiceRuntimeCount { get; set; }
             public long PlatformServiceSourceFileCount { get; set; }
@@ -2068,6 +2380,7 @@ return 0";
                 RemainingApplicationPhysicalTables
                 + RemainingApplicationTableDefinitions
                 + RemainingApplicationFieldDefinitions
+                + RemainingApplicationLanguageEntries
                 + RemainingApplicationApiEngines
                 + RemainingApplicationScheduleJobs
                 + RemainingApplicationMicroservices

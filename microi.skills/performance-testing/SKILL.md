@@ -3,6 +3,8 @@ name: performance-testing
 description: Microi 高并发、性能压力测试规范。用于对 ApiEngine、V8 事件、FormEngine CRUD、VS Code 插件性能页、压力/尖峰/长稳测试、报告、并发、吞吐、延迟分位和瓶颈诊断做压测。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 高并发性能压力测试
 
 > 排查长任务时，严禁把“等待或执行超过 1 分钟”直接判定为失败；接口引擎、V8、表单写入、导入导出、批处理等合法长任务默认应支持 10 分钟以上，同步链路推荐 10 分钟，排队窗口推荐 30 分钟。

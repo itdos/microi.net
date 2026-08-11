@@ -1,0 +1,11 @@
+1、文件【install-microi.sh】为一键安装脚本的源码：
+https://microi.net/doc/getting-started/docker-run.html
+
+2、数据库下载地址：
+https://static.itdos.com/install/microi_empty_mysql57.sql.zip
+https://static.itdos.com/install/microi_empty_mysql80.sql.zip
+https://static.itdos.com/install/microi_empty_sqlserver2022.sql.zip
+https://static.itdos.com/install/microi_empty_oracle19c.sql.zip
+https://static.itdos.com/install/microi_empty_postgresql17.sql.zip
+https://static.itdos.com/install/microi_empty_dm8.sql.zip
+https://static.itdos.com/install/microi_empty_kingbasees.sql.zip

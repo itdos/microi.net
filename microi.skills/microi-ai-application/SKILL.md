@@ -3,6 +3,8 @@ name: microi-ai-application
 description: Microi 吾码 AI 应用的创建、迁移、工程化开发和交付规范。用于 Web、MicroService、UniApp、H5、响应式网站或游戏类 AI 应用，尤其是选择前端技术栈、生成 Vue 工程、维护 TypeScript 源码、接入登录与接口引擎、构建发布、二次开发和多端验收。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi AI 应用
 
 ## 默认技术基线
@@ -31,7 +33,7 @@ UniApp 使用 Vue 3 + TypeScript 的官方 Vite 工具链，并同时遵守 `mic
 4. 读取 `microi-frontend-sdk`、`ui-design`；MicroService 再读取 `microi-microservice`，UniApp 再读取 `microi-uniapp-frontend`，游戏或复杂媒体再读取 `ui-design/references/motion-and-media.md`。
 5. 在项目根目录维护 `.microi-micro-app.json`；源码必须位于当前租户的 `Microi-V8-Engine/.../AI应用/{appKey}`，不得跨租户复用目录。
 
-`microi.apps/` 只用于可审计的官方应用商城发行包工程，例如 Manifest、接口引擎、资源策略、安装测试和离线包生成；它不是 Web、UniApp 或 MicroService 的本地源码根。发行包需要包含前端产物或可选源码时，必须从上述当前服务器、当前租户的 `AI应用/{appKey}` 唯一源码构建或打包，禁止在 `microi.apps/{package}/microservice` 再维护一份可编辑副本。
+当前服务器、当前租户的 `AI应用/{appKey}` 是每个 Web、UniApp、MicroService 或平台 AI 应用的唯一源码根。界面源码、Manifest、接口引擎、资源策略、安装测试、离线包生成与应用商城上传素材都必须归入对应应用目录共同演进；禁止创建平行的 `microi.apps/` 发行根或在应用目录中嵌套第二份可编辑工程。纯平台应用即使没有前端运行时，也放在官方租户的 `AI应用/{appKey}`，由自身构建脚本生成商城包。
 
 ## 工程边界
 

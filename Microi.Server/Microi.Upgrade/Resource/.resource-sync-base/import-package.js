@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.10.0
+ * Version: v1.10.2
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
@@ -763,6 +763,9 @@ try {
         MenuInserted: 0,
         MenuUpdated: 0,
         MenuIdRemapped: 0,
+        AdminRoleLimitInserted: 0,
+        AdminRoleLimitUpdated: 0,
+        AdminRoleLimitSkipped: 0,
         ReferenceRowsUpdated: 0,
         FlowInserted: 0,
         FlowUpdated: 0,
@@ -4164,6 +4167,204 @@ try {
             target[sourceKey] = source[sourceKey];
         }
     };
+
+    // ADMIN_MENU_PERMISSION_V1
+    // 应用新增菜单必须立即对目标租户所有系统管理员可用。只处理本次新建或
+    // 从删除状态恢复的菜单，避免应用升级覆盖客户为既有菜单维护的角色策略。
+    var administratorRolesForMenuGrant = null;
+    var parseMenuPermissionArray = function (value) {
+        if (value === null || value === undefined || value === '') return [];
+        if (Array.isArray(value)) return value;
+        if (typeof value == 'object' && value.length !== undefined) return value;
+        var text = String(value).replace(/^\s+|\s+$/g, '');
+        if (!text) return [];
+        try {
+            var parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) return parsed;
+            if (parsed !== null && parsed !== undefined && parsed !== '') return [parsed];
+        } catch (parseError) {
+            // 历史数据偶尔保存为逗号分隔文本；保留可识别值，不能因补权限而丢失。
+            return text.replace(/^\[|\]$/g, '').split(',');
+        }
+        return [];
+    };
+    var appendUniqueMenuPermission = function (values, seen, value) {
+        if (value === null || value === undefined) return;
+        var text = String(value).replace(/^\s+|\s+$/g, '').replace(/^['\"]|['\"]$/g, '');
+        if (!text || seen[text]) return;
+        seen[text] = true;
+        values.push(text);
+    };
+    var collectAdministratorMenuPermissions = function (menuModel) {
+        var permissions = [];
+        var seen = {};
+        var basePermissions = ['Read', 'Add', 'Edit', 'Del', 'Export', 'Import'];
+        for (var baseIndex = 0; baseIndex < basePermissions.length; baseIndex++) {
+            appendUniqueMenuPermission(permissions, seen, basePermissions[baseIndex]);
+        }
+        var buttonFields = ['MoreBtns', 'ExportMoreBtns', 'BatchSelectMoreBtns', 'PageBtns', 'PageTabs', 'FormBtns'];
+        for (var fieldIndex = 0; fieldIndex < buttonFields.length; fieldIndex++) {
+            var buttonList = parseMenuPermissionArray((menuModel || {})[buttonFields[fieldIndex]]);
+            for (var buttonIndex = 0; buttonIndex < buttonList.length; buttonIndex++) {
+                var button = buttonList[buttonIndex] || {};
+                if (typeof button == 'object') {
+                    appendUniqueMenuPermission(permissions, seen, button.Id);
+                    appendUniqueMenuPermission(permissions, seen, button.Name);
+                }
+            }
+        }
+        return permissions;
+    };
+    var getAdministratorRolesForMenuGrant = function () {
+        if (administratorRolesForMenuGrant !== null) return administratorRolesForMenuGrant;
+        var roleResult = V8.FormEngine.GetTableData('sys_role', {
+            _Where: [['Level', '>=', 9999]],
+            _SelectFields: ['Id', 'Name', 'Level', 'IsDeleted'],
+            _OrderBy: 'Level',
+            _OrderByType: 'DESC',
+            _PageIndex: 1,
+            _PageSize: 1000
+        });
+        if (!roleResult || (roleResult.Code != 1 && roleResult.Code != 2)) {
+            throw new Error('查询系统管理员角色失败：' + ((roleResult && roleResult.Msg) || '接口无返回'));
+        }
+        var roleRows = roleResult && roleResult.Code == 1 && roleResult.Data ? roleResult.Data : [];
+        administratorRolesForMenuGrant = [];
+        for (var roleIndex = 0; roleIndex < roleRows.length; roleIndex++) {
+            var role = roleRows[roleIndex] || {};
+            if (role.Id && Number(role.Level || 0) >= 9999 && Number(role.IsDeleted || 0) !== 1) {
+                administratorRolesForMenuGrant.push(role);
+            }
+        }
+        if (administratorRolesForMenuGrant.length === 0) {
+            throw new Error('未找到有效的系统管理员角色（sys_role.Level >= 9999），已阻止提交，避免新菜单无人可管理');
+        }
+        return administratorRolesForMenuGrant;
+    };
+    var readAdministratorMenuRoleLimits = function (roleId, menuId) {
+        var limitResult = V8.FormEngine.GetTableData('sys_rolelimit', {
+            _Where: [
+                ['RoleId', '=', roleId],
+                ['AND', 'FkId', '=', menuId],
+                ['AND', 'Type', '=', 'Menu']
+            ],
+            _SelectFields: ['Id', 'Permission'],
+            _PageIndex: 1,
+            _PageSize: 1000
+        });
+        if (!limitResult || (limitResult.Code != 1 && limitResult.Code != 2)) {
+            throw new Error('查询系统管理员菜单权限失败：' + ((limitResult && limitResult.Msg) || '接口无返回'));
+        }
+        return limitResult && limitResult.Code == 1 && limitResult.Data ? limitResult.Data : [];
+    };
+    var assertAdministratorMenuPermissionReadback = function (role, menuModel, requiredPermissions) {
+        var persistedRows = readAdministratorMenuRoleLimits(role.Id, menuModel.Id);
+        var persistedSeen = {};
+        for (var persistedIndex = 0; persistedIndex < persistedRows.length; persistedIndex++) {
+            var persistedPermissions = parseMenuPermissionArray((persistedRows[persistedIndex] || {}).Permission);
+            for (var permissionIndex = 0; permissionIndex < persistedPermissions.length; permissionIndex++) {
+                appendUniqueMenuPermission([], persistedSeen, persistedPermissions[permissionIndex]);
+            }
+        }
+        var missingPermissions = [];
+        for (var requiredIndex = 0; requiredIndex < requiredPermissions.length; requiredIndex++) {
+            if (!persistedSeen[requiredPermissions[requiredIndex]]) {
+                missingPermissions.push(requiredPermissions[requiredIndex]);
+            }
+        }
+        if (persistedRows.length === 0 || missingPermissions.length > 0) {
+            throw new Error('系统管理员[' + (role.Name || role.Id) + ']菜单[' + (menuModel.Name || menuModel.Id)
+                + ']权限写后回读不完整，缺少：' + (missingPermissions.join(',') || '权限记录'));
+        }
+    };
+    var mergeAdministratorMenuRoleLimits = function (role, menuModel, requiredPermissions, roleLimits) {
+        var merged = [];
+        var seen = {};
+        for (var requiredIndex = 0; requiredIndex < requiredPermissions.length; requiredIndex++) {
+            appendUniqueMenuPermission(merged, seen, requiredPermissions[requiredIndex]);
+        }
+        for (var limitIndex = 0; limitIndex < roleLimits.length; limitIndex++) {
+            var existingPermissions = parseMenuPermissionArray((roleLimits[limitIndex] || {}).Permission);
+            for (var existingIndex = 0; existingIndex < existingPermissions.length; existingIndex++) {
+                appendUniqueMenuPermission(merged, seen, existingPermissions[existingIndex]);
+            }
+        }
+        var permissionJson = JSON.stringify(merged);
+        var updatedAny = false;
+        for (var updateIndex = 0; updateIndex < roleLimits.length; updateIndex++) {
+            var roleLimit = roleLimits[updateIndex] || {};
+            if (!roleLimit.Id) continue;
+            var currentValues = parseMenuPermissionArray(roleLimit.Permission);
+            var currentSeen = {};
+            for (var currentIndex = 0; currentIndex < currentValues.length; currentIndex++) {
+                appendUniqueMenuPermission([], currentSeen, currentValues[currentIndex]);
+            }
+            var needsUpdate = false;
+            for (var mergedIndex = 0; mergedIndex < merged.length; mergedIndex++) {
+                if (!currentSeen[merged[mergedIndex]]) {
+                    needsUpdate = true;
+                    break;
+                }
+            }
+            if (!needsUpdate) continue;
+            var updateResult = runWriteWithRetry(function () {
+                return V8.FormEngine.UptFormData('sys_rolelimit', {
+                    Id: roleLimit.Id,
+                    Permission: permissionJson
+                });
+            }, 'admin_menu_permission_upt_' + role.Id + '_' + menuModel.Id + '_' + roleLimit.Id);
+            if (!updateResult || updateResult.Code != 1) {
+                throw new Error('更新系统管理员[' + (role.Name || role.Id) + ']菜单[' + (menuModel.Name || menuModel.Id)
+                    + ']权限失败：' + ((updateResult && updateResult.Msg) || '接口无返回'));
+            }
+            updatedAny = true;
+        }
+        assertAdministratorMenuPermissionReadback(role, menuModel, requiredPermissions);
+        if (updatedAny) stats.AdminRoleLimitUpdated++;
+        else stats.AdminRoleLimitSkipped++;
+    };
+    var grantAdministratorPermissionsForNewMenu = function (menuModel) {
+        var roles = getAdministratorRolesForMenuGrant();
+        var requiredPermissions = collectAdministratorMenuPermissions(menuModel);
+        for (var roleIndex = 0; roleIndex < roles.length; roleIndex++) {
+            var role = roles[roleIndex] || {};
+            var roleLimits = readAdministratorMenuRoleLimits(role.Id, menuModel.Id);
+            if (roleLimits.length > 0) {
+                mergeAdministratorMenuRoleLimits(role, menuModel, requiredPermissions, roleLimits);
+                continue;
+            }
+            var deterministicId = String(V8.EncryptHelper.MD5Encrypt(
+                'app-menu-admin|' + String(V8.OsClient || '').toLowerCase() + '|'
+                + String(role.Id || '').toLowerCase() + '|' + String(menuModel.Id || '').toLowerCase()
+            )).toLowerCase();
+            var addPermissionResult = runWriteWithRetry(function () {
+                return V8.FormEngine.AddFormData('sys_rolelimit', {
+                    Id: deterministicId,
+                    Customer: V8.OsClient,
+                    RoleId: role.Id,
+                    FkId: menuModel.Id,
+                    Type: 'Menu',
+                    Permission: JSON.stringify(requiredPermissions),
+                    CreateTime: nowText()
+                });
+            }, 'admin_menu_permission_add_' + role.Id + '_' + menuModel.Id);
+            if (addPermissionResult && addPermissionResult.Code == 1) {
+                assertAdministratorMenuPermissionReadback(role, menuModel, requiredPermissions);
+                stats.AdminRoleLimitInserted++;
+                continue;
+            }
+            if (isDuplicatePrimaryError(addPermissionResult)) {
+                roleLimits = readAdministratorMenuRoleLimits(role.Id, menuModel.Id);
+                if (roleLimits.length > 0) {
+                    mergeAdministratorMenuRoleLimits(role, menuModel, requiredPermissions, roleLimits);
+                    continue;
+                }
+            }
+            throw new Error('新增系统管理员[' + (role.Name || role.Id) + ']菜单[' + (menuModel.Name || menuModel.Id)
+                + ']权限失败：' + ((addPermissionResult && addPermissionResult.Msg) || '接口无返回'));
+        }
+    };
+    // ADMIN_MENU_PERMISSION_V1_END
     var syncLegacyMenuDiyConfig = function (model, existingDiyConfig, label) {
         var config = {};
         // 先保留目标库中仅旧版使用的未知配置，再合并包内显式配置。
@@ -4236,6 +4437,7 @@ try {
 
         var packageMenuId = menu.Id;
         var exists = checkExists('sys_menu', menu.Id);
+        var revivedDeletedMenu = false;
         if (!exists) {
             var rawMenuById = V8.Db.FromSql(
                 'SELECT Id, ModuleEngineKey, Url FROM sys_menu WHERE Id = @p0 LIMIT 1'
@@ -4251,6 +4453,7 @@ try {
                         [V8.OsClient, menu.Id]
                     );
                     exists = checkExists('sys_menu', menu.Id);
+                    revivedDeletedMenu = !!exists;
                 }
             }
         }
@@ -4339,6 +4542,9 @@ try {
             String(menu.Id || i)
         );
 
+        var menuNeedsAdministratorPermission = !exists || revivedDeletedMenu;
+        var menuWriteSucceeded = false;
+
         // 接口引擎的 PageTabs 是每个客户按接口分类长期维护的V8按钮集合。
         // 只对 app.microi.api-engine 保留目标库已有的真正多Tab配置（至少2个）；其它字段、
         // 其它菜单及其它应用继续按应用包覆盖，避免把通用合并规则扩大到所有应用。
@@ -4371,6 +4577,7 @@ try {
             }, 'menu_upt_' + menu.Id);
             if (uptResult.Code == 1) {
                 stats.MenuUpdated++;
+                menuWriteSucceeded = true;
             } else {
                 debugLog['menu_upt_error_' + menu.Id] = uptResult.Msg;
             }
@@ -4389,10 +4596,16 @@ try {
                 addResult = runWriteWithRetry(function () {
                     return V8.FormEngine.UptFormData('sys_menu', modelCopy);
                 }, 'menu_duplicate_recover_' + menu.Id);
-                if (addResult.Code == 1) stats.MenuUpdated++;
+                if (addResult.Code == 1) {
+                    stats.MenuUpdated++;
+                    menuWriteSucceeded = true;
+                }
             }
             if (addResult.Code == 1) {
-                if (!recoveredDuplicateMenu) stats.MenuInserted++;
+                if (!recoveredDuplicateMenu) {
+                    stats.MenuInserted++;
+                    menuWriteSucceeded = true;
+                }
             } else if (addResult.Msg && addResult.Msg.indexOf('[Url]已存在唯一值') > -1 && modelCopy.Url) {
                 // Url重复，自动追加后缀重试
                 var originalUrl = modelCopy.Url;
@@ -4405,12 +4618,17 @@ try {
                 }, 'menu_url_retry_' + menu.Id);
                 if (retryResult.Code == 1) {
                     stats.MenuInserted++;
+                    menuWriteSucceeded = true;
                 } else {
                     debugLog['menu_add_error_' + menu.Id] = retryResult.Msg;
                 }
             } else {
                 debugLog['menu_add_error_' + menu.Id] = addResult.Msg;
             }
+        }
+
+        if (menuWriteSucceeded && menuNeedsAdministratorPermission) {
+            grantAdministratorPermissionsForNewMenu(modelCopy);
         }
 
         //清除缓存
@@ -4515,7 +4733,9 @@ try {
         debugLog.step3ReferenceRowsUpdated = step3ReferenceRowsUpdated;
     }
 
-    debugLog.step3Result = '菜单数据处理完成：新增' + stats.MenuInserted + '，修改' + stats.MenuUpdated + '，迁移微服务旧菜单' + stats.MicroServiceMenus + '，保留现有原生菜单' + stats.MicroServiceMenusPreserved;
+    debugLog.step3Result = '菜单数据处理完成：新增' + stats.MenuInserted + '，修改' + stats.MenuUpdated
+        + '，系统管理员权限新增' + stats.AdminRoleLimitInserted + '、补齐' + stats.AdminRoleLimitUpdated + '、已完整' + stats.AdminRoleLimitSkipped
+        + '，迁移微服务旧菜单' + stats.MicroServiceMenus + '，保留现有原生菜单' + stats.MicroServiceMenusPreserved;
 
     // ==================== 步骤4：处理wf_flowdesign数据（可选） ====================
 
@@ -5278,6 +5498,7 @@ try {
             字段定义: '新增' + stats.FieldInserted + '条，修改' + stats.FieldUpdated + '条，幂等跳过' + (stats.FieldSkipped || 0) + '条，Id对齐' + stats.FieldIdRemapped + '条',
             物理字段同步: '重命名' + (stats.PhysicalFieldsRenamed || 0) + '个，修改' + (stats.PhysicalFieldsModified || 0) + '个，新增' + (stats.PhysicalFieldsAdded || 0) + '个',
             菜单: '新增' + stats.MenuInserted + '条，修改' + stats.MenuUpdated + '条，Id对齐' + stats.MenuIdRemapped + '条',
+            系统管理员菜单权限: '新增' + stats.AdminRoleLimitInserted + '条，补齐' + stats.AdminRoleLimitUpdated + '条，已完整' + stats.AdminRoleLimitSkipped + '条',
             引用修复: '更新' + stats.ReferenceRowsUpdated + '行',
             工作流: '新增' + stats.FlowInserted + '条，修改' + stats.FlowUpdated + '条',
             工作流节点: '新增' + stats.NodeInserted + '条，修改' + stats.NodeUpdated + '条',

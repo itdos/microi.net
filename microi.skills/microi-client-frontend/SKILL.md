@@ -3,6 +3,8 @@ name: microi-client-frontend
 description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue 前端代码，尤其是表单引擎、diy-table、diy-form-full、工作流面板、sys_menu 按钮、前端 V8 事件、路由以及页面/弹窗/抽屉行为。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi.Client 前台源码架构说明
 
 ## 单行文本插槽按钮约定
@@ -472,6 +474,13 @@ DiyCommon.FormEngine.AddFormData("table_name", { Field: "value" }, function (res
 都重新解析并挂载当前微服务。路由输入必须拒绝外部 URL、协议相对地址、反斜杠、登录、访问密钥和
 内部 redirect，并在跳转前用当前 Router 解析，404/未注册动态路由失败关闭。宿主结果用
 `micro-app:host-action-result` 尽力回传，但关闭或跳转会卸载子应用，不能承诺结果事件必达。
+
+`navigate/replaceTab` 只用于主框架级跳转；同一微服务内部菜单必须在子应用内用 Vue Router、
+状态或 iframe Hash 切换，并将异步页面的 `Suspense` 骨架屏限制在内容区域。不得通过改变主框架
+`$route.fullPath` 实现内部页面切换，否则 TagsView 会重建整个微服务。宿主根节点与 `<micro-app>`
+元素必须建立 `contain: layout paint`、`isolation:isolate` 的绘制边界；子应用仍必须把主题/reset/
+元素选择器限定在 AppKey 唯一的 `[data-mci-ui-root="{AppKey}"]`，不能只写宿主也会命中的裸属性
+选择器，禁止以 `:root/html/body` 或固定全屏装饰污染主框架。
 
 `OpenAppDialog` 不暴露 Tab 模式能力；弹窗成功/取消/失败继续使用
 `app-dialog:success/cancel/error`。修改桥接时至少运行

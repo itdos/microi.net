@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.7.4
+ * Version: v1.7.6
  * Function:
- * - 统一生成应用商城安装包；绑定精确版本、完整资源选择、任务定义与接口引擎所有权策略。
+ * - 统一生成应用商城安装包；分离商城发行版本与不可变运行时版本，并保持精确发布、菜单合同、完整资源选择、任务定义及接口引擎所有权门禁。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -122,6 +122,27 @@ function highestVersion(values) {
     }
   }
   return selected;
+}
+function resolveDeliveryVersions(options) {
+  var values = options || {};
+  var exactPublishedVersion = values.ExactPublishedVersion === true;
+  var runtimeVersionNo = exactPublishedVersion
+    ? normalizeVersion(values.RequestedPublishedVersion)
+    : (text(values.AppType) === 'MicroService' && !isBlank(values.RuntimeBuildVersion)
+        ? normalizeVersion(values.RuntimeBuildVersion)
+        : highestVersion([values.LatestVersion, values.ApplicationVersion]));
+  var packageVersionNo = exactPublishedVersion
+    ? runtimeVersionNo
+    : highestVersion([
+        values.RequestedPackageVersion,
+        values.PreparedPackageVersion,
+        values.ExistingPackageVersion,
+        runtimeVersionNo
+      ]);
+  return {
+    RuntimeVersion: runtimeVersionNo,
+    PackageVersion: packageVersionNo
+  };
 }
 function getApp(appIdOrKey) {
   var result = V8.FormEngine.GetFormData('sys_microistore', {
@@ -805,16 +826,22 @@ if (exactPublishedVersion) {
   if (!exactVersionValidation || exactVersionValidation.Code !== 1) return exactVersionValidation;
   requestedPublishedVersion = exactVersionValidation.Data.AppVersion;
 }
-var versionNo = exactPublishedVersion
-  ? requestedPublishedVersion
-  : (appType === 'MicroService' && runtime.Service && !isBlank(runtime.Service.BuildVersion)
-      ? normalizeVersion(runtime.Service.BuildVersion)
-      : highestVersion([
-          latestVersion ? latestVersion.VersionNo : '',
-          V8.Param.AppVersion,
-          existingStore ? existingStore.AppVersion : '',
-          app.AppVersion
-        ]));
+// 商城发行版本与不可变运行时版本是两个合同。目录整理、安装包或说明更新
+// 可以只提升商城版本；只有构建产物变化才提升 MicroService BuildVersion。
+// ExactPublishedVersion/v3 仍要求二者严格相同，保持 committed pointer 门禁。
+var deliveryVersions = resolveDeliveryVersions({
+  AppType: appType,
+  ExactPublishedVersion: exactPublishedVersion,
+  RequestedPublishedVersion: requestedPublishedVersion,
+  RuntimeBuildVersion: runtime.Service ? runtime.Service.BuildVersion : '',
+  LatestVersion: latestVersion ? latestVersion.VersionNo : '',
+  ApplicationVersion: app.AppVersion,
+  RequestedPackageVersion: V8.Param.AppVersion,
+  PreparedPackageVersion: packageAssets ? packageAssets.PackageVersion : '',
+  ExistingPackageVersion: existingStore ? existingStore.AppVersion : ''
+});
+var runtimeVersionNo = deliveryVersions.RuntimeVersion;
+var versionNo = deliveryVersions.PackageVersion;
 var entryPath = protocolV3
   ? text(committedVersion.EntryPath)
   : text((runtime.Service && runtime.Service.EntryPath) || 'index.html');
@@ -896,7 +923,7 @@ var packageModel = {
   PackageInfo: {
     Name: text(V8.Param.AppName || app.Name || app.AppKey),
     Version: versionNo,
-    AppVersion: versionNo,
+    AppVersion: runtimeVersionNo,
     AppId: app.AppKey,
     ApplicationType: appType,
     Description: text(V8.Param.AppDetail || app.Description),
@@ -912,7 +939,7 @@ var packageModel = {
     SchemaVersion: 2,
     ApplicationType: appType,
     IncludeSource: includeSource,
-    VersionNo: versionNo,
+    VersionNo: runtimeVersionNo,
     EntryPath: entryPath,
     Application: {
       Id: app.Id,
@@ -927,7 +954,7 @@ var packageModel = {
       Description: text(V8.Param.AppDetail || app.AppDetail || app.Description),
       CurrentVersion: app.CurrentVersion || 1,
       EntryPath: entryPath,
-      BuildVersion: versionNo
+      BuildVersion: runtimeVersionNo
     },
     PackageAssets: packageAssets,
     MicroService: runtime.Service,

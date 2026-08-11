@@ -3,6 +3,8 @@ name: message-notification
 description: 设计、实现、迁移和验收 Microi 多通道消息通知。用于涉及 wx_tpl_msg、mic_msgset、mic_msg_event_log、微信公众号或服务号模板消息、小程序跳转、短信、邮件、平台内部通知、V8.Notification、通知中心 SignalR、msg_event、消息幂等或通知应用商城交付的任务。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 消息通知
 
 ## 目标
