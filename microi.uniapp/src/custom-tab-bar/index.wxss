@@ -17,6 +17,66 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.mci-bottom-dock__ai-slot {
+  position: relative;
+  width: 112rpx;
+  height: 112rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1rpx solid rgba(8, 125, 168, .22);
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 8rpx 30rpx rgba(15, 49, 66, .16);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  pointer-events: auto;
+}
+
+.mci-bottom-dock__ai-slot--pressed {
+  transform: scale(.93);
+  box-shadow: 0 4rpx 16rpx rgba(15, 49, 66, .14);
+}
+
+.mci-bottom-dock__ai-ring {
+  position: absolute;
+  inset: 5rpx;
+  border: 2rpx solid rgba(24, 166, 184, .22);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: mciAiSlotPulse 2.8s ease-in-out infinite;
+}
+
+.mci-bottom-dock__ai-robot {
+  position: relative;
+  z-index: 1;
+  width: 76rpx;
+  height: 76rpx;
+  margin-top: -7rpx;
+  pointer-events: none;
+}
+
+.mci-bottom-dock__ai-label {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 5rpx;
+  left: 0;
+  color: #087da8;
+  font-size: 18rpx;
+  line-height: 22rpx;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+}
+
+@keyframes mciAiSlotPulse {
+  0%, 100% { transform: scale(.96); opacity: .45; }
+  50% { transform: scale(1); opacity: .9; }
+}
+
 .mci-bottom-dock__nav {
   min-width: 0;
   height: 112rpx;
@@ -68,5 +128,13 @@
 @media (prefers-reduced-motion: reduce) {
   .mci-bottom-dock__item {
     transition: none;
+  }
+
+  .mci-bottom-dock__ai-slot {
+    transition: none;
+  }
+
+  .mci-bottom-dock__ai-ring {
+    animation: none;
   }
 }

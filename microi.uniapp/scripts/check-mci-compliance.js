@@ -87,7 +87,7 @@ assert(visualAuthPrompt.includes('workspace-login.png'), 'Visual screenshot chec
 assert(visualAuthPrompt.includes('message-login.png'), 'Visual screenshot check must include the message auth prompt.');
 assert(aiClient.includes("MCI_AI_ENGINE_KEY = 'mci_ai_data_assistant'"), 'AI client must use the canonical mci_ai_data_assistant engine key.');
 assert(!aiLauncher.includes('getToken') && aiLauncher.includes("url: '/pages/ai/index'"), 'The enabled AI launcher must open the dedicated route without an auth request.');
-assert(aiLauncher.includes('isFallbackLauncher') && aiLauncher.includes('getAiAssistantEnabled'), 'The floating AI launcher visibility must be controlled by the server-side system setting.');
+assert(aiLauncher.includes('isFallbackLauncher') && aiLauncher.includes('getAiAssistantEnabled'), 'The fixed AI launcher visibility must be controlled by the server-side system setting.');
 assert(sysConfig.includes('IsShowAiAssistant') && sysConfig.includes('enabled: false') && sysConfig.includes('getSysConfig({ refresh: true })'), 'AI feature flag must default closed and refresh from Sys_Config.');
 assert(sysConfig.includes('IsShowAiModel') && sysConfig.includes('getAiModelEnabled') && sysConfig.includes('aiModelFlagState'), 'AI model selectors must use the fail-closed IsShowAiModel platform flag.');
 assert(pagesConfig.tabBar && pagesConfig.tabBar.custom === true, 'The active profile must use a custom tabBar for the navigation capsule.');
@@ -102,33 +102,19 @@ assert(customTabBarJs.includes('pageLifetimes') && customTabBarJs.includes('sche
 assert(!/setData\(\{\s*switching:\s*true,\s*selected:/.test(customTabBarJs), 'WeChat custom tabBar must not optimistically replace the route-derived selected state.');
 assert(!/Number\.isInteger\(state\.selected\)/.test(customTabBarJs), 'External component state must not override the route-derived selected state.');
 assert(customTabBarJs.includes('safeAreaInsets') && customTabBarWxml.includes('{{safeBottom}}') && /position:\s*fixed[\s\S]*bottom:\s*0/.test(customTabBarWxss), 'The custom tabBar must consume the runtime safe area while staying fixed to the bottom.');
-assert(aiLauncher.includes('activeTabBar.custom === true') && aiLauncher.includes('class="mci-bottom-dock mci-bottom-dock--without-ai"') && aiLauncher.includes('mci-bottom-dock__nav') && !aiLauncher.includes('mci-bottom-dock__ai-slot'), 'The legacy H5 custom dock must stay disabled unless a profile explicitly opts in.');
+assert(aiLauncher.includes('activeTabBar.custom === true') && aiLauncher.includes('mci-bottom-dock--with-ai') && aiLauncher.includes('mci-bottom-dock__nav'), 'The H5 custom dock must place the enabled AI entry beside the navigation capsule.');
 assert(aiLauncher.includes('scheduleActiveRouteSync') && !aiLauncher.includes('this.activeIndex = index'), 'The H5 custom dock must also derive selection from the visible route instead of optimistic clicks.');
 assert(!aiLauncher.includes('setData({ ...state, selected:'), 'Async assistant state must never overwrite the custom tabBar selected index.');
 assert(app.includes('.mci-tabbar-spacer') && app.includes('144rpx + var(--mci-safe-bottom'), 'Tab page content must reserve the custom dock height and runtime bottom safe area.');
 for (const tabPage of [workspacePage, messagePage, read('src/pages/mall/index.vue'), read('src/pages/news/index.vue'), read('src/pages/profile/index.vue')]) {
   assert(tabPage.includes('mci-tabbar-spacer'), 'Every tab page scroll area must include the shared bottom spacer.');
 }
-assert(aiLauncher.includes('mci-ai-launcher--fallback') && aiLauncher.includes('getSafeAreaMetrics') && aiLauncher.includes('safeRight') && aiLauncher.includes('safeBottom'), 'All pages must retain a safe-area-aware floating AI launcher.');
+assert(customTabBarWxml.includes('mci-bottom-dock__ai-slot') && customTabBarWxml.includes('wx:if="{{aiAssistantEnabled}}"') && customTabBarJs.includes('openAssistant'), 'WeChat tab pages must place the enabled AI entry in the fixed dock beside TabBar.');
+assert(aiLauncher.includes('mci-ai-launcher--fallback') && aiLauncher.includes('getSafeAreaMetrics') && aiLauncher.includes('this.isTabBarPage') && aiLauncher.includes("runtimeTarget !== 'mp-weixin'"), 'Non-WeChat fallback launchers must remain fixed and limited to TabBar pages.');
 assert(aiLauncher.includes('--mci-safe-bottom') && aiLauncher.includes('env(safe-area-inset-bottom'), 'The H5 bottom dock must consume the shared bottom safe-area variable with an env fallback.');
-for (const dragToken of [
-  'DRAG_THRESHOLD',
-  'POSITION_STORAGE_VERSION',
-  'dragState',
-  'handleDragStart',
-  'handleDragMove',
-  'handleDragEnd',
-  'handleDragCancel',
-  'avoidBottomAction',
-  '@touchstart',
-  '@touchmove',
-  '@touchend',
-  'setStorageSync'
-]) {
-  assert(aiLauncher.includes(dragToken), `The unified AI launcher must preserve draggable collision-safe behavior: ${dragToken}.`);
+for (const dragToken of ['DRAG_THRESHOLD', 'POSITION_STORAGE_VERSION', 'dragState', 'handleDragMove', '@touchmove', 'setStorageSync']) {
+  assert(!aiLauncher.includes(dragToken), `The AI entry must stay in its fixed dock position without draggable state: ${dragToken}.`);
 }
-assert(!/@touch(?:start|move|end|cancel)\.(?:stop|prevent)/.test(aiLauncher), 'The draggable AI launcher must use bind-style touch events instead of catchtouch event modifiers.');
-assert(/handleDragEnd\(\)\s*\{[\s\S]*?if \(!moved\)\s*\{[\s\S]*?this\.openAssistant\(\)/.test(aiLauncher), 'A short touch must open the AI assistant directly from touchend.');
 assert(aiLauncher.includes("服务助手打开失败，请重试"), 'Assistant launcher navigation failures must give the user visible feedback.');
 assert(aiPage.includes('onBackPress') && aiPage.includes('assistant.handleBack'), 'AI page must consume internal back states before leaving the dedicated route.');
 assert(aiPage.includes('getAiAssistantEnabled({ refresh: true })') && aiPage.includes('message-fallback-page') && aiPage.includes('暂无新消息'), 'Direct assistant routes must enforce the server-side switch and render a complete normal message state while disabled.');
