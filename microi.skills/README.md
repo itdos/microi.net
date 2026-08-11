@@ -8,7 +8,7 @@
 
 ## 包含的 Skills
 
-当前仓库包含 59 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
+当前仓库包含 62 个 `SKILL.md`。以下清单按任务类型组织；AI 必须先完整读取与当前任务匹配的 Skill，再执行源码、MCP、文档或交付操作。
 
 ### V8 引擎核心（后端）
 
@@ -75,6 +75,7 @@
 | **microi-deployment** | Docker/Windows/源码部署、配置、升级和多节点运行验收 | `microi-deployment/SKILL.md` |
 | **microi-microservice** | 前端微服务/微应用源码、路由、发布、宿主上下文和运行时交付 | `microi-microservice/SKILL.md` |
 | **microi-ai-application** | Web、MicroService、UniApp、H5 与游戏类 AI 应用的 Vue 3 + Vite + TypeScript 默认架构、迁移和质量门 | `microi-ai-application/SKILL.md` |
+| **unity-integration** | Unity UPM SDK、WebGL 宿主、DiyToken、V8 接口引擎与 3D 项目交付 | `unity-integration/SKILL.md` |
 | **microi-docs-coverage** | 中文官网文档到 Skills 的能力映射、V8 API 漏项审计和同步流程 | `microi-docs-coverage/SKILL.md` |
 | **microi-solution-quotation** | 生成紧凑的一页式 Microi吾码解决方案、市场预估价、优惠报价与开发周期 Word | `microi-solution-quotation/SKILL.md` |
 | **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token终端会话/续签、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
@@ -85,6 +86,7 @@
 | **v8-explorer-tree** | VS Code 插件 V8 资源管理器目录规范和本地文件归档 | `v8-explorer-tree/SKILL.md` |
 | **workspace-conventions** | 工作区文件放置、临时产物、项目专属目录和根目录污染防护 | `workspace-conventions/SKILL.md` |
 | **microi-codex-installer** | Codex 插件立即检测、授权安装、旧 marketplace 迁移与验收 | `microi-codex-installer/SKILL.md` |
+| **microi-codex** | Codex 中连接租户、读取实时上下文并完成 Microi 等价工作流 | `microi-codex/SKILL.md` |
 | **production-readonly-audit** | 正式环境只读巡检，不改动线上数据的业务核对流程 | `production-readonly-audit/SKILL.md` |
 | **uniapp-mall-assets** | UniApp/H5/商城上传资源、FileServer、私有临时 URL 与富文本安全 | `uniapp-mall-assets/SKILL.md` |
 

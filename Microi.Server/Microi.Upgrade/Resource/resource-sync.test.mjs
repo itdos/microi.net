@@ -739,6 +739,34 @@ test('官网 MCP 发布器兼容带 API 主机后缀的稳定服务器名称', a
   assert.equal(found.server.env.MICROI_TOKEN_FILE, server.env.MICROI_TOKEN_FILE);
 });
 
+test('官网 MCP 发布器支持 Codex 插件生成的 microi-cli-mcp 稳定入口', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'microi-codex-mcp-entry-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const pluginRoot = join(root, 'plugins', 'microi', '4.9.2');
+  const entry = join(pluginRoot, 'scripts', 'microi-cli-mcp.js');
+  await mkdir(dirname(entry), { recursive: true });
+  await writeFile(entry, "require('./mcp-server.js');\n", 'utf8');
+
+  const server = {
+    type: 'stdio',
+    command: 'node',
+    args: [entry],
+    env: {
+      MICROI_API_URL: 'https://api.itdos.com',
+      MICROI_OS_CLIENT: 'iTdos',
+      MICROI_TOKEN_FILE: join(root, 'token.json'),
+    },
+  };
+  const configPath = join(root, '.mcp.json');
+  const launch = await resolveItDosMcpLaunch(server, configPath);
+
+  assert.equal(launch.command, process.execPath);
+  assert.equal(launch.args[0], entry);
+  assert.equal(launch.cwd, pluginRoot);
+  assert.equal(launch.launchSource, 'configured');
+  assert.equal(launch.env.MICROI_TOKEN_FILE, server.env.MICROI_TOKEN_FILE);
+});
+
 test('官网 MCP 发布器不会被仍存在的旧插件入口锁住', async t => {
   const root = await mkdtemp(join(tmpdir(), 'microi-mcp-stale-config-'));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -842,7 +870,7 @@ test('官网 MCP 发布器拒绝不含标准服务入口的启动参数', async 
   };
   await assert.rejects(
     resolveItDosMcpLaunch(server, configPath),
-    /args 中缺少 mcp-server\.js/,
+    /args 中缺少 mcp-server\.js 或 microi-cli-mcp\.js/,
   );
 });
 

@@ -3,6 +3,8 @@ name: v8-workflow
 description: Microi V8 工作流事件指南。用于编写审批流条件、节点 V8 代码、wf_flowdesign/wf_node/wf_line 逻辑、V8.WF 变量和工作流路由。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 工作流事件开发
 
 你正在开发 Microi 吾码平台的工作流（审批流程）V8 事件。流程引擎基于表单引擎，通过 V8 事件控制审批逻辑。

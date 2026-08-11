@@ -1,0 +1,25 @@
+{
+  "name": "com.microi.unity",
+  "displayName": "Microi Unity SDK",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "Microi吾码 Unity/WebGL SDK：V8接口引擎通讯、宿主桥接、可恢复Editor工具箱与WebGL构建。",
+  "keywords": [
+    "microi",
+    "unity",
+    "webgl",
+    "v8",
+    "low-code"
+  ],
+  "author": {
+    "name": "Microi吾码",
+    "url": "https://microi.net"
+  },
+  "samples": [
+    {
+      "displayName": "V8 API Quick Start",
+      "description": "调用V8接口引擎并接收Microi宿主页面上下文的最小示例。",
+      "path": "Samples~/V8ApiQuickStart"
+    }
+  ]
+}

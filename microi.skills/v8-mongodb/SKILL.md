@@ -3,6 +3,8 @@ name: v8-mongodb
 description: Microi V8 MongoDB 指南。用于使用 V8.MongoDb AddFormData、UptFormData、DelFormData、GetFormData、GetTableData、对象过滤和文档 Id。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 MongoDB 操作
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 MongoDB 存储非结构化数据（如日志、IoT 数据、大文档等）。

@@ -3,6 +3,8 @@ name: dos-orm
 description: Dos.ORM C# 数据访问指南。用于 Microi.Server 中编写或审查 DbSession、Entity、From、WhereClip、事务、异步查询、BulkInsert、Upsert、SqlFunc、子查询、导航属性、CodeFirst、读写分离和分库分表代码。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Dos.ORM
 
 Dos.ORM 是 Microi.Server 底层 C# ORM。它不是接口引擎里的 `V8.Db`：

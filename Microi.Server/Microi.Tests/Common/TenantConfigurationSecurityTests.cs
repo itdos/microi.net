@@ -415,4 +415,49 @@ public class TenantConfigurationSecurityTests
         Assert.Equal("frontend-global-v8", projection["GlobalV8Code"]?.ToString());
         Assert.Equal("Tenant Title", projection["SysTitle"]?.ToString());
     }
+
+    [Fact]
+    public void StableSigningKeyWrite_RemovesSecretsAndMarksThemNotSave()
+    {
+        var param = new DiyTableRowParam
+        {
+            _RowModel = new JObject
+            {
+                ["Id"] = "tenant-row",
+                ["authsecret"] = "must-not-be-written",
+                ["AuthSecretRotateVersion"] = "must-not-be-written",
+                ["ClientName"] = "Safe Name"
+            },
+            _NotSaveField = new List<string> { "ExistingField", "AUTHSECRET" }
+        };
+
+        var removed = TenantConfigurationSecurity.ProtectStableSigningKeyWrite(
+            param,
+            "Sys-OsClients");
+
+        Assert.True(removed);
+        Assert.Null(param._RowModel["authsecret"]);
+        Assert.Null(param._RowModel["AuthSecretRotateVersion"]);
+        Assert.Equal("Safe Name", param._RowModel["ClientName"]?.ToString());
+        Assert.Single(param._NotSaveField, field =>
+            string.Equals(field, "AuthSecret", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("AuthSecretRotateVersion", param._NotSaveField);
+    }
+
+    [Fact]
+    public void StableSigningKeyWrite_DoesNotAlterOtherTables()
+    {
+        var param = new DiyTableRowParam
+        {
+            _RowModel = new JObject { ["AuthSecret"] = "ordinary-business-value" }
+        };
+
+        var removed = TenantConfigurationSecurity.ProtectStableSigningKeyWrite(
+            param,
+            "business_settings");
+
+        Assert.False(removed);
+        Assert.Equal("ordinary-business-value", param._RowModel["AuthSecret"]?.ToString());
+        Assert.Null(param._NotSaveField);
+    }
 }

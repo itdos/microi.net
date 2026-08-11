@@ -58,6 +58,21 @@
     </setting-item-box>
   </collapse-item>
 
+  <collapse-item name="Microi 会话">
+    <setting-item-box name="Microi.Unity SDK">
+      <setting-item name="自动注入当前 ApiBase、OsClient、DiyToken 与设备Id">
+        <n-switch v-model:value="optionData.autoInjectMicroiContext" size="small" />
+      </setting-item>
+      <setting-item name="SDK 场景对象名称">
+        <n-input
+          v-model:value="optionData.apiClientObjectName"
+          size="small"
+          placeholder="MicroiApiClient"
+        />
+      </setting-item>
+    </setting-item-box>
+  </collapse-item>
+
   <collapse-item name="外观">
     <setting-item-box name="样式">
       <setting-item name="背景色">

@@ -1271,6 +1271,49 @@ LoadFabPosition() {
         },
         // ========== 卡片模式辅助方法 END ==========
 
+        GetTableFillColumnKey() {
+            var self = this;
+            // 审计列渲染在业务列之后；优先让最后一个可见审计列吸收剩余宽度。
+            var auditFields = ["UpdateTime", "UserName", "CreateTime"];
+            for (var auditIndex = 0; auditIndex < auditFields.length; auditIndex++) {
+                if (self.ColIsDisplay(auditFields[auditIndex])) {
+                    return "audit:" + auditFields[auditIndex];
+                }
+            }
+
+            var visibleFields = self.PresentationTableFieldList || self.ShowDiyFieldList || [];
+            // 固定列不承担中间可用区的伸缩；正常表格取最右侧非固定业务列。
+            for (var fieldIndex = visibleFields.length - 1; fieldIndex >= 0; fieldIndex--) {
+                var field = visibleFields[fieldIndex];
+                if (!self.ColIsFixed(field.Id)) {
+                    return "field:" + String(field.Id || field.Name || fieldIndex);
+                }
+            }
+            if (visibleFields.length > 0) {
+                var fallbackField = visibleFields[visibleFields.length - 1];
+                return "field:" + String(fallbackField.Id || fallbackField.Name || (visibleFields.length - 1));
+            }
+            return "";
+        },
+        IsTableFillField(field, fieldIndex) {
+            return this.GetTableFillColumnKey() === "field:" + String(field.Id || field.Name || fieldIndex);
+        },
+        IsTableFillAuditField(fieldName) {
+            return this.GetTableFillColumnKey() === "audit:" + fieldName;
+        },
+        GetTableColumnWidth(field, fieldIndex) {
+            return this.IsTableFillField(field, fieldIndex) ? undefined : this.GetColWidth(field, fieldIndex);
+        },
+        GetTableColumnMinWidth(field, fieldIndex) {
+            return this.IsTableFillField(field, fieldIndex) ? this.GetColWidth(field, fieldIndex) : undefined;
+        },
+        GetAuditColumnWidth(fieldName, configuredWidth) {
+            return this.IsTableFillAuditField(fieldName) ? undefined : configuredWidth;
+        },
+        GetAuditColumnMinWidth(fieldName, configuredWidth) {
+            return this.IsTableFillAuditField(fieldName) ? configuredWidth : undefined;
+        },
+
         GetColWidth(field, fieldIndex) {
             var self = this;
             var presentationColumn = typeof self.GetListColumnConfig === 'function'
@@ -1281,10 +1324,6 @@ LoadFabPosition() {
             }
             if (field.TableWidth && Number(field.TableWidth) > 0) {
                 return Number(field.TableWidth);
-            }
-            var visibleFields = self.PresentationTableFieldList || self.ShowDiyFieldList || [];
-            if (fieldIndex == visibleFields.length - 1) {
-                return "";
             }
             var fieldText = [field.Name, field.Label, field.Component, field.Type].filter(Boolean).join(' ').toLowerCase();
             var component = String(field.Component || '').toLowerCase();

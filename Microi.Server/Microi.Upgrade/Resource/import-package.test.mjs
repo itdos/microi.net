@@ -36,8 +36,110 @@ const countPageTabs = context.result;
 const dataSetImportSource = source.match(
   /\/\/ DATASET_INSERT_IF_MISSING_V1[\s\S]*?(?=\n    var hasInstallErrorsBeforeVersion)/
 );
+const adminMenuPermissionSource = source.match(
+  /\/\/ ADMIN_MENU_PERMISSION_V1[\s\S]*?\/\/ ADMIN_MENU_PERMISSION_V1_END/
+);
 
 assert.ok(dataSetImportSource, "InsertIfMissing dataset importer should be extractable");
+assert.ok(adminMenuPermissionSource, "administrator menu-permission helper should be extractable");
+
+function runAdminMenuPermissionFixture(options = {}) {
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const roles = clone(options.roles || [
+    { Id: "role-admin-a", Name: "系统管理员A", Level: 9999, IsDeleted: 0 },
+    { Id: "role-admin-b", Name: "系统管理员B", Level: 10000, IsDeleted: 0 },
+  ]);
+  const roleLimits = clone(options.roleLimits || [
+    {
+      Id: "limit-admin-a",
+      RoleId: "role-admin-a",
+      FkId: "menu-new",
+      Type: "Menu",
+      Permission: '["Read","LegacyButton"]',
+    },
+  ]);
+  const calls = { add: [], update: [] };
+  let duplicateInjected = false;
+  const menuModel = clone(options.menuModel || {
+    Id: "menu-new",
+    Name: "新增业务菜单",
+    MoreBtns: JSON.stringify([{ Id: "btn-approve", Name: "审批" }]),
+    PageTabs: [{ Id: "tab-overview", Name: "概览" }],
+  });
+  const stats = {
+    AdminRoleLimitInserted: 0,
+    AdminRoleLimitUpdated: 0,
+    AdminRoleLimitSkipped: 0,
+  };
+  const fixtureContext = {
+    menuModel,
+    stats,
+    debugLog: {},
+    nowText: () => "2026-08-11 12:00:00",
+    runWriteWithRetry: action => action(),
+    isDuplicatePrimaryError: value => /duplicate entry.+primary/i.test(String(value?.Msg || "")),
+    V8: {
+      OsClient: "iTdos",
+      EncryptHelper: {
+        MD5Encrypt(value) {
+          return `deterministic-${String(value).toLowerCase()}`;
+        },
+      },
+      FormEngine: {
+        GetTableData(tableName, param) {
+          if (tableName === "sys_role") return { Code: 1, Data: clone(roles) };
+          if (tableName !== "sys_rolelimit") throw new Error(`unexpected table ${tableName}`);
+          const where = param?._Where || [];
+          const findValue = name => {
+            const condition = where.find(item => item[0] === name || item[1] === name);
+            return condition ? condition[condition.length - 1] : undefined;
+          };
+          const roleId = findValue("RoleId");
+          const menuId = findValue("FkId");
+          const type = findValue("Type");
+          const rows = roleLimits.filter(row => (
+            row.RoleId === roleId && row.FkId === menuId && row.Type === type
+          ));
+          return rows.length ? { Code: 1, Data: clone(rows) } : { Code: 2, Data: [] };
+        },
+        AddFormData(tableName, row) {
+          assert.equal(tableName, "sys_rolelimit");
+          calls.add.push(clone(row));
+          if (options.duplicateOnAdd && !duplicateInjected) {
+            duplicateInjected = true;
+            roleLimits.push({
+              ...clone(row),
+              Id: "concurrent-limit",
+              Permission: '["LegacyRace"]',
+            });
+            return { Code: 0, Msg: "Duplicate entry 'same' for key 'PRIMARY'" };
+          }
+          if (options.dropSuccessfulAdd) return { Code: 1, Data: { Id: row.Id } };
+          roleLimits.push(clone(row));
+          return { Code: 1, Data: { Id: row.Id } };
+        },
+        UptFormData(tableName, row) {
+          assert.equal(tableName, "sys_rolelimit");
+          calls.update.push(clone(row));
+          const target = roleLimits.find(item => item.Id === row.Id);
+          assert.ok(target, `role limit ${row.Id} should exist`);
+          Object.assign(target, clone(row));
+          return { Code: 1, Data: { Id: row.Id } };
+        },
+      },
+    },
+    Array,
+    JSON,
+    Number,
+    Object,
+    String,
+  };
+  vm.runInNewContext(
+    `${adminMenuPermissionSource[0]}\ngrantAdministratorPermissionsForNewMenu(menuModel);`,
+    fixtureContext,
+  );
+  return { calls, roleLimits: clone(roleLimits), stats: clone(stats) };
+}
 
 function runPhysicalNotNullBackfillFixture(sourceColumn, options = {}) {
   const calls = [];
@@ -214,6 +316,83 @@ test("PageTabs only preserves a real multi-tab target", () => {
     assert.equal(countPageTabs(value), expected, `unexpected count for ${JSON.stringify(value)}`);
   }
   assert.match(source, /existingPageTabsCount\s*>\s*1/);
+});
+
+test("new application menus grant complete permissions to every administrator role idempotently", () => {
+  const first = runAdminMenuPermissionFixture();
+  assert.deepEqual(first.stats, {
+    AdminRoleLimitInserted: 1,
+    AdminRoleLimitUpdated: 1,
+    AdminRoleLimitSkipped: 0,
+  });
+  assert.equal(first.calls.add.length, 1);
+  assert.equal(first.calls.update.length, 1);
+  assert.match(first.calls.add[0].Id, /^deterministic-app-menu-admin\|itdos\|role-admin-b\|menu-new$/);
+
+  const permissionsByRole = new Map(first.roleLimits.map(row => [
+    row.RoleId,
+    JSON.parse(row.Permission),
+  ]));
+  const completePermissions = [
+    "Read", "Add", "Edit", "Del", "Export", "Import",
+    "btn-approve", "审批", "tab-overview", "概览",
+  ];
+  for (const roleId of ["role-admin-a", "role-admin-b"]) {
+    const permissions = permissionsByRole.get(roleId);
+    assert.ok(permissions, roleId);
+    for (const permission of completePermissions) {
+      assert.ok(permissions.includes(permission), `${roleId} missing ${permission}`);
+    }
+  }
+  assert.ok(permissionsByRole.get("role-admin-a").includes("LegacyButton"));
+
+  const second = runAdminMenuPermissionFixture({ roleLimits: first.roleLimits });
+  assert.deepEqual(second.stats, {
+    AdminRoleLimitInserted: 0,
+    AdminRoleLimitUpdated: 0,
+    AdminRoleLimitSkipped: 2,
+  });
+  assert.equal(second.calls.add.length, 0);
+  assert.equal(second.calls.update.length, 0);
+  assert.deepEqual(second.roleLimits, first.roleLimits);
+
+  assert.match(
+    source,
+    /if \(menuWriteSucceeded && menuNeedsAdministratorPermission\) \{\s*grantAdministratorPermissionsForNewMenu\(modelCopy\);/,
+  );
+  assert.match(source, /var menuNeedsAdministratorPermission = !exists \|\| revivedDeletedMenu;/);
+});
+
+test("concurrent menu permission insertion is recovered and merged without losing legacy values", () => {
+  const result = runAdminMenuPermissionFixture({
+    roles: [{ Id: "role-admin-b", Name: "系统管理员B", Level: 10000, IsDeleted: 0 }],
+    roleLimits: [],
+    duplicateOnAdd: true,
+  });
+  assert.equal(result.calls.add.length, 1);
+  assert.equal(result.calls.update.length, 1);
+  assert.deepEqual(result.stats, {
+    AdminRoleLimitInserted: 0,
+    AdminRoleLimitUpdated: 1,
+    AdminRoleLimitSkipped: 0,
+  });
+  const permissions = JSON.parse(result.roleLimits[0].Permission);
+  assert.ok(permissions.includes("LegacyRace"));
+  assert.ok(permissions.includes("Read"));
+  assert.ok(permissions.includes("Import"));
+  assert.ok(permissions.includes("btn-approve"));
+});
+
+test("administrator menu permission writes fail closed when database readback is incomplete", () => {
+  assert.throws(
+    () => runAdminMenuPermissionFixture({
+      roles: [{ Id: "role-admin-b", Name: "系统管理员B", Level: 10000, IsDeleted: 0 }],
+      roleLimits: [],
+      dropSuccessfulAdd: true,
+    }),
+    /权限写后回读不完整/,
+  );
+  assert.match(source, /assertAdministratorMenuPermissionReadback\(role, menuModel, requiredPermissions\)/);
 });
 
 test("physical schema sync backfills all legacy application publish NULLs before NOT NULL", () => {
@@ -608,11 +787,12 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.9.8") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.2") >= 0);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(source, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
+  assert.match(source, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(source, /previousState\.UpgradePolicy[\s\S]*?CreateIfMissing/);
   assert.match(source, /接口引擎稳定Id冲突/);
   assert.match(source, /接口引擎稳定Key冲突/);
@@ -655,14 +835,19 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 9, 8\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.9.8 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 9, 8\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 2\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.2 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 2\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 13\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
     3,
     "runtime, downloaded importer, and embedded package validation must all require the row-size fallback",
+  );
+  assert.equal(
+    (appStoreUpgradeSource.match(/ADMIN_MENU_PERMISSION_V1/g) || []).length,
+    3,
+    "runtime, downloaded importer, and embedded package validation must all require administrator menu permissions",
   );
   assert.match(appStoreUpgradeSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(appStoreUpgradeSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
@@ -674,7 +859,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(appStoreUpgradeSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 6, 0\)/);
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_009_008/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_010_002/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -686,9 +871,10 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_006_000/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_009_008/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_002/);
   assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
+  assert.match(refreshSource, /ADMIN_MENU_PERMISSION_V1/);
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {

@@ -183,12 +183,12 @@ test("module header, metric strip and compound search consume runtime theme toke
     assert.match(buttonSource, /height:\s*100%[\s\S]*?border-radius:\s*inherit/);
 });
 
-test("composite MinWidth wins over last-column auto sizing and unconfigured fields receive semantic widths", () => {
+test("composite MinWidth remains the flex minimum and unconfigured fields receive semantic widths", () => {
     const source = fs.readFileSync(new URL("../src/views/form-engine/mixins/diy-table-ui.mixin.js", import.meta.url), "utf8");
     const start = source.indexOf("GetColWidth(field, fieldIndex)");
     const block = start >= 0 ? source.slice(start, start + 2600) : "";
     assert.match(block, /presentationColumn\.MinWidth/);
-    assert.ok(block.indexOf("presentationColumn.MinWidth") < block.indexOf("fieldIndex == visibleFields.length - 1"));
+    assert.doesNotMatch(block, /fieldIndex\s*==\s*visibleFields\.length\s*-\s*1/);
     assert.match(block, /return 200/);
     assert.match(block, /return 170/);
     assert.match(block, /return 140/);

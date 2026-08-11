@@ -200,6 +200,7 @@
 <tr><td>🌍 <strong><a href="/doc/system-engine/translate-engine">多语言</a></strong></td><td>前后端多语言管理，在线配置</td></tr>
 <tr><td>📊 <strong><a href="/doc/system-engine/visualization-engine">goView 数据大屏</a></strong></td><td>自由拖拽驾驶舱，设计 JSON 与 Microi 表单引擎数据统一管理</td></tr>
 <tr><td>🧊 <strong><a href="/doc/system-engine/visualization-engine">3D 与 CAD</a></strong></td><td>Three.js GLB/GLTF 场景设计，以及 DWG/DXF、STEP/STP、STL 转换与预览</td></tr>
+<tr><td>🌸 <strong><a href="/doc/system-engine/unity-integration">Unity 3D 与 WebGL</a></strong></td><td>Microi.Unity UPM SDK、安全工具箱、V8 通讯与可安装 WebGL AI 应用</td></tr>
 <tr><td>💬 <strong>腾讯 IM</strong></td><td>快速集成社交聊天、客服会话、直播弹幕</td></tr>
 </tbody>
 </table>
@@ -272,7 +273,7 @@ Microi.net/
 ├── microi.app/             # 📱 HBuilderX APK/IPA 套壳打包工程（Wap2App）
 ├── microi.doc/             # 📝 官方文档（基于 VitePress）
 ├── microi.mcp/             # 🔌 MCP Server 源码（AI Agent 工具）
-├── microi.apps/            # 🧩 官方应用商城发行包源码（非租户微应用源码根）
+├── Microi-V8-Engine/       # 🤖 各服务器/租户 AI 应用及应用商城发行源码
 └── microi.skills/          # 🧠 AI Skills 知识库
 ```
 

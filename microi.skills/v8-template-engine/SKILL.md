@@ -3,6 +3,8 @@ name: v8-template-engine
 description: Microi V8 模板引擎指南。用于编写表格/表单模板渲染、V8.Result HTML/text 输出、行格式化、徽章、图片和自定义显示逻辑。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 模板引擎（表格/表单 V8 模板）
 
 你正在为 Microi 吾码平台编写 **表格 V8 模板引擎**、**表单 V8 模板引擎** 代码。模板引擎用于在数据渲染后自定义最终展示效果（颜色、徽章、图片、HTML），是表单引擎的高级特性。
