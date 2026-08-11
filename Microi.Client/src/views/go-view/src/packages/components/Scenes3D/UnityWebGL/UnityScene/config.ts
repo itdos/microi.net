@@ -15,6 +15,9 @@ export const option = {
   productVersion: '1.0',
   companyName: 'DefaultCompany',
   streamingAssetsUrl: 'StreamingAssets',
+  // Microi.Unity SDK 会话握手（默认关闭以兼容旧 Unity 构建）
+  autoInjectMicroiContext: false,
+  apiClientObjectName: 'MicroiApiClient',
   // 画布背景色
   backgroundColor: '#000000',
   // 控制面板

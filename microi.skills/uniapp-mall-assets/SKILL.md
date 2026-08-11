@@ -3,6 +3,8 @@ name: uniapp-mall-assets
 description: Microi UniApp、H5、商城与 PC 页面中的上传图片、附件、FileServer、私有文件临时 URL 和富文本资源安全规范。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi UniApp / 商城资源路径规范
 
 本 Skill 只描述平台通用资源规则。不得写入客户名称、真实 `OsClient`、客户应用路径、客户接口 Key 或特定商城结算规则。

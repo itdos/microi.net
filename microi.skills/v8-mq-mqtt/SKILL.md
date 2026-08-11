@@ -3,6 +3,8 @@ name: v8-mq-mqtt
 description: Microi V8 消息队列与 MQTT 指南。用于使用 V8.MQ.SendMsg、RabbitMQ 队列、MQTT 事件处理、主题、载荷、客户端 Id 和异步集成。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 消息队列与 MQTT
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 RabbitMQ 消息队列或 MQTT 物联网协议。

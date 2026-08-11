@@ -99,6 +99,12 @@ namespace Microi.net
                 "FaceApiKey"
             };
 
+        private static readonly string[] StableSigningKeyFields =
+        {
+            "AuthSecret",
+            "AuthSecretRotateVersion"
+        };
+
         private static readonly HashSet<string> V8SafePublicInfrastructureFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -139,6 +145,56 @@ namespace Microi.net
 
         public static IReadOnlyCollection<string> TenantServiceCredentialFields =>
             TenantServiceCredentialFieldSet.ToArray();
+
+        /// <summary>
+        /// Prevents ordinary FormEngine writes from replacing the durable JWT
+        /// signing root or its applied rotation marker. Rotation is requested via
+        /// BackendAuthSecretRotateVer and persisted by the trusted SaaS runtime;
+        /// editable forms and tenant-authored V8 never receive direct write access
+        /// to the signing material.
+        /// </summary>
+        public static bool ProtectStableSigningKeyWrite(
+            DiyTableRowParam param,
+            string resolvedTableName)
+        {
+            if (param == null
+                || !string.Equals(
+                    (resolvedTableName ?? string.Empty).Trim().Replace('-', '_'),
+                    "sys_osclients",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var removed = false;
+            var row = param._RowModel;
+            if (row != null)
+            {
+                foreach (var field in StableSigningKeyFields)
+                {
+                    var property = row.Properties().FirstOrDefault(item =>
+                        string.Equals(item.Name, field, StringComparison.OrdinalIgnoreCase));
+                    if (property == null) continue;
+                    property.Remove();
+                    removed = true;
+                }
+            }
+
+            if (param._NotSaveField == null)
+            {
+                param._NotSaveField = new List<string>();
+            }
+            foreach (var field in StableSigningKeyFields)
+            {
+                if (!param._NotSaveField.Any(item =>
+                        string.Equals(item, field, StringComparison.OrdinalIgnoreCase)))
+                {
+                    param._NotSaveField.Add(field);
+                }
+            }
+
+            return removed;
+        }
 
         public static string NormalizeTenantId(string osClient)
         {

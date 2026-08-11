@@ -3,6 +3,8 @@ name: v8-cache-pattern
 description: Microi V8 Redis 缓存与管理模式。用于读写 V8.Cache、租户缓存命名、TTL 策略、防陈旧数据，以及使用 Redis 管理器页面或 MCP 检索、统计、查看和维护 String、Hash、List、Set、Sorted Set、Stream。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 Redis 缓存模式
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要使用 Redis 缓存提升性能。V8 只获得当前租户的安全缓存代理，不会获得 Redis `IDatabase`、连接管理或服务器扫描能力。

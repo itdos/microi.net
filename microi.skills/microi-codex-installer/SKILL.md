@@ -9,20 +9,63 @@ description: 当用户在 Codex、WorkBuddy、CodeBuddy、Qoder、Comate、Trae�
 
 只要本技能已经由 Microi.VSCode、工作区 `microi.skills` 或已安装插件提供，用户说“帮我初始化 Microi吾码插件”时就必须识别该意图，用户不需要再次说出 npm 包名。全新 Codex 与空目录尚未加载任何吾码 Skill 时，用户只需在首次请求中明确 `@microi.net/cli`，例如“通过 `@microi.net/cli` 安装吾码 Codex 插件”；具备终端与网络权限的 AI 必须直接执行本技能中的确定性安装命令。安装完成后，更短的“初始化吾码”“添加服务器/MCP”“拉取全部 V8”均由插件 Skill 自动识别。
 
+## Codex 每任务最新版硬门禁（强制）
+
+只要当前 AI 宿主是 Codex，且当前对话能够读取任意 Microi吾码 Skill，每个新建或已有对话首次处理 Microi 任务时都必须先执行本节一次。门禁必须发生在业务分析、MCP 调用、源码修改、构建、测试或发布之前；同一任务内已经用在线结果通过后不重复执行。
+
+先从 npm 官方 registry 强制在线读取唯一可信的最新版：
+
+```bash
+npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/
+```
+
+随后核对本机与工作区状态：
+
+```bash
+microi version --json
+microi codex status --json
+microi doctor --workspace "<工作区绝对路径>" --json
+```
+
+旧版 CLI 尚不支持 `microi version --json` 时，使用 `npm list --global '@microi.net/cli' --depth=0 --json` 读取全局安装版本；不能把命令不存在解释为“已经最新”。`microi codex status --json` 的 `expectedVersion` 来自当前 CLI 自己携带的快照，只能检查本地一致性，不能代替前面的 npm 在线查询。
+
+只有以下条件全部满足才允许继续 Microi 任务：
+
+- npm 官方最新版、当前全局 CLI 版本、Codex 插件 `plugin.version` 与 `plugin.expectedVersion` 完全一致；
+- `microi@microi-net` 已安装并启用，且不存在仍在生效的 `microi-official` 旧入口；
+- `doctor.coexistence.aiBundleVersion` 不低于当前 CLI，所有 Microi MCP provider 都不是 `legacy` 或 `upgrade-available`；
+- 当前工作区 AI 配置由最新版 CLI 重新初始化过，MCP 配置已在同一流程更新。
+
+任何一项不满足时，先一次性向用户说明即将执行的全局变更并取得授权。用户当前请求已经明确包含“安装、升级、更新、初始化吾码 CLI/Codex 插件/AI 配置”时，该请求本身就是授权，不重复询问。获得授权后必须连续执行完整闭环：
+
+```bash
+npm install --global @microi.net/cli@latest
+microi codex install --yes
+microi ai init --workspace "<工作区绝对路径>" --json
+microi doctor --workspace "<工作区绝对路径>" --json
+microi codex status --json
+```
+
+`microi ai init` 默认同时更新工作区 Skills、AI 指令、typings 与全部受支持宿主的 MCP 配置；本流程禁止传 `--no-mcp`。即使只更新了 CLI 或 Codex 插件，也必须重新执行该命令，不能沿用旧工作区生成物。若 Codex 插件被安装或升级，必须新建 Codex 任务或重载 Codex；重载后的任务再次通过本门禁后才可继续，当前旧任务不得声称已热加载新版 Skills/MCP。
+
+npm 官方 registry 无法访问、版本无法解析、用户拒绝授权、安装失败或尚未完成重载时，必须失败关闭：明确报告尚未证明为最新版，不继续 Microi 远端写入、源码实现、构建或发布。禁止改用第三方 registry、离线缓存或旧 CLI 冒充最新版。
+
 ## 自然语言入口规则
 
 - 任一 AI 宿主开始处理 Microi吾码低代码、V8、MCP、表单/模块/流程、微应用或平台源码任务时，先判断当前任务是否已经提供 `microi` 的 Skills/MCP/CLI 能力。
 - 能力不明确时立即做只读检测，不得等到缺少工具或上下文后才检查。
 - 用户明确说“安装 `@microi.net/cli`”“初始化 Microi吾码插件”“添加服务器/MCP”或“拉取某连接全部 V8”时，该请求本身就是对应操作授权；立即执行本技能中的确定性命令，不再重复询问同一授权。
-- 用户只是在进行普通 Microi 业务对话、尚未要求安装时，发现插件缺失后必须立即说明将修改 Codex 全局 marketplace、插件配置和本地缓存，并请求一次明确同意。未获同意不得安装、下载或改写全局配置。
-- 用户拒绝或暂不安装时，继续使用工作区现有 `microi.skills`、`@microi.net/cli` 或 MCP 完成可完成的工作，不得阻塞或反复提示。
+- 用户只是在进行普通 Microi 业务对话、尚未要求安装或升级时，发现 CLI、Codex 插件、AI bundle 或 MCP 不是最新版，必须立即说明完整升级闭环会修改哪些全局/工作区配置，并请求一次明确同意。未获同意不得安装、下载或改写配置。
+- 用户拒绝或暂不升级时，不得反复提示，但最新版门禁保持未通过；只可回答安装说明或进行不依赖吾码运行能力的只读解释，不得继续 Microi 写入、实现、构建或发布任务。
 
 ## 检测
 
-优先使用已经安装的 CLI：
+先完成上一节的 npm 官方在线版本查询，再使用已经安装的 CLI 检查本地状态：
 
 ```bash
+microi version --json
 microi codex status --json
+microi doctor --workspace "<工作区绝对路径>" --json
 ```
 
 如果 `microi` 命令不存在，只可先运行不会下载包的本机只读检查：
@@ -34,22 +77,25 @@ codex plugin list
 
 成功状态必须同时满足：
 
+- 全局 CLI、npm 官方最新版与 Codex 插件版本一致；
 - marketplace 为 `microi-net`；
 - `microi@microi-net` 显示 `installed, enabled`；
 - 已安装版本等于 CLI 内置 marketplace 的目标版本。
 - 插件路径位于 `microi-net-marketplace/plugins/microi`，且 `.codex-plugin/plugin.json` 的显示名为 `Microi吾码`。
+- `doctor.coexistence.aiBundleVersion` 不低于当前 CLI，MCP provider 没有 `legacy` 或 `upgrade-available`；`newer-provider-preserved` 表示较新的 VS Code/CLI 提供者已被安全保留，可以通过。
 
 `microi-official` 和 `microi@microi-official` 仅是旧标识，不得写入新文档或新配置；安装器会在新版安装成功后迁移并清理旧标识。
 
 ## 获得授权后安装
 
-已安装全局 CLI 时：
+安装或升级统一先把全局 CLI 更新到 npm 官方最新版：
 
 ```bash
+npm install --global @microi.net/cli@latest
 microi codex install --yes
 ```
 
-没有全局 CLI，但用户已明确授权安装时：
+只有在全局安装受宿主限制且用户明确选择不安装全局命令时，才可使用下面的临时执行方式；它不能证明一个既有旧版全局 CLI 已被升级：
 
 ```bash
 npx --yes @microi.net/cli@latest codex install --yes
@@ -68,6 +114,16 @@ npx --yes @microi.net/cli@latest codex install --yes
 ```bash
 microi codex install --yes --force
 ```
+
+CLI 或 Codex 插件安装/升级完成后，必须立即重新初始化当前工作区 AI 配置并更新 MCP，然后双重验收：
+
+```bash
+microi ai init --workspace "<工作区绝对路径>" --json
+microi doctor --workspace "<工作区绝对路径>" --json
+microi codex status --json
+```
+
+不得用单独的 `microi mcp init` 代替完整 AI 重新初始化；`ai init` 已默认包含 MCP 更新。只有诊断表明 MCP 仍有明确残留问题时，才追加 `microi mcp init` 做定向恢复。
 
 开发者从可信本地源码验收时，可以显式指定 marketplace 源：
 

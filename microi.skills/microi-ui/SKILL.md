@@ -3,6 +3,8 @@ name: microi-ui
 description: 用于构建或编写 Microi.UI / MCI-UI 文档，覆盖 Vue 3 网站、响应式站点、uni-app 移动端、主题色板、形态模式、高品质移动端界面、骨架屏、安全区、动效和 Microi 品牌前端组件。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi.UI / MCI-UI
 
 Microi.UI 是 Microi 产品共享前端设计系统。Vue 3 网站、响应式站点、H5 和 uni-app 移动端项目都应使用它。PC 后台页面仍可使用 Element Plus，但视觉变量、加载状态、空状态、动效和品牌色应与 `--mci-*` 变量保持一致。

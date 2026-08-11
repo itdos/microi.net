@@ -3,6 +3,8 @@ name: v8-frontend-events
 description: Microi 前端 V8 事件与客户端能力指南。用于编写浏览器端字段、按钮、列表事件，或使用 V8.EventName、V8.Form、V8.Print 蓝牙打印、扫码、弹窗、表单联动和界面交互。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 前端事件大全
 
 你正在为 Microi 吾码平台编写 **前端 V8 事件** 代码。前端事件运行在浏览器，通过 `V8.EventName` 区分事件类型，可访问表单/列表/弹窗等丰富的客户端 API。

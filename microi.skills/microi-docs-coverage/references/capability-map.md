@@ -38,6 +38,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/app-store.md` | app-store | 应用包、安装、升级和回滚 |
 | `system-engine/databases.md` | dos-orm, v8-sql-query, microi-deployment | 扩展数据库与迁移 |
 | `system-engine/datasource-engine.md` | datasource-engine | 数据源定义、执行和供数 |
+| `system-engine/file-manage.md` | v8-file-upload, microi-client-frontend | 文件柜、公私桶管理、在线预览、回收站、跨平台与 MinIO 同步 |
 | `system-engine/job.md` | job-engine | 调度、后台任务和分布式恢复 |
 | `system-engine/micro-app.md` | microi-microservice, microi-ai-application | 微服务/AI 前端应用的工程架构与交付 |
 | `system-engine/multi-end-client.md` | microi-client-frontend, microi-mobile-app-quality, microi-uniapp-frontend | PC、WebOS、移动自适应、UniApp 与 App 边界 |
@@ -53,6 +54,7 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/search-engine.md` | search-engine | Elasticsearch 索引和查询 |
 | `system-engine/spider-engine.md` | spider-engine | 浏览器采集和 Worker |
 | `system-engine/translate-engine.md` | translate-engine | 多语言与翻译供应商 |
+| `system-engine/unity-integration.md` | unity-integration, v8-api-config, microi-client-frontend | Unity UPM、WebGL 宿主、DiyToken 与 V8 通讯边界 |
 | `system-engine/visualization-engine.md` | page-engine, microi-ui | 3D、CAD、goView 与数据大屏能力边界 |
 | `system-engine/wf-engine.md` | v8-workflow | 工作流设计和事件 |
 | `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config | AI 辅助接口引擎开发 |

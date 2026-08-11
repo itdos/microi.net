@@ -3,6 +3,8 @@ name: v8-export-import
 description: Microi V8 Office 导入导出指南。用于使用 V8.Office 导出单/多 Sheet Excel、Word、PowerPoint，解析 Excel，自定义表头/图片、文件响应和批量导入校验。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 Office 导入导出
 
 你正在为 Microi 吾码平台编写自定义 Excel、Word、PowerPoint 导入/导出代码。平台通过 `V8.Office` 提供 Office 处理能力，源码在 `Microi.Office` 插件中。

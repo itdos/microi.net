@@ -46,6 +46,32 @@ test('微服务遵循宿主协议且不使用原生阻塞弹窗', async () => {
   assert.doesNotMatch(source, /access_key\s*=/i)
 })
 
+test('微服务内部导航只替换内容区并由局部骨架屏承接异步页面', async () => {
+  const [app, host] = await Promise.all([read('src/App.vue'), read('src/platform/host.ts')])
+
+  assert.match(app, /<Suspense\s+:timeout="0">/)
+  assert.match(app, /class="content-skeleton"/)
+  assert.match(app, /defineAsyncComponent\(\(\)\s*=>\s*import\('\.\/pages\/OverviewPage\.vue'\)\)/)
+  assert.match(app, /currentRoute\.value\s*=\s*navigateMicroRoute\(path\)/)
+  assert.doesNotMatch(app, /callMicroiHost\(['"]replaceTab['"]/)
+  assert.match(host, /navigateMicroRoute\(path:\s*unknown/)
+  assert.match(host, /window\.history\[replace\s*\?\s*'replaceState'\s*:\s*'pushState'\]/)
+})
+
+test('微服务主题与装饰样式被限制在自身根容器内', async () => {
+  const [app, styles, tokens] = await Promise.all([
+    read('src/App.vue'), read('src/styles/app.css'), read('src/styles/tokens.css')
+  ])
+
+  assert.match(app, /data-mci-ui-root="ai-platform-studio"/)
+  assert.match(app, /\.studio::before\s*\{\s*position:\s*absolute;/)
+  assert.doesNotMatch(app, /\.studio::before\s*\{\s*position:\s*fixed;/)
+  assert.doesNotMatch(app, /document\.documentElement\.dataset/)
+  assert.doesNotMatch(styles, /(?:^|\n)\s*(?:html|body|#app|button|\*)\s*[,\{]/)
+  assert.doesNotMatch(tokens, /:root/)
+  assert.match(tokens, /\[data-mci-ui-root="ai-platform-studio"\]\[data-theme="dark"\]/)
+})
+
 test('新增治理控制面使用计划哈希、条件回滚、租约和资产不可变版本', async () => {
   const [access, assets, release, services, observability] = await Promise.all([
     read('src/pages/AccessPage.vue'), read('src/pages/AssetsPage.vue'),

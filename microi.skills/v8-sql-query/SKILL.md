@@ -3,6 +3,8 @@ name: v8-sql-query
 description: Microi V8 安全 SQL 查询指南。用于选择 V8.FormEngine _Where 或 V8.Db.FromSql，处理参数化查询、联表、聚合并避免 SQL 注入。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 安全 SQL 查询
 
 你正在开发 Microi 吾码平台的 V8 引擎代码。数据库查询有两种方式：`V8.FormEngine`（推荐）和 `V8.Db`（原始 SQL）。必须遵守安全规范。

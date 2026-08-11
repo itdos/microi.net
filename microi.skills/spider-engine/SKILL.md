@@ -3,6 +3,8 @@ name: spider-engine
 description: Microi 采集引擎规范。用于设计、维护、测试或调用 Microi.Spider、OpenClaw 本地 Worker、Chrome/Playwright 采集、验证码、MCP 建模、V8 入库与导出、可重复采集站点规则。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 采集引擎
 
 ## 核心原则
