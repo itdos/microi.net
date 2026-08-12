@@ -15,6 +15,7 @@
  *   var data = command.getData();
  */
 import { encode } from "./encoding.js";
+import { tagPrintData } from "./printer-compatibility.js";
 
 var jpPrinter = {
   createNew: function () {
@@ -260,7 +261,7 @@ var jpPrinter = {
 
     jpPrinter.getData = function () {
       // 获取打印数据
-      return data;
+      return tagPrintData(data, "escpos");
     };
 
     return jpPrinter;

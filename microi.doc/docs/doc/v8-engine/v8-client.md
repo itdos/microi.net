@@ -1161,11 +1161,19 @@ if (result.Code !== 1) return V8.Tips(result.Msg, false);
 
 ## 蓝牙打印（`V8.Print`）
 
-`V8.Print` 是前端 BLE 直连打印能力，支持 TSC/TSPL 标签指令和 ESC/POS
-小票指令。它不是“仅移动端函数”：5+App 使用 `plus.bluetooth`，存在
-`navigator.bluetooth.requestDevice` 的 PC/H5 浏览器使用 Web Bluetooth。
-浏览器模板、PDF、A4 和 Print Engine JSON 请使用[打印引擎](/doc/system-engine/print-engine)，
-不要把两套打印协议混用。
+`V8.Print` 是前端蓝牙直连打印能力，支持 TSC/TSPL、CPCL 标签指令和 ESC/POS
+小票指令。它不是“仅移动端函数”：5+App 使用 BLE，Android 的 ZICOX CC4 还可回退到
+经典蓝牙 SPP；存在 `navigator.bluetooth.requestDevice` 的 PC/H5 浏览器使用 Web Bluetooth。
+
+| 型号 | `createNew()` 标签路径 | `createNewESC()` | 存量 V8 |
+|---|---|---|---|
+| 佳博 GP-M322 | 原 TSPL 字节逐字节发送 | ESC/POS 原样发送 | 无需修改 |
+| ZICOX CC4 | 标准 TSC 调用在发送前转换为 CPCL | ESC/POS 原样发送 | 常用标准调用无需修改 |
+| 其它 TSPL 机型 | 原 TSPL 字节发送 | ESC/POS 原样发送 | 无需修改 |
+
+完整的选型、连接、TSC→CPCL 映射、Android SPP 和实机验收见
+[蓝牙打印机](/doc/system-engine/bluetooth-printer)。浏览器模板、PDF、A4 和 Print Engine JSON
+请使用[打印引擎](/doc/system-engine/print-engine)，不要把两套打印协议混用。
 
 ### 已挂载到哪些前端 V8
 
@@ -1191,10 +1199,14 @@ PC 与平板端的顶部导航在 AI 助手后显示蓝牙图标：绿色圆点�
 
 | 环境 | 实现 | 注意事项 |
 |---|---|---|
-| 5+App APK/IPA | `plus.bluetooth` | 扫描并查找可写特征，监听连接状态变化 |
+| Android 5+App | `plus.bluetooth` BLE；CC4 可用 `plus.android` SPP | BLE 优先；SPP 需先在系统完成配对；Android 12+ 主动搜索时申请附近设备权限 |
+| iOS 5+App | `plus.bluetooth` BLE | 不使用 Android RFCOMM/SPP |
 | 支持 Web Bluetooth 的浏览器 | `navigator.bluetooth` | 通常要求 HTTPS/localhost 和用户点击手势 |
 | 其它 H5/浏览器 | 无可用引擎 | `V8.Print` 仍可能存在，但连接会失败并提示 |
 | 微信小程序 | 不属于此模块 | 使用小程序/UniApp 专用 BLE 实现 |
+
+Android 12+ 的宿主包必须声明 `BLUETOOTH_SCAN`、`BLUETOOTH_CONNECT` 并启用 DCloud
+Bluetooth 模块。源码仅在用户点击“搜索”时申请运行时权限，不在自动重连阶段打扰用户。
 
 不要使用 `V8.ClientType === 'PC'` 排除蓝牙，也不要用
 `BLEInformation.deviceId` 判断实时连接。标准流程：
@@ -1218,8 +1230,8 @@ async function ensurePrinterConnected() {
 
 `OpenBluetoothPage()` 返回 `Promise<boolean>`，在连接弹窗关闭时解析；弹窗已打开时
 重复调用会取得同一个 Promise。Web 端 `isConnected()` 检查实时 GATT 和写特征，5+App
-端结合 `onBLEConnectionStateChange` 维护的在线标记与设备/写特征 ID 判断；写入期间仍可能
-物理断线，所以任何环境都要捕获发送异常。
+端的 BLE 结合 `onBLEConnectionStateChange` 维护的在线标记与设备/写特征 ID 判断，Android
+SPP 则检查实时 RFCOMM Socket 与输出流；写入期间仍可能物理断线，所以任何环境都要捕获发送异常。
 
 设备元数据会同时写入 `localStorage` 和兼容用 `sessionStorage`。应用启动、页面恢复、重新
 获得焦点或意外断开时会尝试有限次数自动重连：5+App 使用已记住的 `deviceId`，Web 端只有
@@ -1238,14 +1250,22 @@ async function ensurePrinterConnected() {
 | `V8.Print.reconnect()` | `Promise<boolean>` | 使用已记住的授权或设备 ID 重连，不弹设备选择框 |
 | `V8.Print.getConnectionState()` | 状态快照 | 展示引擎、连接/记忆状态、设备名、错误与时间 |
 | `V8.Print.subscribeConnection(listener)` | 取消订阅函数 | 注册后立即回调，并持续接收连接变化 |
+| `V8.Print.getPrinterProfile()` | 型号快照 | 返回当前型号、标签指令与首选/兜底传输；普通业务无需调用 |
+| `V8.Print.setPrinterProfile(mode)` | 型号选择 | `auto` 或三个内置 profile；设备名无法识别时使用 |
 | `V8.Print.prepareSend(bytes)` | `Promise<void>` | 自动恢复连接，进入应用级队列后分包串行写入；必须 `await` |
 | `V8.Print.Send(bytes)` | 内部状态机入口 | 依赖 `prepareSend` 设置的共享游标，业务代码不要直接调用 |
 | `V8.Print.setOneTimeData(bytes)` | 设置 BLE 包长 | 只接受 1–512 整数；默认 20，连接页候选 20–190 |
 | `V8.Print.setPrinterNum(num)` | 同一缓冲区重复发送 | 只接受 1–99 整数；连接页候选 1–9 |
 | `V8.Print.disconnect()` | 主动断开并忘记设备 | 停止自动重连；下次需要重新选择设备 |
-| `V8.Print.BLEInformation` | 设备与特征元数据 | 只作诊断，不是连接状态或打印回执 |
+| `V8.Print.BLEInformation` | 设备、通道与特征元数据 | 只作诊断，不是连接状态或打印回执 |
+
+`getConnectionState()` 还会返回 `transport`、`profileMode`、`profileId`、`profileName`、
+`commandLanguage`。手工型号值为 `gprinter-gp-m322`、`zicox-cc4`、`generic-tspl`；恢复
+设备名自动识别使用 `auto`。旧 V8 不需要调用型号 API。
 
 ### TSC/TSPL 标签示例
+
+下面同一份代码可用于 GP-M322 与 CC4。GP-M322 取得原 TSPL；CC4 在首包写入前取得完整 CPCL：
 
 TSC 的 `setText`、`setQR`、`setBarCode` 会把内容拼入带双引号的协议字段，
 必须移除引号、换行、NUL/控制字符并限制长度：
@@ -1289,6 +1309,12 @@ TSC 构建器的 28 个源码方法：
 
 `setFromfeed()` 是当前公开拼写，实际生成 `FORMFEED`。`addCommand` 是低层接口，
 只能接受固定、受审查的指令，不能传入表单或接口返回的任意命令。
+
+CC4 自动转换支持常见纸张、质量、方向、坐标、线条、方框、反相、文字、条码、二维码、
+位图和单次输出；`addCommand`、代码页/国家、特殊走纸、蜂鸣、限位和擦除等尚无安全等价映射的
+方法会在任何蓝牙写入前拒绝。必须直接发送 `cmd.getData()`，不要用 `Array.from` 或 JSON
+序列化复制字节数组，否则会丢失不可枚举的转换元数据。完整白名单见
+[蓝牙打印机：CC4 自动转换范围](/doc/system-engine/bluetooth-printer#cc4-自动转换范围)。
 
 ### ESC/POS 小票示例
 
@@ -1336,7 +1362,9 @@ ESC/POS 构建器的 25 个源码方法：
 - Web Bluetooth 只把常见服务 `18f0`、`ff00`、
   `49535343-fe7d-4ae5-8fa9-9fafd205e455`、
   `e7810a71-73ae-499d-8c15-faa9aef0c3f2` 放进 `optionalServices`，并选择发现的
-  第一个可写特征。当前没有公开的自定义服务 UUID 配置，特殊型号需要扩展源码。
+  第一个可写特征。当前没有公开的自定义服务 UUID 配置，特殊型号需要扩展源码。Web 浏览器
+  不能使用经典 SPP；只开放 SPP 或使用其它私有 UUID 的 CC4 固件应在 Android 5+App 使用配对
+  SPP，或取得厂家准确 BLE UUID 后扩展源码。
 
 ### 批量打印
 
@@ -1382,13 +1410,16 @@ async function printBatch(rows, startIndex) {
 - 自动重连是有上限的最佳努力：Web Bluetooth 是否能恢复授权取决于浏览器实现和用户授权，
   5+App 也会受系统蓝牙、距离、休眠与设备电源影响。重试结束后必须由用户点击入口重连。
 - 源码会发现 read/notify 特征，但尚未订阅或解析状态。`prepareSend` 成功只表示
-  字节写入完成，不代表已走纸、无缺纸或物理打印成功。
+  字节写入 BLE 特征或 SPP 输出流，不代表已走纸、无缺纸或物理打印成功。
+- GP-M322 的自动 profile 不改写任何 TSPL 字节。CC4 的转换先整包校验再发送；不支持的方法、
+  缺少高层元数据或不是恰好一次 `setPagePrint()` 时零写入失败，不能把失败改成盲目透传。
 - 设备名称、ID、服务与特征是外部输入。展示时用文本方式转义，不拼 `innerHTML`；
   不记录或上传完整 `BLEInformation`。
 - 业务保存与蓝牙打印不是原子事务。用稳定业务单号支持受控重打，避免打印失败后
   重复执行业务写入。
-- 至少用目标型号验证首次授权、重连、刷新、主动断开、中文/条码/二维码/图片、
-  连续 20 张串行发送、长度恰好整除包长、关机/缺纸/离开范围后的失败恢复。
+- 至少分别用 GP-M322 与 CC4 验证首次授权/配对、自动与手工选型、重连、刷新、主动断开、
+  中文/条码/二维码/图片、连续 20 张串行发送、长度恰好整除包长、交替换机，以及关机/缺纸/
+  离开范围后的失败恢复；CC4 还要分别记录 BLE 与 Android SPP 结果。
 
 ## 移动端函数
 

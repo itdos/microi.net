@@ -329,13 +329,7 @@ namespace Microi.net
 
                 foreach (var group in groups)
                 {
-                    var client = Microi.net.OsClient.GetClient(group.Key.OsClient);
-                    var host = new MongodbHost
-                    {
-                        Connection = client.OsClientModel["DbMongoConnection"].Val<string>(),
-                        DataBase = "sys_log_" + group.Key.OsClient,
-                        Table = "log_" + group.Key.Month
-                    };
+                    var host = CreateTenantMongoHost(group.Key.OsClient, "log_" + group.Key.Month);
                     var circuitKey = host.Connection + "|" + host.DataBase;
                     if (_sysLogCircuitOpenUntil.TryGetValue(circuitKey, out var openUntil) && openUntil > DateTime.UtcNow)
                         return new DosResult(0, null, "MongoDB sys log is temporarily unavailable.");
@@ -376,6 +370,18 @@ namespace Microi.net
         }
         public async Task<DosResultList<SysLog>> GetSysLog(SysLogParam param)
         {
+            try
+            {
+                return await GetSysLogCore(param).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                return new DosResultList<SysLog>(0, null, ex.Message);
+            }
+        }
+
+        private async Task<DosResultList<SysLog>> GetSysLogCore(SysLogParam param)
+        {
             //如果传入了时间
             var tableName = "log_";
             if (param._SearchMonth.DosIsNullOrWhiteSpace())
@@ -386,12 +392,7 @@ namespace Microi.net
             {
                 tableName += param._SearchMonth;
             }
-            var host = new MongodbHost()
-            {
-                Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),//链接字符串
-                DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),//库名
-                Table = tableName//表名
-            };
+            var host = CreateTenantMongoHost(param.OsClient, tableName);
 
             // 确保范围索引存在（CreateTime/Type/Level），提升排序和筛选性能
             await EnsureSysLogIndexesAsync(host);
@@ -540,15 +541,7 @@ namespace Microi.net
                 if (!Regex.IsMatch(traceId, "^[0-9a-f]{32}$"))
                     return new DosResultList<SysLog>(0, null, "TraceId必须是32位十六进制W3C TraceId。");
 
-                var client = Microi.net.OsClient.GetClient(param.OsClient);
-                if (client?.OsClientModel == null)
-                    return new DosResultList<SysLog>(0, null, "当前租户MongoDB配置不可用。");
-                var host = new MongodbHost
-                {
-                    Connection = client.OsClientModel["DbMongoConnection"].Val<string>(),
-                    DataBase = "sys_log_" + param.OsClient.ToLowerInvariant(),
-                    Table = ""
-                };
+                var host = CreateTenantMongoHost(param.OsClient, "");
                 var database = MongodbClient<SysLog>.MongodbDatabase(host);
                 var existingMonths = await GetSystemLogMonthsAsync(database).ConfigureAwait(false);
                 var requestedMonth = NormalizeMonth(param.SearchMonth);
@@ -900,12 +893,7 @@ namespace Microi.net
                 {
                     tableName += param._SearchMonth;
                 }
-                var host = new MongodbHost()
-                {
-                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
-                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
-                    Table = tableName
-                };
+                var host = CreateTenantMongoHost(param.OsClient, tableName);
                 var client = MongodbClient<SysLog>.MongodbInfoClient(host);
                 var types = await client.DistinctAsync<string>("Type", Builders<SysLog>.Filter.Ne("Type", (string)null));
                 var typeList = await types.ToListAsync();
@@ -931,12 +919,7 @@ namespace Microi.net
                     return new DosResult(0, null, "OsClient不能为空");
                 }
 
-                var host = new MongodbHost()
-                {
-                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
-                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
-                    Table = "api_call_count"
-                };
+                var host = CreateTenantMongoHost(param.OsClient, "api_call_count");
 
                 var client = MongodbClient<MongoDB.Bson.BsonDocument>.MongodbInfoClient(host);
 
@@ -977,12 +960,7 @@ namespace Microi.net
                     return new DosResultList<ApiCallCount>(0, null, "OsClient不能为空");
                 }
 
-                var host = new MongodbHost()
-                {
-                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
-                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
-                    Table = "api_call_count"
-                };
+                var host = CreateTenantMongoHost(param.OsClient, "api_call_count");
 
                 var top = param._Top ?? 10;
                 var sort = Builders<ApiCallCount>.Sort.Descending("CallCount");
@@ -1049,16 +1027,35 @@ namespace Microi.net
             return await collection.CountAsync(filter, new CountOptions { Limit = maxCount });
         }
 
-        private static MongodbHost CreateSystemLogHost(string osClient, string month)
+        private static MongodbHost CreateTenantMongoHost(string osClient, string tableName)
         {
+            if (osClient.DosIsNullOrWhiteSpace())
+                throw new InvalidOperationException("系统日志不可用：当前登录租户为空，请重新登录后重试。");
+
             var client = Microi.net.OsClient.GetClient(osClient);
-            if (client?.OsClientModel == null) throw new InvalidOperationException("当前租户MongoDB配置不可用。");
+            var connection = client?.OsClientModel?["DbMongoConnection"]?.Val<string>();
+            if (connection.DosIsNullOrWhiteSpace())
+            {
+                throw new InvalidOperationException(
+                    $"系统日志不可用：租户[{osClient}]的运行时SaaS配置缺少DbMongoConnection。"
+                    + "请在主租户“系统设置 → SaaS引擎 → MongoDB连接字符串”中配置共享MongoDB，"
+                    + "保存后执行租户配置刷新，并确认所有API节点已加载新配置。"
+                );
+            }
+
             return new MongodbHost
             {
-                Connection = client.OsClientModel["DbMongoConnection"].Val<string>(),
+                Connection = connection,
                 DataBase = "sys_log_" + osClient.ToLowerInvariant(),
-                Table = month.DosIsNullOrWhiteSpace() ? "log_" : "log_" + month
+                Table = tableName ?? ""
             };
+        }
+
+        private static MongodbHost CreateSystemLogHost(string osClient, string month)
+        {
+            return CreateTenantMongoHost(
+                osClient,
+                month.DosIsNullOrWhiteSpace() ? "log_" : "log_" + month);
         }
 
         private static string ValidateLifecycleParam(SysLogLifecycleParam param, bool requireRun)
@@ -1205,12 +1202,7 @@ namespace Microi.net
             {
                 var tableName = "log_" + (param._SearchMonth.DosIsNullOrWhiteSpace()
                     ? DateTime.Now.ToString("yyyyMM") : param._SearchMonth);
-                var host = new MongodbHost()
-                {
-                    Connection = Microi.net.OsClient.GetClient(param.OsClient).OsClientModel["DbMongoConnection"].Val<string>(),
-                    DataBase = "sys_log_" + param.OsClient.ToString().ToLower(),
-                    Table = tableName
-                };
+                var host = CreateTenantMongoHost(param.OsClient, tableName);
 
                 // 关键字过滤（同 GetSysLog 逻辑，Regex 搜 Title + Content）
                 FilterDefinition<SysLog> kwFilter = null;

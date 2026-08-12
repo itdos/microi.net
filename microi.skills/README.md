@@ -75,7 +75,7 @@
 | **microi-deployment** | Docker/Windows/源码部署、配置、升级和多节点运行验收 | `microi-deployment/SKILL.md` |
 | **microi-microservice** | 前端微服务/微应用源码、路由、发布、宿主上下文和运行时交付 | `microi-microservice/SKILL.md` |
 | **microi-ai-application** | Web、MicroService、UniApp、H5 与游戏类 AI 应用的 Vue 3 + Vite + TypeScript 默认架构、迁移和质量门 | `microi-ai-application/SKILL.md` |
-| **unity-integration** | Unity UPM SDK、WebGL 宿主、DiyToken、V8 接口引擎与 3D 项目交付 | `unity-integration/SKILL.md` |
+| **unity-integration** | Unity UPM SDK、WebGL/Windows、多人租约、公屏、DiyToken、V8 与 3D AI 应用交付 | `unity-integration/SKILL.md` |
 | **microi-docs-coverage** | 中文官网文档到 Skills 的能力映射、V8 API 漏项审计和同步流程 | `microi-docs-coverage/SKILL.md` |
 | **microi-solution-quotation** | 生成紧凑的一页式 Microi吾码解决方案、市场预估价、优惠报价与开发周期 Word | `microi-solution-quotation/SKILL.md` |
 | **microi-frontend-sdk** | Vue3/UniApp/H5/PC 前端统一 SDK、Token终端会话/续签、上传、资源 URL、ApiEngine/FormEngine | `microi-frontend-sdk/SKILL.md` |
