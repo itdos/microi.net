@@ -1,5 +1,6 @@
 <template>
   <view class="checkin-page" :style="mciTokenStyle">
+    <view v-if="typePickerOpen || customerPickerOpen" class="dropdown-backdrop" @tap="closeDropdowns"></view>
     <view class="page-header mci-safe-top">
       <view class="nav-row mci-safe-nav-row">
         <view class="nav-icon" @tap="goBack"><text>‹</text></view>
@@ -57,18 +58,46 @@
         <view class="section form-section">
           <view class="field">
             <view class="field-heading">
-              <text class="field-label">拜访对象</text>
-              <view class="customer-select-button" hover-class="customer-select-button--pressed" @tap="openCustomerPicker">
-                <view class="customer-select-icon"></view>
-                <text>选择客户</text>
+              <text class="field-label">拜访对象类型</text>
+            </view>
+            <view class="type-combobox">
+              <view class="type-combobox__control" :class="{ focused: typePickerOpen }">
+                <input
+                  :value="form.targetType"
+                  class="type-combobox__input"
+                  placeholder="输入关键词检索"
+                  @focus="openTypePicker"
+                  @input="handleTypeInput"
+                />
+                <text class="type-combobox__arrow" :class="{ open: typePickerOpen }" @tap.stop="toggleTypePicker">›</text>
+              </view>
+              <view v-if="typePickerOpen" class="type-combobox__dropdown">
+                <view
+                  v-for="option in filteredTargetTypes"
+                  :key="option"
+                  class="type-combobox__option"
+                  :class="{ selected: option === form.targetType }"
+                  hover-class="type-combobox__option--pressed"
+                  @tap.stop="selectTargetType(option)"
+                >
+                  <text>{{ option }}</text><text v-if="option === form.targetType">✓</text>
+                </view>
+                <view v-if="!filteredTargetTypes.length" class="type-combobox__empty"><text>未找到匹配类型</text></view>
               </view>
             </view>
-            <view class="field-input-wrap">
-              <input :value="form.name" class="field-input" placeholder="选择已有客户或手动输入" @input="handleTargetInput" />
-              <view v-if="form.name" class="field-clear-button" hover-class="field-clear-button--pressed" @tap="clearTargetInput">
-                <text>×</text>
-              </view>
-            </view>
+          </view>
+          <view class="field field--customer">
+            <view class="field-heading"><text class="field-label">拜访对象</text></view>
+            <mci-customer-combobox
+              ref="customerCombobox"
+              :model-value="form.name"
+              :selected-id="customerId"
+              @update:model-value="handleTargetValue"
+              @select="selectCustomer"
+              @clear="clearSelectedCustomer"
+              @open-change="handleCustomerPickerOpen"
+            />
+            <text class="field-help">可检索已有客户；未检索到时保留输入并按新对象提交</text>
           </view>
           <view class="field field--textarea">
             <view class="field-heading">
@@ -114,12 +143,6 @@
         <text>{{ submitting ? '正在提交' : '确认打卡' }}</text>
       </button>
     </view>
-    <mci-customer-picker
-      :visible="customerPickerVisible"
-      :selected-id="customerId"
-      @close="customerPickerVisible = false"
-      @select="selectCustomer"
-    />
     <mci-ai-launcher />
   </view>
 </template>
@@ -135,12 +158,13 @@ import {
   normalizeCheckinStatistics
 } from '@/platform/checkin-statistics.mjs'
 import { updateTask } from '@/utils/xjy-task.js'
-import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
+import MciCustomerCombobox from '@/components/mci-customer-combobox/mci-customer-combobox.vue'
 
 const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
+const TARGET_TYPES = ['客户', '项目合伙人', '供应商', '商家']
 
 export default {
-  components: { MciCustomerPicker },
+  components: { MciCustomerCombobox },
   mixins: [themeMixin],
   data() {
     return {
@@ -156,18 +180,25 @@ export default {
       submitting: false,
       location: { latitude: 0, longitude: 0, address: '' },
       photos: [],
-      form: { name: '', remark: '' },
+      form: { targetType: '客户', name: '', remark: '' },
       taskId: '',
       customerId: '',
       selectedCustomerName: '',
       returnToFollowup: false,
-      customerPickerVisible: false
+      typePickerOpen: false,
+      typeSearchActive: false,
+      customerPickerOpen: false
     }
   },
   computed: {
     markers() {
       if (!this.location.latitude || !this.location.longitude) return []
       return [{ id: 1, latitude: this.location.latitude, longitude: this.location.longitude, width: 28, height: 36 }]
+    },
+    filteredTargetTypes() {
+      if (!this.typeSearchActive) return TARGET_TYPES
+      const keyword = String(this.form.targetType || '').trim()
+      return keyword ? TARGET_TYPES.filter((item) => item.includes(keyword)) : TARGET_TYPES
     }
   },
   onLoad(options) {
@@ -181,6 +212,7 @@ export default {
     if (visitTarget) this.form.name = decodeURIComponent(visitTarget)
     this.taskId = decodeURIComponent(options.taskId || '')
     this.customerId = decodeURIComponent(options.customerId || '')
+    this.form.targetType = decodeURIComponent(options.targetType || '客户')
     this.returnToFollowup = String(options.returnToFollowup || '0') === '1'
     this.selectedCustomerName = this.customerId ? this.form.name : ''
     this.updateTime()
@@ -288,25 +320,49 @@ export default {
         this.locating = false
       }
     },
-    openCustomerPicker() {
-      this.customerPickerVisible = true
+    openTypePicker() {
+      if (this.$refs.customerCombobox) this.$refs.customerCombobox.closeOptions()
+      // 默认值只是当前选中项，不应被当成检索关键词；展开时先展示全部类型。
+      this.typeSearchActive = false
+      this.typePickerOpen = true
+    },
+    toggleTypePicker() {
+      if (!this.typePickerOpen && this.$refs.customerCombobox) this.$refs.customerCombobox.closeOptions()
+      this.typePickerOpen = !this.typePickerOpen
+      if (this.typePickerOpen) this.typeSearchActive = false
+    },
+    handleCustomerPickerOpen(open) {
+      this.customerPickerOpen = Boolean(open)
+      if (open) this.typePickerOpen = false
+    },
+    closeDropdowns() {
+      this.typePickerOpen = false
+      this.customerPickerOpen = false
+      if (this.$refs.customerCombobox) this.$refs.customerCombobox.closeOptions()
+    },
+    handleTypeInput(event) {
+      this.form.targetType = String(event && event.detail && event.detail.value || '')
+      this.typeSearchActive = true
+      this.typePickerOpen = true
+      if (this.form.targetType !== '客户') this.clearSelectedCustomer()
+    },
+    selectTargetType(option) {
+      this.form.targetType = option
+      this.typeSearchActive = false
+      this.typePickerOpen = false
+      if (option !== '客户') this.clearSelectedCustomer()
     },
     selectCustomer(payload) {
       this.customerId = String(payload && payload.id || '')
       this.selectedCustomerName = String(payload && payload.name || '')
       this.form.name = this.selectedCustomerName
-      this.customerPickerVisible = false
     },
     clearSelectedCustomer() {
       this.customerId = ''
       this.selectedCustomerName = ''
     },
-    clearTargetInput() {
-      this.form.name = ''
-      this.clearSelectedCustomer()
-    },
-    handleTargetInput(event) {
-      const value = String(event && event.detail && event.detail.value || '')
+    handleTargetValue(value) {
+      value = String(value || '')
       this.form.name = value
       if (this.customerId && value.trim() !== this.selectedCustomerName.trim()) this.clearSelectedCustomer()
     },
@@ -366,11 +422,16 @@ export default {
         uni.showToast({ title: '请输入拜访对象', icon: 'none' })
         return
       }
+      if (!TARGET_TYPES.includes(this.form.targetType)) {
+        uni.showToast({ title: '请选择拜访对象类型', icon: 'none' })
+        return
+      }
       this.submitting = true
       try {
         const user = getUser() || {}
         const uploaded = await this.uploadPhotos()
         const result = await V8.FormEngine.AddFormData('Diy_location', {
+          BaifangDXLX: this.form.targetType,
           BaifangDX: this.form.name.trim(),
           DakaDD: this.location.address,
           Beizhu: this.form.remark.trim(),
@@ -424,6 +485,7 @@ export default {
 
 <style lang="scss" scoped>
 .checkin-page { height: 100vh; overflow: hidden; background: #f4f8fa; color: #18313d; }
+.dropdown-backdrop { position: fixed; z-index: 8; inset: 0; background: transparent; }
 .page-header { background: #fff; border-bottom: 1rpx solid #e2ecef; }
 .nav-row { display: grid; grid-template-columns: 72rpx 1fr 72rpx; align-items: center; min-height: 88rpx; padding: 0 calc(20rpx + var(--mci-capsule-right)) 0 20rpx; }
 .nav-icon { display: flex; align-items: center; justify-content: center; width: 64rpx; height: 64rpx; border-radius: 50%; font-size: 44rpx; }
@@ -461,14 +523,20 @@ export default {
 .field--textarea { padding-bottom: 20rpx; }
 .field-heading { display: flex; align-items: center; justify-content: space-between; min-height: 48rpx; }
 .field-label { color: #536f7a; font-size: 25rpx; font-weight: 600; }
-.customer-select-button { display: flex; align-items: center; gap: 7rpx; min-height: 44rpx; margin-right: 16rpx; padding: 0 12rpx; border: 1rpx solid #b9dce8; border-radius: 10rpx; background: #edf8fb; color: #087fae; font-size: 21rpx; transition: transform .15s ease, opacity .15s ease; }
-.customer-select-button--pressed { transform: scale(.97); opacity: .76; }
-.customer-select-icon { position: relative; width: 18rpx; height: 18rpx; border: 2rpx solid #087fae; border-radius: 50%; }
-.customer-select-icon::after { position: absolute; right: -8rpx; bottom: -5rpx; width: 9rpx; height: 2rpx; border-radius: 1rpx; background: #087fae; transform: rotate(45deg); content: ''; }
-.field-input-wrap { position: relative; min-width: 0; padding-top: 4rpx; }
-.field-input { box-sizing: border-box; width: 100%; height: 64rpx; padding-right: 64rpx; color: #233f4b; font-size: 25rpx; }
-.field-clear-button { position: absolute; top: 10rpx; right: 0; display: flex; align-items: center; justify-content: center; width: 52rpx; height: 52rpx; border-radius: 50%; color: #81959d; font-size: 32rpx; line-height: 1; transition: transform .15s ease, opacity .15s ease; }
-.field-clear-button--pressed { transform: scale(.9); opacity: .65; }
+.type-combobox { position: relative; z-index: 30; width: 100%; margin-top: 6rpx; }
+.type-combobox__control { box-sizing: border-box; height: 76rpx; display: grid; grid-template-columns: minmax(0, 1fr) 48rpx; align-items: center; padding-left: 14rpx; border: 2rpx solid #d8e6eb; border-radius: 12rpx; background: #fff; }
+.type-combobox__control.focused { border-color: #28a7cf; box-shadow: 0 0 0 4rpx rgba(40, 167, 207, .08); }
+.type-combobox__input { width: 100%; height: 72rpx; color: #233f4b; font-size: 25rpx; }
+.type-combobox__arrow { align-self: center; justify-self: center; color: #81969e; font-size: 38rpx; line-height: 1; transform: rotate(90deg); transform-origin: center; transition: transform .18s ease; }
+.type-combobox__arrow.open { transform: rotate(-90deg); }
+.type-combobox__dropdown { position: absolute; top: 84rpx; right: 0; left: 0; overflow: hidden; border: 1rpx solid #dce8ec; border-radius: 12rpx; background: #fff; box-shadow: 0 14rpx 38rpx rgba(22, 63, 79, .16); }
+.type-combobox__option { min-height: 76rpx; display: flex; align-items: center; justify-content: space-between; padding: 0 18rpx; border-bottom: 1rpx solid #edf3f5; color: #35515c; font-size: 24rpx; }
+.type-combobox__option:last-child { border-bottom: 0; }
+.type-combobox__option.selected { background: #eef9fc; color: #087fae; }
+.type-combobox__option--pressed { background: #f0f7f9; }
+.type-combobox__empty { min-height: 96rpx; display: flex; align-items: center; justify-content: center; color: #83979e; font-size: 22rpx; }
+.field--customer { position: relative; z-index: 10; }
+.field-help { margin-top: 10rpx; color: #8a9da4; font-size: 20rpx; line-height: 30rpx; }
 .field-textarea-wrap { position: relative; width: 100%; }
 .field-textarea { box-sizing: border-box; width: 100%; min-height: 180rpx; padding: 10rpx 0 36rpx; color: #233f4b; font-size: 25rpx; line-height: 38rpx; }
 .field-count { position: absolute; right: 0; bottom: 4rpx; color: #a0afb5; font-size: 20rpx; }
@@ -484,4 +552,5 @@ export default {
 .submit-button { display: flex; align-items: center; justify-content: center; gap: 12rpx; width: 100%; height: 84rpx; margin: 0; border: none; border-radius: 16rpx; background: #e94b2c; color: #fff; font-size: 28rpx; font-weight: 650; line-height: 84rpx; box-shadow: 0 9rpx 24rpx rgba(233, 75, 44, 0.22); }
 .submit-check-icon { display: flex; align-items: center; justify-content: center; width: 34rpx; height: 34rpx; border: 3rpx solid rgba(255,255,255,.88); border-radius: 50%; font-size: 22rpx; line-height: 1; }
 .submit-button::after { border: none; }
+@media (prefers-reduced-motion: reduce) { .type-combobox__arrow { transition: none; } }
 </style>
