@@ -33,10 +33,13 @@ namespace Microi.net
         private static readonly HashSet<string> SharedInfrastructureFieldSet =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                // Redis / Sentinel
+                // Redis / Sentinel / shared MongoDB system-log cluster.
+                // DbMongoConnection remains hidden from V8 and is never copied into a tenant row;
+                // it is inherited only in the trusted runtime snapshot, while every tenant keeps
+                // an isolated sys_log_{OsClient} database namespace.
                 "NoSqlType", "CacheConnectionType", "RedisHost", "RedisPort", "RedisPwd",
                 "RedisDataBase", "RedisTimeout", "SentinelHost", "SentinelPort",
-                "SentinelServiceName", "SentinelPwd",
+                "SentinelServiceName", "SentinelPwd", "DbMongoConnection",
 
                 // Object storage (Aliyun OSS / MinIO / Amazon S3)
                 "HDFS", "NetworkIsInternet", "UseAliOssPublic", "UseAliOssPrivate",

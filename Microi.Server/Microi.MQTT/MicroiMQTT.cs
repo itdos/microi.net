@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -29,11 +30,18 @@ namespace Microi.net
         public bool IsRunning { get; private set; }
 
         /// <summary>
-        /// 当前节点客户端连接映射：Key=normalizedTenant+separator+ClientId，Value=normalizedTenant。
-        /// 复合键避免设备缓存在 SaaS 租户间串用。
+        /// 当前节点客户端连接映射：Key=normalizedTenant+separator+ClientId。
+        /// ConnectionToken 区分同一 ClientId 的新旧连接，避免旧连接的延迟断开
+        /// 删除新连接刚注册的租户路由。
         /// </summary>
-        private static readonly ConcurrentDictionary<string, string> _connectedClients
-            = new ConcurrentDictionary<string, string>();
+        private static readonly ConcurrentDictionary<string, ConnectedClientRegistration> _connectedClients
+            = new ConcurrentDictionary<string, ConnectedClientRegistration>();
+
+        private sealed class ConnectedClientRegistration
+        {
+            public string OsClient { get; set; }
+            public string ConnectionToken { get; set; }
+        }
 
         /// <summary>
         /// 设备级 ApiEngineId 缓存：normalizedTenant+separator+ClientId → 设备专属接口引擎Id。
@@ -45,6 +53,8 @@ namespace Microi.net
         private static readonly object _clientRegistrationSync = new object();
         private const char ClientKeySeparator = '\u001f';
         private const string InternalSenderPrefix = "__microi_internal__:";
+        private const string TenantSessionItemKey = "Microi.MQTT.OsClient";
+        private const string ConnectionTokenSessionItemKey = "Microi.MQTT.ConnectionToken";
 
         // mci_mqtt_log / mci_mqtt_client 表名与日志类型常量
         private const string LogTable = "mci_mqtt_log";
@@ -62,7 +72,7 @@ namespace Microi.net
         }
 
         public IReadOnlyDictionary<string, string> ConnectedClients
-            => new Dictionary<string, string>(_connectedClients);
+            => _connectedClients.ToDictionary(item => item.Key, item => item.Value?.OsClient);
 
         public IReadOnlyDictionary<string, string> GetConnectedClients(string osClient)
         {
@@ -76,7 +86,7 @@ namespace Microi.net
             {
                 if (item.Key.StartsWith(prefix, StringComparison.Ordinal))
                 {
-                    result[item.Key.Substring(prefix.Length)] = normalizedTenant;
+                    result[item.Key.Substring(prefix.Length)] = item.Value?.OsClient ?? normalizedTenant;
                 }
             }
             return result;
@@ -262,8 +272,17 @@ namespace Microi.net
         /// 解析客户端的 OsClient。已验证的当前节点连接映射优先，
         /// 其次仅接受合法且存在的 MQTT v5 OsClient；未知租户绝不回退主租户。
         /// </summary>
-        private string ResolveOsClient(string clientId, List<MqttUserProperty> userProperties = null)
+        private string ResolveOsClient(
+            string clientId,
+            IDictionary sessionItems = null,
+            List<MqttUserProperty> userProperties = null)
         {
+            var sessionTenant = sessionItems?[TenantSessionItemKey]?.ToString();
+            if (TryResolveTenant(sessionTenant, out var normalizedSessionTenant, out _))
+            {
+                return normalizedSessionTenant;
+            }
+
             if (TryGetConnectedTenant(clientId, out var connectedTenant))
             {
                 return connectedTenant;
@@ -296,33 +315,61 @@ namespace Microi.net
             {
                 if (item.Key.EndsWith(suffix, StringComparison.Ordinal))
                 {
-                    osClient = item.Value;
+                    osClient = item.Value?.OsClient;
                     return true;
                 }
             }
             return false;
         }
 
-        private static bool TryRegisterConnectedClient(string osClient, string clientId, out string existedTenant)
+        private static bool TryRegisterConnectedClient(
+            string osClient,
+            string clientId,
+            IDictionary sessionItems,
+            out string existedTenant)
         {
             existedTenant = null;
+            var normalizedTenant = TenantConfigurationSecurity.NormalizeTenantId(osClient);
+            var connectionToken = Guid.NewGuid().ToString("N");
             lock (_clientRegistrationSync)
             {
                 if (TryGetConnectedTenant(clientId, out existedTenant)
-                    && !string.Equals(existedTenant, osClient, StringComparison.OrdinalIgnoreCase))
+                    && !string.Equals(existedTenant, normalizedTenant, StringComparison.OrdinalIgnoreCase))
                 {
                     return false;
                 }
-                _connectedClients[NormalizeClientCacheKey(osClient, clientId)] = osClient;
+
+                _connectedClients[NormalizeClientCacheKey(normalizedTenant, clientId)] = new ConnectedClientRegistration
+                {
+                    OsClient = normalizedTenant,
+                    ConnectionToken = connectionToken
+                };
+                if (sessionItems != null)
+                {
+                    sessionItems[TenantSessionItemKey] = normalizedTenant;
+                    sessionItems[ConnectionTokenSessionItemKey] = connectionToken;
+                }
                 return true;
             }
         }
 
-        private static void RemoveConnectedClient(string osClient, string clientId)
+        private static bool RemoveConnectedClient(string osClient, string clientId, IDictionary sessionItems)
         {
-            if (osClient.DosIsNullOrWhiteSpace() || clientId.DosIsNullOrWhiteSpace()) return;
-            _connectedClients.TryRemove(NormalizeClientCacheKey(osClient, clientId), out _);
-            _clientApiEngineCache.TryRemove(NormalizeClientCacheKey(osClient, clientId), out _);
+            if (osClient.DosIsNullOrWhiteSpace() || clientId.DosIsNullOrWhiteSpace()) return false;
+            var key = NormalizeClientCacheKey(osClient, clientId);
+            var disconnectToken = sessionItems?[ConnectionTokenSessionItemKey]?.ToString();
+            lock (_clientRegistrationSync)
+            {
+                if (!_connectedClients.TryGetValue(key, out var current)) return false;
+                if (!string.Equals(current?.ConnectionToken, disconnectToken, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                _connectedClients.TryRemove(key, out _);
+                _clientApiEngineCache.TryRemove(key, out _);
+                return true;
+            }
         }
 
         private static bool TryResolveTenant(string candidate, out string normalizedTenant, out OsClientSecret clientModel)
@@ -960,7 +1007,7 @@ namespace Microi.net
                     return Task.CompletedTask;
                 }
 
-                if (!TryRegisterConnectedClient(osClient, args.ClientId, out var existedOsClient))
+                if (!TryRegisterConnectedClient(osClient, args.ClientId, args.SessionItems, out var existedOsClient))
                 {
                     WriteMqttDiagnostic(osClient, "ClientTenantCollisionRejected", "MQTT ClientId 跨租户冲突，已拒绝连接", $"ExistingOsClient={existedOsClient}", 3, args.ClientId);
                     args.ReasonCode = MqttConnectReasonCode.ClientIdentifierNotValid;
@@ -980,7 +1027,7 @@ namespace Microi.net
         // 客户端连接事件：触发对应租户的Connected V8事件
         private async Task OnClientConnected(ClientConnectedEventArgs args)
         {
-            var osClient = ResolveOsClient(args.ClientId, args.UserProperties);
+            var osClient = ResolveOsClient(args.ClientId, args.SessionItems, args.UserProperties);
             if (osClient.DosIsNullOrWhiteSpace())
             {
                 WriteMqttDiagnostic(OsClientDefault.OsClient, "ConnectedTenantResolutionFailed", "MQTT 连接事件未解析到租户，已跳过", "不回退主租户。", 3, args.ClientId);
@@ -1008,15 +1055,18 @@ namespace Microi.net
         // 客户端断开事件：先获取租户映射再清理，触发对应租户的Disconnected V8事件
         private async Task OnClientDisconnected(ClientDisconnectedEventArgs args)
         {
-            TryGetConnectedTenant(args.ClientId, out var osClient);
-            if (osClient.DosIsNullOrWhiteSpace()) osClient = ResolveOsClient(args.ClientId, args.UserProperties);
+            var osClient = ResolveOsClient(args.ClientId, args.SessionItems, args.UserProperties);
             if (osClient.DosIsNullOrWhiteSpace())
             {
                 WriteMqttDiagnostic(OsClientDefault.OsClient, "DisconnectedTenantResolutionFailed", "MQTT 断开事件未解析到租户，已跳过", "不回退主租户。", 3, args.ClientId);
                 return;
             }
 
-            RemoveConnectedClient(osClient, args.ClientId);
+            if (!RemoveConnectedClient(osClient, args.ClientId, args.SessionItems))
+            {
+                WriteMqttDiagnostic(osClient, "StaleDisconnectIgnored", "MQTT 旧连接断开事件已忽略", "当前 ClientId 已由更新的连接会话接管。", 1, args.ClientId);
+                return;
+            }
 
             // 内部写入 mci_mqtt_log + 更新设备表 IsOnline=0 + 清理设备级 ApiEngineId 缓存
             await UpsertMqttClientAsync(osClient, args.ClientId, false);
@@ -1034,7 +1084,7 @@ namespace Microi.net
         // 订阅拦截：强制 Topic 必须在自己租户的命名空间下
         private async Task OnInterceptingSubscription(InterceptingSubscriptionEventArgs args)
         {
-            var osClient = ResolveOsClient(args.ClientId, args.UserProperties);
+            var osClient = ResolveOsClient(args.ClientId, args.SessionItems, args.UserProperties);
             var topic = args.TopicFilter?.Topic;
             if (osClient.DosIsNullOrWhiteSpace()
                 || !TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)
@@ -1122,7 +1172,7 @@ namespace Microi.net
         // 消息接收处理：路由到对应租户的V8事件，V8 返回 Code != 1 可阻断发布
         private async Task OnMessageReceived(InterceptingPublishEventArgs args)
         {
-            var osClient = ResolveOsClient(args.ClientId, args.ApplicationMessage?.UserProperties);
+            var osClient = ResolveOsClient(args.ClientId, args.SessionItems, args.ApplicationMessage?.UserProperties);
             var topic = args.ApplicationMessage?.Topic;
             if (osClient.DosIsNullOrWhiteSpace()
                 || !TryResolveTenant(osClient, out var normalizedTenant, out var clientModel)

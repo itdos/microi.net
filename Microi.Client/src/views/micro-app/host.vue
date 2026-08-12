@@ -503,12 +503,32 @@ export default {
             if (this.mountWatchdog) clearTimeout(this.mountWatchdog);
             this.mountWatchdog = null;
         },
-        startMountWatchdog(generation) {
+        startMountWatchdog(generation, attempt = this.retryKey) {
             this.clearMountWatchdog();
-            this.mountWatchdog = setTimeout(() => {
-                if (generation !== this.resolveGeneration || this.mountState !== "mounting") return;
+            const deadline = Date.now() + 12000;
+            const inspect = () => {
+                if (
+                    generation !== this.resolveGeneration
+                    || attempt !== this.retryKey
+                    || this.mountState !== "mounting"
+                    || this.error
+                ) return;
+
+                // mounted/ready 事件可能早于宿主监听器注册，或在 KeepAlive
+                // 激活期间丢失。真实可见 DOM 才是最终事实；绝不能在页面已
+                // 渲染时因生命周期信号缺失而把健康实例当作超时实例销毁。
+                if (this.hasRenderableMicroAppContent() === true) {
+                    this.markMicroAppReady();
+                    return;
+                }
+
+                if (Date.now() < deadline) {
+                    this.mountWatchdog = setTimeout(inspect, 250);
+                    return;
+                }
                 this.recoverMountFailure("微服务首次挂载超时，宿主已尝试自动恢复。", "MICRO_APP_MOUNT_TIMEOUT");
-            }, 12000);
+            };
+            this.mountWatchdog = setTimeout(inspect, 250);
         },
         markMicroAppReady() {
             this.clearMountWatchdog();
@@ -561,7 +581,7 @@ export default {
                 this.childReadyRendered = false;
                 this.mountState = "mounting";
                 await this.$nextTick();
-                this.startMountWatchdog(generation);
+                this.startMountWatchdog(generation, this.retryKey);
                 return;
             }
             this.setRuntimeError(message, { reasonCode });
@@ -825,7 +845,7 @@ export default {
                 if (generation !== this.resolveGeneration) return;
                 this.entryUrl = url;
                 this.mountState = "mounting";
-                this.startMountWatchdog(generation);
+                this.startMountWatchdog(generation, this.retryKey);
             } catch (error) {
                 if (generation !== this.resolveGeneration) return;
                 this.setRuntimeError(error?.message || String(error), {

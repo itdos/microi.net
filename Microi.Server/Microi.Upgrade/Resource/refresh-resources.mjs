@@ -53,7 +53,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_010_002
+    if (versionNumber < 1_010_003
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -87,8 +87,10 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('LEGACY_SWITCH_BOOLEAN_TEXT_V1')
       || !content.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
       || !content.includes('MYSQL_BIT_NUMERIC_COMPAT_V1')
-      || !content.includes('ADMIN_MENU_PERMISSION_V1')) {
-      throw new Error(`${name} 低于 v1.10.2 或缺少新菜单系统管理员完整权限及写后回读、MySQL BIT数值兼容、Switch JSON字面量解包、双重元数据兼容、历史安装记录身份修复、租户接口引擎所有权不可逆保护、接口引擎资源基线、无商城标识时跳过计数、MySQL宽表行外文本回退、可信批量小包单事务、安装统计响应解析、接口引擎写后回读、后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
+      || !content.includes('ADMIN_MENU_PERMISSION_V1')
+      || !content.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
+      || !content.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')) {
+      throw new Error(`${name} 低于 v1.10.3 或缺少可信官方平台资源较新版本保护、新菜单系统管理员完整权限及写后回读、MySQL BIT数值兼容、Switch JSON字面量解包、双重元数据兼容、历史安装记录身份修复、租户接口引擎所有权不可逆保护、接口引擎资源基线、无商城标识时跳过计数、MySQL宽表行外文本回退、可信批量小包单事务、安装统计响应解析、接口引擎写后回读、后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -97,7 +99,7 @@ function validateReleaseCandidate(name, content) {
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
     if (!content.includes('ai_app_publish_store')
-      || versionNumber < 1_006_000
+      || versionNumber < 1_007_007
       || !content.includes('selectionValues(existingStore.SelectTable')
       || !content.includes('selectionValues(existingStore.SelectApiEngine')
       || !content.includes('IncludeSource: includeSource')
@@ -108,8 +110,9 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('PublishHdfsPath')
       || !content.includes("Source: 'CompiledAssets'")
       || !content.includes('SOURCE_BUILD_ARCHIVE_ROOTS_V1')
-      || !content.includes('buildApiEngineResourcePolicies')) {
-      throw new Error(`${name} 缺少 v1.6.0 接口引擎资源策略、统一应用商城、历史 BuildLog 兼容入口、严格源码/编译分根目录及自包含 PackageOnly 能力`);
+      || !content.includes('buildApiEngineResourcePolicies')
+      || !content.includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')) {
+      throw new Error(`${name} 缺少 v1.7.7 官方平台接口引擎所有权、统一应用商城、历史 BuildLog 兼容入口、严格源码/编译分根目录及自包含 PackageOnly 能力`);
     }
   }
   if (name === 'official-resource-api.js') {
@@ -208,14 +211,17 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_010_002
+        || importerVersionNumber < 1_010_003
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
         || !importerCode.includes('MYSQL_BIT_NUMERIC_COMPAT_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
-        || engineVersionNumber(publisherEngine) < 1_006_000
+        || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
+        || !importerCode.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')
+        || engineVersionNumber(publisherEngine) < 1_007_007
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
+        || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
         || engineVersionNumber(bulkEngine) < 1_001_003
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
