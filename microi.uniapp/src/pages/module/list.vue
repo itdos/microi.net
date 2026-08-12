@@ -4,7 +4,7 @@
       <view class="module-nav mci-safe-nav-row">
         <view class="module-nav__button" hover-class="module-nav__button--pressed" @tap="goBack"><text>‹</text></view>
         <text class="module-nav__title">{{ config.title || '业务列表' }}</text>
-        <view class="module-nav__button module-nav__button--add" hover-class="module-nav__button--pressed" @tap="openAdd"><text>＋</text></view>
+        <view class="module-nav__button module-nav__button--placeholder" aria-hidden="true"></view>
       </view>
       <view class="search-row">
         <view class="search-input-wrap">

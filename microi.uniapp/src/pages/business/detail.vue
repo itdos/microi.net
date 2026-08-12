@@ -5,9 +5,7 @@
 			<view class="nav-row mci-safe-nav-row">
 				<view class="nav-button" hover-class="nav-button--pressed" @tap="goBack">‹</view>
 				<text class="nav-title">{{ pageTitle }}</text>
-				<view v-if="canEditRecord" class="nav-button nav-button--edit" hover-class="nav-button--pressed"
-					@tap="openFullForm">编辑</view>
-				<view v-else class="nav-button nav-button--placeholder" aria-hidden="true"></view>
+				<view class="nav-button nav-button--placeholder" aria-hidden="true"></view>
 			</view>
 		</view>
 
@@ -205,6 +203,12 @@
 		<!-- zhy：子表筛选打开时收起详情页外置业务操作栏，让遮罩完整覆盖到底部安全区。 -->
 		<view v-if="!loading && !error && hasBottomActions && !standaloneRelatedFilterOpen"
 			class="bottom-actions">
+			<button v-if="canEditRecord"
+				class="action-button action-button--edit action-button--with-icon" hover-class="action-button--pressed"
+				@tap="openFullForm">
+				<view class="action-icon action-icon--edit" aria-hidden="true"></view>
+				<text>编辑</text>
+			</button>
 			<template v-if="key === 'tasks'">
 				<button v-if="canAcceptTask" class="action-button action-button--primary" :disabled="submitting"
 					@tap="claimTask">接单</button>
@@ -214,9 +218,11 @@
 				<button v-if="canCancelTask" class="action-button action-button--plain" :disabled="submitting"
 					@tap="cancelTask">撤销</button>
 			</template>
-			<template v-else-if="key === 'orders' && canApproveOrder">
-				<button class="action-button action-button--plain" @tap="openOrderApproval('reject')">驳回</button>
-				<button class="action-button action-button--primary" @tap="openOrderApproval('approve')">同意</button>
+			<template v-else-if="key === 'orders'">
+				<button v-if="canApproveOrder" class="action-button action-button--plain"
+					@tap="openOrderApproval('reject')">驳回</button>
+				<button v-if="canApproveOrder" class="action-button action-button--primary"
+					@tap="openOrderApproval('approve')">同意</button>
 			</template>
 			<template v-else-if="key === 'devices'">
 				<button v-if="canCancelDeviceRepair" class="action-button action-button--plain" :disabled="submitting"
@@ -230,14 +236,20 @@
 					<image class="action-button__icon" :src="customerClaimIcon" mode="aspectFit" />
 					<text>{{ submitting ? '领取中...' : '领取客户' }}</text>
 				</button>
-				<button v-if="canReleaseCustomer"
-					class="action-button action-button--plain action-button--with-icon" :disabled="submitting"
+				<button v-else-if="canGeneratePeriodicTasks" class="action-button action-button--secondary"
+					:disabled="submitting" @tap="generatePeriodicTasks">生成任务</button>
+				<button v-if="canExposeCustomerRelease"
+					class="action-button action-button--danger action-button--with-icon" :disabled="submitting"
 					@tap="releaseCustomer">
 					<image class="action-button__icon" :src="customerReleaseIcon" mode="aspectFit" />
 					<text>{{ submitting ? '移入中...' : '移入公海' }}</text>
 				</button>
-				<button v-if="canGeneratePeriodicTasks" class="action-button action-button--secondary"
-					:disabled="submitting" @tap="generatePeriodicTasks">生成任务</button>
+				<button v-if="hasCustomerMoreActions"
+					class="action-button action-button--more action-button--with-icon" hover-class="action-button--pressed"
+					:disabled="submitting" @tap="showCustomerMoreSheet = true">
+					<view class="action-icon action-icon--more" aria-hidden="true"><view></view><view></view><view></view></view>
+					<text>更多</text>
+				</button>
 			</template>
 			<template v-else-if="key === 'leads'">
 				<button v-if="canClaimLead" class="action-button action-button--primary" :disabled="submitting"
@@ -249,6 +261,24 @@
 				<button v-if="primaryPhone" class="action-button action-button--secondary"
 					@tap="callPhone(primaryPhone)">联系</button>
 			</template>
+		</view>
+
+		<view v-if="showCustomerMoreSheet" class="customer-action-mask">
+			<view class="customer-action-backdrop" @tap="closeCustomerMoreSheet"></view>
+			<view class="customer-action-sheet">
+				<view class="customer-action-handle"></view>
+				<view class="customer-action-heading">
+					<view><text class="customer-action-title">更多操作</text><text class="customer-action-subtitle">{{ primaryTitle }}</text></view>
+					<view class="customer-action-close" @tap="closeCustomerMoreSheet">×</view>
+				</view>
+				<view v-if="canReleaseCustomer" class="customer-action-item customer-action-item--danger"
+					hover-class="customer-action-item--pressed" @tap="runCustomerMoreAction('release')">
+					<image :src="customerReleaseIcon" mode="aspectFit" />
+					<view><text>移入公海</text><text>其他业务人员将可以领取该客户</text></view>
+					<text class="customer-action-arrow">›</text>
+				</view>
+				<button class="customer-action-cancel" @tap="closeCustomerMoreSheet">取消</button>
+			</view>
 		</view>
 
 		<view v-if="showRejectDialog" class="dialog-mask">
@@ -1172,6 +1202,7 @@
 				showRejectDialog: false,
 				rejectReason: '',
 				showOrderApprovalDialog: false,
+				showCustomerMoreSheet: false,
 				approvalMode: 'approve',
 				approvalOpinion: '',
 				approvalOpinions: [],
@@ -1395,12 +1426,13 @@
 				return field ? this.detail[field] : ''
 			},
 			hasBottomActions() {
+				if (this.canEditRecord) return true
 				if (this.key === 'tasks') return this.canAcceptTask || this.canCheckIn || this.canSubmitService || this
 					.canCancelTask
 				if (this.key === 'orders') return this.canApproveOrder
 				if (this.key === 'devices') return true
-				if (this.key === 'customers') return this.canClaimCustomer || this.canReleaseCustomer || this
-					.canGeneratePeriodicTasks
+				if (this.key === 'customers') return this.canClaimCustomer || this.canGeneratePeriodicTasks || this
+					.hasCustomerMoreActions
 				if (this.key === 'leads') return this.canClaimLead || this.canConvertLead
 				return Boolean(this.primaryPhone)
 			},
@@ -1735,6 +1767,17 @@
 				const ownerName = normalizeName(this.detail.FuzeR)
 				const currentUserName = normalizeName(this.currentUser.Name)
 				return !!ownerName && !!currentUserName && ownerName === currentUserName
+			},
+			hasCustomerMoreActions() {
+				return this.key === 'customers' && this.canReleaseCustomer && !this.canExposeCustomerRelease
+			},
+			customerReservedActionCount() {
+				if (this.key !== 'customers') return 0
+				return (this.canEditRecord ? 1 : 0) +
+					((this.canClaimCustomer || this.canGeneratePeriodicTasks) ? 1 : 0)
+			},
+			canExposeCustomerRelease() {
+				return this.key === 'customers' && this.canReleaseCustomer && this.customerReservedActionCount < 3
 			},
 			canGeneratePeriodicTasks() {
 				if (this.key !== 'customers' || !this.roleProfile.isInternal || this.canClaimCustomer) return false
@@ -2227,6 +2270,15 @@
 				await this.runTaskEngine('kehu2gonghai', {
 					Id: this.detail.Id || this.id
 				}, '已移入公海')
+			},
+			closeCustomerMoreSheet() {
+				if (this.submitting) return
+				this.showCustomerMoreSheet = false
+			},
+			async runCustomerMoreAction(action) {
+				if (action !== 'release' || !this.canReleaseCustomer || this.submitting) return
+				this.showCustomerMoreSheet = false
+				await this.releaseCustomer()
 			},
 			async generatePeriodicTasks() {
 				const confirmed = await this.confirm('将按客户及客户设备的服务周期生成售后任务。请确认服务周期已经维护完整。')
@@ -3124,6 +3176,7 @@
 
 	.bottom-actions {
 		display: flex;
+		flex-wrap: wrap;
 		flex: none;
 		gap: 14rpx;
 		padding: 16rpx 22rpx calc(16rpx + var(--mci-safe-bottom));
@@ -3133,8 +3186,8 @@
 	}
 
 	.action-button {
-		flex: 1;
-		min-width: 0;
+		flex: 1 1 190rpx;
+		min-width: 150rpx;
 		height: 82rpx;
 		margin: 0;
 		border-radius: 8rpx;
@@ -3155,6 +3208,16 @@
 		line-height: 1;
 	}
 
+	.action-button--edit,
+	.action-button--more { flex: .72 1 150rpx; border: 1rpx solid #e94b2c; background: #e94b2c; color: #fff; }
+	.bottom-actions>.action-button--edit:only-child { flex: 1 0 100%; width: 100%; }
+	.action-button--pressed { transform: scale(.97); }
+	.action-icon { position: relative; flex: none; width: 32rpx; height: 32rpx; }
+	.action-icon--edit::before { position: absolute; top: 4rpx; left: 14rpx; width: 7rpx; height: 25rpx; border-radius: 4rpx; background: #fff; content: ''; transform: rotate(42deg); }
+	.action-icon--edit::after { position: absolute; right: 3rpx; bottom: 3rpx; width: 12rpx; height: 3rpx; background: #fff; content: ''; }
+	.action-icon--more { display: flex; align-items: center; justify-content: center; gap: 4rpx; }
+	.action-icon--more>view { width: 6rpx; height: 6rpx; border-radius: 50%; background: #fff; }
+
 	.action-button__icon {
 		width: 34rpx;
 		height: 34rpx;
@@ -3170,7 +3233,13 @@
 	}
 
 	.action-button--secondary {
-		background: #0b86d4;
+		// background: #0b86d4;
+		background: #e94b2c;
+		color: #fff;
+	}
+
+	.action-button--danger {
+		background: #e94b2c;
 		color: #fff;
 	}
 
@@ -3182,6 +3251,24 @@
 	.action-button[disabled] {
 		opacity: 0.56;
 	}
+
+	.customer-action-mask { position: fixed; inset: 0; z-index: 90; display: flex; align-items: flex-end; background: rgba(13, 39, 49, .48); }
+	.customer-action-backdrop { position: absolute; inset: 0; }
+	.customer-action-sheet { position: relative; z-index: 1; box-sizing: border-box; width: 100%; padding: 12rpx 24rpx calc(22rpx + var(--mci-safe-bottom)); border-radius: 22rpx 22rpx 0 0; background: #fff; }
+	.customer-action-handle { width: 68rpx; height: 7rpx; margin: 0 auto 18rpx; border-radius: 4rpx; background: #d7e2e6; }
+	.customer-action-heading { display: flex; align-items: center; justify-content: space-between; min-height: 76rpx; }
+	.customer-action-title, .customer-action-subtitle { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+	.customer-action-title { color: #17333e; font-size: 30rpx; font-weight: 750; }
+	.customer-action-subtitle { max-width: 520rpx; margin-top: 5rpx; color: #84979e; font-size: 21rpx; }
+	.customer-action-close { width: 54rpx; height: 54rpx; border-radius: 50%; color: #698089; background: #f0f5f7; font-size: 34rpx; line-height: 51rpx; text-align: center; }
+	.customer-action-item { display: grid; grid-template-columns: 68rpx minmax(0, 1fr) 32rpx; gap: 16rpx; align-items: center; min-height: 112rpx; margin-top: 14rpx; padding: 0 18rpx; border: 1rpx solid #f0d9d7; border-radius: 14rpx; background: #fff8f7; }
+	.customer-action-item image { width: 54rpx; height: 54rpx; padding: 7rpx; box-sizing: border-box; border-radius: 12rpx; background: #fff; }
+	.customer-action-item>view text { display: block; }
+	.customer-action-item>view text:first-child { color: #b4433e; font-size: 26rpx; font-weight: 700; }
+	.customer-action-item>view text:last-child { margin-top: 7rpx; color: #8a7775; font-size: 20rpx; }
+	.customer-action-arrow { color: #b98b87; font-size: 36rpx; text-align: right; }
+	.customer-action-cancel { height: 78rpx; margin-top: 20rpx; border: none; border-radius: 12rpx; color: #476570; background: #edf3f5; font-size: 25rpx; line-height: 78rpx; }
+	.customer-action-cancel::after { border: none; }
 
 	.dialog-mask {
 		position: fixed;

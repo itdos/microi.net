@@ -3,10 +3,16 @@ import { getToken, V8 } from './utils/request.js'
 import { initializeThemeSystem } from './utils/theme.js'
 import { warmPrimaryTabs } from './platform/preload.js'
 import activeTabBar from './generated/active-tabbar.js'
+import {
+  initializeMiniProgramUpdate,
+  loadMiniProgramVersionPolicy
+} from './platform/mini-program-update.js'
 
 const AUTH_RESUME_MIN_INTERVAL = 60 * 1000
 let authResumeTimer = null
 let lastAuthResumeAt = 0
+// zhy：版本策略延迟读取，避免与首屏业务请求争抢网络。
+let versionPolicyTimer = null
 
 export default {
   globalData: {
@@ -16,6 +22,8 @@ export default {
   onLaunch() {
     console.log('App Launch')
     initializeThemeSystem()
+    // zhy：尽早注册全局唯一更新管理器，让新版代码包在后台完成检测与下载。
+    initializeMiniProgramUpdate({ promptOnReady: true })
     // 首屏稳定后再做低优先级预热，避免启动阶段与首页接口、视频解码争抢资源。
     warmPrimaryTabs(1600)
     // 全局错误兜底：避免未捕获错误导致小程序白屏
@@ -33,11 +41,15 @@ export default {
     initializeThemeSystem()
     // 避开首屏渲染，并限制短时间内重复续签造成的启动网络竞争。
     this.scheduleRefreshToken()
+    // zhy：最低支持版本来自 SaaS 系统配置，字段未配置时不会改变现有行为。
+    this.scheduleVersionPolicy()
   },
   onHide() {
     console.log('App Hide')
     if (authResumeTimer) clearTimeout(authResumeTimer)
     authResumeTimer = null
+    if (versionPolicyTimer) clearTimeout(versionPolicyTimer)
+    versionPolicyTimer = null
   },
   methods: {
     scheduleRefreshToken() {
@@ -46,6 +58,16 @@ export default {
         authResumeTimer = null
         this.refreshToken()
       }, 900)
+    },
+    // zhy：每次重新进入前台都可刷新一次版本策略，服务内部复用系统配置缓存。
+    scheduleVersionPolicy() {
+      if (versionPolicyTimer) clearTimeout(versionPolicyTimer)
+      versionPolicyTimer = setTimeout(() => {
+        versionPolicyTimer = null
+        loadMiniProgramVersionPolicy().catch((error) => {
+          console.warn('[Update] 版本策略读取失败:', error && (error.message || error))
+        })
+      }, 1800)
     },
     async refreshToken() {
       const token = getToken()

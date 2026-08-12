@@ -9,6 +9,7 @@ let definition = null
 let currentRoute = 'pages/workspace/index'
 let shouldFail = false
 let timerId = 0
+let openedRoute = ''
 
 const tabBar = {
   color: '#999999',
@@ -37,6 +38,10 @@ vm.runInNewContext(source, {
         currentRoute = String(options.url || '').replace(/^\/+/, '')
         options.success()
       }
+      options.complete()
+    },
+    navigateTo(options) {
+      openedRoute = options.url
       options.complete()
     },
     showToast() {}
@@ -72,6 +77,11 @@ shouldFail = true
 instance.switchTab({ currentTarget: { dataset: { index: 2 } } })
 assert.strictEqual(instance.data.selected, 1, 'failed navigation must retain the visible route selection')
 assert.strictEqual(instance.data.switching, false, 'failed navigation must release the switching guard')
+
+instance.setData({ aiAssistantEnabled: true })
+instance.openAssistant()
+assert.strictEqual(openedRoute, '/pages/ai/index', 'enabled fixed AI entry must open the dedicated assistant route')
+assert.strictEqual(instance.data.openingAssistant, false, 'assistant navigation must release the opening guard')
 
 definition.lifetimes.detached.call(instance)
 console.log('Custom tabBar route-state checks passed.')

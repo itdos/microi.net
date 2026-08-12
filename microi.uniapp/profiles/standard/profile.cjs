@@ -13,6 +13,8 @@ module.exports = {
     servicePlatformName: 'Microi 服务平台',
     poweredBy: 'Microi',
     versionName: '2.0.0',
+    // zhy：标准 Profile 与交付 Profile 共用同一套平台更新能力。
+    releaseNotes: ['新增小程序版本查看与更新能力', '优化版本切换后的配置缓存刷新'],
     appSubTitle: 'AI低代码移动工作台',
     workspaceSubTitle: '业务与服务工作台',
     guestWelcomeText: '欢迎使用移动工作台',
@@ -53,6 +55,8 @@ module.exports = {
       serviceTasks: false
     },
     routes: {
+      // zhy：关于小程序是无需登录即可访问的公共版本入口。
+      about: '/pages/about/index',
       catalog: '/pages/module/catalog',
       login: '/pages/login/index',
       messages: '/pages/message/index',
