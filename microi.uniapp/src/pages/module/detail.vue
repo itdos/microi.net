@@ -1,8 +1,5 @@
 <template>
   <mci-page-shell class="module-detail" :style="mciTokenStyle" :title="pageTitle" :subtitle="config.description || ''" @back="goBack">
-    <template #right>
-      <button v-if="!loading && !error && row.Id" class="edit-command" @tap="openEdit">编辑</button>
-    </template>
     <mci-skeleton v-if="loading" type="detail" :rows="8" />
     <view v-else-if="error" class="state-panel">
       <text class="state-panel__title">详情加载失败</text>
@@ -94,6 +91,9 @@
           :parent-form="row" />
       </view>
       <view class="detail-bottom-space"></view>
+    </view>
+    <view v-if="!loading && !error && row.Id" class="detail-action-bar">
+      <button class="edit-command" hover-class="edit-command--pressed" @tap="openEdit">编辑</button>
     </view>
   </mci-page-shell>
 </template>
@@ -340,9 +340,11 @@ export default {
 
 <style scoped>
 .module-detail { min-height: 100vh; background: #f4f8fa; }
-.edit-command { width: 70rpx; height: 58rpx; margin: 0; padding: 0; border: 0; border-radius: 6rpx; color: #087fbd; background: #edf7fa; font-size: 22rpx; font-weight: 700; line-height: 58rpx; }
+.edit-command { width: 100%; height: 82rpx; margin: 0; padding: 0; border: 0; border-radius: 8rpx; color: #fff; background: #e94b2c; font-size: 25rpx; font-weight: 700; line-height: 82rpx; transition: transform .15s ease; }
 .edit-command::after { border: 0; }
-.detail-content { padding-bottom: calc(32rpx + var(--mci-safe-bottom)); }
+.edit-command--pressed { transform: scale(.98); }
+.detail-content { padding-bottom: calc(128rpx + var(--mci-safe-bottom)); }
+.detail-action-bar { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; padding: 16rpx 22rpx calc(16rpx + var(--mci-safe-bottom)); border-top: 1rpx solid #e5edef; background: #fff; }
 .entity-hero { position: relative; min-height: 280rpx; overflow: hidden; color: #fff; background: #064b69; }
 .entity-hero__background { position: absolute; inset: 0; width: 100%; height: 100%; }
 .entity-hero__shade { position: absolute; inset: 0; background: linear-gradient(105deg, rgba(3, 43, 63, .96), rgba(5, 88, 105, .72)); }
