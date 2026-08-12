@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import tableStateMixin from "../src/views/form-engine/mixins/diy-table-state.mixin.js";
 import tableUtilsMixin from "../src/views/form-engine/mixins/table-utils.mixin.js";
+import tableUiMixin from "../src/views/form-engine/mixins/diy-table-ui.mixin.js";
 
 const methods = tableUtilsMixin.methods;
 
@@ -105,6 +106,33 @@ test("configured action width is a safe minimum and cannot crop wider button con
     assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 288);
     context.SysMenuModel.TableActionFixedWidth = 600;
     assert.equal(tableStateMixin.computed.GetActionWidth.call(context), 600);
+});
+
+test("the last visible content column flex-fills remaining width before the fixed action column", function () {
+    const uiMethods = tableUiMixin.methods;
+    const fields = [
+        { Id: "name", Name: "Name", Label: "名称", TableWidth: 180 },
+        { Id: "status", Name: "Status", Label: "状态", TableWidth: 130 }
+    ];
+    const context = {
+        ...uiMethods,
+        PresentationTableFieldList: fields,
+        ShowDiyFieldList: fields,
+        ColIsDisplay(name) { return name !== "UpdateTime" && name !== "UserName" && name !== "CreateTime"; },
+        ColIsFixed() { return false; },
+        GetListColumnConfig() { return null; }
+    };
+
+    assert.equal(uiMethods.GetTableFillColumnKey.call(context), "field:status");
+    assert.equal(uiMethods.GetTableColumnWidth.call(context, fields[1], 1), undefined);
+    assert.equal(uiMethods.GetTableColumnMinWidth.call(context, fields[1], 1), 130);
+    assert.equal(uiMethods.GetTableColumnWidth.call(context, fields[0], 0), 180);
+
+    context.ColIsDisplay = name => name === "UpdateTime";
+    assert.equal(uiMethods.GetTableFillColumnKey.call(context), "audit:UpdateTime");
+    assert.equal(uiMethods.GetAuditColumnWidth.call(context, "UpdateTime", 150), undefined);
+    assert.equal(uiMethods.GetAuditColumnMinWidth.call(context, "UpdateTime", 150), 150);
+    assert.equal(uiMethods.GetTableColumnWidth.call(context, fields[1], 1), 130);
 });
 
 test("row action styles use compact gaps and keep statistic badges inside the fixed column safe area", function () {

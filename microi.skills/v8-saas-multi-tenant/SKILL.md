@@ -3,6 +3,8 @@ name: v8-saas-multi-tenant
 description: Microi V8 SaaS 多租户指南。用于处理 OsClient、OsClientType、OsClientNetwork、租户配置、V8.OsClientModel、隔离和租户感知代码。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 SaaS 多租户引擎
 
 你正在为 Microi 吾码平台编写多租户（SaaS）相关代码。每个租户使用独立数据库账号；Redis、对象存储、RabbitMQ、MQTT 和搜索集群可以共享基础设施，但必须使用租户命名空间与独立服务凭据，**所有 V8 代码都在租户上下文中运行**。

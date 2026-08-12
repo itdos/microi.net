@@ -100,6 +100,7 @@ test('token-file lookup prefers exact tenant identity and retains legacy fallbac
     buildTokenFileLookupKeys('https://microi.test/', 'demo', 'Product', 'Internal'),
     [
       'https://microi.test|demo|Product|Internal',
+      'https://microi.test|demo||',
       'https://microi.test|demo|Product',
       'https://microi.test|demo',
       'https://microi.test',
@@ -113,6 +114,7 @@ test('token-file lookup prefers exact tenant identity and retains legacy fallbac
     buildTokenFileLookupKeys('https://microi.test/', 'demo', 'Product'),
     [
       'https://microi.test|demo|Product|',
+      'https://microi.test|demo||',
       'https://microi.test|demo|Product',
       'https://microi.test|demo',
       'https://microi.test',
@@ -122,6 +124,7 @@ test('token-file lookup prefers exact tenant identity and retains legacy fallbac
     buildTokenFileLookupKeys('https://microi.test/', 'demo', '', 'Internal'),
     [
       'https://microi.test|demo||Internal',
+      'https://microi.test|demo||',
       'https://microi.test|demo|Internal',
       'https://microi.test|demo',
       'https://microi.test',
@@ -138,6 +141,41 @@ test('empty type/network still selects the canonical broker token before a stale
     .map(key => tokens[key])
     .find(Boolean);
   assert.equal(selected, 'broker-refreshed-token');
+});
+
+test('typed MCP reload chooses a newer untyped tenant token over a stale exact alias', () => {
+  const encode = (value: object): string => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const jwt = (issuedAt: number, suffix: string): string =>
+    `${encode({ alg: 'none' })}.${encode({ MicroiTokenIssuedAt: issuedAt, suffix })}.signature`;
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'microi-mcp-token-selection-'));
+  const tokenFilePath = path.join(tempDir, 'tokens.json');
+  const staleExact = jwt(100, 'typed-exact');
+  const refreshedUntyped = jwt(200, 'untyped');
+  try {
+    fs.writeFileSync(tokenFilePath, JSON.stringify({
+      'https://microi.test|demo|Product|Internal': staleExact,
+      'https://microi.test|demo||': refreshedUntyped,
+    }));
+    const client = new MicroiClient({
+      apiBaseUrl: 'https://microi.test',
+      username: '',
+      password: '',
+      osClient: 'demo',
+      osClientType: 'Product',
+      osClientNetwork: 'Internal',
+      token: staleExact,
+      tokenFilePath,
+    });
+
+    assert.equal(client.reloadTokenFromFile(), true);
+    assert.equal(
+      (client as unknown as { token: string }).token,
+      refreshedUntyped,
+    );
+    client.destroy();
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('MCP requests credential-free VS Code recovery and reloads the rotated token file', async () => {

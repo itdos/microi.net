@@ -581,7 +581,8 @@
                             :prop="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                             :property="DiyCommon.IsNull(field.AsName) ? field.Name : field.AsName"
                             :label="field.Label"
-                            :width="GetColWidth(field, fieldIndex)"
+                            :width="GetTableColumnWidth(field, fieldIndex)"
+                            :min-width="GetTableColumnMinWidth(field, fieldIndex)"
                             :class-name="GetColClassName(field)"
                             :fixed="ColIsFixed(field.Id)"
                             show-overflow-tooltip
@@ -748,7 +749,8 @@
                         v-if="ColIsDisplay('CreateTime')"
                         :label="$t('Msg.CreateTime')"
                         :prop="'CreateTime'"
-                        width="150"
+                        :width="GetAuditColumnWidth('CreateTime', 150)"
+                        :min-width="GetAuditColumnMinWidth('CreateTime', 150)"
                     >
                         <template #header>
                             <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('CreateTime', $t('Msg.CreateTime')), $event)">
@@ -771,7 +773,8 @@
                         v-if="ColIsDisplay('UserName')"
                         :label="$t('Msg.Creator')"
                         :prop="'UserName'"
-                        width="110"
+                        :width="GetAuditColumnWidth('UserName', 110)"
+                        :min-width="GetAuditColumnMinWidth('UserName', 110)"
                     >
                         <template #header>
                             <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('UserName', $t('Msg.Creator')), $event)">
@@ -794,7 +797,8 @@
                         v-if="ColIsDisplay('UpdateTime')"
                         :label="$t('Msg.UpdateTime')"
                         :prop="'UpdateTime'"
-                        width="150"
+                        :width="GetAuditColumnWidth('UpdateTime', 150)"
+                        :min-width="GetAuditColumnMinWidth('UpdateTime', 150)"
                     >
                         <template #header>
                             <div class="col-header-cell" @click.stop="showColHeaderMenu(getSystemAuditField('UpdateTime', $t('Msg.UpdateTime')), $event)">

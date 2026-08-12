@@ -23,12 +23,16 @@ test('diy-table custom headers keep Chinese labels on one line inside configured
     assert.match(styles, /\.col-header-menu-icon\s*\{[\s\S]*?flex:\s*0 0 18px;[\s\S]*?width:\s*18px;[\s\S]*?max-width:\s*18px;/);
 });
 
-test('header wrapping fix remains generic and preserves the existing metadata width chain', () => {
+test('header wrapping fix remains generic and the final content column flex-fills the table', () => {
     const table = read('src/views/form-engine/diy-table.vue');
     const uiMixin = read('src/views/form-engine/mixins/diy-table-ui.mixin.js');
     const styles = read('src/styles/diy-table.scss');
 
-    assert.match(table, /:width="GetColWidth\(field, fieldIndex\)"/);
-    assert.match(uiMixin, /GetColWidth\(field, fieldIndex\)[\s\S]*?if \(!field\.TableWidth\)\s*\{[\s\S]*?return 150;[\s\S]*?return field\.TableWidth;/);
+    assert.match(table, /:width="GetTableColumnWidth\(field, fieldIndex\)"/);
+    assert.match(table, /:min-width="GetTableColumnMinWidth\(field, fieldIndex\)"/);
+    assert.match(table, /:width="GetAuditColumnWidth\('UpdateTime', 150\)"/);
+    assert.match(table, /:min-width="GetAuditColumnMinWidth\('UpdateTime', 150\)"/);
+    assert.match(uiMixin, /GetTableFillColumnKey\(\)[\s\S]*?\["UpdateTime", "UserName", "CreateTime"\][\s\S]*?GetTableColumnWidth\(field, fieldIndex\)[\s\S]*?GetTableColumnMinWidth\(field, fieldIndex\)/);
+    assert.doesNotMatch(uiMixin, /fieldIndex\s*==\s*visibleFields\.length\s*-\s*1\)\s*\{\s*return\s+""/);
     assert.doesNotMatch(`${table}\n${styles}`, /(?:^|[^a-z])bwl(?:[^a-z]|$)/i);
 });

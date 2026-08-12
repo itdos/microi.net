@@ -3,6 +3,8 @@ name: business-blueprint
 description: Microi 业务架构蓝图（System Blueprint）— 设计期系统知识图谱，AI 生成低代码系统时防幻觉的唯一事实源
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 业务架构蓝图（System Blueprint）
 
 ## 这是什么

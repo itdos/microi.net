@@ -21,6 +21,21 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        public async Task<IActionResult> WorkerStatus([FromBody] JObject param)
+        {
+            var identity = await GetIdentity(param).ConfigureAwait(false);
+            if (identity.CurrentUser == null
+                || (identity.CurrentUser["Level"]?.Val<int>() ?? 0) < 999)
+            {
+                return Json(new DosResult(0, null, "仅超级管理员可以查看后台任务Worker状态。"));
+            }
+
+            var data = BackgroundTaskWorkerRuntime.Snapshot();
+            data["Readiness"] = BackgroundTaskService.GetWorkerReadiness();
+            return Json(new DosResult(1, data));
+        }
+
+        [HttpPost]
         public async Task<IActionResult> ClearCompleted([FromBody] JObject param)
         {
             var identity = await GetIdentity(param).ConfigureAwait(false);

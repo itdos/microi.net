@@ -478,6 +478,20 @@ app.UseMicroiUpgrade();// 启用平台自动升级
 redisConn = RedisConnBuilder.Build(clientModel);
 #endregion
 
+// Generated entities select their complete physical field list. A source
+// checkout can therefore fail before the hosted upgrade starts when its
+// database predates a newly generated column (for example diy_table.V8Unlimited).
+// Run the shared-lease, expand-only prerequisite gate before License or login
+// can query FormEngine, and fail closed if the invariant cannot be established.
+var runtimePrerequisiteResult = await app.Services
+    .GetRequiredService<IMicroiUpgrade>()
+    .EnsureRuntimePhysicalPrerequisitesAsync(clientModel);
+if (runtimePrerequisiteResult.Code != 1)
+{
+    throw new InvalidOperationException(runtimePrerequisiteResult.Msg);
+}
+Console.WriteLine($"Microi：【成功】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】{runtimePrerequisiteResult.Msg}");
+
 #region License 自动恢复
 var scheduleLicenseRestoreRetry = false;
 try

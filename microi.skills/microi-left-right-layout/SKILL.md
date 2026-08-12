@@ -3,6 +3,8 @@ name: microi-left-right-layout
 description: Microi 吾码模块引擎“树形+表格/表单”左右结构配置规范。用于通过 MCP、模块引擎或源码配置 `diy_LeftJoinRightView`，把项目、分类、组织等主数据作为左树，并用主外键过滤右侧列表；覆盖字段语义、初始化 V8、移动端自适应、幂等写入和回读验收。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 左右树表配置规范
 
 当需求是“左侧按项目/分类导航，右侧显示该节点的数据列表或表单”时，使用模块组件 `/diy/left-right/LeftTreeJoinRightForm`，配置表为 `diy_LeftJoinRightView`。不要为每个业务菜单复制定制 Vue 页面。

@@ -128,6 +128,7 @@
 <script setup lang="ts">
 import { PropType, ref, toRefs, watch, onBeforeUnmount, onActivated, onDeactivated, onMounted, nextTick } from 'vue'
 import { CreateComponentType } from '@goview/packages/index.d'
+import { DiyCommon } from '@/utils/diy.common'
 
 const props = defineProps({
   chartConfig: {
@@ -146,6 +147,8 @@ const {
   productVersion,
   companyName,
   streamingAssetsUrl,
+  autoInjectMicroiContext,
+  apiClientObjectName,
   backgroundColor,
   showControls,
   gameManagerName,
@@ -172,6 +175,30 @@ let loadedLoaderUrl = ''
 let blobUrls: string[] = []
 // 追踪正在进行的 destroy promise，用于防止 destroy / init 并发竞争
 let destroyPromise: Promise<void> | null = null
+
+/**
+ * 将当前 Microi 会话只注入 Unity 运行时内存。Token 不进入资源 URL、图表配置或日志。
+ * 旧 Unity 构建默认不启用，避免向不存在的场景对象发送消息。
+ */
+const injectMicroiHostContext = () => {
+  if (!autoInjectMicroiContext?.value || !unityInstance) return false
+  const target = String(apiClientObjectName?.value || 'MicroiApiClient').trim()
+  if (!target) return false
+
+  const context = {
+    ApiBaseUrl: DiyCommon.GetApiBase(),
+    OsClient: DiyCommon.GetOsClient(),
+    Authorization: DiyCommon.getToken(),
+    Did: DiyCommon.GetDid()
+  }
+  try {
+    unityInstance.SendMessage(target, 'ApplyMicroiHostContext', JSON.stringify(context))
+    return true
+  } catch (e) {
+    console.error('[Unity3D] Microi host context injection failed:', e)
+    return false
+  }
+}
 
 const cleanupBlobUrls = () => {
   blobUrls.forEach(u => URL.revokeObjectURL(u))
@@ -338,6 +365,7 @@ const initUnity = async () => {
 
     loading.value = false
     unityReady.value = true
+    injectMicroiHostContext()
     emit('ready', publicApi)
   } catch (e: any) {
     loading.value = false
@@ -407,6 +435,8 @@ const publicApi = {
   isReady: () => unityReady.value && !loading.value && !errorMsg.value,
   /** Unity 原始实例（高级用途） */
   getInstance: () => unityInstance,
+  /** 将当前 Microi 会话重新注入 com.microi.unity 的 MicroiApiClient */
+  injectMicroiContext: () => injectMicroiHostContext(),
   /** 通用消息发送：对应 unityInstance.SendMessage */
   sendMessage: (methodOrTarget: string, methodOrParam?: string, param?: string) => {
     // 兼容两种调用方式：
@@ -495,6 +525,10 @@ watch(() => instanceName?.value, (v, old) => {
 // 注意：多个 Unity 实例共用同一组全局回调，因此用聚合方式分发
 const installGlobalUnityCallbacks = () => {
   const w = window as any
+  const forEachUnityApi = (callback: (api: any) => void) => {
+    const values = Object.values(w.$microiUnity?._map || {})
+    ;[...new Set(values)].forEach(api => callback(api))
+  }
   const dispatch = (event: UnityEventName, ...args: any[]) => {
     const reg = w.$microiUnity
     if (!reg) return
@@ -523,6 +557,16 @@ const installGlobalUnityCallbacks = () => {
     w.onUnityNotification = (title: string, msg: string) => {
       try { prevNotify && prevNotify(title, msg) } catch (_) {}
       dispatch('notification', title, msg)
+    }
+    const prevMicroiReady = w.onMicroiUnityReady
+    w.onMicroiUnityReady = () => {
+      try { prevMicroiReady && prevMicroiReady() } catch (_) {}
+      forEachUnityApi((api: any) => api.injectMicroiContext?.())
+    }
+    const prevAuthorizationRotated = w.onMicroiUnityAuthorizationRotated
+    w.onMicroiUnityAuthorizationRotated = (token: string, requestToken: string) => {
+      try { prevAuthorizationRotated && prevAuthorizationRotated(token, requestToken) } catch (_) {}
+      DiyCommon.ApplyAuthorizationToken(token, requestToken || DiyCommon.getToken())
     }
   }
 }

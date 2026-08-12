@@ -3,6 +3,8 @@ name: microi-form-engine
 description: Microi 表单引擎设计与控件配置指南。用于创建或修改 diy_table、diy_field、表单组件、字段属性、选项/SQL/数据源引擎数据源、子表、关联表单、定制组件、表单布局和字段事件。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 表单引擎设计
 
 表单引擎同时驱动数据模型、表单、列表、模块、接口配置和工作流配置。处理“新增字段”

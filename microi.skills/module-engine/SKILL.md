@@ -3,6 +3,8 @@ name: module-engine
 description: Microi 模块引擎与 sys_menu 配置指南。用于创建或修改后台菜单、菜单统计角标、模块标题指标、复合列表列、移动端业务卡片、查询列、接口替换、跨端 ViewSchema、动态按钮、PageTabs、树形加表格布局和 MicroService 菜单。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 模块引擎
 
 模块引擎决定同一张表在某个菜单、角色和终端中“如何查询、展示和操作”。

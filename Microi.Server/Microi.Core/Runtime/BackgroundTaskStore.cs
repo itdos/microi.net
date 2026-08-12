@@ -32,6 +32,10 @@ namespace Microi.net
     internal static class BackgroundTaskStore
     {
         internal const string TableName = "mci_background_task";
+        private const int DefaultLeaseSeconds = 90;
+        private const int EmptyDatabaseReleaseLeaseSeconds = 900;
+        private const string EmptyDatabaseReleaseApiEngineKey =
+            "admin_build_sanitized_empty_database";
         private const string Projection = @"Id,OsClient,UserKey,Title,Type,ApiEngineKey,Status,StatusText,
 Progress,ProgressMode,WorkCurrent AS Current,WorkTotal AS Total,Msg,Log,CreateTime,StartTime,EndTime,
 HeartbeatTime,EstimatedEndTime,RemainingSeconds,EstimateConfidence,CancelRequested,ResultJson,ParamJson,
@@ -272,12 +276,36 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
             return null;
         }
 
+        public static BackgroundTaskRecord TryClaimConfiguredTenant(string nodeId)
+        {
+            var configuredTenant = OsClientExtend.GetConfigOsClient();
+            if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
+            if (configuredTenant.DosIsNullOrWhiteSpace() || !IsAvailable(configuredTenant)) return null;
+            return TryClaimNext(configuredTenant, nodeId);
+        }
+
         private static BackgroundTaskRecord TryClaimNext(string osClient, string nodeId)
         {
             var client = GetRequiredClient(osClient);
             var now = DateTime.Now;
             var runtimeType = CurrentRuntimeOsClientType();
             var runtimeNetwork = CurrentRuntimeOsClientNetwork();
+            // A stale execution can be reclaimed just before its still-running
+            // predecessor releases the distributed concurrency lease. The claim is
+            // then deferred before user code starts, so it must not consume the last
+            // recovery attempt and leave a resumable chunk permanently Pending.
+            client.Db.FromSql($@"UPDATE {TableName}
+SET AttemptCount=CASE WHEN MaxAttempts>0 THEN MaxAttempts-1 ELSE 0 END,UpdateTime=@p0
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
+  AND {RuntimeScopePredicate}
+  AND Status='Pending' AND (LeaseOwner IS NULL OR LeaseOwner='')
+  AND AttemptCount>=MaxAttempts
+  AND Msg='等待同一并发组的上一项任务完成'")
+                .AddInParameter("p0", DbTime(now))
+                .AddInParameter("p1", osClient)
+                .AddInParameter("runtimeType", runtimeType)
+                .AddInParameter("runtimeNetwork", runtimeNetwork)
+                .ExecuteNonQuery();
             // Heal cancellation races and cancellations whose owning node died.
             // A running task is finalized only after its lease expires; pending or
             // retrying work has no active owner and can be finalized immediately.
@@ -312,6 +340,7 @@ ORDER BY CreateTime ASC");
 
             var owner = nodeId + ":" + Guid.NewGuid().ToString("N");
             var staleRecovery = string.Equals(candidate.Status, "Running", StringComparison.OrdinalIgnoreCase);
+            var leaseSeconds = ResolveLeaseSeconds(candidate.ApiEngineKey);
             var affected = client.Db.FromSql($@"UPDATE {TableName}
 SET Status='Running',StatusText='执行中',LeaseOwner=@p0,LeaseExpiresAt=@p1,HeartbeatTime=@p2,
     StartTime=CASE WHEN StartTime IS NULL THEN @p2 ELSE StartTime END,
@@ -323,7 +352,7 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
   AND {RuntimeScopePredicate}
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p2)))")
                 .AddInParameter("p0", owner)
-                .AddInParameter("p1", DbTime(now.AddSeconds(90)))
+                .AddInParameter("p1", DbTime(now.AddSeconds(leaseSeconds)))
                 .AddInParameter("p2", DbTime(now))
                 .AddInParameter("p3", staleRecovery ? 1 : 0)
                 .AddInParameter("p4", candidate.Id)
@@ -339,10 +368,11 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
             cancelRequested = false;
             var client = GetRequiredClient(item.OsClient);
             var now = DateTime.Now;
+            var leaseSeconds = ResolveLeaseSeconds(item.ApiEngineKey);
             var affected = client.Db.FromSql($@"UPDATE {TableName}
 SET LeaseExpiresAt=@p0,HeartbeatTime=@p1,UpdateTime=@p1
 WHERE Id=@p2 AND OsClient=@p3 AND Status='Running' AND LeaseOwner=@p4 AND FencingToken=@p5")
-                .AddInParameter("p0", DbTime(now.AddSeconds(90)))
+                .AddInParameter("p0", DbTime(now.AddSeconds(leaseSeconds)))
                 .AddInParameter("p1", DbTime(now))
                 .AddInParameter("p2", item.Id)
                 .AddInParameter("p3", item.OsClient)
@@ -356,6 +386,16 @@ WHERE Id=@p0 AND OsClient=@p1")
                 .AddInParameter("p1", item.OsClient)
                 .ToScalar<int>() == 1;
             return true;
+        }
+
+        internal static int ResolveLeaseSeconds(string apiEngineKey)
+        {
+            return string.Equals(
+                apiEngineKey,
+                EmptyDatabaseReleaseApiEngineKey,
+                StringComparison.OrdinalIgnoreCase)
+                ? EmptyDatabaseReleaseLeaseSeconds
+                : DefaultLeaseSeconds;
         }
 
         internal static bool IsLeaseCurrent(
@@ -471,7 +511,12 @@ RemainingSeconds=NULL,EstimateConfidence='None',LeaseOwner='',LeaseExpiresAt=NUL
                 ? ""
                 : checkpoint.ToString(Newtonsoft.Json.Formatting.None);
             item.Msg = message ?? item.Msg ?? "等待下一批";
-            var nextRun = DateTime.Now.AddSeconds(Math.Max(0, Math.Min(3600, delaySeconds)));
+            // Give the current execution's finally block time to release its
+            // cross-node concurrency lease before another node claims the next chunk.
+            var nextRun = DateTime.Now.AddSeconds(Math.Max(1, Math.Min(3600, delaySeconds)));
+            item.Status = item.CancelRequested ? "Canceled" : "Pending";
+            item.StatusText = item.CancelRequested ? "已停止" : "等待下一批";
+            item.NextRunTime = item.CancelRequested ? (DateTime?)null : nextRun;
             return OwnedUpdate(item, @"Status=CASE WHEN CancelRequested=1 THEN 'Canceled' ELSE 'Pending' END,
 StatusText=CASE WHEN CancelRequested=1 THEN '已停止' ELSE '等待下一批' END,
 Msg=CASE WHEN CancelRequested=1 THEN '任务已停止；失败或取消不会伪装成 100%。' ELSE @p0 END,
@@ -496,6 +541,16 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",
             int delaySeconds)
         {
             var nextRun = DateTime.Now.AddSeconds(Math.Max(1, Math.Min(300, delaySeconds)));
+            item.Status = item.CancelRequested ? "Canceled" : "Pending";
+            item.StatusText = item.CancelRequested ? "已停止" : "排队中";
+            item.Msg = item.CancelRequested
+                ? "任务已停止；失败或取消不会伪装成 100%。"
+                : message ?? "等待执行";
+            item.NextRunTime = item.CancelRequested ? (DateTime?)null : nextRun;
+            if (!item.CancelRequested && item.AttemptCount >= item.MaxAttempts)
+            {
+                item.AttemptCount = Math.Max(0, item.MaxAttempts - 1);
+            }
             return OwnedUpdate(item, @"Status=CASE WHEN CancelRequested=1 THEN 'Canceled' ELSE 'Pending' END,
 StatusText=CASE WHEN CancelRequested=1 THEN '已停止' ELSE '排队中' END,
 Msg=CASE WHEN CancelRequested=1 THEN '任务已停止；失败或取消不会伪装成 100%。' ELSE @p0 END,
@@ -504,6 +559,11 @@ EndTime=CASE WHEN CancelRequested=1 THEN @p2 ELSE EndTime END,
 EstimatedEndTime=CASE WHEN CancelRequested=1 THEN NULL ELSE EstimatedEndTime END,
 RemainingSeconds=CASE WHEN CancelRequested=1 THEN NULL ELSE RemainingSeconds END,
 EstimateConfidence=CASE WHEN CancelRequested=1 THEN 'None' ELSE EstimateConfidence END,
+AttemptCount=CASE
+  WHEN CancelRequested=0 AND AttemptCount>=MaxAttempts
+    THEN CASE WHEN MaxAttempts>0 THEN MaxAttempts-1 ELSE 0 END
+  ELSE AttemptCount
+END,
 LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
                 command => command
                     .AddInParameter("p0", message ?? "等待执行")
@@ -520,6 +580,10 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
             {
                 item.AttemptCount = nextAttempt;
                 item.LastError = safeError;
+                item.Status = "Failed";
+                item.StatusText = "执行失败";
+                item.Msg = safeError;
+                item.EndTime = now;
                 return OwnedUpdate(item, @"Status='Failed',StatusText='执行失败',Msg=@p0,LastError=@p0,
 AttemptCount=@p1,EndTime=@p2,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
 LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
@@ -533,6 +597,10 @@ LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p2",
             item.LastError = safeError;
             var statusText = hostStopping ? "节点停止，等待恢复" : "等待重试";
             var nextRun = now.AddSeconds(hostStopping ? 5 : Math.Min(300, 5 * (1 << Math.Min(6, nextAttempt - 1))));
+            item.Status = "Retrying";
+            item.StatusText = statusText;
+            item.Msg = safeError;
+            item.NextRunTime = nextRun;
             return OwnedUpdate(item, @"Status='Retrying',StatusText=@p0,Msg=@p1,LastError=@p1,
 AttemptCount=@p2,NextRunTime=@p3,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
 LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p4",

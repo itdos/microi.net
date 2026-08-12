@@ -21,18 +21,19 @@ Microi吾码不是单一的后台管理模板。完整工程由低代码运行�
 | `Microi.Server/` | .NET 10 后端解决方案，包含 API、核心引擎、缓存、文件、消息、AI、OCR、任务与多数据库能力 | 本页“后端项目” |
 | `Microi.Client/` | Vue 3 + Vite + Element Plus 管理端；同时承载经典界面、WebOS、移动 Web 页、表单/页面/打印/流程/可视化设计器 | [PC、WebOS 与移动端](/doc/system-engine/multi-end-client) |
 | `Microi.UI/` | 跨 Web、UniApp 的 MCI-UI 设计令牌、组件与交付规范 | [吾码 UI](/doc/system-engine/microi-ui) |
+| `Microi.Unity/` | Unity 2022.3 LTS 的 UPM SDK：V8/DiyToken 客户端、WebGL 宿主桥、可恢复 Editor 工具箱和构建能力；不是 .NET 服务端类库 | [Unity 3D 与 WebGL](/doc/system-engine/unity-integration) |
 | `microi.uniapp/` | uni-app + Vue 3 原生动态小程序/H5/App 基线，支持 Profile 与租户定制隔离 | [PC、WebOS 与移动端](/doc/system-engine/multi-end-client) |
 | `microi.app/` | HBuilderX 5+App/Wap2App 壳，把远程 `Microi.Client` 包装为 APK/IPA 并提供 `plus` 原生 API | [PC、WebOS 与移动端](/doc/system-engine/multi-end-client) |
 | `microi.mcp/` | TypeScript MCP Server，让 AI 按租户读取结构、生成系统、维护 V8/页面/流程/微服务并回读验收 | [MCP Server](/doc/v8-engine/mcp-server) |
 | `microi.skills/` | 面向 AI Agent 的平台规范、工作流和安全边界，避免只知道函数名却不知道正确交付顺序 | [AI 编程](/doc/v8-engine/ai-apiengine) |
 | `microi.doc/` | 当前官网与官方文档，VitePress 构建；中文 `docs/doc/` 是维护源 | [平台介绍](/doc/index) |
-| `microi.apps/` | 官方应用商城发行包源码：Manifest、接口引擎、资源策略、安装测试与离线包；不是租户前端微应用源码根 | [应用商城](/doc/system-engine/app-store) |
+| `Microi-V8-Engine/.../AI应用/{appKey}/` | 当前服务器与租户的 AI 应用唯一源码根：界面、微服务、Manifest、接口引擎、资源策略、测试、离线包与应用商城上传素材 | [应用商城](/doc/system-engine/app-store) |
 | `数据库、案例、文档、资料/` | 演示库、空库、案例和部署辅助资料；使用前核对版本与目标数据库类型 | [数据库扩展](/doc/system-engine/databases) |
 
 以下两个目录常在完整开发工作区中出现，但用途与主仓库源码不同：
 
 - `Microi.VSCode/` 是 VS Code 插件与 `@microi.net/cli` 的伴随源码仓库，包含同步、远程执行、调试、MCP 打包和 AI 配置生成。详见 [AI 开发工具](/doc/v8-engine/vs-code-plugin)。
-- `Microi-V8-Engine/` 通常由插件或 CLI 在本机生成，按服务器与 OsClient 保存接口引擎、事件、数据库快照和同步基线；Web、UniApp、MicroService 的唯一可编辑源码放在对应租户的 `AI应用/{appKey}`。它可能包含本机 Token 或租户代码，不是应整体提交到公开仓库的产品源码目录；只有经过明确白名单审计的官方应用才可单独纳入版本控制。
+- `Microi-V8-Engine/` 通常由插件或 CLI 在本机生成，按服务器与 OsClient 保存接口引擎、事件、数据库快照和同步基线；Web、UniApp、MicroService 及无前端的平台 AI 应用都以对应租户的 `AI应用/{appKey}` 作为唯一源码根，Manifest、接口引擎、资源策略、测试和商城上传素材不得拆到平行目录。它可能包含本机 Token 或租户代码，不是应整体提交到公开仓库的产品源码目录；只有经过明确白名单审计的官方应用才可单独纳入版本控制。
 
 ## 后端项目
 

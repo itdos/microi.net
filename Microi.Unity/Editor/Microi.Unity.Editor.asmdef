@@ -1,0 +1,18 @@
+{
+  "name": "Microi.Unity.Editor",
+  "rootNamespace": "Microi.Unity.Editor",
+  "references": [
+    "Microi.Unity.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

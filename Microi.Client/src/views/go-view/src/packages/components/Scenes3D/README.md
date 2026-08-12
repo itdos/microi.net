@@ -4,7 +4,7 @@
 > 可在其它插件的"基础事件 / 高级事件 / 交互事件"中调用，从而实现"点击图表 → 切换 Unity 相机画面 / 控制播放"等联动效果。
 
 - 插件源码：[UnityWebGL/UnityScene/index.vue](UnityWebGL/UnityScene/index.vue)
-- WebGL ↔ JS 桥接：[`MicroiWebGLBridge.jslib`](../../../../../../../任亿3D数字孪生/waiqiang-Anderson优化后/Assets/Plugins/WebGL/MicroiWebGLBridge.jslib)
+- WebGL ↔ JS 桥接：仓库根级 `Microi.Unity/Runtime/WebGL/Plugins/WebGL/MicroiWebGLBridge.jslib`
 - Unity 端脚本：`Assets/Scripts/MicroiGameManager.cs`、`MicroiCameraController.cs`、`MicroiSimpleCameraPath.cs`
 
 ---
@@ -29,6 +29,12 @@
 
 - **JS → Unity**：通过 `unityInstance.SendMessage(target, method, param?)`，`target` 默认是配置项中的"GameManager 名称"（默认 `Main Camera`），`method` 是 GameManager 上的 public 方法。
 - **Unity → JS**：通过 `[DllImport("__Internal")]` 调用 jslib 中导出的函数，jslib 再调用 `window.onUnityXxx`。
+
+### Microi.Unity 会话握手
+
+使用根级 `com.microi.unity` UPM 包时，在组件配置中开启“自动注入 Microi 会话”，并保持 Unity 场景对象名为 `MicroiApiClient`。组件会在实例就绪后通过 `SendMessage` 注入当前 `ApiBaseUrl / OsClient / DiyToken / Did`；DiyToken 只进入运行时内存，不写入 loader URL 或大屏配置。
+
+SDK 若从 API 响应头取得轮换 Token，会调用 `window.onMicroiUnityAuthorizationRotated(token, requestToken)`。宿主通过 `DiyCommon.ApplyAuthorizationToken` 进行并发安全更新，防止旧 Unity 请求覆盖已经轮换的新 Token。
 
 ---
 
@@ -61,6 +67,7 @@ window.$microiUnity = {
 | `sendMessage(method, param?)` | `(string, string?)` | 用配置的 GameManager 调用任意方法 |
 | `sendMessage(target, method, param)` | `(string, string, string)` | 自定义 target 对象 |
 | `getInstance()` | — | 返回 Unity 原始 `unityInstance`（高级用途） |
+| `injectMicroiContext()` | — | 重新向 `MicroiApiClient` 注入当前 Microi 会话（需在配置中启用） |
 | `on(eventName, fn)` | — | 监听 Unity → JS 事件 |
 | `off(eventName, fn?)` | — | 取消监听（不传 fn 清空全部） |
 | `chartId` | 属性 | 当前组件的 go-view chartId |

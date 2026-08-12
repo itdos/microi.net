@@ -36,7 +36,11 @@ public class IdentityUpgradePackageTests
         var resources = Assert.IsType<Dictionary<string, string>>(loader!.Invoke(null, null));
         var package = JObject.Parse(resources["app.microi.saas-engine.json"]);
         Assert.Equal("SaaS引擎", package["PackageInfo"]?["Name"]?.Value<string>());
-        Assert.Equal("v6.5.0", package["PackageInfo"]?["Version"]?.Value<string>());
+        var packageVersionText = package["PackageInfo"]?["Version"]?.Value<string>()?.TrimStart('v', 'V');
+        Assert.True(
+            Version.TryParse(packageVersionText, out var packageVersion)
+            && packageVersion >= new Version(6, 5, 1),
+            $"SaaS 引擎身份数据包版本过低：{packageVersionText ?? "(空)"}");
         Assert.True(package["PackageInfo"]?["IncludeSource"]?.Value<bool>());
 
         var tables = package["DiyTables"]?.Children<JObject>().ToList() ?? [];

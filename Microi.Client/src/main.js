@@ -39,6 +39,7 @@ import { DiyOsClient } from "./utils/itdos.osclient";
 import { reportApiServiceFailure } from "./utils/api-service-status.js";
 import { syncClassicShellVisibilityFromUrl } from "./utils/classic-shell-visibility.js";
 import { isEmbeddedWebosWindowRuntime } from "./utils/webos-embedded-runtime.js";
+import { installLegacyQrCodeDownload } from "./utils/legacy-qrcode.js";
 // 主题色工具 - 360 极速浏览器兼容方案
 import { initThemeColor, setThemeColor } from "./utils/theme-color";
 import $ from "jquery";
@@ -102,6 +103,17 @@ if (isWebosEmbeddedRuntime) {
 app.use(ElementPlus, {
     locale: zhCn,
     size: Cookies.get("size") || "small"//default
+});
+// 兼容历史表单/菜单 V8：旧版通过 window.downloadQRCode 批量生成二维码。
+// 若宿主已注册同名业务实现则保留原实现，避免覆盖租户定制逻辑。
+installLegacyQrCodeDownload(window, {
+    notify(message, type) {
+        if (type === "error") {
+            DiyCommon.Tips(message, false);
+        } else {
+            DiyCommon.Tips(message, true);
+        }
+    }
 });
 // 注册所有 Element Plus 图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

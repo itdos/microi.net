@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Dos.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using StackExchange.Redis;
 
 namespace Microi.net
 {
@@ -57,10 +58,21 @@ namespace Microi.net
     public static class BackgroundTaskService
     {
         private const int MaxLogChars = 120000;
+        private const int LeaseRenewalTransientFailureLimit = 3;
+        private static readonly TimeSpan RenewalShutdownTimeout = TimeSpan.FromSeconds(5);
+        private static readonly TimeSpan LeaseRenewalRetryDelay = TimeSpan.FromSeconds(5);
         private static readonly ConcurrentDictionary<string, ActiveExecution> ActiveExecutions =
             new ConcurrentDictionary<string, ActiveExecution>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, byte> ProjectionPruneInFlight =
+            new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, NotificationRequest> PendingNotifications =
+            new ConcurrentDictionary<string, NotificationRequest>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, byte> NotificationWorkers =
+            new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
         private static readonly string NodeId = BuildNodeId();
         private static int _claimFailureReported;
+        private static int _workerParallelism;
+        private static int _workerRunningCount;
 
         static BackgroundTaskService()
         {
@@ -354,7 +366,9 @@ namespace Microi.net
                 fencingToken);
         }
 
-        public static async Task RunWorkerLoopAsync(CancellationToken stoppingToken)
+        public static async Task RunWorkerLoopAsync(
+            CancellationToken stoppingToken,
+            Action heartbeat = null)
         {
             var parallelism = Clamp(
                 ConfigHelper.GetRuntimeConfigurationInt(
@@ -362,20 +376,40 @@ namespace Microi.net
                     4),
                 1,
                 16);
-            var running = new HashSet<Task>();
+            Volatile.Write(ref _workerParallelism, parallelism);
+            var configuredTenant = OsClientExtend.GetConfigOsClient();
+            if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
+            var running = new Dictionary<Task, string>();
             while (!stoppingToken.IsCancellationRequested)
             {
-                foreach (var completed in running.Where(task => task.IsCompleted).ToList())
+                // This callback is diagnostic state only. The durable task table,
+                // leases and fencing tokens remain the shared source of truth.
+                // Never let observability code terminate the worker loop.
+                try { heartbeat?.Invoke(); } catch { }
+
+                foreach (var completed in running.Keys.Where(task => task.IsCompleted).ToList())
                 {
                     running.Remove(completed);
                     try { await completed.ConfigureAwait(false); }
                     catch (Exception ex) { LogFailure("", "WorkerTaskFailed", "后台任务工作器出现未处理异常", ex, NodeId); }
                 }
+                Volatile.Write(ref _workerRunningCount, running.Count);
 
                 while (running.Count < parallelism && !stoppingToken.IsCancellationRequested)
                 {
                     BackgroundTaskRecord item;
-                    try { item = BackgroundTaskStore.TryClaimNext(NodeId); }
+                    var nonConfiguredRunning = running.Values.Count(osClient => !string.Equals(
+                        osClient,
+                        configuredTenant,
+                        StringComparison.OrdinalIgnoreCase));
+                    var reserveConfiguredSlot = parallelism > 1
+                                                && nonConfiguredRunning >= parallelism - 1;
+                    try
+                    {
+                        item = reserveConfiguredSlot
+                            ? BackgroundTaskStore.TryClaimConfiguredTenant(NodeId)
+                            : BackgroundTaskStore.TryClaimNext(NodeId);
+                    }
                     catch (Exception ex)
                     {
                         LogFailure("", "WorkerClaimFailed", "后台任务抢占失败", ex, NodeId);
@@ -388,7 +422,8 @@ namespace Microi.net
                     }
                     if (item == null) break;
                     Interlocked.Exchange(ref _claimFailureReported, 0);
-                    running.Add(ProcessClaimedAsync(item, stoppingToken));
+                    running[ProcessClaimedAsync(item, stoppingToken)] = item.OsClient ?? "";
+                    Volatile.Write(ref _workerRunningCount, running.Count);
                 }
 
                 if (running.Count == 0)
@@ -399,7 +434,7 @@ namespace Microi.net
                 else
                 {
                     var delay = Task.Delay(1000, stoppingToken);
-                    try { await Task.WhenAny(running.Cast<Task>().Append(delay)).ConfigureAwait(false); }
+                    try { await Task.WhenAny(running.Keys.Append(delay)).ConfigureAwait(false); }
                     catch (OperationCanceledException) { break; }
                 }
             }
@@ -410,8 +445,53 @@ namespace Microi.net
             }
             if (running.Count > 0)
             {
-                await Task.WhenAny(Task.WhenAll(running), Task.Delay(TimeSpan.FromSeconds(30))).ConfigureAwait(false);
+                await Task.WhenAny(Task.WhenAll(running.Keys), Task.Delay(TimeSpan.FromSeconds(30))).ConfigureAwait(false);
             }
+            Volatile.Write(ref _workerRunningCount, 0);
+        }
+
+        /// <summary>
+        /// Returns a side-effect-free readiness probe for the configured tenant.
+        /// It deliberately validates the full worker projection so a half-applied
+        /// mci_background_task schema cannot look healthy.
+        /// </summary>
+        public static JObject GetWorkerReadiness()
+        {
+            var osClient = OsClientExtend.GetConfigOsClient();
+            if (osClient.DosIsNullOrWhiteSpace()) osClient = OsClientDefault.OsClient;
+            var available = BackgroundTaskStore.TryGetAvailability(osClient, out var reason);
+            var activeTasks = ActiveExecutions.Values
+                .Select(active => new
+                {
+                    active.Record.Id,
+                    active.Record.OsClient,
+                    active.Record.ApiEngineKey,
+                    active.Record.Status,
+                    active.Record.StartTime,
+                    active.Record.HeartbeatTime,
+                    active.Record.FencingToken,
+                    active.Record.ConcurrencyKey,
+                    active.LeaseLost,
+                    CancellationRequested = active.Cancellation.IsCancellationRequested
+                })
+                .OrderBy(active => active.OsClient, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(active => active.StartTime)
+                .Take(32)
+                .ToArray();
+            return JObject.FromObject(new
+            {
+                OsClient = osClient ?? "",
+                RuntimeOsClientType = BackgroundTaskStore.CurrentRuntimeOsClientType(),
+                RuntimeOsClientNetwork = BackgroundTaskStore.CurrentRuntimeOsClientNetwork(),
+                SchemaReady = available,
+                Reason = reason ?? "",
+                MaxParallelTaskCount = Volatile.Read(ref _workerParallelism),
+                ConfiguredTenant = osClient ?? "",
+                ReservedConfiguredTenantSlotCount = Volatile.Read(ref _workerParallelism) > 1 ? 1 : 0,
+                RunningSlotCount = Volatile.Read(ref _workerRunningCount),
+                ActiveExecutionCount = ActiveExecutions.Count,
+                ActiveTasks = activeTasks
+            });
         }
 
         public static async Task SendTaskListToUserAsync(string osClient, string userKey)
@@ -462,7 +542,8 @@ namespace Microi.net
                         item.ConcurrencyKey,
                         item.LeaseOwner,
                         item.RuntimeOsClientType,
-                        item.RuntimeOsClientNetwork);
+                        item.RuntimeOsClientNetwork,
+                        BackgroundTaskStore.ResolveLeaseSeconds(item.ApiEngineKey) * 1000);
                     if (concurrencyLease == null)
                     {
                         BackgroundTaskStore.ReleaseToPending(item, "等待同一并发组的上一项任务完成", 2);
@@ -642,17 +723,45 @@ namespace Microi.net
                 finally
                 {
                     try { active.RenewalCancellation.Cancel(); } catch { }
-                    try { await renewal.ConfigureAwait(false); } catch { }
-                    ActiveExecutions.TryRemove(item.Id, out _);
-                    var current = BackgroundTaskStore.Get(item.OsClient, item.Id);
-                    if (current != null)
+                    if (!await WaitForWorkerCleanupAsync(renewal, RenewalShutdownTimeout).ConfigureAwait(false))
                     {
-                        CacheProjection(current);
-                        QueueNotification(current);
+                        LogFailure(
+                            item.OsClient,
+                            "WorkerRenewalShutdownTimedOut",
+                            "后台任务租约续期收尾超过上限，已释放执行槽并由持久租约兜底",
+                            new TimeoutException($"续期收尾超过 {RenewalShutdownTimeout.TotalSeconds:0} 秒。"),
+                            item.Id);
                     }
+                    ActiveExecutions.TryRemove(item.Id, out _);
+                    // All terminal/requeue store methods update the owned in-memory
+                    // record before their guarded write. Do not perform another
+                    // tenant database read here: a slow legacy tenant must never
+                    // retain a global worker slot after its durable row is terminal.
+                    CacheProjection(item);
+                    QueueNotification(item);
                     activity?.Stop();
                 }
             }
+        }
+
+        internal static async Task<bool> WaitForWorkerCleanupAsync(Task cleanup, TimeSpan timeout)
+        {
+            if (cleanup == null) return true;
+            if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(timeout));
+
+            var completed = await Task.WhenAny(cleanup, Task.Delay(timeout)).ConfigureAwait(false);
+            if (ReferenceEquals(completed, cleanup))
+            {
+                try { await cleanup.ConfigureAwait(false); } catch { }
+                return true;
+            }
+
+            _ = cleanup.ContinueWith(
+                task => { var ignored = task.Exception; },
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            return false;
         }
 
         private static async Task RenewLoopAsync(
@@ -663,19 +772,33 @@ namespace Microi.net
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(
                 active.RenewalCancellation.Token,
                 stoppingToken);
+            var consecutiveFailures = 0;
             while (!linked.IsCancellationRequested)
             {
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(20), linked.Token).ConfigureAwait(false);
+                    await Task.Delay(
+                            consecutiveFailures == 0
+                                ? TimeSpan.FromSeconds(20)
+                                : LeaseRenewalRetryDelay,
+                            linked.Token)
+                        .ConfigureAwait(false);
                     var leaseOk = BackgroundTaskStore.RenewLease(active.Record, out var cancelRequested);
                     var concurrencyOk = concurrencyLease == null || concurrencyLease.Renew();
                     if (!leaseOk || !concurrencyOk)
                     {
                         active.LeaseLost = true;
                         active.Cancellation.Cancel();
+                        LogFailure(
+                            active.Record.OsClient,
+                            "WorkerLeaseOwnershipLost",
+                            "后台任务执行租约或并发租约所有权已丢失",
+                            new InvalidOperationException(
+                                $"TaskLease={leaseOk};ConcurrencyLease={concurrencyOk}"),
+                            active.Record.Id);
                         return;
                     }
+                    consecutiveFailures = 0;
                     if (cancelRequested)
                     {
                         active.UserCancellationRequested = true;
@@ -684,13 +807,27 @@ namespace Microi.net
                     }
                 }
                 catch (OperationCanceledException) { return; }
-                catch
+                catch (Exception ex)
                 {
+                    consecutiveFailures++;
+                    if (ShouldRetryRenewalFailure(consecutiveFailures)) continue;
                     active.LeaseLost = true;
                     try { active.Cancellation.Cancel(); } catch { }
+                    LogFailure(
+                        active.Record.OsClient,
+                        "WorkerLeaseRenewalFailed",
+                        "后台任务租约连续续期失败，已停止当前执行并交由持久队列恢复",
+                        ex,
+                        active.Record.Id);
                     return;
                 }
             }
+        }
+
+        internal static bool ShouldRetryRenewalFailure(int consecutiveFailures)
+        {
+            return consecutiveFailures > 0
+                   && consecutiveFailures < LeaseRenewalTransientFailureLimit;
         }
 
         private static void ApplyContinuationProgress(string taskId, JObject continuation)
@@ -742,7 +879,40 @@ namespace Microi.net
         {
             if (item == null) return;
             var scope = GetItemRuntimeScope(item);
-            _ = SendTaskListToUserAsync(item.OsClient, item.UserKey, scope.Type, scope.Network);
+            var key = string.Join("\n", item.OsClient ?? "", item.UserKey ?? "", scope.Type, scope.Network);
+            PendingNotifications[key] = new NotificationRequest
+            {
+                OsClient = item.OsClient,
+                UserKey = item.UserKey,
+                RuntimeOsClientType = scope.Type,
+                RuntimeOsClientNetwork = scope.Network
+            };
+            TryStartNotificationWorker(key);
+        }
+
+        private static void TryStartNotificationWorker(string key)
+        {
+            if (!NotificationWorkers.TryAdd(key, 0)) return;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    while (PendingNotifications.TryRemove(key, out var request))
+                    {
+                        await SendTaskListToUserAsync(
+                                request.OsClient,
+                                request.UserKey,
+                                request.RuntimeOsClientType,
+                                request.RuntimeOsClientNetwork)
+                            .ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    NotificationWorkers.TryRemove(key, out _);
+                    if (PendingNotifications.ContainsKey(key)) TryStartNotificationWorker(key);
+                }
+            });
         }
 
         private static void CacheProjection(BackgroundTaskItem item)
@@ -754,16 +924,46 @@ namespace Microi.net
                 var cache = MicroiEngine.CacheTenant.Cache(item.OsClient);
                 var scope = GetItemRuntimeScope(item);
                 cache.HashSet(GetTaskHashKey(item.OsClient, item.UserKey, scope.Type, scope.Network),
-                    item.Id, ApplyRuntimeFields(item));
+                    item.Id, ApplyRuntimeFields(item), When.Always, CommandFlags.FireAndForget);
                 // Do not leave a stale pre-scope projection behind after an upgraded
                 // node has persisted the authoritative scoped projection.
-                cache.HashDelete(GetLegacyTaskHashKey(item.OsClient, item.UserKey), item.Id);
-                PruneTaskHash(cache, item.OsClient, item.UserKey, scope.Type, scope.Network);
+                cache.HashDelete(
+                    GetLegacyTaskHashKey(item.OsClient, item.UserKey),
+                    item.Id,
+                    CommandFlags.FireAndForget);
+                QueueProjectionPrune(cache, item.OsClient, item.UserKey, scope.Type, scope.Network);
             }
             catch (Exception ex)
             {
                 LogFailure(item.OsClient, "RedisTaskWriteFailed", "保存 Redis 后台任务投影失败", ex, item.Id);
             }
+        }
+
+        private static void QueueProjectionPrune(
+            IMicroiCache cache,
+            string osClient,
+            string userKey,
+            string runtimeOsClientType,
+            string runtimeOsClientNetwork)
+        {
+            var key = GetTaskHashKey(
+                osClient,
+                userKey,
+                runtimeOsClientType,
+                runtimeOsClientNetwork);
+            if (!ProjectionPruneInFlight.TryAdd(key, 0)) return;
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    PruneTaskHash(cache, osClient, userKey, runtimeOsClientType, runtimeOsClientNetwork);
+                }
+                finally
+                {
+                    ProjectionPruneInFlight.TryRemove(key, out _);
+                }
+            });
         }
 
         private static List<BackgroundTaskItem> ListLegacyCache(string osClient, string userKey)
@@ -964,6 +1164,14 @@ namespace Microi.net
         {
             try { MicroiEngine.QueueSystemLog(osClient, "BackgroundTask", key, title, ex?.ToString() ?? "", 2, false, data); }
             catch { }
+        }
+
+        private sealed class NotificationRequest
+        {
+            public string OsClient { get; set; }
+            public string UserKey { get; set; }
+            public string RuntimeOsClientType { get; set; }
+            public string RuntimeOsClientNetwork { get; set; }
         }
 
         private sealed class ActiveExecution

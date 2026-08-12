@@ -1,23 +1,26 @@
 <template>
     <div class="diy-qrcode">
-        <!-- QrCodeGenerator 组件已注释，保留空容器 -->
-        <!-- 如果需要启用，取消下面的注释并安装相应的二维码库 -->
-        <!-- <QrCodeGenerator
-            :dataAppend="field.DataAppend"
-            :FormMode="FormMode"
-            :field="field"
-            v-model="localValue"
-            @handleGenerate="handleGenerate"
-            @handleDownload="handleDownload"
-            @send-data="handleQrCodeImageBase64"
-            v-if="GetFieldIsShow(field)"
-            ref="qrCodeGenerator"
-        /> -->
+        <el-button type="success" :loading="loading" :disabled="!imageDataUrl" @click="downloadQrCode">
+            下载二维码
+        </el-button>
+        <img
+            v-if="imageDataUrl"
+            class="diy-qrcode__card"
+            :src="imageDataUrl"
+            :alt="payload.titleText || '二维码'"
+        />
+        <el-alert v-else-if="errorMessage" class="diy-qrcode__error" type="warning" :closable="false" :title="errorMessage" />
     </div>
 </template>
 
 <script setup>
-import { ref, computed, getCurrentInstance } from "vue";
+import { computed, ref, watch } from "vue";
+import { ElMessage } from "element-plus";
+import {
+    createLegacyQrCodeCardDataUrl,
+    downloadLegacyQrCode,
+    normalizeLegacyQrCodePayload
+} from "@/utils/legacy-qrcode.js";
 
 const props = defineProps({
     modelValue: {},
@@ -35,45 +38,67 @@ const props = defineProps({
     }
 });
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "send-data"]);
+const imageDataUrl = ref("");
+const errorMessage = ref("");
+const loading = ref(false);
+let renderVersion = 0;
 
-const { proxy } = getCurrentInstance();
-const DiyCommon = proxy.DiyCommon;
+const payload = computed(() => normalizeLegacyQrCodePayload(props.field?.DataAppend || {}));
 
-const localValue = computed({
-    get() {
-        return props.modelValue;
+watch(
+    () => props.field?.DataAppend,
+    async (dataAppend) => {
+        const currentVersion = ++renderVersion;
+        imageDataUrl.value = "";
+        errorMessage.value = "";
+        loading.value = false;
+        if (!dataAppend?.Code) return;
+
+        loading.value = true;
+        try {
+            const value = await createLegacyQrCodeCardDataUrl(dataAppend);
+            if (currentVersion !== renderVersion) return;
+            imageDataUrl.value = value;
+            emit("update:modelValue", value);
+            emit("send-data", value);
+        } catch (error) {
+            if (currentVersion !== renderVersion) return;
+            errorMessage.value = error?.message || "二维码生成失败";
+        } finally {
+            if (currentVersion === renderVersion) loading.value = false;
+        }
     },
-    set(value) {
-        emit("update:modelValue", value);
+    { deep: true, immediate: true }
+);
+
+async function downloadQrCode() {
+    try {
+        await downloadLegacyQrCode(props.field?.DataAppend || {});
+        ElMessage.success("二维码下载成功");
+    } catch (error) {
+        ElMessage.error(error?.message || "二维码下载失败");
     }
-});
-
-const qrCodeGenerator = ref(null);
-
-// 预留的事件处理器
-const handleGenerate = (field, action) => {
-    // 调用父组件的方法（如果需要）
-    // proxy.$parent.ComponentQrcodeButtonClick(field, 'generate');
-};
-
-const handleDownload = (field, action) => {
-    // 调用父组件的方法（如果需要）
-    // proxy.$parent.ComponentQrcodeButtonClick(field, 'download');
-};
-
-const handleQrCodeImageBase64 = (data) => {
-    // 处理二维码图片数据
-    // proxy.$parent.handleQrCodeImageBase64(data);
-};
-
-const GetFieldIsShow = (field) => {
-    return DiyCommon.IsNull(field.Visible) ? true : field.Visible;
-};
+}
 </script>
 
 <style scoped>
 .diy-qrcode {
     width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.diy-qrcode__card {
+    display: block;
+    width: 400px;
+    max-width: 100%;
+    height: auto;
+}
+
+.diy-qrcode__error {
+    max-width: 400px;
 }
 </style>
