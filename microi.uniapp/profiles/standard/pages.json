@@ -26,7 +26,7 @@
     },
     {
       "path": "pages/about/index",
-      "style": { "navigationBarTitleText": "关于我们", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
+      "style": { "navigationBarTitleText": "关于小程序", "navigationBarBackgroundColor": "#ffffff", "navigationBarTextStyle": "black" }
     }
   ],
   "subPackages": [

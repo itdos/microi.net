@@ -1,6 +1,7 @@
 import {
   normalizeChosenLocation,
-  reverseGeocode
+  reverseGeocode,
+  stripRegionFromAddress
 } from '@/platform/location.js'
 import {
   normalizeOptions,
@@ -17,6 +18,7 @@ import {
   proposalInheritedValues,
   proposalInitialValues
 } from './proposal-calculation.js'
+import { XJY_CUSTOMER_DEFAULT_REGION } from './customer-location.mjs'
 import {
   CUSTOMER_FOLLOW_FIELDS,
   customerFollowScopeValues
@@ -967,8 +969,10 @@ function applyCustomerLocation(context, location) {
     submitValues[regionName] = regionValue
   }
   if (location.address) {
-    updates[addressName] = location.address
-    submitValues[addressName] = location.address
+    // 城市字段已经保存省、市、区，详细地址只保留街道、门牌及地图点名称。
+    const detailAddress = stripRegionFromAddress(location.address, location.region)
+    updates[addressName] = detailAddress
+    submitValues[addressName] = detailAddress
   }
   if (Number.isFinite(latitude)) {
     updates[latitudeName] = latitude
@@ -1164,6 +1168,7 @@ export function createState() {
     followupCustomerId: '',
     followupCustomerName: '',
     openingFollowupCheckin: false,
+    followupCheckinSucceeded: false,
     proposalInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
@@ -1192,6 +1197,14 @@ export async function initialize(context) {
     })
   }
   if (isCustomerForm(context) && ['Add', 'Edit'].includes(context.mode)) {
+    if (isCustomerAdd(context)) {
+      const regionName = fieldName(context, CUSTOMER_LOCATION_FIELDS.region, '城市')
+      if (isEmptyFormValue(context.form[regionName])) {
+        context.patchForm({
+          [regionName]: JSON.stringify(XJY_CUSTOMER_DEFAULT_REGION)
+        })
+      }
+    }
     // zhy：新增、编辑客户统一按负责人归一跟进状态，兼容历史记录状态为空的情况。
     applyCustomerFollowScope(context)
   }
@@ -1349,7 +1362,7 @@ export function getPresentation(context) {
     return {
       floatingAction: {
         key: 'xjy-followup-checkin',
-        label: '拜访打卡',
+        label: context.state.followupCheckinSucceeded ? '已打卡' : '拜访打卡',
         iconType: 'location'
       }
     }
@@ -1380,7 +1393,14 @@ export async function runPresentationAction(context, action) {
     ]
     uni.navigateTo({
       url: `/pages/native/checkin?${params.join('&')}`,
-      success: () => setTimeout(() => { context.state.openingFollowupCheckin = false }, 600),
+      success: (result) => {
+        if (result.eventChannel && typeof result.eventChannel.on === 'function') {
+          result.eventChannel.on('checkinSuccess', () => {
+            context.state.followupCheckinSucceeded = true
+          })
+        }
+        setTimeout(() => { context.state.openingFollowupCheckin = false }, 600)
+      },
       fail: () => {
         context.state.openingFollowupCheckin = false
         uni.showToast({ title: '拜访打卡页面打开失败', icon: 'none' })
