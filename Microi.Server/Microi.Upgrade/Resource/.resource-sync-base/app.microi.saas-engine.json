@@ -1,7 +1,7 @@
 {
   "PackageInfo": {
     "Name": "SaaS引擎",
-    "Version": "v7.2.9",
+    "Version": "v7.2.10",
     "CreateTime": "2026-08-11T11:45:00.000Z",
     "CreateUser": "管理员",
     "OsClient": "iTdos",
@@ -22510,8 +22510,9 @@
       "Readonly": 0,
       "Encrypt": 0,
       "BindRole": "[]",
-      "Placeholder": "选填",
+      "Placeholder": "主租户填写；子租户可留空继承",
       "Component": "Text",
+      "Description": "主租户填写共享MongoDB连接；子租户留空时由可信运行时自动继承，系统日志按 sys_log_{OsClient} 独立数据库隔离。保存后请刷新租户配置，并确认所有API节点均已重载。",
       "Visible": 1,
       "IsLockField": 0,
       "Data": "[]",

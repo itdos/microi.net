@@ -143,10 +143,11 @@ Q1: 核心可见字段数、子表和强任务域？
   "Name": "MrpGroup",
   "Label": "MRP 运算",
   "Component": "CollapseGroup",
-  "Type": "varchar(50)",
+  "Type": "",
   "Sort": 120,
   "Visible": 1,
   "AppVisible": 1,
+  "FormWidth": 24,
   "Config": "{\"CollapseGroup\":{...}}"
 }
 
@@ -163,6 +164,10 @@ Q1: 核心可见字段数、子表和强任务域？
 ```
 
 **作用范围**：从该 CollapseGroup 字段开始，到下一个 `Component in (Tabs, CollapseGroup, Divider)` 字段为止。
+
+**默认值硬规则**：`CollapseGroup` 必须保存 `FormWidth=24`（PC 表单 100% 宽度）；
+`Config.CollapseGroup.ShowFieldCount` 省略时必须补为 `true`。只有用户明确要求隐藏数量时
+才允许写 `ShowFieldCount=false`，只有用户明确要求非整行实验布局时才允许覆盖宽度。
 
 **与 Tab 的关键区别**：所有 CollapseGroup 标题**始终可见**，分组内字段**默认展开**或**默认收起**，但所有分组的字段**都在同一页面**，可同时展开多个。
 
@@ -223,6 +228,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - 字段数 13~30 的表单，必须有可见的**业务分组**（Tab 或 CollapseGroup 二选一），不能让用户上下滚动 5 屏找字段。
 - 创建 CollapseGroup 分组时，必须设置 `Icon`（如 `fas fa-calculator` / `fas fa-info-circle`），不要默认空白。
 - 任何 Tab / CollapseGroup 都必须有 `Description` 解释分组用途，不要只放一个标题。
+- 每个 CollapseGroup 必须回读到 `FormWidth=24`；`Config.CollapseGroup.ShowFieldCount` 默认必须为 `true`。
 - 修改 `diy_table.Tabs` 或 `diy_field.Tab` / `Config.CollapseGroup` / `Config.FieldTabs` 后，必须调用 `microi_refresh_schema_cache`。
 - Tab 内嵌套 CollapseGroup 时，CollapseGroup 必须设 `DefaultCollapsed=true`（默认收起），避免 Tab 内继续被折叠分组抢首屏空间。
 - 新增布局节点后必须同时回读 `diy_field` 元数据和目标业务表结构，确认没有新增物理业务列；若当前工具不提供仅元数据能力，只报告设计建议，不得绕过后端直接写表。
@@ -233,7 +239,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - ❌ **禁止**仅凭 13~30 个原始字段决定平铺或分 Tab；总有效行超过 6 且存在明确业务域时，至少使用 CollapseGroup 分组。
 - ❌ **禁止**为 8~10 字段的简单业务表创建多层 Tab 嵌套（直接用 CollapseGroup 即可）。
 - ❌ **禁止**在用户没有要求时使用 `Tabs` 字段控件（`diy_field.Component='Tabs'`），更优先用 `diy_table.Tabs`。
-- ❌ **禁止**为 `Tabs` / `CollapseGroup` / `Divider` / `Alert` 等布局控件设置 `FormWidth=24`，这些控件天然占整行。
+- ❌ **禁止**让 `CollapseGroup.FormWidth` 为空或依赖表默认列宽；CollapseGroup 默认必须显式保存 `FormWidth=24`。Tabs / Divider / Alert 继续按各自运行时规范处理。
 - ❌ **禁止**只创建 Tab 不写字段的 `Tab` 归属（每个 Tab 必须有至少 1 个非空 `Tab` 的字段）。
 - ❌ **禁止**用 Tabs 控件的 `FieldCount` 跨过 CollapseGroup 或 Divider 计数（不同布局控件的计数是隔离的）。
 - ❌ **禁止**把高频访问的字段（如单据编号、项目名称）放进默认收起的 CollapseGroup。
@@ -244,6 +250,7 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 修改或新建表单布局后，AI 必须按以下顺序验收：
 
 1. **回读字段**：`microi_get_field_list` 检查 `Tab` / `Component` / `Config` 与设计一致。
+   CollapseGroup 还必须检查 `FormWidth=24`、`Config.CollapseGroup.ShowFieldCount=true`（除非用户明确覆盖）。
 2. **回读表与结构**：`microi_get_table_data _SelectFields=['Id'] _PageSize=1` 验证表可读，并检查实时表结构未因纯布局节点新增物理业务列。
 3. **清缓存**：`microi_refresh_schema_cache tables=['表名']`。
 4. **手动打开表单**：通过 Playwright 或 V8 引擎调用，截图第一屏。
@@ -252,6 +259,10 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
    - Tab 或 CollapseGroup 标题与说明文字清晰可见。
    - 没有任何"只剩 1 个字段的 Tab"。
 6. **业务闭环**：新建一条测试数据、编辑、查看、删除，验证字段在正确分组中显示。
+
+若“表单设计器能看到、真实新增/编辑/查看表单看不到”，必须先读取表级 `InFormV8`
+以及相关字段 V8，搜索 `V8.FieldSet`、`hideField`、`Visible=false`、`HideFields`。设计模式
+通常跳过这些运行态事件；未完成这一步不得直接判定为 Microi.Client 渲染缺陷。
 
 ## 7. 反例参考（必须避免）
 
@@ -328,11 +339,10 @@ microi_update_table({
 
 ```js
 // 1. 创建一个 CollapseGroup 字段
-microi_add_field({
+microi_add_layout_field({
   tableId: "01KTASHWEBE514R1XTB0WVJJRX",
   name: "MrpGroup",
   label: "MRP 运算",
-  type: "varchar(50)",
   component: "CollapseGroup",
   sort: 150,
   visible: 1,
@@ -346,8 +356,11 @@ microi_add_field({
       Theme: "primary",
       ShowFieldCount: true
     }
-  })
+  }),
+  confirmExecution: "MrpGroup"
 })
+
+// 工具默认写入 FormWidth=24；回读必须确认宽度为 24 且 ShowFieldCount=true。
 
 // 2. 让"MRP 运算"相关字段归属到该 CollapseGroup
 // 范围方式：把 CalcStatus、CalcBatchNo、MrpTime 三个字段的 Sort 排在 150~300 之间，

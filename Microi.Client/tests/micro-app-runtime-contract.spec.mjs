@@ -165,8 +165,17 @@ test("page host derives height from the visible viewport instead of its collapse
 test("page host automatically heals one stuck first mount and then exposes a stable diagnostic", () => {
     const host = read("src/views/micro-app/host.vue");
     const health = read("src/views/micro-app/render-health.js");
+    const mountWatchdog = host.indexOf("startMountWatchdog(generation, attempt = this.retryKey)");
+    const visibleContentGuard = host.indexOf("if (this.hasRenderableMicroAppContent() === true)", mountWatchdog);
+    const mountTimeoutRecovery = host.indexOf('this.recoverMountFailure("微服务首次挂载超时', mountWatchdog);
 
     assert.match(host, /startMountWatchdog/);
+    assert.ok(mountWatchdog >= 0, "mount watchdog must track the current mount attempt");
+    assert.ok(visibleContentGuard > mountWatchdog, "mount watchdog must inspect real DOM even when lifecycle signals are missing");
+    assert.ok(mountTimeoutRecovery > visibleContentGuard, "a visibly rendered micro-app must be accepted before timeout recovery can destroy it");
+    assert.ok(host.includes("attempt !== this.retryKey"));
+    assert.match(host, /this\.mountWatchdog\s*=\s*setTimeout\(inspect,\s*250\)/);
+    assert.match(host, /this\.hasRenderableMicroAppContent\(\)\s*===\s*true[\s\S]{0,120}?this\.markMicroAppReady\(\)/);
     assert.match(host, /shouldAutoRecoverMicroApp\(this\.autoMountRetryCount,\s*this\.entryUrl\)/);
     assert.match(health, /Number\(retryCount\s*\|\|\s*0\)\s*<\s*1/);
     assert.match(host, /unmountApp\(this\.microAppName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);

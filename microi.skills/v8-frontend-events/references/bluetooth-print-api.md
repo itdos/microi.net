@@ -1,12 +1,14 @@
-# V8.Print TSC 与 ESC/POS 源码 API
+# V8.Print TSC、CPCL 适配与 ESC/POS 源码 API
 
-本表直接按 `Microi.Client/src/utils/ble/tsc.js`、`esc.js` 与编码文件整理。方法名
+本表直接按 `Microi.Client/src/utils/ble/tsc.js`、`esc.js`、
+`printer-compatibility.js` 与编码文件整理。方法名
 （包括历史拼写）必须与源码完全一致，不能根据打印机手册自行改名。
 
 ## 目录
 
 - [构建器与编码](#构建器与编码)
 - [TSC/TSPL 的 28 个方法](#tsctspl-的-28-个方法)
+- [ZICOX CC4 的 CPCL 映射](#zicox-cc4-的-cpcl-映射)
 - [ESC/POS 的 25 个方法](#escpos-的-25-个方法)
 - [参数与组合规则](#参数与组合规则)
 
@@ -17,7 +19,9 @@ var tsc = V8.Print.createNew();
 var esc = V8.Print.createNewESC();
 ```
 
-两个构建器都把指令累积到普通字节数组，`getData()` 返回该数组。TSC 的全部文本命令、
+两个构建器都把指令累积到普通字节数组，`getData()` 返回该数组。TSC 返回值还带不可枚举
+协议/操作元数据：普通遍历与 GP-M322 字节值不变，CC4 发送前据此生成 CPCL。不要复制或
+序列化 TSC 数组后再交给 `prepareSend`。TSC 的全部文本命令、
 ESC 的 `setText` 和二维码内容通过本地 `TextEncoder('gb18030', {
 NONSTANDARD_allowLegacyEncoding: true })` 编码；映射表来自同目录的
 `encoding-indexes.js`，不需要网络请求。
@@ -58,6 +62,30 @@ NONSTANDARD_allowLegacyEncoding: true })` 编码；映射表来自同目录的
 最小顺序通常是 `setSize` → `setGap`/`setBline` → `setCls` → 内容 →
 `setPagePrint` → `getData`。字体名、条码类型、纸张传感器、速度和浓度由打印机固件决定，
 构建器不验证范围。
+
+## ZICOX CC4 的 CPCL 映射
+
+| TSC 方法 | CC4 CPCL 结果 |
+|---|---|
+| `setSize(w,h)` | 203 dpi 下按 `8 dots/mm` 生成页宽/页高 |
+| `setSpeed` / `setDensity` | `SPEED` / `CONTRAST`，钳制到当前安全范围 |
+| `setGap` / `setBline` | `GAP-SENSE` / `BAR-SENSE` |
+| `setFeed` / `setBackFeed` | `POSTFEED` / `PREFEED` |
+| `setDirection(0/1)` | `ZPROTATE` / `ZPROTATE180` |
+| `setReference` | 转换坐标时叠加参考点 |
+| `setBar` / `setBox` / `setReverse` | `LINE` / `BOX` / `INVERSE-LINE` |
+| `setText` | `SETMAG` + `T`，字体名按 16/24/32 档映射 |
+| `setBarCode` | `BARCODE`，可选 `BARCODE-TEXT` |
+| `setQR` | 厂家 SDK 格式 `BARCODE QR ...` + 数据 + `ENDQR` |
+| `setBitmap` | `CG` + 原始单色位图字节 |
+| `setPagePrint` | 最终统一补 `FORM` + `PRINT`，每份必须恰好一次 |
+
+`init`、`setCls` 不输出。`addCommand`、`setCountry`、`setCodepage`、`setFromfeed`、
+`setHome`、`setSound`、`setLimitfeed`、`setErase` 与未知方法会抛错，并且适配发生在分包前，
+所以失败时不得写入任何一包。该白名单只表达当前有证据的等价转换，不代表 CC4 固件不具备
+其它 CPCL 能力。
+
+`createNewESC()` 的数组标记为 ESC/POS，CC4 直接原样发送，不进入 CPCL 转换。
 
 ## ESC/POS 的 25 个方法
 

@@ -33,9 +33,12 @@ Config/Data、菜单查询列与缓存保持一致。
    `diy_field` 或执行临时 DDL。
 4. 选项控件同时设置 `data/config`；关联控件明确保存字段和显示字段。
 5. 字段多时设置 `diy_table.Tabs` 与字段 `Tab`；只有整行控件设置
-   `FormWidth=24`，普通字段省略。
+   `FormWidth=24`，普通字段省略。`CollapseGroup` 属于整行控件，必须显式保存
+   `FormWidth=24`，且 `Config.CollapseGroup.ShowFieldCount` 默认补为 `true`。
 6. 绑定菜单后补齐/允许平台推断列表列、搜索列、隐藏列、排序列、移动端列和默认排序。
 7. 回读 `diy_field`、刷新 schema 缓存，再在真实新增/编辑/查看表单中验收。
+   若设计器显示而运行态不显示，先检查 `InFormV8`/字段 V8 是否调用
+   `V8.FieldSet(..., 'Visible', false)`、`hideField` 或传入 `HideFields`，再判断前端源码。
 
 ## 物理类型底线
 

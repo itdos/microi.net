@@ -68,6 +68,7 @@
   "microi-ui.md" : "吾码UI",
   "multi-end-client.md" : "PC、WebOS与移动端",
   "print-engine.md" : "打印引擎",
+  "bluetooth-printer.md" : "蓝牙打印机",
   "spider-engine.md" : "采集引擎",
   "translate-engine.md" : "翻译引擎",
   "search-engine.md" : "搜索引擎",

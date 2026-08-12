@@ -99,12 +99,12 @@ Detail/Edit 自定义表单，不能用它关闭 List/Card 展示设计。
 - ❌ **禁止**为 ≤7 字段的业务域单独建 Tab（必须改用 `CollapseGroup`，否则用户必须点击 Tab 才能看到 3~5 个字段，违反"首屏信息密度"原则）。
 - ❌ **禁止**为 13~30 字段的表把所有字段平铺（必须用 Tab 或 CollapseGroup 分组）。
 - ❌ **禁止**在用户没有要求时使用 `Component='Tabs'` 字段级控件（更优先用 `diy_table.Tabs` 表级 Tab）。
-- ❌ **禁止**为 Tabs / CollapseGroup / Divider / Alert 等布局控件设置 `FormWidth=24`（这些控件天然占整行）。
+- ❌ **禁止**让 CollapseGroup 依赖空 `FormWidth`；CollapseGroup 默认必须显式保存 `FormWidth=24`，并默认设置 `Config.CollapseGroup.ShowFieldCount=true`。Tabs / Divider / Alert 按各自运行时规范处理。
 - ❌ **禁止**只创建 Tab 不写字段的 `Tab` 归属（每个 Tab 必须有至少 1 个非空 `Tab` 的字段）。
 
 典型反例：`yutaoliaojieguo` 表 13 字段有"MRP 运算"3 字段 Tab — 这是错误的，应该用 `CollapseGroup` 把 MRP 3 字段收起（默认展开），让用户第一屏看到基础信息 + MRP 字段而不是必须点击 Tab 切换。详见 `microi-form-layout/SKILL.md` 的"反例参考"章节。
 
-表单控件选择必须参考 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`，包括文本、数字、日期、选择、树、部门、地址、关联表单、弹窗选表、子表、上传、富文本、代码、地图、二维码、布局控件等；普通字段不手动设置 `FormWidth`，整行控件才设 `24`。
+表单控件选择必须参考 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`，包括文本、数字、日期、选择、树、部门、地址、关联表单、弹窗选表、子表、上传、富文本、代码、地图、二维码、布局控件等；普通字段不手动设置 `FormWidth`，整行控件才设 `24`。CollapseGroup 必须显式设 `24`，并默认开启 `ShowFieldCount`。
 
 ### 3. 主子表与关联表单设计
 
@@ -124,6 +124,9 @@ Detail/Edit 自定义表单，不能用它关闭 List/Card 展示设计。
   关系语义审查。MCP 会硬性拒绝“1:N + JoinForm”、自关联 JoinForm、缺主/子外键、缺
   `Display=0/AppDisplay=0/HasChild=0` 隐藏子菜单或缺 `(OsClient, FK)` 回查索引；AI
   不得改用直接单字段工具绕过。
+- 复用已有子表时，优先复用源 `TableChild` 已验证、当前用户有权限的子表菜单；只有不存在
+  可复用菜单时才新建隐藏菜单。设计器显示但运行表单不显示时，必须先检查主表 `InFormV8`
+  是否通过 `V8.FieldSet`/`hideField` 把目标 TableChild 设为不可见。
 
 `JoinForm` 的可移植 Manifest 只写名称，不写租户 Id：
 

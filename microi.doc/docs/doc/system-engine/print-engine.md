@@ -2,6 +2,8 @@
 
 打印引擎用于在线设计并调用业务打印模板；先通过预览了解模板效果，再根据打印入口与终端类型选择服务端模板或蓝牙直连方案。
 
+标签机/小票机需要 TSC/TSPL、CPCL、ESC/POS、BLE 或 Android SPP 时，请使用独立的[蓝牙打印机](/doc/system-engine/bluetooth-printer)能力。它支持原有佳博 GP-M322 V8 零改动兼容 ZICOX CC4；Print Engine 的 `PageObj`/`PrintObj` 不能直接作为打印机原生命令发送。
+
 > **在线制作打印模板，支持多种打印场景**
 
 ---

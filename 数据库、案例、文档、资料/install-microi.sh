@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-08 18:18:36
+# 版本：v2026-08-12 10:00:44
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-08 18:18:36"
+SCRIPT_VERSION="v2026-08-12 10:00:44"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -3948,7 +3948,7 @@ ${COMPOSE_SERVICE_NETWORK}
     ports:
       - "${VUE_PORT}:80"
     environment:
-      - OsClient=${OS_CLIENT}
+      - OsClient=
       - ApiBase=http://${ACCESS_IP}:${API_PORT}
     volumes:
       - /etc/localtime:/etc/localtime

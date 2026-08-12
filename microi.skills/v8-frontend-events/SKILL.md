@@ -1,6 +1,6 @@
 ---
 name: v8-frontend-events
-description: Microi 前端 V8 事件与客户端能力指南。用于编写浏览器端字段、按钮、列表事件，或使用 V8.EventName、V8.Form、V8.Print 蓝牙打印、扫码、弹窗、表单联动和界面交互。
+description: Microi 前端 V8 事件与客户端能力指南。用于编写浏览器端字段、按钮、列表事件，或使用 V8.EventName、V8.Form、V8.Print 蓝牙打印（佳博 GP-M322、ZICOX CC4、TSPL、CPCL、ESC/POS、BLE、SPP）、扫码、弹窗、表单联动和界面交互。
 ---
 
 > **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
@@ -16,7 +16,7 @@ description: Microi 前端 V8 事件与客户端能力指南。用于编写浏�
 ## 能力路由
 
 - 查询前端 V8 全部上下文、导航、表单、列表、网络、引擎与工具入口时，读取 `../v8-utilities/references/client-api-index.md`。
-- 需求包含“蓝牙打印、标签打印、TSC/TSPL、ESC/POS、小票打印、佳博打印机”时，必须先读取 `references/bluetooth-print.md`；需要完整指令签名、编码或位图参数时，再读取 `references/bluetooth-print-api.md`。
+- 需求包含“蓝牙打印、标签打印、TSC/TSPL、CPCL、ESC/POS、小票打印、佳博/GP-M322、ZICOX/芝柯/CC4、BLE/SPP”时，必须先读取 `references/bluetooth-print.md`；需要完整指令签名、型号转换范围、编码或位图参数时，再读取 `references/bluetooth-print-api.md`。
 - 浏览器模板打印、PDF/纸张模板、`mic_print`、`PageObj`、`PrintObj` 使用 `print-engine/SKILL.md`，不要与直接蓝牙指令混为一套 API。
 - 扫码使用 `V8.Method.ScanCode`，结果从 Promise/回调取得；`V8.ScanCodeRes` 只作兼容结果槽，详见客户端 API 索引。
 - 登录后的敏感操作使用 `V8.Identity.Verify` 完成 Passkey/严格人脸交互；前端只取得一次性 Ticket，后端接口引擎必须重算 `ActionHash` 并原子消费，不能把前端成功当作授权。
@@ -206,12 +206,14 @@ V8.RefreshTable({ _PageIndex: 1 });
 | `V8.FormEngine.GetTableData(name, params, cb)` | 前端查列表（参数对象、回调或 await） |
 | `V8.Post(url, data, cb, errCb, headers, contentType)` | 通用 POST |
 | `V8.Method.ScanCode({...})` | 调用当前终端支持的扫码能力 |
-| `V8.Print.isConnected()` | 检查当前蓝牙写特征是否仍可用 |
+| `V8.Print.isConnected()` | 检查当前 BLE 写特征或 Android SPP Socket 是否仍可用 |
 | `V8.Print.OpenBluetoothPage()` | 在用户手势中打开蓝牙连接页，返回 Promise |
 | `V8.Print.reconnect()` | 使用已记住的设备授权或设备 ID 尝试重连 |
-| `V8.Print.getConnectionState()` | 获取连接、设备、记忆和错误状态快照 |
+| `V8.Print.getConnectionState()` | 获取连接、设备、传输、型号、指令、记忆和错误状态快照 |
 | `V8.Print.subscribeConnection(listener)` | 订阅应用级共享连接状态，返回取消订阅函数 |
-| `V8.Print.prepareSend(bytes)` | 串行分包发送 TSC 或 ESC/POS 字节，必须 `await` |
+| `V8.Print.getPrinterProfile()` | 查看自动识别或手工选择后的型号配置 |
+| `V8.Print.setPrinterProfile(mode)` | 广播名无法识别时选 `zicox-cc4` 等型号；旧业务通常不调用 |
+| `V8.Print.prepareSend(bytes)` | 按型号适配后串行分包发送 TSPL、CPCL 或 ESC/POS，必须 `await` |
 
 `V8.OpenAnyForm` 只发起打开动作，不返回“用户关闭后的 Promise”。需要替换
 子表单保存时，通过 `EventReplace.Submit(v8, param, callback)` 注册提交替换；
@@ -231,7 +233,7 @@ if (!V8.Print.isConnected()) {
   if (!connected || !V8.Print.isConnected()) return;
 }
 
-var command = V8.Print.createNew(); // TSC/TSPL 标签
+var command = V8.Print.createNew(); // 同一 TSC 调用：GP-M322 原 TSPL，CC4 自动转 CPCL
 command.setSize(60, 40);
 command.setGap(2);
 command.setCls();
@@ -246,7 +248,9 @@ try {
 }
 ```
 
-PC/平板顶部导航与移动端【我的】页共用同一个应用级 `V8.Print` 实例，用户可先在全局入口连接，再进入任意模块打印。`prepareSend` 内部会把不同 V8 上下文排入同一发送队列；成功只证明字节已经写入蓝牙特征，不代表打印机已走纸、无缺纸或无硬件故障。批量打印仍应逐条 `await`，不得用固定 `setTimeout` 猜测完成时间，也不要用 `Promise.all` 表达同一设备的并行打印。完整挂载范围、连接语义、批量恢复、安全与硬件验收见 `references/bluetooth-print.md`；源码级 TSC/ESC 方法表见 `references/bluetooth-print-api.md`。
+PC/平板顶部导航与移动端【我的】页共用同一个应用级 `V8.Print` 实例，用户可先在全局入口连接，再进入任意模块打印。佳博 GP-M322 路径必须保持原 TSPL 字节不变；ZICOX CC4 只转换有明确 CPCL 等价语义的高层 TSC 调用，不支持的命令必须在首包写入前失败，禁止盲目透传乱码。Android 5+App 的 CC4 可在 BLE 失败时使用已配对 SPP，Web 端不能使用经典蓝牙。
+
+`prepareSend` 内部会把不同 V8 上下文排入同一发送队列；成功只证明字节已经写入 BLE 特征或 SPP 输出流，不代表打印机已走纸、无缺纸或无硬件故障。批量打印仍应逐条 `await`，不得用固定 `setTimeout` 猜测完成时间，也不要用 `Promise.all` 表达同一设备的并行打印。完整挂载范围、双型号连接、协议映射、批量恢复、安全与硬件验收见 `references/bluetooth-print.md`；源码级 TSC/ESC/CPCL 方法表见 `references/bluetooth-print-api.md`。
 
 ### 常用上下文差异
 

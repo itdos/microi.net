@@ -763,12 +763,12 @@ export const V8ApiDefinitions = {
             Print: {
                 label: "Print",
                 kind: "Module",
-                documentation: "蓝牙打印模块\n\n提供 TSC(TSPL) 标签和 ESC/POS 小票的 BLE 直连打印。5+App 使用 plus.bluetooth；存在 navigator.bluetooth.requestDevice 的 PC/H5 浏览器使用 Web Bluetooth。PC/平板右上角和移动端【我的】页共用同一连接状态与连接页。V8.Print 存在不等于当前环境可连接，必须调用 isConnected() 并处理连接页结果。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- await V8.Print.OpenBluetoothPage() — 打开连接页，关闭时返回是否已连接\n- await V8.Print.reconnect() — 使用已记住的授权或设备 ID 重连\n- V8.Print.getConnectionState() — 获取可展示的连接快照\n- V8.Print.subscribeConnection(listener) — 订阅连接状态\n- await V8.Print.prepareSend(data) — 进入应用级队列并串行分包写入\n- V8.Print.Send(data) — 内部分包状态机，业务代码不要直接调用\n- V8.Print.isConnected() — 检测当前连接\n- V8.Print.disconnect() — 主动断开并忘记设备\n- V8.Print.BLEInformation — 仅作诊断的连接元数据\n\n全部前端 V8 上下文共用一个 Print 实例和一条发送队列。业务代码仍应逐次 await，避免用 Promise.all 表达同一设备的并行打印。",
+                documentation: "蓝牙打印模块\n\n提供 TSC(TSPL)、CPCL 标签和 ESC/POS 小票直连打印。佳博 GP-M322 继续原样发送 TSPL；ZICOX CC4 会在写入前把 createNew() 的常用 TSC 调用转换为厂家 CPCL，旧 V8 无需品牌分支。5+App 使用 BLE，Android CC4 可回退到已配对的经典蓝牙 SPP；存在 navigator.bluetooth.requestDevice 的 PC/H5 浏览器使用 Web Bluetooth。PC/平板右上角和移动端【我的】页共用同一连接状态与连接页。V8.Print 存在不等于当前环境可连接，必须调用 isConnected() 并处理连接页结果。\n\n核心 API：\n- V8.Print.createNew() — 创建 TSC 标签指令构建器；CC4 发送时自动适配 CPCL\n- V8.Print.createNewESC() — 创建 ESC/POS 票据指令构建器\n- await V8.Print.OpenBluetoothPage() — 打开连接页，选择设备与型号\n- await V8.Print.reconnect() — 使用已记住的授权或设备 ID 重连\n- V8.Print.getConnectionState() — 获取含型号/通道的连接快照\n- V8.Print.subscribeConnection(listener) — 订阅连接状态\n- V8.Print.getPrinterProfile() / setPrinterProfile(mode) — 型号诊断或手工选择\n- await V8.Print.prepareSend(data) — 适配协议后进入应用级队列并串行分包写入\n- V8.Print.Send(data) — 内部分包状态机，业务代码不要直接调用\n- V8.Print.isConnected() — 检测当前 BLE/SPP 连接\n- V8.Print.disconnect() — 主动断开并忘记设备\n- V8.Print.BLEInformation — 仅作诊断的连接元数据\n\n全部前端 V8 上下文共用一个 Print 实例和一条发送队列。业务代码仍应逐次 await，避免用 Promise.all 表达同一设备的并行打印。",
                 insertText: "Print",
                 methods: {
                     createNew: {
                         label: "createNew()",
-                        documentation: '创建 TSC(TSPL) 标签打印指令构建器\n\n全部28个源码方法：init、addCommand、setSize、setSpeed、setDensity、setGap、setBline、setCountry、setCodepage、setCls、setFeed、setBackFeed、setDirection、setReference、setFromfeed、setHome、setSound、setLimitfeed、setBar、setBox、setErase、setReverse、setText、setQR、setBarCode、setBitmap、setPagePrint、getData。低层 addCommand 只允许固定可信命令。\n\n文字、二维码和条码内容会拼入协议字段，应移除引号、换行和控制字符并限制长度。setBitmap 需要 ImageData 风格的 {width,height,data}。\n\n示例:\nvar cmd = V8.Print.createNew();\ncmd.setSize(75, 65);\ncmd.setGap(2);\ncmd.setCls();\ncmd.setText(10, 10, "TSS24.BF2", 1, 1, "Hello");\ncmd.setQR(100, 100, "L", 5, "A", "https://microi.net");\ncmd.setPagePrint();\nawait V8.Print.prepareSend(cmd.getData());',
+                        documentation: '创建 TSC(TSPL) 标签打印指令构建器\n\n佳博 GP-M322/通用 TSPL 路径原字节发送；ZICOX CC4 在 prepareSend 前把常用高层调用转换为 CPCL。必须直接发送 cmd.getData()，不要 Array.from 或 JSON 序列化，否则会丢失不可枚举的 CC4 转换元数据。无法安全映射的方法会在首包写入前失败。\n\n全部28个源码方法：init、addCommand、setSize、setSpeed、setDensity、setGap、setBline、setCountry、setCodepage、setCls、setFeed、setBackFeed、setDirection、setReference、setFromfeed、setHome、setSound、setLimitfeed、setBar、setBox、setErase、setReverse、setText、setQR、setBarCode、setBitmap、setPagePrint、getData。低层 addCommand 只允许固定可信命令。\n\n文字、二维码和条码内容会拼入协议字段，应移除引号、换行和控制字符并限制长度。setBitmap 需要 ImageData 风格的 {width,height,data}。\n\n示例:\nvar cmd = V8.Print.createNew();\ncmd.setSize(75, 65);\ncmd.setGap(2);\ncmd.setCls();\ncmd.setText(10, 10, "TSS24.BF2", 1, 1, "Hello");\ncmd.setQR(100, 100, "L", 5, "A", "https://microi.net");\ncmd.setPagePrint();\nawait V8.Print.prepareSend(cmd.getData());',
                         snippet: 'createNew()'
                     },
                     createNewESC: {
@@ -778,33 +778,43 @@ export const V8ApiDefinitions = {
                     },
                     OpenBluetoothPage: {
                         label: "OpenBluetoothPage()",
-                        documentation: '打开蓝牙连接页面\n\n返回 Promise<boolean>，在弹窗关闭时解析；boolean 表示关闭时是否已连接。弹窗已打开时，重复调用返回同一个 Promise。首次选择 Web Bluetooth 设备必须由用户点击等手势触发。不要用 BLEInformation.deviceId 替代实时连接判断。\n\n示例:\nif (!V8.Print.isConnected()) {\n    var connected = await V8.Print.OpenBluetoothPage();\n    if (!connected || !V8.Print.isConnected()) return;\n}',
+                        documentation: '打开蓝牙连接页面\n\n可选择自动识别、佳博 GP-M322、ZICOX CC4 或通用 TSPL。Android CC4 使用经典蓝牙时应先在系统完成配对。返回 Promise<boolean>，在弹窗关闭时解析；boolean 表示关闭时是否已连接。弹窗已打开时，重复调用返回同一个 Promise。首次选择 Web Bluetooth 设备必须由用户点击等手势触发。不要用 BLEInformation.deviceId 替代实时连接判断。\n\n示例:\nif (!V8.Print.isConnected()) {\n    var connected = await V8.Print.OpenBluetoothPage();\n    if (!connected || !V8.Print.isConnected()) return;\n}',
                         snippet: 'OpenBluetoothPage()'
                     },
                     prepareSend: {
                         label: "prepareSend(data)",
-                        documentation: '发送打印数据到蓝牙打印机\n\n异步检查或恢复连接，并进入应用级共享队列后串行分包写入；无法恢复时打开连接页。必须 await，不要用 Promise.all 表达同一设备的并行打印。成功只表示 BLE 写入完成，不代表物理走纸或无缺纸故障。\n\n参数：data — 非空指令字节数组（由 createNew().getData() 或 createNewESC().getData() 返回）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
+                        documentation: '发送打印数据到蓝牙打印机\n\n异步检查或恢复连接，按型号完成协议适配，再进入应用级共享队列串行分包写入；无法恢复时打开连接页。必须 await，不要用 Promise.all 表达同一设备的并行打印。CC4 不支持的 TSC 调用会在任何写入前失败。成功只表示 BLE 特征或 SPP 输出流写入完成，不代表物理走纸或无缺纸故障。\n\n参数：data — 非空指令字节数组（直接使用 createNew().getData() 或 createNewESC().getData() 返回值）\n\n示例:\nvar cmd = V8.Print.createNew();\n// ... 构建指令 ...\nawait V8.Print.prepareSend(cmd.getData());',
                         snippet: 'prepareSend(${1:data})'
                     },
                     isConnected: {
                         label: "isConnected()",
-                        documentation: '检测蓝牙是否已连接\n\n返回 boolean。Web 端检查实时 GATT 和写特征；5+App 根据连接事件维护的在线标记以及设备/写特征 ID 判断。任何环境都仍需捕获写入期间的物理断线。\n\n示例:\nif (V8.Print.isConnected()) {\n    // 可以尝试发送，仍需捕获写入异常\n}',
+                        documentation: '检测蓝牙是否已连接\n\n返回 boolean。Web 端检查实时 GATT 和写特征；5+App BLE 根据连接事件在线标记以及设备/写特征 ID 判断；Android SPP 检查 RFCOMM Socket 和输出流。任何环境都仍需捕获写入期间的物理断线。\n\n示例:\nif (V8.Print.isConnected()) {\n    // 可以尝试发送，仍需捕获写入异常\n}',
                         snippet: 'isConnected()'
                     },
                     reconnect: {
                         label: "reconnect(options)",
-                        documentation: '使用已记住的设备重连\n\n返回 Promise<boolean>，不会弹出浏览器设备选择框。5+App 使用已保存 deviceId；Web 端仅在浏览器仍保留授权且支持 navigator.bluetooth.getDevices() 时可自动取回设备。失败后可调用 OpenBluetoothPage() 让用户重新选择。\n\n示例:\nvar connected = await V8.Print.reconnect();\nif (!connected) await V8.Print.OpenBluetoothPage();',
+                        documentation: '使用已记住的设备重连\n\n返回 Promise<boolean>，不会弹出浏览器设备选择框。5+App 使用已保存的 deviceId、型号与 BLE/SPP 通道；Web 端仅在浏览器仍保留授权且支持 navigator.bluetooth.getDevices() 时可自动取回设备。失败后可调用 OpenBluetoothPage() 让用户重新选择。\n\n示例:\nvar connected = await V8.Print.reconnect();\nif (!connected) await V8.Print.OpenBluetoothPage();',
                         snippet: 'reconnect()'
                     },
                     getConnectionState: {
                         label: "getConnectionState()",
-                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、autoReconnect、error、changedAt 等字段。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
+                        documentation: '获取连接状态快照\n\n返回 engine、supported、status、connected、remembered、deviceId、deviceName、transport、profileMode、profileId、profileName、commandLanguage、autoReconnect、error、changedAt 等字段。用于展示状态；打印前仍以 isConnected() 和 prepareSend() 为准。',
                         snippet: 'getConnectionState()'
                     },
                     subscribeConnection: {
                         label: "subscribeConnection(listener)",
                         documentation: '订阅连接状态变化\n\n注册后立即收到一次当前快照，并在连接、断开、重连或不支持时继续回调。返回取消订阅函数，组件销毁时必须调用。\n\n示例:\nvar unsubscribe = V8.Print.subscribeConnection(function (state) {\n    console.log(state.status, state.deviceName);\n});\n// 页面销毁时 unsubscribe();',
                         snippet: 'subscribeConnection(${1:function (state) {\n\t$0\n}})'
+                    },
+                    getPrinterProfile: {
+                        label: "getPrinterProfile()",
+                        documentation: '获取当前打印机型号配置\n\n自动模式按设备名识别，返回 id、name、commandLanguage、preferredTransport 等字段。普通业务无需品牌判断；主要用于诊断或展示。',
+                        snippet: 'getPrinterProfile()'
+                    },
+                    setPrinterProfile: {
+                        label: "setPrinterProfile(mode)",
+                        documentation: '手工选择打印机型号\n\n设备广播名无法识别时使用。mode 可为 auto、gprinter-gp-m322、zicox-cc4、generic-tspl；选择会与设备信息一起保存。恢复自动识别调用 setPrinterProfile("auto")。',
+                        snippet: 'setPrinterProfile("${1|auto,gprinter-gp-m322,zicox-cc4,generic-tspl|}")'
                     },
                     disconnect: {
                         label: "disconnect()",

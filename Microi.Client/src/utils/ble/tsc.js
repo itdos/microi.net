@@ -15,12 +15,15 @@
  *   var data = command.getData();  // 获取指令字节数组
  */
 import { encode } from "./encoding.js";
+import { tagPrintData } from "./printer-compatibility.js";
 
 var jpPrinter = {
   createNew: function () {
     var jpPrinter = {};
     var data = "";
     var command = [];
+    var operations = [];
+    var invokingOperation = false;
 
     jpPrinter.name = "蓝牙打印机";
 
@@ -223,8 +226,50 @@ var jpPrinter = {
 
     jpPrinter.getData = function () {
       // 获取打印数据
-      return command;
+      return tagPrintData(command, "tspl", operations);
     };
+
+    // 为 CC4 兼容层记录高层 TSC 调用。元数据不可枚举，不会改变佳博收到的任何字节。
+    var originalAddCommand = jpPrinter.addCommand;
+    jpPrinter.addCommand = function (content) {
+      if (!invokingOperation) operations.push({ name: "addCommand", args: [content] });
+      return originalAddCommand.call(jpPrinter, content);
+    };
+
+    [
+      "init", "setSize", "setSpeed", "setDensity", "setGap", "setBline",
+      "setCountry", "setCodepage", "setCls", "setFeed", "setBackFeed",
+      "setDirection", "setReference", "setFromfeed", "setHome", "setSound",
+      "setLimitfeed", "setBar", "setBox", "setErase", "setReverse", "setText",
+      "setQR", "setBarCode", "setBitmap", "setPagePrint"
+    ].forEach(function (methodName) {
+      var original = jpPrinter[methodName];
+      jpPrinter[methodName] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        var entry = {
+          name: methodName,
+          args: methodName === "setBitmap" ? args.slice(0, 3) : args
+        };
+        var byteOffsetBefore = command.length;
+        operations.push(entry);
+        var previous = invokingOperation;
+        invokingOperation = true;
+        try {
+          var result = original.apply(jpPrinter, args);
+          if (methodName === "setBitmap") {
+            var imageData = args[3] || {};
+            var byteWidth = parseInt((Number(imageData.width) + 7) / 8 * 8 / 8);
+            var bitmapHeader = "BITMAP " + args[0] + "," + args[1] + "," + byteWidth + "," + imageData.height + "," + args[2] + ",";
+            entry.byteWidth = byteWidth;
+            entry.height = Number(imageData.height);
+            entry.byteOffset = byteOffsetBefore + bitmapHeader.length;
+          }
+          return result;
+        } finally {
+          invokingOperation = previous;
+        }
+      };
+    });
 
     return jpPrinter;
   }

@@ -12,11 +12,12 @@ outline: [2, 3]
     <h1>让 Unity 场景，成为<br><em>可安装的吾码应用</em></h1>
     <p class="unity-doc-lead">Unity 负责实时 3D，Microi.Unity 负责浏览器桥接，V8 接口引擎负责身份、权限与数据。游戏、数字孪生、展厅，都沿用同一条交付链。</p>
     <div class="unity-doc-actions">
-      <a class="is-primary" href="/app-detail.html?app=microi-unity-taoyuan">查看桃源云梦</a>
+      <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线进入桃源</a>
+      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.3.0.exe">下载 Windows 版</a>
       <a href="#五分钟接入">五分钟接入</a>
     </div>
     <div class="unity-doc-badges" aria-label="核心能力">
-      <span>UPM SDK</span><span>WebGL 2</span><span>DiyToken</span><span>V8 API</span>
+      <span>UPM SDK</span><span>WebGL 2</span><span>Windows x64</span><span>多人同场</span><span>实时公屏</span><span>V8 API</span>
     </div>
   </div>
   <figure class="unity-doc-hero__visual">
@@ -96,16 +97,21 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
     <img src="/images/microi-unity-taoyuan-heroine.png" alt="桃源云梦应用预览" />
   </div>
   <div class="unity-doc-app__body">
-    <p class="unity-doc-eyebrow">MICROI AI APPLICATION · WEB</p>
+    <p class="unity-doc-eyebrow">MICROI AI APPLICATION · WEBGL + WINDOWS</p>
     <h3>走进云海桃园，寻回九枚桃花灵韵</h3>
-    <p>操控原创古风女主云绮行走、奔跑、跳跃；未登录可离线漫游，登录后由 V8 接口引擎恢复并保存进度。</p>
+    <p>操控原创古风女主云绮行走、奔跑、跳跃；浏览器即开即玩，也可下载安装 Windows x64 本地版。每位访客拥有唯一随机昵称，同场角色与左下角公屏实时同步；登录后再由 V8 接口引擎恢复并保存个人进度。</p>
     <ul>
-      <li><b>原创可分发</b><span>程序化场景与角色，不夹带来源不明模型</span></li>
-      <li><b>完整商城包</b><span>Web 产物、2 张表、3 个接口和运营菜单</span></li>
+      <li><b>可追溯实时角色</b><span>AI 设定图约束造型，CC0 基础网格二次创作；设定图与实机证据分开标注</span></li>
+      <li><b>双端同版</b><span>WebGL 在线全屏与 Windows 安装包统一使用 v1.3.0</span></li>
+      <li><b>多人桃源</b><span>随机昵称、2 秒心跳、10 秒掉线消失、头顶名牌与角色插值</span></li>
+      <li><b>实时公屏</b><span>左下角文字聊天、表情选择、输入隔离、限频与幂等</span></li>
+      <li><b>完整商城包</b><span>Web 产物、4 张表、9 个接口和 4 个运营菜单</span></li>
       <li><b>租户可扩展</b><span>保存后 Hook 首次创建，官方升级永不覆盖</span></li>
     </ul>
     <div class="unity-doc-actions">
-      <a class="is-primary" href="/apps.html">前往 AI 应用列表</a>
+      <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线游玩</a>
+      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.3.0.exe">Windows 本地版</a>
+      <a href="/apps.html">前往 AI 应用列表</a>
       <a href="/app-detail.html?app=microi-unity-taoyuan">应用详情</a>
     </div>
   </div>
@@ -115,9 +121,29 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
 
 <div class="unity-doc-install-grid">
   <article><b>在线游戏</b><p>全屏 WebGL 外壳、海报预载、失败降级与退出释放。</p></article>
+  <article><b>Windows 本地版</b><p>当前用户安装、开始菜单快捷方式与卸载入口；下载页显示版本、体积和 SHA-256。</p></article>
   <article><b>玩家数据</b><p><code>app_unity_taoyuan_player</code> 保存当前快照。</p></article>
   <article><b>幂等台账</b><p><code>app_unity_taoyuan_save_log</code> 抵御重试与节点切换。</p></article>
-  <article><b>运营菜单</b><p>查看玩家名称、灵韵数量、版本与最近在线。</p></article>
+  <article><b>在线租约</b><p><code>app_unity_taoyuan_presence</code> 保存随机昵称、位置与 10 秒到期时间。</p></article>
+  <article><b>公屏消息</b><p><code>app_unity_taoyuan_chat</code> 保存经过会话校验、限频与幂等处理的文字和表情。</p></article>
+  <article><b>运营菜单</b><p>分别查看玩家进度、在线访客与公屏消息；会话秘密永不展示。</p></article>
+</div>
+
+## 多人在线与公屏如何工作
+
+<section class="unity-doc-flow" aria-label="桃源云梦多人在线流程">
+  <article><i>1</i><b>加入房间</b><p>V8 分配当前租户内唯一随机昵称，只把一次性会话秘密返回给本人。</p></article>
+  <span aria-hidden="true">→</span>
+  <article><i>2</i><b>心跳续租</b><p>客户端每 2 秒提交受限位置与动作；数据库租约写为服务端当前时间加 10 秒。</p></article>
+  <span aria-hidden="true">→</span>
+  <article><i>3</i><b>共享快照</b><p>其他客户端只读取未过期角色，显示相同模型、插值移动和头顶昵称。</p></article>
+  <span aria-hidden="true">→</span>
+  <article><i>4</i><b>公屏同步</b><p>文字与表情经秘密哈希校验、80 字限制、十秒限频和请求幂等后广播。</p></article>
+</section>
+
+<div class="unity-doc-note is-security">
+  <b>掉线不是依赖单机定时器</b>
+  <p>每个 API 节点都只查询共享数据库中的未过期租约，因此负载均衡、节点重启或滚动发布不会让“幽灵角色”永久留在场景。页面正常退出会主动离场；异常掉线最迟约 10 秒从其他访客快照消失。</p>
 </div>
 
 ## 五分钟接入
@@ -184,6 +210,10 @@ unityInstance.SendMessage('MicroiApiClient', 'ApplyMicroiHostContext', JSON.stri
   <article><i>升级</i><b>Manifest + ResourcePolicies</b><p>核心接口 Managed，租户 Hook CreateIfMissing。</p></article>
 </section>
 
+- 匿名多人接口使用服务端签发的 `SessionId + SessionSecret`；数据库只存 SHA-256，不把秘密、用户身份或内部字段放进公开快照。
+- 在线事实进入共享数据库或 Redis；2 秒心跳和 10 秒租约只是本样板参数，不能以进程内字典代替。
+- 公屏消息限制长度、表情白名单、单位时间发送数和稳定 `RequestId`；页面输入框必须阻止键盘事件继续驱动角色。
+
 <details class="unity-doc-details">
   <summary>查看幂等保存核心片段</summary>
 
@@ -208,12 +238,12 @@ if (replay && replay.Code === 1) {
 
 </details>
 
-## WebGL 构建与上线
+## WebGL 与 Windows 双端构建
 
 <div class="unity-doc-command">
   <span>UNITY 2022.3 LTS</span>
   <code>Microi → Taoyuan → Build WebGL</code>
-  <p>构建脚本固定 WebGL 2、WASM、模板、场景与产物目录。</p>
+  <p>同一工程分别生成 WebGL 在线版和 Windows x64 本地版，再由安装器封装为可下载 EXE。</p>
 </div>
 
 ```powershell
@@ -223,6 +253,13 @@ $projectPath = Join-Path $env:MICROI_REPOSITORY_ROOT 'AI-Project\microi\Unity'
   -batchmode -nographics -quit `
   -projectPath $projectPath `
   -executeMethod Microi.Taoyuan.Editor.TaoyuanWebGLBuild.Build
+```
+
+```powershell
+& $unityExe `
+  -batchmode -nographics -quit `
+  -projectPath $projectPath `
+  -executeMethod Microi.Taoyuan.Editor.TaoyuanWebGLBuild.BuildWindows
 ```
 
 `MICROI_UNITY_EDITOR_ROOT` 指向 Unity Editor 目录，`MICROI_REPOSITORY_ROOT` 指向吾码仓库根目录；示例不绑定开发者电脑的盘符。
@@ -236,6 +273,10 @@ $projectPath = Join-Path $env:MICROI_REPOSITORY_ROOT 'AI-Project\microi\Unity'
   <span>✓ gzip / Brotli Content-Encoding</span>
   <span>✓ HTTP(S) 运行，不使用 file://</span>
   <span>✓ 桌面 64 位浏览器实测</span>
+  <span>✓ Windows 安装、启动、卸载冒烟测试</span>
+  <span>✓ 公网安装包 SHA-256 回读一致</span>
+  <span>✓ 两个独立访客互见昵称、位置与公屏</span>
+  <span>✓ 异常断开 10 秒后角色消失</span>
 </div>
 
 Unity 2022.3 的官方 WebGL 支持以桌面浏览器为主。移动端需要单独做触控、内存、画质和弱网分档，不能用桌面构建通过代替。
@@ -252,6 +293,10 @@ Unity 2022.3 的官方 WebGL 支持以桌面浏览器为主。移动端需要单
 </div>
 
 每一层都是独立证据。源码检查不能描述成线上成功，应用受理编号也不能替代公开页面与非官方租户安装回读。
+
+::: tip 视觉验收必须看实机
+AI 角色设定图用于约束脸型、发式、衣料与色彩，不是运行时截图。只有 Unity Player/WebGL 的近景截图、帧率、模型拓扑、材质通道和目标设备实测，才能证明实际画质；文档与商城页不得把设定图标成“AAA 实机”。
+:::
 
 ## 继续深入
 
