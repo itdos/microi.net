@@ -43,6 +43,51 @@ const adminMenuPermissionSource = source.match(
 assert.ok(dataSetImportSource, "InsertIfMissing dataset importer should be extractable");
 assert.ok(adminMenuPermissionSource, "administrator menu-permission helper should be extractable");
 
+function extractNamedFunction(sourceText, name) {
+  const start = sourceText.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `missing function ${name}`);
+  const brace = sourceText.indexOf("{", start);
+  let depth = 0;
+  let quote = "";
+  let escaped = false;
+  for (let index = brace; index < sourceText.length; index += 1) {
+    const char = sourceText[index];
+    if (quote) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === quote) quote = "";
+      continue;
+    }
+    if (char === "'" || char === '"' || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return sourceText.slice(start, index + 1);
+    }
+  }
+  assert.fail(`unterminated function ${name}`);
+}
+
+test("managed API-engine conflict decisions preserve only newer trusted platform resources", () => {
+  const fixture = { String };
+  vm.runInNewContext(`
+    ${extractNamedFunction(source, "compareApiEngineVersion")}
+    ${extractNamedFunction(source, "decideManagedApiEngineUpdate")}
+    result = decideManagedApiEngineUpdate;
+  `, fixture);
+
+  const decide = fixture.result;
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "PreserveNewer");
+  assert.equal(decide("Application", "base", "local", "incoming", [1, 7, 6], [1, 7, 4]), "Conflict");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 4], [1, 7, 4]), "Conflict");
+  assert.equal(decide("Platform", "base", "local", "incoming", [1, 7, 3], [1, 7, 4]), "Conflict");
+  assert.equal(decide("Platform", "base", "base", "incoming", [1, 7, 3], [1, 7, 4]), "Apply");
+  assert.equal(decide("Platform", "base", "incoming", "incoming", null, null), "Apply");
+});
+
 function runAdminMenuPermissionFixture(options = {}) {
   const clone = value => JSON.parse(JSON.stringify(value));
   const roles = clone(options.roles || [
@@ -787,11 +832,13 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.2") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.3") >= 0);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(source, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
+  assert.match(source, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
+  assert.match(source, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
   assert.match(source, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(source, /previousState\.UpgradePolicy[\s\S]*?CreateIfMissing/);
   assert.match(source, /接口引擎稳定Id冲突/);
@@ -835,9 +882,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 2\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.2 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 2\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 3\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.3 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 3\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 13\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
@@ -857,9 +904,12 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(appStoreUpgradeSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(appStoreUpgradeSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(appStoreUpgradeSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(appStoreUpgradeSource, /publisherVersion\s*<\s*new System\.Version\(1, 6, 0\)/);
+  assert.equal(
+    (appStoreUpgradeSource.match(/publisherVersion\s*<\s*new System\.Version\(1, 7, 7\)/g) || []).length,
+    2,
+  );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_010_002/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_010_003/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -869,9 +919,11 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(refreshSource, /versionNumber\s*<\s*1_006_000/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_007_007/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_002/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_003/);
+  assert.match(refreshSource, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
+  assert.match(refreshSource, /OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1/);
   assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_V1/);

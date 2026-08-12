@@ -46,15 +46,16 @@ Markdown。第一列是相对 `microi.doc/docs/doc/` 的路径；第二列 Skill
 | `system-engine/message-notification.md` | message-notification | 平台内部消息、SignalR 与多通道通知 |
 | `system-engine/module-engine.md` | module-engine, v8-menu-buttons, v8-template-engine, microi-mobile-app-quality | 菜单统计、模块指标、复合列、移动卡片、按钮角标和页面入口 |
 | `system-engine/mq.md` | v8-mq-mqtt | RabbitMQ 生产与消费 |
-| `system-engine/mqtt-engine.md` | v8-mq-mqtt | MQTT 事件与 IoT |
+| `system-engine/mqtt-engine.md` | v8-mq-mqtt | MQTT Broker、SaaS 认证、Topic ACL、V8 事件、设备路由、下行与生产部署 |
 | `system-engine/page-engine.md` | page-engine | 界面引擎 JSON |
 | `system-engine/print-engine.md` | print-engine, v8-frontend-events | 服务端模板打印与蓝牙直连边界 |
+| `system-engine/bluetooth-printer.md` | v8-frontend-events, print-engine, microi-client-frontend | GP-M322 与 CC4 双型号、TSPL/CPCL/ESC-POS、BLE/SPP、旧 V8 兼容及实机验收 |
 | `system-engine/report-engine.md` | report-engine | 虚拟报表和导出 |
 | `system-engine/saas-engine.md` | v8-saas-multi-tenant | 租户识别和 SaaS 配置 |
 | `system-engine/search-engine.md` | search-engine | Elasticsearch 索引和查询 |
 | `system-engine/spider-engine.md` | spider-engine | 浏览器采集和 Worker |
 | `system-engine/translate-engine.md` | translate-engine | 多语言与翻译供应商 |
-| `system-engine/unity-integration.md` | unity-integration, v8-api-config, microi-client-frontend | Unity UPM、WebGL 宿主、DiyToken 与 V8 通讯边界 |
+| `system-engine/unity-integration.md` | unity-integration, v8-api-config, microi-client-frontend | Unity UPM、WebGL/Windows、多人租约、公屏、DiyToken 与 V8 通讯边界 |
 | `system-engine/visualization-engine.md` | page-engine, microi-ui | 3D、CAD、goView 与数据大屏能力边界 |
 | `system-engine/wf-engine.md` | v8-workflow | 工作流设计和事件 |
 | `v8-engine/ai-apiengine.md` | ai-engine, v8-api-config | AI 辅助接口引擎开发 |

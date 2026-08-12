@@ -2,7 +2,7 @@
  * V8.Print 蓝牙打印模块（双引擎版）
  * ================================================
  * 自动检测运行环境，在不同平台使用对应的蓝牙 API：
- *   - 5+App (APK/IPA): 使用 plus.bluetooth API（与旧 uni-app 完全一致）
+ *   - 5+App (APK/IPA): 使用 plus.bluetooth BLE；Android 的 CC4 可回退到经典蓝牙 SPP
  *   - PC/H5 浏览器:    使用 Web Bluetooth API（Chrome/Edge）
  *
  * 功能特性：
@@ -32,13 +32,21 @@
 
 import { tsc } from "./ble/tsc.js";
 import { esc } from "./ble/esc.js";
+import {
+    PRINTER_PROFILES,
+    adaptPrintPayload,
+    normalizeProfileMode,
+    resolvePrinterProfile,
+} from "./ble/printer-compatibility.js";
 
 // ====================== 常量 ======================
 const BLE_STORAGE_KEY = "microi_ble_info";
 const LOG_PREFIX = "Microi：【蓝牙打印】";
 const RECONNECT_DELAYS = [0, 1000, 2500, 5000, 10000, 30000];
+const SPP_UUID = "00001101-0000-1000-8000-00805F9B34FB";
 const EMPTY_BLE_INFO = Object.freeze({
     platform: "", deviceId: "", deviceName: "",
+    transport: "ble", profileMode: "auto", profileId: "generic-tspl", commandLanguage: "tspl",
     writeCharaterId: "", writeServiceId: "",
     notifyCharaterId: "", notifyServiceId: "",
     readCharaterId: "", readServiceId: "",
@@ -77,10 +85,16 @@ function getBLEEngine() {
 
 function normalizeBLEInfo(info) {
     if (!info || typeof info !== "object" || !info.deviceId) return null;
+    var profileMode = normalizeProfileMode(info.profileMode || "auto");
+    var profile = resolvePrinterProfile(info.deviceName, profileMode);
     return {
         platform: String(info.platform || ""),
         deviceId: String(info.deviceId || ""),
         deviceName: String(info.deviceName || ""),
+        transport: String(info.transport || "").toLowerCase() === "spp" ? "spp" : "ble",
+        profileMode: profileMode,
+        profileId: profile.id,
+        commandLanguage: profile.commandLanguage,
         writeCharaterId: String(info.writeCharaterId || ""),
         writeServiceId: String(info.writeServiceId || ""),
         notifyCharaterId: String(info.notifyCharaterId || ""),
@@ -132,6 +146,11 @@ function delay(ms) {
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
 }
 
+function currentPrinterProfile(Print, info) {
+    var current = info || (Print.isConnected && Print.isConnected() ? Print.BLEInformation : Print._rememberedInfo) || {};
+    return resolvePrinterProfile(current.deviceName, current.profileMode || Print._profileMode || "auto");
+}
+
 // ====================== plus 蓝牙错误提示 ======================
 
 function bleErrorTip(code) {
@@ -166,6 +185,11 @@ function updateConnectionState(Print, status, detail) {
         remembered: !!remembered,
         deviceId: current ? current.deviceId : "",
         deviceName: current ? current.deviceName : "",
+        transport: current ? current.transport : "",
+        profileMode: current ? current.profileMode : (Print._profileMode || "auto"),
+        profileId: current ? current.profileId : currentPrinterProfile(Print, current).id,
+        profileName: currentPrinterProfile(Print, current).name,
+        commandLanguage: currentPrinterProfile(Print, current).commandLanguage,
         autoReconnect: !!remembered && !Print._manualDisconnect,
         error: Object.prototype.hasOwnProperty.call(detail, "error") ? String(detail.error || "") : "",
         changedAt: Date.now(),
@@ -182,6 +206,7 @@ function applyConnectedInfo(Print, info) {
     if (!normalized) throw new Error("蓝牙设备信息不完整");
     Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
     Print._rememberedInfo = Object.assign({}, normalized);
+    Print._profileMode = normalized.profileMode;
     Print._manualDisconnect = false;
     Print._reconnectAttempt = 0;
     saveBLEInfo(normalized);
@@ -190,6 +215,7 @@ function applyConnectedInfo(Print, info) {
 
 function clearLiveConnection(Print) {
     Print._plusConnected = false;
+    closePlusSppConnection(Print);
     Print._webServer = null;
     Print._webWriteChar = null;
     Print.BLEInformation = emptyBLEInfo();
@@ -203,12 +229,210 @@ function markUnexpectedDisconnect(Print, reason) {
     }
 }
 
+function isPlusAndroidSppSupported() {
+    if (!isPlusApp() || !window.plus.android) return false;
+    var osName = window.plus.os && window.plus.os.name;
+    return !osName || String(osName).toLowerCase() === "android";
+}
+
+function requestPlusAndroidBluetoothPermissions() {
+    if (!isPlusAndroidSppSupported()) return Promise.resolve();
+    var android = window.plus.android;
+    var sdkInt = 0;
+    try {
+        var Build = android.importClass("android.os.Build");
+        sdkInt = Number(Build && Build.VERSION && Build.VERSION.SDK_INT) || 0;
+    } catch (error) {
+        // 旧版 5+ Runtime 可能无法读取 SDK_INT；沿用原有蓝牙流程，由系统 API 返回明确错误。
+        return Promise.resolve();
+    }
+    if (sdkInt < 31) return Promise.resolve();
+    if (typeof android.requestPermissions !== "function") {
+        return Promise.reject(new Error("当前 5+ Runtime 无法申请 Android 12+ 的附近设备权限，请升级 App 基座"));
+    }
+
+    return new Promise(function (resolve, reject) {
+        android.requestPermissions([
+            "android.permission.BLUETOOTH_SCAN",
+            "android.permission.BLUETOOTH_CONNECT",
+        ], function (result) {
+            result = result || {};
+            var deniedPresent = result.deniedPresent || [];
+            var deniedAlways = result.deniedAlways || [];
+            if (deniedPresent.length || deniedAlways.length) {
+                var suffix = deniedAlways.length ? "；若已永久拒绝，请到系统设置中开启“附近的设备”权限" : "";
+                reject(new Error("搜索蓝牙打印机需要“附近的设备”权限" + suffix));
+                return;
+            }
+            resolve();
+        }, function (error) {
+            reject(new Error("申请蓝牙权限失败: " + ((error && (error.message || error.errMsg)) || "未知错误")));
+        });
+    });
+}
+
+function closePlusSppConnection(Print) {
+    if (!Print) return;
+    try { if (Print._plusSppOutput && typeof Print._plusSppOutput.flush === "function") Print._plusSppOutput.flush(); } catch (e) { }
+    try { if (Print._plusSppOutput && typeof Print._plusSppOutput.close === "function") Print._plusSppOutput.close(); } catch (e) { }
+    try { if (Print._plusSppSocket && typeof Print._plusSppSocket.close === "function") Print._plusSppSocket.close(); } catch (e) { }
+    Print._plusSppOutput = null;
+    Print._plusSppSocket = null;
+}
+
+function isPlusSppConnected(Print) {
+    if (!Print || !Print._plusSppSocket || !Print._plusSppOutput) return false;
+    try { return !!Print._plusSppSocket.isConnected(); } catch (e) { return false; }
+}
+
+function getPairedPlusSppDevices(profileMode) {
+    if (!isPlusAndroidSppSupported()) return [];
+    var mode = normalizeProfileMode(profileMode || "auto");
+    if (mode !== "auto" && mode !== "zicox-cc4") return [];
+    try {
+        var android = window.plus.android;
+        var BluetoothAdapter = android.importClass("android.bluetooth.BluetoothAdapter");
+        var adapter = BluetoothAdapter.getDefaultAdapter();
+        if (!adapter) return [];
+        android.importClass(adapter);
+        var bonded = adapter.getBondedDevices();
+        if (!bonded) return [];
+        android.importClass(bonded);
+        var iterator = bonded.iterator();
+        android.importClass(iterator);
+        var devices = [];
+        while (iterator.hasNext()) {
+            var device = iterator.next();
+            android.importClass(device);
+            var name = String(device.getName() || "");
+            var deviceId = String(device.getAddress() || "");
+            var isAutoDetectedCc4 = resolvePrinterProfile(name, "auto").id === "zicox-cc4";
+            if (name && deviceId && (mode === "zicox-cc4" || isAutoDetectedCc4)) {
+                devices.push({ name: name, deviceId: deviceId, transportHint: "spp" });
+            }
+        }
+        return devices;
+    } catch (error) {
+        console.log(LOG_PREFIX + " [spp] 无法读取已配对的经典蓝牙设备:", error);
+        return [];
+    }
+}
+
+function connectPlusSppSocket(android, nativeDevice, uuid) {
+    var failures = [];
+
+    function connectSocket(socket, label) {
+        if (!socket) throw new Error(label + "未创建 Socket");
+        android.importClass(socket);
+        try {
+            socket.connect();
+            if (!socket.isConnected()) throw new Error(label + "未建立连接");
+            return socket;
+        } catch (error) {
+            try { socket.close(); } catch (e) { }
+            throw error;
+        }
+    }
+
+    // 厂家 Demo 实际使用隐藏的 createRfcommSocket(1)，优先保持同款握手方式。
+    try {
+        var vendorSocket = typeof android.invoke === "function"
+            ? android.invoke(nativeDevice, "createRfcommSocket", 1)
+            : (typeof nativeDevice.createRfcommSocket === "function" ? nativeDevice.createRfcommSocket(1) : null);
+        return connectSocket(vendorSocket, "RFCOMM 通道 1");
+    } catch (vendorError) {
+        failures.push("RFCOMM 通道 1: " + (vendorError.message || vendorError));
+    }
+
+    // 某些 Android/固件不允许调用隐藏方法，继续尝试标准 SPP UUID。
+    try {
+        var standardSocket = typeof nativeDevice.createInsecureRfcommSocketToServiceRecord === "function"
+            ? nativeDevice.createInsecureRfcommSocketToServiceRecord(uuid)
+            : nativeDevice.createRfcommSocketToServiceRecord(uuid);
+        return connectSocket(standardSocket, "标准 SPP UUID");
+    } catch (standardError) {
+        failures.push("标准 SPP UUID: " + (standardError.message || standardError));
+    }
+
+    throw new Error("经典蓝牙连接失败（" + failures.join("；") + "）");
+}
+
+async function connectPlusSppDevice(Print, device, options) {
+    options = options || {};
+    if (!isPlusAndroidSppSupported()) throw new Error("当前 5+App 终端不支持 Android 经典蓝牙 SPP");
+    var deviceId = String(device && device.deviceId || "");
+    if (!deviceId) throw new Error("经典蓝牙设备地址不能为空");
+    var deviceName = String(device && device.name || (Print._rememberedInfo && Print._rememberedInfo.deviceName) || "蓝牙打印机");
+    var profileMode = normalizeProfileMode(options.profileMode || device.profileMode || Print._profileMode || "auto");
+    var profile = resolvePrinterProfile(deviceName, profileMode);
+    if (profile.id !== "zicox-cc4") throw new Error("经典蓝牙 SPP 兜底当前仅对 ZICOX CC4 开放");
+    if (Print.isConnected() && Print.BLEInformation.transport === "spp" && Print.BLEInformation.deviceId === deviceId) return true;
+
+    updateConnectionState(Print, options.reconnecting ? "reconnecting" : "connecting", { error: "" });
+    if (typeof options.onStatus === "function") options.onStatus((options.reconnecting ? "正在重新连接 " : "正在通过经典蓝牙连接 ") + deviceName + "...", "searching");
+    await delay(0);
+
+    try {
+        if (Print._plusConnected && Print.BLEInformation.deviceId) {
+            Print._suppressDisconnectUntil = Date.now() + 1500;
+            try { window.plus.bluetooth.closeBLEConnection({ deviceId: Print.BLEInformation.deviceId }); } catch (e) { }
+            Print._plusConnected = false;
+        }
+        closePlusSppConnection(Print);
+        var android = window.plus.android;
+        var BluetoothAdapter = android.importClass("android.bluetooth.BluetoothAdapter");
+        var UUID = android.importClass("java.util.UUID");
+        var adapter = BluetoothAdapter.getDefaultAdapter();
+        if (!adapter || !adapter.isEnabled()) throw new Error("蓝牙未开启");
+        android.importClass(adapter);
+        adapter.cancelDiscovery();
+        var nativeDevice = adapter.getRemoteDevice(deviceId);
+        if (!nativeDevice) throw new Error("找不到已配对的经典蓝牙设备");
+        android.importClass(nativeDevice);
+        var uuid = UUID.fromString(SPP_UUID);
+        var socket = connectPlusSppSocket(android, nativeDevice, uuid);
+        var output = socket.getOutputStream();
+        android.importClass(output);
+        Print._plusSppSocket = socket;
+        Print._plusSppOutput = output;
+
+        var info = emptyBLEInfo();
+        info.deviceId = deviceId;
+        info.deviceName = deviceName;
+        info.transport = "spp";
+        info.profileMode = profileMode;
+        applyConnectedInfo(Print, info);
+        if (typeof options.onStatus === "function") options.onStatus("已连接: " + deviceName + "（经典蓝牙 SPP）", "connected");
+        console.log(LOG_PREFIX + " [spp] 经典蓝牙连接成功");
+        return true;
+    } catch (error) {
+        closePlusSppConnection(Print);
+        updateConnectionState(Print, "disconnected", { error: error.message || error });
+        throw error;
+    }
+}
+
+function writePlusSppChunk(Print, chunk) {
+    if (!isPlusSppConnected(Print)) return Promise.reject(new Error("经典蓝牙 SPP 连接已断开"));
+    try {
+        var binary = "";
+        for (var i = 0; i < chunk.length; i++) binary += String.fromCharCode(chunk[i]);
+        var nativeBytes = window.plus.android.invoke(binary, "getBytes", "ISO-8859-1");
+        Print._plusSppOutput.write(nativeBytes);
+        Print._plusSppOutput.flush();
+        return Promise.resolve();
+    } catch (error) {
+        return Promise.reject(new Error("经典蓝牙写入失败: " + (error.message || error)));
+    }
+}
+
 function ensurePlusEventBridge(Print) {
     if (!isPlusApp() || Print._plusBridgeRegistered) return;
     Print._plusBridgeRegistered = true;
 
     if (typeof window.plus.bluetooth.onBLEConnectionStateChange === "function") {
         window.plus.bluetooth.onBLEConnectionStateChange(function (event) {
+            if (Print.BLEInformation.transport === "spp") return;
             var activeId = Print.BLEInformation.deviceId || (Print._rememberedInfo && Print._rememberedInfo.deviceId);
             if (!event || !activeId || event.deviceId !== activeId) return;
             if (event.connected) {
@@ -262,6 +486,7 @@ async function connectPlusDevice(Print, device, options) {
     var deviceId = String(device && device.deviceId || "");
     if (!deviceId) throw new Error("蓝牙设备 ID 不能为空");
     var deviceName = String(device && device.name || (Print._rememberedInfo && Print._rememberedInfo.deviceName) || "蓝牙打印机");
+    var profileMode = normalizeProfileMode(options.profileMode || device.profileMode || Print._profileMode || "auto");
     if (Print.isConnected() && Print.BLEInformation.deviceId === deviceId) return true;
 
     ensurePlusEventBridge(Print);
@@ -269,6 +494,7 @@ async function connectPlusDevice(Print, device, options) {
     if (typeof options.onStatus === "function") options.onStatus((options.reconnecting ? "正在重新连接 " : "正在连接 ") + deviceName + "...", "searching");
 
     await openPlusBluetoothAdapter();
+    closePlusSppConnection(Print);
     if (Print._plusConnected && Print.BLEInformation.deviceId && Print.BLEInformation.deviceId !== deviceId) {
         Print._suppressDisconnectUntil = Date.now() + 1500;
         try { window.plus.bluetooth.closeBLEConnection({ deviceId: Print.BLEInformation.deviceId }); } catch (e) { }
@@ -289,6 +515,8 @@ async function connectPlusDevice(Print, device, options) {
         var info = emptyBLEInfo();
         info.deviceId = deviceId;
         info.deviceName = deviceName;
+        info.transport = "ble";
+        info.profileMode = profileMode;
         var writeFound = false;
         for (var serviceIndex = 0; serviceIndex < services.length; serviceIndex++) {
             var serviceId = services[serviceIndex].uuid;
@@ -334,6 +562,26 @@ async function connectPlusDevice(Print, device, options) {
     }
 }
 
+async function connectPlusPrinter(Print, device, options) {
+    options = options || {};
+    var profileMode = normalizeProfileMode(options.profileMode || (device && device.profileMode) || Print._profileMode || "auto");
+    var profile = resolvePrinterProfile(device && device.name, profileMode);
+    if (device && device.transportHint === "spp") {
+        return connectPlusSppDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
+    }
+    try {
+        return await connectPlusDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
+    } catch (bleError) {
+        if (profile.id !== "zicox-cc4" || !isPlusAndroidSppSupported()) throw bleError;
+        if (typeof options.onStatus === "function") options.onStatus("CC4 的 BLE 通道不可用，正在尝试经典蓝牙 SPP...", "searching");
+        try {
+            return await connectPlusSppDevice(Print, device, Object.assign({}, options, { profileMode: profileMode }));
+        } catch (sppError) {
+            throw new Error("CC4 BLE 连接失败（" + bleError.message + "）；SPP 连接也失败（" + sppError.message + "）");
+        }
+    }
+}
+
 function attachWebDisconnectListener(Print, device) {
     if (!device || typeof device.addEventListener !== "function") return;
     if (Print._webDisconnectDevice && Print._webDisconnectHandler && typeof Print._webDisconnectDevice.removeEventListener === "function") {
@@ -353,6 +601,7 @@ async function connectWebDevice(Print, device, options) {
     if (!device || !device.gatt) throw new Error("未取得可连接的蓝牙设备");
     if (Print.isConnected() && Print._webDevice === device) return true;
     var deviceName = String(device.name || (Print._rememberedInfo && Print._rememberedInfo.deviceName) || "蓝牙打印机");
+    var profileMode = normalizeProfileMode(options.profileMode || device.profileMode || Print._profileMode || "auto");
 
     if (Print._webDevice && Print._webDevice !== device && Print._webDevice.gatt && Print._webDevice.gatt.connected) {
         Print._suppressDisconnectUntil = Date.now() + 1500;
@@ -372,6 +621,8 @@ async function connectWebDevice(Print, device, options) {
         var info = emptyBLEInfo();
         info.deviceId = String(device.id || "");
         info.deviceName = deviceName;
+        info.transport = "ble";
+        info.profileMode = profileMode;
 
         for (var serviceIndex = 0; serviceIndex < services.length; serviceIndex++) {
             try {
@@ -453,6 +704,14 @@ const BT_DIALOG_CSS = `
     }
     @keyframes microi-bt-spin { to { transform: rotate(360deg); } }
     #microi-bt-actions { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    #microi-bt-profile-row {
+        display: grid; grid-template-columns: 86px 1fr; gap: 10px; align-items: center;
+        margin-bottom: 12px; font-size: 13px; color: #606266;
+    }
+    #microi-bt-profile {
+        width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid #dcdfe6;
+        border-radius: 6px; background: #fff; color: #303133;
+    }
     .microi-bt-btn {
         padding: 8px 16px; border-radius: 6px; border: 1px solid #dcdfe6;
         background: #fff; color: #606266; font-size: 13px; cursor: pointer;
@@ -478,6 +737,7 @@ const BT_DIALOG_CSS = `
         font-size: 11px; padding: 2px 8px; border-radius: 10px;
         background: #67c23a; color: #fff; flex-shrink: 0;
     }
+    .microi-bt-device-badge.info { background: #409eff; }
     #microi-bt-info {
         margin-top: 12px; padding: 10px 14px; background: #fafafa;
         border-radius: 8px; font-size: 12px; color: #909399; line-height: 1.8;
@@ -530,6 +790,9 @@ function showPlusBluetoothDialog(Print) {
             '<div id="microi-bt-header"><h3>\uD83D\uDDA8\uFE0F 蓝牙打印机连接</h3><button id="microi-bt-close">&times;</button></div>' +
             '<div id="microi-bt-body">' +
             '<div id="microi-bt-status"><span id="microi-bt-status-icon"></span><span id="microi-bt-status-text">准备就绪，点击搜索蓝牙设备</span></div>' +
+            '<div id="microi-bt-profile-row"><label for="microi-bt-profile">打印机型号</label><select id="microi-bt-profile">' +
+            '<option value="auto">自动识别（推荐）</option><option value="gprinter-gp-m322">佳博 GP-M322</option>' +
+            '<option value="zicox-cc4">ZICOX CC4</option><option value="generic-tspl">其它 TSPL 打印机</option></select></div>' +
             '<div id="microi-bt-actions">' +
             '<button id="microi-bt-search" class="microi-bt-btn primary">\uD83D\uDD0D 开始搜索蓝牙</button>' +
             '<button id="microi-bt-stop" class="microi-bt-btn" style="display:none;">\u23F9\uFE0F 停止搜索</button>' +
@@ -539,7 +802,8 @@ function showPlusBluetoothDialog(Print) {
             '<div>1. 确保蓝牙打印机已开机</div>' +
             '<div>2. 点击搜索按钮，等待设备列表出现</div>' +
             '<div>3. 点击设备名称进行连接</div>' +
-            '<div>4. 等待连接完成后即可使用打印功能</div></div></div>' +
+            '<div>4. 等待连接完成后即可使用打印功能</div>' +
+            '<div style="margin-top:6px;color:#e6a23c;">CC4 使用经典蓝牙时请先在 Android 系统中完成配对；自动模式只展示已识别的 CC4 配对设备</div></div></div>' +
             '<div id="microi-bt-footer">' +
             '<button id="microi-bt-cancel" class="microi-bt-btn">关闭</button>' +
             '<button id="microi-bt-test" class="microi-bt-btn" style="display:none;">\uD83E\uDDEA 打印测试</button></div></div>';
@@ -553,10 +817,13 @@ function showPlusBluetoothDialog(Print) {
         var disconnectBtn = document.getElementById("microi-bt-disconnect");
         var deviceListEl = document.getElementById("microi-bt-device-list");
         var testBtn = document.getElementById("microi-bt-test");
+        var profileSelect = document.getElementById("microi-bt-profile");
         var unsubscribeConnection = null;
         var isSearching = false;
         var discoveredDevices = [];
         var searchRefreshTimer = null;
+        profileSelect.value = Print._profileMode || "auto";
+        profileSelect.addEventListener("change", function () { Print.setPrinterProfile(profileSelect.value); });
 
         function setStatus(text, type) {
             type = type || "info";
@@ -591,6 +858,14 @@ function showPlusBluetoothDialog(Print) {
                 idEl.textContent = device.deviceId || "";
                 content.append(nameEl, idEl);
                 row.appendChild(content);
+                var detectedProfile = resolvePrinterProfile(device.name, profileSelect.value);
+                if (detectedProfile.id !== "generic-tspl" || device.transportHint === "spp") {
+                    var badge = document.createElement("span");
+                    badge.className = "microi-bt-device-badge info";
+                    var profileLabel = detectedProfile.id === "zicox-cc4" ? "CC4" : (detectedProfile.id === "gprinter-gp-m322" ? "GP-M322" : "已配对");
+                    badge.textContent = profileLabel + (device.transportHint === "spp" ? " · SPP" : " · BLE");
+                    row.appendChild(badge);
+                }
                 row.addEventListener("click", function () { connectDevice(device); });
                 deviceListEl.appendChild(row);
             });
@@ -600,8 +875,9 @@ function showPlusBluetoothDialog(Print) {
             var list = result.devices || [];
             for (var i = 0; i < list.length; i++) {
                 if (!list[i].name || list[i].name === "未知设备") continue;
-                var exists = discoveredDevices.some(function (item) { return item.deviceId === list[i].deviceId; });
-                if (!exists) discoveredDevices.push(list[i]);
+                var bleDevice = Object.assign({}, list[i], { transportHint: "ble" });
+                var exists = discoveredDevices.some(function (item) { return item.deviceId === bleDevice.deviceId && item.transportHint === "ble"; });
+                if (!exists) discoveredDevices.push(bleDevice);
             }
             renderDeviceList();
         }
@@ -610,9 +886,18 @@ function showPlusBluetoothDialog(Print) {
         Print._plusDeviceFoundListeners.add(onDevicesFound);
 
         // --- 搜索蓝牙设备（plus.bluetooth API）---
-        function startSearch() {
-            discoveredDevices = [];
+        async function startSearch() {
+            if (isSearching) return;
+            try {
+                // 只在用户主动点击搜索时申请权限，避免页面加载/自动重连突然弹出系统授权框。
+                await requestPlusAndroidBluetoothPermissions();
+            } catch (permissionError) {
+                setStatus(permissionError.message, "error");
+                return;
+            }
+            discoveredDevices = getPairedPlusSppDevices(profileSelect.value);
             deviceListEl.innerHTML = "";
+            renderDeviceList();
             isSearching = true;
             searchBtn.style.display = "none";
             stopBtn.style.display = "";
@@ -671,7 +956,7 @@ function showPlusBluetoothDialog(Print) {
             if (isSearching) { try { plus.bluetooth.stopBluetoothDevicesDiscovery(); } catch (e) { } isSearching = false; }
             stopBtn.style.display = "none"; searchBtn.style.display = "none";
             try {
-                await connectPlusDevice(Print, device, { onStatus: setStatus });
+                await connectPlusPrinter(Print, Object.assign({}, device, { profileMode: profileSelect.value }), { onStatus: setStatus, profileMode: profileSelect.value });
                 _showConnectedDevice(deviceListEl, Print.BLEInformation.deviceName, Print.BLEInformation.deviceId);
             } catch (err) {
                 setStatus("连接失败: " + err.message, "error");
@@ -689,7 +974,7 @@ function showPlusBluetoothDialog(Print) {
         async function testPrint() {
             try {
                 setStatus("正在发送测试打印...", "searching");
-                var command = tsc.jpPrinter.createNew();
+                var command = Print.createNew();
                 command.setSize(75, 65); command.setGap(2); command.setCls();
                 command.setText(180, 10, "TSS24.BF2", 1, 1, "Microi.net 蓝牙打印测试");
                 command.setText(10, 60, "TSS24.BF2", 1, 1, "平台版本：吾码 v3.0");
@@ -751,6 +1036,9 @@ function showWebBluetoothDialog(Print) {
             '<div id="microi-bt-header"><h3>\uD83D\uDDA8\uFE0F 蓝牙打印机连接</h3><button id="microi-bt-close">&times;</button></div>' +
             '<div id="microi-bt-body">' +
             '<div id="microi-bt-status"><span id="microi-bt-status-icon"></span><span id="microi-bt-status-text">准备就绪，点击搜索蓝牙设备</span></div>' +
+            '<div id="microi-bt-profile-row"><label for="microi-bt-profile">打印机型号</label><select id="microi-bt-profile">' +
+            '<option value="auto">自动识别（推荐）</option><option value="gprinter-gp-m322">佳博 GP-M322</option>' +
+            '<option value="zicox-cc4">ZICOX CC4</option><option value="generic-tspl">其它 TSPL 打印机</option></select></div>' +
             '<div id="microi-bt-actions">' +
             '<button id="microi-bt-search" class="microi-bt-btn primary">\uD83D\uDD0D 搜索蓝牙设备</button>' +
             '<button id="microi-bt-disconnect" class="microi-bt-btn danger" style="display:none;">断开连接</button></div>' +
@@ -773,7 +1061,10 @@ function showWebBluetoothDialog(Print) {
         var disconnectBtn = document.getElementById("microi-bt-disconnect");
         var deviceListEl = document.getElementById("microi-bt-device-list");
         var testBtn = document.getElementById("microi-bt-test");
+        var profileSelect = document.getElementById("microi-bt-profile");
         var unsubscribeConnection = null;
+        profileSelect.value = Print._profileMode || "auto";
+        profileSelect.addEventListener("change", function () { Print.setPrinterProfile(profileSelect.value); });
 
         function setStatus(text, type) {
             type = type || "info";
@@ -808,7 +1099,7 @@ function showWebBluetoothDialog(Print) {
 
                 var device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: PRINTER_SERVICE_UUIDS });
                 setStatus("已选择: " + (device.name || "未知设备") + "，正在连接...", "searching");
-                await connectWebDevice(Print, device, { onStatus: setStatus });
+                await connectWebDevice(Print, device, { onStatus: setStatus, profileMode: profileSelect.value });
                 _showConnectedDevice(deviceListEl, device.name, device.id);
                 searchBtn.disabled = false;
             } catch (error) {
@@ -830,7 +1121,7 @@ function showWebBluetoothDialog(Print) {
         async function testPrint() {
             try {
                 setStatus("正在发送测试打印...", "searching");
-                var command = tsc.jpPrinter.createNew();
+                var command = Print.createNew();
                 command.setSize(75, 65); command.setGap(2); command.setCls();
                 command.setText(180, 10, "TSS24.BF2", 1, 1, "Microi.net 蓝牙打印测试");
                 command.setText(10, 60, "TSS24.BF2", 1, 1, "平台版本：吾码 v3.0");
@@ -890,11 +1181,14 @@ function createV8Print(V8) {
         // ========== 应用级连接与发送状态 ==========
         _isMicroiSharedPrint: true,
         _rememberedInfo: rememberedInfo,
+        _profileMode: rememberedInfo ? rememberedInfo.profileMode : "auto",
         _connectionState: null,
         _connectionListeners: new Set(),
         _plusDeviceFoundListeners: new Set(),
         _plusBridgeRegistered: false,
         _plusConnected: false,
+        _plusSppSocket: null,
+        _plusSppOutput: null,
         _webDevice: null,
         _webServer: null,
         _webWriteChar: null,
@@ -914,6 +1208,29 @@ function createV8Print(V8) {
 
         setTipHandler: function (handler) {
             if (typeof handler === "function") Print._tipHandler = handler;
+        },
+
+        /** 获取当前型号配置；自动模式按设备名识别。 */
+        getPrinterProfile: function () {
+            return Object.assign({}, currentPrinterProfile(Print));
+        },
+
+        /** 连接页型号选择。旧 V8 无需调用；用于设备名称无法识别时显式指定。 */
+        setPrinterProfile: function (profileMode) {
+            var rawMode = String(profileMode || "auto").toLowerCase();
+            if (rawMode !== "auto" && !PRINTER_PROFILES[rawMode]) throw new Error("不支持的蓝牙打印机型号: " + profileMode);
+            var mode = normalizeProfileMode(rawMode);
+            Print._profileMode = mode;
+            var source = normalizeBLEInfo(Print.isConnected() ? Print.BLEInformation : Print._rememberedInfo);
+            if (source) {
+                source.profileMode = mode;
+                var normalized = normalizeBLEInfo(source);
+                if (Print.isConnected()) Print.BLEInformation = Object.assign(emptyBLEInfo(), normalized);
+                Print._rememberedInfo = Object.assign({}, normalized);
+                saveBLEInfo(normalized);
+            }
+            updateConnectionState(Print, Print.isConnected() ? "connected" : undefined, { error: "" });
+            return Print.getPrinterProfile();
         },
 
         /** 获取可订阅的权威连接快照。 */
@@ -941,6 +1258,7 @@ function createV8Print(V8) {
         /** 检测当前写通道是否仍可用。 */
         isConnected: function () {
             if (isPlusApp()) {
+                if (Print.BLEInformation.transport === "spp") return isPlusSppConnected(Print);
                 return !!(Print._plusConnected && Print.BLEInformation.deviceId && Print.BLEInformation.writeCharaterId);
             }
             return !!(Print._webDevice && Print._webDevice.gatt && Print._webDevice.gatt.connected && Print._webWriteChar);
@@ -1006,10 +1324,12 @@ function createV8Print(V8) {
             Print._reconnectPromise = (async function () {
                 try {
                     if (isPlusApp()) {
-                        return await connectPlusDevice(Print, {
+                        return await connectPlusPrinter(Print, {
                             deviceId: remembered.deviceId,
                             name: remembered.deviceName,
-                        }, { reconnecting: true });
+                            transportHint: remembered.transport,
+                            profileMode: remembered.profileMode,
+                        }, { reconnecting: true, profileMode: remembered.profileMode });
                     }
                     if (!isWebBluetoothSupported()) {
                         throw new Error("当前浏览器不支持 Web Bluetooth，无法自动重连");
@@ -1020,7 +1340,7 @@ function createV8Print(V8) {
                         device = grantedDevices.find(function (item) { return item.id === remembered.deviceId; }) || null;
                     }
                     if (!device) throw new Error("浏览器未保留该设备授权，请点击蓝牙图标重新连接");
-                    return await connectWebDevice(Print, device, { reconnecting: true });
+                    return await connectWebDevice(Print, device, { reconnecting: true, profileMode: remembered.profileMode });
                 } catch (error) {
                     updateConnectionState(Print, "disconnected", { error: error.message || error });
                     if (!options.silent) console.error(LOG_PREFIX + " 自动重连失败:", error);
@@ -1074,6 +1394,7 @@ function createV8Print(V8) {
         /** 内部分包写入；业务代码应调用 prepareSend。 */
         Send: async function (buff) {
             if (!Print.isConnected()) throw new Error("蓝牙未连接");
+            buff = adaptPrintPayload(buff, currentPrinterProfile(Print));
             var packetSize = Number(Print.oneTimeData);
             if (!Number.isInteger(packetSize) || packetSize <= 0) throw new Error("蓝牙分包字节数必须是正整数");
             var packetCount = Math.ceil(buff.length / packetSize);
@@ -1092,7 +1413,9 @@ function createV8Print(V8) {
                             chunk[byteIndex - start] = Number(buff[byteIndex]) & 0xff;
                         }
                         Print.currentTime = packetIndex + 1;
-                        if (isPlusApp()) {
+                        if (isPlusApp() && Print.BLEInformation.transport === "spp") {
+                            await writePlusSppChunk(Print, chunk);
+                        } else if (isPlusApp()) {
                             await new Promise(function (resolve, reject) {
                                 window.plus.bluetooth.writeBLECharacteristicValue({
                                     deviceId: Print.BLEInformation.deviceId,
@@ -1116,7 +1439,7 @@ function createV8Print(V8) {
                     if (copyIndex + 1 < Print.printerNum) await delay(100);
                 }
             } catch (error) {
-                if (!Print.isConnected() || /10006|断开|disconnected|GATT/i.test(String(error.message || error))) {
+                if (Print.BLEInformation.transport === "spp" || !Print.isConnected() || /10006|断开|disconnected|GATT/i.test(String(error.message || error))) {
                     markUnexpectedDisconnect(Print, "蓝牙写入失败，连接已断开");
                 }
                 throw error;
@@ -1151,7 +1474,8 @@ function createV8Print(V8) {
                 Print._reconnectTimer = null;
             }
             if (isPlusApp()) {
-                try { if (Print.BLEInformation.deviceId) window.plus.bluetooth.closeBLEConnection({ deviceId: Print.BLEInformation.deviceId }); } catch (e) { }
+                if (Print.BLEInformation.transport === "spp") closePlusSppConnection(Print);
+                else try { if (Print.BLEInformation.deviceId) window.plus.bluetooth.closeBLEConnection({ deviceId: Print.BLEInformation.deviceId }); } catch (e) { }
             }
             try {
                 if (Print._webDevice && Print._webDevice.gatt && Print._webDevice.gatt.connected) Print._webDevice.gatt.disconnect();
@@ -1177,6 +1501,11 @@ function createV8Print(V8) {
         remembered: !!rememberedInfo,
         deviceId: rememberedInfo ? rememberedInfo.deviceId : "",
         deviceName: rememberedInfo ? rememberedInfo.deviceName : "",
+        transport: rememberedInfo ? rememberedInfo.transport : "",
+        profileMode: rememberedInfo ? rememberedInfo.profileMode : Print._profileMode,
+        profileId: currentPrinterProfile(Print, rememberedInfo).id,
+        profileName: currentPrinterProfile(Print, rememberedInfo).name,
+        commandLanguage: currentPrinterProfile(Print, rememberedInfo).commandLanguage,
         autoReconnect: !!rememberedInfo,
         error: "",
         changedAt: Date.now(),
