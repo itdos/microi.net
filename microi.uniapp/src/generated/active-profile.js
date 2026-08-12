@@ -10,6 +10,10 @@ export default {
   "servicePlatformName": "集福鲤服务平台",
   "poweredBy": "集福鲤",
   "versionName": "2.0.0",
+  "releaseNotes": [
+    "新增小程序版本查看与更新能力",
+    "优化版本切换后的配置缓存刷新"
+  ],
   "appSubTitle": "让每一次服务都有迹可循",
   "workspaceSubTitle": "客户与服务工作台",
   "guestWelcomeText": "欢迎使用集福鲤",
@@ -57,6 +61,7 @@ export default {
     "serviceTasks": true
   },
   "routes": {
+    "about": "/pages/about/index",
     "catalog": "/pages/business/catalog",
     "login": "/pages/login/index",
     "messages": "/pages/message/index",

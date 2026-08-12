@@ -26,14 +26,16 @@ assert.match(actionsSource, /hasExactMenuPermission\(menuId, \['Add', '新增'\]
   '新增必须精确匹配平台 Add/新增权限')
 assert.match(actionsSource, /hasExactMenuPermission\(menuId, \['Edit', '编辑'\], user\)/,
   '编辑必须精确匹配平台 Edit/编辑权限')
-assert.match(listSource, /v-if="canAddRecord" class="nav-icon"/,
-  '列表右上角新增按钮必须按新增权限显示')
+assert.doesNotMatch(listSource, /class="nav-icon"[^>]*@tap="openAdd"/,
+  '列表顶部不得重复展示新增按钮')
 assert.match(listSource, /v-if="canAddRecord" class="floating-add"/,
   '列表悬浮新增按钮必须按新增权限显示')
 assert.match(listSource, /if \(!this\.canAddRecord\)[\s\S]*?当前账号没有新增权限/,
   '列表新增方法必须二次校验新增权限')
-assert.match(detailSource, /v-if="canEditRecord" class="nav-button nav-button--edit"/,
-  '详情编辑按钮必须按编辑权限显示')
+assert.doesNotMatch(detailSource, /class="nav-button nav-button--edit"/,
+  '详情顶部不得展示编辑按钮')
+assert.match(detailSource, /v-if="canEditRecord"[\s\S]*?class="action-button action-button--edit action-button--with-icon"/,
+  '详情底部编辑按钮必须按编辑权限显示')
 assert.match(detailSource, /if \(!this\.canEditRecord\)[\s\S]*?当前账号没有编辑权限/,
   '详情编辑方法必须二次校验编辑权限')
 
