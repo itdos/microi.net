@@ -156,7 +156,7 @@ public sealed class DiyLangBackgroundTaskTests
     }
 
     [Fact]
-    public void LanguageMaintenance_IsTenantIsolatedAndReportsDurableProgress()
+    public void LanguageMaintenance_IsTenantIsolatedProcessBoundedAndReportsDurableProgress()
     {
         var root = FindRepositoryRoot();
         var formEngine = File.ReadAllText(Path.Combine(
@@ -174,11 +174,22 @@ public sealed class DiyLangBackgroundTaskTests
 
         Assert.Contains("DiyLangTenantFullSyncSemaphores", formEngine, StringComparison.Ordinal);
         Assert.Contains("GetDiyLangTenantFullSyncSemaphore(osClient)", formEngine, StringComparison.Ordinal);
-        Assert.DoesNotContain("DiyLangFullSyncSemaphore", formEngine, StringComparison.Ordinal);
+        Assert.Contains("DiyLangProcessMaintenanceSemaphore", formEngine, StringComparison.Ordinal);
+        Assert.Contains("DiyLangStartupRepairMaxCandidateRows = 200", formEngine, StringComparison.Ordinal);
+        Assert.Contains("RepairCandidateLimit", formEngine, StringComparison.Ordinal);
+        Assert.Contains("var candidateSql = string.Join(\" OR \", candidatePredicates)", formEngine, StringComparison.Ordinal);
+        Assert.Contains("PlaceholderCandidatesIncluded", formEngine, StringComparison.Ordinal);
+        Assert.Contains("LOWER(TRIM({field})) LIKE 'diy_table:%'", formEngine, StringComparison.Ordinal);
+        Assert.Contains("!startupRepair", formEngine, StringComparison.Ordinal);
+        Assert.DoesNotContain("RepairCandidateLimitPerLanguage", formEngine, StringComparison.Ordinal);
         Assert.Contains("EnterDiyLangSyncProgressReporter", worker, StringComparison.Ordinal);
         Assert.Contains("currentWork, totalWork", formEngine, StringComparison.Ordinal);
-        Assert.Contains("正在扫描并补齐", formEngine, StringComparison.Ordinal);
+        Assert.Contains("已合并检查", formEngine, StringComparison.Ordinal);
+        Assert.Contains("CoverageDeferred", formEngine, StringComparison.Ordinal);
         Assert.Contains("TimeSpan.FromSeconds(1)", worker, StringComparison.Ordinal);
+        Assert.Contains("ClusterConcurrencyKey", worker, StringComparison.Ordinal);
+        Assert.Contains("ToString(\"yyyyMMdd\"", worker, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToString(\"yyyyMMddHH\"", worker, StringComparison.Ordinal);
     }
 
     [Fact]

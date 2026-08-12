@@ -40,6 +40,11 @@ namespace Microi.net
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> DiyLangTenantFullSyncSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
         private static readonly ConcurrentDictionary<string, Dictionary<string, string>> DiyLangTreeRootIdsCache = new ConcurrentDictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
         private static readonly SemaphoreSlim DiyLangGlobalDbSemaphore = new SemaphoreSlim(1, 1);
+        // Full language maintenance is deliberately process-wide. A tenant-scoped
+        // lock still prevents duplicate work for the same tenant, while this gate
+        // keeps several large tenant scans from competing for CPU and database
+        // connections immediately after a container restart.
+        private static readonly SemaphoreSlim DiyLangProcessMaintenanceSemaphore = new SemaphoreSlim(1, 1);
         private static readonly SemaphoreSlim DiyLangTranslateSemaphore = new SemaphoreSlim(2, 2);
         private static readonly AsyncLocal<Func<bool>> DiyLangSyncOwnershipGuard = new AsyncLocal<Func<bool>>();
         private static readonly AsyncLocal<Action<int?, string, int?, int?>> DiyLangSyncProgressReporter = new AsyncLocal<Action<int?, string, int?, int?>>();
@@ -55,6 +60,8 @@ namespace Microi.net
         private const int DiyLangDbBackoffMinutes = 5;
         private const int DiyLangDbOperationDelayMs = 15;
         private const int DiyLangMetadataQueueMax = 2000;
+        private const int DiyLangStartupRepairMaxCandidateRows = 200;
+        private const int DiyLangManualRepairMaxCandidateRows = 50000;
         private const int DiyLangTextColumnLength = 2000;
         private const int DiyLangRuntimeCacheDefaultPageSize = 500;
         private const int DiyLangRuntimeCacheDefaultMaxRows = 10000;
@@ -2001,7 +2008,9 @@ namespace Microi.net
             JObject stats,
             bool reportUnits = true,
             int progressStart = 0,
-            int progressEnd = 92)
+            int progressEnd = 92,
+            int maxCandidateRows = DiyLangManualRepairMaxCandidateRows,
+            bool includePlaceholderCandidates = true)
         {
             if (IsBlank(osClient) || langConfigs == null || langConfigs.Count == 0)
             {
@@ -2020,18 +2029,60 @@ namespace Microi.net
                 return;
             }
 
-            var sourceRowCount = await RunDiyLangDbOperationAsync(osClient, () =>
+            var boundedRowLimit = Math.Max(1, Math.Min(
+                DiyLangManualRepairMaxCandidateRows,
+                maxCandidateRows));
+            // Query all target fields in one pass. The previous implementation
+            // materialized up to 50,000 rows once per language and then filtered
+            // them in managed code. Querying every language separately still makes
+            // a healthy table pay N scans, so build one bounded any-language
+            // predicate and repair each candidate once.
+            var candidatePredicates = targetLangs.Select(lang =>
             {
-                var db = OsClientExtend.GetClient(osClient).Db;
-                var count = db.FromSql(@"SELECT COUNT(*)
-                        FROM diy_lang
-                        WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
-                          AND ZhCN IS NOT NULL AND ZhCN <> ''")
-                    .ToScalar<long>();
-                return Task.FromResult(Math.Max(0L, Math.Min(50000L, count)));
-            });
-            var totalWorkLong = sourceRowCount * targetLangs.Count;
-            var totalWork = (int)Math.Min(int.MaxValue, totalWorkLong);
+                var field = $"`{lang.Field}`";
+                var missing = $"{field} IS NULL OR TRIM({field}) = ''";
+                if (!includePlaceholderCandidates)
+                {
+                    return $"({missing})";
+                }
+                return $@"({missing}
+                    OR LOWER(TRIM({field})) = LOWER(TRIM(`Key`))
+                    OR LOWER(TRIM({field})) LIKE 'diy_table:%'
+                    OR LOWER(TRIM({field})) LIKE 'diy_field:%'
+                    OR LOWER(TRIM({field})) LIKE 'sys_menu:%'
+                    OR LOWER(TRIM({field})) LIKE 'msg.%'
+                    OR LOWER(TRIM({field})) LIKE 'data.%')";
+            }).ToArray();
+            var candidateSql = string.Join(" OR ", candidatePredicates);
+            var selectFields = string.Join(", ", new[] { "Id", "`Key`", "ZhCN" }
+                .Concat(targetLangs.Select(lang => $"`{lang.Field}`")));
+            List<JObject> rows;
+            try
+            {
+                rows = await RunDiyLangDbOperationAsync(osClient, () =>
+                {
+                    var db = OsClientExtend.GetClient(osClient).Db;
+                    var data = db.FromSql($@"SELECT {selectFields}
+                            FROM diy_lang
+                            WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
+                              AND ZhCN IS NOT NULL AND ZhCN <> ''
+                              AND ({candidateSql})
+                            LIMIT {boundedRowLimit}")
+                        .ToList<dynamic>()
+                        .Select(ToJObjectSafe)
+                        .ToList();
+                    return Task.FromResult(data);
+                });
+            }
+            catch (Exception ex)
+            {
+                IncJObjectInt(stats, "Errors");
+                AddDiyLangFailureReason(stats, "FillMissing:CandidateQuery", ex.Message);
+                ReportDiyLangBackgroundProgress(progressEnd, "缺失译文候选查询失败，已记录错误");
+                return;
+            }
+
+            var totalWork = rows.Count;
             var currentWork = 0;
             Action<string> reportScanProgress = message =>
             {
@@ -2053,58 +2104,40 @@ namespace Microi.net
                         message);
                 }
             };
-            reportScanProgress($"准备扫描 {sourceRowCount} 条中文词条、{targetLangs.Count} 个目标语言");
+            stats["RepairCandidateLimit"] = boundedRowLimit;
+            stats["RepairCandidateCount"] = rows.Count;
+            stats["PlaceholderCandidatesIncluded"] = includePlaceholderCandidates;
+            reportScanProgress($"已合并检查 {targetLangs.Count} 个目标语言，共找到 {rows.Count} 条待修复候选，上限 {boundedRowLimit} 条");
 
-            foreach (var lang in targetLangs)
+            foreach (var row in rows)
             {
+                ThrowIfDiyLangSyncOwnershipLost();
+                var key = TokenString(row, "Key");
+                var sourceText = TokenString(row, "ZhCN");
                 try
                 {
-                    ThrowIfDiyLangSyncOwnershipLost();
-                    var rows = await RunDiyLangDbOperationAsync(osClient, () =>
+                    if (IsBlank(key) || IsBlank(sourceText))
                     {
-                        var db = OsClientExtend.GetClient(osClient).Db;
-                        var data = db.FromSql($@"SELECT Id, `Key`, ZhCN, `{lang.Field}`
-                                FROM diy_lang
-                                WHERE (IsDeleted <> 1 OR IsDeleted IS NULL)
-                                  AND ZhCN IS NOT NULL AND ZhCN <> ''
-                                LIMIT 50000")
-                            .ToList<dynamic>()
-                            .Select(ToJObjectSafe)
-                            .ToList();
-                        return Task.FromResult(data);
-                    });
-                    foreach (var row in rows ?? new List<JObject>())
-                    {
-                        ThrowIfDiyLangSyncOwnershipLost();
-                        try
-                        {
-                            var key = TokenString(row, "Key");
-                            var sourceText = TokenString(row, "ZhCN");
-                            if (IsBlank(key) || IsBlank(sourceText))
-                            {
-                                continue;
-                            }
-                            var currentValue = TokenString(row[lang.Field]);
-                            if (IsFilledDiyLangValue(currentValue, key))
-                            {
-                                continue;
-                            }
-                            await EnsureDiyLangMetadataAsync(osClient, key, sourceText, null, true, langConfigs);
-                            IncJObjectInt(stats, "MissingFilled");
-                        }
-                        finally
-                        {
-                            currentWork = Math.Min(totalWork, currentWork + 1);
-                            reportScanProgress(
-                                $"正在扫描并补齐 {lang.Label}（{currentWork}/{totalWork}）");
-                        }
+                        continue;
                     }
+                    var hasMissingValue = targetLangs.Any(lang =>
+                        !IsFilledDiyLangValue(TokenString(row[lang.Field]), key));
+                    if (!hasMissingValue)
+                    {
+                        continue;
+                    }
+                    await EnsureDiyLangMetadataAsync(osClient, key, sourceText, null, true, langConfigs);
+                    IncJObjectInt(stats, "MissingFilled");
                 }
                 catch (Exception ex)
                 {
                     IncJObjectInt(stats, "Errors");
-                    AddDiyLangFailureReason(stats, $"FillMissing:{lang.Locale}", ex.Message, lang.Field);
-                    reportScanProgress($"{lang.Label} 扫描未完成，已记录错误并继续下一语言");
+                    AddDiyLangFailureReason(stats, $"FillMissing:{key}", ex.Message, key);
+                }
+                finally
+                {
+                    currentWork = Math.Min(totalWork, currentWork + 1);
+                    reportScanProgress($"正在补齐缺失译文（{currentWork}/{totalWork}）");
                 }
             }
             reportScanProgress($"缺失译文扫描结束（{currentWork}/{totalWork}）");
@@ -2215,11 +2248,18 @@ namespace Microi.net
                 return new DosResult(0, null, backoffMessage);
             }
 
+            var startupRepair = string.Equals(
+                (source ?? "").Trim(),
+                "startup",
+                StringComparison.OrdinalIgnoreCase);
             var fullSyncSemaphore = GetDiyLangTenantFullSyncSemaphore(osClient);
-            ReportDiyLangBackgroundProgress(null, $"正在等待租户[{osClient}]的多语言执行权");
-            await fullSyncSemaphore.WaitAsync();
+            ReportDiyLangBackgroundProgress(null, $"正在等待租户[{osClient}]的低扰动多语言执行权");
+            await DiyLangProcessMaintenanceSemaphore.WaitAsync();
             try
             {
+                await fullSyncSemaphore.WaitAsync();
+                try
+                {
                 ReportDiyLangBackgroundProgress(null, "正在准备缺失译文扫描");
                 var startedAt = DateTime.Now;
                 var stats = new JObject()
@@ -2243,7 +2283,8 @@ namespace Microi.net
                     ["Errors"] = 0,
                     ["UnsupportedLangCount"] = 0,
                     ["FailureReasonCount"] = 0,
-                    ["FailureReasons"] = new JArray()
+                    ["FailureReasons"] = new JArray(),
+                    ["StartupLowImpact"] = startupRepair
                 };
                 var logId = "";
                 try
@@ -2253,16 +2294,43 @@ namespace Microi.net
                     stats["SysLangs"] = string.Join(",", langConfigs.Select(lang => lang.Locale));
                     stats["LangCount"] = langConfigs.Count;
                     logId = await CreateDiyLangInitLogAsync(osClient, source, stats, startedAt);
-                    PreflightDiyLangTranslateTargets(osClient, langConfigs, stats);
+                    // Startup repair must not call every translation target just to
+                    // discover that there is no missing data. Manual repair keeps
+                    // the complete provider preflight and coverage report.
+                    if (!startupRepair)
+                    {
+                        PreflightDiyLangTranslateTargets(osClient, langConfigs, stats);
+                    }
                     await ReportDiyLangInitProgressAsync(osClient, logId, stats, startedAt);
-                    await FillMissingDiyLangTranslationsAsync(osClient, langConfigs, stats);
-                    ReportDiyLangBackgroundProgress(null, "正在刷新多语言缓存");
-                    await ReloadDiyLangCacheAsync(osClient);
-                    ReportDiyLangBackgroundProgress(null, "正在校准多语言目录结构");
-                    await NormalizeDiyLangTreeAsync(osClient, langConfigs, stats);
-                    ReportDiyLangBackgroundProgress(null, "正在复核多语言覆盖率");
-                    await ReloadDiyLangCacheAsync(osClient);
-                    await ApplyDiyLangCoverageStatsAsync(osClient, langConfigs, stats);
+                    await FillMissingDiyLangTranslationsAsync(
+                        osClient,
+                        langConfigs,
+                        stats,
+                        true,
+                        0,
+                        92,
+                        startupRepair
+                            ? DiyLangStartupRepairMaxCandidateRows
+                            : DiyLangManualRepairMaxCandidateRows,
+                        !startupRepair);
+                    var repairedCount = stats.Value<int>("MissingFilled");
+                    if (!startupRepair || repairedCount > 0)
+                    {
+                        ReportDiyLangBackgroundProgress(null, "正在刷新多语言缓存");
+                        await ReloadDiyLangCacheAsync(osClient);
+                    }
+                    if (!startupRepair)
+                    {
+                        ReportDiyLangBackgroundProgress(null, "正在校准多语言目录结构");
+                        await NormalizeDiyLangTreeAsync(osClient, langConfigs, stats);
+                        ReportDiyLangBackgroundProgress(null, "正在复核多语言覆盖率");
+                        await ReloadDiyLangCacheAsync(osClient);
+                        await ApplyDiyLangCoverageStatsAsync(osClient, langConfigs, stats);
+                    }
+                    else
+                    {
+                        stats["CoverageDeferred"] = true;
+                    }
                     var status = stats.Value<int>("FailedCount") > 0 || stats.Value<int>("Errors") > 0 ? "Partial" : "Success";
                     var failureSummary = status == "Success" ? "" : BuildDiyLangFailureSummary(stats);
                     await UpdateDiyLangInitLogAsync(osClient, logId, status, stats, startedAt, failureSummary);
@@ -2284,10 +2352,15 @@ namespace Microi.net
                     await UpdateDiyLangInitLogAsync(osClient, logId, "Failed", stats, startedAt, IsBlank(failureSummary) ? ex.Message : failureSummary);
                     return new DosResult(0, stats, ex.Message, 0, stats);
                 }
+                }
+                finally
+                {
+                    fullSyncSemaphore.Release();
+                }
             }
             finally
             {
-                fullSyncSemaphore.Release();
+                DiyLangProcessMaintenanceSemaphore.Release();
             }
         }
 
@@ -2365,9 +2438,12 @@ namespace Microi.net
 
             var fullSyncSemaphore = GetDiyLangTenantFullSyncSemaphore(osClient);
             ReportDiyLangBackgroundProgress(null, $"正在等待租户[{osClient}]的多语言执行权");
-            await fullSyncSemaphore.WaitAsync();
+            await DiyLangProcessMaintenanceSemaphore.WaitAsync();
             try
             {
+                await fullSyncSemaphore.WaitAsync();
+                try
+                {
                 ReportDiyLangBackgroundProgress(null, "正在准备多语言元数据全量同步");
                 var startedAt = DateTime.Now;
                 var logId = "";
@@ -2613,12 +2689,17 @@ namespace Microi.net
                 var failureSummary = BuildDiyLangFailureSummary(stats);
                 await UpdateDiyLangInitLogAsync(osClient, logId, "Failed", stats, startedAt, IsBlank(failureSummary) ? ex.Message : failureSummary);
                 return new DosResult(0, stats, ex.Message, 0, stats);
+                }
+                }
+                finally
+                {
+                    fullSyncSemaphore.Release();
+                }
             }
+            finally
+            {
+                DiyLangProcessMaintenanceSemaphore.Release();
             }
-             finally
-             {
-                 fullSyncSemaphore.Release();
-             }
         }
 
         protected static T TranslateMetadataSingleForReturn<T>(T source, string tableName, string osClient, string lang)

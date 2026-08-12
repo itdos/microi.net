@@ -43,6 +43,8 @@ public sealed class BackgroundTaskWorkerSupervisionTests
         Assert.Contains("nonConfiguredRunning >= parallelism - 1", runtime);
         Assert.Contains("ReservedNonDiyLangSlotCount", runtime);
         Assert.Contains("ShouldReserveNonMaintenanceSlot", runtime);
+        Assert.Contains("DiyLangBackgroundTaskService.ClusterConcurrencyKey", runtime);
+        Assert.Contains("concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient()", runtime);
         Assert.Contains("ActiveTasks", runtime);
         Assert.Contains("CommandFlags.FireAndForget", runtime);
         Assert.Contains("WorkerRenewalShutdownTimedOut", runtime);
@@ -83,7 +85,7 @@ public sealed class BackgroundTaskWorkerSupervisionTests
     [InlineData(2, 0, false)]
     [InlineData(2, 1, true)]
     [InlineData(3, 1, true)]
-    [InlineData(4, 1, false)]
+    [InlineData(4, 1, true)]
     [InlineData(4, 2, true)]
     public void LanguageMaintenance_CannotConsumeEveryWorkerSlot(
         int parallelism,

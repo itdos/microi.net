@@ -478,8 +478,10 @@ namespace Microi.net
             int diyLangRunning)
         {
             if (parallelism <= 1) return false;
-            var reservedSlots = parallelism > 2 ? 2 : 1;
-            return diyLangRunning >= parallelism - reservedSlots;
+            // Language repair is CPU and database intensive. Keep it to one local
+            // worker slot; the remaining slots stay available for user-submitted
+            // work regardless of the configured general worker parallelism.
+            return diyLangRunning >= 1;
         }
 
         /// <summary>
@@ -530,7 +532,7 @@ namespace Microi.net
                 MaxParallelTaskCount = Volatile.Read(ref _workerParallelism),
                 ConfiguredTenant = osClient ?? "",
                 ReservedConfiguredTenantSlotCount = Volatile.Read(ref _workerParallelism) > 1 ? 1 : 0,
-                ReservedNonDiyLangSlotCount = Volatile.Read(ref _workerParallelism) > 1 ? 1 : 0,
+                ReservedNonDiyLangSlotCount = Math.Max(0, Volatile.Read(ref _workerParallelism) - 1),
                 RunningSlotCount = Volatile.Read(ref _workerRunningCount),
                 ActiveExecutionCount = ActiveExecutions.Count,
                 ActiveTasks = activeTasks
@@ -580,9 +582,25 @@ namespace Microi.net
             {
                 try
                 {
+                    var concurrencyLeaseOsClient = item.OsClient;
+                    var concurrencyLeaseKey = item.ConcurrencyKey;
+                    if (string.Equals(
+                            item.ApiEngineKey,
+                            DiyLangBackgroundTaskService.WorkerApiEngineKey,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Tenant task tables remain the durable source of truth, but
+                        // all language jobs coordinate through the configured
+                        // tenant's Redis. This serializes maintenance across tenants
+                        // and nodes instead of merely within one tenant database.
+                        concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient();
+                        if (concurrencyLeaseOsClient.DosIsNullOrWhiteSpace())
+                            concurrencyLeaseOsClient = OsClientDefault.OsClient;
+                        concurrencyLeaseKey = DiyLangBackgroundTaskService.ClusterConcurrencyKey;
+                    }
                     concurrencyLease = BackgroundTaskConcurrencyLease.TryAcquire(
-                        item.OsClient,
-                        item.ConcurrencyKey,
+                        concurrencyLeaseOsClient,
+                        concurrencyLeaseKey,
                         item.LeaseOwner,
                         item.RuntimeOsClientType,
                         item.RuntimeOsClientNetwork,

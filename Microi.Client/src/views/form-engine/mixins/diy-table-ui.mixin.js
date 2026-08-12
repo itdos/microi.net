@@ -828,8 +828,14 @@ LoadFabPosition() {
         GetUserTableColumns() {
             var self = this;
             var fields = self._allFieldList || [];
+            var defaultFieldNames = (self.DiyCommon && self.DiyCommon.DefaultFieldNames || []).map(function (name) {
+                return String(name || "").toLowerCase();
+            });
             var result = fields.filter(function (field) {
-                return field && field.Id && self.FixedNotShowField.indexOf(field.Component) < 0;
+                return field
+                    && field.Id
+                    && self.FixedNotShowField.indexOf(field.Component) < 0
+                    && defaultFieldNames.indexOf(String(field.Name || "").toLowerCase()) < 0;
             }).map(function (field) {
                 return {
                     Key: tableFieldPreferenceKey(field),
