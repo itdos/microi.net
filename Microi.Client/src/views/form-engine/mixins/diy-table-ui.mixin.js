@@ -1,6 +1,16 @@
 import _u from "underscore";
 import { hasFieldReference } from "./table-field-data-source.js";
 import { buildIdBackedTreeFilterOptions, isIdBackedTreeFilterField } from "./column-filter-options.js";
+import {
+    USER_TABLE_COLUMN_PREFERENCE_ENGINE,
+    USER_TABLE_COLUMN_PREFERENCE_VERSION,
+    buildColumnPreferenceCacheKey,
+    invertVisibleColumnKeys,
+    normalizeHiddenColumnKeys,
+    setColumnKeyVisible,
+    tableAuditPreferenceKey,
+    tableFieldPreferenceKey
+} from "../utils/user-table-column-preference.js";
 
 export default {
     methods: {
@@ -665,6 +675,249 @@ LoadFabPosition() {
         },
         // ========== 性能优化V3 END ==========
 
+        // ========== 用户模块列显示设置 ==========
+        GetColumnSettingsText(key) {
+            var locale = this.$i18n && this.$i18n.locale;
+            if (locale && typeof locale === "object") locale = locale.value;
+            locale = String(locale || (this.diyStore && this.diyStore.Lang) || "zh-CN");
+            var english = /^en/i.test(locale);
+            var zh = {
+                title: "列显示设置", search: "搜索字段", selectAll: "全选", invert: "反选", reset: "恢复模块默认",
+                visible: "已显示", field: "业务字段", audit: "系统字段", empty: "没有匹配的字段",
+                loading: "正在读取", pending: "等待保存", saving: "正在保存", saved: "已自动保存", error: "保存失败，点击重试",
+                hint: "修改后立即生效，并自动同步到当前账号的此模块设置。"
+            };
+            var en = {
+                title: "Column visibility", search: "Search fields", selectAll: "Select all", invert: "Invert", reset: "Reset module defaults",
+                visible: "Visible", field: "Field", audit: "System", empty: "No matching fields",
+                loading: "Loading", pending: "Waiting to save", saving: "Saving", saved: "Saved", error: "Save failed — retry",
+                hint: "Changes apply immediately and sync to this account for the current module."
+            };
+            return (english ? en : zh)[key] || key;
+        },
+        GetColumnSettingsStatusText() {
+            var state = this._columnSettingsSaveState;
+            return state === "idle" ? "" : this.GetColumnSettingsText(state);
+        },
+        GetUserTableColumnPreferenceContext() {
+            var currentUser = this.GetCurrentUser || {};
+            var userId = String(currentUser.Id || currentUser.UserId || "").trim();
+            var sysMenuId = String(this.SysMenuId || (this.SysMenuModel && this.SysMenuModel.Id) || "").trim();
+            var osClient = String(this.DiyCommon.GetOsClient ? this.DiyCommon.GetOsClient() : (this.diyStore && this.diyStore.OsClient) || "").trim();
+            if (!userId || !sysMenuId) return null;
+            return {
+                userId: userId,
+                sysMenuId: sysMenuId,
+                osClient: osClient,
+                cacheKey: buildColumnPreferenceCacheKey({ osClient: osClient, userId: userId, sysMenuId: sysMenuId })
+            };
+        },
+        ReadCachedUserTableColumnPreference(context) {
+            if (!context || typeof localStorage === "undefined") return null;
+            try {
+                var cached = JSON.parse(localStorage.getItem(context.cacheKey) || "null");
+                if (!cached || Number(cached.Version || 0) !== USER_TABLE_COLUMN_PREFERENCE_VERSION) return null;
+                return normalizeHiddenColumnKeys(cached.HiddenColumnKeys);
+            } catch (_) {
+                return null;
+            }
+        },
+        WriteCachedUserTableColumnPreference(context, hiddenColumnKeys) {
+            if (!context || typeof localStorage === "undefined") return;
+            try {
+                localStorage.setItem(context.cacheKey, JSON.stringify({
+                    Version: USER_TABLE_COLUMN_PREFERENCE_VERSION,
+                    HiddenColumnKeys: normalizeHiddenColumnKeys(hiddenColumnKeys),
+                    UpdateTime: new Date().toISOString()
+                }));
+            } catch (_) {
+                // 本地缓存失败不阻断实时显示与服务端保存。
+            }
+        },
+        RefreshUserTableColumns() {
+            var self = this;
+            if (self.SysMenuModel && self.DiyFieldList && self.DiyFieldList.length > 0) self.GetShowDiyFieldList();
+            self.$nextTick(function () {
+                var tableRef = self.$refs["diy-table-" + self.TableId];
+                if (tableRef && typeof tableRef.doLayout === "function") tableRef.doLayout();
+            });
+        },
+        ApplyUserTableColumnPreference(hiddenColumnKeys) {
+            this._runtimeHiddenFields = normalizeHiddenColumnKeys(hiddenColumnKeys);
+            this.RefreshUserTableColumns();
+        },
+        async LoadUserTableColumnPreference() {
+            var self = this;
+            var context = self.GetUserTableColumnPreferenceContext();
+            if (!context) return;
+
+            if (self._columnPreferenceMenuId !== context.sysMenuId) {
+                if (self._columnPreferenceSaveTimer) clearTimeout(self._columnPreferenceSaveTimer);
+                self._columnPreferenceSaveTimer = null;
+                self._columnPreferenceMenuId = context.sysMenuId;
+                self._columnPreferenceEditVersion = 0;
+                self._columnSettingsSearch = "";
+                self._runtimeHiddenFields = [];
+                var cached = self.ReadCachedUserTableColumnPreference(context);
+                if (cached) self.ApplyUserTableColumnPreference(cached);
+            }
+
+            var requestId = ++self._columnPreferenceRequestId;
+            var editVersion = self._columnPreferenceEditVersion;
+            if (self._columnSettingsSaveState === "idle") self._columnSettingsSaveState = "loading";
+            try {
+                var result = await self.DiyCommon.ApiEngine.Run(USER_TABLE_COLUMN_PREFERENCE_ENGINE, {
+                    Action: "Get",
+                    SysMenuId: context.sysMenuId
+                });
+                if (requestId !== self._columnPreferenceRequestId || context.sysMenuId !== self._columnPreferenceMenuId) return;
+                if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || "Load failed");
+                var hiddenColumnKeys = normalizeHiddenColumnKeys(result.Data && result.Data.HiddenColumnKeys);
+                self.WriteCachedUserTableColumnPreference(context, hiddenColumnKeys);
+                // 用户在请求期间已经操作过复选框时，以本地新选择为准，避免慢响应覆盖。
+                if (editVersion === self._columnPreferenceEditVersion) self.ApplyUserTableColumnPreference(hiddenColumnKeys);
+                if (self._columnSettingsSaveState === "loading") self._columnSettingsSaveState = "saved";
+            } catch (error) {
+                if (requestId !== self._columnPreferenceRequestId) return;
+                self._columnSettingsSaveError = String(error && error.message || error || "Load failed");
+                if (self._columnSettingsSaveState === "loading") self._columnSettingsSaveState = "error";
+            }
+        },
+        ScheduleUserTableColumnPreferenceSave() {
+            var self = this;
+            var context = self.GetUserTableColumnPreferenceContext();
+            if (!context) return;
+            self._columnPreferenceEditVersion += 1;
+            self._columnSettingsSaveState = "pending";
+            self._columnSettingsSaveError = "";
+            self.WriteCachedUserTableColumnPreference(context, self._runtimeHiddenFields);
+            if (self._columnPreferenceSaveTimer) clearTimeout(self._columnPreferenceSaveTimer);
+            self._columnPreferenceSaveTimer = setTimeout(function () {
+                self._columnPreferenceSaveTimer = null;
+                self.SaveUserTableColumnPreference();
+            }, 450);
+        },
+        async SaveUserTableColumnPreference() {
+            var self = this;
+            var context = self.GetUserTableColumnPreferenceContext();
+            if (!context) return;
+            var hiddenColumnKeys = normalizeHiddenColumnKeys(self._runtimeHiddenFields);
+            var saveId = ++self._columnPreferenceSaveId;
+            self._columnSettingsSaveState = "saving";
+            try {
+                var result = await self.DiyCommon.ApiEngine.Run(USER_TABLE_COLUMN_PREFERENCE_ENGINE, {
+                    Action: "Save",
+                    SysMenuId: context.sysMenuId,
+                    HiddenColumnKeys: hiddenColumnKeys,
+                    Version: USER_TABLE_COLUMN_PREFERENCE_VERSION
+                });
+                if (saveId !== self._columnPreferenceSaveId || context.sysMenuId !== self._columnPreferenceMenuId) return;
+                if (!result || Number(result.Code) !== 1) throw new Error((result && result.Msg) || "Save failed");
+                self._columnSettingsSaveState = "saved";
+                self._columnSettingsSaveError = "";
+                self.WriteCachedUserTableColumnPreference(context, hiddenColumnKeys);
+            } catch (error) {
+                if (saveId !== self._columnPreferenceSaveId) return;
+                self._columnSettingsSaveState = "error";
+                self._columnSettingsSaveError = String(error && error.message || error || "Save failed");
+            }
+        },
+        GetUserTableColumnKey(field, isAudit) {
+            return isAudit ? tableAuditPreferenceKey(field && field.Name) : tableFieldPreferenceKey(field);
+        },
+        GetUserTableColumns() {
+            var self = this;
+            var fields = self._allFieldList || [];
+            var result = fields.filter(function (field) {
+                return field && field.Id && self.FixedNotShowField.indexOf(field.Component) < 0;
+            }).map(function (field) {
+                return {
+                    Key: tableFieldPreferenceKey(field),
+                    Name: field.Name,
+                    Label: field.Label || field.Name,
+                    IsAudit: false,
+                    Field: field
+                };
+            });
+            var auditFields = [
+                { Name: "CreateTime", Label: self.$t("Msg.CreateTime") },
+                { Name: "UserName", Label: self.$t("Msg.Creator") },
+                { Name: "UpdateTime", Label: self.$t("Msg.UpdateTime") }
+            ];
+            auditFields.forEach(function (field) {
+                if (!self.ColIsConfigured(field.Name)) return;
+                result.push({
+                    Key: tableAuditPreferenceKey(field.Name),
+                    Name: field.Name,
+                    Label: field.Label,
+                    IsAudit: true,
+                    Field: self.getSystemAuditField(field.Name, field.Label)
+                });
+            });
+            return result;
+        },
+        GetFilteredUserTableColumns() {
+            var keyword = String(this._columnSettingsSearch || "").trim().toLowerCase();
+            var columns = this.GetUserTableColumns();
+            if (!keyword) return columns;
+            return columns.filter(function (column) {
+                return String(column.Label || "").toLowerCase().indexOf(keyword) > -1
+                    || String(column.Name || "").toLowerCase().indexOf(keyword) > -1;
+            });
+        },
+        GetVisibleUserTableColumnCount() {
+            var self = this;
+            return self.GetUserTableColumns().filter(function (column) { return !self.IsUserTableColumnHidden(column); }).length;
+        },
+        SetUserTableColumnVisible(column, visible) {
+            this._runtimeHiddenFields = setColumnKeyVisible(this._runtimeHiddenFields, column && column.Key, visible);
+            this.RefreshUserTableColumns();
+            this.ScheduleUserTableColumnPreferenceSave();
+        },
+        SelectAllUserTableColumns() {
+            this.ApplyUserTableColumnPreference([]);
+            this.ScheduleUserTableColumnPreferenceSave();
+        },
+        InvertUserTableColumns() {
+            var keys = this.GetUserTableColumns().map(function (column) { return column.Key; });
+            this.ApplyUserTableColumnPreference(invertVisibleColumnKeys(this._runtimeHiddenFields, keys));
+            this.ScheduleUserTableColumnPreferenceSave();
+        },
+        ResetUserTableColumns() {
+            this.SelectAllUserTableColumns();
+        },
+        showColumnSettings(event) {
+            var self = this;
+            event.stopPropagation();
+            self.hideMoreMenu();
+            self.hideColHeaderMenu();
+            var rect = event.currentTarget.getBoundingClientRect();
+            var width = Math.min(380, window.innerWidth - 20);
+            var left = Math.max(10, Math.min(rect.right - width, window.innerWidth - width - 10));
+            var top = rect.bottom + 4;
+            self._columnSettingsPosition = {
+                top: top,
+                left: left,
+                maxHeight: Math.max(260, window.innerHeight - top - 12)
+            };
+            self._columnSettingsVisible = true;
+            setTimeout(function () {
+                document.removeEventListener("click", self.hideColumnSettings, true);
+                document.addEventListener("click", self.hideColumnSettings, true);
+            }, 0);
+        },
+        hideColumnSettings(event) {
+            var self = this;
+            if (event && event.target) {
+                var menu = self.$refs.globalColumnSettings;
+                if (menu && menu.contains && menu.contains(event.target)) return;
+                var closest = event.target.closest ? event.target.closest(".el-popper, .el-select__popper") : null;
+                if (closest) return;
+            }
+            self._columnSettingsVisible = false;
+            document.removeEventListener("click", self.hideColumnSettings, true);
+        },
+
         // ========== 列头菜单方法 ==========
         getSystemAuditField(fieldName, fallbackLabel) {
             var self = this;
@@ -851,22 +1104,19 @@ LoadFabPosition() {
         colMenuHideColumn() {
             var self = this;
             if (!self._colMenuField) return;
-            self._runtimeHiddenFields.push(self._colMenuField.Id);
-            // 从 ShowDiyFieldList 中移除
-            if (self.ShowDiyFieldList) {
-                var idx = self.ShowDiyFieldList.findIndex(f => f.Id === self._colMenuField.Id);
-                if (idx > -1) {
-                    self.ShowDiyFieldList.splice(idx, 1);
-                }
-            }
+            var businessField = (self._allFieldList || []).find(function (field) { return field.Id === self._colMenuField.Id; });
+            var isAudit = !businessField && ["CreateTime", "UserName", "UpdateTime"].indexOf(self._colMenuField.Name) > -1;
+            self.SetUserTableColumnVisible({
+                Key: self.GetUserTableColumnKey(self._colMenuField, isAudit),
+                Field: self._colMenuField,
+                IsAudit: isAudit,
+                Name: self._colMenuField.Name
+            }, false);
             self.hideColHeaderMenu();
         },
         colMenuRestoreColumns() {
             var self = this;
-            // 恢复所有运行时隐藏的列
-            self._runtimeHiddenFields = [];
-            // 重新生成显示列
-            self.GetShowDiyFieldList();
+            self.ResetUserTableColumns();
             self.hideColHeaderMenu();
         },
         colMenuSaveWidth() {

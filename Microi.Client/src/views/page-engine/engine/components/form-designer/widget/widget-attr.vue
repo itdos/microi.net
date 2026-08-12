@@ -6,11 +6,11 @@
         <el-tag size="small" effect="plain">{{ curWidget.type || 'unknown' }}</el-tag>
       </div>
       <div class="selected-widget-meta">
-        <span>组件编号：{{ curWidget.widgetOption?.number || '-' }}</span>
-        <span>容器编号：{{ curWidget.widgetOption?.wrapperNumber || '-' }}</span>
+        <span>{{ $pet('组件编号') }}: {{ curWidget.widgetOption?.number || '-' }}</span>
+        <span>{{ $pet('容器编号') }}: {{ curWidget.widgetOption?.wrapperNumber || '-' }}</span>
       </div>
       <div v-if="isOfficeWidget" class="selected-widget-tip">
-        这是 PDF/Office 预览组件，可在下方配置接口引擎、文件地址、文件类型、初始页码和轮询接口秒数。
+        {{ $pet('这是 PDF/Office 预览组件，可在下方配置接口引擎、文件地址、文件类型、初始页码和轮询接口秒数。') }}
       </div>
     </div>
 
@@ -20,13 +20,13 @@
       plain
       class="btnJson"
       @click="drawerjson = true"
-      >组件JSON</el-button
+      >{{ $pet('组件JSON') }}</el-button
     >
 
     <el-collapse v-model="activeName">
-      <el-collapse-item title="通用配置" name="1">
+      <el-collapse-item :title="$pet('通用配置')" name="1">
         <el-form>
-          <el-form-item label="组件类型">
+          <el-form-item :label="$pet('组件类型')">
             <el-input
               disabled
               size="small"
@@ -34,7 +34,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="组件编号">
+          <el-form-item :label="$pet('组件编号')">
             <el-input
               disabled
               size="small"
@@ -42,7 +42,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="容器编号">
+          <el-form-item :label="$pet('容器编号')">
             <el-input
               disabled
               size="small"
@@ -50,7 +50,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="栅格宽度">
+          <el-form-item :label="$pet('栅格宽度')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -79,7 +79,7 @@
             </el-slider>
           </el-form-item>
 
-          <el-form-item label="组件高度">
+          <el-form-item :label="$pet('组件高度')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -105,7 +105,7 @@
         </el-slider>
       </el-form-item> -->
 
-          <el-form-item label="组件上移">
+          <el-form-item :label="$pet('组件上移')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -131,7 +131,7 @@
         </el-slider>
       </el-form-item> -->
 
-          <el-form-item label="左侧间隔">
+          <el-form-item :label="$pet('左侧间隔')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -144,7 +144,7 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="栅格右移">
+          <el-form-item :label="$pet('栅格右移')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -157,7 +157,7 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="栅格左移">
+          <el-form-item :label="$pet('栅格左移')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -170,7 +170,7 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="内边距值">
+          <el-form-item :label="$pet('内边距值')">
             <el-input
               size="small"
               :model-value="curWidget.widgetOption.dynamicStyle.padding"
@@ -184,7 +184,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="背景颜色">
+          <el-form-item :label="$pet('背景颜色')">
             <el-color-picker
               show-alpha
               size="small"
@@ -202,7 +202,7 @@
       </el-collapse-item>
       <el-collapse-item :title="componentConfigTitle" name="2">
         <div v-if="isOfficeWidget" class="widget-config-help">
-          数据源可选择接口引擎。接口返回 `FileByteBase64` / `FileUrl` 和 `PageNumber` 后，PDF 会按页码打开；返回 `Refresh:false`、`Changed:false` 或 `NotModified:true` 时保持当前文件；轮询接口秒数为 0 表示不自动请求。
+          {{ $pet('数据源可选择接口引擎。接口返回 `FileByteBase64` / `FileUrl` 和 `PageNumber` 后，PDF 会按页码打开；返回 `Refresh:false`、`Changed:false` 或 `NotModified:true` 时保持当前文件；轮询接口秒数为 0 表示不自动请求。') }}
         </div>
 
         <el-form label-position="left" label-width="88px" class="widget-param-form">
@@ -211,7 +211,7 @@
             v-for="(item, index) in curWidget.widgetParams"
             :key="index"
           >
-            <el-form-item :label="item.label">
+            <el-form-item :label="$pet(item.label)">
               <template v-if="item.type === 'textarea'">
                 <!-- 数据来源：接口引擎选择 + 手动输入 -->
                 <template v-if="index === 0">
@@ -221,7 +221,7 @@
                     size="small"
                     :model-value="getApiEngineSelectValue(item.value)"
                     @update:model-value="(val) => handleApiEngineSelect(index, val)"
-                    placeholder="选择接口引擎"
+                    :placeholder="$pet('选择接口引擎')"
                     filterable
                     clearable
                     @clear="handleInputChange(index, '')"
@@ -256,7 +256,7 @@
                     type="success"
                     plain
                     @click="getDataJson(item.typeOptions.dataJson, index)"
-                    >查看数据格式</el-button
+                    >{{ $pet('查看数据格式') }}</el-button
                   >
                   <el-button
                     v-if="curWidget.type === 'html'"
@@ -266,7 +266,7 @@
                     type="warning"
                     plain
                     @click="getDataHtml(item.typeOptions.dataHtml, index)"
-                    >查看Html代码</el-button
+                    >{{ $pet('查看Html代码') }}</el-button
                   >
                 </template>
               </template>
@@ -277,7 +277,7 @@
                   size="small"
                   :model-value="getLocalValue(index, item.value)"
                   @update:model-value="handleInputChange(index, $event)"
-                  placeholder="请选择界面引擎"
+                  :placeholder="$pet('请选择界面引擎')"
                   filterable
                   clearable
                   :loading="pageEngineLoading"
@@ -359,7 +359,7 @@
                     v-for="(option, optionIndex) in item.typeOptions?.options"
                     :key="optionIndex"
                     :value="option.value"
-                    :label="option.label"
+                    :label="$pet(option.label)"
                   />
                 </el-select>
               </template>
@@ -372,7 +372,7 @@
                     v-for="(option, optionIndex) in item.typeOptions?.options"
                     :key="optionIndex"
                     :value="option.value"
-                    :label="option.label"
+                    :label="$pet(option.label)"
                   ></el-radio>
                 </el-radio-group>
               </template>
@@ -382,7 +382,7 @@
                   <el-input
                     v-model="sysMenuFilterText"
                     size="small"
-                    placeholder="搜索菜单"
+                    :placeholder="$pet('搜索菜单')"
                     clearable
                     style="margin-bottom: 8px"
                   />
@@ -411,9 +411,9 @@
       </el-collapse-item>
     </el-collapse>
 
-    <el-drawer size="60%" title="动态数据格式" v-model="drawer" direction="ltr">
+    <el-drawer size="60%" :title="$pet('动态数据格式')" v-model="drawer" direction="ltr">
       <el-tabs v-model="activeName1" type="card">
-        <el-tab-pane label="接口格式" name="first">
+        <el-tab-pane :label="$pet('接口格式')" name="first">
           <JsonEditor
             v-if="drawer"
             height="480px"
@@ -421,19 +421,19 @@
             :option="jsonEditorOption"
           />
         </el-tab-pane>
-        <el-tab-pane label="HTML代码" name="second">
+        <el-tab-pane :label="$pet('HTML代码')" name="second">
           <div style="height: 480px; overflow: auto">
-            <codemirror
+            <MonacoHtmlEditor
               v-if="drawer"
               :htmlStr="dataHtmlStr"
               @editor-content="handleEditorContent"
-            ></codemirror>
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
     </el-drawer>
 
-    <el-drawer size="60%" title="组件JSON" v-model="drawerjson" direction="ltr">
+    <el-drawer size="60%" :title="$pet('组件JSON')" v-model="drawerjson" direction="ltr">
       <JsonEditor
         v-if="drawerjson"
         height="480px"
@@ -442,7 +442,7 @@
       />
     </el-drawer>
   </div>
-  <el-empty v-else description="请选择一个组件" :image-size="72" />
+  <el-empty v-else :description="$pet('请选择一个组件')" :image-size="72" />
 </template>
 
 <script setup name="widget-attr">
@@ -456,7 +456,8 @@ import { ElMessage } from 'element-plus'
 import { widgetList as builtWidgetList } from '../../../utils/builtWidget.js'
 import { deepClone } from '../../../utils/util'
 
-import codemirror from '../../codemirror/index.vue'
+import MonacoHtmlEditor from '../../monaco-html-editor/index.vue'
+import { peT } from '../../../i18n.js'
 
 const pageEngineStore = usePageEngineStore()
 const { curWidget, curWidgetIdx } = storeToRefs(pageEngineStore)
@@ -792,7 +793,7 @@ const getDataHtml = (dataHtml, index) => {
     updateIndex.value = index
   } else {
     ElMessage({
-      message: '只适用于超文本组件',
+      message: peT('只适用于超文本组件'),
       type: 'warning',
     })
   }
@@ -808,7 +809,7 @@ const jsonEditorOption = {
 // html编辑器回调函数
 const handleEditorContent = (content) => {
   ElMessage({
-    message: '已完成修改',
+    message: peT('已完成修改'),
     type: 'success',
   })
   curWidget.value.widgetParams[updateIndex.value].typeOptions.dataHtml = content

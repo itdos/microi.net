@@ -3,12 +3,14 @@ name: v8-crud-api
 description: Microi V8 CRUD 接口引擎开发。用于编写服务端 JavaScript，涉及 V8.FormEngine Add/Upt/Del/GetTableData、DosResult 返回、事务和校验。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi V8 CRUD API 接口引擎开发
 
 你正在开发 Microi 吾码平台的 V8 接口引擎。接口引擎是运行在服务端的 JavaScript 函数，通过 `V8.FormEngine` 操作数据库，通过 `V8.Result` 或 `return` 返回结果。
 
+<!-- microi-progressive:begin -->
+<!-- microi-progressive:chunk id=v8-crud-api-000 sha256=bfeaae480ebf6028fe98904cc6f8feb630b140b99551fefcc551c8038a2ca078 -->
 ## 本地优先与版本头（必做）
 
 AI 本地开发接口引擎时，优先修改 `microi-v8-engine/<租户>/<项目>/接口引擎/.../*.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。插件提示“本地和远端不一致”时，必须先读取本地与远端代码并合并有效差异，不能盲目用任一侧覆盖另一侧。
@@ -35,6 +37,8 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 
 生成接口引擎代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；跨表事务、权限校验、状态机、金额/库存计算、复杂 `_Where` 条件等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-crud-api-001 sha256=86768d106f68593e51beb29bcff1ee0291c483706431181da34984b22228ff21 -->
 ## 核心规则
 
 - 接口引擎文件是纯 JavaScript（Jint 引擎，非 Node.js）
@@ -46,6 +50,8 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - 服务端调用 FormEngine 默认**不触发**表单 V8 事件，加 `_InvokeType: 'Client'` 才触发
 - 接口内 `return Code=1` 自动提交事务、`Code≠1` 自动回滚事务，**禁止**手动 Commit/Rollback
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-crud-api-002 sha256=9f10ab278468f292b5e26679b7a7ab2ea91bb6d4094e2bff8adb7cb15e39adce -->
 ## 性能底线（必须自检）
 
 - 写接口引擎前必须先做数据访问计划：需要哪些表、哪些字段、预计数据量、是否分页、是否需要缓存。
@@ -64,6 +70,8 @@ Microi.net.Api 普通本地启动不要额外设置 `ASPNETCORE_ENVIRONMENT` / `
 - 面向个人中心的流水接口必须按 `V8.CurrentUser.Id` 强制隔离，并返回 `PageIndex`、`PageSize`、`TotalCount`；列表只取页面需要的审计字段。
 - 为便于用户核对，可以保存经过空白归一化的用户输入短摘要；摘要按 Unicode 文本元素截取，不能截断 emoji 或代理对，也不要把完整请求 JSON 当摘要。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-crud-api-003 sha256=d46768bbaaf8b2ebfdd38e09d11e886b135cb65e78984dbfa67d75ec5f947175 -->
 ## DosResult 状态码
 
 | Code | 含义 |
@@ -82,6 +90,8 @@ if (r.Code !== 1) return r;
 // r.Data 才是真实数据
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-crud-api-004 sha256=6d58584cabd1659ae3af6cbddb797df2c0844c99fd8d2627d02a9c0eae98e8c2 -->
 ## 全局日期函数
 
 ```javascript
@@ -90,82 +100,8 @@ DateFormat(new Date(), 'yyyy-MM-dd')          // 格式化
 DateAdd(new Date(), 'd', 7, 'yyyy-MM-dd')     // 加减（s/m/h/d/w/q/M/y）
 ```
 
-## 查询列表（分页）
-
-```javascript
-var result = V8.FormEngine.GetTableData('SysUser', {
-  _Where: [
-    ['Status', '=', 1],
-    ['AND', 'Name', 'Like', V8.Param.keyword || '']
-  ],
-  _SelectFields: ['Id', 'Account', 'Name', 'Phone', 'CreateTime'],
-  _OrderBy: 'CreateTime',
-  _OrderByType: 'DESC',
-  _PageIndex: V8.Param.pageIndex || 1,
-  _PageSize: V8.Param.pageSize || 20
-});
-
-return { Code: 1, Data: result.Data, DataCount: result.DataCount, Msg: '成功' };
-```
-
-### 请求内异步查询
-
-后端接口引擎可在本次请求内使用真实异步查询；前端 V8 不使用这个方法名：
-
-```javascript
-var result = await V8.FormEngine.GetTableDataAsync('SysUser', {
-  _Where: [['Status', '=', 1]],
-  _SelectFields: ['Id', 'Account', 'Name'],
-  _PageIndex: 1,
-  _PageSize: 20
-});
-
-return { Code: 1, Data: result.Data, DataCount: result.DataCount };
-```
-
-必须 `await` 结果。需要接口先返回、后续再批量处理时，应改用平台后台任务、Job、MQ 或 outbox，而不是丢弃 Promise。
-
-### 多字段排序
-
-```javascript
-var result = V8.FormEngine.GetTableData('SysUser', {
-  _Where: [['Status', '=', 1]],
-  _OrderBys: { 'CreateTime': 'desc', 'Name': 'asc' }
-});
-```
-
-### 匿名查询（无需登录）
-
-```javascript
-var result = V8.FormEngine.GetTableDataAnonymous('Article', {
-  _Where: [['IsPublished', '=', 1]],
-  _PageSize: 10
-});
-```
-
-匿名新增的公开入口是
-`POST /api/formengine/AddFormDataAnonymous`，且目标表必须显式允许匿名新增。
-当前后端 `V8.FormEngine` 接口不公开
-`V8.FormEngine.AddFormDataAnonymous`；接口引擎内部仍使用
-`V8.FormEngine.AddFormData(...)` 并遵守可信执行身份。不要仅因为历史文档出现
-该名称就为匿名业务接口关闭服务端校验。
-
-### 获取树形数据
-
-```javascript
-// 表单属性需开启【树形结构】
-var result = V8.FormEngine.GetTableDataTree('Department', {});
-```
-
-### 仅获取数据条数
-
-```javascript
-var result = V8.FormEngine.GetTableDataCount('SysUser', {
-  _Where: [['Status', '=', 1]]
-});
-// result.DataCount 为总数
-```
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-crud-api-005 sha256=35220022799bbed7f9b3d82fe14dc0855aa8f77d0640ac411c61d222d02b0eda -->
 ## 查询单条
 
 ```javascript
@@ -186,6 +122,8 @@ if (result.Code !== 1 || !result.Data) {
 return { Code: 1, Data: result.Data };
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-crud-api-006 sha256=510588ad14503caff0a92c614f0e7453bdd343a1e22711c6c5a2b3f8893b5a8d -->
 ## 新增
 
 ```javascript
@@ -227,174 +165,11 @@ for (var i = 0; i < V8.Param.items.length; i++) {
 var result = V8.FormEngine.AddTableData(addList);
 ```
 
-## 更新
+<!-- /microi-progressive:chunk -->
+## 详细参考路由（渐进披露）
 
-```javascript
-if (!V8.Param.Id) {
-  return { Code: 0, Msg: 'Id 不能为空' };
-}
+仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 
-var result = V8.FormEngine.UptFormData('SysUser', {
-  Id: V8.Param.Id,          // 必传
-  Name: V8.Param.Name,
-  Phone: V8.Param.Phone,
-  _NotSaveField: ['Account'],  // 可选：忽略这些字段不更新
-  _NoLineForAdd: true,         // 可选：数据不存在时自动插入
-  _ForceUpt: true              // 可选：强制修改自动编号字段
-});
-
-return { Code: result.Code, Msg: result.Code === 1 ? '更新成功' : result.Msg };
-```
-
-### 批量更新
-
-```javascript
-var uptList = [];
-for (var i = 0; i < V8.Param.items.length; i++) {
-  uptList.push({
-    FormEngineKey: 'SysUser',
-    Id: V8.Param.items[i].Id,
-    Status: V8.Param.items[i].Status
-  });
-}
-V8.FormEngine.UptTableData(uptList);
-```
-
-## 删除
-
-```javascript
-// 删除单条
-var result = V8.FormEngine.DelFormData('SysUser', { Id: V8.Param.Id });
-
-// 批量删除（传 Ids 数组）
-var result = V8.FormEngine.DelFormData('SysUser', { Ids: V8.Param.Ids });
-
-return { Code: result.Code, Msg: result.Code === 1 ? '删除成功' : result.Msg };
-```
-
-### 批量删除（跨表）
-
-```javascript
-var delList = [];
-delList.push({ FormEngineKey: 'OrderDetail', Id: V8.Param.detailId });
-delList.push({ FormEngineKey: 'OrderHeader', Id: V8.Param.orderId });
-V8.FormEngine.DelTableData(delList);
-```
-
-## 按条件批量操作
-
-```javascript
-// 按条件更新
-V8.FormEngine.UptFormDataByWhere('SysUser', {
-  _Where: [['DeptId', '=', V8.Param.deptId]],
-  Status: 0,
-  _NoLineForAdd: true  // 可选：不存在时插入
-});
-
-// 按条件删除（不支持 _Where 以外的删除方式）
-V8.FormEngine.DelFormDataByWhere('SysUser', {
-  _Where: [['Status', '=', 0], ['AND', 'CreateTime', '<', '2024-01-01']]
-});
-```
-
-## 事务处理
-
-```javascript
-// 接口引擎中 V8.Db 自动开启事务：
-// 返回DosResult/带Code对象：仅Code=1提交，其他值回滚
-// 返回对象但没有Code：回滚
-// 返回字符串/数字/数组/布尔/null且未异常：提交
-// 手动调用 V8.DbTrans.Commit() 或 Rollback() 无效，由平台统一管理
-
-// FormEngine 可传入事务对象（第三个参数）
-V8.FormEngine.AddFormData('Table1', { Name: '测试' }, V8.DbTrans);
-V8.FormEngine.UptFormData('Table2', { Id: 'xxx', Status: 1 }, V8.DbTrans);
-
-// 调用其他接口引擎也可共享事务
-V8.ApiEngine.Run('other-engine-key', { Id: 'xxx' }, V8.DbTrans);
-```
-
-## 请求内异步与后台处理
-
-```javascript
-// 本次请求必须拿到结果时，使用真实Async API并await
-var resp = await V8.Http.PostResponseAsync({
-  Url: 'https://other.com/notify',
-  PostParam: { Id: V8.Param.id },
-  Timeout: 10
-});
-return resp.StatusCode >= 200 && resp.StatusCode < 300
-  ? { Code: 1 }
-  : { Code: 0, Msg: '通知失败' };
-```
-
-禁止用 `setTimeout` / `Task.Run` 实现“立即返回、后台继续”：接口返回后 Jint Engine、租户上下文、事务和执行租约会释放。脱离请求的任务使用后台任务、Job、MQ 或 outbox，并按 `EventId` 幂等处理与恢复。
-
-## 动态加字段（运行时改表结构）
-
-```javascript
-V8.FormEngine.AddField({
-  TableName: 'diy_test',
-  Name: 'Age',
-  Type: 'int',          // 仅使用平台允许的varchar(N)/mediumtext/longtext/int/bigint/decimal(18,N)
-  Label: '年龄',
-  Component: 'NumberText',
-  TableWidth: '100',
-  Visible: 1
-});
-```
-
-> 风险：会执行 DDL（ALTER TABLE）。仅在低代码自定义配置场景使用，业务运行时**不要**频繁调用。
-
-日期时间字段统一使用 `varchar(25)` 保存 `yyyy-MM-dd HH:mm:ss`，组件使用 `DateTime`。禁止 `datetime/date/timestamp/float/double/boolean/string/text/nvarchar` 等平台不允许的物理类型。动态表/字段属于控制面能力，只允许 `Level >= 9999` 的可信管理脚本使用。
-
-## 旧版 _Where 兼容
-
-```javascript
-// 老版本前端 / 老接口可能传旧格式 _Where：[{ Name, Value, Type, AndOr, Group }, ...]
-// 转换成新格式：
-var newWhere = V8.Method.ParseWhere(V8.Param._Where);
-V8.FormEngine.GetTableData('Table', { _Where: newWhere });
-```
-
-## _Where 条件语法速查
-
-```javascript
-// 等于
-[['Field', '=', value]]
-
-// 模糊查询
-[['Name', 'Like', '张']]      // %张%
-[['Name', 'StartLike', '张']] // 张%
-[['Name', 'EndLike', '三']]   // %三
-
-// AND / OR
-[['A', '=', 1], ['AND', 'B', '>', 10]]
-[['A', '=', 1], ['OR', 'B', '=', 2]]
-
-// IN / NotIn
-[['Id', 'In', ['id1', 'id2', 'id3']]]
-[['Status', 'NotIn', [0, -1]]]
-
-// NULL
-[['Field', '=', null]]    // IS NULL
-[['Field', '<>', null]]   // IS NOT NULL
-
-// 分组（括号）
-[['Name', 'Like', '张'], ['AND', '(', 'Age', '>', 18], ['OR', 'Status', '=', 1, ')']]
-
-// 日期范围
-[['CreateTime', '>=', '2024-01-01'], ['AND', 'CreateTime', '<', '2024-02-01']]
-```
-
-**支持的操作符：** `=`, `==`, `<>`, `!=`, `>`, `>=`, `<`, `<=`, `Like`, `NotLike`, `StartLike`, `EndLike`, `In`, `NotIn`
-
-## 注意事项
-
-- `_Where` 是参数化查询，自动防 SQL 注入，**不要拼接 SQL 字符串**
-- `AddFormData` 不需要传 `Id`，后端自动生成 GUID
-- `UptFormData` 必须包含 `Id` 字段
-- 如需触发表单 V8 事件，在参数中加 `_InvokeType: 'Client'`
-- 返回值中 `Code: 1` 表示成功，`Code: 0` 表示失败，`Code: 2` 表示数据不存在
-- 分页参数使用 `_PageIndex` 和 `_PageSize`（带下划线前缀）
-- 列表返回总数字段为 `result.DataCount`（非 Total）
+- [references/progressive-01-查询列表-分页.md](references/progressive-01-查询列表-分页.md)：查询列表（分页）；更新；删除；按条件批量操作；事务处理；请求内异步与后台处理；动态加字段（运行时改表结构）；旧版 _Where 兼容
+- [references/progressive-02-where-条件语法速查.md](references/progressive-02-where-条件语法速查.md)：_Where 条件语法速查；注意事项
+<!-- microi-progressive:end -->

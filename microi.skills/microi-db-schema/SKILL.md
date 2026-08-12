@@ -1,9 +1,9 @@
 ---
 name: microi-db-schema
-description: Microi 吾码数据库结构与字典指南。用于检查或解释 AI-Project/microi/db.json 中的 Microi 平台表，梳理 diy_table/diy_field/sys_menu 关系，定位 V8 事件存储字段，生成安全的系统表 V8 FormEngine 查询，或分析工作流、SaaS、权限、菜单、接口引擎、数据源和系统配置结构。
+description: Microi 吾码数据库结构与字典指南。用于通过实时 MCP Schema 或当前租户快照检查 Microi 平台表，梳理 diy_table/diy_field/sys_menu 关系，定位 V8 事件存储字段，生成安全的系统表 V8 FormEngine 查询，或分析工作流、SaaS、权限、菜单、接口引擎、数据源和系统配置结构。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi DB Schema
 
@@ -11,9 +11,9 @@ description: Microi 吾码数据库结构与字典指南。用于检查或解释
 
 ## 快速流程
 
-1. 阅读 `references/schema.md` 获取完整数据库结构：固定字段、核心关系、V8 事件字段、全部表分类，以及每张核心表的字段明细。
+1. 优先调用 `microi_get_db_schema` 获取当前服务器的实时表结构；无法连接时才读取当前引擎所属 OsClient 目录的 `.microi-db-schema.md`，并明确说明快照可能过期。`references/schema.md` 只用于理解通用关系，不是任何租户的权威字段清单。
 2. 编写感知结构的 V8 代码时，优先使用带 `_Where` 的 `V8.FormEngine`。只有联表、聚合或 FormEngine 无法表达的场景才使用 `V8.Db.FromSql`，并且必须参数化动态值。
-3. 将 `AI-Project/microi/db.json` 视为当前导出字段列表的权威来源。它列出可配置字段；DIY 表还带有导出中未列出的固定系统字段（`Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted`）。
+3. 实时 MCP Schema 是字段事实源；本地 `.microi-db-schema.md` 仅作离线快照。不要假设普通用户拥有某个仓库专属数据库文件。DIY 表还带有固定系统字段（`Id`、`CreateTime`、`UpdateTime`、`UserId`、`UserName`、`IsDeleted`）。
 
 ## 核心模型
 

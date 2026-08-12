@@ -21,7 +21,7 @@
                 <el-input
                     v-model="searchKeyword"
                     class="ws-search__input"
-                    placeholder="搜索菜单 / 功能"
+                    :placeholder="$t('Msg.Mobile.workspace.searchPlaceholder')"
                     clearable
                 >
                     <template #prefix>
@@ -52,10 +52,10 @@
             <section v-if="hasSearchKeyword" class="search-panel mci-card">
                 <header class="search-panel__head">
                     <div>
-                        <span class="search-panel__eyebrow">快速定位</span>
-                        <h2 class="search-panel__title">搜索结果</h2>
+                        <span class="search-panel__eyebrow">{{ $t("Msg.Mobile.workspace.quickLocate") }}</span>
+                        <h2 class="search-panel__title">{{ $t("Msg.Mobile.workspace.searchResults") }}</h2>
                     </div>
-                    <span class="search-panel__count">{{ searchResults.length }} 项</span>
+                    <span class="search-panel__count">{{ $t("Msg.Mobile.workspace.resultCount", { count: searchResults.length }) }}</span>
                 </header>
 
                 <div v-if="searchResults.length > 0" class="search-results">
@@ -81,8 +81,8 @@
 
                 <div v-else class="empty-state empty-state--search">
                     <el-icon class="empty-state__search-icon"><Search /></el-icon>
-                    <span class="empty-state__title">未找到相关菜单</span>
-                    <span class="empty-state__sub">换个关键词试试</span>
+                    <span class="empty-state__title">{{ $t("Msg.Mobile.workspace.noMatch") }}</span>
+                    <span class="empty-state__sub">{{ $t("Msg.Mobile.workspace.tryAnother") }}</span>
                 </div>
             </section>
 
@@ -90,8 +90,8 @@
                 <!-- 空状态 -->
                 <div v-if="menuList.length === 0" class="empty-state mci-card">
                     <span class="empty-state__icon">📁</span>
-                    <span class="empty-state__title">暂无菜单</span>
-                    <span class="empty-state__sub">请联系管理员开通权限</span>
+                    <span class="empty-state__title">{{ $t("Msg.Mobile.workspace.noMenu") }}</span>
+                    <span class="empty-state__sub">{{ $t("Msg.Mobile.workspace.contactAdmin") }}</span>
                 </div>
 
                 <article
@@ -137,7 +137,7 @@
         <!-- 子菜单弹窗 -->
         <el-dialog
             v-model="showSubMenu"
-            :title="currentSubMenu?.meta?.title || '子菜单'"
+            :title="currentSubMenu?.meta?.title || $t('Msg.Mobile.workspace.submenu')"
             width="92%"
             class="mci-submenu-dialog"
             :close-on-click-modal="true"
@@ -169,6 +169,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { usePermissionStore, useDiyStore } from '@/pinia';
 import { Folder, Document, ArrowRight, Search } from '@element-plus/icons-vue';
 import { DiyCommon } from '@/utils/diy.common';
@@ -181,12 +182,13 @@ defineOptions({
 const router = useRouter();
 const permissionStore = usePermissionStore();
 const diyStore = useDiyStore();
+const { t } = useI18n();
 
 const loading = ref(true);
 const searchKeyword = ref('');
 
 const isPhoneView = computed(() => diyStore.IsPhoneView);
-const appName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 工作台');
+const appName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || t('Msg.Mobile.workspace.appName'));
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const logoUrl = computed(() => {
     const logo = diyStore.SysConfig?.SysLogo;
@@ -329,7 +331,7 @@ const flattenVisibleMenus = (menus, ancestors = []) => {
             key: `${getMenuKey(menu, index)}-${index}-${ancestors.length}`,
             menu,
             title,
-            subtitle: subtitle || (children.length ? '目录菜单' : pathText),
+            subtitle: subtitle || (children.length ? t('Msg.Mobile.workspace.directoryMenu') : pathText),
             path: pathText,
             searchText
         });

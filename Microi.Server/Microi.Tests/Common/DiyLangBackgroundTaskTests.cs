@@ -156,6 +156,32 @@ public sealed class DiyLangBackgroundTaskTests
     }
 
     [Fact]
+    public void LanguageMaintenance_IsTenantIsolatedAndReportsDurableProgress()
+    {
+        var root = FindRepositoryRoot();
+        var formEngine = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Core",
+            "FormEngine",
+            "FormEngineLang.cs"));
+        var worker = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Core",
+            "Services",
+            "DiyLangBackgroundTaskService.cs"));
+
+        Assert.Contains("DiyLangTenantFullSyncSemaphores", formEngine, StringComparison.Ordinal);
+        Assert.Contains("GetDiyLangTenantFullSyncSemaphore(osClient)", formEngine, StringComparison.Ordinal);
+        Assert.DoesNotContain("DiyLangFullSyncSemaphore", formEngine, StringComparison.Ordinal);
+        Assert.Contains("EnterDiyLangSyncProgressReporter", worker, StringComparison.Ordinal);
+        Assert.Contains("currentWork, totalWork", formEngine, StringComparison.Ordinal);
+        Assert.Contains("正在扫描并补齐", formEngine, StringComparison.Ordinal);
+        Assert.Contains("TimeSpan.FromSeconds(1)", worker, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ActiveTaskReuse_RequiresEquivalentOrSupersetSemantics()
     {
         var repair = new Newtonsoft.Json.Linq.JObject

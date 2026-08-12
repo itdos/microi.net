@@ -43,7 +43,7 @@
           <el-icon>
             <FullScreen />
           </el-icon>
-          {{ wrapperObj.wrapperOption.number }} , 子元素
+          {{ wrapperObj.wrapperOption.number }}, {{ $pet('子元素') }}
           {{ wrapperObj.widgetList.length }}
         </el-text>
       </div>
@@ -53,7 +53,7 @@
           <el-icon>
             <Delete />
           </el-icon>
-          删除
+          {{ $pet('删除') }}
         </el-text>
       </div>
 
@@ -65,7 +65,7 @@
           <el-icon>
             <CopyDocument />
           </el-icon>
-          克隆
+          {{ $pet('克隆') }}
         </el-text>
       </div>
 
@@ -99,7 +99,7 @@
               v-show="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.refresh != '0'"
               :style="wrapperObj.wrapperOption.titleOption.moreOption && wrapperObj.wrapperOption.titleOption.moreOption.dynamicStyle"
             >
-              <span v-show="wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.refresh == '1' || wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3')">刷新</span>
+              <span v-show="wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.refresh == '1' || wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3')">{{ $pet('刷新') }}</span>
               <el-icon v-show="wrapperObj.wrapperOption.titleOption.moreOption && (wrapperObj.wrapperOption.titleOption.moreOption.refresh == '2' || wrapperObj.wrapperOption.titleOption.moreOption.refresh == '3')" size="20">
                 <Refresh />
               </el-icon>
@@ -126,7 +126,7 @@
               @click.stop="openPageDesigner"
             >
               <el-icon><EditPen /></el-icon>
-              <span>界面设计</span>
+              <span>{{ $pet('界面设计') }}</span>
             </el-link>
           </div>
         </div>
@@ -204,6 +204,7 @@ import { EventBus } from '../../../utils/eventBus.js'
 import { ElMessageBox, ElNotification, ElMessage } from 'element-plus'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import useResizable from '../../../hooks/useResizable'
+import { peT } from '../../../i18n.js'
 import vueCustomScrollbar from 'vue-custom-scrollbar/src/vue-scrollbar.vue'
 import 'vue-custom-scrollbar/dist/vueScrollbar.css'
 import {
@@ -452,9 +453,9 @@ const openPageDesigner = () => {
 }
 //右键删除
 const handleDelClick = () => {
-  ElMessageBox.confirm('是否删除此容器?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(peT('是否删除此容器?'), peT('提示'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
     type: 'warning',
   })
     .then(() => {
@@ -462,15 +463,15 @@ const handleDelClick = () => {
 
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '删除成功!',
+        title: peT('提示'),
+        message: peT('删除成功!'),
         duration: 2000,
       })
     })
     .catch(() => {
       ElMessage({
         type: 'info',
-        message: '已取消删除',
+        message: peT('已取消删除'),
         duration: 500,
       })
     })
@@ -478,24 +479,24 @@ const handleDelClick = () => {
 
 //拷贝容器
 const handleCopyClick = () => {
-  ElMessageBox.confirm('是否克隆此容器?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(peT('是否克隆此容器?'), peT('提示'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
     type: 'warning',
   })
     .then(() => {
       pageEngineStore.copyWrapper(curWrapper.value)
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '克隆成功',
+        title: peT('提示'),
+        message: peT('克隆成功'),
         duration: 2000,
       })
     })
     .catch(() => {
       ElMessage({
         type: 'info',
-        message: '已取消克隆',
+        message: peT('已取消克隆'),
         duration: 500,
       })
     })

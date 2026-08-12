@@ -10,6 +10,17 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const repositoryRoot = path.resolve(projectRoot, '..');
 const read = relativePath => fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
 const sha256 = relativePath => crypto.createHash('sha256').update(fs.readFileSync(path.join(repositoryRoot, relativePath))).digest('hex');
+const readSkill = skillName => {
+  const skillDirectory = path.join(repositoryRoot, 'microi.skills', skillName);
+  const referencesDirectory = path.join(skillDirectory, 'references');
+  const references = fs.existsSync(referencesDirectory)
+    ? fs.readdirSync(referencesDirectory)
+      .filter(name => name.endsWith('.md'))
+      .sort()
+      .map(name => fs.readFileSync(path.join(referencesDirectory, name), 'utf8'))
+    : [];
+  return [fs.readFileSync(path.join(skillDirectory, 'SKILL.md'), 'utf8'), ...references].join('\n');
+};
 
 function relativeLuminance(hex) {
   const value = hex.replace('#', '');
@@ -130,10 +141,10 @@ test('light and dark documentation surfaces keep readable foreground pairs', () 
 });
 
 test('future AI delivery rules prohibit manual chunks and require standalone auth', () => {
-  const sourceSkill = read('microi.skills/microi-microservice/SKILL.md');
-  const docsSkill = read('microi.skills/microi-docs-coverage/SKILL.md');
-  const sdkSkill = read('microi.skills/microi-frontend-sdk/SKILL.md');
-  const uiSkill = read('microi.skills/ui-design/SKILL.md');
+  const sourceSkill = readSkill('microi-microservice');
+  const docsSkill = readSkill('microi-docs-coverage');
+  const sdkSkill = readSkill('microi-frontend-sdk');
+  const uiSkill = readSkill('ui-design');
   const aiInstructions = read('Microi.VSCode/src/editor/typingsManager.ts');
   const mcp = read('microi.mcp/src/server.ts');
   const scaffold = read('microi.mcp/src/microservice-scaffold.ts');

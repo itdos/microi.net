@@ -34,8 +34,8 @@
                         </el-col>
                     </el-col>
                     <el-col :span="8">
-                        <div class="codemirror">
-                            <codemirror ref="cmObj" v-model="currentModel" :options="cmOptions" @input="modelChange" />
+                        <div class="code-editor">
+                            <MicroiCodeEditor ref="cmObj" v-model="currentModel" :options="cmOptions" height="500" @input="modelChange" />
                         </div>
                         <p class="tips">注：可以直接在输入框内写代码，请注意格式正确！！</p>
                         <p class="tips">[{"Father":"FielName1","Child":"FielName2"},{"Father":"FielName3","Child":"FielName4"}]</p>
@@ -49,13 +49,10 @@
 <script>
 import qs from "qs";
 import { DiyCommon } from "@/utils/diy.common";
-// vue-codemirror 暂不支持 Vue 3
-// import "codemirror/lib/codemirror.css";
-// import { codemirror } from "vue-codemirror";
-// require("codemirror/mode/javascript/javascript.js");
+import MicroiCodeEditor from "@/components/microi-code-editor.vue";
 export default {
     components: {
-        // codemirror  // 已禁用
+        MicroiCodeEditor
     },
     props: {
         fields: {
@@ -88,7 +85,7 @@ export default {
             currentModel: this.model,
             // 代码输入框
             cmOptions: {
-                // 所有参数配置见：https://codemirror.net/doc/manual.html#config
+                // 编辑器行为选项；底层统一使用 Monaco。
                 tabSize: 4,
                 styleActiveLine: true,
                 lineNumbers: true,
@@ -301,9 +298,8 @@ export default {
         getMirror() {
             let that = this;
             that.clientHeight = `${document.documentElement.clientHeight}`; //获取浏览器可视区域高度
-            // 获取codemirror对象  // 获取报错bug未解决，输出this.$refs为{}内容，this.$nextTick试过了
-            that.editor = this.$refs.cmObj.codemirror;
-            // 设置codemirror高度
+            that.editor = this.$refs.cmObj.editorApi;
+            // 设置 Monaco 高度
             that.editor.setSize("auto", this.clientHeight - 50);
 
             // 监听屏幕

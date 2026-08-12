@@ -7,12 +7,12 @@
         plain
         class="btnJson"
         @click="drawerjson = true"
-        >容器JSON</el-button
+        >{{ $pet('容器JSON') }}</el-button
       >
 
-      <el-collapse-item title="通用配置" name="1">
+      <el-collapse-item :title="$pet('通用配置')" name="1">
         <el-form v-if="curWrapperIdx > -1">
-          <el-form-item label="容器编号">
+          <el-form-item :label="$pet('容器编号')">
             <el-input
               disabled
               size="small"
@@ -20,14 +20,14 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="标题名称">
+          <el-form-item :label="$pet('标题名称')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.title"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="栅格宽度">
+          <el-form-item :label="$pet('栅格宽度')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -50,7 +50,7 @@
             </el-slider>
           </el-form-item>
 
-          <el-form-item label="容器高度">
+          <el-form-item :label="$pet('容器高度')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -73,7 +73,7 @@
         </el-slider>
       </el-form-item> -->
 
-          <el-form-item label="容器上移">
+          <el-form-item :label="$pet('容器上移')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -96,7 +96,7 @@
         </el-slider>
       </el-form-item> -->
 
-          <el-form-item label="栅格间距">
+          <el-form-item :label="$pet('栅格间距')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -108,7 +108,7 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="左侧间隔">
+          <el-form-item :label="$pet('左侧间隔')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -118,7 +118,7 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="栅格右移">
+          <el-form-item :label="$pet('栅格右移')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -128,7 +128,7 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="栅格左移">
+          <el-form-item :label="$pet('栅格左移')">
             <el-input-number
               size="small"
               style="clear: both"
@@ -138,21 +138,21 @@
             ></el-input-number>
           </el-form-item>
 
-          <el-form-item label="外边距值">
+          <el-form-item :label="$pet('外边距值')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.margin"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="内边距值">
+          <el-form-item :label="$pet('内边距值')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.dynamicStyle.padding"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="面板背景">
+          <el-form-item :label="$pet('面板背景')">
             <el-color-picker
               show-alpha
               size="small"
@@ -160,7 +160,7 @@
             ></el-color-picker>
           </el-form-item>
 
-          <el-form-item label="内容背景">
+          <el-form-item :label="$pet('内容背景')">
             <el-color-picker
               show-alpha
               size="small"
@@ -168,27 +168,27 @@
             ></el-color-picker>
           </el-form-item>
 
-          <el-form-item label="显示标题">
+          <el-form-item :label="$pet('显示标题')">
             <el-switch
               v-model="curWrapper.wrapperOption.titleOption.hidden"
             ></el-switch>
           </el-form-item>
 
-          <el-form-item label="标题位置">
+          <el-form-item :label="$pet('标题位置')">
             <el-select
               size="small"
               v-model="
                 curWrapper.wrapperOption.titleOption.dynamicStyle.textAlign
               "
-              placeholder="请选择"
+              :placeholder="$pet('请选择')"
             >
-              <el-option label="左对齐" value="left"> </el-option>
-              <el-option label="居中" value="center"> </el-option>
-              <el-option label="右对齐" value="right"> </el-option>
+              <el-option :label="$pet('左对齐')" value="left"> </el-option>
+              <el-option :label="$pet('居中')" value="center"> </el-option>
+              <el-option :label="$pet('右对齐')" value="right"> </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="标题边距">
+          <el-form-item :label="$pet('标题边距')">
             <el-input
               size="small"
               v-model="
@@ -197,14 +197,14 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="标题高度">
+          <el-form-item :label="$pet('标题高度')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.dynamicStyle.height"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="标题行高">
+          <el-form-item :label="$pet('标题行高')">
             <el-input
               size="small"
               v-model="
@@ -213,7 +213,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="标题字号">
+          <el-form-item :label="$pet('标题字号')">
             <el-input
               size="small"
               v-model="
@@ -222,7 +222,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="标题颜色">
+          <el-form-item :label="$pet('标题颜色')">
             <el-color-picker
               show-alpha
               size="small"
@@ -230,20 +230,20 @@
             ></el-color-picker>
           </el-form-item>
 
-          <el-form-item label="启用更多">
+          <el-form-item :label="$pet('启用更多')">
             <el-switch
               v-model="curWrapper.wrapperOption.titleOption.moreOption.hidden"
             ></el-switch>
           </el-form-item>
 
-          <el-form-item label="更多标题">
+          <el-form-item :label="$pet('更多标题')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.moreOption.text"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="更多字号">
+          <el-form-item :label="$pet('更多字号')">
             <el-input
               size="small"
               v-model="
@@ -253,7 +253,7 @@
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="更多颜色">
+          <el-form-item :label="$pet('更多颜色')">
             <el-color-picker
               show-alpha
               size="small"
@@ -264,31 +264,31 @@
             ></el-color-picker>
           </el-form-item>
 
-          <el-form-item label="更多图标">
+          <el-form-item :label="$pet('更多图标')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.moreOption.icon"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="显示图标">
+          <el-form-item :label="$pet('显示图标')">
             <el-switch
               v-model="curWrapper.wrapperOption.titleOption.moreOption.iconShow"
             ></el-switch>
           </el-form-item>
 
-          <el-form-item label="更多链接">
+          <el-form-item :label="$pet('更多链接')">
             <el-input
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.moreOption.linkurl"
             ></el-input>
           </el-form-item>
 
-          <el-form-item label="跳转方式">
+          <el-form-item :label="$pet('跳转方式')">
             <el-select
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.moreOption.linktype"
-              placeholder="请选择"
+              :placeholder="$pet('请选择')"
             >
               <el-option label="router" value="router"> </el-option>
               <el-option label="_parent" value="_parent"> </el-option>
@@ -298,38 +298,38 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="刷新数据">
+          <el-form-item :label="$pet('刷新数据')">
             <el-select
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.moreOption.refresh"
-              placeholder="请选择"
+              :placeholder="$pet('请选择')"
             >
-              <el-option label="不显示" value="0"> </el-option>
-              <el-option label="仅文本" value="1"> </el-option>
-              <el-option label="仅图标" value="2"> </el-option>
-              <el-option label="文本图标" value="3"> </el-option>
+              <el-option :label="$pet('不显示')" value="0"> </el-option>
+              <el-option :label="$pet('仅文本')" value="1"> </el-option>
+              <el-option :label="$pet('仅图标')" value="2"> </el-option>
+              <el-option :label="$pet('文本图标')" value="3"> </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="日期时间">
+          <el-form-item :label="$pet('日期时间')">
             <el-select
               size="small"
               v-model="curWrapper.wrapperOption.titleOption.moreOption.datetime"
-              placeholder="请选择"
+              :placeholder="$pet('请选择')"
             >
-              <el-option label="不显示" value="0"> </el-option>
-              <el-option label="仅日期" value="1"> </el-option>
-              <el-option label="日期时间" value="2"> </el-option>
+              <el-option :label="$pet('不显示')" value="0"> </el-option>
+              <el-option :label="$pet('仅日期')" value="1"> </el-option>
+              <el-option :label="$pet('日期时间')" value="2"> </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="动态时间">
+          <el-form-item :label="$pet('动态时间')">
             <el-switch
               v-model="curWrapper.wrapperOption.titleOption.moreOption.autotime"
             ></el-switch>
           </el-form-item>
 
-          <el-form-item label="时间间隔">
+          <el-form-item :label="$pet('时间间隔')">
             <el-input
               type="number"
               size="small"
@@ -342,34 +342,34 @@
       </el-collapse-item>
 
       <!-- 选项卡配置（仅tabs容器显示） -->
-      <el-collapse-item v-if="curWrapperIdx > -1 && curWrapper?.type === 'tabs'" title="选项卡配置" name="2">
+      <el-collapse-item v-if="curWrapperIdx > -1 && curWrapper?.type === 'tabs'" :title="$pet('选项卡配置')" name="2">
         <el-form v-if="curWrapper.wrapperOption">
-          <el-form-item label="选项卡风格">
+          <el-form-item :label="$pet('选项卡风格')">
             <el-select
               size="small"
               v-model="curWrapper.wrapperOption.tabType"
-              placeholder="请选择"
+              :placeholder="$pet('请选择')"
             >
-              <el-option label="默认" value=""> </el-option>
-              <el-option label="卡片" value="card"> </el-option>
-              <el-option label="边框卡片" value="border-card"> </el-option>
+              <el-option :label="$pet('默认')" value=""> </el-option>
+              <el-option :label="$pet('卡片')" value="card"> </el-option>
+              <el-option :label="$pet('边框卡片')" value="border-card"> </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="选项卡位置">
+          <el-form-item :label="$pet('选项卡位置')">
             <el-select
               size="small"
               v-model="curWrapper.wrapperOption.tabPosition"
-              placeholder="请选择"
+              :placeholder="$pet('请选择')"
             >
-              <el-option label="顶部" value="top"> </el-option>
-              <el-option label="底部" value="bottom"> </el-option>
-              <el-option label="左侧" value="left"> </el-option>
-              <el-option label="右侧" value="right"> </el-option>
+              <el-option :label="$pet('顶部')" value="top"> </el-option>
+              <el-option :label="$pet('底部')" value="bottom"> </el-option>
+              <el-option :label="$pet('左侧')" value="left"> </el-option>
+              <el-option :label="$pet('右侧')" value="right"> </el-option>
             </el-select>
           </el-form-item>
 
-          <el-form-item label="标签页列表">
+          <el-form-item :label="$pet('标签页列表')">
             <div style="width: 100%">
               <div
                 v-for="(tab, idx) in curWrapper.wrapperOption.tabs"
@@ -380,7 +380,7 @@
                   size="small"
                   v-model="tab.label"
                   style="flex: 1"
-                  placeholder="标签名称"
+                  :placeholder="$pet('标签名称')"
                 ></el-input>
                 <el-button
                   size="small"
@@ -399,7 +399,7 @@
                 @click="addTab"
               >
                 <el-icon><Plus /></el-icon>
-                添加标签页
+                {{ $pet('添加标签页') }}
               </el-button>
             </div>
           </el-form-item>
@@ -408,7 +408,7 @@
 
     </el-collapse>
 
-    <el-drawer size="60%" title="组件JSON" v-model="drawerjson" direction="ltr">
+    <el-drawer size="60%" :title="$pet('组件JSON')" v-model="drawerjson" direction="ltr">
       <JsonEditor
         v-if="drawerjson"
         height="480px"
