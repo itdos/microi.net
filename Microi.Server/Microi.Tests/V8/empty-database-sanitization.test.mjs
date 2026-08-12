@@ -31,10 +31,31 @@ function projectStoreRows(storeRows) {
     return {
       ...row,
       PackageIsValid: packageIsValid,
-      DiyTableNamesJson: packageModel?.DiyTables
+      PackageDiyTableNamesJson: packageModel?.DiyTables
         ? JSON.stringify(packageModel.DiyTables.map((table) => table.Name))
         : null,
-      ApiEngineKeysJson: packageModel?.SysApiEngines
+      PackageDiyFieldTableNamesJson: packageModel?.DiyFields
+        ? JSON.stringify(packageModel.DiyFields.map((field) => field.TableName))
+        : null,
+      PackageDataSetTableNamesJson: packageModel?.DataSets
+        ? JSON.stringify(packageModel.DataSets.map((dataSet) => dataSet.TableName))
+        : null,
+      PackageDdlTableNamesJson: packageModel?.DDLStatements
+        ? JSON.stringify(packageModel.DDLStatements.map((statement) => statement.TableName))
+        : null,
+      PackagePhysicalColumnTableNamesJson: packageModel?.PhysicalColumns
+        ? JSON.stringify(packageModel.PhysicalColumns.map((column) => column.TableName))
+        : null,
+      PackageApplicationBundleTableNamesJson: packageModel?.ApplicationBundles
+        ? JSON.stringify(packageModel.ApplicationBundles.map((bundle) => bundle.TableName))
+        : null,
+      PackageSysMenuTableNamesJson: packageModel?.SysMenus
+        ? JSON.stringify(packageModel.SysMenus.map((menu) => menu.TableName))
+        : null,
+      PackageDdlValuesJson: packageModel?.DDLStatements
+        ? JSON.stringify(packageModel.DDLStatements.map((statement) => statement.DDL))
+        : null,
+      PackageApiEngineKeysJson: packageModel?.SysApiEngines
         ? JSON.stringify(packageModel.SysApiEngines.map((engine) => engine.ApiEngineKey))
         : null
     }
@@ -58,6 +79,27 @@ function run(storeRows, options = {}) {
         queries.push(sql)
         if (/FROM\s+sys_apiengine/i.test(sql)) {
           return { ToArray: () => options.evidenceEngineRows || [] }
+        }
+        if (/FROM\s+information_schema\.tables/i.test(sql)) {
+          const optionalTables = options.optionalTables || [
+            'microi_job_cron_triggers',
+            'microi_job_triggers',
+            'microi_job_job_details',
+            'mci_background_task',
+            'mci_database_backup',
+            'mci_gitee_star_audit',
+            'mci_identity_credential',
+            'mci_identity_device',
+            'mci_identity_totp',
+            'mci_marketplace_install_event',
+            'mci_tenant_quota_log',
+            'mic_msg_event_log',
+            'microi_job_locks',
+            'wx_mini_program',
+            'wx_tpl_msg',
+            'mic_msgset'
+          ]
+          return { ToArray: () => optionalTables.map((TableName) => ({ TableName })) }
         }
         return { ToArray: () => projectStoreRows(storeRows) }
       }
@@ -178,14 +220,40 @@ test('store packages use compact MySQL JSON projection instead of loading packag
   const { result, queries } = run([])
 
   assert.equal(result.Code, 1)
-  assert.equal(queries.length, 2)
+  assert.equal(queries.length, 3)
   assert.match(queries[0], /JSON_VALID\(AppPakcet\)/)
   assert.match(queries[0], /JSON_EXTRACT\(SelectTable, '\$\[\*\]\.Name'\)/)
   assert.match(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.DiyTables\[\*\]\.Name'\)/)
+  assert.doesNotMatch(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.DiyFields/)
+  assert.doesNotMatch(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.ApplicationBundles/)
+  assert.doesNotMatch(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.DDLStatements/)
+  assert.doesNotMatch(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\*\*\.TableName'\)/)
   assert.match(queries[0], /JSON_EXTRACT\(SelectApiEngine, '\$\[\*\]\.ApiEngineKey'\)/)
   assert.match(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\.SysApiEngines\[\*\]\.ApiEngineKey'\)/)
+  assert.doesNotMatch(queries[0], /JSON_EXTRACT\(AppPakcet, '\$\*\*/)
   assert.doesNotMatch(queries[0].split(/\bCASE\b/i, 1)[0], /\bAppPakcet\b/i)
   assert.match(queries[1], /FROM sys_apiengine/)
+})
+
+test('large non-DiyTables ownership nodes are deferred to backend recursive reconciliation', () => {
+  const { result } = run([
+    {
+      Id: 'structured-app',
+      AppKey: 'structured-app',
+      ApplicationType: 'Regular',
+      AppPakcet: JSON.stringify({
+        DiyFields: [{ TableName: 'OnlyInDiyFields' }],
+        DataSets: [{ TableName: 'OnlyInDataSets' }],
+        DDLStatements: [{ TableName: 'OnlyInDdlMetadata', DDL: 'CREATE TABLE IF NOT EXISTS `OnlyInDdlText` (`Id` varchar(36));' }],
+        PhysicalColumns: [{ TableName: 'OnlyInPhysicalColumns' }],
+        ApplicationBundles: [{ TableName: 'OnlyInApplicationBundles' }],
+        SysMenus: [{ TableName: 'OnlyInSysMenus' }]
+      })
+    }
+  ])
+
+  assert.equal(result.Code, 1)
+  assert.deepEqual(result.Data.ApplicationOwnedTables, [])
 })
 
 test('empty database SQL clears credentials and operational residue but keeps core table structures', () => {
@@ -200,6 +268,20 @@ test('empty database SQL clears credentials and operational residue but keeps co
   assert.match(result.Data.Sql, /DELETE from mci_security_attack_event;/)
   assert.match(result.Data.Sql, /DELETE from mci_user_access_key;/)
   assert.match(result.Data.Sql, /DELETE from sys_business_blueprint;/)
+  assert.match(result.Data.Sql, /DELETE l FROM diy_lang l/)
+  assert.match(result.Data.Sql, /SUBSTRING_INDEX\(COALESCE\(l\.\`Key\`, ''\), ':', 2\)/)
+  assert.match(result.Data.Sql, /l\.\`Key\` LIKE 'diy_field:%'/)
+  assert.match(result.Data.Sql, /l\.\`Key\` LIKE 'diy_table:%'/)
+  assert.doesNotMatch(result.Data.Sql, /LIKE CONCAT\('diy_field:', LOWER\(x\.Name\)/)
+  for (const table of [
+    'mci_background_task', 'mci_database_backup', 'mci_gitee_star_audit',
+    'mci_identity_credential', 'mci_identity_device', 'mci_identity_totp',
+    'mci_marketplace_install_event', 'mci_tenant_quota_log', 'mic_msg_event_log',
+    'microi_job_locks', 'wx_mini_program', 'wx_tpl_msg', 'mic_msgset'
+  ]) {
+    assert.match(result.Data.Sql, new RegExp(`DELETE FROM ${table};`, 'i'))
+    assert.ok(result.Data.ProtectedPlatformTables.includes(table))
+  }
   assert.match(result.Data.Sql, /DELETE from sys_datasource\s+WHERE LOWER\(COALESCE\(DataSourceKey, ''\)\) <> 'virtual-table-personal-setting';/)
   assert.doesNotMatch(result.Data.Sql, /DROP TABLE IF EXISTS mci_ai_token_account/)
 })

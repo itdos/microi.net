@@ -571,6 +571,49 @@ public class SaaSRuntimeConfigurationTests
     }
 
     [Fact]
+    public void SaaSReload_IsPublishedOnlyAfterTheConfigurationTransactionCommits()
+    {
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.net",
+            "V8Engine",
+            "V8Method.cs"));
+        var start = source.IndexOf("public DosResult ReloadOsClient", StringComparison.Ordinal);
+        var end = source.IndexOf("public DosResult RefreshExtensionDatabases", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var block = source.Substring(start, end - start);
+
+        Assert.Contains("RegisterAfterCommit", block, StringComparison.Ordinal);
+        Assert.Contains("ReloadSingleOsClient(targetOsClient)", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("ReloadSingleOsClient(osClient, _trans)", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SaaSMarketplacePackage_HidesAndLocksTheJwtSigningRoot()
+    {
+        var root = FindRepositoryRoot();
+        var package = JObject.Parse(File.ReadAllText(Path.Combine(
+            root,
+            "Microi.Server",
+            "Microi.Upgrade",
+            "Resource",
+            "app.microi.saas-engine.json")));
+        var authSecret = Assert.Single(
+            package["DiyFields"]!.OfType<JObject>(),
+            field =>
+                string.Equals(field.Value<string>("TableName"), "sys_osclients", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(field.Value<string>("Name"), "AuthSecret", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(0, authSecret.Value<int>("Visible"));
+        Assert.Equal(0, authSecret.Value<int>("AppVisible"));
+        Assert.Equal(1, authSecret.Value<int>("Readonly"));
+        Assert.Equal(1, authSecret.Value<int>("IsLockField"));
+        Assert.Equal("varchar(100)", authSecret.Value<string>("Type"));
+    }
+
+    [Fact]
     public void RuntimeSources_DoNotReadBusinessTuningEnvironmentVariables()
     {
         var root = FindRepositoryRoot();

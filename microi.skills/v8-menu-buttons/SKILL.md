@@ -3,6 +3,8 @@ name: v8-menu-buttons
 description: Microi 菜单按钮与 Tab V8 指南。用于配置 sys_menu MoreBtns、FormBtns、BatchSelectMoreBtns、PageTabs、PageBtns、ExportMoreBtns、显隐代码和行操作。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # v8-menu-buttons — 菜单按钮 / Tab / 批量操作 V8 写法
 
 > 适用于 sys_menu 表的 MoreBtns、FormBtns、BatchSelectMoreBtns、PageTabs、ExportMoreBtns、PageBtns 字段。

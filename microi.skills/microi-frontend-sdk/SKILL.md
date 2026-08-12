@@ -3,6 +3,8 @@ name: microi-frontend-sdk
 description: Microi 前端 SDK 使用规范，适用于 Vue 3、uni-app、H5、PC 网站与 Microi.Client 扩展。用于创建或修改前端请求、登录态、Token 续签、终端会话、上传、文件 URL、ApiEngine、FormEngine 或应用启动代码。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 前端 SDK
 
 所有 Vue 3 前端项目都应使用 `microi.skills/microi.v8.js` 作为统一的 Microi 前端 SDK。新项目不要复制旧版 Vue2/Vuex 请求封装，也不要重新手写 token、上传、文件 URL、ApiEngine 或 FormEngine 层。

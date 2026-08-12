@@ -3,6 +3,8 @@ name: v8-debugging
 description: Microi V8 调试与日志指南。用于排查接口引擎、V8 事件、console.log、DataAppend.DebugLog、sys_log、异常处理和远程执行问题。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 调试与日志
 
 你正在为 Microi 吾码平台编写 V8 引擎代码，需要在开发/测试/生产环境进行排错。本指南提供调试模式、异常捕获、系统日志、调试输出的标准做法。

@@ -75,6 +75,14 @@ namespace Microi.net
 
             try
             {
+                var prerequisiteResult = await _upgrade
+                    .EnsureRuntimePhysicalPrerequisitesAsync(runtimeClient, stoppingToken)
+                    .ConfigureAwait(false);
+                if (prerequisiteResult.Code != 1)
+                {
+                    throw new InvalidOperationException(prerequisiteResult.Msg);
+                }
+
                 UpgradeDistributedLease upgradeLease = null;
                 string leaseReason = null;
                 const int maxLeaseAttempts = 30;

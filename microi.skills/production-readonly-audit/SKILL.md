@@ -3,6 +3,8 @@ name: production-readonly-audit
 description: Microi 正式环境只读业务巡检规范。用于在不改动线上数据的前提下，检查会员、余额、订单、库存卡、奖励、积分、兑换金额、日志和结算正确性等生产业务数据。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 正式环境只读业务巡检
 
 ## 核心边界

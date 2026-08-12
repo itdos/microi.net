@@ -3,6 +3,8 @@ name: v8-formengine-http
 description: 移动端 / 外部系统通过 HTTP 直接调用 Microi FormEngine（GetTableData / GetFormData / Add / Upt / Del）的 RESTful 路由约定与排错指南
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # FormEngine HTTP 路由约定（外部系统调用）
 
 > 适用于：uni-app H5、原生 App、Postman、第三方系统、Playwright/Cypress 自动化测试等任何**没有进入 V8 引擎**的客户端。

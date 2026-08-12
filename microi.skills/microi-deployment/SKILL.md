@@ -3,6 +3,8 @@ name: microi-deployment
 description: Microi 安装、部署、升级和本地运行指南。用于 Docker Compose、离线安装、Windows IIS、源码运行、MySQL、Redis、MongoDB、MinIO、反向代理、滚动发布、健康检查、备份恢复和生产部署验收。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 安装与部署
 
 本 Skill 把官网 Docker、Windows 和源码运行文档转成可执行的安全流程。具体镜像、

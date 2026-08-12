@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.7.4 V3 source", () => {
+test("publisher package metadata matches the v1.7.6 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.7.4");
+  assert.equal(packagedPublisher.Version, "v1.7.6");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -352,13 +352,58 @@ test("interrupted package repair resolves legacy exact against the single newest
   );
   assert.match(
     publisherSource,
-    /var versionNo = exactPublishedVersion\s*\? requestedPublishedVersion\s*:/,
+    /var deliveryVersions = resolveDeliveryVersions\(\{[\s\S]*?ExactPublishedVersion: exactPublishedVersion,[\s\S]*?RequestedPublishedVersion: requestedPublishedVersion/,
   );
   assert.match(
     publisherSource,
     /AppVersion:\s*versionNo,/,
     "the validated immutable version must be written back to the store",
   );
+});
+
+test("legacy marketplace package version can advance without republishing identical microservice assets", () => {
+  const context = {
+    String,
+    parseInt,
+  };
+  vm.runInNewContext(`
+    ${extractFunction(publisherSource, "text")}
+    ${extractFunction(publisherSource, "isBlank")}
+    ${extractFunction(publisherSource, "normalizeVersion")}
+    ${extractFunction(publisherSource, "highestVersion")}
+    ${extractFunction(publisherSource, "resolveDeliveryVersions")}
+    this.resolveDeliveryVersions = resolveDeliveryVersions;
+  `, context);
+
+  const legacy = context.resolveDeliveryVersions({
+    AppType: "MicroService",
+    RuntimeBuildVersion: "v2.0.4",
+    LatestVersion: "v2.0.4",
+    ApplicationVersion: "v2.0.4",
+    RequestedPackageVersion: "v2.0.6",
+    PreparedPackageVersion: "v2.0.6",
+    ExistingPackageVersion: "v2.0.5",
+    ExactPublishedVersion: false,
+  });
+  assert.equal(legacy.RuntimeVersion, "v2.0.4");
+  assert.equal(legacy.PackageVersion, "v2.0.6");
+
+  const exact = context.resolveDeliveryVersions({
+    AppType: "MicroService",
+    RuntimeBuildVersion: "v2.0.4",
+    RequestedPackageVersion: "v2.0.6",
+    PreparedPackageVersion: "v2.0.6",
+    ExistingPackageVersion: "v2.0.5",
+    RequestedPublishedVersion: "v2.0.4",
+    ExactPublishedVersion: true,
+  });
+  assert.equal(exact.RuntimeVersion, "v2.0.4");
+  assert.equal(exact.PackageVersion, "v2.0.4");
+
+  assert.match(publisherSource, /AppVersion:\s*runtimeVersionNo,/);
+  assert.match(publisherSource, /VersionNo:\s*runtimeVersionNo,/);
+  assert.match(publisherSource, /BuildVersion:\s*runtimeVersionNo/);
+  assert.match(publisherSource, /AppVersion:\s*versionNo,/);
 });
 
 test("protocol v3 resolves the committed version by exact VersionId instead of a newer staged row", () => {
@@ -395,7 +440,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.7\.4/);
+  assert.match(publisherSource, /Version: v1\.7\.6/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,
