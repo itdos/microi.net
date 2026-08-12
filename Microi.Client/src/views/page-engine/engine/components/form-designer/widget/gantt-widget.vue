@@ -2,10 +2,10 @@
   <div style="height: 100%">
     <div class="gantt-controls">
       <el-button size="small" style="margin-left: 0" button @click="zoomOut"
-        >缩小(-)</el-button
+        >{{ $pet('缩小(-)') }}</el-button
       >
       <el-button size="small" style="margin-left: 0" @click="zoomIn"
-        >放大(+)</el-button
+        >{{ $pet('放大(+)') }}</el-button
       >
       <el-select
         size="small"
@@ -23,7 +23,7 @@
 
       <el-input
         v-model="searchKeyword"
-        placeholder="搜索任务名称..."
+        :placeholder="$pet('搜索任务名称...')"
         size="small"
         style="width: 220px"
         clearable
@@ -35,7 +35,7 @@
         type="primary"
         plain
         @click="saveUpdate"
-        >保存修改</el-button
+        >{{ $pet('保存修改') }}</el-button
       >
     </div>
     <div
@@ -60,6 +60,7 @@ import { post, get } from '../../../utils/axiosInstance'
 import { debounce } from 'lodash' //引入 debounce 函数
 import { defineProps } from 'vue'
 import { ElMessageBox, ElNotification } from 'element-plus'
+import { peT } from '../../../i18n.js'
 
 const props = defineProps({
   widgetObj: {
@@ -75,14 +76,14 @@ let changeTasks = ref([])
 const saveUpdate = async () => {
   try {
     if (changeTasks.value.length == 0) {
-      ElMessageBox.alert('没有需要提交的修改', '提示', {
-        confirmButtonText: '关闭',
+      ElMessageBox.alert(peT('没有需要提交的修改'), peT('提示'), {
+        confirmButtonText: peT('关闭'),
       })
       return false
     }
-    await ElMessageBox.confirm('是否保存提交？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(peT('是否保存提交？'), peT('提示'), {
+      confirmButtonText: peT('确定'),
+      cancelButtonText: peT('取消'),
       type: 'warning',
     })
     // 用户点击"确定"后继续更新任务
@@ -97,8 +98,8 @@ const saveUpdate = async () => {
     })
 
     if (result) {
-      ElMessageBox.alert('存在多选的负责人，请检查数据格式', '错误', {
-        confirmButtonText: '确定',
+      ElMessageBox.alert(peT('存在多选的负责人，请检查数据格式'), peT('错误'), {
+        confirmButtonText: peT('确定'),
         type: 'error',
       })
       return false
@@ -113,7 +114,7 @@ const saveUpdate = async () => {
         console.log('', response)
         ElNotification({
           title: 'Success',
-          message: '任务更新到接口',
+          message: peT('任务更新到接口'),
           type: 'success',
         })
       }
@@ -121,7 +122,7 @@ const saveUpdate = async () => {
       console.error('任务更新失败:', error)
       ElNotification({
         title: 'Error',
-        message: '任务更新失败',
+        message: peT('任务更新失败'),
         type: 'error',
       })
     }
@@ -153,39 +154,39 @@ const ganttRef = ref()
 const scrollElement = ref(null) // 存储实际滚动元素
 
 //缩放级别
-const levelOptions = [
+const levelOptions = computed(() => [
   {
     value: 'hour',
-    label: '小时',
+    label: peT('小时'),
   },
   {
     value: 'day',
-    label: '日视图',
+    label: peT('日视图'),
   },
   {
     value: 'week',
-    label: '周视图',
+    label: peT('周视图'),
   },
   {
     value: 'month',
-    label: '月视图',
+    label: peT('月视图'),
   },
   {
     value: 'quarter',
-    label: '季度视图',
+    label: peT('季度视图'),
   },
   {
     value: 'year',
-    label: '年视图',
+    label: peT('年视图'),
   },
-]
+])
 
 //初始化缩放 - 从配置项读取默认视图模式
 const defaultZoomLevel = props.widgetObj.widgetParams[23]?.value || 'day'
 const currentZoomLevel = ref(defaultZoomLevel)
 
 // 根据默认视图模式计算索引
-const defaultZoomLevelIdx = levelOptions.findIndex(
+const defaultZoomLevelIdx = levelOptions.value.findIndex(
   (item) => item.value === defaultZoomLevel
 )
 const currentZoomLevelIdx = ref(
@@ -1076,7 +1077,7 @@ const zoomIn = () => {
   gantt.ext.zoom.zoomIn()
   currentZoomLevelIdx.value =
     currentZoomLevelIdx.value - 1 < 0 ? 0 : currentZoomLevelIdx.value - 1
-  currentZoomLevel.value = levelOptions[currentZoomLevelIdx.value].value
+  currentZoomLevel.value = levelOptions.value[currentZoomLevelIdx.value].value
 }
 
 const zoomOut = () => {
@@ -1084,12 +1085,12 @@ const zoomOut = () => {
   gantt.ext.zoom.zoomOut()
   currentZoomLevelIdx.value =
     currentZoomLevelIdx.value + 1 > 5 ? 5 : currentZoomLevelIdx.value + 1
-  currentZoomLevel.value = levelOptions[currentZoomLevelIdx.value].value
+  currentZoomLevel.value = levelOptions.value[currentZoomLevelIdx.value].value
 }
 
 const changeZoomLevel = () => {
   gantt.ext.zoom.setLevel(currentZoomLevel.value)
-  currentZoomLevelIdx.value = levelOptions.findIndex(
+  currentZoomLevelIdx.value = levelOptions.value.findIndex(
     (item) => item.value === currentZoomLevel.value
   )
 }

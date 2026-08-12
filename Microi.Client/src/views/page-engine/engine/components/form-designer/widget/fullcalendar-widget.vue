@@ -28,11 +28,15 @@ import interactionPlugin from '@fullcalendar/interaction'
 import resourceTimelinePlugin from '@fullcalendar/resource-timeline'
 import { EventBus } from '../../../utils/eventBus.js'
 import { post } from '../../../utils/axiosInstance'
+import { useI18n } from 'vue-i18n'
+import { getLanguage } from '@/lang'
+import { peT } from '../../../i18n.js'
 
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { storeToRefs } from 'pinia'
 const pageEngineStore = usePageEngineStore()
 const { curWrapper, formData } = storeToRefs(pageEngineStore)
+const { t } = useI18n()
 
 const props = defineProps({
   widgetObj: {
@@ -67,12 +71,12 @@ const calendar = ref(null)
 
 //定义响应式变量 calendarOptions，作为 FullCalendar 的配置对象
 const calendarOptions = ref({
-  locale: 'zh-cn', // 中文
+  locale: getLanguage() === 'zh-TW' ? 'zh-tw' : getLanguage() === 'en' ? 'en' : 'zh-cn',
   buttonText: {
-    today: '今天',
-    day: '日',
-    week: '周',
-    month: '月',
+    today: peT('今天'),
+    day: peT('日'),
+    week: peT('周'),
+    month: peT('月'),
   },
   height: props.widgetObj.widgetOption.height, //控件高度
   eventColor: props.widgetObj.widgetParams[1].value, //事件颜色
@@ -127,8 +131,8 @@ const calendarOptions = ref({
         if (response && response.length > 0) {
           reloadEvents()
           ElNotification({
-            title: '温馨提示',
-            message: '已同步更新事件日期',
+            title: peT('温馨提示'),
+            message: peT('已同步更新事件日期'),
             type: 'success',
             duration: 0,
           })
@@ -138,8 +142,8 @@ const calendarOptions = ref({
       }
     } else {
       ElNotification({
-        title: '温馨提示',
-        message: '请先设置拖拽事件接口地址',
+        title: peT('温馨提示'),
+        message: peT('请先设置拖拽事件接口地址'),
         type: 'warning',
         duration: 0,
       })
@@ -150,11 +154,11 @@ const calendarOptions = ref({
       e.preventDefault() // 阻止默认右键菜单
 
       ElMessageBox.confirm(
-        `您确定要删除事件 '${info.event.title}' 吗？`,
-        '删除事件',
+        t('Msg.PageEngine.deleteEventConfirm', { title: info.event.title }),
+        t('Msg.PageEngine.deleteEvent'),
         {
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
+          confirmButtonText: peT('确定'),
+          cancelButtonText: peT('取消'),
           type: 'warning',
         }
       )
@@ -176,8 +180,8 @@ const calendarOptions = ref({
             }
           } else {
             ElNotification({
-              title: '温馨提示',
-              message: '请先设置删除事件接口地址',
+              title: peT('温馨提示'),
+              message: peT('请先设置删除事件接口地址'),
               type: 'warning',
               duration: 0,
             })
@@ -265,15 +269,15 @@ async function handleDateSelect(selectInfo) {
   let end = formmatTime(selectInfo.endStr) // / 格式化结束时间
   let pageid = formData.value.Id // 获取页面id
 
-  ElMessageBox.prompt('请为您的活动输入新标题', '添加事件', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.prompt(peT('请为您的活动输入新标题'), peT('添加事件'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
   })
     .then(async ({ value }) => {
       if (!value) {
         ElNotification({
-          title: '温馨提示',
-          message: '请为您的活动输入新标题',
+          title: peT('温馨提示'),
+          message: peT('请为您的活动输入新标题'),
           type: 'warning',
           duration: 0,
         })
@@ -297,8 +301,8 @@ async function handleDateSelect(selectInfo) {
         }
       } else {
         ElNotification({
-          title: '温馨提示',
-          message: '请设置创建事件接口地址',
+          title: peT('温馨提示'),
+          message: peT('请设置创建事件接口地址'),
           type: 'warning',
           duration: 0,
         })

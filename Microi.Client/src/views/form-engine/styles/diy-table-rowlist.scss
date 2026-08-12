@@ -50,6 +50,22 @@
   isolation: isolate;
 }
 
+// Element Plus 会给 fixed-right 单元格单独铺背景；操作列显式复用普通列的表头、
+// 斑马纹与 hover 色，避免固定区看起来像另一张白色表格。
+:deep(.table-data .el-table__header th.row-last-op) {
+  background: var(--el-fill-color-light, #f5f7fa) !important;
+  border-bottom-color: var(--el-border-color, #e4e7ed) !important;
+}
+:deep(.table-data .el-table__body tr:not(.el-table__row--striped) > td.row-last-op) {
+  background: var(--el-bg-color, #fff) !important;
+}
+:deep(.table-data .el-table__body tr.el-table__row--striped > td.row-last-op) {
+  background: var(--el-fill-color-extra-light, #fafafa) !important;
+}
+:deep(.table-data .el-table__body tr:hover > td.row-last-op) {
+  background: var(--el-fill-color-light, #f5f7fa) !important;
+}
+
 .search-box{
      display: flex;
      justify-content: space-between;

@@ -2,7 +2,7 @@
   <div class="diyform-widget" :style="{ width: '100%', height: autoHeight }">
     <div v-if="!tableId" class="widget-placeholder">
       <el-icon :size="32"><Document /></el-icon>
-      <span>DIY表单 - 请配置表ID</span>
+      <span>{{ $pet('DIY表单 - 请配置表ID') }}</span>
     </div>
     <component
       v-else

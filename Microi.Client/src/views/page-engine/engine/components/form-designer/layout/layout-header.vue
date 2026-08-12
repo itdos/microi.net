@@ -15,51 +15,51 @@
       </div>
       <div class="header-section header-center">
         <div class="toolbar-group">
-          <el-tooltip content="页面数据可视化" placement="bottom">
+          <el-tooltip :content="$t('Msg.PageEngine.visualPage')" placement="bottom">
             <el-button size="small" text :icon="Tickets" @click="showJsonClick">JSON</el-button>
           </el-tooltip>
-          <el-tooltip content="撤销（Ctrl/Cmd + Z）" placement="bottom">
-            <el-button size="small" text :icon="RefreshLeft" :disabled="!canUndo" aria-label="撤销" @click="undoDesign" />
+          <el-tooltip :content="$t('Msg.PageEngine.undo') + ' (Ctrl/Cmd + Z)'" placement="bottom">
+            <el-button size="small" text :icon="RefreshLeft" :disabled="!canUndo" :aria-label="$t('Msg.PageEngine.undo')" @click="undoDesign" />
           </el-tooltip>
-          <el-tooltip content="重做（Ctrl/Cmd + Shift + Z / Ctrl + Y）" placement="bottom">
-            <el-button size="small" text :icon="RefreshRight" :disabled="!canRedo" aria-label="重做" @click="redoDesign" />
+          <el-tooltip :content="$t('Msg.PageEngine.redo') + ' (Ctrl/Cmd + Shift + Z / Ctrl + Y)'" placement="bottom">
+            <el-button size="small" text :icon="RefreshRight" :disabled="!canRedo" :aria-label="$t('Msg.PageEngine.redo')" @click="redoDesign" />
           </el-tooltip>
           <el-dropdown trigger="click" @command="versionCommand" :teleported="true">
             <el-button size="small" text :icon="Clock">
-              版本<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              {{ $t("Msg.PageEngine.version") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="history"><el-icon><Clock /></el-icon>历史与差异</el-dropdown-item>
-                <el-dropdown-item command="assets"><el-icon><Collection /></el-icon>区块与模板资产</el-dropdown-item>
-                <el-dropdown-item command="source"><el-icon><DocumentCopy /></el-icon>Vue 源码桥接</el-dropdown-item>
-                <el-dropdown-item command="export"><el-icon><Download /></el-icon>导出设计</el-dropdown-item>
-                <el-dropdown-item command="import"><el-icon><Upload /></el-icon>导入设计</el-dropdown-item>
+                <el-dropdown-item command="history"><el-icon><Clock /></el-icon>{{ $t("Msg.PageEngine.historyAndDiff") }}</el-dropdown-item>
+                <el-dropdown-item command="assets"><el-icon><Collection /></el-icon>{{ $t("Msg.PageEngine.assets") }}</el-dropdown-item>
+                <el-dropdown-item command="source"><el-icon><DocumentCopy /></el-icon>{{ $t("Msg.PageEngine.vueBridge") }}</el-dropdown-item>
+                <el-dropdown-item command="export"><el-icon><Download /></el-icon>{{ $t("Msg.PageEngine.exportDesign") }}</el-dropdown-item>
+                <el-dropdown-item command="import"><el-icon><Upload /></el-icon>{{ $t("Msg.PageEngine.importDesign") }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-tooltip content="清空所有容器和组件" placement="bottom">
-            <el-button size="small" text :icon="Delete" @click="clearClick">清空</el-button>
+          <el-tooltip :content="$t('Msg.PageEngine.clearTip')" placement="bottom">
+            <el-button size="small" text :icon="Delete" @click="clearClick">{{ $t("Msg.PageEngine.clear") }}</el-button>
           </el-tooltip>
           <el-dropdown trigger="click" @command="mockClick" :teleported="true">
             <el-button size="small" text :loading="btnLoading" :icon="Star">
-              模板<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              {{ $t("Msg.PageEngine.templates") }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item :command="0"><el-icon><Star /></el-icon>模板 1</el-dropdown-item>
-                <el-dropdown-item :command="1"><el-icon><Star /></el-icon>模板 2</el-dropdown-item>
-                <el-dropdown-item :command="2"><el-icon><Star /></el-icon>模板 3</el-dropdown-item>
+                <el-dropdown-item :command="0"><el-icon><Star /></el-icon>{{ $t("Msg.PageEngine.templateN", { index: 1 }) }}</el-dropdown-item>
+                <el-dropdown-item :command="1"><el-icon><Star /></el-icon>{{ $t("Msg.PageEngine.templateN", { index: 2 }) }}</el-dropdown-item>
+                <el-dropdown-item :command="2"><el-icon><Star /></el-icon>{{ $t("Msg.PageEngine.templateN", { index: 3 }) }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>
         <el-divider direction="vertical" class="header-divider" />
-        <el-button type="success" size="small" plain :icon="View" @click="previewClick" round>预览</el-button>
-        <el-button type="primary" size="small" :loading="btnLoading" @click="saveClick" :icon="Collection" round>保存</el-button>
+        <el-button type="success" size="small" plain :icon="View" @click="previewClick" round>{{ $t("Msg.PageEngine.preview") }}</el-button>
+        <el-button type="primary" size="small" :loading="btnLoading" @click="saveClick" :icon="Collection" round>{{ $t("Msg.PageEngine.save") }}</el-button>
       </div>
       <div class="header-section header-right">
-        <el-tooltip content="切换主题模式" placement="bottom">
+        <el-tooltip :content="$t('Msg.PageEngine.switchTheme')" placement="bottom">
           <el-switch
             @change="darkChange"
             v-model="isDark"
@@ -68,13 +68,13 @@
             :inactive-action-icon="Sunny"
           />
         </el-tooltip>
-        <el-tooltip content="初始化页面配置" placement="bottom">
+        <el-tooltip :content="$t('Msg.PageEngine.initialize')" placement="bottom">
           <el-button size="small" type="info" text :icon="Setting" @click="setIni" circle />
         </el-tooltip>
       </div>
     </div>
   </div>
-  <el-drawer title="页面JSON" v-model="jsonDrawer" direction="ltr">
+  <el-drawer :title="$t('Msg.PageEngine.pageJson')" v-model="jsonDrawer" direction="ltr">
     <el-form>
       <el-form-item label="">
         <JsonEditor
@@ -90,7 +90,7 @@
   <el-dialog
     @closed="closeDialog"
     top="5vh"
-    title="预览页面"
+    :title="$t('Msg.PageEngine.previewPage')"
     width="90%"
     v-model="dialogFormVisible"
     draggable
@@ -104,63 +104,63 @@
 
   <el-dialog
     v-model="historyDialogVisible"
-    title="界面版本历史"
+    :title="$t('Msg.PageEngine.historyTitle')"
     width="920px"
     destroy-on-close
   >
     <div class="version-summary">
-      <span>当前内容哈希</span>
-      <code>{{ shortHash(currentHash) || '尚未读取' }}</code>
-      <el-tag v-if="pageEngineStore.historyAvailable" type="success" effect="plain">历史治理已启用</el-tag>
-      <el-tag v-else type="info" effect="plain">历史治理未安装</el-tag>
+      <span>{{ $t("Msg.PageEngine.currentHash") }}</span>
+      <code>{{ shortHash(currentHash) || $t('Msg.PageEngine.notRead') }}</code>
+      <el-tag v-if="pageEngineStore.historyAvailable" type="success" effect="plain">{{ $t("Msg.PageEngine.historyEnabled") }}</el-tag>
+      <el-tag v-else type="info" effect="plain">{{ $t("Msg.PageEngine.historyMissing") }}</el-tag>
     </div>
     <el-table
       v-loading="historyLoading"
       :data="historyItems"
       row-key="Id"
       max-height="500"
-      empty-text="暂无历史版本"
+      :empty-text="$t('Msg.PageEngine.noHistory')"
     >
-      <el-table-column prop="VersionNo" label="版本" width="170" />
-      <el-table-column prop="ChangeSummary" label="变更摘要" min-width="220" show-overflow-tooltip />
-      <el-table-column prop="UserName" label="操作人" width="120" />
-      <el-table-column prop="CreateTime" label="时间" width="180" />
-      <el-table-column label="内容哈希" width="130">
+      <el-table-column prop="VersionNo" :label="$t('Msg.PageEngine.version')" width="170" />
+      <el-table-column prop="ChangeSummary" :label="$t('Msg.PageEngine.changeSummary')" min-width="220" show-overflow-tooltip />
+      <el-table-column prop="UserName" :label="$t('Msg.PageEngine.operator')" width="120" />
+      <el-table-column prop="CreateTime" :label="$t('Msg.PageEngine.time')" width="180" />
+      <el-table-column :label="$t('Msg.PageEngine.contentHash')" width="130">
         <template #default="scope"><code>{{ shortHash(scope.row.ContentHash) }}</code></template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column :label="$t('Msg.PageEngine.operation')" width="150" fixed="right">
         <template #default="scope">
-          <el-button link type="primary" @click="compareHistory(scope.row)">比较</el-button>
-          <el-button link type="warning" @click="rollbackHistory(scope.row)">回滚</el-button>
+          <el-button link type="primary" @click="compareHistory(scope.row)">{{ $t("Msg.PageEngine.compare") }}</el-button>
+          <el-button link type="warning" @click="rollbackHistory(scope.row)">{{ $t("Msg.PageEngine.rollback") }}</el-button>
         </template>
       </el-table-column>
     </el-table>
     <template #footer>
-      <el-button @click="historyDialogVisible = false">关闭</el-button>
-      <el-button type="primary" :loading="historyLoading" @click="loadHistory">刷新</el-button>
+      <el-button @click="historyDialogVisible = false">{{ $t("Msg.PageEngine.close") }}</el-button>
+      <el-button type="primary" :loading="historyLoading" @click="loadHistory">{{ $t("Msg.PageEngine.refresh") }}</el-button>
     </template>
   </el-dialog>
 
   <el-dialog
     v-model="diffDialogVisible"
-    title="界面版本语义差异"
+    :title="$t('Msg.PageEngine.diffTitle')"
     width="900px"
     destroy-on-close
   >
     <div class="diff-metrics" v-if="diffResult">
-      <el-tag type="success">新增 {{ diffResult.Added || 0 }}</el-tag>
-      <el-tag type="danger">删除 {{ diffResult.Removed || 0 }}</el-tag>
-      <el-tag type="warning">修改 {{ diffResult.Changed || 0 }}</el-tag>
-      <el-tag v-if="diffResult.Equal" type="info">内容一致</el-tag>
-      <el-tag v-if="diffResult.Truncated" type="warning">结果已截断</el-tag>
+      <el-tag type="success">{{ $t("Msg.PageEngine.added", { count: diffResult.Added || 0 }) }}</el-tag>
+      <el-tag type="danger">{{ $t("Msg.PageEngine.removed", { count: diffResult.Removed || 0 }) }}</el-tag>
+      <el-tag type="warning">{{ $t("Msg.PageEngine.changed", { count: diffResult.Changed || 0 }) }}</el-tag>
+      <el-tag v-if="diffResult.Equal" type="info">{{ $t("Msg.PageEngine.equal") }}</el-tag>
+      <el-tag v-if="diffResult.Truncated" type="warning">{{ $t("Msg.PageEngine.truncated") }}</el-tag>
     </div>
-    <el-table :data="diffResult?.Changes || []" max-height="520" empty-text="两个版本内容一致">
-      <el-table-column prop="Type" label="类型" width="90" />
-      <el-table-column prop="Path" label="路径" min-width="230" show-overflow-tooltip />
-      <el-table-column label="变更前" min-width="210" show-overflow-tooltip>
+    <el-table :data="diffResult?.Changes || []" max-height="520" :empty-text="$t('Msg.PageEngine.versionsEqual')">
+      <el-table-column prop="Type" :label="$t('Msg.PageEngine.type')" width="90" />
+      <el-table-column prop="Path" :label="$t('Msg.PageEngine.path')" min-width="230" show-overflow-tooltip />
+      <el-table-column :label="$t('Msg.PageEngine.before')" min-width="210" show-overflow-tooltip>
         <template #default="scope">{{ diffValue(scope.row.Before) }}</template>
       </el-table-column>
-      <el-table-column label="变更后" min-width="210" show-overflow-tooltip>
+      <el-table-column :label="$t('Msg.PageEngine.after')" min-width="210" show-overflow-tooltip>
         <template #default="scope">{{ diffValue(scope.row.After) }}</template>
       </el-table-column>
     </el-table>
@@ -168,18 +168,18 @@
 
   <el-dialog
     v-model="sourceDialogVisible"
-    title="可视设计 ↔ Vue 源码桥接"
+    :title="$t('Msg.PageEngine.sourceTitle')"
     width="min(1100px, 94vw)"
     destroy-on-close
   >
     <div class="source-bridge-note">
       <el-icon><Lock /></el-icon>
       <div>
-        <strong>受控、可审阅、可无损回导</strong>
-        <span>只解析标记区内的页面 JSON，不执行 Vue 文件中的 script；任意 Vue 项目不能伪装成设计器结构。</span>
+        <strong>{{ $t("Msg.PageEngine.sourceSafe") }}</strong>
+        <span>{{ $t("Msg.PageEngine.sourceDescription") }}</span>
       </div>
-      <el-tag v-if="sourceMeta.sourceChanged" type="warning" effect="plain">源码已编辑</el-tag>
-      <el-tag v-else type="success" effect="plain">来源摘要一致</el-tag>
+      <el-tag v-if="sourceMeta.sourceChanged" type="warning" effect="plain">{{ $t("Msg.PageEngine.sourceEdited") }}</el-tag>
+      <el-tag v-else type="success" effect="plain">{{ $t("Msg.PageEngine.sourceSame") }}</el-tag>
     </div>
     <el-input
       v-model="sourceText"
@@ -191,36 +191,36 @@
     />
     <div class="source-bridge-meta">
       <span>Schema v{{ sourceMeta.schemaVersion || 1 }}</span>
-      <code>{{ shortHash(sourceMeta.currentHash || sourceMeta.declaredHash) || '尚未校验' }}</code>
-      <span>{{ sourceText.length.toLocaleString() }} 字符</span>
+      <code>{{ shortHash(sourceMeta.currentHash || sourceMeta.declaredHash) || $t('Msg.PageEngine.notVerified') }}</code>
+      <span>{{ $t("Msg.PageEngine.characters", { count: sourceText.length.toLocaleString() }) }}</span>
     </div>
     <template #footer>
-      <el-button @click="chooseSourceFile"><el-icon><Upload /></el-icon>读取 .vue</el-button>
-      <el-button @click="downloadSource"><el-icon><Download /></el-icon>下载源码</el-button>
-      <el-button @click="sourceDialogVisible = false">关闭</el-button>
-      <el-button type="primary" :loading="sourceBusy" @click="applySourceToCanvas">导入到画布</el-button>
+      <el-button @click="chooseSourceFile"><el-icon><Upload /></el-icon>{{ $t("Msg.PageEngine.readVue") }}</el-button>
+      <el-button @click="downloadSource"><el-icon><Download /></el-icon>{{ $t("Msg.PageEngine.downloadSource") }}</el-button>
+      <el-button @click="sourceDialogVisible = false">{{ $t("Msg.PageEngine.close") }}</el-button>
+      <el-button type="primary" :loading="sourceBusy" @click="applySourceToCanvas">{{ $t("Msg.PageEngine.importCanvas") }}</el-button>
     </template>
   </el-dialog>
 
   <el-dialog
     v-model="assetDialogVisible"
-    title="区块、组件与页面模板资产"
+    :title="$t('Msg.PageEngine.assetTitle')"
     width="min(1080px, 94vw)"
     destroy-on-close
   >
     <div class="asset-library-toolbar">
-      <el-select v-model="assetTypeFilter" placeholder="全部类型" clearable>
-        <el-option label="区块" value="Block" />
-        <el-option label="组件" value="Component" />
-        <el-option label="页面模板" value="PageTemplate" />
-        <el-option label="主题" value="Theme" />
-        <el-option label="数据适配器" value="DataAdapter" />
+      <el-select v-model="assetTypeFilter" :placeholder="$t('Msg.PageEngine.allTypes')" clearable>
+        <el-option :label="$t('Msg.PageEngine.block')" value="Block" />
+        <el-option :label="$t('Msg.PageEngine.component')" value="Component" />
+        <el-option :label="$t('Msg.PageEngine.pageTemplate')" value="PageTemplate" />
+        <el-option :label="$t('Msg.PageEngine.theme')" value="Theme" />
+        <el-option :label="$t('Msg.PageEngine.dataAdapter')" value="DataAdapter" />
       </el-select>
-      <el-input v-model.trim="assetKeyword" clearable placeholder="搜索名称、Key、标签或负责人" />
-      <el-button :loading="assetLoading" @click="loadAssetLibrary">刷新</el-button>
+      <el-input v-model.trim="assetKeyword" clearable :placeholder="$t('Msg.PageEngine.assetSearch')" />
+      <el-button :loading="assetLoading" @click="loadAssetLibrary">{{ $t("Msg.PageEngine.refresh") }}</el-button>
     </div>
     <el-alert
-      title="资产使用已发布的不可变版本；依赖、内容哈希和兼容范围由接口引擎重新校验。"
+      :title="$t('Msg.PageEngine.assetImmutable')"
       type="info"
       :closable="false"
       show-icon
@@ -230,12 +230,12 @@
         <header><span>{{ assetTypeLabel(item.AssetType) }}</span><el-tag size="small" effect="plain">{{ item.Scope || 'Tenant' }}</el-tag></header>
         <strong>{{ item.Name }}</strong>
         <code>{{ item.PackageKey }}</code>
-        <p>{{ item.Description || '暂无说明' }}</p>
-        <footer><small>{{ item.Owner || '未指定负责人' }}</small><el-button link type="primary" :loading="assetApplyingKey === item.PackageKey" @click="applyAsset(item)">应用到画布</el-button></footer>
+        <p>{{ item.Description || $t('Msg.PageEngine.noDescription') }}</p>
+        <footer><small>{{ item.Owner || $t('Msg.PageEngine.noOwner') }}</small><el-button link type="primary" :loading="assetApplyingKey === item.PackageKey" @click="applyAsset(item)">{{ $t("Msg.PageEngine.applyCanvas") }}</el-button></footer>
       </article>
-      <el-empty v-if="!assetLoading && !filteredAssets.length" description="暂无匹配的已发布资产" />
+      <el-empty v-if="!assetLoading && !filteredAssets.length" :description="$t('Msg.PageEngine.noAssets')" />
     </div>
-    <template #footer><el-button @click="assetDialogVisible = false">关闭</el-button></template>
+    <template #footer><el-button @click="assetDialogVisible = false">{{ $t("Msg.PageEngine.close") }}</el-button></template>
   </el-dialog>
 
   <input
@@ -257,6 +257,7 @@
 <script setup name="layout-header">
 import { nextTick, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { EventBus } from '../../../utils/eventBus.js'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import { ElMessageBox, ElNotification, ElLoading } from 'element-plus'
@@ -307,6 +308,7 @@ const importTempData = async (index) => {
 }
 
 const pageEngineStore = usePageEngineStore()
+const { t } = useI18n()
 const { formData } = storeToRefs(pageEngineStore)
 const btnLoading = ref(false)
 const historyDialogVisible = ref(false)
@@ -374,7 +376,7 @@ onBeforeUnmount(() => {
 })
 
 //页面标题
-const title = ref('界面引擎')
+const title = computed(() => t('Msg.PageEngine.title'))
 
 // 页面配置里的暗黑开关只属于当前设计数据，不再改写后台全局 html.dark。
 const isDark = ref(pageEngineStore.dark == 'true' || pageEngineStore.dark == true)
@@ -416,18 +418,18 @@ const saveClick = async () => {
     const plainData = JSON.parse(JSON.stringify(formData.value || {}))
     const result = await PageVersionApi.save({
       PageId: plainData.Id,
-      Title: plainData.Title || plainData.Name || '未命名界面',
+      Title: plainData.Title || plainData.Name || t('Msg.PageEngine.unnamedPage'),
       Number: plainData.Number,
       Desc: plainData.Desc,
       RoutePath: plainData.RoutePath,
       ComponentPath: plainData.ComponentPath,
       JsonStr: JSON.stringify(plainData.JsonObj || {}),
       ExpectedCurrentHash: currentHash.value || undefined,
-      ChangeSummary: '界面设计器保存',
+      ChangeSummary: t('Msg.PageEngine.saveSummary'),
     })
     if (!result || result.Code !== 1) {
       const conflict = result?.Data?.Conflict === true
-      throw new Error(result?.Msg || (conflict ? '界面已被其他用户修改，请刷新后重试' : '保存界面失败'))
+      throw new Error(result?.Msg || (conflict ? t('Msg.PageEngine.concurrentChanged') : t('Msg.PageEngine.saveFailed')))
     }
     pageEngineStore.setVersionState(
       result.Data?.CurrentHash || currentHash.value,
@@ -435,8 +437,8 @@ const saveClick = async () => {
     )
     ElNotification({
       type: 'success',
-      title: '保存成功',
-      message: result.Msg || result.Data?.Message || '界面配置已持久化',
+      title: t('Msg.PageEngine.saveSuccess'),
+      message: result.Msg || result.Data?.Message || t('Msg.PageEngine.persisted'),
       duration: 1800,
     })
     EventBus.emit('saveFormJson', { ...plainData, __persisted: true })
@@ -450,8 +452,8 @@ const saveClick = async () => {
   } catch (error) {
     ElNotification({
       type: 'error',
-      title: '保存失败',
-      message: error?.message || '界面保存失败，请稍后重试',
+      title: t('Msg.PageEngine.saveFailed'),
+      message: error?.message || t('Msg.PageEngine.saveLater'),
       duration: 3500,
     })
   } finally {
@@ -475,15 +477,15 @@ const loadHistory = async () => {
   historyLoading.value = true
   try {
     const result = await PageVersionApi.listHistory(formData.value.Id, 1, 100)
-    if (!result || result.Code !== 1) throw new Error(result?.Msg || '读取界面历史失败')
+    if (!result || result.Code !== 1) throw new Error(result?.Msg || t('Msg.PageEngine.readHistoryFailed'))
     historyItems.value = result.Data?.Items || []
     pageEngineStore.setVersionState(result.Data?.CurrentHash || currentHash.value, true)
   } catch (error) {
     historyItems.value = []
     ElNotification({
       type: 'warning',
-      title: '版本历史不可用',
-      message: error?.message || '请先安装或更新 AI 平台治理中心应用',
+      title: t('Msg.PageEngine.historyUnavailable'),
+      message: error?.message || t('Msg.PageEngine.installGovernance'),
       duration: 3500,
     })
   } finally {
@@ -500,11 +502,11 @@ const compareHistory = async (row) => {
   historyLoading.value = true
   try {
     const result = await PageVersionApi.compare(formData.value.Id, row.Id)
-    if (!result || result.Code !== 1) throw new Error(result?.Msg || '比较界面版本失败')
+    if (!result || result.Code !== 1) throw new Error(result?.Msg || t('Msg.PageEngine.compareVersionFailed'))
     diffResult.value = result.Data || {}
     diffDialogVisible.value = true
   } catch (error) {
-    ElNotification({ type: 'error', title: '比较失败', message: error?.message || '无法比较版本' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.compareFailed'), message: error?.message || t('Msg.PageEngine.cannotCompare') })
   } finally {
     historyLoading.value = false
   }
@@ -529,31 +531,31 @@ const applyServerPage = (page) => {
 
 const rollbackHistory = async (row) => {
   if (!currentHash.value) {
-    ElNotification({ type: 'warning', title: '无法回滚', message: '尚未读取当前内容哈希，请刷新历史后重试' })
+    ElNotification({ type: 'warning', title: t('Msg.PageEngine.cannotRollback'), message: t('Msg.PageEngine.hashMissing') })
     return
   }
   try {
     await ElMessageBox.confirm(
-      `确定回滚到版本 ${row.VersionNo || row.Id}？当前内容不会被删除，而会生成一条新的审计版本。`,
-      '回滚界面版本',
-      { confirmButtonText: '确认回滚', cancelButtonText: '取消', type: 'warning' }
+      t('Msg.PageEngine.rollbackConfirm', { version: row.VersionNo || row.Id }),
+      t('Msg.PageEngine.rollbackTitle'),
+      { confirmButtonText: t('Msg.PageEngine.confirmRollback'), cancelButtonText: t('Msg.PageEngine.cancel'), type: 'warning' }
     )
     historyLoading.value = true
     const result = await PageVersionApi.rollback(
       formData.value.Id,
       row.Id,
       currentHash.value,
-      `设计器回滚到版本 ${row.VersionNo || row.Id}`
+      t('Msg.PageEngine.rollbackSummary', { version: row.VersionNo || row.Id })
     )
-    if (!result || result.Code !== 1) throw new Error(result?.Msg || '回滚界面失败')
+    if (!result || result.Code !== 1) throw new Error(result?.Msg || t('Msg.PageEngine.rollbackFailed'))
     const detail = await PageVersionApi.detail(formData.value.Id)
-    if (!detail || detail.Code !== 1) throw new Error(detail?.Msg || '回滚成功但重新读取界面失败')
+    if (!detail || detail.Code !== 1) throw new Error(detail?.Msg || t('Msg.PageEngine.rollbackReloadFailed'))
     applyServerPage(detail.Data)
     await loadHistory()
-    ElNotification({ type: 'success', title: '回滚成功', message: result.Msg || '界面已恢复并生成新的审计版本' })
+    ElNotification({ type: 'success', title: t('Msg.PageEngine.rollbackSuccess'), message: result.Msg || t('Msg.PageEngine.rollbackSuccessMessage') })
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
-    ElNotification({ type: 'error', title: '回滚失败', message: error?.message || '无法回滚界面版本' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.rollbackError'), message: error?.message || t('Msg.PageEngine.cannotRollbackVersion') })
   } finally {
     historyLoading.value = false
   }
@@ -562,7 +564,7 @@ const rollbackHistory = async (row) => {
 const exportDesign = async () => {
   try {
     const result = await PageVersionApi.export(formData.value?.Id)
-    if (!result || result.Code !== 1) throw new Error(result?.Msg || '导出界面失败')
+    if (!result || result.Code !== 1) throw new Error(result?.Msg || t('Msg.PageEngine.exportFailed'))
     const data = result.Data || {}
     const blob = new Blob([JSON.stringify(data.Snapshot || {}, null, 2)], { type: 'application/json;charset=utf-8' })
     const url = URL.createObjectURL(blob)
@@ -574,7 +576,7 @@ const exportDesign = async () => {
     link.remove()
     URL.revokeObjectURL(url)
   } catch (error) {
-    ElNotification({ type: 'error', title: '导出失败', message: error?.message || '无法导出界面设计' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.exportError'), message: error?.message || t('Msg.PageEngine.cannotExport') })
   }
 }
 
@@ -611,7 +613,7 @@ const openSourceBridge = async () => {
     }
     sourceDialogVisible.value = true
   } catch (error) {
-    ElNotification({ type: 'error', title: '源码生成失败', message: error?.message || '无法生成界面 Vue 源码' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.sourceGenerateFailed'), message: error?.message || t('Msg.PageEngine.cannotGenerateSource') })
   } finally {
     sourceBusy.value = false
   }
@@ -627,7 +629,7 @@ const handleSourceFile = async (event) => {
   const file = event?.target?.files?.[0]
   if (!file) return
   try {
-    if (file.size > 8 * 1024 * 1024) throw new Error('界面 Vue 源码不能超过 8MB')
+    if (file.size > 8 * 1024 * 1024) throw new Error(t('Msg.PageEngine.sourceTooLarge'))
     const text = await file.text()
     const parsed = await PageSourceBridge.parse(text)
     sourceText.value = text
@@ -635,7 +637,7 @@ const handleSourceFile = async (event) => {
     sourceMeta.value = parsed
     sourceDialogVisible.value = true
   } catch (error) {
-    ElNotification({ type: 'error', title: '源码读取失败', message: error?.message || '界面 Vue 源码无效' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.sourceReadFailed'), message: error?.message || t('Msg.PageEngine.invalidSource') })
   }
 }
 
@@ -644,7 +646,7 @@ const downloadSource = async () => {
     if (!sourceText.value) await openSourceBridge()
     downloadText(sourceText.value, sourceFileName.value || 'page.microi-page.vue', 'text/x-vue;charset=utf-8')
   } catch (error) {
-    ElNotification({ type: 'error', title: '源码下载失败', message: error?.message || '无法下载界面 Vue 源码' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.sourceDownloadFailed'), message: error?.message || t('Msg.PageEngine.cannotDownloadSource') })
   }
 }
 
@@ -654,7 +656,7 @@ const normalizeImportedPage = (source) => {
   let jsonObj = page.JsonObj ?? page.jsonObj ?? root.JsonObj
   if (typeof jsonObj === 'string') jsonObj = JSON.parse(jsonObj || '{}')
   if (!jsonObj || typeof jsonObj !== 'object' || Array.isArray(jsonObj)) {
-    throw new Error('导入文件缺少有效的 Page.JsonObj 对象')
+    throw new Error(t('Msg.PageEngine.missingPageObject'))
   }
   if (!jsonObj.formConfig || typeof jsonObj.formConfig !== 'object' || Array.isArray(jsonObj.formConfig)) {
     jsonObj.formConfig = {}
@@ -688,43 +690,43 @@ const applySourceToCanvas = async () => {
     const parsed = await PageSourceBridge.parse(sourceText.value)
     const imported = normalizeImportedPage(parsed.page)
     const warning = parsed.sourceChanged
-      ? '源码标记区已被编辑。确认用编辑后的页面结构替换当前画布？只有点击“保存”后才会写入服务器。'
-      : '确认用该 Vue 源码中的页面结构替换当前画布？只有点击“保存”后才会写入服务器。'
-    await ElMessageBox.confirm(warning, '导入界面 Vue 源码', {
-      confirmButtonText: '导入到画布', cancelButtonText: '取消', type: parsed.sourceChanged ? 'warning' : 'info'
+      ? t('Msg.PageEngine.sourceEditedConfirm')
+      : t('Msg.PageEngine.sourceConfirm')
+    await ElMessageBox.confirm(warning, t('Msg.PageEngine.importVueTitle'), {
+      confirmButtonText: t('Msg.PageEngine.importCanvas'), cancelButtonText: t('Msg.PageEngine.cancel'), type: parsed.sourceChanged ? 'warning' : 'info'
     })
     applyImportedPage(imported)
     sourceMeta.value = parsed
     sourceDialogVisible.value = false
-    ElNotification({ type: 'success', title: '源码已导入', message: '页面结构已载入画布，请预览并点击保存' })
+    ElNotification({ type: 'success', title: t('Msg.PageEngine.sourceImported'), message: t('Msg.PageEngine.sourceImportedMessage') })
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
-    ElNotification({ type: 'error', title: '源码导入失败', message: error?.message || '界面 Vue 源码无效' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.sourceImportFailed'), message: error?.message || t('Msg.PageEngine.invalidSource') })
   } finally {
     sourceBusy.value = false
   }
 }
 
 const assetTypeLabel = (value) => ({
-  Block: '区块',
-  Component: '组件',
-  PageTemplate: '页面模板',
-  Theme: '主题',
-  DataAdapter: '数据适配器',
-}[value] || value || '资产')
+  Block: t('Msg.PageEngine.block'),
+  Component: t('Msg.PageEngine.component'),
+  PageTemplate: t('Msg.PageEngine.pageTemplate'),
+  Theme: t('Msg.PageEngine.theme'),
+  DataAdapter: t('Msg.PageEngine.dataAdapter'),
+}[value] || value || t('Msg.PageEngine.assetFallback'))
 
 const loadAssetLibrary = async () => {
   assetLoading.value = true
   try {
     const result = await PageVersionApi.listPublishedAssets()
-    if (!result || result.Code !== 1) throw new Error(result?.Msg || '读取资产库失败')
+    if (!result || result.Code !== 1) throw new Error(result?.Msg || t('Msg.PageEngine.readAssetsFailed'))
     assetItems.value = Array.isArray(result.Data) ? result.Data : (result.Data?.List || [])
   } catch (error) {
     assetItems.value = []
     ElNotification({
       type: 'warning',
-      title: '资产库不可用',
-      message: error?.message || '请先安装或更新 AI 平台治理中心应用',
+      title: t('Msg.PageEngine.assetUnavailable'),
+      message: error?.message || t('Msg.PageEngine.installGovernance'),
       duration: 3500,
     })
   } finally {
@@ -764,44 +766,44 @@ const applyAsset = async (item) => {
   assetApplyingKey.value = item.PackageKey
   try {
     const result = await PageVersionApi.resolveAsset(item.PackageKey)
-    if (!result || result.Code !== 1 || !result.Data) throw new Error(result?.Msg || '资产解析失败')
+    if (!result || result.Code !== 1 || !result.Data) throw new Error(result?.Msg || t('Msg.PageEngine.assetResolveFailed'))
     const asset = result.Data
     const content = asset.Content || {}
     const type = asset.Package?.AssetType || item.AssetType
     if (type === 'PageTemplate') {
       const jsonObj = content.Page?.JsonObj || content.JsonObj || content
       const imported = normalizeImportedPage({ JsonObj: jsonObj })
-      await ElMessageBox.confirm('页面模板会替换当前画布。只有点击“保存”后才写入服务器，是否继续？', '应用页面模板', {
-        confirmButtonText: '替换画布', cancelButtonText: '取消', type: 'warning'
+      await ElMessageBox.confirm(t('Msg.PageEngine.pageTemplateConfirm'), t('Msg.PageEngine.applyPageTemplate'), {
+        confirmButtonText: t('Msg.PageEngine.replaceCanvas'), cancelButtonText: t('Msg.PageEngine.cancel'), type: 'warning'
       })
       pageEngineStore.updateFormData({ ...formData.value, JsonObj: imported.JsonObj })
     } else if (type === 'Block') {
       const wrappers = content.Wrappers || (content.Wrapper ? [content.Wrapper] : [])
-      if (!Array.isArray(wrappers) || !wrappers.length) throw new Error('区块资产缺少 Wrapper 或 Wrappers')
+      if (!Array.isArray(wrappers) || !wrappers.length) throw new Error(t('Msg.PageEngine.blockMissing'))
       wrappers.forEach((wrapper) => pageEngineStore.addWrapper(rekeyAssetTree(wrapper)))
     } else if (type === 'Component') {
       const widget = content.Widget || content
-      if (!widget?.widgetOption) throw new Error('组件资产缺少 Widget')
-      if (pageEngineStore.curWrapperIdx < 0) throw new Error('请先在画布中选择一个容器')
+      if (!widget?.widgetOption) throw new Error(t('Msg.PageEngine.widgetMissing'))
+      if (pageEngineStore.curWrapperIdx < 0) throw new Error(t('Msg.PageEngine.selectContainer'))
       const wrapper = formData.value.JsonObj.wrapperList[pageEngineStore.curWrapperIdx]
       const wrapperNumber = wrapper?.wrapperOption?.number
       pageEngineStore.addWidget(pageEngineStore.curWrapperIdx, rekeyAssetTree(widget, wrapperNumber))
     } else if (type === 'Theme') {
       const theme = content.FormConfig || content.Theme || content
-      if (!theme || typeof theme !== 'object' || Array.isArray(theme)) throw new Error('主题资产内容无效')
+      if (!theme || typeof theme !== 'object' || Array.isArray(theme)) throw new Error(t('Msg.PageEngine.invalidTheme'))
       Object.assign(formData.value.JsonObj.formConfig, deepClone(theme))
     } else {
-      throw new Error('数据适配器资产请在组件的数据绑定面板中引用，不能直接放入画布')
+      throw new Error(t('Msg.PageEngine.adapterReference'))
     }
     assetDialogVisible.value = false
     ElNotification({
       type: 'success',
-      title: '资产已应用',
-      message: `${asset.Package?.Name || item.Name} ${asset.Version?.VersionNo || ''} 已载入画布，请预览后保存`,
+      title: t('Msg.PageEngine.assetApplied'),
+      message: t('Msg.PageEngine.assetAppliedMessage', { name: asset.Package?.Name || item.Name, version: asset.Version?.VersionNo || '' }),
     })
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
-    ElNotification({ type: 'error', title: '应用资产失败', message: error?.message || '无法应用该资产' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.applyAssetFailed'), message: error?.message || t('Msg.PageEngine.cannotApplyAsset') })
   } finally {
     assetApplyingKey.value = ''
   }
@@ -811,16 +813,16 @@ const handleImportFile = async (event) => {
   const file = event?.target?.files?.[0]
   if (!file) return
   try {
-    if (file.size > 5 * 1024 * 1024) throw new Error('界面设计文件不能超过 5MB')
+    if (file.size > 5 * 1024 * 1024) throw new Error(t('Msg.PageEngine.designTooLarge'))
     const imported = normalizeImportedPage(JSON.parse(await file.text()))
-    await ElMessageBox.confirm('导入会替换当前画布，但只有点击“保存”后才会写入服务器。是否继续？', '导入界面设计', {
-      confirmButtonText: '导入到画布', cancelButtonText: '取消', type: 'warning'
+    await ElMessageBox.confirm(t('Msg.PageEngine.designImportConfirm'), t('Msg.PageEngine.importDesignTitle'), {
+      confirmButtonText: t('Msg.PageEngine.importCanvas'), cancelButtonText: t('Msg.PageEngine.cancel'), type: 'warning'
     })
     applyImportedPage(imported)
-    ElNotification({ type: 'success', title: '导入完成', message: '设计已载入画布，请检查后点击保存' })
+    ElNotification({ type: 'success', title: t('Msg.PageEngine.importDone'), message: t('Msg.PageEngine.importDoneMessage') })
   } catch (error) {
     if (error === 'cancel' || error === 'close') return
-    ElNotification({ type: 'error', title: '导入失败', message: error?.message || '界面设计文件无效' })
+    ElNotification({ type: 'error', title: t('Msg.PageEngine.importFailed'), message: error?.message || t('Msg.PageEngine.invalidDesign') })
   }
 }
 
@@ -848,16 +850,16 @@ const curPageJson = computed({
       // 更新 curWidget 的值，假设 curWidget 是响应式的 ref 或 pinia store 的响应式属性
       Object.assign(formData.value, parsed)
     } catch (e) {
-      console.error('JSON 解析失败')
+      console.error('[page-engine] JSON parse failed')
     }
   },
 })
 
 //清空组件
 const clearClick = () => {
-  ElMessageBox.confirm('是否清空当前画布所有容器和组件?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(t('Msg.PageEngine.clearConfirm'), t('Msg.PageEngine.prompt'), {
+    confirmButtonText: t('Msg.PageEngine.confirm'),
+    cancelButtonText: t('Msg.PageEngine.cancel'),
     type: 'warning',
   })
     .then(() => {
@@ -866,8 +868,8 @@ const clearClick = () => {
       localStorage.removeItem('page_formData')
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '画布已清空',
+        title: t('Msg.PageEngine.prompt'),
+        message: t('Msg.PageEngine.canvasCleared'),
         duration: 1000,
       })
     })
@@ -878,17 +880,17 @@ const clearClick = () => {
 
 //初始化当前页面，
 const setIni = () => {
-  ElMessageBox.confirm('是否初始化当前页面配置吗?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(t('Msg.PageEngine.initializeConfirm'), t('Msg.PageEngine.prompt'), {
+    confirmButtonText: t('Msg.PageEngine.confirm'),
+    cancelButtonText: t('Msg.PageEngine.cancel'),
     type: 'warning',
   })
     .then(() => {
       pageEngineStore.setIni()
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '页面已初始化',
+        title: t('Msg.PageEngine.prompt'),
+        message: t('Msg.PageEngine.initialized'),
         duration: 1000,
       })
     })
@@ -899,9 +901,9 @@ const setIni = () => {
 
 //是否切换模板1
 const mockClick = (index) => {
-  ElMessageBox.confirm('是否切换模板吗?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(t('Msg.PageEngine.templateConfirm'), t('Msg.PageEngine.prompt'), {
+    confirmButtonText: t('Msg.PageEngine.confirm'),
+    cancelButtonText: t('Msg.PageEngine.cancel'),
     type: 'warning',
   })
     .then(async () => {
@@ -917,8 +919,8 @@ const mockClick = (index) => {
       })
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '已切换模板' + (index + 1),
+        title: t('Msg.PageEngine.prompt'),
+        message: t('Msg.PageEngine.templateChanged', { index: index + 1 }),
         duration: 1000,
       })
     })

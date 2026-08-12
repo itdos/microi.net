@@ -2,6 +2,7 @@ import _u from "underscore";
 import DynamicComponentCache from "@/utils/dynamicComponentCache.js";
 import { getVisiblePageTabs, resolveInitialPageTab } from "./page-tab-runtime.js";
 import { selectTableDataSourceFields } from "./table-field-data-source.js";
+import { tableAuditPreferenceKey, tableFieldPreferenceKey } from "../utils/user-table-column-preference.js";
 
 export default {
     methods: {
@@ -29,7 +30,7 @@ export default {
             return null;
             // TableChildField.Readonly  == true ? true : null
         },
-        ColIsDisplay(fieldName) {
+        ColIsConfigured(fieldName) {
             var self = this;
             if (self.NotShowFields.indexOf(fieldName) > -1
                 || self.NotShowFields.findIndex(item => item.Name == fieldName || item.Id == fieldName) > -1) {
@@ -48,6 +49,21 @@ export default {
             //     return true;
             // }
             return true;
+        },
+        ColIsDisplay(fieldName) {
+            if (this._runtimeHiddenFields.indexOf(tableAuditPreferenceKey(fieldName)) > -1) return false;
+            return this.ColIsConfigured(fieldName);
+        },
+        IsUserTableColumnHidden(fieldOrColumn) {
+            var self = this;
+            if (!fieldOrColumn) return false;
+            var key = fieldOrColumn.Key || (fieldOrColumn.IsAudit
+                ? tableAuditPreferenceKey(fieldOrColumn.Name)
+                : tableFieldPreferenceKey(fieldOrColumn.Field || fieldOrColumn));
+            if (key && self._runtimeHiddenFields.indexOf(key) > -1) return true;
+            // 兼容升级前“隐藏此列”只保存 fieldId 的运行时状态。
+            var field = fieldOrColumn.Field || fieldOrColumn;
+            return !!(field && field.Id && self._runtimeHiddenFields.indexOf(field.Id) > -1);
         },
         ColIsFixed(fieldId) {
             var self = this;
@@ -848,7 +864,7 @@ export default {
                     self._allFieldList = tempArr;
                     // 过滤运行时隐藏的列
                     if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
-                        tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
+                        tempArr = tempArr.filter(f => !self.IsUserTableColumnHidden(f));
                     }
                     self.ShowDiyFieldList = tempArr;
                     return tempArr;
@@ -894,7 +910,7 @@ export default {
                     self._allFieldList = tempArr;
                     // 过滤运行时隐藏的列
                     if (self._runtimeHiddenFields && self._runtimeHiddenFields.length > 0) {
-                        tempArr = tempArr.filter(f => self._runtimeHiddenFields.indexOf(f.Id) === -1);
+                        tempArr = tempArr.filter(f => !self.IsUserTableColumnHidden(f));
                     }
                     self.ShowDiyFieldList = tempArr;
                     return tempArr;

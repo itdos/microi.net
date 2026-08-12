@@ -64,6 +64,7 @@
 import pannelWrapper from '../form-designer/wrapper/pannel-wrapper.vue'
 import pannelTabs from '../form-designer/wrapper/pannel-tabs.vue'
 import { computed, inject, onMounted, onBeforeUnmount, onActivated, provide } from 'vue'
+import { useI18n } from 'vue-i18n'
 import loadComponentsFromFolder from '../../utils/dynamicComponents'
 import { storeToRefs } from 'pinia'
 import { DiyCommon } from '@/utils/diy.common';
@@ -86,7 +87,8 @@ const diyStore = useDiyStore()
 // 移动端判断及顶部信息
 const isPhoneView = computed(() => diyStore.IsPhoneView)
 const peAppName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码')
-const pePageTitle = computed(() => formData.value?.Name || formData.value?.JsonObj?.formConfig?.title || '界面引擎')
+const { t } = useI18n()
+const pePageTitle = computed(() => formData.value?.Name || formData.value?.JsonObj?.formConfig?.title || t('Msg.PageEngine.title'))
 const peLogoUrl = computed(() => {
   const logo = diyStore.SysConfig?.SysLogo
   if (logo && DiyCommon) return DiyCommon.GetServerPath(logo)

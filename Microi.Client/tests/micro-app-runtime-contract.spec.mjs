@@ -157,7 +157,12 @@ test("page host derives height from the visible viewport instead of its collapse
     assert.match(host, /host\.style\.height/);
     assert.match(host, /host\.style\.minHeight/);
     assert.doesNotMatch(host, /Math\.min\(rect\.height/);
-    assert.match(host, /overflow:\s*auto/);
+    const hostRule = host.match(/\.micro-app-host\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+    const appRule = host.match(/\.micro-app-host__app\s*\{([\s\S]*?)\n\}/)?.[1] || "";
+    assert.match(hostRule, /overflow:\s*hidden/);
+    assert.match(appRule, /overflow-x:\s*auto/);
+    assert.match(appRule, /overflow-y:\s*auto/);
+    assert.match(appRule, /overscroll-behavior:\s*contain/);
     assert.match(host, /contain:\s*layout paint/);
     assert.match(host, /isolation:\s*isolate/);
 });

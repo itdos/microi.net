@@ -506,6 +506,17 @@ export default {
             _colPageFilterKeyword: '',
             _colPageFilterSelectedValues: [],
             _colPageFilters: {}, // { fieldName: { values } }
+            // 当前用户在当前模块内的列显示偏好；本地缓存负责首帧，服务端稀疏记录负责跨设备同步。
+            _columnSettingsVisible: false,
+            _columnSettingsPosition: { top: 0, left: 0, maxHeight: 0 },
+            _columnSettingsSearch: "",
+            _columnSettingsSaveState: "idle", // idle | loading | pending | saving | saved | error
+            _columnSettingsSaveError: "",
+            _columnPreferenceMenuId: "",
+            _columnPreferenceRequestId: 0,
+            _columnPreferenceSaveId: 0,
+            _columnPreferenceEditVersion: 0,
+            _columnPreferenceSaveTimer: null,
             _batchDragPending: false,
             _batchDragSelecting: false,
             _batchDragSelectionMode: true,
@@ -517,7 +528,7 @@ export default {
             _batchDragRect: null,
             _batchDragSuppressClick: false,
             _batchDragBodyUserSelect: null,
-            _runtimeHiddenFields: [], // 运行时用户隐藏的列（fieldId数组）
+            _runtimeHiddenFields: [], // 用户隐藏列键：field:{fieldId} / audit:{fieldName}
             // 移动端搜索弹窗状态
             showMobileSearch: false,
             cardCompactMode: false,

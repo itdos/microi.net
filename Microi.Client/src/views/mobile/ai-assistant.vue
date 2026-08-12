@@ -10,7 +10,7 @@
                     v-if="!embedded"
                     type="button"
                     class="mobile-ai-icon-button"
-                    aria-label="返回"
+                    :aria-label="$t('Msg.Mobile.ai.backLabel')"
                     @click="goBack"
                 >
                     <el-icon><ArrowLeft /></el-icon>
@@ -32,7 +32,7 @@
                     </span>
                 </div>
                 <div v-else class="mobile-ai-embedded-scope">
-                    <strong>数据权限</strong>
+                    <strong>{{ $t("Msg.Mobile.ai.dataPermission") }}</strong>
                     <small>{{ headerScopeText }}</small>
                 </div>
 
@@ -41,7 +41,7 @@
                         v-if="isAuthenticated && ready && enabled"
                         type="button"
                         class="mobile-ai-icon-button"
-                        aria-label="对话记录"
+                        :aria-label="$t('Msg.Mobile.ai.historyLabel')"
                         data-testid="mobile-ai-history"
                         @click="openHistory"
                     >
@@ -51,7 +51,7 @@
                         v-if="isAuthenticated && ready && enabled"
                         type="button"
                         class="mobile-ai-icon-button"
-                        aria-label="新建对话"
+                        :aria-label="$t('Msg.Mobile.ai.newConversationLabel')"
                         data-testid="mobile-ai-new-conversation"
                         @click="startNewConversation"
                     >
@@ -63,12 +63,12 @@
 
         <main v-if="!isAuthenticated" class="mobile-ai-state">
             <span class="mobile-ai-state__icon"><el-icon><Lock /></el-icon></span>
-            <h1>登录后使用 AI 数据分析</h1>
-            <p>AI 助手会严格按照当前账号角色和数据权限回答，登录前不读取任何业务数据。</p>
-            <button type="button" class="mobile-ai-primary-button" @click="goLogin">去登录</button>
+            <h1>{{ $t("Msg.Mobile.ai.loginTitle") }}</h1>
+            <p>{{ $t("Msg.Mobile.ai.loginDescription") }}</p>
+            <button type="button" class="mobile-ai-primary-button" @click="goLogin">{{ $t("Msg.Mobile.ai.login") }}</button>
         </main>
 
-        <main v-else-if="!ready" class="mobile-ai-skeleton" aria-label="AI助手加载中">
+        <main v-else-if="!ready" class="mobile-ai-skeleton" :aria-label="$t('Msg.Mobile.ai.loadingLabel')">
             <div v-for="index in 5" :key="index" class="mobile-ai-skeleton__card">
                 <span></span><span></span>
             </div>
@@ -78,22 +78,22 @@
             <span class="mobile-ai-state__icon"><el-icon><Warning /></el-icon></span>
             <h1>{{ unavailableTitle }}</h1>
             <p>{{ unavailableDescription }}</p>
-            <button type="button" class="mobile-ai-secondary-button" @click="goBack">返回</button>
+            <button type="button" class="mobile-ai-secondary-button" @click="goBack">{{ $t("Msg.Mobile.common.back") }}</button>
         </main>
 
         <main v-else class="mobile-ai-workspace">
             <div class="mobile-ai-disclosure" role="note">
                 <strong>AI</strong>
-                <span>内容由人工智能生成，请注意甄别</span>
+                <span>{{ $t("Msg.Mobile.ai.disclaimer") }}</span>
             </div>
 
-            <section class="mobile-ai-toolbar" aria-label="AI模型设置">
+            <section class="mobile-ai-toolbar" :aria-label="$t('Msg.Mobile.ai.settingsLabel')">
                 <label class="mobile-ai-field">
-                    <span>模型通道</span>
+                    <span>{{ $t("Msg.Mobile.ai.channel") }}</span>
                     <el-select
                         v-model="selectedModelId"
                         data-testid="mobile-ai-model"
-                        placeholder="选择模型通道"
+                        :placeholder="$t('Msg.Mobile.ai.selectChannel')"
                         :teleported="false"
                     >
                         <el-option
@@ -106,11 +106,11 @@
                 </label>
 
                 <label v-if="relayOptions.length" class="mobile-ai-field">
-                    <span>运行模型</span>
+                    <span>{{ $t("Msg.Mobile.ai.runtimeModel") }}</span>
                     <el-select
                         v-model="selectedRelayId"
                         data-testid="mobile-ai-relay-model"
-                        placeholder="选择运行模型"
+                        :placeholder="$t('Msg.Mobile.ai.selectRuntimeModel')"
                         :teleported="false"
                     >
                         <el-option
@@ -123,7 +123,7 @@
                 </label>
 
                 <label class="mobile-ai-field mobile-ai-field--reasoning">
-                    <span>推理强度</span>
+                    <span>{{ $t("Msg.Mobile.ai.reasoning") }}</span>
                     <el-select
                         v-model="reasoningEffort"
                         data-testid="mobile-ai-reasoning"
@@ -137,13 +137,13 @@
                             :value="item.value"
                         />
                     </el-select>
-                    <small v-if="!supportsReasoning" class="mobile-ai-field__hint">当前模型不支持调节，将使用自动模式</small>
+                    <small v-if="!supportsReasoning" class="mobile-ai-field__hint">{{ $t("Msg.Mobile.ai.reasoningUnsupported") }}</small>
                 </label>
             </section>
 
             <section v-if="conversationId" class="mobile-ai-conversation-bar">
                 <span>
-                    <small>当前对话</small>
+                    <small>{{ $t("Msg.Mobile.ai.currentConversation") }}</small>
                     <strong>{{ conversationTitle }}</strong>
                 </span>
                 <button
@@ -151,15 +151,15 @@
                     data-testid="mobile-ai-current-rename"
                     @click="requestRename({ Id: conversationId, Title: conversationTitle })"
                 >
-                    <el-icon><EditPen /></el-icon>改名
+                    <el-icon><EditPen /></el-icon>{{ $t("Msg.Mobile.ai.rename") }}
                 </button>
             </section>
 
             <section ref="messageList" class="mobile-ai-messages" aria-live="polite">
                 <div class="mobile-ai-welcome">
-                    <span><i></i>安全分析通道已连接</span>
-                    <h1>你好，我已准备好分析你的业务数据</h1>
-                    <p>查询范围由当前租户、角色和数据权限共同决定。</p>
+                    <span><i></i>{{ $t("Msg.Mobile.ai.secureConnected") }}</span>
+                    <h1>{{ $t("Msg.Mobile.ai.readyTitle") }}</h1>
+                    <p>{{ $t("Msg.Mobile.ai.readyDescription") }}</p>
                 </div>
 
                 <div v-if="!messages.length && prompts.length" class="mobile-ai-prompts">
@@ -176,13 +176,13 @@
                 >
                     <div class="mobile-ai-bubble">
                         <div v-if="message.loading" class="mobile-ai-thinking-live">
-                            <i></i><i></i><i></i><span>正在思考</span>
+                            <i></i><i></i><i></i><span>{{ $t("Msg.Mobile.chat.thinking") }}</span>
                         </div>
                         <p v-else>{{ message.text }}</p>
 
                         <div v-if="message.thinking?.length" class="mobile-ai-thinking">
                             <button type="button" @click="toggleThinking(index)">
-                                <span>{{ message.thinkingOpen ? '收起思考过程' : '查看思考过程' }}</span>
+                                <span>{{ message.thinkingOpen ? $t('Msg.Mobile.ai.collapseThinking') : $t('Msg.Mobile.ai.viewThinking') }}</span>
                                 <b :class="{ open: message.thinkingOpen }">⌄</b>
                             </button>
                             <ol v-if="message.thinkingOpen">
@@ -198,7 +198,7 @@
                             class="mobile-ai-copy"
                             @click="copyAnswer(message.text)"
                         >
-                            <el-icon><CopyDocument /></el-icon>复制
+                            <el-icon><CopyDocument /></el-icon>{{ $t("Msg.Mobile.ai.copy") }}
                         </button>
                     </div>
                 </article>
@@ -212,7 +212,7 @@
                     :autosize="{ minRows: 1, maxRows: 4 }"
                     :disabled="sending"
                     resize="none"
-                    placeholder="询问客户、合同、跟进、售后或设备数据"
+                    :placeholder="$t('Msg.Mobile.ai.inputPlaceholder')"
                     data-testid="mobile-ai-input"
                     @keydown.enter.exact.prevent="sendQuestion"
                 />
@@ -221,7 +221,7 @@
                     class="mobile-ai-send"
                     data-testid="mobile-ai-send"
                     :disabled="!canSend"
-                    aria-label="发送"
+                    :aria-label="$t('Msg.Mobile.ai.sendLabel')"
                 >
                     <el-icon v-if="sending" class="mobile-ai-spin"><Loading /></el-icon>
                     <el-icon v-else><Promotion /></el-icon>
@@ -231,29 +231,29 @@
 
         <Transition name="mobile-ai-drawer">
             <div v-if="historyVisible" class="mobile-ai-history-mask" @click="closeHistory">
-                <aside class="mobile-ai-history-panel" aria-label="AI对话记录" @click.stop>
+                <aside class="mobile-ai-history-panel" :aria-label="$t('Msg.Mobile.ai.historyLabel')" @click.stop>
                     <header>
-                        <span><strong>对话记录</strong><small>仅显示当前账号的会话</small></span>
-                        <button type="button" aria-label="关闭对话记录" @click="closeHistory">
+                        <span><strong>{{ $t("Msg.Mobile.ai.historyLabel") }}</strong><small>{{ $t("Msg.Mobile.ai.historyDescription") }}</small></span>
+                        <button type="button" :aria-label="$t('Msg.Mobile.ai.closeHistory')" @click="closeHistory">
                             <el-icon><Close /></el-icon>
                         </button>
                     </header>
 
                     <button type="button" class="mobile-ai-history-create" @click="startNewConversation">
-                        <el-icon><Plus /></el-icon><span>新建 AI 对话</span>
+                        <el-icon><Plus /></el-icon><span>{{ $t("Msg.Mobile.ai.newAiConversation") }}</span>
                     </button>
 
                     <div class="mobile-ai-history-tabs">
-                        <button type="button" :class="{ active: historyTab === 'current' }" @click="historyTab = 'current'">AI 对话</button>
-                        <button type="button" :class="{ active: historyTab === 'archived' }" @click="historyTab = 'archived'">已归档</button>
+                        <button type="button" :class="{ active: historyTab === 'current' }" @click="historyTab = 'current'">{{ $t("Msg.Mobile.ai.conversations") }}</button>
+                        <button type="button" :class="{ active: historyTab === 'archived' }" @click="historyTab = 'archived'">{{ $t("Msg.Mobile.ai.archived") }}</button>
                     </div>
 
-                    <el-input v-model="historyQuery" clearable placeholder="搜索对话标题" :prefix-icon="Search" />
+                    <el-input v-model="historyQuery" clearable :placeholder="$t('Msg.Mobile.ai.searchTitle')" :prefix-icon="Search" />
 
                     <div class="mobile-ai-history-list">
-                        <div v-if="historyLoading" class="mobile-ai-history-empty">正在读取对话记录…</div>
+                        <div v-if="historyLoading" class="mobile-ai-history-empty">{{ $t("Msg.Mobile.ai.readingHistory") }}</div>
                         <div v-else-if="!filteredConversations.length" class="mobile-ai-history-empty">
-                            {{ historyTab === 'archived' ? '暂无已归档对话' : '暂无对话记录' }}
+                            {{ historyTab === 'archived' ? $t('Msg.Mobile.ai.noArchived') : $t('Msg.Mobile.ai.noHistory') }}
                         </div>
                         <template v-else>
                             <article
@@ -265,7 +265,7 @@
                                 @click="selectConversation(item)"
                             >
                                 <span>
-                                    <strong>{{ item.Title || '新对话' }}</strong>
+                                    <strong>{{ item.Title || $t('Msg.Mobile.ai.newConversation') }}</strong>
                                     <small>{{ formatHistoryMeta(item) }}</small>
                                 </span>
                                 <div>
@@ -273,13 +273,13 @@
                                         type="button"
                                         :data-testid="`mobile-ai-rename-${item.Id}`"
                                         @click.stop="requestRename(item)"
-                                    >改名</button>
+                                    >{{ $t("Msg.Mobile.ai.rename") }}</button>
                                     <button
                                         type="button"
                                         :data-testid="`mobile-ai-${item.Archived ? 'restore' : 'archive'}-${item.Id}`"
                                         :disabled="historyActionId === item.Id"
                                         @click.stop="toggleArchive(item, !item.Archived)"
-                                    >{{ item.Archived ? '还原' : '归档' }}</button>
+                                    >{{ item.Archived ? $t('Msg.Mobile.ai.restore') : $t('Msg.Mobile.ai.archive') }}</button>
                                 </div>
                             </article>
                         </template>
@@ -290,7 +290,7 @@
 
         <el-dialog
             v-model="renameVisible"
-            title="修改对话标题"
+            :title="$t('Msg.Mobile.ai.renameTitle')"
             width="min(420px, calc(100vw - 32px))"
             append-to-body
             align-center
@@ -303,12 +303,12 @@
                 show-word-limit
                 autofocus
                 data-testid="mobile-ai-rename-input"
-                placeholder="请输入对话标题"
+                :placeholder="$t('Msg.Mobile.ai.enterTitle')"
                 @keyup.enter="confirmRename"
             />
             <template #footer>
-                <el-button @click="cancelRename">取消</el-button>
-                <el-button type="primary" data-testid="mobile-ai-rename-save" :loading="renameSaving" @click="confirmRename">保存</el-button>
+                <el-button @click="cancelRename">{{ $t("Msg.Mobile.common.cancel") }}</el-button>
+                <el-button type="primary" data-testid="mobile-ai-rename-save" :loading="renameSaving" @click="confirmRename">{{ $t("Msg.Mobile.common.save") }}</el-button>
             </template>
         </el-dialog>
     </div>
@@ -317,6 +317,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import {
     ArrowLeft,
     Clock,
@@ -365,10 +366,11 @@ const embedded = computed(() => props.embedded);
 const router = useRouter();
 const route = useRoute();
 const diyStore = useDiyStore();
+const { t } = useI18n();
 const currentUser = computed(() => diyStore.GetCurrentUser || {});
 const isAuthenticated = computed(() => Boolean((diyStore.Token || DiyCommon.getToken?.()) && currentUser.value.Id));
 const featureEnabled = computed(() => isMobileAiAssistantEnabled(diyStore.SysConfig));
-const assistantName = "AI助手";
+const assistantName = computed(() => t("Msg.Mobile.message.aiAssistant"));
 
 const ready = ref(false);
 const enabled = ref(false);
@@ -381,19 +383,19 @@ const prompts = ref([]);
 const selectedModelId = ref("");
 const selectedRelayId = ref("");
 const reasoningEffort = ref("auto");
-const reasoningOptions = [
-    { value: "auto", label: "自动推理" },
-    { value: "low", label: "简洁推理" },
-    { value: "medium", label: "标准推理" },
-    { value: "high", label: "深度推理" }
-];
+const reasoningOptions = computed(() => [
+    { value: "auto", label: t("Msg.Mobile.ai.autoReasoning") },
+    { value: "low", label: t("Msg.Mobile.ai.lowReasoning") },
+    { value: "medium", label: t("Msg.Mobile.ai.mediumReasoning") },
+    { value: "high", label: t("Msg.Mobile.ai.highReasoning") }
+]);
 
 const question = ref("");
 const sending = ref(false);
 const messages = ref([]);
 const messageList = ref(null);
 const conversationId = ref("");
-const conversationTitle = ref("新对话");
+const conversationTitle = ref(t("Msg.Mobile.ai.newConversation"));
 
 const historyVisible = ref(false);
 const historyLoading = ref(false);
@@ -429,20 +431,20 @@ const canSend = computed(() => {
     return !sending.value && !historyLoading.value && Boolean(question.value.trim()) && Boolean(selectedModel.value) && relayReady;
 });
 const headerScopeText = computed(() => {
-    if (!isAuthenticated.value) return "登录后启用 · 匿名状态不读取数据";
-    if (!ready.value) return "正在校验账号与数据权限";
+    if (!isAuthenticated.value) return t("Msg.Mobile.ai.anonymousStatus");
+    if (!ready.value) return t("Msg.Mobile.ai.validatingStatus");
     if (!enabled.value) return featureEnabled.value
-        ? (bootstrapFailure.value?.header || "当前角色未授权")
-        : "系统未开启";
-    return `${scopeLabel.value || roleText.value || "当前角色"} · 数据权限已校验`;
+        ? (bootstrapFailure.value?.header || t("Msg.Mobile.ai.roleUnauthorized"))
+        : t("Msg.Mobile.ai.disabled");
+    return t("Msg.Mobile.ai.permissionVerified", { scope: scopeLabel.value || roleText.value || t("Msg.Mobile.ai.roleFallback") });
 });
 const unavailableTitle = computed(() => {
-    if (!featureEnabled.value) return "当前系统未开启 AI助手";
-    return bootstrapFailure.value?.title || "当前角色暂未开通 AI助手";
+    if (!featureEnabled.value) return t("Msg.Mobile.ai.featureDisabledTitle");
+    return bootstrapFailure.value?.title || t("Msg.Mobile.ai.roleDisabledTitle");
 });
 const unavailableDescription = computed(() => {
-    if (!featureEnabled.value) return "请联系管理员开启 AI助手功能。";
-    return bootstrapFailure.value?.description || "请联系管理员配置可用模型、业务域和数据范围。";
+    if (!featureEnabled.value) return t("Msg.Mobile.ai.enableFeature");
+    return bootstrapFailure.value?.description || t("Msg.Mobile.ai.configureFeature");
 });
 const filteredConversations = computed(() => {
     const archived = historyTab.value === "archived";
@@ -469,7 +471,7 @@ function restoreSelections() {
     selectedRelayId.value = relayModels.value.some((item) => String(item.Id) === String(saved.relayModel))
         ? saved.relayModel
         : (relayModels.value[0]?.Id || "");
-    reasoningEffort.value = reasoningOptions.some((item) => item.value === saved.reasoningEffort)
+    reasoningEffort.value = reasoningOptions.value.some((item) => item.value === saved.reasoningEffort)
         ? saved.reasoningEffort
         : "auto";
 }
@@ -514,8 +516,8 @@ async function loadBootstrap(force = false, generation = sessionGeneration) {
         const data = await loadMobileAiBootstrap(DiyCommon, currentUser.value.Id, force);
         if (!isCurrentSession(generation)) return;
         enabled.value = data.Enabled === true || Number(data.Enabled) === 1;
-        scopeLabel.value = data.ScopeLabel || "当前角色";
-        roleText.value = data.RoleText || "已授权用户";
+        scopeLabel.value = data.ScopeLabel || t("Msg.Mobile.ai.roleFallback");
+        roleText.value = data.RoleText || t("Msg.Mobile.ai.authorizedUser");
         models.value = Array.isArray(data.Models) ? data.Models : [];
         relayModels.value = Array.isArray(data.RelayModels) ? data.RelayModels : [];
         prompts.value = Array.isArray(data.Prompts) ? data.Prompts : [];
@@ -545,7 +547,7 @@ function resetAssistantSession() {
     messages.value = [];
     question.value = "";
     conversationId.value = "";
-    conversationTitle.value = "新对话";
+    conversationTitle.value = t("Msg.Mobile.ai.newConversation");
     conversations.value = [];
     historyLoaded.value = false;
     historyLoading.value = false;
@@ -586,10 +588,10 @@ function clearProgress() {
 
 function beginProgress(message) {
     const steps = [
-        "正在验证角色与数据权限",
-        "正在应用租户和业务范围",
-        "正在汇总授权业务数据",
-        "正在等待所选模型生成结论"
+        t("Msg.Mobile.ai.progressValidate"),
+        t("Msg.Mobile.ai.progressScope"),
+        t("Msg.Mobile.ai.progressData"),
+        t("Msg.Mobile.ai.progressModel")
     ];
     let cursor = 0;
     message.thinking = [steps[0]];
@@ -617,7 +619,7 @@ function toggleThinking(index) {
 async function copyAnswer(text) {
     try {
         await navigator.clipboard.writeText(String(text || ""));
-        ElMessage.success("已复制");
+        ElMessage.success(t("Msg.Mobile.ai.copied"));
     } catch (error) {
         const textarea = document.createElement("textarea");
         textarea.value = String(text || "");
@@ -627,7 +629,7 @@ async function copyAnswer(text) {
         textarea.select();
         const copied = document.execCommand("copy");
         textarea.remove();
-        copied ? ElMessage.success("已复制") : ElMessage.error("复制失败");
+        copied ? ElMessage.success(t("Msg.Mobile.ai.copied")) : ElMessage.error(t("Msg.Mobile.ai.copyFailed"));
     }
 }
 
@@ -654,7 +656,7 @@ async function sendQuestion() {
         });
         if (!isCurrentSession(generation)) return;
         answerMessage.loading = false;
-        answerMessage.text = data.Answer || "暂未获得分析结果";
+        answerMessage.text = data.Answer || t("Msg.Mobile.ai.noAnswer");
         answerMessage.thinking = Array.isArray(data.Thinking) ? data.Thinking.map(String) : answerMessage.thinking;
         answerMessage.thinkingOpen = false;
         conversationId.value = String(data.ConversationId || conversationId.value);
@@ -664,7 +666,7 @@ async function sendQuestion() {
     } catch (error) {
         if (!isCurrentSession(generation)) return;
         answerMessage.loading = false;
-        answerMessage.text = error.message || "分析服务暂时不可用，请稍后重试";
+        answerMessage.text = error.message || t("Msg.Mobile.ai.serviceUnavailable");
         answerMessage.thinkingOpen = false;
     } finally {
         if (isCurrentSession(generation)) {
@@ -712,7 +714,7 @@ async function refreshHistory(force = false) {
         historyLoaded.value = true;
     } catch (error) {
         if (!isCurrentSession(generation)) return;
-        if (force) ElMessage.error(error.message || "对话记录加载失败");
+        if (force) ElMessage.error(error.message || t("Msg.Mobile.ai.historyLoadFailed"));
     } finally {
         if (isCurrentSession(generation)) historyLoading.value = false;
     }
@@ -732,12 +734,12 @@ async function selectConversation(item) {
         if (!isCurrentSession(generation)) return;
         messages.value = normalizeMobileAiMessages(data);
         conversationId.value = String(item.Id);
-        conversationTitle.value = item.Title || "新对话";
+        conversationTitle.value = item.Title || t("Msg.Mobile.ai.newConversation");
         historyVisible.value = false;
         scrollToBottom();
     } catch (error) {
         if (!isCurrentSession(generation)) return;
-        ElMessage.error(error.message || "对话加载失败");
+        ElMessage.error(error.message || t("Msg.Mobile.ai.conversationLoadFailed"));
     } finally {
         if (isCurrentSession(generation)) historyLoading.value = false;
     }
@@ -759,7 +761,7 @@ async function confirmRename() {
     const target = renameTarget.value;
     const title = renameTitle.value.trim();
     if (!target?.Id || !title || renameSaving.value) {
-        if (!title) ElMessage.warning("请输入对话标题");
+        if (!title) ElMessage.warning(t("Msg.Mobile.ai.enterTitle"));
         return;
     }
     const generation = sessionGeneration;
@@ -772,10 +774,10 @@ async function confirmRename() {
         });
         if (conversationId.value === target.Id) conversationTitle.value = title;
         cancelRename();
-        ElMessage.success("标题已更新");
+        ElMessage.success(t("Msg.Mobile.ai.titleUpdated"));
     } catch (error) {
         if (!isCurrentSession(generation)) return;
-        ElMessage.error(error.message || "标题更新失败");
+        ElMessage.error(error.message || t("Msg.Mobile.ai.titleUpdateFailed"));
     } finally {
         if (isCurrentSession(generation)) renameSaving.value = false;
     }
@@ -790,10 +792,10 @@ async function toggleArchive(item, archived) {
         if (!isCurrentSession(generation)) return;
         item.Archived = archived;
         if (archived && item.Id === conversationId.value) startNewConversation();
-        ElMessage.success(archived ? "已归档" : "已还原");
+        ElMessage.success(archived ? t("Msg.Mobile.ai.archived") : t("Msg.Mobile.ai.restored"));
     } catch (error) {
         if (!isCurrentSession(generation)) return;
-        ElMessage.error(error.message || "操作失败");
+        ElMessage.error(error.message || t("Msg.Mobile.ai.operationFailed"));
     } finally {
         if (isCurrentSession(generation)) historyActionId.value = "";
     }
@@ -802,7 +804,7 @@ async function toggleArchive(item, archived) {
 function formatHistoryMeta(item) {
     const count = Number(item.MessageCount || 0);
     const time = String(item.LastTime || "").replace("T", " ").slice(0, 16);
-    return `${time || "刚刚"} · ${count} 条消息`;
+    return t("Msg.Mobile.ai.messageCount", { time: time || t("Msg.Mobile.common.justNow"), count });
 }
 
 watch(

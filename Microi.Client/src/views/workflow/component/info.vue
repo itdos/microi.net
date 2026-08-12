@@ -9,17 +9,11 @@
         >
         </el-alert> -->
         <br />
-        <!--codemirror 已禁用 - vue-codemirror 不支持 Vue 3-->
         <pre class="code">{{ FlowDesignModel }}</pre>
     </el-dialog>
 </template>
 
 <script>
-// vue-codemirror 暂不支持 Vue 3
-// import "codemirror/lib/codemirror.css";
-// import { codemirror } from "vue-codemirror";
-// require("codemirror/mode/javascript/javascript.js");
-
 export default {
     props: {
         data: Object
@@ -33,9 +27,6 @@ export default {
                 lineNumbers: true
             }
         };
-    },
-    components: {
-        // codemirror  // 已禁用
     },
     methods: {
         init() {

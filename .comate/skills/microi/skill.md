@@ -7,13 +7,13 @@ description: 安装或初始化 @microi.net/cli、配置 Microi吾码服务器�
 
 
 
-## Codex 吾码最新版硬门禁（强制）
+## Microi吾码非阻塞自动更新规范（强制）
 
-- 当前宿主是 Codex 且会话能够读取任意 Microi吾码 Skill 时，每个对话首次处理 Microi 任务必须先完整读取 `microi.skills/microi-codex-installer/SKILL.md`，并在业务分析、MCP 调用、源码修改、构建或发布前完成一次最新版门禁。
-- 使用 npm 官方 registry 强制在线查询：`npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/`。本地 `microi codex status` 不能证明 npm 没有新版。
-- 同时核对 `microi version --json`、`microi codex status --json` 与 `microi doctor --workspace "<工作区绝对路径>" --json`。CLI、Codex 插件、工作区 AI bundle 或 MCP provider 不是最新版时，必须先取得一次用户授权；用户已明确要求安装、升级、更新或初始化时不重复询问。
-- 获得授权后连续执行 `npm install --global @microi.net/cli@latest`、`microi codex install --yes`、`microi ai init --workspace "<工作区绝对路径>" --json`、`microi doctor --workspace "<工作区绝对路径>" --json`、`microi codex status --json`。`ai init` 默认包含 MCP 更新，禁止传 `--no-mcp`。
-- Codex 插件发生变化后必须新建任务或重载 Codex，再次通过门禁后继续；registry 不可用、用户拒绝授权、安装失败或未重载时失败关闭，不得用第三方 registry、缓存或旧 CLI 冒充最新版。
+- VS Code 扩展、`@microi.net/cli` 与 Codex 插件默认在后台从官方分发源检查和安装更新；更新检查不得成为分析、MCP 调用、源码修改、构建、发布或任何新任务的前置门禁。
+- CLI 使用 npm 官方 registry：`npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/`；VS Code 扩展使用官方扩展宿主的安装/自动更新能力。禁止用第三方 registry 或不明镜像冒充官方更新。
+- 自动更新由 `microi update --background --workspace "<工作区绝对路径>" --json` 投递。它会在后台升级全局 CLI、更新 Codex 插件，并幂等执行 `microi ai init`、`microi doctor` 与 `microi codex status`；`codex install --yes` 中的 `--yes` 只为兼容旧脚本，不再代表工作授权门槛。
+- 当前运行中的扩展、CLI、Codex Router 和 MCP 继续使用已加载版本；不得为了升级杀进程、强制重载窗口、终止对话或暂停用户任务。新版本只在后续新进程或宿主自然重启时接管。
+- registry 不可用、权限不足、文件被运行中任务占用、安装失败或宿主暂不支持热更新时，记录可诊断状态并在后台延后重试；可以非模态提示用户“立即重试/查看日志”，但无论用户是否处理，都必须允许当前、正在进行和新建工作继续。
 
 
 ## 立即执行规则

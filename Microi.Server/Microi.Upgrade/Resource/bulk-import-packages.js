@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.1.3
+ * Version: v1.1.4
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -17,6 +17,8 @@
 // 整个商城的上千个应用和数千张业务表误装到租户。
 // BULK_ADAPTIVE_SINGLE_SLICE_V1：小型官方包按“一个应用一个事务”执行，外层
 // 任务仍在每个应用后持久化检查点；只有大型包继续使用导入器的内部安全分片。
+// BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1：失败终态必须带任务、阶段、应用序号和
+// 可执行恢复建议，后台任务中心不能再只显示“接口无返回”或无法定位的笼统错误。
 function text(value, fallback) {
     return value === null || value === undefined ? (fallback || '') : String(value);
 }
@@ -132,6 +134,18 @@ function continuation(nextCheckpoint, progress, current, total, message) {
         Msg: message
     };
 }
+function failure(message, detail, recoveryHint) {
+    var data = detail && typeof detail == 'object' ? detail : {};
+    data.TaskId = taskId;
+    data.Phase = phase;
+    data.CheckpointVersion = checkpointVersion;
+    data.RecoveryHint = recoveryHint || '确认后台任务工作器健康后重新发起；已提交的应用会由安装版本和幂等键自动跳过。';
+    return {
+        Code: 0,
+        Data: data,
+        Msg: message + '；解决方案：' + data.RecoveryHint
+    };
+}
 function loadInstalledVersions() {
     try {
         var result = V8.FormEngine.GetTableData('sys_microistoreversion', {
@@ -210,7 +224,16 @@ if (phase == 'Discover') {
     });
     listResult = parseJson(listResult, listResult);
     if (!listResult || listResult.Code != 1) {
-        return { Code: 0, Msg: '读取应用商城批量安装计划失败：' + ((listResult && listResult.Msg) || '接口无返回') };
+        return failure(
+            '读取应用商城批量安装计划失败：' + ((listResult && listResult.Msg) || '接口无返回'),
+            {
+                FailureStage: 'Discover',
+                SourceApiBase: sourceApiBase,
+                SourceOsClient: sourceOsClient,
+                PageIndex: pageIndex
+            },
+            '检查商城源地址、源租户和网络连通性；修正后重新发起，盘点阶段不会写入应用资源。'
+        );
     }
 
     var rows = toArray(listResult.Data);
@@ -253,7 +276,11 @@ if (phase == 'Discover') {
 }
 
 if (phase != 'Install') {
-    return { Code: 0, Msg: '未知的批量安装检查点阶段：' + phase };
+    return failure(
+        '未知的批量安装检查点阶段：' + phase,
+        { FailureStage: 'CheckpointValidation', Checkpoint: checkpoint },
+        '该检查点与当前应用包版本不兼容，请让任务进入失败终态后重新发起，系统会重新盘点。'
+    );
 }
 
 var installPlan = normalizePlan(checkpoint.Plan);
@@ -298,15 +325,19 @@ childResult = parseJson(childResult, childResult);
 if (!childResult || childResult.Code != 1) {
     var childMsg = (childResult && childResult.Msg) || '子安装接口无返回';
     var childDetail = childFailureDetail(childResult);
-    return {
-        Code: 0,
-        Data: {
+    return failure(
+        '应用【' + item.AppName + '】安装/更新失败：' + childMsg
+            + (childDetail ? '；失败详情：' + childDetail : ''),
+        {
+            FailureStage: 'Install',
+            FailedIndex: currentIndex + 1,
+            Completed: currentIndex,
+            Total: total,
             FailedItem: item,
             ChildData: childResult && childResult.Data ? childResult.Data : null
         },
-        Msg: '应用【' + item.AppName + '】安装/更新失败：' + childMsg
-            + (childDetail ? '；失败详情：' + childDetail : '')
-    };
+        '先按失败详情处理冲突或数据问题，再重新发起全部安装/更新；前 ' + currentIndex + ' 个已完成应用会幂等跳过。'
+    );
 }
 
 var childBackground = childResult.Data && childResult.Data.BackgroundTask;

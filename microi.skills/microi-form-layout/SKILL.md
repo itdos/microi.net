@@ -3,7 +3,7 @@ name: microi-form-layout
 description: Microi 吾码低代码表单布局分组规范。用于通过 MCP、Manifest、VS Code 插件或 V8 引擎创建/优化 `diy_table` 和 `diy_field` 时，决定使用 `diy_table.Tabs` 表单全局 Tab、字段级 `Tabs` 控件、字段级 `CollapseGroup` 折叠分组，还是直接平铺字段。覆盖"何时分 Tab、何时分折叠分组、有效表单行判断阈值、JSON 配置示例、回读验收与回滚"。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 表单布局分组规范（Tabs vs CollapseGroup）
 
@@ -13,6 +13,8 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 
 控件事实源：`Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json` 中 `Sort=1000` 附近的 `Divider`、`CollapseGroup`、`Tabs`、`Alert`、`StaticText`、`Html`、`RichText` 等都属于 Advanced 布局控件。
 
+<!-- microi-progressive:begin -->
+<!-- microi-progressive:chunk id=microi-form-layout-000 sha256=cade6a415454aa04f5fcf840e6d9df1323ac9751c0e3c8e1b07b360007413819 -->
 ## 1. 三种分组能力速查
 
 | 能力 | 存储位置 | 控件 | 核心作用 | 适用场景 |
@@ -22,6 +24,8 @@ Microi 吾码低代码提供 **三种** 表单分组能力，但每种都有明�
 | **C. 字段级 CollapseGroup（折叠分组）** | `diy_field.Component='CollapseGroup'` + `Config.CollapseGroup` | 字段是折叠面板标题 | **所有分组可在同一页面展开**，用户一屏看到全部标题和分组字段 | 只占 **≤5 个有效表单行** 的小分组（短字段即使有 8~10 个，也常只占 4~5 行） |
 | **D. 不分组（默认平铺）** | 无 | — | 全部字段在第一屏 | 总有效表单行 ≤ 6、没有复杂控件，且没有必须强调的业务分组 |
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-form-layout-001 sha256=f43f8c6f1c156ef3669f0c1f9a9d9d2cb7baf630d0b0cb2f48307a31f3f82ae2 -->
 ## 2. 黄金决策流程（AI 必须按此顺序判断）
 
 ### 2.1 先算“有效表单行”，禁止只数字段
@@ -71,116 +75,8 @@ Q1: 核心可见字段数、子表和强任务域？
 | 8 字段简单登记表 | D. 不分组 | 禁止任何 Tab/折叠 |
 | 工作流审批表（≤10 字段） | D. 不分组 | 禁止使用 Tab |
 
-## 3. 三种分组的存储与配置
-
-### 3.1 diy_table.Tabs（表级 Tab）
-
-存储：`diy_table.Tabs`（JSON 字符串）+ 每个字段的 `diy_field.Tab`（归属 Tab 名）。
-
-```jsonc
-// diy_table.Tabs JSON 格式
-[
-  { "Id": "basic",   "Name": "基础信息", "Sort": 10 },
-  { "Id": "business","Name": "业务明细", "Sort": 20 },
-  { "Id": "attach",  "Name": "附件备注", "Sort": 30 }
-]
-```
-
-字段归属：在 `diy_field.Tab` 写 `Id`（不是 `Name`）。`Tab` 留空的字段属于"非 Tab 字段"（即 `diy_table.Tabs` 之外的字段），会作为隐藏的剩余字段自动归到最后 Tab。
-
-- 字段 `Tab="basic"` → 归属"基础信息"Tab
-- 字段 `Tab=""` 且 `diy_table.Tabs` 存在 → 自动归到最后一个 Tab 的剩余字段
-- 字段 `Tab=""` 且 `diy_table.Tabs` 不存在 → 全部在第一屏平铺
-
-**不推荐用法**：把 `diy_table.Tabs` 拆出 3 个 Tab、每个 Tab 内只有 2~3 个字段。这会让用户必须点击 3 次 Tab 才能看完一张表，且首屏只看到 2~3 个字段。
-
-### 3.2 字段级 Tabs 控件（`diy_field.Component='Tabs'`）
-
-存储：`diy_field` 行 + `Config.FieldTabs`（JSON）。
-
-```jsonc
-// diy_field 必要字段
-{
-  "Id": "TabsField_Main",
-  "Name": "TabsMain",
-  "Label": "主分组",
-  "Component": "Tabs",
-  "Type": "varchar(50)",
-  "Sort": 50,
-  "Visible": 0,        // 通常设为 0，因为 Tabs 本身是布局控件
-  "AppVisible": 0,
-  "Config": "{\"FieldTabs\":{...}}"
-}
-
-// Config.FieldTabs
-{
-  "ScopeMode": "FieldCount",   // 或 "Manual"
-  "TotalFieldCount": 0,        // 0 表示直到下一个 Tabs
-  "DefaultActiveKey": "tab1",
-  "Type": "card",               // "" | "card" | "border-card"
-  "Position": "top",            // top | bottom | left | right
-  "Stretch": false,
-  "ShowFieldCount": true,
-  "CaptureRest": true,
-  "Description": "",
-  "Theme": "default",
-  "Tabs": [
-    { "Key": "tab1", "Title": "页签一", "Icon": "fas fa-info-circle", "FieldCount": 6, "Disabled": false }
-  ]
-}
-```
-
-**作用范围**：从该 Tabs 字段开始，到下一个 `Component in (Tabs, CollapseGroup, Divider)` 字段为止。
-
-### 3.3 字段级 CollapseGroup 折叠分组（`diy_field.Component='CollapseGroup'`）
-
-存储：`diy_field` 行 + `Config.CollapseGroup`（JSON）。
-
-```jsonc
-// diy_field 必要字段
-{
-  "Id": "CollapseGroup_MRP",
-  "Name": "MrpGroup",
-  "Label": "MRP 运算",
-  "Component": "CollapseGroup",
-  "Type": "",
-  "Sort": 120,
-  "Visible": 1,
-  "AppVisible": 1,
-  "FormWidth": 24,
-  "Config": "{\"CollapseGroup\":{...}}"
-}
-
-// Config.CollapseGroup
-{
-  "DefaultCollapsed": false,            // 默认展开；高频访问分组可设 false
-  "ScopeMode": "UntilNextGroup",        // 直到下一个折叠/Tab/Divider
-  "FieldCount": 5,                      // ScopeMode=FieldCount 时生效
-  "Description": "MRP 运算结果与时间",
-  "Icon": "fas fa-calculator",
-  "Theme": "primary",                    // default | primary | success | warning | danger
-  "ShowFieldCount": true
-}
-```
-
-**作用范围**：从该 CollapseGroup 字段开始，到下一个 `Component in (Tabs, CollapseGroup, Divider)` 字段为止。
-
-**默认值硬规则**：`CollapseGroup` 必须保存 `FormWidth=24`（PC 表单 100% 宽度）；
-`Config.CollapseGroup.ShowFieldCount` 省略时必须补为 `true`。只有用户明确要求隐藏数量时
-才允许写 `ShowFieldCount=false`，只有用户明确要求非整行实验布局时才允许覆盖宽度。
-
-**与 Tab 的关键区别**：所有 CollapseGroup 标题**始终可见**，分组内字段**默认展开**或**默认收起**，但所有分组的字段**都在同一页面**，可同时展开多个。
-
-### 3.4 控件视觉对比
-
-| 视觉表现 | Tabs | CollapseGroup |
-|---------|------|---------------|
-| 首屏可见字段数 | 仅一个 Tab 的字段 | **所有分组的标题 + 展开分组的字段** |
-| 用户切换分组方式 | 必须点击 Tab 头 | 可直接滚动或逐个点击展开 |
-| 同时看到多组 | ❌ | ✅ |
-| 适合"展开后阅读" | ❌（频繁切换会烦） | ✅ |
-| 适合"互斥分组" | ✅ | ❌ |
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-form-layout-002 sha256=9165f561ba90696ce130d24f71a0e56c521b5f8935eac2ddcffb852f3af5d9b2 -->
 ## 4. AI 生成表单布局的标准动作
 
 ### 4.1 必做顺序
@@ -221,6 +117,8 @@ Q1: 核心可见字段数、子表和强任务域？
 
 V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.ClickFormTab('tabId')` 动态控制 Tab 显隐和默认选中。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-form-layout-003 sha256=eebf51aec08023443964d82e1140026ec7cef627b3d2ed6ead169e1fd14353a3 -->
 ## 5. 必填与禁止
 
 ### 5.1 必填
@@ -245,6 +143,8 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 - ❌ **禁止**把高频访问的字段（如单据编号、项目名称）放进默认收起的 CollapseGroup。
 - ❌ **禁止**用普通新增字段或通用表单数据写入创建布局节点；这类路径可能对目标业务表执行物理 DDL。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-form-layout-004 sha256=539ae919554ca9eda5b5a26ac405181f601f4195f6a59baf1fd368d315987e6c -->
 ## 6. 验收清单
 
 修改或新建表单布局后，AI 必须按以下顺序验收：
@@ -264,121 +164,8 @@ V8 事件中可用 `V8.HideFormTab('tabId')` / `V8.ShowFormTab('tabId')` / `V8.C
 以及相关字段 V8，搜索 `V8.FieldSet`、`hideField`、`Visible=false`、`HideFields`。设计模式
 通常跳过这些运行态事件；未完成这一步不得直接判定为 Microi.Client 渲染缺陷。
 
-## 7. 反例参考（必须避免）
-
-### 反例 1：MRP 运算 3 字段单独建 Tab
-
-```
-❌ 错误：
-diy_table.Tabs = [
-  { Id: 'basic',  Name: '基础信息' },     // 5 字段
-  { Id: 'mrp',    Name: 'MRP 运算' },     // 3 字段
-  { Id: 'remark', Name: '备注' }          // 1 字段
-]
-// 用户打开表单，第一屏只看到 5 个"基础信息"字段，"MRP 运算"和"备注"被藏在 Tab 里
-
-✅ 正确：
-// 不创建 diy_table.Tabs，把"MRP 运算" 3 字段用 CollapseGroup 收在表单末尾（默认展开）
-// 把"备注"也用 CollapseGroup 或 Divider 收
-// 第一屏用户能看到所有基础信息 + MRP 运算
-```
-
-### 反例 1.1：项目收款记录拆成 2/9/2 三个 Tab
-
-```
-❌ 错误：
-项目(2 个短字段) + 收款(9 个短字段) + 附件备注(2 个整行字段)分别建 Tab。
-结果是每页只有 1~5 行内容，桌面抽屉出现大面积空白，用户要切换三次才能看完整记录。
-
-✅ 正确：
-取消表级 Tab，按原顺序建立“项目信息 / 收款信息 / 附件备注”三个 CollapseGroup。
-核心组默认展开，低频附件备注可默认收起；保留原字段、数据源、必填规则和 V8 代码。
-```
-
-### 反例 2：13 字段表全平铺
-
-```
-❌ 错误：
-// 13 字段全部 Tab 留空
-// 用户必须向下滚动 3 屏才能看到所有字段
-
-✅ 正确：
-// 13 字段按业务分两组：8 字段"基础信息" + 5 字段"业务明细"
-// 用 1 个 diy_table.Tabs（基础信息 + 业务明细）
-// 或用 1 个 CollapseGroup 把"业务明细"5 字段收起
-```
-
-### 反例 3：42 字段表用 6 个 Tab
-
-```
-❌ 错误：
-// 6 个 Tab：基础(14) + 项目业主(2) + 发货通知(13) + 生产需求(3) + 审核(4) + ERP出库(4) + 其他(2)
-// 用户要点 6 次才能看完，且"项目业主"和"生产需求"这种 2~3 字段的 Tab 完全没必要
-
-✅ 正确：
-// 4 个 Tab：基础(14) + 发货通知+生产需求(16) + 审核+ERP出库(8) + 其他(4)
-// 或 3 个 Tab + 内部嵌套 CollapseGroup
-```
-
-## 8. 快速参考代码片段
-
-### 8.1 MCP 创建表级 Tab
-
-```js
-// 假设已创建 diy_table，通过 microi_update_table 设置 Tabs
-// 注意：microi_create_table 不直接接收 Tabs JSON，需创建后 microi_update_table 补全
-microi_update_table({
-  name: "yutaoliaojieguo",
-  // 暂未直接传 Tabs，需要通过 microi_update_table 文档化的方式补全
-})
-```
-
-> 实际写入 `diy_table.Tabs` 优先用 `microi_update_field` 之外的元数据写入方式或 `microi_upsert_engine` 委托接口引擎；后续 MCP 工具可补强 `Tabs` 参数。
-
-### 8.2 MCP 创建字段级 CollapseGroup
-
-```js
-// 1. 创建一个 CollapseGroup 字段
-microi_add_layout_field({
-  tableId: "01KTASHWEBE514R1XTB0WVJJRX",
-  name: "MrpGroup",
-  label: "MRP 运算",
-  component: "CollapseGroup",
-  sort: 150,
-  visible: 1,
-  appVisible: 1,
-  config: JSON.stringify({
-    CollapseGroup: {
-      DefaultCollapsed: false,
-      ScopeMode: "UntilNextGroup",
-      Description: "MRP 运算状态、批次号与时间",
-      Icon: "fas fa-calculator",
-      Theme: "primary",
-      ShowFieldCount: true
-    }
-  }),
-  confirmExecution: "MrpGroup"
-})
-
-// 工具默认写入 FormWidth=24；回读必须确认宽度为 24 且 ShowFieldCount=true。
-
-// 2. 让"MRP 运算"相关字段归属到该 CollapseGroup
-// 范围方式：把 CalcStatus、CalcBatchNo、MrpTime 三个字段的 Sort 排在 150~300 之间，
-// 下一个 CollapseGroup/Tabs/Divider 字段之前的所有字段都属于该分组
-```
-
-### 8.3 MCP 把字段 Tab 归属到 diy_table.Tabs
-
-```js
-// 创建表级 Tab
-// 1. microi_update_table 设置 diy_table.Tabs 字段（待 MCP 工具补全）
-// 2. 给字段写 Tab 归属
-microi_update_field({
-  id: "01KVTWDJ7WXB3Z60HGJ5BPTBJ0",
-  tab: "basic"  // 归属到 diy_table.Tabs.Id='basic' 的 Tab
-})
-```
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-form-layout-005 sha256=db6759bef83e520e5f137347070f85df1275e14dcbc742bebfdaac4da14be375 -->
 ## 9. 与其他 Skill 的关系
 
 - 字段创建流程：`v8-table-event/SKILL.md` 写 InFormV8 / SubmitFormV8 等。
@@ -386,3 +173,10 @@ microi_update_field({
 - 整行控件规则：`microi-system-delivery/SKILL.md` 中 `FormWidth=24` 的使用条件。
 - 表单设计器与按钮：`v8-menu-buttons/SKILL.md`。
 - V8 事件 Tab 显隐 API：`v8-table-event/SKILL.md` 中 `V8.HideFormTab` / `V8.ShowFormTab` / `V8.ClickFormTab`。
+<!-- /microi-progressive:chunk -->
+## 详细参考路由（渐进披露）
+
+仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
+
+- [references/progressive-01-3-三种分组的存储与配置.md](references/progressive-01-3-三种分组的存储与配置.md)：3. 三种分组的存储与配置；7. 反例参考（必须避免）；8. 快速参考代码片段
+<!-- microi-progressive:end -->

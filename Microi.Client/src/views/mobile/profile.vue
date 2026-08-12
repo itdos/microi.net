@@ -1,4 +1,4 @@
-?<template>
+<template>
     <div class="mci-mobile-page page-profile">
         <!-- 顶部用户卡片（霓虹光晕） -->
         <header class="profile-hero">
@@ -51,19 +51,19 @@
             <div class="quick-grid mci-stagger-item" :style="{ '--mci-index': 0 }">
                 <div class="quick-grid__item" @click="showThemePanel = true">
                     <div class="quick-grid__icon quick-grid__icon--primary"><el-icon><Brush /></el-icon></div>
-                    <span class="quick-grid__label">主题</span>
+                    <span class="quick-grid__label">{{ $t("Msg.Mobile.profile.theme") }}</span>
                 </div>
                 <div class="quick-grid__item" @click="showLangSelect = true">
                     <div class="quick-grid__icon quick-grid__icon--cyan"><fa-icon icon="fas fa-globe" /></div>
-                    <span class="quick-grid__label">语言</span>
+                    <span class="quick-grid__label">{{ $t("Msg.Mobile.profile.language") }}</span>
                 </div>
                 <div class="quick-grid__item" @click="openPersonalSettings('password')">
                     <div class="quick-grid__icon quick-grid__icon--gold"><el-icon><Lock /></el-icon></div>
-                    <span class="quick-grid__label">修改密码</span>
+                    <span class="quick-grid__label">{{ $t("Msg.Mobile.profile.changePassword") }}</span>
                 </div>
                 <div class="quick-grid__item" @click="showAbout = true">
                     <div class="quick-grid__icon quick-grid__icon--pink"><el-icon><InfoFilled /></el-icon></div>
-                    <span class="quick-grid__label">关于</span>
+                    <span class="quick-grid__label">{{ $t("Msg.Mobile.profile.about") }}</span>
                 </div>
             </div>
 
@@ -73,7 +73,7 @@
                 <div v-if="isApk" class="mci-cell" @click="openServerUrlDialog">
                     <div class="mci-cell__icon mci-cell__icon--cyan"><el-icon><Connection /></el-icon></div>
                     <div class="mci-cell__main">
-                        <span class="mci-cell__title">服务器地址</span>
+                        <span class="mci-cell__title">{{ $t("Msg.Mobile.profile.serverAddress") }}</span>
                         <span class="mci-cell__desc">{{ currentServerUrl }}</span>
                     </div>
                     <el-icon class="mci-cell__arrow"><ArrowRight /></el-icon>
@@ -82,7 +82,7 @@
                     <div class="mci-cell__icon mci-cell__icon--ios"><fa-icon icon="fab fa-apple" /></div>
                     <div class="mci-cell__main">
                         <span class="mci-cell__title">iOS APP</span>
-                        <span class="mci-cell__desc">添加到手机主屏幕</span>
+                        <span class="mci-cell__desc">{{ $t("Msg.Mobile.profile.addHomeScreen") }}</span>
                     </div>
                     <el-icon class="mci-cell__arrow"><ArrowRight /></el-icon>
                 </div>
@@ -91,29 +91,29 @@
             <!-- 退出登录按钮 -->
             <button class="mci-btn mci-btn--danger logout-btn" @click="handleLogout">
                 <el-icon><SwitchButton /></el-icon>
-                <span>退出登录</span>
+                <span>{{ $t("Msg.Mobile.profile.logout") }}</span>
             </button>
         </div>
 
         <!-- 主题色面板 -->
-        <el-drawer v-model="showThemePanel" direction="btt" size="auto" title="主题设置" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
+        <el-drawer v-model="showThemePanel" direction="btt" size="auto" :title="$t('Msg.Mobile.profile.themeSettings')" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
             <!-- 显示模式切换 -->
             <div class="mode-section">
-                <div class="mode-section__label">显示模式</div>
+                <div class="mode-section__label">{{ $t("Msg.Mobile.profile.displayMode") }}</div>
                 <div class="mode-switch">
                     <div class="mode-switch__item" :class="{ active: darkMode === 'light' }" @click="changeMode('light')">
                         <el-icon :size="20"><Sunny /></el-icon>
-                        <span>浅色</span>
+                        <span>{{ $t("Msg.Mobile.profile.light") }}</span>
                     </div>
                     <div class="mode-switch__item" :class="{ active: darkMode === 'dark' }" @click="changeMode('dark')">
                         <el-icon :size="20"><Moon /></el-icon>
-                        <span>暗色</span>
+                        <span>{{ $t("Msg.Mobile.profile.dark") }}</span>
                     </div>
                 </div>
             </div>
             <!-- 主题色 -->
             <div class="mode-section">
-                <div class="mode-section__label">主题色</div>
+                <div class="mode-section__label">{{ $t("Msg.Mobile.profile.themeColor") }}</div>
             </div>
             <div class="theme-grid">
                 <div
@@ -132,7 +132,7 @@
         </el-drawer>
 
         <!-- 关于 -->
-        <el-dialog v-model="showAbout" title="关于系统" width="92%" class="mci-submenu-dialog" draggable align-center>
+        <el-dialog v-model="showAbout" :title="$t('Msg.Mobile.profile.aboutSystem')" width="92%" class="mci-submenu-dialog" draggable align-center>
             <div class="about-content">
                 <img :src="systemLogo" class="about-logo" alt="logo" />
                 <h3 class="about-title">{{ systemName }}</h3>
@@ -145,46 +145,46 @@
         <!-- APK 服务器地址 -->
         <el-dialog
             v-if="isApk"
-            v-model="showServerUrlDialog" title="修改服务器地址"
+            v-model="showServerUrlDialog" :title="$t('Msg.Mobile.profile.changeServer')"
             width="92%" class="mci-submenu-dialog" draggable align-center
             :close-on-click-modal="false"
         >
             <div class="server-url-form">
                 <div class="current-url-card">
-                    <div class="current-url-label">当前服务器</div>
+                    <div class="current-url-label">{{ $t("Msg.Mobile.profile.currentServer") }}</div>
                     <div class="current-url-value">{{ currentServerUrl }}</div>
                 </div>
                 <div class="new-url-section">
-                    <div class="section-title">新地址配置</div>
+                    <div class="section-title">{{ $t("Msg.Mobile.profile.newAddress") }}</div>
                     <div class="url-row">
                         <el-select v-model="serverUrlForm.protocol" class="protocol-select" size="large">
                             <el-option label="https://" value="https://" />
                             <el-option label="http://" value="http://" />
                         </el-select>
                         <el-input
-                            v-model="serverUrlForm.domain" placeholder="域名或 IP"
+                            v-model="serverUrlForm.domain" :placeholder="$t('Msg.Mobile.profile.domainPlaceholder')"
                             class="domain-input" size="large" clearable
                             @keyup.enter="confirmServerUrl"
                         />
                     </div>
                     <div class="url-preview" v-if="serverUrlForm.domain">
-                        <span class="mci-tag mci-tag--cyan">预览</span>
+                        <span class="mci-tag mci-tag--cyan">{{ $t("Msg.Mobile.profile.preview") }}</span>
                         <span class="preview-text">{{ serverUrlForm.protocol }}{{ serverUrlForm.domain }}</span>
                     </div>
                 </div>
                 <div class="tip-text">
                     <el-icon><InfoFilled /></el-icon>
-                    修改后应用将自动重启
+                    {{ $t("Msg.Mobile.profile.restartHint") }}
                 </div>
             </div>
             <template #footer>
-                <el-button @click="showServerUrlDialog = false">取消</el-button>
-                <el-button type="primary" :loading="serverUrlLoading" @click="confirmServerUrl">保存并重启</el-button>
+                <el-button @click="showServerUrlDialog = false">{{ $t("Msg.Mobile.common.cancel") }}</el-button>
+                <el-button type="primary" :loading="serverUrlLoading" @click="confirmServerUrl">{{ $t("Msg.Mobile.profile.saveRestart") }}</el-button>
             </template>
         </el-dialog>
 
         <!-- 语言选择 -->
-        <el-drawer v-model="showLangSelect" direction="btt" size="auto" title="选择语言" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
+        <el-drawer v-model="showLangSelect" direction="btt" size="auto" :title="$t('Msg.Mobile.profile.selectLanguage')" class="mci-drawer mci-drawer--above-tabbar" :z-index="2001">
             <div class="lang-list">
                 <div
                     v-for="item in SUPPORTED_LOCALES"
@@ -205,38 +205,27 @@
             v-model="showIosGuide"
             direction="btt"
             size="auto"
-            title="添加到主屏幕"
+            :title="$t('Msg.Mobile.profile.addHomeTitle')"
             class="mci-drawer mci-drawer--above-tabbar"
             :z-index="2001"
         >
             <div class="ios-guide">
-                <p class="ios-guide__tip">请按以下步骤手动操作：</p>
+                <p class="ios-guide__tip">{{ $t("Msg.Mobile.profile.iosTip") }}</p>
                 <div class="ios-guide__steps">
                     <div class="ios-guide__step">
                         <div class="ios-guide__step-num">1</div>
-                        <div class="ios-guide__step-text">
-                            点击 Safari 底部中央的
-                            <span class="ios-guide__badge">分享</span>
-                            按钮（方框+箭头图标 <span class="ios-guide__icon-hint">⬆</span>）
-                        </div>
+                        <div class="ios-guide__step-text">{{ $t("Msg.Mobile.profile.iosStep1") }}</div>
                     </div>
                     <div class="ios-guide__step">
                         <div class="ios-guide__step-num">2</div>
-                        <div class="ios-guide__step-text">
-                            在弹出菜单中向下滑动，找到并点击
-                            <span class="ios-guide__badge">添加到主屏幕</span>
-                        </div>
+                        <div class="ios-guide__step-text">{{ $t("Msg.Mobile.profile.iosStep2") }}</div>
                     </div>
                     <div class="ios-guide__step">
                         <div class="ios-guide__step-num">3</div>
-                        <div class="ios-guide__step-text">
-                            确认应用名称后，点击右上角
-                            <span class="ios-guide__badge">添加</span>
-                            即可完成
-                        </div>
+                        <div class="ios-guide__step-text">{{ $t("Msg.Mobile.profile.iosStep3") }}</div>
                     </div>
                 </div>
-                <p class="ios-guide__hint">添加后从主屏幕打开，将以全屏 App 模式运行，无浏览器导航栏干扰。</p>
+                <p class="ios-guide__hint">{{ $t("Msg.Mobile.profile.iosHint") }}</p>
             </div>
         </el-drawer>
     </div>
@@ -271,7 +260,7 @@ const diyStore = useDiyStore();
 const userStore = useUserStore();
 const tagsViewStore = useTagsViewStore();
 const appStore = useAppStore();
-const { locale } = useI18n();
+const { t, locale } = useI18n();
 
 const loading = ref(true);
 
@@ -311,7 +300,7 @@ const orgInfo = computed(() => {
 });
 
 const version = computed(() => `v${appVersion}`);
-const systemName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || 'Microi 吾码');
+const systemName = computed(() => diyStore.SysConfig?.SysTitle || diyStore.WebTitle || t('Msg.Mobile.profile.systemName'));
 const companyName = computed(() => diyStore.SysConfig?.CompanyName || '');
 const systemLogo = computed(() => {
     const logo = DiyCommon.GetServerPath(diyStore.SysConfig?.SysLogo || './static/img/logo/microi-logo.svg');
@@ -334,7 +323,7 @@ const currentTheme = computed(() => diyStore.themeColor || diyStore.SysConfig?.T
 const language = computed(() => normalizeLocale(appStore.language) || 'zh-CN');
 const currentLang = computed(() => {
     const found = SUPPORTED_LOCALES.find(l => l.value === language.value);
-    return found ? found.label : '简体中文';
+    return found ? found.label : language.value;
 });
 
 const showThemePanel = ref(false);
@@ -391,12 +380,12 @@ const openServerUrlDialog = () => {
 
 const confirmServerUrl = () => {
     const domain = serverUrlForm.domain.trim().replace(/\/$/, '');
-    if (!domain) { ElMessage.warning('请输入域名或 IP 地址'); return; }
+    if (!domain) { ElMessage.warning(t('Msg.Mobile.profile.enterDomain')); return; }
     const fullUrl = serverUrlForm.protocol + domain;
     ElMessageBox.confirm(
-        `将切换服务器地址为\n\n${fullUrl}\n\n确认后应用将自动重启`,
-        '确认切换',
-        { confirmButtonText: '确定并重启', cancelButtonText: '取消', type: 'warning' }
+        t('Msg.Mobile.profile.switchConfirm', { url: fullUrl }),
+        t('Msg.Mobile.profile.switchTitle'),
+        { confirmButtonText: t('Msg.Mobile.profile.confirmRestart'), cancelButtonText: t('Msg.Mobile.common.cancel'), type: 'warning' }
     ).then(() => {
         serverUrlLoading.value = true;
         try { localStorage.setItem('microi_apk_server_url', fullUrl); } catch (e) {}
@@ -422,7 +411,7 @@ const changeTheme = (color) => {
     const appliedColor = applyThemeColor(color);
     diyStore.setThemeColor(appliedColor || color);
     showThemePanel.value = false;
-    ElMessage.success('主题已切换');
+    ElMessage.success(t('Msg.Mobile.profile.themeChanged'));
 };
 
 const handleSetLanguage = (lang) => {
@@ -431,7 +420,7 @@ const handleSetLanguage = (lang) => {
     appStore.setLanguage(n);
     if (DiyCommon?.ChangeLang) DiyCommon.ChangeLang(n, true);
     showLangSelect.value = false;
-    ElMessage.success('语言已切换');
+    ElMessage.success(t('Msg.Mobile.profile.languageChanged'));
 };
 
 const handleLogout = (showConfirm = true) => {
@@ -448,7 +437,7 @@ const handleLogout = (showConfirm = true) => {
                 } catch (wxErr) { /* 降级 */ }
             }
             router.push('/login');
-            ElMessage.success('已退出登录');
+            ElMessage.success(t('Msg.Mobile.profile.loggedOut'));
         } catch (error) {
             removeToken();
             LocalStorageManager.remove('CurrentUser');
@@ -463,8 +452,8 @@ const handleLogout = (showConfirm = true) => {
     };
 
     if (showConfirm) {
-        ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-            confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+        ElMessageBox.confirm(t('Msg.Mobile.profile.logoutConfirm'), t('Msg.Mobile.common.prompt'), {
+            confirmButtonText: t('Msg.Mobile.common.confirm'), cancelButtonText: t('Msg.Mobile.common.cancel'), type: 'warning'
         }).then(doLogout).catch(() => {});
     } else {
         doLogout();

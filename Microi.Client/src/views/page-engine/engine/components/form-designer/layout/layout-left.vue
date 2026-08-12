@@ -9,7 +9,7 @@
                 <el-icon>
                   <Grid />
                 </el-icon>
-                组件
+                {{ $pet('组件') }}
               </el-text>
             </template>
 
@@ -35,7 +35,7 @@
                       draggable="false"
                     />
                   </span>
-                  <span class="btn_name">{{ item.label }}</span>
+                  <span class="btn_name">{{ $pet(item.label) }}</span>
                 </div>
               </template>
             </div>
@@ -46,7 +46,7 @@
                 <el-icon>
                   <FullScreen />
                 </el-icon>
-                容器
+                {{ $pet('容器') }}
               </el-text>
             </template>
 
@@ -69,7 +69,7 @@
                     draggable="false"
                   />
                 </span>
-                <span class="btn_name">{{ item.label }}</span>
+                <span class="btn_name">{{ $pet(item.label) }}</span>
               </div>
             </div>
           </el-tab-pane>

@@ -336,7 +336,7 @@ export default {
             SaveAllDiyFieldLoding: false,
             DialogV8Code: "Code", // Explain
             cmOptions: {
-                // 所有参数配置见：https://codemirror.net/doc/manual.html#config
+                // 编辑器行为选项；底层统一使用 Monaco。
                 tabSize: 4,
                 styleActiveLine: true,
                 lineNumbers: true,

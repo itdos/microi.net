@@ -1233,7 +1233,8 @@ namespace Microi.net
             var supportedScopes = new HashSet<string>(new[]
             {
                 "page:open", "form:read", "form:write", "form:export",
-                "api-engine:run", "data-source:run", "file:read"
+                "api-engine:run", "data-source:run", "file:read",
+                "mcp:read", "mcp:write", "mcp:execute", "mcp:admin"
             }, StringComparer.OrdinalIgnoreCase);
             if (normalizedScopes.Length == 0 || normalizedScopes.Any(scope => !supportedScopes.Contains(scope)))
                 return new DosResult(0, null, "密钥权限范围不合法。");

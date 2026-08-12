@@ -98,7 +98,8 @@
           class="ai-app-card"
           tabindex="0"
           @click="openDetail(app)"
-          @keydown.enter="openDetail(app)"
+          @keydown.enter.self="openDetail(app)"
+          @keydown.space.self.prevent="openDetail(app)"
         >
           <div class="ai-app-preview" :class="previewFitClass(app.ApplicationType)">
             <img
@@ -134,6 +135,18 @@
                 {{ compactNumber(app.FavoriteCount) }}
               </button>
             </div>
+            <button
+              v-if="app.PreviewUrl"
+              type="button"
+              class="ai-app-experience"
+              :aria-label="`${copy.tryNow}：${app.Name}`"
+              @click.stop="openPreview(app)"
+            >
+              <span>{{ copy.tryNow }}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 17 17 7M9 7h8v8" />
+              </svg>
+            </button>
           </div>
           <div class="ai-app-meta">
             <div class="ai-app-author-avatar" aria-hidden="true">
@@ -166,6 +179,8 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vitepress'
+import { withPreviewVersion } from '../utils/app-preview-url.js'
+import { buildApplicationLaunchUrl } from '../utils/uniapp-preview-mode.js'
 import { OFFICIAL_MICROI_API_BASE } from '../utils/site-api-base.js'
 import { buildMarketplaceHref, readMarketplaceState } from '../utils/marketplace-query-state.js'
 import {
@@ -219,7 +234,7 @@ const copy = computed(() => isEnglish.value ? {
   relatedDescription: 'Matched by role, industry, or workflow. They may not fully satisfy your original requirement.',
   popularBadge: 'Popular suggestions', popularTitle: 'No exact match — here are popular apps to explore',
   popularDescription: 'These are clearly labeled popular suggestions, not exact search results.',
-  describeNeed: 'Describe and generate my software', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', finished: 'All applications loaded'
+  describeNeed: 'Describe and generate my software', tryNow: 'Try now', loadingMore: 'Loading more applications', retry: 'Loading failed, retry', finished: 'All applications loaded'
 } : {
   apps: 'AI 应用', categories: '应用分类', sort: '排序', sortLabel: '应用排序', search: '搜索应用',
   empty: '暂时没有找到精确或相关应用。', emptyHelp: '请描述你要解决的问题；只有点击继续后，需求才会被明确提交。',
@@ -227,7 +242,7 @@ const copy = computed(() => isEnglish.value ? {
   relatedDescription: '这些候选按行业、角色或流程匹配，可能不能完整替代你原本想找的软件。',
   popularBadge: '热门推荐', popularTitle: '没有完全匹配，先看看热门软件',
   popularDescription: '以下是明确标注的热门推荐，不是对搜索词的精确命中。',
-  describeNeed: '描述并生成我要的软件', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', finished: '已加载全部应用'
+  describeNeed: '描述并生成我要的软件', tryNow: '立即体验', loadingMore: '正在加载更多应用', retry: '加载失败，点击重试', finished: '已加载全部应用'
 })
 
 const defaultBusinessCategories = [
@@ -586,6 +601,16 @@ function openDetail(app) {
   if (typeof window !== 'undefined') window.location.href = `/app-detail.html?app=${encodeURIComponent(app.AppKey || app.Id)}`
 }
 
+function openPreview(app) {
+  if (typeof window === 'undefined' || !app?.PreviewUrl) return
+  const previewUrl = withPreviewVersion(app.PreviewUrl, app, window.location.origin, {
+    apiBase: API_BASE,
+    osClient: OS_CLIENT
+  })
+  if (!previewUrl) return
+  window.open(buildApplicationLaunchUrl(app, previewUrl, window), '_blank', 'noopener,noreferrer')
+}
+
 function openDemandCenter() {
   if (typeof window === 'undefined') return
   const target = demandCenter.value?.PreviewUrl || '/app-detail.html?app=software-demand-studio'
@@ -740,6 +765,12 @@ onBeforeUnmount(() => {
 .ai-app-favorite.active { color: #ff5c7c; }
 .ai-app-favorite.active svg { fill: currentColor; }
 .ai-app-favorite.busy { opacity: .55; cursor: wait; }
+.ai-app-experience { position: absolute; z-index: 3; right: 12px; bottom: 12px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 16px; border: 1px solid rgba(255,255,255,.28); border-radius: 11px; background: linear-gradient(135deg, #e52c3e 0%, var(--mci-color-primary, #b51220) 72%); box-shadow: 0 12px 28px rgba(181,18,32,.34), inset 0 1px 0 rgba(255,255,255,.22); color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; letter-spacing: .02em; opacity: 0; pointer-events: none; transform: translateY(8px) scale(.96); transition: opacity .2s ease, transform .2s ease, filter .2s ease, box-shadow .2s ease; }
+.ai-app-experience svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s ease; }
+.ai-app-card:hover .ai-app-experience, .ai-app-card:focus-within .ai-app-experience, .ai-app-experience:focus-visible { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+.ai-app-experience:hover { filter: brightness(1.08); box-shadow: 0 15px 34px rgba(181,18,32,.42), inset 0 1px 0 rgba(255,255,255,.28); }
+.ai-app-experience:hover svg { transform: translate(2px,-2px); }
+.ai-app-experience:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .ai-app-meta { display: flex; align-items: flex-start; gap: 10px; padding: 10px 6px 0; }
 .ai-app-author-avatar { flex: 0 0 28px; width: 28px; height: 28px; overflow: hidden; display: grid; place-items: center; border: 1px solid #454545; border-radius: 50%; background: #282828; color: #d5d5d5; font-size: 12px; font-weight: 700; }
 .ai-app-author-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -775,6 +806,6 @@ onBeforeUnmount(() => {
 @media (max-width: 1180px) { .ai-app-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 1080px) { .ai-app-toolbar { align-items: stretch; flex-direction: column-reverse; gap: 12px; } .ai-app-controls { justify-content: flex-end; } }
 @media (max-width: 900px) { .ai-app-controls { justify-content: flex-start; } .ai-app-search { flex-basis: auto; width: min(100%, 360px); } .ai-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .ai-app-shell { width: min(100% - 28px, 1440px); padding-bottom: 64px; } .ai-app-controls { align-items: stretch; flex-direction: column; } .ai-app-sort, .ai-app-search { width: 100%; box-sizing: border-box; } .ai-app-sort-trigger { flex: 1; } .ai-app-sort-menu { left: 0; right: 0; width: auto; } .ai-app-search-notice { align-items: stretch; flex-direction: column; } .ai-app-search-notice button { width: 100%; } .ai-app-grid { grid-template-columns: 1fr; gap: 24px; } .ai-app-stats { opacity: 1; transform: none; } .ai-app-author { max-width: 90px; } }
-@media (prefers-reduced-motion: reduce) { .ai-app-preview > img, .ai-app-stats, .skeleton, .ai-app-loading i { transition: none; animation: none; } }
+@media (max-width: 640px) { .ai-app-shell { width: min(100% - 28px, 1440px); padding-bottom: 64px; } .ai-app-controls { align-items: stretch; flex-direction: column; } .ai-app-sort, .ai-app-search { width: 100%; box-sizing: border-box; } .ai-app-sort-trigger { flex: 1; } .ai-app-sort-menu { left: 0; right: 0; width: auto; } .ai-app-search-notice { align-items: stretch; flex-direction: column; } .ai-app-search-notice button { width: 100%; } .ai-app-grid { grid-template-columns: 1fr; gap: 24px; } .ai-app-stats, .ai-app-experience { opacity: 1; transform: none; } .ai-app-experience { pointer-events: auto; } .ai-app-author { max-width: 90px; } }
+@media (prefers-reduced-motion: reduce) { .ai-app-preview > img, .ai-app-stats, .ai-app-experience, .ai-app-experience svg, .skeleton, .ai-app-loading i { transition: none; animation: none; } }
 </style>

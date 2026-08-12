@@ -343,6 +343,7 @@
 
 <script setup>
 import { onMounted, ref, reactive, computed, watch, onBeforeUnmount, nextTick, getCurrentInstance } from 'vue';
+import { loadMonaco } from '@/utils/monaco-loader';
 
 // 动态导入 Monaco Editor（延迟加载，减少首屏体积）
 // 使用全局缓存，避免多个组件实例之间的 worker 引用冲突
@@ -350,58 +351,7 @@ let monaco = null;
 
 // 异步初始化 Monaco
 const initMonaco = async () => {
-    // 优先使用全局缓存的 monaco 实例
-    if (window.__monacoEditorInstance) {
-        monaco = window.__monacoEditorInstance;
-        return monaco;
-    }
-    if (monaco) return monaco;
-    
-    const [
-        monacoModule,
-        jsonWorkerModule,
-        cssWorkerModule,
-        htmlWorkerModule,
-        tsWorkerModule,
-        editorWorkerModule
-    ] = await Promise.all([
-        import('monaco-editor'),
-        import('monaco-editor/esm/vs/language/json/json.worker?worker'),
-        import('monaco-editor/esm/vs/language/css/css.worker?worker'),
-        import('monaco-editor/esm/vs/language/html/html.worker?worker'),
-        import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
-        import('monaco-editor/esm/vs/editor/editor.worker?worker')
-    ]);
-    
-    monaco = monacoModule;
-    
-    // 将 worker 构造函数存储在全局，确保 MonacoEnvironment.getWorker 始终能正确引用
-    if (!window.__monacoWorkers) {
-        window.__monacoWorkers = {
-            json: jsonWorkerModule.default,
-            css: cssWorkerModule.default,
-            html: htmlWorkerModule.default,
-            ts: tsWorkerModule.default,
-            editor: editorWorkerModule.default
-        };
-    }
-    
-    // 全局只设置一次 MonacoEnvironment，使用全局 worker 引用
-    if (!window.__monacoEnvSet) {
-        window.__monacoEnvSet = true;
-        globalThis.MonacoEnvironment = {
-            getWorker(arg1, label) {
-                const w = window.__monacoWorkers;
-                if (label === 'json') return new w.json();
-                if (label === 'css' || label === 'scss' || label === 'less') return new w.css();
-                if (label === 'html' || label === 'handlebars' || label === 'razor') return new w.html();
-                if (['typescript', 'javascript'].includes(label)) return new w.ts();
-                return new w.editor();
-            },
-        };
-    }
-    
-    window.__monacoEditorInstance = monaco;
+    if (!monaco) monaco = await loadMonaco();
     return monaco;
 };
 import { getToken } from '@/utils/auth.js';

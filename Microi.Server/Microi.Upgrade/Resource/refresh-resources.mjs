@@ -222,7 +222,7 @@ function validateReleaseCandidate(name, content) {
         || engineVersionNumber(publisherEngine) < 1_007_007
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
-        || engineVersionNumber(bulkEngine) < 1_001_003
+        || engineVersionNumber(bulkEngine) < 1_001_004
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
         || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
@@ -230,7 +230,9 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_CHILD_FAILURE_DETAIL_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_PLATFORM_ONLY_PLAN_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_ADAPTIVE_SINGLE_SLICE_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1')
         || !content.includes("RunBackground('bulk-import-microi-store-packages'")
+        || !content.includes('BULK_QUEUE_PREFLIGHT_DIAGNOSTICS_V1')
         || !content.includes("ApplicationType: 'Platform'")
         || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
         || !importerCode.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')

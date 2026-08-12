@@ -1,6 +1,6 @@
 # Microi DB Schema Overview
 
-- Source: `ai-helper/microi/db.json`
+- Source: generic reference snapshot; current tenant truth must come from `microi_get_db_schema`.
 - Tables: 75
 - Configurable fields: 975
 

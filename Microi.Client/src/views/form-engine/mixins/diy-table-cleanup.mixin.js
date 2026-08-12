@@ -219,10 +219,16 @@ beforeUnmount() {
         // ========== 10. 清理全局菜单事件监听器 ==========
         document.removeEventListener('click', self.hideMoreMenu);
         document.removeEventListener('click', self.hideColHeaderMenu);
+        document.removeEventListener('click', self.hideColumnSettings, true);
+        if (self._columnPreferenceSaveTimer) {
+            clearTimeout(self._columnPreferenceSaveTimer);
+            self._columnPreferenceSaveTimer = null;
+        }
         self._moreMenuVisible = false;
         self._moreMenuRow = null;
         self._colMenuVisible = false;
         self._colMenuField = null;
+        self._columnSettingsVisible = false;
 
         // console.log('%c[DiyTableRowlist] ========== beforeUnmount 完成 ==========', 'color: green; font-size: 16px; font-weight: bold');
     },
