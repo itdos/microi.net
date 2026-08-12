@@ -1,6 +1,6 @@
 <template>
   <view class="checkin-page" :style="mciTokenStyle">
-    <view v-if="typePickerOpen || customerPickerOpen" class="dropdown-backdrop" @tap="closeDropdowns"></view>
+    <view v-if="typePickerOpen || targetPickerOpen" class="dropdown-backdrop" @tap="closeDropdowns"></view>
     <view class="page-header mci-safe-top">
       <view class="nav-row mci-safe-nav-row">
         <view class="nav-icon" @tap="goBack"><text>‹</text></view>
@@ -86,18 +86,20 @@
               </view>
             </view>
           </view>
-          <view class="field field--customer">
+          <view class="field field--target">
             <view class="field-heading"><text class="field-label">拜访对象</text></view>
-            <mci-customer-combobox
-              ref="customerCombobox"
+            <mci-visit-target-combobox
+              ref="targetCombobox"
               :model-value="form.name"
-              :selected-id="customerId"
+              :selected-id="targetId"
+              :module-key="targetModuleKey"
+              :target-type="form.targetType"
               @update:model-value="handleTargetValue"
-              @select="selectCustomer"
-              @clear="clearSelectedCustomer"
-              @open-change="handleCustomerPickerOpen"
+              @select="selectTarget"
+              @clear="clearSelectedTarget"
+              @open-change="handleTargetPickerOpen"
             />
-            <text class="field-help">可检索已有客户；未检索到时保留输入并按新对象提交</text>
+            <text class="field-help">可检索当前账号有权查看的{{ form.targetType }}；未检索到时保留输入并按新对象提交</text>
           </view>
           <view class="field field--textarea">
             <view class="field-heading">
@@ -158,13 +160,19 @@ import {
   normalizeCheckinStatistics
 } from '@/platform/checkin-statistics.mjs'
 import { updateTask } from '@/utils/xjy-task.js'
-import MciCustomerCombobox from '@/components/mci-customer-combobox/mci-customer-combobox.vue'
+import MciVisitTargetCombobox from '@/components/mci-visit-target-combobox/mci-visit-target-combobox.vue'
 
 const AMAP_REVERSE_GEOCODE_ENGINE = 'xjy-amap-regeo'
 const TARGET_TYPES = ['客户', '项目合伙人', '供应商', '商家']
+const TARGET_MODULE_KEYS = {
+  客户: 'customers',
+  项目合伙人: 'partners',
+  供应商: 'suppliers',
+  商家: 'stores'
+}
 
 export default {
-  components: { MciCustomerCombobox },
+  components: { MciVisitTargetCombobox },
   mixins: [themeMixin],
   data() {
     return {
@@ -182,12 +190,12 @@ export default {
       photos: [],
       form: { targetType: '客户', name: '', remark: '' },
       taskId: '',
-      customerId: '',
-      selectedCustomerName: '',
+      targetId: '',
+      selectedTargetName: '',
       returnToFollowup: false,
       typePickerOpen: false,
       typeSearchActive: false,
-      customerPickerOpen: false
+      targetPickerOpen: false
     }
   },
   computed: {
@@ -199,6 +207,9 @@ export default {
       if (!this.typeSearchActive) return TARGET_TYPES
       const keyword = String(this.form.targetType || '').trim()
       return keyword ? TARGET_TYPES.filter((item) => item.includes(keyword)) : TARGET_TYPES
+    },
+    targetModuleKey() {
+      return TARGET_MODULE_KEYS[this.form.targetType] || ''
     }
   },
   onLoad(options) {
@@ -211,10 +222,10 @@ export default {
     const visitTarget = options.customer || options.name
     if (visitTarget) this.form.name = decodeURIComponent(visitTarget)
     this.taskId = decodeURIComponent(options.taskId || '')
-    this.customerId = decodeURIComponent(options.customerId || '')
     this.form.targetType = decodeURIComponent(options.targetType || '客户')
+    this.targetId = this.form.targetType === '客户' ? decodeURIComponent(options.customerId || '') : ''
     this.returnToFollowup = String(options.returnToFollowup || '0') === '1'
-    this.selectedCustomerName = this.customerId ? this.form.name : ''
+    this.selectedTargetName = this.targetId ? this.form.name : ''
     this.updateTime()
     this.timer = setInterval(this.updateTime, 1000)
     this.initializePage()
@@ -321,50 +332,55 @@ export default {
       }
     },
     openTypePicker() {
-      if (this.$refs.customerCombobox) this.$refs.customerCombobox.closeOptions()
+      if (this.$refs.targetCombobox) this.$refs.targetCombobox.closeOptions()
       // 默认值只是当前选中项，不应被当成检索关键词；展开时先展示全部类型。
       this.typeSearchActive = false
       this.typePickerOpen = true
     },
     toggleTypePicker() {
-      if (!this.typePickerOpen && this.$refs.customerCombobox) this.$refs.customerCombobox.closeOptions()
+      if (!this.typePickerOpen && this.$refs.targetCombobox) this.$refs.targetCombobox.closeOptions()
       this.typePickerOpen = !this.typePickerOpen
       if (this.typePickerOpen) this.typeSearchActive = false
     },
-    handleCustomerPickerOpen(open) {
-      this.customerPickerOpen = Boolean(open)
+    handleTargetPickerOpen(open) {
+      this.targetPickerOpen = Boolean(open)
       if (open) this.typePickerOpen = false
     },
     closeDropdowns() {
       this.typePickerOpen = false
-      this.customerPickerOpen = false
-      if (this.$refs.customerCombobox) this.$refs.customerCombobox.closeOptions()
+      this.targetPickerOpen = false
+      if (this.$refs.targetCombobox) this.$refs.targetCombobox.closeOptions()
     },
     handleTypeInput(event) {
       this.form.targetType = String(event && event.detail && event.detail.value || '')
       this.typeSearchActive = true
       this.typePickerOpen = true
-      if (this.form.targetType !== '客户') this.clearSelectedCustomer()
+      this.clearSelectedTarget(true)
     },
     selectTargetType(option) {
+      const changed = option !== this.form.targetType
       this.form.targetType = option
       this.typeSearchActive = false
       this.typePickerOpen = false
-      if (option !== '客户') this.clearSelectedCustomer()
+      if (changed) this.clearSelectedTarget(true)
+      this.$nextTick(() => {
+        if (this.$refs.targetCombobox) this.$refs.targetCombobox.openOptions()
+      })
     },
-    selectCustomer(payload) {
-      this.customerId = String(payload && payload.id || '')
-      this.selectedCustomerName = String(payload && payload.name || '')
-      this.form.name = this.selectedCustomerName
+    selectTarget(payload) {
+      this.targetId = String(payload && payload.id || '')
+      this.selectedTargetName = String(payload && payload.name || '')
+      this.form.name = this.selectedTargetName
     },
-    clearSelectedCustomer() {
-      this.customerId = ''
-      this.selectedCustomerName = ''
+    clearSelectedTarget(clearName = false) {
+      this.targetId = ''
+      this.selectedTargetName = ''
+      if (clearName === true) this.form.name = ''
     },
     handleTargetValue(value) {
       value = String(value || '')
       this.form.name = value
-      if (this.customerId && value.trim() !== this.selectedCustomerName.trim()) this.clearSelectedCustomer()
+      if (this.targetId && value.trim() !== this.selectedTargetName.trim()) this.clearSelectedTarget()
     },
     openWatermarkCamera() {
       if (this.photos.length >= 6) return
@@ -440,7 +456,7 @@ export default {
           TenantId: user.TenantId || '',
           DakaR: user.Name || user.Account || '',
           DakaSJ: this.currentTime,
-          KehuID: this.customerId || '',
+          KehuID: this.form.targetType === '客户' ? this.targetId : '',
           ShouhouDDID: this.taskId || ''
         })
         if (!result || result.Code !== 1) throw new Error((result && result.Msg) || '打卡提交失败')
@@ -458,7 +474,7 @@ export default {
             if (eventChannel && typeof eventChannel.emit === 'function') {
               eventChannel.emit('checkinSuccess', {
                 id: result.Data?.Id || (typeof result.Data === 'string' ? result.Data : ''),
-                customerId: this.customerId || '',
+                customerId: this.form.targetType === '客户' ? this.targetId : '',
                 customerName: this.form.name.trim(),
                 time: this.currentTime
               })
@@ -535,7 +551,7 @@ export default {
 .type-combobox__option.selected { background: #eef9fc; color: #087fae; }
 .type-combobox__option--pressed { background: #f0f7f9; }
 .type-combobox__empty { min-height: 96rpx; display: flex; align-items: center; justify-content: center; color: #83979e; font-size: 22rpx; }
-.field--customer { position: relative; z-index: 10; }
+.field--target { position: relative; z-index: 10; }
 .field-help { margin-top: 10rpx; color: #8a9da4; font-size: 20rpx; line-height: 30rpx; }
 .field-textarea-wrap { position: relative; width: 100%; }
 .field-textarea { box-sizing: border-box; width: 100%; min-height: 180rpx; padding: 10rpx 0 36rpx; color: #233f4b; font-size: 25rpx; line-height: 38rpx; }

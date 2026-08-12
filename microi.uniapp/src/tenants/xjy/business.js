@@ -284,7 +284,7 @@ export const businessModules = {
     ]
   }),
   stores: native({
-    title: '商家', table: 'Diy_Tenant', menuAliases: ['商家', '商家管理'],
+    title: '商家', table: 'Diy_Tenant', menuAliases: ['商家列表', '商家', '商家管理'],
     titleField: 'TenantName', statusField: 'Zhuangtai', tagFields: ['SuoshuHY'],
     lines: [
       { label: '联系人', field: 'LianxiR' },
