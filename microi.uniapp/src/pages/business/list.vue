@@ -231,6 +231,7 @@ import {
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
 import { fieldDisplayValue, parseJson } from '@/platform/native-form.js'
 import { loadModuleDefinition } from '@/platform/module-registry.js'
+import { shouldKeepEmptyCardLine } from '@/platform/card-field-policy.mjs'
 import MciBusinessCard from '@/components/mci-business-card/mci-business-card.vue'
 import {
   formatDateTime,
@@ -711,6 +712,8 @@ export default {
         const key = cardFieldKey(line.field)
         if (!key || usedFields.has(key)) return false
         usedFields.add(key)
+        // “负责人”是卡片的固定业务信息，暂未分配时也要保留标签和空值占位。
+        if (shouldKeepEmptyCardLine(line)) return true
         return row[line.field] !== undefined && row[line.field] !== null && row[line.field] !== ''
       }).slice(0, 4)
     },

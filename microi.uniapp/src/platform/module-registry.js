@@ -3,6 +3,7 @@ import { cachedRequest } from '@/platform/cache.js'
 import { findMenu, loadMenuTree } from '@/platform/business-runtime.js'
 import { loadNativeFormDefinition, parseJson } from '@/platform/native-form.js'
 import { normalizeStringList } from '@/platform/view-schema-core.mjs'
+import { appendSystemAuditFields, resolveConfiguredFieldNames } from '@/platform/card-field-policy.mjs'
 
 const DEFAULT_ICON = '/static/microi-blue-256.png'
 const HEAVY_COMPONENTS = new Set([
@@ -36,19 +37,10 @@ function collectMenus(items, parent = null, output = []) {
 export function configuredFieldNames(value, fields) {
   const rows = parseJson(value, value)
   const list = Array.isArray(rows) ? rows : normalizeStringList(rows)
-  const byId = new Map(fields.map((field) => [String(field.Id || '').toLowerCase(), field]))
-  const byName = new Map(fields.map((field) => [String(field.Name || '').toLowerCase(), field]))
-  return list.map((item) => {
-    if (item && typeof item === 'object') {
-      const candidate = item.Id || item.id || item.Name || item.name || item.Field || item.field
-      const field = byId.get(String(candidate || '').toLowerCase()) ||
-        byName.get(String(candidate || '').toLowerCase())
-      return field && field.Name
-    }
-    const field = byId.get(String(item || '').toLowerCase()) ||
-      byName.get(String(item || '').toLowerCase())
-    return field && field.Name
-  }).filter(Boolean)
+  // CreateTime/UpdateTime 等审计列由平台统一提供，不一定存在于 diy_field。
+  // 菜单卡片配置仍应能通过字段名引用它们。
+  const availableFields = appendSystemAuditFields(fields)
+  return resolveConfiguredFieldNames(list, availableFields)
 }
 
 function uniqueFieldNames(values = []) {
