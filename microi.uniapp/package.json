@@ -33,6 +33,7 @@
     "check:view-schema": "node scripts/check-view-schema.mjs",
     "check:field-roles": "node scripts/check-native-field-role-visibility.mjs",
     "check:menu-resolution": "node scripts/check-menu-resolution.mjs",
+    "check:card-fields": "node scripts/test-card-field-display.mjs",
     "check:tabbar": "node scripts/check-custom-tabbar-state.cjs",
     "check:xjy-order-product-cooperation": "node scripts/check-xjy-order-product-cooperation.mjs",
     "check:xjy-order-approval": "node scripts/check-xjy-order-approval.mjs",
