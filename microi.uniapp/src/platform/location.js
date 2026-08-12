@@ -1,5 +1,8 @@
 // import { getSysConfig } from '@/utils/sysconfig.js'
 import { callApiEngine } from '@/platform/business-runtime.js'
+import { stripRegionFromAddress } from '@/platform/region-value.mjs'
+
+export { stripRegionFromAddress } from '@/platform/region-value.mjs'
 
 function textValue(value) {
   if (Array.isArray(value)) return value.find(Boolean) || ''
@@ -91,5 +94,6 @@ export function normalizeChosenLocation(location = {}, geocode = null) {
 export default {
   inferRegionFromAddress,
   reverseGeocode,
-  normalizeChosenLocation
+  normalizeChosenLocation,
+  stripRegionFromAddress
 }
