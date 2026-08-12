@@ -1321,10 +1321,53 @@ export interface LegacyStreamPublishFallbackResult {
  * the dynamic runtime tries to invoke Dos.Common.Val<T> on a JValue.
  */
 export function isLegacyApplicationStreamJValueFailure(result?: Partial<ApiResponse> | null): boolean {
+  return isLegacyJValueValFailure(result);
+}
+
+/**
+ * Detect old API nodes whose dynamic JSON path calls Val<T>() on a JValue.
+ * Keep this generic so metadata tools can use a narrowly-scoped, verified
+ * compatibility path without treating unrelated server failures as writable.
+ */
+export function isLegacyJValueValFailure(result?: Partial<ApiResponse> | null): boolean {
   if (!result || Number(result.Code) === 1) return false;
   const message = String(result.Msg || '');
   return /Newtonsoft\.Json\.Linq\.JValue/iu.test(message)
     && /does not contain a definition for ['‘’"]?Val|\.Val(?:<|\b)/iu.test(message);
+}
+
+export function defaultLayoutFieldFormWidth(component: string, formWidth?: number): number | undefined {
+  if (formWidth !== undefined) return formWidth;
+  return component === 'CollapseGroup' ? 24 : undefined;
+}
+
+export function normalizeLayoutFieldConfig(
+  component: string,
+  config?: string | Record<string, unknown>,
+): string | undefined {
+  if (config === undefined && component !== 'CollapseGroup') return undefined;
+  if (component !== 'CollapseGroup') {
+    const configText = typeof config === 'string' ? config : JSON.stringify(config);
+    JSON.parse(configText);
+    return configText;
+  }
+  const normalized = config === undefined
+    ? {}
+    : (typeof config === 'string' ? JSON.parse(config) : { ...config });
+  if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
+    throw new Error('布局控件 Config 必须是 JSON 对象');
+  }
+  if (component === 'CollapseGroup') {
+    const root = normalized as Record<string, unknown>;
+    const collapseGroup = root.CollapseGroup && typeof root.CollapseGroup === 'object' && !Array.isArray(root.CollapseGroup)
+      ? { ...(root.CollapseGroup as Record<string, unknown>) }
+      : {};
+    if (!Object.prototype.hasOwnProperty.call(collapseGroup, 'ShowFieldCount')) {
+      collapseGroup.ShowFieldCount = true;
+    }
+    root.CollapseGroup = collapseGroup;
+  }
+  return JSON.stringify(normalized);
 }
 
 export function resolveLegacyApplicationStreamFallbackPolicy(
@@ -5041,19 +5084,17 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       sort: z.number().optional().describe('Display order. Place the layout node immediately before the fields it controls.'),
       visible: z.number().optional().describe('PC visibility. Default: 1.'),
       appVisible: z.number().optional().describe('Mobile visibility. Default: 1.'),
-      config: z.union([z.string(), jsonRecordSchema]).optional().describe('Component Config JSON. CollapseGroup should normally set DefaultCollapsed=false, Description, Icon, Theme and ShowFieldCount.'),
+      formWidth: z.number().int().min(1).max(24).optional().describe('Form grid width. CollapseGroup defaults to 24 (100% width).'),
+      config: z.union([z.string(), jsonRecordSchema]).optional().describe('Component Config JSON. CollapseGroup defaults ShowFieldCount to true when omitted.'),
       description: z.string().optional(),
       confirmExecution: z.string().describe('Must equal the exact layout field name or EXECUTE.'),
     },
-    async ({ tableId, name, label, component, tab, sort, visible, appVisible, config, description, confirmExecution }) => {
+    async ({ tableId, name, label, component, tab, sort, visible, appVisible, formWidth, config, description, confirmExecution }) => {
       try {
         if (confirmExecution !== name && confirmExecution !== 'EXECUTE') {
           return { content: [{ type: 'text', text: `Error: confirmExecution must equal "${name}" or EXECUTE.` }], isError: true };
         }
-        const configText = config === undefined
-          ? undefined
-          : (typeof config === 'string' ? config : JSON.stringify(config));
-        if (configText) JSON.parse(configText);
+        const configText = normalizeLayoutFieldConfig(component, config);
         const result = await client.addField({
           TableId: tableId,
           Name: name,
@@ -5063,6 +5104,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           Visible: visible ?? 1,
           AppVisible: appVisible ?? 1,
           Tab: tab,
+          FormWidth: defaultLayoutFieldFormWidth(component, formWidth),
           TableWidth: 120,
           Sort: sort ?? nextSortFor(tableId),
           Data: '[]',
@@ -5080,6 +5122,15 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           .find(item => String(item.Name || '') === name && String(item.Component || '') === component);
         if (!saved) {
           return { content: [{ type: 'text', text: `Error: layout field ${name} was not found after readback.` }], isError: true };
+        }
+        if (component === 'CollapseGroup') {
+          const savedConfig = JSON.parse(String(saved.Config || '{}')) as Record<string, unknown>;
+          const savedCollapse = asJsonRecord(savedConfig.CollapseGroup);
+          const expectedFormWidth = defaultLayoutFieldFormWidth(component, formWidth);
+          const expectedShowFieldCount = asJsonRecord(JSON.parse(configText || '{}').CollapseGroup).ShowFieldCount;
+          if (Number(saved.FormWidth) !== expectedFormWidth || savedCollapse.ShowFieldCount !== expectedShowFieldCount) {
+            return { content: [{ type: 'text', text: `Error: layout field ${name} readback does not match CollapseGroup FormWidth/ShowFieldCount defaults.` }], isError: true };
+          }
         }
         return {
           content: [{
@@ -5122,6 +5173,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           visible: z.number().optional(),
           appVisible: z.number().optional(),
           config: z.union([z.string(), jsonRecordSchema]).optional(),
+          formWidth: z.number().int().min(1).max(24).optional(),
           description: z.string().optional(),
         })).optional(),
         fieldPatches: z.array(z.object({
@@ -5321,10 +5373,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           const newNames = new Set((plan.layoutFields || []).map(field => field.name));
           const immutableBefore = immutableState(before, newNames);
           for (const layoutField of plan.layoutFields || []) {
-            const configText = layoutField.config === undefined
-              ? undefined
-              : (typeof layoutField.config === 'string' ? layoutField.config : JSON.stringify(layoutField.config));
-            if (configText) JSON.parse(configText);
+            const configText = normalizeLayoutFieldConfig(layoutField.component, layoutField.config);
             const addResult = await client.addField({
               TableId: plan.tableId,
               Name: layoutField.name,
@@ -5334,6 +5383,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
               Visible: layoutField.visible ?? 1,
               AppVisible: layoutField.appVisible ?? 1,
               Tab: layoutField.tab,
+              FormWidth: defaultLayoutFieldFormWidth(layoutField.component, layoutField.formWidth),
               TableWidth: 120,
               Sort: layoutField.sort,
               Data: '[]',
@@ -5386,6 +5436,23 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
           for (const layoutField of plan.layoutFields || []) {
             const saved = after.fields.find(field => String(field.Name || '') === layoutField.name);
             if (!saved || String(saved.Component || '') !== layoutField.component) throw new Error(`布局节点 ${layoutField.name} 回读失败`);
+            const expectedFormWidth = defaultLayoutFieldFormWidth(layoutField.component, layoutField.formWidth);
+            if (expectedFormWidth !== undefined && Number(saved.FormWidth) !== expectedFormWidth) {
+              throw new Error(`布局节点 ${layoutField.name} FormWidth 回读不一致`);
+            }
+            const expectedConfigText = normalizeLayoutFieldConfig(layoutField.component, layoutField.config);
+            if (expectedConfigText !== undefined) {
+              try {
+                const expectedConfig = JSON.parse(expectedConfigText);
+                const actualConfig = JSON.parse(String(saved.Config || '{}'));
+                if (!matchesExpectedJson(actualConfig, expectedConfig)) {
+                  throw new Error(`布局节点 ${layoutField.name} Config 回读不一致`);
+                }
+              } catch (error: unknown) {
+                if (error instanceof Error && error.message.includes('Config 回读不一致')) throw error;
+                throw new Error(`布局节点 ${layoutField.name} Config 回读不是有效 JSON`);
+              }
+            }
           }
           summary.verified++;
         } catch (e: unknown) {
@@ -5638,7 +5705,46 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
         for (const [k, v] of Object.entries(args)) {
           if (v !== undefined && map[k]) patch[map[k]] = v;
         }
-        const result = await client.updateField(patch);
+        let result = await client.updateField(patch);
+        if (result.Code !== 1 && isLegacyJValueValFailure(result) && typeof patch.Id === 'string' && patch.Id) {
+          const beforeResponse = await client.getTableData('diy_field', {
+            _Where: [['Id', '=', patch.Id]],
+            _PageIndex: 1,
+            _PageSize: 2,
+          });
+          const beforeRows = unwrapList<Record<string, unknown>>(beforeResponse.Data);
+          if (beforeResponse.Code !== 1 || beforeRows.length !== 1) {
+            return { content: [{ type: 'text', text: `Error: legacy JValue.Val fallback could not resolve field ${patch.Id}.` }], isError: true };
+          }
+          const targetField = beforeRows[0];
+          const targetTableId = String(targetField.TableId || '');
+          if (patch.TableId && String(patch.TableId) !== targetTableId) {
+            return { content: [{ type: 'text', text: 'Error: legacy JValue.Val fallback rejected a mismatched TableId.' }], isError: true };
+          }
+          const fallbackPatch: Record<string, unknown> = { ...patch, Id: patch.Id };
+          delete fallbackPatch.TableName;
+          const fallback = await client.updateFormData('diy_field', fallbackPatch);
+          if (fallback.Code !== 1) {
+            return { content: [{ type: 'text', text: `Error: legacy JValue.Val fallback failed: ${fallback.Msg || ''}` }], isError: true };
+          }
+          if (targetTableId) await client.refreshSchemaCache([targetTableId]);
+          const verifyResponse = await client.getTableData('diy_field', {
+            _Where: [['Id', '=', patch.Id]],
+            _PageIndex: 1,
+            _PageSize: 2,
+          });
+          const verifyRows = unwrapList<Record<string, unknown>>(verifyResponse.Data);
+          const verified = verifyResponse.Code === 1 && verifyRows.length === 1
+            && Object.entries(fallbackPatch).every(([key, value]) => String(verifyRows[0][key] ?? '') === String(value ?? ''));
+          if (!verified) {
+            return { content: [{ type: 'text', text: 'Error: legacy JValue.Val fallback write could not be verified by readback.' }], isError: true };
+          }
+          result = {
+            Code: 1,
+            Data: { Id: patch.Id, TableId: targetTableId, LegacyJValueFallback: true },
+            Msg: 'Legacy JValue.Val fallback applied and verified.',
+          };
+        }
         if (result.Code !== 1) return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
         return { content: [{ type: 'text', text: `✅ Field updated. ${JSON.stringify(result.Data)}` }] };
       } catch (e: unknown) {

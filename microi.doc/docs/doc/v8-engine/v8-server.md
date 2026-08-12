@@ -954,6 +954,34 @@ if(result2.Code == 1){
 }
 ```
 
+## V8.MQTT
+
+`V8.MQTT` 是 MQTT 事件接口引擎的只读上下文，配合 `V8.EventName` 使用。它不是普通接口引擎中的通用发布函数；服务端设备下行使用带租户上下文的 `IMicroiMQTT.PublishAsync(osClient, ...)`。
+
+| `V8.EventName` | 说明 |
+| --- | --- |
+| `StartServer` / `StopServer` | 当前 Broker 启动或正常停止 |
+| `Connected` / `Disconnected` | 当前租户设备连接或断开 |
+| `Subscribing` | 订阅通过租户 Topic ACL 后 |
+| `MessageReceived` | 收到发布消息；返回 `Code != 1` 可阻止向订阅者广播 |
+| `MessageChanged` | Retained Message 发生变化 |
+
+| `V8.MQTT` 字段 | 说明 |
+| --- | --- |
+| `ClientId`、`OsClient`、`Topic` | 已由 Broker 校验的设备、租户与规范化 Topic |
+| `Payload`、`PayloadRaw` | JSON 自动解析结果与原始 UTF-8 文本 |
+| `UserName`、`UserProperties` | 连接用户名与 MQTT v5 User Properties |
+| `Qos`、`Retain` | QoS 级别与保留消息标记 |
+
+```javascript
+if (V8.EventName === 'MessageReceived') {
+  console.log(V8.MQTT.ClientId + ' -> ' + V8.MQTT.Topic);
+  return { Code: 1, Data: V8.MQTT.Payload };
+}
+```
+
+完整的 Broker 配置、SaaS 凭据、Topic 隔离、设备级接口引擎、TLS、数据落库、服务端下行与集群边界见 [MQTT 引擎（IoT 物联网）](/doc/system-engine/mqtt-engine)。
+
 ## V8.MongoDb
 ### 介绍
 >* 本篇介绍如何在接口引擎、后端V8事件中对MongoDB进行相关操作

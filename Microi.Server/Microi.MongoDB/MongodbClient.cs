@@ -35,6 +35,15 @@ namespace Microi.net
         public static IMongoDatabase MongodbDatabase(MongodbHost host)
         {
             if (host == null) throw new ArgumentNullException(nameof(host));
+            if (string.IsNullOrWhiteSpace(host.Connection))
+            {
+                throw new InvalidOperationException(
+                    "MongoDB连接字符串为空。请在主租户“系统设置 → SaaS引擎 → MongoDB连接字符串”中完成配置，"
+                    + "保存后刷新租户运行时配置；子租户使用共享MongoDB时无需复制连接字符串。"
+                );
+            }
+            if (string.IsNullOrWhiteSpace(host.DataBase))
+                throw new InvalidOperationException("MongoDB数据库名称为空，请检查调用方的租户与数据库命名配置。");
             var client = _clientCache.GetOrAdd(host.Connection, CreateClient);
             return client.GetDatabase(host.DataBase);
         }

@@ -122,7 +122,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
 });
 
 test("package importer fails closed when an API engine is not durably persisted", () => {
-  assert.match(importerSource, /Version: v1\.10\.2/);
+  assert.match(importerSource, /Version: v1\.10\.3/);
   assert.match(importerSource, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(importerSource, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(importerSource, /BULK_SMALL_PACKAGE_SINGLE_SLICE_V1/);
@@ -144,13 +144,15 @@ test("package importer fails closed when an API engine is not durably persisted"
   assert.match(importerSource, /actualCode !== expectedCode/);
   assert.match(importerSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(importerSource, /UpgradePolicy == 'CreateIfMissing'/);
-  assert.match(importerSource, /localHash != incomingHash[\s\S]*localHash != baseHash/);
+  assert.match(importerSource, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
+  assert.match(importerSource, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
+  assert.match(importerSource, /managedDecision == 'PreserveNewer'/);
   assert.match(importerSource, /接口引擎升级冲突/);
 
   const embeddedImporter = packageModel.SysApiEngines.find(
     (item) => item.ApiEngineKey === "import-microi-store-package",
   );
   assert.ok(embeddedImporter, "embedded package importer is missing");
-  assert.equal(embeddedImporter.Version, "v1.10.2");
+  assert.equal(embeddedImporter.Version, "v1.10.3");
   assert.equal(embeddedImporter.ApiV8Code, normalizeSource(importerSource));
 });

@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.7.6
+ * Version: v1.7.7
  * Function:
  * - 统一生成应用商城安装包；分离商城发行版本与不可变运行时版本，并保持精确发布、菜单合同、完整资源选择、任务定义及接口引擎所有权门禁。
  */
@@ -381,7 +381,7 @@ function apiEngineMap(engines) {
   }
   return result;
 }
-function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStore) {
+function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStore, publicationContext) {
   var rows = toArray(engines);
   if (rows.length === 0) return null;
   var requestedRoot = parseObject(requestedPolicies, {});
@@ -390,6 +390,13 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
   var previousEngines = apiEngineMap(previousPackage.SysApiEngines);
   var previousRoot = parseObject(previousPackage.ResourcePolicies, {});
   var previousPolicies = parseObject(previousRoot.ApiEngines, {});
+  // OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1: official Platform packages publish
+  // shared managed engines as platform-owned resources. Explicit caller ownership
+  // remains authoritative, and tenant hooks stay CreateIfMissing/Tenant.
+  var publication = publicationContext || {};
+  var platformPublisherType = text(publication.PublisherType);
+  var officialPlatformPublication = text(publication.ApplicationType).toLowerCase() === 'platform'
+    && (platformPublisherType === '官方应用' || platformPublisherType === '平台应用');
   var result = { SchemaVersion: 1, ApiEngines: {} };
 
   for (var i = 0; i < rows.length; i++) {
@@ -397,15 +404,21 @@ function buildApiEngineResourcePolicies(engines, requestedPolicies, existingStor
     var originalKey = text(engine.ApiEngineKey);
     var key = originalKey.toLowerCase();
     if (!key) continue;
-    var source = requested[key] || requested[originalKey]
+    var requestedSource = requested[key] || requested[originalKey] || null;
+    var source = requestedSource
       || previousPolicies[key] || previousPolicies[originalKey] || {};
     if (typeof source === 'string') source = { UpgradePolicy: source };
     var policy = text(source.UpgradePolicy || source.Policy || 'Managed');
     if (policy !== 'Managed' && policy !== 'CreateIfMissing') {
       throw new Error('接口引擎资源策略不受支持：' + originalKey + ' -> ' + policy);
     }
+    var requestedOwnership = requestedSource && typeof requestedSource === 'object'
+      ? text(requestedSource.Ownership)
+      : '';
+    var ownership = text(source.Ownership || (policy === 'CreateIfMissing' ? 'Tenant' : 'Application'));
+    if (policy === 'Managed' && officialPlatformPublication && !requestedOwnership) ownership = 'Platform';
     var entry = {
-      Ownership: text(source.Ownership || (policy === 'CreateIfMissing' ? 'Tenant' : 'Application')),
+      Ownership: ownership,
       UpgradePolicy: policy
     };
     if (policy === 'Managed') {
@@ -975,7 +988,11 @@ var packageModel = {
 var generatedResourcePolicies = buildApiEngineResourcePolicies(
   packageModel.SysApiEngines,
   requestedResourcePolicies,
-  existingStore
+  existingStore,
+  {
+    ApplicationType: appType,
+    PublisherType: text(V8.Param.PublisherType || app.PublisherType || '官方应用')
+  }
 );
 if (generatedResourcePolicies) packageModel.ResourcePolicies = generatedResourcePolicies;
 

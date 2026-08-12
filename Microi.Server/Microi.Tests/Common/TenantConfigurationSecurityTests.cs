@@ -42,6 +42,7 @@ public class TenantConfigurationSecurityTests
             ["MQPassword"] = "mq-secret",
             ["MqttPwd"] = "mqtt-secret",
             ["SearchEngineApiKey"] = "search-secret",
+            ["DbMongoConnection"] = "mongodb://shared-log-cluster:27017",
             ["OcrEnabled"] = 1,
             ["OcrEndpoint"] = "http://ocr.internal:8080/ocr",
             ["OcrApiKey"] = "ocr-secret",
@@ -70,6 +71,7 @@ public class TenantConfigurationSecurityTests
         Assert.Null(projection["MQPassword"]);
         Assert.Null(projection["MqttPwd"]);
         Assert.Null(projection["SearchEngineApiKey"]);
+        Assert.Null(projection["DbMongoConnection"]);
         Assert.Null(projection["OcrEnabled"]);
         Assert.Null(projection["OcrEndpoint"]);
         Assert.Null(projection["OcrApiKey"]);
@@ -88,7 +90,7 @@ public class TenantConfigurationSecurityTests
     }
 
     [Fact]
-    public void SharedInfrastructureInheritance_DoesNotCopyTenantCredentialsOrDatabase()
+    public void SharedInfrastructureInheritance_SharesMongoRuntimeButNotRelationalDatabaseOrTenantCredentials()
     {
         var main = new JObject
         {
@@ -99,6 +101,7 @@ public class TenantConfigurationSecurityTests
             ["MQUserName"] = "main-admin",
             ["MqttPwd"] = "main-mqtt",
             ["SearchEngineApiKey"] = "main-search-key",
+            ["DbMongoConnection"] = "mongodb://shared-log-cluster:27017",
             ["DbConn"] = "main-db"
         };
         var tenant = new JObject { ["OsClient"] = "tenant_a" };
@@ -109,6 +112,7 @@ public class TenantConfigurationSecurityTests
         Assert.Equal("shared-runtime-secret", tenant["RedisPwd"]?.ToString());
         Assert.Equal("https", tenant["SearchEngineScheme"]?.ToString());
         Assert.Equal("search.internal", tenant["SearchEngineHost"]?.ToString());
+        Assert.Equal("mongodb://shared-log-cluster:27017", tenant["DbMongoConnection"]?.ToString());
         Assert.Null(tenant["MQUserName"]);
         Assert.Null(tenant["MqttPwd"]);
         Assert.Null(tenant["SearchEngineApiKey"]);
@@ -164,13 +168,15 @@ public class TenantConfigurationSecurityTests
         {
             ["TranslateKey"] = "main-translate",
             ["WeChatAppSecret"] = "main-wechat",
-            ["RedisPwd"] = "shared-redis"
+            ["RedisPwd"] = "shared-redis",
+            ["DbMongoConnection"] = "mongodb://shared-log-cluster:27017"
         };
         var tenant = new JObject
         {
             ["TranslateKey"] = "main-translate",
             ["WeChatAppSecret"] = "tenant-wechat",
-            ["RedisPwd"] = "shared-redis"
+            ["RedisPwd"] = "shared-redis",
+            ["DbMongoConnection"] = "mongodb://shared-log-cluster:27017"
         };
 
         TenantConfigurationSecurity.RemoveLegacySharedTenantCredentials(tenant, main);
@@ -178,6 +184,7 @@ public class TenantConfigurationSecurityTests
         Assert.Null(tenant["TranslateKey"]);
         Assert.Equal("tenant-wechat", tenant["WeChatAppSecret"]?.ToString());
         Assert.Equal("shared-redis", tenant["RedisPwd"]?.ToString());
+        Assert.Equal("mongodb://shared-log-cluster:27017", tenant["DbMongoConnection"]?.ToString());
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("TranslateKey"));
         Assert.False(TenantConfigurationSecurity.ShouldCopyFromMain("AlidnsKeyId"));
     }

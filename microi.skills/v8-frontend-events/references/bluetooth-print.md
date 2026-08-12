@@ -1,13 +1,15 @@
-# V8.Print 蓝牙打印运行指南
+# V8.Print 蓝牙打印运行指南（GP-M322 / ZICOX CC4）
 
-本参考用于 Microi 前端 V8 的 BLE 标签和小票打印。运行时事实源为
-`Microi.Client/src/utils/v8-print.js`，指令方法事实源见
+本参考用于 Microi 前端 V8 的 BLE/SPP 标签和小票打印。运行时事实源为
+`Microi.Client/src/utils/v8-print.js`，型号与协议适配事实源为
+`Microi.Client/src/utils/ble/printer-compatibility.js`，指令方法事实源见
 [`bluetooth-print-api.md`](bluetooth-print-api.md)。官网旧业务示例不能作为当前连接语义。
 
 ## 目录
 
 - [前端挂载范围](#前端挂载范围)
 - [运行环境与能力判断](#运行环境与能力判断)
+- [双型号兼容契约](#双型号兼容契约)
 - [连接与发送语义](#连接与发送语义)
 - [最小安全流程](#最小安全流程)
 - [批量打印与恢复](#批量打印与恢复)
@@ -40,7 +42,8 @@ PC/平板顶部导航和移动端【我的】页的蓝牙入口也使用该单�
 
 | 运行环境 | 当前引擎 | 结论 |
 |---|---|---|
-| 5+App 打包的 APK/IPA | `plus.bluetooth` | 支持 BLE 扫描、连接和写特征 |
+| Android 5+App | `plus.bluetooth` + `plus.android` | BLE；ZICOX CC4 可回退到已配对 RFCOMM/SPP；Android 12+ 需要附近设备权限 |
+| iOS 5+App | `plus.bluetooth` | BLE，不使用 Android SPP |
 | 存在 `navigator.bluetooth.requestDevice` 的浏览器 | Web Bluetooth | 支持；通常要求安全上下文和用户手势 |
 | 其它普通 H5/浏览器 | 无 | `V8.Print` 仍可能存在，但连接页会提示能力不可用 |
 | 微信小程序原生 BLE | 不属于此模块 | 需要小程序/UniApp 侧专用实现 |
@@ -49,8 +52,36 @@ PC/平板顶部导航和移动端【我的】页的蓝牙入口也使用该单�
 `BLEInformation.deviceId`。正确顺序是检查 `V8.Print`、调用 `isConnected()`，再在
 用户点击事件中 `await OpenBluetoothPage()`。
 
+Android 12+ 宿主必须启用 DCloud Bluetooth 模块并声明 `BLUETOOTH_SCAN`、
+`BLUETOOTH_CONNECT`。运行时只在用户主动点击“搜索”时申请，不得在页面初始化或自动重连
+时弹授权框；拒绝或永久拒绝要引导用户进入系统“附近的设备”权限设置。
+
 浏览器模板、PDF、A4 单据和 Print Engine JSON 属于 `print-engine`；TSC/TSPL 或
-ESC/POS 原生字节通过 BLE 写入才属于 `V8.Print`。
+CPCL/ESC/POS 原生字节通过 BLE/SPP 写入才属于 `V8.Print`。
+
+## 双型号兼容契约
+
+| 型号 | 标签协议 | 传输 | 兼容承诺 |
+|---|---|---|---|
+| 佳博 GP-M322 | TSPL | BLE | `createNew().getData()` 原字节发送，协议适配层不得改写 |
+| ZICOX CC4 | CPCL | BLE 优先，Android SPP 兜底 | 同一份标准 TSC 高层调用在首包写入前转换为 CPCL |
+| 其它 TSPL | TSPL | BLE | 保持原字节路径 |
+
+`createNewESC()` 在 CC4 上也原样发送，因为厂家声明 CC4 支持 ESC/POS。不要根据厂家 Demo
+里存在测试字符串就擅自宣称其它协议；以产品页、准确手册和实机固件为准。
+
+TSC 构建器给字节数组附加不可枚举的操作元数据，因此 GP 字节值、长度与数组枚举完全不变。
+CC4 必须直接收到同一次 `getData()` 返回值；`Array.from`、展开、JSON 序列化等复制会丢失
+元数据并失败关闭。适配器先完成整份转换和校验，再开始分包；不支持的命令不得产生半张输出。
+
+CC4 可转换：纸张尺寸、速度、浓度、间隙/黑标、前后走纸、方向 0/1、参考点、线/框/反相、
+文字、条码、二维码、位图及单次 `setPagePrint`。`init`/`setCls` 无需输出。原始 `addCommand`、
+国家/代码页、`setFromfeed`、`setHome`、蜂鸣、限位、擦除和未知方法没有足够等价语义，必须
+在首包写入前拒绝。扩展白名单前要同时增加协议单测和两台目标机回归。
+
+Android SPP 与厂家 Demo 一致，优先 RFCOMM 通道 1，再以标准 UUID
+`00001101-0000-1000-8000-00805F9B34FB` 兜底。自动模式只显示名称可识别为 CC4 的已配对
+经典设备；广播名不规范时，用户先手工选择 `zicox-cc4`。Web Bluetooth 不能访问 SPP。
 
 ## 连接与发送语义
 
@@ -63,12 +94,17 @@ ESC/POS 原生字节通过 BLE 写入才属于 `V8.Print`。
 | `reconnect()` | 使用已记住的设备 ID 或浏览器保留的设备授权重连，不弹选择框 |
 | `getConnectionState()` | 返回可展示的连接、记忆、设备、错误和重连状态快照 |
 | `subscribeConnection(listener)` | 立即回调当前快照并持续通知状态变化，返回取消订阅函数 |
-| `prepareSend(bytes)` | 先尝试恢复连接，再进入应用级队列按包串行写入；必须 `await` 并捕获失败 |
+| `getPrinterProfile()` | 返回最终型号、标签指令和传输偏好；普通业务无需调用 |
+| `setPrinterProfile(mode)` | 手工选 `gprinter-gp-m322`、`zicox-cc4`、`generic-tspl`，或恢复 `auto` |
+| `prepareSend(bytes)` | 先恢复连接、完成型号协议适配，再进入应用级队列按包串行写入 |
 | `Send(bytes)` | 依赖 `prepareSend` 已设置的内部游标，属于内部状态机入口，业务代码不要直接调用 |
 | `setOneTimeData(bytes)` | 设置 BLE 包长；只接受 1–512 整数，连接页候选 20–190，默认 20 |
 | `setPrinterNum(num)` | 重复发送同一缓冲区；只接受 1–99 整数，连接页候选 1–9 |
 | `disconnect()` | 主动断开、停止自动重连并忘记当前设备 |
-| `BLEInformation` | 最近设备/服务/特征元数据，只用于诊断，不代表实时连接或打印回执 |
+| `BLEInformation` | 最近设备/型号/通道/服务/特征元数据，只用于诊断，不代表实时连接或打印回执 |
+
+`getConnectionState()` 额外含 `transport`、`profileMode`、`profileId`、`profileName`、
+`commandLanguage`；前端展示可以使用，打印判断仍使用 `isConnected()`。
 
 `OpenBluetoothPage()` 不是“连接成功事件”；用户连上设备后仍要关闭弹窗，调用方才能继续。
 设备元数据会写入 `localStorage` 与兼容用 `sessionStorage`。应用初始化、页面恢复、重新获得
@@ -115,8 +151,9 @@ async function printLabel(order) {
 }
 ```
 
-ESC/POS 小票使用 `createNewESC()`，完整顺序和 25 个真实方法见
-[`bluetooth-print-api.md`](bluetooth-print-api.md)。发送成功只表示 BLE 写调用完成，不能
+同一段标签代码在 GP-M322 上保持 TSPL，在 CC4 上转换为 CPCL。ESC/POS 小票使用
+`createNewESC()`，完整顺序和 25 个真实方法见
+[`bluetooth-print-api.md`](bluetooth-print-api.md)。发送成功只表示 BLE/SPP 写调用完成，不能
 写成“打印机已走纸”或“物理打印成功”。当前源码虽发现 read/notify 特征，但没有订阅状态
 通知，也没有消费 ACK、缺纸或故障回执。
 
@@ -157,6 +194,8 @@ async function printBatch(rows, startIndex) {
 - Web Bluetooth 仅把四个常见服务 UUID 传入 `optionalServices`：`18f0`、`ff00`、
   `49535343-fe7d-4ae5-8fa9-9fafd205e455`、`e7810a71-73ae-499d-8c15-faa9aef0c3f2`。
   当前没有公开的自定义服务配置，并选择枚举到的第一个可写特征；其它型号可能需要扩展源码。
+  CC4 固件若只开放 SPP 或使用其它私有 UUID，Web 端不可连接；Android 5+App 使用已配对 SPP，
+  或先取得厂家准确 BLE UUID 再扩展源码，禁止猜 UUID。
 - `prepareSend` 默认每包 20 字节、包间约 20ms；同一缓冲区多份打印间约 100ms。这只是
   BLE 写节奏，不是打印完成等待时间。包长必须是已实测的正整数，空缓冲区不得发送。
 - 当前分包公式使用 `Math.ceil(length / packetSize)`，长度恰好整除时不会产生 0 字节末包；
@@ -167,6 +206,8 @@ async function printBatch(rows, startIndex) {
   大图可能产生大缓冲区；先缩放、二值化并用小图测试。
 - `V8.Print` 使用应用级共享发送队列，跨 V8 上下文不会再并发覆盖 `currentTime`、`looptime`、
   `lastData` 等共享状态。队列只保证写入顺序，不提供打印机 ACK、业务事务或自动重打语义。
+- CC4 遇到不支持的方法、复制后丢失元数据、缺少或重复 `setPagePrint()` 时应零写入失败；不要
+  在业务层捕获后把原 TSPL 盲目重发给 CC4。
 
 ## 安全边界
 
@@ -182,10 +223,11 @@ async function printBatch(rows, startIndex) {
 
 至少记录：
 
-1. 打印机品牌、型号、固件、纸张规格、服务/写特征 UUID 和指令集。
-2. 5+App 或浏览器版本；首次授权、再次连接、主动断开、页面刷新和断线重连。
+1. GP-M322 与 CC4 的固件、纸张规格、服务/写特征 UUID 或 SPP、指令集。
+2. 5+App 或浏览器版本；首次授权/配对、自动/手工选型、再次连接、主动断开、页面刷新和断线重连。
 3. 中文、数字、特殊字符、二维码、条码、长文本、图片和边界金额。
 4. 默认 20 字节与目标包长；同时覆盖“长度恰好整除包长”。
 5. 连续 20 张严格串行发送，无乱序、丢包、重复或任务状态互相污染。
 6. 中途关机、缺纸、离开范围、权限撤销后的失败位置与恢复行为。
-7. 页面只确认“数据已发送”；若业务要求确认物理结果，另接状态回读或人工确认。
+7. 两种设备交替连接，证明 GP 原 TSPL 不变、CC4 收到 CPCL/ESC-POS；CC4 分别记录 BLE 与 SPP。
+8. 页面只确认“数据已发送”；若业务要求确认物理结果，另接状态回读或人工确认。
