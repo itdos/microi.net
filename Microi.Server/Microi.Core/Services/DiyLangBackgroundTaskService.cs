@@ -17,6 +17,7 @@ namespace Microi.net
     public static class DiyLangBackgroundTaskService
     {
         public const string WorkerApiEngineKey = "__microi_native_diy_lang_sync__";
+        public const string ClusterConcurrencyKey = "__microi_native_diy_lang_sync_cluster__";
         private static readonly Regex SourceRegex = new Regex(
             @"[^A-Za-z0-9._:-]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
@@ -160,7 +161,22 @@ namespace Microi.net
                 {
                     return new DosResult(0, null, "启动期多语言修复未找到仍具权威权限的平台管理员。");
                 }
-                var hourBucket = DateTime.UtcNow.ToString("yyyyMMddHH", CultureInfo.InvariantCulture);
+                // One repair per UTC day is enough for startup self-healing. The
+                // previous hourly key caused every rolling restart to rescan every
+                // tenant, even when the previous run had already succeeded.
+                var dayBucket = DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+                var startupIdempotencyKey = $"diy-lang-sync:{osClient}:startup:{dayBucket}";
+                var completedToday = BackgroundTaskStore.FindByIdempotency(
+                    osClient,
+                    startupIdempotencyKey);
+                if (completedToday != null)
+                {
+                    return BuildQueuedResult(
+                        completedToday,
+                        true,
+                        "本租户今日已投递过低扰动多语言启动修复，本次启动不重复扫描。",
+                        true);
+                }
                 var task = Queue(
                     startupAdministrator,
                     osClient,
@@ -168,7 +184,7 @@ namespace Microi.net
                     "startup",
                     false,
                     true,
-                    $"diy-lang-sync:{osClient}:startup:{hourBucket}");
+                    startupIdempotencyKey);
                 return BuildQueuedResult(
                     task,
                     false,
