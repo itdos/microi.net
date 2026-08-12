@@ -51,7 +51,8 @@
               <text class="menu-title">{{ item.title }}</text>
               <text class="menu-note">{{ item.note }}</text>
             </view>
-            <text v-if="item.value" class="menu-value">{{ item.value }}</text>
+            <!-- zhy：关于入口在有新版时突出“可更新”，其余状态显示真实运行版本。 -->
+            <text v-if="item.value" class="menu-value" :class="{ 'menu-value--update': item.updateReady }">{{ item.value }}</text>
             <text v-if="item.arrow !== false" class="menu-arrow">›</text>
           </view>
         </view>
@@ -67,10 +68,7 @@
 
         <button v-if="isLoggedIn" class="logout-button" @tap="logout">退出登录</button>
 
-        <view class="version-text">
-          <text>{{ appConfig.platformName }} v{{ appConfig.versionName }}</text>
-          <text>Power by {{ appConfig.poweredBy }}</text>
-        </view>
+        <!-- zhy：版本信息已收口到可点击的“关于小程序”入口，避免页面底部重复展示调试式版本块。 -->
         <view class="mci-tabbar-spacer" aria-hidden="true" />
       </view>
     </scroll-view>
@@ -103,6 +101,11 @@ import { loadSummarySnapshot, readSummarySnapshot } from '@/platform/preload.js'
 import { hasFeature, getProfileRoute } from '@/platform/profile/index.js'
 import appConfig from '@/config.js'
 import { buildInviteSharePayload } from '@/utils/share.js'
+import {
+  getMiniProgramUpdateState,
+  initializeMiniProgramUpdate,
+  subscribeMiniProgramUpdate
+} from '@/platform/mini-program-update.js'
 
 export default {
   mixins: [themeMixin],
@@ -115,6 +118,9 @@ export default {
       avatarUrl: '',
       inviteVisible: false,
       inviteType: 'normal',
+      // zhy：我的页只订阅平台级状态，不自行创建或检查更新管理器。
+      updateState: getMiniProgramUpdateState(),
+      updateUnsubscribe: null,
       summaryLoading: false,
       summary: { orders: 0, devices: 0, services: 0, tasks: 0, customers: 0 },
       quickItems: [
@@ -131,7 +137,9 @@ export default {
         { key: 'intentions', title: '购买意向', note: '产品与服务意向记录', icon: '/static/xjy/user/my-goumaiyixiang.png', feature: 'business' },
         { key: 'favorites', title: '我的收藏', note: '已收藏商品与方案', icon: '/static/xjy/user/my-shoucang.png', feature: 'mall' },
         { key: 'members', title: '成员管理', note: '组织成员与权限入口', icon: '/static/xjy/user/my-chengyuan.jpg', feature: 'business' },
-        { key: 'servicePhone', title: '平台客服', note: '工作日 08:30 - 18:00', value: '400-888-5680', arrow: false, icon: '/static/xjy/user/kefu.png' }
+        { key: 'servicePhone', title: '平台客服', note: '工作日 08:30 - 18:00', value: '400-888-5680', arrow: false, icon: '/static/xjy/user/kefu.png' },
+        // zhy：关于小程序属于公开平台能力，使用纳入主包的真实品牌图标，不依赖远程资源。
+        { key: 'about', title: '关于小程序', note: '版本与更新', icon: '/static/xjy/user/version.png', public: true }
       ]
     }
   },
@@ -160,9 +168,17 @@ export default {
       return available.filter((item) => allowed.includes(item.key))
     },
     visibleMenuItems() {
-      const available = this.menuItems.filter((item) => !item.feature || hasFeature(item.feature))
+      // zhy：About 行根据全局更新状态实时显示版本或可更新提示。
+      const available = this.menuItems
+        .filter((item) => !item.feature || hasFeature(item.feature))
+        .map((item) => item.key === 'about' ? {
+          ...item,
+          note: this.updateState.message || '版本与更新',
+          value: this.updateState.updateReady ? '可更新' : `v${this.updateState.version || appConfig.versionName}`,
+          updateReady: this.updateState.updateReady
+        } : item)
       if (!this.isLoggedIn || this.roleProfile.isAdmin) return available
-      const common = ['personalInfo', 'password', 'reminders', 'servicePhone']
+      const common = ['personalInfo', 'password', 'reminders', 'servicePhone', 'about']
       const roleKeys = this.roleProfile.isCustomer ? ['providers', 'intentions', 'favorites'] : []
       return available.filter((item) => [...common, ...roleKeys].includes(item.key))
     }
@@ -176,12 +192,22 @@ export default {
     }
     const summary = readSummarySnapshot()
     if (summary) this.summary = summary
+    // zhy：进入我的页即可拿到 App 已完成的检查状态；兜底初始化不会重复注册监听。
+    initializeMiniProgramUpdate({ promptOnReady: true })
+    this.updateUnsubscribe = subscribeMiniProgramUpdate((nextState) => {
+      this.updateState = nextState
+    })
   },
   onShow() {
     this.isLoggedIn = !!getToken()
     this.currentUser = getUser() || {}
     this.resolveAvatar()
     if (this.isLoggedIn) this.loadSummary()
+  },
+  onUnload() {
+    // zhy：释放页面订阅，避免重复进入后残留监听。
+    if (this.updateUnsubscribe) this.updateUnsubscribe()
+    this.updateUnsubscribe = null
   },
   methods: {
     featureEnabled(name) {
@@ -208,6 +234,11 @@ export default {
       else openBusiness(item.key)
     },
     handleMenu(item) {
+      // zhy：关于小程序无需登录，未登录用户也必须能够更新版本。
+      if (item.key === 'about') {
+        uni.navigateTo({ url: getProfileRoute('about', '/pages/about/index') })
+        return
+      }
       if (!this.isLoggedIn) { this.goLogin(); return }
       if (item.key === 'servicePhone') uni.makePhoneCall({ phoneNumber: item.value })
       else if (item.key === 'personalInfo') this.openProfile()
@@ -299,6 +330,8 @@ export default {
 .menu-title { color: #2d4b57; font-size: 25rpx; font-weight: 600; }
 .menu-note { margin-top: 4rpx; overflow: hidden; color: #8b9fa7; font-size: 20rpx; text-overflow: ellipsis; white-space: nowrap; }
 .menu-value { margin-left: 12rpx; color: #0b86d4; font-size: 22rpx; }
+/* zhy：新版已就绪时使用醒目的胶囊状态，但不改变整行布局。 */
+.menu-value--update { padding: 5rpx 12rpx; border-radius: 999rpx; background: #fff0ed; color: #d8492d; font-weight: 700; }
 .menu-arrow { color: #a2b1b7; font-size: 34rpx; text-align: right; }
 .share-row { grid-template-columns: 66rpx minmax(0, 1fr) 34rpx; margin-bottom: 0; line-height: normal; }
 .share-row::after { border: none; }
@@ -318,6 +351,5 @@ export default {
 @keyframes inviteUp { from { transform: translateY(100%); } to { transform: none; } }
 .logout-button { width: 100%; height: 82rpx; margin: 22rpx 0 0; border: 1rpx solid #f0d9d4; border-radius: 16rpx; background: #fff; color: #d8492d; font-size: 26rpx; line-height: 82rpx; }
 .logout-button::after { border: none; }
-.version-text { display: flex; flex-direction: column; align-items: center; padding: 30rpx 0 18rpx; color: #a2b0b6; font-size: 19rpx; line-height: 30rpx; }
 @media (prefers-reduced-motion: reduce) { .invite-sheet { animation: none; } }
 </style>
