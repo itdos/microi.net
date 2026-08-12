@@ -3,8 +3,6 @@
 	<mci-page-shell class="native-form-page" :class="{ 'native-form-page--select-open': !!openSelectorField }"
 		:style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
 		@back="goBack">
-		<template #right><button v-if="!loading && !error && mode === 'View' && rowId" class="edit-command"
-				@tap="switchToEdit">编辑</button></template>
 		<mci-skeleton v-if="loading" type="form" :rows="7" />
 
 		<view v-else-if="error" class="form-state">
@@ -229,6 +227,10 @@
 					<text v-else>{{ tenantFormPresentation.floatingAction.icon || '＋' }}</text>
 				</view>
 				<text>{{ tenantFormPresentation.floatingAction.label }}</text>
+			</view>
+			<view v-if="!loading && !error && mode === 'View' && rowId && !openSelectorField"
+				class="form-view-actions">
+				<button class="edit-command" hover-class="edit-command--pressed" @tap="switchToEdit">编辑</button>
 			</view>
 			<view v-if="!loading && !error && mode !== 'View'" class="form-actions">
 				<view class="form-actions__secondary" hover-class="form-actions__pressed" @tap="goBack"><text>取消</text>
@@ -1068,21 +1070,35 @@
 	}
 
 	.edit-command {
-		width: 70rpx;
-		height: 58rpx;
+		width: 100%;
+		height: 84rpx;
 		margin: 0;
 		padding: 0;
 		border: 0;
-		border-radius: 6rpx;
-		background: #edf7fa;
-		color: #087fbd;
-		font-size: 22rpx;
-		font-weight: 650;
-		line-height: 58rpx;
+		border-radius: 8rpx;
+		background: #e94b2c;
+		color: #fff;
+		font-size: 26rpx;
+		font-weight: 700;
+		line-height: 84rpx;
+		transition: transform .16s ease;
 	}
 
 	.edit-command::after {
 		border: none;
+	}
+
+	.edit-command--pressed { transform: scale(.98); }
+
+	.form-view-actions {
+		position: fixed;
+		z-index: 40;
+		left: var(--mci-safe-left);
+		right: var(--mci-safe-right);
+		bottom: 0;
+		padding: 18rpx 22rpx calc(18rpx + var(--mci-safe-bottom));
+		border-top: 1px solid #dfe8eb;
+		background: rgba(255, 255, 255, .98);
 	}
 
 	.native-form {
