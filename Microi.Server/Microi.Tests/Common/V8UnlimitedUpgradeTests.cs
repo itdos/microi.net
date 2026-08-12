@@ -5,6 +5,34 @@ namespace Microi.Tests.Common;
 public class V8UnlimitedUpgradeTests
 {
     [Fact]
+    public void StartupRepairsGeneratedRuntimeColumnsBeforeLicenseQueriesFormEngine()
+    {
+        var root = FindRepositoryRoot();
+        var program = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.net.Api", "Program.cs"));
+        var hostedService = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "MicroiUpgradeHostedService.cs"));
+        var upgrade = File.ReadAllText(Path.Combine(
+            root, "Microi.Server", "Microi.Upgrade", "Upgrade.cs"));
+
+        var prerequisiteIndex = program.IndexOf(
+            ".EnsureRuntimePhysicalPrerequisitesAsync(clientModel)",
+            StringComparison.Ordinal);
+        var licenseIndex = program.IndexOf(
+            "LicenseServerStore.RestoreCurrentServerLicenseAsync",
+            StringComparison.Ordinal);
+
+        Assert.True(prerequisiteIndex >= 0);
+        Assert.True(licenseIndex > prerequisiteIndex);
+        Assert.Contains("UpgradeDistributedLease.TryAcquire", upgrade, StringComparison.Ordinal);
+        Assert.Contains("RuntimePhysicalPrerequisitesReady", upgrade, StringComparison.Ordinal);
+        Assert.Contains("EnsureRuntimePhysicalPrerequisitesAsync(runtimeClient, stoppingToken)", hostedService, StringComparison.Ordinal);
+        Assert.True(
+            hostedService.IndexOf("EnsureRuntimePhysicalPrerequisitesAsync", StringComparison.Ordinal)
+            < hostedService.IndexOf("new Upgrade21()", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Upgrade27_PreservesCustomInFormCodeAndAddsOneManagedVisibilityBlock()
     {
         const string custom = "V8.FieldSet('LockKey', 'Visible', !!V8.Form.Lock);";
@@ -51,5 +79,19 @@ public class V8UnlimitedUpgradeTests
             index += needle.Length;
         }
         return count;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null)
+        {
+            if (Directory.Exists(Path.Combine(directory.FullName, "Microi.Server")))
+            {
+                return directory.FullName;
+            }
+            directory = directory.Parent;
+        }
+        throw new DirectoryNotFoundException("未找到 Microi 仓库根目录。");
     }
 }

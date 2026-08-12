@@ -1,0 +1,11 @@
+{
+  "name": "@microi/ai-content-operations-package",
+  "version": "1.0.10",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:manifest": "node build-manifest.mjs",
+    "test": "node --test tests/manifest.test.mjs",
+    "build": "npm run build:manifest && npm test"
+  }
+}

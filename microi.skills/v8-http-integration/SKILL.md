@@ -3,6 +3,8 @@ name: v8-http-integration
 description: Microi V8 HTTP 集成指南。用于通过 V8.Http.Get/Post/Patch、对应 Response 方法及后端 Async 方法调用接口，处理请求头、JSON/form/XML 载荷、超时、文件和响应解析，并兼容前后端 V8。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi V8 HTTP 外部接口集成
 
 你正在开发 Microi 吾码平台的 V8 引擎代码，需要调用外部 HTTP API（微信、支付宝、短信、ERP 等第三方系统）。

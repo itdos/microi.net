@@ -3,6 +3,8 @@ name: page-engine
 description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。用于创建仪表盘、图表、表格、地图、组件、页面布局，或校验 mic_page formData JSON。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 界面引擎（Page Engine）页面 JSON 生成
 
 MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_page_design`；版本治理入口见下文。保存工具写入后仍需回读 `mic_page`，不能把生成成功当作持久化成功。

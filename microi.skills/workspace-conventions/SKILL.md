@@ -14,11 +14,15 @@ AI 处理任何 Microi 低代码、V8、MCP、OpenClaw、采集引擎、前端�
 - 涉及 V8 CRUD、SQL、上传下载、导入导出、菜单按钮、表单事件、前端页面或自动化测试时，继续读取对应专项 Skill。
 - 最终交付说明必须能逐条对应用户编号需求；不得遗漏、合并或把仍可执行的需求写成“下一步继续”。
 
-### Codex 插件入口（强制）
+### Codex 最新版与重新初始化门禁（强制）
 
-- Codex 开始处理 Microi吾码任务时，应立即确认 `microi@microi-net` 是否已安装并启用；能力不明确时读取 `microi-codex-installer` 并先做只读检测。
-- 用户明确要求安装、升级或启用插件时可直接执行；普通业务对话中发现缺失时，必须先说明会修改 Codex 全局配置并取得一次授权，禁止静默安装。
-- 用户暂不安装时继续使用现有 Skills、CLI 或 MCP，不得把插件安装变成处理 Microi 需求的强制前置条件。
+- Codex 在每个新建或已有对话中首次处理任一 Microi吾码任务时，只要当前会话能够读取任何吾码 Skill，就必须先完整读取 `microi-codex-installer`，并在业务分析、MCP 调用、源码修改、构建或发布前完成一次最新版门禁。不得因为上一个对话检查过、`microi codex status` 返回 `ok: true`，或 VS Code 已安装吾码插件而跳过。
+- 最新版只能以 npm 官方 registry 的在线结果为准：`npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/`。`microi codex status` 只比较当前 CLI 内置快照与本机 Codex 插件，不能证明 npm 没有更新版本。
+- 门禁必须同时核对：官方最新版、当前 `microi` CLI 版本、`microi@microi-net` 的安装/启用/版本、当前工作区 AI bundle 版本，以及 MCP provider 的来源与版本。全局 CLI 已安装时不得保留旧版；Codex 插件、工作区 AI 配置或 MCP 低于官方最新版时也不得继续业务任务。
+- 只读查询不需要授权。需要安装或升级时，先向用户一次性说明将更新全局 `@microi.net/cli`、修改 Codex 全局 marketplace/插件、重新生成当前工作区 AI 配置并刷新 MCP；用户明确要求“安装、升级、更新、初始化吾码”时视为已经授权这些对应操作，否则必须取得一次明确同意。
+- 获得授权后必须使用最新版 CLI 完整执行：`npm install --global @microi.net/cli@latest`、`microi codex install --yes`、`microi ai init --workspace "<工作区绝对路径>" --json`、`microi doctor --workspace "<工作区绝对路径>" --json`、`microi codex status --json`。`ai init` 默认包含 MCP 更新，禁止在此流程使用 `--no-mcp`；若诊断仍显示旧版或 `legacy` provider，继续修复到版本一致后再验收。
+- Codex 插件发生安装或升级后，当前任务通常不能热加载新 Skills/MCP。必须提示并要求新建 Codex 任务或重载 Codex，重载后的新任务再次通过最新版门禁后才继续；不得在旧任务中声称新版能力已经生效。
+- npm 官方 registry 无法访问、版本无法解析、用户拒绝必要授权、安装失败或重载尚未完成时，必须明确报告门禁未通过；在能够证明最新版前，不得继续 Microi 远端写入、源码实现、构建或发布，也不得改用第三方 registry、缓存结果或旧 CLI 冒充最新版。
 
 ## Microi吾码工作进度播报规范（强制）
 
@@ -102,10 +106,11 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 | 吾码 App 源码 | `microi.app/` |
 | 吾码 UniApp 源码 | `microi.uniapp/` |
 | 吾码官方网站 / 文档源码 | `microi.doc/` |
-| 吾码 AI 应用源码 | `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/` |
-| 吾码官方应用商城发行包源码 | `microi.apps/{packageKey}/` |
+| 吾码 AI 应用及应用商城发行源码 | `Microi-V8-Engine/{系统名称} ({ApiBase域名})/{OsClient}.{OsClientType}.{OsClientNetwork}/AI应用/{appKey}/` |
 
 以上路径只作为通用工作区相对路径规范，不写入具体本机盘符。跨仓库、空工作区或普通用户项目中，如果路径不存在，以插件生成的 `AGENTS.md`、MCP 配置和实际文件树为准。
+
+每个 `AI应用/{appKey}` 必须是界面、微服务、Manifest、接口引擎、资源策略、测试、构建脚本与商城上传素材的唯一事实源。纯平台应用没有前端时仍使用该目录；禁止另建 `microi.apps/` 平行发行根。
 
 ## Skills 通用化原则
 

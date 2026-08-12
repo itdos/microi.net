@@ -1,0 +1,4 @@
+interface:
+  display_name: "Microi Unity 集成"
+  short_description: "交付 Unity UPM、WebGL、V8 与可安装 AI 应用"
+  default_prompt: "使用 $unity-integration 设计、实现并分层验收完整的 Microi Unity WebGL 应用。"

@@ -854,6 +854,8 @@ export default {
     min-width: 0;
     min-height: 1px;
     overflow: auto;
+    contain: layout paint;
+    isolation: isolate;
     background: var(--mci-bg-base, var(--el-bg-color));
 }
 
@@ -866,5 +868,7 @@ export default {
     min-height: var(--micro-app-available-height);
     padding-bottom: var(--micro-app-safe-area-bottom);
     box-sizing: border-box;
+    contain: layout paint;
+    isolation: isolate;
 }
 </style>

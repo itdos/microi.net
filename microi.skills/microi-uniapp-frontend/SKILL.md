@@ -3,6 +3,8 @@ name: microi-uniapp-frontend
 description: Microi 吾码 UniApp/H5 前端通用规范。用于构建或修复任何 Microi uni-app/移动端 H5 项目，覆盖上传资源渲染、头像、骨架屏、移动安全区、tabBar、固定底栏和明确业务素材选择。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi UniApp 前端通用规范
 
 本 Skill 适用于任何 Microi 吾码 UniApp/H5 项目，包括商城、OA、ERP、MES、CRM、互联网项目、预约项目等。不要把规则写成某一个业务应用专属规范。

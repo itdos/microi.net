@@ -3,6 +3,8 @@ name: microi-mobile-app-quality
 description: Microi 移动端质量门禁，适用于 UniApp/H5/微信小程序。用于创建、重设计、修复、测试或交付任何 Microi 移动端项目，覆盖登录、底部导航、快捷入口、按钮、动效、菜单层级与移动端视觉验收。
 ---
 
+> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+
 # Microi 移动端质量门禁
 
 每次交付 Microi UniApp/H5/微信小程序时都必须应用本 skill。这里记录的是移动端项目反复出现、必须避免的问题。

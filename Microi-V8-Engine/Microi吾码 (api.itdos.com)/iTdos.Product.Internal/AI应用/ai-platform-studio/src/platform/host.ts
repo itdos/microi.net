@@ -1,5 +1,5 @@
 import type { HostContext } from '../domain/models'
-import { isInternalPath, normalizeRoute } from '../domain/navigation'
+import { isInternalPath, normalizeRoute, type RoutePath } from '../domain/navigation'
 
 function hostData(): Record<string, unknown> {
   return window.microApp?.getData?.() ?? {}
@@ -38,6 +38,19 @@ export function callMicroiHost(action: string, data: Record<string, unknown> = {
     data
   })
   return true
+}
+
+/**
+ * Navigate inside this microservice without changing the Microi host Tab route.
+ * Host navigate/replaceTab are reserved for leaving the current microservice.
+ */
+export function navigateMicroRoute(path: unknown, replace = false): RoutePath {
+  const route = normalizeRoute(path)
+  const nextHash = `#${route}`
+  if (window.location.hash !== nextHash) {
+    window.history[replace ? 'replaceState' : 'pushState']({}, '', nextHash)
+  }
+  return route
 }
 
 export function notifyReady(): void {

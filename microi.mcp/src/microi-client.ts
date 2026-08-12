@@ -8,7 +8,11 @@ import { Readable } from 'node:stream';
 import { createGzip } from 'node:zlib';
 import { API } from './api-paths.js';
 import { resolveMcpDid } from './mcp-did.js';
-import { normalizeAuthorizationToken, shouldRefreshAuthorizationToken } from './token-utils.js';
+import {
+  normalizeAuthorizationToken,
+  selectPreferredAuthorizationTokenFromCandidates,
+  shouldRefreshAuthorizationToken,
+} from './token-utils.js';
 import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-integrity.js';
 import { prepareV8VersionedCode } from './v8-version.js';
 
@@ -66,6 +70,11 @@ export function buildTokenFileLookupKeys(
 
   if (tenant) {
     keys.push(`${apiUrl}|${tenant}|${tenantType}|${tenantNetwork}`);
+    // Login can happen before the backend reports Type/Network, so the broker
+    // first stores the fresh token under the canonical untyped identity. Keep
+    // that same-tenant alias in typed lookups; issuance-time arbitration below
+    // prevents a stale typed exact key from winning forever.
+    keys.push(`${apiUrl}|${tenant}||`);
     const compactIdentity = [apiUrl, tenant, tenantType, tenantNetwork]
       .filter(Boolean)
       .join('|');
@@ -839,7 +848,13 @@ export class MicroiClient {
         this.config.osClientType,
         this.config.osClientNetwork,
       );
-      const fileToken = lookupKeys.map(key => tokens[key]).find(Boolean);
+      const apiKey = String(this.config.apiBaseUrl || '').replace(/\/+$/, '');
+      const tenantKeys = this.config.osClient
+        ? lookupKeys.filter(key => key !== apiKey)
+        : lookupKeys;
+      const fileToken = selectPreferredAuthorizationTokenFromCandidates(
+        tenantKeys.map(key => tokens[key]),
+      ) || tokens[apiKey];
       const normalizedFileToken = normalizeAuthorizationToken(fileToken);
       if (normalizedFileToken && normalizedFileToken !== this.token) {
         this.token = normalizedFileToken;

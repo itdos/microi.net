@@ -12,16 +12,22 @@ namespace Microi.net
     /// </summary>
     internal sealed class BackgroundTaskConcurrencyLease : IDisposable
     {
-        private const int LeaseMilliseconds = 90000;
+        private const int DefaultLeaseMilliseconds = 90000;
         private readonly IDatabase _database;
         private readonly string _lockKey;
         private readonly string _owner;
+        private readonly int _leaseMilliseconds;
 
-        private BackgroundTaskConcurrencyLease(IDatabase database, string lockKey, string owner)
+        private BackgroundTaskConcurrencyLease(
+            IDatabase database,
+            string lockKey,
+            string owner,
+            int leaseMilliseconds)
         {
             _database = database;
             _lockKey = lockKey;
             _owner = owner;
+            _leaseMilliseconds = leaseMilliseconds;
         }
 
         public static BackgroundTaskConcurrencyLease TryAcquire(
@@ -29,7 +35,13 @@ namespace Microi.net
             string concurrencyKey,
             string owner)
         {
-            return TryAcquire(osClient, concurrencyKey, owner, "", "");
+            return TryAcquire(
+                osClient,
+                concurrencyKey,
+                owner,
+                "",
+                "",
+                DefaultLeaseMilliseconds);
         }
 
         public static BackgroundTaskConcurrencyLease TryAcquire(
@@ -37,9 +49,13 @@ namespace Microi.net
             string concurrencyKey,
             string owner,
             string runtimeOsClientType,
-            string runtimeOsClientNetwork)
+            string runtimeOsClientNetwork,
+            int leaseMilliseconds = DefaultLeaseMilliseconds)
         {
             if (string.IsNullOrWhiteSpace(concurrencyKey)) return null;
+            leaseMilliseconds = Math.Max(
+                DefaultLeaseMilliseconds,
+                Math.Min(900000, leaseMilliseconds));
             var database = MicroiEngine.CacheTenant.Cache(osClient).GetIDatabase();
             if (database == null)
                 throw new InvalidOperationException("Redis 不可用，已拒绝在无分布式并发租约时执行串行后台任务。");
@@ -58,9 +74,13 @@ return 0";
             var acquired = (long)database.ScriptEvaluate(
                 script,
                 new RedisKey[] { lockKey },
-                new RedisValue[] { owner, LeaseMilliseconds });
+                new RedisValue[] { owner, leaseMilliseconds });
             return acquired == 1
-                ? new BackgroundTaskConcurrencyLease(database, lockKey, owner)
+                ? new BackgroundTaskConcurrencyLease(
+                    database,
+                    lockKey,
+                    owner,
+                    leaseMilliseconds)
                 : null;
         }
 
@@ -74,7 +94,7 @@ return 0";
             return (long)_database.ScriptEvaluate(
                 script,
                 new RedisKey[] { _lockKey },
-                new RedisValue[] { _owner, LeaseMilliseconds }) == 1;
+                new RedisValue[] { _owner, _leaseMilliseconds }) == 1;
         }
 
         public void Dispose()
@@ -89,7 +109,8 @@ return 0";
                 _database.ScriptEvaluate(
                     script,
                     new RedisKey[] { _lockKey },
-                    new RedisValue[] { _owner });
+                    new RedisValue[] { _owner },
+                    CommandFlags.FireAndForget);
             }
             catch
             {
