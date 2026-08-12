@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.7.6 V3 source", () => {
+test("publisher package metadata matches the v1.7.7 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.7.6");
+  assert.equal(packagedPublisher.Version, "v1.7.7");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -26,7 +26,7 @@ test("microservice packages exclude deleted and disabled historical routes", () 
   assert.match(publisherSource, /\['AND', 'IsEnable', '<>', 0\]/);
 });
 
-test("publisher emits managed baselines and tenant-owned create-if-missing policies", () => {
+test("publisher emits platform-owned managed baselines and tenant-owned hooks for official platform apps", () => {
   const context = {
     V8: {
       EncryptHelper: {
@@ -59,9 +59,11 @@ test("publisher emits managed baselines and tenant-owned create-if-missing polic
         SysApiEngines: [{ ApiEngineKey: "core", ApiV8Code: "old-core" }],
       }),
     },
+    { ApplicationType: "Platform", PublisherType: "官方应用" },
   );
 
   assert.equal(policies.ApiEngines.core.UpgradePolicy, "Managed");
+  assert.equal(policies.ApiEngines.core.Ownership, "Platform");
   assert.equal(
     policies.ApiEngines.core.BaseHash,
     crypto.createHash("sha256").update("old-core").digest("hex"),
@@ -69,6 +71,22 @@ test("publisher emits managed baselines and tenant-owned create-if-missing polic
   assert.equal(policies.ApiEngines.hook.Ownership, "Tenant");
   assert.equal(policies.ApiEngines.hook.UpgradePolicy, "CreateIfMissing");
   assert.equal(policies.ApiEngines.hook.BaseHash, undefined);
+
+  const regularPolicies = context.result(
+    [{ ApiEngineKey: "core", ApiV8Code: "new-core" }],
+    null,
+    null,
+    { ApplicationType: "Web", PublisherType: "官方应用" },
+  );
+  assert.equal(regularPolicies.ApiEngines.core.Ownership, "Application");
+
+  const explicitlyApplicationOwned = context.result(
+    [{ ApiEngineKey: "core", ApiV8Code: "new-core" }],
+    { ApiEngines: { core: { UpgradePolicy: "Managed", Ownership: "Application" } } },
+    null,
+    { ApplicationType: "Platform", PublisherType: "官方应用" },
+  );
+  assert.equal(explicitlyApplicationOwned.ApiEngines.core.Ownership, "Application");
 });
 
 function extractFunction(source, name) {
@@ -440,7 +458,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.7\.6/);
+  assert.match(publisherSource, /Version: v1\.7\.7/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,

@@ -94,7 +94,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 2) ||
+                    importerVersion < new System.Version(1, 10, 3) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -126,6 +126,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
                     !code.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
                     !code.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
+                    !code.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
+                    !code.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
                     !code.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !code.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !code.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
@@ -178,12 +180,13 @@ WHERE `ApiEngineKey`=@p0 AND (`IsDeleted`=0 OR `IsDeleted` IS NULL)";
                 var publisherVersionMatch = Regex.Match(publisherCode, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 6, 0) ||
+                    publisherVersion < new System.Version(1, 7, 7) ||
                     !publisherCode.Contains("OfflineSelfContained") ||
                     !publisherCode.Contains("IncludeSource: includeSource") ||
                     !publisherCode.Contains("action === 'PackageOnly'") ||
                     !publisherCode.Contains("ReturnPackageModel") ||
                     !publisherCode.Contains("buildApiEngineResourcePolicies") ||
+                    !publisherCode.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||
                     !publisherCode.Contains("GetFormData('sys_microistore'") ||
                     !publisherCode.Contains("ApplicationType || app.AppType") ||
                     !publisherCode.Contains("SOURCE_BUILD_ARCHIVE_ROOTS_V1") ||
@@ -513,7 +516,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 2) ||
+                    importerVersion < new System.Version(1, 10, 3) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -539,6 +542,8 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !content.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
                     !content.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
                     !content.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
+                    !content.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
+                    !content.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
                     !content.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !content.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !content.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
@@ -555,12 +560,13 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!content.Contains("ai_app_publish_store") ||
                     !publisherVersionMatch.Success ||
                     !System.Version.TryParse(publisherVersionMatch.Groups[1].Value, out var publisherVersion) ||
-                    publisherVersion < new System.Version(1, 6, 0) ||
+                    publisherVersion < new System.Version(1, 7, 7) ||
                     !content.Contains("OfflineSelfContained") ||
                     !content.Contains("IncludeSource: includeSource") ||
                     !content.Contains("action === 'PackageOnly'") ||
                     !content.Contains("ReturnPackageModel") ||
                     !content.Contains("buildApiEngineResourcePolicies") ||
+                    !content.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||
                     !content.Contains("SOURCE_BUILD_ARCHIVE_ROOTS_V1"))
                 {
                     throw new InvalidOperationException($"升级资源[{resourceName}]内容校验失败，未找到目标接口Key。");
@@ -623,7 +629,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
                     packageVersion < new System.Version(7, 0, 13) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 10, 2) ||
+                    embeddedImporterVersion < new System.Version(1, 10, 3) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
                     embeddedBulkVersion < new System.Version(1, 1, 1) ||
                     bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
@@ -646,10 +652,13 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                     !importerEngineCode.Contains("PACKAGE_API_ENGINE_READBACK_V1") ||
                     !importerEngineCode.Contains("API_ENGINE_RESOURCE_BASELINE_V1") ||
                     !importerEngineCode.Contains("TENANT_API_ENGINE_POLICY_IMMUTABLE_V1") ||
+                    !importerEngineCode.Contains("TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1") ||
+                    !importerEngineCode.Contains("PLATFORM_API_ENGINE_PRESERVE_NEWER_V1") ||
                     !importerEngineCode.Contains("SKIP_INSTALL_COUNT_WITHOUT_MARKETPLACE_ID_V1") ||
                     !importerEngineCode.Contains("LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1") ||
                     !importerEngineCode.Contains("MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1") ||
                     !importerEngineCode.Contains("ADMIN_MENU_PERMISSION_V1") ||
+                    !content.Contains("OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_CHECKPOINT_PLAN_V2") ||
                     !bulkEngineCode.Contains("BACKGROUND_TASK_TRUSTED_BOOTSTRAP_V1"))
                 {

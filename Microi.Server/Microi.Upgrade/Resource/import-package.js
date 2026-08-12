@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.10.2
+ * Version: v1.10.3
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
@@ -352,6 +352,7 @@ var syncStoreMetaFromRow = function () {
 var storeRow = syncStoreMetaFromRow();
 var storeApiBase = trimRightSlash(firstTextParam([V8.Param.StoreApiBase, storeRow.StoreApiBase, storeRow.AppStoreApiBase, 'https://api.itdos.com']));
 var storeOsClient = firstTextParam([V8.Param.StoreOsClient, V8.Param.AppStoreOsClient, storeRow.StoreOsClient, storeRow.AppStoreOsClient, storeRow.SourceOsClient, 'iTdos']);
+var authoritativeStoreModel = null;
 if (!Package && storeRow && storeRow.AppPakcet) {
     Package = storeRow.AppPakcet;
 }
@@ -369,6 +370,7 @@ if (!Package && firstTextParam([V8.Param.StoreId, V8.Param.Id, storeRow.Id])) {
     }
     if (storeModelResult && storeModelResult.Code == 1 && storeModelResult.Data) {
         var storeModel = storeModelResult.Data;
+        authoritativeStoreModel = storeModel;
         Package = storeModel.AppPakcet;
         if (!V8.Param.AppId) V8.Param.AppId = firstTextParam([storeModel.AppId, storeModel.AppKey, storeModel.Id]);
         if (!V8.Param.AppName) V8.Param.AppName = firstTextParam([storeModel.AppName, storeModel.Name]);
@@ -394,6 +396,19 @@ if (!Package.PackageInfo) {
         Msg: '参数错误：Package.PackageInfo不能为空'
     };
 }
+
+// TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1：旧版官方平台应用包的资源策略都写成
+// Ownership=Application。只有从固定 iTdos 商城实时回读、且商城元数据明确为
+// 官方/平台应用时，才把它迁移为 Platform；直接传入的离线包或自定义商城源
+// 继续使用包内原策略，不能靠自报 PublisherType 获得平台级宽松处理。
+var officialPublisherType = authoritativeStoreModel
+    ? String(authoritativeStoreModel.PublisherType || '')
+    : '';
+var trustedOfficialPlatformPackage = !!authoritativeStoreModel
+    && String(storeApiBase || '').toLowerCase() == 'https://api.itdos.com'
+    && String(storeOsClient || '').toLowerCase() == 'itdos'
+    && String(authoritativeStoreModel.ApplicationType || '').toLowerCase() == 'platform'
+    && (officialPublisherType == '官方应用' || officialPublisherType == '平台应用');
 
 // BULK_SMALL_PACKAGE_SINGLE_SLICE_V1：批量安装本身已经按“一个应用一个外层
 // checkpoint”持久化。对规模可控的官方平台包，再把同一个应用拆成几十个内部
@@ -4966,6 +4981,19 @@ try {
         return 0;
     }
 
+    // PLATFORM_API_ENGINE_PRESERVE_NEWER_V1：官方平台应用可能携带发布时的旧版
+    // 共享接口引擎。若当前租户已经运行更高语义版本，保留该版本并继续安装；
+    // 同版本异哈希、无版本、普通应用及低版本本地修改仍按三方基线冲突回滚。
+    function decideManagedApiEngineUpdate(ownership, baseHash, localHash, incomingHash, localVersion, incomingVersion) {
+        if (localHash == incomingHash || (baseHash && localHash == baseHash)) return 'Apply';
+        if (String(ownership || '').toLowerCase() == 'platform'
+            && localVersion && incomingVersion
+            && compareApiEngineVersion(localVersion, incomingVersion) > 0) {
+            return 'PreserveNewer';
+        }
+        return 'Conflict';
+    }
+
     function apiEngineHash(code) {
         if (!V8.EncryptHelper || !V8.EncryptHelper.Sha256Hex) {
             throw new Error('接口引擎资源升级需要 V8.EncryptHelper.Sha256Hex');
@@ -4984,9 +5012,15 @@ try {
         if (upgradePolicy != 'Managed' && upgradePolicy != 'CreateIfMissing') {
             throw new Error('接口引擎资源策略不受支持：' + apiEngineKey + ' -> ' + upgradePolicy);
         }
+        var ownership = String(source.Ownership || (upgradePolicy == 'CreateIfMissing' ? 'Tenant' : 'Application'));
+        if (upgradePolicy == 'Managed'
+            && ownership.toLowerCase() == 'application'
+            && trustedOfficialPlatformPackage) {
+            ownership = 'Platform';
+        }
         return {
             UpgradePolicy: upgradePolicy,
-            Ownership: String(source.Ownership || (upgradePolicy == 'CreateIfMissing' ? 'Tenant' : 'Application')),
+            Ownership: ownership,
             BaseHash: String(source.BaseHash || '').toLowerCase()
         };
     }
@@ -5166,13 +5200,41 @@ try {
                         + ' 已归当前租户维护，应用更新不得改回 Managed。请发布新的受管接口 Key。'
                     );
                 }
+                if (String(previousState.Ownership || '').toLowerCase() == 'platform'
+                    && String(apiEnginePolicy.Ownership || '').toLowerCase() != 'platform') {
+                    throw new Error(
+                        '接口引擎资源所有权冲突：' + apiEngine.ApiEngineKey
+                        + ' 已归平台维护，应用更新不得降级为普通应用资源。'
+                    );
+                }
                 var baseHash = String(previousState.BaseHash || apiEnginePolicy.BaseHash || '').toLowerCase();
-                if (localHash != incomingHash && (!baseHash || localHash != baseHash)) {
+                var localVersion = parseApiEngineVersion(existingApiEngine);
+                var incomingVersion = parseApiEngineVersion(apiEngine);
+                var managedDecision = decideManagedApiEngineUpdate(
+                    apiEnginePolicy.Ownership,
+                    baseHash,
+                    localHash,
+                    incomingHash,
+                    localVersion,
+                    incomingVersion
+                );
+                if (managedDecision == 'PreserveNewer') {
+                    stats.ApiEngineSkipped++;
+                    debugLog['apiengine_platform_newer_skip_' + i] =
+                        '保留较新的平台接口引擎：' + apiEngine.ApiEngineKey
+                        + '，current=' + localVersion.join('.')
+                        + '，package=' + incomingVersion.join('.');
+                    recordApiEngineResourceState(existingApiEngine, apiEnginePolicy);
+                    continue;
+                }
+                if (managedDecision == 'Conflict') {
                     throw new Error(
                         '接口引擎升级冲突：' + apiEngine.ApiEngineKey
                         + ' 已被当前租户修改，应用更新不会覆盖。请将本地改动迁移到租户扩展接口，'
                         + '或人工确认后恢复上游基线再重试。Base=' + (baseHash || 'none')
                         + '，Local=' + localHash + '，Incoming=' + incomingHash
+                        + '，LocalVersion=' + (localVersion ? localVersion.join('.') : 'unknown')
+                        + '，IncomingVersion=' + (incomingVersion ? incomingVersion.join('.') : 'unknown')
                     );
                 }
             }

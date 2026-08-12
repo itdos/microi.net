@@ -141,6 +141,7 @@
 <tr><td>🔄 <strong><a href="/doc/system-engine/wf-engine">工作流引擎 v4</a></strong></td><td>完全自主研发，由表单引擎 + 接口引擎驱动</td></tr>
 <tr><td>🎨 <strong><a href="/doc/system-engine/page-engine">界面引擎</a></strong></td><td>可视化界面自定义设计，支持 ECharts 图表</td></tr>
 <tr><td>🖨️ <strong><a href="/doc/system-engine/print-engine">打印引擎</a></strong></td><td>在线制作打印模板，无需导出即可打印</td></tr>
+<tr><td>🧾 <strong><a href="/doc/system-engine/bluetooth-printer">蓝牙打印机</a></strong></td><td>一份 V8 同时兼容佳博 GP-M322 与 ZICOX CC4，支持 TSPL、CPCL、ESC/POS、BLE 与 Android SPP</td></tr>
 <tr><td>📊 <strong><a href="/doc/system-engine/report-engine">报表引擎</a></strong></td><td>虚拟表格、ECharts 报表，支持自定义增删改</td></tr>
 <tr><td>☁️ <strong><a href="/doc/system-engine/saas-engine">SaaS 引擎</a></strong></td><td>三种模式：数据库隔离多租户、TenantId 租户隔离、独立组织机构隔离</td></tr>
 </tbody>
