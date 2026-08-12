@@ -1,4 +1,4 @@
-?<template>
+<template>
     <div class="mci-mobile-page page-chat">
         <!-- 顶部 -->
         <header class="chat-header">
@@ -9,7 +9,7 @@
                 </span>
                 <div class="chat-header__title">
                     <span class="title-name">{{ chatName }}</span>
-                    <span class="title-status" v-if="!wsConnected">连接中...</span>
+                    <span class="title-status" v-if="!wsConnected">{{ $t("Msg.Mobile.chat.connecting") }}</span>
                 </div>
                 <span class="chat-header__btn" @click="showChatMenu = true">
                     <el-icon><MoreFilled /></el-icon>
@@ -21,13 +21,13 @@
         <div class="chat-messages" ref="messagesContainer" @scroll="handleScroll">
             <div v-if="!wsConnected" class="connection-status">
                 <el-icon class="rot"><Loading /></el-icon>
-                <span>正在重新连接...</span>
+                <span>{{ $t("Msg.Mobile.chat.reconnecting") }}</span>
             </div>
 
             <div class="messages-inner">
                 <div v-if="loading" class="loading-more">
                     <el-icon class="rot"><Loading /></el-icon>
-                    <span>加载中...</span>
+                    <span>{{ $t("Msg.Mobile.common.loading") }}</span>
                 </div>
 
                 <div
@@ -68,7 +68,7 @@
                             >
                                 <span v-if="msg.isThinking" class="thinking-indicator">
                                     <span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>
-                                    正在思考
+                                    {{ $t("Msg.Mobile.chat.thinking") }}
                                 </span>
                                 <span v-safe-html="formatMessageContent(msg.Content || msg.content)"></span>
                                 <span v-if="msg.isStreaming && !msg.isThinking" class="typing-cursor">▋</span>
@@ -93,12 +93,12 @@
         <!-- 底部输入区 -->
         <div class="chat-input-area">
             <div v-if="isAIChat" class="ai-model-bar">
-                <span class="ai-model-label">AI模型</span>
+                <span class="ai-model-label">{{ $t("Msg.Mobile.chat.aiModel") }}</span>
                 <el-select
                     v-model="selectedAiModel"
                     value-key="Id"
                     size="small"
-                    placeholder="选择AI模型"
+                    :placeholder="$t('Msg.Mobile.chat.selectAiModel')"
                     :loading="aiModelLoading"
                     style="flex: 1;"
                 >
@@ -120,7 +120,7 @@
                         v-model="inputMessage"
                         type="textarea"
                         :autosize="{ minRows: 1, maxRows: 4 }"
-                        placeholder="输入消息..."
+                        :placeholder="$t('Msg.Mobile.chat.inputPlaceholder')"
                         @keydown="handleInputKeydown"
                         @compositionstart="isComposing = true"
                         @compositionend="isComposing = false"
@@ -130,26 +130,26 @@
                     <el-icon><CirclePlusFilled /></el-icon>
                 </span>
                 <button v-else class="mci-btn mci-btn--primary send-btn" @click="sendMessage">
-                    发送
+                    {{ $t("Msg.Mobile.chat.send") }}
                 </button>
             </div>
 
             <div v-if="showMorePanel" class="more-panel">
                 <div class="panel-item" @click="handleAction('image')">
                     <div class="panel-item__icon"><el-icon><Picture /></el-icon></div>
-                    <span>图片</span>
+                    <span>{{ $t("Msg.Mobile.chat.image") }}</span>
                 </div>
                 <div class="panel-item" @click="handleAction('camera')">
                     <div class="panel-item__icon"><el-icon><Camera /></el-icon></div>
-                    <span>拍摄</span>
+                    <span>{{ $t("Msg.Mobile.chat.camera") }}</span>
                 </div>
                 <div class="panel-item" @click="handleAction('file')">
                     <div class="panel-item__icon"><el-icon><Folder /></el-icon></div>
-                    <span>文件</span>
+                    <span>{{ $t("Msg.Mobile.chat.file") }}</span>
                 </div>
                 <div class="panel-item" @click="handleAction('location')">
                     <div class="panel-item__icon"><el-icon><Location /></el-icon></div>
-                    <span>位置</span>
+                    <span>{{ $t("Msg.Mobile.chat.location") }}</span>
                 </div>
             </div>
 
@@ -157,18 +157,18 @@
         </div>
 
         <!-- 聊天设置 -->
-        <el-drawer v-model="showChatMenu" direction="rtl" size="280px" title="聊天信息" class="mci-drawer">
+        <el-drawer v-model="showChatMenu" direction="rtl" size="280px" :title="$t('Msg.Mobile.chat.info')" class="mci-drawer">
             <div class="chat-settings">
                 <div class="mci-cell">
-                    <span class="mci-cell__title">消息免打扰</span>
+                    <span class="mci-cell__title">{{ $t("Msg.Mobile.chat.mute") }}</span>
                     <el-switch v-model="chatMuted" />
                 </div>
                 <div class="mci-cell">
-                    <span class="mci-cell__title">置顶聊天</span>
+                    <span class="mci-cell__title">{{ $t("Msg.Mobile.chat.pin") }}</span>
                     <el-switch v-model="chatPinned" />
                 </div>
                 <div class="mci-cell danger" @click="clearHistory">
-                    <span class="mci-cell__title" style="color: var(--mci-color-danger);">清空聊天记录</span>
+                    <span class="mci-cell__title" style="color: var(--mci-color-danger);">{{ $t("Msg.Mobile.chat.clearHistory") }}</span>
                     <el-icon><ArrowRight /></el-icon>
                 </div>
             </div>
@@ -179,6 +179,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useDiyStore } from '@/pinia';
 import {
     ArrowLeft, MoreFilled, Microphone, CirclePlusFilled,
@@ -197,9 +198,10 @@ defineOptions({ name: 'mobile_chat' });
 const router = useRouter();
 const route = useRoute();
 const diyStore = useDiyStore();
+const { t, locale } = useI18n();
 
 const chatId = computed(() => route.query.id);
-const chatName = computed(() => route.query.name || '聊天');
+const chatName = computed(() => route.query.name || t('Msg.Mobile.chat.defaultTitle'));
 const chatType = computed(() => route.query.type || 'private');
 const currentUser = computed(() => diyStore.GetCurrentUser);
 
@@ -257,27 +259,27 @@ const formatMessageTime = (time) => {
     if (isNaN(date.getTime())) return '';
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
-    if (isToday) return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    if (isToday) return date.toLocaleTimeString(locale.value || 'zh-CN', { hour: '2-digit', minute: '2-digit' });
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     if (date.toDateString() === yesterday.toDateString()) {
-        return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        return `${t('Msg.Mobile.common.yesterday')} ${date.toLocaleTimeString(locale.value || 'zh-CN', { hour: '2-digit', minute: '2-digit' })}`;
     }
-    return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleString(locale.value || 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 const formatBubbleTime = (time) => {
     if (!time) return '';
     const date = new Date(time);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(locale.value || 'zh-CN', { hour: '2-digit', minute: '2-digit' });
 };
 
 const sendMessage = async () => {
     if (!inputMessage.value.trim()) return;
     const ws = getWebSocket();
     if (!ws || ws.state !== 'Connected') {
-        ElMessage.error('连接已断开，请稍后重试');
+        ElMessage.error(t('Msg.Mobile.chat.disconnected'));
         return;
     }
     const content = inputMessage.value.trim();
@@ -287,7 +289,7 @@ const sendMessage = async () => {
         SendTime: new Date().toISOString(),
         FromUserId: currentUser.value.Id, ToUserId: chatId.value,
         isSelf: true,
-        senderName: currentUser.value.NickName || currentUser.value.Name || '我',
+        senderName: currentUser.value.NickName || currentUser.value.Name || t('Msg.Mobile.common.me'),
         avatar: currentUser.value.Avatar
     };
     messages.value.push(newMsg);
@@ -306,8 +308,8 @@ const sendMessage = async () => {
             OtherInfo: buildAiOtherInfo(chatId.value, selectedAiModel.value)
         });
     } catch (error) {
-        console.error('[移动端聊天] 发送失败', error);
-        ElMessage.error('发送失败');
+        console.error('[mobile-chat] send failed', error);
+        ElMessage.error(t('Msg.Mobile.chat.sendFailed'));
     }
 };
 
@@ -354,7 +356,7 @@ const doLoadChatRecord = async () => {
         if (!ws || ws.state !== 'Connected') return;
         await getChatRecord(ws, currentUser.value.Id, chatId.value, DiyCommon.GetOsClient());
     } catch (error) {
-        console.error('[移动端聊天] 加载聊天记录失败:', error);
+        console.error('[mobile-chat] history load failed:', error);
     }
 };
 
@@ -430,7 +432,7 @@ const handleReceiveSendChatRecordToUser = (records) => {
             SendTime: r.CreateTime || r.SendTime,
             FromUserId: r.FromUserId, ToUserId: r.ToUserId,
             isSelf: r.FromUserId === currentUser.value.Id,
-            senderName: r.FromUserId === currentUser.value.Id ? '我' : (r.FromUserName || chatName.value),
+            senderName: r.FromUserId === currentUser.value.Id ? t('Msg.Mobile.common.me') : (r.FromUserName || chatName.value),
             avatar: r.FromUserAvatar || '',
             isStreaming: false
         }));
@@ -490,16 +492,17 @@ const setupReconnectHandler = () => {
 
 const handleAction = (action) => {
     showMorePanel.value = false;
-    ElMessage.info(`${action} 功能开发中...`);
+    const label = t(`Msg.Mobile.chat.${action}`);
+    ElMessage.info(t('Msg.Mobile.chat.featureComing', { action: label }));
 };
 
 const clearHistory = () => {
-    ElMessageBox.confirm('确定要清空聊天记录吗？', '提示', {
-        confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+    ElMessageBox.confirm(t('Msg.Mobile.chat.clearConfirm'), t('Msg.Mobile.common.prompt'), {
+        confirmButtonText: t('Msg.Mobile.common.confirm'), cancelButtonText: t('Msg.Mobile.common.cancel'), type: 'warning'
     }).then(() => {
         messages.value = [];
         showChatMenu.value = false;
-        ElMessage.success('聊天记录已清空');
+        ElMessage.success(t('Msg.Mobile.chat.cleared'));
     }).catch(() => {});
 };
 

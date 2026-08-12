@@ -20,34 +20,34 @@ export const MOBILE_AI_BOOTSTRAP_FAILURES = Object.freeze({
 
 const MOBILE_AI_FAILURE_COPY = Object.freeze({
     [MOBILE_AI_BOOTSTRAP_FAILURES.serviceMissing]: {
-        header: "AI助手服务尚未安装",
-        title: "当前租户尚未安装 AI助手",
-        description: "请安装或升级官方“AI助手”应用后重试。",
-        optionLabel: "安全业务数据（需安装 AI助手）"
+        header: "serviceNotInstalledHeader",
+        title: "serviceNotInstalledTitle",
+        description: "serviceNotInstalledDescription",
+        optionLabel: "serviceNotInstalledOption"
     },
     [MOBILE_AI_BOOTSTRAP_FAILURES.installIncomplete]: {
-        header: "AI助手安装不完整",
-        title: "AI助手安装不完整",
-        description: "请重新安装或升级官方“AI助手”应用，补齐权限策略和业务域配置。",
-        optionLabel: "安全业务数据（安装不完整）"
+        header: "installIncompleteHeader",
+        title: "installIncompleteTitle",
+        description: "installIncompleteDescription",
+        optionLabel: "installIncompleteOption"
     },
     [MOBILE_AI_BOOTSTRAP_FAILURES.unauthorized]: {
-        header: "当前角色未授权",
-        title: "当前角色暂未开通 AI助手",
-        description: "请联系管理员为当前角色配置可分析业务域、数据范围和可用模型。",
-        optionLabel: "安全业务数据（当前角色未授权）"
+        header: "unauthorizedHeader",
+        title: "unauthorizedTitle",
+        description: "unauthorizedDescription",
+        optionLabel: "unauthorizedOption"
     },
     [MOBILE_AI_BOOTSTRAP_FAILURES.modelMissing]: {
-        header: "尚未配置可用模型",
-        title: "AI助手尚未配置可用模型",
-        description: "请联系管理员启用模型，并将模型加入当前角色的 AI助手权限策略。",
-        optionLabel: "安全业务数据（无可用模型）"
+        header: "noModelHeader",
+        title: "noModelTitle",
+        description: "noModelDescription",
+        optionLabel: "noModelOption"
     },
     [MOBILE_AI_BOOTSTRAP_FAILURES.unavailable]: {
-        header: "AI助手服务暂时不可用",
-        title: "AI助手暂时不可用",
-        description: "服务加载失败，请稍后重试或联系管理员查看服务状态。",
-        optionLabel: "安全业务数据（服务不可用）"
+        header: "unavailableHeader",
+        title: "unavailableTitle",
+        description: "unavailableDescription",
+        optionLabel: "unavailableOption"
     }
 });
 
@@ -57,7 +57,7 @@ export function makeMobileAiBootstrapFailure(kind, rawMessage = "") {
         : MOBILE_AI_BOOTSTRAP_FAILURES.unavailable;
     return {
         kind: normalizedKind,
-        ...MOBILE_AI_FAILURE_COPY[normalizedKind],
+        ...Object.fromEntries(Object.entries(MOBILE_AI_FAILURE_COPY[normalizedKind]).map(([field, key]) => [field, aiText(key)])),
         rawMessage: String(rawMessage || "")
     };
 }
@@ -103,13 +103,13 @@ export function unwrapMobileAiResult(result) {
 
 async function runMobileAi(diyCommon, action, payload = {}) {
     if (!diyCommon?.ApiEngine?.Run) {
-        throw new Error("AI 服务请求能力不可用");
+        throw new Error(aiText("requestUnavailable"));
     }
     const result = unwrapMobileAiResult(
         await diyCommon.ApiEngine.Run(MOBILE_AI_ENGINE_KEY, { Action: action, ...payload })
     );
     if (!result || Number(result.Code) !== 1) {
-        throw new Error(result?.Msg || "AI 服务暂时不可用");
+        throw new Error(result?.Msg || aiText("requestFailed"));
     }
     return result.Data || {};
 }
@@ -163,7 +163,7 @@ export function listMobileAiMessages(diyCommon, conversationId) {
 export function newMobileAiConversation() {
     return {
         ConversationId: "",
-        Title: "新对话",
+        Title: aiText("newConversation"),
         Messages: []
     };
 }
@@ -214,13 +214,13 @@ export function mobileAiModelSupportsReasoning(model, runtimeModel = "") {
 }
 
 export function formatMobileAiModelName(model) {
-    if (!model) return "暂无可用模型";
+    if (!model) return aiText("noModel");
     const name = model.Name || model.AiModel || "AI";
     return model.AiModel ? `${name}（${model.AiModel}）` : name;
 }
 
 export function formatMobileAiRelayName(model) {
-    if (!model) return "请选择运行模型";
+    if (!model) return aiText("chooseModel");
     const label = model.DisplayName || model.Name || model.Id;
     return label && label !== model.Id ? `${model.Id} · ${label}` : String(model.Id || label || "");
 }
@@ -236,4 +236,9 @@ export function normalizeMobileAiMessages(data) {
         thinkingOpen: false,
         time: row.Time || row.CreateTime || ""
     }));
+}
+import i18n from "@/lang";
+
+function aiText(key, params) {
+    return i18n.global.t(`Msg.Mobile.ai.${key}`, params || {});
 }

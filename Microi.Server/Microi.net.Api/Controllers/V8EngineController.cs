@@ -30,6 +30,7 @@ namespace Microi.net.Api
     [Route("api/V8Debug/[action]")]
     [EnableCors("any")]
     [ServiceFilter(typeof(DiyFilter<dynamic>))]
+    [V8McpAuthorization]
     public class V8EngineController : Controller
     {
         private static string DecodeCodeBase64(string codeBase64)
@@ -58,6 +59,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetStatus()
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -66,6 +68,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetApiEngineList(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -78,6 +81,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetApiEngine(string osClient, string apiEngineKey, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -91,6 +95,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetApiEngineCode(string osClient, string apiEngineKey, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -104,6 +109,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetUpdatedApiEngines(string osClient, string lastSyncTime, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -116,6 +122,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateApiEngineCode([FromBody] JObject? param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -151,6 +158,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> CreateApiEngine([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -184,6 +192,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UploadFileBase64([FromBody] JObject param)
         {
             if (param == null && Request?.Body != null)
@@ -235,6 +244,7 @@ namespace Microi.net.Api
         // to 128MiB. The 130MiB HTTP envelope leaves room for multipart metadata.
         [RequestSizeLimit(136314880L)]
         [RequestFormLimits(MultipartBodyLengthLimit = 136314880L)]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UploadApplicationAssetStream()
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -398,6 +408,7 @@ namespace Microi.net.Api
         /// 请求只包含路径、大小、SHA-256、RequestId 与路由元数据，不包含文件体。
         /// </summary>
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> FinalizeApplicationStreamPublish([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -426,6 +437,7 @@ namespace Microi.net.Api
         /// ConfirmExecution 与完全一致的 ConfirmationSha256 才允许写入。
         /// </summary>
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> TransitionApplicationStreamGate([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -448,6 +460,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetMicroService(string osClient, string msKey, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -461,6 +474,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListApplications([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -476,6 +490,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetApplicationContext([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -492,6 +507,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetApplicationFile([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -508,6 +524,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> CreateMicroService([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -519,6 +536,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SyncMicroServiceSource([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -530,6 +548,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> PublishMicroService([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -541,6 +560,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> CheckVersions([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -553,6 +573,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> ExecuteApiEngine([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -575,6 +596,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetV8EventList(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -587,6 +609,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetV8EventCode(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -603,6 +626,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateV8EventCode([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -618,6 +642,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetWorkflowV8EventList(string? osClient, string? flowDesignId, [FromBody] JObject? param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -631,6 +656,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetWorkflowV8EventCode(string? osClient, string? flowDesignId, string? nodeId, string? eventType, [FromBody] JObject? param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -648,6 +674,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateWorkflowV8EventCode([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -675,6 +702,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> QueryMongodbLogs(string? osClient, [FromBody] JObject? param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -685,6 +713,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> WriteMongodbLog([FromBody] JObject? param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -695,6 +724,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> ExecuteV8Event([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -709,6 +739,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetDbSchema(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -721,6 +752,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetTableIndexes(
             string osClient,
             string tableName,
@@ -735,6 +767,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> CreateTableIndex([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -754,6 +787,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> DropTableIndex([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -767,6 +801,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetSupportedDatabaseTypes()
         {
             var (ok, msg, _) = await V8McpLogic.CheckPermission();
@@ -775,6 +810,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> InspectExternalDatabase([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -793,6 +829,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> QueryExternalDatabase([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -811,6 +848,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> ExecuteExternalDatabaseSql([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -838,6 +876,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SaveDatabaseConnection([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -851,6 +890,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> ImportExternalAttachment([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -869,6 +909,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> GetPlaywrightContext(string osClient, string keyword, int? pageSize, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -886,6 +927,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> CreateTable([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -901,6 +943,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> AddField([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -928,6 +971,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> CreateModule([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -975,6 +1019,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> DebugSession(string action, string sessionId, [FromBody] JObject param = null)
         {
             var (ok, msg, _) = await V8McpLogic.CheckPermission();
@@ -1005,6 +1050,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SetRolePermission([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1019,6 +1065,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListRoles(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1030,6 +1077,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SaveRole([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1040,6 +1088,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListModules(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1051,6 +1100,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetModule(string osClient, string moduleId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1064,6 +1114,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateModule([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1076,6 +1127,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListDataSources(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1087,6 +1139,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SaveDataSource([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1097,6 +1150,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListPrintTemplates(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1108,6 +1162,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SavePrintTemplate([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1118,6 +1173,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SaveWorkflowPackage([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1128,6 +1184,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SaveJob([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1138,6 +1195,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> ListDatabaseBackupTenants(
             string osClient,
             [FromBody] JObject param = null)
@@ -1152,6 +1210,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> RunDatabaseBackup([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1169,6 +1228,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> GetDatabaseBackupSettings(
             string osClient,
             [FromBody] JObject param = null)
@@ -1190,6 +1250,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SaveDatabaseBackupSettings([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1208,6 +1269,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> ValidateLowCodeSystem([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1218,6 +1280,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> WriteMcpAuditLog([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1231,6 +1294,7 @@ namespace Microi.net.Api
         #region 界面引擎（Page Engine）
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetPageEngineList(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1244,6 +1308,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetPageEngineDetail(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1258,6 +1323,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SavePageEngine([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1277,6 +1343,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListPageEngineHistory(
             string osClient, string pageId, int pageIndex = 1, int pageSize = 50,
             [FromBody] JObject param = null)
@@ -1292,6 +1359,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetPageEngineHistory(
             string osClient, string pageId, string historyId,
             [FromBody] JObject param = null)
@@ -1306,6 +1374,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ComparePageEngineVersions(
             string osClient, string pageId, string leftHistoryId, string rightHistoryId,
             [FromBody] JObject param = null)
@@ -1321,6 +1390,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ExportPageEngine(
             string osClient, string pageId, [FromBody] JObject param = null)
         {
@@ -1333,6 +1403,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> RollbackPageEngine([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1346,6 +1417,7 @@ namespace Microi.net.Api
         #region MCP 扩展（字段/表/缓存/匿名）
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateField([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1357,6 +1429,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateFieldList([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1368,6 +1441,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetFieldList(string? osClient, string? tableId, string? tableName = null, [FromBody] JObject? param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1382,6 +1456,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> UpdateTable([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1393,6 +1468,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> RefreshSchemaCache([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1406,6 +1482,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Admin)]
         public async Task<IActionResult> SetEngineAnonymous([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1427,6 +1504,7 @@ namespace Microi.net.Api
         /// 列出当前 OsClient 的所有业务蓝图（不含 BlueprintData）
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListBlueprints(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1443,6 +1521,7 @@ namespace Microi.net.Api
         /// 获取单个蓝图详情（含 BlueprintData JSON 全文）
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetBlueprint(string osClient, string blueprintId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1459,6 +1538,7 @@ namespace Microi.net.Api
         /// 分页读取蓝图历史元数据。列表不返回 BlueprintData 全文，只返回内容长度和稳定 Hash。
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListBlueprintHistory(
             string osClient,
             string blueprintId,
@@ -1480,6 +1560,7 @@ namespace Microi.net.Api
         /// 读取一条蓝图历史快照全文。HistoryId 必须属于指定蓝图和当前租户。
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetBlueprintHistory(
             string osClient,
             string blueprintId,
@@ -1501,6 +1582,7 @@ namespace Microi.net.Api
         /// LeftHistoryId 为空时自动使用最近一条历史。
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> CompareBlueprintVersions(
             string osClient,
             string blueprintId,
@@ -1522,6 +1604,7 @@ namespace Microi.net.Api
         /// 导出当前蓝图为带 Schema 与稳定内容哈希的可移植 JSON 设计包。
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ExportBlueprint(
             string osClient,
             string blueprintId,
@@ -1542,6 +1625,7 @@ namespace Microi.net.Api
         ///   - 自动重建反向引用索引（sys_blueprint_relation）
         /// </summary>
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SaveBlueprint([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1556,6 +1640,7 @@ namespace Microi.net.Api
         /// 删除蓝图（软删除主表 + 同步删反向索引；保留历史快照用于回溯）
         /// </summary>
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> DeleteBlueprint([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1572,6 +1657,7 @@ namespace Microi.net.Api
         /// ExpectedCurrentHash 用于阻止多节点或多人并发覆盖。
         /// </summary>
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> RollbackBlueprint([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1586,6 +1672,7 @@ namespace Microi.net.Api
         /// 返回 errors/warnings/CheckedRefs 统计，AI 据此决定是否需先修复蓝图再生成代码。
         /// </summary>
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> ValidateBlueprint(string osClient, string blueprintId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1603,6 +1690,7 @@ namespace Microi.net.Api
         #region 状态机（State Machine）
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListStateMachines(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1615,6 +1703,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetStateMachine(string osClient, string id, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1627,6 +1716,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SaveStateMachine([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1638,6 +1728,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> DeleteStateMachine([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1650,6 +1741,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> TransitionState([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1661,6 +1753,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetStateHistory(string osClient, string tableName, string rowId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1677,6 +1770,7 @@ namespace Microi.net.Api
         #region 自动化流（Flow Engine）
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> ListFlows(string osClient, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1688,6 +1782,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetFlow(string osClient, string id, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1700,6 +1795,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> SaveFlow([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1711,6 +1807,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
         public async Task<IActionResult> DeleteFlow([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1723,6 +1820,7 @@ namespace Microi.net.Api
         }
 
         [HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> RunFlow([FromBody] JObject param)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1736,6 +1834,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetFlowRuns(string osClient, string flowId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1748,6 +1847,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetFlowRunDetail(string osClient, string runId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1764,6 +1864,7 @@ namespace Microi.net.Api
         #region 流程挖掘（Process Mining）
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Execute)]
         public async Task<IActionResult> AnalyzeWorkflow(string osClient, string flowDesignId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1777,6 +1878,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetHotPaths(string osClient, string flowDesignId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1789,6 +1891,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetSlaViolations(string osClient, string flowDesignId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1802,6 +1905,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetBottlenecks(string osClient, string flowDesignId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();
@@ -1814,6 +1918,7 @@ namespace Microi.net.Api
         }
 
         [HttpGet, HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
         public async Task<IActionResult> GetWorkflowOverview(string osClient, string flowDesignId, [FromBody] JObject param = null)
         {
             var (ok, msg, token) = await V8McpLogic.CheckPermission();

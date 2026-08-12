@@ -2,7 +2,7 @@
   <div style="display: flex; justify-content: space-between">
     <div>
       <el-button @click="updateMap(widgetObj.widgetParams[13]?.value)"
-        >初始化地图</el-button
+        >{{ $pet('初始化地图') }}</el-button
       >
     </div>
   </div>

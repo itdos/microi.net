@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using Dos.Common;
 using Dos.ORM;
 using Newtonsoft.Json.Linq;
@@ -36,6 +37,7 @@ namespace Microi.net
         private const int EmptyDatabaseReleaseLeaseSeconds = 900;
         private const string EmptyDatabaseReleaseApiEngineKey =
             "admin_build_sanitized_empty_database";
+        private static long _tenantScanCursor;
         private const string Projection = @"Id,OsClient,UserKey,Title,Type,ApiEngineKey,Status,StatusText,
 Progress,ProgressMode,WorkCurrent AS Current,WorkTotal AS Total,Msg,Log,CreateTime,StartTime,EndTime,
 HeartbeatTime,EstimatedEndTime,RemainingSeconds,EstimateConfidence,CancelRequested,ResultJson,ParamJson,
@@ -234,7 +236,9 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
                 .ExecuteNonQuery();
         }
 
-        public static BackgroundTaskRecord TryClaimNext(string nodeId)
+        public static BackgroundTaskRecord TryClaimNext(
+            string nodeId,
+            string excludedApiEngineKey = null)
         {
             var tenantNames = OsClientExtend.ClientList.Keys
                 .Where(name => !name.DosIsNullOrWhiteSpace())
@@ -246,12 +250,16 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
             tenantNames.RemoveAll(name => string.Equals(name, configuredTenant, StringComparison.OrdinalIgnoreCase));
             tenantNames.Insert(0, configuredTenant);
 
-            foreach (var osClient in tenantNames)
+            if (tenantNames.Count == 0) return null;
+            var scanSequence = RotateTenantScanOrder(
+                tenantNames,
+                Interlocked.Increment(ref _tenantScanCursor) - 1);
+            foreach (var osClient in scanSequence)
             {
                 try
                 {
                     if (!IsAvailable(osClient)) continue;
-                    var item = TryClaimNext(osClient, nodeId);
+                    var item = TryClaimNext(osClient, nodeId, excludedApiEngineKey);
                     if (item != null) return item;
                 }
                 catch (Exception ex)
@@ -276,15 +284,38 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND UserKey=@p2 AND Id
             return null;
         }
 
-        public static BackgroundTaskRecord TryClaimConfiguredTenant(string nodeId)
+        public static BackgroundTaskRecord TryClaimConfiguredTenant(
+            string nodeId,
+            string excludedApiEngineKey = null)
         {
             var configuredTenant = OsClientExtend.GetConfigOsClient();
             if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
             if (configuredTenant.DosIsNullOrWhiteSpace() || !IsAvailable(configuredTenant)) return null;
-            return TryClaimNext(configuredTenant, nodeId);
+            return TryClaimNext(configuredTenant, nodeId, excludedApiEngineKey);
         }
 
-        private static BackgroundTaskRecord TryClaimNext(string osClient, string nodeId)
+        internal static IReadOnlyList<string> RotateTenantScanOrder(
+            IReadOnlyList<string> tenantNames,
+            long cursor)
+        {
+            if (tenantNames == null || tenantNames.Count == 0)
+            {
+                return Array.Empty<string>();
+            }
+
+            var start = (int)(unchecked((ulong)cursor) % (ulong)tenantNames.Count);
+            var result = new List<string>(tenantNames.Count);
+            for (var offset = 0; offset < tenantNames.Count; offset++)
+            {
+                result.Add(tenantNames[(start + offset) % tenantNames.Count]);
+            }
+            return result;
+        }
+
+        private static BackgroundTaskRecord TryClaimNext(
+            string osClient,
+            string nodeId,
+            string excludedApiEngineKey)
         {
             var client = GetRequiredClient(osClient);
             var now = DateTime.Now;
@@ -301,6 +332,25 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1
   AND Status='Pending' AND (LeaseOwner IS NULL OR LeaseOwner='')
   AND AttemptCount>=MaxAttempts
   AND Msg='等待同一并发组的上一项任务完成'")
+                .AddInParameter("p0", DbTime(now))
+                .AddInParameter("p1", osClient)
+                .AddInParameter("runtimeType", runtimeType)
+                .AddInParameter("runtimeNetwork", runtimeNetwork)
+                .ExecuteNonQuery();
+            // Legacy rows and interrupted workers could leave exhausted work in an
+            // active state forever. Finalize only ownerless work (or Running work
+            // whose lease has expired), preserving a live owner's execution.
+            client.Db.FromSql($@"UPDATE {TableName}
+SET Status='Failed',StatusText='执行失败',
+    Msg='任务已耗尽重试次数，系统已自动终结；请查看错误与日志，修复原因后重新提交。',
+    LastError=CASE WHEN LastError IS NULL OR LastError='' THEN '任务已耗尽重试次数。' ELSE LastError END,
+    EndTime=@p0,EstimatedEndTime=NULL,RemainingSeconds=NULL,EstimateConfidence='None',
+    LeaseOwner='',LeaseExpiresAt=NULL,UpdateTime=@p0
+WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=0
+  AND {RuntimeScopePredicate}
+  AND (MaxAttempts IS NULL OR MaxAttempts<=0 OR AttemptCount>=MaxAttempts)
+  AND (Status IN ('Pending','Retrying')
+       OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p0)))")
                 .AddInParameter("p0", DbTime(now))
                 .AddInParameter("p1", osClient)
                 .AddInParameter("runtimeType", runtimeType)
@@ -323,24 +373,35 @@ WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p1 AND CancelRequested=1
                 .AddInParameter("runtimeType", runtimeType)
                 .AddInParameter("runtimeNetwork", runtimeNetwork)
                 .ExecuteNonQuery();
+            var excludedPredicate = excludedApiEngineKey.DosIsNullOrWhiteSpace()
+                ? ""
+                : " AND (ApiEngineKey IS NULL OR ApiEngineKey<>@excludedApiEngineKey)";
             var candidateSql = FirstSql(client, $@"SELECT {Projection} FROM {TableName}
 WHERE (IsDeleted=0 OR IsDeleted IS NULL) AND OsClient=@p0 AND CancelRequested=0
   AND {RuntimeScopePredicate}
+  {excludedPredicate}
   AND AttemptCount < MaxAttempts
   AND (NextRunTime IS NULL OR NextRunTime<=@p1)
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p1)))
 ORDER BY CreateTime ASC");
-            var candidate = Hydrate(client.Db.FromSql(candidateSql)
+            var candidateCommand = client.Db.FromSql(candidateSql)
                 .AddInParameter("p0", osClient)
                 .AddInParameter("p1", DbTime(now))
                 .AddInParameter("runtimeType", runtimeType)
-                .AddInParameter("runtimeNetwork", runtimeNetwork)
-                .ToFirst<BackgroundTaskRecord>());
+                .AddInParameter("runtimeNetwork", runtimeNetwork);
+            if (!excludedApiEngineKey.DosIsNullOrWhiteSpace())
+            {
+                candidateCommand = candidateCommand.AddInParameter(
+                    "excludedApiEngineKey",
+                    excludedApiEngineKey);
+            }
+            var candidate = Hydrate(candidateCommand.ToFirst<BackgroundTaskRecord>());
             if (candidate == null) return null;
 
             var owner = nodeId + ":" + Guid.NewGuid().ToString("N");
             var staleRecovery = string.Equals(candidate.Status, "Running", StringComparison.OrdinalIgnoreCase);
             var leaseSeconds = ResolveLeaseSeconds(candidate.ApiEngineKey);
+            var leaseExpiresAt = now.AddSeconds(leaseSeconds);
             var affected = client.Db.FromSql($@"UPDATE {TableName}
 SET Status='Running',StatusText='执行中',LeaseOwner=@p0,LeaseExpiresAt=@p1,HeartbeatTime=@p2,
     StartTime=CASE WHEN StartTime IS NULL THEN @p2 ELSE StartTime END,
@@ -352,7 +413,7 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
   AND {RuntimeScopePredicate}
   AND (Status IN ('Pending','Retrying') OR (Status='Running' AND (LeaseExpiresAt IS NULL OR LeaseExpiresAt<@p2)))")
                 .AddInParameter("p0", owner)
-                .AddInParameter("p1", DbTime(now.AddSeconds(leaseSeconds)))
+                .AddInParameter("p1", DbTime(leaseExpiresAt))
                 .AddInParameter("p2", DbTime(now))
                 .AddInParameter("p3", staleRecovery ? 1 : 0)
                 .AddInParameter("p4", candidate.Id)
@@ -369,10 +430,11 @@ WHERE Id=@p4 AND OsClient=@p5 AND CancelRequested=0 AND AttemptCount<MaxAttempts
             var client = GetRequiredClient(item.OsClient);
             var now = DateTime.Now;
             var leaseSeconds = ResolveLeaseSeconds(item.ApiEngineKey);
+            var leaseExpiresAt = now.AddSeconds(leaseSeconds);
             var affected = client.Db.FromSql($@"UPDATE {TableName}
 SET LeaseExpiresAt=@p0,HeartbeatTime=@p1,UpdateTime=@p1
 WHERE Id=@p2 AND OsClient=@p3 AND Status='Running' AND LeaseOwner=@p4 AND FencingToken=@p5")
-                .AddInParameter("p0", DbTime(now.AddSeconds(leaseSeconds)))
+                .AddInParameter("p0", DbTime(leaseExpiresAt))
                 .AddInParameter("p1", DbTime(now))
                 .AddInParameter("p2", item.Id)
                 .AddInParameter("p3", item.OsClient)
@@ -380,6 +442,8 @@ WHERE Id=@p2 AND OsClient=@p3 AND Status='Running' AND LeaseOwner=@p4 AND Fencin
                 .AddInParameter("p5", item.FencingToken)
                 .ExecuteNonQuery();
             if (affected != 1) return false;
+            item.HeartbeatTime = now;
+            item.LeaseExpiresAt = leaseExpiresAt;
             cancelRequested = client.Db.FromSql($@"SELECT CancelRequested FROM {TableName}
 WHERE Id=@p0 AND OsClient=@p1")
                 .AddInParameter("p0", item.Id)

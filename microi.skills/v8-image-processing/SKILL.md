@@ -3,7 +3,7 @@ name: v8-image-processing
 description: Microi V8.Image 服务端图像处理指南。用于在接口引擎或后端 V8 事件中生成图片、横向/纵向/网格拼接、图层覆盖、水印、缩放、裁剪、旋转、翻转、格式转换、绘制文字与图形、生成二维码、读取图片信息，以及设计安全的 Base64/Data URI 图像处理流程。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi V8 图像处理
 

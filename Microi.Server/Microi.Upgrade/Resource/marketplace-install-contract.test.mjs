@@ -58,6 +58,10 @@ test("application-store package hides every install mutation on the official pla
   assert.match(bulk.V8Code, /已是最新版的应用不会重新安装/);
   assert.match(bulk.V8Code, /ApplicationType: 'Platform'/);
   assert.match(bulk.V8Code, /官方平台应用/);
+  assert.match(bulk.V8Code, /BULK_QUEUE_PREFLIGHT_DIAGNOSTICS_V1/);
+  assert.match(bulk.V8Code, /BackgroundTask\/WorkerStatus/);
+  assert.match(bulk.V8Code, /mci_background_task 表已升级/);
+  assert.match(bulk.V8Code, /平台已保留普通任务执行槽/);
   assert.equal(bulk.Workload.ExpectedItems, 29);
   assert.equal(bulk.Workload.ExecutionMode, undefined);
 });
@@ -78,6 +82,9 @@ test("bulk install persists its plan in the shared background-task checkpoint", 
   assert.match(bulkSource, /BULK_CHILD_FAILURE_DETAIL_V1/);
   assert.match(bulkSource, /BULK_PLATFORM_ONLY_PLAN_V1/);
   assert.match(bulkSource, /BULK_ADAPTIVE_SINGLE_SLICE_V1/);
+  assert.match(bulkSource, /BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1/);
+  assert.match(bulkSource, /RecoveryHint/);
+  assert.match(bulkSource, /FailureStage/);
   assert.match(bulkSource, /ApplicationType: bulkApplicationType/);
   assert.match(bulkSource, /trim\(row\.ApplicationType \|\| row\.AppType\) != bulkApplicationType/);
   assert.match(bulkSource, /checkpointVersion[\s\S]*checkpointVersion < 3[\s\S]*phase = 'Discover'/);
@@ -114,7 +121,7 @@ test("the embedded bulk engine exactly matches its maintained source", () => {
     (item) => item.ApiEngineKey === "bulk-import-microi-store-packages",
   );
   assert.ok(engine, "embedded bulk engine is missing");
-  assert.equal(engine.Version, "v1.1.3");
+  assert.equal(engine.Version, "v1.1.4");
   assert.equal(engine.IsEnable, 1);
   assert.equal(engine.StopHttp, 0);
   assert.equal(engine.ApiV8Code, normalizeSource(bulkSource));

@@ -7,11 +7,11 @@ description: 在 Codex 中完成 Microi吾码 VS Code 扩展的等价工作流�
 
 本插件与 `Microi.VSCode`、`@microi.net/cli` 共用配置、Token、MCP Server 和 Microi Skills。不要另写原生 HTTP、SQL 或第二套认证实现。
 
-## 最新版启动门禁（强制）
+## 非阻塞自动更新（强制）
 
-当前对话在执行任何 Microi 分析、MCP 调用、源码修改、构建或发布前，必须先完整读取同级 `microi-codex-installer/SKILL.md`，并完成其中“Codex 每任务最新版硬门禁”。至少要执行 `npm view '@microi.net/cli' version --json --prefer-online --registry=https://registry.npmjs.org/`，不能只看本地 `microi codex status`。
+Codex Router 启动后会异步调用 bundled CLI 的 `microi update --background`。需要了解完整安装/诊断机制时读取同级 `microi-codex-installer/SKILL.md`；更新检查不得发生在用户工作之前，也不得让任务等待。
 
-若 CLI、Codex 插件、工作区 AI bundle 或 MCP provider 不是最新版，取得一次用户授权后，必须依次执行 `npm install --global @microi.net/cli@latest`、`microi codex install --yes`、`microi ai init --workspace "<工作区绝对路径>" --json`、`microi doctor --workspace "<工作区绝对路径>" --json` 与 `microi codex status --json`。`ai init` 默认包含 MCP 更新，禁止传 `--no-mcp`。插件发生变化后必须新建任务或重载 Codex，再次通过门禁后继续；当前任务不得假装已经热加载新版能力。
+自动更新会从 npm 官方 registry 升级 CLI，更新 Codex 插件并重新初始化工作区 AI/MCP。当前 Router 和已经启动的 MCP 继续使用旧版本，不被杀死或强制重载；新版供后续新进程使用。自动更新失败、被占用或用户暂不重载时，只记录/提示并继续当前、正在进行和新建任务；不得要求升级授权，也不得把版本状态当作业务门禁。
 
 ## 先确认工作区连接
 
@@ -37,7 +37,7 @@ description: 在 Codex 中完成 Microi吾码 VS Code 扩展的等价工作流�
 ## 同步与安全边界
 
 - `Microi-V8-Engine/.microi-config.json` 是三端连接配置事实源；未知字段必须保留。
-- CLI、VS Code 插件与 Codex 插件可以在同一工作区并存；三者必须复用同一配置/Token/MCP 协议，带版本写入实行较新 provider 优先，禁止旧入口回写降级。最新版门禁与 `doctor.coexistence` 未通过时不得声称任意历史版本组合绝对无冲突。
+- CLI、VS Code 插件与 Codex 插件可以在同一工作区并存；三者必须复用同一配置/Token/MCP 协议，带版本写入实行较新 provider 优先，禁止旧入口回写降级。`doctor.coexistence` 未通过时准确报告兼容风险并后台修复，但不得因此停止无关工作。
 - 推送前先做远端差异检查。写请求超时只表示结果不确定，使用对应 get 工具短超时回读，禁止盲目重复创建或覆盖。
 - 配置和 Token 文件使用现有原子写与锁协议；不要手工拼接或清空用户已有 MCP 配置。
 - Codex Plugin 路由器只选择连接，业务行为必须继续走原 MCP bundle。

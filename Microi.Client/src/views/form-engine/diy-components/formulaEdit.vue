@@ -17,7 +17,7 @@
                     </div>
                 </template>
                 <div class="code-div">
-                    <codemirror ref="cmObj" class="textarea" v-model="currentModel" :options="cmOptions" @input="modelChange"></codemirror>
+                    <MicroiCodeEditor ref="cmObj" class="textarea" v-model="currentModel" :options="cmOptions" height="170" @input="modelChange" />
                 </div>
             </el-card>
 
@@ -124,19 +124,7 @@
 <script>
 import qs from "qs";
 import { DiyCommon } from "@/utils/diy.common";
-// vue-codemirror 暂不支持 Vue 3
-// let CodeMirror = require("codemirror/lib/codemirror");
-// import { codemirror } from "vue-codemirror";
-// require("codemirror/lib/codemirror.css");
-// require("codemirror/mode/javascript/javascript.js");
-// require("codemirror/mode/css/css.js");
-// import "codemirror/addon/hint/show-hint.css";
-// import "codemirror/addon/hint/show-hint.js";
-// import "codemirror/addon/hint/javascript-hint";
-// import "codemirror/addon/hint/xml-hint";
-// import "codemirror/addon/hint/sql-hint";
-// import "codemirror/addon/hint/anyword-hint";
-// import "codemirror/theme/colorforth.css";
+import MicroiCodeEditor from "@/components/microi-code-editor.vue";
 export default {
     name: "formulaEdit",
     props: {
@@ -158,7 +146,7 @@ export default {
         // }
     },
     components: {
-        // codemirror  // 已禁用
+        MicroiCodeEditor
     },
     watch: {
         model: function (newVal, oldVal) {
@@ -178,7 +166,7 @@ export default {
             showForm: false,
             currentModel: "",
             cmOptions: {
-                // 所有参数配置见：https://codemirror.net/doc/manual.html#config
+                // 编辑器行为选项；底层统一使用 Monaco。
                 tabSize: 4,
                 styleActiveLine: true,
                 lineNumbers: true,
@@ -305,14 +293,14 @@ export default {
         };
     },
     computed: {
-        codeMirror() {
-            return this.$refs.cmObj.codemirror;
+        codeEditor() {
+            return this.$refs.cmObj.editorApi;
         }
     },
     mounted() {
         this.getDiyApiBase();
         this.$nextTick(() => {
-            this.$refs.cmObj && this.$refs.cmObj.codemirror.setSize("auto", "170px");
+            this.$refs.cmObj && this.$refs.cmObj.editorApi.setSize("auto", "170px");
         });
         this.GetDiyTableRow(true);
         // this.getChooseData(this.chooseDataId)
@@ -408,18 +396,14 @@ export default {
         //选择变量
         onSelectValue(item) {
             this.varValue = item.Label;
-            // console.log(this.codeMirror);
 
             this.$nextTick(function () {
                 if (this.$refs.cmObj) {
-                    // console.log(11111,this.$refs.cmObj.codemirror)
-                    this.$refs.cmObj.codemirror.focus();
-                    this.$refs.cmObj.codemirror.replaceSelection(item.Label);
+                    this.$refs.cmObj.editorApi.focus();
+                    this.$refs.cmObj.editorApi.replaceSelection(item.Label);
                 }
             });
 
-            // this.codeMirror.focus();
-            // this.codeMirror.replaceSelection(item.Label)
         },
         //选择函数
         onSelectFun(index, item) {
@@ -430,19 +414,18 @@ export default {
             if (!this.isShowCursor) {
                 this.currentModel = this.currentModel.concat(item.name + "()");
                 this.$nextTick(() => {
-                    this.$refs.cmObj.codemirror.focus();
-                    this.$refs.cmObj.codemirror.setCursor(1);
-                    this.$refs.cmObj.codemirror.execCommand("goColumnLeft");
+                    this.$refs.cmObj.editorApi.focus();
+                    this.$refs.cmObj.editorApi.setCursor(1);
+                    this.$refs.cmObj.editorApi.execCommand("goColumnLeft");
                 });
                 this.isShowCursor = true;
             } else {
                 // let value = `<div style="color:blue;display:inline-block;">${item.name + "()"}</div>`
-                // this.codeMirror.replaceSelection(value)
 
-                this.$refs.cmObj.codemirror.replaceSelection(item.name + "()");
+                this.$refs.cmObj.editorApi.replaceSelection(item.name + "()");
                 this.$nextTick(() => {
-                    this.$refs.cmObj.codemirror.focus();
-                    this.$refs.cmObj.codemirror.execCommand("goColumnLeft");
+                    this.$refs.cmObj.editorApi.focus();
+                    this.$refs.cmObj.editorApi.execCommand("goColumnLeft");
                 });
             }
         },
@@ -1221,7 +1204,7 @@ export default {
     font-size: 13px;
     color: #91a1b7;
 }
-:deep(.CodeMirror) {
+:deep(.microi-code-editor) {
     height: 170px;
     border: 1px solid black;
     font-size: 12px;
@@ -1238,11 +1221,6 @@ export default {
 :deep(.el-autocomplete-suggestion) {
     display: none !important;
 }
-:deep(.cm-variable) {
-    background: #ebf5ff;
-    color: #008dcd;
-}
-
 .gongshi {
     width: 100%;
     height: 250px;
@@ -1256,7 +1234,7 @@ export default {
 .code-div::-webkit-scrollbar {
     display: none; /* Chrome Safari */
 }
-:deep(.code-div .CodeMirror) {
+:deep(.code-div .microi-code-editor) {
     min-height: 170px !important;
 }
 .title {

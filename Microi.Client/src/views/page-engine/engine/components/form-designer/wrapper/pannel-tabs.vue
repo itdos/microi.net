@@ -27,21 +27,21 @@
       >
         <el-text>
           <el-icon><FullScreen /></el-icon>
-          {{ wrapperObj.wrapperOption.number }} , 选项卡容器
+          {{ wrapperObj.wrapperOption.number }}, {{ $pet('选项卡容器') }}
         </el-text>
       </div>
 
       <div v-if="isShowBorderSub" class="drag-handler drag-left drag-bottom">
         <el-text @click="handleDelClick">
           <el-icon><Delete /></el-icon>
-          删除
+          {{ $pet('删除') }}
         </el-text>
       </div>
 
       <div v-if="isShowBorderSub" class="drag-handler drag-left ml-60 drag-bottom">
         <el-text @click="handleCopyClick">
           <el-icon><CopyDocument /></el-icon>
-          克隆
+          {{ $pet('克隆') }}
         </el-text>
       </div>
 
@@ -75,7 +75,7 @@
             </el-row>
             <div v-if="getTabWidgets(tab.key).length === 0" class="tab-empty-hint">
               <el-icon :size="24"><Plus /></el-icon>
-              <span>将组件拖入此标签页</span>
+              <span>{{ $pet('将组件拖入此标签页') }}</span>
             </div>
           </div>
         </el-tab-pane>
@@ -105,6 +105,7 @@ import { ElMessageBox, ElNotification, ElMessage } from 'element-plus'
 import { usePageEngineStore } from '../../../stores/pageEngine'
 import useResizable from '../../../hooks/useResizable'
 import { buildDefaultWidgetJson, deepClone } from '../../../utils/util'
+import { peT } from '../../../i18n.js'
 
 const pageEngineStore = usePageEngineStore()
 const { formData, curWrapperIdx, curWrapper } = storeToRefs(pageEngineStore)
@@ -197,32 +198,32 @@ const handleCardClick = (e) => {
 }
 
 const handleDelClick = () => {
-  ElMessageBox.confirm('是否删除此容器?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(peT('是否删除此容器?'), peT('提示'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
     type: 'warning',
   })
     .then(() => {
       pageEngineStore.delWrapper(curWrapperIdx.value)
-      ElNotification({ type: 'success', title: '提示', message: '删除成功!', duration: 2000 })
+      ElNotification({ type: 'success', title: peT('提示'), message: peT('删除成功!'), duration: 2000 })
     })
     .catch(() => {
-      ElMessage({ type: 'info', message: '已取消删除', duration: 500 })
+      ElMessage({ type: 'info', message: peT('已取消删除'), duration: 500 })
     })
 }
 
 const handleCopyClick = () => {
-  ElMessageBox.confirm('是否克隆此容器?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(peT('是否克隆此容器?'), peT('提示'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
     type: 'warning',
   })
     .then(() => {
       pageEngineStore.copyWrapper(curWrapper.value)
-      ElNotification({ type: 'success', title: '提示', message: '克隆成功', duration: 2000 })
+      ElNotification({ type: 'success', title: peT('提示'), message: peT('克隆成功'), duration: 2000 })
     })
     .catch(() => {
-      ElMessage({ type: 'info', message: '已取消克隆', duration: 500 })
+      ElMessage({ type: 'info', message: peT('已取消克隆'), duration: 500 })
     })
 }
 

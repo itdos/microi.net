@@ -873,7 +873,11 @@ export default {
     height: auto;
     min-width: 0;
     min-height: 1px;
-    overflow: auto;
+    // The outer host only owns viewport geometry. The micro-app boundary below
+    // is the framework fallback scroller; a child with a real constrained
+    // scroll container keeps its content inside that boundary, so only the
+    // child's scrollbar is active.
+    overflow: hidden;
     contain: layout paint;
     isolation: isolate;
     background: var(--mci-bg-base, var(--el-bg-color));
@@ -887,6 +891,9 @@ export default {
     min-width: 0;
     min-height: var(--micro-app-available-height);
     padding-bottom: var(--micro-app-safe-area-bottom);
+    overflow-x: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     box-sizing: border-box;
     contain: layout paint;
     isolation: isolate;

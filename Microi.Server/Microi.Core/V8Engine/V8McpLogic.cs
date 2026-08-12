@@ -443,27 +443,64 @@ namespace Microi.net
 
         #region 权限校验
 
+        private const string PermissionTokenItemKey = "__Microi_V8Mcp_PermissionToken__";
+        private const string PermissionErrorItemKey = "__Microi_V8Mcp_PermissionError__";
+
         /// <summary>
-        /// 校验当前用户权限（Level >= 9999）
+        /// 校验当前用户权限。Token 只作为身份提示；平台管理员身份会从
+        /// 当前租户主库复核，并在同一个 HTTP 请求内缓存供 ActionFilter 与
+        /// 旧版 Action 内部检查共同复用。
         /// </summary>
         public static async Task<(bool ok, string msg, dynamic token)> CheckPermission()
         {
             try
             {
-                var currentToken = await DiyToken.GetCurrentToken();
+                var httpContext = DiyHttpContext.Current;
+                if (httpContext?.Items.TryGetValue(PermissionTokenItemKey, out var cachedToken) == true
+                    && cachedToken is CurrentToken trustedToken)
+                {
+                    return (true, "", trustedToken);
+                }
+                if (httpContext?.Items.TryGetValue(PermissionErrorItemKey, out var cachedError) == true)
+                {
+                    return (false, cachedError?.ToString() ?? "权限验证失败", null);
+                }
+
+                var currentToken = await DiyToken.GetCurrentToken(false).ConfigureAwait(false);
                 if (currentToken == null || currentToken.CurrentUser == null)
                 {
+                    if (httpContext != null) httpContext.Items[PermissionErrorItemKey] = "未登录或登录已过期";
                     return (false, "未登录或登录已过期", null);
                 }
-                var level = currentToken.CurrentUser["Level"].Val<int>();
-                if (level < 9999)
+
+                var currentUser = currentToken.CurrentUser;
+                var tokenClaimsAdministrator = currentUser["_IsAdmin"].Val<bool>()
+                    || currentUser["Level"].Val<int>() >= DiyCommon.MaxRoleLevel;
+                var isCurrentAdministrator = tokenClaimsAdministrator
+                    && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                        currentToken.OsClient,
+                        currentUser);
+                if (!isCurrentAdministrator)
                 {
-                    return (false, "权限不足，需要 Level >= 9999", null);
+                    const string noAuth = "权限不足，需要当前有效的平台管理员身份";
+                    if (httpContext != null) httpContext.Items[PermissionErrorItemKey] = noAuth;
+                    return (false, noAuth, null);
                 }
+
+                if (httpContext != null) httpContext.Items[PermissionTokenItemKey] = currentToken;
                 return (true, "", currentToken);
             }
             catch
             {
+                try
+                {
+                    var httpContext = DiyHttpContext.Current;
+                    if (httpContext != null) httpContext.Items[PermissionErrorItemKey] = "权限验证失败";
+                }
+                catch
+                {
+                    // Unit tests and non-HTTP callers may not have an accessor.
+                }
                 return (false, "权限验证失败", null);
             }
         }

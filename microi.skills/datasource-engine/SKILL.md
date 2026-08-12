@@ -3,7 +3,7 @@ name: datasource-engine
 description: Microi 数据源引擎设计、调用与安全规范。用于配置 sys_datasource 的 SQL、V8、JSON 数据源，为表单选项、报表、接口或远程搜索供数，以及通过前后端 V8.DataSourceEngine.Run 调用和验收。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 数据源引擎
 

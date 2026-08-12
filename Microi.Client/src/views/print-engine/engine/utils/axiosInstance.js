@@ -3,6 +3,7 @@ import { usePrintEngineStore } from '../stores/printEngine'
 import { ElMessage } from 'element-plus'
 import { DiyCommon } from "@/utils/diy.common.js"
 import { reportApiServiceFailure, reportApiServiceRecovered } from "@/utils/api-service-status.js"
+import { printT } from '../i18n.js'
 
 // 创建 axios 实例
 const axiosInstance = axios.create({
@@ -46,10 +47,10 @@ axiosInstance.interceptors.response.use(
       const { status } = error.response
       if (status === 401) {
         // 未授权，跳转到登录页面
-        ElMessage.error('未授权')
+        ElMessage.error(printT('未授权'))
       } else if (status === 403) {
         // 无权限访问，提示用户
-        ElMessage.error('无权限访问')
+        ElMessage.error(printT('无权限访问'))
       } else if (status === 500) {
         // 服务器错误
         console.error('服务器错误')

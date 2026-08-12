@@ -8,11 +8,11 @@
             <div class="msg-hero__safe-top"></div>
             <div class="msg-tabs">
                 <div class="msg-tab" :class="{ active: activeTab === 'messages' }" @click="activeTab = 'messages'">
-                    <span>消息</span>
+                    <span>{{ $t("Msg.Mobile.message.messages") }}</span>
                     <div class="tab-line" v-if="activeTab === 'messages'"></div>
                 </div>
                 <div class="msg-tab" :class="{ active: activeTab === 'contacts' }" @click="switchToContacts">
-                    <span>通讯录</span>
+                    <span>{{ $t("Msg.Mobile.message.contacts") }}</span>
                     <div class="tab-line" v-if="activeTab === 'contacts'"></div>
                 </div>
             </div>
@@ -23,11 +23,11 @@
                 <el-icon class="search-icon"><Search /></el-icon>
                 <input
                     class="search-input"
-                    :placeholder="activeTab === 'messages' ? '搜索消息' : '搜索联系人'"
+                    :placeholder="activeTab === 'messages' ? $t('Msg.Mobile.message.searchMessages') : $t('Msg.Mobile.message.searchContacts')"
                     v-model="searchKeyword"
                     @input="activeTab === 'contacts' ? onContactSearchInput() : null"
                 />
-                <span v-if="searchKeyword" class="search-clear" @click="clearSearch">?</span>
+                <span v-if="searchKeyword" class="search-clear" @click="clearSearch">×</span>
             </div>
             <span class="search-add-btn" @click="showNewChat = true">
                 <el-icon><Plus /></el-icon>
@@ -81,8 +81,8 @@
 
             <div v-if="!loading && filteredMessageList.length === 0" class="empty-state mci-card">
                 <span class="empty-state__icon">📭</span>
-                <span class="empty-state__title">暂无消息</span>
-                <button class="mci-btn mci-btn--primary" @click="showNewChat = true">发起聊天</button>
+                <span class="empty-state__title">{{ $t("Msg.Mobile.message.noMessages") }}</span>
+                <button class="mci-btn mci-btn--primary" @click="showNewChat = true">{{ $t("Msg.Mobile.message.startChat") }}</button>
             </div>
         </div>
 
@@ -115,18 +115,18 @@
                 </div>
             </div>
 
-            <div v-if="contactLoadingMore" class="loading-more-hint">加载中...</div>
-            <div v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">已加载全部联系人</div>
+            <div v-if="contactLoadingMore" class="loading-more-hint">{{ $t("Msg.Mobile.common.loading") }}</div>
+            <div v-else-if="!contactHasMore && contactList.length > 0" class="loading-more-hint">{{ $t("Msg.Mobile.message.loadingAll") }}</div>
 
             <div v-if="!contactLoading && contactList.length === 0" class="empty-state mci-card">
                 <span class="empty-state__icon">👥</span>
-                <span class="empty-state__title">暂无联系人</span>
+                <span class="empty-state__title">{{ $t("Msg.Mobile.message.noContacts") }}</span>
             </div>
         </div>
 
-        <el-dialog v-model="showNewChat" title="选择联系人" width="92%" class="mci-submenu-dialog" align-center>
+        <el-dialog v-model="showNewChat" :title="$t('Msg.Mobile.message.selectContact')" width="92%" class="mci-submenu-dialog" align-center>
             <div class="contact-search">
-                <el-input v-model="contactKeyword" placeholder="搜索联系人" :prefix-icon="Search" clearable @input="searchContacts" />
+                <el-input v-model="contactKeyword" :placeholder="$t('Msg.Mobile.message.searchContacts')" :prefix-icon="Search" clearable @input="searchContacts" />
             </div>
             <div class="dialog-contact-list">
                 <div v-for="contact in dialogContactList" :key="contact.Id" class="mci-cell" @click="startDialogChat(contact)">
@@ -146,6 +146,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useDiyStore } from '@/pinia';
 import { Search, Plus } from '@element-plus/icons-vue';
 import { getLastContacts, formatTime as chatFormatTime, initWebSocketEvents, cleanupWebSocketEvents } from '@/utils/chat.common';
@@ -155,6 +156,7 @@ defineOptions({ name: 'mobile_message' });
 
 const router = useRouter();
 const diyStore = useDiyStore();
+const { t } = useI18n();
 const currentUser = computed(() => diyStore.GetCurrentUser);
 
 const activeTab = ref('messages');
@@ -243,7 +245,7 @@ const doLoadLastContacts = async () => {
         await getLastContacts(websocket, currentUser.value.Id, DiyCommon.GetOsClient());
         setTimeout(() => { if (loading.value) loading.value = false; }, 8000);
     } catch (error) {
-        console.error('[移动端消息] 加载联系人失败:', error);
+        console.error('[mobile-message] contact load failed:', error);
         loading.value = false;
     }
 };
@@ -260,7 +262,7 @@ const loadContacts = (isLoadMore = false) => {
             if (isLoadMore) contactList.value = contactList.value.concat(data);
             else {
                 if (!searchKeyword.value) {
-                    contactList.value = [{ Id: 'AI', Name: 'AI助手', UserImg: '', DepartmentName: '系统' }, ...data];
+                    contactList.value = [{ Id: 'AI', Name: t('Msg.Mobile.message.aiAssistant'), UserImg: '', DepartmentName: t('Msg.Mobile.message.system') }, ...data];
                 } else {
                     contactList.value = data;
                 }
@@ -312,7 +314,7 @@ const registerWebSocketEvents = () => {
             } else {
                 messageList.value.unshift({
                     ContactUserId: message.FromUserId,
-                    ContactUserName: message.FromUserName || '未知',
+                    ContactUserName: message.FromUserName || t('Msg.Mobile.common.unknown'),
                     ContactUserAvatar: message.FromUserAvatar || '',
                     LastMessage: message.Content,
                     UpdateTime: new Date().toISOString(),
@@ -326,8 +328,8 @@ const registerWebSocketEvents = () => {
                 const aiIndex = messageList.value.findIndex(m => m.ContactUserId === 'AI');
                 if (aiIndex === -1) {
                     messageList.value.unshift({
-                        ContactUserId: 'AI', ContactUserName: 'AI助手', ContactUserAvatar: '',
-                        LastMessage: '点击与AI对话，有什么可以帮您？',
+                        ContactUserId: 'AI', ContactUserName: t('Msg.Mobile.message.aiAssistant'), ContactUserAvatar: '',
+                        LastMessage: t('Msg.Mobile.message.aiWelcome'),
                         UpdateTime: new Date().toISOString(), UnRead: 0, muted: false
                     });
                 } else if (aiIndex > 0) {
@@ -337,14 +339,14 @@ const registerWebSocketEvents = () => {
             }
             loading.value = false;
         }
-    }, { enableDuplicateCheck: true, logPrefix: '[移动端消息]', scope: 'mobile-message' });
+    }, { enableDuplicateCheck: true, logPrefix: '[mobile-message]', scope: 'mobile-message' });
 
     if (success) wsEventsRegistered = true;
 };
 
 const unregisterWebSocketEvents = () => {
     if (wsEventsRegistered) {
-        cleanupWebSocketEvents(websocket, '[移动端消息]', 'mobile-message');
+        cleanupWebSocketEvents(websocket, '[mobile-message]', 'mobile-message');
         wsEventsRegistered = false;
     }
 };

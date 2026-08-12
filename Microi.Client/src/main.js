@@ -25,7 +25,7 @@ import App from "./App.vue";
 // 使用 Pinia 替代 Vuex
 import pinia, { useDiyStore } from "./pinia";
 import router from "./router";
-import i18n from "./lang"; // internationalization
+import i18n, { translateEngineLiteral } from "./lang"; // internationalization
 // Vite SVG 图标注册
 import "virtual:svg-icons-register";
 import "./permission"; // permission control
@@ -65,6 +65,8 @@ app.config.globalProperties.$axios = axios;
 app.config.globalProperties.DiyOsClient = DiyOsClient;
 app.config.globalProperties.$websocket = null;
 app.config.globalProperties.OsVersion = `v${packageInfo.version}`;
+app.config.globalProperties.$pet = value => translateEngineLiteral("PageEngine", value);
+app.config.globalProperties.$prt = value => translateEngineLiteral("PrintEngine", value);
 // 注册 microi 组件到 Vue 3（组件已经是异步的）
 RegMicroiComponents(app);
 // 注册 drag 指令 (Vue 3 方式)
