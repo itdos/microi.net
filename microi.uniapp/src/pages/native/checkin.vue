@@ -13,7 +13,22 @@
       <view v-else class="content">
         <view class="time-panel">
           <text class="current-time">{{ currentTime }}</text>
-          <text class="time-note">今日已打卡 {{ todayCount }} 次</text>
+          <text class="time-note">今日共打卡 {{ todayCount }} 次</text>
+          <view v-if="todayCheckinRecords.length" class="checkin-time-group">
+            <text class="checkin-time-title">今日打卡时间</text>
+            <scroll-view class="checkin-time-scroll" scroll-x enable-flex>
+              <view class="checkin-time-list">
+                <view v-for="(record, index) in todayCheckinRecords" :key="record.id || `${record.time}-${index}`"
+                  class="checkin-time-chip" :class="{ 'checkin-time-chip--clickable': record.id }"
+                  hover-class="checkin-time-chip--pressed" @tap="openCheckinDetail(record)">
+                  <view class="checkin-time-dot"></view>
+                  <text>{{ checkinTimeLabel(record.time) }}</text>
+                  <text v-if="record.id" class="checkin-time-arrow">›</text>
+                </view>
+              </view>
+            </scroll-view>
+          </view>
+          <text v-else class="checkin-time-empty">今日暂无打卡记录</text>
         </view>
 
         <view class="section">
@@ -112,8 +127,13 @@
 <script>
 import { themeMixin } from '@/utils/theme.js'
 import { V8, getUser } from '@/utils/request.js'
-import { callApiEngine, openLowCodeMenu } from '@/platform/business-runtime.js'
+import { callApiEngine, openForm, openLowCodeMenu } from '@/platform/business-runtime.js'
 import { normalizeChosenLocation, reverseGeocode } from '@/platform/location.js'
+import {
+  checkinDetailFormOptions,
+  checkinTimeLabel,
+  normalizeCheckinStatistics
+} from '@/platform/checkin-statistics.mjs'
 import { updateTask } from '@/utils/xjy-task.js'
 import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
 
@@ -128,6 +148,7 @@ export default {
       timer: null,
       currentTime: '',
       todayCount: 0,
+      todayCheckinRecords: [],
       initialLoading: true,
       locating: false,
       mapReady: false,
@@ -175,7 +196,7 @@ export default {
       // 首屏只等待一次视图刷新，统计、定位和地图均在内容可操作后异步加载。
       this.$nextTick(() => {
         this.initialLoading = false
-        this.loadTodayCount()
+        this.loadTodayStatistics()
         setTimeout(() => this.chooseLocation(false), 60)
       })
     },
@@ -184,11 +205,18 @@ export default {
       const pad = (value) => String(value).padStart(2, '0')
       this.currentTime = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`
     },
-    async loadTodayCount() {
+    checkinTimeLabel,
+    async loadTodayStatistics() {
       try {
         const result = await callApiEngine('sign_statistics', {})
-        this.todayCount = Number(result && result.Data !== undefined ? result.Data : result) || 0
+        const statistics = normalizeCheckinStatistics(result)
+        this.todayCount = statistics.count
+        this.todayCheckinRecords = statistics.records
       } catch (e) {}
+    },
+    openCheckinDetail(record) {
+      const options = checkinDetailFormOptions(record)
+      if (options) openForm(options)
     },
     requestCurrentCheckinLocation() {
       return new Promise((resolve, reject) => {
@@ -357,6 +385,11 @@ export default {
         if (!result || result.Code !== 1) throw new Error((result && result.Msg) || '打卡提交失败')
         if (this.taskId) await updateTask(this.taskId, { ShangmenSJ: this.currentTime })
         this.todayCount += 1
+        const checkinId = String(result.Data?.Id || (typeof result.Data === 'string' ? result.Data : ''))
+        this.todayCheckinRecords = [
+          { id: checkinId, time: this.currentTime },
+          ...this.todayCheckinRecords
+        ]
         if (this.returnToFollowup && typeof this.getOpenerEventChannel === 'function') {
           // 回传仅用于通知来源页，不能让事件通道异常把已成功落库的打卡误报为失败。
           try {
@@ -401,6 +434,16 @@ export default {
 .time-panel { position: relative; display: flex; flex-direction: column; padding: 28rpx; border-radius: 16rpx; overflow: hidden; background: linear-gradient(120deg, #0b86d4, #12a6b3 65%, #31af81); color: #fff; box-shadow: 0 10rpx 28rpx rgba(11, 134, 212, 0.16); }
 .current-time { position: relative; font-size: 37rpx; font-weight: 700; }
 .time-note { position: relative; margin-top: 8rpx; color: rgba(255, 255, 255, 0.78); font-size: 23rpx; }
+.checkin-time-group { position: relative; margin-top: 20rpx; padding-top: 16rpx; border-top: 1rpx solid rgba(255, 255, 255, 0.2); }
+.checkin-time-title { display: block; margin-bottom: 12rpx; color: rgba(255, 255, 255, 0.78); font-size: 21rpx; }
+.checkin-time-scroll { width: 100%; white-space: nowrap; }
+.checkin-time-list { display: inline-flex; gap: 12rpx; padding-right: 8rpx; }
+.checkin-time-chip { display: inline-flex; align-items: center; gap: 8rpx; padding: 9rpx 14rpx; border: 1rpx solid rgba(255, 255, 255, 0.26); border-radius: 999rpx; background: rgba(255, 255, 255, 0.13); color: #fff; font-size: 22rpx; }
+.checkin-time-chip--clickable { padding-right: 10rpx; }
+.checkin-time-chip--pressed { opacity: 0.68; transform: scale(0.97); }
+.checkin-time-dot { width: 8rpx; height: 8rpx; border-radius: 50%; background: #baf8d9; box-shadow: 0 0 8rpx rgba(186, 248, 217, 0.7); }
+.checkin-time-arrow { margin-left: 2rpx; color: rgba(255, 255, 255, 0.72); font-size: 28rpx; line-height: 1; }
+.checkin-time-empty { position: relative; margin-top: 18rpx; padding-top: 15rpx; border-top: 1rpx solid rgba(255, 255, 255, 0.18); color: rgba(255, 255, 255, 0.62); font-size: 21rpx; }
 .section { margin-top: 20rpx; padding: 22rpx; border: 1rpx solid #e1ebef; border-radius: 16rpx; background: #fff; box-shadow: 0 6rpx 18rpx rgba(24, 76, 98, 0.05); }
 .section-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16rpx; }
 .section-heading > view { display: flex; flex-direction: column; }
