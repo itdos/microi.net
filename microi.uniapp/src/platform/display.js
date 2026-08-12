@@ -1,4 +1,5 @@
 import appConfig from '@/config.js'
+import { formatRegionSelection } from '@/platform/region-value.mjs'
 
 const EMPTY_UPLOAD_VALUES = new Set(['', 'null', 'undefined', '[]', '[ ]', '{}', '正在上传中...'])
 const TECHNICAL_KEYS = new Set([
@@ -129,10 +130,13 @@ export function objectDisplayValue(value, preferredKeys = []) {
 
 export function formatRegionValue(value) {
   const parsed = parseStructuredValue(value)
-  if (Array.isArray(parsed)) return parsed.map((item) => objectDisplayValue(item)).filter(Boolean).join('')
+  if (Array.isArray(parsed)) {
+    const values = parsed.map((item) => objectDisplayValue(item)).filter(Boolean)
+    return formatRegionSelection(values)
+  }
   if (parsed && typeof parsed === 'object') {
     const region = objectRegion(parsed)
-    return region.length ? region.join('') : objectDisplayValue(parsed)
+    return region.length ? formatRegionSelection(region) : objectDisplayValue(parsed)
   }
   return String(value || '').replace(/[\[\]"]/g, '').replace(/[,，]\s*/g, '')
 }
@@ -149,7 +153,8 @@ export function formatStructuredValue(value, options = {}) {
       ? objectDisplayValue(item, options.preferredKeys || [])
       : richTextPlainText(item) || String(item || '')).filter(Boolean)
     if (!values.length) return empty
-    return options.region || looksLikeRegion(values) ? values.join('') : [...new Set(values)].join('、')
+    if (options.region) return formatRegionSelection(values)
+    return looksLikeRegion(values) ? values.join('') : [...new Set(values)].join('、')
   }
   if (parsed && typeof parsed === 'object') return objectDisplayValue(parsed, options.preferredKeys || []) || empty
   return String(value)

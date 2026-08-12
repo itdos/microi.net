@@ -62,7 +62,8 @@
       @change="emitValue($event.detail.value)"
     />
 
-    <picker v-else-if="component === 'Address'" mode="region" :value="regionValue" @change="changeRegion">
+    <picker v-else-if="component === 'Address'" mode="multiSelector" :range="regionPicker.columns"
+      range-key="name" :value="regionPicker.indexes" @columnchange="changeRegionColumn" @change="changeRegion">
       <view class="native-control__input native-control__picker"><text :class="{ placeholder: !regionText }">{{ regionText || field.placeholder }}</text><text>›</text></view>
     </picker>
 
@@ -214,6 +215,12 @@ import {
 } from '@/platform/native-form.js'
 import { V8 } from '@/utils/request.js'
 import { isHtmlValue, normalizeRichTextHtml } from '@/platform/display.js'
+import { formatRegionSelection } from '@/platform/region-value.mjs'
+import {
+  createRegionPickerState,
+  regionPickerSelection,
+  updateRegionPickerState
+} from '@/platform/region-picker.mjs'
 
 const OPTION_COMPONENTS = new Set(['Select', 'MultipleSelect', 'Radio', 'Checkbox', 'Autocomplete', 'Cascader', 'SelectTree', 'TreeCheckbox', 'Department', 'Transfer'])
 export default {
@@ -253,7 +260,8 @@ export default {
       draftIds: [],
       draftValues: {},
       searchTimer: null,
-      optionRequestId: 0
+      optionRequestId: 0,
+      regionPicker: createRegionPickerState([])
     }
   },
   computed: {
@@ -319,7 +327,7 @@ export default {
       if (value && typeof value === 'object') return [value.Province || value.province, value.City || value.city, value.Area || value.area || value.District || value.district].filter(Boolean)
       return []
     },
-    regionText() { return this.regionValue.join('') },
+    regionText() { return formatRegionSelection(this.regionValue) },
     mapValue() { return parseJson(this.modelValue, {}) || {} },
     mapText() { return this.mapValue.address || this.mapValue.Address || this.mapValue.name || this.mapValue.Name || (typeof this.modelValue === 'string' && !this.modelValue.trim().startsWith('{') ? this.modelValue : '') },
     dateMode() {
@@ -388,6 +396,15 @@ export default {
     sliderMax() { return Number((this.field.config && this.field.config.Max) || 100) }
   },
   watch: {
+    modelValue: {
+      immediate: true,
+      deep: true,
+      handler() {
+        if (this.component === 'Address') {
+          this.regionPicker = createRegionPickerState(this.regionValue)
+        }
+      }
+    },
     'field.options': {
       immediate: true,
       deep: true,
@@ -676,7 +693,14 @@ export default {
         multiple: true
       })
     },
-    changeRegion(event) { this.emitValue(JSON.stringify(event.detail.value || [])) },
+    changeRegionColumn(event) {
+      this.regionPicker = updateRegionPickerState(this.regionPicker, event.detail.column, event.detail.value)
+    },
+    changeRegion(event) {
+      const indexes = Array.isArray(event.detail.value) ? event.detail.value : this.regionPicker.indexes
+      this.regionPicker = updateRegionPickerState({ ...this.regionPicker, indexes }, 2, indexes[2])
+      this.emitValue(JSON.stringify(regionPickerSelection(this.regionPicker)))
+    },
     chooseLocation() {
       uni.chooseLocation({ success: (location) => this.emitValue(JSON.stringify({ address: location.address || location.name, name: location.name, latitude: location.latitude, longitude: location.longitude })) })
     },
