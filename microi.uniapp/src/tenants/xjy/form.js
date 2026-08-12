@@ -1168,6 +1168,7 @@ export function createState() {
     followupCustomerId: '',
     followupCustomerName: '',
     openingFollowupCheckin: false,
+    followupCheckinSucceeded: false,
     proposalInitialized: false,
     customerFollowScopeValues: {},
     orderInitialized: false,
@@ -1361,7 +1362,7 @@ export function getPresentation(context) {
     return {
       floatingAction: {
         key: 'xjy-followup-checkin',
-        label: '拜访打卡',
+        label: context.state.followupCheckinSucceeded ? '已打卡' : '拜访打卡',
         iconType: 'location'
       }
     }
@@ -1392,7 +1393,14 @@ export async function runPresentationAction(context, action) {
     ]
     uni.navigateTo({
       url: `/pages/native/checkin?${params.join('&')}`,
-      success: () => setTimeout(() => { context.state.openingFollowupCheckin = false }, 600),
+      success: (result) => {
+        if (result.eventChannel && typeof result.eventChannel.on === 'function') {
+          result.eventChannel.on('checkinSuccess', () => {
+            context.state.followupCheckinSucceeded = true
+          })
+        }
+        setTimeout(() => { context.state.openingFollowupCheckin = false }, 600)
+      },
       fail: () => {
         context.state.openingFollowupCheckin = false
         uni.showToast({ title: '拜访打卡页面打开失败', icon: 'none' })
