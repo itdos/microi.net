@@ -51,7 +51,7 @@
           <el-icon>
             <CopyDocument />
           </el-icon>
-          克隆
+          {{ $pet('克隆') }}
         </el-text>
       </div>
       <div
@@ -63,7 +63,7 @@
           <el-icon>
             <Delete />
           </el-icon>
-          删除
+          {{ $pet('删除') }}
         </el-text>
       </div>
 
@@ -158,6 +158,7 @@ const pageEngineStore = usePageEngineStore()
 const { formData, curWidget, curWrapper, components } =
   storeToRefs(pageEngineStore)
 import useResizable from '../../../hooks/useResizable'
+import { peT } from '../../../i18n.js'
 
 const componentRaw = toRaw(components.value)
 
@@ -337,9 +338,9 @@ const handleSetCurWidget = (e) => {
 
 //删除选中组件
 const handleDelClick = () => {
-  ElMessageBox.confirm('是否删除此组件?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(peT('是否删除此组件?'), peT('提示'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
     type: 'warning',
   })
     .then(() => {
@@ -353,24 +354,24 @@ const handleDelClick = () => {
       }
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '删除成功!',
+        title: peT('提示'),
+        message: peT('删除成功!'),
         duration: 2000,
       })
     })
     .catch(() => {
       ElMessage({
         type: 'info',
-        message: '已取消删除',
+        message: peT('已取消删除'),
         duration: 500,
       })
     })
 }
 //克隆选中组件
 const handleCopyClick = () => {
-  ElMessageBox.confirm('是否克隆此组件?', '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(peT('是否克隆此组件?'), peT('提示'), {
+    confirmButtonText: peT('确定'),
+    cancelButtonText: peT('取消'),
     type: 'warning',
   })
     .then(() => {
@@ -384,15 +385,15 @@ const handleCopyClick = () => {
       }
       ElNotification({
         type: 'success',
-        title: '提示',
-        message: '克隆成功!',
+        title: peT('提示'),
+        message: peT('克隆成功!'),
         duration: 2000,
       })
     })
     .catch(() => {
       ElMessage({
         type: 'info',
-        message: '已取消克隆',
+        message: peT('已取消克隆'),
         duration: 500,
       })
     })
@@ -417,7 +418,7 @@ const handleDrop = (e) => {
       swapWidgets(fromWrapperIdx, fromWidgetIdx)
     } else {
       ElMessage({
-        message: '不能将组件拖拽到其他容器内',
+        message: peT('不能将组件拖拽到其他容器内'),
         duration: 1000,
         type: 'warning',
       })

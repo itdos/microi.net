@@ -2,6 +2,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-labelledby="architecture-title architecture-desc" text-rendering="geometricPrecision" shape-rendering="geometricPrecision">
   <title id="architecture-title">Microi吾码 AI平台 架构图</title>
   <desc id="architecture-desc">以 V8引擎为运行核心，连接 AI、低代码、治理、服务观测、多端入口、安全、多租户和数据存储的 Microi吾码 AI 平台全景架构。</desc>
+  <metadata id="architecture-source">{&quot;architectureVersion&quot;:&quot;2026.08.12&quot;,&quot;capabilitySourceHash&quot;:&quot;06319e9efe22a4a304cae2a39607d20d3849c55418db2d055b5b4e4e3bfd9473&quot;}</metadata>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#020716"/><stop offset=".48" stop-color="#07152b"/><stop offset="1" stop-color="#020713"/></linearGradient>
     <linearGradient id="header-line" x1="0" x2="1"><stop stop-color="#4de8ff"/><stop offset=".5" stop-color="#b995ff"/><stop offset="1" stop-color="#48e7a6"/></linearGradient>
@@ -111,7 +112,7 @@
   </g><g transform="translate(960 112)">
     <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
     <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
-    <text x="15" y="23" class="channel-title">AI 应用</text>
+    <text x="15" y="23" class="channel-title">AI 应用 / Agent</text>
     <text x="15" y="41" class="channel-sub">Web / UniApp</text>
   </g><g transform="translate(1144 112)">
     <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
@@ -126,8 +127,8 @@
   </g><g transform="translate(1512 112)">
     <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
     <rect x="0" y="0" width="4" height="54" fill="#4de8ff"/>
-    <text x="15" y="23" class="channel-title">MCP / Codex</text>
-    <text x="15" y="41" class="channel-sub">AI 原生交付</text>
+    <text x="15" y="23" class="channel-title">MCP / Skills</text>
+    <text x="15" y="41" class="channel-sub">Codex / OpenClaw</text>
   </g><g transform="translate(1696 112)">
     <path d="M8 0H166L174 8V46L166 54H8L0 46V8Z" class="channel-shell"/>
     <rect x="0" y="0" width="4" height="54" fill="#b995ff"/>
@@ -363,10 +364,10 @@
     <path d="M58 779H171L176 784V800L171 805H58L53 800V784Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="62" cy="792" r="2" fill="#b995ff"/>
     <text x="118.5" y="796" text-anchor="middle" class="feature-text">语义 Diff</text>
-  </g><g data-feature="区块 / 物料">
+  </g><g data-feature="Microi.UI / 物料">
     <path d="M188 779H301L306 784V800L301 805H188L183 800V784Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="192" cy="792" r="2" fill="#b995ff"/>
-    <text x="248.5" y="796" text-anchor="middle" class="feature-text">区块 / 物料</text>
+    <text x="248.5" y="796" text-anchor="middle" class="feature-text feature-text--compact">Microi.UI / 物料</text>
   </g><g data-feature="资产依赖">
     <path d="M318 779H431L436 784V800L431 805H318L313 800V784Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="322" cy="792" r="2" fill="#b995ff"/>
@@ -387,18 +388,18 @@
     <path d="M318 810H431L436 815V831L431 836H318L313 831V815Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="322" cy="823" r="2" fill="#b995ff"/>
     <text x="378.5" y="827" text-anchor="middle" class="feature-text">模板引擎</text>
-  </g><g data-feature="Office 导出">
+  </g><g data-feature="Office / 蓝牙打印">
     <path d="M448 810H561L566 815V831L561 836H448L443 831V815Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="452" cy="823" r="2" fill="#b995ff"/>
-    <text x="508.5" y="827" text-anchor="middle" class="feature-text">Office 导出</text>
-  </g><g data-feature="图表 / 地图">
+    <text x="508.5" y="827" text-anchor="middle" class="feature-text">Office / 蓝牙打印</text>
+  </g><g data-feature="图表 / 地图 / 甘特">
     <path d="M58 841H171L176 846V862L171 867H58L53 862V846Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="62" cy="854" r="2" fill="#b995ff"/>
-    <text x="118.5" y="858" text-anchor="middle" class="feature-text">图表 / 地图</text>
-  </g><g data-feature="甘特图">
+    <text x="118.5" y="858" text-anchor="middle" class="feature-text">图表 / 地图 / 甘特</text>
+  </g><g data-feature="Unity / WebGL">
     <path d="M188 841H301L306 846V862L301 867H188L183 862V846Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="192" cy="854" r="2" fill="#b995ff"/>
-    <text x="248.5" y="858" text-anchor="middle" class="feature-text">甘特图</text>
+    <text x="248.5" y="858" text-anchor="middle" class="feature-text">Unity / WebGL</text>
   </g><g data-feature="3D / CAD / 大屏">
     <path d="M318 841H431L436 846V862L431 867H318L313 862V846Z" class="feature-shell" stroke="#b995ff"/>
     <circle cx="322" cy="854" r="2" fill="#b995ff"/>

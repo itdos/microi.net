@@ -1,9 +1,9 @@
-?<template>
+<template>
     <div class="mci-mobile-page page-home">
         <!-- 顶部导航栏 -->
         <header class="mci-navbar">
             <span class="mci-navbar__action"></span>
-            <h1 class="mci-navbar__title">首页</h1>
+            <h1 class="mci-navbar__title">{{ $t("Msg.Mobile.home.title") }}</h1>
             <span class="mci-navbar__action" @click="goTo('/mobile/message')">
                 <el-icon><Bell /></el-icon>
             </span>
@@ -29,7 +29,7 @@
         <!-- 快捷入口 -->
         <section class="entry-section">
             <div class="mci-section-title">
-                <span>快捷入口</span>
+                <span>{{ $t("Msg.Mobile.home.quickAccess") }}</span>
             </div>
             <div class="entry-grid">
                 <div
@@ -50,9 +50,9 @@
         <!-- 待办事项 -->
         <section class="list-section">
             <div class="mci-section-title">
-                <span>待办事项</span>
+                <span>{{ $t("Msg.Mobile.home.todo") }}</span>
                 <span class="mci-section-title__more" @click="goTo('/mobile/workspace')">
-                    查看全部
+                    {{ $t("Msg.Mobile.home.viewAll") }}
                     <el-icon><ArrowRight /></el-icon>
                 </span>
             </div>
@@ -63,6 +63,7 @@
                         :key="item.id"
                         class="mci-cell mci-stagger-item"
                         :style="{ '--mci-index': idx }"
+                        @click="goTo('/mobile/workspace')"
                     >
                         <div class="mci-cell__icon mci-cell__icon--danger">
                             <el-icon><Bell /></el-icon>
@@ -76,7 +77,7 @@
                 </template>
                 <div v-else class="empty-state">
                     <el-icon class="empty-icon"><CircleCheck /></el-icon>
-                    <span>暂无待办事项</span>
+                    <span>{{ $t("Msg.Mobile.home.noTodo") }}</span>
                 </div>
             </div>
         </section>
@@ -84,23 +85,29 @@
         <!-- 系统公告 -->
         <section class="list-section">
             <div class="mci-section-title">
-                <span>系统公告</span>
+                <span>{{ $t("Msg.Mobile.home.announcements") }}</span>
             </div>
             <div class="mci-cell-group">
-                <div
-                    v-for="(notice, idx) in noticeList"
-                    :key="notice.id"
-                    class="mci-cell mci-stagger-item"
-                    :style="{ '--mci-index': idx }"
-                >
-                    <div class="mci-cell__icon mci-cell__icon--info">
-                        <el-icon><DocumentCopy /></el-icon>
+                <template v-if="noticeList.length > 0">
+                    <div
+                        v-for="(notice, idx) in noticeList"
+                        :key="notice.id"
+                        class="mci-cell mci-stagger-item"
+                        :style="{ '--mci-index': idx }"
+                    >
+                        <div class="mci-cell__icon mci-cell__icon--info">
+                            <el-icon><DocumentCopy /></el-icon>
+                        </div>
+                        <div class="mci-cell__body">
+                            <span class="mci-cell__title">{{ notice.title }}</span>
+                            <span class="mci-cell__sub">{{ notice.time }}</span>
+                        </div>
+                        <span class="mci-tag mci-tag--primary">{{ $t("Msg.Mobile.home.announcement") }}</span>
                     </div>
-                    <div class="mci-cell__body">
-                        <span class="mci-cell__title">{{ notice.title }}</span>
-                        <span class="mci-cell__sub">{{ notice.time }}</span>
-                    </div>
-                    <span class="mci-tag mci-tag--primary">公告</span>
+                </template>
+                <div v-else class="empty-state">
+                    <el-icon class="empty-icon"><DocumentCopy /></el-icon>
+                    <span>{{ $t("Msg.Mobile.home.noAnnouncements") }}</span>
                 </div>
             </div>
         </section>
@@ -108,9 +115,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useDiyStore } from '@/pinia';
+import { DiyCommon } from '@/utils/diy.common';
 import {
     Grid, ChatDotRound, User, MoreFilled, Bell,
     ArrowRight, CircleCheck, DocumentCopy
@@ -122,59 +131,95 @@ defineOptions({
 
 const router = useRouter();
 const diyStore = useDiyStore();
+const { t, locale } = useI18n();
 
 const currentUser = computed(() => diyStore.GetCurrentUser);
 
 const welcomePrefix = computed(() => {
     const hour = new Date().getHours();
-    if (hour < 6) return '夜深了';
-    if (hour < 9) return '早上好';
-    if (hour < 12) return '上午好';
-    if (hour < 14) return '中午好';
-    if (hour < 18) return '下午好';
-    if (hour < 22) return '晚上好';
-    return '夜深了';
+    if (hour < 6) return t('Msg.Mobile.home.lateNight');
+    if (hour < 9) return t('Msg.Mobile.home.goodMorning');
+    if (hour < 12) return t('Msg.Mobile.home.goodForenoon');
+    if (hour < 14) return t('Msg.Mobile.home.goodNoon');
+    if (hour < 18) return t('Msg.Mobile.home.goodAfternoon');
+    if (hour < 22) return t('Msg.Mobile.home.goodEvening');
+    return t('Msg.Mobile.home.lateNight');
 });
 
 const welcomeMessage = computed(() => {
     const sysConfig = diyStore.SysConfig;
     if (sysConfig?.SysTitle) {
-        return `欢迎使用 ${sysConfig.SysTitle}`;
+        return t('Msg.Mobile.home.welcomeSystem', { name: sysConfig.SysTitle });
     }
     if (sysConfig?.SysShortTitle) {
-        return `欢迎使用 ${sysConfig.SysShortTitle}`;
+        return t('Msg.Mobile.home.welcomeSystem', { name: sysConfig.SysShortTitle });
     }
-    return '欢迎使用 Microi 吾码低代码平台';
+    return t('Msg.Mobile.home.welcomeMicroi');
 });
 
 const currentDate = computed(() => {
-    const now = new Date();
-    return `${now.getMonth() + 1}月${now.getDate()}日`;
+    return new Intl.DateTimeFormat(locale.value || 'zh-CN', { month: 'long', day: 'numeric' }).format(new Date());
 });
 
 const currentWeek = computed(() => {
-    const weeks = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    return weeks[new Date().getDay()];
+    return new Intl.DateTimeFormat(locale.value || 'zh-CN', { weekday: 'long' }).format(new Date());
 });
 
-const entries = ref([
-    { label: '工作台', icon: Grid, tone: 'primary', path: '/mobile/workspace' },
-    { label: '消息', icon: ChatDotRound, tone: 'cyan', path: '/mobile/message' },
-    { label: '我的', icon: User, tone: 'gold', path: '/mobile/profile' },
-    { label: '更多', icon: MoreFilled, tone: 'pink', action: 'more' }
+const entries = computed(() => [
+    { label: t('Msg.Mobile.home.workbench'), icon: Grid, tone: 'primary', path: '/mobile/workspace' },
+    { label: t('Msg.Mobile.home.messages'), icon: ChatDotRound, tone: 'cyan', path: '/mobile/message' },
+    { label: t('Msg.Mobile.home.mine'), icon: User, tone: 'gold', path: '/mobile/profile' },
+    { label: t('Msg.Mobile.home.more'), icon: MoreFilled, tone: 'pink', action: 'more' }
 ]);
 
 const showMore = ref(false);
 
-const todoList = ref([
-    { id: 1, title: '审批申请：请假申请 - 张三', time: '10分钟前' },
-    { id: 2, title: '审批申请：报销申请 - 李四', time: '30分钟前' }
-]);
+const todoList = ref([]);
+const noticeList = ref([]);
 
-const noticeList = ref([
-    { id: 1, title: '关于系统升级的通知', time: '2026-01-28' },
-    { id: 2, title: '春节假期安排通知', time: '2026-01-25' }
-]);
+function formatBusinessTime(value) {
+    const date = value ? new Date(value) : null;
+    if (!date || Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(locale.value || 'zh-CN', {
+        month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+    }).format(date);
+}
+
+async function loadTodoList() {
+    const result = await DiyCommon.PostAsync('/api/WorkFlow/getWFWork', {
+        WorkType: 'Todo', _PageIndex: 1, _PageSize: 3, _Keyword: ''
+    });
+    if (!result || result.Code !== 1) return;
+    todoList.value = (Array.isArray(result.Data) ? result.Data : []).map(item => ({
+        id: item.Id,
+        title: item.FlowTitle || item.NodeName || item.Id,
+        time: formatBusinessTime(item.CreateTime)
+    }));
+}
+
+async function loadNoticeList() {
+    const result = await DiyCommon.FormEngine.GetTableData({
+        FormEngineKey: 'diy_notice',
+        _PageSize: 3,
+        _PageIndex: 1,
+        _OrderBy: 'CreateTime',
+        _OrderByType: 'DESC',
+        _SelectFields: ['Id', 'Biaoti', 'Fenlei', 'CreateTime']
+    });
+    if (!result || result.Code !== 1) return;
+    noticeList.value = (Array.isArray(result.Data) ? result.Data : []).map(item => ({
+        id: item.Id,
+        title: item.Biaoti || item.Fenlei || item.Id,
+        time: formatBusinessTime(item.CreateTime)
+    }));
+}
+
+onMounted(async () => {
+    const results = await Promise.allSettled([loadTodoList(), loadNoticeList()]);
+    results.filter(item => item.status === 'rejected').forEach(item => {
+        console.warn('[mobile-home] business data load failed', item.reason);
+    });
+});
 
 
 

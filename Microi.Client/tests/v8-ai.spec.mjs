@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import test from "node:test";
 import { createV8AI } from "../src/utils/v8-ai.js";
+
+test("AI 视频工作区按 Token Plan 真实规格创建 VideoClip，并要求合成唯一带声母版", () => {
+    const source = fs.readFileSync(new URL("../src/views/ai-engine/index.vue", import.meta.url), "utf8");
+
+    assert.match(source, /Token Plan · 6 秒 \/ 768P \/ 固定 24 fps/);
+    assert.match(source, /10 秒 \/ 768P 与 6 秒 \/ 1080P 属于按量接口规格/);
+    assert.match(source, /AssetType: "VideoClip"/);
+    assert.match(source, /"VideoClip", "VideoMaster", "Video"/);
+    assert.match(source, /分镜不得单独发布/);
+    assert.match(source, /工作区 3 条 \/ 日/);
+    assert.doesNotMatch(source, /preset: "quality"/);
+    assert.doesNotMatch(source, /preset: "duration"/);
+});
 
 test("V8.AI.Chat 固定走平台接口并清除伪造身份与密钥", async () => {
     let captured;
@@ -67,16 +81,23 @@ test("V8.AI MiniMax 视频方法固定走平台接口并清除伪造密钥", asy
     await ai.CreateMiniMaxVideo({ Prompt: "办公室协作", ApiKey: "forged", OsClient: "forged" });
     await ai.GetMiniMaxVideoTask({ TaskHandle: "signed-task" });
     await ai.GetMiniMaxVideoFile({ FileHandle: "signed-file" });
+    await ai.PersistMiniMaxVideoFile({ FileHandle: "signed-file", ApiKey: "forged" });
+    await ai.GenerateMiniMaxMusic({ RequestId: "music:test", Prompt: "企业科技感纯音乐", ApiKey: "forged" });
 
     assert.deepEqual(calls.map((item) => item.Url), [
         "/api/Ai/CreateMiniMaxVideo",
         "/api/Ai/GetMiniMaxVideoTask",
-        "/api/Ai/GetMiniMaxVideoFile"
+        "/api/Ai/GetMiniMaxVideoFile",
+        "/api/Ai/PersistMiniMaxVideoFile",
+        "/api/Ai/GenerateMiniMaxMusic"
     ]);
     assert.deepEqual(calls[0].PostParam, { Prompt: "办公室协作" });
     assert.equal(ai.CreateMiniMaxVideoAsync, ai.CreateMiniMaxVideo);
     assert.equal(ai.GetMiniMaxVideoTaskAsync, ai.GetMiniMaxVideoTask);
     assert.equal(ai.GetMiniMaxVideoFileAsync, ai.GetMiniMaxVideoFile);
+    assert.equal(ai.PersistMiniMaxVideoFileAsync, ai.PersistMiniMaxVideoFile);
+    assert.equal(ai.GenerateMiniMaxMusicAsync, ai.GenerateMiniMaxMusic);
+    assert.deepEqual(calls[3].PostParam, { FileHandle: "signed-file" });
 });
 
 test("V8.AI.ChatStream 解析 SSE 打字机分片、最终结果并回收新 Token", async () => {

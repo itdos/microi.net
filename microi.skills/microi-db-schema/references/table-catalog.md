@@ -1,6 +1,6 @@
 # Microi Table Catalog
 
-Full generated catalog from `ai-helper/microi/db.json`. Load this only when a task needs exact fields outside the core tables.
+Generic reference catalog. Load it only to understand common platform tables; never use it as the exact field authority for a tenant. Query `microi_get_db_schema` first.
 
 ## All Tables
 

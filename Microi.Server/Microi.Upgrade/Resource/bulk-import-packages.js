@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: bulk-import-microi-store-packages
- * Version: v1.1.3
+ * Version: v1.1.6
  * Function:
  * - 只规划并安装“未安装/可更新”应用，绝不重新安装已是最新版的应用。
  * - 计划和子检查点写入后台任务 CheckpointJson，支持多节点租约转移、进程重启和幂等重试。
@@ -17,6 +17,8 @@
 // 整个商城的上千个应用和数千张业务表误装到租户。
 // BULK_ADAPTIVE_SINGLE_SLICE_V1：小型官方包按“一个应用一个事务”执行，外层
 // 任务仍在每个应用后持久化检查点；只有大型包继续使用导入器的内部安全分片。
+// BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1：失败终态必须带任务、阶段、应用序号和
+// 可执行恢复建议，后台任务中心不能再只显示“接口无返回”或无法定位的笼统错误。
 function text(value, fallback) {
     return value === null || value === undefined ? (fallback || '') : String(value);
 }
@@ -57,6 +59,47 @@ function childFailureDetail(result) {
         }
     }
     return details.join('；');
+}
+// BULK_STORAGE_FAILURE_RECOVERY_V1：存储类失败不能再给出“处理冲突或数据问题”
+// 这种无关建议。按子导入器的稳定 ErrorType/HTTP 线索返回可执行恢复步骤。
+function childRecoveryHint(message, completed) {
+    var value = text(message).toLowerCase();
+    if (value.indexOf('object_storage_forbidden') >= 0
+        || value.indexOf('403') >= 0
+        || value.indexOf('forbidden') >= 0
+        || value.indexOf('accessdenied') >= 0) {
+        return '目标租户对象存储拒绝访问：请核对 SaaS 引擎 HDFS 类型、桶与 Endpoint，'
+            + '并为当前凭证补齐对象读取存在性和写入权限；不要修改已完成应用。修复后重新发起，前 '
+            + completed + ' 个应用会幂等跳过。';
+    }
+    if (value.indexOf('object_storage_unreachable') >= 0
+        || value.indexOf('hdfs') >= 0
+        || value.indexOf('minio') >= 0
+        || value.indexOf('oss') >= 0) {
+        return '请检查目标租户 SaaS 引擎中的 HDFS/OSS/MinIO Endpoint、网络路由、桶和凭证完整性；'
+            + '修复后重新发起，前 ' + completed + ' 个应用会幂等跳过。';
+    }
+    return '先按失败详情处理冲突或数据问题，再重新发起全部安装/更新；前 '
+        + completed + ' 个已完成应用会幂等跳过。';
+}
+// BULK_MONOTONIC_CHILD_PROGRESS_V1：批量协调器每次恢复子导入器前，必须继承
+// 子检查点的精确 Progress；兼容旧检查点时按阶段取保守下限。否则即使子导入器
+// 已保持 55%，外层仍会在每个分片开头按已完成应用数把进度压回 3%。
+function childCheckpointProgress(value) {
+    value = value && typeof value == 'object' ? value : {};
+    var exact = parseInt(value.Progress, 10);
+    if (!isNaN(exact)) return Math.max(0, Math.min(99, exact));
+    var phaseFloors = {
+        Ddl: toInt(value.Index, 0) > 0 ? 10 : 0,
+        Tables: 25,
+        PlanFields: 40,
+        Fields: 40,
+        Physical: 55,
+        ApplicationAssets: 65,
+        PostSchema: 70,
+        ScheduleJobs: 97
+    };
+    return phaseFloors[text(value.Phase)] || 0;
 }
 
 var currentUser = V8.CurrentUser || {};
@@ -130,6 +173,18 @@ function continuation(nextCheckpoint, progress, current, total, message) {
             }
         },
         Msg: message
+    };
+}
+function failure(message, detail, recoveryHint) {
+    var data = detail && typeof detail == 'object' ? detail : {};
+    data.TaskId = taskId;
+    data.Phase = phase;
+    data.CheckpointVersion = checkpointVersion;
+    data.RecoveryHint = recoveryHint || '确认后台任务工作器健康后重新发起；已提交的应用会由安装版本和幂等键自动跳过。';
+    return {
+        Code: 0,
+        Data: data,
+        Msg: message + '；解决方案：' + data.RecoveryHint
     };
 }
 function loadInstalledVersions() {
@@ -210,7 +265,16 @@ if (phase == 'Discover') {
     });
     listResult = parseJson(listResult, listResult);
     if (!listResult || listResult.Code != 1) {
-        return { Code: 0, Msg: '读取应用商城批量安装计划失败：' + ((listResult && listResult.Msg) || '接口无返回') };
+        return failure(
+            '读取应用商城批量安装计划失败：' + ((listResult && listResult.Msg) || '接口无返回'),
+            {
+                FailureStage: 'Discover',
+                SourceApiBase: sourceApiBase,
+                SourceOsClient: sourceOsClient,
+                PageIndex: pageIndex
+            },
+            '检查商城源地址、源租户和网络连通性；修正后重新发起，盘点阶段不会写入应用资源。'
+        );
     }
 
     var rows = toArray(listResult.Data);
@@ -253,7 +317,11 @@ if (phase == 'Discover') {
 }
 
 if (phase != 'Install') {
-    return { Code: 0, Msg: '未知的批量安装检查点阶段：' + phase };
+    return failure(
+        '未知的批量安装检查点阶段：' + phase,
+        { FailureStage: 'CheckpointValidation', Checkpoint: checkpoint },
+        '该检查点与当前应用包版本不兼容，请让任务进入失败终态后重新发起，系统会重新盘点。'
+    );
 }
 
 var installPlan = normalizePlan(checkpoint.Plan);
@@ -272,6 +340,7 @@ if (currentIndex >= total) {
 
 var item = installPlan[currentIndex];
 var childCheckpoint = parseJson(checkpoint.ChildCheckpoint, {}) || {};
+var resumedChildProgress = childCheckpointProgress(childCheckpoint);
 var childParam = {
     StoreId: item.StoreId,
     AppId: item.AppId,
@@ -291,22 +360,28 @@ var childParam = {
     _BackgroundTaskCheckpoint: childCheckpoint,
     _TrustedServerInvocation: true
 };
-report(Math.max(3, Math.floor((currentIndex / total) * 100)), currentIndex, total,
+report(Math.max(3, Math.min(99,
+    Math.floor(((currentIndex + resumedChildProgress / 100) / total) * 100))),
+    currentIndex + resumedChildProgress / 100, total,
     '[' + (currentIndex + 1) + '/' + total + '] 正在' + (item.InstallAction == 'Update' ? '更新' : '安装') + item.AppName);
 var childResult = V8.ApiEngine.Run('import-microi-store-package', childParam);
 childResult = parseJson(childResult, childResult);
 if (!childResult || childResult.Code != 1) {
     var childMsg = (childResult && childResult.Msg) || '子安装接口无返回';
     var childDetail = childFailureDetail(childResult);
-    return {
-        Code: 0,
-        Data: {
+    return failure(
+        '应用【' + item.AppName + '】安装/更新失败：' + childMsg
+            + (childDetail ? '；失败详情：' + childDetail : ''),
+        {
+            FailureStage: 'Install',
+            FailedIndex: currentIndex + 1,
+            Completed: currentIndex,
+            Total: total,
             FailedItem: item,
             ChildData: childResult && childResult.Data ? childResult.Data : null
         },
-        Msg: '应用【' + item.AppName + '】安装/更新失败：' + childMsg
-            + (childDetail ? '；失败详情：' + childDetail : '')
-    };
+        childRecoveryHint(childMsg + '；' + childDetail, currentIndex)
+    );
 }
 
 var childBackground = childResult.Data && childResult.Data.BackgroundTask;

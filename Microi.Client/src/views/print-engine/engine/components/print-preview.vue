@@ -4,14 +4,14 @@
       <div class="mpe-wrap" @click="close">
         <div class="mpe-box" @click.stop="">
           <div class="mpe-modal-box__header">
-            <span class="mpe-modal-title">打印预览</span>
+            <span class="mpe-modal-title">{{ $prt('打印预览') }}</span>
             <button class="mpe-modal-close" @click="close">&times;</button>
           </div>
           <div class="mpe-preview-body">
             <div class="mpe-preview-container" ref="previewContainer"></div>
           </div>
           <div class="mpe-modal-box__footer">
-            <el-button type="primary" @click="close">关闭预览</el-button>
+            <el-button type="primary" @click="close">{{ $prt('关闭预览') }}</el-button>
           </div>
         </div>
       </div>

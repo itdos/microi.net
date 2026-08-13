@@ -3,7 +3,7 @@ name: ocr-engine
 description: 为 Microi 吾码集成、配置、调用和验收通用 OCR 能力。处理 V8.OCR、/api/ocr、PaddleX/PaddleOCR 服务、SaaS 租户 OCR 配置、图片或 PDF 文字识别、OCR 安全边界、Docker 部署和多节点交付时使用。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi OCR 引擎
 

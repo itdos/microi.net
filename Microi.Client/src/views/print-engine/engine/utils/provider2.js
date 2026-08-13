@@ -1,14 +1,15 @@
 import { hiprint } from "vue-plugin-hiprint";
+import { printT } from '../i18n.js'
 export const provider2 = function () {
 
   var addElementTypes = function (context) {
     context.removePrintElementTypes("providerModule2");
     context.addPrintElementTypes("providerModule2", [
-      new hiprint.PrintElementTypeGroup("常规", [
+      new hiprint.PrintElementTypeGroup(printT('常规'), [
 
         {
           tid: "providerModule2.header",
-          title: "单据表头",
+          title: printT('单据表头'),
           data: "单据表头",
           type: "text",
           options: {
@@ -22,7 +23,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.type",
-          title: "单据类型",
+          title: printT('单据类型'),
           data: "单据类型",
           type: "text",
           options: {
@@ -36,7 +37,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.order",
-          title: "订单编号",
+          title: printT('订单编号'),
           data: "XS888888888",
           type: "text",
           options: {
@@ -51,7 +52,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.date",
-          title: "业务日期",
+          title: printT('业务日期'),
           data: "2020-01-01",
           type: "text",
           options: {
@@ -66,7 +67,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.platform",
-          title: "平台名称",
+          title: printT('平台名称'),
           data: "平台名称",
           type: "text",
           options: {
@@ -82,7 +83,7 @@ export const provider2 = function () {
 
         {
           tid: "providerModule2.bindingline",
-          title: "装订线",
+          title: printT('装订线'),
           data: "",
           type: "text",
           options: {
@@ -98,7 +99,7 @@ export const provider2 = function () {
 
         {
           tid: "providerModule2.iframe",
-          title: "网页",
+          title: printT('网页'),
           type: "html",
           options: {
             width: 200,
@@ -140,10 +141,10 @@ export const provider2 = function () {
         },
 
       ]),
-      new hiprint.PrintElementTypeGroup("客户", [
+      new hiprint.PrintElementTypeGroup(printT('客户'), [
         {
           tid: "providerModule2.khname",
-          title: "客户名称",
+          title: printT('客户名称'),
           data: "高级客户",
           type: "text",
           options: {
@@ -158,7 +159,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.tel",
-          title: "客户电话",
+          title: printT('客户电话'),
           data: "18888888888",
           type: "text",
           options: {
@@ -173,7 +174,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.address",
-          title: "收货地址",
+          title: printT('收货地址'),
           data: "XX省XX市XX区XX路XX号",
           type: "longText",
           options: {
@@ -183,10 +184,10 @@ export const provider2 = function () {
           },
         },
       ]),
-      new hiprint.PrintElementTypeGroup("财务", [
+      new hiprint.PrintElementTypeGroup(printT('财务'), [
         {
           tid: "providerModule2.amount",
-          title: "金额",
+          title: printT('金额'),
           data: "¥1,000.00",
           type: "text",
           options: {
@@ -201,7 +202,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.amountUpper",
-          title: "大写金额",
+          title: printT('大写金额'),
           data: "壹仟元整",
           type: "text",
           options: {
@@ -216,7 +217,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.taxRate",
-          title: "税率",
+          title: printT('税率'),
           data: "13%",
           type: "text",
           options: {
@@ -229,10 +230,10 @@ export const provider2 = function () {
           },
         },
       ]),
-      new hiprint.PrintElementTypeGroup("签章", [
+      new hiprint.PrintElementTypeGroup(printT('签章'), [
         {
           tid: "providerModule2.signLine",
-          title: "签名行",
+          title: printT('签名行'),
           type: "text",
           options: {
             testData: "签名：_______________",
@@ -244,11 +245,11 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.sealImage",
-          title: "印章",
+          title: printT('印章'),
           data: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
           type: "image",
           options: {
-            title: "印章",
+            title: printT('印章'),
             field: "sealImage",
             src: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==",
             width: 80,
@@ -257,7 +258,7 @@ export const provider2 = function () {
         },
         {
           tid: "providerModule2.dateLine",
-          title: "日期行",
+          title: printT('日期行'),
           type: "text",
           options: {
             testData: "日期：____年____月____日",

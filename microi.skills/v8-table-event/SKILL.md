@@ -3,12 +3,14 @@ name: v8-table-event
 description: Microi V8 表单事件开发。用于编写 InFormV8、SubmitFormV8、SubmitBeforeServerV8、SubmitAfterServerV8、OutFormV8、DataFilterV8 和事务感知事件。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi V8 表单事件开发
 
 你正在开发 Microi 吾码平台的 V8 表单事件。事件绑定在表单引擎的表上，在数据操作的不同阶段自动触发。
 
+<!-- microi-progressive:begin -->
+<!-- microi-progressive:chunk id=v8-table-event-000 sha256=dd86294c8cf42f580b2eb806d981c239c0efc2934505c0716e804de2f8a9235c -->
 ## 本地优先与版本头（必做）
 
 AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<项目>/表单引擎/.../<事件Label>（<EventType>）.js` 本地文件，再通过 MCP 或 VS Code 插件同步到数据库。文件中文名必须取 `diy_table` 对应 `diy_field.Label`，其中 `SubmitFormV8` 为 `前端表单提交前V8事件（SubmitFormV8）.js`，`OutFormV8` 为 `前端表单提交后V8事件（OutFormV8）.js`。若插件显示“本地和远端不一致”，先读取本地与远端并合并有效差异，不能直接覆盖。
@@ -35,6 +37,8 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 
 生成 V8 事件代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；提交前校验、提交后联动、字段显隐、数据脱敏、跨表写入、复杂条件判断等代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-table-event-001 sha256=7bad55ca6781e6ca458a0333a47c71a3bad30334d146e940496c45c4ffa7ddf5 -->
 ## 事件类型
 
 | 事件 | 运行端 | V8.EventName | 触发时机 | 用途 |
@@ -46,6 +50,8 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 | `SubmitAfterServerV8.js` | **后端** | `FormSubmitAfter` | 数据写入 DB 之后 | 触发通知、同步其它表、日志 |
 | `DataFilterV8.js` | **后端** | `DataFilter` | 获取列表/表单数据后 | 每行数据加工、脱敏、补充字段 |
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-table-event-002 sha256=1956a46955c57434582c8dd5a41ffe9d445a74f42b26706c7d2033dfb822ffc0 -->
 ## 事件触发规则
 
 - 后端 V8 事件 / 接口引擎中调用 `V8.FormEngine` 增删改 → **不触发**表单 V8 事件
@@ -54,6 +60,8 @@ AI 本地开发表单 V8 事件时，优先修改 `microi-v8-engine/<租户>/<�
 - 服务器端提交前/后 V8 事件在**同一事务**中执行
 - `diy_table.V8Unlimited` 只控制该表的后端提交前、提交后和数据处理 V8；仅当事件链必须保持一个事务且无法安全分片时开启。它解除当前 Jint Engine 的超时、语句、函数递归和累计分配限制，但不解除进程常驻内存、取消、并发、接口嵌套深度、权限和数据库保护。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-table-event-003 sha256=65a1e728982d4e534d06dc2440eac111fe53a08f0a3012c6a9f8b1de45b4b81f -->
 ## ⚠️ 关键陷阱（必读）
 
 ### 1. 设计模式保护（前端事件必加）
@@ -95,6 +103,8 @@ V8.ApiEngine.Run('other-engine', { Form: V8.Form }, V8.DbTrans);
 
 ---
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-table-event-004 sha256=d3852ea4ed2f399ca19b537372d7f53a7d8f667d39ebd215210957fb8b6d9c0f -->
 ## 前端事件特有 API
 
 ```javascript
@@ -147,241 +157,11 @@ V8.ShowFormTab('tabName'); // 显示Tab
 V8.ClickFormTab('tabName'); // 选中Tab
 ```
 
-## InFormV8.js — 表单打开事件
+<!-- /microi-progressive:chunk -->
+## 详细参考路由（渐进披露）
 
-```javascript
-// 新增时设置默认值
-if (V8.FormMode === 'Add') {
-  V8.FormSet('Status', 1);
-  V8.FormSet('CreateTime', DateNow('yyyy-MM-dd HH:mm:ss'));
-  V8.FormSet('CreatorId', V8.CurrentUser.Id);
-  V8.FormSet('CreatorName', V8.CurrentUser.Name);
-}
+仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 
-// 编辑时禁用某些字段
-if (V8.FormMode === 'Edit') {
-  V8.FieldSet('Account', 'Readonly', true);  // 账号不可修改
-}
-
-// 查看模式隐藏操作按钮
-if (V8.FormMode === 'View') {
-  V8.HideFormBtn('Save');
-}
-
-// 根据角色控制字段可见性
-if (V8.CurrentUser.RoleName.indexOf('管理员') === -1) {
-  V8.FieldSet('AuditField', 'Visible', false);
-}
-```
-
-## SubmitFormV8.js — 前端提交校验
-
-```javascript
-// 自定义校验
-var phone = V8.Form.Phone;
-if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
-  V8.Tips('手机号格式不正确', false);
-  return false;  // 返回 false 阻止提交
-}
-
-// 业务逻辑校验
-if (V8.Form.StartDate > V8.Form.EndDate) {
-  V8.Tips('开始日期不能大于结束日期', false);
-  return false;
-}
-```
-
-## SubmitBeforeServerV8.js — 服务端提交前
-
-```javascript
-// V8.Form 是即将写入数据库的数据
-// V8.OldForm 是修改前的旧数据（仅更新时有值）
-// V8.FormSubmitAction：'Insert' / 'Update' / 'Delete'
-
-// 新增时：自动填充审计字段
-if (V8.FormSubmitAction === 'Insert') {
-  V8.Form.CreateTime = DateNow('yyyy-MM-dd HH:mm:ss');
-  V8.Form.CreateUserId = V8.CurrentUser.Id;
-}
-
-// 更新时：记录修改人
-if (V8.FormSubmitAction === 'Update') {
-  V8.Form.UpdateTime = DateNow('yyyy-MM-dd HH:mm:ss');
-  V8.Form.UpdateUserId = V8.CurrentUser.Id;
-}
-
-// 删除时：校验是否允许删除
-if (V8.FormSubmitAction === 'Delete') {
-  var related = V8.FormEngine.GetTableDataCount('OrderDetail', {
-    _Where: [['OrderId', '=', V8.Form.Id]]
-  });
-  if (related.DataCount > 0) {
-    return { Code: 0, Msg: '该订单下有明细数据，不允许删除' };
-  }
-}
-
-// 唯一性校验
-if (V8.FormSubmitAction === 'Insert' || V8.FormSubmitAction === 'Update') {
-  var where = [['Code', '=', V8.Form.Code]];
-  if (V8.FormSubmitAction === 'Update') {
-    where.push(['AND', 'Id', '<>', V8.Form.Id]);
-  }
-  var exist = V8.FormEngine.GetFormData('Product', { _Where: where });
-  if (exist.Code === 1 && exist.Data) {
-    return { Code: 0, Msg: '编码已存在' };
-  }
-}
-
-// 返回 { Code: 0, Msg: '...' } 阻止提交并自动回滚事务
-// 无需手动调用 V8.DbTrans.Rollback()
-```
-
-## SubmitAfterServerV8.js — 服务端提交后
-
-```javascript
-// 此时数据已成功写入数据库（仍在事务中）
-// 返回 { Code: 0 } 仍可回滚事务
-
-// 新增后：自动创建关联数据。保持默认 Server 调用，不触发目标表事件
-if (V8.FormSubmitAction === 'Insert') {
-  V8.FormEngine.AddFormData('UserProfile', {
-    UserId: V8.Form.Id,
-    NickName: V8.Form.Name
-  }, V8.DbTrans);
-}
-
-// 更新后：同步更新其它表的冗余字段
-if (V8.FormSubmitAction === 'Update') {
-  if (V8.OldForm.Name !== V8.Form.Name) {
-    V8.FormEngine.UptFormDataByWhere('OrderHeader', {
-      _Where: [['CustomerId', '=', V8.Form.Id]],
-      CustomerName: V8.Form.Name
-    });
-  }
-}
-
-// 通知（调用其他接口引擎，可共享事务）
-V8.ApiEngine.Run('send-notification', {
-  userId: V8.Form.Id,
-  type: V8.FormSubmitAction
-}, V8.DbTrans);
-
-// 记录操作日志
-V8.Method.AddSysLog({
-  Title: V8.FormSubmitAction + ' ' + V8.TableModel.Name,
-  Content: JSON.stringify({ Id: V8.Form.Id }),
-  Type: '业务日志'
-});
-```
-
-`SubmitAfterServerV8` 的“After”仍是“写入后、提交前”。需要在事务真正提交后才发布的缓存版本、跨节点通知等副作用，不能直接在事件中执行。平台为 `microi_database` 提供专用 `V8.Method.RefreshExtensionDatabases()`：事件调用时只登记提交后回调，提交成功才递增当前租户共享 Redis 版本，回滚时自动丢弃。普通业务的外部消息仍优先使用同事务 outbox，不能把任意不可撤销副作用都塞进内存回调。
-
-## DataFilterV8.js — 服务端数据处理事件
-
-获取列表/表单数据后，每行数据都会执行一次此事件。
-
-```javascript
-// V8.RowIndex — 当前行索引（从 0 开始）
-// V8.Form — 当前行数据
-// V8.NotSaveField — 指定哪些字段编辑时不保存（数组）
-// V8.CacheData — 用于缓存数据，避免每行重复查询
-
-// 补充计算字段
-V8.Form.TotalPrice = V8.Form.Price * V8.Form.Quantity;
-
-// 指定某些字段不保存（仅在编辑表单时有效）
-V8.NotSaveField = ['TotalPrice', 'CompanyName'];
-
-// 使用 CacheData 避免 N+1 查询
-if (!V8.CacheData.deptMap) {
-  var depts = V8.FormEngine.GetTableData('Department', {});
-  var map = {};
-  for (var i = 0; i < depts.Data.length; i++) {
-    map[depts.Data[i].Id] = depts.Data[i].Name;
-  }
-  V8.CacheData.deptMap = map;
-}
-V8.Form.DeptName = V8.CacheData.deptMap[V8.Form.DeptId] || '';
-
-// 数据脱敏
-if (V8.Form.Phone) {
-  V8.Form.Phone = V8.Form.Phone.substring(0, 3) + '****' + V8.Form.Phone.substring(7);
-}
-```
-
-## 事件上下文变量
-
-### 前端事件
-
-| 变量 | 说明 | 可用事件 |
-|------|------|---------|
-| `V8.Form` | 当前表单数据（新增时也有 Id） | 全部 |
-| `V8.OldForm` | 已加载的修改前旧数据 | 普通表单；提交前/后 |
-| `V8.FormMode` | `'Add'` / `'Edit'` / `'View'` | 全部 |
-| `V8.FormOutAction` | `'Insert'`/`'Update'`/`'Close'`/`'Delete'` | FormOut |
-| `V8.FormSubmitAction` | `'Insert'` / `'Update'` / `'Delete'` | SubmitBefore |
-| `V8.EventName` | 当前事件名 | 全部 |
-| `V8.CurrentUser` | 当前用户 | 全部 |
-| `V8.TableId` / `V8.TableName` | 当前表 Id / Name | 全部 |
-| `V8.SelectedData` / `V8.TableRowSelected` | 选中的行数组 | 列表/批量按钮 |
-| `V8.CurrentTableData` | 当前表当页数据 | 全部 |
-| `V8.ClientType` | `'PC'`/`'IOS'`/`'Android'`/`'H5'`/`'WeChat'` | 全部 |
-| `V8.ThisValue` | 当前字段新值：可能是对象、原始值或行内 `{New,Old}` | FieldValueChange |
-| `V8.OldValue` | 当前字段旧值，仅行内编辑可靠 | 表格行内 FieldValueChange |
-| `V8.KeyCode` | 键盘事件的键码 | FieldOnKeyup |
-| `V8.Event` | 原生事件；键盘事件目前不提供 | FieldSlotButtonClick 等显式事件 |
-| `V8.ParentV8` | 子表中访问父表 V8 对象 | 子表事件 |
-
-### 后端事件
-
-| 变量 | 说明 | 可用事件 |
-|------|------|---------|
-| `V8.Form` | 当前表单/行数据 | 全部 |
-| `V8.OldForm` | 提交前旧数据 | SubmitBefore/After |
-| `V8.FormSubmitAction` | `'Insert'`/`'Update'`/`'Delete'` | SubmitBefore/After |
-| `V8.TableModel` | 表模型（Id, Name 等） | SubmitBefore/After |
-| `V8.EventName` | 当前事件名 | 全部 |
-| `V8.InvokeType` | `'Server'`/`'Client'` | 全部 |
-| `V8.CurrentUser` | 当前用户 | 全部 |
-| `V8.RowIndex` | 行索引（从 0） | DataFilter |
-| `V8.NotSaveField` | 不保存的字段（数组，可写） | DataFilter |
-| `V8.CacheData` | 缓存数据（避免 N+1，可写） | DataFilter |
-
-## 前端事件名（V8.EventName 可能的值）
-
-| 值 | 说明 |
-|---|---|
-| `FormIn` | 进入表单事件 |
-| `FormSubmitBefore` | 提交前事件 |
-| `FormOut` | 离开表单事件 |
-| `FieldValueChange` | 字段值变更事件 |
-| `FieldOnKeyup` | 文本框键盘事件 |
-| `TableFieldOnKeyup` | 表格行内文本框键盘事件 |
-| `FieldSlotButtonClick` | 单行文本插槽按钮点击事件 |
-| `V8BtnRun` | V8 按钮执行事件 |
-| `V8BtnLimit` | V8 按钮是否显示事件 |
-| `BtnFormDetailRun` | 详情按钮 V8 按钮 |
-| `TableRowClick` | 表格行点击 V8 事件 |
-| `OpenTableBefore` | 弹出表格前事件 |
-| `OpenTableSubmit` | 弹出表格提交事件 |
-| `PageTab` | 多 Tab 页签 V8 事件 |
-| `WFNodeStart` | 流程节点开始 V8 事件 |
-| `WFNodeEnd` | 流程节点结束 V8 事件 |
-
-## 注意事项
-
-- 前端事件可使用 `window` 对象和 `async/await`，后端事件不可以
-- 后端提交前/后事件返回 `{ Code: 0, Msg: '...' }` 可阻止数据写入并回滚事务
-- 直接修改 `V8.Form` 的字段值即可改变最终写入的数据
-- 后端事件中使用 `V8.FormEngine` 默认是 Server 调用，不触发目标表事件；`_InvokeType:'Client'` 恰好会触发目标表事件，不能用于“避免递归”
-- `_InvokeType:'Server'` 只表达事件调用语义，不是客户端授权开关；浏览器伪造它不会获得受信任权限
-- `V8.FormSubmitAction` 的值是 `'Insert'`/`'Update'`/`'Delete'`（非 Add/Upt/Del）
-- 在 DataFilterV8 中使用 `V8.CacheData` 缓存查询结果，避免每行执行 N+1 查询
-- 表事件调用下游接口时，`diy_table.V8Unlimited` 不会自动放开下游接口；下游 `sys_apiengine.V8Unlimited` 必须独立配置，避免一次开关无边界扩散到整条调用链
-
-### 复盘：提交后事件误把增量表单当作完整记录
-
-- 触发场景：插件、MCP 或后端只更新代码等少数字段时，`SubmitAfterServerV8` 直接对 `V8.Form.Id`、业务 Key 调用 `toLowerCase()`，保存动作因字段未出现在增量参数中而异常。
-- 根因：事件假设 `V8.Form` 始终包含整行数据，没有兼容稀疏更新（sparse patch）。
-- 通用规则：提交后事件使用非本次必传字段前，必须从 `V8.OldForm` 合并兜底，或凭已有 `Id` 回查当前记录；调用字符串方法前先显式 `String(...)` 并校验空值。写缓存时应缓存合并后的完整模型，不能用稀疏对象覆盖整行缓存。
-- 自动化检查：分别只更新一个普通字段、只更新大文本代码字段并执行一次完整表单保存；事件均不得报错，按 Id、唯一 Key 和可选地址回读缓存都应得到完整记录。
+- [references/progressive-01-informv8-js-表单打开事件.md](references/progressive-01-informv8-js-表单打开事件.md)：InFormV8.js — 表单打开事件；SubmitFormV8.js — 前端提交校验；SubmitBeforeServerV8.js — 服务端提交前；SubmitAfterServerV8.js — 服务端提交后；DataFilterV8.js — 服务端数据处理事件；事件上下文变量
+- [references/progressive-02-前端事件名-v8-eventname-可能的值.md](references/progressive-02-前端事件名-v8-eventname-可能的值.md)：前端事件名（V8.EventName 可能的值）；注意事项
+<!-- microi-progressive:end -->

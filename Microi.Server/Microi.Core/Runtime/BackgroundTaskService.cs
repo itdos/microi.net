@@ -293,6 +293,11 @@ namespace Microi.net
                 var now = DateTime.Now;
                 var nextCurrent = current.HasValue ? Math.Max(0, current.Value) : item.Current;
                 var nextTotal = total.HasValue && total.Value > 0 ? total.Value : item.Total;
+                nextCurrent = BackgroundTaskProgress.PreserveMonotonicCurrent(
+                    item.Current,
+                    item.Total,
+                    nextCurrent,
+                    nextTotal);
                 var estimate = BackgroundTaskProgress.Calculate(
                     now,
                     item.StartTime ?? now,
@@ -302,7 +307,8 @@ namespace Microi.net
                     item.ProgressSampleTime,
                     item.ProgressSampleCurrent,
                     item.ThroughputPerSecond,
-                    item.ProgressSampleCount);
+                    item.ProgressSampleCount,
+                    item.Progress);
 
                 item.Current = nextCurrent;
                 item.Total = nextTotal;
@@ -379,7 +385,7 @@ namespace Microi.net
             Volatile.Write(ref _workerParallelism, parallelism);
             var configuredTenant = OsClientExtend.GetConfigOsClient();
             if (configuredTenant.DosIsNullOrWhiteSpace()) configuredTenant = OsClientDefault.OsClient;
-            var running = new Dictionary<Task, string>();
+            var running = new Dictionary<Task, WorkerSlot>();
             while (!stoppingToken.IsCancellationRequested)
             {
                 // This callback is diagnostic state only. The durable task table,
@@ -398,17 +404,36 @@ namespace Microi.net
                 while (running.Count < parallelism && !stoppingToken.IsCancellationRequested)
                 {
                     BackgroundTaskRecord item;
-                    var nonConfiguredRunning = running.Values.Count(osClient => !string.Equals(
-                        osClient,
+                    var nonConfiguredRunning = running.Values.Count(slot => !string.Equals(
+                        slot.OsClient,
                         configuredTenant,
                         StringComparison.OrdinalIgnoreCase));
                     var reserveConfiguredSlot = parallelism > 1
-                                                && nonConfiguredRunning >= parallelism - 1;
+                                                 && nonConfiguredRunning >= parallelism - 1;
+                    var diyLangRunning = running.Values.Count(slot => string.Equals(
+                        slot.ApiEngineKey,
+                        DiyLangBackgroundTaskService.WorkerApiEngineKey,
+                        StringComparison.OrdinalIgnoreCase));
+                    var excludedApiEngineKey = ShouldReserveNonMaintenanceSlot(
+                        parallelism,
+                        diyLangRunning)
+                        ? DiyLangBackgroundTaskService.WorkerApiEngineKey
+                        : null;
                     try
                     {
                         item = reserveConfiguredSlot
-                            ? BackgroundTaskStore.TryClaimConfiguredTenant(NodeId)
-                            : BackgroundTaskStore.TryClaimNext(NodeId);
+                            ? BackgroundTaskStore.TryClaimConfiguredTenant(NodeId, excludedApiEngineKey)
+                            : BackgroundTaskStore.TryClaimNext(NodeId, excludedApiEngineKey);
+                        // When language maintenance already occupies its quota, a
+                        // configured-tenant reservation must not starve an ordinary
+                        // task from another tenant. Prefer the configured tenant,
+                        // then lend the slot only to non-maintenance work.
+                        if (item == null
+                            && reserveConfiguredSlot
+                            && !excludedApiEngineKey.DosIsNullOrWhiteSpace())
+                        {
+                            item = BackgroundTaskStore.TryClaimNext(NodeId, excludedApiEngineKey);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -422,7 +447,11 @@ namespace Microi.net
                     }
                     if (item == null) break;
                     Interlocked.Exchange(ref _claimFailureReported, 0);
-                    running[ProcessClaimedAsync(item, stoppingToken)] = item.OsClient ?? "";
+                    running[ProcessClaimedAsync(item, stoppingToken)] = new WorkerSlot
+                    {
+                        OsClient = item.OsClient ?? "",
+                        ApiEngineKey = item.ApiEngineKey ?? ""
+                    };
                     Volatile.Write(ref _workerRunningCount, running.Count);
                 }
 
@@ -450,6 +479,17 @@ namespace Microi.net
             Volatile.Write(ref _workerRunningCount, 0);
         }
 
+        internal static bool ShouldReserveNonMaintenanceSlot(
+            int parallelism,
+            int diyLangRunning)
+        {
+            if (parallelism <= 1) return false;
+            // Language repair is CPU and database intensive. Keep it to one local
+            // worker slot; the remaining slots stay available for user-submitted
+            // work regardless of the configured general worker parallelism.
+            return diyLangRunning >= 1;
+        }
+
         /// <summary>
         /// Returns a side-effect-free readiness probe for the configured tenant.
         /// It deliberately validates the full worker projection so a half-applied
@@ -467,9 +507,19 @@ namespace Microi.net
                     active.Record.OsClient,
                     active.Record.ApiEngineKey,
                     active.Record.Status,
+                    active.Record.Progress,
+                    active.Record.ProgressMode,
+                    active.Record.Current,
+                    active.Record.Total,
+                    active.Record.Msg,
                     active.Record.StartTime,
                     active.Record.HeartbeatTime,
+                    active.Record.LeaseExpiresAt,
                     active.Record.FencingToken,
+                    active.Record.AttemptCount,
+                    active.Record.MaxAttempts,
+                    active.Record.ExecutionCount,
+                    active.Record.LastError,
                     active.Record.ConcurrencyKey,
                     active.LeaseLost,
                     CancellationRequested = active.Cancellation.IsCancellationRequested
@@ -488,6 +538,7 @@ namespace Microi.net
                 MaxParallelTaskCount = Volatile.Read(ref _workerParallelism),
                 ConfiguredTenant = osClient ?? "",
                 ReservedConfiguredTenantSlotCount = Volatile.Read(ref _workerParallelism) > 1 ? 1 : 0,
+                ReservedNonDiyLangSlotCount = Math.Max(0, Volatile.Read(ref _workerParallelism) - 1),
                 RunningSlotCount = Volatile.Read(ref _workerRunningCount),
                 ActiveExecutionCount = ActiveExecutions.Count,
                 ActiveTasks = activeTasks
@@ -537,9 +588,25 @@ namespace Microi.net
             {
                 try
                 {
+                    var concurrencyLeaseOsClient = item.OsClient;
+                    var concurrencyLeaseKey = item.ConcurrencyKey;
+                    if (string.Equals(
+                            item.ApiEngineKey,
+                            DiyLangBackgroundTaskService.WorkerApiEngineKey,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Tenant task tables remain the durable source of truth, but
+                        // all language jobs coordinate through the configured
+                        // tenant's Redis. This serializes maintenance across tenants
+                        // and nodes instead of merely within one tenant database.
+                        concurrencyLeaseOsClient = OsClientExtend.GetConfigOsClient();
+                        if (concurrencyLeaseOsClient.DosIsNullOrWhiteSpace())
+                            concurrencyLeaseOsClient = OsClientDefault.OsClient;
+                        concurrencyLeaseKey = DiyLangBackgroundTaskService.ClusterConcurrencyKey;
+                    }
                     concurrencyLease = BackgroundTaskConcurrencyLease.TryAcquire(
-                        item.OsClient,
-                        item.ConcurrencyKey,
+                        concurrencyLeaseOsClient,
+                        concurrencyLeaseKey,
                         item.LeaseOwner,
                         item.RuntimeOsClientType,
                         item.RuntimeOsClientNetwork,
@@ -606,7 +673,10 @@ namespace Microi.net
                         item.BusinessTaskIdField,
                         item.BusinessProgressField,
                         item.BusinessEtaField,
-                        item.LeaseOwner
+                        item.LeaseOwner,
+                        item.Progress,
+                        item.Current,
+                        item.Total
                     });
 
                     dynamic rawResult;
@@ -1172,6 +1242,12 @@ namespace Microi.net
             public string UserKey { get; set; }
             public string RuntimeOsClientType { get; set; }
             public string RuntimeOsClientNetwork { get; set; }
+        }
+
+        private sealed class WorkerSlot
+        {
+            public string OsClient { get; set; }
+            public string ApiEngineKey { get; set; }
         }
 
         private sealed class ActiveExecution

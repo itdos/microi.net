@@ -9,7 +9,7 @@
                 <el-icon>
                   <Grid />
                 </el-icon>
-                组件
+                {{ $pet('组件') }}
               </el-text>
             </template>
             <Suspense>
@@ -22,7 +22,7 @@
                 <el-icon>
                   <FullScreen />
                 </el-icon>
-                容器
+                {{ $pet('容器') }}
               </el-text>
             </template>
             <Suspense>
@@ -35,7 +35,7 @@
                 <el-icon>
                   <Memo />
                 </el-icon>
-                页面
+                {{ $pet('页面') }}
               </el-text>
             </template>
             <Suspense>

@@ -817,7 +817,21 @@
                         </template>
                     </el-table-column>
                     <!-- 操作列按每行真实可见按钮计算宽度，取最宽行并统一右对齐 -->
-                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class="row-last-op" align="right" header-align="right" :width="GetActionWidth">
+                    <el-table-column :fixed="DosCommon.isMobile ? false : 'right'" :label="$t('Msg.Action')" class-name="row-last-op" align="right" header-align="left" :width="GetActionWidth">
+                        <template #header>
+                            <div
+                                class="col-header-cell action-column-settings-trigger"
+                                role="button"
+                                tabindex="0"
+                                :aria-expanded="_columnSettingsVisible"
+                                @click.stop="showColumnSettings($event)"
+                                @keydown.enter.stop="showColumnSettings($event)"
+                                @keydown.space.stop.prevent="showColumnSettings($event)"
+                            >
+                                <span class="col-header-label">{{ $t('Msg.Action') }}</span>
+                                <el-icon class="col-header-menu-icon action-column-settings-icon" :size="15"><Setting /></el-icon>
+                            </div>
+                        </template>
                         <template #default="scope">
                             <div class="diy-table-action-content">
                                 <el-button
@@ -1603,6 +1617,72 @@
                             <el-button size="small" type="primary" @click="colMenuApplyAllFilters()">筛选</el-button>
                         </div>
                     </div>
+                </div>
+            </div>
+        </teleport>
+
+        <!-- 当前用户 × 当前模块的列显示偏好 -->
+        <teleport to="body">
+            <div
+                v-show="_columnSettingsVisible"
+                ref="globalColumnSettings"
+                class="global-col-header-menu user-column-settings-menu"
+                :style="{
+                    top: _columnSettingsPosition.top + 'px',
+                    left: _columnSettingsPosition.left + 'px',
+                    maxHeight: _columnSettingsPosition.maxHeight ? _columnSettingsPosition.maxHeight + 'px' : undefined
+                }"
+                @click.stop
+            >
+                <div class="user-column-settings-head">
+                    <div class="user-column-settings-title">
+                        <span class="user-column-settings-title-icon"><el-icon><Setting /></el-icon></span>
+                        <div>
+                            <strong>{{ GetColumnSettingsText('title') }}</strong>
+                            <small>{{ GetVisibleUserTableColumnCount() }}/{{ GetUserTableColumns().length }} {{ GetColumnSettingsText('visible') }}</small>
+                        </div>
+                    </div>
+                    <button
+                        v-if="GetColumnSettingsStatusText()"
+                        type="button"
+                        class="user-column-settings-status"
+                        :class="'is-' + _columnSettingsSaveState"
+                        :title="_columnSettingsSaveError"
+                        @click="_columnSettingsSaveState === 'error' ? SaveUserTableColumnPreference() : undefined"
+                    >
+                        <i></i>{{ GetColumnSettingsStatusText() }}
+                    </button>
+                </div>
+                <div class="user-column-settings-search">
+                    <el-input v-model="_columnSettingsSearch" clearable :placeholder="GetColumnSettingsText('search')">
+                        <template #prefix><el-icon><Search /></el-icon></template>
+                    </el-input>
+                </div>
+                <div class="user-column-settings-actions">
+                    <button type="button" @click="SelectAllUserTableColumns()">{{ GetColumnSettingsText('selectAll') }}</button>
+                    <button type="button" @click="InvertUserTableColumns()">{{ GetColumnSettingsText('invert') }}</button>
+                    <button type="button" class="is-reset" @click="ResetUserTableColumns()">{{ GetColumnSettingsText('reset') }}</button>
+                </div>
+                <div class="user-column-settings-list">
+                    <el-checkbox
+                        v-for="column in GetFilteredUserTableColumns()"
+                        :key="column.Key"
+                        class="user-column-settings-option"
+                        :model-value="!IsUserTableColumnHidden(column)"
+                        @change="SetUserTableColumnVisible(column, $event)"
+                    >
+                        <span class="user-column-settings-option-label" :title="column.Label">{{ column.Label }}</span>
+                        <span class="user-column-settings-option-name" :title="column.Name">{{ column.Name }}</span>
+                        <span class="user-column-settings-option-kind">{{ GetColumnSettingsText(column.IsAudit ? 'audit' : 'field') }}</span>
+                    </el-checkbox>
+                    <div v-if="GetFilteredUserTableColumns().length === 0" class="user-column-settings-empty">
+                        <el-icon><Search /></el-icon>
+                        <span>{{ GetColumnSettingsText('empty') }}</span>
+                    </div>
+                </div>
+                <div class="user-column-settings-foot">
+                    <el-icon><InfoFilled /></el-icon>
+                    <span>{{ GetColumnSettingsText('hint') }}</span>
                 </div>
             </div>
         </teleport>

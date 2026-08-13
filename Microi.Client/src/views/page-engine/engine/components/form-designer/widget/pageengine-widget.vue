@@ -4,19 +4,19 @@
       v-if="pageId && canDesignPage"
       type="button"
       class="nested-page-design-btn"
-      aria-label="界面设计"
+      :aria-label="$pet('界面设计')"
       @click="openNestedPageDesigner"
     >
       <el-icon><EditPen /></el-icon>
-      <span>界面设计</span>
+      <span>{{ $pet('界面设计') }}</span>
     </button>
     <div v-if="!pageId" class="pageengine-widget__placeholder">
       <el-icon :size="34"><DataBoard /></el-icon>
-      <span>请选择要嵌入的界面引擎</span>
+      <span>{{ $pet('请选择要嵌入的界面引擎') }}</span>
     </div>
     <div v-else-if="loading" class="pageengine-widget__placeholder">
       <el-icon class="is-loading" :size="30"><Loading /></el-icon>
-      <span>正在加载界面引擎...</span>
+      <span>{{ $pet('正在加载界面引擎...') }}</span>
     </div>
     <el-alert
       v-else-if="error"

@@ -3,7 +3,7 @@ name: page-engine
 description: 生成和审查 Microi 界面引擎 Page Engine 页面 JSON。用于创建仪表盘、图表、表格、地图、组件、页面布局，或校验 mic_page formData JSON。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 界面引擎（Page Engine）页面 JSON 生成
 
@@ -11,6 +11,8 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 
 你正在为 Microi 吾码平台生成界面引擎页面的 JSON 数据。界面引擎页面由 `formData` 对象描述，用户导入 JSON 即可使用。
 
+<!-- microi-progressive:begin -->
+<!-- microi-progressive:chunk id=page-engine-000 sha256=5b79a31a8484bf0a618c2810e66c0ab542fd86ceeb76e7a5cd07a86284c4f6ac -->
 ## 设计器源码事件
 
 只有在扩展界面引擎设计器源码时才使用全局事件总线。用
@@ -18,6 +20,8 @@ MCP 的生成/保存入口包含 `microi_build_page_design` 与 `microi_save_pag
 组件卸载时逐项调用 `EventBus.off(eventName)`。重复挂载不解绑会造成一次操作
 触发多次；普通页面 JSON 生成不需要注册事件总线。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-001 sha256=fa60ff07b50f0d1fdbbf8c3838e94f5de8333a9072c8a5b7e86c4cc91038dfd9 -->
 ## 核心数据结构
 
 ```
@@ -35,6 +39,8 @@ formData（页面）
             └── widgetParams[]  // 组件私有参数
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-002 sha256=6a1a85b40bcb5f8be694b0aad73a805083acd0d6fcd9cba36278dc9b51d24dcb -->
 ## formConfig 页面全局配置
 
 ```json
@@ -51,6 +57,8 @@ formData（页面）
 }
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-003 sha256=8afb75b0e4d85ab9f56a7ba018e1cc50f758d3e604683d8c38d5f0a45d53f135 -->
 ## 容器类型
 
 | type | label | 说明 |
@@ -104,6 +112,8 @@ formData（页面）
 }
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-004 sha256=9c7c85bb0d25267d07e45d9abeb5691c2f0ffd9da233351cf2f448a9b848cea5 -->
 ## 组件通用结构
 
 ```json
@@ -123,6 +133,8 @@ formData（页面）
 }
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-005 sha256=c1e31dede775f14761182fc197cf428d494806c4503a622ffdad3d16d091d3e0 -->
 ## widgetParams 参数类型
 
 | type | 说明 | value 类型 |
@@ -136,6 +148,8 @@ formData（页面）
 | `select` | 下拉选择 | `string` |
 | `radio` | 单选组 | `string` |
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-006 sha256=f50da72e63e62c2e1ea2d47ad2294deba20d6ca1ed732835eeab1e794407306e -->
 ## 数据来源（widgetParams[0]）
 
 大多数组件的第一个参数（sort=0）是"数据来源"：
@@ -147,126 +161,8 @@ formData（页面）
 $ApiBase$/apiengine/{ApiEngineKey}
 ```
 
-## 所有组件类型
-
-### statistic — 统计面板
-```json
-{ "data": [{ "name": "指标名", "value": 100000, "icon": "Top", "bgColor": "", "bgImage": "linear-gradient(...)", "linkUrl": "/" }], "searchData": [] }
-```
-
-### progress — 进度
-```json
-{ "data": [{ "title": "标题", "value": "￥1,000", "subTitle": "目标", "percentage": 60, "color": "#409EFF" }], "searchData": [] }
-```
-
-### links — 快捷导航
-```json
-[{ "title": "导航名", "iconUrl": "图标URL", "linkUrl": "/路径" }]
-```
-
-### carousel — 轮播图
-```json
-[{ "url": "图片URL" }]
-```
-
-### tabel — 表格
-```json
-{
-  "headerData": [{ "prop": "字段名", "label": "列标题", "width": "", "align": "center" }],
-  "bodyData": [{ "字段名": "值" }],
-  "total": 2,
-  "searchData": []
-}
-```
-特殊列标记：`progress_ui`(进度条), `chart_ui`(迷你图), `rate_ui`(评分), `status_ui`(状态标签), `children`(多级表头)
-
-### line / bar — 折线图 / 柱状图
-```json
-{ "xAxis": ["Mon", "Tue", "Wed"], "series": [{ "name": "系列", "data": [420, 132, 101] }], "searchData": [] }
-```
-
-### pie — 饼图
-```json
-{ "data": [{ "value": 1048, "name": "搜索引擎" }], "searchData": [] }
-```
-
-### funnel — 漏斗图
-```json
-{ "data": [{ "value": 100, "name": "展示" }], "searchData": [] }
-```
-
-### linebar — 折柱混合
-```json
-{ "xAxis": ["周一"], "series": [{ "name": "蒸发量", "type": "bar", "unit": "ml", "data": [2.0] }, { "name": "温度", "type": "line", "unit": "°C", "data": [2.0] }], "searchData": [] }
-```
-
-### map — 高德地图
-```json
-[{ "id": "1", "title": "标记名", "position": "经度,纬度", "icon": "", "content": "" }]
-```
-
-### areamap — 区域地图
-```json
-[{ "name": "地区名", "value": 74, "path": "/路径" }]
-```
-
-### gantt — 甘特图
-```json
-{
-  "tasks": [{ "id": 10, "text": "任务名", "type": "project", "progress": 0.1, "open": true }],
-  "links": [{ "id": 10, "source": 12, "target": 13, "type": 1 }],
-  "columns": [{ "name": "text", "label": "任务名称", "width": 220, "tree": true }]
-}
-```
-
-### fullcalendar — 日历看板
-```json
-[{ "id": "event_01", "title": "事件名", "start": "2025-05-12", "end": "2025-05-13", "allDay": true }]
-```
-
-### html — 超文本
-```json
-{ "dataJson": { "col21": "替换值" }, "dataHtml": "<!DOCTYPE html>...<td>${col21}</td>..." }
-```
-
-### descriptions — 描述列表
-```json
-[{ "label": "字段名", "value": "值", "span": 1, "align": "center" }]
-```
-
-### 其他组件
-| 组件 | dataJson |
-|------|----------|
-| workbench | `{ "icon": "URL", "title": "欢迎", "subTitle": "副标题" }` |
-| calendar | `[{ "date": "2024-12-01", "content": "事件" }]` |
-| collapse | `[{ "title": "标题", "content": "HTML内容" }]` |
-| steps | `{ "activeIndex": 0, "stepArr": [{ "title": "步骤1", "description": "描述" }] }` |
-| timeline | `[{ "date": "2024-05-01", "title": "标题", "content": "内容" }]` |
-| fish | `[{ "label": "类别", "children": [{ "label": "子项" }] }]` |
-| webgl | `{ "gltfPath": "模型URL", "hdrPath": "HDR URL" }` |
-| office | `{ "filePath": "文件URL" }` |
-| image | widgetParams[0] 为 `input` 类型，value 为图片URL |
-| video | widgetParams[0] 为 `input` 类型，value 为视频URL |
-| browser | widgetParams[0] 为 `input` 类型，value 为网址 |
-| diytable | 传入模块ID和菜单ID，嵌入低代码表格 |
-| diyform | 传入表ID和记录ID，嵌入低代码表单 |
-
-### 平台内置业务组件
-
-| type | label | 关键参数 | 说明 |
-|------|-------|----------|------|
-| `aiengine` | AI引擎 | 无 | 嵌入 `Microi.Client/src/views/ai-engine/index.vue`；运行态使用紧凑嵌入模式，缩小英雄区、统计卡和快捷入口 |
-| `workcenter` | 工作中心 | `[0]` 内容；`[1]` 待办模块；`[2]` 流程模块 | 展示“我的工作”时可用两个隐藏 `sys_menu` 模块让 `diy-table` 承载待办与流程列表；日历/公告为兼容模式 |
-| `pageengine` | 界面引擎 | `widgetParams[0].type = "pageengine"`，`value` 为 `mic_page.Id` | 嵌入另一个界面引擎页面，设计器提供图形化页面下拉选择 |
-
-界面引擎嵌套必须使用 `pageengine-widget.vue` 直接加载 `form-renderer` 组件，不得使用 iframe。每个嵌套页面由 `PAGE_ENGINE_STORE_KEY` 注入独立的 Pinia store，避免子页面覆盖父页面 `formData`；递归页面 Id 通过 `PAGE_ENGINE_RENDER_CONTEXT_KEY` 检测并阻止循环嵌套。父容器和组件高度设为 `0` 表示自动高度，由最外层页面统一滚动。
-
-`mic_page` 是按角色管理的运行资源：普通登录用户读取或嵌套页面时必须拥有菜单权限或高级表 `Read`，新增、修改、删除分别要求明确的 `Add`、`Edit`、`Del`；所有匿名 FormEngine 调用仍拒绝。角色页只展示服务端返回的分级策略，最终授权和当前操作者的平台管理员身份由后端主库复核。
-
-界面引擎渲染页会为 `_IsAdmin` 或 `Level >= 9999` 的用户提供“界面设计”入口，跳转 `/mic/autopage?Id={mic_page.Id}`。入口优先放入后台 TagsView 页签右键菜单，并在页面第一个容器标题栏右侧提供紧凑快捷入口，与 `moreOption` 等操作使用同一个 flex 操作区垂直居中、右对齐；不得额外占用页面高度、增加顶部空白或覆盖标题，非管理员不显示。嵌套 `pageengine` 也必须显示其自身页面的设计入口，并由父页面直接打开对应子页面设计器。
-
-首页编排可以组合 `aiengine`、`workcenter`、`diycalendar`、`diytable` 和一个占大区域的 `pageengine`。公告应优先通过绑定 `diy_notice` 的 `diytable` 渲染，使增删改权限继续由 `sys_menu + _RoleLimits` 控制；统计子页面由客户独立替换时，只需修改被嵌入的 `mic_page`，无需重做首页布局。
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=page-engine-007 sha256=bf6b4a76b11f27e62fe55e91258e3edb547aeb8456efde9d1ff787136533bf70 -->
 ## 运行态布局与滚动规范
 
 - 页面只保留一个主滚动容器：仪表盘、首页和嵌套界面优先继承最外层页面滚动；单个 `pannel`、`workcenter`、`diytable`、`diycalendar`、嵌套 `pageengine` 在运行态默认使用内容自适应高度和 `overflow: visible`，不得无条件设置 `overflow: auto`。
@@ -279,155 +175,11 @@ $ApiBase$/apiengine/{ApiEngineKey}
 - `aiengine` 在移动端嵌入首页时应使用内容自适应高度和外层页面滚动，指标卡与快捷入口优先两列紧凑排布，避免 4 个指标和全部快捷入口单列堆叠造成超长首屏；输入区和模型/推理设置必须保持可见且不横向溢出。
 - 交付前必须在真实运行页检查：是否存在内部纵向/横向滚动条、15 条表格分页是否可见、同排容器是否对齐、四周边距是否一致、组件底部是否有异常空白。仅检查设计器画布不算验收完成。
 
-## Office/PDF 在线预览自然语言生成规则
+<!-- /microi-progressive:chunk -->
+## 详细参考路由（渐进披露）
 
-当用户用自然语言要求“界面引擎预览 PDF/Word/Excel/PPT”“接口引擎返回 PDF 文件”“打开时跳到第 N 页”“按角色显示不同页码”“每 5 秒/10 秒轮询，但只有文件变化才刷新”时，优先生成 `office` 组件，而不是 `iframe/html/browser` 拼接。
+仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 
-`office` 组件图形化参数必须完整：
-
-```json
-{
-  "type": "office",
-  "label": "Office/PDF预览",
-  "widgetOption": { "span": 24, "height": 720 },
-  "widgetParams": [
-    { "sort": 0, "label": "接口引擎地址", "type": "textarea", "value": "$ApiBase$/apiengine/{ApiEngineKey}" },
-    { "sort": 1, "label": "静态文件地址", "type": "input", "value": "" },
-    { "sort": 2, "label": "文件类型", "type": "select", "value": "pdf" },
-    { "sort": 3, "label": "初始页码", "type": "number", "value": 1 },
-    { "sort": 4, "label": "轮询接口秒数", "type": "number", "value": 0 }
-  ]
-}
-```
-
-接口引擎返回契约：
-
-```javascript
-return {
-  Code: 1,
-  Data: {
-    FileName: 'report.pdf',
-    ContentType: 'application/pdf',
-    FileByteBase64: base64,
-    PageNumber: 2,
-    InitialPage: 2,
-    FileKey: activeFileKey + ':p2',
-    RefreshSeconds: 5
-  }
-};
-```
-
-轮询但不刷新时，不要重复返回文件内容；返回下面任一写法即可，前端会保持当前预览不重建：
-
-```javascript
-return { Code: 1, Data: { NeedRefresh: false, FileKey: currentFileKey, PageNumber: currentPage } };
-return { Code: 1, Data: { NotModified: true, FileKey: currentFileKey } };
-```
-
-接口引擎应读取前端轮询参数：`V8.Param.CurrentFileKey`、`V8.Param.CurrentPageNumber`、`V8.Param.PageNumber`、`V8.Param.WidgetNumber`。当 Redis/缓存中的活动文件、版本号、角色页码没有变化时返回 `NeedRefresh:false`；当文件或页码变化时返回 `FileByteBase64` 或 `FileUrl`，同时返回新的 `FileKey` 和 `PageNumber/InitialPage`。
-
-角色页码建议在接口引擎中根据 `V8.CurrentUser.Level`、`RoleName`、`RoleIds` 判断，例如管理员第 2 页、财务第 3 页；不要把角色判断写死在前端 Page JSON。缓存 Key 使用 `Microi:${V8.OsClient}:PageEnginePdfPreview:{业务Key}`。
-
-### Office/PDF 接口返回字段细则
-
-- `FileName`：文件名，例如 `report.pdf`。
-- `ContentType`：文件类型，PDF 必须用 `application/pdf`；Word/Excel/PPT 可用对应 Office MIME。
-- `FileByteBase64`：文件字节 Base64；适合接口引擎动态生成或转发 PDF。
-- `FileUrl`：文件 URL；适合文件已在 HDFS/OSS/公网可访问时返回。
-- `PageNumber` / `InitialPage`：PDF 打开后跳转页码。角色控制页码必须在接口引擎中根据 `V8.CurrentUser` 判断，不要写死在页面 JSON。
-- `FileKey` / `CacheKey`：文件版本标识，建议包含业务 Key、缓存版本号、角色页码，例如 `activePdf:v3:page2`。
-- `NeedRefresh:false` / `NotModified:true`：轮询时文件和页码未变化，前端保持当前预览并重新按当前页码定位，不重新下载文件。
-- `RefreshSeconds`：接口可返回建议轮询秒数，但页面图形化配置仍是主要控制项；没有自动刷新需求时配置为 `0`。
-
-接口引擎要显式读取这些前端参数：
-
-- `V8.Param.PageNumber`：组件配置的初始页码。
-- `V8.Param.CurrentPageNumber`：前端当前页码。
-- `V8.Param.CurrentFileKey`：前端当前文件 Key。
-- `V8.Param.CurrentFileUrl`：前端当前文件地址。
-- `V8.Param.WidgetNumber`：当前 office 组件编号。
-
-生成示例接口时必须写清楚中文注释：每个参数的含义、Redis/缓存 Key 的作用、什么情况下返回 `NeedRefresh:false`、什么情况下返回新的 `FileByteBase64/FileUrl` 和 `PageNumber`。
-
-## searchData 查询条件通用结构
-
-```json
-[
-  { "prop": "period", "value": "month", "defaultValue": "month", "label": "统计周期", "type": "select", "remote": false, "options": [{ "label": "本日", "value": "today" }, { "label": "本周", "value": "week" }, { "label": "本月", "value": "month" }, { "label": "本季", "value": "quarter" }, { "label": "本年", "value": "year" }, { "label": "去年", "value": "lastYear" }] },
-  { "prop": "department", "value": "", "label": "部门", "type": "select", "remote": false, "optionUrl": "", "options": [{ "label": "全部", "value": "" }] },
-  { "prop": "keyword", "value": "", "label": "关键词", "type": "input" }
-]
-```
-
-### 统计周期与更多筛选
-
-- 统计类组件 `statistic`、`progress`、`bar`、`line`、`linebar`、`pie`、`funnel`、`tabel` 默认必须支持周期筛选。
-- 周期按钮固定包含：本日 `today`、本周 `week`、本月 `month`、本季 `quarter`、本年 `year`、去年 `lastYear`。
-- 同时开启组件的显示查询和日期筛选开关：`statistic` 为 `widgetParams[18]/[19]`，`progress` 为 `[26]/[27]`，`bar/line` 为 `[1]/[16]`，`linebar` 为 `[1]/[18]`，`pie` 为 `[1]/[19]`，`funnel/tabel` 为 `[1]/[13]`。
-- 接口引擎会收到 `period`、`_period`、`start`、`end`、`startDate`、`endDate`。当 `period` 是 `today/week/month/quarter/year/lastYear` 时，必须优先按 `period` 计算时间范围、标题前缀和图表粒度；只有 `period=custom` 或没有 `period` 但有 `start/end` 时，才按自定义时间范围处理。
-- “更多”筛选里放业务条件，例如 `keyword`、`ownerId`、`customerType`、`status`、`department` 等；日期范围作为自定义时间范围保留在更多筛选中。
-
-### 交付类首页例外与乱码验收
-
-- 如果用户明确说明首页是“项目交付看板、全量采集看板、客户交付状态看板”，或统计的是表单数、模块数、接口引擎数、用户数等平台全量资源，并明确不要本日/本周/本月/本年筛选，则统计组件的 `searchData` 必须保持 `[]`，相关显示查询开关必须为 `false`，不要套用经营看板的周期筛选默认值。
-- 交付类首页优先使用 `statistic`、`progress`、`pie`、`bar`、`linebar`、`html` 等图形化组件，不要为了凑数据把明细表格放到首页；明细应放在低代码表单菜单里查看。
-- 使用脚本或 FormEngine 写入 `mic_page.JsonObj` 时，中文 JSON 必须做编码安全处理：可将最终 JSON 字符串中的非 ASCII 字符转为 `\uXXXX` 后写入，避免数据库或中间层把标题写成 `????`。
-- 写入界面引擎后必须回读 `mic_page.JsonObj` 并检查：不包含 `????`；用户要求无周期筛选时，不包含 `period`、`本日`、`本周`、`本月`、`本年`；`JSON.parse(JsonObj)` 后标题能还原为中文。
-- 如果使用 MCP 或自动页面生成工具后发现它注入了默认周期筛选，必须在最终写入前移除这些筛选，并再次回读验证。
-- 交付类首页必须做可读性验收：彩色统计卡片、深色渐变、图表标签、HTML 组件中的文字必须显式设置高对比文字色。深色/饱和背景使用白色或接近白色文字；浅色背景使用 `#0f172a/#334155` 等深色文字。不得只设置背景色而遗漏标题、数值、图标颜色。
-- 写入后必须检查页面 JSON 和接口返回内容不包含直接暴露的 ECharts 模板占位符：`{a}`、`{b}`、`{c}`、`{d}`、`{value}`。这些只能作为图表 formatter 内部配置使用，不能出现在用户可见标题、饼图中心标题、HTML 文案或默认加载文本中。
-- 容器标题栏的 `moreOption.hidden` 语义必须按“true=隐藏、false=显示”处理。交付首页、统计驾驶舱如无明确跳转需求，容器标题可直接留空并在 HTML/组件内部渲染标题，避免右上角出现默认 `More/更多`。
-- 如果 Page Engine 前端标准图表组件会因为远程数据源自动显示周期筛选，而用户明确要求不要筛选条，可优先使用 `html` 组件承载实时接口返回的图形化驾驶舱；接口返回扁平字段如 `{ html: "<div>...</div>" }`，页面 `dataHtml` 使用 `${html}`。写入后回读验证无周期词、无 `More/更多`、无占位符、无低对比色。
-- 生成首页前必须判断组件沉淀层级：如果某个能力是平台高频标准能力（如指标卡、进度列表、状态分布、排行榜、时间线、描述列表、Office 预览），优先使用或补充 Page Engine 标准组件源码；如果只是当前项目的强业务驾驶舱、组合排版、一次性说明区块，可以用 `html` 组件定制。不要把明显可复用的标准能力长期塞进项目 HTML，也不要为了单个业务驾驶舱新增一堆低复用组件。
-- `html` 组件承载长文本、失败原因、来源清单、备注说明、交付结论时，必须设置 `white-space:normal`、`overflow-wrap:anywhere` 或使用逐条列表/卡片渲染；禁止把多条内容用 `；`、`,` 拼成一整行导致底部说明挤在一起。写入后必须检查长文本在 1366/1440 宽度下能自然换行且不横向溢出。
-- 交付类首页如果使用一个远程 `html` 组件承载整页驾驶舱，运行态应由外层框架滚动，不要给容器和组件写死 1000px 这类固定高度。页面 JSON 可将 `wrapperOption.height` 与 `widgetOption.height` 设为 `0`（或运行态支持的 `auto`），前端运行态必须按内容自适应高度；设计器模式再使用可编辑的默认高度。
-- 首页写入口径说明时，必须区分“用户口头期望数量”“原始资料条目数量”“按业务主体合并后的数量”“后台项目/规则/别名数量”。不要只显示一个“未交付 N 个”，应同时列出部分交付、待执行、阻塞/需业务人员配合的清单和原因。
-
-## 版本历史、并发保存与回滚
-
-修改现有页面时必须先读取页面详情中的 `CurrentHash`，保存时把它作为 `expectedHash` 传入，并填写简短 `changeSummary`。不要仅凭本地旧 JSON 覆盖远端页面。
-
-| MCP 工具 | 用途 |
-|---|---|
-| `microi_list_page_history` | 获取历史元数据与当前哈希 |
-| `microi_get_page_history` | 获取指定不可变快照 |
-| `microi_compare_page_versions` | 结构化比较两个版本；右侧省略时比较当前页面 |
-| `microi_export_page_design` | 导出 `microi.page.v1` 设计包 |
-| `microi_rollback_page_design` | 使用 `expectedCurrentHash` 回滚并新增审计版本 |
-
-- 内容规范化后哈希未变化时，不应新增空历史。
-- 遇到哈希冲突先重新读取、比较，再决定合并或重做；禁止去掉 `expectedHash` 强行覆盖。
-- 回滚不是删除：目标快照成为新当前版本，回滚前内容仍保留。
-- 写后必须再次读取页面详情和历史，确认 `CurrentHash`、版本号、变更摘要和 JSON 一致。
-- 页面历史属于当前租户数据库；不要假定业务表有物理 `OsClient` 列。
-
-## 本地撤销、Vue 源码桥与资产包
-
-- 设计器本地历史最多 50 步、总计最多 20MB；连续编辑允许合并，但保存前必须刷新当前 `CurrentHash`。
-- `Ctrl/Cmd+Z`、`Ctrl/Cmd+Shift+Z`、`Ctrl/Cmd+Y` 不能抢占输入框、textarea、contenteditable 或代码编辑器自己的撤销行为。
-- 本地 Undo/Redo 不是审计版本；跨会话恢复仍使用服务端历史与 CAS。
-- Page JSON → Vue SFC 只使用确定性 `microi.page.sfc.v1` 模板；禁止 eval、动态执行用户 JSON 或注入任意 import。
-- Vue SFC → Page JSON 只接受平台生成标记、完整元数据和匹配 Hash；任意手写 Vue、第三方 SFC 或未知 script 必须拒绝。
-- 导入源码后先规范化、显示 Diff，再由用户确认写入；不得因为“解析成功”直接覆盖当前页面。
-- 可复用组件/区块使用治理中心 `microi.asset.v1`，声明 Props、Setters、DataAdapters、Platforms 和 DependencyPackages；调用 `mci-asset-publish` DryRun 后再发布。
-- 资产依赖必须检查缺失、语义版本范围、循环和最大深度；运行时使用 `mci-asset-resolve` 返回的 `LoadOrder`。
-- 复杂页面需要完整工程能力时提升为前端微服务；不要承诺任意 Vue 源码无损反编译回界面引擎。
-
-## 生成 JSON 注意事项
-
-1. **编号唯一**：`wrapperOption.number` 和 `widgetOption.number` 页面内唯一（随机5位整数）
-2. **关联一致**：`widgetOption.wrapperNumber` 必须等于所在容器的 `wrapperOption.number`
-3. **高度合理**：容器高度 >= 内部组件高度之和
-4. **widgetParams 完整**：必须包含该组件定义的所有参数，不能遗漏
-5. **栅格布局**：span 总和 24 为一行，如 span=12 的两个容器为两列布局
-6. **数据来源**：接口引擎 value 使用稳定路径 `$ApiBase$/apiengine/{Key}`，由运行时通过 `osclient` Header 传入 `$OsClient$`；只有无法设置 Header/Form/Query 的 GET/HEAD 或第三方回调才使用特殊租户路径
-7. **formConfig 完整**：所有字段都应包含，不能省略
-8. **选项卡容器**：组件放在 `tabWidgetMap[tabKey][]` 中，不放在 `widgetList` 中
-## 经营看板周期筛选与布局规则
-
-- 老板驾驶舱、经营看板、CRM/订单/售后统计页面，所有统计类组件默认都要提供统一周期筛选：本日、本周、本月、本季、本年、去年，以及“更多”里的自定义时间范围和业务条件。
-- 指标名称不要写死为“月订单金额、月新增客户、月跟进活跃”等固定月份口径。优先使用“订单金额、新增客户、跟进活跃”等中性名称；如业务需要展示周期前缀，运行态会根据当前 `period` 自动显示为“本日/本周/本月/本季/本年/去年”。
-- `statistic`、`progress` 这类内容型组件在运行态必须允许按内容自适应高度。生成 JSON 时也要按数据条数预留高度：统计卡片按每行列数计算行数，避免首次打开时出现卡片底部被遮挡或容器内部滚动条。
-- 有远程数据源的图表/表格/统计组件，点击周期按钮必须真实触发接口请求，并把 `period`、`_period`、`startDate`、`endDate` 等查询条件传给接口。接口返回数据时不要清空组件已有的 `searchData`，除非明确返回新的完整筛选配置。
-- 接口返回的指标名、图例名、表格列名禁止固定写成“月新增客户、月订单金额”等，必须根据最终生效周期输出“本日/本周/本月/本季/本年/去年/自定义”或保持中性名称；否则切换周期后文案会和数据口径冲突。
-- `/mic/autopage/:Id` 面向最终用户运行态展示，应渲染 `formRenderer`；设计器入口才渲染 `formDesigner`，避免导航、组件面板、引导遮罩干扰看板访问和自动化截图。
+- [references/progressive-01-所有组件类型.md](references/progressive-01-所有组件类型.md)：所有组件类型；Office/PDF 在线预览自然语言生成规则；searchData 查询条件通用结构
+- [references/progressive-02-版本历史-并发保存与回滚.md](references/progressive-02-版本历史-并发保存与回滚.md)：版本历史、并发保存与回滚；本地撤销、Vue 源码桥与资产包；生成 JSON 注意事项；经营看板周期筛选与布局规则
+<!-- microi-progressive:end -->

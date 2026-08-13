@@ -17,6 +17,7 @@ namespace Microi.net
     public static class DiyLangBackgroundTaskService
     {
         public const string WorkerApiEngineKey = "__microi_native_diy_lang_sync__";
+        public const string ClusterConcurrencyKey = "__microi_native_diy_lang_sync_cluster__";
         private static readonly Regex SourceRegex = new Regex(
             @"[^A-Za-z0-9._:-]", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
@@ -160,7 +161,22 @@ namespace Microi.net
                 {
                     return new DosResult(0, null, "启动期多语言修复未找到仍具权威权限的平台管理员。");
                 }
-                var hourBucket = DateTime.UtcNow.ToString("yyyyMMddHH", CultureInfo.InvariantCulture);
+                // One repair per UTC day is enough for startup self-healing. The
+                // previous hourly key caused every rolling restart to rescan every
+                // tenant, even when the previous run had already succeeded.
+                var dayBucket = DateTime.UtcNow.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+                var startupIdempotencyKey = $"diy-lang-sync:{osClient}:startup:{dayBucket}";
+                var completedToday = BackgroundTaskStore.FindByIdempotency(
+                    osClient,
+                    startupIdempotencyKey);
+                if (completedToday != null)
+                {
+                    return BuildQueuedResult(
+                        completedToday,
+                        true,
+                        "本租户今日已投递过低扰动多语言启动修复，本次启动不重复扫描。",
+                        true);
+                }
                 var task = Queue(
                     startupAdministrator,
                     osClient,
@@ -168,7 +184,7 @@ namespace Microi.net
                     "startup",
                     false,
                     true,
-                    $"diy-lang-sync:{osClient}:startup:{hourBucket}");
+                    startupIdempotencyKey);
                 return BuildQueuedResult(
                     task,
                     false,
@@ -202,9 +218,33 @@ namespace Microi.net
                     null,
                     "多语言任务执行前权限复核失败：提交管理员已失效、被降权或不属于目标租户。");
             }
+            var lastProgressWriteUtc = DateTime.MinValue;
             using (FormEngineExtend.EnterDiyLangSyncOwnershipGuard(
                        () => !cancellationToken.IsCancellationRequested
                              && BackgroundTaskService.IsCurrentExecutionOwner(taskId, fencingToken)))
+            using (FormEngineExtend.EnterDiyLangSyncProgressReporter(
+                       (progress, message, current, total) =>
+                       {
+                           var now = DateTime.UtcNow;
+                           var terminalSample = progress.HasValue && progress.Value >= 99
+                                                || current.HasValue && total.HasValue
+                                                && total.Value > 0 && current.Value >= total.Value;
+                           if (!terminalSample
+                               && lastProgressWriteUtc != DateTime.MinValue
+                               && now - lastProgressWriteUtc < TimeSpan.FromSeconds(1))
+                           {
+                               return;
+                           }
+                           if (BackgroundTaskRuntime.TryUpdateProgress(
+                                   taskId,
+                                   progress,
+                                   message,
+                                   current,
+                                   total))
+                           {
+                               lastProgressWriteUtc = now;
+                           }
+                       }))
             {
 
             var includeClientText = ReadBool(param["IncludeClientText"], true);
@@ -213,7 +253,7 @@ namespace Microi.net
             var source = SanitizeSource(param["Source"]?.ToString(), "background-task");
 
             ThrowIfExecutionOwnershipLost(taskId, fencingToken, cancellationToken);
-            BackgroundTaskRuntime.TryUpdateProgress(taskId, 2, "正在重新加载多语言运行配置");
+            BackgroundTaskRuntime.TryUpdateProgress(taskId, null, "正在重新加载多语言运行配置");
             BackgroundTaskRuntime.TryAppendLog(
                 taskId,
                 $"开始执行租户[{osClient}]多语言任务；模式={(onlyFillMissing ? "OnlyFillMissing" : "FullSync")}；FencingToken={fencingToken}。");
@@ -231,7 +271,7 @@ namespace Microi.net
             ThrowIfExecutionOwnershipLost(taskId, fencingToken, cancellationToken);
             BackgroundTaskRuntime.TryUpdateProgress(
                 taskId,
-                5,
+                null,
                 onlyFillMissing ? "正在补齐缺失的多语言译文" : "正在同步多语言元数据");
             var result = onlyFillMissing
                 ? await MicroiEngine.FormEngine

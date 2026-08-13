@@ -53,7 +53,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_010_003
+    if (versionNumber < 1_010_008
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -88,9 +88,15 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
       || !content.includes('MYSQL_BIT_NUMERIC_COMPAT_V1')
       || !content.includes('ADMIN_MENU_PERMISSION_V1')
+      || !content.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
+      || !content.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
       || !content.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
-      || !content.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')) {
-      throw new Error(`${name} 低于 v1.10.3 或缺少可信官方平台资源较新版本保护、新菜单系统管理员完整权限及写后回读、MySQL BIT数值兼容、Switch JSON字面量解包、双重元数据兼容、历史安装记录身份修复、租户接口引擎所有权不可逆保护、接口引擎资源基线、无商城标识时跳过计数、MySQL宽表行外文本回退、可信批量小包单事务、安装统计响应解析、接口引擎写后回读、后台任务运行环境隔离、Schema/资产分片、仅缺失时插入数据、断点复用、微服务公有HDFS稳定路径、DB运行产物兜底、Jint安全清理及统一应用商城能力，拒绝降级本地基线`);
+      || !content.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')
+      || !content.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
+      || !content.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
+      || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
+      || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
+      throw new Error(`${name} 低于 v1.10.8 或缺少跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台资源较新版本保护及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -135,6 +141,25 @@ function validateReleaseCandidate(name, content) {
     };
     if (packageModel?.PackageInfo?.Name !== expectedNames[name]) {
       throw new Error(`${name} 的 PackageInfo.Name 不正确`);
+    }
+    if (name === 'app.microi.saas-engine.json') {
+      const bundle = Array.isArray(packageModel.ApplicationBundles)
+        ? packageModel.ApplicationBundles[0]
+        : null;
+      const buildAssets = Array.isArray(bundle?.BuildAssets) ? bundle.BuildAssets : [];
+      const buildBytes = buildAssets.reduce((sum, asset) => sum + (Number(asset?.Size) || 0), 0);
+      if (packageModel?.PackageInfo?.IncludeSource !== false
+        || bundle?.IncludeSource !== false
+        || (Array.isArray(bundle?.SourceFiles) && bundle.SourceFiles.length > 0)
+        || bundle?.PackageAssets?.SourceZip
+        || bundle?.MicroService?.StorageMode !== 'db'
+        || bundle?.AssetStoragePolicy?.Source !== 'NotIncluded'
+        || bundle?.AssetStoragePolicy?.Build !== 'DatabaseOnly'
+        || buildAssets.length < 1
+        || buildAssets.length > 256
+        || buildBytes > 5 * 1024 * 1024) {
+        throw new Error(`${name} 必须以无伪源码、256 文件/5MB 内的 DatabaseOnly 平台内置微服务发布`);
+      }
     }
     if (name === 'app.microi.store.json') {
       const version = String(packageModel?.PackageInfo?.Version || '').replace(/^v/i, '');
@@ -211,18 +236,24 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_010_003
+        || importerVersionNumber < 1_010_008
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
         || !importerCode.includes('MYSQL_BIT_NUMERIC_COMPAT_V1')
         || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
+        || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
+        || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')
         || !importerCode.includes('TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1')
         || !importerCode.includes('PLATFORM_API_ENGINE_PRESERVE_NEWER_V1')
+        || !importerCode.includes('DATABASE_ONLY_BUILD_ASSETS_V1')
+        || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
+        || !importerCode.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
+        || !importerCode.includes('OBJECT_STORAGE_FORBIDDEN')
         || engineVersionNumber(publisherEngine) < 1_007_007
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
-        || engineVersionNumber(bulkEngine) < 1_001_003
+        || engineVersionNumber(bulkEngine) < 1_001_006
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0
         || !String(bulkEngine?.ApiV8Code || '').includes('BACKGROUND_TASK_CHECKPOINT_PLAN_V2')
@@ -230,7 +261,11 @@ function validateReleaseCandidate(name, content) {
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_CHILD_FAILURE_DETAIL_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_PLATFORM_ONLY_PLAN_V1')
         || !String(bulkEngine?.ApiV8Code || '').includes('BULK_ADAPTIVE_SINGLE_SLICE_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BULK_FAILURE_RECOVERY_DIAGNOSTICS_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BULK_STORAGE_FAILURE_RECOVERY_V1')
+        || !String(bulkEngine?.ApiV8Code || '').includes('BULK_MONOTONIC_CHILD_PROGRESS_V1')
         || !content.includes("RunBackground('bulk-import-microi-store-packages'")
+        || !content.includes('BULK_QUEUE_PREFLIGHT_DIAGNOSTICS_V1')
         || !content.includes("ApplicationType: 'Platform'")
         || !importerCode.includes('SKIP_MOVE_FOR_REUSED_BUILD_V1')
         || !importerCode.includes('MICRO_APP_PUBLIC_HDFS_PATH_V1')
@@ -248,7 +283,9 @@ function validateReleaseCandidate(name, content) {
       || !importerCode.includes('LEGACY_INSTALL_VERSION_IDENTITY_FALLBACK_V1')
       || !importerCode.includes('BULK_SMALL_PACKAGE_SINGLE_SLICE_V1')
       || !importerCode.includes('MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1')
-      || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')) {
+      || !importerCode.includes('ADMIN_MENU_PERMISSION_V1')
+      || !importerCode.includes('ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1')
+      || !importerCode.includes('ADMIN_MENU_PERMISSION_DB_TIME_V1')) {
         throw new Error(
           `${name} 版本过旧，或缺少统一商城及严格 SourceZip/BuildZip 资产边界能力：`
           + JSON.stringify({
@@ -288,6 +325,10 @@ function validateReleaseCandidate(name, content) {
               'PACKAGE_API_ENGINE_READBACK_V1',
               'API_ENGINE_RESOURCE_BASELINE_V1',
               'TENANT_API_ENGINE_POLICY_IMMUTABLE_V1',
+              'BACKGROUND_TASK_MONOTONIC_PROGRESS_V1',
+              'BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1',
+              'ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1',
+              'ADMIN_MENU_PERMISSION_DB_TIME_V1',
             ].filter(marker => !importerCode.includes(marker)),
           }),
         );

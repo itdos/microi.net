@@ -284,6 +284,23 @@ function synchronizeBulkInstallButton(packageModel) {
   if (!bulk) return;
   bulk.V8Code = `V8.ConfirmTips('将只安装未安装的官方平台应用，并更新存在新版本的官方平台应用；已是最新版的应用不会重新安装。任务进度可在右上角后台任务中心查看。', async function () {
   try {
+    // BULK_QUEUE_PREFLIGHT_DIAGNOSTICS_V1：新后端可在排队前返回工作器与任务表
+    // 就绪状态；旧后端没有此接口时保持兼容，仍允许提交后台任务。
+    var workerStatus = null;
+    try {
+      if (V8.PostAsync) {
+        workerStatus = await V8.PostAsync('/api/BackgroundTask/WorkerStatus', {}, null, null, 'json');
+      }
+    } catch (workerStatusError) {
+      workerStatus = null;
+    }
+    var worker = workerStatus && workerStatus.Code == 1 ? workerStatus.Data : null;
+    var readiness = worker && worker.Readiness ? worker.Readiness : null;
+    if (worker && (worker.LoopHealthy !== true || (readiness && readiness.SchemaReady === false))) {
+      var notReadyReason = (readiness && readiness.Reason) || worker.LastError || '后台任务工作器循环未运行';
+      V8.Tips('后台任务工作器未就绪：' + notReadyReason + '。解决方案：确认 API 节点健康、mci_background_task 表已升级并等待工作器心跳恢复后重试。', false);
+      return;
+    }
     var selectApi = String((V8.SysMenuModel && V8.SysMenuModel.SelectApi) || 'https://api.itdos.com/apiengine/get-microi-store-list?OsClient=iTdos');
     var parsed = new URL(selectApi, window.location.origin);
     var sourceOsClient = parsed.searchParams.get('OsClient') || 'iTdos';
@@ -302,7 +319,15 @@ function synchronizeBulkInstallButton(packageModel) {
       V8.Tips('启动全部安装/更新失败：' + ((result && result.Msg) || '接口无返回'), false);
       return;
     }
-    V8.Tips('官方平台应用的全部安装/更新已进入后台任务，请在右上角后台任务中心查看进度。', true);
+    var queuedTask = result.Data || {};
+    var queuedTaskId = queuedTask.Id || queuedTask.TaskId || queuedTask.BackgroundTaskId || '';
+    var slotHint = readiness
+      ? '；工作器槽位 ' + Number(readiness.RunningSlotCount || 0) + '/' + Number(readiness.MaxParallelTaskCount || 0)
+        + '，平台已保留普通任务执行槽'
+      : '';
+    V8.Tips('官方平台应用的全部安装/更新已进入后台任务'
+      + (queuedTaskId ? '（任务ID：' + queuedTaskId + '）' : '')
+      + slotHint + '，请在右上角后台任务中心查看进度。', true);
   } catch (error) {
     V8.Tips('启动全部安装/更新失败：' + error.message, false);
   }

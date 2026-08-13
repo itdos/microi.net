@@ -8,10 +8,14 @@
 
 - 每天 08:30、16:30 由 Microi Job 创建稳定时段，数据库唯一键防止多节点重复派发。
 - 在线 AI 根据经过验证的资料快照生成文章初稿；标题、正文和来源证据都进入内容记录。
-- MiniMax 视频走 `V8.AI.CreateMiniMaxVideo / GetMiniMaxVideoTask / GetMiniMaxVideoFile`，供应商 Key、原始 task_id 和 file_id 不进入 V8 代码或业务表。
-- 抖音、快手使用硬质量门禁：优先合格视频；只有 6～9 张原生竖版卡片形成完整叙事时才允许图文。低质量或广告感素材记为 `BlockedQuality`，不会为了“全部帐号”硬发。
+- MiniMax 视频走 `V8.AI.CreateMiniMaxVideo / GetMiniMaxVideoTask / GetMiniMaxVideoFile`；MiniMax 纯音乐走 `V8.AI.GenerateMiniMaxMusic`。供应商 Key、原始 task_id 和 file_id 不进入前端、发布参数或业务日志。
+- `VideoClip` 只代表生成分镜，永远不能直接发布；同一主题必须先剪成唯一 `VideoMaster`。成片必须有可听音轨，并保存 SHA-256、ffprobe 分辨率/实际 FPS/时长/编码器与响度证据。
+- MiniMax 音乐资产先以 `Draft` 写入共享数据库，再由每分钟的 `MciAiMusicWorker` 原子认领一个资产。禁止用 `setTimeout`、HTTP 请求寿命或假进度承载音乐生成；同步 524/结果不确定时转 `NeedsReview`，不得盲目重试。
+- 当前 MiniMax Token Plan 的视频包含档位按实时套餐核验；2026-08-13 的官方规则是单段 6 秒、768P、模型固定 24fps。通用按量 API 的 10 秒/768P 与 6 秒/1080P 是二选一，不能写成 10 秒/1080P，也不存在可调 FPS 参数。
+- 抖音、快手使用硬质量门禁：优先唯一合格成片；只有 6～9 张原生竖版卡片形成完整叙事时才允许图文。低质量、静音、分镜原片或广告感素材记为 `BlockedQuality`，不会为了“全部帐号”硬发。
+- 标题只能是纯文本。`<p>`、`<topic>` 等平台编辑器标记与话题标签只能进入平台适配字段，绝不能进入标题。
 - 多平台发布由本机连接器实时查询 yxer/蚁小二帐号后写入队列。连接器通过限期、可吊销、仅允许指定接口的访问密钥认领任务；Cookie、Token、clientId、apiKey 永远留在本机受保护配置。
-- 发布任务使用稳定幂等键、租约、FencingToken 和尝试记录。提交结果必须匹配当前租约与栅栏令牌，避免重试或多节点并发造成重复发布。
+- 发布任务使用“内容 + 平台 + 帐号 + 唯一成片哈希”稳定幂等键、租约、FencingToken 和尝试记录。每个帐号每版成片最多一次正式提交，避免按分镜、重试或多节点并发造成重复发布。
 
 ## 安装后的菜单
 

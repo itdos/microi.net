@@ -1,6 +1,6 @@
 <template>
   <div class="office-widget" ref="officeWidgetRef" @wheel.capture="handleOfficeWheel">
-    <div v-if="loading" class="office-state">文档加载中...</div>
+    <div v-if="loading" class="office-state">{{ $pet('文档加载中...') }}</div>
     <div v-else-if="error" class="office-state office-state-error">{{ error }}</div>
     <iframe
       v-else-if="isPdfPreview && previewSrc"
@@ -29,7 +29,7 @@
       :style="{ height: widgetHeight }"
       @load="onRendered"
     ></iframe>
-    <div v-else class="office-state">未配置预览文件</div>
+    <div v-else class="office-state">{{ $pet('未配置预览文件') }}</div>
   </div>
 </template>
 

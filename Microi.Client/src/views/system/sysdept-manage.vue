@@ -222,19 +222,8 @@ import Sortable from "sortablejs";
 import _ from "underscore";
 // import C_V8Explain from '@/views/form-engine/v8-explain'
 
-// vue-codemirror 暂不支持 Vue 3 (需要完全重构为 codemirror 6)
-// 以下是vue-codemirror
-// import { codemirror } from "vue-codemirror";
-// import language js
-// import "codemirror/mode/javascript/javascript.js";
-// import base style
-// import "codemirror/lib/codemirror.css";
-// import theme style
-// import "codemirror/theme/base16-dark.css";
-
 export default {
     components: {
-        // codemirror  // 已禁用
         // C_V8Explain
         Operation,
         RefreshLeft

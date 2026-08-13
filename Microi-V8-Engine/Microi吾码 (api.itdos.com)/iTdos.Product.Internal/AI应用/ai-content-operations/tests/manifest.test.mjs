@@ -18,11 +18,11 @@ test('内部应用以官方租户 AI应用目录为唯一事实源', () => {
 test('资源数量、mci前缀与业务键稳定', () => {
   assert.equal(manifest.tables.length, 6)
   assert.equal(manifest.modules.length, 6)
-  assert.equal(manifest.engines.length, 11)
-  assert.equal(manifest.jobs.length, 2)
+  assert.equal(manifest.engines.length, 12)
+  assert.equal(manifest.jobs.length, 3)
   assert.ok(manifest.tables.every((item) => item.name.startsWith('mci_')))
   assert.equal(new Set(manifest.tables.map((item) => item.name)).size, 6)
-  assert.equal(new Set(manifest.engines.map((item) => item.apiEngineKey)).size, 11)
+  assert.equal(new Set(manifest.engines.map((item) => item.apiEngineKey)).size, 12)
 })
 
 test('所有接口都有显式应用所有权策略', () => {
@@ -46,12 +46,17 @@ test('全部V8接口脚本可被异步JavaScript引擎解析', () => {
 })
 
 test('任务时间、时区和英文稳定Key符合约束', () => {
-  assert.deepEqual(manifest.jobs.map((item) => item.CronExpression), ['0 30 8 * * ?', '0 30 16 * * ?'])
+  assert.deepEqual(manifest.jobs.slice(0, 2).map((item) => item.CronExpression), ['0 30 8 * * ?', '0 30 16 * * ?'])
   for (const job of manifest.jobs) {
     assert.match(job.JobName, /^[A-Za-z]+$/)
     assert.equal(job.TimeZoneId, 'Asia/Shanghai')
-    assert.equal(JSON.parse(job.JobParam).Timezone, 'Asia/Shanghai')
-    assert.equal(job.ApiEngineKey, 'mci-ai-content-dispatch')
+    if (job.JobName === 'MciAiMusicWorker') {
+      assert.equal(job.CronExpression, '0 0/1 * * * ?')
+      assert.equal(job.ApiEngineKey, 'mci-ai-music-generate')
+    } else {
+      assert.equal(JSON.parse(job.JobParam).Timezone, 'Asia/Shanghai')
+      assert.equal(job.ApiEngineKey, 'mci-ai-content-dispatch')
+    }
   }
 })
 
@@ -73,6 +78,13 @@ test('发布队列具有幂等键、租约、栅栏和结果尝试唯一键', ()
   for (const name of ['IdempotencyKey', 'LeaseOwner', 'LeaseUntil', 'FencingToken', 'AttemptCount']) assert.ok(publishFields.has(name), name)
   assert.ok(table.mci_ai_publish_task.indexes.some((item) => item.unique && item.columns.includes('IdempotencyKey')))
   assert.ok(table.mci_ai_publish_attempt.indexes.some((item) => item.unique && item.columns.includes('AttemptKey')))
+  const claim = manifest.engines.find((item) => item.apiEngineKey === 'mci-ai-publish-claim').code
+  const complete = manifest.engines.find((item) => item.apiEngineKey === 'mci-ai-publish-complete').code
+  assert.match(claim, /DateNow\(/)
+  assert.match(claim, /DateAdd\(/)
+  assert.match(complete, /DateNow\(/)
+  assert.match(complete, /DateAdd\(/)
+  assert.doesNotMatch(`${claim}\n${complete}`, /System\.DateTime\.Now/)
 })
 
 test('抖音快手质量阻断不可被全部帐号语义绕过', () => {
@@ -82,6 +94,22 @@ test('抖音快手质量阻断不可被全部帐号语义绕过', () => {
   assert.match(source, /Kuaishou|kuaishou/)
   assert.match(source, /approvedCards\.length\s*>=\s*6/)
   assert.doesNotMatch(source, /blockedQuality[^\n]*Succeeded/i)
+})
+
+test('视频必须是唯一带音轨成片且标题不得泄漏平台标记', () => {
+  const source = manifest.engines.map((item) => item.code).join('\n')
+  const assets = manifest.tables.find((item) => item.name === 'mci_ai_content_asset')
+  const fieldNames = new Set(assets.fields.map((item) => item.name))
+  for (const name of ['HasAudio', 'ArtifactHash', 'MediaInfoJson']) assert.ok(fieldNames.has(name), name)
+  assert.match(source, /VideoMaster/)
+  assert.match(source, /VideoClip/)
+  assert.match(source, /AudioStreamCount/)
+  assert.match(source, /IntegratedLoudnessLufs/)
+  assert.match(source, /<topic/)
+  assert.match(source, /一个帐号一个成片/)
+  assert.match(source, /artifactIdentity/)
+  assert.doesNotMatch(source, /setTimeout\s*\(/)
+  assert.ok(manifest.jobs.some((item) => item.JobName === 'MciAiMusicWorker'))
 })
 
 test('商城公开资源不包含第三方发布凭据或本机命令执行', async () => {

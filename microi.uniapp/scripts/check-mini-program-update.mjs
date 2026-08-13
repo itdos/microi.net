@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url'
 // zhy：兼容项目常用的 Node 18+，不依赖较新的 import.meta.dirname。
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
-const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
+// zhy：统一换行符，避免 Windows 工作区的 CRLF 让语义门禁产生假失败。
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n?/g, '\n')
 const failures = []
 const expect = (condition, message) => { if (!condition) failures.push(message) }
 

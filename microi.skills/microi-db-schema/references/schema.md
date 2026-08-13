@@ -1,6 +1,6 @@
 # Microi 平台标准数据库结构
 
-> 来源：`AI-Project/microi/db.json`（共 75 张表，975 个可配置字段）
+> 通用参考快照，不代表当前租户。实际字段以 `microi_get_db_schema` 实时回读为准；离线时仅使用当前 OsClient 目录的 `.microi-db-schema.md` 并标注快照时间。
 
 ---
 

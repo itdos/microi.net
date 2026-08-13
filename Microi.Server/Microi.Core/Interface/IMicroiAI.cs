@@ -221,5 +221,25 @@ namespace Microi.net
             string authenticatedOsClient,
             MiniMaxVideoFileParam param,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 将 MiniMax 视频转存到当前租户 HDFS；currentUser 必须是服务端认证上下文。
+        /// </summary>
+        Task<DosResult> PersistMiniMaxVideoFileAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            object currentUser,
+            MiniMaxVideoFileParam param,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 使用可信服务端身份生成 MiniMax 纯音乐并直接转存当前租户 HDFS。
+        /// </summary>
+        Task<DosResult> GenerateMiniMaxMusicAsync(
+            string currentUserId,
+            string authenticatedOsClient,
+            object currentUser,
+            MiniMaxMusicGenerateParam param,
+            CancellationToken cancellationToken = default);
     }
 }

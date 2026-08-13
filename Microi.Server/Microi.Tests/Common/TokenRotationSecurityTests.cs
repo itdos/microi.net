@@ -133,6 +133,70 @@ public class TokenRotationSecurityTests
         Assert.Matches("^[a-f0-9]{16}$", status.Fingerprint);
     }
 
+    [Fact]
+    public void RuntimeVariants_WithSameRotationVersion_KeepOldestStableSigningKey()
+    {
+        var rows = new[]
+        {
+            CreateRuntimeVariant("internet", "Product", "Internet", "2021-10-21T17:15:56", "2026-08-11T18:00:21", StableSigningSecret, "rotation-v1"),
+            CreateRuntimeVariant("internal", "Product", "Internal", "2021-10-21T17:15:57", "2026-08-12T15:25:38", StableSigningSecret + "_different", "rotation-v1")
+        };
+
+        var canonical = TenantJwtSigningKeyCoordinator.SelectCanonicalRow(rows);
+
+        Assert.Equal("internet", canonical?["Id"]?.Value<string>());
+        Assert.Equal(StableSigningSecret, canonical?["AuthSecret"]?.Value<string>());
+        Assert.Equal(new[] { "iTdos" }, TenantJwtSigningKeyCoordinator.FindDivergentTenants(rows));
+    }
+
+    [Fact]
+    public void RuntimeVariants_WithDifferentRotationVersions_PreferLatestExplicitRotation()
+    {
+        var rows = new[]
+        {
+            CreateRuntimeVariant("old", "Product", "Internet", "2021-10-21T17:15:56", "2026-08-11T18:00:21", StableSigningSecret, "rotation-v1"),
+            CreateRuntimeVariant("rotated", "Product", "Internal", "2021-10-21T17:15:57", "2026-08-13T08:00:00", StableSigningSecret + "_rotated", "rotation-v2")
+        };
+
+        var canonical = TenantJwtSigningKeyCoordinator.SelectCanonicalRow(rows);
+
+        Assert.Equal("rotated", canonical?["Id"]?.Value<string>());
+    }
+
+    [Fact]
+    public void RuntimeVariants_AreGroupedOnlyInsideSameTenantBoundary()
+    {
+        var rows = new[]
+        {
+            CreateRuntimeVariant("a1", "Product", "Internet", "2021-01-01", "2026-01-01", StableSigningSecret, "rotation-v1", "tenant-a"),
+            CreateRuntimeVariant("a2", "Product", "Internal", "2021-01-02", "2026-01-02", StableSigningSecret + "_different", "rotation-v1", "tenant-a"),
+            CreateRuntimeVariant("b1", "Product", "Internal", "2021-01-03", "2026-01-03", StableSigningSecret + "_tenant_b", "rotation-v1", "tenant-b")
+        };
+
+        Assert.Equal(new[] { "tenant-a" }, TenantJwtSigningKeyCoordinator.FindDivergentTenants(rows));
+    }
+
+    [Theory]
+    [InlineData("VSCode")]
+    [InlineData("MCP")]
+    public void DeveloperTerminal_DefaultLifetime_IsTwentyDays(string clientType)
+    {
+        var client = CreateClient("tenant-row-id", StableSigningSecret);
+
+        Assert.Equal(TimeSpan.FromDays(20), DiyToken.ResolveClientTokenLifetime(client, clientType));
+    }
+
+    [Fact]
+    public void DeveloperTerminal_ExplicitTenantLifetime_OverridesDefault()
+    {
+        var client = CreateClient("tenant-row-id", StableSigningSecret);
+        client.OsClientModel["VSCodeAccessTokenLifetime"] = 12;
+        client.OsClientModel["McpAccessTokenLifetime"] = 16;
+
+        Assert.Equal(TimeSpan.FromDays(12), DiyToken.ResolveClientTokenLifetime(client, "VSCode"));
+        Assert.Equal(TimeSpan.FromDays(16), DiyToken.ResolveClientTokenLifetime(client, "MCP"));
+    }
+
     private static OsClientSecret CreateClient(string? id, string secret)
     {
         var model = new JObject
@@ -144,6 +208,29 @@ public class TokenRotationSecurityTests
         {
             OsClient = "restart-tenant",
             OsClientModel = model
+        };
+    }
+
+    private static JObject CreateRuntimeVariant(
+        string id,
+        string osClientType,
+        string osClientNetwork,
+        string createTime,
+        string updateTime,
+        string secret,
+        string rotateVersion,
+        string osClient = "iTdos")
+    {
+        return new JObject
+        {
+            ["Id"] = id,
+            ["OsClient"] = osClient,
+            ["OsClientType"] = osClientType,
+            ["OsClientNetwork"] = osClientNetwork,
+            ["CreateTime"] = createTime,
+            ["UpdateTime"] = updateTime,
+            ["AuthSecret"] = secret,
+            ["AuthSecretRotateVersion"] = rotateVersion
         };
     }
 

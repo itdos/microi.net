@@ -11,11 +11,14 @@ const readCanonicalText = async url => (
 const source = await readCanonicalText(new URL("./import-package.js", import.meta.url));
 const publishSource = await readCanonicalText(new URL("./ai-app-publish-store.js", import.meta.url));
 const packageModel = JSON.parse(await readFile(new URL("./app.microi.store.json", import.meta.url), "utf8"));
+const saasPackageModel = JSON.parse(await readFile(new URL("./app.microi.saas-engine.json", import.meta.url), "utf8"));
 const refreshSource = await readCanonicalText(new URL("./refresh-resources.mjs", import.meta.url));
 const upgradeSource = await readCanonicalText(new URL("../Upgrade.cs", import.meta.url));
 const appStoreUpgradeSource = await readCanonicalText(new URL("../13-UpgradeAppStore.cs", import.meta.url));
 const sysMenuLogicSource = await readCanonicalText(new URL("../../Microi.Core/Logic/SysMenuLogic.cs", import.meta.url));
 const microAppControllerSource = await readCanonicalText(new URL("../../Microi.net.Api/Controllers/MicroAppController.cs", import.meta.url));
+const hdfsUploadSource = await readCanonicalText(new URL("../../Microi.HDFS/MicroiHDFS.cs", import.meta.url));
+const aliyunHdfsSource = await readCanonicalText(new URL("../../Microi.HDFS/MicroiHDFSAliyun.cs", import.meta.url));
 const apiProgramSource = await readCanonicalText(new URL("../../Microi.net.Api/Program.cs", import.meta.url));
 const tableActionsSource = await readCanonicalText(new URL("../../../Microi.Client/src/views/form-engine/mixins/diy-table-actions.mixin.js", import.meta.url));
 const functionSource = source.match(/var countPageTabs = function \(value\) \{[\s\S]*?\n\};/);
@@ -103,7 +106,7 @@ function runAdminMenuPermissionFixture(options = {}) {
       Permission: '["Read","LegacyButton"]',
     },
   ]);
-  const calls = { add: [], update: [] };
+  const calls = { add: [], update: [], physical: [], cache: [] };
   let duplicateInjected = false;
   const menuModel = clone(options.menuModel || {
     Id: "menu-new",
@@ -121,6 +124,12 @@ function runAdminMenuPermissionFixture(options = {}) {
     stats,
     debugLog: {},
     nowText: () => "2026-08-11 12:00:00",
+    writeResultMessage(value) {
+      if (!value) return "";
+      if (value.Msg !== undefined && value.Msg !== null) return String(value.Msg);
+      if (value.message !== undefined && value.message !== null) return String(value.message);
+      return String(value);
+    },
     runWriteWithRetry: action => action(),
     isDuplicatePrimaryError: value => /duplicate entry.+primary/i.test(String(value?.Msg || "")),
     V8: {
@@ -134,6 +143,13 @@ function runAdminMenuPermissionFixture(options = {}) {
         GetTableData(tableName, param) {
           if (tableName === "sys_role") return { Code: 1, Data: clone(roles) };
           if (tableName !== "sys_rolelimit") throw new Error(`unexpected table ${tableName}`);
+          if (options.roleLimitReadResult) return clone(options.roleLimitReadResult);
+          if (options.missingRoleLimitMetadata) {
+            return {
+              Code: 0,
+              Msg: '不存在的数据！ <br>表名：diy_table<br>条件：[["AND","Id","=","sys_rolelimit"],["OR","Name","=","sys_rolelimit"]]',
+            };
+          }
           const where = param?._Where || [];
           const findValue = name => {
             const condition = where.find(item => item[0] === name || item[1] === name);
@@ -172,9 +188,70 @@ function runAdminMenuPermissionFixture(options = {}) {
           return { Code: 1, Data: { Id: row.Id } };
         },
       },
+      Db: {
+        FromSql(sql) {
+          const call = { sql, parameters: [], executed: false };
+          calls.physical.push(call);
+          if (/^SELECT /i.test(sql) && options.physicalReadError) {
+            throw new Error(options.physicalReadError);
+          }
+          if (!/^SELECT /i.test(sql) && options.physicalWriteError) {
+            throw new Error(options.physicalWriteError);
+          }
+          const command = {
+            AddInParameter(name, value) {
+              call.parameters.push([name, value]);
+              return command;
+            },
+            ToArray() {
+              const values = call.parameters.map(item => item[1]);
+              return clone(roleLimits.filter(row => (
+                row.RoleId === values[0] && row.FkId === values[1] && row.Type === values[2]
+              )));
+            },
+            ExecuteNonQuery() {
+              call.executed = true;
+              const values = call.parameters.map(item => item[1]);
+              if (/^INSERT /i.test(sql)) {
+                if (roleLimits.some(row => row.Id === values[0])) {
+                  throw new Error("Duplicate entry 'same' for key 'PRIMARY'");
+                }
+                roleLimits.push({
+                  Id: values[0],
+                  RoleId: values[1],
+                  FkId: values[2],
+                  Type: values[3],
+                  Permission: values[4],
+                  CreateTime: values[5],
+                });
+                return 1;
+              }
+              const target = roleLimits.find(row => row.Id === values[1]);
+              if (!target) return 0;
+              target.Permission = values[0];
+              return 1;
+            },
+          };
+          return command;
+        },
+      },
+      Cache: {
+        Get(key) {
+          const latest = [...calls.cache].reverse().find(item => item.key === key);
+          return latest ? latest.value : "8";
+        },
+        Set(key, value) {
+          calls.cache.push({ key, value: String(value) });
+          return options.cacheWriteFails ? false : true;
+        },
+      },
     },
+    System: { DateTime: { Now: "2026-08-11T12:00:00Z" } },
+    setTimeout(action) { action(); },
     Array,
+    Date,
     JSON,
+    Math,
     Number,
     Object,
     String,
@@ -440,6 +517,64 @@ test("administrator menu permission writes fail closed when database readback is
   assert.match(source, /assertAdministratorMenuPermissionReadback\(role, menuModel, requiredPermissions\)/);
 });
 
+test("legacy tenants without sys_rolelimit form metadata use parameterized physical fallback and invalidate authorization cache", () => {
+  const result = runAdminMenuPermissionFixture({ missingRoleLimitMetadata: true });
+  assert.deepEqual(result.stats, {
+    AdminRoleLimitInserted: 1,
+    AdminRoleLimitUpdated: 1,
+    AdminRoleLimitSkipped: 0,
+  });
+  assert.equal(result.calls.add.length, 0);
+  assert.equal(result.calls.update.length, 0);
+  assert.ok(result.calls.physical.length >= 6);
+  for (const call of result.calls.physical) {
+    assert.match(call.sql, /@p\d/);
+    assert.ok(call.parameters.length >= 2);
+  }
+  const physicalInsert = result.calls.physical.find(call => /^INSERT /i.test(call.sql));
+  assert.ok(physicalInsert, "the legacy fallback should insert the missing role permission");
+  assert.match(physicalInsert.sql, /CURRENT_TIMESTAMP/i);
+  assert.doesNotMatch(physicalInsert.sql, /@p5/);
+  assert.equal(physicalInsert.parameters.length, 5, "database time must not be serialized through Jint");
+  const permissionsByRole = new Map(result.roleLimits.map(row => [
+    row.RoleId,
+    JSON.parse(row.Permission),
+  ]));
+  assert.ok(permissionsByRole.get("role-admin-a").includes("LegacyButton"));
+  assert.ok(permissionsByRole.get("role-admin-b").includes("btn-approve"));
+  assert.equal(result.calls.cache.length, 2, "authorization version should be invalidated before and after commit");
+  assert.ok(result.calls.cache.every(call => call.key === "Microi:iTdos:FormEngineAuthz:Version"));
+  assert.ok(Number(result.calls.cache[1].value) > Number(result.calls.cache[0].value));
+  assert.match(source, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
+  assert.match(source, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
+});
+
+test("administrator permission fallback does not hide non-metadata failures", () => {
+  assert.throws(
+    () => runAdminMenuPermissionFixture({
+      roleLimitReadResult: { Code: 0, Msg: "database connection timeout" },
+    }),
+    /查询系统管理员菜单权限失败：database connection timeout/,
+  );
+  assert.throws(
+    () => runAdminMenuPermissionFixture({
+      missingRoleLimitMetadata: true,
+      physicalReadError: "physical table denied",
+    }),
+    /元数据错误：[\s\S]*物理表错误：physical table denied[\s\S]*解决方案/,
+  );
+});
+
+test("physical role-limit writes fail closed when authorization cache cannot be invalidated", () => {
+  assert.throws(
+    () => runAdminMenuPermissionFixture({
+      missingRoleLimitMetadata: true,
+      cacheWriteFails: true,
+    }),
+    /授权缓存版本更新失败[\s\S]*已阻止提交/,
+  );
+});
+
 test("physical schema sync backfills all legacy application publish NULLs before NOT NULL", () => {
   const expectedDefaults = new Map([
     ["PublishProtocolVersion", "2"],
@@ -683,6 +818,45 @@ test("background application assets are committed in bounded resumable slices", 
   assert.equal(continuation.Data.BackgroundTask.Checkpoint.AssetKind, "Build");
 });
 
+test("resumed background slices keep task progress monotonic", () => {
+  assert.match(source, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
+  assert.match(source, /backgroundCheckpoint\.Progress/);
+  assert.match(source, /Physical:\s*55/);
+  assert.match(source, /PostSchema:\s*70/);
+  assert.match(source, /Checkpoint:\s*buildPersistentCheckpoint\(phase, index, \{ Progress: progress \}\)/);
+  assert.match(source, /progress = Math\.max\(lastReportedBackgroundProgress/);
+
+  const progressFloorSource = source.match(
+    /\/\/ BACKGROUND_TASK_MONOTONIC_PROGRESS_V1[\s\S]*?var lastReportedBackgroundProgress = backgroundCheckpointProgressFloor;/,
+  );
+  const reportProgressSource = source.match(
+    /var reportProgress = function \(progress, msg\) \{[\s\S]*?\n\};/,
+  );
+  assert.ok(progressFloorSource, "checkpoint progress-floor logic should be extractable");
+  assert.ok(reportProgressSource, "background progress reporter should be extractable");
+
+  const updates = [];
+  const context = {
+    backgroundCheckpoint: { Phase: "Physical", Progress: 55 },
+    backgroundCheckpointPhase: "Physical",
+    backgroundCheckpointIndex: 4,
+    backgroundTaskId: "task-monotonic",
+    backgroundTaskEnvelope: {},
+    backgroundChunkingEnabled: false,
+    debugLog: {},
+    V8: {
+      Param: {},
+      Method: { UpdateBackgroundTask: update => updates.push({ ...update }) },
+    },
+  };
+  vm.runInNewContext(
+    `${progressFloorSource[0]}\n${reportProgressSource[0]}\nreportProgress(3, '重新取包');\nreportProgress(55, '继续物理列');\nreportProgress(70, '后置资源');`,
+    context,
+  );
+  assert.deepEqual(updates.map(update => update.Progress), [55, 55, 70]);
+  assert.deepEqual(updates.map(update => update.Current), [55, 55, 70]);
+});
+
 test("schema import uses durable bounded phases before application assets", () => {
   assert.match(source, /SCHEMA_BACKGROUND_CHUNKS_V1/);
   assert.match(source, /SchemaDdlChunkSize \|\| 1/);
@@ -832,7 +1006,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
   assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.3") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.8") >= 0);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
@@ -840,6 +1014,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /TRUSTED_OFFICIAL_PLATFORM_PACKAGE_V1/);
   assert.match(source, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
   assert.match(source, /ADMIN_MENU_PERMISSION_V1/);
+  assert.match(source, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
+  assert.match(source, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
+  assert.match(source, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
   assert.match(source, /previousState\.UpgradePolicy[\s\S]*?CreateIfMissing/);
   assert.match(source, /接口引擎稳定Id冲突/);
   assert.match(source, /接口引擎稳定Key冲突/);
@@ -852,6 +1029,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(source, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(source, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(source, /DB_RUNTIME_BUILD_ASSETS_V1/);
+  assert.match(source, /DATABASE_ONLY_BUILD_ASSETS_V1/);
+  assert.match(source, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
+  assert.match(source, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(source, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(source, /var latestCacheJson = JSON\.stringify\(latest\)/);
   assert.equal(
@@ -882,9 +1062,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 3\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.3 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 3\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 8\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.8 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 8\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 13\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
@@ -896,9 +1076,26 @@ test("application-store upgrade resources carry the canonical resumable importer
     3,
     "runtime, downloaded importer, and embedded package validation must all require administrator menu permissions",
   );
+  assert.equal(
+    (appStoreUpgradeSource.match(/ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/g) || []).length,
+    3,
+    "all importer validation paths must require the legacy physical permission fallback",
+  );
+  assert.equal(
+    (appStoreUpgradeSource.match(/ADMIN_MENU_PERMISSION_DB_TIME_V1/g) || []).length,
+    3,
+    "all importer validation paths must require database-side permission timestamps",
+  );
   assert.match(appStoreUpgradeSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(appStoreUpgradeSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(appStoreUpgradeSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
+  assert.match(appStoreUpgradeSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
+  assert.equal(
+    (appStoreUpgradeSource.match(/BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/g) || []).length,
+    3,
+    "runtime, downloaded importer, and embedded package validation must all require monotonic progress",
+  );
+  assert.match(appStoreUpgradeSource, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(appStoreUpgradeSource, /PRUNE_ASSET_IDS_WITH_DELFORM_V1/);
   assert.match(appStoreUpgradeSource, /BACKGROUND_TASK_BOOTSTRAP_READINESS_V1/);
   assert.match(appStoreUpgradeSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
@@ -909,7 +1106,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_010_003/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_010_008/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -921,12 +1118,18 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
   assert.match(refreshSource, /versionNumber\s*<\s*1_007_007/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_003/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_008/);
+  assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
+  assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
+  assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
+  assert.match(refreshSource, /OBJECT_STORAGE_FORBIDDEN/);
   assert.match(refreshSource, /PLATFORM_API_ENGINE_PRESERVE_NEWER_V1/);
   assert.match(refreshSource, /OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1/);
   assert.match(refreshSource, /API_ENGINE_RESOURCE_BASELINE_V1/);
   assert.match(refreshSource, /TENANT_API_ENGINE_POLICY_IMMUTABLE_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_V1/);
+  assert.match(refreshSource, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
+  assert.match(refreshSource, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {
@@ -1020,6 +1223,42 @@ test("database runtime mode embeds compiled files while retaining the HDFS manif
   assert.match(source, /AssetsJson:\s*JSON\.stringify\(inlineRuntimeBuild \? runtimeDbAssets : uploadedBuild\)/);
   assert.match(source, /AssetManifestJson:\s*JSON\.stringify\(\{[\s\S]*?Assets:\s*uploadedBuild/);
   assert.match(source, /if \(inlineRuntimeBuild\) runtimeStorageMode = 'db'/);
+});
+
+test("object storage existence probes no longer block a collision-safe PUT attempt", () => {
+  assert.match(hdfsUploadSource, /OBJECT_EXISTENCE_PROBE_WRITE_FALLBACK_V1/);
+  const probeFailure = hdfsUploadSource.match(
+    /if \(objectExistResult\.Code != 1\)[\s\S]*?else[\s\S]*?objectExist = objectExistResult\.Data;/
+  );
+  assert.ok(probeFailure, "object-existence fallback should be extractable");
+  assert.match(probeFailure[0], /realFileName \+= "-" \+ Ulid\.NewUlid\(\)\.ToString\(\)/);
+  assert.doesNotMatch(probeFailure[0], /return new DosResult/);
+  assert.match(aliyunHdfsSource, /ErrorType=\{errorType\}/);
+  assert.match(aliyunHdfsSource, /oss:GetObject/);
+  assert.match(aliyunHdfsSource, /oss:PutObject/);
+  assert.match(aliyunHdfsSource, /OBJECT_STORAGE_CONFIG_INCOMPLETE/);
+});
+
+test("SaaS engine ships its built-in microservice as a bounded database-only runtime", () => {
+  const bundle = saasPackageModel.ApplicationBundles?.[0];
+  assert.ok(bundle, "SaaS engine application bundle is missing");
+  assert.equal(saasPackageModel.PackageInfo.IncludeSource, false);
+  assert.equal(bundle.IncludeSource, false);
+  assert.deepEqual(bundle.SourceFiles, []);
+  assert.equal(bundle.PackageAssets?.IncludeSource, false);
+  assert.equal(bundle.PackageAssets?.SourceZip, undefined);
+  assert.equal(bundle.ApplicationType, "MicroService");
+  assert.equal(bundle.MicroService?.StorageMode, "db");
+  assert.equal(bundle.MicroService?.MsUrl, "db");
+  assert.deepEqual(bundle.AssetStoragePolicy, {
+    Source: "NotIncluded",
+    Build: "DatabaseOnly",
+    Reason: "平台内置微服务只交付可验证运行产物；数据库内联受 256 文件/5MB 限制，不依赖目标租户对象存储。",
+  });
+  const assets = bundle.BuildAssets || [];
+  assert.ok(assets.length > 0 && assets.length <= 256);
+  assert.ok(assets.reduce((sum, asset) => sum + Number(asset.Size || 0), 0) <= 5 * 1024 * 1024);
+  assert.ok(assets.some((asset) => asset.Path === bundle.EntryPath));
 });
 
 test("application-store package embeds the canonical publisher", () => {
@@ -1197,6 +1436,7 @@ test("fresh microservice build moves to a tenant-prefixed stable public HDFS key
     firstTextParam(values) {
       return values.find(value => value !== null && value !== undefined && String(value).trim() !== "") || "";
     },
+    rewriteApplicationRuntimeContext(_root, _path, base64) { return base64; },
     reuseApplicationAsset() { return null; },
     uploadApplicationAsset() {
       return {
@@ -1275,6 +1515,7 @@ test("database runtime build keeps the HDFS copy and embeds the package bytes", 
     firstTextParam(values) {
       return values.find(value => value !== null && value !== undefined && String(value).trim() !== "") || "";
     },
+    rewriteApplicationRuntimeContext(_root, _path, base64) { return base64; },
     reuseApplicationAsset() { return null; },
     uploadApplicationAsset() {
       calls.upload++;
@@ -1306,6 +1547,103 @@ test("database runtime build keeps the HDFS copy and embeds the package bytes", 
   assert.equal(calls.upload, 1, "DB runtime must still upload the HDFS build asset");
   assert.equal(calls.move, 1, "DB runtime must still move the HDFS build asset to its stable key");
   assert.equal(calls.rows.length, 1, "DB runtime must still persist HDFS build metadata");
+  assert.deepEqual(JSON.parse(JSON.stringify(buildContext.runtimeDbAssets)), [{
+    Path: "index.html",
+    FileName: "index.html",
+    ContentType: "text/html",
+    ContentBase64: "PGgxPk9LPC9oMT4=",
+    Size: 11,
+    Hash: "hash-index",
+    IsEntry: true
+  }]);
+});
+
+test("explicit database-only runtime never calls HDFS and keeps complete inline bytes", () => {
+  const buildStageSource = source.match(
+    /var uploadedBuild = \[\];[\s\S]*?pruneApplicationAssets\(appId, expectedApplicationPaths\);/
+  );
+  assert.ok(buildStageSource, "build asset stage should be extractable");
+
+  const calls = { upload: 0, move: 0, rows: 0, prune: 0 };
+  const buildContext = {
+    appId: "app-db-only",
+    appKey: "platform-service",
+    appName: "Platform Service",
+    appType: "MicroService",
+    app: {},
+    bundle: { EntryPath: "index.html" },
+    inlineRuntimeBuild: true,
+    databaseOnlyBuild: true,
+    buildRoot: "micro-app/platform-service/v1.0.0",
+    buildAssets: [{
+      Path: "index.html",
+      FileName: "index.html",
+      ContentType: "text/html",
+      FileByteBase64: "PGgxPk9LPC9oMT4=",
+      Size: 11,
+      Sha256: "hash-index"
+    }],
+    existingApplicationAssets: {},
+    expectedApplicationPaths: {},
+    stats: {
+      ApplicationBuildAssets: 0,
+      ApplicationBuildAssetsReused: 0,
+      ApplicationInlineBuildAssets: 0
+    },
+    V8: {
+      OsClient: "tenant-a",
+      Base64: { StringToBase64(value) { return Buffer.from(value).toString("base64"); } },
+      EncryptHelper: { Sha256Hex() { return "rewritten-hash"; } },
+      Method: {
+        MoveObject() {
+          calls.move++;
+          throw new Error("database-only runtime must not move objects");
+        }
+      }
+    },
+    normalizeApplicationPath(value) {
+      return String(value || "").replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+    },
+    firstTextParam(values) {
+      return values.find(value => value !== null && value !== undefined && String(value).trim() !== "") || "";
+    },
+    rewriteApplicationRuntimeContext(_root, _path, base64) { return base64; },
+    base64DecodedSize(value) { return Buffer.from(value, "base64").length; },
+    reuseApplicationAsset() { throw new Error("database-only runtime must not inspect HDFS metadata"); },
+    uploadApplicationAsset() {
+      calls.upload++;
+      throw new Error("database-only runtime must not upload objects");
+    },
+    upsertApplicationRow() {
+      calls.rows++;
+      throw new Error("database-only runtime must not persist HDFS rows");
+    },
+    applicationFileName(value) { return String(value || "").split("/").pop(); },
+    applicationFileType() { return "html"; },
+    shouldContinueApplicationAssets() { return false; },
+    markApplicationAssetUploaded() {},
+    reportProgress() {},
+    pruneApplicationAssets() { calls.prune++; }
+  };
+
+  vm.runInNewContext(
+    `(function () { ${buildStageSource[0]}; this.uploadedBuild = uploadedBuild; this.runtimeDbAssets = runtimeDbAssets; }).call(this);`,
+    buildContext
+  );
+
+  assert.equal(calls.upload, 0);
+  assert.equal(calls.move, 0);
+  assert.equal(calls.rows, 0);
+  assert.equal(calls.prune, 1);
+  assert.equal(buildContext.stats.ApplicationInlineBuildAssets, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(buildContext.uploadedBuild)), [{
+    Path: "index.html",
+    HdfsPath: "",
+    FilePathName: "",
+    Size: 11,
+    Hash: "hash-index",
+    DatabaseInline: true
+  }]);
   assert.deepEqual(JSON.parse(JSON.stringify(buildContext.runtimeDbAssets)), [{
     Path: "index.html",
     FileName: "index.html",

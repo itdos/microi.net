@@ -3,12 +3,14 @@ name: v8-workflow
 description: Microi V8 工作流事件指南。用于编写审批流条件、节点 V8 代码、wf_flowdesign/wf_node/wf_line 逻辑、V8.WF 变量和工作流路由。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi V8 工作流事件开发
 
 你正在开发 Microi 吾码平台的工作流（审批流程）V8 事件。流程引擎基于表单引擎，通过 V8 事件控制审批逻辑。
 
+<!-- microi-progressive:begin -->
+<!-- microi-progressive:chunk id=v8-workflow-000 sha256=9030cd2de9f1febfb9a749c82cf83e97ccb8fb972a3f8f0ff11067488e14cd8e -->
 ## 本地优先与版本头（必做）
 
 工作流节点、连线条件、开始/结束节点等 V8 代码如果有本地文件，必须优先修改 `microi-v8-engine/<租户>/<项目>/...` 下的本地文件，再同步到数据库。插件提示本地/远端不一致时，先比对并合并，不得直接覆盖。
@@ -30,6 +32,8 @@ description: Microi V8 工作流事件指南。用于编写审批流条件、节
 
 生成工作流 V8 代码时，代码内容本身（文件头、普通注释、`console.log`、返回 `Msg` 等）不要包含 `Microi`、`吾码` 等平台品牌文字，除非业务数据或字段值本身必须如此。生成代码要有可维护注释：每个 `function` 前写清用途、关键参数和返回值；路线选择、审批人计算、状态回写、撤回/驳回处理、跨表联动等复杂代码段前写短注释说明业务原因；避免“给变量赋值”这类无信息量注释。若工作流存储表支持 `Version`/`ChangeHistory`，历史说明也必须最新在前并保留旧记录。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-workflow-001 sha256=013233bfa935a24b668691318ea79c2f0a95787d05d0b033b82859a5999878ba -->
 ## 工作流物理表
 
 | 表名 | 说明 |
@@ -64,6 +68,8 @@ var history = V8.Db.FromSql(
  .ToArray();
 ```
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-workflow-002 sha256=1f94d40c041929aafc45ec975f42bcbbc50c3ba424ed499c7bdf65fa73a41041 -->
 ## 流程 V8 事件执行顺序
 
 1. 用户点击发起流程或处理工作
@@ -80,6 +86,8 @@ var history = V8.Db.FromSql(
 12. **节点结束 V8 事件（后端 WFNodeEnd）**
 13. **节点结束 V8 事件（前端 WFNodeEnd）**
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-workflow-003 sha256=f5776a5b8fe4e460f79e20e9806b3a80bcadf6f1e09408880bd5ca911cb79533 -->
 ## V8.WF 上下文属性
 
 ### 所有流程事件可访问
@@ -113,6 +121,8 @@ var history = V8.Db.FromSql(
 |------|------|
 | `V8.WF.WorkResult` | 流程执行结果（发送到了哪个节点、哪些审批人） |
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-workflow-004 sha256=d8445c1d473579fde063179d6330eefaa2373f1166e837656b780058295de3a3 -->
 ## ApprovalType 审批类型
 
 | 值 | 说明 |
@@ -122,6 +132,8 @@ var history = V8.Db.FromSql(
 | `Recall` | 撤回 |
 | `Auto` | 发起流程(开始节点) / 业务节点 / 自动结束节点 |
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-workflow-005 sha256=96e49e15fcb4b9da83f46b6818e198f338cb77ce76d11c56dfddebc2cc24f881 -->
 ## 条件判断 V8 事件（后端 WFNodeLine）
 
 根据业务规则决定流程走向。优先推荐设置 `V8.NextNodeId` 直接指定下一节点；如仍使用条件线的条件值，也可以设置 `V8.LineValue`。
@@ -139,88 +151,8 @@ if (V8.Form.Money <= 100) {
 }
 ```
 
-## 节点开始 V8 事件
-
-### 前端 — 指定审批人
-
-```javascript
-// V8.EventName === 'WFNodeStart'
-// 可以强制指定下一节点审批人
-if (V8.Form.DeptId === 'special-dept') {
-  V8.WF.ForceSelectUsers = ['user-id-1', 'user-id-2'];
-}
-```
-
-### 后端 — 阻止流程提交
-
-```javascript
-// V8.EventName === 'WFNodeStart'
-// 返回 Code: 0 可以阻止流程提交并回滚事务
-if (!V8.Form.ApprovalFiles) {
-  V8.Result = { Code: 0, Msg: '请先上传审批附件' };
-}
-```
-
-## 节点结束 V8 事件
-
-### 后端 — 流程结束后业务处理
-
-```javascript
-// V8.EventName === 'WFNodeEnd'
-var approvalType = V8.WF.ApprovalType;
-
-// 同意 — 更新业务状态
-if (approvalType === 'Agree') {
-  // 判断是否到达最终节点
-  var nextNode = V8.WF.NextNode;
-  if (!nextNode || nextNode.NodeType === 'End') {
-    // 流程结束，更新业务状态
-    V8.FormEngine.UptFormData(V8.TableModel.Name, {
-      Id: V8.Form.Id,
-      ApprovalStatus: 'Approved',
-      ApprovalTime: DateNow('yyyy-MM-dd HH:mm:ss')
-    });
-  }
-}
-
-// 拒绝 — 回退状态
-if (approvalType === 'Disagree') {
-  V8.FormEngine.UptFormData(V8.TableModel.Name, {
-    Id: V8.Form.Id,
-    ApprovalStatus: 'Rejected',
-    RejectReason: V8.WF.ApprovalIdea
-  });
-}
-
-// 撤回
-if (approvalType === 'Recall') {
-  V8.FormEngine.UptFormData(V8.TableModel.Name, {
-    Id: V8.Form.Id,
-    ApprovalStatus: 'Draft'
-  });
-}
-
-// 通知下一审批人
-if (V8.WF.NextTodoUsers && V8.WF.NextTodoUsers.length > 0) {
-  for (var i = 0; i < V8.WF.NextTodoUsers.length; i++) {
-    V8.ApiEngine.Run('send-notification', {
-      userId: V8.WF.NextTodoUsers[i].Id,
-      title: '您有新的审批任务',
-      content: V8.CurrentUser.Name + '提交了' + V8.TableModel.Name + '审批'
-    });
-  }
-}
-```
-
-### 前端 — 流程提交后提示
-
-```javascript
-// V8.EventName === 'WFNodeEnd'
-if (V8.WF.WorkResult) {
-  V8.Tips('流程已提交', true);
-}
-```
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=v8-workflow-006 sha256=e67b72bf060a38ed5f94a57f3978026d151bb971fcf47a0b30a434dba819c264 -->
 ## 前端发起流程
 
 ```javascript
@@ -242,83 +174,10 @@ V8.WF.StartWork({
 });
 ```
 
-## 前端打开流程表单
+<!-- /microi-progressive:chunk -->
+## 详细参考路由（渐进披露）
 
-```javascript
-// 发起流程
-V8.OpenFormWF(V8.Form, 'Add', {
-  WorkType: 'StartWork',
-  FlowDesignId: 'flow-design-id'
-});
+仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 
-// 查看流程
-V8.OpenFormWF(V8.Form, 'View', {
-  WorkType: 'ViewWork',
-  FlowDesignId: 'flow-design-id'
-});
-```
-
-## MCP 创建/检查/测试工作流
-
-从自然语言需求创建审批流时，优先整理成完整 Manifest 的 `workflows` 配置，再走 MCP 干跑和验收流程。
-
-```json
-{
-  "workflows": [
-    {
-      "FlowDesign": { "FlowName": "请假审批", "table": "diy_leave", "IsEnable": 1 },
-      "Nodes": [
-        { "Id": "start", "NodeName": "发起人", "NodeType": "Start", "LineValueV8": "" },
-        { "Id": "leader", "NodeName": "部门负责人审批", "NodeType": "Approve", "Roles": "dept-leader" },
-        { "Id": "end", "NodeName": "结束", "NodeType": "End" }
-      ],
-      "Lines": [
-        { "Id": "line_start_leader", "FromNodeId": "start", "ToNodeId": "leader", "LineName": "发起人 到 部门负责人审批", "LineValue": "" },
-        { "Id": "line_leader_end", "FromNodeId": "leader", "ToNodeId": "end", "LineName": "部门负责人审批 到 结束", "LineValue": "" }
-      ]
-    }
-  ]
-}
-```
-
-MCP 操作顺序：
-
-1. `microi_get_db_schema`：确认业务表、已有流程、角色、字段。
-2. `microi_get_manifest_schema`：按 Manifest 协议生成 tables/modules/workflows。
-3. `microi_plan_system`：本地干跑，必须修复 workflow 拓扑错误。
-4. `microi_check_workflow_package`：单独检查某个 workflow package。
-5. `microi_test_workflow_condition`：对图形条件生成的 `LineValueV8` 传入样例 `formData`，验证会选中哪条路线。
-6. `microi_generate_system` 或 `microi_save_workflow_package`：用户明确确认后再写入。
-
-工作流建模规则：
-
-- 必须有且仅有 1 个开始节点，至少 1 个结束节点。
-- 所有 `wf_line.FromNodeId/ToNodeId` 必须指向存在的节点。
-- 线路标题 `LineName` 默认使用 `{起点节点名称} 到 {终点节点名称}`，不要把业务条件名写成线路标题。
-- 条件名称只作为图形配置/注释标记里的业务说明；修改条件名称不应改变线路标题。
-- 多出线节点必须配置条件判断 V8，优先设置 `V8.NextNodeId`，只有兼容旧条件值时才设置 `V8.LineValue`。
-- 图形条件生成的 V8 会带 `MICROI_WF_LINE_CONDITION_JSON` 标记，MCP 测试工具只解析该标记，不执行任意手写 V8。
-
-## 发起流程与表单保存
-
-新建业务数据并发起流程时，应先保存表单，再启动流程，或使用平台的合并接口 `StartWorkWithForm` 在同一事务里完成。首次发起建议以 `Add` 模式打开流程表单；如果前端提前生成了 `Id` 但业务表还没有该行，后端会使用 `_NoLineForAdd` 兜底，避免 `UptFormData` 报“数据显示不存在”。
-
-## 流程相关表
-
-| 表 | 说明 |
-|---|---|
-| `WF_FlowDesign` | 流程图设计表 |
-| `WF_Node` | 流程节点属性表 |
-| `WF_Line` | 流程条件(线)属性表 |
-| `WF_Flow` | 流程实例表 |
-| `WF_Work` | 流程工作待办表 |
-| `WF_History` | 流程轨迹表 |
-
-## 注意事项
-
-- 条件判断 V8 事件可以设置 `V8.NextNodeId` 直接指定下一节点；未设置时才按 `V8.LineValue` 匹配条件线的**条件值**
-- 配置图形化条件时，节点/路线标识来自流程拓扑，条件名称只是规则名称，不要用条件名称覆盖 `wf_line.LineName`
-- 节点开始后端事件返回 `{ Code: 0, Msg: '...' }` 或 `V8.Result = { Code: 0 }` 可阻止流程提交
-- 流程事件在事务中执行，任何节点返回失败都会回滚
-- `V8.WF.ApprovalType === 'Auto'` 表示自动节点（发起、业务节点、自动结束），无需人工审批
-- `V8.WF.ForceSelectUsers` 仅在**前端节点开始事件**中有效
+- [references/progressive-01-节点开始-v8-事件.md](references/progressive-01-节点开始-v8-事件.md)：节点开始 V8 事件；节点结束 V8 事件；前端打开流程表单；MCP 创建/检查/测试工作流；发起流程与表单保存；流程相关表；注意事项
+<!-- microi-progressive:end -->

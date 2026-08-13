@@ -3,7 +3,7 @@ name: microi-docs-coverage
 description: Microi 中文官网文档与 Skills 能力覆盖审计。用于全面分析 microi.doc/docs/doc 与 docs/case、核对官方能力和 V8 函数是否已进入 microi.skills、补充或重构 Skills、维护文档到 Skill 的责任映射，以及防止后续新增中文文档造成 AI 知识漏项。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 中文官网文档与 Skills 覆盖审计
 

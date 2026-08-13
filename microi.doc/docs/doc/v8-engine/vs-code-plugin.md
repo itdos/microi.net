@@ -199,7 +199,7 @@ VS Code 插件和 CLI 都支持本地 stdio MCP；远程 SSE 与可视化生命�
         └── AI应用/
 ```
 
-MCP 配置、Token 文件、数据库快照和运行态元数据会加入本地 Git exclude，避免把个人服务器信息误提交给团队。工具升级 Skills 时使用逐文件 hash 判断：自动生成且用户未修改的文件可以安全升级，本地已经改过的文件会被保留。
+MCP 配置、Token 文件、Windows DPAPI 凭据保险库、数据库快照和运行态元数据会加入本地 Git exclude，避免把个人服务器信息误提交给团队。工具升级 Skills 时使用逐文件 hash 判断：自动生成且用户未修改的文件可以安全升级，本地已经改过的文件会被保留。
 
 ## 快速开始：任选 VS Code 或纯命令行
 
@@ -211,7 +211,7 @@ MCP 配置、Token 文件、数据库快照和运行态元数据会加入本地 
 
 1. 在扩展市场搜索 **`Microi吾码`**，或从扩展面板安装 `v8-engine-x.x.x.vsix`。
 2. 打开 **`Microi: 插件配置`**，输入 API Base URL 和 OsClient，点击“检测服务器，登录并保存连接”。
-3. 输入帐号、密码；服务端开启验证码时一并输入。凭据保存在当前工作区作用域的 VS Code `SecretStorage`。
+3. 输入帐号、密码；服务端开启验证码时一并输入。凭据以 VS Code `SecretStorage` 为主，并在 Windows 当前工作区镜像为 DPAPI CurrentUser 加密的 `Microi-V8-Engine/.microi-workspace-secrets.dpapi.json`，供 CLI/MCP 在验签密钥变化后静默续登；不会写入明文配置或 MCP 环境。
 4. 执行 **`Microi: 初始化AI配置`**，生成 AI 指令、Skills、V8 typings、`jsconfig.json` 和 MCP 配置。
 5. 如需复查，执行 **`Microi MCP: 诊断 MCP 可调用性`**。
 6. 需要人工编辑、Git 管理或远程调试时，在服务器节点执行 **“拉取此服务器代码”**。
@@ -236,7 +236,7 @@ npm install -g ./Microi.VSCode/plugins/microi
 microi init --pull
 ```
 
-命令会按顺序完成：添加服务器连接、提示输入帐号和密码、在需要时保存验证码图片并提示输入、登录、注入 AI/Skills/typings、配置 MCP，并在显式传入 `--pull` 时拉取全部 V8 资源和数据库结构。密码只存在于当前 CLI 进程内，不写入文件。
+命令会按顺序完成：添加服务器连接、提示输入帐号和密码、在需要时保存验证码图片并提示输入、登录、注入 AI/Skills/typings、配置 MCP，并在显式传入 `--pull` 时拉取全部 V8 资源和数据库结构。密码不会进入命令行、日志、明文配置或 MCP 环境；Windows 需要自动续登时只写入当前用户 DPAPI 加密的工作区保险库。
 
 如果只初始化 AI 和 MCP、暂不拉取代码：
 
@@ -244,7 +244,7 @@ microi init --pull
 microi init
 ```
 
-首次写入 Codex MCP 后必须新开 Codex 对话；已经打开的对话通常不会热加载新增工具。
+首次写入 Codex MCP 后，已经打开的对话继续使用已加载工具且不被强制结束；新增工具在下一次自然新建对话或宿主重启时生效。
 
 在一个完全空白的工作区，可以直接对 WorkBuddy、CodeBuddy、Qoder、Comate、Trae、Cursor、Claude Code 或 Codex 说：
 
@@ -258,7 +258,7 @@ microi init
 
 ### 方案 C：Codex Plugin
 
-Codex Plugin 已合并在 `@microi.net/cli` 中，marketplace 固定名为 `microi-net`，选择器为 `microi@microi-net`。普通用户明确同意安装后，可直接让 AI 执行：
+Codex Plugin 已合并在 `@microi.net/cli` 中，marketplace 固定名为 `microi-net`，选择器为 `microi@microi-net`。安装器默认非交互执行，可直接让 AI 执行：
 
 ```bash
 npx --yes @microi.net/cli@latest codex install --yes
@@ -266,11 +266,23 @@ npx --yes @microi.net/cli@latest codex install --yes
 
 #### 自动安装流程
 
-因此在全新 Codex 的空目录里，用户可以直接说“**通过 `@microi.net/cli@latest` 安装吾码 Codex 插件**”。具备终端和网络权限的 Codex 会执行上面的确定性命令：npm 仅负责下载，CLI 将包内完整插件复制到当前用户的 `~/.codex/microi-net-marketplace/plugins/microi`（设置 `CODEX_HOME` 时使用对应目录），注册 Codex 官方支持的本地 marketplace，再安装、启用 `microi@microi-net`。重载后，“插件”页面显示 **Microi吾码**，来源为 **microi-net**。
+因此在全新 Codex 的空目录里，用户可以直接说“**通过 `@microi.net/cli@latest` 安装吾码 Codex 插件**”。具备终端和网络权限的 Codex 会执行上面的确定性命令：npm 仅负责下载，CLI 将包内完整插件复制到当前用户的 `~/.codex/microi-net-marketplace/plugins/microi`（设置 `CODEX_HOME` 时使用对应目录），注册 Codex 官方支持的本地 marketplace，再安装、启用 `microi@microi-net`。Codex 下次自然启动后，“插件”页面显示 **Microi吾码**，来源为 **microi-net**；当前任务不必重载即可继续。
 
 #### 安装后验收
 
-已安装 CLI 时也可运行 `microi codex status --json` 检测、运行 `microi codex install --yes` 安装。`--yes` 表示用户已经授权修改 Codex 全局 marketplace、插件配置和缓存；普通 Microi 对话不得静默补上该参数。
+已安装 CLI 时也可运行 `microi codex status --json` 检测、运行 `microi codex install` 安装。`--yes` 只兼容旧版无人值守脚本，不再是允许继续工作的授权开关。
+
+#### 非阻塞自动更新
+
+VS Code 扩展激活、Codex Router 启动以及任一常规 `microi` 命令都会轻量投递：
+
+```bash
+microi update --background --workspace "<工作区绝对路径>" --json
+```
+
+更新器只从 npm 官方 registry 查询和安装 `@microi.net/cli`，随后幂等更新 Codex 插件、工作区 AI 指令、Skills 与 MCP，并执行 `doctor` / `codex status`。运行中的 VS Code Extension Host、CLI、Codex Router 和 MCP 不被终止或强制重载；新版 MCP 写入 `~/.microi/runtime/versions/<version>`，原子切换 `current.json` 后仅供新进程使用。
+
+断网、权限不足、Windows `EBUSY` 文件占用或宿主暂不支持热更新时，状态写入 `~/.microi/updater/status.json` 并在后台延后重试。界面可以非模态提示“立即重试/查看日志”，但用户不处理也不影响当前、正在进行或新建工作。设置 `microi.automaticUpdates=false` 可显式关闭 VS Code 端自动检查，已有功能仍照常使用。
 
 开发仓库先运行 `npm run codex:build`，再用 `microi codex install --yes --source ./Microi.VSCode` 验收仓库 marketplace；重启 ChatGPT/Codex 桌面端后，来源显示为 **Microi.Net**。npm 安装器生成用户本地 marketplace 所使用的模板见 `codex/marketplace.npm.json`。
 
@@ -319,6 +331,7 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 | `microi auth login` / `status` / `logout` | 管理工作区登录 Token |
 | `microi ai init` | 生成或更新 AI 指令、Skills、typings 与 MCP |
 | `microi mcp init` | 幂等更新各 AI 客户端 MCP 配置 |
+| `microi update --background` | 后台更新 CLI、Codex 插件与工作区 AI/MCP；失败延后且不阻断工作 |
 | `microi pull --profile <连接/OsClient/mcpName> --scope all` | 按连接拉取全部资源；也可选 `api/form/module/workflow/schema` |
 | `microi plugin path --json` | 查看 npm 包根和 WorkBuddy/CodeBuddy 原生插件/市场清单 |
 | `microi sync status --scope all` | 读取本地与远端差异 |
@@ -331,7 +344,7 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 
 - 两者共用 `Microi-V8-Engine/.microi-config.json`、`.microi-mcp-tokens.json` 和各服务器 `.microi-meta.json`。
 - MCP 配置采用幂等合并，只替换 Microi 管理的 server，保留用户已有的其他 MCP；内容未变化时不重写。
-- CLI 不保存帐号密码。插件可把凭据放在 VS Code `SecretStorage` 以支持静默续登；两者仍共用最新 Token 文件。
+- Windows 下 CLI、插件和 MCP 通过当前工作区 DPAPI 密文保险库共享静默续登凭据；VS Code `SecretStorage` 仍是插件主存储。非 Windows 不允许退化为明文或伪加密文件；三者继续共用最新 Token 文件。
 - 本地 V8 文件和同步基线是共同事实源。切换工具前先执行差异检查，任何一端都不要在冲突未处理时强行拉取或推送。
 - 多个终端或编辑器同时操作同一工作区时，不要并发推送同一个资源。
 
@@ -458,8 +471,9 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 
 - 同一工作区可保存多个服务器 / OsClient Profile。
 - 服务器标题优先从 `SysShortTitle` / `SysTitle` 获取。
-- 每个 Profile 独立保存 Token 和本地资源目录；VS Code 插件的密码另存于工作区 SecretStorage，CLI 不落盘保存密码。
-- Token 临近失效时自动刷新；服务端状态已失效时按 Profile 精确清理并恢复登录。
+- 每个 Profile 独立保存 Token 和本地资源目录；Windows 自动续登凭据仅存于 VS Code `SecretStorage` 与当前工作区 DPAPI CurrentUser 密文保险库，CLI/MCP 不接收明文密码参数。
+- VS Code/MCP Token 默认访问期为 20 天，租户显式配置优先。Token 临近失效时自动刷新；服务端验签密钥变化时按 Profile 从保险库自动续登并原子更新 Token/MCP，只有保险库缺失或解密失败才提示人工登录。
+- “Token 签名验证失败”不等同于“Token 已过期”。同一 `OsClient` 的 Product/Internal、Product/Internet 等 SaaS 运行记录必须共用一个 `AuthSecret`；后端在 JWT 初始化前做 CAS 收敛，只有可信后端写入新的唯一 `AuthSecretRotateVersion` 才轮换密钥，避免升级或实例切换让刚登录的 Token 失效。
 - 支持有验证码和无验证码登录。
 - MCP Server key、显示名称和设备标识会转换为安全的 ASCII 传输格式，兼容中文 Windows 主机名与不同 AI 客户端。
 - Windows 工作区会自动启用当前 Git 仓库的 `core.longpaths=true`，降低深层 V8 目录的长路径问题。
@@ -668,13 +682,13 @@ npm run publish:cli:resume
 
 ### 不安装 VS Code，能否完整使用吾码 AI 开发能力
 
-可以。安装 `@microi.net/cli` 后运行 `microi init --pull`，再新开或重载 Codex、WorkBuddy、CodeBuddy、Qoder、Comate、Claude Code 或 Trae 对话即可使用同一套 MCP 与 Skills。所谓“完整 AI 开发能力”指自然语言建模、V8、页面、打印、流程、微服务、测试和回读验收；资源树、编辑器 Diff 和断点调试是 IDE 交互能力，只在 VS Code 插件中提供。
+可以。安装 `@microi.net/cli` 后运行 `microi init --pull` 即可使用同一套 MCP 与 Skills；当前对话继续使用已加载版本，新增能力在下一次自然新建对话或宿主启动时接管，不要求立即重载才能继续工作。所谓“完整 AI 开发能力”指自然语言建模、V8、页面、打印、流程、微服务、测试和回读验收；资源树、编辑器 Diff 和断点调试是 IDE 交互能力，只在 VS Code 插件中提供。
 
 ### CLI 和 VS Code 插件会不会冲突
 
 不会各建一套配置。两者共用连接、Token、MCP、源码和同步基线。新版共存协议包含：配置/Token 原子写入与未知字段保留；MCP 中写入来源和版本，两者版本不同时由较新版本保持内置 Server 路径；Skills 和 AI 指令 manifest 拒绝被旧 bundle 降级；`microi doctor` 可显示当前 MCP 提供者版本。
 
-已经安装的历史旧版本无法被新代码“隔空修改”。如果其 MCP 记录显示 `legacy` 或旧版本，建议更新两端；暂时不更新时，每次运行旧工具后再用较新一端执行 `microi mcp init` 或“配置 MCP”即可修复。两端可以交替操作，但仍不应同时推送同一个远程资源；推送前必须做差异检查。
+已经安装的历史旧版本无法被新代码“隔空修改”，但新版会把 MCP 运行文件放入用户目录的版本隔离目录。已经启动的旧进程继续使用旧文件，新进程读取新版本；若旧全局包仍被历史任务占用，更新器只延后，不会结束任务。两端可以交替操作，但仍不应同时推送同一个远程资源；推送前必须做差异检查。
 
 ### `npm install -g @microi.net/cli` 提示包不存在
 
