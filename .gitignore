@@ -85,23 +85,9 @@ unpackage/release/
 .venv/
 
 /Microi.VSCode/
+# V8 与 AI 应用源码通过私有 HDFS / 应用商城交付，不进入公开源码仓库。
 /Microi-V8-Engine/
 /microi-v8-engine/
-
-# 官方 AI 应用的可审计源码仍按服务器/租户归档在 AI应用/{appKey}。
-# 只开放明确的官方项目，继续忽略同目录下其它租户源码、Token 和同步基线。
-!/Microi-V8-Engine/
-/Microi-V8-Engine/*
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/
-/Microi-V8-Engine/Microi吾码 (api.itdos.com)/*
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/
-/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/*
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/
-/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/*
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-platform-studio/
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-platform-studio/package-lock.json
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/ai-content-operations/
-!/Microi-V8-Engine/Microi吾码 (api.itdos.com)/iTdos.Product.Internal/AI应用/wechat-content-security/
 
 /microi.mcp/publish.sh
 
@@ -139,11 +125,15 @@ switch-env.ps1
 .tmp
 .microi-performance
 
-# Unity 本地生成缓存；保留 Packages、ProjectSettings 与 Microi.Unity 源码。
+# Unity 本地生成缓存；可复现验证工程位于 Microi.Unity/TestProject~。
 /Library/
 /Temp/
 /Logs/
 /UserSettings/
+/Microi.Unity/TestProject~/Library/
+/Microi.Unity/TestProject~/Temp/
+/Microi.Unity/TestProject~/Logs/
+/Microi.Unity/TestProject~/UserSettings/
 AI-Project/
 new-water-source-h5/
 Microi-MicroApp/
