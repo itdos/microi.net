@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-12T12:26:00.417Z",
+  "generatedAt": "2026-08-13T13:32:29.323Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "a895090a5fa0930425e6674beb3ec38ddb601eaa99d7dcc9c71a86e405e7e173",
-      "originalLines": 596,
-      "prefixSha256": "3da2562f2b34a12495dfe54f8fa881dc31715bf34bcb7cba9a266c34bd1429c9",
-      "prefixBytes": 656,
-      "entryLines": 179,
+      "originalSha256": "44a340c0c57469956b46ce947e91a83f40142022d7a786f73a6fa667024654ab",
+      "originalLines": 609,
+      "prefixSha256": "5decf25a3ed71a6eb78accc950df73a3e3addf0909921f38389d3c526efb8738",
+      "prefixBytes": 720,
+      "entryLines": 186,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -211,8 +211,8 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "ec659a0b0836eb53a55ac85c6e9c3d7701c77b01881a073ee35fc2b205f8d912",
-          "lines": 10,
+          "sha256": "79848e844c493736d8f7955fcf6ea2c22bf23a1b4a7bacbdbdcc32a2c5dffefb",
+          "lines": 17,
           "heading": "7. 验证建议"
         },
         {
@@ -267,8 +267,8 @@
           "id": "microi-client-frontend-011",
           "ordinal": 11,
           "destination": "microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md",
-          "sha256": "18261b2eb8de007296bc536802abaf995f0696fd44c54677e0f7141dcef3c5ca",
-          "lines": 76,
+          "sha256": "cdb6c4e59594572e4c1264856f42f428af215c8515b6ee14d0da4442555cc268",
+          "lines": 82,
           "heading": "Vue3 前端微服务宿主规则"
         },
         {
@@ -1344,11 +1344,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "e9ae52e876bad6413b92875ac83124750432682e72eaf54c087cc155c99e1318",
-      "originalLines": 746,
-      "prefixSha256": "c95509b6804353c3d7dbfcaa5101284d4b468f4d20e8ffc7dfb1eae22f5cbe49",
-      "prefixBytes": 1648,
-      "entryLines": 180,
+      "originalSha256": "dfedb663bea48a7f16bf0c6ae8448ae6cef1249245cf2867fb9585414ceb9d89",
+      "originalLines": 748,
+      "prefixSha256": "8002a056799f289a3d76ae93418f5aaab4fde77a481b25d948ca70034714b30f",
+      "prefixBytes": 1696,
+      "entryLines": 184,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -1554,8 +1554,8 @@
           "id": "playwright-e2e-025",
           "ordinal": 25,
           "destination": "playwright-e2e/references/progressive-04-ci-建议.md",
-          "sha256": "2ae146b962ec19d0f74f9228ccfdb2d67164dea441dccce4dcc68a867269131a",
-          "lines": 9,
+          "sha256": "be071153d695081b7c20d34cb5e9563480e3f09d9cd0292f2ca4b0245438787b",
+          "lines": 11,
           "heading": "前端微服务 E2E 必测点"
         },
         {
@@ -2221,11 +2221,11 @@
       ]
     },
     "v8-file-upload": {
-      "originalSha256": "60496ffb4c5476884f631801c0f2978362155620f5c3d0f7e94daf3a57b8b130",
-      "originalLines": 518,
+      "originalSha256": "a812df73c7f9e29bdfeeaa7f740a4b7b7490a6431e642d56ada31b2b9206923a",
+      "originalLines": 529,
       "prefixSha256": "2cb0db96cd348d7a50f36b6e4f43435188e374ace1962eb639a501b9c7490c7e",
       "prefixBytes": 1074,
-      "entryLines": 180,
+      "entryLines": 191,
       "chunks": [
         {
           "id": "v8-file-upload-000",
@@ -2247,8 +2247,8 @@
           "id": "v8-file-upload-002",
           "ordinal": 2,
           "destination": "v8-file-upload/SKILL.md",
-          "sha256": "ab3fa9eda3090868f45651aaddfa6b5ecd390535123f4666c9b67fba6a6e34f7",
-          "lines": 90,
+          "sha256": "01111b2fe994a2a5e424f45d405821f0b4f5c29235bc93757352d4c7e10d8d84",
+          "lines": 101,
           "heading": "接收前端上传的文件"
         },
         {

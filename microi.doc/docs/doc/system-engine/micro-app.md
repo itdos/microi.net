@@ -239,6 +239,17 @@ Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应�
 - UniApp 继续使用 Vue 3 + TypeScript 的官方 Vite 工具链并遵守 UniApp 跨端规范；Canvas/WebGL 游戏的高频渲染循环保持独立，Vue 负责登录、大厅、房间、设置、HUD 和结算界面。
 - 正式流式发布采用两阶段协议：先回读并冻结应用的 `CurrentVersion`、`AppVersion`，stage 上传并验签不可变版本资产，finalize 同时提交 `ExpectedCurrentVersion`、`ExpectedAppVersion` 做条件切换。任何一项缺失或远端状态已变化都必须重新盘点，不能用旧任务覆盖新版本。
 
+### 5GB 级应用资产：不进 AI 上下文
+
+<div class="micro-app-guard-grid">
+  <article class="is-success"><span>自动选择</span><strong>大于 128 MiB 使用协议 v3</strong><p>MCP 与 <code>@microi.net/cli</code> 共用客户端，默认按 16 MiB 原始字节分片，不走 Base64。</p></article>
+  <article class="is-success"><span>可恢复</span><strong>重启后只补缺失分片</strong><p>会话由租户、应用、版本、路径和摘要确定；逐片与整文件都从 HDFS 回读验签。</p></article>
+  <article><span>无产品字节上限</span><strong>容量由真实基础设施决定</strong><p>吾码不再设置文件/目录业务字节上限；协议、对象存储、磁盘、网关和网络仍需满足。</p></article>
+  <article><span>全程留痕</span><strong>系统引擎 → 超大文件上传记录</strong><p>管理员可查看阶段、字节/分片进度、心跳、错误、恢复建议和最终状态。</p></article>
+</div>
+
+例如 5 GiB 文件会生成 320 个 16 MiB 分片。失败或超时时不能盲目重发完整文件，应先查询远端会话；同摘要已完成时幂等返回，不允许用同一版本覆盖为不同内容。
+
 原生 HTML/JavaScript 仅适用于用户明确要求、目标环境不能构建，或一次性且无状态的极小静态页；交付时必须记录例外原因与后续升级路径。
 
 `.microi-micro-app.json` 是插件识别项目的依据：
@@ -633,6 +644,7 @@ console.log(hostData.appKey);
 console.log(hostData.version);
 console.log(hostData.microRoute);
 console.log(hostData.hostCapabilities);
+console.log(hostData.cache);
 console.log(hostData.dialog);
 console.log(hostData.dialogData);
 ```
@@ -650,6 +662,7 @@ console.log(hostData.dialogData);
 | `version` | 实际构建版本。 |
 | `microRoute` | 当前内部路由。 |
 | `hostCapabilities` | 菜单型微服务可调用的吾码宿主协议、模式和动作清单；弹窗型微服务不提供 Tab 动作。 |
+| `cache` | 菜单型微服务的运行时缓存上下文，包含 `mode/state/instanceName/stateEvent`；弹窗和表单嵌入不承诺页签保活。 |
 | `dialog` | 由 `OpenAppDialog` 打开时为 `true`。 |
 | `dialogData` | 宿主传入的 `Data`。 |
 | `route` | 包含 `microRoute`、`microRoutePath` 的兼容对象。 |
@@ -667,6 +680,55 @@ const result = await V8.ApiEngine.Run('get-device-detail', {
 ```
 
 不要把 Token 拼接进 URL。SDK 会把运行时 Token 放入 `Authorization`，并携带当前 `osclient` 请求头。
+
+## 菜单页签保活与单一缓存所有者
+
+菜单型微服务采用“**Vue 外层不缓存宿主，micro-app 运行时独占子应用缓存**”的单一所有者模型：主框架路由仍设置 `keepAlive:false`，避免 Vue `KeepAlive` 与微应用运行时同时缓存同一个页面；真正的表单输入、表格筛选、内部路由、滚动位置和组件状态由 `<micro-app keep-alive>` 保留。因此，`keepAlive:false` 不等于每次重新加载微服务，它只是明确 Vue 外层不能再拥有第二份生命周期。
+
+宿主以“租户 + AppKey + 主框架 `fullPath` + 发布版本/入口”的指纹生成稳定实例名，不把 Token 或查询参数原文暴露到 DOM。菜单 Id 不参与实例名，因为友好路由首屏可能先于动态菜单元数据完成；权限上下文补齐前后必须仍命中同一个运行时。当前策略最多保留 5 个菜单微服务实例，超过后只淘汰最久未使用的隐藏实例；被淘汰的顶部 Tab 仍保留，再次进入时冷启动。下列场景会精确销毁对应实例并清除运行时数据：
+
+- 关闭当前 Tab、关闭其它 Tab、关闭全部 Tab，或顶部访问记录达到上限并淘汰旧 Tab；
+- 退出登录、Token 重置、切换角色；
+- 同一路由解析到新的发布版本或入口地址；
+- 宿主检测到已挂载页面没有真实可见 DOM，并执行一次受限自愈重建。
+
+平台对上述销毁统一调用 `unmountApp(name,{destroy:true,clearData:true})`，确保组件实例、沙箱、事件监听和通信数据一并释放，而不是只从 Vue 的 `KeepAlive` 名单中删除。
+
+从隐藏状态恢复时，宿主会重新同步 Token、OsClient、权限、主题、路由和可用视口，并再次检查可见 DOM。子应用同时会收到原生 `appstate-change` 事件，必须用它暂停和恢复轮询、WebSocket、观察器、图表测量等昂贵任务；启动和停止函数应保持幂等：
+
+```js
+function syncHostContext() {
+  const context = window.microApp?.getData?.() || {};
+  configureMicroiV8(context);
+  // 按项目需要同步 theme、permissionContext、hostViewport。
+}
+
+function pauseBackgroundWork() {
+  stopPolling();
+  disconnectBusinessSocket();
+}
+
+function resumeBackgroundWork() {
+  syncHostContext();
+  startPollingOnce();
+  connectBusinessSocketOnce();
+  requestAnimationFrame(() => resizeChartsAndVirtualLists());
+}
+
+window.addEventListener('appstate-change', (event) => {
+  const state = event.detail?.appState;
+  if (state === 'afterhidden') pauseBackgroundWork();
+  if (state === 'aftershow') resumeBackgroundWork();
+});
+
+window.microApp?.addDataListener?.((data) => {
+  if (data?.type === 'host:resume') syncHostContext();
+});
+```
+
+不要在 `afterhidden` 中清空用户输入或内部路由，也不要在 `aftershow` 无条件重复注册定时器和监听器。静态 JS/CSS 仍由浏览器和 CDN 按版本缓存；运行时 LRU 只决定是否保留该页签的内存状态。
+
+`hostCapabilities.lifecycle` 会声明当前契约：`cacheOwner=micro-app`、`cacheMode=runtime-keep-alive`、`maxCachedTabs=5`，以及 `beforeshow / aftershow / afterhidden` 三个状态。AI 创建或修改菜单微服务时，应自动生成上述生命周期适配；弹窗型和表单嵌入型页面仍按打开/关闭生命周期处理，不套用菜单页签缓存。
 
 ## 子应用调用吾码主框架 Tab 与路由
 
@@ -893,7 +955,9 @@ AI 应用工作台“发布应用商城”
 - 目标端需要迁移的 `LegacyMenuUrls/LegacyComponentPaths` 菜单已绑定 `/micro-app/host`，且旧菜单 URL、稳定 `MsKey` 路由和历史服务 `Id` 路由均能打开同一页面；原开发服务器仍可运行的原生组件菜单保持不变。
 - 真实主站 URL 不携带 Token，页面仍能调用需要登录的接口。
 - Dialog 的成功、取消、失败回调都已测试。
-- 同一微服务的两个菜单连续切换不会出现 `app name conflict`。
+- 同一微服务的多个菜单至少连续往返切换 8 轮，不出现 `app name conflict`、白屏、永久骨架屏或菜单内容串页。
+- 缓存范围内返回旧 Tab 时，表单输入、筛选、内部路由和滚动位置保持；打开第 6 个菜单实例后，最久未使用的隐藏实例被淘汰且再次进入可正常冷启动。
+- 关闭当前/其它/全部 Tab 以及退出登录后，对应微应用实例已销毁；恢复页签后 Token、OsClient、权限、主题和可用视口均为当前值。
 - 目标分辨率下没有横向溢出、遮挡或右侧内容看不全。
 - 应用商城安装后，使用的是目标租户自己的 HDFS 文件地址。
 - 发布后的 active 文件清单与本地构建完全一致；旧 `dist/` 元数据已可逆归档，Private、非 `dist/` 及其它应用文件未受影响。
@@ -902,7 +966,13 @@ AI 应用工作台“发布应用商城”
 
 ### 页面空白
 
-检查菜单动态路由是否带有 `MicroAppUrl`、`MicroServiceRoutePath` 等 meta，以及 `ComponentPath` 是否为 `/micro-app/host`。若宿主把菜单 Id 当成 AppKey，通常是菜单绑定字段不完整。
+先检查菜单动态路由是否带有 `MicroAppUrl`、`MicroServiceRoutePath` 等 meta，以及 `ComponentPath` 是否为 `/micro-app/host`。若首次进入正常、连续切换后无数据、永久骨架屏或白屏，而刷新恢复，应继续检查缓存所有权：Vue 外层宿主必须 `keepAlive:false`，`<micro-app>` 才能使用原生 `keep-alive`；不能同时缓存两层，也不能给不同顶部 Tab 复用同一个固定实例名。宿主还应在恢复时强制同步上下文并复核真实可见 DOM。若宿主把菜单 Id 当成 AppKey，通常是菜单绑定字段不完整。
+
+控制台若只出现 `chrome-extension://... Failed to fetch dynamically imported module`，先用无扩展浏览器或无痕窗口复测；该地址属于浏览器扩展，不足以单独证明微服务产物加载失败。真正的微服务资源错误应能对应到 `/micro-app/{OsClient}/{AppKey}/{BuildVersion}/...` 或实际发布域名，并结合 Network 状态码、宿主诊断信息和可见 DOM 判断。
+
+### 切回页签后状态丢失或出现双重生命周期
+
+不要把菜单微服务的主框架 `meta.keepAlive` 改回 `true`。正确做法是保留 Vue 外层 `keepAlive:false`，由平台 `<micro-app keep-alive>` 单独保活，并让子应用监听 `appstate-change`。若第 6 个及之后的实例重新进入时冷启动，这是受控 LRU 淘汰，不是缓存失效；若 5 个以内也总是冷启动，则检查实例名是否随时间随机变化、入口 URL 是否被追加了每次不同的参数，以及子应用是否在 `afterhidden` 主动清空状态。
 
 ### 页面或静态资源 404
 

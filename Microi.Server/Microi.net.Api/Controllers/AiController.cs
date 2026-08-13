@@ -680,6 +680,24 @@ namespace Microi.net.Api
         }
 
         /// <summary>
+        /// 从 MiniMax 官方接口实时读取当前服务端订阅 Key 的脱敏 Token Plan 用量。
+        /// </summary>
+        [HttpGet]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> GetMiniMaxTokenPlanRemains()
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = token?.CurrentUser == null
+                ? null
+                : JObject.FromObject(token.CurrentUser);
+            return Json(await _proxyService.GetMiniMaxTokenPlanRemainsAsync(
+                currentUser?["Id"]?.ToString(),
+                token?.OsClient ?? string.Empty,
+                currentUser,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
         /// 查询当前用户的 MiniMax 视频任务；仅接收服务器签发的 TaskHandle。
         /// </summary>
         [HttpPost]
@@ -739,6 +757,24 @@ namespace Microi.net.Api
             var token = await DiyToken.GetCurrentToken();
             var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
             return Json(await _proxyService.GenerateAuthenticatedMusicAsync(
+                currentUser?["Id"]?.ToString(),
+                token?.OsClient ?? string.Empty,
+                currentUser,
+                param,
+                HttpContext.RequestAborted));
+        }
+
+        /// <summary>
+        /// 生成 MiniMax 固定男女系统音色的短对白并直接写入当前租户 HDFS。
+        /// 文本、音色和音频规格均由白名单约束，供应商 Key 不返回浏览器。
+        /// </summary>
+        [HttpPost]
+        [PlatformAdminOnly]
+        public async Task<JsonResult> GenerateMiniMaxSpeech([FromBody] MiniMaxSpeechGenerateParam param)
+        {
+            var token = await DiyToken.GetCurrentToken();
+            var currentUser = token?.CurrentUser == null ? null : JObject.FromObject(token.CurrentUser);
+            return Json(await _proxyService.GenerateAuthenticatedSpeechAsync(
                 currentUser?["Id"]?.ToString(),
                 token?.OsClient ?? string.Empty,
                 currentUser,

@@ -1,6 +1,6 @@
 ---
 name: microi-microservice
-description: Microi 前端微服务 MicroService 开发与交付指南。用于创建、读取、修改、构建、发布或修复 Vue3 微应用，维护 microi.routes.json，绑定 sys_menu，使用 V8.OpenAppDialog，或通过 MCP 管理 Web、UniApp、MicroService 应用源码和运行时。
+description: Microi 前端微服务 MicroService 开发与交付指南。用于创建、读取、修改、构建、发布或修复 Vue3 微应用，维护 microi.routes.json，绑定 sys_menu，使用 V8.OpenAppDialog，处理菜单页签 keep-alive、appstate-change、状态保留、滚动条、骨架屏或白屏，或通过 MCP 管理 Web、UniApp、MicroService 应用源码和运行时。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -159,6 +159,24 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 放在右侧内容容器内，使微服务导航栏和顶部栏保持挂载；浏览器 `popstate/hashchange` 要能恢复
 内部路由。只有确实要离开当前微服务、打开另一个吾码后台菜单或替换顶部 Tab 时才调用宿主路由动作。
 
+### 菜单页签缓存与子应用生命周期（强制）
+
+- 菜单微服务只有一个缓存所有者：Vue 路由宿主固定 `meta.keepAlive=false`，`<micro-app keep-alive>` 独占子应用状态。禁止把外层 Vue `KeepAlive` 打开，也禁止子应用通过随机实例名规避运行时缓存；双层缓存会产生旧宿主与当前路由竞争、无数据、永久骨架屏和白屏。
+- 每个主框架 `fullPath` 使用稳定且不泄露查询参数/Token 的实例指纹。平台最多保留 5 个菜单运行时，超过后按 LRU 销毁最久未使用的隐藏实例；Tab 仍保留，再次进入允许冷启动。关闭当前/其它/全部 Tab、访问记录淘汰、退出登录、Token 重置、角色变化、同路由版本或入口变化时必须精确 `unmountApp(name,{destroy:true,clearData:true})`。
+- 恢复隐藏实例时，宿主用 `forceSetData` 同步当前 Token、OsClient、权限、主题、路由和视口，再复核 `micro-app-body/#app` 的真实可见 DOM；失败只允许自动销毁重建一次。`hostCapabilities.lifecycle` 暴露 `cacheOwner=micro-app`、`cacheMode=runtime-keep-alive`、`maxCachedTabs=5` 和状态事件。
+- AI 创建或修改菜单微服务时必须生成 `appstate-change` 适配：`afterhidden` 幂等暂停轮询、WebSocket、观察器和昂贵任务；`aftershow` 重新读取宿主数据、幂等恢复任务并在下一帧重算图表/虚拟列表。隐藏时保留表单输入、筛选、滚动与内部路由，禁止清空业务状态；弹窗和表单嵌入不套用菜单页签保活。
+
+```js
+window.addEventListener('appstate-change', (event) => {
+  if (event.detail?.appState === 'afterhidden') pauseBackgroundWork();
+  if (event.detail?.appState === 'aftershow') {
+    configureMicroiV8(getMicroiContext());
+    resumeBackgroundWorkOnce();
+    requestAnimationFrame(resizeChartsAndVirtualLists);
+  }
+});
+```
+
 微服务所有主题变量、reset、通用元素规则必须限定在 AppKey 唯一根容器（推荐
 `[data-mci-ui-root="{AppKey}"]`）下，不能只用宿主也会命中的裸 `[data-mci-ui-root]`；禁止用
 `:root/html/body/#app`、裸 `*`、裸 `button/input` 污染宿主。
@@ -202,7 +220,8 @@ AI 生成菜单微服务时，应优先封装一个 `callMicroiHost(action, data
 
 - 源码、构建文件、运行时、页面路由和菜单五层分别回读。
 - 组合发布成功前，私有源码回读必须与本地源码在路径集合、文件数、字节数、逐文件 SHA-256 和规范化清单哈希上完全一致；任何缺失、多余或读取错误都要阻止运行版本切换。
-- 直接刷新友好路由与连续切换多个微应用不 404、白屏或实例名冲突。
+- 直接刷新友好路由与多个菜单至少往返 8 轮不 404、白屏、永久骨架屏、串页或实例名冲突；缓存范围内输入/筛选/滚动/内部路由保持。
+- 打开第 6 个菜单实例后确认 LRU 只淘汰最旧隐藏实例且重入可冷启动；关闭 Tab、关闭其它/全部与退出登录后确认对应运行时已销毁。
 - Dialog/Drawer 成功、取消、错误和关闭协议正确。
 - 表单 `DevComponentPath` 能匹配页面 `LegacyComponentPaths`，指定路由正常加载；Add/Edit/View/只读、字段值回写和自动高度均通过。
 - 独立地址覆盖“已有 Token 自动进入”和“无 Token 显示帐号密码”；`EnableCaptcha` 开/关各验一次，验证码响应头和登录参数正确。

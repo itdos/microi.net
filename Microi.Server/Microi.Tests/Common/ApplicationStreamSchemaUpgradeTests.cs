@@ -284,6 +284,41 @@ public sealed class ApplicationStreamSchemaUpgradeTests
             item["TableName"]?.ToString() == "mci_ai_app_file")["DDL"]!.ToString();
         Assert.Contains("`FilePathHash` char(64) NULL", fileDdl);
 
+        var multipartAuditFields = new[]
+        {
+            "UploadStatus",
+            "UploadPhase",
+            "UploadedBytes",
+            "UploadProgress",
+            "UploadedParts",
+            "UploadTotalParts",
+            "UploadHeartbeatAt",
+            "UploadCompletedAt",
+            "UploadLastError",
+            "UploadRecoveryHint"
+        };
+        foreach (var fieldName in multipartAuditFields)
+        {
+            Assert.Contains("`" + fieldName + "`", fileDdl);
+            Assert.Single(package["PhysicalColumns"]!.Children<JObject>(), item =>
+                item["TABLE_NAME"]?.ToString() == "mci_ai_app_file"
+                && item["COLUMN_NAME"]?.ToString() == fieldName);
+            var metadata = Assert.Single(package["DiyFields"]!.Children<JObject>(), item =>
+                item["TableName"]?.ToString() == "mci_ai_app_file"
+                && item["Name"]?.ToString() == fieldName);
+            Assert.Equal(1, metadata.Value<int>("Readonly"));
+        }
+
+        var uploadAuditMenu = Assert.Single(package["SysMenus"]!.Children<JObject>(), item =>
+            item["Id"]?.ToString() == "a3000100-0000-4000-8000-000000000100");
+        Assert.Equal("application-asset-upload-audit", uploadAuditMenu["ModuleEngineKey"]?.ToString());
+        Assert.Equal(1, uploadAuditMenu.Value<int>("Display"));
+        Assert.Equal(0, uploadAuditMenu.Value<int>("AppDisplay"));
+        Assert.Contains("ApplicationAssetMultipartSession", uploadAuditMenu["SqlWhere"]?.ToString());
+        Assert.Equal("V8.Result = false;", uploadAuditMenu["AddCodeShowV8"]?.ToString());
+        Assert.Equal("V8.Result = false;", uploadAuditMenu["EditCodeShowV8"]?.ToString());
+        Assert.Equal("V8.Result = false;", uploadAuditMenu["DelCodeShowV8"]?.ToString());
+
         // The portable package describes physical columns but has no provider-
         // specific index section. A database whose ServerVersion is already
         // current must therefore still be detected as missing every v3 index

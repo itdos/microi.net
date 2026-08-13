@@ -103,7 +103,7 @@ await V8.Notification.MarkRead({ All: true });
 
 ## 应用商城交付
 
-“消息通知”应用包至少包含三张业务表、相关菜单、`msg_event`、`msg_internal_list`、`msg_internal_mark_read` 和必要索引。包内不得包含真实公众号 Token/AppSecret、用户接收人、OpenId、历史发送记录或租户专属 URL。先 `ValidateOnly`，再在获准的目标租户安装并回读；结构校验不能替代真实安装验收。
+“消息通知”应用包必须包含 `mic_msgset`、`mic_msg_event_log`、`wx_tpl_msg`、`wx_mp`、`wx_mini_program` 五张结构资源，以及相关菜单、`msg_event`、`msg_internal_list`、`msg_internal_mark_read` 和必要索引。`wx_mp`、`wx_mini_program` 只交付物理表结构与表单字段元数据，不得携带数据集；否则既可能泄露真实公众号/小程序密钥，也会覆盖目标租户配置。`sys_user.WxMpId` 和 `wx_tpl_msg` 会读取 `wx_mp`，漏包会使 `/system/diy-user` 等无关页面在加载 Select 数据源时触发 `GetDiyFieldSqlData` 缺表错误。包内不得包含真实公众号 Token/AppSecret、用户接收人、OpenId、历史发送记录或租户专属 URL。先 `ValidateOnly`，再在全新或缺表目标租户真实安装，回读五张表、应用版本和依赖页面；结构校验不能替代真实安装验收。
 
 ## 最低验收
 

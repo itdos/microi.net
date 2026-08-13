@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
@@ -302,6 +303,57 @@ namespace Microi.net
         }
 
         /// <summary>
+        /// Streams an object into a caller-owned destination without allocating a
+        /// whole-object MemoryStream.  The async callback is awaited by MinIO, so
+        /// the response stays alive until the bounded pipeline has consumed it.
+        /// </summary>
+        public async Task<DosResult> CopyObjectToStream(HDFSParam param)
+        {
+            if (param?.FileStream == null || !param.FileStream.CanWrite)
+                return new DosResult(0, null, "HDFS流式读取需要可写的目标流。");
+            try
+            {
+                var clientModel = param.ClientModel;
+                var useInternet = param.NetworkIsInternet == true;
+                var endPoint = useInternet
+                    ? clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>()
+                    : clientModel.OsClientModel["MinIOEndPoint"].Val<string>();
+                var client = BuildMinioClient(
+                    endPoint,
+                    useInternet
+                        ? clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1
+                        : clientModel.OsClientModel["MinIOPrivateEndPointSSL"].Val<int>() == 1,
+                    clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
+                    clientModel.OsClientModel["MinIOSecretKey"].Val<string>(),
+                    clientModel.OsClientModel["MinIORegion"].Val<string>());
+                var bucketName = param.Limit == true
+                    ? clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>()
+                    : clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
+                var args = new GetObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithObject(param.FileFullPath.DosTrimStart('/'))
+                    .WithCallbackStream(async (source, callbackToken) =>
+                    {
+                        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                            callbackToken,
+                            param.CancellationToken);
+                        await source.CopyToAsync(param.FileStream, 128 * 1024, linked.Token)
+                            .ConfigureAwait(false);
+                    });
+                var stat = await client.GetObjectAsync(args, param.CancellationToken).ConfigureAwait(false);
+                return new DosResult(1, new { Size = stat.Size, ETag = stat.ETag });
+            }
+            catch (OperationCanceledException)
+            {
+                return new DosResult(0, null, "HDFS流式读取已取消。");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "MinIO Stream Read Error:" + ex.Message);
+            }
+        }
+
+        /// <summary>
         /// 上传文件
         /// </summary>
         /// <param name="param"></param>
@@ -364,7 +416,10 @@ namespace Microi.net
 
             var fileSuffix = Path.GetExtension(param.FileFullPath).ToLower();
             var objectName = param.FileFullPath.DosTrimStart('/');
-            var expectedSize = param.FileStream.Length;
+            var expectedSize = param.ContentLength
+                               ?? (param.FileStream.CanSeek ? param.FileStream.Length : -1L);
+            if (expectedSize < 0)
+                return new DosResult(0, null, "MinIO流式上传必须提供ContentLength。");
             //很重要，否则直接访问图片路径会直接下载，而不是直接预览
             var contentType = "application/octet-stream";
             if (fileSuffix == ".pdf")
@@ -380,7 +435,7 @@ namespace Microi.net
 
             try
             {
-                if (param.FileStream.Position != 0)
+                if (param.FileStream.CanSeek && param.FileStream.Position != 0)
                 {
                     //param.FileStream.Position = 0;
                     //或者
@@ -394,7 +449,7 @@ namespace Microi.net
                                 .WithContentType(contentType)
                                 ;
                 putObjParam = putObjParam.WithBucket(bucketName);
-                var result = await minIOClient.PutObjectAsync(putObjParam);
+                var result = await minIOClient.PutObjectAsync(putObjParam, param.CancellationToken);
                 if (result.ResponseStatusCode == HttpStatusCode.OK)
                 {
                     var verification = await VerifyUploadedObjectAsync(

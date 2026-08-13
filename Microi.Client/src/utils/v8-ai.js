@@ -186,20 +186,26 @@ export function createV8AI(options = {}) {
             return stream("/api/Ai/NL2V8Engine", param, onChunk, callOptions);
         },
         CreateMiniMaxVideo: function (param) { return request("/api/Ai/CreateMiniMaxVideo", param); },
+        GetMiniMaxTokenPlanRemains: function (param) {
+            return request("/api/Ai/GetMiniMaxTokenPlanRemains", param, "GET");
+        },
         GetMiniMaxVideoTask: function (param) { return request("/api/Ai/GetMiniMaxVideoTask", param); },
         GetMiniMaxVideoFile: function (param) { return request("/api/Ai/GetMiniMaxVideoFile", param); },
         PersistMiniMaxVideoFile: function (param) { return request("/api/Ai/PersistMiniMaxVideoFile", param); },
-        GenerateMiniMaxMusic: function (param) { return request("/api/Ai/GenerateMiniMaxMusic", param); }
+        GenerateMiniMaxMusic: function (param) { return request("/api/Ai/GenerateMiniMaxMusic", param); },
+        GenerateMiniMaxSpeech: function (param) { return request("/api/Ai/GenerateMiniMaxSpeech", param); }
     };
     api.ChatAsync = api.Chat;
     api.RecognizeIntentAsync = api.RecognizeIntent;
     api.NL2SQLAsync = api.NL2SQL;
     api.NL2V8Async = api.NL2V8;
     api.CreateMiniMaxVideoAsync = api.CreateMiniMaxVideo;
+    api.GetMiniMaxTokenPlanRemainsAsync = api.GetMiniMaxTokenPlanRemains;
     api.GetMiniMaxVideoTaskAsync = api.GetMiniMaxVideoTask;
     api.GetMiniMaxVideoFileAsync = api.GetMiniMaxVideoFile;
     api.PersistMiniMaxVideoFileAsync = api.PersistMiniMaxVideoFile;
     api.GenerateMiniMaxMusicAsync = api.GenerateMiniMaxMusic;
+    api.GenerateMiniMaxSpeechAsync = api.GenerateMiniMaxSpeech;
     return api;
 }
 

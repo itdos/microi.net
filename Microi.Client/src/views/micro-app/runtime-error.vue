@@ -39,6 +39,9 @@ export default {
                 publishStatus: "发布状态",
                 assetSource: "资产来源",
                 mountState: "挂载状态",
+                cacheMode: "缓存模式",
+                cacheState: "缓存状态",
+                cacheInstance: "实例标识",
                 reasonCode: "诊断代码"
             };
             return Object.keys(labels)

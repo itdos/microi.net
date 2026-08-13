@@ -160,10 +160,47 @@ test('future AI delivery rules prohibit manual chunks and require standalone aut
   assert.match(host, /permissionContext/);
 });
 
+test('menu MicroService cache docs, Skills and host use one native lifecycle owner', () => {
+  const guide = read('microi.doc/docs/doc/system-engine/micro-app.md');
+  const microserviceSkill = readSkill('microi-microservice');
+  const clientSkill = readSkill('microi-client-frontend');
+  const e2eSkill = readSkill('playwright-e2e');
+  const permission = read('Microi.Client/src/pinia/modules/permission.js');
+  const host = read('Microi.Client/src/views/micro-app/host.vue');
+  const cache = read('Microi.Client/src/utils/microAppRuntimeCache.js');
+
+  for (const token of [
+    '单一缓存所有者',
+    'runtime-keep-alive',
+    'appstate-change',
+    'afterhidden',
+    'aftershow',
+    '最多保留 5 个',
+    'destroy:true,clearData:true',
+  ]) assert.ok(guide.includes(token), `MicroService guide is missing ${token}`);
+
+  for (const source of [microserviceSkill, clientSkill, e2eSkill]) {
+    for (const token of ['runtime-keep-alive', 'appstate-change', 'afterhidden', 'aftershow', 'LRU']) {
+      assert.ok(source.includes(token), `Skill is missing ${token}`);
+    }
+  }
+
+  assert.match(permission, /meta\.keepAlive\s*=\s*false/);
+  assert.match(host, /<micro-app[\s\S]*?keep-alive/);
+  assert.match(host, /@beforeshow="handleBeforeShow"/);
+  assert.match(host, /forceSetData\(this\.microAppName,\s*data\)/);
+  assert.match(cache, /MICRO_APP_RUNTIME_CACHE_LIMIT\s*=\s*5/);
+  assert.match(cache, /unmountApp\(normalizedName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
+});
+
 test('workspace Skills and the packaged Codex plugin carry the same rules', () => {
   const files = [
     'microi-microservice/SKILL.md',
     'microi-microservice/references/runtime-delivery.md',
+    'microi-client-frontend/SKILL.md',
+    'microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md',
+    'playwright-e2e/SKILL.md',
+    'playwright-e2e/references/progressive-04-ci-建议.md',
     'microi-form-engine/SKILL.md',
     'microi-docs-coverage/SKILL.md',
     'microi-frontend-sdk/SKILL.md',

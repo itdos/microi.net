@@ -157,7 +157,7 @@ const host = window.microApp?.getData?.() || {};
 
 常见字段：`apiBase`、`osClient`、`token`、`menuId`、`moduleEngineKey`、`diyTableId`、
 `permissionContext`、`appKey`、`version`、`microRoute`、`dialog`、`dialogData`、
-`componentMode`、`componentData`。只在内存中使用 Token。
+`componentMode`、`componentData`、`cache`、`hostCapabilities.lifecycle`。只在内存中使用 Token。
 
 独立访问时没有宿主 Token：先配置清单中的 `apiBase/osClient`，读取 `V8.GetSysConfig(true)`，
 没有有效本地 Token 才显示吾码帐号密码登录；按 `EnableCaptcha` 动态请求验证码并向 `V8.Login`
@@ -174,6 +174,31 @@ const host = window.microApp?.getData?.() || {};
 菜单页采用单一纵向滚动所有者：自然增高的长页面由 `<micro-app>` 边界兜底滚动；需要内部
 sticky/虚拟列表时，子应用以宿主可用高度约束自己的滚动容器并设置 `overflow-y:auto`，框架边界
 因不再发生内容溢出而不显示滚动条。不要同时让宿主外层、微服务边界和自动高度根节点都承担滚动。
+
+菜单页签还采用单一缓存所有者：主框架 Vue 宿主不进入 `KeepAlive`，由 `<micro-app keep-alive>`
+保存子应用状态。宿主按租户、AppKey、主框架 `fullPath`、版本和入口生成稳定指纹，菜单 Id 只进入权限上下文、不参与实例名，避免首屏动态菜单元数据尚未补齐时产生第二个运行时；最多保留
+5 个运行时；超过上限时只按 LRU 销毁隐藏实例。关闭当前/其它/全部 Tab、访问记录淘汰、退出登录、
+Token 重置、角色变化、同一路由版本或入口变化时，使用 `destroy:true,clearData:true` 精确销毁。
+弹窗和表单组件不承诺页签缓存，禁止套用菜单规则。
+
+隐藏/恢复由子应用原生事件通知：
+
+```javascript
+window.addEventListener('appstate-change', function (event) {
+  var state = event.detail && event.detail.appState;
+  if (state === 'afterhidden') pauseBackgroundWork();
+  if (state === 'aftershow') {
+    configureMicroiV8(getMicroiContext());
+    resumeBackgroundWorkOnce();
+    requestAnimationFrame(resizeChartsAndVirtualLists);
+  }
+});
+```
+
+`pause/resume` 必须幂等，分别处理轮询、WebSocket、观察器、图表和虚拟列表；隐藏时不得清空用户
+输入、筛选、滚动或内部路由。恢复时宿主会以 `host:resume` 强制同步当前 Token、OsClient、权限、
+主题、路由和视口，然后复核真实可见 DOM；子应用也应重新读取宿主上下文。AI 生成菜单微服务时
+必须包含此生命周期适配，不能只实现首次 `mount`。
 
 子应用通过模板 SDK 调用接口，不自行发明认证协议。关闭/结果使用宿主约定的
 success、cancel、error/close 事件；业务写入成功后再报告 success。

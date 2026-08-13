@@ -154,6 +154,88 @@ namespace Microi.net.Api
                 || currentUser?["Level"]?.Val<int>() >= DiyCommon.MaxRoleLevel;
         }
 
+        private static bool IsCurrentPlatformAdmin(string osClient, JObject currentUser)
+        {
+            return IsPlatformAdmin(currentUser)
+                && PlatformAdministratorSecurity.IsCurrentPlatformAdministrator(
+                    osClient,
+                    currentUser);
+        }
+
+        private static async Task<DosResult> AuthorizeSysUserTableOperationAsync(
+            SysUserParam source,
+            JObject currentUser,
+            string osClient,
+            string operation)
+        {
+            return await MicroiEngine.FormEngine.AuthorizeClientTableOperationAsync(
+                new DiyTableRowParam
+                {
+                    FormEngineKey = "sys_user",
+                    Id = source?.Id,
+                    _TableRowId = source?.Id,
+                    OsClient = osClient,
+                    _CurrentUser = currentUser,
+                    _InvokeType = InvokeType.Client.ToString(),
+                    _Lang = source?._Lang,
+                    // Add/Edit authorization also runs the account hierarchy gate.
+                    // The DTO-specific role payload is validated separately below.
+                    _RowModel = string.Equals(operation, "Add", StringComparison.OrdinalIgnoreCase)
+                                || string.Equals(operation, "Edit", StringComparison.OrdinalIgnoreCase)
+                        ? new JObject { ["Id"] = source?.Id }
+                        : null
+                },
+                operation);
+        }
+
+        private static SysUserManagementDecision AuthorizeDelegatedSysUserMutation(
+            SysUserParam param,
+            JObject currentUser,
+            SysUserManagementOperation operation)
+        {
+            var roleIdsSupplied = param?.RoleIds != null;
+            var requestedRoleIds = roleIdsSupplied
+                ? JArray.FromObject(param.RoleIds)
+                : null;
+            var dbSession = OsClientExtend.GetClient(param?.OsClient)?.Db;
+            var decision = SysUserManagementSecurity.Authorize(
+                dbSession,
+                currentUser,
+                operation,
+                param?.Id,
+                requestedRoleIds,
+                roleIdsSupplied);
+            if (!decision.Allowed)
+            {
+                return decision;
+            }
+
+            // Never accept denormalized Level from an ordinary request. If the
+            // request changes RoleIds, persist only the level derived from active
+            // database role rows.
+            param.Level = roleIdsSupplied ? decision.AssignedLevel : null;
+            if (roleIdsSupplied)
+            {
+                param.RoleIds = decision.RoleIds.ToList();
+            }
+            return decision;
+        }
+
+        private static void RestrictDelegatedManagementFields(SysUserParam param)
+        {
+            // These are server-owned identity/session/audit fields. Account managers
+            // may manage ordinary profile, organization, state and role data, but an
+            // Edit permission must not become Delete, token or login-state control.
+            param.IsDeleted = null;
+            param.LastLoginIP = null;
+            param.PwdErrorCount = null;
+            param.Token = null;
+            param._token = null;
+            param.TokenName = null;
+            param._LevelLimit = null;
+            param._DevBypassPwd = false;
+        }
+
         /// <summary>
         /// Self-service profile updates must never reuse the administrator DTO
         /// unchecked.  SysUserParam also contains roles, departments, account
@@ -1112,7 +1194,7 @@ namespace Microi.net.Api
             }
 
             var currentUserId = currentUser["Id"].Val<string>();
-            if (!IsPlatformAdmin(currentUser))
+            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
             {
                 // Ordinary users may only refresh their own cached identity.
                 userId = currentUserId;
@@ -1148,18 +1230,46 @@ namespace Microi.net.Api
             param._CurrentUser = currentUser;
             param.OsClient = currentToken.OsClient;
 
-            if (!IsPlatformAdmin(currentUser))
+            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
             {
                 var currentUserId = currentUser["Id"].Val<string>();
-                if (currentUserId.DosIsNullOrWhiteSpace()
-                    || (!param.Id.DosIsNullOrWhiteSpace()
-                        && !string.Equals(param.Id, currentUserId, StringComparison.Ordinal)))
+                if (currentUserId.DosIsNullOrWhiteSpace())
                 {
                     Response.StatusCode = 403;
                     return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
                 }
-                RestrictSelfServiceUpdate(param, currentUserId);
 
+                var isSelfUpdate = param.Id.DosIsNullOrWhiteSpace()
+                    || string.Equals(param.Id, currentUserId, StringComparison.OrdinalIgnoreCase);
+                if (isSelfUpdate)
+                {
+                    RestrictSelfServiceUpdate(param, currentUserId);
+                }
+                else
+                {
+                    RestrictDelegatedManagementFields(param);
+                    var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
+                        param,
+                        currentUser,
+                        currentToken.OsClient,
+                        "Edit");
+                    if (tableAuthorization.Code != 1)
+                    {
+                        Response.StatusCode = 403;
+                        return Json(tableAuthorization);
+                    }
+                    var mutationDecision = AuthorizeDelegatedSysUserMutation(
+                        param,
+                        currentUser,
+                        SysUserManagementOperation.Edit);
+                    if (!mutationDecision.Allowed)
+                    {
+                        Console.WriteLine(
+                            $"Microi：[SysUserManagementSecurity] 拒绝普通账号编辑用户，原因={mutationDecision.Reason}");
+                        Response.StatusCode = 403;
+                        return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
+                    }
+                }
             }
 
             // 已登记 Passkey/严格人脸因子的用户修改自己的密码时必须进行二次认证。
@@ -1247,10 +1357,44 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
-        [PlatformAdminOnly]
         public async Task<JsonResult> AddSysUser(SysUserParam param)
         {
-            await DefaultParam(param);
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var currentUser = currentToken?.CurrentUser;
+            if (currentUser == null)
+            {
+                Response.StatusCode = 401;
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            }
+            param ??= new SysUserParam();
+            param._CurrentUser = currentUser;
+            param.OsClient = currentToken.OsClient;
+
+            var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
+                param,
+                currentUser,
+                currentToken.OsClient,
+                "Add");
+            if (tableAuthorization.Code != 1)
+            {
+                Response.StatusCode = 403;
+                return Json(tableAuthorization);
+            }
+            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
+            {
+                RestrictDelegatedManagementFields(param);
+                var decision = AuthorizeDelegatedSysUserMutation(
+                    param,
+                    currentUser,
+                    SysUserManagementOperation.Add);
+                if (!decision.Allowed)
+                {
+                    Console.WriteLine(
+                        $"Microi：[SysUserManagementSecurity] 拒绝普通账号新增用户，原因={decision.Reason}");
+                    Response.StatusCode = 403;
+                    return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
+                }
+            }
 
             //2022-06-27 新增密码提前加密，也可以不使用
             //if (!param.Pwd.DosIsNullOrWhiteSpace())
@@ -1269,10 +1413,43 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost]
-        [PlatformAdminOnly]
         public async Task<JsonResult> DelSysUser(SysUserParam param)
         {
-            await DefaultParam(param);
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var currentUser = currentToken?.CurrentUser;
+            if (currentUser == null)
+            {
+                Response.StatusCode = 401;
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            }
+            param ??= new SysUserParam();
+            param._CurrentUser = currentUser;
+            param.OsClient = currentToken.OsClient;
+
+            var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
+                param,
+                currentUser,
+                currentToken.OsClient,
+                "Delete");
+            if (tableAuthorization.Code != 1)
+            {
+                Response.StatusCode = 403;
+                return Json(tableAuthorization);
+            }
+            if (!IsCurrentPlatformAdmin(currentToken.OsClient, currentUser))
+            {
+                var decision = AuthorizeDelegatedSysUserMutation(
+                    param,
+                    currentUser,
+                    SysUserManagementOperation.Delete);
+                if (!decision.Allowed)
+                {
+                    Console.WriteLine(
+                        $"Microi：[SysUserManagementSecurity] 拒绝普通账号删除用户，原因={decision.Reason}");
+                    Response.StatusCode = 403;
+                    return Json(new DosResult(0, null, DiyMessage.GetLang(currentToken.OsClient, "NoAuth", param._Lang)));
+                }
+            }
 
             var result = await _sysUserLogic.DelSysUser(param);
             return Json(result);
@@ -1284,10 +1461,28 @@ namespace Microi.net.Api
         /// <param name="param"></param>
         /// <returns></returns>
         [HttpPost, HttpGet]
-        [PlatformAdminOnly]
         public async Task<JsonResult> GetSysUser(SysUserParam param)
         {
-            await DefaultParam(param);
+            var currentToken = await DiyToken.GetCurrentToken(false);
+            var currentUser = currentToken?.CurrentUser;
+            if (currentUser == null)
+            {
+                Response.StatusCode = 401;
+                return Json(new DosResult(1001, null, "登录身份已过期，请重新登录。"));
+            }
+            param ??= new SysUserParam();
+            param._CurrentUser = currentUser;
+            param.OsClient = currentToken.OsClient;
+            var tableAuthorization = await AuthorizeSysUserTableOperationAsync(
+                param,
+                currentUser,
+                currentToken.OsClient,
+                "List");
+            if (tableAuthorization.Code != 1)
+            {
+                Response.StatusCode = 403;
+                return Json(tableAuthorization);
+            }
 
             param.IsDeleted = 0;
             var result = await _sysUserLogic.GetSysUser(param);

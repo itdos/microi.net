@@ -38,7 +38,7 @@ description: Microi V8 与 MCP 文件上传下载指南。用于处理流式 AI 
 可信后端 V8 可用 `V8.Http.GetResponse({ Url: url }).RawBytes` 下载，再用 `System.Convert.ToBase64String` 和 `V8.Method.Upload` 上传。该路径同样必须校验域名、大小、Content-Type、后缀和最终重定向目标。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=ab3fa9eda3090868f45651aaddfa6b5ecd390535123f4666c9b67fba6a6e34f7 -->
+<!-- microi-progressive:chunk id=v8-file-upload-002 sha256=01111b2fe994a2a5e424f45d405821f0b4f5c29235bc93757352d4c7e10d8d84 -->
 ## 接收前端上传的文件
 
 前端发起文件上传时，平台自动把文件以 base64 形式注入到 `V8.FilesByteBase64`：
@@ -69,9 +69,20 @@ var filePath = upResult.Data[0].Path;  // 相对路径，存数据库
 var fullUrl  = upResult.Data[0].FullPath;  // 完整 URL（公有桶）
 ```
 
-### 平台上传分层限制
+### AI 应用超大资产断点续传
 
-Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入口必须在解码 Base64、解析图片或调用对象存储前执行服务端校验。上传限制分为四层，不能把租户业务值误称为平台硬上限：
+Unity `Data`、WASM、Windows 安装包、视频模型等发布资产不得进入 Base64、JSON 或 Jint。`microi_publish_application_directory_stream` 在协议 v3 下与 `@microi.net/cli` 共用同一套传输客户端：单文件大于 128 MiB 时自动切换为原始字节断点续传，小文件继续兼容旧版单请求链路。
+
+- 默认分片 16 MiB；5 GiB 文件为 320 片。分片通过 `application/octet-stream` 发送，必须携带精确 `Content-Length` 与 SHA-256。
+- 服务端逐片写入 HDFS 后重新流式回读校验；完成时按顺序合并、再次核对整文件 SHA-256，再生成不可变版本完整性标记。
+- 会话 Id 由租户、应用、版本、路径和文件摘要确定。网络中断或进程重启后先读取远端状态，只续传缺失分片；已成功的相同摘要请求直接幂等返回。
+- 吾码不为协议 v3 设置业务文件/目录字节上限，状态中的 `ApplicationAssetResumableProductSizeLimitBytes=0` 表示没有产品配置上限。每个对象仍受协议技术边界（最多 10000 片、单片最多 1 GiB）、JavaScript 安全整数、对象存储、磁盘、网关和网络条件约束。
+- 该链路只允许通过能力鉴权的当前租户超级管理员，并继续受 `FileUploadEnabled` 总开关控制；它不是普通用户上传或任意 HDFS 路径写入接口。
+- 每个会话都在 `mci_ai_app_file` 保留审计记录，`StorageScope=ApplicationAssetMultipartSession`。管理员在 **系统引擎 → 超大文件上传记录** 查看状态、阶段、已传字节/分片、进度、心跳、错误和恢复建议；成功、失败和取消记录都不静默删除。
+
+### 普通业务上传的分层限制
+
+以下限制适用于 HTTP、表单、V8、移动端和旧版应用资产单请求，不适用于上面的受信任 v3 断点续传。Token 不是无限上传授权；普通入口必须在解码 Base64、解析图片或调用对象存储前执行服务端校验：
 
 1. **租户业务配置**：有效正数/布尔值按 `sys_osclients` 当前租户 → 代码默认值解析。租户可以按业务需要提高或降低默认值，不要求安装者维护额外环境变量或修改 `appsettings`。
 2. **平台绝对上限**：最终业务值再与代码内固定灾难保护上限取较小值，租户和安装参数都不能放大。
@@ -91,7 +102,7 @@ Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入
 
 - `sys_osclients` 六个字段全部可空；空值、无效值或老数据库缺列时使用代码默认值，不会因升级自动停用上传。`FileUploadMaxRequestMB` 指一次上传所有文件的业务合计大小，不等于 Kestrel HTTP 请求正文上限。
 - 固定灾难保护和 HTTP/Multipart/Form 解析上限不属于安装配置；租户值即使更大也会被这些边界截断。最终单次总量还不能超过帐号或租户的有效日额度，单文件不能超过最终单次总量。
-- `FileUploadEnabled=0` 表示禁用当前租户的交互式上传，不表示绕过限制。平台内部受控任务仍受全局大小硬上限；租户配置刷新应走现有 SaaS 引擎重载和共享 Redis 发布订阅，不能依赖单节点内存。
+- `FileUploadEnabled=0` 表示禁用当前租户上传，也会阻止 AI 应用资产断点续传；不能把内部发布协议当成绕过开关的后门。普通单请求继续受全局大小硬上限，v3 只移除产品级字节上限；租户配置刷新应走现有 SaaS 引擎重载和共享 Redis 发布订阅，不能依赖单节点内存。
 - 帐号与租户每日额度在共享 Redis 中用单次原子脚本预留，支持多节点；Redis 不可用时失败关闭，不能降级成无限上传。
 - 额度按 UTC 日期统计。为防并发重试绕过限制，后续对象存储失败也不退还已经预留的额度。
 - 每日额度只阻断短期滥用；对象存储必须另外配置租户/桶总容量、账单告警、生命周期与实际用量对账。Redis 计数不能作为长期容量事实源。
@@ -116,7 +127,7 @@ Token 不是无限上传授权。所有 HTTP、表单、V8 和移动端上传入
 4. 保存后逐条远程回读；FormEngine 会排队重载 SaaS 运行配置，再用真实小文件上传做生效冒烟。只看到 MCP 返回“更新成功”不算验收。
 5. 提高每日配额保留当天已用计数，剩余额度为新上限减已用量。计数按 UTC 日期，失败上传不退款；除非用户明确授权事故处置，不得删除 Redis 配额 Key。
 
-租户 MCP 只能调整业务层配置；平台固定灾难保护、HTTP/Multipart/Form 解析上限和反向代理上限不能通过 `sys_osclients` 绕过。写入 `sys_osclients` 属于控制面操作，只允许当前租户的 `Level >= 9999` 管理身份，并且必须保留 MCP 审计与写后回读。
+租户 MCP 只能调整普通业务上传配置；平台固定灾难保护、HTTP/Multipart/Form 解析上限和反向代理上限不能通过 `sys_osclients` 绕过。协议 v3 的原始分片不读取普通单请求大小字段，但仍要求能力鉴权、总开关、版本快照、逐片/整文件哈希和审计。写入 `sys_osclients` 属于控制面操作，只允许当前租户的 `Level >= 9999` 管理身份，并且必须保留 MCP 审计与写后回读。
 
 ### UniApp / H5 客户端直传路径规则
 

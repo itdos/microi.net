@@ -561,7 +561,15 @@ namespace Microi.net
                 ApplicationAssetStreamMaxFileBytes,
                 ApplicationAssetStreamMaxTotalBytes,
                 ApplicationAssetStreamIoConcurrency,
-                ApplicationAssetStreamReadBudgetBytes
+                ApplicationAssetStreamReadBudgetBytes,
+                ApplicationAssetStreamLimitsApplyTo = "legacy-single-request",
+                ApplicationAssetResumableSupported,
+                ApplicationAssetResumableProtocolVersion,
+                ApplicationAssetResumableDefaultChunkBytes,
+                ApplicationAssetResumableMaxChunkBytes,
+                ApplicationAssetResumableMaxParts,
+                ApplicationAssetResumableMaxObjectBytes,
+                ApplicationAssetResumableProductSizeLimitBytes
             };
         }
 

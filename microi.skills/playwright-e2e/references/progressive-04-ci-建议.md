@@ -46,12 +46,14 @@ jobs:
 | 页面有横向滚动 | 组件撑出视口 | 对根容器和列表容器加 `max-width:100vw; overflow-x:hidden` |
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-025 sha256=2ae146b962ec19d0f74f9228ccfdb2d67164dea441dccce4dcc68a867269131a -->
+<!-- microi-progressive:chunk id=playwright-e2e-025 sha256=be071153d695081b7c20d34cb5e9563480e3f09d9cd0292f2ca4b0245438787b -->
 ## 前端微服务 E2E 必测点
 
 测试 Vue3 MicroApp 微服务时，不能只验证 `/micro-app/{OsClient}/{appKey}/index.html` 或带 token 的临时 URL。必须先建立真实登录态，再访问用户实际使用的不带 token 菜单路由，例如 `/#/micro-app/{MsKey}/{RoutePath}`，并确认地址栏没有退回旧的 `micro-app-host` 长地址。
 
-同一套微服务绑定多个菜单时，至少连续访问两个菜单页面，断言没有 `element head is missing`、`Failed to fetch`、`ERR_TOO_MANY_REDIRECTS`、`app name conflict` 等 micro-app 错误。
+同一套微服务绑定多个菜单时，至少选择 3 个真实菜单往返切换 8 轮，逐轮断言主框架 route、当前菜单和子应用可见内容匹配，且没有 `element head is missing`、`Failed to fetch`、`ERR_TOO_MANY_REDIRECTS`、`app name conflict`、永久骨架屏或空白内容。不能只断言 `<micro-app>` 元素存在。
+
+页签缓存验收必须覆盖单一所有者与清理边界：在一个缓存范围内修改表单输入、筛选、内部路由或滚动位置，切走再返回后状态应保持；连续打开 6 个菜单微服务实例，断言运行时最多保留 5 个，最久未使用的隐藏实例重入时正常冷启动；关闭当前/其它/全部 Tab 后对应实例消失，退出登录后全部实例清空。恢复页还要断言收到最新 Token/OsClient/权限/主题/视口上下文，且任一时刻只有一个可见活动微服务。若子应用有轮询或 WebSocket，记录 `appstate-change`，确认 `afterhidden` 暂停、`aftershow` 幂等恢复而没有重复连接。
 
 如果页面内提供 Microi SDK 调用按钮，必须点击并断言返回 `Code=1`，同时确认没有 `登录身份已过期`、`1001`、`1002`。只看到标题文本不代表鉴权链路通过。
 

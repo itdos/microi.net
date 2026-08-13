@@ -1,6 +1,6 @@
 ---
 name: playwright-e2e
-description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。用于测试 PC Vue、uni-app H5、网站、界面引擎、移动商城、ApiEngine/FormEngine 契约、登录流程、写入闭环、网络防护、截图、报告和 Playwright Test for VSCode 集成。
+description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。用于测试 PC Vue、前端微服务菜单切换与 keep-alive/LRU、uni-app H5、网站、界面引擎、移动商城、ApiEngine/FormEngine 契约、登录流程、写入闭环、网络防护、截图、报告和 Playwright Test for VSCode 集成。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -169,6 +169,10 @@ uni-app H5 或移动端前端按项目自身命令启动，例如 `npm run dev:h
 
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）
+
+### 菜单微服务生命周期验收（强制）
+
+菜单型 MicroService 使用 `runtime-keep-alive` 单一缓存所有者。E2E 必须覆盖至少 3 条子路由连续切换 8 轮，确认返回后状态仍在、页面无永久骨架屏或空白；继续打开第 6 个实例，确认 LRU 只淘汰最久未使用的隐藏实例。还要观察 `appstate-change`：`afterhidden` 后后台任务应暂停，`aftershow` 后应幂等恢复；关闭 Tab、关闭其它/全部以及退出登录后，对应运行时必须被销毁。
 
 仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 

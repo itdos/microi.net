@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Dos.Common;
 using Minio;
@@ -190,6 +191,53 @@ namespace Microi.net
             return new DosResult<bool>(1, objectExist);
         }
 
+        public async Task<DosResult> CopyObjectToStream(HDFSParam param)
+        {
+            if (param?.FileStream == null || !param.FileStream.CanWrite)
+                return new DosResult(0, null, "HDFS流式读取需要可写的目标流。");
+            try
+            {
+                var clientModel = param.ClientModel;
+                var endPoint = param.Limit == true
+                    ? clientModel.OsClientModel["MinIOEndPoint"].Val<string>()
+                    : clientModel.OsClientModel["MinIOEndPointInternet"].Val<string>();
+                var builder = new MinioClient()
+                    .WithEndpoint(endPoint)
+                    .WithCredentials(
+                        clientModel.OsClientModel["MinIOAccessKey"].Val<string>(),
+                        clientModel.OsClientModel["MinIOSecretKey"].Val<string>());
+                if (clientModel.OsClientModel["MinIOEndPointSSL"].Val<int>() == 1)
+                    builder = builder.WithSSL();
+                if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
+                    builder = builder.WithRegion(clientModel.OsClientModel["MinIORegion"].Val<string>());
+                var client = builder.Build();
+                var bucketName = param.Limit == true
+                    ? clientModel.OsClientModel["MinIOPrivateBucketName"].Val<string>()
+                    : clientModel.OsClientModel["MinIOPublicBucketName"].Val<string>();
+                var args = new GetObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithObject(param.FileFullPath.DosTrimStart('/'))
+                    .WithCallbackStream(async (source, callbackToken) =>
+                    {
+                        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                            callbackToken,
+                            param.CancellationToken);
+                        await source.CopyToAsync(param.FileStream, 128 * 1024, linked.Token)
+                            .ConfigureAwait(false);
+                    });
+                var stat = await client.GetObjectAsync(args, param.CancellationToken).ConfigureAwait(false);
+                return new DosResult(1, new { Size = stat.Size, ETag = stat.ETag });
+            }
+            catch (OperationCanceledException)
+            {
+                return new DosResult(0, null, "HDFS流式读取已取消。");
+            }
+            catch (Exception ex)
+            {
+                return new DosResult(0, null, "Amazon S3 Stream Read Error:" + ex.Message);
+            }
+        }
+
         public async Task<DosResult> PutObject(HDFSParam param)
         {
             var clientModel = param.ClientModel;
@@ -249,10 +297,14 @@ namespace Microi.net
             try
             {
                 // 上传文件。注意：objectName不能以/开头，并且objectName区分大小写
+                var objectLength = param.ContentLength
+                                   ?? (param.FileStream.CanSeek ? param.FileStream.Length : -1L);
+                if (objectLength < 0)
+                    return new DosResult(0, null, "Amazon S3流式上传必须提供ContentLength。");
                 var putObjParam = new PutObjectArgs()
                                 .WithObject(param.FileFullPath.DosTrimStart('/'))
                                 .WithStreamData(param.FileStream)
-                                .WithObjectSize(param.FileStream.Length)
+                                .WithObjectSize(objectLength)
                                 .WithContentType(contentType)
                                 ;
                 if (!clientModel.OsClientModel["MinIORegion"].Val<string>().DosIsNullOrWhiteSpace())
@@ -264,7 +316,7 @@ namespace Microi.net
                 }
                 putObjParam = putObjParam.WithBucket(bucketName);
 
-                await minIOClient.PutObjectAsync(putObjParam);
+                await minIOClient.PutObjectAsync(putObjParam, param.CancellationToken);
                 return new DosResult(1);
             }
             catch (Exception ex)

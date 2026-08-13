@@ -193,8 +193,10 @@ const MICRO_SERVICE_SOURCE_EXCLUDED_FILES = new Set([
 ]);
 const MICRO_SERVICE_SOURCE_CHUNK_ARTIFACT = /^(?:\.sync-seg-.*|sync-source-files\.json)$/iu;
 
-const APPLICATION_ASSET_MAX_FILE_BYTES = 128 * 1024 * 1024;
-const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
+// Runtime assets use the resumable HDFS multipart transport above the legacy
+// 128MiB endpoint boundary. Keep only JavaScript's exact-integer boundary as a
+// platform invariant; maxTotalBytes remains an optional caller safety rail.
+const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = Number.MAX_SAFE_INTEGER;
 
 export function validateLocalApplicationAssetSize(
   relativePath: string,
@@ -202,11 +204,15 @@ export function validateLocalApplicationAssetSize(
   nextTotalSize: number,
   maxTotalBytes = APPLICATION_MANIFEST_MAX_TOTAL_BYTES,
 ): void {
-  if (fileSize > APPLICATION_ASSET_MAX_FILE_BYTES) {
-    throw new Error(`发布单文件超过硬上限 ${APPLICATION_ASSET_MAX_FILE_BYTES} bytes：${relativePath}；已在上传前中止。`);
+  if (!Number.isSafeInteger(fileSize) || fileSize < 0
+    || !Number.isSafeInteger(nextTotalSize) || nextTotalSize < 0) {
+    throw new Error(`发布资产大小必须位于 JavaScript 安全整数范围：${relativePath}`);
   }
-  if (nextTotalSize > Math.min(maxTotalBytes, APPLICATION_MANIFEST_MAX_TOTAL_BYTES)) {
-    throw new Error(`发布总大小超过上限 ${Math.min(maxTotalBytes, APPLICATION_MANIFEST_MAX_TOTAL_BYTES)} bytes，已在上传前中止。`);
+  const callerLimit = Number.isSafeInteger(maxTotalBytes) && maxTotalBytes > 0
+    ? maxTotalBytes
+    : APPLICATION_MANIFEST_MAX_TOTAL_BYTES;
+  if (nextTotalSize > callerLimit) {
+    throw new Error(`发布总大小超过调用方安全上限 ${callerLimit} bytes，已在上传前中止。`);
   }
 }
 
@@ -872,10 +878,10 @@ export async function buildLocalApplicationAssetManifest(
   const rootRealPath = fs.realpathSync(root);
   const normalizedEntry = normalizeLocalApplicationRelativePath(entryPath);
   const maxFiles = Math.min(20_000, Math.max(1, options.maxFiles ?? 20_000));
-  const maxTotalBytes = Math.min(
-    APPLICATION_MANIFEST_MAX_TOTAL_BYTES,
-    Math.max(1, options.maxTotalBytes ?? APPLICATION_MANIFEST_MAX_TOTAL_BYTES),
-  );
+  const requestedMaxTotalBytes = options.maxTotalBytes ?? APPLICATION_MANIFEST_MAX_TOTAL_BYTES;
+  const maxTotalBytes = Number.isSafeInteger(requestedMaxTotalBytes) && requestedMaxTotalBytes > 0
+    ? requestedMaxTotalBytes
+    : APPLICATION_MANIFEST_MAX_TOTAL_BYTES;
   const pending = [rootRealPath];
   const files: Array<{ absolutePath: string; relativePath: string; size: number }> = [];
   const skippedSourceMaps: string[] = [];
@@ -6680,7 +6686,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
   // ========================
   server.tool(
     'microi_publish_application_directory_stream',
-    `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using bounded multipart file streams and deterministic RequestId evidence. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Each file is capped at 128 MiB and the complete manifest at 1 GiB before upload. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without RequestId support fail closed.`,
+    `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using deterministic RequestId evidence. Protocol v3 automatically switches files above the legacy 128 MiB request boundary to durable HDFS multipart sessions with per-part SHA-256, status readback and reconnect resume; logical files such as 5 GiB installers never enter Base64/Jint or whole-file memory. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without the resumable endpoints fail closed for oversized assets.`,
     {
       appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
       versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
@@ -6707,7 +6713,7 @@ export function createMcpServer(client: MicroiClient, context: McpServerContext)
       expectedCommittedPublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 committed version id baseline; explicit null means empty.'),
       includeSourceMaps: z.boolean().optional().default(false).describe('Publish *.map source maps. Defaults to false to avoid source disclosure.'),
       maxFiles: z.number().int().min(1).max(20_000).optional().describe('Safety cap checked before upload. Default and hard maximum 20,000.'),
-      maxTotalMegabytes: z.number().positive().max(1024).optional().default(1024).describe('Safety cap checked before upload. Default and hard maximum 1 GiB (1024 MiB).'),
+      maxTotalMegabytes: z.number().positive().max(Number.MAX_SAFE_INTEGER / (1024 * 1024)).optional().describe('Optional caller safety cap checked before upload. Omit for the platform maximum; 5 GiB and larger builds use resumable HDFS multipart.'),
       timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
       allowLegacyFallback: z.boolean().optional().default(false).describe('Deprecated compatibility flag. RequestId-capable two-phase publishing fails closed on old API nodes instead of publishing through the legacy payload.'),
       confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),

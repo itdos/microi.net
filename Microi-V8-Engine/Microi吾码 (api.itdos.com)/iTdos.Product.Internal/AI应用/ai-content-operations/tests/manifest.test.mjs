@@ -18,11 +18,11 @@ test('内部应用以官方租户 AI应用目录为唯一事实源', () => {
 test('资源数量、mci前缀与业务键稳定', () => {
   assert.equal(manifest.tables.length, 6)
   assert.equal(manifest.modules.length, 6)
-  assert.equal(manifest.engines.length, 12)
+  assert.equal(manifest.engines.length, 13)
   assert.equal(manifest.jobs.length, 3)
   assert.ok(manifest.tables.every((item) => item.name.startsWith('mci_')))
   assert.equal(new Set(manifest.tables.map((item) => item.name)).size, 6)
-  assert.equal(new Set(manifest.engines.map((item) => item.apiEngineKey)).size, 12)
+  assert.equal(new Set(manifest.engines.map((item) => item.apiEngineKey)).size, 13)
 })
 
 test('所有接口都有显式应用所有权策略', () => {
@@ -104,6 +104,8 @@ test('视频必须是唯一带音轨成片且标题不得泄漏平台标记', ()
   assert.match(source, /VideoMaster/)
   assert.match(source, /VideoClip/)
   assert.match(source, /AudioStreamCount/)
+  assert.match(source, /GenerateMiniMaxSpeech/)
+  assert.ok(assets.fields.find((item) => item.name === 'Speaker'))
   assert.match(source, /IntegratedLoudnessLufs/)
   assert.match(source, /<topic/)
   assert.match(source, /一个帐号一个成片/)

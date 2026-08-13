@@ -1065,7 +1065,7 @@ test("application-store upgrade resources carry the canonical resumable importer
   const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 8\)/g) || [];
   assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.8 floor");
   assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 8\)/);
-  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 0, 13\)/);
+  assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 3, 6\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
     3,
@@ -1130,6 +1130,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_PHYSICAL_FALLBACK_V1/);
   assert.match(refreshSource, /ADMIN_MENU_PERMISSION_DB_TIME_V1/);
+  assert.match(refreshSource, /tabbedMenus\.length\s*===\s*tabbedMenuIds\.size/);
+  assert.match(refreshSource, /uploadAuditMenuValid/);
+  assert.match(refreshSource, /ApplicationAssetMultipartSession/);
 });
 
 test("reinstall DDL classifies existing indexes for idempotent skipping", () => {

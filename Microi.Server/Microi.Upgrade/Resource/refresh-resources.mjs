@@ -169,7 +169,13 @@ function validateReleaseCandidate(name, content) {
         + (versionParts[2] || 0);
       const expectedTabs = ['平台应用', '我安装的应用', '我发布的应用', 'UniApp', 'Web', '微服务'];
       const menus = Array.isArray(packageModel?.SysMenus) ? packageModel.SysMenus : [];
-      const menuTabsValid = menus.length === 3 && menus.every(menu => {
+      const tabbedMenuIds = new Set([
+        '01KXFSG8153B3VZPZ45WNCCFHR',
+        '01KXFSG7MZ40CY8KCWCZZZJH2M',
+        '61b7faee-35b2-4571-add2-5231a355f368',
+      ]);
+      const tabbedMenus = menus.filter(menu => tabbedMenuIds.has(String(menu?.Id || '')));
+      const menuTabsValid = tabbedMenus.length === tabbedMenuIds.size && tabbedMenus.every(menu => {
         try {
           const tabs = typeof menu.PageTabs === 'string' ? JSON.parse(menu.PageTabs) : menu.PageTabs;
           const names = Array.isArray(tabs) ? tabs.map(tab => tab.Name) : [];
@@ -183,6 +189,13 @@ function validateReleaseCandidate(name, content) {
           return false;
         }
       });
+      const uploadAuditMenuId = 'a3000100-0000-4000-8000-000000000100';
+      const uploadAuditMenu = menus.find(menu => String(menu?.Id || '') === uploadAuditMenuId);
+      const uploadAuditMenuValid = Boolean(uploadAuditMenu)
+        && String(uploadAuditMenu.ModuleEngineKey || '') === 'application-asset-upload-audit'
+        && Number(uploadAuditMenu.Display) === 1
+        && Number(uploadAuditMenu.AppDisplay) === 0
+        && String(uploadAuditMenu.SqlWhere || '').includes('ApplicationAssetMultipartSession');
       const menuTabDiagnostics = menus.map(menu => {
         try {
           const tabs = typeof menu.PageTabs === 'string' ? JSON.parse(menu.PageTabs) : menu.PageTabs;
@@ -227,6 +240,7 @@ function validateReleaseCandidate(name, content) {
         || !content.includes('PublisherTypes')
         || !content.includes('StoreInstallStatus')
         || !menuTabsValid
+        || !uploadAuditMenuValid
         || applicationType?.Component !== 'Radio'
         || !applicationTypeOptions.includes('"Key":"Platform"')
         || !applicationTypeOptions.includes('"Key":"UniApp"')
@@ -292,6 +306,7 @@ function validateReleaseCandidate(name, content) {
             versionNumber,
             menuCount: menus.length,
             menuTabsValid,
+            uploadAuditMenuValid,
             menuTabDiagnostics,
             applicationTypeComponent: applicationType?.Component || '',
             applicationTypeOptions,

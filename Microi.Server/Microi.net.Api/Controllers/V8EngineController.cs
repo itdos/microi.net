@@ -344,7 +344,9 @@ namespace Microi.net.Api
                             "RequestFingerprint",
                             "DeliveryBatchId",
                             "SourceManifestHash",
-                            "RuntimeManifestHash"
+                            "RuntimeManifestHash",
+                            "RouteSnapshotJson",
+                            "RouteSnapshotHash"
                         })
                         {
                             if (!form.ContainsKey(fieldName)) continue;
@@ -400,6 +402,169 @@ namespace Microi.net.Api
             catch (Exception ex)
             {
                 return Ok(new DosResult(0, null, "应用资产流式上传请求失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 为单个不可变应用资产创建跨节点可恢复的 HDFS 分片上传会话。
+        /// 会话、操作者、进度、心跳和错误检查点持久化到 mci_ai_app_file，
+        /// 管理员可在 AI 应用文件/大文件上传记录中审计。
+        /// </summary>
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
+        public async Task<IActionResult> InitiateApplicationAssetMultipart([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(
+                    param["OsClient"]?.Val<string>(),
+                    (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                return Ok(await V8McpLogic.InitiateApplicationAssetMultipart(
+                    osClient,
+                    param,
+                    (object)token,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "创建断点上传会话失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 回读已持久化的分片、字节进度、心跳、阶段和恢复提示。
+        /// </summary>
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Read)]
+        public async Task<IActionResult> GetApplicationAssetMultipartStatus([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(
+                    param["OsClient"]?.Val<string>(),
+                    (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                return Ok(await V8McpLogic.GetApplicationAssetMultipartStatus(
+                    osClient,
+                    param,
+                    (object)token,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "读取断点上传会话失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 上传一个原始二进制分片。请求体不会进入 multipart/form-data、JSON、
+        /// Base64 或 Jint；服务端按会话协商长度和 SHA-256 流式写入并回读复核。
+        /// HTTP 层不设置总文件上限，单块大小由会话协商并受对象存储能力约束。
+        /// </summary>
+        [HttpPost]
+        [Consumes("application/octet-stream")]
+        [DisableRequestSizeLimit]
+        [V8McpCapability(V8McpScope.Write)]
+        public async Task<IActionResult> UploadApplicationAssetMultipartPart(
+            [FromQuery] string osClient,
+            [FromQuery] string sessionId,
+            [FromQuery] int partNumber,
+            [FromQuery] string expectedPartSha256)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            try
+            {
+                osClient = V8McpLogic.ResolveOsClient(osClient, (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                if (!Request.ContentLength.HasValue || Request.ContentLength.Value < 0)
+                    return Ok(new DosResult(
+                        0,
+                        null,
+                        "断点分片必须提供精确 Content-Length，不能使用未知长度请求体"));
+                return Ok(await V8McpLogic.UploadApplicationAssetMultipartPart(
+                    osClient,
+                    sessionId,
+                    partNumber,
+                    expectedPartSha256,
+                    Request.Body,
+                    Request.ContentLength.Value,
+                    (object)token,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "断点分片上传请求失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 以有界匿名管道将临时 HDFS 分片流式合并为不可变最终对象，并再次
+        /// 对最终对象执行全量 SHA-256 回读；可在节点重启后幂等重试。
+        /// </summary>
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
+        public async Task<IActionResult> CompleteApplicationAssetMultipart([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(
+                    param["OsClient"]?.Val<string>(),
+                    (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                return Ok(await V8McpLogic.CompleteApplicationAssetMultipart(
+                    osClient,
+                    param,
+                    (object)token,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "完成断点上传请求失败：" + ex.Message));
+            }
+        }
+
+        /// <summary>
+        /// 取消未完成会话并清理临时块；审计记录保留，已完成的不可变最终对象
+        /// 不允许通过此接口删除。
+        /// </summary>
+        [HttpPost]
+        [V8McpCapability(V8McpScope.Write)]
+        public async Task<IActionResult> AbortApplicationAssetMultipart([FromBody] JObject param)
+        {
+            var (ok, msg, token) = await V8McpLogic.CheckPermission();
+            if (!ok) return Ok(new DosResult(0, null, msg));
+            if (param == null) return Ok(new DosResult(0, null, "参数不能为空"));
+            try
+            {
+                var osClient = V8McpLogic.ResolveOsClient(
+                    param["OsClient"]?.Val<string>(),
+                    (object)token);
+                if (string.IsNullOrWhiteSpace(osClient))
+                    return Ok(new DosResult(0, null, "OsClient 不能为空"));
+                return Ok(await V8McpLogic.AbortApplicationAssetMultipart(
+                    osClient,
+                    param,
+                    (object)token,
+                    HttpContext.RequestAborted));
+            }
+            catch (Exception ex)
+            {
+                return Ok(new DosResult(0, null, "取消断点上传请求失败：" + ex.Message));
             }
         }
 

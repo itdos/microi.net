@@ -1,6 +1,6 @@
 ---
 name: microi-client-frontend
-description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue 前端代码，尤其是表单引擎、diy-table、diy-form-full、工作流面板、sys_menu 按钮、前端 V8 事件、路由以及页面/弹窗/抽屉行为。
+description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue 前端代码，尤其是表单引擎、diy-table、diy-form-full、工作流面板、sys_menu 按钮、前端 V8 事件、路由、微服务宿主 keep-alive/TagsView 缓存/白屏恢复，以及页面、弹窗和抽屉行为。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -157,8 +157,15 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=ec659a0b0836eb53a55ac85c6e9c3d7701c77b01881a073ee35fc2b205f8d912 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=79848e844c493736d8f7955fcf6ea2c22bf23a1b4a7bacbdbdcc32a2c5dffefb -->
 ## 7. 验证建议
+
+### 菜单微服务缓存与恢复（强制）
+
+- 动态菜单宿主的 Vue 路由保持 `keepAlive:false`，由 `<micro-app keep-alive>` 独占运行时状态；契约固定为 `runtime-keep-alive`，禁止 Vue `KeepAlive` 和 micro-app 双层缓存。
+- 每个顶部 Tab 按完整路由生成稳定实例身份，最多保留 5 个隐藏实例并按 LRU 淘汰。关闭 Tab、退出登录、Token/角色变化以及版本或入口变化时必须精确销毁对应运行时。
+- 恢复时强制同步宿主上下文并检查真实可见 DOM；子应用监听 `appstate-change`，在 `afterhidden` 幂等暂停轮询、WebSocket 和观察器，在 `aftershow` 幂等恢复并重新测量布局，同时保留用户输入、筛选、滚动和内部路由。
+- 修改宿主、TagsView 或权限路由时，必须同时读取 [Vue3 前端微服务宿主规则](references/progressive-03-vue3-前端微服务宿主规则.md) 并运行微服务缓存契约测试。
 
 - 修改 Vue/JS 后先跑 VS Code Problems 或 `get_errors`。
 - 影响核心前端时跑 `Microi.Client` 的 `npm run build`。

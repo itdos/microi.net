@@ -29,6 +29,10 @@
       "Ownership": "Application",
       "UpgradePolicy": "Managed"
     },
+    "mci-ai-speech-generate": {
+      "Ownership": "Application",
+      "UpgradePolicy": "Managed"
+    },
     "mci-ai-publish-prepare": {
       "Ownership": "Application",
       "UpgradePolicy": "Managed"

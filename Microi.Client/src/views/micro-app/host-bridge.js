@@ -1,3 +1,8 @@
+import {
+    MICRO_APP_RUNTIME_CACHE_LIMIT,
+    MICRO_APP_RUNTIME_CACHE_MODE
+} from "../../utils/microAppRuntimeCache.js";
+
 export const MICRO_APP_HOST_PROTOCOL = "microi.host.v1";
 export const MICRO_APP_HOST_ACTION_TYPE = "micro-app:host-action";
 export const MICRO_APP_HOST_ACTION_RESULT_TYPE = "micro-app:host-action-result";
@@ -96,7 +101,14 @@ export function createMicroAppHostCapabilities() {
         mode: "tab",
         requestType: MICRO_APP_HOST_ACTION_TYPE,
         resultType: MICRO_APP_HOST_ACTION_RESULT_TYPE,
-        actions: [...TAB_ACTIONS]
+        actions: [...TAB_ACTIONS],
+        lifecycle: {
+            cacheMode: MICRO_APP_RUNTIME_CACHE_MODE,
+            cacheOwner: "micro-app",
+            maxCachedTabs: MICRO_APP_RUNTIME_CACHE_LIMIT,
+            stateEvent: "appstate-change",
+            states: ["beforeshow", "aftershow", "afterhidden"]
+        }
     };
 }
 
