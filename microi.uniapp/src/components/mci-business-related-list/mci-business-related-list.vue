@@ -1,8 +1,9 @@
 <template>
   <view class="related-business-list" :class="{
     'related-business-list--preview': isPreview,
-    'related-business-list--section': isPreview && showPreviewHeader
-  }">
+    'related-business-list--section': isPreview && showPreviewHeader,
+    'related-business-list--independent-scroll': independentScroll && !isPreview
+  }" :style="independentRootStyle">
     <view v-if="isPreview && showPreviewHeader" class="preview-section-header"
       hover-class="preview-section-header--pressed" @tap="previewExpanded = !previewExpanded">
       <view class="preview-section-header__main">
@@ -12,16 +13,6 @@
       </view>
       <!-- zhy：关联区折叠图标与详情“基本信息”分组统一，避免使用字形不稳定的上下箭头。 -->
       <text class="preview-section-header__arrow" :class="{ expanded: previewExpanded }">›</text>
-    </view>
-
-    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
-      <view v-for="metric in relatedMetrics" :key="metric.key" class="related-metric"
-        :class="`related-metric--${metric.tone || 'neutral'}`">
-        <view class="related-metric__value">
-          <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
-        </view>
-        <text class="related-metric__label">{{ metric.label }}</text>
-      </view>
     </view>
 
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
@@ -41,6 +32,23 @@
       <view class="search-button" @tap="resetSearch"><text>重置</text></view>
     </view>
 
+    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
+      <view v-for="metric in relatedMetrics" :key="metric.key" class="related-metric"
+        :class="`related-metric--${metric.tone || 'neutral'}`">
+        <view class="related-metric__value">
+          <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
+        </view>
+        <text class="related-metric__label">{{ metric.label }}</text>
+      </view>
+    </view>
+
+    <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
+      :style="relatedListBodyStyle"
+      :scroll-y="independentScroll && !isPreview"
+      :enable-flex="independentScroll && !isPreview"
+      :show-scrollbar="false"
+      :lower-threshold="120" @scrolltolower="loadMore">
+    <view class="related-list-scroll-content">
     <view v-if="previewContentVisible && loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
       <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
@@ -85,6 +93,8 @@
         <text v-if="canAdd && !isPreview">点击右下角加号新增</text>
       </template>
     </view>
+    </view>
+    </scroll-view>
 
     <view v-if="showFloatingAdd && canAdd && !isPreview" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
@@ -327,6 +337,8 @@ export default {
     showPreviewHeader: { type: Boolean, default: false },
     relationValueOverride: { type: [String, Number], default: '' },
     showFloatingAdd: { type: Boolean, default: true },
+    independentScroll: { type: Boolean, default: false },
+    viewportHeight: { type: Number, default: 0 },
     parentTableChildAuth: { type: Object, default: null }
   },
   emits: ['floating-add-state', 'filter-open-state', 'data-count'],
@@ -362,7 +374,9 @@ export default {
       searchTimer: null,
       loadRequestId: 0,
       metricLoading: false,
-      metricValues: {}
+      metricValues: {},
+      listBodyHeight: 0,
+      layoutMeasureTimers: []
     }
   },
   computed: {
@@ -445,9 +459,27 @@ export default {
           ? 'calc(34rpx + var(--mci-safe-bottom))'
           : 'calc(132rpx + var(--mci-safe-bottom))'
       }
+    },
+    independentRootStyle() {
+      if (!this.independentScroll || this.isPreview) return {}
+      if (this.viewportHeight < 120) return { height: '100%', maxHeight: '100%' }
+      return {
+        height: `${Math.floor(this.viewportHeight)}px`,
+        maxHeight: `${Math.floor(this.viewportHeight)}px`
+      }
+    },
+    relatedListBodyStyle() {
+      if (!this.independentScroll || this.isPreview || this.listBodyHeight < 80) return {}
+      return { height: `${this.listBodyHeight}px`, maxHeight: `${this.listBodyHeight}px` }
     }
   },
   watch: {
+    viewportHeight: {
+      immediate: true,
+      handler() {
+        this.scheduleListBodyMeasure()
+      }
+    },
     canAdd: {
       immediate: true,
       handler(value) {
@@ -477,13 +509,45 @@ export default {
     uni.$on('microi:data-changed', this.handleDataChanged)
     this.initialize()
   },
+  mounted() {
+    this.scheduleListBodyMeasure()
+  },
   beforeUnmount() {
     uni.$off('microi:data-changed', this.handleDataChanged)
     clearTimeout(this.searchTimer)
+    this.clearLayoutMeasureTimers()
     this.$emit('filter-open-state', false)
   },
   methods: {
     noop() {},
+    clearLayoutMeasureTimers() {
+      this.layoutMeasureTimers.forEach((timer) => clearTimeout(timer))
+      this.layoutMeasureTimers = []
+    },
+    scheduleListBodyMeasure() {
+      if (!this.independentScroll || this.isPreview) return
+      this.clearLayoutMeasureTimers()
+      this.layoutMeasureTimers = [0, 80, 220].map((delay) => setTimeout(() => {
+        this.measureListBody()
+      }, delay))
+    },
+    measureListBody() {
+      if (!this.independentScroll || this.isPreview || typeof uni.createSelectorQuery !== 'function') return
+      this.$nextTick(() => {
+        const query = uni.createSelectorQuery().in(this)
+        query.select('.related-business-list').boundingClientRect()
+        query.select('.related-list-body').boundingClientRect()
+        query.exec((rects = []) => {
+          const root = rects[0]
+          const body = rects[1]
+          if (!root || !body) return
+          const height = Math.floor(Number(root.bottom) - Number(body.top))
+          if (Number.isFinite(height) && height >= 80 && height !== this.listBodyHeight) {
+            this.listBodyHeight = height
+          }
+        })
+      })
+    },
     async initialize(refresh = false) {
       if (!this.childTableId) {
         this.error = '关联表未配置数据表'
@@ -530,6 +594,7 @@ export default {
           return
         }
         await Promise.all([this.loadData(true, refresh), this.loadRelatedMetrics(refresh)])
+        this.scheduleListBodyMeasure()
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
         this.loading = false
@@ -1242,6 +1307,16 @@ export default {
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .related-business-list--section { padding-top: 0; }
+.related-business-list--independent-scroll { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; overflow: hidden; }
+.related-list-body { width: 100%; }
+.related-list-body--scroll { flex: 1; min-height: 0; height: 100%; box-sizing: border-box; }
+.related-list-body--scroll .related-list-scroll-content { min-height: 100%; padding-bottom: calc(138rpx + var(--mci-safe-bottom)); box-sizing: border-box; }
+/* zhy：隐藏客户详情各列表 Tab 右侧原生滚动指示条，保留触摸滚动与触底分页。 */
+.related-list-body--scroll,
+.related-list-body--scroll scroll-view { scrollbar-width: none; -ms-overflow-style: none; }
+.related-list-body--scroll::-webkit-scrollbar,
+.related-list-body--scroll scroll-view::-webkit-scrollbar,
+.related-list-body--scroll ::-webkit-scrollbar { display: none; width: 0; height: 0; color: transparent; background: transparent; }
 .preview-section-header { min-height: 82rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 0 28rpx; border-bottom: 1rpx solid #edf2f4; background: #fff; transition: background 150ms ease; }
 .preview-section-header--pressed { background: #f7fafb; }
 .preview-section-header__main { min-width: 0; display: flex; align-items: center; gap: 12rpx; }

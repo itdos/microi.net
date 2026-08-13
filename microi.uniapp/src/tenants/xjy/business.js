@@ -422,6 +422,7 @@ export const businessModules = {
     title: '客户方案', table: 'Diy_kehufaxx', menuAliases: ['客户方案', '方案管理'],
     titleField: 'FanganMC', tagFields: ['YujiHZSJ'],
     relatedMetrics: [
+      { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', tone: 'primary' },
       { key: 'month', label: '本月客户方案', monthField: 'YujiHZSJ', tone: 'primary' },
       { key: 'total', label: '方案总量', tone: 'neutral' }
     ],
