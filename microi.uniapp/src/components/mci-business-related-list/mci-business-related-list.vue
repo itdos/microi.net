@@ -14,6 +14,16 @@
       <text class="preview-section-header__arrow" :class="{ expanded: previewExpanded }">›</text>
     </view>
 
+    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
+      <view v-for="metric in relatedMetrics" :key="metric.key" class="related-metric"
+        :class="`related-metric--${metric.tone || 'neutral'}`">
+        <view class="related-metric__value">
+          <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
+        </view>
+        <text class="related-metric__label">{{ metric.label }}</text>
+      </view>
+    </view>
+
     <view v-if="!isPreview" class="search-row" :class="{ 'search-row--simple': !filterFields.length }">
       <view class="search-input-wrap">
         <input v-model="keyword" class="search-input" type="text" confirm-type="search"
@@ -179,7 +189,8 @@ import {
   formatDateTime,
   formatFieldValue,
   loadModuleRows,
-  openForm
+  openForm,
+  statisticsFieldValue
 } from '@/platform/business-runtime.js'
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
@@ -349,7 +360,9 @@ export default {
       actionSubmitting: false,
       previewExpanded: true,
       searchTimer: null,
-      loadRequestId: 0
+      loadRequestId: 0,
+      metricLoading: false,
+      metricValues: {}
     }
   },
   computed: {
@@ -399,6 +412,21 @@ export default {
       )
     },
     filterFields() { return this.config.filterFields || [] },
+    relatedMetricDefinitions() {
+      if (this.config.relatedMetrics?.length) return this.config.relatedMetrics
+      return [{ key: 'total', label: `${this.config.title || this.sectionTitle}总量`, tone: 'neutral' }]
+    },
+    relatedMetrics() {
+      return this.relatedMetricDefinitions.map((metric) => {
+        const raw = this.metricValues[metric.key]
+        const loading = this.metricLoading && (raw === undefined || raw === null)
+        return {
+          ...metric,
+          value: loading ? '—' : this.formatRelatedMetric(raw, metric),
+          unit: loading ? '' : (metric.unit !== undefined ? metric.unit : (metric.format === 'compactMoney' ? '' : '条'))
+        }
+      })
+    },
     activeFilterCount() {
       return this.filterFields.reduce((count, field) => {
         const value = this.filterValues[field.key]
@@ -501,7 +529,7 @@ export default {
           this.loading = false
           return
         }
-        await this.loadData(true, refresh)
+        await Promise.all([this.loadData(true, refresh), this.loadRelatedMetrics(refresh)])
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
         this.loading = false
@@ -648,6 +676,68 @@ export default {
         if (requestId === this.loadRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
       } finally {
         if (requestId === this.loadRequestId) this.loading = false
+      }
+    },
+    monthRange() {
+      const now = new Date()
+      const pad = (value) => String(value).padStart(2, '0')
+      const start = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01 00:00:00`
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const end = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-01 00:00:00`
+      return { start, end }
+    },
+    formatRelatedMetric(value, metric) {
+      const numeric = Number(value || 0)
+      if (metric.format !== 'compactMoney') return Number.isFinite(numeric) ? Math.floor(numeric) : 0
+      const absolute = Math.abs(numeric)
+      if (absolute >= 10000) return `¥${(numeric / 10000).toFixed(absolute >= 100000 ? 0 : 1).replace(/\.0$/, '')}万`
+      return `¥${numeric.toLocaleString()}`
+    },
+    async loadRelatedMetrics(refresh = false) {
+      const metrics = this.relatedMetricDefinitions
+      if (!metrics.length || !this.relationValue || !this.config.table) return
+      this.metricLoading = true
+      const range = this.monthRange()
+      const baseWhere = [
+        { Name: this.childFkField, Type: '=', Value: this.relationValue },
+        ...(this.config.fixedWhere || [])
+      ]
+      try {
+        const values = {}
+        await Promise.all(metrics.map(async (metric) => {
+          const where = [...baseWhere, ...(metric.where || [])]
+          if (metric.monthField) {
+            where.push({ Name: metric.monthField, Type: '>=', Value: range.start })
+            where.push({ Name: metric.monthField, Type: '<', Value: range.end })
+          }
+          if (metric.aggregateField) {
+            const summary = await loadModuleRows(this.config, {
+              pageIndex: 1,
+              pageSize: 1,
+              refresh,
+              cacheAge: 0,
+              tableChildAuth: this.tableChildAuth,
+              extraWhere: where
+            })
+            values[metric.key] = Number(statisticsFieldValue(summary.append, metric.aggregateField, 0)) || 0
+            return
+          }
+          const payload = {
+            _PageIndex: 1,
+            _PageSize: 1,
+            _Where: where,
+            _TableChildAuth: this.tableChildAuth
+          }
+          const response = await V8.FormEngine.GetTableData(this.config.table, payload)
+          if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '统计加载失败')
+          values[metric.key] = Number(response.DataCount || 0)
+        }))
+        this.metricValues = values
+      } catch (error) {
+        // 统计失败不阻断关联列表，保留可读的零值并允许下次数据刷新重试。
+        this.metricValues = metrics.reduce((values, metric) => ({ ...values, [metric.key]: 0 }), {})
+      } finally {
+        this.metricLoading = false
       }
     },
     search() {
@@ -1141,7 +1231,7 @@ export default {
         // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
         if (this.mergeDraftChangedRow(payload)) return
         // zhy：只有子表真实保存后才通知父表更新派生总数，普通打开、搜索和筛选不改主表字段。
-        this.loadData(true, true, true)
+        Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
       }
     }
   }
@@ -1165,6 +1255,33 @@ export default {
 .preview-section-header ~ .related-skeleton,
 .preview-section-header ~ .related-empty { width: auto; margin: 18rpx 22rpx 0; }
 .preview-section-header ~ .preview-actions { margin-right: 22rpx; margin-left: 22rpx; }
+.related-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10rpx;
+  margin: -2rpx -2rpx 16rpx;
+}
+.related-metric {
+  min-width: 0;
+  padding: 17rpx 8rpx 15rpx;
+  border: 1rpx solid #e1eaf0;
+  border-radius: 12rpx;
+  background: #fff;
+  text-align: center;
+}
+.related-metric__value { display: flex; align-items: baseline; justify-content: center; gap: 3rpx; color: #263e49; }
+.related-metric__value > text:first-child { overflow: hidden; font-size: 29rpx; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.related-metric__value > text:last-child { flex: 0 0 auto; font-size: 18rpx; }
+.related-metric__label { display: block; overflow: hidden; margin-top: 5rpx; color: #6c828c; font-size: 19rpx; text-overflow: ellipsis; white-space: nowrap; }
+.related-metric--warning { border-color: #f4e5b9; background: #fffaf0; }
+.related-metric--warning .related-metric__value { color: #b56800; }
+.related-metric--success { border-color: #ccebdd; background: #f1fbf6; }
+.related-metric--success .related-metric__value { color: #008660; }
+.related-metric--primary { border-color: #d8e5fa; background: #f2f7ff; }
+.related-metric--primary .related-metric__value { color: #1768d8; }
+@media (max-width: 360px) {
+  .related-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
