@@ -149,6 +149,7 @@ new-water-source-h5/
 Microi-MicroApp/
 logs
 .cache
+/.asset-cache/
 .microi-e2e
 .tmp-lang-api-engine-after.png
 .tmp-lang-api-engine-refresh-after.png
