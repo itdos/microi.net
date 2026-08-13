@@ -82,7 +82,7 @@
         <mci-business-related-list v-if="relatedTab.type === 'child'" :field="relatedTab.field"
           :parent-id="rowId" :parent-form="row" :parent-menu-id="config.menuId"
           :parent-table-id="config.definition && config.definition.table ? config.definition.table.Id : ''"
-          parent-mode="View" display-mode="preview" show-preview-header :preview-limit="2" />
+          parent-mode="View" display-mode="full" />
         <mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
           :parent-form="row" parent-mode="View" readonly />
         <mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
