@@ -1,5 +1,8 @@
 <template>
-	<view class="detail-page" :class="{ 'detail-page--related-filter-open': standaloneRelatedFilterOpen }"
+	<view class="detail-page" :class="{
+		'detail-page--related-filter-open': standaloneRelatedFilterOpen,
+		'detail-page--standalone-list': standaloneListMode
+	}"
 		:style="mciTokenStyle">
 		<view class="page-nav mci-safe-top">
 			<view class="nav-row mci-safe-nav-row">
@@ -9,8 +12,9 @@
 			</view>
 		</view>
 
-		<scroll-view class="detail-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
-			@refresherrefresh="refresh">
+		<!-- zhy：禁止用停用滚动的父 scroll-view 包裹子 scroll-view，微信端会吞掉子列表上滑手势。 -->
+		<view class="detail-scroll" :class="{ 'detail-scroll--locked': standaloneListMode }">
+			<view class="detail-scroll-content">
 			<view v-if="loading" class="loading-state">
 				<view class="skeleton skeleton--hero"></view>
 				<view class="skeleton skeleton--line" v-for="index in 8" :key="index"></view>
@@ -35,8 +39,10 @@
 						</view>
 						<text v-if="statusText" class="status-pill" :class="statusClass">{{ statusText }}</text>
 					</view>
-					<view v-if="heroMetrics.length" class="metric-row">
-						<view class="metric-item" v-for="metric in heroMetrics" :key="metric.label">
+					<view v-if="heroMetrics.length" class="metric-row"
+						:style="{ gridTemplateColumns: `repeat(${heroMetrics.length}, minmax(0, 1fr))` }">
+						<view class="metric-item" :class="{ 'metric-item--money': metric.format === 'compactMoney' }"
+							v-for="metric in heroMetrics" :key="metric.key || metric.label">
 							<text class="metric-value">{{ metric.value }}</text>
 							<text class="metric-label">{{ metric.label }}</text>
 						</view>
@@ -163,10 +169,13 @@
 
 				<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
 					<mci-business-related-list v-if="relatedTab.type === 'child'" ref="standaloneRelatedList"
+						class="standalone-related-list"
 						:field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
-						parent-mode="View" display-mode="preview" show-preview-header :preview-limit="2"
+						parent-mode="View" display-mode="full"
+						:independent-scroll="standaloneListMode"
+						:viewport-height="relatedListViewportHeight"
 						:show-floating-add="false"
 						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
 						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
@@ -193,7 +202,8 @@
 
 				<view class="content-spacer"></view>
 			</template>
-		</scroll-view>
+			</view>
+		</view>
 
 		<!-- zhy：客户详情 Tab 的新增按钮必须挂在 scroll-view 外，避免随列表内容滚动。 -->
 		<view v-if="showStandaloneRelatedAdd" class="related-floating-add"
@@ -338,7 +348,9 @@
 		callApiEngine,
 		findMenu,
 		formatFieldValue,
-		openForm
+		loadModuleRows,
+		openForm,
+		statisticsFieldValue
 	} from '@/platform/business-runtime.js'
 	import {
 		isHtmlValue,
@@ -390,6 +402,15 @@
 		return ''
 	}
 
+	function formatCompactMoney(value) {
+		const amount = Number(value)
+		if (!Number.isFinite(amount)) return '-'
+		const absolute = Math.abs(amount)
+		if (absolute >= 100000000) return `¥${Number((amount / 100000000).toFixed(2))}亿`
+		if (absolute >= 10000) return `¥${Number((amount / 10000).toFixed(2))}万`
+		return `¥${amount.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`
+	}
+
 	const presets = {
 		customers: {
 			title: '客户详情',
@@ -399,14 +420,22 @@
 			metaField: 'KehuLX',
 			phoneFields: ['LianxiDH', 'FuzeRDH', 'ZhuanshuKFDH'],
 			metrics: [{
+					key: 'customer-device-count',
 					label: '设备',
-					field: 'ShebeiSL',
+					source: 'Runtime',
 					suffix: '台'
 				},
 				{
+					key: 'customer-order-count',
 					label: '订单',
-					field: 'DingdanSL',
+					source: 'Runtime',
 					suffix: '份'
+				},
+				{
+					key: 'customer-order-amount',
+					label: '金额',
+					source: 'Runtime',
+					format: 'compactMoney'
 				},
 				{
 					label: '综合评价',
@@ -1219,6 +1248,8 @@
 				standaloneRelatedAddAvailable: false,
 				standaloneRelatedFilterKey: '',
 				standaloneRelatedFilterOpen: false,
+				relatedListViewportHeight: 0,
+				relatedViewportMeasureTimers: [],
 				customerClaimIcon: icon('business/kehu.png'),
 				customerReleaseIcon: icon('business/xiezuo.png')
 			}
@@ -1299,13 +1330,48 @@
 				return 'status-pill--info'
 			},
 			heroMetrics() {
-				return (this.preset.metrics || []).map((metric) => {
+				let metrics = [...(this.preset.metrics || [])]
+				if (this.key === 'customers') {
+					const configured = (label) => metrics.find((metric) => metric.label === label) || {}
+					// zhy：客户 Hero 的设备、订单与金额必须来自关联实表实时统计。
+					// ViewSchema 只保留标签/样式扩展，不能把指标重新指向未维护的主表冗余字段或可选接口。
+					metrics = [{
+						...configured('设备'),
+						key: 'customer-device-count',
+						label: '设备',
+						source: 'Runtime',
+						field: '',
+						apiEngineKey: '',
+						suffix: '台'
+					}, {
+						...configured('订单'),
+						key: 'customer-order-count',
+						label: '订单',
+						source: 'Runtime',
+						field: '',
+						apiEngineKey: '',
+						suffix: '份'
+					}, {
+						...configured('金额'),
+						key: 'customer-order-amount',
+						label: '金额',
+						source: 'Runtime',
+						format: 'compactMoney'
+					}, {
+						...configured('综合评价'),
+						label: '综合评价',
+						field: configured('综合评价').field || 'KehuZHPJ',
+						suffix: configured('综合评价').suffix || '分'
+					}]
+				}
+				return metrics.map((metric) => {
 					const key = metric.key || metric.field || metric.apiEngineKey
-					const remote = String(metric.source || '').toLowerCase() === 'apiengine'
-					const raw = remote ? this.metricValues[key] : this.detail[metric.field]
+					const metricSource = String(metric.source || '').toLowerCase()
+					const calculated = metricSource === 'apiengine' || metricSource === 'runtime'
+					const raw = calculated ? this.metricValues[key] : this.detail[metric.field]
 					const value = raw === null || raw === undefined || raw === '' || raw === '-' ?
 						'-' :
-						`${formatFieldValue(raw, metric.format)}${metric.suffix || ''}`
+						`${metric.format === 'compactMoney' ? formatCompactMoney(raw) : formatFieldValue(raw, metric.format)}${metric.suffix || ''}`
 					return {
 						...metric,
 						value
@@ -1386,6 +1452,9 @@
 			},
 			standaloneChildTab() {
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
+			},
+			standaloneListMode() {
+				return !this.loading && !this.error && Boolean(this.standaloneChildTab)
 			},
 			showStandaloneRelatedAdd() {
 				return !this.loading && !this.error && !this.standaloneRelatedFilterOpen &&
@@ -1810,8 +1879,35 @@
 		},
 		onShow() {
 			if (!this.loading && this.id) this.loadDetail(false)
+			this.scheduleRelatedViewportMeasure()
+		},
+		onReady() {
+			this.scheduleRelatedViewportMeasure()
+		},
+		onUnload() {
+			this.clearRelatedViewportMeasureTimers()
 		},
 		methods: {
+			clearRelatedViewportMeasureTimers() {
+				this.relatedViewportMeasureTimers.forEach((timer) => clearTimeout(timer))
+				this.relatedViewportMeasureTimers = []
+			},
+			scheduleRelatedViewportMeasure() {
+				if (!this.standaloneListMode) return
+				this.clearRelatedViewportMeasureTimers()
+				this.relatedViewportMeasureTimers = [0, 80, 220].map((delay) => setTimeout(() => {
+					this.measureRelatedViewport()
+				}, delay))
+			},
+			measureRelatedViewport() {
+				if (!this.standaloneListMode || typeof uni.createSelectorQuery !== 'function') return
+				this.$nextTick(() => {
+					uni.createSelectorQuery().in(this).select('.related-tab-panel').boundingClientRect((rect) => {
+						const height = Math.floor(Number(rect && rect.height))
+						if (Number.isFinite(height) && height >= 120) this.relatedListViewportHeight = height
+					}).exec()
+				})
+			},
 			tenantDetailFormContext() {
 				return {
 					tableName: this.moduleConfig.table,
@@ -1861,6 +1957,7 @@
 							ModuleEngineKey: this.viewManifest?.Module?.ModuleEngineKey || ''
 						}
 					})
+					if (this.key === 'customers') await this.loadCustomerRelationMetrics()
 					if (!Object.keys(this.expandedSections).length) {
 						this.$nextTick(() => {
 							const first = this.visibleSections[0]
@@ -1875,6 +1972,7 @@
 				} finally {
 					this.loading = false
 					this.refreshing = false
+					this.$nextTick(() => this.scheduleRelatedViewportMeasure())
 				}
 			},
 			async refresh() {
@@ -2098,6 +2196,7 @@
 				this.standaloneRelatedFilterOpen = false
 				this.standaloneRelatedFilterKey = ''
 				this.activeFormTabKey = tab.key
+				this.$nextTick(() => this.scheduleRelatedViewportMeasure())
 			},
 			setStandaloneRelatedAddState(tab, available) {
 				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
@@ -2121,6 +2220,39 @@
 				) || candidates.find(Boolean)
 				if (target && typeof target.openAdd === 'function') target.openAdd()
 			},
+			// zhy：设备数、订单数和订单金额统一从关联模块实时统计，避免依赖
+			// Diy_Kehu.ShebeiSL / DingdanSL 这两个未必回写的冗余字段。
+			async loadCustomerRelationMetrics() {
+				const customerId = this.detail.Id || this.id
+				const loadSummary = async (moduleKey) => {
+					const config = getBusinessModule(moduleKey)
+					const menu = await findMenu(config.menuAliases || [], config.table)
+					return loadModuleRows({
+						...config,
+						menuId: menu?.Id || '',
+						moduleEngineKey: menu?.ModuleEngineKey || config.moduleEngineKey || config.table
+					}, {
+						pageIndex: 1,
+						pageSize: 1,
+						cacheAge: 0,
+						extraWhere: [{ Name: 'KehuID', Type: '=', Value: customerId }]
+					})
+				}
+				const [deviceSummary, orderSummary] = await Promise.allSettled([
+					loadSummary('devices'),
+					loadSummary('orders')
+				])
+				const values = { ...this.metricValues }
+				values['customer-device-count'] = deviceSummary.status === 'fulfilled'
+					? Number(deviceSummary.value.count || 0) : '-'
+				values['customer-order-count'] = orderSummary.status === 'fulfilled'
+					? Number(orderSummary.value.count || 0) : '-'
+				values['customer-order-amount'] = orderSummary.status === 'fulfilled'
+					? Number(statisticsFieldValue(orderSummary.value.append, 'DingdanJE', 0)) || 0 : '-'
+				this.metricValues = values
+			},
+			// zhy：详情 Tab 直接复用完整关联列表；滚动到底按组件页码继续加载，
+			// 同时保留组件内“加载更多”按钮作为弱网和小程序滚动事件的交互兜底。
 			initializeFormTabs() {
 				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
 					this.activeFormTabKey = this.formTabs[0]?.key || ''
@@ -2513,6 +2645,54 @@
 	.detail-scroll {
 		flex: 1;
 		min-height: 0;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.detail-scroll--locked {
+		overflow: hidden;
+	}
+
+	.detail-scroll-content {
+		min-height: 100%;
+	}
+
+	/* zhy：列表型 Tab 由子表组件单独滚动，客户头图、Tab、搜索与统计保持固定。 */
+	.detail-page--standalone-list .detail-scroll-content {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.detail-page--standalone-list .hero-band,
+	.detail-page--standalone-list :deep(.related-tabs) {
+		flex: none;
+	}
+
+	.detail-page--standalone-list .related-tab-panel {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.detail-page--standalone-list .related-tab-panel :deep(.related-business-list) {
+		flex: 1;
+		min-height: 0;
+	}
+
+	.detail-page--standalone-list .standalone-related-list {
+		display: block;
+		width: 100%;
+		min-height: 0;
+		flex: 1;
+	}
+
+	.detail-page--standalone-list .content-spacer {
+		display: none;
 	}
 
 	/* zhy：筛选遮罩位于子表组件内，打开时将整个滚动内容提升到外置新增按钮和底部操作栏之上。 */
@@ -3206,6 +3386,10 @@
 		justify-content: center;
 		gap: 10rpx;
 		line-height: 1;
+	}
+
+	.metric-item--money .metric-value {
+		font-size: 24rpx;
 	}
 
 	.action-button--edit,

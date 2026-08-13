@@ -492,9 +492,18 @@ for (const [source, name] of [
   ]) {
     if (!source.includes(token)) fail(`${name} embedded child rendering is missing: ${token}`)
   }
-  if (!source.includes('show-preview-header')) {
-    fail(`${name} standalone TableChild must use the shared collapsible preview section`)
+  if (!source.includes('display-mode="full"')) {
+    fail(`${name} standalone TableChild must use the paged full-list presentation`)
   }
+}
+if (businessDetail.includes('display-mode="preview" show-preview-header') ||
+  moduleDetail.includes('display-mode="preview" show-preview-header') ||
+  nativeForm.includes(':show-preview-header="mode === \'View\'"')) {
+  fail('standalone TableChild tabs must not render a collapsible title or preview-only list')
+}
+if (!businessDetail.includes('@scrolltolower="loadActiveRelatedPage"') ||
+  !businessDetail.includes('loadActiveRelatedPage()')) {
+  fail('business detail related tabs must load the next page when the detail scroll reaches the bottom')
 }
 for (const [source, name] of [
   [nativeForm, 'native form detail'],
