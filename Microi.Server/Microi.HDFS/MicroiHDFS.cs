@@ -253,9 +253,18 @@ namespace Microi.net
                 });
                 if (objectExistResult.Code != 1)
                 {
-                    return new DosResult(0, null, objectExistResult.Msg);
+                    // OBJECT_EXISTENCE_PROBE_WRITE_FALLBACK_V1：这里的 ObjectExist
+                    // 只用于避免同名覆盖，不是上传前的业务权限证明。部分最小权限
+                    // OSS/MinIO 凭证允许 PutObject、但不允许 HEAD/GetObject。探测失败
+                    // 时改用不可预测 ULID 文件名继续真实 PUT；若写权限或配置也有问题，
+                    // PutObject 会返回带桶、对象范围和解决方案的最终错误。
+                    realFileName += "-" + Ulid.NewUlid().ToString();
+                    objectExist = false;
                 }
-                objectExist = objectExistResult.Data;
+                else
+                {
+                    objectExist = objectExistResult.Data;
+                }
 
                 //加一个时间戳，访问同样文件名被覆盖 +"_" + new DateTimeOffset(DateTime.UtcNow).ToUnixTimeSeconds()
                 if (objectExist)
