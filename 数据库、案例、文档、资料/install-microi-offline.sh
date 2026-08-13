@@ -1126,7 +1126,9 @@ services:
     stdin_open: true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: microi-install-api microi-install-client
+    # Keep the generated offline deployment aligned with the online installer:
+    # poll every five minutes and update monitored services one at a time.
+    command: --interval 300 --rolling-restart microi-install-api microi-install-client
     logging:
       driver: "json-file"
       options:

@@ -20,7 +20,8 @@ namespace Microi.net
     public static partial class V8McpLogic
     {
         public const string ApplicationStreamGateTransitionAuditTable = "mci_app_stream_gate_transition";
-        private const int ApplicationStreamGateTransitionAdministratorLevel = 999;
+        private const int ApplicationStreamGateTransitionTenantAdministratorLevel = 999;
+        private const int ApplicationStreamGateTransitionPlatformAdministratorLevel = 9999;
         private const int ApplicationStreamGateDrainProofMaxBytes = 1024 * 1024;
         private const string ApplicationStreamGateAuditEmptyText = "__MICROI_EMPTY_V1__";
 
@@ -141,9 +142,10 @@ namespace Microi.net
 
         public static string ValidateApplicationStreamGateTransitionAdministratorLevel(int level)
         {
-            return level == ApplicationStreamGateTransitionAdministratorLevel
+            return level == ApplicationStreamGateTransitionTenantAdministratorLevel
+                   || level == ApplicationStreamGateTransitionPlatformAdministratorLevel
                 ? null
-                : "仅 Level=999 管理员可以转换应用流式发布门禁";
+                : "仅 Level=999 租户管理员或 Level=9999 平台管理员可以转换应用流式发布门禁";
         }
 
         public static IReadOnlyList<string> FindMissingApplicationStreamGateStoreTables(
@@ -943,7 +945,12 @@ namespace Microi.net
                     .AddInParameter("@operatorAccount", EncodeApplicationStreamGateAuditText(request.OperatorAccount))
                     .AddInParameter("@operatorName", EncodeApplicationStreamGateAuditText(request.OperatorName))
                     .AddInParameter("@reason", request.Reason)
-                    .AddInParameter("@createTime", now)
+                    // Dos.ORM's object overload defaults to DbType.String. That serializes
+                    // DateTime with the current process culture (for example
+                    // "08/13/2026 23:03:28"), which MySQL rejects in strict mode and is
+                    // not portable across the three supported providers. Bind the provider
+                    // type explicitly so the driver owns the wire representation.
+                    .AddInParameter("@createTime", System.Data.DbType.DateTime, now)
                     .ExecuteNonQuery();
                 if (inserted != 1) throw new InvalidOperationException("门禁转换审计写入失败，affectedRows=" + inserted);
 

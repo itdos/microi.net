@@ -16,6 +16,7 @@ using Newtonsoft.Json.Linq;
 using Dos.Common;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
@@ -351,10 +352,31 @@ namespace Microi.net.Api
                         {
                             if (!form.ContainsKey(fieldName)) continue;
                             var rawValue = form[fieldName].ToString();
-                            protocolParam[fieldName] = nullableFields.Contains(fieldName)
-                                                       && string.Equals(rawValue, "null", StringComparison.Ordinal)
-                                ? JValue.CreateNull()
-                                : rawValue;
+                            if (string.Equals(fieldName, "ExpectedCurrentVersion", StringComparison.Ordinal))
+                            {
+                                // multipart/form-data has no scalar type information. Keep
+                                // the Core v3 contract strict and restore this JSON integer at
+                                // the HTTP boundary; all Int64 fencing fields deliberately stay
+                                // canonical decimal strings so JavaScript never loses precision.
+                                if (!int.TryParse(
+                                        rawValue,
+                                        NumberStyles.None,
+                                        CultureInfo.InvariantCulture,
+                                        out var expectedCurrentVersion)
+                                    || expectedCurrentVersion < 0)
+                                {
+                                    return Ok(new DosResult(0, null,
+                                        "ExpectedCurrentVersion 必须是规范非负 int 整数"));
+                                }
+                                protocolParam[fieldName] = expectedCurrentVersion;
+                            }
+                            else
+                            {
+                                protocolParam[fieldName] = nullableFields.Contains(fieldName)
+                                                           && string.Equals(rawValue, "null", StringComparison.Ordinal)
+                                    ? JValue.CreateNull()
+                                    : rawValue;
+                            }
                         }
                         result = await V8McpLogic.UploadApplicationAssetStreamV3(
                             osClient,
@@ -509,7 +531,8 @@ namespace Microi.net.Api
         }
 
         /// <summary>
-        /// 以有界匿名管道将临时 HDFS 分片流式合并为不可变最终对象，并再次
+        /// 以有界内存将临时 HDFS 分片顺序合并到可删除临时文件，再流式写入
+        /// 不可变最终对象，并再次
         /// 对最终对象执行全量 SHA-256 回读；可在节点重启后幂等重试。
         /// </summary>
         [HttpPost]
@@ -530,7 +553,12 @@ namespace Microi.net.Api
                     osClient,
                     param,
                     (object)token,
-                    HttpContext.RequestAborted));
+                    // Completion is a durable, resumable server-side compose.
+                    // A CLI, browser, reverse proxy or MCP transport disconnect
+                    // must not cancel verified parts or the final OSS write.
+                    // Progress and terminal failure remain persisted in
+                    // mci_ai_app_file for polling and administrator audit.
+                    System.Threading.CancellationToken.None));
             }
             catch (Exception ex)
             {

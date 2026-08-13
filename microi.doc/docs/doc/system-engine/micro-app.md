@@ -313,6 +313,31 @@ Microi-V8-Engine/示例服务器 (api.example.com)/Demo.Product.Internal/AI应�
 - 调用吾码接口时使用模板自带的 `src/microi.js` 或 `src/utils/microi.v8.js`。
 - `vite.config.js` 的资源基础路径必须适配微应用托管，避免构建后静态资源请求到主站根目录。
 
+#### 从线上页面自动识别目标并在本地复现
+
+处理“线上微服务异常、需要用本地 `Microi.Client` 源码复现”时，AI 应先在一次性独立浏览器
+上下文打开线上地址，等待吾码主框架初始化，再读取：
+
+```js
+window.__MICROI_RUNTIME_ENDPOINT__
+```
+
+该对象只公开当前 `apiBase`、`osClient`、来源和浏览器隔离提示，不包含 Token。旧版线上主框架
+没有该对象时，再依次读取线上 URL 参数、`window.ApiBase/window.OsClient`、同源 localStorage
+中的 `microi.net.ApiBase/OsClient`；仍无法确定租户时通过线上域名的租户解析接口或已成功请求
+确认，禁止根据系统名称猜测。
+
+然后在另一个独立浏览器上下文打开本地源码，URL 参数权重最高：
+
+```text
+http://localhost:61500/?OsClient={编码后的租户}&ApiBase={编码后的API地址}#/micro-app/{MsKey}/{RoutePath}
+```
+
+每个并行的 `ApiBase + OsClient` 必须使用独立 `browser.newContext()`、浏览器 Profile 或独立
+`--user-data-dir`。同源普通窗口共享 Token、CurrentUser、ApiBase 和 OsClient；多个无痕窗口也
+可能属于同一个临时会话，因此不能把“开了无痕”当作三个以上并行租户的充分隔离。完整规则见
+[源码本地运行：指定或切换 ApiBase 与 OsClient](../getting-started/local-run#指定或切换-apibase-与-osclient)。
+
 ## AI 对话与 MCP 使用
 
 配置好目标租户的 Microi MCP 后，AI 可以读取当前所有 Web、UniApp、MicroService 应用及其文件，再决定扩展已有应用还是创建新应用。
@@ -456,7 +481,7 @@ OsClientNetwork 默认读取当前环境值但允许手工修改。页面使用 
 例如：
 
 ```text
-http://localhost:1988/?OsClient=iTdos#/micro-app/microi-official/saas-tenant/create
+http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/microi-official/saas-tenant/create
 ```
 
 同一微服务可以绑定多个菜单。宿主会为每个运行实例生成独立名称，避免切换页面时出现 `app name conflict`。

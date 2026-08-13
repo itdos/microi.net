@@ -73,6 +73,37 @@ public class AiApplicationFileStorageScopeTests
     }
 
     [Theory]
+    [InlineData("ApplicationAssetMultipartSession")]
+    [InlineData("ApplicationAssetPublishAudit")]
+    public void SourceReplacement_PreservesControlPlaneRows(string storageScope)
+    {
+        var syncedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "src/App.vue" };
+        var controlPlaneRow = new JObject
+        {
+            ["StorageScope"] = storageScope,
+            ["FilePath"] = "dist/downloads/large-installer.exe"
+        };
+
+        Assert.False(V8McpLogic.IsPrivateAiApplicationSourceFile(controlPlaneRow));
+        Assert.False(V8McpLogic.ShouldRemoveAiApplicationSourceFile(controlPlaneRow, syncedPaths));
+    }
+
+    [Fact]
+    public void LegacyPrivateSource_WithoutStorageScope_RemainsReplaceable()
+    {
+        var syncedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "src/App.vue" };
+        var legacySource = new JObject
+        {
+            ["FilePath"] = "src/old.vue",
+            ["HdfsPath"] = "/micro-app/loctek/source/src/old.vue",
+            ["PublishHdfsPath"] = ""
+        };
+
+        Assert.True(V8McpLogic.IsPrivateAiApplicationSourceFile(legacySource));
+        Assert.True(V8McpLogic.ShouldRemoveAiApplicationSourceFile(legacySource, syncedPaths));
+    }
+
+    [Theory]
     [InlineData(null, null)]
     [InlineData("", "/micro-app/loctek/dist/index.html")]
     [InlineData("/micro-app/loctek/source/index.html", "")]

@@ -693,7 +693,14 @@ function buildFieldConfig(sourceType, options) {
         return { config: { DateTimeType: getString(options, 'dateTimeType', 'DateTimeType') || 'datetime' }, warnings };
     }
     if (type === 'joinform') {
-        return { config: { JoinForm: { TableId: getString(options, 'tableId'), TableName: getString(options, 'tableName'), JoinFieldName: getString(options, 'joinFieldName') || 'Name' } }, warnings };
+        const tableId = getString(options, 'tableId');
+        const tableName = getString(options, 'tableName');
+        const joinFieldName = getString(options, 'joinFieldName');
+        if (!tableId && !tableName)
+            warnings.push('JoinForm 缺少 tableId/tableName，禁止保存未解析目标表的配置');
+        if (!joinFieldName)
+            warnings.push('JoinForm 缺少 joinFieldName；该字段必须是当前主表中保存目标记录 Id 的真实字段名');
+        return { config: { JoinForm: compactObject({ TableId: tableId, TableName: tableName, JoinFieldName: joinFieldName }) }, warnings };
     }
     warnings.push(`未知 sourceType: ${sourceType}，已返回空配置`);
     return { config: {}, warnings };
@@ -929,6 +936,199 @@ function defaultCardBottomFields(fields) {
         return isDateField(field) || hasKeyword(text, ['amount', 'money', 'price', 'total', 'count', 'qty', '积分', '余额', '金额', '价格', '数量']);
     }).slice(0, 3);
 }
+function presentationFieldMeta(value, index = 0) {
+    const field = asRecord(value);
+    const name = getString(field, 'name', 'Name');
+    if (!name)
+        return null;
+    return {
+        id: getString(field, 'id', 'Id') || name,
+        name,
+        label: getString(field, 'label', 'Label') || name,
+        tableId: getString(field, 'tableId', 'TableId'),
+        tableName: getString(field, 'tableName', 'TableName'),
+        tableDescription: getString(field, 'tableDescription', 'TableDescription'),
+        component: getString(field, 'component', 'Component') || 'Text',
+        type: getString(field, 'type', 'Type') || 'varchar(500)',
+    };
+}
+/** Stable semantic list width used when AI/Manifest callers omit TableWidth. */
+export function inferTableColumnWidth(value) {
+    const field = presentationFieldMeta(value);
+    if (!field)
+        return 150;
+    const text = fieldText(field);
+    const component = componentKey(field);
+    if (['richtext', 'textarea', 'address', 'map', 'maparea', 'fileupload', 'imgupload'].includes(component)
+        || hasKeyword(text, ['address', 'remark', 'description', 'content', '地址', '备注', '说明', '内容', '附件', '图片']))
+        return 240;
+    if (hasKeyword(text, ['name', 'title', 'subject', 'customer', 'company', '名称', '标题', '主题', '客户', '企业']))
+        return 200;
+    if (isDateField(field))
+        return 170;
+    if (isNumericField(field))
+        return 140;
+    if (component === 'autonumber' || hasKeyword(text, ['phone', 'mobile', 'email', 'code', 'number', '编号', '单号', '电话', '手机', '邮箱']))
+        return 160;
+    if (EXACT_SEARCH_COMPONENTS.has(component) || hasKeyword(text, ['status', 'state', 'type', 'category', '状态', '类型', '分类']))
+        return 130;
+    return 150;
+}
+function presentationDescriptor(field, extras = {}) {
+    return {
+        Name: field.name,
+        Label: field.label || field.name,
+        ...extras,
+    };
+}
+function takeUnusedPresentationFields(candidates, count, used) {
+    const result = [];
+    for (const field of candidates) {
+        if (!field?.name || used.has(lower(field.name)))
+            continue;
+        used.add(lower(field.name));
+        result.push(field);
+        if (result.length >= count)
+            break;
+    }
+    return result;
+}
+/**
+ * Minimum production-ready List/Card presentation for every visible bound module.
+ * It intentionally contains no Detail/Edit views, so EnableViewSchema remains a
+ * custom-form switch only. Metrics are real field aggregates/list counts; never random.
+ */
+export function buildDefaultModulePresentation(moduleName, rawFields, tableDescription = '') {
+    const fields = rawFields.map(presentationFieldMeta).filter(Boolean);
+    const visible = defaultListFields(fields);
+    const title = String(moduleName || tableDescription || fields[0]?.tableDescription || fields[0]?.tableName || '业务模块').trim();
+    const descriptionSource = String(tableDescription || fields[0]?.tableDescription || '').trim();
+    const description = descriptionSource && descriptionSource !== title
+        ? descriptionSource
+        : `${title}的业务数据、进度与关键指标`;
+    const primary = rankedFields(visible, (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['title', 'subject', '标题', '主题']))
+            return 150;
+        if (hasKeyword(text, ['name', '名称']))
+            return 130;
+        if (componentKey(field) === 'autonumber' || hasKeyword(text, ['no', 'code', 'number', '编号', '单号', '编码']))
+            return 110;
+        return listFieldScore(field);
+    })[0] || visible[0];
+    const statusCandidates = rankedFields(visible.filter((field) => field !== primary), (field) => (hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'stage', '状态', '类型', '分类', '阶段']) ? 100 : 0)).filter((field) => hasKeyword(fieldText(field), ['status', 'state', 'type', 'category', 'stage', '状态', '类型', '分类', '阶段']));
+    const numericCandidates = defaultStatisticsFields(fields).filter((field) => field !== primary);
+    const dateCandidates = rankedFields(fields.filter(isDateField), (field) => hasKeyword(fieldText(field), ['create', '创建']) ? 100 : 50);
+    const lineCandidates = rankedFields(visible.filter((field) => field !== primary
+        && !statusCandidates.includes(field)
+        && !numericCandidates.includes(field)), (field) => {
+        const text = fieldText(field);
+        if (hasKeyword(text, ['customer', 'member', 'user', 'owner', 'contact', '客户', '会员', '用户', '负责人', '联系人']))
+            return 90;
+        if (isDateField(field))
+            return 70;
+        return listFieldScore(field);
+    }).slice(0, 2);
+    const trailingFields = uniqueFields([...statusCandidates.slice(0, 1), ...numericCandidates.slice(0, 1)]);
+    const requiredFields = uniqueFields([primary, ...lineCandidates, ...trailingFields].filter(Boolean))
+        .map((field) => field.name);
+    const compositeWidth = primary
+        ? Math.min(520, Math.max(340, inferTableColumnWidth(primary) + (lineCandidates.length * 28) + (trailingFields.length * 70)))
+        : 0;
+    const metricVisuals = [
+        { Icon: 'fas fa-chart-column', Tone: 'primary' },
+        { Icon: 'fas fa-calculator', Tone: 'success' },
+    ];
+    const metrics = numericCandidates.slice(0, 2).map((field, index) => ({
+        Key: `Aggregate:${field.name}`,
+        Label: `${field.label || field.name}合计`,
+        Source: 'Field',
+        Field: field.name,
+        ...metricVisuals[index],
+    }));
+    metrics.push({
+        Key: 'DataCount',
+        Label: '筛选结果',
+        Source: 'DataCount',
+        Icon: 'fas fa-layer-group',
+        Tone: 'info',
+    });
+    if (metrics.length < 3) {
+        metrics.push({
+            Key: 'PageCount',
+            Label: '本页展示',
+            Source: 'PageCount',
+            Icon: 'fas fa-list-check',
+            Tone: 'warning',
+        });
+    }
+    const used = new Set(primary ? [lower(primary.name)] : []);
+    const cardSubtitle = takeUnusedPresentationFields(lineCandidates, 1, used);
+    const cardStatus = takeUnusedPresentationFields(statusCandidates, 1, used);
+    const cardTop = takeUnusedPresentationFields(statusCandidates, 1, used);
+    const cardRight = takeUnusedPresentationFields(numericCandidates, 1, used);
+    const cardMeta = takeUnusedPresentationFields(dateCandidates, 2, used);
+    const cardContent = takeUnusedPresentationFields(visible, 2, used);
+    const cardBottom = takeUnusedPresentationFields([...numericCandidates, ...dateCandidates], 2, used);
+    const hero = {
+        Title: title,
+        Description: description,
+        Metrics: metrics,
+    };
+    return {
+        Views: [
+            {
+                Key: 'auto-list-pc',
+                Scene: 'List',
+                Device: 'PC',
+                Priority: 100,
+                Layout: {
+                    Hero: hero,
+                    List: {
+                        Density: 'Compact',
+                        Columns: primary ? [{
+                                Key: `composite:${primary.name}`,
+                                Field: primary.name,
+                                Lines: lineCandidates.map((field) => presentationDescriptor(field, { Icon: isDateField(field) ? 'fas fa-clock' : 'fas fa-circle-info', Tone: 'info' })),
+                                TrailingFields: trailingFields.map((field) => presentationDescriptor(field, {
+                                    Icon: statusCandidates.includes(field) ? 'fas fa-circle-check' : 'fas fa-coins',
+                                    Tone: statusCandidates.includes(field) ? 'success' : 'warning',
+                                    DisplayStyle: statusCandidates.includes(field) ? 'Tag' : 'Text',
+                                })),
+                                RequiredFields: requiredFields,
+                                Align: 'Left',
+                                MinWidth: compositeWidth,
+                            }] : [],
+                    },
+                },
+            },
+            {
+                Key: 'auto-card-mobile',
+                Scene: 'Card',
+                Device: 'Mobile',
+                Priority: 100,
+                Layout: {
+                    Hero: { ...hero, Metrics: metrics.map((metric) => ({ ...metric })) },
+                    Card: {
+                        Preset: 'Business',
+                        AvatarTextField: primary?.name || '',
+                        TitleField: primary?.name || '',
+                        SubtitleFields: cardSubtitle.map((field) => presentationDescriptor(field, { Icon: 'fas fa-circle-info', Tone: 'info' })),
+                        StatusFields: cardStatus.map((field) => presentationDescriptor(field, { DisplayStyle: 'Tag', Icon: 'fas fa-circle-check', Tone: 'success' })),
+                        TopFields: cardTop.map((field) => presentationDescriptor(field, { DisplayStyle: 'Tag', Icon: 'fas fa-tag', Tone: 'primary' })),
+                        RightFields: cardRight.map((field) => presentationDescriptor(field, { Icon: 'fas fa-coins', Tone: 'danger', FontWeight: '700' })),
+                        Fields: cardContent.map((field) => presentationDescriptor(field)),
+                        MetaFields: cardMeta.map((field) => presentationDescriptor(field, { Icon: 'fas fa-clock', Tone: 'info' })),
+                        BottomFields: cardBottom.map((field) => presentationDescriptor(field, { Icon: isDateField(field) ? 'fas fa-calendar' : 'fas fa-chart-simple', Tone: 'warning' })),
+                        HideIndex: true,
+                        ShowCreateTime: cardMeta.length === 0,
+                        ShowUpdateTime: false,
+                    },
+                },
+            },
+        ],
+    };
+}
 function defaultOrderByFromFields(fields, tableId, tableName) {
     const candidates = fields.length ? fields : [systemFieldMeta(tableId, tableName, 'CreateTime')];
     const field = candidates.find((item) => lower(item.name) === 'createtime')
@@ -1134,6 +1334,9 @@ export function buildPlan(manifest) {
     if (!tables.length && !engines.length && !modules.length && !pages.length) {
         warnings.push('Manifest 未声明 tables/engines/modules/pages，可能不是完整系统计划');
     }
+    const relationValidation = validateManifestFieldRelations(manifest);
+    errors.push(...relationValidation.errors);
+    warnings.push(...relationValidation.warnings);
     roles.forEach((item) => plan.push(`save_role ${getString(item, 'name', 'Name')}`));
     tables.forEach((table, tableIndex) => {
         const name = getString(table, 'name', 'Name');
@@ -1195,6 +1398,30 @@ export function buildPlan(manifest) {
         warnings.push(...normalized.warnings);
         const tableRef = getString(item, 'table', 'tableName', 'diyTableName', 'DiyTableName');
         const moduleName = getString(item, 'name', 'Name');
+        const openType = getString(item, 'openType', 'OpenType');
+        const microServiceKey = getString(item, 'microServiceKey', 'MicroServiceKey');
+        const microServiceRoutePath = getString(item, 'microServiceRoutePath', 'MicroServiceRoutePath');
+        const isMicroService = openType.toLowerCase() === 'microservice'
+            || Boolean(getNumber(item, 'isMicroiService', 'IsMicroiService') === 1
+                || microServiceKey
+                || microServiceRoutePath
+                || getString(item, 'microServiceId', 'MicroServiceId')
+                || getString(item, 'microServicePageId', 'MicroServicePageId'));
+        if (isMicroService) {
+            if (!microServiceKey)
+                errors.push(`modules.${moduleName || '(unnamed)'}.microServiceKey 不能为空`);
+            if (!microServiceRoutePath)
+                errors.push(`modules.${moduleName || '(unnamed)'}.microServiceRoutePath 不能为空`);
+            if (microServiceRoutePath) {
+                try {
+                    normalizeManifestMicroServiceRoutePath(microServiceRoutePath);
+                }
+                catch (error) {
+                    errors.push(`modules.${moduleName || '(unnamed)'}.microServiceRoutePath ${error instanceof Error ? error.message : String(error)}`);
+                }
+            }
+            plan.push(`resolve_microservice_binding ${microServiceKey || '(missing)'}${microServiceRoutePath || '/(missing)'}`);
+        }
         if (tableRef && manifestFieldsByTable.has(tableRef.toLowerCase())) {
             const fields = manifestFieldsByTable.get(tableRef.toLowerCase()) || new Set();
             const fieldGroups = [
@@ -1526,6 +1753,26 @@ function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
     const diyTableId = getString(module, 'diyTableId', 'DiyTableId') || (tableRef ? tableIdByName.get(tableRef.toLowerCase()) : '');
     const tableName = tableRef || getString(module, 'DiyTableName', 'diyTableName');
     const resolvedFields = fieldLookup ? resolveModuleFields(module, fieldLookup, diyTableId || '', tableName) : {};
+    const display = getNumber(module, 'display', 'Display') ?? 1;
+    const appDisplay = getNumber(module, 'appDisplay', 'AppDisplay') ?? 1;
+    const openType = getString(module, 'openType', 'OpenType') || 'Diy';
+    let effectiveViewSchema = normalized.data.ViewSchema;
+    if (!effectiveViewSchema
+        && fieldLookup
+        && diyTableId
+        && (display === 1 || appDisplay === 1)
+        && lower(openType) === 'diy') {
+        const tableFields = getFieldsForTable(fieldLookup, diyTableId).length
+            ? getFieldsForTable(fieldLookup, diyTableId)
+            : getFieldsForTable(fieldLookup, tableName);
+        if (tableFields.length) {
+            const generated = buildDefaultModulePresentation(getString(module, 'name', 'Name'), tableFields, tableFields[0]?.tableDescription || tableName);
+            const normalizedGenerated = normalizeViewSchemaJson(generated);
+            if (!normalizedGenerated.ok)
+                throw new Error(normalizedGenerated.errors.join('\n'));
+            effectiveViewSchema = normalizedGenerated.value;
+        }
+    }
     const payload = compactObject({
         ...normalized.data,
         ...resolvedFields,
@@ -1534,9 +1781,10 @@ function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
         ParentId: getString(module, 'parentId', 'ParentId') || (moduleIdByName ? moduleIdByName.get(getString(module, 'parentName', 'ParentName').toLowerCase()) : undefined),
         ComponentName: getString(module, 'componentName', 'ComponentName'),
         ComponentPath: getString(module, 'componentPath', 'ComponentPath'),
-        Display: getNumber(module, 'display', 'Display') ?? 1,
-        AppDisplay: getNumber(module, 'appDisplay', 'AppDisplay') ?? 1,
-        OpenType: getString(module, 'openType', 'OpenType'),
+        Display: display,
+        AppDisplay: appDisplay,
+        HasChild: getNumber(module, 'hasChild', 'HasChild'),
+        OpenType: openType,
         Url: getString(module, 'url', 'Url'),
         Sort: getNumber(module, 'sort', 'Sort'),
         Icon: getString(module, 'icon', 'Icon'),
@@ -1557,12 +1805,287 @@ function modulePayload(module, tableIdByName, moduleIdByName, fieldLookup) {
         CardBottomTagFields: getExplicitJsonString(module, 'cardBottomTagFields', 'CardBottomTagFields') || resolvedFields.CardBottomTagFields,
         MenuBadgeEnabled: getNumber(module, 'menuBadgeEnabled', 'MenuBadgeEnabled'),
         MenuBadgeApiEngineKey: getString(module, 'menuBadgeApiEngineKey', 'MenuBadgeApiEngineKey'),
-        EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema'),
-        ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion'),
-        ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion'),
-        ViewSchema: normalized.data.ViewSchema,
+        EnableViewSchema: getNumber(module, 'enableViewSchema', 'EnableViewSchema') ?? 0,
+        ViewSchemaVersion: getString(module, 'viewSchemaVersion', 'ViewSchemaVersion') || (effectiveViewSchema ? '1.0' : undefined),
+        ViewConfigVersion: getNumber(module, 'viewConfigVersion', 'ViewConfigVersion') ?? (effectiveViewSchema ? 1 : undefined),
+        ViewSchema: effectiveViewSchema,
+        IsMicroiService: getNumber(module, 'isMicroiService', 'IsMicroiService'),
+        MicroServiceId: getString(module, 'microServiceId', 'MicroServiceId'),
+        MicroServicePageId: getString(module, 'microServicePageId', 'MicroServicePageId'),
+        MicroServiceRoutePath: getString(module, 'microServiceRoutePath', 'MicroServiceRoutePath'),
+        MicroServiceKey: getString(module, 'microServiceKey', 'MicroServiceKey'),
     });
     return payload;
+}
+function normalizeRelationCardinality(value) {
+    const normalized = value.trim().toLowerCase().replace(/\s+/gu, '').replace(/[×＊*]/gu, ':');
+    if (['1:1', 'one:one', 'one-to-one', 'onetoone'].includes(normalized))
+        return '1:1';
+    if (['n:1', 'many:one', 'many-to-one', 'manytoone'].includes(normalized))
+        return 'N:1';
+    if (['1:n', 'one:many', 'one-to-many', 'onetomany'].includes(normalized))
+        return '1:N';
+    return '';
+}
+function getManifestRelationContract(field) {
+    const raw = getValue(field, 'relation', 'Relation');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+        return undefined;
+    const relation = asRecord(raw);
+    return {
+        cardinality: normalizeRelationCardinality(getString(relation, 'cardinality', 'Cardinality')),
+        targetTable: getString(relation, 'targetTable', 'TargetTable', 'table', 'Table'),
+        joinFieldName: getString(relation, 'joinFieldName', 'JoinFieldName', 'foreignKey', 'ForeignKey'),
+        childForeignKey: getString(relation, 'childForeignKey', 'ChildForeignKey', 'foreignKey', 'ForeignKey'),
+        childModule: getString(relation, 'childModule', 'ChildModule', 'module', 'Module'),
+        primaryTableFieldName: getString(relation, 'primaryTableFieldName', 'PrimaryTableFieldName') || 'Id',
+    };
+}
+function parseConfigRecord(value) {
+    if (typeof value === 'string') {
+        if (!value.trim())
+            return {};
+        try {
+            return asRecord(JSON.parse(value));
+        }
+        catch {
+            return {};
+        }
+    }
+    return asRecord(value);
+}
+function moduleTableRef(module) {
+    return getString(module, 'table', 'tableName', 'diyTableName', 'DiyTableName');
+}
+/**
+ * Validate the portable relation contract before any Manifest write occurs.
+ * Runtime ids in raw Config are deliberately not trusted: they are resolved
+ * from table/module names after the tenant resources exist.
+ */
+export function validateManifestFieldRelations(manifest) {
+    const errors = [];
+    const warnings = [];
+    const tables = getArray(manifest, 'tables', 'Tables');
+    const modules = getArray(manifest, 'modules', 'Modules');
+    const tableByName = new Map();
+    const moduleByName = new Map();
+    for (const table of tables) {
+        const name = getString(table, 'name', 'Name');
+        if (name)
+            tableByName.set(normalizeKey(name), table);
+    }
+    for (const module of modules) {
+        const name = getString(module, 'name', 'Name');
+        if (name)
+            moduleByName.set(normalizeKey(name), module);
+    }
+    tables.forEach((table, tableIndex) => {
+        const tableName = getString(table, 'name', 'Name');
+        const currentFields = getArray(table, 'fields', 'Fields');
+        const currentFieldNames = new Set(currentFields.map((field) => normalizeKey(getString(field, 'name', 'Name'))).filter(Boolean));
+        currentFields.forEach((field, fieldIndex) => {
+            const component = normalizeKey(getString(field, 'component', 'Component'));
+            if (component !== 'joinform' && component !== 'tablechild')
+                return;
+            const path = `tables[${tableIndex}].fields[${fieldIndex}]`;
+            const fieldName = getString(field, 'name', 'Name');
+            const relation = getManifestRelationContract(field);
+            if (!relation) {
+                errors.push(`${path} (${tableName}.${fieldName}) 使用 ${component === 'joinform' ? 'JoinForm' : 'TableChild'} 时必须声明 portable relation；禁止直接写入租户 Id 或未初始化 Config`);
+                return;
+            }
+            if (!relation.cardinality) {
+                errors.push(`${path}.relation.cardinality 仅允许 1:1、N:1 或 1:N`);
+            }
+            if (!relation.targetTable) {
+                errors.push(`${path}.relation.targetTable 不能为空`);
+                return;
+            }
+            if (normalizeKey(relation.targetTable) === normalizeKey(tableName)) {
+                errors.push(`${path} 关联目标 ${relation.targetTable} 与当前表相同；JoinForm/TableChild 禁止自关联`);
+            }
+            const targetTable = tableByName.get(normalizeKey(relation.targetTable));
+            if (!targetTable) {
+                errors.push(`${path}.relation.targetTable 引用未在 Manifest tables 中声明的表 "${relation.targetTable}"；完整系统生成必须声明目标表以完成前置校验`);
+                return;
+            }
+            if (component === 'joinform') {
+                if (relation.cardinality !== '1:1' && relation.cardinality !== 'N:1') {
+                    errors.push(`${path} 的 JoinForm 只允许 1:1 或 N:1；1:N 明细必须改用 TableChild`);
+                }
+                if (!relation.joinFieldName) {
+                    errors.push(`${path}.relation.joinFieldName 不能为空，且必须指向当前主表中保存目标记录 Id 的字段`);
+                }
+                else if (!currentFieldNames.has(normalizeKey(relation.joinFieldName))) {
+                    errors.push(`${path}.relation.joinFieldName 引用当前表不存在的字段 "${relation.joinFieldName}"`);
+                }
+                else if (normalizeKey(relation.joinFieldName) === normalizeKey(fieldName)) {
+                    errors.push(`${path}.relation.joinFieldName 不能指向 JoinForm 组件字段自身`);
+                }
+                return;
+            }
+            if (relation.cardinality !== '1:N') {
+                errors.push(`${path} 的 TableChild 只允许 1:N；1:1/N:1 应使用 JoinForm`);
+            }
+            const targetFields = getArray(targetTable, 'fields', 'Fields');
+            const targetFieldNames = new Set(targetFields.map((item) => normalizeKey(getString(item, 'name', 'Name'))).filter(Boolean));
+            if (!relation.childForeignKey) {
+                errors.push(`${path}.relation.childForeignKey 不能为空`);
+            }
+            else if (!targetFieldNames.has(normalizeKey(relation.childForeignKey))) {
+                errors.push(`${path}.relation.childForeignKey 引用子表 ${relation.targetTable} 不存在的字段 "${relation.childForeignKey}"`);
+            }
+            if (!relation.childModule) {
+                errors.push(`${path}.relation.childModule 不能为空`);
+            }
+            else {
+                const childModule = moduleByName.get(normalizeKey(relation.childModule));
+                if (!childModule) {
+                    errors.push(`${path}.relation.childModule 引用不存在的模块 "${relation.childModule}"`);
+                }
+                else {
+                    if (normalizeKey(moduleTableRef(childModule)) !== normalizeKey(relation.targetTable)) {
+                        errors.push(`${path}.relation.childModule 必须绑定子表 ${relation.targetTable}`);
+                    }
+                    if (getNumber(childModule, 'display', 'Display') !== 0
+                        || getNumber(childModule, 'appDisplay', 'AppDisplay') !== 0
+                        || getNumber(childModule, 'hasChild', 'HasChild') !== 0) {
+                        errors.push(`${path}.relation.childModule 必须显式设置 display=0、appDisplay=0、hasChild=0`);
+                    }
+                }
+            }
+            const indexMatches = getArray(targetTable, 'indexes', 'Indexes').some((index) => {
+                const columns = getStringArray(index, 'columns', 'Columns').map(normalizeKey);
+                return columns.length >= 2 && columns[0] === 'osclient' && columns[1] === normalizeKey(relation.childForeignKey);
+            });
+            if (relation.childForeignKey && !indexMatches) {
+                errors.push(`${path} 的子表 ${relation.targetTable} 必须声明以 (OsClient, ${relation.childForeignKey}) 开头的组合索引`);
+            }
+        });
+    });
+    return { errors, warnings };
+}
+export function resolveManifestRelationConfig(field, currentTableName, tableIdByName, moduleIdByName) {
+    const component = normalizeKey(getString(field, 'component', 'Component'));
+    const relation = getManifestRelationContract(field);
+    if (!relation || (component !== 'joinform' && component !== 'tablechild')) {
+        throw new Error(`${currentTableName}.${getString(field, 'name', 'Name')} 缺少有效 relation`);
+    }
+    const targetTableId = tableIdByName.get(normalizeKey(relation.targetTable));
+    if (!targetTableId)
+        throw new Error(`无法解析关联目标表 ${relation.targetTable} 的当前租户 diy_table.Id`);
+    const base = parseConfigRecord(getValue(field, 'config', 'Config'));
+    if (component === 'joinform') {
+        return {
+            ...base,
+            JoinForm: {
+                ...asRecord(base.JoinForm),
+                TableId: targetTableId,
+                TableName: relation.targetTable,
+                JoinFieldName: relation.joinFieldName,
+            },
+        };
+    }
+    const childModuleId = moduleIdByName.get(normalizeKey(relation.childModule));
+    if (!childModuleId)
+        throw new Error(`无法解析隐藏子表模块 ${relation.childModule} 的当前租户 sys_menu.Id`);
+    return {
+        ...base,
+        TableChildTableId: targetTableId,
+        TableChildSysMenuId: childModuleId,
+        TableChildSysMenuName: relation.childModule,
+        TableChildFkFieldName: relation.childForeignKey,
+        TableChild: {
+            ...asRecord(base.TableChild),
+            PrimaryTableFieldName: relation.primaryTableFieldName,
+        },
+    };
+}
+function normalizeManifestMicroServiceRoutePath(value) {
+    let routePath = String(value || '').trim().replace(/\\/gu, '/');
+    if (!routePath)
+        return '/';
+    if (!routePath.startsWith('/'))
+        routePath = `/${routePath}`;
+    routePath = routePath.replace(/\/{2,}/gu, '/');
+    if (routePath.length > 1)
+        routePath = routePath.replace(/\/+$/gu, '');
+    if (!/^\/(?:[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)*)?$/u.test(routePath)
+        || routePath.includes('..')) {
+        throw new Error(`不合法：${value}`);
+    }
+    return routePath;
+}
+/**
+ * Resolve a portable Manifest MicroService reference to the tenant-specific
+ * sys_microiservice/sys_microiservice_page ids before any system writes begin.
+ */
+export async function resolveMicroServiceModuleBinding(client, module) {
+    const openType = getString(module, 'openType', 'OpenType');
+    const microServiceKey = getString(module, 'microServiceKey', 'MicroServiceKey');
+    const rawRoutePath = getString(module, 'microServiceRoutePath', 'MicroServiceRoutePath');
+    const explicitServiceId = getString(module, 'microServiceId', 'MicroServiceId');
+    const explicitPageId = getString(module, 'microServicePageId', 'MicroServicePageId');
+    const isMicroService = openType.toLowerCase() === 'microservice'
+        || Boolean(getNumber(module, 'isMicroiService', 'IsMicroiService') === 1
+            || microServiceKey
+            || rawRoutePath
+            || explicitServiceId
+            || explicitPageId);
+    if (!isMicroService)
+        return undefined;
+    if (!microServiceKey || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(microServiceKey)) {
+        throw new Error(`MicroService 菜单缺少合法的 microServiceKey：${microServiceKey || '(empty)'}`);
+    }
+    if (!rawRoutePath)
+        throw new Error('MicroService 菜单缺少 microServiceRoutePath');
+    const routePath = normalizeManifestMicroServiceRoutePath(rawRoutePath);
+    const detailResult = await client.getMicroService(microServiceKey);
+    if (!detailResult || detailResult.Code !== 1) {
+        throw new Error(`无法解析微服务 ${microServiceKey}：${detailResult?.Msg || '接口无返回'}`);
+    }
+    const detail = asRecord(detailResult.Data);
+    const service = asRecord(detail.Service);
+    const serviceId = getString(service, 'Id', 'id');
+    const savedServiceKey = getString(service, 'MsKey', 'MicroServiceKey', 'AppKey');
+    if (!serviceId || savedServiceKey.toLowerCase() !== microServiceKey.toLowerCase()) {
+        throw new Error(`微服务 ${microServiceKey} 的运行元数据不完整或业务键不一致`);
+    }
+    if (explicitServiceId && explicitServiceId !== serviceId) {
+        throw new Error(`MicroServiceId 已过期：Manifest=${explicitServiceId}，当前租户=${serviceId}`);
+    }
+    const pages = Array.isArray(detail.Pages) ? detail.Pages.map(asRecord) : [];
+    const page = pages.find((item) => {
+        const candidate = getString(item, 'RoutePath', 'routePath', 'Path', 'path');
+        if (!candidate)
+            return false;
+        try {
+            return normalizeManifestMicroServiceRoutePath(candidate) === routePath;
+        }
+        catch {
+            return false;
+        }
+    });
+    const pageId = page ? getString(page, 'Id', 'id') : '';
+    if (!pageId)
+        throw new Error(`微服务 ${microServiceKey} 不存在可用页面 ${routePath}`);
+    if (explicitPageId && explicitPageId !== pageId) {
+        throw new Error(`MicroServicePageId 已过期：Manifest=${explicitPageId}，当前租户=${pageId}`);
+    }
+    const encodedRoute = routePath === '/'
+        ? ''
+        : `/${routePath.slice(1).split('/').map((segment) => encodeURIComponent(segment)).join('/')}`;
+    return {
+        IsMicroiService: 1,
+        OpenType: 'MicroService',
+        ComponentName: getString(module, 'componentName', 'ComponentName') || 'MicroService',
+        ComponentPath: getString(module, 'componentPath', 'ComponentPath') || '/micro-app/host',
+        Url: getString(module, 'url', 'Url') || `/micro-app/${encodeURIComponent(microServiceKey)}${encodedRoute}`,
+        MicroServiceId: serviceId,
+        MicroServicePageId: pageId,
+        MicroServiceRoutePath: routePath,
+        MicroServiceKey: microServiceKey,
+    };
 }
 function rolePayload(role) {
     return compactObject({
@@ -1625,6 +2148,41 @@ function jobPayload(job) {
         JobPath: getString(job, 'JobPath', 'jobPath'),
     });
 }
+function isManifestRelationField(field) {
+    const component = normalizeKey(getString(field, 'component', 'Component'));
+    return component === 'joinform' || component === 'tablechild';
+}
+function manifestFieldPayload(table, field, tableId, tableLayout, resolvedConfig) {
+    const configSource = asRecord(field.configSource ?? field.ConfigSource);
+    const generatedConfig = getString(configSource, 'sourceType')
+        ? buildFieldConfig(getString(configSource, 'sourceType'), configSource)
+        : undefined;
+    return compactObject({
+        TableId: tableId,
+        Name: getString(field, 'name', 'Name'),
+        Label: getString(field, 'label', 'Label'),
+        Type: getString(field, 'type', 'Type') || (isManifestRelationField(field) ? 'mediumtext' : ''),
+        Component: getString(field, 'component', 'Component'),
+        Visible: getNumber(field, 'visible', 'Visible') ?? 1,
+        AppVisible: getNumber(field, 'appVisible', 'AppVisible') ?? 1,
+        Tab: getString(field, 'tab', 'Tab') || tableLayout.fieldTabs.get(getString(field, 'name', 'Name')),
+        TableWidth: getNumber(field, 'tableWidth', 'TableWidth') ?? inferTableColumnWidth(field),
+        Sort: getNumber(field, 'sort', 'Sort'),
+        Readonly: getNumber(field, 'readonly', 'Readonly'),
+        NotEmpty: getNumber(field, 'notEmpty', 'NotEmpty'),
+        Unique: getNumber(field, 'unique', 'Unique'),
+        DefaultValue: getString(field, 'defaultValue', 'DefaultValue'),
+        Placeholder: getString(field, 'placeholder', 'Placeholder'),
+        FormWidth: getNumber(field, 'formWidth', 'FormWidth'),
+        Data: generatedConfig?.data ?? getString(field, 'data', 'Data'),
+        Config: resolvedConfig !== undefined
+            ? JSON.stringify(resolvedConfig)
+            : (generatedConfig ? JSON.stringify(generatedConfig.config) : stringifyConfig(field.config ?? field.Config)),
+        Description: getString(field, 'description', 'Description'),
+        Encrypt: getNumber(field, 'encrypt', 'Encrypt'),
+        InTableEdit: getNumber(field, 'inTableEdit', 'InTableEdit'),
+    });
+}
 export function manifestGuide(osClient) {
     const confirmTarget = osClient || 'EXECUTE';
     return {
@@ -1648,7 +2206,9 @@ export function manifestGuide(osClient) {
                     fields: [
                         { name: 'OrderNo', label: 'Order No', type: 'varchar(50)', component: 'AutoNumber', tab: 'basic', configSource: { sourceType: 'AutoNumber', prefix: 'ORD', length: 6 }, notEmpty: 1, unique: 1, tableWidth: 160, sort: 10 },
                         { name: 'CustomerName', label: 'Customer', type: 'varchar(100)', component: 'Text', tab: 'basic', notEmpty: 1, tableWidth: 160, sort: 20 },
-                        { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, sort: 30 },
+                        { name: 'OwnerName', label: 'Owner', type: 'varchar(100)', component: 'Text', tab: 'basic', tableWidth: 150, sort: 30 },
+                        { name: 'Amount', label: 'Order Amount', type: 'decimal(18,2)', component: 'NumberText', tab: 'business', tableWidth: 140, sort: 40 },
+                        { name: 'Status', label: 'Status', type: 'varchar(50)', component: 'Select', tab: 'business', configSource: { sourceType: 'KeyValue', items: [{ Key: 'Draft', Value: 'Draft' }, { Key: 'Submitted', Value: 'Submitted' }] }, tableWidth: 130, sort: 50 },
                     ],
                     indexes: [
                         { name: 'uk_biz_order_osclient_orderno', columns: ['OsClient', 'OrderNo'], unique: true, purpose: 'Tenant-scoped order number invariant' },
@@ -1679,7 +2239,7 @@ export function manifestGuide(osClient) {
                     name: 'Orders',
                     table: 'Biz_Order',
                     icon: 'Document',
-                    listFields: ['OrderNo', 'CustomerName', 'Status', 'CreateTime'],
+                    listFields: ['OrderNo', 'CustomerName', 'OwnerName', 'Amount', 'Status', 'CreateTime'],
                     searchFields: ['OrderNo', 'CustomerName', 'Status'],
                     sortFields: ['CreateTime'],
                     defaultOrderBy: [{ field: 'CreateTime', type: 'DESC' }],
@@ -1697,15 +2257,21 @@ export function manifestGuide(osClient) {
                                 Layout: {
                                     Hero: {
                                         Title: 'Orders',
-                                        Metrics: [{ Key: 'pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', Tone: 'warning' }],
+                                        Description: 'Track order value, pending work and current filtered results',
+                                        Metrics: [
+                                            { Key: 'pending', Label: 'Pending', ApiEngineKey: 'biz_order_metrics', ValuePath: 'Data.Pending', Icon: 'fas fa-clock', Tone: 'warning' },
+                                            { Key: 'amount', Label: 'Order Amount', Source: 'Field', Field: 'Amount', Icon: 'fas fa-coins', Tone: 'success' },
+                                            { Key: 'records', Label: 'Filtered Results', Source: 'DataCount', Icon: 'fas fa-layer-group', Tone: 'info' },
+                                        ],
                                     },
                                     List: {
                                         Density: 'Comfortable',
                                         Columns: [{
                                                 Field: 'OrderNo',
                                                 Lines: [{ Name: 'CustomerName', Label: 'Customer', ShowLabel: true, Tone: 'info' }],
-                                                TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
-                                                RequiredFields: ['CustomerName', 'Status'],
+                                                TrailingFields: [{ Name: 'Status', DisplayStyle: 'Tag' }, { Name: 'Amount', Icon: 'fas fa-coins', Tone: 'warning' }],
+                                                RequiredFields: ['CustomerName', 'Status', 'Amount'],
+                                                MinWidth: 380,
                                             }],
                                     },
                                 },
@@ -1728,12 +2294,12 @@ export function manifestGuide(osClient) {
                                         AvatarTextField: 'CustomerName',
                                         TitleField: 'OrderNo',
                                         SubtitleFields: ['CustomerName'],
-                                        StatusField: 'Status',
-                                        TopFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                                        StatusFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                                        TopFields: [],
                                         RightFields: [{ Name: 'Amount', Format: 'currency', Tone: 'danger' }],
-                                        Fields: [{ Name: 'CustomerName', Label: 'Customer' }, { Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
+                                        Fields: [{ Name: 'OwnerName', Label: 'Owner' }],
                                         MetaFields: [{ Name: 'CreateTime', Label: 'Created At', Format: 'datetime' }],
-                                        BottomFields: [{ Name: 'Status', DisplayStyle: 'Tag' }],
+                                        BottomFields: [],
                                     },
                                 },
                             },
@@ -1778,6 +2344,24 @@ export function manifestGuide(osClient) {
                 }],
             jobs: [],
         },
+        relationExamples: {
+            joinForm: {
+                parentStorageField: { name: 'CustomerId', label: 'Customer Id', type: 'varchar(50)', component: 'Text', visible: 0, appVisible: 0 },
+                displayField: {
+                    name: 'CustomerProfile', label: 'Customer Profile', type: 'mediumtext', component: 'JoinForm', formWidth: 24,
+                    relation: { cardinality: 'N:1', targetTable: 'Biz_Customer', joinFieldName: 'CustomerId' },
+                },
+            },
+            tableChild: {
+                parentField: {
+                    name: 'OrderItems', label: 'Order Items', type: 'mediumtext', component: 'TableChild', formWidth: 24,
+                    relation: { cardinality: '1:N', targetTable: 'Biz_OrderItem', childForeignKey: 'OrderId', childModule: 'Order Items (hidden)', primaryTableFieldName: 'Id' },
+                },
+                childForeignKeyField: { name: 'OrderId', label: 'Order Id', type: 'varchar(50)', component: 'Text', visible: 0, appVisible: 0 },
+                childIndex: { name: 'idx_biz_orderitem_osclient_orderid', columns: ['OsClient', 'OrderId'], unique: false },
+                hiddenChildModule: { name: 'Order Items (hidden)', table: 'Biz_OrderItem', display: 0, appDisplay: 0, hasChild: 0 },
+            },
+        },
         naturalFieldKeys: {
             tables: {
                 tabs: 'diy_table.Tabs form groups. When omitted and the table has more than 12 business fields, generator creates Basic/Contact/Business/Attachment/Extra tabs and assigns empty field tab values.',
@@ -1791,9 +2375,13 @@ export function manifestGuide(osClient) {
             fields: {
                 component: 'Use the real Microi component name. Available controls include Text, Textarea, NumberText, DateTime, Select, MultipleSelect, Radio, Checkbox, Switch, Rate, Progress, Slider, ColorPicker, AutoNumber, Divider, CollapseGroup, Tabs, Alert, StaticText, Html, RichText, CodeEditor, JsonTable, ImgUpload, FileUpload, Autocomplete, TagInput, Transfer, Cascader, Address, Department, SelectTree, TreeCheckbox, OpenTable, JoinTable, JoinForm, TableChild, Map, MapArea, Qrcode, FontAwesome, DevComponent.',
                 tab: 'Assign a field to a diy_table.Tabs Id/Name. For many fields, prefer table-level Tabs; use CollapseGroup or field component Tabs only when an in-page section needs collapsible or nested grouping.',
+                relation: 'Required for JoinForm/TableChild. Use {cardinality:"1:1"|"N:1",targetTable,joinFieldName} for JoinForm, or {cardinality:"1:N",targetTable,childForeignKey,childModule,primaryTableFieldName:"Id"} for TableChild. Names are resolved to tenant ids only after resources exist; raw ids are not portable.',
             },
             modules: {
                 table: 'Bind by table name. The generator resolves the table Id after create/refresh schema.',
+                hasChild: 'For a hidden TableChild carrier module set display=0, appDisplay=0 and hasChild=0 explicitly.',
+                microServiceKey: 'Portable sys_microiservice.MsKey reference for openType=MicroService. The generator resolves the tenant-specific MicroServiceId before any writes.',
+                microServiceRoutePath: 'Portable sys_microiservice_page.RoutePath reference such as /overview. The generator resolves and verifies MicroServicePageId before any writes.',
                 listFields: 'Field names/labels/ids for grid columns. Produces TableDiyFieldIds and SelectFields. When omitted, generator chooses title/no/status/person/amount/time fields.',
                 searchFields: 'Field names/labels/ids for search controls. Produces SearchFieldIds object array. When omitted, generator chooses title/no/status/type/category/person/time fields.',
                 sortFields: 'Field names/labels/ids for sortable fields. Produces SortFieldIds. When omitted, generator chooses date/time, Sort and numeric business fields.',
@@ -1808,11 +2396,12 @@ export function manifestGuide(osClient) {
                 enableViewSchema: 'Set to 1 only when Detail/Edit should use custom form views. Configured List/Card presentation is always applied and does not depend on this switch.',
                 viewSchemaVersion: 'Optional protocol version. Blank or omitted values resolve to 1.0.',
                 viewConfigVersion: 'Optional monotonic configuration version. Omitted values resolve to 1 and later changes increment it.',
-                viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Layout.List supports multi-line columns and trailing fields; Layout.Card supports top/right/body/meta/bottom field groups. The full declarative object is preserved. Use ActionSchema only; never place arbitrary client V8Code in mobile actions.',
+                viewSchema: 'Versioned Detail/Edit/List/Card layouts for PC/Mobile/All. Every visible bound module gets generated List/Card defaults when omitted, but AI must still business-tune Hero metrics, composite columns and mobile regions. Layout.List supports multi-line columns and trailing fields; Layout.Card supports top/right/body/meta/bottom field groups. The full declarative object is preserved. Use ActionSchema only; never place arbitrary client V8Code in mobile actions.',
             },
         },
         rules: [
             'Use table and field names in manifests; do not ask the user for diy_field ids.',
+            'JoinForm is only for 1:1/N:1 and must target a different table through a real parent Id field. Use TableChild for every 1:N collection; declare its child table, child foreign key, hidden child module and (OsClient, foreignKey) index. The generator rejects raw or unresolved relation Config.',
             'Put business logic in API engines and call them from menu button V8Code.',
             'For workflow manifests, include exactly one start node, at least one end node, valid FromNodeId/ToNodeId lines, and stable LineName values in the form "{from node} 到 {to node}".',
             'For multi-route workflow nodes, generate LineValueV8 with the visual condition marker and prefer assigning V8.NextNodeId; then call microi_check_workflow_package and microi_test_workflow_condition before microi_save_workflow_package.',
@@ -1820,6 +2409,10 @@ export function manifestGuide(osClient) {
             'Never infer v8Unlimited=true from data volume alone. Enable it only for an explicit single-transaction requirement after warning about database locks, rollback cost, connection timeout and process memory; the resident-memory guard remains active.',
             'Leave diy_field.FormWidth null/omitted for normal fields; use formWidth: 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.',
             'Do not leave sys_menu list configuration empty. If the user does not specify it, rely on the generator defaults for NotShowFields, SearchFieldIds, SortFieldIds, StatisticsFields, MobileListFields, CardTitleTagFields and CardBottomTagFields.',
+            'Every visible bound business module must have a compact Hero title, a real business subtitle and 2-4 meaningful dynamic metrics. Prefer pending/overdue/amount/capacity/risk aggregates; DataCount/PageCount are truthful fallback only. Never generate random or fabricated statistics.',
+            'Give every list field a semantic TableWidth. Build at least one PC composite column with a reasonable MinWidth, remove its Lines/TrailingFields from standalone columns, and configure mobile title/subtitle/top/status/right/body/meta/bottom regions without repeating the same field.',
+            'Use sidebar menu badges only for a small set of actionable important menus. Add PageTabs and More/Page/Form/Batch/Export button badges when their counts help the workflow; batch one statistics API and never issue N+1 requests.',
+            'EnableViewSchema controls Detail/Edit custom forms only. List/Card presentation and generated Hero/metrics remain active when it is 0.',
             'Do not use diy_table.DiyConfig, diy_field.DiyConfig or sys_menu.DiyConfig for new configuration. Add dedicated physical columns and expose them through DIY metadata.',
             'For forms with many fields, use diy_table.Tabs first. Use CollapseGroup for optional/secondary sections and field component Tabs for nested in-page grouping.',
             'Use dryRun=true until the user explicitly asks to write.',
@@ -1867,6 +2460,15 @@ export function registerAdvancedTools(server, client, context) {
     }, async (input) => textResult(JSON.stringify(testWorkflowVisualCondition(input), null, 2)));
     server.tool('microi_validate_system', `Validate that a generated low-code system exists on Microi server after generation. OsClient: ${osClient}`, { manifest: jsonRecordSchema.describe('The same manifest used by microi_generate_system') }, async ({ manifest }) => {
         try {
+            const plan = buildPlan(manifest);
+            if (plan.errors.length > 0) {
+                return textResult(JSON.stringify({
+                    ok: false,
+                    failedAt: 'manifestPreflight',
+                    errors: plan.errors,
+                    warnings: plan.warnings,
+                }, null, 2), true);
+            }
             const result = await client.validateLowCodeSystem(manifest);
             return apiText('Low-Code System Validation', result);
         }
@@ -1892,7 +2494,25 @@ export function registerAdvancedTools(server, client, context) {
         const moduleIdByName = new Map();
         const roleIdByName = new Map();
         const fieldLookup = createFieldLookup();
+        const manifestModules = getArray(manifest, 'modules', 'Modules');
+        const microServiceBindings = [];
         try {
+            // Resolve every portable microservice reference before the first write.
+            // A missing app/page must fail closed without leaving a partially generated system.
+            for (let moduleIndex = 0; moduleIndex < manifestModules.length; moduleIndex += 1) {
+                try {
+                    microServiceBindings[moduleIndex] = await resolveMicroServiceModuleBinding(client, manifestModules[moduleIndex]);
+                }
+                catch (error) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'resolveMicroServiceModule',
+                        module: getString(manifestModules[moduleIndex], 'name', 'Name'),
+                        error: error instanceof Error ? error.message : String(error),
+                        results,
+                    }, null, 2), true);
+                }
+            }
             await audit(client, 'microi_generate_system:start', getString(manifest, 'name', 'Name') || 'manifest', manifest);
             for (const role of getArray(manifest, 'roles', 'Roles')) {
                 const payload = rolePayload(role);
@@ -1905,7 +2525,11 @@ export function registerAdvancedTools(server, client, context) {
                 if (roleName && roleId)
                     roleIdByName.set(roleName.toLowerCase(), roleId);
             }
-            for (const table of getArray(manifest, 'tables', 'Tables')) {
+            const manifestTables = getArray(manifest, 'tables', 'Tables');
+            const deferredRelationFields = [];
+            // Phase 1: create every table first. Relation fields must never be
+            // materialized while target tables still have unresolved tenant ids.
+            for (const table of manifestTables) {
                 const tableName = getString(table, 'name', 'Name');
                 const tableLayout = buildDefaultTableLayout(table);
                 const response = await client.createTable(tableName, getString(table, 'description', 'Description'), {
@@ -1922,34 +2546,22 @@ export function registerAdvancedTools(server, client, context) {
                 if (response.Code !== 1)
                     return textResult(JSON.stringify({ ok: false, failedAt: 'createTable', tableName, response, results }, null, 2), true);
                 const tableId = getString(asRecord(response.Data), 'TableId', 'Id');
-                if (tableId)
-                    tableIdByName.set(tableName.toLowerCase(), tableId);
+                if (!tableId)
+                    return textResult(JSON.stringify({ ok: false, failedAt: 'resolveCreatedTableId', tableName, response, results }, null, 2), true);
+                tableIdByName.set(tableName.toLowerCase(), tableId);
+            }
+            // Phase 2: create ordinary/storage fields for all tables. JoinForm and
+            // TableChild are deferred until their complete dependency graph exists.
+            for (const table of manifestTables) {
+                const tableName = getString(table, 'name', 'Name');
+                const tableId = tableIdByName.get(tableName.toLowerCase()) || '';
+                const tableLayout = buildDefaultTableLayout(table);
                 for (const field of getArray(table, 'fields', 'Fields')) {
-                    const configSource = asRecord(field.configSource ?? field.ConfigSource);
-                    const generatedConfig = getString(configSource, 'sourceType') ? buildFieldConfig(getString(configSource, 'sourceType'), configSource) : undefined;
-                    const fieldPayload = compactObject({
-                        TableId: tableId,
-                        Name: getString(field, 'name', 'Name'),
-                        Label: getString(field, 'label', 'Label'),
-                        Type: getString(field, 'type', 'Type'),
-                        Component: getString(field, 'component', 'Component'),
-                        Visible: getNumber(field, 'visible', 'Visible') ?? 1,
-                        AppVisible: getNumber(field, 'appVisible', 'AppVisible') ?? 1,
-                        Tab: getString(field, 'tab', 'Tab') || tableLayout.fieldTabs.get(getString(field, 'name', 'Name')),
-                        TableWidth: getNumber(field, 'tableWidth', 'TableWidth'),
-                        Sort: getNumber(field, 'sort', 'Sort'),
-                        Readonly: getNumber(field, 'readonly', 'Readonly'),
-                        NotEmpty: getNumber(field, 'notEmpty', 'NotEmpty'),
-                        Unique: getNumber(field, 'unique', 'Unique'),
-                        DefaultValue: getString(field, 'defaultValue', 'DefaultValue'),
-                        Placeholder: getString(field, 'placeholder', 'Placeholder'),
-                        FormWidth: getNumber(field, 'formWidth', 'FormWidth'),
-                        Data: generatedConfig?.data ?? getString(field, 'data', 'Data'),
-                        Config: generatedConfig ? JSON.stringify(generatedConfig.config) : stringifyConfig(field.config ?? field.Config),
-                        Description: getString(field, 'description', 'Description'),
-                        Encrypt: getNumber(field, 'encrypt', 'Encrypt'),
-                        InTableEdit: getNumber(field, 'inTableEdit', 'InTableEdit'),
-                    });
+                    if (isManifestRelationField(field)) {
+                        deferredRelationFields.push({ table, field, tableId, tableName, tableLayout });
+                        continue;
+                    }
+                    const fieldPayload = manifestFieldPayload(table, field, tableId, tableLayout);
                     const addResponse = await client.addField(fieldPayload);
                     results.push({ step: 'addField', tableName, fieldName: getString(field, 'name', 'Name'), response: addResponse });
                     if (addResponse.Code !== 1)
@@ -1997,7 +2609,7 @@ export function registerAdvancedTools(server, client, context) {
                 }
             }
             const schemaResponse = await client.getDbSchema();
-            results.push({ step: 'refreshDbSchema', response: { Code: schemaResponse.Code, Msg: schemaResponse.Msg, Summary: asRecord(asRecord(schemaResponse.Data).Summary) } });
+            results.push({ step: 'refreshDbSchemaBeforeModules', response: { Code: schemaResponse.Code, Msg: schemaResponse.Msg, Summary: asRecord(asRecord(schemaResponse.Data).Summary) } });
             if (schemaResponse.Code === 1) {
                 populateFieldLookupFromSchema(fieldLookup, schemaResponse.Data, tableIdByName);
             }
@@ -2023,8 +2635,12 @@ export function registerAdvancedTools(server, client, context) {
                 if (response.Code !== 1)
                     return textResult(JSON.stringify({ ok: false, failedAt: 'saveEvent', event, response, results }, null, 2), true);
             }
-            for (const module of getArray(manifest, 'modules', 'Modules')) {
-                const payload = modulePayload(module, tableIdByName, moduleIdByName, fieldLookup);
+            for (let moduleIndex = 0; moduleIndex < manifestModules.length; moduleIndex += 1) {
+                const module = manifestModules[moduleIndex];
+                const payload = {
+                    ...modulePayload(module, tableIdByName, moduleIdByName, fieldLookup),
+                    ...(microServiceBindings[moduleIndex] || {}),
+                };
                 const response = await client.createModule(payload);
                 results.push({ step: 'createModule', moduleName: payload.Name, response });
                 if (response.Code !== 1)
@@ -2032,6 +2648,92 @@ export function registerAdvancedTools(server, client, context) {
                 const moduleId = getString(asRecord(response.Data), 'ModuleId', 'Id');
                 if (moduleId && typeof payload.Name === 'string')
                     moduleIdByName.set(payload.Name.toLowerCase(), moduleId);
+            }
+            // Phase 3: resolve portable relation names to current-tenant ids only
+            // after every target table and hidden TableChild carrier module exists.
+            for (const deferred of deferredRelationFields) {
+                let resolvedConfig;
+                try {
+                    resolvedConfig = resolveManifestRelationConfig(deferred.field, deferred.tableName, tableIdByName, moduleIdByName);
+                }
+                catch (error) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'resolveRelationConfig',
+                        tableName: deferred.tableName,
+                        fieldName: getString(deferred.field, 'name', 'Name'),
+                        error: error instanceof Error ? error.message : String(error),
+                        results,
+                    }, null, 2), true);
+                }
+                const fieldPayload = manifestFieldPayload(deferred.table, deferred.field, deferred.tableId, deferred.tableLayout, resolvedConfig);
+                const addResponse = await client.addField(fieldPayload);
+                results.push({
+                    step: 'addRelationField',
+                    tableName: deferred.tableName,
+                    fieldName: getString(deferred.field, 'name', 'Name'),
+                    response: addResponse,
+                });
+                if (addResponse.Code !== 1) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'addRelationField',
+                        tableName: deferred.tableName,
+                        field: deferred.field,
+                        response: addResponse,
+                        results,
+                    }, null, 2), true);
+                }
+                // Idempotent reruns must repair stale/broken relation metadata instead
+                // of treating an existing field name as proof that its Config is valid.
+                const responseData = asRecord(addResponse.Data);
+                if (getBoolean(responseData, 'Skipped') === true) {
+                    const repairResponse = await client.updateField(compactObject({
+                        Id: getString(responseData, 'FieldId', 'Id'),
+                        TableId: deferred.tableId,
+                        Name: getString(fieldPayload, 'Name'),
+                        Label: getString(fieldPayload, 'Label'),
+                        Component: getString(fieldPayload, 'Component'),
+                        Config: getString(fieldPayload, 'Config'),
+                        FormWidth: getNumber(fieldPayload, 'FormWidth'),
+                    }));
+                    results.push({
+                        step: 'repairRelationField',
+                        tableName: deferred.tableName,
+                        fieldName: getString(deferred.field, 'name', 'Name'),
+                        response: repairResponse,
+                    });
+                    if (repairResponse.Code !== 1) {
+                        return textResult(JSON.stringify({
+                            ok: false,
+                            failedAt: 'repairRelationField',
+                            tableName: deferred.tableName,
+                            field: deferred.field,
+                            response: repairResponse,
+                            results,
+                        }, null, 2), true);
+                    }
+                }
+            }
+            if (deferredRelationFields.length > 0) {
+                const relationSchemaResponse = await client.getDbSchema();
+                results.push({
+                    step: 'refreshDbSchemaAfterRelations',
+                    response: {
+                        Code: relationSchemaResponse.Code,
+                        Msg: relationSchemaResponse.Msg,
+                        Summary: asRecord(asRecord(relationSchemaResponse.Data).Summary),
+                    },
+                });
+                if (relationSchemaResponse.Code !== 1) {
+                    return textResult(JSON.stringify({
+                        ok: false,
+                        failedAt: 'refreshDbSchemaAfterRelations',
+                        response: relationSchemaResponse,
+                        results,
+                    }, null, 2), true);
+                }
+                populateFieldLookupFromSchema(fieldLookup, relationSchemaResponse.Data, tableIdByName);
             }
             for (const permission of getArray(manifest, 'permissions', 'Permissions')) {
                 const roleName = getString(permission, 'roleName', 'RoleName', 'name', 'Name');

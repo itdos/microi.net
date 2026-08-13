@@ -1,6 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { ApiResponse, MicroiClient, OcrRecognizeRequest, OcrRecognizeResult, TranslateFileRequest, TranslateFileResult } from './microi-client.js';
+import type { ApiResponse, MicroiClient } from './microi-client.js';
+export { buildMcpOcrResult, decodeMcpTranslatedFile, prepareMcpOcrInput, prepareMcpTranslateFileInput, } from './document-inputs.js';
+export type { PreparedMcpOcrInput, PreparedMcpTranslateFileInput } from './document-inputs.js';
 /** MCP Server 上下文（用于区分不同租户） */
 export interface McpServerContext {
     osClient: string;
@@ -29,6 +31,20 @@ export interface LocalApplicationAssetManifest {
     manifestHash: string;
     skippedSourceMaps: string[];
     skippedInternalEvidenceFiles: string[];
+}
+export interface LocalMicroServiceSourceFile {
+    absolutePath: string;
+    relativePath: string;
+    size: number;
+    sha256: string;
+}
+export interface LocalMicroServiceSourceManifest {
+    rootDirectory: string;
+    files: LocalMicroServiceSourceFile[];
+    totalSize: number;
+    manifestHash: string;
+    skippedDirectories: string[];
+    skippedFiles: string[];
 }
 export type ApplicationStreamPublishMode = 'stage' | 'finalize' | 'stage-and-finalize';
 export interface ApplicationDirectoryStreamPublishInput {
@@ -94,45 +110,6 @@ export interface ApplicationStreamGateTransitionConfirmation {
     confirmationCanonicalJson: string;
     confirmationSha256: string;
 }
-export interface PreparedMcpOcrInput {
-    request: OcrRecognizeRequest;
-    byteLength: number;
-    sha256: string;
-    auditFileName: string;
-}
-/**
- * Resolve one MCP OCR input without following symlinks or accepting caller-controlled
- * tenant/network configuration. The backend repeats magic-byte and tenant-limit checks.
- */
-export declare function prepareMcpOcrInput(input: {
-    filePath?: string;
-    fileByteBase64?: string;
-    fileName?: string;
-    useDocOrientationClassify?: boolean;
-    useDocUnwarping?: boolean;
-    useTextlineOrientation?: boolean;
-    textRecScoreThresh?: number;
-    returnWordBox?: boolean;
-}): PreparedMcpOcrInput;
-export declare function buildMcpOcrResult(value: OcrRecognizeResult | null | undefined, options?: {
-    includePages?: boolean;
-    includeRegions?: boolean;
-    maxTextChars?: number;
-}): OcrRecognizeResult | null;
-export interface PreparedMcpTranslateFileInput {
-    request: TranslateFileRequest;
-    byteLength: number;
-    sha256: string;
-    auditFileName: string;
-}
-export declare function prepareMcpTranslateFileInput(input: {
-    filePath?: string;
-    fileByteBase64?: string;
-    fileName?: string;
-    fromLang?: string;
-    targetLang: string;
-}): PreparedMcpTranslateFileInput;
-export declare function decodeMcpTranslatedFile(result: TranslateFileResult | null | undefined): Buffer;
 export declare function validateLocalApplicationAssetSize(relativePath: string, fileSize: number, nextTotalSize: number, maxTotalBytes?: number): void;
 export declare function buildApplicationAssetRequestId(input: {
     deliveryBatchId: string;
@@ -202,6 +179,15 @@ export declare function buildLocalApplicationAssetManifest(rootDirectory: string
     maxFiles?: number;
     maxTotalBytes?: number;
 }): Promise<LocalApplicationAssetManifest>;
+/**
+ * Build the private-source manifest inside the MCP process. Source bytes never
+ * enter the model context: callers pass one local directory and the server
+ * reads each ordinary file directly after a bounded preflight.
+ */
+export declare function buildLocalMicroServiceSourceManifest(rootDirectory: string, options?: {
+    maxFiles?: number;
+    maxTotalBytes?: number;
+}): Promise<LocalMicroServiceSourceManifest>;
 export interface LegacyStreamPublishFallbackResult {
     attempted: boolean;
     reason: string;
@@ -214,6 +200,14 @@ export interface LegacyStreamPublishFallbackResult {
  * the dynamic runtime tries to invoke Dos.Common.Val<T> on a JValue.
  */
 export declare function isLegacyApplicationStreamJValueFailure(result?: Partial<ApiResponse> | null): boolean;
+/**
+ * Detect old API nodes whose dynamic JSON path calls Val<T>() on a JValue.
+ * Keep this generic so metadata tools can use a narrowly-scoped, verified
+ * compatibility path without treating unrelated server failures as writable.
+ */
+export declare function isLegacyJValueValFailure(result?: Partial<ApiResponse> | null): boolean;
+export declare function defaultLayoutFieldFormWidth(component: string, formWidth?: number): number | undefined;
+export declare function normalizeLayoutFieldConfig(component: string, config?: string | Record<string, unknown>): string | undefined;
 export declare function resolveLegacyApplicationStreamFallbackPolicy(result: Partial<ApiResponse> | null | undefined, uploadedCount: number, allowLegacyFallback?: boolean): {
     matched: boolean;
     attemptFallback: boolean;
@@ -265,5 +259,4 @@ export declare function buildAccessKeyCreationConfirmation(input: AccessKeyCreat
  * @param context - 服务器上下文（OsClient、API地址），用于在 instructions 中标识身份
  */
 export declare function createMcpServer(client: MicroiClient, context: McpServerContext): McpServer;
-export {};
 //# sourceMappingURL=server.d.ts.map

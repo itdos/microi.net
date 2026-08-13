@@ -50,6 +50,11 @@ export const API = {
     RUN_BACKGROUND_API_ENGINE: '/api/BackgroundTask/RunApiEngine',
     UPLOAD_FILE_BASE64: '/api/V8Engine/UploadFileBase64',
     UPLOAD_APPLICATION_ASSET_STREAM: '/api/V8Engine/UploadApplicationAssetStream',
+    INITIATE_APPLICATION_ASSET_MULTIPART: '/api/V8Engine/InitiateApplicationAssetMultipart',
+    GET_APPLICATION_ASSET_MULTIPART_STATUS: '/api/V8Engine/GetApplicationAssetMultipartStatus',
+    UPLOAD_APPLICATION_ASSET_MULTIPART_PART: '/api/V8Engine/UploadApplicationAssetMultipartPart',
+    COMPLETE_APPLICATION_ASSET_MULTIPART: '/api/V8Engine/CompleteApplicationAssetMultipart',
+    ABORT_APPLICATION_ASSET_MULTIPART: '/api/V8Engine/AbortApplicationAssetMultipart',
     FINALIZE_APPLICATION_STREAM_PUBLISH: '/api/V8Engine/FinalizeApplicationStreamPublish',
     // 微服务 / 微应用
     LIST_APPLICATIONS: '/api/V8Engine/ListApplications',

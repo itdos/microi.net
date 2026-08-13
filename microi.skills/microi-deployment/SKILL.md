@@ -1,6 +1,6 @@
 ---
 name: microi-deployment
-description: Microi 安装、部署、升级和本地运行指南。用于 Docker Compose、离线安装、Windows IIS、源码运行、MySQL、Redis、MongoDB、MinIO、反向代理、滚动发布、健康检查、备份恢复和生产部署验收。
+description: Microi 安装、部署、升级和本地运行指南。用于 Docker Compose、离线安装、Windows IIS、源码运行、本地 ApiBase/OsClient 切换与浏览器隔离、MySQL、Redis、MongoDB、MinIO、反向代理、滚动发布、健康检查、备份恢复和生产部署验收。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -28,6 +28,19 @@ description: Microi 安装、部署、升级和本地运行指南。用于 Docke
 | 无互联网环境 | 在联网机制作离线包，再在目标机校验并安装 |
 | Windows 传统环境 | IIS + .NET Hosting Bundle + 独立依赖 |
 | 开发/调试 | 后端源码 + 前端 Vite，本地依赖或隔离容器 |
+
+本地 `Microi.Client` 默认读取 `src/config.json` 的 `ApiBaseDev`，也允许在 `#` 前通过 URL 参数
+临时指定运行目标：
+
+```text
+http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.itdos.com
+```
+
+URL 的 `ApiBase`、`OsClient` 优先级最高，但不会隔离同源 localStorage/Pinia/Token。多个 AI
+对话或自动化并行测试不同目标时，每个 `ApiBase + OsClient` 必须使用独立浏览器上下文/Profile；
+Playwright 使用 `browser.newContext()`。人工第二组至少使用无痕窗口，多个 Chrome 无痕窗口不能
+视为多组强隔离。完整取值顺序、线上识别和验收见 `../microi-client-frontend/SKILL.md` 与
+`../playwright-e2e/SKILL.md`。
 
 不得在未确认目标主机、目录、数据卷和备份的情况下执行官网“删除所有容器/编排”
 或任何递归删除命令。

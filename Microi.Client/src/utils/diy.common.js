@@ -30,6 +30,7 @@ import {
     normalizeAuthorizationToken
 } from "./auth-transition.js";
 import { isEmbeddedWebosWindowRuntime } from "./webos-embedded-runtime.js";
+import { getRuntimeEndpointQuery, getRuntimeWindowValue } from "./runtime-endpoint-query.js";
 // import { for } from 'core-js/fn/symbol'
 // import QRCode from "qrcodejs2";
 import config from "@/config.json";
@@ -707,9 +708,15 @@ var DiyCommon = {
         return DiyCommon.ResolveAppStoreInstallStatus(latestVersion, installedVersion, status);
     },
     GetApiBase: function () {
-        //如果index.html指定了ApiBase，这个权力最大
-        if (!DiyCommon.IsNull(ApiBase)) {
-            return ApiBase.trim().replace(/\/+$/, "");
+        // 本地自动化可以用 ?ApiBase=... 临时覆盖；URL 参数是当前页面的最高优先级。
+        var runtimeEndpointQuery = getRuntimeEndpointQuery();
+        if (runtimeEndpointQuery.apiBase.present) {
+            return runtimeEndpointQuery.apiBase.value;
+        }
+        // 未使用 URL 覆盖时，再读取 index.html 的部署期全局值。
+        var indexApiBase = getRuntimeWindowValue("ApiBase");
+        if (!DiyCommon.IsNull(indexApiBase)) {
+            return indexApiBase.replace(/\/+$/, "");
         }
         // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
         if (config && config.ApiBaseDev) {
@@ -1227,22 +1234,22 @@ var DiyCommon = {
     },
     GetOsClient() {
         var self = this;
-        if (!DiyCommon.IsNull(OsClient)) {
-            return OsClient;
+        // 与 ApiBase 一致，?OsClient=... 必须覆盖 index.html、Pinia 与同源缓存。
+        var runtimeEndpointQuery = getRuntimeEndpointQuery();
+        if (runtimeEndpointQuery.osClient.present) {
+            return runtimeEndpointQuery.osClient.value;
+        }
+        var indexOsClient = getRuntimeWindowValue("OsClient");
+        if (!DiyCommon.IsNull(indexOsClient)) {
+            return indexOsClient;
         }
         var result = store.state.DiyStore.OsClient;
         if (!DiyCommon.IsNull(result)) {
             return result;
         }
-        var href = window.location.href.toLowerCase();
-        var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
-        var r190317 = window.location.search.substr(1).match(reg190317);
-        var osClient = r190317 != null ? r190317[2] : "";
         var cachedOsClient = LocalStorageManager.get("OsClient");
         if (!DiyCommon.IsNull(cachedOsClient)) {
             return cachedOsClient;
-        } else if (!DiyCommon.IsNull(osClient)) {
-            return osClient;
         } else {
             return "iTdos";
         }
