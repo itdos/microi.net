@@ -1,5 +1,8 @@
 <template>
-	<view class="detail-page" :class="{ 'detail-page--related-filter-open': standaloneRelatedFilterOpen }"
+	<view class="detail-page" :class="{
+		'detail-page--related-filter-open': standaloneRelatedFilterOpen,
+		'detail-page--standalone-list': standaloneListMode
+	}"
 		:style="mciTokenStyle">
 		<view class="page-nav mci-safe-top">
 			<view class="nav-row mci-safe-nav-row">
@@ -9,8 +12,9 @@
 			</view>
 		</view>
 
-		<scroll-view class="detail-scroll" scroll-y refresher-enabled :refresher-triggered="refreshing"
-			:lower-threshold="120" @refresherrefresh="refresh" @scrolltolower="loadActiveRelatedPage">
+		<!-- zhy：禁止用停用滚动的父 scroll-view 包裹子 scroll-view，微信端会吞掉子列表上滑手势。 -->
+		<view class="detail-scroll" :class="{ 'detail-scroll--locked': standaloneListMode }">
+			<view class="detail-scroll-content">
 			<view v-if="loading" class="loading-state">
 				<view class="skeleton skeleton--hero"></view>
 				<view class="skeleton skeleton--line" v-for="index in 8" :key="index"></view>
@@ -165,10 +169,13 @@
 
 				<view v-for="relatedTab in standaloneRelatedTabs" :key="relatedTab.key" class="related-tab-panel">
 					<mci-business-related-list v-if="relatedTab.type === 'child'" ref="standaloneRelatedList"
+						class="standalone-related-list"
 						:field="relatedTab.field"
 						:parent-id="detail.Id || id" :parent-form="detail" :parent-menu-id="menuId"
 						:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 						parent-mode="View" display-mode="full"
+						:independent-scroll="standaloneListMode"
+						:viewport-height="relatedListViewportHeight"
 						:show-floating-add="false"
 						@floating-add-state="setStandaloneRelatedAddState(relatedTab, $event)"
 						@filter-open-state="setStandaloneRelatedFilterState(relatedTab, $event)" />
@@ -195,7 +202,8 @@
 
 				<view class="content-spacer"></view>
 			</template>
-		</scroll-view>
+			</view>
+		</view>
 
 		<!-- zhy：客户详情 Tab 的新增按钮必须挂在 scroll-view 外，避免随列表内容滚动。 -->
 		<view v-if="showStandaloneRelatedAdd" class="related-floating-add"
@@ -1240,6 +1248,8 @@
 				standaloneRelatedAddAvailable: false,
 				standaloneRelatedFilterKey: '',
 				standaloneRelatedFilterOpen: false,
+				relatedListViewportHeight: 0,
+				relatedViewportMeasureTimers: [],
 				customerClaimIcon: icon('business/kehu.png'),
 				customerReleaseIcon: icon('business/xiezuo.png')
 			}
@@ -1442,6 +1452,9 @@
 			},
 			standaloneChildTab() {
 				return this.standaloneRelatedTabs.find((item) => item.type === 'child') || null
+			},
+			standaloneListMode() {
+				return !this.loading && !this.error && Boolean(this.standaloneChildTab)
 			},
 			showStandaloneRelatedAdd() {
 				return !this.loading && !this.error && !this.standaloneRelatedFilterOpen &&
@@ -1866,8 +1879,35 @@
 		},
 		onShow() {
 			if (!this.loading && this.id) this.loadDetail(false)
+			this.scheduleRelatedViewportMeasure()
+		},
+		onReady() {
+			this.scheduleRelatedViewportMeasure()
+		},
+		onUnload() {
+			this.clearRelatedViewportMeasureTimers()
 		},
 		methods: {
+			clearRelatedViewportMeasureTimers() {
+				this.relatedViewportMeasureTimers.forEach((timer) => clearTimeout(timer))
+				this.relatedViewportMeasureTimers = []
+			},
+			scheduleRelatedViewportMeasure() {
+				if (!this.standaloneListMode) return
+				this.clearRelatedViewportMeasureTimers()
+				this.relatedViewportMeasureTimers = [0, 80, 220].map((delay) => setTimeout(() => {
+					this.measureRelatedViewport()
+				}, delay))
+			},
+			measureRelatedViewport() {
+				if (!this.standaloneListMode || typeof uni.createSelectorQuery !== 'function') return
+				this.$nextTick(() => {
+					uni.createSelectorQuery().in(this).select('.related-tab-panel').boundingClientRect((rect) => {
+						const height = Math.floor(Number(rect && rect.height))
+						if (Number.isFinite(height) && height >= 120) this.relatedListViewportHeight = height
+					}).exec()
+				})
+			},
 			tenantDetailFormContext() {
 				return {
 					tableName: this.moduleConfig.table,
@@ -1932,6 +1972,7 @@
 				} finally {
 					this.loading = false
 					this.refreshing = false
+					this.$nextTick(() => this.scheduleRelatedViewportMeasure())
 				}
 			},
 			async refresh() {
@@ -2155,6 +2196,7 @@
 				this.standaloneRelatedFilterOpen = false
 				this.standaloneRelatedFilterKey = ''
 				this.activeFormTabKey = tab.key
+				this.$nextTick(() => this.scheduleRelatedViewportMeasure())
 			},
 			setStandaloneRelatedAddState(tab, available) {
 				if (!tab || !this.standaloneChildTab || tab.key !== this.standaloneChildTab.key) return
@@ -2211,17 +2253,6 @@
 			},
 			// zhy：详情 Tab 直接复用完整关联列表；滚动到底按组件页码继续加载，
 			// 同时保留组件内“加载更多”按钮作为弱网和小程序滚动事件的交互兜底。
-			loadActiveRelatedPage() {
-				if (!this.standaloneChildTab || this.standaloneRelatedFilterOpen) return
-				const refs = this.$refs.standaloneRelatedList
-				const candidates = Array.isArray(refs) ? refs : [refs]
-				const target = candidates.find((item) =>
-					item && item.field && String(item.field.Id || item.field.id || '') ===
-						String(this.standaloneChildTab.field &&
-							(this.standaloneChildTab.field.Id || this.standaloneChildTab.field.id) || '')
-				) || candidates.find(Boolean)
-				if (target && typeof target.loadMore === 'function') target.loadMore()
-			},
 			initializeFormTabs() {
 				if (!this.formTabs.some((item) => item.key === this.activeFormTabKey)) {
 					this.activeFormTabKey = this.formTabs[0]?.key || ''
@@ -2614,6 +2645,54 @@
 	.detail-scroll {
 		flex: 1;
 		min-height: 0;
+		overflow-y: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.detail-scroll--locked {
+		overflow: hidden;
+	}
+
+	.detail-scroll-content {
+		min-height: 100%;
+	}
+
+	/* zhy：列表型 Tab 由子表组件单独滚动，客户头图、Tab、搜索与统计保持固定。 */
+	.detail-page--standalone-list .detail-scroll-content {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	.detail-page--standalone-list .hero-band,
+	.detail-page--standalone-list :deep(.related-tabs) {
+		flex: none;
+	}
+
+	.detail-page--standalone-list .related-tab-panel {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
+	.detail-page--standalone-list .related-tab-panel :deep(.related-business-list) {
+		flex: 1;
+		min-height: 0;
+	}
+
+	.detail-page--standalone-list .standalone-related-list {
+		display: block;
+		width: 100%;
+		min-height: 0;
+		flex: 1;
+	}
+
+	.detail-page--standalone-list .content-spacer {
+		display: none;
 	}
 
 	/* zhy：筛选遮罩位于子表组件内，打开时将整个滚动内容提升到外置新增按钮和底部操作栏之上。 */

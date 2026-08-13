@@ -7,8 +7,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const related = fs.readFileSync(path.join(root, 'src/components/mci-business-related-list/mci-business-related-list.vue'), 'utf8')
 const business = fs.readFileSync(path.join(root, 'src/tenants/xjy/business.js'), 'utf8')
 
-assert.match(related, /v-if="!isPreview && relatedMetrics\.length"[\s\S]*?class="search-row"/,
-  '客户关联 Tab 的统计条必须展示在检索框上方')
+assert.match(related, /class="search-row"[\s\S]*?v-if="!isPreview && relatedMetrics\.length"/,
+	'客户关联 Tab 的统计条必须展示在检索框下方')
 assert.match(related, /const baseWhere = \[[\s\S]*?this\.childFkField[\s\S]*?this\.relationValue[\s\S]*?this\.config\.fixedWhere/,
   '统计查询必须限定当前客户外键并继承模块固定条件')
 assert.match(related, /_TableChildAuth: this\.tableChildAuth/,
