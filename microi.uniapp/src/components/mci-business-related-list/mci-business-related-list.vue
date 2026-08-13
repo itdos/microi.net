@@ -1,8 +1,9 @@
 <template>
   <view class="related-business-list" :class="{
     'related-business-list--preview': isPreview,
-    'related-business-list--section': isPreview && showPreviewHeader
-  }">
+    'related-business-list--section': isPreview && showPreviewHeader,
+    'related-business-list--independent-scroll': independentScroll && !isPreview
+  }" :style="independentRootStyle">
     <view v-if="isPreview && showPreviewHeader" class="preview-section-header"
       hover-class="preview-section-header--pressed" @tap="previewExpanded = !previewExpanded">
       <view class="preview-section-header__main">
@@ -31,6 +32,23 @@
       <view class="search-button" @tap="resetSearch"><text>重置</text></view>
     </view>
 
+    <view v-if="!isPreview && relatedMetrics.length" class="related-metrics">
+      <view v-for="metric in relatedMetrics" :key="metric.key" class="related-metric"
+        :class="`related-metric--${metric.tone || 'neutral'}`">
+        <view class="related-metric__value">
+          <text>{{ metric.value }}</text><text>{{ metric.unit }}</text>
+        </view>
+        <text class="related-metric__label">{{ metric.label }}</text>
+      </view>
+    </view>
+
+    <scroll-view class="related-list-body" :class="{ 'related-list-body--scroll': independentScroll && !isPreview }"
+      :style="relatedListBodyStyle"
+      :scroll-y="independentScroll && !isPreview"
+      :enable-flex="independentScroll && !isPreview"
+      :show-scrollbar="false"
+      :lower-threshold="120" @scrolltolower="loadMore">
+    <view class="related-list-scroll-content">
     <view v-if="previewContentVisible && loading && pageIndex === 1 && !waitingForParentSave" class="related-skeleton">
       <view v-for="item in (isPreview ? previewLimit : 3)" :key="item" class="skeleton-card">
         <view class="skeleton-line wide"></view>
@@ -75,6 +93,8 @@
         <text v-if="canAdd && !isPreview">点击右下角加号新增</text>
       </template>
     </view>
+    </view>
+    </scroll-view>
 
     <view v-if="showFloatingAdd && canAdd && !isPreview" class="floating-add" :style="floatingStyle"
       hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
@@ -179,7 +199,8 @@ import {
   formatDateTime,
   formatFieldValue,
   loadModuleRows,
-  openForm
+  openForm,
+  statisticsFieldValue
 } from '@/platform/business-runtime.js'
 import { compileListConfig, loadModuleViewManifest } from '@/platform/view-manifest.js'
 import { executeViewAction, isActionVisible } from '@/platform/view-actions.js'
@@ -316,6 +337,8 @@ export default {
     showPreviewHeader: { type: Boolean, default: false },
     relationValueOverride: { type: [String, Number], default: '' },
     showFloatingAdd: { type: Boolean, default: true },
+    independentScroll: { type: Boolean, default: false },
+    viewportHeight: { type: Number, default: 0 },
     parentTableChildAuth: { type: Object, default: null }
   },
   emits: ['floating-add-state', 'filter-open-state', 'data-count'],
@@ -349,7 +372,11 @@ export default {
       actionSubmitting: false,
       previewExpanded: true,
       searchTimer: null,
-      loadRequestId: 0
+      loadRequestId: 0,
+      metricLoading: false,
+      metricValues: {},
+      listBodyHeight: 0,
+      layoutMeasureTimers: []
     }
   },
   computed: {
@@ -399,6 +426,21 @@ export default {
       )
     },
     filterFields() { return this.config.filterFields || [] },
+    relatedMetricDefinitions() {
+      if (this.config.relatedMetrics?.length) return this.config.relatedMetrics
+      return [{ key: 'total', label: `${this.config.title || this.sectionTitle}总量`, tone: 'neutral' }]
+    },
+    relatedMetrics() {
+      return this.relatedMetricDefinitions.map((metric) => {
+        const raw = this.metricValues[metric.key]
+        const loading = this.metricLoading && (raw === undefined || raw === null)
+        return {
+          ...metric,
+          value: loading ? '—' : this.formatRelatedMetric(raw, metric),
+          unit: loading ? '' : (metric.unit !== undefined ? metric.unit : (metric.format === 'compactMoney' ? '' : '条'))
+        }
+      })
+    },
     activeFilterCount() {
       return this.filterFields.reduce((count, field) => {
         const value = this.filterValues[field.key]
@@ -417,9 +459,27 @@ export default {
           ? 'calc(34rpx + var(--mci-safe-bottom))'
           : 'calc(132rpx + var(--mci-safe-bottom))'
       }
+    },
+    independentRootStyle() {
+      if (!this.independentScroll || this.isPreview) return {}
+      if (this.viewportHeight < 120) return { height: '100%', maxHeight: '100%' }
+      return {
+        height: `${Math.floor(this.viewportHeight)}px`,
+        maxHeight: `${Math.floor(this.viewportHeight)}px`
+      }
+    },
+    relatedListBodyStyle() {
+      if (!this.independentScroll || this.isPreview || this.listBodyHeight < 80) return {}
+      return { height: `${this.listBodyHeight}px`, maxHeight: `${this.listBodyHeight}px` }
     }
   },
   watch: {
+    viewportHeight: {
+      immediate: true,
+      handler() {
+        this.scheduleListBodyMeasure()
+      }
+    },
     canAdd: {
       immediate: true,
       handler(value) {
@@ -449,13 +509,45 @@ export default {
     uni.$on('microi:data-changed', this.handleDataChanged)
     this.initialize()
   },
+  mounted() {
+    this.scheduleListBodyMeasure()
+  },
   beforeUnmount() {
     uni.$off('microi:data-changed', this.handleDataChanged)
     clearTimeout(this.searchTimer)
+    this.clearLayoutMeasureTimers()
     this.$emit('filter-open-state', false)
   },
   methods: {
     noop() {},
+    clearLayoutMeasureTimers() {
+      this.layoutMeasureTimers.forEach((timer) => clearTimeout(timer))
+      this.layoutMeasureTimers = []
+    },
+    scheduleListBodyMeasure() {
+      if (!this.independentScroll || this.isPreview) return
+      this.clearLayoutMeasureTimers()
+      this.layoutMeasureTimers = [0, 80, 220].map((delay) => setTimeout(() => {
+        this.measureListBody()
+      }, delay))
+    },
+    measureListBody() {
+      if (!this.independentScroll || this.isPreview || typeof uni.createSelectorQuery !== 'function') return
+      this.$nextTick(() => {
+        const query = uni.createSelectorQuery().in(this)
+        query.select('.related-business-list').boundingClientRect()
+        query.select('.related-list-body').boundingClientRect()
+        query.exec((rects = []) => {
+          const root = rects[0]
+          const body = rects[1]
+          if (!root || !body) return
+          const height = Math.floor(Number(root.bottom) - Number(body.top))
+          if (Number.isFinite(height) && height >= 80 && height !== this.listBodyHeight) {
+            this.listBodyHeight = height
+          }
+        })
+      })
+    },
     async initialize(refresh = false) {
       if (!this.childTableId) {
         this.error = '关联表未配置数据表'
@@ -501,7 +593,8 @@ export default {
           this.loading = false
           return
         }
-        await this.loadData(true, refresh)
+        await Promise.all([this.loadData(true, refresh), this.loadRelatedMetrics(refresh)])
+        this.scheduleListBodyMeasure()
       } catch (error) {
         this.error = error.message || error.Msg || '关联数据加载失败'
         this.loading = false
@@ -648,6 +741,68 @@ export default {
         if (requestId === this.loadRequestId) this.error = error.message || error.Msg || '关联数据加载失败'
       } finally {
         if (requestId === this.loadRequestId) this.loading = false
+      }
+    },
+    monthRange() {
+      const now = new Date()
+      const pad = (value) => String(value).padStart(2, '0')
+      const start = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01 00:00:00`
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const end = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-01 00:00:00`
+      return { start, end }
+    },
+    formatRelatedMetric(value, metric) {
+      const numeric = Number(value || 0)
+      if (metric.format !== 'compactMoney') return Number.isFinite(numeric) ? Math.floor(numeric) : 0
+      const absolute = Math.abs(numeric)
+      if (absolute >= 10000) return `¥${(numeric / 10000).toFixed(absolute >= 100000 ? 0 : 1).replace(/\.0$/, '')}万`
+      return `¥${numeric.toLocaleString()}`
+    },
+    async loadRelatedMetrics(refresh = false) {
+      const metrics = this.relatedMetricDefinitions
+      if (!metrics.length || !this.relationValue || !this.config.table) return
+      this.metricLoading = true
+      const range = this.monthRange()
+      const baseWhere = [
+        { Name: this.childFkField, Type: '=', Value: this.relationValue },
+        ...(this.config.fixedWhere || [])
+      ]
+      try {
+        const values = {}
+        await Promise.all(metrics.map(async (metric) => {
+          const where = [...baseWhere, ...(metric.where || [])]
+          if (metric.monthField) {
+            where.push({ Name: metric.monthField, Type: '>=', Value: range.start })
+            where.push({ Name: metric.monthField, Type: '<', Value: range.end })
+          }
+          if (metric.aggregateField) {
+            const summary = await loadModuleRows(this.config, {
+              pageIndex: 1,
+              pageSize: 1,
+              refresh,
+              cacheAge: 0,
+              tableChildAuth: this.tableChildAuth,
+              extraWhere: where
+            })
+            values[metric.key] = Number(statisticsFieldValue(summary.append, metric.aggregateField, 0)) || 0
+            return
+          }
+          const payload = {
+            _PageIndex: 1,
+            _PageSize: 1,
+            _Where: where,
+            _TableChildAuth: this.tableChildAuth
+          }
+          const response = await V8.FormEngine.GetTableData(this.config.table, payload)
+          if (!response || Number(response.Code) !== 1) throw new Error(response?.Msg || '统计加载失败')
+          values[metric.key] = Number(response.DataCount || 0)
+        }))
+        this.metricValues = values
+      } catch (error) {
+        // 统计失败不阻断关联列表，保留可读的零值并允许下次数据刷新重试。
+        this.metricValues = metrics.reduce((values, metric) => ({ ...values, [metric.key]: 0 }), {})
+      } finally {
+        this.metricLoading = false
       }
     },
     search() {
@@ -1141,7 +1296,7 @@ export default {
         // zhy：草稿父记录优先使用保存回传数据，避免空的远程查询覆盖刚新增的联系人。
         if (this.mergeDraftChangedRow(payload)) return
         // zhy：只有子表真实保存后才通知父表更新派生总数，普通打开、搜索和筛选不改主表字段。
-        this.loadData(true, true, true)
+        Promise.all([this.loadData(true, true, true), this.loadRelatedMetrics(true)])
       }
     }
   }
@@ -1152,6 +1307,16 @@ export default {
 .related-business-list { position: relative; min-height: 180rpx; padding: 18rpx 22rpx calc(118rpx + var(--mci-safe-bottom)); background: var(--mci-bg-base, #f4f8fa); }
 .related-business-list--preview { min-height: 0; padding: 10rpx 0 0; background: transparent; }
 .related-business-list--section { padding-top: 0; }
+.related-business-list--independent-scroll { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; padding-bottom: 0; overflow: hidden; }
+.related-list-body { width: 100%; }
+.related-list-body--scroll { flex: 1; min-height: 0; height: 100%; box-sizing: border-box; }
+.related-list-body--scroll .related-list-scroll-content { min-height: 100%; padding-bottom: calc(138rpx + var(--mci-safe-bottom)); box-sizing: border-box; }
+/* zhy：隐藏客户详情各列表 Tab 右侧原生滚动指示条，保留触摸滚动与触底分页。 */
+.related-list-body--scroll,
+.related-list-body--scroll scroll-view { scrollbar-width: none; -ms-overflow-style: none; }
+.related-list-body--scroll::-webkit-scrollbar,
+.related-list-body--scroll scroll-view::-webkit-scrollbar,
+.related-list-body--scroll ::-webkit-scrollbar { display: none; width: 0; height: 0; color: transparent; background: transparent; }
 .preview-section-header { min-height: 82rpx; display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 0 28rpx; border-bottom: 1rpx solid #edf2f4; background: #fff; transition: background 150ms ease; }
 .preview-section-header--pressed { background: #f7fafb; }
 .preview-section-header__main { min-width: 0; display: flex; align-items: center; gap: 12rpx; }
@@ -1165,6 +1330,33 @@ export default {
 .preview-section-header ~ .related-skeleton,
 .preview-section-header ~ .related-empty { width: auto; margin: 18rpx 22rpx 0; }
 .preview-section-header ~ .preview-actions { margin-right: 22rpx; margin-left: 22rpx; }
+.related-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10rpx;
+  margin: -2rpx -2rpx 16rpx;
+}
+.related-metric {
+  min-width: 0;
+  padding: 17rpx 8rpx 15rpx;
+  border: 1rpx solid #e1eaf0;
+  border-radius: 12rpx;
+  background: #fff;
+  text-align: center;
+}
+.related-metric__value { display: flex; align-items: baseline; justify-content: center; gap: 3rpx; color: #263e49; }
+.related-metric__value > text:first-child { overflow: hidden; font-size: 29rpx; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+.related-metric__value > text:last-child { flex: 0 0 auto; font-size: 18rpx; }
+.related-metric__label { display: block; overflow: hidden; margin-top: 5rpx; color: #6c828c; font-size: 19rpx; text-overflow: ellipsis; white-space: nowrap; }
+.related-metric--warning { border-color: #f4e5b9; background: #fffaf0; }
+.related-metric--warning .related-metric__value { color: #b56800; }
+.related-metric--success { border-color: #ccebdd; background: #f1fbf6; }
+.related-metric--success .related-metric__value { color: #008660; }
+.related-metric--primary { border-color: #d8e5fa; background: #f2f7ff; }
+.related-metric--primary .related-metric__value { color: #1768d8; }
+@media (max-width: 360px) {
+  .related-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .search-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;

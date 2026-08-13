@@ -50,6 +50,7 @@
       "name": "business",
       "root": "pages/business",
       "pages": [
+        { "path": "proposal-compare", "style": { "navigationBarTitleText": "方案比价", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
         { "path": "list", "style": { "navigationBarTitleText": "业务列表", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa", "enablePullDownRefresh": false } },
         { "path": "catalog", "style": { "navigationBarTitleText": "全部功能", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
         { "path": "detail", "style": { "navigationBarTitleText": "业务详情", "navigationStyle": "custom", "navigationBarTextStyle": "black", "backgroundColor": "#f4f8fa" } },
