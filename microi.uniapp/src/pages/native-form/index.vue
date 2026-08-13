@@ -198,9 +198,8 @@
 					:parent-table-id="definition && definition.table ? definition.table.Id : ''"
 					:parent-table-child-auth="tableChildAuth"
 					:parent-mode="mode"
-					:display-mode="mode === 'View' ? 'preview' : 'full'"
-					:show-preview-header="mode === 'View'"
-					:preview-limit="2" @data-count="handleRelatedCount" />
+					display-mode="full"
+					@data-count="handleRelatedCount" />
 				<mci-join-form v-else-if="relatedTab.type === 'join'" :field="relatedTab.field"
 					:parent-form="form" :parent-mode="mode" :readonly="mode === 'View'" />
 				<mci-table-selector v-else-if="relatedTab.type === 'openTable'" :field="relatedTab.field"
