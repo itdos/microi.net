@@ -78,6 +78,8 @@ const CHECKIN_FIELDS = {
   customerId: 'KehuID',
   customerName: 'BaifangDX',
   address: 'DakaDD',
+  longitude: 'DakaDD_Lng',
+  latitude: 'DakaDD_Lat',
   time: 'DakaSJ',
   userName: 'DakaR'
 }
@@ -1063,16 +1065,27 @@ function applyCheckinTime(context) {
 }
 
 function applyCheckinLocation(context, location) {
+  const longitudeName = fieldName(context, CHECKIN_FIELDS.longitude)
+  const latitudeName = fieldName(context, CHECKIN_FIELDS.latitude)
+  const longitude = Number(location.longitude)
+  const latitude = Number(location.latitude)
+  const hasCoordinates = Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 &&
+    Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
   const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
-  if (location.address) context.patchForm({ [addressName]: location.address })
+  const locationValues = {
+    ...(location.address ? { [addressName]: location.address } : {}),
+    ...(hasCoordinates ? { [longitudeName]: longitude, [latitudeName]: latitude } : {})
+  }
+  if (Object.keys(locationValues).length) context.patchForm(locationValues)
   context.state.checkinLocation = {
     ...(context.state.checkinLocation || {}),
     ...location,
+    ...(hasCoordinates ? { longitude, latitude } : {}),
     address: location.address || context.state.checkinLocation?.address || context.form[addressName] || ''
   }
   context.state.checkinValues = {
     ...(context.state.checkinValues || {}),
-    ...(location.address ? { [addressName]: location.address } : {})
+    ...locationValues
   }
 }
 
@@ -1241,10 +1254,25 @@ export async function initialize(context) {
   if (isCheckinEditable(context) && !context.state.checkinInitialized) {
     context.state.checkinInitialized = true
     const addressName = fieldName(context, CHECKIN_FIELDS.address, '签到地点')
+    const longitudeName = fieldName(context, CHECKIN_FIELDS.longitude)
+    const latitudeName = fieldName(context, CHECKIN_FIELDS.latitude)
+    const rawLongitude = context.form[longitudeName]
+    const rawLatitude = context.form[latitudeName]
+    const longitude = rawLongitude === null || rawLongitude === undefined || String(rawLongitude).trim() === ''
+      ? null
+      : Number(rawLongitude)
+    const latitude = rawLatitude === null || rawLatitude === undefined || String(rawLatitude).trim() === ''
+      ? null
+      : Number(rawLatitude)
+    const hasSavedCoordinates = Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 &&
+      Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
     context.state.checkinLocation = {
       ...(context.state.checkinLocation || {}),
+      latitude: hasSavedCoordinates ? latitude : 0,
+      longitude: hasSavedCoordinates ? longitude : 0,
       address: String(context.form[addressName] || '')
     }
+    if (hasSavedCoordinates) scheduleCheckinMapMount(context)
     if (isCheckinAdd(context)) {
       context.state.currentTime = currentTimestamp()
       applyCheckinTime(context)
@@ -1895,11 +1923,24 @@ export async function beforeSubmit(context) {
     const userName = fieldName(context, CHECKIN_FIELDS.userName, '打卡人')
     const customerIdName = fieldName(context, CHECKIN_FIELDS.customerId, '客户Id')
     const targetTypeName = fieldName(context, CHECKIN_FIELDS.targetType, '拜访对象类型')
+    const longitudeName = fieldName(context, CHECKIN_FIELDS.longitude)
+    const latitudeName = fieldName(context, CHECKIN_FIELDS.latitude)
     const targetType = String(context.form[targetTypeName] || '').trim()
+    const rawLongitude = context.form[longitudeName]
+    const rawLatitude = context.form[latitudeName]
+    const longitude = rawLongitude === null || rawLongitude === undefined || String(rawLongitude).trim() === ''
+      ? null
+      : Number(rawLongitude)
+    const latitude = rawLatitude === null || rawLatitude === undefined || String(rawLatitude).trim() === ''
+      ? null
+      : Number(rawLatitude)
+    const hasCoordinates = Number.isFinite(longitude) && longitude >= -180 && longitude <= 180 &&
+      Number.isFinite(latitude) && latitude >= -90 && latitude <= 90
     const values = {
       ...context.state.checkinValues,
       [addressName]: context.form[addressName] || context.state.checkinLocation.address || '',
-      [customerIdName]: targetType === '客户' ? context.form[customerIdName] || '' : ''
+      [customerIdName]: targetType === '客户' ? context.form[customerIdName] || '' : '',
+      ...(hasCoordinates ? { [longitudeName]: longitude, [latitudeName]: latitude } : {})
     }
     if (isCheckinAdd(context)) {
       const user = await verifiedCurrentUserOption()
