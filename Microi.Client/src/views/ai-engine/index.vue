@@ -19,6 +19,16 @@
                     v-if="isAiAdmin"
                     type="button"
                     class="workspace-tab"
+                    :class="{ active: activeWorkspace === 'video' }"
+                    @click="openVideoWorkspace"
+                >
+                    <el-icon><VideoPlay /></el-icon>
+                    <span>AI视频</span>
+                </button>
+                <button
+                    v-if="isAiAdmin"
+                    type="button"
+                    class="workspace-tab"
                     @click="goAiApps"
                 >
                     <el-icon><FolderOpened /></el-icon>
@@ -109,6 +119,13 @@
                 </div>
             </template>
 
+            <template v-else-if="activeWorkspace === 'video'">
+                <div class="app-sidebar-intro">
+                    <strong>MiniMax 视频中心</strong>
+                    <p>创建记录、任务句柄、HDFS 持久地址和人工验片状态都保存在当前租户；临时下载地址不会被当成最终资产。</p>
+                </div>
+            </template>
+
             <template v-else>
                 <div class="app-sidebar-intro">
                     <strong>AI应用工坊</strong>
@@ -124,7 +141,7 @@
                         <button type="button" @click="activeWorkspace = 'chat'">AI对话</button>
                         <button type="button" class="active" @click="activeWorkspace = 'apps'">AI应用</button>
                     </div>
-                    <h2>{{ activeWorkspace === "apps" ? "AI应用" : "AI助手" }}</h2>
+                    <h2>{{ workspaceTitle }}</h2>
                     <el-tag size="small" effect="plain">{{ osClient }}</el-tag>
                     <el-tooltip v-if="secureAssistantAvailable" :content="secureAssistantRoleText" placement="bottom">
                         <el-tag class="secure-scope-tag" size="small" type="success" effect="plain">
@@ -440,6 +457,128 @@
                 </div>
             </footer>
             </template>
+
+            <template v-else-if="activeWorkspace === 'video'">
+                <section class="video-workspace" data-testid="ai-video-workspace">
+                    <div class="video-create-card">
+                        <div class="video-section-heading">
+                            <div>
+                                <span class="hero-kicker">MiniMax Token Plan</span>
+                                <h1>创建可追踪、可下载、可发布的 AI 视频</h1>
+                                <p>当前 Token Plan 的 Hailuo 2.3 视频档为 6 秒 / 768P，API 不提供 fps 参数，本轮实测固定 24 fps。10 秒 / 768P 与 6 秒 / 1080P 属于按量接口规格，不冒充当前订阅权益；需要更长成片时，应把多个分镜合成一条带声 VideoMaster。</p>
+                            </div>
+                            <div class="video-policy-tags">
+                                <el-tag type="success" effect="plain">Token Plan · 768P / 6 秒</el-tag>
+                                <el-tag type="warning" effect="plain">固定 24 fps</el-tag>
+                                <el-tag effect="plain">工作区 3 条 / 日</el-tag>
+                                <el-tag effect="plain">分镜只合成，不单独发布</el-tag>
+                            </div>
+                        </div>
+                        <el-form label-position="top" class="video-create-form" @submit.prevent>
+                            <el-form-item label="视频提示词">
+                                <el-input
+                                    v-model="videoForm.prompt"
+                                    type="textarea"
+                                    :rows="5"
+                                    maxlength="2000"
+                                    show-word-limit
+                                    placeholder="描述人物、办公室场景、镜头运动、动作连续性和希望传达的信息；避免大段文字、夸张广告和不可验证承诺。"
+                                />
+                            </el-form-item>
+                            <div class="video-form-grid">
+                                <el-form-item label="模型">
+                                    <el-input v-model="videoForm.model" disabled />
+                                </el-form-item>
+                                <el-form-item label="当前订阅规格">
+                                    <el-select v-model="videoForm.preset" @change="applyVideoPreset">
+                                        <el-option
+                                            v-for="option in videoPresetOptions"
+                                            :key="option.value"
+                                            :label="option.label"
+                                            :value="option.value"
+                                        />
+                                    </el-select>
+                                </el-form-item>
+                                <el-form-item label="实际规格">
+                                    <el-input :model-value="`${videoForm.duration} 秒 / ${videoForm.resolution}`" disabled />
+                                </el-form-item>
+                            </div>
+                            <div class="video-create-actions">
+                                <el-button
+                                    type="primary"
+                                    :icon="VideoPlay"
+                                    :loading="videoCreateLoading"
+                                    data-testid="ai-video-create"
+                                    @click="createMiniMaxVideo"
+                                >创建视频任务</el-button>
+                                <el-button :icon="Refresh" :loading="videoLoading" @click="loadVideoRecords">刷新记录</el-button>
+                            </div>
+                        </el-form>
+                    </div>
+
+                    <div class="video-record-card">
+                        <div class="video-section-heading compact-heading">
+                            <div>
+                                <h2>视频创建记录</h2>
+                                <p>任务状态、持久文件、审核结论和失败原因均从 mci_ai_content_asset 回读。</p>
+                            </div>
+                            <el-tag effect="plain">{{ videoRows.length }} 条</el-tag>
+                        </div>
+                        <el-table :data="videoRows" v-loading="videoLoading" row-key="Id" class="video-record-table">
+                            <el-table-column type="expand">
+                                <template #default="scope">
+                                    <div class="video-record-detail">
+                                        <video v-if="scope.row.FileUrl" :src="scope.row.FileUrl" controls preload="metadata"></video>
+                                        <div>
+                                            <strong>完整提示词</strong>
+                                            <p>{{ scope.row.Prompt || "-" }}</p>
+                                            <small v-if="scope.row.QualityReview">{{ scope.row.QualityReview }}</small>
+                                        </div>
+                                    </div>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="Prompt" label="提示词" min-width="280" show-overflow-tooltip />
+                            <el-table-column prop="AssetType" label="资产类型" width="125" />
+                            <el-table-column prop="Model" label="模型" width="190" />
+                            <el-table-column label="规格" width="110">
+                                <template #default="scope">{{ scope.row.Resolution || "-" }} · {{ scope.row.Duration || 0 }}s</template>
+                            </el-table-column>
+                            <el-table-column label="状态" width="120">
+                                <template #default="scope">
+                                    <el-tag :type="videoStatusType(scope.row.Status)" effect="plain">{{ videoStatusLabel(scope.row.Status) }}</el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="UpdateTime" label="更新时间" width="170" />
+                            <el-table-column label="操作" width="300" fixed="right">
+                                <template #default="scope">
+                                    <el-button
+                                        v-if="['Preparing','Queueing','Processing'].includes(String(scope.row.Status || ''))"
+                                        text
+                                        type="primary"
+                                        :loading="videoActionLoading === scope.row.Id"
+                                        @click="refreshVideoRecord(scope.row)"
+                                    >刷新状态</el-button>
+                                    <el-button
+                                        v-if="scope.row.FileUrl"
+                                        text
+                                        type="primary"
+                                        :icon="Download"
+                                        @click="downloadVideo(scope.row)"
+                                    >下载</el-button>
+                                    <el-button
+                                        v-if="scope.row.FileUrl && scope.row.ReviewStatus !== 'Approved'"
+                                        text
+                                        type="success"
+                                        :icon="CircleCheck"
+                                        @click="approveVideoRecord(scope.row)"
+                                    >验片通过</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                        <el-empty v-if="!videoRows.length && !videoLoading" description="暂无视频创建记录" />
+                    </div>
+                </section>
+            </template>
         </main>
 
         <el-drawer
@@ -465,26 +604,30 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onMounted, reactive, ref, watch } from "vue";
+import { computed, defineAsyncComponent, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useDiyStore } from "@/pinia";
 import {
     Box,
     CircleClose,
+    CircleCheck,
     CopyDocument,
     Cpu,
     DataAnalysis,
     EditPen,
+    Download,
     FolderOpened,
     Grid,
     MagicStick,
     Operation,
     Paperclip,
     RefreshLeft,
+    Refresh,
     Search,
     ShoppingBag,
     Top,
-    User
+    User,
+    VideoPlay
 } from "@element-plus/icons-vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import {
@@ -564,6 +707,23 @@ const aiModelTableId = ref("");
 const aiModelSysMenuId = ref("");
 const modelDrawerVisible = ref(false);
 const activeWorkspace = ref("chat");
+const videoLoading = ref(false);
+const videoCreateLoading = ref(false);
+const videoActionLoading = ref("");
+const videoRows = ref([]);
+const videoPlan = ref(null);
+const videoPresetOptions = [
+    { value: "token-plan", label: "Token Plan · 6 秒 / 768P / 固定 24 fps", duration: 6, resolution: "768P" }
+];
+const videoForm = reactive({
+    prompt: "",
+    model: "MiniMax-Hailuo-2.3",
+    preset: "token-plan",
+    duration: 6,
+    resolution: "768P"
+});
+let videoPollTimer = null;
+let videoPollBusy = false;
 const statsLoading = ref(false);
 const platformStats = reactive({
     DiyTableCount: 0,
@@ -698,6 +858,11 @@ const isAiAdmin = computed(() => {
     const user = currentUser.value || {};
     return user._IsAdmin === true || user.IsAdmin === true || Number(user.Level || 0) >= 9999;
 });
+const workspaceTitle = computed(() => ({
+    chat: "AI助手",
+    video: "AI视频",
+    apps: "AI应用"
+}[activeWorkspace.value] || "AI助手"));
 const currentUserName = computed(() => {
     const user = currentUser.value || {};
     return user.Name || user.Account || "你";
@@ -728,6 +893,8 @@ onMounted(async () => {
     await loadHistory();
 });
 
+onBeforeUnmount(() => stopVideoPolling());
+
 watch(reasoningEffort, (value) => {
     try {
         window.localStorage.setItem("microi-ai-reasoning-effort", value || "auto");
@@ -742,6 +909,11 @@ watch(
 
 watch(() => [route.query.workspace, route.query.appId], () => {
     redirectLegacyAiAppWorkspace();
+});
+
+watch(activeWorkspace, (workspace) => {
+    if (workspace === "video") startVideoPolling();
+    else stopVideoPolling();
 });
 
 watch(selectedAiModel, () => {
@@ -1383,6 +1555,322 @@ function goMicroiStore() {
 
 function goAiApps() {
     proxy.$router.push({ path: "/mci-ai-app" });
+}
+
+async function openVideoWorkspace() {
+    if (!isAiAdmin.value) {
+        ElMessage.warning("只有管理员可以创建和管理 AI 视频");
+        return;
+    }
+    activeWorkspace.value = "video";
+    await Promise.all([loadVideoPlan(), loadVideoRecords()]);
+}
+
+async function loadVideoPlan() {
+    if (videoPlan.value?.Id) return videoPlan.value;
+    try {
+        const result = await DiyCommon.FormEngine.GetTableData("mci_ai_content_plan", {
+            _Where: [["Enabled", "=", 1]],
+            _OrderBy: "CreateTime",
+            _OrderByType: "ASC",
+            _PageSize: 1
+        });
+        if (isOk(result)) videoPlan.value = (getData(result) || [])[0] || null;
+    } catch (error) {
+        console.warn("[AiVideo] load content plan failed", error);
+    }
+    return videoPlan.value;
+}
+
+async function loadVideoRecords() {
+    if (!isAiAdmin.value) return;
+    videoLoading.value = true;
+    try {
+        const result = await DiyCommon.FormEngine.GetTableData("mci_ai_content_asset", {
+            _Where: [["AssetType", "In", ["VideoClip", "VideoMaster", "Video"]]],
+            _OrderBy: "CreateTime",
+            _OrderByType: "DESC",
+            _PageSize: 200
+        });
+        if (!isOk(result)) throw new Error(unwrapDosResult(result)?.Msg || "视频记录读取失败");
+        videoRows.value = Array.isArray(getData(result)) ? getData(result) : [];
+    } catch (error) {
+        videoRows.value = [];
+        ElMessage.warning("AI 视频记录不可用：请先安装或升级官方 AI 内容运营应用。" + (error?.message ? `（${error.message}）` : ""));
+    } finally {
+        videoLoading.value = false;
+    }
+}
+
+function readCreatedId(result) {
+    const data = getData(result);
+    if (typeof data === "string") return data;
+    if (Array.isArray(data)) return String(data[0]?.Id || data[0]?.id || "");
+    return String(data?.Id || data?.id || data?.Data?.Id || "");
+}
+
+async function readRowIdByField(tableName, fieldName, value) {
+    const result = await DiyCommon.FormEngine.GetFormData(tableName, {
+        _Where: [[fieldName, "=", value]],
+        _SelectFields: ["Id"]
+    });
+    return isOk(result) ? String(getData(result)?.Id || "") : "";
+}
+
+function localDatePrefix() {
+    const date = new Date();
+    const pad = (part) => String(part).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function applyVideoPreset(value) {
+    const preset = videoPresetOptions.find((option) => option.value === value) || videoPresetOptions[0];
+    videoForm.duration = preset.duration;
+    videoForm.resolution = preset.resolution;
+}
+
+async function createMiniMaxVideo() {
+    const prompt = String(videoForm.prompt || "").trim();
+    if (prompt.length < 10) {
+        ElMessage.warning("视频提示词至少需要 10 个字符");
+        return;
+    }
+    const todayCount = videoRows.value.filter((row) => (
+        ["VideoClip", "Video"].includes(String(row.AssetType || ""))
+        && String(row.CreateTime || "").startsWith(localDatePrefix())
+    )).length;
+    if (todayCount >= 3) {
+        ElMessage.warning("今天已记录 3 次视频创建；当前工作区的保守日门禁不会继续提交。MiniMax 实际余额请以 Token Plan 控制台为准。");
+        return;
+    }
+
+    videoCreateLoading.value = true;
+    let assetId = "";
+    try {
+        const plan = await loadVideoPlan();
+        if (!plan?.Id) throw new Error("未找到启用的 AI 内容计划，请先安装或启用官方 AI 内容运营应用");
+
+        const unique = `${Date.now()}_${Math.random().toString(16).slice(2, 10)}`;
+        const slotKey = `manual-video:${unique}`;
+        const assetKey = `manual-video-asset:${unique}`;
+        const requestId = `manual-video:${unique}`;
+        const contentResult = await DiyCommon.FormEngine.AddFormData("mci_ai_content_item", {
+            SlotKey: slotKey,
+            PlanId: plan.Id,
+            Title: prompt.slice(0, 120),
+            Angle: "MiniMax Token Plan 当前订阅档（6 秒 / 768P / 固定 24 fps）；分镜只能用于合成唯一带声 VideoMaster。",
+            ContentType: "Video",
+            Status: "Queued",
+            AiModel: videoForm.model,
+            Summary: prompt,
+            QualityScore: 0,
+            QualityStatus: "Pending"
+        });
+        if (!isOk(contentResult)) throw new Error(unwrapDosResult(contentResult)?.Msg || "视频内容记录创建失败");
+        const contentId = readCreatedId(contentResult)
+            || await readRowIdByField("mci_ai_content_item", "SlotKey", slotKey);
+        if (!contentId) throw new Error("视频内容记录写入后回读失败");
+
+        const assetResult = await DiyCommon.FormEngine.AddFormData("mci_ai_content_asset", {
+            AssetKey: assetKey,
+            ContentId: contentId,
+            AssetType: "VideoClip",
+            Platform: "AllVideoPlatforms",
+            SequenceNo: todayCount + 1,
+            Prompt: prompt,
+            Model: videoForm.model,
+            Duration: videoForm.duration,
+            Resolution: videoForm.resolution,
+            Status: "Draft",
+            ReviewStatus: "Pending",
+            QualityScore: 0
+        });
+        if (!isOk(assetResult)) throw new Error(unwrapDosResult(assetResult)?.Msg || "视频资产记录创建失败");
+        assetId = readCreatedId(assetResult)
+            || await readRowIdByField("mci_ai_content_asset", "AssetKey", assetKey);
+        if (!assetId) throw new Error("视频资产写入后回读失败");
+
+        const createResult = await DiyCommon.PostAsync("/api/Ai/CreateMiniMaxVideo", {
+            RequestId: requestId,
+            Prompt: prompt,
+            Model: videoForm.model,
+            Duration: videoForm.duration,
+            Resolution: videoForm.resolution
+        }, null, null, "json");
+        if (!isOk(createResult)) throw new Error(unwrapDosResult(createResult)?.Msg || "MiniMax 视频任务创建失败");
+        const created = getData(createResult) || {};
+        const updateResult = await DiyCommon.FormEngine.UptFormData("mci_ai_content_asset", {
+            Id: assetId,
+            MiniMaxTaskHandle: created.TaskHandle || "",
+            Model: created.Model || videoForm.model,
+            Duration: created.Duration || videoForm.duration,
+            Resolution: created.Resolution || videoForm.resolution,
+            Status: created.Status || "Queueing",
+            ReviewStatus: "Pending",
+            QualityScore: 0,
+            QualityReview: "VideoClip 分镜任务已提交。生成成功后转存当前租户 HDFS；分镜不得单独发布，必须合成唯一带声 VideoMaster 后再验片发布。"
+        });
+        if (!isOk(updateResult)) throw new Error(unwrapDosResult(updateResult)?.Msg || "视频任务已创建，但记录更新失败");
+        videoForm.prompt = "";
+        await loadVideoRecords();
+        ElMessage.success(created.Replayed === true ? "已回放同一幂等视频任务" : "MiniMax 视频任务已创建");
+        startVideoPolling();
+    } catch (error) {
+        if (assetId) {
+            try {
+                await DiyCommon.FormEngine.UptFormData("mci_ai_content_asset", {
+                    Id: assetId,
+                    Status: "Failed",
+                    QualityReview: String(error?.message || "MiniMax 视频任务创建失败").slice(0, 1000)
+                });
+            } catch {}
+        }
+        await loadVideoRecords();
+        ElMessage.error("创建视频失败：" + (error?.message || "未知错误"));
+    } finally {
+        videoCreateLoading.value = false;
+    }
+}
+
+async function refreshVideoRecord(row, silent = false) {
+    if (!row?.Id || !row.MiniMaxTaskHandle || videoActionLoading.value) return;
+    videoActionLoading.value = row.Id;
+    try {
+        const taskResult = await DiyCommon.PostAsync("/api/Ai/GetMiniMaxVideoTask", {
+            TaskHandle: row.MiniMaxTaskHandle
+        }, null, null, "json");
+        if (!isOk(taskResult)) throw new Error(unwrapDosResult(taskResult)?.Msg || "视频任务查询失败");
+        const task = getData(taskResult) || {};
+        const status = String(task.Status || "Unknown");
+        if (status !== "Success") {
+            const update = await DiyCommon.FormEngine.UptFormData("mci_ai_content_asset", {
+                Id: row.Id,
+                Status: status === "Fail" ? "Failed" : status,
+                QualityReview: status === "Fail"
+                    ? String(task.FailureReason || "MiniMax 视频生成失败")
+                    : String(row.QualityReview || "视频仍在生成中。")
+            });
+            if (!isOk(update)) throw new Error(unwrapDosResult(update)?.Msg || "视频状态保存失败");
+            if (!silent) ElMessage.info(status === "Fail" ? "视频生成失败" : `当前状态：${videoStatusLabel(status)}`);
+            await loadVideoRecords();
+            return;
+        }
+        if (!task.FileHandle) throw new Error("MiniMax 已成功但没有返回文件句柄");
+
+        let fileUrl = "";
+        let permanent = false;
+        const persistResult = await DiyCommon.PostAsync("/api/Ai/PersistMiniMaxVideoFile", {
+            FileHandle: task.FileHandle
+        }, null, null, "json");
+        if (isOk(persistResult)) {
+            const persisted = getData(persistResult) || {};
+            fileUrl = String(persisted.FileUrl || "");
+            permanent = Boolean(persisted.Permanent);
+        }
+        if (!fileUrl) {
+            const fileResult = await DiyCommon.PostAsync("/api/Ai/GetMiniMaxVideoFile", {
+                FileHandle: task.FileHandle
+            }, null, null, "json");
+            if (!isOk(fileResult)) throw new Error(unwrapDosResult(fileResult)?.Msg || "视频下载地址读取失败");
+            fileUrl = String((getData(fileResult) || {}).DownloadUrl || "");
+        }
+        if (!fileUrl) throw new Error("视频文件地址为空");
+
+        const update = await DiyCommon.FormEngine.UptFormData("mci_ai_content_asset", {
+            Id: row.Id,
+            MiniMaxFileHandle: task.FileHandle,
+            FileUrl: fileUrl,
+            Status: "ReviewRequired",
+            ReviewStatus: "Pending",
+            QualityScore: 0,
+            QualityReview: permanent
+                ? "视频已转存 Microi HDFS。发布前请检查叙事、字幕/声音、墙面文字、人脸、手部、广告感和实际信息价值。"
+                : "当前仅保存 MiniMax 临时地址，请尽快转存 HDFS；未验片不得发布。"
+        });
+        if (!isOk(update)) throw new Error(unwrapDosResult(update)?.Msg || "视频文件记录保存失败");
+        await loadVideoRecords();
+        if (!silent) ElMessage.success(permanent ? "视频已生成并转存 HDFS" : "视频已生成，请尽快转存 HDFS");
+    } catch (error) {
+        if (!silent) ElMessage.error("刷新视频失败：" + (error?.message || "未知错误"));
+    } finally {
+        videoActionLoading.value = "";
+    }
+}
+
+async function approveVideoRecord(row) {
+    if (!row?.Id || !row.FileUrl) return;
+    const result = await DiyCommon.FormEngine.UptFormData("mci_ai_content_asset", {
+        Id: row.Id,
+        Status: "Approved",
+        ReviewStatus: "Approved",
+        QualityScore: 100,
+        QualityReview: "管理员已在 AI 视频中心完成验片；可进入支持视频的平台发布流程。"
+    });
+    if (!isOk(result)) {
+        ElMessage.error(unwrapDosResult(result)?.Msg || "验片状态保存失败");
+        return;
+    }
+    await loadVideoRecords();
+    ElMessage.success("已标记为验片通过");
+}
+
+function downloadVideo(row) {
+    const url = String(row?.FileUrl || "");
+    if (!/^https:\/\//i.test(url)) {
+        ElMessage.warning("视频地址不是可下载的 HTTPS 地址");
+        return;
+    }
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.download = "";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+}
+
+function videoStatusLabel(status) {
+    return ({
+        Draft: "待生成",
+        Preparing: "准备中",
+        Queueing: "排队中",
+        Processing: "生成中",
+        ReviewRequired: "待验片",
+        Approved: "已通过",
+        Rejected: "已拒绝",
+        Failed: "失败",
+        Fail: "失败",
+        Unknown: "未知"
+    })[String(status || "")] || String(status || "未知");
+}
+
+function videoStatusType(status) {
+    if (status === "Approved") return "success";
+    if (["Failed", "Fail", "Rejected"].includes(String(status || ""))) return "danger";
+    if (status === "ReviewRequired") return "warning";
+    return "info";
+}
+
+function startVideoPolling() {
+    stopVideoPolling();
+    if (activeWorkspace.value !== "video") return;
+    videoPollTimer = window.setInterval(async () => {
+        if (videoPollBusy || activeWorkspace.value !== "video") return;
+        const pending = videoRows.value.filter((row) => ["Preparing", "Queueing", "Processing"].includes(String(row.Status || "")));
+        if (!pending.length) return;
+        videoPollBusy = true;
+        try {
+            for (const row of pending.slice(0, 3)) await refreshVideoRecord(row, true);
+        } finally {
+            videoPollBusy = false;
+        }
+    }, 15000);
+}
+
+function stopVideoPolling() {
+    if (videoPollTimer) window.clearInterval(videoPollTimer);
+    videoPollTimer = null;
 }
 
 async function redirectLegacyAiAppWorkspace() {
@@ -2516,7 +3004,7 @@ async function copyText(text) {
 
 .workspace-tabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     padding: 14px 14px 6px;
 }
@@ -2763,6 +3251,120 @@ async function copyText(text) {
     height: 100%;
     padding: 14px;
     background: #f7f8fb;
+}
+
+.video-workspace {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    padding: 22px;
+    background:
+        radial-gradient(circle at 8% 0%, rgba(255, 95, 46, .08), transparent 32%),
+        #f7f8fb;
+}
+
+.video-create-card,
+.video-record-card {
+    border: 1px solid #e7eaf1;
+    border-radius: 16px;
+    background: #fff;
+    padding: 22px;
+    box-shadow: 0 16px 38px rgba(28, 40, 68, .06);
+}
+
+.video-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 20px;
+}
+
+.video-section-heading h1,
+.video-section-heading h2 {
+    margin: 7px 0 8px;
+    color: #1f2937;
+}
+
+.video-section-heading h1 {
+    font-size: clamp(23px, 3vw, 34px);
+}
+
+.video-section-heading h2 {
+    font-size: 20px;
+}
+
+.video-section-heading p {
+    max-width: 780px;
+    margin: 0;
+    color: #697386;
+    line-height: 1.7;
+}
+
+.compact-heading {
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.video-policy-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.video-create-form {
+    max-width: 1040px;
+}
+
+.video-form-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 14px;
+}
+
+.video-create-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.video-record-table {
+    width: 100%;
+}
+
+.video-record-detail {
+    display: grid;
+    grid-template-columns: minmax(260px, 42%) minmax(0, 1fr);
+    gap: 22px;
+    padding: 14px 36px 18px;
+    background: #fafbfc;
+}
+
+.video-record-detail video {
+    width: 100%;
+    max-height: 360px;
+    border-radius: 12px;
+    background: #111827;
+}
+
+.video-record-detail strong {
+    color: #20242c;
+}
+
+.video-record-detail p {
+    color: #596273;
+    line-height: 1.75;
+    white-space: pre-wrap;
+}
+
+.video-record-detail small {
+    display: block;
+    color: #8a5a1f;
+    line-height: 1.65;
 }
 
 .header-left,
@@ -4040,6 +4642,14 @@ body.dark .ai-engine-page,
     .platform-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .video-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .video-record-detail {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-height: 760px) and (min-width: 761px) {
@@ -4085,6 +4695,34 @@ body.dark .ai-engine-page,
 
     .ai-engine-header {
         padding: 12px 14px;
+    }
+
+    .workspace-tabs {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .workspace-tab {
+        padding: 0 6px;
+        font-size: 12px;
+    }
+
+    .video-workspace {
+        padding: 12px;
+    }
+
+    .video-create-card,
+    .video-record-card {
+        padding: 16px;
+    }
+
+    .video-section-heading {
+        flex-direction: column;
+    }
+
+    .video-policy-tags {
+        justify-content: flex-start;
     }
 
     .message-wrap {
