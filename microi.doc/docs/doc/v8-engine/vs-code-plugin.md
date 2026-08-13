@@ -199,7 +199,7 @@ VS Code 插件和 CLI 都支持本地 stdio MCP；远程 SSE 与可视化生命�
         └── AI应用/
 ```
 
-MCP 配置、Token 文件、数据库快照和运行态元数据会加入本地 Git exclude，避免把个人服务器信息误提交给团队。工具升级 Skills 时使用逐文件 hash 判断：自动生成且用户未修改的文件可以安全升级，本地已经改过的文件会被保留。
+MCP 配置、Token 文件、Windows DPAPI 凭据保险库、数据库快照和运行态元数据会加入本地 Git exclude，避免把个人服务器信息误提交给团队。工具升级 Skills 时使用逐文件 hash 判断：自动生成且用户未修改的文件可以安全升级，本地已经改过的文件会被保留。
 
 ## 快速开始：任选 VS Code 或纯命令行
 
@@ -211,7 +211,7 @@ MCP 配置、Token 文件、数据库快照和运行态元数据会加入本地 
 
 1. 在扩展市场搜索 **`Microi吾码`**，或从扩展面板安装 `v8-engine-x.x.x.vsix`。
 2. 打开 **`Microi: 插件配置`**，输入 API Base URL 和 OsClient，点击“检测服务器，登录并保存连接”。
-3. 输入帐号、密码；服务端开启验证码时一并输入。凭据保存在当前工作区作用域的 VS Code `SecretStorage`。
+3. 输入帐号、密码；服务端开启验证码时一并输入。凭据以 VS Code `SecretStorage` 为主，并在 Windows 当前工作区镜像为 DPAPI CurrentUser 加密的 `Microi-V8-Engine/.microi-workspace-secrets.dpapi.json`，供 CLI/MCP 在验签密钥变化后静默续登；不会写入明文配置或 MCP 环境。
 4. 执行 **`Microi: 初始化AI配置`**，生成 AI 指令、Skills、V8 typings、`jsconfig.json` 和 MCP 配置。
 5. 如需复查，执行 **`Microi MCP: 诊断 MCP 可调用性`**。
 6. 需要人工编辑、Git 管理或远程调试时，在服务器节点执行 **“拉取此服务器代码”**。
@@ -236,7 +236,7 @@ npm install -g ./Microi.VSCode/plugins/microi
 microi init --pull
 ```
 
-命令会按顺序完成：添加服务器连接、提示输入帐号和密码、在需要时保存验证码图片并提示输入、登录、注入 AI/Skills/typings、配置 MCP，并在显式传入 `--pull` 时拉取全部 V8 资源和数据库结构。密码只存在于当前 CLI 进程内，不写入文件。
+命令会按顺序完成：添加服务器连接、提示输入帐号和密码、在需要时保存验证码图片并提示输入、登录、注入 AI/Skills/typings、配置 MCP，并在显式传入 `--pull` 时拉取全部 V8 资源和数据库结构。密码不会进入命令行、日志、明文配置或 MCP 环境；Windows 需要自动续登时只写入当前用户 DPAPI 加密的工作区保险库。
 
 如果只初始化 AI 和 MCP、暂不拉取代码：
 
@@ -344,7 +344,7 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 
 - 两者共用 `Microi-V8-Engine/.microi-config.json`、`.microi-mcp-tokens.json` 和各服务器 `.microi-meta.json`。
 - MCP 配置采用幂等合并，只替换 Microi 管理的 server，保留用户已有的其他 MCP；内容未变化时不重写。
-- CLI 不保存帐号密码。插件可把凭据放在 VS Code `SecretStorage` 以支持静默续登；两者仍共用最新 Token 文件。
+- Windows 下 CLI、插件和 MCP 通过当前工作区 DPAPI 密文保险库共享静默续登凭据；VS Code `SecretStorage` 仍是插件主存储。非 Windows 不允许退化为明文或伪加密文件；三者继续共用最新 Token 文件。
 - 本地 V8 文件和同步基线是共同事实源。切换工具前先执行差异检查，任何一端都不要在冲突未处理时强行拉取或推送。
 - 多个终端或编辑器同时操作同一工作区时，不要并发推送同一个资源。
 
@@ -471,8 +471,9 @@ CLI 与 Codex Plugin 的目标是让用户**无需先安装 IDE，也能完整�
 
 - 同一工作区可保存多个服务器 / OsClient Profile。
 - 服务器标题优先从 `SysShortTitle` / `SysTitle` 获取。
-- 每个 Profile 独立保存 Token 和本地资源目录；VS Code 插件的密码另存于工作区 SecretStorage，CLI 不落盘保存密码。
-- Token 临近失效时自动刷新；服务端状态已失效时按 Profile 精确清理并恢复登录。
+- 每个 Profile 独立保存 Token 和本地资源目录；Windows 自动续登凭据仅存于 VS Code `SecretStorage` 与当前工作区 DPAPI CurrentUser 密文保险库，CLI/MCP 不接收明文密码参数。
+- VS Code/MCP Token 默认访问期为 20 天，租户显式配置优先。Token 临近失效时自动刷新；服务端验签密钥变化时按 Profile 从保险库自动续登并原子更新 Token/MCP，只有保险库缺失或解密失败才提示人工登录。
+- “Token 签名验证失败”不等同于“Token 已过期”。同一 `OsClient` 的 Product/Internal、Product/Internet 等 SaaS 运行记录必须共用一个 `AuthSecret`；后端在 JWT 初始化前做 CAS 收敛，只有可信后端写入新的唯一 `AuthSecretRotateVersion` 才轮换密钥，避免升级或实例切换让刚登录的 Token 失效。
 - 支持有验证码和无验证码登录。
 - MCP Server key、显示名称和设备标识会转换为安全的 ASCII 传输格式，兼容中文 Windows 主机名与不同 AI 客户端。
 - Windows 工作区会自动启用当前 Git 仓库的 `core.longpaths=true`，降低深层 V8 目录的长路径问题。

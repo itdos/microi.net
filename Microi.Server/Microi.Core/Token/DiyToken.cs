@@ -187,7 +187,16 @@ namespace Microi.net
                 days = ReadPositiveInt(clientModel, "AccessTokenLifetime");
             }
 
-            return TimeSpan.FromDays(days > 0 ? days : 30);
+            // Developer terminals are expected to survive ordinary backend
+            // releases without forcing a fresh interactive login.  Keep the
+            // product default aligned with the documented VS Code/Codex/MCP
+            // policy; tenants may still shorten or extend it explicitly via
+            // the existing SaaS fields above.
+            var defaultDays = normalizedClientType.Equals("VSCode", StringComparison.OrdinalIgnoreCase)
+                || normalizedClientType.Equals("MCP", StringComparison.OrdinalIgnoreCase)
+                ? 20
+                : 30;
+            return TimeSpan.FromDays(days > 0 ? days : defaultDays);
         }
 
         public static string DescribeClientTokenLifetime(OsClientSecret clientModel, string clientType)

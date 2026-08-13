@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: mci-ai-publish-claim
- * Version: v1.0.0
+ * Version: v1.0.1
  * Function:
- * - 请补充该 V8 代码的完整功能说明。
+ * - 以共享租约和栅栏令牌安全认领待发布任务，返回非敏感内容与已审核资产；使用 DateNow/DateAdd 兼容 Jint 运行时。
  */
 
 var user = V8.CurrentUser || {};
@@ -13,9 +13,9 @@ function safeWorker(value) {
   var worker = String(value || '').trim();
   return /^[A-Za-z0-9._:-]{1,80}$/.test(worker) ? worker : '';
 }
-function parseDate(value) {
-  if (!value) return null;
-  try { return System.DateTime.Parse(String(value)); } catch (e) { return null; }
+function safeDateText(value) {
+  var text = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text) ? text : '';
 }
 function parseJson(value, fallback) {
   if (!value) return fallback;
@@ -31,9 +31,8 @@ if (leaseSeconds > 900) leaseSeconds = 900;
 var batchSize = Number(V8.Param.BatchSize || 5);
 if (batchSize < 1) batchSize = 1;
 if (batchSize > 20) batchSize = 20;
-var now = System.DateTime.Now;
-var nowText = now.ToString('yyyy-MM-dd HH:mm:ss');
-var leaseUntil = now.AddSeconds(leaseSeconds).ToString('yyyy-MM-dd HH:mm:ss');
+var nowText = DateNow('yyyy-MM-dd HH:mm:ss');
+var leaseUntil = DateAdd(nowText, 's', leaseSeconds, 'yyyy-MM-dd HH:mm:ss');
 
 var candidatesResult = V8.FormEngine.GetTableData('mci_ai_publish_task', {
   _Where: [['Status', 'In', ['Pending', 'Retry']]],
@@ -46,10 +45,10 @@ var candidates = candidatesResult && candidatesResult.Code === 1 ? (candidatesRe
 var claimed = [];
 for (var i = 0; i < candidates.length && claimed.length < batchSize; i++) {
   var candidate = candidates[i] || {};
-  var retryAt = parseDate(candidate.NextRetryTime);
-  var activeLease = parseDate(candidate.LeaseUntil);
-  if (retryAt && retryAt > now) continue;
-  if (activeLease && activeLease > now) continue;
+  var retryAt = safeDateText(candidate.NextRetryTime);
+  var activeLease = safeDateText(candidate.LeaseUntil);
+  if (retryAt && retryAt > nowText) continue;
+  if (activeLease && activeLease > nowText) continue;
   var oldFence = Number(candidate.FencingToken || 0);
   var affected = V8.Db.FromSql(
     "UPDATE mci_ai_publish_task SET Status=@p0,LeaseOwner=@p1,LeaseUntil=@p2,FencingToken=COALESCE(FencingToken,0)+1,AttemptCount=COALESCE(AttemptCount,0)+1,UpdateTime=@p3 " +

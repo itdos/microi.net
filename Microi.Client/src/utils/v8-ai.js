@@ -187,7 +187,9 @@ export function createV8AI(options = {}) {
         },
         CreateMiniMaxVideo: function (param) { return request("/api/Ai/CreateMiniMaxVideo", param); },
         GetMiniMaxVideoTask: function (param) { return request("/api/Ai/GetMiniMaxVideoTask", param); },
-        GetMiniMaxVideoFile: function (param) { return request("/api/Ai/GetMiniMaxVideoFile", param); }
+        GetMiniMaxVideoFile: function (param) { return request("/api/Ai/GetMiniMaxVideoFile", param); },
+        PersistMiniMaxVideoFile: function (param) { return request("/api/Ai/PersistMiniMaxVideoFile", param); },
+        GenerateMiniMaxMusic: function (param) { return request("/api/Ai/GenerateMiniMaxMusic", param); }
     };
     api.ChatAsync = api.Chat;
     api.RecognizeIntentAsync = api.RecognizeIntent;
@@ -196,6 +198,8 @@ export function createV8AI(options = {}) {
     api.CreateMiniMaxVideoAsync = api.CreateMiniMaxVideo;
     api.GetMiniMaxVideoTaskAsync = api.GetMiniMaxVideoTask;
     api.GetMiniMaxVideoFileAsync = api.GetMiniMaxVideoFile;
+    api.PersistMiniMaxVideoFileAsync = api.PersistMiniMaxVideoFile;
+    api.GenerateMiniMaxMusicAsync = api.GenerateMiniMaxMusic;
     return api;
 }
 

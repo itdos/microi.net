@@ -76,6 +76,9 @@ async function main(): Promise<void> {
     osClientNetwork: process.env.MICROI_OS_CLIENT_NETWORK || '',
     rsaPublicKey: process.env.MICROI_RSA_PUBLIC_KEY || undefined,
     token: process.env.MICROI_TOKEN || undefined,
+    workspaceCredentialFilePath: process.env.MICROI_WORKSPACE_CREDENTIAL_FILE || undefined,
+    workspaceCredentialUsernameKey: process.env.MICROI_WORKSPACE_USERNAME_KEY || undefined,
+    workspaceCredentialPasswordKey: process.env.MICROI_WORKSPACE_PASSWORD_KEY || undefined,
   };
 
   // 本地开发服务器（localhost / 127.0.0.1）使用自签证书，允许 Node.js 跳过 TLS 验证
@@ -116,11 +119,16 @@ async function main(): Promise<void> {
       console.error('Missing required: MICROI_API_URL');
       process.exit(1);
     }
-    if (!config.token && (!config.username || !config.password)) {
+    const hasWorkspaceCredentialVault = !!config.workspaceCredentialFilePath
+      && !!config.workspaceCredentialUsernameKey
+      && !!config.workspaceCredentialPasswordKey
+      && fs.existsSync(config.workspaceCredentialFilePath);
+    if (!config.token && (!config.username || !config.password) && !hasWorkspaceCredentialVault) {
       console.error('Missing required environment variables:');
       console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
       console.error('  MICROI_TOKEN_FILE   - Token file path (preferred, auto-managed by VS Code extension)');
       console.error('  MICROI_AUTH_RECOVERY_DIR - Optional credential-free VS Code recovery request directory');
+      console.error('  MICROI_WORKSPACE_CREDENTIAL_FILE - Optional Windows DPAPI workspace credential vault');
       console.error('  MICROI_TOKEN        - JWT token (fallback)');
       console.error('  MICROI_USERNAME     - Login username (fallback if no token)');
       console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');

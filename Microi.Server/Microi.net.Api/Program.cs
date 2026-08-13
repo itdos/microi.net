@@ -463,6 +463,27 @@ if (!OsClient.EnsureHydrated(osClientName))
     Console.WriteLine($"Microi：【⚠️警告】【{DateTime.Now:yyyy-MM-dd HH:mm:ss}】主租户[{osClientName}]的 OsClientModel 未能从 sys_osclients 完整挂载，部分 DB 配置项将以默认值生效。");
 }
 var clientModel = OsClient.GetClient(osClientName);
+
+// 第二道门禁覆盖首次安装时“所有变体均为弱密钥”的场景：UseMicroi 会先为
+// 当前变体生成强密钥，这里立即把它收敛到同租户的其它运行时变体并复读验收。
+var tenantSigningKeyConvergence = TenantJwtSigningKeyCoordinator.Converge(
+    clientModel.Db,
+    clientModel.OsClientModel["DbType"]?.Val<string>() ?? OsClientDefault.OsClientDbType);
+if (!tenantSigningKeyConvergence.Success)
+{
+    throw new InvalidOperationException(tenantSigningKeyConvergence.Message);
+}
+if (tenantSigningKeyConvergence.UpdatedOsClients.Any(value =>
+        string.Equals(value, osClientName, StringComparison.OrdinalIgnoreCase)))
+{
+    var reloadResult = new OsClient().ReloadSingleOsClient(osClientName);
+    if (reloadResult.Code != 1)
+    {
+        throw new InvalidOperationException(
+            $"租户[{osClientName}]签名密钥收敛后重载失败：{reloadResult.Msg}");
+    }
+    clientModel = OsClient.GetClient(osClientName);
+}
 var jwtSigningKeyStatus = DiyToken.GetJwtSigningKeyStatus(clientModel);
 if (!jwtSigningKeyStatus.Ready)
 {

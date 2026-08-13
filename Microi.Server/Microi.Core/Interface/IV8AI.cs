@@ -48,5 +48,15 @@ namespace Microi.net
         /// 使用服务器签名的 FileHandle 获取临时下载地址。
         /// </summary>
         Task<DosResult> GetMiniMaxVideoFile(MiniMaxVideoFileParam param);
+
+        /// <summary>
+        /// 平台管理员将当前用户的视频文件句柄转存到当前租户公有 HDFS。
+        /// </summary>
+        Task<DosResult> PersistMiniMaxVideoFile(MiniMaxVideoFileParam param);
+
+        /// <summary>
+        /// 平台管理员生成 MiniMax 无人声纯音乐并直接转存当前租户公有 HDFS。
+        /// </summary>
+        Task<DosResult> GenerateMiniMaxMusic(MiniMaxMusicGenerateParam param);
     }
 }

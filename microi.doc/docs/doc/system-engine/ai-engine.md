@@ -140,9 +140,9 @@ MiniMax 当前采用异步流程：创建任务返回 `task_id`，查询成功�
 ### 配置边界
 
 - MiniMax Token Plan Key 与按量 API Key 是两套独立凭据。把实际使用的 Key 配置到现有服务器端 AI Provider/ApiKey 受保护数据中，不要放进前端、V8 源码、Compose 环境变量或 API `AppSettings`。
-- Provider 的官方 API Base 必须是 `https://api.minimaxi.com`。系统拒绝把视频请求转发到其它 Host。
-- 套餐价格和每天可生成条数可能变化，应以购买页和 Token Plan 控制台为准；服务端不硬编码“每天 2 条”或“每天 3 条”。
-- 当前官方模型边界：`MiniMax-Hailuo-2.3` 支持文生/图生；`MiniMax-Hailuo-2.3-Fast` 只支持图生并要求首帧；首尾帧使用 `MiniMax-Hailuo-02`。默认 6 秒、768P；10 秒不能使用 1080P。
+- 租户优先使用已启用的 MiniMax 直连 Provider，官方 API Base 必须是 `https://api.minimaxi.com`。直连不可用时可以使用现有 `Microi.AI中转站` 配置，Base 固定为 `https://api.itdos.com/v1`；系统拒绝把视频请求转发到其它 Host。
+- 当前 Token Plan 使用统一用量条、5 小时滚动窗口和周窗口，实际剩余额度以控制台为准；服务端不把“每天 2 条”或“每天 3 条”硬编码成供应商权威配额。若运营工作区明确要求每日最多 3 条，可以增加更保守的业务门禁，并在界面中明确它不是 MiniMax 官方剩余额度。
+- 当前官方模型边界：`MiniMax-Hailuo-2.3` 支持文生/图生；`MiniMax-Hailuo-2.3-Fast` 只支持图生并要求首帧；首尾帧使用 `MiniMax-Hailuo-02`。Hailuo 2.3 清晰优先使用 6 秒 / 1080P，时长优先使用 10 秒 / 768P，两者不能同时最大；安全默认值仍为 6 秒 / 768P。
 
 ### 登录态 API
 
@@ -158,7 +158,7 @@ Authorization: <当前吾码登录 Token>
   "Prompt": "Two adult engineers naturally discuss a release checklist in a modern office [固定].",
   "Model": "MiniMax-Hailuo-2.3-Fast",
   "Duration": 6,
-  "Resolution": "768P",
+  "Resolution": "1080P",
   "FirstFrameImage": "https://example.com/inspected-office-first-frame.png"
 }
 ```
@@ -174,7 +174,16 @@ Content-Type: application/json
 { "TaskHandle": "<创建接口返回的签名句柄>" }
 ```
 
-终态 `Status=Success` 时会返回 `FileHandle`。再获取临时下载地址：
+终态 `Status=Success` 时会返回 `FileHandle`。正常流程应立即把视频转存到当前租户 HDFS：
+
+```http
+POST /api/Ai/PersistMiniMaxVideoFile
+Content-Type: application/json
+
+{ "FileHandle": "<任务查询返回的签名句柄>" }
+```
+
+服务端会校验签名句柄、HTTPS 公网来源、文件大小和 MP4 文件头，再写入当前租户文件服务；成功返回永久 `FileUrl`。只有旧节点或转存故障诊断时才获取临时下载地址：
 
 ```http
 POST /api/Ai/GetMiniMaxVideoFile
@@ -183,7 +192,9 @@ Content-Type: application/json
 { "FileHandle": "<任务查询返回的签名句柄>" }
 ```
 
-下载地址只代表视频生成完成，不代表已经发布到抖音、快手或其它平台。分发端仍要执行目标平台的上传、字段校验、dry-run、一次正式发布、任务详情和公开页面回读，并按平台规则如实标记 AI 生成内容。
+后台 `/#/mic-ai-engine` 的管理员【AI视频】页读取 `mci_ai_content_asset`，可以创建、刷新、预览、审核和下载视频；对话记录仍由 `mic_ai_record` 提供。临时/永久下载地址只代表视频生成或持久化完成，不代表已经发布到抖音、快手或其它平台。分发端仍要执行目标平台的上传、字段校验、dry-run、一次正式发布、任务详情和公开页面回读，并按平台规则如实标记 AI 生成内容。
+
+当租户经 `Microi.AI中转站` 创建视频时，中转节点使用 `/v1/video_generation`、`/v1/query/video_generation`、`/v1/files/retrieve` 对接 MiniMax 协议；创建请求必须带稳定 `Idempotency-Key`。平台 ApiKey 只允许查询自己创建的原始 `task_id` / `file_id`，中转节点只访问直连官方 Provider，不能递归调用自己。
 
 ### 内容质量边界
 
