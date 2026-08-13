@@ -79,6 +79,13 @@ IIS 进程启动不代表 API 可用，仍要检查 readiness 和真实登录路
 
 - 使用仓库规定的 Node/npm/pnpm 版本；
 - 复用已有 Vite 服务，不重复启动；
+- `src/config.json` 的 `ApiBaseDev` 是默认值；本地 URL 可在 `#` 前用
+  `?OsClient=...&ApiBase=...` 以最高优先级覆盖 ApiBase 与租户；
+- 多组 `ApiBase + OsClient` 并行时按组创建独立浏览器 Profile/进程或 Playwright context，不能在
+  同一同源 context 的多个 Page 中混测；
+- 人工第二组至少使用无痕窗口，但多个 Chrome 无痕窗口可能共享临时会话，不能承担多组强隔离；
+- 从线上页面读取 `window.__MICROI_RUNTIME_ENDPOINT__`；旧版无该对象时按 URL、window 全局、
+  同源状态、域名解析/成功请求逐级确认，禁止猜测；
 - 本地页面成功不替代宿主 Token、OsClient、菜单权限和生产构建验收。
 
 ## 最小上线验收

@@ -3,7 +3,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools } from './advanced-tools.js';
+import { buildMcpOcrResult, decodeMcpTranslatedFile, OCR_MAX_BASE64_CHARACTERS, prepareMcpOcrInput, prepareMcpTranslateFileInput, saveMcpTranslatedFile, TRANSLATE_INLINE_RESULT_BYTES, TRANSLATE_MAX_BASE64_CHARACTERS, } from './document-inputs.js';
+export { buildMcpOcrResult, decodeMcpTranslatedFile, prepareMcpOcrInput, prepareMcpTranslateFileInput, } from './document-inputs.js';
+import { buildDefaultModulePresentation, inferTableColumnWidth, normalizeAllMenuJson, normalizeViewSchemaJson, registerAdvancedTools, } from './advanced-tools.js';
 import { registerBlueprintTools } from './blueprint-tools.js';
 import { registerDesignTools } from './design-tools.js';
 import { normalizePageJsonObj } from './design-engine.js';
@@ -37,250 +39,69 @@ const FORBIDDEN_APPLICATION_ASSET_FILES = [
     /^(?:id_rsa|id_dsa|id_ecdsa|id_ed25519)(?:\.|$)/iu,
     /\.(?:pem|key|pfx|p12|jks|keystore)$/iu,
 ];
-const OCR_MAX_FILE_BYTES = 100 * 1024 * 1024;
-const OCR_MAX_BASE64_CHARACTERS = Math.ceil(OCR_MAX_FILE_BYTES / 3) * 4 + 512;
-const OCR_ALLOWED_EXTENSIONS = new Set([
-    '.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tif', '.tiff', '.webp',
+const MICRO_SERVICE_SOURCE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
+const MICRO_SERVICE_SOURCE_MAX_FILES = 1_000;
+const MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES = new Set([
+    '.git', '.hg', '.svn', '.cache', '.codex-temp', '.next', '.nuxt', '.output', '.turbo', '.vite',
+    'coverage', 'dist', 'build', 'node_modules',
 ]);
-function normalizeOcrFileName(value) {
-    const trimmed = String(value || '').trim();
-    if (!trimmed)
-        return undefined;
-    if (trimmed.includes('\0'))
-        throw new Error('fileName 不能包含空字符。');
-    const fileName = path.basename(trimmed);
-    if (!fileName || fileName === '.' || fileName === '..') {
-        throw new Error('fileName 无效。');
-    }
-    if (fileName.length > 255)
-        throw new Error('fileName 不能超过 255 个字符。');
-    const extension = path.extname(fileName).toLowerCase();
-    if (extension && !OCR_ALLOWED_EXTENSIONS.has(extension)) {
-        throw new Error('OCR 仅支持 PDF、PNG、JPEG、GIF、BMP、TIFF 或 WebP 文件。');
-    }
-    return fileName;
-}
-function decodeMcpOcrBase64(value) {
-    const trimmed = value.trim();
-    const commaIndex = /^data:[^;,]+;base64,/iu.test(trimmed) ? trimmed.indexOf(',') : -1;
-    const normalized = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed).replace(/\s/gu, '');
-    if (!normalized)
-        throw new Error('fileByteBase64 不能为空。');
-    if (normalized.length > OCR_MAX_BASE64_CHARACTERS) {
-        throw new Error('OCR 文件超过 MCP 100 MB 硬上限。');
-    }
-    if (normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized)) {
-        throw new Error('fileByteBase64 不是有效的 Base64 内容。');
-    }
-    const bytes = Buffer.from(normalized, 'base64');
-    const canonicalInput = normalized.replace(/=+$/u, '');
-    const canonicalDecoded = bytes.toString('base64').replace(/=+$/u, '');
-    if (canonicalInput !== canonicalDecoded) {
-        throw new Error('fileByteBase64 不是规范的 Base64 内容。');
-    }
-    if (bytes.length === 0 || bytes.length > OCR_MAX_FILE_BYTES) {
-        throw new Error('OCR 文件必须大于 0 字节且不超过 MCP 100 MB 硬上限。');
-    }
-    return bytes;
-}
-/**
- * Resolve one MCP OCR input without following symlinks or accepting caller-controlled
- * tenant/network configuration. The backend repeats magic-byte and tenant-limit checks.
- */
-export function prepareMcpOcrInput(input) {
-    const hasPath = Boolean(input.filePath?.trim());
-    const hasBase64 = Boolean(input.fileByteBase64?.trim());
-    if (hasPath === hasBase64) {
-        throw new Error('filePath 与 fileByteBase64 必须且只能提供一个。');
-    }
-    let bytes;
-    let fileName = normalizeOcrFileName(input.fileName);
-    if (hasPath) {
-        const requestedPath = String(input.filePath).trim();
-        if (!path.isAbsolute(requestedPath))
-            throw new Error('filePath 必须是绝对路径。');
-        const stat = fs.lstatSync(requestedPath);
-        if (stat.isSymbolicLink())
-            throw new Error('filePath 不能是符号链接。');
-        if (!stat.isFile())
-            throw new Error('filePath 必须指向普通文件。');
-        if (stat.size <= 0 || stat.size > OCR_MAX_FILE_BYTES) {
-            throw new Error('OCR 文件必须大于 0 字节且不超过 MCP 100 MB 硬上限。');
+const MICRO_SERVICE_SOURCE_EXCLUDED_FILES = new Set([
+    '.ds_store', 'thumbs.db', '.microi-micro-app-sync.json', '.microi-build-evidence.json',
+]);
+const MICRO_SERVICE_SOURCE_CHUNK_ARTIFACT = /^(?:\.sync-seg-.*|sync-source-files\.json)$/iu;
+function readMicroServiceSourceExcludePrefixes(rootDirectory) {
+    const descriptorPath = path.join(rootDirectory, '.microi-micro-app.json');
+    if (!fs.existsSync(descriptorPath))
+        return [];
+    let descriptor;
+    try {
+        const parsed = JSON.parse(fs.readFileSync(descriptorPath, 'utf8'));
+        if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+            throw new Error('根节点必须是对象');
         }
-        const localFileName = normalizeOcrFileName(path.basename(requestedPath));
-        if (!localFileName || !path.extname(localFileName)) {
-            throw new Error('本地 OCR 文件必须使用受支持的扩展名。');
+        descriptor = parsed;
+    }
+    catch (error) {
+        throw new Error(`.microi-micro-app.json 无法解析，不能安全应用 SourceExcludes：${error instanceof Error ? error.message : String(error)}`);
+    }
+    const rawExcludes = descriptor.SourceExcludes;
+    if (rawExcludes == null)
+        return [];
+    if (!Array.isArray(rawExcludes) || rawExcludes.length > 100) {
+        throw new Error('.microi-micro-app.json 的 SourceExcludes 必须是最多 100 项的字符串数组。');
+    }
+    const prefixes = rawExcludes.map((value, index) => {
+        if (typeof value !== 'string') {
+            throw new Error(`SourceExcludes[${index}] 必须是字符串。`);
         }
-        fileName = fileName || localFileName;
-        bytes = fs.readFileSync(requestedPath);
-        if (bytes.length !== stat.size)
-            throw new Error('OCR 文件在读取期间发生变化，请重试。');
-    }
-    else {
-        bytes = decodeMcpOcrBase64(String(input.fileByteBase64));
-    }
-    return {
-        request: {
-            FileByteBase64: bytes.toString('base64'),
-            FileName: fileName,
-            UseDocOrientationClassify: input.useDocOrientationClassify,
-            UseDocUnwarping: input.useDocUnwarping,
-            UseTextlineOrientation: input.useTextlineOrientation,
-            TextRecScoreThresh: input.textRecScoreThresh,
-            ReturnWordBox: input.returnWordBox,
-        },
-        byteLength: bytes.length,
-        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
-        auditFileName: fileName || '(unnamed OCR input)',
-    };
-}
-export function buildMcpOcrResult(value, options = {}) {
-    if (!value)
-        return null;
-    const maxTextChars = Math.max(1_000, Math.min(200_000, options.maxTextChars || 100_000));
-    const sourceText = String(value.Text || '');
-    const result = {
-        Provider: value.Provider,
-        TraceId: value.TraceId,
-        FileName: value.FileName,
-        FileType: value.FileType,
-        Text: sourceText.slice(0, maxTextChars),
-        AverageConfidence: value.AverageConfidence,
-        PageCount: value.PageCount,
-        ElapsedMilliseconds: value.ElapsedMilliseconds,
-        TextTruncated: sourceText.length > maxTextChars,
-    };
-    if (!options.includePages)
-        return result;
-    let remainingPageCharacters = maxTextChars;
-    result.Pages = (value.Pages || []).map(page => {
-        const pageText = String(page.Text || '');
-        const visibleText = pageText.slice(0, remainingPageCharacters);
-        remainingPageCharacters = Math.max(0, remainingPageCharacters - visibleText.length);
-        if (visibleText.length < pageText.length)
-            result.TextTruncated = true;
-        return {
-            PageIndex: page.PageIndex,
-            Text: visibleText,
-            AverageConfidence: page.AverageConfidence,
-            ...(options.includeRegions ? { Regions: page.Regions || [] } : {}),
-        };
+        const normalized = value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '');
+        if (!normalized.endsWith('/**')) {
+            throw new Error(`SourceExcludes 仅支持安全目录前缀 <relative-directory>/**：${value}`);
+        }
+        const prefix = normalized.slice(0, -3).replace(/\/$/u, '');
+        normalizeLocalApplicationRelativePath(prefix);
+        if (!prefix || prefix === '.' || /^\.(?:git|hg|svn)(?:\/|$)/iu.test(prefix)) {
+            throw new Error(`SourceExcludes 不允许排除工程根目录或 VCS 元数据：${value}`);
+        }
+        return prefix.toLowerCase();
     });
-    return result;
+    return [...new Set(prefixes)].sort();
 }
-const TRANSLATE_MAX_FILE_BYTES = 20 * 1024 * 1024;
-const TRANSLATE_MAX_RESULT_BYTES = 25 * 1024 * 1024;
-const TRANSLATE_INLINE_RESULT_BYTES = 2 * 1024 * 1024;
-const TRANSLATE_MAX_BASE64_CHARACTERS = Math.ceil(TRANSLATE_MAX_FILE_BYTES / 3) * 4 + 512;
-const TRANSLATE_ALLOWED_EXTENSIONS = new Set([
-    '.txt', '.html', '.htm', '.odt', '.odp', '.docx', '.pptx', '.xlsx', '.epub', '.pdf',
-]);
-function normalizeTranslateFileName(value) {
-    const trimmed = String(value || '').trim();
-    if (!trimmed || trimmed.includes('\0'))
-        throw new Error('fileName 无效。');
-    const fileName = path.basename(trimmed);
-    if (!fileName || fileName === '.' || fileName === '..' || fileName.length > 255) {
-        throw new Error('fileName 无效或超过 255 个字符。');
-    }
-    if (!TRANSLATE_ALLOWED_EXTENSIONS.has(path.extname(fileName).toLowerCase())) {
-        throw new Error('文件翻译仅支持 TXT、HTML、ODT、ODP、DOCX、PPTX、XLSX、EPUB 或 PDF。');
-    }
-    return fileName;
-}
-function decodeTranslateBase64(value) {
-    const trimmed = value.trim();
-    const commaIndex = /^data:[^;,]+;base64,/iu.test(trimmed) ? trimmed.indexOf(',') : -1;
-    const normalized = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed).replace(/\s/gu, '');
-    if (!normalized || normalized.length > TRANSLATE_MAX_BASE64_CHARACTERS) {
-        throw new Error('翻译文件必须大于 0 字节且不超过 20 MB。');
-    }
-    if (normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(normalized)) {
-        throw new Error('fileByteBase64 不是有效的 Base64 内容。');
-    }
-    const bytes = Buffer.from(normalized, 'base64');
-    if (bytes.length === 0 || bytes.length > TRANSLATE_MAX_FILE_BYTES
-        || bytes.toString('base64').replace(/=+$/u, '') !== normalized.replace(/=+$/u, '')) {
-        throw new Error('fileByteBase64 无效或超过 20 MB。');
-    }
-    return bytes;
-}
-export function prepareMcpTranslateFileInput(input) {
-    const hasPath = Boolean(input.filePath?.trim());
-    const hasBase64 = Boolean(input.fileByteBase64?.trim());
-    if (hasPath === hasBase64)
-        throw new Error('filePath 与 fileByteBase64 必须且只能提供一个。');
-    if (!String(input.targetLang || '').trim())
-        throw new Error('targetLang 不能为空。');
-    let bytes;
-    let fileName;
-    if (hasPath) {
-        const requestedPath = String(input.filePath).trim();
-        if (!path.isAbsolute(requestedPath))
-            throw new Error('filePath 必须是绝对路径。');
-        const stat = fs.lstatSync(requestedPath);
-        if (stat.isSymbolicLink() || !stat.isFile())
-            throw new Error('filePath 必须指向非符号链接的普通文件。');
-        if (stat.size <= 0 || stat.size > TRANSLATE_MAX_FILE_BYTES) {
-            throw new Error('翻译文件必须大于 0 字节且不超过 20 MB。');
-        }
-        fileName = normalizeTranslateFileName(input.fileName || path.basename(requestedPath));
-        bytes = fs.readFileSync(requestedPath);
-        if (bytes.length !== stat.size)
-            throw new Error('翻译文件在读取期间发生变化，请重试。');
-    }
-    else {
-        fileName = normalizeTranslateFileName(input.fileName);
-        bytes = decodeTranslateBase64(String(input.fileByteBase64));
-    }
-    return {
-        request: {
-            FileByteBase64: bytes.toString('base64'),
-            FileName: fileName,
-            FromLang: String(input.fromLang || 'auto').trim() || 'auto',
-            Lang: String(input.targetLang).trim(),
-        },
-        byteLength: bytes.length,
-        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
-        auditFileName: fileName,
-    };
-}
-export function decodeMcpTranslatedFile(result) {
-    const value = String(result?.FileByteBase64 || '').trim();
-    if (!value)
-        throw new Error('后端未返回翻译文件内容。');
-    const bytes = Buffer.from(value, 'base64');
-    if (bytes.length === 0 || bytes.length > TRANSLATE_MAX_RESULT_BYTES
-        || bytes.toString('base64').replace(/=+$/u, '') !== value.replace(/=+$/u, '')) {
-        throw new Error('后端返回的翻译文件无效或超过 25 MB。');
-    }
-    if (result?.ByteLength !== undefined && Number(result.ByteLength) !== bytes.length) {
-        throw new Error('后端翻译文件长度回读不一致。');
-    }
-    return bytes;
-}
-function saveMcpTranslatedFile(outputFilePath, bytes) {
-    const resolved = path.resolve(String(outputFilePath || '').trim());
-    if (!path.isAbsolute(String(outputFilePath || '').trim()))
-        throw new Error('outputFilePath 必须是绝对路径。');
-    if (fs.existsSync(resolved))
-        throw new Error('outputFilePath 已存在；为避免覆盖，请使用新的文件名。');
-    const parent = path.dirname(resolved);
-    const parentStat = fs.lstatSync(parent);
-    if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) {
-        throw new Error('outputFilePath 的父目录必须是非符号链接目录。');
-    }
-    fs.writeFileSync(resolved, bytes, { flag: 'wx' });
-    return resolved;
-}
-const APPLICATION_ASSET_MAX_FILE_BYTES = 128 * 1024 * 1024;
-const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
+// Runtime assets use the resumable HDFS multipart transport above the legacy
+// 128MiB endpoint boundary. Keep only JavaScript's exact-integer boundary as a
+// platform invariant; maxTotalBytes remains an optional caller safety rail.
+const APPLICATION_MANIFEST_MAX_TOTAL_BYTES = Number.MAX_SAFE_INTEGER;
 export function validateLocalApplicationAssetSize(relativePath, fileSize, nextTotalSize, maxTotalBytes = APPLICATION_MANIFEST_MAX_TOTAL_BYTES) {
-    if (fileSize > APPLICATION_ASSET_MAX_FILE_BYTES) {
-        throw new Error(`发布单文件超过硬上限 ${APPLICATION_ASSET_MAX_FILE_BYTES} bytes：${relativePath}；已在上传前中止。`);
+    if (!Number.isSafeInteger(fileSize) || fileSize < 0
+        || !Number.isSafeInteger(nextTotalSize) || nextTotalSize < 0) {
+        throw new Error(`发布资产大小必须位于 JavaScript 安全整数范围：${relativePath}`);
     }
-    if (nextTotalSize > Math.min(maxTotalBytes, APPLICATION_MANIFEST_MAX_TOTAL_BYTES)) {
-        throw new Error(`发布总大小超过上限 ${Math.min(maxTotalBytes, APPLICATION_MANIFEST_MAX_TOTAL_BYTES)} bytes，已在上传前中止。`);
+    const callerLimit = Number.isSafeInteger(maxTotalBytes) && maxTotalBytes > 0
+        ? maxTotalBytes
+        : APPLICATION_MANIFEST_MAX_TOTAL_BYTES;
+    if (nextTotalSize > callerLimit) {
+        throw new Error(`发布总大小超过调用方安全上限 ${callerLimit} bytes，已在上传前中止。`);
     }
 }
 function normalizeLocalApplicationRelativePath(value) {
@@ -776,7 +597,7 @@ function validateApplicationAssetV3FinalizeEvidence(result, expected) {
     requireStreamEvidenceNumber(evidence, 'ProtocolVersion', 3, context);
     requireStreamEvidenceString(evidence, 'PublishMode', expected.publishMode, context);
     requireStreamEvidenceString(evidence, 'GateEpoch', expected.expectedGateEpoch, context);
-    requireStreamEvidenceString(evidence, 'AppKey', expected.appIdOrKey, context);
+    requireApplicationAssetV3IdentityEvidence(evidence, expected.appIdOrKey, context);
     requireStreamEvidenceString(evidence, 'VersionNo', normalizedApplicationVersion(expected.versionNo), context);
     requireStreamEvidenceString(evidence, 'RequestId', expected.requestId, context);
     requireStreamEvidenceString(evidence, 'RequestFingerprint', expected.requestFingerprint, context);
@@ -866,7 +687,10 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
     const rootRealPath = fs.realpathSync(root);
     const normalizedEntry = normalizeLocalApplicationRelativePath(entryPath);
     const maxFiles = Math.min(20_000, Math.max(1, options.maxFiles ?? 20_000));
-    const maxTotalBytes = Math.min(APPLICATION_MANIFEST_MAX_TOTAL_BYTES, Math.max(1, options.maxTotalBytes ?? APPLICATION_MANIFEST_MAX_TOTAL_BYTES));
+    const requestedMaxTotalBytes = options.maxTotalBytes ?? APPLICATION_MANIFEST_MAX_TOTAL_BYTES;
+    const maxTotalBytes = Number.isSafeInteger(requestedMaxTotalBytes) && requestedMaxTotalBytes > 0
+        ? requestedMaxTotalBytes
+        : APPLICATION_MANIFEST_MAX_TOTAL_BYTES;
     const pending = [rootRealPath];
     const files = [];
     const skippedSourceMaps = [];
@@ -939,6 +763,103 @@ export async function buildLocalApplicationAssetManifest(rootDirectory, entryPat
         skippedInternalEvidenceFiles,
     };
 }
+/**
+ * Build the private-source manifest inside the MCP process. Source bytes never
+ * enter the model context: callers pass one local directory and the server
+ * reads each ordinary file directly after a bounded preflight.
+ */
+export async function buildLocalMicroServiceSourceManifest(rootDirectory, options = {}) {
+    const root = path.resolve(String(rootDirectory || '').trim());
+    if (!path.isAbsolute(String(rootDirectory || '').trim())) {
+        throw new Error('directory 必须是微服务项目的绝对路径。');
+    }
+    const rootStat = fs.lstatSync(root);
+    if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
+        throw new Error(`源码根目录必须是真实目录且不能是符号链接：${root}`);
+    }
+    const rootRealPath = fs.realpathSync(root);
+    const descriptorExcludePrefixes = readMicroServiceSourceExcludePrefixes(rootRealPath);
+    const maxFiles = Math.min(MICRO_SERVICE_SOURCE_MAX_FILES, Math.max(1, options.maxFiles ?? MICRO_SERVICE_SOURCE_MAX_FILES));
+    const maxTotalBytes = Math.min(MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES, Math.max(1, options.maxTotalBytes ?? MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES));
+    const pending = [rootRealPath];
+    const sourceFiles = [];
+    const skippedDirectories = [];
+    const skippedFiles = [];
+    let totalSize = 0;
+    while (pending.length > 0) {
+        const current = pending.pop();
+        for (const item of fs.readdirSync(current, { withFileTypes: true })) {
+            const absolutePath = path.join(current, item.name);
+            const itemStat = fs.lstatSync(absolutePath);
+            if (itemStat.isSymbolicLink())
+                throw new Error(`源码目录不允许符号链接：${absolutePath}`);
+            const relativePath = normalizeLocalApplicationRelativePath(path.relative(rootRealPath, absolutePath));
+            const resolvedRealPath = fs.realpathSync(absolutePath);
+            if (resolvedRealPath !== rootRealPath && !resolvedRealPath.startsWith(rootRealPath + path.sep)) {
+                throw new Error(`源码文件越过了根目录：${absolutePath}`);
+            }
+            if (itemStat.isDirectory()) {
+                const normalizedDirectory = relativePath.toLowerCase();
+                const excluded = MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES.has(item.name.toLowerCase())
+                    || normalizedDirectory === 'unpackage/dist'
+                    || normalizedDirectory.startsWith('unpackage/dist/')
+                    || descriptorExcludePrefixes.some(prefix => (normalizedDirectory === prefix || normalizedDirectory.startsWith(`${prefix}/`)));
+                if (excluded) {
+                    skippedDirectories.push(relativePath);
+                    continue;
+                }
+                pending.push(absolutePath);
+                continue;
+            }
+            if (!itemStat.isFile())
+                throw new Error(`源码目录包含非普通文件：${absolutePath}`);
+            const normalizedName = item.name.toLowerCase();
+            if (MICRO_SERVICE_SOURCE_CHUNK_ARTIFACT.test(item.name)) {
+                throw new Error(`发现废弃的手工切片文件 ${relativePath}。请删除 .sync-seg-* / sync-source-files.json，`
+                    + '然后直接把项目 directory 传给 microi_sync_microservice_source；不要再分段或拼接 Base64。');
+            }
+            if (MICRO_SERVICE_SOURCE_EXCLUDED_FILES.has(normalizedName)) {
+                skippedFiles.push(relativePath);
+                continue;
+            }
+            if (/^\.env(?:\.|$)/iu.test(item.name) && !/^\.env\.example$/iu.test(item.name)) {
+                throw new Error(`源码目录疑似包含环境密钥文件，已拒绝同步：${relativePath}`);
+            }
+            if (FORBIDDEN_APPLICATION_ASSET_FILES.slice(1).some(pattern => pattern.test(item.name))) {
+                throw new Error(`源码目录疑似包含密钥文件，已拒绝同步：${relativePath}`);
+            }
+            if (itemStat.size > MICRO_SERVICE_SOURCE_MAX_FILE_BYTES) {
+                throw new Error(`源码单文件超过 ${MICRO_SERVICE_SOURCE_MAX_FILE_BYTES} bytes：${relativePath}`);
+            }
+            totalSize += itemStat.size;
+            if (totalSize > maxTotalBytes) {
+                throw new Error(`源码总大小超过 ${maxTotalBytes} bytes；请检查是否误包含缓存或构建目录。`);
+            }
+            sourceFiles.push({ absolutePath, relativePath, size: itemStat.size });
+            if (sourceFiles.length > maxFiles) {
+                throw new Error(`源码文件超过上限 ${maxFiles}；请检查是否误包含依赖、缓存或构建目录。`);
+            }
+        }
+    }
+    sourceFiles.sort((left, right) => (left.relativePath < right.relativePath ? -1 : left.relativePath > right.relativePath ? 1 : 0));
+    if (sourceFiles.length === 0)
+        throw new Error(`源码目录没有可同步文件：${rootRealPath}`);
+    const files = [];
+    for (const file of sourceFiles) {
+        files.push({ ...file, sha256: await sha256LocalFile(file.absolutePath) });
+    }
+    const manifestHash = crypto.createHash('sha256')
+        .update(files.map(file => `${file.relativePath}\t${file.sha256}\t${file.size}`).join('\n'))
+        .digest('hex');
+    return {
+        rootDirectory: rootRealPath,
+        files,
+        totalSize,
+        manifestHash,
+        skippedDirectories: skippedDirectories.sort(),
+        skippedFiles: skippedFiles.sort(),
+    };
+}
 const LEGACY_STREAM_COMPATIBILITY_MAX_FILES = 256;
 const LEGACY_STREAM_COMPATIBILITY_MAX_BYTES = 5 * 1024 * 1024;
 /**
@@ -947,11 +868,50 @@ const LEGACY_STREAM_COMPATIBILITY_MAX_BYTES = 5 * 1024 * 1024;
  * the dynamic runtime tries to invoke Dos.Common.Val<T> on a JValue.
  */
 export function isLegacyApplicationStreamJValueFailure(result) {
+    return isLegacyJValueValFailure(result);
+}
+/**
+ * Detect old API nodes whose dynamic JSON path calls Val<T>() on a JValue.
+ * Keep this generic so metadata tools can use a narrowly-scoped, verified
+ * compatibility path without treating unrelated server failures as writable.
+ */
+export function isLegacyJValueValFailure(result) {
     if (!result || Number(result.Code) === 1)
         return false;
     const message = String(result.Msg || '');
     return /Newtonsoft\.Json\.Linq\.JValue/iu.test(message)
         && /does not contain a definition for ['‘’"]?Val|\.Val(?:<|\b)/iu.test(message);
+}
+export function defaultLayoutFieldFormWidth(component, formWidth) {
+    if (formWidth !== undefined)
+        return formWidth;
+    return component === 'CollapseGroup' ? 24 : undefined;
+}
+export function normalizeLayoutFieldConfig(component, config) {
+    if (config === undefined && component !== 'CollapseGroup')
+        return undefined;
+    if (component !== 'CollapseGroup') {
+        const configText = typeof config === 'string' ? config : JSON.stringify(config);
+        JSON.parse(configText);
+        return configText;
+    }
+    const normalized = config === undefined
+        ? {}
+        : (typeof config === 'string' ? JSON.parse(config) : { ...config });
+    if (!normalized || typeof normalized !== 'object' || Array.isArray(normalized)) {
+        throw new Error('布局控件 Config 必须是 JSON 对象');
+    }
+    if (component === 'CollapseGroup') {
+        const root = normalized;
+        const collapseGroup = root.CollapseGroup && typeof root.CollapseGroup === 'object' && !Array.isArray(root.CollapseGroup)
+            ? { ...root.CollapseGroup }
+            : {};
+        if (!Object.prototype.hasOwnProperty.call(collapseGroup, 'ShowFieldCount')) {
+            collapseGroup.ShowFieldCount = true;
+        }
+        root.CollapseGroup = collapseGroup;
+    }
+    return JSON.stringify(normalized);
 }
 export function resolveLegacyApplicationStreamFallbackPolicy(result, uploadedCount, allowLegacyFallback = true) {
     const matched = uploadedCount === 0 && isLegacyApplicationStreamJValueFailure(result);
@@ -969,6 +929,13 @@ function asJsonRecord(value) {
 function requireStreamEvidenceString(evidence, field, expected, context) {
     if (String(evidence[field] ?? '') !== expected) {
         throw new Error(`${context} 返回证据 ${field} 不一致`);
+    }
+}
+function requireApplicationAssetV3IdentityEvidence(evidence, expectedAppIdOrKey, context) {
+    const appId = String(evidence.AppId ?? '');
+    const appKey = String(evidence.AppKey ?? '');
+    if ((!appId && !appKey) || (appId !== expectedAppIdOrKey && appKey !== expectedAppIdOrKey)) {
+        throw new Error(`${context} 返回证据 AppId/AppKey 均未匹配请求应用身份`);
     }
 }
 function requireStreamEvidenceNumber(evidence, field, expected, context) {
@@ -2166,14 +2133,19 @@ BOUNDARY RULES:
 ## sys_menu 自动增强默认值（创建后端菜单必须关注）
 - 绑定 diyTableId 创建菜单时，不要只写 Name/DiyTableId。应配置或允许 MCP/后端自动推断：TableDiyFieldIds、SelectFields、SearchFieldIds、SortFieldIds、NotShowFields、StatisticsFields、MobileListFields、CardTitleTagFields、CardBottomTagFields、DefaultOrderBy。
 - NotShowFields 默认隐藏 Id/外键/系统字段/布局控件/上传富文本地图子表等重字段；SearchFieldIds 默认选择标题、名称、编号、状态、类型、分类、负责人、时间等常用筛选；StatisticsFields 默认选择金额、价格、数量、积分、余额等数值字段；MobileListFields 默认选择 3-4 个卡片可读字段。
-- 如果用户显式指定上述字段，以用户配置为准；否则 microi_generate_system 和后端 CreateModule 会按真实 diy_field 元数据补齐。
+- 每个可见且绑定表的 Diy 模块必须有：紧凑 Hero 标题、业务副标题、2-4 个真实动态指标、合理列宽、至少一个有合理 MinWidth 的 PC 复合列，以及不重复字段的移动端标题/副标题/顶部标签/状态/右侧金额/正文/Meta/底部区域。用户未配置 ViewSchema 时，microi_generate_system、microi_create_module 和后端 CreateModule 会按真实 diy_field 元数据补齐 List/Card 最低默认值。
+- 自动默认值不是 AI 省略设计的理由。应按当前表和状态流把指标改为待处理、逾期、金额、容量、风险等有业务含义的真实聚合；DataCount/PageCount 只是无可推断指标时的真实兜底。禁止随机数、伪统计和无来源数字。
+- 复合列 Lines/TrailingFields 使用的字段不再作为普通列重复展示；复合列必须给足 MinWidth。每个 diy_field 未显式设置 TableWidth 时按标题/地址、日期/编码、数值、状态等语义自动推断。
+- MenuBadge 只挑少量有行动意义的重要菜单；PageTabs、MoreBtns、PageBtns、FormBtns、BatchSelectMoreBtns、ExportMoreBtns 在数量有助于决策时配置角标。相同页面的统计必须批量返回，禁止逐行或逐指标 N+1。
+- EnableViewSchema 只控制 Detail/Edit 自定义表单。它为 0 时，Hero、动态指标、列表密度、PC 复合列和移动端卡片仍然生效。
+- 如果用户显式指定上述字段，以用户配置为准；否则平台按真实 diy_field 元数据补齐。
 
 ## ✅ 工具支持并发调用（请尽量并发以提高效率）
 主要低代码建模写入工具（microi_create_table / microi_add_field / microi_create_module）已做幂等保护；microi_create_engine 的 ApiEngineKey 必须唯一，重复创建会返回错误：
 - 后端使用 Ulid 随机段（非时间戳）生成唯一 URL 后缀，碰撞自动重试最多 5 次
 - 重复 Name/字段会幂等返回 Skipped:true 而非报错
 - "已存在唯一值" 错误会自动重试并追加随机后缀
-**鼓励**：为同一张表批量添加 N 个字段时，可一次性发起 N 个并发 microi_add_field 调用以缩短总耗时；
+**鼓励**：普通独立字段可批量并发添加；JoinForm/TableChild 必须等目标表、外键、索引和隐藏子表模块就绪后顺序创建，完整系统优先使用 Manifest 生成器；
 不同表的 microi_create_table 也可并发；菜单模块同理。接口引擎请先 list/get 再 create，避免重复 ApiEngineKey。
 
 ## ⚖️ 何时创建接口引擎（microi_create_engine）
@@ -2291,6 +2263,11 @@ microi_add_field 的 component 决定该字段在表单中的 UI 控件：
 | JoinForm | 关联表单（外键） | varchar(50) |
 | OpenTable | 弹窗选择关联数据 | varchar(50) |
 
+### JoinForm / TableChild 关系组件硬规则
+- \`JoinForm\` 仅表示 1:1 或 N:1：目标表必须与当前表不同，\`Config.JoinForm.JoinFieldName\` 必须是当前主表里已存在、实际保存目标记录 Id 的字段；禁止默认写成 \`Name\`，禁止目标表/字段未解析时落库。
+- \`TableChild\` 仅表示 1:N：必须先创建独立子表与真实外键字段，再创建以 \`(OsClient, 外键)\` 开头的组合索引，以及 \`Display=0、AppDisplay=0、HasChild=0\` 且绑定子表的隐藏菜单；最后才能写入 \`TableChildTableId/TableChildSysMenuId/TableChildFkFieldName\`。
+- 自然语言生成完整系统时必须使用 Manifest \`fields[].relation\`，让 \`microi_generate_system\` 分阶段解析当前租户真实 Id。不要直接拼租户 Id 或把 1:N 明细伪装成 JoinForm。
+
 ## 选项类组件（Select/MultipleSelect/Radio/Checkbox）数据源（重要！）
 为这四种组件添加字段时，**必须**通过 \`data\` 参数传入选项，否则表单下拉框为空。
 MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON。
@@ -2318,7 +2295,7 @@ MCP 后端会自动解析 \`data\` 字符串并构建正确的 \`Config\` JSON�
 - openType: Diy（低代码页面）, Url（外部链接）, Page（自定义前端页面）
 - 绑定 diyTableId 后，平台自动提供完整 CRUD 功能（列表、搜索、新增、编辑、删除、导入、导出）
 - 重要菜单可配置 menuBadgeEnabled=1 和 menuBadgeApiEngineKey，在侧栏显示接口引擎统计值；接口应返回 {Code:1,Data:{Value:number}}，并保持轻量、租户隔离。
-- ViewSchema 可直接传 JSON 对象或字符串；Layout.List 的多行列/尾随字段与 Layout.Card 的顶部、右侧、正文、元数据、底部字段组会完整保存。
+- ViewSchema 可直接传 JSON 对象或字符串；省略时，可见且绑定表的 Diy 模块会自动生成仅含 List/Card 的真实数据展示默认值，EnableViewSchema 仍为 0。Layout.List 的多行列/尾随字段与 Layout.Card 的顶部、右侧、正文、元数据、底部字段组会完整保存。
 
 ## V8 事件类型（microi_get_event_code / microi_save_event_code 的 eventType）
 | eventType | 运行端 | 触发时机 |
@@ -4124,7 +4101,7 @@ export function createMcpServer(client, context) {
         visible: z.number().optional().describe('Is visible in form (1=yes, 0=no). Default: 1'),
         appVisible: z.number().optional().describe('Is visible in mobile app (1=yes, 0=no). Default: 1'),
         tab: z.string().optional().describe('Form tab group name (for organizing fields into tabs)'),
-        tableWidth: z.number().optional().describe('Column width in list view (pixels). Default: 120'),
+        tableWidth: z.number().optional().describe('Column width in list view (pixels). When omitted, MCP infers a stable width from field semantics: titles/addresses are wider, dates/codes medium, numbers/statuses compact.'),
         sort: z.number().optional().describe('Field display order (smaller = front). If omitted, MCP auto-increments per table starting at 100, step 10 — so adding fields in business-meaningful order produces correct list/form ordering automatically. Override only when you need a specific position.'),
         readonly: z.number().optional().describe('Is readonly (1=yes, 0=no). Default: 0'),
         notEmpty: z.number().optional().describe('Required field validation (1=required, 0=optional). Default: 0'),
@@ -4133,7 +4110,7 @@ export function createMcpServer(client, context) {
         placeholder: z.string().optional().describe('Placeholder text shown in form input'),
         formWidth: z.number().nullable().optional().describe('Field width in form grid columns (1-24). Default: null/omitted for normal fields. Use 24 only for full-row controls such as CodeEditor, Textarea, RichText, upload, TableChild, map/layout/custom components.'),
         data: z.string().optional().describe('Options data source for Select/MultipleSelect/Radio/Checkbox components. REQUIRED for these four components. Format: "key1|label1,key2|label2" (KeyValue, recommended — e.g. "1|启用,0|禁用", "male|男,female|女") — backend stores key, displays label. Or simple "v1,v2,v3" (same value for both). Backend auto-builds the Config JSON. For SQL/ApiEngine/DataSource sources, use the config parameter instead.'),
-        config: z.string().optional().describe('Component config JSON string. Auto-generated for Select/Radio/Checkbox when "data" is provided. Use this only for advanced cases:\n - SQL source: \'{"DataSource":"Sql","Sql":"select Id,Name from t where Name like \\\'%$Keyword$%\\\' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\'\n - ApiEngine: \'{"DataSource":"ApiEngine","DataSourceApiEngineKey":"key","SelectLabel":"name","SelectSaveField":"id"}\'\n - AutoNumber: \'{"AutoNumberFixed":"ORD","AutoNumberLength":4}\'\n - DateTime: \'{"DateTimeType":"datetime"}\' (datetime|date|month|year|HH:mm)\n - JoinForm: \'{"JoinForm":{"TableId":"xxx","TableName":"xxx","JoinFieldName":"yyy"}}\''),
+        config: z.string().optional().describe('Component config JSON string. Auto-generated for Select/Radio/Checkbox when "data" is provided. Use this only for advanced cases:\n - SQL source: \'{"DataSource":"Sql","Sql":"select Id,Name from t where Name like \\\'%$Keyword$%\\\' limit 0,20","SelectLabel":"Name","SelectSaveField":"Id","DataSourceSqlRemote":true}\'\n - ApiEngine: \'{"DataSource":"ApiEngine","DataSourceApiEngineKey":"key","SelectLabel":"name","SelectSaveField":"id"}\'\n - AutoNumber: \'{"AutoNumberFixed":"ORD","AutoNumberLength":4}\'\n - DateTime: \'{"DateTimeType":"datetime"}\' (datetime|date|month|year|HH:mm)\n - JoinForm direct writes require a different, existing target TableId/TableName and an existing parent JoinFieldName that stores the target Id. For 1:N use Manifest relation + TableChild instead. Backend rejects unresolved/self-referencing relation config.'),
         description: z.string().optional().describe('Field description / help text'),
         encrypt: z.number().optional().describe('Enable encryption storage (1=encrypt, 0=plain). Default: 0. For sensitive data like phone/ID number.'),
         inTableEdit: z.number().optional().describe('Enable inline editing in table list view (1=yes, 0=no). Default: 0'),
@@ -4148,7 +4125,9 @@ export function createMcpServer(client, context) {
                 TableId: tableId, Name: name, Label: label,
                 Type: normalizedType, Component: component,
                 Visible: visible ?? 1, AppVisible: appVisible ?? 1,
-                Tab: tab, TableWidth: tableWidth, Sort: sort ?? nextSortFor(tableId),
+                Tab: tab,
+                TableWidth: tableWidth ?? inferTableColumnWidth({ Name: name, Label: label, Type: normalizedType, Component: component }),
+                Sort: sort ?? nextSortFor(tableId),
                 Readonly: readonlyVal,
                 NotEmpty: notEmpty, Unique: unique,
                 DefaultValue: defaultValue, Placeholder: placeholder,
@@ -4176,19 +4155,16 @@ export function createMcpServer(client, context) {
         sort: z.number().optional().describe('Display order. Place the layout node immediately before the fields it controls.'),
         visible: z.number().optional().describe('PC visibility. Default: 1.'),
         appVisible: z.number().optional().describe('Mobile visibility. Default: 1.'),
-        config: z.union([z.string(), jsonRecordSchema]).optional().describe('Component Config JSON. CollapseGroup should normally set DefaultCollapsed=false, Description, Icon, Theme and ShowFieldCount.'),
+        formWidth: z.number().int().min(1).max(24).optional().describe('Form grid width. CollapseGroup defaults to 24 (100% width).'),
+        config: z.union([z.string(), jsonRecordSchema]).optional().describe('Component Config JSON. CollapseGroup defaults ShowFieldCount to true when omitted.'),
         description: z.string().optional(),
         confirmExecution: z.string().describe('Must equal the exact layout field name or EXECUTE.'),
-    }, async ({ tableId, name, label, component, tab, sort, visible, appVisible, config, description, confirmExecution }) => {
+    }, async ({ tableId, name, label, component, tab, sort, visible, appVisible, formWidth, config, description, confirmExecution }) => {
         try {
             if (confirmExecution !== name && confirmExecution !== 'EXECUTE') {
                 return { content: [{ type: 'text', text: `Error: confirmExecution must equal "${name}" or EXECUTE.` }], isError: true };
             }
-            const configText = config === undefined
-                ? undefined
-                : (typeof config === 'string' ? config : JSON.stringify(config));
-            if (configText)
-                JSON.parse(configText);
+            const configText = normalizeLayoutFieldConfig(component, config);
             const result = await client.addField({
                 TableId: tableId,
                 Name: name,
@@ -4198,6 +4174,7 @@ export function createMcpServer(client, context) {
                 Visible: visible ?? 1,
                 AppVisible: appVisible ?? 1,
                 Tab: tab,
+                FormWidth: defaultLayoutFieldFormWidth(component, formWidth),
                 TableWidth: 120,
                 Sort: sort ?? nextSortFor(tableId),
                 Data: '[]',
@@ -4215,6 +4192,15 @@ export function createMcpServer(client, context) {
                 .find(item => String(item.Name || '') === name && String(item.Component || '') === component);
             if (!saved) {
                 return { content: [{ type: 'text', text: `Error: layout field ${name} was not found after readback.` }], isError: true };
+            }
+            if (component === 'CollapseGroup') {
+                const savedConfig = JSON.parse(String(saved.Config || '{}'));
+                const savedCollapse = asJsonRecord(savedConfig.CollapseGroup);
+                const expectedFormWidth = defaultLayoutFieldFormWidth(component, formWidth);
+                const expectedShowFieldCount = asJsonRecord(JSON.parse(configText || '{}').CollapseGroup).ShowFieldCount;
+                if (Number(saved.FormWidth) !== expectedFormWidth || savedCollapse.ShowFieldCount !== expectedShowFieldCount) {
+                    return { content: [{ type: 'text', text: `Error: layout field ${name} readback does not match CollapseGroup FormWidth/ShowFieldCount defaults.` }], isError: true };
+                }
             }
             return {
                 content: [{
@@ -4253,6 +4239,7 @@ export function createMcpServer(client, context) {
                 visible: z.number().optional(),
                 appVisible: z.number().optional(),
                 config: z.union([z.string(), jsonRecordSchema]).optional(),
+                formWidth: z.number().int().min(1).max(24).optional(),
                 description: z.string().optional(),
             })).optional(),
             fieldPatches: z.array(z.object({
@@ -4457,11 +4444,7 @@ export function createMcpServer(client, context) {
                 const newNames = new Set((plan.layoutFields || []).map(field => field.name));
                 const immutableBefore = immutableState(before, newNames);
                 for (const layoutField of plan.layoutFields || []) {
-                    const configText = layoutField.config === undefined
-                        ? undefined
-                        : (typeof layoutField.config === 'string' ? layoutField.config : JSON.stringify(layoutField.config));
-                    if (configText)
-                        JSON.parse(configText);
+                    const configText = normalizeLayoutFieldConfig(layoutField.component, layoutField.config);
                     const addResult = await client.addField({
                         TableId: plan.tableId,
                         Name: layoutField.name,
@@ -4471,6 +4454,7 @@ export function createMcpServer(client, context) {
                         Visible: layoutField.visible ?? 1,
                         AppVisible: layoutField.appVisible ?? 1,
                         Tab: layoutField.tab,
+                        FormWidth: defaultLayoutFieldFormWidth(layoutField.component, layoutField.formWidth),
                         TableWidth: 120,
                         Sort: layoutField.sort,
                         Data: '[]',
@@ -4532,6 +4516,25 @@ export function createMcpServer(client, context) {
                     const saved = after.fields.find(field => String(field.Name || '') === layoutField.name);
                     if (!saved || String(saved.Component || '') !== layoutField.component)
                         throw new Error(`布局节点 ${layoutField.name} 回读失败`);
+                    const expectedFormWidth = defaultLayoutFieldFormWidth(layoutField.component, layoutField.formWidth);
+                    if (expectedFormWidth !== undefined && Number(saved.FormWidth) !== expectedFormWidth) {
+                        throw new Error(`布局节点 ${layoutField.name} FormWidth 回读不一致`);
+                    }
+                    const expectedConfigText = normalizeLayoutFieldConfig(layoutField.component, layoutField.config);
+                    if (expectedConfigText !== undefined) {
+                        try {
+                            const expectedConfig = JSON.parse(expectedConfigText);
+                            const actualConfig = JSON.parse(String(saved.Config || '{}'));
+                            if (!matchesExpectedJson(actualConfig, expectedConfig)) {
+                                throw new Error(`布局节点 ${layoutField.name} Config 回读不一致`);
+                            }
+                        }
+                        catch (error) {
+                            if (error instanceof Error && error.message.includes('Config 回读不一致'))
+                                throw error;
+                            throw new Error(`布局节点 ${layoutField.name} Config 回读不是有效 JSON`);
+                        }
+                    }
                 }
                 summary.verified++;
             }
@@ -4764,7 +4767,47 @@ export function createMcpServer(client, context) {
                 if (v !== undefined && map[k])
                     patch[map[k]] = v;
             }
-            const result = await client.updateField(patch);
+            let result = await client.updateField(patch);
+            if (result.Code !== 1 && isLegacyJValueValFailure(result) && typeof patch.Id === 'string' && patch.Id) {
+                const beforeResponse = await client.getTableData('diy_field', {
+                    _Where: [['Id', '=', patch.Id]],
+                    _PageIndex: 1,
+                    _PageSize: 2,
+                });
+                const beforeRows = unwrapList(beforeResponse.Data);
+                if (beforeResponse.Code !== 1 || beforeRows.length !== 1) {
+                    return { content: [{ type: 'text', text: `Error: legacy JValue.Val fallback could not resolve field ${patch.Id}.` }], isError: true };
+                }
+                const targetField = beforeRows[0];
+                const targetTableId = String(targetField.TableId || '');
+                if (patch.TableId && String(patch.TableId) !== targetTableId) {
+                    return { content: [{ type: 'text', text: 'Error: legacy JValue.Val fallback rejected a mismatched TableId.' }], isError: true };
+                }
+                const fallbackPatch = { ...patch, Id: patch.Id };
+                delete fallbackPatch.TableName;
+                const fallback = await client.updateFormData('diy_field', fallbackPatch);
+                if (fallback.Code !== 1) {
+                    return { content: [{ type: 'text', text: `Error: legacy JValue.Val fallback failed: ${fallback.Msg || ''}` }], isError: true };
+                }
+                if (targetTableId)
+                    await client.refreshSchemaCache([targetTableId]);
+                const verifyResponse = await client.getTableData('diy_field', {
+                    _Where: [['Id', '=', patch.Id]],
+                    _PageIndex: 1,
+                    _PageSize: 2,
+                });
+                const verifyRows = unwrapList(verifyResponse.Data);
+                const verified = verifyResponse.Code === 1 && verifyRows.length === 1
+                    && Object.entries(fallbackPatch).every(([key, value]) => String(verifyRows[0][key] ?? '') === String(value ?? ''));
+                if (!verified) {
+                    return { content: [{ type: 'text', text: 'Error: legacy JValue.Val fallback write could not be verified by readback.' }], isError: true };
+                }
+                result = {
+                    Code: 1,
+                    Data: { Id: patch.Id, TableId: targetTableId, LegacyJValueFallback: true },
+                    Msg: 'Legacy JValue.Val fallback applied and verified.',
+                };
+            }
             if (result.Code !== 1)
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             return { content: [{ type: 'text', text: `✅ Field updated. ${JSON.stringify(result.Data)}` }] };
@@ -5266,7 +5309,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 创建功能模块/菜单（低代码系统设计）
     // ========================
-    server.tool('microi_create_module', `Create a menu module for OsClient "${osClient}". Inserts a record into sys_menu table (NOT sys_module, NOT Sys_Module). Links a diy_table to the navigation sidebar. IDEMPOTENT — calling again with the same Name+ParentId returns Skipped:true with the existing ModuleId. URL collisions are auto-resolved with random suffixes (concurrency-safe). Step 4 of system design. ⚠️ For business systems, also pass moreBtns/formBtns/pageTabs/batchSelectMoreBtns JSON to wire up business buttons in one call — see skill doc microi.skills/v8-menu-buttons.`, {
+    server.tool('microi_create_module', `Create a menu module for OsClient "${osClient}". Inserts a record into sys_menu table (NOT sys_module, NOT Sys_Module). Links a diy_table to the navigation sidebar. IDEMPOTENT — calling again with the same Name+ParentId returns Skipped:true with the existing ModuleId. URL collisions are auto-resolved with random suffixes (concurrency-safe). Every visible bound Diy module receives a real-data compact Hero, meaningful metrics, a sensible PC composite column and a complete mobile card when viewSchema is omitted; EnableViewSchema remains 0 because it controls Detail/Edit custom forms only. Step 4 of system design. ⚠️ For business systems, also pass moreBtns/formBtns/pageTabs/batchSelectMoreBtns JSON to wire up business buttons in one call — see skill doc microi.skills/v8-menu-buttons.`, {
         name: z.string().describe('Module display name (Chinese, e.g. "客户管理", "订单列表")'),
         diyTableId: z.string().optional().describe('The TableId to bind this module to (from microi_create_table)'),
         parentId: z.string().optional().describe('Parent menu Id for nesting (omit for top-level)'),
@@ -5274,6 +5317,7 @@ export function createMcpServer(client, context) {
         componentPath: z.string().optional().describe('Component path. Default: "/diy/diy-table-rowlist"'),
         display: z.number().optional().describe('Show in PC menu (1=yes, 0=no). Default: 1'),
         appDisplay: z.number().optional().describe('Show in mobile menu (1=yes, 0=no). Default: 1'),
+        hasChild: z.number().optional().describe('Whether this menu has visible child menus. A hidden TableChild carrier module MUST set 0.'),
         openType: z.string().optional().describe('Open type. Default: "Diy" (low-code page). Options: "Diy", "Url", "Page", "MicroService"'),
         url: z.string().optional().describe('Menu route. MicroService menus normally use /micro-app/{MicroServiceKey}/{routePath}.'),
         sort: z.number().optional().describe('Sort order for menu display. Default: 100. Lower numbers appear first'),
@@ -5287,7 +5331,7 @@ export function createMcpServer(client, context) {
         enableViewSchema: z.number().optional().describe('Enable custom Detail/Edit form views (1=yes, 0=no). List/Card presentation in ViewSchema is applied whenever configured and is not gated by this switch. Default: 0.'),
         viewSchemaVersion: z.string().optional().describe('Optional ViewSchema protocol version stored in sys_menu.ViewSchemaVersion. Blank or omitted defaults to "1.0".'),
         viewConfigVersion: z.number().optional().describe('Optional monotonic configuration version stored in sys_menu.ViewConfigVersion. Omitted defaults to 1.'),
-        viewSchema: z.union([z.string(), jsonRecordSchema]).optional().describe('Versioned cross-client view JSON object/string stored in sys_menu.ViewSchema. Supports Detail/Edit/List/Card and PC/Mobile/All. Layout.List keeps multi-line Columns[].Lines, TrailingFields and RequiredFields; Layout.Card keeps AvatarTextField, TitleField, SubtitleFields, StatusFields, TopFields, RightFields, Fields, MetaFields and BottomFields.'),
+        viewSchema: z.union([z.string(), jsonRecordSchema]).optional().describe('Versioned cross-client view JSON object/string stored in sys_menu.ViewSchema. When omitted for a visible bound Diy module, MCP generates List/Card presentation only. Supports Detail/Edit/List/Card and PC/Mobile/All. Layout.List keeps multi-line Columns[].Lines, TrailingFields and RequiredFields; Layout.Card keeps AvatarTextField, TitleField, SubtitleFields, StatusFields, TopFields, RightFields, Fields, MetaFields and BottomFields.'),
         moreBtns: z.string().optional().describe('Row action buttons JSON ARRAY (string). Each item: {Id,Sort,Name,Icon,BtnStyle,IsVisible,ShowRow:true,V8CodeShow,V8Code,RunBackground,BackgroundTask,IsBackgroundTask,ApiEngineKey}. V8Code typically calls V8.ApiEngine.Run(...). Long tasks such as install/import/init should set RunBackground=true and ApiEngineKey so the frontend starts a background task. Example: \'[{"Id":"01K...","Name":"指派","BtnStyle":"primary","IsVisible":true,"ShowRow":true,"V8CodeShow":"V8.Result=V8.Form.Status==\\"待指派\\";","V8Code":"V8.OpenAnyForm({TableName:\\"Diy_X\\",Id:V8.Form.Id,FormMode:\\"Edit\\",SelectFields:[\\"AssigneeId\\"],EventReplace:{Submit:async function(v8,p,cb){var r=await V8.ApiEngine.Run({ApiEngineKey:\\"x_assign\\",Id:v8.Form.Id,AssigneeId:v8.Form.AssigneeId});cb(r);V8.RefreshTable({_PageIndex:1});}}});"}]\''),
         formBtns: z.string().optional().describe('Form bottom buttons JSON ARRAY (string). Same item shape as moreBtns but ShowRow not required. Buttons may configure BadgeEnabled, BadgeApiEngineKey, BadgeValuePath, BadgeTone, BadgeMax, BadgeShowZero and BadgeRefreshSeconds.'),
         batchSelectMoreBtns: z.string().optional().describe('Batch action buttons JSON ARRAY (string). Same item and optional Badge* fields as moreBtns. Use V8.TableRowSelected to access selected rows; badge APIs must batch current-page Ids instead of calling once per row.'),
@@ -5310,7 +5354,7 @@ export function createMcpServer(client, context) {
         microServiceRoutePath: z.string().optional().describe('Internal Vue route such as /context-test. Required when openType=MicroService.'),
         microServiceKey: z.string().optional().describe('sys_microiservice.MsKey/AppKey. Used to generate the friendly menu URL.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Must exactly equal name, or EXECUTE. Omit for a dry-run payload.'),
-    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, openType, url, sort, icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
+    }, async ({ name, diyTableId, parentId, componentName, componentPath, display, appDisplay, hasChild, openType, url, sort, icon, menuBadgeEnabled, menuBadgeApiEngineKey, searchFieldIds, tableDiyFieldIds, defaultOrderBy, sqlWhere, enableViewSchema, viewSchemaVersion, viewConfigVersion, viewSchema, moreBtns, formBtns, batchSelectMoreBtns, pageTabs, exportMoreBtns, pageBtns, sortFieldIds, notShowFields, sqlJoin, joinTables, selectFields, statisticsFields, inTableEdit, inTableEditFields, mobileListFields, cardTitleTagFields, cardBottomTagFields, microServiceId, microServicePageId, microServiceRoutePath, microServiceKey, confirmExecution }) => {
         try {
             const isMicroService = String(openType || '').toLowerCase() === 'microservice'
                 || Boolean(microServiceId || microServicePageId || microServiceRoutePath || microServiceKey);
@@ -5342,6 +5386,28 @@ export function createMcpServer(client, context) {
                     : '/' + routePath.slice(1).split('/').map(segment => encodeURIComponent(segment)).join('/');
                 effectiveUrl = url || `/micro-app/${encodeURIComponent(String(microServiceKey))}${encodedRoute}`;
             }
+            let effectiveViewSchema = viewSchema;
+            const autoPresentationEligible = Boolean(diyTableId)
+                && !isMicroService
+                && String(effectiveOpenType || 'Diy').toLowerCase() === 'diy'
+                && ((display ?? 1) === 1 || (appDisplay ?? 1) === 1);
+            if (!effectiveViewSchema && autoPresentationEligible && diyTableId) {
+                const fieldResult = await client.getFieldList(undefined, diyTableId);
+                if (fieldResult.Code !== 1) {
+                    return {
+                        content: [{ type: 'text', text: `Error: 无法读取模块字段并生成默认展示配置：${fieldResult.Msg}` }],
+                        isError: true,
+                    };
+                }
+                effectiveViewSchema = buildDefaultModulePresentation(name, unwrapList(fieldResult.Data), name);
+            }
+            const normalizedViewSchema = normalizeViewSchemaJson(effectiveViewSchema);
+            if (!normalizedViewSchema.ok) {
+                return {
+                    content: [{ type: 'text', text: `Error: ${normalizedViewSchema.errors.join('\n')}` }],
+                    isError: true,
+                };
+            }
             if (confirmExecution !== name && confirmExecution !== 'EXECUTE') {
                 return {
                     content: [{ type: 'text', text: JSON.stringify({
@@ -5350,6 +5416,7 @@ export function createMcpServer(client, context) {
                                 module: {
                                     Name: name,
                                     ParentId: parentId,
+                                    HasChild: hasChild,
                                     OpenType: effectiveOpenType || 'Diy',
                                     ComponentName: effectiveComponentName,
                                     ComponentPath: effectiveComponentPath,
@@ -5357,7 +5424,7 @@ export function createMcpServer(client, context) {
                                     MenuBadgeEnabled: menuBadgeEnabled ?? 0,
                                     MenuBadgeApiEngineKey: menuBadgeApiEngineKey,
                                     EnableViewSchema: enableViewSchema ?? 0,
-                                    ViewSchema: viewSchema,
+                                    ViewSchema: normalizedViewSchema.value ? JSON.parse(normalizedViewSchema.value) : undefined,
                                     IsMicroiService: isMicroService ? 1 : 0,
                                     MicroServiceId: microServiceId,
                                     MicroServicePageId: microServicePageId,
@@ -5367,17 +5434,10 @@ export function createMcpServer(client, context) {
                             }, null, 2) }],
                 };
             }
-            const normalizedViewSchema = normalizeViewSchemaJson(viewSchema);
-            if (!normalizedViewSchema.ok) {
-                return {
-                    content: [{ type: 'text', text: `Error: ${normalizedViewSchema.errors.join('\n')}` }],
-                    isError: true,
-                };
-            }
             const result = await client.createModule({
                 Name: name, DiyTableId: diyTableId, ParentId: parentId,
                 ComponentName: effectiveComponentName, ComponentPath: effectiveComponentPath,
-                Display: display ?? 1, AppDisplay: appDisplay ?? 1,
+                Display: display ?? 1, AppDisplay: appDisplay ?? 1, HasChild: hasChild,
                 OpenType: effectiveOpenType, Url: effectiveUrl, Sort: sort,
                 Icon: icon,
                 MenuBadgeEnabled: menuBadgeEnabled ?? 0,
@@ -5706,31 +5766,90 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 同步微服务源码到在线 AI 应用
     // ========================
-    server.tool('microi_sync_microservice_source', `Sync local microservice source files into the online AI Application for OsClient "${osClient}". The app is created/upserted as AppType=MicroService; source files are private and remain separate from published assets.`, {
+    server.tool('microi_sync_microservice_source', `Sync a local Web, UniApp or MicroService source directory into the online AI Application for OsClient "${osClient}". Prefer directory: MCP scans, hashes and reads the local files internally, so AI agents must never read large files into Base64, create .sync-seg-* files, create sync-source-files.json, or split one source file across tool calls. The legacy sourceFiles array remains available only for compatibility. Source files stay private and separate from published assets.`, {
         microService: jsonRecordSchema.describe('Microservice metadata. Required: MsKey and MsName/Name. Optional: Description and SourceDirName.'),
-        sourceFiles: z.array(jsonRecordSchema).describe('Source files. Each item needs Path/FilePath and FileByteBase64/ContentBase64. Optional: Size and Sha256.'),
+        directory: z.string().optional().describe('Preferred. Absolute local project directory; MCP reads it directly and excludes node_modules, dist, build, coverage, caches and VCS data.'),
+        sourceFiles: z.array(jsonRecordSchema).optional().describe('Legacy compatibility only. Do not construct this array from manually split files when a local directory is available.'),
         replace: z.boolean().optional().describe('When true, remove stale private-source metadata not present in this manifest. Public runtime/build rows are always preserved.'),
         confirmExecution: z.string().optional().describe('Required for real writes. Pass any non-empty confirmation string after reviewing the payload.'),
-    }, async ({ microService, sourceFiles, replace, confirmExecution }) => {
-        if (!confirmExecution) {
-            return {
-                content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, sourceFileCount: sourceFiles.length, replace: replace === true }, null, 2) }],
-            };
-        }
+    }, async ({ microService, directory, sourceFiles, replace, confirmExecution }) => {
         try {
+            const explicitFiles = sourceFiles || [];
+            if (directory && explicitFiles.length > 0) {
+                throw new Error('directory 与 sourceFiles 不能同时传入；本地工程必须只传 directory。');
+            }
+            if (!directory && explicitFiles.length === 0) {
+                throw new Error('请传入 directory；仅兼容旧调用时才传 sourceFiles。');
+            }
+            const localManifest = directory
+                ? await buildLocalMicroServiceSourceManifest(directory)
+                : null;
+            const summary = localManifest
+                ? {
+                    sourceMode: 'local-directory',
+                    sourceDirectory: localManifest.rootDirectory,
+                    sourceFileCount: localManifest.files.length,
+                    totalSize: localManifest.totalSize,
+                    sourceManifestHash: localManifest.manifestHash,
+                    files: localManifest.files.map(file => ({ Path: file.relativePath, Size: file.size, Sha256: file.sha256 })),
+                    skippedDirectories: localManifest.skippedDirectories,
+                    skippedFiles: localManifest.skippedFiles,
+                    aiContextFileBytes: 0,
+                    manualChunking: false,
+                }
+                : {
+                    sourceMode: 'legacy-inline-array',
+                    sourceFileCount: explicitFiles.length,
+                    manualChunking: false,
+                };
+            if (!confirmExecution) {
+                return {
+                    content: [{ type: 'text', text: JSON.stringify({ dryRun: true, microService, replace: replace === true, ...summary }, null, 2) }],
+                };
+            }
+            const uploadFiles = localManifest
+                ? await Promise.all(localManifest.files.map(async (file) => {
+                    const bytes = await fs.promises.readFile(file.absolutePath);
+                    const actualSha256 = crypto.createHash('sha256').update(bytes).digest('hex');
+                    if (bytes.byteLength !== file.size || actualSha256 !== file.sha256) {
+                        throw new Error(`源码在 dry-run/清单生成后发生变化：${file.relativePath}`);
+                    }
+                    return {
+                        Path: file.relativePath,
+                        FileName: path.posix.basename(file.relativePath),
+                        FileByteBase64: bytes.toString('base64'),
+                        Size: file.size,
+                        Sha256: file.sha256,
+                    };
+                }))
+                : explicitFiles;
             // Replace=true on legacy servers could prune public build metadata because
             // source and runtime rows share mci_ai_app_file. The new flag is ignored by
             // old servers (safe/no prune) and honored by new servers (private-only prune).
             const result = await client.syncMicroServiceSource({
                 microService,
-                sourceFiles,
+                sourceFiles: uploadFiles,
                 Replace: false,
                 ReplacePrivateSourceOnly: replace === true,
             });
             if (result.Code !== 1) {
                 return { content: [{ type: 'text', text: `Error: ${result.Msg}` }], isError: true };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(result.Data, null, 2) }] };
+            const evidence = asJsonRecord(result.Data);
+            if (localManifest) {
+                requireStreamEvidenceNumber(evidence, 'FileCount', localManifest.files.length, '源码目录同步');
+                requireStreamEvidenceNumber(evidence, 'TotalSize', localManifest.totalSize, '源码目录同步');
+                requireStreamEvidenceString(evidence, 'SourceManifestHash', localManifest.manifestHash, '源码目录同步');
+            }
+            return {
+                content: [{ type: 'text', text: JSON.stringify({
+                            ...evidence,
+                            sourceMode: localManifest ? 'local-directory' : 'legacy-inline-array',
+                            sourceDirectory: localManifest?.rootDirectory,
+                            aiContextFileBytes: 0,
+                            manualChunking: false,
+                        }, null, 2) }],
+            };
         }
         catch (e) {
             return { content: [{ type: 'text', text: `Error: ${e instanceof Error ? e.message : String(e)}` }], isError: true };
@@ -5801,7 +5920,7 @@ export function createMcpServer(client, context) {
     // ========================
     // Tool: 流式发布完整应用目录
     // ========================
-    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using bounded multipart file streams and deterministic RequestId evidence. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Each file is capped at 128 MiB and the complete manifest at 1 GiB before upload. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without RequestId support fail closed.`, {
+    server.tool('microi_publish_application_directory_stream', `Publish a real Web, UniApp or MicroService build directory for OsClient "${osClient}" using deterministic RequestId evidence. Protocol v3 automatically switches files above the legacy 128 MiB request boundary to durable HDFS multipart sessions with per-part SHA-256, status readback and reconnect resume; logical files such as 5 GiB installers never enter Base64/Jint or whole-file memory. publishMode=stage uploads immutable version assets only; finalize rebuilds the same local manifest and promotes it without uploading; stage-and-finalize keeps the original one-call flow. Paths, hashes, sizes, request ids, version preconditions and final manifest evidence are verified strictly. Old API nodes without the resumable endpoints fail closed for oversized assets.`, {
         appIdOrKey: z.string().min(1).describe('Existing sys_microistore Id or AppKey.'),
         versionNo: z.string().regex(/^v?\d+\.\d+\.\d+$/u).describe('Immutable semantic version, e.g. v1.2.3.'),
         directory: z.string().min(1).describe('Local compiled output directory such as dist or unpackage/dist/build/h5.'),
@@ -5827,7 +5946,7 @@ export function createMcpServer(client, context) {
         expectedCommittedPublishVersionId: z.string().min(1).nullable().optional().describe('Protocol v3 committed version id baseline; explicit null means empty.'),
         includeSourceMaps: z.boolean().optional().default(false).describe('Publish *.map source maps. Defaults to false to avoid source disclosure.'),
         maxFiles: z.number().int().min(1).max(20_000).optional().describe('Safety cap checked before upload. Default and hard maximum 20,000.'),
-        maxTotalMegabytes: z.number().positive().max(1024).optional().default(1024).describe('Safety cap checked before upload. Default and hard maximum 1 GiB (1024 MiB).'),
+        maxTotalMegabytes: z.number().positive().max(Number.MAX_SAFE_INTEGER / (1024 * 1024)).optional().describe('Optional caller safety cap checked before upload. Omit for the platform maximum; 5 GiB and larger builds use resumable HDFS multipart.'),
         timeoutMsPerFile: z.number().int().min(1_000).max(2 * 60 * 60_000).optional().describe('Per-file upload timeout. Default 30 minutes.'),
         allowLegacyFallback: z.boolean().optional().default(false).describe('Deprecated compatibility flag. RequestId-capable two-phase publishing fails closed on old API nodes instead of publishing through the legacy payload.'),
         confirmExecution: z.string().optional().describe('Required for real publishing and must exactly equal appIdOrKey. Omit for a local preflight manifest only.'),

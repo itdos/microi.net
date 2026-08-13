@@ -204,22 +204,8 @@ namespace Microi.net
             OssClient ossClientPrivate = null;
             OssClient ossClient = null;
 
-            // 普通上传保持原 60 秒；数据库备份等已授权长任务可按单次请求
-            // 显式放宽。上限 2 小时，避免把错误端点变成无限挂起。
-            var uploadTimeoutSeconds = Math.Max(5, Math.Min(7200, param.TimeoutSeconds ?? 60));
-            var uploadTimeoutMilliseconds = checked(uploadTimeoutSeconds * 1000);
-            var configPrivate = new ClientConfiguration
-            {
-                ConnectionTimeout = uploadTimeoutMilliseconds,
-                MaxErrorRetry = 3,
-                EnableCrcCheck = false // 禁用CRC校验，可能影响某些上传
-            };
-            var configPublic = new ClientConfiguration
-            {
-                ConnectionTimeout = uploadTimeoutMilliseconds,
-                MaxErrorRetry = 3,
-                EnableCrcCheck = false
-            };
+            var configPrivate = CreateUploadClientConfiguration(param);
+            var configPublic = CreateUploadClientConfiguration(param);
 
             bucketNamePrivate = clientModel.OsClientModel["AliOssPrivateBucketName"].Val<string>();
             //这里无需再判断是走内网、还是走外网，因为clientModel.AliOssPrivateEndpoint已经是根据OsClientNetwork=Internet/Internal存储的内网或外网地址
@@ -293,13 +279,13 @@ namespace Microi.net
                     // multipart API with a bounded window per part.
                     if (declaredLength >= 64L * 1024 * 1024 || !param.FileStream.CanSeek)
                     {
-                        return PutMultipartObject(
+                        return await PutMultipartObjectAsync(
                             param.Limit == true ? ossClientPrivate : ossClient,
                             param.Limit == true ? bucketNamePrivate : bucketName,
                             objectKey,
                             param.FileStream,
                             declaredLength,
-                            param.CancellationToken);
+                            param.CancellationToken).ConfigureAwait(false);
                     }
                     
                     // 直接上传，让SDK自动处理
@@ -325,7 +311,11 @@ namespace Microi.net
         internal static long CalculateMultipartPartSize(long totalBytes)
         {
             if (totalBytes < 0) throw new ArgumentOutOfRangeException(nameof(totalBytes));
-            const long minimum = 64L * 1024 * 1024;
+            // Keep provider requests below common proxy/SDK timeout windows.
+            // 5 GiB therefore uses 320 OSS parts, still far below the provider
+            // limit of 10,000.  The dynamic lower bound grows automatically for
+            // multi-terabyte objects so the same limit is never exceeded.
+            const long minimum = 16L * 1024 * 1024;
             const long unit = 1024L * 1024;
             const long providerMaxPart = 5L * 1024 * 1024 * 1024;
             var required = totalBytes == 0 ? minimum : (totalBytes + 9_999L) / 10_000L;
@@ -338,7 +328,55 @@ namespace Microi.net
             return partSize;
         }
 
-        private static DosResult PutMultipartObject(
+        internal static ClientConfiguration CreateUploadClientConfiguration(HDFSParam param)
+        {
+            // 普通上传保持原 60 秒；数据库备份、应用发布等已授权长任务可按单次请求
+            // 显式放宽。上限 2 小时，避免把错误端点变成无限挂起。
+            var uploadTimeoutSeconds = Math.Max(5, Math.Min(7200, param?.TimeoutSeconds ?? 60));
+            var declaredLength = param?.ContentLength
+                                 ?? (param?.FileStream?.CanSeek == true
+                                     ? param.FileStream.Length
+                                     : -1L);
+            var useStableLargeObjectTransport = declaredLength >= 64L * 1024 * 1024
+                                                || param?.FileStream?.CanSeek == false;
+            return new ClientConfiguration
+            {
+                ConnectionTimeout = checked(uploadTimeoutSeconds * 1000),
+                MaxErrorRetry = 3,
+                EnableCrcCheck = false,
+                // Aliyun OSS SDK 2.14.1 defaults to a shared HttpClient whose
+                // timeout cancellation has been observed during long UploadPart
+                // requests. Its retained HttpWebRequest implementation applies
+                // both request and read/write timeouts per request and supports
+                // direct streaming. Limit this compatibility path to large or
+                // non-seekable objects; ordinary uploads keep the default client.
+                UseNewServiceClient = !useStableLargeObjectTransport,
+                DirectWriteStreamThreshold = useStableLargeObjectTransport ? 1L : 0L
+            };
+        }
+
+        private static string BuildMultipartFailureMessage(
+            string phase,
+            int partNumber,
+            long offset,
+            long partSize,
+            long totalBytes,
+            CancellationToken cancellationToken,
+            Exception exception)
+        {
+            var root = exception?.GetBaseException() ?? exception;
+            var message = root?.Message ?? exception?.Message ?? "未知错误";
+            if (message.Length > 1200) message = message.Substring(0, 1200);
+            return "阿里云OSS multipart上传失败："
+                   + $"Phase={phase};PartNumber={partNumber};Offset={offset};"
+                   + $"PartSize={partSize};TotalBytes={totalBytes};"
+                   + $"CallerCancellationRequested={cancellationToken.IsCancellationRequested};"
+                   + $"ExceptionType={exception?.GetType().FullName ?? "Unknown"};"
+                   + $"RootExceptionType={root?.GetType().FullName ?? "Unknown"};"
+                   + "Message=" + message;
+        }
+
+        private static async Task<DosResult> PutMultipartObjectAsync(
             OssClient client,
             string bucketName,
             string objectKey,
@@ -347,6 +385,10 @@ namespace Microi.net
             CancellationToken cancellationToken)
         {
             InitiateMultipartUploadResult initiated = null;
+            var phase = "InitiateMultipartUpload";
+            var partNumber = 0;
+            long offset = 0;
+            long currentSize = 0;
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -354,13 +396,23 @@ namespace Microi.net
                     new InitiateMultipartUploadRequest(bucketName, objectKey));
                 var partSize = CalculateMultipartPartSize(totalBytes);
                 var partETags = new List<PartETag>();
-                long offset = 0;
-                var partNumber = 1;
+                partNumber = 1;
                 while (offset < totalBytes)
                 {
+                    phase = "PreparePart";
                     cancellationToken.ThrowIfCancellationRequested();
-                    var currentSize = Math.Min(partSize, totalBytes - offset);
-                    using var window = new BoundedReadStream(source, currentSize, cancellationToken);
+                    currentSize = Math.Min(partSize, totalBytes - offset);
+                    // Aliyun OSS SDK 2.14 seeks its UploadPart input while
+                    // calculating or retrying the request. HTTP request bodies
+                    // and resumable chunk streams are intentionally not
+                    // seekable, so spool only this bounded provider part to a
+                    // DeleteOnClose file. Memory remains constant and the full
+                    // multi-gigabyte logical object is never materialized.
+                    using var window = await CreateSeekableMultipartPartAsync(
+                        source,
+                        currentSize,
+                        cancellationToken).ConfigureAwait(false);
+                    phase = "UploadPart";
                     var upload = client.UploadPart(new UploadPartRequest(
                         bucketName,
                         objectKey,
@@ -370,9 +422,6 @@ namespace Microi.net
                         PartNumber = partNumber,
                         PartSize = currentSize
                     });
-                    if (window.BytesRead != currentSize)
-                        throw new EndOfStreamException(
-                            $"OSS multipart第{partNumber}块长度不足，期望{currentSize}，实际{window.BytesRead}。");
                     partETags.Add(upload.PartETag ?? new PartETag(partNumber, upload.ETag));
                     offset += currentSize;
                     partNumber++;
@@ -380,6 +429,8 @@ namespace Microi.net
 
                 // Empty objects stay on the ordinary PutObject route, so a
                 // multipart completion always contains at least one part.
+                phase = "CompleteMultipartUpload";
+                currentSize = 0;
                 var complete = new CompleteMultipartUploadRequest(
                     bucketName,
                     objectKey,
@@ -390,6 +441,14 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
+                var failure = BuildMultipartFailureMessage(
+                    phase,
+                    partNumber,
+                    offset,
+                    currentSize,
+                    totalBytes,
+                    cancellationToken,
+                    ex);
                 if (initiated != null && !initiated.UploadId.DosIsNullOrWhiteSpace())
                 {
                     try
@@ -401,7 +460,68 @@ namespace Microi.net
                     }
                     catch { }
                 }
-                return new DosResult(0, null, "阿里云OSS multipart上传失败：" + ex.Message);
+                return new DosResult(0, null, failure);
+            }
+        }
+
+        internal static async Task<FileStream> CreateSeekableMultipartPartAsync(
+            Stream source,
+            long length,
+            CancellationToken cancellationToken)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (!source.CanRead) throw new ArgumentException("源流不可读。", nameof(source));
+            if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+
+            var temporaryPath = Path.Combine(
+                Path.GetTempPath(),
+                "microi-oss-part-" + Guid.NewGuid().ToString("N") + ".tmp");
+            FileStream seekable = null;
+            try
+            {
+                seekable = new FileStream(
+                    temporaryPath,
+                    FileMode.CreateNew,
+                    FileAccess.ReadWrite,
+                    FileShare.None,
+                    128 * 1024,
+                    FileOptions.DeleteOnClose | FileOptions.SequentialScan);
+                var buffer = new byte[128 * 1024];
+                long copied = 0;
+                while (copied < length)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var requested = (int)Math.Min(buffer.Length, length - copied);
+                    // ASP.NET Core request bodies reject synchronous reads by
+                    // default. Always consume the inbound body asynchronously;
+                    // only the bounded temporary FileStream is later read
+                    // synchronously by Aliyun OSS SDK 2.14.
+                    var read = await source.ReadAsync(
+                        buffer,
+                        0,
+                        requested,
+                        cancellationToken).ConfigureAwait(false);
+                    if (read <= 0)
+                    {
+                        throw new EndOfStreamException(
+                            $"OSS multipart临时分片长度不足，期望{length}，实际{copied}。");
+                    }
+                    await seekable.WriteAsync(
+                        buffer,
+                        0,
+                        read,
+                        cancellationToken).ConfigureAwait(false);
+                    copied += read;
+                }
+                await seekable.FlushAsync(cancellationToken).ConfigureAwait(false);
+                seekable.Position = 0;
+                return seekable;
+            }
+            catch
+            {
+                seekable?.Dispose();
+                try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); } catch { }
+                throw;
             }
         }
 

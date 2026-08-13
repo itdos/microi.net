@@ -42,6 +42,56 @@ public class ApplicationAssetStreamPublishTests
     }
 
     [Fact]
+    public void CommittedV3Manifest_AcceptsFiveGiBLogicalAssetThroughResumableTransport()
+    {
+        const long fiveGiB = 5L * 1024 * 1024 * 1024;
+        var manifest = new JArray
+        {
+            new JObject
+            {
+                ["Path"] = "index.html",
+                ["Sha256"] = new string('a', 64),
+                ["Size"] = fiveGiB,
+                ["IsEntry"] = true
+            }
+        };
+        var version = new JObject
+        {
+            ["EntryPath"] = "index.html",
+            ["AssetManifestJson"] = manifest.ToString(Newtonsoft.Json.Formatting.None),
+            ["RuntimeManifestHash"] = V8McpLogic.ComputeMicroServiceManifestHash(manifest)
+        };
+
+        Assert.Null(V8McpLogic.ValidateApplicationAssetV3CommittedManifest(version));
+    }
+
+    [Fact]
+    public void CommittedV3Manifest_RejectsLogicalAssetBeyondProviderBoundary()
+    {
+        var tooLarge = V8McpLogic.ApplicationAssetResumableMaxObjectBytes + 1L;
+        var manifest = new JArray
+        {
+            new JObject
+            {
+                ["Path"] = "index.html",
+                ["Sha256"] = new string('a', 64),
+                ["Size"] = tooLarge,
+                ["IsEntry"] = true
+            }
+        };
+        var version = new JObject
+        {
+            ["EntryPath"] = "index.html",
+            ["AssetManifestJson"] = manifest.ToString(Newtonsoft.Json.Formatting.None),
+            ["RuntimeManifestHash"] = V8McpLogic.ComputeMicroServiceManifestHash(manifest)
+        };
+
+        Assert.Contains(
+            "Size 超限",
+            V8McpLogic.ValidateApplicationAssetV3CommittedManifest(version));
+    }
+
+    [Fact]
     public void ValidateStreamPublishOperator_DoesNotPropagateDynamicJValueBinding()
     {
         var validate = typeof(V8McpLogic).GetMethod(
@@ -1584,6 +1634,11 @@ public class ApplicationAssetStreamPublishTests
             "Microi.Core",
             "V8Engine",
             "V8McpLogic.ApplicationAssetStream.cs"));
+        var runtimeSource = File.ReadAllText(Path.Combine(
+            serverRoot,
+            "Microi.Core",
+            "V8Engine",
+            "V8McpLogic.ApplicationAssetStreamV3.Runtime.cs"));
         Assert.Equal(2, CountOccurrences(publisherSource, "}, async lease =>"));
         Assert.Contains("ExecuteApplicationAssetSideEffect(", publisherSource);
         Assert.Contains("FencingToken = fencingToken", publisherSource);
@@ -1751,6 +1806,25 @@ public class ApplicationAssetStreamPublishTests
         Assert.Contains("decodedLength > V8McpLogic.ApplicationAssetStreamMaxFileBytes", controllerSource);
         Assert.Contains("FileOptions.DeleteOnClose", controllerSource);
         Assert.Contains("stream.Length", controllerSource);
+        Assert.Contains("NumberStyles.None", controllerSource);
+        Assert.Contains("CultureInfo.InvariantCulture", controllerSource);
+        Assert.Contains("out var expectedCurrentVersion", controllerSource);
+        Assert.Contains("protocolParam[fieldName] = expectedCurrentVersion", controllerSource);
+        Assert.Contains("RouteSnapshotJson = request.RouteSnapshotJson", runtimeSource);
+        Assert.Equal(
+            2,
+            CountOccurrences(runtimeSource, "RouteSnapshotJson = plan.RouteSnapshotJson"));
+        Assert.DoesNotContain(
+            ".AddInParameter(\"@now\", DateTime.Now)",
+            runtimeSource);
+        Assert.DoesNotContain(
+            ".AddInParameter(\"@now\", now)",
+            runtimeSource);
+        Assert.Equal(
+            16,
+            CountOccurrences(
+                runtimeSource,
+                ".AddInParameter(\"@now\", System.Data.DbType.DateTime,"));
     }
 
     [Fact]

@@ -4,7 +4,7 @@
 # Microi吾码平台 Docker Compose 一键安装脚本
 # 支持宝塔面板 Docker 编排模块可视化管理
 # 兼容 CentOS 7/8/9、Ubuntu 20/22/24、Debian 10/11/12
-# 版本：v2026-08-12 10:00:44
+# 版本：v2026-08-14 05:20:59
 # 维护规则：每次修改本文件必须同步更新此版本时间（Asia/Shanghai，精确到秒）
 # ============================================================
 # 编排列表（每个编排在宝塔面板中独立可见）：
@@ -29,7 +29,7 @@
 
 set -e
 
-SCRIPT_VERSION="v2026-08-12 10:00:44"
+SCRIPT_VERSION="v2026-08-14 05:20:59"
 RUNTIME_OS_CLIENT_TYPE="Product"
 RUNTIME_OS_CLIENT_NETWORK="Internal"
 MINIMUM_PLATFORM_SERVER_VERSION="6.9.8.6"
@@ -4214,7 +4214,10 @@ ${COMPOSE_SERVICE_NETWORK}
       - DOCKER_API_VERSION=1.40
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: microi-install-api microi-install-client
+    # The upstream default is 86400 seconds. A five-minute poll keeps patch
+    # releases timely while rolling-restart avoids taking both monitored
+    # services down together.
+    command: --interval 300 --rolling-restart microi-install-api microi-install-client
     logging:
       driver: "json-file"
       options:

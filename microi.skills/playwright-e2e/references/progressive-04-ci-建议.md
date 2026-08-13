@@ -28,7 +28,7 @@ jobs:
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-024 sha256=01abd9079de1ec60a1de8a441b93e32beccd0666f7fedf359ccbec2e0d40f8e9 -->
+<!-- microi-progressive:chunk id=playwright-e2e-024 sha256=b939c97eef28fab71caa54d134ea524d7ed7c8381deec09e38a7d694b15f53c0 -->
 ## 常见问题
 
 | 现象 | 原因 | 处理 |
@@ -44,6 +44,50 @@ jobs:
 | 本地浏览器下载失败 | Playwright 下载 Chromium 受阻 | 先用 `PW_BROWSER_CHANNEL=msedge`，没有 Edge 时从吾码 CDN 下载 Chromium 并设置 `PW_CHROMIUM_EXECUTABLE` |
 | 用例偶发失败 | HMR 或网络请求未稳定 | CI 使用静态构建，断言明确等待关键元素 |
 | 页面有横向滚动 | 组件撑出视口 | 对根容器和列表容器加 `max-width:100vw; overflow-x:hidden` |
+
+### 多服务器、多租户并行上下文模板
+
+`incognito` 的本质是独立存储上下文。Playwright 的 `browser.newContext()` 每次都会创建隔离上下文，
+比在同一个浏览器 context 中开多个 Page 更可靠：
+
+```js
+function buildLocalMicroiUrl({ apiBase, osClient, route = '/' }) {
+  return `http://localhost:61500/?OsClient=${encodeURIComponent(osClient)}`
+    + `&ApiBase=${encodeURIComponent(apiBase)}#${route}`;
+}
+
+const targetA = await browser.newContext();
+const pageA = await targetA.newPage();
+await pageA.goto(buildLocalMicroiUrl({ apiBase: apiA, osClient: tenantA, route: '/home' }));
+await pageA.waitForFunction(() => Boolean(window.__MICROI_RUNTIME_ENDPOINT__));
+await expect.poll(() => pageA.evaluate(() => window.__MICROI_RUNTIME_ENDPOINT__)).toMatchObject({
+  apiBase: apiA,
+  osClient: tenantA,
+  requiresIsolatedContextForParallelTenants: true
+});
+
+const targetB = await browser.newContext();
+// targetB 重复同样流程；禁止复用 targetA.newPage() 测 tenantB。
+```
+
+若给定的是线上吾码页面，先在第三个一次性 context 中读取
+`window.__MICROI_RUNTIME_ENDPOINT__`。旧版回退脚本只读取公开运行目标，不读取或输出 Token：
+
+```js
+const endpoint = await page.evaluate(() => {
+  const current = window.__MICROI_RUNTIME_ENDPOINT__;
+  if (current?.apiBase && current?.osClient) return current;
+  const stored = JSON.parse(localStorage.getItem('microi.net') || '{}');
+  return {
+    apiBase: window.ApiBase || stored.ApiBase || location.origin,
+    osClient: new URLSearchParams(location.search).get('OsClient') || window.OsClient || stored.OsClient || ''
+  };
+});
+```
+
+OsClient 仍为空时调用目标站点域名租户解析接口或从成功请求确认。手工 Chrome 的第二个不同租户
+至少使用无痕窗口，但同一 Chrome 无痕会话的多个窗口可能继续共享存储；三个以上目标使用独立
+Profile 或独立 `--user-data-dir`。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=playwright-e2e-025 sha256=be071153d695081b7c20d34cb5e9563480e3f09d9cd0292f2ca4b0245438787b -->

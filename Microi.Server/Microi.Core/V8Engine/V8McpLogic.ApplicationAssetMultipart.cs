@@ -44,6 +44,25 @@ namespace Microi.net
         public static long ApplicationAssetResumableMaxObjectBytes =>
             ApplicationAssetMultipartMaxChunkBytes * ApplicationAssetMultipartTargetMaxParts;
         public static long ApplicationAssetResumableProductSizeLimitBytes => 0;
+
+        private static bool TryAddApplicationAssetResumableLogicalSize(
+            long currentTotal,
+            long logicalFileSize,
+            out long nextTotal)
+        {
+            nextTotal = 0L;
+            if (currentTotal < 0L
+                || logicalFileSize < 0L
+                || logicalFileSize > ApplicationAssetResumableMaxObjectBytes
+                || currentTotal > long.MaxValue - logicalFileSize)
+            {
+                return false;
+            }
+
+            nextTotal = currentTotal + logicalFileSize;
+            var productLimit = ApplicationAssetResumableProductSizeLimitBytes;
+            return productLimit <= 0L || nextTotal <= productLimit;
+        }
         private static readonly ConcurrentDictionary<string, long>
             ApplicationAssetMultipartAuditProjectionReady =
                 new ConcurrentDictionary<string, long>(StringComparer.OrdinalIgnoreCase);

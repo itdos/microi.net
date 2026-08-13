@@ -1,6 +1,6 @@
 ---
 name: microi-microservice
-description: Microi 前端微服务 MicroService 开发与交付指南。用于创建、读取、修改、构建、发布或修复 Vue3 微应用，维护 microi.routes.json，绑定 sys_menu，使用 V8.OpenAppDialog，处理菜单页签 keep-alive、appstate-change、状态保留、滚动条、骨架屏或白屏，或通过 MCP 管理 Web、UniApp、MicroService 应用源码和运行时。
+description: Microi 前端微服务 MicroService 开发与交付指南。用于创建、读取、修改、构建、发布或修复 Vue3 微应用，识别线上 ApiBase/OsClient 并用本地 61500 隔离复现，维护 microi.routes.json，绑定 sys_menu，使用 V8.OpenAppDialog，处理菜单页签 keep-alive、appstate-change、状态保留、滚动条、骨架屏或白屏，或通过 MCP 管理 Web、UniApp、MicroService 应用源码和运行时。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -71,6 +71,18 @@ AppKey 稳定且只含安全字符。`microi.routes.json` 是页面事实源，�
 
 构建前遵守本地 OOM 保护；已有 dev server 可复用时不重复启动。新脚手架必须支持独立
 访问时的平台帐号登录，但独立 Vite 预览仍没有菜单/弹窗等完整宿主上下文，不能替代宿主验收。
+
+### 线上目标在本地 Microi.Client 复现（强制）
+
+- 先在一次性隔离 browser context 打开线上友好路由并读取
+  `window.__MICROI_RUNTIME_ENDPOINT__`；旧版回退读取页面全局、同源缓存和域名解析，禁止猜
+  ApiBase/OsClient。
+- 在新的独立 context 打开
+  `http://localhost:61500/?OsClient=<encoded>&ApiBase=<encoded>#/micro-app/{MsKey}/{RoutePath}`。
+  两个 URL 参数是当前页面最高优先级；初始化后回读同一个运行时对象确认命中目标。
+- 同源普通窗口共享 Token、CurrentUser、ApiBase、OsClient。并行不同目标必须一组目标一个
+  Playwright `browser.newContext()` 或独立浏览器 Profile；多个无痕窗口不保证彼此隔离。
+- 本地复现、主框架宿主验收、远端运行产物和生产部署分别报告；本地通过不能替代发布后回读。
 
 迁移 Vue2 定制页到独立 Vite 微服务时，不得假设宿主会提供 Tailwind/UnoCSS 等原子类；
 页面依赖的宽高、颜色、间距、响应式和打印/下载样式必须由组件自身的语义 class 明确声明，

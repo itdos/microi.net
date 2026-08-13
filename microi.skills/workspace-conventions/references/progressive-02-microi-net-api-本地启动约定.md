@@ -20,7 +20,7 @@ Pop-Location
 **本地后端自动重启要求（强制）**：本地联调需要启动或重启 `Microi.net.Api` 时，先检查 `.tmp/microi-process-state/release.lock`；发布锁存在时禁止启动或重启。无发布时先回读标准端口和 `/api/Diagnostics/liveness`，健康服务默认复用；只有本任务修改了需重载的后端代码、服务不健康或用户明确要求重启时，才可精确停止当前工作区的后端进程，然后在 `Microi.Server/Microi.net.Api` 目录执行 `dotnet run --launch-profile Microi.net.Api`。优先使用用户能在 VS Code 中看到和停止的终端（包含 VS Code 集成终端、VS Code 任务终端、用户明确允许的 VS Code 可追踪隐藏终端）；如果当前工具没有 VS Code 终端能力，允许使用本机可见的 `cmd`/PowerShell 窗口启动，禁止使用脱离用户可见窗口的后台服务或守护进程。不要误杀数据库、Redis、Node 前端或其它业务进程。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=4b9936ad45a2893f4b9c32f3acd7230e4f57cb4314fd67e16d13ce09f368c003 -->
+<!-- microi-progressive:chunk id=workspace-conventions-025 sha256=07c3d729c8f1e9a2bf93ff00937e5d6eae4602d346e4f9254b03a33211ac4848 -->
 ## 多 AI 对话共享本地服务与发布互斥（强制）
 
 同一工作区的 4、5 个 AI 对话共用同一份源码和固定端口时，`61500/61501` 是工作区级单例共享服务，不属于某个对话。端口相同意味着无法让每个对话拥有一套独立进程；正确模型是“复用健康服务 + 需要重载时串行重启 + 发布时独占”，不能让每个对话都无条件先杀再启动。
@@ -32,6 +32,24 @@ Pop-Location
 - 发布锁存在期间，所有 AI 自动启动、服务自愈和 Playwright `webServer` 都必须等待或退出，禁止重新抢占 `61500/61501`。发布正常结束或中断时由脚本释放锁；无法证明锁持有者已退出时不得自行删除锁。
 - Edge/Chrome 主浏览器、VS Code 持有的 Playwright Test Server、语言服务和 MCP Node 进程不属于发布文件锁清理范围。浏览器自动化必须关闭本用例创建的 context/browser；不得通过 `taskkill /IM chrome.exe|msedge.exe|node.exe|dotnet.exe` 清空整机进程。
 - 人工盘点使用：`powershell -NoProfile -ExecutionPolicy Bypass -File Microi.Server/tools/Microi.LocalProcessManager.ps1 -Action Status`。需要单独停止当前工作区服务时使用 `-Action StopBackend` 或 `-Action StopFrontend`，不再让用户根据任务管理器猜进程。
+
+### 共享前端服务不等于共享浏览器会话
+
+多个 AI 对话可以复用同一个 `61500` Vite 进程，但不能复用同一个浏览器存储上下文测试不同
+`ApiBase + OsClient`。`Microi.Client` 对 localhost 同源持久化 Token、CurrentUser、ApiBase、
+OsClient 等状态；同一 Profile/Context 内切换租户会污染其它窗口。
+
+- 本地 URL 的最高优先级参数位于 `#` 之前：
+  `/?OsClient=<tenant>&ApiBase=<encodeURIComponent(apiBase)>#/route`。
+- 手工第二个不同租户至少使用无痕窗口；多个无痕窗口可能共享同一临时会话，因此更多并发目标使用
+  独立 Profile 或独立 `--user-data-dir`。
+- Playwright/Codex 为每组目标创建独立 `browser.newContext()`，一个 context 内不得用多个 Page
+  混测不同租户。只关闭本任务创建的 context/browser，不结束用户浏览器。
+- 线上目标先在一次性 context 等待页面初始化并读取 `window.__MICROI_RUNTIME_ENDPOINT__`；旧版本
+  回退读取 URL、`window.ApiBase/window.OsClient`、`localStorage['microi.net']`，必要时调用域名租户
+  解析接口。不能根据站点标题猜 OsClient，也不能把 Token 放入本地 URL。
+- 目标 API 还需允许 `http://localhost:61500` 的 CORS。运行目标识别、本地源码验证与线上部署验收
+  分层报告。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=workspace-conventions-026 sha256=73207c0cfcc442a177c47c36503dd6145fc826e23e79df3913861f65d8d16df3 -->

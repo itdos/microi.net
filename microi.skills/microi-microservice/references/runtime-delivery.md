@@ -30,6 +30,24 @@
 
 不要将本地项目的 AppKey 改成另一个已存在应用 Key。
 
+## 线上运行目标与本地宿主复现
+
+收到线上微服务 URL 时，先在一次性独立浏览器上下文等待主框架初始化，并读取
+`window.__MICROI_RUNTIME_ENDPOINT__` 中的 `apiBase`、`osClient` 和 `webBase`。旧版主框架没有该
+对象时，依次检查 URL 参数、`window.ApiBase/window.OsClient`、同源 `microi.net` 持久化状态；
+OsClient 仍为空时调用域名租户解析接口或从已经成功的请求确认，禁止按域名猜测。
+
+确认后用本地 `Microi.Client` 宿主复现，查询参数位于 `#` 之前并具有最高优先级：
+
+```text
+http://localhost:61500/?OsClient=tenant-a&ApiBase=https%3A%2F%2Fapi.example.com#/micro-app/example-app/projects
+```
+
+同源页面会共享 Pinia/localStorage、Token、CurrentUser、ApiBase 和 OsClient。每组不同的
+`ApiBase + OsClient` 必须使用独立浏览器 Profile/进程或 Playwright `browser.newContext()`；人工
+第二组至少使用无痕窗口，但多个 Chrome 无痕窗口仍可能共享同一临时会话，不能作为多组并发的
+强隔离。只切 URL 不等于隔离登录态，也不能绕过 CORS、菜单、角色或数据权限。
+
 `microi.routes.json`：
 
 ```json

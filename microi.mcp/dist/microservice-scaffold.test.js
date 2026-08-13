@@ -40,6 +40,7 @@ test('Vue MicroService scaffold preflight declares exactly one page file per rou
         assert.equal(plan.fileContents.has('tsconfig.json'), true);
         assert.equal(plan.fileContents.has('src/main.ts'), true);
         assert.equal(plan.fileContents.has('src/env.d.ts'), true);
+        assert.equal(plan.fileContents.has('src/auth.ts'), true);
         assert.equal(plan.fileContents.has('src/microi.ts'), true);
         assert.equal(plan.fileContents.has('src/routes.ts'), true);
         assert.equal(plan.fileContents.has('vite.config.js'), false);
@@ -57,7 +58,11 @@ test('Vue MicroService scaffold preflight declares exactly one page file per rou
         assert.equal(packageModel.scripts?.build, 'npm run typecheck && vite build');
         assert.equal(Object.hasOwn(packageModel.dependencies || {}, 'pinia'), false);
         assert.equal(Object.hasOwn(packageModel.dependencies || {}, 'vue-router'), false);
-        assert.match(plan.fileContents.get('src/App.vue') || '', /<script setup lang="ts">/u);
+        const appVue = plan.fileContents.get('src/App.vue') || '';
+        assert.match(appVue, /<script setup lang="ts">/u);
+        assert.match(appVue, /data-testid="standalone-login"/u);
+        assert.match(appVue, /auth\.captchaEnabled/u);
+        assert.match(appVue, /useMicroiAuthentication/u);
         for (const route of plan.routes) {
             assert.match(plan.fileContents.get(route.sourceFile) || '', /<script setup lang="ts">/u);
         }
@@ -69,15 +74,36 @@ test('Vue MicroService scaffold preflight declares exactly one page file per rou
         assert.equal(tsConfig.compilerOptions?.moduleResolution, 'Bundler');
         assert.equal(tsConfig.compilerOptions?.noUncheckedIndexedAccess, true);
         assert.equal(tsConfig.compilerOptions?.verbatimModuleSyntax, true);
-        assert.match(plan.fileContents.get('src/microi.ts') || '', /createMicroiV8/u);
-        assert.match(plan.fileContents.get('src/microi.ts') || '', /appliedHostToken/u);
+        const bridge = plan.fileContents.get('src/microi.ts') || '';
+        assert.match(bridge, /createMicroiV8/u);
+        assert.match(bridge, /appliedHostToken/u);
+        assert.match(bridge, /standaloneDefaults/u);
+        assert.match(bridge, /MicroiV8Runtime/u);
+        assert.match(bridge, /split\('\?'\)\[0\] \|\| ''/u);
+        assert.match(bridge, /moduleEngineKey/u);
+        assert.match(bridge, /permissionContext/u);
+        const auth = plan.fileContents.get('src/auth.ts') || '';
+        assert.match(auth, /GetSysConfig/u);
+        assert.match(auth, /EnableCaptcha/u);
+        assert.match(auth, /\/api\/Captcha\/GetCaptcha/u);
+        assert.match(auth, /captchaid/u);
+        assert.match(auth, /_CaptchaId/u);
+        assert.match(auth, /_CaptchaValue/u);
+        assert.match(auth, /_ClientType: 'PC'/u);
+        assert.match(auth, /microiV8\.Login/u);
+        assert.equal(auth.includes("replace(/\\/+$/, '')"), true);
         assert.match(plan.fileContents.get('src/routes.ts') || '', /MicroServiceRoute/u);
         const sdk = plan.fileContents.get('src/utils/microi.v8.js') || '';
         assert.match(sdk, /\/apiengine\//u);
         assert.doesNotMatch(sdk, /\/api\/ApiEngine\/Run/u);
+        assert.match(sdk, /DataAppend\?\.Token/u);
+        assert.match(sdk, /\[401, -1, 1001, 1002\]/u);
+        assert.match(sdk, /config\.onAuthExpired/u);
         const styles = plan.fileContents.get('src/style.css') || '';
         assert.match(styles, /min-height:\s*var\(--micro-app-available-height,\s*100vh\)/u);
         assert.doesNotMatch(styles, /min-height:\s*100vh/u);
+        assert.match(styles, /\.mci-auth-card/u);
+        assert.match(plan.fileContents.get('.gitignore') || '', /\.sync-seg-\*/u);
         assert.equal(fs.existsSync(plan.targetDirectory), false);
     }
     finally {

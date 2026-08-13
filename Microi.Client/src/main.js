@@ -484,10 +484,14 @@ window.addEventListener("beforeunload", () => {
 });
 // 执行初始化
 initApp().catch(function (error) {
+    var failedApiBase = "";
+    var failedOsClient = "";
+    try { failedApiBase = DiyCommon.GetApiBase(); } catch (readApiBaseError) {}
+    try { failedOsClient = DiyCommon.GetOsClient(); } catch (readOsClientError) {}
     reportApiServiceFailure(error, {
-        apiBase: DiyCommon.GetApiBase(),
-        osClient: DiyCommon.GetOsClient(),
-        url: error?.config?.url || DiyCommon.GetApiBase() + "/api/FormEngine/GetSysConfig"
+        apiBase: failedApiBase,
+        osClient: failedOsClient,
+        url: error?.config?.url || (failedApiBase ? failedApiBase + "/api/FormEngine/GetSysConfig" : "")
     });
     console.error("[Microi] 应用初始化失败：", error);
 });

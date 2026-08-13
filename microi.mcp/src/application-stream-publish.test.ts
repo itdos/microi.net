@@ -762,6 +762,7 @@ test('protocol v3 stage uses one release RequestId for every asset then obtains 
             GateEpoch: input.ExpectedGateEpoch,
             V3Only: true,
             AllowedModes: ['stage', 'finalize'],
+            AppId: 'v3-stage-record-id',
             AppKey: 'v3-stage-app',
             VersionId: 'version-v3-stage',
             VersionNo: 'v1.0.0',
@@ -791,7 +792,7 @@ test('protocol v3 stage uses one release RequestId for every asset then obtains 
       },
     } as unknown as MicroiClient;
     const result = await runApplicationDirectoryStreamPublish(fakeClient, {
-      appIdOrKey: 'v3-stage-app',
+      appIdOrKey: 'v3-stage-record-id',
       versionNo: 'v1.0.0',
       directory: root,
       publishMode: 'stage',
@@ -813,7 +814,7 @@ test('protocol v3 stage uses one release RequestId for every asset then obtains 
       expectedActivePublishVersionId: null,
       expectedCommittedPublishVersionId: 'version-old',
       allowLegacyFallback: false,
-      confirmExecution: 'v3-stage-app',
+      confirmExecution: 'v3-stage-record-id',
     });
     assert.equal(result.isError, undefined);
     assert.equal(uploadCalls.length, 2);

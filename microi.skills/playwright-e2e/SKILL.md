@@ -1,6 +1,6 @@
 ---
 name: playwright-e2e
-description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。用于测试 PC Vue、前端微服务菜单切换与 keep-alive/LRU、uni-app H5、网站、界面引擎、移动商城、ApiEngine/FormEngine 契约、登录流程、写入闭环、网络防护、截图、报告和 Playwright Test for VSCode 集成。
+description: 按 Microi 系统真实业务逻辑进行 Playwright 全自动化、全面测试。用于测试 PC Vue、本地多 ApiBase/OsClient 独立浏览器上下文、远端运行目标识别、前端微服务菜单切换与 keep-alive/LRU、uni-app H5、网站、界面引擎、移动商城、ApiEngine/FormEngine 契约、登录流程、写入闭环、网络防护、截图、报告和 Playwright Test for VSCode 集成。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -101,7 +101,7 @@ PW_HOME_PATH=/#/pages/index/index
 ```
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=playwright-e2e-005 sha256=e348db509b586871f19b16b6b49da840c93aa438dd891d827af7107744513e00 -->
+<!-- microi-progressive:chunk id=playwright-e2e-005 sha256=a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e -->
 ## 本地测试账号自动发现
 
 当没有显式传入 `PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD` / `MICROI_OSCLIENT` 时，AI 不要把账号密码写入后端配置来制造旁路：
@@ -110,6 +110,20 @@ PW_HOME_PATH=/#/pages/index/index
 2. 账号密码只从用户本轮明确提供、`PW_TEST_ACCOUNT` / `PW_TEST_PASSWORD`、CI Secret 或既有受保护登录态取得；`appsettings.*.json` 不再保存测试账号密码。
 3. 这些值只作为自动化进程的登录输入或接口请求参数使用。日志、最终回复、截图说明、报告和异常消息中必须写成 `<redacted>` 或“本地配置凭据”，不要展开真实账号密码、Token、连接串或 Redis 密码。
 4. 如果凭据不存在或登录失败，再报告具体阻塞点，例如“未提供受保护测试凭据”“本地后端未启动”“登录接口返回 Code=0”，不要泛泛说无法测试。
+
+### 跨 ApiBase / OsClient 本地自动化（强制）
+
+1. 复用工作区唯一的 `61500` Vite 服务，但每组 `ApiBase + OsClient` 创建独立
+   `browser.newContext()`；禁止在同一个 context 的多个 Page 中混测不同租户。
+2. 本地入口固定把参数放在 `#` 前：
+   `http://localhost:61500/?OsClient=${encodeURIComponent(osClient)}&ApiBase=${encodeURIComponent(apiBase)}#/route`。
+   URL 参数应覆盖 `index.html`、`src/config.json`、Pinia 和 localStorage。
+3. 页面初始化后读取 `window.__MICROI_RUNTIME_ENDPOINT__`，断言实际 ApiBase/OsClient 与测试目标
+   完全一致再登录或点击业务。该对象不得包含 Token。
+4. 从线上地址复现时，先在一次性独立 context 读取上述对象；旧版回退到页面全局值、
+   `localStorage['microi.net']` 和域名租户解析。不能根据标题猜租户，也不能复用线上 context 跑本地。
+5. 人工第二租户至少使用无痕窗口；多个无痕窗口可能共享同一临时会话，更多并行目标使用独立
+   Profile/`--user-data-dir`。自动化收尾只关闭自己创建的 context/browser。
 
 <!-- /microi-progressive:chunk -->
 <!-- microi-progressive:chunk id=playwright-e2e-006 sha256=6aeefebda3a9e598564c53c2f8028a4ccefe2291c4c7c7ae4781ca15fb5d0697 -->

@@ -5,13 +5,18 @@ import express from 'express';
 import { buildTokenFileLookupKeys, MicroiClient } from './microi-client.js';
 import { createMcpServer } from './server.js';
 import { resolveMcpLabel } from './mcp-label.js';
+import { selectPreferredAuthorizationTokenFromCandidates } from './token-utils.js';
 /** 从 VS Code 扩展写入的 token 文件中读取指定服务器的 token */
 function readTokenFromFile(filePath, apiUrl, osClient, osClientType = '', osClientNetwork = '') {
     try {
         const tokens = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        return buildTokenFileLookupKeys(apiUrl, osClient, osClientType, osClientNetwork)
-            .map(key => tokens[key])
-            .find(Boolean);
+        const apiKey = String(apiUrl || '').replace(/\/+$/, '');
+        const lookupKeys = buildTokenFileLookupKeys(apiUrl, osClient, osClientType, osClientNetwork);
+        const tenantKeys = osClient ? lookupKeys.filter(key => key !== apiKey) : lookupKeys;
+        const tenantToken = selectPreferredAuthorizationTokenFromCandidates(tenantKeys.map(key => tokens[key]));
+        // The API-wide legacy token can belong to another tenant. Keep it only as
+        // a last-resort fallback when no tenant-scoped alias exists.
+        return tenantToken || tokens[apiKey];
     }
     catch {
         return undefined;
@@ -49,6 +54,9 @@ async function main() {
         osClientNetwork: process.env.MICROI_OS_CLIENT_NETWORK || '',
         rsaPublicKey: process.env.MICROI_RSA_PUBLIC_KEY || undefined,
         token: process.env.MICROI_TOKEN || undefined,
+        workspaceCredentialFilePath: process.env.MICROI_WORKSPACE_CREDENTIAL_FILE || undefined,
+        workspaceCredentialUsernameKey: process.env.MICROI_WORKSPACE_USERNAME_KEY || undefined,
+        workspaceCredentialPasswordKey: process.env.MICROI_WORKSPACE_PASSWORD_KEY || undefined,
     };
     // 本地开发服务器（localhost / 127.0.0.1）使用自签证书，允许 Node.js 跳过 TLS 验证
     if (/^https:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(config.apiBaseUrl)) {
@@ -80,11 +88,16 @@ async function main() {
             console.error('Missing required: MICROI_API_URL');
             process.exit(1);
         }
-        if (!config.token && (!config.username || !config.password)) {
+        const hasWorkspaceCredentialVault = !!config.workspaceCredentialFilePath
+            && !!config.workspaceCredentialUsernameKey
+            && !!config.workspaceCredentialPasswordKey
+            && fs.existsSync(config.workspaceCredentialFilePath);
+        if (!config.token && (!config.username || !config.password) && !hasWorkspaceCredentialVault) {
             console.error('Missing required environment variables:');
             console.error('  MICROI_API_URL      - Microi backend API URL (e.g. https://api.example.com)');
             console.error('  MICROI_TOKEN_FILE   - Token file path (preferred, auto-managed by VS Code extension)');
             console.error('  MICROI_AUTH_RECOVERY_DIR - Optional credential-free VS Code recovery request directory');
+            console.error('  MICROI_WORKSPACE_CREDENTIAL_FILE - Optional Windows DPAPI workspace credential vault');
             console.error('  MICROI_TOKEN        - JWT token (fallback)');
             console.error('  MICROI_USERNAME     - Login username (fallback if no token)');
             console.error('  MICROI_PASSWORD     - Login password (fallback if no token)');

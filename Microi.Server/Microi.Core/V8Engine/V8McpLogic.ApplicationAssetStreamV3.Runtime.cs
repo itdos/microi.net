@@ -157,6 +157,31 @@ namespace Microi.net
                 : token.ToString(Formatting.None);
         }
 
+        public static string ValidateApplicationAssetV3ExpectedPointerBaselines(
+            JObject app,
+            string expectedActivePublishVersionId,
+            string expectedCommittedPublishVersionId)
+        {
+            // Pointer ids are nullable database facts. SafeJString intentionally
+            // collapses null to "" for display-oriented callers, which would make
+            // a legitimate first v3 release fail its exact null baseline CAS.
+            if (!string.Equals(
+                    ReadApplicationAssetV3NullableStringFact(app, "ActivePublishVersionId"),
+                    expectedActivePublishVersionId,
+                    StringComparison.Ordinal))
+            {
+                return "ExpectedActivePublishVersionId 不一致";
+            }
+            if (!string.Equals(
+                    ReadApplicationAssetV3NullableStringFact(app, "CommittedPublishVersionId"),
+                    expectedCommittedPublishVersionId,
+                    StringComparison.Ordinal))
+            {
+                return "ExpectedCommittedPublishVersionId 不一致";
+            }
+            return null;
+        }
+
         public static bool IsApplicationAssetV3ClassicBaseline(
             JObject app,
             int expectedCurrentVersion,
@@ -832,9 +857,12 @@ namespace Microi.net
                 {
                     return sizeError + "：" + normalizedPath;
                 }
-                if (size > MaxStreamPublishFileBytes || totalSize > MaxStreamPublishTotalBytes - size)
+                if (!TryAddApplicationAssetResumableLogicalSize(
+                        totalSize,
+                        size,
+                        out var nextTotalSize))
                     return "AssetManifestJson.Size 超限：" + normalizedPath;
-                totalSize += size;
+                totalSize = nextTotalSize;
                 if (item["IsEntry"]?.Type != JTokenType.Boolean)
                     return "AssetManifestJson.IsEntry 必须是 boolean：" + normalizedPath;
                 var isEntry = item.Value<bool>("IsEntry");
@@ -873,6 +901,30 @@ namespace Microi.net
         /// AppKey is rechecked ordinally after the JOIN so case-insensitive database
         /// collations cannot turn an ambiguous key into a valid public pointer.
         /// </summary>
+        public static string ResolveApplicationAssetV3RuntimeOsClientKey(
+            string requestedOsClient,
+            IEnumerable<string> registeredKeys)
+        {
+            if (string.IsNullOrWhiteSpace(requestedOsClient)) return null;
+            var requested = requestedOsClient.Trim();
+            var keys = (registeredKeys ?? Enumerable.Empty<string>())
+                .Where(key => !string.IsNullOrWhiteSpace(key))
+                .Select(key => key.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            var exact = keys.Where(key => string.Equals(key, requested, StringComparison.Ordinal)).ToList();
+            if (exact.Count == 1) return exact[0];
+
+            var normalized = TenantConfigurationSecurity.NormalizeTenantId(requested).ToLowerInvariant();
+            var matches = keys.Where(key => string.Equals(
+                    TenantConfigurationSecurity.NormalizeTenantId(key).ToLowerInvariant(),
+                    normalized,
+                    StringComparison.Ordinal))
+                .Take(2)
+                .ToList();
+            return matches.Count == 1 ? matches[0] : null;
+        }
+
         public static DosResult<ApplicationAssetV3ResolverSnapshot>
             ReadApplicationAssetV3ResolverSnapshot(
                 string osClient,
@@ -888,10 +940,18 @@ namespace Microi.net
                 {
                     return new DosResult<ApplicationAssetV3ResolverSnapshot>(0, null, "AppKey 必须精确且无首尾空白");
                 }
-                var client = OsClientExtend.GetClient(osClient);
+                var runtimeOsClient = ResolveApplicationAssetV3RuntimeOsClientKey(
+                    osClient,
+                    OsClientExtend.ClientList.Keys);
+                if (runtimeOsClient.DosIsNullOrWhiteSpace())
+                {
+                    return new DosResult<ApplicationAssetV3ResolverSnapshot>(0, null,
+                        "stable resolver tenant coordinate is unloaded or case-ambiguous");
+                }
+                var client = OsClientExtend.GetClient(runtimeOsClient);
                 if (client?.Db == null)
                     return new DosResult<ApplicationAssetV3ResolverSnapshot>(0, null, "未找到租户主库连接");
-                var dialect = ResolveApplicationAssetV3SqlDialect(osClient);
+                var dialect = ResolveApplicationAssetV3SqlDialect(runtimeOsClient);
                 string Q(string name) => QuoteApplicationAssetV3Identifier(dialect, name);
                 string A(string alias, string name) => alias + "." + Q(name);
                 var select = string.Join(",", new[]
@@ -981,7 +1041,7 @@ namespace Microi.net
                 };
                 if (!string.Equals(SafeJString(app, "AppKey"), appKey, StringComparison.Ordinal))
                     return new DosResult<ApplicationAssetV3ResolverSnapshot>(0, null, "AppKey ordinal 精确回读失败");
-                var resolverError = ValidateApplicationAssetV3StableResolverTarget(osClient, app, version);
+                var resolverError = ValidateApplicationAssetV3StableResolverTarget(runtimeOsClient, app, version);
                 if (resolverError != null)
                     return new DosResult<ApplicationAssetV3ResolverSnapshot>(0, null, resolverError);
                 string normalizedPath;
@@ -1017,7 +1077,7 @@ namespace Microi.net
                 }
                 var identity = new ApplicationAssetV3ReleaseIdentity
                 {
-                    Tenant = TenantConfigurationSecurity.NormalizeTenantId(osClient).ToLowerInvariant(),
+                    Tenant = TenantConfigurationSecurity.NormalizeTenantId(runtimeOsClient).ToLowerInvariant(),
                     Kind = "runtime",
                     AppKey = appKey,
                     Version = SafeJString(version, "VersionNo"),
@@ -1734,6 +1794,7 @@ namespace Microi.net
                     RequestId = request.RequestId,
                     RequestFingerprint = request.RequestFingerprint,
                     DeliveryBatchId = request.DeliveryBatchId,
+                    RouteSnapshotJson = request.RouteSnapshotJson,
                     RouteSnapshotHash = request.RouteSnapshotHash,
                     FencingToken = FormatApplicationAssetV3Int64(businessFencingToken),
                     LeaseFencingToken = FormatApplicationAssetV3Int64(leaseFencingToken),
@@ -2089,7 +2150,7 @@ namespace Microi.net
                         .AddInParameter("@expectedCommitted", request.ExpectedCommittedPublishVersionId)
                         .AddInParameter("@expectedCurrentVersion", request.ExpectedCurrentVersion)
                         .AddInParameter("@expectedAppVersion", request.ExpectedAppVersion)
-                        .AddInParameter("@now", DateTime.Now)
+                        .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                         .ExecuteNonQuery();
                     if (appCommitCount != 1)
                         return new DosResult<object>(0, null, "sys_microistore v3 指针 CAS 失败，未提交任何变更");
@@ -2107,7 +2168,7 @@ namespace Microi.net
                         .AddInParameter("@id", versionId)
                         .AddInParameter("@oldRow", stagedRowVersionForFinalize)
                         .AddInParameter("@expectedState", ApplicationAssetV3PublishState.ReleaseVerified.ToString())
-                        .AddInParameter("@now", DateTime.Now)
+                        .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                         .ExecuteNonQuery();
                     if (versionCommitCount != 1)
                         return new DosResult<object>(0, null, "mci_ai_app_version v3 PointerCommitted CAS 失败");
@@ -2128,7 +2189,7 @@ namespace Microi.net
                         .AddInParameter("@rowVersion", targetPublishRowVersion)
                         .AddInParameter("@versionId", versionId)
                         .AddInParameter("@runtimeHash", plan.RuntimeManifestHash)
-                        .AddInParameter("@now", DateTime.Now)
+                        .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                         .ExecuteNonQuery();
                     if (appProjectionCount != 1)
                         return new DosResult<object>(0, null, "sys_microistore PointerCommitted→ProjectionPending 前滚失败");
@@ -2144,7 +2205,7 @@ namespace Microi.net
                         .AddInParameter("@id", versionId)
                         .AddInParameter("@oldRow", pointerVersionRowVersion)
                         .AddInParameter("@pointerState", ApplicationAssetV3PublishState.PointerCommitted.ToString())
-                        .AddInParameter("@now", DateTime.Now)
+                        .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                         .ExecuteNonQuery();
                     if (versionProjectionCount != 1)
                         return new DosResult<object>(0, null, "mci_ai_app_version PointerCommitted→ProjectionPending 前滚失败");
@@ -2315,7 +2376,7 @@ namespace Microi.net
                         .AddInParameter("@active", ActiveStreamBuildStorageScope)
                         .AddInParameter("@appId", appId)
                         .AddInParameter("@versionId", versionId)
-                        .AddInParameter("@now", DateTime.Now)
+                        .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                         .ExecuteNonQuery();
 
                     if (request.ExpectedCurrentVersion == int.MaxValue)
@@ -2367,7 +2428,7 @@ namespace Microi.net
                                 $"CommittedPublishVersionId={versionId}；RuntimeManifestHash={plan.RuntimeManifestHash}；" +
                                 $"PublishFence={committedFence}。")
                             .AddInParameter("@completed", ApplicationAssetV3PublishState.Completed.ToString())
-                            .AddInParameter("@now", DateTime.Now)
+                            .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                             .AddInParameter("@appId", appId)
                             .AddInParameter("@versionId", versionId)
                             .AddInParameter("@runtimeHash", plan.RuntimeManifestHash)
@@ -2400,7 +2461,7 @@ namespace Microi.net
                         var versionCompleteCount = trans.FromSql(versionCompleteSql)
                             .AddInParameter("@completed", ApplicationAssetV3PublishState.Completed.ToString())
                             .AddInParameter("@nextRow", completedVersionRowVersion + 1)
-                            .AddInParameter("@now", DateTime.Now)
+                            .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                             .AddInParameter("@versionId", versionId)
                             .AddInParameter("@oldRow", completedVersionRowVersion)
                             .AddInParameter("@fence", committedFence)
@@ -2566,7 +2627,7 @@ namespace Microi.net
                     .AddInParameter("@scope", ActiveStreamBuildStorageScope)
                     .AddInParameter("@contentHash", asset.Sha256)
                     .AddInParameter("@size", asset.Size)
-                    .AddInParameter("@now", now)
+                    .AddInParameter("@now", System.Data.DbType.DateTime, now)
                     .ExecuteNonQuery();
                 return inserted == 1 ? null : "新增 v3 投影文件失败：" + filePath;
             }
@@ -2587,7 +2648,7 @@ namespace Microi.net
                 .AddInParameter("@scope", ActiveStreamBuildStorageScope)
                 .AddInParameter("@contentHash", asset.Sha256)
                 .AddInParameter("@size", asset.Size)
-                .AddInParameter("@now", now)
+                .AddInParameter("@now", System.Data.DbType.DateTime, now)
                 .AddInParameter("@id", SafeJString(existing, "Id"))
                 .AddInParameter("@versionId", versionId)
                 .AddInParameter("@pathHash", filePathHash)
@@ -2739,7 +2800,7 @@ namespace Microi.net
                     .AddInParameter("@runtime", "micro-app")
                     .AddInParameter("@storage", "file")
                     .AddInParameter("@url", SafeJString(desiredService, "MsUrl"))
-                    .AddInParameter("@now", now)
+                    .AddInParameter("@now", System.Data.DbType.DateTime, now)
                     .AddInParameter("@entry", plan.EntryPath)
                     .AddInParameter("@assetCount", plan.FileCount)
                     .AddInParameter("@totalSize", plan.TotalSize)
@@ -2771,7 +2832,7 @@ namespace Microi.net
                     .AddInParameter("@runtime", "micro-app")
                     .AddInParameter("@storage", "file")
                     .AddInParameter("@url", SafeJString(desiredService, "MsUrl"))
-                    .AddInParameter("@now", now)
+                    .AddInParameter("@now", System.Data.DbType.DateTime, now)
                     .AddInParameter("@entry", plan.EntryPath)
                     .AddInParameter("@assetCount", plan.FileCount)
                     .AddInParameter("@totalSize", plan.TotalSize)
@@ -2887,7 +2948,7 @@ namespace Microi.net
                     $"AND COALESCE({Q("IsDeleted")},0)=@oldDeleted " +
                     $"AND {BuildApplicationAssetV3NullableStringEqualsSql(dialect, "BuildVersion", "@oldBuildVersion")}";
                 var staleCount = trans.FromSql(staleSql)
-                    .AddInParameter("@now", now)
+                    .AddInParameter("@now", System.Data.DbType.DateTime, now)
                     .AddInParameter("@id", SafeApplicationAssetV3DbString(stale, "Id"))
                     .AddInParameter("@serviceId", serviceId)
                     .AddInParameter("@routePath", SafeApplicationAssetV3DbString(stale, "RoutePath"))
@@ -3009,7 +3070,7 @@ namespace Microi.net
                 .AddInParameter("@isEnable", SafeJInt(page, "IsEnable", 1))
                 .AddInParameter("@buildVersion", SafeJString(page, "BuildVersion"))
                 .AddInParameter("@routeMeta", SafeJString(page, "RouteMetaJson"))
-                .AddInParameter("@now", now);
+                .AddInParameter("@now", System.Data.DbType.DateTime, now);
         }
 
         private static bool IsApplicationAssetV3DesiredService(JObject actual, JObject desired)
@@ -3107,7 +3168,7 @@ namespace Microi.net
                         $"AND {Q("PublishState")} IN (@pointer,@pending,@repair)";
                     if (trans.FromSql(appRepairSql)
                             .AddInParameter("@repair", ApplicationAssetV3PublishState.RepairRequired.ToString())
-                            .AddInParameter("@now", DateTime.Now)
+                            .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                             .AddInParameter("@appId", appId)
                             .AddInParameter("@versionId", versionId)
                             .AddInParameter("@runtimeHash", plan.RuntimeManifestHash)
@@ -3135,7 +3196,7 @@ namespace Microi.net
                             .AddInParameter("@repair", ApplicationAssetV3PublishState.RepairRequired.ToString())
                             .AddInParameter("@error", lastError)
                             .AddInParameter("@nextRow", versionRowVersion + 1)
-                            .AddInParameter("@now", DateTime.Now)
+                            .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                             .AddInParameter("@versionId", versionId)
                             .AddInParameter("@oldRow", versionRowVersion)
                             .AddInParameter("@fence", fence)
@@ -3238,9 +3299,12 @@ namespace Microi.net
                 {
                     return sizeError + "：" + relativePath;
                 }
-                if (size < 0 || size > MaxStreamPublishFileBytes) return "Assets Size 不合法：" + relativePath;
-                if (totalSize > MaxStreamPublishTotalBytes - size) return "Assets 总大小超限";
-                totalSize += size;
+                if (!TryAddApplicationAssetResumableLogicalSize(
+                        totalSize,
+                        size,
+                        out var nextTotalSize))
+                    return "Assets Size 不合法：" + relativePath;
+                totalSize = nextTotalSize;
                 assets.Add(new StreamPublishAsset
                 {
                     RelativePath = relativePath,
@@ -3401,7 +3465,7 @@ namespace Microi.net
                 .AddInParameter("@routeSnapshotHash", plan.RouteSnapshotHash)
                 .AddInParameter("@fence", fencingToken)
                 .AddInParameter("@rowVersion", rowVersion)
-                .AddInParameter("@now", DateTime.Now)
+                .AddInParameter("@now", System.Data.DbType.DateTime, DateTime.Now)
                 .ExecuteNonQuery();
         }
 
@@ -3522,6 +3586,7 @@ namespace Microi.net
                 StableResolverPath = plan.StableResolverPath,
                 RuntimeManifestHash = plan.RuntimeManifestHash,
                 SourceManifestHash = plan.SourceManifestHash,
+                RouteSnapshotJson = plan.RouteSnapshotJson,
                 RouteSnapshotHash = plan.RouteSnapshotHash,
                 LastError = SafeJString(version, "LastError"),
                 Idempotent = idempotent
@@ -3579,6 +3644,7 @@ namespace Microi.net
                 StableResolverPath = plan.StableResolverPath,
                 RuntimeManifestHash = plan.RuntimeManifestHash,
                 SourceManifestHash = plan.SourceManifestHash,
+                RouteSnapshotJson = plan.RouteSnapshotJson,
                 RouteSnapshotHash = plan.RouteSnapshotHash,
                 Idempotent = idempotent
             }, idempotent
@@ -3970,10 +4036,11 @@ namespace Microi.net
                 return "ExpectedPublishFence 与 sys_microistore.PublishFence 不一致";
             if (SafeApplicationAssetV3Long(app, "PublishRowVersion", 0L) != request.ExpectedPublishRowVersion)
                 return "ExpectedPublishRowVersion 与 sys_microistore.PublishRowVersion 不一致";
-            if (!string.Equals(SafeJString(app, "ActivePublishVersionId"), request.ExpectedActivePublishVersionId, StringComparison.Ordinal))
-                return "ExpectedActivePublishVersionId 不一致";
-            if (!string.Equals(SafeJString(app, "CommittedPublishVersionId"), request.ExpectedCommittedPublishVersionId, StringComparison.Ordinal))
-                return "ExpectedCommittedPublishVersionId 不一致";
+            var pointerBaselineError = ValidateApplicationAssetV3ExpectedPointerBaselines(
+                app,
+                request.ExpectedActivePublishVersionId,
+                request.ExpectedCommittedPublishVersionId);
+            if (pointerBaselineError != null) return pointerBaselineError;
             if (SafeJInt(app, "CurrentVersion") != request.ExpectedCurrentVersion)
                 return "ExpectedCurrentVersion 不一致";
             if (!string.Equals(

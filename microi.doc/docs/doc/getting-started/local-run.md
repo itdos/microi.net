@@ -178,6 +178,83 @@ nrm use taobao
 npm install
 npm run dev
 ```
+
+### 指定或切换 ApiBase 与 OsClient
+
+`Microi.Client/src/config.json` 的 `ApiBaseDev` 是本地 Vite 的默认 API 地址。开发服务器默认使用
+`http://localhost:61500`，可在主框架 URL 的 `#` 之前临时指定目标租户和 API：
+
+```text
+http://localhost:61500/?OsClient=iTdos&ApiBase=https%3A%2F%2Fapi.example.com#/首页或菜单路由
+```
+
+`ApiBase` 建议用 `encodeURIComponent` 编码。`ApiBase` 可以包含路径，例如
+`https://api.example.com/v2`；只允许完整的 `http://` 或 `https://` 地址，不能包含账号密码、额外
+query 或 hash。`OsClient` 与 `ApiBase` 都不是登录凭据，Token、密码和访问密钥禁止放进 URL。
+
+运行时取值顺序如下：
+
+| 优先级 | ApiBase | OsClient |
+|---|---|---|
+| 1（最高） | 当前 URL 的 `ApiBase` | 当前 URL 的 `OsClient` |
+| 2 | `index.html` 的 `window.ApiBase` | `index.html` 的 `window.OsClient` |
+| 3 | `src/config.json` 的 `ApiBaseDev` | 当前 Pinia/localStorage 状态 |
+| 4 | 当前 Pinia/localStorage 状态；最后回落同源 | 状态为空时按当前域名向 API 解析；最后使用平台默认值 |
+
+URL 参数决定当前页面的运行目标，不需要反复改 `config.json`。平台初始化和登录仍会把运行状态
+写入当前浏览器的同源持久化存储，因此并行租户仍必须按下文隔离浏览器。跨域连接远端 API 时，
+目标租户还必须允许 `http://localhost:61500` 的 CORS；否则参数已正确生效，浏览器请求仍会被
+CORS 拦截。
+
+页面完成租户初始化后会公开一个不含 Token 的只读诊断对象，AI 和测试脚本可直接读取：
+
+```js
+window.__MICROI_RUNTIME_ENDPOINT__
+// {
+//   protocol: 'microi.runtime-endpoint.v1',
+//   apiBase: 'https://api.example.com',
+//   osClient: 'iTdos',
+//   source: { apiBase: 'url-query', osClient: 'url-query' }
+// }
+```
+
+#### 多租户并行测试必须隔离浏览器存储
+
+同一浏览器配置文件下，相同 `http://localhost:61500` 源的 Tab 和窗口共享 localStorage、Pinia
+持久化数据、Token、CurrentUser、ApiBase 和 OsClient。A 窗口登录租户 A 后，再让 B 窗口切换到
+租户 B，A 窗口可能被新 Token/用户状态污染，表现为自动切租户、身份失效、请求发往错误服务器或
+页面白屏。URL 参数优先级不能隔离共享的登录态。
+
+::: danger 并行测试规则
+- 人工测试第二个不同 `ApiBase + OsClient` 时，至少使用无痕/隐私窗口；更稳妥的是独立浏览器
+  Profile 或独立 `--user-data-dir`。
+- 同一 Chrome 进程中的多个无痕窗口可能共享同一个临时无痕会话。三个以上并行租户不要只开多个
+  无痕窗口，应为每组目标使用独立 Profile/浏览器进程。
+- Codex、Playwright 等自动化必须为每个 `ApiBase + OsClient` 创建独立
+  `browser.newContext()`，不得在同一个 context 中用多个 Page 混测不同租户；结束后只关闭自己
+  创建的 context/browser。
+:::
+
+#### AI 从线上页面识别目标后在本地复现
+
+AI 收到一个已部署吾码页面地址时，应先在一次性独立浏览器上下文打开线上页面，等主框架完成
+初始化，再读取 `window.__MICROI_RUNTIME_ENDPOINT__`。旧版本尚未提供该对象时，按顺序读取 URL
+参数、`window.ApiBase/window.OsClient`、同源 localStorage 的 `microi.net.ApiBase/OsClient`；若
+OsClient 仍为空，再以线上域名调用平台租户解析接口或从已成功的平台请求中确认，不能猜租户。
+
+确认目标后，使用新的独立浏览器上下文打开本地源码：
+
+```js
+const localUrl = `http://localhost:61500/?OsClient=${encodeURIComponent(osClient)}`
+  + `&ApiBase=${encodeURIComponent(apiBase)}#/目标路由`;
+const context = await browser.newContext();
+const page = await context.newPage();
+await page.goto(localUrl);
+```
+
+远端识别、本地源码构建、浏览器页面验收和生产部署是不同证据层；本地参数切换成功不表示线上已
+部署新源码。
+
 3. 常见问题
 ```js
 npm : 无法加载文件 d:\nvm4w\nodejs\npm.ps1，因为在此系统上禁止运行脚本。有关详细信息，请参阅 https:/go.microsoft.com/fwlink/?LinkID

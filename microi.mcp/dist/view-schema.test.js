@@ -1,6 +1,45 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeAllMenuJson, normalizeViewSchemaJson } from './advanced-tools.js';
+import { buildDefaultModulePresentation, inferTableColumnWidth, normalizeAllMenuJson, normalizeViewSchemaJson, } from './advanced-tools.js';
+test('builds mandatory List/Card presentation without enabling or inventing custom forms', () => {
+    const schema = buildDefaultModulePresentation('订单管理', [
+        { Id: 'f1', Name: 'OrderTitle', Label: '订单标题', Component: 'Text', Type: 'varchar(200)' },
+        { Id: 'f2', Name: 'CustomerName', Label: '客户名称', Component: 'Text', Type: 'varchar(200)' },
+        { Id: 'f3', Name: 'Status', Label: '状态', Component: 'Select', Type: 'varchar(25)' },
+        { Id: 'f4', Name: 'TotalAmount', Label: '订单金额', Component: 'NumberText', Type: 'decimal(18,2)' },
+        { Id: 'f5', Name: 'OwnerName', Label: '负责人', Component: 'Text', Type: 'varchar(100)' },
+        { Id: 'f6', Name: 'CreateTime', Label: '创建时间', Component: 'DateTime', Type: 'varchar(25)' },
+    ], '订单业务台账');
+    const views = schema.Views;
+    assert.deepEqual(views.map((view) => view.Scene), ['List', 'Card']);
+    assert.equal(views.some((view) => ['Detail', 'Edit'].includes(view.Scene)), false);
+    const list = views[0].Layout.List;
+    const hero = views[0].Layout.Hero;
+    assert.equal(list.Density, 'Compact');
+    assert.ok(list.Columns[0].MinWidth >= 340);
+    assert.ok(list.Columns[0].Lines.length >= 1);
+    assert.ok(list.Columns[0].TrailingFields.length >= 1);
+    assert.deepEqual(hero.Metrics.map((metric) => metric.Source), ['Field', 'DataCount', 'PageCount']);
+    const card = views[1].Layout.Card;
+    assert.equal(card.TitleField, 'OrderTitle');
+    assert.ok(card.SubtitleFields.length >= 1);
+    assert.ok(card.StatusFields.length >= 1);
+    assert.ok(card.RightFields.length >= 1);
+    assert.ok(card.MetaFields.length >= 1);
+    assert.equal(normalizeViewSchemaJson(schema).ok, true);
+});
+test('default presentation without numeric fields uses truthful counts and semantic field widths', () => {
+    const schema = buildDefaultModulePresentation('客户管理', [
+        { Name: 'CustomerName', Label: '客户名称', Component: 'Text', Type: 'varchar(200)' },
+        { Name: 'Phone', Label: '手机号', Component: 'Text', Type: 'varchar(25)' },
+    ]);
+    const views = schema.Views;
+    assert.deepEqual(views[0].Layout.Hero.Metrics.map((metric) => metric.Source), ['DataCount', 'PageCount']);
+    assert.doesNotMatch(JSON.stringify(schema), /random|随机/i);
+    assert.equal(inferTableColumnWidth({ Name: 'CustomerName', Label: '客户名称', Component: 'Text' }), 200);
+    assert.equal(inferTableColumnWidth({ Name: 'CreateTime', Label: '创建时间', Component: 'DateTime' }), 170);
+    assert.equal(inferTableColumnWidth({ Name: 'Amount', Label: '金额', Component: 'NumberText', Type: 'decimal(18,2)' }), 140);
+});
 test('normalizes a declarative cross-client view schema', () => {
     const result = normalizeViewSchemaJson({
         Views: [{

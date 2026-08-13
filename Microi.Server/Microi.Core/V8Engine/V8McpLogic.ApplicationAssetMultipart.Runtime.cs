@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.IO.Pipes;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -133,75 +132,51 @@ namespace Microi.net
                 IMicroiLockLease lease,
                 CancellationToken cancellationToken)
         {
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            using var pipeServer = new AnonymousPipeServerStream(
-                PipeDirection.Out,
-                HandleInheritability.None);
-            var clientHandle = pipeServer.GetClientHandleAsString();
-            using var pipeClient = new AnonymousPipeClientStream(PipeDirection.In, clientHandle);
-            pipeServer.DisposeLocalCopyOfClientHandle();
-
-            var producerTask = Task.Run(async () =>
+            var temporaryPath = Path.Combine(
+                Path.GetTempPath(),
+                "microi-application-asset-compose-" + Guid.NewGuid().ToString("N") + ".tmp");
+            try
             {
-                try
+                // Object-store SDKs own the lifetime of their upload stream and may
+                // close it as soon as a provider request fails. Feeding that stream
+                // through an anonymous pipe turns the useful provider error into a
+                // producer-side "Broken pipe" and can leave an immutable destination
+                // object with unchecked content. Compose to a DeleteOnClose file
+                // first: memory stays bounded, every source part is verified before
+                // publication, and Aliyun OSS receives the seekable stream it expects
+                // for multipart retries. This also works for multi-gigabyte objects.
+                await using var composed = new FileStream(
+                    temporaryPath,
+                    FileMode.CreateNew,
+                    FileAccess.ReadWrite,
+                    FileShare.None,
+                    1024 * 1024,
+                    FileOptions.Asynchronous | FileOptions.DeleteOnClose | FileOptions.SequentialScan);
+                var digest = await ComposeApplicationAssetMultipartAsync(
+                    hdfs,
+                    clientModel,
+                    orderedParts,
+                    composed,
+                    cancellationToken).ConfigureAwait(false);
+                if (digest.Size != totalSize)
                 {
-                    return await ComposeApplicationAssetMultipartAsync(
-                        hdfs,
-                        clientModel,
-                        orderedParts,
-                        pipeServer,
-                        linked.Token).ConfigureAwait(false);
+                    return new ApplicationAssetMultipartComposeResult
+                    {
+                        Digest = digest,
+                        Error = $"HDFS分片合并长度不一致：Expected={totalSize},Actual={digest.Size}"
+                    };
                 }
-                finally
-                {
-                    pipeServer.Dispose();
-                }
-            }, CancellationToken.None);
-            var putTask = Task.Run(
-                () => ExecuteApplicationAssetSideEffect(
+                await composed.FlushAsync(cancellationToken).ConfigureAwait(false);
+                composed.Position = 0;
+                var put = await ExecuteApplicationAssetSideEffect(
                     lease,
                     () => PutApplicationObject(
                         hdfs,
                         clientModel,
                         finalPath,
-                        pipeClient,
+                        composed,
                         totalSize,
-                        linked.Token)),
-                CancellationToken.None);
-
-            try
-            {
-                var first = await Task.WhenAny(producerTask, putTask).ConfigureAwait(false);
-                if (ReferenceEquals(first, putTask))
-                {
-                    var earlyPut = await putTask.ConfigureAwait(false);
-                    if (earlyPut.Code != 1)
-                    {
-                        linked.Cancel();
-                        try { await producerTask.ConfigureAwait(false); } catch { }
-                        return new ApplicationAssetMultipartComposeResult
-                        {
-                            PutResult = earlyPut,
-                            Error = "最终对象流式写入失败：" + earlyPut.Msg
-                        };
-                    }
-                }
-
-                ApplicationAssetObjectDigest digest;
-                try
-                {
-                    digest = await producerTask.ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    linked.Cancel();
-                    try { await putTask.ConfigureAwait(false); } catch { }
-                    return new ApplicationAssetMultipartComposeResult
-                    {
-                        Error = "HDFS分片合并失败：" + ex.Message
-                    };
-                }
-                var put = await putTask.ConfigureAwait(false);
+                        cancellationToken)).ConfigureAwait(false);
                 return new ApplicationAssetMultipartComposeResult
                 {
                     PutResult = put,
@@ -211,11 +186,14 @@ namespace Microi.net
             }
             catch (Exception ex)
             {
-                linked.Cancel();
                 return new ApplicationAssetMultipartComposeResult
                 {
                     Error = "最终对象合并异常：" + ex.Message
                 };
+            }
+            finally
+            {
+                try { if (File.Exists(temporaryPath)) File.Delete(temporaryPath); } catch { }
             }
         }
 

@@ -185,13 +185,51 @@ const MICRO_SERVICE_SOURCE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MICRO_SERVICE_SOURCE_MAX_TOTAL_BYTES = 100 * 1024 * 1024;
 const MICRO_SERVICE_SOURCE_MAX_FILES = 1_000;
 const MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES = new Set([
-  '.git', '.hg', '.svn', '.cache', '.next', '.nuxt', '.output', '.turbo', '.vite',
+  '.git', '.hg', '.svn', '.cache', '.codex-temp', '.next', '.nuxt', '.output', '.turbo', '.vite',
   'coverage', 'dist', 'build', 'node_modules',
 ]);
 const MICRO_SERVICE_SOURCE_EXCLUDED_FILES = new Set([
   '.ds_store', 'thumbs.db', '.microi-micro-app-sync.json', '.microi-build-evidence.json',
 ]);
 const MICRO_SERVICE_SOURCE_CHUNK_ARTIFACT = /^(?:\.sync-seg-.*|sync-source-files\.json)$/iu;
+
+function readMicroServiceSourceExcludePrefixes(rootDirectory: string): string[] {
+  const descriptorPath = path.join(rootDirectory, '.microi-micro-app.json');
+  if (!fs.existsSync(descriptorPath)) return [];
+  let descriptor: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(descriptorPath, 'utf8')) as unknown;
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+      throw new Error('根节点必须是对象');
+    }
+    descriptor = parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new Error(
+      `.microi-micro-app.json 无法解析，不能安全应用 SourceExcludes：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  const rawExcludes = descriptor.SourceExcludes;
+  if (rawExcludes == null) return [];
+  if (!Array.isArray(rawExcludes) || rawExcludes.length > 100) {
+    throw new Error('.microi-micro-app.json 的 SourceExcludes 必须是最多 100 项的字符串数组。');
+  }
+  const prefixes = rawExcludes.map((value, index) => {
+    if (typeof value !== 'string') {
+      throw new Error(`SourceExcludes[${index}] 必须是字符串。`);
+    }
+    const normalized = value.trim().replace(/\\/gu, '/').replace(/^\.\//u, '');
+    if (!normalized.endsWith('/**')) {
+      throw new Error(`SourceExcludes 仅支持安全目录前缀 <relative-directory>/**：${value}`);
+    }
+    const prefix = normalized.slice(0, -3).replace(/\/$/u, '');
+    normalizeLocalApplicationRelativePath(prefix);
+    if (!prefix || prefix === '.' || /^\.(?:git|hg|svn)(?:\/|$)/iu.test(prefix)) {
+      throw new Error(`SourceExcludes 不允许排除工程根目录或 VCS 元数据：${value}`);
+    }
+    return prefix.toLowerCase();
+  });
+  return [...new Set(prefixes)].sort();
+}
 
 // Runtime assets use the resumable HDFS multipart transport above the legacy
 // 128MiB endpoint boundary. Keep only JavaScript's exact-integer boundary as a
@@ -786,7 +824,7 @@ function validateApplicationAssetV3FinalizeEvidence(
   requireStreamEvidenceNumber(evidence, 'ProtocolVersion', 3, context);
   requireStreamEvidenceString(evidence, 'PublishMode', expected.publishMode, context);
   requireStreamEvidenceString(evidence, 'GateEpoch', expected.expectedGateEpoch, context);
-  requireStreamEvidenceString(evidence, 'AppKey', expected.appIdOrKey, context);
+  requireApplicationAssetV3IdentityEvidence(evidence, expected.appIdOrKey, context);
   requireStreamEvidenceString(evidence, 'VersionNo', normalizedApplicationVersion(expected.versionNo), context);
   requireStreamEvidenceString(evidence, 'RequestId', expected.requestId, context);
   requireStreamEvidenceString(evidence, 'RequestFingerprint', expected.requestFingerprint, context);
@@ -974,6 +1012,7 @@ export async function buildLocalMicroServiceSourceManifest(
     throw new Error(`源码根目录必须是真实目录且不能是符号链接：${root}`);
   }
   const rootRealPath = fs.realpathSync(root);
+  const descriptorExcludePrefixes = readMicroServiceSourceExcludePrefixes(rootRealPath);
   const maxFiles = Math.min(
     MICRO_SERVICE_SOURCE_MAX_FILES,
     Math.max(1, options.maxFiles ?? MICRO_SERVICE_SOURCE_MAX_FILES),
@@ -1004,7 +1043,10 @@ export async function buildLocalMicroServiceSourceManifest(
         const normalizedDirectory = relativePath.toLowerCase();
         const excluded = MICRO_SERVICE_SOURCE_EXCLUDED_DIRECTORIES.has(item.name.toLowerCase())
           || normalizedDirectory === 'unpackage/dist'
-          || normalizedDirectory.startsWith('unpackage/dist/');
+          || normalizedDirectory.startsWith('unpackage/dist/')
+          || descriptorExcludePrefixes.some(prefix => (
+            normalizedDirectory === prefix || normalizedDirectory.startsWith(`${prefix}/`)
+          ));
         if (excluded) {
           skippedDirectories.push(relativePath);
           continue;
@@ -1163,6 +1205,18 @@ function requireStreamEvidenceString(
 ): void {
   if (String(evidence[field] ?? '') !== expected) {
     throw new Error(`${context} 返回证据 ${field} 不一致`);
+  }
+}
+
+function requireApplicationAssetV3IdentityEvidence(
+  evidence: Record<string, unknown>,
+  expectedAppIdOrKey: string,
+  context: string,
+): void {
+  const appId = String(evidence.AppId ?? '');
+  const appKey = String(evidence.AppKey ?? '');
+  if ((!appId && !appKey) || (appId !== expectedAppIdOrKey && appKey !== expectedAppIdOrKey)) {
+    throw new Error(`${context} 返回证据 AppId/AppKey 均未匹配请求应用身份`);
   }
 }
 

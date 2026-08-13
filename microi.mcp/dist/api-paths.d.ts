@@ -44,6 +44,11 @@ export declare const API: {
     readonly RUN_BACKGROUND_API_ENGINE: "/api/BackgroundTask/RunApiEngine";
     readonly UPLOAD_FILE_BASE64: "/api/V8Engine/UploadFileBase64";
     readonly UPLOAD_APPLICATION_ASSET_STREAM: "/api/V8Engine/UploadApplicationAssetStream";
+    readonly INITIATE_APPLICATION_ASSET_MULTIPART: "/api/V8Engine/InitiateApplicationAssetMultipart";
+    readonly GET_APPLICATION_ASSET_MULTIPART_STATUS: "/api/V8Engine/GetApplicationAssetMultipartStatus";
+    readonly UPLOAD_APPLICATION_ASSET_MULTIPART_PART: "/api/V8Engine/UploadApplicationAssetMultipartPart";
+    readonly COMPLETE_APPLICATION_ASSET_MULTIPART: "/api/V8Engine/CompleteApplicationAssetMultipart";
+    readonly ABORT_APPLICATION_ASSET_MULTIPART: "/api/V8Engine/AbortApplicationAssetMultipart";
     readonly FINALIZE_APPLICATION_STREAM_PUBLISH: "/api/V8Engine/FinalizeApplicationStreamPublish";
     readonly LIST_APPLICATIONS: "/api/V8Engine/ListApplications";
     readonly GET_APPLICATION_CONTEXT: "/api/V8Engine/GetApplicationContext";

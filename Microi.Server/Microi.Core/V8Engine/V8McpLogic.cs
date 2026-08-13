@@ -5297,7 +5297,7 @@ namespace Microi.net
             // 否则客户端会拿公有桶路径调用私有桶读取接口，既产生假故障，也泄露错误的工程结构。
             return new JArray(JArray.FromObject(result.Data)
                 .OfType<JObject>()
-                .Where(file => !IsPublishedAiApplicationBuildFile(file)));
+                .Where(IsPrivateAiApplicationSourceFile));
         }
 
         private static string NormalizeAiApplicationStoragePath(string value)
@@ -5324,9 +5324,31 @@ namespace Microi.net
                 && string.Equals(hdfsPath, publishHdfsPath, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Source synchronization owns only private source rows.  Other
+        /// non-public scopes (for example durable multipart upload audit
+        /// sessions) are control-plane records and must neither be exposed as
+        /// source files nor removed by ReplacePrivateSourceOnly.
+        ///
+        /// Rows created before StorageScope was introduced remain compatible:
+        /// an empty scope is treated as private only when it is not a legacy
+        /// published build row.
+        /// </summary>
+        internal static bool IsPrivateAiApplicationSourceFile(JObject file)
+        {
+            if (file == null) return false;
+            var storageScope = SafeJString(file, "StorageScope").Trim();
+            if (string.Equals(storageScope, "Private", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            if (!IsBlank(storageScope)) return false;
+            return !IsPublishedAiApplicationBuildFile(file);
+        }
+
         internal static bool ShouldRemoveAiApplicationSourceFile(JObject file, ISet<string> syncedPaths)
         {
-            if (file == null || IsPublishedAiApplicationBuildFile(file)) return false;
+            if (!IsPrivateAiApplicationSourceFile(file)) return false;
             var filePath = SafeJString(file, "FilePath");
             return !IsBlank(filePath) && (syncedPaths == null || !syncedPaths.Contains(filePath));
         }

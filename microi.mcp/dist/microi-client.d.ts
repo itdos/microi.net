@@ -14,6 +14,10 @@ export interface MicroiConfig {
     tokenFilePath?: string;
     /** MCP 仅写入无密恢复请求；VS Code 扩展使用 SecretStorage 中的凭据完成重登。 */
     authRecoveryRequestDir?: string;
+    /** Windows DPAPI(CurrentUser) 工作区凭据保险库；只传路径和键名，不传明文。 */
+    workspaceCredentialFilePath?: string;
+    workspaceCredentialUsernameKey?: string;
+    workspaceCredentialPasswordKey?: string;
     /** 普通 HTTP 请求超时，默认 120 秒 */
     requestTimeoutMs?: number;
     /** V8 代码、菜单等写请求超时，默认 60 秒 */
@@ -174,6 +178,27 @@ export interface ApplicationAssetStreamUploadRequest {
     ExpectedActivePublishVersionId?: string | null;
     ExpectedCommittedPublishVersionId?: string | null;
 }
+export interface ApplicationAssetMultipartPartEvidence {
+    Number: number;
+    Size: number;
+    Sha256: string;
+    Path?: string;
+    UploadedAt?: string;
+}
+export interface ApplicationAssetMultipartEvidence {
+    SessionId: string;
+    Status: string;
+    ChunkSize: number;
+    TotalParts: number;
+    UploadedParts?: number;
+    ReceivedBytes?: number;
+    Total?: number;
+    ProgressPercent?: number;
+    Parts?: ApplicationAssetMultipartPartEvidence[];
+    Completed?: boolean;
+    Idempotent?: boolean;
+    [key: string]: unknown;
+}
 export interface ApplicationAssetStreamFinalizeRequest {
     AppIdOrKey: string;
     VersionNo: string;
@@ -214,6 +239,9 @@ export interface ListEnvelope<T> {
 }
 interface RequestOptions {
     timeoutMs?: number;
+    /** Ordinary JSON requests stay bounded to ten minutes unless an explicit
+     * long-running streaming operation raises this ceiling. */
+    maxTimeoutMs?: number;
     operationName?: string;
 }
 export declare class MicroiTransportError extends Error {
@@ -456,6 +484,7 @@ export declare class MicroiClient {
      */
     private tryRecoverFromAuthFailure;
     private tryRecoverFromAuthFailureCore;
+    private reloadWorkspaceCredentials;
     /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */
     private post;
     /** 通用 GET 请求（自动处理 token 失效：刷新后重试一次） */
@@ -469,6 +498,13 @@ export declare class MicroiClient {
     private requestMultipartFile;
     private requestJsonNative;
     private requestMultipartFileNative;
+    /**
+     * Send one exact local byte range as application/octet-stream. Each retry
+     * opens a fresh range stream, so an interrupted request never depends on a
+     * partially consumed Node stream. The server binds the part number to a
+     * declared size and SHA-256 before committing its durable checkpoint.
+     */
+    private requestBinaryFileRange;
     private isUncertainWriteError;
     private readbackOptions;
     private pollReadback;
@@ -556,6 +592,8 @@ export declare class MicroiClient {
         TargetField?: string;
     }): Promise<ApiResponse>;
     uploadApplicationAssetStream(data: ApplicationAssetStreamUploadRequest): Promise<ApiResponse>;
+    private getApplicationAssetMultipartStatus;
+    private uploadApplicationAssetResumable;
     finalizeApplicationStreamPublish(data: ApplicationAssetStreamFinalizeRequest): Promise<ApiResponse>;
     getMicroService(msKey: string): Promise<ApiResponse>;
     listApplications(data?: Record<string, unknown>): Promise<ApiResponse>;
@@ -645,6 +683,7 @@ export declare class MicroiClient {
         ComponentPath?: string;
         Display?: number;
         AppDisplay?: number;
+        HasChild?: number;
         OpenType?: string;
         Url?: string;
         Sort?: number;

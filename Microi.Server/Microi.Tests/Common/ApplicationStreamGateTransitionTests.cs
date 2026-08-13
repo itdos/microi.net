@@ -58,11 +58,13 @@ public sealed class ApplicationStreamGateTransitionTests
     }
 
     [Fact]
-    public void AdministratorGate_IsExactLevel999()
+    public void AdministratorGate_AllowsOnlyTenantAndPlatformControlPlaneLevels()
     {
         Assert.Null(V8McpLogic.ValidateApplicationStreamGateTransitionAdministratorLevel(999));
+        Assert.Null(V8McpLogic.ValidateApplicationStreamGateTransitionAdministratorLevel(9999));
         Assert.NotNull(V8McpLogic.ValidateApplicationStreamGateTransitionAdministratorLevel(998));
         Assert.NotNull(V8McpLogic.ValidateApplicationStreamGateTransitionAdministratorLevel(1000));
+        Assert.NotNull(V8McpLogic.ValidateApplicationStreamGateTransitionAdministratorLevel(10000));
     }
 
     [Fact]

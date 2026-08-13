@@ -500,13 +500,24 @@ namespace Microi.net
             CancellationToken cancellationToken = default)
         {
             if (stream.CanSeek) stream.Position = 0;
+            var effectiveContentLength = contentLength
+                                         ?? (stream.CanSeek ? stream.Length : (long?)null);
             return await hdfs.PutObject(new HDFSParam
             {
                 ClientModel = clientModel,
                 Limit = false,
                 FileFullPath = path,
                 FileStream = stream,
-                ContentLength = contentLength,
+                ContentLength = effectiveContentLength,
+                // Application assets at or above the native multipart boundary
+                // are durable publishing operations, not ordinary form uploads.
+                // Give the object-store operation the existing two-hour HDFS
+                // ceiling while retaining the normal 60-second behavior for
+                // small files. This remains a per-operation transport choice;
+                // it does not introduce another production configuration source.
+                TimeoutSeconds = effectiveContentLength >= 64L * 1024 * 1024
+                    ? 7200
+                    : (int?)null,
                 CancellationToken = cancellationToken
             }).ConfigureAwait(false);
         }
