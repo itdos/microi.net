@@ -156,6 +156,11 @@ export const businessModules = {
     title: '联系人', table: 'Diy_LianxiR', menuAliases: ['联系人', '客户联系人'],
     titleField: 'Xingming', statusField: 'GuanjianJCR', tagFields: ['Bumen', 'Zhiwu'],
     phoneField: 'ShoujiH',
+    relatedMetrics: [
+      { key: 'active', label: '在职', where: [{ Name: 'ZhiweiZT', Type: '=', Value: '在职' }], tone: 'warning' },
+      { key: 'month', label: '本月联系人', monthField: 'CreateTime', tone: 'primary' },
+      { key: 'total', label: '联系人总量', tone: 'neutral' }
+    ],
     lines: [
       { label: '联系电话', field: 'ShoujiH', format: 'phone' },
       { label: '所属客户', field: 'SuoshuKH' },
@@ -171,6 +176,11 @@ export const businessModules = {
   visits: native({
     title: '跟进记录', table: 'Diy_GenjinJL', menuAliases: ['跟进记录', '拜访记录'],
     titleField: 'KehuMC', statusField: 'GenjinFS', tagFields: ['ShenpiZT'],
+    relatedMetrics: [
+      { key: 'valid', label: '有效跟进', where: [{ Name: 'GuanjianJCR', Type: '=', Value: 1 }], tone: 'success' },
+      { key: 'month', label: '本月跟进', monthField: 'GenjinSJ', tone: 'primary' },
+      { key: 'total', label: '跟进总量', tone: 'neutral' }
+    ],
     lines: [
       { label: '跟进人', field: 'BaifangR' },
       { label: '跟进时间', field: 'GenjinSJ', format: 'datetime' },
@@ -183,6 +193,12 @@ export const businessModules = {
     title: '合同订单', table: 'Diy_Dingdan', menuAliases: ['合同订单', '订单管理', '我的订单'],
     titleField: 'DingdanBH', statusField: 'DingdanZT', tagFields: ['XinLDD', 'DingdanHZFS'],
     fixedWhere: [{ Name: 'DingdanZT', Type: '!=', Value: '已作废' }],
+    relatedMetrics: [
+      { key: 'pending', label: '待审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '待审批' }], tone: 'warning' },
+      { key: 'approved', label: '已审批', where: [{ Name: 'DingdanZT', Type: '=', Value: '已审批' }], tone: 'success' },
+      { key: 'amount', label: '订单总额', aggregateField: 'DingdanJE', format: 'compactMoney', tone: 'primary' },
+      { key: 'month', label: '本月订单', monthField: 'CreateTime', tone: 'neutral' }
+    ],
     lines: [
       { label: '客户名称', field: 'KehuMC' },
       { label: '订单金额', field: 'DingdanJE', format: 'money' },
@@ -213,6 +229,12 @@ export const businessModules = {
     target: 'task-list',
     title: '售后任务', table: 'Diy_ShouhouDD', menuAliases: ['售后订单', '售后任务', '我的任务'],
     titleField: 'ShouhouFWBH', statusField: 'Zhuangtai', tagFields: ['Leixing'],
+    relatedMetrics: [
+      { key: 'action', label: '进行中', where: [{ Name: 'Zhuangtai', Type: 'In', Value: ['待指派', '待接单', '待服务', '待完成', '待验收', '待评论', '待商家验收', '待客户验收'] }], tone: 'warning' },
+      { key: 'positive', label: '已完结', where: [{ Name: 'Zhuangtai', Type: 'In', Value: ['已完结'] }], tone: 'success' },
+      { key: 'amount', label: '应收金额合计', aggregateField: 'ShouhouFY', format: 'compactMoney', tone: 'primary' },
+      { key: 'month', label: '本月售后任务', monthField: 'YujiSHSJ', tone: 'primary' }
+    ],
     lines: [
       { label: '客户名称', field: 'KehuMC' },
       { label: '计划服务', field: 'YujiSHSJ', format: 'datetime' },
@@ -224,6 +246,12 @@ export const businessModules = {
   devices: native({
     title: '客户设备', table: 'Diy_KehuSB', menuAliases: ['客户设备', '我的设备', '设备管理'],
     titleField: 'KehuMC', statusField: 'ShebeiZT', tagFields: ['ShebeiXH', 'ShebeiGZZT'],
+    relatedMetrics: [
+      { key: 'pending', label: '待安装', where: [{ Name: 'ShebeiZT', Type: '=', Value: '待安装' }], tone: 'warning' },
+      { key: 'active', label: '使用中', where: [{ Name: 'ShebeiZT', Type: '=', Value: '使用中' }], tone: 'success' },
+      { key: 'month', label: '本月设备', monthField: 'CreateTime', tone: 'primary' },
+      { key: 'total', label: '设备总量', tone: 'neutral' }
+    ],
     lines: [
       { label: '设备编号', field: 'ShebeiBH' },
       { label: '安装位置', field: 'AnzhuangWZ' },
@@ -262,6 +290,11 @@ export const businessModules = {
   serviceForms: native({
     title: '客户服务记录表', table: 'diy_ServiceRecord', menuAliases: ['服务记录表', '客户服务记录'],
     titleField: 'KehuMC', tagFields: ['FuwuXM'],
+    relatedMetrics: [
+      { key: 'month', label: '本月服务', monthField: 'KaishiSJ', tone: 'primary' },
+      { key: 'quality', label: '信息已完善', where: [{ Name: 'FuwuJLBSJ', Type: '<>', Value: '' }], tone: 'success' },
+      { key: 'total', label: '服务总量', tone: 'neutral' }
+    ],
     lines: [{ label: '开始时间', field: 'KaishiSJ', format: 'datetime' }, { label: '结束时间', field: 'JieshuSJ', format: 'datetime' }, { label: '创建人', field: 'UserName' }]
   }),
   filters: native({
@@ -340,6 +373,11 @@ export const businessModules = {
   opportunities: native({
     title: '商机', table: 'Diy_Shangji', menuAliases: ['商机', '商机管理'],
     titleField: 'Biaoti', tagFields: ['ZhongyaoCD'],
+    relatedMetrics: [
+      { key: 'amount', label: '预计金额合计', aggregateField: 'YujiJE', format: 'compactMoney', tone: 'primary' },
+      { key: 'month', label: '本月商机', monthField: 'YujiHZSJ', tone: 'primary' },
+      { key: 'total', label: '商机总量', tone: 'neutral' }
+    ],
     lines: [
       { label: '客户名称', field: 'Kehu' },
       { label: '预计金额', field: 'YujiJE', format: 'money' },
@@ -383,6 +421,11 @@ export const businessModules = {
   proposals: native({
     title: '客户方案', table: 'Diy_kehufaxx', menuAliases: ['客户方案', '方案管理'],
     titleField: 'ShebeiMC', tagFields: ['ShebeiXH', 'AnzhuangCS'],
+    relatedMetrics: [
+      { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', format: 'number', unit: '个', tone: 'primary' },
+      { key: 'month', label: '本月客户方案', monthField: 'YujiHZSJ', tone: 'primary' },
+      { key: 'total', label: '方案总量', tone: 'neutral' }
+    ],
     lines: [{ label: '安装场所', field: 'AnzhuangCS' }, { label: '设备数量', field: 'ChangsuoDWSL' }, { label: '预计合作', field: 'YujiHZSJ', format: 'date' }]
   }),
   customerCare: native({
