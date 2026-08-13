@@ -1,7 +1,7 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: import-microi-store-package
- * Version: v1.10.8
+ * Version: v1.10.11
  * Function:
  * - 统一使用 sys_microistore 作为应用主表；mci_ai_app_file 与 mci_ai_app_version 继续保存私有源码和构建版本。
  * - 接口引擎按 Managed/CreateIfMissing 资源策略升级，并用安装基线阻止覆盖租户修改。
@@ -244,8 +244,12 @@ var buildSchemaContinuation = function (phase, index, progress, msg) {
         Msg: msg
     };
 };
-var applicationAssetChunkMaxFiles = parseInt(V8.Param.ApplicationAssetChunkMaxFiles || 8, 10);
-if (isNaN(applicationAssetChunkMaxFiles)) applicationAssetChunkMaxFiles = 8;
+// REMOTE_ZIP_SINGLE_ASSET_SLICE_V1：商城远程 ZIP 会先在可信 .NET 原子能力中
+// 下载、校验并解包，再把当前文件交给 V8。Jint 的内存约束统计累计分配而不是
+// 存活堆；默认每片只提交一个资产，避免同一片内继续叠加第二次 Base64 上传。
+// 已写入的 AppId + FilePath + Hash 会在下一片幂等复用。
+var applicationAssetChunkMaxFiles = parseInt(V8.Param.ApplicationAssetChunkMaxFiles || 1, 10);
+if (isNaN(applicationAssetChunkMaxFiles)) applicationAssetChunkMaxFiles = 1;
 applicationAssetChunkMaxFiles = Math.max(1, Math.min(50, applicationAssetChunkMaxFiles));
 var applicationAssetChunkMaxBase64Chars = parseInt(V8.Param.ApplicationAssetChunkMaxBase64Chars || (32 * 1024 * 1024), 10);
 if (isNaN(applicationAssetChunkMaxBase64Chars)) applicationAssetChunkMaxBase64Chars = 32 * 1024 * 1024;
@@ -687,10 +691,12 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
         var validationBuildPolicy = String(validationStoragePolicy.Build || validationStoragePolicy.BuildMode || 'PublicHdfs').toLowerCase();
         var validationSourceNotIncluded = /^(notincluded|not-included|none)$/i.test(validationSourcePolicy);
         var validationDatabaseOnlyBuild = /^(databaseonly|database-only|db-only)$/i.test(validationBuildPolicy);
+        var validationSharedPublicBuild = /^(sharedpublicruntime|shared-public-runtime|sharedruntime)$/i.test(validationBuildPolicy);
+        var validationSharedRuntime = bundle.SharedPublicRuntime || bundle.SharedRuntime || {};
         if (!validationSourceNotIncluded && !/^(privatehdfs|private-hdfs|hdfs)$/i.test(validationSourcePolicy)) {
             validationErrors.push('第' + (validationIndex + 1) + '个AI应用的 AssetStoragePolicy.Source 不受支持：' + validationSourcePolicy);
         }
-        if (!validationDatabaseOnlyBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(validationBuildPolicy)) {
+        if (!validationDatabaseOnlyBuild && !validationSharedPublicBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(validationBuildPolicy)) {
             validationErrors.push('第' + (validationIndex + 1) + '个AI应用的 AssetStoragePolicy.Build 不受支持：' + validationBuildPolicy);
         }
         if (validationSourceNotIncluded && (validationSourceExpected || sourceCount > 0)) {
@@ -703,6 +709,24 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
         }
         if (validationDatabaseOnlyBuild && embeddedAssets.length > 256) {
             validationErrors.push('第' + (validationIndex + 1) + '个数据库内联运行包超过 256 个文件');
+        }
+        if (validationSharedPublicBuild) {
+            var validationSharedEntryUrl = String(validationSharedRuntime.EntryUrl || '');
+            var validationSharedManifestHash = String(validationSharedRuntime.ManifestHash || '').toLowerCase();
+            var validationSharedVersion = String(validationSharedRuntime.VersionNo || bundle.VersionNo || '');
+            if (!validationSourceNotIncluded) {
+                validationErrors.push('第' + (validationIndex + 1) + '个共享公共运行时必须声明 Source=NotIncluded');
+            }
+            if (!/^https:\/\/[^?#]{1,2040}$/i.test(validationSharedEntryUrl)) {
+                validationErrors.push('第' + (validationIndex + 1) + '个共享公共运行时 EntryUrl 必须是无查询参数和片段的 HTTPS 地址');
+            }
+            if (!/^[a-f0-9]{64}$/i.test(validationSharedManifestHash)) {
+                validationErrors.push('第' + (validationIndex + 1) + '个共享公共运行时必须提供 64 位 ManifestHash');
+            }
+            if (!/^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$/i.test(validationSharedVersion)
+                || validationSharedEntryUrl.toLowerCase().indexOf('/' + validationSharedVersion.toLowerCase() + '/') < 0) {
+                validationErrors.push('第' + (validationIndex + 1) + '个共享公共运行时 EntryUrl 必须固定到 VersionNo 目录');
+            }
         }
         var validationInlineBytes = 0;
         var emptySourceContent = 0;
@@ -737,7 +761,7 @@ if (V8.Param.ValidateOnly === true || String(V8.Param.Action || '').toLowerCase(
         if (validationSourceExpected && sourceCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个AI应用声明包含源码但没有源码文件');
         if (emptySourceContent > 0) validationErrors.push('第' + (validationIndex + 1) + '个AI应用有' + emptySourceContent + '个源码文件缺少内嵌内容');
         if (emptyBuildContent > 0) validationErrors.push('第' + (validationIndex + 1) + '个AI应用有' + emptyBuildContent + '个编译文件缺少内嵌内容');
-        if (assetCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个AI应用没有公有编译产物');
+        if (assetCount < 1 && !validationSharedPublicBuild) validationErrors.push('第' + (validationIndex + 1) + '个AI应用没有公有编译产物');
         if (applicationType == 'MicroService' && !bundle.MicroService) validationErrors.push('第' + (validationIndex + 1) + '个微服务应用缺少 MicroService 运行配置');
         if (applicationType == 'MicroService' && routeCount < 1) validationErrors.push('第' + (validationIndex + 1) + '个微服务应用没有可安装路由');
         validationSummary.push({
@@ -892,6 +916,7 @@ try {
         ApplicationBuildAssets: 0,
         ApplicationBuildAssetsReused: 0,
         ApplicationInlineBuildAssets: 0,
+        ApplicationSharedRuntimes: 0,
         AssetRowsPruned: 0,
         MicroServicePages: 0,
         MicroServiceMenus: 0,
@@ -924,7 +949,18 @@ try {
         'TableInserted', 'TableUpdated', 'TableIdRemapped',
         'FieldInserted', 'FieldUpdated', 'FieldSkipped', 'FieldIdRemapped',
         'PhysicalFieldsAdded', 'PhysicalFieldsRenamed', 'PhysicalFieldsModified',
-        'PhysicalFieldsSkipped', 'PhysicalFieldsErrors'
+        'PhysicalFieldsSkipped', 'PhysicalFieldsErrors',
+        'ApplicationInstalled', 'ApplicationSourceFiles', 'ApplicationSourceFilesReused',
+        'ApplicationBuildAssets', 'ApplicationBuildAssetsReused',
+        'ApplicationInlineBuildAssets', 'ApplicationSharedRuntimes', 'AssetRowsPruned',
+        'MicroServicePages', 'MicroServiceMenus', 'MicroServiceMenusPreserved',
+        'MenuInserted', 'MenuUpdated', 'MenuIdRemapped',
+        'AdminRoleLimitInserted', 'AdminRoleLimitUpdated', 'AdminRoleLimitSkipped',
+        'ReferenceRowsUpdated', 'FlowInserted', 'FlowUpdated',
+        'NodeInserted', 'NodeUpdated', 'LineInserted', 'LineUpdated',
+        'ApiEngineInserted', 'ApiEngineUpdated', 'ApiEngineSkipped',
+        'DataSetCount', 'DataInserted', 'DataUpdated', 'DataSkipped',
+        'ScheduleJobSaved', 'VersionRecordUpdated'
     ];
     var snapshotPersistentSchemaStats = function () {
         var result = {};
@@ -1308,11 +1344,16 @@ try {
         ])).replace(/^\s+|\s+$/g, '').toLowerCase();
         var sourceNotIncluded = /^(notincluded|not-included|none)$/i.test(sourceStoragePolicy);
         var databaseOnlyBuild = /^(databaseonly|database-only|db-only)$/i.test(buildStoragePolicy);
+        var sharedPublicBuild = /^(sharedpublicruntime|shared-public-runtime|sharedruntime)$/i.test(buildStoragePolicy);
+        var sharedRuntime = bundle.SharedPublicRuntime || bundle.SharedRuntime || {};
         if (!sourceNotIncluded && !/^(privatehdfs|private-hdfs|hdfs)$/i.test(sourceStoragePolicy)) {
             throw new Error('AssetStoragePolicy.Source 不受支持：' + sourceStoragePolicy);
         }
-        if (!databaseOnlyBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(buildStoragePolicy)) {
+        if (!databaseOnlyBuild && !sharedPublicBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(buildStoragePolicy)) {
             throw new Error('AssetStoragePolicy.Build 不受支持：' + buildStoragePolicy);
+        }
+        if (sharedPublicBuild && !sourceNotIncluded) {
+            throw new Error('AssetStoragePolicy.Build=SharedPublicRuntime 时必须同时声明 Source=NotIncluded。');
         }
         var appKey = firstTextParam([app.AppKey, app.MsKey, V8.Param.AppId, Package.PackageInfo.AppId]);
         if (!appKey) throw new Error('ApplicationBundle.Application.AppKey 不能为空');
@@ -1387,13 +1428,35 @@ try {
 
         var versionNo = firstTextParam([bundle.VersionNo, app.BuildVersion, Package.PackageInfo.Version, 'v1.0.0']);
         if (versionNo.charAt(0).toLowerCase() != 'v') versionNo = 'v' + versionNo;
+        var sharedEntryUrl = sharedPublicBuild ? firstTextParam([sharedRuntime.EntryUrl]) : '';
+        var sharedBaseUrl = sharedPublicBuild ? firstTextParam([sharedRuntime.BaseUrl]) : '';
+        var sharedManifestHash = sharedPublicBuild ? firstTextParam([sharedRuntime.ManifestHash]).toLowerCase() : '';
+        var sharedRuntimeVersion = sharedPublicBuild ? firstTextParam([sharedRuntime.VersionNo, versionNo]) : '';
+        if (sharedPublicBuild) {
+            if (!/^https:\/\/[^?#]{1,2040}$/i.test(sharedEntryUrl)) {
+                throw new Error('SharedPublicRuntime.EntryUrl 必须是无查询参数和片段的 HTTPS 地址。');
+            }
+            if (!/^[a-f0-9]{64}$/i.test(sharedManifestHash)) {
+                throw new Error('SharedPublicRuntime.ManifestHash 必须是 64 位十六进制摘要。');
+            }
+            if (sharedRuntimeVersion.toLowerCase() != versionNo.toLowerCase()
+                || sharedEntryUrl.toLowerCase().indexOf('/' + versionNo.toLowerCase() + '/') < 0) {
+                throw new Error('SharedPublicRuntime.EntryUrl 必须固定到当前 VersionNo 的不可变目录。');
+            }
+            if (sharedBaseUrl && (!/^https:\/\/[^?#]{1,2040}$/i.test(sharedBaseUrl)
+                || sharedEntryUrl.toLowerCase().indexOf(sharedBaseUrl.replace(/\/+$/g, '').toLowerCase() + '/') != 0)) {
+                throw new Error('SharedPublicRuntime.BaseUrl 必须是 EntryUrl 的 HTTPS 父路径。');
+            }
+        }
         var buildRoot = appType == 'MicroService'
             ? 'micro-app/' + appKey + '/' + versionNo
             : 'ai-app-publish/' + appKey + '/versions/' + versionNo;
         var embeddedBuildAssets = bundle.BuildAssets || bundle.Assets || [];
-        var buildAssets = embeddedBuildAssets && embeddedBuildAssets.length !== undefined && embeddedBuildAssets.length
+        var buildAssets = sharedPublicBuild
+            ? []
+            : (embeddedBuildAssets && embeddedBuildAssets.length !== undefined && embeddedBuildAssets.length
             ? embeddedBuildAssets
-            : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []);
+            : (packageAssets && packageAssets.BuildZip ? downloadApplicationZip(packageAssets.BuildZip, '编译') : []));
         if (databaseOnlyBuild) {
             if (appType != 'MicroService' || !inlineRuntimeBuild) {
                 throw new Error('AssetStoragePolicy.Build=DatabaseOnly 仅支持 StorageMode=db 的 MicroService。');
@@ -1421,10 +1484,24 @@ try {
                 throw new Error('数据库内联运行包总大小不能超过 5MB，当前为 ' + databaseOnlyBuildBytes + ' bytes；请修复 HDFS 后使用 PublicHdfs。');
             }
         }
-        totalBundleAssets += buildAssets.length;
+        totalBundleAssets += sharedPublicBuild ? 1 : buildAssets.length;
         var uploadedBuild = [];
         var runtimeDbAssets = [];
         var useDatabaseOnlyBuild = typeof databaseOnlyBuild != 'undefined' && databaseOnlyBuild === true;
+        var useSharedPublicBuild = typeof sharedPublicBuild != 'undefined' && sharedPublicBuild === true;
+        if (useSharedPublicBuild) {
+            var sharedEntryPath = firstTextParam([bundle.EntryPath, app.EntryPath, 'index.html']);
+            uploadedBuild.push({
+                Path: normalizeApplicationPath(sharedEntryPath),
+                HdfsPath: sharedEntryUrl,
+                FilePathName: sharedEntryUrl,
+                PublishHdfsPath: sharedEntryUrl,
+                Size: Number(sharedRuntime.TotalSize || 0),
+                Hash: sharedManifestHash,
+                SharedPublicRuntime: true
+            });
+            stats.ApplicationSharedRuntimes++;
+        }
         var moveBuildToStablePath = function (buildUpload, stableBuildPath) {
             if (!V8.Method.MoveObject || !buildUpload.HdfsPath || !stableBuildPath) return false;
             if (normalizeApplicationPath(buildUpload.HdfsPath).toLowerCase() == stableBuildPath.toLowerCase()) {
@@ -1451,9 +1528,11 @@ try {
             }
             return false;
         };
-        reportProgress(65, useDatabaseOnlyBuild
+        reportProgress(65, useSharedPublicBuild
+            ? '正在登记不可变共享公共运行时'
+            : (useDatabaseOnlyBuild
             ? '正在写入' + appType + '应用数据库内联运行文件'
-            : '正在写入' + appType + '应用公有编译文件');
+            : '正在写入' + appType + '应用公有编译文件'));
         for (var b = 0; b < buildAssets.length; b++) {
             var buildFile = buildAssets[b] || {};
             var buildRelativePath = normalizeApplicationPath(buildFile.Path || buildFile.FilePath || buildFile.RelativePath || buildFile.FileName);
@@ -1595,7 +1674,7 @@ try {
             previewUrl = '/micro-app/' + encodeURIComponent(String(V8.OsClient || ''))
                 + '/' + encodeURIComponent(appKey) + '/index.html';
         }
-        if (entryHdfsPath && V8.Method.GetPrivateFileUrl) {
+        if (entryHdfsPath && !/^https?:\/\//i.test(entryHdfsPath) && V8.Method.GetPrivateFileUrl) {
             var urlResult = V8.Method.GetPrivateFileUrl({ OsClient: V8.OsClient, FilePathName: entryHdfsPath, Limit: false });
             if (urlResult && urlResult.Code == 1) {
                 var urlData = urlResult.Data || {};
@@ -1626,7 +1705,7 @@ try {
             IsApprove: uploadedBuild.length ? 1 : 0,
             PreviewUrl: previewUrl,
             PrivateSourcePath: uploadedSource.length ? sourceRoot : firstTextParam([existingApp && existingApp.PrivateSourcePath, app.PrivateSourcePath]),
-            PublicPublishPath: buildRoot
+            PublicPublishPath: useSharedPublicBuild ? firstTextParam([sharedBaseUrl, sharedEntryUrl]) : buildRoot
         };
         var appResult = upsertApplicationRow('sys_microistore', [['AppKey', '=', appKey]], appRow);
         if (!appResult || appResult.Code != 1) throw new Error('写入统一应用商城失败：' + ((appResult && appResult.Msg) || ''));
@@ -1649,7 +1728,7 @@ try {
                 VersionNo: versionNo,
                 VersionName: versionNo,
                 Status: 'Published',
-                PublishPath: buildRoot,
+                PublishPath: useSharedPublicBuild ? firstTextParam([sharedBaseUrl, sharedEntryUrl]) : buildRoot,
                 PreviewUrl: previewUrl,
                 BuildLog: '',
                 ChangeSummary: '从应用商城安装',
@@ -1888,6 +1967,7 @@ try {
                     ApplicationSourceFiles: stats.ApplicationSourceFiles,
                     ApplicationBuildAssets: stats.ApplicationBuildAssets,
                     ApplicationInlineBuildAssets: stats.ApplicationInlineBuildAssets,
+                    ApplicationSharedRuntimes: stats.ApplicationSharedRuntimes,
                     ResourceState: {
                         SchemaVersion: 1,
                         ApiEngines: nextApiEngineResourceState
@@ -5909,7 +5989,7 @@ try {
                 + '条，保留租户扩展' + stats.ApiEngineSkipped + '条',
             选择数据: '数据集' + stats.DataSetCount + '个，新增' + stats.DataInserted + '条，修改' + stats.DataUpdated + '条，跳过' + stats.DataSkipped + '条',
             定时任务: '保存' + stats.ScheduleJobSaved + '个',
-            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，数据库内联运行文件' + stats.ApplicationInlineBuildAssets + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
+            在线应用: '安装' + stats.ApplicationInstalled + '个，私有源码新增' + stats.ApplicationSourceFiles + '个/复用' + stats.ApplicationSourceFilesReused + '个，公有编译文件新增' + stats.ApplicationBuildAssets + '个/复用' + stats.ApplicationBuildAssetsReused + '个，数据库内联运行文件' + stats.ApplicationInlineBuildAssets + '个，共享公共运行时' + stats.ApplicationSharedRuntimes + '个，清理旧文件元数据' + stats.AssetRowsPruned + '个，微服务页面' + stats.MicroServicePages + '个，迁移旧菜单' + stats.MicroServiceMenus + '个，保留原生菜单' + stats.MicroServiceMenusPreserved + '个',
             应用安装版本: '写入' + (stats.VersionRecordUpdated || 0) + '条'
         }
     };

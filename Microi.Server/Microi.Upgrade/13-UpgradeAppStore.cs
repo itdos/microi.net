@@ -37,9 +37,11 @@ namespace Microi.net
         private const string ApplicationAssetUploadAuditMenuId =
             "a3000100-0000-4000-8000-000000000100";
         // Jint 4.14 的 MemoryLimitConstraint 统计一次执行的累计分配量，而非实时存活堆。
-        // 大型官方应用包在 2GB 限额下会于约 2055MB 被终止；仅提升受信任导入器，
-        // 普通接口引擎仍遵守原有默认值与平台硬上限。
-        private const int ImporterLimitMemoryMb = 3072;
+        // 远程 ZIP 即使只有十余 MB，也会因 HTTP byte[]、Base64、ZIP Entry 与 JS/.NET
+        // 互操作在单片中累计到 4GB 以上。统一导入器同时强制每片一个资产，因此仅把
+        // 受信任核心导入器提升到平台既有 8GB 累计分配硬上限；进程常驻内存保护仍生效，
+        // 普通接口引擎不受影响，5GB 运行资产继续走 HDFS multipart 而不进入 Jint。
+        private const int ImporterLimitMemoryMb = 8192;
 
         private static readonly string[] RequiredResourceNames =
         {
@@ -96,7 +98,7 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                 var importerVersion = new System.Version(0, 0, 0);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 8) ||
+                    importerVersion < new System.Version(1, 10, 11) ||
                     !long.TryParse(importerLimitMemoryText, out var importerLimitMemory) ||
                     importerLimitMemory < ImporterLimitMemoryMb ||
                     !long.TryParse(importerLimitRecursionText, out var importerLimitRecursion) ||
@@ -106,6 +108,8 @@ WHERE ApiEngineKey=@p0 AND (IsDeleted=0 OR IsDeleted IS NULL)")
                     !code.Contains("preserve_interface_engine_pagetabs_") ||
                     !code.Contains("System.DateTime.Now.ToString") ||
                     !code.Contains("applicationSha256Base64") ||
+                    !code.Contains("REMOTE_ZIP_SINGLE_ASSET_SLICE_V1") ||
+                    !code.Contains("SharedPublicRuntime") ||
                     !code.Contains("MicroServiceMenusPreserved") ||
                     !code.Contains("sourceExpected") ||
                     !code.Contains("validationSourceExpected") ||
@@ -570,7 +574,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 var versionMatch = Regex.Match(content, @"Version\s*:\s*v?(\d+\.\d+\.\d+)", RegexOptions.IgnoreCase);
                 if (!versionMatch.Success ||
                     !System.Version.TryParse(versionMatch.Groups[1].Value, out var importerVersion) ||
-                    importerVersion < new System.Version(1, 10, 8) ||
+                    importerVersion < new System.Version(1, 10, 11) ||
                     !content.Contains("applicationSha256Base64") ||
                     !content.Contains("field_primary_recovered_") ||
                     !content.Contains("preserve_interface_engine_pagetabs_") ||
@@ -712,7 +716,7 @@ WHERE RoleId=@p0 AND FkId=@p1 AND Type=@p2")
                 if (!System.Version.TryParse(packageVersionText, out var packageVersion) ||
                     packageVersion < new System.Version(7, 3, 6) ||
                     !System.Version.TryParse(importerEngineVersionText, out var embeddedImporterVersion) ||
-                    embeddedImporterVersion < new System.Version(1, 10, 8) ||
+                    embeddedImporterVersion < new System.Version(1, 10, 11) ||
                     !System.Version.TryParse(bulkEngineVersionText, out var embeddedBulkVersion) ||
                     embeddedBulkVersion < new System.Version(1, 1, 6) ||
                     bulkEngine?["IsEnable"]?.Value<int>() != 1 ||
