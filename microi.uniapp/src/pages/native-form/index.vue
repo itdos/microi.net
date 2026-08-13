@@ -2,7 +2,7 @@
 	<!-- zhy: 下拉打开时提升表单正文层级，避免被固定栏和悬浮入口遮挡。 -->
 	<mci-page-shell class="native-form-page" :class="{ 'native-form-page--select-open': !!openSelectorField }"
 		:style="mciTokenStyle" :title="pageTitle" :subtitle="tableDescription"
-		@back="goBack">
+		@back="goBack" @tap="closeOpenVisitTarget">
 		<mci-skeleton v-if="loading" type="form" :rows="7" />
 
 		<view v-else-if="error" class="form-state">
@@ -97,7 +97,13 @@
 					</view>
 					<view v-for="field in group.fields" :key="field.Id || field.Name" class="form-field"
 						v-show="tenantFieldPresentation(field).visible !== false"
-						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name }">
+						:class="{ 'form-field--readonly': isReadonly(field), 'form-field--select-open': openSelectorField === field.Name, 'form-field--visit-target-member': tenantFieldPresentation(field).type === 'visit-target-member' }">
+						<mci-visit-target-fields v-if="tenantFieldPresentation(field).type === 'visit-target-fields'"
+							ref="visitTargetFields" :target-type="checkinTargetType" :target-name="checkinTargetName"
+							:target-id="checkinTargetId" @update:target-type="updateCheckinTargetType"
+							@update:target-name="updateCheckinTargetName" @update:target-id="updateCheckinTargetId"
+							@open-change="handleVisitTargetOpen(field, $event)" />
+						<template v-else-if="tenantFieldPresentation(field).type !== 'visit-target-member'">
 						<view class="form-field__label">
 							<view class="form-field__label-copy">
 								<text>{{ field.Label || field.Name }}</text>
@@ -165,6 +171,7 @@
 
 						<text v-if="field.optionError" class="form-field__option-error">选项暂未加载，可稍后重试</text>
 						<text v-if="field.Description" class="form-field__description">{{ field.Description }}</text>
+						</template>
 					</view>
 					<mci-business-related-list
 						v-for="relatedTab in embeddedChildRelatedForGroup(group)"
@@ -293,6 +300,7 @@
 	} from '@/platform/form-extension.js'
 	import MciBusinessRelatedList from '@/components/mci-business-related-list/mci-business-related-list.vue'
 	import MciCustomerPicker from '@/components/mci-customer-picker/mci-customer-picker.vue'
+	import MciVisitTargetFields from '@/components/mci-visit-target-fields/mci-visit-target-fields.vue'
 
 	function createDraftRowId() {
 		let seed = Date.now()
@@ -308,7 +316,7 @@
 	const TENANT_FLOATING_ACTION_POSITION_VERSION = 1
 
 	export default {
-		components: { MciBusinessRelatedList, MciCustomerPicker },
+		components: { MciBusinessRelatedList, MciCustomerPicker, MciVisitTargetFields },
 		mixins: [themeMixin],
 		data() {
 			return {
@@ -419,6 +427,9 @@
 				const fieldName = this.customerPickerConfig && this.customerPickerConfig.idFieldName
 				return fieldName ? this.form[fieldName] || '' : ''
 			},
+			checkinTargetType() { return String(this.form.BaifangDXLX || '客户') },
+			checkinTargetName() { return String(this.form.BaifangDX || '') },
+			checkinTargetId() { return String(this.form.KehuID || '') },
 			standaloneRelatedTabs() {
 				return this.activeRelatedTabs.filter((item) => !this.isEmbeddedRelated(item))
 			},
@@ -914,6 +925,27 @@
 					value
 				})
 			},
+			updateCheckinTargetType(value) {
+				this.form = { ...this.form, BaifangDXLX: String(value || '') }
+			},
+			updateCheckinTargetName(value) {
+				this.form = { ...this.form, BaifangDX: String(value || '') }
+			},
+			updateCheckinTargetId(value) {
+				this.form = { ...this.form, KehuID: this.checkinTargetType === '客户' ? String(value || '') : '' }
+			},
+			 handleVisitTargetOpen(field, open) {
+				this.handleSelectorToggle(field, open)
+			},
+			closeOpenVisitTarget() {
+				if (!this.openSelectorField) return
+				const refs = this.$refs.visitTargetFields
+				const components = Array.isArray(refs) ? refs : refs ? [refs] : []
+				components.forEach((component) => {
+					if (component && typeof component.closeOptions === 'function') component.closeOptions()
+				})
+				this.openSelectorField = ''
+			},
 			// zhy: 根据下拉开关状态提升或恢复对应表单分组。
 			handleSelectorToggle(field, open) {
 				const fieldName = String(field && field.Name || '')
@@ -1361,6 +1393,8 @@
 	.form-field--select-open {
 		z-index: 101;
 	}
+
+	.form-field--visit-target-member { display: none; }
 
 	.form-field:last-child {
 		border-bottom: 0;
