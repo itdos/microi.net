@@ -780,7 +780,8 @@ test("large application installs resume uploaded assets instead of restarting th
 
 test("background application assets are committed in bounded resumable slices", () => {
   assert.match(source, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
-  assert.match(source, /ApplicationAssetChunkMaxFiles \|\| 8/);
+  assert.match(source, /REMOTE_ZIP_SINGLE_ASSET_SLICE_V1/);
+  assert.match(source, /ApplicationAssetChunkMaxFiles \|\| 1/);
   assert.match(source, /ApplicationAssetChunkMaxBase64Chars \|\| \(32 \* 1024 \* 1024\)/);
   assert.match(source, /HasMore:\s*true[\s\S]*?Checkpoint:/);
   assert.match(source, /shouldContinueApplicationAssets\(sourceFile\)/);
@@ -880,6 +881,9 @@ test("schema import uses durable bounded phases before application assets", () =
   assert.match(source, /应用包版本在后台分片期间发生变化/);
   assert.match(source, /snapshotPersistentSchemaStats/);
   assert.match(source, /checkpoint\.SchemaStats\s*=\s*schemaStats/);
+  assert.match(source, /persistentSchemaStatNames[\s\S]*?'ApplicationSharedRuntimes'/);
+  assert.match(source, /persistentSchemaStatNames[\s\S]*?'ApiEngineInserted'/);
+  assert.match(source, /persistentSchemaStatNames[\s\S]*?'VersionRecordUpdated'/);
   assert.match(source, /checkpoint\.IdMapsPlanned\s*=\s*true/);
   assert.match(source, /rebuildLegacyCheckpointIdMaps/);
 });
@@ -1004,9 +1008,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   const importerSourceVersion = `v${source.match(/Version:\s*v?(\d+\.\d+\.\d+)/)?.[1] || ""}`;
   assert.equal(packageImporter.Version, importerSourceVersion);
   assert.equal(packageImporter.ApiV8Code, source, "embedded importer must match the canonical normalized source");
-  assert.equal(packageImporter.LimitMemory, 3072, "trusted app-store importer needs the reviewed cumulative-allocation budget");
+  assert.equal(packageImporter.LimitMemory, 8192, "trusted app-store importer needs the reviewed cumulative-allocation budget");
   assert.equal(packageImporter.Timeout, 3600, "background-capable imports must not inherit the generic ten-minute HTTP budget");
-  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.8") >= 0);
+  assert.ok(compareSemanticVersions(importerSourceVersion, "v1.10.11") >= 0);
   assert.match(source, /MYSQL_BIT_NUMERIC_COMPAT_V1/);
   assert.match(source, /\^\(bit\|tinyint\|smallint/);
   assert.match(source, /API_ENGINE_RESOURCE_BASELINE_V1/);
@@ -1062,9 +1066,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.equal(legacyMenuConfig.HiddenIndex, appStoreMenu.HiddenIndex);
   assert.equal(legacyMenuConfig.GeneralSeaarch, appStoreMenu.GeneralSeaarch);
 
-  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 8\)/g) || [];
-  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.8 floor");
-  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 8\)/);
+  const csharpVersionGates = appStoreUpgradeSource.match(/importerVersion\s*<\s*new System\.Version\(1, 10, 11\)/g) || [];
+  assert.equal(csharpVersionGates.length, 2, "runtime and downloaded-resource validation should share the v1.10.11 floor");
+  assert.match(appStoreUpgradeSource, /embeddedImporterVersion\s*<\s*new System\.Version\(1, 10, 11\)/);
   assert.match(appStoreUpgradeSource, /packageVersion\s*<\s*new System\.Version\(7, 3, 6\)/);
   assert.equal(
     (appStoreUpgradeSource.match(/MYSQL_ROW_SIZE_OFFPAGE_FALLBACK_V1/g) || []).length,
@@ -1106,7 +1110,7 @@ test("application-store upgrade resources carry the canonical resumable importer
     2,
   );
 
-  assert.match(refreshSource, /versionNumber\s*<\s*1_010_008/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_010_011/);
   assert.match(refreshSource, /SKIP_MOVE_FOR_REUSED_BUILD_V1/);
   assert.match(refreshSource, /MICRO_APP_PUBLIC_HDFS_PATH_V1/);
   assert.match(refreshSource, /DB_RUNTIME_BUILD_ASSETS_V1/);
@@ -1116,9 +1120,9 @@ test("application-store upgrade resources carry the canonical resumable importer
   assert.match(refreshSource, /APPLICATION_ASSET_BACKGROUND_CHUNKS_V1/);
   assert.match(refreshSource, /ASSET_METADATA_WITHOUT_SECOND_DECODE_V1/);
   assert.match(refreshSource, /DATASET_INSERT_IF_MISSING_V1/);
-  assert.match(refreshSource, /versionNumber\s*<\s*1_007_007/);
+  assert.match(refreshSource, /versionNumber\s*<\s*1_007_008/);
   assert.match(refreshSource, /versionNumber\s*<\s*7_000_013/);
-  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_008/);
+  assert.match(refreshSource, /importerVersionNumber\s*<\s*1_010_011/);
   assert.match(refreshSource, /DATABASE_ONLY_BUILD_ASSETS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_MONOTONIC_PROGRESS_V1/);
   assert.match(refreshSource, /BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1/);
@@ -1790,4 +1794,15 @@ test("schedule job package contract is bounded and excludes custom runtime types
   assert.match(source, /包含定时任务的应用必须通过持久后台任务安装/);
   assert.match(publishSource, /应用包只允许发布接口引擎任务/);
   assert.match(publishSource, /定时任务引用的接口引擎未包含在当前应用包/);
+});
+
+test("shared public runtime is immutable, HDFS-free, and does not weaken ordinary packages", () => {
+  assert.match(source, /sharedpublicruntime\|shared-public-runtime\|sharedruntime/);
+  assert.match(source, /SharedPublicRuntime\.EntryUrl 必须是无查询参数和片段的 HTTPS 地址/);
+  assert.match(source, /SharedPublicRuntime\.ManifestHash 必须是 64 位十六进制摘要/);
+  assert.match(source, /SharedPublicRuntime\.EntryUrl 必须固定到当前 VersionNo 的不可变目录/);
+  assert.match(source, /var buildAssets = sharedPublicBuild[\s\S]*?\? \[\]/);
+  assert.match(source, /useSharedPublicBuild[\s\S]*?SharedPublicRuntime: true/);
+  assert.ok(source.includes("entryHdfsPath && !/^https?:\\/\\//i.test(entryHdfsPath) && V8.Method.GetPrivateFileUrl"));
+  assert.ok(source.includes("if (!databaseOnlyBuild && !sharedPublicBuild && !/^(publichdfs|public-hdfs|hdfs)$/i.test(buildStoragePolicy))"));
 });

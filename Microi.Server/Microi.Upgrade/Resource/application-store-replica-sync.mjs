@@ -12,6 +12,7 @@ export const applicationStoreReplicaMappings = Object.freeze([
     resourceName: 'import-package.js',
     apiEngineKey: 'import-microi-store-package',
     publishedStandalone: true,
+    limitMemory: 8192,
   }),
   Object.freeze({
     resourceName: 'bulk-import-packages.js',
@@ -354,6 +355,7 @@ export function synchronizeApplicationStoreEngines(packageContent, standaloneCon
     if (versionMatch) {
       engine.Version = versionMatch[1].startsWith('v') ? versionMatch[1] : `v${versionMatch[1]}`;
     }
+    if (mapping.limitMemory) engine.LimitMemory = mapping.limitMemory;
   }
   if (packageModel.PackageInfo) {
     packageModel.PackageInfo.ApiEngineCount = Array.isArray(packageModel.SysApiEngines)

@@ -13,7 +13,7 @@ outline: [2, 3]
     <p class="unity-doc-lead">Unity 负责实时 3D，Microi.Unity 负责浏览器桥接，V8 接口引擎负责身份、权限与数据。游戏、数字孪生、展厅，都沿用同一条交付链。</p>
     <div class="unity-doc-actions">
       <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线进入桃源</a>
-      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.3.0.exe">下载 Windows 版</a>
+      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/external/v1.4.0/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.0.exe">下载 Windows v1.4</a>
       <a href="#五分钟接入">五分钟接入</a>
     </div>
     <div class="unity-doc-badges" aria-label="核心能力">
@@ -99,10 +99,11 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
   <div class="unity-doc-app__body">
     <p class="unity-doc-eyebrow">MICROI AI APPLICATION · WEBGL + WINDOWS</p>
     <h3>走进云海桃园，寻回九枚桃花灵韵</h3>
-    <p>操控原创古风女主云绮行走、奔跑、跳跃；浏览器即开即玩，也可下载安装 Windows x64 本地版。每位访客拥有唯一随机昵称，同场角色与左下角公屏实时同步；登录后再由 V8 接口引擎恢复并保存个人进度。</p>
+    <p>v1.4 专业角色预览版支持操控古风女主行走、奔跑、跳跃；浏览器即开即玩，也可下载安装 Windows x64 本地版。每位访客拥有唯一随机昵称，同场角色与左下角公屏实时同步；登录后再由 V8 接口引擎恢复并保存个人进度。</p>
     <ul>
       <li><b>可追溯实时角色</b><span>AI 设定图约束造型，CC0 基础网格二次创作；设定图与实机证据分开标注</span></li>
-      <li><b>双端同版</b><span>WebGL 在线全屏与 Windows 安装包统一使用 v1.3.0</span></li>
+      <li><b>双端同版</b><span>WebGL 在线全屏与 Windows 安装包统一使用 v1.4.0</span></li>
+      <li><b>视觉状态透明</b><span>当前是专业角色预览；正式原创云绮 AAA 高模仍在制作与实机近景验收中</span></li>
       <li><b>多人桃源</b><span>随机昵称、2 秒心跳、10 秒掉线消失、头顶名牌与角色插值</span></li>
       <li><b>实时公屏</b><span>左下角文字聊天、表情选择、输入隔离、限频与幂等</span></li>
       <li><b>完整商城包</b><span>Web 产物、4 张表、9 个接口和 4 个运营菜单</span></li>
@@ -110,7 +111,7 @@ Microi 已有大屏 Unity 加载能力与项目级工具。现在补齐的是公
     </ul>
     <div class="unity-doc-actions">
       <a class="is-primary" href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/index.html" target="_blank" rel="noreferrer">在线游玩</a>
-      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.3.0.exe">Windows 本地版</a>
+      <a href="https://static.itdos.com/itdos/micro-app/microi-unity-taoyuan/external/v1.4.0/downloads/Microi-Taoyuan-Yunmeng-Setup-v1.4.0.exe">Windows v1.4 本地版</a>
       <a href="/apps.html">前往 AI 应用列表</a>
       <a href="/app-detail.html?app=microi-unity-taoyuan">应用详情</a>
     </div>

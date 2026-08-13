@@ -53,7 +53,7 @@ function validateReleaseCandidate(name, content) {
     const versionNumber = versionMatch
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
-    if (versionNumber < 1_010_008
+    if (versionNumber < 1_010_011
       || !content.includes('preserve_interface_engine_pagetabs_')
       || !content.includes('System.DateTime.Now.ToString')
       || !content.includes('OwnerUserId')
@@ -74,6 +74,8 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('BACKGROUND_TASK_RUNTIME_SCOPE_V1')
       || !content.includes('SCHEMA_BACKGROUND_CHUNKS_V1')
       || !content.includes('APPLICATION_ASSET_BACKGROUND_CHUNKS_V1')
+      || !content.includes('REMOTE_ZIP_SINGLE_ASSET_SLICE_V1')
+      || !content.includes('SharedPublicRuntime')
       || !content.includes('ASSET_METADATA_WITHOUT_SECOND_DECODE_V1')
       || !content.includes('DATASET_INSERT_IF_MISSING_V1')
       || !content.includes('PACKAGE_API_ENGINE_READBACK_V1')
@@ -96,7 +98,7 @@ function validateReleaseCandidate(name, content) {
       || !content.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
       || !content.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
       || !content.includes('OBJECT_STORAGE_FORBIDDEN')) {
-      throw new Error(`${name} 低于 v1.10.8 或缺少跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台资源较新版本保护及统一应用商城能力，拒绝降级本地基线`);
+      throw new Error(`${name} 低于 v1.10.11 或缺少跨分片累计结果、不可变共享公共运行时、远程 ZIP 单资产安全分片、跨数据库权限时间、共享任务进度下限、旧租户权限物理表兼容、单调后台进度、对象存储可行动诊断、受限数据库内联运行、可信官方平台资源较新版本保护及统一应用商城能力，拒绝降级本地基线`);
     }
   }
   if (name === 'ai-app-publish-store.js') {
@@ -105,7 +107,7 @@ function validateReleaseCandidate(name, content) {
       ? Number(versionMatch[1]) * 1_000_000 + Number(versionMatch[2]) * 1_000 + Number(versionMatch[3])
       : 0;
     if (!content.includes('ai_app_publish_store')
-      || versionNumber < 1_007_007
+      || versionNumber < 1_007_008
       || !content.includes('selectionValues(existingStore.SelectTable')
       || !content.includes('selectionValues(existingStore.SelectApiEngine')
       || !content.includes('IncludeSource: includeSource')
@@ -117,8 +119,9 @@ function validateReleaseCandidate(name, content) {
       || !content.includes("Source: 'CompiledAssets'")
       || !content.includes('SOURCE_BUILD_ARCHIVE_ROOTS_V1')
       || !content.includes('buildApiEngineResourcePolicies')
-      || !content.includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')) {
-      throw new Error(`${name} 缺少 v1.7.7 官方平台接口引擎所有权、统一应用商城、历史 BuildLog 兼容入口、严格源码/编译分根目录及自包含 PackageOnly 能力`);
+      || !content.includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
+      || !content.includes('SharedPublicRuntime')) {
+      throw new Error(`${name} 缺少 v1.7.8 不可变共享公共运行时、官方平台接口引擎所有权、统一应用商城、历史 BuildLog 兼容入口、严格源码/编译分根目录及自包含 PackageOnly 能力`);
     }
   }
   if (name === 'official-resource-api.js') {
@@ -250,7 +253,7 @@ function validateReleaseCandidate(name, content) {
         || !String(buildZipEngine?.ApiV8Code || '').includes('REAL_BUILD_ZIP_ASSETS_V1')
         || engineVersionNumber(sourceZipEngine) < 1_002_000
         || !String(sourceZipEngine?.ApiV8Code || '').includes('SOURCE_ONLY_ZIP_ROOT_V1')
-        || importerVersionNumber < 1_010_008
+        || importerVersionNumber < 1_010_011
         || !importerCode.includes('API_ENGINE_RESOURCE_BASELINE_V1')
         || !importerCode.includes('TENANT_API_ENGINE_POLICY_IMMUTABLE_V1')
         || !importerCode.includes('JSON_SWITCH_LITERAL_UNQUOTE_V1')
@@ -264,9 +267,10 @@ function validateReleaseCandidate(name, content) {
         || !importerCode.includes('BACKGROUND_TASK_MONOTONIC_PROGRESS_V1')
         || !importerCode.includes('BACKGROUND_TASK_PERSISTED_PROGRESS_FLOOR_V1')
         || !importerCode.includes('OBJECT_STORAGE_FORBIDDEN')
-        || engineVersionNumber(publisherEngine) < 1_007_007
+        || engineVersionNumber(publisherEngine) < 1_007_008
         || !String(publisherEngine?.ApiV8Code || '').includes('buildApiEngineResourcePolicies')
         || !String(publisherEngine?.ApiV8Code || '').includes('OFFICIAL_PLATFORM_API_ENGINE_OWNERSHIP_V1')
+        || !String(publisherEngine?.ApiV8Code || '').includes('SharedPublicRuntime')
         || engineVersionNumber(bulkEngine) < 1_001_006
         || Number(bulkEngine?.IsEnable) !== 1
         || Number(bulkEngine?.StopHttp) !== 0

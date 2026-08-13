@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: ai_app_publish_store
- * Version: v1.7.7
+ * Version: v1.7.9
  * Function:
- * - 统一生成应用商城安装包；分离商城发行版本与不可变运行时版本，并保持精确发布、菜单合同、完整资源选择、任务定义及接口引擎所有权门禁。
+ * - 统一应用商城发布器：v3 committed proof、精确版本、资源所有权与共享公共运行时包合同。
  */
 
 function ok(data, msg) { return { Code: 1, Data: data || null, Msg: msg || '成功' }; }
@@ -855,6 +855,40 @@ var deliveryVersions = resolveDeliveryVersions({
 });
 var runtimeVersionNo = deliveryVersions.RuntimeVersion;
 var versionNo = deliveryVersions.PackageVersion;
+var sharedPublicRuntime = V8.Param.SharedPublicRuntime || null;
+if (typeof sharedPublicRuntime === 'string') sharedPublicRuntime = parseObject(sharedPublicRuntime, null);
+if (sharedPublicRuntime) {
+  if (!protocolV3) return fail('SharedPublicRuntime 只允许 ProtocolVersion=3 的已提交不可变运行时。');
+  if (includeSource) return fail('SharedPublicRuntime 必须使用 IncludeSource=false；源码交付请使用普通 HDFS 或离线包。');
+  if (appType !== 'Web' && appType !== 'UniApp') return fail('SharedPublicRuntime 只支持 Web 或 UniApp。');
+  var sharedEntryUrl = text(sharedPublicRuntime.EntryUrl);
+  var sharedBaseUrl = text(sharedPublicRuntime.BaseUrl);
+  var sharedManifestHash = text(sharedPublicRuntime.ManifestHash).toLowerCase();
+  var committedRuntimeHash = text(committedProof && committedProof.RuntimeManifestHash).toLowerCase();
+  if (!/^https:\/\/[^?#]{1,2040}$/i.test(sharedEntryUrl)) {
+    return fail('SharedPublicRuntime.EntryUrl 必须是无查询参数和片段的 HTTPS 地址。');
+  }
+  if (!/^[a-f0-9]{64}$/i.test(sharedManifestHash) || sharedManifestHash !== committedRuntimeHash) {
+    return fail('SharedPublicRuntime.ManifestHash 必须与已提交 v3 运行清单摘要一致。');
+  }
+  if (sharedEntryUrl.toLowerCase().indexOf('/' + runtimeVersionNo.toLowerCase() + '/') < 0) {
+    return fail('SharedPublicRuntime.EntryUrl 必须固定到当前不可变运行时版本目录。');
+  }
+  if (sharedBaseUrl && (!/^https:\/\/[^?#]{1,2040}$/i.test(sharedBaseUrl)
+      || sharedEntryUrl.toLowerCase().indexOf(sharedBaseUrl.replace(/\/+$/g, '').toLowerCase() + '/') !== 0)) {
+    return fail('SharedPublicRuntime.BaseUrl 必须是 EntryUrl 的 HTTPS 父路径。');
+  }
+  sharedPublicRuntime = {
+    SchemaVersion: 1,
+    EntryUrl: sharedEntryUrl,
+    BaseUrl: sharedBaseUrl || sharedEntryUrl.substring(0, sharedEntryUrl.lastIndexOf('/')),
+    VersionNo: runtimeVersionNo,
+    ManifestHash: sharedManifestHash,
+    ProviderOsClient: text(sharedPublicRuntime.ProviderOsClient || V8.OsClient),
+    TotalSize: Number(sharedPublicRuntime.TotalSize || 0),
+    HostContext: true
+  };
+}
 var entryPath = protocolV3
   ? text(committedVersion.EntryPath)
   : text((runtime.Service && runtime.Service.EntryPath) || 'index.html');
@@ -985,6 +1019,14 @@ var packageModel = {
   SysApiEngines: toArray(selectedExport.SysApiEngines),
   ScheduleJobs: selectedScheduleJobs
 };
+if (sharedPublicRuntime) {
+  packageModel.PackageInfo.SharedPublicRuntime = true;
+  packageModel.ApplicationBundle.AssetStoragePolicy = {
+    Source: 'NotIncluded',
+    Build: 'SharedPublicRuntime'
+  };
+  packageModel.ApplicationBundle.SharedPublicRuntime = sharedPublicRuntime;
+}
 var generatedResourcePolicies = buildApiEngineResourcePolicies(
   packageModel.SysApiEngines,
   requestedResourcePolicies,
