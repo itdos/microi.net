@@ -12,9 +12,9 @@ const packagedPublisher = packageModel.SysApiEngines.find(
   item => item.ApiEngineKey === "ai_app_publish_store",
 );
 
-test("publisher package metadata matches the v1.7.7 V3 source", () => {
+test("publisher package metadata matches the v1.7.9 V3 source", () => {
   assert.ok(packagedPublisher);
-  assert.equal(packagedPublisher.Version, "v1.7.7");
+  assert.equal(packagedPublisher.Version, "v1.7.9");
   assert.equal(
     packagedPublisher.ApiV8Code.replace(/\r\n/g, "\n"),
     publisherSource.replace(/\r\n/g, "\n"),
@@ -458,7 +458,7 @@ test("protocol v3 resolves the committed version by exact VersionId instead of a
 });
 
 test("protocol v3 package write is a committed-proof fenced CAS with pre/post readback", () => {
-  assert.match(publisherSource, /Version: v1\.7\.7/);
+  assert.match(publisherSource, /Version: v1\.7\.9/);
   assert.match(
     publisherSource,
     /V8\.FormEngine\.UptFormDataByWhere\('sys_microistore', packageFields\)/,
@@ -516,4 +516,13 @@ test("v3 MicroService 包只使用 committed route/metadata snapshot，禁止回
     publisherSource,
     /postCommittedVersion = getCommittedVersion[\s\S]*?postCommittedVersion\.RouteSnapshotJson[\s\S]*?route snapshot 已漂移/u,
   );
+});
+
+test("v3 publisher emits a hash-pinned shared public runtime only for immutable Web delivery", () => {
+  assert.match(publisherSource, /SharedPublicRuntime 只允许 ProtocolVersion=3/);
+  assert.match(publisherSource, /SharedPublicRuntime 必须使用 IncludeSource=false/);
+  assert.match(publisherSource, /sharedManifestHash !== committedRuntimeHash/);
+  assert.match(publisherSource, /sharedEntryUrl\.toLowerCase\(\)\.indexOf\('\/' \+ runtimeVersionNo\.toLowerCase\(\) \+ '\/'\)/);
+  assert.match(publisherSource, /Build: 'SharedPublicRuntime'/);
+  assert.match(publisherSource, /packageModel\.ApplicationBundle\.SharedPublicRuntime = sharedPublicRuntime/);
 });
