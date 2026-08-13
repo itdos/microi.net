@@ -73,8 +73,21 @@
       <image class="summary-icon" :src="entry.icon" mode="aspectFit" />
     </view>
 
+    <view v-if="key === 'proposals'" class="proposal-compare-tools">
+      <view
+        class="proposal-compare-button"
+        :class="{ disabled: proposalSelection.length < 2 || proposalComparing }"
+        hover-class="proposal-compare-button--pressed"
+        @tap="compareProposals"
+      ><text>{{ proposalComparing ? '比价中...' : '一键比价' }}</text><text v-if="proposalSelection.length">{{ proposalSelection.length }}</text></view>
+      <view class="proposal-select-all" :class="{ active: areAllProposalsSelected }" @tap="toggleAllProposals">
+        <text>{{ areAllProposalsSelected ? '✓' : '' }}</text><text>{{ areAllProposalsSelected ? '取消全选' : '全选' }}</text>
+      </view>
+    </view>
+
     <scroll-view
       class="data-scroll"
+      :class="{ 'data-scroll--proposal': key === 'proposals' }"
       scroll-y
       :scroll-top="mciScrollCommand"
       :refresher-enabled="true"
@@ -93,9 +106,11 @@
 
       <view v-else-if="rows.length" class="data-list">
         <!-- zhy：把租户配置的摘要最大行数传给卡片组件。 -->
+        <view v-for="(row, index) in rows" :key="row.Id || index" class="selectable-card">
+          <view v-if="key === 'proposals'" class="proposal-select" :class="{ active: isProposalSelected(row) }" @tap.stop="toggleProposal(row)">
+            <text>{{ isProposalSelected(row) ? '✓' : '' }}</text>
+          </view>
         <mci-business-card
-          v-for="(row, index) in rows"
-          :key="row.Id || index"
           :row="row"
           :index="index"
           :title="getTitle(row)"
@@ -111,6 +126,7 @@
           @phone="callPhone"
           @action="triggerRowAction"
         />
+        </view>
 
         <view class="load-state">
           <text v-if="loading">正在加载...</text>
@@ -127,7 +143,6 @@
     </scroll-view>
 
     <view v-if="canAddRecord" class="floating-add" hover-class="floating-add--pressed" @tap="openAdd"><text>＋</text></view>
-
     <view v-if="filterOpen" class="filter-mask" @tap="closeAdvancedFilters">
       <view class="filter-sheet" @tap.stop>
         <view class="filter-sheet__head">
@@ -298,7 +313,9 @@ export default {
       filterOptions: {},
       viewManifest: null,
       loadRequestId: 0,
-      searchTimer: null
+      searchTimer: null,
+      proposalSelection: [],
+      proposalComparing: false
     }
   },
   computed: {
@@ -326,6 +343,9 @@ export default {
     statisticsValue() {
       const value = statisticsFieldValue(this.dataAppend, this.config.statisticsField, 0)
       return formatMoney(value || 0)
+    },
+    areAllProposalsSelected() {
+      return this.key === 'proposals' && this.rows.length > 0 && this.rows.every((row) => this.isProposalSelected(row))
     }
   },
   onLoad(options) {
@@ -351,6 +371,46 @@ export default {
     clearTimeout(this.searchTimer)
   },
   methods: {
+    isProposalSelected(row) {
+      return this.proposalSelection.some((item) => String(item.Id) === String(row.Id))
+    },
+    toggleProposal(row) {
+      const index = this.proposalSelection.findIndex((item) => String(item.Id) === String(row.Id))
+      if (index >= 0) this.proposalSelection.splice(index, 1)
+      else this.proposalSelection.push(row)
+    },
+    toggleAllProposals() {
+      if (!this.rows.length) return
+      if (this.areAllProposalsSelected) {
+        const visibleIds = new Set(this.rows.map((row) => String(row.Id)))
+        this.proposalSelection = this.proposalSelection.filter((item) => !visibleIds.has(String(item.Id)))
+        return
+      }
+      const selectedIds = new Set(this.proposalSelection.map((item) => String(item.Id)))
+      this.rows.forEach((row) => {
+        if (!selectedIds.has(String(row.Id))) this.proposalSelection.push(row)
+      })
+    },
+    async compareProposals() {
+      if (this.proposalComparing) return
+      if (this.proposalSelection.length < 2) {
+        uni.showToast({ title: '请至少选择两个方案', icon: 'none' })
+        return
+      }
+      this.proposalComparing = true
+      try {
+        const ids = this.proposalSelection.map((item) => item.Id).filter(Boolean).join(',')
+        await new Promise((resolve, reject) => uni.navigateTo({
+          url: `/pages/business/proposal-compare?ids=${encodeURIComponent(ids)}`,
+          success: resolve,
+          fail: reject
+        }))
+      } catch (error) {
+        uni.showToast({ title: error.message || '方案比价失败', icon: 'none' })
+      } finally {
+        this.proposalComparing = false
+      }
+    },
     async initializeList(restored = false, refresh = false) {
       try {
         const menu = await findMenu(
@@ -1277,6 +1337,8 @@ export default {
   height: calc(100vh - 438rpx - var(--mci-safe-top));
 }
 
+.data-scroll--proposal { height: calc(100vh - 534rpx - var(--mci-safe-top)); }
+
 .data-list,
 .skeleton-list {
   padding: 0 24rpx calc(140rpx + var(--mci-safe-bottom));
@@ -1534,6 +1596,18 @@ export default {
 .floating-add--pressed {
   transform: scale(0.9);
 }
+
+.proposal-compare-tools { display: flex; align-items: center; justify-content: flex-end; gap: 36rpx; height: 72rpx; margin: -2rpx 24rpx 18rpx; padding: 0 8rpx; }
+.proposal-compare-button { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-width: 190rpx; height: 68rpx; padding: 0 28rpx; border-radius: 14rpx; color: #fff; background: linear-gradient(135deg, #0787c9, #17b5a6); box-shadow: 0 8rpx 20rpx rgba(7, 135, 201, .2); font-size: 25rpx; font-weight: 700; box-sizing: border-box; }
+.proposal-compare-button > text:last-child:not(:first-child) { min-width: 30rpx; height: 30rpx; padding: 0 5rpx; border-radius: 15rpx; color: #0787c9; background: #fff; font-size: 19rpx; line-height: 30rpx; text-align: center; }
+.proposal-compare-button.disabled { opacity: .48; box-shadow: none; }
+.proposal-compare-button--pressed { transform: scale(.97); }
+.proposal-select-all { display: flex; align-items: center; gap: 10rpx; height: 64rpx; color: #607d8b; font-size: 25rpx; }
+.proposal-select-all > text:first-child, .proposal-select { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; border: 2rpx solid #aebfc7; border-radius: 10rpx; box-sizing: border-box; }
+.proposal-select-all.active { color: #0787c9; font-weight: 650; }
+.proposal-select-all.active > text:first-child, .proposal-select.active { border-color: #0787c9; color: #fff; background: #0787c9; }
+.selectable-card { position: relative; }
+.proposal-select { position: absolute; top: 16rpx; right: 16rpx; z-index: 5; color: transparent; background: rgba(255, 255, 255, .96); box-shadow: 0 3rpx 10rpx rgba(21, 68, 88, .12); }
 
 .action-mask {
   position: fixed;

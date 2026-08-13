@@ -420,13 +420,12 @@ export const businessModules = {
   }),
   proposals: native({
     title: '客户方案', table: 'Diy_kehufaxx', menuAliases: ['客户方案', '方案管理'],
-    titleField: 'ShebeiMC', tagFields: ['ShebeiXH', 'AnzhuangCS'],
+    titleField: 'FanganMC', tagFields: ['YujiHZSJ'],
     relatedMetrics: [
-      { key: 'positions', label: '场所点位数量合计', aggregateField: 'ChangsuoDWSL', format: 'number', unit: '个', tone: 'primary' },
       { key: 'month', label: '本月客户方案', monthField: 'YujiHZSJ', tone: 'primary' },
       { key: 'total', label: '方案总量', tone: 'neutral' }
     ],
-    lines: [{ label: '安装场所', field: 'AnzhuangCS' }, { label: '设备数量', field: 'ChangsuoDWSL' }, { label: '预计合作', field: 'YujiHZSJ', format: 'date' }]
+    lines: [{ label: '预计合作', field: 'YujiHZSJ', format: 'date' }]
   }),
   customerCare: native({
     title: '客户关怀', table: 'Diy_kehuguanhuai', menuAliases: ['客户关怀', '关怀记录'],
