@@ -161,7 +161,7 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 文档改动后执行 `npm run docs:build`；验收时检查本次没有无理由新增 `.md` 页面或导航路由。
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=3e9f3fbe30417e8b309ebc5b52544d70390db36b30cebe3e96f1fa5928a9b99a -->
+<!-- microi-progressive:chunk id=workspace-conventions-009 sha256=dc7dbe2d2f60466a7170fff65a5df8769bc795b4ab23151a24b665380d7c6e37 -->
 ## 多对话共享工作区变更归属保护（强制）
 
 同一工作区可能同时被用户、其它 Codex 对话、IDE、自动化任务或外部 Git 操作修改。任务启动前已经存在、或无法用本对话证据严格证明归属的差异，一律视为他人资产并保留；“工作区是脏的”不是清理授权。
@@ -173,6 +173,21 @@ AI 在工作区任意任务中生成的**一次性临时脚本、诊断文件、
 - 禁止为了获得干净工作区而使用整文件覆盖、`git checkout -- <file>`、`git restore <file>`、`git reset --hard` 或删除未跟踪文件；这些操作可能抹掉其它对话尚未提交的成果。
 - 修复误撤回时，只恢复被本对话删除的原始字节/行，随后断言目标 hunk 已恢复、其它既有差异保持不变，并在最终说明中明确列出仍存在但未触碰的并行改动。
 - 对 `microi.doc/docs/doc/about/update-log.md` 尤其严格：已经发布的条目即使日期是当天、位于最新提交或内容覆盖当前任务，也必须默认属于既有发布成果。除非用户明确要求修改，或本对话持有精确新增证据，否则不得删除、重写或降级该条目。
+
+## 本地多租户浏览器隔离（强制）
+
+- 本地 `Microi.Client` 使用 `src/config.json.ApiBaseDev` 作为默认 API；URL 中位于 `#` 之前的
+  `ApiBase` 与 `OsClient` 是当前页面最高优先级，标准形式为
+  `http://localhost:61500/?OsClient=<tenant>&ApiBase=<encodeURIComponent(apiBase)>#/route`。
+- 同一个浏览器 Profile/Context 下的 localhost 页面共享 localStorage、Pinia、Token、CurrentUser、
+  ApiBase 和 OsClient。并行测试不同目标时，一组 `ApiBase + OsClient` 必须对应一个独立浏览器
+  Context/Profile；Playwright/Codex 使用 `browser.newContext()`，不得只在同一 context 中新开 Page。
+- 人工测试的第二个不同租户至少使用无痕窗口；多个无痕窗口可能共享同一临时会话，三个以上并行
+  目标必须使用独立 Profile、独立 `--user-data-dir` 或自动化独立 context。
+- AI 收到线上吾码地址时，先在一次性独立 context 读取
+  `window.__MICROI_RUNTIME_ENDPOINT__`；旧版再回退到页面全局值、同源缓存和域名解析。确认实际
+  ApiBase/OsClient 后，才在新的独立 context 打开本地 URL。详细流程读取 `microi-client-frontend`、
+  `playwright-e2e` 与 `microi-deployment`。
 
 <!-- /microi-progressive:chunk -->
 ## 详细参考路由（渐进披露）

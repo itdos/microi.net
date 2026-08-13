@@ -2,7 +2,7 @@
 
 > 按需读取；本文件由 SKILL.md 的原章节无损拆分。
 
-<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=cdb6c4e59594572e4c1264856f42f428af215c8515b6ee14d0da4442555cc268 -->
+<!-- microi-progressive:chunk id=microi-client-frontend-011 sha256=7f8680e6afd7cae492a0d938e1efc95d0d20b04d0a33b0b956f2d0edb26d25cb -->
 ## Vue3 前端微服务宿主规则
 
 `sys_menu.OpenType=MicroService` 时，动态路由必须把 `MicroServiceId`、`MicroServicePageId`、`MicroServiceRoutePath` 和真实入口 `MicroAppUrl` 写入 route meta；浏览器侧菜单路由使用 `/#/micro-app/{MsKey}/{RoutePath}`，不要再生成 `/micro-app-host/{menuId}`，否则地址过长且刷新或直接访问菜单路由容易加载空白页。
@@ -75,6 +75,23 @@ VS Code 插件执行前端微服务构建前必须先安全清理当前项目自
 ### 表单下拉 Data 动态对象选项
 
 表单 V8 通过 `V8.FieldSet('字段名', 'Data', objectRows)` 动态写入下拉数据时，如果 `objectRows` 是对象数组，即使 `diy_field.Config.DataSource='Data'`，前端也必须按对象数据源处理，并使用 `SelectLabel/SelectSaveField` 或常见字段兜底生成 label/value。禁止把对象数组按普通字符串 Data 源过滤，否则会出现接口已有数据但下拉显示“无数据”的回归。
+
+### 线上微服务到本地宿主的运行目标复现
+
+AI 收到线上 `/micro-app/{MsKey}/{RoutePath}` 地址并需要用本地 `Microi.Client` 排查时：
+
+1. 在一次性隔离 browser context 打开线上地址并等待主框架初始化。
+2. 优先读取 `window.__MICROI_RUNTIME_ENDPOINT__`。旧版没有该对象时，读取 URL、
+   `window.ApiBase/window.OsClient`、`JSON.parse(localStorage.getItem('microi.net') || '{}')`；
+   OsClient 仍为空再通过域名解析接口或成功请求确认。
+3. 在新的独立 context 打开
+   `http://localhost:61500/?OsClient=<encoded>&ApiBase=<encoded>#/micro-app/{MsKey}/{RoutePath}`。
+4. 断言本地 `window.__MICROI_RUNTIME_ENDPOINT__` 与线上识别结果一致，再开始功能回归。若不一致，
+   先停止测试，不能把 `config.json` 指向的其它服务器结果当成目标租户证据。
+
+同一个普通浏览器 Profile/Playwright context 不能并行承载不同租户；页面间会共享 Token、
+CurrentUser、ApiBase 和 OsClient。无痕窗口是人工第二租户的最低要求，但多个无痕窗口可能共享临时
+会话；自动化必须一组运行目标一个 `browser.newContext()`。目标 API 还必须允许 localhost CORS。
 
 ### 复盘：历史 OpenIframe 打印入口在 Vue3 弹窗中空白
 

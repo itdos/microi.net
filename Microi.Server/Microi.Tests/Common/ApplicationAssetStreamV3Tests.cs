@@ -47,6 +47,27 @@ public class ApplicationAssetStreamV3Tests
         }
     }
 
+    [Fact]
+    public void RuntimeOsClientKey_MapsCanonicalLowercaseRouteWithoutAcceptingAmbiguousTenants()
+    {
+        Assert.Equal(
+            "iTdos",
+            V8McpLogic.ResolveApplicationAssetV3RuntimeOsClientKey(
+                "itdos",
+                new[] { "iTdos", "customer" }));
+        Assert.Equal(
+            "itdos",
+            V8McpLogic.ResolveApplicationAssetV3RuntimeOsClientKey(
+                "itdos",
+                new[] { "iTdos", "itdos" }));
+        Assert.Null(V8McpLogic.ResolveApplicationAssetV3RuntimeOsClientKey(
+            "ITDOS",
+            new[] { "iTdos", "itdos" }));
+        Assert.Null(V8McpLogic.ResolveApplicationAssetV3RuntimeOsClientKey(
+            "missing",
+            new[] { "iTdos", "customer" }));
+    }
+
     [Theory]
     [InlineData("../index.html")]
     [InlineData("assets/../../index.html")]
@@ -417,6 +438,36 @@ public class ApplicationAssetStreamV3Tests
         Assert.Equal(string.Empty, V8McpLogic.ReadApplicationAssetV3NullableStringFact(
             version,
             "ExpectedAppVersion"));
+    }
+
+    [Fact]
+    public void FirstV3Release_PointerBaselinesPreserveNullAndRejectEmptyOrDrift()
+    {
+        var app = new JObject
+        {
+            ["ActivePublishVersionId"] = JValue.CreateNull(),
+            ["CommittedPublishVersionId"] = JValue.CreateNull()
+        };
+        Assert.Null(V8McpLogic.ValidateApplicationAssetV3ExpectedPointerBaselines(
+            app,
+            null,
+            null));
+
+        app["ActivePublishVersionId"] = string.Empty;
+        Assert.Contains("ExpectedActivePublishVersionId",
+            V8McpLogic.ValidateApplicationAssetV3ExpectedPointerBaselines(app, null, null));
+
+        app["ActivePublishVersionId"] = "version-active";
+        app["CommittedPublishVersionId"] = "version-committed";
+        Assert.Null(V8McpLogic.ValidateApplicationAssetV3ExpectedPointerBaselines(
+            app,
+            "version-active",
+            "version-committed"));
+        Assert.Contains("ExpectedCommittedPublishVersionId",
+            V8McpLogic.ValidateApplicationAssetV3ExpectedPointerBaselines(
+                app,
+                "version-active",
+                "version-other"));
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
+using Aliyun.OSS.Common;
 using Microi.net;
 using Minio;
 
@@ -8,6 +9,198 @@ namespace Microi.Tests.Common;
 
 public class MicroiHdfsMinioEndpointTests
 {
+    private static async Task<Stream> CreateAliyunSeekableMultipartPartAsync(
+        Stream source,
+        long length,
+        CancellationToken cancellationToken = default)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "CreateSeekableMultipartPartAsync",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        var task = (Task<FileStream>)method!.Invoke(null, new object?[]
+        {
+            source,
+            length,
+            cancellationToken
+        })!;
+        return await task;
+    }
+
+    private static long CalculateAliyunMultipartPartSize(long totalBytes)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "CalculateMultipartPartSize",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (long)method!.Invoke(null, new object?[] { totalBytes })!;
+    }
+
+    private static ClientConfiguration CreateAliyunUploadClientConfiguration(HDFSParam param)
+    {
+        var method = typeof(MicroiHDFSAliyun).GetMethod(
+            "CreateUploadClientConfiguration",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+        return (ClientConfiguration)method!.Invoke(null, new object?[] { param })!;
+    }
+
+    private sealed class NonSeekableReadStream : Stream
+    {
+        private readonly Stream _inner;
+
+        public NonSeekableReadStream(byte[] bytes)
+        {
+            _inner = new MemoryStream(bytes, writable: false);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class AsyncOnlyNonSeekableReadStream : Stream
+    {
+        private readonly Stream _inner;
+
+        public AsyncOnlyNonSeekableReadStream(byte[] bytes)
+        {
+            _inner = new MemoryStream(bytes, writable: false);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override int Read(byte[] buffer, int offset, int count) =>
+            throw new InvalidOperationException("Synchronous operations are disallowed.");
+        public override Task<int> ReadAsync(
+            byte[] buffer,
+            int offset,
+            int count,
+            CancellationToken cancellationToken) =>
+            _inner.ReadAsync(buffer, offset, count, cancellationToken);
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) _inner.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+
+    [Fact]
+    public async Task AliyunMultipartSpoolsOnlyOneBoundedPartToASeekableDeleteOnCloseStream()
+    {
+        var bytes = Enumerable.Range(0, 257).Select(value => (byte)value).ToArray();
+        using var source = new NonSeekableReadStream(bytes.Concat(new byte[] { 0x7F }).ToArray());
+        using var part = await CreateAliyunSeekableMultipartPartAsync(source, bytes.Length);
+
+        Assert.True(part.CanSeek);
+        Assert.Equal(bytes.Length, part.Length);
+        Assert.Equal(0, part.Position);
+        using var copy = new MemoryStream();
+        part.CopyTo(copy);
+        Assert.Equal(bytes, copy.ToArray());
+        Assert.Equal(0x7F, source.ReadByte());
+    }
+
+    [Fact]
+    public async Task AliyunMultipartRejectsAnIncompleteProviderPartBeforeCallingTheSdk()
+    {
+        using var source = new NonSeekableReadStream(new byte[] { 1, 2, 3 });
+        await Assert.ThrowsAsync<EndOfStreamException>(() =>
+            CreateAliyunSeekableMultipartPartAsync(source, 4));
+    }
+
+    [Fact]
+    public async Task AliyunMultipartReadsAspNetRequestBodiesAsynchronously()
+    {
+        var bytes = Enumerable.Range(0, 513).Select(value => (byte)value).ToArray();
+        using var source = new AsyncOnlyNonSeekableReadStream(bytes);
+        using var part = await CreateAliyunSeekableMultipartPartAsync(source, bytes.Length);
+
+        using var copy = new MemoryStream();
+        await part.CopyToAsync(copy);
+        Assert.Equal(bytes, copy.ToArray());
+    }
+
+    [Fact]
+    public void FiveGiBAliyunObjectUsesBoundedSixteenMiBProviderParts()
+    {
+        const long totalBytes = 5L * 1024L * 1024L * 1024L;
+        var partSize = CalculateAliyunMultipartPartSize(totalBytes);
+
+        Assert.Equal(16L * 1024L * 1024L, partSize);
+        Assert.Equal(320L, (totalBytes + partSize - 1L) / partSize);
+    }
+
+    [Fact]
+    public void MultiTerabyteAliyunObjectGrowsProviderPartsWithoutExceedingTenThousand()
+    {
+        const long totalBytes = 4L * 1024L * 1024L * 1024L * 1024L;
+        var partSize = CalculateAliyunMultipartPartSize(totalBytes);
+        var partCount = (totalBytes + partSize - 1L) / partSize;
+
+        Assert.InRange(partSize, 16L * 1024L * 1024L, 5L * 1024L * 1024L * 1024L);
+        Assert.InRange(partCount, 1L, 10_000L);
+    }
+
+    [Fact]
+    public void LargeAliyunUploadsUsePerRequestDirectWriteTransportAndLongTimeout()
+    {
+        using var stream = new MemoryStream(new byte[1]);
+        var config = CreateAliyunUploadClientConfiguration(new HDFSParam
+        {
+            FileStream = stream,
+            ContentLength = 5L * 1024L * 1024L * 1024L,
+            TimeoutSeconds = 7200
+        });
+
+        Assert.False(config.UseNewServiceClient);
+        Assert.Equal(1L, config.DirectWriteStreamThreshold);
+        Assert.Equal(7_200_000, config.ConnectionTimeout);
+    }
+
+    [Fact]
+    public void OrdinaryAliyunUploadsKeepTheDefaultHttpClientPath()
+    {
+        using var stream = new MemoryStream(new byte[1]);
+        var config = CreateAliyunUploadClientConfiguration(new HDFSParam
+        {
+            FileStream = stream,
+            ContentLength = 1024,
+            TimeoutSeconds = 60
+        });
+
+        Assert.True(config.UseNewServiceClient);
+        Assert.Equal(0L, config.DirectWriteStreamThreshold);
+        Assert.Equal(60_000, config.ConnectionTimeout);
+    }
+
     private static bool ShouldUseInternetEndpoint(bool? networkIsInternet, string returnFileType)
     {
         var method = typeof(MicroiHDFSMinIO).GetMethod(

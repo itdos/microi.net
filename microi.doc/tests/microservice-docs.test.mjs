@@ -193,14 +193,53 @@ test('menu MicroService cache docs, Skills and host use one native lifecycle own
   assert.match(cache, /unmountApp\(normalizedName,\s*\{\s*destroy:\s*true,\s*clearData:\s*true\s*\}\)/);
 });
 
+test('local source runtime documents and enforces URL endpoint priority with isolated tenants', () => {
+  const localRun = read('microi.doc/docs/doc/getting-started/local-run.md');
+  const microserviceGuide = read('microi.doc/docs/doc/system-engine/micro-app.md');
+  const runtimeQuery = read('Microi.Client/src/utils/runtime-endpoint-query.js');
+  const client = read('Microi.Client/src/utils/diy.common.js');
+  const osClient = read('Microi.Client/src/utils/itdos.osclient.js');
+  const skills = [
+    'workspace-conventions',
+    'microi-client-frontend',
+    'microi-microservice',
+    'playwright-e2e',
+    'microi-deployment',
+  ].map(readSkill).join('\n');
+
+  for (const token of [
+    'http://localhost:61500/?OsClient=iTdos&ApiBase=',
+    '1（最高）',
+    'window.__MICROI_RUNTIME_ENDPOINT__',
+    'browser.newContext()',
+    '多个无痕窗口',
+  ]) assert.ok(localRun.includes(token), `local source guide is missing ${token}`);
+
+  assert.ok(microserviceGuide.includes('?OsClient=iTdos&ApiBase='));
+  assert.match(runtimeQuery, /RUNTIME_ENDPOINT_PROTOCOL\s*=\s*"microi\.runtime-endpoint\.v1"/);
+  assert.match(runtimeQuery, /requiresIsolatedContextForParallelTenants:\s*true/);
+  assert.match(runtimeQuery, /parsed\.protocol !== "http:" && parsed\.protocol !== "https:"/);
+  assert.match(client, /getRuntimeEndpointQuery\(\)[\s\S]*?getRuntimeWindowValue\("ApiBase"\)[\s\S]*?config\.ApiBaseDev/);
+  assert.match(osClient, /getRuntimeEndpointQuery\(\)[\s\S]*?getRuntimeWindowValue\("ApiBase"\)[\s\S]*?config\.ApiBaseDev/);
+  for (const token of ['URL', 'ApiBase', 'OsClient', 'browser.newContext()', '__MICROI_RUNTIME_ENDPOINT__']) {
+    assert.ok(skills.includes(token), `Microi Skills are missing ${token}`);
+  }
+});
+
 test('workspace Skills and the packaged Codex plugin carry the same rules', () => {
   const files = [
+    '.progressive-disclosure-manifest.json',
+    'workspace-conventions/SKILL.md',
+    'workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md',
     'microi-microservice/SKILL.md',
     'microi-microservice/references/runtime-delivery.md',
     'microi-client-frontend/SKILL.md',
     'microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md',
     'playwright-e2e/SKILL.md',
     'playwright-e2e/references/progressive-04-ci-建议.md',
+    'microi-deployment/SKILL.md',
+    'microi-deployment/references/deployment-matrix.md',
+    'microi-docs-coverage/references/capability-map.md',
     'microi-form-engine/SKILL.md',
     'microi-docs-coverage/SKILL.md',
     'microi-frontend-sdk/SKILL.md',

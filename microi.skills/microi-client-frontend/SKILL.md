@@ -1,6 +1,6 @@
 ---
 name: microi-client-frontend
-description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue 前端代码，尤其是表单引擎、diy-table、diy-form-full、工作流面板、sys_menu 按钮、前端 V8 事件、路由、微服务宿主 keep-alive/TagsView 缓存/白屏恢复，以及页面、弹窗和抽屉行为。
+description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue 前端代码，尤其是本地 ApiBase/OsClient URL 切换、浏览器租户隔离、表单引擎、diy-table、diy-form-full、工作流面板、sys_menu 按钮、前端 V8 事件、路由、微服务宿主 keep-alive/TagsView 缓存/白屏恢复，以及页面、弹窗和抽屉行为。
 ---
 
 > **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
@@ -157,8 +157,20 @@ description: Microi.Client 源码架构指南。用于修改 Microi.Client Vue �
 ---
 
 <!-- /microi-progressive:chunk -->
-<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=79848e844c493736d8f7955fcf6ea2c22bf23a1b4a7bacbdbdcc32a2c5dffefb -->
+<!-- microi-progressive:chunk id=microi-client-frontend-004 sha256=5c5669acf2040f87491abe1f8c85f89e9707a128508ca00f82d8f6a73c3ba7bc -->
 ## 7. 验证建议
+
+### 本地 ApiBase 与 OsClient 解析（强制）
+
+- `src/config.json.ApiBaseDev` 是本地默认 API；URL 中 `#` 之前的 `ApiBase`、`OsClient` 必须同时
+  高于 `index.html`、config、Pinia 与 localStorage。解析统一走
+  `src/utils/runtime-endpoint-query.js`，禁止在新入口另写正则形成不同优先级。
+- URL 只允许有效的 HTTP(S) ApiBase 和安全 OsClient。页面初始化后通过不含 Token 的
+  `window.__MICROI_RUNTIME_ENDPOINT__` 暴露实际值，便于 AI/自动化确认没有误连配置文件中的服务器。
+- 同源浏览器窗口仍共享 Token、CurrentUser 等持久化状态。不同 `ApiBase + OsClient` 并行测试必须
+  使用独立 browser context/profile；URL 最高优先级不等于登录态隔离。
+- 修改该链路时运行 `node --test tests/runtime-endpoint-query.spec.mjs`，再使用两个独立
+  `browser.newContext()` 验证两组运行目标互不串号。
 
 ### 菜单微服务缓存与恢复（强制）
 

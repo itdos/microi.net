@@ -5,6 +5,11 @@ import { DiyCommon, DosCommon } from "@/utils/microi.net.import";
 import _, { any } from "underscore";
 import config from "@/config.json";
 import { getStoredLanguage, resolveSysLocale } from "@/lang";
+import {
+    getRuntimeEndpointQuery,
+    getRuntimeWindowValue,
+    publishRuntimeEndpointContext
+} from "@/utils/runtime-endpoint-query.js";
 
 // 辅助函数：获取 DiyStore
 const getDiyStore = () => useDiyStore(pinia);
@@ -50,11 +55,9 @@ const store = {
 var DiyOsClient = {
     /**
      * 初始化os时，首先知道是哪个osclient，才能获取到ApiBase
-     * 指定osclient方式及权重：
-     * 1、index.html
-     * 2、url的OsClient参数
-     * 3、域名对应
-     * 4、DiyCommon.SetOsClient/SetApiBase【原理是localStorage和vuex】
+     * 运行目标权重：
+     * ApiBase：URL > index.html > config.json > localStorage/Pinia > 当前站点同源
+     * OsClient：URL > index.html > localStorage/Pinia > 域名解析 > 默认租户
      * @param {*} init
      */
     OsClientInit: async function (init) {
@@ -84,6 +87,16 @@ var DiyOsClient = {
             value: osClient
         });
         DiyCommon.SetOsClient(osClient);
+        publishRuntimeEndpointContext({
+            apiBase: apiBase,
+            osClient: osClient,
+            apiBaseSource: !DiyCommon.IsNull(getRuntimeWindowValue("ApiBase"))
+                ? "index.html"
+                : (config && config.ApiBaseDev ? "config.json" : "local-storage-or-origin"),
+            osClientSource: !DiyCommon.IsNull(getRuntimeWindowValue("OsClient"))
+                ? "index.html"
+                : "local-storage-or-domain"
+        });
 
         var href = window.location.href.toLowerCase();
         //同步从服务器中获取配置信息，一种是使用await，一种是使用 Promise、Then里面获取
@@ -205,9 +218,14 @@ var DiyOsClient = {
         }
     },
     GetApiBase: function () {
-        //如果index.html指定了ApiBase，这个权重最大
-        if (!DiyCommon.IsNull(ApiBase)) {
-            return ApiBase.trim().replace(/\/+$/, "");
+        // URL 覆盖用于本地源码跨服务器测试，优先于 index.html 和 config.json。
+        var runtimeEndpointQuery = getRuntimeEndpointQuery();
+        if (runtimeEndpointQuery.apiBase.present) {
+            return runtimeEndpointQuery.apiBase.value;
+        }
+        var indexApiBase = getRuntimeWindowValue("ApiBase");
+        if (!DiyCommon.IsNull(indexApiBase)) {
+            return indexApiBase.replace(/\/+$/, "");
         }
         // 读取 config.json 中的配置（修改 JSON 文件后，Vite HMR 会自动更新）
         if (config && config.ApiBaseDev) {
@@ -256,18 +274,15 @@ var DiyOsClient = {
     },
     GetOsClientNotDomain: function () {
         var self = this;
-        //如果Index.html指定了OsClient，这个权力最大
-        //一般单独部署的客户，都是以Index.html为准，但iTdos官方是一套程序支持N个客户，不是以index.html为准，而是以域名为准
-        if (!DiyCommon.IsNull(OsClient)) {
-            return OsClient;
+        // ?OsClient=... 是当前页面最高优先级，便于本地自动化精确绑定目标租户。
+        var runtimeEndpointQuery = getRuntimeEndpointQuery();
+        if (runtimeEndpointQuery.osClient.present) {
+            return runtimeEndpointQuery.osClient.value;
         }
-        var href = window.location.href.toLowerCase();
-        var reg190317 = new RegExp("(^|&)" + "OsClient" + "=([^&]*)(&|$)");
-        var r190317 = window.location.search.substr(1).match(reg190317);
-        var osClient = r190317 != null ? r190317[2] : null;
-        //2020-04-02 ?OsClient=xxx优先，本地调试用
-        if (osClient) {
-            return osClient;
+        // 未显式覆盖时，单独部署仍可使用 index.html；多租户站点继续走域名/缓存解析。
+        var indexOsClient = getRuntimeWindowValue("OsClient");
+        if (!DiyCommon.IsNull(indexOsClient)) {
+            return indexOsClient;
         }
         if (!DiyCommon.IsNull(localStorage.getItem("Microi.OsClient"))) {
             return localStorage.getItem("Microi.OsClient");

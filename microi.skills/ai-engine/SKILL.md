@@ -7,7 +7,7 @@ description: Microi AI 引擎、模型代理、NL2SQL/NL2V8 与知识库规范�
 
 # Microi AI Engine
 
-平台视频生成的受控 HTTP 入口为 `/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。
+平台视频生成的受控 HTTP 入口为 `/api/Ai/CreateMiniMaxVideo`、`/api/Ai/GetMiniMaxVideoTask`、`/api/Ai/GetMiniMaxVideoFile`、`/api/Ai/PersistMiniMaxVideoFile`；AI 工作流入口统一位于 `/api/AIWorkFlow/*`。调用方只提交业务参数和模型选择，供应商密钥、租户配额、任务归属和文件读取权限由服务端判定。`PersistMiniMaxVideoFile` 只能将当前登录用户所属、且已成功完成的 MiniMax 视频任务文件持久化到当前租户 HDFS；禁止把该入口作为任意 URL 搬运器，任务归属、文件来源和租户边界必须由服务端重新校验。
 
 ## 能力
 

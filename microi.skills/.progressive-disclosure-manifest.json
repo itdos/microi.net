@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T13:32:29.323Z",
+  "generatedAt": "2026-08-13T15:04:59.034Z",
   "policy": {
     "maxEntryLines": 285,
     "referenceBudgetLines": 245,
@@ -169,11 +169,11 @@
       ]
     },
     "microi-client-frontend": {
-      "originalSha256": "44a340c0c57469956b46ce947e91a83f40142022d7a786f73a6fa667024654ab",
-      "originalLines": 609,
-      "prefixSha256": "5decf25a3ed71a6eb78accc950df73a3e3addf0909921f38389d3c526efb8738",
-      "prefixBytes": 720,
-      "entryLines": 186,
+      "originalSha256": "0cd7f005debd9bc307e9a0c4beffcd9368a2b0ee1b2afa7869c749882267cd38",
+      "originalLines": 638,
+      "prefixSha256": "65cd4f270c1895c459014ab1ce7c376f69ec5469fe94ddf0f82827eb8616d579",
+      "prefixBytes": 781,
+      "entryLines": 198,
       "chunks": [
         {
           "id": "microi-client-frontend-000",
@@ -211,8 +211,8 @@
           "id": "microi-client-frontend-004",
           "ordinal": 7,
           "destination": "microi-client-frontend/SKILL.md",
-          "sha256": "79848e844c493736d8f7955fcf6ea2c22bf23a1b4a7bacbdbdcc32a2c5dffefb",
-          "lines": 17,
+          "sha256": "5c5669acf2040f87491abe1f8c85f89e9707a128508ca00f82d8f6a73c3ba7bc",
+          "lines": 29,
           "heading": "7. 验证建议"
         },
         {
@@ -267,8 +267,8 @@
           "id": "microi-client-frontend-011",
           "ordinal": 11,
           "destination": "microi-client-frontend/references/progressive-03-vue3-前端微服务宿主规则.md",
-          "sha256": "cdb6c4e59594572e4c1264856f42f428af215c8515b6ee14d0da4442555cc268",
-          "lines": 82,
+          "sha256": "7f8680e6afd7cae492a0d938e1efc95d0d20b04d0a33b0b956f2d0edb26d25cb",
+          "lines": 99,
           "heading": "Vue3 前端微服务宿主规则"
         },
         {
@@ -1344,11 +1344,11 @@
       ]
     },
     "playwright-e2e": {
-      "originalSha256": "dfedb663bea48a7f16bf0c6ae8448ae6cef1249245cf2867fb9585414ceb9d89",
-      "originalLines": 748,
-      "prefixSha256": "8002a056799f289a3d76ae93418f5aaab4fde77a481b25d948ca70034714b30f",
-      "prefixBytes": 1696,
-      "entryLines": 184,
+      "originalSha256": "ba0d85ed668e479a307f5e7dbd0f040bf8a8bdad2903fafdbabea3c7fea45662",
+      "originalLines": 806,
+      "prefixSha256": "4a1dca656797241fbd27b7b6c8022f01ff40229394928f3418ad0b8263da11f7",
+      "prefixBytes": 1777,
+      "entryLines": 198,
       "chunks": [
         {
           "id": "playwright-e2e-000",
@@ -1394,8 +1394,8 @@
           "id": "playwright-e2e-005",
           "ordinal": 5,
           "destination": "playwright-e2e/SKILL.md",
-          "sha256": "e348db509b586871f19b16b6b49da840c93aa438dd891d827af7107744513e00",
-          "lines": 10,
+          "sha256": "a66696c3263f060d0b7be309a527fca6a9bad95dd534eabbe84f1b6539770d8e",
+          "lines": 24,
           "heading": "本地测试账号自动发现"
         },
         {
@@ -1546,8 +1546,8 @@
           "id": "playwright-e2e-024",
           "ordinal": 24,
           "destination": "playwright-e2e/references/progressive-04-ci-建议.md",
-          "sha256": "01abd9079de1ec60a1de8a441b93e32beccd0666f7fedf359ccbec2e0d40f8e9",
-          "lines": 17,
+          "sha256": "b939c97eef28fab71caa54d134ea524d7ed7c8381deec09e38a7d694b15f53c0",
+          "lines": 61,
           "heading": "常见问题"
         },
         {
@@ -3196,11 +3196,11 @@
       ]
     },
     "workspace-conventions": {
-      "originalSha256": "5e52e816cb38c5f9fee557e28c2bc82dfe851f6d648b934eba4735b218dcc143",
-      "originalLines": 518,
+      "originalSha256": "58812f002d909c3fda3dc6f3b3ba04926da23c09b09fcd15c18f1e8fc401f9a6",
+      "originalLines": 551,
       "prefixSha256": "b58cd0a59d3643525695b94a5941278a5088c33cbe2ce81620359f37db69878e",
       "prefixBytes": 252,
-      "entryLines": 186,
+      "entryLines": 201,
       "chunks": [
         {
           "id": "workspace-conventions-000",
@@ -3278,8 +3278,8 @@
           "id": "workspace-conventions-009",
           "ordinal": 9,
           "destination": "workspace-conventions/SKILL.md",
-          "sha256": "3e9f3fbe30417e8b309ebc5b52544d70390db36b30cebe3e96f1fa5928a9b99a",
-          "lines": 13,
+          "sha256": "dc7dbe2d2f60466a7170fff65a5df8769bc795b4ab23151a24b665380d7c6e37",
+          "lines": 28,
           "heading": "多对话共享工作区变更归属保护（强制）"
         },
         {
@@ -3406,8 +3406,8 @@
           "id": "workspace-conventions-025",
           "ordinal": 25,
           "destination": "workspace-conventions/references/progressive-02-microi-net-api-本地启动约定.md",
-          "sha256": "4b9936ad45a2893f4b9c32f3acd7230e4f57cb4314fd67e16d13ce09f368c003",
-          "lines": 13,
+          "sha256": "07c3d729c8f1e9a2bf93ff00937e5d6eae4602d346e4f9254b03a33211ac4848",
+          "lines": 31,
           "heading": "多 AI 对话共享本地服务与发布互斥（强制）"
         },
         {
