@@ -22,7 +22,7 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
    - 多连接：`profile list|add|remove`
    - 登录：`auth login|status|logout --profile <name>`
    - 诊断：`doctor --json`
-4. 登录会在真实终端中隐式输入密码；不要把密码写入命令、日志、Skill、MCP 参数或工作区文件。Token 继续写入 `Microi-V8-Engine/.microi-mcp-tokens.json`，并按 API、OsClient、Type、Network 四段身份隔离。
+4. 登录会在真实终端中隐式输入密码；不要把密码写入命令、日志、Skill、MCP 参数或任何明文文件。Windows 工作区把自动续登凭据以当前用户 DPAPI 加密后写入 `Microi-V8-Engine/.microi-workspace-secrets.dpapi.json`，MCP 配置只传保险库路径和非敏感 Key 名；Token 继续写入同目录 `.microi-mcp-tokens.json`，并按 API、OsClient、Type、Network 四段身份隔离。两个文件都必须加入本地 Git exclude。
 
 ## 功能路由
 
@@ -40,6 +40,8 @@ Codex Router 启动后会异步调用 bundled CLI 的 `microi update --backgroun
 - CLI、VS Code 插件与 Codex 插件可以在同一工作区并存；三者必须复用同一配置/Token/MCP 协议，带版本写入实行较新 provider 优先，禁止旧入口回写降级。`doctor.coexistence` 未通过时准确报告兼容风险并后台修复，但不得因此停止无关工作。
 - 推送前先做远端差异检查。写请求超时只表示结果不确定，使用对应 get 工具短超时回读，禁止盲目重复创建或覆盖。
 - 配置和 Token 文件使用现有原子写与锁协议；不要手工拼接或清空用户已有 MCP 配置。
+- VS Code/MCP Token 默认访问期为 20 天，租户显式配置仍优先。遇到“Token 签名验证失败”不能误报成到期：MCP 先重载工作区 DPAPI 保险库并对精确 Profile 自动续登，再原子更新 Token 与 MCP；保险库不存在或解密失败时才要求交互登录，且绝不打印帐号密码。
+- 同一 `OsClient` 可以有 Product/Internal、Product/Internet 等运行记录，但 JWT 身份只绑定 `OsClient`，因此所有有效运行记录必须收敛为同一 `AuthSecret`。后端启动在加载 JWT 前执行 CAS 收敛；同版本冲突保留稳定的最早强密钥，只有可信后端写入新的唯一 `AuthSecretRotateVersion` 才表示显式轮换。禁止在后端更新时随机改密钥或按 Network 各自验签。
 - Codex Plugin 路由器只选择连接，业务行为必须继续走原 MCP bundle。
 
 完整 VS Code 命令覆盖关系见插件根目录 `assets/feature-matrix.json`。

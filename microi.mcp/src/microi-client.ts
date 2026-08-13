@@ -15,6 +15,7 @@ import {
 } from './token-utils.js';
 import { assertPayloadSourceIntegrity, assertSourceIntegrity } from './source-integrity.js';
 import { prepareV8VersionedCode } from './v8-version.js';
+import { readWorkspaceCredentials } from './workspace-protected-credentials.js';
 
 /** Microi 后端登录身份失效错误码（与 diy_lang 表中 NoLogin 一致） */
 const AUTH_FAILURE_CODES = new Set([1001, 1002]);
@@ -41,6 +42,10 @@ export interface MicroiConfig {
   tokenFilePath?: string;
   /** MCP 仅写入无密恢复请求；VS Code 扩展使用 SecretStorage 中的凭据完成重登。 */
   authRecoveryRequestDir?: string;
+  /** Windows DPAPI(CurrentUser) 工作区凭据保险库；只传路径和键名，不传明文。 */
+  workspaceCredentialFilePath?: string;
+  workspaceCredentialUsernameKey?: string;
+  workspaceCredentialPasswordKey?: string;
   /** 普通 HTTP 请求超时，默认 120 秒 */
   requestTimeoutMs?: number;
   /** V8 代码、菜单等写请求超时，默认 60 秒 */
@@ -687,6 +692,7 @@ export class MicroiClient {
 
   constructor(config: MicroiConfig) {
     this.config = config;
+    this.reloadWorkspaceCredentials();
     this.rsaPublicKey = config.rsaPublicKey || DEFAULT_LOGIN_RSA_PUBLIC_KEY;
     this.did = resolveMcpDid(process.env.MICROI_MCP_DID, os.hostname());
     this.requestTimeoutMs = resolveTimeoutMs(
@@ -737,6 +743,10 @@ export class MicroiClient {
       return;
     }
 
+    this.reloadWorkspaceCredentials();
+    if (!this.config.username || !this.config.password) {
+      throw new Error('Login credentials are unavailable from environment or workspace protected storage');
+    }
     const encryptedPwd = this.rsaEncrypt(this.config.password);
 
     const loginBody = new URLSearchParams();
@@ -987,7 +997,9 @@ export class MicroiClient {
     // 2. 只有首段恢复才允许主动刷新。刷新签发的 Token 若立即被拒绝，
     // 第二段必须跳过 RefreshToken，否则会在同一枚无效 Token 上循环。
     if (!credentialOnly && await this.refreshTokenNow()) return true;
-    // 3. 独立 MCP 配置的兜底：用账号密码重新登录
+    // 3. 优先重新读取工作区 DPAPI 保险库（密码可能刚由 VS Code/CLI 更新），
+    // 再使用内存凭据重新登录。明文不会进入 MCP 配置或环境变量。
+    this.reloadWorkspaceCredentials();
     if (this.config.username && this.config.password) {
       try {
         this.token = '';
@@ -1004,6 +1016,18 @@ export class MicroiClient {
     }
     // 4. VS Code 托管模式：请求扩展宿主使用 SecretStorage 重登。
     return this.requestVsCodeCredentialRecovery(failedToken);
+  }
+
+  private reloadWorkspaceCredentials(): boolean {
+    const credentials = readWorkspaceCredentials({
+      filePath: this.config.workspaceCredentialFilePath,
+      usernameKey: this.config.workspaceCredentialUsernameKey,
+      passwordKey: this.config.workspaceCredentialPasswordKey,
+    });
+    if (!credentials) { return false; }
+    this.config.username = credentials.username;
+    this.config.password = credentials.password;
+    return true;
   }
 
   /** 通用 POST 请求（自动处理 token 失效：刷新后重试一次） */

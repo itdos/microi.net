@@ -536,7 +536,7 @@ export const V8ApiDefinitions = {
                         kind: "Method",
                         documentation: "创建 MiniMax 异步视频任务。浏览器不接触供应商密钥，返回签名 TaskHandle。",
                         insertText: "CreateMiniMaxVideo",
-                        snippet: 'CreateMiniMaxVideo({ Prompt: "${1:办公室工作场景}", Model: "${2:MiniMax-Hailuo-2.3}", Duration: ${3:6}, Resolution: "${4:1080P}" })'
+                        snippet: 'CreateMiniMaxVideo({ Prompt: "${1:办公室工作场景}", Model: "${2:MiniMax-Hailuo-2.3}", Duration: ${3:6}, Resolution: "${4:768P}" })'
                     },
                     GetMiniMaxVideoTask: {
                         label: "GetMiniMaxVideoTask",
@@ -551,6 +551,20 @@ export const V8ApiDefinitions = {
                         documentation: "使用签名 FileHandle 获取短时有效下载地址。",
                         insertText: "GetMiniMaxVideoFile",
                         snippet: 'GetMiniMaxVideoFile({ FileHandle: "${1:fileHandle}" })'
+                    },
+                    PersistMiniMaxVideoFile: {
+                        label: "PersistMiniMaxVideoFile",
+                        detail: "管理员将 MiniMax 临时视频转存当前租户 HDFS",
+                        kind: "function",
+                        insertText: "PersistMiniMaxVideoFile",
+                        snippet: 'PersistMiniMaxVideoFile({ FileHandle: "${1:fileHandle}" })'
+                    },
+                    GenerateMiniMaxMusic: {
+                        label: "GenerateMiniMaxMusic",
+                        detail: "生成 MiniMax 纯音乐并转存当前租户 HDFS（仅平台管理员）",
+                        kind: "function",
+                        insertText: "GenerateMiniMaxMusic",
+                        snippet: 'GenerateMiniMaxMusic({ RequestId: "${1:music-request-id}", Prompt: "${2:克制的企业科技感纯音乐}", Model: "${3:music-3.0}", IsInstrumental: true, SampleRate: 44100, Bitrate: 256000, Format: "mp3" })'
                     }
                 }
             },

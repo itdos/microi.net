@@ -1,9 +1,9 @@
 /*
  * V8 ApiEngine
  * ApiEngineKey: mci-ai-publish-complete
- * Version: v1.0.0
+ * Version: v1.0.3
  * Function:
- * - 请补充该 V8 代码的完整功能说明。
+ * - 校验租约和栅栏令牌，幂等记录发布终态与非敏感证据，汇总部分失败原因，并仅在确认尚未提交时安排安全重试。
  */
 
 var user = V8.CurrentUser || {};
@@ -54,9 +54,10 @@ var retryable = resultStatus === 'Failed'
   && submissionState === 'NotSubmitted'
   && Number(task.AttemptCount || 0) < Number(task.MaxAttempts || 3);
 var taskStatus = retryable ? 'Retry' : resultStatus;
-var now = System.DateTime.Now;
-var nowText = now.ToString('yyyy-MM-dd HH:mm:ss');
-var nextRetry = retryable ? now.AddMinutes(Math.min(60, Math.max(2, Number(task.AttemptCount || 1) * 5))).ToString('yyyy-MM-dd HH:mm:ss') : null;
+var nowText = DateNow('yyyy-MM-dd HH:mm:ss');
+var nextRetry = retryable
+  ? DateAdd(nowText, 'm', Math.min(60, Math.max(2, Number(task.AttemptCount || 1) * 5)), 'yyyy-MM-dd HH:mm:ss')
+  : null;
 var publicUrl = safeUrl(V8.Param.PublicUrl);
 var remoteTaskId = safeText(V8.Param.RemoteTaskId, 500);
 var errorCode = safeText(V8.Param.ErrorCode, 200);
@@ -112,6 +113,7 @@ var succeeded = 0;
 var unresolved = 0;
 var failed = 0;
 var urls = [];
+var failureSummaries = [];
 for (var i = 0; i < taskList.length; i++) {
   var row = taskList[i] || {};
   var rowStatus = row.Id === taskId ? taskStatus : String(row.Status || '');
@@ -121,17 +123,24 @@ for (var i = 0; i < taskList.length; i++) {
     if (url) urls.push({ Platform: row.Platform, AccountName: row.AccountName, Url: url });
   } else if (['Failed', 'BlockedQuality', 'NeedsReview'].indexOf(rowStatus) >= 0) {
     failed++;
+    var rowError = row.Id === taskId ? errorMessage : safeText(row.LastError, 1000);
+    if (rowError && failureSummaries.length < 20) {
+      failureSummaries.push(safeText(row.Platform, 100) + '：' + rowError);
+    }
   } else {
     unresolved++;
   }
 }
 var contentStatus = unresolved > 0 ? 'Publishing' : (succeeded > 0 ? (failed > 0 ? 'PartiallyPublished' : 'Published') : (failed > 0 ? 'NeedsReview' : 'Ready'));
+var contentError = failureSummaries.join('；');
 V8.FormEngine.UptFormData('mci_ai_content_item', {
   Id: task.ContentId,
   Status: contentStatus,
   PublicUrlsJson: JSON.stringify(urls),
   PublishedTime: unresolved === 0 && succeeded > 0 ? nowText : null,
-  LastError: contentStatus === 'NeedsReview' ? errorMessage : ''
+  LastError: ['PartiallyPublished', 'NeedsReview'].indexOf(contentStatus) >= 0
+    ? safeText(contentError || errorMessage, 2000)
+    : ''
 });
 
 return {

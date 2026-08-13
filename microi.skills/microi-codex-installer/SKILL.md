@@ -136,7 +136,9 @@ npx --yes @microi.net/cli@latest init --workspace <工作区>
 microi init --workspace <工作区> --pull
 ```
 
-`init` 必须能够在干净空目录中依次添加服务器连接、交互登录、生成 `microi.skills/`、`AGENTS.md`、`CLAUDE.md`、Copilot/Cursor/CodeBuddy 规则、CodeBuddy/Qoder/Comate 项目 Skill、typings、`jsconfig.json`，并配置 Codex、VS Code、Cursor、Trae、Claude Code、WorkBuddy、CodeBuddy、Qoder、Comate MCP。密码只允许隐式输入，禁止放入命令参数、对话记录或生成文件。
+`init` 必须能够在干净空目录中依次添加服务器连接、交互登录、生成 `microi.skills/`、`AGENTS.md`、`CLAUDE.md`、Copilot/Cursor/CodeBuddy 规则、CodeBuddy/Qoder/Comate 项目 Skill、typings、`jsconfig.json`，并配置 Codex、VS Code、Cursor、Trae、Claude Code、WorkBuddy、CodeBuddy、Qoder、Comate MCP。密码只允许隐式输入，禁止放入命令参数、对话记录或明文生成文件。Windows 需要静默恢复时，只能写入当前工作区 `Microi-V8-Engine/.microi-workspace-secrets.dpapi.json` 的 DPAPI CurrentUser 密文保险库；MCP 环境只保存该路径和 Key 名，保险库与同目录 Token 文件必须 Git-ignore。
+
+安装/升级后若 `microi doctor` 返回“Token 签名验证失败”，先区分验签密钥变化与 20 天到期。新版 MCP 会从工作区 DPAPI 保险库重载精确 Profile 的帐号密码并自动续登、更新 Token/MCP；不得删除全部 Profile、清空 Token 文件或要求用户反复手工输入。同一 `OsClient` 的多条 SaaS 运行记录必须由后端在 JWT 初始化前收敛到同一个 `AuthSecret`，否则更新后仍会反复失效。
 
 原生配置对应关系：
 
