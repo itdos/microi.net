@@ -329,6 +329,8 @@ export default {
           BaifangDXLX: this.form.targetType,
           BaifangDX: this.form.name.trim(),
           DakaDD: this.location.address,
+          DakaDD_Lng: Number(this.location.longitude),
+          DakaDD_Lat: Number(this.location.latitude),
           Beizhu: this.form.remark.trim(),
           Tupian: uploaded.length ? JSON.stringify(uploaded) : '',
           TenantName: user.TenantName || '',
