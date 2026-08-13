@@ -3,7 +3,7 @@ name: ai-engine
 description: Microi AI 引擎、模型代理、NL2SQL/NL2V8 与知识库规范。用于模型路由、密钥和订阅配额、Schema/Skill 关键词检索与可选向量融合、提示词安全、流式响应、租户隔离和验收。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi AI Engine
 
@@ -57,7 +57,7 @@ AI 业务统一实现在 `Microi.Server/Microi.AI`。`Microi.Server/Microi.net.A
 - MiniMax Token Plan Key 与按量 API Key 是相互独立的凭据，必须复用现有服务器端 Provider/ApiKey 受保护配置，不新增 API `AppSettings`、`MICROI_*` 环境变量或浏览器可见 Key。视频创建、查询和下载仅允许官方 HTTPS Host `api.minimaxi.com`。
 - 视频创建必须要求调用方稳定 `RequestId`，先在当前租户共享 Redis 以 `OsClient + 用户 + RequestId` 原子 `NX` 占位；Redis 不可用时失败关闭。相同 RequestId/参数回放返回原任务，不同参数冲突拒绝；上游 POST 超时或结果不确定时禁止自动换 RequestId 重试。查询不再次扣生成额度。
 - 原始 MiniMax `task_id`/`file_id` 不下发。服务端返回由供应商 Key 签名、绑定当前用户和用途的短句柄；查询/下载验签后才还原。Key 轮换会使旧句柄失效，应先完成或重新登记在途任务。
-- 当前官方模型边界必须实时校准：`MiniMax-Hailuo-2.3` 支持文生/图生，`MiniMax-Hailuo-2.3-Fast` 仅图生且必须有首帧，首尾帧使用 `MiniMax-Hailuo-02`；默认 6 秒 768P，10 秒不允许 1080P。套餐每日条数会变化，禁止在代码中硬编码价格或日额度。
+- 当前官方模型边界必须实时校准：`MiniMax-Hailuo-2.3` 支持文生/图生，`MiniMax-Hailuo-2.3-Fast` 仅图生且必须有首帧，首尾帧使用 `MiniMax-Hailuo-02`。Hailuo 2.3 的清晰优先上限是 6 秒 / 1080P，时长优先上限是 10 秒 / 768P，两者不能同时最大；安全默认值仍可使用 6 秒 / 768P。当前 Token Plan 使用统一用量条、5 小时滚动窗口和周窗口，控制台是剩余额度事实源，不再把固定“每天 N 条”写成官方配额。工作区可按用户明确要求保留 3 条/日等更保守的业务门禁，但领域服务不得硬编码价格或把客户端计数当成供应商权威额度。
 - 使用 Microi.AI 中转站时，租户侧 AI Bootstrap 通过官方 `official_ai_relay_models` 发现可用运行模型。该接口是跨租户只读公共契约，必须保持启用、允许匿名 HTTP 调用，并且只返回模型标识、展示名等公开白名单字段，绝不能返回中转密钥或上游 Endpoint。消费者不得把 `NoAuth` 静默伪装为“没有配置模型”；应返回可诊断错误，同时前端显示明确空态。
 - PC、UniApp 和其它客户端通过 `POST /apiengine/{key}` 发送的 JSON Body 必须完整进入 `V8.Param`；兼容入口 `/api/ApiEngine/Run` 的 JSON Body 还必须包含 `ApiEngineKey`。API 层只负责请求绑定和清除客户端伪造的可信字段，模型选择、权限策略与对话逻辑仍全部位于 `Microi.AI` 或受控 AI 接口引擎中。
 - 当前计量记录除问题摘要外还可能持久化完整 `Question`、`Answer`，部分诊断日志也会输出问题或摘要。处理现有版本时必须把这些字段视为敏感业务数据，限制查询权限和留存；不要声称已经全面脱敏。

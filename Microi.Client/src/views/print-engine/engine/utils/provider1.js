@@ -1,26 +1,27 @@
 import { hiprint } from "vue-plugin-hiprint";
+import { printT } from '../i18n.js'
 export const provider1 = function () {
 
   var addElementTypes = function (context) {
     context.removePrintElementTypes("providerModule1");
     context.addPrintElementTypes("providerModule1", [
-      new hiprint.PrintElementTypeGroup("表格/文本", [
+      new hiprint.PrintElementTypeGroup(printT('表格/文本'), [
 
         {
-          tid: "providerModule1.customText", title: "文本", type: "text", options: {
+          tid: "providerModule1.customText", title: printT('文本'), type: "text", options: {
             field: "",
             testData: "测试文本",
           },
         },
         {
-          tid: "providerModule1.customText1", title: "键值文本", type: "text", options: {
+          tid: "providerModule1.customText1", title: printT('键值文本'), type: "text", options: {
             field: "keytext_01",
             testData: "测试键值文本",
           },
         },
         {
           tid: "providerModule1.longText",
-          title: "长文本",
+          title: printT('长文本'),
           type: "longText",
           options: {
             field: "longText_01",
@@ -30,7 +31,7 @@ export const provider1 = function () {
         },
         {
           tid: "providerModule1.html",
-          title: "静态表格",
+          title: printT('静态表格'),
           type: "html",
           options: {
             width: 500,
@@ -94,12 +95,12 @@ export const provider1 = function () {
         },
         {
           tid: "providerModule1.table", //元素类型的标识
-          title: "表格", //用户托拽列表中显示的名称
+          title: printT('表格'), //用户托拽列表中显示的名称
           type: "table",
           columns: [
             [
-              { title: "列名1", align: "center", field: "col1" },
-              { title: "列名2", align: "center", field: "col2" },
+              { title: printT('列名1'), align: "center", field: "col1" },
+              { title: printT('列名2'), align: "center", field: "col2" },
             ],
           ],
           options: {
@@ -110,12 +111,12 @@ export const provider1 = function () {
 
         {
           tid: "providerModule1.image", //元素类型的标识
-          title: "图片",
+          title: printT('图片'),
           // field: "image", //打印元素类型所对应的数据Josn的Key
           data: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==", //打印设置时，显示的默认值
           type: "image",
           options: {
-            title: "图片", //标题或内容，field 存在：title为标题，打印结果为 title:data , field 不存在：title为内容，打印结果为 title
+            title: printT('图片'), //标题或内容，field 存在：title为标题，打印结果为 title:data , field 不存在：title为内容，打印结果为 title
             field: "image_01",//字段名称
             src: "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==", //field不存在的情况下，显示src的内容
             transform: 0,//旋转角度
@@ -130,7 +131,7 @@ export const provider1 = function () {
 
         {
           tid: "providerModule1.barcode",
-          title: "条形码",
+          title: printT('条形码'),
           data: "XS888888888",
           type: "text",
           options: {
@@ -145,7 +146,7 @@ export const provider1 = function () {
         },
         {
           tid: "providerModule1.qrcode",
-          title: "二维码",
+          title: printT('二维码'),
           data: "XS888888888",
           type: "text",
           options: {
@@ -163,32 +164,32 @@ export const provider1 = function () {
 
 
       ]),
-      new hiprint.PrintElementTypeGroup("辅助/图形", [
+      new hiprint.PrintElementTypeGroup(printT('辅助/图形'), [
         {
           tid: "providerModule1.hline",
-          title: "横线",
+          title: printT('横线'),
           type: "hline",
         },
         {
           tid: "providerModule1.vline",
-          title: "竖线",
+          title: printT('竖线'),
           type: "vline",
         },
         {
           tid: "providerModule1.rect",
-          title: "矩形",
+          title: printT('矩形'),
           type: "rect",
         },
         {
           tid: "providerModule1.oval",
-          title: "椭圆",
+          title: printT('椭圆'),
           type: "oval",
         },
       ]),
-      new hiprint.PrintElementTypeGroup("高级", [
+      new hiprint.PrintElementTypeGroup(printT('高级'), [
         {
           tid: "providerModule1.emptyTable",
-          title: "空白表格",
+          title: printT('空白表格'),
           type: "table",
           columns: [
             [
@@ -213,14 +214,14 @@ export const provider1 = function () {
         },
         {
           tid: "providerModule1.customText",
-          title: "自定义文本",
+          title: printT('自定义文本'),
           customText: "自定义文本",
           custom: true,
           type: "text",
         },
         {
           tid: "providerModule1.barcodeSvg",
-          title: "条形码SVG",
+          title: printT('条形码SVG'),
           type: "barcode",
           options: {
             field: "barcodeSvg_01",
@@ -231,7 +232,7 @@ export const provider1 = function () {
         },
         {
           tid: "providerModule1.qrcodeSvg",
-          title: "二维码SVG",
+          title: printT('二维码SVG'),
           type: "qrcode",
           options: {
             field: "qrcodeSvg_01",

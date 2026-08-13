@@ -2,7 +2,7 @@
   <div class="diytable-widget" :class="{ 'is-design-mode': isDesignMode }" :style="{ width: '100%', height: autoHeight }">
     <div v-if="!tableId" class="widget-placeholder">
       <el-icon :size="32"><Grid /></el-icon>
-      <span>DIY表格 - 请配置模块ID</span>
+      <span>{{ $pet('DIY表格 - 请配置模块ID') }}</span>
     </div>
     <component
       v-else

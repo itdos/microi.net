@@ -428,6 +428,9 @@ export default {
                     // 补充加载SearchFieldIds引用但DiyFieldList中缺失的表字段
                     await self.EnsureSearchFieldsLoaded();
 
+                    // 本地缓存同步应用后立即加载列表；服务端偏好异步回读，避免阻塞主列表首帧。
+                    self.LoadUserTableColumnPreference();
+
                     //2022-05-14 新增：全部After处理好了再获取数据
                     var isInit = param && param.IsInit ? true : false;
                     self.GetDiyTableRow({ _PageIndex: 1, IsInit: isInit });

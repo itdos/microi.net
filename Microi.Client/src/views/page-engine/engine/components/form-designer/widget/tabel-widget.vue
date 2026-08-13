@@ -64,16 +64,16 @@
         size="small"
         unlink-panels
         type="daterange"
-        range-separator="至"
-        start-placeholder="开始日期"
-        end-placeholder="结束日期"
+        :range-separator="$pet('至')"
+        :start-placeholder="$pet('开始日期')"
+        :end-placeholder="$pet('结束日期')"
         format="YYYY-MM-DD"
         value-format="YYYY-MM-DD"
         :teleported="false"
         @change="handleDateRangeChange"
       />
       <el-button :icon="Refresh" size="small" @click="resetSearch">
-        重置
+        {{ $pet('重置') }}
       </el-button>
       <el-button
         :icon="Search"

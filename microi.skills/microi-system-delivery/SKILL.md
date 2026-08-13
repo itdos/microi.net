@@ -3,12 +3,14 @@ name: microi-system-delivery
 description: Microi 吾码从自然语言交付完整系统的总控规范。用于通过 MCP、VS Code 插件、V8 引擎、低代码元数据、UniApp/H5、PC 后台和 Playwright E2E 设计、生成、升级、测试、同步或交付完整 Microi 系统。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi 全系统交付复盘与总控规范
 
 本 Skill 来自一次完整业务系统交付复盘。目标是让下一套 OA、ERP、MES、CRM、商城、预约、互联网项目等 Microi 系统少走返工路：先固定事实源，再用 MCP 正确建模，最后用可视化和业务闭环测试证明可交付。
 
+<!-- microi-progressive:begin -->
+<!-- microi-progressive:chunk id=microi-system-delivery-000 sha256=b09c3f2d05e2927322de0c42913f85813296e9001bccf31b6dc85779cbe3099f -->
 ## 交付总原则
 
 1. **先事实源，后建模**：先读需求文档、截图、现有蓝图、数据库结构和菜单结构，形成业务蓝图；不要边猜边建表、边猜边写接口。
@@ -20,6 +22,8 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 7. **默认按分布式交付**：任何后端能力都假设会有至少两个节点连接同一数据库和 Redis，并经历滚动升级、重复投递与节点硬重启。定时任务/消费者使用分布式租约且业务本身幂等；会话、票据和任务状态使用共享存储；新旧版本并存时采用“先扩展、后迁移、再收缩”。只在单节点验证通过不能视为完整交付。
 8. **业务逻辑默认接口引擎、元数据升级默认应用商城**：先用低代码 CRUD/事件，再用接口引擎；只缺底层原子能力时先扩展 V8，只有协议/鉴权/密钥隔离/运行时内核才进入 C#。表、字段、Tab、菜单、权限、引擎、页面和任务等可打包资源不得新增 `Microi.Upgrade` 定制类；官方开发者通过 `microi_itdos` 发布官方应用后再由目标租户 MCP 更新，无官方权限时只升级自己的租户。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-system-delivery-001 sha256=174d99145946baf94a5eee934fc1453921fa7eed544b853f86be515582dc1343 -->
 ## 用户问题编号跟踪（强制）
 
 用户一次提出多个问题时，必须先拆成 `1、2、3、4...` 的问题清单，并在交付过程中保持同一编号，不得合并吞掉或用笼统“已优化”代替。
@@ -34,186 +38,8 @@ description: Microi 吾码从自然语言交付完整系统的总控规范。用
 
 最终回复必须按原始编号逐项汇总：哪些已实现、哪些未实现、是否通过全自动化测试、是否通过截图验证。不能只给总括性“都完成了”。如果某项没有测试或没有截图，必须明说“未覆盖/未截图”，并说明原因。
 
-## 标准工作流
-
-### 1. 需求蓝图阶段
-
-- 读取全部需求文件、截图、历史说明、客户反馈和已交付文档。
-- 用 `business-blueprint` 或同等文档固定：角色、菜单、状态机、关键表、接口引擎、按钮、任务调度、业务时间窗口、费率和权限边界。
-- 用户新增或纠正规则后，立即同步到蓝图/方案文档，避免后续实现忘记业务口径。
-- 生成系统前，用 MCP 读取现有 `diy_table`、`diy_field`、`sys_menu`、`sys_apiengine`，不要重复造表或编造字段。
-
-### 2. MCP 建模阶段
-
-- 开始任何 MCP 盘点前先调用 `microi_get_status` 验证当前连接、API Server
-  与 `OsClient`，再读取结构；“配置文件里有 MCP”不能证明当前真实可用。
-- 创建复杂系统优先使用 Manifest：表、字段、菜单、按钮、接口引擎、权限、页面、打印、工作流、任务统一规划。
-- 先 dry-run：`microi_plan_system` / `microi_generate_system dryRun:true`。
-- 用户确认后真实写入，并立即 `microi_validate_system`。
-- 所有写操作前必须确认 MCP 绑定的 API Server、OsClient 和用户指定租户一致；多个 MCP 同时存在时，读写不能跨服务器混用。
-- 对资金/资产类生产数据执行清理、重算、修复、补发、扣减前，必须留下可审计痕迹：中文备注 SQL、维护接口说明、执行时间、影响行数、回读验证结果。能用小范围条件时不要全表更新。
-- 写入菜单时，业务按钮一次性配齐 `MoreBtns`、`FormBtns`、`PageBtns`、`BatchSelectMoreBtns`、`PageTabs`，按钮前端只负责交互，后端逻辑放接口引擎。
-- 写入后台菜单时必须至少规划两级菜单树：先创建业务域父菜单，再把 CRUD、报表、日志、设置模块挂到对应父菜单。不要把客户、设备、工单、报告、日志、配置等所有模块直接创建为一级菜单。Manifest dry-run 和最终交付说明都必须列出菜单树。
-- 新建前端 MicroService 时，必须先 `microi_list_applications` 盘点，再用 `microi_scaffold_vue_microservice` 在当前租户 `AI应用/{appKey}` 做预演和确认创建；构建后依次同步私有源码、发布公有产物、回读页面 Id。每个菜单通过 `microi_create_module` 一次绑定 `MicroServiceId/MicroServicePageId/MicroServiceRoutePath/MicroServiceKey`，写后用 `microi_get_module` 回读，不得把普通 URL 菜单的创建成功误报成微服务菜单已交付。
-- 完整系统 Manifest 中的 MicroService 菜单使用 `microServiceKey + microServiceRoutePath` 作为跨租户可移植引用；`microi_generate_system` 必须在任何写入前回读并解析当前租户的服务/页面 Id。直接调用 `microi_create_module` 时仍须一次提供全部四个绑定字段。
-- Windows 上脚手架从临时目录原子改名时，杀毒软件或索引器可能短暂返回 `EPERM/EACCES/EBUSY`；MCP 应做有上限的短重试并保持原子改名，重试仍失败才清理临时目录并报错，禁止改成逐文件覆盖目标目录。
-- 编译产物优先调用 `microi_publish_application_directory_stream`。流式端点失败时必须检查 `uploadedCount/retrySafe`：只有 `uploadedCount=0` 且 `retrySafe=true`、并且产物较小时，才可临时回退 `microi_publish_microservice`；已上传部分文件时先按版本和哈希回读，禁止无判断重复发布。回退与远端版本缺口必须写进交付结论。
-- `microi_get_application_context` 返回文件清单不等于源码可读；必须检查 `ContentsComplete/ContentErrorCount` 以及逐文件 `ContentReadError`。MinIO 服务端读取私有源码应走内网端点，不能因公网代理拒绝私有桶而把 `IncludedContents=true` 误判为完整上下文。
-- 用户明确要求通过 MCP 修正当前后台菜单时，不能只更新 Skill 或文档后停下。必须回读 `sys_menu`，创建缺失的父级 `SecondMenu`，更新现有子菜单 `ParentId` / `Sort`，给管理员角色补父菜单权限，最后再次回读验证树结构。
-- 表单布局默认遵守平台约定，例如 PC 双列；字段显示顺序要跟业务表单顺序一致。
-- 平台通用功能除了改源码，还必须同步到官方主租户 `iTdos` 的应用商城母版并回读验证；项目专属视图、字段和业务动作只写目标租户，不能混入官方母版。
-
-### 2.1 物理字段与跨端视图
-
-- `diy_table.DiyConfig`、`diy_field.DiyConfig`、`sys_menu.DiyConfig` 均为废弃兼容字段。MCP、Manifest、应用包和手工更新都不得向其中写入新配置。
-- 新配置必须先增加业务语义清晰的物理字段，再通过 `diy_field` 元数据暴露控件；不得把多个无关能力重新塞进一个通用 JSON 口袋字段。
-- Detail/Edit/List/Card 统一视图属于模块场景，使用 `sys_menu.EnableViewSchema`、`ViewSchemaVersion`、`ViewConfigVersion`、`ViewSchema`。
-- `ViewSchema` 可按 PC/Mobile/All 和 RoleIds 选择视图；禁用、缺失、损坏或客户端不支持时必须回退到现有模块/表单。
-- EntityHero、MetricStrip、ActionGrid、ResponsiveSection 是独立视图区块，不是 `diy_field` 数据字段，也不能用 DevComponent 或虚拟字段模拟。
-- 小程序仅执行白名单 ActionSchema 和声明式显隐/参数映射，不执行任意前端 V8。复杂业务动作调用接口引擎，重要校验进入后端表单事件。
-
-绑定 `diyTableId` 创建 CRUD 菜单时，必须配置或允许 MCP/后端自动推断 `TableDiyFieldIds`、`SelectFields`、`SearchFieldIds`、`SortFieldIds`、`NotShowFields`、`StatisticsFields`、`MobileListFields`、`CardTitleTagFields`、`CardBottomTagFields`、`DefaultOrderBy`。列表列、搜索列、移动端卡片列不能为空白；`Id/XxxId/XxxIds`、系统字段、布局控件和富文本/上传/地图/子表等重字段默认不展示在列表。
-
-搜索字段默认覆盖名称/标题/编号、状态/类型/分类、负责人/部门/客户、日期时间；金额、价格、数量、积分、余额、人数等数值字段默认进入 `StatisticsFields`。选择类、开关、部门、树、级联、地址等字段应尽量使用等值筛选。
-
-每个可见业务模块还必须通过视觉交付门禁：逐字段设置合理列表宽度；每个模块都有紧凑
-标题、业务副标题和 2~4 个真实动态指标；只给少量重要菜单设置行动型侧栏角标；为状态
-PageTabs 和有决策价值的更多按钮设置批量统计角标；PC 至少一个合理宽度且去重普通列的
-复合主列；移动端按图片/标题/副标题/顶部/状态/右侧金额/正文/Meta/底部规划动态区域。
-自动生成只是最低兜底，AI 必须按业务表、状态机和数据口径精调。禁止用随机数、固定演示数
-或无来源值装饰指标；当前页求和必须明确标注“本页”。`EnableViewSchema` 只控制
-Detail/Edit 自定义表单，不能用它关闭 List/Card 展示设计。
-
-字段较多的表单必须做视觉分组，但**优先用 `CollapseGroup` 折叠分组**，**只有大业务域（≥8 字段）才用 Tabs**。详细决策表、Config JSON 示例、字段数阈值和回读验收必须先读 `microi-form-layout/SKILL.md`，再按以下快速决策表执行：
-
-| 字段总数 | 业务域拆分 | 推荐方案 |
-|---------|----------|---------|
-| ≤ 12 | — | **不分组**，全部平铺第一屏 |
-| 13 ~ 30 | 不可拆 | `CollapseGroup` 把次要业务域收起 |
-| 13 ~ 30 | 可拆且每个域 ≥ 8 | `diy_table.Tabs`（表级 Tab） |
-| 13 ~ 30 | 域大小混合（大域 ≥ 8 + 小域 ≤ 7） | `diy_table.Tabs` + Tab 内嵌套 `CollapseGroup` |
-| > 30 | 多域 | `diy_table.Tabs`（3~5 个 Tab，每个 Tab 6~12 字段），必要时嵌套 `CollapseGroup` |
-
-**强制禁止**：
-
-- ❌ **禁止**为 ≤7 字段的业务域单独建 Tab（必须改用 `CollapseGroup`，否则用户必须点击 Tab 才能看到 3~5 个字段，违反"首屏信息密度"原则）。
-- ❌ **禁止**为 13~30 字段的表把所有字段平铺（必须用 Tab 或 CollapseGroup 分组）。
-- ❌ **禁止**在用户没有要求时使用 `Component='Tabs'` 字段级控件（更优先用 `diy_table.Tabs` 表级 Tab）。
-- ❌ **禁止**让 CollapseGroup 依赖空 `FormWidth`；CollapseGroup 默认必须显式保存 `FormWidth=24`，并默认设置 `Config.CollapseGroup.ShowFieldCount=true`。Tabs / Divider / Alert 按各自运行时规范处理。
-- ❌ **禁止**只创建 Tab 不写字段的 `Tab` 归属（每个 Tab 必须有至少 1 个非空 `Tab` 的字段）。
-
-典型反例：`yutaoliaojieguo` 表 13 字段有"MRP 运算"3 字段 Tab — 这是错误的，应该用 `CollapseGroup` 把 MRP 3 字段收起（默认展开），让用户第一屏看到基础信息 + MRP 字段而不是必须点击 Tab 切换。详见 `microi-form-layout/SKILL.md` 的"反例参考"章节。
-
-表单控件选择必须参考 `Microi.Client/src/views/form-engine/diy-field-component/diy-component-list.json`，包括文本、数字、日期、选择、树、部门、地址、关联表单、弹窗选表、子表、上传、富文本、代码、地图、二维码、布局控件等；普通字段不手动设置 `FormWidth`，整行控件才设 `24`。CollapseGroup 必须显式设 `24`，并默认开启 `ShowFieldCount`。
-
-### 3. 主子表与关联表单设计
-
-先判定关系基数，再生成字段：
-
-- “子表、明细、清单、条目、行项目、多个记录”默认是主表 1:N 子表，使用
-  `TableChild`。创建独立子表，在子表放真实父级外键，建立 `(OsClient, ParentId)`
-  回查索引，并创建 `Display=0`、`AppDisplay=0`、`HasChild=0` 的子表菜单。
-- `JoinForm` 只用于主表保存一个目标 Id、并嵌入一条独立目标记录完整表单的 N:1/1:1
-  场景；目标表不能是当前表。需要列表、多行增删改或可能有多条记录时禁止使用。
-- `TableChild` 的 `TableChildTableId`、`TableChildSysMenuId`、`TableChildFkFieldName`
-  必须引用回读后的真实资源。完整系统 Manifest 使用
-  `relation:{cardinality:"1:N",targetTable,childForeignKey,childModule}`，生成器按“全部表与
-  普通字段 → 隐藏子表菜单 → 关系字段”分阶段解析当前租户 Id；禁止猜 Id，禁止退化成
-  `JoinForm`。
-- 基数不清楚时必须在远端写入前询问用户。调用 `microi_plan_system` / `dryRun` 前先做
-  关系语义审查。MCP 会硬性拒绝“1:N + JoinForm”、自关联 JoinForm、缺主/子外键、缺
-  `Display=0/AppDisplay=0/HasChild=0` 隐藏子菜单或缺 `(OsClient, FK)` 回查索引；AI
-  不得改用直接单字段工具绕过。
-- 复用已有子表时，优先复用源 `TableChild` 已验证、当前用户有权限的子表菜单；只有不存在
-  可复用菜单时才新建隐藏菜单。设计器显示但运行表单不显示时，必须先检查主表 `InFormV8`
-  是否通过 `V8.FieldSet`/`hideField` 把目标 TableChild 设为不可见。
-
-`JoinForm` 的可移植 Manifest 只写名称，不写租户 Id：
-
-```json
-{
-  "name": "CustomerProfile",
-  "label": "客户资料",
-  "component": "JoinForm",
-  "relation": {
-    "cardinality": "N:1",
-    "targetTable": "Biz_Customer",
-    "joinFieldName": "CustomerId"
-  }
-}
-```
-
-`JoinForm` / `OpenTable` 等单记录关联仍需兼顾可读字段，不能只生成一个裸 `XxxId`。
-
-推荐模式：
-
-- `XxxId`：隐藏字段，保存真实 Id。
-- `XxxName`：可见 Select/OpenTable/JoinForm，显示业务名称。
-- 数据源：优先 SQL 或接口引擎，`SelectLabel` 为名称，`SelectSaveField` 按业务需要保存名称或 Id。
-- 值变更事件：选择名称时同步写入隐藏 Id，或选择 Id 时同步名称，保持列表和详情可读。
-- 下拉远程搜索无数据时必须结束 loading，显示空状态，不能一直“加载中”。
-
-### 3.1 业务枚举字段一致性
-
-业务枚举或专区、等级、状态、类型字段不能只改前端映射，也不能只改接口引擎逻辑。低代码后台的 `diy_field.Data` / `diy_field.Config` 是 PC 管理端录入数据的事实源之一，必须同步维护。
-
-- 改枚举前先用 MCP 读取目标 `diy_field`，确认 `Component`、`DataSource`、`SelectSaveField` 和现有选项。
-- KeyValue 组件必须让后台选项、接口引擎判断值、前端展示/筛选值保持同一套 Key。后台存了旧 Key 时，移动端会查不到或显示不出来。
-- 修改字段属性优先使用 `microi_get_field_list` / `microi_update_field` / `microi_refresh_schema_cache`，MCP 缺能力时先补 MCP 或平台通用 API。
-- 完成后必须回读 `diy_field.Data` / `diy_field.Config`，并用 Playwright 或接口测试覆盖后台录入值在前端列表、详情、筛选中的显示。
-
-### 4. 示例数据与资源导入
-
-- 每个核心表至少准备 5-10 条可重复测试数据，且能清理重建。
-- 业务图片、头像、海报、二维码、商品图、公告图必须通过平台 HDFS/API 或数据库字段进入系统，不要用 `picsum.photos`、`qrserver.com`、`placeholder.com` 等第三方占位服务。
-- 图片字段既要验数据库值，也要验前端真实加载。
-- 需要二维码时优先用平台接口，例如 `/api/Os/CreateQRCodeImage` 或租户接口引擎生成 HDFS 图片。
-
-### 5. V8 接口引擎与事件
-
-- 接口引擎代码必须格式化、语义版本可追踪、可回读。
-- 保存后必须走 HTTP 稳定路径 `/apiengine/{ApiEngineKey}` 并通过 `osclient` Header 传租户做 smoke test；只用内部 run 通过不够。普通 POST/PUT/PATCH/DELETE 禁止追加 `--OsClient--...--`；只有调用方无法设置 Header/Query 的第三方回调才使用 `--OsClient--{OsClient}--`，可使用 Query 时固定为 `?OsClient=`。
-- 返回必须是标准 DosResult，除明确文件/HTML场景外，不允许返回字符串 `null`、空响应、非 JSON。
-- 业务异常必须给用户可理解的 `Msg`，不能吞异常或只 `catch(e){}`。
-- 定时任务、超时取消、VIP 过期、自动拒绝、库存释放等跨时间逻辑，必须建 Job 或可被 Job 调用的接口引擎。
-- 交易、库存、积分、余额、审批状态流转必须做后端幂等和权限校验。
-
-### 6. VS Code 插件同步纪律
-
-VS Code 插件必须让用户清楚知道本地和远端是否一致。
-
-- 每次准备推送接口引擎、表单/字段 V8、模块按钮或流程节点 V8 前，必须先运行当前服务器及对应引擎分类的同步状态检测。直接“推送当前文件”也必须自动预检；远端较新、双方冲突、没有同步基线或预检失败时一律停止覆盖。
-- 同步状态接口若超时、限流、返回 `Code != 1` 或数据不完整，必须按“检查失败”停止拉取和推送；禁止将缺失的远端结果解释成“服务器无修改”。命令行可用 `npm run sync:status -- --os-client <tenant> --scope <api|form|module|workflow> --conflict-dir <dir>` 保存冲突双方供 AI 合并；确认本地修改与冲突均为 0 后，可用 `--pull --confirm <tenant>` 复用插件拉取链路，禁止绕开预检。
-- 单文件推送预检只查询目标文件对应的接口、表、模块或流程节点，不得为推送一个文件扫描整个分类；全量同步状态使用低并发、短间隔批次，避免多人并行开发时触发服务器安全限流。
-- AI 只修改少量 V8 文件时，收尾优先逐个执行 `sync:status -- --file <path>`；只有需要做服务器基线盘点或多人交接时才运行全量状态检查。
-- 同步状态要显示本地修改数、远端较新数、服务器已删除数、冲突数，以及接口引擎、表单/字段 V8、模块按钮、流程节点的分类数量。
-- 已成功推送到数据库的文件不能继续显示为已修改。
-- Web 端改过远端代码时，插件要支持检测冲突、查看 diff、手动选择本地/远端/合并。
-- Token 过期时优先自动 refresh token；不要频繁让用户重新登录。
-- ApiEngine 本地文件推送到 `sys_apiengine.ApiV8Code` 必须是明文代码。历史 Base64 旧数据可以读取时兼容解码，但新保存不得写 Base64。
-- ApiEngineKey、ApiAddress、Id 用于缓存或匹配时统一大小写策略，避免大小写导致重复或缓存 miss。
-- 生成 MCP Server 后，插件应自动启动或提示一键启动，不要让用户每次手工右键启动。
-- “查看同步状态”必须能从数量下钻到具体资源。若提示本地未推送，必须列出接口引擎/表单V8事件/字段V8事件/模块按钮/流程节点V8的 Key、名称、文件路径、本地修改时间和同步基准时间，不能只弹出总数。
-- 插件判断本地修改时，若远端代码和本地代码内容一致，应自动对齐 `.microi-meta.json` 与文件 `mtime`；表单事件等 Key 匹配要大小写兼容，避免真实无差异却长期提示“本地未推送”。
-- AI 交付前要使用插件口径或完全等价的插件状态复核；最终说明中必须写明本地未推送、远端差异、冲突是否为 0。
-- 多人并行开发时按状态处理：`localModified` 才允许推送；`remoteModified` 先拉取；`remoteDeleted` 表示服务器已删除且本地未改，全量拉取必须先备份再清理；服务器已删除但本地也修改时按 `conflict` 处理；`conflict` 必须比较基线、本地和远端后人工合并。正文一致仅时间戳不同则自动校准 meta/mtime。处理后再次检测，不能以“已点击同步”代替结果回读。
-- AI 使用 MCP、接口引擎 API 或手写脚本直接写远端 V8 后，必须立刻把远端当前生效代码回读到本地 V8 文件，并同步更新 `.microi-meta.json` 的 `updateTime/filePath` 与文件 `mtime`。只推远端、不校准本地时间戳，会被插件判定为“本地未推送”，属于未完成交付。
-- 同步检查不能只看总数。若数量不为 0，必须按“正文一致仅 meta/mtime 不一致 / 远端较新需拉回 / 本地较新需推送 / 冲突需人工合并”分类列出具体文件，并在处理后再次复核到 0 或说明原因。
-- 生产环境资金、积分、资产、订单相关 V8 代码不得为了清空同步状态而盲目覆盖远端。远端 `UpdateTime` 晚于本地基线且正文不同，默认先拉远端或做人工合并；只有确认本地是未推送修复时才推送。
-
-### 7. MCP 能力优先级
-
-遇到平台元数据批量修复、示例数据、接口格式化、表单布局、外键 Select、页面按钮、权限、任务调度、工作流、打印、数据源等需求，优先级如下：
-
-1. 已有 MCP 工具直接完成。
-2. MCP 缺工具但后端有 API：补 MCP 封装。
-3. 后端也缺通用 API：补 `V8EngineController` 或对应平台控制器的通用能力，再补 MCP。
-4. 只有租户私有业务逻辑才新建接口引擎。
-
-交付包含 DIY 表时，验收固定审计物理列与 `diy_field` 元数据一致；发现 `Id/CreateTime/UpdateTime/UserId/UserName/IsDeleted` 被列为异常字段时，调用通用修复接口或 MCP `microi_repair_audit_fields` 幂等修复并回读。交付用户个性化首页时，同时验收 Token 绑定保存、站内路由规范化、权限失效回退，以及账号密码、Token 与 SSO 三种登录入口的一致性。
-
-不要用租户接口引擎修平台设计器、全局上传限制、VS Code 插件同步、MCP 元数据写入等平台级问题。
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-system-delivery-002 sha256=aa3d244481565608bc92f7c389f8647e8cd551d241aabad9a9d876f1d15aab52 -->
 ## 平台安全与存量兼容验收（强制）
 
 AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉及 FormEngine、菜单、角色、子表、文件、SaaS 或登录协议的交付，都必须按以下服务端边界设计和验收：
@@ -265,127 +91,8 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 8. 历史 RSA fallback 和专属匹配密钥均可登录；并发续签不反复退出。
 9. SaaS 脱敏投影不包含基础设施密钥，Redis anonymous/temporary/非管理员管理失败。
 
-## 自动化测试必须覆盖的坑
-
-### 后端统一测试与发布门禁
-
-- 吾码后端统一测试入口是 `Microi.Server/Microi.Tests/Microi.Tests.csproj`，
-  不得重新创建 `Dos.Common.Tests`、`Dos.ORM.Tests` 等分散入口。
-- 日常源码验证运行
-  `Microi.Server/Microi.Tests/run-tests.ps1 -Mode Quick`。Quick 只做
-  单元/组件回归，不连接远端、不写数据库，不能称为“全量生产验收”。
-- 发布 API 前运行 `-Mode Full`。默认提供隔离测试租户、专用测试表、
-  测试 ApiEngine、测试 Token，并显式设置
-  `MICROI_TEST_ALLOW_WRITES=YES`。只有用户明确授权时才可对真实租户执行；
-  真实租户默认只做登录和只读烟测，写入必须限定到名称/说明明确为自动化
-  测试用途的专用表，并使用唯一前缀、`finally` 清理和清理回读。
-- Full 至少覆盖完整 Release 构建、FormEngine 单条/批量/按条件 CRUD、
-  查询和计数、ApiEngine GET/JSON POST、API 实际启动与健康检查、真实登录、
-  匿名系统配置脱敏、清理回读、NuGet 漏洞/弃用审计。NuGet 全面升级后不能
-  只看编译；必须捕获程序集 ABI 不一致、旧连接串枚举值失效等启动/运行时问题。
-  新增后端公共操作时，同步扩展统一测试入口和 FullStack 闭环。
-- 真实账号、密码和 Token 只能来自进程环境变量、CI Secret 或已被 Git 忽略
-  的本机配置；不得写入 `Microi.Tests`、README、命令行参数、TRX、覆盖率报告
-  或失败消息。测试输出还要验证私有 `appsettings.*.json` 未被复制发布。
-- 交付报告必须分别写明：源码检查、项目/解决方案构建、Quick 结果、
-  FullStack 结果、两节点分布式故障结果。未提供测试环境而未运行 Full，
-  必须明确写“未运行”，不能用 Quick 通过代替。
-- 即使 Full 通过，涉及定时任务、消息消费、共享缓存、迁移或滚动发布时，
-  仍需两个节点连接同一 Redis/数据库，覆盖重复投递、锁持有者退出、
-  Redis/MongoDB 短暂故障、响应前重启和新旧版本共存。
-
-### 登录与账号密码
-
-- E2E 必须支持提前录入测试账号密码：`PW_TEST_ACCOUNT`、`PW_TEST_PASSWORD`、`PW_LOGIN_ENGINE`。
-- 登录优先调用租户登录接口拿 Token，再注入 localStorage/sessionStorage/Cookie。
-- 仍需保留 UI 登录兜底，验证真实表单可用。
-- 注册成功后应按业务要求自动登录时，必须测试 token 和用户信息已写入本地存储。
-- 移动端可支持历史登录账号列表、记住密码、删除本地历史账号，但测试报告不能泄露密码。
-
-### 截图与人眼复核
-
-每次完整自动化测试都必须截图，不只失败截图。
-
-强制截图页面：
-
-- 首页/工作台
-- 登录/注册
-- 核心列表页
-- 核心详情页
-- 提交/支付/审批/确认页面
-- 我的/个人中心
-- PC 管理端关键菜单
-- H5 在 PC 宽屏下的移动端模拟壳
-
-每张截图要人工 `view_image` 复核：图片是否真实显示、文字是否看得清、底部菜单是否可见、是否横向溢出、按钮是否被遮挡、状态徽章是否正确。
-
-### 网络与接口契约
-
-- 拦截全部请求，404、5xx、CORS/ORB、图片加载失败、字符串 `null`、空响应、非 JSON 全部失败。
-- 页面出现“请求失败”“网络错误”“开发中”“待开发”“null”等文案，默认失败。
-- 扫描源码禁止残留 `开发中|待开发`。
-- 所有 `callEngine('xxx')` 必须有接口契约测试覆盖：HTTP ok、标准 DosResult、必要字段非空。
-
-### 真实业务闭环
-
-不能只测页面能打开。至少选择一条客户验收主线跑通：
-
-1. 准备测试数据。
-2. 登录。
-3. 执行真实用户动作。
-4. 等待对应接口响应。
-5. 后端查询状态变化。
-6. 前端刷新后状态正确。
-7. 清理测试数据。
-
-交易/资产类系统要覆盖：创建资源、上架/提交、支付/上传凭证、审核/确认、状态流转、超时取消、再次流转、记录明细。
-
-### 低代码详情页与字段按钮
-
-低代码后台模块验收不能只停留在列表页。涉及 `diy_table.Tabs`、字段 `Tab`、`TableChild`、字段级 `Button`、字段 V8Code、菜单按钮 V8Code 的模块，E2E 必须打开至少一条真实详情，逐个切换表单 Tab，并点击详情内字段按钮或关联子表开关。
-
-- 校验每个可见 Tab 都有可见字段或可见子表内容，不能只检查 `Tabs` JSON 合法。
-- 校验字段按钮 V8Code 中引用的字段名真实存在，尤其是历史 `TableChildxxx`、`Textxxx`、`Buttonxxx` 重命名后不能遗留旧引用。
-- 字段按钮点击后必须守卫前端错误提示、`pageerror`、控制台 `TypeError/ReferenceError/SyntaxError`，并截图保留展开后的关联子表。
-- 详情页测试选择器要限定在当前表格操作列和当前详情弹层内部，避免误点侧边菜单或其它同名按钮。
-- `TableChild` 验收必须在父记录 A 新增/编辑/删除多条子记录，再打开父记录 B 验证
-  不串数据且不能跨父记录操作；同时回读子表外键、隐藏子菜单和组合索引。
-- `JoinForm` 验收必须确认目标表与当前表不同，`JoinFieldName` 的值确实是目标记录 Id，
-  并分别覆盖空 Id 与有效 Id 的渲染行为。
-
-### 视觉与布局
-
-- 必须检查横向滚动条。
-- 必须检查底部 tabBar / 侧边菜单 / 顶部导航是否可见。
-- 必须检查文字对比度，尤其是筛选条件、小标签、退出登录、状态文字、渐变背景上的小字。
-- 金额、数量、积分等大数字必须格式化为万、百万、千万、亿等可读形式，不能撑破卡片。
-- 移动端 H5 在 PC 浏览器必须自动模拟移动端宽度。
-
-### 资源与隐私文件
-
-- 公开图片走 FileServer/CDN。
-- 私有图片必须先调用签名 URL，如 `/api/HDFS/GetPrivateFileUrl`。
-- 上传接口必须通用，不能在平台 HDFS 控制器写某项目“只允许支付凭证或实名认证图片”这类硬编码。
-- iOS Safari 上传后要验证表单字段不丢失，上传组件不能重置整张表单。
-
-### 商品资料同步
-
-- 从本地商品资料目录同步到低代码表时，不要只靠标题模糊匹配目录或复用最近一条记录；必须使用显式映射、唯一编码或人工确认后的目录清单。
-- 同步前先回读目标表枚举字段、价格字段、主图字段、详情富文本字段和状态字段，确认写入值与平台字段 KeyValue 一致。
-- 图片上传遇到 5xx、网关超时或 OSS/HDFS 临时失败必须重试，最终回读 `MainImg`、详情富文本、价格比例、专区/分类、上下架状态，不能只看接口返回成功。
-- 缺少主图素材的商品不能默认上架；要补齐素材后再上架，或明确下架，避免移动端出现“商品图”等占位图。
-- 商品同步后必须用真实前端列表和详情页截图复核：列表主图真实显示，详情富文本可见，价格比例正确，页面没有横向溢出或占位图。
-
-### 交易资产与奖励流水
-
-- 业务编号、卡号、券码、提货码等展示给用户的短码必须以方案文档/字段说明为准；不要用手机号、日期、ULID 或长前缀自行拼接。若文档要求短随机码，写入主表后必须同步所有历史/订单/奖励等冗余编号字段。
-- 奖励记录和真实资产流水要分层：`reward_log` / `commission_log` 可以记录待结算权益，`point_log` / `balance_log` 只能记录已真实影响余额的流水。
-- 若业务存在“待入账/已入账”，待入账记录不得写资产流水，不得增加余额；从待入账转已入账时必须同时更新状态、写资产流水、更新余额，并保证幂等，避免重复入账。
-- 分佣/返点必须只有一个触发点。若规则定义为“扣服务费时结算”，确认收款、订单完成、后台修复脚本都不得再重复生成同类奖励。
-- 层级奖励要先写清楚接收人选择规则：直推、间推、团队/品牌补贴类奖励是否逐层发、是否只给最近达标人、团队人数是否含自己、单笔是否封顶。实现后用至少一条真实链路验证 Pending 和 Settled 两种状态。
-- 团队/分润人数统计必须明确资格口径，例如是否只统计已认证、已激活、有效状态用户。若业务规则要求认证门槛，未认证小号不得计入直推、间推、团队总人数、奖励门槛或入账门槛。
-- 每次修复资金/资产业务规则后，必须同步更新项目蓝图/方案文档中的触发点、计算公式、字段口径和验收方式，不能只改代码或只在对话里说明。
-
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-system-delivery-003 sha256=479ccdb65450c7741b052a30d8e4a11917bc19d80bf9b4ac89ea00092b4aaa73 -->
 ## 前端交付检查清单
 
 - 底部 tabBar 图标不 404。
@@ -398,6 +105,8 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 - 消息/待办/约单/审核类提醒必须有未读角标，已读后消失。
 - 订单状态角标只给需要处理的状态，不给“全部/已完成/已取消”等静态分类堆数字。
 
+<!-- /microi-progressive:chunk -->
+<!-- microi-progressive:chunk id=microi-system-delivery-004 sha256=08ccc8091df4d3933a208d9a7ad054ada9e7f245818bf8f8c96b3e1e44857b66 -->
 ## 交付完成定义
 
 一次 Microi 全系统交付只有同时满足以下条件才算完成：
@@ -411,84 +120,11 @@ AI 零代码交付不能只验证管理员帐号和页面能打开。任何涉�
 7. Playwright 账号登录、接口契约、网络守卫、业务闭环、截图复核均通过。
 8. 生成或修改的通用经验已写回 microi.skills，且不能包含项目专属措辞；不能只写本地 memory、聊天记录或项目临时文档。
 
-## 复盘记录格式
+<!-- /microi-progressive:chunk -->
+## 详细参考路由（渐进披露）
 
-每次用户手工测出问题，修复后都要把问题写入对应通用 Skill，格式如下：
+仅在当前任务涉及对应主题时读取；下列文件合计保留了原 SKILL.md 的全部详细知识。
 
-```md
-### 复盘：问题标题
-
-- 触发场景：用户如何发现。
-- 根因：平台/MCP/插件/前端/业务哪个环节漏了。
-- 通用规则：以后所有项目都要怎样避免。
-- 自动化检查：哪个测试或截图能提前发现。
-```
-
-不要只在本次项目文档或记忆里记录；能通用的经验必须沉淀到 `microi.skills`。如果发现的是 VS Code 插件、MCP、Microi.Client、V8、FormEngine、Playwright 或性能测试的通用坑，必须更新对应 Skill 或新增 Skill，让插件下一次打包后能同步给所有用户。
-
-### 复盘：授权文件已生效但插件仍缓存开源版
-
-- 触发场景：授权管理接口已经返回个人版或企业版，相关插件仍提示开源版；重启服务后也可能因授权文件挂载、写入或数据库恢复晚于插件首次检查而复现。
-- 根因：宿主授权接口与功能插件各自持有静态授权状态或各自重新验签；当插件来自旧 NuGet、独立程序集上下文或残留发布文件时，两边即使读取同一文件也可能长期分叉。让插件“自行再验一次”仍然保留了两套事实源，不能根治。
-- 通用规则：宿主必须提供唯一的 DI 授权服务，负责缓存刷新、HID、有效期和 RSA 签名验证；所有 Controller、AI、工作流等付费功能只读取这个实例，插件禁止自行缓存或再次创建 `LicenseValidator`。授权验证接口必须返回功能实际读取的 `OnlineFeatureLicensed/ProductType` 与宿主、插件程序集版本。核心插件接口应包含授权状态契约，使旧插件混入新发布包时直接启动/类型加载失败并暴露版本不一致，禁止静默退回开源版。
-- 自动化检查：先以无授权状态启动，再写入或挂载有效签名文件，验证统一服务限频刷新后授权接口与真实付费功能同时恢复；替换为旧插件 DLL 时启动必须失败或健康检查明确报版本不兼容，不能出现“Verify=Enterprise、功能=OpenSource”。无效签名、错误 HID、过期文件必须继续拒绝。
-
-### 复盘：全局版本已升级但基础应用并未完整安装
-
-- 触发场景：客户旧库的 `ServerVersion` 已被后续步骤推进，但应用商城、导入器、菜单权限或关键元数据仍缺失；客户服务器不通外网时，重启也无法自愈。
-- 根因：升级器把全局版本号当成所有步骤成功的证明，单步失败后仍继续执行并更新版本；基础应用只依赖在线资源，且完整性检查继续走可能已经失真的 FormEngine 元数据。
-- 通用规则：后端发布包必须内置可启动的基础应用基线，在线资源只能整组校验成功后作为最新版覆盖，断网或任一资源失败时整组回退；迁移步骤必须失败即停且失败时禁止推进版本。导入器、必要表、菜单和权限等启动前置能力要独立做幂等完整性检查，老库检查以参数化物理表只读查询为准，不能只依赖全局版本或低代码元数据。
-- 自动化检查：选择一个版本号偏高但故意缺基础应用的旧库，以禁止外网模式启动，验证后端自动安装基础应用、管理员可见并打开应用商城、插件列表接口可拉取；再次冷启动不得重复导入。再注入任一步骤失败，验证后续步骤不执行且 `ServerVersion` 不前进。
-
-流式应用发布等当前运行时入口若会直接查询新增物理字段，其扩展型结构不能只挂在
-`ServerVersion` 条件升级链里。必须在后台启动服务的共享分布式升级租约内、入口接流量前
-独立幂等维护，并在版本链之前回读验证；历史版本号漂移或更早无关迁移失败时也要自愈。
-自动化至少构造“版本号已高但发布字段缺失”的旧库并并发启动两个节点，断言只扩展一次、
-没有永久锁，随后流式发布预检和首个文件写入不再出现缺列错误。
-
-### 复盘：平台升级覆盖客户菜单的移动端显隐
-
-- 触发场景：旧租户切换到新版后端并执行自动升级后，移动端工作台整棵菜单消失；顶级 `sys_menu.AppDisplay` 为 `NULL` 或被升级包写成 `0` 时，所有下级菜单即使为 `1` 也无法展示。
-- 根因：旧 `UptSysMenu` 部分更新接口读取旧菜单后又丢弃旧实体，重新创建非空 `int` 字段默认为 `0` 的 `SysMenu` 再全字段更新；仅修改排序或父级也会把未传的 `Display/AppDisplay` 清零。历史加列迁移的不可重入多语句 SQL、应用包全量覆盖目标菜单，以及移动端把 `NULL/未配置` 当作隐藏，都会进一步放大影响。
-- 通用规则：实体型部分更新必须把非空参数合并到已读取的旧实体，禁止新建实体后全字段更新；新增菜单的 `Display/AppDisplay` 默认均为 `1`。移动端只有明确的 `0/false` 才表示隐藏，`NULL/未配置` 按兼容可见处理；升级开始前先把 `NULL` 按同一行 `Display` 归一，再快照所有既有菜单的 `AppDisplay`，升级结束无论成功失败都要恢复发生变化的旧菜单。应用包只能给新增菜单写包内显隐值，更新既有菜单时必须保留目标库 `Display/AppDisplay`。加列迁移必须按“查列、单条加列、单条回填”幂等执行。
-- 自动化检查：先用只含 `Id/Sort/ParentId` 的旧菜单更新请求验证 `Display/AppDisplay` 不变，并验证新增菜单默认双端可见。再构造含 `AppDisplay=NULL/0/1`、顶级和子级菜单的旧库，运行升级并验证空值按 `Display` 归一、既有 `0/1` 原样保留、新增包菜单采用包内值；升级中途失败时快照仍恢复。应用包导入测试必须断言存在 `preserve_existing_menu_visibility_` 保护标记，移动端测试必须覆盖 `undefined/null/0/"0"/false/1` 六种输入。
-
-### 复盘：Compose 升级脚本按目录推导 project 后误判旧容器不存在
-
-- 触发场景：客户历史服务由另一个工作目录或显式 project name 启动；升级脚本虽然拿到现存 `docker-compose.yml`，但执行 `docker compose -p <目录名> ps -q <服务>` 返回空，随后误报旧容器不存在。继续用错误 project 启动还会与旧容器的宿主机端口冲突。
-- 根因：把 Compose 文件路径或当前目录推导出的 project name 当成运行态事实源，没有从现有容器的 `com.docker.compose.project` 标签回读真实 project，也没有用宿主机 published port 和 service 标签交叉定位旧容器。
-- 通用规则：生产 Compose 升级先按目标 published port、当前 project、`com.docker.compose.service` 三层发现唯一运行容器，并校验服务标签或镜像身份；再读取并复用其 `com.docker.compose.project`。完成原 yml 和旧镜像不可变备份、拉取并校验新镜像后，先检查所有新增服务的宿主机发布端口；端口可顺延时必须设置明确起点、步长和有限重试上限，把最终端口写入实际 Compose 与审计记录，确认可用后才停止旧容器。启动瞬间再次发生端口竞争时，只重试冲突服务；非端口错误立即回滚。再由同一 project 执行 `up --force-recreate`，且不在新镜像就绪和端口预检通过前删除旧容器。后续手工拉取 `latest` 做日常更新时，必须把当前编排、实际 project、发布端口以及 API/前端两个运行镜像 ID 同时备份并打不可变回滚标签；失败时回到本次更新前的两个镜像，禁止误用首次跨版本升级的旧基线。Compose v2 的 `version is obsolete` 只可在命令成功时作为已知非致命告警过滤，其它 stderr 和非零退出码必须保留。
-- 自动化检查：模拟当前 project 查询为空、目标宿主机端口仍有旧 API、容器标签带另一个 project 的场景；断言脚本识别旧容器、保存并复用真实 project、在覆盖 yml 前完成备份、拉取校验后执行 stop，并覆盖新增端口连续占用时按上限顺延、重试耗尽时旧服务不停止，以及新服务启动失败后的自动还原。日常更新另测 API/前端双镜像拉取、当前动态端口保持、强制重建成功，以及任一重建/健康检查失败后两个镜像都恢复到本次更新前的 ID。
-
-### 复盘：新旧 Compose 双版本并行部署误伤旧服务或产生重叠网络
-
-- 通用规则：需要保留旧版本并并行安装新版本时，新版必须使用独立 Compose 文件、独立 project 和独立 service 名；旧编排与旧容器在安装路径中只读。新版若必须保持原内网通信，应从旧容器回读并校验实际 Docker 网络，再通过 `external` 网络引用其真实名称，禁止由第二个 project 重复声明同一 IPAM 子网。动态端口必须写回 API 自身公开地址及前端 `ApiBase`；先启动并确认 API，再启动前端。失败清理只能 `down` 新 project，完成后还要回读旧端口对应的容器 ID 和运行状态，确认未被替换。并行项目后续更新必须使用另一份专用命令，固定读取新版 Compose/project/service，保留现场动态端口，备份新版 API/前端两个运行镜像 ID 并打不可变标签；先更新 API、再更新前端，任一步失败时只恢复新版双镜像，禁止复用会读取旧编排的历史日常更新脚本。进程、端口和 project 隔离不代表数据隔离；若新旧后端共用数据库、Redis 或租户，新版迁移、缓存与基础数据变化仍可能影响旧版，交付时必须明确警告并准备数据库级恢复方案。
-- 自动化检查：模拟新版起始端口连续占用、新版 API 启动失败和前端健康检查失败；断言旧 yml 字节不变、旧容器未执行 stop/rm/recreate、新版使用独立 project、实际 API 端口同时写入 `AuthServer` 与 `ApiBase`、新版 API 先于前端启动，失败时只清理新 project，并保存端口、网络、镜像 ID 和失败日志。并行日常更新另测动态端口不变、API/前端按序重建、任一服务失败后两个镜像都恢复到本次更新前的 ID，且旧端口容器 ID 始终不变。
-
-### 复盘：容器已删除但残留 Compose 文件阻止安全重装
-
-- 触发场景：用户删除某个独立 Compose project 的全部容器后重新执行一键安装，脚本只因目标 yml 仍存在就报错退出；用户不得不手工删除文件，且容易误删其它编排。
-- 根因：安装保护只检查文件存在性，没有区分“仍有运行/停止容器的活跃环境”“容器已清空但本交付 yml 残留”和“身份不明的其它 yml”。
-- 通用规则：可重装脚本应先用 `docker ps -a` 按 project 标签检查全部运行及停止容器；只要存在任何容器就拒绝覆盖。容器为零但目标 yml 存在时，必须确认它是普通文件，校验预期 service、镜像和 `docker compose config`，保存 SHA-256 并归档原文件后才允许重新生成；身份不符、符号链接或语法错误一律停止。不得直接 `rm -f` 未确认身份的生产 yml。
-- 自动化检查：先安装并留下有效 yml，再模拟容器全部被删除，断言重复安装会归档旧 yml、保存哈希、重新选端口并保持旧项目不变；再模拟仍有停止容器，断言安装拒绝继续且原 yml 字节不变。
-
-### 复盘：现场 Compose 文件名或 project 漂移导致专用更新脚本误报不存在
-
-- 触发场景：运维人员手工调整端口、外网 API 地址或重启脚本后，Compose 文件出现历史拼写变体，或容器被目录默认 project 启动；更新脚本仍硬编码标准文件名和初始 project，先报编排不存在，修正文件名后又可能报找不到容器。
-- 根因：把首次安装时的文件名和 project 当成长期不变事实，没有从当前磁盘与运行容器标签回读现场状态。
-- 通用规则：更新脚本应优先采用显式参数；未显式指定时可兼容已知历史文件名，但两个候选同时存在必须停止，禁止猜测。Compose 文件负责配置事实，运行容器的 `com.docker.compose.project` 与 `com.docker.compose.service` 标签负责运行态事实；应先按 service 标签唯一定位运行容器，再分别回读真实 project，并用各自 project 执行 `compose ps/port/up`。若 API 与前端历史上分属不同 project，更新和回滚可在服务身份唯一、project 合法且未显式限定 project 的前提下分别原地执行，禁止通过删除、迁移或改名强行合并拓扑。更新只拉镜像与重建，不得为了适配现场漂移而重新生成或覆盖端口、AuthServer、ApiBase 和网络配置。
-- 自动化检查：覆盖仅标准文件、仅历史拼写文件、两个文件并存、运行 project 使用安装默认值、运行 project 使用目录默认值、API/前端 project 不一致六类场景；断言兼容分支保留现场 yml 字节和动态端口，分别记录 API/前端 project，并在跨 project 成功与失败回滚路径中都使用各自 project；文件歧义及显式 project 不匹配仍应失败关闭。
-
-### 复盘：一键安装脚本仍直接拉取海外镜像或工具二进制
-
-- 触发场景：国内服务器能够拉取平台自有镜像，但 Docker Hub、GitHub、`dl.min.io` 等海外源超时；某个可选服务镜像或安装后的初始化工具下载失败，导致整套一键安装中途退出。
-- 根因：只迁移了 Redis、MySQL 等主要服务镜像，没有把 Compose 中的全部 `image:`、变量镜像和 `curl/wget` 二进制依赖纳入同一份交付清单；辅助 CLI 仍被当作临时下载项，且本机单架构 `docker pull/tag/push` 被误认为已完整复制上游多架构镜像。
-- 通用规则：发布一键安装脚本前必须盘点全部容器镜像和运行期下载 URL。海外服务镜像与辅助 CLI 优先按上游固定版本完整复制到平台国内仓库，脚本引用固定版本标签；适合容器化的 CLI 用短生命周期工具容器执行，并把临时配置目录及时清理。迁移时先核对上游 manifest digest 和平台列表，再保留所有受支持架构及 attestation，禁止用仅 `linux/amd64` 的本地推送冒充多架构镜像。
-- 自动化检查：静态扫描安装脚本，断言业务 `image:` 不再引用未批准的海外仓库、关键初始化不再依赖海外二进制直链；对国内固定标签执行远端 manifest 回读和真实 `docker pull`，核对 digest、平台和容器内版本；运行完整 `bash -n`，并用隔离临时服务跑通辅助 CLI 的连接、写入和回读闭环，最后确认测试容器、网络、卷均已清理。
-
-### 复盘：程序能启动但 Obfuscar 找不到共享框架程序集
-
-- 触发场景：框架依赖型 `dotnet publish` 的程序冒烟启动正常，但 Obfuscar 处理某个插件 DLL 时报告 `Unable to resolve dependency: Microsoft.Extensions.*`；此前同一脚本可用，插件新增 `BackgroundService`、Hosted Service 或其它共享框架类型后开始失败。
-- 根因：ASP.NET Core 运行时从 `Microsoft.AspNetCore.App` / `Microsoft.NETCore.App` 共享框架加载程序集，这些 DLL 默认不复制到 framework-dependent 的发布目录；Obfuscar 是离线元数据处理器，只搜索 `InPath` 时无法解析新增基类。同时，插件直接使用的 NuGet API 若只由其它项目传递带入，项目依赖契约也不完整。
-- 通用规则：项目直接使用的包必须在自身 `.csproj` 声明直接 `PackageReference`，但不能把“补 NuGet 引用”误当作 Obfuscar 搜索路径修复。混淆脚本应从发布目录的 `runtimeconfig.json` 读取目标 .NET 主版本，再从 `dotnet --list-runtimes` 动态选择同主版本的最新 `Microsoft.AspNetCore.App` 和 `Microsoft.NETCore.App` 目录，生成绝对路径 `AssemblySearchPath`；禁止硬编码补丁版本，也不要为了混淆把共享框架 DLL 强行复制进最终发布目录。错误提示应保留 Obfuscar 的真实依赖解析错误，不能统一误报“工具未安装”。
-- 自动化检查：使用实际 Git Bash 执行脚本语法检查；定向构建插件并检查 nupkg 明确包含直接依赖；对全部受保护 DLL 执行混淆并验证哈希变化；最后必须启动混淆后的发布目录，断言插件注入、平台初始化和 Kestrel 监听成功，且日志不存在 `FileNotFoundException`、`TypeLoadException`、`Unable to resolve dependency` 或 `Could not load file or assembly`。
+- [references/progressive-01-标准工作流.md](references/progressive-01-标准工作流.md)：标准工作流
+- [references/progressive-02-自动化测试必须覆盖的坑.md](references/progressive-02-自动化测试必须覆盖的坑.md)：自动化测试必须覆盖的坑；复盘记录格式
+<!-- microi-progressive:end -->

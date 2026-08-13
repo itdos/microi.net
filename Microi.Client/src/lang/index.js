@@ -11,6 +11,7 @@ import elementZhTwLocale from "element-plus/dist/locale/zh-tw.mjs";
 import enLocale from "./en";
 import zhLocale from "./zh";
 import zhTwLocale from "./zh-tw";
+import { platformUiMessages } from "./platform-ui";
 
 /**
  * 支持的语言列表。label 固定显示中文，避免在系统设置里看不懂目标语言。
@@ -46,13 +47,13 @@ export const SUPPORTED_LOCALES = [
 export const DEFAULT_SYS_LOCALES = ["zh-CN", "zh-TW", "en"];
 
 const messages = {
-    "zh-CN": { ...zhLocale, ...elementZhLocale },
-    "zh-TW": { ...zhTwLocale, ...elementZhTwLocale },
-    en: { ...enLocale, ...elementEnLocale }
+    "zh-CN": { ...zhLocale, ...elementZhLocale, Msg: { ...(zhLocale.Msg || {}), ...platformUiMessages["zh-CN"].Msg } },
+    "zh-TW": { ...zhTwLocale, ...elementZhTwLocale, Msg: { ...(zhTwLocale.Msg || {}), ...platformUiMessages["zh-TW"].Msg } },
+    en: { ...enLocale, ...elementEnLocale, Msg: { ...(enLocale.Msg || {}), ...platformUiMessages.en.Msg } }
 };
 
 function createFallbackLocaleMessage() {
-    return { ...enLocale, ...elementEnLocale };
+    return messages.en;
 }
 
 /**
@@ -201,6 +202,26 @@ export function getElementLocale(locale) {
     const n = normalizeLocale(locale) || "zh-CN";
     const found = SUPPORTED_LOCALES.find((l) => l.value === n);
     return (found && found.element) || elementEnLocale;
+}
+
+/**
+ * Translate a persisted Page/Print built-in label without changing the stored
+ * JSON value. Unknown values are treated as tenant-authored content and remain
+ * untouched.
+ */
+export function translateEngineLiteral(namespace, value) {
+    const source = String(value ?? "");
+    if (!source) return source;
+    const configured = typeof i18n.global.locale === "string"
+        ? i18n.global.locale
+        : i18n.global.locale?.value;
+    const locale = normalizeLocale(configured) || "zh-CN";
+    for (const candidate of [locale, "en", "zh-CN"]) {
+        const localeMessage = i18n.global.getLocaleMessage(candidate);
+        const translated = localeMessage?.Msg?.[namespace]?.literal?.[source];
+        if (translated) return translated;
+    }
+    return source;
 }
 
 const initLocale = getLanguage();

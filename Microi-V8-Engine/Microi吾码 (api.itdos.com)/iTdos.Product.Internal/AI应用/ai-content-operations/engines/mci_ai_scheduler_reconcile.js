@@ -3,7 +3,7 @@
  * ApiEngineKey: mci-ai-scheduler-reconcile
  * Version: v1.0.3
  * Function:
- * - 管理员幂等校准 AI 内容发布的 08:30 与 16:30 Quartz 任务，并在触发器已存在时修复 diy_schedule_job 元数据状态。
+ * - 管理员幂等校准 AI 内容发布的 08:30、16:30 与 MiniMax 音乐持久 Worker，并在触发器已存在时修复 diy_schedule_job 元数据状态。
  */
 
 function isAdmin() {
@@ -29,6 +29,7 @@ var definitions = [
     CronDesc: '每天08:30 Asia/Shanghai',
     CronExpression: '0 30 8 * * ?',
     TimeZoneId: 'Asia/Shanghai',
+    ApiEngineKey: 'mci-ai-content-dispatch',
     JobParam: JSON.stringify({ PlanKey: 'microi-ai-content-default', Slot: 'am', Timezone: 'Asia/Shanghai' })
   },
   {
@@ -37,7 +38,17 @@ var definitions = [
     CronDesc: '每天16:30 Asia/Shanghai',
     CronExpression: '0 30 16 * * ?',
     TimeZoneId: 'Asia/Shanghai',
+    ApiEngineKey: 'mci-ai-content-dispatch',
     JobParam: JSON.stringify({ PlanKey: 'microi-ai-content-default', Slot: 'pm', Timezone: 'Asia/Shanghai' })
+  },
+  {
+    JobName: 'MciAiMusicWorker',
+    JobDesc: '每分钟认领一个待生成的MiniMax纯音乐资产',
+    CronDesc: '每分钟 Asia/Shanghai',
+    CronExpression: '0 0/1 * * * ?',
+    TimeZoneId: 'Asia/Shanghai',
+    ApiEngineKey: 'mci-ai-music-generate',
+    JobParam: JSON.stringify({ JobName: 'MciAiMusicWorker' })
   }
 ];
 var results = [];
@@ -55,7 +66,7 @@ for (var i = 0; i < definitions.length; i++) {
       CronExpression: item.CronExpression,
       TimeZoneId: item.TimeZoneId,
       JobType: '1',
-      ApiEngineKey: 'mci-ai-content-dispatch',
+      ApiEngineKey: item.ApiEngineKey,
       JobParam: item.JobParam,
       DllName: '',
       JobPath: ''
@@ -79,7 +90,7 @@ for (var i = 0; i < definitions.length; i++) {
       CronDesc: item.CronDesc,
       CronExpression: item.CronExpression,
       JobType: '1',
-      ApiEngineKey: 'mci-ai-content-dispatch',
+      ApiEngineKey: item.ApiEngineKey,
       JobParam: item.JobParam,
       DllName: '',
       JobPath: '',
@@ -100,7 +111,7 @@ for (var i = 0; i < definitions.length; i++) {
     CronDesc: item.CronDesc,
     CronExpression: item.CronExpression,
     JobType: '1',
-    ApiEngineKey: 'mci-ai-content-dispatch',
+    ApiEngineKey: item.ApiEngineKey,
     JobParam: item.JobParam,
     DllName: '',
     JobPath: '',
@@ -117,4 +128,4 @@ for (var i = 0; i < definitions.length; i++) {
   if (!existing || existing.Code !== 1 || !existing.Data) return { Code: 0, Msg: '调度元数据写入后回读失败：' + item.JobName };
   results.push({ JobName: item.JobName, Id: existing.Data.Id, Replayed: false, QuartzCreated: runtimeResult.Code === 1 });
 }
-return { Code: 1, Data: { Jobs: results }, Msg: '08:30 与 16:30 的 Quartz 任务及数据库元数据已完成幂等校准。' };
+return { Code: 1, Data: { Jobs: results }, Msg: '08:30、16:30 与 MiniMax 音乐 Worker 的 Quartz 任务及数据库元数据已完成幂等校准。' };

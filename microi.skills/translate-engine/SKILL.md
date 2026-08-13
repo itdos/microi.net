@@ -3,7 +3,7 @@ name: translate-engine
 description: Microi 翻译引擎与多语言词条规范。用于 V8.TranslateEngine 文本/批量/HTML/检测/语言列表/文件/建议/健康能力、HTTP 与 MCP 翻译调用、GetLang 词条、供应商配置、租户隔离、缓存和验收。
 ---
 
-> **Codex 强制前置：** 当前宿主为 Codex 时，在使用本 Skill 前必须先完整读取 `../microi-codex-installer/SKILL.md`，完成“Codex 每任务最新版硬门禁”；门禁未通过不得继续本 Skill。非 Codex 宿主跳过此项。
+> **Codex 非阻塞自动更新：** 当前宿主为 Codex 时，吾码 CLI、Codex 插件与工作区 AI/MCP 由后台自动更新；需要诊断时读取 `../microi-codex-installer/SKILL.md`。更新失败、等待空闲或尚未重载均不得阻断当前、正在进行或新建任务。非 Codex 宿主跳过此项。
 
 # Microi TranslateEngine
 

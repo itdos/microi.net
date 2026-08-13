@@ -186,9 +186,10 @@ export default defineConfig({
                     if (normalizedId.includes('monaco-editor')) return 'monaco'
                     if (normalizedId.includes('echarts') || normalizedId.includes('zrender')) return 'echarts'
                     if (normalizedId.includes('@visactor')) return 'vchart'
+                    if (normalizedId.includes('naive-ui')) return 'go-view-ui'
                     if (normalizedId.includes('three')) return 'three'
                     if (normalizedId.includes('fullcalendar') || normalizedId.includes('@fullcalendar')) return 'fullcalendar'
-                    if (normalizedId.includes('@wangeditor') || normalizedId.includes('@codemirror') || normalizedId.includes('codemirror')) return 'editors'
+                    if (normalizedId.includes('@wangeditor')) return 'editors'
                     // Element Plus 依赖 lodash-unified；lodash 不再强制拆成 utils，
                     // 交由 Rollup 自动放置，避免 legacy SystemJS 循环分片。
                     if (normalizedId.includes('element-plus')) return 'element-plus'
